@@ -1,0 +1,56 @@
+# ==============================================================================
+# FIX TURAS.R - Add local = FALSE to all source() calls
+# ==============================================================================
+
+turas_path <- "~/Documents/Turas/turas.R"
+
+# Read the file
+content <- readLines(turas_path, warn = FALSE)
+
+cat("Original file has", length(content), "lines\n\n")
+
+# Find all lines with source() calls
+source_lines <- grep("source\\(", content)
+cat("Found source() calls at lines:", paste(source_lines, collapse = ", "), "\n\n")
+
+# Show what we're changing
+cat("Lines to modify:\n")
+cat("================\n")
+for (line_num in source_lines) {
+  cat(sprintf("Line %3d: %s\n", line_num, content[line_num]))
+}
+
+cat("\n\nModifying lines...\n")
+
+# Fix each source() call
+for (line_num in source_lines) {
+  old_line <- content[line_num]
+  
+  # Check if it already has local parameter
+  if (grepl("local\\s*=", old_line)) {
+    cat(sprintf("Line %3d: Already has 'local' parameter, skipping\n", line_num))
+    next
+  }
+  
+  # Replace source(path) with source(path, local = FALSE)
+  # Handle both source("path") and source(variable)
+  new_line <- gsub('source\\(([^)]+)\\)', 'source(\\1, local = FALSE)', old_line)
+  
+  if (new_line != old_line) {
+    content[line_num] <- new_line
+    cat(sprintf("Line %3d: ✓ Modified\n", line_num))
+    cat(sprintf("  OLD: %s\n", old_line))
+    cat(sprintf("  NEW: %s\n", new_line))
+  } else {
+    cat(sprintf("Line %3d: ✗ Could not modify\n", line_num))
+  }
+}
+
+# Write back
+writeLines(content, turas_path)
+
+cat("\n✓ File updated successfully!\n")
+cat("\nNow run:\n")
+cat("  rm(list = ls())\n")
+cat("  source('~/Documents/Turas/turas.R')\n")
+cat("  exists('log_message')\n")

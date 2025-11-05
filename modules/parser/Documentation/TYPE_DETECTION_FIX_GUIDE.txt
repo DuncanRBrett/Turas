@@ -1,0 +1,145 @@
+# TYPE DETECTION BUG FIX
+
+## The Problem
+
+The parser was incorrectly detecting question types:
+- Q10 with **[ ] brackets** (should be Multi_Mention) → detected as Single_Response
+- Q6 with **( ) parentheses** (should be Single_Response) → detected as Multi_Mention
+
+## Root Cause
+
+The `type_detector.R` was checking format hints (brackets vs parentheses) **LAST**, after text pattern matching. This meant if the question text contained certain keywords, it would override the format hint.
+
+**Example of broken logic flow:**
+1. Check text for "job title" → might trigger wrong type
+2. Check option count → might guess wrong
+3. Finally check format hint [ ] vs ( ) → TOO LATE!
+
+## The Fix
+
+The format hint should be checked **FIRST** since it's the most reliable indicator:
+
+**New logic flow:**
+1. ✓ Check format hint [ ] vs ( ) → MOST RELIABLE
+2. Check for specific numeric patterns (0-10, 1-10)
+3. Check text patterns (NPS, ranking, etc.)
+4. Fall back to option count
+
+## What Changed in the Code
+
+### OLD CODE (BROKEN):
+```r
+detect_question_type <- function(text, option_count, options = NULL, format_hint = NA) {
+  # Check text patterns first...
+  if (grepl("select.*all", text_lower)) return("Multi_Mention")
+  if (grepl("rate|rating", text_lower)) return("Rating")
+  # ... many more text checks ...
+  
+  # Format hint checked LAST (too late!)
+  return(detect_type_by_options(option_count, text_lower, format_hint))
+}
+```
+
+### NEW CODE (FIXED):
+```r
+detect_question_type <- function(text, option_count, options = NULL, format_hint = NA) {
+  # CHECK FORMAT HINT FIRST!
+  if (!is.na(format_hint)) {
+    if (format_hint == "brackets") return("Multi_Mention")
+    if (format_hint == "parentheses") return("Single_Response")
+  }
+  
+  # Then check everything else...
+  # (numeric patterns, text patterns, option count)
+}
+```
+
+## How to Install the Fix
+
+**Step 1:** Navigate to your Turas directory
+```bash
+cd /Users/duncan/Documents/Turas/modules/parser/lib
+```
+
+**Step 2:** Backup the old file
+```bash
+cp type_detector.R type_detector.R.backup
+```
+
+**Step 3:** Replace with fixed version
+- Copy the new `type_detector.R` file to this location
+
+**Step 4:** Test it
+```r
+setwd("/Users/duncan/Documents/Turas")
+source("modules/parser/run_parser.R")
+run_parser()
+```
+
+## Testing
+
+Upload a questionnaire with:
+1. A question using **[ ] brackets** → Should be Multi_Mention
+2. A question using **( ) parentheses** → Should be Single_Response
+
+Check the console output - you should see:
+```
+[Format hint: brackets] → Multi_Mention
+[Format hint: parentheses] → Single_Response
+```
+
+## What You'll See in the Console
+
+The fixed version prints debug messages:
+```
+Step 5: Post-processing...
+Question Q10: 7 options, format: brackets
+    [Format hint: brackets] → Multi_Mention
+Question Q6: 11 options, format: parentheses
+    [Format hint: parentheses] → Single_Response
+```
+
+## Verification Checklist
+
+After installing the fix, verify:
+
+✓ Q10 with [ ] Memory, [ ] Internal store system → Multi_Mention
+✓ Q10 Columns field = 7
+✓ Q6 with ( ) Manager, ( ) Store manager → Single_Response
+✓ Console shows "[Format hint: brackets]" messages
+
+## Why This Works
+
+**Bracket type is the most reliable indicator** because:
+1. It's what the survey designer explicitly chose
+2. [ ] = checkboxes = multiple selection = Multi_Mention
+3. ( ) = radio buttons = single selection = Single_Response
+4. This is industry standard and never ambiguous
+
+Text patterns like "job title" or "how do you keep track" are NOT reliable because:
+- "Job title" could be multi-mention if you have multiple jobs
+- "Keep track" doesn't indicate single vs multi
+- Only explicit phrases like "select all that apply" are reliable
+
+## Impact
+
+This fix affects:
+- ✓ All questions parsed going forward
+- ✓ No changes to existing Survey_Structure files
+- ✓ No changes to crosstabs code
+- ✓ Format hint detection already worked (in text_cleaner.R)
+- ✓ Only the type detection priority was broken
+
+## Version Info
+
+**Fixed Version:** 1.2.0
+**Previous Version:** 1.1.1
+**Date:** October 31, 2025
+
+---
+
+## Summary
+
+**Before:** Text patterns override format hints → wrong detection
+**After:** Format hints checked first → correct detection
+**Result:** [ ] brackets always → Multi_Mention, ( ) parentheses always → Single_Response

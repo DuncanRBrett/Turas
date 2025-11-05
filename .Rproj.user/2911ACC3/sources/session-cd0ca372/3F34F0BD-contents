@@ -1,0 +1,260 @@
+# ==============================================================================
+# TURAS CORE - UTILITIES
+# ==============================================================================
+# General utility functions used throughout the toolkit
+# Migrated from shared_functions.r V9.9.1
+# ==============================================================================
+
+# ==============================================================================
+# PATH HANDLING
+# ==============================================================================
+
+#' Resolve relative path from base path
+#'
+#' USAGE: Convert relative paths to absolute for file operations
+#' DESIGN: Platform-independent, handles ./ and ../ correctly
+#' SECURITY: Normalizes path to prevent directory traversal attacks
+#'
+#' @param base_path Character, base directory path
+#' @param relative_path Character, path relative to base
+#' @return Character, absolute normalized path
+#' @export
+#' @examples
+#' resolve_path("/Users/john/project", "Data/survey.xlsx")
+#' resolve_path("/Users/john/project", "./Data/survey.xlsx")
+resolve_path <- function(base_path, relative_path) {
+  # Validate inputs
+  if (is.null(base_path) || is.na(base_path) || base_path == "") {
+    stop("base_path cannot be empty", call. = FALSE)
+  }
+  
+  if (is.null(relative_path) || is.na(relative_path) || relative_path == "") {
+    return(normalizePath(base_path, mustWork = FALSE))
+  }
+  
+  # Remove leading ./
+  relative_path <- gsub("^\\./", "", relative_path)
+  
+  # Combine paths (handles both / and \)
+  full_path <- file.path(base_path, relative_path)
+  
+  # Normalize (resolves .., ., converts to OS-specific separators)
+  full_path <- normalizePath(full_path, winslash = "/", mustWork = FALSE)
+  
+  return(full_path)
+}
+
+#' Get project root directory from config file location
+#'
+#' USAGE: Determine project root for resolving relative paths
+#' DESIGN: Simple - parent directory of config file
+#'
+#' @param config_file_path Character, path to config file
+#' @return Character, project root directory path
+#' @export
+#' @examples
+#' project_root <- get_project_root(config_file)
+get_project_root <- function(config_file_path) {
+  validate_char_param(config_file_path, "config_file_path", allow_empty = FALSE)
+  
+  project_root <- dirname(config_file_path)
+  project_root <- normalizePath(project_root, winslash = "/", mustWork = FALSE)
+  
+  return(project_root)
+}
+
+# ==============================================================================
+# TYPE CONVERSION UTILITIES
+# ==============================================================================
+
+#' Type-safe equality comparison with trimming
+#'
+#' CRITICAL FUNCTION: Used extensively for matching survey responses to options
+#'
+#' CASE SENSITIVITY: Comparison is CASE-SENSITIVE
+#'   - "Apple" != "apple"
+#'   - Both values are trimmed of whitespace before comparison
+#'   - If case-insensitive matching needed, use tolower() on both sides
+#'
+#' NA HANDLING (V9.9.1):
+#'   - Real NA values are treated as missing
+#'   - NA == NA returns TRUE (both missing)
+#'   - NA != "NA" (missing value != string "NA")
+#'
+#' @param a First value/vector
+#' @param b Second value/vector
+#' @return Logical vector of comparisons
+#' @export
+#' @examples
+#' safe_equal("Apple", "apple")      # FALSE (case-sensitive)
+#' safe_equal("  Apple  ", "Apple")  # TRUE (whitespace trimmed)
+#' safe_equal(NA, NA)                # TRUE (both missing)
+#' safe_equal(NA, "NA")              # FALSE (missing != string)
+safe_equal <- function(a, b) {
+  if (length(a) == 0 || length(b) == 0) {
+    return(logical(0))
+  }
+  
+  # Vectorize to longer length
+  max_len <- max(length(a), length(b))
+  if (length(a) < max_len) a <- rep_len(a, max_len)
+  if (length(b) < max_len) b <- rep_len(b, max_len)
+  
+  # Initialize result
+  result <- rep(FALSE, max_len)
+  
+  # Identify NAs
+  na_a <- is.na(a)
+  na_b <- is.na(b)
+  
+  # Both NA = TRUE (both missing)
+  both_na <- na_a & na_b
+  result[both_na] <- TRUE
+  
+  # Compare non-NA values (trim whitespace)
+  neither_na <- !na_a & !na_b
+  if (any(neither_na)) {
+    result[neither_na] <- trimws(as.character(a[neither_na])) == 
+      trimws(as.character(b[neither_na]))
+  }
+  
+  # One NA, one not = FALSE (already initialized to FALSE)
+  
+  return(result)
+}
+
+#' Safely convert to numeric
+#'
+#' USAGE: Convert config values, survey responses to numeric
+#' DESIGN: Suppresses warnings, replaces failures with na_value
+#'
+#' @param x Value(s) to convert
+#' @param na_value Value to use for conversion failures (default: NA_real_)
+#' @return Numeric value(s)
+#' @export
+#' @examples
+#' safe_numeric("123")     # 123
+#' safe_numeric("abc")     # NA
+#' safe_numeric("abc", 0)  # 0
+safe_numeric <- function(x, na_value = NA_real_) {
+  result <- suppressWarnings(as.numeric(x))
+  result[is.na(result)] <- na_value
+  return(result)
+}
+
+#' Safely convert to logical
+#'
+#' USAGE: Convert config settings to TRUE/FALSE
+#' DESIGN: Handles multiple text representations (Y/N, YES/NO, T/F, 1/0)
+#' CASE INSENSITIVE: Converts to uppercase before checking
+#'
+#' @param x Value to convert (TRUE/FALSE/Y/N/YES/NO/T/F/1/0)
+#' @param default Default value if conversion fails (default: FALSE)
+#' @return Logical value
+#' @export
+#' @examples
+#' safe_logical("Y")      # TRUE
+#' safe_logical("yes")    # TRUE
+#' safe_logical("1")      # TRUE
+#' safe_logical("N")      # FALSE
+#' safe_logical("maybe")  # FALSE (with warning)
+safe_logical <- function(x, default = FALSE) {
+  if (is.null(x) || (length(x) == 1 && is.na(x))) {
+    return(default)
+  }
+  
+  # Already logical
+  if (is.logical(x)) {
+    return(x)
+  }
+  
+  # Convert to uppercase string
+  x_upper <- toupper(trimws(as.character(x)))
+  
+  # Check TRUE values
+  if (x_upper %in% c("TRUE", "T", "Y", "YES", "1")) {
+    return(TRUE)
+  }
+  
+  # Check FALSE values
+  if (x_upper %in% c("FALSE", "F", "N", "NO", "0")) {
+    return(FALSE)
+  }
+  
+  # Couldn't convert
+  warning(sprintf(
+    "Could not convert '%s' to logical, using default: %s", 
+    x, default
+  ), call. = FALSE)
+  return(default)
+}
+
+# ==============================================================================
+# DATA VALIDATION HELPERS
+# ==============================================================================
+
+#' Check if data frame has data
+#'
+#' USAGE: Guard clause at start of functions expecting data
+#' DESIGN: Simple null/empty check
+#'
+#' @param df Data frame to check
+#' @return Logical, TRUE if data frame has at least 1 row
+#' @export
+#' @examples
+#' if (!has_data(filtered_data)) {
+#'   return(NULL)
+#' }
+has_data <- function(df) {
+  !is.null(df) && is.data.frame(df) && nrow(df) > 0
+}
+
+# ==============================================================================
+# MATH UTILITIES
+# ==============================================================================
+
+#' Safe division with zero handling
+#'
+#' USAGE: Prevent division by zero errors
+#' DESIGN: Returns NA_real_ when denominator is 0 or NA
+#'
+#' @param numerator Numeric, numerator
+#' @param denominator Numeric, denominator
+#' @return Numeric, result or NA_real_
+#' @export
+#' @examples
+#' safe_divide(10, 2)   # 5
+#' safe_divide(10, 0)   # NA
+#' safe_divide(10, NA)  # NA
+safe_divide <- function(numerator, denominator) {
+  if (is.na(denominator) || denominator == 0) {
+    return(NA_real_)
+  }
+  
+  return(numerator / denominator)
+}
+
+#' Calculate percentage
+#'
+#' USAGE: Calculate percentages with automatic 0/0 handling
+#' DESIGN: Returns NA_real_ for division by zero (not 0 or error)
+#'
+#' @param numerator Numeric, numerator
+#' @param denominator Numeric, denominator
+#' @param decimal_places Integer, decimal places for rounding (default: 0)
+#' @return Numeric, percentage (0-100 scale) or NA_real_
+#' @export
+#' @examples
+#' calc_percentage(50, 100)     # 50
+#' calc_percentage(1, 3, 1)     # 33.3
+#' calc_percentage(10, 0)       # NA
+calc_percentage <- function(numerator, denominator, decimal_places = 0) {
+  if (is.na(denominator) || denominator == 0) {
+    return(NA_real_)
+  }
+  
+  return(round((numerator / denominator) * 100, decimal_places))
+}
+
+# Success message
+cat("Turas utilities loaded (COMPLETE!)\n")

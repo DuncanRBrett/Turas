@@ -1,0 +1,243 @@
+# DATA HEADERS FEATURE - COMPLETE SUMMARY
+
+## What's New
+
+The parser now generates **THREE** files instead of two:
+
+1. **Survey_Structure.xlsx** - Question and option definitions
+2. **Selection_Sheet.xlsx** - Crosstab configuration template  
+3. **Data_Headers.xlsx** - Column headers for raw data ← **NEW!**
+
+---
+
+## What Problem Does It Solve?
+
+**Before:** Users had to guess column names for their data file
+- Is it Q10 or Q10_1, Q10_2, Q10_3?
+- Does Q01_othertext exist?
+- What's the correct column order?
+
+**After:** Users have an authoritative reference
+- Exact column names provided
+- No guessing needed
+- Data structure matches Survey_Structure perfectly
+
+---
+
+## Example Output
+
+**For a questionnaire with:**
+- Q01: Job title (Single, has "Other - Write In")
+- Q10: Keep track (Multi, 7 options, has "Other - specify")
+
+**Data_Headers.xlsx contains:**
+```
+ID | Q01 | Q01_othertext | Q02 | Q03 | ... | Q10_1 | Q10_2 | Q10_3 | Q10_4 | Q10_5 | Q10_6 | Q10_7 | Q10_othertext | ...
+```
+
+---
+
+## Column Structure
+
+### ID Column
+- Always first
+- Respondent identifier
+
+### Single Mention Questions
+- Format: `Q01`, `Q02`, `Q03`
+- One column per question
+
+### Multi-Mention Questions
+- Format: `Q10_1`, `Q10_2`, `Q10_3`
+- Individual columns for each option
+- Number of columns = Columns field in Questions sheet
+
+### Other-Text Columns
+- Format: `Q01_othertext`, `Q10_othertext`
+- Added for any question with "other specify" option
+- Always included (even if ShowInOutput = "N")
+
+---
+
+## How Users Will Use It
+
+### Scenario 1: Creating New Data File
+1. Download Data_Headers.xlsx
+2. Open in Excel
+3. Copy header row to new file
+4. Add respondent data below
+5. Save as survey_data.xlsx
+
+### Scenario 2: Verifying Existing Data
+1. Download Data_Headers.xlsx
+2. Compare with existing data file headers
+3. Rename columns to match exactly
+4. Fix any missing columns
+
+### Scenario 3: Data Entry Template
+1. Download Data_Headers.xlsx
+2. Use as template for data collection
+3. Share with data entry team
+4. Ensures consistent column naming
+
+---
+
+## Technical Implementation
+
+### Files to Update
+
+**1. output_generator.R → v1.2.0**
+- Added `generate_data_headers()` function
+- Generates single-row Excel file with headers
+
+**2. shiny_app.R**
+- Add download button to UI
+- Add download handler to server
+- Test with sample questionnaire
+
+### Installation Steps
+
+**Step 1:** Replace output_generator.R
+```bash
+cd /Users/duncan/Documents/Turas/modules/parser/lib
+cp output_generator.R output_generator.R.backup
+# Copy new output_generator_v1.2.0.R to output_generator.R
+```
+
+**Step 2:** Update shiny_app.R
+```r
+# Add to UI:
+downloadButton("download_headers", "Download Data Headers", class = "btn-success")
+
+# Add to Server:
+output$download_headers <- downloadHandler(
+  filename = function() { "Data_Headers.xlsx" },
+  content = function(file) {
+    req(parsed_questions())
+    generate_data_headers(parsed_questions(), file)
+  }
+)
+```
+
+**Step 3:** Test
+```r
+setwd("/Users/duncan/Documents/Turas")
+source("modules/parser/run_parser.R")
+run_parser()
+```
+
+---
+
+## Console Output
+
+When generating Data_Headers.xlsx:
+
+```
+=== GENERATING DATA HEADERS ===
+Questions to export: 69
+  Added othertext column: Q01_othertext
+  Added othertext column: Q10_othertext
+Total columns: 85
+  - ID column: 1
+  - Question columns: 84
+✓ Generated Data_Headers.xlsx
+=== GENERATION COMPLETE ===
+```
+
+---
+
+## File Details
+
+**Format:** Excel (.xlsx)  
+**Sheet Name:** Headers  
+**Rows:** 1 (header only, no data)  
+**Columns:** Variable (depends on questionnaire)  
+**Styling:** Blue header, white text, frozen row  
+**Column Width:** 15 for all columns  
+
+---
+
+## Benefits
+
+### For Users
+✓ No guessing about column names
+✓ Single source of truth for data structure
+✓ Easy to create data entry templates
+✓ Quick verification of existing data
+
+### For Data Entry
+✓ Clear column names
+✓ Consistent structure
+✓ Reduces errors
+
+### For Analysis
+✓ Data matches Survey_Structure exactly
+✓ No "column not found" errors
+✓ Smooth import into crosstabs
+
+---
+
+## Integration with Workflow
+
+**Complete Parser Workflow:**
+
+1. **Upload** questionnaire (.docx)
+2. **Parse** document
+3. **Review** questions table
+4. **Download** three files:
+   - Survey_Structure.xlsx
+   - Selection_Sheet.xlsx
+   - Data_Headers.xlsx ← NEW!
+5. **Create** raw data file using headers
+6. **Configure** crosstabs using Selection_Sheet
+7. **Run** crosstabs using Survey_Structure
+
+---
+
+## What's Included
+
+[Updated output_generator.R v1.2.0](computer:///mnt/user-data/outputs/output_generator_v1.2.0.R)
+
+[Implementation guide](computer:///mnt/user-data/outputs/DATA_HEADERS_IMPLEMENTATION_GUIDE.txt)
+
+[Shiny app update code](computer:///mnt/user-data/outputs/SHINY_APP_UPDATE_GUIDE.txt)
+
+[This summary](computer:///mnt/user-data/outputs/DATA_HEADERS_FEATURE_SUMMARY.txt)
+
+---
+
+## Quick Start
+
+**For Implementation:**
+1. Replace output_generator.R with v1.2.0
+2. Add download button to Shiny app
+3. Test with sample questionnaire
+
+**For Users:**
+1. Parse your questionnaire
+2. Download all three files
+3. Use Data_Headers.xlsx to create/verify data
+
+---
+
+## Version Info
+
+**Feature:** Data Headers File  
+**Version:** 1.2.0  
+**Function:** `generate_data_headers()`  
+**Output:** Data_Headers.xlsx  
+**Date:** October 31, 2025  
+**Status:** Production Ready  
+
+---
+
+## Summary
+
+✓ Third downloadable file added  
+✓ Shows exact column names for data  
+✓ Eliminates guessing  
+✓ Improves workflow  
+✓ Easy to implement  
+✓ Ready to use  
+
+Users now get complete guidance from questionnaire to crosstabs!

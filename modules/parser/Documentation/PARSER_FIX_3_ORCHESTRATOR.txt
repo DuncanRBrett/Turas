@@ -1,0 +1,106 @@
+# PARSER BUG FIX #3 - Numeric Range Detection
+
+## The Error
+
+```
+Error details:
+<simpleError in questions$min_value[i] <- range_info$min: replacement has length zero>
+```
+
+## The Problem
+
+In `parse_orchestrator.R`, the code tried to extract `min` and `max` values from `range_info` without checking if it was NULL:
+
+```r
+# OLD CODE (BROKEN)
+range_info <- detect_numeric_range(question_text)
+questions$min_value[i] <- range_info$min  # ERROR if range_info is NULL!
+questions$max_value[i] <- range_info$max  # ERROR if range_info is NULL!
+```
+
+When a question doesn't contain a numeric range (like "1-10" or "from 1 to 5"), `detect_numeric_range()` returns NULL. Trying to access `NULL$min` causes the error.
+
+## The Fix
+
+Added a NULL check before accessing the range values:
+
+```r
+# NEW CODE (FIXED)
+range_info <- detect_numeric_range(question_text)
+if (!is.null(range_info)) {
+  questions$min_value[i] <- range_info$min
+  questions$max_value[i] <- range_info$max
+}
+```
+
+Now if no range is detected, `min_value` and `max_value` simply stay as NA (which is correct).
+
+## What Changed
+
+**File:** `parse_orchestrator.R`  
+**Lines:** 172-176  
+**Version:** 1.0.3
+
+## Installation
+
+```bash
+cd /Users/duncan/Documents/Turas/modules/parser/lib
+cp parse_orchestrator.R parse_orchestrator.R.backup
+# Copy the new parse_orchestrator.R to this location
+```
+
+## Testing
+
+The parser should now complete without errors:
+
+```r
+setwd("/Users/duncan/Documents/Turas")
+source("modules/parser/run_parser.R")
+run_parser()
+```
+
+Upload any questionnaire and you should see:
+
+```
+Step 5: Post-processing...
+=== PARSING COMPLETE ===
+Final question count: 69
+Questions needing review: X
+```
+
+No errors!
+
+## Impact
+
+- ✓ Parser no longer crashes on questions without numeric ranges
+- ✓ Questions with ranges (like "1-10 scale") still get min/max extracted
+- ✓ Questions without ranges get min_value = NA, max_value = NA (correct)
+- ✓ Non-breaking change - doesn't affect anything else
+
+---
+
+## Summary of All Three Fixes
+
+### Fix #1: Output Generator (output_generator.R v1.1.0)
+- Multi-mention individual codes (Q10_1, Q10_2, etc.)
+- Auto-generate _othertext questions
+
+### Fix #2: Type Detector (type_detector.R v1.2.0)
+- Format hints checked FIRST ([ ] = Multi, ( ) = Single)
+- Fixes incorrect type detection
+
+### Fix #3: Parse Orchestrator (parse_orchestrator.R v1.0.3)
+- NULL check for numeric range detection
+- Fixes crash on questions without ranges
+
+---
+
+## All Files to Replace
+
+Replace these 3 files in `/Users/duncan/Documents/Turas/modules/parser/lib/`:
+
+1. ✓ `output_generator.R` (v1.1.0) - Multi-mention codes & othertext
+2. ✓ `type_detector.R` (v1.2.0) - Format hint priority
+3. ✓ `parse_orchestrator.R` (v1.0.3) - NULL range check
+
+After replacing all three files, your parser will be fully functional!

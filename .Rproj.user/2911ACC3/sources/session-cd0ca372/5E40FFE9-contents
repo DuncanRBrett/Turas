@@ -1,0 +1,282 @@
+# ==============================================================================
+# TURAS>TABS - UTILITIES MODULE
+# ==============================================================================
+# Helper functions for the Tabs module
+# Extracted from run_crosstabs.r V9.9
+# ==============================================================================
+
+# ==============================================================================
+# LOGGING FUNCTIONS
+# ==============================================================================
+
+#' Log a message with timestamp
+#'
+#' @param msg Character, message to log
+#' @param level Character, log level (INFO, WARNING, ERROR)
+#' @param verbose Logical, whether to print
+#' @return Invisible NULL
+#' @export
+log_message <- function(msg, level = "INFO", verbose = TRUE) {
+  if (!verbose) return(invisible(NULL))
+  
+  timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+  cat(sprintf("[%s] %s: %s\n", timestamp, level, msg))
+  invisible(NULL)
+}
+
+#' Log progress with percentage and ETA
+#'
+#' @param current Integer, current item number
+#' @param total Integer, total items
+#' @param item Character, item description
+#' @param start_time POSIXct, when processing started (for ETA calculation)
+#' @return Invisible NULL
+#' @export
+log_progress <- function(current, total, item = "", start_time = NULL) {
+  pct <- round(100 * current / total, 1)
+  
+  eta_str <- ""
+  if (!is.null(start_time) && current > 0) {
+    elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+    rate <- elapsed / current
+    remaining <- (total - current) * rate
+    eta_str <- sprintf(" | ETA: %s", format_seconds(remaining))
+  }
+  
+  cat(sprintf("\r[%3d%%] %d/%d%s %s", 
+             round(pct), current, total, eta_str, item))
+  
+  if (current == total) cat("\n")
+  invisible(NULL)
+}
+
+#' Format seconds into readable time string
+#'
+#' @param seconds Numeric, number of seconds
+#' @return Character, formatted time (e.g., "45s", "2.3m", "1.5h")
+#' @export
+format_seconds <- function(seconds) {
+  if (seconds < 60) {
+    return(sprintf("%.0fs", seconds))
+  } else if (seconds < 3600) {
+    return(sprintf("%.1fm", seconds / 60))
+  } else {
+    return(sprintf("%.1fh", seconds / 3600))
+  }
+}
+
+#' Check and warn about memory usage
+#'
+#' Memory reported in GiB (1024^3 bytes) to match OS conventions.
+#' Requires the 'pryr' package for memory monitoring.
+#'
+#' @param force_gc Logical, force garbage collection if memory high
+#' @param warning_threshold Numeric, GiB threshold for warning (default: 2.0)
+#' @param critical_threshold Numeric, GiB threshold for critical (default: 4.0)
+#' @return Invisible NULL
+#' @export
+check_memory <- function(force_gc = TRUE, 
+                        warning_threshold = 2.0,
+                        critical_threshold = 4.0) {
+  if (!requireNamespace("pryr", quietly = TRUE)) return(invisible(NULL))
+  
+  mem_used_bytes <- pryr::mem_used()
+  mem_used_gib <- mem_used_bytes / (1024^3)
+  
+  if (mem_used_gib > critical_threshold) {
+    log_message(sprintf("CRITICAL: Memory usage %.1f GiB - forcing cleanup", 
+                       mem_used_gib), "ERROR")
+    if (force_gc) gc()
+  } else if (mem_used_gib > warning_threshold) {
+    log_message(sprintf("WARNING: Memory usage %.1f GiB", mem_used_gib), "WARNING")
+    if (force_gc) gc()
+  }
+  
+  invisible(NULL)
+}
+
+# ==============================================================================
+# VALIDATION FUNCTIONS
+# ==============================================================================
+
+#' Validate weight vector against data
+#'
+#' Ensures weights are numeric, match data row count, and don't contain
+#' problematic values (negatives, all zeros).
+#'
+#' @param weights Numeric vector of weights
+#' @param data_rows Integer, expected number of rows
+#' @param allow_zero Logical, allow zero weights (default: TRUE)
+#' @return Invisible TRUE if valid, stops on error
+#' @export
+validate_weights <- function(weights, data_rows, allow_zero = TRUE) {
+  if (!is.numeric(weights)) {
+    stop("Weights must be numeric, got: ", class(weights)[1], call. = FALSE)
+  }
+  
+  if (length(weights) != data_rows) {
+    stop(sprintf("Weight vector length (%d) must match data rows (%d)", 
+                length(weights), data_rows), call. = FALSE)
+  }
+  
+  if (any(weights < 0, na.rm = TRUE)) {
+    stop("Weights cannot be negative", call. = FALSE)
+  }
+  
+  if (!allow_zero && all(weights == 0)) {
+    stop("All weights are zero", call. = FALSE)
+  }
+  
+  n_na <- sum(is.na(weights))
+  if (n_na > 0) {
+    warning(sprintf("Weight vector contains %d NA values (%.1f%%)", 
+                   n_na, 100 * n_na / length(weights)), call. = FALSE)
+  }
+  
+  invisible(TRUE)
+}
+
+#' Check if data frame has data
+#'
+#' @param df Data frame to check
+#' @return Logical, TRUE if df is valid data frame with rows
+#' @export
+has_data <- function(df) {
+  !is.null(df) && is.data.frame(df) && nrow(df) > 0
+}
+
+# ==============================================================================
+# SAFE EXECUTION WRAPPERS
+# ==============================================================================
+
+#' Safely execute expression with error handling
+#'
+#' Wraps an expression in tryCatch and returns a default value on error.
+#' Useful for operations that might fail but shouldn't stop execution.
+#'
+#' @param expr Expression to evaluate
+#' @param default Default value to return on error
+#' @param error_msg Error message prefix for warnings
+#' @param silent Logical, suppress warnings (default: FALSE)
+#' @return Result of expr or default value
+#' @export
+safe_execute <- function(expr, default = NA, error_msg = "Operation failed", 
+                        silent = FALSE) {
+  tryCatch(
+    expr,
+    error = function(e) {
+      if (!silent) {
+        warning(sprintf("%s: %s", error_msg, conditionMessage(e)), call. = FALSE)
+      }
+      return(default)
+    }
+  )
+}
+
+#' Type-safe equality with trimming
+#'
+#' CASE SENSITIVITY: Comparison is CASE-SENSITIVE by default.
+#' Both values are trimmed of whitespace before comparison.
+#' - "Apple" != "apple"
+#' - " Apple " == "Apple"
+#'
+#' If case-insensitive matching is needed, use tolower() on both sides.
+#'
+#' @param a First value/vector (will be coerced to character)
+#' @param b Second value/vector (will be coerced to character)
+#' @return Logical vector of equality results
+#' @export
+safe_equal <- function(a, b) {
+  if (length(a) == 0 || length(b) == 0) return(logical(0))
+  trimws(as.character(a)) == trimws(as.character(b))
+}
+
+# ==============================================================================
+# FORMATTING UTILITIES
+# ==============================================================================
+
+#' Format value for Excel output
+#'
+#' Returns NA_real_ for NULL/NA values (displays as blank in Excel).
+#' Rounds numeric values according to type-specific decimal places.
+#'
+#' @param value Numeric value to format
+#' @param type Character, value type ("frequency", "percent", "rating", "index", "numeric")
+#' @param decimal_places_percent Integer, decimals for percentages (default: 0)
+#' @param decimal_places_ratings Integer, decimals for ratings (default: 1)
+#' @param decimal_places_index Integer, decimals for index values (default: 1)
+#' @param decimal_places_numeric Integer, decimals for numeric stats (default: 1)
+#' @return Numeric value (rounded) or NA_real_
+#' @export
+format_output_value <- function(value, type = "frequency", 
+                               decimal_places_percent = 0,
+                               decimal_places_ratings = 1,
+                               decimal_places_index = 1,
+                               decimal_places_numeric = 1) {
+  if (is.null(value) || is.na(value)) return(NA_real_)
+  
+  formatted_value <- switch(type,
+    "percent" = round(as.numeric(value), decimal_places_percent),
+    "rating" = round(as.numeric(value), decimal_places_ratings),
+    "index" = round(as.numeric(value), decimal_places_index),
+    "numeric" = round(as.numeric(value), decimal_places_numeric),
+    "frequency" = round(as.numeric(value), 0),
+    round(as.numeric(value), 2)  # default
+  )
+  
+  return(formatted_value)
+}
+
+#' Generate Excel column letters (A, B, ..., Z, AA, AB, ..., XFD)
+#'
+#' Converts column numbers to Excel-style letters using proper base-26
+#' algorithm. Handles A..Z (1-26), AA..ZZ (27-702), AAA..XFD (703-16384).
+#'
+#' @param n Integer, number of letters to generate
+#' @return Character vector of Excel column letters
+#' @export
+generate_excel_letters <- function(n) {
+  if (n <= 0) return(character(0))
+  if (n > 16384) stop("Excel has maximum 16384 columns (XFD)", call. = FALSE)
+  
+  letters_vec <- character(n)
+  
+  for (i in 1:n) {
+    col_num <- i
+    letter <- ""
+    
+    while (col_num > 0) {
+      remainder <- (col_num - 1) %% 26
+      letter <- paste0(LETTERS[remainder + 1], letter)
+      col_num <- (col_num - 1) %/% 26
+    }
+    
+    letters_vec[i] <- letter
+  }
+  
+  return(letters_vec)
+}
+
+#' Batch row binding (efficient)
+#'
+#' Efficiently combines a list of data frames into a single data frame.
+#' Much faster than iterative rbind for large lists.
+#'
+#' @param row_list List of data frames with compatible columns
+#' @return Single data frame (empty if row_list is empty)
+#' @export
+batch_rbind <- function(row_list) {
+  if (length(row_list) == 0) return(data.frame())
+  do.call(rbind, row_list)
+}
+
+# ==============================================================================
+# MODULE INFO
+# ==============================================================================
+
+#' Get utilities module version
+#' @return Character, version string
+#' @export
+utilities_version <- function() {
+  "1.0.0"
+}

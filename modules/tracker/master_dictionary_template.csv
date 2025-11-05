@@ -1,0 +1,5 @@
+TrackingCode,CanonicalLabel,VariableType,ValueScale,FirstWave,LastWave,Hash
+TRK_NPS,Net Promoter Score,Rating,0-10,W23,current,df06d4a631
+TRK_SAT_01,Service satisfaction: Speed,Likert,1-5,W23,current,591ccfd37e
+TRK_GROUP,Store Group,SingleChoice,categories,W23,current,b4e26aad6d
+TRK_NEW_01,New app satisfaction,Rating,0-10,W25,current,78127638eb
