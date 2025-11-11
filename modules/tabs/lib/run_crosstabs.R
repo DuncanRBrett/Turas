@@ -137,6 +137,10 @@ source(file.path(script_dir, "banner_indices.R"))
 source(file.path(script_dir, "config_loader.R"))
 source(file.path(script_dir, "question_orchestrator.R"))
 
+# Composite Metrics Feature (V10.1)
+source(file.path(script_dir, "composite_processor.R"))
+source(file.path(script_dir, "summary_builder.R"))
+
 # ==============================================================================
 # LOGGING & MONITORING SYSTEM
 # ==============================================================================
@@ -302,6 +306,15 @@ survey_structure$options$ExcludeFromIndex[is.na(survey_structure$options$Exclude
 
 log_message("✓ Survey structure loaded", "INFO")
 
+# Load composite definitions (V10.1 Feature - validation happens after data load)
+composite_defs <- load_composite_definitions(structure_file_path)
+
+if (!is.null(composite_defs) && nrow(composite_defs) > 0) {
+  log_message(sprintf("Loaded %d composite metric(s)", nrow(composite_defs)), "INFO")
+} else {
+  log_message("No composite metrics defined", "INFO")
+}
+
 # ==============================================================================
 # LOAD DATA
 # ==============================================================================
@@ -368,6 +381,30 @@ error_log <- run_all_validations(survey_structure, survey_data, config_obj)
 
 if (nrow(error_log) > 0) {
   log_message(sprintf("⚠  Found %d validation issues", nrow(error_log)), "WARNING")
+}
+
+# Validate composites (V10.1 Feature)
+if (!is.null(composite_defs) && nrow(composite_defs) > 0) {
+  log_message("Validating composite definitions...", "INFO")
+
+  validation_result <- validate_composite_definitions(
+    composite_defs = composite_defs,
+    questions_df = survey_structure$questions,
+    survey_data = survey_data
+  )
+
+  if (!validation_result$is_valid) {
+    stop("Composite validation failed:\n",
+         paste(validation_result$errors, collapse = "\n"))
+  }
+
+  if (length(validation_result$warnings) > 0) {
+    for (warn in validation_result$warnings) {
+      warning(warn, call. = FALSE)
+    }
+  }
+
+  log_message("✓ Composite definitions validated", "INFO")
 }
 
 # ==============================================================================
@@ -765,6 +802,84 @@ if (config_obj$enable_checkpointing && file.exists(checkpoint_file)) {
 }
 
 # ==============================================================================
+# PROCESS COMPOSITE METRICS (V10.1 Feature)
+# ==============================================================================
+
+composite_results <- list()
+
+if (!is.null(composite_defs) && nrow(composite_defs) > 0) {
+  log_message(sprintf("\nProcessing %d composite metric(s)...", nrow(composite_defs)), "INFO")
+
+  # ISSUE #3 FIX: Create banner row indices for composites
+  # Composites need banner_row_indices to filter data by banner segments
+  log_message("Creating banner row indices for composites...", "INFO")
+  banner_result <- create_banner_row_indices(survey_data, banner_info)
+  banner_row_indices <- banner_result$row_indices
+
+  # Merge row_indices into banner_info as 'subsets' (expected by composite processor)
+  banner_info$subsets <- banner_row_indices
+  log_message(sprintf("✓ Created indices for %d banner columns", length(banner_row_indices)), "INFO")
+
+  tryCatch({
+    composite_results <- process_all_composites(
+      composite_defs = composite_defs,
+      data = survey_data,
+      questions_df = survey_structure$questions,
+      banner_info = banner_info,
+      config = config_obj
+    )
+
+    log_message(sprintf("✓ Processed %d composite(s)", length(composite_results)), "INFO")
+  }, error = function(e) {
+    error_msg <- sprintf("Error processing composites: %s\n\nCall stack:\n%s",
+                        e$message,
+                        paste(sys.calls(), collapse = "\n"))
+    log_message(error_msg, "ERROR")
+    stop(e)
+  })
+
+  # Add composites to all_results so they appear in Crosstabs sheet
+  if (length(composite_results) > 0) {
+    for (comp_code in names(composite_results)) {
+      comp_result <- composite_results[[comp_code]]
+
+      # Safety check
+      if (is.null(comp_result) || is.null(comp_result$question_table)) {
+        warning(sprintf("Composite '%s' has no results table, skipping", comp_code))
+        next
+      }
+
+      if (nrow(comp_result$question_table) == 0) {
+        warning(sprintf("Composite '%s' has empty results table, skipping", comp_code))
+        next
+      }
+
+      # Get composite label safely
+      comp_label <- if ("RowLabel" %in% names(comp_result$question_table) &&
+                        nrow(comp_result$question_table) > 0) {
+        comp_result$question_table$RowLabel[1]
+      } else if (!is.null(comp_result$metadata$composite_code)) {
+        comp_result$metadata$composite_code
+      } else {
+        comp_code
+      }
+
+      # Convert to standard result format
+      # Composites use the same base sizes as the overall banner
+      all_results[[comp_code]] <- list(
+        question_code = comp_code,
+        question_text = comp_label,
+        question_type = "Composite",
+        base_filter = NA,
+        table = comp_result$question_table,
+        bases = banner_info$base_sizes  # Use banner base sizes
+      )
+    }
+    log_message(sprintf("Added %d composite(s) to results", length(composite_results)), "INFO")
+  }
+}
+
+# ==============================================================================
 # CREATE EXCEL OUTPUT
 # ==============================================================================
 
@@ -773,12 +888,48 @@ log_message("Creating Excel output...", "INFO")
 wb <- openxlsx::createWorkbook()
 
 # Styles with separate rating/index/score styles
+# Safe extraction of style parameters
+decimal_separator <- if (!is.null(config_obj$decimal_separator) &&
+                         length(config_obj$decimal_separator) > 0) {
+  config_obj$decimal_separator
+} else {
+  "."
+}
+
+decimal_places_percent <- if (!is.null(config_obj$decimal_places_percent) &&
+                              length(config_obj$decimal_places_percent) > 0) {
+  config_obj$decimal_places_percent
+} else {
+  1
+}
+
+decimal_places_ratings <- if (!is.null(config_obj$decimal_places_ratings) &&
+                              length(config_obj$decimal_places_ratings) > 0) {
+  config_obj$decimal_places_ratings
+} else {
+  1
+}
+
+decimal_places_index <- if (!is.null(config_obj$decimal_places_index) &&
+                            length(config_obj$decimal_places_index) > 0) {
+  config_obj$decimal_places_index
+} else {
+  1
+}
+
+decimal_places_numeric <- if (!is.null(config_obj$decimal_places_numeric) &&
+                              length(config_obj$decimal_places_numeric) > 0) {
+  config_obj$decimal_places_numeric
+} else {
+  1
+}
+
 styles <- create_excel_styles(
-  config_obj$decimal_separator,
-  config_obj$decimal_places_percent,
-  config_obj$decimal_places_ratings,
-  config_obj$decimal_places_index,
-  config_obj$decimal_places_numeric  # V10.0.0: Added
+  decimal_separator,
+  decimal_places_percent,
+  decimal_places_ratings,
+  decimal_places_index,
+  decimal_places_numeric  # V10.0.0: Added
 )
 
 project_name <- get_config_value(survey_structure$project, "project_name", "Crosstabs")
@@ -795,8 +946,64 @@ project_info <- list(
   }
 )
 
-create_summary_sheet(wb, project_info, all_results, config_obj, styles,
-                     SCRIPT_VERSION, TOTAL_COLUMN, VERY_SMALL_BASE_SIZE)
+tryCatch({
+  log_message("Creating Summary sheet...", "INFO")
+  create_summary_sheet(wb, project_info, all_results, config_obj, styles,
+                       SCRIPT_VERSION, TOTAL_COLUMN, VERY_SMALL_BASE_SIZE)
+  log_message("✓ Summary sheet created", "INFO")
+}, error = function(e) {
+  cat("\n!!! ERROR in create_summary_sheet !!!\n")
+  cat("Error message:", e$message, "\n")
+  cat("Number of results:", length(all_results), "\n")
+  cat("Result codes:", paste(names(all_results), collapse = ", "), "\n\n")
+  stop(sprintf("Error creating Summary sheet: %s", e$message))
+})
+
+# Build and write Index_Summary sheet (V10.1 Feature)
+# Default to TRUE if composites are defined, otherwise FALSE
+default_create_summary <- !is.null(composite_defs) && nrow(composite_defs) > 0
+create_index_summary <- get_config_value(config_obj, "create_index_summary", default_create_summary)
+
+if (create_index_summary) {
+  tryCatch({
+    log_message("Building index summary...", "INFO")
+
+    summary_table <- build_index_summary_table(
+      results_list = all_results,
+      composite_results = composite_results,
+      banner_info = banner_info,
+      config = config_obj,
+      composite_defs = composite_defs
+    )
+
+    if (!is.null(summary_table) && nrow(summary_table) > 0) {
+      log_message(sprintf("Writing Index_Summary sheet with %d metrics...", nrow(summary_table)), "INFO")
+
+      write_index_summary_sheet(
+        wb = wb,
+        summary_table = summary_table,
+        banner_info = banner_info,
+        config = config_obj,
+        styles = styles,
+        all_results = all_results
+      )
+
+      log_message("✓ Index_Summary sheet created", "INFO")
+    } else {
+      log_message("No metrics to include in Index_Summary", "INFO")
+    }
+  }, error = function(e) {
+    error_msg <- sprintf("Error creating Index_Summary: %s\n\nTraceback:\n%s",
+                        e$message,
+                        paste(capture.output(traceback()), collapse = "\n"))
+    log_message(error_msg, "ERROR")
+    cat("\n!!! INDEX_SUMMARY ERROR DETAILS !!!\n")
+    cat("Error message:", e$message, "\n")
+    cat("Call:", deparse(e$call), "\n\n")
+    print(traceback())
+    stop(e)
+  })
+}
 
 # Error log
 write_error_log_sheet(wb, error_log, styles)
@@ -824,40 +1031,67 @@ openxlsx::freezePane(wb, "Crosstabs", firstActiveRow = current_row, firstActiveC
 
 # Write questions
 for (q_code in names(all_results)) {
-  question_results <- all_results[[q_code]]
-  
-  if (!is.null(question_results$table) && nrow(question_results$table) > 0) {
-    header_text <- paste(question_results$question_code, "-", 
-                        question_results$question_text)
-    if (config_obj$apply_weighting) {
-      header_text <- paste0(header_text, " [", config_obj$weight_label, "]")
-    }
-    
-    openxlsx::writeData(wb, "Crosstabs", header_text, 
-                       startRow = current_row, startCol = 1, colNames = FALSE)
-    openxlsx::addStyle(wb, "Crosstabs", styles$question, rows = current_row, cols = 1)
-    current_row <- current_row + 1
-    
-    if (!is.null(question_results$base_filter) && 
-        !is.na(question_results$base_filter) && 
-        nchar(trimws(question_results$base_filter)) > 0) {
-      filter_display <- paste("  Filter:", question_results$base_filter)
-      openxlsx::writeData(wb, "Crosstabs", filter_display, 
+  tryCatch({
+    question_results <- all_results[[q_code]]
+
+    if (!is.null(question_results$table) && nrow(question_results$table) > 0) {
+      cat(sprintf("Writing question: %s\n", q_code))
+
+      header_text <- paste(question_results$question_code, "-",
+                          question_results$question_text)
+
+      # Safe weighting check
+      apply_weighting <- !is.null(config_obj$apply_weighting) &&
+                         length(config_obj$apply_weighting) > 0 &&
+                         config_obj$apply_weighting
+
+      if (apply_weighting) {
+        weight_label <- if (!is.null(config_obj$weight_label) &&
+                           length(config_obj$weight_label) > 0) {
+          config_obj$weight_label
+        } else {
+          "Weighted"
+        }
+        header_text <- paste0(header_text, " [", weight_label, "]")
+      }
+
+      openxlsx::writeData(wb, "Crosstabs", header_text,
                          startRow = current_row, startCol = 1, colNames = FALSE)
-      openxlsx::addStyle(wb, "Crosstabs", styles$filter, rows = current_row, cols = 1)
+      openxlsx::addStyle(wb, "Crosstabs", styles$question, rows = current_row, cols = 1)
       current_row <- current_row + 1
+
+      if (!is.null(question_results$base_filter) &&
+          !is.na(question_results$base_filter) &&
+          nchar(trimws(question_results$base_filter)) > 0) {
+        filter_display <- paste("  Filter:", question_results$base_filter)
+        openxlsx::writeData(wb, "Crosstabs", filter_display,
+                           startRow = current_row, startCol = 1, colNames = FALSE)
+        openxlsx::addStyle(wb, "Crosstabs", styles$filter, rows = current_row, cols = 1)
+        current_row <- current_row + 1
+      }
+
+      cat(sprintf("  Writing base rows for %s\n", q_code))
+      current_row <- write_base_rows(wb, "Crosstabs", banner_info,
+                                     question_results$bases, styles,
+                                     current_row, config_obj)
+
+      cat(sprintf("  Writing table for %s\n", q_code))
+      current_row <- write_question_table_fast(wb, "Crosstabs", question_results$table,
+                                               banner_info, banner_info$internal_keys,
+                                               styles, current_row)
+
+      current_row <- current_row + 1
+      cat(sprintf("  ✓ Completed %s\n", q_code))
     }
-    
-    current_row <- write_base_rows(wb, "Crosstabs", banner_info, 
-                                   question_results$bases, styles, 
-                                   current_row, config_obj)
-    
-    current_row <- write_question_table_fast(wb, "Crosstabs", question_results$table, 
-                                             banner_info, banner_info$internal_keys, 
-                                             styles, current_row)
-    
-    current_row <- current_row + 1
-  }
+  }, error = function(e) {
+    cat(sprintf("\n!!! ERROR writing question %s !!!\n", q_code))
+    cat("Error message:", e$message, "\n")
+    cat("Question type:", question_results$question_type, "\n")
+    cat("Has table:", !is.null(question_results$table), "\n")
+    cat("Table rows:", if(!is.null(question_results$table)) nrow(question_results$table) else "NULL", "\n")
+    cat("Has bases:", !is.null(question_results$bases), "\n\n")
+    stop(sprintf("Error writing question %s: %s", q_code, e$message))
+  })
 }
 
 openxlsx::setColWidths(wb, "Crosstabs", cols = 1:2, widths = c(25, 12))

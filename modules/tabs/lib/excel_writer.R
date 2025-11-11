@@ -613,6 +613,35 @@ create_summary_sheet <- function(wb, project_info, all_results, config, styles,
                                  very_small_base_size = 10) {
   openxlsx::addWorksheet(wb, "Summary")
 
+  # Safe config value extraction
+  apply_weighting <- !is.null(config$apply_weighting) &&
+                     length(config$apply_weighting) > 0 &&
+                     config$apply_weighting
+
+  enable_sig_testing <- !is.null(config$enable_significance_testing) &&
+                        length(config$enable_significance_testing) > 0 &&
+                        config$enable_significance_testing
+
+  show_frequency <- !is.null(config$show_frequency) &&
+                    length(config$show_frequency) > 0 &&
+                    config$show_frequency
+
+  show_percent_column <- !is.null(config$show_percent_column) &&
+                         length(config$show_percent_column) > 0 &&
+                         config$show_percent_column
+
+  show_percent_row <- !is.null(config$show_percent_row) &&
+                      length(config$show_percent_row) > 0 &&
+                      config$show_percent_row
+
+  zero_division_as_blank <- !is.null(config$zero_division_as_blank) &&
+                            length(config$zero_division_as_blank) > 0 &&
+                            config$zero_division_as_blank
+
+  bonf_corr <- !is.null(config$bonferroni_correction) &&
+               length(config$bonferroni_correction) > 0 &&
+               config$bonferroni_correction
+
   summary_rows <- list(
     c("PROJECT INFORMATION", ""),
     c("Project Name", project_info$project_name),
@@ -624,28 +653,27 @@ create_summary_sheet <- function(wb, project_info, all_results, config, styles,
     c("Questions Analyzed", as.character(length(all_results))),
     c("", ""),
     c("WEIGHTING", ""),
-    c("Weighting Applied", if (config$apply_weighting) "YES" else "NO"),
-    c("Weight Variable", if (config$apply_weighting) config$weight_variable else "N/A"),
+    c("Weighting Applied", if (apply_weighting) "YES" else "NO"),
+    c("Weight Variable", if (apply_weighting && !is.null(config$weight_variable)) config$weight_variable else "N/A"),
     c("Effective Sample Size", as.character(project_info$effective_n)),
     c("", ""),
     c("SIGNIFICANCE TESTING", ""),
-    c("Enabled", if (config$enable_significance_testing) "YES" else "NO"),
-    c("Alpha (p-value threshold)", if (config$enable_significance_testing)
+    c("Enabled", if (enable_sig_testing) "YES" else "NO"),
+    c("Alpha (p-value threshold)", if (enable_sig_testing && !is.null(config$alpha))
       sprintf("%.3f", config$alpha) else "N/A"),
-    c("Minimum Base Size", if (config$enable_significance_testing)
+    c("Minimum Base Size", if (enable_sig_testing && !is.null(config$significance_min_base))
       as.character(config$significance_min_base) else "N/A"),
-    c("Bonferroni Correction", if (config$enable_significance_testing &&
-      config$bonferroni_correction) "YES" else "NO"),
+    c("Bonferroni Correction", if (enable_sig_testing && bonf_corr) "YES" else "NO"),
     c("", ""),
     c("DISPLAY SETTINGS", ""),
-    c("Show Frequency", if (config$show_frequency) "YES" else "NO"),
-    c("Show Column %", if (config$show_percent_column) "YES" else "NO"),
-    c("Show Row %", if (config$show_percent_row) "YES" else "NO"),
-    c("Zero Division Display", if (config$zero_division_as_blank) "Blank" else "Zero"),
-    c("Decimal Places (Percent)", as.character(config$decimal_places_percent)),
-    c("Decimal Places (Ratings)", as.character(config$decimal_places_ratings)),
-    c("Decimal Places (Index)", as.character(config$decimal_places_index)),
-    c("Decimal Separator", config$decimal_separator),
+    c("Show Frequency", if (show_frequency) "YES" else "NO"),
+    c("Show Column %", if (show_percent_column) "YES" else "NO"),
+    c("Show Row %", if (show_percent_row) "YES" else "NO"),
+    c("Zero Division Display", if (zero_division_as_blank) "Blank" else "Zero"),
+    c("Decimal Places (Percent)", if (!is.null(config$decimal_places_percent)) as.character(config$decimal_places_percent) else "1"),
+    c("Decimal Places (Ratings)", if (!is.null(config$decimal_places_ratings)) as.character(config$decimal_places_ratings) else "1"),
+    c("Decimal Places (Index)", if (!is.null(config$decimal_places_index)) as.character(config$decimal_places_index) else "1"),
+    c("Decimal Separator", if (!is.null(config$decimal_separator)) config$decimal_separator else "."),
     c("", ""),
     c("BANNER INFORMATION", ""),
     c("Total Banner Columns", as.character(project_info$total_banner_cols)),
@@ -690,6 +718,18 @@ create_summary_sheet <- function(wb, project_info, all_results, config, styles,
 add_question_list <- function(wb, all_results, config, styles, start_row,
                              total_column_name = "Total",
                              very_small_base_size = 10) {
+  # Safe config extraction
+  apply_weighting <- !is.null(config$apply_weighting) &&
+                     length(config$apply_weighting) > 0 &&
+                     config$apply_weighting
+
+  sig_min_base <- if (!is.null(config$significance_min_base) &&
+                      length(config$significance_min_base) > 0) {
+    config$significance_min_base
+  } else {
+    30  # Default
+  }
+
   question_list_rows <- list(
     c("Question Code", "Question Text", "Variable Type", "Base (Total)", "Base Warning")
   )
@@ -698,37 +738,71 @@ add_question_list <- function(wb, all_results, config, styles, start_row,
     q_result <- all_results[[q_code]]
 
     total_key <- paste0("TOTAL::", total_column_name)
-    base_info <- q_result$bases[[total_key]]
-
-    if (config$apply_weighting) {
-      total_base <- round(base_info$weighted, 0)
-      eff_base <- round(base_info$effective, 0)
-      base_display <- paste0(total_base, " (eff: ", eff_base, ")")
+    base_info <- if (!is.null(q_result$bases)) {
+      q_result$bases[[total_key]]
     } else {
-      total_base <- base_info$unweighted
-      eff_base <- total_base
-      base_display <- as.character(total_base)
+      NULL
     }
 
-    base_warning <- ""
-    if (eff_base < very_small_base_size) {
-      base_warning <- paste0("WARNING: Very small base (n<", very_small_base_size, ")")
-    } else if (eff_base < config$significance_min_base) {
-      base_warning <- paste0("CAUTION: Small base (n<", config$significance_min_base, ")")
+    if (!is.null(base_info)) {
+      if (apply_weighting) {
+        total_base <- round(base_info$weighted, 0)
+        eff_base <- round(base_info$effective, 0)
+        base_display <- paste0(total_base, " (eff: ", eff_base, ")")
+      } else {
+        total_base <- base_info$unweighted
+        eff_base <- total_base
+        base_display <- as.character(total_base)
+      }
+
+      base_warning <- ""
+      if (eff_base < very_small_base_size) {
+        base_warning <- paste0("WARNING: Very small base (n<", very_small_base_size, ")")
+      } else if (eff_base < sig_min_base) {
+        base_warning <- paste0("CAUTION: Small base (n<", sig_min_base, ")")
+      }
+    } else {
+      # No base info available (shouldn't happen, but handle gracefully)
+      base_display <- "N/A"
+      base_warning <- ""
+      eff_base <- 0
     }
 
     filter_text <- if (!is.null(q_result$base_filter) &&
+                      length(q_result$base_filter) > 0 &&
                       !is.na(q_result$base_filter) &&
-                      q_result$base_filter != "") {
+                      nchar(trimws(q_result$base_filter)) > 0) {
       paste0(" [Filter: ", q_result$base_filter, "]")
     } else {
       ""
     }
 
+    # Safe extraction of question fields
+    q_code_display <- if (!is.null(q_result$question_code) &&
+                          length(q_result$question_code) > 0) {
+      as.character(q_result$question_code)
+    } else {
+      q_code
+    }
+
+    q_text <- if (!is.null(q_result$question_text) &&
+                  length(q_result$question_text) > 0) {
+      as.character(q_result$question_text)
+    } else {
+      ""
+    }
+
+    q_type <- if (!is.null(q_result$question_type) &&
+                  length(q_result$question_type) > 0) {
+      as.character(q_result$question_type)
+    } else {
+      "Unknown"
+    }
+
     question_list_rows[[length(question_list_rows) + 1]] <- c(
-      q_result$question_code,
-      paste0(q_result$question_text, filter_text),
-      q_result$question_type,
+      q_code_display,
+      paste0(q_text, filter_text),
+      q_type,
       base_display,
       base_warning
     )
@@ -751,10 +825,19 @@ add_question_list <- function(wb, all_results, config, styles, start_row,
 
   for (i in seq_len(nrow(question_list_df))) {
     warning_text <- question_list_df[i, 5]
-    if (!is.na(warning_text) && warning_text != "") {
-      style <- if (grepl("WARNING", warning_text)) {
+
+    # Safe warning text check
+    has_warning <- !is.null(warning_text) &&
+                   length(warning_text) > 0 &&
+                   !is.na(warning_text) &&
+                   nchar(trimws(as.character(warning_text))) > 0
+
+    if (has_warning) {
+      warning_text_str <- as.character(warning_text)
+
+      style <- if (grepl("WARNING", warning_text_str)) {
         styles$warning
-      } else if (grepl("CAUTION", warning_text)) {
+      } else if (grepl("CAUTION", warning_text_str)) {
         styles$caution
       } else {
         NULL
@@ -1072,6 +1155,277 @@ get_excel_writer_info <- function() {
       "utilities.R"
     )
   )
+}
+
+# ==============================================================================
+# INDEX SUMMARY SHEET WRITER (COMPOSITE METRICS FEATURE)
+# ==============================================================================
+
+#' Write Index Summary Sheet
+#'
+#' Write formatted Index_Summary sheet to Excel workbook
+#'
+#' @param wb Workbook object
+#' @param summary_table Data frame with summary metrics
+#' @param banner_info Banner structure
+#' @param config Configuration list
+#' @param styles Styles list
+#' @return Invisible NULL (modifies workbook by reference)
+#' @export
+write_index_summary_sheet <- function(wb, summary_table, banner_info,
+                                       config, styles, all_results = NULL) {
+
+  if (is.null(summary_table) || nrow(summary_table) == 0) {
+    return(invisible(NULL))
+  }
+
+  # Extract base sizes from first question result if banner_info$base_sizes is NULL
+  if (is.null(banner_info$base_sizes) && !is.null(all_results) && length(all_results) > 0) {
+    # Get first result that has bases
+    for (result in all_results) {
+      if (!is.null(result$bases)) {
+        banner_info$base_sizes <- result$bases
+        break
+      }
+    }
+  }
+
+  # Create sheet
+  openxlsx::addWorksheet(wb, "Index_Summary")
+
+  current_row <- 1
+
+  # Title style
+  title_style <- openxlsx::createStyle(
+    fontSize = 14,
+    textDecoration = "bold",
+    halign = "left"
+  )
+
+  # Section header style
+  section_style <- openxlsx::createStyle(
+    fontSize = 11,
+    textDecoration = "bold",
+    fgFill = "#E8E8E8",
+    border = "TopBottom"
+  )
+
+  # Composite row style
+  composite_style <- openxlsx::createStyle(
+    fontSize = 10,
+    fgFill = "#FFF8DC",
+    fontName = "Calibri"
+  )
+
+  # Metric style
+  metric_style <- openxlsx::createStyle(
+    fontSize = 10,
+    halign = "left"
+  )
+
+  # Data cell style
+  data_style <- openxlsx::createStyle(
+    fontSize = 10,
+    halign = "right",
+    numFmt = "0.0"
+  )
+
+  # Write title section
+  openxlsx::writeData(wb, "Index_Summary", "INDEX & RATING SUMMARY",
+                      startCol = 1, startRow = current_row)
+  openxlsx::addStyle(wb, "Index_Summary", title_style,
+                     rows = current_row, cols = 1, gridExpand = FALSE)
+  current_row <- current_row + 2
+
+  # Write metadata
+  project_name <- if (!is.null(config$project_name) && length(config$project_name) > 0) {
+    config$project_name
+  } else {
+    "Survey Analysis"
+  }
+  openxlsx::writeData(wb, "Index_Summary",
+                      paste("Survey:", project_name),
+                      startRow = current_row)
+  current_row <- current_row + 1
+
+  base_desc <- if (!is.null(banner_info$base_description) &&
+                   length(banner_info$base_description) > 0) {
+    banner_info$base_description
+  } else {
+    "All Respondents"
+  }
+  openxlsx::writeData(wb, "Index_Summary",
+                      paste("Base:", base_desc),
+                      startRow = current_row)
+  current_row <- current_row + 2
+
+  # Write column headers
+  internal_keys <- banner_info$internal_keys
+
+  # Safe extraction of column labels
+  column_labels <- if (!is.null(banner_info$column_labels) &&
+                       length(banner_info$column_labels) > 0) {
+    banner_info$column_labels
+  } else {
+    internal_keys  # Fallback to internal keys
+  }
+
+  headers <- c("Metric", column_labels)
+
+  openxlsx::writeData(wb, "Index_Summary", t(headers),
+                      startCol = 1, startRow = current_row, colNames = FALSE)
+  openxlsx::addStyle(wb, "Index_Summary", styles$header,
+                     rows = current_row, cols = 1:length(headers),
+                     gridExpand = TRUE)
+  current_row <- current_row + 1
+
+  # Write data rows
+  for (i in 1:nrow(summary_table)) {
+    row_data <- summary_table[i, ]
+
+    # Determine style based on row type
+    # Safe extraction of StyleHint
+    style_hint <- if ("StyleHint" %in% names(row_data) &&
+                      !is.null(row_data$StyleHint) &&
+                      length(row_data$StyleHint) > 0) {
+      as.character(row_data$StyleHint[1])
+    } else {
+      "Normal"
+    }
+
+    if (!is.na(style_hint) && style_hint == "SectionHeader") {
+      row_style <- section_style
+      is_section <- TRUE
+    } else if (!is.na(style_hint) && style_hint == "Composite") {
+      row_style <- composite_style
+      is_section <- FALSE
+    } else {
+      row_style <- metric_style
+      is_section <- FALSE
+    }
+
+    # Write row label
+    # Safe extraction of RowLabel
+    row_label <- if ("RowLabel" %in% names(row_data) &&
+                     !is.null(row_data$RowLabel) &&
+                     length(row_data$RowLabel) > 0) {
+      as.character(row_data$RowLabel[1])
+    } else {
+      ""
+    }
+
+    openxlsx::writeData(wb, "Index_Summary", row_label,
+                        startCol = 1, startRow = current_row)
+    openxlsx::addStyle(wb, "Index_Summary", row_style,
+                       rows = current_row, cols = 1, gridExpand = FALSE)
+
+    # Write data values (skip if section header)
+    if (!is_section) {
+      for (j in seq_along(internal_keys)) {
+        key <- internal_keys[j]
+
+        if (key %in% names(row_data)) {
+          value <- row_data[[key]]
+
+          # Safe value extraction and conversion to numeric
+          if (is.null(value) || length(value) == 0) {
+            value <- ""
+          } else {
+            # Extract single value and convert to character first for safety
+            value <- as.character(value[1])
+
+            # Handle NA values
+            if (is.na(value) || value == "NA") {
+              value <- ""
+            } else if (value != "") {
+              # Try to convert to numeric (so Excel style formatting applies)
+              has_letters <- grepl("[a-zA-Z]", value)
+              if (!is.na(has_letters) && !has_letters) {
+                numeric_value <- suppressWarnings(as.numeric(gsub(",", ".", value)))
+                if (!is.na(numeric_value)) {
+                  value <- numeric_value
+                }
+                # else keep as character string
+              }
+              # else keep as character string with letters
+            }
+          }
+
+          openxlsx::writeData(wb, "Index_Summary", value,
+                              startCol = j + 1, startRow = current_row)
+          openxlsx::addStyle(wb, "Index_Summary", data_style,
+                             rows = current_row, cols = j + 1,
+                             gridExpand = FALSE)
+        }
+      }
+    } else {
+      # Section header - apply style across row
+      openxlsx::addStyle(wb, "Index_Summary", section_style,
+                         rows = current_row, cols = 1:length(headers),
+                         gridExpand = TRUE)
+    }
+
+    current_row <- current_row + 1
+  }
+
+  # Add base sizes at bottom if enabled
+  show_base <- if ("index_summary_show_base_sizes" %in% names(config)) {
+    isTRUE(config$index_summary_show_base_sizes) ||
+      toupper(trimws(as.character(config$index_summary_show_base_sizes))) == "Y"
+  } else {
+    TRUE  # Default
+  }
+
+  if (show_base) {
+    current_row <- current_row + 1
+
+    # Write "Base sizes:" label
+    openxlsx::writeData(wb, "Index_Summary", "Base sizes:",
+                        startCol = 1, startRow = current_row)
+    openxlsx::addStyle(wb, "Index_Summary", metric_style,
+                       rows = current_row, cols = 1, gridExpand = FALSE)
+    current_row <- current_row + 1
+
+    # Write unweighted n
+    openxlsx::writeData(wb, "Index_Summary", "Unweighted n:",
+                        startCol = 1, startRow = current_row)
+
+    for (j in seq_along(internal_keys)) {
+      key <- internal_keys[j]
+      if (!is.null(banner_info$base_sizes[[key]])) {
+        n <- banner_info$base_sizes[[key]]$unweighted
+        openxlsx::writeData(wb, "Index_Summary", n,
+                            startCol = j + 1, startRow = current_row)
+      }
+    }
+
+    # Write weighted n (if applicable)
+    apply_weighting <- !is.null(config$apply_weighting) &&
+                       length(config$apply_weighting) > 0 &&
+                       config$apply_weighting
+
+    if (apply_weighting) {
+      current_row <- current_row + 1
+      openxlsx::writeData(wb, "Index_Summary", "Weighted n:",
+                          startCol = 1, startRow = current_row)
+
+      for (j in seq_along(internal_keys)) {
+        key <- internal_keys[j]
+        if (!is.null(banner_info$base_sizes[[key]])) {
+          n <- banner_info$base_sizes[[key]]$weighted
+          openxlsx::writeData(wb, "Index_Summary", round(n, 0),
+                              startCol = j + 1, startRow = current_row)
+        }
+      }
+    }
+  }
+
+  # Set column widths
+  openxlsx::setColWidths(wb, "Index_Summary", cols = 1, widths = 40)
+  openxlsx::setColWidths(wb, "Index_Summary",
+                         cols = 2:(length(headers)), widths = 12)
+
+  return(invisible(NULL))
 }
 
 # ==============================================================================
