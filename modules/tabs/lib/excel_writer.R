@@ -28,9 +28,45 @@ if (!requireNamespace("openxlsx", quietly = TRUE)) {
 }
 
 # Load shared formatting module (Phase 2 refactoring)
-script_dir <- dirname(sys.frame(1)$ofile)
-shared_dir <- file.path(script_dir, "..", "..", "shared")
-source(file.path(shared_dir, "formatting.R"), local = FALSE)
+# Robust path resolution - searches up directory tree to find Turas root
+find_turas_root <- function() {
+  # Method 1: Check if TURAS_ROOT is already set
+  if (exists("TURAS_ROOT", envir = .GlobalEnv)) {
+    return(get("TURAS_ROOT", envir = .GlobalEnv))
+  }
+  
+  # Method 2: Start from current working directory
+  current_dir <- getwd()
+  
+  # Search up directory tree for Turas root markers
+  while (current_dir != dirname(current_dir)) {  # Stop at filesystem root
+    # Check for Turas root markers
+    if (file.exists(file.path(current_dir, "launch_turas.R")) ||
+        (dir.exists(file.path(current_dir, "shared")) && 
+         dir.exists(file.path(current_dir, "modules")))) {
+      return(current_dir)
+    }
+    current_dir <- dirname(current_dir)
+  }
+  
+  # Method 3: Try relative paths from module location
+  for (rel_path in c("../..", "../../..", "../../../..")) {
+    test_path <- normalizePath(file.path(rel_path, "shared", "formatting.R"), mustWork = FALSE)
+    if (file.exists(test_path)) {
+      return(normalizePath(dirname(dirname(test_path)), mustWork = TRUE))
+    }
+  }
+  
+  stop(paste0(
+    "Cannot locate Turas root directory.\n",
+    "Please ensure you're running from the Turas directory.\n",
+    "Current working directory: ", getwd()
+  ))
+}
+
+turas_root <- find_turas_root()
+source(file.path(turas_root, "shared", "formatting.R"), local = FALSE)
+
 
 # ==============================================================================
 # MAIN EXCEL WRITER
