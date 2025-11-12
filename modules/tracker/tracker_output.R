@@ -5,12 +5,20 @@
 # Generates Excel output for tracking analysis.
 # Creates one sheet per question plus summary/metadata sheets.
 #
-# SHARED CODE NOTES:
-# - Excel styling patterns should use /shared/excel_styles.R
-# - Number formatting should use /shared/formatting.R
-# - Future: Extract create_standard_styles(), format_number()
+# VERSION: 2.0.0 - Phase 2 Update
+# CHANGES: Now uses shared/formatting.R for consistent decimal separator handling
+#
+# PHASE 2 UPDATE:
+# - Decimal separator now properly respected (was hardcoded to "." before)
+# - Uses create_excel_number_format() from shared/formatting.R
+# - Fixes inconsistency with TurasTabs decimal separator behavior
 #
 # ==============================================================================
+
+# Load shared formatting module (Phase 2 refactoring)
+script_dir <- dirname(sys.frame(1)$ofile)
+shared_dir <- file.path(script_dir, "..", "..", "shared")
+source(file.path(shared_dir, "formatting.R"), local = FALSE)
 
 #' Write Tracker Output to Excel
 #'
@@ -289,17 +297,10 @@ write_mean_trend_table <- function(wb, sheet_name, result, wave_ids, config, sty
   decimal_sep <- get_setting(config, "decimal_separator", default = ".")
   decimal_places <- get_setting(config, "decimal_places_ratings", default = 1)
 
-  # Build Excel number format string
-  # IMPORTANT: Excel format codes ALWAYS use "." for decimal position
-  # Excel then converts to comma/period based on system locale
-  # So use "0.0" for 1 decimal regardless of desired separator
-  if (decimal_places == 0) {
-    number_format <- "0"  # No decimals
-  } else {
-    zeros <- paste(rep("0", decimal_places), collapse = "")
-    # Always use period in format code - Excel handles locale conversion
-    number_format <- paste0("0.", zeros)
-  }
+  # Phase 2 Update: Use shared formatting module
+  # This FIXES the issue where decimal_separator was ignored!
+  # Now properly respects config setting instead of always using "."
+  number_format <- create_excel_number_format(decimal_places, decimal_sep)
 
   # Mean row - write label and numbers separately to preserve numeric type
   # First, write the label
@@ -429,17 +430,10 @@ write_nps_trend_table <- function(wb, sheet_name, result, wave_ids, config, styl
   decimal_sep <- get_setting(config, "decimal_separator", default = ".")
   decimal_places <- get_setting(config, "decimal_places_ratings", default = 1)
 
-  # Build Excel number format string
-  # IMPORTANT: Excel format codes ALWAYS use "." for decimal position
-  # Excel then converts to comma/period based on system locale
-  # So use "0.0" for 1 decimal regardless of desired separator
-  if (decimal_places == 0) {
-    number_format <- "0"  # No decimals
-  } else {
-    zeros <- paste(rep("0", decimal_places), collapse = "")
-    # Always use period in format code - Excel handles locale conversion
-    number_format <- paste0("0.", zeros)
-  }
+  # Phase 2 Update: Use shared formatting module
+  # This FIXES the issue where decimal_separator was ignored!
+  # Now properly respects config setting instead of always using "."
+  number_format <- create_excel_number_format(decimal_places, decimal_sep)
 
   # Headers
   headers <- c("Metric", wave_ids)
@@ -516,17 +510,10 @@ write_proportions_trend_table <- function(wb, sheet_name, result, wave_ids, conf
   decimal_sep <- get_setting(config, "decimal_separator", default = ".")
   decimal_places <- get_setting(config, "decimal_places_ratings", default = 1)
 
-  # Build Excel number format string
-  # IMPORTANT: Excel format codes ALWAYS use "." for decimal position
-  # Excel then converts to comma/period based on system locale
-  # So use "0.0" for 1 decimal regardless of desired separator
-  if (decimal_places == 0) {
-    number_format <- "0"  # No decimals
-  } else {
-    zeros <- paste(rep("0", decimal_places), collapse = "")
-    # Always use period in format code - Excel handles locale conversion
-    number_format <- paste0("0.", zeros)
-  }
+  # Phase 2 Update: Use shared formatting module
+  # This FIXES the issue where decimal_separator was ignored!
+  # Now properly respects config setting instead of always using "."
+  number_format <- create_excel_number_format(decimal_places, decimal_sep)
 
   # Headers
   headers <- c("Response Option", wave_ids)
@@ -754,17 +741,10 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
   decimal_sep <- get_setting(config, "decimal_separator", default = ".")
   decimal_places <- get_setting(config, "decimal_places_ratings", default = 1)
 
-  # Build Excel number format string
-  # IMPORTANT: Excel format codes ALWAYS use "." for decimal position
-  # Excel then converts to comma/period based on system locale
-  # So use "0.0" for 1 decimal regardless of desired separator
-  if (decimal_places == 0) {
-    number_format <- "0"  # No decimals
-  } else {
-    zeros <- paste(rep("0", decimal_places), collapse = "")
-    # Always use period in format code - Excel handles locale conversion
-    number_format <- paste0("0.", zeros)
-  }
+  # Phase 2 Update: Use shared formatting module
+  # This FIXES the issue where decimal_separator was ignored!
+  # Now properly respects config setting instead of always using "."
+  number_format <- create_excel_number_format(decimal_places, decimal_sep)
 
   segment_names <- names(question_segments)
   first_seg <- question_segments[[1]]
@@ -992,17 +972,10 @@ write_change_summary_sheet <- function(wb, banner_results, config, styles) {
   decimal_sep <- get_setting(config, "decimal_separator", default = ".")
   decimal_places <- get_setting(config, "decimal_places_ratings", default = 1)
 
-  # Build Excel number format string
-  # IMPORTANT: Excel format codes ALWAYS use "." for decimal position
-  # Excel then converts to comma/period based on system locale
-  # So use "0.0" for 1 decimal regardless of desired separator
-  if (decimal_places == 0) {
-    number_format <- "0"  # No decimals
-  } else {
-    zeros <- paste(rep("0", decimal_places), collapse = "")
-    # Always use period in format code - Excel handles locale conversion
-    number_format <- paste0("0.", zeros)
-  }
+  # Phase 2 Update: Use shared formatting module
+  # This FIXES the issue where decimal_separator was ignored!
+  # Now properly respects config setting instead of always using "."
+  number_format <- create_excel_number_format(decimal_places, decimal_sep)
 
   # Headers
   headers <- c("Question", "Metric", "Baseline", "Latest", "Absolute Change", "% Change")
@@ -1133,17 +1106,10 @@ write_distribution_table <- function(wb, sheet_name, result, wave_ids, config, s
   decimal_sep <- get_setting(config, "decimal_separator", default = ".")
   decimal_places <- get_setting(config, "decimal_places_ratings", default = 1)
 
-  # Build Excel number format string
-  # IMPORTANT: Excel format codes ALWAYS use "." for decimal position
-  # Excel then converts to comma/period based on system locale
-  # So use "0.0" for 1 decimal regardless of desired separator
-  if (decimal_places == 0) {
-    number_format <- "0"  # No decimals
-  } else {
-    zeros <- paste(rep("0", decimal_places), collapse = "")
-    # Always use period in format code - Excel handles locale conversion
-    number_format <- paste0("0.", zeros)
-  }
+  # Phase 2 Update: Use shared formatting module
+  # This FIXES the issue where decimal_separator was ignored!
+  # Now properly respects config setting instead of always using "."
+  number_format <- create_excel_number_format(decimal_places, decimal_sep)
 
   # Write distribution table
   headers <- c("Rating Value", wave_ids)

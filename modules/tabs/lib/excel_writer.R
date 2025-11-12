@@ -15,15 +15,22 @@
 # DEPENDENCIES:
 #   - openxlsx (Excel creation)
 #   - utilities.R (formatting, logging)
+#   - shared/formatting.R (number formatting - Phase 2 refactoring)
 #
-# VERSION: 1.0.0
-# DATE: 2025-10-25
+# VERSION: 1.1.0 - Phase 2 Update
+# DATE: 2025-11-12
+# CHANGES: Now uses shared/formatting.R for consistent number formatting
 # ==============================================================================
 
 # Require openxlsx
 if (!requireNamespace("openxlsx", quietly = TRUE)) {
   stop("Package 'openxlsx' is required for excel_writer module")
 }
+
+# Load shared formatting module (Phase 2 refactoring)
+script_dir <- dirname(sys.frame(1)$ofile)
+shared_dir <- file.path(script_dir, "..", "..", "shared")
+source(file.path(shared_dir, "formatting.R"), local = FALSE)
 
 # ==============================================================================
 # MAIN EXCEL WRITER
@@ -107,6 +114,10 @@ write_crosstab_workbook <- function(output_file, all_results, banner_info,
 #'
 #' Creates all formatting styles for Excel output.
 #'
+#' NOTE (Phase 2 Update): This function now uses shared/formatting.R
+#' for number format generation. This ensures consistent decimal separator
+#' handling across all TURAS modules.
+#'
 #' @param decimal_separator Character, "." or ","
 #' @param decimal_places_percent Integer, decimals for percentages
 #' @param decimal_places_ratings Integer, decimals for ratings
@@ -119,9 +130,14 @@ create_excel_styles <- function(decimal_separator = ".",
                                decimal_places_ratings = 1,
                                decimal_places_index = 1,
                                decimal_places_numeric = 1) {
-  
-  sep <- decimal_separator
-  
+
+  # Phase 2 Update: Use shared formatting module
+  # This ensures consistent number formatting across Tabs and Tracker
+  fmt_percent <- create_excel_number_format(decimal_places_percent, decimal_separator)
+  fmt_rating <- create_excel_number_format(decimal_places_ratings, decimal_separator)
+  fmt_index <- create_excel_number_format(decimal_places_index, decimal_separator)
+  fmt_numeric <- create_excel_number_format(decimal_places_numeric, decimal_separator)
+
   list(
     banner = openxlsx::createStyle(
       fontSize = 12, fontName = "Aptos", fontColour = "white",
@@ -158,21 +174,13 @@ create_excel_styles <- function(decimal_separator = ".",
     column_pct = openxlsx::createStyle(
       fontSize = 12, fontName = "Aptos", fontColour = "black",
       halign = "center", valign = "center",
-      numFmt = if (decimal_places_percent == 0) {
-        "0"
-      } else {
-        paste0("0", sep, paste(rep("0", decimal_places_percent), collapse = ""))
-      }
+      numFmt = fmt_percent
     ),
-    
+
     row_pct = openxlsx::createStyle(
       fontSize = 12, fontName = "Aptos", fontColour = "#595959",
       halign = "left", valign = "center",
-      numFmt = if (decimal_places_percent == 0) {
-        "0"
-      } else {
-        paste0("0", sep, paste(rep("0", decimal_places_percent), collapse = ""))
-      }
+      numFmt = fmt_percent
     ),
     
     sig = openxlsx::createStyle(
@@ -183,41 +191,25 @@ create_excel_styles <- function(decimal_separator = ".",
     rating_style = openxlsx::createStyle(
       fontSize = 12, fontName = "Aptos", fontColour = "black",
       halign = "center", valign = "center", textDecoration = "bold",
-      numFmt = if (decimal_places_ratings == 0) {
-        "0"
-      } else {
-        paste0("0", sep, paste(rep("0", decimal_places_ratings), collapse = ""))
-      }
+      numFmt = fmt_rating
     ),
-    
+
     numeric_style = openxlsx::createStyle(
       fontSize = 12, fontName = "Aptos", fontColour = "black",
       halign = "center", valign = "center", textDecoration = "bold",
-      numFmt = if (decimal_places_numeric == 0) {
-        "0"
-      } else {
-        paste0("0", sep, paste(rep("0", decimal_places_numeric), collapse = ""))
-      }
+      numFmt = fmt_numeric
     ),
-    
+
     index_style = openxlsx::createStyle(
       fontSize = 12, fontName = "Aptos", fontColour = "black",
       halign = "center", valign = "center", textDecoration = "bold",
-      numFmt = if (decimal_places_index == 0) {
-        "0"
-      } else {
-        paste0("0", sep, paste(rep("0", decimal_places_index), collapse = ""))
-      }
+      numFmt = fmt_index
     ),
-    
+
     score_style = openxlsx::createStyle(
       fontSize = 12, fontName = "Aptos", fontColour = "black",
       halign = "center", valign = "center", textDecoration = "bold",
-      numFmt = if (decimal_places_percent == 0) {
-        "0"
-      } else {
-        paste0("0", sep, paste(rep("0", decimal_places_percent), collapse = ""))
-      }
+      numFmt = fmt_percent
     ),
     
     row_label = openxlsx::createStyle(
@@ -228,11 +220,7 @@ create_excel_styles <- function(decimal_separator = ".",
     stddev_style = openxlsx::createStyle(
       fontSize = 11, fontName = "Aptos", fontColour = "#595959",
       halign = "center", valign = "center", fgFill = "#F2F2F2",
-      numFmt = if (decimal_places_ratings == 0) {
-        "0"
-      } else {
-        paste0("0", sep, paste(rep("0", decimal_places_ratings), collapse = ""))
-      }
+      numFmt = fmt_rating
     ),
 
     header = openxlsx::createStyle(

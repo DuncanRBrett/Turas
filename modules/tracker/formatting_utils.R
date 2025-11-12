@@ -4,11 +4,21 @@
 #
 # Number and text formatting utilities for output.
 #
+# VERSION: 2.0.0 - Phase 2 Update
+# CHANGES: Now uses shared/formatting.R for consistent formatting
 # ==============================================================================
+
+# Load shared formatting module (Phase 2 refactoring)
+script_dir <- dirname(sys.frame(1)$ofile)
+shared_dir <- file.path(script_dir, "..", "..", "shared")
+source(file.path(shared_dir, "formatting.R"), local = FALSE)
 
 #' Format Number with Decimal Separator
 #'
 #' Formats a number using the configured decimal separator (comma or period).
+#'
+#' NOTE (Phase 2 Update): This function now wraps shared/formatting.R::format_number()
+#' to ensure consistent behavior across all TURAS modules.
 #'
 #' @param x Numeric value or vector
 #' @param decimal_places Integer. Number of decimal places
@@ -17,29 +27,16 @@
 #'
 #' @export
 format_number_with_separator <- function(x, decimal_places = 1, decimal_sep = ".") {
-
-  if (is.null(x) || all(is.na(x))) {
-    return(as.character(x))
-  }
-
-  # Round to decimal places
-  x_rounded <- round(x, decimal_places)
-
-  # Format with period first
-  x_formatted <- format(x_rounded, nsmall = decimal_places, trim = TRUE)
-
-  # Replace period with comma if needed
-  if (decimal_sep == ",") {
-    x_formatted <- gsub("\\.", ",", x_formatted)
-  }
-
-  return(x_formatted)
+  # Wrapper for shared format_number function
+  format_number(x, decimal_places, decimal_sep)
 }
 
 
 #' Apply Number Format to Excel Range
 #'
 #' Applies number formatting to cells with custom decimal separator.
+#'
+#' NOTE (Phase 2 Update): Now uses create_excel_number_format() from shared module.
 #'
 #' @param wb Workbook object
 #' @param sheet Sheet name
@@ -51,14 +48,8 @@ format_number_with_separator <- function(x, decimal_places = 1, decimal_sep = ".
 #' @export
 apply_number_format_excel <- function(wb, sheet, rows, cols, decimal_places = 1, decimal_sep = ".") {
 
-  # Create Excel number format string
-  if (decimal_sep == ",") {
-    # Use European format with comma decimal separator
-    format_str <- paste0("#", decimal_sep, paste(rep("0", decimal_places), collapse = ""))
-  } else {
-    # Use standard format with period
-    format_str <- paste0("#", decimal_sep, paste(rep("0", decimal_places), collapse = ""))
-  }
+  # Phase 2 Update: Use shared formatting module
+  format_str <- create_excel_number_format(decimal_places, decimal_sep)
 
   # Create style with this format
   number_style <- openxlsx::createStyle(numFmt = format_str)
@@ -68,4 +59,4 @@ apply_number_format_excel <- function(wb, sheet, rows, cols, decimal_places = 1,
 }
 
 
-message("Turas>Tracker formatting_utils module loaded")
+message("Turas>Tracker formatting_utils module loaded (v2.0 - using shared/formatting.R)")
