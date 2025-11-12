@@ -58,20 +58,16 @@ create_excel_number_format <- function(decimal_places = 1, decimal_separator = "
     return("0")
   }
 
-  # CRITICAL: In Excel format codes, comma is a THOUSANDS separator, not decimal!
-  # We must use different format patterns depending on the decimal separator
+  # CRITICAL FIX: Excel format codes ALWAYS use . for decimal and , for thousands
+  # Using comma in format code means "divide by 1000" which causes 8.2 → 0.0082 → "08"!
+  #
+  # SOLUTION: Always use . in the format code regardless of user's decimal preference
+  # Excel will automatically display it with comma if the system locale uses comma
+  #
+  # The decimal_separator parameter only affects TEXT formatting (format_number function),
+  # not Excel's internal number format codes
   zeros <- paste(rep("0", decimal_places), collapse = "")
-
-  if (decimal_separator == ",") {
-    # For comma decimal separator: use space as thousands separator and comma as decimal
-    # Format pattern: "# ##0,00" uses space for thousands and comma for decimals
-    # The space between # symbols creates the thousands separator
-    format_code <- paste0("# ##0", ",", zeros)
-  } else {
-    # For period decimal separator: standard format without thousands separator
-    # Format pattern: "0.0" just shows the decimal part
-    format_code <- paste0("0", ".", zeros)
-  }
+  format_code <- paste0("0", ".", zeros)
 
   return(format_code)
 }
