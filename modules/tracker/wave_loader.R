@@ -6,11 +6,18 @@
 # Supports both CSV and Excel formats.
 # Handles weighting variable application.
 #
-# SHARED CODE NOTES:
-# - Weight calculation logic should be extracted to /shared/weights.R
-# - Data validation patterns similar to TurasTabs data_loader.R
-# - Future: Extract common data loading utilities to /shared/data_utils.R
+# VERSION: 2.0.0 - Phase 4 Update
 #
+# PHASE 4 UPDATE:
+# Shared weight utilities NOW AVAILABLE in shared/weights.R:
+# - calculate_weight_efficiency() - Effective sample size calculation
+# - calculate_design_effect() - Design effect (deff) calculation
+# - validate_weights() - Comprehensive weight validation
+# - get_weight_summary() - Descriptive weight statistics
+# - standardize_weight_variable() - Create standardized weight column
+#
+# This module currently uses local calculate_weight_efficiency() function.
+# New code should use shared/weights.R functions for consistency.
 # ==============================================================================
 
 #' Load All Wave Data
