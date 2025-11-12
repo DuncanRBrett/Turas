@@ -58,10 +58,20 @@ create_excel_number_format <- function(decimal_places = 1, decimal_separator = "
     return("0")
   }
 
-  # Build format with explicit separator
-  # Using explicit separator ensures consistent display regardless of Excel locale
+  # CRITICAL: In Excel format codes, comma is a THOUSANDS separator, not decimal!
+  # We must use different format patterns depending on the decimal separator
   zeros <- paste(rep("0", decimal_places), collapse = "")
-  format_code <- paste0("0", decimal_separator, zeros)
+
+  if (decimal_separator == ",") {
+    # For comma decimal separator: use space as thousands separator and comma as decimal
+    # Format pattern: "# ##0,00" uses space for thousands and comma for decimals
+    # The space between # symbols creates the thousands separator
+    format_code <- paste0("# ##0", ",", zeros)
+  } else {
+    # For period decimal separator: standard format without thousands separator
+    # Format pattern: "0.0" just shows the decimal part
+    format_code <- paste0("0", ".", zeros)
+  }
 
   return(format_code)
 }
