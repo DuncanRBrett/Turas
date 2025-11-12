@@ -6,11 +6,18 @@
 #   - tracking_config.xlsx (Waves, Settings, Banner, TrackedQuestions)
 #   - question_mapping.xlsx (QuestionMap sheet)
 #
-# SHARED CODE NOTES:
-# - Config file parsing logic is similar to TurasTabs config_loader.R
-# - Future: Extract common config utilities to /shared/config_utils.R
-#   (e.g., read_config_sheet, validate_required_columns, parse_settings)
+# VERSION: 2.0.0 - Phase 3 Update
 #
+# PHASE 3 UPDATE:
+# Shared config utilities NOW AVAILABLE in shared/config_utils.R:
+# - read_config_sheet() - Read Excel sheets with error handling
+# - parse_settings_to_list() - Convert settings to named list
+# - get_setting() - Retrieve settings with defaults
+# - validate_required_columns() - Column validation
+# - check_duplicates() - Uniqueness validation
+#
+# This module continues to use its current implementation for backward
+# compatibility. New code should use shared/config_utils.R functions.
 # ==============================================================================
 
 #' Load Tracking Configuration

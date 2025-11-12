@@ -4,7 +4,12 @@
 # Purpose: Load and parse crosstab configuration files
 # Dependencies: core/validation, shared/data/loader
 # Author: Turas Analytics Toolkit
-# Version: 1.0.0
+# Version: 1.1.0 - Phase 3 Update
+#
+# PHASE 3 NOTE:
+# Shared config utilities are now available in shared/config_utils.R
+# New code should use: read_config_sheet(), parse_settings_to_list(), etc.
+# This module will be incrementally refactored to use shared utilities.
 # ==============================================================================
 
 #' Load Complete Crosstab Configuration
