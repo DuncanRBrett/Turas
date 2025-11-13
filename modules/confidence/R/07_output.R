@@ -199,13 +199,14 @@ add_summary_sheet <- function(wb, study_stats, prop_results, mean_results,
                        rows = row, cols = 1)
     row <- row + 1
 
-    # Format study stats with decimal separator
-    study_display <- study_stats
-    study_display <- format_dataframe_decimals(study_display, decimal_sep)
-
-    openxlsx::writeData(wb, "Summary", study_display, startCol = 1, startRow = row,
+    # Write numeric data (not converted to strings)
+    openxlsx::writeData(wb, "Summary", study_stats, startCol = 1, startRow = row,
                         colNames = TRUE, rowNames = FALSE)
-    row <- row + nrow(study_display) + 2
+
+    # Apply Excel number formatting to preserve numeric values
+    apply_numeric_formatting(wb, "Summary", row + 1, 1, study_stats, decimal_sep)
+
+    row <- row + nrow(study_stats) + 2
   }
 
   # Results Summary
@@ -275,13 +276,12 @@ add_study_level_sheet <- function(wb, study_stats, decimal_sep) {
                      style = openxlsx::createStyle(fontSize = 14, textDecoration = "bold"),
                      rows = 1, cols = 1)
 
-  # Format with decimal separator
-  study_display <- study_stats
-  study_display <- format_dataframe_decimals(study_display, decimal_sep)
-
-  # Write data
-  openxlsx::writeData(wb, "Study_Level", study_display, startCol = 1, startRow = 3,
+  # Write numeric data (not converted to strings)
+  openxlsx::writeData(wb, "Study_Level", study_stats, startCol = 1, startRow = 3,
                       colNames = TRUE, rowNames = FALSE)
+
+  # Apply Excel number formatting to preserve numeric values
+  apply_numeric_formatting(wb, "Study_Level", 4, 1, study_stats, decimal_sep)
 
   # Header style
   header_style <- openxlsx::createStyle(
@@ -351,12 +351,12 @@ add_proportions_detail_sheet <- function(wb, prop_results, decimal_sep) {
     return(invisible(NULL))
   }
 
-  # Format with decimal separator
-  prop_display <- format_dataframe_decimals(prop_df, decimal_sep)
-
-  # Write data
-  openxlsx::writeData(wb, "Proportions_Detail", prop_display, startCol = 1, startRow = 3,
+  # Write numeric data (not converted to strings)
+  openxlsx::writeData(wb, "Proportions_Detail", prop_df, startCol = 1, startRow = 3,
                       colNames = TRUE, rowNames = FALSE)
+
+  # Apply Excel number formatting to preserve numeric values
+  apply_numeric_formatting(wb, "Proportions_Detail", 4, 1, prop_df, decimal_sep)
 
   # Header style
   header_style <- openxlsx::createStyle(
@@ -457,12 +457,12 @@ add_means_detail_sheet <- function(wb, mean_results, decimal_sep) {
     return(invisible(NULL))
   }
 
-  # Format with decimal separator
-  mean_display <- format_dataframe_decimals(mean_df, decimal_sep)
-
-  # Write data
-  openxlsx::writeData(wb, "Means_Detail", mean_display, startCol = 1, startRow = 3,
+  # Write numeric data (not converted to strings)
+  openxlsx::writeData(wb, "Means_Detail", mean_df, startCol = 1, startRow = 3,
                       colNames = TRUE, rowNames = FALSE)
+
+  # Apply Excel number formatting to preserve numeric values
+  apply_numeric_formatting(wb, "Means_Detail", 4, 1, mean_df, decimal_sep)
 
   # Header style
   header_style <- openxlsx::createStyle(
@@ -734,48 +734,79 @@ add_inputs_sheet <- function(wb, config, decimal_sep) {
 # HELPER FUNCTIONS
 # ==============================================================================
 
-#' Format data frame numeric columns with decimal separator (internal)
+#' Create Excel number format string with decimal separator (internal)
+#'
+#' Creates an Excel number format code that includes the specified decimal separator.
+#' Keeps values numeric so Excel can perform calculations and sorting.
+#'
+#' @param decimal_places Integer. Number of decimal places
+#' @param decimal_sep Character. "." or ","
+#' @return Character. Excel number format code
 #' @keywords internal
-format_dataframe_decimals <- function(df, decimal_sep) {
+create_excel_number_format <- function(decimal_places = 2, decimal_sep = ".") {
 
-  if (!is.data.frame(df)) {
-    return(df)
+  if (decimal_places == 0) {
+    return("0")
   }
 
-  # Create copy
-  df_formatted <- df
+  # Create format string with specified decimal separator
+  # Excel understands format codes like "0.00" or "0,00"
+  zeros <- paste(rep("0", decimal_places), collapse = "")
+  format_str <- paste0("0", decimal_sep, zeros)
 
-  # Format each numeric column
-  for (col_name in names(df_formatted)) {
-    col_data <- df_formatted[[col_name]]
+  return(format_str)
+}
+
+
+#' Apply Excel number formatting to numeric columns in dataframe region (internal)
+#'
+#' Applies Excel cell styles with number formatting to preserve numeric values.
+#' Does NOT convert to character strings - keeps values numeric.
+#'
+#' @param wb Workbook object
+#' @param sheet Sheet name
+#' @param start_row Starting row
+#' @param start_col Starting column
+#' @param df Data frame to format
+#' @param decimal_sep Character. "." or ","
+#' @keywords internal
+apply_numeric_formatting <- function(wb, sheet, start_row, start_col, df, decimal_sep) {
+
+  if (!is.data.frame(df) || nrow(df) == 0) {
+    return(invisible(NULL))
+  }
+
+  # Apply formatting to each numeric column
+  for (col_idx in seq_along(df)) {
+    col_data <- df[[col_idx]]
+    col_name <- names(df)[col_idx]
 
     if (is.numeric(col_data)) {
       # Determine appropriate decimal places
       digits <- 2
 
-      # Use more precision for small values (SE, MOE, etc.)
+      # Use more precision for small values (SE, MOE, CV, DEFF, etc.)
       if (any(grepl("SE|MOE|CV|DEFF", col_name, ignore.case = TRUE))) {
         digits <- 3
       }
 
-      # Format with decimal separator
-      formatted_values <- sapply(col_data, function(x) {
-        if (is.na(x)) {
-          return(NA_character_)
-        } else {
-          val <- formatC(x, format = "f", digits = digits)
-          if (decimal_sep == ",") {
-            val <- gsub("\\.", ",", val)
-          }
-          return(val)
-        }
-      })
+      # Create Excel number format
+      num_format <- create_excel_number_format(digits, decimal_sep)
+      num_style <- openxlsx::createStyle(numFmt = num_format)
 
-      df_formatted[[col_name]] <- formatted_values
+      # Apply to all data rows in this column
+      excel_col <- start_col + col_idx - 1
+      data_rows <- start_row:(start_row + nrow(df) - 1)
+
+      openxlsx::addStyle(wb, sheet, num_style,
+                        rows = data_rows,
+                        cols = excel_col,
+                        gridExpand = TRUE,
+                        stack = TRUE)
     }
   }
 
-  return(df_formatted)
+  invisible(NULL)
 }
 
 
