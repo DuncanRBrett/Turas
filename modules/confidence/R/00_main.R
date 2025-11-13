@@ -170,7 +170,7 @@ run_confidence_analysis <- function(config_path,
     cat(sprintf("  ✓ Configuration loaded successfully\n"))
     cat(sprintf("  ✓ Questions to analyze: %d (limit: 200)\n",
                 nrow(config$question_analysis)))
-    cat(sprintf("  ✓ Confidence level: %.2f\n", config$study_settings$Confidence_Level))
+    cat(sprintf("  ✓ Confidence level: %.2f\n", as.numeric(config$study_settings$Confidence_Level)))
     cat(sprintf("  ✓ Decimal separator: %s\n", config$study_settings$Decimal_Separator))
   }
 
