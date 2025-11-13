@@ -132,12 +132,10 @@ load_file_paths_sheet <- function(config_path) {
     ), call. = FALSE)
   }
 
-  # Required parameters
+  # Required parameters (simplified for standalone module)
   required_params <- c(
-    "survey_structure_file",
-    "crosstab_config_file",
-    "raw_data_file",
-    "output_file"
+    "Data_File",
+    "Output_File"
   )
 
   # Check all required parameters present
@@ -327,24 +325,17 @@ validate_file_paths <- function(file_paths_df) {
   # Convert to named list for easier access
   paths <- setNames(file_paths_df$Value, file_paths_df$Parameter)
 
-  # Check input files exist
-  input_files <- c("survey_structure_file", "crosstab_config_file", "raw_data_file")
+  # Check input data file exists
+  data_file <- paths[["Data_File"]]
 
-  for (param in input_files) {
-    file_path <- paths[[param]]
-
-    if (is.na(file_path) || file_path == "") {
-      errors <- c(errors, sprintf("'%s' cannot be empty", param))
-      next
-    }
-
-    if (!file.exists(file_path)) {
-      errors <- c(errors, sprintf("'%s' file not found: %s", param, file_path))
-    }
+  if (is.na(data_file) || data_file == "") {
+    errors <- c(errors, "'Data_File' cannot be empty")
+  } else if (!file.exists(data_file)) {
+    errors <- c(errors, sprintf("'Data_File' not found: %s", data_file))
   }
 
   # Check output file parent directory exists
-  output_file <- paths[["output_file"]]
+  output_file <- paths[["Output_File"]]
   if (!is.na(output_file) && output_file != "") {
     output_dir <- dirname(output_file)
     if (output_dir != "." && !dir.exists(output_dir)) {
