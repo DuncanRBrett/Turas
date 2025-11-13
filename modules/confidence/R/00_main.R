@@ -449,19 +449,21 @@ process_proportion_question <- function(q_row, survey_data, weight_var, config, 
     # Bootstrap
     if (toupper(q_row$Run_Bootstrap) == "Y") {
       boot_iter <- as.integer(config$study_settings$Bootstrap_Iterations)
-      result$bootstrap <- bootstrap_proportion_ci(success_values, weights_valid, conf_level, boot_iter)
+      # Pass raw values and categories, not success_values
+      values_valid <- values[valid_idx]
+      result$bootstrap <- bootstrap_proportion_ci(values_valid, categories, weights_valid, boot_iter, conf_level)
     }
 
     # Bayesian
     if (toupper(q_row$Run_Credible) == "Y") {
-      # Check for prior specifications
-      prior_alpha <- if (!is.na(q_row$Prior_Alpha)) q_row$Prior_Alpha else NULL
-      prior_beta <- if (!is.na(q_row$Prior_Beta)) q_row$Prior_Beta else NULL
+      # Check for prior specifications (Prior_Mean and Prior_N, not Alpha/Beta)
+      prior_mean <- if (!is.na(q_row$Prior_Mean)) as.numeric(q_row$Prior_Mean) else NULL
+      prior_n_val <- if (!is.na(q_row$Prior_N)) as.integer(q_row$Prior_N) else NULL
 
-      x <- sum(success_values)
-      n <- length(success_values)
+      # Calculate proportion from success_values
+      n_bayes <- length(success_values)
 
-      result$bayesian <- credible_interval_proportion(x, n, conf_level, prior_alpha, prior_beta)
+      result$bayesian <- credible_interval_proportion(p, n_bayes, conf_level, prior_mean, prior_n_val)
     }
 
   }, error = function(e) {
