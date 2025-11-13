@@ -91,8 +91,8 @@ load_confidence_config <- function(config_path) {
   cat(sprintf("  - Question analysis: %d questions (max 200)\n", nrow(question_analysis)))
 
   # Convert file_paths and study_settings to named lists for easier access
-  file_paths_list <- setNames(as.character(file_paths$Value), file_paths$Parameter)
-  study_settings_list <- setNames(study_settings$Value, study_settings$Setting)
+  file_paths_list <- as.list(setNames(as.character(file_paths$Value), file_paths$Parameter))
+  study_settings_list <- as.list(setNames(study_settings$Value, study_settings$Setting))
 
   # Return structured config object
   config <- list(
