@@ -89,7 +89,7 @@ create_example_config <- function(output_path = "examples/confidence_config_exam
       "None",
       "5000",
       "0.95",
-      "."
+      ","
     ),
     stringsAsFactors = FALSE
   )
