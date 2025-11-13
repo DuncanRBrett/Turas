@@ -358,6 +358,9 @@ run_confidence_gui <- function() {
           sprintf("\n%s\n\n", strrep("=", 80))
         ))
 
+        # Set script directory override so module can find its files
+        assign("script_dir_override", file.path(confidence_dir, "R"), envir = .GlobalEnv)
+
         # Source the confidence module
         source(file.path(confidence_dir, "R", "00_main.R"))
 
@@ -387,6 +390,10 @@ run_confidence_gui <- function() {
         showNotification(paste("Error:", e$message), type = "error", duration = 10)
 
       }, finally = {
+        # Clean up global variables
+        if (exists("script_dir_override", envir = .GlobalEnv)) {
+          rm("script_dir_override", envir = .GlobalEnv)
+        }
         # Restore original working directory
         setwd(old_wd)
         is_running(FALSE)
