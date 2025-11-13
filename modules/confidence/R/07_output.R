@@ -292,10 +292,10 @@ add_study_level_sheet <- function(wb, study_stats, decimal_sep) {
     border = "TopBottomLeftRight"
   )
   openxlsx::addStyle(wb, "Study_Level", header_style, rows = 3,
-                     cols = 1:ncol(study_display), gridExpand = TRUE)
+                     cols = 1:ncol(study_stats), gridExpand = TRUE)
 
   # Interpretation notes
-  row <- 3 + nrow(study_display) + 2
+  row <- 3 + nrow(study_stats) + 2
   openxlsx::writeData(wb, "Study_Level", "INTERPRETATION:", startCol = 1, startRow = row)
   openxlsx::addStyle(wb, "Study_Level",
                      style = openxlsx::createStyle(textDecoration = "bold"),
@@ -321,7 +321,7 @@ add_study_level_sheet <- function(wb, study_stats, decimal_sep) {
   }
 
   # Auto-size columns
-  openxlsx::setColWidths(wb, "Study_Level", cols = 1:ncol(study_display), widths = "auto")
+  openxlsx::setColWidths(wb, "Study_Level", cols = 1:ncol(study_stats), widths = "auto")
 }
 
 
@@ -367,10 +367,10 @@ add_proportions_detail_sheet <- function(wb, prop_results, decimal_sep) {
     border = "TopBottomLeftRight"
   )
   openxlsx::addStyle(wb, "Proportions_Detail", header_style, rows = 3,
-                     cols = 1:ncol(prop_display), gridExpand = TRUE)
+                     cols = 1:ncol(prop_df), gridExpand = TRUE)
 
   # Auto-size columns
-  openxlsx::setColWidths(wb, "Proportions_Detail", cols = 1:ncol(prop_display), widths = "auto")
+  openxlsx::setColWidths(wb, "Proportions_Detail", cols = 1:ncol(prop_df), widths = "auto")
 }
 
 
@@ -473,10 +473,10 @@ add_means_detail_sheet <- function(wb, mean_results, decimal_sep) {
     border = "TopBottomLeftRight"
   )
   openxlsx::addStyle(wb, "Means_Detail", header_style, rows = 3,
-                     cols = 1:ncol(mean_display), gridExpand = TRUE)
+                     cols = 1:ncol(mean_df), gridExpand = TRUE)
 
   # Auto-size columns
-  openxlsx::setColWidths(wb, "Means_Detail", cols = 1:ncol(mean_display), widths = "auto")
+  openxlsx::setColWidths(wb, "Means_Detail", cols = 1:ncol(mean_df), widths = "auto")
 }
 
 
