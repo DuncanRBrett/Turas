@@ -40,7 +40,7 @@ create_example_config <- function(output_path = "examples/confidence_config_exam
   openxlsx::addWorksheet(wb, "File_Paths")
 
   file_paths_df <- data.frame(
-    Setting = c(
+    Parameter = c(
       "Data_File",
       "Output_File",
       "Weight_Variable"
@@ -49,11 +49,6 @@ create_example_config <- function(output_path = "examples/confidence_config_exam
       data_file,
       output_file,
       "weight"
-    ),
-    Description = c(
-      "Path to survey data file (CSV or XLSX)",
-      "Path for output Excel file",
-      "Name of weight variable (leave blank for unweighted)"
     ),
     stringsAsFactors = FALSE
   )
@@ -69,9 +64,9 @@ create_example_config <- function(output_path = "examples/confidence_config_exam
     fontColour = "#FFFFFF",
     border = "TopBottomLeftRight"
   )
-  openxlsx::addStyle(wb, "File_Paths", header_style, rows = 1, cols = 1:3, gridExpand = TRUE)
+  openxlsx::addStyle(wb, "File_Paths", header_style, rows = 1, cols = 1:2, gridExpand = TRUE)
 
-  openxlsx::setColWidths(wb, "File_Paths", cols = 1:3, widths = c(20, 50, 50))
+  openxlsx::setColWidths(wb, "File_Paths", cols = 1:2, widths = c(20, 50))
 
   # ============================================================================
   # SHEET 2: STUDY_SETTINGS
@@ -96,22 +91,14 @@ create_example_config <- function(output_path = "examples/confidence_config_exam
       "0.95",
       "."
     ),
-    Description = c(
-      "Calculate effective sample size and DEFF (Y/N)",
-      "Apply multiple comparison adjustment (Y/N)",
-      "Adjustment method: Bonferroni, Holm, FDR, or None",
-      "Number of bootstrap iterations (1000-10000)",
-      "Confidence level (0.90, 0.95, or 0.99)",
-      "Decimal separator: period (.) or comma (,)"
-    ),
     stringsAsFactors = FALSE
   )
 
   openxlsx::writeData(wb, "Study_Settings", study_settings_df, startRow = 1, startCol = 1,
                       colNames = TRUE, rowNames = FALSE)
 
-  openxlsx::addStyle(wb, "Study_Settings", header_style, rows = 1, cols = 1:3, gridExpand = TRUE)
-  openxlsx::setColWidths(wb, "Study_Settings", cols = 1:3, widths = c(30, 15, 50))
+  openxlsx::addStyle(wb, "Study_Settings", header_style, rows = 1, cols = 1:2, gridExpand = TRUE)
+  openxlsx::setColWidths(wb, "Study_Settings", cols = 1:2, widths = c(30, 15))
 
   # ============================================================================
   # SHEET 3: QUESTION_ANALYSIS
