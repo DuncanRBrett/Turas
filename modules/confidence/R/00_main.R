@@ -431,7 +431,7 @@ process_proportion_question <- function(q_row, survey_data, weight_var, config, 
     result$category <- paste(categories, collapse = ",")
 
     # Calculate confidence intervals based on config
-    conf_level <- config$study_settings$Confidence_Level
+    conf_level <- as.numeric(config$study_settings$Confidence_Level)
 
     # MOE
     if (toupper(q_row$Run_MOE) == "Y") {
@@ -445,7 +445,7 @@ process_proportion_question <- function(q_row, survey_data, weight_var, config, 
 
     # Bootstrap
     if (toupper(q_row$Run_Bootstrap) == "Y") {
-      boot_iter <- config$study_settings$Bootstrap_Iterations
+      boot_iter <- as.integer(config$study_settings$Bootstrap_Iterations)
       result$bootstrap <- bootstrap_proportion_ci(success_values, weights_valid, conf_level, boot_iter)
     }
 
@@ -521,7 +521,7 @@ process_mean_question <- function(q_row, survey_data, weight_var, config, warnin
     result$n <- length(values_valid)
 
     # Calculate confidence intervals based on config
-    conf_level <- config$study_settings$Confidence_Level
+    conf_level <- as.numeric(config$study_settings$Confidence_Level)
 
     # t-distribution CI
     if (toupper(q_row$Run_MOE) == "Y") {
@@ -530,7 +530,7 @@ process_mean_question <- function(q_row, survey_data, weight_var, config, warnin
 
     # Bootstrap
     if (toupper(q_row$Run_Bootstrap) == "Y") {
-      boot_iter <- config$study_settings$Bootstrap_Iterations
+      boot_iter <- as.integer(config$study_settings$Bootstrap_Iterations)
       result$bootstrap <- bootstrap_mean_ci(values_valid, weights_valid, conf_level, boot_iter)
     }
 
