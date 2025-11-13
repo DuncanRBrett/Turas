@@ -414,6 +414,9 @@ process_proportion_question <- function(q_row, survey_data, weight_var, config, 
     valid_idx <- !is.na(values)
     success_values <- success_values[valid_idx]
 
+    # Initialize weights_valid for unweighted case
+    weights_valid <- NULL
+
     if (!is.null(weights)) {
       weights_valid <- weights[valid_idx]
       weights_valid <- weights_valid[!is.na(weights_valid) & weights_valid > 0]
