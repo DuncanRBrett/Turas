@@ -161,7 +161,7 @@ run_confidence_analysis <- function(config_path,
   if (verbose) cat("STEP 1/6: Loading configuration...\n")
 
   config <- tryCatch({
-    load_confidence_config(config_path, verbose = verbose)
+    load_confidence_config(config_path)
   }, error = function(e) {
     stop(sprintf("Failed to load configuration\nError: %s", conditionMessage(e)), call. = FALSE)
   })
