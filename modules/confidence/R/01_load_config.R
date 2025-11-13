@@ -178,14 +178,14 @@ load_study_settings_sheet <- function(config_path) {
     ), call. = FALSE)
   }
 
-  # Required settings
+  # Required settings (using readable PascalCase names)
   required_settings <- c(
-    "calculate_eff_sample_size",
-    "multiple_comparison_adjust",
-    "adjustment_method",
-    "bootstrap_iterations",
-    "confidence_level",
-    "decimal_separator"
+    "Calculate_Effective_N",
+    "Multiple_Comparison_Adjustment",
+    "Multiple_Comparison_Method",
+    "Bootstrap_Iterations",
+    "Confidence_Level",
+    "Decimal_Separator"
   )
 
   # Check all required settings present
@@ -361,46 +361,46 @@ validate_study_settings <- function(study_settings_df) {
   # Convert to named list
   settings <- setNames(study_settings_df$Value, study_settings_df$Setting)
 
-  # Validate calculate_eff_sample_size
-  calc_eff <- toupper(as.character(settings[["calculate_eff_sample_size"]]))
+  # Validate Calculate_Effective_N
+  calc_eff <- toupper(as.character(settings[["Calculate_Effective_N"]]))
   if (!calc_eff %in% c("Y", "N")) {
-    errors <- c(errors, "calculate_eff_sample_size must be 'Y' or 'N'")
+    errors <- c(errors, "Calculate_Effective_N must be 'Y' or 'N'")
   }
 
-  # Validate multiple_comparison_adjust
-  multi_comp <- toupper(as.character(settings[["multiple_comparison_adjust"]]))
+  # Validate Multiple_Comparison_Adjustment
+  multi_comp <- toupper(as.character(settings[["Multiple_Comparison_Adjustment"]]))
   if (!multi_comp %in% c("Y", "N")) {
-    errors <- c(errors, "multiple_comparison_adjust must be 'Y' or 'N'")
+    errors <- c(errors, "Multiple_Comparison_Adjustment must be 'Y' or 'N'")
   }
 
-  # Validate adjustment_method (only if multiple_comparison_adjust = Y)
+  # Validate Multiple_Comparison_Method (only if Multiple_Comparison_Adjustment = Y)
   if (multi_comp == "Y") {
-    adj_method <- as.character(settings[["adjustment_method"]])
+    adj_method <- as.character(settings[["Multiple_Comparison_Method"]])
     if (!adj_method %in% c("Bonferroni", "Holm", "FDR")) {
-      errors <- c(errors, "adjustment_method must be 'Bonferroni', 'Holm', or 'FDR'")
+      errors <- c(errors, "Multiple_Comparison_Method must be 'Bonferroni', 'Holm', or 'FDR'")
     }
   }
 
-  # Validate bootstrap_iterations
-  boot_iter <- suppressWarnings(as.numeric(settings[["bootstrap_iterations"]]))
+  # Validate Bootstrap_Iterations
+  boot_iter <- suppressWarnings(as.numeric(settings[["Bootstrap_Iterations"]]))
   if (is.na(boot_iter)) {
-    errors <- c(errors, "bootstrap_iterations must be numeric")
+    errors <- c(errors, "Bootstrap_Iterations must be numeric")
   } else if (boot_iter < 1000 || boot_iter > 10000) {
-    errors <- c(errors, "bootstrap_iterations must be between 1000 and 10000")
+    errors <- c(errors, "Bootstrap_Iterations must be between 1000 and 10000")
   }
 
-  # Validate confidence_level
-  conf_level <- suppressWarnings(as.numeric(settings[["confidence_level"]]))
+  # Validate Confidence_Level
+  conf_level <- suppressWarnings(as.numeric(settings[["Confidence_Level"]]))
   if (is.na(conf_level)) {
-    errors <- c(errors, "confidence_level must be numeric")
+    errors <- c(errors, "Confidence_Level must be numeric")
   } else if (!conf_level %in% c(0.90, 0.95, 0.99)) {
-    errors <- c(errors, "confidence_level must be 0.90, 0.95, or 0.99")
+    errors <- c(errors, "Confidence_Level must be 0.90, 0.95, or 0.99")
   }
 
-  # Validate decimal_separator
-  dec_sep <- as.character(settings[["decimal_separator"]])
+  # Validate Decimal_Separator
+  dec_sep <- as.character(settings[["Decimal_Separator"]])
   if (!dec_sep %in% c(".", ",")) {
-    errors <- c(errors, "decimal_separator must be '.' or ','")
+    errors <- c(errors, "Decimal_Separator must be '.' or ','")
   }
 
   # Validate random_seed (optional)
