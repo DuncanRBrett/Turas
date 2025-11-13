@@ -736,11 +736,11 @@ add_inputs_sheet <- function(wb, config, decimal_sep) {
 
 #' Create Excel number format string with decimal separator (internal)
 #'
-#' Creates an Excel number format code that includes the specified decimal separator.
-#' Keeps values numeric so Excel can perform calculations and sorting.
+#' Creates an Excel number format code. Note that the actual decimal separator
+#' displayed depends on Excel's regional settings, not the format code itself.
 #'
 #' @param decimal_places Integer. Number of decimal places
-#' @param decimal_sep Character. "." or ","
+#' @param decimal_sep Character. Ignored - kept for API compatibility
 #' @return Character. Excel number format code
 #' @keywords internal
 create_excel_number_format <- function(decimal_places = 2, decimal_sep = ".") {
@@ -749,10 +749,11 @@ create_excel_number_format <- function(decimal_places = 2, decimal_sep = ".") {
     return("0")
   }
 
-  # Create format string with specified decimal separator
-  # Excel understands format codes like "0.00" or "0,00"
+  # IMPORTANT: Excel format codes always use period for decimal position
+  # The actual separator displayed (period or comma) depends on Excel's locale
+  # We cannot control this through the format code alone
   zeros <- paste(rep("0", decimal_places), collapse = "")
-  format_str <- paste0("0", decimal_sep, zeros)
+  format_str <- paste0("0.", zeros)  # Always use period in format code
 
   return(format_str)
 }
