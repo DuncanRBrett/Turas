@@ -325,8 +325,8 @@ run_confidence_analysis <- function(config_path,
       proportion_results = proportion_results,
       mean_results = mean_results,
       config = list(
-        confidence_level = config$study_settings$Confidence_Level,
-        bootstrap_iterations = config$study_settings$Bootstrap_Iterations,
+        confidence_level = as.numeric(config$study_settings$Confidence_Level),
+        bootstrap_iterations = as.integer(config$study_settings$Bootstrap_Iterations),
         multiple_comparison_method = config$study_settings$Multiple_Comparison_Method,
         calculate_effective_n = config$study_settings$Calculate_Effective_N == "Y"
       ),
