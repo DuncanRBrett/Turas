@@ -536,7 +536,7 @@ process_mean_question <- function(q_row, survey_data, weight_var, config, warnin
     # Bootstrap
     if (toupper(q_row$Run_Bootstrap) == "Y") {
       boot_iter <- as.integer(config$study_settings$Bootstrap_Iterations)
-      result$bootstrap <- bootstrap_mean_ci(values_valid, weights_valid, conf_level, boot_iter)
+      result$bootstrap <- bootstrap_mean_ci(values_valid, weights_valid, boot_iter, conf_level)
     }
 
     # Bayesian
