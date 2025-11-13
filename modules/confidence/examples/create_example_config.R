@@ -320,8 +320,8 @@ create_example_setup <- function() {
   # Create config
   create_example_config(
     output_path = "examples/confidence_config_example.xlsx",
-    data_file = "survey_data_example.csv",
-    output_file = "confidence_results_example.xlsx"
+    data_file = "examples/survey_data_example.csv",
+    output_file = "examples/confidence_results_example.xlsx"
   )
 
   # Create data
