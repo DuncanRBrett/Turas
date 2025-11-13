@@ -114,6 +114,13 @@ launch_turas <- function() {
         .btn-tracker:hover {
           background-color: #c0392b;
         }
+        .btn-confidence {
+          background-color: #f59e0b;
+          color: white;
+        }
+        .btn-confidence:hover {
+          background-color: #d97706;
+        }
         .status-message {
           margin-top: 20px;
           padding: 15px;
@@ -181,6 +188,16 @@ launch_turas <- function() {
           ),
           actionButton("launch_tracker", "Launch Tracker",
                       class = "launch-btn btn-tracker")
+        ),
+
+        # Confidence
+        div(class = "module-card",
+          div(class = "module-title", "📊 Confidence"),
+          div(class = "module-description",
+            "Calculate statistical confidence intervals for means and proportions. Supports Bootstrap, Bayesian, and Wilson methods with design effect adjustments."
+          ),
+          actionButton("launch_confidence", "Launch Confidence",
+                      class = "launch-btn btn-confidence")
         )
       ),
 
@@ -246,6 +263,19 @@ launch_turas <- function() {
       Sys.sleep(0.5)
       stopApp(returnValue = "tracker")
     })
+
+    # Launch Confidence
+    observeEvent(input$launch_confidence, {
+      showModal(modalDialog(
+        title = "Launching Confidence",
+        "Closing launcher and starting Confidence...",
+        footer = NULL
+      ))
+
+      # Small delay to show message
+      Sys.sleep(0.5)
+      stopApp(returnValue = "confidence")
+    })
   }
 
   # Run the app and get selection
@@ -302,6 +332,19 @@ launch_turas <- function() {
         runApp(app, launch.browser = TRUE)
       }, error = function(e) {
         cat("\nError launching Tracker:\n")
+        cat(e$message, "\n")
+      })
+
+    } else if (selected == "confidence") {
+      cat("Loading Confidence module...\n\n")
+      source(file.path(turas_root, "modules/confidence/run_confidence_gui.R"))
+
+      # run_confidence_gui() returns a shinyApp object, we need to run it
+      tryCatch({
+        app <- run_confidence_gui()
+        runApp(app, launch.browser = TRUE)
+      }, error = function(e) {
+        cat("\nError launching Confidence:\n")
         cat(e$message, "\n")
       })
     }
