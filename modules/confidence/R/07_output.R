@@ -424,8 +424,21 @@ build_proportions_dataframe <- function(prop_results) {
     rows_list[[length(rows_list) + 1]] <- base_row
   }
 
-  # Combine all rows
-  df <- do.call(rbind, lapply(rows_list, function(x) as.data.frame(x, stringsAsFactors = FALSE)))
+  # Combine all rows - use bind_rows to handle mismatched columns
+  if (requireNamespace("dplyr", quietly = TRUE)) {
+    df <- dplyr::bind_rows(rows_list)
+  } else {
+    # Fallback: find all unique column names and fill missing ones with NA
+    all_cols <- unique(unlist(lapply(rows_list, names)))
+    rows_list_filled <- lapply(rows_list, function(row) {
+      missing_cols <- setdiff(all_cols, names(row))
+      for (col in missing_cols) {
+        row[[col]] <- NA
+      }
+      return(row[all_cols])  # Reorder to match all_cols
+    })
+    df <- do.call(rbind, lapply(rows_list_filled, function(x) as.data.frame(x, stringsAsFactors = FALSE)))
+  }
 
   return(df)
 }
@@ -526,8 +539,21 @@ build_means_dataframe <- function(mean_results) {
     rows_list[[length(rows_list) + 1]] <- base_row
   }
 
-  # Combine all rows
-  df <- do.call(rbind, lapply(rows_list, function(x) as.data.frame(x, stringsAsFactors = FALSE)))
+  # Combine all rows - use bind_rows to handle mismatched columns
+  if (requireNamespace("dplyr", quietly = TRUE)) {
+    df <- dplyr::bind_rows(rows_list)
+  } else {
+    # Fallback: find all unique column names and fill missing ones with NA
+    all_cols <- unique(unlist(lapply(rows_list, names)))
+    rows_list_filled <- lapply(rows_list, function(row) {
+      missing_cols <- setdiff(all_cols, names(row))
+      for (col in missing_cols) {
+        row[[col]] <- NA
+      }
+      return(row[all_cols])  # Reorder to match all_cols
+    })
+    df <- do.call(rbind, lapply(rows_list_filled, function(x) as.data.frame(x, stringsAsFactors = FALSE)))
+  }
 
   return(df)
 }
