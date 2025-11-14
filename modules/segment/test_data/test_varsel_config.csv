@@ -1,0 +1,35 @@
+Setting,Value
+data_file,modules/segment/test_data/test_survey_data_20vars.csv
+id_variable,respondent_id
+clustering_vars,"q1,q2,q3,q4,q5,q6,q7,q8,q9,q10,q11,q12,q13,q14,q15,q16,q17,q18,q19,q20"
+profile_vars,"age,tenure_years"
+method,kmeans
+k_fixed,
+k_min,3
+k_max,5
+nstart,25
+seed,456
+missing_data,listwise_deletion
+missing_threshold,15
+standardize,TRUE
+min_segment_size_pct,10
+outlier_detection,TRUE
+outlier_method,zscore
+outlier_threshold,3.0
+outlier_min_vars,1
+outlier_handling,flag
+outlier_alpha,0.001
+variable_selection,TRUE
+variable_selection_method,variance_correlation
+max_clustering_vars,10
+varsel_min_variance,0.1
+varsel_max_correlation,0.8
+k_selection_metrics,"silhouette,elbow"
+output_folder,modules/segment/test_data/output/
+output_prefix,varsel_test_
+create_dated_folder,FALSE
+segment_names,auto
+save_model,TRUE
+project_name,Variable Selection Test
+analyst_name,Test User
+description,Testing variable selection with 20 satisfaction variables

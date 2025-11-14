@@ -12,6 +12,7 @@ source("modules/shared/lib/logging_utils.R")
 
 # Source segment utilities
 source("modules/segment/lib/segment_outliers.R")
+source("modules/segment/lib/segment_variable_selection.R")
 
 #' Load and prepare segmentation data
 #'
@@ -120,6 +121,63 @@ load_segment_data <- function(config) {
     config = config,
     n_original = nrow(data)
   ))
+}
+
+#' Perform Variable Selection
+#'
+#' DESIGN: Selects optimal subset of clustering variables if enabled
+#' METHODS: Variance, correlation, factor analysis
+#'
+#' @param data_list List from load_segment_data()
+#' @return Updated data_list with selected variables
+#' @export
+perform_variable_selection <- function(data_list) {
+  config <- data_list$config
+
+  # Skip if variable selection is disabled
+  if (!config$variable_selection) {
+    cat("\nVariable selection: Skipped (disabled in config)\n")
+    data_list$variable_selection_result <- NULL
+    return(data_list)
+  }
+
+  # Skip if already at or below target
+  if (length(config$clustering_vars) <= config$max_clustering_vars) {
+    cat(sprintf("\nVariable selection: Skipped (%d vars <= target of %d)\n",
+                length(config$clustering_vars), config$max_clustering_vars))
+    data_list$variable_selection_result <- NULL
+    return(data_list)
+  }
+
+  cat("\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("VARIABLE SELECTION\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("\n")
+
+  # Perform variable selection
+  selection_result <- select_clustering_variables(
+    data = data_list$data,
+    candidate_vars = config$clustering_vars,
+    target_n = config$max_clustering_vars,
+    method = config$variable_selection_method,
+    min_variance = config$varsel_min_variance,
+    max_correlation = config$varsel_max_correlation
+  )
+
+  # Print summary
+  print_variable_selection_summary(selection_result)
+
+  # Update config with selected variables
+  config$clustering_vars <- selection_result$selected_vars
+  config$clustering_vars_original <- data_list$config$clustering_vars
+
+  # Update clustering data with selected variables
+  data_list$clustering_data <- data_list$data[, selection_result$selected_vars, drop = FALSE]
+  data_list$config <- config
+  data_list$variable_selection_result <- selection_result
+
+  return(data_list)
 }
 
 #' Handle missing data in clustering variables
@@ -451,6 +509,9 @@ pre_clustering_checks <- function(data_list) {
 prepare_segment_data <- function(config) {
   # Load data
   data_list <- load_segment_data(config)
+
+  # Perform variable selection (if enabled)
+  data_list <- perform_variable_selection(data_list)
 
   # Handle missing data
   data_list <- handle_missing_data(data_list)

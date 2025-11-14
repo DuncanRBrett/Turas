@@ -176,6 +176,30 @@ export_exploration_report <- function(exploration_result, metrics_result,
     }
   }
 
+  # Add variable selection sheets if variable selection was performed
+  if (config$variable_selection && !is.null(data_list$variable_selection_result)) {
+    cat("  Creating variable selection sheets...\n")
+
+    varsel <- data_list$variable_selection_result
+
+    # Selected variables sheet
+    selected_df <- data.frame(
+      Variable = varsel$selected_vars,
+      Status = "Selected",
+      stringsAsFactors = FALSE
+    )
+    profile_sheets[["VarSel_Selected"]] <- selected_df
+
+    # Variable statistics sheet
+    if (!is.null(varsel$selection_log$variance)) {
+      var_stats <- varsel$selection_log$variance$variance_df
+      var_stats$selected <- var_stats$variable %in% varsel$selected_vars
+      var_stats$variance <- round(var_stats$variance, 4)
+      var_stats$sd <- round(var_stats$sd, 4)
+      profile_sheets[["VarSel_Statistics"]] <- var_stats
+    }
+  }
+
   # Write all sheets to Excel
   writexl::write_xlsx(profile_sheets, output_path)
 
@@ -225,6 +249,21 @@ export_final_report <- function(final_result, profile_result, validation_metrics
     sprintf("Clustering variables: %s", paste(config$clustering_vars, collapse = ", ")),
     sprintf("Number of segments: %d", k)
   )
+
+  # Add variable selection information if enabled
+  if (config$variable_selection && !is.null(data_list$variable_selection_result)) {
+    varsel <- data_list$variable_selection_result
+    summary_text <- c(
+      summary_text,
+      "",
+      "VARIABLE SELECTION",
+      "------------------",
+      sprintf("Method: %s", varsel$method),
+      sprintf("Original variables: %d", varsel$n_original),
+      sprintf("Selected variables: %d", varsel$n_selected),
+      sprintf("Selected: %s", paste(varsel$selected_vars, collapse = ", "))
+    )
+  }
 
   # Add outlier information if enabled
   if (config$outlier_detection && !is.null(data_list$outlier_handling)) {
@@ -348,6 +387,31 @@ export_final_report <- function(final_result, profile_result, validation_metrics
 
     if (nrow(outlier_report) > 0) {
       sheets[["Outliers"]] <- outlier_report
+    }
+  }
+
+  # ===========================================================================
+  # SHEET 5 (optional): Variable Selection
+  # ===========================================================================
+
+  if (config$variable_selection && !is.null(data_list$variable_selection_result)) {
+    varsel <- data_list$variable_selection_result
+
+    # Selected variables sheet
+    selected_df <- data.frame(
+      Variable = varsel$selected_vars,
+      Status = "Selected",
+      stringsAsFactors = FALSE
+    )
+    sheets[["VarSel_Selected"]] <- selected_df
+
+    # Variable statistics sheet
+    if (!is.null(varsel$selection_log$variance)) {
+      var_stats <- varsel$selection_log$variance$variance_df
+      var_stats$selected <- var_stats$variable %in% varsel$selected_vars
+      var_stats$variance <- round(var_stats$variance, 4)
+      var_stats$sd <- round(var_stats$sd, 4)
+      sheets[["VarSel_Statistics"]] <- var_stats
     }
   }
 

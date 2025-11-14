@@ -164,6 +164,35 @@ validate_segment_config <- function(config) {
     ), call. = FALSE)
   }
 
+  # Variable selection
+  variable_selection <- get_logical_config(config, "variable_selection",
+                                          default_value = FALSE)
+
+  variable_selection_method <- get_char_config(config, "variable_selection_method",
+                                               default_value = "variance_correlation",
+                                               allowed_values = c("variance_correlation",
+                                                                "factor_analysis",
+                                                                "both"))
+
+  max_clustering_vars <- get_numeric_config(config, "max_clustering_vars",
+                                            default_value = 10, min = 2, max = 20)
+
+  varsel_min_variance <- get_numeric_config(config, "varsel_min_variance",
+                                           default_value = 0.1, min = 0.01, max = 1.0)
+
+  varsel_max_correlation <- get_numeric_config(config, "varsel_max_correlation",
+                                              default_value = 0.8, min = 0.5, max = 0.95)
+
+  # Validate variable selection parameters
+  if (variable_selection) {
+    if (length(clustering_vars) <= max_clustering_vars) {
+      warning(sprintf(
+        "variable_selection enabled but clustering_vars (%d) already <= max_clustering_vars (%d). Skipping selection.",
+        length(clustering_vars), max_clustering_vars
+      ), call. = FALSE)
+    }
+  }
+
   # Validation metrics
   k_selection_metrics_str <- get_char_config(config, "k_selection_metrics",
                                               default_value = "silhouette,elbow")
@@ -248,6 +277,13 @@ validate_segment_config <- function(config) {
     outlier_handling = outlier_handling,
     outlier_alpha = outlier_alpha,
 
+    # Variable selection
+    variable_selection = variable_selection,
+    variable_selection_method = variable_selection_method,
+    max_clustering_vars = max_clustering_vars,
+    varsel_min_variance = varsel_min_variance,
+    varsel_max_correlation = varsel_max_correlation,
+
     # Validation
     k_selection_metrics = k_selection_metrics,
 
@@ -283,6 +319,13 @@ validate_segment_config <- function(config) {
     cat(sprintf("  Outlier detection: enabled (%s method)\n", outlier_method))
   } else {
     cat(sprintf("  Outlier detection: disabled\n"))
+  }
+
+  if (variable_selection && length(clustering_vars) > max_clustering_vars) {
+    cat(sprintf("  Variable selection: enabled (%s, target: %d)\n",
+                variable_selection_method, max_clustering_vars))
+  } else {
+    cat(sprintf("  Variable selection: disabled\n"))
   }
 
   return(validated_config)
