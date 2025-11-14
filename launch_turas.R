@@ -114,6 +114,13 @@ launch_turas <- function() {
         .btn-tracker:hover {
           background-color: #c0392b;
         }
+        .btn-segment {
+          background-color: #9b59b6;
+          color: white;
+        }
+        .btn-segment:hover {
+          background-color: #8e44ad;
+        }
         .status-message {
           margin-top: 20px;
           padding: 15px;
@@ -181,6 +188,16 @@ launch_turas <- function() {
           ),
           actionButton("launch_tracker", "Launch Tracker",
                       class = "launch-btn btn-tracker")
+        ),
+
+        # Segment
+        div(class = "module-card",
+          div(class = "module-title", "🎯 Segment"),
+          div(class = "module-description",
+            "K-means clustering segmentation. Automatically select optimal variables, detect outliers, and create meaningful respondent segments."
+          ),
+          actionButton("launch_segment", "Launch Segment",
+                      class = "launch-btn btn-segment")
         )
       ),
 
@@ -246,6 +263,19 @@ launch_turas <- function() {
       Sys.sleep(0.5)
       stopApp(returnValue = "tracker")
     })
+
+    # Launch Segment
+    observeEvent(input$launch_segment, {
+      showModal(modalDialog(
+        title = "Launching Segment",
+        "Closing launcher and starting Segment...",
+        footer = NULL
+      ))
+
+      # Small delay to show message
+      Sys.sleep(0.5)
+      stopApp(returnValue = "segment")
+    })
   }
 
   # Run the app and get selection
@@ -302,6 +332,19 @@ launch_turas <- function() {
         runApp(app, launch.browser = TRUE)
       }, error = function(e) {
         cat("\nError launching Tracker:\n")
+        cat(e$message, "\n")
+      })
+
+    } else if (selected == "segment") {
+      cat("Loading Segment module...\n\n")
+      source(file.path(turas_root, "modules/segment/run_segment_gui.R"))
+
+      # run_segment_gui() returns a shinyApp object, we need to run it
+      tryCatch({
+        app <- run_segment_gui()
+        runApp(app, launch.browser = TRUE)
+      }, error = function(e) {
+        cat("\nError launching Segment:\n")
         cat(e$message, "\n")
       })
     }
