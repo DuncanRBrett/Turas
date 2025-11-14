@@ -6,9 +6,9 @@
 # ==============================================================================
 
 # Source shared utilities
-source("../../shared/lib/validation_utils.R")
-source("../../shared/lib/data_utils.R")
-source("../../shared/lib/logging_utils.R")
+source("modules/shared/lib/validation_utils.R")
+source("modules/shared/lib/data_utils.R")
+source("modules/shared/lib/logging_utils.R")
 
 #' Load and prepare segmentation data
 #'

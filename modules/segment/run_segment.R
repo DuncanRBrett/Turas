@@ -13,18 +13,18 @@
 # ==============================================================================
 
 # Shared utilities
-source("../shared/lib/validation_utils.R")
-source("../shared/lib/config_utils.R")
-source("../shared/lib/data_utils.R")
-source("../shared/lib/logging_utils.R")
+source("modules/shared/lib/validation_utils.R")
+source("modules/shared/lib/config_utils.R")
+source("modules/shared/lib/data_utils.R")
+source("modules/shared/lib/logging_utils.R")
 
 # Segmentation modules
-source("lib/segment_config.R")
-source("lib/segment_data_prep.R")
-source("lib/segment_kmeans.R")
-source("lib/segment_validation.R")
-source("lib/segment_profile.R")
-source("lib/segment_export.R")
+source("modules/segment/lib/segment_config.R")
+source("modules/segment/lib/segment_data_prep.R")
+source("modules/segment/lib/segment_kmeans.R")
+source("modules/segment/lib/segment_validation.R")
+source("modules/segment/lib/segment_profile.R")
+source("modules/segment/lib/segment_export.R")
 
 # ==============================================================================
 # MAIN SEGMENTATION FUNCTION

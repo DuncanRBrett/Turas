@@ -6,7 +6,7 @@
 # ==============================================================================
 
 # Source shared utilities
-source("../../shared/lib/logging_utils.R")
+source("modules/shared/lib/logging_utils.R")
 
 #' Run k-means clustering for a single k value
 #'

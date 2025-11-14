@@ -6,9 +6,9 @@
 # ==============================================================================
 
 # Source shared utilities
-source("../../shared/lib/validation_utils.R")
-source("../../shared/lib/config_utils.R")
-source("../../shared/lib/data_utils.R")
+source("modules/shared/lib/validation_utils.R")
+source("modules/shared/lib/config_utils.R")
+source("modules/shared/lib/data_utils.R")
 
 #' Read segmentation configuration from Excel file
 #'
