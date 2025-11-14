@@ -135,6 +135,35 @@ validate_segment_config <- function(config) {
   min_segment_size_pct <- get_numeric_config(config, "min_segment_size_pct",
                                               default_value = 10, min = 0, max = 50)
 
+  # Outlier detection
+  outlier_detection <- get_logical_config(config, "outlier_detection",
+                                          default_value = FALSE)
+
+  outlier_method <- get_char_config(config, "outlier_method",
+                                    default_value = "zscore",
+                                    allowed_values = c("zscore", "mahalanobis"))
+
+  outlier_threshold <- get_numeric_config(config, "outlier_threshold",
+                                          default_value = 3.0, min = 1.0, max = 5.0)
+
+  outlier_min_vars <- get_numeric_config(config, "outlier_min_vars",
+                                         default_value = 1, min = 1)
+
+  outlier_handling <- get_char_config(config, "outlier_handling",
+                                      default_value = "flag",
+                                      allowed_values = c("none", "flag", "remove"))
+
+  outlier_alpha <- get_numeric_config(config, "outlier_alpha",
+                                      default_value = 0.001, min = 0.0001, max = 0.1)
+
+  # Validate outlier parameters
+  if (outlier_detection && outlier_min_vars > length(clustering_vars)) {
+    stop(sprintf(
+      "outlier_min_vars (%d) cannot exceed number of clustering variables (%d)",
+      outlier_min_vars, length(clustering_vars)
+    ), call. = FALSE)
+  }
+
   # Validation metrics
   k_selection_metrics_str <- get_char_config(config, "k_selection_metrics",
                                               default_value = "silhouette,elbow")
@@ -211,6 +240,14 @@ validate_segment_config <- function(config) {
     standardize = standardize,
     min_segment_size_pct = min_segment_size_pct,
 
+    # Outlier detection
+    outlier_detection = outlier_detection,
+    outlier_method = outlier_method,
+    outlier_threshold = outlier_threshold,
+    outlier_min_vars = outlier_min_vars,
+    outlier_handling = outlier_handling,
+    outlier_alpha = outlier_alpha,
+
     # Validation
     k_selection_metrics = k_selection_metrics,
 
@@ -240,6 +277,12 @@ validate_segment_config <- function(config) {
     cat(sprintf("  K range: %d to %d\n", k_min, k_max))
   } else {
     cat(sprintf("  Fixed K: %d\n", k_fixed))
+  }
+
+  if (outlier_detection) {
+    cat(sprintf("  Outlier detection: enabled (%s method)\n", outlier_method))
+  } else {
+    cat(sprintf("  Outlier detection: disabled\n"))
   }
 
   return(validated_config)

@@ -11,6 +11,7 @@ The Turas Segmentation Module provides a standardized, repeatable approach to cl
 - Excel-based configuration
 - Exploration mode (compare multiple k values)
 - Final run mode (detailed output for chosen k)
+- **Outlier detection and handling** (z-score or Mahalanobis distance)
 - Validation metrics (silhouette, elbow, optional gap statistic)
 - Segment profiling and characterization
 - Excel output reports
@@ -75,6 +76,7 @@ modules/segment/
 │   ├── segment_config.R        # Configuration loading/validation
 │   ├── segment_data_prep.R     # Data loading and preparation
 │   ├── segment_kmeans.R        # K-means clustering engine
+│   ├── segment_outliers.R      # Outlier detection and handling
 │   ├── segment_validation.R    # Validation metrics
 │   ├── segment_profile.R       # Segment profiling
 │   └── segment_export.R        # Excel export functions
@@ -104,6 +106,17 @@ modules/segment/
 | `missing_data` | listwise_deletion | How to handle missing data |
 | `standardize` | TRUE | Standardize variables before clustering |
 | `segment_names` | auto | Custom segment names (comma-separated) |
+
+### Outlier Detection Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `outlier_detection` | FALSE | Enable outlier detection |
+| `outlier_method` | zscore | Detection method: zscore or mahalanobis |
+| `outlier_threshold` | 3.0 | Z-score threshold (typically 2.5-3.5) |
+| `outlier_min_vars` | 1 | Min variables that must be extreme |
+| `outlier_handling` | flag | Strategy: none, flag, or remove |
+| `outlier_alpha` | 0.001 | Alpha for Mahalanobis method |
 
 See specifications document for complete list.
 
@@ -182,6 +195,81 @@ survey_with_segments <- left_join(survey_data, segments, by = "respondent_id")
 - Computationally expensive
 - Optional in config
 
+## Outlier Detection
+
+### Why Detect Outliers?
+
+Outliers (extreme values) can distort k-means clustering by:
+- Pulling cluster centroids toward extreme respondents
+- Creating artificial segments around unusual responses
+- Reducing the quality of "normal" segments
+
+**Example:** A respondent who rates everything 1 (when most rate 3-5) can create a "low rater" segment that's not meaningful for business decisions.
+
+### Detection Methods
+
+#### Z-Score Method (Default)
+- Flags respondents with extreme z-scores (typically |z| > 3.0)
+- Fast and interpretable
+- Good for most use cases
+- Can set minimum number of extreme variables (`outlier_min_vars`)
+
+**Example:**
+```
+outlier_detection     | TRUE
+outlier_method        | zscore
+outlier_threshold     | 3.0
+outlier_min_vars      | 1
+```
+
+#### Mahalanobis Distance Method
+- Accounts for correlations between variables
+- More sophisticated multivariate detection
+- Slower but more accurate
+- Uses chi-square distribution threshold
+
+**Example:**
+```
+outlier_detection     | TRUE
+outlier_method        | mahalanobis
+outlier_alpha         | 0.001
+```
+
+### Handling Strategies
+
+| Strategy | Description | When to Use |
+|----------|-------------|-------------|
+| **flag** | Mark outliers but include in clustering | Default; allows review |
+| **remove** | Exclude outliers from clustering | Clean data for analysis |
+| **none** | Skip outlier detection | When outliers are meaningful |
+
+### Outputs
+
+When outlier detection is enabled:
+
+1. **Console output:**
+   - Number of outliers detected
+   - Percentage of sample flagged
+   - Which variables have extreme values
+
+2. **Segment assignments file:**
+   - Added column: `outlier_flag` (TRUE/FALSE)
+
+3. **Excel reports:**
+   - New "Outliers" sheet with:
+     - Respondent IDs of outliers
+     - Z-scores for each variable
+     - Number of extreme variables
+     - Which variables are extreme
+
+### Best Practices
+
+1. **Start with flag strategy** to review outliers before removing
+2. **Use threshold = 3.0** as standard (3 standard deviations)
+3. **Review outlier sheet** to ensure removals are justified
+4. **Check if >10% flagged** - may indicate data quality issues
+5. **Consider business context** - some "outliers" may be important segments
+
 ## Troubleshooting
 
 ### "Sample size insufficient"
@@ -201,6 +289,12 @@ survey_with_segments <- left_join(survey_data, segments, by = "respondent_id")
 - Or increase `missing_threshold`
 
 ## Version History
+
+- **V1.0.1** (2025-11-14) - Outlier detection added
+  - Z-score and Mahalanobis distance methods
+  - Flag, remove, or skip outlier handling
+  - Outlier reporting in Excel outputs
+  - Outlier flags in segment assignments
 
 - **V1.0** (2025-11-13) - Initial Phase 1 release
   - K-means clustering

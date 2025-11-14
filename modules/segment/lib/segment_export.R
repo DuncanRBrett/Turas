@@ -7,7 +7,7 @@
 
 #' Export segment assignments file
 #'
-#' DESIGN: Simple join table (respondent_id, segment, segment_name)
+#' DESIGN: Simple join table (respondent_id, segment, segment_name, outlier_flag)
 #' PURPOSE: Easy to merge back with original data
 #'
 #' @param data Original data frame
@@ -15,8 +15,10 @@
 #' @param segment_names Character vector, segment names
 #' @param id_var Character, ID variable name
 #' @param output_path Character, output file path
+#' @param outlier_flags Logical vector, outlier flags (optional)
 #' @export
-export_segment_assignments <- function(data, clusters, segment_names, id_var, output_path) {
+export_segment_assignments <- function(data, clusters, segment_names, id_var, output_path,
+                                      outlier_flags = NULL) {
   cat(sprintf("Exporting segment assignments to: %s\n", basename(output_path)))
 
   # Create assignments data frame
@@ -26,6 +28,11 @@ export_segment_assignments <- function(data, clusters, segment_names, id_var, ou
     segment_name = segment_names[clusters],
     stringsAsFactors = FALSE
   )
+
+  # Add outlier flags if provided
+  if (!is.null(outlier_flags) && length(outlier_flags) > 0) {
+    assignments$outlier_flag <- outlier_flags
+  }
 
   # Rename first column to match original ID variable name
   names(assignments)[1] <- id_var
@@ -149,6 +156,26 @@ export_exploration_report <- function(exploration_result, metrics_result,
     profile_sheets[[sheet_name]] <- profile_export
   }
 
+  # Add outlier analysis sheet if outliers were detected
+  if (config$outlier_detection && !is.null(data_list$outlier_result)) {
+    cat("  Creating outlier analysis sheet...\n")
+
+    # Source outlier module for create_outlier_report function
+    source("modules/segment/lib/segment_outliers.R")
+
+    outlier_report <- create_outlier_report(
+      outlier_result = data_list$outlier_result,
+      data = data_list$data,
+      id_var = config$id_variable,
+      standardized_data = as.data.frame(data_list$scaled_data),
+      clustering_vars = config$clustering_vars
+    )
+
+    if (nrow(outlier_report) > 0) {
+      profile_sheets[["Outliers"]] <- outlier_report
+    }
+  }
+
   # Write all sheets to Excel
   writexl::write_xlsx(profile_sheets, output_path)
 
@@ -196,7 +223,26 @@ export_final_report <- function(final_result, profile_result, validation_metrics
     sprintf("Total respondents: %d", data_list$n_original),
     sprintf("Valid responses: %d", nrow(data_list$data)),
     sprintf("Clustering variables: %s", paste(config$clustering_vars, collapse = ", ")),
-    sprintf("Number of segments: %d", k),
+    sprintf("Number of segments: %d", k)
+  )
+
+  # Add outlier information if enabled
+  if (config$outlier_detection && !is.null(data_list$outlier_handling)) {
+    summary_text <- c(
+      summary_text,
+      "",
+      "OUTLIER DETECTION",
+      "-----------------",
+      sprintf("Method: %s", config$outlier_method),
+      sprintf("Outliers detected: %d (%.1f%%)",
+              data_list$outlier_handling$n_outliers,
+              data_list$outlier_handling$pct_outliers),
+      sprintf("Handling strategy: %s", config$outlier_handling)
+    )
+  }
+
+  summary_text <- c(
+    summary_text,
     "",
     "SEGMENTATION QUALITY",
     "--------------------",
@@ -283,6 +329,27 @@ export_final_report <- function(final_result, profile_result, validation_metrics
   )
 
   sheets[["Validation"]] <- validation_df
+
+  # ===========================================================================
+  # SHEET 4 (optional): Outlier Analysis
+  # ===========================================================================
+
+  if (config$outlier_detection && !is.null(data_list$outlier_result)) {
+    # Source outlier module for create_outlier_report function
+    source("modules/segment/lib/segment_outliers.R")
+
+    outlier_report <- create_outlier_report(
+      outlier_result = data_list$outlier_result,
+      data = data_list$data,
+      id_var = config$id_variable,
+      standardized_data = as.data.frame(data_list$scaled_data),
+      clustering_vars = config$clustering_vars
+    )
+
+    if (nrow(outlier_report) > 0) {
+      sheets[["Outliers"]] <- outlier_report
+    }
+  }
 
   # Write to Excel
   writexl::write_xlsx(sheets, output_path)

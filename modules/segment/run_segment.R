@@ -25,6 +25,7 @@ source("modules/segment/lib/segment_kmeans.R")
 source("modules/segment/lib/segment_validation.R")
 source("modules/segment/lib/segment_profile.R")
 source("modules/segment/lib/segment_export.R")
+source("modules/segment/lib/segment_outliers.R")
 
 # ==============================================================================
 # MAIN SEGMENTATION FUNCTION
@@ -220,7 +221,8 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
       clusters = final_result$clusters,
       segment_names = segment_names,
       id_var = config$id_variable,
-      output_path = assignments_path
+      output_path = assignments_path,
+      outlier_flags = data_list$outlier_flags
     )
 
     # Export full report

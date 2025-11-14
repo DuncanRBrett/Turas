@@ -10,6 +10,9 @@ source("modules/shared/lib/validation_utils.R")
 source("modules/shared/lib/data_utils.R")
 source("modules/shared/lib/logging_utils.R")
 
+# Source segment utilities
+source("modules/segment/lib/segment_outliers.R")
+
 #' Load and prepare segmentation data
 #'
 #' DESIGN: Loads data, validates structure, extracts variables
@@ -272,6 +275,90 @@ standardize_data <- function(data_list) {
   return(data_list)
 }
 
+#' Detect and Handle Outliers
+#'
+#' DESIGN: Identifies extreme values that may distort clustering
+#' METHODS: Z-score or Mahalanobis distance
+#' STRATEGIES: Flag, remove, or skip outlier detection
+#'
+#' @param data_list List from standardize_data()
+#' @return Updated data_list with outlier information
+#' @export
+detect_and_handle_outliers <- function(data_list) {
+  config <- data_list$config
+
+  # Skip if outlier detection is disabled
+  if (!config$outlier_detection) {
+    cat("\nOutlier detection: Skipped (disabled in config)\n")
+    data_list$outlier_flags <- rep(FALSE, nrow(data_list$data))
+    data_list$outlier_result <- NULL
+    data_list$outlier_handling <- list(handling = "none", n_outliers = 0)
+    return(data_list)
+  }
+
+  # Prepare standardized data as data frame
+  scaled_df <- as.data.frame(data_list$scaled_data)
+  colnames(scaled_df) <- config$clustering_vars
+
+  # Detect outliers based on method
+  if (config$outlier_method == "zscore") {
+    outlier_result <- detect_outliers_zscore(
+      data = scaled_df,
+      clustering_vars = config$clustering_vars,
+      threshold = config$outlier_threshold,
+      min_vars = config$outlier_min_vars
+    )
+  } else if (config$outlier_method == "mahalanobis") {
+    outlier_result <- detect_outliers_mahalanobis(
+      data = scaled_df,
+      clustering_vars = config$clustering_vars,
+      alpha = config$outlier_alpha
+    )
+  } else {
+    stop("Unknown outlier detection method: ", config$outlier_method, call. = FALSE)
+  }
+
+  # Handle outliers according to strategy
+  outlier_handling <- handle_outliers(
+    data = data_list$data,
+    outlier_flags = outlier_result$outlier_flags,
+    handling = config$outlier_handling
+  )
+
+  # Print summary
+  print_outlier_summary(
+    outlier_detection = outlier_result,
+    outlier_handling = outlier_handling,
+    clustering_vars = config$clustering_vars,
+    method = config$outlier_method
+  )
+
+  # Update data_list based on handling strategy
+  if (outlier_handling$removed && outlier_handling$n_outliers > 0) {
+    # Remove outliers from all data structures
+    keep_rows <- !outlier_result$outlier_flags
+
+    data_list$data <- data_list$data[keep_rows, ]
+    data_list$clustering_data <- data_list$clustering_data[keep_rows, ]
+    if (!is.null(data_list$profile_data)) {
+      data_list$profile_data <- data_list$profile_data[keep_rows, ]
+    }
+    data_list$scaled_data <- data_list$scaled_data[keep_rows, , drop = FALSE]
+
+    # Update outlier flags to reflect remaining records
+    data_list$outlier_flags <- rep(FALSE, nrow(data_list$data))
+  } else {
+    # Keep outlier flags for reporting
+    data_list$outlier_flags <- outlier_result$outlier_flags
+  }
+
+  # Store outlier results for reporting
+  data_list$outlier_result <- outlier_result
+  data_list$outlier_handling <- outlier_handling
+
+  return(data_list)
+}
+
 #' Run pre-clustering quality checks
 #'
 #' DESIGN: Validates data is suitable for clustering
@@ -370,6 +457,9 @@ prepare_segment_data <- function(config) {
 
   # Standardize
   data_list <- standardize_data(data_list)
+
+  # Detect and handle outliers
+  data_list <- detect_and_handle_outliers(data_list)
 
   # Quality checks
   data_list <- pre_clustering_checks(data_list)
