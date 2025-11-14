@@ -162,11 +162,12 @@ perform_variable_selection <- function(data_list) {
     target_n = config$max_clustering_vars,
     method = config$variable_selection_method,
     min_variance = config$varsel_min_variance,
-    max_correlation = config$varsel_max_correlation
+    max_correlation = config$varsel_max_correlation,
+    question_labels = config$question_labels
   )
 
   # Print summary
-  print_variable_selection_summary(selection_result)
+  print_variable_selection_summary(selection_result, config$question_labels)
 
   # Update config with selected variables
   config$clustering_vars <- selection_result$selected_vars

@@ -28,3 +28,4 @@ save_model,TRUE
 project_name,Test Segmentation
 analyst_name,Test User
 description,Testing segmentation module with outlier detection
+question_labels_file,modules/segment/test_data/test_question_labels.xlsx

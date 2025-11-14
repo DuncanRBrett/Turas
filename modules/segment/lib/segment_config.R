@@ -18,6 +18,106 @@ source("modules/shared/lib/data_utils.R")
 #' @param config_file Character, path to Excel config file
 #' @return Named list of configuration parameters
 #' @export
+#' Format variable name with label
+#'
+#' DESIGN: Returns "variable: label" if label exists, otherwise just "variable"
+#' EXAMPLE: format_variable_label("q1", labels) -> "q1: Overall satisfaction"
+#'
+#' @param variable Character, variable name(s)
+#' @param question_labels Named vector of labels (from load_question_labels)
+#' @return Character vector of formatted variable names
+#' @export
+format_variable_label <- function(variable, question_labels = NULL) {
+  if (is.null(question_labels) || length(question_labels) == 0) {
+    return(variable)
+  }
+
+  sapply(variable, function(v) {
+    if (v %in% names(question_labels)) {
+      paste0(v, ": ", question_labels[v])
+    } else {
+      v
+    }
+  }, USE.NAMES = FALSE)
+}
+
+#' Load question labels from Excel file
+#'
+#' DESIGN: Two-column format (variable | label)
+#' EXAMPLE: q1 | Overall satisfaction with service
+#'
+#' @param labels_file Character, path to Excel labels file
+#' @return Named vector of labels (names = variable codes, values = labels)
+#' @export
+load_question_labels <- function(labels_file) {
+  # Validate file exists
+  if (!file.exists(labels_file)) {
+    warning(sprintf("Question labels file not found: %s\nContinuing without labels.",
+                   labels_file), call. = FALSE)
+    return(NULL)
+  }
+
+  # Validate extension
+  if (!grepl("\\.(xlsx|xls)$", labels_file, ignore.case = TRUE)) {
+    warning(sprintf("Question labels file must be Excel format (.xlsx or .xls): %s\nContinuing without labels.",
+                   labels_file), call. = FALSE)
+    return(NULL)
+  }
+
+  tryCatch({
+    cat(sprintf("Loading question labels from: %s\n", basename(labels_file)))
+
+    # Try loading from different possible sheet names
+    sheet_names <- c("Labels", "Questions", "Sheet1", "Data")
+    labels_df <- NULL
+
+    for (sheet in sheet_names) {
+      labels_df <- tryCatch({
+        readxl::read_excel(labels_file, sheet = sheet)
+      }, error = function(e) NULL)
+
+      if (!is.null(labels_df)) break
+    }
+
+    if (is.null(labels_df)) {
+      warning("Could not read question labels file. Continuing without labels.", call. = FALSE)
+      return(NULL)
+    }
+
+    # Validate structure (must have at least 2 columns)
+    if (ncol(labels_df) < 2) {
+      warning("Question labels file must have at least 2 columns (variable, label). Continuing without labels.",
+             call. = FALSE)
+      return(NULL)
+    }
+
+    # Use first two columns
+    labels_df <- labels_df[, 1:2]
+    names(labels_df) <- c("variable", "label")
+
+    # Remove any empty rows
+    labels_df <- labels_df[!is.na(labels_df$variable) & !is.na(labels_df$label), ]
+
+    if (nrow(labels_df) == 0) {
+      warning("Question labels file is empty. Continuing without labels.", call. = FALSE)
+      return(NULL)
+    }
+
+    # Convert to named vector
+    labels_vec <- as.character(labels_df$label)
+    names(labels_vec) <- as.character(labels_df$variable)
+
+    cat(sprintf("✓ Loaded %d question labels\n", length(labels_vec)))
+
+    return(labels_vec)
+
+  }, error = function(e) {
+    warning(sprintf("Error loading question labels: %s\nContinuing without labels.",
+                   e$message), call. = FALSE)
+    return(NULL)
+  })
+}
+
 read_segment_config <- function(config_file) {
   # Validate file exists
   validate_file_path(config_file, "config_file", must_exist = TRUE,
@@ -241,6 +341,16 @@ validate_segment_config <- function(config) {
   description <- get_char_config(config, "description",
                                  default_value = "")
 
+  # Question labels (optional)
+  question_labels_file <- get_config_value(config, "question_labels_file",
+                                          default_value = NULL)
+
+  # Load question labels if file provided
+  question_labels <- NULL
+  if (!is.null(question_labels_file) && nzchar(trimws(as.character(question_labels_file)))) {
+    question_labels <- load_question_labels(question_labels_file)
+  }
+
   # ===========================================================================
   # CONSTRUCT VALIDATED CONFIG
   # ===========================================================================
@@ -298,6 +408,10 @@ validate_segment_config <- function(config) {
     project_name = project_name,
     analyst_name = analyst_name,
     description = description,
+
+    # Question labels
+    question_labels_file = question_labels_file,
+    question_labels = question_labels,
 
     # Mode detection
     mode = if (is.null(k_fixed)) "exploration" else "final"

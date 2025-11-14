@@ -5,6 +5,9 @@
 # Part of Turas Segmentation Module
 # ==============================================================================
 
+# Source config utilities for label formatting
+source("modules/segment/lib/segment_config.R")
+
 #' Export segment assignments file
 #'
 #' DESIGN: Simple join table (respondent_id, segment, segment_name, outlier_flag)
@@ -116,6 +119,12 @@ export_exploration_report <- function(exploration_result, metrics_result,
     # Format profile for export
     profile_export <- profile$clustering_profile
 
+    # Apply question labels to Variable column if available
+    if (!is.null(config$question_labels)) {
+      profile_export$Variable <- format_variable_label(profile_export$Variable,
+                                                       config$question_labels)
+    }
+
     # Round numeric columns
     num_cols <- sapply(profile_export, is.numeric)
     profile_export[num_cols] <- lapply(profile_export[num_cols], function(x) round(x, 2))
@@ -182,20 +191,46 @@ export_exploration_report <- function(exploration_result, metrics_result,
 
     varsel <- data_list$variable_selection_result
 
-    # Selected variables sheet
+    # Selected variables sheet with labels
     selected_df <- data.frame(
       Variable = varsel$selected_vars,
       Status = "Selected",
       stringsAsFactors = FALSE
     )
+
+    # Add labels column if available
+    if (!is.null(config$question_labels)) {
+      selected_df$Label <- sapply(varsel$selected_vars, function(v) {
+        if (v %in% names(config$question_labels)) {
+          config$question_labels[v]
+        } else {
+          ""
+        }
+      }, USE.NAMES = FALSE)
+    }
+
     profile_sheets[["VarSel_Selected"]] <- selected_df
 
-    # Variable statistics sheet
+    # Variable statistics sheet with labels
     if (!is.null(varsel$selection_log$variance)) {
       var_stats <- varsel$selection_log$variance$variance_df
       var_stats$selected <- var_stats$variable %in% varsel$selected_vars
       var_stats$variance <- round(var_stats$variance, 4)
       var_stats$sd <- round(var_stats$sd, 4)
+
+      # Add labels column if available
+      if (!is.null(config$question_labels)) {
+        var_stats$label <- sapply(var_stats$variable, function(v) {
+          if (v %in% names(config$question_labels)) {
+            config$question_labels[v]
+          } else {
+            ""
+          }
+        }, USE.NAMES = FALSE)
+        # Reorder columns to put label after variable
+        var_stats <- var_stats[, c("variable", "label", setdiff(names(var_stats), c("variable", "label")))]
+      }
+
       profile_sheets[["VarSel_Statistics"]] <- var_stats
     }
   }
@@ -234,6 +269,13 @@ export_final_report <- function(final_result, profile_result, validation_metrics
   # SHEET 1: Summary
   # ===========================================================================
 
+  # Format clustering variables with labels
+  clustering_vars_display <- if (!is.null(config$question_labels)) {
+    paste(format_variable_label(config$clustering_vars, config$question_labels), collapse = ", ")
+  } else {
+    paste(config$clustering_vars, collapse = ", ")
+  }
+
   summary_text <- c(
     "SEGMENTATION SUMMARY",
     "====================",
@@ -246,13 +288,21 @@ export_final_report <- function(final_result, profile_result, validation_metrics
     "-------------",
     sprintf("Total respondents: %d", data_list$n_original),
     sprintf("Valid responses: %d", nrow(data_list$data)),
-    sprintf("Clustering variables: %s", paste(config$clustering_vars, collapse = ", ")),
+    sprintf("Clustering variables: %s", clustering_vars_display),
     sprintf("Number of segments: %d", k)
   )
 
   # Add variable selection information if enabled
   if (config$variable_selection && !is.null(data_list$variable_selection_result)) {
     varsel <- data_list$variable_selection_result
+
+    # Format selected variables with labels
+    selected_vars_display <- if (!is.null(config$question_labels)) {
+      paste(format_variable_label(varsel$selected_vars, config$question_labels), collapse = ", ")
+    } else {
+      paste(varsel$selected_vars, collapse = ", ")
+    }
+
     summary_text <- c(
       summary_text,
       "",
@@ -261,7 +311,7 @@ export_final_report <- function(final_result, profile_result, validation_metrics
       sprintf("Method: %s", varsel$method),
       sprintf("Original variables: %d", varsel$n_original),
       sprintf("Selected variables: %d", varsel$n_selected),
-      sprintf("Selected: %s", paste(varsel$selected_vars, collapse = ", "))
+      sprintf("Selected: %s", selected_vars_display)
     )
   }
 
@@ -318,6 +368,12 @@ export_final_report <- function(final_result, profile_result, validation_metrics
   # ===========================================================================
 
   profile_export <- profile_result$clustering_profile
+
+  # Apply question labels to Variable column if available
+  if (!is.null(config$question_labels)) {
+    profile_export$Variable <- format_variable_label(profile_export$Variable,
+                                                     config$question_labels)
+  }
 
   # Round numeric columns
   num_cols <- sapply(profile_export, is.numeric)
@@ -397,20 +453,46 @@ export_final_report <- function(final_result, profile_result, validation_metrics
   if (config$variable_selection && !is.null(data_list$variable_selection_result)) {
     varsel <- data_list$variable_selection_result
 
-    # Selected variables sheet
+    # Selected variables sheet with labels
     selected_df <- data.frame(
       Variable = varsel$selected_vars,
       Status = "Selected",
       stringsAsFactors = FALSE
     )
+
+    # Add labels column if available
+    if (!is.null(config$question_labels)) {
+      selected_df$Label <- sapply(varsel$selected_vars, function(v) {
+        if (v %in% names(config$question_labels)) {
+          config$question_labels[v]
+        } else {
+          ""
+        }
+      }, USE.NAMES = FALSE)
+    }
+
     sheets[["VarSel_Selected"]] <- selected_df
 
-    # Variable statistics sheet
+    # Variable statistics sheet with labels
     if (!is.null(varsel$selection_log$variance)) {
       var_stats <- varsel$selection_log$variance$variance_df
       var_stats$selected <- var_stats$variable %in% varsel$selected_vars
       var_stats$variance <- round(var_stats$variance, 4)
       var_stats$sd <- round(var_stats$sd, 4)
+
+      # Add labels column if available
+      if (!is.null(config$question_labels)) {
+        var_stats$label <- sapply(var_stats$variable, function(v) {
+          if (v %in% names(config$question_labels)) {
+            config$question_labels[v]
+          } else {
+            ""
+          }
+        }, USE.NAMES = FALSE)
+        # Reorder columns to put label after variable
+        var_stats <- var_stats[, c("variable", "label", setdiff(names(var_stats), c("variable", "label")))]
+      }
+
       sheets[["VarSel_Statistics"]] <- var_stats
     }
   }

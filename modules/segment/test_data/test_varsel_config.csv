@@ -33,3 +33,4 @@ save_model,TRUE
 project_name,Variable Selection Test
 analyst_name,Test User
 description,Testing variable selection with 20 satisfaction variables
+question_labels_file,modules/segment/test_data/test_question_labels.xlsx

@@ -6,6 +6,9 @@
 # Author: Turas Development Team
 # ==============================================================================
 
+# Source config utilities for label formatting
+source("modules/segment/lib/segment_config.R")
+
 #' Analyze Variable Variance
 #'
 #' Identifies and flags low-variance variables that provide little
@@ -245,7 +248,8 @@ perform_factor_analysis <- function(data, candidate_vars, n_factors = NULL,
 select_clustering_variables <- function(data, candidate_vars, target_n,
                                        method = "variance_correlation",
                                        min_variance = 0.1,
-                                       max_correlation = 0.8) {
+                                       max_correlation = 0.8,
+                                       question_labels = NULL) {
 
   # Track selection process
   selection_log <- list()
@@ -257,14 +261,22 @@ select_clustering_variables <- function(data, candidate_vars, target_n,
   variance_analysis <- analyze_variable_variance(data, remaining_vars, min_variance)
 
   if (variance_analysis$n_low_variance > 0) {
+    # Format variable names with labels
+    vars_display <- if (!is.null(question_labels)) {
+      paste(format_variable_label(variance_analysis$low_variance_vars, question_labels),
+            collapse = ", ")
+    } else {
+      paste(variance_analysis$low_variance_vars, collapse = ", ")
+    }
+
     cat(sprintf("  Removed %d low-variance variables: %s\n",
-                variance_analysis$n_low_variance,
-                paste(variance_analysis$low_variance_vars, collapse = ", ")))
+                variance_analysis$n_low_variance, vars_display))
     remaining_vars <- setdiff(remaining_vars, variance_analysis$low_variance_vars)
   } else {
     cat("  No low-variance variables found\n")
   }
 
+  cat(sprintf("  Remaining: %d\n", length(remaining_vars)))
   selection_log$variance <- variance_analysis
 
   # Step 2: Remove highly correlated variables
@@ -273,16 +285,24 @@ select_clustering_variables <- function(data, candidate_vars, target_n,
   correlation_analysis <- analyze_variable_correlations(data, remaining_vars, max_correlation)
 
   if (length(correlation_analysis$vars_to_remove) > 0) {
+    # Format variable names with labels
+    vars_display <- if (!is.null(question_labels)) {
+      paste(format_variable_label(correlation_analysis$vars_to_remove, question_labels),
+            collapse = ", ")
+    } else {
+      paste(correlation_analysis$vars_to_remove, collapse = ", ")
+    }
+
     cat(sprintf("  Found %d highly correlated pairs\n",
                 correlation_analysis$n_high_cor_pairs))
     cat(sprintf("  Removed %d correlated variables: %s\n",
-                length(correlation_analysis$vars_to_remove),
-                paste(correlation_analysis$vars_to_remove, collapse = ", ")))
+                length(correlation_analysis$vars_to_remove), vars_display))
     remaining_vars <- setdiff(remaining_vars, correlation_analysis$vars_to_remove)
   } else {
     cat("  No highly correlated pairs found\n")
   }
 
+  cat(sprintf("  Remaining: %d\n", length(remaining_vars)))
   selection_log$correlation <- correlation_analysis
 
   # Step 3: If still too many variables, use ranking method
@@ -348,7 +368,8 @@ select_clustering_variables <- function(data, candidate_vars, target_n,
 #' Displays variable selection results to console
 #'
 #' @param selection_result Result from select_clustering_variables()
-print_variable_selection_summary <- function(selection_result) {
+#' @param question_labels Optional named vector of question labels
+print_variable_selection_summary <- function(selection_result, question_labels = NULL) {
 
   cat("\n")
   cat(rep("=", 80), "\n", sep = "")
@@ -361,12 +382,26 @@ print_variable_selection_summary <- function(selection_result) {
   cat(sprintf("Selected variables: %d\n", selection_result$n_selected))
   cat(sprintf("Removed variables: %d\n\n", selection_result$n_removed))
 
+  # Format selected variables with labels
+  selected_display <- if (!is.null(question_labels)) {
+    paste(format_variable_label(selection_result$selected_vars, question_labels), collapse = ", ")
+  } else {
+    paste(selection_result$selected_vars, collapse = ", ")
+  }
+
   cat("Selected variables:\n")
-  cat(sprintf("  %s\n", paste(selection_result$selected_vars, collapse = ", ")))
+  cat(sprintf("  %s\n", selected_display))
 
   if (selection_result$n_removed > 0) {
+    # Format removed variables with labels
+    removed_display <- if (!is.null(question_labels)) {
+      paste(format_variable_label(selection_result$removed_vars, question_labels), collapse = ", ")
+    } else {
+      paste(selection_result$removed_vars, collapse = ", ")
+    }
+
     cat("\nRemoved variables:\n")
-    cat(sprintf("  %s\n", paste(selection_result$removed_vars, collapse = ", ")))
+    cat(sprintf("  %s\n", removed_display))
   }
 
   cat("\n")
