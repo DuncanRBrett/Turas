@@ -241,15 +241,21 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
       model_filename <- paste0(config$output_prefix, "model.rds")
       model_path <- file.path(output_folder, model_filename)
 
+      # Get segment distribution
+      segment_dist <- table(final_result$clusters)
+
       model_object <- list(
         model = final_result$model,
         k = final_result$k,
         clusters = final_result$clusters,
+        centers = final_result$model$centers,  # Add centers for scoring
         segment_names = segment_names,
         clustering_vars = config$clustering_vars,
         id_variable = config$id_variable,
         scale_params = data_list$scale_params,
+        original_distribution = segment_dist,  # Add for drift monitoring
         config = config,
+        timestamp = Sys.time(),
         date_created = Sys.time(),
         turas_version = "1.0"
       )

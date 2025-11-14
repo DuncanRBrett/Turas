@@ -1,287 +1,269 @@
 # ==============================================================================
-# SEGMENTATION VALIDATION METRICS
+# SEGMENTATION VALIDATION
 # ==============================================================================
-# Calculate validation metrics: silhouette, elbow, gap statistic
+# Validate segment quality and stability
 # Part of Turas Segmentation Module
 # ==============================================================================
 
-#' Calculate silhouette scores
+#' Assess Segment Stability via Bootstrap
 #'
-#' DESIGN: Uses cluster::silhouette() for quality assessment
-#' INTERPRETATION: >0.5 = good, 0.3-0.5 = acceptable, <0.3 = poor
+#' Tests segment stability by resampling data and measuring consistency
 #'
-#' @param data Matrix, scaled clustering data
-#' @param clusters Integer vector, cluster assignments
-#' @return List with avg_silhouette, segment_silhouettes, sil_object
+#' @param data Data frame with clustering variables
+#' @param clustering_vars Character vector of clustering variable names
+#' @param k Number of segments
+#' @param n_bootstrap Number of bootstrap iterations (default: 100)
+#' @param seed Random seed for reproducibility
+#' @return List with stability metrics
 #' @export
-calculate_silhouette <- function(data, clusters) {
-  if (!requireNamespace("cluster", quietly = TRUE)) {
-    stop("Package 'cluster' required for silhouette calculation.\nInstall with: install.packages('cluster')",
-         call. = FALSE)
-  }
+assess_segment_stability <- function(data, clustering_vars, k, n_bootstrap = 100, seed = 123) {
 
-  # Calculate distance matrix
-  dist_matrix <- dist(data)
-
-  # Calculate silhouette
-  sil <- cluster::silhouette(clusters, dist_matrix)
-
-  # Extract average
-  avg_sil <- mean(sil[, "sil_width"])
-
-  # Calculate per-segment averages
-  seg_sil <- aggregate(sil[, "sil_width"],
-                       by = list(cluster = sil[, "cluster"]),
-                       FUN = mean)
-  names(seg_sil) <- c("segment", "avg_silhouette")
-
-  return(list(
-    avg_silhouette = avg_sil,
-    segment_silhouettes = seg_sil,
-    sil_object = sil
-  ))
-}
-
-#' Calculate within-cluster sum of squares
-#'
-#' DESIGN: Extracts WSS from k-means model
-#' USAGE: For elbow plot
-#'
-#' @param kmeans_model K-means model object
-#' @return Numeric, total within-cluster sum of squares
-#' @export
-calculate_wss <- function(kmeans_model) {
-  return(kmeans_model$tot.withinss)
-}
-
-#' Calculate gap statistic
-#'
-#' DESIGN: Uses cluster::clusGap() to compare to null reference
-#' WARNING: Computationally expensive - may take several minutes
-#'
-#' @param data Matrix, scaled clustering data
-#' @param k_range Integer vector, k values to test
-#' @param nstart Integer, number of random starts for k-means
-#' @param B Integer, number of Monte Carlo samples (default: 50)
-#' @return Gap statistic object from cluster::clusGap()
-#' @export
-calculate_gap_statistic <- function(data, k_range, nstart = 25, B = 50) {
-  if (!requireNamespace("cluster", quietly = TRUE)) {
-    stop("Package 'cluster' required for gap statistic.\nInstall with: install.packages('cluster')",
-         call. = FALSE)
-  }
-
-  cat("Calculating gap statistic (this may take a few minutes)...\n")
-
-  # Define k-means function for clusGap
-  kmeans_fun <- function(x, k) {
-    kmeans(x, centers = k, nstart = nstart)
-  }
-
-  # Calculate gap statistic
-  gap_result <- cluster::clusGap(
-    x = data,
-    FUNcluster = kmeans_fun,
-    K.max = max(k_range),
-    B = B,
-    verbose = FALSE
-  )
-
-  # Extract relevant k range
-  gap_values <- gap_result$Tab[k_range, "gap"]
-
-  return(list(
-    gap_object = gap_result,
-    gap_values = gap_values
-  ))
-}
-
-#' Calculate all validation metrics for a single k
-#'
-#' DESIGN: Comprehensive metrics for one clustering solution
-#' RETURNS: Named list of all metrics
-#'
-#' @param data Matrix, scaled clustering data
-#' @param model K-means model object
-#' @param k Integer, number of clusters
-#' @param calculate_gap Logical, whether to calculate gap statistic
-#' @return List with all validation metrics
-#' @export
-calculate_validation_metrics <- function(data, model, k, calculate_gap = FALSE) {
-  # Silhouette
-  sil_result <- calculate_silhouette(data, model$cluster)
-
-  # WSS
-  wss <- calculate_wss(model)
-
-  # Between/Total SS ratio
-  betweenss_totss <- model$betweenss / model$totss
-
-  # Segment sizes
-  seg_sizes <- table(model$cluster)
-  seg_pcts <- prop.table(seg_sizes) * 100
-
-  metrics <- list(
-    k = k,
-    n_obs = nrow(data),
-    avg_silhouette = sil_result$avg_silhouette,
-    segment_silhouettes = sil_result$segment_silhouettes,
-    wss = wss,
-    betweenss = model$betweenss,
-    totss = model$totss,
-    betweenss_totss = betweenss_totss,
-    segment_sizes = as.vector(seg_sizes),
-    segment_pcts = as.vector(seg_pcts),
-    smallest_segment_n = min(seg_sizes),
-    smallest_segment_pct = min(seg_pcts)
-  )
-
-  return(metrics)
-}
-
-#' Calculate validation metrics for all k in exploration mode
-#'
-#' DESIGN: Runs metrics for each k value tested
-#' RETURNS: Data frame with one row per k
-#'
-#' @param exploration_result Result from run_kmeans_exploration()
-#' @return Data frame with metrics for each k
-#' @export
-calculate_exploration_metrics <- function(exploration_result) {
   cat("\n")
-  cat(paste(rep("=", 80), collapse = ""), "\n")
-  cat("CALCULATING VALIDATION METRICS\n")
-  cat(paste(rep("=", 80), collapse = ""), "\n\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("SEGMENT STABILITY ANALYSIS\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("\n")
 
-  models <- exploration_result$models
-  data <- exploration_result$data_list$scaled_data
-  config <- exploration_result$data_list$config
-  k_range <- exploration_result$k_range
+  set.seed(seed)
 
-  metrics_list <- list()
+  clustering_data <- data[, clustering_vars, drop = FALSE]
+  n <- nrow(clustering_data)
 
-  for (k in k_range) {
-    cat(sprintf("Calculating metrics for k=%d...\n", k))
+  cat(sprintf("Running %d bootstrap iterations...\n", n_bootstrap))
 
-    model <- models[[as.character(k)]]
+  # Store bootstrap results
+  bootstrap_assignments <- matrix(NA, nrow = n, ncol = n_bootstrap)
 
-    # Calculate metrics (skip gap for now - expensive)
-    metrics <- calculate_validation_metrics(data, model, k, calculate_gap = FALSE)
+  # Run bootstrap
+  for (i in 1:n_bootstrap) {
+    if (i %% 20 == 0) cat(sprintf("  Iteration %d/%d\n", i, n_bootstrap))
 
-    metrics_list[[as.character(k)]] <- metrics
+    # Resample with replacement
+    boot_idx <- sample(1:n, n, replace = TRUE)
+    boot_data <- clustering_data[boot_idx, ]
+
+    # Cluster
+    boot_model <- kmeans(scale(boot_data), centers = k, nstart = 25)
+
+    # Map back to original indices
+    bootstrap_assignments[boot_idx, i] <- boot_model$cluster
   }
 
-  # Optional: Calculate gap statistic if requested
-  if ("gap" %in% config$k_selection_metrics) {
-    cat("\nCalculating gap statistic for all k values...\n")
-    cat("  This may take several minutes...\n")
+  cat("\nCalculating stability metrics...\n")
 
-    gap_result <- calculate_gap_statistic(data, k_range, nstart = config$nstart)
+  # Calculate Jaccard similarity between bootstrap iterations
+  jaccard_similarities <- numeric(n_bootstrap - 1)
 
-    # Add gap values to metrics
-    for (i in seq_along(k_range)) {
-      k <- k_range[i]
-      metrics_list[[as.character(k)]]$gap_statistic <- gap_result$gap_values[i]
-    }
+  for (i in 1:(n_bootstrap - 1)) {
+    # Compare iteration i with i+1
+    valid_rows <- !is.na(bootstrap_assignments[, i]) & !is.na(bootstrap_assignments[, i + 1])
 
-    cat("✓ Gap statistic calculated\n")
-  } else {
-    # Add NULL gap statistics
-    for (k in k_range) {
-      metrics_list[[as.character(k)]]$gap_statistic <- NA
+    if (sum(valid_rows) > 0) {
+      # For each pair of respondents, check if they're in same segment in both iterations
+      same_cluster_i <- outer(bootstrap_assignments[valid_rows, i],
+                              bootstrap_assignments[valid_rows, i], "==")
+      same_cluster_j <- outer(bootstrap_assignments[valid_rows, i + 1],
+                              bootstrap_assignments[valid_rows, i + 1], "==")
+
+      # Jaccard = intersection / union
+      intersection <- sum(same_cluster_i & same_cluster_j)
+      union <- sum(same_cluster_i | same_cluster_j)
+
+      jaccard_similarities[i] <- intersection / union
     }
   }
 
-  # Convert to data frame for easy comparison
-  metrics_df <- data.frame(
-    k = sapply(metrics_list, function(x) x$k),
-    n_obs = sapply(metrics_list, function(x) x$n_obs),
-    avg_silhouette = sapply(metrics_list, function(x) x$avg_silhouette),
-    wss = sapply(metrics_list, function(x) x$wss),
-    betweenss_totss = sapply(metrics_list, function(x) x$betweenss_totss),
-    gap_statistic = sapply(metrics_list, function(x) x$gap_statistic),
-    smallest_segment_n = sapply(metrics_list, function(x) x$smallest_segment_n),
-    smallest_segment_pct = sapply(metrics_list, function(x) x$smallest_segment_pct),
-    stringsAsFactors = FALSE
-  )
+  avg_stability <- mean(jaccard_similarities, na.rm = TRUE)
 
-  cat("\n✓ Metrics calculation complete\n")
+  cat(sprintf("\n✓ Stability analysis complete\n"))
+  cat(sprintf("  Average Jaccard similarity: %.3f\n", avg_stability))
+
+  # Interpret stability
+  if (avg_stability > 0.8) {
+    interpretation <- "Excellent - segments are very stable"
+  } else if (avg_stability > 0.6) {
+    interpretation <- "Good - segments are reasonably stable"
+  } else if (avg_stability > 0.4) {
+    interpretation <- "Fair - segments show moderate instability"
+  } else {
+    interpretation <- "Poor - segments are unstable, consider different k"
+  }
+
+  cat(sprintf("  Interpretation: %s\n\n", interpretation))
 
   return(list(
-    metrics_df = metrics_df,
-    metrics_detail = metrics_list
+    avg_stability = avg_stability,
+    jaccard_similarities = jaccard_similarities,
+    interpretation = interpretation,
+    n_bootstrap = n_bootstrap
   ))
 }
 
-#' Recommend optimal k based on metrics
+
+#' Perform Discriminant Analysis
 #'
-#' DESIGN: Applies heuristics to recommend best k
-#' LOGIC: Prioritizes silhouette, checks size constraints
+#' Tests how well clustering variables discriminate between segments
 #'
-#' @param metrics_df Data frame from calculate_exploration_metrics()
-#' @param min_segment_size_pct Minimum segment size threshold
-#' @return List with recommended k and rationale
+#' @param data Data frame with clustering variables
+#' @param clusters Integer vector of segment assignments
+#' @param clustering_vars Character vector of clustering variable names
+#' @return List with discriminant analysis results
 #' @export
-recommend_k <- function(metrics_df, min_segment_size_pct = 10) {
+perform_discriminant_analysis <- function(data, clusters, clustering_vars) {
+
   cat("\n")
-  cat(paste(rep("=", 80), collapse = ""), "\n")
-  cat("K SELECTION RECOMMENDATION\n")
-  cat(paste(rep("=", 80), collapse = ""), "\n\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("DISCRIMINANT ANALYSIS\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("\n")
 
-  # Filter to k values meeting size constraint
-  valid_k <- metrics_df$k[metrics_df$smallest_segment_pct >= min_segment_size_pct]
-
-  if (length(valid_k) == 0) {
-    warning("No k values meet minimum segment size threshold. Relaxing constraint.",
-            call. = FALSE)
-    valid_k <- metrics_df$k
+  # Check if MASS package is available
+  if (!requireNamespace("MASS", quietly = TRUE)) {
+    cat("⚠ MASS package not installed. Skipping discriminant analysis.\n")
+    cat("  Install with: install.packages('MASS')\n")
+    return(invisible(NULL))
   }
 
-  # Among valid k, find best silhouette
-  valid_metrics <- metrics_df[metrics_df$k %in% valid_k, ]
-  best_idx <- which.max(valid_metrics$avg_silhouette)
-  recommended_k <- valid_metrics$k[best_idx]
-  recommended_sil <- valid_metrics$avg_silhouette[best_idx]
+  # Prepare data
+  disc_data <- data[, clustering_vars, drop = FALSE]
+  disc_data$segment <- as.factor(clusters)
 
-  # Quality assessment
-  quality <- if (recommended_sil > 0.7) {
-    "Strong"
-  } else if (recommended_sil > 0.5) {
-    "Good"
-  } else if (recommended_sil > 0.3) {
-    "Acceptable"
+  cat("Performing Linear Discriminant Analysis (LDA)...\n")
+
+  # Perform LDA
+  lda_model <- MASS::lda(segment ~ ., data = disc_data)
+
+  # Predict
+  lda_pred <- predict(lda_model)
+
+  # Calculate accuracy
+  confusion <- table(Predicted = lda_pred$class, Actual = clusters)
+  accuracy <- sum(diag(confusion)) / sum(confusion)
+
+  cat(sprintf("\n✓ Discriminant analysis complete\n"))
+  cat(sprintf("  Classification accuracy: %.1f%%\n", accuracy * 100))
+
+  # Interpret accuracy
+  if (accuracy > 0.9) {
+    interpretation <- "Excellent - segments are very well separated"
+  } else if (accuracy > 0.75) {
+    interpretation <- "Good - segments are adequately separated"
+  } else if (accuracy > 0.6) {
+    interpretation <- "Fair - segments have moderate overlap"
   } else {
-    "Weak"
+    interpretation <- "Poor - segments have substantial overlap"
   }
 
-  # Generate rationale
-  rationale <- sprintf(
-    "k=%d maximizes silhouette score (%.3f - %s separation) while meeting size constraints",
-    recommended_k, recommended_sil, quality
-  )
+  cat(sprintf("  Interpretation: %s\n", interpretation))
 
-  # Display recommendation
-  cat(sprintf("Recommended: k = %d\n", recommended_k))
-  cat(sprintf("  Silhouette: %.3f (%s)\n", recommended_sil, quality))
-  cat(sprintf("  Smallest segment: %.1f%%\n",
-              valid_metrics$smallest_segment_pct[best_idx]))
-  cat(sprintf("  Between/Total SS: %.3f\n",
-              valid_metrics$betweenss_totss[best_idx]))
+  # Show confusion matrix
+  cat("\nConfusion Matrix:\n")
+  print(confusion)
 
-  # Show alternatives
-  cat("\nAlternatives:\n")
-  for (i in 1:nrow(valid_metrics)) {
-    k <- valid_metrics$k[i]
-    sil <- valid_metrics$avg_silhouette[i]
-    marker <- if (k == recommended_k) " ← Recommended" else ""
-    cat(sprintf("  k=%d: Silhouette=%.3f%s\n", k, sil, marker))
+  # Variable importance (proportion of trace)
+  svd_vals <- lda_model$svd
+  prop_trace <- svd_vals^2 / sum(svd_vals^2)
+
+  cat("\nDiscriminant Function Importance:\n")
+  for (i in seq_along(prop_trace)) {
+    cat(sprintf("  LD%d: %.1f%%\n", i, prop_trace[i] * 100))
   }
+
+  cat("\n")
 
   return(list(
-    recommended_k = recommended_k,
-    recommended_silhouette = recommended_sil,
-    quality = quality,
-    rationale = rationale,
-    alternatives = valid_metrics
+    lda_model = lda_model,
+    accuracy = accuracy,
+    confusion_matrix = confusion,
+    interpretation = interpretation,
+    prop_trace = prop_trace
+  ))
+}
+
+
+#' Calculate Segment Separation Metrics
+#'
+#' Computes various metrics measuring how well-separated segments are
+#'
+#' @param data Data frame with clustering variables
+#' @param clusters Integer vector of segment assignments
+#' @param clustering_vars Character vector of clustering variable names
+#' @return List with separation metrics
+#' @export
+calculate_separation_metrics <- function(data, clusters, clustering_vars) {
+
+  cat("\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("SEGMENT SEPARATION METRICS\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("\n")
+
+  clustering_data <- scale(data[, clustering_vars, drop = FALSE])
+  k <- length(unique(clusters))
+
+  # 1. Calinski-Harabasz Index
+  grand_mean <- colMeans(clustering_data)
+
+  # Between-cluster sum of squares
+  bgss <- 0
+  for (seg in unique(clusters)) {
+    seg_data <- clustering_data[clusters == seg, , drop = FALSE]
+    seg_mean <- colMeans(seg_data)
+    n_seg <- nrow(seg_data)
+    bgss <- bgss + n_seg * sum((seg_mean - grand_mean)^2)
+  }
+
+  # Within-cluster sum of squares
+  wgss <- 0
+  for (seg in unique(clusters)) {
+    seg_data <- clustering_data[clusters == seg, , drop = FALSE]
+    seg_mean <- colMeans(seg_data)
+    wgss <- wgss + sum((seg_data - matrix(seg_mean, nrow = nrow(seg_data),
+                                          ncol = ncol(seg_data), byrow = TRUE))^2)
+  }
+
+  n <- nrow(clustering_data)
+  ch_index <- (bgss / (k - 1)) / (wgss / (n - k))
+
+  # 2. Davies-Bouldin Index
+  centers <- matrix(NA, nrow = k, ncol = ncol(clustering_data))
+  for (i in 1:k) {
+    centers[i, ] <- colMeans(clustering_data[clusters == i, , drop = FALSE])
+  }
+
+  avg_within <- numeric(k)
+  for (i in 1:k) {
+    seg_data <- clustering_data[clusters == i, , drop = FALSE]
+    center <- centers[i, ]
+    avg_within[i] <- mean(sqrt(rowSums((seg_data -
+                                       matrix(center, nrow = nrow(seg_data),
+                                             ncol = ncol(seg_data), byrow = TRUE))^2)))
+  }
+
+  db_scores <- numeric(k)
+  for (i in 1:k) {
+    max_ratio <- 0
+    for (j in 1:k) {
+      if (i != j) {
+        between_dist <- sqrt(sum((centers[i, ] - centers[j, ])^2))
+        ratio <- (avg_within[i] + avg_within[j]) / between_dist
+        max_ratio <- max(max_ratio, ratio)
+      }
+    }
+    db_scores[i] <- max_ratio
+  }
+  db_index <- mean(db_scores)
+
+  cat(sprintf("Calinski-Harabasz Index: %.2f\n", ch_index))
+  cat("  Higher is better. Typical range: 10-1000+\n")
+  cat(sprintf("\nDavies-Bouldin Index: %.2f\n", db_index))
+  cat("  Lower is better. Good segmentation: < 1.0\n\n")
+
+  return(list(
+    calinski_harabasz = ch_index,
+    davies_bouldin = db_index,
+    between_ss = bgss,
+    within_ss = wgss,
+    variance_ratio = bgss / wgss
   ))
 }
