@@ -196,9 +196,11 @@ run_segment_gui <- function() {
         div(class = "step-title", "Step 1: Select Configuration File"),
         p("Choose your segmentation configuration Excel file (must contain a 'Config' sheet)."),
 
-        actionButton("select_config_btn", "Browse for Config File",
-                    class = "btn btn-primary",
-                    icon = icon("folder-open")),
+        shinyFilesButton("select_config_btn", "Browse for Config File", 
+                         "Please select a config file",
+                         multiple = FALSE,
+                         class = "btn btn-primary",
+                         icon = icon("folder-open")),
 
         uiOutput("config_display"),
 
