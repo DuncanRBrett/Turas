@@ -267,3 +267,78 @@ calculate_separation_metrics <- function(data, clusters, clustering_vars) {
     variance_ratio = bgss / wgss
   ))
 }
+
+#' Calculate Exploration Metrics
+#'
+#' Calculate validation metrics for multiple k values in exploration mode
+#'
+#' @param exploration_result Result from run_kmeans_exploration()
+#' @return List with metrics_df and exploration_result
+#' @export
+calculate_exploration_metrics <- function(exploration_result) {
+  library(cluster)
+
+  models <- exploration_result$models
+  data <- exploration_result$data_list$scaled_data
+
+  metrics_list <- list()
+
+  for (k_str in names(models)) {
+    k <- as.numeric(k_str)
+    model <- models[[k_str]]
+
+    # Calculate silhouette
+    sil <- silhouette(model$cluster, dist(data))
+    avg_sil <- mean(sil[, 3])
+
+    # Get segment sizes
+    sizes <- table(model$cluster)
+    min_size_pct <- min(prop.table(sizes)) * 100
+
+    metrics_list[[k_str]] <- data.frame(
+      k = k,
+      tot.withinss = model$tot.withinss,
+      betweenss = model$betweenss,
+      totss = model$totss,
+      betweenss_totss = model$betweenss / model$totss,
+      avg_silhouette_width = avg_sil,
+      min_segment_pct = min_size_pct
+    )
+  }
+
+  metrics_df <- do.call(rbind, metrics_list)
+  rownames(metrics_df) <- NULL
+
+  return(list(
+    metrics_df = metrics_df,
+    exploration_result = exploration_result
+  ))
+}
+
+#' Recommend Optimal k
+#'
+#' Recommend the best k value based on validation metrics
+#'
+#' @param metrics_df Data frame of metrics from calculate_exploration_metrics
+#' @param min_segment_size_pct Minimum segment size percentage threshold
+#' @return List with recommended_k, metrics, and reason
+#' @export
+recommend_k <- function(metrics_df, min_segment_size_pct) {
+  # Filter by segment size
+  valid <- metrics_df[metrics_df$min_segment_pct >= min_segment_size_pct, ]
+
+  if (nrow(valid) == 0) {
+    warning("No k values meet minimum segment size requirement")
+    valid <- metrics_df
+  }
+
+  # Recommend k with highest silhouette
+  best_idx <- which.max(valid$avg_silhouette_width)
+  recommended_k <- valid$k[best_idx]
+
+  return(list(
+    recommended_k = recommended_k,
+    metrics = valid,
+    reason = "Highest average silhouette width"
+  ))
+}
