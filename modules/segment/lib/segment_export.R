@@ -426,8 +426,7 @@ export_final_report <- function(final_result, profile_result, validation_metrics
   # ===========================================================================
   # SHEET 4 (option# Restart R if needed (Session -> Restart R)
   setwd("/Users/duncan/Documents/Turas")
-  source("modules/segment/run_segment.R")
-  result_labeled <- turas_segment_from_config("/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/2025 Projects/Helderberg Village/TurasTest/HV_config.xlsx")al): Outlier Analysis
+ 
   # ===========================================================================
 
   if (config$outlier_detection && !is.null(data_list$outlier_result)) {
