@@ -147,71 +147,73 @@ plot_k_selection <- function(exploration_result, output_file = NULL) {
 #' @param output_file Optional path to save plot
 #' @export
 plot_segment_profiles <- function(profile, question_labels = NULL, output_file = NULL) {
-
+  
   # Extract clustering profile
   profile_df <- profile$clustering_profile
-
+  
   # Convert to matrix (variables x segments)
   var_names <- profile_df$Variable
   segment_cols <- setdiff(names(profile_df), "Variable")
-
+  
   profile_matrix <- as.matrix(profile_df[, segment_cols])
   rownames(profile_matrix) <- var_names
-
+  
   # Apply labels if available
   if (!is.null(question_labels)) {
     # Source config for format_variable_label
     source("modules/segment/lib/segment_config.R")
     rownames(profile_matrix) <- format_variable_label(var_names, question_labels)
   }
-
+  
   # Open graphics device if saving
   if (!is.null(output_file)) {
-    png(output_file, width = 800, height = 600, res = 100)
+    png(output_file, width = 1000, height = 700, res = 100)
   }
-
-  # Create color palette (blue-white-red)
-  colors <- colorRampPalette(c("steelblue", "white", "coral"))(100)
-
-  # Create heatmap
-  par(mar = c(5, 10, 4, 2))
-
-  # Normalize data for better visualization (z-scores by row)
-  profile_normalized <- t(scale(t(profile_matrix)))
-
+  
+  # Create color palette (blue-white-red) for actual values
+  colors <- colorRampPalette(c("steelblue", "lightyellow", "coral"))(100)
+  
+  # Create heatmap with ORIGINAL values (not re-standardized)
+  par(mar = c(6, 12, 4, 2))
+  
+  # Use actual values, not z-scores
+  data_range <- range(profile_matrix, na.rm = TRUE)
+  
   image(
-    x = 1:ncol(profile_normalized),
-    y = 1:nrow(profile_normalized),
-    z = t(profile_normalized),
+    x = 1:ncol(profile_matrix),
+    y = 1:nrow(profile_matrix),
+    z = t(profile_matrix),
     col = colors,
     xlab = "",
     ylab = "",
-    main = "Segment Profiles Heatmap",
+    main = "Segment Profiles Heatmap\n(Mean Scores)",
     axes = FALSE,
-    zlim = c(-2, 2)  # Cap at +/- 2 std devs
+    zlim = data_range
   )
-
+  
   # Add axes
-  axis(1, at = 1:ncol(profile_normalized), labels = colnames(profile_normalized), las = 2)
-  axis(2, at = 1:nrow(profile_normalized), labels = rownames(profile_normalized), las = 2)
-
+  axis(1, at = 1:ncol(profile_matrix), labels = colnames(profile_matrix), las = 2, cex.axis = 0.9)
+  axis(2, at = 1:nrow(profile_matrix), labels = rownames(profile_matrix), las = 2, cex.axis = 0.8)
+  
   # Add grid
-  abline(h = 0.5:(nrow(profile_normalized) + 0.5), col = "white", lwd = 1)
-  abline(v = 0.5:(ncol(profile_normalized) + 0.5), col = "white", lwd = 1)
-
-  # Add color legend
-  legend_vals <- seq(-2, 2, length.out = 100)
-  legend_y <- seq(0.8 * nrow(profile_normalized), 0.2 * nrow(profile_normalized), length.out = 100)
-
+  abline(h = 0.5:(nrow(profile_matrix) + 0.5), col = "white", lwd = 1)
+  abline(v = 0.5:(ncol(profile_matrix) + 0.5), col = "white", lwd = 1)
+  
+  # Add text values in each cell
+  for (i in 1:nrow(profile_matrix)) {
+    for (j in 1:ncol(profile_matrix)) {
+      text(j, i, sprintf("%.1f", profile_matrix[i, j]), cex = 0.8, font = 2)
+    }
+  }
+  
   # Close device if saving
   if (!is.null(output_file)) {
     dev.off()
     cat(sprintf("Saved segment profiles heatmap to: %s\n", basename(output_file)))
   }
-
-  invisible(profile_normalized)
+  
+  invisible(profile_matrix)
 }
-
 
 #' Plot Segment Spider/Radar Chart
 #'
