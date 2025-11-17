@@ -341,3 +341,40 @@ recommend_k <- function(metrics_df, min_segment_size_pct) {
     reason = "Highest average silhouette width"
   ))
 }
+#' Calculate Validation Metrics for Final Run
+#'
+#' Calculate validation metrics for a single k value in final mode
+#'
+#' @param data Scaled data matrix
+#' @param model K-means model object
+#' @param k Number of clusters
+#' @param calculate_gap Logical, whether to calculate gap statistic
+#' @return List with validation metrics
+#' @export
+calculate_validation_metrics <- function(data, model, k, calculate_gap = FALSE) {
+  library(cluster)
+  
+  # Calculate silhouette
+  sil <- silhouette(model$cluster, dist(data))
+  avg_sil <- mean(sil[, 3])
+  
+  # Get quality metrics from model
+  betweenss_totss <- model$betweenss / model$totss
+  
+  metrics <- list(
+    avg_silhouette = avg_sil,
+    betweenss_totss = betweenss_totss,
+    tot_withinss = model$tot.withinss,
+    betweenss = model$betweenss,
+    totss = model$totss
+  )
+  
+  # Optionally calculate gap statistic (computationally expensive)
+  if (calculate_gap) {
+    # Gap statistic calculation would go here
+    # Skipped for now as it's not critical
+    metrics$gap_statistic <- NA
+  }
+  
+  return(metrics)
+}
