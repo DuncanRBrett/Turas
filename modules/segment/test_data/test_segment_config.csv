@@ -1,0 +1,31 @@
+Setting,Value
+data_file,modules/segment/test_data/test_survey_data.csv
+id_variable,respondent_id
+clustering_vars,"q1,q2,q3,q4,q5"
+profile_vars,"age,tenure_years"
+method,kmeans
+k_fixed,
+k_min,3
+k_max,5
+nstart,25
+seed,123
+missing_data,listwise_deletion
+missing_threshold,15
+standardize,TRUE
+min_segment_size_pct,10
+outlier_detection,TRUE
+outlier_method,zscore
+outlier_threshold,3.0
+outlier_min_vars,1
+outlier_handling,flag
+outlier_alpha,0.001
+k_selection_metrics,"silhouette,elbow"
+output_folder,modules/segment/test_data/output/
+output_prefix,test_
+create_dated_folder,FALSE
+segment_names,auto
+save_model,TRUE
+project_name,Test Segmentation
+analyst_name,Test User
+description,Testing segmentation module with outlier detection
+question_labels_file,modules/segment/test_data/test_question_labels.xlsx
