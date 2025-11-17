@@ -414,7 +414,7 @@ export_final_report <- function(final_result, profile_result, validation_metrics
     ),
     Value = c(
       round(validation_metrics$avg_silhouette, 3),
-      round(validation_metrics$wss, 1),
+      round(validation_metrics$tot_withinss, 1),
       round(validation_metrics$betweenss, 1),
       round(validation_metrics$betweenss_totss, 3)
     ),
