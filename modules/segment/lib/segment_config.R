@@ -158,7 +158,11 @@ validate_segment_config <- function(config) {
 
   # Segmentation variables
   clustering_vars_str <- get_char_config(config, "clustering_vars", required = TRUE)
+  # Try comma first (standard), then semicolon (European Excel)
   clustering_vars <- trimws(unlist(strsplit(clustering_vars_str, ",")))
+  if (length(clustering_vars) == 1) {
+    clustering_vars <- trimws(unlist(strsplit(clustering_vars_str, ";")))
+  }
 
   if (length(clustering_vars) < 2) {
     stop("Must specify at least 2 clustering variables. Got: ", length(clustering_vars),
@@ -181,7 +185,12 @@ validate_segment_config <- function(config) {
   # Profiling variables
   profile_vars_str <- get_config_value(config, "profile_vars", default_value = NULL)
   profile_vars <- if (!is.null(profile_vars_str) && nzchar(trimws(profile_vars_str))) {
-    trimws(unlist(strsplit(profile_vars_str, ",")))
+    # Try comma first (standard), then semicolon (European Excel)
+    vars <- trimws(unlist(strsplit(profile_vars_str, ",")))
+    if (length(vars) == 1) {
+      vars <- trimws(unlist(strsplit(profile_vars_str, ";")))
+    }
+    vars
   } else {
     NULL  # Will use all non-clustering variables
   }
