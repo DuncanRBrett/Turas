@@ -73,13 +73,14 @@ export_exploration_report <- function(exploration_result, metrics_result,
   metrics_df$Recommendation <- ""
   rec_idx <- which(metrics_df$k == recommendation$recommended_k)
   if (length(rec_idx) > 0) {
-    metrics_df$Recommendation[rec_idx] <- sprintf("← Best silhouette (%.3f)",
-                                                   recommendation$recommended_silhouette)
+    # Get silhouette from metrics_df
+    rec_silhouette <- metrics_df$avg_silhouette_width[rec_idx]
+    metrics_df$Recommendation[rec_idx] <- sprintf("← Best silhouette (%.3f)", rec_silhouette)
   }
 
   # Check for warnings
   for (i in 1:nrow(metrics_df)) {
-    if (metrics_df$smallest_segment_pct[i] < config$min_segment_size_pct) {
+    if (metrics_df$min_segment_pct[i] < config$min_segment_size_pct) {
       if (nchar(metrics_df$Recommendation[i]) > 0) {
         metrics_df$Recommendation[i] <- paste(metrics_df$Recommendation[i],
                                                "⚠ Small segment")
@@ -90,13 +91,10 @@ export_exploration_report <- function(exploration_result, metrics_result,
   }
 
   # Round numeric columns for readability
-  metrics_df$avg_silhouette <- round(metrics_df$avg_silhouette, 3)
-  metrics_df$wss <- round(metrics_df$wss, 1)
+  metrics_df$avg_silhouette_width <- round(metrics_df$avg_silhouette_width, 3)
+  metrics_df$tot.withinss <- round(metrics_df$tot.withinss, 1)
   metrics_df$betweenss_totss <- round(metrics_df$betweenss_totss, 3)
-  if (!all(is.na(metrics_df$gap_statistic))) {
-    metrics_df$gap_statistic <- round(metrics_df$gap_statistic, 3)
-  }
-  metrics_df$smallest_segment_pct <- round(metrics_df$smallest_segment_pct, 1)
+  metrics_df$min_segment_pct <- round(metrics_df$min_segment_pct, 1)
 
   # Prepare profiles for each k
   profile_sheets <- list()
