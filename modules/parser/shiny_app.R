@@ -136,7 +136,29 @@ parser_server <- function(input, output, session) {
   # Parse button clicked
   shiny::observeEvent(input$parse_btn, {
     shiny::req(input$docx_file)
-    
+
+    # Validate file type and size
+    file_ext <- tolower(tools::file_ext(input$docx_file$name))
+    if (!file_ext %in% c("docx", "doc")) {
+      shiny::showNotification(
+        "Invalid file type. Please upload a Word document (.docx or .doc)",
+        type = "error",
+        duration = 5
+      )
+      return(NULL)
+    }
+
+    # Check file size (max 50MB)
+    max_size <- 50 * 1024 * 1024  # 50MB in bytes
+    if (file.size(input$docx_file$datapath) > max_size) {
+      shiny::showNotification(
+        "File too large. Maximum file size is 50MB.",
+        type = "error",
+        duration = 5
+      )
+      return(NULL)
+    }
+
     # Show loading
     parse_notif_id <- shiny::showNotification(
       "Parsing document...",
