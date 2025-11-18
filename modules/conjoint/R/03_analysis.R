@@ -192,11 +192,6 @@ estimate_choice_based_conjoint <- function(data, config) {
   # Extract utilities from coefficients
   coefs <- coef(model)
 
-  # DEBUG: Print coefficient names
-  cat("\n--- DEBUG: Model coefficient names ---\n")
-  print(names(coefs))
-  cat("--------------------------------------\n\n")
-
   # Create utilities data frame
   utilities_list <- list()
 
@@ -210,22 +205,11 @@ estimate_choice_based_conjoint <- function(data, config) {
     # Get all levels for this attribute
     all_levels <- attributes$levels_list[attributes$AttributeName == attr][[1]]
 
-    # DEBUG
-    cat("\n--- DEBUG: Attribute =", attr, "---\n")
-    cat("Extracted level_names from coefficients:\n")
-    print(level_names)
-    cat("All levels from config:\n")
-    print(all_levels)
-    cat("attr_coefs before assignment:\n")
-    print(attr_coefs)
-    cat("------------------------------\n")
-
     # Initialize utilities vector
     utilities <- numeric(length(all_levels))
     names(utilities) <- all_levels
 
     # Assign coefficients (first level is reference, utility = 0)
-    # Strip names from attr_coefs to ensure proper assignment
     utilities[level_names] <- as.numeric(attr_coefs)
 
     # Zero-center utilities (sum to zero within attribute)
