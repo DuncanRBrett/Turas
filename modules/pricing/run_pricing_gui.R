@@ -9,7 +9,22 @@
 # ==============================================================================
 
 # Source module files
-module_dir <- dirname(normalizePath(sys.frame(1)$ofile))
+# Try to get script location, fallback to working directory
+script_path <- tryCatch({
+  if (!is.null(sys.frame(1)$ofile)) {
+    normalizePath(sys.frame(1)$ofile)
+  } else {
+    NULL
+  }
+}, error = function(e) NULL)
+
+if (is.null(script_path)) {
+  # Fallback: assume we're in Turas root
+  module_dir <- file.path(getwd(), "modules", "pricing")
+} else {
+  module_dir <- dirname(script_path)
+}
+
 r_dir <- file.path(module_dir, "R")
 
 source(file.path(r_dir, "00_main.R"))
