@@ -419,7 +419,11 @@ process_proportion_question <- function(q_row, survey_data, weight_var, config, 
 
     if (!is.null(weights)) {
       weights_valid <- weights[valid_idx]
-      weights_valid <- weights_valid[!is.na(weights_valid) & weights_valid > 0]
+
+      # Filter to valid weights and align success_values accordingly
+      valid_weight_idx <- !is.na(weights_valid) & weights_valid > 0
+      weights_valid <- weights_valid[valid_weight_idx]
+      success_values <- success_values[valid_weight_idx]
 
       n_eff <- calculate_effective_n(weights_valid)
       p <- sum(weights_valid[success_values]) / sum(weights_valid)
@@ -516,13 +520,18 @@ process_mean_question <- function(q_row, survey_data, weight_var, config, warnin
     if (!is.null(weights_valid)) {
       mean_val <- weighted.mean(values_valid, weights_valid)
       result$n_eff <- calculate_effective_n(weights_valid)
+
+      # Calculate weighted SD (same formula as in calculate_mean_ci)
+      weighted_var <- sum(weights_valid * (values_valid - mean_val)^2) / sum(weights_valid)
+      sd_val <- sqrt(weighted_var)
     } else {
       mean_val <- mean(values_valid)
       result$n_eff <- length(values_valid)
+      sd_val <- sd(values_valid)
     }
 
     result$mean <- mean_val
-    result$sd <- sd(values_valid)
+    result$sd <- sd_val
     result$n <- length(values_valid)
 
     # Calculate confidence intervals based on config

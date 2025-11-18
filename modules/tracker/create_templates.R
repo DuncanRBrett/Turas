@@ -14,6 +14,13 @@ library(openxlsx)
 
 message("Creating TurasTracker template files...")
 
+# Get script directory for output paths
+script_dir <- if (interactive()) {
+  getwd()
+} else {
+  dirname(sys.frame(1)$ofile)
+}
+
 # ==============================================================================
 # 1. TRACKING CONFIG TEMPLATE
 # ==============================================================================
@@ -132,7 +139,7 @@ writeData(wb_config, "TrackedQuestions",
 
 # Save
 saveWorkbook(wb_config,
-             "/Users/duncan/Documents/Turas/modules/tracker/tracking_config_template.xlsx",
+             file.path(script_dir, "tracking_config_template.xlsx"),
              overwrite = TRUE)
 
 message("  ✓ Created tracking_config_template.xlsx")
@@ -264,7 +271,7 @@ writeData(wb_mapping, "QuestionMap",
 
 # Save
 saveWorkbook(wb_mapping,
-             "/Users/duncan/Documents/Turas/modules/tracker/question_mapping_template.xlsx",
+             file.path(script_dir, "question_mapping_template.xlsx"),
              overwrite = TRUE)
 
 message("  ✓ Created question_mapping_template.xlsx")
@@ -308,7 +315,7 @@ wave_data <- data.frame(
 
 # Save
 write.csv(wave_data,
-          "/Users/duncan/Documents/Turas/modules/tracker/wave_data_template.csv",
+          file.path(script_dir, "wave_data_template.csv"),
           row.names = FALSE)
 
 message("  ✓ Created wave_data_template.csv")

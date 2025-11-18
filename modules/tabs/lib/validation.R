@@ -35,6 +35,9 @@
 
 SCRIPT_VERSION <- "9.9.5"
 
+# Maximum decimal places allowed for rounding settings
+MAX_DECIMAL_PLACES <- 6
+
 # ==============================================================================
 # DEPENDENCIES (V9.9.2)
 # ==============================================================================

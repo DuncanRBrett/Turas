@@ -967,17 +967,24 @@ create_error_log <- function() {
 #' @param question_code Character, related question code (default: "")
 #' @param severity Character, severity level (default: "Warning")
 #' @return Data frame, updated error log
+#' @return Data frame with new log entry appended. IMPORTANT: This is a PURE
+#'   function - it returns a NEW error_log and does NOT modify the input.
+#'   You MUST assign the result: error_log <- log_issue(error_log, ...)
 #' @export
 #' @examples
+#' # CORRECT usage - assign the result:
 #' error_log <- log_issue(error_log, "Validation", "Missing Column",
 #'                       "Column Q1 not found", "Q1", "Error")
-#' 
+#'
+#' # INCORRECT - will not work (issue not logged):
+#' # log_issue(error_log, "Validation", "Missing Column", "Column Q1 not found")
+#'
 #' # For many issues, use list accumulation:
 #' issues <- list()
 #' issues[[1]] <- data.frame(Timestamp = ..., Component = ..., ...)
 #' issues[[2]] <- data.frame(Timestamp = ..., Component = ..., ...)
 #' error_log <- do.call(rbind, issues)
-log_issue <- function(error_log, component, issue_type, description, 
+log_issue <- function(error_log, component, issue_type, description,
                      question_code = "", severity = "Warning") {
   new_entry <- data.frame(
     Timestamp = as.character(Sys.time()),

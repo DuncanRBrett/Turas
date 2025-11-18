@@ -31,8 +31,11 @@ run_parser <- function(port = NULL, launch_browser = TRUE) {
   missing_pkgs <- required_pkgs[!required_pkgs %in% installed.packages()[,"Package"]]
   
   if (length(missing_pkgs) > 0) {
-    message("Installing required packages: ", paste(missing_pkgs, collapse = ", "))
-    install.packages(missing_pkgs)
+    stop(
+      "Missing required packages: ", paste(missing_pkgs, collapse = ", "), "\n",
+      "Please install them manually using:\n",
+      "install.packages(c(", paste(paste0("'", missing_pkgs, "'"), collapse = ", "), "))"
+    )
   }
   
   # Load Turas core (if available)

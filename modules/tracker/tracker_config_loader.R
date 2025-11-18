@@ -240,8 +240,8 @@ validate_tracking_config <- function(config, question_mapping) {
   # Validate data files exist (if absolute paths provided)
   for (i in 1:nrow(config$waves)) {
     data_file <- config$waves$DataFile[i]
-    # Skip validation if relative path (will be resolved later)
-    if (file.exists(data_file) && !file.exists(data_file)) {
+    # Only validate if absolute path provided (relative paths resolved later)
+    if (file.exists(dirname(data_file)) && !file.exists(data_file)) {
       warning(paste0("Data file not found for Wave ", config$waves$WaveID[i], ": ", data_file))
     }
   }

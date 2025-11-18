@@ -223,6 +223,12 @@ calculate_separation_metrics <- function(data, clusters, clustering_vars) {
   }
 
   n <- nrow(clustering_data)
+
+  # Validate that we have enough data points for the number of clusters
+  if (n <= k) {
+    stop(sprintf("Cannot calculate Calinski-Harabasz index: n (%d) must be greater than k (%d)", n, k), call. = FALSE)
+  }
+
   ch_index <- (bgss / (k - 1)) / (wgss / (n - k))
 
   # 2. Davies-Bouldin Index
@@ -275,8 +281,10 @@ calculate_separation_metrics <- function(data, clusters, clustering_vars) {
 #' @return List with metrics_df and exploration_result
 #' @export
 calculate_exploration_metrics <- function(exploration_result) {
-  library(cluster)
-  
+  if (!requireNamespace("cluster", quietly = TRUE)) {
+    stop("Package 'cluster' is required for exploration metrics. Install with: install.packages('cluster')", call. = FALSE)
+  }
+
   models <- exploration_result$models
   data <- exploration_result$data_list$scaled_data
   
@@ -352,10 +360,12 @@ recommend_k <- function(metrics_df, min_segment_size_pct) {
 #' @return List with validation metrics
 #' @export
 calculate_validation_metrics <- function(data, model, k, calculate_gap = FALSE) {
-  library(cluster)
-  
+  if (!requireNamespace("cluster", quietly = TRUE)) {
+    stop("Package 'cluster' is required for validation metrics. Install with: install.packages('cluster')", call. = FALSE)
+  }
+
   # Calculate silhouette
-  sil <- silhouette(model$cluster, dist(data))
+  sil <- cluster::silhouette(model$cluster, dist(data))
   avg_sil <- mean(sil[, 3])
   
   # Get quality metrics from model
