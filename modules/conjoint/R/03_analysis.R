@@ -216,6 +216,8 @@ estimate_choice_based_conjoint <- function(data, config) {
     print(level_names)
     cat("All levels from config:\n")
     print(all_levels)
+    cat("attr_coefs before assignment:\n")
+    print(attr_coefs)
     cat("------------------------------\n")
 
     # Initialize utilities vector
@@ -223,7 +225,8 @@ estimate_choice_based_conjoint <- function(data, config) {
     names(utilities) <- all_levels
 
     # Assign coefficients (first level is reference, utility = 0)
-    utilities[level_names] <- attr_coefs
+    # Strip names from attr_coefs to ensure proper assignment
+    utilities[level_names] <- as.numeric(attr_coefs)
 
     # Zero-center utilities (sum to zero within attribute)
     utilities <- utilities - mean(utilities)
