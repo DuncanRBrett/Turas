@@ -142,6 +142,13 @@ launch_turas <- function() {
         .btn-keydriver:hover {
           background-color: #db2777;
         }
+        .btn-pricing {
+          background-color: #10b981;
+          color: white;
+        }
+        .btn-pricing:hover {
+          background-color: #059669;
+        }
         .status-message {
           margin-top: 20px;
           padding: 15px;
@@ -249,6 +256,16 @@ launch_turas <- function() {
           ),
           actionButton("launch_keydriver", "Launch Key Driver",
                       class = "launch-btn btn-keydriver")
+        ),
+
+        # Pricing
+        div(class = "module-card",
+          div(class = "module-title", "💰 Pricing"),
+          div(class = "module-description",
+            "Pricing research analysis using Van Westendorp PSM and Gabor-Granger methods. Determine optimal price points and acceptable price ranges."
+          ),
+          actionButton("launch_pricing", "Launch Pricing",
+                      class = "launch-btn btn-pricing")
         )
       ),
 
@@ -366,6 +383,19 @@ launch_turas <- function() {
       Sys.sleep(0.5)
       stopApp(returnValue = "keydriver")
     })
+
+    # Launch Pricing
+    observeEvent(input$launch_pricing, {
+      showModal(modalDialog(
+        title = "Launching Pricing",
+        "Closing launcher and starting Pricing...",
+        footer = NULL
+      ))
+
+      # Small delay to show message
+      Sys.sleep(0.5)
+      stopApp(returnValue = "pricing")
+    })
   }
 
   # Run the app and get selection
@@ -476,6 +506,10 @@ launch_turas <- function() {
         cat("\nError launching Key Driver:\n")
         cat(e$message, "\n")
       })
+
+    } else if (selected == "pricing") {
+      cat("Loading Pricing module...\n\n")
+      source(file.path(turas_root, "modules/pricing/run_pricing_gui.R"))
     }
   } else {
     cat("\nLauncher closed without selection.\n")
