@@ -192,6 +192,11 @@ estimate_choice_based_conjoint <- function(data, config) {
   # Extract utilities from coefficients
   coefs <- coef(model)
 
+  # DEBUG: Print coefficient names
+  cat("\n--- DEBUG: Model coefficient names ---\n")
+  print(names(coefs))
+  cat("--------------------------------------\n\n")
+
   # Create utilities data frame
   utilities_list <- list()
 
