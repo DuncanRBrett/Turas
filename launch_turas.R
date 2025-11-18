@@ -128,6 +128,20 @@ launch_turas <- function() {
         .btn-segment:hover {
           background-color: #8e44ad;
         }
+        .btn-conjoint {
+          background-color: #06b6d4;
+          color: white;
+        }
+        .btn-conjoint:hover {
+          background-color: #0891b2;
+        }
+        .btn-keydriver {
+          background-color: #ec4899;
+          color: white;
+        }
+        .btn-keydriver:hover {
+          background-color: #db2777;
+        }
         .status-message {
           margin-top: 20px;
           padding: 15px;
@@ -215,6 +229,26 @@ launch_turas <- function() {
           ),
           actionButton("launch_segment", "Launch Segment",
                       class = "launch-btn btn-segment")
+        ),
+
+        # Conjoint
+        div(class = "module-card",
+          div(class = "module-title", "🔄 Conjoint"),
+          div(class = "module-description",
+            "Choice-based conjoint analysis. Calculate part-worth utilities and attribute importance from experimental choice data."
+          ),
+          actionButton("launch_conjoint", "Launch Conjoint",
+                      class = "launch-btn btn-conjoint")
+        ),
+
+        # Key Driver
+        div(class = "module-card",
+          div(class = "module-title", "🔑 Key Driver"),
+          div(class = "module-description",
+            "Key driver analysis using multiple regression methods. Identify which factors most influence your target outcome with derived importance scores."
+          ),
+          actionButton("launch_keydriver", "Launch Key Driver",
+                      class = "launch-btn btn-keydriver")
         )
       ),
 
@@ -306,6 +340,32 @@ launch_turas <- function() {
       Sys.sleep(0.5)
       stopApp(returnValue = "segment")
     })
+
+    # Launch Conjoint
+    observeEvent(input$launch_conjoint, {
+      showModal(modalDialog(
+        title = "Launching Conjoint",
+        "Closing launcher and starting Conjoint...",
+        footer = NULL
+      ))
+
+      # Small delay to show message
+      Sys.sleep(0.5)
+      stopApp(returnValue = "conjoint")
+    })
+
+    # Launch Key Driver
+    observeEvent(input$launch_keydriver, {
+      showModal(modalDialog(
+        title = "Launching Key Driver",
+        "Closing launcher and starting Key Driver...",
+        footer = NULL
+      ))
+
+      # Small delay to show message
+      Sys.sleep(0.5)
+      stopApp(returnValue = "keydriver")
+    })
   }
 
   # Run the app and get selection
@@ -388,6 +448,32 @@ launch_turas <- function() {
         runApp(app, launch.browser = TRUE)
       }, error = function(e) {
         cat("\nError launching Segment:\n")
+        cat(e$message, "\n")
+      })
+
+    } else if (selected == "conjoint") {
+      cat("Loading Conjoint module...\n\n")
+      source(file.path(turas_root, "modules/conjoint/run_conjoint_gui.R"))
+
+      # run_conjoint_gui() returns a shinyApp object, we need to run it
+      tryCatch({
+        app <- run_conjoint_gui()
+        runApp(app, launch.browser = TRUE)
+      }, error = function(e) {
+        cat("\nError launching Conjoint:\n")
+        cat(e$message, "\n")
+      })
+
+    } else if (selected == "keydriver") {
+      cat("Loading Key Driver module...\n\n")
+      source(file.path(turas_root, "modules/keydriver/run_keydriver_gui.R"))
+
+      # run_keydriver_gui() returns a shinyApp object, we need to run it
+      tryCatch({
+        app <- run_keydriver_gui()
+        runApp(app, launch.browser = TRUE)
+      }, error = function(e) {
+        cat("\nError launching Key Driver:\n")
         cat(e$message, "\n")
       })
     }
