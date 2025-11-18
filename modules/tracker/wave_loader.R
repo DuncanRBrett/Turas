@@ -293,6 +293,8 @@ apply_wave_weights <- function(wave_df, weight_var, wave_id) {
   if (any(weights[!is.na(weights)] <= 0)) {
     n_invalid <- sum(weights[!is.na(weights)] <= 0)
     warning(paste0("Wave ", wave_id, ": ", n_invalid, " records have zero or negative weights (will be excluded)"))
+    # Actually exclude invalid weights by setting to NA
+    weights[weights <= 0] <- NA
   }
 
   # Create standardized weight column

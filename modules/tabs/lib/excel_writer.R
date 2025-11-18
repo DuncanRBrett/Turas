@@ -65,7 +65,7 @@ find_turas_root <- function() {
 }
 
 turas_root <- find_turas_root()
-source(file.path(turas_root, "shared", "formatting.R"), local = FALSE)
+source(file.path(turas_root, "shared", "formatting.R"), local = TRUE)
 
 
 # ==============================================================================

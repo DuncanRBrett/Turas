@@ -627,7 +627,12 @@ calculate_changes <- function(wave_results, wave_ids, metric_name, sub_metric = 
     # Calculate changes
     if (!is.na(current_val) && !is.na(previous_val)) {
       absolute_change <- current_val - previous_val
-      percentage_change <- (absolute_change / previous_val) * 100
+      # Avoid division by zero
+      percentage_change <- if (previous_val == 0) {
+        NA  # Cannot calculate percentage change from zero baseline
+      } else {
+        (absolute_change / previous_val) * 100
+      }
 
       changes[[paste0(prev_wave_id, "_to_", wave_id)]] <- list(
         from_wave = prev_wave_id,
@@ -779,16 +784,27 @@ perform_significance_tests_nps <- function(wave_results, wave_ids, config) {
     if (current$available && previous$available &&
         current$n_unweighted >= min_base && previous$n_unweighted >= min_base) {
 
-      # For MVT, we'll use a simple comparison
-      # Future enhancement: Test promoter and detractor proportions separately
-      nps_diff <- abs(current$nps - previous$nps)
+      # Calculate z-test for NPS difference
+      # NPS is on -100 to +100 scale, convert to proportion scale (0-1)
+      nps_diff <- current$nps - previous$nps
 
-      # Simple heuristic: NPS difference > 10 points is "significant"
-      # This is NOT statistically rigorous - just for MVT
+      # Approximate standard error for NPS difference
+      # Using conservative estimate: SE = sqrt((100^2 / n1) + (100^2 / n2))
+      # This assumes worst-case variance for NPS scale
+      se_nps <- sqrt((10000 / current$n_unweighted) + (10000 / previous$n_unweighted))
+
+      # Calculate z-statistic
+      z_stat <- abs(nps_diff) / se_nps
+
+      # Critical value for two-tailed test (e.g., 1.96 for 95% confidence)
+      z_critical <- qnorm(1 - alpha/2)
+
       sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- list(
-        significant = nps_diff > 10,
-        nps_difference = current$nps - previous$nps,
-        note = "MVT: Simple threshold comparison, not statistical test"
+        significant = z_stat > z_critical,
+        nps_difference = nps_diff,
+        z_statistic = z_stat,
+        p_value = 2 * (1 - pnorm(abs(z_stat))),
+        note = "Z-test for NPS difference (conservative SE estimate)"
       )
     } else {
       sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- list(

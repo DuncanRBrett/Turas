@@ -123,10 +123,35 @@ parser_ui <- function() {
 }
 
 #' Parser Server
-#' 
+#'
 #' @description
 #' Server logic for the questionnaire parser.
-#' 
+#'
+#' @note REFACTORING NEEDED (CR-PARSER-003):
+#' This function is 294 lines long and violates single responsibility principle.
+#' Recommended refactoring using Shiny modules pattern:
+#'
+#' PHASE 1 - Extract Reactive Logic:
+#' - create_parsing_module() -> handles document parsing (lines 137-184)
+#' - create_status_module() -> handles status display (lines 186-213)
+#' - create_questions_table_module() -> handles questions display (lines 215-290)
+#' - create_download_module() -> handles Excel generation (lines 292-350)
+#' - create_upload_module() -> handles edited file upload (lines 352-425)
+#'
+#' PHASE 2 - Shared State:
+#' - Use reactiveValues() for shared state instead of multiple reactiveVal()
+#' - Implement event bus pattern for cross-module communication
+#'
+#' PHASE 3 - UI Modules:
+#' - Extract corresponding UI functions for each module
+#' - Implement consistent module naming: mod_parsing_ui() / mod_parsing_server()
+#'
+#' BENEFITS:
+#' - Each module <50 lines, easier to test
+#' - Clear separation of concerns
+#' - Reusable components
+#' - Better error isolation
+#'
 #' @export
 parser_server <- function(input, output, session) {
   
@@ -136,7 +161,29 @@ parser_server <- function(input, output, session) {
   # Parse button clicked
   shiny::observeEvent(input$parse_btn, {
     shiny::req(input$docx_file)
-    
+
+    # Validate file type and size
+    file_ext <- tolower(tools::file_ext(input$docx_file$name))
+    if (!file_ext %in% c("docx", "doc")) {
+      shiny::showNotification(
+        "Invalid file type. Please upload a Word document (.docx or .doc)",
+        type = "error",
+        duration = 5
+      )
+      return(NULL)
+    }
+
+    # Check file size (max 50MB)
+    max_size <- 50 * 1024 * 1024  # 50MB in bytes
+    if (file.size(input$docx_file$datapath) > max_size) {
+      shiny::showNotification(
+        "File too large. Maximum file size is 50MB.",
+        type = "error",
+        duration = 5
+      )
+      return(NULL)
+    }
+
     # Show loading
     parse_notif_id <- shiny::showNotification(
       "Parsing document...",

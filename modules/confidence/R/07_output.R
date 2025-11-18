@@ -533,7 +533,7 @@ build_means_dataframe <- function(mean_results) {
     if (!is.null(q_result$bayesian)) {
       base_row$Bayesian_Lower <- q_result$bayesian$lower
       base_row$Bayesian_Upper <- q_result$bayesian$upper
-      base_row$Bayesian_Mean <- q_result$bayesian$posterior_mean
+      base_row$Bayesian_Mean <- q_result$bayesian$post_mean
     }
 
     rows_list[[length(rows_list) + 1]] <- base_row

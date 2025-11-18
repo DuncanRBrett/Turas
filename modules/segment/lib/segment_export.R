@@ -424,9 +424,7 @@ export_final_report <- function(final_result, profile_result, validation_metrics
   sheets[["Validation"]] <- validation_df
 
   # ===========================================================================
-  # SHEET 4 (option# Restart R if needed (Session -> Restart R)
-  setwd("/Users/duncan/Documents/Turas")
- 
+  # SHEET 4 (optional): Outlier Analysis
   # ===========================================================================
 
   if (config$outlier_detection && !is.null(data_list$outlier_result)) {
