@@ -53,8 +53,8 @@ load_conjoint_data <- function(data_file, config) {
   }
 
   # Count respondents and profiles
-  respondent_id_col <- config$settings$respondent_id_column %||% "respondent_id"
-  profile_id_col <- config$settings$profile_id_column %||% "profile_id"
+  respondent_id_col <- config$settings$respondent_id_column %||% "resp_id"
+  choice_set_col <- config$settings$choice_set_column %||% "choice_set_id"
 
   n_respondents <- if (respondent_id_col %in% names(data)) {
     length(unique(data[[respondent_id_col]]))
@@ -62,16 +62,21 @@ load_conjoint_data <- function(data_file, config) {
     NA
   }
 
-  n_profiles <- if (profile_id_col %in% names(data)) {
-    length(unique(data[[profile_id_col]]))
+  # Count total rows (alternatives across all choice sets)
+  n_total_rows <- nrow(data)
+
+  # Count unique choice sets
+  n_choice_sets <- if (choice_set_col %in% names(data)) {
+    length(unique(data[[choice_set_col]]))
   } else {
-    nrow(data)
+    NA
   }
 
   list(
     data = data,
     n_respondents = n_respondents,
-    n_profiles = n_profiles
+    n_profiles = n_total_rows,
+    n_choice_sets = n_choice_sets
   )
 }
 

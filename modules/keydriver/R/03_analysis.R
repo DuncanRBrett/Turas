@@ -92,7 +92,12 @@ calculate_beta_weights <- function(model, data, config) {
   beta_weights <- coefs * (sd_x / sd_y)
 
   # Return as percentage of sum of absolute betas
-  pct <- (abs(beta_weights) / sum(abs(beta_weights))) * 100
+  sum_abs <- sum(abs(beta_weights))
+  if (sum_abs == 0) {
+    pct <- rep(0, length(beta_weights))
+  } else {
+    pct <- (abs(beta_weights) / sum_abs) * 100
+  }
 
   unname(pct)
 }
@@ -124,7 +129,12 @@ calculate_relative_weights <- function(model, correlations, config) {
   rw <- rowSums((Delta %*% R_xy)^2)
 
   # Normalize to percentages
-  rw_pct <- (rw / sum(rw)) * 100
+  sum_rw <- sum(rw)
+  if (sum_rw == 0) {
+    rw_pct <- rep(0, length(rw))
+  } else {
+    rw_pct <- (rw / sum_rw) * 100
+  }
 
   unname(rw_pct)
 }
@@ -210,7 +220,12 @@ calculate_shapley_values <- function(model, data, config) {
   }
 
   # Convert to percentages
-  shapley_pct <- (shapley / sum(shapley)) * 100
+  sum_shapley <- sum(shapley)
+  if (sum_shapley == 0) {
+    shapley_pct <- rep(0, length(shapley))
+  } else {
+    shapley_pct <- (shapley / sum_shapley) * 100
+  }
 
   unname(shapley_pct)
 }

@@ -205,6 +205,11 @@ estimate_choice_based_conjoint <- function(data, config) {
     # Get all levels for this attribute
     all_levels <- attributes$levels_list[attributes$AttributeName == attr][[1]]
 
+    # Check for NA coefficients (indicates multicollinearity)
+    if (any(is.na(attr_coefs))) {
+      warning(sprintf("Attribute '%s': Some coefficients could not be estimated (NA). This may indicate multicollinearity in your data.", attr), call. = FALSE)
+    }
+
     # Initialize utilities vector
     utilities <- numeric(length(all_levels))
     names(utilities) <- all_levels
@@ -212,8 +217,13 @@ estimate_choice_based_conjoint <- function(data, config) {
     # Assign coefficients (first level is reference, utility = 0)
     utilities[level_names] <- as.numeric(attr_coefs)
 
+    # Handle NA values - set to 0 and warn
+    if (any(is.na(utilities))) {
+      utilities[is.na(utilities)] <- 0
+    }
+
     # Zero-center utilities (sum to zero within attribute)
-    utilities <- utilities - mean(utilities)
+    utilities <- utilities - mean(utilities, na.rm = TRUE)
 
     # Store
     for (i in seq_along(utilities)) {
