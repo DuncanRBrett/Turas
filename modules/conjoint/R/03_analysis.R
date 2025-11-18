@@ -173,7 +173,7 @@ estimate_choice_based_conjoint <- function(data, config) {
   formula_str <- paste(
     chosen_col, "~",
     paste(attribute_cols, collapse = " + "),
-    "+ strata(", choice_set_col, ")"
+    "+ survival::strata(", choice_set_col, ")"
   )
   model_formula <- as.formula(formula_str)
 
