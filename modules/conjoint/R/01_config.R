@@ -7,17 +7,44 @@
 #' Loads and validates conjoint study configuration from Excel file.
 #'
 #' @param config_file Path to configuration Excel file
+#' @param project_root Optional project root directory (defaults to config file directory)
 #' @return List with validated configuration
 #' @keywords internal
-load_conjoint_config <- function(config_file) {
+load_conjoint_config <- function(config_file, project_root = NULL) {
 
   if (!file.exists(config_file)) {
     stop("Configuration file not found: ", config_file, call. = FALSE)
   }
 
+  # Set project root to config file directory if not specified
+  if (is.null(project_root)) {
+    project_root <- dirname(config_file)
+  }
+
   # Load settings
   settings <- openxlsx::read.xlsx(config_file, sheet = "Settings")
   settings_list <- setNames(as.list(settings$Value), settings$Setting)
+
+  # Extract and resolve file paths from settings
+  data_file <- settings_list$data_file
+  output_file <- settings_list$output_file
+
+  # Resolve relative paths
+  if (!is.null(data_file) && !is.na(data_file)) {
+    if (!grepl("^(/|[A-Za-z]:)", data_file)) {
+      # Relative path - resolve from project root
+      data_file <- file.path(project_root, data_file)
+    }
+    data_file <- normalizePath(data_file, winslash = "/", mustWork = FALSE)
+  }
+
+  if (!is.null(output_file) && !is.na(output_file)) {
+    if (!grepl("^(/|[A-Za-z]:)", output_file)) {
+      # Relative path - resolve from project root
+      output_file <- file.path(project_root, output_file)
+    }
+    output_file <- normalizePath(output_file, winslash = "/", mustWork = FALSE)
+  }
 
   # Load attributes definition
   attributes <- openxlsx::read.xlsx(config_file, sheet = "Attributes")
@@ -55,6 +82,9 @@ load_conjoint_config <- function(config_file) {
   list(
     settings = settings_list,
     attributes = attributes,
-    design = design
+    design = design,
+    data_file = data_file,
+    output_file = output_file,
+    project_root = project_root
   )
 }

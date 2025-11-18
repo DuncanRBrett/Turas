@@ -22,8 +22,11 @@
 #'
 #' @param config_file Path to key driver configuration Excel file
 #'   Required sheets: Settings, Variables
-#' @param data_file Path to respondent data (CSV, XLSX, SAV, DTA)
-#' @param output_file Path for results Excel file (default: keydriver_results.xlsx)
+#'   Settings sheet should include: data_file, output_file
+#' @param data_file Path to respondent data (CSV, XLSX, SAV, DTA).
+#'   If NULL, reads from config Settings sheet.
+#' @param output_file Path for results Excel file.
+#'   If NULL, reads from config Settings sheet.
 #'
 #' @return List containing:
 #'   - importance: Data frame with importance scores from each method
@@ -33,10 +36,16 @@
 #'
 #' @examples
 #' \dontrun{
-#' # Basic usage
+#' # Using config file with paths specified in Settings
+#' results <- run_keydriver_analysis(
+#'   config_file = "keydriver_config.xlsx"
+#' )
+#'
+#' # Override paths from config
 #' results <- run_keydriver_analysis(
 #'   config_file = "keydriver_config.xlsx",
-#'   data_file = "survey_data.csv"
+#'   data_file = "my_data.csv",
+#'   output_file = "my_results.xlsx"
 #' )
 #'
 #' # View importance rankings
@@ -47,7 +56,7 @@
 #' }
 #'
 #' @export
-run_keydriver_analysis <- function(config_file, data_file, output_file = "keydriver_results.xlsx") {
+run_keydriver_analysis <- function(config_file, data_file = NULL, output_file = NULL) {
 
   cat("\n")
   cat(rep("=", 80), "\n", sep = "")
@@ -60,6 +69,23 @@ run_keydriver_analysis <- function(config_file, data_file, output_file = "keydri
   config <- load_keydriver_config(config_file)
   cat(sprintf("   ✓ Outcome variable: %s\n", config$outcome_var))
   cat(sprintf("   ✓ Driver variables: %d variables\n", length(config$driver_vars)))
+
+  # Get data_file from config if not provided
+  if (is.null(data_file)) {
+    data_file <- config$data_file
+    if (is.null(data_file) || is.na(data_file)) {
+      stop("data_file not specified in function call or config Settings sheet", call. = FALSE)
+    }
+  }
+
+  # Get output_file from config if not provided
+  if (is.null(output_file)) {
+    output_file <- config$output_file
+    if (is.null(output_file) || is.na(output_file)) {
+      # Default to project_root/keydriver_results.xlsx
+      output_file <- file.path(config$project_root, "keydriver_results.xlsx")
+    }
+  }
 
   # STEP 2: Load and Validate Data
   cat("\n2. Loading and validating data...\n")

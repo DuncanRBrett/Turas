@@ -22,9 +22,12 @@
 #' - Supports both choice-based and rating-based designs
 #'
 #' @param config_file Path to conjoint configuration Excel file
-#'   Required sheets: Settings, Attributes, Design, Data
-#' @param data_file Path to respondent data (CSV, XLSX, SAV, DTA)
-#' @param output_file Path for results Excel file (default: conjoint_results.xlsx)
+#'   Required sheets: Settings, Attributes
+#'   Settings sheet should include: data_file, output_file
+#' @param data_file Path to respondent data (CSV, XLSX, SAV, DTA).
+#'   If NULL, reads from config Settings sheet.
+#' @param output_file Path for results Excel file.
+#'   If NULL, reads from config Settings sheet.
 #'
 #' @return List containing:
 #'   - utilities: Data frame of part-worth utilities by attribute level
@@ -34,10 +37,16 @@
 #'
 #' @examples
 #' \dontrun{
-#' # Basic usage
+#' # Using config file with paths specified in Settings
+#' results <- run_conjoint_analysis(
+#'   config_file = "conjoint_config.xlsx"
+#' )
+#'
+#' # Override paths from config
 #' results <- run_conjoint_analysis(
 #'   config_file = "conjoint_config.xlsx",
-#'   data_file = "survey_data.csv"
+#'   data_file = "my_data.csv",
+#'   output_file = "my_results.xlsx"
 #' )
 #'
 #' # View attribute importance
@@ -48,7 +57,7 @@
 #' }
 #'
 #' @export
-run_conjoint_analysis <- function(config_file, data_file, output_file = "conjoint_results.xlsx") {
+run_conjoint_analysis <- function(config_file, data_file = NULL, output_file = NULL) {
 
   cat("\n")
   cat(rep("=", 80), "\n", sep = "")
@@ -62,6 +71,23 @@ run_conjoint_analysis <- function(config_file, data_file, output_file = "conjoin
   cat(sprintf("   ✓ Loaded %d attributes with %d total levels\n",
               nrow(config$attributes),
               sum(config$attributes$NumLevels)))
+
+  # Get data_file from config if not provided
+  if (is.null(data_file)) {
+    data_file <- config$data_file
+    if (is.null(data_file) || is.na(data_file)) {
+      stop("data_file not specified in function call or config Settings sheet", call. = FALSE)
+    }
+  }
+
+  # Get output_file from config if not provided
+  if (is.null(output_file)) {
+    output_file <- config$output_file
+    if (is.null(output_file) || is.na(output_file)) {
+      # Default to project_root/conjoint_results.xlsx
+      output_file <- file.path(config$project_root, "conjoint_results.xlsx")
+    }
+  }
 
   # STEP 2: Load and Validate Data
   cat("\n2. Loading and validating data...\n")

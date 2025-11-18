@@ -63,15 +63,6 @@ run_conjoint_gui <- function() {
     unique(detected)
   }
 
-  # Detect data files in directory
-  detect_data_files <- function(dir) {
-    if (!dir.exists(dir)) return(character(0))
-    files <- list.files(dir, pattern = "\\.(csv|xlsx|sav|dta)$", full.names = FALSE, ignore.case = TRUE)
-    # Exclude config files
-    files <- files[!grepl("config", files, ignore.case = TRUE)]
-    files
-  }
-
   ui <- fluidPage(
 
     tags$head(
@@ -163,16 +154,14 @@ run_conjoint_gui <- function() {
           white-space: pre-wrap;
           font-size: 13px;
         }
-        .recent-item {
-          padding: 8px 12px;
-          border: 1px solid #dee2e6;
+        .info-box {
+          background-color: #d1ecf1;
+          border: 1px solid #bee5eb;
+          color: #0c5460;
+          padding: 10px 15px;
           border-radius: 5px;
-          margin-bottom: 5px;
-          cursor: pointer;
-          transition: background-color 0.2s;
-        }
-        .recent-item:hover {
-          background-color: #e9ecef;
+          margin-top: 10px;
+          font-size: 13px;
         }
       "))
     ),
@@ -211,29 +200,11 @@ run_conjoint_gui <- function() {
         div(class = "step-card",
           div(class = "step-title", "Step 2: Select Configuration File"),
           uiOutput("config_selector"),
-          uiOutput("config_display")
-        )
-      ),
-
-      # Step 3: Data File
-      conditionalPanel(
-        condition = "output.config_selected",
-        div(class = "step-card",
-          div(class = "step-title", "Step 3: Select Data File"),
-          uiOutput("data_selector"),
-          uiOutput("data_display")
-        )
-      ),
-
-      # Step 4: Output
-      conditionalPanel(
-        condition = "output.data_selected",
-        div(class = "step-card",
-          div(class = "step-title", "Step 4: Output Settings"),
-          textInput("output_filename", "Output Filename:",
-                   value = "conjoint_results.xlsx",
-                   width = "100%"),
-          uiOutput("output_display")
+          uiOutput("config_display"),
+          div(class = "info-box",
+            tags$strong("Note: "), "The config file's Settings sheet should specify ",
+            tags$code("data_file"), " and ", tags$code("output_file"), " paths."
+          )
         )
       ),
 
@@ -265,8 +236,7 @@ run_conjoint_gui <- function() {
     # Reactive values
     files <- reactiveValues(
       project_dir = NULL,
-      config_file = NULL,
-      data_file = NULL
+      config_file = NULL
     )
 
     console_text <- reactiveVal("")
@@ -286,7 +256,6 @@ run_conjoint_gui <- function() {
         if (length(dir_path) > 0 && dir.exists(dir_path)) {
           files$project_dir <- dir_path
           files$config_file <- NULL
-          files$data_file <- NULL
         }
       }
     })
@@ -311,7 +280,6 @@ run_conjoint_gui <- function() {
         if (dir.exists(input$recent_project)) {
           files$project_dir <- input$recent_project
           files$config_file <- NULL
-          files$data_file <- NULL
         }
       }
     })
@@ -367,71 +335,14 @@ run_conjoint_gui <- function() {
       }
     })
 
-    # Data file selector
-    output$data_selector <- renderUI({
-      req(files$project_dir)
-      data_files <- detect_data_files(files$project_dir)
-
-      if (length(data_files) > 0) {
-        radioButtons("data_select", "Detected data files:",
-                    choices = data_files,
-                    selected = data_files[1])
-      } else {
-        shinyFilesButton("data_btn", "Browse for Data File",
-                        "Select data file",
-                        class = "btn btn-conjoint",
-                        multiple = FALSE)
-      }
-    })
-
-    # Handle data selection
-    observeEvent(input$data_select, {
-      if (!is.null(input$data_select) && !is.null(files$project_dir)) {
-        files$data_file <- file.path(files$project_dir, input$data_select)
-      }
-    })
-
-    # Data display
-    output$data_display <- renderUI({
-      if (!is.null(files$data_file)) {
-        div(class = "file-display",
-          div(class = "filename", basename(files$data_file)),
-          div(class = "filepath", files$data_file),
-          if (file.exists(files$data_file)) {
-            div(class = "status-success", "✓ Data file found")
-          } else {
-            div(class = "status-error", "✗ File not found")
-          }
-        )
-      }
-    })
-
-    # Output display
-    output$output_display <- renderUI({
-      req(files$project_dir, input$output_filename)
-      output_path <- file.path(files$project_dir, input$output_filename)
-      div(class = "file-display",
-        div(class = "filename", input$output_filename),
-        div(class = "filepath", output_path)
-      )
-    })
-
     # Conditional panel outputs
     output$project_selected <- reactive({ !is.null(files$project_dir) })
     outputOptions(output, "project_selected", suspendWhenHidden = FALSE)
 
-    output$config_selected <- reactive({ !is.null(files$config_file) })
-    outputOptions(output, "config_selected", suspendWhenHidden = FALSE)
-
-    output$data_selected <- reactive({ !is.null(files$data_file) })
-    outputOptions(output, "data_selected", suspendWhenHidden = FALSE)
-
     output$ready_to_run <- reactive({
       !is.null(files$project_dir) &&
       !is.null(files$config_file) &&
-      !is.null(files$data_file) &&
-      !is.null(input$output_filename) &&
-      nchar(input$output_filename) > 0 &&
+      file.exists(files$config_file) &&
       !is_running()
     })
     outputOptions(output, "ready_to_run", suspendWhenHidden = FALSE)
@@ -445,7 +356,7 @@ run_conjoint_gui <- function() {
     # Run analysis
     observeEvent(input$run_analysis, {
 
-      req(files$project_dir, files$config_file, files$data_file)
+      req(files$project_dir, files$config_file)
 
       is_running(TRUE)
       console_text("")
@@ -473,20 +384,16 @@ run_conjoint_gui <- function() {
         source(file.path(turas_root, "modules/conjoint/R/03_analysis.R"))
         source(file.path(turas_root, "modules/conjoint/R/04_output.R"))
 
-        output_path <- file.path(files$project_dir, input$output_filename)
-
         # Capture analysis output
+        # Paths are read from config file Settings sheet
         capture <- capture.output({
           results <- run_conjoint_analysis(
-            config_file = files$config_file,
-            data_file = files$data_file,
-            output_file = output_path
+            config_file = files$config_file
           )
         }, type = "output")
 
         output_text <- paste0(output_text, paste(capture, collapse = "\n"))
         output_text <- paste0(output_text, "\n\n✓ Analysis complete!")
-        output_text <- paste0(output_text, "\n\nOutput saved to:\n", output_path)
 
       }, error = function(e) {
         output_text <<- paste0(output_text, "\n\n✗ Error: ", e$message)
