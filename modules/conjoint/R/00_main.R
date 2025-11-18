@@ -61,7 +61,7 @@ run_conjoint_analysis <- function(config_file, data_file, output_file = "conjoin
   config <- load_conjoint_config(config_file)
   cat(sprintf("   ✓ Loaded %d attributes with %d total levels\n",
               nrow(config$attributes),
-              sum(config$attributes$num_levels)))
+              sum(config$attributes$NumLevels)))
 
   # STEP 2: Load and Validate Data
   cat("\n2. Loading and validating data...\n")
