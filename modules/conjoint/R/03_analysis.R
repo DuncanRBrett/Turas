@@ -210,6 +210,14 @@ estimate_choice_based_conjoint <- function(data, config) {
     # Get all levels for this attribute
     all_levels <- attributes$levels_list[attributes$AttributeName == attr][[1]]
 
+    # DEBUG
+    cat("\n--- DEBUG: Attribute =", attr, "---\n")
+    cat("Extracted level_names from coefficients:\n")
+    print(level_names)
+    cat("All levels from config:\n")
+    print(all_levels)
+    cat("------------------------------\n")
+
     # Initialize utilities vector
     utilities <- numeric(length(all_levels))
     names(utilities) <- all_levels
