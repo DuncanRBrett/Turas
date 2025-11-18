@@ -177,11 +177,14 @@ estimate_choice_based_conjoint <- function(data, config) {
   )
   model_formula <- as.formula(formula_str)
 
-  # Check if survival package is available
+  # Check if survival package is available and load it
   if (!requireNamespace("survival", quietly = TRUE)) {
     stop("Package 'survival' required for choice-based conjoint. Install with: install.packages('survival')",
          call. = FALSE)
   }
+
+  # Load survival package (needed for clogit's internal coxph call)
+  library(survival)
 
   # Fit conditional logit model
   model <- survival::clogit(model_formula, data = df)
