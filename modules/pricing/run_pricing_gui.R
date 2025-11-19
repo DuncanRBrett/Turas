@@ -9,22 +9,31 @@
 # ==============================================================================
 
 # Source module files
-# Try to get script location, fallback to working directory
-script_path <- tryCatch({
-  if (!is.null(sys.frame(1)$ofile)) {
-    normalizePath(sys.frame(1)$ofile)
-  } else {
-    NULL
+# Try multiple methods to find script location
+get_script_dir <- function() {
+  # Method 1: Check if running via source() - look through call stack
+  for (i in seq_len(sys.nframe())) {
+    file <- sys.frame(i)$ofile
+    if (!is.null(file) && grepl("run_pricing_gui", file)) {
+      return(dirname(normalizePath(file)))
+    }
   }
-}, error = function(e) NULL)
 
-if (is.null(script_path)) {
-  # Fallback: assume we're in Turas root
-  module_dir <- file.path(getwd(), "modules", "pricing")
-} else {
-  module_dir <- dirname(script_path)
+  # Method 2: Check commandArgs for --file
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("--file=", args, value = TRUE)
+  if (length(file_arg) > 0) {
+    file_path <- sub("--file=", "", file_arg)
+    if (grepl("run_pricing_gui", file_path)) {
+      return(dirname(normalizePath(file_path)))
+    }
+  }
+
+  # Method 3: Fallback - assume we're in Turas root
+  return(file.path(getwd(), "modules", "pricing"))
 }
 
+module_dir <- get_script_dir()
 r_dir <- file.path(module_dir, "R")
 
 source(file.path(r_dir, "00_main.R"))
