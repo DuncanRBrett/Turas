@@ -510,6 +510,15 @@ launch_turas <- function() {
     } else if (selected == "pricing") {
       cat("Loading Pricing module...\n\n")
       source(file.path(turas_root, "modules/pricing/run_pricing_gui.R"))
+
+      # run_pricing_gui() returns a shinyApp object, we need to run it
+      tryCatch({
+        app <- run_pricing_gui()
+        runApp(app, launch.browser = TRUE)
+      }, error = function(e) {
+        cat("\nError launching Pricing:\n")
+        cat(e$message, "\n")
+      })
     }
   } else {
     cat("\nLauncher closed without selection.\n")

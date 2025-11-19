@@ -8,56 +8,64 @@
 #
 # ==============================================================================
 
-# Source module files
-# Try multiple methods to find script location
-get_script_dir <- function() {
-  # Method 1: Check if running via source() - look through call stack
-  for (i in seq_len(sys.nframe())) {
-    file <- sys.frame(i)$ofile
-    if (!is.null(file) && grepl("run_pricing_gui", file)) {
-      return(dirname(normalizePath(file)))
+#' Run Pricing GUI
+#'
+#' Launch the Shiny GUI for pricing analysis.
+#'
+#' @return A shinyApp object
+#' @export
+run_pricing_gui <- function() {
+
+  # Source module files
+  # Try multiple methods to find script location
+  get_script_dir <- function() {
+    # Method 1: Check if running via source() - look through call stack
+    for (i in seq_len(sys.nframe())) {
+      file <- sys.frame(i)$ofile
+      if (!is.null(file) && grepl("run_pricing_gui", file)) {
+        return(dirname(normalizePath(file)))
+      }
     }
+
+    # Method 2: Check commandArgs for --file
+    args <- commandArgs(trailingOnly = FALSE)
+    file_arg <- grep("--file=", args, value = TRUE)
+    if (length(file_arg) > 0) {
+      file_path <- sub("--file=", "", file_arg)
+      if (grepl("run_pricing_gui", file_path)) {
+        return(dirname(normalizePath(file_path)))
+      }
+    }
+
+    # Method 3: Fallback - assume we're in Turas root
+    return(file.path(getwd(), "modules", "pricing"))
   }
 
-  # Method 2: Check commandArgs for --file
-  args <- commandArgs(trailingOnly = FALSE)
-  file_arg <- grep("--file=", args, value = TRUE)
-  if (length(file_arg) > 0) {
-    file_path <- sub("--file=", "", file_arg)
-    if (grepl("run_pricing_gui", file_path)) {
-      return(dirname(normalizePath(file_path)))
-    }
+  module_dir <- get_script_dir()
+  r_dir <- file.path(module_dir, "R")
+
+  source(file.path(r_dir, "00_main.R"))
+  source(file.path(r_dir, "01_config.R"))
+  source(file.path(r_dir, "02_validation.R"))
+  source(file.path(r_dir, "03_van_westendorp.R"))
+  source(file.path(r_dir, "04_gabor_granger.R"))
+  source(file.path(r_dir, "05_visualization.R"))
+  source(file.path(r_dir, "06_output.R"))
+
+  # Check for required packages
+  required_packages <- c("shiny", "readxl", "openxlsx")
+  missing <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
+  if (length(missing) > 0) {
+    stop(sprintf("Missing required packages: %s\nInstall with: install.packages(c('%s'))",
+                 paste(missing, collapse = ", "),
+                 paste(missing, collapse = "', '")),
+         call. = FALSE)
   }
 
-  # Method 3: Fallback - assume we're in Turas root
-  return(file.path(getwd(), "modules", "pricing"))
-}
+  library(shiny)
 
-module_dir <- get_script_dir()
-r_dir <- file.path(module_dir, "R")
-
-source(file.path(r_dir, "00_main.R"))
-source(file.path(r_dir, "01_config.R"))
-source(file.path(r_dir, "02_validation.R"))
-source(file.path(r_dir, "03_van_westendorp.R"))
-source(file.path(r_dir, "04_gabor_granger.R"))
-source(file.path(r_dir, "05_visualization.R"))
-source(file.path(r_dir, "06_output.R"))
-
-# Check for required packages
-required_packages <- c("shiny", "readxl", "openxlsx")
-missing <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
-if (length(missing) > 0) {
-  stop(sprintf("Missing required packages: %s\nInstall with: install.packages(c('%s'))",
-               paste(missing, collapse = ", "),
-               paste(missing, collapse = "', '")),
-       call. = FALSE)
-}
-
-library(shiny)
-
-# Recent projects file
-recent_projects_file <- file.path(module_dir, ".recent_pricing_projects.rds")
+  # Recent projects file
+  recent_projects_file <- file.path(module_dir, ".recent_pricing_projects.rds")
 
 #' Load Recent Projects
 load_recent_projects <- function() {
@@ -362,6 +370,7 @@ server <- function(input, output, session) {
 }
 
 # ==============================================================================
-# RUN APP
+# RETURN APP
 # ==============================================================================
-shinyApp(ui = ui, server = server)
+  shinyApp(ui = ui, server = server)
+}
