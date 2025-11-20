@@ -312,22 +312,12 @@ if ("%s" != "alchemerparser") {
       temp_script <- tempfile(fileext = ".R")
       writeLines(launch_script, temp_script)
 
-      # For segment, capture errors to debug file
-      if (module_name == "segment") {
-        error_file <- file.path(turas_root, "segment_debug.log")
-        system2("Rscript",
-                args = c(temp_script),
-                wait = FALSE,
-                stdout = error_file,
-                stderr = error_file)
-      } else {
-        # Launch in background process - completely detached
-        system2("Rscript",
-                args = c(temp_script),
-                wait = FALSE,
-                stdout = NULL,
-                stderr = NULL)
-      }
+      # Launch in background process - completely detached
+      system2("Rscript",
+              args = c(temp_script),
+              wait = FALSE,
+              stdout = NULL,
+              stderr = NULL)
 
       # Clean up temp file after a delay
       later::later(function() {
