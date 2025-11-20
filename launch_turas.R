@@ -100,6 +100,13 @@ launch_turas <- function() {
         .btn-parser:hover {
           background-color: #2980b9;
         }
+        .btn-alchemerparser {
+          background-color: #16a085;
+          color: white;
+        }
+        .btn-alchemerparser:hover {
+          background-color: #138d75;
+        }
         .btn-tabs {
           background-color: #2ecc71;
           color: white;
@@ -196,6 +203,16 @@ launch_turas <- function() {
           ),
           actionButton("launch_parser", "Launch Parser",
                       class = "launch-btn btn-parser")
+        ),
+
+        # AlchemerParser
+        div(class = "module-card",
+          div(class = "module-title", "🔄 AlchemerParser"),
+          div(class = "module-description",
+            "Parse Alchemer survey files and generate Tabs configuration. Converts questionnaire, data export map, and translation files into ready-to-use Tabs inputs."
+          ),
+          actionButton("launch_alchemerparser", "Launch AlchemerParser",
+                      class = "launch-btn btn-alchemerparser")
         ),
 
         # Tabs
@@ -304,6 +321,19 @@ launch_turas <- function() {
       # Small delay to show message
       Sys.sleep(0.5)
       stopApp(returnValue = "parser")
+    })
+
+    # Launch AlchemerParser
+    observeEvent(input$launch_alchemerparser, {
+      showModal(modalDialog(
+        title = "Launching AlchemerParser",
+        "Closing launcher and starting AlchemerParser...",
+        footer = NULL
+      ))
+
+      # Small delay to show message
+      Sys.sleep(0.5)
+      stopApp(returnValue = "alchemerparser")
     })
 
     # Launch Tabs
@@ -426,6 +456,19 @@ launch_turas <- function() {
         runApp(app, launch.browser = TRUE)
       }, error = function(e) {
         cat("\nError launching Parser:\n")
+        cat(e$message, "\n")
+      })
+
+    } else if (selected == "alchemerparser") {
+      cat("Loading AlchemerParser module...\n\n")
+      source(file.path(turas_root, "modules/AlchemerParser/run_alchemerparser_gui.R"))
+
+      # run_alchemerparser_gui() returns a shinyApp object, we need to run it
+      tryCatch({
+        app <- run_alchemerparser_gui()
+        runApp(app, launch.browser = TRUE)
+      }, error = function(e) {
+        cat("\nError launching AlchemerParser:\n")
         cat(e$message, "\n")
       })
 
