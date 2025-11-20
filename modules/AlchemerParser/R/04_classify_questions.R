@@ -231,12 +231,26 @@ classify_variable_type <- function(question, options, hints, verbose = FALSE) {
     }
   }
 
-  # 8. Check if Single-Mention (has options)
+  # 8. Check for numeric rating scale (before Single_Mention)
+  # If options are mostly numeric (e.g., 0-10, 1-5), classify as Rating
+  if (n_options > 0) {
+    option_texts <- sapply(options, function(o) o$text)
+    # Try to convert to numeric (ignore "Don't know", "None", etc.)
+    numeric_values <- suppressWarnings(as.numeric(option_texts))
+    n_numeric <- sum(!is.na(numeric_values))
+
+    # If most options are numeric (at least 50%), it's a rating scale
+    if (n_numeric >= max(3, n_options * 0.5)) {
+      return("Rating")
+    }
+  }
+
+  # 9. Check if Single-Mention (has options)
   if (n_options > 0) {
     return("Single_Mention")
   }
 
-  # 9. Otherwise Open_End (no options, not classified above)
+  # 10. Otherwise Open_End (no options, not classified above)
   return("Open_End")
 }
 
@@ -296,7 +310,7 @@ pivot_checkbox_grid <- function(question, options, hints) {
 #'
 #' @description
 #' Creates sub-questions for a radio button grid (one per row).
-#' Each sub-question is Single_Mention type.
+#' Each sub-question is Single_Mention type, unless options are numeric (then Rating).
 #'
 #' @param question Question group
 #' @param options Options from translation
@@ -313,6 +327,20 @@ create_radio_grid_questions <- function(question, options, hints) {
   row_labels <- unique(sapply(cols, function(c) c$row_label))
   # DO NOT sort - preserve data order
 
+  # Determine variable type based on options
+  # If options are mostly numeric (e.g., 0-10), classify as Rating
+  var_type <- "Single_Mention"
+  if (length(options) > 0) {
+    option_texts <- sapply(options, function(o) o$text)
+    numeric_values <- suppressWarnings(as.numeric(option_texts))
+    n_numeric <- sum(!is.na(numeric_values))
+
+    # If most options are numeric (at least 50%), it's a rating scale
+    if (n_numeric >= max(3, length(options) * 0.5)) {
+      var_type <- "Rating"
+    }
+  }
+
   sub_questions <- list()
 
   for (i in seq_along(row_labels)) {
@@ -323,7 +351,7 @@ create_radio_grid_questions <- function(question, options, hints) {
       suffix = suffix,
       row_label = row,
       question_text = row,  # Use row label as question text (e.g., "Tees", "greens", "fairways")
-      variable_type = "Single_Mention",
+      variable_type = var_type,
       n_columns = 1,
       options = options  # Options from translation (e.g., Happy, Neutral, Unhappy)
     )
