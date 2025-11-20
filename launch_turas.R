@@ -290,242 +290,223 @@ launch_turas <- function() {
       }
     })
 
-    # Store selected module
-    selected_module <- reactiveVal(NULL)
+    # Helper function to launch modules in background
+    launch_module <- function(module_name, script_path) {
+      # Create R script to launch the module
+      launch_script <- sprintf('
+        setwd("%s")
+        source("%s")
+        module_name <- "%s"
+
+        if (module_name == "alchemerparser") {
+          app <- run_alchemerparser_gui()
+        } else if (module_name == "tabs") {
+          app <- run_tabs_gui()
+        } else if (module_name == "tracker") {
+          app <- run_tracker_gui()
+        } else if (module_name == "confidence") {
+          app <- run_confidence_gui()
+        } else if (module_name == "segment") {
+          app <- run_segment_gui()
+        } else if (module_name == "conjoint") {
+          app <- run_conjoint_gui()
+        } else if (module_name == "keydriver") {
+          app <- run_keydriver_gui()
+        } else if (module_name == "pricing") {
+          app <- run_pricing_gui()
+        }
+
+        shiny::runApp(app, launch.browser = TRUE, port = 0)
+      ', turas_root, script_path, module_name)
+
+      # Write temporary launch script
+      temp_script <- tempfile(fileext = ".R")
+      writeLines(launch_script, temp_script)
+
+      # Launch in background process
+      system2("Rscript", args = c(temp_script), wait = FALSE, stdout = FALSE, stderr = FALSE)
+
+      # Clean up temp file after a delay (in another process)
+      later::later(function() {
+        if (file.exists(temp_script)) unlink(temp_script)
+      }, delay = 5)
+    }
 
     # Launch AlchemerParser
     observeEvent(input$launch_alchemerparser, {
-      showModal(modalDialog(
-        title = "Launching AlchemerParser",
-        "Closing launcher and starting AlchemerParser...",
-        footer = NULL
-      ))
+      status("Launching AlchemerParser in new tab...")
 
-      # Small delay to show message
-      Sys.sleep(0.5)
-      stopApp(returnValue = "alchemerparser")
+      tryCatch({
+        launch_module("alchemerparser",
+                     file.path(turas_root, "modules/AlchemerParser/run_alchemerparser_gui.R"))
+
+        # Update status after short delay
+        later::later(function() {
+          status("AlchemerParser launched successfully!")
+        }, delay = 1)
+
+        # Clear status after a few seconds
+        later::later(function() {
+          status("")
+        }, delay = 4)
+
+      }, error = function(e) {
+        status(paste("Error launching AlchemerParser:", e$message))
+      })
     })
 
     # Launch Tabs
     observeEvent(input$launch_tabs, {
-      showModal(modalDialog(
-        title = "Launching Tabs",
-        "Closing launcher and starting Tabs...",
-        footer = NULL
-      ))
+      status("Launching Tabs in new tab...")
 
-      # Small delay to show message
-      Sys.sleep(0.5)
-      stopApp(returnValue = "tabs")
+      tryCatch({
+        launch_module("tabs",
+                     file.path(turas_root, "modules/tabs/run_tabs_gui.R"))
+
+        later::later(function() {
+          status("Tabs launched successfully!")
+        }, delay = 1)
+
+        later::later(function() {
+          status("")
+        }, delay = 4)
+
+      }, error = function(e) {
+        status(paste("Error launching Tabs:", e$message))
+      })
     })
 
     # Launch Tracker
     observeEvent(input$launch_tracker, {
-      showModal(modalDialog(
-        title = "Launching Tracker",
-        "Closing launcher and starting Tracker...",
-        footer = NULL
-      ))
+      status("Launching Tracker in new tab...")
 
-      # Small delay to show message
-      Sys.sleep(0.5)
-      stopApp(returnValue = "tracker")
+      tryCatch({
+        launch_module("tracker",
+                     file.path(turas_root, "modules/tracker/run_tracker_gui.R"))
+
+        later::later(function() {
+          status("Tracker launched successfully!")
+        }, delay = 1)
+
+        later::later(function() {
+          status("")
+        }, delay = 4)
+
+      }, error = function(e) {
+        status(paste("Error launching Tracker:", e$message))
+      })
     })
 
     # Launch Confidence
     observeEvent(input$launch_confidence, {
-      showModal(modalDialog(
-        title = "Launching Confidence",
-        "Closing launcher and starting Confidence...",
-        footer = NULL
-      ))
+      status("Launching Confidence in new tab...")
 
-      # Small delay to show message
-      Sys.sleep(0.5)
-      stopApp(returnValue = "confidence")
+      tryCatch({
+        launch_module("confidence",
+                     file.path(turas_root, "modules/confidence/run_confidence_gui.R"))
+
+        later::later(function() {
+          status("Confidence launched successfully!")
+        }, delay = 1)
+
+        later::later(function() {
+          status("")
+        }, delay = 4)
+
+      }, error = function(e) {
+        status(paste("Error launching Confidence:", e$message))
+      })
     })
 
     # Launch Segment
     observeEvent(input$launch_segment, {
-      showModal(modalDialog(
-        title = "Launching Segment",
-        "Closing launcher and starting Segment...",
-        footer = NULL
-      ))
+      status("Launching Segment in new tab...")
 
-      # Small delay to show message
-      Sys.sleep(0.5)
-      stopApp(returnValue = "segment")
+      tryCatch({
+        launch_module("segment",
+                     file.path(turas_root, "modules/segment/run_segment_gui.R"))
+
+        later::later(function() {
+          status("Segment launched successfully!")
+        }, delay = 1)
+
+        later::later(function() {
+          status("")
+        }, delay = 4)
+
+      }, error = function(e) {
+        status(paste("Error launching Segment:", e$message))
+      })
     })
 
     # Launch Conjoint
     observeEvent(input$launch_conjoint, {
-      showModal(modalDialog(
-        title = "Launching Conjoint",
-        "Closing launcher and starting Conjoint...",
-        footer = NULL
-      ))
+      status("Launching Conjoint in new tab...")
 
-      # Small delay to show message
-      Sys.sleep(0.5)
-      stopApp(returnValue = "conjoint")
+      tryCatch({
+        launch_module("conjoint",
+                     file.path(turas_root, "modules/conjoint/run_conjoint_gui.R"))
+
+        later::later(function() {
+          status("Conjoint launched successfully!")
+        }, delay = 1)
+
+        later::later(function() {
+          status("")
+        }, delay = 4)
+
+      }, error = function(e) {
+        status(paste("Error launching Conjoint:", e$message))
+      })
     })
 
     # Launch Key Driver
     observeEvent(input$launch_keydriver, {
-      showModal(modalDialog(
-        title = "Launching Key Driver",
-        "Closing launcher and starting Key Driver...",
-        footer = NULL
-      ))
+      status("Launching Key Driver in new tab...")
 
-      # Small delay to show message
-      Sys.sleep(0.5)
-      stopApp(returnValue = "keydriver")
+      tryCatch({
+        launch_module("keydriver",
+                     file.path(turas_root, "modules/keydriver/run_keydriver_gui.R"))
+
+        later::later(function() {
+          status("Key Driver launched successfully!")
+        }, delay = 1)
+
+        later::later(function() {
+          status("")
+        }, delay = 4)
+
+      }, error = function(e) {
+        status(paste("Error launching Key Driver:", e$message))
+      })
     })
 
     # Launch Pricing
     observeEvent(input$launch_pricing, {
-      showModal(modalDialog(
-        title = "Launching Pricing",
-        "Closing launcher and starting Pricing...",
-        footer = NULL
-      ))
+      status("Launching Pricing in new tab...")
 
-      # Small delay to show message
-      Sys.sleep(0.5)
-      stopApp(returnValue = "pricing")
+      tryCatch({
+        launch_module("pricing",
+                     file.path(turas_root, "modules/pricing/run_pricing_gui.R"))
+
+        later::later(function() {
+          status("Pricing launched successfully!")
+        }, delay = 1)
+
+        later::later(function() {
+          status("")
+        }, delay = 4)
+
+      }, error = function(e) {
+        status(paste("Error launching Pricing:", e$message))
+      })
     })
   }
 
-  # Run the app and get selection
-  selected <- runApp(list(ui = ui, server = server),
-                     launch.browser = TRUE,
-                     quiet = TRUE)
-
-  # Launch the selected module
-  if (!is.null(selected)) {
-    cat("\n")
-    cat("==============================================================================\n")
-    cat("  LAUNCHING", toupper(selected), "\n")
-    cat("==============================================================================\n\n")
-
-    # Ensure we're in the Turas root directory
-    setwd(turas_root)
-
-    # Give browser time to close previous app
-    Sys.sleep(0.5)
-
-    if (selected == "alchemerparser") {
-      cat("Loading AlchemerParser module...\n\n")
-      source(file.path(turas_root, "modules/AlchemerParser/run_alchemerparser_gui.R"))
-
-      # run_alchemerparser_gui() returns a shinyApp object, we need to run it
-      tryCatch({
-        app <- run_alchemerparser_gui()
-        runApp(app, launch.browser = TRUE)
-      }, error = function(e) {
-        cat("\nError launching AlchemerParser:\n")
-        cat(e$message, "\n")
-      })
-
-    } else if (selected == "tabs") {
-      cat("Loading Tabs module...\n\n")
-      source(file.path(turas_root, "modules/tabs/run_tabs_gui.R"))
-
-      # run_tabs_gui() returns a shinyApp object, we need to run it
-      tryCatch({
-        app <- run_tabs_gui()
-        runApp(app, launch.browser = TRUE)
-      }, error = function(e) {
-        cat("\nError launching Tabs:\n")
-        cat(e$message, "\n")
-      })
-
-    } else if (selected == "tracker") {
-      cat("Loading Tracker module...\n\n")
-      source(file.path(turas_root, "modules/tracker/run_tracker_gui.R"))
-
-      # run_tracker_gui() returns a shinyApp object, we need to run it
-      tryCatch({
-        app <- run_tracker_gui()
-        runApp(app, launch.browser = TRUE)
-      }, error = function(e) {
-        cat("\nError launching Tracker:\n")
-        cat(e$message, "\n")
-      })
-
-    } else if (selected == "confidence") {
-      cat("Loading Confidence module...\n\n")
-      source(file.path(turas_root, "modules/confidence/run_confidence_gui.R"))
-
-      # run_confidence_gui() returns a shinyApp object, we need to run it
-      tryCatch({
-        app <- run_confidence_gui()
-        runApp(app, launch.browser = TRUE)
-      }, error = function(e) {
-        cat("\nError launching Confidence:\n")
-        cat(e$message, "\n")
-      })
-
-    } else if (selected == "segment") {
-      cat("Loading Segment module...\n\n")
-      source(file.path(turas_root, "modules/segment/run_segment_gui.R"))
-
-      # run_segment_gui() returns a shinyApp object, we need to run it
-      tryCatch({
-        app <- run_segment_gui()
-        runApp(app, launch.browser = TRUE)
-      }, error = function(e) {
-        cat("\nError launching Segment:\n")
-        cat(e$message, "\n")
-      })
-
-    } else if (selected == "conjoint") {
-      cat("Loading Conjoint module...\n\n")
-      source(file.path(turas_root, "modules/conjoint/run_conjoint_gui.R"))
-
-      # run_conjoint_gui() returns a shinyApp object, we need to run it
-      tryCatch({
-        app <- run_conjoint_gui()
-        runApp(app, launch.browser = TRUE)
-      }, error = function(e) {
-        cat("\nError launching Conjoint:\n")
-        cat(e$message, "\n")
-      })
-
-    } else if (selected == "keydriver") {
-      cat("Loading Key Driver module...\n\n")
-      source(file.path(turas_root, "modules/keydriver/run_keydriver_gui.R"))
-
-      # run_keydriver_gui() returns a shinyApp object, we need to run it
-      tryCatch({
-        app <- run_keydriver_gui()
-        runApp(app, launch.browser = TRUE)
-      }, error = function(e) {
-        cat("\nError launching Key Driver:\n")
-        cat(e$message, "\n")
-      })
-
-    } else if (selected == "pricing") {
-      cat("Loading Pricing module...\n\n")
-      source(file.path(turas_root, "modules/pricing/run_pricing_gui.R"))
-
-      # run_pricing_gui() returns a shinyApp object, we need to run it
-      tryCatch({
-        app <- run_pricing_gui()
-        runApp(app, launch.browser = TRUE)
-      }, error = function(e) {
-        cat("\nError launching Pricing:\n")
-        cat(e$message, "\n")
-      })
-    }
-  } else {
-    cat("\nLauncher closed without selection.\n")
-  }
-
-  # Return invisibly
-  invisible(NULL)
+  # Run the launcher app (stays open while modules launch in background)
+  runApp(list(ui = ui, server = server),
+         launch.browser = TRUE,
+         quiet = TRUE)
 }
 
 
