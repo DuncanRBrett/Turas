@@ -103,6 +103,10 @@ AlchemerParser requires **three files** exported from Alchemer, all with the sam
 2. Create a new export or edit existing
 3. Set format to **Question Numbers** (not Question IDs only)
 4. Download the **mapping file** (not the actual data)
+5. must repeat and for Question ID
+6. create a file with data export with Question numbers in cell A1 - and the headers in cell B1 oonwards
+then put data export with Question numbers in cell A2 and the headers inB2 onwards
+
 
 **What It Contains:**
 - Row 1: Question numbers (1:, 2:, 3:...)

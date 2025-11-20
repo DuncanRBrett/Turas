@@ -25,10 +25,19 @@ You need to export three files from your Alchemer survey:
 - Download the export mapping
 - Save as: `{ProjectName}_data_export_map.xlsx`
 
+Note this needs 2 rows
+Row1 = data export with Question number
+Row2 = data export with Question ID
+
+This can be selected in setting in Alchemer export.
+
+
 ### 3. Translation Export
 - Go to Survey → Build → Translations
 - Export **Default Language**
 - Save as: `{ProjectName}_translation-export.xlsx`
+
+- delete all rows below the thank you - 
 
 **Important:** All three files must use the same project name prefix.
 
@@ -95,7 +104,10 @@ You're now ready to use these files with the Tabs module!
 
 1. Rename your data file columns using the `Data_Headers.xlsx` file
 2. Load the config files into Tabs
-3. Run your cross-tabulation analysis
+3. Copy the data headers row into your data file and make sure the number of columns match
+4. There may be errors so double check
+5. Set up the rest of you config and survey structure
+6. Run your cross-tabulation analysis
 
 See the [User Manual](USER_MANUAL.md) for detailed guidance on:
 - Handling complex grid questions
