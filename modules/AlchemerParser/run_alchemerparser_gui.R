@@ -37,7 +37,7 @@ for (f in r_files) {
 
 # Check required packages
 check_dependencies <- function() {
-  required_packages <- c("readxl", "openxlsx", "officer", "shiny")
+  required_packages <- c("readxl", "openxlsx", "officer", "shiny", "shinyFiles", "fs")
   missing_packages <- character(0)
 
   for (pkg in required_packages) {
@@ -156,7 +156,9 @@ run_alchemerparser_gui <- function() {
           ),
           column(4,
             br(),
-            actionButton("browse_dir", "Browse...", width = "100%")
+            shinyFiles::shinyDirButton("browse_dir", "Browse...",
+                                       title = "Select Project Directory",
+                                       buttonType = "default", class = NULL)
           )
         ),
 
@@ -263,14 +265,18 @@ run_alchemerparser_gui <- function() {
       }
     })
 
-    # Browse button (simulated - actual file dialog requires shinyFiles package)
+    # Set up directory chooser
+    volumes <- c(Home = fs::path_home(), shinyFiles::getVolumes()())
+    shinyFiles::shinyDirChoose(input, "browse_dir", roots = volumes, session = session)
+
+    # Handle directory selection
     observeEvent(input$browse_dir, {
-      showModal(modalDialog(
-        title = "Browse for Directory",
-        "Please enter the full path to your project directory in the text box above.",
-        "Or select from recent projects if available.",
-        footer = modalButton("Close")
-      ))
+      if (!is.integer(input$browse_dir)) {
+        dir_path <- shinyFiles::parseDirPath(volumes, input$browse_dir)
+        if (length(dir_path) > 0) {
+          updateTextInput(session, "project_dir", value = as.character(dir_path))
+        }
+      }
     })
 
     # Check files when directory changes
