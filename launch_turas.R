@@ -292,76 +292,39 @@ launch_turas <- function() {
 
     # Helper function to launch modules in background
     launch_module <- function(module_name, script_path) {
-      # Get the module directory (parent of the script)
-      module_dir <- dirname(script_path)
-      script_name <- basename(script_path)
-
       # Create R script to launch the module
+      # Simple approach: create a wrapper script that sources and runs the module
       launch_script <- sprintf('
-        # Set working directory to Turas root (modules expect TURAS_HOME to be root)
+        # Set working directory to Turas root
         setwd("%s")
 
-        # Load required libraries
-        suppressPackageStartupMessages({
-          library(shiny)
-        })
+        # Source the module script
+        source("%s")
 
-        # Source the module script with full path (local = FALSE so functions are in global env)
-        source("%s", local = FALSE)
-
-        # Get the function name based on module name
-        module_name <- "%s"
-
-        # Call the appropriate function to get the shinyApp object
-        # Note: AlchemerParser auto-launches when sourced in non-interactive mode
-        if (module_name == "alchemerparser") {
-          # AlchemerParser has auto-launch code that runs during source
-          # Do nothing here - it already launched
-        } else if (module_name == "tabs") {
-          app <- run_tabs_gui()
-          shiny::runApp(app, launch.browser = TRUE, port = 0)
-        } else if (module_name == "tracker") {
-          app <- run_tracker_gui()
-          shiny::runApp(app, launch.browser = TRUE, port = 0)
-        } else if (module_name == "confidence") {
-          app <- run_confidence_gui()
-          shiny::runApp(app, launch.browser = TRUE, port = 0)
-        } else if (module_name == "segment") {
-          app <- run_segment_gui()
-          shiny::runApp(app, launch.browser = TRUE, port = 0)
-        } else if (module_name == "conjoint") {
-          app <- run_conjoint_gui()
-          shiny::runApp(app, launch.browser = TRUE, port = 0)
-        } else if (module_name == "keydriver") {
-          app <- run_keydriver_gui()
-          shiny::runApp(app, launch.browser = TRUE, port = 0)
-        } else if (module_name == "pricing") {
-          app <- run_pricing_gui()
+        # Call the function and run the app
+        # AlchemerParser has auto-launch code, others need explicit call
+        if ("%s" != "alchemerparser") {
+          app <- %s()
           shiny::runApp(app, launch.browser = TRUE, port = 0)
         }
-      ', turas_root, script_path, module_name)
+      ',
+      turas_root,
+      script_path,
+      module_name,
+      paste0("run_", module_name, "_gui"))
 
       # Write temporary launch script
       temp_script <- tempfile(fileext = ".R")
       writeLines(launch_script, temp_script)
 
-      # Create log file for debugging (if needed)
-      log_file <- tempfile(pattern = paste0("turas_", module_name, "_"), fileext = ".log")
-
-      # Launch in background process, redirect output to log file
+      # Launch in background process - no output redirection to allow browser launch
       system2("Rscript",
               args = c(temp_script),
-              wait = FALSE,
-              stdout = log_file,
-              stderr = log_file)
+              wait = FALSE)
 
-      # Clean up temp files after a delay (in another process)
+      # Clean up temp file after a delay
       later::later(function() {
         if (file.exists(temp_script)) unlink(temp_script)
-        # Keep log file for a bit longer in case there are issues
-        later::later(function() {
-          if (file.exists(log_file)) unlink(log_file)
-        }, delay = 60)
       }, delay = 5)
     }
 
