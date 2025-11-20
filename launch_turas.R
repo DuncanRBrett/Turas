@@ -297,36 +297,69 @@ launch_turas <- function() {
       script_name <- basename(script_path)
 
       # Create R script to launch the module
+      # Note: AlchemerParser has auto-launch code that runs when sourced,
+      # but other modules need to have their function called explicitly
       launch_script <- sprintf('
-        # Set working directory to module directory so it can find its dependencies
+        # Set working directory to Turas root (modules expect TURAS_HOME to be root)
         setwd("%s")
 
-        # Source the module script
-        source("%s")
+        # Redirect errors to a log file for debugging
+        log_file <- tempfile(pattern = "turas_launch_", fileext = ".log")
+        sink(log_file, type = "output")
+        sink(log_file, type = "message")
 
-        # Get the function name based on module name
-        module_name <- "%s"
+        tryCatch({
+          # Load required libraries
+          suppressPackageStartupMessages({
+            library(shiny)
+          })
 
-        if (module_name == "alchemerparser") {
-          app <- run_alchemerparser_gui()
-        } else if (module_name == "tabs") {
-          app <- run_tabs_gui()
-        } else if (module_name == "tracker") {
-          app <- run_tracker_gui()
-        } else if (module_name == "confidence") {
-          app <- run_confidence_gui()
-        } else if (module_name == "segment") {
-          app <- run_segment_gui()
-        } else if (module_name == "conjoint") {
-          app <- run_conjoint_gui()
-        } else if (module_name == "keydriver") {
-          app <- run_keydriver_gui()
-        } else if (module_name == "pricing") {
-          app <- run_pricing_gui()
-        }
+          # Source the module script with full path (local = FALSE so functions are in global env)
+          source("%s", local = FALSE)
 
-        shiny::runApp(app, launch.browser = TRUE, port = 0)
-      ', module_dir, script_name, module_name)
+          # Get the function name based on module name
+          module_name <- "%s"
+
+          # Call the appropriate function to get the shinyApp object
+          if (module_name == "alchemerparser") {
+            # AlchemerParser has auto-launch code that already ran during source
+            # Do nothing - it already launched
+          } else if (module_name == "tabs") {
+            cat("Calling run_tabs_gui()\\n")
+            app <- run_tabs_gui()
+            cat("Got app, running it\\n")
+            shiny::runApp(app, launch.browser = TRUE, port = 0)
+          } else if (module_name == "tracker") {
+            app <- run_tracker_gui()
+            shiny::runApp(app, launch.browser = TRUE, port = 0)
+          } else if (module_name == "confidence") {
+            app <- run_confidence_gui()
+            shiny::runApp(app, launch.browser = TRUE, port = 0)
+          } else if (module_name == "segment") {
+            app <- run_segment_gui()
+            shiny::runApp(app, launch.browser = TRUE, port = 0)
+          } else if (module_name == "conjoint") {
+            app <- run_conjoint_gui()
+            shiny::runApp(app, launch.browser = TRUE, port = 0)
+          } else if (module_name == "keydriver") {
+            app <- run_keydriver_gui()
+            shiny::runApp(app, launch.browser = TRUE, port = 0)
+          } else if (module_name == "pricing") {
+            app <- run_pricing_gui()
+            shiny::runApp(app, launch.browser = TRUE, port = 0)
+          }
+        }, error = function(e) {
+          cat("\\n=== ERROR ===\\n")
+          cat("Module:", module_name, "\\n")
+          cat("Error message:", e$message, "\\n")
+          cat("Error trace:\\n")
+          print(e)
+          cat("Log file:", log_file, "\\n")
+        })
+
+        sink(type = "message")
+        sink(type = "output")
+      ', turas_root, script_path, module_name)
 
       # Write temporary launch script
       temp_script <- tempfile(fileext = ".R")
