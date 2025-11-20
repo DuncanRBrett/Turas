@@ -93,13 +93,6 @@ launch_turas <- function() {
           cursor: pointer;
           transition: background-color 0.2s;
         }
-        .btn-parser {
-          background-color: #3498db;
-          color: white;
-        }
-        .btn-parser:hover {
-          background-color: #2980b9;
-        }
         .btn-alchemerparser {
           background-color: #16a085;
           color: white;
@@ -194,16 +187,6 @@ launch_turas <- function() {
 
       # Module Cards
       div(class = "module-section",
-
-        # Parser
-        div(class = "module-card",
-          div(class = "module-title", "📊 Parser"),
-          div(class = "module-description",
-            "Parse and process survey data files. Convert raw data into structured formats for analysis."
-          ),
-          actionButton("launch_parser", "Launch Parser",
-                      class = "launch-btn btn-parser")
-        ),
 
         # AlchemerParser
         div(class = "module-card",
@@ -309,19 +292,6 @@ launch_turas <- function() {
 
     # Store selected module
     selected_module <- reactiveVal(NULL)
-
-    # Launch Parser
-    observeEvent(input$launch_parser, {
-      showModal(modalDialog(
-        title = "Launching Parser",
-        "Closing launcher and starting Parser...",
-        footer = NULL
-      ))
-
-      # Small delay to show message
-      Sys.sleep(0.5)
-      stopApp(returnValue = "parser")
-    })
 
     # Launch AlchemerParser
     observeEvent(input$launch_alchemerparser, {
@@ -446,20 +416,7 @@ launch_turas <- function() {
     # Give browser time to close previous app
     Sys.sleep(0.5)
 
-    if (selected == "parser") {
-      cat("Loading Parser module...\n\n")
-      source(file.path(turas_root, "modules/parser/run_parser.R"))
-
-      # run_parser() returns a shinyApp object, we need to run it
-      tryCatch({
-        app <- run_parser()
-        runApp(app, launch.browser = TRUE)
-      }, error = function(e) {
-        cat("\nError launching Parser:\n")
-        cat(e$message, "\n")
-      })
-
-    } else if (selected == "alchemerparser") {
+    if (selected == "alchemerparser") {
       cat("Loading AlchemerParser module...\n\n")
       source(file.path(turas_root, "modules/AlchemerParser/run_alchemerparser_gui.R"))
 
