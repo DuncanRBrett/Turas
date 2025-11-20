@@ -7,7 +7,7 @@ Get your first Alchemer survey parsed and ready for Tabs in under 10 minutes.
 Ensure you have R installed with the following packages:
 
 ```r
-install.packages(c("readxl", "openxlsx", "officer", "shiny"))
+install.packages(c("readxl", "openxlsx", "officer", "shiny", "shinyFiles", "fs"))
 ```
 
 ## Step 1: Export Files from Alchemer (5 minutes)
@@ -52,7 +52,10 @@ source("modules/AlchemerParser/run_alchemerparser_gui.R")
 
 ## Step 3: Select Project Directory (1 minute)
 
-1. In the GUI, enter or browse to the folder containing your three exported files
+1. In the GUI, either:
+   - Click **"Browse..."** to graphically navigate to your project folder, OR
+   - Type the full path in the text box, OR
+   - Select from recent projects dropdown (shows project names like "HV2025 (W2025/01_Setup)")
 2. The parser will automatically detect the project name and validate files
 3. You should see: **"✓ All required files found"**
 

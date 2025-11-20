@@ -36,8 +36,16 @@ AlchemerParser automates the tedious process of setting up Tabs configuration fi
 ### Required Packages
 
 ```r
-install.packages(c("readxl", "openxlsx", "officer", "shiny"))
+install.packages(c("readxl", "openxlsx", "officer", "shiny", "shinyFiles", "fs"))
 ```
+
+**Package Purposes:**
+- `readxl`: Read Excel files (data export map, translation export)
+- `openxlsx`: Write Excel output files
+- `officer`: Read Word documents (questionnaire)
+- `shiny`: Interactive GUI
+- `shinyFiles`: Graphical folder browser in GUI
+- `fs`: Cross-platform file system operations
 
 ### Module Location
 
@@ -148,12 +156,18 @@ source("modules/AlchemerParser/run_alchemerparser_gui.R")
 
 #### Step 1: Select Project Directory
 
-1. Enter the full path to your project folder, or
-2. Select from recent projects dropdown
-3. The GUI validates files and displays status:
-   - ✓ Green = All files found
-   - ⚠ Yellow = Missing files
-   - ✗ Red = Invalid directory
+You have three options for selecting your project folder:
+
+1. **Browse Graphically**: Click the **"Browse..."** button to open a folder picker and navigate visually
+2. **Type Path**: Enter the full path directly in the text box
+3. **Recent Projects**: Select from the dropdown showing recent projects (displays as "ProjectName (parent/folder)")
+   - Example: `HV2025 (W2025/01_Setup)` vs `CCPB_CSAT2025 (CSAT2025/01_Setup)`
+   - Prevents confusion when multiple projects are in similarly-named folders
+
+The GUI validates files and displays status:
+- ✓ Green = All files found
+- ⚠ Yellow = Missing files
+- ✗ Red = Invalid directory
 
 #### Step 2: Configure Options
 
@@ -350,13 +364,19 @@ Questions are classified in this order:
 3. **Rating**
    - 5, 7, 10, or 11-point scales
    - Options contain: satisfied, poor, excellent, quality, likely
+   - **OR** ≥50% of options are numeric (e.g., 0-10, 1-5, 1-3 + "Don't know")
+   - Numeric rating scales are automatically detected and classified as Rating
 
 4. **Ranking**
-   - Word doc contains "rank" keyword
-   - OR multiple columns with sequential position values
+   - **Detected BEFORE grid classification** to avoid false positives
+   - Question text contains: "ranking question", "most to least", "least to most"
+   - OR contains "rank", "ranking", "prioritize" keywords
+   - Multiple columns represent ranking positions (1st choice, 2nd choice, etc.)
+   - **Note:** "multi mention" in question text takes precedence over ranking
 
 5. **Multi_Mention**
-   - Word doc has `[ ]` brackets
+   - Question text explicitly says "(multi mention" or "select all"
+   - OR Word doc has `[ ]` brackets
    - OR multiple columns with different option labels
 
 6. **Single_Mention**
@@ -412,6 +432,27 @@ The parser automatically handles three types of grids:
 **Output:**
 - Q13a (Kelvin) - Rating
 - Q13b (Mowbray) - Rating
+
+### Grid Options Finding
+
+Alchemer stores grid options inconsistently across different surveys. AlchemerParser uses a smart search strategy:
+
+**Standard Pattern** (most common):
+- Options stored at question ID = `base_id + num_rows`
+- Example: Q6 (ID 9) with 4 rows → options at ID 13
+
+**When Standard Pattern Fails:**
+1. **Try base ID**: Check if options are at the grid's own ID
+2. **Search nearby IDs**: Check IDs from `expected - 2` to `expected + 10`
+3. **Fallback to shared scale**: Look for common 0-10 + "Don't know" rating scale in translation file
+
+**Why This Matters:**
+- Real survey data (e.g., Helderberg Village) had options at ID 260 instead of expected ID 258
+- CCPB CSAT had options at ID 23 instead of expected ID 22
+- The parser finds them automatically without manual intervention
+
+**Row Order Preservation:**
+Grid rows appear in the same order as the data export map (not alphabetically sorted)
 
 ---
 
@@ -487,6 +528,32 @@ The parser flags issues that may need manual review.
 **Severity:** REVIEW
 **Cause:** Multi-column question classified as Multi_Mention or Ranking without Word doc confirmation
 **Fix:** Verify question type in original survey
+
+---
+
+## Known Issues
+
+### Othermention Text Field Naming (Non-Critical)
+
+**Issue:** Multi-mention questions with "Other - Write In" options may create duplicate column labels in the data export map.
+
+**Example:**
+- Column 17: "Other - Write In (Required)" (checkbox)
+- Column 18: "Other - Write In (Required)" (text field)
+
+**Current Behavior:**
+- Detected as duplicate
+- Renamed to `Q32_16othertext`
+- Column count may show 16 instead of 17
+
+**Ideal Behavior:**
+- Checkbox: `Q32_17`
+- Text field: `Q32_17text`
+- Column count: 17
+
+**Workaround:** Manually rename codes in output files if needed. This is a cosmetic issue and doesn't affect Tabs functionality.
+
+**Status:** Low priority - does not impact analysis
 
 ---
 

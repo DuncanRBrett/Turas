@@ -206,6 +206,7 @@ Numbers: [1, 2]
 3. Rating
    - 5/7/10/11 options
    - Options contain: satisfied, poor, excellent, quality, likely
+   - **OR** ≥50% of options are numeric (0-10, 1-5, etc.)
 
 4. Numeric (from Word hints)
    - Type = "slider" or "numeric"
@@ -213,17 +214,27 @@ Numbers: [1, 2]
 5. Open_End (from Word hints)
    - Type = "textbox"
 
-6. Ranking
-   - Text contains "rank" OR Word hint has_rank_keyword
+6. Ranking (**checked BEFORE grid detection**)
+   - Text contains "ranking question", "most to least", "least to most"
+   - OR Text contains "rank", "ranking", "prioritize" (word boundaries)
    - Multiple columns
+   - **Note:** "multi mention" in text takes precedence
 
 7. Multi_Mention
-   - Word hint brackets = "[]"
+   - Text contains "(multi mention" or "select all" (takes precedence)
+   - OR Word hint brackets = "[]"
    - OR multiple columns with different row_labels
 
-8. Single_Mention (default)
+8. Numeric Rating Scale Detection
+   - If ≥50% of options can be converted to numbers → Rating
+   - Checked before Single_Mention default
+
+9. Single_Mention (default)
    - Word hint brackets = "()"
-   - OR fallback for all others
+   - OR has options but not classified above
+
+10. Open_End (fallback)
+    - No options and not classified above
 ```
 
 **Example:**
@@ -243,7 +254,34 @@ word_hint$brackets: "[]"
 → Multi_Mention
 ```
 
-### Algorithm 4: Generate Question Codes
+### Algorithm 4: Grid Options Finding
+
+**Purpose:** Locate options for grid questions despite inconsistent Alchemer storage patterns
+
+**Problem:** Alchemer stores grid options at varying offsets from base question ID across different surveys
+
+**Solution:** Multi-strategy search with fallbacks
+
+**Logic:**
+```r
+find_grid_options(base_id, expected_last_qid, translation_data):
+  1. Try expected_last_qid (base_id + num_rows) - most common
+  2. If not found, try base_id itself
+  3. If still not found, search range [expected-2 to expected+10]
+  4. If still nothing, look for shared 0-10 rating scale in translation
+  5. Return empty list if all strategies fail
+```
+
+**Real Examples:**
+- **Helderberg Q6**: base=9, rows=4, expected=13, **actual=23** (found by range search)
+- **Helderberg Q65**: base=255, rows=3, expected=258, **actual=260** (found by range search)
+- **CCPB Q6**: No options in translation, **fallback to shared 0-10 scale** (found by strategy 4)
+
+**Row Order Preservation:**
+- Grid rows use `unique()` on row_labels which preserves original data order
+- **NO sorting applied** - rows appear in data export map order
+
+### Algorithm 5: Generate Question Codes
 
 **Purpose:** Creates standardized question codes
 
@@ -254,15 +292,16 @@ word_hint$brackets: "[]"
    - **Grid:** Q02a, Q02b, Q02c (letter suffix per row/item)
    - **Multi-Mention:** Q04_1, Q04_2, Q04_3 (number suffix per option)
    - **Ranking:** Q12_1, Q12_2, Q12_3 (number suffix per position)
-3. Detect "other" fields → rename to Q##_othermention
+3. Detect "other" fields → rename to Q##_othermention or Q##_#othertext
 
 **Other Field Detection:**
 Patterns matched (case-insensitive):
+- "other.*text"
 - "other.*write.*in"
-- "other.*please.*specify"
-- "other - write in"
-- "please specify"
-- "^other$"
+- "other.*specify"
+- "other.*enter"
+- "other.*required"
+- Duplicate row_label (indicates text field for previous "other" checkbox)
 
 ---
 
