@@ -48,6 +48,47 @@ classify_questions <- function(questions, translation_data, word_hints,
     # Get Word doc hints first (needed for grid detection)
     hints <- get_hint_for_question(q_num, word_hints)
 
+    # Check for Ranking BEFORE grid detection
+    # Ranking questions can look like grids but should be treated differently
+    is_ranking <- FALSE
+    q_text <- tolower(q$question_text %||% "")
+    n_cols <- length(q$columns)
+
+    # Check Word doc hint for ranking
+    if (!is.null(hints$has_rank_keyword) && !is.na(hints$has_rank_keyword) && hints$has_rank_keyword) {
+      if (n_cols > 1) {
+        is_ranking <- TRUE
+      }
+    }
+
+    # Check question text for explicit ranking indicators
+    if (!is_ranking && n_cols > 1) {
+      if (grepl("ranking question", q_text, ignore.case = TRUE) ||
+          grepl("most to least|least to most", q_text, ignore.case = TRUE) ||
+          grepl("\\brank\\b|\\branking\\b|prioriti[sz]e", q_text, ignore.case = TRUE)) {
+        is_ranking <- TRUE
+      }
+    }
+
+    # If this is a ranking question, handle it separately (not as a grid)
+    if (is_ranking) {
+      options <- get_options_for_question(q$q_id, translation_data)
+
+      classified[[q_num]] <- list(
+        q_num = q_num,
+        q_id = q$q_id,
+        question_text = q$question_text,
+        variable_type = "Ranking",
+        grid_type = "multi_column",
+        n_columns = n_cols,
+        columns = q$columns,
+        options = options,
+        hints = hints,
+        is_grid = FALSE
+      )
+      next
+    }
+
     # Detect grid type (with Word doc hints for better detection)
     grid_type <- detect_grid_type_with_hints(q, hints)
 
