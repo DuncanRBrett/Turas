@@ -250,9 +250,18 @@ run_alchemerparser_gui <- function() {
     # Load recent projects on startup
     observe({
       if (file.exists(recent_projects_file)) {
-        recent <- tryCatch(readRDS(recent_projects_file), error = function(e) character(0))
-        if (length(recent) > 0) {
-          choices <- c("Select..." = "", setNames(recent, basename(recent)))
+        recent <- tryCatch(readRDS(recent_projects_file), error = function(e) NULL)
+        if (!is.null(recent) && length(recent) > 0) {
+          # recent is a named vector: names = project names, values = paths
+          # Display format: "ProjectName (path/to/folder)"
+          display_names <- sapply(names(recent), function(proj_name) {
+            path <- recent[[proj_name]]
+            # Show last 2 parts of path for context
+            path_parts <- strsplit(path, "/")[[1]]
+            short_path <- paste(tail(path_parts, 2), collapse = "/")
+            sprintf("%s (%s)", proj_name, short_path)
+          })
+          choices <- c("Select..." = "", setNames(recent, display_names))
           updateSelectInput(session, "recent_project", choices = choices)
         }
       }
@@ -351,14 +360,25 @@ run_alchemerparser_gui <- function() {
 
       # Save to recent projects
       tryCatch({
+        # Load existing recent projects (named vector: project_name = path)
         recent <- if (file.exists(recent_projects_file)) {
           readRDS(recent_projects_file)
         } else {
-          character(0)
+          setNames(character(0), character(0))
         }
 
-        # Add current directory to top of list
-        recent <- unique(c(input$project_dir, recent))
+        # Get project name (either user input or detected)
+        proj_name <- if (input$project_name != "") {
+          input$project_name
+        } else if (!is.null(rv$project_name)) {
+          rv$project_name
+        } else {
+          basename(input$project_dir)
+        }
+
+        # Add current project (will overwrite if name exists)
+        new_entry <- setNames(input$project_dir, proj_name)
+        recent <- c(new_entry, recent[names(recent) != proj_name])
         recent <- head(recent, 10)  # Keep only 10 most recent
 
         saveRDS(recent, recent_projects_file)
