@@ -68,13 +68,16 @@ generate_question_codes <- function(questions, verbose = FALSE) {
       # For multi-column questions, generate column codes
       if (q$n_columns > 1) {
         if (q$variable_type == "Multi_Mention") {
-          # Multi-mention: Q04_1, Q04_2, Q04_3
-          option_labels <- sapply(q$columns, function(c) c$row_label)
-          q$q_codes <- generate_multi_mention_codes(base_code, option_labels)
+          # Multi-mention: Q04_1, Q04_2, Q04_3, Q04_4, Q04_4othertext
+          q$q_codes <- generate_multi_mention_codes_sequential(base_code, q$columns)
 
         } else if (q$variable_type == "Ranking") {
           # Ranking: Q12_1, Q12_2, Q12_3
           q$q_codes <- paste0(base_code, "_", seq_along(q$columns))
+
+        } else if (q$variable_type == "Single_Mention") {
+          # Single_Mention with multiple columns (usually main + othermention)
+          q$q_codes <- generate_single_mention_codes(base_code, q$columns)
 
         } else {
           # Other multi-column (shouldn't happen often)
@@ -110,44 +113,73 @@ generate_base_code <- function(q_num, padding = 2) {
 }
 
 
-#' Generate Multi-Mention Codes
+#' Generate Single Mention Codes
 #'
 #' @description
-#' Generates codes for multi-mention questions.
-#' Handles othermention fields specially.
+#' Generates codes for single-mention questions with potential othermention field.
 #'
-#' @param base_code Base question code (e.g., "Q04")
-#' @param option_labels Option labels from columns
+#' @param base_code Base question code (e.g., "Q01")
+#' @param columns Column objects from question
 #'
-#' @return Named vector of codes
+#' @return Vector of codes
 #'
 #' @keywords internal
-generate_multi_mention_codes <- function(base_code, option_labels) {
+generate_single_mention_codes <- function(base_code, columns) {
 
-  codes <- character(length(option_labels))
-  other_count <- 0
+  codes <- character(length(columns))
 
-  for (i in seq_along(option_labels)) {
-    label <- option_labels[i]
+  for (i in seq_along(columns)) {
+    col <- columns[[i]]
+    label <- col$row_label
 
-    # Check if this is an "other" field
-    if (is_other_field(label)) {
-      other_count <- other_count + 1
-
-      if (other_count == 1) {
-        # First other field becomes "_othermention"
-        codes[i] <- paste0(base_code, "_othermention")
-      } else {
-        # Additional other fields (flag for review)
-        codes[i] <- paste0(base_code, "_othermention", other_count)
-      }
+    # Check if this is an "othertext" field
+    if (!is.na(label) && grepl("other.*text", label, ignore.case = TRUE)) {
+      codes[i] <- paste0(base_code, "_othermention")
     } else {
-      # Regular option: _1, _2, _3
-      codes[i] <- paste0(base_code, "_", i)
+      # Main column
+      codes[i] <- base_code
     }
   }
 
-  names(codes) <- option_labels
+  return(codes)
+}
+
+
+#' Generate Multi-Mention Codes (Sequential)
+#'
+#' @description
+#' Generates codes for multi-mention questions.
+#' Uses sequential numbering (Q04_1, Q04_2, Q04_3, Q04_4).
+#' Detects othertext fields and names them Q04_#othertext.
+#'
+#' @param base_code Base question code (e.g., "Q04")
+#' @param columns Column objects from question
+#'
+#' @return Vector of codes
+#'
+#' @keywords internal
+generate_multi_mention_codes_sequential <- function(base_code, columns) {
+
+  codes <- character(length(columns))
+  option_index <- 0
+  last_option_num <- 0
+
+  for (i in seq_along(columns)) {
+    col <- columns[[i]]
+    label <- col$row_label
+
+    # Check if this is an "othertext" field
+    if (!is.na(label) && grepl("other.*text", label, ignore.case = TRUE)) {
+      # This is the text field for the previous "other" option
+      codes[i] <- paste0(base_code, "_", last_option_num, "othertext")
+    } else {
+      # Regular option - increment index
+      option_index <- option_index + 1
+      codes[i] <- paste0(base_code, "_", option_index)
+      last_option_num <- option_index
+    }
+  }
+
   return(codes)
 }
 

@@ -253,11 +253,14 @@ generate_survey_structure <- function(questions) {
 
     } else {
       # Non-grid question
+      # Calculate correct column count (exclude othertext/othermention)
+      display_columns <- calculate_display_columns(q)
+
       question_rows[[length(question_rows) + 1]] <- create_question_row(
         q$q_code,
         q$question_text,
         q$variable_type,
-        q$n_columns
+        display_columns
       )
 
       # Add option rows
@@ -270,6 +273,33 @@ generate_survey_structure <- function(questions) {
     questions = do.call(rbind, question_rows),
     options = do.call(rbind, option_rows)
   )
+}
+
+
+#' Calculate Display Columns
+#'
+#' @description
+#' Calculates the number of columns to display in Survey_Structure.
+#' Excludes othertext/othermention auxiliary columns.
+#'
+#' @keywords internal
+calculate_display_columns <- function(q) {
+  var_type <- q$variable_type
+
+  # Single_Mention always shows 1 column (even with othermention)
+  if (var_type == "Single_Mention") {
+    return(1)
+  }
+
+  # For other types, count non-othertext columns
+  if (!is.null(q$q_codes) && length(q$q_codes) > 1) {
+    # Count codes that don't end with "othertext" or "_othermention"
+    main_codes <- !grepl("othertext$|_othermention$", q$q_codes)
+    return(sum(main_codes))
+  }
+
+  # Default to n_columns
+  return(q$n_columns)
 }
 
 
@@ -334,7 +364,8 @@ create_option_rows <- function(q) {
       label <- col_labels[i]
       code <- codes[i]
 
-      show_output <- if (grepl("_othermention", code)) "N" else "Y"
+      # Hide othertext and othermention fields
+      show_output <- if (grepl("othertext$|_othermention$", code)) "N" else "Y"
 
       rows[[i]] <- data.frame(
         QuestionCode = code,
