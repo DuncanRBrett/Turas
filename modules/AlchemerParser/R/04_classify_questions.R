@@ -54,15 +54,13 @@ classify_questions <- function(questions, translation_data, word_hints,
     # Get options from translation
     # For grids, options are stored in the LAST question ID in the range
     if (grid_type %in% c("radio_grid", "checkbox_grid")) {
-      # Calculate the last question ID (base_id + number of rows)
+      # Calculate the expected last question ID (base_id + number of rows)
       num_rows <- length(unique(sapply(q$columns, function(c) c$row_label)))
-      last_qid <- as.character(as.integer(q$q_id) + num_rows)
-      options <- get_options_for_question(last_qid, translation_data)
+      last_qid <- as.integer(q$q_id) + num_rows
 
-      # If no options found at last_qid, try base question ID
-      if (length(options) == 0) {
-        options <- get_options_for_question(q$q_id, translation_data)
-      }
+      # Search for options near the expected location
+      # Alchemer is inconsistent - sometimes it's +num_rows, +num_rows+1, +num_rows+2, etc.
+      options <- find_grid_options(as.integer(q$q_id), last_qid, translation_data)
 
       # If still no options, try to find a shared rating scale (0-10 + Don't know)
       if (length(options) == 0) {
@@ -414,11 +412,65 @@ create_star_rating_grid_questions <- function(question, options, hints) {
 }
 
 
+#' Find Grid Options
+#'
+#' @description
+#' Searches for grid options in translation data.
+#' Alchemer stores grid options inconsistently - sometimes at base_id + num_rows,
+#' sometimes at base_id + num_rows + 1, etc.
+#' This function searches a range of IDs to find the options.
+#'
+#' @param base_id Base question ID (as integer)
+#' @param expected_last_qid Expected last question ID (base_id + num_rows)
+#' @param translation_data Translation export data
+#'
+#' @return List of options, or empty list if not found
+#'
+#' @keywords internal
+find_grid_options <- function(base_id, expected_last_qid, translation_data) {
+
+  # First try the expected location (most common)
+  qid <- as.character(expected_last_qid)
+  if (qid %in% names(translation_data$options)) {
+    opts <- translation_data$options[[qid]]
+    if (length(opts) > 0) {
+      return(opts)
+    }
+  }
+
+  # Try base ID
+  qid <- as.character(base_id)
+  if (qid %in% names(translation_data$options)) {
+    opts <- translation_data$options[[qid]]
+    if (length(opts) > 0) {
+      return(opts)
+    }
+  }
+
+  # Search nearby IDs (expected - 2 to expected + 10)
+  # This handles Alchemer's inconsistent storage patterns
+  search_range <- (expected_last_qid - 2):(expected_last_qid + 10)
+  for (test_id in search_range) {
+    qid <- as.character(test_id)
+    if (qid %in% names(translation_data$options)) {
+      opts <- translation_data$options[[qid]]
+      if (length(opts) > 0) {
+        return(opts)
+      }
+    }
+  }
+
+  # No options found
+  return(list())
+}
+
+
 #' Find Rating Scale Options
 #'
 #' @description
 #' Searches for a standard 0-10 + "Don't know" rating scale in the translation data.
 #' Used as a fallback when radio grid options aren't found at expected question IDs.
+#' Prefers the 12-option version (0-10 + Don't know) over 11-option version (0-10 only).
 #'
 #' @param translation_data Translation export data
 #'
@@ -427,20 +479,37 @@ create_star_rating_grid_questions <- function(question, options, hints) {
 #' @keywords internal
 find_rating_scale_options <- function(translation_data) {
 
-  # Search all questions with options
+  # First pass: Look for 12-option scale (0-10 + Don't know) - preferred
   for (qid in names(translation_data$options)) {
     opts <- translation_data$options[[qid]]
 
-    # Look for a scale with 11-12 options (likely 0-10 or 0-10 + Don't know)
-    if (length(opts) >= 11 && length(opts) <= 12) {
+    if (length(opts) == 12) {
       opt_texts <- sapply(opts, function(o) o$text)
 
-      # Check if this looks like a 0-10 scale
+      # Check if this is a 0-10 + Don't know scale
+      has_zero <- any(grepl("^0$", opt_texts))
+      has_ten <- any(grepl("^10$", opt_texts))
+      has_dont_know <- any(grepl("don't know", opt_texts, ignore.case = TRUE))
+
+      if (has_zero && has_ten && has_dont_know) {
+        # Found the preferred 12-option scale
+        return(opts)
+      }
+    }
+  }
+
+  # Second pass: Fall back to 11-option scale (0-10 only) if 12-option not found
+  for (qid in names(translation_data$options)) {
+    opts <- translation_data$options[[qid]]
+
+    if (length(opts) == 11) {
+      opt_texts <- sapply(opts, function(o) o$text)
+
       has_zero <- any(grepl("^0$", opt_texts))
       has_ten <- any(grepl("^10$", opt_texts))
 
       if (has_zero && has_ten) {
-        # Found a 0-10 scale, return it
+        # Found 11-option scale as fallback
         return(opts)
       }
     }
