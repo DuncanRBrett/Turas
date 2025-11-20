@@ -321,13 +321,22 @@ detect_grid_type_with_hints <- function(question_group, hints = list()) {
     } else if (hints$brackets == "[]") {
       # [ ] brackets = Multi mention
 
+      # Check if this has col_labels (indicates a checkbox grid)
+      col_labels <- sapply(cols, function(c) c$col_label)
+      has_col_labels <- any(!is.na(col_labels))
+
+      # If NO col_labels, it's a multi-column multi-mention (not a grid)
+      if (!has_col_labels) {
+        return("multi_column")
+      }
+
       # If each column has different row label, it's a multi-column multi-mention (not a grid)
       if (length(unique_rows) > 1 && length(unique_rows) == n_cols) {
         return("multi_column")
       }
 
-      # If multiple columns share row labels, it's a checkbox grid
-      if (length(unique_rows) > 1) {
+      # If multiple columns share row labels AND has col_labels, it's a checkbox grid
+      if (length(unique_rows) > 1 && has_col_labels) {
         return("checkbox_grid")
       }
     }
