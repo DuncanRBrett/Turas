@@ -292,22 +292,8 @@ launch_turas <- function() {
 
     # Helper function to launch modules in background
     launch_module <- function(module_name, script_path) {
-      # Special handling for segment - source run_segment.R first
-      if (module_name == "segment") {
-        launch_script <- sprintf('
-Sys.setenv(TURAS_ROOT = "%s")
-setwd("%s")
-source("modules/segment/run_segment.R")
-source("%s")
-app <- run_segment_gui()
-shiny::runApp(app, launch.browser = TRUE)
-',
-        turas_root,
-        turas_root,
-        script_path)
-      } else {
-        # Normal launch for other modules
-        launch_script <- sprintf('
+      # Standard launch for all modules
+      launch_script <- sprintf('
 Sys.setenv(TURAS_ROOT = "%s")
 setwd("%s")
 source("%s")
@@ -316,12 +302,11 @@ if ("%s" != "alchemerparser") {
   shiny::runApp(app, launch.browser = TRUE)
 }
 ',
-        turas_root,
-        turas_root,
-        script_path,
-        module_name,
-        paste0("run_", module_name, "_gui"))
-      }
+      turas_root,
+      turas_root,
+      script_path,
+      module_name,
+      paste0("run_", module_name, "_gui"))
 
       # Write temporary launch script
       temp_script <- tempfile(fileext = ".R")
