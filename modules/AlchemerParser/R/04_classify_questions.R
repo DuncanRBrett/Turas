@@ -223,8 +223,13 @@ classify_variable_type <- function(question, options, hints, verbose = FALSE) {
     }
   }
 
-  # 8. Default to Single-Mention
-  return("Single_Mention")
+  # 8. Check if Single-Mention (has options)
+  if (n_options > 0) {
+    return("Single_Mention")
+  }
+
+  # 9. Otherwise Open_End (no options, not classified above)
+  return("Open_End")
 }
 
 
@@ -245,13 +250,11 @@ pivot_checkbox_grid <- function(question, options, hints) {
 
   cols <- question$columns
 
-  # Extract unique rows and columns
+  # Extract unique rows and columns (preserve original order from data)
   row_labels <- unique(sapply(cols, function(c) c$row_label))
   col_labels <- unique(sapply(cols, function(c) c$col_label))
 
-  # Sort to ensure consistent order
-  row_labels <- sort(row_labels)
-  col_labels <- sort(col_labels)
+  # DO NOT sort - preserve data order
 
   # Create sub-questions (one per row)
   sub_questions <- list()
@@ -298,9 +301,9 @@ create_radio_grid_questions <- function(question, options, hints) {
 
   cols <- question$columns
 
-  # Extract unique rows
+  # Extract unique rows (preserve original order from data export map)
   row_labels <- unique(sapply(cols, function(c) c$row_label))
-  row_labels <- sort(row_labels)
+  # DO NOT sort - preserve data order
 
   sub_questions <- list()
 
