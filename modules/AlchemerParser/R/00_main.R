@@ -128,7 +128,18 @@ run_alchemerparser <- function(project_dir,
   )
 
   if (verbose) {
-    type_summary <- table(sapply(questions, function(q) q$variable_type))
+    # Extract variable types (handling both grid and non-grid questions)
+    all_types <- unlist(lapply(questions, function(q) {
+      if (q$is_grid) {
+        # For grid questions, get types from sub-questions
+        sapply(q$sub_questions, function(sq) sq$variable_type)
+      } else {
+        # For non-grid questions, get type directly
+        q$variable_type
+      }
+    }))
+
+    type_summary <- table(all_types)
     cat("  Question type distribution:\n")
     for (type in names(type_summary)) {
       cat(sprintf("    %s: %d\n", type, type_summary[type]))
@@ -196,12 +207,31 @@ run_alchemerparser <- function(project_dir,
   # ==============================================================================
   # Prepare summary
   # ==============================================================================
+
+  # Count total columns (handling both grid and non-grid questions)
+  total_columns <- sum(sapply(questions, function(q) {
+    if (q$is_grid) {
+      sum(sapply(q$sub_questions, function(sq) sq$n_columns))
+    } else {
+      q$n_columns
+    }
+  }))
+
+  # Extract all variable types (handling both grid and non-grid questions)
+  all_types <- unlist(lapply(questions, function(q) {
+    if (q$is_grid) {
+      sapply(q$sub_questions, function(sq) sq$variable_type)
+    } else {
+      q$variable_type
+    }
+  }))
+
   summary <- list(
     project_name = project_name,
     n_questions = length(questions),
-    n_columns = sum(sapply(questions, function(q) q$n_columns)),
+    n_columns = total_columns,
     n_flags = length(validation$flags),
-    type_distribution = table(sapply(questions, function(q) q$variable_type))
+    type_distribution = table(all_types)
   )
 
   if (verbose) {
