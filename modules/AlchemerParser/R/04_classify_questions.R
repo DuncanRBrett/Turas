@@ -208,8 +208,23 @@ classify_variable_type <- function(question, options, hints, verbose = FALSE) {
     }
   }
 
-  # Check question text for rank keyword
-  if (grepl("rank|order|priorit", q_text, ignore.case = TRUE)) {
+  # Check question text for explicit ranking indicators
+  # Very specific patterns to avoid false positives
+  if (grepl("ranking question", q_text, ignore.case = TRUE)) {
+    if (n_cols > 1) {
+      return("Ranking")
+    }
+  }
+
+  if (grepl("most to least|least to most", q_text, ignore.case = TRUE)) {
+    if (n_cols > 1) {
+      return("Ranking")
+    }
+  }
+
+  # Check for rank keyword (but be careful about "order" - too broad)
+  # Only check for "rank" specifically, not "order" (matches "place your order")
+  if (grepl("\\brank\\b|\\branking\\b|prioriti[sz]e", q_text, ignore.case = TRUE)) {
     if (n_cols > 1) {
       return("Ranking")
     }
