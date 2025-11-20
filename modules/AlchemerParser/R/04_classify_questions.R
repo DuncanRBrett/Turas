@@ -45,14 +45,14 @@ classify_questions <- function(questions, translation_data, word_hints,
       next
     }
 
-    # Detect grid type
-    grid_type <- detect_grid_type(q)
+    # Get Word doc hints first (needed for grid detection)
+    hints <- get_hint_for_question(q_num, word_hints)
 
     # Get options from translation
     options <- get_options_for_question(q$q_id, translation_data)
 
-    # Get Word doc hints
-    hints <- get_hint_for_question(q_num, word_hints)
+    # Detect grid type (with Word doc hints for better detection)
+    grid_type <- detect_grid_type_with_hints(q, hints)
 
     # Handle different grid types
     if (grid_type == "checkbox_grid") {

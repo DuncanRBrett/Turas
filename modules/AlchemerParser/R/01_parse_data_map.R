@@ -262,6 +262,24 @@ group_columns_by_question <- function(parsed_columns) {
 #'
 #' @keywords internal
 detect_grid_type <- function(question_group) {
+  # Legacy function - calls new version without hints
+  return(detect_grid_type_with_hints(question_group, list()))
+}
+
+
+#' Detect Grid Type with Word Doc Hints
+#'
+#' @description
+#' Improved grid detection using Word doc hints.
+#' Uses ( ) vs [ ] brackets to distinguish radio vs checkbox grids.
+#'
+#' @param question_group Question group with columns
+#' @param hints Word doc hints (must include brackets field)
+#'
+#' @return Grid type classification
+#'
+#' @keywords internal
+detect_grid_type_with_hints <- function(question_group, hints = list()) {
 
   cols <- question_group$columns
   n_cols <- length(cols)
@@ -283,29 +301,44 @@ detect_grid_type <- function(question_group) {
   # Check for multiple unique row labels
   unique_rows <- unique(row_labels)
 
-  # IMPORTANT: Only treat as grid if we have strong evidence
-  # Multi-mention and ranking questions also have multiple columns with different row_labels
+  # KEY INSIGHT: If we have multiple columns with DIFFERENT row_labels,
+  # check Word doc hints to determine if it's a grid or multi-column question
   if (length(unique_rows) > 1 && length(unique_rows) == n_cols) {
-    # Each column has a unique row label - likely a grid
+    # Each column has a unique row label
 
+    # Check Word doc brackets
+    if (!is.null(hints$brackets) && !is.na(hints$brackets)) {
+      if (hints$brackets == "()") {
+        # ( ) brackets = Single mention = RADIO GRID
+        # Check for numeric labels (star rating grid)
+        if (all(grepl("^\\d+$", unique_rows))) {
+          return("star_rating_grid")
+        } else {
+          return("radio_grid")
+        }
+      } else if (hints$brackets == "[]") {
+        # [ ] brackets = Multi mention = NOT a grid (multi-column multi-mention)
+        return("multi_column")
+      }
+    }
+
+    # No Word doc hint - use heuristics
     # Check if all row labels are purely numeric (star rating grid)
     if (all(grepl("^\\d+$", unique_rows))) {
       return("star_rating_grid")
     }
 
-    # Check if row labels look like grid items (longer text, descriptive)
-    # vs. simple options (shorter, like "Yes", "No", option codes)
-    # This is a heuristic - grids typically have more descriptive row labels
+    # Check row label characteristics
+    # Grids typically have descriptive row labels
+    # Multi-mention typically has short option names
     avg_label_length <- mean(nchar(unique_rows))
 
-    if (avg_label_length > 10) {
-      # Likely a radio grid (long descriptive labels per row)
+    if (avg_label_length > 8) {
+      # Likely a radio grid (descriptive labels)
       return("radio_grid")
     }
   }
 
   # Otherwise multi-column question (multi-mention or ranking)
-  # This includes questions where all columns have the same row_label
-  # or where row_labels are short option texts
   return("multi_column")
 }
