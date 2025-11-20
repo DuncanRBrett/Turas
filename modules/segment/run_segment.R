@@ -314,7 +314,8 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
 # ==============================================================================
 
 # If running as a script (not sourced), execute main function
-if (!interactive()) {
+# Use sys.nframe() == 0 to detect if run directly (not sourced)
+if (!interactive() && sys.nframe() == 0) {
   args <- commandArgs(trailingOnly = TRUE)
 
   if (length(args) == 0) {
