@@ -289,11 +289,6 @@ detect_grid_type_with_hints <- function(question_group, hints = list()) {
     return("single")
   }
 
-  # Check if all columns have structure = "checkbox_grid" (4-part headers)
-  if (all(sapply(cols, function(c) c$structure == "checkbox_grid"))) {
-    return("checkbox_grid")
-  }
-
   # Extract row labels
   row_labels <- sapply(cols, function(c) c$row_label)
   row_labels <- row_labels[!is.na(row_labels)]
@@ -301,45 +296,67 @@ detect_grid_type_with_hints <- function(question_group, hints = list()) {
   # Check for multiple unique row labels
   unique_rows <- unique(row_labels)
 
-  # KEY INSIGHT: If we have multiple columns with DIFFERENT row_labels,
-  # check Word doc hints to determine if it's a grid or multi-column question
+  # PRIORITY 1: Check Word doc brackets first (most reliable source of truth)
+  # Word doc brackets override data export map structure field
+  if (!is.null(hints$brackets) && !is.na(hints$brackets)) {
+    if (hints$brackets == "()") {
+      # ( ) brackets = Single mention per row
+
+      # Check for star rating grid pattern (numeric labels like "1", "2", "3")
+      if (length(unique_rows) > 1 && all(grepl("^\\d+$", unique_rows))) {
+        return("star_rating_grid")
+      }
+
+      # Check for star rating grid pattern (e.g., "Item:1", "Item:2", "Item:3")
+      if (length(unique_rows) > 1 && all(grepl(":.+:\\d+$", unique_rows))) {
+        return("star_rating_grid")
+      }
+
+      # Otherwise it's a radio grid (single mention per row)
+      # This handles cases where structure == "checkbox_grid" but brackets say ()
+      if (length(unique_rows) > 1) {
+        return("radio_grid")
+      }
+
+    } else if (hints$brackets == "[]") {
+      # [ ] brackets = Multi mention
+
+      # If each column has different row label, it's a multi-column multi-mention (not a grid)
+      if (length(unique_rows) > 1 && length(unique_rows) == n_cols) {
+        return("multi_column")
+      }
+
+      # If multiple columns share row labels, it's a checkbox grid
+      if (length(unique_rows) > 1) {
+        return("checkbox_grid")
+      }
+    }
+  }
+
+  # PRIORITY 2: Check data export map structure field
+  # Only use this if no Word doc hints available
+  if (all(sapply(cols, function(c) c$structure == "checkbox_grid"))) {
+    # Could be either checkbox_grid or radio_grid
+    # Without Word doc hints, assume checkbox_grid (but this is risky)
+    return("checkbox_grid")
+  }
+
+  # PRIORITY 3: Heuristics based on row label patterns
   if (length(unique_rows) > 1 && length(unique_rows) == n_cols) {
     # Each column has a unique row label
 
-    # Check for star rating grid pattern (e.g., "Item:1", "Item:2", "Item:3")
-    # Pattern: text:number where multiple columns share the same base text
+    # Check for star rating grid pattern
     if (all(grepl(":.+:\\d+$", unique_rows))) {
-      # All labels have "text:subtext:number" pattern
       return("star_rating_grid")
     }
 
-    # Check Word doc brackets
-    if (!is.null(hints$brackets) && !is.na(hints$brackets)) {
-      if (hints$brackets == "()") {
-        # ( ) brackets = Single mention = RADIO GRID
-        # Check for numeric labels (star rating grid)
-        if (all(grepl("^\\d+$", unique_rows))) {
-          return("star_rating_grid")
-        } else {
-          return("radio_grid")
-        }
-      } else if (hints$brackets == "[]") {
-        # [ ] brackets = Multi mention = NOT a grid (multi-column multi-mention)
-        return("multi_column")
-      }
-    }
-
-    # No Word doc hint - use heuristics
     # Check if all row labels are purely numeric (star rating grid)
     if (all(grepl("^\\d+$", unique_rows))) {
       return("star_rating_grid")
     }
 
     # Check row label characteristics
-    # Grids typically have descriptive row labels
-    # Multi-mention typically has short option names
     avg_label_length <- mean(nchar(unique_rows))
-
     if (avg_label_length > 8) {
       # Likely a radio grid (descriptive labels)
       return("radio_grid")
