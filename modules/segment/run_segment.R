@@ -12,20 +12,23 @@
 # LOAD DEPENDENCIES
 # ==============================================================================
 
-# Shared utilities
-source("modules/shared/lib/validation_utils.R")
-source("modules/shared/lib/config_utils.R")
-source("modules/shared/lib/data_utils.R")
-source("modules/shared/lib/logging_utils.R")
+# Get Turas root directory
+turas_root <- Sys.getenv("TURAS_ROOT", getwd())
 
-# Segmentation modules
-source("modules/segment/lib/segment_config.R")
-source("modules/segment/lib/segment_data_prep.R")
-source("modules/segment/lib/segment_kmeans.R")
-source("modules/segment/lib/segment_validation.R")
-source("modules/segment/lib/segment_profile.R")
-source("modules/segment/lib/segment_export.R")
-source("modules/segment/lib/segment_outliers.R")
+# Shared utilities - use absolute paths
+source(file.path(turas_root, "modules/shared/lib/validation_utils.R"))
+source(file.path(turas_root, "modules/shared/lib/config_utils.R"))
+source(file.path(turas_root, "modules/shared/lib/data_utils.R"))
+source(file.path(turas_root, "modules/shared/lib/logging_utils.R"))
+
+# Segmentation modules - use absolute paths
+source(file.path(turas_root, "modules/segment/lib/segment_config.R"))
+source(file.path(turas_root, "modules/segment/lib/segment_data_prep.R"))
+source(file.path(turas_root, "modules/segment/lib/segment_kmeans.R"))
+source(file.path(turas_root, "modules/segment/lib/segment_validation.R"))
+source(file.path(turas_root, "modules/segment/lib/segment_profile.R"))
+source(file.path(turas_root, "modules/segment/lib/segment_export.R"))
+source(file.path(turas_root, "modules/segment/lib/segment_outliers.R"))
 
 # ==============================================================================
 # MAIN SEGMENTATION FUNCTION
