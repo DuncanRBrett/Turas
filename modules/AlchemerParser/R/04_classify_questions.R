@@ -200,7 +200,7 @@ classify_variable_type <- function(question, options, hints, verbose = FALSE) {
   }
 
   # 6. Check for Multi-Mention from Word doc brackets
-  if (!is.na(hints$brackets)) {
+  if (!is.null(hints$brackets) && !is.na(hints$brackets)) {
     if (hints$brackets == "[]") {
       return("Multi_Mention")
     }
