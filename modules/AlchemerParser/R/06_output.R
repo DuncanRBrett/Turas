@@ -417,15 +417,22 @@ create_option_rows <- function(q) {
 
   } else if (q$variable_type == "Ranking") {
     # Ranking: options are items being ranked
-    # Get from column row_labels
+    # Use q_codes (Q12_1, Q12_2, Q12_3) not just q_code
     items <- sapply(q$columns, function(c) c$row_label)
     unique_items <- unique(items)
 
+    codes <- if (!is.null(q$q_codes) && length(q$q_codes) == length(unique_items)) {
+      q$q_codes
+    } else {
+      paste0(q$q_code, "_", seq_along(unique_items))
+    }
+
     for (i in seq_along(unique_items)) {
       item <- unique_items[i]
+      code <- codes[i]
 
       rows[[i]] <- data.frame(
-        QuestionCode = q$q_code,
+        QuestionCode = code,  # Use Q12_1, Q12_2, Q12_3 not just Q12
         OptionText = item,
         DisplayText = item,
         DisplayOrder = NA,
