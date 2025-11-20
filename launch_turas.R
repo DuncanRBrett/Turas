@@ -292,40 +292,8 @@ launch_turas <- function() {
 
     # Helper function to launch modules in background
     launch_module <- function(module_name, script_path) {
-      # Create a minimal launch script
-      # Add error logging for segment to debug
-      if (module_name == "segment") {
-        log_file <- file.path(tempdir(), "segment_error.log")
-        launch_script <- sprintf('
-log_file <- "%s"
-cat("=== SEGMENT DEBUG LOG ===\\n", file = log_file)
-cat("Working directory:", getwd(), "\\n", file = log_file, append = TRUE)
-cat("TURAS_ROOT:", Sys.getenv("TURAS_ROOT"), "\\n", file = log_file, append = TRUE)
-
-tryCatch({
-  Sys.setenv(TURAS_ROOT = "%s")
-  setwd("%s")
-  cat("After setwd:", getwd(), "\\n", file = log_file, append = TRUE)
-
-  cat("Sourcing: %s\\n", file = log_file, append = TRUE)
-  source("%s")
-
-  cat("Calling run_segment_gui()\\n", file = log_file, append = TRUE)
-  app <- run_segment_gui()
-
-  cat("Running app\\n", file = log_file, append = TRUE)
-  shiny::runApp(app, launch.browser = TRUE)
-}, error = function(e) {
-  cat("\\n\\nERROR:\\n", file = log_file, append = TRUE)
-  cat(conditionMessage(e), "\\n", file = log_file, append = TRUE)
-  cat(paste(capture.output(traceback()), collapse = "\\n"), "\\n", file = log_file, append = TRUE)
-})
-',
-        log_file, turas_root, turas_root, script_path, script_path)
-        cat("Segment debug log will be at:", log_file, "\n")
-      } else {
-        # Normal launch for other modules
-        launch_script <- sprintf('
+      # Create a minimal launch script - same for all modules
+      launch_script <- sprintf('
 Sys.setenv(TURAS_ROOT = "%s")
 setwd("%s")
 source("%s")
@@ -334,12 +302,11 @@ if ("%s" != "alchemerparser") {
   shiny::runApp(app, launch.browser = TRUE)
 }
 ',
-        turas_root,
-        turas_root,
-        script_path,
-        module_name,
-        paste0("run_", module_name, "_gui"))
-      }
+      turas_root,
+      turas_root,
+      script_path,
+      module_name,
+      paste0("run_", module_name, "_gui"))
 
       # Write temporary launch script
       temp_script <- tempfile(fileext = ".R")
