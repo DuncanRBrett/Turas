@@ -294,6 +294,7 @@ launch_turas <- function() {
     launch_module <- function(module_name, script_path) {
       # Create a minimal launch script - no logging, no tryCatch, just run it
       launch_script <- sprintf('
+Sys.setenv(TURAS_ROOT = "%s")
 setwd("%s")
 source("%s")
 if ("%s" != "alchemerparser") {
@@ -301,6 +302,7 @@ if ("%s" != "alchemerparser") {
   shiny::runApp(app, launch.browser = TRUE)
 }
 ',
+      turas_root,
       turas_root,
       script_path,
       module_name,
