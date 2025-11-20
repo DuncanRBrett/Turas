@@ -608,8 +608,7 @@ The parser flags issues that may need manual review.
 
 ## Getting Help
 
-- **Specification:** See `ALCHEMER_PARSER_SPECIFICATION.md` for detailed parsing logic
-- **Technical Docs:** See `TECHNICAL_DOCUMENTATION.md` for code architecture
+- **Technical Docs:** See `TECHNICAL_DOCUMENTATION.md` for code architecture and detailed parsing logic
 - **Examples:** See `EXAMPLE_WORKFLOWS.md` for real-world scenarios
 
 ---

@@ -94,7 +94,6 @@ result <- run_alchemerparser(
 | [USER_MANUAL.md](USER_MANUAL.md) | Comprehensive user guide | 30 min |
 | [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md) | Developer documentation | 45 min |
 | [EXAMPLE_WORKFLOWS.md](EXAMPLE_WORKFLOWS.md) | Real-world examples | 20 min |
-| [ALCHEMER_PARSER_SPECIFICATION.md](ALCHEMER_PARSER_SPECIFICATION.md) | Detailed specification | 60 min |
 
 ---
 
@@ -103,7 +102,7 @@ result <- run_alchemerparser(
 ### R Packages
 
 ```r
-install.packages(c("readxl", "openxlsx", "officer", "shiny"))
+install.packages(c("readxl", "openxlsx", "officer", "shiny", "shinyFiles", "fs"))
 ```
 
 ### Input Files
@@ -127,9 +126,11 @@ AlchemerParser/
 │   └── 06_output.R                 # Output file generation
 ├── run_alchemerparser.R            # CLI entry point
 ├── run_alchemerparser_gui.R        # Shiny GUI
-├── [Sample Files]                  # Example data for testing
-├── [Templates]                     # Output templates
-└── [Documentation]                 # User & technical docs
+├── QUICK_START.md                  # Quick start guide
+├── USER_MANUAL.md                  # Comprehensive user manual
+├── TECHNICAL_DOCUMENTATION.md      # Developer documentation
+├── EXAMPLE_WORKFLOWS.md            # Real-world examples
+└── README.md                       # This file
 ```
 
 ---
