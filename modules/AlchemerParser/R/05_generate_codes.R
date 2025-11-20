@@ -138,10 +138,16 @@ generate_single_mention_codes <- function(base_code, columns) {
     # 1st = radio button option, 2nd = text entry field
     is_duplicate <- !is.na(label) && label %in% seen_labels
 
-    # Also check for explicit "othertext" in the label
-    has_text_keyword <- !is.na(label) && grepl("other.*text", label, ignore.case = TRUE)
+    # Check for othermention patterns:
+    # - "othertext" or "other text"
+    # - "Other - Write In" or "Other (Write In)"
+    # - "other.*required"
+    is_othermention <- !is.na(label) && (
+      grepl("other.*text", label, ignore.case = TRUE) ||
+      grepl("other.*(write|specify|enter|required)", label, ignore.case = TRUE)
+    )
 
-    if (is_duplicate || has_text_keyword) {
+    if (is_duplicate || is_othermention) {
       # This is the text field for the "other" option
       codes[i] <- paste0(base_code, "_othermention")
     } else {
@@ -184,10 +190,13 @@ generate_multi_mention_codes_sequential <- function(base_code, columns) {
     # 1st = checkbox option, 2nd = text entry field
     is_duplicate <- !is.na(label) && label %in% seen_labels
 
-    # Also check for explicit "othertext" in the label
-    has_text_keyword <- !is.na(label) && grepl("other.*text", label, ignore.case = TRUE)
+    # Check for othertext patterns (same as Single_Mention)
+    is_othertext <- !is.na(label) && (
+      grepl("other.*text", label, ignore.case = TRUE) ||
+      grepl("other.*(write|specify|enter|required)", label, ignore.case = TRUE)
+    )
 
-    if (is_duplicate || has_text_keyword) {
+    if (is_duplicate || is_othertext) {
       # This is the text field for the previous "other" option
       codes[i] <- paste0(base_code, "_", last_option_num, "othertext")
     } else {
