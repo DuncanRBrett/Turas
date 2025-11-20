@@ -4,8 +4,8 @@
 # Get current working directory (should already be in Turas folder)
 source("modules/AlchemerParser/R/03_parse_word_doc.R")
 
-# Parse the Word doc
-word_file <- file.path(getwd(), "modules/AlchemerParser/Sample Files/TestProject_questionnaire.docx")
+# Parse the Word doc (it's directly in the AlchemerParser folder)
+word_file <- file.path(getwd(), "modules/AlchemerParser/Questionnaire.docx")
 
 if (file.exists(word_file)) {
   hints <- parse_word_questionnaire(word_file, verbose = TRUE)

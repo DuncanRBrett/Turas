@@ -7,7 +7,7 @@ if (!requireNamespace("officer", quietly = TRUE)) {
 }
 
 # Read Word doc (use relative path from current working directory)
-word_file <- file.path(getwd(), "modules/AlchemerParser/Sample Files/TestProject_questionnaire.docx")
+word_file <- file.path(getwd(), "modules/AlchemerParser/Questionnaire.docx")
 
 if (file.exists(word_file)) {
   doc <- officer::read_docx(word_file)
