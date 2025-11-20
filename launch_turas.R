@@ -292,10 +292,19 @@ launch_turas <- function() {
 
     # Helper function to launch modules in background
     launch_module <- function(module_name, script_path) {
+      # Get the module directory (parent of the script)
+      module_dir <- dirname(script_path)
+      script_name <- basename(script_path)
+
       # Create R script to launch the module
       launch_script <- sprintf('
+        # Set working directory to module directory so it can find its dependencies
         setwd("%s")
+
+        # Source the module script
         source("%s")
+
+        # Get the function name based on module name
         module_name <- "%s"
 
         if (module_name == "alchemerparser") {
@@ -317,7 +326,7 @@ launch_turas <- function() {
         }
 
         shiny::runApp(app, launch.browser = TRUE, port = 0)
-      ', turas_root, script_path, module_name)
+      ', module_dir, script_name, module_name)
 
       # Write temporary launch script
       temp_script <- tempfile(fileext = ".R")
