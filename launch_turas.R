@@ -292,37 +292,70 @@ launch_turas <- function() {
 
     # Helper function to launch modules in background
     launch_module <- function(module_name, script_path) {
-      # Create R script to launch the module
-      # Simple approach: create a wrapper script that sources and runs the module
+      # Create output log file to capture errors
+      log_file <- file.path(tempdir(), paste0("turas_", module_name, "_log.txt"))
+
+      # Create R script to launch the module with error logging
       launch_script <- sprintf('
-        # Set working directory to Turas root
-        setwd("%s")
+# Log file for debugging
+log_file <- "%s"
+cat("Starting launch of %s\\n", file = log_file)
 
-        # Source the module script
-        source("%s")
+tryCatch({
+  # Set working directory to Turas root
+  cat("Setting wd to: %s\\n", file = log_file, append = TRUE)
+  setwd("%s")
 
-        # Call the function and run the app
-        # AlchemerParser has auto-launch code, others need explicit call
-        if ("%s" != "alchemerparser") {
-          app <- %s()
-          shiny::runApp(app, launch.browser = TRUE, port = 0)
-        }
-      ',
+  # Source the module script
+  cat("Sourcing: %s\\n", file = log_file, append = TRUE)
+  source("%s")
+
+  cat("Source completed\\n", file = log_file, append = TRUE)
+
+  # Call the function and run the app
+  # AlchemerParser has auto-launch code, others need explicit call
+  if ("%s" != "alchemerparser") {
+    cat("Calling %s()\\n", file = log_file, append = TRUE)
+    app <- %s()
+    cat("Got app, calling runApp\\n", file = log_file, append = TRUE)
+    shiny::runApp(app, launch.browser = TRUE, port = 0)
+  } else {
+    cat("AlchemerParser auto-launched\\n", file = log_file, append = TRUE)
+  }
+
+}, error = function(e) {
+  cat("\\n\\nERROR:\\n", file = log_file, append = TRUE)
+  cat(e$message, "\\n", file = log_file, append = TRUE)
+  cat(paste(capture.output(print(e)), collapse = "\\n"), "\\n", file = log_file, append = TRUE)
+})
+',
+      log_file,
+      module_name,
+      turas_root,
       turas_root,
       script_path,
       module_name,
+      paste0("run_", module_name, "_gui"),
       paste0("run_", module_name, "_gui"))
 
       # Write temporary launch script
       temp_script <- tempfile(fileext = ".R")
       writeLines(launch_script, temp_script)
 
-      # Launch in background process - no output redirection to allow browser launch
+      # Also save script for debugging
+      debug_script <- file.path(tempdir(), paste0("turas_", module_name, "_script.R"))
+      writeLines(launch_script, debug_script)
+
+      cat(paste0("Launch script for ", module_name, " saved to: ", debug_script, "\n"))
+      cat(paste0("Log file will be at: ", log_file, "\n"))
+
+      # Launch in background process
       system2("Rscript",
               args = c(temp_script),
-              wait = FALSE)
+              wait = FALSE,
+              stdout = "", stderr = "")
 
-      # Clean up temp file after a delay
+      # Clean up temp file after a delay (keep debug files)
       later::later(function() {
         if (file.exists(temp_script)) unlink(temp_script)
       }, delay = 5)
