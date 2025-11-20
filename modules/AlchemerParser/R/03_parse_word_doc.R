@@ -84,11 +84,13 @@ parse_word_questionnaire <- function(file_path, verbose = FALSE) {
 
     # If we're tracking a question, look for hints
     if (!is.null(current_q_num) && !is.null(current_hint)) {
-      # Check for brackets
-      if (grepl("\\(\\s*\\)", text)) {
+      # Check for brackets (allow some flexibility with whitespace and formatting)
+      # Match: ( ) or () with possible whitespace
+      if (grepl("\\([\\s\u00A0]*\\)", text, perl = TRUE)) {
         current_hint$brackets <- "()"
       }
-      if (grepl("\\[\\s*\\]", text)) {
+      # Match: [ ] or [] with possible whitespace
+      if (grepl("\\[[\\s\u00A0]*\\]", text, perl = TRUE)) {
         current_hint$brackets <- "[]"
       }
 
