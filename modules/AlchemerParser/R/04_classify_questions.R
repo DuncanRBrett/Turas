@@ -27,6 +27,24 @@ classify_questions <- function(questions, translation_data, word_hints,
   for (q_num in names(questions)) {
     q <- questions[[q_num]]
 
+    # Special handling for ResponseID (system variable)
+    if (q_num == "ResponseID") {
+      classified[[q_num]] <- list(
+        q_num = q_num,
+        q_id = "ResponseID",
+        question_text = "Response ID",
+        variable_type = "System",
+        grid_type = "single",
+        n_columns = 1,
+        columns = q$columns,
+        options = list(),
+        hints = list(),
+        is_grid = FALSE,
+        is_system = TRUE
+      )
+      next
+    }
+
     # Detect grid type
     grid_type <- detect_grid_type(q)
 
@@ -120,7 +138,13 @@ classify_variable_type <- function(question, options, hints, verbose = FALSE) {
     option_values <- suppressWarnings(as.numeric(option_texts))
 
     if (all(!is.na(option_values)) && all(option_values == 0:10)) {
-      if (grepl("recommend", q_text)) {
+      # Check for NPS keywords: recommend, likely to recommend
+      if (grepl("recommend|likely", q_text, ignore.case = TRUE)) {
+        return("NPS")
+      }
+      # If 11-point scale (0-10) but no clear keyword, still likely NPS
+      # Check if options match exactly 0:10
+      if (all(sort(option_values) == 0:10)) {
         return("NPS")
       }
     }
@@ -161,7 +185,15 @@ classify_variable_type <- function(question, options, hints, verbose = FALSE) {
   }
 
   # 5. Check for Ranking
-  if (grepl("rank", q_text) || (!is.na(hints$has_rank_keyword) && hints$has_rank_keyword)) {
+  # Check Word doc hint first
+  if (!is.null(hints$has_rank_keyword) && !is.na(hints$has_rank_keyword) && hints$has_rank_keyword) {
+    if (n_cols > 1) {
+      return("Ranking")
+    }
+  }
+
+  # Check question text for rank keyword
+  if (grepl("rank|order|priorit", q_text, ignore.case = TRUE)) {
     if (n_cols > 1) {
       return("Ranking")
     }

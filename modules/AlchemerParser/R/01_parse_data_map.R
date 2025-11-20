@@ -98,6 +98,20 @@ parse_data_export_map <- function(file_path, verbose = FALSE) {
 #' @keywords internal
 parse_column_header <- function(q_num_header, q_id_header, col_index) {
 
+  # Special handling for ResponseID (first column)
+  if (grepl("^Response\\s*ID$", q_num_header, ignore.case = TRUE)) {
+    return(list(
+      col_index = col_index,
+      q_num = "ResponseID",
+      q_id = "ResponseID",
+      structure = "system",
+      question_text = "Response ID",
+      row_label = NA_character_,
+      col_label = NA_character_,
+      is_system = TRUE
+    ))
+  }
+
   # Extract Q numbers using regex
   q_num <- extract_leading_number(q_num_header)
   q_id <- extract_leading_number(q_id_header)
@@ -257,7 +271,7 @@ detect_grid_type <- function(question_group) {
     return("single")
   }
 
-  # Check if all columns have structure = "checkbox_grid"
+  # Check if all columns have structure = "checkbox_grid" (4-part headers)
   if (all(sapply(cols, function(c) c$structure == "checkbox_grid"))) {
     return("checkbox_grid")
   }
@@ -266,18 +280,32 @@ detect_grid_type <- function(question_group) {
   row_labels <- sapply(cols, function(c) c$row_label)
   row_labels <- row_labels[!is.na(row_labels)]
 
-  # Check for multiple unique row labels (radio grid)
+  # Check for multiple unique row labels
   unique_rows <- unique(row_labels)
 
-  if (length(unique_rows) > 1) {
+  # IMPORTANT: Only treat as grid if we have strong evidence
+  # Multi-mention and ranking questions also have multiple columns with different row_labels
+  if (length(unique_rows) > 1 && length(unique_rows) == n_cols) {
+    # Each column has a unique row label - likely a grid
+
     # Check if all row labels are purely numeric (star rating grid)
     if (all(grepl("^\\d+$", unique_rows))) {
       return("star_rating_grid")
-    } else {
+    }
+
+    # Check if row labels look like grid items (longer text, descriptive)
+    # vs. simple options (shorter, like "Yes", "No", option codes)
+    # This is a heuristic - grids typically have more descriptive row labels
+    avg_label_length <- mean(nchar(unique_rows))
+
+    if (avg_label_length > 10) {
+      # Likely a radio grid (long descriptive labels per row)
       return("radio_grid")
     }
   }
 
   # Otherwise multi-column question (multi-mention or ranking)
+  # This includes questions where all columns have the same row_label
+  # or where row_labels are short option texts
   return("multi_column")
 }

@@ -31,13 +31,13 @@ generate_output_files <- function(questions, project_name, output_dir,
          call. = FALSE)
   }
 
-  # Generate file paths
+  # Generate file paths with "_parsed" suffix to distinguish from templates
   crosstab_file <- file.path(output_dir,
-                             paste0(project_name, "_Crosstab_Config.xlsx"))
+                             paste0(project_name, "_Crosstab_Config_parsed.xlsx"))
   survey_file <- file.path(output_dir,
-                           paste0(project_name, "_Survey_Structure.xlsx"))
+                           paste0(project_name, "_Survey_Structure_parsed.xlsx"))
   headers_file <- file.path(output_dir,
-                            paste0(project_name, "_Data_Headers.xlsx"))
+                            paste0(project_name, "_Data_Headers_parsed.xlsx"))
 
   # ===========================================================================
   # Generate Crosstab_Config (Selection sheet)
@@ -172,24 +172,13 @@ generate_crosstab_config <- function(questions) {
 
     } else {
       # Non-grid question
-      if (q$n_columns > 1) {
-        # Multi-column: add each code
-        for (i in seq_along(q$q_codes)) {
-          code <- q$q_codes[i]
-          rows[[length(rows) + 1]] <- create_crosstab_row(
-            code,
-            q$question_text,
-            q$variable_type
-          )
-        }
-      } else {
-        # Single column
-        rows[[length(rows) + 1]] <- create_crosstab_row(
-          q$q_code,
-          q$question_text,
-          q$variable_type
-        )
-      }
+      # Crosstab_Config shows only the base question code (Q01, Q04)
+      # Not the individual columns (Q04_1, Q04_2, etc.)
+      rows[[length(rows) + 1]] <- create_crosstab_row(
+        q$q_code,
+        q$question_text,
+        q$variable_type
+      )
     }
   }
 
