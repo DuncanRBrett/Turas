@@ -58,6 +58,16 @@ classify_questions <- function(questions, translation_data, word_hints,
       num_rows <- length(unique(sapply(q$columns, function(c) c$row_label)))
       last_qid <- as.character(as.integer(q$q_id) + num_rows)
       options <- get_options_for_question(last_qid, translation_data)
+
+      # If no options found at last_qid, try base question ID
+      if (length(options) == 0) {
+        options <- get_options_for_question(q$q_id, translation_data)
+      }
+
+      # If still no options, try to find a shared rating scale (0-10 + Don't know)
+      if (length(options) == 0) {
+        options <- find_rating_scale_options(translation_data)
+      }
     } else {
       options <- get_options_for_question(q$q_id, translation_data)
     }
@@ -401,4 +411,41 @@ create_star_rating_grid_questions <- function(question, options, hints) {
   }
 
   return(sub_questions)
+}
+
+
+#' Find Rating Scale Options
+#'
+#' @description
+#' Searches for a standard 0-10 + "Don't know" rating scale in the translation data.
+#' Used as a fallback when radio grid options aren't found at expected question IDs.
+#'
+#' @param translation_data Translation export data
+#'
+#' @return List of options, or empty list if not found
+#'
+#' @keywords internal
+find_rating_scale_options <- function(translation_data) {
+
+  # Search all questions with options
+  for (qid in names(translation_data$options)) {
+    opts <- translation_data$options[[qid]]
+
+    # Look for a scale with 11-12 options (likely 0-10 or 0-10 + Don't know)
+    if (length(opts) >= 11 && length(opts) <= 12) {
+      opt_texts <- sapply(opts, function(o) o$text)
+
+      # Check if this looks like a 0-10 scale
+      has_zero <- any(grepl("^0$", opt_texts))
+      has_ten <- any(grepl("^10$", opt_texts))
+
+      if (has_zero && has_ten) {
+        # Found a 0-10 scale, return it
+        return(opts)
+      }
+    }
+  }
+
+  # No rating scale found
+  return(list())
 }
