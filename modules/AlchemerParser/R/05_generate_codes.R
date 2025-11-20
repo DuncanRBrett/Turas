@@ -184,6 +184,28 @@ generate_multi_mention_codes_sequential <- function(base_code, columns) {
 }
 
 
+#' Generate Multi-Mention Codes (for Grid Sub-questions)
+#'
+#' @description
+#' Generates codes for checkbox grid sub-questions.
+#' Uses column labels for naming (based on col_labels).
+#'
+#' @param base_code Base question code (e.g., "Q02a")
+#' @param col_labels Column labels from grid
+#'
+#' @return Vector of codes
+#'
+#' @keywords internal
+generate_multi_mention_codes <- function(base_code, col_labels) {
+
+  # For checkbox grid sub-questions, generate codes like:
+  # Q02a_1, Q02a_2, Q02a_3
+  codes <- paste0(base_code, "_", seq_along(col_labels))
+
+  return(codes)
+}
+
+
 #' Check if Option is Other/Specify Field
 #'
 #' @description

@@ -238,12 +238,15 @@ generate_survey_structure <- function(questions) {
       for (suffix in names(q$sub_questions)) {
         sub_q <- q$sub_questions[[suffix]]
 
+        # Calculate correct column count (exclude othertext/othermention)
+        display_columns <- calculate_display_columns(sub_q)
+
         # Add question row
         question_rows[[length(question_rows) + 1]] <- create_question_row(
           sub_q$q_code,
           sub_q$question_text,
           sub_q$variable_type,
-          sub_q$n_columns
+          display_columns
         )
 
         # Add option rows
@@ -292,14 +295,23 @@ calculate_display_columns <- function(q) {
   }
 
   # For other types, count non-othertext columns
-  if (!is.null(q$q_codes) && length(q$q_codes) > 1) {
-    # Count codes that don't end with "othertext" or "_othermention"
-    main_codes <- !grepl("othertext$|_othermention$", q$q_codes)
-    return(sum(main_codes))
+  if (!is.null(q$q_codes)) {
+    # Handle both single string and vector
+    codes <- if (is.list(q$q_codes)) unlist(q$q_codes) else q$q_codes
+
+    # If we have multiple codes, count non-auxiliary ones
+    if (length(codes) > 1) {
+      # Count codes that don't end with "othertext" or "_othermention"
+      main_codes <- !grepl("othertext$|_othermention$", codes)
+      return(sum(main_codes))
+    } else if (length(codes) == 1 && !grepl("othertext$|_othermention$", codes)) {
+      # Single code that's not othertext
+      return(1)
+    }
   }
 
   # Default to n_columns
-  return(q$n_columns)
+  return(q$n_columns %||% 1)
 }
 
 
