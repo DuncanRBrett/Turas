@@ -533,12 +533,17 @@ generate_data_headers <- function(questions) {
     } else {
       # Non-grid
       if (length(q$q_codes) > 1) {
-        headers <- c(headers, q$q_codes)
+        # Convert _othermention to _othertext for display
+        codes <- gsub("_othermention$", "_othertext", q$q_codes)
+        headers <- c(headers, codes)
       } else {
         headers <- c(headers, q$q_code)
       }
     }
   }
+
+  # Convert any remaining _othermention to _othertext for display
+  headers <- gsub("_othermention$", "_othertext", headers)
 
   # Create single-row data frame
   as.data.frame(t(headers), stringsAsFactors = FALSE)

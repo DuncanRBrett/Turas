@@ -127,17 +127,27 @@ generate_base_code <- function(q_num, padding = 2) {
 generate_single_mention_codes <- function(base_code, columns) {
 
   codes <- character(length(columns))
+  seen_labels <- character(0)
 
   for (i in seq_along(columns)) {
     col <- columns[[i]]
     label <- col$row_label
 
-    # Check if this is an "othertext" field
-    if (!is.na(label) && grepl("other.*text", label, ignore.case = TRUE)) {
+    # Check if this is a duplicate label (indicates othermention field)
+    # For "Other - Write In (Required)", Alchemer creates TWO columns with same label:
+    # 1st = radio button option, 2nd = text entry field
+    is_duplicate <- !is.na(label) && label %in% seen_labels
+
+    # Also check for explicit "othertext" in the label
+    has_text_keyword <- !is.na(label) && grepl("other.*text", label, ignore.case = TRUE)
+
+    if (is_duplicate || has_text_keyword) {
+      # This is the text field for the "other" option
       codes[i] <- paste0(base_code, "_othermention")
     } else {
       # Main column
       codes[i] <- base_code
+      seen_labels <- c(seen_labels, label)
     }
   }
 
