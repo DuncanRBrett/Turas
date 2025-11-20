@@ -303,10 +303,10 @@ create_radio_grid_questions <- function(question, options, hints) {
     sub_questions[[suffix]] <- list(
       suffix = suffix,
       row_label = row,
-      question_text = question$question_text,  # Same question for all rows
+      question_text = row,  # Use row label as question text (e.g., "Tees", "greens", "fairways")
       variable_type = "Single_Mention",
       n_columns = 1,
-      options = options
+      options = options  # Options from translation (e.g., Happy, Neutral, Unhappy)
     )
   }
 
