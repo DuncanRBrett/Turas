@@ -37,11 +37,11 @@ parse_word_questionnaire <- function(file_path, verbose = FALSE) {
   doc <- officer::read_docx(file_path)
   doc_content <- officer::docx_summary(doc)
 
-  # Filter to text paragraphs
-  text_paras <- doc_content[doc_content$content_type == "paragraph", ]
+  # Filter to text paragraphs AND table cells (for grid questions)
+  text_paras <- doc_content[doc_content$content_type %in% c("paragraph", "table cell"), ]
 
   if (verbose) {
-    cat(sprintf("  Reading %d paragraphs from questionnaire\n",
+    cat(sprintf("  Reading %d paragraphs and table cells from questionnaire\n",
                 nrow(text_paras)))
   }
 
