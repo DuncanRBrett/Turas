@@ -1,11 +1,11 @@
 # Diagnostic script to check Word doc hint detection
 # Run this to see what brackets are being detected for each question
 
-setwd("/home/user/Turas")
+# Get current working directory (should already be in Turas folder)
 source("modules/AlchemerParser/R/03_parse_word_doc.R")
 
 # Parse the Word doc
-word_file <- "/home/user/Turas/modules/AlchemerParser/Sample Files/TestProject_questionnaire.docx"
+word_file <- file.path(getwd(), "modules/AlchemerParser/Sample Files/TestProject_questionnaire.docx")
 
 if (file.exists(word_file)) {
   hints <- parse_word_questionnaire(word_file, verbose = TRUE)

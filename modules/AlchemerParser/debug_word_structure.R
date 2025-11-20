@@ -1,15 +1,13 @@
 # Diagnostic script to see raw Word document structure
 # This will show all paragraphs and table cells to help debug bracket detection
 
-setwd("/home/user/Turas")
-
 # Load officer package
 if (!requireNamespace("officer", quietly = TRUE)) {
   stop("Install officer package first")
 }
 
-# Read Word doc
-word_file <- "/home/user/Turas/modules/AlchemerParser/Sample Files/TestProject_questionnaire.docx"
+# Read Word doc (use relative path from current working directory)
+word_file <- file.path(getwd(), "modules/AlchemerParser/Sample Files/TestProject_questionnaire.docx")
 
 if (file.exists(word_file)) {
   doc <- officer::read_docx(word_file)
