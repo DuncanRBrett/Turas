@@ -48,11 +48,19 @@ classify_questions <- function(questions, translation_data, word_hints,
     # Get Word doc hints first (needed for grid detection)
     hints <- get_hint_for_question(q_num, word_hints)
 
-    # Get options from translation
-    options <- get_options_for_question(q$q_id, translation_data)
-
     # Detect grid type (with Word doc hints for better detection)
     grid_type <- detect_grid_type_with_hints(q, hints)
+
+    # Get options from translation
+    # For grids, options are stored in the LAST question ID in the range
+    if (grid_type %in% c("radio_grid", "checkbox_grid")) {
+      # Calculate the last question ID (base_id + number of rows)
+      num_rows <- length(unique(sapply(q$columns, function(c) c$row_label)))
+      last_qid <- as.character(as.integer(q$q_id) + num_rows)
+      options <- get_options_for_question(last_qid, translation_data)
+    } else {
+      options <- get_options_for_question(q$q_id, translation_data)
+    }
 
     # Handle different grid types
     if (grid_type == "checkbox_grid") {
