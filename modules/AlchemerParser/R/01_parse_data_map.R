@@ -306,6 +306,13 @@ detect_grid_type_with_hints <- function(question_group, hints = list()) {
   if (length(unique_rows) > 1 && length(unique_rows) == n_cols) {
     # Each column has a unique row label
 
+    # Check for star rating grid pattern (e.g., "Item:1", "Item:2", "Item:3")
+    # Pattern: text:number where multiple columns share the same base text
+    if (all(grepl(":.+:\\d+$", unique_rows))) {
+      # All labels have "text:subtext:number" pattern
+      return("star_rating_grid")
+    }
+
     # Check Word doc brackets
     if (!is.null(hints$brackets) && !is.na(hints$brackets)) {
       if (hints$brackets == "()") {

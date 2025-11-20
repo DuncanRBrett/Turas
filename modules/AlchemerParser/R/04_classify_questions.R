@@ -319,6 +319,7 @@ create_radio_grid_questions <- function(question, options, hints) {
 #' @description
 #' Creates sub-questions for a star rating grid (one per item).
 #' Each sub-question is Rating type.
+#' Handles patterns like "Question:Item:1", "Question:Item:2", etc.
 #'
 #' @param question Question group
 #' @param options Options from translation
@@ -331,10 +332,13 @@ create_star_rating_grid_questions <- function(question, options, hints) {
 
   cols <- question$columns
 
-  # Extract unique items (remove the numeric suffixes)
+  # Extract unique items (remove the numeric rating suffixes)
+  # Handles both "Item:1" and "Question:Item:1" patterns
   items <- unique(sapply(cols, function(c) {
-    # Remove trailing ":digit" pattern
-    gsub(":\\d+$", "", c$row_label)
+    label <- c$row_label
+    # Remove trailing ":digit" pattern to get base item name
+    base <- gsub(":\\d+$", "", label)
+    return(base)
   }))
   items <- sort(items)
 
@@ -344,21 +348,41 @@ create_star_rating_grid_questions <- function(question, options, hints) {
     item <- items[i]
     suffix <- letters[i]
 
-    # Determine rating scale from row labels
-    item_cols <- Filter(function(c) grepl(paste0("^", item, ":"), c$row_label), cols)
+    # Find all columns for this item
+    # Escape special regex characters in item name
+    item_escaped <- gsub("([.?*+^$\\[\\]{}()|\\\\])", "\\\\\\1", item)
+    item_cols <- Filter(function(c) {
+      grepl(paste0("^", item_escaped, ":\\d+$"), c$row_label)
+    }, cols)
+
+    # Extract rating scale values from row labels
     scale_values <- sort(unique(sapply(item_cols, function(c) {
-      gsub("^.*:(\\d+)$", "\\1", c$row_label)
+      # Extract the final number after the last colon
+      matches <- regmatches(c$row_label, regexec(":(\\d+)$", c$row_label))
+      if (length(matches[[1]]) > 1) {
+        return(matches[[1]][2])
+      }
+      return(NA)
     })))
+    scale_values <- scale_values[!is.na(scale_values)]
 
     # Create synthetic options for the scale (e.g., 1-5)
     scale_options <- lapply(scale_values, function(val) {
       list(code = val, text = val, key = paste0("synthetic-", val))
     })
 
+    # Extract item display name (last part after colons)
+    # For "Q13: Item description:1", we want "Item description"
+    item_display <- gsub("^.*?:(.*)$", "\\1", item)
+    if (item_display == item) {
+      # No colon found, use as-is
+      item_display <- item
+    }
+
     sub_questions[[suffix]] <- list(
       suffix = suffix,
       item_label = item,
-      question_text = paste0(item, ":", question$question_text),
+      question_text = item_display,
       variable_type = "Rating",
       n_columns = 1,
       options = scale_options
