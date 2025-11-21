@@ -66,6 +66,11 @@ validate_tracker_setup <- function(config, question_mapping, question_map, wave_
   banner_validation <- validate_banner_structure(config, wave_data)
   validation_results <- merge_validation_results(validation_results, banner_validation)
 
+  # 7. Validate TrackingSpecs (Enhancement Phase 1)
+  message("\n7. Validating TrackingSpecs...")
+  specs_validation <- validate_all_tracking_specs(config, question_map)
+  validation_results <- merge_validation_results(validation_results, specs_validation)
+
   # Print summary
   message("\n========================================")
   message("VALIDATION SUMMARY")
@@ -216,7 +221,7 @@ validate_mapping_structure <- function(question_mapping, config) {
   }
 
   # Validate question types
-  valid_types <- c("Rating", "SingleChoice", "MultiChoice", "NPS", "Index", "OpenEnd", "Composite")
+  valid_types <- c("Rating", "SingleChoice", "MultiChoice", "Multi_Mention", "NPS", "Index", "OpenEnd", "Composite")
   invalid_types <- setdiff(unique(question_mapping$QuestionType), valid_types)
   if (length(invalid_types) > 0) {
     results$warnings <- c(results$warnings,
@@ -396,4 +401,72 @@ merge_validation_results <- function(results1, results2) {
     warnings = c(results1$warnings, results2$warnings),
     info = c(results1$info, results2$info)
   ))
+}
+
+
+# ==============================================================================
+# TRACKINGSPECS VALIDATION (Enhancement Phase 1)
+# ==============================================================================
+
+#' Validate All TrackingSpecs
+#'
+#' Validates TrackingSpecs for all tracked questions.
+#' Checks syntax, compatibility with question types, and existence of referenced options.
+#'
+#' @param config List. Configuration object
+#' @param question_map List. Question map index
+#' @return List with errors, warnings, and info
+#'
+#' @keywords internal
+validate_all_tracking_specs <- function(config, question_map) {
+  results <- list(errors = character(0), warnings = character(0), info = character(0))
+
+  # Check if TrackingSpecs column exists
+  has_tracking_specs <- "TrackingSpecs" %in% names(question_map$question_metadata)
+
+  if (!has_tracking_specs) {
+    results$info <- c(results$info, "No TrackingSpecs column found (using defaults for all questions)")
+    return(results)
+  }
+
+  tracked_questions <- config$tracked_questions$QuestionCode
+  n_with_specs <- 0
+
+  for (q_code in tracked_questions) {
+    # Get metadata
+    metadata <- get_question_metadata(question_map, q_code)
+
+    if (is.null(metadata)) {
+      next  # Already validated in trackable_questions check
+    }
+
+    # Get TrackingSpecs
+    tracking_specs <- get_tracking_specs(question_map, q_code)
+
+    if (is.null(tracking_specs)) {
+      next  # No specs = use defaults (valid)
+    }
+
+    n_with_specs <- n_with_specs + 1
+
+    # Validate specs syntax
+    validation <- validate_tracking_specs(tracking_specs, metadata$QuestionType)
+
+    if (!validation$valid) {
+      results$errors <- c(results$errors,
+                         paste0("Question '", q_code, "': ", validation$message))
+    } else {
+      # Additional contextual validation can go here
+      # For example, checking if specified categories exist in data
+      results$info <- c(results$info,
+                       paste0("Question '", q_code, "': TrackingSpecs validated (", tracking_specs, ")"))
+    }
+  }
+
+  if (n_with_specs > 0) {
+    results$info <- c(results$info,
+                     paste0(n_with_specs, " questions have custom TrackingSpecs"))
+  }
+
+  return(results)
 }

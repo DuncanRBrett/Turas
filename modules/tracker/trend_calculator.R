@@ -84,7 +84,8 @@ calculate_all_trends <- function(config, question_map, wave_data) {
 
     trend_result <- tryCatch({
       if (q_type == "rating") {
-        calculate_rating_trend(q_code, question_map, wave_data, config)
+        # Use enhanced version (supports TrackingSpecs, backward compatible)
+        calculate_rating_trend_enhanced(q_code, question_map, wave_data, config)
       } else if (q_type == "nps") {
         calculate_nps_trend(q_code, question_map, wave_data, config)
       } else if (q_type == "single_choice") {
@@ -93,7 +94,8 @@ calculate_all_trends <- function(config, question_map, wave_data) {
         warning(paste0("  Multi-choice questions not yet supported in tracker - skipping"))
         NULL
       } else if (q_type == "composite") {
-        calculate_composite_trend(q_code, question_map, wave_data, config)
+        # Use enhanced version (supports TrackingSpecs, backward compatible)
+        calculate_composite_trend_enhanced(q_code, question_map, wave_data, config)
       } else if (q_type == "open_end") {
         warning(paste0("  Open-end questions cannot be tracked - skipping"))
         NULL
@@ -897,5 +899,693 @@ z_test_for_proportions <- function(p1, n1, p2, n2, alpha = 0.05) {
     p_value = p_value,
     significant = significant,
     alpha = alpha
+  ))
+}
+
+
+# ==============================================================================
+# ENHANCED RATING CALCULATIONS (Enhancement Phase 1)
+# ==============================================================================
+
+#' Calculate Top Box
+#'
+#' Calculates percentage of responses in top N values of scale.
+#' Auto-detects scale from data.
+#'
+#' @param values Numeric vector of response values
+#' @param weights Numeric vector of weights
+#' @param n_boxes Integer, number of top values to include (1, 2, or 3)
+#' @return List with proportion, scale_detected, top_values
+#'
+#' @keywords internal
+calculate_top_box <- function(values, weights, n_boxes = 1) {
+
+  # Remove NA values
+  valid_idx <- !is.na(values) & !is.na(weights) & weights > 0
+  values_valid <- values[valid_idx]
+  weights_valid <- weights[valid_idx]
+
+  if (length(values_valid) == 0) {
+    return(list(
+      proportion = NA,
+      scale_detected = NA,
+      top_values = NA,
+      n_unweighted = 0,
+      n_weighted = 0
+    ))
+  }
+
+  # Detect scale
+  unique_values <- sort(unique(values_valid))
+  scale_min <- min(unique_values)
+  scale_max <- max(unique_values)
+
+  # Get top N values
+  n_boxes <- min(n_boxes, length(unique_values))  # Can't exceed available values
+  top_values <- tail(unique_values, n_boxes)
+
+  # Calculate percentage
+  in_top_box <- values_valid %in% top_values
+  top_weight <- sum(weights_valid[in_top_box])
+  total_weight <- sum(weights_valid)
+
+  proportion <- (top_weight / total_weight) * 100
+
+  return(list(
+    proportion = proportion,
+    scale_detected = paste0(scale_min, "-", scale_max),
+    top_values = top_values,
+    n_unweighted = length(values_valid),
+    n_weighted = total_weight
+  ))
+}
+
+
+#' Calculate Bottom Box
+#'
+#' Calculates percentage of responses in bottom N values of scale.
+#' Auto-detects scale from data.
+#'
+#' @param values Numeric vector of response values
+#' @param weights Numeric vector of weights
+#' @param n_boxes Integer, number of bottom values to include (1, 2, or 3)
+#' @return List with proportion, scale_detected, bottom_values
+#'
+#' @keywords internal
+calculate_bottom_box <- function(values, weights, n_boxes = 1) {
+
+  # Remove NA values
+  valid_idx <- !is.na(values) & !is.na(weights) & weights > 0
+  values_valid <- values[valid_idx]
+  weights_valid <- weights[valid_idx]
+
+  if (length(values_valid) == 0) {
+    return(list(
+      proportion = NA,
+      scale_detected = NA,
+      bottom_values = NA,
+      n_unweighted = 0,
+      n_weighted = 0
+    ))
+  }
+
+  # Detect scale
+  unique_values <- sort(unique(values_valid))
+  scale_min <- min(unique_values)
+  scale_max <- max(unique_values)
+
+  # Get bottom N values
+  n_boxes <- min(n_boxes, length(unique_values))
+  bottom_values <- head(unique_values, n_boxes)
+
+  # Calculate percentage
+  in_bottom_box <- values_valid %in% bottom_values
+  bottom_weight <- sum(weights_valid[in_bottom_box])
+  total_weight <- sum(weights_valid)
+
+  proportion <- (bottom_weight / total_weight) * 100
+
+  return(list(
+    proportion = proportion,
+    scale_detected = paste0(scale_min, "-", scale_max),
+    bottom_values = bottom_values,
+    n_unweighted = length(values_valid),
+    n_weighted = total_weight
+  ))
+}
+
+
+#' Calculate Custom Range
+#'
+#' Calculates percentage of responses within a custom range (e.g., 9-10, 7-8).
+#'
+#' @param values Numeric vector of response values
+#' @param weights Numeric vector of weights
+#' @param range_spec Character, range specification (e.g., "range:9-10")
+#' @return List with proportion, range_values, range_spec
+#'
+#' @keywords internal
+calculate_custom_range <- function(values, weights, range_spec) {
+
+  # Parse range spec: "range:9-10" -> c(9, 10)
+  range_str <- sub("^range:", "", tolower(range_spec))
+  parts <- strsplit(range_str, "-")[[1]]
+
+  if (length(parts) != 2) {
+    warning(paste0("Invalid range specification: ", range_spec))
+    return(list(
+      proportion = NA,
+      range_values = NA,
+      range_spec = range_spec,
+      n_unweighted = 0,
+      n_weighted = 0
+    ))
+  }
+
+  range_min <- as.numeric(parts[1])
+  range_max <- as.numeric(parts[2])
+
+  if (is.na(range_min) || is.na(range_max) || range_min > range_max) {
+    warning(paste0("Invalid range values: ", range_spec))
+    return(list(
+      proportion = NA,
+      range_values = NA,
+      range_spec = range_spec,
+      n_unweighted = 0,
+      n_weighted = 0
+    ))
+  }
+
+  # Generate sequence of values in range
+  range_values <- seq(range_min, range_max)
+
+  # Remove NA values
+  valid_idx <- !is.na(values) & !is.na(weights) & weights > 0
+  values_valid <- values[valid_idx]
+  weights_valid <- weights[valid_idx]
+
+  if (length(values_valid) == 0) {
+    return(list(
+      proportion = NA,
+      range_values = range_values,
+      range_spec = range_spec,
+      n_unweighted = 0,
+      n_weighted = 0
+    ))
+  }
+
+  # Calculate proportion
+  in_range <- values_valid %in% range_values
+  range_weight <- sum(weights_valid[in_range])
+  total_weight <- sum(weights_valid)
+
+  proportion <- (range_weight / total_weight) * 100
+
+  return(list(
+    proportion = proportion,
+    range_values = range_values,
+    range_spec = range_spec,
+    n_unweighted = length(values_valid),
+    n_weighted = total_weight
+  ))
+}
+
+
+#' Calculate Distribution
+#'
+#' Calculates percentage for each unique value found in data.
+#'
+#' @param values Numeric vector of response values
+#' @param weights Numeric vector of weights
+#' @return List with distribution (named list of percentages), n_unweighted, n_weighted
+#'
+#' @keywords internal
+calculate_distribution <- function(values, weights) {
+
+  # Remove NA values
+  valid_idx <- !is.na(values) & !is.na(weights) & weights > 0
+  values_valid <- values[valid_idx]
+  weights_valid <- weights[valid_idx]
+
+  if (length(values_valid) == 0) {
+    return(list(
+      distribution = list(),
+      n_unweighted = 0,
+      n_weighted = 0
+    ))
+  }
+
+  # Get unique values
+  unique_vals <- sort(unique(values_valid))
+
+  # Calculate percentage for each value
+  distribution <- list()
+  total_weight <- sum(weights_valid)
+
+  for (val in unique_vals) {
+    matched <- values_valid == val
+    val_weight <- sum(weights_valid[matched])
+    distribution[[as.character(val)]] <- (val_weight / total_weight) * 100
+  }
+
+  return(list(
+    distribution = distribution,
+    n_unweighted = length(values_valid),
+    n_weighted = total_weight
+  ))
+}
+
+
+#' Calculate Rating Trend - Enhanced Version
+#'
+#' Enhanced version that supports TrackingSpecs for multiple metrics.
+#' Backward compatible - defaults to mean if no TrackingSpecs specified.
+#'
+#' @keywords internal
+calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, config) {
+
+  wave_ids <- config$waves$WaveID
+  metadata <- get_question_metadata(question_map, q_code)
+
+  # Get TrackingSpecs
+  tracking_specs <- get_tracking_specs(question_map, q_code)
+
+  # Parse specs (default to "mean" if not specified)
+  if (is.null(tracking_specs) || tracking_specs == "") {
+    specs_list <- c("mean")
+  } else {
+    specs_list <- trimws(strsplit(tracking_specs, ",")[[1]])
+  }
+
+  # Calculate metrics for each wave
+  wave_results <- list()
+
+  for (wave_id in wave_ids) {
+    # Extract question data for this wave
+    wave_df <- wave_data[[wave_id]]
+    q_data <- extract_question_data(wave_df, wave_id, q_code, question_map)
+
+    if (is.null(q_data)) {
+      # Wave not available - initialize with NA
+      wave_results[[wave_id]] <- list(
+        available = FALSE,
+        metrics = list()
+      )
+      next
+    }
+
+    # Calculate each requested metric
+    metrics <- list()
+
+    for (spec in specs_list) {
+      spec_lower <- tolower(trimws(spec))
+
+      if (spec_lower == "mean") {
+        result <- calculate_weighted_mean(q_data, wave_df$weight_var)
+        metrics$mean <- result$mean
+        metrics$sd <- result$sd
+
+      } else if (spec_lower == "top_box") {
+        result <- calculate_top_box(q_data, wave_df$weight_var, n_boxes = 1)
+        metrics$top_box <- result$proportion
+
+      } else if (spec_lower == "top2_box") {
+        result <- calculate_top_box(q_data, wave_df$weight_var, n_boxes = 2)
+        metrics$top2_box <- result$proportion
+
+      } else if (spec_lower == "top3_box") {
+        result <- calculate_top_box(q_data, wave_df$weight_var, n_boxes = 3)
+        metrics$top3_box <- result$proportion
+
+      } else if (spec_lower == "bottom_box") {
+        result <- calculate_bottom_box(q_data, wave_df$weight_var, n_boxes = 1)
+        metrics$bottom_box <- result$proportion
+
+      } else if (spec_lower == "bottom2_box") {
+        result <- calculate_bottom_box(q_data, wave_df$weight_var, n_boxes = 2)
+        metrics$bottom2_box <- result$proportion
+
+      } else if (grepl("^range:", spec_lower)) {
+        result <- calculate_custom_range(q_data, wave_df$weight_var, spec)
+        metric_name <- gsub("[^a-z0-9_]", "_", spec_lower)  # Clean for list name
+        metrics[[metric_name]] <- result$proportion
+
+      } else if (spec_lower == "distribution") {
+        result <- calculate_distribution(q_data, wave_df$weight_var)
+        metrics$distribution <- result$distribution
+      }
+    }
+
+    # Store basic counts (shared across all metrics)
+    valid_idx <- !is.na(q_data) & !is.na(wave_df$weight_var) & wave_df$weight_var > 0
+    wave_results[[wave_id]] <- list(
+      available = TRUE,
+      metrics = metrics,
+      n_unweighted = sum(valid_idx),
+      n_weighted = sum(wave_df$weight_var[valid_idx]),
+      values = q_data,
+      weights = wave_df$weight_var
+    )
+  }
+
+  # Calculate changes and significance for each metric
+  changes <- list()
+  significance <- list()
+
+  for (spec in specs_list) {
+    spec_lower <- tolower(trimws(spec))
+    metric_name <- if (grepl("^range:", spec_lower)) {
+      gsub("[^a-z0-9_]", "_", spec_lower)
+    } else {
+      spec_lower
+    }
+
+    # Skip distribution (too complex for wave-over-wave comparison)
+    if (metric_name == "distribution") {
+      next
+    }
+
+    # Calculate changes
+    changes[[metric_name]] <- calculate_changes_for_metric(wave_results, wave_ids, metric_name)
+
+    # Significance testing
+    # For means, use t-test; for proportions (boxes/ranges), use z-test
+    if (metric_name == "mean") {
+      significance[[metric_name]] <- perform_significance_tests_means(wave_results, wave_ids, config)
+    } else {
+      # Box/range metrics are proportions
+      significance[[metric_name]] <- perform_significance_tests_for_metric(
+        wave_results, wave_ids, metric_name, config, test_type = "proportion"
+      )
+    }
+  }
+
+  return(list(
+    question_code = q_code,
+    question_text = metadata$QuestionText,
+    question_type = metadata$QuestionType,
+    metric_type = "rating_enhanced",
+    tracking_specs = specs_list,
+    wave_results = wave_results,
+    changes = changes,
+    significance = significance
+  ))
+}
+
+
+#' Calculate Changes for a Specific Metric
+#'
+#' Helper function to calculate wave-over-wave changes for enhanced metrics.
+#'
+#' @keywords internal
+calculate_changes_for_metric <- function(wave_results, wave_ids, metric_name) {
+
+  changes <- list()
+
+  for (i in 2:length(wave_ids)) {
+    wave_id <- wave_ids[i]
+    prev_wave_id <- wave_ids[i - 1]
+
+    current <- wave_results[[wave_id]]
+    previous <- wave_results[[prev_wave_id]]
+
+    # Get metric values
+    current_val <- if (current$available && !is.null(current$metrics[[metric_name]])) {
+      current$metrics[[metric_name]]
+    } else {
+      NA
+    }
+
+    previous_val <- if (previous$available && !is.null(previous$metrics[[metric_name]])) {
+      previous$metrics[[metric_name]]
+    } else {
+      NA
+    }
+
+    # Calculate changes
+    if (!is.na(current_val) && !is.na(previous_val)) {
+      absolute_change <- current_val - previous_val
+      percentage_change <- if (previous_val == 0) {
+        NA
+      } else {
+        (absolute_change / previous_val) * 100
+      }
+
+      changes[[paste0(prev_wave_id, "_to_", wave_id)]] <- list(
+        from_wave = prev_wave_id,
+        to_wave = wave_id,
+        from_value = previous_val,
+        to_value = current_val,
+        absolute_change = absolute_change,
+        percentage_change = percentage_change,
+        direction = if (absolute_change > 0) "up" else if (absolute_change < 0) "down" else "stable"
+      )
+    } else {
+      changes[[paste0(prev_wave_id, "_to_", wave_id)]] <- list(
+        from_wave = prev_wave_id,
+        to_wave = wave_id,
+        from_value = previous_val,
+        to_value = current_val,
+        absolute_change = NA,
+        percentage_change = NA,
+        direction = NA
+      )
+    }
+  }
+
+  return(changes)
+}
+
+
+#' Perform Significance Tests for Enhanced Metric
+#'
+#' Performs significance testing for proportion-based metrics (top_box, range, etc.).
+#'
+#' @keywords internal
+perform_significance_tests_for_metric <- function(wave_results, wave_ids, metric_name,
+                                                   config, test_type = "proportion") {
+
+  alpha <- get_setting(config, "alpha_level", default = 0.05)
+  sig_tests <- list()
+
+  for (i in 2:length(wave_ids)) {
+    wave_id <- wave_ids[i]
+    prev_wave_id <- wave_ids[i - 1]
+
+    current <- wave_results[[wave_id]]
+    previous <- wave_results[[prev_wave_id]]
+
+    # Check availability
+    if (!current$available || !previous$available) {
+      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
+      next
+    }
+
+    # Get metric values
+    current_val <- current$metrics[[metric_name]]
+    previous_val <- previous$metrics[[metric_name]]
+
+    if (is.na(current_val) || is.na(previous_val)) {
+      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
+      next
+    }
+
+    # Perform test based on type
+    if (test_type == "proportion") {
+      # Convert percentages to proportions
+      p1 <- previous_val / 100
+      p2 <- current_val / 100
+      n1 <- previous$n_unweighted
+      n2 <- current$n_unweighted
+
+      test_result <- z_test_for_proportions(p1, n1, p2, n2, alpha)
+    } else {
+      # Would use t-test for means, but this function is for proportions
+      test_result <- NA
+    }
+
+    sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- test_result
+  }
+
+  return(sig_tests)
+}
+
+
+# ==============================================================================
+# ENHANCED COMPOSITE CALCULATIONS (Enhancement Phase 1)
+# ==============================================================================
+
+#' Calculate Composite Values Per Respondent
+#'
+#' Calculates composite score for each respondent (row mean of source questions).
+#' Returns the composite values vector which can then be treated like rating values.
+#'
+#' @keywords internal
+calculate_composite_values_per_respondent <- function(wave_df, wave_id, source_questions, question_map) {
+
+  # Extract data for each source question
+  source_values <- list()
+
+  for (src_code in source_questions) {
+    src_data <- extract_question_data(wave_df, wave_id, src_code, question_map)
+
+    if (!is.null(src_data)) {
+      source_values[[src_code]] <- src_data
+    }
+  }
+
+  if (length(source_values) == 0) {
+    warning("No valid source questions found for composite")
+    return(rep(NA, nrow(wave_df)))
+  }
+
+  # Build matrix: rows = respondents, cols = source questions
+  n_resp <- nrow(wave_df)
+  n_sources <- length(source_values)
+  source_matrix <- matrix(NA, nrow = n_resp, ncol = n_sources)
+
+  for (i in seq_along(source_values)) {
+    source_matrix[, i] <- source_values[[i]]
+  }
+
+  # Calculate row means (composite score per respondent)
+  composite_values <- rowMeans(source_matrix, na.rm = TRUE)
+
+  # Set to NA if all sources were NA for a respondent
+  all_na <- apply(source_matrix, 1, function(row) all(is.na(row)))
+  composite_values[all_na] <- NA
+
+  return(composite_values)
+}
+
+
+#' Calculate Composite Trend - Enhanced Version
+#'
+#' Enhanced version that supports TrackingSpecs for composite questions.
+#' Calculates composite values per respondent, then applies requested metrics
+#' (mean, top_box, distribution, etc.) to those composite scores.
+#'
+#' @keywords internal
+calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, config) {
+
+  wave_ids <- config$waves$WaveID
+  metadata <- get_question_metadata(question_map, q_code)
+
+  # Get source questions for composite
+  source_questions <- get_composite_sources(question_map, q_code)
+
+  if (is.null(source_questions) || length(source_questions) == 0) {
+    stop(paste0("No source questions defined for composite question: ", q_code))
+  }
+
+  # Get TrackingSpecs
+  tracking_specs <- get_tracking_specs(question_map, q_code)
+
+  # Parse specs (default to "mean" if not specified)
+  if (is.null(tracking_specs) || tracking_specs == "") {
+    specs_list <- c("mean")
+  } else {
+    specs_list <- trimws(strsplit(tracking_specs, ",")[[1]])
+  }
+
+  # Calculate composite values and metrics for each wave
+  wave_results <- list()
+
+  for (wave_id in wave_ids) {
+    wave_df <- wave_data[[wave_id]]
+
+    # Calculate composite values per respondent
+    composite_values <- calculate_composite_values_per_respondent(
+      wave_df, wave_id, source_questions, question_map
+    )
+
+    # Check if we got valid composite values
+    valid_idx <- !is.na(composite_values) & !is.na(wave_df$weight_var) & wave_df$weight_var > 0
+
+    if (sum(valid_idx) == 0) {
+      # No valid data for this wave
+      wave_results[[wave_id]] <- list(
+        available = FALSE,
+        metrics = list()
+      )
+      next
+    }
+
+    # Now apply requested metrics to composite values
+    # (same logic as rating questions)
+    metrics <- list()
+
+    for (spec in specs_list) {
+      spec_lower <- tolower(trimws(spec))
+
+      if (spec_lower == "mean") {
+        result <- calculate_weighted_mean(composite_values, wave_df$weight_var)
+        metrics$mean <- result$mean
+        metrics$sd <- result$sd
+
+      } else if (spec_lower == "top_box") {
+        result <- calculate_top_box(composite_values, wave_df$weight_var, n_boxes = 1)
+        metrics$top_box <- result$proportion
+
+      } else if (spec_lower == "top2_box") {
+        result <- calculate_top_box(composite_values, wave_df$weight_var, n_boxes = 2)
+        metrics$top2_box <- result$proportion
+
+      } else if (spec_lower == "top3_box") {
+        result <- calculate_top_box(composite_values, wave_df$weight_var, n_boxes = 3)
+        metrics$top3_box <- result$proportion
+
+      } else if (spec_lower == "bottom_box") {
+        result <- calculate_bottom_box(composite_values, wave_df$weight_var, n_boxes = 1)
+        metrics$bottom_box <- result$proportion
+
+      } else if (spec_lower == "bottom2_box") {
+        result <- calculate_bottom_box(composite_values, wave_df$weight_var, n_boxes = 2)
+        metrics$bottom2_box <- result$proportion
+
+      } else if (grepl("^range:", spec_lower)) {
+        result <- calculate_custom_range(composite_values, wave_df$weight_var, spec)
+        metric_name <- gsub("[^a-z0-9_]", "_", spec_lower)
+        metrics[[metric_name]] <- result$proportion
+
+      } else if (spec_lower == "distribution") {
+        result <- calculate_distribution(composite_values, wave_df$weight_var)
+        metrics$distribution <- result$distribution
+      }
+    }
+
+    # Store results
+    wave_results[[wave_id]] <- list(
+      available = TRUE,
+      metrics = metrics,
+      n_unweighted = sum(valid_idx),
+      n_weighted = sum(wave_df$weight_var[valid_idx]),
+      values = composite_values,
+      weights = wave_df$weight_var,
+      source_questions = source_questions
+    )
+  }
+
+  # Calculate changes and significance for each metric
+  changes <- list()
+  significance <- list()
+
+  for (spec in specs_list) {
+    spec_lower <- tolower(trimws(spec))
+    metric_name <- if (grepl("^range:", spec_lower)) {
+      gsub("[^a-z0-9_]", "_", spec_lower)
+    } else {
+      spec_lower
+    }
+
+    # Skip distribution
+    if (metric_name == "distribution") {
+      next
+    }
+
+    # Calculate changes
+    changes[[metric_name]] <- calculate_changes_for_metric(wave_results, wave_ids, metric_name)
+
+    # Significance testing
+    if (metric_name == "mean") {
+      significance[[metric_name]] <- perform_significance_tests_means(wave_results, wave_ids, config)
+    } else {
+      # Box/range metrics are proportions
+      significance[[metric_name]] <- perform_significance_tests_for_metric(
+        wave_results, wave_ids, metric_name, config, test_type = "proportion"
+      )
+    }
+  }
+
+  return(list(
+    question_code = q_code,
+    question_text = metadata$QuestionText,
+    question_type = metadata$QuestionType,
+    metric_type = "composite_enhanced",
+    tracking_specs = specs_list,
+    source_questions = source_questions,
+    wave_results = wave_results,
+    changes = changes,
+    significance = significance
   ))
 }

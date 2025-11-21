@@ -302,3 +302,191 @@ validate_question_mapping <- function(config, question_map, wave_data) {
 
   return(availability)
 }
+
+
+# ==============================================================================
+# TRACKINGSPECS SUPPORT (Enhancement Phase 1)
+# ==============================================================================
+
+#' Get Tracking Specs for Question
+#'
+#' Retrieves the TrackingSpecs string for a question from the question mapping.
+#' TrackingSpecs is an optional column that allows customization of which metrics
+#' to track (e.g., "mean,top2_box" or "option:Q30_1,any").
+#'
+#' @param question_map List. Question map index from build_question_map_index()
+#' @param question_code Character. Question code
+#' @return Character. TrackingSpecs string, or NULL if not specified/blank
+#'
+#' @export
+get_tracking_specs <- function(question_map, question_code) {
+
+  metadata_df <- question_map$question_metadata
+
+  # Check if TrackingSpecs column exists
+  if (!"TrackingSpecs" %in% names(metadata_df)) {
+    return(NULL)
+  }
+
+  # Find question row
+  q_row <- metadata_df[metadata_df$QuestionCode == question_code, ]
+
+  if (nrow(q_row) == 0) {
+    return(NULL)
+  }
+
+  tracking_specs <- q_row$TrackingSpecs[1]
+
+  # Return NULL if blank/NA
+  if (is.na(tracking_specs) || trimws(tracking_specs) == "") {
+    return(NULL)
+  }
+
+  return(trimws(tracking_specs))
+}
+
+
+#' Validate Tracking Specs Syntax
+#'
+#' Validates that TrackingSpecs string contains valid specifications for
+#' the given question type.
+#'
+#' @param specs_str Character. TrackingSpecs string (e.g., "mean,top2_box")
+#' @param question_type Character. Question type (e.g., "Rating", "NPS", "Single_Choice")
+#' @return List with $valid (logical) and $message (character)
+#'
+#' @export
+validate_tracking_specs <- function(specs_str, question_type) {
+
+  # If NULL or empty, always valid (uses defaults)
+  if (is.null(specs_str) || trimws(specs_str) == "") {
+    return(list(valid = TRUE, message = ""))
+  }
+
+  # Normalize question type for comparison
+  q_type_normalized <- tolower(trimws(question_type))
+
+  # Define valid specs by question type
+  VALID_SPECS <- list(
+    rating = c("mean", "top_box", "top2_box", "top3_box",
+               "bottom_box", "bottom2_box", "distribution"),
+    nps = c("nps_score", "promoters_pct", "passives_pct",
+            "detractors_pct", "full"),
+    single_choice = c("all", "top3"),
+    multi_choice = c("auto", "any", "count_mean", "count_distribution"),
+    multi_mention = c("auto", "any", "count_mean", "count_distribution"),
+    composite = c("mean", "top_box", "top2_box", "top3_box", "distribution")
+  )
+
+  # Map common question type names to normalized types
+  type_map <- c(
+    "rating" = "rating",
+    "likert" = "rating",
+    "index" = "rating",
+    "numeric" = "rating",
+    "nps" = "nps",
+    "single_choice" = "single_choice",
+    "single_response" = "single_choice",
+    "singlechoice" = "single_choice",
+    "multi_choice" = "multi_choice",
+    "multi_mention" = "multi_mention",
+    "multichoice" = "multi_choice",
+    "composite" = "composite"
+  )
+
+  # Normalize the question type
+  q_type_key <- type_map[q_type_normalized]
+  if (is.na(q_type_key)) {
+    q_type_key <- q_type_normalized
+  }
+
+  # Get valid specs for this type
+  valid_for_type <- VALID_SPECS[[as.character(q_type_key)]]
+
+  if (is.null(valid_for_type)) {
+    return(list(
+      valid = FALSE,
+      message = paste0("Unknown question type: ", question_type)
+    ))
+  }
+
+  # Parse comma-separated specs
+  specs <- trimws(strsplit(specs_str, ",")[[1]])
+
+  # Validate each spec
+  for (spec in specs) {
+    spec_lower <- tolower(spec)
+
+    # Check if it's a base valid spec
+    if (spec_lower %in% valid_for_type) {
+      next
+    }
+
+    # Check for pattern-based specs
+    if (grepl("^range:", spec_lower)) {
+      # Range specs only valid for rating/composite
+      if (!q_type_key %in% c("rating", "composite")) {
+        return(list(
+          valid = FALSE,
+          message = paste0("'", spec, "' is only valid for Rating or Composite questions, not ", question_type)
+        ))
+      }
+
+      # Validate range syntax: range:X-Y
+      range_part <- sub("^range:", "", spec_lower)
+      if (!grepl("^[0-9]+-[0-9]+$", range_part)) {
+        return(list(
+          valid = FALSE,
+          message = paste0("Invalid range syntax: '", spec, "'. Expected format: range:X-Y (e.g., range:9-10)")
+        ))
+      }
+
+      # Validate range values
+      parts <- strsplit(range_part, "-")[[1]]
+      range_min <- as.numeric(parts[1])
+      range_max <- as.numeric(parts[2])
+
+      if (is.na(range_min) || is.na(range_max) || range_min > range_max) {
+        return(list(
+          valid = FALSE,
+          message = paste0("Invalid range values in '", spec, "': min must be <= max")
+        ))
+      }
+
+      next
+    }
+
+    # Check for category specs (single_choice)
+    if (grepl("^category:", spec_lower)) {
+      if (!q_type_key %in% c("single_choice", "multi_choice")) {
+        return(list(
+          valid = FALSE,
+          message = paste0("'", spec, "' is only valid for Single_Choice or Multi_Choice questions, not ", question_type)
+        ))
+      }
+      next
+    }
+
+    # Check for option specs (multi_mention)
+    if (grepl("^option:", spec_lower)) {
+      if (!q_type_key %in% c("multi_choice", "multi_mention")) {
+        return(list(
+          valid = FALSE,
+          message = paste0("'", spec, "' is only valid for Multi_Choice or Multi_Mention questions, not ", question_type)
+        ))
+      }
+      next
+    }
+
+    # If we get here, spec is invalid
+    return(list(
+      valid = FALSE,
+      message = paste0("Invalid spec '", spec, "' for question type ", question_type,
+                       ". Valid options: ", paste(valid_for_type, collapse = ", "),
+                       ", or pattern-based specs (range:, category:, option:)")
+    ))
+  }
+
+  # All specs valid
+  return(list(valid = TRUE, message = ""))
+}
