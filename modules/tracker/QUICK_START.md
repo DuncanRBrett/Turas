@@ -212,6 +212,77 @@ Now you know both average AND % satisfied!
 
 ---
 
+## Wave History Report Format ⭐
+
+**New in Version 2.0: Multiple output formats!**
+
+### What is Wave History Format?
+
+**Compact, executive-friendly layout:**
+- One row per question (or per metric)
+- Columns: QuestionCode | Question | Type | Wave 1 | Wave 2 | ... | Wave N
+- All questions on one sheet (vs. one sheet per question)
+- Best for: Quick overview, presentations, executive dashboards
+
+### How to Enable
+
+**Add to Settings sheet:**
+```
+SettingName   | SettingValue
+report_types  | detailed,wave_history
+```
+
+**Options:**
+- `detailed` - Detailed format only (default)
+- `wave_history` - Wave History format only
+- `detailed,wave_history` - Generate both
+
+### Output Files
+
+**If both formats specified:**
+```
+ProjectName_Tracker_20251121.xlsx         (detailed - full analysis)
+ProjectName_WaveHistory_20251121.xlsx     (wave history - compact)
+```
+
+### Example Output
+
+**Wave History Sheet:**
+```
+QuestionCode | Question           | Type      | W1  | W2  | W3
+Q38          | Satisfaction      | Mean      | 8.2 | 8.4 | 8.6
+Q38          | Satisfaction      | Top 2 Box | 72  | 75  | 78
+Q39          | Recommend         | % Yes     | 68  | 71  | 74
+Q20          | NPS               | NPS       | 32  | 35  | 38
+```
+
+**With Banners:**
+- One sheet per segment (Total, Male, Female, etc.)
+- Same layout for each segment
+
+### When to Use
+
+**✅ Use Wave History for:**
+- Executive presentations
+- Quick trend scanning
+- PowerPoint tables
+- Client executive summaries
+
+**✅ Use Detailed for:**
+- Statistical analysis
+- Significance testing
+- Technical reports
+- Deep investigation
+
+**✅ Generate Both when:**
+- Serving multiple audiences
+- Need both overview and detail
+- Creating comprehensive deliverables
+
+**See USER_MANUAL.md Section 6 for complete Wave History documentation.**
+
+---
+
 ## Understanding Trend Indicators
 
 ### Symbols

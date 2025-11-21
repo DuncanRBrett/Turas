@@ -13,16 +13,17 @@
 3. [Understanding Tracking Studies](#understanding-tracking-studies)
 4. [Configuration Guide](#configuration-guide)
 5. [TrackingSpecs - Custom Metrics](#trackingspecs---custom-metrics) **⭐ NEW**
-6. [Question Types](#question-types)
-7. [Wave Management](#wave-management)
-8. [Question Mapping](#question-mapping)
-9. [Trend Calculation](#trend-calculation)
-10. [Banner Analysis](#banner-analysis)
-11. [Output Interpretation](#output-interpretation)
-12. [Advanced Features](#advanced-features)
-13. [Troubleshooting](#troubleshooting)
-14. [Best Practices](#best-practices)
-15. [FAQ](#faq)
+6. [Report Types and Wave History Format](#report-types-and-wave-history-format) **⭐ NEW**
+7. [Question Types](#question-types)
+8. [Wave Management](#wave-management)
+9. [Question Mapping](#question-mapping)
+10. [Trend Calculation](#trend-calculation)
+11. [Banner Analysis](#banner-analysis)
+12. [Output Interpretation](#output-interpretation)
+13. [Advanced Features](#advanced-features)
+14. [Troubleshooting](#troubleshooting)
+15. [Best Practices](#best-practices)
+16. [FAQ](#faq)
 
 ---
 
@@ -901,6 +902,343 @@ Top 2 Box %: 125%  ← WRONG
 - Check your data doesn't have values outside expected range
 - Verify scale (1-5 vs 0-5 makes a difference)
 - Look at distribution to see actual values in data
+
+---
+
+## Report Types and Wave History Format
+
+### Overview
+
+Turas Tracker supports multiple output formats to serve different audiences and use cases:
+
+**1. Detailed Format (default)**
+- One sheet per question with full trend analysis
+- Wave-to-wave changes, significance testing, confidence intervals
+- Distribution tables, sample sizes, statistical detail
+- Best for: Analysts, detailed investigation, technical reports
+
+**2. Wave History Format (new in v2.0)**
+- One sheet per segment with all questions
+- Compact layout: one row per question/metric
+- Columns: QuestionCode | Question | Type | Wave 1 | Wave 2 | ... | Wave N
+- Best for: Executives, quick overview, presentations
+
+You can generate **detailed only**, **wave history only**, or **both simultaneously**.
+
+---
+
+### Configuring Report Types
+
+Add to your **Settings** sheet:
+
+```
+SettingName   | SettingValue
+report_types  | detailed,wave_history
+```
+
+**Valid Options:**
+
+| Setting Value | Output Generated | Use When |
+|---------------|------------------|----------|
+| `detailed` | Detailed format only (default) | Standard analysis, technical reports |
+| `wave_history` | Wave History format only | Executive dashboards, presentations |
+| `detailed,wave_history` | Both formats | Serve multiple stakeholders |
+
+**If omitted:** Defaults to `detailed` (backward compatible).
+
+---
+
+### Wave History Format Specification
+
+#### Sheet Structure
+
+**Without Banners:**
+- Single sheet: "Total"
+
+**With Banners:**
+- One sheet per segment
+- First sheet: "Total" (total sample)
+- Subsequent sheets: Each banner segment (e.g., "Male", "Female", "18-34", "35+")
+
+#### Column Layout
+
+```
+QuestionCode | Question                    | Type      | W1   | W2   | W3   | W4
+Q02          | Overall satisfaction (1-10) | Mean      | 8.2  | 8.4  | 8.6  | 8.8
+Q05          | Would recommend             | % Yes     | 67   | 70   | 72   | 75
+Q20          | Net Promoter Score          | NPS       | 32   | 35   | 38   | 41
+```
+
+**Column Definitions:**
+- **QuestionCode**: Question identifier
+- **Question**: Question text
+- **Type**: Metric type (Mean, Top Box, % Yes, NPS, etc.)
+- **Wave columns**: One per wave showing metric value
+
+#### Numeric Formatting
+
+Wave History respects your configuration settings:
+- **decimal_places_ratings**: Number of decimal places (e.g., 1 → 8.2)
+- **decimal_separator**: Decimal separator (. or ,)
+- Missing data shows as blank cells (not 0 or NA)
+
+---
+
+### How TrackingSpecs Work with Wave History
+
+#### Single Metric Questions
+
+Questions without TrackingSpecs or with single metric show **one row**:
+
+```
+QuestionCode | QuestionType | TrackingSpecs
+Q02          | Rating       |                (blank - defaults to mean)
+```
+
+**Wave History:**
+```
+QuestionCode | Question           | Type | W1  | W2  | W3
+Q02          | Overall satisfaction | Mean | 8.2 | 8.4 | 8.6
+```
+
+#### Multiple Metrics Questions
+
+Questions with multiple TrackingSpecs show **one row per metric**:
+
+```
+QuestionCode | QuestionType | TrackingSpecs
+Q38          | Rating       | mean,top2_box
+```
+
+**Wave History:**
+```
+QuestionCode | Question           | Type      | W1  | W2  | W3
+Q38          | Satisfaction      | Mean      | 8.2 | 8.4 | 8.6
+Q38          | Satisfaction      | Top 2 Box | 72  | 75  | 78
+```
+
+#### Multi-Mention Questions
+
+Multi-mention questions show **one row per tracked option**:
+
+```
+QuestionCode | QuestionType  | TrackingSpecs
+Q15          | Multi_Mention | auto
+```
+
+**Wave History:**
+```
+QuestionCode | Question      | Type          | W1 | W2 | W3
+Q15          | Features used | % Feature_1   | 45 | 48 | 50
+Q15          | Features used | % Feature_2   | 32 | 35 | 38
+Q15          | Features used | % Feature_3   | 18 | 20 | 22
+```
+
+---
+
+### Output File Naming
+
+**Single Report Type:**
+```
+ProjectName_Tracker_20251121.xlsx          (if report_types = detailed)
+ProjectName_WaveHistory_20251121.xlsx      (if report_types = wave_history)
+```
+
+**Multiple Report Types:**
+```
+ProjectName_Tracker_20251121.xlsx          (detailed format)
+ProjectName_WaveHistory_20251121.xlsx      (wave history format)
+```
+
+Files are saved to:
+1. Directory specified in `output_dir` setting, OR
+2. Same directory as tracking configuration file (default)
+
+---
+
+### Use Cases
+
+#### Use Case 1: Executive Dashboard
+
+**Setup:**
+```
+SettingName   | SettingValue
+report_types  | detailed,wave_history
+```
+
+**Workflow:**
+- Analysts use **detailed** report for full investigation
+- Share **wave history** with executives for quick overview
+- No need to manually create summary - it's automatic
+
+#### Use Case 2: Client Deliverable
+
+**Setup:**
+```
+SettingName   | SettingValue
+report_types  | detailed,wave_history
+```
+
+**Deliverable:**
+- **Detailed report**: Full technical appendix with methodology
+- **Wave history**: Executive summary in clean, scannable format
+- Both generated from same analysis ensuring consistency
+
+#### Use Case 3: Presentation Preparation
+
+**Setup:**
+```
+SettingName   | SettingValue
+report_types  | wave_history
+```
+
+**Workflow:**
+- Generate wave history only for speed
+- Copy data directly into PowerPoint tables
+- Easy to scan for interesting trends to highlight
+- Create simplified charts from wave columns
+
+---
+
+### Comparing Formats
+
+**Example: Q38 Overall Satisfaction with TrackingSpecs="mean,top2_box"**
+
+#### Detailed Format Output
+
+**Sheet: Q38**
+```
+Q38: Overall satisfaction (1-10)
+
+Metric         | Wave 1 | Wave 2 | Wave 3 | Change W2→W3
+─────────────────────────────────────────────────────────
+Mean           | 8.2    | 8.4    | 8.6    | +0.2↑
+Top 2 Box %    | 72     | 75     | 78     | +3↑
+Sample Size(n) | 500    | 500    | 500    |
+
+Wave-over-Wave Changes:
+Comparison     | From | To  | Change | % Change | Significant
+W1 → W2 (mean) | 8.2  | 8.4 | +0.2   | +2.4%    | Yes
+W2 → W3 (mean) | 8.4  | 8.6 | +0.2   | +2.4%    | Yes
+...
+```
+
+#### Wave History Format Output
+
+**Sheet: Total**
+```
+QuestionCode | Question           | Type      | Wave 1 | Wave 2 | Wave 3
+Q38          | Overall satisfaction | Mean      | 8.2    | 8.4    | 8.6
+Q38          | Overall satisfaction | Top 2 Box | 72     | 75     | 78
+Q39          | Likelihood to...   | Mean      | 7.5    | 7.8    | 8.0
+Q40          | Would recommend    | % Yes     | 68     | 71     | 74
+```
+
+**Differences:**
+- Wave History: All questions on one sheet vs. one sheet per question
+- Wave History: No change indicators, significance flags
+- Wave History: More scannable for quick comparison
+- Detailed: Full statistical context and methodology
+
+---
+
+### Best Practices
+
+**✅ DO:**
+- Generate both formats for comprehensive reporting
+- Use wave history for executive presentations
+- Use detailed format for technical analysis
+- Set consistent decimal_places across both formats
+- Review wave history to quickly identify trends for deeper dive
+
+**❌ DON'T:**
+- Rely solely on wave history for statistical decisions (use detailed for significance)
+- Mix decimal separators between formats (set once in Settings)
+- Manually create summaries when wave history can auto-generate them
+- Forget to update report_types when switching audiences
+
+---
+
+### Example Configuration
+
+**Complete Settings for Both Report Types:**
+
+```
+SettingName              | SettingValue
+project_name             | Q4 2024 Brand Tracking
+report_types             | detailed,wave_history
+output_dir               | /Users/username/Tracking_Reports
+decimal_places_ratings   | 1
+decimal_places_nps       | 0
+decimal_separator        | .
+show_significance        | TRUE
+confidence_level         | 0.95
+```
+
+**Example Question Mapping:**
+
+```
+QuestionCode | QuestionType | TrackingSpecs   | Wave1 | Wave2 | Wave3
+Q02          | Rating       | mean            | Q02   | Q02   | Q02
+Q38          | Rating       | mean,top2_box   | Q38   | Q38A  | Q38B
+Q05          | Single       |                 | Q05   | Q05   | Q05C
+Q20          | NPS          |                 | Q20   | Q20   | Q20
+Comp_Sat     | Composite    | mean            | -     | -     | -
+```
+
+**Result:**
+- Both detailed and wave history reports generated
+- Q38 shows two rows in wave history (mean + top2_box)
+- All numeric values formatted with 1 decimal place (except NPS which uses 0)
+- Files saved to specified output_dir
+
+---
+
+### Troubleshooting Wave History
+
+**Issue: Wave history file not generated**
+
+```
+Only seeing detailed report, no wave history file
+```
+
+**Solution:**
+- Check Settings sheet has `report_types` setting
+- Verify value includes "wave_history" (case-insensitive)
+- Check console output for errors during wave history generation
+
+**Issue: Wrong metrics showing in wave history**
+
+```
+Expected top2_box but seeing mean
+```
+
+**Solution:**
+- Verify TrackingSpecs column in question mapping includes "top2_box"
+- Check question_metadata has correct specs for that question
+- Review console output for TrackingSpecs parsing messages
+
+**Issue: Too many/too few rows for multi-mention question**
+
+```
+Q15 should show 5 options but only showing 3
+```
+
+**Solution:**
+- Verify column naming matches pattern: Q15_1, Q15_2, etc.
+- Check data files have all expected columns across all waves
+- Ensure QuestionType is "Multi_Mention" with TrackingSpecs="auto"
+
+**Issue: Missing banner segments in wave history**
+
+```
+Wave history only has Total sheet, not Male/Female
+```
+
+**Solution:**
+- Verify you ran with `use_banners = TRUE`
+- Check Banner sheet exists in tracking config
+- Ensure banner segments calculated correctly (check detailed report first)
 
 ---
 
