@@ -1056,7 +1056,8 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
           # Get significance
           sig_key <- paste0(change$from_wave, "_vs_", change$to_wave)
           sig_test <- sig_tests[[sig_key]]
-          is_sig <- !is.null(sig_test) && !is.na(sig_test$significant) && sig_test$significant
+          # Use isTRUE() to safely handle NA/NULL cases
+          is_sig <- isTRUE(!is.null(sig_test) && !is.na(sig_test$significant) && sig_test$significant)
 
           # Write label
           openxlsx::writeData(wb, sheet_name, comparison_label,
@@ -1095,7 +1096,7 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
           openxlsx::addStyle(wb, sheet_name, number_style,
                             rows = current_row, cols = 2:5, gridExpand = TRUE, stack = TRUE)
 
-          # Style based on significance
+          # Style based on significance (is_sig is now guaranteed to be TRUE or FALSE)
           if (is_sig) {
             openxlsx::addStyle(wb, sheet_name, styles$significant,
                               rows = current_row, cols = 4:5, gridExpand = TRUE, stack = TRUE)
