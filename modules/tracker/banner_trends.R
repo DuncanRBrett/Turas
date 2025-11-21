@@ -188,21 +188,33 @@ calculate_trend_for_segment <- function(q_code, question_map, wave_data, config,
     return(NULL)
   }
 
-  # Route to appropriate calculator based on question type
-  q_type <- metadata$QuestionType
+  # Normalize question type to internal standard
+  q_type_raw <- metadata$QuestionType
+  q_type <- normalize_question_type(q_type_raw)
 
+  # Route to appropriate calculator based on question type
   trend_result <- tryCatch({
-    if (q_type == "Rating") {
-      calculate_rating_trend(q_code, question_map, wave_data, config)
-    } else if (q_type == "NPS") {
+    if (q_type == "rating") {
+      # Use enhanced version (supports TrackingSpecs, backward compatible)
+      calculate_rating_trend_enhanced(q_code, question_map, wave_data, config)
+    } else if (q_type == "nps") {
       calculate_nps_trend(q_code, question_map, wave_data, config)
-    } else if (q_type == "SingleChoice") {
+    } else if (q_type == "single_choice") {
       calculate_single_choice_trend(q_code, question_map, wave_data, config)
-    } else if (q_type == "Index") {
-      calculate_rating_trend(q_code, question_map, wave_data, config)
-    } else if (q_type == "Composite") {
-      calculate_composite_trend(q_code, question_map, wave_data, config)
+    } else if (q_type == "multi_choice" || q_type_raw == "Multi_Mention") {
+      # Multi-mention support (Enhancement Phase 2)
+      calculate_multi_mention_trend(q_code, question_map, wave_data, config)
+    } else if (q_type == "composite") {
+      # Use enhanced version (supports TrackingSpecs, backward compatible)
+      calculate_composite_trend_enhanced(q_code, question_map, wave_data, config)
+    } else if (q_type == "open_end") {
+      warning(paste0("  Open-end questions cannot be tracked - skipping"))
+      NULL
+    } else if (q_type == "ranking") {
+      warning(paste0("  Ranking questions not yet supported in tracker - skipping"))
+      NULL
     } else {
+      warning(paste0("  Question type '", q_type_raw, "' not supported - skipping"))
       NULL
     }
   }, error = function(e) {
