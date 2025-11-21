@@ -173,13 +173,82 @@ run_tracker <- function(tracking_config_path,
   message("\n[8/8] GENERATING OUTPUT")
   message("================================================================================")
 
-  output_file <- write_tracker_output(
-    trend_results = trend_results,
-    config = config,
-    wave_data = wave_data,
-    output_path = output_path,
-    banner_segments = banner_segments
-  )
+  # Check report_types setting to determine which outputs to generate
+  report_types_setting <- get_setting(config, "report_types", default = "detailed")
+
+  # Parse comma-separated list and trim whitespace
+  report_types <- trimws(strsplit(report_types_setting, ",")[[1]])
+
+  # Validate report types
+  valid_types <- c("detailed", "wave_history")
+  invalid_types <- setdiff(report_types, valid_types)
+  if (length(invalid_types) > 0) {
+    warning(paste0("Invalid report types ignored: ", paste(invalid_types, collapse = ", ")))
+    report_types <- intersect(report_types, valid_types)
+  }
+
+  # If no valid types, default to detailed
+  if (length(report_types) == 0) {
+    report_types <- "detailed"
+    message("  No valid report types specified, defaulting to 'detailed'")
+  }
+
+  message(paste0("  Report types to generate: ", paste(report_types, collapse = ", ")))
+
+  # Generate outputs based on report types
+  output_files <- list()
+
+  if ("detailed" %in% report_types) {
+    # Generate detailed trend report
+    detailed_path <- if (length(report_types) > 1) {
+      # Multiple report types - use specific filename
+      output_dir <- if (!is.null(output_path)) {
+        dirname(output_path)
+      } else {
+        get_setting(config, "output_dir", default = dirname(config$config_path))
+      }
+      project_name <- get_setting(config, "project_name", default = "Tracking")
+      project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
+      file.path(output_dir, paste0(project_name, "_Tracker_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
+    } else {
+      # Single report type - use default output_path
+      output_path
+    }
+
+    output_files$detailed <- write_tracker_output(
+      trend_results = trend_results,
+      config = config,
+      wave_data = wave_data,
+      output_path = detailed_path,
+      banner_segments = banner_segments
+    )
+  }
+
+  if ("wave_history" %in% report_types) {
+    # Generate wave history report
+    wave_history_path <- if (length(report_types) > 1) {
+      # Multiple report types - use specific filename
+      output_dir <- if (!is.null(output_path)) {
+        dirname(output_path)
+      } else {
+        get_setting(config, "output_dir", default = dirname(config$config_path))
+      }
+      project_name <- get_setting(config, "project_name", default = "Tracking")
+      project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
+      file.path(output_dir, paste0(project_name, "_WaveHistory_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
+    } else {
+      # Single report type - use default output_path or auto-generate
+      NULL  # Let write_wave_history_output handle it
+    }
+
+    output_files$wave_history <- write_wave_history_output(
+      trend_results = trend_results,
+      config = config,
+      wave_data = wave_data,
+      output_path = wave_history_path,
+      banner_segments = banner_segments
+    )
+  }
 
 
   # ============================================================================
@@ -198,12 +267,25 @@ run_tracker <- function(tracking_config_path,
   message("✓ Question mapping indexed")
   message("✓ Wave data loaded")
   message(paste0("✓ Trends calculated for ", length(trend_results), " questions"))
-  message(paste0("✓ Output written to: ", output_file))
+
+  # Display output files
+  if (length(output_files) > 0) {
+    message("✓ Output files generated:")
+    for (report_type in names(output_files)) {
+      message(paste0("  - ", report_type, ": ", output_files[[report_type]]))
+    }
+  }
+
   message("")
   message("================================================================================\n")
 
-  # Return output file path
-  return(output_file)
+  # Return output file path(s)
+  # If single output, return as character; if multiple, return as named list
+  if (length(output_files) == 1) {
+    return(output_files[[1]])
+  } else {
+    return(output_files)
+  }
 }
 
 

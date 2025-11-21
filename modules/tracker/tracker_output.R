@@ -1687,3 +1687,316 @@ write_multi_mention_trend_table <- function(wb, sheet_name, result, wave_ids, co
 
   return(current_row)
 }
+
+
+# ==============================================================================
+# WAVE HISTORY REPORT FORMAT
+# ==============================================================================
+
+#' Write Wave History Output to Excel
+#'
+#' Creates Wave History format Excel workbook with one row per question.
+#' Format: QuestionCode | Question | Type | Wave 1 | Wave 2 | ... | Wave N
+#'
+#' @param trend_results List. Trend results from calculate_all_trends() or calculate_trends_with_banners()
+#' @param config Configuration object
+#' @param wave_data List of wave data frames
+#' @param output_path Character. Path for output file
+#' @param banner_segments List. Banner segment definitions (optional)
+#' @return Character. Path to created file
+#'
+#' @export
+write_wave_history_output <- function(trend_results, config, wave_data, output_path = NULL, banner_segments = NULL) {
+
+  message("\n================================================================================")
+  message("WRITING WAVE HISTORY EXCEL OUTPUT")
+  message("================================================================================\n")
+
+  # Detect if results have banner breakouts
+  has_banners <- detect_banner_results(trend_results)
+
+  if (has_banners) {
+    message("  Detected banner breakout results")
+  }
+
+  # Determine output path
+  if (is.null(output_path)) {
+    # Get output directory from settings or use config file location
+    output_dir <- get_setting(config, "output_dir", default = NULL)
+
+    if (is.null(output_dir)) {
+      # Default to same directory as config file
+      output_dir <- dirname(config$config_path)
+    }
+
+    # Generate filename
+    project_name <- get_setting(config, "project_name", default = "Tracking")
+    project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)  # Sanitize
+    filename <- paste0(project_name, "_WaveHistory_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+
+    # Combine directory and filename
+    output_path <- file.path(output_dir, filename)
+  }
+
+  message(paste0("Output file: ", output_path))
+
+  # Create workbook
+  wb <- openxlsx::createWorkbook()
+
+  # Create styles
+  styles <- create_tracker_styles()
+
+  # Get wave IDs for column headers
+  wave_ids <- config$waves$WaveID
+
+  # Write sheets based on result structure
+  if (has_banners) {
+    # Get segment names from first question's results
+    first_q_result <- trend_results[[1]]
+    segment_names <- names(first_q_result)
+
+    # Write one sheet per segment
+    for (seg_name in segment_names) {
+      write_wave_history_sheet(wb, seg_name, trend_results, wave_ids, config, styles, segment_filter = seg_name)
+    }
+  } else {
+    # Single "Total" sheet for simple results
+    write_wave_history_sheet(wb, "Total", trend_results, wave_ids, config, styles, segment_filter = NULL)
+  }
+
+  # Save workbook
+  message(paste0("\nSaving workbook..."))
+  openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+
+  message(paste0("✓ Wave History output written to: ", output_path))
+  message("================================================================================\n")
+
+  return(output_path)
+}
+
+
+#' Write Wave History Sheet
+#'
+#' Writes one sheet in Wave History format (one row per question/metric).
+#'
+#' @keywords internal
+write_wave_history_sheet <- function(wb, sheet_name, trend_results, wave_ids, config, styles, segment_filter = NULL) {
+
+  message(paste0("  Writing sheet: ", sheet_name))
+
+  # Create sheet
+  openxlsx::addWorksheet(wb, sheet_name)
+
+  current_row <- 1
+
+  # Header row 1: Segment label
+  segment_label <- if (sheet_name == "Total") {
+    "Total Sample"
+  } else {
+    paste0("Filter: ", sheet_name)
+  }
+
+  openxlsx::writeData(wb, sheet_name, segment_label,
+                      startRow = current_row, startCol = 1, colNames = FALSE)
+  openxlsx::addStyle(wb, sheet_name, styles$title, rows = current_row, cols = 1)
+  current_row <- current_row + 2
+
+  # Column headers: QuestionCode | Question | Type | Wave 1 | Wave 2 | ...
+  headers <- c("QuestionCode", "Question", "Type", wave_ids)
+  openxlsx::writeData(wb, sheet_name, t(headers),
+                      startRow = current_row, startCol = 1, colNames = FALSE)
+  openxlsx::addStyle(wb, sheet_name, styles$header,
+                    rows = current_row, cols = 1:length(headers), gridExpand = TRUE)
+  current_row <- current_row + 1
+
+  # Get decimal separator and decimal places
+  decimal_sep <- get_setting(config, "decimal_separator", default = ".")
+  decimal_places <- get_setting(config, "decimal_places_ratings", default = 1)
+  number_format <- create_excel_number_format(decimal_places, decimal_sep)
+
+  # Write data rows - one row per question/metric
+  for (q_code in names(trend_results)) {
+    # Get result for this question
+    q_result <- if (!is.null(segment_filter)) {
+      # Banner results: extract segment
+      trend_results[[q_code]][[segment_filter]]
+    } else {
+      # Simple results
+      trend_results[[q_code]]
+    }
+
+    # Skip if segment not available for this question
+    if (is.null(q_result)) {
+      next
+    }
+
+    # Extract metrics to track based on question type
+    metrics_to_track <- extract_wave_history_metrics(q_result)
+
+    # Write one row for each metric
+    for (metric_info in metrics_to_track) {
+      # Write QuestionCode
+      openxlsx::writeData(wb, sheet_name, q_result$question_code,
+                          startRow = current_row, startCol = 1, colNames = FALSE)
+
+      # Write Question text
+      openxlsx::writeData(wb, sheet_name, q_result$question_text,
+                          startRow = current_row, startCol = 2, colNames = FALSE)
+
+      # Write Type (metric label)
+      openxlsx::writeData(wb, sheet_name, metric_info$label,
+                          startRow = current_row, startCol = 3, colNames = FALSE)
+
+      # Extract wave values for this metric
+      wave_values <- numeric(length(wave_ids))
+      for (i in seq_along(wave_ids)) {
+        wave_id <- wave_ids[i]
+        wave_result <- q_result$wave_results[[wave_id]]
+
+        if (!is.null(wave_result) && wave_result$available) {
+          # Extract value based on metric type
+          value <- extract_metric_value(wave_result, metric_info$metric_key, q_result$metric_type)
+          wave_values[i] <- if (!is.na(value)) round(value, decimal_places) else NA_real_
+        } else {
+          wave_values[i] <- NA_real_
+        }
+      }
+
+      # Write wave values
+      openxlsx::writeData(wb, sheet_name, t(wave_values),
+                          startRow = current_row, startCol = 4, colNames = FALSE)
+
+      # Apply number format to wave columns
+      number_style <- openxlsx::createStyle(numFmt = number_format)
+      openxlsx::addStyle(wb, sheet_name, number_style,
+                        rows = current_row, cols = 4:(3 + length(wave_ids)), gridExpand = TRUE, stack = TRUE)
+
+      current_row <- current_row + 1
+    }
+  }
+
+  # Set column widths
+  openxlsx::setColWidths(wb, sheet_name, cols = 1, widths = 15)  # QuestionCode
+  openxlsx::setColWidths(wb, sheet_name, cols = 2, widths = 60)  # Question
+  openxlsx::setColWidths(wb, sheet_name, cols = 3, widths = 12)  # Type
+  openxlsx::setColWidths(wb, sheet_name, cols = 4:(3 + length(wave_ids)), widths = 12)  # Waves
+}
+
+
+#' Extract Wave History Metrics
+#'
+#' Determines which metrics to track for a question in Wave History format.
+#'
+#' @keywords internal
+extract_wave_history_metrics <- function(q_result) {
+  metrics <- list()
+
+  metric_type <- q_result$metric_type
+
+  if (metric_type == "rating_enhanced" || metric_type == "composite_enhanced") {
+    # Enhanced metrics - use tracking_specs
+    for (spec in q_result$tracking_specs) {
+      spec_lower <- tolower(trimws(spec))
+
+      # Skip distribution
+      if (spec_lower == "distribution") {
+        next
+      }
+
+      # Generate label
+      label <- if (spec_lower == "mean") {
+        "Mean"
+      } else if (spec_lower == "top_box") {
+        "Top Box"
+      } else if (spec_lower == "top2_box") {
+        "Top 2 Box"
+      } else if (spec_lower == "top3_box") {
+        "Top 3 Box"
+      } else if (spec_lower == "bottom_box") {
+        "Bottom Box"
+      } else if (spec_lower == "bottom2_box") {
+        "Bottom 2 Box"
+      } else if (startsWith(spec_lower, "range:")) {
+        paste0("% ", sub("range:", "", spec))
+      } else {
+        spec
+      }
+
+      metrics[[length(metrics) + 1]] <- list(
+        metric_key = spec_lower,
+        label = label
+      )
+    }
+
+  } else if (metric_type == "mean" || metric_type == "composite") {
+    # Simple mean
+    metrics[[1]] <- list(metric_key = "mean", label = "Mean")
+
+  } else if (metric_type == "nps") {
+    # NPS score
+    metrics[[1]] <- list(metric_key = "nps", label = "NPS")
+
+  } else if (metric_type == "proportions") {
+    # Proportions - track first response code (or all if multiple)
+    # For Wave History, typically track one specific category
+    # Use first response code as default
+    if (!is.null(q_result$response_codes) && length(q_result$response_codes) > 0) {
+      first_code <- q_result$response_codes[1]
+      metrics[[1]] <- list(
+        metric_key = paste0("proportion:", first_code),
+        label = paste0("% ", first_code)
+      )
+    }
+
+  } else if (metric_type == "multi_mention") {
+    # Multi-mention - track each column
+    if (!is.null(q_result$tracked_columns)) {
+      for (col_name in q_result$tracked_columns) {
+        metrics[[length(metrics) + 1]] <- list(
+          metric_key = paste0("mention:", col_name),
+          label = paste0("% ", col_name)
+        )
+      }
+    }
+  }
+
+  return(metrics)
+}
+
+
+#' Extract Metric Value from Wave Result
+#'
+#' Extracts the appropriate metric value from a wave result based on metric key.
+#'
+#' @keywords internal
+extract_metric_value <- function(wave_result, metric_key, question_metric_type) {
+
+  # Handle enhanced metrics (stored in metrics list)
+  if (question_metric_type == "rating_enhanced" || question_metric_type == "composite_enhanced") {
+    if (!is.null(wave_result$metrics) && !is.null(wave_result$metrics[[metric_key]])) {
+      return(wave_result$metrics[[metric_key]])
+    }
+  }
+
+  # Handle simple metrics
+  if (metric_key == "mean") {
+    return(wave_result$mean)
+  } else if (metric_key == "nps") {
+    return(wave_result$nps)
+  } else if (startsWith(metric_key, "proportion:")) {
+    # Extract proportion for specific response code
+    code <- sub("proportion:", "", metric_key)
+    if (!is.null(wave_result$proportions) && !is.null(wave_result$proportions[[code]])) {
+      return(wave_result$proportions[[code]])
+    }
+  } else if (startsWith(metric_key, "mention:")) {
+    # Extract mention proportion for specific column
+    col_name <- sub("mention:", "", metric_key)
+    if (!is.null(wave_result$mention_proportions) && !is.null(wave_result$mention_proportions[[col_name]])) {
+      return(wave_result$mention_proportions[[col_name]])
+    }
+  }
+
+  # Return NA if metric not found
+  return(NA_real_)
+}
