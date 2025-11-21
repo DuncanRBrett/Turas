@@ -1163,69 +1163,154 @@ write_change_summary_sheet <- function(wb, banner_results, config, styles) {
     if ("Total" %in% names(question_segments)) {
       total_result <- question_segments[["Total"]]
 
-      baseline_val <- NA
-      latest_val <- NA
+      # Determine which metrics to show
+      if (total_result$metric_type == "rating_enhanced" || total_result$metric_type == "composite_enhanced") {
+        # Enhanced metrics - write a row for each tracked metric
+        for (metric_spec in total_result$tracking_specs) {
+          metric_lower <- tolower(trimws(metric_spec))
 
-      # Get baseline and latest values
-      if (total_result$metric_type == "mean" || total_result$metric_type == "composite") {
-        if (total_result$wave_results[[baseline_wave]]$available) {
-          baseline_val <- total_result$wave_results[[baseline_wave]]$mean
+          # Skip distribution
+          if (metric_lower == "distribution") {
+            next
+          }
+
+          baseline_val <- NA
+          latest_val <- NA
+
+          # Get baseline and latest values from metrics list
+          if (total_result$wave_results[[baseline_wave]]$available) {
+            baseline_val <- total_result$wave_results[[baseline_wave]]$metrics[[metric_lower]]
+          }
+          if (total_result$wave_results[[latest_wave]]$available) {
+            latest_val <- total_result$wave_results[[latest_wave]]$metrics[[metric_lower]]
+          }
+
+          # Calculate change
+          abs_change <- NA
+          pct_change <- NA
+          if (!is.na(baseline_val) && !is.na(latest_val)) {
+            abs_change <- latest_val - baseline_val
+            if (baseline_val != 0) {
+              pct_change <- (abs_change / baseline_val) * 100
+            }
+          }
+
+          # Format metric name for display
+          display_metric <- if (metric_lower == "mean") {
+            "mean"
+          } else if (metric_lower == "top_box") {
+            "top_box"
+          } else if (metric_lower == "top2_box") {
+            "top2_box"
+          } else if (metric_lower == "top3_box") {
+            "top3_box"
+          } else if (startsWith(metric_lower, "range:")) {
+            metric_lower
+          } else {
+            metric_lower
+          }
+
+          # Write text columns
+          openxlsx::writeData(wb, "Change_Summary", total_result$question_text,
+                              startRow = current_row, startCol = 1, colNames = FALSE)
+          openxlsx::writeData(wb, "Change_Summary", display_metric,
+                              startRow = current_row, startCol = 2, colNames = FALSE)
+
+          # Write numeric values separately (rounded)
+          openxlsx::writeData(wb, "Change_Summary", round(baseline_val, decimal_places),
+                              startRow = current_row, startCol = 3, colNames = FALSE)
+          openxlsx::writeData(wb, "Change_Summary", round(latest_val, decimal_places),
+                              startRow = current_row, startCol = 4, colNames = FALSE)
+          openxlsx::writeData(wb, "Change_Summary", round(abs_change, decimal_places),
+                              startRow = current_row, startCol = 5, colNames = FALSE)
+          openxlsx::writeData(wb, "Change_Summary", round(pct_change, decimal_places),
+                              startRow = current_row, startCol = 6, colNames = FALSE)
+
+          # Apply number format to numeric columns (3-6)
+          number_style <- openxlsx::createStyle(numFmt = number_format)
+          openxlsx::addStyle(wb, "Change_Summary", number_style,
+                            rows = current_row, cols = 3:6, gridExpand = TRUE, stack = TRUE)
+
+          # Style change columns
+          change_style <- if (!is.na(abs_change) && abs_change > 0) {
+            styles$change_positive
+          } else if (!is.na(abs_change) && abs_change < 0) {
+            styles$change_negative
+          } else {
+            styles$data_number
+          }
+
+          openxlsx::addStyle(wb, "Change_Summary", change_style, rows = current_row, cols = 5:6, gridExpand = TRUE)
+
+          current_row <- current_row + 1
         }
-        if (total_result$wave_results[[latest_wave]]$available) {
-          latest_val <- total_result$wave_results[[latest_wave]]$mean
-        }
-      } else if (total_result$metric_type == "nps") {
-        if (total_result$wave_results[[baseline_wave]]$available) {
-          baseline_val <- total_result$wave_results[[baseline_wave]]$nps
-        }
-        if (total_result$wave_results[[latest_wave]]$available) {
-          latest_val <- total_result$wave_results[[latest_wave]]$nps
-        }
-      }
 
-      # Calculate change
-      abs_change <- NA
-      pct_change <- NA
-      if (!is.na(baseline_val) && !is.na(latest_val)) {
-        abs_change <- latest_val - baseline_val
-        if (baseline_val != 0) {
-          pct_change <- (abs_change / baseline_val) * 100
-        }
-      }
-
-      # Write text columns
-      openxlsx::writeData(wb, "Change_Summary", total_result$question_text,
-                          startRow = current_row, startCol = 1, colNames = FALSE)
-      openxlsx::writeData(wb, "Change_Summary", total_result$metric_type,
-                          startRow = current_row, startCol = 2, colNames = FALSE)
-
-      # Write numeric values separately (rounded)
-      openxlsx::writeData(wb, "Change_Summary", round(baseline_val, decimal_places),
-                          startRow = current_row, startCol = 3, colNames = FALSE)
-      openxlsx::writeData(wb, "Change_Summary", round(latest_val, decimal_places),
-                          startRow = current_row, startCol = 4, colNames = FALSE)
-      openxlsx::writeData(wb, "Change_Summary", round(abs_change, decimal_places),
-                          startRow = current_row, startCol = 5, colNames = FALSE)
-      openxlsx::writeData(wb, "Change_Summary", round(pct_change, decimal_places),
-                          startRow = current_row, startCol = 6, colNames = FALSE)
-
-      # Apply number format to numeric columns (3-6)
-      number_style <- openxlsx::createStyle(numFmt = number_format)
-      openxlsx::addStyle(wb, "Change_Summary", number_style,
-                        rows = current_row, cols = 3:6, gridExpand = TRUE, stack = TRUE)
-
-      # Style change columns
-      change_style <- if (!is.na(abs_change) && abs_change > 0) {
-        styles$change_positive
-      } else if (!is.na(abs_change) && abs_change < 0) {
-        styles$change_negative
       } else {
-        styles$data_number
+        # Legacy metric types (mean, composite, nps)
+        baseline_val <- NA
+        latest_val <- NA
+
+        # Get baseline and latest values
+        if (total_result$metric_type == "mean" || total_result$metric_type == "composite") {
+          if (total_result$wave_results[[baseline_wave]]$available) {
+            baseline_val <- total_result$wave_results[[baseline_wave]]$mean
+          }
+          if (total_result$wave_results[[latest_wave]]$available) {
+            latest_val <- total_result$wave_results[[latest_wave]]$mean
+          }
+        } else if (total_result$metric_type == "nps") {
+          if (total_result$wave_results[[baseline_wave]]$available) {
+            baseline_val <- total_result$wave_results[[baseline_wave]]$nps
+          }
+          if (total_result$wave_results[[latest_wave]]$available) {
+            latest_val <- total_result$wave_results[[latest_wave]]$nps
+          }
+        }
+
+        # Calculate change
+        abs_change <- NA
+        pct_change <- NA
+        if (!is.na(baseline_val) && !is.na(latest_val)) {
+          abs_change <- latest_val - baseline_val
+          if (baseline_val != 0) {
+            pct_change <- (abs_change / baseline_val) * 100
+          }
+        }
+
+        # Write text columns
+        openxlsx::writeData(wb, "Change_Summary", total_result$question_text,
+                            startRow = current_row, startCol = 1, colNames = FALSE)
+        openxlsx::writeData(wb, "Change_Summary", total_result$metric_type,
+                            startRow = current_row, startCol = 2, colNames = FALSE)
+
+        # Write numeric values separately (rounded)
+        openxlsx::writeData(wb, "Change_Summary", round(baseline_val, decimal_places),
+                            startRow = current_row, startCol = 3, colNames = FALSE)
+        openxlsx::writeData(wb, "Change_Summary", round(latest_val, decimal_places),
+                            startRow = current_row, startCol = 4, colNames = FALSE)
+        openxlsx::writeData(wb, "Change_Summary", round(abs_change, decimal_places),
+                            startRow = current_row, startCol = 5, colNames = FALSE)
+        openxlsx::writeData(wb, "Change_Summary", round(pct_change, decimal_places),
+                            startRow = current_row, startCol = 6, colNames = FALSE)
+
+        # Apply number format to numeric columns (3-6)
+        number_style <- openxlsx::createStyle(numFmt = number_format)
+        openxlsx::addStyle(wb, "Change_Summary", number_style,
+                          rows = current_row, cols = 3:6, gridExpand = TRUE, stack = TRUE)
+
+        # Style change columns
+        change_style <- if (!is.na(abs_change) && abs_change > 0) {
+          styles$change_positive
+        } else if (!is.na(abs_change) && abs_change < 0) {
+          styles$change_negative
+        } else {
+          styles$data_number
+        }
+
+        openxlsx::addStyle(wb, "Change_Summary", change_style, rows = current_row, cols = 5:6, gridExpand = TRUE)
+
+        current_row <- current_row + 1
       }
-
-      openxlsx::addStyle(wb, "Change_Summary", change_style, rows = current_row, cols = 5:6, gridExpand = TRUE)
-
-      current_row <- current_row + 1
     }
   }
 
