@@ -1,8 +1,9 @@
 # Turas Tracker - Quick Start Guide
 
-**Version:** 1.0
+**Version:** 2.0 (Enhanced with TrackingSpecs)
 **Estimated Time:** 15 minutes
 **Difficulty:** Intermediate
+**New in v2.0:** Custom metrics, top box tracking, multi-mention support
 
 ---
 
@@ -153,6 +154,61 @@ Base (weighted)      | 1,000   | 1,000   | 1,000   |
 Effective N          | 925     | 918     | 932     |
 Confidence Interval  | ±3.1%   | ±3.1%   | ±3.0%   |
 ```
+
+---
+
+## New in Version 2.0: TrackingSpecs ⭐
+
+**Track custom metrics for deeper insights!**
+
+### Quick Example
+
+Add a `TrackingSpecs` column to your question_mapping.xlsx:
+
+```
+QuestionCode | QuestionType | TrackingSpecs   | Wave1 | Wave2 | Wave3
+Q4_Satisfaction | Rating    | mean,top2_box   | Q4    | Q4    | Q4
+```
+
+**Result:** Track BOTH average satisfaction AND % highly satisfied (top 2 box)
+
+### Available Metrics
+
+**For Rating Questions (1-5, 1-10 scales):**
+- `mean` - Average rating
+- `top_box` - % giving highest rating
+- `top2_box` - % giving top 2 ratings
+- `top3_box` - % giving top 3 ratings
+- `range:X-Y` - % within custom range (e.g., range:9-10)
+
+**For Multi-Mention Questions:**
+- `auto` - Auto-detect and track all options
+- `option:COL` - Track specific option
+- `any` - % selecting at least one
+
+### Why Use TrackingSpecs?
+
+**Traditional (without TrackingSpecs):**
+```
+Q4 Satisfaction: Mean = 4.1 (on 1-5 scale)
+```
+Tells you average satisfaction but not how many are really satisfied.
+
+**Enhanced (with TrackingSpecs="mean,top2_box"):**
+```
+Q4 Satisfaction:
+- Mean = 4.1
+- Top 2 Box = 72% (rated 4 or 5)
+```
+Now you know both average AND % satisfied!
+
+**Example Use Cases:**
+- Track mean NPS + % promoters
+- Monitor average satisfaction + % highly satisfied
+- Track multiple top box metrics (top box, top 2, top 3)
+- Auto-detect multi-select question options
+
+**See USER_MANUAL.md Section 5 for complete TrackingSpecs documentation.**
 
 ---
 
@@ -396,4 +452,9 @@ Satisfaction (1-5) 3.8     | 3.9     | 4.1↑    | Improving ↑
 
 **Congratulations!** You're now tracking metrics across waves with statistical rigor.
 
-*Version 1.0.0 | Quick Start | Turas Tracker Module*
+**What's Next?**
+- Try adding TrackingSpecs to track custom metrics
+- See USER_MANUAL.md for comprehensive documentation
+- Check EXAMPLE_WORKFLOWS.md for advanced scenarios
+
+*Version 2.0.0 | Quick Start | Turas Tracker Module | Last Updated: 2025-11-21*

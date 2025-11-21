@@ -1,7 +1,7 @@
 # Turas Tracker - User Manual
 
-**Version:** 1.0 (MVT - Minimum Viable Tracker)
-**Last Updated:** 2025-11-18
+**Version:** 2.0 (Enhanced with TrackingSpecs)
+**Last Updated:** 2025-11-21
 **Target Audience:** Market Researchers, Data Analysts, Survey Managers
 
 ---
@@ -12,16 +12,17 @@
 2. [Getting Started](#getting-started)
 3. [Understanding Tracking Studies](#understanding-tracking-studies)
 4. [Configuration Guide](#configuration-guide)
-5. [Question Types](#question-types)
-6. [Wave Management](#wave-management)
-7. [Question Mapping](#question-mapping)
-8. [Trend Calculation](#trend-calculation)
-9. [Banner Analysis](#banner-analysis)
-10. [Output Interpretation](#output-interpretation)
-11. [Advanced Features](#advanced-features)
-12. [Troubleshooting](#troubleshooting)
-13. [Best Practices](#best-practices)
-14. [FAQ](#faq)
+5. [TrackingSpecs - Custom Metrics](#trackingspecs---custom-metrics) **⭐ NEW**
+6. [Question Types](#question-types)
+7. [Wave Management](#wave-management)
+8. [Question Mapping](#question-mapping)
+9. [Trend Calculation](#trend-calculation)
+10. [Banner Analysis](#banner-analysis)
+11. [Output Interpretation](#output-interpretation)
+12. [Advanced Features](#advanced-features)
+13. [Troubleshooting](#troubleshooting)
+14. [Best Practices](#best-practices)
+15. [FAQ](#faq)
 
 ---
 
@@ -265,6 +266,7 @@ Q06_PurchaseIntent | Purchase intent next 3 months       | proportion
 
 | Setting | Description | Default |
 |---------|-------------|---------|
+| output_dir | Directory for output file | Same as config file location |
 | trend_significance | Show trend indicators (TRUE/FALSE) | TRUE |
 | decimal_places_proportion | Decimals for proportions | 0 |
 | decimal_places_mean | Decimals for means | 1 |
@@ -277,12 +279,31 @@ Q06_PurchaseIntent | Purchase intent next 3 months       | proportion
 SettingName              | SettingValue
 project_name             | Q4 2024 Brand Tracking
 output_file              | Q4_Brand_Tracking_Results.xlsx
+output_dir               | /Users/duncan/Reports
 confidence_level         | 0.95
 min_base_size            | 30
 trend_significance       | TRUE
 decimal_places_proportion| 0
 decimal_places_mean      | 2
 show_sample_sizes        | TRUE
+```
+
+**Output Location (New in v2.0):**
+
+By default, the tracker places output files in the same directory as your tracking_config.xlsx file. You can customize this with the `output_dir` setting:
+
+**Examples:**
+```
+# Default (no output_dir specified)
+→ Output goes to same folder as tracking_config.xlsx
+
+# Absolute path
+output_dir | /Users/duncan/Reports
+→ Output goes to /Users/duncan/Reports/
+
+# Relative path (relative to tracking_config.xlsx location)
+output_dir | ../Reports
+→ Output goes to Reports folder one level up from config
 ```
 
 ### Complete Configuration Example
@@ -313,6 +334,573 @@ output_file        | results.xlsx
 confidence_level   | 0.95
 min_base_size      | 30
 ```
+
+---
+
+## TrackingSpecs - Custom Metrics
+
+### Overview
+
+**TrackingSpecs** is a powerful enhancement that lets you customize which metrics are tracked for each question, rather than being limited to default metrics.
+
+**Key Benefits:**
+- Track multiple metrics for a single question (e.g., both mean AND top 2 box %)
+- Calculate "top box" and "bottom box" percentages for rating scales
+- Track specific response ranges (e.g., % rating 9-10 on 0-10 scale)
+- Auto-detect and track multi-mention questions
+- Apply enhanced metrics to composite scores
+
+**Version:** Introduced in Tracker 2.0 (2025-11-21)
+
+### Quick Example
+
+**Before TrackingSpecs** (default behavior):
+```
+Q38 Satisfaction (1-10 scale)
+- Only tracks Mean score (e.g., 8.2)
+```
+
+**With TrackingSpecs:**
+```
+Q38 Satisfaction (1-10 scale)  |  TrackingSpecs: mean,top2_box
+- Tracks Mean score (e.g., 8.2)
+- PLUS Top 2 Box % (e.g., 67% rating 9-10)
+```
+
+This gives you deeper insights into both average satisfaction AND the percentage who are highly satisfied.
+
+---
+
+### Adding TrackingSpecs to Your Configuration
+
+#### Step 1: Add TrackingSpecs Column to Question Mapping
+
+Your question_mapping.xlsx file needs a new column called **TrackingSpecs**.
+
+**Location:** Add it anywhere in the QuestionMap sheet (typically after QuestionType)
+
+**Example Structure:**
+```
+QuestionCode | QuestionText                  | QuestionType | TrackingSpecs   | Wave1 | Wave2 | Wave3
+Q38          | Satisfaction (1-10)           | Rating       | mean,top2_box   | Q38   | Q38   | Q38
+Q41          | Service Quality (1-5)         | Rating       | mean,top_box    | Q41   | Q41   | Q41
+Q30          | Purchase Motivations          | Multi_Mention| auto            | Q30   | Q30   | Q30
+Q05          | Brand Awareness               | SingleChoice |                 | Q05   | Q05   | Q05
+```
+
+**Important Notes:**
+- Column name must be exactly **TrackingSpecs** (case-sensitive)
+- Leave blank for questions where you want default behavior
+- Multiple specs separated by commas (no spaces): `mean,top2_box`
+
+#### Step 2: That's It!
+
+No other configuration changes needed. The tracker will automatically:
+1. Detect the TrackingSpecs column
+2. Parse the specifications for each question
+3. Calculate the requested metrics
+4. Display all metrics in output sheets
+
+---
+
+### Enhanced Metrics for Rating Questions
+
+Rating questions (1-5 scales, 1-10 scales, etc.) now support these metrics:
+
+#### Available Metrics
+
+| Metric | Description | Example (1-10 scale) |
+|--------|-------------|----------------------|
+| **mean** | Average rating | 8.2 |
+| **top_box** | % giving highest rating | % rating 10 |
+| **top2_box** | % giving top 2 ratings | % rating 9-10 |
+| **top3_box** | % giving top 3 ratings | % rating 8-10 |
+| **bottom_box** | % giving lowest rating | % rating 1 |
+| **bottom2_box** | % giving bottom 2 ratings | % rating 1-2 |
+| **range:X-Y** | % within custom range | range:9-10 (same as top2_box for 1-10 scale) |
+| **distribution** | Full distribution table | Shows % for each rating value |
+
+#### Scale Auto-Detection
+
+The tracker automatically detects your scale from the data:
+- **1-5 scale:** top_box = % rating 5, top2_box = % rating 4-5
+- **1-10 scale:** top_box = % rating 10, top2_box = % rating 9-10
+- **0-10 scale:** top_box = % rating 10, top2_box = % rating 9-10
+- **Any scale:** Works with any numeric rating scale
+
+#### Usage Examples
+
+**Example 1: Track mean + top 2 box**
+```
+QuestionCode | QuestionType | TrackingSpecs
+Q38          | Rating       | mean,top2_box
+```
+
+**Output:**
+```
+Q38: How satisfied are you? (1-10 scale)
+
+Metric          W22     W23     W24
+Mean            8.20    8.03    8.27
+Top 2 Box %     67.0    64.0    70.0
+Sample Size     60      60      60
+```
+
+**Example 2: Track all top box metrics**
+```
+QuestionCode | QuestionType | TrackingSpecs
+Q41          | Rating       | mean,top_box,top2_box,top3_box
+```
+
+**Output:**
+```
+Q41: Service Quality (1-5 scale)
+
+Metric          Wave 1  Wave 2  Wave 3
+Mean            3.8     4.1     4.3
+Top Box %       25%     30%     35%
+Top 2 Box %     55%     60%     68%
+Top 3 Box %     80%     85%     90%
+Sample Size     500     500     500
+```
+
+**Example 3: Custom range tracking**
+```
+QuestionCode | QuestionType | TrackingSpecs
+Q42          | Rating       | mean,range:4-5
+```
+
+For a 1-5 scale, this tracks % rating 4 or 5 (satisfied/very satisfied).
+
+#### When to Use Each Metric
+
+**Use `mean`** when:
+- You want overall average performance
+- Scale has meaningful intervals (1-10 NPS, 1-5 satisfaction)
+- Need to track subtle shifts in average opinion
+
+**Use `top_box` when:**
+- Only the highest rating matters ("excellent" vs all others)
+- Measuring strong brand advocacy
+- Corporate KPIs focus on "% excellent"
+
+**Use `top2_box` when:**
+- Measuring general satisfaction (satisfied + very satisfied)
+- Industry standard is top 2 box reporting
+- Want to capture positive sentiment broadly
+
+**Use `range:X-Y` when:**
+- Need custom thresholds (e.g., range:7-10 for "acceptable")
+- Different from standard top box definitions
+- Specific business requirements
+
+---
+
+### Multi-Mention Question Support
+
+Multi-mention questions (also called "select all that apply" or checkbox questions) are now automatically detected and tracked.
+
+#### What Are Multi-Mention Questions?
+
+**Example:** "What features are important to you? (Select all that apply)"
+- Feature A: Price
+- Feature B: Quality
+- Feature C: Service
+- Feature D: Warranty
+
+**Data Structure:**
+```
+RespondentID | Q30_1 | Q30_2 | Q30_3 | Q30_4
+1            | 1     | 1     | 0     | 0
+2            | 0     | 1     | 1     | 1
+3            | 1     | 0     | 0     | 0
+```
+
+Where:
+- `Q30_1` = Selected Feature A (Price)
+- `Q30_2` = Selected Feature B (Quality)
+- etc.
+- 1 = selected, 0 = not selected
+
+#### Auto-Detection
+
+The tracker automatically detects multi-mention columns using the pattern: **`{QuestionCode}_{number}`**
+
+**Examples:**
+- `Q30_1`, `Q30_2`, `Q30_3`, ... → Auto-detected as Q30 options
+- `Q15_1`, `Q15_2`, `Q15_10`, ... → Auto-detected as Q15 options (numeric sorting handles Q15_10 after Q15_2)
+
+#### Configuration
+
+**Option 1: Auto-detect all options (recommended)**
+```
+QuestionCode | QuestionType  | TrackingSpecs
+Q30          | Multi_Mention | auto
+```
+
+This automatically finds and tracks ALL Q30_* columns.
+
+**Output:**
+```
+Q30: Important Features (Select all that apply)
+
+Option              Wave 1  Wave 2  Wave 3
+Price (Q30_1)       65%     68%     72%
+Quality (Q30_2)     80%     82%     85%
+Service (Q30_3)     45%     48%     50%
+Warranty (Q30_4)    30%     28%     25%
+Sample Size         500     500     500
+```
+
+**Option 2: Track specific options**
+```
+QuestionCode | QuestionType  | TrackingSpecs
+Q30          | Multi_Mention | option:Q30_1,option:Q30_2
+```
+
+Tracks only Price and Quality, ignoring Service and Warranty.
+
+**Option 3: Track "any" mentions**
+```
+QuestionCode | QuestionType  | TrackingSpecs
+Q30          | Multi_Mention | auto,any
+```
+
+Adds an "Any" row showing % who selected at least one option.
+
+#### Advanced Multi-Mention Metrics
+
+**Track average number of mentions per respondent:**
+```
+QuestionCode | QuestionType  | TrackingSpecs
+Q30          | Multi_Mention | auto,count_mean
+```
+
+**Output includes:**
+```
+Mean Count: 2.3 → Respondents selected average of 2.3 options
+```
+
+---
+
+### Enhanced Composite Metrics
+
+Composite questions (calculated indices combining multiple questions) now support TrackingSpecs too.
+
+#### Example: Customer Satisfaction Index
+
+**Scenario:** Track composite satisfaction score made from 3 questions:
+- Q10: Product Satisfaction (1-5)
+- Q11: Service Satisfaction (1-5)
+- Q12: Value Satisfaction (1-5)
+
+**Configuration:**
+```
+QuestionCode   | QuestionType      | SourceQuestions     | TrackingSpecs
+Comp_Sat       | Composite         | Q10,Q11,Q12         | mean,top2_box
+```
+
+**What Happens:**
+1. Tracker calculates composite score (average of Q10, Q11, Q12)
+2. Applies TrackingSpecs to the composite:
+   - Calculates mean composite score
+   - Calculates % with top 2 box on composite (4-5 on rescaled composite)
+
+**Output:**
+```
+Overall Satisfaction Composite
+
+Metric          Wave 1  Wave 2  Wave 3
+Mean            4.1     4.3     4.5
+Top 2 Box %     72%     78%     82%
+Sample Size     500     500     500
+```
+
+#### Supported Composite Metrics
+
+Same as rating questions:
+- mean, top_box, top2_box, top3_box
+- bottom_box, bottom2_box
+- range:X-Y
+- distribution
+
+---
+
+### Complete TrackingSpecs Reference
+
+#### Syntax Rules
+
+**Format:** Comma-separated list (no spaces)
+```
+metric1,metric2,metric3
+```
+
+**Examples:**
+- `mean` → Single metric
+- `mean,top2_box` → Two metrics
+- `mean,top_box,top2_box,top3_box` → Four metrics
+
+**Case insensitive:** `mean` = `Mean` = `MEAN` (all work)
+
+#### Rating Question Specs
+
+| Spec | Description |
+|------|-------------|
+| `mean` | Average rating |
+| `top_box` | % in highest rating |
+| `top2_box` | % in top 2 ratings |
+| `top3_box` | % in top 3 ratings |
+| `bottom_box` | % in lowest rating |
+| `bottom2_box` | % in bottom 2 ratings |
+| `range:X-Y` | % in range X to Y (e.g., range:9-10) |
+| `distribution` | Full distribution table |
+
+#### Multi-Mention Specs
+
+| Spec | Description |
+|------|-------------|
+| `auto` | Auto-detect all options |
+| `option:COLNAME` | Track specific column (e.g., option:Q30_1) |
+| `any` | % selecting at least one option |
+| `count_mean` | Average number of options selected |
+| `count_distribution` | Distribution of mention counts |
+
+#### Composite Specs
+
+Same as Rating Question Specs (mean, top_box, etc.)
+
+#### NPS Questions
+
+TrackingSpecs **not supported** for NPS questions - NPS has fixed calculation (% Promoters - % Detractors).
+
+#### Single/Multi Choice
+
+TrackingSpecs **not needed** - these automatically track all options.
+
+---
+
+### Validation and Error Handling
+
+The tracker validates your TrackingSpecs before running:
+
+**Common Errors:**
+
+**Error: Invalid spec for question type**
+```
+Error: TrackingSpecs 'top2_box' not valid for question type 'NPS'
+```
+
+**Solution:** NPS questions don't support custom specs. Remove TrackingSpecs for NPS questions.
+
+**Error: Invalid range format**
+```
+Error: Invalid range format 'range:10'. Must be 'range:X-Y'
+```
+
+**Solution:** Use format `range:9-10` not `range:10`.
+
+**Error: Multi-mention columns not found**
+```
+Warning: No columns found matching pattern Q30_*
+```
+
+**Solution:** Check your data has columns like Q30_1, Q30_2, etc. Verify QuestionCode matches.
+
+---
+
+### Output File Changes
+
+#### Question Sheets
+
+With TrackingSpecs, question sheets show multiple metric rows:
+
+**Before (default):**
+```
+Q38 Satisfaction
+
+Metric      W22     W23     W24
+Mean        8.20    8.03    8.27
+Sample      60      60      60
+```
+
+**After (with TrackingSpecs="mean,top2_box"):**
+```
+Q38 Satisfaction
+
+Metric          W22     W23     W24
+Mean            8.20    8.03    8.27
+Top 2 Box %     67.0    64.0    70.0
+Sample Size     60      60      60
+```
+
+#### Banner Sheets
+
+Enhanced metrics work with banner breakouts too:
+
+```
+Q38 Satisfaction - By Gender
+
+Metric          W22_Total  W22_Male  W22_Female  W23_Total  W23_Male  W23_Female
+Mean            8.20       8.30      8.10        8.03       8.15      7.90
+Top 2 Box %     67.0       70.0      64.0        64.0       68.0      60.0
+Sample Size     60         30        30          60         30        30
+```
+
+#### Change Summary Sheet
+
+The Change Summary sheet shows separate rows for each tracked metric:
+
+```
+CHANGE SUMMARY - BASELINE COMPARISON
+
+Question            Metric      Baseline  Latest  Change   % Change
+Q38 Satisfaction    mean        8.20      8.27    +0.07    +0.9%
+Q38 Satisfaction    top2_box    67.0      70.0    +3.0     +4.5%
+```
+
+This lets you see which metrics improved most.
+
+---
+
+### TrackingSpecs Best Practices
+
+#### 1. Start Simple
+
+**First time using TrackingSpecs?**
+- Start with `mean,top2_box` for key rating questions
+- Don't add specs to every question - use defaults where appropriate
+- Test with a small config first
+
+#### 2. Choose Meaningful Metrics
+
+**Ask yourself:**
+- Does this metric align with business KPIs?
+- Will stakeholders understand "top 2 box"?
+- Is mean score sufficient, or do we need distribution?
+
+**Example:**
+- Corporate KPI is "% highly satisfied" → Use `top2_box`
+- Report tracks average scores → Use `mean` only
+- Detailed diagnostics needed → Use `mean,top2_box,distribution`
+
+#### 3. Stay Consistent
+
+**Within a study:**
+- Use same TrackingSpecs across waves
+- Don't change specs mid-study (breaks trend comparison)
+
+**Across studies:**
+- Document your TrackingSpecs choices
+- Use consistent definitions (e.g., always define "satisfied" as top 2 box)
+
+#### 4. Document Your Choices
+
+Add notes to your question_mapping file:
+
+```
+QuestionCode | TrackingSpecs  | Notes
+Q38          | mean,top2_box  | Top 2 box = "satisfied" (9-10 on 1-10 scale)
+Q41          | mean,top_box   | Top box = "excellent" only (5 on 1-5 scale)
+```
+
+#### 5. Validate Output
+
+**First time running with TrackingSpecs:**
+1. Check output has expected metrics
+2. Verify top box % makes sense (shouldn't exceed 100%)
+3. Confirm all metrics shown in Change Summary
+4. Test with small dataset first
+
+---
+
+### Migration Guide
+
+**Upgrading existing tracking studies to use TrackingSpecs?**
+
+#### Step 1: Backup Current Setup
+
+Save copies of:
+- tracking_config.xlsx
+- question_mapping.xlsx
+- Last output file (for comparison)
+
+#### Step 2: Add TrackingSpecs Column
+
+1. Open question_mapping.xlsx
+2. Insert new column "TrackingSpecs" (after QuestionType recommended)
+3. Leave all cells blank initially
+4. Save file
+
+#### Step 3: Test with Defaults
+
+Run tracker - should work identically to before (blank TrackingSpecs = default behavior).
+
+#### Step 4: Add Specs Gradually
+
+Add TrackingSpecs to 1-2 key questions:
+
+```
+QuestionCode | QuestionType | TrackingSpecs
+Q38          | Rating       | mean,top2_box
+```
+
+Run tracker, verify output looks correct.
+
+#### Step 5: Expand
+
+Add TrackingSpecs to more questions as needed.
+
+**Important:** Once you add TrackingSpecs to a question, all future waves should use same specs for consistency.
+
+---
+
+### Troubleshooting TrackingSpecs
+
+**Issue: TrackingSpecs ignored**
+
+```
+Expected: Mean + Top 2 Box
+Actual: Only showing Mean
+```
+
+**Solutions:**
+- Check column name is exactly "TrackingSpecs" (case-sensitive)
+- Verify specs syntax (no spaces in comma-separated list)
+- Check QuestionType is "Rating" or "Composite" (doesn't work with NPS)
+
+**Issue: "Invalid spec" error**
+
+```
+Error: Invalid TrackingSpecs 'top2box' for question Q38
+```
+
+**Solutions:**
+- Use underscore: `top2_box` not `top2box`
+- Check spelling: `mean` not `avg`
+- See [Complete Reference](#complete-trackingspecs-reference) for valid specs
+
+**Issue: Multi-mention not detecting columns**
+
+```
+Warning: No multi-mention columns found for Q30
+```
+
+**Solutions:**
+- Data must have columns named Q30_1, Q30_2, etc.
+- Check QuestionCode matches exactly (case-sensitive)
+- Verify QuestionType is "Multi_Mention"
+- Use TrackingSpecs="auto" to enable auto-detection
+
+**Issue: Top box % looks wrong**
+
+```
+Top 2 Box %: 125%  ← WRONG
+```
+
+**Solutions:**
+- Check your data doesn't have values outside expected range
+- Verify scale (1-5 vs 0-5 makes a difference)
+- Look at distribution to see actual values in data
 
 ---
 
@@ -1219,6 +1807,14 @@ Q05_NPS            | nps          | Q5_NPS          | Q05_NPS_Score       | NPS_
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** 2025-11-18
+**Document Version:** 2.0
+**Last Updated:** 2025-11-21
+**Changes in v2.0:**
+- Added TrackingSpecs section with comprehensive documentation
+- Documented enhanced rating metrics (top_box, top2_box, etc.)
+- Documented Multi-Mention question support
+- Documented enhanced composite metrics
+- Added output_dir setting documentation
+- Updated examples throughout
+
 **Next Review:** Q1 2026
