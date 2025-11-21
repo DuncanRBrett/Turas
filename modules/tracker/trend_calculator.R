@@ -90,9 +90,9 @@ calculate_all_trends <- function(config, question_map, wave_data) {
         calculate_nps_trend(q_code, question_map, wave_data, config)
       } else if (q_type == "single_choice") {
         calculate_single_choice_trend(q_code, question_map, wave_data, config)
-      } else if (q_type == "multi_choice") {
-        warning(paste0("  Multi-choice questions not yet supported in tracker - skipping"))
-        NULL
+      } else if (q_type == "multi_choice" || q_type_raw == "Multi_Mention") {
+        # Multi-mention support (Enhancement Phase 2)
+        calculate_multi_mention_trend(q_code, question_map, wave_data, config)
       } else if (q_type == "composite") {
         # Use enhanced version (supports TrackingSpecs, backward compatible)
         calculate_composite_trend_enhanced(q_code, question_map, wave_data, config)
@@ -1588,4 +1588,536 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
     changes = changes,
     significance = significance
   ))
+}
+
+
+# ==============================================================================
+# MULTI-MENTION SUPPORT (Enhancement Phase 2)
+# ==============================================================================
+
+#' Detect Multi-Mention Columns
+#'
+#' Auto-detects multi-mention option columns based on naming pattern.
+#' Pattern: {base_code}_{number} (e.g., Q30_1, Q30_2, Q30_3)
+#'
+#' @param wave_df Data frame. Wave data
+#' @param base_code Character. Base question code (e.g., "Q30")
+#' @return Character vector of detected column names, sorted numerically
+#'
+#' @keywords internal
+detect_multi_mention_columns <- function(wave_df, base_code) {
+
+  # Escape special regex characters in base_code
+  base_code_escaped <- gsub("([.|()\\^{}+$*?\\[\\]])", "\\\\\\1", base_code)
+
+  # Build pattern: ^{base_code}_{digits}$
+  pattern <- paste0("^", base_code_escaped, "_[0-9]+$")
+
+  # Find matches
+  matched_cols <- grep(pattern, names(wave_df), value = TRUE)
+
+  if (length(matched_cols) == 0) {
+    warning(paste0("No multi-mention columns found for base code: ", base_code))
+    return(NULL)
+  }
+
+  # Extract numeric parts and sort numerically (not lexicographically)
+  numeric_parts <- as.integer(sub(paste0("^", base_code_escaped, "_"), "", matched_cols))
+  sort_order <- order(numeric_parts)
+  matched_cols <- matched_cols[sort_order]
+
+  return(matched_cols)
+}
+
+
+#' Parse Multi-Mention TrackingSpecs
+#'
+#' Parses TrackingSpecs for multi-mention questions to determine which
+#' options to track and what additional metrics to calculate.
+#'
+#' @param tracking_specs Character. TrackingSpecs string
+#' @param base_code Character. Base question code
+#' @param wave_df Data frame. Wave data for validation
+#' @return List with $mode, $columns, $additional_metrics
+#'
+#' @keywords internal
+parse_multi_mention_specs <- function(tracking_specs, base_code, wave_df) {
+
+  # Default to auto if blank
+  if (is.null(tracking_specs) || tracking_specs == "" || tolower(trimws(tracking_specs)) == "auto") {
+    return(list(
+      mode = "auto",
+      columns = detect_multi_mention_columns(wave_df, base_code),
+      additional_metrics = character(0)
+    ))
+  }
+
+  # Parse comma-separated specs
+  specs <- trimws(strsplit(tracking_specs, ",")[[1]])
+
+  result <- list(
+    mode = "selective",
+    columns = character(0),
+    additional_metrics = character(0)
+  )
+
+  for (spec in specs) {
+    spec_lower <- tolower(trimws(spec))
+
+    if (spec_lower == "auto") {
+      # Auto-detect all columns
+      result$mode <- "auto"
+      auto_cols <- detect_multi_mention_columns(wave_df, base_code)
+      if (!is.null(auto_cols)) {
+        result$columns <- unique(c(result$columns, auto_cols))
+      }
+
+    } else if (startsWith(spec_lower, "option:")) {
+      # Specific option: "option:Q30_1"
+      col_name <- sub("^option:", "", spec, ignore.case = TRUE)
+      result$columns <- c(result$columns, col_name)
+
+    } else if (spec_lower %in% c("any", "count_mean", "count_distribution")) {
+      # Additional metrics
+      result$additional_metrics <- c(result$additional_metrics, spec_lower)
+
+    } else {
+      warning(paste0("Unknown Multi_Mention spec: ", spec))
+    }
+  }
+
+  # Remove duplicates
+  result$columns <- unique(result$columns)
+  result$additional_metrics <- unique(result$additional_metrics)
+
+  # Validate columns exist in data
+  if (length(result$columns) > 0) {
+    missing <- setdiff(result$columns, names(wave_df))
+    if (length(missing) > 0) {
+      warning(paste0("Multi-mention columns not found in data: ",
+                     paste(missing, collapse = ", ")))
+      result$columns <- intersect(result$columns, names(wave_df))
+    }
+  }
+
+  return(result)
+}
+
+
+#' Calculate Multi-Mention Trend
+#'
+#' Calculates percentage mentioning each option across waves for multi-mention questions.
+#' Supports TrackingSpecs for selective option tracking and additional metrics.
+#'
+#' @keywords internal
+calculate_multi_mention_trend <- function(q_code, question_map, wave_data, config) {
+
+  wave_ids <- config$waves$WaveID
+  metadata <- get_question_metadata(question_map, q_code)
+
+  # Get TrackingSpecs
+  tracking_specs <- get_tracking_specs(question_map, q_code)
+
+  # Initialize structure to track all detected columns across all waves
+  all_columns <- character(0)
+
+  # First pass: detect columns in each wave
+  wave_base_codes <- list()
+  for (wave_id in wave_ids) {
+    wave_code <- get_wave_question_code(question_map, q_code, wave_id)
+    if (!is.na(wave_code)) {
+      wave_base_codes[[wave_id]] <- wave_code
+      wave_df <- wave_data[[wave_id]]
+      detected_cols <- detect_multi_mention_columns(wave_df, wave_code)
+      if (!is.null(detected_cols)) {
+        all_columns <- unique(c(all_columns, detected_cols))
+      }
+    }
+  }
+
+  if (length(all_columns) == 0) {
+    warning(paste0("No multi-mention columns found for question: ", q_code))
+    return(NULL)
+  }
+
+  # Calculate metrics for each wave
+  wave_results <- list()
+
+  for (wave_id in wave_ids) {
+    wave_df <- wave_data[[wave_id]]
+    wave_code <- wave_base_codes[[wave_id]]
+
+    if (is.null(wave_code) || is.na(wave_code)) {
+      wave_results[[wave_id]] <- list(
+        available = FALSE,
+        mention_proportions = list(),
+        additional_metrics = list()
+      )
+      next
+    }
+
+    # Parse specs for this wave
+    specs <- parse_multi_mention_specs(tracking_specs, wave_code, wave_df)
+
+    # Use detected columns from specs
+    option_columns <- specs$columns
+
+    if (is.null(option_columns) || length(option_columns) == 0) {
+      wave_results[[wave_id]] <- list(
+        available = FALSE,
+        mention_proportions = list(),
+        additional_metrics = list()
+      )
+      next
+    }
+
+    # Calculate mention proportions for each option
+    mention_proportions <- list()
+
+    valid_idx <- !is.na(wave_df$weight_var) & wave_df$weight_var > 0
+
+    for (col_name in option_columns) {
+      if (!col_name %in% names(wave_df)) {
+        mention_proportions[[col_name]] <- NA
+        next
+      }
+
+      # Get column data
+      col_data <- wave_df[[col_name]]
+
+      # Calculate % mentioning (value == 1)
+      mentioned_idx <- valid_idx & !is.na(col_data) & col_data == 1
+      mentioned_weight <- sum(wave_df$weight_var[mentioned_idx])
+      total_weight <- sum(wave_df$weight_var[valid_idx])
+
+      proportion <- if (total_weight > 0) {
+        (mentioned_weight / total_weight) * 100
+      } else {
+        NA
+      }
+
+      mention_proportions[[col_name]] <- proportion
+    }
+
+    # Calculate additional metrics if requested
+    additional_metrics <- list()
+
+    if ("any" %in% specs$additional_metrics) {
+      # % mentioning at least one option
+      option_matrix <- as.matrix(wave_df[valid_idx, option_columns, drop = FALSE])
+      mentioned_any <- rowSums(option_matrix == 1, na.rm = TRUE) > 0
+      any_weight <- sum(wave_df$weight_var[valid_idx][mentioned_any])
+      total_weight <- sum(wave_df$weight_var[valid_idx])
+      additional_metrics$any_mention_pct <- if (total_weight > 0) {
+        (any_weight / total_weight) * 100
+      } else {
+        NA
+      }
+    }
+
+    if ("count_mean" %in% specs$additional_metrics) {
+      # Mean number of mentions
+      option_matrix <- as.matrix(wave_df[valid_idx, option_columns, drop = FALSE])
+      mention_counts <- rowSums(option_matrix == 1, na.rm = TRUE)
+      weights_valid <- wave_df$weight_var[valid_idx]
+      additional_metrics$count_mean <- if (sum(weights_valid) > 0) {
+        sum(mention_counts * weights_valid) / sum(weights_valid)
+      } else {
+        NA
+      }
+    }
+
+    if ("count_distribution" %in% specs$additional_metrics) {
+      # Distribution of mention counts
+      option_matrix <- as.matrix(wave_df[valid_idx, option_columns, drop = FALSE])
+      mention_counts <- rowSums(option_matrix == 1, na.rm = TRUE)
+      weights_valid <- wave_df$weight_var[valid_idx]
+      total_weight <- sum(weights_valid)
+
+      count_dist <- list()
+      for (count_val in 0:length(option_columns)) {
+        matched <- mention_counts == count_val
+        count_weight <- sum(weights_valid[matched])
+        count_dist[[as.character(count_val)]] <- if (total_weight > 0) {
+          (count_weight / total_weight) * 100
+        } else {
+          NA
+        }
+      }
+      additional_metrics$count_distribution <- count_dist
+    }
+
+    # Store results
+    wave_results[[wave_id]] <- list(
+      available = TRUE,
+      mention_proportions = mention_proportions,
+      additional_metrics = additional_metrics,
+      tracked_columns = option_columns,
+      n_unweighted = sum(valid_idx),
+      n_weighted = sum(wave_df$weight_var[valid_idx])
+    )
+  }
+
+  # Calculate changes for each option
+  changes <- list()
+  for (col_name in all_columns) {
+    changes[[col_name]] <- calculate_changes_for_multi_mention_option(
+      wave_results, wave_ids, col_name
+    )
+  }
+
+  # Calculate changes for additional metrics
+  additional_specs <- parse_multi_mention_specs(tracking_specs, "", wave_data[[wave_ids[1]]])
+  if ("any" %in% additional_specs$additional_metrics) {
+    changes$any_mention_pct <- calculate_changes_for_multi_mention_metric(
+      wave_results, wave_ids, "any_mention_pct"
+    )
+  }
+  if ("count_mean" %in% additional_specs$additional_metrics) {
+    changes$count_mean <- calculate_changes_for_multi_mention_metric(
+      wave_results, wave_ids, "count_mean"
+    )
+  }
+
+  # Significance testing for each option
+  significance <- list()
+  for (col_name in all_columns) {
+    significance[[col_name]] <- perform_significance_tests_multi_mention(
+      wave_results, wave_ids, col_name, config
+    )
+  }
+
+  # Significance for additional metrics
+  if ("any" %in% additional_specs$additional_metrics) {
+    significance$any_mention_pct <- perform_significance_tests_multi_mention_metric(
+      wave_results, wave_ids, "any_mention_pct", config
+    )
+  }
+
+  return(list(
+    question_code = q_code,
+    question_text = metadata$QuestionText,
+    question_type = metadata$QuestionType,
+    metric_type = "multi_mention",
+    tracking_specs = tracking_specs,
+    tracked_columns = all_columns,
+    wave_results = wave_results,
+    changes = changes,
+    significance = significance
+  ))
+}
+
+
+#' Calculate Changes for Multi-Mention Option
+#'
+#' @keywords internal
+calculate_changes_for_multi_mention_option <- function(wave_results, wave_ids, column_name) {
+
+  changes <- list()
+
+  for (i in 2:length(wave_ids)) {
+    wave_id <- wave_ids[i]
+    prev_wave_id <- wave_ids[i - 1]
+
+    current <- wave_results[[wave_id]]
+    previous <- wave_results[[prev_wave_id]]
+
+    # Get mention proportions
+    current_val <- if (current$available && !is.null(current$mention_proportions[[column_name]])) {
+      current$mention_proportions[[column_name]]
+    } else {
+      NA
+    }
+
+    previous_val <- if (previous$available && !is.null(previous$mention_proportions[[column_name]])) {
+      previous$mention_proportions[[column_name]]
+    } else {
+      NA
+    }
+
+    # Calculate changes
+    if (!is.na(current_val) && !is.na(previous_val)) {
+      absolute_change <- current_val - previous_val
+      percentage_change <- if (previous_val == 0) {
+        NA
+      } else {
+        (absolute_change / previous_val) * 100
+      }
+
+      changes[[paste0(prev_wave_id, "_to_", wave_id)]] <- list(
+        from_wave = prev_wave_id,
+        to_wave = wave_id,
+        from_value = previous_val,
+        to_value = current_val,
+        absolute_change = absolute_change,
+        percentage_change = percentage_change,
+        direction = if (absolute_change > 0) "up" else if (absolute_change < 0) "down" else "stable"
+      )
+    } else {
+      changes[[paste0(prev_wave_id, "_to_", wave_id)]] <- list(
+        from_wave = prev_wave_id,
+        to_wave = wave_id,
+        from_value = previous_val,
+        to_value = current_val,
+        absolute_change = NA,
+        percentage_change = NA,
+        direction = NA
+      )
+    }
+  }
+
+  return(changes)
+}
+
+
+#' Calculate Changes for Multi-Mention Additional Metric
+#'
+#' @keywords internal
+calculate_changes_for_multi_mention_metric <- function(wave_results, wave_ids, metric_name) {
+
+  changes <- list()
+
+  for (i in 2:length(wave_ids)) {
+    wave_id <- wave_ids[i]
+    prev_wave_id <- wave_ids[i - 1]
+
+    current <- wave_results[[wave_id]]
+    previous <- wave_results[[prev_wave_id]]
+
+    current_val <- if (current$available && !is.null(current$additional_metrics[[metric_name]])) {
+      current$additional_metrics[[metric_name]]
+    } else {
+      NA
+    }
+
+    previous_val <- if (previous$available && !is.null(previous$additional_metrics[[metric_name]])) {
+      previous$additional_metrics[[metric_name]]
+    } else {
+      NA
+    }
+
+    if (!is.na(current_val) && !is.na(previous_val)) {
+      absolute_change <- current_val - previous_val
+      percentage_change <- if (previous_val == 0) {
+        NA
+      } else {
+        (absolute_change / previous_val) * 100
+      }
+
+      changes[[paste0(prev_wave_id, "_to_", wave_id)]] <- list(
+        from_wave = prev_wave_id,
+        to_wave = wave_id,
+        from_value = previous_val,
+        to_value = current_val,
+        absolute_change = absolute_change,
+        percentage_change = percentage_change,
+        direction = if (absolute_change > 0) "up" else if (absolute_change < 0) "down" else "stable"
+      )
+    } else {
+      changes[[paste0(prev_wave_id, "_to_", wave_id)]] <- list(
+        from_wave = prev_wave_id,
+        to_wave = wave_id,
+        from_value = previous_val,
+        to_value = current_val,
+        absolute_change = NA,
+        percentage_change = NA,
+        direction = NA
+      )
+    }
+  }
+
+  return(changes)
+}
+
+
+#' Perform Significance Tests for Multi-Mention Option
+#'
+#' Uses z-test for proportions (same as single-choice questions).
+#'
+#' @keywords internal
+perform_significance_tests_multi_mention <- function(wave_results, wave_ids, column_name, config) {
+
+  alpha <- get_setting(config, "alpha_level", default = 0.05)
+  sig_tests <- list()
+
+  for (i in 2:length(wave_ids)) {
+    wave_id <- wave_ids[i]
+    prev_wave_id <- wave_ids[i - 1]
+
+    current <- wave_results[[wave_id]]
+    previous <- wave_results[[prev_wave_id]]
+
+    if (!current$available || !previous$available) {
+      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
+      next
+    }
+
+    current_val <- current$mention_proportions[[column_name]]
+    previous_val <- previous$mention_proportions[[column_name]]
+
+    if (is.na(current_val) || is.na(previous_val)) {
+      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
+      next
+    }
+
+    # Convert percentages to proportions
+    p1 <- previous_val / 100
+    p2 <- current_val / 100
+    n1 <- previous$n_unweighted
+    n2 <- current$n_unweighted
+
+    test_result <- z_test_for_proportions(p1, n1, p2, n2, alpha)
+    sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- test_result
+  }
+
+  return(sig_tests)
+}
+
+
+#' Perform Significance Tests for Multi-Mention Additional Metric
+#'
+#' @keywords internal
+perform_significance_tests_multi_mention_metric <- function(wave_results, wave_ids, metric_name, config) {
+
+  alpha <- get_setting(config, "alpha_level", default = 0.05)
+  sig_tests <- list()
+
+  for (i in 2:length(wave_ids)) {
+    wave_id <- wave_ids[i]
+    prev_wave_id <- wave_ids[i - 1]
+
+    current <- wave_results[[wave_id]]
+    previous <- wave_results[[prev_wave_id]]
+
+    if (!current$available || !previous$available) {
+      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
+      next
+    }
+
+    current_val <- current$additional_metrics[[metric_name]]
+    previous_val <- previous$additional_metrics[[metric_name]]
+
+    if (is.na(current_val) || is.na(previous_val)) {
+      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
+      next
+    }
+
+    # For "any" metric, use z-test for proportions
+    # For "count_mean", use t-test (but need raw values - skip for now)
+    if (metric_name == "any_mention_pct") {
+      p1 <- previous_val / 100
+      p2 <- current_val / 100
+      n1 <- previous$n_unweighted
+      n2 <- current$n_unweighted
+
+      test_result <- z_test_for_proportions(p1, n1, p2, n2, alpha)
+      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- test_result
+    } else {
+      # For count_mean, we'd need the raw count values for t-test
+      # Skip significance testing for now
+      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
+    }
+  }
+
+  return(sig_tests)
 }

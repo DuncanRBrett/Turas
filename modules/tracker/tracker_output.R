@@ -308,6 +308,15 @@ write_trend_sheets <- function(wb, trend_results, config, styles) {
 
     } else if (result$metric_type == "proportions") {
       current_row <- write_proportions_trend_table(wb, sheet_name, result, wave_ids, config, styles, current_row)
+
+    } else if (result$metric_type == "rating_enhanced") {
+      current_row <- write_enhanced_rating_trend_table(wb, sheet_name, result, wave_ids, config, styles, current_row)
+
+    } else if (result$metric_type == "composite_enhanced") {
+      current_row <- write_enhanced_composite_trend_table(wb, sheet_name, result, wave_ids, config, styles, current_row)
+
+    } else if (result$metric_type == "multi_mention") {
+      current_row <- write_multi_mention_trend_table(wb, sheet_name, result, wave_ids, config, styles, current_row)
     }
   }
 }
@@ -1197,6 +1206,273 @@ write_distribution_table <- function(wb, sheet_name, result, wave_ids, config, s
                       rows = current_row, cols = 2:(length(wave_ids) + 1), gridExpand = TRUE, stack = TRUE)
     current_row <- current_row + 1
   }
+
+  return(current_row)
+}
+
+
+# ==============================================================================
+# ENHANCED OUTPUT FORMATTING (Enhancement Phases 1 & 2)
+# ==============================================================================
+
+#' Write Enhanced Rating Trend Table
+#'
+#' Writes table for rating questions with multiple metrics (mean, top_box, etc.)
+#'
+#' @keywords internal
+write_enhanced_rating_trend_table <- function(wb, sheet_name, result, wave_ids, config, styles, start_row) {
+
+  current_row <- start_row
+
+  # Get decimal separator and decimal places from config
+  decimal_sep <- get_setting(config, "decimal_separator", default = ".")
+  decimal_places <- get_setting(config, "decimal_places_ratings", default = 1)
+  number_format <- create_excel_number_format(decimal_places, decimal_sep)
+
+  # Headers
+  headers <- c("Metric", wave_ids)
+  openxlsx::writeData(wb, sheet_name, t(headers),
+                      startRow = current_row, startCol = 1, colNames = FALSE)
+  openxlsx::addStyle(wb, sheet_name, styles$header,
+                    rows = current_row, cols = 1:length(headers), gridExpand = TRUE)
+  current_row <- current_row + 1
+
+  # Write row for each metric in tracking_specs
+  for (metric_name in result$tracking_specs) {
+    metric_lower <- tolower(trimws(metric_name))
+
+    # Skip distribution (handled separately below)
+    if (metric_lower == "distribution") {
+      next
+    }
+
+    # Clean metric name for display
+    display_name <- if (startsWith(metric_lower, "range:")) {
+      paste0("% ", sub("range:", "", metric_name))
+    } else if (metric_lower == "mean") {
+      "Mean"
+    } else if (metric_lower == "top_box") {
+      "Top Box %"
+    } else if (metric_lower == "top2_box") {
+      "Top 2 Box %"
+    } else if (metric_lower == "top3_box") {
+      "Top 3 Box %"
+    } else if (metric_lower == "bottom_box") {
+      "Bottom Box %"
+    } else if (metric_lower == "bottom2_box") {
+      "Bottom 2 Box %"
+    } else {
+      metric_name
+    }
+
+    # Write label
+    openxlsx::writeData(wb, sheet_name, display_name,
+                        startRow = current_row, startCol = 1, colNames = FALSE)
+    openxlsx::addStyle(wb, sheet_name, styles$metric_label, rows = current_row, cols = 1)
+
+    # Collect numeric values
+    metric_values <- numeric(length(wave_ids))
+    for (i in seq_along(wave_ids)) {
+      wave_result <- result$wave_results[[wave_ids[i]]]
+      if (wave_result$available && !is.null(wave_result$metrics)) {
+        metric_val <- wave_result$metrics[[metric_lower]]
+        if (!is.null(metric_val)) {
+          metric_values[i] <- round(metric_val, decimal_places)
+        } else {
+          metric_values[i] <- NA
+        }
+      } else {
+        metric_values[i] <- NA
+      }
+    }
+
+    # Write numeric values
+    openxlsx::writeData(wb, sheet_name, t(metric_values),
+                        startRow = current_row, startCol = 2, colNames = FALSE)
+
+    # Apply number format
+    number_style <- openxlsx::createStyle(numFmt = number_format)
+    openxlsx::addStyle(wb, sheet_name, number_style,
+                      rows = current_row, cols = 2:(length(wave_ids) + 1), gridExpand = TRUE, stack = TRUE)
+
+    current_row <- current_row + 1
+  }
+
+  # Sample size row
+  openxlsx::writeData(wb, sheet_name, "Sample Size (n)",
+                      startRow = current_row, startCol = 1, colNames = FALSE)
+  openxlsx::addStyle(wb, sheet_name, styles$metric_label, rows = current_row, cols = 1)
+
+  n_values <- numeric(length(wave_ids))
+  for (i in seq_along(wave_ids)) {
+    wave_result <- result$wave_results[[wave_ids[i]]]
+    if (wave_result$available) {
+      n_values[i] <- wave_result$n_unweighted
+    } else {
+      n_values[i] <- NA
+    }
+  }
+
+  openxlsx::writeData(wb, sheet_name, t(n_values),
+                      startRow = current_row, startCol = 2, colNames = FALSE)
+  openxlsx::addStyle(wb, sheet_name, styles$data_integer,
+                    rows = current_row, cols = 2:(length(wave_ids) + 1), gridExpand = TRUE)
+  current_row <- current_row + 2
+
+  return(current_row)
+}
+
+
+#' Write Enhanced Composite Trend Table
+#'
+#' Same as enhanced rating (composites support same metrics)
+#'
+#' @keywords internal
+write_enhanced_composite_trend_table <- function(wb, sheet_name, result, wave_ids, config, styles, start_row) {
+  return(write_enhanced_rating_trend_table(wb, sheet_name, result, wave_ids, config, styles, start_row))
+}
+
+
+#' Write Multi-Mention Trend Table
+#'
+#' Writes table for multi-mention questions showing % mentioning each option
+#'
+#' @keywords internal
+write_multi_mention_trend_table <- function(wb, sheet_name, result, wave_ids, config, styles, start_row) {
+
+  current_row <- start_row
+
+  # Get decimal separator and decimal places
+  decimal_sep <- get_setting(config, "decimal_separator", default = ".")
+  decimal_places <- get_setting(config, "decimal_places_ratings", default = 1)
+  number_format <- create_excel_number_format(decimal_places, decimal_sep)
+
+  # Headers
+  headers <- c("Option", wave_ids)
+  openxlsx::writeData(wb, sheet_name, t(headers),
+                      startRow = current_row, startCol = 1, colNames = FALSE)
+  openxlsx::addStyle(wb, sheet_name, styles$header,
+                    rows = current_row, cols = 1:length(headers), gridExpand = TRUE)
+  current_row <- current_row + 1
+
+  # Write row for each tracked column
+  for (col_name in result$tracked_columns) {
+    # Write label
+    openxlsx::writeData(wb, sheet_name, col_name,
+                        startRow = current_row, startCol = 1, colNames = FALSE)
+    openxlsx::addStyle(wb, sheet_name, styles$metric_label, rows = current_row, cols = 1)
+
+    # Collect numeric values (% mentioning)
+    mention_values <- numeric(length(wave_ids))
+    for (i in seq_along(wave_ids)) {
+      wave_result <- result$wave_results[[wave_ids[i]]]
+      if (wave_result$available && !is.null(wave_result$mention_proportions)) {
+        mention_pct <- wave_result$mention_proportions[[col_name]]
+        if (!is.null(mention_pct) && !is.na(mention_pct)) {
+          mention_values[i] <- round(mention_pct, decimal_places)
+        } else {
+          mention_values[i] <- NA
+        }
+      } else {
+        mention_values[i] <- NA
+      }
+    }
+
+    # Write numeric values
+    openxlsx::writeData(wb, sheet_name, t(mention_values),
+                        startRow = current_row, startCol = 2, colNames = FALSE)
+
+    # Apply number format
+    number_style <- openxlsx::createStyle(numFmt = number_format)
+    openxlsx::addStyle(wb, sheet_name, number_style,
+                      rows = current_row, cols = 2:(length(wave_ids) + 1), gridExpand = TRUE, stack = TRUE)
+
+    current_row <- current_row + 1
+  }
+
+  # Add additional metrics if present
+  # Check first wave for additional metrics
+  first_wave_result <- result$wave_results[[wave_ids[1]]]
+  if (first_wave_result$available && !is.null(first_wave_result$additional_metrics)) {
+    additional_metrics <- first_wave_result$additional_metrics
+
+    if (!is.null(additional_metrics$any_mention_pct)) {
+      current_row <- current_row + 1  # Blank row
+
+      # "Any mention" row
+      openxlsx::writeData(wb, sheet_name, "% Mentioning Any",
+                          startRow = current_row, startCol = 1, colNames = FALSE)
+      openxlsx::addStyle(wb, sheet_name, styles$metric_label, rows = current_row, cols = 1)
+
+      any_values <- numeric(length(wave_ids))
+      for (i in seq_along(wave_ids)) {
+        wave_result <- result$wave_results[[wave_ids[i]]]
+        if (wave_result$available && !is.null(wave_result$additional_metrics$any_mention_pct)) {
+          any_values[i] <- round(wave_result$additional_metrics$any_mention_pct, decimal_places)
+        } else {
+          any_values[i] <- NA
+        }
+      }
+
+      openxlsx::writeData(wb, sheet_name, t(any_values),
+                          startRow = current_row, startCol = 2, colNames = FALSE)
+
+      number_style <- openxlsx::createStyle(numFmt = number_format)
+      openxlsx::addStyle(wb, sheet_name, number_style,
+                        rows = current_row, cols = 2:(length(wave_ids) + 1), gridExpand = TRUE, stack = TRUE)
+
+      current_row <- current_row + 1
+    }
+
+    if (!is.null(additional_metrics$count_mean)) {
+      # "Mean count" row
+      openxlsx::writeData(wb, sheet_name, "Mean # of Mentions",
+                          startRow = current_row, startCol = 1, colNames = FALSE)
+      openxlsx::addStyle(wb, sheet_name, styles$metric_label, rows = current_row, cols = 1)
+
+      count_values <- numeric(length(wave_ids))
+      for (i in seq_along(wave_ids)) {
+        wave_result <- result$wave_results[[wave_ids[i]]]
+        if (wave_result$available && !is.null(wave_result$additional_metrics$count_mean)) {
+          count_values[i] <- round(wave_result$additional_metrics$count_mean, decimal_places)
+        } else {
+          count_values[i] <- NA
+        }
+      }
+
+      openxlsx::writeData(wb, sheet_name, t(count_values),
+                          startRow = current_row, startCol = 2, colNames = FALSE)
+
+      number_style <- openxlsx::createStyle(numFmt = number_format)
+      openxlsx::addStyle(wb, sheet_name, number_style,
+                        rows = current_row, cols = 2:(length(wave_ids) + 1), gridExpand = TRUE, stack = TRUE)
+
+      current_row <- current_row + 1
+    }
+  }
+
+  # Sample size row
+  current_row <- current_row + 1
+  openxlsx::writeData(wb, sheet_name, "Sample Size (n)",
+                      startRow = current_row, startCol = 1, colNames = FALSE)
+  openxlsx::addStyle(wb, sheet_name, styles$metric_label, rows = current_row, cols = 1)
+
+  n_values <- numeric(length(wave_ids))
+  for (i in seq_along(wave_ids)) {
+    wave_result <- result$wave_results[[wave_ids[i]]]
+    if (wave_result$available) {
+      n_values[i] <- wave_result$n_unweighted
+    } else {
+      n_values[i] <- NA
+    }
+  }
+
+  openxlsx::writeData(wb, sheet_name, t(n_values),
+                      startRow = current_row, startCol = 2, colNames = FALSE)
+  openxlsx::addStyle(wb, sheet_name, styles$data_integer,
+                    rows = current_row, cols = 2:(length(wave_ids) + 1), gridExpand = TRUE)
+
+  current_row <- current_row + 2
 
   return(current_row)
 }
