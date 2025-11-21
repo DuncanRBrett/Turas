@@ -346,6 +346,46 @@ get_tracking_specs <- function(question_map, question_code) {
 }
 
 
+#' Get Composite Source Questions
+#'
+#' Retrieves the SourceQuestions string for a composite question from the question mapping.
+#' SourceQuestions contains comma-separated list of source question codes that form the composite.
+#'
+#' @param question_map List. Question map index from build_question_map_index()
+#' @param question_code Character. Question code
+#' @return Character vector. Source question codes, or NULL if not specified/blank
+#'
+#' @export
+get_composite_sources <- function(question_map, question_code) {
+
+  metadata_df <- question_map$question_metadata
+
+  # Check if SourceQuestions column exists
+  if (!"SourceQuestions" %in% names(metadata_df)) {
+    return(NULL)
+  }
+
+  # Find question row
+  q_row <- metadata_df[metadata_df$QuestionCode == question_code, ]
+
+  if (nrow(q_row) == 0) {
+    return(NULL)
+  }
+
+  source_questions <- q_row$SourceQuestions[1]
+
+  # Return NULL if blank/NA
+  if (is.na(source_questions) || trimws(source_questions) == "") {
+    return(NULL)
+  }
+
+  # Parse comma-separated list
+  sources <- trimws(strsplit(trimws(source_questions), ",")[[1]])
+
+  return(sources)
+}
+
+
 #' Validate Tracking Specs Syntax
 #'
 #' Validates that TrackingSpecs string contains valid specifications for

@@ -854,6 +854,73 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
                       rows = current_row, cols = 2:length(headers), gridExpand = TRUE, stack = TRUE)
     current_row <- current_row + 1
 
+  } else if (first_seg$metric_type == "rating_enhanced" || first_seg$metric_type == "composite_enhanced") {
+    # Enhanced metrics - write row for each metric in tracking_specs
+    for (metric_name in first_seg$tracking_specs) {
+      metric_lower <- tolower(trimws(metric_name))
+
+      # Skip distribution (too complex for banner table)
+      if (metric_lower == "distribution") {
+        next
+      }
+
+      # Clean metric name for display
+      display_name <- if (startsWith(metric_lower, "range:")) {
+        paste0("% ", sub("range:", "", metric_name))
+      } else if (metric_lower == "mean") {
+        "Mean"
+      } else if (metric_lower == "top_box") {
+        "Top Box %"
+      } else if (metric_lower == "top2_box") {
+        "Top 2 Box %"
+      } else if (metric_lower == "top3_box") {
+        "Top 3 Box %"
+      } else if (metric_lower == "bottom_box") {
+        "Bottom Box %"
+      } else if (metric_lower == "bottom2_box") {
+        "Bottom 2 Box %"
+      } else {
+        metric_name
+      }
+
+      # Write label
+      openxlsx::writeData(wb, sheet_name, display_name,
+                          startRow = current_row, startCol = 1, colNames = FALSE)
+      openxlsx::addStyle(wb, sheet_name, styles$metric_label, rows = current_row, cols = 1)
+
+      # Collect numeric values
+      num_cols <- length(segment_names) * length(wave_ids)
+      metric_values <- numeric(num_cols)
+      idx <- 1
+      for (seg_name in segment_names) {
+        seg_result <- question_segments[[seg_name]]
+        for (wave_id in wave_ids) {
+          wave_result <- seg_result$wave_results[[wave_id]]
+          if (wave_result$available && !is.null(wave_result$metrics)) {
+            metric_val <- wave_result$metrics[[metric_lower]]
+            if (!is.null(metric_val) && is.numeric(metric_val)) {
+              metric_values[idx] <- round(metric_val, decimal_places)
+            } else {
+              metric_values[idx] <- NA_real_
+            }
+          } else {
+            metric_values[idx] <- NA_real_
+          }
+          idx <- idx + 1
+        }
+      }
+
+      # Write numeric values
+      openxlsx::writeData(wb, sheet_name, t(metric_values),
+                          startRow = current_row, startCol = 2, colNames = FALSE)
+
+      # Apply number format
+      number_style <- openxlsx::createStyle(numFmt = number_format)
+      openxlsx::addStyle(wb, sheet_name, number_style,
+                        rows = current_row, cols = 2:length(headers), gridExpand = TRUE, stack = TRUE)
+      current_row <- current_row + 1
+    }
+
   } else if (first_seg$metric_type == "nps") {
     # NPS rows
     metrics <- c("NPS Score", "% Promoters", "% Passives", "% Detractors")
@@ -937,59 +1004,105 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
     total_result <- question_segments[["Total"]]
 
     if (!is.null(total_result$changes) && length(total_result$changes) > 0) {
-      # Changes header
-      openxlsx::writeData(wb, sheet_name, "Wave-over-Wave Changes (Total):",
-                          startRow = current_row, startCol = 1, colNames = FALSE)
-      openxlsx::addStyle(wb, sheet_name, styles$header, rows = current_row, cols = 1)
-      current_row <- current_row + 1
 
-      # Changes table headers
-      change_headers <- c("Comparison", "From", "To", "Change", "% Change", "Significant")
-      openxlsx::writeData(wb, sheet_name, t(change_headers),
-                          startRow = current_row, startCol = 1, colNames = FALSE)
-      openxlsx::addStyle(wb, sheet_name, styles$wave_header,
-                        rows = current_row, cols = 1:length(change_headers), gridExpand = TRUE)
-      current_row <- current_row + 1
+      # Determine changes structure (flat or nested by metric)
+      first_change_item <- total_result$changes[[1]]
+      is_nested <- is.list(first_change_item) && !("from_wave" %in% names(first_change_item))
 
-      # Write change rows
-      for (change_name in names(total_result$changes)) {
-        change <- total_result$changes[[change_name]]
+      # For enhanced metrics with multiple metrics, show changes for first metric only
+      changes_to_show <- if (is_nested) {
+        # Use first metric's changes (typically "mean")
+        metric_name <- names(total_result$changes)[1]
+        total_result$changes[[metric_name]]
+      } else {
+        # Flat structure (old format)
+        total_result$changes
+      }
 
-        comparison_label <- paste0(change$from_wave, " → ", change$to_wave)
-
-        # Get significance
-        sig_key <- paste0(change$from_wave, "_vs_", change$to_wave)
-        sig_test <- total_result$significance[[sig_key]]
-        is_sig <- !is.null(sig_test) && sig_test$significant
-
-        # Write label
-        openxlsx::writeData(wb, sheet_name, comparison_label,
+      if (length(changes_to_show) > 0) {
+        # Changes header
+        changes_header_text <- if (is_nested) {
+          paste0("Wave-over-Wave Changes (Total - ", names(total_result$changes)[1], "):")
+        } else {
+          "Wave-over-Wave Changes (Total):"
+        }
+        openxlsx::writeData(wb, sheet_name, changes_header_text,
                             startRow = current_row, startCol = 1, colNames = FALSE)
+        openxlsx::addStyle(wb, sheet_name, styles$header, rows = current_row, cols = 1)
+        current_row <- current_row + 1
 
-        # Write numeric values separately (rounded)
-        openxlsx::writeData(wb, sheet_name, round(change$from_value, decimal_places),
-                            startRow = current_row, startCol = 2, colNames = FALSE)
-        openxlsx::writeData(wb, sheet_name, round(change$to_value, decimal_places),
-                            startRow = current_row, startCol = 3, colNames = FALSE)
-        openxlsx::writeData(wb, sheet_name, round(change$absolute_change, decimal_places),
-                            startRow = current_row, startCol = 4, colNames = FALSE)
-        openxlsx::writeData(wb, sheet_name, round(change$percentage_change, decimal_places),
-                            startRow = current_row, startCol = 5, colNames = FALSE)
-        openxlsx::writeData(wb, sheet_name, if (is_sig) "Yes" else "No",
-                            startRow = current_row, startCol = 6, colNames = FALSE)
+        # Changes table headers
+        change_headers <- c("Comparison", "From", "To", "Change", "% Change", "Significant")
+        openxlsx::writeData(wb, sheet_name, t(change_headers),
+                            startRow = current_row, startCol = 1, colNames = FALSE)
+        openxlsx::addStyle(wb, sheet_name, styles$wave_header,
+                          rows = current_row, cols = 1:length(change_headers), gridExpand = TRUE)
+        current_row <- current_row + 1
 
-        # Apply number format
-        number_style <- openxlsx::createStyle(numFmt = number_format)
-        openxlsx::addStyle(wb, sheet_name, number_style,
-                          rows = current_row, cols = 2:5, gridExpand = TRUE, stack = TRUE)
-
-        # Style based on significance
-        if (is_sig) {
-          openxlsx::addStyle(wb, sheet_name, styles$significant,
-                            rows = current_row, cols = 4:5, gridExpand = TRUE, stack = TRUE)
+        # Get significance tests for the metric
+        sig_tests <- if (is_nested) {
+          metric_name <- names(total_result$changes)[1]
+          total_result$significance[[metric_name]]
+        } else {
+          total_result$significance
         }
 
-        current_row <- current_row + 1
+        # Write change rows
+        for (change_name in names(changes_to_show)) {
+          change <- changes_to_show[[change_name]]
+
+          comparison_label <- paste0(change$from_wave, " → ", change$to_wave)
+
+          # Get significance
+          sig_key <- paste0(change$from_wave, "_vs_", change$to_wave)
+          sig_test <- sig_tests[[sig_key]]
+          is_sig <- !is.null(sig_test) && !is.na(sig_test$significant) && sig_test$significant
+
+          # Write label
+          openxlsx::writeData(wb, sheet_name, comparison_label,
+                              startRow = current_row, startCol = 1, colNames = FALSE)
+
+          # Write numeric values separately (rounded), checking for NA
+          from_val <- if (!is.na(change$from_value) && is.numeric(change$from_value)) {
+            round(change$from_value, decimal_places)
+          } else { NA_real_ }
+
+          to_val <- if (!is.na(change$to_value) && is.numeric(change$to_value)) {
+            round(change$to_value, decimal_places)
+          } else { NA_real_ }
+
+          abs_change <- if (!is.na(change$absolute_change) && is.numeric(change$absolute_change)) {
+            round(change$absolute_change, decimal_places)
+          } else { NA_real_ }
+
+          pct_change <- if (!is.na(change$percentage_change) && is.numeric(change$percentage_change)) {
+            round(change$percentage_change, decimal_places)
+          } else { NA_real_ }
+
+          openxlsx::writeData(wb, sheet_name, from_val,
+                              startRow = current_row, startCol = 2, colNames = FALSE)
+          openxlsx::writeData(wb, sheet_name, to_val,
+                              startRow = current_row, startCol = 3, colNames = FALSE)
+          openxlsx::writeData(wb, sheet_name, abs_change,
+                              startRow = current_row, startCol = 4, colNames = FALSE)
+          openxlsx::writeData(wb, sheet_name, pct_change,
+                              startRow = current_row, startCol = 5, colNames = FALSE)
+          openxlsx::writeData(wb, sheet_name, if (is_sig) "Yes" else "No",
+                              startRow = current_row, startCol = 6, colNames = FALSE)
+
+          # Apply number format
+          number_style <- openxlsx::createStyle(numFmt = number_format)
+          openxlsx::addStyle(wb, sheet_name, number_style,
+                            rows = current_row, cols = 2:5, gridExpand = TRUE, stack = TRUE)
+
+          # Style based on significance
+          if (is_sig) {
+            openxlsx::addStyle(wb, sheet_name, styles$significant,
+                              rows = current_row, cols = 4:5, gridExpand = TRUE, stack = TRUE)
+          }
+
+          current_row <- current_row + 1
+        }
       }
     }
   }
