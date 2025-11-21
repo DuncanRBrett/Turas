@@ -82,9 +82,21 @@ write_tracker_output <- function(trend_results, config, wave_data, output_path =
 
   # Determine output path
   if (is.null(output_path)) {
+    # Get output directory from settings or use config file location
+    output_dir <- get_setting(config, "output_dir", default = NULL)
+
+    if (is.null(output_dir)) {
+      # Default to same directory as config file
+      output_dir <- dirname(config$config_path)
+    }
+
+    # Generate filename
     project_name <- get_setting(config, "project_name", default = "Tracking")
     project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)  # Sanitize
-    output_path <- paste0(project_name, "_Tracker_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+    filename <- paste0(project_name, "_Tracker_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+
+    # Combine directory and filename
+    output_path <- file.path(output_dir, filename)
   }
 
   message(paste0("Output file: ", output_path))
