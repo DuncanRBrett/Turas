@@ -640,8 +640,11 @@ calculate_composite_score <- function(wave_df, wave_id, source_questions, questi
   composite_values <- rowMeans(source_matrix, na.rm = TRUE)
 
   # Handle cases where all source questions are NA for a respondent
-  all_na <- apply(source_matrix, 1, function(row) all(is.na(row)))
-  composite_values[all_na] <- NA
+  # Use which() to avoid NA issues in logical indexing
+  all_na_idx <- which(apply(source_matrix, 1, function(row) all(is.na(row))))
+  if (length(all_na_idx) > 0) {
+    composite_values[all_na_idx] <- NA
+  }
 
   # Calculate weighted mean of composite scores
   result <- calculate_weighted_mean(
@@ -1416,11 +1419,12 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
     }
 
     # Store basic counts (shared across all metrics)
-    valid_idx <- !is.na(q_data) & !is.na(wave_df$weight_var) & wave_df$weight_var > 0
+    # Use which() to get numeric indices (avoids NA issues)
+    valid_idx <- which(!is.na(q_data) & !is.na(wave_df$weight_var) & wave_df$weight_var > 0)
     wave_results[[wave_id]] <- list(
       available = TRUE,
       metrics = metrics,
-      n_unweighted = sum(valid_idx),
+      n_unweighted = length(valid_idx),
       n_weighted = sum(wave_df$weight_var[valid_idx]),
       values = q_data,
       weights = wave_df$weight_var
@@ -1631,8 +1635,11 @@ calculate_composite_values_per_respondent <- function(wave_df, wave_id, source_q
   composite_values <- rowMeans(source_matrix, na.rm = TRUE)
 
   # Set to NA if all sources were NA for a respondent
-  all_na <- apply(source_matrix, 1, function(row) all(is.na(row)))
-  composite_values[all_na] <- NA
+  # Use which() to avoid NA issues in logical indexing
+  all_na_idx <- which(apply(source_matrix, 1, function(row) all(is.na(row))))
+  if (length(all_na_idx) > 0) {
+    composite_values[all_na_idx] <- NA
+  }
 
   return(composite_values)
 }
@@ -1679,9 +1686,10 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
     )
 
     # Check if we got valid composite values
-    valid_idx <- !is.na(composite_values) & !is.na(wave_df$weight_var) & wave_df$weight_var > 0
+    # Use which() to get numeric indices (avoids NA issues)
+    valid_idx <- which(!is.na(composite_values) & !is.na(wave_df$weight_var) & wave_df$weight_var > 0)
 
-    if (sum(valid_idx) == 0) {
+    if (length(valid_idx) == 0) {
       # No valid data for this wave
       wave_results[[wave_id]] <- list(
         available = FALSE,
@@ -1737,7 +1745,7 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
     wave_results[[wave_id]] <- list(
       available = TRUE,
       metrics = metrics,
-      n_unweighted = sum(valid_idx),
+      n_unweighted = length(valid_idx),
       n_weighted = sum(wave_df$weight_var[valid_idx]),
       values = composite_values,
       weights = wave_df$weight_var,
@@ -1976,7 +1984,8 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
     # Calculate mention proportions for each option
     mention_proportions <- list()
 
-    valid_idx <- !is.na(wave_df$weight_var) & wave_df$weight_var > 0
+    # Create valid row indices (use which() to ensure numeric indices)
+    valid_rows <- which(!is.na(wave_df$weight_var) & wave_df$weight_var > 0)
 
     for (col_name in option_columns) {
       if (!col_name %in% names(wave_df)) {
@@ -1994,12 +2003,13 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
       }
 
       # Calculate % mentioning (value == 1)
-      # Use which() to ensure we get valid indices without NA
-      mentioned_idx <- which(valid_idx & !is.na(col_data) & col_data == 1)
-      valid_idx_which <- which(valid_idx)
+      # Use which() on valid_rows subset to avoid NA issues
+      valid_col_data <- col_data[valid_rows]
+      mentioned_idx <- which(!is.na(valid_col_data) & valid_col_data == 1)
+      mentioned_rows <- valid_rows[mentioned_idx]
 
-      mentioned_weight <- sum(wave_df$weight_var[mentioned_idx], na.rm = TRUE)
-      total_weight <- sum(wave_df$weight_var[valid_idx_which], na.rm = TRUE)
+      mentioned_weight <- sum(wave_df$weight_var[mentioned_rows], na.rm = TRUE)
+      total_weight <- sum(wave_df$weight_var[valid_rows], na.rm = TRUE)
 
       proportion <- if (total_weight > 0) {
         (mentioned_weight / total_weight) * 100
@@ -2013,8 +2023,7 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
     # Calculate additional metrics if requested
     additional_metrics <- list()
 
-    # Use which() to get valid row indices (avoids NA issues)
-    valid_rows <- which(valid_idx)
+    # Note: valid_rows already defined above
 
     if ("any" %in% specs$additional_metrics) {
       # % mentioning at least one option
