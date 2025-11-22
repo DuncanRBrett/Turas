@@ -1982,10 +1982,19 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
       # Get column data
       col_data <- wave_df[[col_name]]
 
+      # Check if column data is valid
+      if (is.null(col_data) || all(is.na(col_data))) {
+        mention_proportions[[col_name]] <- NA
+        next
+      }
+
       # Calculate % mentioning (value == 1)
-      mentioned_idx <- valid_idx & !is.na(col_data) & col_data == 1
-      mentioned_weight <- sum(wave_df$weight_var[mentioned_idx])
-      total_weight <- sum(wave_df$weight_var[valid_idx])
+      # Use which() to ensure we get valid indices without NA
+      mentioned_idx <- which(valid_idx & !is.na(col_data) & col_data == 1)
+      valid_idx_which <- which(valid_idx)
+
+      mentioned_weight <- sum(wave_df$weight_var[mentioned_idx], na.rm = TRUE)
+      total_weight <- sum(wave_df$weight_var[valid_idx_which], na.rm = TRUE)
 
       proportion <- if (total_weight > 0) {
         (mentioned_weight / total_weight) * 100
@@ -1999,12 +2008,15 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
     # Calculate additional metrics if requested
     additional_metrics <- list()
 
+    # Use which() to get valid row indices (avoids NA issues)
+    valid_rows <- which(valid_idx)
+
     if ("any" %in% specs$additional_metrics) {
       # % mentioning at least one option
-      option_matrix <- as.matrix(wave_df[valid_idx, option_columns, drop = FALSE])
+      option_matrix <- as.matrix(wave_df[valid_rows, option_columns, drop = FALSE])
       mentioned_any <- rowSums(option_matrix == 1, na.rm = TRUE) > 0
-      any_weight <- sum(wave_df$weight_var[valid_idx][mentioned_any])
-      total_weight <- sum(wave_df$weight_var[valid_idx])
+      any_weight <- sum(wave_df$weight_var[valid_rows][mentioned_any], na.rm = TRUE)
+      total_weight <- sum(wave_df$weight_var[valid_rows], na.rm = TRUE)
       additional_metrics$any_mention_pct <- if (total_weight > 0) {
         (any_weight / total_weight) * 100
       } else {
@@ -2014,11 +2026,11 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
 
     if ("count_mean" %in% specs$additional_metrics) {
       # Mean number of mentions
-      option_matrix <- as.matrix(wave_df[valid_idx, option_columns, drop = FALSE])
+      option_matrix <- as.matrix(wave_df[valid_rows, option_columns, drop = FALSE])
       mention_counts <- rowSums(option_matrix == 1, na.rm = TRUE)
-      weights_valid <- wave_df$weight_var[valid_idx]
-      additional_metrics$count_mean <- if (sum(weights_valid) > 0) {
-        sum(mention_counts * weights_valid) / sum(weights_valid)
+      weights_valid <- wave_df$weight_var[valid_rows]
+      additional_metrics$count_mean <- if (sum(weights_valid, na.rm = TRUE) > 0) {
+        sum(mention_counts * weights_valid, na.rm = TRUE) / sum(weights_valid, na.rm = TRUE)
       } else {
         NA
       }
@@ -2026,15 +2038,15 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
 
     if ("count_distribution" %in% specs$additional_metrics) {
       # Distribution of mention counts
-      option_matrix <- as.matrix(wave_df[valid_idx, option_columns, drop = FALSE])
+      option_matrix <- as.matrix(wave_df[valid_rows, option_columns, drop = FALSE])
       mention_counts <- rowSums(option_matrix == 1, na.rm = TRUE)
-      weights_valid <- wave_df$weight_var[valid_idx]
-      total_weight <- sum(weights_valid)
+      weights_valid <- wave_df$weight_var[valid_rows]
+      total_weight <- sum(weights_valid, na.rm = TRUE)
 
       count_dist <- list()
       for (count_val in 0:length(option_columns)) {
         matched <- mention_counts == count_val
-        count_weight <- sum(weights_valid[matched])
+        count_weight <- sum(weights_valid[matched], na.rm = TRUE)
         count_dist[[as.character(count_val)]] <- if (total_weight > 0) {
           (count_weight / total_weight) * 100
         } else {
@@ -2050,8 +2062,8 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
       mention_proportions = mention_proportions,
       additional_metrics = additional_metrics,
       tracked_columns = option_columns,
-      n_unweighted = sum(valid_idx),
-      n_weighted = sum(wave_df$weight_var[valid_idx])
+      n_unweighted = length(valid_rows),
+      n_weighted = sum(wave_df$weight_var[valid_rows], na.rm = TRUE)
     )
   }
 
