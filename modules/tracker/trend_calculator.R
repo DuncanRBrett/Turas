@@ -368,8 +368,10 @@ parse_single_choice_specs <- function(tracking_specs, all_codes) {
     } else if (startsWith(spec_lower, "category:")) {
       # Specific category: "category:last week"
       category_name <- sub("^category:", "", spec, ignore.case = TRUE)
-      category_name <- trimws(category_name)
-      result$codes <- c(result$codes, category_name)
+      category_name <- trimws(category_name)  # Remove any leading/trailing whitespace
+      if (category_name != "") {  # Only add if not empty
+        result$codes <- c(result$codes, category_name)
+      }
 
     } else {
       warning(paste0("Unknown Single_Choice spec: ", spec))
@@ -790,8 +792,17 @@ calculate_changes <- function(wave_results, wave_ids, metric_name, sub_metric = 
     # Get metric values
     if (!is.null(sub_metric)) {
       # For proportions, access by sub_metric (response code)
-      current_val <- current[[metric_name]][[as.character(sub_metric)]]
-      previous_val <- previous[[metric_name]][[as.character(sub_metric)]]
+      sub_metric_str <- as.character(sub_metric)
+      current_val <- if (!is.null(current[[metric_name]]) && sub_metric_str %in% names(current[[metric_name]])) {
+        current[[metric_name]][[sub_metric_str]]
+      } else {
+        NA
+      }
+      previous_val <- if (!is.null(previous[[metric_name]]) && sub_metric_str %in% names(previous[[metric_name]])) {
+        previous[[metric_name]][[sub_metric_str]]
+      } else {
+        NA
+      }
     } else {
       current_val <- current[[metric_name]]
       previous_val <- previous[[metric_name]]
@@ -907,20 +918,32 @@ perform_significance_tests_proportions <- function(wave_results, wave_ids, confi
         current$n_unweighted >= min_base && previous$n_unweighted >= min_base) {
 
       # Get proportions for this response code
-      p1 <- previous$proportions[[as.character(response_code)]] / 100  # Convert to proportion
-      p2 <- current$proportions[[as.character(response_code)]] / 100
+      response_code_str <- as.character(response_code)
 
-      # Z-test for proportions
-      # SHARED CODE NOTE: Extract to shared/significance_tests.R::z_test_proportions()
-      z_result <- z_test_for_proportions(
-        p1 = p1,
-        n1 = previous$n_unweighted,
-        p2 = p2,
-        n2 = current$n_unweighted,
-        alpha = alpha
-      )
+      # Check if response code exists in both waves
+      if (!is.null(previous$proportions) && response_code_str %in% names(previous$proportions) &&
+          !is.null(current$proportions) && response_code_str %in% names(current$proportions)) {
 
-      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- z_result
+        p1 <- previous$proportions[[response_code_str]] / 100  # Convert to proportion
+        p2 <- current$proportions[[response_code_str]] / 100
+
+        # Z-test for proportions
+        # SHARED CODE NOTE: Extract to shared/significance_tests.R::z_test_proportions()
+        z_result <- z_test_for_proportions(
+          p1 = p1,
+          n1 = previous$n_unweighted,
+          p2 = p2,
+          n2 = current$n_unweighted,
+          alpha = alpha
+        )
+
+        sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- z_result
+      } else {
+        sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- list(
+          significant = FALSE,
+          reason = "response_code_not_found"
+        )
+      }
     } else {
       sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- list(
         significant = FALSE,
@@ -1846,7 +1869,10 @@ parse_multi_mention_specs <- function(tracking_specs, base_code, wave_df) {
     } else if (startsWith(spec_lower, "option:")) {
       # Specific option: "option:Q30_1"
       col_name <- sub("^option:", "", spec, ignore.case = TRUE)
-      result$columns <- c(result$columns, col_name)
+      col_name <- trimws(col_name)  # Remove any leading/trailing whitespace
+      if (col_name != "") {  # Only add if not empty
+        result$columns <- c(result$columns, col_name)
+      }
 
     } else if (spec_lower %in% c("any", "count_mean", "count_distribution")) {
       # Additional metrics
