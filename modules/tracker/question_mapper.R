@@ -98,6 +98,9 @@ build_question_map_index <- function(question_mapping, config) {
 #' @export
 get_wave_question_code <- function(question_map, standard_code, wave_id) {
 
+  # Trim whitespace from standard_code (defensive - handles whitespace in tracked_questions)
+  standard_code <- trimws(as.character(standard_code))
+
   if (!standard_code %in% names(question_map$standard_to_wave)) {
     return(NA_character_)
   }
@@ -144,6 +147,9 @@ get_standard_question_code <- function(question_map, wave_code, wave_id) {
 #'
 #' @export
 get_question_metadata <- function(question_map, standard_code) {
+
+  # Trim whitespace from standard_code (defensive - handles whitespace in tracked_questions)
+  standard_code <- trimws(as.character(standard_code))
 
   metadata <- question_map$question_metadata
 
@@ -326,6 +332,9 @@ validate_question_mapping <- function(config, question_map, wave_data) {
 #' @export
 get_tracking_specs <- function(question_map, question_code) {
 
+  # Trim whitespace from question_code (defensive - handles whitespace in tracked_questions)
+  question_code <- trimws(as.character(question_code))
+
   metadata_df <- question_map$question_metadata
 
   # Check if TrackingSpecs column exists
@@ -362,6 +371,9 @@ get_tracking_specs <- function(question_map, question_code) {
 #'
 #' @export
 get_composite_sources <- function(question_map, question_code) {
+
+  # Trim whitespace from question_code (defensive - handles whitespace in tracked_questions)
+  question_code <- trimws(as.character(question_code))
 
   metadata_df <- question_map$question_metadata
 
