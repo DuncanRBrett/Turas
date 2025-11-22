@@ -662,7 +662,8 @@ calculate_composite_score <- function(wave_df, wave_id, source_questions, questi
 calculate_weighted_mean <- function(values, weights) {
 
   # Remove NA values
-  valid_idx <- !is.na(values) & !is.na(weights) & weights > 0
+  # Use which() to ensure we get numeric indices without NA
+  valid_idx <- which(!is.na(values) & !is.na(weights) & weights > 0)
   values <- values[valid_idx]
   weights <- weights[valid_idx]
 
@@ -697,7 +698,8 @@ calculate_weighted_mean <- function(values, weights) {
 calculate_nps_score <- function(values, weights) {
 
   # Remove NA values
-  valid_idx <- !is.na(values) & !is.na(weights) & weights > 0
+  # Use which() to ensure we get numeric indices without NA
+  valid_idx <- which(!is.na(values) & !is.na(weights) & weights > 0)
   values <- values[valid_idx]
   weights <- weights[valid_idx]
 
@@ -745,7 +747,8 @@ calculate_nps_score <- function(values, weights) {
 calculate_proportions <- function(values, weights, codes) {
 
   # Remove NA values
-  valid_idx <- !is.na(values) & !is.na(weights) & weights > 0
+  # Use which() to ensure we get numeric indices without NA
+  valid_idx <- which(!is.na(values) & !is.na(weights) & weights > 0)
   values <- values[valid_idx]
   weights <- weights[valid_idx]
 
