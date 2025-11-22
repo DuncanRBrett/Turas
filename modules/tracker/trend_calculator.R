@@ -764,7 +764,9 @@ calculate_proportions <- function(values, weights, codes) {
 
   # Calculate proportion for each code
   proportions <- sapply(codes, function(code) {
-    code_weight <- sum(weights[values == code])
+    # Use which() to avoid NA issues in logical indexing
+    matched_idx <- which(values == code)
+    code_weight <- sum(weights[matched_idx], na.rm = TRUE)
     (code_weight / total_weight) * 100
   })
 
