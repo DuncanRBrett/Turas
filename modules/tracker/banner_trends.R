@@ -201,7 +201,8 @@ calculate_trend_for_segment <- function(q_code, question_map, wave_data, config,
     } else if (q_type == "nps") {
       calculate_nps_trend(q_code, question_map, wave_data, config)
     } else if (q_type == "single_choice") {
-      calculate_single_choice_trend(q_code, question_map, wave_data, config)
+      # Use enhanced version (supports TrackingSpecs, backward compatible)
+      calculate_single_choice_trend_enhanced(q_code, question_map, wave_data, config)
     } else if (q_type == "multi_choice" || q_type_raw == "Multi_Mention") {
       # Multi-mention support (Enhancement Phase 2)
       calculate_multi_mention_trend(q_code, question_map, wave_data, config)
