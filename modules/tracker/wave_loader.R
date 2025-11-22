@@ -240,8 +240,10 @@ get_wave_weight_var <- function(config, wave_id) {
 
   # Check if WeightVar column exists in waves definition
   if ("WeightVar" %in% names(config$waves)) {
-    wave_row <- config$waves[config$waves$WaveID == wave_id, ]
-    if (nrow(wave_row) > 0) {
+    # Use which() to avoid NA issues in logical indexing
+    wave_idx <- which(config$waves$WaveID == wave_id)
+    if (length(wave_idx) > 0) {
+      wave_row <- config$waves[wave_idx[1], ]
       weight_var <- wave_row$WeightVar[1]
       if (!is.na(weight_var) && weight_var != "") {
         return(weight_var)

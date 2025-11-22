@@ -157,7 +157,12 @@ get_question_metadata <- function(question_map, standard_code) {
     return(NULL)
   }
 
-  row <- metadata[metadata$QuestionCode == standard_code, ]
+  # Use which() to avoid NA issues in logical indexing
+  row_idx <- which(metadata$QuestionCode == standard_code)
+  if (length(row_idx) == 0) {
+    return(NULL)
+  }
+  row <- metadata[row_idx[1], ]
 
   return(list(
     QuestionText = row$QuestionText[1],
@@ -342,12 +347,12 @@ get_tracking_specs <- function(question_map, question_code) {
     return(NULL)
   }
 
-  # Find question row
-  q_row <- metadata_df[metadata_df$QuestionCode == question_code, ]
-
-  if (nrow(q_row) == 0) {
+  # Find question row (use which() to avoid NA issues)
+  q_row_idx <- which(metadata_df$QuestionCode == question_code)
+  if (length(q_row_idx) == 0) {
     return(NULL)
   }
+  q_row <- metadata_df[q_row_idx[1], ]
 
   tracking_specs <- q_row$TrackingSpecs[1]
 
@@ -382,12 +387,12 @@ get_composite_sources <- function(question_map, question_code) {
     return(NULL)
   }
 
-  # Find question row
-  q_row <- metadata_df[metadata_df$QuestionCode == question_code, ]
-
-  if (nrow(q_row) == 0) {
+  # Find question row (use which() to avoid NA issues)
+  q_row_idx <- which(metadata_df$QuestionCode == question_code)
+  if (length(q_row_idx) == 0) {
     return(NULL)
   }
+  q_row <- metadata_df[q_row_idx[1], ]
 
   source_questions <- q_row$SourceQuestions[1]
 

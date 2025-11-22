@@ -575,11 +575,12 @@ get_composite_source_questions <- function(question_map, composite_code) {
   # Check if metadata has SourceQuestions field
   metadata_df <- question_map$question_metadata
 
-  comp_row <- metadata_df[metadata_df$QuestionCode == composite_code, ]
-
-  if (nrow(comp_row) == 0) {
+  # Use which() to avoid NA issues in logical indexing
+  comp_row_idx <- which(metadata_df$QuestionCode == composite_code)
+  if (length(comp_row_idx) == 0) {
     return(NULL)
   }
+  comp_row <- metadata_df[comp_row_idx[1], ]
 
   # Check for SourceQuestions column
   if (!"SourceQuestions" %in% names(metadata_df)) {
