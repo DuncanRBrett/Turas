@@ -299,6 +299,8 @@ validate_trackable_questions <- function(config, question_map, wave_data) {
     q_metadata <- get_question_metadata(question_map, q_code)
     is_composite <- !is.null(q_metadata) && !is.na(q_metadata$QuestionType) &&
                     q_metadata$QuestionType == "Composite"
+    is_multi_mention <- !is.null(q_metadata) && !is.na(q_metadata$QuestionType) &&
+                       q_metadata$QuestionType == "Multi_Mention"
 
     # Skip data existence check for composites (they're calculated, not in raw data)
     if (is_composite) {
@@ -314,8 +316,19 @@ validate_trackable_questions <- function(config, question_map, wave_data) {
       } else {
         # Check if exists in data
         if (wave_id %in% names(wave_data)) {
-          if (!wave_code %in% names(wave_data[[wave_id]])) {
-            missing_waves <- c(missing_waves, paste0(wave_id, "(data)"))
+          # For Multi_Mention, check for pattern columns (Q10_1, Q10_2, etc.)
+          if (is_multi_mention) {
+            wave_code_escaped <- gsub("([.|()\\^{}+$*?\\[\\]])", "\\\\\\1", wave_code)
+            pattern <- paste0("^", wave_code_escaped, "_[0-9]+$")
+            matched_cols <- grep(pattern, names(wave_data[[wave_id]]), value = TRUE)
+            if (length(matched_cols) == 0) {
+              missing_waves <- c(missing_waves, paste0(wave_id, "(data)"))
+            }
+          } else {
+            # For other question types, check exact column name
+            if (!wave_code %in% names(wave_data[[wave_id]])) {
+              missing_waves <- c(missing_waves, paste0(wave_id, "(data)"))
+            }
           }
         }
       }
