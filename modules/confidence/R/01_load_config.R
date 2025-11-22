@@ -86,12 +86,20 @@ load_confidence_config <- function(config_path) {
   question_analysis <- load_question_analysis_sheet(config_path)
 
   cat(sprintf("✓ Configuration loaded successfully\n"))
-  cat(sprintf("  - File paths: %d parameters\n", nrow(file_paths)))
+  if (!is.null(file_paths)) {
+    cat(sprintf("  - File paths: %d parameters\n", nrow(file_paths)))
+  } else {
+    cat("  - File paths: (optional sheet not provided)\n")
+  }
   cat(sprintf("  - Study settings: %d parameters\n", nrow(study_settings)))
   cat(sprintf("  - Question analysis: %d questions (max 200)\n", nrow(question_analysis)))
 
   # Convert file_paths and study_settings to named lists for easier access
-  file_paths_list <- as.list(setNames(as.character(file_paths$Value), file_paths$Parameter))
+  file_paths_list <- if (!is.null(file_paths)) {
+    as.list(setNames(as.character(file_paths$Value), file_paths$Parameter))
+  } else {
+    list()  # Empty list if no File_Paths sheet
+  }
   study_settings_list <- as.list(setNames(study_settings$Value, study_settings$Setting))
 
   # Return structured config object
@@ -117,6 +125,13 @@ load_confidence_config <- function(config_path) {
 #' @keywords internal
 load_file_paths_sheet <- function(config_path) {
   sheet_name <- "File_Paths"
+
+  # Check if sheet exists
+  available_sheets <- readxl::excel_sheets(config_path)
+  if (!sheet_name %in% available_sheets) {
+    # Return NULL if File_Paths sheet doesn't exist (optional sheet)
+    return(NULL)
+  }
 
   # Read sheet
   df <- tryCatch(
@@ -325,6 +340,11 @@ validate_config <- function(config) {
 validate_file_paths <- function(file_paths_df) {
   errors <- character()
   warnings <- character()
+
+  # If file_paths_df is empty (File_Paths sheet was optional), return valid
+  if (is.null(file_paths_df) || length(file_paths_df) == 0) {
+    return(list(errors = errors, warnings = warnings))
+  }
 
   # Convert to named list for easier access
   paths <- setNames(file_paths_df$Value, file_paths_df$Parameter)
