@@ -163,8 +163,9 @@ filter_wave_data_to_segment <- function(wave_data, segment_def) {
     }
 
     # Filter to segment value
-    segment_rows <- wave_df[[segment_def$variable]] == segment_def$value &
-                    !is.na(wave_df[[segment_def$variable]])
+    # Use which() to get numeric indices (avoids NA issues with logical indexing)
+    segment_rows <- which(wave_df[[segment_def$variable]] == segment_def$value &
+                         !is.na(wave_df[[segment_def$variable]]))
 
     filtered_data[[wave_id]] <- wave_df[segment_rows, ]
   }
