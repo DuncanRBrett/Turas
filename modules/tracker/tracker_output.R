@@ -1856,7 +1856,8 @@ write_wave_history_sheet <- function(wb, sheet_name, trend_results, wave_ids, co
         if (!is.null(wave_result) && wave_result$available) {
           # Extract value based on metric type
           value <- extract_metric_value(wave_result, metric_info$metric_key, q_result$metric_type)
-          wave_values[i] <- if (!is.na(value)) round(value, decimal_places) else NA_real_
+          # Ensure value is scalar before checking is.na
+          wave_values[i] <- if (length(value) == 1 && !is.na(value)) round(value, decimal_places) else NA_real_
         } else {
           wave_values[i] <- NA_real_
         }
