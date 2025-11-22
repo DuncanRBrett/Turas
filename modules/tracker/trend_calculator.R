@@ -89,7 +89,8 @@ calculate_all_trends <- function(config, question_map, wave_data) {
       } else if (q_type == "nps") {
         calculate_nps_trend(q_code, question_map, wave_data, config)
       } else if (q_type == "single_choice") {
-        calculate_single_choice_trend(q_code, question_map, wave_data, config)
+        # Use enhanced version (supports TrackingSpecs, backward compatible)
+        calculate_single_choice_trend_enhanced(q_code, question_map, wave_data, config)
       } else if (q_type == "multi_choice" || q_type_raw == "Multi_Mention") {
         # Multi-mention support (Enhancement Phase 2)
         calculate_multi_mention_trend(q_code, question_map, wave_data, config)
@@ -316,6 +317,176 @@ calculate_single_choice_trend <- function(q_code, question_map, wave_data, confi
     question_type = metadata$QuestionType,
     metric_type = "proportions",
     response_codes = all_codes,
+    wave_results = wave_results,
+    changes = changes,
+    significance = sig_tests
+  ))
+}
+
+
+#' Parse Single Choice TrackingSpecs
+#'
+#' Parses TrackingSpecs for single-choice questions.
+#' Supports: "all", "top3", "category:X", "category:X,category:Y"
+#'
+#' @param tracking_specs Character. TrackingSpecs string
+#' @param all_codes Character vector. All available response codes
+#' @return List with $mode and $codes
+#'
+#' @keywords internal
+parse_single_choice_specs <- function(tracking_specs, all_codes) {
+
+  # Default to all if blank
+  if (is.null(tracking_specs) || tracking_specs == "" || tolower(trimws(tracking_specs)) == "all") {
+    return(list(
+      mode = "all",
+      codes = all_codes
+    ))
+  }
+
+  # Parse comma-separated specs
+  specs <- trimws(strsplit(tracking_specs, ",")[[1]])
+
+  result <- list(
+    mode = "selective",
+    codes = character(0)
+  )
+
+  for (spec in specs) {
+    spec_lower <- tolower(trimws(spec))
+
+    if (spec_lower == "all") {
+      # Track all codes
+      result$mode <- "all"
+      result$codes <- unique(c(result$codes, all_codes))
+
+    } else if (spec_lower == "top3") {
+      # Track top 3 most frequent codes (will need to determine from data)
+      result$mode <- "top3"
+      # Codes will be determined after calculating frequencies
+
+    } else if (startsWith(spec_lower, "category:")) {
+      # Specific category: "category:last week"
+      category_name <- sub("^category:", "", spec, ignore.case = TRUE)
+      category_name <- trimws(category_name)
+      result$codes <- c(result$codes, category_name)
+
+    } else {
+      warning(paste0("Unknown Single_Choice spec: ", spec))
+    }
+  }
+
+  # Remove duplicates
+  result$codes <- unique(result$codes)
+
+  return(result)
+}
+
+
+#' Calculate Single Choice Trend Enhanced
+#'
+#' Enhanced version with TrackingSpecs support.
+#' Calculates proportions for specified response options across waves.
+#' Supports selective tracking via category: syntax.
+#'
+#' @keywords internal
+calculate_single_choice_trend_enhanced <- function(q_code, question_map, wave_data, config) {
+
+  wave_ids <- config$waves$WaveID
+  metadata <- get_question_metadata(question_map, q_code)
+
+  # Get TrackingSpecs
+  tracking_specs <- get_tracking_specs(question_map, q_code)
+
+  # Get all unique response codes across all waves
+  all_codes <- character(0)
+  for (wave_id in wave_ids) {
+    wave_df <- wave_data[[wave_id]]
+    q_data <- extract_question_data(wave_df, wave_id, q_code, question_map)
+    if (!is.null(q_data)) {
+      all_codes <- unique(c(all_codes, unique(q_data[!is.na(q_data)])))
+    }
+  }
+
+  # Parse specs to determine which codes to track
+  specs_parsed <- parse_single_choice_specs(tracking_specs, all_codes)
+
+  # If top3 mode, calculate frequencies and select top 3
+  if (specs_parsed$mode == "top3") {
+    # Calculate overall frequencies across all waves
+    code_frequencies <- list()
+    for (code in all_codes) {
+      total_count <- 0
+      for (wave_id in wave_ids) {
+        wave_df <- wave_data[[wave_id]]
+        q_data <- extract_question_data(wave_df, wave_id, q_code, question_map)
+        if (!is.null(q_data)) {
+          total_count <- total_count + sum(q_data == code, na.rm = TRUE)
+        }
+      }
+      code_frequencies[[as.character(code)]] <- total_count
+    }
+
+    # Sort by frequency and take top 3
+    sorted_codes <- names(sort(unlist(code_frequencies), decreasing = TRUE))
+    specs_parsed$codes <- head(sorted_codes, 3)
+  }
+
+  # Use specified codes or all codes
+  codes_to_track <- if (length(specs_parsed$codes) > 0) {
+    specs_parsed$codes
+  } else {
+    all_codes
+  }
+
+  # Calculate proportions for each wave
+  wave_results <- list()
+
+  for (wave_id in wave_ids) {
+    wave_df <- wave_data[[wave_id]]
+    q_data <- extract_question_data(wave_df, wave_id, q_code, question_map)
+
+    if (is.null(q_data)) {
+      wave_results[[wave_id]] <- list(
+        proportions = NA,
+        n_unweighted = NA,
+        n_weighted = NA,
+        available = FALSE
+      )
+      next
+    }
+
+    # Calculate proportions for tracked codes only
+    result <- calculate_proportions(
+      values = q_data,
+      weights = wave_df$weight_var,
+      codes = codes_to_track
+    )
+
+    wave_results[[wave_id]] <- c(result, list(available = TRUE))
+  }
+
+  # Calculate changes for each tracked code
+  changes <- list()
+  for (code in codes_to_track) {
+    changes[[as.character(code)]] <- calculate_changes(wave_results, wave_ids, "proportions", code)
+  }
+
+  # Significance tests for each tracked code
+  sig_tests <- list()
+  for (code in codes_to_track) {
+    sig_tests[[as.character(code)]] <- perform_significance_tests_proportions(
+      wave_results, wave_ids, config, code
+    )
+  }
+
+  return(list(
+    question_code = q_code,
+    question_text = metadata$QuestionText,
+    question_type = metadata$QuestionType,
+    metric_type = "proportions",
+    response_codes = codes_to_track,
+    tracking_specs = if (!is.null(tracking_specs) && tracking_specs != "") tracking_specs else NULL,
     wave_results = wave_results,
     changes = changes,
     significance = sig_tests
