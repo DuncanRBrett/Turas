@@ -432,7 +432,7 @@ write_mean_trend_table <- function(wb, sheet_name, result, wave_ids, config, sty
       # Get significance
       sig_key <- paste0(change$from_wave, "_vs_", change$to_wave)
       sig_test <- result$significance[[sig_key]]
-      is_sig <- !is.null(sig_test) && sig_test$significant
+      is_sig <- is_significant(sig_test)
 
       # Write label
       openxlsx::writeData(wb, sheet_name, comparison_label,
@@ -1108,7 +1108,7 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
               sig_key <- paste0(comp$from_wave, "_vs_", comp$to_wave)
               sig_test_for_code <- total_result$significance[[response_code]]
               sig_test <- if (!is.null(sig_test_for_code)) sig_test_for_code[[sig_key]] else NULL
-              is_sig <- isTRUE(!is.null(sig_test) && !is.na(sig_test$significant) && sig_test$significant)
+              is_sig <- is_significant(sig_test)
 
               # Write label
               openxlsx::writeData(wb, sheet_name, comparison_label,
@@ -1156,8 +1156,7 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
           # Get significance
           sig_key <- paste0(change$from_wave, "_vs_", change$to_wave)
           sig_test <- sig_tests[[sig_key]]
-          # Use isTRUE() to safely handle NA/NULL cases
-          is_sig <- isTRUE(!is.null(sig_test) && !is.na(sig_test$significant) && sig_test$significant)
+          is_sig <- is_significant(sig_test)
 
           # Write label
           openxlsx::writeData(wb, sheet_name, comparison_label,

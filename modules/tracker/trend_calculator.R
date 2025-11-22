@@ -12,6 +12,23 @@
 #
 # ==============================================================================
 
+#' Check if Significance Test Result is Significant
+#'
+#' Safe helper function to check if a significance test result indicates significance.
+#' Handles NULL, NA, and missing values gracefully.
+#'
+#' @param sig_test Significance test result object (may be NULL or have $significant field)
+#' @return Logical. TRUE if test is significant, FALSE otherwise (including NULL/NA cases)
+#'
+#' @keywords internal
+is_significant <- function(sig_test) {
+  # Use isTRUE to safely handle NULL, NA, and non-logical values
+  return(isTRUE(!is.null(sig_test) &&
+                !is.na(sig_test$significant) &&
+                sig_test$significant))
+}
+
+
 #' Calculate Trends for All Questions
 #'
 #' Main function to calculate trends across waves for all tracked questions.
@@ -865,8 +882,8 @@ calculate_changes <- function(wave_results, wave_ids, metric_name, sub_metric = 
 #' @keywords internal
 perform_significance_tests_means <- function(wave_results, wave_ids, config) {
 
-  alpha <- get_setting(config, "alpha", default = 0.05)
-  min_base <- get_setting(config, "minimum_base", default = 30)
+  alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
+  min_base <- get_setting(config, "minimum_base", default = DEFAULT_MINIMUM_BASE)
 
   sig_tests <- list()
 
@@ -914,8 +931,8 @@ perform_significance_tests_means <- function(wave_results, wave_ids, config) {
 #' @keywords internal
 perform_significance_tests_proportions <- function(wave_results, wave_ids, config, response_code) {
 
-  alpha <- get_setting(config, "alpha", default = 0.05)
-  min_base <- get_setting(config, "minimum_base", default = 30)
+  alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
+  min_base <- get_setting(config, "minimum_base", default = DEFAULT_MINIMUM_BASE)
 
   sig_tests <- list()
 
@@ -978,8 +995,8 @@ perform_significance_tests_nps <- function(wave_results, wave_ids, config) {
   # This is a simplified approach for MVT
   # Could be enhanced with proper proportion difference testing
 
-  alpha <- get_setting(config, "alpha", default = 0.05)
-  min_base <- get_setting(config, "minimum_base", default = 30)
+  alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
+  min_base <- get_setting(config, "minimum_base", default = DEFAULT_MINIMUM_BASE)
 
   sig_tests <- list()
 
@@ -1035,7 +1052,7 @@ perform_significance_tests_nps <- function(wave_results, wave_ids, config) {
 #' Identical to TurasTabs t-test implementation
 #'
 #' @keywords internal
-t_test_for_means <- function(mean1, sd1, n1, mean2, sd2, n2, alpha = 0.05) {
+t_test_for_means <- function(mean1, sd1, n1, mean2, sd2, n2, alpha = DEFAULT_ALPHA) {
 
   # Pooled standard deviation
   pooled_var <- ((n1 - 1) * sd1^2 + (n2 - 1) * sd2^2) / (n1 + n2 - 2)
@@ -1074,7 +1091,7 @@ t_test_for_means <- function(mean1, sd1, n1, mean2, sd2, n2, alpha = 0.05) {
 #' Identical to TurasTabs z-test implementation
 #'
 #' @keywords internal
-z_test_for_proportions <- function(p1, n1, p2, n2, alpha = 0.05) {
+z_test_for_proportions <- function(p1, n1, p2, n2, alpha = DEFAULT_ALPHA) {
 
   # Pooled proportion
   p_pooled <- (p1 * n1 + p2 * n2) / (n1 + n2)
@@ -1553,7 +1570,7 @@ calculate_changes_for_metric <- function(wave_results, wave_ids, metric_name) {
 perform_significance_tests_for_metric <- function(wave_results, wave_ids, metric_name,
                                                    config, test_type = "proportion") {
 
-  alpha <- get_setting(config, "alpha_level", default = 0.05)
+  alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
   sig_tests <- list()
 
   for (i in 2:length(wave_ids)) {
@@ -2266,7 +2283,7 @@ calculate_changes_for_multi_mention_metric <- function(wave_results, wave_ids, m
 #' @keywords internal
 perform_significance_tests_multi_mention <- function(wave_results, wave_ids, column_name, config) {
 
-  alpha <- get_setting(config, "alpha_level", default = 0.05)
+  alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
   sig_tests <- list()
 
   for (i in 2:length(wave_ids)) {
@@ -2308,7 +2325,7 @@ perform_significance_tests_multi_mention <- function(wave_results, wave_ids, col
 #' @keywords internal
 perform_significance_tests_multi_mention_metric <- function(wave_results, wave_ids, metric_name, config) {
 
-  alpha <- get_setting(config, "alpha_level", default = 0.05)
+  alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
   sig_tests <- list()
 
   for (i in 2:length(wave_ids)) {

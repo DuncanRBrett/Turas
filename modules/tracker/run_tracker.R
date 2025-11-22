@@ -28,6 +28,7 @@ script_dir <- tryCatch({
   getwd()
 })
 
+source(file.path(script_dir, "constants.R"))
 source(file.path(script_dir, "tracker_config_loader.R"))
 source(file.path(script_dir, "wave_loader.R"))
 source(file.path(script_dir, "question_mapper.R"))

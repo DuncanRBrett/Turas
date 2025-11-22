@@ -119,9 +119,13 @@ clean_wave_data <- function(wave_df, wave_id) {
 
         # Replace non-response codes with NA (use which() to avoid NA issues)
         for (code in non_response_codes) {
-          match_idx <- which(trimws(toupper(col_data)) == toupper(code))
-          if (length(match_idx) > 0) {
-            col_data[match_idx] <- NA
+          # Only check non-NA values to avoid toupper() warnings
+          non_na_idx <- which(!is.na(col_data))
+          if (length(non_na_idx) > 0) {
+            match_idx <- non_na_idx[trimws(toupper(col_data[non_na_idx])) == toupper(code)]
+            if (length(match_idx) > 0) {
+              col_data[match_idx] <- NA
+            }
           }
         }
 
