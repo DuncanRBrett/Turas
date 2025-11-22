@@ -5,10 +5,8 @@
 # Part of Turas Segmentation Module
 # ==============================================================================
 
-# Source shared utilities
-source("modules/shared/lib/validation_utils.R")
-source("modules/shared/lib/config_utils.R")
-source("modules/shared/lib/data_utils.R")
+# NOTE: Dependencies are sourced by run_segment.R - do not source here
+# This ensures portability and prevents path resolution issues
 
 #' Read segmentation configuration from Excel file
 #'

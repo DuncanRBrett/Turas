@@ -5,8 +5,8 @@
 # Part of Turas Segmentation Module
 # ==============================================================================
 
-# Source shared utilities
-source("modules/shared/lib/logging_utils.R")
+# NOTE: Dependencies are sourced by run_segment.R - do not source here
+# This ensures portability and prevents path resolution issues
 
 #' Run k-means clustering for a single k value
 #'
