@@ -1094,6 +1094,63 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
         for (change_name in names(changes_to_show)) {
           change <- changes_to_show[[change_name]]
 
+          # For proportions, change is nested by response code, then by wave comparison
+          # For other metrics, change is the wave comparison directly
+          if (total_result$metric_type == "proportions" && is_nested) {
+            # Nested by response code - iterate through wave comparisons for this code
+            response_code <- change_name
+            for (comp_name in names(change)) {
+              comp <- change[[comp_name]]
+
+              comparison_label <- paste0(comp$from_wave, " → ", comp$to_wave, " (", response_code, ")")
+
+              # Get significance
+              sig_key <- paste0(comp$from_wave, "_vs_", comp$to_wave)
+              sig_test_for_code <- total_result$significance[[response_code]]
+              sig_test <- if (!is.null(sig_test_for_code)) sig_test_for_code[[sig_key]] else NULL
+              is_sig <- isTRUE(!is.null(sig_test) && !is.na(sig_test$significant) && sig_test$significant)
+
+              # Write label
+              openxlsx::writeData(wb, sheet_name, comparison_label,
+                                  startRow = current_row, startCol = 1, colNames = FALSE)
+
+              # Write numeric values separately (rounded), checking for NA
+              from_val <- if (!is.na(comp$from_value) && is.numeric(comp$from_value)) {
+                round(comp$from_value, decimal_places)
+              } else { NA_real_ }
+
+              to_val <- if (!is.na(comp$to_value) && is.numeric(comp$to_value)) {
+                round(comp$to_value, decimal_places)
+              } else { NA_real_ }
+
+              abs_change <- if (!is.na(comp$absolute_change) && is.numeric(comp$absolute_change)) {
+                round(comp$absolute_change, decimal_places)
+              } else { NA_real_ }
+
+              pct_change <- if (!is.na(comp$percentage_change) && is.numeric(comp$percentage_change)) {
+                round(comp$percentage_change, decimal_places)
+              } else { NA_real_ }
+
+              openxlsx::writeData(wb, sheet_name, from_val,
+                                  startRow = current_row, startCol = 2, colNames = FALSE)
+              openxlsx::writeData(wb, sheet_name, to_val,
+                                  startRow = current_row, startCol = 3, colNames = FALSE)
+              openxlsx::writeData(wb, sheet_name, abs_change,
+                                  startRow = current_row, startCol = 4, colNames = FALSE)
+              openxlsx::writeData(wb, sheet_name, pct_change,
+                                  startRow = current_row, startCol = 5, colNames = FALSE)
+              openxlsx::writeData(wb, sheet_name, if (is_sig) "Yes" else "No",
+                                  startRow = current_row, startCol = 6, colNames = FALSE)
+
+              # Apply number format
+              number_style <- openxlsx::createStyle(numFmt = number_format)
+              openxlsx::addStyle(wb, sheet_name, number_style,
+                                rows = current_row, cols = 2:5, gridExpand = TRUE, stack = TRUE)
+              current_row <- current_row + 1
+            }
+          } else {
+            # Single level - change is the wave comparison directly
+
           comparison_label <- paste0(change$from_wave, " → ", change$to_wave)
 
           # Get significance
@@ -1146,6 +1203,7 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
           }
 
           current_row <- current_row + 1
+          }  # End else block for non-proportions metrics
         }
       }
     }
