@@ -1047,11 +1047,16 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
       first_change_item <- total_result$changes[[1]]
       is_nested <- is.list(first_change_item) && !("from_wave" %in% names(first_change_item))
 
-      # For enhanced metrics with multiple metrics, show changes for first metric only
+      # For proportions, show ALL response codes; for enhanced metrics, show first metric only
       changes_to_show <- if (is_nested) {
-        # Use first metric's changes (typically "mean")
-        metric_name <- names(total_result$changes)[1]
-        total_result$changes[[metric_name]]
+        if (total_result$metric_type == "proportions") {
+          # Show all response codes for proportions
+          total_result$changes
+        } else {
+          # Use first metric's changes for other enhanced metrics (typically "mean")
+          metric_name <- names(total_result$changes)[1]
+          total_result$changes[[metric_name]]
+        }
       } else {
         # Flat structure (old format)
         total_result$changes
@@ -1059,7 +1064,7 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
 
       if (length(changes_to_show) > 0) {
         # Changes header
-        changes_header_text <- if (is_nested) {
+        changes_header_text <- if (is_nested && total_result$metric_type != "proportions") {
           paste0("Wave-over-Wave Changes (Total - ", names(total_result$changes)[1], "):")
         } else {
           "Wave-over-Wave Changes (Total):"
@@ -1078,7 +1083,7 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
         current_row <- current_row + 1
 
         # Get significance tests for the metric
-        sig_tests <- if (is_nested) {
+        sig_tests <- if (is_nested && total_result$metric_type != "proportions") {
           metric_name <- names(total_result$changes)[1]
           total_result$significance[[metric_name]]
         } else {
