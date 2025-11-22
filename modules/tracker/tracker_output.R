@@ -921,6 +921,44 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
       current_row <- current_row + 1
     }
 
+  } else if (first_seg$metric_type == "proportions") {
+    # Proportions - write row for each response code
+    for (code in first_seg$response_codes) {
+      # Write label
+      openxlsx::writeData(wb, sheet_name, as.character(code),
+                          startRow = current_row, startCol = 1, colNames = FALSE)
+      openxlsx::addStyle(wb, sheet_name, styles$metric_label, rows = current_row, cols = 1)
+
+      # Collect numeric values
+      num_cols <- length(segment_names) * length(wave_ids)
+      code_values <- numeric(num_cols)
+      idx <- 1
+      for (seg_name in segment_names) {
+        seg_result <- question_segments[[seg_name]]
+        for (wave_id in wave_ids) {
+          wave_result <- seg_result$wave_results[[wave_id]]
+
+          if (wave_result$available && !is.null(wave_result$proportions)) {
+            pct <- wave_result$proportions[[as.character(code)]]
+            code_values[idx] <- if (!is.null(pct) && !is.na(pct)) round(pct, decimal_places) else NA_real_
+          } else {
+            code_values[idx] <- NA_real_
+          }
+          idx <- idx + 1
+        }
+      }
+
+      # Write numeric values
+      openxlsx::writeData(wb, sheet_name, t(code_values),
+                          startRow = current_row, startCol = 2, colNames = FALSE)
+
+      # Apply number format
+      number_style <- openxlsx::createStyle(numFmt = number_format)
+      openxlsx::addStyle(wb, sheet_name, number_style,
+                        rows = current_row, cols = 2:length(headers), gridExpand = TRUE, stack = TRUE)
+      current_row <- current_row + 1
+    }
+
   } else if (first_seg$metric_type == "nps") {
     # NPS rows
     metrics <- c("NPS Score", "% Promoters", "% Passives", "% Detractors")
