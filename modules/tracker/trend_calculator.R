@@ -266,7 +266,9 @@ calculate_single_choice_trend <- function(q_code, question_map, wave_data, confi
     wave_df <- wave_data[[wave_id]]
     q_data <- extract_question_data(wave_df, wave_id, q_code, question_map)
     if (!is.null(q_data)) {
-      all_codes <- unique(c(all_codes, unique(q_data[!is.na(q_data)])))
+      # Use which() to avoid NA issues in logical indexing
+      valid_idx <- which(!is.na(q_data))
+      all_codes <- unique(c(all_codes, unique(q_data[valid_idx])))
     }
   }
 
@@ -406,7 +408,9 @@ calculate_single_choice_trend_enhanced <- function(q_code, question_map, wave_da
     wave_df <- wave_data[[wave_id]]
     q_data <- extract_question_data(wave_df, wave_id, q_code, question_map)
     if (!is.null(q_data)) {
-      all_codes <- unique(c(all_codes, unique(q_data[!is.na(q_data)])))
+      # Use which() to avoid NA issues in logical indexing
+      valid_idx <- which(!is.na(q_data))
+      all_codes <- unique(c(all_codes, unique(q_data[valid_idx])))
     }
   }
 
