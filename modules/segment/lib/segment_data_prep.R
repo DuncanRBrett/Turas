@@ -5,8 +5,14 @@
 # Part of Turas Segmentation Module
 # ==============================================================================
 
-# NOTE: Dependencies are sourced by run_segment.R - do not source here
-# This ensures portability and prevents path resolution issues
+# Source shared utilities
+source("modules/shared/lib/validation_utils.R")
+source("modules/shared/lib/data_utils.R")
+source("modules/shared/lib/logging_utils.R")
+
+# Source segment utilities
+source("modules/segment/lib/segment_outliers.R")
+source("modules/segment/lib/segment_variable_selection.R")
 
 #' Load and prepare segmentation data
 #'
