@@ -106,8 +106,9 @@ clean_wave_data <- function(wave_df, wave_id) {
 
     # Check if column might be numeric (has digits)
     if (is.character(col_data)) {
-      # Check if any values contain digits or decimal separators
-      non_na_values <- col_data[!is.na(col_data)]
+      # Check if any values contain digits or decimal separators (use which() to avoid NA issues)
+      non_na_idx <- which(!is.na(col_data))
+      non_na_values <- col_data[non_na_idx]
       has_numbers <- length(non_na_values) > 0 && any(grepl("[0-9]", non_na_values))
 
       if (has_numbers) {
@@ -116,9 +117,12 @@ clean_wave_data <- function(wave_df, wave_id) {
         # Replace comma decimals with period decimals
         col_data <- gsub(",", ".", col_data, fixed = TRUE)
 
-        # Replace non-response codes with NA
+        # Replace non-response codes with NA (use which() to avoid NA issues)
         for (code in non_response_codes) {
-          col_data[trimws(toupper(col_data)) == toupper(code)] <- NA
+          match_idx <- which(trimws(toupper(col_data)) == toupper(code))
+          if (length(match_idx) > 0) {
+            col_data[match_idx] <- NA
+          }
         }
 
         # Try converting to numeric
@@ -295,8 +299,11 @@ apply_wave_weights <- function(wave_df, weight_var, wave_id) {
   if (any(weights[!is.na(weights)] <= 0)) {
     n_invalid <- sum(weights[!is.na(weights)] <= 0)
     warning(paste0("Wave ", wave_id, ": ", n_invalid, " records have zero or negative weights (will be excluded)"))
-    # Actually exclude invalid weights by setting to NA
-    weights[weights <= 0] <- NA
+    # Actually exclude invalid weights by setting to NA (use which() to avoid NA issues)
+    invalid_idx <- which(!is.na(weights) & weights <= 0)
+    if (length(invalid_idx) > 0) {
+      weights[invalid_idx] <- NA
+    }
   }
 
   # Create standardized weight column
@@ -304,7 +311,9 @@ apply_wave_weights <- function(wave_df, weight_var, wave_id) {
 
   # Calculate weight efficiency (measure of weight distribution)
   # SHARED CODE NOTE: This calculation should be in /shared/weights.R
-  valid_weights <- weights[!is.na(weights) & weights > 0]
+  # Use which() to avoid NA issues in logical indexing
+  valid_idx <- which(!is.na(weights) & weights > 0)
+  valid_weights <- weights[valid_idx]
   if (length(valid_weights) > 0) {
     eff_n <- calculate_weight_efficiency(valid_weights)
     message(paste0("    Weight efficiency: ", round(eff_n, 1), " (out of ", length(valid_weights), " records)"))
@@ -378,19 +387,21 @@ validate_wave_data <- function(wave_data, config, question_mapping) {
 
     if (wave_col %in% names(question_mapping)) {
       wave_questions <- trimws(as.character(question_mapping[[wave_col]]))
-      wave_questions <- wave_questions[!is.na(wave_questions) & wave_questions != ""]
+      # Use which() to avoid NA issues in logical indexing
+      valid_idx <- which(!is.na(wave_questions) & wave_questions != "")
+      wave_questions <- wave_questions[valid_idx]
 
       # Filter out composite questions (they're calculated, not in raw data)
       if ("QuestionType" %in% names(question_mapping)) {
-        # Get indices of non-composite questions
-        non_composite_idx <- question_mapping$QuestionType != "Composite" |
-                            is.na(question_mapping$QuestionType)
+        # Get indices of non-composite questions (use which() to avoid NA issues)
+        non_composite_idx <- which(question_mapping$QuestionType != "Composite" |
+                                   is.na(question_mapping$QuestionType))
         wave_questions_to_check <- question_mapping[[wave_col]][non_composite_idx]
-        wave_questions_to_check <- wave_questions_to_check[!is.na(wave_questions_to_check) &
-                                                           wave_questions_to_check != ""]
+        valid_check_idx <- which(!is.na(wave_questions_to_check) &
+                                 wave_questions_to_check != "")
+        wave_questions_to_check <- wave_questions_to_check[valid_check_idx]
         question_types_to_check <- question_mapping$QuestionType[non_composite_idx]
-        question_types_to_check <- question_types_to_check[!is.na(wave_questions_to_check) &
-                                                           wave_questions_to_check != ""]
+        question_types_to_check <- question_types_to_check[valid_check_idx]
       } else {
         wave_questions_to_check <- wave_questions
         question_types_to_check <- rep(NA, length(wave_questions))

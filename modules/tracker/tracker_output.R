@@ -1937,15 +1937,14 @@ extract_wave_history_metrics <- function(q_result) {
     metrics[[1]] <- list(metric_key = "nps", label = "NPS")
 
   } else if (metric_type == "proportions") {
-    # Proportions - track first response code (or all if multiple)
-    # For Wave History, typically track one specific category
-    # Use first response code as default
+    # Proportions - track ALL response codes
     if (!is.null(q_result$response_codes) && length(q_result$response_codes) > 0) {
-      first_code <- q_result$response_codes[1]
-      metrics[[1]] <- list(
-        metric_key = paste0("proportion:", first_code),
-        label = paste0("% ", first_code)
-      )
+      for (code in q_result$response_codes) {
+        metrics[[length(metrics) + 1]] <- list(
+          metric_key = paste0("proportion:", code),
+          label = paste0("% ", code)
+        )
+      }
     }
 
   } else if (metric_type == "multi_mention") {
