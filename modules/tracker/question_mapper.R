@@ -35,7 +35,7 @@ build_question_map_index <- function(question_mapping, config) {
 
   # Process each question
   for (i in 1:nrow(question_mapping)) {
-    standard_code <- question_mapping$QuestionCode[i]
+    standard_code <- trimws(as.character(question_mapping$QuestionCode[i]))
 
     # Initialize list for this standard code
     standard_to_wave[[standard_code]] <- list()
@@ -48,6 +48,11 @@ build_question_map_index <- function(question_mapping, config) {
       # Get wave-specific code
       if (wave_col %in% names(question_mapping)) {
         wave_code <- question_mapping[[wave_col]][i]
+
+        # Trim whitespace from wave codes (common issue with Excel data)
+        if (!is.na(wave_code)) {
+          wave_code <- trimws(as.character(wave_code))
+        }
 
         # Only map if code exists for this wave
         if (!is.na(wave_code) && wave_code != "") {
