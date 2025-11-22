@@ -719,11 +719,11 @@ calculate_nps_score <- function(values, weights) {
   passives <- values >= 7 & values <= 8
   detractors <- values <= 6
 
-  # Calculate weighted percentages
+  # Calculate weighted percentages (use which() to avoid NA issues)
   total_weight <- sum(weights)
-  promoters_pct <- sum(weights[promoters]) / total_weight * 100
-  passives_pct <- sum(weights[passives]) / total_weight * 100
-  detractors_pct <- sum(weights[detractors]) / total_weight * 100
+  promoters_pct <- sum(weights[which(promoters)]) / total_weight * 100
+  passives_pct <- sum(weights[which(passives)]) / total_weight * 100
+  detractors_pct <- sum(weights[which(detractors)]) / total_weight * 100
 
   # NPS = % Promoters - % Detractors
   nps <- promoters_pct - detractors_pct
@@ -1143,9 +1143,9 @@ calculate_top_box <- function(values, weights, n_boxes = 1) {
   n_boxes <- min(n_boxes, length(unique_values))  # Can't exceed available values
   top_values <- tail(unique_values, n_boxes)
 
-  # Calculate percentage
+  # Calculate percentage (use which() to avoid NA issues)
   in_top_box <- values_valid %in% top_values
-  top_weight <- sum(weights_valid[in_top_box])
+  top_weight <- sum(weights_valid[which(in_top_box)])
   total_weight <- sum(weights_valid)
 
   proportion <- (top_weight / total_weight) * 100
@@ -1197,9 +1197,9 @@ calculate_bottom_box <- function(values, weights, n_boxes = 1) {
   n_boxes <- min(n_boxes, length(unique_values))
   bottom_values <- head(unique_values, n_boxes)
 
-  # Calculate percentage
+  # Calculate percentage (use which() to avoid NA issues)
   in_bottom_box <- values_valid %in% bottom_values
-  bottom_weight <- sum(weights_valid[in_bottom_box])
+  bottom_weight <- sum(weights_valid[which(in_bottom_box)])
   total_weight <- sum(weights_valid)
 
   proportion <- (bottom_weight / total_weight) * 100
@@ -1273,9 +1273,9 @@ calculate_custom_range <- function(values, weights, range_spec) {
     ))
   }
 
-  # Calculate proportion
+  # Calculate proportion (use which() to avoid NA issues)
   in_range <- values_valid %in% range_values
-  range_weight <- sum(weights_valid[in_range])
+  range_weight <- sum(weights_valid[which(in_range)])
   total_weight <- sum(weights_valid)
 
   proportion <- (range_weight / total_weight) * 100
@@ -1322,8 +1322,8 @@ calculate_distribution <- function(values, weights) {
   total_weight <- sum(weights_valid)
 
   for (val in unique_vals) {
-    matched <- values_valid == val
-    val_weight <- sum(weights_valid[matched])
+    matched_idx <- which(values_valid == val)
+    val_weight <- sum(weights_valid[matched_idx])
     distribution[[as.character(val)]] <- (val_weight / total_weight) * 100
   }
 
@@ -2020,7 +2020,8 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
       # % mentioning at least one option
       option_matrix <- as.matrix(wave_df[valid_rows, option_columns, drop = FALSE])
       mentioned_any <- rowSums(option_matrix == 1, na.rm = TRUE) > 0
-      any_weight <- sum(wave_df$weight_var[valid_rows][mentioned_any], na.rm = TRUE)
+      mentioned_any_idx <- which(mentioned_any)
+      any_weight <- sum(wave_df$weight_var[valid_rows][mentioned_any_idx], na.rm = TRUE)
       total_weight <- sum(wave_df$weight_var[valid_rows], na.rm = TRUE)
       additional_metrics$any_mention_pct <- if (total_weight > 0) {
         (any_weight / total_weight) * 100
@@ -2050,8 +2051,8 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
 
       count_dist <- list()
       for (count_val in 0:length(option_columns)) {
-        matched <- mention_counts == count_val
-        count_weight <- sum(weights_valid[matched], na.rm = TRUE)
+        matched_idx <- which(mention_counts == count_val)
+        count_weight <- sum(weights_valid[matched_idx], na.rm = TRUE)
         count_dist[[as.character(count_val)]] <- if (total_weight > 0) {
           (count_weight / total_weight) * 100
         } else {
