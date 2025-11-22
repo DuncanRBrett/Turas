@@ -1887,8 +1887,8 @@ parse_multi_mention_specs <- function(tracking_specs, base_code, wave_df) {
   result$columns <- unique(result$columns)
   result$additional_metrics <- unique(result$additional_metrics)
 
-  # Validate columns exist in data
-  if (length(result$columns) > 0) {
+  # Validate columns exist in data (skip if base_code is empty - we're just parsing for additional metrics)
+  if (length(result$columns) > 0 && !is.null(base_code) && base_code != "") {
     missing <- setdiff(result$columns, names(wave_df))
     if (length(missing) > 0) {
       warning(paste0("Multi-mention columns not found in data: ",

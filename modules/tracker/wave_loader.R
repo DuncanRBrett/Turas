@@ -375,7 +375,7 @@ validate_wave_data <- function(wave_data, config, question_mapping) {
     wave_col <- paste0("Wave", which(config$waves$WaveID == wave_id))
 
     if (wave_col %in% names(question_mapping)) {
-      wave_questions <- question_mapping[[wave_col]]
+      wave_questions <- trimws(as.character(question_mapping[[wave_col]]))
       wave_questions <- wave_questions[!is.na(wave_questions) & wave_questions != ""]
 
       # Filter out composite questions (they're calculated, not in raw data)
@@ -386,12 +386,39 @@ validate_wave_data <- function(wave_data, config, question_mapping) {
         wave_questions_to_check <- question_mapping[[wave_col]][non_composite_idx]
         wave_questions_to_check <- wave_questions_to_check[!is.na(wave_questions_to_check) &
                                                            wave_questions_to_check != ""]
+        question_types_to_check <- question_mapping$QuestionType[non_composite_idx]
+        question_types_to_check <- question_types_to_check[!is.na(wave_questions_to_check) &
+                                                           wave_questions_to_check != ""]
       } else {
         wave_questions_to_check <- wave_questions
+        question_types_to_check <- rep(NA, length(wave_questions))
       }
 
       # Check which questions are missing
-      missing_questions <- setdiff(wave_questions_to_check, names(wave_df))
+      # For Multi_Mention questions, check for pattern Q##_1, Q##_2, etc.
+      missing_questions <- character(0)
+      for (i in seq_along(wave_questions_to_check)) {
+        q_code <- wave_questions_to_check[i]
+        q_type <- question_types_to_check[i]
+
+        # For Multi_Mention, check if at least one option column exists
+        if (!is.na(q_type) && q_type == "Multi_Mention") {
+          # Build pattern: ^{q_code}_{digits}$
+          q_code_escaped <- gsub("([.|()\\^{}+$*?\\[\\]])", "\\\\\\1", q_code)
+          pattern <- paste0("^", q_code_escaped, "_[0-9]+$")
+          matched_cols <- grep(pattern, names(wave_df), value = TRUE)
+
+          if (length(matched_cols) == 0) {
+            missing_questions <- c(missing_questions, q_code)
+          }
+        } else {
+          # For other question types, check exact column name
+          if (!q_code %in% names(wave_df)) {
+            missing_questions <- c(missing_questions, q_code)
+          }
+        }
+      }
+
       if (length(missing_questions) > 0) {
         warning(paste0(
           "Wave ", wave_id, ": ",
