@@ -1,0 +1,128 @@
+Script Name,Location,Lines of Code,Key Function,Code Quality
+compare_outputs.R,Root,116,Compares baseline and modular output Excel files to validate refactoring changes,Solid
+create_all_templates.R,Root,646,Generates Excel template files for all Turas modules with formatting and examples,Solid
+launch_tracker_gui.R,Root,21,Quick launcher script for Turas Tracker GUI,Solid
+launch_turas.R,Root,510,Unified Shiny-based launcher for all Turas modules with modern UI,Solid
+test_bug_fixes.R,Root,191,Smoke test validating critical bug fixes across modules,Needs Improvement
+config_utils.R,Shared,356,Shared configuration file handling utilities for reading Excel and parsing settings,Solid
+formatting.R,Shared,318,Number and text formatting utilities with decimal separator handling,Solid
+weights.R,Shared,327,Weight calculation and validation utilities including efficiency and design effect,Solid
+generate_conjoint_test_data.R,Test Data,46,Generates synthetic orthogonal conjoint test data,Needs Improvement
+testthat.R,Tests,47,Main test runner executing all testthat tests,Solid
+test_shared_functions.R,Tests,198,Tests core shared utility functions including type conversion,Solid
+test_formatting_baseline.R,Tests,146,Documents baseline formatting behavior across modules,Solid
+test_shared_config.R,Tests,372,Tests shared configuration utilities with comprehensive coverage,Solid
+test_shared_weights.R,Tests,361,Tests weight calculation functions with edge cases,Solid
+test_config_baseline.R,Tests,85,Baseline tests for config loader functionality,Solid
+test_weights_baseline.R,Tests,106,Baseline weight calculation behavior tests,Solid
+test_shared_formatting.R,Tests,334,Tests shared formatting module with Excel format codes,Solid
+banner_trends.R,Tracker,372,Calculates trend metrics for banner segments with multi-segment comparisons,Solid
+constants.R,Tracker,68,Centralized constants for configuration management,Solid
+create_templates.R,Tracker,342,Generates production-ready tracker template files,Needs Improvement
+formatting_utils.R,Tracker,98,Number and Excel formatting utilities for tracker,Solid
+question_mapper.R,Tracker,554,Maps questions across waves with validation and composites,Solid
+run_ccs_tracking.R,Tracker,27,Hardcoded example script for CCS tracking,Needs Improvement
+run_tracker.R,Tracker,393,Main orchestration script for end-to-end tracking analysis,Solid
+run_tracker_gui.R,Tracker,625,Shiny GUI for tracker with file selection and output console,Solid
+test_quick_fixes.R,Tracker,163,Unit test validating module loading and helper functions,Solid
+test_wave_history.R,Tracker,145,Test suite for Wave History report format,Needs Improvement
+tracker_config_loader.R,Tracker,317,Loads and parses Excel configuration files with validation,Solid
+tracker_output.R,Tracker,2102,Excel output writer generating detailed trend sheets and reports,Solid
+trend_calculator.R,Tracker,2369,Core calculations for rating NPS trends with significance testing,Solid
+validation_tracker.R,Tracker,485,Comprehensive validation for configuration and data mappings,Solid
+wave_loader.R,Tracker,486,Loads survey data and applies weighting with validation,Solid
+test_enhancements.R,Tracker Test Data,152,Tests enhancement phase features and complex metrics,Needs Improvement
+test_mvt.R,Tracker Test Data,36,Minimal viable test for core tracker foundation,Needs Improvement
+test_phase1.R,Tracker Test Data,119,Tests Phase 1 initialization and configuration,Needs Improvement
+test_phase2.R,Tracker Test Data,33,Tests Phase 2 trend calculation,Needs Improvement
+test_phase3.R,Tracker Test Data,110,Tests Phase 3 banner breakouts with demographics,Needs Improvement
+regenerate_test_config.R,Segment Test Data,26,Converts CSV test configuration to Excel format,Solid
+generate_test_question_labels.R,Segment Test Data,53,Generates structured question labels for testing,Solid
+generate_test_data_20vars.R,Segment Test Data,139,Creates synthetic data with 20 correlated variables,Solid
+generate_test_data.R,Segment Test Data,100,Generates test data with known 4-cluster structure,Solid
+test_segmentation_real_data.R,Segment Test Data,226,Interactive testing guide for real survey data,Needs Improvement
+run_segment.R,Segment,343,Main orchestrator for segmentation pipeline,Solid
+run_segment_gui.R,Segment,511,Shiny GUI for segmentation with project management,Solid
+segment_scoring.R,Segment Lib,280,Applies k-means models to new data for segment assignment,Solid
+segment_variable_selection.R,Segment Lib,510,Variable selection methods to reduce dimensionality,Solid
+segment_data_prep.R,Segment Lib,538,Data preparation pipeline with outlier detection,Solid
+segment_profiling_enhanced.R,Segment Lib,326,Advanced statistical profiles with ANOVA and effect sizes,Solid
+segment_visualization.R,Segment Lib,373,Publication-quality visualizations including heatmaps,Solid
+segment_utils.R,Segment Lib,387,Utility functions for initialization and validation,Solid
+segment_profile.R,Segment Lib,225,Calculates segment mean profiles and ANOVA statistics,Solid
+segment_kmeans.R,Segment Lib,209,K-means clustering wrapper with convergence checks,Solid
+segment_outliers.R,Segment Lib,365,Multivariate outlier detection using z-score and Mahalanobis,Solid
+segment_config.R,Segment Lib,458,Loads and validates segmentation configuration,Solid
+segment_export.R,Segment Lib,530,Exports segment assignments to Excel with reports,Solid
+segment_validation.R,Segment Lib,391,Assesses segment quality through stability analysis,Solid
+run_tabs.R,Tabs,87,Entry point for tabs analysis framework,Needs Improvement
+run_tabs_gui.R,Tabs,394,Shiny GUI for interactive tabs analysis,Solid
+validation.R,Tabs Lib,1838,Comprehensive input validation and data quality checks,Solid
+excel_writer.R,Tabs Lib,1463,Creates formatted Excel workbooks with crosstab results,Solid
+question_dispatcher.R,Tabs Lib,420,Routes question processing based on type,Solid
+run_crosstabs.R,Tabs Lib,1194,Main execution orchestrating entire crosstabs pipeline,Solid
+cell_calculator.R,Tabs Lib,731,Core cell and row calculation functions,Solid
+ranking.R,Tabs Lib,1615,Handles ranking question analysis with statistical rigor,Solid
+composite_processor.R,Tabs Lib,713,Processes composite metrics combining multiple questions,Solid
+numeric_processor.R,Tabs Lib,581,Processes numeric questions with bin distributions,Solid
+config_loader.R,Tabs Lib,631,Loads and parses configuration files,Solid
+shared_functions.R,Tabs Lib,1646,Common utilities for validation formatting and logging,Solid
+standard_processor.R,Tabs Lib,1273,Processes standard questions (single/multi choice rating NPS),Solid
+question_orchestrator.R,Tabs Lib,541,Coordinates question processing workflow,Solid
+banner_indices.R,Tabs Lib,503,Creates memory-optimized banner row indices,Solid
+summary_builder.R,Tabs Lib,626,Builds consolidated index summary sheet,Solid
+banner.R,Tabs Lib,523,Creates complete banner structure for crosstabs,Solid
+weighting.R,Tabs Lib,1490,Implements weighted analysis and significance testing,Solid
+create_example_config.R,Confidence Examples,360,Creates example configuration and survey data files,Solid
+utils.R,Confidence R,424,Decimal formatting input validation and utilities,Solid
+00_main.R,Confidence R,621,Orchestrates complete confidence analysis workflow,Solid
+02_load_data.R,Confidence R,415,Loads and validates survey data from CSV/XLSX,Solid
+03_study_level.R,Confidence R,393,Calculates design effects and effective sample sizes,Solid
+07_output.R,Confidence R,850,Generates multi-sheet Excel workbooks with results,Needs Improvement
+04_proportions.R,Confidence R,582,Implements four confidence interval methods for proportions,Solid
+01_load_config.R,Confidence R,611,Loads and validates configuration from Excel,Solid
+05_means.R,Confidence R,590,Implements confidence interval methods for means,Solid
+test_01_load_config.R,Confidence Tests,563,Test suite for configuration loading and validation,Solid
+test_utils.R,Confidence Tests,548,Test suite for utility functions,Solid
+run_confidence_gui.R,Confidence,408,Shiny GUI for confidence interval analysis,Needs Improvement
+turas_launcher_shiny.R,Parser,571,Modern Shiny GUI launcher with directory browsing,Solid
+turas_launcher_tcltk.R,Parser,375,Cross-platform tcltk GUI launcher,Solid
+shiny_app.R,Parser,472,Questionnaire parser interactive Shiny app,Needs Improvement
+run_parser.R,Parser,84,Main entry point for parser module,Solid
+docx_reader.R,Parser Lib,112,Reads Word documents and extracts text,Solid
+text_cleaner.R,Parser Lib,192,Cleans question text formatting artifacts,Solid
+type_detector.R,Parser Lib,334,Automatically detects question types,Solid
+pattern_parser.R,Parser Lib,265,Parses questionnaires using regex patterns,Solid
+structure_parser.R,Parser Lib,148,Fallback parser using document structure,Solid
+bin_detector.R,Parser Lib,161,Detects numeric bins and ranges in options,Solid
+output_generator.R,Parser Lib,599,Generates Survey_Structure.xlsx and related files,Solid
+parse_orchestrator.R,Parser Lib,213,Coordinates complete parsing workflow,Solid
+run_alchemerparser.R,AlchemerParser,94,CLI entry point with dependency checking,Solid
+run_alchemerparser_gui.R,AlchemerParser,560,Interactive Shiny GUI for AlchemerParser,Solid
+00_main.R,AlchemerParser R,337,Main orchestrator for Alchemer parsing workflow,Solid
+01_parse_data_map.R,AlchemerParser R,377,Parses Alchemer data export map,Solid
+02_parse_translation.R,AlchemerParser R,202,Extracts question texts and option labels,Solid
+03_parse_word_doc.R,AlchemerParser R,159,Extracts type hints from Word questionnaire,Solid
+04_classify_questions.R,AlchemerParser R,604,Classifies question types and handles grid structures,Solid
+05_generate_codes.R,AlchemerParser R,401,Generates question codes with proper padding,Solid
+06_output.R,AlchemerParser R,550,Generates output files with Excel formatting,Solid
+run_pricing_gui.R,Pricing,376,Shiny GUI for pricing analysis,Solid
+00_main.R,Pricing R,221,Orchestrates pricing analysis workflow,Solid
+01_config.R,Pricing R,621,Loads and validates Excel configuration for pricing,Needs Improvement
+02_validation.R,Pricing R,336,Comprehensive data validation for pricing,Solid
+03_van_westendorp.R,Pricing R,348,Implements Van Westendorp PSM methodology,Solid
+04_gabor_granger.R,Pricing R,434,Implements Gabor-Granger demand curve analysis,Solid
+05_visualization.R,Pricing R,345,Generates ggplot2 visualizations for pricing,Solid
+06_output.R,Pricing R,346,Creates formatted Excel workbook output,Solid
+run_conjoint_gui.R,Conjoint,408,Shiny GUI for conjoint analysis,Solid
+00_main.R,Conjoint R,138,Main entry point for conjoint analysis,Solid
+01_config.R,Conjoint R,90,Loads validates and processes conjoint configuration,Needs Improvement
+02_validation.R,Conjoint R,84,Loads conjoint data with format detection,Needs Improvement
+03_analysis.R,Conjoint R,322,Calculates part-worth utilities using regression,Needs Improvement
+04_output.R,Conjoint R,73,Writes formatted Excel workbook,Solid
+run_keydriver_gui.R,Keydriver,408,Shiny GUI for key driver analysis,Solid
+00_main.R,Keydriver R,150,Orchestrates key driver analysis workflow,Solid
+01_config.R,Keydriver R,88,Loads and validates key driver configuration,Solid
+02_validation.R,Keydriver R,88,Loads and validates data for key driver analysis,Solid
+03_analysis.R,Keydriver R,231,Calculates importance metrics including Shapley values,Solid
+04_output.R,Keydriver R,89,Generates Excel output with importance rankings,Solid
