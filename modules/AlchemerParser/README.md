@@ -186,7 +186,7 @@ AlchemerParser uses a hierarchical detection system:
 3. **Rating** - 5/7/10-point scales with satisfaction/quality terms
 4. **Ranking** - "rank" keyword or sequential position data
 5. **Multi_Mention** - `[ ]` brackets in Word doc or multiple columns
-6. **Single_Mention** - `( )` brackets or default
+6. **Single_Response** - `( )` brackets or default
 7. **Numeric** - Numeric input or slider
 8. **Open_End** - Text box (excluded from analysis)
 
@@ -196,7 +196,7 @@ AlchemerParser uses a hierarchical detection system:
 
 ### Radio Button Grid
 **Input:** Multiple rows, single choice per row
-**Output:** Q##a, Q##b, Q##c (Single_Mention per row)
+**Output:** Q##a, Q##b, Q##c (Single_Response per row)
 
 ### Checkbox Grid
 **Input:** Multiple rows, multiple choices per row
@@ -214,7 +214,7 @@ AlchemerParser uses a hierarchical detection system:
 |-------|----------|
 | "Files not found" | Ensure all 3 files have matching project name prefix |
 | "Translation missing columns" | Re-export from Alchemer with "Key" and "Default Text" columns |
-| Questions all classified as Single_Mention | Check Word doc is .docx format with proper question numbering |
+| Questions all classified as Single_Response | Check Word doc is .docx format with proper question numbering |
 | Grid questions not detected | Verify data export is mapping file (not data) with Question Numbers format |
 
 ---

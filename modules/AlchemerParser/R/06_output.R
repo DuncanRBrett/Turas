@@ -289,8 +289,8 @@ generate_survey_structure <- function(questions) {
 calculate_display_columns <- function(q) {
   var_type <- q$variable_type
 
-  # Single_Mention always shows 1 column (even with othermention)
-  if (var_type == "Single_Mention") {
+  # Single_Response always shows 1 column (even with othermention)
+  if (var_type == "Single_Response") {
     return(1)
   }
 
@@ -392,7 +392,7 @@ create_option_rows <- function(q) {
       )
     }
 
-  } else if (q$variable_type %in% c("Single_Mention", "Rating", "Likert", "NPS")) {
+  } else if (q$variable_type %in% c("Single_Response", "Rating", "Likert", "NPS")) {
     # Options from translation
     options <- q$options
 

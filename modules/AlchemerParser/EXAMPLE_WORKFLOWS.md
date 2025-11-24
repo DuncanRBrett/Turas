@@ -41,7 +41,7 @@ CustomerSat2025_translation-export.xlsx
    - 15 questions detected
    - 2 NPS questions
    - 5 Rating questions
-   - 8 Single_Mention questions
+   - 8 Single_Response questions
    - 0 validation flags
 5. Download all 3 output files
 6. Proceed to Tabs module
@@ -65,7 +65,7 @@ cat(sprintf("Validation flags: %d\n", result$summary$n_flags))
 
 # Type distribution
 print(result$summary$type_distribution)
-#   NPS          Rating   Single_Mention
+#   NPS          Rating   Single_Response
 #   2            5        8
 ```
 
@@ -87,8 +87,8 @@ Q04          | Y           | How likely are you to recommend us? (NPS)
 ```
 QuestionCode | QuestionText | Variable_Type | Columns
 -------------|--------------|---------------|--------
-Q01          | Age group    | Single_Mention| 1
-Q02          | Gender       | Single_Mention| 1
+Q01          | Age group    | Single_Response| 1
+Q02          | Gender       | Single_Response| 1
 Q03          | Satisfaction | Rating        | 1
 Q04          | NPS          | NPS           | 1
 ...
@@ -170,7 +170,7 @@ result <- run_alchemerparser(
 #
 # Step 5: Classifying question types...
 #   Question type distribution:
-#     Single_Mention: 8
+#     Single_Response: 8
 #     Multi_Mention: 1
 #     Rating: 9
 #     NPS: 1
@@ -218,9 +218,9 @@ for (q_num in names(result$questions)) {
 
 # Output:
 # Q05 is a radio_grid with 3 sub-questions:
-#   - Q05a: HR Department (Single_Mention)
-#   - Q05b: IT Department (Single_Mention)
-#   - Q05c: Finance Department (Single_Mention)
+#   - Q05a: HR Department (Single_Response)
+#   - Q05b: IT Department (Single_Response)
+#   - Q05c: Finance Department (Single_Response)
 #
 # Q08 is a checkbox_grid with 3 sub-questions:
 #   - Q08a: Health Insurance (Multi_Mention)
@@ -247,9 +247,9 @@ Q5: Finance:How would you rate the following departments?
 
 AlchemerParser output:
 ```
-Q05a | HR Department      | Single_Mention | Options: Excellent, Good, Fair, Poor
-Q05b | IT Department      | Single_Mention | Options: Excellent, Good, Fair, Poor
-Q05c | Finance Department | Single_Mention | Options: Excellent, Good, Fair, Poor
+Q05a | HR Department      | Single_Response | Options: Excellent, Good, Fair, Poor
+Q05b | IT Department      | Single_Response | Options: Excellent, Good, Fair, Poor
+Q05c | Finance Department | Single_Response | Options: Excellent, Good, Fair, Poor
 ```
 
 **Checkbox Grid (Q08):**
@@ -672,16 +672,16 @@ HV2025_translation-export.xlsx
 
 #### Issue 1: Open-Ended Question Misclassified
 
-**Problem:** Q03 (an open-ended question) was being classified as Single_Mention instead of Open_End.
+**Problem:** Q03 (an open-ended question) was being classified as Single_Response instead of Open_End.
 
-**Root Cause:** Question had no options in the translation export, but the classification logic was defaulting to Single_Mention before checking for Open_End.
+**Root Cause:** Question had no options in the translation export, but the classification logic was defaulting to Single_Response before checking for Open_End.
 
-**Solution:** Updated classification hierarchy in `04_classify_questions.R:234-254` to check `if (n_options > 0)` before returning Single_Mention. Questions with zero options now correctly default to Open_End.
+**Solution:** Updated classification hierarchy in `04_classify_questions.R:234-254` to check `if (n_options > 0)` before returning Single_Response. Questions with zero options now correctly default to Open_End.
 
 **Result:**
 ```r
 # Before fix:
-Q03 | Variable_Type: Single_Mention | Options: 0
+Q03 | Variable_Type: Single_Response | Options: 0
 
 # After fix:
 Q03 | Variable_Type: Open_End | Options: 0
@@ -746,7 +746,7 @@ Q06d | Options: 5 (Very dissatisfied, Dissatisfied, Neutral, Satisfied, Very sat
 
 #### Issue 4: Numeric Rating Scales Misclassified
 
-**Problem:** Q60 and Q65 (0-10 rating scales) were being classified as Single_Mention instead of Rating.
+**Problem:** Q60 and Q65 (0-10 rating scales) were being classified as Single_Response instead of Rating.
 
 **Root Cause:** Parser only detected Likert-style ratings (5-point scales with text labels), not numeric scales.
 
@@ -758,8 +758,8 @@ Q06d | Options: 5 (Very dissatisfied, Dissatisfied, Neutral, Satisfied, Very sat
 **Result:**
 ```r
 # Before fix:
-Q60 | Variable_Type: Single_Mention | Options: 12 (0, 1, 2, ..., 10, Don't know)
-Q65 | Variable_Type: Single_Mention | Options: 12 (0, 1, 2, ..., 10, Don't know)
+Q60 | Variable_Type: Single_Response | Options: 12 (0, 1, 2, ..., 10, Don't know)
+Q65 | Variable_Type: Single_Response | Options: 12 (0, 1, 2, ..., 10, Don't know)
 
 # After fix:
 Q60 | Variable_Type: Rating | Options: 12 (0, 1, 2, ..., 10, Don't know)
@@ -791,7 +791,7 @@ All issues resolved:
 - ✅ Q03 correctly classified as Open_End
 - ✅ Q06 rows in correct data order (Village management → CEO)
 - ✅ Q06 sub-questions all have 5 options
-- ✅ Q60 and Q65 classified as Rating (not Single_Mention)
+- ✅ Q60 and Q65 classified as Rating (not Single_Response)
 
 ---
 
@@ -857,10 +857,10 @@ The question had explicit "ranking question" text but was caught by grid detecti
 **Result:**
 ```r
 # Before fix:
-Q119a | Variable_Type: Single_Mention | Options: 4
-Q119b | Variable_Type: Single_Mention | Options: 4
-Q119c | Variable_Type: Single_Mention | Options: 4
-Q119d | Variable_Type: Single_Mention | Options: 4
+Q119a | Variable_Type: Single_Response | Options: 4
+Q119b | Variable_Type: Single_Response | Options: 4
+Q119c | Variable_Type: Single_Response | Options: 4
+Q119d | Variable_Type: Single_Response | Options: 4
 
 # After fix:
 Q119 | Variable_Type: Ranking | Columns: 4 | Options: 4

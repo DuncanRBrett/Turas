@@ -53,7 +53,7 @@ Generate Outputs → Crosstab Config → Survey Structure → Data Headers
 
 **2. Grid Pivoting**
 - Checkbox grids pivoted by rows (each row becomes a question)
-- Radio grids split by rows (each row is a separate Single_Mention)
+- Radio grids split by rows (each row is a separate Single_Response)
 - Star rating grids split by items (each item is a separate Rating)
 
 **3. Multi-Source Reconciliation**
@@ -227,9 +227,9 @@ Numbers: [1, 2]
 
 8. Numeric Rating Scale Detection
    - If ≥50% of options can be converted to numbers → Rating
-   - Checked before Single_Mention default
+   - Checked before Single_Response default
 
-9. Single_Mention (default)
+9. Single_Response (default)
    - Word hint brackets = "()"
    - OR has options but not classified above
 
@@ -327,7 +327,7 @@ Patterns matched (case-insensitive):
   q_num: "1"
   q_id: "2"
   question_text: "What is your gender?"
-  variable_type: "Single_Mention"
+  variable_type: "Single_Response"
   grid_type: "single"
   n_columns: 1
   columns: [...]
@@ -349,7 +349,7 @@ Patterns matched (case-insensitive):
       suffix: "a"
       row_label: "Tees"
       question_text: "..."
-      variable_type: "Single_Mention"
+      variable_type: "Single_Response"
       n_columns: 1
       options: [...]
       q_code: "Q02a"
@@ -674,7 +674,7 @@ expect_equal(result$summary$n_flags, 0)  # Expected no flags
 
 ### Manual Testing Checklist
 
-- [ ] Simple questions (Single_Mention, Open_End, Numeric)
+- [ ] Simple questions (Single_Response, Open_End, Numeric)
 - [ ] Scale questions (NPS, Likert, Rating)
 - [ ] Multi-column questions (Multi_Mention, Ranking)
 - [ ] Radio button grids

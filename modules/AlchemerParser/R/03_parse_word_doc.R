@@ -9,7 +9,7 @@
 #'
 #' @description
 #' Parses the Word questionnaire document to extract type hints:
-#' - ( ) brackets = Single_Mention
+#' - ( ) brackets = Single_Response
 #' - [ ] brackets = Multi_Mention
 #' - "rank" keyword = Ranking
 #' - Question numbers and text

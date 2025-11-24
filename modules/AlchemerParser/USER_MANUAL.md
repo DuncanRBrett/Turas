@@ -189,7 +189,7 @@ The GUI displays:
 **Question Preview Table:**
 - Question Code (Q01, Q02a, etc.)
 - Question Text (truncated)
-- Variable Type (Single_Mention, NPS, etc.)
+- Variable Type (Single_Response, NPS, etc.)
 - Number of data columns
 
 **Validation Flags Table:**
@@ -309,7 +309,7 @@ for (proj in projects) {
 |--------|-------------|
 | QuestionCode | Unique identifier |
 | QuestionText | Full question text |
-| Variable_Type | Single_Mention, Multi_Mention, NPS, Likert, Rating, Ranking, Numeric, Open_End |
+| Variable_Type | Single_Response, Multi_Mention, NPS, Likert, Rating, Ranking, Numeric, Open_End |
 | Columns | Number of data columns |
 | Ranking_Format | "position" for ranking questions, blank otherwise |
 | Ranking_Positions | Blank (user fills if needed) |
@@ -383,7 +383,7 @@ Questions are classified in this order:
    - OR Word doc has `[ ]` brackets
    - OR multiple columns with different option labels
 
-6. **Single_Mention**
+6. **Single_Response**
    - Word doc has `( )` brackets
    - OR single column with options
    - Default for most radio button questions
@@ -409,9 +409,9 @@ The parser automatically handles three types of grids:
 - Fairways (Happy / Neutral / Unhappy)
 
 **Output:**
-- Q02a (Tees) - Single_Mention
-- Q02b (Greens) - Single_Mention
-- Q02c (Fairways) - Single_Mention
+- Q02a (Tees) - Single_Response
+- Q02b (Greens) - Single_Response
+- Q02c (Fairways) - Single_Response
 
 #### Checkbox Grid
 **Structure:** Multiple rows, multiple choices per row
@@ -494,7 +494,7 @@ This ensures proper alphabetical sorting.
 
 If the parser encounters:
 - **Missing translation for a question:** Uses data export map text, flags for review
-- **No options for Single_Mention:** Flags as ERROR
+- **No options for Single_Response:** Flags as ERROR
 - **Ambiguous multi-column:** Flags as REVIEW if Word doc doesn't clarify
 
 ---
@@ -525,7 +525,7 @@ The parser flags issues that may need manual review.
 
 #### "NO_OPTIONS_FOUND"
 **Severity:** ERROR
-**Cause:** Single_Mention question has no options in translation
+**Cause:** Single_Response question has no options in translation
 **Fix:** Check translation export or verify question type
 
 #### "AMBIGUOUS_MULTI_COLUMN"
@@ -580,7 +580,7 @@ The parser flags issues that may need manual review.
 - Re-export from Alchemer
 - Ensure columns are named "Key" and "Default Text"
 
-### Issue: All questions classified as "Single_Mention"
+### Issue: All questions classified as "Single_Response"
 **Cause:** Word questionnaire file not being read correctly
 **Fix:**
 - Ensure file is .docx format (not .doc)

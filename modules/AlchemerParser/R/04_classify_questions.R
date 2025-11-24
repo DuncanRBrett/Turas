@@ -33,7 +33,7 @@ classify_questions <- function(questions, translation_data, word_hints,
         q_num = q_num,
         q_id = "ResponseID",
         question_text = "Response ID",
-        variable_type = "System",
+        variable_type = "Open_End",
         grid_type = "single",
         n_columns = 1,
         columns = q$columns,
@@ -173,7 +173,7 @@ classify_questions <- function(questions, translation_data, word_hints,
 #' @description
 #' Classifies a single question's variable type using detection hierarchy:
 #' 1. NPS, 2. Likert, 3. Rating, 4. Ranking, 5. Multi_Mention,
-#' 6. Single_Mention, 7. Numeric, 8. Open_End
+#' 6. Single_Response, 7. Numeric, 8. Open_End
 #'
 #' @param question Question group
 #' @param options Option list from translation
@@ -287,7 +287,7 @@ classify_variable_type <- function(question, options, hints, verbose = FALSE) {
     }
   }
 
-  # 8. Check for numeric rating scale (before Single_Mention)
+  # 8. Check for numeric rating scale (before Single_Response)
   # If options are mostly numeric (e.g., 0-10, 1-5), classify as Rating
   if (n_options > 0) {
     option_texts <- sapply(options, function(o) o$text)
@@ -301,9 +301,9 @@ classify_variable_type <- function(question, options, hints, verbose = FALSE) {
     }
   }
 
-  # 9. Check if Single-Mention (has options)
+  # 9. Check if Single-Response (has options)
   if (n_options > 0) {
-    return("Single_Mention")
+    return("Single_Response")
   }
 
   # 10. Otherwise Open_End (no options, not classified above)
@@ -366,7 +366,7 @@ pivot_checkbox_grid <- function(question, options, hints) {
 #'
 #' @description
 #' Creates sub-questions for a radio button grid (one per row).
-#' Each sub-question is Single_Mention type, unless options are numeric (then Rating).
+#' Each sub-question is Single_Response type, unless options are numeric (then Rating).
 #'
 #' @param question Question group
 #' @param options Options from translation
@@ -385,7 +385,7 @@ create_radio_grid_questions <- function(question, options, hints) {
 
   # Determine variable type based on options
   # If options are mostly numeric (e.g., 0-10), classify as Rating
-  var_type <- "Single_Mention"
+  var_type <- "Single_Response"
   if (length(options) > 0) {
     option_texts <- sapply(options, function(o) o$text)
     numeric_values <- suppressWarnings(as.numeric(option_texts))

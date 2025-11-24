@@ -75,8 +75,8 @@ generate_question_codes <- function(questions, verbose = FALSE) {
           # Ranking: Q12_1, Q12_2, Q12_3
           q$q_codes <- paste0(base_code, "_", seq_along(q$columns))
 
-        } else if (q$variable_type == "Single_Mention") {
-          # Single_Mention with multiple columns (usually main + othermention)
+        } else if (q$variable_type == "Single_Response") {
+          # Single_Response with multiple columns (usually main + othermention)
           q$q_codes <- generate_single_mention_codes(base_code, q$columns)
 
         } else {
@@ -190,7 +190,7 @@ generate_multi_mention_codes_sequential <- function(base_code, columns) {
     # 1st = checkbox option, 2nd = text entry field
     is_duplicate <- !is.na(label) && label %in% seen_labels
 
-    # Check for othertext patterns (same as Single_Mention)
+    # Check for othertext patterns (same as Single_Response)
     is_othertext <- !is.na(label) && (
       grepl("other.*text", label, ignore.case = TRUE) ||
       grepl("other.*(write|specify|enter|required)", label, ignore.case = TRUE)
@@ -334,15 +334,15 @@ validate_parsing <- function(questions, translation_data, word_hints,
       }
     }
 
-    # Check 3: Missing options for Single_Mention
-    if (!q$is_grid && q$variable_type == "Single_Mention") {
+    # Check 3: Missing options for Single_Response
+    if (!q$is_grid && q$variable_type == "Single_Response") {
       if (length(q$options) == 0) {
         flags[[length(flags) + 1]] <- list(
           q_num = q_num,
           q_code = q$q_code %||% "unknown",
           issue = "NO_OPTIONS_FOUND",
           severity = "ERROR",
-          details = "Single_Mention question has no options in translation"
+          details = "Single_Response question has no options in translation"
         )
       }
     }
