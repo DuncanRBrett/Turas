@@ -499,19 +499,13 @@ process_composite_question <- function(composite_def, data, questions_df,
     raw_value <- banner_results[[key]]
 
     # Format the value
+    # NOTE: Store as numeric (not string) so Excel writer can handle it properly
+    # The Excel writer will apply the correct decimal separator formatting
     if (is.null(raw_value) || is.na(raw_value)) {
-      formatted <- NA_character_
+      formatted <- NA_real_
     } else {
-      # Round to correct decimal places
-      rounded <- round(as.numeric(raw_value), decimal_places_ratings)
-      # Format with default decimal separator (period)
-      formatted <- format(rounded, nsmall = decimal_places_ratings)
-      formatted <- trimws(formatted)  # Remove whitespace
-
-      # Replace period with configured decimal separator if different
-      if (decimal_sep != ".") {
-        formatted <- gsub("\\.", decimal_sep, formatted)
-      }
+      # Round to correct decimal places and keep as numeric
+      formatted <- round(as.numeric(raw_value), decimal_places_ratings)
     }
 
     result_table[[key]] <- formatted

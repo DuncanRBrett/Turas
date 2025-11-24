@@ -901,32 +901,40 @@ decimal_separator <- if (!is.null(config_obj$decimal_separator) &&
   "."
 }
 
+# Get general decimal_places as fallback (defaults to 1 if not specified)
+general_decimal_places <- if (!is.null(config_obj$decimal_places) &&
+                               length(config_obj$decimal_places) > 0) {
+  config_obj$decimal_places
+} else {
+  1
+}
+
 decimal_places_percent <- if (!is.null(config_obj$decimal_places_percent) &&
                               length(config_obj$decimal_places_percent) > 0) {
   config_obj$decimal_places_percent
 } else {
-  1
+  general_decimal_places
 }
 
 decimal_places_ratings <- if (!is.null(config_obj$decimal_places_ratings) &&
                               length(config_obj$decimal_places_ratings) > 0) {
   config_obj$decimal_places_ratings
 } else {
-  1
+  general_decimal_places
 }
 
 decimal_places_index <- if (!is.null(config_obj$decimal_places_index) &&
                             length(config_obj$decimal_places_index) > 0) {
   config_obj$decimal_places_index
 } else {
-  1
+  general_decimal_places
 }
 
 decimal_places_numeric <- if (!is.null(config_obj$decimal_places_numeric) &&
                               length(config_obj$decimal_places_numeric) > 0) {
   config_obj$decimal_places_numeric
 } else {
-  1
+  general_decimal_places
 }
 
 styles <- create_excel_styles(
