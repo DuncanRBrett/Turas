@@ -511,22 +511,6 @@ process_composite_question <- function(composite_def, data, questions_df,
     result_table[[key]] <- formatted
   }
 
-  # Debug: Log composite table structure and values
-  cat(sprintf("\n  DEBUG Composite %s:\n", composite_def$CompositeCode))
-  cat(sprintf("    result_table class: %s\n", class(result_table)[1]))
-  cat(sprintf("    result_table dims: %d rows x %d cols\n",
-             nrow(result_table), ncol(result_table)))
-  cat(sprintf("    Column names: %s\n", paste(names(result_table)[1:min(3, ncol(result_table))], collapse=", ")))
-  if (length(internal_keys) > 0 && ncol(result_table) > 2) {
-    first_key <- internal_keys[1]
-    val <- result_table[[first_key]][1]
-    cat(sprintf("    First data value [%s]: %s (class: %s)\n",
-               first_key,
-               if(is.na(val)) "NA" else as.character(val),
-               class(val)[1]))
-  }
-  cat("\n")
-
   # Run significance testing if enabled
   enable_sig_testing <- !is.null(config$enable_significance_testing) &&
                         length(config$enable_significance_testing) > 0 &&
