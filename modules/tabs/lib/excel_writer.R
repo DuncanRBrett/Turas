@@ -1247,11 +1247,25 @@ write_index_summary_sheet <- function(wb, summary_table, banner_info,
     halign = "left"
   )
 
-  # Data cell style
+  # Data cell style - use config decimal places for index/rating values
+  # Get decimal places for index/rating values (default to 2 if not specified)
+  decimal_places_for_summary <- if (!is.null(config$decimal_places_index) &&
+                                     length(config$decimal_places_index) > 0) {
+    config$decimal_places_index
+  } else if (!is.null(config$decimal_places_ratings) &&
+             length(config$decimal_places_ratings) > 0) {
+    config$decimal_places_ratings
+  } else {
+    2  # Default to 2 decimal places
+  }
+
+  # Create number format string (e.g., "0.00" for 2 decimal places)
+  num_format <- paste0("0.", paste(rep("0", decimal_places_for_summary), collapse = ""))
+
   data_style <- openxlsx::createStyle(
     fontSize = 10,
     halign = "right",
-    numFmt = "0.0"
+    numFmt = num_format
   )
 
   # Write title section
