@@ -859,6 +859,22 @@ if (!is.null(composite_defs) && nrow(composite_defs) > 0) {
         next
       }
 
+      # Debug: Check what's in the composite result table
+      cat(sprintf("\n  DEBUG: Adding composite '%s' to all_results\n", comp_code))
+      cat(sprintf("    Table dims: %d rows x %d cols\n",
+                 nrow(comp_result$question_table), ncol(comp_result$question_table)))
+      cat(sprintf("    Table columns: %s\n",
+                 paste(names(comp_result$question_table)[1:min(5, ncol(comp_result$question_table))], collapse=", ")))
+      if (ncol(comp_result$question_table) > 2) {
+        third_col <- names(comp_result$question_table)[3]
+        val <- comp_result$question_table[[third_col]][1]
+        cat(sprintf("    First data value [%s]: %s (class: %s)\n",
+                   third_col,
+                   if(is.na(val)) "NA" else as.character(val),
+                   class(val)[1]))
+      }
+      cat("\n")
+
       # Get composite label safely
       comp_label <- if ("RowLabel" %in% names(comp_result$question_table) &&
                         nrow(comp_result$question_table) > 0) {
