@@ -337,54 +337,92 @@ run_tabs_gui <- function() {
       # Save current working directory
       old_wd <- getwd()
       
-      tryCatch({
-        # Build paths
-        tabs_lib_dir <- file.path(TURAS_HOME, "modules", "tabs", "lib")
-        run_script <- file.path(tabs_lib_dir, "run_crosstabs.R")
-        
-        if (!file.exists(run_script)) {
-          stop("Could not find run_crosstabs.R at: ", run_script)
-        }
-        
-        # Update console
+      # Build paths
+      tabs_lib_dir <- file.path(TURAS_HOME, "modules", "tabs", "lib")
+      run_script <- file.path(tabs_lib_dir, "run_crosstabs.R")
+
+      if (!file.exists(run_script)) {
+        console_output(paste0(console_output(), "\n\nERROR: Could not find run_crosstabs.R at: ", run_script))
+        is_running(FALSE)
+        return()
+      }
+
+      # Update console
+      console_output(paste0(
+        console_output(),
+        sprintf("Project: %s\n", data$path),
+        sprintf("Config: %s\n", data$selected_config),
+        sprintf("\n%s\n\n", strrep("=", 80))
+      ))
+
+      # Change to modules/tabs/lib directory where all the analysis scripts are
+      setwd(tabs_lib_dir)
+
+      # Set config_file as global variable (script expects this)
+      assign("config_file", file.path(data$path, data$selected_config), envir = .GlobalEnv)
+
+      # Run analysis and capture ALL console output (including validation errors)
+      # Use sink() to capture output even when errors occur
+      output_file <- tempfile()
+      sink(output_file, type = "output")
+
+      analysis_result <- tryCatch({
+        source("run_crosstabs.R", local = FALSE)  # local = FALSE so it uses global config_file
+        list(success = TRUE, error = NULL)
+
+      }, error = function(e) {
+        list(success = FALSE, error = e)
+
+      }, finally = {
+        # Always restore console output
+        sink(type = "output")
+      })
+
+      # Read captured output (available even if error occurred)
+      captured_output <- readLines(output_file, warn = FALSE)
+      unlink(output_file)
+
+      # Append captured output to console (works for both success and error cases)
+      if (length(captured_output) > 0) {
         console_output(paste0(
           console_output(),
-          sprintf("Project: %s\n", data$path),
-          sprintf("Config: %s\n", data$selected_config),
-          sprintf("\n%s\n\n", strrep("=", 80))
+          paste(captured_output, collapse = "\n"),
+          "\n"
         ))
-        
-        # Change to modules/tabs/lib directory where all the analysis scripts are
-        setwd(tabs_lib_dir)
-        
-        # Set config_file as global variable (script expects this)
-        assign("config_file", file.path(data$path, data$selected_config), envir = .GlobalEnv)
-        
-        # Run analysis
-        source("run_crosstabs.R", local = FALSE)  # local = FALSE so it uses global config_file
-        
+      }
+
+      # Handle success or error
+      if (analysis_result$success) {
         # Update console with completion message
         console_output(paste0(
           console_output(),
           sprintf("\n%s\n✓ ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80)),
           sprintf("\nOutput files saved to:\n%s\n", file.path(data$path, "Output", "Crosstabs"))
         ))
-        
+
         showNotification("Analysis completed successfully!", type = "message", duration = 5)
-        
-      }, error = function(e) {
-        console_output(paste0(console_output(), "\n\nERROR: ", e$message, "\n\nCheck R console for details."))
-        showNotification(paste("Error:", e$message), type = "error", duration = 10)
-        
-      }, finally = {
-        # Clean up global variable
-        if (exists("config_file", envir = .GlobalEnv)) {
-          rm("config_file", envir = .GlobalEnv)
-        }
-        # Restore original working directory
-        setwd(old_wd)
-        is_running(FALSE)
-      })
+
+      } else {
+        # Display error
+        error_output <- paste0(
+          console_output(),
+          "\n\n",
+          strrep("=", 80), "\n",
+          "ERROR\n",
+          strrep("=", 80), "\n",
+          analysis_result$error$message, "\n"
+        )
+        console_output(error_output)
+        showNotification(paste("Error:", analysis_result$error$message), type = "error", duration = 10)
+      }
+
+      # Clean up global variable
+      if (exists("config_file", envir = .GlobalEnv)) {
+        rm("config_file", envir = .GlobalEnv)
+      }
+      # Restore original working directory
+      setwd(old_wd)
+      is_running(FALSE)
     })
   }
   
