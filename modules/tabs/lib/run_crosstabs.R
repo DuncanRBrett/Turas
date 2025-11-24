@@ -726,11 +726,16 @@ save_checkpoint <- function(checkpoint_file, all_results, processed_questions) {
 #' @return List or NULL
 #' @export
 load_checkpoint <- function(checkpoint_file) {
+  # Check if directory exists first (important for OneDrive paths)
+  checkpoint_dir <- dirname(checkpoint_file)
+  if (!dir.exists(checkpoint_dir)) return(NULL)
+
+  # Check if file exists
   if (!file.exists(checkpoint_file)) return(NULL)
-  
+
   tryCatch({
     checkpoint_data <- readRDS(checkpoint_file)
-    log_message(sprintf("Checkpoint loaded: %d questions already processed", 
+    log_message(sprintf("Checkpoint loaded: %d questions already processed",
                        length(checkpoint_data$processed)), "INFO")
     return(checkpoint_data)
   }, error = function(e) {
