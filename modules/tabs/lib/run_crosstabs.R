@@ -937,6 +937,11 @@ decimal_places_numeric <- if (!is.null(config_obj$decimal_places_numeric) &&
   general_decimal_places
 }
 
+# Log decimal places settings for debugging
+log_message(sprintf("Decimal places - Percent: %d, Ratings: %d, Index: %d, Numeric: %d",
+                   decimal_places_percent, decimal_places_ratings,
+                   decimal_places_index, decimal_places_numeric), "INFO")
+
 styles <- create_excel_styles(
   decimal_separator,
   decimal_places_percent,
