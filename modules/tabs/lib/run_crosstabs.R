@@ -712,6 +712,12 @@ write_question_table_fast <- function(wb, sheet, data_table, banner_info,
 #' @param processed_questions Character vector
 #' @export
 save_checkpoint <- function(checkpoint_file, all_results, processed_questions) {
+  # Ensure checkpoint directory exists
+  checkpoint_dir <- dirname(checkpoint_file)
+  if (!dir.exists(checkpoint_dir)) {
+    dir.create(checkpoint_dir, recursive = TRUE)
+  }
+
   checkpoint_data <- list(
     results = all_results,
     processed = processed_questions,
