@@ -331,7 +331,7 @@ resolve_config_paths <- function(settings, project_root) {
   
   # Get output directory
   output_subfolder <- get_config_value(settings, "output_subfolder", "Crosstabs")
-  output_dir <- file.path(project_root, output_subfolder)
+  output_dir <- file.path(project_root, "Output", output_subfolder)
   
   # Create output directory if needed
   if (!dir.exists(output_dir)) {
