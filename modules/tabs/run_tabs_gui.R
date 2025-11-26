@@ -393,11 +393,17 @@ run_tabs_gui <- function() {
 
       # Handle success or error
       if (analysis_result$success) {
+        # Get actual output path from config
+        config_settings <- tryCatch({
+          load_config_settings(file.path(data$path, data$selected_config))
+        }, error = function(e) list())
+        output_subfolder <- get_config_value(config_settings, "output_subfolder", "Crosstabs")
+
         # Update console with completion message
         console_output(paste0(
           console_output(),
           sprintf("\n%s\n✓ ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80)),
-          sprintf("\nOutput files saved to:\n%s\n", file.path(data$path, "Output", "Crosstabs"))
+          sprintf("\nOutput files saved to:\n%s\n", file.path(data$path, output_subfolder))
         ))
 
         showNotification("Analysis completed successfully!", type = "message", duration = 5)

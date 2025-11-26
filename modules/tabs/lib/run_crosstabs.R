@@ -748,7 +748,7 @@ load_checkpoint <- function(checkpoint_file) {
 # CHECKPOINTING SETUP
 # ==============================================================================
 
-checkpoint_file <- file.path(project_root, "Output", output_subfolder, 
+checkpoint_file <- file.path(project_root, output_subfolder,
                              ".crosstabs_checkpoint.rds")
 
 if (config_obj$enable_checkpointing) {
@@ -1114,7 +1114,7 @@ if (length(banner_info$columns) > 0) {
 }
 
 # Save
-output_path <- resolve_path(project_root, file.path("Output", output_subfolder, 
+output_path <- resolve_path(project_root, file.path(output_subfolder,
                                                     output_filename))
 output_dir <- dirname(output_path)
 
