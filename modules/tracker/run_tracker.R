@@ -61,12 +61,32 @@ run_tracker <- function(tracking_config_path,
 
   start_time <- Sys.time()
 
-  # Enable detailed error tracking
+  # Enable detailed error tracking with logging to file
+  log_file <- file.path(dirname(tracking_config_path), "tracker_error.log")
   old_options <- options(warn = 1, error = quote({
+    error_msg <- geterrmessage()
+
+    # Write to console
     cat("\n!!! ERROR OCCURRED !!!\n")
-    cat("Error message:", geterrmessage(), "\n")
+    cat("Error message:", error_msg, "\n")
     cat("\nCall stack:\n")
     traceback()
+
+    # Write to log file
+    tryCatch({
+      log_conn <- file(log_file, "w")
+      cat("TRACKER ERROR LOG\n", file = log_conn)
+      cat("================================================================================\n", file = log_conn)
+      cat("Time:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n", file = log_conn)
+      cat("Error message:", error_msg, "\n\n", file = log_conn)
+      cat("Call stack:\n", file = log_conn)
+      cat(paste(capture.output(traceback()), collapse = "\n"), file = log_conn)
+      cat("\n================================================================================\n", file = log_conn)
+      close(log_conn)
+      cat("\nError details written to:", log_file, "\n")
+    }, error = function(e) {
+      # Ignore if logging fails
+    })
   }))
   on.exit(options(old_options), add = TRUE)
 
