@@ -48,6 +48,8 @@ module_files <- c(
   "modules/conjoint/R/02_data.R",
   "modules/conjoint/R/03_estimation.R",
   "modules/conjoint/R/04_utilities.R",
+  "modules/conjoint/R/05_simulator.R",         # Market simulator functions
+  "modules/conjoint/R/08_market_simulator.R",  # Excel simulator sheet
   "modules/conjoint/R/07_output.R",
   "modules/conjoint/R/00_main.R"
 )

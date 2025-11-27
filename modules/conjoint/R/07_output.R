@@ -46,10 +46,17 @@ write_conjoint_output <- function(utilities, importance, diagnostics, model_resu
   # Sheet 4: Model Diagnostics
   create_diagnostics_sheet(wb, diagnostics, model_result, header_style)
 
-  # Sheet 5: Data Summary
+  # Sheet 5: Market Simulator (if enabled)
+  if (!is.null(config$generate_market_simulator) &&
+      safe_logical(config$generate_market_simulator, default = FALSE)) {
+    create_market_simulator_sheet(wb, utilities, importance, config, header_style)
+    create_simulator_data_sheet(wb, utilities, importance, header_style)
+  }
+
+  # Sheet 6: Data Summary
   create_data_summary_sheet(wb, data_info, config, header_style)
 
-  # Sheet 6: Configuration
+  # Sheet 7: Configuration
   create_configuration_sheet(wb, config, header_style)
 
   # Save workbook
