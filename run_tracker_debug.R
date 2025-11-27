@@ -34,7 +34,11 @@ cat("===========================================================================
 cat("RUNNING TRACKER WITH FULL ERROR OUTPUT\n")
 cat("================================================================================\n\n")
 
-result <- run_tracker(config_path)
+# The config file contains both tracking config and question mapping sheets
+result <- run_tracker(
+  tracking_config_path = config_path,
+  question_mapping_path = config_path
+)
 
 cat("\n================================================================================\n")
 cat("TRACKER COMPLETED\n")
