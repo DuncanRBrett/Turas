@@ -116,14 +116,22 @@ get_banner_segments <- function(config, wave_data) {
     wave_specific_mapping <- list()
     has_wave_mapping <- FALSE
 
+    message(paste0("Processing banner variable: ", break_var, " (", break_label, ")"))
+    message(paste0("  Available banner columns: ", paste(names(banner), collapse = ", ")))
+
     for (wave_id in wave_ids) {
       if (wave_id %in% names(banner)) {
         wave_code <- banner[[wave_id]][i]
         if (!is.na(wave_code) && trimws(wave_code) != "") {
           wave_specific_mapping[[wave_id]] <- trimws(wave_code)
           has_wave_mapping <- TRUE
+          message(paste0("  Found wave mapping: ", wave_id, " -> ", trimws(wave_code)))
         }
       }
+    }
+
+    if (!has_wave_mapping) {
+      message(paste0("  No wave-specific mapping found, looking for '", break_var, "' column directly"))
     }
 
     # Determine which variable name to use
@@ -138,10 +146,15 @@ get_banner_segments <- function(config, wave_data) {
 
           if (wave_code %in% names(wave_df)) {
             vals <- unique(wave_df[[wave_code]][!is.na(wave_df[[wave_code]])])
+            message(paste0("  ", wave_id, " (", wave_code, "): Found ", length(vals), " unique values"))
             all_unique_vals <- unique(c(all_unique_vals, vals))
+          } else {
+            message(paste0("  ", wave_id, " (", wave_code, "): Column not found in wave data"))
           }
         }
       }
+
+      message(paste0("  Total unique values across all waves: ", length(all_unique_vals)))
 
       # Create segments for each unique value
       for (val in all_unique_vals) {
