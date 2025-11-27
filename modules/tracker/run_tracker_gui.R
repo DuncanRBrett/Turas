@@ -589,14 +589,23 @@ run_tracker_gui <- function() {
         # Source run_tracker.R
         source("run_tracker.R")
 
-        # Run analysis
-        output_file <- run_tracker(
-          tracking_config_path = tracking_config,
-          question_mapping_path = question_mapping,
-          data_dir = data_dir,
-          output_path = output_path,
-          use_banners = input$use_banners
-        )
+        # Run analysis and capture console output
+        tracker_output <- capture.output({
+          output_file <- run_tracker(
+            tracking_config_path = tracking_config,
+            question_mapping_path = question_mapping,
+            data_dir = data_dir,
+            output_path = output_path,
+            use_banners = input$use_banners
+          )
+        }, type = "message")
+
+        # Append captured output to console
+        console_output(paste0(
+          console_output(),
+          paste(tracker_output, collapse = "\n"),
+          "\n"
+        ))
 
         # Save to recent projects
         add_recent_project(list(

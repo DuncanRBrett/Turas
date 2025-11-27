@@ -1909,6 +1909,42 @@ write_wave_history_sheet <- function(wb, sheet_name, trend_results, wave_ids, co
                     rows = current_row, cols = 1:length(headers), gridExpand = TRUE)
   current_row <- current_row + 1
 
+  # Base row: Show sample size (n) for each wave
+  base_row <- c("", "BASE", "n")
+  for (wave_id in wave_ids) {
+    # Get sample size from first available question's wave result
+    # or directly from wave_data if available
+    n_value <- NA
+
+    # Try to get from first question result
+    for (q_code in names(trend_results)) {
+      q_result <- if (!is.null(segment_filter)) {
+        trend_results[[q_code]][[segment_filter]]
+      } else {
+        trend_results[[q_code]]
+      }
+
+      if (!is.null(q_result) && !is.null(q_result$wave_results[[wave_id]])) {
+        wave_result <- q_result$wave_results[[wave_id]]
+        if (wave_result$available && !is.null(wave_result$n_unweighted)) {
+          n_value <- wave_result$n_unweighted
+          break
+        }
+      }
+    }
+
+    base_row <- c(base_row, n_value)
+  }
+
+  openxlsx::writeData(wb, sheet_name, t(base_row),
+                      startRow = current_row, startCol = 1, colNames = FALSE)
+
+  # Style base row with bold font
+  base_style <- openxlsx::createStyle(textDecoration = "bold")
+  openxlsx::addStyle(wb, sheet_name, base_style,
+                    rows = current_row, cols = 1:length(base_row), gridExpand = TRUE)
+  current_row <- current_row + 1
+
   # Get decimal separator and decimal places
   decimal_sep <- get_setting(config, "decimal_separator", default = ".")
   decimal_places <- get_setting(config, "decimal_places_ratings", default = 1)
