@@ -1,39 +1,45 @@
 # ==============================================================================
-# TURAS CONJOINT ANALYSIS MODULE - MAIN ENTRY POINT
+# TURAS CONJOINT ANALYSIS MODULE - ENHANCED MAIN ENTRY POINT
 # ==============================================================================
 #
 # Module: Conjoint Analysis
 # Purpose: Calculate part-worth utilities and attribute importance from
 #          choice-based or rating-based conjoint data
-# Version: 1.0.0 (Initial Implementation)
-# Date: 2025-11-18
+# Version: 2.0.0 (Enhanced Implementation)
+# Date: 2025-11-26
 #
 # ==============================================================================
 
 #' Run Conjoint Analysis
 #'
-#' Main entry point for conjoint analysis. Calculates part-worth utilities
-#' and attribute importance scores from conjoint experimental data.
+#' Main entry point for enhanced conjoint analysis. Calculates part-worth utilities
+#' and attribute importance scores from conjoint experimental data with comprehensive
+#' validation and diagnostics.
 #'
 #' METHODOLOGY:
-#' - Uses regression-based approach (OLS or logistic depending on data type)
-#' - Calculates part-worth utilities for each level of each attribute
-#' - Derives attribute importance from range of utilities
-#' - Supports both choice-based and rating-based designs
+#' - Primary: mlogit for robust maximum likelihood estimation
+#' - Fallback: clogit (survival package) for simpler estimation
+#' - Calculates zero-centered part-worth utilities with confidence intervals
+#' - Derives attribute importance from utility ranges
+#' - Supports choice-based and rating-based designs
+#' - Auto-detects and handles "none of these" options
 #'
-#' @param config_file Path to conjoint configuration Excel file
+#' @param config_file Path to conjoint configuration Excel file (.xlsx)
 #'   Required sheets: Settings, Attributes
 #'   Settings sheet should include: data_file, output_file
 #' @param data_file Path to respondent data (CSV, XLSX, SAV, DTA).
 #'   If NULL, reads from config Settings sheet.
 #' @param output_file Path for results Excel file.
 #'   If NULL, reads from config Settings sheet.
+#' @param verbose Logical, print detailed progress (default TRUE)
 #'
 #' @return List containing:
 #'   - utilities: Data frame of part-worth utilities by attribute level
 #'   - importance: Data frame of attribute importance scores
-#'   - fit: Model fit statistics
+#'   - diagnostics: Model fit statistics and quality assessments
+#'   - model_result: Full model estimation results
 #'   - config: Processed configuration
+#'   - data_info: Data statistics and validation results
 #'
 #' @examples
 #' \dontrun{
@@ -54,83 +60,208 @@
 #'
 #' # View part-worth utilities
 #' print(results$utilities)
+#'
+#' # View model diagnostics
+#' print(results$diagnostics$fit_statistics)
 #' }
 #'
 #' @export
-run_conjoint_analysis <- function(config_file, data_file = NULL, output_file = NULL) {
+run_conjoint_analysis <- function(config_file, data_file = NULL, output_file = NULL,
+                                  verbose = TRUE) {
 
-  cat("\n")
-  cat(rep("=", 80), "\n", sep = "")
-  cat("TURAS CONJOINT ANALYSIS\n")
-  cat(rep("=", 80), "\n", sep = "")
-  cat("\n")
+  # Start timing
+  start_time <- Sys.time()
 
-  # STEP 1: Load Configuration
-  cat("1. Loading configuration...\n")
-  config <- load_conjoint_config(config_file)
-  cat(sprintf("   ✓ Loaded %d attributes with %d total levels\n",
-              nrow(config$attributes),
-              sum(config$attributes$NumLevels)))
-
-  # Get data_file from config if not provided
-  if (is.null(data_file)) {
-    data_file <- config$data_file
-    if (is.null(data_file) || is.na(data_file)) {
-      stop("data_file not specified in function call or config Settings sheet", call. = FALSE)
-    }
+  # Print header
+  if (verbose) {
+    cat("\n")
+    cat(rep("=", 80), "\n", sep = "")
+    cat("TURAS CONJOINT ANALYSIS - Enhanced Version 2.0\n")
+    cat(rep("=", 80), "\n", sep = "")
+    cat("\n")
   }
 
-  # Get output_file from config if not provided
-  if (is.null(output_file)) {
-    output_file <- config$output_file
-    if (is.null(output_file) || is.na(output_file)) {
-      # Default to project_root/conjoint_results.xlsx
-      output_file <- file.path(config$project_root, "conjoint_results.xlsx")
+  # Error handling wrapper
+  result <- tryCatch({
+
+    # STEP 1: Load Configuration
+    if (verbose) cat("1. Loading configuration...\n")
+
+    config <- load_conjoint_config(config_file, verbose = verbose)
+
+    if (verbose) {
+      cat(sprintf("   ✓ Loaded %d attributes with %d total levels\n",
+                  nrow(config$attributes),
+                  sum(config$attributes$NumLevels)))
+
+      if (length(config$validation$warnings) > 0) {
+        cat(sprintf("   ⚠ %d configuration warnings (see messages above)\n",
+                    length(config$validation$warnings)))
+      }
     }
-  }
 
-  # STEP 2: Load and Validate Data
-  cat("\n2. Loading and validating data...\n")
-  data <- load_conjoint_data(data_file, config)
-  cat(sprintf("   ✓ Loaded %d respondents with %d profiles each\n",
-              data$n_respondents,
-              data$n_profiles))
+    # Override paths if provided
+    if (!is.null(data_file)) {
+      config$data_file <- data_file
+    }
+    if (!is.null(output_file)) {
+      config$output_file <- output_file
+    }
 
-  # STEP 3: Run Analysis
-  cat("\n3. Calculating part-worth utilities...\n")
-  analysis_results <- calculate_conjoint_utilities(data, config)
-  cat(sprintf("   ✓ Estimated %d part-worth utilities\n",
-              nrow(analysis_results$utilities)))
+    # STEP 2: Load and Validate Data
+    if (verbose) cat("\n2. Loading and validating data...\n")
 
-  # STEP 4: Calculate Importance
-  cat("\n4. Calculating attribute importance...\n")
-  importance <- calculate_attribute_importance(analysis_results$utilities, config)
-  cat("   ✓ Importance scores calculated\n")
+    data_list <- load_conjoint_data(config$data_file, config, verbose = verbose)
 
-  # STEP 5: Generate Output
-  cat("\n5. Generating output file...\n")
-  write_conjoint_output(
-    utilities = analysis_results$utilities,
-    importance = importance,
-    fit = analysis_results$fit,
-    config = config,
-    output_file = output_file
-  )
-  cat(sprintf("   ✓ Results written to: %s\n", output_file))
+    if (verbose) {
+      cat(sprintf("   ✓ Validated %d respondents with %d choice sets\n",
+                  data_list$n_respondents,
+                  data_list$n_choice_sets))
 
-  cat("\n")
-  cat(rep("=", 80), "\n", sep = "")
-  cat("ANALYSIS COMPLETE\n")
-  cat(rep("=", 80), "\n", sep = "")
-  cat("\n")
+      if (data_list$has_none) {
+        cat(sprintf("   ℹ None option detected and handled (%d selected)\n",
+                    data_list$none_info$n_none_chosen))
+      }
 
-  # Return results
-  invisible(list(
-    utilities = analysis_results$utilities,
-    importance = importance,
-    fit = analysis_results$fit,
-    config = config
-  ))
+      if (length(data_list$validation$warnings) > 0) {
+        cat(sprintf("   ⚠ %d data warnings (see messages above)\n",
+                    length(data_list$validation$warnings)))
+      }
+    }
+
+    # STEP 3: Estimate Model
+    if (verbose) cat("\n3. Estimating choice model...\n")
+
+    model_result <- estimate_choice_model(data_list, config, verbose = verbose)
+
+    if (verbose) {
+      cat(sprintf("   ✓ Model estimation complete (method: %s)\n",
+                  model_result$method))
+
+      if (!model_result$convergence$converged) {
+        cat(sprintf("   ⚠ Convergence warning: %s\n",
+                    model_result$convergence$message))
+      }
+    }
+
+    # STEP 4: Calculate Utilities
+    if (verbose) cat("\n4. Calculating part-worth utilities...\n")
+
+    utilities <- calculate_utilities(model_result, config, verbose = verbose)
+
+    if (verbose) {
+      cat(sprintf("   ✓ Estimated %d part-worth utilities\n", nrow(utilities)))
+
+      # Show significance summary
+      n_sig <- sum(utilities$p_value < 0.05, na.rm = TRUE)
+      n_total <- sum(!utilities$is_baseline)
+      if (n_total > 0) {
+        cat(sprintf("   ✓ %d of %d levels significant (p < 0.05)\n",
+                    n_sig, n_total))
+      }
+    }
+
+    # STEP 5: Calculate Importance
+    if (verbose) cat("\n5. Calculating attribute importance...\n")
+
+    importance <- calculate_attribute_importance(utilities, config, verbose = verbose)
+
+    if (verbose) {
+      cat("   ✓ Importance scores calculated:\n")
+      for (i in 1:min(3, nrow(importance))) {
+        cat(sprintf("      %d. %s: %.1f%%\n",
+                    i,
+                    importance$Attribute[i],
+                    importance$Importance[i]))
+      }
+    }
+
+    # STEP 6: Calculate Diagnostics
+    if (verbose) cat("\n6. Running model diagnostics...\n")
+
+    diagnostics <- calculate_model_diagnostics(
+      model_result, data_list, utilities, importance, config, verbose = verbose
+    )
+
+    if (verbose && model_result$method %in% c("mlogit", "clogit")) {
+      cat(sprintf("   ✓ McFadden R² = %.3f (%s)\n",
+                  diagnostics$fit_statistics$mcfadden_r2,
+                  diagnostics$quality_assessment$level))
+
+      if (!is.na(diagnostics$fit_statistics$hit_rate)) {
+        cat(sprintf("   ✓ Hit rate = %.1f%% (chance = %.1f%%)\n",
+                    diagnostics$fit_statistics$hit_rate * 100,
+                    diagnostics$fit_statistics$chance_rate * 100))
+      }
+    }
+
+    # STEP 7: Generate Output
+    if (verbose) cat("\n7. Generating Excel output...\n")
+
+    write_conjoint_output(
+      utilities = utilities,
+      importance = importance,
+      diagnostics = diagnostics,
+      model_result = model_result,
+      config = config,
+      data_info = data_list,
+      output_file = config$output_file
+    )
+
+    if (verbose) {
+      cat(sprintf("   ✓ Results written to: %s\n", basename(config$output_file)))
+    }
+
+    # Calculate elapsed time
+    elapsed <- difftime(Sys.time(), start_time, units = "secs")
+
+    if (verbose) {
+      cat("\n")
+      cat(rep("=", 80), "\n", sep = "")
+      cat("ANALYSIS COMPLETE\n")
+      cat(sprintf("Total time: %.1f seconds\n", as.numeric(elapsed)))
+      cat(rep("=", 80), "\n", sep = "")
+      cat("\n")
+    }
+
+    # Return comprehensive results
+    list(
+      utilities = utilities,
+      importance = importance,
+      diagnostics = diagnostics,
+      model_result = model_result,
+      config = config,
+      data_info = data_list,
+      elapsed_time = as.numeric(elapsed),
+      version = "2.0.0"
+    )
+
+  }, error = function(e) {
+    # Error handling
+    if (verbose) {
+      cat("\n")
+      cat(rep("=", 80), "\n", sep = "")
+      cat("ERROR: Analysis Failed\n")
+      cat(rep("=", 80), "\n", sep = "")
+      cat("\n")
+      cat("Error message:\n")
+      cat(conditionMessage(e), "\n")
+      cat("\n")
+
+      # Additional troubleshooting
+      cat("Troubleshooting:\n")
+      cat("  1. Check your configuration file is valid\n")
+      cat("  2. Verify your data file exists and has correct format\n")
+      cat("  3. Ensure required packages are installed (mlogit, survival, openxlsx)\n")
+      cat("  4. Review validation warnings above\n")
+      cat("\n")
+    }
+
+    # Re-throw error for caller to handle
+    stop(e)
+  })
+
+  invisible(result)
 }
 
 
