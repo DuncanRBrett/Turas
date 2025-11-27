@@ -4,8 +4,9 @@
 # This script runs the tracker directly in R with full error output visible
 # ==============================================================================
 
-# Set working directory to Turas root
-setwd("/home/user/Turas")
+# Ensure we're in the Turas root directory
+# (Assumes you've already set your working directory to the Turas folder)
+cat("Current working directory:", getwd(), "\n")
 
 # Source the tracker module
 source("modules/tracker/run_tracker.R")
