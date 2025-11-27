@@ -101,6 +101,7 @@ get_banner_segments <- function(config, wave_data) {
 
   # Get segments from Banner sheet
   banner <- config$banner
+  wave_ids <- config$waves$WaveID
 
   for (i in 1:nrow(banner)) {
     break_var <- banner$BreakVariable[i]
@@ -111,24 +112,66 @@ get_banner_segments <- function(config, wave_data) {
       next
     }
 
-    # For MVT, we'll create segments for each unique value in the banner variable
-    # Get unique values from first wave
-    wave_ids <- config$waves$WaveID
-    first_wave <- wave_data[[wave_ids[1]]]
+    # Check if wave-specific columns exist in banner (like W2023, W2024, etc.)
+    wave_specific_mapping <- list()
+    has_wave_mapping <- FALSE
 
-    if (break_var %in% names(first_wave)) {
-      unique_vals <- unique(first_wave[[break_var]][!is.na(first_wave[[break_var]])])
+    for (wave_id in wave_ids) {
+      if (wave_id %in% names(banner)) {
+        wave_code <- banner[[wave_id]][i]
+        if (!is.na(wave_code) && trimws(wave_code) != "") {
+          wave_specific_mapping[[wave_id]] <- trimws(wave_code)
+          has_wave_mapping <- TRUE
+        }
+      }
+    }
 
-      for (val in unique_vals) {
-        # Create segment name
+    # Determine which variable name to use
+    if (has_wave_mapping) {
+      # Use wave-specific mapping - collect unique values across all waves
+      all_unique_vals <- character(0)
+
+      for (wave_id in wave_ids) {
+        if (wave_id %in% names(wave_specific_mapping)) {
+          wave_df <- wave_data[[wave_id]]
+          wave_code <- wave_specific_mapping[[wave_id]]
+
+          if (wave_code %in% names(wave_df)) {
+            vals <- unique(wave_df[[wave_code]][!is.na(wave_df[[wave_code]])])
+            all_unique_vals <- unique(c(all_unique_vals, vals))
+          }
+        }
+      }
+
+      # Create segments for each unique value
+      for (val in all_unique_vals) {
         seg_name <- paste0(break_label, "_", val)
 
         segments[[seg_name]] <- list(
           name = seg_name,
           variable = break_var,
           value = val,
+          wave_mapping = wave_specific_mapping,
           is_total = FALSE
         )
+      }
+    } else {
+      # Legacy: Use break_var directly (same column across all waves)
+      first_wave <- wave_data[[wave_ids[1]]]
+
+      if (break_var %in% names(first_wave)) {
+        unique_vals <- unique(first_wave[[break_var]][!is.na(first_wave[[break_var]])])
+
+        for (val in unique_vals) {
+          seg_name <- paste0(break_label, "_", val)
+
+          segments[[seg_name]] <- list(
+            name = seg_name,
+            variable = break_var,
+            value = val,
+            is_total = FALSE
+          )
+        }
       }
     }
   }
@@ -155,8 +198,17 @@ filter_wave_data_to_segment <- function(wave_data, segment_def) {
   for (wave_id in names(wave_data)) {
     wave_df <- wave_data[[wave_id]]
 
-    # Check if segment variable exists
-    if (!segment_def$variable %in% names(wave_df)) {
+    # Determine which variable to use for this wave
+    if (!is.null(segment_def$wave_mapping) && wave_id %in% names(segment_def$wave_mapping)) {
+      # Use wave-specific question code
+      var_name <- segment_def$wave_mapping[[wave_id]]
+    } else {
+      # Use break variable directly
+      var_name <- segment_def$variable
+    }
+
+    # Check if variable exists in this wave
+    if (!var_name %in% names(wave_df)) {
       # Variable doesn't exist in this wave - return empty data
       filtered_data[[wave_id]] <- wave_df[0, ]  # Empty dataframe with same structure
       next
@@ -164,8 +216,8 @@ filter_wave_data_to_segment <- function(wave_data, segment_def) {
 
     # Filter to segment value
     # Use which() to get numeric indices (avoids NA issues with logical indexing)
-    segment_rows <- which(wave_df[[segment_def$variable]] == segment_def$value &
-                         !is.na(wave_df[[segment_def$variable]]))
+    segment_rows <- which(wave_df[[var_name]] == segment_def$value &
+                         !is.na(wave_df[[var_name]]))
 
     filtered_data[[wave_id]] <- wave_df[segment_rows, ]
   }
