@@ -140,7 +140,7 @@ run_tracker <- function(tracking_config_path,
   message("\n[4/6] LOADING WAVE DATA")
   message("================================================================================")
 
-  wave_data <- load_all_waves(config, data_dir)
+  wave_data <- load_all_waves(config, data_dir, question_mapping)
 
   # Display wave summary
   wave_summary <- get_wave_summary(wave_data)
