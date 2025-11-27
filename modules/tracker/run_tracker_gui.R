@@ -643,5 +643,21 @@ run_tracker_gui <- function() {
 
   # Launch
   cat("\nLaunching Turas>Tracker GUI...\n\n")
+
+  # Set error logging
+  options(shiny.error = function() {
+    log_file <- file.path(tempdir(), "tracker_gui_error.log")
+    tryCatch({
+      cat("TRACKER GUI ERROR\n", file = log_file)
+      cat("================================================================================\n", file = log_file, append = TRUE)
+      cat("Time:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n", file = log_file, append = TRUE)
+      cat("Error:", geterrmessage(), "\n\n", file = log_file, append = TRUE)
+      cat("Traceback:\n", file = log_file, append = TRUE)
+      cat(paste(capture.output(traceback()), collapse = "\n"), file = log_file, append = TRUE)
+      cat("\n================================================================================\n", file = log_file, append = TRUE)
+      cat("\n\nError log written to:", log_file, "\n")
+    }, error = function(e) {})
+  })
+
   shinyApp(ui = ui, server = server)
 }
