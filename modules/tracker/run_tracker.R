@@ -61,11 +61,21 @@ run_tracker <- function(tracking_config_path,
 
   start_time <- Sys.time()
 
+  # Enable detailed error tracking
+  old_options <- options(warn = 1, error = quote({
+    cat("\n!!! ERROR OCCURRED !!!\n")
+    cat("Error message:", geterrmessage(), "\n")
+    cat("\nCall stack:\n")
+    traceback()
+  }))
+  on.exit(options(old_options), add = TRUE)
+
   phase_label <- if (use_banners) "PHASE 3: BANNER BREAKOUTS & COMPOSITES" else "PHASE 2: TREND CALCULATION & OUTPUT"
 
   message("================================================================================")
   message(paste0("TURASTACKER - MVT ", phase_label))
   message("================================================================================")
+  message(paste0("Version: 2024-11-27 (Fixed Wave Detection + Diagnostics)"))
   message(paste0("Started: ", format(start_time, "%Y-%m-%d %H:%M:%S")))
   message("")
 
