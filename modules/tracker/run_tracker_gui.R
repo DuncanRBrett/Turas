@@ -198,6 +198,9 @@ run_tracker_gui <- function() {
 
   server <- function(input, output, session) {
 
+    # Turn warnings into errors to get proper tracebacks
+    options(warn = 2)
+
     # Reactive values
     files <- reactiveValues(
       tracking_config = NULL,
