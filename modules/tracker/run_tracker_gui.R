@@ -475,22 +475,17 @@ run_tracker_gui <- function() {
       )
     })
 
-    # Console output UI - always show if tracking has been run
+    # Console output UI - always visible
     output$console_ui <- renderUI({
-      # Get values safely
-      output_text <- console_output()
-      is_running_now <- is_running()
-      has_run_before <- isTRUE(session$userData$has_run)
-
-      # Only hide if: no output AND not running AND never run before
-      if (nchar(output_text) == 0 && !is_running_now && !has_run_before) {
-        return(NULL)
-      }
-
       div(class = "card",
         h3("4. Analysis Output"),
         div(class = "console-output",
-          verbatimTextOutput("console_text")
+          if (nchar(console_output()) == 0) {
+            p(style = "color: #666; font-style: italic;",
+              "Console output will appear here when you run the tracker...")
+          } else {
+            verbatimTextOutput("console_text")
+          }
         )
       )
     })
