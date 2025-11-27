@@ -1912,23 +1912,35 @@ write_wave_history_sheet <- function(wb, sheet_name, trend_results, wave_ids, co
   # Base row: Show sample size (n) for each wave
   base_row <- c("", "BASE", "n")
   for (wave_id in wave_ids) {
-    # Get sample size from first available question's wave result
-    # or directly from wave_data if available
+    # Get sample size from any available question's wave result
     n_value <- NA
 
-    # Try to get from first question result
+    # Try to get from any question result for this wave
     for (q_code in names(trend_results)) {
       q_result <- if (!is.null(segment_filter)) {
-        trend_results[[q_code]][[segment_filter]]
+        # For banner segments, extract segment-specific result
+        if (!is.null(trend_results[[q_code]]) && is.list(trend_results[[q_code]]) &&
+            segment_filter %in% names(trend_results[[q_code]])) {
+          trend_results[[q_code]][[segment_filter]]
+        } else {
+          NULL
+        }
       } else {
+        # For Total, extract main result
         trend_results[[q_code]]
       }
 
-      if (!is.null(q_result) && !is.null(q_result$wave_results[[wave_id]])) {
+      # Check if we got valid result and extract n_unweighted
+      if (!is.null(q_result) &&
+          !is.null(q_result$wave_results) &&
+          wave_id %in% names(q_result$wave_results)) {
         wave_result <- q_result$wave_results[[wave_id]]
-        if (wave_result$available && !is.null(wave_result$n_unweighted)) {
+        if (!is.null(wave_result) &&
+            !is.null(wave_result$available) &&
+            wave_result$available &&
+            !is.null(wave_result$n_unweighted)) {
           n_value <- wave_result$n_unweighted
-          break
+          break  # Found a valid sample size, use it
         }
       }
     }
