@@ -26,18 +26,19 @@ options(error = function() {
   traceback()
 })
 
-# Your config file path - UPDATE THIS to your actual path
+# Your file paths - UPDATE THESE to your actual paths
 config_path <- "/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Projects/SACAP/SACS/04_CrossWave/01_Analysis/SACS_tracking_config.xlsx"
+mapping_path <- "/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Projects/SACAP/SACS/04_CrossWave/01_Analysis/SACS_question_mapping.xlsx"
 
 # Run the tracker
 cat("================================================================================\n")
 cat("RUNNING TRACKER WITH FULL ERROR OUTPUT\n")
 cat("================================================================================\n\n")
 
-# The config file contains both tracking config and question mapping sheets
+# Run with separate config and mapping files
 result <- run_tracker(
   tracking_config_path = config_path,
-  question_mapping_path = config_path
+  question_mapping_path = mapping_path
 )
 
 cat("\n================================================================================\n")
