@@ -20,69 +20,47 @@
 # New code should use shared/weights.R functions for consistency.
 # ==============================================================================
 
-#' Extract Categorical Banner Question Codes
+#' Extract Categorical Question Codes
 #'
-#' Extracts question codes used as banner variables that are categorical.
-#' Only categorical banner variables are preserved as text - numeric banner
-#' variables (like percentages or scales) are still converted to numeric.
+#' Extracts all question codes that should preserve text/categorical values.
+#' This includes Single_Response, Multi_Mention, and other categorical question types.
+#' Numeric question types (Rating, Likert, NPS, Numeric, Index) will be converted to numeric.
 #'
-#' @param config List. Configuration object from load_tracking_config()
 #' @param question_mapping Data frame. Question mapping with QuestionType column
-#' @return Character vector of categorical question codes used in banner breakouts
+#' @return Character vector of categorical question codes to preserve
 #'
 #' @keywords internal
-extract_banner_question_codes <- function(config, question_mapping = NULL) {
+extract_categorical_question_codes <- function(question_mapping = NULL) {
 
-  if (is.null(config$banner) || nrow(config$banner) == 0) {
+  if (is.null(question_mapping) || !"QuestionType" %in% names(question_mapping)) {
     return(character(0))
   }
 
-  banner <- config$banner
+  categorical_codes <- character(0)
 
-  # Get wave IDs from config
-  wave_ids <- config$waves$WaveID
+  for (i in 1:nrow(question_mapping)) {
+    q_code <- question_mapping$QuestionCode[i]
+    q_type <- question_mapping$QuestionType[i]
 
-  # Collect all question codes from wave-specific columns in banner
-  all_codes <- character(0)
+    if (is.na(q_code) || is.na(q_type)) {
+      next
+    }
 
-  for (wave_id in wave_ids) {
-    if (wave_id %in% names(banner)) {
-      wave_codes <- banner[[wave_id]]
-      # Extract non-empty codes
-      valid_codes <- wave_codes[!is.na(wave_codes) & trimws(wave_codes) != ""]
-      all_codes <- c(all_codes, trimws(valid_codes))
+    # Preserve text for these question types:
+    # - Single_Response (categorical with text options)
+    # - Multi_Mention (multiple categorical responses)
+    # - Categorical, Nominal, Ordinal (explicit categorical types)
+    # - Open_End (text responses)
+    #
+    # Convert to numeric for these types:
+    # - Rating, Likert, NPS, Numeric, Index (numeric scales)
+    if (grepl("single_response|multi_mention|categorical|nominal|ordinal|open_end|text|choice",
+              tolower(q_type))) {
+      categorical_codes <- c(categorical_codes, q_code)
     }
   }
 
-  all_codes <- unique(all_codes)
-
-  # Filter to only categorical questions if we have question mapping
-  if (!is.null(question_mapping) && "QuestionType" %in% names(question_mapping)) {
-    categorical_codes <- character(0)
-
-    for (code in all_codes) {
-      # Find this question in the mapping
-      q_idx <- which(question_mapping$QuestionCode == code)
-
-      if (length(q_idx) > 0) {
-        q_type <- question_mapping$QuestionType[q_idx[1]]
-
-        # Only preserve if categorical (not numeric/scale)
-        if (!is.na(q_type) &&
-            grepl("categorical|text|nominal|ordinal", tolower(q_type))) {
-          categorical_codes <- c(categorical_codes, code)
-        }
-      } else {
-        # If not in question mapping, assume it's categorical (safer default for banner vars)
-        categorical_codes <- c(categorical_codes, code)
-      }
-    }
-
-    return(categorical_codes)
-  }
-
-  # If no question mapping available, return all banner codes (original behavior)
-  return(all_codes)
+  return(unique(categorical_codes))
 }
 
 
@@ -93,7 +71,7 @@ extract_banner_question_codes <- function(config, question_mapping = NULL) {
 #'
 #' @param config List. Configuration object from load_tracking_config()
 #' @param data_dir Character. Directory containing wave data files (if relative paths used)
-#' @param question_mapping Data frame. Question mapping (optional, for determining categorical banners)
+#' @param question_mapping Data frame. Question mapping (optional, for determining categorical questions)
 #' @return List of data frames, one per wave, with names as WaveIDs
 #'
 #' @export
@@ -101,12 +79,13 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL) {
 
   message("Loading wave data files...")
 
-  # Extract categorical banner variable question codes to preserve their data types
-  # Numeric banner variables will still be converted to numeric
-  banner_cols <- extract_banner_question_codes(config, question_mapping)
-  if (length(banner_cols) > 0) {
-    message(paste0("  Identified ", length(banner_cols), " categorical banner variable(s) to preserve: ",
-                   paste(banner_cols, collapse = ", ")))
+  # Extract all categorical question codes to preserve their text values
+  # Numeric questions (Rating, Likert, NPS) will still be converted to numeric
+  categorical_cols <- extract_categorical_question_codes(question_mapping)
+  if (length(categorical_cols) > 0) {
+    message(paste0("  Identified ", length(categorical_cols), " categorical question(s) to preserve as text: ",
+                   paste(head(categorical_cols, 10), collapse = ", "),
+                   if (length(categorical_cols) > 10) " ..." else ""))
   }
 
   wave_data <- list()
@@ -121,8 +100,8 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL) {
     # Resolve file path
     file_path <- resolve_data_file_path(data_file, data_dir)
 
-    # Load wave data (passing banner columns to preserve)
-    wave_df <- load_wave_data(file_path, wave_id, banner_cols)
+    # Load wave data (passing categorical question codes to preserve)
+    wave_df <- load_wave_data(file_path, wave_id, categorical_cols)
 
     # Apply weighting if specified
     weight_var <- get_wave_weight_var(config, wave_id)
@@ -153,15 +132,16 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL) {
 #' - DK/Don't Know/Prefer not to say -> NA
 #' - Other non-response codes -> NA
 #'
-#' Banner/categorical variables are preserved as-is (not converted to numeric).
+#' Categorical questions (Single_Response, Multi_Mention) are preserved as text.
+#' Numeric questions (Rating, Likert, NPS) are converted to numeric.
 #'
 #' @param wave_df Data frame. Wave data
 #' @param wave_id Character. Wave identifier for messages
-#' @param banner_cols Character vector. Question codes used as banner variables (optional)
+#' @param categorical_cols Character vector. Question codes to preserve as categorical/text (optional)
 #' @return Cleaned data frame
 #'
 #' @keywords internal
-clean_wave_data <- function(wave_df, wave_id, banner_cols = character(0)) {
+clean_wave_data <- function(wave_df, wave_id, categorical_cols = character(0)) {
 
   n_cleaned <- 0
 
@@ -184,11 +164,11 @@ clean_wave_data <- function(wave_df, wave_id, banner_cols = character(0)) {
 
     # Check if column might be numeric (has digits) OR looks like a question code
     if (is.character(col_data)) {
-      # Check if this column is a banner variable - if so, skip numeric conversion
-      is_banner_col <- col_name %in% banner_cols
+      # Check if this column is a categorical question - if so, skip numeric conversion
+      is_categorical <- col_name %in% categorical_cols
 
-      if (is_banner_col) {
-        # Skip banner columns - preserve as categorical
+      if (is_categorical) {
+        # Skip categorical questions - preserve text values for Single_Response, Multi_Mention, etc.
         next
       }
 
@@ -257,11 +237,11 @@ clean_wave_data <- function(wave_df, wave_id, banner_cols = character(0)) {
 #'
 #' @param file_path Character. Full path to data file
 #' @param wave_id Character. Wave identifier for error messages
-#' @param banner_cols Character vector. Question codes used as banner variables (optional)
+#' @param categorical_cols Character vector. Question codes to preserve as categorical/text (optional)
 #' @return Data frame containing wave data
 #'
 #' @keywords internal
-load_wave_data <- function(file_path, wave_id, banner_cols = character(0)) {
+load_wave_data <- function(file_path, wave_id, categorical_cols = character(0)) {
 
   if (!file.exists(file_path)) {
     stop(paste0("Data file not found for Wave ", wave_id, ": ", file_path))
@@ -296,8 +276,8 @@ load_wave_data <- function(file_path, wave_id, banner_cols = character(0)) {
   }
 
   # Clean data (handle comma decimals, DK values, etc.)
-  # Banner columns are preserved as categorical (not converted to numeric)
-  wave_df <- clean_wave_data(wave_df, wave_id, banner_cols)
+  # Categorical questions are preserved as text (not converted to numeric)
+  wave_df <- clean_wave_data(wave_df, wave_id, categorical_cols)
 
   return(wave_df)
 }
