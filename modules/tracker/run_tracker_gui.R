@@ -477,8 +477,13 @@ run_tracker_gui <- function() {
 
     # Console output UI - always show if tracking has been run
     output$console_ui <- renderUI({
-      # Always show console after first run
-      if (console_output() == "" && !is_running() && !isTRUE(session$userData$has_run)) {
+      # Get values safely
+      output_text <- console_output()
+      is_running_now <- is_running()
+      has_run_before <- isTRUE(session$userData$has_run)
+
+      # Only hide if: no output AND not running AND never run before
+      if (nchar(output_text) == 0 && !is_running_now && !has_run_before) {
         return(NULL)
       }
 
