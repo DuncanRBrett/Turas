@@ -20,6 +20,44 @@
 # New code should use shared/weights.R functions for consistency.
 # ==============================================================================
 
+#' Extract Banner Question Codes
+#'
+#' Extracts all question codes used as banner variables across all waves.
+#' These columns should be preserved as-is (not converted to numeric) since
+#' they contain categorical values for segmentation.
+#'
+#' @param config List. Configuration object from load_tracking_config()
+#' @return Character vector of question codes used in banner breakouts
+#'
+#' @keywords internal
+extract_banner_question_codes <- function(config) {
+
+  if (is.null(config$banner) || nrow(config$banner) == 0) {
+    return(character(0))
+  }
+
+  banner <- config$banner
+
+  # Get wave IDs from config
+  wave_ids <- config$waves$WaveID
+
+  # Collect all question codes from wave-specific columns in banner
+  all_codes <- character(0)
+
+  for (wave_id in wave_ids) {
+    if (wave_id %in% names(banner)) {
+      wave_codes <- banner[[wave_id]]
+      # Extract non-empty codes
+      valid_codes <- wave_codes[!is.na(wave_codes) & trimws(wave_codes) != ""]
+      all_codes <- c(all_codes, trimws(valid_codes))
+    }
+  }
+
+  # Return unique codes
+  unique(all_codes)
+}
+
+
 #' Load All Wave Data
 #'
 #' Loads data for all waves defined in tracking configuration.
@@ -34,6 +72,13 @@ load_all_waves <- function(config, data_dir = NULL) {
 
   message("Loading wave data files...")
 
+  # Extract all banner variable question codes to preserve their data types
+  banner_cols <- extract_banner_question_codes(config)
+  if (length(banner_cols) > 0) {
+    message(paste0("  Identified ", length(banner_cols), " banner variable columns to preserve: ",
+                   paste(banner_cols, collapse = ", ")))
+  }
+
   wave_data <- list()
 
   for (i in 1:nrow(config$waves)) {
@@ -46,8 +91,8 @@ load_all_waves <- function(config, data_dir = NULL) {
     # Resolve file path
     file_path <- resolve_data_file_path(data_file, data_dir)
 
-    # Load wave data
-    wave_df <- load_wave_data(file_path, wave_id)
+    # Load wave data (passing banner columns to preserve)
+    wave_df <- load_wave_data(file_path, wave_id, banner_cols)
 
     # Apply weighting if specified
     weight_var <- get_wave_weight_var(config, wave_id)
@@ -78,12 +123,15 @@ load_all_waves <- function(config, data_dir = NULL) {
 #' - DK/Don't Know/Prefer not to say -> NA
 #' - Other non-response codes -> NA
 #'
+#' Banner/categorical variables are preserved as-is (not converted to numeric).
+#'
 #' @param wave_df Data frame. Wave data
 #' @param wave_id Character. Wave identifier for messages
+#' @param banner_cols Character vector. Question codes used as banner variables (optional)
 #' @return Cleaned data frame
 #'
 #' @keywords internal
-clean_wave_data <- function(wave_df, wave_id) {
+clean_wave_data <- function(wave_df, wave_id, banner_cols = character(0)) {
 
   n_cleaned <- 0
 
@@ -106,6 +154,14 @@ clean_wave_data <- function(wave_df, wave_id) {
 
     # Check if column might be numeric (has digits) OR looks like a question code
     if (is.character(col_data)) {
+      # Check if this column is a banner variable - if so, skip numeric conversion
+      is_banner_col <- col_name %in% banner_cols
+
+      if (is_banner_col) {
+        # Skip banner columns - preserve as categorical
+        next
+      }
+
       # Check if any values contain digits or decimal separators (use which() to avoid NA issues)
       non_na_idx <- which(!is.na(col_data))
       non_na_values <- col_data[non_na_idx]
@@ -171,10 +227,11 @@ clean_wave_data <- function(wave_df, wave_id) {
 #'
 #' @param file_path Character. Full path to data file
 #' @param wave_id Character. Wave identifier for error messages
+#' @param banner_cols Character vector. Question codes used as banner variables (optional)
 #' @return Data frame containing wave data
 #'
 #' @keywords internal
-load_wave_data <- function(file_path, wave_id) {
+load_wave_data <- function(file_path, wave_id, banner_cols = character(0)) {
 
   if (!file.exists(file_path)) {
     stop(paste0("Data file not found for Wave ", wave_id, ": ", file_path))
@@ -209,7 +266,8 @@ load_wave_data <- function(file_path, wave_id) {
   }
 
   # Clean data (handle comma decimals, DK values, etc.)
-  wave_df <- clean_wave_data(wave_df, wave_id)
+  # Banner columns are preserved as categorical (not converted to numeric)
+  wave_df <- clean_wave_data(wave_df, wave_id, banner_cols)
 
   return(wave_df)
 }
