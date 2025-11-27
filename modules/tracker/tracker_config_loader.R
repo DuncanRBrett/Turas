@@ -124,7 +124,7 @@ load_tracking_config <- function(config_path) {
 #' @param mapping_path Character. Path to question_mapping.xlsx file.
 #' @return Data frame with columns:
 #'   - QuestionCode: Standardized question code
-#'   - Wave1, Wave2, Wave3, etc.: Wave-specific question codes
+#'   - Wave columns (e.g., W1, W2, W3 or Wave1, Wave2, Wave3): Wave-specific question codes
 #'   - QuestionText: Question wording
 #'   - QuestionType: Type of question (Rating, SingleChoice, etc.)
 #'
@@ -152,10 +152,24 @@ load_question_mapping <- function(mapping_path) {
     stop(paste0("Missing required columns in QuestionMap sheet: ", paste(missing_cols, collapse = ", ")))
   }
 
-  # Find wave columns (Wave1, Wave2, Wave3, etc.)
-  wave_cols <- grep("^Wave\\d+$", names(mapping), value = TRUE)
+  # Find wave columns
+  # FIXED: More flexible wave column detection to support W1, W2, W3 or Wave1, Wave2, Wave3
+  # Exclude known metadata columns to identify wave columns
+  known_metadata_cols <- c("QuestionCode", "QuestionText", "QuestionType", "SourceQuestions", "TrackingSpecs")
+  potential_wave_cols <- setdiff(names(mapping), known_metadata_cols)
+
+  # Further filter: wave columns should have mostly non-NA values (question codes)
+  wave_cols <- character(0)
+  for (col in potential_wave_cols) {
+    # If more than 50% of values are non-NA and non-empty, consider it a wave column
+    non_empty_count <- sum(!is.na(mapping[[col]]) & trimws(as.character(mapping[[col]])) != "")
+    if (non_empty_count > nrow(mapping) * 0.5) {
+      wave_cols <- c(wave_cols, col)
+    }
+  }
+
   if (length(wave_cols) == 0) {
-    stop("No wave columns found in QuestionMap sheet (expected Wave1, Wave2, etc.)")
+    stop("No wave columns found in QuestionMap sheet. Expected columns with wave identifiers (e.g., W1, W2, W3 or Wave1, Wave2, Wave3)")
   }
 
   message(paste0("  Loaded mapping for ", nrow(mapping), " questions across ", length(wave_cols), " waves"))

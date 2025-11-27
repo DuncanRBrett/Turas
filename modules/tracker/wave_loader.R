@@ -387,7 +387,9 @@ validate_wave_data <- function(wave_data, config, question_mapping) {
 
     # Check for tracked question variables
     # Get question codes for this wave from mapping
-    wave_col <- paste0("Wave", which(config$waves$WaveID == wave_id))
+    # FIXED: Use the wave_id directly instead of constructing "Wave" + index
+    # This fixes the "condition has length > 1" error and supports flexible wave naming
+    wave_col <- wave_id
 
     if (wave_col %in% names(question_mapping)) {
       wave_questions <- trimws(as.character(question_mapping[[wave_col]]))

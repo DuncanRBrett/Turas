@@ -43,7 +43,9 @@ build_question_map_index <- function(question_mapping, config) {
     # Map to each wave
     for (wave_idx in seq_along(wave_ids)) {
       wave_id <- wave_ids[wave_idx]
-      wave_col <- paste0("Wave", wave_idx)
+      # FIXED: Use actual WaveID instead of hardcoded "Wave" + index
+      # This allows for flexible wave naming like W1, W2, W3 or Wave1, Wave2, Wave3
+      wave_col <- wave_id
 
       # Get wave-specific code
       if (wave_col %in% names(question_mapping)) {
@@ -69,8 +71,9 @@ build_question_map_index <- function(question_mapping, config) {
 
   # Extract metadata - keep all non-wave columns for future extensibility
   # This includes QuestionCode, QuestionText, QuestionType, SourceQuestions, etc.
-  wave_col_pattern <- "^Wave\\d+$"
-  wave_cols <- grep(wave_col_pattern, names(question_mapping), value = TRUE)
+  # FIXED: Use actual wave IDs from config instead of regex pattern
+  # This supports flexible wave naming (W1, W2, W3 or Wave1, Wave2, Wave3)
+  wave_cols <- wave_ids
 
   # Get all columns except wave columns
   metadata_cols <- setdiff(names(question_mapping), wave_cols)
