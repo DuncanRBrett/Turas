@@ -475,9 +475,12 @@ run_tracker_gui <- function() {
       )
     })
 
-    # Console output UI
+    # Console output UI - always show if tracking has been run
     output$console_ui <- renderUI({
-      if (console_output() == "") return(NULL)
+      # Always show console after first run
+      if (console_output() == "" && !is_running() && !isTRUE(session$userData$has_run)) {
+        return(NULL)
+      }
 
       div(class = "card",
         h3("4. Analysis Output"),
@@ -496,12 +499,20 @@ run_tracker_gui <- function() {
       req(files$tracking_config, files$question_mapping)
 
       is_running(TRUE)
+      session$userData$has_run <- TRUE
       console_output("Starting tracking analysis...\n\n")
 
       # Save current working directory
       old_wd <- getwd()
 
-      tryCatch({
+      # Capture all warnings
+      all_warnings <- character(0)
+      warning_handler <- function(w) {
+        all_warnings <<- c(all_warnings, conditionMessage(w))
+        invokeRestart("muffleWarning")
+      }
+
+      tryCatch(withCallingHandlers({
         # Validate and ensure all paths are character strings
         tracking_config <- files$tracking_config
         question_mapping <- files$question_mapping
@@ -603,9 +614,15 @@ run_tracker_gui <- function() {
           sprintf("\nOutput file saved to:\n%s\n", output_file)
         ))
 
+        # Display any warnings that occurred
+        if (length(all_warnings) > 0) {
+          warning_msg <- paste0("\n\nWarnings encountered:\n", paste(all_warnings, collapse = "\n"))
+          console_output(paste0(console_output(), warning_msg))
+        }
+
         showNotification("Tracking analysis completed successfully!", type = "message", duration = 5)
 
-      }, error = function(e) {
+      }, warning = warning_handler), error = function(e) {
         error_msg <- paste0("\n\n", strrep("=", 80), "\nERROR: ", e$message, "\n", strrep("=", 80), "\n\n")
         error_msg <- paste0(error_msg, "Full error:\n", paste(capture.output(print(e)), collapse = "\n"))
         console_output(paste0(console_output(), error_msg))
