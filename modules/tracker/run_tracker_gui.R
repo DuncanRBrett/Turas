@@ -273,7 +273,7 @@ run_tracker_gui <- function() {
       tryCatch({
         if (!is.integer(input$data_dir_btn)) {
           dir_path <- parseDirPath(volumes, input$data_dir_btn)
-          if (length(dir_path) > 0 && dir_path != "") {
+          if (length(dir_path) > 0 && nchar(dir_path[1]) > 0) {
             files$data_dir <- as.character(dir_path[1])
           }
         }
