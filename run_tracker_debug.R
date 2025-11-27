@@ -8,8 +8,15 @@
 # (Assumes you've already set your working directory to the Turas folder)
 cat("Current working directory:", getwd(), "\n")
 
+# Change to tracker module directory to source correctly
+old_wd <- getwd()
+setwd("modules/tracker")
+
 # Source the tracker module
-source("modules/tracker/run_tracker.R")
+source("run_tracker.R")
+
+# Return to original directory
+setwd(old_wd)
 
 # Enable full error traceback
 options(error = function() {
