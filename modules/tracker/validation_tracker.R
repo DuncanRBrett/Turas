@@ -201,10 +201,22 @@ validate_mapping_structure <- function(question_mapping, config) {
                        paste0("Missing columns in question mapping: ", paste(missing_cols, collapse = ", ")))
   }
 
-  # Check for wave columns
-  wave_cols <- grep("^Wave\\d+$", names(question_mapping), value = TRUE)
+  # Check for wave columns - use flexible detection to support any wave naming
+  # (W1, W2, W3 or Wave1, Wave2, Wave3 or custom names)
+  known_metadata_cols <- c("QuestionCode", "QuestionText", "QuestionType", "SourceQuestions", "TrackingSpecs")
+  potential_wave_cols <- setdiff(names(question_mapping), known_metadata_cols)
+
+  wave_cols <- character(0)
+  for (col in potential_wave_cols) {
+    # Count non-empty values - if > 50% of rows have data, it's likely a wave column
+    non_empty_count <- sum(!is.na(question_mapping[[col]]) & trimws(as.character(question_mapping[[col]])) != "")
+    if (non_empty_count > nrow(question_mapping) * 0.5) {
+      wave_cols <- c(wave_cols, col)
+    }
+  }
+
   if (length(wave_cols) == 0) {
-    results$errors <- c(results$errors, "No Wave columns found in question mapping")
+    results$errors <- c(results$errors, "No wave columns found in question mapping")
   } else {
     # Check wave columns match wave count
     n_config_waves <- nrow(config$waves)
