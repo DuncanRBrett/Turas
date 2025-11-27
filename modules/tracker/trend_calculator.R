@@ -85,6 +85,7 @@ calculate_all_trends <- function(config, question_map, wave_data) {
   trend_results <- list()
 
   for (q_code in tracked_questions) {
+    message(paste0("\n", strrep("=", 80)))
     message(paste0("Processing question: ", q_code))
 
     # Get question metadata
@@ -98,6 +99,7 @@ calculate_all_trends <- function(config, question_map, wave_data) {
     # Normalize question type to internal standard
     q_type_raw <- metadata$QuestionType
     q_type <- normalize_question_type(q_type_raw)
+    message(paste0("  Type: ", q_type_raw, " (normalized: ", q_type, ")"))
 
     trend_result <- tryCatch({
       if (q_type == "rating") {
@@ -159,9 +161,15 @@ calculate_rating_trend <- function(q_code, question_map, wave_data, config) {
   for (wave_id in wave_ids) {
     # Extract question data for this wave
     wave_df <- wave_data[[wave_id]]
+    wave_code <- get_wave_question_code(question_map, q_code, wave_id)
     q_data <- extract_question_data(wave_df, wave_id, q_code, question_map)
 
     if (is.null(q_data)) {
+      if (!is.na(wave_code)) {
+        message(paste0("  ", wave_id, ": Mapped to ", wave_code, " but not found in data"))
+      } else {
+        message(paste0("  ", wave_id, ": Not mapped for this wave"))
+      }
       wave_results[[wave_id]] <- list(
         mean = NA,
         sd = NA,
@@ -172,6 +180,8 @@ calculate_rating_trend <- function(q_code, question_map, wave_data, config) {
         weights = NULL
       )
       next
+    } else {
+      message(paste0("  ", wave_id, ": Found as ", wave_code, " (n=", length(q_data), ")"))
     }
 
     # Calculate weighted mean
@@ -1630,18 +1640,36 @@ calculate_composite_values_per_respondent <- function(wave_df, wave_id, source_q
 
   # Extract data for each source question
   source_values <- list()
+  missing_sources <- character(0)
 
   for (src_code in source_questions) {
+    # Get wave-specific code for this source question
+    wave_code <- get_wave_question_code(question_map, src_code, wave_id)
+
     src_data <- extract_question_data(wave_df, wave_id, src_code, question_map)
 
     if (!is.null(src_data)) {
       source_values[[src_code]] <- src_data
+      message(paste0("    ✓ Found source question ", src_code, " (", wave_code, ") for ", wave_id))
+    } else {
+      missing_sources <- c(missing_sources, src_code)
+      if (!is.na(wave_code)) {
+        message(paste0("    ✗ Source question ", src_code, " mapped to ", wave_code, " but not found in ", wave_id, " data"))
+      } else {
+        message(paste0("    ✗ Source question ", src_code, " not mapped for ", wave_id))
+      }
     }
   }
 
   if (length(source_values) == 0) {
-    warning("No valid source questions found for composite")
+    warning(paste0("No valid source questions found for composite in ", wave_id,
+                   ". Missing: ", paste(missing_sources, collapse = ", ")))
     return(rep(NA, nrow(wave_df)))
+  }
+
+  if (length(missing_sources) > 0) {
+    message(paste0("    Note: ", length(source_values), "/", length(source_questions),
+                   " source questions found for ", wave_id))
   }
 
   # Build matrix: rows = respondents, cols = source questions
@@ -1699,7 +1727,10 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
   # Calculate composite values and metrics for each wave
   wave_results <- list()
 
+  message(paste0("  Calculating composite for ", length(wave_ids), " waves..."))
+
   for (wave_id in wave_ids) {
+    message(paste0("  Processing ", wave_id, "..."))
     wave_df <- wave_data[[wave_id]]
 
     # Calculate composite values per respondent
