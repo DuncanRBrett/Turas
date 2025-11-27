@@ -696,6 +696,18 @@ calculate_composite_score <- function(wave_df, wave_id, source_questions, questi
 #' @keywords internal
 calculate_weighted_mean <- function(values, weights) {
 
+  # Type validation - check if values are numeric
+  if (!is.numeric(values)) {
+    # Show sample of non-numeric values for debugging
+    sample_values <- head(unique(values[!is.na(values)]), 5)
+    stop(paste0(
+      "Non-numeric data detected in question values. ",
+      "Expected numeric responses but found: ",
+      paste(sample_values, collapse = ", "),
+      ". Check that the data file has numeric values for this question."
+    ))
+  }
+
   # Remove NA values
   # Use which() to ensure we get numeric indices without NA
   valid_idx <- which(!is.na(values) & !is.na(weights) & weights > 0)

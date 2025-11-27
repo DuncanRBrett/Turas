@@ -104,14 +104,18 @@ clean_wave_data <- function(wave_df, wave_id) {
       next
     }
 
-    # Check if column might be numeric (has digits)
+    # Check if column might be numeric (has digits) OR looks like a question code
     if (is.character(col_data)) {
       # Check if any values contain digits or decimal separators (use which() to avoid NA issues)
       non_na_idx <- which(!is.na(col_data))
       non_na_values <- col_data[non_na_idx]
       has_numbers <- length(non_na_values) > 0 && any(grepl("[0-9]", non_na_values))
 
-      if (has_numbers) {
+      # Also check if column name looks like a question code (Q## pattern)
+      # This ensures we clean question columns even if they only contain non-response codes
+      is_question_col <- grepl("^Q[0-9]+(_[0-9]+)?$", col_name)
+
+      if (has_numbers || is_question_col) {
         original_col <- col_data
 
         # Replace comma decimals with period decimals
@@ -136,11 +140,17 @@ clean_wave_data <- function(wave_df, wave_id) {
         new_nas <- sum(is.na(col_numeric)) - sum(is.na(original_col))
         if (new_nas > 0) {
           n_cleaned <- n_cleaned + 1
-          message(paste0("    ", col_name, ": Converted ", new_nas, " non-numeric values to NA"))
+          if (is_question_col && new_nas == length(original_col[!is.na(original_col)])) {
+            # All non-NA values were converted to NA - this is a problem
+            message(paste0("    WARNING: ", col_name, ": All ", new_nas, " values are non-numeric (converted to NA). Check data source."))
+          } else {
+            message(paste0("    ", col_name, ": Converted ", new_nas, " non-numeric values to NA"))
+          }
         }
 
-        # If at least some values converted successfully, use the numeric version
-        if (sum(!is.na(col_numeric)) > 0) {
+        # For question columns, use the numeric version even if all values are NA
+        # This ensures consistent data types for question responses
+        if (is_question_col || sum(!is.na(col_numeric)) > 0) {
           wave_df[[col_name]] <- col_numeric
         }
       }
