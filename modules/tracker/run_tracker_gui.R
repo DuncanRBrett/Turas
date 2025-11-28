@@ -640,34 +640,34 @@ run_tracker_gui <- function() {
           ))
         }
 
-        # Extract output_file
+        # Extract output_file and handle success case
         if (analysis_result$success) {
           output_file <- analysis_result$output_file
+
+          # Save to recent projects
+          add_recent_project(list(
+            tracking_config = tracking_config,
+            question_mapping = question_mapping,
+            data_dir = data_dir,
+            output_path = output_path,
+            use_banners = input$use_banners
+          ))
+
+          # Update console with completion message
+          console_output(paste0(
+            console_output(),
+            sprintf("\n%s\n✓ ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80)),
+            sprintf("\nOutput file saved to:\n%s\n", output_file)
+          ))
+
+          # Display any warnings that occurred
+          if (length(all_warnings) > 0) {
+            warning_msg <- paste0("\n\nWarnings encountered:\n", paste(all_warnings, collapse = "\n"))
+            console_output(paste0(console_output(), warning_msg))
+          }
+
+          showNotification("Tracking analysis completed successfully!", type = "message", duration = 5)
         }
-
-        # Save to recent projects
-        add_recent_project(list(
-          tracking_config = tracking_config,
-          question_mapping = question_mapping,
-          data_dir = data_dir,
-          output_path = output_path,
-          use_banners = input$use_banners
-        ))
-
-        # Update console with completion message
-        console_output(paste0(
-          console_output(),
-          sprintf("\n%s\n✓ ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80)),
-          sprintf("\nOutput file saved to:\n%s\n", output_file)
-        ))
-
-        # Display any warnings that occurred
-        if (length(all_warnings) > 0) {
-          warning_msg <- paste0("\n\nWarnings encountered:\n", paste(all_warnings, collapse = "\n"))
-          console_output(paste0(console_output(), warning_msg))
-        }
-
-        showNotification("Tracking analysis completed successfully!", type = "message", duration = 5)
 
       }, warning = warning_handler), error = function(e) {
         error_msg <- paste0("\n\n", strrep("=", 80), "\nERROR: ", e$message, "\n", strrep("=", 80), "\n\n")
