@@ -591,12 +591,7 @@ run_tracker_gui <- function() {
       # Source run_tracker.R
       source("run_tracker.R")
 
-      # Run analysis and capture ALL console output
-      # Tracker uses message() (stderr) heavily, so we must capture BOTH stdout and stderr
-      output_file_temp <- tempfile()
-      sink(output_file_temp, type = "output")  # Capture stdout (cat)
-      sink(output_file_temp, type = "message") # Capture stderr (message) - same file!
-
+      # Run analysis
       analysis_result <- tryCatch({
         output_file <- run_tracker(
           tracking_config_path = tracking_config,
@@ -609,25 +604,7 @@ run_tracker_gui <- function() {
 
       }, error = function(e) {
         list(success = FALSE, output_file = NULL, error = e)
-
-      }, finally = {
-        # Always restore console output - restore in reverse order!
-        tryCatch(sink(type = "message"), error = function(e) {})
-        tryCatch(sink(type = "output"), error = function(e) {})
       })
-
-      # Read captured output (available even if error occurred)
-      captured_output <- readLines(output_file_temp, warn = FALSE)
-      unlink(output_file_temp)
-
-      # Append captured output to console (works for both success and error cases)
-      if (length(captured_output) > 0) {
-        console_output(paste0(
-          console_output(),
-          paste(captured_output, collapse = "\n"),
-          "\n"
-        ))
-      }
 
       # Handle success or error
       if (analysis_result$success) {
