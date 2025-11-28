@@ -589,29 +589,45 @@ run_tracker_gui <- function() {
         # Source run_tracker.R
         source("run_tracker.R")
 
-        # Run analysis and capture ALL output (stdout + messages)
-        # This captures after completion, not in real-time, but that's acceptable
-        all_output <- capture.output({
-          all_messages <- capture.output({
-            output_file <- run_tracker(
-              tracking_config_path = tracking_config,
-              question_mapping_path = question_mapping,
-              data_dir = data_dir,
-              output_path = output_path,
-              use_banners = input$use_banners
-            )
-          }, type = "message")
-          cat(all_messages, sep = "\n")
-        }, type = "output")
+        # Run analysis and capture ALL console output (same approach as tabs module)
+        # Use sink() to capture output even when errors occur
+        output_capture_file <- tempfile()
+        sink(output_capture_file, type = "output")
 
-        # Display captured output
-        if (length(all_output) > 0) {
+        analysis_result <- tryCatch({
+          output_file <- run_tracker(
+            tracking_config_path = tracking_config,
+            question_mapping_path = question_mapping,
+            data_dir = data_dir,
+            output_path = output_path,
+            use_banners = input$use_banners
+          )
+          list(success = TRUE, output_file = output_file, error = NULL)
+
+        }, error = function(e) {
+          list(success = FALSE, output_file = NULL, error = e)
+
+        }, finally = {
+          # Always restore console output
+          sink(type = "output")
+        })
+
+        # Read captured output (available even if error occurred)
+        captured_output <- readLines(output_capture_file, warn = FALSE)
+        unlink(output_capture_file)
+
+        # Append captured output to console (works for both success and error cases)
+        if (length(captured_output) > 0) {
           console_output(paste0(
             console_output(),
-            "\n",
-            paste(all_output, collapse = "\n"),
+            paste(captured_output, collapse = "\n"),
             "\n"
           ))
+        }
+
+        # Extract output_file for later use
+        if (analysis_result$success) {
+          output_file <- analysis_result$output_file
         }
 
         # Save to recent projects
