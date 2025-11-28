@@ -22,9 +22,12 @@ find_turas_root <- function() {
   # Search up directory tree for Turas root markers
   while (current_dir != dirname(current_dir)) {  # Stop at filesystem root
     # Check for Turas root markers
-    if (file.exists(file.path(current_dir, "launch_turas.R")) ||
-        (dir.exists(file.path(current_dir, "shared")) && 
-         dir.exists(file.path(current_dir, "modules")))) {
+    # Use isTRUE() to ensure single logical value for R 4.2+ compatibility
+    has_launch <- isTRUE(file.exists(file.path(current_dir, "launch_turas.R")))
+    has_shared <- isTRUE(dir.exists(file.path(current_dir, "shared")))
+    has_modules <- isTRUE(dir.exists(file.path(current_dir, "modules")))
+
+    if (has_launch || (has_shared && has_modules)) {
       return(current_dir)
     }
     current_dir <- dirname(current_dir)
@@ -33,7 +36,7 @@ find_turas_root <- function() {
   # Method 3: Try relative paths from module location
   for (rel_path in c("../..", "../../..", "../../../..")) {
     test_path <- normalizePath(file.path(rel_path, "shared", "formatting.R"), mustWork = FALSE)
-    if (file.exists(test_path)) {
+    if (isTRUE(file.exists(test_path))) {
       return(normalizePath(dirname(dirname(test_path)), mustWork = TRUE))
     }
   }
