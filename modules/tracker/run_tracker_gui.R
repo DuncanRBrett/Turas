@@ -614,20 +614,11 @@ run_tracker_gui <- function() {
         captured_output <- readLines(output_capture_file, warn = FALSE)
         unlink(output_capture_file)
 
-        # DEBUG: Show capture stats
-        debug_msg <- sprintf("\n=== DEBUG INFO ===\nCaptured %d lines of output\nFirst 3 lines:\n", length(captured_output))
-        if (length(captured_output) > 0) {
-          debug_msg <- paste0(debug_msg, paste(head(captured_output, 3), collapse = "\n"))
-        } else {
-          debug_msg <- paste0(debug_msg, "(no output captured)")
-        }
-        debug_msg <- paste0(debug_msg, "\n===================\n\n")
-
         # Display captured output in console
         if (length(captured_output) > 0) {
-          console_output(paste0(debug_msg, paste(captured_output, collapse = "\n")))
+          console_output(paste(captured_output, collapse = "\n"))
         } else {
-          console_output(paste0(debug_msg, "Tracker ran but produced no console output."))
+          console_output("Tracker completed but produced no console output.")
         }
 
         # Extract output_file
