@@ -589,12 +589,15 @@ run_tracker_gui <- function() {
         # Source run_tracker.R
         source("run_tracker.R")
 
-        # Run analysis with progressive console capture
-        # Create a connection to capture messages
-        con <- textConnection("tracker_msgs", open = "w", local = TRUE)
+        # Run analysis and capture all console output
+        # Use sink() to capture messages to a temporary file
+        temp_log <- tempfile(fileext = ".log")
 
-        # Capture messages with custom handler that updates console in real-time
-        withCallingHandlers({
+        tryCatch({
+          # Redirect messages to file
+          sink(temp_log, type = "output", split = FALSE)
+          sink(temp_log, type = "message", append = TRUE, split = FALSE)
+
           output_file <- run_tracker(
             tracking_config_path = tracking_config,
             question_mapping_path = question_mapping,
@@ -602,12 +605,22 @@ run_tracker_gui <- function() {
             output_path = output_path,
             use_banners = input$use_banners
           )
-        }, message = function(m) {
-          # Append message to console output
-          current_output <- console_output()
-          console_output(paste0(current_output, conditionMessage(m)))
-          # Suppress default message printing
-          invokeRestart("muffleMessage")
+
+          # Stop redirecting
+          sink(type = "message")
+          sink(type = "output")
+
+          # Read captured output and append to console
+          if (file.exists(temp_log)) {
+            captured_output <- paste(readLines(temp_log, warn = FALSE), collapse = "\n")
+            console_output(paste0(console_output(), captured_output, "\n"))
+            unlink(temp_log)
+          }
+        }, error = function(e) {
+          # Make sure sinks are closed even on error
+          sink(type = "message", append = FALSE)
+          sink(type = "output", append = FALSE)
+          stop(e)
         })
 
         # Save to recent projects

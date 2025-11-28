@@ -1910,10 +1910,17 @@ write_wave_history_sheet <- function(wb, sheet_name, trend_results, wave_ids, co
   current_row <- current_row + 1
 
   # Base row: Show sample size (n) for each wave
-  base_row <- c("", "BASE", "n")
-  for (wave_id in wave_ids) {
+  # Write label columns first
+  openxlsx::writeData(wb, sheet_name, "", startRow = current_row, startCol = 1, colNames = FALSE)
+  openxlsx::writeData(wb, sheet_name, "BASE", startRow = current_row, startCol = 2, colNames = FALSE)
+  openxlsx::writeData(wb, sheet_name, "n", startRow = current_row, startCol = 3, colNames = FALSE)
+
+  # Collect sample sizes for each wave (as numeric)
+  base_values <- numeric(length(wave_ids))
+  for (i in seq_along(wave_ids)) {
+    wave_id <- wave_ids[i]
     # Get sample size from any available question's wave result
-    n_value <- NA
+    n_value <- NA_real_
 
     # Try to get from any question result for this wave
     for (q_code in names(trend_results)) {
@@ -1939,22 +1946,23 @@ write_wave_history_sheet <- function(wb, sheet_name, trend_results, wave_ids, co
             !is.null(wave_result$available) &&
             wave_result$available &&
             !is.null(wave_result$n_unweighted)) {
-          n_value <- wave_result$n_unweighted
+          n_value <- as.numeric(wave_result$n_unweighted)
           break  # Found a valid sample size, use it
         }
       }
     }
 
-    base_row <- c(base_row, n_value)
+    base_values[i] <- n_value
   }
 
-  openxlsx::writeData(wb, sheet_name, t(base_row),
-                      startRow = current_row, startCol = 1, colNames = FALSE)
+  # Write numeric base values
+  openxlsx::writeData(wb, sheet_name, t(base_values),
+                      startRow = current_row, startCol = 4, colNames = FALSE)
 
   # Style base row with bold font
-  base_style <- openxlsx::createStyle(textDecoration = "bold")
+  base_style <- openxlsx::createStyle(textDecoration = "bold", numFmt = "0")
   openxlsx::addStyle(wb, sheet_name, base_style,
-                    rows = current_row, cols = 1:length(base_row), gridExpand = TRUE)
+                    rows = current_row, cols = 1:(3 + length(wave_ids)), gridExpand = TRUE)
   current_row <- current_row + 1
 
   # Get decimal separator and decimal places
