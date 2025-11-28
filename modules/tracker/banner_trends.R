@@ -223,6 +223,7 @@ filter_wave_data_to_segment <- function(wave_data, segment_def) {
     # Check if variable exists in this wave
     if (!var_name %in% names(wave_df)) {
       # Variable doesn't exist in this wave - return empty data
+      message(sprintf("    WARNING: Banner variable '%s' not found in wave %s", var_name, wave_id))
       filtered_data[[wave_id]] <- wave_df[0, ]  # Empty dataframe with same structure
       next
     }
@@ -231,14 +232,24 @@ filter_wave_data_to_segment <- function(wave_data, segment_def) {
     # Handle both numeric and text banner variables
     var_data <- wave_df[[var_name]]
 
+    # Diagnostic output
+    message(sprintf("    Filtering %s: variable='%s', looking for value='%s', data type=%s",
+                    wave_id, var_name, segment_def$value, class(var_data)[1]))
+
     # For text variables, trim whitespace and do case-insensitive comparison
     if (is.character(var_data)) {
       var_data_clean <- trimws(toupper(as.character(var_data)))
       segment_value_clean <- trimws(toupper(as.character(segment_def$value)))
       segment_rows <- which(var_data_clean == segment_value_clean & !is.na(var_data))
+      unique_values <- unique(var_data[!is.na(var_data)])
+      message(sprintf("      Found %d matching rows (text comparison). Unique values in data: %s",
+                      length(segment_rows), paste(head(unique_values, 5), collapse=", ")))
     } else {
       # For numeric variables, use exact comparison
       segment_rows <- which(var_data == segment_def$value & !is.na(var_data))
+      unique_values <- unique(var_data[!is.na(var_data)])
+      message(sprintf("      Found %d matching rows (numeric comparison). Unique values in data: %s",
+                      length(segment_rows), paste(head(unique_values, 5), collapse=", ")))
     }
 
     filtered_data[[wave_id]] <- wave_df[segment_rows, ]
