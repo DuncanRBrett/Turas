@@ -590,40 +590,27 @@ run_tracker_gui <- function() {
         source("run_tracker.R")
 
         # Run analysis and capture console output
-        # Match the proven approach from tabs module: capture stdout only
-        output_capture_file <- tempfile()
-
+        # Use capture.output() with type="message" - more robust in reactive contexts
         analysis_result <- tryCatch({
-          # Capture stdout only - messages from run_tracker() will display normally
-          sink(output_capture_file, type = "output")
+          # Capture both message() and cat() output
+          all_output <- capture.output({
+            output_file <- run_tracker(
+              tracking_config_path = tracking_config,
+              question_mapping_path = question_mapping,
+              data_dir = data_dir,
+              output_path = output_path,
+              use_banners = input$use_banners
+            )
+          }, type = "message")
 
-          output_file <- run_tracker(
-            tracking_config_path = tracking_config,
-            question_mapping_path = question_mapping,
-            data_dir = data_dir,
-            output_path = output_path,
-            use_banners = input$use_banners
-          )
-          list(success = TRUE, output_file = output_file, error = NULL)
+          list(success = TRUE, output_file = output_file, error = NULL, output = all_output)
 
         }, error = function(e) {
-          list(success = FALSE, output_file = NULL, error = e)
-
-        }, finally = {
-          # Always restore sink
-          tryCatch({
-            sink(type = "output")
-          }, error = function(e) {})
+          list(success = FALSE, output_file = NULL, error = e, output = character(0))
         })
 
-        # Read captured output (cat() calls from run_tracker)
-        all_output <- character(0)
-        if (file.exists(output_capture_file)) {
-          all_output <- c(all_output, readLines(output_capture_file, warn = FALSE))
-          unlink(output_capture_file)
-        }
-
         # Display all captured output
+        all_output <- analysis_result$output
         if (length(all_output) > 0) {
           console_output(paste0(
             console_output(),
