@@ -592,11 +592,12 @@ run_tracker_gui <- function() {
         # Run analysis and capture all console output
         # Use sink() to capture messages to a temporary file
         temp_log <- tempfile(fileext = ".log")
+        log_con <- file(temp_log, open = "wt")
 
         tryCatch({
-          # Redirect messages to file
-          sink(temp_log, type = "output", split = FALSE)
-          sink(temp_log, type = "message", append = TRUE, split = FALSE)
+          # Redirect output and messages to file connection
+          sink(log_con, type = "output", split = FALSE)
+          sink(log_con, type = "message", split = FALSE)
 
           output_file <- run_tracker(
             tracking_config_path = tracking_config,
@@ -609,6 +610,7 @@ run_tracker_gui <- function() {
           # Stop redirecting
           sink(type = "message")
           sink(type = "output")
+          close(log_con)
 
           # Read captured output and append to console
           if (file.exists(temp_log)) {
@@ -618,8 +620,11 @@ run_tracker_gui <- function() {
           }
         }, error = function(e) {
           # Make sure sinks are closed even on error
-          sink(type = "message", append = FALSE)
-          sink(type = "output", append = FALSE)
+          tryCatch({
+            sink(type = "message")
+            sink(type = "output")
+            close(log_con)
+          }, error = function(e2) {})
           stop(e)
         })
 
