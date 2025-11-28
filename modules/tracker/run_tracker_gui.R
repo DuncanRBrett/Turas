@@ -582,13 +582,32 @@ run_tracker_gui <- function() {
         # Change to tracker directory
         setwd(tracker_dir)
 
-        # Source run_tracker.R
-        source("run_tracker.R")
-
-        # DEBUG: Test if console_output updates work
+        # DEBUG 1: Before sourcing
         console_output(paste0(
           console_output(),
-          "[DEBUG] About to run tracker...\n"
+          "[DEBUG 1] About to source run_tracker.R from: ", getwd(), "\n"
+        ))
+
+        # Source run_tracker.R - THIS may be where error occurs
+        tryCatch({
+          source("run_tracker.R")
+          console_output(paste0(
+            console_output(),
+            "[DEBUG 2] Successfully sourced run_tracker.R\n"
+          ))
+        }, error = function(e) {
+          console_output(paste0(
+            console_output(),
+            "[DEBUG ERROR] source() failed: ", e$message, "\n",
+            "Traceback:\n", paste(capture.output(traceback()), collapse = "\n"), "\n\n"
+          ))
+          stop(e)  # Re-throw
+        })
+
+        # DEBUG 3: After sourcing
+        console_output(paste0(
+          console_output(),
+          "[DEBUG 3] About to run tracker function...\n"
         ))
 
         # Run analysis and capture ALL console output (same method as tabs module)
