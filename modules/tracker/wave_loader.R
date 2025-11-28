@@ -23,40 +23,59 @@
 #' Extract Categorical Question Codes
 #'
 #' Extracts all question codes that should preserve text/categorical values.
-#' This includes Single_Response, Multi_Mention, and other categorical question types.
+#' This includes:
+#' - Banner variables (ALWAYS preserved as text for filtering)
+#' - Single_Response, Multi_Mention, and other categorical question types
 #' Numeric question types (Rating, Likert, NPS, Numeric, Index) will be converted to numeric.
 #'
+#' @param config List. Configuration object (for banner variables)
 #' @param question_mapping Data frame. Question mapping with QuestionType column
 #' @return Character vector of categorical question codes to preserve
 #'
 #' @keywords internal
-extract_categorical_question_codes <- function(question_mapping = NULL) {
-
-  if (is.null(question_mapping) || !"QuestionType" %in% names(question_mapping)) {
-    return(character(0))
-  }
+extract_categorical_question_codes <- function(config = NULL, question_mapping = NULL) {
 
   categorical_codes <- character(0)
 
-  for (i in 1:nrow(question_mapping)) {
-    q_code <- question_mapping$QuestionCode[i]
-    q_type <- question_mapping$QuestionType[i]
+  # FIRST: Extract ALL banner variables - these MUST be preserved as text
+  # Banner variables are used for filtering, so they need their original text values
+  if (!is.null(config) && !is.null(config$banner) && nrow(config$banner) > 0) {
+    banner <- config$banner
+    wave_ids <- config$waves$WaveID
 
-    if (is.na(q_code) || is.na(q_type)) {
-      next
+    # Collect all question codes from wave-specific columns in banner
+    for (wave_id in wave_ids) {
+      if (wave_id %in% names(banner)) {
+        wave_codes <- banner[[wave_id]]
+        # Extract non-empty codes
+        valid_codes <- wave_codes[!is.na(wave_codes) & trimws(wave_codes) != ""]
+        categorical_codes <- c(categorical_codes, trimws(valid_codes))
+      }
     }
+  }
 
-    # Preserve text for these question types:
-    # - Single_Response (categorical with text options)
-    # - Multi_Mention (multiple categorical responses)
-    # - Categorical, Nominal, Ordinal (explicit categorical types)
-    # - Open_End (text responses)
-    #
-    # Convert to numeric for these types:
-    # - Rating, Likert, NPS, Numeric, Index (numeric scales)
-    if (grepl("single_response|multi_mention|categorical|nominal|ordinal|open_end|text|choice",
-              tolower(q_type))) {
-      categorical_codes <- c(categorical_codes, q_code)
+  # SECOND: Add categorical tracked questions from question mapping
+  if (!is.null(question_mapping) && "QuestionType" %in% names(question_mapping)) {
+    for (i in 1:nrow(question_mapping)) {
+      q_code <- question_mapping$QuestionCode[i]
+      q_type <- question_mapping$QuestionType[i]
+
+      if (is.na(q_code) || is.na(q_type)) {
+        next
+      }
+
+      # Preserve text for these question types:
+      # - Single_Response (categorical with text options)
+      # - Multi_Mention (multiple categorical responses)
+      # - Categorical, Nominal, Ordinal (explicit categorical types)
+      # - Open_End (text responses)
+      #
+      # Convert to numeric for these types:
+      # - Rating, Likert, NPS, Numeric, Index (numeric scales)
+      if (grepl("single_response|multi_mention|categorical|nominal|ordinal|open_end|text|choice",
+                tolower(q_type))) {
+        categorical_codes <- c(categorical_codes, q_code)
+      }
     }
   }
 
@@ -80,8 +99,8 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL) {
   message("Loading wave data files...")
 
   # Extract all categorical question codes to preserve their text values
-  # Numeric questions (Rating, Likert, NPS) will still be converted to numeric
-  categorical_cols <- extract_categorical_question_codes(question_mapping)
+  # This includes ALL banner variables (always text) plus categorical tracked questions
+  categorical_cols <- extract_categorical_question_codes(config, question_mapping)
   if (length(categorical_cols) > 0) {
     message(paste0("  Identified ", length(categorical_cols), " categorical question(s) to preserve as text: ",
                    paste(head(categorical_cols, 10), collapse = ", "),
