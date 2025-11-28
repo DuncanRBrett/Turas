@@ -186,8 +186,13 @@ run_tracker_gui <- function() {
         # Step 3: Run Button
         uiOutput("run_ui"),
 
-        # Step 4: Console Output
-        uiOutput("console_ui")
+        # Step 4: Console Output (static UI - always visible)
+        div(class = "card",
+          h3("4. Analysis Output"),
+          div(class = "console-output",
+            verbatimTextOutput("console_text")
+          )
+        )
       )
     )
   )
@@ -475,23 +480,14 @@ run_tracker_gui <- function() {
       )
     })
 
-    # Console output UI - always visible
-    output$console_ui <- renderUI({
-      div(class = "card",
-        h3("4. Analysis Output"),
-        div(class = "console-output",
-          if (nchar(console_output()) == 0) {
-            p(style = "color: #666; font-style: italic;",
-              "Console output will appear here when you run the tracker...")
-          } else {
-            verbatimTextOutput("console_text")
-          }
-        )
-      )
-    })
-
+    # Console output - static UI, always present
     output$console_text <- renderText({
-      console_output()
+      current_output <- console_output()
+      if (nchar(current_output) == 0) {
+        "Console output will appear here when you run the tracker..."
+      } else {
+        current_output
+      }
     })
 
     # Run analysis
