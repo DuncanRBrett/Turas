@@ -496,7 +496,14 @@ run_tracker_gui <- function() {
 
       is_running(TRUE)
       session$userData$has_run <- TRUE
-      console_output("Starting tracking analysis...\n\n")
+
+      # Clear previous console output
+      console_output("")
+
+      # Create progress indicator
+      progress <- Progress$new(session)
+      progress$set(message = "Running Tracker Analysis", value = 0)
+      on.exit(progress$close())
 
       # Save current working directory
       old_wd <- getwd()
@@ -517,13 +524,8 @@ run_tracker_gui <- function() {
         tracking_config <- normalizePath(tracking_config, mustWork = FALSE)
         question_mapping <- normalizePath(question_mapping, mustWork = FALSE)
 
-        # Debug info
-        console_output(paste0(
-          console_output(),
-          "Validating inputs...\n",
-          sprintf("  tracking_config: %s\n", tracking_config),
-          sprintf("  question_mapping: %s\n", question_mapping)
-        ))
+        # Validate inputs
+        progress$set(value = 0.1, detail = "Validating inputs...")
 
         # Ensure character
         if (!is.character(tracking_config) || length(tracking_config) != 1) {
@@ -567,50 +569,16 @@ run_tracker_gui <- function() {
           stop("Could not find run_tracker.R at: ", run_script)
         }
 
-        # Update console
-        console_output(paste0(
-          console_output(),
-          "\nStarting analysis with:\n",
-          sprintf("  Tracking Config: %s\n", tracking_config),
-          sprintf("  Question Mapping: %s\n", question_mapping),
-          sprintf("  Data Directory: %s\n", data_dir),
-          sprintf("  Output Path: %s\n", output_path),
-          sprintf("  Use Banners: %s\n", ifelse(input$use_banners, "Yes", "No")),
-          sprintf("\n%s\n\n", strrep("=", 80))
-        ))
-
         # Change to tracker directory
         setwd(tracker_dir)
 
-        # DEBUG 1: Before sourcing
-        console_output(paste0(
-          console_output(),
-          "[DEBUG 1] About to source run_tracker.R from: ", getwd(), "\n"
-        ))
+        # Source run_tracker.R
+        progress$set(value = 0.2, detail = "Loading tracker modules...")
+        source("run_tracker.R")
 
-        # Source run_tracker.R - THIS may be where error occurs
-        tryCatch({
-          source("run_tracker.R")
-          console_output(paste0(
-            console_output(),
-            "[DEBUG 2] Successfully sourced run_tracker.R\n"
-          ))
-        }, error = function(e) {
-          console_output(paste0(
-            console_output(),
-            "[DEBUG ERROR] source() failed: ", e$message, "\n",
-            "Traceback:\n", paste(capture.output(traceback()), collapse = "\n"), "\n\n"
-          ))
-          stop(e)  # Re-throw
-        })
+        # Run analysis and capture ALL console output
+        progress$set(value = 0.3, detail = "Running tracker analysis...")
 
-        # DEBUG 3: After sourcing
-        console_output(paste0(
-          console_output(),
-          "[DEBUG 3] About to run tracker function...\n"
-        ))
-
-        # Run analysis and capture ALL console output (same method as tabs module)
         output_capture_file <- tempfile()
         sink(output_capture_file, type = "output")
 
@@ -632,23 +600,17 @@ run_tracker_gui <- function() {
           sink(type = "output")
         })
 
+        progress$set(value = 0.9, detail = "Finalizing...")
+
         # Read captured output (available even if error occurred)
         captured_output <- readLines(output_capture_file, warn = FALSE)
         unlink(output_capture_file)
 
-        # DEBUG: Show what we captured
-        console_output(paste0(
-          console_output(),
-          sprintf("\n[DEBUG] Tracker completed. Captured %d lines of output\n", length(captured_output))
-        ))
-
-        # Display captured output (works for both success and error cases)
+        # Display captured output in console
         if (length(captured_output) > 0) {
-          console_output(paste0(
-            console_output(),
-            paste(captured_output, collapse = "\n"),
-            "\n"
-          ))
+          console_output(paste(captured_output, collapse = "\n"))
+        } else {
+          console_output("Tracker ran but produced no console output.")
         }
 
         # Extract output_file
@@ -675,16 +637,17 @@ run_tracker_gui <- function() {
         # Display any warnings that occurred
         if (length(all_warnings) > 0) {
           warning_msg <- paste0("\n\nWarnings encountered:\n", paste(all_warnings, collapse = "\n"))
-          console_output(paste0(console_output(), warning_msg))
+          console_output(paste0(console_output(), "\n", warning_msg))
         }
 
+        progress$set(value = 1.0, detail = "Complete!")
         showNotification("Tracking analysis completed successfully!", type = "message", duration = 5)
 
       }, warning = warning_handler), error = function(e) {
-        error_msg <- paste0("\n\n", strrep("=", 80), "\nERROR: ", e$message, "\n", strrep("=", 80), "\n\n")
+        error_msg <- paste0(strrep("=", 80), "\nERROR: ", e$message, "\n", strrep("=", 80), "\n\n")
         error_msg <- paste0(error_msg, "Full error:\n", paste(capture.output(print(e)), collapse = "\n"), "\n\n")
         error_msg <- paste0(error_msg, "Traceback:\n", paste(capture.output(traceback()), collapse = "\n"))
-        console_output(paste0(console_output(), error_msg))
+        console_output(paste0(console_output(), "\n\n", error_msg))
         showNotification(paste("Error:", e$message), type = "error", duration = 10)
 
       }, finally = {
