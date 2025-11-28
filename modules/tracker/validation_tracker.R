@@ -26,9 +26,9 @@
 #' @export
 validate_tracker_setup <- function(config, question_mapping, question_map, wave_data) {
 
-  message("========================================")
-  message("RUNNING TRACKER VALIDATION")
-  message("========================================")
+  cat("========================================\n")
+  cat("RUNNING TRACKER VALIDATION\n")
+  cat("========================================\n")
 
   validation_results <- list(
     errors = character(0),
@@ -37,61 +37,61 @@ validate_tracker_setup <- function(config, question_mapping, question_map, wave_
   )
 
   # 1. Validate configuration structure
-  message("\n1. Validating configuration structure...")
+  cat("\n1. Validating configuration structure...\n")
   config_validation <- validate_config_structure(config)
   validation_results <- merge_validation_results(validation_results, config_validation)
 
   # 2. Validate wave definitions
-  message("\n2. Validating wave definitions...")
+  cat("\n2. Validating wave definitions...\n")
   wave_validation <- validate_wave_definitions(config)
   validation_results <- merge_validation_results(validation_results, wave_validation)
 
   # 3. Validate question mapping
-  message("\n3. Validating question mapping...")
+  cat("\n3. Validating question mapping...\n")
   mapping_validation <- validate_mapping_structure(question_mapping, config)
   validation_results <- merge_validation_results(validation_results, mapping_validation)
 
   # 4. Validate data availability
-  message("\n4. Validating data availability...")
+  cat("\n4. Validating data availability...\n")
   data_validation <- validate_data_availability(config, question_map, wave_data)
   validation_results <- merge_validation_results(validation_results, data_validation)
 
   # 5. Validate trackable questions
-  message("\n5. Validating trackable questions...")
+  cat("\n5. Validating trackable questions...\n")
   trackable_validation <- validate_trackable_questions(config, question_map, wave_data)
   validation_results <- merge_validation_results(validation_results, trackable_validation)
 
   # 6. Validate banner structure
-  message("\n6. Validating banner structure...")
+  cat("\n6. Validating banner structure...\n")
   banner_validation <- validate_banner_structure(config, wave_data)
   validation_results <- merge_validation_results(validation_results, banner_validation)
 
   # 7. Validate TrackingSpecs (Enhancement Phase 1)
-  message("\n7. Validating TrackingSpecs...")
+  cat("\n7. Validating TrackingSpecs...\n")
   specs_validation <- validate_all_tracking_specs(config, question_map)
   validation_results <- merge_validation_results(validation_results, specs_validation)
 
   # Print summary
-  message("\n========================================")
-  message("VALIDATION SUMMARY")
-  message("========================================")
-  message(paste0("Errors: ", length(validation_results$errors)))
-  message(paste0("Warnings: ", length(validation_results$warnings)))
-  message(paste0("Info: ", length(validation_results$info)))
+  cat("\n========================================\n")
+  cat("VALIDATION SUMMARY\n")
+  cat("========================================\n")
+  cat(paste0("Errors: ", length(validation_results$errors), "\n"))
+  cat(paste0("Warnings: ", length(validation_results$warnings), "\n"))
+  cat(paste0("Info: ", length(validation_results$info), "\n"))
 
   # Print errors
   if (length(validation_results$errors) > 0) {
-    message("\nERRORS:")
+    cat("\nERRORS:\n")
     for (err in validation_results$errors) {
-      message(paste0("  ✗ ", err))
+      cat(paste0("  ✗ ", err, "\n"))
     }
   }
 
   # Print warnings
   if (length(validation_results$warnings) > 0) {
-    message("\nWARNINGS:")
+    cat("\nWARNINGS:\n")
     for (warn in validation_results$warnings) {
-      message(paste0("  ⚠ ", warn))
+      cat(paste0("  ⚠ ", warn, "\n"))
     }
   }
 
@@ -100,8 +100,8 @@ validate_tracker_setup <- function(config, question_mapping, question_map, wave_
     stop("Validation failed with errors. Please fix the issues above and try again.")
   }
 
-  message("\n✓ Validation passed")
-  message("========================================\n")
+  cat("\n✓ Validation passed\n")
+  cat("========================================\n")
 
   return(validation_results)
 }

@@ -92,32 +92,32 @@ run_tracker <- function(tracking_config_path,
 
   phase_label <- if (use_banners) "PHASE 3: BANNER BREAKOUTS & COMPOSITES" else "PHASE 2: TREND CALCULATION & OUTPUT"
 
-  message("================================================================================")
-  message(paste0("TURASTACKER - MVT ", phase_label))
-  message("================================================================================")
-  message(paste0("Version: 2024-11-27 (Fixed Wave Detection + Diagnostics)"))
-  message(paste0("Started: ", format(start_time, "%Y-%m-%d %H:%M:%S")))
-  message("")
+  cat("================================================================================\n")
+  cat(paste0("TURASTACKER - MVT ", phase_label, "\n"))
+  cat("================================================================================\n")
+  cat(paste0("Version: 2024-11-27 (Fixed Wave Detection + Diagnostics)\n"))
+  cat(paste0("Started: ", format(start_time, "%Y-%m-%d %H:%M:%S"), "\n"))
+  cat("\n")
 
   # ============================================================================
   # STEP 1: Load Configuration
   # ============================================================================
-  message("\n[1/6] LOADING CONFIGURATION")
-  message("================================================================================")
+  cat("\n[1/6] LOADING CONFIGURATION\n")
+  cat("================================================================================\n")
 
   config <- load_tracking_config(tracking_config_path)
 
   # Display project info
   project_name <- get_setting(config, "project_name", default = "Tracking Analysis")
-  message(paste0("\nProject: ", project_name))
-  message(paste0("Waves: ", paste(config$waves$WaveName, collapse = ", ")))
+  cat(paste0("\nProject: ", project_name, "\n"))
+  cat(paste0("Waves: ", paste(config$waves$WaveName, collapse = ", "), "\n"))
 
 
   # ============================================================================
   # STEP 2: Load Question Mapping
   # ============================================================================
-  message("\n[2/6] LOADING QUESTION MAPPING")
-  message("================================================================================")
+  cat("\n[2/6] LOADING QUESTION MAPPING\n")
+  cat("================================================================================\n")
 
   question_mapping <- load_question_mapping(question_mapping_path)
 
@@ -128,8 +128,8 @@ run_tracker <- function(tracking_config_path,
   # ============================================================================
   # STEP 3: Validate Configuration
   # ============================================================================
-  message("\n[3/6] VALIDATING CONFIGURATION")
-  message("================================================================================")
+  cat("\n[3/6] VALIDATING CONFIGURATION\n")
+  cat("================================================================================\n")
 
   validate_tracking_config(config, question_mapping)
 
@@ -137,8 +137,8 @@ run_tracker <- function(tracking_config_path,
   # ============================================================================
   # STEP 4: Load Wave Data
   # ============================================================================
-  message("\n[4/6] LOADING WAVE DATA")
-  message("================================================================================")
+  cat("\n[4/6] LOADING WAVE DATA\n")
+  cat("================================================================================\n")
 
   wave_data <- load_all_waves(config, data_dir, question_mapping)
 
@@ -150,8 +150,8 @@ run_tracker <- function(tracking_config_path,
   # ============================================================================
   # STEP 5: Validate Wave Data
   # ============================================================================
-  message("\n[5/6] VALIDATING WAVE DATA")
-  message("================================================================================")
+  cat("\n[5/6] VALIDATING WAVE DATA\n")
+  cat("================================================================================\n")
 
   validate_wave_data(wave_data, config, question_mapping)
 
@@ -159,8 +159,8 @@ run_tracker <- function(tracking_config_path,
   # ============================================================================
   # STEP 6: Comprehensive Validation
   # ============================================================================
-  message("\n[6/6] RUNNING COMPREHENSIVE VALIDATION")
-  message("================================================================================")
+  cat("\n[6/6] RUNNING COMPREHENSIVE VALIDATION\n")
+  cat("================================================================================\n")
 
   validation_results <- validate_tracker_setup(
     config = config,
@@ -176,8 +176,8 @@ run_tracker <- function(tracking_config_path,
   # ============================================================================
   # STEP 7: Calculate Trends
   # ============================================================================
-  message("\n[7/8] CALCULATING TRENDS")
-  message("================================================================================")
+  cat("\n[7/8] CALCULATING TRENDS\n")
+  cat("================================================================================\n")
 
   if (use_banners) {
     # Phase 3: Calculate trends with banner breakouts
@@ -201,8 +201,8 @@ run_tracker <- function(tracking_config_path,
   # ============================================================================
   # STEP 8: Write Excel Output
   # ============================================================================
-  message("\n[8/8] GENERATING OUTPUT")
-  message("================================================================================")
+  cat("\n[8/8] GENERATING OUTPUT\n")
+  cat("================================================================================\n")
 
   # Check report_types setting to determine which outputs to generate
   report_types_setting <- get_setting(config, "report_types", default = "detailed")
@@ -221,10 +221,10 @@ run_tracker <- function(tracking_config_path,
   # If no valid types, default to detailed
   if (length(report_types) == 0) {
     report_types <- "detailed"
-    message("  No valid report types specified, defaulting to 'detailed'")
+    cat("  No valid report types specified, defaulting to 'detailed'\n")
   }
 
-  message(paste0("  Report types to generate: ", paste(report_types, collapse = ", ")))
+  cat(paste0("  Report types to generate: ", paste(report_types, collapse = ", "), "\n"))
 
   # Generate outputs based on report types
   output_files <- list()
@@ -288,27 +288,27 @@ run_tracker <- function(tracking_config_path,
   end_time <- Sys.time()
   elapsed <- as.numeric(difftime(end_time, start_time, units = "secs"))
 
-  message("\n================================================================================")
-  message("TRACKING ANALYSIS COMPLETE")
-  message("================================================================================")
-  message(paste0("Completed: ", format(end_time, "%Y-%m-%d %H:%M:%S")))
-  message(paste0("Elapsed time: ", round(elapsed, 1), " seconds"))
-  message("")
-  message("✓ Configuration loaded and validated")
-  message("✓ Question mapping indexed")
-  message("✓ Wave data loaded")
-  message(paste0("✓ Trends calculated for ", length(trend_results), " questions"))
+  cat("\n================================================================================\n")
+  cat("TRACKING ANALYSIS COMPLETE\n")
+  cat("================================================================================\n")
+  cat(paste0("Completed: ", format(end_time, "%Y-%m-%d %H:%M:%S"), "\n"))
+  cat(paste0("Elapsed time: ", round(elapsed, 1), " seconds\n"))
+  cat("\n")
+  cat("✓ Configuration loaded and validated\n")
+  cat("✓ Question mapping indexed\n")
+  cat("✓ Wave data loaded\n")
+  cat(paste0("✓ Trends calculated for ", length(trend_results), " questions\n"))
 
   # Display output files
   if (length(output_files) > 0) {
-    message("✓ Output files generated:")
+    cat("✓ Output files generated:\n")
     for (report_type in names(output_files)) {
-      message(paste0("  - ", report_type, ": ", output_files[[report_type]]))
+      cat(paste0("  - ", report_type, ": ", output_files[[report_type]], "\n"))
     }
   }
 
-  message("")
-  message("================================================================================\n")
+  cat("\n")
+  cat("================================================================================\n\n")
 
   # Return output file path(s)
   # If single output, return as character; if multiple, return as named list
@@ -330,7 +330,7 @@ run_tracker <- function(tracking_config_path,
 #' @export
 test_tracker_foundation <- function(use_synthetic_data = FALSE) {
 
-  message("Running tracker foundation test...\n")
+  cat("Running tracker foundation test...\n\n")
 
   script_dir <- dirname(sys.frame(1)$ofile)
 
@@ -348,8 +348,8 @@ test_tracker_foundation <- function(use_synthetic_data = FALSE) {
   }
 
   # For Phase 1, just test loading and validation
-  message("NOTE: This test will load templates but may fail on data loading")
-  message("      if synthetic test data is not available.\n")
+  cat("NOTE: This test will load templates but may fail on data loading\n")
+  cat("      if synthetic test data is not available.\n\n")
 
   tryCatch({
     results <- run_tracker(
@@ -358,13 +358,13 @@ test_tracker_foundation <- function(use_synthetic_data = FALSE) {
       data_dir = script_dir
     )
 
-    message("\n✓ Foundation test completed successfully!")
+    cat("\n✓ Foundation test completed successfully!\n")
     return(results)
 
   }, error = function(e) {
-    message("\n✗ Test failed: ", e$message)
-    message("\nThis is expected if test data files are not yet available.")
-    message("Templates loaded successfully up to the point of data file loading.")
+    cat("\n✗ Test failed: ", e$message, "\n")
+    cat("\nThis is expected if test data files are not yet available.\n")
+    cat("Templates loaded successfully up to the point of data file loading.\n")
   })
 }
 

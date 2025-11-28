@@ -96,15 +96,15 @@ extract_categorical_question_codes <- function(config = NULL, question_mapping =
 #' @export
 load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL) {
 
-  message("Loading wave data files...")
+  cat("Loading wave data files...\n")
 
   # Extract all categorical question codes to preserve their text values
   # This includes ALL banner variables (always text) plus categorical tracked questions
   categorical_cols <- extract_categorical_question_codes(config, question_mapping)
   if (length(categorical_cols) > 0) {
-    message(paste0("  Identified ", length(categorical_cols), " categorical question(s) to preserve as text: ",
+    cat(paste0("  Identified ", length(categorical_cols), " categorical question(s) to preserve as text: ",
                    paste(head(categorical_cols, 10), collapse = ", "),
-                   if (length(categorical_cols) > 10) " ..." else ""))
+                   if (length(categorical_cols) > 10) " ..." else "", "\n"))
   }
 
   wave_data <- list()
@@ -114,7 +114,7 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL) {
     wave_name <- config$waves$WaveName[i]
     data_file <- config$waves$DataFile[i]
 
-    message(paste0("  Loading Wave ", wave_id, ": ", wave_name))
+    cat(paste0("  Loading Wave ", wave_id, ": ", wave_name, "\n"))
 
     # Resolve file path
     file_path <- resolve_data_file_path(data_file, data_dir)
@@ -127,7 +127,7 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL) {
     if (!is.null(weight_var) && weight_var != "") {
       wave_df <- apply_wave_weights(wave_df, weight_var, wave_id)
     } else {
-      message("    No weighting variable specified for this wave")
+      cat("    No weighting variable specified for this wave\n")
       # Create default weight of 1
       wave_df$weight_var <- 1
     }
@@ -135,10 +135,10 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL) {
     # Store in list
     wave_data[[wave_id]] <- wave_df
 
-    message(paste0("    Loaded ", nrow(wave_df), " records"))
+    cat(paste0("    Loaded ", nrow(wave_df), " records\n"))
   }
 
-  message(paste0("Successfully loaded ", length(wave_data), " waves"))
+  cat(paste0("Successfully loaded ", length(wave_data), " waves\n"))
 
   return(wave_data)
 }
@@ -227,9 +227,9 @@ clean_wave_data <- function(wave_df, wave_id, categorical_cols = character(0)) {
           n_cleaned <- n_cleaned + 1
           if (is_question_col && new_nas == length(original_col[!is.na(original_col)])) {
             # All non-NA values were converted to NA - this is a problem
-            message(paste0("    WARNING: ", col_name, ": All ", new_nas, " values are non-numeric (converted to NA). Check data source."))
+            cat(paste0("    WARNING: ", col_name, ": All ", new_nas, " values are non-numeric (converted to NA). Check data source.\n"))
           } else {
-            message(paste0("    ", col_name, ": Converted ", new_nas, " non-numeric values to NA"))
+            cat(paste0("    ", col_name, ": Converted ", new_nas, " non-numeric values to NA\n"))
           }
         }
 
@@ -243,7 +243,7 @@ clean_wave_data <- function(wave_df, wave_id, categorical_cols = character(0)) {
   }
 
   if (n_cleaned > 0) {
-    message(paste0("    Cleaned ", n_cleaned, " column(s) with comma decimals or DK values"))
+    cat(paste0("    Cleaned ", n_cleaned, " column(s) with comma decimals or DK values\n"))
   }
 
   return(wave_df)
@@ -417,7 +417,7 @@ apply_wave_weights <- function(wave_df, weight_var, wave_id) {
   valid_weights <- weights[valid_idx]
   if (length(valid_weights) > 0) {
     eff_n <- calculate_weight_efficiency(valid_weights)
-    message(paste0("    Weight efficiency: ", round(eff_n, 1), " (out of ", length(valid_weights), " records)"))
+    cat(paste0("    Weight efficiency: ", round(eff_n, 1), " (out of ", length(valid_weights), " records)\n"))
   }
 
   return(wave_df)
@@ -462,7 +462,7 @@ calculate_weight_efficiency <- function(weights) {
 #' @export
 validate_wave_data <- function(wave_data, config, question_mapping) {
 
-  message("Validating wave data structure...")
+  cat("Validating wave data structure...\n")
 
   # Check all waves loaded
   expected_waves <- config$waves$WaveID
@@ -546,7 +546,7 @@ validate_wave_data <- function(wave_data, config, question_mapping) {
     }
   }
 
-  message("  Wave data validation completed")
+  cat("  Wave data validation completed\n")
 
   invisible(TRUE)
 }

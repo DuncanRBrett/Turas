@@ -69,15 +69,15 @@ source(file.path(turas_root, "shared", "formatting.R"), local = FALSE)
 #' @export
 write_tracker_output <- function(trend_results, config, wave_data, output_path = NULL, banner_segments = NULL) {
 
-  message("\n================================================================================")
-  message("WRITING EXCEL OUTPUT")
-  message("================================================================================\n")
+  cat("\n================================================================================\n")
+  cat("WRITING EXCEL OUTPUT\n")
+  cat("================================================================================\n\n")
 
   # Detect if results have banner breakouts
   has_banners <- detect_banner_results(trend_results)
 
   if (has_banners) {
-    message("  Detected banner breakout results")
+    cat("  Detected banner breakout results\n")
   }
 
   # Determine output path
@@ -99,7 +99,7 @@ write_tracker_output <- function(trend_results, config, wave_data, output_path =
     output_path <- file.path(output_dir, filename)
   }
 
-  message(paste0("Output file: ", output_path))
+  cat(paste0("Output file: ", output_path, "\n"))
 
   # Create workbook
   wb <- openxlsx::createWorkbook()
@@ -120,11 +120,11 @@ write_tracker_output <- function(trend_results, config, wave_data, output_path =
   write_metadata_sheet(wb, config, wave_data, styles)
 
   # Save workbook
-  message(paste0("\nSaving workbook..."))
+  cat(paste0("\nSaving workbook...\n"))
   openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
 
-  message(paste0("✓ Output written to: ", output_path))
-  message("================================================================================\n")
+  cat(paste0("✓ Output written to: ", output_path, "\n"))
+  cat("================================================================================\n\n")
 
   return(output_path)
 }
@@ -1808,15 +1808,15 @@ write_multi_mention_trend_table <- function(wb, sheet_name, result, wave_ids, co
 #' @export
 write_wave_history_output <- function(trend_results, config, wave_data, output_path = NULL, banner_segments = NULL) {
 
-  message("\n================================================================================")
-  message("WRITING WAVE HISTORY EXCEL OUTPUT")
-  message("================================================================================\n")
+  cat("\n================================================================================\n")
+  cat("WRITING WAVE HISTORY EXCEL OUTPUT\n")
+  cat("================================================================================\n\n")
 
   # Detect if results have banner breakouts
   has_banners <- detect_banner_results(trend_results)
 
   if (has_banners) {
-    message("  Detected banner breakout results")
+    cat("  Detected banner breakout results\n")
   }
 
   # Determine output path
@@ -1838,7 +1838,7 @@ write_wave_history_output <- function(trend_results, config, wave_data, output_p
     output_path <- file.path(output_dir, filename)
   }
 
-  message(paste0("Output file: ", output_path))
+  cat(paste0("Output file: ", output_path, "\n"))
 
   # Create workbook
   wb <- openxlsx::createWorkbook()
@@ -1865,11 +1865,11 @@ write_wave_history_output <- function(trend_results, config, wave_data, output_p
   }
 
   # Save workbook
-  message(paste0("\nSaving workbook..."))
+  cat(paste0("\nSaving workbook...\n"))
   openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
 
-  message(paste0("✓ Wave History output written to: ", output_path))
-  message("================================================================================\n")
+  cat(paste0("✓ Wave History output written to: ", output_path, "\n"))
+  cat("================================================================================\n\n")
 
   return(output_path)
 }

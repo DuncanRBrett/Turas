@@ -590,16 +590,11 @@ run_tracker_gui <- function() {
         source("run_tracker.R")
 
         # Run analysis and capture ALL console output
-        # Tracker uses message() which goes to stderr, so capture BOTH stdout and stderr
+        # Tracker now uses cat() for output (same as tabs module) which writes to stdout
         output_capture_file <- tempfile()
-        message_capture_file <- tempfile()
-        msg_con <- file(message_capture_file, open = "wt")
+        sink(output_capture_file, type = "output")
 
         analysis_result <- tryCatch({
-          # Capture stdout and stderr
-          sink(output_capture_file, type = "output")
-          sink(msg_con, type = "message")
-
           output_file <- run_tracker(
             tracking_config_path = tracking_config,
             question_mapping_path = question_mapping,
@@ -613,30 +608,19 @@ run_tracker_gui <- function() {
           list(success = FALSE, output_file = NULL, error = e)
 
         }, finally = {
-          # Always restore sinks
-          tryCatch({
-            sink(type = "message")
-            sink(type = "output")
-            close(msg_con)
-          }, error = function(e) {})
+          # Always restore console output
+          sink(type = "output")
         })
 
-        # Read ALL captured output
-        all_output <- character(0)
-        if (file.exists(output_capture_file)) {
-          all_output <- c(all_output, readLines(output_capture_file, warn = FALSE))
-          unlink(output_capture_file)
-        }
-        if (file.exists(message_capture_file)) {
-          all_output <- c(all_output, readLines(message_capture_file, warn = FALSE))
-          unlink(message_capture_file)
-        }
+        # Read captured output (available even if error occurred)
+        captured_output <- readLines(output_capture_file, warn = FALSE)
+        unlink(output_capture_file)
 
-        # Display all captured output
-        if (length(all_output) > 0) {
+        # Append captured output to console (works for both success and error cases)
+        if (length(captured_output) > 0) {
           console_output(paste0(
             console_output(),
-            paste(all_output, collapse = "\n"),
+            paste(captured_output, collapse = "\n"),
             "\n"
           ))
         }
