@@ -589,47 +589,30 @@ run_tracker_gui <- function() {
         # Source run_tracker.R
         source("run_tracker.R")
 
-        # Run analysis and capture all console output
-        temp_log <- tempfile(fileext = ".log")
-        log_con <- NULL
+        # Run analysis and capture ALL output (stdout + messages)
+        # This captures after completion, not in real-time, but that's acceptable
+        all_output <- capture.output({
+          all_messages <- capture.output({
+            output_file <- run_tracker(
+              tracking_config_path = tracking_config,
+              question_mapping_path = question_mapping,
+              data_dir = data_dir,
+              output_path = output_path,
+              use_banners = input$use_banners
+            )
+          }, type = "message")
+          cat(all_messages, sep = "\n")
+        }, type = "output")
 
-        run_error <- NULL
-
-        tryCatch({
-          # Create file connection and redirect output
-          log_con <- file(temp_log, open = "wt")
-          sink(log_con, type = "output", split = FALSE)
-          sink(log_con, type = "message", split = FALSE)
-
-          output_file <- run_tracker(
-            tracking_config_path = tracking_config,
-            question_mapping_path = question_mapping,
-            data_dir = data_dir,
-            output_path = output_path,
-            use_banners = input$use_banners
-          )
-        }, error = function(e) {
-          run_error <<- e
-        }, finally = {
-          # ALWAYS close sinks and read output, even on error
-          tryCatch({
-            sink(type = "message")
-            sink(type = "output")
-            if (!is.null(log_con)) close(log_con)
-          }, error = function(e2) {})
-
-          # Read and display captured output
-          if (file.exists(temp_log)) {
-            captured_output <- paste(readLines(temp_log, warn = FALSE), collapse = "\n")
-            console_output(paste0(console_output(), "\n", captured_output, "\n"))
-            unlink(temp_log)
-          }
-
-          # Re-throw error if one occurred
-          if (!is.null(run_error)) {
-            stop(run_error)
-          }
-        })
+        # Display captured output
+        if (length(all_output) > 0) {
+          console_output(paste0(
+            console_output(),
+            "\n",
+            paste(all_output, collapse = "\n"),
+            "\n"
+          ))
+        }
 
         # Save to recent projects
         add_recent_project(list(
