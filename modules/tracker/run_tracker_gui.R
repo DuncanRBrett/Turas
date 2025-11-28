@@ -589,38 +589,46 @@ run_tracker_gui <- function() {
         # Source run_tracker.R
         source("run_tracker.R")
 
+        # DEBUG: Test if console_output updates work
+        console_output(paste0(
+          console_output(),
+          "[DEBUG] About to run tracker...\n"
+        ))
+
         # Run analysis and capture ALL console output
-        # Tracker now uses cat() for output (same as tabs module) which writes to stdout
-        output_capture_file <- tempfile()
-        sink(output_capture_file, type = "output")
+        # Use capture.output() which is more reliable in Shiny than sink()
+        captured_lines <- NULL
 
         analysis_result <- tryCatch({
-          output_file <- run_tracker(
-            tracking_config_path = tracking_config,
-            question_mapping_path = question_mapping,
-            data_dir = data_dir,
-            output_path = output_path,
-            use_banners = input$use_banners
-          )
+          # Capture all output from run_tracker
+          captured_lines <- capture.output({
+            output_file <- run_tracker(
+              tracking_config_path = tracking_config,
+              question_mapping_path = question_mapping,
+              data_dir = data_dir,
+              output_path = output_path,
+              use_banners = input$use_banners
+            )
+          }, type = "output")
+
           list(success = TRUE, output_file = output_file, error = NULL)
 
         }, error = function(e) {
           list(success = FALSE, output_file = NULL, error = e)
-
-        }, finally = {
-          # Always restore console output
-          sink(type = "output")
         })
 
-        # Read captured output (available even if error occurred)
-        captured_output <- readLines(output_capture_file, warn = FALSE)
-        unlink(output_capture_file)
+        # DEBUG: Show what we captured
+        console_output(paste0(
+          console_output(),
+          sprintf("\n[DEBUG] Tracker completed. Captured %d lines of output\n",
+                  if (!is.null(captured_lines)) length(captured_lines) else 0)
+        ))
 
-        # Append captured output to console (works for both success and error cases)
-        if (length(captured_output) > 0) {
+        # Display captured output (works for both success and error cases)
+        if (!is.null(captured_lines) && length(captured_lines) > 0) {
           console_output(paste0(
             console_output(),
-            paste(captured_output, collapse = "\n"),
+            paste(captured_lines, collapse = "\n"),
             "\n"
           ))
         }
