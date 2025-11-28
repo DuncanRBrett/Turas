@@ -591,14 +591,14 @@ run_tracker_gui <- function() {
 
         # Run analysis and capture ALL console output
         # Tracker uses message() which goes to stderr, so capture BOTH stdout and stderr
+        # Use file paths directly with sink(), not connection objects
         output_capture_file <- tempfile()
         message_capture_file <- tempfile()
-        msg_con <- file(message_capture_file, open = "wt")
 
         analysis_result <- tryCatch({
-          # Capture stdout and stderr
+          # Capture stdout (output) and stderr (messages)
           sink(output_capture_file, type = "output")
-          sink(msg_con, type = "message")
+          sink(message_capture_file, type = "message")
 
           output_file <- run_tracker(
             tracking_config_path = tracking_config,
@@ -613,11 +613,10 @@ run_tracker_gui <- function() {
           list(success = FALSE, output_file = NULL, error = e)
 
         }, finally = {
-          # Always restore sinks
+          # Always restore sinks - use same order as they were set up
           tryCatch({
             sink(type = "message")
             sink(type = "output")
-            close(msg_con)
           }, error = function(e) {})
         })
 
