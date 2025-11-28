@@ -589,25 +589,13 @@ run_tracker_gui <- function() {
         # Source run_tracker.R
         source("run_tracker.R")
 
-        # Run analysis and capture ALL console output
-        # Tracker uses message() which goes to stderr, so capture BOTH stdout and stderr
-        # Use file paths directly with sink(), not connection objects
+        # Run analysis and capture console output
+        # Match the proven approach from tabs module: capture stdout only
         output_capture_file <- tempfile()
-        message_capture_file <- tempfile()
-
-        # Debug: Log that we're about to start capturing
-        console_output(paste0(
-          console_output(),
-          "Setting up output capture...\n"
-        ))
 
         analysis_result <- tryCatch({
-          # Capture stdout (output) and stderr (messages)
+          # Capture stdout only - messages from run_tracker() will display normally
           sink(output_capture_file, type = "output")
-          sink(message_capture_file, type = "message")
-
-          # This message goes to captured output
-          message("\n[GUI LOG] Starting run_tracker()...")
 
           output_file <- run_tracker(
             tracking_config_path = tracking_config,
@@ -616,40 +604,23 @@ run_tracker_gui <- function() {
             output_path = output_path,
             use_banners = input$use_banners
           )
-
-          # This message goes to captured output
-          message("[GUI LOG] run_tracker() completed successfully")
-
           list(success = TRUE, output_file = output_file, error = NULL)
 
         }, error = function(e) {
-          # This message goes to captured output
-          message("[GUI LOG] ERROR in run_tracker(): ", e$message)
           list(success = FALSE, output_file = NULL, error = e)
 
         }, finally = {
-          # Always restore sinks - use same order as they were set up
+          # Always restore sink
           tryCatch({
-            sink(type = "message")
             sink(type = "output")
           }, error = function(e) {})
-
-          # Debug: Log that sinks have been closed
-          console_output(paste0(
-            console_output(),
-            "Output capture complete, reading results...\n"
-          ))
         })
 
-        # Read ALL captured output
+        # Read captured output (cat() calls from run_tracker)
         all_output <- character(0)
         if (file.exists(output_capture_file)) {
           all_output <- c(all_output, readLines(output_capture_file, warn = FALSE))
           unlink(output_capture_file)
-        }
-        if (file.exists(message_capture_file)) {
-          all_output <- c(all_output, readLines(message_capture_file, warn = FALSE))
-          unlink(message_capture_file)
         }
 
         # Display all captured output
