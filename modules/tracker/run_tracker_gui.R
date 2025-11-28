@@ -505,161 +505,166 @@ run_tracker_gui <- function() {
       # Save current working directory
       old_wd <- getwd()
 
-      # Capture all warnings
-      all_warnings <- character(0)
-      warning_handler <- function(w) {
-        all_warnings <<- c(all_warnings, conditionMessage(w))
-        invokeRestart("muffleWarning")
+      # Validate and ensure all paths are character strings
+      tracking_config <- files$tracking_config
+      question_mapping <- files$question_mapping
+
+      # Expand paths (resolve ~ and relative paths)
+      tracking_config <- normalizePath(tracking_config, mustWork = FALSE)
+      question_mapping <- normalizePath(question_mapping, mustWork = FALSE)
+
+      # Debug info
+      console_output(paste0(
+        console_output(),
+        "Validating inputs...\n",
+        sprintf("  tracking_config: %s\n", tracking_config),
+        sprintf("  question_mapping: %s\n", question_mapping)
+      ))
+
+      # Ensure character
+      if (!is.character(tracking_config) || length(tracking_config) != 1) {
+        console_output(paste0(console_output(), "ERROR: Invalid tracking config path\n"))
+        is_running(FALSE)
+        return()
+      }
+      if (!is.character(question_mapping) || length(question_mapping) != 1) {
+        console_output(paste0(console_output(), "ERROR: Invalid question mapping path\n"))
+        is_running(FALSE)
+        return()
       }
 
-      # Capture all messages
-      all_messages <- character(0)
-      message_handler <- function(m) {
-        all_messages <<- c(all_messages, conditionMessage(m))
-        invokeRestart("muffleMessage")
+      # Validate files exist
+      if (!file.exists(tracking_config)) {
+        console_output(paste0(console_output(), "ERROR: Tracking config file not found: ", tracking_config, "\n"))
+        is_running(FALSE)
+        return()
+      }
+      if (!file.exists(question_mapping)) {
+        console_output(paste0(console_output(), "ERROR: Question mapping file not found: ", question_mapping, "\n"))
+        is_running(FALSE)
+        return()
       }
 
-      tryCatch(withCallingHandlers({
-        # Validate and ensure all paths are character strings
-        tracking_config <- files$tracking_config
-        question_mapping <- files$question_mapping
+      # Auto-set data_dir to same directory as config files if not specified
+      config_dir <- dirname(tracking_config)
+      data_dir <- if (!is.null(files$data_dir)) {
+        normalizePath(files$data_dir, mustWork = FALSE)
+      } else {
+        config_dir  # Use same directory as config
+      }
 
-        # Expand paths (resolve ~ and relative paths)
-        tracking_config <- normalizePath(tracking_config, mustWork = FALSE)
-        question_mapping <- normalizePath(question_mapping, mustWork = FALSE)
+      # Auto-generate output path in same directory as config
+      output_path <- if (!is.null(files$output_path)) {
+        normalizePath(files$output_path, mustWork = FALSE)
+      } else {
+        # Generate filename based on tracking config name
+        config_basename <- gsub("_tracking_config\\.xlsx$|_config\\.xlsx$", "", basename(tracking_config))
+        output_filename <- paste0(config_basename, "_tracking_output.xlsx")
+        file.path(config_dir, output_filename)
+      }
 
-        # Debug info
-        console_output(paste0(
-          console_output(),
-          "Validating inputs...\n",
-          sprintf("  tracking_config: %s\n", tracking_config),
-          sprintf("  question_mapping: %s\n", question_mapping)
-        ))
+      # Build paths
+      tracker_dir <- file.path(TURAS_HOME, "modules", "tracker")
+      run_script <- file.path(tracker_dir, "run_tracker.R")
 
-        # Ensure character
-        if (!is.character(tracking_config) || length(tracking_config) != 1) {
-          stop("Invalid tracking config path: not a single character string")
-        }
-        if (!is.character(question_mapping) || length(question_mapping) != 1) {
-          stop("Invalid question mapping path: not a single character string")
-        }
+      if (!file.exists(run_script)) {
+        console_output(paste0(console_output(), "ERROR: Could not find run_tracker.R at: ", run_script, "\n"))
+        is_running(FALSE)
+        return()
+      }
 
-        # Validate files exist
-        if (!file.exists(tracking_config)) {
-          stop("Tracking config file not found: ", tracking_config)
-        }
-        if (!file.exists(question_mapping)) {
-          stop("Question mapping file not found: ", question_mapping)
-        }
+      # Update console
+      console_output(paste0(
+        console_output(),
+        "\nStarting analysis with:\n",
+        sprintf("  Tracking Config: %s\n", tracking_config),
+        sprintf("  Question Mapping: %s\n", question_mapping),
+        sprintf("  Data Directory: %s\n", data_dir),
+        sprintf("  Output Path: %s\n", output_path),
+        sprintf("  Use Banners: %s\n", ifelse(input$use_banners, "Yes", "No")),
+        sprintf("\n%s\n\n", strrep("=", 80))
+      ))
 
-        # Auto-set data_dir to same directory as config files if not specified
-        config_dir <- dirname(tracking_config)
-        data_dir <- if (!is.null(files$data_dir)) {
-          normalizePath(files$data_dir, mustWork = FALSE)
-        } else {
-          config_dir  # Use same directory as config
-        }
+      # Change to tracker directory
+      setwd(tracker_dir)
 
-        # Auto-generate output path in same directory as config
-        output_path <- if (!is.null(files$output_path)) {
-          normalizePath(files$output_path, mustWork = FALSE)
-        } else {
-          # Generate filename based on tracking config name
-          config_basename <- gsub("_tracking_config\\.xlsx$|_config\\.xlsx$", "", basename(tracking_config))
-          output_filename <- paste0(config_basename, "_tracking_output.xlsx")
-          file.path(config_dir, output_filename)
-        }
+      # Source run_tracker.R
+      source("run_tracker.R")
 
-        # Build paths
-        tracker_dir <- file.path(TURAS_HOME, "modules", "tracker")
-        run_script <- file.path(tracker_dir, "run_tracker.R")
+      # Run analysis and capture ALL console output (same pattern as tabs module)
+      output_file_temp <- tempfile()
+      sink(output_file_temp, type = "output")
 
-        if (!file.exists(run_script)) {
-          stop("Could not find run_tracker.R at: ", run_script)
-        }
+      analysis_result <- tryCatch({
+        output_file <- run_tracker(
+          tracking_config_path = tracking_config,
+          question_mapping_path = question_mapping,
+          data_dir = data_dir,
+          output_path = output_path,
+          use_banners = input$use_banners
+        )
+        list(success = TRUE, output_file = output_file, error = NULL)
 
-        # Update console
-        console_output(paste0(
-          console_output(),
-          "\nStarting analysis with:\n",
-          sprintf("  Tracking Config: %s\n", tracking_config),
-          sprintf("  Question Mapping: %s\n", question_mapping),
-          sprintf("  Data Directory: %s\n", data_dir),
-          sprintf("  Output Path: %s\n", output_path),
-          sprintf("  Use Banners: %s\n", ifelse(input$use_banners, "Yes", "No")),
-          sprintf("\n%s\n\n", strrep("=", 80))
-        ))
-
-        # Change to tracker directory
-        setwd(tracker_dir)
-
-        # Source run_tracker.R
-        source("run_tracker.R")
-
-        # Run analysis (messages will be captured by message_handler via withCallingHandlers)
-        analysis_result <- tryCatch({
-          output_file <- run_tracker(
-            tracking_config_path = tracking_config,
-            question_mapping_path = question_mapping,
-            data_dir = data_dir,
-            output_path = output_path,
-            use_banners = input$use_banners
-          )
-          list(success = TRUE, output_file = output_file, error = NULL)
-
-        }, error = function(e) {
-          list(success = FALSE, output_file = NULL, error = e)
-        })
-
-        # Display all captured messages
-        if (length(all_messages) > 0) {
-          console_output(paste0(
-            console_output(),
-            paste(all_messages, collapse = "\n"),
-            "\n"
-          ))
-        }
-
-        # Extract output_file and handle success case
-        if (analysis_result$success) {
-          output_file <- analysis_result$output_file
-
-          # Save to recent projects
-          add_recent_project(list(
-            tracking_config = tracking_config,
-            question_mapping = question_mapping,
-            data_dir = data_dir,
-            output_path = output_path,
-            use_banners = input$use_banners
-          ))
-
-          # Update console with completion message
-          console_output(paste0(
-            console_output(),
-            sprintf("\n%s\n✓ ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80)),
-            sprintf("\nOutput file saved to:\n%s\n", output_file)
-          ))
-
-          # Display any warnings that occurred
-          if (length(all_warnings) > 0) {
-            warning_msg <- paste0("\n\nWarnings encountered:\n", paste(all_warnings, collapse = "\n"))
-            console_output(paste0(console_output(), warning_msg))
-          }
-
-          showNotification("Tracking analysis completed successfully!", type = "message", duration = 5)
-        }
-
-      }, warning = warning_handler, message = message_handler), error = function(e) {
-        error_msg <- paste0("\n\n", strrep("=", 80), "\nERROR: ", e$message, "\n", strrep("=", 80), "\n\n")
-        error_msg <- paste0(error_msg, "Full error:\n", paste(capture.output(print(e)), collapse = "\n"))
-        console_output(paste0(console_output(), error_msg))
-        showNotification(paste("Error:", e$message), type = "error", duration = 10)
+      }, error = function(e) {
+        list(success = FALSE, output_file = NULL, error = e)
 
       }, finally = {
-        # Restore original working directory
-        setwd(old_wd)
-        is_running(FALSE)
+        # Always restore console output
+        sink(type = "output")
       })
+
+      # Read captured output (available even if error occurred)
+      captured_output <- readLines(output_file_temp, warn = FALSE)
+      unlink(output_file_temp)
+
+      # Append captured output to console (works for both success and error cases)
+      if (length(captured_output) > 0) {
+        console_output(paste0(
+          console_output(),
+          paste(captured_output, collapse = "\n"),
+          "\n"
+        ))
+      }
+
+      # Handle success or error
+      if (analysis_result$success) {
+        output_file <- analysis_result$output_file
+
+        # Save to recent projects
+        add_recent_project(list(
+          tracking_config = tracking_config,
+          question_mapping = question_mapping,
+          data_dir = data_dir,
+          output_path = output_path,
+          use_banners = input$use_banners
+        ))
+
+        # Update console with completion message
+        console_output(paste0(
+          console_output(),
+          sprintf("\n%s\n✓ ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80)),
+          sprintf("\nOutput file saved to:\n%s\n", output_file)
+        ))
+
+        showNotification("Tracking analysis completed successfully!", type = "message", duration = 5)
+
+      } else {
+        # Display error
+        error_output <- paste0(
+          console_output(),
+          "\n\n",
+          strrep("=", 80), "\n",
+          "ERROR\n",
+          strrep("=", 80), "\n",
+          analysis_result$error$message, "\n"
+        )
+        console_output(error_output)
+        showNotification(paste("Error:", analysis_result$error$message), type = "error", duration = 10)
+      }
+
+      # Restore original working directory
+      setwd(old_wd)
+      is_running(FALSE)
     })
   }
 
