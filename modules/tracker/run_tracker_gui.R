@@ -483,10 +483,18 @@ run_tracker_gui <- function() {
     # Console output - static UI, always present
     output$console_text <- renderText({
       current_output <- console_output()
-      if (nchar(current_output) == 0) {
+
+      # Ensure single string for R 4.2+ compatibility
+      # If vector, collapse it; if empty/NULL, return placeholder
+      if (is.null(current_output) || length(current_output) == 0 || nchar(current_output[1]) == 0) {
         "Console output will appear here when you run the tracker..."
       } else {
-        current_output
+        # Ensure it's a single string
+        if (length(current_output) > 1) {
+          paste(current_output, collapse = "\n")
+        } else {
+          current_output
+        }
       }
     })
 
