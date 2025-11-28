@@ -512,6 +512,13 @@ run_tracker_gui <- function() {
         invokeRestart("muffleWarning")
       }
 
+      # Capture all messages
+      all_messages <- character(0)
+      message_handler <- function(m) {
+        all_messages <<- c(all_messages, conditionMessage(m))
+        invokeRestart("muffleMessage")
+      }
+
       tryCatch(withCallingHandlers({
         # Validate and ensure all paths are character strings
         tracking_config <- files$tracking_config
@@ -589,32 +596,26 @@ run_tracker_gui <- function() {
         # Source run_tracker.R
         source("run_tracker.R")
 
-        # Run analysis and capture console output
-        # Use capture.output() with type="message" - more robust in reactive contexts
+        # Run analysis (messages will be captured by message_handler via withCallingHandlers)
         analysis_result <- tryCatch({
-          # Capture both message() and cat() output
-          all_output <- capture.output({
-            output_file <- run_tracker(
-              tracking_config_path = tracking_config,
-              question_mapping_path = question_mapping,
-              data_dir = data_dir,
-              output_path = output_path,
-              use_banners = input$use_banners
-            )
-          }, type = "message")
-
-          list(success = TRUE, output_file = output_file, error = NULL, output = all_output)
+          output_file <- run_tracker(
+            tracking_config_path = tracking_config,
+            question_mapping_path = question_mapping,
+            data_dir = data_dir,
+            output_path = output_path,
+            use_banners = input$use_banners
+          )
+          list(success = TRUE, output_file = output_file, error = NULL)
 
         }, error = function(e) {
-          list(success = FALSE, output_file = NULL, error = e, output = character(0))
+          list(success = FALSE, output_file = NULL, error = e)
         })
 
-        # Display all captured output
-        all_output <- analysis_result$output
-        if (length(all_output) > 0) {
+        # Display all captured messages
+        if (length(all_messages) > 0) {
           console_output(paste0(
             console_output(),
-            paste(all_output, collapse = "\n"),
+            paste(all_messages, collapse = "\n"),
             "\n"
           ))
         }
@@ -648,7 +649,7 @@ run_tracker_gui <- function() {
           showNotification("Tracking analysis completed successfully!", type = "message", duration = 5)
         }
 
-      }, warning = warning_handler), error = function(e) {
+      }, warning = warning_handler, message = message_handler), error = function(e) {
         error_msg <- paste0("\n\n", strrep("=", 80), "\nERROR: ", e$message, "\n", strrep("=", 80), "\n\n")
         error_msg <- paste0(error_msg, "Full error:\n", paste(capture.output(print(e)), collapse = "\n"))
         console_output(paste0(console_output(), error_msg))
