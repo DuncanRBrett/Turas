@@ -591,9 +591,11 @@ run_tracker_gui <- function() {
       # Source run_tracker.R
       source("run_tracker.R")
 
-      # Run analysis and capture ALL console output (same pattern as tabs module)
+      # Run analysis and capture ALL console output
+      # Tracker uses message() (stderr) heavily, so we must capture BOTH stdout and stderr
       output_file_temp <- tempfile()
-      sink(output_file_temp, type = "output")
+      sink(output_file_temp, type = "output")  # Capture stdout (cat)
+      sink(output_file_temp, type = "message") # Capture stderr (message) - same file!
 
       analysis_result <- tryCatch({
         output_file <- run_tracker(
@@ -609,8 +611,9 @@ run_tracker_gui <- function() {
         list(success = FALSE, output_file = NULL, error = e)
 
       }, finally = {
-        # Always restore console output
-        sink(type = "output")
+        # Always restore console output - restore in reverse order!
+        tryCatch(sink(type = "message"), error = function(e) {})
+        tryCatch(sink(type = "output"), error = function(e) {})
       })
 
       # Read captured output (available even if error occurred)
