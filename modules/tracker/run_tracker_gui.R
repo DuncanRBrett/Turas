@@ -660,7 +660,8 @@ run_tracker_gui <- function() {
 
       }, warning = warning_handler), error = function(e) {
         error_msg <- paste0("\n\n", strrep("=", 80), "\nERROR: ", e$message, "\n", strrep("=", 80), "\n\n")
-        error_msg <- paste0(error_msg, "Full error:\n", paste(capture.output(print(e)), collapse = "\n"))
+        error_msg <- paste0(error_msg, "Full error:\n", paste(capture.output(print(e)), collapse = "\n"), "\n\n")
+        error_msg <- paste0(error_msg, "Traceback:\n", paste(capture.output(traceback()), collapse = "\n"))
         console_output(paste0(console_output(), error_msg))
         showNotification(paste("Error:", e$message), type = "error", duration = 10)
 
