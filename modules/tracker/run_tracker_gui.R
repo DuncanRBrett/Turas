@@ -590,12 +590,14 @@ run_tracker_gui <- function() {
         source("run_tracker.R")
 
         # Run analysis and capture all console output
-        # Use sink() to capture messages to a temporary file
         temp_log <- tempfile(fileext = ".log")
-        log_con <- file(temp_log, open = "wt")
+        log_con <- NULL
+
+        run_error <- NULL
 
         tryCatch({
-          # Redirect output and messages to file connection
+          # Create file connection and redirect output
+          log_con <- file(temp_log, open = "wt")
           sink(log_con, type = "output", split = FALSE)
           sink(log_con, type = "message", split = FALSE)
 
@@ -606,26 +608,27 @@ run_tracker_gui <- function() {
             output_path = output_path,
             use_banners = input$use_banners
           )
-
-          # Stop redirecting
-          sink(type = "message")
-          sink(type = "output")
-          close(log_con)
-
-          # Read captured output and append to console
-          if (file.exists(temp_log)) {
-            captured_output <- paste(readLines(temp_log, warn = FALSE), collapse = "\n")
-            console_output(paste0(console_output(), captured_output, "\n"))
-            unlink(temp_log)
-          }
         }, error = function(e) {
-          # Make sure sinks are closed even on error
+          run_error <<- e
+        }, finally = {
+          # ALWAYS close sinks and read output, even on error
           tryCatch({
             sink(type = "message")
             sink(type = "output")
-            close(log_con)
+            if (!is.null(log_con)) close(log_con)
           }, error = function(e2) {})
-          stop(e)
+
+          # Read and display captured output
+          if (file.exists(temp_log)) {
+            captured_output <- paste(readLines(temp_log, warn = FALSE), collapse = "\n")
+            console_output(paste0(console_output(), "\n", captured_output, "\n"))
+            unlink(temp_log)
+          }
+
+          # Re-throw error if one occurred
+          if (!is.null(run_error)) {
+            stop(run_error)
+          }
         })
 
         # Save to recent projects
