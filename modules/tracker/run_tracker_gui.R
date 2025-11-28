@@ -595,10 +595,19 @@ run_tracker_gui <- function() {
         output_capture_file <- tempfile()
         message_capture_file <- tempfile()
 
+        # Debug: Log that we're about to start capturing
+        console_output(paste0(
+          console_output(),
+          "Setting up output capture...\n"
+        ))
+
         analysis_result <- tryCatch({
           # Capture stdout (output) and stderr (messages)
           sink(output_capture_file, type = "output")
           sink(message_capture_file, type = "message")
+
+          # This message goes to captured output
+          message("\n[GUI LOG] Starting run_tracker()...")
 
           output_file <- run_tracker(
             tracking_config_path = tracking_config,
@@ -607,9 +616,15 @@ run_tracker_gui <- function() {
             output_path = output_path,
             use_banners = input$use_banners
           )
+
+          # This message goes to captured output
+          message("[GUI LOG] run_tracker() completed successfully")
+
           list(success = TRUE, output_file = output_file, error = NULL)
 
         }, error = function(e) {
+          # This message goes to captured output
+          message("[GUI LOG] ERROR in run_tracker(): ", e$message)
           list(success = FALSE, output_file = NULL, error = e)
 
         }, finally = {
@@ -618,6 +633,12 @@ run_tracker_gui <- function() {
             sink(type = "message")
             sink(type = "output")
           }, error = function(e) {})
+
+          # Debug: Log that sinks have been closed
+          console_output(paste0(
+            console_output(),
+            "Output capture complete, reading results...\n"
+          ))
         })
 
         # Read ALL captured output
