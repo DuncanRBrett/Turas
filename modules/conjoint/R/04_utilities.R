@@ -314,6 +314,13 @@ calculate_choice_fit_stats <- function(model_result, data, config) {
 #' Percentage of choices correctly predicted
 #'
 #' @keywords internal
+#'
+#' Assumptions:
+#' - model_result$model is an mlogit model fitted on dfidx data with idx = (chid, alt)
+#' - config$chosen_column is a 0/1 indicator of the chosen alternative per row
+#' - Each choice set has exactly one chosen alt (or NA-handling kicks in)
+#' - fitted(..., outcome = FALSE) returns a matrix (n_choice_sets × n_alternatives)
+#'
 calculate_hit_rate <- function(model_result, data, config) {
 
   tryCatch({
@@ -332,7 +339,15 @@ calculate_hit_rate <- function(model_result, data, config) {
 
       # Get actual choices from long-format data
       model_df <- model_result$model$model
-      chosen <- as.logical(model_df[[1]])  # Choice indicator per row
+
+      # Get choice column by name (future-proof vs positional indexing)
+      choice_col_name <- config$chosen_column
+      if (!choice_col_name %in% names(model_df)) {
+        # Fallback: use first column if name not found
+        choice_col_name <- names(model_df)[1]
+      }
+      chosen <- as.logical(model_df[[choice_col_name]])  # Choice indicator per row
+
       idx_df <- as.data.frame(dfidx::idx(model_df))
       chid <- idx_df[[1]]  # Choice set IDs
 
@@ -389,31 +404,34 @@ calculate_hit_rate <- function(model_result, data, config) {
       total <- length(actual_vec)
       hit_rate <- correct / total
 
-      # Optional: Print diagnostic info
-      cat("\n[HIT RATE CALCULATION]\n")
-      cat("======================\n")
-      cat(sprintf("Fitted matrix dimensions: %d choice sets × %d alternatives\n",
-                  nrow(fitted_mat), ncol(fitted_mat)))
-      cat(sprintf("Row sums (should all be ~1.0): %s\n",
-                  paste(round(head(rowSums(fitted_mat), 3), 4), collapse = ", ")))
+      # Optional: Print diagnostic info (controlled by option)
+      # Set with: options(conjoint.verbose_diagnostics = TRUE)
+      if (getOption("conjoint.verbose_diagnostics", default = TRUE)) {
+        cat("\n[HIT RATE CALCULATION]\n")
+        cat("======================\n")
+        cat(sprintf("Fitted matrix dimensions: %d choice sets × %d alternatives\n",
+                    nrow(fitted_mat), ncol(fitted_mat)))
+        cat(sprintf("Row sums (should all be ~1.0): %s\n",
+                    paste(round(head(rowSums(fitted_mat), 3), 4), collapse = ", ")))
 
-      # Show first 10 choice sets
-      cat("\nFirst 10 choice sets (predicted vs actual):\n")
-      cat(sprintf("%-8s %-10s %-10s %-8s\n", "Set", "Predicted", "Actual", "Match"))
-      cat(strrep("-", 45), "\n")
+        # Show first 10 choice sets
+        cat("\nFirst 10 choice sets (predicted vs actual):\n")
+        cat(sprintf("%-8s %-10s %-10s %-8s\n", "Set", "Predicted", "Actual", "Match"))
+        cat(strrep("-", 45), "\n")
 
-      first_10 <- head(seq_along(chid_levels), 10)
-      for (i in first_10) {
-        cs_id <- chid_levels[i]
-        pred <- pred_vec[i]
-        act <- actual_vec[i]
-        match <- if (pred == act) "YES" else "NO"
-        cat(sprintf("%-8s %-10d %-10d %-8s\n", cs_id, pred, act, match))
+        first_10 <- head(seq_along(chid_levels), 10)
+        for (i in first_10) {
+          cs_id <- chid_levels[i]
+          pred <- pred_vec[i]
+          act <- actual_vec[i]
+          match <- if (pred == act) "YES" else "NO"
+          cat(sprintf("%-8s %-10d %-10d %-8s\n", cs_id, pred, act, match))
+        }
+
+        cat(sprintf("\nTotal correct: %d / %d = %.1f%%\n", correct, total, 100 * hit_rate))
+        cat(sprintf("Chance rate (1/%d alts): %.1f%%\n",
+                    ncol(fitted_mat), 100 / ncol(fitted_mat)))
       }
-
-      cat(sprintf("\nTotal correct: %d / %d = %.1f%%\n", correct, total, 100 * hit_rate))
-      cat(sprintf("Chance rate (1/%d alts): %.1f%%\n",
-                  ncol(fitted_mat), 100 / ncol(fitted_mat)))
 
       hit_rate
 
