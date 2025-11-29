@@ -246,8 +246,26 @@ extract_mlogit_results <- function(model, data, config) {
   vcov_matrix <- vcov(model)
 
   # Log-likelihoods
-  ll_fitted <- logLik(model)
-  ll_null <- model$logLik[1]  # Null log-likelihood
+  ll_fitted <- as.numeric(logLik(model))
+
+  # Extract null log-likelihood from mlogit model
+  # In mlogit, this is stored in model$logLik with name "null"
+  if (!is.null(attr(logLik(model), "null"))) {
+    ll_null <- attr(logLik(model), "null")
+  } else if (!is.null(model$logLik.null)) {
+    ll_null <- model$logLik.null
+  } else {
+    # Fallback: try to get it from the model summary
+    ll_null <- tryCatch({
+      summary(model)$logLik["null"]
+    }, error = function(e) {
+      # Last resort: estimate null model
+      warning("Could not extract null log-likelihood, estimating...")
+      null_formula <- as.formula(paste(config$chosen_column, "~ 1"))
+      null_model <- mlogit::mlogit(null_formula, data = data)
+      as.numeric(logLik(null_model))
+    })
+  }
 
   # Sample info
   n_obs <- nrow(data)
