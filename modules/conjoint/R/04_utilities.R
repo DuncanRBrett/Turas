@@ -327,40 +327,55 @@ calculate_hit_rate <- function(model_result, data, config) {
       chosen <- as.logical(model_df[[1]])  # Response: which was chosen
       idx_df <- as.data.frame(dfidx::idx(model_df))
       chid <- idx_df[[1]]  # Choice set IDs
+      alt_id <- idx_df[[2]]  # Alternative IDs
 
-      # Step 3: Normalize probabilities to sum to 1 per choice set
-      # Using ave() to properly group and normalize
-      normalized_probs <- ave(fitted_vals, chid, FUN = function(x) x / sum(x))
+      # CRITICAL DEBUG: Check if fitted() is giving per-task probabilities
+      cat("\n[CRITICAL CHECK] Are fitted() values proper probabilities?\n")
+      cat("==========================================================\n")
 
-      # DEBUG: Verify normalization
-      first_cs <- unique(chid)[1]
-      cat("\n[DEBUG] Normalization check:\n")
-      cat("  Before normalization:\n")
-      cat("    Values:", fitted_vals[chid == first_cs], "\n")
-      cat("    Sum:", sum(fitted_vals[chid == first_cs]), "\n")
-      cat("  After normalization:\n")
-      cat("    Values:", normalized_probs[chid == first_cs], "\n")
-      cat("    Sum:", sum(normalized_probs[chid == first_cs]), "\n")
+      # Check 3 random choice sets
+      test_cs <- sample(unique(chid), min(3, length(unique(chid))))
+      for (i in 1:length(test_cs)) {
+        cs <- test_cs[i]
+        cs_rows <- which(chid == cs)
+        cs_fitted <- fitted_vals[cs_rows]
+        cs_chosen <- chosen[cs_rows]
 
-      # Check if normalization changes which.max
-      cat("  Which.max before:", which.max(fitted_vals[chid == first_cs]), "\n")
-      cat("  Which.max after:", which.max(normalized_probs[chid == first_cs]), "\n")
+        cat(sprintf("\nChoice set %s (rows %s):\n", cs, paste(cs_rows, collapse = ",")))
+        cat("  Alternatives:", alt_id[cs_rows], "\n")
+        cat("  Fitted values:", round(cs_fitted, 4), "\n")
+        cat("  Sum:", round(sum(cs_fitted), 6), "<-- Should be 1.0\n")
+        cat("  Actual choice:", which(cs_chosen), "\n")
+        cat("  Predicted choice:", which.max(cs_fitted), "\n")
+        cat("  Match?:", which(cs_chosen) == which.max(cs_fitted), "\n")
+      }
 
-      # Step 4: For each choice set, find predicted (max prob) and actual (chosen)
-      predicted_choice <- tapply(normalized_probs, chid, which.max)
+      cat("\n[ALIGNMENT CHECK] Verify predictions match actual choices:\n")
+      cat("===========================================================\n")
+
+      # Step 3: Calculate predictions using RAW fitted() values
+      predicted_choice <- tapply(fitted_vals, chid, which.max)
       actual_choice <- tapply(chosen, chid, which)
 
-      # DEBUG: Show predictions
-      cat("\n[DEBUG] Predictions:\n")
-      cat("  First 10 predicted:", head(predicted_choice, 10), "\n")
-      cat("  First 10 actual:   ", head(actual_choice, 10), "\n")
-      cat("  Matches:", sum(head(predicted_choice, 10) == head(actual_choice, 10)), "/ 10\n")
+      # Build alignment table for first 10 choice sets
+      first_10_sets <- head(unique(chid), 10)
+      cat("\nFirst 10 choice sets (predicted vs actual):\n")
+      cat(sprintf("%-8s %-10s %-10s %-8s\n", "Set", "Predicted", "Actual", "Match"))
+      cat(strrep("-", 40), "\n")
+      for (cs in first_10_sets) {
+        pred <- predicted_choice[as.character(cs)]
+        act <- actual_choice[as.character(cs)]
+        match <- if (pred == act) "YES" else "NO"
+        cat(sprintf("%-8s %-10s %-10s %-8s\n", cs, pred, act, match))
+      }
 
-      # Step 5: Count correct predictions
+      # Step 4: Count correct predictions
       correct <- sum(predicted_choice == actual_choice, na.rm = TRUE)
       total <- length(unique(chid))
 
-      cat("  TOTAL:", correct, "/", total, "=", sprintf("%.1f%%", 100 * correct / total), "\n")
+      cat("\n[SUMMARY]\n")
+      cat("  Total correct:", correct, "/", total, "=", sprintf("%.1f%%", 100 * correct / total), "\n")
+      cat("  If this is ~34%, the calculation is correct but probabilities from fitted() are suspect.\n")
 
       hit_rate <- correct / total
 
