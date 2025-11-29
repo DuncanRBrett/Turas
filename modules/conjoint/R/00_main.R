@@ -34,6 +34,7 @@ source(file.path(.conjoint_module_dir, "04_utilities.R"))    # Utilities calcula
 source(file.path(.conjoint_module_dir, "05_simulator.R"))    # Market simulator functions
 source(file.path(.conjoint_module_dir, "07_output.R"))       # Output generation
 source(file.path(.conjoint_module_dir, "08_market_simulator.R"))  # Excel simulator
+source(file.path(.conjoint_module_dir, "09_none_handling.R"))     # None option handling
 
 # Optional advanced features (load if needed)
 if (file.exists(file.path(.conjoint_module_dir, "06_interactions.R"))) {
