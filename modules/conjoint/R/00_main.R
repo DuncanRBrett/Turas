@@ -11,6 +11,33 @@
 # ==============================================================================
 
 # ==============================================================================
+# LOAD REQUIRED PACKAGES
+# ==============================================================================
+
+# Suppress package startup messages for cleaner output
+suppressPackageStartupMessages({
+  # Data manipulation
+  if (!require(dplyr, quietly = TRUE)) {
+    stop("Package 'dplyr' is required. Install with: install.packages('dplyr')")
+  }
+
+  # Excel I/O
+  if (!require(openxlsx, quietly = TRUE)) {
+    stop("Package 'openxlsx' is required. Install with: install.packages('openxlsx')")
+  }
+
+  # Choice modeling
+  if (!require(mlogit, quietly = TRUE)) {
+    warning("Package 'mlogit' not found. Install with: install.packages('mlogit')")
+  }
+
+  # Fallback estimation
+  if (!require(survival, quietly = TRUE)) {
+    warning("Package 'survival' not found. Install with: install.packages('survival')")
+  }
+})
+
+# ==============================================================================
 # LOAD MODULE COMPONENTS
 # ==============================================================================
 
