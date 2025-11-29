@@ -520,8 +520,13 @@ create_simulator_data_sheet <- function(wb, utilities, importance, header_style)
   setColWidths(wb, sheet_name, cols = 1:3, widths = c(20, 20, 15))
   setColWidths(wb, sheet_name, cols = 5:6, widths = c(20, 15))
 
-  # Hide this sheet
-  sheetVisibility(wb)[sheet_name] <- "hidden"
+  # Hide this sheet - get sheet index and set visibility
+  sheet_idx <- which(names(wb) == sheet_name)
+  if (length(sheet_idx) > 0) {
+    visibility <- sheetVisibility(wb)
+    visibility[sheet_idx] <- "hidden"
+    sheetVisibility(wb) <- visibility
+  }
 
   invisible(NULL)
 }
