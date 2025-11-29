@@ -332,6 +332,15 @@ calculate_hit_rate <- function(model_result, data, config) {
       idx_df <- as.data.frame(dfidx::idx(model_df))
       chid <- idx_df[[1]]
 
+      # DEBUG: Check if fitted() returns probabilities
+      cat("\n[DEBUG] Fitted values check:\n")
+      first_cs <- unique(chid)[1]
+      first_cs_vals <- fitted_probs[chid == first_cs]
+      cat("  First choice set values:", first_cs_vals, "\n")
+      cat("  Sum of first choice set:", sum(first_cs_vals), "\n")
+      cat("  Range of all fitted values:", range(fitted_probs), "\n")
+      cat("  Are these probabilities? Sum should be ~1, range 0-1\n")
+
       # For each choice set, find which alternative has max probability
       # and which was actually chosen
       predicted_choice <- tapply(fitted_probs, chid, which.max)
