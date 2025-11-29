@@ -259,12 +259,22 @@ write_market_share_section <- function(wb, sheet_name, config, n_products,
                  startCol = col, startRow = exp_utility_row)
 
     # Market Share Formula
-    # Create range for sum of all exp(Utility) values
-    sum_range <- sprintf("$%s$%d:$%s$%d",
-                         int2col(2), exp_utility_row,
-                         int2col(1 + n_products), exp_utility_row)
-    share_formula <- sprintf("=%s%d/SUM(%s)*100",
-                             col_letter, exp_utility_row, sum_range)
+    # Use conditional sum to exclude blank products (Total Utility ≈ 0)
+    # Only include products where Total Utility is not zero/blank
+    utility_range <- sprintf("$%s$%d:$%s$%d",
+                             int2col(2), utility_row,
+                             int2col(1 + n_products), utility_row)
+    exp_utility_range <- sprintf("$%s$%d:$%s$%d",
+                                 int2col(2), exp_utility_row,
+                                 int2col(1 + n_products), exp_utility_row)
+
+    # Formula: exp(U_i) / SUMIF(utility_range, "<>0", exp_utility_range) * 100
+    # This excludes products with zero total utility from the share calculation
+    share_formula <- sprintf("=IF(%s%d=0,0,%s%d/SUMIF(%s,\"<>0\",%s)*100)",
+                             col_letter, utility_row,  # If this product's utility is 0, return 0
+                             col_letter, exp_utility_row,  # Otherwise: exp(U_i)
+                             utility_range,  # Check which products have non-zero utility
+                             exp_utility_range)  # Sum only those exp(U) values
     writeFormula(wb, sheet_name, x = share_formula,
                  startCol = col, startRow = share_row)
   }
