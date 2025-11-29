@@ -184,12 +184,14 @@ prepare_mlogit_data <- function(data, config) {
     data$alt <- data[[config$alternative_id_column]]
   }
 
-  # Ensure choice set is numeric
-  if (!is.numeric(data[[config$choice_set_column]])) {
-    data$chid <- as.numeric(as.factor(data[[config$choice_set_column]]))
-  } else {
-    data$chid <- data[[config$choice_set_column]]
-  }
+  # Create unique choice set ID combining respondent and choice_set
+  # This ensures (chid, alt) is unique across all observations
+  # Required for mlogit's dfidx when multiple respondents have same choice_set_id
+  data$chid <- as.numeric(as.factor(
+    paste(data[[config$respondent_id_column]],
+          data[[config$choice_set_column]],
+          sep = "_")
+  ))
 
   # Convert attributes to factors with correct reference level
   for (attr in config$attributes$AttributeName) {
