@@ -378,10 +378,26 @@ run_conjoint_gui <- function() {
         output_text <- paste0(output_text, "Loading Conjoint module...\n\n")
         console_text(output_text)
 
+        # Set working directory to Turas root for module loading
+        old_wd <- getwd()
+        setwd(turas_root)
+
+        # Source main module file
         source(file.path(turas_root, "modules/conjoint/R/00_main.R"))
+
+        # Restore working directory
+        setwd(old_wd)
+
+        # Verify config file exists
+        if (!file.exists(files$config_file)) {
+          stop("Config file not found: ", files$config_file)
+        }
 
         # Capture analysis output
         # Paths are read from config file Settings sheet
+        output_text <- paste0(output_text, "Config file: ", basename(files$config_file), "\n\n")
+        console_text(output_text)
+
         capture <- capture.output({
           results <- run_conjoint_analysis(
             config_file = files$config_file
@@ -393,6 +409,14 @@ run_conjoint_gui <- function() {
 
       }, error = function(e) {
         output_text <<- paste0(output_text, "\n\n✗ Error: ", e$message)
+        output_text <<- paste0(output_text, "\n\nDebug info:")
+        output_text <<- paste0(output_text, "\n  - Turas root: ", turas_root)
+        output_text <<- paste0(output_text, "\n  - Config file: ", files$config_file)
+        output_text <<- paste0(output_text, "\n  - Config exists: ", file.exists(files$config_file))
+        if (exists("e")) {
+          output_text <<- paste0(output_text, "\n  - Error class: ", class(e)[1])
+          output_text <<- paste0(output_text, "\n  - Call stack: ", paste(head(sys.calls(), 5), collapse = " -> "))
+        }
       })
 
       console_text(output_text)

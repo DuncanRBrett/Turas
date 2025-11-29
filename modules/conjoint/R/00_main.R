@@ -47,14 +47,40 @@ suppressPackageStartupMessages({
 # ==============================================================================
 
 # Get the directory where this script is located
-.conjoint_module_dir <- getSrcDirectory(function() {})
-if (.conjoint_module_dir == "") {
-  # Fallback if getSrcDirectory doesn't work
-  .conjoint_module_dir <- dirname(sys.frame(1)$ofile)
-}
-if (.conjoint_module_dir == "") {
-  # Last resort - assume we're in the modules/conjoint/R directory
-  .conjoint_module_dir <- getwd()
+.conjoint_module_dir <- tryCatch({
+  dir <- getSrcDirectory(function() {})
+  if (is.null(dir) || length(dir) == 0 || dir == "") {
+    # Fallback if getSrcDirectory doesn't work
+    dir <- tryCatch(dirname(sys.frame(1)$ofile), error = function(e) "")
+  }
+  if (is.null(dir) || length(dir) == 0 || dir == "") {
+    # Check if we're in Turas directory structure
+    wd <- getwd()
+    if (file.exists(file.path(wd, "modules/conjoint/R"))) {
+      # We're in Turas root
+      dir <- file.path(wd, "modules/conjoint/R")
+    } else if (basename(dirname(wd)) == "conjoint" && basename(wd) == "R") {
+      # We're already in modules/conjoint/R
+      dir <- wd
+    } else if (basename(wd) == "conjoint") {
+      # We're in modules/conjoint
+      dir <- file.path(wd, "R")
+    } else {
+      # Last resort - assume working directory is Turas root
+      dir <- file.path(wd, "modules/conjoint/R")
+    }
+  }
+  dir
+}, error = function(e) {
+  file.path(getwd(), "modules/conjoint/R")
+})
+
+# Validate the directory exists
+if (!dir.exists(.conjoint_module_dir)) {
+  stop(sprintf(
+    "Could not locate conjoint module directory. Expected: %s\nCurrent working directory: %s",
+    .conjoint_module_dir, getwd()
+  ))
 }
 
 # Source all component files in order
