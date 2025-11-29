@@ -337,7 +337,17 @@ calculate_hit_rate <- function(model_result, data, config) {
       chid <- idx_df[[1]]  # Choice set IDs
 
       # Compress to per-choice-set actual choice index
-      actual_choice <- tapply(chosen, chid, function(x) which(x))
+      # Defensive: handle edge cases where 0 or >1 alternatives are chosen
+      actual_choice <- tapply(chosen, chid, function(x) {
+        idx <- which(x)
+        if (length(idx) == 0L) return(NA_integer_)  # No choice (dirty data)
+        if (length(idx) > 1L) {
+          warning(sprintf("Choice set has %d chosen alternatives; using first", length(idx)))
+          idx <- idx[1L]
+        }
+        idx
+      })
+      actual_choice <- unlist(actual_choice)  # Ensure it's a vector, not a list
 
       # Get predicted choice index per choice set (row-wise max)
       # max.col returns the column index of the maximum value per row
@@ -349,7 +359,8 @@ calculate_hit_rate <- function(model_result, data, config) {
 
       # If fitted_mat has rownames, use those for alignment; otherwise assume 1:N order
       if (!is.null(rownames(fitted_mat))) {
-        chid_levels <- intersect(names(actual_choice), rownames(fitted_mat))
+        # Preserve ordering of actual_choice while filtering to matched IDs
+        chid_levels <- names(actual_choice)[names(actual_choice) %in% rownames(fitted_mat)]
         actual_vec <- actual_choice[chid_levels]
         pred_vec <- predicted_choice[match(chid_levels, rownames(fitted_mat))]
       } else {
@@ -357,6 +368,20 @@ calculate_hit_rate <- function(model_result, data, config) {
         chid_levels <- as.character(chid_unique)
         actual_vec <- actual_choice[chid_levels]
         pred_vec <- predicted_choice
+      }
+
+      # Sanity checks: verify dimensions match before computing hit rate
+      if (length(actual_vec) != nrow(fitted_mat)) {
+        stop(sprintf(
+          "Alignment error: %d actual choices != %d rows in fitted matrix",
+          length(actual_vec), nrow(fitted_mat)
+        ))
+      }
+      if (length(pred_vec) != length(actual_vec)) {
+        stop(sprintf(
+          "Alignment error: %d predictions != %d actual choices",
+          length(pred_vec), length(actual_vec)
+        ))
       }
 
       # Calculate hit rate
