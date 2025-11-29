@@ -65,7 +65,8 @@ create_warning <- function(module, problem, suggestion = NULL) {
 #' @return Logical value
 #' @keywords internal
 safe_logical <- function(x, default = FALSE) {
-  if (is.null(x) || is.na(x)) return(default)
+  if (is.null(x) || length(x) == 0) return(default)
+  if (is.na(x)) return(default)
 
   # Already logical
   if (is.logical(x)) return(x)
@@ -90,8 +91,9 @@ safe_logical <- function(x, default = FALSE) {
 #' Safely convert to numeric
 #' @keywords internal
 safe_numeric <- function(x, default = NA_real_) {
+  if (is.null(x) || length(x) == 0) return(default)
   result <- suppressWarnings(as.numeric(x))
-  if (is.na(result)) default else result
+  if (length(result) == 0 || is.na(result)) default else result
 }
 
 
