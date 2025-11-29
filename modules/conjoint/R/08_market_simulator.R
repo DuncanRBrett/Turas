@@ -162,13 +162,14 @@ write_product_configuration <- function(wb, sheet_name, config, utilities,
     for (prod in 1:n_products) {
       col <- 1 + prod
 
-      # Create data validation (dropdown)
+      # Create data validation (dropdown) using simple comma-separated list
+      # Avoid complex quote nesting which can cause Excel corruption
       dataValidation(
         wb, sheet_name,
         col = col,
         rows = current_row,
         type = "list",
-        value = sprintf('"%s"', paste(attr_levels, collapse = '","'))
+        value = paste(attr_levels, collapse = ",")
       )
 
       # Set default value (first level)
