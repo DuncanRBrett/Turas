@@ -205,8 +205,9 @@ prepare_mlogit_data <- function(data, config) {
     }
   }
 
-  # Create mlogit.data object
-  mlogit_data <- mlogit::dfidx(
+  # Create mlogit.data object using dfidx package
+  # Note: dfidx was moved to separate package in mlogit >= 1.1-0
+  mlogit_data <- dfidx::dfidx(
     data,
     choice = config$chosen_column,
     idx = list(c("chid", "alt")),

@@ -31,6 +31,11 @@ suppressPackageStartupMessages({
     warning("Package 'mlogit' not found. Install with: install.packages('mlogit')")
   }
 
+  # Data indexing for mlogit (required for mlogit >= 1.1-0)
+  if (!require(dfidx, quietly = TRUE)) {
+    warning("Package 'dfidx' not found. Install with: install.packages('dfidx')")
+  }
+
   # Fallback estimation
   if (!require(survival, quietly = TRUE)) {
     warning("Package 'survival' not found. Install with: install.packages('survival')")
