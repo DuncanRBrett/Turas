@@ -319,18 +319,27 @@ calculate_hit_rate <- function(model_result, data, config) {
   # Get predictions
   tryCatch({
     if (model_result$method == "mlogit") {
-      # mlogit predictions
+      # mlogit predictions - use the model's data to ensure alignment
       pred_probs <- fitted(model_result$model, outcome = FALSE)
 
+      # Get the index from the mlogit model's data
+      model_data <- model_result$model$model
+      choice_set_idx <- attr(model_data, "index")[[1]]  # First index is choice set
+
+      # Get actual choices from model data
+      actual_choices <- model_result$model$model[[1]]  # Response variable
+
       # For each choice set, find alternative with highest probability
-      choice_sets <- unique(data[[config$choice_set_column]])
+      choice_sets <- unique(choice_set_idx)
       correct <- 0
 
       for (cs in choice_sets) {
-        cs_rows <- which(data[[config$choice_set_column]] == cs)
+        cs_rows <- which(choice_set_idx == cs)
         cs_probs <- pred_probs[cs_rows]
         predicted <- which.max(cs_probs)
-        actual <- which(data[[config$chosen_column]][cs_rows] == 1)
+
+        # Find which alternative was actually chosen
+        actual <- which(actual_choices[cs_rows] == TRUE | actual_choices[cs_rows] == 1)
 
         if (length(actual) > 0 && predicted == actual[1]) {
           correct <- correct + 1
