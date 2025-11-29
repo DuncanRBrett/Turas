@@ -10,6 +10,49 @@
 #
 # ==============================================================================
 
+# ==============================================================================
+# LOAD MODULE COMPONENTS
+# ==============================================================================
+
+# Get the directory where this script is located
+.conjoint_module_dir <- getSrcDirectory(function() {})
+if (.conjoint_module_dir == "") {
+  # Fallback if getSrcDirectory doesn't work
+  .conjoint_module_dir <- dirname(sys.frame(1)$ofile)
+}
+if (.conjoint_module_dir == "") {
+  # Last resort - assume we're in the modules/conjoint/R directory
+  .conjoint_module_dir <- getwd()
+}
+
+# Source all component files in order
+source(file.path(.conjoint_module_dir, "99_helpers.R"))      # Helper functions (must be first)
+source(file.path(.conjoint_module_dir, "01_config.R"))       # Configuration loading
+source(file.path(.conjoint_module_dir, "02_data.R"))         # Data loading and validation
+source(file.path(.conjoint_module_dir, "03_estimation.R"))   # Model estimation
+source(file.path(.conjoint_module_dir, "04_utilities.R"))    # Utilities calculation
+source(file.path(.conjoint_module_dir, "05_simulator.R"))    # Market simulator functions
+source(file.path(.conjoint_module_dir, "07_output.R"))       # Output generation
+source(file.path(.conjoint_module_dir, "08_market_simulator.R"))  # Excel simulator
+
+# Optional advanced features (load if needed)
+if (file.exists(file.path(.conjoint_module_dir, "06_interactions.R"))) {
+  source(file.path(.conjoint_module_dir, "06_interactions.R"))
+}
+if (file.exists(file.path(.conjoint_module_dir, "10_best_worst.R"))) {
+  source(file.path(.conjoint_module_dir, "10_best_worst.R"))
+}
+if (file.exists(file.path(.conjoint_module_dir, "11_hierarchical_bayes.R"))) {
+  source(file.path(.conjoint_module_dir, "11_hierarchical_bayes.R"))
+}
+
+# Clean up
+rm(.conjoint_module_dir)
+
+# ==============================================================================
+# MAIN ENTRY POINT
+# ==============================================================================
+
 #' Run Conjoint Analysis
 #'
 #' Main entry point for enhanced conjoint analysis. Calculates part-worth utilities
