@@ -337,9 +337,17 @@ calculate_hit_rate <- function(model_result, data, config) {
       predicted_choice <- tapply(fitted_probs, chid, which.max)
       actual_choice <- tapply(chosen, chid, which)
 
+      # DEBUG: Print first few to see what we're comparing
+      cat("\n[DEBUG] Hit Rate Calculation:\n")
+      cat("  First 10 predicted:", head(predicted_choice, 10), "\n")
+      cat("  First 10 actual:   ", head(actual_choice, 10), "\n")
+      cat("  Match?:            ", head(predicted_choice, 10) == head(actual_choice, 10), "\n")
+
       # Count matches
       correct <- sum(predicted_choice == actual_choice, na.rm = TRUE)
       total <- length(unique(chid))
+
+      cat("  Total: ", correct, "correct out of", total, "choice sets\n")
 
       hit_rate <- correct / total
 
