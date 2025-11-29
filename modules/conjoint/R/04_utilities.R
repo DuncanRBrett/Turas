@@ -319,41 +319,37 @@ calculate_hit_rate <- function(model_result, data, config) {
   # Get predictions
   tryCatch({
     if (model_result$method == "mlogit") {
-      # For mlogit: use predict with type="probabilities"
-      # This returns probabilities for each alternative in each choice set
-      pred_probs <- predict(model_result$model, newdata = model_result$model$model)
+      # Use model's fitted probabilities
+      fitted_probs <- fitted(model_result$model, outcome = FALSE)
 
-      # Get response variable and index from the model
-      response_var <- model.response(model_result$model$model)
-      idx <- dfidx::idx(model_result$model$model)
+      # Extract info from the mlogit model's data frame
+      model_df <- model_result$model$model
 
-      # Extract choice set IDs
-      if (is.data.frame(idx)) {
-        choice_set_ids <- idx[[1]]  # First column is choice set
-      } else {
-        choice_set_ids <- idx[, 1]
-      }
+      # Get response variable (chosen)
+      response_col <- model_df[[1]]  # First column is response
 
-      # Get unique choice sets
-      unique_sets <- unique(choice_set_ids)
+      # Get the dfidx index
+      idx_df <- as.data.frame(dfidx::idx(model_df))
+      choice_sets <- idx_df[[1]]  # First column of index is choice set
+
+      unique_sets <- unique(choice_sets)
       correct <- 0
 
       for (cs in unique_sets) {
-        cs_rows <- which(choice_set_ids == cs)
+        # Rows for this choice set in model data
+        cs_rows <- which(choice_sets == cs)
 
-        # Predicted alternative (highest probability)
-        if (is.matrix(pred_probs)) {
-          cs_probs <- pred_probs[cs_rows[1], ]  # Probabilities for this choice set
-          predicted <- which.max(cs_probs)
-        } else {
-          cs_probs <- pred_probs[cs_rows]
-          predicted <- which.max(cs_probs)
-        }
+        # Probabilities for this choice set
+        cs_probs <- fitted_probs[cs_rows]
 
-        # Actual chosen alternative
-        actual <- which(response_var[cs_rows])
+        # Predicted: alternative with highest probability
+        predicted_idx <- which.max(cs_probs)
 
-        if (length(actual) > 0 && predicted == actual[1]) {
+        # Actual: which alternative was chosen
+        actual_idx <- which(response_col[cs_rows])
+
+        # Count as correct if prediction matches actual
+        if (length(actual_idx) > 0 && predicted_idx == actual_idx[1]) {
           correct <- correct + 1
         }
       }
