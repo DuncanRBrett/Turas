@@ -374,15 +374,11 @@ run_conjoint_gui <- function() {
           turas_root <- dirname(turas_root)
         }
 
-        # Source module files
+        # Source module files (00_main.R loads all components)
         output_text <- paste0(output_text, "Loading Conjoint module...\n\n")
         console_text(output_text)
 
         source(file.path(turas_root, "modules/conjoint/R/00_main.R"))
-        source(file.path(turas_root, "modules/conjoint/R/01_config.R"))
-        source(file.path(turas_root, "modules/conjoint/R/02_validation.R"))
-        source(file.path(turas_root, "modules/conjoint/R/03_analysis.R"))
-        source(file.path(turas_root, "modules/conjoint/R/04_output.R"))
 
         # Capture analysis output
         # Paths are read from config file Settings sheet
