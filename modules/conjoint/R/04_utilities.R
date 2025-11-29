@@ -316,68 +316,81 @@ calculate_choice_fit_stats <- function(model_result, data, config) {
 #' @keywords internal
 calculate_hit_rate <- function(model_result, data, config) {
 
-  # Get predictions
   tryCatch({
     if (model_result$method == "mlogit") {
-      # Step 1: Get fitted values from mlogit model
-      fitted_vals <- fitted(model_result$model, outcome = FALSE)
+      # Get fitted probabilities as MATRIX (choice sets × alternatives)
+      # fitted(..., outcome = FALSE) returns a matrix with:
+      #   - one row per choice set
+      #   - one column per alternative
+      #   - row sums = 1.0 (probabilities)
+      fitted_mat <- fitted(model_result$model, outcome = FALSE)
 
-      # Step 2: Get model data and indices
+      # Sanity check: verify it's a matrix and row sums are ~1.0
+      if (!is.matrix(fitted_mat)) {
+        stop("fitted() did not return a matrix as expected")
+      }
+
+      # Get actual choices from long-format data
       model_df <- model_result$model$model
-      chosen <- as.logical(model_df[[1]])  # Response: which was chosen
+      chosen <- as.logical(model_df[[1]])  # Choice indicator per row
       idx_df <- as.data.frame(dfidx::idx(model_df))
       chid <- idx_df[[1]]  # Choice set IDs
-      alt_id <- idx_df[[2]]  # Alternative IDs
 
-      # CRITICAL DEBUG: Check if fitted() is giving per-task probabilities
-      cat("\n[CRITICAL CHECK] Are fitted() values proper probabilities?\n")
-      cat("==========================================================\n")
+      # Compress to per-choice-set actual choice index
+      actual_choice <- tapply(chosen, chid, function(x) which(x))
 
-      # Check 3 random choice sets
-      test_cs <- sample(unique(chid), min(3, length(unique(chid))))
-      for (i in 1:length(test_cs)) {
-        cs <- test_cs[i]
-        cs_rows <- which(chid == cs)
-        cs_fitted <- fitted_vals[cs_rows]
-        cs_chosen <- chosen[cs_rows]
+      # Get predicted choice index per choice set (row-wise max)
+      # max.col returns the column index of the maximum value per row
+      predicted_choice <- max.col(fitted_mat, ties.method = "first")
 
-        cat(sprintf("\nChoice set %s (rows %s):\n", cs, paste(cs_rows, collapse = ",")))
-        cat("  Alternatives:", alt_id[cs_rows], "\n")
-        cat("  Fitted values:", round(cs_fitted, 4), "\n")
-        cat("  Sum:", round(sum(cs_fitted), 6), "<-- Should be 1.0\n")
-        cat("  Actual choice:", which(cs_chosen), "\n")
-        cat("  Predicted choice:", which.max(cs_fitted), "\n")
-        cat("  Match?:", which(cs_chosen) == which.max(cs_fitted), "\n")
+      # Align predictions and actuals
+      # Row i of fitted_mat corresponds to choice set i
+      chid_unique <- unique(chid)
+
+      # If fitted_mat has rownames, use those for alignment; otherwise assume 1:N order
+      if (!is.null(rownames(fitted_mat))) {
+        chid_levels <- intersect(names(actual_choice), rownames(fitted_mat))
+        actual_vec <- actual_choice[chid_levels]
+        pred_vec <- predicted_choice[match(chid_levels, rownames(fitted_mat))]
+      } else {
+        # Assume rows are in order of unique chid
+        chid_levels <- as.character(chid_unique)
+        actual_vec <- actual_choice[chid_levels]
+        pred_vec <- predicted_choice
       }
 
-      cat("\n[ALIGNMENT CHECK] Verify predictions match actual choices:\n")
-      cat("===========================================================\n")
+      # Calculate hit rate
+      correct <- sum(actual_vec == pred_vec, na.rm = TRUE)
+      total <- length(actual_vec)
+      hit_rate <- correct / total
 
-      # Step 3: Calculate predictions using RAW fitted() values
-      predicted_choice <- tapply(fitted_vals, chid, which.max)
-      actual_choice <- tapply(chosen, chid, which)
+      # Optional: Print diagnostic info
+      cat("\n[HIT RATE CALCULATION]\n")
+      cat("======================\n")
+      cat(sprintf("Fitted matrix dimensions: %d choice sets × %d alternatives\n",
+                  nrow(fitted_mat), ncol(fitted_mat)))
+      cat(sprintf("Row sums (should all be ~1.0): %s\n",
+                  paste(round(head(rowSums(fitted_mat), 3), 4), collapse = ", ")))
 
-      # Build alignment table for first 10 choice sets
-      first_10_sets <- head(unique(chid), 10)
+      # Show first 10 choice sets
       cat("\nFirst 10 choice sets (predicted vs actual):\n")
       cat(sprintf("%-8s %-10s %-10s %-8s\n", "Set", "Predicted", "Actual", "Match"))
-      cat(strrep("-", 40), "\n")
-      for (cs in first_10_sets) {
-        pred <- predicted_choice[as.character(cs)]
-        act <- actual_choice[as.character(cs)]
+      cat(strrep("-", 45), "\n")
+
+      first_10 <- head(seq_along(chid_levels), 10)
+      for (i in first_10) {
+        cs_id <- chid_levels[i]
+        pred <- pred_vec[i]
+        act <- actual_vec[i]
         match <- if (pred == act) "YES" else "NO"
-        cat(sprintf("%-8s %-10s %-10s %-8s\n", cs, pred, act, match))
+        cat(sprintf("%-8s %-10d %-10d %-8s\n", cs_id, pred, act, match))
       }
 
-      # Step 4: Count correct predictions
-      correct <- sum(predicted_choice == actual_choice, na.rm = TRUE)
-      total <- length(unique(chid))
+      cat(sprintf("\nTotal correct: %d / %d = %.1f%%\n", correct, total, 100 * hit_rate))
+      cat(sprintf("Chance rate (1/%d alts): %.1f%%\n",
+                  ncol(fitted_mat), 100 / ncol(fitted_mat)))
 
-      cat("\n[SUMMARY]\n")
-      cat("  Total correct:", correct, "/", total, "=", sprintf("%.1f%%", 100 * correct / total), "\n")
-      cat("  If this is ~34%, the calculation is correct but probabilities from fitted() are suspect.\n")
-
-      hit_rate <- correct / total
+      hit_rate
 
     } else if (model_result$method == "clogit") {
       # clogit predictions
