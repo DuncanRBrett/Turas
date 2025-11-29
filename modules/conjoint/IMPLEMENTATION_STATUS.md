@@ -1,10 +1,10 @@
 # Enhanced Conjoint Module - Implementation Status
 
-**Date:** 2025-11-27
-**Version:** 2.0.0 (COMPLETE)
-**Branch:** claude/enhance-conjoint-module-01TSUfoueFUWVGUM1XBiZhbx
+**Date:** 2025-11-29
+**Version:** 2.0.1 (PRODUCTION)
+**Branch:** main (merged from claude/enhance-conjoint-module-01TSUfoueFUWVGUM1XBiZhbx)
 
-## Status: ✅ PHASE 3 COMPLETE
+## Status: ✅ PHASE 3 COMPLETE + CRITICAL BUG FIXES
 
 All planned features implemented including:
 - Phase 1-2: Core functionality, estimation, utilities, output ✅
@@ -519,7 +519,90 @@ The module now provides:
 
 ---
 
-**Last Updated:** 2025-11-27
-**Version:** 2.0.0 COMPLETE
-**Status:** ✅ Phase 3 Complete - Production Ready
-**Total Development:** Phase 1-3 fully implemented
+## Critical Bug Fixes (Post-Phase 3)
+
+### Session: 2025-11-26 to 2025-11-29
+
+After Phase 3 completion, real-world testing with noodle dataset revealed critical bugs that have been fixed:
+
+#### 1. ✅ mlogit Hit Rate Calculation Bug (CRITICAL)
+**Issue:** Hit rate stuck at 34% when R² = 0.35 (good fit)
+**Cause:** Misinterpreted `fitted(model, outcome = FALSE)` as vector instead of matrix
+**Fix:** Treat fitted() as matrix (choice_sets × alternatives), use max.col() for row-wise predictions
+**Impact:** Hit rate now 64.3% (correctly reflects model quality)
+**File:** `modules/conjoint/R/04_utilities.R` (lines 312-436)
+
+#### 2. ✅ Multi-Respondent Validation Bug (CRITICAL)
+**Issue:** Validation failed for multi-respondent data ("5 choice sets don't have exactly 1 chosen")
+**Cause:** Grouped by choice_set_id only, not (respondent_id, choice_set_id)
+**Fix:** Change validation to group by BOTH respondent_id and choice_set_column
+**Impact:** Validation now works correctly for multi-respondent datasets
+**File:** `modules/conjoint/R/02_data.R` (lines 170-199)
+
+#### 3. ✅ clogit Hit Rate Bug (CRITICAL)
+**Issue:** Hit rate showing 0.0% when should be 64%
+**Cause:** Iterated over unique choice_set_id values (5) instead of unique (respondent_id, choice_set_id) pairs (1,725)
+**Fix:** Iterate over unique (respondent_id, choice_set_id) combinations
+**Impact:** Hit rate calculation now accurate for multi-respondent data
+**File:** `modules/conjoint/R/04_utilities.R` (lines 438-469)
+
+#### 4. ✅ Chance Rate Calculation Bug
+**Issue:** Chance rate displayed as 0.1% instead of 33.3%
+**Cause:** Same grouping issue as above
+**Fix:** Group by both respondent_id and choice_set_column when calculating average alternatives
+**Impact:** Diagnostics now show correct baseline comparison
+**File:** `modules/conjoint/R/04_utilities.R` (lines 288-296)
+
+#### 5. ✅ mlogit Unique chid Bug (CRITICAL)
+**Issue:** mlogit failed with "indexes don't define unique observations"
+**Cause:** chid created from choice_set_column only (values 1-5), causing duplicate (chid, alt) pairs
+**Fix:** Create unique chid by combining respondent_id and choice_set_id: `paste(resp_id, choice_set_id, sep="_")`
+**Impact:** mlogit now works correctly for multi-respondent data
+**File:** `modules/conjoint/R/03_estimation.R` (lines 187-194)
+
+#### 6. ✅ Market Simulator Blank Products Bug
+**Issue:** Blank products (all attributes at reference level) showed non-zero market share
+**Cause:** exp(0) = 1, so blank products contributed to denominator
+**Fix:** Use SUMIF to exclude products where Total Utility = 0 from share calculation
+**Impact:** Market shares now sum to 100% correctly when <5 products configured
+**File:** `modules/conjoint/R/08_market_simulator.R` (lines 261-279)
+
+#### 7. ✅ GUI Module Loading Bug (CRITICAL)
+**Issue:** "argument is of length zero" error when launching from Turas GUI
+**Cause:** getSrcDirectory() and sys.frame() don't work in Shiny contexts; module directory detection failed
+**Fix:** (1) GUI sets working directory before sourcing, (2) Robust multi-strategy directory detection, (3) Validation that directory exists
+**Impact:** Conjoint now launches successfully from Turas launcher
+**Files:**
+- `modules/conjoint/run_conjoint_gui.R` (lines 381-389, 410-419)
+- `modules/conjoint/R/00_main.R` (lines 50-84)
+
+### Real-World Testing Results
+
+**Noodle Dataset (1,725 choice sets, 345 respondents, 3 alternatives):**
+- ✅ Validation: PASSED (after fix #2)
+- ✅ Estimation: mlogit successful (after fix #5)
+- ✅ Hit Rate: 64.3% vs 33.3% chance (after fixes #1, #3)
+- ✅ McFadden R²: 0.249 (good fit)
+- ✅ Market Simulator: Working (after fix #6)
+- ✅ GUI Integration: Working (after fix #7)
+
+**Coffee Tutorial Dataset (23 choice sets, 1 respondent, 3 alternatives):**
+- ✅ Hit Rate: 69% vs 33% chance
+- ✅ McFadden R²: 0.351
+- ✅ All diagnostics accurate
+
+### Key Lessons Learned
+
+1. **Multi-Respondent Data:** ALWAYS group by (respondent_id, choice_set_id), NEVER by choice_set_id alone
+2. **mlogit fitted():** Returns MATRIX (choice_sets × alternatives), not vector
+3. **Shiny Contexts:** getSrcDirectory() and sys.frame() don't work; need robust fallbacks
+4. **Matrix Validation:** Always verify assumptions with `is.matrix()`, `dim()`, `rowSums()`
+5. **Testing Coverage:** Need both single-respondent AND multi-respondent test cases
+
+---
+
+**Last Updated:** 2025-11-29
+**Version:** 2.0.1 PRODUCTION
+**Status:** ✅ Phase 3 Complete + Critical Fixes Applied - Production Ready
+**Total Development:** Phase 1-3 fully implemented + 7 critical bug fixes
+**Documentation:** Added comprehensive MAINTENANCE_GUIDE.md
