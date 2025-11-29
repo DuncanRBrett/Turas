@@ -439,11 +439,23 @@ calculate_hit_rate <- function(model_result, data, config) {
       # clogit predictions
       pred_probs <- predict(model_result$model, type = "expected")
 
-      choice_sets <- unique(data[[config$choice_set_column]])
+      # Get unique choice sets (respondent × choice_set_id combinations)
+      unique_sets <- data %>%
+        select(!!sym(config$respondent_id_column), !!sym(config$choice_set_column)) %>%
+        distinct()
+
       correct <- 0
 
-      for (cs in choice_sets) {
-        cs_rows <- which(data[[config$choice_set_column]] == cs)
+      for (i in 1:nrow(unique_sets)) {
+        resp <- unique_sets[[config$respondent_id_column]][i]
+        cs <- unique_sets[[config$choice_set_column]][i]
+
+        # Get rows for this specific respondent's choice set
+        cs_rows <- which(
+          data[[config$respondent_id_column]] == resp &
+          data[[config$choice_set_column]] == cs
+        )
+
         cs_probs <- pred_probs[cs_rows]
         predicted <- which.max(cs_probs)
         actual <- which(data[[config$chosen_column]][cs_rows] == 1)
@@ -453,7 +465,7 @@ calculate_hit_rate <- function(model_result, data, config) {
         }
       }
 
-      hit_rate <- correct / length(choice_sets)
+      hit_rate <- correct / nrow(unique_sets)
 
     } else {
       hit_rate <- NA
