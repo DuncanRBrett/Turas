@@ -319,34 +319,46 @@ calculate_hit_rate <- function(model_result, data, config) {
   # Get predictions
   tryCatch({
     if (model_result$method == "mlogit") {
-      # mlogit predictions - use the model's data to ensure alignment
-      pred_probs <- fitted(model_result$model, outcome = FALSE)
+      # For mlogit: use predict with type="probabilities"
+      # This returns probabilities for each alternative in each choice set
+      pred_probs <- predict(model_result$model, newdata = model_result$model$model)
 
-      # Get the index from the mlogit model's data
-      model_data <- model_result$model$model
-      choice_set_idx <- attr(model_data, "index")[[1]]  # First index is choice set
+      # Get response variable and index from the model
+      response_var <- model.response(model_result$model$model)
+      idx <- dfidx::idx(model_result$model$model)
 
-      # Get actual choices from model data
-      actual_choices <- model_result$model$model[[1]]  # Response variable
+      # Extract choice set IDs
+      if (is.data.frame(idx)) {
+        choice_set_ids <- idx[[1]]  # First column is choice set
+      } else {
+        choice_set_ids <- idx[, 1]
+      }
 
-      # For each choice set, find alternative with highest probability
-      choice_sets <- unique(choice_set_idx)
+      # Get unique choice sets
+      unique_sets <- unique(choice_set_ids)
       correct <- 0
 
-      for (cs in choice_sets) {
-        cs_rows <- which(choice_set_idx == cs)
-        cs_probs <- pred_probs[cs_rows]
-        predicted <- which.max(cs_probs)
+      for (cs in unique_sets) {
+        cs_rows <- which(choice_set_ids == cs)
 
-        # Find which alternative was actually chosen
-        actual <- which(actual_choices[cs_rows] == TRUE | actual_choices[cs_rows] == 1)
+        # Predicted alternative (highest probability)
+        if (is.matrix(pred_probs)) {
+          cs_probs <- pred_probs[cs_rows[1], ]  # Probabilities for this choice set
+          predicted <- which.max(cs_probs)
+        } else {
+          cs_probs <- pred_probs[cs_rows]
+          predicted <- which.max(cs_probs)
+        }
+
+        # Actual chosen alternative
+        actual <- which(response_var[cs_rows])
 
         if (length(actual) > 0 && predicted == actual[1]) {
           correct <- correct + 1
         }
       }
 
-      hit_rate <- correct / length(choice_sets)
+      hit_rate <- correct / length(unique_sets)
 
     } else if (model_result$method == "clogit") {
       # clogit predictions
