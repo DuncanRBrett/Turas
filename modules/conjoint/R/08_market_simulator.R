@@ -499,16 +499,15 @@ create_simulator_data_sheet <- function(wb, utilities, importance, header_style)
   lookup_data <- utilities[, c("Level", "Attribute", "Utility")]
   lookup_data <- lookup_data[order(lookup_data$Attribute, lookup_data$Level), ]
 
-  writeData(wb, sheet_name, lookup_data, startRow = 1, startCol = 1,
-            colNames = TRUE, headerStyle = header_style)
-
-  # Format as table
-  addTable(wb, sheet_name,
-           x = lookup_data,
-           startCol = 1,
-           startRow = 1,
-           tableName = "UtilityLookup",
-           withFilter = FALSE)
+  # Write as formatted table
+  writeDataTable(wb, sheet_name,
+                 x = lookup_data,
+                 startCol = 1,
+                 startRow = 1,
+                 tableName = "UtilityLookup",
+                 tableStyle = "TableStyleLight9",
+                 withFilter = FALSE,
+                 headerStyle = header_style)
 
   # Table 2: Attribute Importance (cols E-F)
   importance_data <- importance[, c("Attribute", "Importance")]
