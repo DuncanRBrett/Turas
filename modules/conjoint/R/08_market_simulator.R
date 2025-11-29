@@ -158,22 +158,17 @@ write_product_configuration <- function(wb, sheet_name, config, utilities,
     attr_levels <- utilities$Level[utilities$Attribute == attr]
     attr_levels <- unique(attr_levels)
 
-    # Create dropdown for each product
+    # Set default values for each product
+    # Note: Data validation dropdowns disabled to avoid Excel compatibility issues
     for (prod in 1:n_products) {
       col <- 1 + prod
 
-      # Create data validation (dropdown) using simple comma-separated list
-      # Avoid complex quote nesting which can cause Excel corruption
-      dataValidation(
-        wb, sheet_name,
-        col = col,
-        rows = current_row,
-        type = "list",
-        value = paste(attr_levels, collapse = ",")
-      )
-
       # Set default value (first level)
       writeData(wb, sheet_name, attr_levels[1], startCol = col, startRow = current_row)
+
+      # Add cell style to indicate it's editable
+      editable_style <- createStyle(fgFill = "#FFF2CC", border = "TopBottomLeftRight")
+      addStyle(wb, sheet_name, editable_style, rows = current_row, cols = col)
     }
 
     current_row <- current_row + 1
@@ -181,7 +176,7 @@ write_product_configuration <- function(wb, sheet_name, config, utilities,
 
   # Add help text
   writeData(wb, sheet_name,
-            "Use dropdowns above to configure each product's attributes",
+            "Edit cells above to configure products (formulas update automatically). See Simulator Data sheet for valid options.",
             startCol = 1, startRow = current_row)
   note_style <- createStyle(fontSize = 10, fontColour = "#666666", textDecoration = "italic")
   addStyle(wb, sheet_name, note_style, rows = current_row, cols = 1)
