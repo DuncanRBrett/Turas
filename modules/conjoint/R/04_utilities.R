@@ -286,9 +286,11 @@ calculate_choice_fit_stats <- function(model_result, data, config) {
   hit_rate <- calculate_hit_rate(model_result, data, config)
 
   # Chance rate (1 / avg alternatives per choice set)
+  # Group by BOTH respondent and choice set to get correct count
   alts_per_set <- data %>%
-    count(!!sym(config$choice_set_column)) %>%
-    pull(n) %>%
+    group_by(!!sym(config$respondent_id_column), !!sym(config$choice_set_column)) %>%
+    summarise(n_alts = n(), .groups = "drop") %>%
+    pull(n_alts) %>%
     mean()
 
   chance_rate <- 1 / alts_per_set
