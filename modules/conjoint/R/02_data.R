@@ -167,9 +167,9 @@ validate_conjoint_data <- function(data, config) {
     ))
   }
 
-  # Check 2: Exactly one chosen per choice set
+  # Check 2: Exactly one chosen per choice set (per respondent)
   chosen_per_set <- data %>%
-    group_by(!!sym(config$choice_set_column)) %>%
+    group_by(!!sym(config$respondent_id_column), !!sym(config$choice_set_column)) %>%
     summarise(
       n_chosen = sum(!!sym(config$chosen_column)),
       .groups = "drop"
@@ -179,14 +179,22 @@ validate_conjoint_data <- function(data, config) {
     filter(n_chosen != 1)
 
   if (nrow(invalid_sets) > 0) {
-    bad_set_ids <- head(invalid_sets[[config$choice_set_column]], 10)
+    # Show respondent_id and choice_set_id for problematic sets
+    bad_examples <- head(invalid_sets, 10)
+    bad_set_desc <- paste(
+      sprintf("Resp %s / Set %s (%d chosen)",
+              bad_examples[[config$respondent_id_column]],
+              bad_examples[[config$choice_set_column]],
+              bad_examples$n_chosen),
+      collapse = "; "
+    )
     errors <- c(errors, sprintf(
       "%d choice sets do not have exactly 1 chosen alternative",
       nrow(invalid_sets)
     ))
     errors <- c(errors, sprintf(
       "Example problematic choice sets: %s",
-      paste(bad_set_ids, collapse = ", ")
+      bad_set_desc
     ))
   }
 
