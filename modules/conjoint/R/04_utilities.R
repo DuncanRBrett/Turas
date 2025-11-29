@@ -319,42 +319,29 @@ calculate_hit_rate <- function(model_result, data, config) {
   # Get predictions
   tryCatch({
     if (model_result$method == "mlogit") {
-      # Use model's fitted probabilities
+      # Vectorized approach: compare predicted vs actual for all choice sets
       fitted_probs <- fitted(model_result$model, outcome = FALSE)
 
-      # Extract info from the mlogit model's data frame
+      # Get model data frame
       model_df <- model_result$model$model
 
-      # Get response variable (chosen)
-      response_col <- model_df[[1]]  # First column is response
+      # Response variable (chosen TRUE/FALSE)
+      chosen <- as.logical(model_df[[1]])
 
-      # Get the dfidx index
+      # Get choice set IDs
       idx_df <- as.data.frame(dfidx::idx(model_df))
-      choice_sets <- idx_df[[1]]  # First column of index is choice set
+      chid <- idx_df[[1]]
 
-      unique_sets <- unique(choice_sets)
-      correct <- 0
+      # For each choice set, find which alternative has max probability
+      # and which was actually chosen
+      predicted_choice <- tapply(fitted_probs, chid, which.max)
+      actual_choice <- tapply(chosen, chid, which)
 
-      for (cs in unique_sets) {
-        # Rows for this choice set in model data
-        cs_rows <- which(choice_sets == cs)
+      # Count matches
+      correct <- sum(predicted_choice == actual_choice, na.rm = TRUE)
+      total <- length(unique(chid))
 
-        # Probabilities for this choice set
-        cs_probs <- fitted_probs[cs_rows]
-
-        # Predicted: alternative with highest probability
-        predicted_idx <- which.max(cs_probs)
-
-        # Actual: which alternative was chosen
-        actual_idx <- which(response_col[cs_rows])
-
-        # Count as correct if prediction matches actual
-        if (length(actual_idx) > 0 && predicted_idx == actual_idx[1]) {
-          correct <- correct + 1
-        }
-      }
-
-      hit_rate <- correct / length(unique_sets)
+      hit_rate <- correct / total
 
     } else if (model_result$method == "clogit") {
       # clogit predictions
