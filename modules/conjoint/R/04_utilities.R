@@ -332,13 +332,35 @@ calculate_hit_rate <- function(model_result, data, config) {
       # Using ave() to properly group and normalize
       normalized_probs <- ave(fitted_vals, chid, FUN = function(x) x / sum(x))
 
+      # DEBUG: Verify normalization
+      first_cs <- unique(chid)[1]
+      cat("\n[DEBUG] Normalization check:\n")
+      cat("  Before normalization:\n")
+      cat("    Values:", fitted_vals[chid == first_cs], "\n")
+      cat("    Sum:", sum(fitted_vals[chid == first_cs]), "\n")
+      cat("  After normalization:\n")
+      cat("    Values:", normalized_probs[chid == first_cs], "\n")
+      cat("    Sum:", sum(normalized_probs[chid == first_cs]), "\n")
+
+      # Check if normalization changes which.max
+      cat("  Which.max before:", which.max(fitted_vals[chid == first_cs]), "\n")
+      cat("  Which.max after:", which.max(normalized_probs[chid == first_cs]), "\n")
+
       # Step 4: For each choice set, find predicted (max prob) and actual (chosen)
       predicted_choice <- tapply(normalized_probs, chid, which.max)
       actual_choice <- tapply(chosen, chid, which)
 
+      # DEBUG: Show predictions
+      cat("\n[DEBUG] Predictions:\n")
+      cat("  First 10 predicted:", head(predicted_choice, 10), "\n")
+      cat("  First 10 actual:   ", head(actual_choice, 10), "\n")
+      cat("  Matches:", sum(head(predicted_choice, 10) == head(actual_choice, 10)), "/ 10\n")
+
       # Step 5: Count correct predictions
       correct <- sum(predicted_choice == actual_choice, na.rm = TRUE)
       total <- length(unique(chid))
+
+      cat("  TOTAL:", correct, "/", total, "=", sprintf("%.1f%%", 100 * correct / total), "\n")
 
       hit_rate <- correct / total
 
