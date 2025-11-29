@@ -207,10 +207,11 @@ prepare_mlogit_data <- function(data, config) {
 
   # Create mlogit.data object using dfidx package
   # Note: dfidx was moved to separate package in mlogit >= 1.1-0
+  # idx: first column is choice set (chid), second is alternative (alt)
   mlogit_data <- dfidx::dfidx(
     data,
     choice = config$chosen_column,
-    idx = list(c("chid", "alt")),
+    idx = c("chid", "alt"),
     drop.index = FALSE,
     ranked = FALSE
   )
