@@ -319,8 +319,8 @@ calculate_hit_rate <- function(model_result, data, config) {
   # Get predictions
   tryCatch({
     if (model_result$method == "mlogit") {
-      # Vectorized approach: compare predicted vs actual for all choice sets
-      fitted_probs <- fitted(model_result$model, outcome = FALSE)
+      # Get fitted values from mlogit model
+      fitted_vals <- fitted(model_result$model, outcome = FALSE)
 
       # Get model data frame
       model_df <- model_result$model$model
@@ -332,31 +332,33 @@ calculate_hit_rate <- function(model_result, data, config) {
       idx_df <- as.data.frame(dfidx::idx(model_df))
       chid <- idx_df[[1]]
 
-      # DEBUG: Check if fitted() returns probabilities
-      cat("\n[DEBUG] Fitted values check:\n")
+      # CRITICAL FIX: Normalize probabilities within each choice set to sum to 1
+      # fitted() returns values that don't properly sum to 1, causing incorrect hit rates
+      choice_totals <- tapply(fitted_vals, chid, sum)
+      normalized_probs <- fitted_vals / choice_totals[as.character(chid)]
+
+      # Verify normalization
+      cat("\n[DEBUG] Normalization fix:\n")
       first_cs <- unique(chid)[1]
-      first_cs_vals <- fitted_probs[chid == first_cs]
-      cat("  First choice set values:", first_cs_vals, "\n")
-      cat("  Sum of first choice set:", sum(first_cs_vals), "\n")
-      cat("  Range of all fitted values:", range(fitted_probs), "\n")
-      cat("  Are these probabilities? Sum should be ~1, range 0-1\n")
+      cat("  Before - sum:", sum(fitted_vals[chid == first_cs]), "\n")
+      cat("  After  - sum:", sum(normalized_probs[chid == first_cs]), "\n")
 
       # For each choice set, find which alternative has max probability
-      # and which was actually chosen
-      predicted_choice <- tapply(fitted_probs, chid, which.max)
+      predicted_choice <- tapply(normalized_probs, chid, which.max)
       actual_choice <- tapply(chosen, chid, which)
 
-      # DEBUG: Print first few to see what we're comparing
-      cat("\n[DEBUG] Hit Rate Calculation:\n")
+      # DEBUG: Show results
+      cat("\n[DEBUG] Hit Rate (WITH FIX):\n")
       cat("  First 10 predicted:", head(predicted_choice, 10), "\n")
       cat("  First 10 actual:   ", head(actual_choice, 10), "\n")
-      cat("  Match?:            ", head(predicted_choice, 10) == head(actual_choice, 10), "\n")
+      cat("  Matches:", sum(head(predicted_choice, 10) == head(actual_choice, 10)), "/ 10\n")
 
       # Count matches
       correct <- sum(predicted_choice == actual_choice, na.rm = TRUE)
       total <- length(unique(chid))
 
-      cat("  Total: ", correct, "correct out of", total, "choice sets\n")
+      cat("  Total: ", correct, "correct out of", total, "choice sets =",
+          sprintf("%.1f%%", 100 * correct / total), "\n")
 
       hit_rate <- correct / total
 
