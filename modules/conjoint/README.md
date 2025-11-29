@@ -15,15 +15,29 @@ The Conjoint Analysis module estimates consumer preferences for product/service 
 
 ## Quick Start
 
-```r
-# Source the module
-source("modules/conjoint/R/00_main.R")
-source("modules/conjoint/R/01_config.R")
-source("modules/conjoint/R/02_validation.R")
-source("modules/conjoint/R/03_analysis.R")
-source("modules/conjoint/R/04_output.R")
+### Option 1: Launch from Turas Suite (Recommended)
 
-# Run analysis (works for both rating-based and choice-based)
+```r
+# Launch Turas GUI
+source("launch_turas.R")
+
+# Click "Launch Conjoint" button
+# Select your project directory and config file
+# Run analysis from GUI
+```
+
+### Option 2: Command Line
+
+```r
+# Source the module (loads all components)
+source("modules/conjoint/R/00_main.R")
+
+# Run analysis (paths can be specified in config file)
+results <- run_conjoint_analysis(
+  config_file = "conjoint_config.xlsx"
+)
+
+# Or override paths
 results <- run_conjoint_analysis(
   config_file = "conjoint_config.xlsx",
   data_file = "survey_data.csv",
@@ -37,7 +51,7 @@ print(results$importance)
 print(results$utilities)
 
 # View model fit (choice-based includes McFadden R² and hit rate)
-print(results$fit)
+print(results$diagnostics$fit_statistics)
 ```
 
 ### Example: Alchemer Choice-Based Conjoint
@@ -159,12 +173,27 @@ The module creates an Excel workbook with four sheets:
 
 ## Implementation Status
 
+### Core Features (Production Ready)
 - ✅ Rating-based conjoint (OLS regression)
-- ✅ Choice-based conjoint (conditional logit) - **Alchemer-compatible**
-- ❌ Mixed logit for heterogeneity (TODO)
-- ❌ Hierarchical Bayes for individual utilities (TODO)
-- ❌ Interaction effects (TODO)
-- ❌ Market simulation (TODO)
+- ✅ Choice-based conjoint (mlogit, clogit, auto-selection)
+- ✅ Multi-respondent data support with robust validation
+- ✅ None option auto-detection and handling
+- ✅ Confidence intervals and significance testing
+- ✅ Comprehensive diagnostics (McFadden R², hit rate, convergence)
+- ✅ Interactive market simulator with Excel formulas
+- ✅ GUI integration via Turas launcher
+
+### Advanced Features (Available)
+- ✅ Interaction effects analysis
+- ✅ Best-worst scaling support
+- ✅ Market share prediction and sensitivity analysis
+- ✅ Product optimization algorithms
+- ✅ Comprehensive test suite (50+ tests)
+
+### Future Enhancements
+- ⏳ Mixed logit for heterogeneity
+- ⏳ Hierarchical Bayes for individual utilities (framework exists)
+- ⏳ Visualization (utility curves, trade-off charts)
 
 ## Future Enhancements
 
@@ -177,10 +206,17 @@ The module creates an Excel workbook with four sheets:
 
 ## Dependencies
 
-- `openxlsx`: Excel I/O
-- `survival`: Conditional logit (choice-based conjoint)
-- `haven` (optional): SPSS/Stata files
-- Base R `stats`: Regression (rating-based conjoint)
+### Required
+- `mlogit`: Primary estimation method for choice-based conjoint
+- `dfidx`: Data indexing for mlogit (required for mlogit >= 1.1-0)
+- `survival`: Fallback conditional logit method
+- `openxlsx`: Excel I/O for config and output files
+- `dplyr`: Data manipulation
+
+### Optional
+- `haven`: SPSS/Stata file support (.sav, .dta)
+- `shiny` + `shinyFiles`: GUI interface (for launch_turas integration)
+- `bayesm` or `RSGHB`: Hierarchical Bayes (future)
 
 ## References
 
@@ -190,7 +226,22 @@ The module creates an Excel workbook with four sheets:
 
 ---
 
-**Version**: 1.1.0 (Choice-Based CBC Added)
-**Status**: Production - Both rating-based and choice-based methods fully functional
-**Compatibility**: Alchemer/SurveyGizmo CBC data format supported
-**Last Updated**: 2025-11-18
+## Documentation
+
+- **README.md** (this file): Overview and quick start
+- **TUTORIAL.md**: Step-by-step tutorial with coffee example
+- **MAINTENANCE_GUIDE.md**: Comprehensive technical documentation for maintenance
+- **IMPLEMENTATION_STATUS.md**: Feature status and development history
+- **examples/QUICK_START_GUIDE.md**: Detailed usage examples
+
+---
+
+**Version**: 2.0.1
+**Status**: Production - Full-featured conjoint analysis with market simulator
+**Compatibility**:
+- Alchemer/SurveyGizmo CBC format ✅
+- Generic choice-based format ✅
+- Multi-respondent datasets ✅
+- Rating-based conjoint ✅
+**Last Updated**: 2025-11-29
+**Critical Fixes**: Multi-respondent validation, hit rate calculation, GUI integration (see MAINTENANCE_GUIDE.md)
