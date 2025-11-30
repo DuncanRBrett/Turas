@@ -393,18 +393,22 @@ run_segment_gui <- function() {
       )
     })
 
-    # Render console output (R 4.2+ compatible)
+    # Render console output (R 4.2+ compatible - EXACT same fix as tracker)
     output$console_text <- renderText({
       current_output <- console_output()
 
-      # R 4.2+ requires single TRUE/FALSE in if conditions
-      # Check length first to avoid "condition has length > 1" error
-      if (length(current_output) == 0 || is.null(current_output)) {
-        return("")
+      # Ensure single string for R 4.2+ compatibility
+      # If vector, collapse it; if empty/NULL, return placeholder
+      if (is.null(current_output) || length(current_output) == 0 || nchar(current_output[1]) == 0) {
+        "Console output will appear here when you run the analysis..."
+      } else {
+        # Ensure it's a single string
+        if (length(current_output) > 1) {
+          paste(current_output, collapse = "\n")
+        } else {
+          current_output
+        }
       }
-
-      # Return the output
-      as.character(current_output)
     })
 
     # Run analysis
