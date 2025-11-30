@@ -182,6 +182,21 @@ run_segment_gui <- function() {
           background: #f5f5f5;
           border-color: #667eea;
         }
+
+        .console-output {
+          background: #1e1e1e;
+          color: #d4d4d4;
+          padding: 20px;
+          border-radius: 8px;
+          font-family: 'Courier New', Consolas, monospace;
+          font-size: 12px;
+          line-height: 1.5;
+          max-height: 500px;
+          overflow-y: auto;
+          margin-top: 15px;
+          white-space: pre-wrap;
+          word-wrap: break-word;
+        }
       "))
     ),
 
@@ -228,6 +243,7 @@ run_segment_gui <- function() {
     # Reactive values
     config_file <- reactiveVal(NULL)
     analysis_result <- reactiveVal(NULL)
+    console_output <- reactiveVal("")  # Store console output
 
     # Setup file browser
     volumes <- c(Home = normalizePath("~"),
@@ -377,39 +393,87 @@ run_segment_gui <- function() {
       )
     })
 
+    # Render console output
+    output$console_text <- renderText({
+      console_output()
+    })
+
     # Run analysis
     observeEvent(input$run_analysis_btn, {
       req(config_file())
+
+      # Clear previous console output
+      console_output("")
 
       # Show progress
       withProgress(message = 'Running segmentation analysis...', value = 0, {
 
         incProgress(0.1, detail = "Loading configuration")
 
-        tryCatch({
+        # Capture console output using sink
+        output_file <- tempfile()
+        sink(output_file, type = "output")
+
+        analysis_result_data <- tryCatch({
           # Change working directory to Turas root
           setwd(turas_root)
 
           incProgress(0.2, detail = "Preparing data")
 
           # Run segmentation
-          result <- turas_segment_from_config(config_file(), verbose = FALSE)
+          result <- turas_segment_from_config(config_file(), verbose = TRUE)
 
           incProgress(0.9, detail = "Finalizing")
 
-          # Store result
-          analysis_result(result)
+          list(success = TRUE, result = result)
 
-          incProgress(1.0, detail = "Complete!")
+        }, error = function(e) {
+          list(success = FALSE, error = e$message)
+
+        }, finally = {
+          # Always restore console output
+          sink(type = "output")
+        })
+
+        # Read captured output
+        captured_output <- readLines(output_file, warn = FALSE)
+        unlink(output_file)
+
+        # Update console display
+        if (length(captured_output) > 0) {
+          console_output(paste(captured_output, collapse = "\n"))
+        }
+
+        incProgress(1.0, detail = "Complete!")
+
+        # Handle success or error
+        if (analysis_result_data$success) {
+          # Store successful result
+          analysis_result(analysis_result_data$result)
+
+          # Append completion message to console
+          console_output(paste0(
+            console_output(),
+            sprintf("\n\n%s\n✓ ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80))
+          ))
 
           showNotification("Segmentation analysis completed successfully!",
                           type = "message", duration = 5)
 
-        }, error = function(e) {
-          showNotification(paste("Error:", e$message),
+        } else {
+          # Store error result
+          analysis_result(list(error = analysis_result_data$error))
+
+          # Append error to console
+          console_output(paste0(
+            console_output(),
+            sprintf("\n\n%s\nERROR\n%s\n%s\n",
+                   strrep("=", 80), strrep("=", 80), analysis_result_data$error)
+          ))
+
+          showNotification(paste("Error:", analysis_result_data$error),
                           type = "error", duration = 10)
-          analysis_result(list(error = e$message))
-        })
+        }
       })
     })
 
@@ -427,7 +491,16 @@ run_segment_gui <- function() {
             strong("✗ Analysis Failed"), br(),
             hr(style = "margin: 10px 0;"),
             result$error
-          )
+          ),
+          # Show console output
+          if (nchar(console_output()) > 0) {
+            div(
+              h4("Console Output:", style = "margin-top: 20px;"),
+              div(class = "console-output",
+                verbatimTextOutput("console_text")
+              )
+            )
+          }
         )
       } else {
         # Success
@@ -476,7 +549,17 @@ run_segment_gui <- function() {
           br(),
           actionButton("open_output_btn", "Open Output Folder",
                       class = "btn btn-primary",
-                      icon = icon("folder-open"))
+                      icon = icon("folder-open")),
+
+          # Show console output
+          if (nchar(console_output()) > 0) {
+            div(
+              h4("Console Output:", style = "margin-top: 30px;"),
+              div(class = "console-output",
+                verbatimTextOutput("console_text")
+              )
+            )
+          }
         )
       }
     })
