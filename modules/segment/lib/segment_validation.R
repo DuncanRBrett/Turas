@@ -296,7 +296,7 @@ calculate_exploration_metrics <- function(exploration_result) {
     model <- models[[k_str]]
     
     # Calculate silhouette
-    sil <- silhouette(model$cluster, dist(data))
+    sil <- cluster::silhouette(model$cluster, dist(data))
     avg_sil <- mean(sil[, 3])
     
     # Get segment sizes
