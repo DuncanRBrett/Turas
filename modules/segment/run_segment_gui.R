@@ -513,26 +513,13 @@ run_segment_gui <- function() {
 
       result <- analysis_result()
 
-      # Always show console output section if there is output (R 4.2+ compatible)
-      current_console <- console_output()
-      # Check if we have actual output (not just empty string from initialization)
-      has_output <- tryCatch({
-        !is.null(current_console) &&
-        length(current_console) > 0 &&
-        isTRUE(current_console != "") &&
-        isTRUE(nchar(current_console) > 0)
-      }, error = function(e) FALSE)
-
-      console_section <- if (isTRUE(has_output)) {
-        div(
-          h4("Console Output:", style = "margin-top: 20px;"),
-          div(class = "console-output",
-            verbatimTextOutput("console_text")
-          )
+      # Always show console output section (simplified for stability)
+      console_section <- div(
+        h4("Console Output:", style = "margin-top: 20px;"),
+        div(class = "console-output",
+          verbatimTextOutput("console_text")
         )
-      } else {
-        NULL
-      }
+      )
 
       if (!is.null(result$error)) {
         # Error occurred
