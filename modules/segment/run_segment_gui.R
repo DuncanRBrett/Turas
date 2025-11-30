@@ -229,7 +229,15 @@ run_segment_gui <- function() {
       # Step 3: Run Analysis
       uiOutput("run_button_ui"),
 
-      # Step 4: Results
+      # Step 4: Console Output (static UI - always visible, like tracker)
+      div(class = "step-card",
+        div(class = "step-title", "Step 4: Console Output"),
+        div(class = "console-output",
+          verbatimTextOutput("console_text")
+        )
+      ),
+
+      # Step 5: Results
       uiOutput("results_ui")
     )
   )
@@ -513,33 +521,23 @@ run_segment_gui <- function() {
 
       result <- analysis_result()
 
-      # Always show console output section (simplified for stability)
-      console_section <- div(
-        h4("Console Output:", style = "margin-top: 20px;"),
-        div(class = "console-output",
-          verbatimTextOutput("console_text")
-        )
-      )
-
       if (!is.null(result$error)) {
         # Error occurred
         div(class = "step-card",
-          div(class = "step-title", "Step 4: Results"),
+          div(class = "step-title", "Step 5: Results"),
           div(class = "error-box",
             strong("✗ Analysis Error"), br(),
             hr(style = "margin: 10px 0;"),
             p(strong("Error Details:")),
             p(style = "font-family: monospace; white-space: pre-wrap;", result$error),
             hr(style = "margin: 10px 0;"),
-            p(strong("Note:"), " Check console output below for details. Output files may still have been generated - check your output folder.")
-          ),
-          # Always show console output for errors
-          console_section
+            p(strong("Note:"), " Check console output above for details. Output files may still have been generated - check your output folder.")
+          )
         )
       } else {
         # Success
         div(class = "step-card",
-          div(class = "step-title", "Step 4: Results"),
+          div(class = "step-title", "Step 5: Results"),
 
           div(class = "success-box",
             strong("✓ Analysis Complete!"), br(),
@@ -583,10 +581,7 @@ run_segment_gui <- function() {
           br(),
           actionButton("open_output_btn", "Open Output Folder",
                       class = "btn btn-primary",
-                      icon = icon("folder-open")),
-
-          # Show console output (using shared section)
-          console_section
+                      icon = icon("folder-open"))
         )
       }
     })
