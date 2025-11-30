@@ -426,28 +426,25 @@ run_segment_gui <- function() {
       # Clear previous console output
       console_output("")
 
-      # Show progress
-      withProgress(message = 'Running segmentation analysis...', value = 0, {
+      # Create progress indicator (like tracker - NOT withProgress!)
+      progress <- Progress$new(session)
+      progress$set(message = "Running segmentation analysis", value = 0)
+      on.exit(progress$close())
 
-        incProgress(0.1, detail = "Loading configuration")
+      # Change working directory to Turas root
+      old_wd <- getwd()
+      setwd(turas_root)
 
-        # Capture console output using sink (both stdout and stderr)
-        output_file <- tempfile()
-        error_file <- tempfile()
-        sink(output_file, type = "output")
-        sink(error_file, type = "message")
+      tryCatch({
+        progress$set(value = 0.3, detail = "Running analysis...")
+
+        # Capture console output using sink (stdout only like tracker)
+        output_capture_file <- tempfile()
+        sink(output_capture_file, type = "output")
 
         analysis_result_data <- tryCatch({
-          # Change working directory to Turas root
-          setwd(turas_root)
-
-          incProgress(0.2, detail = "Preparing data")
-
           # Run segmentation
           result <- turas_segment_from_config(config_file(), verbose = TRUE)
-
-          incProgress(0.9, detail = "Finalizing")
-
           list(success = TRUE, result = result)
 
         }, error = function(e) {
@@ -461,28 +458,22 @@ run_segment_gui <- function() {
           list(success = FALSE, error = error_msg)
 
         }, finally = {
-          # Always restore console output (both streams)
+          # Always restore console output
           sink(type = "output")
-          sink(type = "message")
         })
 
-        # Read captured output from both streams
-        captured_stdout <- readLines(output_file, warn = FALSE)
-        captured_stderr <- readLines(error_file, warn = FALSE)
-        unlink(output_file)
-        unlink(error_file)
+        progress$set(value = 0.9, detail = "Finalizing...")
 
-        # Combine output from both streams
-        all_output <- c(captured_stdout, captured_stderr)
+        # Read captured output (available even if error occurred)
+        captured_output <- readLines(output_capture_file, warn = FALSE)
+        unlink(output_capture_file)
 
-        # Update console display
-        if (length(all_output) > 0) {
-          console_output(paste(all_output, collapse = "\n"))
+        # Display captured output in console
+        if (length(captured_output) > 0) {
+          console_output(paste(captured_output, collapse = "\n"))
         } else {
           console_output("Analysis completed but produced no console output.")
         }
-
-        incProgress(1.0, detail = "Complete!")
 
         # Handle success or error
         if (analysis_result_data$success) {
@@ -495,6 +486,7 @@ run_segment_gui <- function() {
             sprintf("\n\n%s\n✓ ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80))
           ))
 
+          progress$set(value = 1.0, detail = "Complete!")
           showNotification("Segmentation analysis completed successfully!",
                           type = "message", duration = 5)
 
@@ -512,6 +504,16 @@ run_segment_gui <- function() {
           showNotification(paste("Error:", analysis_result_data$error),
                           type = "error", duration = 10)
         }
+
+      }, error = function(e) {
+        # Top-level error handler
+        error_msg <- paste0(strrep("=", 80), "\nERROR: ", e$message, "\n", strrep("=", 80))
+        console_output(paste0(console_output(), "\n\n", error_msg))
+        showNotification(paste("Error:", e$message), type = "error", duration = 10)
+
+      }, finally = {
+        # Restore original working directory
+        setwd(old_wd)
       })
     })
 
