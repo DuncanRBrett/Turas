@@ -419,9 +419,11 @@ run_segment_gui <- function() {
 
         incProgress(0.1, detail = "Loading configuration")
 
-        # Capture console output using sink
+        # Capture console output using sink (both stdout and stderr)
         output_file <- tempfile()
+        error_file <- tempfile()
         sink(output_file, type = "output")
+        sink(error_file, type = "message")
 
         analysis_result_data <- tryCatch({
           # Change working directory to Turas root
@@ -447,17 +449,25 @@ run_segment_gui <- function() {
           list(success = FALSE, error = error_msg)
 
         }, finally = {
-          # Always restore console output
+          # Always restore console output (both streams)
           sink(type = "output")
+          sink(type = "message")
         })
 
-        # Read captured output
-        captured_output <- readLines(output_file, warn = FALSE)
+        # Read captured output from both streams
+        captured_stdout <- readLines(output_file, warn = FALSE)
+        captured_stderr <- readLines(error_file, warn = FALSE)
         unlink(output_file)
+        unlink(error_file)
+
+        # Combine output from both streams
+        all_output <- c(captured_stdout, captured_stderr)
 
         # Update console display
-        if (length(captured_output) > 0) {
-          console_output(paste(captured_output, collapse = "\n"))
+        if (length(all_output) > 0) {
+          console_output(paste(all_output, collapse = "\n"))
+        } else {
+          console_output("Analysis completed but produced no console output.")
         }
 
         incProgress(1.0, detail = "Complete!")
