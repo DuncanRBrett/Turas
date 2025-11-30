@@ -196,8 +196,8 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
     profile_result <- create_full_segment_profile(
       data = data_list$data,
       clusters = final_result$clusters,
-      clustering_vars = config$clustering_vars,
-      profile_vars = config$profile_vars
+      clustering_vars = data_list$config$clustering_vars,  # Use selected vars
+      profile_vars = data_list$config$profile_vars  # Use updated config
     )
 
     # Generate segment names
@@ -257,13 +257,13 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
         clusters = final_result$clusters,
         centers = final_result$model$centers,  # Add centers for scoring
         segment_names = segment_names,
-        clustering_vars = config$clustering_vars,
+        clustering_vars = data_list$config$clustering_vars,  # Use selected vars, not original
         id_variable = config$id_variable,
         scale_params = data_list$scale_params,
         imputation_params = data_list$imputation_params,  # Add for scoring consistency
         original_distribution = segment_dist,  # Add for drift monitoring
         seed = seed_used,  # Add for reproducibility
-        config = config,
+        config = data_list$config,  # Use updated config with selected vars
         timestamp = Sys.time(),
         date_created = Sys.time(),
         turas_version = "1.0"
