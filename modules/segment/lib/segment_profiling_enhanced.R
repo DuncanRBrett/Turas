@@ -10,6 +10,11 @@
 #' Performs ANOVA/Kruskal-Wallis tests to determine which variables
 #' significantly differentiate segments
 #'
+#' IMPORTANT NOTE: P-values are DESCRIPTIVE, not inferential. Since segments
+#' are defined using these variables (or correlates), statistical tests are
+#' used for exploration and ranking, not hypothesis testing. Focus on effect
+#' sizes (Cohen's d, eta-squared) and practical significance.
+#'
 #' @param data Data frame with all variables
 #' @param clusters Integer vector of segment assignments
 #' @param variables Character vector of variables to test
@@ -22,6 +27,9 @@ test_segment_differences <- function(data, clusters, variables, alpha = 0.05) {
   cat(rep("=", 80), "\n", sep = "")
   cat("STATISTICAL SIGNIFICANCE TESTS\n")
   cat(rep("=", 80), "\n", sep = "")
+  cat("\n")
+  cat("NOTE: P-values are DESCRIPTIVE (exploratory), not inferential.\n")
+  cat("      Focus on effect sizes for practical interpretation.\n")
   cat("\n")
 
   results <- data.frame(

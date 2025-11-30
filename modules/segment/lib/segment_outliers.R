@@ -119,6 +119,26 @@ detect_outliers_mahalanobis <- function(data, clustering_vars, alpha = 0.001) {
 
   cluster_data_complete <- cluster_data[complete_cases, , drop = FALSE]
 
+  # CRITICAL GUARDRAIL: Check sample size vs. number of variables
+  # Mahalanobis requires n > p for non-singular covariance matrix
+  # Conservative rule: require n >= 5*p for stable estimation
+  n <- nrow(cluster_data_complete)
+  p <- ncol(cluster_data_complete)
+
+  if (n < 3 * p) {
+    stop(sprintf(
+      "Mahalanobis distance requires more observations relative to variables.\n  Observations (n): %d\n  Variables (p): %d\n  Minimum required: %d (3 * p)\n  Recommended: %d (5 * p)\n\nOptions:\n  1. Use 'z_score' outlier method instead\n  2. Reduce number of clustering variables\n  3. Increase sample size",
+      n, p, 3 * p, 5 * p
+    ), call. = FALSE)
+  }
+
+  if (n < 5 * p) {
+    warning(sprintf(
+      "Mahalanobis distance may be unstable with n=%d and p=%d.\n  Recommended: n >= %d (5 * p)\n  Consider using 'z_score' method or reducing variables.",
+      n, p, 5 * p
+    ), call. = FALSE)
+  }
+
   # Calculate center and covariance
   center <- colMeans(cluster_data_complete)
   cov_matrix <- cov(cluster_data_complete)
@@ -205,7 +225,15 @@ handle_outliers <- function(data, outlier_flags, handling = "flag") {
   } else if (handling == "remove") {
     # Remove outliers from data
     if (n_outliers > 0) {
-      result$data <- data[!outlier_flags, , drop = FALSE]
+      # DEFENSIVE: Handle NA values in outlier_flags
+      # Keep rows where outlier_flags is FALSE (not TRUE and not NA)
+      keep_rows <- !isTRUE(outlier_flags)
+      # Alternative: keep_rows <- isFALSE(outlier_flags) - only keeps explicit FALSE
+      # We use !isTRUE() to keep both FALSE and NA rows, then remove NAs explicitly
+      keep_rows <- outlier_flags == FALSE
+      keep_rows[is.na(keep_rows)] <- FALSE  # Treat NA as "don't keep"
+
+      result$data <- data[keep_rows, , drop = FALSE]
       result$removed <- TRUE
       result$message <- sprintf(
         "Found %d potential outliers (%.1f%%). Removed from clustering.",

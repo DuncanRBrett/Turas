@@ -50,6 +50,8 @@ score_new_data <- function(model_file, new_data, id_variable, output_file = NULL
   clustering_vars <- model_data$clustering_vars
   centers <- model_data$centers
   segment_names <- model_data$segment_names
+  scale_params <- model_data$scale_params
+  imputation_params <- model_data$imputation_params
 
   cat(sprintf("✓ Model loaded successfully\n"))
   cat(sprintf("  Segments: %d\n", nrow(centers)))
@@ -110,18 +112,60 @@ score_new_data <- function(model_file, new_data, id_variable, output_file = NULL
       scoring_data <- scoring_data[complete_rows, ]
       new_data <- new_data[complete_rows, ]
       cat(sprintf("  Removed %d incomplete cases\n", rows_before - nrow(scoring_data)))
+
     } else if (missing_method == "mean_imputation") {
-      for (var in vars_with_missing) {
-        mean_val <- mean(scoring_data[[var]], na.rm = TRUE)
-        scoring_data[[var]][is.na(scoring_data[[var]])] <- mean_val
+      # Use saved training means for consistency
+      if (!is.null(imputation_params) && !is.null(imputation_params$means)) {
+        cat(sprintf("  Using training data means for imputation\n"))
+        for (var in vars_with_missing) {
+          if (var %in% names(imputation_params$means)) {
+            mean_val <- imputation_params$means[[var]]
+            scoring_data[[var]][is.na(scoring_data[[var]])] <- mean_val
+            cat(sprintf("    %s: mean = %.3f\n", var, mean_val))
+          } else {
+            warning(sprintf("No saved mean for variable '%s', using current batch mean", var),
+                   call. = FALSE)
+            mean_val <- mean(scoring_data[[var]], na.rm = TRUE)
+            scoring_data[[var]][is.na(scoring_data[[var]])] <- mean_val
+          }
+        }
+      } else {
+        # Fallback to batch means (with warning)
+        warning("Model does not contain saved imputation parameters. Using current batch means.",
+               call. = FALSE)
+        for (var in vars_with_missing) {
+          mean_val <- mean(scoring_data[[var]], na.rm = TRUE)
+          scoring_data[[var]][is.na(scoring_data[[var]])] <- mean_val
+        }
+        cat(sprintf("  Imputed missing values with batch means\n"))
       }
-      cat(sprintf("  Imputed missing values with means\n"))
+
     } else if (missing_method == "median_imputation") {
-      for (var in vars_with_missing) {
-        median_val <- median(scoring_data[[var]], na.rm = TRUE)
-        scoring_data[[var]][is.na(scoring_data[[var]])] <- median_val
+      # Use saved training medians for consistency
+      if (!is.null(imputation_params) && !is.null(imputation_params$medians)) {
+        cat(sprintf("  Using training data medians for imputation\n"))
+        for (var in vars_with_missing) {
+          if (var %in% names(imputation_params$medians)) {
+            median_val <- imputation_params$medians[[var]]
+            scoring_data[[var]][is.na(scoring_data[[var]])] <- median_val
+            cat(sprintf("    %s: median = %.3f\n", var, median_val))
+          } else {
+            warning(sprintf("No saved median for variable '%s', using current batch median", var),
+                   call. = FALSE)
+            median_val <- median(scoring_data[[var]], na.rm = TRUE)
+            scoring_data[[var]][is.na(scoring_data[[var]])] <- median_val
+          }
+        }
+      } else {
+        # Fallback to batch medians (with warning)
+        warning("Model does not contain saved imputation parameters. Using current batch medians.",
+               call. = FALSE)
+        for (var in vars_with_missing) {
+          median_val <- median(scoring_data[[var]], na.rm = TRUE)
+          scoring_data[[var]][is.na(scoring_data[[var]])] <- median_val
+        }
+        cat(sprintf("  Imputed missing values with batch medians\n"))
       }
-      cat(sprintf("  Imputed missing values with medians\n"))
     }
   }
 
@@ -132,8 +176,33 @@ score_new_data <- function(model_file, new_data, id_variable, output_file = NULL
   # Standardize if model was standardized
   if (config$standardize) {
     cat("\nStandardizing variables...\n")
-    scoring_data_scaled <- scale(scoring_data)
-    cat("✓ Variables standardized\n")
+
+    # CRITICAL: Use saved training scale parameters, not batch parameters
+    if (is.null(scale_params) ||
+        is.null(scale_params$center) ||
+        is.null(scale_params$scale)) {
+      stop("Model was standardized, but no scale parameters were found in the saved model.",
+           call. = FALSE)
+    }
+
+    # Align scale parameters with clustering variables
+    scale_center <- scale_params$center[clustering_vars]
+    scale_scale <- scale_params$scale[clustering_vars]
+
+    # Safety check for missing parameters
+    if (any(is.na(scale_center)) || any(is.na(scale_scale))) {
+      stop("Scale parameters are missing for one or more clustering variables.",
+           call. = FALSE)
+    }
+
+    # Apply training standardization parameters to new data
+    scoring_data_scaled <- scale(
+      scoring_data,
+      center = scale_center,
+      scale = scale_scale
+    )
+
+    cat("✓ Variables standardized using training scale parameters\n")
   } else {
     scoring_data_scaled <- as.matrix(scoring_data)
   }

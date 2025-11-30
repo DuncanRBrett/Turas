@@ -210,7 +210,7 @@ validate_segment_config <- function(config) {
 
   k_min <- get_numeric_config(config, "k_min", default_value = 3, min = 2, max = 10)
   k_max <- get_numeric_config(config, "k_max", default_value = 6, min = 2, max = 15)
-  nstart <- get_numeric_config(config, "nstart", default_value = 25, min = 1, max = 100)
+  nstart <- get_numeric_config(config, "nstart", default_value = 50, min = 1, max = 200)
   seed <- get_numeric_config(config, "seed", default_value = 123, min = 1)
 
   # Validate k relationships

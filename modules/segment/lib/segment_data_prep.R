@@ -229,6 +229,13 @@ handle_missing_data <- function(data_list) {
   # Apply missing data strategy
   cat(sprintf("\nApplying strategy: %s\n", config$missing_data))
 
+  # Initialize imputation parameters storage
+  imputation_params <- list(
+    method = config$missing_data,
+    means = NULL,
+    medians = NULL
+  )
+
   if (config$missing_data == "listwise_deletion") {
     # Remove rows with any missing data
     keep_rows <- complete.cases(clustering_data)
@@ -245,31 +252,44 @@ handle_missing_data <- function(data_list) {
                 (nrow(data_list$data) / data_list$n_original) * 100))
 
   } else if (config$missing_data == "mean_imputation") {
-    # Impute with column means
+    # Impute with column means and save parameters
+    imputation_means <- list()
+
     for (col in names(clustering_data)) {
+      col_mean <- mean(clustering_data[[col]], na.rm = TRUE)
+      imputation_means[[col]] <- col_mean
+
       na_idx <- is.na(clustering_data[[col]])
       if (any(na_idx)) {
-        col_mean <- mean(clustering_data[[col]], na.rm = TRUE)
         clustering_data[[col]][na_idx] <- col_mean
         cat(sprintf("  Imputed %d values in %s (mean = %.2f)\n",
                     sum(na_idx), col, col_mean))
       }
     }
     data_list$clustering_data <- clustering_data
+    imputation_params$means <- imputation_means
 
   } else if (config$missing_data == "median_imputation") {
-    # Impute with column medians
+    # Impute with column medians and save parameters
+    imputation_medians <- list()
+
     for (col in names(clustering_data)) {
+      col_median <- median(clustering_data[[col]], na.rm = TRUE)
+      imputation_medians[[col]] <- col_median
+
       na_idx <- is.na(clustering_data[[col]])
       if (any(na_idx)) {
-        col_median <- median(clustering_data[[col]], na.rm = TRUE)
         clustering_data[[col]][na_idx] <- col_median
         cat(sprintf("  Imputed %d values in %s (median = %.2f)\n",
                     sum(na_idx), col, col_median))
       }
     }
     data_list$clustering_data <- clustering_data
+    imputation_params$medians <- imputation_medians
   }
+
+  # Store imputation parameters for scoring consistency
+  data_list$imputation_params <- imputation_params
 
   return(data_list)
 }
@@ -355,8 +375,13 @@ detect_and_handle_outliers <- function(data_list) {
     return(data_list)
   }
 
-  # Prepare standardized data as data frame
-  scaled_df <- as.data.frame(data_list$scaled_data)
+  # IMPORTANT: Outlier detection now happens BEFORE standardization
+  # We need to standardize the data temporarily for outlier detection,
+  # then the final standardization will happen later on clean data
+
+  # Temporarily standardize clustering data for outlier detection
+  temp_scaled <- scale(data_list$clustering_data, center = TRUE, scale = TRUE)
+  scaled_df <- as.data.frame(temp_scaled)
   colnames(scaled_df) <- config$clustering_vars
 
   # Detect outliers based on method
@@ -402,7 +427,8 @@ detect_and_handle_outliers <- function(data_list) {
     if (!is.null(data_list$profile_data)) {
       data_list$profile_data <- data_list$profile_data[keep_rows, ]
     }
-    data_list$scaled_data <- data_list$scaled_data[keep_rows, , drop = FALSE]
+    # NOTE: scaled_data doesn't exist yet - it will be created later in standardize_data()
+    # This is correct because outliers are now removed BEFORE standardization
 
     # Update outlier flags to reflect remaining records
     data_list$outlier_flags <- rep(FALSE, nrow(data_list$data))
@@ -514,14 +540,20 @@ prepare_segment_data <- function(config) {
   # Perform variable selection (if enabled)
   data_list <- perform_variable_selection(data_list)
 
-  # Handle missing data
+  # CRITICAL ORDER OF OPERATIONS:
+  # 1. Handle missing data first
+  # 2. Detect and handle outliers (on raw data)
+  # 3. Standardize AFTER outliers are handled (so z-scores are correct)
+  # This ensures scale parameters are calculated on clean data
+
+  # 1. Handle missing data
   data_list <- handle_missing_data(data_list)
 
-  # Standardize
-  data_list <- standardize_data(data_list)
-
-  # Detect and handle outliers
+  # 2. Detect and handle outliers (BEFORE standardization)
   data_list <- detect_and_handle_outliers(data_list)
+
+  # 3. Standardize (AFTER outliers removed, so scale params are correct)
+  data_list <- standardize_data(data_list)
 
   # Quality checks
   data_list <- pre_clustering_checks(data_list)

@@ -22,6 +22,7 @@ source(file.path(turas_root, "modules/shared/lib/data_utils.R"))
 source(file.path(turas_root, "modules/shared/lib/logging_utils.R"))
 
 # Segmentation modules - use absolute paths
+source(file.path(turas_root, "modules/segment/lib/segment_utils.R"))
 source(file.path(turas_root, "modules/segment/lib/segment_config.R"))
 source(file.path(turas_root, "modules/segment/lib/segment_data_prep.R"))
 source(file.path(turas_root, "modules/segment/lib/segment_kmeans.R"))
@@ -74,6 +75,9 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
   # Read and validate configuration
   config_raw <- read_segment_config(config_file)
   config <- validate_segment_config(config_raw)
+
+  # Set seed for reproducibility
+  seed_used <- set_segmentation_seed(config)
 
   # Prepare data
   data_list <- prepare_segment_data(config)
@@ -256,7 +260,9 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
         clustering_vars = config$clustering_vars,
         id_variable = config$id_variable,
         scale_params = data_list$scale_params,
+        imputation_params = data_list$imputation_params,  # Add for scoring consistency
         original_distribution = segment_dist,  # Add for drift monitoring
+        seed = seed_used,  # Add for reproducibility
         config = config,
         timestamp = Sys.time(),
         date_created = Sys.time(),

@@ -13,10 +13,11 @@
 #' @param clustering_vars Character vector of clustering variable names
 #' @param k Number of segments
 #' @param n_bootstrap Number of bootstrap iterations (default: 100)
+#' @param nstart Number of random starts for k-means (default: 25)
 #' @param seed Random seed for reproducibility
 #' @return List with stability metrics
 #' @export
-assess_segment_stability <- function(data, clustering_vars, k, n_bootstrap = 100, seed = 123) {
+assess_segment_stability <- function(data, clustering_vars, k, n_bootstrap = 100, nstart = 25, seed = 123) {
 
   cat("\n")
   cat(rep("=", 80), "\n", sep = "")
@@ -43,7 +44,7 @@ assess_segment_stability <- function(data, clustering_vars, k, n_bootstrap = 100
     boot_data <- clustering_data[boot_idx, ]
 
     # Cluster
-    boot_model <- kmeans(scale(boot_data), centers = k, nstart = 25)
+    boot_model <- kmeans(scale(boot_data), centers = k, nstart = nstart)
 
     # Map back to original indices
     bootstrap_assignments[boot_idx, i] <- boot_model$cluster
