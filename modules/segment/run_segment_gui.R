@@ -393,9 +393,18 @@ run_segment_gui <- function() {
       )
     })
 
-    # Render console output
+    # Render console output (R 4.2+ compatible)
     output$console_text <- renderText({
-      console_output()
+      current_output <- console_output()
+
+      # R 4.2+ requires single TRUE/FALSE in if conditions
+      # Check length first to avoid "condition has length > 1" error
+      if (length(current_output) == 0 || is.null(current_output)) {
+        return("")
+      }
+
+      # Return the output
+      as.character(current_output)
     })
 
     # Run analysis
@@ -490,8 +499,13 @@ run_segment_gui <- function() {
 
       result <- analysis_result()
 
-      # Always show console output section if there is output
-      console_section <- if (nchar(console_output()) > 0) {
+      # Always show console output section if there is output (R 4.2+ compatible)
+      current_console <- console_output()
+      has_output <- length(current_console) > 0 &&
+                    !is.null(current_console) &&
+                    nchar(current_console[1]) > 0
+
+      console_section <- if (has_output) {
         div(
           h4("Console Output:", style = "margin-top: 20px;"),
           div(class = "console-output",
