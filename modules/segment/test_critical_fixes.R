@@ -96,8 +96,8 @@ cat(rep("-", 80), "\n", sep = "")
 set.seed(123)
 data_with_outliers <- data.frame(
   id = 1:50,
-  var1 = c(rnorm(45, mean = 5, sd = 1), rep(100, 5)),  # 5 extreme outliers
-  var2 = c(rnorm(45, mean = 10, sd = 2), rep(200, 5))
+  var1 = c(rnorm(45, mean = 5, sd = 1), rep(500, 5)),  # 5 VERY extreme outliers
+  var2 = c(rnorm(45, mean = 10, sd = 2), rep(1000, 5))  # Must be extreme enough to exceed z>3
 )
 
 # Mock config for testing
