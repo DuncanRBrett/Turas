@@ -428,7 +428,14 @@ run_segment_gui <- function() {
           list(success = TRUE, result = result)
 
         }, error = function(e) {
-          list(success = FALSE, error = e$message)
+          # Capture detailed error information
+          error_msg <- paste0(
+            e$message,
+            "\n\nError Type: ", class(e)[1],
+            "\n\nCall Stack:\n",
+            paste(deparse(e$call), collapse = "\n")
+          )
+          list(success = FALSE, error = error_msg)
 
         }, finally = {
           # Always restore console output
@@ -483,24 +490,32 @@ run_segment_gui <- function() {
 
       result <- analysis_result()
 
+      # Always show console output section if there is output
+      console_section <- if (nchar(console_output()) > 0) {
+        div(
+          h4("Console Output:", style = "margin-top: 20px;"),
+          div(class = "console-output",
+            verbatimTextOutput("console_text")
+          )
+        )
+      } else {
+        NULL
+      }
+
       if (!is.null(result$error)) {
         # Error occurred
         div(class = "step-card",
           div(class = "step-title", "Step 4: Results"),
           div(class = "error-box",
-            strong("✗ Analysis Failed"), br(),
+            strong("✗ Analysis Error"), br(),
             hr(style = "margin: 10px 0;"),
-            result$error
+            p(strong("Error Details:")),
+            p(style = "font-family: monospace; white-space: pre-wrap;", result$error),
+            hr(style = "margin: 10px 0;"),
+            p(strong("Note:"), " Check console output below for details. Output files may still have been generated - check your output folder.")
           ),
-          # Show console output
-          if (nchar(console_output()) > 0) {
-            div(
-              h4("Console Output:", style = "margin-top: 20px;"),
-              div(class = "console-output",
-                verbatimTextOutput("console_text")
-              )
-            )
-          }
+          # Always show console output for errors
+          console_section
         )
       } else {
         # Success
@@ -551,15 +566,8 @@ run_segment_gui <- function() {
                       class = "btn btn-primary",
                       icon = icon("folder-open")),
 
-          # Show console output
-          if (nchar(console_output()) > 0) {
-            div(
-              h4("Console Output:", style = "margin-top: 30px;"),
-              div(class = "console-output",
-                verbatimTextOutput("console_text")
-              )
-            )
-          }
+          # Show console output (using shared section)
+          console_section
         )
       }
     })
