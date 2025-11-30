@@ -511,11 +511,15 @@ run_segment_gui <- function() {
 
       # Always show console output section if there is output (R 4.2+ compatible)
       current_console <- console_output()
-      has_output <- length(current_console) > 0 &&
-                    !is.null(current_console) &&
-                    nchar(current_console[1]) > 0
+      # Check if we have actual output (not just empty string from initialization)
+      has_output <- tryCatch({
+        !is.null(current_console) &&
+        length(current_console) > 0 &&
+        isTRUE(current_console != "") &&
+        isTRUE(nchar(current_console) > 0)
+      }, error = function(e) FALSE)
 
-      console_section <- if (has_output) {
+      console_section <- if (isTRUE(has_output)) {
         div(
           h4("Console Output:", style = "margin-top: 20px;"),
           div(class = "console-output",
