@@ -46,6 +46,20 @@ initialize_segmentation_project(
 
 ### Step 3: Run Segmentation
 
+**Option A: Use the GUI (Recommended)**
+```r
+source("modules/segment/run_segment_gui.R")
+run_segment_gui()
+```
+
+Then:
+1. Click "Select Config File" → browse to your config
+2. Click "Validate Configuration"
+3. Click "Run Segmentation Analysis"
+4. **Watch the console output** for real-time progress
+5. View results when complete
+
+**Option B: Use Command Line**
 ```r
 source("modules/segment/run_segment.R")
 result <- turas_segment_from_config("path/to/your_config.xlsx")
@@ -70,6 +84,35 @@ After running, you'll find these files in your output folder:
 
 ## Example Workflow
 
+**Using GUI (Easiest):**
+```r
+# 1. Launch GUI
+source("modules/segment/run_segment_gui.R")
+run_segment_gui()
+
+# 2. In GUI:
+#    - Select your exploration config
+#    - Click Validate → Run
+#    - Watch console output for progress
+#    - Review results to choose k
+
+# 3. Edit config: set k_fixed = 4 (your chosen k)
+
+# 4. In GUI:
+#    - Select your final config
+#    - Click Validate → Run
+#    - Download results
+
+# 5. Score new data with saved model
+source("modules/segment/lib/segment_scoring.R")
+new_scores <- score_new_data(
+  model_file = "output/seg_model.rds",
+  new_data = new_survey_data,
+  id_variable = "respondent_id"
+)
+```
+
+**Using Command Line (Advanced):**
 ```r
 # 1. Load module
 source("modules/segment/run_segment.R")

@@ -4,9 +4,160 @@
 
 ---
 
-## Workflow 1: First-Time Segmentation (Exploration → Final)
+## Workflow 0: GUI-Based Segmentation (Easiest - Start Here!)
 
-**Scenario**: You've never segmented this customer base before and need to find the optimal number of segments.
+**Scenario**: You want to use the GUI interface with real-time console output for easy interaction.
+
+**Best For**: First-time users, interactive exploration, visual feedback during analysis
+
+### Step 1: Launch the GUI
+
+```r
+source("modules/segment/run_segment_gui.R")
+run_segment_gui()
+```
+
+The GUI window opens in your browser.
+
+### Step 2: Select and Validate Configuration
+
+**In the GUI:**
+1. Click **"Browse..."** under Step 1
+2. Navigate to your configuration file (e.g., `config/customer_segmentation.xlsx`)
+3. Click **"Validate Configuration"** button
+4. Wait for green checkmark ✓ or fix any red error messages
+
+### Step 3: Run Exploration Analysis
+
+1. Click **"Run Segmentation Analysis"** button
+2. **Watch the Console Output** (Step 4) for real-time progress:
+
+```
+========================================
+TURAS SEGMENTATION ANALYSIS
+========================================
+Started: 2025-12-01 14:23:15
+
+[1/6] Loading configuration...
+✓ Configuration loaded successfully
+Mode: Exploration (testing k = 3 to 6)
+
+[2/6] Loading and preparing data...
+✓ Data loaded: 350 rows, 12 columns
+✓ All clustering variables present
+
+[3/6] Running k-means clustering...
+Testing k=3... Silhouette: 0.42
+Testing k=4... Silhouette: 0.51  ← Highest
+Testing k=5... Silhouette: 0.48
+Testing k=6... Silhouette: 0.39
+
+[4/6] Creating segment profiles...
+[5/6] Generating visualizations...
+[6/6] Exporting results...
+
+✓ Analysis complete!
+Results saved to: output/customer_segments/
+```
+
+### Step 4: Review Results in GUI
+
+**Step 5 displays immediately after completion:**
+
+```
+✓ Analysis Complete!
+
+Recommended K: 4
+Silhouette Score: 0.51
+
+Tested k values: 3, 4, 5, 6
+
+Output Files:
+📊 Exploration Report: output/customer_segments/seg_exploration_report.xlsx
+📈 K Selection Plot: output/customer_segments/seg_k_selection.png
+```
+
+Click the file links to open Excel reports directly.
+
+### Step 5: Review Exploration Report
+
+Open the exploration report Excel file:
+- **Metrics_Comparison** sheet → k=4 has highest silhouette
+- **Profile_k4** sheet → See how segments differ
+- **Profile_k3**, **Profile_k5**, **Profile_k6** → Compare alternatives
+
+**Decision**: Use k=4 based on highest silhouette and interpretability.
+
+### Step 6: Run Final Segmentation
+
+1. **Edit your config file** (outside GUI):
+   - Change `k_fixed` from blank to `4`
+   - Save (or save as `customer_segmentation_final.xlsx`)
+
+2. **Back in GUI**:
+   - Click "Browse..." to select updated config
+   - Click "Validate Configuration"
+   - Click "Run Segmentation Analysis"
+
+3. **Watch Console Output** for final run:
+
+```
+[3/6] Running k-means clustering...
+Running final segmentation with k=4...
+✓ Clustering complete
+
+[4/6] Creating segment profiles...
+✓ Profiles created
+```
+
+4. **View Final Results** (Step 5):
+
+```
+✓ Analysis Complete!
+
+Number of Segments: 4
+Silhouette Score: 0.51
+Observations: 350
+
+Segment Sizes:
+- Segment 1: 80 (23%)
+- Segment 2: 180 (51%)
+- Segment 3: 60 (17%)
+- Segment 4: 30 (9%)
+
+Output Files:
+📊 Final Report: output/customer_segments/seg_final_report.xlsx
+📋 Assignments: output/customer_segments/seg_assignments.xlsx
+📈 Charts: output/customer_segments/seg_*.png
+💾 Model: output/customer_segments/seg_model.rds
+```
+
+### Step 7: Interpret and Name Segments
+
+Open `seg_final_report.xlsx` → Profiles sheet:
+
+| Variable | Seg 1 | Seg 2 | Seg 3 | Seg 4 | Overall |
+|----------|-------|-------|-------|-------|---------|
+| q1: Product quality | 9.2 | 7.8 | 5.1 | 2.8 | 7.1 |
+| q2: Service quality | 9.0 | 7.5 | 4.8 | 3.2 | 7.0 |
+| q3: Value for money | 8.8 | 7.2 | 5.5 | 3.5 | 6.8 |
+| q4: Support | 8.9 | 7.6 | 4.9 | 2.5 | 6.9 |
+| **Size** | **80** | **180** | **60** | **30** | **350** |
+| **Percent** | **23%** | **51%** | **17%** | **9%** | **100%** |
+
+**Segment Names:**
+- **Segment 1 → "Advocates"** (23%): Highest scores across all dimensions
+- **Segment 2 → "Satisfied"** (51%): Above average, largest segment
+- **Segment 3 → "At-Risk"** (17%): Below average, need attention
+- **Segment 4 → "Detractors"** (9%): Low scores, critical issues
+
+**Complete!** You now have actionable customer segments with all output files ready.
+
+---
+
+## Workflow 1: Command-Line Segmentation (Exploration → Final)
+
+**Scenario**: You prefer command-line workflow or are scripting segmentation runs.
 
 ### Step 1: Prepare Your Data
 
@@ -96,6 +247,8 @@ Review profiles in `output/seg_final_report.xlsx`:
 ## Workflow 2: Variable Selection (Many Variables)
 
 **Scenario**: Survey has 30 satisfaction questions, unsure which to use for clustering.
+
+**Note**: This works in both GUI and command-line modes. Example shows command-line.
 
 ### Step 1: Enable Variable Selection
 
