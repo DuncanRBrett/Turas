@@ -57,12 +57,17 @@ load_pricing_config <- function(config_file) {
 
   # Resolve data_file path relative to config directory
   if (!is.null(settings$data_file) && !is.na(settings$data_file)) {
-    if (!file.exists(settings$data_file)) {
-      # Try relative to config directory
-      relative_path <- file.path(config_dir, settings$data_file)
-      if (file.exists(relative_path)) {
-        settings$data_file <- relative_path
-      }
+    # If not an absolute path, make it relative to config directory
+    if (!grepl("^(/|[A-Za-z]:|\\.\\./|\\./)", settings$data_file)) {
+      # Relative path - resolve to absolute path
+      settings$data_file <- normalizePath(
+        file.path(config_dir, settings$data_file),
+        winslash = "/",
+        mustWork = FALSE
+      )
+    } else if (file.exists(settings$data_file)) {
+      # Already absolute and exists - normalize it
+      settings$data_file <- normalizePath(settings$data_file, winslash = "/")
     }
   }
 
