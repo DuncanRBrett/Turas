@@ -37,16 +37,26 @@ run_van_westendorp <- function(data, config) {
   expensive <- data[[vw$col_expensive]]
   too_expensive <- data[[vw$col_too_expensive]]
 
+  # Extract weights (if specified)
+  if (!is.na(config$weight_var) && config$weight_var %in% names(data)) {
+    weights <- data[[config$weight_var]]
+  } else {
+    weights <- rep(1, nrow(data))
+  }
+
   # Remove cases with any missing values
   complete_cases <- !is.na(too_cheap) & !is.na(cheap) &
-    !is.na(expensive) & !is.na(too_expensive)
+    !is.na(expensive) & !is.na(too_expensive) &
+    !is.na(weights) & is.finite(weights) & weights > 0
 
   too_cheap <- too_cheap[complete_cases]
   cheap <- cheap[complete_cases]
   expensive <- expensive[complete_cases]
   too_expensive <- too_expensive[complete_cases]
+  weights <- weights[complete_cases]
 
   n_valid <- length(too_cheap)
+  effective_n <- sum(weights)  # Effective sample size for weighted data
 
   if (n_valid < 30) {
     warning(sprintf("Low sample size for Van Westendorp analysis: n=%d (recommended minimum: 30)",
@@ -55,6 +65,7 @@ run_van_westendorp <- function(data, config) {
 
   # Calculate cumulative distribution curves
   curves <- calculate_vw_curves(too_cheap, cheap, expensive, too_expensive,
+                                weights = weights,
                                 interpolation = vw$interpolation_method %||% "linear")
 
   # Find intersection points
@@ -76,13 +87,15 @@ run_van_westendorp <- function(data, config) {
   if (isTRUE(vw$calculate_confidence)) {
     confidence_intervals <- bootstrap_vw_confidence(
       too_cheap, cheap, expensive, too_expensive,
+      weights = weights,
       iterations = vw$bootstrap_iterations %||% 1000,
       level = vw$confidence_level %||% 0.95
     )
   }
 
   # Calculate descriptive statistics
-  descriptives <- calculate_vw_descriptives(too_cheap, cheap, expensive, too_expensive)
+  descriptives <- calculate_vw_descriptives(too_cheap, cheap, expensive, too_expensive,
+                                           weights = weights)
 
   # Return results
   list(
@@ -110,13 +123,23 @@ run_van_westendorp <- function(data, config) {
 #' @param cheap Vector of "bargain" prices
 #' @param expensive Vector of "expensive" prices
 #' @param too_expensive Vector of "too expensive" prices
+#' @param weights Vector of case weights (defaults to equal weights if NULL)
 #' @param interpolation Interpolation method ("linear" or "spline")
 #'
 #' @return Data frame with price points and cumulative percentages
 #'
 #' @keywords internal
 calculate_vw_curves <- function(too_cheap, cheap, expensive, too_expensive,
+                                weights = NULL,
                                 interpolation = "linear") {
+
+  # Default to equal weights if not provided
+  if (is.null(weights)) {
+    weights <- rep(1, length(too_cheap))
+  }
+
+  # Normalize weights to sum to 1
+  weights <- weights / sum(weights)
 
   # Get all unique price points
   all_prices <- sort(unique(c(too_cheap, cheap, expensive, too_expensive)))
@@ -125,24 +148,24 @@ calculate_vw_curves <- function(too_cheap, cheap, expensive, too_expensive,
   price_range <- range(all_prices)
   price_grid <- seq(price_range[1], price_range[2], length.out = 200)
 
-  # Calculate cumulative percentages at each price point
-  # Using ECDF (empirical cumulative distribution function)
+  # Calculate cumulative percentages at each price point using weighted proportions
+  # Using weighted ECDF (empirical cumulative distribution function)
 
   # "Too Cheap" curve: % who say price is too cheap (cumulative from high to low)
-  # At price P: % of respondents whose "too cheap" price >= P
-  curve_too_cheap <- sapply(price_grid, function(p) mean(too_cheap >= p))
+  # At price P: weighted % of respondents whose "too cheap" price >= P
+  curve_too_cheap <- sapply(price_grid, function(p) sum(weights[too_cheap >= p]))
 
   # "Not Cheap" curve (inverse of cheap): % who say price is NOT cheap
-  # At price P: % of respondents whose "cheap" price <= P
-  curve_not_cheap <- sapply(price_grid, function(p) mean(cheap <= p))
+  # At price P: weighted % of respondents whose "cheap" price <= P
+  curve_not_cheap <- sapply(price_grid, function(p) sum(weights[cheap <= p]))
 
   # "Not Expensive" curve (inverse of expensive): % who say price is NOT expensive
-  # At price P: % of respondents whose "expensive" price >= P
-  curve_not_expensive <- sapply(price_grid, function(p) mean(expensive >= p))
+  # At price P: weighted % of respondents whose "expensive" price >= P
+  curve_not_expensive <- sapply(price_grid, function(p) sum(weights[expensive >= p]))
 
   # "Too Expensive" curve: % who say price is too expensive
-  # At price P: % of respondents whose "too expensive" price <= P
-  curve_too_expensive <- sapply(price_grid, function(p) mean(too_expensive <= p))
+  # At price P: weighted % of respondents whose "too expensive" price <= P
+  curve_too_expensive <- sapply(price_grid, function(p) sum(weights[too_expensive <= p]))
 
   # Also calculate the "Cheap" and "Expensive" curves for IDP
   curve_cheap <- 1 - curve_not_cheap
@@ -263,6 +286,7 @@ find_curve_intersection <- function(x, y1, y2) {
 #' @param cheap Vector of "bargain" prices
 #' @param expensive Vector of "expensive" prices
 #' @param too_expensive Vector of "too expensive" prices
+#' @param weights Vector of case weights (defaults to equal weights if NULL)
 #' @param iterations Number of bootstrap iterations
 #' @param level Confidence level (e.g., 0.95 for 95% CI)
 #'
@@ -270,10 +294,16 @@ find_curve_intersection <- function(x, y1, y2) {
 #'
 #' @keywords internal
 bootstrap_vw_confidence <- function(too_cheap, cheap, expensive, too_expensive,
+                                    weights = NULL,
                                     iterations = 1000, level = 0.95) {
 
   n <- length(too_cheap)
   alpha <- 1 - level
+
+  # Default to equal weights if not provided
+  if (is.null(weights)) {
+    weights <- rep(1, n)
+  }
 
   # Storage for bootstrap results
   boot_results <- matrix(NA, nrow = iterations, ncol = 4)
@@ -281,17 +311,19 @@ bootstrap_vw_confidence <- function(too_cheap, cheap, expensive, too_expensive,
 
   # Run bootstrap
   for (i in seq_len(iterations)) {
-    # Resample with replacement
+    # Resample respondents with replacement
     idx <- sample(n, n, replace = TRUE)
 
     boot_too_cheap <- too_cheap[idx]
     boot_cheap <- cheap[idx]
     boot_expensive <- expensive[idx]
     boot_too_expensive <- too_expensive[idx]
+    boot_weights <- weights[idx]
 
     # Calculate curves and intersections
     curves <- calculate_vw_curves(boot_too_cheap, boot_cheap,
-                                  boot_expensive, boot_too_expensive)
+                                  boot_expensive, boot_too_expensive,
+                                  weights = boot_weights)
     points <- find_vw_intersections(curves)
 
     boot_results[i, ] <- c(points$PMC, points$OPP, points$IDP, points$PME)
@@ -320,29 +352,49 @@ bootstrap_vw_confidence <- function(too_cheap, cheap, expensive, too_expensive,
 #' @param cheap Vector of "bargain" prices
 #' @param expensive Vector of "expensive" prices
 #' @param too_expensive Vector of "too expensive" prices
+#' @param weights Vector of case weights (defaults to equal weights if NULL)
 #'
 #' @return Data frame with descriptive statistics
 #'
 #' @keywords internal
-calculate_vw_descriptives <- function(too_cheap, cheap, expensive, too_expensive) {
+calculate_vw_descriptives <- function(too_cheap, cheap, expensive, too_expensive,
+                                     weights = NULL) {
 
-  calc_stats <- function(x, name) {
+  # Default to equal weights if not provided
+  if (is.null(weights)) {
+    weights <- rep(1, length(too_cheap))
+  }
+
+  calc_stats <- function(x, w, name) {
+    # Remove NAs
+    valid <- !is.na(x) & !is.na(w)
+    x_valid <- x[valid]
+    w_valid <- w[valid]
+
+    # Normalize weights
+    if (sum(w_valid) > 0) {
+      w_norm <- w_valid / sum(w_valid)
+    } else {
+      w_norm <- w_valid
+    }
+
     data.frame(
       variable = name,
-      n = sum(!is.na(x)),
-      mean = mean(x, na.rm = TRUE),
-      median = median(x, na.rm = TRUE),
-      sd = sd(x, na.rm = TRUE),
-      min = min(x, na.rm = TRUE),
-      max = max(x, na.rm = TRUE),
+      n = sum(valid),
+      effective_n = sum(w_valid),
+      mean = if (sum(valid) > 0) sum(x_valid * w_norm) else NA_real_,
+      median = if (sum(valid) > 0) median(x_valid) else NA_real_,  # Weighted median is complex, using unweighted
+      sd = if (sum(valid) > 1) sqrt(sum(w_norm * (x_valid - sum(x_valid * w_norm))^2)) else NA_real_,
+      min = if (sum(valid) > 0) min(x_valid) else NA_real_,
+      max = if (sum(valid) > 0) max(x_valid) else NA_real_,
       stringsAsFactors = FALSE
     )
   }
 
   rbind(
-    calc_stats(too_cheap, "Too Cheap"),
-    calc_stats(cheap, "Cheap/Bargain"),
-    calc_stats(expensive, "Expensive"),
-    calc_stats(too_expensive, "Too Expensive")
+    calc_stats(too_cheap, weights, "Too Cheap"),
+    calc_stats(cheap, weights, "Cheap/Bargain"),
+    calc_stats(expensive, weights, "Expensive"),
+    calc_stats(too_expensive, weights, "Too Expensive")
   )
 }
