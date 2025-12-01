@@ -56,7 +56,7 @@ run_pricing_gui <- function() {
   source(file.path(r_dir, "09_price_volume_optimisation.R"))
 
   # Check for required packages
-  required_packages <- c("shiny", "readxl", "openxlsx")
+  required_packages <- c("shiny", "readxl", "openxlsx", "shinyFiles")
   missing <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
   if (length(missing) > 0) {
     stop(sprintf("Missing required packages: %s\nInstall with: install.packages(c('%s'))",
@@ -66,6 +66,7 @@ run_pricing_gui <- function() {
   }
 
   library(shiny)
+  library(shinyFiles)
 
   # Recent projects file
   recent_projects_file <- file.path(module_dir, ".recent_pricing_projects.rds")
@@ -104,18 +105,20 @@ ui <- fluidPage(
 
       h4("Configuration"),
 
-      # Config file path (text input - preferred method)
-      textInput("config_path_text", "Config File Path",
+      # File browser button
+      shinyFilesButton("config_file_button", "Browse for Config File",
+                      "Select configuration file", multiple = FALSE,
+                      icon = icon("folder-open")),
+
+      # Display selected path
+      verbatimTextOutput("config_path_display", placeholder = TRUE),
+
+      # Or paste path manually
+      textInput("config_path_text", "Or Paste Full Path",
                 placeholder = "/full/path/to/config.xlsx"),
 
-      helpText("Paste the full path to your config file, OR use file upload below"),
-
-      # Or use file upload (NOTE: may have path issues)
-      fileInput("config_file", "Or Upload Config File",
-                accept = c(".xlsx", ".xls")),
-
       # Or select recent
-      selectInput("recent_projects", "Or Select Recent Project",
+      selectInput("recent_projects", "Or Select Recent",
                   choices = c("", load_recent_projects()),
                   selected = ""),
 
@@ -260,6 +263,30 @@ server <- function(input, output, session) {
     config_path = NULL
   )
 
+  # Set up file chooser - allow browsing from root and home
+  volumes <- c(Home = path.expand("~"), Root = "/")
+  shinyFileChoose(input, "config_file_button", roots = volumes,
+                  filetypes = c("xlsx", "xls"))
+
+  # Handle file browser selection
+  observeEvent(input$config_file_button, {
+    if (!is.null(input$config_file_button) && !is.integer(input$config_file_button)) {
+      file_selected <- parseFilePaths(volumes, input$config_file_button)
+      if (nrow(file_selected) > 0) {
+        rv$config_path <- as.character(file_selected$datapath)
+      }
+    }
+  })
+
+  # Display selected config path
+  output$config_path_display <- renderText({
+    if (!is.null(rv$config_path) && rv$config_path != "") {
+      paste("Selected:", rv$config_path)
+    } else {
+      "No file selected"
+    }
+  })
+
   # Handle text path input
   observeEvent(input$config_path_text, {
     if (!is.null(input$config_path_text) && input$config_path_text != "") {
@@ -271,13 +298,6 @@ server <- function(input, output, session) {
   observeEvent(input$recent_projects, {
     if (input$recent_projects != "") {
       rv$config_path <- input$recent_projects
-    }
-  })
-
-  # Handle file upload
-  observeEvent(input$config_file, {
-    if (!is.null(input$config_file)) {
-      rv$config_path <- input$config_file$datapath
     }
   })
 
