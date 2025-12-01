@@ -208,12 +208,12 @@ load_gabor_granger_config <- function(config_file) {
 
   # Parse price sequence if present
   if (!is.null(gg$price_sequence) && !is.na(gg$price_sequence)) {
-    gg$price_sequence <- as.numeric(strsplit(as.character(gg$price_sequence), ";")[[1]])
+    gg$price_sequence <- as.numeric(strsplit(as.character(gg$price_sequence), ",")[[1]])
   }
 
   # Parse response columns if present
   if (!is.null(gg$response_columns) && !is.na(gg$response_columns)) {
-    gg$response_columns <- trimws(strsplit(as.character(gg$response_columns), ";")[[1]])
+    gg$response_columns <- trimws(strsplit(as.character(gg$response_columns), ",")[[1]])
   }
 
   # Convert numeric fields
