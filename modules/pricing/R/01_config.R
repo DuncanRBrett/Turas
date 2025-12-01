@@ -376,6 +376,59 @@ apply_pricing_defaults <- function(settings) {
   settings$currency_symbol <- settings$currency_symbol %||% "$"
   settings$verbose <- as.logical(settings$verbose %||% TRUE)
 
+  # Weighting and segmentation
+  settings$weight_var <- settings$weight_var %||% NA_character_
+  if (!is.na(settings$weight_var) && settings$weight_var == "") {
+    settings$weight_var <- NA_character_
+  }
+
+  # Segment variables (comma-separated list)
+  if (!is.null(settings$segment_vars) && !is.na(settings$segment_vars)) {
+    settings$segment_vars <- trimws(strsplit(as.character(settings$segment_vars), ",")[[1]])
+    settings$segment_vars <- settings$segment_vars[settings$segment_vars != ""]
+  } else {
+    settings$segment_vars <- character(0)
+  }
+
+  # Cost for profit calculations
+  settings$unit_cost <- if (!is.null(settings$unit_cost) && !is.na(settings$unit_cost)) {
+    as.numeric(settings$unit_cost)
+  } else {
+    NA_real_
+  }
+
+  # Monotonicity behavior
+  settings$vw_monotonicity_behavior <- settings$vw_monotonicity_behavior %||% "flag_only"
+  valid_vw_mono <- c("drop", "fix", "flag_only")
+  if (!settings$vw_monotonicity_behavior %in% valid_vw_mono) {
+    warning(sprintf("Invalid vw_monotonicity_behavior: '%s'. Using 'flag_only'.",
+                    settings$vw_monotonicity_behavior))
+    settings$vw_monotonicity_behavior <- "flag_only"
+  }
+
+  settings$gg_monotonicity_behavior <- settings$gg_monotonicity_behavior %||% "smooth"
+  valid_gg_mono <- c("diagnostic_only", "smooth")
+  if (!settings$gg_monotonicity_behavior %in% valid_gg_mono) {
+    warning(sprintf("Invalid gg_monotonicity_behavior: '%s'. Using 'smooth'.",
+                    settings$gg_monotonicity_behavior))
+    settings$gg_monotonicity_behavior <- "smooth"
+  }
+
+  # Don't know codes (comma-separated list of numeric codes)
+  if (!is.null(settings$dk_codes) && !is.na(settings$dk_codes)) {
+    dk_vals <- trimws(strsplit(as.character(settings$dk_codes), ",")[[1]])
+    settings$dk_codes <- as.numeric(dk_vals)
+    settings$dk_codes <- settings$dk_codes[!is.na(settings$dk_codes)]
+  } else {
+    settings$dk_codes <- numeric(0)
+  }
+
+  # ID variable for respondent-level operations
+  settings$id_var <- settings$id_var %||% NA_character_
+  if (!is.na(settings$id_var) && settings$id_var == "") {
+    settings$id_var <- NA_character_
+  }
+
   return(settings)
 }
 
@@ -426,9 +479,14 @@ create_pricing_config <- function(output_file = "pricing_config.xlsx",
       "analysis_method",
       "data_file",
       "output_file",
-      "id_column",
-      "weight_column",
+      "id_var",
+      "weight_var",
+      "segment_vars",
+      "unit_cost",
       "currency_symbol",
+      "vw_monotonicity_behavior",
+      "gg_monotonicity_behavior",
+      "dk_codes",
       "verbose"
     ),
     Value = c(
@@ -438,7 +496,12 @@ create_pricing_config <- function(output_file = "pricing_config.xlsx",
       "pricing_results.xlsx",
       "respondent_id",
       "",
+      "",
+      "",
       "$",
+      "flag_only",
+      "smooth",
+      "",
       "TRUE"
     ),
     Description = c(
@@ -448,7 +511,12 @@ create_pricing_config <- function(output_file = "pricing_config.xlsx",
       "Path for output file",
       "Respondent ID column name",
       "Weight column name (optional)",
+      "Segment variables (comma-separated, optional)",
+      "Unit cost for profit calculations (optional)",
       "Currency symbol for display",
+      "VW monotonicity: drop, fix, or flag_only",
+      "GG monotonicity: diagnostic_only or smooth",
+      "Don't know codes (comma-separated, e.g., 98,99)",
       "Show progress messages"
     ),
     stringsAsFactors = FALSE

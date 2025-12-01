@@ -60,12 +60,46 @@ load_pricing_data <- function(data_file, config) {
     stop(sprintf("Unsupported file format: %s", file_ext), call. = FALSE)
   )
 
+  # Recode "don't know" codes to NA
+  dk_codes <- config$dk_codes
+  if (length(dk_codes) > 0) {
+    # Get all pricing-related columns
+    pricing_cols <- character(0)
+
+    # Van Westendorp columns
+    if (!is.null(config$van_westendorp)) {
+      vw <- config$van_westendorp
+      pricing_cols <- c(pricing_cols,
+                       vw$col_too_cheap, vw$col_cheap,
+                       vw$col_expensive, vw$col_too_expensive)
+    }
+
+    # Gabor-Granger columns
+    if (!is.null(config$gabor_granger)) {
+      gg <- config$gabor_granger
+      if (gg$data_format == "wide" && !is.null(gg$response_columns)) {
+        pricing_cols <- c(pricing_cols, gg$response_columns)
+      } else if (!is.null(gg$price_column) && !is.null(gg$response_column)) {
+        pricing_cols <- c(pricing_cols, gg$price_column, gg$response_column)
+      }
+    }
+
+    # Recode DK codes to NA in pricing columns
+    pricing_cols <- unique(pricing_cols[pricing_cols %in% names(data)])
+    for (col in pricing_cols) {
+      if (is.numeric(data[[col]])) {
+        data[[col]][data[[col]] %in% dk_codes] <- NA
+      }
+    }
+  }
+
   # Return with metadata
   list(
     data = data,
     n_rows = nrow(data),
     n_cols = ncol(data),
-    file_type = file_ext
+    file_type = file_ext,
+    dk_recoded = length(dk_codes) > 0
   )
 }
 
@@ -130,6 +164,54 @@ validate_pricing_data <- function(data, config) {
              call. = FALSE)
       }
     }
+  }
+
+  # --------------------------------------------------------------------------
+  # Validate Weight Variable
+  # --------------------------------------------------------------------------
+
+  weight_summary <- NULL
+  if (!is.na(config$weight_var)) {
+    if (!config$weight_var %in% names(data)) {
+      stop(sprintf("Weight variable '%s' not found in data.\nAvailable columns: %s",
+                   config$weight_var,
+                   paste(names(data), collapse = ", ")),
+           call. = FALSE)
+    }
+
+    # Coerce to numeric
+    data[[config$weight_var]] <- suppressWarnings(as.numeric(data[[config$weight_var]]))
+
+    # Flag invalid weights
+    invalid_weight <- is.na(data[[config$weight_var]]) |
+                      !is.finite(data[[config$weight_var]]) |
+                      data[[config$weight_var]] < 0
+
+    if (any(invalid_weight)) {
+      exclusions[invalid_weight] <- TRUE
+      exclusion_reasons[invalid_weight] <- paste0(
+        exclusion_reasons[invalid_weight],
+        ifelse(exclusion_reasons[invalid_weight] == "", "", "; "),
+        "invalid_weight"
+      )
+      warnings_list[[length(warnings_list) + 1]] <- sprintf(
+        "Weight variable has %d invalid values (NA, negative, or non-finite) - cases excluded",
+        sum(invalid_weight)
+      )
+    }
+
+    # Calculate weight summary for diagnostics
+    valid_weights <- data[[config$weight_var]][!invalid_weight]
+    weight_summary <- list(
+      n_total = length(data[[config$weight_var]]),
+      n_valid = sum(!invalid_weight),
+      n_invalid = sum(invalid_weight),
+      n_zero = sum(valid_weights == 0, na.rm = TRUE),
+      min = min(valid_weights, na.rm = TRUE),
+      max = max(valid_weights, na.rm = TRUE),
+      mean = mean(valid_weights, na.rm = TRUE),
+      sd = sd(valid_weights, na.rm = TRUE)
+    )
   }
 
   # --------------------------------------------------------------------------
@@ -271,7 +353,8 @@ validate_pricing_data <- function(data, config) {
     exclusion_mask = exclusions,
     exclusion_reasons = exclusion_reasons,
     warnings = warnings_list,
-    n_warnings = length(warnings_list)
+    n_warnings = length(warnings_list),
+    weight_summary = weight_summary
   )
 }
 
