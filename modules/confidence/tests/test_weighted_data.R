@@ -60,8 +60,9 @@ openxlsx::writeData(wb1, "File_Paths", data.frame(
 
 openxlsx::addWorksheet(wb1, "Study_Settings")
 openxlsx::writeData(wb1, "Study_Settings", data.frame(
-  Setting = c("Calculate_Effective_N", "Bootstrap_Iterations", "Confidence_Level", "Decimal_Separator"),
-  Value = c("Y", "1000", "0.95", ".")
+  Setting = c("Calculate_Effective_N", "Multiple_Comparison_Adjustment", "Multiple_Comparison_Method",
+              "Bootstrap_Iterations", "Confidence_Level", "Decimal_Separator"),
+  Value = c("Y", "N", "None", "1000", "0.95", ".")
 ))
 
 openxlsx::addWorksheet(wb1, "Question_Analysis")
@@ -140,8 +141,9 @@ openxlsx::writeData(wb2, "File_Paths", data.frame(
 
 openxlsx::addWorksheet(wb2, "Study_Settings")
 openxlsx::writeData(wb2, "Study_Settings", data.frame(
-  Setting = c("Calculate_Effective_N", "Bootstrap_Iterations", "Confidence_Level", "Decimal_Separator"),
-  Value = c("Y", "1000", "0.95", ".")
+  Setting = c("Calculate_Effective_N", "Multiple_Comparison_Adjustment", "Multiple_Comparison_Method",
+              "Bootstrap_Iterations", "Confidence_Level", "Decimal_Separator"),
+  Value = c("Y", "N", "None", "1000", "0.95", ".")
 ))
 
 openxlsx::addWorksheet(wb2, "Question_Analysis")
@@ -213,8 +215,9 @@ openxlsx::writeData(wb3, "File_Paths", data.frame(
 
 openxlsx::addWorksheet(wb3, "Study_Settings")
 openxlsx::writeData(wb3, "Study_Settings", data.frame(
-  Setting = c("Calculate_Effective_N", "Bootstrap_Iterations", "Confidence_Level", "Decimal_Separator"),
-  Value = c("Y", "1000", "0.95", ".")
+  Setting = c("Calculate_Effective_N", "Multiple_Comparison_Adjustment", "Multiple_Comparison_Method",
+              "Bootstrap_Iterations", "Confidence_Level", "Decimal_Separator"),
+  Value = c("Y", "N", "None", "1000", "0.95", ".")
 ))
 
 openxlsx::addWorksheet(wb3, "Question_Analysis")
@@ -284,8 +287,9 @@ openxlsx::writeData(wb4, "File_Paths", data.frame(
 
 openxlsx::addWorksheet(wb4, "Study_Settings")
 openxlsx::writeData(wb4, "Study_Settings", data.frame(
-  Setting = c("Calculate_Effective_N", "Bootstrap_Iterations", "Confidence_Level", "Decimal_Separator"),
-  Value = c("Y", "1000", "0.95", ".")
+  Setting = c("Calculate_Effective_N", "Multiple_Comparison_Adjustment", "Multiple_Comparison_Method",
+              "Bootstrap_Iterations", "Confidence_Level", "Decimal_Separator"),
+  Value = c("Y", "N", "None", "1000", "0.95", ".")
 ))
 
 openxlsx::addWorksheet(wb4, "Question_Analysis")
@@ -360,8 +364,9 @@ openxlsx::writeData(wb5, "File_Paths", data.frame(
 
 openxlsx::addWorksheet(wb5, "Study_Settings")
 openxlsx::writeData(wb5, "Study_Settings", data.frame(
-  Setting = c("Calculate_Effective_N", "Bootstrap_Iterations", "Confidence_Level", "Decimal_Separator"),
-  Value = c("Y", "1000", "0.95", ".")
+  Setting = c("Calculate_Effective_N", "Multiple_Comparison_Adjustment", "Multiple_Comparison_Method",
+              "Bootstrap_Iterations", "Confidence_Level", "Decimal_Separator"),
+  Value = c("Y", "N", "None", "1000", "0.95", ".")
 ))
 
 openxlsx::addWorksheet(wb5, "Question_Analysis")
