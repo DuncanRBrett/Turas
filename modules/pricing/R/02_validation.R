@@ -60,12 +60,46 @@ load_pricing_data <- function(data_file, config) {
     stop(sprintf("Unsupported file format: %s", file_ext), call. = FALSE)
   )
 
+  # Recode "don't know" codes to NA
+  dk_codes <- config$dk_codes
+  if (length(dk_codes) > 0) {
+    # Get all pricing-related columns
+    pricing_cols <- character(0)
+
+    # Van Westendorp columns
+    if (!is.null(config$van_westendorp)) {
+      vw <- config$van_westendorp
+      pricing_cols <- c(pricing_cols,
+                       vw$col_too_cheap, vw$col_cheap,
+                       vw$col_expensive, vw$col_too_expensive)
+    }
+
+    # Gabor-Granger columns
+    if (!is.null(config$gabor_granger)) {
+      gg <- config$gabor_granger
+      if (gg$data_format == "wide" && !is.null(gg$response_columns)) {
+        pricing_cols <- c(pricing_cols, gg$response_columns)
+      } else if (!is.null(gg$price_column) && !is.null(gg$response_column)) {
+        pricing_cols <- c(pricing_cols, gg$price_column, gg$response_column)
+      }
+    }
+
+    # Recode DK codes to NA in pricing columns
+    pricing_cols <- unique(pricing_cols[pricing_cols %in% names(data)])
+    for (col in pricing_cols) {
+      if (is.numeric(data[[col]])) {
+        data[[col]][data[[col]] %in% dk_codes] <- NA
+      }
+    }
+  }
+
   # Return with metadata
   list(
     data = data,
     n_rows = nrow(data),
     n_cols = ncol(data),
-    file_type = file_ext
+    file_type = file_ext,
+    dk_recoded = length(dk_codes) > 0
   )
 }
 
@@ -133,6 +167,54 @@ validate_pricing_data <- function(data, config) {
   }
 
   # --------------------------------------------------------------------------
+  # Validate Weight Variable
+  # --------------------------------------------------------------------------
+
+  weight_summary <- NULL
+  if (!is.na(config$weight_var)) {
+    if (!config$weight_var %in% names(data)) {
+      stop(sprintf("Weight variable '%s' not found in data.\nAvailable columns: %s",
+                   config$weight_var,
+                   paste(names(data), collapse = ", ")),
+           call. = FALSE)
+    }
+
+    # Coerce to numeric
+    data[[config$weight_var]] <- suppressWarnings(as.numeric(data[[config$weight_var]]))
+
+    # Flag invalid weights
+    invalid_weight <- is.na(data[[config$weight_var]]) |
+                      !is.finite(data[[config$weight_var]]) |
+                      data[[config$weight_var]] < 0
+
+    if (any(invalid_weight)) {
+      exclusions[invalid_weight] <- TRUE
+      exclusion_reasons[invalid_weight] <- paste0(
+        exclusion_reasons[invalid_weight],
+        ifelse(exclusion_reasons[invalid_weight] == "", "", "; "),
+        "invalid_weight"
+      )
+      warnings_list[[length(warnings_list) + 1]] <- sprintf(
+        "Weight variable has %d invalid values (NA, negative, or non-finite) - cases excluded",
+        sum(invalid_weight)
+      )
+    }
+
+    # Calculate weight summary for diagnostics
+    valid_weights <- data[[config$weight_var]][!invalid_weight]
+    weight_summary <- list(
+      n_total = length(data[[config$weight_var]]),
+      n_valid = sum(!invalid_weight),
+      n_invalid = sum(invalid_weight),
+      n_zero = sum(valid_weights == 0, na.rm = TRUE),
+      min = min(valid_weights, na.rm = TRUE),
+      max = max(valid_weights, na.rm = TRUE),
+      mean = mean(valid_weights, na.rm = TRUE),
+      sd = sd(valid_weights, na.rm = TRUE)
+    )
+  }
+
+  # --------------------------------------------------------------------------
   # Validate Data Types and Ranges
   # --------------------------------------------------------------------------
 
@@ -185,8 +267,8 @@ validate_pricing_data <- function(data, config) {
       }
     }
 
-    # Check monotonicity
-    if (isTRUE(vw$validate_monotonicity)) {
+    # Check monotonicity with configurable behavior
+    if (isTRUE(vw$validate_monotonicity %||% TRUE)) {
       violations <- check_vw_monotonicity(
         data[[vw$col_too_cheap]],
         data[[vw$col_cheap]],
@@ -196,24 +278,57 @@ validate_pricing_data <- function(data, config) {
 
       if (violations$count > 0) {
         violation_rate <- violations$rate
+        behavior <- config$vw_monotonicity_behavior
 
-        if (isTRUE(vw$exclude_violations)) {
+        # Apply configured behavior
+        if (behavior == "drop") {
+          # Exclude violating respondents
           exclusions[violations$violation_indices] <- TRUE
           exclusion_reasons[violations$violation_indices] <- paste0(
             exclusion_reasons[violations$violation_indices],
-            "; monotonicity violation"
+            ifelse(exclusion_reasons[violations$violation_indices] == "", "", "; "),
+            "vw_non_monotone"
+          )
+          warnings_list[[length(warnings_list) + 1]] <- sprintf(
+            "VW monotonicity: %d cases (%.1f%%) excluded (behavior: drop)",
+            violations$count, violation_rate * 100
+          )
+        } else if (behavior == "fix") {
+          # Fix by sorting the four values for each violating respondent
+          viol_idx <- violations$violation_indices
+          for (idx in viol_idx) {
+            vals <- c(
+              data[[vw$col_too_cheap]][idx],
+              data[[vw$col_cheap]][idx],
+              data[[vw$col_expensive]][idx],
+              data[[vw$col_too_expensive]][idx]
+            )
+            # Sort and reassign
+            if (!any(is.na(vals))) {
+              vals_sorted <- sort(vals)
+              data[[vw$col_too_cheap]][idx] <- vals_sorted[1]
+              data[[vw$col_cheap]][idx] <- vals_sorted[2]
+              data[[vw$col_expensive]][idx] <- vals_sorted[3]
+              data[[vw$col_too_expensive]][idx] <- vals_sorted[4]
+            }
+          }
+          warnings_list[[length(warnings_list) + 1]] <- sprintf(
+            "VW monotonicity: %d cases (%.1f%%) fixed by sorting (behavior: fix)",
+            violations$count, violation_rate * 100
+          )
+        } else {  # "flag_only"
+          # Just report, don't modify
+          warnings_list[[length(warnings_list) + 1]] <- sprintf(
+            "VW monotonicity: %d cases (%.1f%%) flagged but retained (behavior: flag_only)",
+            violations$count, violation_rate * 100
           )
         }
 
+        # Additional warning if rate exceeds threshold
         if (violation_rate > (vw$violation_threshold %||% 0.1)) {
           warnings_list[[length(warnings_list) + 1]] <- sprintf(
-            "Monotonicity violations: %d cases (%.1f%%) - exceeds threshold of %.0f%%",
-            violations$count, violation_rate * 100, (vw$violation_threshold %||% 0.1) * 100
-          )
-        } else {
-          warnings_list[[length(warnings_list) + 1]] <- sprintf(
-            "Monotonicity violations: %d cases (%.1f%%)",
-            violations$count, violation_rate * 100
+            "WARNING: VW monotonicity violation rate (%.1f%%) exceeds threshold (%.0f%%)",
+            violation_rate * 100, (vw$violation_threshold %||% 0.1) * 100
           )
         }
       }
@@ -271,7 +386,8 @@ validate_pricing_data <- function(data, config) {
     exclusion_mask = exclusions,
     exclusion_reasons = exclusion_reasons,
     warnings = warnings_list,
-    n_warnings = length(warnings_list)
+    n_warnings = length(warnings_list),
+    weight_summary = weight_summary
   )
 }
 

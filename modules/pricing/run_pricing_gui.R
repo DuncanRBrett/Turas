@@ -51,9 +51,12 @@ run_pricing_gui <- function() {
   source(file.path(r_dir, "04_gabor_granger.R"))
   source(file.path(r_dir, "05_visualization.R"))
   source(file.path(r_dir, "06_output.R"))
+  source(file.path(r_dir, "07_wtp_distribution.R"))
+  source(file.path(r_dir, "08_competitive_scenarios.R"))
+  source(file.path(r_dir, "09_price_volume_optimisation.R"))
 
   # Check for required packages
-  required_packages <- c("shiny", "readxl", "openxlsx")
+  required_packages <- c("shiny", "readxl", "openxlsx", "shinyFiles", "shinyjs")
   missing <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
   if (length(missing) > 0) {
     stop(sprintf("Missing required packages: %s\nInstall with: install.packages(c('%s'))",
@@ -63,6 +66,8 @@ run_pricing_gui <- function() {
   }
 
   library(shiny)
+  library(shinyFiles)
+  library(shinyjs)
 
   # Recent projects file
   recent_projects_file <- file.path(module_dir, ".recent_pricing_projects.rds")
@@ -93,6 +98,7 @@ save_recent_project <- function(path) {
 # UI
 # ==============================================================================
 ui <- fluidPage(
+  useShinyjs(),  # Enable shinyjs
   titlePanel("Turas Pricing Research Analysis"),
 
   sidebarLayout(
@@ -101,13 +107,21 @@ ui <- fluidPage(
 
       h4("Configuration"),
 
-      # Config file selection
-      fileInput("config_file", "Select Configuration File",
-                accept = c(".xlsx", ".xls")),
+      # File browser button
+      shinyFilesButton("config_file_button", "Browse for Config File",
+                      "Select configuration file", multiple = FALSE,
+                      icon = icon("folder-open")),
 
-      # Or select recent
-      selectInput("recent_projects", "Or Select Recent Project",
-                  choices = c("", load_recent_projects()),
+      # Display selected path
+      verbatimTextOutput("config_path_display", placeholder = TRUE),
+
+      # Or paste path manually
+      textInput("config_path_text", "Or Paste Full Path",
+                placeholder = "/full/path/to/config.xlsx"),
+
+      # Or select recent (populated dynamically in server)
+      selectInput("recent_projects", "Or Select Recent",
+                  choices = c(""),
                   selected = ""),
 
       hr(),
@@ -117,10 +131,50 @@ ui <- fluidPage(
       # Data file override
       fileInput("data_file", "Override Data File (optional)",
                 accept = c(".csv", ".xlsx", ".xls", ".sav", ".dta", ".rds")),
+      actionButton("clear_data_file", "Clear Data File",
+                   class = "btn-sm btn-warning"),
+      br(),
 
       # Output file
       textInput("output_file", "Output File Name",
                 value = "pricing_results.xlsx"),
+
+      hr(),
+
+      h4("Phase 1: Advanced Features"),
+
+      # Weight variable
+      textInput("weight_var", "Weight Variable (optional)",
+                placeholder = "e.g., survey_weight"),
+
+      # DK codes
+      textInput("dk_codes", "Don't Know Codes (optional)",
+                placeholder = "e.g., 98,99"),
+
+      # Monotonicity behaviors
+      selectInput("vw_monotonicity", "VW Monotonicity Behavior",
+                  choices = c("Flag Only" = "flag_only",
+                             "Drop" = "drop",
+                             "Fix" = "fix"),
+                  selected = "flag_only"),
+
+      selectInput("gg_monotonicity", "GG Monotonicity Behavior",
+                  choices = c("Smooth" = "smooth",
+                             "Flag Only" = "flag_only",
+                             "None" = "none"),
+                  selected = "smooth"),
+
+      # Segment variables
+      textInput("segment_vars", "Segment Variables (optional)",
+                placeholder = "e.g., age_group,region"),
+
+      hr(),
+
+      h4("Phase 2: Profit Optimization"),
+
+      # Unit cost
+      numericInput("unit_cost", "Unit Cost (for profit)",
+                   value = NA, min = 0, step = 0.01),
 
       hr(),
 
@@ -134,6 +188,10 @@ ui <- fluidPage(
       h4("Create Config Template"),
       selectInput("template_method", "Analysis Method",
                   choices = c("van_westendorp", "gabor_granger", "both")),
+      shinyDirButton("template_dir_button", "Choose Save Folder",
+                    "Select folder to save template",
+                    icon = icon("folder-open")),
+      verbatimTextOutput("template_dir_display", placeholder = TRUE),
       textInput("template_name", "Template File Name",
                 value = "pricing_config.xlsx"),
       actionButton("create_template", "Create Template",
@@ -153,19 +211,41 @@ ui <- fluidPage(
                  conditionalPanel(
                    condition = "output.has_results",
                    h4("Key Results"),
-                   tableOutput("results_table")
+                   tableOutput("results_table"),
+                   conditionalPanel(
+                     condition = "output.has_profit_results",
+                     hr(),
+                     h4("Profit Optimization"),
+                     tableOutput("profit_table")
+                   )
                  )
         ),
 
-        tabPanel("Plots",
+        tabPanel("Main Plot",
                  br(),
                  plotOutput("main_plot", height = "500px")
+        ),
+
+        tabPanel("Additional Plots",
+                 br(),
+                 conditionalPanel(
+                   condition = "output.has_additional_plots",
+                   selectInput("plot_selector", "Select Plot",
+                              choices = c("Revenue Curve", "Profit Curve", "Revenue vs Profit")),
+                   plotOutput("additional_plot", height = "500px")
+                 )
         ),
 
         tabPanel("Diagnostics",
                  br(),
                  h4("Validation Summary"),
                  tableOutput("validation_table"),
+                 conditionalPanel(
+                   condition = "output.has_weight_summary",
+                   hr(),
+                   h4("Weight Statistics"),
+                   tableOutput("weight_table")
+                 ),
                  hr(),
                  h4("Warnings"),
                  verbatimTextOutput("warnings_output")
@@ -189,8 +269,53 @@ server <- function(input, output, session) {
   rv <- reactiveValues(
     results = NULL,
     console = "",
-    config_path = NULL
+    config_path = NULL,
+    template_dir = NULL
   )
+
+  # Set up file/folder choosers - allow browsing from root and home
+  volumes <- c(Home = path.expand("~"), Root = "/")
+  shinyFileChoose(input, "config_file_button", roots = volumes,
+                  filetypes = c("xlsx", "xls"))
+  shinyDirChoose(input, "template_dir_button", roots = volumes)
+
+  # Populate recent projects dropdown on startup
+  observe({
+    recent <- load_recent_projects()
+    if (length(recent) > 0) {
+      # Show just filename as label, full path as value
+      choices <- c("", setNames(recent, basename(recent)))
+    } else {
+      choices <- c("")
+    }
+    updateSelectInput(session, "recent_projects", choices = choices)
+  })
+
+  # Handle file browser selection
+  observeEvent(input$config_file_button, {
+    if (!is.null(input$config_file_button) && !is.integer(input$config_file_button)) {
+      file_selected <- parseFilePaths(volumes, input$config_file_button)
+      if (nrow(file_selected) > 0) {
+        rv$config_path <- as.character(file_selected$datapath)
+      }
+    }
+  })
+
+  # Display selected config path
+  output$config_path_display <- renderText({
+    if (!is.null(rv$config_path) && rv$config_path != "") {
+      paste("Selected:", rv$config_path)
+    } else {
+      "No file selected"
+    }
+  })
+
+  # Handle text path input
+  observeEvent(input$config_path_text, {
+    if (!is.null(input$config_path_text) && input$config_path_text != "") {
+      rv$config_path <- input$config_path_text
+    }
+  })
 
   # Handle recent project selection
   observeEvent(input$recent_projects, {
@@ -199,21 +324,53 @@ server <- function(input, output, session) {
     }
   })
 
-  # Handle file upload
-  observeEvent(input$config_file, {
-    if (!is.null(input$config_file)) {
-      rv$config_path <- input$config_file$datapath
+  # Handle template folder selection
+  observeEvent(input$template_dir_button, {
+    if (!is.null(input$template_dir_button) && !is.integer(input$template_dir_button)) {
+      dir_selected <- parseDirPath(volumes, input$template_dir_button)
+      if (length(dir_selected) > 0) {
+        rv$template_dir <- as.character(dir_selected)
+      }
     }
+  })
+
+  # Display selected template directory
+  output$template_dir_display <- renderText({
+    if (!is.null(rv$template_dir) && rv$template_dir != "") {
+      paste("Save to:", rv$template_dir)
+    } else {
+      paste("Save to:", getwd())
+    }
+  })
+
+  # Clear data file override
+  observeEvent(input$clear_data_file, {
+    # Reset the file input by updating its value
+    shinyjs::reset("data_file")
+    showNotification("Data file override cleared", type = "message")
   })
 
   # Run analysis
   observeEvent(input$run_analysis, {
 
-    # Get config path
-    config_path <- rv$config_path
+    # Get config path - prioritize text input, then recent, then upload
+    config_path <- NULL
 
-    if (is.null(config_path) || config_path == "") {
-      showNotification("Please select a configuration file", type = "error")
+    if (!is.null(input$config_path_text) && input$config_path_text != "") {
+      config_path <- input$config_path_text
+    } else {
+      config_path <- rv$config_path
+    }
+
+    # Validate config path is not empty
+    if (is.null(config_path) || length(config_path) == 0 || !nzchar(config_path)) {
+      showNotification("Please specify a configuration file path", type = "error")
+      return()
+    }
+
+    # Validate config file exists
+    if (!file.exists(config_path)) {
+      showNotification(sprintf("Config file not found: %s", config_path), type = "error")
       return()
     }
 
@@ -225,41 +382,103 @@ server <- function(input, output, session) {
 
     # Get output file
     output_file <- input$output_file
-    if (output_file == "") {
+    if (is.null(output_file) || output_file == "") {
       output_file <- "pricing_results.xlsx"
+    }
+
+    # Build config overrides for Phase 1-3 features
+    config_overrides <- list()
+
+    # Phase 1: Weighting and data quality
+    if (!is.null(input$weight_var) && input$weight_var != "") {
+      config_overrides$weight_var <- input$weight_var
+    }
+
+    if (!is.null(input$dk_codes) && input$dk_codes != "") {
+      dk_vals <- trimws(strsplit(input$dk_codes, ",")[[1]])
+      config_overrides$dk_codes <- as.numeric(dk_vals)
+    }
+
+    if (!is.null(input$vw_monotonicity)) {
+      config_overrides$vw_monotonicity_behavior <- input$vw_monotonicity
+    }
+
+    if (!is.null(input$gg_monotonicity)) {
+      config_overrides$gg_monotonicity_behavior <- input$gg_monotonicity
+    }
+
+    if (!is.null(input$segment_vars) && input$segment_vars != "") {
+      seg_vals <- trimws(strsplit(input$segment_vars, ",")[[1]])
+      config_overrides$segment_vars <- seg_vals
+    }
+
+    # Phase 2: Profit optimization
+    if (!is.null(input$unit_cost) && !is.na(input$unit_cost) && input$unit_cost > 0) {
+      config_overrides$unit_cost <- input$unit_cost
     }
 
     # Capture console output
     rv$console <- ""
 
     tryCatch({
+      # Load config
+      config <- load_pricing_config(config_path)
+
+      # Apply overrides
+      if (length(config_overrides) > 0) {
+        for (key in names(config_overrides)) {
+          config[[key]] <- config_overrides[[key]]
+        }
+      }
+
+      # Override data file if specified
+      if (!is.null(data_file)) {
+        config$data_file <- data_file
+      }
+
+      # Override output file - resolve to project directory if relative
+      if (!is.null(output_file) && length(output_file) > 0 && nzchar(output_file)) {
+        # If just a filename, put it in project directory
+        if (!grepl("/", output_file) && !grepl("\\\\", output_file)) {
+          output_file <- file.path(config$project_root, output_file)
+        }
+        config$output$directory <- dirname(output_file)
+        config$output$filename_prefix <- tools::file_path_sans_ext(basename(output_file))
+      }
+
       # Run analysis with console capture
       output_capture <- capture.output({
-        rv$results <- run_pricing_analysis(
-          config_file = config_path,
-          data_file = data_file,
-          output_file = output_file
-        )
+        rv$results <- run_pricing_analysis_from_config(config)
       })
 
       rv$console <- paste(output_capture, collapse = "\n")
 
-      # Save to recent projects
-      if (!is.null(input$config_file)) {
-        save_recent_project(input$config_file$datapath)
+      # Save to recent projects (use actual config path, not temp file)
+      if (!is.null(config_path) && config_path != "" && file.exists(config_path)) {
+        # Don't save temp paths
+        if (!grepl("^/private/var/folders/|^/tmp/|Rtmp", config_path)) {
+          save_recent_project(config_path)
+        }
       }
 
       showNotification("Analysis completed successfully!", type = "message")
 
     }, error = function(e) {
+      # Print full error to R console for debugging
+      cat("\n=== ERROR IN PRICING ANALYSIS ===\n")
+      cat("Message:", e$message, "\n")
+      cat("Call:", deparse(e$call), "\n")
+      print(traceback())
+      cat("=================================\n\n")
+
       rv$console <- paste("ERROR:", e$message)
       showNotification(paste("Error:", e$message), type = "error")
     })
   })
 
-  # Console output
-  output$console_output <- renderText({
-    rv$console
+  # Console output (R 4.2+ compatible)
+  output$console_output <- renderPrint({
+    cat(rv$console)
   })
 
   # Has results flag
@@ -291,7 +510,7 @@ server <- function(input, output, session) {
       opt <- rv$results$results$optimal_price
       if (!is.null(opt)) {
         data.frame(
-          Metric = c("Optimal Price", "Purchase Intent", "Revenue Index"),
+          Metric = c("Revenue-Maximizing Price", "Purchase Intent", "Revenue Index"),
           Value = c(
             sprintf("$%.2f", opt$price),
             sprintf("%.1f%%", opt$purchase_intent * 100),
@@ -303,7 +522,7 @@ server <- function(input, output, session) {
       vw <- rv$results$results$van_westendorp$price_points
       gg <- rv$results$results$gabor_granger$optimal_price
       data.frame(
-        Metric = c("VW Acceptable Range", "VW Optimal Range", "GG Optimal Price"),
+        Metric = c("VW Acceptable Range", "VW Optimal Range", "GG Revenue-Max Price"),
         Value = c(
           sprintf("$%.2f - $%.2f", vw$PMC, vw$PME),
           sprintf("$%.2f - $%.2f", vw$OPP, vw$IDP),
@@ -313,6 +532,53 @@ server <- function(input, output, session) {
     }
   })
 
+  # Profit results table (Phase 2)
+  output$profit_table <- renderTable({
+    req(rv$results)
+    method <- rv$results$method
+
+    # Extract GG results
+    gg_results <- if (method == "gabor_granger") {
+      rv$results$results
+    } else if (method == "both") {
+      rv$results$results$gabor_granger
+    } else {
+      NULL
+    }
+
+    req(gg_results)
+    opt_profit <- gg_results$optimal_price_profit
+    req(opt_profit)
+
+    data.frame(
+      Metric = c("Profit-Maximizing Price", "Purchase Intent", "Profit Index", "Margin"),
+      Value = c(
+        sprintf("$%.2f", opt_profit$price),
+        sprintf("%.1f%%", opt_profit$purchase_intent * 100),
+        sprintf("%.2f", opt_profit$profit_index),
+        sprintf("$%.2f", opt_profit$margin)
+      )
+    )
+  })
+
+  # Weight statistics table (Phase 1)
+  output$weight_table <- renderTable({
+    req(rv$results)
+    ws <- rv$results$diagnostics$weight_summary
+    req(ws)
+
+    data.frame(
+      Metric = c("Valid Weights", "Effective N", "Range", "Mean", "SD"),
+      Value = c(
+        sprintf("%d", ws$n_valid),
+        sprintf("%.1f", ws$n_valid),
+        sprintf("%.2f - %.2f", ws$min, ws$max),
+        sprintf("%.2f", ws$mean),
+        sprintf("%.2f", ws$sd)
+      )
+    )
+  })
+
   # Main plot
   output$main_plot <- renderPlot({
     req(rv$results)
@@ -320,6 +586,26 @@ server <- function(input, output, session) {
 
     # Return first plot
     rv$results$plots[[1]]
+  })
+
+  # Additional plot handler (Phase 2 profit plots)
+  output$additional_plot <- renderPlot({
+    req(rv$results)
+    req(length(rv$results$plots) > 1)
+    req(input$plot_selector)
+
+    # Map selection to plot name
+    plot_name <- switch(input$plot_selector,
+      "Revenue Curve" = "revenue_curve",
+      "Profit Curve" = "profit_curve",
+      "Revenue vs Profit" = "revenue_vs_profit",
+      NULL
+    )
+
+    req(plot_name)
+    req(!is.null(rv$results$plots[[plot_name]]))
+
+    rv$results$plots[[plot_name]]
   })
 
   # Validation table
@@ -345,6 +631,33 @@ server <- function(input, output, session) {
     }
   })
 
+  # Reactive flags for conditional panels
+  output$has_profit_results <- reactive({
+    if (is.null(rv$results)) return(FALSE)
+    method <- rv$results$method
+
+    gg_results <- if (method == "gabor_granger") {
+      rv$results$results
+    } else if (method == "both") {
+      rv$results$results$gabor_granger
+    } else {
+      NULL
+    }
+
+    !is.null(gg_results) && !is.null(gg_results$optimal_price_profit)
+  })
+  outputOptions(output, "has_profit_results", suspendWhenHidden = FALSE)
+
+  output$has_weight_summary <- reactive({
+    !is.null(rv$results) && !is.null(rv$results$diagnostics$weight_summary)
+  })
+  outputOptions(output, "has_weight_summary", suspendWhenHidden = FALSE)
+
+  output$has_additional_plots <- reactive({
+    !is.null(rv$results) && length(rv$results$plots) > 1
+  })
+  outputOptions(output, "has_additional_plots", suspendWhenHidden = FALSE)
+
   # Create template
   observeEvent(input$create_template, {
 
@@ -353,14 +666,24 @@ server <- function(input, output, session) {
       template_name <- "pricing_config.xlsx"
     }
 
+    # Determine save directory
+    save_dir <- if (!is.null(rv$template_dir) && rv$template_dir != "") {
+      rv$template_dir
+    } else {
+      getwd()
+    }
+
+    # Construct full path
+    output_path <- file.path(save_dir, template_name)
+
     tryCatch({
       create_pricing_config(
-        output_file = template_name,
+        output_file = output_path,
         method = input$template_method,
         overwrite = TRUE
       )
       showNotification(
-        sprintf("Template created: %s", template_name),
+        sprintf("Template created: %s", output_path),
         type = "message"
       )
     }, error = function(e) {

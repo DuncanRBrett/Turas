@@ -28,9 +28,9 @@ run_gabor_granger <- function(data, config) {
 
   # Prepare data based on format
   if (gg$data_format == "wide") {
-    gg_data <- prepare_gg_wide_data(data, gg)
+    gg_data <- prepare_gg_wide_data(data, gg, config)
   } else {
-    gg_data <- prepare_gg_long_data(data, gg)
+    gg_data <- prepare_gg_long_data(data, gg, config)
   }
 
   n_respondents <- length(unique(gg_data$respondent_id))
@@ -56,13 +56,27 @@ run_gabor_granger <- function(data, config) {
   # Calculate demand curve
   demand_curve <- calculate_demand_curve(gg_data)
 
-  # Calculate revenue curve
-  revenue_curve <- calculate_revenue_curve(demand_curve)
+  # Apply monotone smoothing if configured
+  if (config$gg_monotonicity_behavior == "smooth") {
+    # Enforce monotone decreasing demand: as price increases, demand should not increase
+    # Simple approach: cummax from high price to low price
+    demand_curve <- demand_curve[order(demand_curve$price, decreasing = TRUE), ]
+    demand_curve$purchase_intent <- cummax(demand_curve$purchase_intent)
+    demand_curve <- demand_curve[order(demand_curve$price), ]  # Back to ascending order
+  }
 
-  # Find optimal price
+  # Calculate revenue curve (and profit if unit_cost specified)
+  revenue_curve <- calculate_revenue_curve(demand_curve, unit_cost = config$unit_cost)
+
+  # Find optimal price (revenue or profit)
   optimal_price <- NULL
+  optimal_price_profit <- NULL
   if (isTRUE(gg$revenue_optimization)) {
-    optimal_price <- find_optimal_price(revenue_curve)
+    optimal_price <- find_optimal_price(revenue_curve, metric = "revenue")
+    # Also find profit-maximizing price if profit was calculated
+    if ("profit_index" %in% names(revenue_curve)) {
+      optimal_price_profit <- find_optimal_price(revenue_curve, metric = "profit")
+    }
   }
 
   # Calculate elasticity
@@ -86,6 +100,7 @@ run_gabor_granger <- function(data, config) {
     demand_curve = demand_curve,
     revenue_curve = revenue_curve,
     optimal_price = optimal_price,
+    optimal_price_profit = optimal_price_profit,
     elasticity = elasticity,
     confidence_intervals = confidence_intervals,
     diagnostics = list(
@@ -93,7 +108,8 @@ run_gabor_granger <- function(data, config) {
       n_price_points = n_prices,
       monotonicity_check = monotonicity_check,
       price_range = range(gg_data$price),
-      method = "gabor_granger"
+      method = "gabor_granger",
+      has_profit = "profit_index" %in% names(revenue_curve)
     )
   )
 }
@@ -104,15 +120,16 @@ run_gabor_granger <- function(data, config) {
 #' Converts wide format survey data to long format for analysis.
 #'
 #' @param data Data frame in wide format
-#' @param config Gabor-Granger configuration
+#' @param gg_config Gabor-Granger configuration
+#' @param main_config Main configuration (for weight_var)
 #'
-#' @return Data frame in long format with respondent_id, price, response columns
+#' @return Data frame in long format with respondent_id, price, response, weight columns
 #'
 #' @keywords internal
-prepare_gg_wide_data <- function(data, config) {
+prepare_gg_wide_data <- function(data, gg_config, main_config) {
 
-  prices <- config$price_sequence
-  response_cols <- config$response_columns
+  prices <- gg_config$price_sequence
+  response_cols <- gg_config$response_columns
 
   if (length(prices) != length(response_cols)) {
     stop(sprintf("Number of prices (%d) must match number of response columns (%d)",
@@ -121,10 +138,17 @@ prepare_gg_wide_data <- function(data, config) {
   }
 
   # Create respondent IDs if not present
-  if (is.null(config$respondent_column) || is.na(config$respondent_column)) {
+  if (is.null(gg_config$respondent_column) || is.na(gg_config$respondent_column)) {
     data$respondent_id <- seq_len(nrow(data))
   } else {
-    data$respondent_id <- data[[config$respondent_column]]
+    data$respondent_id <- data[[gg_config$respondent_column]]
+  }
+
+  # Extract weights (if specified)
+  if (!is.na(main_config$weight_var) && main_config$weight_var %in% names(data)) {
+    data$weight <- data[[main_config$weight_var]]
+  } else {
+    data$weight <- 1
   }
 
   # Reshape to long format
@@ -135,13 +159,14 @@ prepare_gg_wide_data <- function(data, config) {
       respondent_id = data$respondent_id,
       price = prices[i],
       response = data[[response_cols[i]]],
+      weight = data$weight,
       stringsAsFactors = FALSE
     )
     long_data <- rbind(long_data, temp)
   }
 
   # Code responses as binary if needed
-  long_data$response <- code_gg_response(long_data$response, config)
+  long_data$response <- code_gg_response(long_data$response, gg_config)
 
   return(long_data)
 }
@@ -152,22 +177,31 @@ prepare_gg_wide_data <- function(data, config) {
 #' Validates and standardizes long format data for analysis.
 #'
 #' @param data Data frame in long format
-#' @param config Gabor-Granger configuration
+#' @param gg_config Gabor-Granger configuration
+#' @param main_config Main configuration (for weight_var)
 #'
 #' @return Standardized data frame
 #'
 #' @keywords internal
-prepare_gg_long_data <- function(data, config) {
+prepare_gg_long_data <- function(data, gg_config, main_config) {
+
+  # Extract weights (if specified)
+  if (!is.na(main_config$weight_var) && main_config$weight_var %in% names(data)) {
+    weight <- data[[main_config$weight_var]]
+  } else {
+    weight <- 1
+  }
 
   long_data <- data.frame(
-    respondent_id = data[[config$respondent_column]],
-    price = as.numeric(data[[config$price_column]]),
-    response = data[[config$response_column]],
+    respondent_id = data[[gg_config$respondent_column]],
+    price = as.numeric(data[[gg_config$price_column]]),
+    response = data[[gg_config$response_column]],
+    weight = weight,
     stringsAsFactors = FALSE
   )
 
   # Code responses as binary
-  long_data$response <- code_gg_response(long_data$response, config)
+  long_data$response <- code_gg_response(long_data$response, gg_config)
 
   return(long_data)
 }
@@ -264,9 +298,9 @@ check_gg_monotonicity <- function(gg_data) {
 #'
 #' Aggregates purchase intent at each price point to create demand curve.
 #'
-#' @param gg_data Long format Gabor-Granger data
+#' @param gg_data Long format Gabor-Granger data (must include weight column)
 #'
-#' @return Data frame with price and purchase intent percentage
+#' @return Data frame with price and weighted purchase intent percentage
 #'
 #' @keywords internal
 calculate_demand_curve <- function(gg_data) {
@@ -277,7 +311,8 @@ calculate_demand_curve <- function(gg_data) {
   demand <- data.frame(
     price = prices,
     n_respondents = integer(length(prices)),
-    n_purchase = integer(length(prices)),
+    effective_n = numeric(length(prices)),
+    n_purchase = numeric(length(prices)),
     purchase_intent = numeric(length(prices)),
     stringsAsFactors = FALSE
   )
@@ -286,9 +321,21 @@ calculate_demand_curve <- function(gg_data) {
     p <- prices[i]
     subset_data <- gg_data[gg_data$price == p & !is.na(gg_data$response), ]
 
-    demand$n_respondents[i] <- nrow(subset_data)
-    demand$n_purchase[i] <- sum(subset_data$response)
-    demand$purchase_intent[i] <- mean(subset_data$response)
+    if (nrow(subset_data) > 0) {
+      weights <- subset_data$weight
+      responses <- subset_data$response
+
+      demand$n_respondents[i] <- nrow(subset_data)
+      demand$effective_n[i] <- sum(weights)
+      demand$n_purchase[i] <- sum(weights * responses)
+      # Weighted purchase intent
+      demand$purchase_intent[i] <- sum(weights * responses) / sum(weights)
+    } else {
+      demand$n_respondents[i] <- 0
+      demand$effective_n[i] <- 0
+      demand$n_purchase[i] <- 0
+      demand$purchase_intent[i] <- NA_real_
+    }
   }
 
   return(demand)
@@ -297,43 +344,76 @@ calculate_demand_curve <- function(gg_data) {
 
 #' Calculate Revenue Curve
 #'
-#' Computes expected revenue index at each price point.
+#' Computes expected revenue and profit indices at each price point.
 #'
 #' @param demand_curve Demand curve from calculate_demand_curve()
+#' @param unit_cost Optional unit cost for profit calculations
 #'
-#' @return Data frame with price, purchase intent, and revenue index
+#' @return Data frame with price, purchase intent, revenue index, and optionally profit
 #'
 #' @keywords internal
-calculate_revenue_curve <- function(demand_curve) {
+calculate_revenue_curve <- function(demand_curve, unit_cost = NA) {
 
   revenue <- demand_curve
   revenue$revenue_index <- revenue$price * revenue$purchase_intent
   revenue$revenue_per_100 <- revenue$price * revenue$purchase_intent * 100
 
+  # Calculate profit if unit cost is provided
+  if (!is.na(unit_cost) && is.finite(unit_cost)) {
+    revenue$margin <- revenue$price - unit_cost
+    revenue$profit_index <- revenue$margin * revenue$purchase_intent
+    revenue$profit_per_100 <- revenue$margin * revenue$purchase_intent * 100
+  }
+
   return(revenue)
 }
 
 
-#' Find Revenue-Maximizing Price
+#' Find Optimal Price
 #'
-#' Identifies the price point that maximizes expected revenue.
+#' Identifies the price point that maximizes expected revenue or profit.
 #'
 #' @param revenue_curve Revenue curve from calculate_revenue_curve()
+#' @param metric Either "revenue" (default) or "profit"
 #'
-#' @return List with optimal price, purchase intent, and revenue index
+#' @return List with optimal price, purchase intent, and metric value
 #'
 #' @keywords internal
-find_optimal_price <- function(revenue_curve) {
+find_optimal_price <- function(revenue_curve, metric = "revenue") {
 
-  optimal_idx <- which.max(revenue_curve$revenue_index)
+  if (metric == "profit") {
+    if (!"profit_index" %in% names(revenue_curve)) {
+      stop("Profit index not found in revenue_curve. Specify unit_cost in config.", call. = FALSE)
+    }
+    optimal_idx <- which.max(revenue_curve$profit_index)
+    result <- list(
+      price = revenue_curve$price[optimal_idx],
+      purchase_intent = revenue_curve$purchase_intent[optimal_idx],
+      revenue_index = revenue_curve$revenue_index[optimal_idx],
+      profit_index = revenue_curve$profit_index[optimal_idx],
+      margin = revenue_curve$margin[optimal_idx],
+      position = optimal_idx,
+      n_price_points = nrow(revenue_curve),
+      metric = "profit"
+    )
+  } else {
+    optimal_idx <- which.max(revenue_curve$revenue_index)
+    result <- list(
+      price = revenue_curve$price[optimal_idx],
+      purchase_intent = revenue_curve$purchase_intent[optimal_idx],
+      revenue_index = revenue_curve$revenue_index[optimal_idx],
+      position = optimal_idx,
+      n_price_points = nrow(revenue_curve),
+      metric = "revenue"
+    )
+    # Include profit info if available
+    if ("profit_index" %in% names(revenue_curve)) {
+      result$profit_index <- revenue_curve$profit_index[optimal_idx]
+      result$margin <- revenue_curve$margin[optimal_idx]
+    }
+  }
 
-  list(
-    price = revenue_curve$price[optimal_idx],
-    purchase_intent = revenue_curve$purchase_intent[optimal_idx],
-    revenue_index = revenue_curve$revenue_index[optimal_idx],
-    position = optimal_idx,
-    n_price_points = nrow(revenue_curve)
-  )
+  return(result)
 }
 
 
@@ -407,16 +487,22 @@ bootstrap_gg_confidence <- function(gg_data, iterations = 1000, level = 0.95) {
     # Resample respondents
     boot_respondents <- sample(respondents, n_resp, replace = TRUE)
 
-    # Get data for resampled respondents
+    # Get data for resampled respondents (includes weights)
     boot_data <- do.call(rbind, lapply(boot_respondents, function(r) {
       gg_data[gg_data$respondent_id == r, ]
     }))
 
-    # Calculate demand at each price
+    # Calculate weighted demand at each price
     for (j in seq_along(prices)) {
       p <- prices[j]
       subset_data <- boot_data[boot_data$price == p & !is.na(boot_data$response), ]
-      boot_results[i, j] <- mean(subset_data$response)
+      if (nrow(subset_data) > 0 && "weight" %in% names(subset_data)) {
+        # Weighted mean
+        boot_results[i, j] <- sum(subset_data$weight * subset_data$response) / sum(subset_data$weight)
+      } else {
+        # Fallback to unweighted if no weights
+        boot_results[i, j] <- mean(subset_data$response)
+      }
     }
   }
 

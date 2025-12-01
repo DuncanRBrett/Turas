@@ -35,10 +35,22 @@ generate_pricing_plots <- function(results, config) {
   } else if (method == "gabor_granger") {
     plots$demand_curve <- plot_gg_demand(results, config)
     plots$revenue_curve <- plot_gg_revenue(results, config)
+
+    # Add profit curve if profit optimization was performed
+    if (!is.null(results$optimal_price_profit)) {
+      plots$profit_curve <- plot_gg_profit(results, config)
+      plots$revenue_vs_profit <- plot_revenue_vs_profit(results, config)
+    }
   } else if (method == "both") {
     plots$van_westendorp <- plot_van_westendorp(results$van_westendorp, config)
     plots$demand_curve <- plot_gg_demand(results$gabor_granger, config)
     plots$revenue_curve <- plot_gg_revenue(results$gabor_granger, config)
+
+    # Add profit curve if available
+    if (!is.null(results$gabor_granger$optimal_price_profit)) {
+      plots$profit_curve <- plot_gg_profit(results$gabor_granger, config)
+      plots$revenue_vs_profit <- plot_revenue_vs_profit(results$gabor_granger, config)
+    }
   }
 
   return(plots)
@@ -282,6 +294,144 @@ plot_gg_revenue <- function(gg_results, config) {
         vjust = -0.5, hjust = 0.5,
         color = "red", fontface = "bold", size = 3.5
       )
+  }
+
+  return(p)
+}
+
+
+#' Plot Gabor-Granger Profit Curve
+#'
+#' Creates profit curve plot showing profit index vs price.
+#'
+#' @param gg_results Gabor-Granger results with profit optimization
+#' @param config Configuration list
+#'
+#' @return ggplot2 object
+#'
+#' @keywords internal
+plot_gg_profit <- function(gg_results, config) {
+
+  library(ggplot2)
+
+  revenue <- gg_results$revenue_curve
+  optimal_profit <- gg_results$optimal_price_profit
+  currency <- config$currency_symbol %||% "$"
+
+  # Filter to rows with profit data
+  profit_data <- revenue[!is.na(revenue$profit_index), ]
+
+  p <- ggplot(profit_data, aes(x = price, y = profit_index)) +
+    geom_line(color = "#9B59B6", linewidth = 1.2) +
+    geom_point(size = 3, color = "#9B59B6") +
+    labs(
+      title = "Gabor-Granger Profit Curve",
+      subtitle = "Profit Index = (Price - Cost) x Purchase Intent",
+      x = sprintf("Price (%s)", currency),
+      y = "Profit Index"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 16, face = "bold"),
+      plot.subtitle = element_text(size = 11, color = "gray40"),
+      panel.grid.minor = element_blank()
+    )
+
+  # Mark optimal profit price
+  if (!is.null(optimal_profit)) {
+    p <- p +
+      geom_vline(xintercept = optimal_profit$price, linetype = "dashed", color = "darkviolet") +
+      geom_point(
+        data = data.frame(x = optimal_profit$price, y = optimal_profit$profit_index),
+        aes(x = x, y = y),
+        size = 5, color = "darkviolet", inherit.aes = FALSE
+      ) +
+      annotate(
+        "text",
+        x = optimal_profit$price,
+        y = optimal_profit$profit_index,
+        label = sprintf("Max Profit\n%s%.2f", currency, optimal_profit$price),
+        vjust = -0.5, hjust = 0.5,
+        color = "darkviolet", fontface = "bold", size = 3.5
+      )
+  }
+
+  return(p)
+}
+
+
+#' Plot Revenue vs Profit Comparison
+#'
+#' Creates dual-axis plot comparing revenue and profit optimization.
+#'
+#' @param gg_results Gabor-Granger results with profit optimization
+#' @param config Configuration list
+#'
+#' @return ggplot2 object
+#'
+#' @keywords internal
+plot_revenue_vs_profit <- function(gg_results, config) {
+
+  library(ggplot2)
+
+  revenue <- gg_results$revenue_curve
+  optimal_revenue <- gg_results$optimal_price
+  optimal_profit <- gg_results$optimal_price_profit
+  currency <- config$currency_symbol %||% "$"
+
+  # Filter to rows with profit data
+  plot_data <- revenue[!is.na(revenue$profit_index), ]
+
+  # Normalize both curves to 0-100 scale for comparison
+  plot_data$revenue_norm <- (plot_data$revenue_index / max(plot_data$revenue_index, na.rm = TRUE)) * 100
+  plot_data$profit_norm <- (plot_data$profit_index / max(plot_data$profit_index, na.rm = TRUE)) * 100
+
+  # Reshape for ggplot
+  plot_long <- data.frame(
+    price = rep(plot_data$price, 2),
+    value = c(plot_data$revenue_norm, plot_data$profit_norm),
+    metric = rep(c("Revenue", "Profit"), each = nrow(plot_data)),
+    stringsAsFactors = FALSE
+  )
+
+  p <- ggplot(plot_long, aes(x = price, y = value, color = metric)) +
+    geom_line(linewidth = 1.2) +
+    geom_point(size = 2.5) +
+    scale_color_manual(values = c("Revenue" = "#2ECC71", "Profit" = "#9B59B6")) +
+    labs(
+      title = "Revenue vs Profit Optimization",
+      subtitle = "Normalized to 100 = Maximum",
+      x = sprintf("Price (%s)", currency),
+      y = "Index (Normalized)",
+      color = "Metric"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 16, face = "bold"),
+      plot.subtitle = element_text(size = 11, color = "gray40"),
+      legend.position = "right",
+      panel.grid.minor = element_blank()
+    )
+
+  # Mark optimal points
+  if (!is.null(optimal_revenue)) {
+    revenue_norm_val <- (optimal_revenue$revenue_index / max(plot_data$revenue_index, na.rm = TRUE)) * 100
+    p <- p +
+      geom_vline(xintercept = optimal_revenue$price, linetype = "dashed",
+                 color = "#2ECC71", alpha = 0.6) +
+      annotate("text", x = optimal_revenue$price, y = 95,
+               label = sprintf("Rev Max\n%s%.2f", currency, optimal_revenue$price),
+               size = 3, color = "#2ECC71", fontface = "bold", hjust = 0.5)
+  }
+
+  if (!is.null(optimal_profit)) {
+    profit_norm_val <- (optimal_profit$profit_index / max(plot_data$profit_index, na.rm = TRUE)) * 100
+    p <- p +
+      geom_vline(xintercept = optimal_profit$price, linetype = "dashed",
+                 color = "#9B59B6", alpha = 0.6) +
+      annotate("text", x = optimal_profit$price, y = 85,
+               label = sprintf("Profit Max\n%s%.2f", currency, optimal_profit$price),
+               size = 3, color = "#9B59B6", fontface = "bold", hjust = 0.5)
   }
 
   return(p)
