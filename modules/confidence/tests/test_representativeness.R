@@ -219,8 +219,8 @@ population_margins_df <- data.frame(
     0.07, 0.08, 0.10, 0.10
   ),
   Include = c(
-    # All included
-    rep("Y", 21)
+    # All included (2 gender + 5 age + 5 region + 4 nested = 16)
+    rep("Y", 16)
   ),
   stringsAsFactors = FALSE
 )
@@ -233,7 +233,7 @@ openxlsx::writeData(wb, "Population_Margins", population_margins_df,
 openxlsx::saveWorkbook(wb, config_path, overwrite = TRUE)
 
 cat("✓ Test configuration workbook written with Population_Margins sheet\n")
-cat(sprintf("  - %d simple margin targets (Gender, Age, Region)\n", 14))
+cat(sprintf("  - %d simple margin targets (Gender, Age, Region)\n", 12))
 cat(sprintf("  - %d nested quota targets (Gender x Age)\n", 4))
 cat("\n")
 
