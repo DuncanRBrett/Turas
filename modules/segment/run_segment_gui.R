@@ -549,7 +549,11 @@ run_segment_gui <- function() {
               tagList(
                 strong("Recommended K: "), result$recommendation$recommended_k, br(),
                 strong("Silhouette Score: "),
-                round(result$recommendation$recommended_silhouette, 3), br(),
+                if (!is.null(result$recommendation$recommended_silhouette) && is.numeric(result$recommendation$recommended_silhouette)) {
+                  round(result$recommendation$recommended_silhouette, 3)
+                } else {
+                  "N/A"
+                }, br(),
                 br(),
                 strong("Output Files:"), br(),
                 "• K Selection Report: ",
