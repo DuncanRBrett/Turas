@@ -199,8 +199,8 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
       units = "in"
     )
 
-    # Clean up temp file
-    unlink(plot_file)
+    # Note: Don't delete plot_file yet - it needs to exist until saveWorkbook() is called
+    # The temp file will be cleaned up by the OS eventually
   } else {
     openxlsx::writeData(wb, "Charts",
                        "Shapley_Value column not found; chart not generated.",
