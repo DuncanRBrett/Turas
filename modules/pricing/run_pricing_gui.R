@@ -313,7 +313,8 @@ server <- function(input, output, session) {
       config_path <- rv$config_path
     }
 
-    if (is.null(config_path) || config_path == "") {
+    # Validate config path is not empty
+    if (is.null(config_path) || length(config_path) == 0 || !nzchar(config_path)) {
       showNotification("Please specify a configuration file path", type = "error")
       return()
     }
