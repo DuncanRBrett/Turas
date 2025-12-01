@@ -254,6 +254,7 @@ run_confidence_analysis <- function(config_path,
 
   proportion_results <- list()
   mean_results <- list()
+  nps_results <- list()
 
   n_questions <- nrow(config$question_analysis)
 
@@ -277,6 +278,10 @@ run_confidence_analysis <- function(config_path,
       result <- process_mean_question(q_row, survey_data, weight_var, config, warnings_list)
       mean_results[[q_id]] <- result$result
       warnings_list <- result$warnings
+    } else if (stat_type == "nps") {
+      result <- process_nps_question(q_row, survey_data, weight_var, config, warnings_list)
+      nps_results[[q_id]] <- result$result
+      warnings_list <- result$warnings
     } else {
       warning(sprintf("Unknown statistic type '%s' for question %s", stat_type, q_id))
       warnings_list <- c(warnings_list, sprintf("Question %s: Unknown statistic type '%s'", q_id, stat_type))
@@ -284,8 +289,8 @@ run_confidence_analysis <- function(config_path,
   }
 
   if (verbose) {
-    cat(sprintf("  ✓ Processed: %d proportions, %d means\n",
-                length(proportion_results), length(mean_results)))
+    cat(sprintf("  ✓ Processed: %d proportions, %d means, %d NPS\n",
+                length(proportion_results), length(mean_results), length(nps_results)))
   }
 
   # ============================================================================
@@ -324,6 +329,7 @@ run_confidence_analysis <- function(config_path,
       study_level_stats = study_stats,
       proportion_results = proportion_results,
       mean_results = mean_results,
+      nps_results = nps_results,
       config = list(
         confidence_level = as.numeric(config$study_settings$Confidence_Level),
         bootstrap_iterations = as.integer(config$study_settings$Bootstrap_Iterations),
@@ -364,6 +370,7 @@ run_confidence_analysis <- function(config_path,
     study_stats = study_stats,
     proportion_results = proportion_results,
     mean_results = mean_results,
+    nps_results = nps_results,
     warnings = warnings_list,
     config = config,
     elapsed_seconds = elapsed
@@ -727,6 +734,285 @@ process_mean_question <- function(q_row, survey_data, weight_var, config, warnin
         prior_mean = prior_mean,
         prior_sd   = prior_sd,
         prior_n    = prior_n
+      )
+    }
+
+  }, error = function(e) {
+    warnings_list <- c(
+      warnings_list,
+      sprintf("Question %s: %s", q_id, conditionMessage(e))
+    )
+  })
+
+  return(list(result = result, warnings = warnings_list))
+}
+
+
+#' Process NPS question (internal)
+#' @keywords internal
+process_nps_question <- function(q_row, survey_data, weight_var, config, warnings_list) {
+  q_id <- q_row$Question_ID
+  result <- list()
+
+  tryCatch({
+    # -------------------------------------------------------------------------
+    # 1. Check question exists
+    # -------------------------------------------------------------------------
+    if (!q_id %in% names(survey_data)) {
+      warnings_list <- c(
+        warnings_list,
+        sprintf("Question %s: Not found in data", q_id)
+      )
+      return(list(result = NULL, warnings = warnings_list))
+    }
+
+    values <- survey_data[[q_id]]
+
+    # Require numeric for NPS analysis
+    if (!is.numeric(values)) {
+      warnings_list <- c(
+        warnings_list,
+        sprintf("Question %s: Non-numeric values for NPS analysis", q_id)
+      )
+      return(list(result = NULL, warnings = warnings_list))
+    }
+
+    # -------------------------------------------------------------------------
+    # 2. Get weights (if applicable)
+    # -------------------------------------------------------------------------
+    weights <- NULL
+    if (!is.null(weight_var) && nzchar(weight_var) && weight_var %in% names(survey_data)) {
+      weights <- survey_data[[weight_var]]
+    }
+
+    # -------------------------------------------------------------------------
+    # 3. Parse promoter and detractor codes
+    # -------------------------------------------------------------------------
+    promoter_codes <- parse_codes(q_row$Promoter_Codes)
+    detractor_codes <- parse_codes(q_row$Detractor_Codes)
+
+    if (length(promoter_codes) == 0) {
+      warnings_list <- c(
+        warnings_list,
+        sprintf("Question %s: No promoter codes specified", q_id)
+      )
+      return(list(result = NULL, warnings = warnings_list))
+    }
+
+    if (length(detractor_codes) == 0) {
+      warnings_list <- c(
+        warnings_list,
+        sprintf("Question %s: No detractor codes specified", q_id)
+      )
+      return(list(result = NULL, warnings = warnings_list))
+    }
+
+    # -------------------------------------------------------------------------
+    # 4. Clean and align values and weights
+    # -------------------------------------------------------------------------
+    # Start with non-missing numeric values
+    valid_value_idx <- !is.na(values) & is.finite(values)
+
+    if (!is.null(weights)) {
+      weights_raw <- weights
+      # Keep only respondents with valid answer AND valid weight
+      good_idx <- valid_value_idx & !is.na(weights_raw) & weights_raw > 0
+
+      values_valid  <- values[good_idx]
+      weights_valid <- weights_raw[good_idx]
+
+      if (length(values_valid) == 0) {
+        warnings_list <- c(
+          warnings_list,
+          sprintf("Question %s: No valid cases after applying weights", q_id)
+        )
+        return(list(result = NULL, warnings = warnings_list))
+      }
+    } else {
+      values_valid  <- values[valid_value_idx]
+      weights_valid <- NULL
+
+      if (length(values_valid) == 0) {
+        warnings_list <- c(
+          warnings_list,
+          sprintf("Question %s: No valid (non-missing) responses", q_id)
+        )
+        return(list(result = NULL, warnings = warnings_list))
+      }
+    }
+
+    # -------------------------------------------------------------------------
+    # 5. Calculate NPS components
+    # -------------------------------------------------------------------------
+    is_promoter  <- values_valid %in% promoter_codes
+    is_detractor <- values_valid %in% detractor_codes
+
+    if (!is.null(weights_valid)) {
+      total_w <- sum(weights_valid)
+
+      if (isTRUE(total_w <= 0)) {
+        warnings_list <- c(
+          warnings_list,
+          sprintf("Question %s: Total weight is zero or negative", q_id)
+        )
+        return(list(result = NULL, warnings = warnings_list))
+      }
+
+      pct_promoters  <- 100 * sum(weights_valid[is_promoter]) / total_w
+      pct_detractors <- 100 * sum(weights_valid[is_detractor]) / total_w
+      n_eff <- calculate_effective_n(weights_valid)
+      n_raw <- length(values_valid)
+    } else {
+      pct_promoters  <- 100 * mean(is_promoter)
+      pct_detractors <- 100 * mean(is_detractor)
+      n_eff <- length(values_valid)
+      n_raw <- length(values_valid)
+    }
+
+    nps_score <- pct_promoters - pct_detractors
+
+    # -------------------------------------------------------------------------
+    # 6. Store core stats
+    # -------------------------------------------------------------------------
+    result$nps_score       <- nps_score
+    result$pct_promoters   <- pct_promoters
+    result$pct_detractors  <- pct_detractors
+    result$pct_passives    <- 100 - pct_promoters - pct_detractors
+    result$n               <- n_raw
+    result$n_eff           <- n_eff
+    result$promoter_codes  <- paste(promoter_codes, collapse = ",")
+    result$detractor_codes <- paste(detractor_codes, collapse = ",")
+
+    # -------------------------------------------------------------------------
+    # 7. Confidence intervals according to config
+    # -------------------------------------------------------------------------
+    conf_level <- as.numeric(config$study_settings$Confidence_Level)
+
+    # Normal approximation (using variance of difference formula)
+    run_moe_flag <- q_row$Run_MOE
+    if (!is.null(run_moe_flag) &&
+        !is.na(run_moe_flag) &&
+        toupper(run_moe_flag) == "Y") {
+      if (!is.na(n_eff) && n_eff > 0) {
+        # Convert percentages to proportions for variance calculation
+        p_prom <- pct_promoters / 100
+        p_detr <- pct_detractors / 100
+
+        # Variance of difference (assuming independence)
+        var_prom <- p_prom * (1 - p_prom) / n_eff
+        var_detr <- p_detr * (1 - p_detr) / n_eff
+        se_nps <- sqrt(var_prom + var_detr) * 100  # Convert back to percentage scale
+
+        z <- qnorm(1 - (1 - conf_level) / 2)
+        moe <- z * se_nps
+
+        result$moe_normal <- list(
+          lower = nps_score - moe,
+          upper = nps_score + moe,
+          se = se_nps
+        )
+      } else {
+        warnings_list <- c(
+          warnings_list,
+          sprintf("Question %s: Effective n <= 0, MOE CI not calculated", q_id)
+        )
+      }
+    }
+
+    # Bootstrap CI
+    run_boot_flag <- q_row$Run_Bootstrap
+    if (!is.null(run_boot_flag) &&
+        !is.na(run_boot_flag) &&
+        toupper(run_boot_flag) == "Y") {
+      boot_iter <- as.integer(config$study_settings$Bootstrap_Iterations)
+
+      # Bootstrap NPS
+      B <- boot_iter
+      validate_sample_size(B, "B", min_n = 1000)
+
+      n <- length(values_valid)
+      boot_nps <- numeric(B)
+
+      for (b in 1:B) {
+        boot_idx <- sample(1:n, size = n, replace = TRUE)
+        boot_values <- values_valid[boot_idx]
+
+        if (!is.null(weights_valid)) {
+          boot_weights <- weights_valid[boot_idx]
+          total_w_boot <- sum(boot_weights)
+
+          if (total_w_boot > 0) {
+            is_prom_boot <- boot_values %in% promoter_codes
+            is_detr_boot <- boot_values %in% detractor_codes
+
+            pct_prom_boot <- 100 * sum(boot_weights[is_prom_boot]) / total_w_boot
+            pct_detr_boot <- 100 * sum(boot_weights[is_detr_boot]) / total_w_boot
+
+            boot_nps[b] <- pct_prom_boot - pct_detr_boot
+          } else {
+            boot_nps[b] <- NA
+          }
+        } else {
+          is_prom_boot <- boot_values %in% promoter_codes
+          is_detr_boot <- boot_values %in% detractor_codes
+
+          pct_prom_boot <- 100 * mean(is_prom_boot)
+          pct_detr_boot <- 100 * mean(is_detr_boot)
+
+          boot_nps[b] <- pct_prom_boot - pct_detr_boot
+        }
+      }
+
+      # Remove any NAs from bootstrap
+      boot_nps <- boot_nps[!is.na(boot_nps)]
+
+      if (length(boot_nps) > 0) {
+        alpha <- 1 - conf_level
+        result$bootstrap <- list(
+          lower = quantile(boot_nps, alpha / 2, names = FALSE),
+          upper = quantile(boot_nps, 1 - alpha / 2, names = FALSE)
+        )
+      } else {
+        warnings_list <- c(
+          warnings_list,
+          sprintf("Question %s: Bootstrap failed (all NA)", q_id)
+        )
+      }
+    }
+
+    # Bayesian CI (using normal approximation for NPS)
+    run_cred_flag <- q_row$Run_Credible
+    if (!is.null(run_cred_flag) &&
+        !is.na(run_cred_flag) &&
+        toupper(run_cred_flag) == "Y") {
+      prior_mean <- if (!is.na(q_row$Prior_Mean)) q_row$Prior_Mean else 0
+      prior_sd   <- if (!is.na(q_row$Prior_SD))   q_row$Prior_SD   else 50  # Wide prior if not specified
+
+      # Use normal approximation for NPS posterior
+      # Likelihood: NPS ~ Normal(nps_score, se_nps^2)
+      # Prior: NPS ~ Normal(prior_mean, prior_sd^2)
+
+      p_prom <- pct_promoters / 100
+      p_detr <- pct_detractors / 100
+      var_prom <- p_prom * (1 - p_prom) / n_eff
+      var_detr <- p_detr * (1 - p_detr) / n_eff
+      se_nps <- sqrt(var_prom + var_detr) * 100
+
+      # Posterior (normal-normal conjugate)
+      precision_prior <- 1 / (prior_sd^2)
+      precision_data  <- 1 / (se_nps^2)
+      precision_post  <- precision_prior + precision_data
+
+      mean_post <- (precision_prior * prior_mean + precision_data * nps_score) / precision_post
+      sd_post   <- sqrt(1 / precision_post)
+
+      # Credible interval
+      alpha <- 1 - conf_level
+      result$bayesian <- list(
+        lower = qnorm(alpha / 2, mean = mean_post, sd = sd_post),
+        upper = qnorm(1 - alpha / 2, mean = mean_post, sd = sd_post),
+        posterior_mean = mean_post,
+        posterior_sd = sd_post
       )
     }
 

@@ -462,22 +462,31 @@ validate_question_analysis <- function(question_df) {
     }
 
     # Validate Statistic_Type
-    # NOTE: NPS support planned for Phase 2
     stat_type <- tolower(as.character(row$Statistic_Type))
-    if (!stat_type %in% c("proportion", "mean")) {
+    if (!stat_type %in% c("proportion", "mean", "nps")) {
       errors <- c(errors, sprintf(
-        "%s: Statistic_Type must be 'proportion' or 'mean' (NPS support planned for Phase 2)",
+        "%s: Statistic_Type must be 'proportion', 'mean', or 'nps'",
         q_id
       ))
     }
 
-    # Validate Categories (required for proportion, must be empty for mean)
+    # Validate Categories (required for proportion, must be empty for mean/nps)
     if (stat_type == "proportion") {
       if (is.na(row$Categories) || row$Categories == "") {
         errors <- c(errors, sprintf(
           "%s: Categories required for Statistic_Type='proportion'",
           q_id
         ))
+      }
+    }
+
+    # Validate NPS codes (required for nps type)
+    if (stat_type == "nps") {
+      if (is.na(row$Promoter_Codes) || row$Promoter_Codes == "") {
+        errors <- c(errors, sprintf("%s: Promoter_Codes required for NPS", q_id))
+      }
+      if (is.na(row$Detractor_Codes) || row$Detractor_Codes == "") {
+        errors <- c(errors, sprintf("%s: Detractor_Codes required for NPS", q_id))
       }
     }
 
@@ -516,8 +525,14 @@ validate_question_analysis <- function(question_df) {
             q_id
           ))
         }
-        # For means, Prior_SD is required
-        if (stat_type == "mean") {
+        if (stat_type == "nps" && (prior_mean < -100 || prior_mean > 100)) {
+          errors <- c(errors, sprintf(
+            "%s: Prior_Mean for NPS must be between -100 and 100",
+            q_id
+          ))
+        }
+        # For means and NPS, Prior_SD is required
+        if (stat_type %in% c("mean", "nps")) {
           if (is.na(row$Prior_SD) || row$Prior_SD == "") {
             errors <- c(errors, sprintf(
               "%s: Prior_SD required when Prior_Mean specified for %s",
