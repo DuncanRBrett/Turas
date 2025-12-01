@@ -76,10 +76,22 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
          call. = FALSE)
   }
 
+  # Extract optional weight variable
+  weight_vars <- variables$VariableName[variables$Type == "Weight"]
+  weight_var <- if (length(weight_vars) == 0) {
+    NULL
+  } else {
+    if (length(weight_vars) > 1) {
+      warning("Multiple weight variables found. Using first: ", weight_vars[1])
+    }
+    weight_vars[1]
+  }
+
   list(
     settings = settings_list,
     outcome_var = outcome_vars,
     driver_vars = driver_vars,
+    weight_var = weight_var,
     variables = variables,
     data_file = data_file,
     output_file = output_file,
