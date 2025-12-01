@@ -163,6 +163,9 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
     # Build the bar plot and insert it below the table
     plot_row_start <- nrow(chart_data) + 4
 
+    # Create temporary file for plot
+    plot_file <- tempfile(fileext = ".png")
+
     # Use Label if available, otherwise Driver
     labels <- ifelse(
       is.na(chart_data$Label) | chart_data$Label == "",
@@ -170,7 +173,8 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
       chart_data$Label
     )
 
-    # Create plot in current device
+    # Create and save plot
+    grDevices::png(filename = plot_file, width = 800, height = 600, res = 100)
     graphics::par(mar = c(5, 14, 4, 2))  # Extra left margin for labels
     graphics::barplot(
       height = chart_data$Shapley_Percent,
@@ -181,16 +185,22 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
       xlab = "Shapley Impact (%)",
       main = "Key Driver Impact (Shapley Values)"
     )
+    grDevices::dev.off()
 
-    # Insert this plot into the workbook (captures current plot)
-    openxlsx::insertPlot(
+    # Insert the saved plot
+    openxlsx::insertImage(
       wb,
       sheet = "Charts",
-      xy = c(1, plot_row_start),
+      file = plot_file,
+      startRow = plot_row_start,
+      startCol = 1,
       width = 7,
       height = 5,
-      fileType = "png"
+      units = "in"
     )
+
+    # Clean up temp file
+    unlink(plot_file)
   } else {
     openxlsx::writeData(wb, "Charts",
                        "Shapley_Value column not found; chart not generated.",
