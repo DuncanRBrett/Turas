@@ -378,100 +378,195 @@ run_confidence_analysis <- function(config_path,
 #' Process proportion question (internal)
 #' @keywords internal
 process_proportion_question <- function(q_row, survey_data, weight_var, config, warnings_list) {
-
   q_id <- q_row$Question_ID
   result <- list()
 
   tryCatch({
-    # Get question data
+    # -------------------------------------------------------------------------
+    # 1. Check question exists
+    # -------------------------------------------------------------------------
     if (!q_id %in% names(survey_data)) {
-      warnings_list <- c(warnings_list, sprintf("Question %s: Not found in data", q_id))
+      warnings_list <- c(
+        warnings_list,
+        sprintf("Question %s: Not found in data", q_id)
+      )
       return(list(result = NULL, warnings = warnings_list))
     }
 
     values <- survey_data[[q_id]]
 
-    # Get weights if applicable
+    # -------------------------------------------------------------------------
+    # 2. Get weights (if applicable)
+    # -------------------------------------------------------------------------
     weights <- NULL
-    if (!is.null(weight_var)) {
+    if (!is.null(weight_var) && nzchar(weight_var) && weight_var %in% names(survey_data)) {
       weights <- survey_data[[weight_var]]
     }
 
-    # Parse categories
+    # -------------------------------------------------------------------------
+    # 3. Parse categories and basic validation
+    # -------------------------------------------------------------------------
     categories <- parse_codes(q_row$Categories)
-
-    # Calculate proportion
     if (length(categories) == 0) {
-      warnings_list <- c(warnings_list, sprintf("Question %s: No categories specified", q_id))
+      warnings_list <- c(
+        warnings_list,
+        sprintf("Question %s: No categories specified", q_id)
+      )
       return(list(result = NULL, warnings = warnings_list))
     }
 
-    # For simplicity in Phase 1, use first category or count successes
-    # More sophisticated category handling can be added later
-    success_values <- values %in% categories
-
-    # Remove NAs
-    valid_idx <- !is.na(values)
-    success_values <- success_values[valid_idx]
-
-    # Initialize weights_valid for unweighted case
-    weights_valid <- NULL
+    # -------------------------------------------------------------------------
+    # 4. Clean and align values and weights
+    # -------------------------------------------------------------------------
+    # Start with non-missing values
+    valid_value_idx <- !is.na(values)
 
     if (!is.null(weights)) {
-      weights_valid <- weights[valid_idx]
+      # Keep only respondents with a valid answer AND valid weight
+      weights_raw <- weights
+      good_idx <- valid_value_idx & !is.na(weights_raw) & weights_raw > 0
 
-      # Filter to valid weights and align success_values accordingly
-      valid_weight_idx <- !is.na(weights_valid) & weights_valid > 0
-      weights_valid <- weights_valid[valid_weight_idx]
-      success_values <- success_values[valid_weight_idx]
+      values_valid  <- values[good_idx]
+      weights_valid <- weights_raw[good_idx]
 
-      n_eff <- calculate_effective_n(weights_valid)
-      p <- sum(weights_valid[success_values]) / sum(weights_valid)
+      if (length(values_valid) == 0) {
+        warnings_list <- c(
+          warnings_list,
+          sprintf("Question %s: No valid cases after applying weights", q_id)
+        )
+        return(list(result = NULL, warnings = warnings_list))
+      }
     } else {
-      n_eff <- sum(valid_idx)
-      p <- mean(success_values)
+      values_valid  <- values[valid_value_idx]
+      weights_valid <- NULL
+
+      if (length(values_valid) == 0) {
+        warnings_list <- c(
+          warnings_list,
+          sprintf("Question %s: No valid (non-missing) responses", q_id)
+        )
+        return(list(result = NULL, warnings = warnings_list))
+      }
     }
 
-    result$proportion <- p
-    result$n <- sum(valid_idx)
-    result$n_eff <- n_eff
-    result$category <- paste(categories, collapse = ",")
+    # -------------------------------------------------------------------------
+    # 5. Calculate observed proportion and effective n
+    # -------------------------------------------------------------------------
+    in_category <- values_valid %in% categories
 
-    # Calculate confidence intervals based on config
+    if (!is.null(weights_valid)) {
+      total_w   <- sum(weights_valid)
+      success_w <- sum(weights_valid[in_category])
+
+      if (isTRUE(total_w <= 0)) {
+        warnings_list <- c(
+          warnings_list,
+          sprintf("Question %s: Total weight is zero or negative", q_id)
+        )
+        return(list(result = NULL, warnings = warnings_list))
+      }
+
+      p      <- success_w / total_w
+      n_eff  <- calculate_effective_n(weights_valid)
+      n_raw  <- length(values_valid)
+    } else {
+      p      <- mean(in_category)
+      n_eff  <- length(values_valid)
+      n_raw  <- length(values_valid)
+    }
+
+    # Basic sanity check
+    if (is.na(p)) {
+      warnings_list <- c(
+        warnings_list,
+        sprintf("Question %s: Proportion could not be calculated (NA)", q_id)
+      )
+      return(list(result = NULL, warnings = warnings_list))
+    }
+
+    # -------------------------------------------------------------------------
+    # 6. Store core stats for this question
+    # -------------------------------------------------------------------------
+    result$category   <- paste(categories, collapse = ",")
+    result$proportion <- p
+    result$n          <- n_raw
+    result$n_eff      <- n_eff
+
+    # -------------------------------------------------------------------------
+    # 7. Confidence intervals according to config
+    # -------------------------------------------------------------------------
     conf_level <- as.numeric(config$study_settings$Confidence_Level)
 
-    # MOE
-    if (toupper(q_row$Run_MOE) == "Y") {
-      result$moe_normal <- calculate_proportion_ci_normal(p, n_eff, conf_level)
+    # Margin of error (normal approximation using effective n)
+    run_moe_flag <- q_row$Run_MOE
+    if (!is.null(run_moe_flag) &&
+        !is.na(run_moe_flag) &&
+        toupper(run_moe_flag) == "Y") {
+      if (!is.na(n_eff) && n_eff > 0) {
+        result$moe <- calculate_proportion_ci_normal(p, n_eff, conf_level)
+      } else {
+        warnings_list <- c(
+          warnings_list,
+          sprintf("Question %s: Effective n <= 0, MOE CI not calculated", q_id)
+        )
+      }
     }
 
-    # Wilson
-    if (toupper(q_row$Run_Wilson) == "Y") {
-      result$wilson <- calculate_proportion_ci_wilson(p, n_eff, conf_level)
+    # Wilson interval (using Use_Wilson flag)
+    use_wilson_flag <- q_row$Use_Wilson
+    if (!is.null(use_wilson_flag) &&
+        !is.na(use_wilson_flag) &&
+        toupper(use_wilson_flag) == "Y") {
+      if (!is.na(n_eff) && n_eff > 0) {
+        result$wilson <- calculate_proportion_ci_wilson(p, n_eff, conf_level)
+      } else {
+        warnings_list <- c(
+          warnings_list,
+          sprintf("Question %s: Effective n <= 0, Wilson CI not calculated", q_id)
+        )
+      }
     }
 
-    # Bootstrap
-    if (toupper(q_row$Run_Bootstrap) == "Y") {
+    # Bootstrap CI
+    run_boot_flag <- q_row$Run_Bootstrap
+    if (!is.null(run_boot_flag) &&
+        !is.na(run_boot_flag) &&
+        toupper(run_boot_flag) == "Y") {
       boot_iter <- as.integer(config$study_settings$Bootstrap_Iterations)
-      # Pass raw values and categories, not success_values
-      values_valid <- values[valid_idx]
-      result$bootstrap <- bootstrap_proportion_ci(values_valid, categories, weights_valid, boot_iter, conf_level)
+      result$bootstrap <- bootstrap_proportion_ci(
+        data       = values_valid,
+        categories = categories,
+        weights    = weights_valid,
+        B          = boot_iter,
+        conf_level = conf_level
+      )
     }
 
-    # Bayesian
-    if (toupper(q_row$Run_Credible) == "Y") {
-      # Check for prior specifications (Prior_Mean and Prior_N, not Alpha/Beta)
-      prior_mean <- if (!is.na(q_row$Prior_Mean)) as.numeric(q_row$Prior_Mean) else NULL
-      prior_n_val <- if (!is.na(q_row$Prior_N)) as.integer(q_row$Prior_N) else NULL
+    # Bayesian CI (Beta-Binomial)
+    run_cred_flag <- q_row$Run_Credible
+    if (!is.null(run_cred_flag) &&
+        !is.na(run_cred_flag) &&
+        toupper(run_cred_flag) == "Y") {
+      prior_mean <- if (!is.na(q_row$Prior_Mean)) q_row$Prior_Mean else NULL
+      prior_n    <- if (!is.na(q_row$Prior_N))    q_row$Prior_N    else NULL
 
-      # Calculate proportion from success_values
-      n_bayes <- length(success_values)
+      # Use effective n for weighted data, raw n otherwise
+      n_bayes <- if (!is.null(weights_valid)) n_eff else length(values_valid)
 
-      result$bayesian <- credible_interval_proportion(p, n_bayes, conf_level, prior_mean, prior_n_val)
+      result$bayesian <- credible_interval_proportion(
+        p          = p,
+        n          = n_bayes,
+        conf_level = conf_level,
+        prior_mean = prior_mean,
+        prior_n    = prior_n
+      )
     }
 
   }, error = function(e) {
-    warnings_list <- c(warnings_list, sprintf("Question %s: %s", q_id, conditionMessage(e)))
+    warnings_list <- c(
+      warnings_list,
+      sprintf("Question %s: %s", q_id, conditionMessage(e))
+    )
   })
 
   return(list(result = result, warnings = warnings_list))
@@ -481,86 +576,165 @@ process_proportion_question <- function(q_row, survey_data, weight_var, config, 
 #' Process mean question (internal)
 #' @keywords internal
 process_mean_question <- function(q_row, survey_data, weight_var, config, warnings_list) {
-
   q_id <- q_row$Question_ID
   result <- list()
 
   tryCatch({
-    # Get question data
+    # -------------------------------------------------------------------------
+    # 1. Check question exists
+    # -------------------------------------------------------------------------
     if (!q_id %in% names(survey_data)) {
-      warnings_list <- c(warnings_list, sprintf("Question %s: Not found in data", q_id))
+      warnings_list <- c(
+        warnings_list,
+        sprintf("Question %s: Not found in data", q_id)
+      )
       return(list(result = NULL, warnings = warnings_list))
     }
 
     values <- survey_data[[q_id]]
 
-    # Ensure numeric
+    # Require numeric for mean analysis
     if (!is.numeric(values)) {
-      values <- as.numeric(as.character(values))
+      warnings_list <- c(
+        warnings_list,
+        sprintf("Question %s: Non-numeric values for mean analysis", q_id)
+      )
+      return(list(result = NULL, warnings = warnings_list))
     }
 
-    # Get weights if applicable
+    # -------------------------------------------------------------------------
+    # 2. Get weights (if applicable)
+    # -------------------------------------------------------------------------
     weights <- NULL
-    if (!is.null(weight_var)) {
+    if (!is.null(weight_var) && nzchar(weight_var) && weight_var %in% names(survey_data)) {
       weights <- survey_data[[weight_var]]
     }
 
-    # Remove NAs
-    valid_idx <- !is.na(values)
-    values_valid <- values[valid_idx]
+    # -------------------------------------------------------------------------
+    # 3. Clean and align values and weights
+    # -------------------------------------------------------------------------
+    # Start with non-missing numeric values
+    valid_value_idx <- !is.na(values) & is.finite(values)
 
     if (!is.null(weights)) {
-      weights_valid <- weights[valid_idx]
-      weights_valid <- weights_valid[!is.na(weights_valid) & weights_valid > 0]
+      weights_raw <- weights
+      # Keep only respondents with valid value AND valid weight
+      good_idx <- valid_value_idx & !is.na(weights_raw) & weights_raw > 0
+
+      values_valid  <- values[good_idx]
+      weights_valid <- weights_raw[good_idx]
+
+      if (length(values_valid) == 0) {
+        warnings_list <- c(
+          warnings_list,
+          sprintf("Question %s: No valid cases after applying weights", q_id)
+        )
+        return(list(result = NULL, warnings = warnings_list))
+      }
     } else {
+      values_valid  <- values[valid_value_idx]
       weights_valid <- NULL
+
+      if (length(values_valid) == 0) {
+        warnings_list <- c(
+          warnings_list,
+          sprintf("Question %s: No valid (non-missing) numeric responses", q_id)
+        )
+        return(list(result = NULL, warnings = warnings_list))
+      }
     }
 
-    # Calculate mean and stats
-    if (!is.null(weights_valid)) {
-      mean_val <- weighted.mean(values_valid, weights_valid)
-      result$n_eff <- calculate_effective_n(weights_valid)
+    # -------------------------------------------------------------------------
+    # 4. Calculate mean, SD and effective n
+    # -------------------------------------------------------------------------
+    if (!is.null(weights_valid) && length(weights_valid) > 0) {
+      # Weighted mean
+      total_w <- sum(weights_valid)
+      if (isTRUE(total_w <= 0)) {
+        warnings_list <- c(
+          warnings_list,
+          sprintf("Question %s: Total weight is zero or negative", q_id)
+        )
+        return(list(result = NULL, warnings = warnings_list))
+      }
 
-      # Calculate weighted SD (same formula as in calculate_mean_ci)
-      weighted_var <- sum(weights_valid * (values_valid - mean_val)^2) / sum(weights_valid)
-      sd_val <- sqrt(weighted_var)
+      mean_val <- sum(values_valid * weights_valid) / total_w
+
+      # Weighted variance (population estimator, consistent with effective n)
+      weighted_var <- sum(weights_valid * (values_valid - mean_val)^2) / total_w
+      sd_val       <- sqrt(weighted_var)
+
+      n_eff <- calculate_effective_n(weights_valid)
+      n_raw <- length(values_valid)
     } else {
+      # Unweighted
       mean_val <- mean(values_valid)
-      result$n_eff <- length(values_valid)
-      sd_val <- sd(values_valid)
+      sd_val   <- sd(values_valid)
+      n_eff    <- length(values_valid)
+      n_raw    <- length(values_valid)
+      weights_valid <- NULL  # be explicit
     }
 
-    result$mean <- mean_val
-    result$sd <- sd_val
-    result$n <- length(values_valid)
+    result$mean  <- mean_val
+    result$sd    <- sd_val
+    result$n     <- n_raw
+    result$n_eff <- n_eff
 
-    # Calculate confidence intervals based on config
+    # -------------------------------------------------------------------------
+    # 5. Confidence intervals according to config
+    # -------------------------------------------------------------------------
     conf_level <- as.numeric(config$study_settings$Confidence_Level)
 
-    # t-distribution CI
-    if (toupper(q_row$Run_MOE) == "Y") {
-      result$t_dist <- calculate_mean_ci(values_valid, weights_valid, conf_level)
+    # t-distribution CI (uses n_eff internally in calculate_mean_ci)
+    run_moe_flag <- q_row$Run_MOE
+    if (!is.null(run_moe_flag) &&
+        !is.na(run_moe_flag) &&
+        toupper(run_moe_flag) == "Y") {
+      result$t_dist <- calculate_mean_ci(
+        values     = values_valid,
+        weights    = weights_valid,
+        conf_level = conf_level
+      )
     }
 
-    # Bootstrap
-    if (toupper(q_row$Run_Bootstrap) == "Y") {
+    # Bootstrap CI
+    run_boot_flag <- q_row$Run_Bootstrap
+    if (!is.null(run_boot_flag) &&
+        !is.na(run_boot_flag) &&
+        toupper(run_boot_flag) == "Y") {
       boot_iter <- as.integer(config$study_settings$Bootstrap_Iterations)
-      result$bootstrap <- bootstrap_mean_ci(values_valid, weights_valid, boot_iter, conf_level)
+      result$bootstrap <- bootstrap_mean_ci(
+        values     = values_valid,
+        weights    = weights_valid,
+        B          = boot_iter,
+        conf_level = conf_level
+      )
     }
 
-    # Bayesian
-    if (toupper(q_row$Run_Credible) == "Y") {
-      # Check for prior specifications
+    # Bayesian CI for the mean
+    run_cred_flag <- q_row$Run_Credible
+    if (!is.null(run_cred_flag) &&
+        !is.na(run_cred_flag) &&
+        toupper(run_cred_flag) == "Y") {
       prior_mean <- if (!is.na(q_row$Prior_Mean)) q_row$Prior_Mean else NULL
-      prior_sd <- if (!is.na(q_row$Prior_SD)) q_row$Prior_SD else NULL
-      prior_n <- if (!is.na(q_row$Prior_N)) q_row$Prior_N else NULL
+      prior_sd   <- if (!is.na(q_row$Prior_SD))   q_row$Prior_SD   else NULL
+      prior_n    <- if (!is.na(q_row$Prior_N))    q_row$Prior_N    else NULL
 
-      result$bayesian <- credible_interval_mean(values_valid, weights_valid, conf_level,
-                                                 prior_mean, prior_sd, prior_n)
+      result$bayesian <- credible_interval_mean(
+        values     = values_valid,
+        weights    = weights_valid,
+        conf_level = conf_level,
+        prior_mean = prior_mean,
+        prior_sd   = prior_sd,
+        prior_n    = prior_n
+      )
     }
 
   }, error = function(e) {
-    warnings_list <- c(warnings_list, sprintf("Question %s: %s", q_id, conditionMessage(e)))
+    warnings_list <- c(
+      warnings_list,
+      sprintf("Question %s: %s", q_id, conditionMessage(e))
+    )
   })
 
   return(list(result = result, warnings = warnings_list))
