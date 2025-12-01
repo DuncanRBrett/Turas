@@ -9,14 +9,37 @@ The Turas Segmentation Module provides a standardized, repeatable approach to cl
 **Phase 1 Features:**
 - K-means clustering with automatic k selection
 - Excel-based configuration
+- **Interactive GUI interface** with real-time console output
 - Exploration mode (compare multiple k values)
 - Final run mode (detailed output for chosen k)
 - **Outlier detection and handling** (z-score or Mahalanobis distance)
 - Validation metrics (silhouette, elbow, optional gap statistic)
 - Segment profiling and characterization
 - Excel output reports
+- Model scoring for new data
 
 ## Quick Start
+
+### Using the GUI (Recommended for Most Users)
+
+**Launch the GUI:**
+```r
+source("modules/segment/run_segment_gui.R")
+run_segment_gui()
+```
+
+**Follow the 5-step workflow:**
+1. **Select Configuration** - Browse to your config Excel file
+2. **Validate** - Click to verify configuration is correct
+3. **Run Analysis** - Start the segmentation
+4. **Monitor Console** - Watch real-time progress in console output
+5. **View Results** - See summary and download output files
+
+The GUI provides real-time feedback, progress monitoring, and is fully compatible with both exploration and final modes.
+
+---
+
+### Using Command Line (Advanced Users)
 
 ### 1. Prepare Your Configuration
 

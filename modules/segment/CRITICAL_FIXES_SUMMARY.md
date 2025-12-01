@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-Based on external code review feedback, **8 critical and high-priority issues** were identified and **ALL have been fixed**. These fixes address production-breaking bugs, reproducibility issues, and architectural problems that could cause incorrect results.
+Based on external code review feedback and production testing, **10 critical and high-priority issues** were identified and **ALL have been fixed**. These fixes address production-breaking bugs, reproducibility issues, architectural problems that could cause incorrect results, and GUI usability issues.
 
 ---
 
@@ -199,22 +199,108 @@ result$data <- data[keep_rows, , drop = FALSE]
 
 ---
 
+### 9. ✅ FIXED: Variable Selection Consistency
+**Severity:** MEDIUM - Model saves wrong variables
+**Files Changed:** `run_segment.R`
+
+**Problem:**
+- After variable selection (20 → 8 variables), model object saved original 20 variables
+- Scoring new data would use wrong variables
+- Profile creation used selected vars but model saved original
+
+**Fix:**
+```r
+# Use selected vars from updated config, not original
+profile_result <- create_full_segment_profile(
+  data = data_list$data,
+  clusters = final_result$clusters,
+  clustering_vars = data_list$config$clustering_vars,  # SELECTED vars
+  profile_vars = data_list$config$profile_vars
+)
+
+model_object <- list(
+  # ...
+  clustering_vars = data_list$config$clustering_vars,  # SELECTED vars
+  config = data_list$config  # Updated config with selected vars
+)
+```
+
+**Impact:** Model object now correctly reflects variables actually used for clustering
+
+**Reference:** See `CRITICAL_FIX_9_VARIABLE_SELECTION.md` for full details
+
+---
+
+### 10. ✅ FIXED: GUI Console Output and Progress Handling
+**Severity:** HIGH - GUI unusable due to grey screen crashes
+**Files Changed:** `run_segment_gui.R`
+
+**Problem:**
+- Grey screen crash on GUI launch (console placement issue)
+- Grey screen during analysis execution (progress handling issue)
+- Console output not displaying (R 4.2+ compatibility issue)
+- Results display error in exploration mode (numeric safety issue)
+
+**Fix:**
+- **Console Placement**: Moved console to static main UI (Step 4) instead of reactive results UI
+- **Progress Handling**: Changed from `withProgress()` to `Progress$new(session)` pattern
+- **R 4.2+ Compatibility**: Check `nchar(x[1])` instead of `nchar(x)` for single TRUE/FALSE
+- **Numeric Safety**: Added `is.numeric()` check before `round()` operations
+
+**Code Patterns Applied (from tracker module):**
+```r
+# 1. Static UI placement (always visible)
+div(class = "step-card",
+  div(class = "step-title", "Step 4: Console Output"),
+  div(class = "console-output", verbatimTextOutput("console_text"))
+)
+
+# 2. Progress outside sink blocks
+progress <- Progress$new(session)
+progress$set(value = 0.3, detail = "Step 1")  # OUTSIDE sink
+
+sink(file, type = "output")
+# ... work ...
+sink(type = "output")
+
+progress$set(value = 0.6, detail = "Step 2")  # OUTSIDE sink
+
+# 3. R 4.2+ safe conditionals
+if (is.null(x) || length(x) == 0 || nchar(x[1]) == 0) {
+  # Single TRUE/FALSE guaranteed
+}
+
+# 4. Numeric safety in UI
+if (!is.null(value) && is.numeric(value)) {
+  round(value, 3)
+} else {
+  "N/A"
+}
+```
+
+**Impact:** GUI now stable, responsive, and works with both final and exploration modes
+
+**Reference:** See `CRITICAL_FIX_10_GUI_CONSOLE.md` for full technical details and patterns
+
+---
+
 ## Files Modified Summary
 
 | File | Changes | Severity |
 |------|---------|----------|
 | `lib/segment_scoring.R` | Scaling bug + imputation fix | CRITICAL |
 | `lib/segment_data_prep.R` | Order of operations + imputation params | CRITICAL |
-| `run_segment.R` | Seed management + imputation params | HIGH |
+| `run_segment.R` | Seed management + imputation params + varsel consistency | HIGH |
 | `lib/segment_utils.R` | Seed management functions + nstart default | HIGH |
 | `lib/segment_outliers.R` | Mahalanobis guardrails + NA handling | HIGH |
+| `run_segment_gui.R` | Console placement + progress handling + R 4.2+ fixes | HIGH |
 | `lib/segment_config.R` | nstart default increase | MEDIUM |
 | `lib/segment_validation.R` | nstart parameter | MEDIUM |
 | `lib/segment_profiling_enhanced.R` | P-value notes | LOW |
 
-**Total Files Modified:** 8
-**Total Functions Modified:** 15+
-**Lines Changed:** ~200 lines
+**Total Files Modified:** 9
+**Total Functions Modified:** 20+
+**Lines Changed:** ~280 lines
 
 ---
 
@@ -240,11 +326,17 @@ result$data <- data[keep_rows, , drop = FALSE]
    - Test with n < 3*p → should error cleanly
    - Test with 3*p < n < 5*p → should warn
 
+5. **GUI Console Output Test**
+   - Launch GUI → should not grey screen
+   - Run analysis → console updates in real-time
+   - Test both exploration and final modes
+   - Verify results display after completion
+
 ### Regression Testing:
 
-5. Run existing test suite on all test datasets
-6. Verify output formats unchanged
-7. Check backward compatibility with old configs
+6. Run existing test suite on all test datasets
+7. Verify output formats unchanged
+8. Check backward compatibility with old configs
 
 ---
 
@@ -306,19 +398,26 @@ The segmentation module is now:
 - ✅ **Mathematically correct** (scaling, imputation, order of operations)
 - ✅ **Reproducible** (seed management)
 - ✅ **Robust** (guardrails, NA handling)
+- ✅ **GUI stable** (console output, progress handling, R 4.2+ compatible)
 - ✅ **Production-ready** (with recommended model regeneration)
 
 **Risk Assessment:**
-- **Before fixes:** HIGH (incorrect results in production)
+- **Before fixes:** HIGH (incorrect results in production, GUI unusable)
 - **After fixes:** LOW (all critical issues resolved)
+
+**Testing Status:**
+- ✅ Fixes 1-8: Systematically implemented from code review
+- ✅ Fix 9: Tested with variable selection workflow
+- ✅ Fix 10: Tested with both HV_config and varsel_config on real data
 
 **Next Steps:**
 1. Test thoroughly with existing datasets
 2. Regenerate all production models
-3. Update user documentation
+3. Update user documentation ✅ (COMPLETED)
 4. Consider implementing remaining lower-priority items
 
 ---
 
-**Reviewer Assessment:** "The architecture is solid and there aren't obvious bugs" ✅
+**External Reviewer Assessment:** "The architecture is solid and there aren't obvious bugs" ✅
+**Production Testing Assessment:** GUI works perfectly with both final and exploration modes ✅
 **Our Assessment:** All identified issues have been systematically addressed ✅

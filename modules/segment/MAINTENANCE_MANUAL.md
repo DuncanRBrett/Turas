@@ -366,6 +366,148 @@ create_all_visualizations(result, output_folder, prefix, question_labels)
 - Colorblind-friendly palettes (rainbow with alpha, blues, greens)
 - Labeled axes and legends
 
+### 3.9 GUI Console Output System (`run_segment_gui.R`) - NEW
+
+**Purpose**: Provide real-time analysis feedback in Shiny GUI
+
+**Architecture**: The GUI console output system was modeled after the tracker module's EXACT pattern to ensure R 4.2+ compatibility and prevent grey screen crashes.
+
+**Key Components**:
+
+```r
+# 1. Console output reactive value
+console_output <- reactiveVal("")
+
+# 2. CSS styling for dark-themed console
+.console-output {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: 'Courier New', monospace;
+  /* ... */
+}
+
+# 3. Static UI placement (CRITICAL)
+# Console is in STATIC main UI (Step 4), NOT in reactive results_ui
+div(class = "step-card",
+  div(class = "step-title", "Step 4: Console Output"),
+  div(class = "console-output",
+    verbatimTextOutput("console_text")
+  )
+)
+
+# 4. R 4.2+ compatible renderText()
+output$console_text <- renderText({
+  current_output <- console_output()
+
+  # CRITICAL: Single TRUE/FALSE for R 4.2+
+  if (is.null(current_output) ||
+      length(current_output) == 0 ||
+      nchar(current_output[1]) == 0) {
+    "Console output will appear here..."
+  } else {
+    # Ensure single string
+    if (length(current_output) > 1) {
+      paste(current_output, collapse = "\n")
+    } else {
+      current_output
+    }
+  }
+})
+
+# 5. Progress handling - EXACT tracker pattern
+progress <- Progress$new(session)  # NOT withProgress()!
+progress$set(message = "Running...", value = 0)
+on.exit(progress$close())
+
+# 6. Console capture with sink()
+output_capture_file <- tempfile()
+sink(output_capture_file, type = "output")
+
+# Run analysis...
+result <- turas_segment_from_config(...)
+
+sink(type = "output")  # Close sink
+
+# 7. Progress updates OUTSIDE sink blocks
+progress$set(value = 0.9, detail = "Finalizing...")
+```
+
+**Critical Design Patterns**:
+
+**Pattern 1: Static UI Placement**
+- ❌ **WRONG**: Console in `renderUI()` that depends on `analysis_result()`
+  ```r
+  # CAUSES GREY SCREEN - don't do this!
+  output$results_ui <- renderUI({
+    req(analysis_result())  # Requires result to exist
+    tagList(
+      # Console here - BAD!
+      verbatimTextOutput("console_text")
+    )
+  })
+  ```
+
+- ✅ **CORRECT**: Console in static main UI
+  ```r
+  # In main UI layout - always visible
+  div(class = "step-card",
+    verbatimTextOutput("console_text")
+  )
+  ```
+
+**Pattern 2: R 4.2+ Conditional Safety**
+- **Problem**: `if (nchar(x) == 0)` returns VECTOR in R 4.2+ if `x` is vector
+- **Solution**: Always check first element `nchar(x[1])`
+  ```r
+  # R 4.2+ safe:
+  if (is.null(x) || length(x) == 0 || nchar(x[1]) == 0) {
+    # Single TRUE/FALSE guaranteed
+  }
+  ```
+
+**Pattern 3: Progress Outside Sink Blocks**
+- **Problem**: `withProgress()` + `incProgress()` inside `sink()` breaks Shiny
+- **Solution**: Use `Progress$new(session)` with updates OUTSIDE sink
+  ```r
+  # CORRECT pattern from tracker:
+  progress <- Progress$new(session)
+  progress$set(value = 0.3, detail = "Step 1")
+
+  sink(file, type = "output")
+  # ... work happens here ...
+  sink(type = "output")
+
+  progress$set(value = 0.6, detail = "Step 2")  # OUTSIDE sink
+  ```
+
+**Pattern 4: Numeric Safety in Results Display**
+- **Problem**: `round(x, 3)` fails if `x` is not numeric
+- **Solution**: Check type before mathematical operations
+  ```r
+  if (!is.null(value) && is.numeric(value)) {
+    round(value, 3)
+  } else {
+    "N/A"
+  }
+  ```
+
+**Common Pitfalls**:
+
+1. **Grey Screen on Launch**: Console in reactive UI instead of static
+2. **Grey Screen During Analysis**: Progress updates inside sink blocks
+3. **Console Not Updating**: R 4.2+ conditional returning vector
+4. **Display Errors**: Attempting math operations on non-numeric values
+
+**Testing Checklist**:
+
+- [ ] GUI launches without grey screen
+- [ ] Console displays placeholder text before analysis
+- [ ] Console updates in real-time during analysis
+- [ ] Progress indicator works throughout
+- [ ] Both exploration and final modes work
+- [ ] Results display after completion
+- [ ] No errors with non-numeric values
+
 ---
 
 ## 4. Data Flow

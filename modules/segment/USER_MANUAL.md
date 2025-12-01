@@ -224,7 +224,108 @@ Create Excel file with "Labels" sheet:
 
 ## 5. Running Segmentation
 
-### Workflow 1: Exploration Mode (Finding Optimal k)
+### Using the GUI Interface (Recommended)
+
+**Launching the GUI:**
+
+From the Turas launcher:
+```r
+source("launch_turas.R")
+# Click "Launch Segment" button
+```
+
+Or directly:
+```r
+source("modules/segment/run_segment_gui.R")
+run_segment_gui()
+```
+
+**GUI Workflow - 5 Simple Steps:**
+
+**Step 1: Select Configuration File**
+- Click "Browse..." to locate your configuration Excel file
+- File path will display once selected
+- Example: `/Users/duncan/projects/hv_config.xlsx`
+
+**Step 2: Validation**
+- Click "Validate Configuration"
+- Reviews all parameters for completeness and correctness
+- Green checkmark (✓) appears if valid
+- Red error messages appear if issues found
+- Fix any errors in the Excel file before proceeding
+
+**Step 3: Run Analysis**
+- Click "Run Segmentation Analysis"
+- Analysis begins immediately
+- Progress indicator shows current stage
+- **Important:** Do not close the browser window during analysis
+
+**Step 4: Console Output**
+- Real-time console messages appear in dark-themed output box
+- Shows analysis progress with detailed logging:
+  ```
+  ========================================
+  TURAS SEGMENTATION ANALYSIS
+  ========================================
+  Started: 2025-12-01 14:23:15
+
+  [1/6] Loading configuration...
+  ✓ Configuration loaded successfully
+  Mode: Exploration (testing k = 3 to 6)
+
+  [2/6] Loading and preparing data...
+  ✓ Data loaded: 350 rows, 20 columns
+  ✓ Variable selection: 20 variables → 8 selected
+
+  [3/6] Running k-means clustering...
+  Testing k=3... Silhouette: 0.276
+  Testing k=4... Silhouette: 0.312
+  Testing k=5... Silhouette: 0.289
+  Testing k=6... Silhouette: 0.245
+
+  [4/6] Creating segment profiles...
+  [5/6] Generating visualizations...
+  [6/6] Exporting results...
+
+  ✓ Analysis complete!
+  ```
+- Console updates in real-time during execution
+- All console output is automatically captured
+
+**Step 5: Results**
+- Displays immediately after analysis completes
+- **Exploration Mode** shows:
+  - Recommended k value
+  - Silhouette score for recommended k
+  - All tested k values
+  - Link to exploration report
+- **Final Mode** shows:
+  - Number of segments created
+  - Silhouette quality score
+  - Segment size distribution
+  - Links to assignments and profile files
+- Click file path links to open output files
+
+**Tips for GUI Usage:**
+
+✅ **DO:**
+- Keep browser window open during analysis
+- Monitor console output for progress
+- Wait for "Analysis Complete!" message
+- Review console for any warnings
+
+❌ **DON'T:**
+- Don't click "Run Analysis" multiple times
+- Don't close browser during processing
+- Don't modify config file during analysis
+
+---
+
+### Command Line Workflows
+
+For advanced users or scripting, use command line:
+
+#### Workflow 1: Exploration Mode (Finding Optimal k)
 
 **Step 1: Create exploration config**
 ```
@@ -254,7 +355,7 @@ k_fixed = 4  # Your chosen k
 final_result <- turas_segment_from_config("config/final.xlsx")
 ```
 
-### Workflow 2: Direct Final (Known k)
+#### Workflow 2: Direct Final (Known k)
 
 If you already know how many segments you want:
 
@@ -263,7 +364,7 @@ result <- turas_segment_from_config("config/k4_segmentation.xlsx")
 # Config has k_fixed = 4
 ```
 
-### Workflow 3: Variable Selection + Segmentation
+#### Workflow 3: Variable Selection + Segmentation
 
 When you have 20+ clustering variables:
 
@@ -584,6 +685,40 @@ Before running segmentation:
 ---
 
 ## 10. Troubleshooting
+
+### GUI-Specific Issues
+
+**Problem: Grey screen when launching GUI**
+- **Cause**: Console output placement in reactive UI component
+- **Fix**: This has been fixed in the latest version. Update to latest code.
+- **Technical**: Console moved to static main UI (Step 4) instead of reactive results UI
+
+**Problem: Grey screen during analysis execution**
+- **Cause**: Incompatible progress indicator pattern with sink() blocks
+- **Fix**: This has been fixed - now uses `Progress$new(session)` pattern
+- **Technical**: Progress updates must be outside sink() blocks for R 4.2+ compatibility
+
+**Problem: Console output not displaying**
+- **Cause**: R 4.2+ compatibility issue with renderText() conditionals
+- **Fix**: Automatic - uses safe conditional checking
+- **Details**: Checks `nchar(output[1])` instead of `nchar(output)` for single TRUE/FALSE
+
+**Problem: "non-numeric argument to mathematical function" in exploration mode**
+- **Cause**: Silhouette score calculation returning non-numeric value
+- **Fix**: Automatic - displays "N/A" instead of attempting to round non-numeric values
+- **Details**: Results display safely handles edge cases
+
+**Problem: Results not displaying after successful analysis**
+- **Check**: Look at console output - did analysis actually complete?
+- **Check**: Are there error messages in the R console (not GUI console)?
+- **Fix**: Refresh browser page and re-run if needed
+
+**Problem: File path links not working**
+- **Cause**: Output files not in expected location
+- **Fix**: Check `output_folder` parameter in config
+- **Verify**: Look in working directory for actual file location
+
+---
 
 ### Common Errors
 
