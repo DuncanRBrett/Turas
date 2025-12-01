@@ -56,7 +56,7 @@ run_pricing_gui <- function() {
   source(file.path(r_dir, "09_price_volume_optimisation.R"))
 
   # Check for required packages
-  required_packages <- c("shiny", "readxl", "openxlsx", "shinyFiles")
+  required_packages <- c("shiny", "readxl", "openxlsx", "shinyFiles", "shinyjs")
   missing <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
   if (length(missing) > 0) {
     stop(sprintf("Missing required packages: %s\nInstall with: install.packages(c('%s'))",
@@ -67,6 +67,7 @@ run_pricing_gui <- function() {
 
   library(shiny)
   library(shinyFiles)
+  library(shinyjs)
 
   # Recent projects file
   recent_projects_file <- file.path(module_dir, ".recent_pricing_projects.rds")
@@ -97,6 +98,7 @@ save_recent_project <- function(path) {
 # UI
 # ==============================================================================
 ui <- fluidPage(
+  useShinyjs(),  # Enable shinyjs
   titlePanel("Turas Pricing Research Analysis"),
 
   sidebarLayout(
@@ -117,9 +119,11 @@ ui <- fluidPage(
       textInput("config_path_text", "Or Paste Full Path",
                 placeholder = "/full/path/to/config.xlsx"),
 
-      # Or select recent
+      # Or select recent (show basenames, store full paths)
       selectInput("recent_projects", "Or Select Recent",
-                  choices = c("", load_recent_projects()),
+                  choices = c("" = "",
+                             setNames(load_recent_projects(),
+                                     basename(load_recent_projects()))),
                   selected = ""),
 
       hr(),
@@ -129,6 +133,9 @@ ui <- fluidPage(
       # Data file override
       fileInput("data_file", "Override Data File (optional)",
                 accept = c(".csv", ".xlsx", ".xls", ".sav", ".dta", ".rds")),
+      actionButton("clear_data_file", "Clear Data File",
+                   class = "btn-sm btn-warning"),
+      br(),
 
       # Output file
       textInput("output_file", "Output File Name",
@@ -183,6 +190,10 @@ ui <- fluidPage(
       h4("Create Config Template"),
       selectInput("template_method", "Analysis Method",
                   choices = c("van_westendorp", "gabor_granger", "both")),
+      shinyDirButton("template_dir_button", "Choose Save Folder",
+                    "Select folder to save template",
+                    icon = icon("folder-open")),
+      verbatimTextOutput("template_dir_display", placeholder = TRUE),
       textInput("template_name", "Template File Name",
                 value = "pricing_config.xlsx"),
       actionButton("create_template", "Create Template",
@@ -260,13 +271,15 @@ server <- function(input, output, session) {
   rv <- reactiveValues(
     results = NULL,
     console = "",
-    config_path = NULL
+    config_path = NULL,
+    template_dir = NULL
   )
 
-  # Set up file chooser - allow browsing from root and home
+  # Set up file/folder choosers - allow browsing from root and home
   volumes <- c(Home = path.expand("~"), Root = "/")
   shinyFileChoose(input, "config_file_button", roots = volumes,
                   filetypes = c("xlsx", "xls"))
+  shinyDirChoose(input, "template_dir_button", roots = volumes)
 
   # Handle file browser selection
   observeEvent(input$config_file_button, {
@@ -299,6 +312,32 @@ server <- function(input, output, session) {
     if (input$recent_projects != "") {
       rv$config_path <- input$recent_projects
     }
+  })
+
+  # Handle template folder selection
+  observeEvent(input$template_dir_button, {
+    if (!is.null(input$template_dir_button) && !is.integer(input$template_dir_button)) {
+      dir_selected <- parseDirPath(volumes, input$template_dir_button)
+      if (length(dir_selected) > 0) {
+        rv$template_dir <- as.character(dir_selected)
+      }
+    }
+  })
+
+  # Display selected template directory
+  output$template_dir_display <- renderText({
+    if (!is.null(rv$template_dir) && rv$template_dir != "") {
+      paste("Save to:", rv$template_dir)
+    } else {
+      paste("Save to:", getwd())
+    }
+  })
+
+  # Clear data file override
+  observeEvent(input$clear_data_file, {
+    # Reset the file input by updating its value
+    shinyjs::reset("data_file")
+    showNotification("Data file override cleared", type = "message")
   })
 
   # Run analysis
@@ -617,14 +656,24 @@ server <- function(input, output, session) {
       template_name <- "pricing_config.xlsx"
     }
 
+    # Determine save directory
+    save_dir <- if (!is.null(rv$template_dir) && rv$template_dir != "") {
+      rv$template_dir
+    } else {
+      getwd()
+    }
+
+    # Construct full path
+    output_path <- file.path(save_dir, template_name)
+
     tryCatch({
       create_pricing_config(
-        output_file = template_name,
+        output_file = output_path,
         method = input$template_method,
         overwrite = TRUE
       )
       showNotification(
-        sprintf("Template created: %s", template_name),
+        sprintf("Template created: %s", output_path),
         type = "message"
       )
     }, error = function(e) {
