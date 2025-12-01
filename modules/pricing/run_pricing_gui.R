@@ -388,7 +388,7 @@ server <- function(input, output, session) {
       }
 
       # Override output file - resolve to project directory if relative
-      if (!is.null(output_file) && output_file != "") {
+      if (!is.null(output_file) && length(output_file) > 0 && nzchar(output_file)) {
         # If just a filename, put it in project directory
         if (!grepl("/", output_file) && !grepl("\\\\", output_file)) {
           output_file <- file.path(config$project_root, output_file)
@@ -415,6 +415,13 @@ server <- function(input, output, session) {
       showNotification("Analysis completed successfully!", type = "message")
 
     }, error = function(e) {
+      # Print full error to R console for debugging
+      cat("\n=== ERROR IN PRICING ANALYSIS ===\n")
+      cat("Message:", e$message, "\n")
+      cat("Call:", deparse(e$call), "\n")
+      print(traceback())
+      cat("=================================\n\n")
+
       rv$console <- paste("ERROR:", e$message)
       showNotification(paste("Error:", e$message), type = "error")
     })
