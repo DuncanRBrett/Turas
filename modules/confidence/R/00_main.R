@@ -242,6 +242,61 @@ run_confidence_analysis <- function(config_path,
         }
       }
     }
+
+    # Add representativeness diagnostics if study stats were calculated
+    if (!is.null(study_stats)) {
+      # Get weights vector for diagnostics
+      weights <- if (!is.null(weight_var) && weight_var %in% names(survey_data)) {
+        survey_data[[weight_var]]
+      } else {
+        NULL
+      }
+
+      # Weight concentration diagnostics
+      weight_conc <- tryCatch({
+        compute_weight_concentration(weights)
+      }, error = function(e) {
+        if (verbose) cat(sprintf("  ⚠ Weight concentration calculation failed: %s\n", conditionMessage(e)))
+        NULL
+      })
+
+      # Margin comparison (if Population_Margins provided)
+      margin_comp <- tryCatch({
+        compute_margin_comparison(
+          data = survey_data,
+          weights = weights,
+          target_margins = config$population_margins
+        )
+      }, error = function(e) {
+        if (verbose) cat(sprintf("  ⚠ Margin comparison failed: %s\n", conditionMessage(e)))
+        NULL
+      })
+
+      # Attach to study_stats as attributes (so they travel with study_stats)
+      attr(study_stats, "weight_concentration") <- weight_conc
+      attr(study_stats, "margin_comparison") <- margin_comp
+
+      # Report if calculated
+      if (!is.null(weight_conc) && verbose) {
+        cat(sprintf("  ✓ Weight concentration: Top 5%% hold %.1f%% of weight (%s)\n",
+                    weight_conc$Top_5pct_Share,
+                    weight_conc$Concentration_Flag))
+      }
+
+      if (!is.null(margin_comp) && verbose) {
+        n_red <- sum(margin_comp$Flag == "RED", na.rm = TRUE)
+        n_amber <- sum(margin_comp$Flag == "AMBER", na.rm = TRUE)
+        n_green <- sum(margin_comp$Flag == "GREEN", na.rm = TRUE)
+        cat(sprintf("  ✓ Margin comparison: %d targets (%d GREEN, %d AMBER, %d RED)\n",
+                    nrow(margin_comp), n_green, n_amber, n_red))
+        if (n_red > 0) {
+          warnings_list <- c(warnings_list, sprintf(
+            "Representativeness: %d margin target(s) off by >5pp (RED flag)",
+            n_red
+          ))
+        }
+      }
+    }
   } else {
     if (verbose) cat("  ⊘ Study-level stats skipped (disabled in config)\n")
   }

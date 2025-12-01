@@ -111,28 +111,33 @@ write_confidence_output <- function(output_path,
     add_study_level_sheet(wb, study_level_stats, decimal_sep)
   }
 
-  # Sheet 3: Proportions Detail
+  # Sheet 3: Representativeness & Weights (if available)
+  if (!is.null(study_level_stats)) {
+    add_representativeness_sheet(wb, study_level_stats, decimal_sep)
+  }
+
+  # Sheet 4: Proportions Detail
   if (length(proportion_results) > 0) {
     add_proportions_detail_sheet(wb, proportion_results, decimal_sep)
   }
 
-  # Sheet 4: Means Detail
+  # Sheet 5: Means Detail
   if (length(mean_results) > 0) {
     add_means_detail_sheet(wb, mean_results, decimal_sep)
   }
 
-  # Sheet 5: NPS Detail
+  # Sheet 6: NPS Detail
   if (length(nps_results) > 0) {
     add_nps_detail_sheet(wb, nps_results, decimal_sep)
   }
 
-  # Sheet 6: Methodology
+  # Sheet 7: Methodology
   add_methodology_sheet(wb)
 
-  # Sheet 7: Warnings
+  # Sheet 8: Warnings
   add_warnings_sheet(wb, warnings)
 
-  # Sheet 8: Inputs
+  # Sheet 9: Inputs
   add_inputs_sheet(wb, config, decimal_sep)
 
   # Save workbook
@@ -333,7 +338,196 @@ add_study_level_sheet <- function(wb, study_stats, decimal_sep) {
 
 
 # ==============================================================================
-# SHEET 3: PROPORTIONS DETAIL
+# SHEET 3: REPRESENTATIVENESS & WEIGHTS
+# ==============================================================================
+
+#' Add representativeness and weight diagnostics sheet (internal)
+#' @keywords internal
+add_representativeness_sheet <- function(wb, study_stats, decimal_sep) {
+
+  # Extract margin comparison and weight concentration from attributes
+  margin_comp <- attr(study_stats, "margin_comparison")
+  weight_conc <- attr(study_stats, "weight_concentration")
+
+  # Skip if no data to show
+  if (is.null(margin_comp) && is.null(weight_conc)) {
+    return(invisible(wb))
+  }
+
+  openxlsx::addWorksheet(wb, "Representativeness_Weights")
+
+  row <- 1
+
+  # Title
+  openxlsx::writeData(wb, "Representativeness_Weights",
+                      "REPRESENTATIVENESS & WEIGHT DIAGNOSTICS",
+                      startCol = 1, startRow = row)
+  openxlsx::addStyle(wb, "Representativeness_Weights",
+                     style = openxlsx::createStyle(fontSize = 14, textDecoration = "bold"),
+                     rows = row, cols = 1)
+  row <- row + 2
+
+  # Block A: Weight Concentration Diagnostics
+  if (!is.null(weight_conc) && nrow(weight_conc) > 0) {
+    openxlsx::writeData(wb, "Representativeness_Weights",
+                        "A. Weight Distribution & Concentration",
+                        startCol = 1, startRow = row)
+    openxlsx::addStyle(wb, "Representativeness_Weights",
+                       style = openxlsx::createStyle(fontSize = 12, textDecoration = "bold"),
+                       rows = row, cols = 1)
+    row <- row + 1
+
+    openxlsx::writeData(wb, "Representativeness_Weights",
+                        weight_conc,
+                        startCol = 1, startRow = row,
+                        colNames = TRUE, rowNames = FALSE)
+
+    # Apply numeric formatting
+    apply_numeric_formatting(wb, "Representativeness_Weights",
+                             row + 1, 1, weight_conc, decimal_sep)
+
+    # Header style
+    header_style <- openxlsx::createStyle(
+      fontSize = 11,
+      textDecoration = "bold",
+      fgFill = "#4F81BD",
+      fontColour = "#FFFFFF",
+      border = "TopBottomLeftRight"
+    )
+    openxlsx::addStyle(wb, "Representativeness_Weights", header_style,
+                       rows = row, cols = 1:ncol(weight_conc), gridExpand = TRUE)
+
+    row <- row + nrow(weight_conc) + 2
+
+    # Interpretation notes for weight concentration
+    openxlsx::writeData(wb, "Representativeness_Weights",
+                        "Interpretation:",
+                        startCol = 1, startRow = row)
+    openxlsx::addStyle(wb, "Representativeness_Weights",
+                       style = openxlsx::createStyle(textDecoration = "bold"),
+                       rows = row, cols = 1)
+    row <- row + 1
+
+    notes_conc <- c(
+      "Weight Concentration (Top 5% Share):",
+      "  LOW (< 15%): Healthy weight distribution",
+      "  MODERATE (15-25%): Acceptable concentration",
+      "  HIGH (> 25%): Concerning - few cases dominate weighted sample"
+    )
+
+    for (note in notes_conc) {
+      openxlsx::writeData(wb, "Representativeness_Weights", note,
+                          startCol = 1, startRow = row)
+      row <- row + 1
+    }
+
+    row <- row + 2
+  }
+
+  # Block B: Margin Comparison (Target vs Actual)
+  if (!is.null(margin_comp) && nrow(margin_comp) > 0) {
+    openxlsx::writeData(wb, "Representativeness_Weights",
+                        "B. Population Margin Comparison (Target vs Weighted Sample)",
+                        startCol = 1, startRow = row)
+    openxlsx::addStyle(wb, "Representativeness_Weights",
+                       style = openxlsx::createStyle(fontSize = 12, textDecoration = "bold"),
+                       rows = row, cols = 1)
+    row <- row + 1
+
+    openxlsx::writeData(wb, "Representativeness_Weights",
+                        margin_comp,
+                        startCol = 1, startRow = row,
+                        colNames = TRUE, rowNames = FALSE)
+
+    # Apply numeric formatting
+    apply_numeric_formatting(wb, "Representativeness_Weights",
+                             row + 1, 1, margin_comp, decimal_sep)
+
+    # Header style
+    header_style <- openxlsx::createStyle(
+      fontSize = 11,
+      textDecoration = "bold",
+      fgFill = "#4F81BD",
+      fontColour = "#FFFFFF",
+      border = "TopBottomLeftRight"
+    )
+    openxlsx::addStyle(wb, "Representativeness_Weights", header_style,
+                       rows = row, cols = 1:ncol(margin_comp), gridExpand = TRUE)
+
+    # Conditional formatting on Flag column
+    flag_col <- which(colnames(margin_comp) == "Flag")
+    if (length(flag_col) == 1) {
+      n_rows <- nrow(margin_comp)
+
+      # RED flag formatting
+      openxlsx::conditionalFormatting(
+        wb, "Representativeness_Weights",
+        cols = flag_col,
+        rows = (row + 1):(row + n_rows),
+        type = "contains",
+        rule = "RED",
+        style = openxlsx::createStyle(fontColour = "#9C0006", bgFill = "#FFC7CE")
+      )
+
+      # AMBER flag formatting
+      openxlsx::conditionalFormatting(
+        wb, "Representativeness_Weights",
+        cols = flag_col,
+        rows = (row + 1):(row + n_rows),
+        type = "contains",
+        rule = "AMBER",
+        style = openxlsx::createStyle(fontColour = "#9C5700", bgFill = "#FFEB9C")
+      )
+
+      # GREEN flag formatting
+      openxlsx::conditionalFormatting(
+        wb, "Representativeness_Weights",
+        cols = flag_col,
+        rows = (row + 1):(row + n_rows),
+        type = "contains",
+        rule = "GREEN",
+        style = openxlsx::createStyle(fontColour = "#006100", bgFill = "#C6EFCE")
+      )
+    }
+
+    row <- row + nrow(margin_comp) + 2
+
+    # Interpretation notes for margin comparison
+    openxlsx::writeData(wb, "Representativeness_Weights",
+                        "Interpretation:",
+                        startCol = 1, startRow = row)
+    openxlsx::addStyle(wb, "Representativeness_Weights",
+                       style = openxlsx::createStyle(textDecoration = "bold"),
+                       rows = row, cols = 1)
+    row <- row + 1
+
+    notes_margin <- c(
+      "Difference from Target (in percentage points):",
+      "  GREEN: |Difference| < 2pp - Excellent representativeness",
+      "  AMBER: |Difference| 2-5pp - Acceptable, minor deviation",
+      "  RED: |Difference| >= 5pp - Concerning, substantial deviation",
+      "",
+      "Diff_pp = Weighted_Sample_Pct - Target_Pct",
+      "Positive values: Over-represented vs target",
+      "Negative values: Under-represented vs target"
+    )
+
+    for (note in notes_margin) {
+      openxlsx::writeData(wb, "Representativeness_Weights", note,
+                          startCol = 1, startRow = row)
+      row <- row + 1
+    }
+  }
+
+  # Auto-size columns
+  openxlsx::setColWidths(wb, "Representativeness_Weights", cols = 1:12, widths = "auto")
+
+  invisible(wb)
+}
+
+
+# ==============================================================================
+# SHEET 4: PROPORTIONS DETAIL
 # ==============================================================================
 
 #' Add proportions detail sheet (internal)
