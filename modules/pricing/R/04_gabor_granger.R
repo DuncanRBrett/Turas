@@ -65,13 +65,18 @@ run_gabor_granger <- function(data, config) {
     demand_curve <- demand_curve[order(demand_curve$price), ]  # Back to ascending order
   }
 
-  # Calculate revenue curve
-  revenue_curve <- calculate_revenue_curve(demand_curve)
+  # Calculate revenue curve (and profit if unit_cost specified)
+  revenue_curve <- calculate_revenue_curve(demand_curve, unit_cost = config$unit_cost)
 
-  # Find optimal price
+  # Find optimal price (revenue or profit)
   optimal_price <- NULL
+  optimal_price_profit <- NULL
   if (isTRUE(gg$revenue_optimization)) {
-    optimal_price <- find_optimal_price(revenue_curve)
+    optimal_price <- find_optimal_price(revenue_curve, metric = "revenue")
+    # Also find profit-maximizing price if profit was calculated
+    if ("profit_index" %in% names(revenue_curve)) {
+      optimal_price_profit <- find_optimal_price(revenue_curve, metric = "profit")
+    }
   }
 
   # Calculate elasticity
@@ -95,6 +100,7 @@ run_gabor_granger <- function(data, config) {
     demand_curve = demand_curve,
     revenue_curve = revenue_curve,
     optimal_price = optimal_price,
+    optimal_price_profit = optimal_price_profit,
     elasticity = elasticity,
     confidence_intervals = confidence_intervals,
     diagnostics = list(
@@ -102,7 +108,8 @@ run_gabor_granger <- function(data, config) {
       n_price_points = n_prices,
       monotonicity_check = monotonicity_check,
       price_range = range(gg_data$price),
-      method = "gabor_granger"
+      method = "gabor_granger",
+      has_profit = "profit_index" %in% names(revenue_curve)
     )
   )
 }
@@ -337,43 +344,76 @@ calculate_demand_curve <- function(gg_data) {
 
 #' Calculate Revenue Curve
 #'
-#' Computes expected revenue index at each price point.
+#' Computes expected revenue and profit indices at each price point.
 #'
 #' @param demand_curve Demand curve from calculate_demand_curve()
+#' @param unit_cost Optional unit cost for profit calculations
 #'
-#' @return Data frame with price, purchase intent, and revenue index
+#' @return Data frame with price, purchase intent, revenue index, and optionally profit
 #'
 #' @keywords internal
-calculate_revenue_curve <- function(demand_curve) {
+calculate_revenue_curve <- function(demand_curve, unit_cost = NA) {
 
   revenue <- demand_curve
   revenue$revenue_index <- revenue$price * revenue$purchase_intent
   revenue$revenue_per_100 <- revenue$price * revenue$purchase_intent * 100
 
+  # Calculate profit if unit cost is provided
+  if (!is.na(unit_cost) && is.finite(unit_cost)) {
+    revenue$margin <- revenue$price - unit_cost
+    revenue$profit_index <- revenue$margin * revenue$purchase_intent
+    revenue$profit_per_100 <- revenue$margin * revenue$purchase_intent * 100
+  }
+
   return(revenue)
 }
 
 
-#' Find Revenue-Maximizing Price
+#' Find Optimal Price
 #'
-#' Identifies the price point that maximizes expected revenue.
+#' Identifies the price point that maximizes expected revenue or profit.
 #'
 #' @param revenue_curve Revenue curve from calculate_revenue_curve()
+#' @param metric Either "revenue" (default) or "profit"
 #'
-#' @return List with optimal price, purchase intent, and revenue index
+#' @return List with optimal price, purchase intent, and metric value
 #'
 #' @keywords internal
-find_optimal_price <- function(revenue_curve) {
+find_optimal_price <- function(revenue_curve, metric = "revenue") {
 
-  optimal_idx <- which.max(revenue_curve$revenue_index)
+  if (metric == "profit") {
+    if (!"profit_index" %in% names(revenue_curve)) {
+      stop("Profit index not found in revenue_curve. Specify unit_cost in config.", call. = FALSE)
+    }
+    optimal_idx <- which.max(revenue_curve$profit_index)
+    result <- list(
+      price = revenue_curve$price[optimal_idx],
+      purchase_intent = revenue_curve$purchase_intent[optimal_idx],
+      revenue_index = revenue_curve$revenue_index[optimal_idx],
+      profit_index = revenue_curve$profit_index[optimal_idx],
+      margin = revenue_curve$margin[optimal_idx],
+      position = optimal_idx,
+      n_price_points = nrow(revenue_curve),
+      metric = "profit"
+    )
+  } else {
+    optimal_idx <- which.max(revenue_curve$revenue_index)
+    result <- list(
+      price = revenue_curve$price[optimal_idx],
+      purchase_intent = revenue_curve$purchase_intent[optimal_idx],
+      revenue_index = revenue_curve$revenue_index[optimal_idx],
+      position = optimal_idx,
+      n_price_points = nrow(revenue_curve),
+      metric = "revenue"
+    )
+    # Include profit info if available
+    if ("profit_index" %in% names(revenue_curve)) {
+      result$profit_index <- revenue_curve$profit_index[optimal_idx]
+      result$margin <- revenue_curve$margin[optimal_idx]
+    }
+  }
 
-  list(
-    price = revenue_curve$price[optimal_idx],
-    purchase_intent = revenue_curve$purchase_intent[optimal_idx],
-    revenue_index = revenue_curve$revenue_index[optimal_idx],
-    position = optimal_idx,
-    n_price_points = nrow(revenue_curve)
-  )
+  return(result)
 }
 
 
