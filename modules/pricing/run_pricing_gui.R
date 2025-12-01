@@ -312,7 +312,7 @@ server <- function(input, output, session) {
 
     # Get output file
     output_file <- input$output_file
-    if (output_file == "") {
+    if (is.null(output_file) || output_file == "") {
       output_file <- "pricing_results.xlsx"
     }
 
@@ -366,9 +366,15 @@ server <- function(input, output, session) {
         config$data_file <- data_file
       }
 
-      # Override output file
-      config$output$directory <- dirname(output_file)
-      config$output$filename_prefix <- tools::file_path_sans_ext(basename(output_file))
+      # Override output file - resolve to project directory if relative
+      if (!is.null(output_file) && output_file != "") {
+        # If just a filename, put it in project directory
+        if (!grepl("/", output_file) && !grepl("\\\\", output_file)) {
+          output_file <- file.path(config$project_root, output_file)
+        }
+        config$output$directory <- dirname(output_file)
+        config$output$filename_prefix <- tools::file_path_sans_ext(basename(output_file))
+      }
 
       # Run analysis with console capture
       output_capture <- capture.output({
