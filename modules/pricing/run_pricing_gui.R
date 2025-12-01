@@ -284,9 +284,9 @@ server <- function(input, output, session) {
     recent <- load_recent_projects()
     if (length(recent) > 0) {
       # Show just filename as label, full path as value
-      choices <- c("" = "", setNames(recent, basename(recent)))
+      choices <- c("", setNames(recent, basename(recent)))
     } else {
-      choices <- c("" = "")
+      choices <- c("")
     }
     updateSelectInput(session, "recent_projects", choices = choices)
   })
