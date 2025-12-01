@@ -51,6 +51,9 @@ run_pricing_gui <- function() {
   source(file.path(r_dir, "04_gabor_granger.R"))
   source(file.path(r_dir, "05_visualization.R"))
   source(file.path(r_dir, "06_output.R"))
+  source(file.path(r_dir, "07_wtp_distribution.R"))
+  source(file.path(r_dir, "08_competitive_scenarios.R"))
+  source(file.path(r_dir, "09_price_volume_optimisation.R"))
 
   # Check for required packages
   required_packages <- c("shiny", "readxl", "openxlsx")
@@ -124,6 +127,43 @@ ui <- fluidPage(
 
       hr(),
 
+      h4("Phase 1: Advanced Features"),
+
+      # Weight variable
+      textInput("weight_var", "Weight Variable (optional)",
+                placeholder = "e.g., survey_weight"),
+
+      # DK codes
+      textInput("dk_codes", "Don't Know Codes (optional)",
+                placeholder = "e.g., 98,99"),
+
+      # Monotonicity behaviors
+      selectInput("vw_monotonicity", "VW Monotonicity Behavior",
+                  choices = c("Flag Only" = "flag_only",
+                             "Drop" = "drop",
+                             "Fix" = "fix"),
+                  selected = "flag_only"),
+
+      selectInput("gg_monotonicity", "GG Monotonicity Behavior",
+                  choices = c("Smooth" = "smooth",
+                             "Flag Only" = "flag_only",
+                             "None" = "none"),
+                  selected = "smooth"),
+
+      # Segment variables
+      textInput("segment_vars", "Segment Variables (optional)",
+                placeholder = "e.g., age_group,region"),
+
+      hr(),
+
+      h4("Phase 2: Profit Optimization"),
+
+      # Unit cost
+      numericInput("unit_cost", "Unit Cost (for profit)",
+                   value = NA, min = 0, step = 0.01),
+
+      hr(),
+
       # Run button
       actionButton("run_analysis", "Run Analysis",
                    class = "btn-primary btn-lg btn-block"),
@@ -153,19 +193,41 @@ ui <- fluidPage(
                  conditionalPanel(
                    condition = "output.has_results",
                    h4("Key Results"),
-                   tableOutput("results_table")
+                   tableOutput("results_table"),
+                   conditionalPanel(
+                     condition = "output.has_profit_results",
+                     hr(),
+                     h4("Profit Optimization"),
+                     tableOutput("profit_table")
+                   )
                  )
         ),
 
-        tabPanel("Plots",
+        tabPanel("Main Plot",
                  br(),
                  plotOutput("main_plot", height = "500px")
+        ),
+
+        tabPanel("Additional Plots",
+                 br(),
+                 conditionalPanel(
+                   condition = "output.has_additional_plots",
+                   selectInput("plot_selector", "Select Plot",
+                              choices = c("Revenue Curve", "Profit Curve", "Revenue vs Profit")),
+                   plotOutput("additional_plot", height = "500px")
+                 )
         ),
 
         tabPanel("Diagnostics",
                  br(),
                  h4("Validation Summary"),
                  tableOutput("validation_table"),
+                 conditionalPanel(
+                   condition = "output.has_weight_summary",
+                   hr(),
+                   h4("Weight Statistics"),
+                   tableOutput("weight_table")
+                 ),
                  hr(),
                  h4("Warnings"),
                  verbatimTextOutput("warnings_output")
@@ -229,17 +291,63 @@ server <- function(input, output, session) {
       output_file <- "pricing_results.xlsx"
     }
 
+    # Build config overrides for Phase 1-3 features
+    config_overrides <- list()
+
+    # Phase 1: Weighting and data quality
+    if (!is.null(input$weight_var) && input$weight_var != "") {
+      config_overrides$weight_var <- input$weight_var
+    }
+
+    if (!is.null(input$dk_codes) && input$dk_codes != "") {
+      dk_vals <- trimws(strsplit(input$dk_codes, ",")[[1]])
+      config_overrides$dk_codes <- as.numeric(dk_vals)
+    }
+
+    if (!is.null(input$vw_monotonicity)) {
+      config_overrides$vw_monotonicity_behavior <- input$vw_monotonicity
+    }
+
+    if (!is.null(input$gg_monotonicity)) {
+      config_overrides$gg_monotonicity_behavior <- input$gg_monotonicity
+    }
+
+    if (!is.null(input$segment_vars) && input$segment_vars != "") {
+      seg_vals <- trimws(strsplit(input$segment_vars, ",")[[1]])
+      config_overrides$segment_vars <- seg_vals
+    }
+
+    # Phase 2: Profit optimization
+    if (!is.null(input$unit_cost) && !is.na(input$unit_cost) && input$unit_cost > 0) {
+      config_overrides$unit_cost <- input$unit_cost
+    }
+
     # Capture console output
     rv$console <- ""
 
     tryCatch({
+      # Load config
+      config <- load_pricing_config(config_path)
+
+      # Apply overrides
+      if (length(config_overrides) > 0) {
+        for (key in names(config_overrides)) {
+          config[[key]] <- config_overrides[[key]]
+        }
+      }
+
+      # Override data file if specified
+      if (!is.null(data_file)) {
+        config$data_file <- data_file
+      }
+
+      # Override output file
+      config$output$directory <- dirname(output_file)
+      config$output$filename_prefix <- tools::file_path_sans_ext(basename(output_file))
+
       # Run analysis with console capture
       output_capture <- capture.output({
-        rv$results <- run_pricing_analysis(
-          config_file = config_path,
-          data_file = data_file,
-          output_file = output_file
-        )
+        rv$results <- run_pricing_analysis_from_config(config)
       })
 
       rv$console <- paste(output_capture, collapse = "\n")
@@ -291,7 +399,7 @@ server <- function(input, output, session) {
       opt <- rv$results$results$optimal_price
       if (!is.null(opt)) {
         data.frame(
-          Metric = c("Optimal Price", "Purchase Intent", "Revenue Index"),
+          Metric = c("Revenue-Maximizing Price", "Purchase Intent", "Revenue Index"),
           Value = c(
             sprintf("$%.2f", opt$price),
             sprintf("%.1f%%", opt$purchase_intent * 100),
@@ -303,7 +411,7 @@ server <- function(input, output, session) {
       vw <- rv$results$results$van_westendorp$price_points
       gg <- rv$results$results$gabor_granger$optimal_price
       data.frame(
-        Metric = c("VW Acceptable Range", "VW Optimal Range", "GG Optimal Price"),
+        Metric = c("VW Acceptable Range", "VW Optimal Range", "GG Revenue-Max Price"),
         Value = c(
           sprintf("$%.2f - $%.2f", vw$PMC, vw$PME),
           sprintf("$%.2f - $%.2f", vw$OPP, vw$IDP),
@@ -313,6 +421,53 @@ server <- function(input, output, session) {
     }
   })
 
+  # Profit results table (Phase 2)
+  output$profit_table <- renderTable({
+    req(rv$results)
+    method <- rv$results$method
+
+    # Extract GG results
+    gg_results <- if (method == "gabor_granger") {
+      rv$results$results
+    } else if (method == "both") {
+      rv$results$results$gabor_granger
+    } else {
+      NULL
+    }
+
+    req(gg_results)
+    opt_profit <- gg_results$optimal_price_profit
+    req(opt_profit)
+
+    data.frame(
+      Metric = c("Profit-Maximizing Price", "Purchase Intent", "Profit Index", "Margin"),
+      Value = c(
+        sprintf("$%.2f", opt_profit$price),
+        sprintf("%.1f%%", opt_profit$purchase_intent * 100),
+        sprintf("%.2f", opt_profit$profit_index),
+        sprintf("$%.2f", opt_profit$margin)
+      )
+    )
+  })
+
+  # Weight statistics table (Phase 1)
+  output$weight_table <- renderTable({
+    req(rv$results)
+    ws <- rv$results$diagnostics$weight_summary
+    req(ws)
+
+    data.frame(
+      Metric = c("Valid Weights", "Effective N", "Range", "Mean", "SD"),
+      Value = c(
+        sprintf("%d", ws$n_valid),
+        sprintf("%.1f", ws$n_valid),
+        sprintf("%.2f - %.2f", ws$min, ws$max),
+        sprintf("%.2f", ws$mean),
+        sprintf("%.2f", ws$sd)
+      )
+    )
+  })
+
   # Main plot
   output$main_plot <- renderPlot({
     req(rv$results)
@@ -320,6 +475,26 @@ server <- function(input, output, session) {
 
     # Return first plot
     rv$results$plots[[1]]
+  })
+
+  # Additional plot handler (Phase 2 profit plots)
+  output$additional_plot <- renderPlot({
+    req(rv$results)
+    req(length(rv$results$plots) > 1)
+    req(input$plot_selector)
+
+    # Map selection to plot name
+    plot_name <- switch(input$plot_selector,
+      "Revenue Curve" = "revenue_curve",
+      "Profit Curve" = "profit_curve",
+      "Revenue vs Profit" = "revenue_vs_profit",
+      NULL
+    )
+
+    req(plot_name)
+    req(!is.null(rv$results$plots[[plot_name]]))
+
+    rv$results$plots[[plot_name]]
   })
 
   # Validation table
@@ -344,6 +519,33 @@ server <- function(input, output, session) {
       paste(seq_along(warnings), ". ", warnings, collapse = "\n")
     }
   })
+
+  # Reactive flags for conditional panels
+  output$has_profit_results <- reactive({
+    if (is.null(rv$results)) return(FALSE)
+    method <- rv$results$method
+
+    gg_results <- if (method == "gabor_granger") {
+      rv$results$results
+    } else if (method == "both") {
+      rv$results$results$gabor_granger
+    } else {
+      NULL
+    }
+
+    !is.null(gg_results) && !is.null(gg_results$optimal_price_profit)
+  })
+  outputOptions(output, "has_profit_results", suspendWhenHidden = FALSE)
+
+  output$has_weight_summary <- reactive({
+    !is.null(rv$results) && !is.null(rv$results$diagnostics$weight_summary)
+  })
+  outputOptions(output, "has_weight_summary", suspendWhenHidden = FALSE)
+
+  output$has_additional_plots <- reactive({
+    !is.null(rv$results) && length(rv$results$plots) > 1
+  })
+  outputOptions(output, "has_additional_plots", suspendWhenHidden = FALSE)
 
   # Create template
   observeEvent(input$create_template, {
