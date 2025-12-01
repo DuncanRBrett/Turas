@@ -322,8 +322,14 @@ run_confidence_gui <- function() {
       )
     })
 
+    # R 4.2+ compatible renderText - must return single string
     output$console_text <- renderText({
-      console_output()
+      out <- console_output()
+      if (is.null(out) || length(out) == 0) {
+        return("")
+      }
+      # Ensure single string output for R 4.2+
+      paste(out, collapse = "")
     })
 
     # Run analysis
@@ -364,30 +370,58 @@ run_confidence_gui <- function() {
         # Source the confidence module
         source(file.path(confidence_dir, "R", "00_main.R"))
 
-        # Capture output
-        output_lines <- character()
+        # Capture ALL console output (cat, print, messages) including errors
+        # This ensures output is displayed even if analysis fails
+        captured_output <- capture.output({
+          result <- tryCatch({
+            run_confidence_analysis(config_path, verbose = TRUE)
+            list(success = TRUE, error = NULL)
+          }, error = function(e) {
+            cat("\n", strrep("=", 80), "\n", sep = "")
+            cat("❌ ERROR OCCURRED\n")
+            cat(strrep("=", 80), "\n\n", sep = "")
+            cat("Error message:\n")
+            cat(e$message, "\n\n")
+            cat("The analysis encountered an error. Check the configuration file and data.\n")
+            cat("Common issues:\n")
+            cat("  • Data file path incorrect or file not accessible\n")
+            cat("  • Missing required columns in data\n")
+            cat("  • Invalid question IDs in config\n")
+            cat("  • Weight variable not found\n\n")
+            list(success = FALSE, error = e$message)
+          })
+        }, type = "output")
 
-        # Run analysis with output capture
-        withCallingHandlers({
-          run_confidence_analysis(config_path, verbose = TRUE)
-        },
-        message = function(m) {
-          output_lines <<- c(output_lines, m$message)
-          console_output(paste0(console_output(), m$message))
-        })
-
-        # Update console with completion message
+        # Update console with all captured output
         console_output(paste0(
           console_output(),
-          sprintf("\n%s\n✓ ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80)),
-          sprintf("\nOutput files saved to:\n%s\n", file.path(data$path, "Output", "Confidence"))
+          paste(captured_output, collapse = "\n")
         ))
 
-        showNotification("Analysis completed successfully!", type = "message", duration = 5)
+        # Show completion or error message
+        if (result$success) {
+          console_output(paste0(
+            console_output(),
+            sprintf("\n\n%s\n✓ ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80)),
+            sprintf("\nOutput files saved to project directory\n")
+          ))
+          showNotification("Analysis completed successfully!", type = "message", duration = 5)
+        } else {
+          showNotification(paste("Error:", result$error), type = "error", duration = 10)
+        }
 
       }, error = function(e) {
-        console_output(paste0(console_output(), "\n\nERROR: ", e$message, "\n\nCheck R console for details."))
-        showNotification(paste("Error:", e$message), type = "error", duration = 10)
+        # This catches errors in the GUI setup itself (not analysis errors)
+        console_output(paste0(
+          console_output(),
+          "\n\n", strrep("=", 80), "\n",
+          "❌ FATAL ERROR\n",
+          strrep("=", 80), "\n\n",
+          "GUI encountered an unexpected error:\n",
+          e$message, "\n\n",
+          "This is likely a GUI configuration issue, not an analysis error.\n"
+        ))
+        showNotification(paste("Fatal error:", e$message), type = "error", duration = 10)
 
       }, finally = {
         # Clean up global variables
