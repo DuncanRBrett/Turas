@@ -427,9 +427,9 @@ server <- function(input, output, session) {
     })
   })
 
-  # Console output
-  output$console_output <- renderText({
-    rv$console
+  # Console output (R 4.2+ compatible)
+  output$console_output <- renderPrint({
+    cat(rv$console)
   })
 
   # Has results flag
