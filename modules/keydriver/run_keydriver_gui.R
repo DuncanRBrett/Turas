@@ -350,8 +350,18 @@ run_keydriver_gui <- function() {
     output$show_console <- reactive({ nchar(console_text()) > 0 })
     outputOptions(output, "show_console", suspendWhenHidden = FALSE)
 
-    # Console output
-    output$console_output <- renderText({ console_text() })
+    # Console output - R 4.2+ compatibility (ensure single string)
+    output$console_output <- renderText({
+      current_output <- console_text()
+
+      # Ensure single string for R 4.2+ compatibility
+      if (is.null(current_output) || length(current_output) == 0 || nchar(current_output[1]) == 0) {
+        "Console output will appear here when you run the analysis..."
+      } else {
+        # Ensure it's a single string
+        paste(current_output, collapse = "\n")
+      }
+    })
 
     # Run analysis
     observeEvent(input$run_analysis, {
