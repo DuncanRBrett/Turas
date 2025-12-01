@@ -267,8 +267,8 @@ validate_pricing_data <- function(data, config) {
       }
     }
 
-    # Check monotonicity
-    if (isTRUE(vw$validate_monotonicity)) {
+    # Check monotonicity with configurable behavior
+    if (isTRUE(vw$validate_monotonicity %||% TRUE)) {
       violations <- check_vw_monotonicity(
         data[[vw$col_too_cheap]],
         data[[vw$col_cheap]],
@@ -278,24 +278,57 @@ validate_pricing_data <- function(data, config) {
 
       if (violations$count > 0) {
         violation_rate <- violations$rate
+        behavior <- config$vw_monotonicity_behavior
 
-        if (isTRUE(vw$exclude_violations)) {
+        # Apply configured behavior
+        if (behavior == "drop") {
+          # Exclude violating respondents
           exclusions[violations$violation_indices] <- TRUE
           exclusion_reasons[violations$violation_indices] <- paste0(
             exclusion_reasons[violations$violation_indices],
-            "; monotonicity violation"
+            ifelse(exclusion_reasons[violations$violation_indices] == "", "", "; "),
+            "vw_non_monotone"
+          )
+          warnings_list[[length(warnings_list) + 1]] <- sprintf(
+            "VW monotonicity: %d cases (%.1f%%) excluded (behavior: drop)",
+            violations$count, violation_rate * 100
+          )
+        } else if (behavior == "fix") {
+          # Fix by sorting the four values for each violating respondent
+          viol_idx <- violations$violation_indices
+          for (idx in viol_idx) {
+            vals <- c(
+              data[[vw$col_too_cheap]][idx],
+              data[[vw$col_cheap]][idx],
+              data[[vw$col_expensive]][idx],
+              data[[vw$col_too_expensive]][idx]
+            )
+            # Sort and reassign
+            if (!any(is.na(vals))) {
+              vals_sorted <- sort(vals)
+              data[[vw$col_too_cheap]][idx] <- vals_sorted[1]
+              data[[vw$col_cheap]][idx] <- vals_sorted[2]
+              data[[vw$col_expensive]][idx] <- vals_sorted[3]
+              data[[vw$col_too_expensive]][idx] <- vals_sorted[4]
+            }
+          }
+          warnings_list[[length(warnings_list) + 1]] <- sprintf(
+            "VW monotonicity: %d cases (%.1f%%) fixed by sorting (behavior: fix)",
+            violations$count, violation_rate * 100
+          )
+        } else {  # "flag_only"
+          # Just report, don't modify
+          warnings_list[[length(warnings_list) + 1]] <- sprintf(
+            "VW monotonicity: %d cases (%.1f%%) flagged but retained (behavior: flag_only)",
+            violations$count, violation_rate * 100
           )
         }
 
+        # Additional warning if rate exceeds threshold
         if (violation_rate > (vw$violation_threshold %||% 0.1)) {
           warnings_list[[length(warnings_list) + 1]] <- sprintf(
-            "Monotonicity violations: %d cases (%.1f%%) - exceeds threshold of %.0f%%",
-            violations$count, violation_rate * 100, (vw$violation_threshold %||% 0.1) * 100
-          )
-        } else {
-          warnings_list[[length(warnings_list) + 1]] <- sprintf(
-            "Monotonicity violations: %d cases (%.1f%%)",
-            violations$count, violation_rate * 100
+            "WARNING: VW monotonicity violation rate (%.1f%%) exceeds threshold (%.0f%%)",
+            violation_rate * 100, (vw$violation_threshold %||% 0.1) * 100
           )
         }
       }

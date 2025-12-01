@@ -56,6 +56,15 @@ run_gabor_granger <- function(data, config) {
   # Calculate demand curve
   demand_curve <- calculate_demand_curve(gg_data)
 
+  # Apply monotone smoothing if configured
+  if (config$gg_monotonicity_behavior == "smooth") {
+    # Enforce monotone decreasing demand: as price increases, demand should not increase
+    # Simple approach: cummax from high price to low price
+    demand_curve <- demand_curve[order(demand_curve$price, decreasing = TRUE), ]
+    demand_curve$purchase_intent <- cummax(demand_curve$purchase_intent)
+    demand_curve <- demand_curve[order(demand_curve$price), ]  # Back to ascending order
+  }
+
   # Calculate revenue curve
   revenue_curve <- calculate_revenue_curve(demand_curve)
 
