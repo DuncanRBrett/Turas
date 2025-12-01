@@ -84,7 +84,6 @@ load_confidence_config <- function(config_path) {
   file_paths <- load_file_paths_sheet(config_path)
   study_settings <- load_study_settings_sheet(config_path)
   question_analysis <- load_question_analysis_sheet(config_path)
-  population_margins <- load_population_margins_sheet(config_path)
 
   cat(sprintf("✓ Configuration loaded successfully\n"))
   if (!is.null(file_paths)) {
@@ -94,11 +93,6 @@ load_confidence_config <- function(config_path) {
   }
   cat(sprintf("  - Study settings: %d parameters\n", nrow(study_settings)))
   cat(sprintf("  - Question analysis: %d questions (max 200)\n", nrow(question_analysis)))
-  if (!is.null(population_margins)) {
-    cat(sprintf("  - Population margins: %d targets\n", nrow(population_margins)))
-  } else {
-    cat("  - Population margins: (optional sheet not provided)\n")
-  }
 
   # Convert file_paths and study_settings to named lists for easier access
   file_paths_list <- if (!is.null(file_paths)) {
@@ -113,7 +107,6 @@ load_confidence_config <- function(config_path) {
     file_paths = file_paths_list,
     study_settings = study_settings_list,
     question_analysis = question_analysis,
-    population_margins = population_margins,
     config_file_path = config_path
   )
 
@@ -538,6 +531,7 @@ validate_question_analysis <- function(question_df) {
             q_id
           ))
         }
+
         # For means and NPS, Prior_SD is required
         if (stat_type %in% c("mean", "nps")) {
           if (is.na(row$Prior_SD) || row$Prior_SD == "") {
@@ -561,137 +555,6 @@ validate_question_analysis <- function(question_df) {
   }
 
   return(list(errors = errors, warnings = warnings))
-}
-
-
-#' Load Population_Margins sheet (optional)
-#'
-#' Loads population margin targets for representativeness checking.
-#' This sheet is OPTIONAL - if not present, no margin comparison will be performed.
-#'
-#' @param config_path Character. Path to config file
-#' @return Data frame with Population_Margins, or NULL if sheet doesn't exist
-#'
-#' Expected columns:
-#' - Variable: Variable name in dataset (e.g., "Gender", "Age_Group")
-#' - Category_Label: Human-readable label (e.g., "Male", "18-24")
-#' - Category_Code: Code as it appears in data (e.g., "1", "M")
-#' - Target_Prop: Target proportion (0-1, not percentage)
-#' - Include: "Y"/"N" to enable/disable this margin
-#'
-#' @keywords internal
-load_population_margins_sheet <- function(config_path) {
-  sheet_name <- "Population_Margins"
-
-  # Check if sheet exists (optional sheet)
-  sheet_names <- tryCatch(
-    readxl::excel_sheets(config_path),
-    error = function(e) character(0)
-  )
-
-  if (!sheet_name %in% sheet_names) {
-    return(NULL)  # Sheet not present, return NULL silently
-  }
-
-  # Read sheet
-  df <- tryCatch(
-    readxl::read_excel(config_path, sheet = sheet_name),
-    error = function(e) {
-      warning(sprintf(
-        "Failed to read '%s' sheet: %s\nMargin comparison will be skipped.",
-        sheet_name,
-        conditionMessage(e)
-      ))
-      return(NULL)
-    }
-  )
-
-  if (is.null(df) || nrow(df) == 0) {
-    return(NULL)
-  }
-
-  # Validate required columns
-  required_cols <- c("Variable", "Category_Label", "Target_Prop")
-  missing_cols <- setdiff(required_cols, names(df))
-
-  if (length(missing_cols) > 0) {
-    warning(sprintf(
-      "'%s' sheet missing required columns: %s\nMargin comparison will be skipped.",
-      sheet_name,
-      paste(missing_cols, collapse = ", ")
-    ))
-    return(NULL)
-  }
-
-  # Add optional columns if missing
-  if (!"Category_Code" %in% names(df)) {
-    df$Category_Code <- df$Category_Label  # Default to label if no code
-  }
-
-  if (!"Include" %in% names(df)) {
-    df$Include <- "Y"  # Default to include all if not specified
-  }
-
-  # Filter to only included rows
-  df <- df[!is.na(df$Include) & toupper(df$Include) == "Y", , drop = FALSE]
-
-  if (nrow(df) == 0) {
-    return(NULL)  # No targets to include
-  }
-
-  # Validate Target_Prop values
-  errors <- character()
-
-  for (i in seq_len(nrow(df))) {
-    row <- df[i, ]
-    var <- as.character(row$Variable)
-    cat_label <- as.character(row$Category_Label)
-
-    # Check Target_Prop is numeric and in range [0, 1]
-    target_prop <- suppressWarnings(as.numeric(row$Target_Prop))
-
-    if (is.na(target_prop)) {
-      errors <- c(errors, sprintf(
-        "%s - %s: Target_Prop must be numeric (got '%s')",
-        var, cat_label, row$Target_Prop
-      ))
-    } else if (target_prop < 0 || target_prop > 1) {
-      errors <- c(errors, sprintf(
-        "%s - %s: Target_Prop must be between 0 and 1 (got %.3f)",
-        var, cat_label, target_prop
-      ))
-    }
-
-    # Convert to numeric
-    df$Target_Prop[i] <- target_prop
-  }
-
-  # Stop if validation errors
-  if (length(errors) > 0) {
-    stop(sprintf(
-      "Population_Margins validation errors:\n%s",
-      paste("  -", errors, collapse = "\n")
-    ), call. = FALSE)
-  }
-
-  # Convert Category_Code to character (handles both numeric and text)
-  df$Category_Code <- as.character(df$Category_Code)
-  df$Category_Label <- as.character(df$Category_Label)
-  df$Variable <- as.character(df$Variable)
-
-  # Validation: Check that proportions sum to ~1 for each variable
-  var_sums <- tapply(df$Target_Prop, df$Variable, sum)
-  for (var_name in names(var_sums)) {
-    sum_val <- var_sums[var_name]
-    if (abs(sum_val - 1.0) > 0.01) {
-      warning(sprintf(
-        "Population_Margins: Variable '%s' proportions sum to %.3f (should be 1.0)",
-        var_name, sum_val
-      ))
-    }
-  }
-
-  return(df)
 }
 
 
