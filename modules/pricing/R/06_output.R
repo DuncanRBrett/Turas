@@ -319,7 +319,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
 
       # Count exclusion reasons
       excluded_data <- validation$data[validation$data$excluded, ]
-      if (nrow(excluded_data) > 0) {
+      if (!is.null(excluded_data) && nrow(excluded_data) > 0) {
         reason_counts <- table(excluded_data$exclusion_reason)
         reason_df <- data.frame(
           Reason = names(reason_counts),
