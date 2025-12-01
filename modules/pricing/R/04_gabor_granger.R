@@ -28,9 +28,9 @@ run_gabor_granger <- function(data, config) {
 
   # Prepare data based on format
   if (gg$data_format == "wide") {
-    gg_data <- prepare_gg_wide_data(data, gg)
+    gg_data <- prepare_gg_wide_data(data, gg, config)
   } else {
-    gg_data <- prepare_gg_long_data(data, gg)
+    gg_data <- prepare_gg_long_data(data, gg, config)
   }
 
   n_respondents <- length(unique(gg_data$respondent_id))
@@ -104,15 +104,16 @@ run_gabor_granger <- function(data, config) {
 #' Converts wide format survey data to long format for analysis.
 #'
 #' @param data Data frame in wide format
-#' @param config Gabor-Granger configuration
+#' @param gg_config Gabor-Granger configuration
+#' @param main_config Main configuration (for weight_var)
 #'
-#' @return Data frame in long format with respondent_id, price, response columns
+#' @return Data frame in long format with respondent_id, price, response, weight columns
 #'
 #' @keywords internal
-prepare_gg_wide_data <- function(data, config) {
+prepare_gg_wide_data <- function(data, gg_config, main_config) {
 
-  prices <- config$price_sequence
-  response_cols <- config$response_columns
+  prices <- gg_config$price_sequence
+  response_cols <- gg_config$response_columns
 
   if (length(prices) != length(response_cols)) {
     stop(sprintf("Number of prices (%d) must match number of response columns (%d)",
@@ -121,10 +122,17 @@ prepare_gg_wide_data <- function(data, config) {
   }
 
   # Create respondent IDs if not present
-  if (is.null(config$respondent_column) || is.na(config$respondent_column)) {
+  if (is.null(gg_config$respondent_column) || is.na(gg_config$respondent_column)) {
     data$respondent_id <- seq_len(nrow(data))
   } else {
-    data$respondent_id <- data[[config$respondent_column]]
+    data$respondent_id <- data[[gg_config$respondent_column]]
+  }
+
+  # Extract weights (if specified)
+  if (!is.na(main_config$weight_var) && main_config$weight_var %in% names(data)) {
+    data$weight <- data[[main_config$weight_var]]
+  } else {
+    data$weight <- 1
   }
 
   # Reshape to long format
@@ -135,13 +143,14 @@ prepare_gg_wide_data <- function(data, config) {
       respondent_id = data$respondent_id,
       price = prices[i],
       response = data[[response_cols[i]]],
+      weight = data$weight,
       stringsAsFactors = FALSE
     )
     long_data <- rbind(long_data, temp)
   }
 
   # Code responses as binary if needed
-  long_data$response <- code_gg_response(long_data$response, config)
+  long_data$response <- code_gg_response(long_data$response, gg_config)
 
   return(long_data)
 }
@@ -152,22 +161,31 @@ prepare_gg_wide_data <- function(data, config) {
 #' Validates and standardizes long format data for analysis.
 #'
 #' @param data Data frame in long format
-#' @param config Gabor-Granger configuration
+#' @param gg_config Gabor-Granger configuration
+#' @param main_config Main configuration (for weight_var)
 #'
 #' @return Standardized data frame
 #'
 #' @keywords internal
-prepare_gg_long_data <- function(data, config) {
+prepare_gg_long_data <- function(data, gg_config, main_config) {
+
+  # Extract weights (if specified)
+  if (!is.na(main_config$weight_var) && main_config$weight_var %in% names(data)) {
+    weight <- data[[main_config$weight_var]]
+  } else {
+    weight <- 1
+  }
 
   long_data <- data.frame(
-    respondent_id = data[[config$respondent_column]],
-    price = as.numeric(data[[config$price_column]]),
-    response = data[[config$response_column]],
+    respondent_id = data[[gg_config$respondent_column]],
+    price = as.numeric(data[[gg_config$price_column]]),
+    response = data[[gg_config$response_column]],
+    weight = weight,
     stringsAsFactors = FALSE
   )
 
   # Code responses as binary
-  long_data$response <- code_gg_response(long_data$response, config)
+  long_data$response <- code_gg_response(long_data$response, gg_config)
 
   return(long_data)
 }
@@ -264,9 +282,9 @@ check_gg_monotonicity <- function(gg_data) {
 #'
 #' Aggregates purchase intent at each price point to create demand curve.
 #'
-#' @param gg_data Long format Gabor-Granger data
+#' @param gg_data Long format Gabor-Granger data (must include weight column)
 #'
-#' @return Data frame with price and purchase intent percentage
+#' @return Data frame with price and weighted purchase intent percentage
 #'
 #' @keywords internal
 calculate_demand_curve <- function(gg_data) {
@@ -277,7 +295,8 @@ calculate_demand_curve <- function(gg_data) {
   demand <- data.frame(
     price = prices,
     n_respondents = integer(length(prices)),
-    n_purchase = integer(length(prices)),
+    effective_n = numeric(length(prices)),
+    n_purchase = numeric(length(prices)),
     purchase_intent = numeric(length(prices)),
     stringsAsFactors = FALSE
   )
@@ -286,9 +305,21 @@ calculate_demand_curve <- function(gg_data) {
     p <- prices[i]
     subset_data <- gg_data[gg_data$price == p & !is.na(gg_data$response), ]
 
-    demand$n_respondents[i] <- nrow(subset_data)
-    demand$n_purchase[i] <- sum(subset_data$response)
-    demand$purchase_intent[i] <- mean(subset_data$response)
+    if (nrow(subset_data) > 0) {
+      weights <- subset_data$weight
+      responses <- subset_data$response
+
+      demand$n_respondents[i] <- nrow(subset_data)
+      demand$effective_n[i] <- sum(weights)
+      demand$n_purchase[i] <- sum(weights * responses)
+      # Weighted purchase intent
+      demand$purchase_intent[i] <- sum(weights * responses) / sum(weights)
+    } else {
+      demand$n_respondents[i] <- 0
+      demand$effective_n[i] <- 0
+      demand$n_purchase[i] <- 0
+      demand$purchase_intent[i] <- NA_real_
+    }
   }
 
   return(demand)
@@ -407,16 +438,22 @@ bootstrap_gg_confidence <- function(gg_data, iterations = 1000, level = 0.95) {
     # Resample respondents
     boot_respondents <- sample(respondents, n_resp, replace = TRUE)
 
-    # Get data for resampled respondents
+    # Get data for resampled respondents (includes weights)
     boot_data <- do.call(rbind, lapply(boot_respondents, function(r) {
       gg_data[gg_data$respondent_id == r, ]
     }))
 
-    # Calculate demand at each price
+    # Calculate weighted demand at each price
     for (j in seq_along(prices)) {
       p <- prices[j]
       subset_data <- boot_data[boot_data$price == p & !is.na(boot_data$response), ]
-      boot_results[i, j] <- mean(subset_data$response)
+      if (nrow(subset_data) > 0 && "weight" %in% names(subset_data)) {
+        # Weighted mean
+        boot_results[i, j] <- sum(subset_data$weight * subset_data$response) / sum(subset_data$weight)
+      } else {
+        # Fallback to unweighted if no weights
+        boot_results[i, j] <- mean(subset_data$response)
+      }
     }
   }
 
