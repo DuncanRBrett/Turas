@@ -121,9 +121,14 @@ ui <- fluidPage(
 
       # Or select recent (show basenames, store full paths)
       selectInput("recent_projects", "Or Select Recent",
-                  choices = c("" = "",
-                             setNames(load_recent_projects(),
-                                     basename(load_recent_projects()))),
+                  choices = {
+                    recent <- load_recent_projects()
+                    if (length(recent) > 0) {
+                      c("" = "", setNames(recent, basename(recent)))
+                    } else {
+                      c("" = "")
+                    }
+                  },
                   selected = ""),
 
       hr(),
