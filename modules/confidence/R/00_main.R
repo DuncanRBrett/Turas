@@ -655,13 +655,30 @@ process_mean_question <- function(q_row, survey_data, weight_var, config, warnin
 
     values <- survey_data[[q_id]]
 
-    # Require numeric for mean analysis
+    # Attempt to convert to numeric if not already numeric
+    # (handles case where numeric data is stored as character/text in source file)
     if (!is.numeric(values)) {
-      warnings_list <- c(
-        warnings_list,
-        sprintf("Question %s: Non-numeric values for mean analysis", q_id)
-      )
-      return(list(result = NULL, warnings = warnings_list))
+      # Try conversion
+      values_converted <- suppressWarnings(as.numeric(values))
+
+      # Check if conversion was mostly successful (>50% valid numbers)
+      n_total <- length(values)
+      n_valid_after_conversion <- sum(!is.na(values_converted))
+      n_was_na_before <- sum(is.na(values))
+
+      # If we got valid numbers, use the converted version
+      if (n_valid_after_conversion > 0 &&
+          (n_valid_after_conversion / n_total) > 0.5) {
+        values <- values_converted
+      } else {
+        # Truly non-numeric - cannot convert
+        warnings_list <- c(
+          warnings_list,
+          sprintf("Question %s: Non-numeric values for mean analysis (only %d/%d convertible to numeric)",
+                  q_id, n_valid_after_conversion, n_total)
+        )
+        return(list(result = NULL, warnings = warnings_list))
+      }
     }
 
     # -------------------------------------------------------------------------
