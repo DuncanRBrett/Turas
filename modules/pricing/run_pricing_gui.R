@@ -104,8 +104,14 @@ ui <- fluidPage(
 
       h4("Configuration"),
 
-      # Config file selection
-      fileInput("config_file", "Select Configuration File",
+      # Config file path (text input - preferred method)
+      textInput("config_path_text", "Config File Path",
+                placeholder = "/full/path/to/config.xlsx"),
+
+      helpText("Paste the full path to your config file, OR use file upload below"),
+
+      # Or use file upload (NOTE: may have path issues)
+      fileInput("config_file", "Or Upload Config File",
                 accept = c(".xlsx", ".xls")),
 
       # Or select recent
@@ -254,6 +260,13 @@ server <- function(input, output, session) {
     config_path = NULL
   )
 
+  # Handle text path input
+  observeEvent(input$config_path_text, {
+    if (!is.null(input$config_path_text) && input$config_path_text != "") {
+      rv$config_path <- input$config_path_text
+    }
+  })
+
   # Handle recent project selection
   observeEvent(input$recent_projects, {
     if (input$recent_projects != "") {
@@ -271,11 +284,23 @@ server <- function(input, output, session) {
   # Run analysis
   observeEvent(input$run_analysis, {
 
-    # Get config path
-    config_path <- rv$config_path
+    # Get config path - prioritize text input, then recent, then upload
+    config_path <- NULL
+
+    if (!is.null(input$config_path_text) && input$config_path_text != "") {
+      config_path <- input$config_path_text
+    } else {
+      config_path <- rv$config_path
+    }
 
     if (is.null(config_path) || config_path == "") {
-      showNotification("Please select a configuration file", type = "error")
+      showNotification("Please specify a configuration file path", type = "error")
+      return()
+    }
+
+    # Validate config file exists
+    if (!file.exists(config_path)) {
+      showNotification(sprintf("Config file not found: %s", config_path), type = "error")
       return()
     }
 
@@ -352,9 +377,12 @@ server <- function(input, output, session) {
 
       rv$console <- paste(output_capture, collapse = "\n")
 
-      # Save to recent projects
-      if (!is.null(input$config_file)) {
-        save_recent_project(input$config_file$datapath)
+      # Save to recent projects (use actual config path, not temp file)
+      if (!is.null(config_path) && config_path != "" && file.exists(config_path)) {
+        # Don't save temp paths
+        if (!grepl("^/private/var/folders/|^/tmp/|Rtmp", config_path)) {
+          save_recent_project(config_path)
+        }
       }
 
       showNotification("Analysis completed successfully!", type = "message")
