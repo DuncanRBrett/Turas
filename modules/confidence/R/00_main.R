@@ -575,7 +575,8 @@ process_proportion_question <- function(q_row, survey_data, weight_var, config, 
     }
 
     # Wilson interval (using Use_Wilson flag)
-    use_wilson_flag <- q_row$Use_Wilson
+    # Check if Use_Wilson column exists (backward compatibility with old configs)
+    use_wilson_flag <- if ("Use_Wilson" %in% names(q_row)) q_row$Use_Wilson else NULL
     if (!is.null(use_wilson_flag) &&
         !is.na(use_wilson_flag) &&
         toupper(use_wilson_flag) == "Y") {
@@ -661,21 +662,39 @@ process_mean_question <- function(q_row, survey_data, weight_var, config, warnin
       # Try conversion
       values_converted <- suppressWarnings(as.numeric(values))
 
-      # Check if conversion was mostly successful (>50% valid numbers)
+      # Smart conversion check that handles questions with low response due to routing
       n_total <- length(values)
-      n_valid_after_conversion <- sum(!is.na(values_converted))
-      n_was_na_before <- sum(is.na(values))
 
-      # If we got valid numbers, use the converted version
-      if (n_valid_after_conversion > 0 &&
-          (n_valid_after_conversion / n_total) > 0.5) {
-        values <- values_converted
+      # Count NAs in original data (routing/skip logic)
+      n_was_na_before <- sum(is.na(values) | trimws(as.character(values)) == "")
+
+      # Count valid numbers after conversion
+      n_valid_after_conversion <- sum(!is.na(values_converted))
+
+      # Count how many non-missing values we had
+      n_non_missing_before <- n_total - n_was_na_before
+
+      # If we have at least 10 valid numbers AND didn't lose more than 20% in conversion, accept it
+      # This handles: (1) routed questions with low n, (2) text-formatted numeric columns
+      if (n_valid_after_conversion >= 10 && n_non_missing_before > 0) {
+        conversion_success_rate <- n_valid_after_conversion / n_non_missing_before
+        if (conversion_success_rate >= 0.80) {
+          values <- values_converted
+        } else {
+          # Most non-missing values couldn't convert - truly non-numeric
+          warnings_list <- c(
+            warnings_list,
+            sprintf("Question %s: Non-numeric values for mean analysis (only %d/%d non-missing values convertible)",
+                    q_id, n_valid_after_conversion, n_non_missing_before)
+          )
+          return(list(result = NULL, warnings = warnings_list))
+        }
       } else {
-        # Truly non-numeric - cannot convert
+        # Too few responses or all missing
         warnings_list <- c(
           warnings_list,
-          sprintf("Question %s: Non-numeric values for mean analysis (only %d/%d convertible to numeric)",
-                  q_id, n_valid_after_conversion, n_total)
+          sprintf("Question %s: Insufficient numeric data for mean analysis (only %d valid values)",
+                  q_id, n_valid_after_conversion)
         )
         return(list(result = NULL, warnings = warnings_list))
       }
