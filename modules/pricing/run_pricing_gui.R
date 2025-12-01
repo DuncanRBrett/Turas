@@ -119,16 +119,9 @@ ui <- fluidPage(
       textInput("config_path_text", "Or Paste Full Path",
                 placeholder = "/full/path/to/config.xlsx"),
 
-      # Or select recent (show basenames, store full paths)
+      # Or select recent (populated dynamically in server)
       selectInput("recent_projects", "Or Select Recent",
-                  choices = {
-                    recent <- load_recent_projects()
-                    if (length(recent) > 0) {
-                      c("" = "", setNames(recent, basename(recent)))
-                    } else {
-                      c("" = "")
-                    }
-                  },
+                  choices = c(""),
                   selected = ""),
 
       hr(),
@@ -285,6 +278,18 @@ server <- function(input, output, session) {
   shinyFileChoose(input, "config_file_button", roots = volumes,
                   filetypes = c("xlsx", "xls"))
   shinyDirChoose(input, "template_dir_button", roots = volumes)
+
+  # Populate recent projects dropdown on startup
+  observe({
+    recent <- load_recent_projects()
+    if (length(recent) > 0) {
+      # Show just filename as label, full path as value
+      choices <- c("" = "", setNames(recent, basename(recent)))
+    } else {
+      choices <- c("" = "")
+    }
+    updateSelectInput(session, "recent_projects", choices = choices)
+  })
 
   # Handle file browser selection
   observeEvent(input$config_file_button, {
