@@ -1,0 +1,396 @@
+File Name,Folder Path,File Type,Total Lines,Blank Lines,Code Lines,Comment/Doc Lines,Purpose/Description,Quality
+.gitattributes,/home/user/Turas,none,2,0,,,Git attributes configuration,N/A
+.gitignore,/home/user/Turas,none,57,9,,,Git ignore rules,N/A
+ARCHITECTURE.md,/home/user/Turas,md,687,154,,,Documentation file,N/A
+README.md,/home/user/Turas,md,170,37,,,Module overview and general information,N/A
+SETUP_AND_TEMPLATES_GUIDE.md,/home/user/Turas,md,887,195,,,Graphical user interface,N/A
+TROUBLESHOOTING.md,/home/user/Turas,md,342,93,,,Documentation file,N/A
+Turas.Rproj,/home/user/Turas,rproj,13,3,,,RStudio project configuration,N/A
+analyze_repository.R,/home/user/Turas,r,357,50,269,38,Unknown purpose,Solid
+analyze_repository.py,/home/user/Turas,py,349,53,,,Python script,N/A
+Active_Scripts_Reference.md,docs,md,405,97,,,Documentation file,N/A
+CODE_REVIEW_SUMMARY.md,docs,md,580,145,,,Documentation file,N/A
+Composite_Scores_Implementation_Summary.md,docs,md,454,88,,,Documentation file,N/A
+Index_Summary_Maintenance_Guide.md,docs,md,934,228,,,Graphical user interface,N/A
+Index_Summary_User_Manual.md,docs,md,352,106,,,Detailed user manual and instructions,N/A
+MAINTENANCE.md,docs,md,1036,317,,,Maintenance guide for code upkeep,N/A
+SPSS_compatibility.md,docs,md,105,36,,,Documentation file,N/A
+Shared_Code_Refactoring_Plan.md,docs,md,684,131,,,Documentation file,N/A
+TURAS_Developer_Maintenance_Guide.docx,docs,docx,123,4,,,Graphical user interface,N/A
+Tracker_integration_considerations.md,docs,md,292,113,,,Documentation file,N/A
+Turas Code Quality Standards.docx,docs,docx,173,3,,,Word document with detailed documentation,N/A
+TurasTabs_Composite_Scores_User_Manual.docx,docs,docx,146,0,,,Word document with detailed documentation,N/A
+TurasTracker_Maintenance_Guide.md,docs,md,1115,256,,,Graphical user interface,N/A
+TurasTracker_User_Manual.md,docs,md,911,237,,,Detailed user manual and instructions,N/A
+USER_MANUAL.md,docs,md,476,120,,,Detailed user manual and instructions,N/A
+CODEBASE_ANALYSIS.md,docs/archive,md,1182,233,,,Documentation file,N/A
+README.md,docs/archive,md,40,11,,,Module overview and general information,N/A
+TEST_BUG_FIXES.md,docs/archive,md,226,65,,,Test suite for module functionality,N/A
+TURAS_Parser_Enhancement_Development_Brief.md,docs/archive/development_specs,md,1037,193,,,Documentation file,N/A
+TURAS_Parser_v2_Architecture_Diagram.txt,docs/archive/development_specs,txt,439,46,,,Text documentation or notes,N/A
+TURAS_Parser_v2_Implementation_Checklist.md,docs/archive/development_specs,md,334,62,,,Documentation file,N/A
+turas_conjoint_development_spec_v1.md,docs/archive/development_specs,md,1775,379,,,Documentation file,N/A
+turas_key_driver_analysis_spec.md,docs/archive/development_specs,md,1444,286,,,Documentation file,N/A
+turas_pricing_module_spec.md,docs/archive/development_specs,md,4371,794,,,Documentation file,N/A
+README.md,docs/archive/feedback,md,24,7,,,Module overview and general information,N/A
+added confidence feedback from chatgpt.txt,docs/archive/feedback,txt,286,39,,,Text documentation or notes,N/A
+confidence review feedback from chatgpt.txt,docs/archive/feedback,txt,1066,135,,,Text documentation or notes,N/A
+segmentation architecture review feedback.txt,docs/archive/feedback,txt,266,17,,,Text documentation or notes,N/A
+segmentation review feedback.txt,docs/archive/feedback,txt,662,98,,,Text documentation or notes,N/A
+turas key driver feedback.txt,docs/archive/feedback,txt,1452,172,,,Text documentation or notes,N/A
+turas pricing module feedback.txt,docs/archive/feedback,txt,1364,123,,,Text documentation or notes,N/A
+turas tabs feedback.txt,docs/archive/feedback,txt,716,87,,,Text documentation or notes,N/A
+turas tracker feedback.txt,docs/archive/feedback,txt,425,19,,,Text documentation or notes,N/A
+README.md,docs/archive/old_manuals,md,23,6,,,Module overview and general information,N/A
+TURAS_Quick_Reference_Guide.docx,docs/archive/old_manuals,docx,111,0,,,Graphical user interface,N/A
+TURAS_User_Manual.docx,docs/archive/old_manuals,docx,144,4,,,Word document with detailed documentation,N/A
+TurasTracker_Quick_Start_Guide.docx,docs/archive/old_manuals,docx,88,3,,,Graphical user interface,N/A
+Turas_Parser_Quick_Reference.docx,docs/archive/old_manuals,docx,104,0,,,Word document with detailed documentation,N/A
+Turas_Quick_Reference.docx,docs/archive/old_manuals,docx,121,2,,,Word document with detailed documentation,N/A
+Turas_Suite_Quick_Start_Guide.docx,docs/archive/old_manuals,docx,97,3,,,Graphical user interface,N/A
+Turas_User_Guide.docx,docs/archive/old_manuals,docx,156,1,,,Graphical user interface,N/A
+KEYDRIVER_CODE_REVIEW_PACKAGE.md,docs/archive/review_packages,md,1511,300,,,Documentation file,N/A
+PRICING_MODULE_IMPLEMENTATION_SUMMARY.md,docs/archive/review_packages,md,581,166,,,Documentation file,N/A
+PRICING_MODULE_REVIEW_PACKAGE.md,docs/archive/review_packages,md,573,134,,,Documentation file,N/A
+TURAS_Tracking_Module_kickoff_pack.md,docs/archive/tracker_specs,md,263,115,,,Documentation file,N/A
+TurasTracking_Development_Brief.md,docs/archive/tracker_specs,md,1660,325,,,Documentation file,N/A
+TurasTracking_brief.md,docs/archive/tracker_specs,md,2502,1173,,,Documentation file,N/A
+Turas_tracking_development_brief.md,docs/archive/tracker_specs,md,374,152,,,Documentation file,N/A
+turas_codebase_analysis.csv,docs/archive,csv,128,0,,,Data file,N/A
+launch_tracker_gui.R,/home/user/Turas,r,21,2,9,10,Graphical user interface,Needs Improvement
+launch_turas.R,/home/user/Turas,r,510,68,396,46,Unknown purpose,Needs Improvement
+EXAMPLE_WORKFLOWS.md,modules/AlchemerParser,md,1004,235,,,Example workflows and use cases,N/A
+QUICK_START.md,modules/AlchemerParser,md,122,37,,,Quick start guide for new users,N/A
+00_main.R,modules/AlchemerParser/R,r,337,51,200,86,Main orchestrator script that coordinates module workflow,Solid
+01_parse_data_map.R,modules/AlchemerParser/R,r,377,59,184,134,Configuration loading and validation,Solid
+02_parse_translation.R,modules/AlchemerParser/R,r,202,25,89,88,Data loading and preprocessing,Solid
+03_parse_word_doc.R,modules/AlchemerParser/R,r,159,24,84,51,Unknown purpose,Solid
+04_classify_questions.R,modules/AlchemerParser/R,r,604,90,339,175,Unknown purpose,Solid
+05_generate_codes.R,modules/AlchemerParser/R,r,401,61,200,140,Script to create/generate example or test data,Solid
+06_output.R,modules/AlchemerParser/R,r,550,90,322,138,Output generation and file export,Solid
+README.md,modules/AlchemerParser,md,301,90,,,Module overview and general information,N/A
+TECHNICAL_DOCUMENTATION.md,modules/AlchemerParser,md,745,189,,,Technical documentation for developers,N/A
+USER_MANUAL.md,modules/AlchemerParser,md,621,169,,,Detailed user manual and instructions,N/A
+run_alchemerparser.R,modules/AlchemerParser,r,94,9,73,12,Main execution script to run the module,Solid
+run_alchemerparser_gui.R,modules/AlchemerParser,r,560,69,437,54,Graphical user interface,Solid
+test_variable_type_fix.R,modules/AlchemerParser,r,249,38,176,35,Test suite for module functionality,Solid
+DOCUMENTATION_INDEX.md,modules/confidence,md,414,127,,,Documentation file,N/A
+EXAMPLE_WORKFLOWS.md,modules/confidence,md,490,113,,,Example workflows and use cases,N/A
+EXTERNAL_REVIEW_FIXES.md,modules/confidence,md,370,99,,,Documentation file,N/A
+MAINTENANCE_GUIDE.md,modules/confidence,md,1515,320,,,Graphical user interface,N/A
+NPS_PHASE2_IMPLEMENTATION.md,modules/confidence,md,489,104,,,Documentation file,N/A
+QUICK_START.md,modules/confidence,md,261,67,,,Quick start guide for new users,N/A
+00_main.R,modules/confidence/R,r,1171,173,762,236,Main orchestrator script that coordinates module workflow,Solid
+01_load_config.R,modules/confidence/R,r,747,110,439,198,Configuration loading and validation,Solid
+02_load_data.R,modules/confidence/R,r,414,58,221,135,Data loading and preprocessing,Solid
+03_study_level.R,modules/confidence/R,r,700,97,328,275,Unknown purpose,Solid
+04_proportions.R,modules/confidence/R,r,581,63,213,305,Unknown purpose,Solid
+05_means.R,modules/confidence/R,r,589,66,264,259,Unknown purpose,Solid
+07_output.R,modules/confidence/R,r,1189,198,751,240,Output generation and file export,Solid
+utils.R,modules/confidence/R,r,423,63,161,199,Utility functions and helper methods,Solid
+README.md,modules/confidence,md,485,139,,,Module overview and general information,N/A
+REAL_CONFIG_TEST_INSTRUCTIONS.md,modules/confidence,md,213,53,,,Configuration loading and validation,N/A
+REPRESENTATIVENESS_GUIDE.md,modules/confidence,md,778,199,,,Graphical user interface,N/A
+TECHNICAL_DOCUMENTATION.md,modules/confidence,md,1230,300,,,Technical documentation for developers,N/A
+TESTING_GUIDE.md,modules/confidence,md,339,101,,,Graphical user interface,N/A
+USER_MANUAL.md,modules/confidence,md,1137,335,,,Detailed user manual and instructions,N/A
+create_example_config.R,modules/confidence/examples,r,359,46,247,66,Configuration loading and validation,Solid
+run_confidence_gui.R,modules/confidence,r,441,54,335,52,Launch confidence intervals analysis GUI,Solid
+test_01_load_config.R,modules/confidence/tests,r,562,121,371,70,Configuration loading and validation,Solid
+test_end_to_end.R,modules/confidence/tests,r,233,43,143,47,Test suite for module functionality,Needs Improvement
+test_nps.R,modules/confidence/tests,r,306,58,200,48,Test suite for module functionality,Needs Improvement
+test_real_config_ccpb.R,modules/confidence/tests,r,173,26,117,30,Verify module works with configs created before NPS/representativeness features,Needs Improvement
+test_representativeness.R,modules/confidence/tests,r,465,87,283,95,Test suite for module functionality,Solid
+test_utils.R,modules/confidence/tests,r,547,106,343,98,Utility functions and helper methods,Needs Improvement
+test_weighted_data.R,modules/confidence/tests,r,432,84,300,48,Comprehensive test of weighted data handling,Needs Improvement
+IMPLEMENTATION_STATUS.md,modules/conjoint,md,608,101,,,Documentation file,N/A
+MAINTENANCE_GUIDE.md,modules/conjoint,md,1248,291,,,Graphical user interface,N/A
+Part1_Core_Technical_Specification.md,modules/conjoint,md,483,95,,,Technical documentation for developers,N/A
+Part2_Configuration_Testing_Validation.md,modules/conjoint,md,718,128,,,Configuration loading and validation,N/A
+Part3_Excel_Output_Market_Simulator.md,modules/conjoint,md,952,175,,,Output generation and file export,N/A
+Part4_Alchemer_Choice_Types_Format_Support.md,modules/conjoint,md,1191,280,,,Documentation file,N/A
+Part5_Excel_Data_Configuration_File_Structures.md,modules/conjoint,md,857,186,,,Configuration loading and validation,N/A
+00_main.R,modules/conjoint/R,r,371,54,206,111,Calculate part-worth utilities and attribute importance from,Solid
+01_config.R,modules/conjoint/R,r,417,61,263,93,Load and validate conjoint study configuration,Solid
+02_data.R,modules/conjoint/R,r,446,65,306,75,"Load, validate, and prepare conjoint data for analysis",Solid
+03_estimation.R,modules/conjoint/R,r,466,78,283,105,Estimate choice models using mlogit (primary) and clogit (fallback),Solid
+04_utilities.R,modules/conjoint/R,r,516,94,298,124,"Calculate utilities, confidence intervals, and attribute importance",Solid
+05_simulator.R,modules/conjoint/R,r,451,83,226,142,Unknown purpose,Solid
+06_interactions.R,modules/conjoint/R,r,442,86,205,151,Unknown purpose,Solid
+07_output.R,modules/conjoint/R,r,346,67,214,65,Create formatted Excel workbook with comprehensive results,Solid
+08_market_simulator.R,modules/conjoint/R,r,561,107,327,127,Unknown purpose,Solid
+09_none_handling.R,modules/conjoint/R,r,383,70,216,97,"Auto-detect and handle ""none of these"" options in CBC data",Solid
+10_best_worst.R,modules/conjoint/R,r,434,87,217,130,Unknown purpose,Solid
+11_hierarchical_bayes.R,modules/conjoint/R,r,453,69,198,186,Unknown purpose,Solid
+99_helpers.R,modules/conjoint/R,r,512,86,223,203,Shared utility functions for conjoint analysis,Solid
+README.md,modules/conjoint,md,247,58,,,Module overview and general information,N/A
+TUTORIAL.md,modules/conjoint,md,931,222,,,Documentation file,N/A
+USER_MANUAL.md,modules/conjoint,md,1120,294,,,Detailed user manual and instructions,N/A
+QUICK_START_GUIDE.md,modules/conjoint/examples,md,649,168,,,Graphical user interface,N/A
+README.md,modules/conjoint/examples,md,222,54,,,Module overview and general information,N/A
+create_example_config.R,modules/conjoint/examples,r,176,19,138,19,Configuration loading and validation,Needs Improvement
+create_example_config.py,modules/conjoint/examples,py,143,23,,,Configuration loading and validation,N/A
+create_sample_data.py,modules/conjoint/examples,py,123,20,,,Data loading and preprocessing,N/A
+example_config.xlsx,modules/conjoint/examples,xlsx,54,0,,,Configuration loading and validation,N/A
+fix_config_paths.py,modules/conjoint/examples,py,46,9,,,Configuration loading and validation,N/A
+fix_example_config.py,modules/conjoint/examples,py,134,20,,,Configuration loading and validation,N/A
+.gitkeep,modules/conjoint/examples/output,none,0,0,,,Placeholder to keep empty directory in git,N/A
+sample_cbc_data.csv,modules/conjoint/examples,csv,1201,0,,,Data loading and preprocessing,N/A
+test_analysis.R,modules/conjoint/examples,r,159,25,107,27,Test suite for module functionality,Solid
+test_market_simulator.R,modules/conjoint/examples,r,392,70,266,56,Test suite for module functionality,Needs Improvement
+update_config_for_simulator.py,modules/conjoint/examples,py,26,5,,,Configuration loading and validation,N/A
+run_conjoint_gui.R,modules/conjoint,r,428,52,330,46,Graphical user interface,Solid
+test_integration.R,modules/conjoint/tests,r,512,103,348,61,Test suite for module functionality,Solid
+test_unit_tests.R,modules/conjoint/tests,r,588,98,432,58,Test suite for module functionality,Needs Improvement
+QUICK_START.md,modules/keydriver,md,165,46,,,Quick start guide for new users,N/A
+00_main.R,modules/keydriver/R,r,150,15,66,69,Determine which independent variables (drivers) have the greatest,Solid
+01_config.R,modules/keydriver/R,r,100,15,64,21,Configuration loading and validation,Solid
+02_validation.R,modules/keydriver/R,r,139,22,90,27,Data loading and preprocessing,Solid
+03_analysis.R,modules/keydriver/R,r,399,76,226,97,Unknown purpose,Solid
+04_output.R,modules/keydriver/R,r,306,36,228,42,Output generation and file export,Needs Improvement
+README.md,modules/keydriver,md,258,58,,,Module overview and general information,N/A
+USER_MANUAL.md,modules/keydriver,md,1155,326,,,Detailed user manual and instructions,N/A
+run_keydriver_gui.R,modules/keydriver,r,418,49,325,44,Graphical user interface,Solid
+DATA_HEADERS_FEATURE_SUMMARY.txt,modules/parser/Documentation,txt,243,65,,,Data loading and preprocessing,N/A
+DATA_HEADERS_IMPLEMENTATION_GUIDE.txt,modules/parser/Documentation,txt,244,63,,,Data loading and preprocessing,N/A
+PARSER_CHANGES_SUMMARY.txt,modules/parser/Documentation,txt,134,35,,,Text documentation or notes,N/A
+PARSER_COMPLETE_FIX_PACKAGE.txt,modules/parser/Documentation,txt,261,62,,,Text documentation or notes,N/A
+PARSER_FIXES_COMBINED_SUMMARY.txt,modules/parser/Documentation,txt,180,46,,,Text documentation or notes,N/A
+PARSER_FIX_3_ORCHESTRATOR.txt,modules/parser/Documentation,txt,106,32,,,Text documentation or notes,N/A
+PARSER_IMPROVEMENTS_GUIDE.txt,modules/parser/Documentation,txt,232,62,,,Graphical user interface,N/A
+SHINY_APP_UPDATE_GUIDE.txt,modules/parser/Documentation,txt,285,72,,,Graphical user interface,N/A
+TYPE_DETECTION_FIX_GUIDE.txt,modules/parser/Documentation,txt,145,36,,,Graphical user interface,N/A
+comparison.docx,modules/parser/Documentation,docx,202,2,,,Word document with detailed documentation,N/A
+index.docx,modules/parser/Documentation,docx,229,8,,,Word document with detailed documentation,N/A
+manifest.docx,modules/parser/Documentation,docx,232,7,,,Word document with detailed documentation,N/A
+migration guide.docx,modules/parser/Documentation,docx,227,6,,,Graphical user interface,N/A
+migration summary.docx,modules/parser/Documentation,docx,263,5,,,Word document with detailed documentation,N/A
+readme.docx,modules/parser/Documentation,docx,122,1,,,Word document with detailed documentation,N/A
+EXAMPLE_WORKFLOWS.md,modules/parser,md,726,164,,,Example workflows and use cases,N/A
+QUICK_START.md,modules/parser,md,217,56,,,Quick start guide for new users,N/A
+TECHNICAL_DOCUMENTATION.md,modules/parser,md,866,194,,,Technical documentation for developers,N/A
+Turas_Parser_Quick_Reference.docx,modules/parser,docx,104,0,,,Word document with detailed documentation,N/A
+USER_MANUAL.md,modules/parser,md,837,192,,,Detailed user manual and instructions,N/A
+bin_detector.R,modules/parser/lib,r,161,20,89,52,Detect numeric bins in option text,Solid
+docx_reader.R,modules/parser/lib,r,112,18,40,54,Read and extract text from Word (.docx) documents,Solid
+output_generator.R,modules/parser/lib,r,599,98,350,151,"Generate Survey_Structure.xlsx, Selection_Sheet.xlsx, and Data_Headers.xlsx",Solid
+parse_orchestrator.R,modules/parser/lib,r,213,34,106,73,Orchestrate the complete parsing workflow,Solid
+pattern_parser.R,modules/parser/lib,r,265,33,145,87,Parse questionnaires using pattern matching,Solid
+structure_parser.R,modules/parser/lib,r,148,24,70,54,Parse questionnaires based on document structure,Solid
+text_cleaner.R,modules/parser/lib,r,192,36,84,72,Clean question text and extract inline options,Solid
+type_detector.R,modules/parser/lib,r,334,45,155,134,Automatically detect question types,Solid
+run_parser.R,modules/parser,r,84,10,43,31,Parse Word questionnaires and generate Survey_Structure.xlsx,Solid
+shiny_app.R,modules/parser,r,472,46,359,67,Interactive UI for questionnaire parsing,Solid
+turas_launcher_shiny.R,modules/parser,r,571,72,433,66,Graphical user interface,Solid
+turas_launcher_tcltk.R,modules/parser,r,375,67,248,60,Unknown purpose,Solid
+EXAMPLE_WORKFLOWS.md,modules/pricing,md,503,135,,,Example workflows and use cases,N/A
+QUICK_START.md,modules/pricing,md,145,38,,,Quick start guide for new users,N/A
+00_main.R,modules/pricing/R,r,387,43,224,120,Analyze pricing sensitivity using Van Westendorp PSM and,Solid
+01_config.R,modules/pricing/R,r,694,98,462,134,Load and validate Excel configuration for pricing analysis,Solid
+02_validation.R,modules/pricing/R,r,452,59,301,92,Load and validate pricing survey data,Solid
+03_van_westendorp.R,modules/pricing/R,r,400,65,194,141,Implement Van Westendorp PSM analysis methodology,Solid
+04_gabor_granger.R,modules/pricing/R,r,520,79,288,153,Implement Gabor-Granger pricing methodology,Solid
+05_visualization.R,modules/pricing/R,r,495,66,327,102,Generate visualizations for pricing analysis results,Solid
+06_output.R,modules/pricing/R,r,602,92,419,91,Generate Excel output files with analysis results,Solid
+07_wtp_distribution.R,modules/pricing/R,r,291,49,145,97,Extract and analyze WTP distributions from pricing data,Solid
+08_competitive_scenarios.R,modules/pricing/R,r,252,40,126,86,Simulate competitive market scenarios and price-based choice,Solid
+09_price_volume_optimisation.R,modules/pricing/R,r,334,50,185,99,Find optimal prices subject to business constraints,Solid
+README.md,modules/pricing,md,216,53,,,Module overview and general information,N/A
+TECHNICAL_DOCUMENTATION.md,modules/pricing,md,465,107,,,Technical documentation for developers,N/A
+TESTING_CHECKLIST.md,modules/pricing,md,174,50,,,Documentation file,N/A
+TEST_NEW_FEATURES.R,modules/pricing,r,327,57,230,40,Test all Phase 1-3 implementations,Needs Improvement
+TUTORIAL.md,modules/pricing,md,461,124,,,Documentation file,N/A
+USER_MANUAL.md,modules/pricing,md,6,2,,,Detailed user manual and instructions,N/A
+sample_vw_data.csv,modules/pricing/examples,csv,11,0,,,Data loading and preprocessing,N/A
+run_pricing_gui.R,modules/pricing,r,699,111,495,93,Provide graphical interface for pricing analysis,Solid
+sample_config_comprehensive.R,modules/pricing,r,362,58,166,138,Configuration loading and validation,Needs Improvement
+README.md,modules/pricing/test_projects,md,272,63,,,Module overview and general information,N/A
+README.md,modules/pricing/test_projects/consumer_electronics,md,83,22,,,Module overview and general information,N/A
+create_config.R,modules/pricing/test_projects/consumer_electronics,r,121,11,103,7,Configuration loading and validation,Poor
+generate_data.R,modules/pricing/test_projects/consumer_electronics,r,53,9,35,9,Data loading and preprocessing,Poor
+README.md,modules/pricing/test_projects/retail_product,md,181,41,,,Module overview and general information,N/A
+create_config.R,modules/pricing/test_projects/retail_product,r,147,12,127,8,Configuration loading and validation,Poor
+generate_data.R,modules/pricing/test_projects/retail_product,r,92,14,64,14,Data loading and preprocessing,Poor
+README.md,modules/pricing/test_projects/saas_subscription,md,125,31,,,Module overview and general information,N/A
+create_config.R,modules/pricing/test_projects/saas_subscription,r,124,11,106,7,Configuration loading and validation,Poor
+generate_data.R,modules/pricing/test_projects/saas_subscription,r,65,10,42,13,Data loading and preprocessing,Poor
+setup_all_projects.R,modules/pricing/test_projects,r,66,15,44,7,Test code,Poor
+CRITICAL_FIXES_SUMMARY.md,modules/segment,md,423,109,,,Documentation file,N/A
+CRITICAL_FIX_10_GUI_CONSOLE.md,modules/segment,md,446,98,,,Graphical user interface,N/A
+CRITICAL_FIX_9_VARIABLE_SELECTION.md,modules/segment,md,171,46,,,Documentation file,N/A
+EXAMPLE_WORKFLOWS.md,modules/segment,md,668,183,,,Example workflows and use cases,N/A
+MAINTENANCE_MANUAL.md,modules/segment,md,949,217,,,Maintenance guide for code upkeep,N/A
+QUICK_START.md,modules/segment,md,214,54,,,Quick start guide for new users,N/A
+README.md,modules/segment,md,349,87,,,Module overview and general information,N/A
+SEGMENTATION_CODE_REVIEW_PACKAGE.md,modules/segment,md,301,73,,,Documentation file,N/A
+TESTING_CHECKLIST.md,modules/segment,md,395,113,,,Documentation file,N/A
+TESTING_GUIDE.md,modules/segment,md,315,96,,,Graphical user interface,N/A
+TESTING_SUMMARY.md,modules/segment,md,256,70,,,Documentation file,N/A
+USER_MANUAL.md,modules/segment,md,812,196,,,Detailed user manual and instructions,N/A
+segment_config.R,modules/segment/lib,r,457,83,285,89,Configuration loading and validation,Solid
+segment_data_prep.R,modules/segment/lib,r,569,88,357,124,Data loading and preprocessing,Solid
+segment_export.R,modules/segment/lib,r,529,87,336,106,' PURPOSE: Easy to merge back with original data,Solid
+segment_kmeans.R,modules/segment/lib,r,208,33,124,51,Unknown purpose,Solid
+segment_outliers.R,modules/segment/lib,r,392,66,228,98,Detect and handle outliers that may distort clustering results,Solid
+segment_profile.R,modules/segment/lib,r,224,33,123,68,Unknown purpose,Solid
+segment_profiling_enhanced.R,modules/segment/lib,r,333,61,196,76,Unknown purpose,Solid
+segment_scoring.R,modules/segment/lib,r,348,59,212,77,Unknown purpose,Solid
+segment_utils.R,modules/segment/lib,r,483,64,315,104,Utility functions and helper methods,Solid
+segment_validation.R,modules/segment/lib,r,391,70,228,93,Input validation and error checking,Solid
+segment_variable_selection.R,modules/segment/lib,r,509,90,314,105,Select optimal subset of variables for clustering,Solid
+segment_visualization.R,modules/segment/lib,r,372,61,222,89,Unknown purpose,Solid
+prepare_review_package.sh,modules/segment,sh,171,20,,,Shell script for automation,N/A
+run_segment.R,modules/segment,r,348,62,193,93,Main execution script to run the module,Solid
+run_segment_gui.R,modules/segment,r,621,97,460,64,Graphical user interface,Solid
+test_critical_fixes.R,modules/segment,r,343,56,230,57,Test suite for module functionality,Needs Improvement
+TEST_GUIDE.md,modules/segment/test_data,md,257,70,,,Graphical user interface,N/A
+VARSEL_TEST_GUIDE.md,modules/segment/test_data,md,153,46,,,Graphical user interface,N/A
+generate_test_data.R,modules/segment/test_data,r,99,17,59,23,Data loading and preprocessing,Poor
+generate_test_data_20vars.R,modules/segment/test_data,r,138,26,69,43,Data loading and preprocessing,Needs Improvement
+generate_test_question_labels.R,modules/segment/test_data,r,52,8,32,12,Test suite for module functionality,Needs Improvement
+regenerate_test_config.R,modules/segment/test_data,r,25,4,12,9,Configuration loading and validation,Needs Improvement
+test_question_labels.xlsx,modules/segment/test_data,xlsx,42,0,,,Test suite for module functionality,N/A
+test_segment_config.csv,modules/segment/test_data,csv,31,0,,,Configuration loading and validation,N/A
+test_segment_config.xlsx,modules/segment/test_data,xlsx,42,0,,,Configuration loading and validation,N/A
+test_segmentation_real_data.R,modules/segment/test_data,r,225,42,154,29,Data loading and preprocessing,Needs Improvement
+test_survey_data.csv,modules/segment/test_data,csv,301,0,,,Data loading and preprocessing,N/A
+test_varsel_config.csv,modules/segment/test_data,csv,36,0,,,Configuration loading and validation,N/A
+test_varsel_config.xlsx,modules/segment/test_data,xlsx,40,0,,,Configuration loading and validation,N/A
+README.md,modules/shared,md,92,24,,,Module overview and general information,N/A
+config_utils.R,modules/shared/lib,r,256,36,108,112,Configuration loading and validation,Solid
+data_utils.R,modules/shared/lib,r,240,31,119,90,Data loading and preprocessing,Solid
+logging_utils.R,modules/shared/lib,r,132,11,61,60,Utility functions and helper methods,Solid
+validation_utils.R,modules/shared/lib,r,311,32,175,104,Input validation and error checking,Solid
+EXAMPLE_WORKFLOWS.md,modules/tabs,md,1409,316,,,Example workflows and use cases,N/A
+QUICK_START.md,modules/tabs,md,298,79,,,Quick start guide for new users,N/A
+TECHNICAL_DOCUMENTATION.md,modules/tabs,md,1887,443,,,Technical documentation for developers,N/A
+USER_MANUAL.md,modules/tabs,md,970,226,,,Detailed user manual and instructions,N/A
+banner.R,modules/tabs/lib,r,523,105,275,143,Create banner (column) structure for crosstabs,Solid
+banner_indices.R,modules/tabs/lib,r,503,94,237,172,Create memory-optimized banner row indices,Solid
+cell_calculator.R,modules/tabs/lib,r,731,132,370,229,Core cell and row calculation functions,Solid
+composite_processor.R,modules/tabs/lib,r,707,107,439,161,Unknown purpose,Solid
+config_loader.R,modules/tabs/lib,r,631,126,321,184,Load and parse crosstab configuration files,Solid
+excel_writer.R,modules/tabs/lib,r,1477,217,959,301,Unknown purpose,Solid
+numeric_processor.R,modules/tabs/lib,r,581,82,361,138,Unknown purpose,Solid
+question_dispatcher.R,modules/tabs/lib,r,420,58,238,124,Unknown purpose,Solid
+question_orchestrator.R,modules/tabs/lib,r,541,59,301,181,Unknown purpose,Solid
+ranking.R,modules/tabs/lib,r,1616,220,942,454,Unknown purpose,Solid
+run_crosstabs.R,modules/tabs/lib,r,1222,213,717,292,Main execution script to run the module,Solid
+shared_functions.R,modules/tabs/lib,r,1685,188,697,800,Unknown purpose,Solid
+standard_processor.R,modules/tabs/lib,r,1273,180,802,291,Unknown purpose,Solid
+summary_builder.R,modules/tabs/lib,r,626,106,378,142,Unknown purpose,Solid
+validation.R,modules/tabs/lib,r,1838,223,1116,499,Input validation and error checking,Solid
+weighting.R,modules/tabs/lib,r,1491,201,722,568,Unknown purpose,Solid
+run_tabs.R,modules/tabs,r,87,16,57,14,Main execution script to run the module,Solid
+run_tabs_gui.R,modules/tabs,r,475,66,347,62,Launch beautiful crosstabs GUI (matches parser interface),Solid
+BUG_FIX_SUMMARY.md,modules/tracker,md,69,21,,,Documentation file,N/A
+ENHANCEMENT_SUMMARY.md,modules/tracker,md,95,21,,,Documentation file,N/A
+EXAMPLE_WORKFLOWS.md,modules/tracker,md,1160,289,,,Example workflows and use cases,N/A
+FINAL_FIX_SUMMARY.md,modules/tracker,md,59,17,,,Documentation file,N/A
+QUICK_START.md,modules/tracker,md,531,131,,,Quick start guide for new users,N/A
+README_TEMPLATES.md,modules/tracker,md,237,52,,,Module overview and general information,N/A
+TECHNICAL_DOCUMENTATION.md,modules/tracker,md,1303,290,,,Technical documentation for developers,N/A
+TESTING_WALKTHROUGH.md,modules/tracker,md,223,63,,,Documentation file,N/A
+TRACKER_ENHANCEMENT_SPEC_Wave_History_Reports.md,modules/tracker,md,497,126,,,Documentation file,N/A
+TURAS_TRACKER_ENHANCEMENT.md,modules/tracker,md,1853,437,,,Documentation file,N/A
+USER_MANUAL.md,modules/tracker,md,2232,612,,,Detailed user manual and instructions,N/A
+WAVE_HISTORY_WALKTHROUGH.md,modules/tracker,md,283,86,,,Documentation file,N/A
+README.md,modules/tracker/archive_docx,md,29,6,,,Module overview and general information,N/A
+SPSS compatability.docx,modules/tracker/archive_docx,docx,128,1,,,Word document with detailed documentation,N/A
+TURAS TRACKER ENHANCEMENT.docx,modules/tracker/archive_docx,docx,690,16,,,Word document with detailed documentation,N/A
+TURAS Tracking Module kick off pack.docx,modules/tracker/archive_docx,docx,163,1,,,Word document with detailed documentation,N/A
+Turas tabs integrations condiserations.docx,modules/tracker/archive_docx,docx,127,0,,,Word document with detailed documentation,N/A
+Turas tracking development brief.docx,modules/tracker/archive_docx,docx,205,0,,,Word document with detailed documentation,N/A
+TurasTracking brief.docx,modules/tracker/archive_docx,docx,652,18,,,Word document with detailed documentation,N/A
+considerations for tracker integration to tabs.docx,modules/tracker/archive_docx,docx,161,1,,,Word document with detailed documentation,N/A
+banner_trends.R,modules/tracker,r,457,85,260,112,Unknown purpose,Solid
+constants.R,modules/tracker,r,68,17,8,43,Unknown purpose,Needs Improvement
+create_templates.R,modules/tracker,r,342,47,252,43,Script to create/generate example or test data,Needs Improvement
+debug_tracker.R,modules/tracker,r,27,5,16,6,Unknown purpose,Poor
+derived_metrics_template.xlsx,modules/tracker,xlsx,41,0,,,Configuration template for user input,N/A
+diagnose_wave3_columns.R,modules/tracker,r,71,12,47,12,Unknown purpose,Needs Improvement
+formatting_utils.R,modules/tracker,r,101,16,37,48,Utility functions and helper methods,Solid
+master_dictionary_template.csv,modules/tracker,csv,5,0,,,Configuration template for user input,N/A
+question_mapper.R,modules/tracker,r,557,105,270,182,Unknown purpose,Solid
+question_mapping_template.xlsx,modules/tracker,xlsx,51,1,,,Configuration template for user input,N/A
+run_ccs_tracking.R,modules/tracker,r,27,4,18,5,Main execution script to run the module,Poor
+run_tracker.R,modules/tracker,r,471,72,247,152,Main execution script to run the module,Solid
+run_tracker_gui.R,modules/tracker,r,688,90,525,73,Launch beautiful tracking analysis GUI,Solid
+test_enhancements.R,modules/tracker/test_data,r,152,27,88,37,Test suite for module functionality,Needs Improvement
+test_mvt.R,modules/tracker/test_data,r,36,7,23,6,Test suite for module functionality,Needs Improvement
+test_phase1.R,modules/tracker/test_data,r,119,25,62,32,Test suite for module functionality,Solid
+test_phase2.R,modules/tracker/test_data,r,33,7,20,6,Test suite for module functionality,Needs Improvement
+test_phase3.R,modules/tracker/test_data,r,110,20,77,13,Test suite for module functionality,Needs Improvement
+test_quick_fixes.R,modules/tracker,r,163,25,110,28,Test suite for module functionality,Needs Improvement
+test_wave_history.R,modules/tracker,r,145,25,93,27,Test suite for module functionality,Needs Improvement
+tracker_config_loader.R,modules/tracker,r,331,49,165,117,Configuration loading and validation,Solid
+tracker_output.R,modules/tracker,r,2161,380,1385,396,Output generation and file export,Solid
+tracking_config_template.xlsx,modules/tracker,xlsx,66,0,,,Configuration loading and validation,N/A
+trend_calculator.R,modules/tracker,r,2479,441,1540,498,Unknown purpose,Solid
+validation_tracker.R,modules/tracker,r,497,91,299,107,Input validation and error checking,Solid
+verify_tracker_fix.R,modules/tracker,r,114,27,67,20,Unknown purpose,Needs Improvement
+wave_data_template.csv,modules/tracker,csv,101,0,,,Data loading and preprocessing,N/A
+wave_loader.R,modules/tracker,r,581,96,276,209,Unknown purpose,Solid
+config_utils.R,shared,r,355,49,167,139,Configuration loading and validation,Solid
+formatting.R,shared,r,317,50,117,150,Unknown purpose,Solid
+weights.R,shared,r,326,41,137,148,Unknown purpose,Solid
+Confidence_Config_Template.xlsx,templates,xlsx,57,0,,,Configuration loading and validation,N/A
+Crosstab_Config_Template.xlsx,templates,xlsx,98,1,,,Configuration loading and validation,N/A
+README.md,templates,md,156,35,,,Module overview and general information,N/A
+Segment_Config_Template.xlsx,templates,xlsx,49,0,,,Configuration loading and validation,N/A
+Survey_Structure_Template.xlsx,templates,xlsx,108,1,,,Configuration template for user input,N/A
+Tracker_Config_Template.xlsx,templates,xlsx,62,0,,,Configuration loading and validation,N/A
+Tracker_Question_Mapping_Template.xlsx,templates,xlsx,48,0,,,Configuration template for user input,N/A
+Turas setup variable configuration.docx,templates,docx,174,1,,,Configuration loading and validation,N/A
+README.md,test_projects,md,19,5,,,Module overview and general information,N/A
+compare_functions.sh,test_projects,sh,30,5,,,Shell script for automation,N/A
+compare_outputs.R,test_projects,r,116,17,89,10,Output generation and file export,Needs Improvement
+FILE_LIST.txt,test_projects/confidence_module_review,txt,20,0,,,Text documentation or notes,N/A
+MANIFEST.md,test_projects/confidence_module_review,md,143,38,,,Documentation file,N/A
+README.md,test_projects/confidence_module_review,md,537,140,,,Module overview and general information,N/A
+REVIEW_CHECKLIST.md,test_projects/confidence_module_review,md,815,231,,,Documentation file,N/A
+TECHNICAL_SUMMARY.md,test_projects/confidence_module_review,md,695,155,,,Technical documentation for developers,N/A
+00_main.R,test_projects/confidence_module_review/core_code,r,620,111,353,156,Main orchestrator script that coordinates module workflow,Solid
+01_load_config.R,test_projects/confidence_module_review/core_code,r,610,90,349,171,Configuration loading and validation,Solid
+02_load_data.R,test_projects/confidence_module_review/core_code,r,414,58,221,135,Data loading and preprocessing,Solid
+03_study_level.R,test_projects/confidence_module_review/core_code,r,392,51,165,176,Unknown purpose,Solid
+04_proportions.R,test_projects/confidence_module_review/core_code,r,581,63,213,305,Unknown purpose,Solid
+05_means.R,test_projects/confidence_module_review/core_code,r,589,66,264,259,Unknown purpose,Solid
+07_output.R,test_projects/confidence_module_review/core_code,r,849,142,509,198,Output generation and file export,Solid
+utils.R,test_projects/confidence_module_review/core_code,r,423,63,161,199,Utility functions and helper methods,Solid
+EXAMPLE_WORKFLOWS.md,test_projects/confidence_module_review/documentation,md,490,113,,,Example workflows and use cases,N/A
+MAINTENANCE_GUIDE.md,test_projects/confidence_module_review/documentation,md,1515,320,,,Graphical user interface,N/A
+QUICK_START.md,test_projects/confidence_module_review/documentation,md,261,67,,,Quick start guide for new users,N/A
+README.md,test_projects/confidence_module_review/documentation,md,191,45,,,Module overview and general information,N/A
+USER_MANUAL.md,test_projects/confidence_module_review/documentation,md,1137,335,,,Detailed user manual and instructions,N/A
+create_example_config.R,test_projects/confidence_module_review/examples,r,359,46,247,66,Configuration loading and validation,Solid
+run_confidence_gui.R,test_projects/confidence_module_review/ui_and_tests,r,407,55,304,48,Launch confidence intervals analysis GUI,Solid
+test_01_load_config.R,test_projects/confidence_module_review/ui_and_tests,r,562,121,371,70,Configuration loading and validation,Solid
+test_utils.R,test_projects/confidence_module_review/ui_and_tests,r,547,106,343,98,Utility functions and helper methods,Needs Improvement
+run_tracker_debug.R,test_projects,r,46,9,23,14,Main execution script to run the module,Needs Improvement
+test_bug_fixes.R,test_projects,r,191,29,132,30,Test suite for module functionality,Solid
+README.md,test_projects/test_composite,md,40,11,,,Module overview and general information,N/A
+test_data.csv,test_projects/test_composite,csv,11,0,,,Data loading and preprocessing,N/A
+README.md,test_projects/test_data,md,5,2,,,Module overview and general information,N/A
+TEST_NEW_MODULES.md,test_projects/test_data,md,242,56,,,Test suite for module functionality,N/A
+conjoint_test_config.xlsx,test_projects/test_data,xlsx,46,0,,,Configuration loading and validation,N/A
+conjoint_test_data.csv,test_projects/test_data,csv,91,0,,,Data loading and preprocessing,N/A
+generate_conjoint_test_data.R,test_projects/test_data,r,46,7,33,6,Data loading and preprocessing,Poor
+keydriver_test_config.xlsx,test_projects/test_data,xlsx,51,0,,,Configuration loading and validation,N/A
+keydriver_test_data.csv,test_projects/test_data,csv,101,0,,,Data loading and preprocessing,N/A
+README.md,tests,md,233,53,,,Module overview and general information,N/A
+testthat.R,tests,r,47,5,27,15,Unknown purpose,Needs Improvement
+test_config_baseline.R,tests/testthat,r,85,17,48,20,Configuration loading and validation,Needs Improvement
+test_formatting_baseline.R,tests/testthat,r,146,34,83,29,Test suite for module functionality,Needs Improvement
+test_shared_config.R,tests/testthat,r,372,76,257,39,Configuration loading and validation,Needs Improvement
+test_shared_formatting.R,tests/testthat,r,334,64,202,68,Test suite for module functionality,Needs Improvement
+test_shared_functions.R,tests/testthat,r,198,44,104,50,Test suite for module functionality,Needs Improvement
+test_shared_weights.R,tests/testthat,r,361,89,231,41,Test suite for module functionality,Needs Improvement
+test_weights_baseline.R,tests/testthat,r,106,27,51,28,Test suite for module functionality,Needs Improvement
+validate_tests.sh,tests,sh,71,10,,,Input validation and error checking,N/A
+README.md,tools,md,39,12,,,Module overview and general information,N/A
+check_documentation_files.bat,tools,bat,55,8,,,Windows batch script,N/A
+check_documentation_files.sh,tools,sh,46,7,,,Shell script for automation,N/A
+check_excel_sheets.R,tools,r,12,2,9,1,Unknown purpose,Poor
+create_all_templates.R,tools,r,646,90,503,53,Script to create/generate example or test data,Needs Improvement
+create_all_templates.py,tools,py,548,105,,,Script to create/generate example or test data,N/A
