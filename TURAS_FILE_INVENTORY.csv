@@ -394,3 +394,11 @@ check_documentation_files.sh,tools,sh,46,7,,,Shell script for automation,N/A
 check_excel_sheets.R,tools,r,12,2,9,1,Unknown purpose,Poor
 create_all_templates.R,tools,r,646,90,503,53,Script to create/generate example or test data,Needs Improvement
 create_all_templates.py,tools,py,548,105,,,Script to create/generate example or test data,N/A
+Survey_Structure_Template_Annotated.xlsx,templates,xlsx,N/A,N/A,N/A,N/A,Comprehensive annotated template for survey structure definition with inline documentation for all parameters,N/A
+Crosstab_Config_Template_Annotated.xlsx,templates,xlsx,N/A,N/A,N/A,N/A,Comprehensive annotated template for crosstab configuration with all 21 settings documented,N/A
+Tracker_Config_Template_Annotated.xlsx,templates,xlsx,N/A,N/A,N/A,N/A,Comprehensive annotated template for tracker configuration with waves and settings documented,N/A
+Tracker_Question_Mapping_Template_Annotated.xlsx,templates,xlsx,N/A,N/A,N/A,N/A,Comprehensive annotated template for question code mapping across waves,N/A
+Confidence_Config_Template_Annotated.xlsx,templates,xlsx,N/A,N/A,N/A,N/A,Comprehensive annotated template for confidence interval analysis with methods documented,N/A
+Segment_Config_Template_Annotated.xlsx,templates,xlsx,N/A,N/A,N/A,N/A,Comprehensive annotated template for k-means segmentation with 37 parameters documented,N/A
+TEMPLATE_REFERENCE_GUIDE.md,templates,md,456,N/A,N/A,N/A,Definitive quick-reference guide for all TURAS configuration templates with complete parameter listings,N/A
+ANNOTATED_TEMPLATES_SUMMARY.md,templates,md,423,N/A,N/A,N/A,Summary of annotated template features and usage guidelines,N/A

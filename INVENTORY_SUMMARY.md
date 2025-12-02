@@ -7,7 +7,9 @@
 
 ## Overview
 
-This comprehensive inventory catalogs **395 files** across the entire Turas repository, providing detailed metrics, quality assessments, and purpose descriptions for each file.
+This comprehensive inventory catalogs **403 files** across the entire Turas repository, providing detailed metrics, quality assessments, and purpose descriptions for each file.
+
+**Latest Update:** Added 8 comprehensive annotated template files with inline documentation for all configuration parameters.
 
 ---
 
@@ -18,10 +20,10 @@ This comprehensive inventory catalogs **395 files** across the entire Turas repo
 | File Type | Count | Purpose |
 |-----------|-------|---------|
 | R Scripts | 181 | Core analysis and processing code |
-| Markdown | 128 | Documentation and guides |
+| Markdown | 130 | Documentation and guides |
 | Word Documents | 25 | Detailed documentation |
 | Text Files | 19 | Notes and legacy documentation |
-| Excel Files | 15 | Configuration templates and test data |
+| Excel Files | 21 | Configuration templates and test data |
 | CSV Files | 11 | Data files and configurations |
 | Python Scripts | 7 | Utility and helper scripts |
 | Shell Scripts | 4 | Automation scripts |
