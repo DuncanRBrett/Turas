@@ -1,7 +1,7 @@
 # Turas Analytics - Setup & Configuration Templates Guide
 
-**Version:** 1.0.0
-**Date:** 2025-11-17
+**Version:** 10.0
+**Date:** December 2, 2025
 
 ---
 
