@@ -20,7 +20,10 @@
 #' paths <- get_example_paths("tabs", "basic")
 #' data <- read.csv(paths$data)
 get_example_paths <- function(module, example = "basic") {
-  base_path <- file.path("examples", module, example)
+  # Find TURAS root directory
+  root <- find_turas_root()
+
+  base_path <- file.path(root, "examples", module, example)
 
   if (!dir.exists(base_path)) {
     stop("Example not found: ", base_path, "\n",
@@ -60,8 +63,11 @@ get_example_paths <- function(module, example = "basic") {
 #' @examples
 #' golden_path <- get_golden_path("tabs", "basic")
 get_golden_path <- function(module, example = "basic") {
+  # Find TURAS root directory
+  root <- find_turas_root()
+
   filename <- paste0(module, "_", example, ".json")
-  path <- file.path("tests", "regression", "golden", filename)
+  path <- file.path(root, "tests", "regression", "golden", filename)
 
   if (!file.exists(path)) {
     stop("Golden values file not found: ", path, "\n",
@@ -104,6 +110,47 @@ load_golden <- function(module, example = "basic") {
   }, error = function(e) {
     stop("Error loading golden values from ", path, ":\n", e$message)
   })
+}
+
+#' Find TURAS root directory
+#'
+#' Walks up the directory tree to find the TURAS root directory.
+#' Identifies root by presence of 'modules', 'tests', and 'examples' subdirectories.
+#'
+#' @return Character. Path to TURAS root directory
+#' @export
+find_turas_root <- function() {
+  # Start from current directory
+  current_dir <- getwd()
+
+  # Check if we're already at root
+  required_dirs <- c("modules", "tests", "examples")
+  if (all(dir.exists(file.path(current_dir, required_dirs)))) {
+    return(current_dir)
+  }
+
+  # Walk up the directory tree
+  max_levels <- 10  # Prevent infinite loop
+  for (i in 1:max_levels) {
+    # Go up one level
+    parent_dir <- dirname(current_dir)
+
+    # Check if we've reached filesystem root
+    if (parent_dir == current_dir) {
+      stop("Could not find TURAS root directory.\n",
+           "Started from: ", getwd(), "\n",
+           "Looking for directories: modules, tests, examples")
+    }
+
+    current_dir <- parent_dir
+
+    # Check if this is TURAS root
+    if (all(dir.exists(file.path(current_dir, required_dirs)))) {
+      return(current_dir)
+    }
+  }
+
+  stop("Could not find TURAS root directory after ", max_levels, " levels")
 }
 
 #' Check if running from TURAS root directory
