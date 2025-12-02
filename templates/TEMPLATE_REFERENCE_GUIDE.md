@@ -1,6 +1,6 @@
 # TURAS Template Reference Guide
 
-**Version:** 1.0
+**Version:** 10.0
 **Last Updated:** December 2, 2025
 **Purpose:** Definitive quick-reference for all TURAS configuration templates
 

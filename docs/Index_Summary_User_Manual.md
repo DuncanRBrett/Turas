@@ -1,7 +1,7 @@
 # TURAS Index Summary Module - User Manual
 
-**Module Version:** V10.1
-**Document Date:** November 2025
+**Module Version:** 10.0
+**Document Date:** December 2, 2025
 **System:** TURAS Crosstabulation Engine
 
 ---

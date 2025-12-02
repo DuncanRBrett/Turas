@@ -1,7 +1,7 @@
 # TurasTabs - Composite Scores & Index Summary User Manual
 
-**Version:** 1.0
-**Last Updated:** November 2025
+**Version:** 10.0
+**Last Updated:** December 2, 2025
 
 ---
 

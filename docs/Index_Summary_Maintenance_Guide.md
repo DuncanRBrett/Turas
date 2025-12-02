@@ -1,6 +1,6 @@
 # TURAS Index Summary Module - Code Maintenance Guide
 
-**Module Version:** V10.1
+**Module Version:** 10.0
 **Implementation Date:** November 2025
 **Developer Documentation**
 

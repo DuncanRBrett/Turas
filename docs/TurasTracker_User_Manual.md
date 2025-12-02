@@ -1,7 +1,7 @@
 # TurasTracker - User Manual
 
-**Version:** MVT 1.0 (Phases 1-3 Complete)
-**Document Date:** November 2025
+**Version:** 10.0
+**Document Date:** December 2, 2025
 **System:** TURAS Tracking Analysis Module
 
 ---
@@ -885,7 +885,7 @@ respondent_id,Q10,Q15,Q25,Gender,AgeGroup,weight
 
 ## Version History
 
-**Version 1.0 - MVT Complete (November 2025)**
+**Version 10.0 (December 2025)**
 - ✅ Multi-wave tracking
 - ✅ Question mapping across waves
 - ✅ Trend calculation (Rating, NPS, SingleChoice)

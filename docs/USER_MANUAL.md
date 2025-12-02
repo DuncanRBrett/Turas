@@ -1,7 +1,7 @@
 # TURAS User Manual
 
-**Version:** 2.0
-**Last Updated:** 2025-01-12
+**Version:** 10.0
+**Last Updated:** December 2, 2025
 
 This manual explains how to set up and run the three core TURAS modules: Parser, Tabs, and Tracker.
 

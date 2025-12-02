@@ -152,5 +152,5 @@ See the module-specific documentation:
 
 ---
 
-**Last Updated:** 2025-11-18
-**Turas Version:** 1.0
+**Last Updated:** December 2, 2025
+**Turas Version:** 10.0
