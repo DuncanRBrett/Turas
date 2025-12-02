@@ -83,6 +83,37 @@ This directory contains ready-to-use Excel templates for all Turas modules.
 - Includes outlier detection settings
 - Ready to switch to final run mode
 
+### Pricing Module
+
+**Pricing_Config_Template.xlsx**
+- Configuration for pricing research analysis
+- Three sheets:
+  - **Settings:** Analysis method (Van Westendorp, Gabor-Granger, or both)
+  - **VanWestendorp:** PSM question mapping (too cheap/cheap/expensive/too expensive)
+  - **GaborGranger:** Price points and purchase intent columns
+- Supports weighted analysis and segmentation
+- Includes profit optimization with unit cost
+
+### Key Driver Module
+
+**KeyDriver_Config_Template.xlsx**
+- Configuration for key driver analysis
+- Two sheets:
+  - **Settings:** Analysis name, data/output files, minimum sample size
+  - **Variables:** Outcome variable, driver variables, optional weight variable
+- Pre-configured for brand health driver analysis
+- Ready for regression-based relative importance analysis
+
+### Conjoint Module
+
+**Conjoint_Config_Template.xlsx**
+- Configuration for choice-based conjoint analysis
+- Two sheets:
+  - **Settings:** Analysis type, data file, choice set structure
+  - **Attributes:** Product attributes with levels (e.g., Price, Brand, Storage)
+- Pre-configured for smartphone CBC example
+- Estimates part-worth utilities and relative importance
+
 ## Template Features
 
 All templates include:
@@ -99,9 +130,10 @@ If templates get corrupted or you need fresh copies:
 ```bash
 # From Turas root directory
 python3 create_all_templates.py
+python3 create_missing_templates.py
 ```
 
-This will regenerate all 7 templates in the `templates/` directory.
+This will regenerate all 10 templates in the `templates/` directory (7 core module templates + 3 additional module templates).
 
 ## Example Workflow
 

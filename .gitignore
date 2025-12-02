@@ -48,6 +48,10 @@ Thumbs.db
 .recent_projects.rds
 .recent_tracker_projects.rds
 
+# User project directories (not part of core Turas)
+my_*
+projects/
+
 # Log files
 *.log
 
