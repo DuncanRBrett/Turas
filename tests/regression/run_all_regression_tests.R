@@ -66,9 +66,9 @@ for (i in seq_along(test_modules)) {
 
   # Run test
   result <- tryCatch({
-    # Source helpers before running test
-    source("tests/regression/helpers/assertion_helpers.R", local = TRUE)
-    source("tests/regression/helpers/path_helpers.R", local = TRUE)
+    # Source helpers before running test (make available globally)
+    source("tests/regression/helpers/assertion_helpers.R")
+    source("tests/regression/helpers/path_helpers.R")
 
     # Capture test output
     test_results <- test_file(test_file, reporter = "silent")
