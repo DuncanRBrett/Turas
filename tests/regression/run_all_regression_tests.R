@@ -68,22 +68,30 @@ for (i in seq_along(test_modules)) {
   result <- tryCatch({
     test_file(test_file, reporter = "silent")
   }, error = function(e) {
-    list(passed = FALSE, failed = 1, error = e$message)
+    list(error = e$message)
   })
 
-  # Check results
+  # Check results - testthat returns a list-like object
   if (!is.null(result$error)) {
     cat(" ❌ ERROR:", result$error, "\n")
     total_failed <- total_failed + 1
-  } else if (length(result$results) > 0 && all(sapply(result$results, function(r) r$passed))) {
-    n_checks <- length(result$results)
-    cat(sprintf(" ✅ PASS (%d/%d checks)\n", n_checks, n_checks))
-    total_passed <- total_passed + 1
   } else {
-    n_failed <- sum(!sapply(result$results, function(r) r$passed))
-    n_total <- length(result$results)
-    cat(sprintf(" ❌ FAIL (%d/%d checks failed)\n", n_failed, n_total))
-    total_failed <- total_failed + 1
+    # Extract expectation results from testthat output
+    # test_file returns a testthat_results object
+    n_failed <- as.integer(result$failed)
+    n_passed <- as.integer(result$passed)
+    n_total <- n_failed + n_passed
+
+    if (n_failed == 0 && n_total > 0) {
+      cat(sprintf(" ✅ PASS (%d/%d checks)\n", n_passed, n_total))
+      total_passed <- total_passed + 1
+    } else if (n_total == 0) {
+      cat(" ❌ NO TESTS RUN\n")
+      total_failed <- total_failed + 1
+    } else {
+      cat(sprintf(" ❌ FAIL (%d/%d checks failed)\n", n_failed, n_total))
+      total_failed <- total_failed + 1
+    }
   }
 
   results[[module$name]] <- result
