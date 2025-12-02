@@ -10,14 +10,14 @@
   "checks": [
     {
       "name": "overall_mean_satisfaction",
-      "value": 7.62,
+      "value": 7.66,
       "tolerance": 0.01,
       "type": "numeric",
       "description": "Overall mean satisfaction score (unweighted)"
     },
     {
       "name": "overall_mean_satisfaction_weighted",
-      "value": 7.621739,
+      "value": 7.699805,
       "tolerance": 0.02,
       "type": "numeric",
       "description": "Overall mean satisfaction score (weighted)"
@@ -42,14 +42,14 @@
     },
     {
       "name": "mean_satisfaction_male",
-      "value": 8.04,
+      "value": 8.32,
       "tolerance": 0.02,
       "type": "numeric",
       "description": "Mean satisfaction for Males"
     },
     {
       "name": "mean_satisfaction_female",
-      "value": 7.2,
+      "value": 7.0,
       "tolerance": 0.02,
       "type": "numeric",
       "description": "Mean satisfaction for Females"
@@ -62,14 +62,14 @@
     },
     {
       "name": "effective_n_total_weighted",
-      "value": 48.78,
+      "value": 49.31029,
       "tolerance": 0.5,
       "type": "numeric",
       "description": "Effective N for total (with weights applied)"
     },
     {
       "name": "top2box_recommend_total",
-      "value": 68.0,
+      "value": 42.0,
       "tolerance": 1.0,
       "type": "numeric",
       "description": "Top 2 box percentage for recommend (9-10 ratings)"
