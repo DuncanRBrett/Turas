@@ -79,7 +79,9 @@ mock_keydriver_module <- function(data_path, config_path = NULL) {
 
 extract_keydriver_value <- function(output, check_name) {
   if (check_name %in% names(output$summary)) {
-    return(output$summary[[check_name]])
+    value <- output$summary[[check_name]]
+    # Strip names from named vectors
+    return(unname(value))
   }
   stop("Unknown check: ", check_name)
 }
