@@ -38,6 +38,54 @@ source(file.path(script_dir, "banner_trends.R"))
 source(file.path(script_dir, "formatting_utils.R"))
 source(file.path(script_dir, "tracker_output.R"))
 
+# Verify all required functions loaded successfully
+verify_tracker_environment <- function() {
+  required_functions <- c(
+    "load_tracking_config",
+    "load_question_mapping",
+    "build_question_map_index",
+    "validate_tracking_config",
+    "load_all_waves",
+    "validate_wave_data",
+    "calculate_all_trends",
+    "calculate_trends_with_banners",
+    "write_tracker_output",
+    "find_turas_root"
+  )
+
+  missing_functions <- character(0)
+  for (func_name in required_functions) {
+    if (!exists(func_name, mode = "function")) {
+      missing_functions <- c(missing_functions, func_name)
+    }
+  }
+
+  if (length(missing_functions) > 0) {
+    stop(paste0(
+      "Tracker module initialization failed. Missing required functions:\n",
+      paste0("  - ", missing_functions, collapse = "\n"),
+      "\n\nThis usually means the tracker was run from the wrong directory.\n",
+      "Fix: Run from modules/tracker/ or set TURAS_ROOT environment variable."
+    ))
+  }
+
+  # Verify shared formatting is accessible
+  tryCatch({
+    find_turas_root()
+  }, error = function(e) {
+    stop(paste0(
+      "Cannot locate Turas root directory and shared/formatting.R.\n",
+      "Error: ", e$message, "\n",
+      "Fix: Run from modules/tracker/ or set TURAS_ROOT environment variable."
+    ))
+  })
+
+  return(TRUE)
+}
+
+# Verify environment immediately after sourcing
+verify_tracker_environment()
+
 
 #' Run Tracking Analysis
 #'

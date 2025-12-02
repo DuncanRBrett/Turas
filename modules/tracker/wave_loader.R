@@ -191,16 +191,12 @@ clean_wave_data <- function(wave_df, wave_id, categorical_cols = character(0)) {
         next
       }
 
-      # Check if any values contain digits or decimal separators (use which() to avoid NA issues)
-      non_na_idx <- which(!is.na(col_data))
-      non_na_values <- col_data[non_na_idx]
-      has_numbers <- length(non_na_values) > 0 && any(grepl("[0-9]", non_na_values))
-
-      # Also check if column name looks like a question code (Q## pattern)
-      # This ensures we clean question columns even if they only contain non-response codes
+      # Only clean columns that look like question codes (Q## pattern)
+      # This prevents over-eager cleaning of ID columns or other numeric fields
+      # that aren't survey responses
       is_question_col <- grepl("^Q[0-9]+(_[0-9]+)?$", col_name)
 
-      if (has_numbers || is_question_col) {
+      if (is_question_col) {
         original_col <- col_data
 
         # Replace comma decimals with period decimals
