@@ -31,11 +31,11 @@ test_modules <- list(
   list(name = "Tabs", file = "test_regression_tabs_mock.R", status = "implemented"),
   list(name = "Confidence", file = "test_regression_confidence_mock.R", status = "implemented"),
   list(name = "KeyDriver", file = "test_regression_keydriver_mock.R", status = "implemented"),
-  list(name = "Tracker", file = "test_regression_tracker_mock.R", status = "planned"),
-  list(name = "Segment", file = "test_regression_segment_mock.R", status = "planned"),
-  list(name = "Conjoint", file = "test_regression_conjoint_mock.R", status = "planned"),
-  list(name = "Pricing", file = "test_regression_pricing_mock.R", status = "planned"),
-  list(name = "AlchemerParser", file = "test_regression_alchemerparser_mock.R", status = "planned")
+  list(name = "AlchemerParser", file = "test_regression_alchemerparser_mock.R", status = "implemented"),
+  list(name = "Segment", file = "test_regression_segment_mock.R", status = "implemented"),
+  list(name = "Conjoint", file = "test_regression_conjoint_mock.R", status = "implemented"),
+  list(name = "Pricing", file = "test_regression_pricing_mock.R", status = "implemented"),
+  list(name = "Tracker", file = "test_regression_tracker_mock.R", status = "implemented")
 )
 
 # Track results
