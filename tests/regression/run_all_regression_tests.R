@@ -66,20 +66,38 @@ for (i in seq_along(test_modules)) {
 
   # Run test
   result <- tryCatch({
-    test_file(test_file, reporter = "silent")
+    # Capture test output
+    test_results <- test_file(test_file, reporter = "silent")
+
+    # Count expectations manually from the result object
+    n_failed <- 0
+    n_passed <- 0
+
+    # testthat results are stored in a list structure
+    if (is.list(test_results) && length(test_results) > 0) {
+      for (test_result in test_results) {
+        if (inherits(test_result, "expectation")) {
+          if (inherits(test_result, "expectation_success")) {
+            n_passed <- n_passed + 1
+          } else if (inherits(test_result, "expectation_failure")) {
+            n_failed <- n_failed + 1
+          }
+        }
+      }
+    }
+
+    list(passed = n_passed, failed = n_failed)
   }, error = function(e) {
     list(error = e$message)
   })
 
-  # Check results - testthat returns a list-like object
+  # Check results
   if (!is.null(result$error)) {
     cat(" ❌ ERROR:", result$error, "\n")
     total_failed <- total_failed + 1
   } else {
-    # Extract expectation results from testthat output
-    # test_file returns a testthat_results object
-    n_failed <- as.integer(result$failed)
-    n_passed <- as.integer(result$passed)
+    n_failed <- result$failed
+    n_passed <- result$passed
     n_total <- n_failed + n_passed
 
     if (n_failed == 0 && n_total > 0) {
