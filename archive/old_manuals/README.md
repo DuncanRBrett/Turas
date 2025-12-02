@@ -1,5 +1,7 @@
 # Archived User Manuals
 
+**Location:** `/archive/old_manuals/`
+
 These are older .docx versions of user manuals that have been superseded by comprehensive markdown versions.
 
 ## Current Active Manuals (in /docs/)
