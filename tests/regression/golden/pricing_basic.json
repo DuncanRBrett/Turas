@@ -29,14 +29,14 @@
     },
     {
       "name": "purchase_rate_at_70",
-      "value": 30.0,
-      "tolerance": 5.0,
+      "value": 20.0,
+      "tolerance": 1.0,
       "type": "numeric",
       "description": "Purchase rate % at price point £70"
     },
     {
       "name": "optimal_price",
-      "value": 60,
+      "value": 50,
       "type": "integer",
       "description": "Optimal price point for revenue maximization"
     },

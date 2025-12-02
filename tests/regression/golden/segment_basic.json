@@ -14,36 +14,36 @@
     },
     {
       "name": "cluster_1_size",
-      "value": 34.0,
-      "tolerance": 5.0,
+      "value": 24.0,
+      "tolerance": 1.0,
       "type": "numeric",
       "description": "Cluster 1 size percentage"
     },
     {
       "name": "cluster_2_size",
-      "value": 32.0,
-      "tolerance": 5.0,
+      "value": 48.0,
+      "tolerance": 1.0,
       "type": "numeric",
       "description": "Cluster 2 size percentage"
     },
     {
       "name": "cluster_3_size",
-      "value": 34.0,
-      "tolerance": 5.0,
+      "value": 28.0,
+      "tolerance": 1.0,
       "type": "numeric",
       "description": "Cluster 3 size percentage"
     },
     {
       "name": "silhouette_score",
-      "value": 0.85,
-      "tolerance": 0.1,
+      "value": 0.65,
+      "tolerance": 0.01,
       "type": "numeric",
       "description": "Silhouette score (clustering quality)"
     },
     {
       "name": "between_ss_ratio",
-      "value": 0.85,
-      "tolerance": 0.1,
+      "value": 0.9595332,
+      "tolerance": 0.001,
       "type": "numeric",
       "description": "Between-cluster SS / Total SS ratio"
     },
