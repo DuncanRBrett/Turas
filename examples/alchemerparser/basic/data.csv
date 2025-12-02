@@ -1,0 +1,21 @@
+respondent_id,question_1,question_2,question_3,question_type_1,question_type_2,question_type_3
+1,Yes,25,Very satisfied,radio,number,radio
+2,No,30,Satisfied,radio,number,radio
+3,Yes,35,Very satisfied,radio,number,radio
+4,Yes,28,Satisfied,radio,number,radio
+5,No,40,Neutral,radio,number,radio
+6,Yes,22,Very satisfied,radio,number,radio
+7,Yes,27,Satisfied,radio,number,radio
+8,No,33,Dissatisfied,radio,number,radio
+9,Yes,29,Very satisfied,radio,number,radio
+10,Yes,31,Satisfied,radio,number,radio
+11,No,26,Neutral,radio,number,radio
+12,Yes,34,Very satisfied,radio,number,radio
+13,Yes,24,Satisfied,radio,number,radio
+14,No,38,Dissatisfied,radio,number,radio
+15,Yes,32,Very satisfied,radio,number,radio
+16,Yes,28,Satisfied,radio,number,radio
+17,No,36,Neutral,radio,number,radio
+18,Yes,25,Very satisfied,radio,number,radio
+19,Yes,30,Satisfied,radio,number,radio
+20,No,35,Very dissatisfied,radio,number,radio

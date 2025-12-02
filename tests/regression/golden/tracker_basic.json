@@ -1,0 +1,83 @@
+{
+  "module": "tracker",
+  "example": "basic",
+  "version": "10.0",
+  "created": "2025-12-02",
+  "description": "Golden values for Tracker module (multi-wave trend analysis)",
+  "status": "WORKING_MOCK",
+  "checks": [
+    {
+      "name": "mean_satisfaction_wave1",
+      "value": 7.53,
+      "tolerance": 0.1,
+      "type": "numeric",
+      "description": "Mean satisfaction in Wave 1"
+    },
+    {
+      "name": "mean_satisfaction_wave2",
+      "value": 8.53,
+      "tolerance": 0.1,
+      "type": "numeric",
+      "description": "Mean satisfaction in Wave 2"
+    },
+    {
+      "name": "mean_satisfaction_wave3",
+      "value": 8.47,
+      "tolerance": 0.1,
+      "type": "numeric",
+      "description": "Mean satisfaction in Wave 3"
+    },
+    {
+      "name": "change_wave1_to_wave2",
+      "value": 1.0,
+      "tolerance": 0.2,
+      "type": "numeric",
+      "description": "Change in satisfaction from Wave 1 to Wave 2"
+    },
+    {
+      "name": "change_wave2_to_wave3",
+      "value": -0.07,
+      "tolerance": 0.2,
+      "type": "numeric",
+      "description": "Change in satisfaction from Wave 2 to Wave 3"
+    },
+    {
+      "name": "sig_wave1_to_wave2",
+      "value": true,
+      "type": "logical",
+      "description": "Wave 1 to 2 change is statistically significant"
+    },
+    {
+      "name": "sig_wave2_to_wave3",
+      "value": false,
+      "type": "logical",
+      "description": "Wave 2 to 3 change is statistically significant"
+    },
+    {
+      "name": "ci_change_lower",
+      "value": 0.3,
+      "tolerance": 0.3,
+      "type": "numeric",
+      "description": "95% CI lower bound for Wave 1-2 change"
+    },
+    {
+      "name": "ci_change_upper",
+      "value": 1.7,
+      "tolerance": 0.3,
+      "type": "numeric",
+      "description": "95% CI upper bound for Wave 1-2 change"
+    },
+    {
+      "name": "n_waves",
+      "value": 3,
+      "type": "integer",
+      "description": "Number of waves tracked"
+    },
+    {
+      "name": "total_respondents",
+      "value": 45,
+      "type": "integer",
+      "description": "Total respondents across all waves"
+    }
+  ]
+}

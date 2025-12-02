@@ -1,0 +1,57 @@
+{
+  "module": "pricing",
+  "example": "basic",
+  "version": "10.0",
+  "created": "2025-12-02",
+  "description": "Golden values for Pricing module (price sensitivity analysis)",
+  "status": "WORKING_MOCK",
+  "checks": [
+    {
+      "name": "purchase_rate_at_40",
+      "value": 100.0,
+      "tolerance": 1.0,
+      "type": "numeric",
+      "description": "Purchase rate % at price point £40"
+    },
+    {
+      "name": "purchase_rate_at_50",
+      "value": 100.0,
+      "tolerance": 1.0,
+      "type": "numeric",
+      "description": "Purchase rate % at price point £50"
+    },
+    {
+      "name": "purchase_rate_at_60",
+      "value": 70.0,
+      "tolerance": 5.0,
+      "type": "numeric",
+      "description": "Purchase rate % at price point £60"
+    },
+    {
+      "name": "purchase_rate_at_70",
+      "value": 30.0,
+      "tolerance": 5.0,
+      "type": "numeric",
+      "description": "Purchase rate % at price point £70"
+    },
+    {
+      "name": "optimal_price",
+      "value": 60,
+      "type": "integer",
+      "description": "Optimal price point for revenue maximization"
+    },
+    {
+      "name": "price_elasticity",
+      "value": 0.0,
+      "tolerance": 0.1,
+      "type": "numeric",
+      "description": "Price elasticity of demand (40 to 50)"
+    },
+    {
+      "name": "n_respondents",
+      "value": 30,
+      "type": "integer",
+      "description": "Number of respondents"
+    }
+  ]
+}
