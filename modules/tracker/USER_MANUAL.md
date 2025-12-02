@@ -2076,6 +2076,73 @@ A: Charts are Phase 4 enhancement (not yet implemented). Current output is table
 
 ---
 
+## Known Limitations and Considerations
+
+### Statistical Considerations
+
+**Significance Testing Under Weighting**
+
+The tracker uses **effective N** (design-effect adjusted sample size) for significance testing when data is weighted. This provides more accurate p-values than using raw unweighted sample sizes, especially when weights vary substantially.
+
+- **What this means:** If your data has high variation in weights (e.g., some respondents weighted 0.5, others weighted 2.0), the effective sample size will be smaller than the unweighted n
+- **Impact:** Significance tests are appropriately conservative and account for the precision loss from weighting
+- **Good practice:** Check the "Weight efficiency" message in console output when loading data
+
+**Questionnaire Changes Between Waves**
+
+- **Scale changes:** If a question changes from 5-point to 7-point scale between waves, trends may not be strictly comparable. Consider creating a "v2" trend starting from the wave where the scale changed.
+- **Wording changes:** Significant wording changes should trigger a new tracking series
+- **Current limitation:** No built-in support for bridging scales or flagging breaks in series
+
+### Question Type Support
+
+**Multi-Mention Questions**
+
+Multi-mention questions (select-all-that-apply) are supported with some considerations:
+
+- **Basic tracking:** Percentage mentioning each option is tracked reliably
+- **Complex TrackingSpecs:** Some advanced specs combinations are still experimental
+- **Known issue:** Certain combinations of multi-mention + complex TrackingSpecs may require additional testing
+
+**Not Currently Supported:**
+
+- **Open-ended questions:** Cannot be tracked quantitatively
+- **Ranking questions:** Planned for future enhancement (currently can track % ranked 1st manually)
+
+### Environment Requirements
+
+**Directory Structure:**
+
+The tracker requires the full Turas directory structure and will fail if:
+- Run from outside the `modules/tracker/` directory without setting `TURAS_ROOT` environment variable
+- The `shared/formatting.R` file is not accessible
+- Required module files are missing
+
+**How to avoid:** Always run from within the Turas project structure, or set the `TURAS_ROOT` environment variable
+
+### Data Cleaning Scope
+
+The tracker automatically cleans numeric question responses (replacing "DK", "Prefer not to say", etc. with NA), but **only** for columns that:
+- Match the question code pattern (e.g., Q1, Q2, Q10_1, etc.), OR
+- Are explicitly listed in the question mapping
+
+**Impact:** ID columns, custom fields, and other non-question numeric columns are preserved as-is, preventing unintended data conversions
+
+### Future Enhancements
+
+Features identified for future implementation:
+
+- **Scale bridging:** Support for recoding when scales change mid-tracker
+- **Multiple comparison correction:** Optional Bonferroni or Holm adjustments for significance tests
+- **Exceptions report:** Automated "What changed this wave?" summary sheet
+- **Rolling averages:** 3-wave, 6-month rolling windows for smoothing trends
+- **Event markers:** Annotation support for promotions, external events
+- **Seasonality flags:** Built-in support for seasonal pattern identification
+
+**Note:** These limitations are documented to ensure you use the tracker appropriately. None prevent the tracker from delivering reliable, production-quality tracking analysis for standard MR workflows.
+
+---
+
 ## Appendix A: Complete Configuration Template
 
 ```
@@ -2145,8 +2212,15 @@ Q05_NPS            | nps          | Q5_NPS          | Q05_NPS_Score       | NPS_
 
 ---
 
-**Document Version:** 2.0
-**Last Updated:** 2025-11-21
+**Document Version:** 2.1
+**Last Updated:** 2025-12-02
+**Changes in v2.1:**
+- Added "Known Limitations and Considerations" section
+- Documented effective N usage in significance testing
+- Documented data cleaning scope (question columns only)
+- Documented environment requirements
+- Listed future enhancement priorities
+
 **Changes in v2.0:**
 - Added TrackingSpecs section with comprehensive documentation
 - Documented enhanced rating metrics (top_box, top2_box, etc.)
@@ -2155,4 +2229,4 @@ Q05_NPS            | nps          | Q5_NPS          | Q05_NPS_Score       | NPS_
 - Added output_dir setting documentation
 - Updated examples throughout
 
-**Next Review:** Q1 2026
+**Next Review:** Q2 2026
