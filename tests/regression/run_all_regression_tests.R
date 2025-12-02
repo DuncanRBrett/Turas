@@ -159,9 +159,9 @@ if (total_passed == implemented && planned == 0) {
 
 cat("\n")
 
-# Exit code
+# Exit code (suppress workspace save prompt)
 if (total_failed > 0) {
-  quit(status = 1)
+  quit(save = "no", status = 1)
 } else {
-  quit(status = 0)
+  quit(save = "no", status = 0)
 }
