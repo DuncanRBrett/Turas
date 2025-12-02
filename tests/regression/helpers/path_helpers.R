@@ -39,8 +39,9 @@ get_example_paths <- function(module, example = "basic") {
     stop("Data file not found: ", data_path)
   }
 
+  # Config file is optional
   if (!file.exists(config_path)) {
-    stop("Config file not found: ", config_path)
+    config_path <- NULL
   }
 
   list(
