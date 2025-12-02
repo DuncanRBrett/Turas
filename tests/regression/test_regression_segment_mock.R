@@ -3,8 +3,14 @@
 # ==============================================================================
 
 library(testthat)
-source("tests/regression/helpers/assertion_helpers.R")
-source("tests/regression/helpers/path_helpers.R")
+
+# Source helpers (only if not already loaded)
+if (!exists("check_numeric")) {
+  source("tests/regression/helpers/assertion_helpers.R")
+}
+if (!exists("get_example_paths")) {
+  source("tests/regression/helpers/path_helpers.R")
+}
 
 mock_segment_module <- function(data_path, config_path = NULL) {
   data <- read.csv(data_path, stringsAsFactors = FALSE)

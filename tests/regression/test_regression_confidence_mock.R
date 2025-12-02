@@ -12,9 +12,13 @@
 
 library(testthat)
 
-# Source helpers
-source("tests/regression/helpers/assertion_helpers.R")
-source("tests/regression/helpers/path_helpers.R")
+# Source helpers (only if not already loaded)
+if (!exists("check_numeric")) {
+  source("tests/regression/helpers/assertion_helpers.R")
+}
+if (!exists("get_example_paths")) {
+  source("tests/regression/helpers/path_helpers.R")
+}
 
 # ==============================================================================
 # MOCK CONFIDENCE MODULE
