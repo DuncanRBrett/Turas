@@ -1,0 +1,84 @@
+{
+  "module": "keydriver",
+  "example": "basic",
+  "version": "10.0",
+  "created": "2025-12-02",
+  "description": "Golden values for KeyDriver module regression test",
+  "note": "Values from correlation and regression analysis of driver importance",
+  "status": "WORKING_MOCK",
+  "checks": [
+    {
+      "name": "r_squared",
+      "value": 0.98,
+      "tolerance": 0.02,
+      "type": "numeric",
+      "description": "Model R-squared (proportion of variance explained)"
+    },
+    {
+      "name": "adj_r_squared",
+      "value": 0.979,
+      "tolerance": 0.02,
+      "type": "numeric",
+      "description": "Adjusted R-squared"
+    },
+    {
+      "name": "correlation_product_quality",
+      "value": 0.99,
+      "tolerance": 0.01,
+      "type": "numeric",
+      "description": "Correlation: product quality with overall satisfaction"
+    },
+    {
+      "name": "correlation_customer_service",
+      "value": 0.98,
+      "tolerance": 0.01,
+      "type": "numeric",
+      "description": "Correlation: customer service with overall satisfaction"
+    },
+    {
+      "name": "importance_product_quality",
+      "value": 25.0,
+      "tolerance": 3.0,
+      "type": "numeric",
+      "description": "Relative importance % for product quality"
+    },
+    {
+      "name": "importance_customer_service",
+      "value": 23.0,
+      "tolerance": 3.0,
+      "type": "numeric",
+      "description": "Relative importance % for customer service"
+    },
+    {
+      "name": "rank_product_quality",
+      "value": 1,
+      "type": "integer",
+      "description": "Rank of product quality (1 = most important)"
+    },
+    {
+      "name": "top_driver",
+      "value": "product_quality",
+      "type": "string",
+      "description": "Top driver name"
+    },
+    {
+      "name": "top_driver_importance",
+      "value": 25.0,
+      "tolerance": 3.0,
+      "type": "numeric",
+      "description": "Top driver importance percentage"
+    },
+    {
+      "name": "base_size",
+      "value": 100,
+      "type": "integer",
+      "description": "Sample size"
+    }
+  ],
+  "integration_notes": [
+    "Mock uses simple linear regression for driver importance",
+    "Relative importance calculated from standardized beta weights",
+    "All drivers have high correlations (data is synthetic)",
+    "Real module may use Shapley values, relative weights, or other methods"
+  ]
+}
