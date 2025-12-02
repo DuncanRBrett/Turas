@@ -1,10 +1,14 @@
 # ==============================================================================
-# SHARED FUNCTIONS V9.9.1 - PRODUCTION READY (EXTERNAL REVIEW FIXES)
+# SHARED FUNCTIONS V10.0.0 - PRODUCTION READY (NUMERIC QUESTION SUPPORT)
 # ==============================================================================
 # Common utilities used across all analysis types
 # Part of R Survey Analytics Toolkit
 #
 # VERSION HISTORY:
+# V10.0.0 - Numeric question support (2025)
+#          - FIXED: format_output_value() now supports numeric question type
+#          - ADDED: decimal_places_numeric parameter to format_output_value()
+#          - ADDED: SHARED_FUNCTIONS_VERSION constant for version checking
 # V9.9.1 - External review fixes (2024)
 #          - FIXED: Extension validation now works for output files (must_exist=FALSE)
 #          - FIXED: Duplicate config settings now detected and blocked
@@ -27,7 +31,8 @@
 # - See DEPENDENCY MAP at end of file before making changes
 # ==============================================================================
 
-SCRIPT_VERSION <- "9.9.1"
+SCRIPT_VERSION <- "10.0.0"
+SHARED_FUNCTIONS_VERSION <- "10.0.0"  # For version checking by other modules
 
 # ==============================================================================
 # CONSTANTS
@@ -870,31 +875,55 @@ generate_excel_letters <- function(n) {
 #'
 #' USAGE: Format numeric values before writing to Excel
 #' DESIGN: Returns NA_real_ for NULL/NA (displays as blank in Excel)
-#' TYPES: frequency, percent, rating, index
+#' TYPES: frequency, percent, rating, index, numeric
+#'
+#' V10.0.0: Added numeric type support for numeric questions
 #'
 #' @param value Numeric value to format
 #' @param type Character, type of value (default: "frequency")
 #' @param decimal_places_percent Integer, decimals for percentages
 #' @param decimal_places_ratings Integer, decimals for ratings
 #' @param decimal_places_index Integer, decimals for indices
+#' @param decimal_places_numeric Integer, decimals for numeric questions (default: 1)
 #' @return Numeric, formatted value or NA_real_
 #' @export
-format_output_value <- function(value, type = "frequency", 
+format_output_value <- function(value, type = "frequency",
                                decimal_places_percent = 0,
                                decimal_places_ratings = 1,
-                               decimal_places_index = 1) {
-  if (is.null(value) || is.na(value)) {
+                               decimal_places_index = 1,
+                               decimal_places_numeric = 1) {
+  # Handle NULL and NA up front
+  if (is.null(value) || (length(value) == 0L)) {
     return(NA_real_)
   }
-  
+
+  # Coerce to numeric safely
+  value_num <- suppressWarnings(as.numeric(value))
+  if (is.na(value_num)) {
+    return(NA_real_)
+  }
+
+  # Choose rounding behaviour by type
   formatted_value <- switch(type,
-    "frequency" = round(as.numeric(value), 0),
-    "percent"   = round(as.numeric(value), decimal_places_percent),
-    "rating"    = round(as.numeric(value), decimal_places_ratings),
-    "index"     = round(as.numeric(value), decimal_places_index),
-    round(as.numeric(value), decimal_places_percent)  # default
+    # Raw counts – always 0 decimals
+    "frequency" = round(value_num, 0),
+
+    # Column / row %s, top 2 box %, etc.
+    "percent"   = round(value_num, decimal_places_percent),
+
+    # Ratings (e.g., 1–5, 0–10) – usually 1 decimal
+    "rating"    = round(value_num, decimal_places_ratings),
+
+    # Index scores (100 = norm, etc.)
+    "index"     = round(value_num, decimal_places_index),
+
+    # NEW: numeric questions (means, medians, SDs, etc.)
+    "numeric"   = round(value_num, decimal_places_numeric),
+
+    # Fallback: treat unknown types as percent-style values
+    round(value_num, decimal_places_percent)
   )
-  
+
   return(formatted_value)
 }
 #' Calculate percentage
@@ -1456,6 +1485,9 @@ apply_base_filter <- function(data, filter_expression) {
 # BACKWARD COMPATIBILITY:
 # - V8.0 → V9.9: Breaking changes in excel letter generation only
 # - V9.9 → V9.9.1: All changes are additions (no breaking changes)
+# - V9.9.1 → V10.0.0: New optional parameter (backward compatible)
+#   - format_output_value() gains decimal_places_numeric parameter (optional, has default)
+#   - All existing calls continue to work without modification
 # - Function signatures unchanged except new optional parameters
 # - All V8.0 code calling these functions will work (with warnings)
 #
@@ -1467,7 +1499,14 @@ apply_base_filter <- function(data, filter_expression) {
 # 5. SPSS labelled columns: Use convert_labelled=TRUE if downstream code expects plain types
 #
 # VERSION HISTORY DETAIL:
-# V9.9.1 (Current - External Review Fixes):
+# V10.0.0 (Current - Numeric Question Support):
+# - CRITICAL FIX: format_output_value() now supports "numeric" type (prevents crashes in numeric_processor.R)
+# - Added decimal_places_numeric parameter to format_output_value()
+# - Added SHARED_FUNCTIONS_VERSION constant for version checking
+# - Improved NULL/NA handling in format_output_value()
+# - Better error handling for edge cases
+#
+# V9.9.1 (External Review Fixes):
 # - Fixed extension validation for output files (validate_extension_even_if_missing)
 # - Fixed duplicate config settings detection (blocks silently overwriting values)
 # - Added typed config getters (get_numeric_config, get_logical_config, get_char_config)
