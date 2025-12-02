@@ -27,6 +27,7 @@ outputs/
 *~
 .tmp/
 temp/
+~$*.*
 
 # System files
 .DS_Store
@@ -43,8 +44,9 @@ Thumbs.db
 *.swp
 *.swo
 
-# Recent projects tracking (optional - keep this if you want to track it)
-# .recent_projects.rds
+# Recent projects tracking
+.recent_projects.rds
+.recent_tracker_projects.rds
 
 # Log files
 *.log
