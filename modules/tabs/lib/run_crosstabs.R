@@ -787,6 +787,15 @@ if (config_obj$enable_checkpointing) {
 log_message(sprintf("Processing %d questions...", nrow(remaining_questions)), "INFO")
 cat("\n")
 
+# Choose progress callback: GUI progress bar if available, otherwise console log
+# This allows the GUI to inject a Shiny progress updater while keeping
+# command-line execution unchanged (backward compatible)
+active_progress_callback <- if (exists("gui_progress_callback", envir = .GlobalEnv)) {
+  get("gui_progress_callback", envir = .GlobalEnv)
+} else {
+  log_progress
+}
+
 orchestration_result <- process_all_questions(
   remaining_questions, survey_data, survey_structure,
   banner_info, master_weights, config_obj,
@@ -795,7 +804,7 @@ orchestration_result <- process_all_questions(
     file = checkpoint_file,
     frequency = CHECKPOINT_FREQUENCY
   ),
-  progress_callback = log_progress,
+  progress_callback = active_progress_callback,
   is_weighted = is_weighted,
   total_column = TOTAL_COLUMN,
   all_questions = crosstab_questions,

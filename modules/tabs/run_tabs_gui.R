@@ -330,13 +330,13 @@ run_tabs_gui <- function() {
     observeEvent(input$run_btn, {
       data <- project_data()
       req(data, data$selected_config)
-      
+
       is_running(TRUE)
       console_output("Starting analysis...\n\n")
-      
+
       # Save current working directory
       old_wd <- getwd()
-      
+
       # Build paths
       tabs_lib_dir <- file.path(TURAS_HOME, "modules", "tabs", "lib")
       run_script <- file.path(tabs_lib_dir, "run_crosstabs.R")
@@ -361,21 +361,55 @@ run_tabs_gui <- function() {
       # Set config_file as global variable (script expects this)
       assign("config_file", file.path(data$path, data$selected_config), envir = .GlobalEnv)
 
-      # Run analysis and capture ALL console output (including validation errors)
-      # Use sink() to capture output even when errors occur
-      output_file <- tempfile()
-      sink(output_file, type = "output")
+      # Create Shiny progress bar updater (replaces log_progress)
+      # This function will be called by process_all_questions()
+      shiny_progress_callback <- function(current, total, item, start_time) {
+        # Calculate progress percentage
+        progress_value <- current / total
 
-      analysis_result <- tryCatch({
-        source("run_crosstabs.R", local = FALSE)  # local = FALSE so it uses global config_file
-        list(success = TRUE, error = NULL)
+        # Build detail message
+        elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+        rate <- elapsed / current
+        remaining <- (total - current) * rate
 
-      }, error = function(e) {
-        list(success = FALSE, error = e)
+        eta_str <- if (remaining < 60) {
+          sprintf("%.0fs", remaining)
+        } else if (remaining < 3600) {
+          sprintf("%.1fm", remaining / 60)
+        } else {
+          sprintf("%.1fh", remaining / 3600)
+        }
 
-      }, finally = {
-        # Always restore console output
-        sink(type = "output")
+        detail_msg <- sprintf("Processing %s... (%d/%d) | ETA: %s",
+                             item, current, total, eta_str)
+
+        # Update Shiny progress bar
+        setProgress(progress_value, detail = detail_msg)
+      }
+
+      # Set the custom progress callback as a global variable
+      # (run_crosstabs.R will use this if it exists)
+      assign("gui_progress_callback", shiny_progress_callback, envir = .GlobalEnv)
+
+      # Run analysis with progress bar
+      withProgress(message = 'Running Analysis', value = 0, {
+
+        # Run analysis and capture ALL console output (including validation errors)
+        # Use sink() to capture output even when errors occur
+        output_file <- tempfile()
+        sink(output_file, type = "output")
+
+        analysis_result <- tryCatch({
+          source("run_crosstabs.R", local = FALSE)  # local = FALSE so it uses global config_file
+          list(success = TRUE, error = NULL)
+
+        }, error = function(e) {
+          list(success = FALSE, error = e)
+
+        }, finally = {
+          # Always restore console output
+          sink(type = "output")
+        })
       })
 
       # Read captured output (available even if error occurred)
@@ -422,9 +456,12 @@ run_tabs_gui <- function() {
         showNotification(paste("Error:", analysis_result$error$message), type = "error", duration = 10)
       }
 
-      # Clean up global variable
+      # Clean up global variables
       if (exists("config_file", envir = .GlobalEnv)) {
         rm("config_file", envir = .GlobalEnv)
+      }
+      if (exists("gui_progress_callback", envir = .GlobalEnv)) {
+        rm("gui_progress_callback", envir = .GlobalEnv)
       }
       # Restore original working directory
       setwd(old_wd)
