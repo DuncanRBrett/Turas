@@ -66,21 +66,29 @@ for (i in seq_along(test_modules)) {
 
   # Run test
   result <- tryCatch({
+    # Source helpers before running test
+    source("tests/regression/helpers/assertion_helpers.R", local = TRUE)
+    source("tests/regression/helpers/path_helpers.R", local = TRUE)
+
     # Capture test output
     test_results <- test_file(test_file, reporter = "silent")
 
-    # Count expectations manually from the result object
+    # Count expectations from nested structure
     n_failed <- 0
     n_passed <- 0
 
-    # testthat results are stored in a list structure
+    # testthat results: result[[1]]$results contains the expectations
     if (is.list(test_results) && length(test_results) > 0) {
-      for (test_result in test_results) {
-        if (inherits(test_result, "expectation")) {
-          if (inherits(test_result, "expectation_success")) {
-            n_passed <- n_passed + 1
-          } else if (inherits(test_result, "expectation_failure")) {
-            n_failed <- n_failed + 1
+      for (test in test_results) {
+        if (is.list(test$results)) {
+          for (expectation in test$results) {
+            if (inherits(expectation, "expectation_success")) {
+              n_passed <- n_passed + 1
+            } else if (inherits(expectation, "expectation_failure")) {
+              n_failed <- n_failed + 1
+            } else if (inherits(expectation, "expectation_error")) {
+              n_failed <- n_failed + 1
+            }
           }
         }
       }
