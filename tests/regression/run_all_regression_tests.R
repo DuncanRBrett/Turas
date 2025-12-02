@@ -159,9 +159,11 @@ if (total_passed == implemented && planned == 0) {
 
 cat("\n")
 
-# Exit code (suppress workspace save prompt)
-if (total_failed > 0) {
-  quit(save = "no", status = 1)
-} else {
-  quit(save = "no", status = 0)
+# Exit code (only quit if running non-interactively, e.g., via Rscript)
+if (!interactive()) {
+  if (total_failed > 0) {
+    quit(save = "no", status = 1)
+  } else {
+    quit(save = "no", status = 0)
+  }
 }
