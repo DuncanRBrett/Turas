@@ -16,6 +16,10 @@
 *.rds
 *.rda
 
+# EXCEPTION: Allow template files
+!templates/**/*.xlsx
+!templates/**/*.xls
+
 # Output files
 Output/
 output/
