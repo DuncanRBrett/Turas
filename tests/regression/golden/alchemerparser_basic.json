@@ -1,0 +1,47 @@
+{
+  "module": "alchemerparser",
+  "example": "basic",
+  "version": "10.0",
+  "created": "2025-12-02",
+  "description": "Golden values for AlchemerParser validation checks",
+  "status": "WORKING_MOCK",
+  "checks": [
+    {
+      "name": "n_respondents",
+      "value": 20,
+      "type": "integer",
+      "description": "Number of respondents"
+    },
+    {
+      "name": "n_variables",
+      "value": 7,
+      "type": "integer",
+      "description": "Number of variables/columns"
+    },
+    {
+      "name": "has_respondent_id",
+      "value": true,
+      "type": "logical",
+      "description": "Has respondent_id column"
+    },
+    {
+      "name": "pct_complete_cases",
+      "value": 100.0,
+      "tolerance": 0.1,
+      "type": "numeric",
+      "description": "Percentage of complete cases"
+    },
+    {
+      "name": "n_questions",
+      "value": 3,
+      "type": "integer",
+      "description": "Number of questions parsed"
+    },
+    {
+      "name": "validation_passed",
+      "value": true,
+      "type": "logical",
+      "description": "Overall validation status"
+    }
+  ]
+}

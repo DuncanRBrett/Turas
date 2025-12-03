@@ -1,0 +1,57 @@
+{
+  "module": "segment",
+  "example": "basic",
+  "version": "10.0",
+  "created": "2025-12-02",
+  "description": "Golden values for Segment module (K-means clustering)",
+  "status": "WORKING_MOCK",
+  "checks": [
+    {
+      "name": "n_clusters",
+      "value": 3,
+      "type": "integer",
+      "description": "Number of clusters (k)"
+    },
+    {
+      "name": "cluster_1_size",
+      "value": 24.0,
+      "tolerance": 1.0,
+      "type": "numeric",
+      "description": "Cluster 1 size percentage"
+    },
+    {
+      "name": "cluster_2_size",
+      "value": 48.0,
+      "tolerance": 1.0,
+      "type": "numeric",
+      "description": "Cluster 2 size percentage"
+    },
+    {
+      "name": "cluster_3_size",
+      "value": 28.0,
+      "tolerance": 1.0,
+      "type": "numeric",
+      "description": "Cluster 3 size percentage"
+    },
+    {
+      "name": "silhouette_score",
+      "value": 0.9595332,
+      "tolerance": 0.001,
+      "type": "numeric",
+      "description": "Silhouette score (clustering quality)"
+    },
+    {
+      "name": "between_ss_ratio",
+      "value": 0.9595332,
+      "tolerance": 0.001,
+      "type": "numeric",
+      "description": "Between-cluster SS / Total SS ratio"
+    },
+    {
+      "name": "n_respondents",
+      "value": 50,
+      "type": "integer",
+      "description": "Number of respondents clustered"
+    }
+  ]
+}

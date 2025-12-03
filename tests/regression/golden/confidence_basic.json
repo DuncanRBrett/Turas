@@ -1,0 +1,101 @@
+{
+  "module": "confidence",
+  "example": "basic",
+  "version": "10.0",
+  "created": "2025-12-02",
+  "description": "Golden values for Confidence module regression test",
+  "note": "Values calculated from examples/confidence/basic/data.csv using standard CI formulas",
+  "status": "WORKING_MOCK",
+  "checks": [
+    {
+      "name": "proportion_support_policy",
+      "value": 0.67,
+      "tolerance": 0.01,
+      "type": "numeric",
+      "description": "Proportion supporting policy"
+    },
+    {
+      "name": "moe_unweighted",
+      "value": 0.092,
+      "tolerance": 0.005,
+      "type": "numeric",
+      "description": "Margin of Error (95% CI, unweighted)"
+    },
+    {
+      "name": "moe_weighted",
+      "value": 0.093,
+      "tolerance": 0.005,
+      "type": "numeric",
+      "description": "Margin of Error (95% CI, weighted with DEFF)"
+    },
+    {
+      "name": "wilson_ci_lower",
+      "value": 0.571,
+      "tolerance": 0.01,
+      "type": "numeric",
+      "description": "Wilson score CI lower bound"
+    },
+    {
+      "name": "wilson_ci_upper",
+      "value": 0.757,
+      "tolerance": 0.01,
+      "type": "numeric",
+      "description": "Wilson score CI upper bound"
+    },
+    {
+      "name": "wilson_ci_width",
+      "value": 0.186,
+      "tolerance": 0.01,
+      "type": "numeric",
+      "description": "Wilson CI width (upper - lower)"
+    },
+    {
+      "name": "effective_n",
+      "value": 98.5,
+      "tolerance": 1.0,
+      "type": "numeric",
+      "description": "Effective sample size (accounting for weights)"
+    },
+    {
+      "name": "deff",
+      "value": 1.015,
+      "tolerance": 0.02,
+      "type": "numeric",
+      "description": "Design Effect (n / effective_n)"
+    },
+    {
+      "name": "mean_satisfaction",
+      "value": 7.3,
+      "tolerance": 0.05,
+      "type": "numeric",
+      "description": "Mean satisfaction score"
+    },
+    {
+      "name": "satisfaction_ci_lower",
+      "value": 7.03,
+      "tolerance": 0.05,
+      "type": "numeric",
+      "description": "Satisfaction 95% CI lower bound"
+    },
+    {
+      "name": "satisfaction_ci_upper",
+      "value": 7.57,
+      "tolerance": 0.05,
+      "type": "numeric",
+      "description": "Satisfaction 95% CI upper bound"
+    },
+    {
+      "name": "base_size",
+      "value": 100,
+      "type": "integer",
+      "description": "Base sample size"
+    }
+  ],
+  "integration_notes": [
+    "Currently using mock Confidence implementation",
+    "Uses standard formulas: MOE = 1.96 * sqrt(p*(1-p)/n)",
+    "Wilson score intervals for better coverage near boundaries",
+    "DEFF calculated as n / effective_n where effective_n = (sum(w))^2 / sum(w^2)",
+    "When real Confidence module is integrated, recalculate from actual output"
+  ]
+}

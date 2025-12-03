@@ -1,0 +1,51 @@
+{
+  "module": "keydriver",
+  "example": "basic",
+  "version": "10.0",
+  "created": "2025-12-02",
+  "description": "Golden values for KeyDriver module regression test",
+  "note": "Values from correlation and regression analysis of driver importance",
+  "status": "WORKING_MOCK",
+  "checks": [
+    {
+      "name": "r_squared",
+      "value": 1.0,
+      "tolerance": 0.01,
+      "type": "numeric",
+      "description": "Model R-squared (proportion of variance explained)"
+    },
+    {
+      "name": "adj_r_squared",
+      "value": 1.0,
+      "tolerance": 0.01,
+      "type": "numeric",
+      "description": "Adjusted R-squared"
+    },
+    {
+      "name": "correlation_product_quality",
+      "value": 0.9815629,
+      "tolerance": 0.001,
+      "type": "numeric",
+      "description": "Correlation: product quality with overall satisfaction"
+    },
+    {
+      "name": "correlation_customer_service",
+      "value": 0.9087791,
+      "tolerance": 0.001,
+      "type": "numeric",
+      "description": "Correlation: customer service with overall satisfaction"
+    },
+    {
+      "name": "base_size",
+      "value": 100,
+      "type": "integer",
+      "description": "Sample size"
+    }
+  ],
+  "integration_notes": [
+    "Mock uses simple linear regression for driver importance",
+    "Relative importance calculated from standardized beta weights",
+    "All drivers have high correlations (data is synthetic)",
+    "Real module may use Shapley values, relative weights, or other methods"
+  ]
+}

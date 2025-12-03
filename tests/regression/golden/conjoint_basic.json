@@ -1,0 +1,72 @@
+{
+  "module": "conjoint",
+  "example": "basic",
+  "version": "10.0",
+  "created": "2025-12-02",
+  "description": "Golden values for Conjoint module (CBC analysis)",
+  "status": "WORKING_MOCK",
+  "checks": [
+    {
+      "name": "utility_price_449",
+      "value": 0.5,
+      "tolerance": 0.1,
+      "type": "numeric",
+      "description": "Part-worth utility for price £449"
+    },
+    {
+      "name": "utility_brand_apple",
+      "value": 0.8,
+      "tolerance": 0.1,
+      "type": "numeric",
+      "description": "Part-worth utility for Apple brand"
+    },
+    {
+      "name": "importance_price",
+      "value": 29.4,
+      "tolerance": 3.0,
+      "type": "numeric",
+      "description": "Relative importance % for Price attribute"
+    },
+    {
+      "name": "importance_brand",
+      "value": 52.9,
+      "tolerance": 3.0,
+      "type": "numeric",
+      "description": "Relative importance % for Brand attribute"
+    },
+    {
+      "name": "importance_storage",
+      "value": 14.7,
+      "tolerance": 3.0,
+      "type": "numeric",
+      "description": "Relative importance % for Storage attribute"
+    },
+    {
+      "name": "importance_battery",
+      "value": 23.5,
+      "tolerance": 3.0,
+      "type": "numeric",
+      "description": "Relative importance % for Battery attribute"
+    },
+    {
+      "name": "mcfadden_r2",
+      "value": 0.35,
+      "tolerance": 0.05,
+      "type": "numeric",
+      "description": "McFadden's pseudo R-squared (model fit)"
+    },
+    {
+      "name": "hit_rate",
+      "value": 0.65,
+      "tolerance": 0.05,
+      "type": "numeric",
+      "description": "Hit rate (% choices correctly predicted)"
+    },
+    {
+      "name": "n_choice_sets",
+      "value": 90,
+      "type": "integer",
+      "description": "Number of choice sets analyzed"
+    }
+  ]
+}
