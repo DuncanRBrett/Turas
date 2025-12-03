@@ -48,20 +48,35 @@ The system is:
 
 ---
 
-## 🏗️ Directory Layout (recommended)
+## 🏗️ Directory Layout
 ```
 /turas/
- ├─ core/                # Shared functions (weights, sig tests, nets, formatting)
- ├─ parser/              # Input validation and metadata setup
- ├─ tabs/                # Single-wave module
- ├─ tracking/            # Multi-wave tracking module
- ├─ segmentation/        # (Future) clustering & profiles
- ├─ maxdiff/             # (Future) MaxDiff estimation
- ├─ conjoint/            # (Future) Conjoint estimation
- ├─ driver_analysis/     # (Future) Importance modelling
- ├─ viz/                 # (Future) Visualisation layer
- ├─ tests/               # Unit & regression tests (golden-master, parity)
- └─ docs/                # Specs, templates, manuals
+ ├─ core/                   # Shared functions (weights, sig tests, nets, formatting)
+ ├─ parser/                 # Input validation and metadata setup
+ ├─ tabs/                   # Single-wave module
+ ├─ tracking/               # Multi-wave tracking module
+ ├─ segmentation/           # (Future) clustering & profiles
+ ├─ maxdiff/                # (Future) MaxDiff estimation
+ ├─ conjoint/               # (Future) Conjoint estimation
+ ├─ driver_analysis/        # (Future) Importance modelling
+ ├─ viz/                    # (Future) Visualisation layer
+ ├─ tests/
+ │   └─ regression/         # Regression test harness (8 modules, 67 checks)
+ │       ├─ run_all_regression_tests.R
+ │       ├─ test_tabs.R
+ │       ├─ test_confidence.R
+ │       ├─ test_keydriver.R
+ │       ├─ test_alchemer_parser.R
+ │       ├─ test_segment.R
+ │       ├─ test_conjoint.R
+ │       ├─ test_pricing.R
+ │       ├─ test_tracker.R
+ │       ├─ helpers/        # Path resolution, assertions, extractors
+ │       ├─ mocks/          # Mock implementations for testing
+ │       └─ golden/         # Known-good outputs (JSON)
+ ├─ examples/               # Test data and configs for all modules
+ ├─ templates/              # Config templates (working + annotated)
+ └─ docs/                   # Specs, templates, manuals
 ```
 
 ---
@@ -107,18 +122,43 @@ Use proven libraries — do not reinvent:
 
 ---
 
+## 🧪 Regression Testing
+
+**Run all regression tests with one command:**
+```r
+source("tests/regression/run_all_regression_tests.R")
+```
+
+**Test Coverage (67 assertions across 8 modules):**
+- ✅ **Tabs** (10 checks) — crosstabs, weights, significance
+- ✅ **Confidence** (12 checks) — intervals, methods, coverage
+- ✅ **KeyDriver** (5 checks) — correlation, importance scores
+- ✅ **AlchemerParser** (6 checks) — survey structure, metadata
+- ✅ **Segment** (7 checks) — clustering, profiles
+- ✅ **Conjoint** (9 checks) — utilities, simulations
+- ✅ **Pricing** (7 checks) — elasticity, optimization
+- ✅ **Tracker** (11 checks) — continuity, trends, base drift
+
+**Golden-master pattern:** Each module has example data and known-good outputs (JSON). Tests verify outputs match within tolerance.
+
+**Configuration:** All modules include working config templates (`examples/{module}/basic/`) for realistic testing scenarios.
+
+**Documentation:** See `tests/regression/REGRESSION_TEST_SYSTEM_COMPLETE.md` for full implementation details.
+
+---
+
 ## ✅ Testing & Release Policy (MANDATORY)
 
 > **No code merges or releases without all checks green.**
 
 **Pre‑commit (local):**
-- Run unit tests for the touched module.
+- Run regression tests: `source("tests/regression/run_all_regression_tests.R")`
 - Run `lintr`/style checks.
-- For Tabs/Tracking: execute the **golden‑master regression** on the sample dataset; outputs must match within tolerance.
+- Verify all 67 assertions pass before committing.
 
 **CI (required to merge):**
 - Build succeeds across supported R versions.
-- **Golden‑master tests**: Tabs and Tracking produce identical results for a shared single-wave dataset (parity test).
+- **All regression tests pass** (67/67 checks green).
 - Performance check: large sample (≥10k×200 vars) completes under agreed time budget.
 - Artifacts saved: logs, metadata sheets, outputs for diffing.
 
