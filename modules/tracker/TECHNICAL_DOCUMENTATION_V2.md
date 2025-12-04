@@ -1097,22 +1097,9 @@ Q30          | Features - Web              | % Mention | 45   | 48   | 50
 
 ### Critical Issues
 
-**ISSUE-001: Multi_Mention with Selective TrackingSpecs**
-- **Status:** KNOWN BUG
-- **Severity:** MEDIUM
-- **Description:** When using `option:Q10_4` for Multi_Mention questions, error occurs: "missing value where TRUE/FALSE needed"
-- **Impact:** Tracker completes successfully but question is skipped in output
-- **Workaround:** Use `auto` or leave TrackingSpecs blank to track all options
-- **Reported:** v2.0
-- **Fix:** Planned for v2.2
+**None currently identified.**
 
-**ISSUE-002: TECHNICAL_DOCUMENTATION.md Outdated**
-- **Status:** RESOLVED in v2.1
-- **Severity:** LOW
-- **Description:** Previous TECHNICAL_DOCUMENTATION.md showed v1.0, actual version was v2.1
-- **Impact:** Developer confusion about capabilities
-- **Resolution:** Complete rewrite to TECHNICAL_DOCUMENTATION_V2.md
-- **Completed:** 2025-12-04
+All previously identified critical issues have been resolved. See [Historical Issues](#historical-issues-resolved) section below.
 
 ### Known Limitations
 
@@ -1142,6 +1129,24 @@ Q30          | Features - Web              | % Mention | 45   | 48   | 50
    - **Planned:** Text analysis integration (v4.0)
 
 ### Historical Issues (Resolved)
+
+**ISSUE-001: Multi_Mention with Selective TrackingSpecs** (v2.1)
+- **Status:** RESOLVED in v2.1
+- **Severity:** MEDIUM (was CRITICAL)
+- **Description:** When using `option:Q10_4` for Multi_Mention questions, error occurred: "missing value where TRUE/FALSE needed"
+- **Root Cause:** First pass auto-detected ALL columns regardless of TrackingSpecs, but second pass only processed selective columns, creating mismatch
+- **Impact:** Tracker failed or skipped question in output
+- **Fix:** Modified calculate_multi_mention_trend() to parse TrackingSpecs BEFORE first pass, ensuring all_columns matches tracked columns
+- **Resolved:** 2025-12-04 (commit d52a3da)
+- **File:** trend_calculator.R lines 2059-2075
+
+**ISSUE-002: TECHNICAL_DOCUMENTATION.md Outdated** (v2.1)
+- **Status:** RESOLVED in v2.1
+- **Severity:** LOW
+- **Description:** Previous TECHNICAL_DOCUMENTATION.md showed v1.0, actual version was v2.1
+- **Impact:** Developer confusion about capabilities
+- **Resolution:** Complete rewrite to TECHNICAL_DOCUMENTATION_V2.md with full v2.1 documentation
+- **Resolved:** 2025-12-04
 
 **RESOLVED-001: TrackingSpecs Not Working in GUI with Banners** (v2.0)
 - **Issue:** When "Use Banners" checkbox enabled, TrackingSpecs ignored
