@@ -1,11 +1,11 @@
 # ==============================================================================
-# PROPORTION CONFIDENCE INTERVALS V1.0.0
+# PROPORTION CONFIDENCE INTERVALS - TURAS V10.0
 # ==============================================================================
 # Functions for calculating confidence intervals for proportions
 # Part of Turas Confidence Analysis Module
 #
 # VERSION HISTORY:
-# V1.0.0 - Initial release (2025-11-12)
+# Turas v10.0 - Initial release (2025-11-12)
 #          - Margin of Error (normal approximation)
 #          - Wilson score interval
 #          - Bootstrap confidence intervals
@@ -27,7 +27,7 @@
 # - 03_study_level.R (for effective n with weights)
 # ==============================================================================
 
-PROPORTIONS_VERSION <- "1.0.0"
+PROPORTIONS_VERSION <- "10.0"
 
 # ==============================================================================
 # DEPENDENCIES

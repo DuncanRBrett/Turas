@@ -5,7 +5,7 @@
 # Module: Pricing Research
 # Purpose: Analyze pricing sensitivity using Van Westendorp PSM and
 #          Gabor-Granger methodologies
-# Version: 1.0.0 (Initial Implementation)
+# Version: Turas v10.0
 # Date: 2025-11-18
 #
 # ==============================================================================

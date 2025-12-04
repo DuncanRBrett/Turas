@@ -9,11 +9,11 @@
 # IMPORTANT: Changes to this file affect multiple modules.
 #             Test thoroughly before committing.
 #
-# VERSION: 1.0.0
+# VERSION: Turas v10.0
 # CREATED: Phase 3 - Code Quality Improvements
 # ==============================================================================
 
-CONFIG_UTILS_VERSION <- "1.0.0"
+CONFIG_UTILS_VERSION <- "10.0"
 
 # ==============================================================================
 # EXCEL CONFIG READING

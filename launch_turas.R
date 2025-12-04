@@ -274,7 +274,7 @@ launch_turas <- function() {
 
       # Footer
       div(class = "footer",
-        paste0("Turas Suite v1.0 | ", turas_root)
+        paste0("Turas Suite v10.0 | ", turas_root)
       )
     )
   )

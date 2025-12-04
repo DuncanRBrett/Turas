@@ -1,11 +1,11 @@
 # ==============================================================================
-# CONFIDENCE ANALYSIS MAIN ORCHESTRATION V1.0.0
+# CONFIDENCE ANALYSIS MAIN ORCHESTRATION - TURAS V10.0
 # ==============================================================================
 # Main script for running complete confidence analysis
 # Part of Turas Confidence Analysis Module
 #
 # VERSION HISTORY:
-# V1.0.0 - Initial release (2025-11-13)
+# Turas v10.0 - Initial release (2025-11-13)
 #          - Complete workflow orchestration
 #          - Progress reporting
 #          - Error handling and validation
@@ -28,7 +28,7 @@
 # - readxl, openxlsx
 # ==============================================================================
 
-MAIN_VERSION <- "1.0.0"
+MAIN_VERSION <- "10.0"
 
 # ==============================================================================
 # DEPENDENCIES

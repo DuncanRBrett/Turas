@@ -5,7 +5,7 @@
 # Module: Conjoint Analysis
 # Purpose: Calculate part-worth utilities and attribute importance from
 #          choice-based or rating-based conjoint data
-# Version: 2.0.0 (Enhanced Implementation)
+# Version: Turas v10.0
 # Date: 2025-11-26
 #
 # ==============================================================================

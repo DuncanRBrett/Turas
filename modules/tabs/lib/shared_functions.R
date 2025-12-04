@@ -1,11 +1,11 @@
 # ==============================================================================
-# SHARED FUNCTIONS V10.0.0 - PRODUCTION READY (NUMERIC QUESTION SUPPORT)
+# SHARED FUNCTIONS - TURAS V10.0
 # ==============================================================================
 # Common utilities used across all analysis types
 # Part of R Survey Analytics Toolkit
 #
 # VERSION HISTORY:
-# V10.0.0 - Numeric question support (2025)
+# Turas v10.0 - Numeric question support (2025)
 #          - FIXED: format_output_value() now supports numeric question type
 #          - ADDED: decimal_places_numeric parameter to format_output_value()
 #          - ADDED: SHARED_FUNCTIONS_VERSION constant for version checking
@@ -31,8 +31,8 @@
 # - See DEPENDENCY MAP at end of file before making changes
 # ==============================================================================
 
-SCRIPT_VERSION <- "10.0.0"
-SHARED_FUNCTIONS_VERSION <- "10.0.0"  # For version checking by other modules
+SCRIPT_VERSION <- "10.0"
+SHARED_FUNCTIONS_VERSION <- "10.0"  # For version checking by other modules
 
 # ==============================================================================
 # CONSTANTS

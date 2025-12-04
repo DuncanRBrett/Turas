@@ -1,11 +1,11 @@
 # ==============================================================================
-# MEAN CONFIDENCE INTERVALS V1.0.0
+# MEAN CONFIDENCE INTERVALS - TURAS V10.0
 # ==============================================================================
 # Functions for calculating confidence intervals for means
 # Part of Turas Confidence Analysis Module
 #
 # VERSION HISTORY:
-# V1.0.0 - Initial release (2025-11-12)
+# Turas v10.0 - Initial release (2025-11-12)
 #          - Standard t-distribution confidence intervals
 #          - Bootstrap confidence intervals
 #          - Bayesian credible intervals (Normal-Normal conjugate)
@@ -25,7 +25,7 @@
 # - 03_study_level.R (for effective n with weights)
 # ==============================================================================
 
-MEANS_VERSION <- "1.0.0"
+MEANS_VERSION <- "10.0"
 
 # ==============================================================================
 # DEPENDENCIES

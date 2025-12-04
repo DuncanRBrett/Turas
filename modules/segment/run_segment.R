@@ -4,7 +4,7 @@
 # K-means clustering segmentation for survey data
 # Part of Turas Analytics Platform
 #
-# VERSION: 1.0
+# VERSION: Turas v10.0
 # DATE: 2025-11-13
 # ==============================================================================
 
@@ -59,7 +59,7 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
   # HEADER
   # ===========================================================================
 
-  print_toolkit_header("Segmentation Analysis", version = "1.0")
+  print_toolkit_header("Segmentation Analysis", version = "10.0")
 
   cat(sprintf("Configuration file: %s\n", basename(config_file)))
   cat(sprintf("Start time: %s\n", format(start_time, "%Y-%m-%d %H:%M:%S")))

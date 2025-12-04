@@ -2,7 +2,7 @@
 # CONFIG UTILITIES
 # ==============================================================================
 # Configuration file loading, validation, and path handling
-# Extracted from shared_functions.R V9.9.1
+# Extracted from shared_functions.R Turas v10.0
 # Part of Turas shared module infrastructure
 # ==============================================================================
 

@@ -25,10 +25,10 @@
 # 
 # ==============================================================================
 # ==============================================================================
-# CROSSTABS V9.9 - PRODUCTION RELEASE (CLEAN VERSION)
+# CROSSTABS - TURAS V10.0
 # ==============================================================================
 # Enterprise-grade survey crosstabs - Debug code removed
-# 
+#
 # FIXES APPLIED:
 # 1. ✅ Multi-mention questions now display correctly
 # 2. ✅ ShowInOutput filtering works properly
@@ -37,7 +37,7 @@
 # 5. ✅ Clean, production-ready code
 # ==============================================================================
 
-SCRIPT_VERSION <- "9.9"
+SCRIPT_VERSION <- "10.0"
 
 # ==============================================================================
 # DEPENDENCY CHECKS (Friendly error messages)
@@ -219,7 +219,7 @@ format_output_value <- function(value, type = "frequency",
 # STARTUP & CONFIG LOADING
 # ==============================================================================
 
-print_toolkit_header("Crosstab Analysis V9.9 - Production Release")
+print_toolkit_header("Crosstab Analysis - Turas v10.0")
 
 if (!exists("config_file")) {
   stop("ERROR: config_file not defined. Run from Jupyter notebook.")
@@ -1153,7 +1153,7 @@ elapsed <- difftime(Sys.time(), start_time, units = "secs")
 
 cat("\n")
 cat(paste(rep("=", 80), collapse=""), "\n")
-cat("ANALYSIS COMPLETE - V9.9 PRODUCTION RELEASE (CLEAN)\n")
+cat("ANALYSIS COMPLETE - TURAS V10.0 (CLEAN)\n")
 cat(paste(rep("=", 80), collapse=""), "\n\n")
 
 cat("✓ Project:", project_name, "\n")
@@ -1177,7 +1177,7 @@ if (nrow(error_log) > 0) {
 }
 
 cat("\n")
-cat("V9.9 PRODUCTION RELEASE - ALL FIXES APPLIED:\n")
+cat("TURAS V10.0 - ALL FIXES APPLIED:\n")
 cat("  ✓ Multi-mention questions display correctly\n")
 cat("  ✓ ShowInOutput filtering works properly\n")
 cat("  ✓ Rating calculations fixed (OptionValue support)\n")
@@ -1188,7 +1188,7 @@ cat("Ready for production use.\n")
 cat(paste(rep("=", 80), collapse=""), "\n")
 
 # ==============================================================================
-# END OF SCRIPT V9.9 - PRODUCTION RELEASE (CLEAN VERSION)
+# END OF SCRIPT - TURAS V10.0 (CLEAN VERSION)
 # ==============================================================================
 # 
 # FIXES APPLIED IN THIS VERSION:

@@ -1,11 +1,11 @@
 # ==============================================================================
-# CONFIDENCE ANALYSIS UTILITIES V1.0.0
+# CONFIDENCE ANALYSIS UTILITIES - TURAS V10.0
 # ==============================================================================
 # Utility functions for the Confidence Analysis Module
 # Part of Turas Survey Analytics Platform
 #
 # VERSION HISTORY:
-# V1.0.0 - Initial release (2025-11-12)
+# Turas v10.0 - Initial release (2025-11-12)
 #          - Decimal separator formatting
 #          - Input validation helpers
 #          - Common utility functions
@@ -13,7 +13,7 @@
 # DEPENDENCIES: None (base R only)
 # ==============================================================================
 
-UTILS_VERSION <- "1.0.0"
+UTILS_VERSION <- "10.0"
 
 # ==============================================================================
 # DECIMAL SEPARATOR FORMATTING

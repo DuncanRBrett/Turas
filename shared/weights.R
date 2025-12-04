@@ -9,11 +9,11 @@
 # IMPORTANT: Changes to this file affect multiple modules.
 #             Test thoroughly before committing.
 #
-# VERSION: 1.0.0
+# VERSION: Turas v10.0
 # CREATED: Phase 4 - Code Quality Improvements
 # ==============================================================================
 
-WEIGHTS_VERSION <- "1.0.0"
+WEIGHTS_VERSION <- "10.0"
 
 # ==============================================================================
 # WEIGHT EFFICIENCY CALCULATION
