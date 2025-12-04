@@ -43,7 +43,7 @@
 # - Worst-to-Best: 1 = worst, higher = better (auto-normalized to Best-to-Worst)
 # ==============================================================================
 
-SCRIPT_VERSION <- "9.9.3"
+SCRIPT_VERSION <- "10.0"
 
 # ==============================================================================
 # DEPENDENCIES

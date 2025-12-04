@@ -33,7 +33,7 @@
 # - Info: Informational only (successful validations)
 # ==============================================================================
 
-SCRIPT_VERSION <- "9.9.5"
+SCRIPT_VERSION <- "10.0"
 
 # Maximum decimal places allowed for rounding settings
 MAX_DECIMAL_PLACES <- 6

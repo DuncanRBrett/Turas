@@ -30,7 +30,7 @@
 # - This ensures correct base sizes and prevents bias from improper inclusion
 # ==============================================================================
 
-SCRIPT_VERSION <- "9.9.4"
+SCRIPT_VERSION <- "10.0"
 
 # ==============================================================================
 # DEPENDENCIES
