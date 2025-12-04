@@ -2056,15 +2056,19 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
   # Initialize structure to track all detected columns across all waves
   all_columns <- character(0)
 
-  # First pass: detect columns in each wave
+  # First pass: detect columns in each wave, RESPECTING TrackingSpecs
   wave_base_codes <- list()
   for (wave_id in wave_ids) {
     wave_code <- get_wave_question_code(question_map, q_code, wave_id)
     if (!is.na(wave_code)) {
       wave_base_codes[[wave_id]] <- wave_code
       wave_df <- wave_data[[wave_id]]
-      detected_cols <- detect_multi_mention_columns(wave_df, wave_code)
-      if (!is.null(detected_cols)) {
+
+      # Parse specs for this wave to determine which columns to track
+      specs <- parse_multi_mention_specs(tracking_specs, wave_code, wave_df)
+      detected_cols <- specs$columns
+
+      if (!is.null(detected_cols) && length(detected_cols) > 0) {
         all_columns <- unique(c(all_columns, detected_cols))
       }
     }
