@@ -1182,7 +1182,18 @@ All previously identified critical issues have been resolved. See [Historical Is
 - **Resolved:** 2025-12-04 (commit d52a3da)
 - **File:** trend_calculator.R lines 2059-2075
 
-**ISSUE-002: TECHNICAL_DOCUMENTATION.md Outdated** (v2.1)
+**ISSUE-002: Multi_Mention Category Mode Data Loss** (v2.1)
+- **Status:** RESOLVED in v2.1
+- **Severity:** CRITICAL
+- **Description:** When using `category:` syntax for Multi_Mention questions (e.g., `category:We rely on CCS`), question appeared in output but all values were blank/NA
+- **Root Cause:** Data loader converted Multi_Mention sub-columns (Q10_1, Q10_2, Q10_4, etc.) to numeric, wiping out text values. Loader only protected exact column name "Q10", not sub-columns like "Q10_4"
+- **Symptoms:** Console warnings showed `"WARNING: Q10_4: All 4 values are non-numeric (converted to NA)"`. Text labels like "We rely on CCS" were converted to NA before tracker could process them
+- **Impact:** Category mode Multi_Mention completely non-functional - all values showed as 0% or blank
+- **Fix:** Modified wave_loader.R clean_wave_data() to extract base code (strip `_[0-9]+$` suffix) when checking categorical protection. Now `is_categorical <- (col_name %in% categorical_cols) || (base_code %in% categorical_cols)`
+- **Resolved:** 2025-12-05
+- **File:** wave_loader.R line 188-189
+
+**ISSUE-003: TECHNICAL_DOCUMENTATION.md Outdated** (v2.1)
 - **Status:** RESOLVED in v2.1
 - **Severity:** LOW
 - **Description:** Previous TECHNICAL_DOCUMENTATION.md showed v1.0, actual version was v2.1
