@@ -2234,10 +2234,24 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
   tracking_specs <- get_tracking_specs(question_map, q_code)
 
   # Parse specs to check mode (need to parse once to determine if category mode)
-  # Use first wave for initial mode detection
-  first_wave_id <- wave_ids[1]
-  first_wave_code <- get_wave_question_code(question_map, q_code, first_wave_id)
-  first_wave_df <- wave_data[[first_wave_id]]
+  # Find first wave where question exists (not NA)
+  first_wave_code <- NA
+  first_wave_df <- NULL
+  for (wave_id in wave_ids) {
+    wave_code <- get_wave_question_code(question_map, q_code, wave_id)
+    if (!is.na(wave_code)) {
+      first_wave_code <- wave_code
+      first_wave_df <- wave_data[[wave_id]]
+      break
+    }
+  }
+
+  # If question not found in any wave, return NULL
+  if (is.na(first_wave_code) || is.null(first_wave_df)) {
+    warning(paste0("Question ", q_code, " not found in any wave"))
+    return(NULL)
+  }
+
   initial_specs <- parse_multi_mention_specs(tracking_specs, first_wave_code, first_wave_df)
 
   # If category mode, use category-based tracking
