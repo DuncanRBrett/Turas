@@ -822,15 +822,21 @@ Q_SAT        | Rating       | mean,top2_box,range:9-10
 
 #### Multi-Mention Questions
 
+Multi_Mention supports TWO tracking modes:
+
+**Mode 1: Binary Column Tracking (0/1 values)**
+
 | Spec | Description | Example Output |
 |------|-------------|----------------|
-| `auto` | Auto-detect all options | % for each detected option |
-| `option:COL` | Track specific option | % mentioning Q30_1 |
+| `auto` | Auto-detect all binary columns | % for each detected option |
+| `option:COL` | Track specific column | % mentioning Q30_1 |
 | `any` | % mentioning at least one | % Mentioning Any: 92% |
 | `count_mean` | Mean number mentioned | Mean # Mentions: 2.3 |
 | `count_distribution` | Distribution of counts | [Count distribution table] |
 
 **Column Detection:** Auto-detects columns matching pattern `{BaseCode}_{Number}` (e.g., Q30_1, Q30_2, Q30_3)
+
+**Data Format:** Each column contains 1 (mentioned) or 0 (not mentioned)
 
 **Example:**
 ```
@@ -842,6 +848,42 @@ Q30          | Multi_Mention | auto,any,count_mean
 - % mentioning each option (Q30_1, Q30_2, Q30_3, ...)
 - % mentioning at least one option
 - Average number of options mentioned
+
+**Mode 2: Category Text Tracking (text values)**
+
+| Spec | Description | Example Output |
+|------|-------------|----------------|
+| `category:TEXT` | Track specific text value | % mentioning "Personal records" |
+| `auto` | Auto-detect all text values | % for each discovered category |
+
+**Column Detection:** Auto-detects columns matching pattern `{BaseCode}_{Number}` (e.g., Q10_1, Q10_2, Q10_3)
+
+**Data Format:** Each column contains TEXT LABELS when selected (not 0/1)
+
+**Text Matching:** Case-insensitive, searches across ALL option columns
+
+**Example:**
+```
+Data:
+RespondentID | Q10_1                                  | Q10_2              | Q10_3
+1            | Internal store system (merchandiser)  |                    |
+2            |                                        | Personal records   |
+3            | Internal store system (merchandiser)  |                    | Other
+
+QuestionCode | QuestionType  | TrackingSpecs
+Q10          | Multi_Mention | category:Internal store system (merchandiser),category:Personal records,category:Other
+```
+
+**Result:**
+- % mentioning "Internal store system (merchandiser)": 66.7%
+- % mentioning "Personal records": 33.3%
+- % mentioning "Other": 33.3%
+
+**How It Works:**
+1. System detects all Q10_* columns (Q10_1, Q10_2, Q10_3, etc.)
+2. For each category, searches for that text across ALL columns
+3. Respondent counts as "mentioning" if text appears in ANY column
+4. Calculates weighted % mentioning each category
 
 #### Composite Questions
 
