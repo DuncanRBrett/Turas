@@ -1980,6 +1980,7 @@ parse_multi_mention_specs <- function(tracking_specs, base_code, wave_df) {
     return(list(
       mode = "auto",
       columns = detect_multi_mention_columns(wave_df, base_code),
+      categories = character(0),
       additional_metrics = character(0)
     ))
   }
@@ -1990,6 +1991,7 @@ parse_multi_mention_specs <- function(tracking_specs, base_code, wave_df) {
   result <- list(
     mode = "selective",
     columns = character(0),
+    categories = character(0),
     additional_metrics = character(0)
   )
 
@@ -2012,6 +2014,15 @@ parse_multi_mention_specs <- function(tracking_specs, base_code, wave_df) {
         result$columns <- c(result$columns, col_name)
       }
 
+    } else if (startsWith(spec_lower, "category:")) {
+      # Specific category text: "category:Internal store system"
+      category_name <- sub("^category:", "", spec, ignore.case = TRUE)
+      category_name <- trimws(category_name)  # Remove any leading/trailing whitespace
+      if (category_name != "") {  # Only add if not empty
+        result$mode <- "category"
+        result$categories <- c(result$categories, category_name)
+      }
+
     } else if (spec_lower %in% c("any", "count_mean", "count_distribution")) {
       # Additional metrics
       result$additional_metrics <- c(result$additional_metrics, spec_lower)
@@ -2023,10 +2034,12 @@ parse_multi_mention_specs <- function(tracking_specs, base_code, wave_df) {
 
   # Remove duplicates
   result$columns <- unique(result$columns)
+  result$categories <- unique(result$categories)
   result$additional_metrics <- unique(result$additional_metrics)
 
   # Validate columns exist in data (skip if base_code is empty - we're just parsing for additional metrics)
-  if (length(result$columns) > 0 && !is.null(base_code) && base_code != "") {
+  # Only validate for option: mode, not category: mode
+  if (result$mode != "category" && length(result$columns) > 0 && !is.null(base_code) && base_code != "") {
     missing <- setdiff(result$columns, names(wave_df))
     if (length(missing) > 0) {
       warning(paste0("Multi-mention columns not found in data: ",
@@ -2036,6 +2049,173 @@ parse_multi_mention_specs <- function(tracking_specs, base_code, wave_df) {
   }
 
   return(result)
+}
+
+
+#' Calculate Multi-Mention Trend with Category-Based Tracking
+#'
+#' For multi-mention questions where each column contains TEXT VALUES (not 0/1),
+#' this function searches for specific category text across all option columns.
+#'
+#' @keywords internal
+calculate_multi_mention_trend_categories <- function(q_code, question_map, wave_data, config) {
+
+  wave_ids <- config$waves$WaveID
+  metadata <- get_question_metadata(question_map, q_code)
+
+  # Get TrackingSpecs
+  tracking_specs <- get_tracking_specs(question_map, q_code)
+
+  # First pass: detect all multi-mention columns and gather unique categories
+  wave_base_codes <- list()
+  all_categories <- character(0)
+
+  for (wave_id in wave_ids) {
+    wave_code <- get_wave_question_code(question_map, q_code, wave_id)
+    if (!is.na(wave_code)) {
+      wave_base_codes[[wave_id]] <- wave_code
+      wave_df <- wave_data[[wave_id]]
+
+      # Detect all multi-mention columns for this question
+      mm_columns <- detect_multi_mention_columns(wave_df, wave_code)
+
+      if (!is.null(mm_columns) && length(mm_columns) > 0) {
+        # Gather all unique text values from these columns
+        for (col in mm_columns) {
+          if (col %in% names(wave_df)) {
+            col_values <- wave_df[[col]]
+            unique_vals <- unique(col_values[!is.na(col_values) & col_values != ""])
+            all_categories <- unique(c(all_categories, unique_vals))
+          }
+        }
+      }
+    }
+  }
+
+  # Parse specs to determine which categories to track
+  specs <- parse_multi_mention_specs(tracking_specs, "", wave_data[[wave_ids[1]]])
+  categories_to_track <- if (length(specs$categories) > 0) {
+    specs$categories
+  } else {
+    all_categories  # Track all discovered categories if no specific ones requested
+  }
+
+  if (length(categories_to_track) == 0) {
+    warning(paste0("No categories found for question: ", q_code))
+    return(NULL)
+  }
+
+  # Calculate metrics for each wave
+  wave_results <- list()
+
+  for (wave_id in wave_ids) {
+    wave_df <- wave_data[[wave_id]]
+    wave_code <- wave_base_codes[[wave_id]]
+
+    if (is.null(wave_code) || is.na(wave_code)) {
+      wave_results[[wave_id]] <- list(
+        available = FALSE,
+        mention_proportions = list(),
+        additional_metrics = list()
+      )
+      next
+    }
+
+    # Detect multi-mention columns for this wave
+    mm_columns <- detect_multi_mention_columns(wave_df, wave_code)
+
+    if (is.null(mm_columns) || length(mm_columns) == 0) {
+      wave_results[[wave_id]] <- list(
+        available = FALSE,
+        mention_proportions = list(),
+        additional_metrics = list()
+      )
+      next
+    }
+
+    # Filter to only existing columns
+    mm_columns <- mm_columns[mm_columns %in% names(wave_df)]
+
+    if (length(mm_columns) == 0) {
+      wave_results[[wave_id]] <- list(
+        available = FALSE,
+        mention_proportions = list(),
+        additional_metrics = list()
+      )
+      next
+    }
+
+    # Calculate mention proportions for each category
+    mention_proportions <- list()
+
+    # Create valid row indices
+    valid_rows <- which(!is.na(wave_df$weight_var) & wave_df$weight_var > 0)
+
+    for (category in categories_to_track) {
+      # Search for this category text across ALL multi-mention columns
+      mentioned_rows <- c()
+
+      for (col in mm_columns) {
+        col_data <- wave_df[[col]]
+        # Find rows where this column contains the category text (case-insensitive match)
+        matching_idx <- which(!is.na(col_data) & trimws(tolower(col_data)) == trimws(tolower(category)))
+        matching_rows <- intersect(valid_rows, matching_idx)
+        mentioned_rows <- unique(c(mentioned_rows, matching_rows))
+      }
+
+      # Calculate weighted proportion
+      mentioned_weight <- sum(wave_df$weight_var[mentioned_rows], na.rm = TRUE)
+      total_weight <- sum(wave_df$weight_var[valid_rows], na.rm = TRUE)
+
+      proportion <- if (total_weight > 0) {
+        (mentioned_weight / total_weight) * 100
+      } else {
+        NA
+      }
+
+      mention_proportions[[category]] <- proportion
+    }
+
+    # Store results
+    wave_results[[wave_id]] <- list(
+      available = TRUE,
+      mention_proportions = mention_proportions,
+      additional_metrics = list(),  # Category mode doesn't support additional metrics yet
+      tracked_columns = mm_columns,
+      tracked_categories = categories_to_track,
+      n_unweighted = length(valid_rows),
+      n_weighted = sum(wave_df$weight_var[valid_rows], na.rm = TRUE)
+    )
+  }
+
+  # Calculate changes for each category
+  changes <- list()
+  for (category in categories_to_track) {
+    changes[[category]] <- calculate_changes_for_multi_mention_option(
+      wave_results, wave_ids, category
+    )
+  }
+
+  # Significance testing for each category
+  significance <- list()
+  for (category in categories_to_track) {
+    significance[[category]] <- perform_significance_tests_multi_mention(
+      wave_results, wave_ids, category, config
+    )
+  }
+
+  return(list(
+    question_code = q_code,
+    question_text = metadata$QuestionText,
+    question_type = metadata$QuestionType,
+    metric_type = "category_mentions",
+    response_categories = categories_to_track,
+    tracking_specs = tracking_specs,
+    wave_results = wave_results,
+    changes = changes,
+    significance = significance,
+    metadata = metadata
+  ))
 }
 
 
@@ -2053,6 +2233,19 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
   # Get TrackingSpecs
   tracking_specs <- get_tracking_specs(question_map, q_code)
 
+  # Parse specs to check mode (need to parse once to determine if category mode)
+  # Use first wave for initial mode detection
+  first_wave_id <- wave_ids[1]
+  first_wave_code <- get_wave_question_code(question_map, q_code, first_wave_id)
+  first_wave_df <- wave_data[[first_wave_id]]
+  initial_specs <- parse_multi_mention_specs(tracking_specs, first_wave_code, first_wave_df)
+
+  # If category mode, use category-based tracking
+  if (initial_specs$mode == "category") {
+    return(calculate_multi_mention_trend_categories(q_code, question_map, wave_data, config))
+  }
+
+  # Otherwise, continue with binary column-based tracking
   # Initialize structure to track all detected columns across all waves
   all_columns <- character(0)
 
