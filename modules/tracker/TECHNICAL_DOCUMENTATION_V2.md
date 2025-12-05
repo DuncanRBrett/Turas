@@ -822,15 +822,21 @@ Q_SAT        | Rating       | mean,top2_box,range:9-10
 
 #### Multi-Mention Questions
 
+Multi_Mention supports TWO tracking modes:
+
+**Mode 1: Binary Column Tracking (0/1 values)**
+
 | Spec | Description | Example Output |
 |------|-------------|----------------|
-| `auto` | Auto-detect all options | % for each detected option |
-| `option:COL` | Track specific option | % mentioning Q30_1 |
+| `auto` | Auto-detect all binary columns | % for each detected option |
+| `option:COL` | Track specific column | % mentioning Q30_1 |
 | `any` | % mentioning at least one | % Mentioning Any: 92% |
 | `count_mean` | Mean number mentioned | Mean # Mentions: 2.3 |
 | `count_distribution` | Distribution of counts | [Count distribution table] |
 
 **Column Detection:** Auto-detects columns matching pattern `{BaseCode}_{Number}` (e.g., Q30_1, Q30_2, Q30_3)
+
+**Data Format:** Each column contains 1 (mentioned) or 0 (not mentioned)
 
 **Example:**
 ```
@@ -842,6 +848,42 @@ Q30          | Multi_Mention | auto,any,count_mean
 - % mentioning each option (Q30_1, Q30_2, Q30_3, ...)
 - % mentioning at least one option
 - Average number of options mentioned
+
+**Mode 2: Category Text Tracking (text values)**
+
+| Spec | Description | Example Output |
+|------|-------------|----------------|
+| `category:TEXT` | Track specific text value | % mentioning "Personal records" |
+| `auto` | Auto-detect all text values | % for each discovered category |
+
+**Column Detection:** Auto-detects columns matching pattern `{BaseCode}_{Number}` (e.g., Q10_1, Q10_2, Q10_3)
+
+**Data Format:** Each column contains TEXT LABELS when selected (not 0/1)
+
+**Text Matching:** Case-insensitive, searches across ALL option columns
+
+**Example:**
+```
+Data:
+RespondentID | Q10_1                                  | Q10_2              | Q10_3
+1            | Internal store system (merchandiser)  |                    |
+2            |                                        | Personal records   |
+3            | Internal store system (merchandiser)  |                    | Other
+
+QuestionCode | QuestionType  | TrackingSpecs
+Q10          | Multi_Mention | category:Internal store system (merchandiser),category:Personal records,category:Other
+```
+
+**Result:**
+- % mentioning "Internal store system (merchandiser)": 66.7%
+- % mentioning "Personal records": 33.3%
+- % mentioning "Other": 33.3%
+
+**How It Works:**
+1. System detects all Q10_* columns (Q10_1, Q10_2, Q10_3, etc.)
+2. For each category, searches for that text across ALL columns
+3. Respondent counts as "mentioning" if text appears in ANY column
+4. Calculates weighted % mentioning each category
 
 #### Composite Questions
 
@@ -1097,22 +1139,9 @@ Q30          | Features - Web              | % Mention | 45   | 48   | 50
 
 ### Critical Issues
 
-**ISSUE-001: Multi_Mention with Selective TrackingSpecs**
-- **Status:** KNOWN BUG
-- **Severity:** MEDIUM
-- **Description:** When using `option:Q10_4` for Multi_Mention questions, error occurs: "missing value where TRUE/FALSE needed"
-- **Impact:** Tracker completes successfully but question is skipped in output
-- **Workaround:** Use `auto` or leave TrackingSpecs blank to track all options
-- **Reported:** v2.0
-- **Fix:** Planned for v2.2
+**None currently identified.**
 
-**ISSUE-002: TECHNICAL_DOCUMENTATION.md Outdated**
-- **Status:** RESOLVED in v2.1
-- **Severity:** LOW
-- **Description:** Previous TECHNICAL_DOCUMENTATION.md showed v1.0, actual version was v2.1
-- **Impact:** Developer confusion about capabilities
-- **Resolution:** Complete rewrite to TECHNICAL_DOCUMENTATION_V2.md
-- **Completed:** 2025-12-04
+All previously identified critical issues have been resolved. See [Historical Issues](#historical-issues-resolved) section below.
 
 ### Known Limitations
 
@@ -1142,6 +1171,35 @@ Q30          | Features - Web              | % Mention | 45   | 48   | 50
    - **Planned:** Text analysis integration (v4.0)
 
 ### Historical Issues (Resolved)
+
+**ISSUE-001: Multi_Mention with Selective TrackingSpecs** (v2.1)
+- **Status:** RESOLVED in v2.1
+- **Severity:** MEDIUM (was CRITICAL)
+- **Description:** When using `option:Q10_4` for Multi_Mention questions, error occurred: "missing value where TRUE/FALSE needed"
+- **Root Cause:** First pass auto-detected ALL columns regardless of TrackingSpecs, but second pass only processed selective columns, creating mismatch
+- **Impact:** Tracker failed or skipped question in output
+- **Fix:** Modified calculate_multi_mention_trend() to parse TrackingSpecs BEFORE first pass, ensuring all_columns matches tracked columns
+- **Resolved:** 2025-12-04 (commit d52a3da)
+- **File:** trend_calculator.R lines 2059-2075
+
+**ISSUE-002: Multi_Mention Category Mode Data Loss** (v2.1)
+- **Status:** RESOLVED in v2.1
+- **Severity:** CRITICAL
+- **Description:** When using `category:` syntax for Multi_Mention questions (e.g., `category:We rely on CCS`), question appeared in output but all values were blank/NA
+- **Root Cause:** Data loader converted Multi_Mention sub-columns (Q10_1, Q10_2, Q10_4, etc.) to numeric, wiping out text values. Loader only protected exact column name "Q10", not sub-columns like "Q10_4"
+- **Symptoms:** Console warnings showed `"WARNING: Q10_4: All 4 values are non-numeric (converted to NA)"`. Text labels like "We rely on CCS" were converted to NA before tracker could process them
+- **Impact:** Category mode Multi_Mention completely non-functional - all values showed as 0% or blank
+- **Fix:** Modified wave_loader.R clean_wave_data() to extract base code (strip `_[0-9]+$` suffix) when checking categorical protection. Now `is_categorical <- (col_name %in% categorical_cols) || (base_code %in% categorical_cols)`
+- **Resolved:** 2025-12-05
+- **File:** wave_loader.R line 188-189
+
+**ISSUE-003: TECHNICAL_DOCUMENTATION.md Outdated** (v2.1)
+- **Status:** RESOLVED in v2.1
+- **Severity:** LOW
+- **Description:** Previous TECHNICAL_DOCUMENTATION.md showed v1.0, actual version was v2.1
+- **Impact:** Developer confusion about capabilities
+- **Resolution:** Complete rewrite to TECHNICAL_DOCUMENTATION_V2.md with full v2.1 documentation
+- **Resolved:** 2025-12-04
 
 **RESOLVED-001: TrackingSpecs Not Working in GUI with Banners** (v2.0)
 - **Issue:** When "Use Banners" checkbox enabled, TrackingSpecs ignored

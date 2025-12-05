@@ -521,12 +521,12 @@ validate_tracking_specs <- function(specs_str, question_type) {
       next
     }
 
-    # Check for category specs (single_choice)
+    # Check for category specs (single_choice and multi_mention)
     if (grepl("^category:", spec_lower)) {
-      if (!q_type_key %in% c("single_choice", "multi_choice")) {
+      if (!q_type_key %in% c("single_choice", "multi_choice", "multi_mention")) {
         return(list(
           valid = FALSE,
-          message = paste0("'", spec, "' is only valid for Single_Choice or Multi_Choice questions, not ", question_type)
+          message = paste0("'", spec, "' is only valid for Single_Choice or Multi_Mention questions, not ", question_type)
         ))
       }
       next

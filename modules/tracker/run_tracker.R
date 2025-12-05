@@ -143,7 +143,7 @@ run_tracker <- function(tracking_config_path,
   cat("================================================================================\n")
   cat(paste0("TURASTACKER - MVT ", phase_label, "\n"))
   cat("================================================================================\n")
-  cat(paste0("Version: 2024-11-27 (Fixed Wave Detection + Diagnostics)\n"))
+  cat(paste0("Version: 2.1 (2025-12-05) - Multi_Mention Category Mode Fix\n"))
   cat(paste0("Started: ", format(start_time, "%Y-%m-%d %H:%M:%S"), "\n"))
   cat("\n")
 

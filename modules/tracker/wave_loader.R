@@ -184,7 +184,9 @@ clean_wave_data <- function(wave_df, wave_id, categorical_cols = character(0)) {
     # Check if column might be numeric (has digits) OR looks like a question code
     if (is.character(col_data)) {
       # Check if this column is a categorical question - if so, skip numeric conversion
-      is_categorical <- col_name %in% categorical_cols
+      # For Multi_Mention sub-columns (Q10_1, Q10_2, etc.), extract base code (Q10)
+      base_code <- sub("_[0-9]+$", "", col_name)
+      is_categorical <- (col_name %in% categorical_cols) || (base_code %in% categorical_cols)
 
       if (is_categorical) {
         # Skip categorical questions - preserve text values for Single_Response, Multi_Mention, etc.
