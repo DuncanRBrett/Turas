@@ -2117,6 +2117,17 @@ extract_wave_history_metrics <- function(q_result) {
         )
       }
     }
+
+  } else if (metric_type == "category_mentions") {
+    # Multi-mention category mode - track each category
+    if (!is.null(q_result$response_categories)) {
+      for (category in q_result$response_categories) {
+        metrics[[length(metrics) + 1]] <- list(
+          metric_key = paste0("mention:", category),
+          label = paste0("% ", category)
+        )
+      }
+    }
   }
 
   return(metrics)
