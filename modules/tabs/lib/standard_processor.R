@@ -940,6 +940,7 @@ add_net_positive_significance <- function(row_counts_top, row_counts_bottom,
 #'
 #' Calculates and adds Net Positive row (Top% - Bottom% with significance).
 #' Uses DisplayOrder to identify Top (lowest) and Bottom (highest non-DK).
+#' Only applies to Rating, Likert, and NPS questions with BoxCategories.
 #'
 #' V9.9.5: NEW FEATURE - Net Positive Option A
 #'
@@ -966,6 +967,11 @@ add_net_positive_row <- function(existing_table, data, question_info,
   }
 
   if (!config$show_net_positive) {
+    return(existing_table)
+  }
+
+  # Only for Rating, Likert, and NPS questions
+  if (!question_info$Variable_Type %in% c("Rating", "Likert", "NPS")) {
     return(existing_table)
   }
 
