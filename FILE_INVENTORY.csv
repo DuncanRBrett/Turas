@@ -1,0 +1,47 @@
+filepath,filename,purpose,filetype,total_lines,active_lines,blank_lines,comment_lines,quality,directory,status
+./README.md,README.md,Project documentation,md,157,,,,"Excellent",./,Active
+./QUICK_LAUNCH.md,QUICK_LAUNCH.md,Quick reference,md,90,,,,"Good",./,Active
+./shared/config_utils.R,config_utils.R,Shared utility,R,245,180,25,40,"Excellent",./shared,Active
+./shared/weights.R,weights.R,Shared utility,R,189,140,20,29,"Excellent",./shared,Active
+./shared/formatting.R,formatting.R,Shared utility,R,167,125,18,24,"Good",./shared,Active
+./tests/README.md,README.md,Documentation,md,381,,,,"Excellent",./tests,Supporting
+./tests/testthat.R,testthat.R,Test runner,R,45,35,5,5,"Adequate",./tests,Supporting
+./tests/testthat/test_shared_functions.R,test_shared_functions.R,Unit test,R,123,95,12,16,"Good",./tests/testthat,Supporting
+./tests/testthat/test_shared_weights.R,test_shared_weights.R,Unit test,R,98,75,10,13,"Good",./tests/testthat,Supporting
+./tests/testthat/test_shared_formatting.R,test_shared_formatting.R,Unit test,R,87,68,8,11,"Good",./tests/testthat,Supporting
+./tests/testthat/test_shared_config.R,test_shared_config.R,Unit test,R,104,82,10,12,"Good",./tests/testthat,Supporting
+./tests/regression/run_all_regression_tests.R,run_all_regression_tests.R,Test runner,R,67,52,7,8,"Good",./tests/regression,Supporting
+./tests/regression/helpers/path_helpers.R,path_helpers.R,Test helper,R,78,60,8,10,"Good",./tests/regression/helpers,Supporting
+./tests/regression/helpers/assertion_helpers.R,assertion_helpers.R,Test helper,R,92,72,9,11,"Good",./tests/regression/helpers,Supporting
+./modules/AlchemerParser/USER_MANUAL.md,USER_MANUAL.md,User documentation,md,1456,,,,"Excellent",./modules/AlchemerParser,Active
+./modules/AlchemerParser/R/00_main.R,00_main.R,Main module entry,R,234,178,22,34,"Excellent",./modules/AlchemerParser/R,Active
+./modules/tabs/USER_MANUAL.md,USER_MANUAL.md,User documentation,md,2646,,,,"Excellent",./modules/tabs,Active
+./modules/tabs/TECHNICAL_DOCS.md,TECHNICAL_DOCS.md,Technical documentation,md,1845,,,,"Excellent",./modules/tabs,Active
+./modules/tabs/R/00_main.R,00_main.R,Main module entry,R,312,245,28,39,"Excellent",./modules/tabs/R,Active
+./modules/tracker/USER_MANUAL.md,USER_MANUAL.md,User documentation,md,4671,,,,"Excellent",./modules/tracker,Active
+./modules/tracker/TECHNICAL_DOCS.md,TECHNICAL_DOCS.md,Technical documentation,md,2134,,,,"Excellent",./modules/tracker,Active
+./modules/tracker/R/00_main.R,00_main.R,Main module entry,R,298,234,26,38,"Excellent",./modules/tracker/R,Active
+./modules/confidence/USER_MANUAL.md,USER_MANUAL.md,User documentation,md,1861,,,,"Excellent",./modules/confidence,Active
+./modules/confidence/TECHNICAL_DOCS.md,TECHNICAL_DOCS.md,Technical documentation,md,3094,,,,"Excellent",./modules/confidence,Active
+./modules/confidence/R/00_main.R,00_main.R,Main module entry,R,287,225,24,38,"Excellent",./modules/confidence/R,Active
+./modules/segment/USER_MANUAL.md,USER_MANUAL.md,User documentation,md,1684,,,,"Excellent",./modules/segment,Active
+./modules/segment/TECHNICAL_DOCS.md,TECHNICAL_DOCS.md,Technical documentation,md,2536,,,,"Excellent",./modules/segment,Active
+./modules/segment/R/00_main.R,00_main.R,Main module entry,R,276,218,23,35,"Excellent",./modules/segment/R,Active
+./modules/conjoint/USER_MANUAL.md,USER_MANUAL.md,User documentation,md,2593,,,,"Excellent",./modules/conjoint,Active
+./modules/conjoint/TECHNICAL_DOCS.md,TECHNICAL_DOCS.md,Technical documentation,md,1711,,,,"Excellent",./modules/conjoint,Active
+./modules/conjoint/R/00_main.R,00_main.R,Main module entry,R,245,192,21,32,"Excellent",./modules/conjoint/R,Active
+./modules/keydriver/USER_MANUAL.md,USER_MANUAL.md,User documentation,md,1234,,,,"Excellent",./modules/keydriver,Active
+./modules/keydriver/TECHNICAL_DOCS.md,TECHNICAL_DOCS.md,Technical documentation,md,987,,,,"Good",./modules/keydriver,Active
+./modules/keydriver/R/00_main.R,00_main.R,Main module entry,R,198,156,18,24,"Good",./modules/keydriver/R,Active
+./modules/pricing/USER_MANUAL.md,USER_MANUAL.md,User documentation,md,876,,,,"Good",./modules/pricing,Active
+./modules/pricing/R/00_main.R,00_main.R,Main module entry,R,167,132,15,20,"Good",./modules/pricing/R,Active
+./examples/README.md,README.md,Documentation,md,245,,,,"Good",./examples,Supporting
+./examples/tabs/basic/README.md,README.md,Example documentation,md,123,,,,"Good",./examples/tabs/basic,Supporting
+./examples/tabs/basic/data.csv,data.csv,Example data,csv,156,,,,"Good",./examples/tabs/basic,Supporting
+./examples/tabs/basic/Survey_Structure.xlsx,Survey_Structure.xlsx,Example template,xlsx,,,,,"Good",./examples/tabs/basic,Supporting
+./examples/confidence/basic/README.md,README.md,Example documentation,md,98,,,,"Adequate",./examples/confidence/basic,Supporting
+./examples/confidence/basic/data.csv,data.csv,Example data,csv,134,,,,"Good",./examples/confidence/basic,Supporting
+./examples/segment/basic/data.csv,data.csv,Example data,csv,178,,,,"Good",./examples/segment/basic,Supporting
+./docs/Survey_Structure_Template_Manual.md,Survey_Structure_Template_Manual.md,Technical documentation,md,567,,,,"Excellent",./docs,Supporting
+./tools/README.md,README.md,Documentation,md,89,,,,"Adequate",./tools,Supporting
+./tools/create_file_inventory.R,create_file_inventory.R,Development tool,R,156,122,14,20,"Good",./tools,Supporting
