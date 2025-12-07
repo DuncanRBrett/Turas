@@ -1,3 +1,540 @@
+# Turas Tracker - Quick Start Guide
+
+**Version:** 2.0 (Enhanced with TrackingSpecs)
+**Estimated Time:** 15 minutes
+**Difficulty:** Intermediate
+**New in v2.0:** Custom metrics, top box tracking, multi-mention support
+
+---
+
+## What is Turas Tracker?
+
+---
+
+
+Turas Tracker analyzes multi-wave tracking studies by:
+- **Comparing metrics across waves** (time series analysis)
+- **Calculating trends** (up/down/stable with statistical significance)
+- **Handling question mapping** (track questions even when wording/codes change)
+- **Supporting banner analysis** (trends by demographic segments)
+- **Generating professional Excel reports** with trend tables and charts
+
+---
+
+## Prerequisites
+
+```r
+install.packages(c("openxlsx", "readxl"))
+```
+
+### What You Need
+
+1. **Multiple wave data files** (one file per wave)
+   - Wave 1, Wave 2, Wave 3, etc.
+   - Same questions across waves (or mapping provided)
+
+2. **Tracking configuration file** (.xlsx)
+   - Which questions to track
+   - Wave information (IDs, labels, dates)
+   - Analysis settings
+
+3. **Question mapping file** (.xlsx, optional)
+   - Maps question codes across waves if they changed
+
+---
+
+## Quick Start (10 Minutes)
+
+### Step 1: Organize Your Wave Data
+
+**Directory structure:**
+```
+project/
+├── wave1_data.xlsx    # Wave 1 (Jan 2024)
+├── wave2_data.xlsx    # Wave 2 (Apr 2024)
+├── wave3_data.xlsx    # Wave 3 (Jul 2024)
+└── config/
+    ├── tracking_config.xlsx
+    └── question_mapping.xlsx
+```
+
+**Each wave file should have:**
+```
+ResponseID | Q1_Awareness | Q2_Consideration | Q3_Purchase | Q4_Satisfaction | Weight
+1          | 1            | 1                | 0           | 4               | 1.2
+2          | 1            | 0                | 0           | 5               | 0.9
+3          | 0            | 0                | 0           | 3               | 1.1
+```
+
+### Step 2: Create Configuration File
+
+**tracking_config.xlsx - Sheet 1: Waves**
+```
+WaveID | WaveLabel    | DataFile         | FieldingDate | WeightVariable
+W1     | Jan 2024     | wave1_data.xlsx  | 2024-01-15   | Weight
+W2     | Apr 2024     | wave2_data.xlsx  | 2024-04-15   | Weight
+W3     | Jul 2024     | wave3_data.xlsx  | 2024-07-15   | Weight
+```
+
+**Sheet 2: Questions**
+```
+QuestionCode    | QuestionText                  | QuestionType
+Q1_Awareness    | Brand awareness (unaided)     | proportion
+Q2_Consideration| Brand consideration           | proportion
+Q3_Purchase     | Purchased in last 3 months    | proportion
+Q4_Satisfaction | Satisfaction (1-5)            | mean
+```
+
+**Sheet 3: Settings**
+```
+SettingName          | SettingValue
+output_file          | tracking_report.xlsx
+confidence_level     | 0.95
+trend_significance   | TRUE
+min_base_for_testing | 30
+```
+
+### Step 3: Run Tracker
+
+**Using GUI:**
+```r
+source("modules/tracker/run_tracker_gui.R")
+# 1. Browse to tracking_config.xlsx
+# 2. Click "Run Analysis"
+# 3. Wait 30-90 seconds
+```
+
+**Using Script:**
+```r
+source("modules/tracker/run_tracker.R")
+
+result <- run_tracking_analysis(
+  config_path = "tracking_config.xlsx"
+)
+```
+
+### Step 4: Review Output
+
+Output Excel file contains:
+
+**1. Summary Sheet:**
+```
+Study Information
+─────────────────
+Number of Waves: 3
+Date Range: Jan 2024 - Jul 2024
+Questions Tracked: 4
+Total Sample: 3,000 (1,000 per wave)
+```
+
+**2. Trend Summary Sheet:**
+```
+Question          | W1    | W2    | W3    | W1→W2 | W2→W3 | Overall
+──────────────────|────---|-------|-------|-------|-------|────────
+Q1_Awareness      | 45%   | 48%   | 52%↑  | ↑     | ↑     | ↑↑
+Q2_Consideration  | 32%   | 31%   | 33%   | →     | →     | →
+Q3_Purchase       | 18%   | 19%   | 20%   | →     | →     | →
+Q4_Satisfaction   | 3.8   | 3.9   | 4.1↑  | →     | ↑     | ↑
+
+Legend: ↑ Significant increase | ↓ Significant decrease | → No significant change
+```
+
+**3. Individual Question Sheets:**
+
+Each question gets a detailed sheet with:
+- Trend table (metrics by wave)
+- Wave-to-wave changes
+- Statistical significance flags
+- Sample sizes (weighted & unweighted)
+
+**Example - Q1_Awareness sheet:**
+```
+Metric               | Wave 1  | Wave 2  | Wave 3  | Change W2→W3
+─────────────────────|─────────|─────────|─────────|─────────────
+Aware (%)            | 45.2    | 48.1    | 52.3    | +4.2↑
+Base (unweighted)    | 1,000   | 1,000   | 1,000   |
+Base (weighted)      | 1,000   | 1,000   | 1,000   |
+Effective N          | 925     | 918     | 932     |
+Confidence Interval  | ±3.1%   | ±3.1%   | ±3.0%   |
+```
+
+---
+
+## New in Version 2.0: TrackingSpecs ⭐
+
+**Track custom metrics for deeper insights!**
+
+### Quick Example
+
+Add a `TrackingSpecs` column to your question_mapping.xlsx:
+
+```
+QuestionCode | QuestionType | TrackingSpecs   | Wave1 | Wave2 | Wave3
+Q4_Satisfaction | Rating    | mean,top2_box   | Q4    | Q4    | Q4
+```
+
+**Result:** Track BOTH average satisfaction AND % highly satisfied (top 2 box)
+
+### Available Metrics
+
+**For Rating Questions (1-5, 1-10 scales):**
+- `mean` - Average rating
+- `top_box` - % giving highest rating
+- `top2_box` - % giving top 2 ratings
+- `top3_box` - % giving top 3 ratings
+- `range:X-Y` - % within custom range (e.g., range:9-10)
+
+**For Multi-Mention Questions:**
+- `auto` - Auto-detect and track all options
+- `option:COL` - Track specific option
+- `any` - % selecting at least one
+
+### Why Use TrackingSpecs?
+
+**Traditional (without TrackingSpecs):**
+```
+Q4 Satisfaction: Mean = 4.1 (on 1-5 scale)
+```
+Tells you average satisfaction but not how many are really satisfied.
+
+**Enhanced (with TrackingSpecs="mean,top2_box"):**
+```
+Q4 Satisfaction:
+- Mean = 4.1
+- Top 2 Box = 72% (rated 4 or 5)
+```
+Now you know both average AND % satisfied!
+
+**Example Use Cases:**
+- Track mean NPS + % promoters
+- Monitor average satisfaction + % highly satisfied
+- Track multiple top box metrics (top box, top 2, top 3)
+- Auto-detect multi-select question options
+
+**See USER_MANUAL.md Section 5 for complete TrackingSpecs documentation.**
+
+---
+
+## Wave History Report Format ⭐
+
+**New in Version 2.0: Multiple output formats!**
+
+### What is Wave History Format?
+
+**Compact, executive-friendly layout:**
+- One row per question (or per metric)
+- Columns: QuestionCode | Question | Type | Wave 1 | Wave 2 | ... | Wave N
+- All questions on one sheet (vs. one sheet per question)
+- Best for: Quick overview, presentations, executive dashboards
+
+### How to Enable
+
+**Add to Settings sheet:**
+```
+SettingName   | SettingValue
+report_types  | detailed,wave_history
+```
+
+**Options:**
+- `detailed` - Detailed format only (default)
+- `wave_history` - Wave History format only
+- `detailed,wave_history` - Generate both
+
+### Output Files
+
+**If both formats specified:**
+```
+ProjectName_Tracker_20251121.xlsx         (detailed - full analysis)
+ProjectName_WaveHistory_20251121.xlsx     (wave history - compact)
+```
+
+### Example Output
+
+**Wave History Sheet:**
+```
+QuestionCode | Question           | Type      | W1  | W2  | W3
+Q38          | Satisfaction      | Mean      | 8.2 | 8.4 | 8.6
+Q38          | Satisfaction      | Top 2 Box | 72  | 75  | 78
+Q39          | Recommend         | % Yes     | 68  | 71  | 74
+Q20          | NPS               | NPS       | 32  | 35  | 38
+```
+
+**With Banners:**
+- One sheet per segment (Total, Male, Female, etc.)
+- Same layout for each segment
+
+### When to Use
+
+**✅ Use Wave History for:**
+- Executive presentations
+- Quick trend scanning
+- PowerPoint tables
+- Client executive summaries
+
+**✅ Use Detailed for:**
+- Statistical analysis
+- Significance testing
+- Technical reports
+- Deep investigation
+
+**✅ Generate Both when:**
+- Serving multiple audiences
+- Need both overview and detail
+- Creating comprehensive deliverables
+
+**See USER_MANUAL.md Section 6 for complete Wave History documentation.**
+
+---
+
+## Understanding Trend Indicators
+
+### Symbols
+
+| Symbol | Meaning |
+|--------|---------|
+| **↑** | Statistically significant increase (p < 0.05) |
+| **↓** | Statistically significant decrease (p < 0.05) |
+| **→** | No significant change |
+| **↑↑** | Strong increase across multiple waves |
+| **↓↓** | Strong decrease across multiple waves |
+
+### Statistical Tests Used
+
+**For Proportions:**
+- Two-proportion z-test
+- Tests null hypothesis: p₁ = p₂
+- Accounts for effective sample size (if weighted)
+
+**For Means:**
+- Two-sample t-test
+- Tests null hypothesis: μ₁ = μ₂
+- Uses pooled or Welch's variance depending on equality
+
+---
+
+## Common Configurations
+
+### Configuration 1: Simple 3-Wave Tracking (No Weights)
+
+**Waves sheet:**
+```
+WaveID | WaveLabel | DataFile         | WeightVariable
+W1     | Wave 1    | wave1_data.xlsx  |                [blank - no weights]
+W2     | Wave 2    | wave2_data.xlsx  |
+W3     | Wave 3    | wave3_data.xlsx  |
+```
+
+### Configuration 2: Tracking with Banner Segments
+
+**Add Sheet: Banner**
+```
+BannerLabel | BreakVariable | BreakValue
+Total       | Total         |
+Male        | Gender        | 1
+Female      | Gender        | 2
+18-34       | AgeGroup      | 1,2
+35+         | AgeGroup      | 3,4
+```
+
+**Result:** Trend analysis for each segment
+
+### Configuration 3: Questions Changed Across Waves
+
+**Add Sheet: Question_Mapping**
+```
+QuestionCode | Wave1_Code | Wave2_Code | Wave3_Code
+Q_Satisfaction | SAT1      | SATISFACTION | Q4
+```
+
+**Tracker will:**
+1. Find SAT1 in Wave 1 data
+2. Find SATISFACTION in Wave 2 data
+3. Find Q4 in Wave 3 data
+4. Track them as one metric
+
+---
+
+## Troubleshooting
+
+### ❌ "Question Q1 not found in Wave 2"
+**Cause:** Question code doesn't match column name in Wave 2 data
+**Fix:**
+- Check spelling/capitalization (case-sensitive)
+- Use Question_Mapping sheet if codes changed
+
+### ❌ "Insufficient overlap for significance testing"
+**Cause:** Base size < 30 in one or both waves
+**Fix:**
+- Lower `min_base_for_testing` (e.g., to 20)
+- Combine segments to increase base
+- Accept that sig testing won't be possible for small cells
+
+### ❌ "All waves have identical data"
+**Cause:** Using same file for all waves (copy-paste error)
+**Fix:** Check `DataFile` column in Waves sheet - each should be unique
+
+### ⚠️ "Large DEFF detected (>2.0)"
+**Impact:** Effective sample sizes much lower than raw n
+**Action:**
+- Review weighting efficiency
+- Report effective N alongside raw N
+- Consider weight trimming
+
+---
+
+## Best Practices
+
+### Data Preparation
+
+✅ **DO:**
+- Use consistent question codes across waves when possible
+- Keep same coding scheme (1=Yes, 0=No)
+- Include weights in same column name across waves
+- Document any questionnaire changes
+
+❌ **DON'T:**
+- Change question codes without mapping
+- Reverse coding between waves (e.g., 1=Yes to 1=No)
+- Mix weighted and unweighted waves
+- Skip waves in sequence (W1, W3, W4 - missing W2)
+
+### Configuration
+
+✅ **DO:**
+- Use meaningful Wave IDs (Q1_2024, Q2_2024) not just (W1, W2)
+- Include fielding dates for time series charts
+- Set realistic min_base thresholds
+- Document any data quality issues in notes
+
+❌ **DON'T:**
+- Use special characters in WaveID
+- Leave WeightVariable blank for some waves but not others
+- Set min_base too low (< 20 unreliable)
+
+### Interpretation
+
+✅ **DO:**
+- Report confidence intervals alongside point estimates
+- Note effective sample sizes for weighted data
+- Consider substantive vs. statistical significance
+- Check for seasonality effects
+
+❌ **DON'T:**
+- Over-interpret small changes even if significant
+- Ignore large changes that aren't quite significant
+- Compare non-comparable questions
+- Report trends without context
+
+---
+
+## Advanced Features
+
+### Feature 1: Derived Metrics
+
+Track computed metrics (e.g., Top 2 Box, NPS):
+
+**Settings sheet:**
+```
+calculate_top2box | TRUE
+top2box_values    | 4,5
+```
+
+### Feature 2: Custom Benchmarks
+
+Compare to target/competitor:
+
+**Waves sheet - add column:**
+```
+WaveID | WaveLabel | Benchmark
+W1     | Current   |
+COMP   | Competitor| competitor_data.xlsx
+TARGET | Target    | [manual entry: 60%]
+```
+
+### Feature 3: Automated Reporting
+
+Generate PowerPoint slides:
+
+**Settings sheet:**
+```
+create_ppt_summary | TRUE
+ppt_template       | template.pptx
+```
+
+---
+
+## Example Output Interpretation
+
+**Scenario: Brand Health Tracking**
+
+**Trend Summary shows:**
+```
+                   Q1_2024 | Q2_2024 | Q3_2024 | Trend
+Brand Awareness    45%     | 48%     | 52%↑    | Growing ↑↑
+Consideration      32%     | 31%     | 33%     | Stable →
+Purchase Intent    18%     | 19%     | 20%     | Stable →
+Satisfaction (1-5) 3.8     | 3.9     | 4.1↑    | Improving ↑
+```
+
+**Interpretation:**
+- ✅ **Awareness growing**: +7pp over 6 months, statistically significant
+- ⚠️ **Consideration flat**: Up slightly Q2→Q3 but not significant
+- ⚠️ **Purchase flat**: Small increases not reaching significance
+- ✅ **Satisfaction improving**: +0.3 points, significant Q2→Q3
+
+**Recommendation:**
+- Awareness campaigns working well
+- Need to convert awareness to consideration
+- Satisfaction gains may drive future purchase
+
+---
+
+## Next Steps
+
+1. **Review USER_MANUAL.md** for comprehensive feature documentation
+2. **See EXAMPLE_WORKFLOWS.md** for complex tracking scenarios
+3. **Check TECHNICAL_DOCUMENTATION.md** for algorithm details
+4. **Explore banner trending** for segment-specific insights
+
+---
+
+## Quick Reference Card
+
+### Minimum Configuration
+
+**3 Required Sheets:**
+1. Waves (WaveID, WaveLabel, DataFile)
+2. Questions (QuestionCode, QuestionType)
+3. Settings (output_file)
+
+### Question Types Supported
+
+- `proportion` - % answering specific value(s)
+- `mean` - Average score
+- `nps` - Net Promoter Score
+- `rating` - 1-5, 1-7, or 1-10 scales
+
+### Analysis Time
+
+| Waves | Questions | Segments | Time |
+|-------|-----------|----------|------|
+| 3     | 10        | 1 (Total)| 20 sec |
+| 5     | 25        | 1 (Total)| 45 sec |
+| 10    | 50        | 5        | 3-5 min |
+
+---
+
+**Congratulations!** You're now tracking metrics across waves with statistical rigor.
+
+**What's Next?**
+- Try adding TrackingSpecs to track custom metrics
+- See USER_MANUAL.md for comprehensive documentation
+- Check EXAMPLE_WORKFLOWS.md for advanced scenarios
+
+*Version 2.0.0 | Quick Start | Turas Tracker Module | Last Updated: 2025-11-21*
+
+---
+
 # Turas Tracker - User Manual
 
 **Version:** 2.0 (Enhanced with TrackingSpecs)
@@ -2230,3 +2767,1905 @@ Q05_NPS            | nps          | Q5_NPS          | Q05_NPS_Score       | NPS_
 - Updated examples throughout
 
 **Next Review:** Q2 2026
+
+---
+
+## Example Workflows
+
+## Workflow 1: Quarterly Brand Tracking (Basic)
+
+### Scenario
+
+You run a quarterly brand tracking study measuring:
+- Brand awareness (unaided and aided)
+- Brand consideration
+- Brand preference
+- Purchase intent
+
+You have 4 quarters of data and want to identify trends.
+
+### Step 1: Organize Your Data
+
+**Directory Structure:**
+```
+brand_tracking/
+├── data/
+│   ├── Q1_2024.csv
+│   ├── Q2_2024.csv
+│   ├── Q3_2024.csv
+│   └── Q4_2024.csv
+├── config/
+│   └── tracking_config.xlsx
+└── output/
+```
+
+**Q1_2024.csv (500 respondents):**
+```
+RespondentID,Q1_Unaided,Q2_Aided,Q3_Consideration,Q4_Preference,Q5_PurchaseIntent
+1,Brand A,Brand A,Brand A,Brand A,1
+2,None,Brand B,Brand B,Brand B,0
+3,Brand C,Brand C,Brand C,Brand C,1
+...
+```
+
+**Each Quarter Same Structure:**
+- Same question codes
+- Same response options
+- Similar sample size (~500 per wave)
+
+### Step 2: Create Configuration File
+
+**config/tracking_config.xlsx**
+
+**Sheet 1: Waves**
+```
+WaveID | WaveName       | DataFile      | FieldworkStart | FieldworkEnd  | WeightVariable
+W1     | Q1 2024        | Q1_2024.csv   | 2024-01-01     | 2024-01-15    | NA
+W2     | Q2 2024        | Q2_2024.csv   | 2024-04-01     | 2024-04-15    | NA
+W3     | Q3 2024        | Q3_2024.csv   | 2024-07-01     | 2024-07-15    | NA
+W4     | Q4 2024        | Q4_2024.csv   | 2024-10-01     | 2024-10-15    | NA
+```
+
+**Sheet 2: TrackedQuestions**
+```
+QuestionCode       | QuestionText                  | QuestionType
+Q1_Unaided         | Brand Awareness (Unaided)     | proportion
+Q2_Aided           | Brand Awareness (Aided)       | proportion
+Q3_Consideration   | Brand Consideration           | proportion
+Q4_Preference      | Brand Preference              | proportion
+Q5_PurchaseIntent  | Purchase Intent (0/1)         | proportion
+```
+
+**Sheet 3: Banner**
+```
+BreakVariable | BreakLabel
+Total         | Total
+```
+
+**Sheet 4: Settings**
+```
+SettingName         | SettingValue
+project_name        | 2024 Brand Tracking Study
+output_file         | output/Brand_Tracking_2024.xlsx
+confidence_level    | 0.95
+min_base_size       | 30
+trend_significance  | TRUE
+```
+
+### Step 3: Run Analysis
+
+```r
+# Load Turas
+source("/path/to/Turas/turas.R")
+turas_load("tracker")
+
+# Set working directory
+setwd("/path/to/brand_tracking")
+
+# Run tracker (no question mapping needed - codes consistent)
+result <- run_tracker(
+  tracking_config_path = "config/tracking_config.xlsx",
+  question_mapping_path = NA,  # Not needed - same codes across waves
+  data_dir = "data/"
+)
+
+cat("Analysis complete! Output:", result, "\n")
+```
+
+### Step 4: Interpret Results
+
+**Brand_Tracking_2024.xlsx - Summary Sheet:**
+
+```
+2024 BRAND TRACKING - SUMMARY
+Generated: 2024-10-16 10:30:00
+
+Question                    Q1      Q2      Trend   Q3      Trend   Q4      Trend
+                           2024    2024            2024            2024
+
+Brand Awareness (Unaided)
+  Brand A              %   42%     45%     →       48%     →       52%     ↑
+  Brand B              %   28%     30%     →       32%     →       33%     →
+  Brand C              %   18%     16%     →       14%     →       11%     ↓
+  None                 %   12%     9%      →       6%      →       4%      →
+
+Brand Preference
+  Brand A              %   38%     40%     →       43%     →       47%     ↑
+  Brand B              %   32%     33%     →       34%     →       35%     →
+  Brand C              %   20%     18%     →       16%     ↓       13%     →
+
+Purchase Intent       %   45%     48%     →       52%     →       56%     ↑
+```
+
+**Key Insights:**
+
+1. **Brand A Growing:**
+   - Unaided awareness: 42% → 52% over year (significant increase in Q4)
+   - Preference: 38% → 47% (significant increase in Q4)
+   - Clear upward momentum
+
+2. **Brand C Declining:**
+   - Unaided awareness: 18% → 11% (significant drop in Q4)
+   - Preference: 20% → 13% (significant drop in Q3)
+   - Concerning downward trend
+
+3. **Brand B Stable:**
+   - Metrics flat across all quarters
+   - Maintaining position but not growing
+
+4. **Purchase Intent Rising:**
+   - 45% → 56% over year (significant increase in Q4)
+   - Category growth or Brand A effect?
+
+**Action Items:**
+- Investigate Brand A success factors (campaigns, product changes?)
+- Analyze Brand C decline (competitive pressure, quality issues?)
+- Monitor Brand B - risk of stagnation
+
+---
+
+## Workflow 2: Customer Satisfaction Tracking with NPS
+
+### Scenario
+
+Monthly customer satisfaction tracking measuring:
+- Overall satisfaction (1-5 scale)
+- Net Promoter Score (0-10 scale)
+- Service quality (1-5 scale)
+- Value for money (1-5 scale)
+
+You have 6 months of data (Jan-Jun 2024).
+
+### Step 1: Prepare Data
+
+**Data Structure (each month same):**
+
+```
+# satisfaction_jan.csv
+CustomerID,Segment,Q1_OverallSat,Q2_NPS,Q3_ServiceQuality,Q4_Value
+1001,Enterprise,5,10,5,4
+1002,SMB,4,9,4,4
+1003,Consumer,3,7,3,3
+...
+```
+
+### Step 2: Create Configuration
+
+**tracking_config.xlsx - Waves:**
+```
+WaveID | WaveName    | DataFile              | FieldworkStart | FieldworkEnd
+W1     | January     | satisfaction_jan.csv  | 2024-01-01     | 2024-01-31
+W2     | February    | satisfaction_feb.csv  | 2024-02-01     | 2024-02-29
+W3     | March       | satisfaction_mar.csv  | 2024-03-01     | 2024-03-31
+W4     | April       | satisfaction_apr.csv  | 2024-04-01     | 2024-04-30
+W5     | May         | satisfaction_may.csv  | 2024-05-01     | 2024-05-31
+W6     | June        | satisfaction_jun.csv  | 2024-06-01     | 2024-06-30
+```
+
+**TrackedQuestions:**
+```
+QuestionCode        | QuestionText                      | QuestionType
+Q1_OverallSat       | Overall Satisfaction (1-5)        | rating
+Q2_NPS              | Net Promoter Score (0-10)         | nps
+Q3_ServiceQuality   | Service Quality (1-5)             | rating
+Q4_Value            | Value for Money (1-5)             | rating
+```
+
+**Banner (for demographic analysis):**
+```
+BreakVariable | BreakLabel
+Total         | Total
+Segment       | Customer Segment
+```
+
+**Settings:**
+```
+SettingName          | SettingValue
+project_name         | H1 2024 Customer Satisfaction Tracking
+output_file          | Customer_Sat_H1_2024.xlsx
+confidence_level     | 0.95
+min_base_size        | 50
+decimal_places_mean  | 2
+```
+
+### Step 3: Run Analysis with Banner
+
+```r
+source("/path/to/Turas/turas.R")
+turas_load("tracker")
+
+result <- run_tracker(
+  tracking_config_path = "tracking_config.xlsx",
+  question_mapping_path = NA,
+  data_dir = "data/",
+  use_banners = TRUE  # Enable banner analysis by segment
+)
+```
+
+### Step 4: Interpret Results
+
+**Customer_Sat_H1_2024.xlsx - Q2_NPS Sheet:**
+
+```
+Net Promoter Score (0-10)
+
+TOTAL
+            Jan     Feb     Trend   Mar     Trend   Apr     Trend   May     Trend   Jun     Trend
+Base (n=)   1000    1000            1000            1000            1000            1000
+
+% Promoters 35%     38%     →       42%     →       45%     →       48%     →       52%     ↑
+% Passives  40%     40%     →       38%     →       35%     →       33%     →       30%     →
+% Detractors 25%    22%     →       20%     →       20%     →       19%     →       18%     →
+NPS Score   10      16      →       22      →       25      →       29      →       34      ↑
+
+BY SEGMENT
+                January         February        March           April           May             June
+            Ent  SMB  Con   Ent  SMB  Con   Ent  SMB  Con   Ent  SMB  Con   Ent  SMB  Con   Ent  SMB  Con
+Base (n=)   300  400  300   300  400  300   300  400  300   300  400  300   300  400  300   300  400  300
+
+NPS Score   25   10   -5    28   12   0     32   15   5     35   18   8     38   22   12    42   25   15
+Trend                       →    →    →     →    →    →     →    →    →     →    →    →     →    →    →
+```
+
+**Key Insights:**
+
+1. **Overall NPS Improving:**
+   - January: 10 → June: 34 (significant increase in June)
+   - Consistent month-over-month improvement
+   - Promoters increasing (35% → 52%), Detractors decreasing (25% → 18%)
+
+2. **Segment Patterns:**
+   - **Enterprise:** Highest NPS (42 in June), steady growth
+   - **SMB:** Moderate NPS (25 in June), improving
+   - **Consumer:** Lowest NPS (15 in June) but showing biggest improvement rate
+
+3. **Detractor Reduction:**
+   - Overall detractors down from 25% to 18%
+   - Suggests service quality improvements effective
+
+**Action Items:**
+- Understand what drove June surge in promoters
+- Focus on converting SMB passives to promoters
+- Continue improving consumer experience (highest growth potential)
+
+---
+
+## Workflow 3: Tracking with Question Code Changes
+
+### Scenario
+
+Your brand tracking study restructured questionnaire between Wave 2 and Wave 3:
+- Questions renumbered
+- Some questions reworded slightly
+- New questions added
+
+You need to track metrics despite these changes.
+
+### Step 1: Identify Question Changes
+
+**Wave 1 & 2 Structure:**
+```
+Q1_BrandAwareness
+Q2_Consideration
+Q3_Preference
+Q4_Satisfaction
+```
+
+**Wave 3 & 4 Structure (after restructure):**
+```
+Q01_Aware_Unaided    # Same as old Q1_BrandAwareness
+Q02_Consideration    # Same as old Q2_Consideration
+Q03_BrandPref        # Same as old Q3_Preference
+Q04_OverallSat       # Same as old Q4_Satisfaction
+Q05_NewMetric        # NEW question
+```
+
+### Step 2: Create Question Mapping
+
+**question_mapping.xlsx - QuestionMap Sheet:**
+
+```
+QuestionCode        | QuestionType | QuestionText                  | W1                | W2                | W3                  | W4
+Q01_BrandAwareness  | proportion   | Brand Awareness (Unaided)     | Q1_BrandAwareness | Q1_BrandAwareness | Q01_Aware_Unaided   | Q01_Aware_Unaided
+Q02_Consideration   | proportion   | Brand Consideration           | Q2_Consideration  | Q2_Consideration  | Q02_Consideration   | Q02_Consideration
+Q03_Preference      | proportion   | Brand Preference              | Q3_Preference     | Q3_Preference     | Q03_BrandPref       | Q03_BrandPref
+Q04_Satisfaction    | rating       | Overall Satisfaction (1-5)    | Q4_Satisfaction   | Q4_Satisfaction   | Q04_OverallSat      | Q04_OverallSat
+Q05_NewMetric       | rating       | New Quality Metric (1-5)      | NA                | NA                | Q05_NewMetric       | Q05_NewMetric
+```
+
+**Key Points:**
+- **QuestionCode:** Standardized code used in tracking_config.xlsx
+- **W1, W2, W3, W4:** Actual column names in each wave's data file
+- **NA:** Question not asked in that wave
+
+### Step 3: Create Tracking Configuration
+
+**tracking_config.xlsx - TrackedQuestions:**
+
+```
+QuestionCode        | QuestionText                  | QuestionType
+Q01_BrandAwareness  | Brand Awareness (Unaided)     | proportion
+Q02_Consideration   | Brand Consideration           | proportion
+Q03_Preference      | Brand Preference              | proportion
+Q04_Satisfaction    | Overall Satisfaction (1-5)    | rating
+Q05_NewMetric       | New Quality Metric (1-5)      | rating
+```
+
+**Note:** Use standardized QuestionCode, not wave-specific codes!
+
+### Step 4: Run Analysis with Mapping
+
+```r
+result <- run_tracker(
+  tracking_config_path = "tracking_config.xlsx",
+  question_mapping_path = "question_mapping.xlsx",  # ← Include mapping
+  data_dir = "data/"
+)
+```
+
+### Step 5: Interpret Results
+
+**Results.xlsx - Q01_BrandAwareness Sheet:**
+
+```
+Brand Awareness (Unaided)
+            Wave 1      Wave 2      Trend   Wave 3      Trend   Wave 4      Trend
+            Q1 2024     Q2 2024             Q3 2024             Q4 2024
+Base (n=)   500         500                 500                 500
+
+Brand A %   42%         45%         →       48%         →       52%         ↑
+Brand B %   30%         32%         →       33%         →       34%         →
+Brand C %   18%         16%         →       14%         →       11%         ↓
+
+Source: Wave 1-2 from Q1_BrandAwareness, Wave 3-4 from Q01_Aware_Unaided
+```
+
+**Q05_NewMetric Sheet:**
+
+```
+New Quality Metric (1-5)
+            Wave 1  Wave 2  Wave 3      Trend   Wave 4      Trend
+Base (n=)   —       —       500                 500
+
+Mean Score  —       —       3.8                 4.0         →
+Std Dev     —       —       1.1                 1.0
+
+Note: Question introduced in Wave 3
+```
+
+**Key Benefits of Mapping:**
+1. **Continuous Tracking:** Trends calculated despite code changes
+2. **Historical Comparison:** Can compare across restructure
+3. **Flexibility:** Easy to add/remove questions between waves
+4. **Documentation:** Mapping file documents all changes
+
+---
+
+## Workflow 4: Multi-Banner Demographic Tracking
+
+### Scenario
+
+Track brand metrics across multiple demographic segments:
+- Gender (Male, Female)
+- Age Group (18-34, 35-54, 55+)
+- Region (North, South, East, West)
+
+Identify which segments showing growth/decline.
+
+### Step 1: Ensure Data Includes Banner Variables
+
+**wave1.csv:**
+```
+RespondentID,Gender,Age_Group,Region,Q1_Awareness,Q2_Consideration,Q3_Preference
+1,Male,18-34,North,Brand A,Brand A,Brand A
+2,Female,35-54,South,Brand B,Brand B,Brand B
+3,Male,55+,East,Brand C,Brand C,Brand C
+...
+```
+
+**All waves must include:** Gender, Age_Group, Region columns with consistent values.
+
+### Step 2: Configure Banner Analysis
+
+**tracking_config.xlsx - Banner Sheet:**
+
+```
+BreakVariable | BreakLabel
+Total         | Total
+Gender        | Gender
+Age_Group     | Age Group
+Region        | Region
+```
+
+**Waves Sheet:**
+```
+WaveID | WaveName  | DataFile   | FieldworkStart | FieldworkEnd
+W1     | Wave 1    | wave1.csv  | 2024-01-15     | 2024-01-30
+W2     | Wave 2    | wave2.csv  | 2024-04-15     | 2024-04-30
+W3     | Wave 3    | wave3.csv  | 2024-07-15     | 2024-07-30
+```
+
+**TrackedQuestions:**
+```
+QuestionCode     | QuestionText          | QuestionType
+Q1_Awareness     | Brand Awareness       | proportion
+Q2_Consideration | Brand Consideration   | proportion
+Q3_Preference    | Brand Preference      | proportion
+```
+
+### Step 3: Run with Banner Analysis
+
+```r
+result <- run_tracker(
+  tracking_config_path = "tracking_config.xlsx",
+  question_mapping_path = NA,
+  data_dir = "data/",
+  use_banners = TRUE  # ← Enable banner breakouts
+)
+```
+
+### Step 4: Interpret Banner Results
+
+**Results.xlsx - Q1_Awareness_Gender Sheet:**
+
+```
+Brand Awareness - By Gender
+
+Brand A
+                    Wave 1              Wave 2              Wave 3
+                Male    Female      Male    Female      Male    Female
+Base (n=)       250     250         250     250         250     250
+
+Brand A    %    48%     36%         50%     40%         58%     46%
+Trend                               →       →           ↑       ↑
+
+Brand B    %    28%     32%         30%     34%         31%     35%
+Trend                               →       →           →       →
+```
+
+**Q1_Awareness_Age_Group Sheet:**
+
+```
+Brand Awareness - By Age Group
+
+Brand A
+                Wave 1                      Wave 2                      Wave 3
+            18-34   35-54   55+         18-34   35-54   55+         18-34   35-54   55+
+Base (n=)   180     200     120         180     200     120         180     200     120
+
+Brand A %   52%     40%     32%         55%     42%     34%         62%     48%     38%
+Trend                                   →       →       →           ↑       ↑       →
+```
+
+**Key Insights from Banner Analysis:**
+
+1. **Gender Differences:**
+   - Males consistently higher awareness of Brand A (48% vs 36%)
+   - Both genders showed significant increase in Wave 3
+   - Gap narrowing over time (W1: 12pt gap → W3: 12pt gap maintained)
+
+2. **Age Pattern:**
+   - Younger respondents (18-34) highest awareness (62% in W3)
+   - Significant increases for 18-34 and 35-54 in Wave 3
+   - 55+ segment stable (no significant change)
+
+3. **Strategic Implications:**
+   - Brand A strongest among young males
+   - Growth opportunity with older demographics
+   - Consider targeted campaigns for 55+ segment
+
+---
+
+## Workflow 5: Weighted Tracking Study
+
+### Scenario
+
+Your tracking study data needs weighting to match population demographics. Each wave has different weight distributions due to sampling variations.
+
+### Step 1: Prepare Data with Weights
+
+**wave1.csv:**
+```
+RespondentID,Gender,Age,Q1_Awareness,Q2_Satisfaction,Weight
+1,Male,25,Brand A,5,1.2
+2,Female,45,Brand B,4,0.8
+3,Male,60,Brand C,3,1.5
+...
+```
+
+**Weight Explanation:**
+- Weight > 1.0: Under-represented in sample (upweight)
+- Weight < 1.0: Over-represented in sample (downweight)
+- Average weight ≈ 1.0
+
+### Step 2: Configure Weighting
+
+**tracking_config.xlsx - Waves Sheet:**
+
+```
+WaveID | WaveName | DataFile   | FieldworkStart | FieldworkEnd | WeightVariable
+W1     | Wave 1   | wave1.csv  | 2024-01-15     | 2024-01-30   | Weight
+W2     | Wave 2   | wave2.csv  | 2024-04-15     | 2024-04-30   | Weight
+W3     | Wave 3   | wave3.csv  | 2024-07-15     | 2024-07-30   | Weight
+W4     | Wave 4   | wave4.csv  | 2024-10-15     | 2024-10-30   | Weight
+```
+
+**Key:** Specify WeightVariable = "Weight" (column name in data)
+
+### Step 3: Run Analysis
+
+```r
+result <- run_tracker(
+  tracking_config_path = "tracking_config.xlsx",
+  question_mapping_path = NA
+)
+```
+
+**Tracker automatically:**
+1. Loads weight column from each wave
+2. Applies weights to all calculations (means, proportions)
+3. Calculates Design Effect (DEFF)
+4. Uses effective sample size for significance testing
+
+### Step 4: Understand Weighted Results
+
+**Results.xlsx - Q2_Satisfaction Sheet:**
+
+```
+Overall Satisfaction (1-5 scale)
+
+                Wave 1      Wave 2      Trend   Wave 3      Trend   Wave 4      Trend
+Base (n=)
+  Unweighted    500         500                 500                 500
+  Weighted      500         500                 500                 500
+  Effective     450         455                 448                 452
+  DEFF          1.11        1.10                1.12                1.11
+
+Mean Score      3.8         3.9         →       4.1         ↑       4.2         →
+Std Dev         1.2         1.1                 1.0                 1.0
+```
+
+**Understanding the Bases:**
+
+- **Unweighted:** Actual number of respondents (500)
+- **Weighted:** Sum of weights ≈ sample size (500)
+- **Effective:** Accounts for weight variance (450)
+  - Effective < Weighted due to weighting impact
+  - Used for significance testing
+- **DEFF:** Design Effect = Weighted / Effective ≈ 1.11
+  - DEFF = 1.0: No weighting impact
+  - DEFF = 1.1: Moderate impact (10% reduction in effective n)
+  - DEFF > 1.5: High impact (significant efficiency loss)
+
+**Impact on Significance:**
+
+```
+Without weighting adjustment (wrong):
+  Use n = 500 → overstates significance
+
+With DEFF adjustment (correct):
+  Use n_eff = 450 → appropriate significance
+```
+
+**Wave 2 → Wave 3 trend:**
+- Mean increased 3.9 → 4.1
+- Significant (↑) because increase meaningful relative to effective sample sizes
+- If used unweighted n=500, would be even more significant (but wrong!)
+
+---
+
+## Workflow 6: Adding New Waves to Existing Tracker
+
+### Scenario
+
+You have a tracking study with 3 waves. Wave 4 data just became available. You want to add it to the existing analysis.
+
+### Step 1: Current Setup
+
+**Existing Configuration:**
+
+```
+tracking_config.xlsx - Waves:
+W1 | Q1 2024 | wave1.csv | 2024-01-15
+W2 | Q2 2024 | wave2.csv | 2024-04-15
+W3 | Q3 2024 | wave3.csv | 2024-07-15
+```
+
+**Existing Output:**
+- Previous results file: Brand_Tracking_Q1-Q3_2024.xlsx
+- Shows trends through Q3
+
+### Step 2: Add New Wave
+
+**Update tracking_config.xlsx - Waves Sheet:**
+
+```
+WaveID | WaveName | DataFile   | FieldworkStart | FieldworkEnd
+W1     | Q1 2024  | wave1.csv  | 2024-01-15     | 2024-01-30
+W2     | Q2 2024  | wave2.csv  | 2024-04-15     | 2024-04-30
+W3     | Q3 2024  | wave3.csv  | 2024-07-15     | 2024-07-30
+W4     | Q4 2024  | wave4.csv  | 2024-10-15     | 2024-10-30  ← NEW ROW
+```
+
+**Update Settings if needed:**
+
+```
+SettingName  | SettingValue
+output_file  | Brand_Tracking_Full_Year_2024.xlsx  ← Updated filename
+```
+
+**No other changes needed!**
+- TrackedQuestions sheet unchanged
+- Banner sheet unchanged
+- Question mapping unchanged (if using)
+
+### Step 3: Verify New Wave Data
+
+**Check wave4.csv:**
+
+```r
+# Quick validation before running full analysis
+library(readr)
+
+wave4 <- read.csv("data/wave4.csv")
+
+# Check sample size
+nrow(wave4)  # Should be similar to previous waves (e.g., ~500)
+
+# Check column names match previous waves
+names(wave4)
+
+# Check for required questions
+required_cols <- c("Q1_Awareness", "Q2_Consideration", "Q3_Preference")
+all(required_cols %in% names(wave4))  # Should be TRUE
+```
+
+### Step 4: Re-run Analysis
+
+```r
+source("/path/to/Turas/turas.R")
+turas_load("tracker")
+
+# Run with updated configuration (now includes W4)
+result <- run_tracker(
+  tracking_config_path = "tracking_config.xlsx",
+  question_mapping_path = NA
+)
+```
+
+**Processing Output:**
+
+```
+================================================================================
+TURASTACKER - MVT PHASE 2: TREND CALCULATION & OUTPUT
+================================================================================
+Started: 2024-10-16 10:30:00
+
+[1/6] LOADING CONFIGURATION
+Project: Brand Tracking Study
+Waves: Q1 2024, Q2 2024, Q3 2024, Q4 2024  ← Now includes Q4!
+
+[4/6] LOADING WAVE DATA
+  Loading Wave W1: Q1 2024
+    Loaded 500 records
+  Loading Wave W2: Q2 2024
+    Loaded 500 records
+  Loading Wave W3: Q3 2024
+    Loaded 500 records
+  Loading Wave W4: Q4 2024  ← NEW
+    Loaded 500 records  ← NEW
+
+[7/8] CALCULATING TRENDS
+Processing question: Q1_Awareness
+  ✓ Trend calculated
+...
+
+Analysis complete!
+```
+
+### Step 5: Review Updated Results
+
+**Brand_Tracking_Full_Year_2024.xlsx - Summary:**
+
+```
+                    Q1      Q2      Trend   Q3      Trend   Q4      Trend
+Brand A        %    42%     45%     →       48%     →       52%     ↑      ← NEW
+Brand B        %    30%     32%     →       33%     →       34%     →      ← NEW
+```
+
+**Now shows:**
+- All 4 quarters
+- Trends Q1→Q2, Q2→Q3, Q3→Q4
+- Latest quarter (Q4) highlighted
+
+**Key Benefits:**
+- No data re-entry for old waves
+- Consistent methodology across all waves
+- Easy to add future waves (Q1 2025, Q2 2025, ...)
+
+---
+
+## Workflow 7: Composite Metric Tracking
+
+### Scenario
+
+You want to track a "Brand Health Index" that combines multiple metrics:
+- Brand Health Index = Average of (Awareness + Consideration + Preference)
+
+Track this composite metric alongside individual metrics.
+
+### Step 1: Define Composite in Question Mapping
+
+**question_mapping.xlsx - QuestionMap Sheet:**
+
+```
+QuestionCode        | QuestionType | QuestionText                      | CompositeFormula        | W1    | W2    | W3
+Q1_Awareness        | proportion   | Brand Awareness                   |                         | Q1    | Q1    | Q1
+Q2_Consideration    | proportion   | Brand Consideration               |                         | Q2    | Q2    | Q2
+Q3_Preference       | proportion   | Brand Preference                  |                         | Q3    | Q3    | Q3
+COMP_BrandHealth    | composite    | Brand Health Index (Composite)    | mean(Q1,Q2,Q3)          | —     | —     | —
+```
+
+**CompositeFormula:**
+- `mean(Q1,Q2,Q3)` — Average of three proportion questions
+- Calculated from raw data, not from percentages in output
+
+### Step 2: Configure Composite Tracking
+
+**tracking_config.xlsx - TrackedQuestions:**
+
+```
+QuestionCode        | QuestionText                      | QuestionType
+Q1_Awareness        | Brand Awareness                   | proportion
+Q2_Consideration    | Brand Consideration               | proportion
+Q3_Preference       | Brand Preference                  | proportion
+COMP_BrandHealth    | Brand Health Index                | composite
+```
+
+### Step 3: Run Analysis
+
+```r
+result <- run_tracker(
+  tracking_config_path = "tracking_config.xlsx",
+  question_mapping_path = "question_mapping.xlsx",
+  use_banners = FALSE
+)
+```
+
+### Step 4: Interpret Composite Results
+
+**Results.xlsx - COMP_BrandHealth Sheet:**
+
+```
+Brand Health Index
+Composite of: Brand Awareness + Brand Consideration + Brand Preference
+
+                Wave 1      Wave 2      Trend   Wave 3      Trend
+Base (n=)       500         500                 500
+
+Index Score     38          40          →       44          ↑
+
+Component Trends:
+  Awareness     42%         45%         →       48%         →
+  Consideration 38%         40%         →       43%         →
+  Preference    34%         35%         →       41%         ↑
+
+Interpretation:
+- Overall brand health improved significantly in Wave 3
+- Driven primarily by increase in Preference
+- Awareness and Consideration also positive but stable
+```
+
+**Composite vs Individual Metrics:**
+
+| Metric | Wave 1 | Wave 2 | Wave 3 | Pattern |
+|--------|--------|--------|--------|---------|
+| **Awareness** | 42% | 45% | 48% | Steady increase |
+| **Consideration** | 38% | 40% | 43% | Steady increase |
+| **Preference** | 34% | 35% | 41% | Spike in W3 |
+| **Composite (Avg)** | 38 | 40 | 44 | Accelerating growth |
+
+**Benefits of Composite Metrics:**
+1. **Single Summary Number:** Easy to communicate
+2. **Trend Detection:** May be significant when components aren't
+3. **Balanced View:** Combines multiple dimensions
+4. **Executive Reporting:** Simple KPI for dashboards
+
+---
+
+## Workflow 8: Integration with Turas Tabs
+
+### Scenario
+
+You run Tabs module for cross-tabulation each wave, then want to track specific Tabs metrics over time using Tracker.
+
+**Use Case:**
+- Run detailed crosstabs for each wave (brand × demographics)
+- Extract key metrics from Tabs output
+- Track those metrics across waves
+
+### Step 1: Run Tabs for Each Wave
+
+**Wave 1 Analysis:**
+
+```r
+# Load Turas
+source("/path/to/Turas/turas.R")
+turas_load("tabs")
+
+# Run tabs for Wave 1
+setwd("/path/to/wave1_project")
+tabs_result_w1 <- run_crosstabs(
+  config_file = "Tabs_Config_W1.xlsx",
+  survey_structure_file = "Survey_Structure.xlsx"
+)
+# Output: Wave1_Crosstabs.xlsx
+```
+
+**Repeat for Wave 2, Wave 3, Wave 4:**
+
+```r
+# Wave 2
+setwd("/path/to/wave2_project")
+tabs_result_w2 <- run_crosstabs(...)
+# Output: Wave2_Crosstabs.xlsx
+
+# Wave 3
+setwd("/path/to/wave3_project")
+tabs_result_w3 <- run_crosstabs(...)
+# Output: Wave3_Crosstabs.xlsx
+```
+
+### Step 2: Extract Metrics from Tabs Outputs
+
+**Create data files for Tracker from Tabs results:**
+
+**Method 1: Manual Extraction**
+
+From each Wave's Tabs output, extract key metrics to CSV:
+
+**tracking_data_wave1.csv:**
+```
+Metric,Value
+BrandA_Awareness,42
+BrandB_Awareness,30
+BrandC_Awareness,18
+BrandA_Preference,38
+BrandB_Preference,32
+BrandC_Preference,20
+OverallSatisfaction,3.8
+NPS,15
+```
+
+**tracking_data_wave2.csv, wave3.csv, wave4.csv:** Same structure
+
+**Method 2: Programmatic Extraction (Recommended)**
+
+```r
+# Function to extract metrics from Tabs output
+extract_tabs_metrics <- function(tabs_result, wave_id) {
+
+  # Extract Brand A awareness from Q01 result
+  q01 <- tabs_result$all_results[["Q01_Awareness"]]
+  brand_a_row <- q01$table[q01$table$RowLabel == "Brand A" & q01$table$RowType == "Column %", ]
+  brand_a_awareness <- as.numeric(brand_a_row$Total)
+
+  # Extract other metrics similarly...
+
+  # Create data frame
+  metrics <- data.frame(
+    Metric = c("BrandA_Awareness", "BrandB_Awareness", ...),
+    Value = c(brand_a_awareness, brand_b_awareness, ...)
+  )
+
+  # Write to file
+  write.csv(metrics, paste0("tracking_data_", wave_id, ".csv"), row.names = FALSE)
+
+  return(metrics)
+}
+
+# Extract for all waves
+metrics_w1 <- extract_tabs_metrics(tabs_result_w1, "wave1")
+metrics_w2 <- extract_tabs_metrics(tabs_result_w2, "wave2")
+metrics_w3 <- extract_tabs_metrics(tabs_result_w3, "wave3")
+```
+
+### Step 3: Configure Tracker
+
+**tracking_config.xlsx:**
+
+**Waves:**
+```
+WaveID | WaveName | DataFile                  | FieldworkStart
+W1     | Wave 1   | tracking_data_wave1.csv   | 2024-01-15
+W2     | Wave 2   | tracking_data_wave2.csv   | 2024-04-15
+W3     | Wave 3   | tracking_data_wave3.csv   | 2024-07-15
+```
+
+**TrackedQuestions:**
+```
+QuestionCode         | QuestionText              | QuestionType
+BrandA_Awareness     | Brand A Awareness         | rating
+BrandB_Awareness     | Brand B Awareness         | rating
+BrandA_Preference    | Brand A Preference        | rating
+OverallSatisfaction  | Overall Satisfaction      | rating
+NPS                  | Net Promoter Score        | rating
+```
+
+**Note:** Using "rating" type to track the numeric values extracted from Tabs.
+
+### Step 4: Run Tracker
+
+```r
+turas_load("tracker")
+
+result <- run_tracker(
+  tracking_config_path = "tracking_config.xlsx",
+  question_mapping_path = NA
+)
+```
+
+### Step 5: Unified Reporting
+
+**Now you have:**
+1. **Detailed Tabs outputs** — Wave-by-wave cross-tabulation analysis
+2. **Tracker summary** — Key metrics trended over time
+
+**Tabs Output (Wave 3):**
+- Detailed breakdown: Brand A awareness by Gender, Age, Region
+- Significance testing within wave
+- Full crosstabs with all response options
+
+**Tracker Output:**
+- Brand A awareness trend: W1 (42%) → W2 (45%) → W3 (48%)
+- Trend indicators showing significant increases
+- Comparison across all waves
+
+**Benefits:**
+- **Best of both worlds:** Detail (Tabs) + Trends (Tracker)
+- **Consistent methodology:** Same Survey_Structure used by both
+- **Efficient workflow:** Run Tabs routinely, consolidate with Tracker
+
+---
+
+## Common Patterns and Tips
+
+### Pattern 1: Quarterly Business Reviews
+
+```r
+# Run tracker before each QBR
+result <- run_tracker(
+  tracking_config_path = "QBR_config.xlsx",
+  question_mapping_path = NA
+)
+
+# Email results to stakeholders
+library(blastula)
+email <- compose_email(
+  body = md("# Q4 2024 Tracking Results\n\nPlease find attached the latest tracking analysis.")
+) %>%
+  add_attachment(result)
+
+smtp_send(email, to = "team@company.com", ...)
+```
+
+### Pattern 2: Automated Monthly Tracking
+
+```r
+# Scheduled script (cron job / Task Scheduler)
+library(lubridate)
+
+# Current month
+current_month <- format(Sys.Date(), "%Y-%m")
+
+# Add new wave to config
+# (Assumes wave data file follows naming convention)
+
+result <- run_tracker(
+  tracking_config_path = "monthly_tracking_config.xlsx",
+  question_mapping_path = NA,
+  output_path = paste0("output/Tracking_", current_month, ".xlsx")
+)
+
+# Auto-email results
+```
+
+### Pattern 3: Year-over-Year Comparison
+
+```r
+# Configure waves for YoY comparison
+# Q1 2023, Q2 2023, Q3 2023, Q4 2023
+# Q1 2024, Q2 2024, Q3 2024, Q4 2024
+
+# Trends calculated:
+# Q1 2023 → Q2 2023 → Q3 2023 → Q4 2023 → Q1 2024 → Q2 2024 ...
+
+# Manually compare:
+# Q1 2024 vs Q1 2023
+# Q2 2024 vs Q2 2023
+# etc.
+```
+
+### Pattern 4: Segment Deep-Dive
+
+```r
+# Run overall tracking
+result_overall <- run_tracker(
+  tracking_config_path = "config_overall.xlsx",
+  use_banners = FALSE
+)
+
+# Run banner analysis for key segments
+result_banners <- run_tracker(
+  tracking_config_path = "config_banners.xlsx",
+  use_banners = TRUE
+)
+
+# Compare overall vs segment trends
+```
+
+---
+
+## Troubleshooting Workflows
+
+### Issue: Trends Not Significant Despite Large Changes
+
+**Example:**
+```
+Wave 1: 45%
+Wave 2: 50%  (5 percentage point increase)
+Trend: → (stable, not significant!)
+```
+
+**Cause:** Small sample sizes
+
+**Solution:**
+
+```r
+# Check sample sizes
+# If n < 100 per wave, hard to detect 5pt change
+
+# Options:
+# 1. Increase sample size in future waves
+# 2. Lower confidence level (0.90 instead of 0.95)
+# 3. Accept that change may not be significant
+# 4. Look for trend pattern across multiple waves
+```
+
+### Issue: Missing Data in Some Waves
+
+**Example:**
+```
+Question Q05 exists in Wave 3 and 4, but not Wave 1 and 2
+```
+
+**Solution:**
+
+```r
+# In question_mapping.xlsx:
+QuestionCode | W1  | W2  | W3      | W4
+Q05          | NA  | NA  | Q5_New  | Q5_New
+
+# Tracker will show:
+# Wave 1: — (not available)
+# Wave 2: — (not available)
+# Wave 3: 3.8
+# Wave 4: 4.0 (trend from W3)
+```
+
+### Issue: Different Sample Sizes Across Waves
+
+**Example:**
+```
+Wave 1: n=500
+Wave 2: n=300  (recruitment issues)
+Wave 3: n=500
+```
+
+**This is OK!** Tracker handles different sample sizes correctly in significance testing.
+
+**But consider:**
+- Why did Wave 2 have lower n?
+- Fielding issues?
+- Seasonal variation?
+- May affect power to detect trends in/out of Wave 2
+
+---
+
+## Next Steps
+
+**After mastering these workflows:**
+
+1. **Create Templates** — Save your configurations for reuse
+2. **Automate** — Schedule regular tracking runs
+3. **Integrate** — Combine with Tabs, Parser, other Turas modules
+4. **Customize** — Add custom composite metrics for your business
+5. **Scale** — Apply to multiple tracking studies
+
+**Additional Resources:**
+- USER_MANUAL.md — Complete feature reference
+- TECHNICAL_DOCUMENTATION.md — Developer guide
+- QUICK_START.md — 15-minute introduction
+
+---
+
+**Document Version:** 1.0
+**Last Updated:** 2025-11-18
+
+---
+
+## Testing Walkthrough
+
+# Tracker Enhancements - Testing Walkthrough
+
+This guide walks you through testing the Phase 1 & 2 enhancements to ensure everything works correctly.
+
+## Quick Start - Basic Functionality Test
+
+Run the basic test script to verify core functions load and work:
+
+```bash
+cd /home/user/Turas/modules/tracker
+Rscript test_data/test_enhancements.R
+```
+
+**Expected Output:**
+- ✓ All functions should load successfully
+- ✓ TrackingSpecs validation should pass/fail appropriately
+- ✓ Multi-mention column detection should work
+- ✓ Rating calculations should produce correct percentages
+
+---
+
+## Step-by-Step Testing
+
+### TEST 1: Backward Compatibility (No Breaking Changes)
+
+**Purpose:** Verify existing tracker configs still work without any changes.
+
+**Steps:**
+1. Find an existing tracker configuration (or use a template)
+2. Run tracker WITHOUT adding TrackingSpecs column
+3. Verify output matches previous behavior
+
+**Expected Result:**
+- Rating questions show "Mean" (default behavior)
+- NPS questions show NPS score
+- No errors or warnings about missing TrackingSpecs
+
+**How to verify:**
+```r
+# In R console
+setwd("/home/user/Turas/modules/tracker")
+source("run_tracker.R")
+
+# Load existing config (use your own config file)
+# Should work exactly as before
+```
+
+---
+
+### TEST 2: Enhanced Rating Metrics
+
+**Purpose:** Test new rating question capabilities (top_box, ranges, etc.)
+
+**Setup:**
+1. Open your `question_mapping.xlsx`
+2. Add a new column called `TrackingSpecs` (if not present)
+3. For a rating question, add specs like:
+   - `mean,top2_box` - Shows both mean and top 2 box
+   - `range:9-10` - Shows % rating 9-10
+   - `top_box,bottom_box` - Shows both ends of scale
+
+**Example question_mapping.xlsx:**
+
+| QuestionCode | QuestionText | QuestionType | TrackingSpecs | Wave1 | Wave2 |
+|--------------|--------------|--------------|---------------|-------|-------|
+| Q_SAT | Overall satisfaction (1-10) | Rating | mean,top2_box,range:9-10 | Q10 | Q11 |
+| Q_LIKELY | Likelihood to recommend | Rating | top_box,mean | Q12 | Q13 |
+
+**Expected Output in Excel:**
+- Q_SAT sheet shows 3 rows: Mean, Top 2 Box %, % 9-10
+- Q_LIKELY sheet shows 2 rows: Top Box %, Mean
+- All values calculated correctly across waves
+
+---
+
+### TEST 3: Multi-Mention Questions
+
+**Purpose:** Test multi-select question support with auto-detection.
+
+**Setup:**
+1. Create a multi-mention question with columns like:
+   - Q30_1, Q30_2, Q30_3, Q30_4 (coded as 1/0)
+2. In question_mapping.xlsx:
+
+| QuestionCode | QuestionText | QuestionType | TrackingSpecs | Wave1 | Wave2 |
+|--------------|--------------|---------------|---------------|-------|-------|
+| Q30 | Features used (select all) | Multi_Mention | auto | Q30 | Q30 |
+
+**Expected Behavior:**
+- Tracker auto-detects Q30_1, Q30_2, Q30_3, Q30_4
+- Sorts them numerically (Q30_1, Q30_2, ... Q30_10, Q30_11)
+- Calculates % mentioning each option
+- Shows all options in Excel output
+
+**Advanced TrackingSpecs:**
+```
+auto,any,count_mean
+```
+This shows:
+- % mentioning each option
+- % mentioning at least one option (any)
+- Mean number of options mentioned (count_mean)
+
+**Selective tracking:**
+```
+option:Q30_1,option:Q30_3,any
+```
+Only tracks Q30_1 and Q30_3, plus "any" metric.
+
+---
+
+### TEST 4: Composite Questions with Enhanced Metrics
+
+**Purpose:** Test that composites can use same metrics as ratings.
+
+**Setup:**
+1. Create a composite question with source questions
+2. Add TrackingSpecs for the composite:
+
+| QuestionCode | QuestionText | QuestionType | SourceQuestions | TrackingSpecs | Wave1 | Wave2 |
+|--------------|--------------|--------------|-----------------|---------------|-------|-------|
+| CX_INDEX | Customer Experience Index | Composite | Q10,Q11,Q12 | mean,top2_box,range:9-10 | - | - |
+
+**Expected Output:**
+- Composite calculated as mean of Q10, Q11, Q12
+- Then enhanced metrics applied to composite scores
+- Shows mean, top 2 box %, and % 9-10 of the composite
+
+---
+
+## Validation Checks
+
+The tracker includes enhanced validation. Run tracker and check for:
+
+**✓ Pre-flight Validation Messages:**
+```
+7. Validating TrackingSpecs...
+  Question 'Q_SAT': TrackingSpecs validated (mean,top2_box)
+  2 questions have custom TrackingSpecs
+```
+
+**✗ Error Detection:**
+Try adding an invalid spec to test error handling:
+- Add `TrackingSpecs: range:9-10` to an NPS question
+- Should show error: "range:9-10 is only valid for Rating or Composite questions"
+
+---
+
+## Common Issues & Solutions
+
+### Issue: "No multi-mention columns found"
+**Cause:** Column naming doesn't match pattern or wave code wrong
+**Solution:** Ensure columns are named {WaveCode}_{number} (e.g., Q30_1, Q30_2)
+
+### Issue: "TrackingSpecs column not found"
+**Cause:** Column name misspelled or missing
+**Solution:** Add "TrackingSpecs" column to question_mapping.xlsx (exact spelling, case-sensitive)
+
+### Issue: Top box shows 0%
+**Cause:** Scale detection issue or data coding
+**Solution:** Check that rating values are numeric (not text), verify scale matches expectations
+
+---
+
+## Verification Checklist
+
+Run through this checklist to confirm everything works:
+
+- [ ] Basic test script runs without errors
+- [ ] Existing configs work unchanged (backward compatibility)
+- [ ] Rating question with `mean` shows same as before
+- [ ] Rating question with `top2_box` calculates correctly
+- [ ] Custom range (e.g., `range:9-10`) shows expected %
+- [ ] Multi-mention auto-detection finds all columns
+- [ ] Multi-mention columns sorted numerically
+- [ ] Multi-mention percentages sum correctly
+- [ ] Composite with TrackingSpecs works
+- [ ] Excel output shows all requested metrics
+- [ ] Validation catches invalid TrackingSpecs
+
+---
+
+## Next Steps
+
+Once basic testing passes:
+
+1. **Test with Real Data** - Use actual survey data if available
+2. **Test Edge Cases**:
+   - Questions missing in some waves
+   - Empty/NA responses
+   - Very small sample sizes
+3. **Banner Breakouts** - Test that enhancements work with banner analysis
+4. **Review Documentation** - Update user manual with examples
+
+---
+
+## Getting Help
+
+If you encounter issues:
+
+1. Check validation messages - they're designed to be helpful
+2. Verify column names and data types
+3. Start with simple TrackingSpecs before adding complexity
+4. Compare output to spec document: `TURAS_TRACKER_ENHANCEMENT.md`
+
+## Questions to Answer During Testing
+
+1. **Does backward compatibility work?**
+   - Yes/No: Existing configs run without changes?
+
+2. **Do enhanced ratings work?**
+   - Yes/No: top_box, bottom_box, ranges calculate correctly?
+
+3. **Does multi-mention work?**
+   - Yes/No: Auto-detection finds columns?
+   - Yes/No: Percentages look reasonable?
+
+4. **Are error messages helpful?**
+   - Yes/No: When you make a mistake, does validation help?
+
+---
+
+**Ready to test!** Start with the basic test script, then move to real data testing.
+
+---
+
+## Wave History Walkthrough
+
+# Wave History Report - Quick Walkthrough
+
+**Version:** 1.0
+**Date:** 2025-11-21
+**Estimated Time:** 5 minutes
+
+---
+
+## What is Wave History Format?
+
+Wave History is a compact, executive-friendly report format that shows tracking data with:
+- **One row per question** (or per metric for questions with multiple TrackingSpecs)
+- **One column per wave** for easy time-series viewing
+- **Clean layout** that fits many questions on screen
+
+### Comparison with Detailed Format
+
+**Detailed Format (default):**
+- One sheet per question
+- Shows wave-to-wave changes, significance, confidence intervals
+- Full statistical detail
+- Best for: Analysts, detailed trend analysis
+
+**Wave History Format (new):**
+- One sheet per segment with all questions
+- Shows only metric values across waves
+- Compact, scannable layout
+- Best for: Executives, quick overview, presentations
+
+---
+
+## How to Use
+
+### Step 1: Add report_types Setting
+
+Open your tracking configuration Excel file and go to the **Settings** sheet.
+
+Add one of these settings:
+
+#### Option A: Wave History Only
+```
+SettingName   | SettingValue
+report_types  | wave_history
+```
+
+#### Option B: Both Report Types (Recommended)
+```
+SettingName   | SettingValue
+report_types  | detailed,wave_history
+```
+
+#### Option C: Detailed Only (Default)
+```
+SettingName   | SettingValue
+report_types  | detailed
+```
+
+Or simply omit the setting - defaults to detailed.
+
+---
+
+### Step 2: Run Tracker as Usual
+
+```r
+source("modules/tracker/run_tracker.R")
+
+result <- run_tracker(
+  tracking_config_path = "path/to/config.xlsx",
+  question_mapping_path = "path/to/mapping.xlsx",
+  use_banners = TRUE  # or FALSE
+)
+```
+
+---
+
+### Step 3: Review Output Files
+
+**If you specified wave_history only:**
+```
+YourProject_WaveHistory_20251121.xlsx
+```
+
+**If you specified detailed,wave_history:**
+```
+YourProject_Tracker_20251121.xlsx       (detailed format)
+YourProject_WaveHistory_20251121.xlsx   (wave history format)
+```
+
+---
+
+## Wave History Output Format
+
+### Sheet Structure
+
+**Without Banners:**
+- Single sheet: "Total"
+
+**With Banners:**
+- One sheet per segment: "Total", "Male", "Female", "18-34", etc.
+
+### Column Layout
+
+```
+QuestionCode | Question                    | Type      | W1   | W2   | W3
+Q38          | Overall satisfaction (1-10) | Mean      | 8.2  | 8.4  | 8.6
+Q38          | Overall satisfaction (1-10) | Top 2 Box | 72   | 75   | 78
+Q20          | Brand awareness             | % Yes     | 45   | 48   | 52
+```
+
+---
+
+## How TrackingSpecs Work in Wave History
+
+### Example 1: Rating Question with Multiple Metrics
+
+**Question Mapping:**
+```
+QuestionCode | QuestionType | TrackingSpecs
+Q38          | Rating       | mean,top2_box
+```
+
+**Wave History Output:**
+```
+QuestionCode | Question                    | Type      | W1  | W2  | W3
+Q38          | Overall satisfaction (1-10) | Mean      | 8.2 | 8.4 | 8.6
+Q38          | Overall satisfaction (1-10) | Top 2 Box | 72  | 75  | 78
+```
+
+Two rows: one for mean, one for top 2 box.
+
+---
+
+### Example 2: Multi-Mention Question
+
+**Question Mapping:**
+```
+QuestionCode | QuestionType  | TrackingSpecs
+Q15          | Multi_Mention | auto
+```
+
+**Wave History Output:**
+```
+QuestionCode | Question                    | Type        | W1 | W2 | W3
+Q15          | Features used               | % Feature_1 | 45 | 48 | 50
+Q15          | Features used               | % Feature_2 | 32 | 35 | 38
+Q15          | Features used               | % Feature_3 | 18 | 20 | 22
+```
+
+One row per detected option.
+
+---
+
+### Example 3: Simple Mean Question
+
+**Question Mapping:**
+```
+QuestionCode | QuestionType | TrackingSpecs
+Q07          | Rating       |              (blank - defaults to mean)
+```
+
+**Wave History Output:**
+```
+QuestionCode | Question           | Type | W1  | W2  | W3
+Q07          | Likelihood to... | Mean | 7.2 | 7.4 | 7.6
+```
+
+Single row showing mean.
+
+---
+
+## Use Cases
+
+### Use Case 1: Executive Dashboard
+
+Generate both formats:
+- Share **Wave History** with executives for quick overview
+- Keep **Detailed** for your analysis and reference
+
+### Use Case 2: Presentation Prep
+
+Use Wave History to:
+- Quickly scan for interesting trends
+- Copy data into PowerPoint tables
+- Create simplified trend charts
+
+### Use Case 3: Client Deliverable
+
+Some clients prefer:
+- **Detailed** for full transparency and statistical rigor
+- **Wave History** for executive summary/appendix
+
+Generate both and let client choose.
+
+---
+
+## Testing Your Setup
+
+### Quick Test with Your Data
+
+```r
+setwd("~/Documents/Turas/modules/tracker")
+source("test_wave_history.R")
+```
+
+This will:
+1. Run tracker with your CCPB-CCS data
+2. Test both with and without banners
+3. Display test results
+
+### Manual Verification Checklist
+
+After generating Wave History output, verify:
+
+- [ ] All tracked questions appear
+- [ ] Questions with TrackingSpecs show multiple rows (one per metric)
+- [ ] Wave columns show correct values (match detailed report)
+- [ ] Banner segments each have their own sheet (if use_banners = TRUE)
+- [ ] Column widths are readable
+- [ ] Numeric formatting respects decimal_places setting
+
+---
+
+## Troubleshooting
+
+### Issue: Only getting detailed report, not wave history
+
+**Solution:** Check Settings sheet has `report_types` setting with value including "wave_history"
+
+---
+
+### Issue: Wave history shows wrong metric for proportion questions
+
+**Solution:** For proportion questions, wave history uses first response code by default. If you want a specific code, add TrackingSpecs to specify it (future enhancement).
+
+---
+
+### Issue: Multi-mention questions missing from wave history
+
+**Solution:** Ensure QuestionType is "Multi_Mention" and columns match pattern `{QuestionCode}_{number}` (e.g., Q15_1, Q15_2)
+
+---
+
+## Next Steps
+
+1. **Try it out** - Add `report_types` setting and run tracker
+2. **Compare formats** - Review both detailed and wave history outputs
+3. **Share feedback** - Which format do different stakeholders prefer?
+4. **Customize** - Add more TrackingSpecs to get the exact metrics you need
+
+---
+
+## Advanced: Configuration Examples
+
+### Example: Full Setup with Both Formats
+
+**Settings sheet:**
+```
+SettingName              | SettingValue
+project_name             | Q4 2024 Brand Tracking
+report_types             | detailed,wave_history
+output_dir               | /path/to/output
+decimal_places_ratings   | 1
+decimal_separator        | .
+```
+
+**Question Mapping (excerpt):**
+```
+QuestionCode | QuestionType | TrackingSpecs   | Wave1 | Wave2 | Wave3
+Q38          | Rating       | mean,top2_box   | Q38   | Q38   | Q38
+Q20          | Single       |                 | Q20   | Q20A  | Q20B
+Comp_Sat     | Composite    | mean            | -     | -     | -
+```
+
+**Output:**
+- Detailed report with full analysis
+- Wave History with mean + top2_box for Q38, standard metrics for others
+- Both use decimal separator "." and 1 decimal place
+
+---
+
+**Questions?** Check USER_MANUAL.md Section 5 for full TrackingSpecs documentation.
+
+*Version 1.0 | Wave History Walkthrough | Turas Tracker Module | Last Updated: 2025-11-21*
+
+---
+
+## README Templates
+
+# TurasTracker - Template Files
+
+This directory contains production-ready template files to help you set up TurasTracker for your project.
+
+## Template Files
+
+### 1. tracking_config_template.xlsx
+**Purpose**: Main configuration file defining waves, settings, banner breakouts, and tracked questions.
+
+**Contents**:
+- **Waves sheet**: Define your survey waves (3 example waves included)
+  - WaveID, WaveName, DataFile, FieldworkStart, FieldworkEnd, WeightVar
+- **Settings sheet**: Configure analysis parameters (8 recommended settings)
+  - Project name, decimal places, significance testing, minimum base size
+- **Banner sheet**: Define demographic breakouts (4 example breakouts)
+  - Total, Gender, Age, Region
+- **TrackedQuestions sheet**: List questions to track (6 example questions)
+  - Including a composite score example
+
+### 2. question_mapping_template.xlsx
+**Purpose**: Map questions across waves and define question properties.
+
+**Contents**:
+- **QuestionMap sheet**: Define question mappings (8 example questions)
+  - QuestionCode: Your standardized identifier (e.g., Q_SAT)
+  - QuestionText: Question wording
+  - QuestionType: Rating, NPS, SingleChoice, Composite, etc.
+  - Wave1, Wave2, Wave3: Wave-specific question codes from your data
+  - SourceQuestions: For composites, list source questions (comma-separated)
+
+**Example mapping**:
+```
+QuestionCode: Q_SAT
+QuestionText: Overall satisfaction with our service
+QuestionType: Rating
+Wave1: Q10
+Wave2: Q11
+Wave3: Q12
+```
+
+This tells TurasTracker that "Q_SAT" is asked as "Q10" in Wave 1, "Q11" in Wave 2, and "Q12" in Wave 3.
+
+### 3. wave_data_template.csv
+**Purpose**: Example data file showing required structure for wave data.
+
+**Contents**:
+- 100 sample respondents with synthetic data
+- Banner variables: Gender, AgeGroup, Region
+- Question variables: Q10-Q13, Q15a-Q15b, Q20
+- Weight variable: weight
+
+**Key Points**:
+- Column names must match those in question_mapping.xlsx Wave columns
+- Banner variables must match BreakVariable names in tracking_config.xlsx Banner sheet
+- Weight variable must match WeightVar in tracking_config.xlsx Waves sheet
+- Missing values should be coded as NA or blank
+
+## How to Use These Templates
+
+### Step 1: Copy Templates to Your Project
+```bash
+cp tracking_config_template.xlsx my_project/tracking_config.xlsx
+cp question_mapping_template.xlsx my_project/question_mapping.xlsx
+cp wave_data_template.csv my_project/wave1_data.csv
+```
+
+### Step 2: Customize tracking_config.xlsx
+
+**Waves sheet**:
+1. Update WaveID, WaveName to match your project
+2. Set DataFile paths to your actual data files
+3. Enter FieldworkStart and FieldworkEnd dates
+4. Set WeightVar to your weight column name
+
+**Settings sheet**:
+1. Update project_name
+2. Adjust decimal places if needed
+3. Set show_significance (TRUE/FALSE)
+4. Set minimum_base (typically 30)
+
+**Banner sheet**:
+1. List demographic variables you want to break out
+2. BreakVariable must match column names in your data files
+3. Keep "Total" as first row
+
+**TrackedQuestions sheet**:
+1. List all QuestionCodes you want to track
+2. Must match QuestionCode in question_mapping.xlsx
+
+### Step 3: Customize question_mapping.xlsx
+
+**QuestionMap sheet**:
+1. For each question you want to track:
+   - Create a QuestionCode (standardized identifier)
+   - Enter QuestionText (appears in output)
+   - Set QuestionType (Rating, NPS, SingleChoice, Composite, etc.)
+   - Fill Wave1, Wave2, ... columns with wave-specific variable names
+   - Leave Wave columns blank (NA) if question not asked in that wave
+
+2. For composite questions:
+   - Set QuestionType = "Composite"
+   - Leave all Wave columns as NA (composites are calculated)
+   - Fill SourceQuestions with comma-separated question codes
+   - Example: "Q_SAT,Q_VALUE,Q_QUALITY"
+
+### Step 4: Prepare Your Data Files
+
+**Required columns**:
+- All question variables listed in question_mapping.xlsx
+- All banner variables listed in tracking_config.xlsx Banner sheet
+- Weight variable (column name must match WeightVar)
+
+**Data format**:
+- CSV or Excel (.csv, .xlsx, .xls)
+- One row per respondent
+- Column headers in first row
+- Missing values as NA or blank
+
+**Example**:
+```csv
+ResponseID,Gender,AgeGroup,Q10,Q11,Q20,weight
+1,Male,35-54,8,9,9,1.0
+2,Female,18-34,7,8,8,1.2
+3,Male,55+,9,10,10,0.9
+```
+
+### Step 5: Run TurasTracker
+
+**R code**:
+```r
+# Load TurasTracker
+source("run_tracker.R")
+
+# Phase 2: Simple trends (Total only)
+result <- run_tracker(
+  tracking_config_path = "my_project/tracking_config.xlsx",
+  question_mapping_path = "my_project/question_mapping.xlsx",
+  data_dir = "my_project/",
+  output_path = "output/trends_simple.xlsx",
+  use_banners = FALSE
+)
+
+# Phase 3: Banner breakouts
+result <- run_tracker(
+  tracking_config_path = "my_project/tracking_config.xlsx",
+  question_mapping_path = "my_project/question_mapping.xlsx",
+  data_dir = "my_project/",
+  output_path = "output/trends_banners.xlsx",
+  use_banners = TRUE
+)
+```
+
+## Template Features
+
+### Included Question Types
+- **Rating**: Satisfaction scales (1-10, 1-5, etc.)
+- **NPS**: Net Promoter Score (0-10 scale, calculates Promoters/Detractors/Net)
+- **Composite**: Derived metrics combining multiple questions
+
+### Included Banner Breakouts
+- **Total**: All respondents (always included)
+- **Gender**: Male, Female, Other
+- **AgeGroup**: 18-34, 35-54, 55+
+- **Region**: North, South, East, West
+
+### Calculated Metrics
+- **Rating questions**: Mean, Std Dev, Base Size
+- **NPS questions**: % Promoters, % Detractors, Net Score, Base Size
+- **Composite questions**: Mean (of source questions), Std Dev, Base Size
+- **Change metrics**: Absolute change, % change
+- **Significance testing**: T-tests for means, Z-tests for proportions
+
+## Example Composite Score
+
+The templates include an example composite score:
+
+**COMP_OVERALL = mean(Q_SAT, Q_VALUE, Q_QUALITY)**
+
+This demonstrates how to create derived metrics. Each respondent's composite score is calculated as the mean of their responses to Q_SAT, Q_VALUE, and Q_QUALITY.
+
+**In question_mapping.xlsx**:
+```
+QuestionCode: COMP_OVERALL
+QuestionText: Overall Score (Composite)
+QuestionType: Composite
+Wave1: NA
+Wave2: NA
+Wave3: NA
+SourceQuestions: Q_SAT,Q_VALUE,Q_QUALITY
+```
+
+## Validation
+
+TurasTracker performs comprehensive validation before analysis:
+
+1. **Configuration validation**: Required sheets and columns
+2. **Wave validation**: Minimum 2 waves, valid dates
+3. **Mapping validation**: No duplicate codes, valid question types
+4. **Data validation**: All waves loaded, weights valid
+5. **Question validation**: Tracked questions exist in data
+6. **Banner validation**: Banner variables exist in data
+
+If validation fails, TurasTracker will report specific errors to fix.
+
+## Documentation
+
+For complete documentation, see:
+
+- **TurasTracker_User_Manual.md**: Comprehensive user guide with examples
+- **TurasTracker_Maintenance_Guide.md**: Developer/maintenance documentation
+
+Both files located in: `/Users/duncan/Documents/Turas/docs/`
+
+## Support
+
+For questions or issues:
+1. Check TurasTracker_User_Manual.md for examples and troubleshooting
+2. Review template files for proper structure
+3. Verify your data files match the wave_data_template.csv structure
+4. Check validation messages for specific errors
+
+## Quick Start Checklist
+
+- [ ] Copy templates to your project directory
+- [ ] Rename files (remove '_template' suffix)
+- [ ] Update tracking_config.xlsx Waves sheet with your waves
+- [ ] Update tracking_config.xlsx TrackedQuestions sheet with your questions
+- [ ] Update question_mapping.xlsx with your question mappings
+- [ ] Prepare wave data files matching the template structure
+- [ ] Run validation: Check error messages
+- [ ] Run analysis: `run_tracker(...)`
+- [ ] Review output Excel file
+
+---
+
+**Last Updated**: 2025-11-07
+**TurasTracker Version**: 1.0 (Phase 3 Complete)
