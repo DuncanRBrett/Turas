@@ -258,7 +258,7 @@ process_single_question <- function(question_code, prepared_data,
     question_table <- if (length(question_results) > 0) {
       batch_rbind(question_results)
     } else {
-      data.frame()
+      data.frame(stringsAsFactors = FALSE)
     }
 
   } else if (question_info$Variable_Type == "Numeric") {
@@ -280,7 +280,7 @@ process_single_question <- function(question_code, prepared_data,
     question_table <- if (!is.null(individual_results)) {
       individual_results
     } else {
-      data.frame()
+      data.frame(stringsAsFactors = FALSE)
     }
 
   } else {
@@ -360,7 +360,7 @@ process_single_question <- function(question_code, prepared_data,
     })
 
     # Combine all results
-    question_table <- data.frame()
+    question_table <- data.frame(stringsAsFactors = FALSE)
     if (!is.null(individual_results) && nrow(individual_results) > 0) {
       question_table <- rbind(question_table, individual_results)
     }
