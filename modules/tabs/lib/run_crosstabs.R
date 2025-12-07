@@ -362,17 +362,27 @@ if (is_weighted) {
 
 log_message("Loading question selection...", "INFO")
 selection_df <- tryCatch({
-  readxl::read_excel(config_file, sheet = "Selection")
+  readxl::read_excel(config_file, sheet = "Selection", col_types = "text")
 }, error = function(e) {
   stop(sprintf("Failed to load Selection sheet: %s", conditionMessage(e)))
 })
 
 validate_data_frame(selection_df, c("QuestionCode"), 1)
 
-selection_df$Include <- ifelse(is.na(selection_df$Include), "N", selection_df$Include)
-selection_df$UseBanner <- ifelse(is.na(selection_df$UseBanner), "N", selection_df$UseBanner)
-selection_df$BannerBoxCategory <- ifelse(is.na(selection_df$BannerBoxCategory), "N", selection_df$BannerBoxCategory)
-selection_df$CreateIndex <- ifelse(is.na(selection_df$CreateIndex), "N", selection_df$CreateIndex)
+# Ensure optional columns exist and are character type before assignment
+for (col in c("Include", "UseBanner", "BannerBoxCategory", "CreateIndex", "BaseFilter")) {
+  if (!col %in% names(selection_df)) {
+    selection_df[[col]] <- NA_character_
+  } else {
+    selection_df[[col]] <- as.character(selection_df[[col]])
+  }
+}
+
+# Apply defaults
+selection_df$Include[is.na(selection_df$Include)] <- "N"
+selection_df$UseBanner[is.na(selection_df$UseBanner)] <- "N"
+selection_df$BannerBoxCategory[is.na(selection_df$BannerBoxCategory)] <- "N"
+selection_df$CreateIndex[is.na(selection_df$CreateIndex)] <- "N"
 
 crosstab_questions <- selection_df[selection_df$Include == "Y", ]
 
