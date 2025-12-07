@@ -2,6 +2,120 @@
 
 Comprehensive guide to using AlchemerParser for converting Alchemer survey files into Tabs-ready configuration.
 
+---
+
+## Quick Start (10 Minutes)
+
+Get your first Alchemer survey parsed and ready for Tabs in under 10 minutes.
+
+### Prerequisites
+
+Ensure you have R installed with the following packages:
+
+```r
+install.packages(c("readxl", "openxlsx", "officer", "shiny", "shinyFiles", "fs"))
+```
+
+### Step 1: Export Files from Alchemer (5 minutes)
+
+You need to export three files from your Alchemer survey:
+
+#### 1. Questionnaire Document
+
+- Go to Survey → Build
+- Click **Export** → **Print to Word**
+- Save as: `{ProjectName}_questionnaire.docx`
+
+#### 2. Data Export Map
+
+- Go to Survey → Results → Data Exports
+- Create new export with **Question Numbers** format
+- Download the export mapping
+- Save as: `{ProjectName}_data_export_map.xlsx`
+
+Note this needs 2 rows Row1 = data export with Question number Row2 = data export with Question ID
+
+This can be selected in setting in Alchemer export.
+
+#### 3. Translation Export
+
+- Go to Survey → Build → Translations
+- Export **Default Language**
+- Save as: `{ProjectName}_translation-export.xlsx`
+- delete all rows below the thank you -
+
+**Important:** All three files must use the same project name prefix.
+
+### Step 2: Launch AlchemerParser GUI (1 minute)
+
+**Option A: From Turas Launcher**
+
+```r
+setwd("/path/to/Turas")
+source("launch_turas.R")
+# Click "Launch AlchemerParser" in the GUI
+```
+
+**Option B: Direct Launch**
+
+```r
+setwd("/path/to/Turas")
+source("modules/AlchemerParser/run_alchemerparser_gui.R")
+# GUI will launch automatically
+```
+
+### Step 3: Select Project Directory (1 minute)
+
+1. In the GUI, either:
+   - Click **"Browse..."** to graphically navigate to your project folder, OR
+   - Type the full path in the text box, OR
+   - Select from recent projects dropdown (shows project names like "HV2025 (W2025/01_Setup)")
+2. The parser will automatically detect the project name and validate files
+3. You should see: **"✓ All required files found"**
+
+### Step 4: Parse Files (1 minute)
+
+1. Optionally adjust the **Project Name** or **Output Directory**
+2. Click **"Parse Files"**
+3. Wait for completion (typically 10-30 seconds)
+
+The parser will:
+- Detect question types (NPS, Likert, Rating, Single/Multi-Mention, etc.)
+- Generate question codes (Q01, Q02a, Q04_1, etc.)
+- Handle grid questions automatically
+- Flag any ambiguous questions for review
+
+### Step 5: Review Results (1 minute)
+
+After parsing completes, review:
+
+- **Question Preview Table**: Shows all detected questions with codes and types
+- **Validation Flags**: Any items needing manual review
+- **Summary**: Question type distribution
+
+### Step 6: Download Outputs (1 minute)
+
+Three files are automatically saved to your output directory:
+
+1. **{ProjectName}_Crosstab_Config.xlsx** - For Tabs banner/crosstab setup
+2. **{ProjectName}_Survey_Structure.xlsx** - For Tabs question/option mapping
+3. **{ProjectName}_Data_Headers.xlsx** - Column headers for your data file
+
+Click the download buttons to get copies, or find them in your output directory.
+
+### Next Steps
+
+You're now ready to use these files with the Tabs module!
+
+1. Rename your data file columns using the `Data_Headers.xlsx` file
+2. Load the config files into Tabs
+3. Copy the data headers row into your data file and make sure the number of columns match
+4. There may be errors so double check
+5. Set up the rest of you config and survey structure
+6. Run your cross-tabulation analysis
+
+---
+
 ## Table of Contents
 
 1. [Overview](#overview)
@@ -14,6 +128,7 @@ Comprehensive guide to using AlchemerParser for converting Alchemer survey files
 8. [Handling Special Cases](#handling-special-cases)
 9. [Validation Flags](#validation-flags)
 10. [Troubleshooting](#troubleshooting)
+11. [Example Workflows](#example-workflows)
 
 ---
 
@@ -610,10 +725,327 @@ The parser flags issues that may need manual review.
 
 ---
 
+## Example Workflows
+
+Real-world examples showing how to use AlchemerParser in different scenarios.
+
+### Example 1: Basic Customer Satisfaction Survey
+
+#### Scenario
+
+You have a simple customer satisfaction survey with:
+- 15 questions
+- Mix of demographics, satisfaction ratings, and NPS
+- No grids or complex structures
+
+#### Input Files
+
+```
+CustomerSat2025_questionnaire.docx
+CustomerSat2025_data_export_map.xlsx
+CustomerSat2025_translation-export.xlsx
+```
+
+#### Using the GUI
+
+1. Launch AlchemerParser from Turas launcher
+2. Enter project directory: `/data/surveys/CustomerSat2025/`
+3. Click "Parse Files"
+4. Review results:
+   - 15 questions detected
+   - 2 NPS questions
+   - 5 Rating questions
+   - 8 Single_Response questions
+   - 0 validation flags
+5. Download all 3 output files
+6. Proceed to Tabs module
+
+**Time:** ~5 minutes
+
+#### Using CLI
+
+```r
+setwd("/path/to/Turas")
+source("modules/AlchemerParser/run_alchemerparser.R")
+
+result <- run_alchemerparser(
+  project_dir = "/data/surveys/CustomerSat2025/",
+  verbose = TRUE
+)
+
+# Check results
+cat(sprintf("Processed %d questions\n", result$summary$n_questions))
+cat(sprintf("Validation flags: %d\n", result$summary$n_flags))
+
+# Type distribution
+print(result$summary$type_distribution)
+#   NPS          Rating   Single_Response
+#   2            5        8
+```
+
+### Example 2: Complex Grid Survey
+
+#### Scenario
+
+Employee engagement survey with multiple grid questions:
+- Radio button grid: Rate departments (HR, IT, Finance) on multiple attributes
+- Checkbox grid: Which benefits do you use? (Health, Dental, Vision) × (Self, Spouse, Children)
+- Star rating grid: Rate your managers (5-point scale)
+
+#### Challenge
+
+Grid questions can be tricky to parse. AlchemerParser automatically detects and pivots them.
+
+#### Using CLI with Detailed Review
+
+```r
+source("modules/AlchemerParser/run_alchemerparser.R")
+
+result <- run_alchemerparser(
+  project_dir = "/data/surveys/EmployeeEngagement/",
+  verbose = TRUE
+)
+
+# Examine grid questions
+for (q_num in names(result$questions)) {
+  q <- result$questions[[q_num]]
+
+  if (q$is_grid) {
+    cat(sprintf("\nQ%s is a %s with %d sub-questions:\n",
+                q_num, q$grid_type, length(q$sub_questions)))
+
+    for (suffix in names(q$sub_questions)) {
+      sub_q <- q$sub_questions[[suffix]]
+      cat(sprintf("  - %s: %s (%s)\n",
+                  sub_q$q_code,
+                  substr(sub_q$question_text, 1, 40),
+                  sub_q$variable_type))
+    }
+  }
+}
+
+# Output:
+# Q05 is a radio_grid with 3 sub-questions:
+#   - Q05a: HR Department (Single_Response)
+#   - Q05b: IT Department (Single_Response)
+#   - Q05c: Finance Department (Single_Response)
+```
+
+### Example 3: Batch Processing Multiple Surveys
+
+#### Scenario
+
+You have 12 monthly customer surveys to process at once.
+
+#### Batch Processing Script
+
+```r
+source("modules/AlchemerParser/run_alchemerparser.R")
+
+# Define all survey folders
+months <- c("Jan2025", "Feb2025", "Mar2025", "Apr2025", "May2025", "Jun2025",
+            "Jul2025", "Aug2025", "Sep2025", "Oct2025", "Nov2025", "Dec2025")
+
+base_dir <- "/data/monthly_surveys"
+output_dir <- "/data/outputs/parsed_configs"
+
+# Create output directory
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir, recursive = TRUE)
+}
+
+# Process each survey
+results_log <- list()
+
+for (month in months) {
+  cat(sprintf("\n=== Processing %s ===\n", month))
+
+  project_dir <- file.path(base_dir, month)
+  month_output_dir <- file.path(output_dir, month)
+
+  # Create month-specific output directory
+  if (!dir.exists(month_output_dir)) {
+    dir.create(month_output_dir)
+  }
+
+  # Run parser
+  result <- tryCatch({
+    run_alchemerparser(
+      project_dir = project_dir,
+      output_dir = month_output_dir,
+      verbose = FALSE
+    )
+  }, error = function(e) {
+    cat(sprintf("ERROR: %s\n", e$message))
+    return(NULL)
+  })
+
+  if (!is.null(result)) {
+    # Log results
+    results_log[[month]] <- list(
+      n_questions = result$summary$n_questions,
+      n_columns = result$summary$n_columns,
+      n_flags = result$summary$n_flags,
+      types = result$summary$type_distribution
+    )
+
+    cat(sprintf("  ✓ Success: %d questions, %d flags\n",
+                result$summary$n_questions,
+                result$summary$n_flags))
+  } else {
+    results_log[[month]] <- list(error = TRUE)
+    cat("  ✗ Failed\n")
+  }
+}
+
+# Save detailed log
+saveRDS(results_log, file.path(output_dir, "processing_log.rds"))
+```
+
+### Example 4: Handling Validation Flags
+
+#### Scenario
+
+Survey parsing completes with 3 validation flags. Need to review and resolve.
+
+#### Workflow
+
+```r
+result <- run_alchemerparser(
+  project_dir = "/data/surveys/ProductFeedback/",
+  verbose = TRUE
+)
+
+# Examine flags in detail
+for (i in seq_along(result$validation_flags)) {
+  flag <- result$validation_flags[[i]]
+
+  cat(sprintf("\n[Flag %d] %s - %s\n", i, flag$severity, flag$issue))
+  cat(sprintf("  Question: %s\n", flag$q_code))
+  cat(sprintf("  Details: %s\n", flag$details))
+}
+
+# Output:
+# [Flag 1] WARNING - Q_ID_NOT_FOUND_IN_TRANSLATION
+#   Question: Q08
+#   Details: Q ID 15 not found in translation export
+#
+# [Flag 2] REVIEW - TEXT_MISMATCH
+#   Question: Q12
+#   Details: Word: 'How satisfied are you...' | Data: 'Please rate your satisfaction...'
+#
+# [Flag 3] REVIEW - AMBIGUOUS_MULTI_COLUMN
+#   Question: Q14
+#   Details: Classified as Multi_Mention but no Word doc confirmation
+```
+
+**Resolving Flags:**
+
+**Flag 1: Q_ID_NOT_FOUND_IN_TRANSLATION** - Since question text is already populated from data export map, no action needed unless you want exact translation wording.
+
+**Flag 2: TEXT_MISMATCH** - Open both files and compare actual text. If needed, manually edit `QuestionText` in Survey_Structure.xlsx.
+
+**Flag 3: AMBIGUOUS_MULTI_COLUMN** - Check original Alchemer survey. If it's actually ranking, manually update `Variable_Type` in Survey_Structure.xlsx.
+
+### Example 5: Real-World Testing - Helderberg Village HV2025
+
+#### Background
+
+This example demonstrates actual issues encountered during real-world testing with a resident satisfaction survey.
+
+#### Issues Encountered and Solutions
+
+**Issue 1: Open-Ended Question Misclassified**
+
+**Problem:** Q03 (an open-ended question) was being classified as Single_Response instead of Open_End.
+
+**Solution:** Updated classification hierarchy to check `if (n_options > 0)` before returning Single_Response. Questions with zero options now correctly default to Open_End.
+
+**Issue 2: Radio Grid Options Missing**
+
+**Problem:** Q06 sub-questions were showing 0 options in the Options sheet.
+
+**Solution:** Implemented smart search strategy in `find_grid_options()`:
+1. First try expected location
+2. Try base question ID
+3. Search nearby IDs (±2 to +10 range)
+4. Fall back to common rating scale options if available
+
+**Issue 3: Numeric Rating Scales Misclassified**
+
+**Problem:** Q60 and Q65 (0-10 rating scales) were being classified as Single_Response instead of Rating.
+
+**Solution:** Added numeric rating scale detection - check if ≥50% of options are numeric, classify as Rating if threshold met.
+
+### Example 6: Real-World Testing - CCPB CSAT2025
+
+#### Background
+
+Customer satisfaction survey highlighting ranking question detection challenges.
+
+#### Issues Encountered and Solutions
+
+**Issue 1: Ranking Question Detected as Grid**
+
+**Problem:** Q119 (a ranking question with 4 columns) was being detected as a radio_grid and split into Q119a, Q119b, Q119c, Q119d.
+
+**Question Text:** "This is a ranking question - please rank the following 4 items from most important to least important."
+
+**Solution:** Moved ranking detection BEFORE grid type detection in classification hierarchy.
+
+**Result:**
+```r
+# Before fix:
+Q119a | Variable_Type: Single_Response | Options: 4
+Q119b | Variable_Type: Single_Response | Options: 4
+
+# After fix:
+Q119 | Variable_Type: Ranking | Columns: 4 | Options: 4
+```
+
+---
+
+## Tips for Real-World Usage
+
+### 1. Test on a Subset First
+
+Before parsing a 200-question survey, test on a smaller subset:
+- Export just the first 10-20 questions
+- Verify parsing works correctly
+- Check question type detection
+- Then process the full survey
+
+### 2. Keep Originals
+
+Always keep your original Alchemer exports:
+```
+/project/
+├── originals/          # Never modify these
+│   ├── questionnaire.docx
+│   ├── data_export_map.xlsx
+│   └── translation-export.xlsx
+├── parsed_outputs/     # Generated by AlchemerParser
+└── final_configs/      # Manually edited versions
+```
+
+### 3. Version Control for Configs
+
+If you manually edit parsed outputs:
+```
+BrandTracker_Survey_Structure_v1.xlsx  # Initial parse
+BrandTracker_Survey_Structure_v2.xlsx  # After fixing flags
+BrandTracker_Survey_Structure_v3.xlsx  # After client review
+```
+
+### 4. Document Custom Changes
+
+If you customize outputs programmatically, save the R script with comments explaining your custom processing.
+
+---
+
 ## Getting Help
 
-- **Technical Docs:** See `TECHNICAL_DOCUMENTATION.md` for code architecture and detailed parsing logic
-- **Examples:** See `EXAMPLE_WORKFLOWS.md` for real-world scenarios
+- **Technical Docs:** See `TECHNICAL_DOCS.md` for code architecture and detailed parsing logic
 
 ---
 
