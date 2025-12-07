@@ -80,7 +80,7 @@ source("modules/AlchemerParser/run_alchemerparser_gui.R")
 3. Wait for completion (typically 10-30 seconds)
 
 The parser will:
-- Detect question types (NPS, Likert, Rating, Single/Multi-Mention, etc.)
+- Detect question types (NPS, Likert, Rating, Single_Response and Multi_Mention, etc.)
 - Generate question codes (Q01, Q02a, Q04_1, etc.)
 - Handle grid questions automatically
 - Flag any ambiguous questions for review
@@ -137,7 +137,7 @@ You're now ready to use these files with the Tabs module!
 AlchemerParser automates the tedious process of setting up Tabs configuration files from Alchemer surveys. It:
 
 - **Parses** three export files from Alchemer
-- **Detects** question types automatically (NPS, Likert, Rating, Single/Multi-Mention, etc.)
+- **Detects** question types automatically (NPS, Likert, Rating, Single_Response and Multi_Mention, etc.)
 - **Generates** standardized question codes
 - **Handles** complex grid questions
 - **Creates** three output files ready for Tabs module

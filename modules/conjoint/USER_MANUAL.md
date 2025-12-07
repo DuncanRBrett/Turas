@@ -6,23 +6,6 @@
 
 ---
 
-## Table of Contents
-
-
----
-
-1. [Overview](#overview)
-2. [Installation](#installation)
-3. [Quick Start Example](#quick-start-example)
-4. [Configuration File Format](#configuration-file-format)
-5. [Data File Format](#data-file-format)
-6. [Running an Analysis](#running-an-analysis)
-7. [Understanding the Output](#understanding-the-output)
-8. [Advanced Features](#advanced-features)
-9. [Troubleshooting](#troubleshooting)
-
----
-
 ## Overview
 
 The Enhanced Turas Conjoint Analysis module calculates part-worth utilities and attribute importance from choice-based or rating-based conjoint experimental data.
@@ -602,54 +585,6 @@ cat("Excel output:", results$config$output_file, "\n")
 3. **Don't use too many attributes** - 4-6 is optimal, >8 gets problematic
 4. **Don't skip validation** - Always review the Data Summary sheet
 5. **Don't compare utilities across attributes** - Use importance instead
-
----
-
-## Next Steps
-
-### After Your First Analysis
-
-1. **Review the Excel output** - All 6 sheets provide valuable insights
-2. **Check model diagnostics** - Ensure acceptable fit quality
-3. **Examine confidence intervals** - Wide CIs may indicate estimation issues
-4. **Validate against expectations** - Do results make intuitive sense?
-
-### Enhancing Your Analysis
-
-1. **Add market simulator** (Phase 3 feature - coming soon)
-2. **Try different estimation methods** - Compare mlogit vs clogit
-3. **Analyze subgroups** - Split data by demographics, run separate analyses
-4. **Bootstrap confidence intervals** - For more robust estimates
-
-### Learning More
-
-See the complete specification documents in `modules/conjoint/`:
-- **Part 1**: Core technical specification
-- **Part 2**: Configuration, testing, validation
-- **Part 3**: Excel output and market simulator
-- **Part 4**: Alchemer choice types
-- **Part 5**: File format structures
-
----
-
-## Version History
-
-- **2.0.0** (2025-11-27): Enhanced implementation with multi-method estimation
-- **1.0.0** (2024-XX-XX): Initial basic implementation
-
----
-
-## Support
-
-For questions, issues, or feature requests:
-1. Check the specification documents
-2. Review this guide
-3. Examine the example files
-4. Contact the Turas development team
-
----
-
-**Ready to analyze your conjoint data? Start with the example files and adapt them to your study!**
 
 ---
 

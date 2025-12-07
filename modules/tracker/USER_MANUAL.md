@@ -184,7 +184,7 @@ Q4_Satisfaction | Rating    | mean,top2_box   | Q4    | Q4    | Q4
 - `top3_box` - % giving top 3 ratings
 - `range:X-Y` - % within custom range (e.g., range:9-10)
 
-**For Multi-Mention Questions:**
+**For Multi_Mention Questions:**
 - `auto` - Auto-detect and track all options
 - `option:COL` - Track specific option
 - `any` - % selecting at least one
@@ -1034,11 +1034,11 @@ For a 1-5 scale, this tracks % rating 4 or 5 (satisfied/very satisfied).
 
 ---
 
-### Multi-Mention Question Support
+### Multi_Mention Question Support
 
 Multi-mention questions (also called "select all that apply" or checkbox questions) are now automatically detected and tracked.
 
-#### What Are Multi-Mention Questions?
+#### What Are Multi_Mention Questions?
 
 **Example:** "What features are important to you? (Select all that apply)"
 - Feature A: Price
@@ -1106,7 +1106,7 @@ Q30          | Multi_Mention | auto,any
 
 Adds an "Any" row showing % who selected at least one option.
 
-#### Advanced Multi-Mention Metrics
+#### Advanced Multi_Mention Metrics
 
 **Track average number of mentions per respondent:**
 ```
@@ -1193,7 +1193,7 @@ metric1,metric2,metric3
 | `range:X-Y` | % in range X to Y (e.g., range:9-10) |
 | `distribution` | Full distribution table |
 
-#### Multi-Mention Specs
+#### Multi_Mention Specs
 
 | Spec | Description |
 |------|-------------|
@@ -1554,7 +1554,7 @@ Q38          | Satisfaction      | Mean      | 8.2 | 8.4 | 8.6
 Q38          | Satisfaction      | Top 2 Box | 72  | 75  | 78
 ```
 
-#### Multi-Mention Questions
+#### Multi_Mention Questions
 
 Multi-mention questions show **one row per tracked option**:
 
@@ -2633,7 +2633,7 @@ The tracker uses **effective N** (design-effect adjusted sample size) for signif
 
 ### Question Type Support
 
-**Multi-Mention Questions**
+**Multi_Mention Questions**
 
 Multi-mention questions (select-all-that-apply) are supported with some considerations:
 
@@ -2761,7 +2761,7 @@ Q05_NPS            | nps          | Q5_NPS          | Q05_NPS_Score       | NPS_
 **Changes in v2.0:**
 - Added TrackingSpecs section with comprehensive documentation
 - Documented enhanced rating metrics (top_box, top2_box, etc.)
-- Documented Multi-Mention question support
+- Documented Multi_Mention question support
 - Documented enhanced composite metrics
 - Added output_dir setting documentation
 - Updated examples throughout
@@ -3991,7 +3991,7 @@ source("run_tracker.R")
 
 ---
 
-### TEST 3: Multi-Mention Questions
+### TEST 3: Multi_Mention Questions
 
 **Purpose:** Test multi-select question support with auto-detection.
 
@@ -4276,7 +4276,7 @@ Two rows: one for mean, one for top 2 box.
 
 ---
 
-### Example 2: Multi-Mention Question
+### Example 2: Multi_Mention Question
 
 **Question Mapping:**
 ```

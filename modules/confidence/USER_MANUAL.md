@@ -44,7 +44,7 @@ Create `config.xlsx` with two sheets:
 
 **Sheet 1: Question_Analysis**
 ```
-Question_Code | Question_Type | Target_Values | Methods
+QuestionCode | QuestionType | Target_Values | Methods
 Q1            | proportion    | 1,2           | moe,wilson,bootstrap
 Q2            | mean          |               | moe,bootstrap,bayesian
 ```
@@ -135,14 +135,14 @@ Bayesian    | 45.1%    | 42.2%    | 48.0%    | 856         | 2.9%
 **`proportion`** - Percent answering specific values
 Example: % who selected "Very Satisfied" (codes 4,5)
 ```
-Question_Code | Question_Type | Target_Values
+QuestionCode | QuestionType | Target_Values
 Q1            | proportion    | 4,5
 ```
 
 **`mean`** - Average value
 Example: Mean satisfaction score (1-5 scale)
 ```
-Question_Code | Question_Type | Target_Values
+QuestionCode | QuestionType | Target_Values
 Q2            | mean          |               [leave blank]
 ```
 
@@ -213,25 +213,6 @@ Output: Design-adjusted effective sample sizes
 **Formula:** DEFF = (n × Σw²) / (Σw)²
 
 **Effective Sample Size:** n_eff = n / DEFF
-
----
-
-## Troubleshooting
-
-### ❌ "Not enough data for bootstrap"
-**Fix:** Reduce `Bootstrap_Iterations` or increase sample size
-
-### ❌ "Confidence interval exceeds [0,1]"
-**Fix:** Use `wilson` method instead of `moe` for extreme proportions
-
-### ❌ "Weight variable has negative values"
-**Fix:** Check your weighting - negative weights are invalid
-
-### ⚠️ "DEFF > 2.0"
-**Review:** Weighting may be too aggressive. Consider:
-- Trimming extreme weights
-- Using raking instead of post-stratification
-- Increasing sample size
 
 ---
 
@@ -1423,7 +1404,7 @@ ResponseID | Q1_Satisfaction | Q2_Purchase | Q3_Recommend
 
 **config_basic_moe.xlsx - Sheet: Question_Analysis**
 ```
-Question_Code | Question_Type | Target_Values | Methods
+QuestionCode | QuestionType | Target_Values | Methods
 Q1            | proportion    | 4,5           | moe
 Q2            | proportion    | 1             | moe
 Q3            | mean          |               | moe
@@ -1498,7 +1479,7 @@ Your stakeholder questions whether MOE is appropriate for a metric near 95%. You
 
 **Sheet: Question_Analysis**
 ```
-Question_Code | Question_Type | Target_Values | Methods
+QuestionCode | QuestionType | Target_Values | Methods
 Q_AWARENESS   | proportion    | 1             | moe,wilson,bootstrap
 ```
 
@@ -1545,7 +1526,7 @@ Sample size: 1,000
 
 **Sheet: Question_Analysis**
 ```
-Question_Code | Question_Type | Target_Values | Methods
+QuestionCode | QuestionType | Target_Values | Methods
 Q1            | proportion    | 4,5           | moe,bayesian
 ```
 
@@ -1606,7 +1587,7 @@ You're analyzing a B2B survey where a rare industry segment has only n=45 respon
 
 **Sheet: Question_Analysis**
 ```
-Question_Code | Question_Type | Target_Values | Methods
+QuestionCode | QuestionType | Target_Values | Methods
 Q_SATISFACTION| proportion    | 4,5           | wilson
 ```
 
@@ -1659,7 +1640,7 @@ ResponseID | Age | Gender | Region | Weight | Q1 | Q2 | Q3
 
 **Sheet: Question_Analysis**
 ```
-Question_Code | Question_Type | Target_Values | Methods
+QuestionCode | QuestionType | Target_Values | Methods
 Q1            | proportion    | 4,5           | moe
 Q2            | proportion    | 1             | moe
 Q3            | mean          |               | moe
@@ -1728,7 +1709,7 @@ NPS = % Promoters (9-10) - % Detractors (0-6)
 
 **Sheet: Question_Analysis**
 ```
-Question_Code | Question_Type | Target_Values | Methods
+QuestionCode | QuestionType | Target_Values | Methods
 NPS_PROMOTERS | proportion    | 9,10          | wilson
 NPS_DETRACTORS| proportion    | 0,1,2,3,4,5,6 | wilson
 ```
@@ -1758,7 +1739,7 @@ NPS = 27 [21, 32]
 
 **Configuration:**
 ```
-Question_Code | Question_Type | Target_Values | Methods
+QuestionCode | QuestionType | Target_Values | Methods
 NPS_SCORE     | custom_nps    |               | bootstrap
 ```
 
@@ -1804,7 +1785,7 @@ From Tabs output, identify metrics needing CIs:
 
 **Sheet: Question_Analysis**
 ```
-Question_Code | Question_Type | Target_Values | Methods
+QuestionCode | QuestionType | Target_Values | Methods
 Q1            | proportion    | 4,5           | wilson
 Q2            | proportion    | 1             | wilson
 NPS_PROM      | proportion    | 9,10          | wilson

@@ -750,7 +750,7 @@ Top 1 Box       35%    40%C   30%
 Bottom 2 Box    10%    8%     12%A
 ```
 
-### 5.3 Multi-Mention Questions
+### 5.3 Multi_Mention Questions
 
 **Special Handling:**
 
@@ -1923,7 +1923,7 @@ Average           Score   3.87    3.80           3.92      3.94       3.75
 
 ---
 
-## Workflow 7: Multi-Mention Question Analysis
+## Workflow 7: Multi_Mention Question Analysis
 
 ### Scenario
 
@@ -1998,7 +1998,7 @@ result <- run_crosstabs(
 )
 ```
 
-### Step 5: Interpret Multi-Mention Results
+### Step 5: Interpret Multi_Mention Results
 
 **Results.xlsx - Q10 Sheet:**
 
@@ -2036,7 +2036,7 @@ Average Mentions          1.95    2.77        1.83    1.30
 - Feature E usage similar across segments (no significant differences)
 - Consumer segment uses significantly fewer features across the board
 
-**Important Notes on Multi-Mention:**
+**Important Notes on Multi_Mention:**
 - Percentages can sum to > 100% (each feature independent)
 - Base = number of respondents (not number of mentions)
 - Frequency = number of respondents who selected this feature (weighted)
