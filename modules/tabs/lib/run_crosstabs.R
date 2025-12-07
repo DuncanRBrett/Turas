@@ -301,6 +301,17 @@ validate_data_frame(survey_structure$questions, c("QuestionCode", "QuestionText"
 validate_data_frame(survey_structure$options, c("QuestionCode", "OptionText"), 0)
 
 # Apply ShowInOutput default to the actual options dataframe
+# Ensure columns exist as character type before assignment
+if (!"ShowInOutput" %in% names(survey_structure$options)) {
+  survey_structure$options$ShowInOutput <- NA_character_
+}
+if (!"ExcludeFromIndex" %in% names(survey_structure$options)) {
+  survey_structure$options$ExcludeFromIndex <- NA_character_
+}
+# Convert to character if not already (handles any type mismatches)
+survey_structure$options$ShowInOutput <- as.character(survey_structure$options$ShowInOutput)
+survey_structure$options$ExcludeFromIndex <- as.character(survey_structure$options$ExcludeFromIndex)
+# Apply defaults
 survey_structure$options$ShowInOutput[is.na(survey_structure$options$ShowInOutput)] <- "Y"
 survey_structure$options$ExcludeFromIndex[is.na(survey_structure$options$ExcludeFromIndex)] <- "N"
 
