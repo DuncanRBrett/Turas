@@ -1069,10 +1069,10 @@ load_survey_structure <- function(structure_file_path, project_root = NULL) {
     project_config <- load_config_sheet(structure_file_path, "Project")
     
     # Load Questions sheet
-    questions_df <- readxl::read_excel(structure_file_path, sheet = "Questions")
-    
+    questions_df <- readxl::read_excel(structure_file_path, sheet = "Questions", col_types = "text")
+
     # Load Options sheet
-    options_df <- readxl::read_excel(structure_file_path, sheet = "Options")
+    options_df <- readxl::read_excel(structure_file_path, sheet = "Options", col_types = "text")
     
   }, error = function(e) {
     stop(sprintf(
