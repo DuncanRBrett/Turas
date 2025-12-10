@@ -149,6 +149,13 @@ launch_turas <- function() {
         .btn-pricing:hover {
           background-color: #059669;
         }
+        .btn-maxdiff {
+          background-color: #8b5cf6;
+          color: white;
+        }
+        .btn-maxdiff:hover {
+          background-color: #7c3aed;
+        }
         .status-message {
           margin-top: 20px;
           padding: 15px;
@@ -266,6 +273,16 @@ launch_turas <- function() {
           ),
           actionButton("launch_pricing", "Launch Pricing",
                       class = "launch-btn btn-pricing")
+        ),
+
+        # MaxDiff
+        div(class = "module-card",
+          div(class = "module-title", "⚖️ MaxDiff"),
+          div(class = "module-description",
+            "Best-Worst Scaling (MaxDiff) design and analysis. Generate optimal experimental designs and compute preference utilities using count scores, logit models, and Hierarchical Bayes estimation."
+          ),
+          actionButton("launch_maxdiff", "Launch MaxDiff",
+                      class = "launch-btn btn-maxdiff")
         )
       ),
 
@@ -492,6 +509,27 @@ if ("%s" != "alchemerparser") {
 
       }, error = function(e) {
         status(paste("Error launching Pricing:", e$message))
+      })
+    })
+
+    # Launch MaxDiff
+    observeEvent(input$launch_maxdiff, {
+      status("Launching MaxDiff in new tab...")
+
+      tryCatch({
+        launch_module("maxdiff",
+                     file.path(turas_root, "modules/maxdiff/run_maxdiff_gui.R"))
+
+        later::later(function() {
+          status("MaxDiff launched successfully!")
+        }, delay = 1)
+
+        later::later(function() {
+          status("")
+        }, delay = 4)
+
+      }, error = function(e) {
+        status(paste("Error launching MaxDiff:", e$message))
       })
     })
   }
