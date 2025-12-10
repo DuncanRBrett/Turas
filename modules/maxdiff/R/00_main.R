@@ -45,25 +45,31 @@ MAXDIFF_VERSION <- "10.0"
 # Get script directory for sourcing
 get_script_dir <- function() {
   # Check for manual override
-
   if (exists("script_dir_override", envir = globalenv())) {
     return(get("script_dir_override", envir = globalenv()))
   }
 
- # Method 1: Try to find from source() call stack
-  # This works when file is being sourced
+  # Method 1: Try to find from source() call stack using srcfile
+  # This is the most reliable method when file is being sourced
   for (i in seq_len(sys.nframe())) {
-    call <- sys.call(i)
-    if (!is.null(call) && deparse(call[[1]]) == "source") {
-      if (length(call) >= 2) {
-        file_arg <- call[[2]]
-        if (is.character(file_arg)) {
-          script_path <- normalizePath(file_arg, mustWork = FALSE)
-          if (file.exists(script_path)) {
-            return(dirname(script_path))
-          }
-        }
+    srcfile <- tryCatch({
+      sys.frame(i)$srcfile
+    }, error = function(e) NULL)
+
+    if (!is.null(srcfile) && !is.null(srcfile$filename)) {
+      script_path <- srcfile$filename
+      if (grepl("00_main\\.R$", script_path)) {
+        return(dirname(normalizePath(script_path, mustWork = FALSE)))
       }
+    }
+
+    # Also try ofile attribute
+    ofile <- tryCatch({
+      sys.frame(i)$ofile
+    }, error = function(e) NULL)
+
+    if (!is.null(ofile) && grepl("00_main\\.R$", ofile)) {
+      return(dirname(normalizePath(ofile, mustWork = FALSE)))
     }
   }
 

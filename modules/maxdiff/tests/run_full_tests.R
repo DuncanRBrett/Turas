@@ -189,11 +189,21 @@ cat("STEP 3: Loading MaxDiff module...\n")
 
 main_file <- file.path(module_dir, "R", "00_main.R")
 
+# Set the script directory override so the module can find its files
+# This is needed because source() doesn't always provide reliable path info
+script_dir_override <- normalizePath(file.path(module_dir, "R"), mustWork = FALSE)
+assign("script_dir_override", script_dir_override, envir = globalenv())
+
 load_result <- tryCatch({
   source(main_file)
   TRUE
 }, error = function(e) {
   e$message
+}, finally = {
+  # Clean up the override
+  if (exists("script_dir_override", envir = globalenv())) {
+    rm("script_dir_override", envir = globalenv())
+  }
 })
 
 log_test("Module loads without error", isTRUE(load_result),
