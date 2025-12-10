@@ -455,18 +455,20 @@ create_test_files <- function(output_dir) {
       # Get utilities and add noise
       utils <- true_utils[shown_items] + rnorm(4, 0, 0.3)
 
-      # Best choice (highest utility)
+      # Best choice (highest utility) - store Item_ID not position
       best_probs <- exp(utils) / sum(exp(utils))
       best_idx <- sample(1:4, 1, prob = best_probs)
+      best_item <- shown_items[best_idx]
 
-      # Worst choice (lowest utility from remaining)
+      # Worst choice (lowest utility from remaining) - store Item_ID not position
       remaining <- setdiff(1:4, best_idx)
       worst_utils <- -utils[remaining]
       worst_probs <- exp(worst_utils) / sum(exp(worst_utils))
       worst_idx <- sample(remaining, 1, prob = worst_probs)
+      worst_item <- shown_items[worst_idx]
 
-      survey_data[r, paste0("Q", task, "_Best")] <- best_idx
-      survey_data[r, paste0("Q", task, "_Worst")] <- worst_idx
+      survey_data[r, paste0("Q", task, "_Best")] <- best_item
+      survey_data[r, paste0("Q", task, "_Worst")] <- worst_item
     }
   }
 
@@ -677,7 +679,10 @@ if (exists("generate_maxdiff_design", mode = "function")) {
   items_df <- data.frame(
     Item_ID = paste0("TEST_", 1:6),
     Item_Label = paste("Test Item", 1:6),
-    Include = 1,
+    Include = rep(1, 6),
+    Item_Group = rep("", 6),
+    Anchor_Item = rep(0, 6),
+    Display_Order = 1:6,
     stringsAsFactors = FALSE
   )
 
@@ -687,7 +692,9 @@ if (exists("generate_maxdiff_design", mode = "function")) {
     Num_Versions = 1,
     Design_Type = "BALANCED",
     Max_Item_Repeats = 4,
-    Force_Min_Pair_Balance = TRUE
+    Force_Min_Pair_Balance = TRUE,
+    Randomise_Task_Order = FALSE,
+    Randomise_Item_Order_Within_Task = FALSE
   )
 
   gen_result <- tryCatch({
