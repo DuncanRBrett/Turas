@@ -279,12 +279,24 @@ safe_numeric <- function(value, default = NA_real_) {
 #' @return Integer value or default
 #' @keywords internal
 safe_integer <- function(value, default = NA_integer_) {
-  if (is.null(value) || length(value) == 0) return(default)
-  if (is.na(value)) return(default)
+  # Handle NULL or empty
+  if (is.null(value) || length(value) == 0) {
+    return(as.integer(default))
+  }
 
+  # Handle NA (check first element if vector)
+  if (length(value) == 1 && is.na(value[1])) {
+    return(as.integer(default))
+  }
+
+  # Try conversion
   result <- suppressWarnings(as.integer(value))
 
-  if (is.na(result)) return(default)
+  # Handle conversion failure
+  if (length(result) == 0 || is.na(result[1])) {
+    return(as.integer(default))
+  }
+
   return(result)
 }
 

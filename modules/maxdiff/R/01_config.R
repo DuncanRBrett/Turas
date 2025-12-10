@@ -295,8 +295,18 @@ parse_project_settings <- function(df, project_root) {
   path_settings <- c("Raw_Data_File", "Design_File", "Output_Folder")
 
   for (ps in path_settings) {
-    if (ps %in% names(settings) && !is.na(settings[[ps]]) && nzchar(settings[[ps]])) {
+    if (ps %in% names(settings)) {
       path_val <- settings[[ps]]
+
+      # Ensure scalar - take first element if vector
+      if (length(path_val) > 1) path_val <- path_val[1]
+
+      # Skip if NA or empty
+      if (is.null(path_val) || is.na(path_val) || !nzchar(trimws(as.character(path_val)))) {
+        next
+      }
+
+      path_val <- as.character(path_val)
 
       # If relative path, make absolute
       if (!grepl("^(/|[A-Za-z]:)", path_val)) {
@@ -307,47 +317,41 @@ parse_project_settings <- function(df, project_root) {
     }
   }
 
+  # Helper to safely check if value is missing (handles vectors)
+  is_missing <- function(x) {
+    is.null(x) || length(x) == 0 || (length(x) == 1 && is.na(x[1]))
+  }
+
+  # Helper to safely get scalar string value
+  get_scalar <- function(x, default = NULL) {
+    if (is_missing(x)) return(default)
+    val <- as.character(x[1])
+    if (is.na(val) || !nzchar(trimws(val))) return(default)
+    trimws(val)
+  }
+
   # Set defaults
-  if (is.null(settings$Module_Version) || is.na(settings$Module_Version)) {
+  if (is_missing(settings$Module_Version)) {
     settings$Module_Version <- "v1.0"
   }
 
-  if (is.null(settings$Seed) || is.na(settings$Seed)) {
+  if (is_missing(settings$Seed)) {
     settings$Seed <- 12345
   } else {
-    settings$Seed <- safe_integer(settings$Seed, 12345)
+    settings$Seed <- safe_integer(settings$Seed[1], 12345)
   }
 
   # Parse Data_File_Sheet
-  if (is.null(settings$Data_File_Sheet) || is.na(settings$Data_File_Sheet)) {
+  if (is_missing(settings$Data_File_Sheet)) {
     settings$Data_File_Sheet <- 1  # Default to first sheet
+  } else {
+    settings$Data_File_Sheet <- settings$Data_File_Sheet[1]
   }
 
   # Parse optional settings
-  settings$Weight_Variable <- if (!is.null(settings$Weight_Variable) &&
-                                  !is.na(settings$Weight_Variable) &&
-                                  nzchar(trimws(settings$Weight_Variable))) {
-    trimws(settings$Weight_Variable)
-  } else {
-    NULL
-  }
-
-  settings$Respondent_ID_Variable <- if (!is.null(settings$Respondent_ID_Variable) &&
-                                         !is.na(settings$Respondent_ID_Variable) &&
-                                         nzchar(trimws(settings$Respondent_ID_Variable))) {
-    trimws(settings$Respondent_ID_Variable)
-  } else {
-    "RespID"  # Default
-  }
-
-  # Parse filter expression
-  settings$Filter_Expression <- if (!is.null(settings$Filter_Expression) &&
-                                    !is.na(settings$Filter_Expression) &&
-                                    nzchar(trimws(settings$Filter_Expression))) {
-    trimws(settings$Filter_Expression)
-  } else {
-    NULL
-  }
+  settings$Weight_Variable <- get_scalar(settings$Weight_Variable, NULL)
+  settings$Respondent_ID_Variable <- get_scalar(settings$Respondent_ID_Variable, "RespID")
+  settings$Filter_Expression <- get_scalar(settings$Filter_Expression, NULL)
 
   return(settings)
 }
