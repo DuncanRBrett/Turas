@@ -8,8 +8,8 @@
 
 run_maxdiff_gui <- function() {
 
-  # Required packages
-  required_packages <- c("shiny", "shinyFiles")
+  # Required packages - NO shinyFiles
+  required_packages <- c("shiny")
 
   # Install missing packages
   missing_packages <- required_packages[!required_packages %in% installed.packages()[,"Package"]]
@@ -21,7 +21,6 @@ run_maxdiff_gui <- function() {
   # Load packages
   suppressPackageStartupMessages({
     library(shiny)
-    library(shinyFiles)
   })
 
   # === CONFIGURATION ===
@@ -99,6 +98,10 @@ run_maxdiff_gui <- function() {
         .btn-primary {
           background: #8b5cf6;
           border: none;
+          color: white;
+          padding: 10px 20px;
+          border-radius: 5px;
+          cursor: pointer;
         }
         .btn-primary:hover {
           background: #6d28d9;
@@ -111,12 +114,6 @@ run_maxdiff_gui <- function() {
           padding: 16px 40px;
           font-size: 18px;
           border-radius: 10px;
-        }
-        .file-display {
-          background: #f7fafc;
-          padding: 15px;
-          border-radius: 8px;
-          margin: 15px 0;
         }
         .console-output {
           background: #1a202c;
@@ -141,11 +138,6 @@ run_maxdiff_gui <- function() {
           background: #edf2f7;
           border-color: #8b5cf6;
         }
-        .file-label {
-          font-weight: 600;
-          color: #2d3748;
-          margin-top: 10px;
-        }
         .mode-selector {
           display: flex;
           gap: 10px;
@@ -166,6 +158,24 @@ run_maxdiff_gui <- function() {
         .mode-btn.active {
           border-color: #8b5cf6;
           background-color: #f3e8ff;
+        }
+        .path-input {
+          width: 100%;
+          padding: 10px;
+          border: 1px solid #e2e8f0;
+          border-radius: 5px;
+          font-family: monospace;
+          font-size: 14px;
+        }
+        .example-path {
+          font-family: monospace;
+          font-size: 12px;
+          color: #666;
+          background: #f7fafc;
+          padding: 5px 10px;
+          border-radius: 3px;
+          display: inline-block;
+          margin-top: 5px;
         }
       "))
     ),
@@ -200,23 +210,21 @@ run_maxdiff_gui <- function() {
           textOutput("mode_description")
         ),
 
-        # Step 2: File Selection
+        # Step 2: File Selection - Simple text input
         div(class = "card",
           h3("2. Select Configuration File"),
-          p(style = "color: #666; font-size: 14px;",
-            "Select your MaxDiff configuration Excel file (.xlsx)"),
-
-          div(class = "file-label", "Configuration File:"),
-          div(style = "display: inline-block; margin-right: 10px;",
-            shinyFilesButton("config_file_btn",
-                          "Browse for config.xlsx",
-                          "Select MaxDiff config file",
-                          class = "btn btn-primary",
-                          icon = icon("file-excel"),
-                          multiple = FALSE)
+          p("Enter the full path to your MaxDiff configuration Excel file:"),
+          textInput("config_path", NULL,
+                    value = "",
+                    placeholder = "e.g., /path/to/your/maxdiff_config.xlsx",
+                    width = "100%"),
+          div(
+            tags$small("Example path: "),
+            tags$span(class = "example-path",
+              file.path(MODULE_DIR, "examples", "basic", "example_maxdiff_config.xlsx"))
           ),
-          uiOutput("config_file_display"),
-
+          br(),
+          uiOutput("file_status"),
           uiOutput("recent_ui")
         ),
 
@@ -242,18 +250,11 @@ run_maxdiff_gui <- function() {
 
     # Reactive values
     rv <- reactiveValues(
-      mode = "ANALYSIS",
-      config_path = NULL
+      mode = "ANALYSIS"
     )
 
     console_output <- reactiveVal("")
     is_running <- reactiveVal(FALSE)
-
-    # File choosers - use simple paths like tracker
-    volumes <- c(Home = "~", Documents = "~/Documents", Desktop = "~/Desktop")
-
-    shinyFileChoose(input, "config_file_btn", roots = volumes, session = session,
-                   filetypes = c("", "xlsx", "xls"))
 
     # Mode selection
     observeEvent(input$mode_design, {
@@ -276,28 +277,49 @@ run_maxdiff_gui <- function() {
       }
     })
 
-    # Handle config file selection
-    observeEvent(input$config_file_btn, {
-      tryCatch({
-        if (!is.integer(input$config_file_btn)) {
-          file_path <- parseFilePaths(volumes, input$config_file_btn)
-          if (nrow(file_path) > 0) {
-            config_path <- as.character(file_path$datapath[1])
-            rv$config_path <- config_path
-          }
-        }
-      }, error = function(e) {
-        showNotification(paste("Error selecting file:", e$message), type = "error")
-      })
+    # File status
+    output$file_status <- renderUI({
+      path <- trimws(input$config_path)
+      if (!nzchar(path)) {
+        div(class = "status-info", "Enter a file path above")
+      } else if (file.exists(path)) {
+        div(class = "status-success", paste("File found:", basename(path)))
+      } else {
+        div(class = "status-warning", "File not found - please check the path")
+      }
+    })
+
+    # Recent projects
+    output$recent_ui <- renderUI({
+      recent <- load_recent_projects()
+      # Filter to only existing files
+      recent <- Filter(function(x) file.exists(x$config_path), recent)
+      if (length(recent) == 0) return(NULL)
+
+      div(
+        tags$hr(),
+        h4("Recent Projects"),
+        lapply(seq_along(recent), function(i) {
+          proj <- recent[[i]]
+          tags$div(
+            class = "recent-project-item",
+            onclick = sprintf("Shiny.setInputValue('select_recent', %d, {priority: 'event'})", i),
+            tags$strong(basename(proj$config_path)),
+            tags$span(style = "float: right; color: #8b5cf6;", proj$mode),
+            tags$br(),
+            tags$small(style = "color: #666;", dirname(proj$config_path))
+          )
+        })
+      )
     })
 
     # Handle recent project selection
     observeEvent(input$select_recent, {
-      req(input$select_recent)
       recent <- load_recent_projects()
+      recent <- Filter(function(x) file.exists(x$config_path), recent)
       if (input$select_recent <= length(recent)) {
         proj <- recent[[input$select_recent]]
-        rv$config_path <- proj$config_path
+        updateTextInput(session, "config_path", value = proj$config_path)
         rv$mode <- proj$mode
         if (proj$mode == "DESIGN") {
           updateActionButton(session, "mode_design", class = "mode-btn active")
@@ -309,73 +331,18 @@ run_maxdiff_gui <- function() {
       }
     })
 
-    # Display config file
-    output$config_file_display <- renderUI({
-      if (is.null(rv$config_path)) {
-        div(class = "status-info",
-          icon("info-circle"), " No file selected"
-        )
-      } else {
-        div(class = "file-display",
-          tags$strong(basename(rv$config_path)),
-          tags$br(),
-          tags$small(rv$config_path),
-          if (file.exists(rv$config_path)) {
-            div(class = "status-success", style = "margin-top: 10px;",
-              icon("check-circle"), " File found"
-            )
-          } else {
-            div(class = "status-warning", style = "margin-top: 10px;",
-              icon("exclamation-triangle"), " File not found"
-            )
-          }
-        )
-      }
-    })
-
-    # Recent projects
-    output$recent_ui <- renderUI({
-      recent <- load_recent_projects()
-      if (length(recent) == 0) return(NULL)
-
-      div(
-        tags$hr(),
-        h4("Recent Projects"),
-        lapply(seq_along(recent), function(i) {
-          proj <- recent[[i]]
-          if (file.exists(proj$config_path)) {
-            tags$div(
-              class = "recent-project-item",
-              onclick = sprintf("Shiny.setInputValue('select_recent', %d, {priority: 'event'})", i),
-              tags$strong(basename(proj$config_path)),
-              tags$span(style = "float: right; color: #8b5cf6;", proj$mode),
-              tags$br(),
-              tags$small(style = "color: #666;", dirname(proj$config_path))
-            )
-          }
-        })
-      )
-    })
-
     # Run button UI
     output$run_ui <- renderUI({
-      if (is.null(rv$config_path)) return(NULL)
-
-      can_run <- !is.null(rv$config_path) && file.exists(rv$config_path)
+      path <- trimws(input$config_path)
+      can_run <- nzchar(path) && file.exists(path) && !is_running()
 
       div(class = "card",
         h3("3. Run MaxDiff"),
-        if (!can_run) {
-          div(class = "status-warning",
-            icon("exclamation-triangle"), " Please select a valid configuration file"
-          )
-        },
         div(style = "text-align: center; margin: 20px 0;",
           actionButton("run_btn",
                       paste("RUN MAXDIFF", rv$mode),
                       class = "btn-run",
-                      icon = icon("play-circle"),
-                      disabled = !can_run || is_running())
+                      disabled = !can_run)
         )
       )
     })
@@ -397,7 +364,9 @@ run_maxdiff_gui <- function() {
 
     # Run analysis
     observeEvent(input$run_btn, {
-      req(rv$config_path)
+      config_path <- trimws(input$config_path)
+      req(nzchar(config_path))
+      req(file.exists(config_path))
 
       is_running(TRUE)
 
@@ -421,14 +390,9 @@ run_maxdiff_gui <- function() {
 
       tryCatch(withCallingHandlers({
         # Validate path
-        config_path <- rv$config_path
         config_path <- normalizePath(config_path, mustWork = FALSE)
 
         progress$set(value = 0.1, detail = "Validating inputs...")
-
-        if (!is.character(config_path) || length(config_path) != 1) {
-          stop("Invalid config path")
-        }
 
         if (!file.exists(config_path)) {
           stop("Config file not found: ", config_path)
@@ -529,21 +493,6 @@ run_maxdiff_gui <- function() {
 
   # Launch
   cat("\nLaunching Turas>MaxDiff GUI...\n\n")
-
-  # Set error logging
-  options(shiny.error = function() {
-    log_file <- file.path(tempdir(), "maxdiff_gui_error.log")
-    tryCatch({
-      cat("MAXDIFF GUI ERROR\n", file = log_file)
-      cat("================================================================================\n", file = log_file, append = TRUE)
-      cat("Time:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n", file = log_file, append = TRUE)
-      cat("Error:", geterrmessage(), "\n\n", file = log_file, append = TRUE)
-      cat("Traceback:\n", file = log_file, append = TRUE)
-      cat(paste(capture.output(traceback()), collapse = "\n"), file = log_file, append = TRUE)
-      cat("\n================================================================================\n", file = log_file, append = TRUE)
-      cat("\n\nError log written to:", log_file, "\n")
-    }, error = function(e) {})
-  })
 
   shinyApp(ui = ui, server = server)
 }
