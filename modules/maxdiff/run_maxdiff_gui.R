@@ -1,24 +1,28 @@
 # ==============================================================================
-# TURAS>MAXDIFF GUI - LAUNCHER (Minimal version)
+# TURAS>MAXDIFF GUI - LAUNCHER (Debug version)
 # ==============================================================================
 
 run_maxdiff_gui <- function() {
 
+  cat("Step 1: Loading shiny...\n")
   library(shiny)
+  cat("Step 1: Done\n")
 
-  # Simple paths
+  cat("Step 2: Setting paths...\n")
   TURAS_HOME <- getwd()
   MODULE_DIR <- file.path(TURAS_HOME, "modules", "maxdiff")
+  cat("Step 2: Done - TURAS_HOME =", TURAS_HOME, "\n")
 
-  # Minimal UI
+  cat("Step 3: Creating UI...\n")
   ui <- fluidPage(
     h1("TURAS MaxDiff"),
     textInput("config_path", "Config file path:", value = ""),
     actionButton("run_btn", "Run MaxDiff"),
     verbatimTextOutput("console_text")
   )
+  cat("Step 3: Done\n")
 
-  # Minimal server
+  cat("Step 4: Creating server...\n")
   server <- function(input, output, session) {
 
     console_output <- reactiveVal("Ready...")
@@ -42,14 +46,12 @@ run_maxdiff_gui <- function() {
 
       console_output("Running MaxDiff...")
 
-      # Save working directory
       old_wd <- getwd()
 
       tryCatch({
         setwd(MODULE_DIR)
         source(file.path("R", "00_main.R"))
 
-        # Capture output
         output_file <- tempfile()
         sink(output_file, type = "output")
 
@@ -71,7 +73,12 @@ run_maxdiff_gui <- function() {
       })
     })
   }
+  cat("Step 4: Done\n")
 
-  cat("\nLaunching MaxDiff GUI...\n")
-  shinyApp(ui = ui, server = server)
+  cat("Step 5: Creating shinyApp...\n")
+  app <- shinyApp(ui = ui, server = server)
+  cat("Step 5: Done\n")
+
+  cat("Step 6: Returning app\n")
+  return(app)
 }
