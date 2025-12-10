@@ -44,20 +44,39 @@ MAXDIFF_VERSION <- "10.0"
 
 # Get script directory for sourcing
 get_script_dir <- function() {
-  if (exists("script_dir_override")) {
-    return(script_dir_override)
+  # Check for manual override
+
+  if (exists("script_dir_override", envir = globalenv())) {
+    return(get("script_dir_override", envir = globalenv()))
   }
 
-  # Try to get from command line args
+ # Method 1: Try to find from source() call stack
+  # This works when file is being sourced
+  for (i in seq_len(sys.nframe())) {
+    call <- sys.call(i)
+    if (!is.null(call) && deparse(call[[1]]) == "source") {
+      if (length(call) >= 2) {
+        file_arg <- call[[2]]
+        if (is.character(file_arg)) {
+          script_path <- normalizePath(file_arg, mustWork = FALSE)
+          if (file.exists(script_path)) {
+            return(dirname(script_path))
+          }
+        }
+      }
+    }
+  }
+
+  # Method 2: Try to get from command line args (Rscript)
   args <- commandArgs(trailingOnly = FALSE)
   file_arg <- grep("^--file=", args, value = TRUE)
 
   if (length(file_arg) > 0) {
     script_path <- sub("^--file=", "", file_arg)
-    return(dirname(script_path))
+    return(dirname(normalizePath(script_path, mustWork = FALSE)))
   }
 
-  # Try rstudioapi
+  # Method 3: Try rstudioapi
   if (requireNamespace("rstudioapi", quietly = TRUE)) {
     if (rstudioapi::isAvailable()) {
       script_path <- tryCatch({
@@ -67,6 +86,20 @@ get_script_dir <- function() {
       if (!is.null(script_path) && nzchar(script_path)) {
         return(dirname(script_path))
       }
+    }
+  }
+
+  # Method 4: Look for module in common locations relative to working directory
+  possible_paths <- c(
+    file.path(getwd(), "modules", "maxdiff", "R"),
+    file.path(getwd(), "R"),
+    file.path(dirname(getwd()), "modules", "maxdiff", "R"),
+    getwd()
+  )
+
+  for (path in possible_paths) {
+    if (file.exists(file.path(path, "utils.R"))) {
+      return(path)
     }
   }
 
