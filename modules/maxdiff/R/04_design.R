@@ -153,8 +153,8 @@ generate_balanced_design <- function(item_ids, items_per_task, tasks_per_respond
                                      n_versions, settings, verbose = TRUE) {
 
   n_items <- length(item_ids)
-  max_iterations <- settings$Max_Design_Iterations
-  efficiency_threshold <- settings$Design_Efficiency_Threshold
+  max_iterations <- settings$Max_Design_Iterations %||% 10000
+  efficiency_threshold <- settings$Design_Efficiency_Threshold %||% 0.90
 
   # Initialize best design
   best_design <- NULL
