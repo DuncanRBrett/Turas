@@ -327,21 +327,39 @@ if ("%s" != "alchemerparser") {
       module_name,
       paste0("run_", module_name, "_gui"))
 
-      # Write temporary launch script
+      # Write temporary launch script with error handling
       temp_script <- tempfile(fileext = ".R")
-      writeLines(launch_script, temp_script)
+      log_file <- tempfile(fileext = ".log")
 
-      # Launch in background process - completely detached
+      # Wrap the script with error handling
+      launch_script_wrapped <- paste0(
+        'tryCatch({\n',
+        launch_script,
+        '}, error = function(e) {\n',
+        '  cat("ERROR:", conditionMessage(e), "\\n", file = "', log_file, '")\n',
+        '})\n'
+      )
+
+      writeLines(launch_script_wrapped, temp_script)
+
+      # Launch in background process
       system2("Rscript",
               args = c(temp_script),
               wait = FALSE,
-              stdout = NULL,
-              stderr = NULL)
+              stdout = log_file,
+              stderr = log_file)
 
-      # Clean up temp file after a delay
+      # Check for errors after a delay
       later::later(function() {
+        if (file.exists(log_file)) {
+          log_content <- readLines(log_file, warn = FALSE)
+          if (length(log_content) > 0 && any(grepl("ERROR|error", log_content, ignore.case = TRUE))) {
+            status(paste("Launch error:", paste(log_content, collapse = " ")))
+          }
+          unlink(log_file)
+        }
         if (file.exists(temp_script)) unlink(temp_script)
-      }, delay = 10)
+      }, delay = 5)
     }
 
     # Launch AlchemerParser
