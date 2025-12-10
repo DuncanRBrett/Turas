@@ -14,6 +14,31 @@
 MAXDIFF_UTILS_VERSION <- "10.0"
 
 # ==============================================================================
+# SAFE VALUE CHECKING (handles vectors)
+# ==============================================================================
+
+#' Safely check if value is missing (NULL, empty, or scalar NA)
+#'
+#' This function safely handles vectors, avoiding the
+#' "length > 1 in coercion to logical(1)" error.
+#'
+#' @param x Value to check
+#' @return Logical. TRUE if x is NULL, length 0, or a single NA value
+#' @keywords internal
+is_missing_value <- function(x) {
+  is.null(x) || length(x) == 0 || (length(x) == 1 && is.na(x[1]))
+}
+
+#' Safely check if scalar value is NA (handles vectors)
+#'
+#' @param x Value to check
+#' @return Logical. TRUE if x is scalar NA
+#' @keywords internal
+is_scalar_na <- function(x) {
+  length(x) == 1 && is.na(x[1])
+}
+
+# ==============================================================================
 # LOGGING AND PROGRESS
 # ==============================================================================
 
@@ -71,9 +96,11 @@ log_progress <- function(current, total, message = "Progress", verbose = TRUE) {
 #' @return The validated value (possibly transformed)
 #' @keywords internal
 validate_option <- function(value, allowed, param_name, case_sensitive = FALSE) {
-  if (is.null(value) || is.na(value)) {
+  if (is_missing_value(value)) {
     stop(sprintf("%s is required but was NULL or NA", param_name), call. = FALSE)
   }
+  # Take first element if vector
+  if (length(value) > 1) value <- value[1]
 
   check_value <- if (case_sensitive) value else toupper(value)
   check_allowed <- if (case_sensitive) allowed else toupper(allowed)
@@ -104,9 +131,12 @@ validate_option <- function(value, allowed, param_name, case_sensitive = FALSE) 
 validate_numeric_range <- function(value, param_name,
                                    min_val = -Inf, max_val = Inf,
                                    allow_na = FALSE) {
-  if (is.null(value)) {
+  if (is.null(value) || length(value) == 0) {
     stop(sprintf("%s is required but was NULL", param_name), call. = FALSE)
   }
+
+  # Take first element if vector
+  if (length(value) > 1) value <- value[1]
 
   if (is.na(value)) {
     if (allow_na) return(value)
@@ -137,9 +167,12 @@ validate_numeric_range <- function(value, param_name,
 #' @return Integer value
 #' @keywords internal
 validate_positive_integer <- function(value, param_name, min_val = 1) {
-  if (is.null(value) || is.na(value)) {
+  if (is_missing_value(value)) {
     stop(sprintf("%s is required but was NULL or NA", param_name), call. = FALSE)
   }
+
+  # Take first element if vector
+  if (length(value) > 1) value <- value[1]
 
   value <- suppressWarnings(as.integer(value))
 
@@ -165,7 +198,14 @@ validate_positive_integer <- function(value, param_name, min_val = 1) {
 #' @return Normalized file path
 #' @keywords internal
 validate_file_path <- function(path, param_name, must_exist = TRUE, extensions = NULL) {
-  if (is.null(path) || is.na(path) || !nzchar(trimws(path))) {
+  if (is.null(path) || length(path) == 0) {
+    stop(sprintf("%s is required but was empty or NA", param_name), call. = FALSE)
+  }
+
+  # Take first element if vector
+  if (length(path) > 1) path <- path[1]
+
+  if (is.na(path) || !nzchar(trimws(path))) {
     stop(sprintf("%s is required but was empty or NA", param_name), call. = FALSE)
   }
 
@@ -201,7 +241,14 @@ validate_file_path <- function(path, param_name, must_exist = TRUE, extensions =
 #' @return Normalized directory path
 #' @keywords internal
 validate_directory_path <- function(path, param_name, create = TRUE) {
-  if (is.null(path) || is.na(path) || !nzchar(trimws(path))) {
+  if (is.null(path) || length(path) == 0) {
+    stop(sprintf("%s is required but was empty or NA", param_name), call. = FALSE)
+  }
+
+  # Take first element if vector
+  if (length(path) > 1) path <- path[1]
+
+  if (is.na(path) || !nzchar(trimws(path))) {
     stop(sprintf("%s is required but was empty or NA", param_name), call. = FALSE)
   }
 
@@ -241,7 +288,9 @@ validate_directory_path <- function(path, param_name, create = TRUE) {
 #' @return Logical value
 #' @keywords internal
 parse_yes_no <- function(value, default = FALSE) {
-  if (is.null(value) || is.na(value)) return(default)
+  if (is_missing_value(value)) return(default)
+  # Take first element if vector
+  if (length(value) > 1) value <- value[1]
   if (is.logical(value)) return(value)
 
   value_upper <- toupper(trimws(as.character(value)))
@@ -262,6 +311,8 @@ parse_yes_no <- function(value, default = FALSE) {
 #' @keywords internal
 safe_numeric <- function(value, default = NA_real_) {
   if (is.null(value) || length(value) == 0) return(default)
+  # Take first element if vector
+  if (length(value) > 1) value <- value[1]
   if (is.na(value)) return(default)
 
   result <- suppressWarnings(as.numeric(value))
@@ -308,7 +359,9 @@ safe_integer <- function(value, default = NA_integer_) {
 #' @return Cleaned item ID
 #' @keywords internal
 clean_item_id <- function(item_id) {
-  if (is.null(item_id) || is.na(item_id)) return(NA_character_)
+  if (is_missing_value(item_id)) return(NA_character_)
+  # Take first element if vector
+  if (length(item_id) > 1) item_id <- item_id[1]
 
   # Remove leading/trailing whitespace
   cleaned <- trimws(as.character(item_id))
@@ -339,7 +392,7 @@ get_col_value <- function(df, col_name, row_idx = 1, default = NA) {
 
   value <- df[[col_name]][row_idx]
 
-  if (is.null(value) || is.na(value)) return(default)
+  if (is_missing_value(value)) return(default)
   return(value)
 }
 
