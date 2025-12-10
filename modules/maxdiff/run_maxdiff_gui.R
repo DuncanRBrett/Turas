@@ -514,5 +514,6 @@ run_maxdiff_gui <- function() {
 
 # When sourced directly, launch the GUI
 if (!interactive() || !exists("TURAS_LAUNCHER_ACTIVE")) {
-  run_maxdiff_gui()
+  app <- run_maxdiff_gui()
+  shiny::runApp(app, launch.browser = TRUE)
 }

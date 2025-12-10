@@ -34,29 +34,26 @@ create_example_files <- function(output_dir = ".") {
   project_settings <- data.frame(
     Setting = c(
       "Project_Name",
-      "Project_Code",
       "Mode",
-      "Raw_Data_Path",
-      "Design_File_Path",
-      "Output_Path",
-      "Respondent_ID_Var",
-      "Weight_Var",
+      "Raw_Data_File",
+      "Design_File",
+      "Output_Folder",
+      "Respondent_ID_Variable",
+      "Weight_Variable",
       "Seed"
     ),
     Value = c(
-      "Example MaxDiff Study",
-      "MAXDIFF_EXAMPLE",
+      "MaxDiff_Example",
       "ANALYSIS",
       "example_survey_data.xlsx",
       "example_design.xlsx",
-      "output/",
+      "output",
       "RespondentID",
-      "Weight",
+      "",
       "12345"
     ),
     Description = c(
-      "Display name for the project",
-      "Short code used in filenames",
+      "Project name (no spaces)",
       "DESIGN or ANALYSIS",
       "Path to survey responses (relative to config)",
       "Path to design file (relative to config)",
@@ -97,11 +94,10 @@ create_example_files <- function(output_dir = ".") {
       "Design_Type",
       "Items_Per_Task",
       "Tasks_Per_Respondent",
-      "N_Versions",
-      "Max_Item_Repeat",
-      "Min_Pair_Balance",
-      "Optimize_Level_Balance",
-      "Output_Filename"
+      "Num_Versions",
+      "Max_Item_Repeats",
+      "Randomise_Task_Order",
+      "Randomise_Item_Order_Within_Task"
     ),
     Value = c(
       "BALANCED",
@@ -109,98 +105,66 @@ create_example_files <- function(output_dir = ".") {
       "10",
       "3",
       "6",
-      "0.8",
-      "Y",
-      "maxdiff_design.xlsx"
+      "TRUE",
+      "TRUE"
     ),
     Description = c(
       "BALANCED, OPTIMAL, or RANDOM",
       "Number of items shown per task",
       "Number of tasks each respondent completes",
       "Number of design versions",
-      "Max times an item can appear",
-      "Minimum balance threshold for item pairs",
-      "Whether to balance within versions",
-      "Output filename for generated design"
+      "Max times an item can appear per respondent",
+      "Randomize task order within versions",
+      "Randomize item position within tasks"
     ),
     stringsAsFactors = FALSE
   )
 
   # Sheet 4: SURVEY_MAPPING
+  # Field_Type: VERSION, BEST_CHOICE, or WORST_CHOICE
   survey_mapping <- data.frame(
-    Task_Number = 1:10,
-    Version_Var = "DesignVersion",
-    Best_Var = paste0("Q", 1:10, "_Best"),
-    Worst_Var = paste0("Q", 1:10, "_Worst"),
-    Shown_Var_1 = paste0("Q", 1:10, "_A"),
-    Shown_Var_2 = paste0("Q", 1:10, "_B"),
-    Shown_Var_3 = paste0("Q", 1:10, "_C"),
-    Shown_Var_4 = paste0("Q", 1:10, "_D"),
+    Field_Type = c("VERSION", rep("BEST_CHOICE", 10), rep("WORST_CHOICE", 10)),
+    Field_Name = c("DesignVersion",
+                   paste0("Q", 1:10, "_Best"),
+                   paste0("Q", 1:10, "_Worst")),
+    Task_Number = c(NA, 1:10, 1:10),
     stringsAsFactors = FALSE
   )
 
   # Sheet 5: SEGMENT_SETTINGS
   segment_settings <- data.frame(
-    Segment_ID = c("SEG_GENDER", "SEG_AGE"),
-    Segment_Label = c("Gender", "Age Group"),
-    Variable_Name = c("Gender", "AgeGroup"),
-    Segment_Def = c("", ""),
-    Include_in_Output = c(1, 1),
+    Segment_Name = c("Gender_Male", "Gender_Female", "Age_18_34", "Age_35_54", "Age_55_Plus"),
+    Segment_Variable = c("Gender", "Gender", "AgeGroup", "AgeGroup", "AgeGroup"),
+    Segment_Value = c("Male", "Female", "18-34", "35-54", "55+"),
+    Include = c(1, 1, 1, 1, 1),
     stringsAsFactors = FALSE
   )
 
-  # Sheet 6: OUTPUT_SETTINGS
-  output_settings <- data.frame(
+  # Sheet 6: ANALYSIS_SETTINGS
+  analysis_settings <- data.frame(
     Setting = c(
-      "Include_Counts",
-      "Include_Logit",
-      "Include_HB",
-      "Include_Individual",
-      "Include_Segments",
-      "Include_Charts",
-      "Rescale_Method",
-      "CI_Level",
-      "Min_Respondents_Per_Segment",
-      "HB_Iterations",
-      "HB_Warmup",
-      "HB_Chains",
+      "Compute_Counts",
+      "Fit_Aggregate_Logit",
+      "Fit_HB",
+      "Generate_Charts",
       "Chart_Width",
-      "Chart_Height",
-      "Chart_DPI"
+      "Chart_Height"
     ),
     Value = c(
-      "Y",
-      "Y",
-      "N",
-      "Y",
-      "Y",
-      "Y",
-      "0_100",
-      "0.95",
-      "30",
-      "2000",
-      "1000",
-      "4",
+      "TRUE",
+      "TRUE",
+      "FALSE",
+      "TRUE",
       "10",
-      "6",
-      "300"
+      "8"
     ),
     Description = c(
       "Include count-based scores (Best%, Worst%, Net)",
       "Include aggregate logit model",
       "Include Hierarchical Bayes estimation (requires cmdstanr)",
-      "Include individual-level utilities",
-      "Include segment analysis",
       "Generate visualization charts",
-      "RAW, 0_100, or PROBABILITY",
-      "Confidence interval level",
-      "Min N for segment-level reporting",
-      "HB MCMC iterations",
-      "HB warmup iterations",
-      "HB number of chains",
       "Chart width in inches",
-      "Chart height in inches",
-      "Chart resolution (dots per inch)"
+      "Chart height in inches"
     ),
     stringsAsFactors = FALSE
   )
@@ -223,8 +187,8 @@ create_example_files <- function(output_dir = ".") {
   addWorksheet(wb_config, "SEGMENT_SETTINGS")
   writeData(wb_config, "SEGMENT_SETTINGS", segment_settings)
 
-  addWorksheet(wb_config, "OUTPUT_SETTINGS")
-  writeData(wb_config, "OUTPUT_SETTINGS", output_settings)
+  addWorksheet(wb_config, "ANALYSIS_SETTINGS")
+  writeData(wb_config, "ANALYSIS_SETTINGS", analysis_settings)
 
   config_path <- file.path(output_dir, "example_maxdiff_config.xlsx")
   saveWorkbook(wb_config, config_path, overwrite = TRUE)
@@ -319,17 +283,19 @@ create_example_files <- function(output_dir = ".") {
       # Calculate choice probabilities based on utilities
       utils <- true_utils[shown_items] + rnorm(4, 0, 0.5)  # Add noise
 
-      # Best choice (highest utility with logit noise)
+      # Best choice (highest utility with logit noise) - store Item_ID
       best_probs <- exp(utils) / sum(exp(utils))
       best_idx <- sample(1:4, 1, prob = best_probs)
-      survey_data[resp, paste0("Q", task, "_Best")] <- best_idx
+      best_item <- shown_items[best_idx]
+      survey_data[resp, paste0("Q", task, "_Best")] <- best_item
 
-      # Worst choice (lowest utility, from remaining items)
+      # Worst choice (lowest utility, from remaining items) - store Item_ID
       remaining_idx <- setdiff(1:4, best_idx)
       worst_utils <- -utils[remaining_idx]  # Negate for worst
       worst_probs <- exp(worst_utils) / sum(exp(worst_utils))
       worst_choice <- sample(remaining_idx, 1, prob = worst_probs)
-      survey_data[resp, paste0("Q", task, "_Worst")] <- worst_choice
+      worst_item <- shown_items[worst_choice]
+      survey_data[resp, paste0("Q", task, "_Worst")] <- worst_item
     }
   }
 
