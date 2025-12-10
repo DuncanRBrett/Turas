@@ -310,9 +310,11 @@ launch_turas <- function() {
     # Helper function to launch modules in background
     launch_module <- function(module_name, script_path) {
       # Standard launch for all modules
+      # Set TURAS_LAUNCHER_ACTIVE to prevent auto-run in GUI files
       launch_script <- sprintf('
 Sys.setenv(TURAS_ROOT = "%s")
 setwd("%s")
+TURAS_LAUNCHER_ACTIVE <- TRUE
 source("%s")
 if ("%s" != "alchemerparser") {
   app <- %s()
