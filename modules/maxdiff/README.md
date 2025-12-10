@@ -132,6 +132,13 @@ modules/maxdiff/
 └── examples/basic/        # Example files
 ```
 
+## Documentation
+
+For detailed documentation, see:
+
+- **[User Manual](docs/USER_MANUAL.md)** - Step-by-step guide for researchers
+- **[Technical Reference](docs/TECHNICAL_REFERENCE.md)** - API documentation for developers
+
 ## Support
 
-For issues or questions, consult the Turas documentation or contact the development team.
+For issues or questions, consult the documentation or contact the development team.
