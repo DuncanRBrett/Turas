@@ -44,11 +44,14 @@ fit_aggregate_logit <- function(long_data, items, weighted = TRUE,
 
   if (verbose) log_message("Fitting aggregate logit model...", "INFO", verbose)
 
-  # Check for survival package
+  # Check for survival package and load it (needed for strata function in formula)
   if (!requireNamespace("survival", quietly = TRUE)) {
     stop("Package 'survival' is required for logit estimation.\n  Install with: install.packages('survival')",
          call. = FALSE)
   }
+
+  # Load survival package to make strata() available for formula
+  suppressPackageStartupMessages(library(survival, quietly = TRUE))
 
   # Get included items
   included_items <- items$Item_ID[items$Include == 1]

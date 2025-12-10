@@ -99,11 +99,11 @@ generate_maxdiff_design <- function(items, design_settings, seed = 12345, verbos
   diagnostics <- compute_design_diagnostics(design, included_items, verbose)
 
   # Optionally randomize task and item order
-  if (design_settings$Randomise_Task_Order) {
+  if (isTRUE(design_settings$Randomise_Task_Order)) {
     design <- randomize_task_order(design, verbose)
   }
 
-  if (design_settings$Randomise_Item_Order_Within_Task) {
+  if (isTRUE(design_settings$Randomise_Item_Order_Within_Task)) {
     design <- randomize_item_order(design, verbose)
   }
 
