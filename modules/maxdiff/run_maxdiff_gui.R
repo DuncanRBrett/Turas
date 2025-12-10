@@ -26,7 +26,7 @@ run_maxdiff_gui <- function() {
   # ===========================================================================
 
   # Check and load required packages
-  required_packages <- c("shiny", "shinyFiles")
+  required_packages <- c("shiny")
   missing <- required_packages[!required_packages %in% installed.packages()[, "Package"]]
 
   if (length(missing) > 0) {
@@ -36,7 +36,6 @@ run_maxdiff_gui <- function() {
 
   suppressPackageStartupMessages({
     library(shiny)
-    library(shinyFiles)
   })
 
   # Determine paths
@@ -77,24 +76,6 @@ run_maxdiff_gui <- function() {
     projects <- unique(c(path, projects))
     if (length(projects) > 10) projects <- projects[1:10]
     save_recent_projects(projects)
-  }
-
-  detect_config_files <- function(dir_path) {
-    if (!dir.exists(dir_path)) return(character(0))
-
-    files <- list.files(dir_path, pattern = "\\.xlsx$", ignore.case = TRUE)
-
-    # Prioritize files with maxdiff or config in name
-    patterns <- c("maxdiff", "MaxDiff", "config", "Config")
-    detected <- character(0)
-
-    for (pattern in patterns) {
-      matches <- grep(pattern, files, value = TRUE, ignore.case = TRUE)
-      if (length(matches) > 0) detected <- c(detected, matches)
-    }
-
-    if (length(detected) == 0) detected <- files
-    unique(detected)
   }
 
   # ===========================================================================
@@ -224,10 +205,21 @@ run_maxdiff_gui <- function() {
           margin-bottom: 5px;
           cursor: pointer;
           font-size: 13px;
+          display: block;
+          text-decoration: none;
+          color: inherit;
         }
         .recent-item:hover {
           background: #f3f4f6;
           border-color: #8b5cf6;
+        }
+        .file-input-container {
+          display: flex;
+          gap: 10px;
+          align-items: center;
+        }
+        .file-input-container .form-control {
+          flex: 1;
         }
       "))
     ),
@@ -258,22 +250,19 @@ run_maxdiff_gui <- function() {
         textOutput("mode_description")
       ),
 
-      # Project Selection
+      # Project Selection - use text input instead of shinyFiles
       div(class = "card",
         h4("2. Select Configuration File"),
-        fluidRow(
-          column(8,
-            shinyFilesButton("config_file", "Browse...",
-                            title = "Select MaxDiff Config File",
-                            multiple = FALSE,
-                            buttonType = "default",
-                            class = "btn-secondary")
-          ),
-          column(4,
-            textOutput("selected_file_display")
-          )
+        div(class = "file-input-container",
+          textInput("config_path", NULL,
+                    placeholder = "Enter path to config file or use file upload below",
+                    width = "100%"),
+          actionButton("browse_btn", "Browse...", class = "btn-secondary")
         ),
-        uiOutput("recent_projects_ui")
+        fileInput("config_upload", "Or upload config file:",
+                  accept = c(".xlsx", ".xls")),
+        uiOutput("recent_projects_ui"),
+        textOutput("file_status")
       ),
 
       # Config Preview
@@ -314,21 +303,9 @@ run_maxdiff_gui <- function() {
     rv <- reactiveValues(
       mode = "ANALYSIS",
       config_path = NULL,
-      config = NULL,
       is_running = FALSE,
       console_output = "Ready to run MaxDiff analysis...\n"
     )
-
-    # Volume roots for file browser
-    volumes <- c(
-      Home = path.expand("~"),
-      Documents = file.path(path.expand("~"), "Documents"),
-      Desktop = file.path(path.expand("~"), "Desktop"),
-      Turas = TURAS_HOME
-    )
-
-    shinyFileChoose(input, "config_file", roots = volumes, session = session,
-                   filetypes = c("xlsx", "xls"))
 
     # Mode selection
     observeEvent(input$mode_design, {
@@ -351,51 +328,91 @@ run_maxdiff_gui <- function() {
       }
     })
 
-    # File selection
-    observeEvent(input$config_file, {
-      if (!is.integer(input$config_file)) {
-        file_info <- parseFilePaths(volumes, input$config_file)
-        if (nrow(file_info) > 0) {
-          rv$config_path <- as.character(file_info$datapath)
-          add_recent_project(rv$config_path)
+    # Handle text input path
+    observeEvent(input$config_path, {
+      path <- trimws(input$config_path)
+      if (nzchar(path) && file.exists(path)) {
+        rv$config_path <- normalizePath(path)
+        add_recent_project(rv$config_path)
+        updateActionButton(session, "run_btn", disabled = FALSE)
+      } else if (nzchar(path)) {
+        rv$config_path <- NULL
+        updateActionButton(session, "run_btn", disabled = TRUE)
+      }
+    }, ignoreInit = TRUE)
 
-          # Try to load config preview
-          rv$console_output <- paste0(rv$console_output,
-                                      sprintf("\nSelected: %s\n", rv$config_path))
+    # Handle file upload
+    observeEvent(input$config_upload, {
+      req(input$config_upload)
+      # Copy uploaded file to a permanent location
+      upload_path <- input$config_upload$datapath
+      file_name <- input$config_upload$name
 
-          tryCatch({
-            # Quick validation only
-            rv$config <- list(path = rv$config_path, valid = TRUE)
-            updateActionButton(session, "run_btn", disabled = FALSE)
-          }, error = function(e) {
-            rv$config <- list(path = rv$config_path, valid = FALSE, error = e$message)
-            rv$console_output <- paste0(rv$console_output,
-                                        sprintf("Warning: %s\n", e$message))
-          })
-        }
+      # Save to module examples directory
+      dest_dir <- file.path(MODULE_DIR, "uploads")
+      if (!dir.exists(dest_dir)) dir.create(dest_dir, recursive = TRUE)
+
+      dest_path <- file.path(dest_dir, file_name)
+      file.copy(upload_path, dest_path, overwrite = TRUE)
+
+      rv$config_path <- dest_path
+      updateTextInput(session, "config_path", value = dest_path)
+      add_recent_project(dest_path)
+      updateActionButton(session, "run_btn", disabled = FALSE)
+
+      rv$console_output <- paste0(rv$console_output,
+                                  sprintf("\nUploaded: %s\n", file_name))
+    })
+
+    # Browse button - show file dialog hint
+    observeEvent(input$browse_btn, {
+      showModal(modalDialog(
+        title = "Select Configuration File",
+        p("Enter the full path to your MaxDiff configuration file (.xlsx):"),
+        textInput("modal_path", NULL,
+                  value = file.path(MODULE_DIR, "examples", "basic"),
+                  width = "100%"),
+        p(tags$small("Example: ", code(file.path(MODULE_DIR, "examples", "basic", "example_maxdiff_config.xlsx")))),
+        footer = tagList(
+          modalButton("Cancel"),
+          actionButton("modal_ok", "OK", class = "btn-primary")
+        )
+      ))
+    })
+
+    observeEvent(input$modal_ok, {
+      path <- trimws(input$modal_path)
+      if (nzchar(path)) {
+        updateTextInput(session, "config_path", value = path)
+        removeModal()
       }
     })
 
-    output$selected_file_display <- renderText({
-      if (!is.null(rv$config_path)) {
-        basename(rv$config_path)
+    output$file_status <- renderText({
+      if (!is.null(rv$config_path) && file.exists(rv$config_path)) {
+        paste("Selected:", basename(rv$config_path))
+      } else if (!is.null(input$config_path) && nzchar(input$config_path)) {
+        "File not found"
       } else {
-        "No file selected"
+        ""
       }
     })
 
     # Recent projects
     output$recent_projects_ui <- renderUI({
       recent <- load_recent_projects()
+      recent <- recent[file.exists(recent)]  # Filter existing files
+
       if (length(recent) > 0) {
         div(class = "recent-projects",
-          tags$small("Recent:"),
+          tags$small(tags$strong("Recent projects:")),
           lapply(recent[1:min(3, length(recent))], function(path) {
-            actionLink(
-              inputId = paste0("recent_", digest::digest(path)),
-              label = basename(path),
+            tags$a(
+              href = "#",
               class = "recent-item",
-              onclick = sprintf('Shiny.setInputValue("select_recent", "%s", {priority: "event"})', path)
+              onclick = sprintf('Shiny.setInputValue("select_recent", "%s", {priority: "event"}); return false;',
+                               gsub("\\\\", "\\\\\\\\", path)),
+              basename(path)
             )
           })
         )
@@ -403,10 +420,10 @@ run_maxdiff_gui <- function() {
     })
 
     observeEvent(input$select_recent, {
-      if (!is.null(input$select_recent) && file.exists(input$select_recent)) {
-        rv$config_path <- input$select_recent
-        rv$console_output <- paste0(rv$console_output,
-                                    sprintf("\nSelected: %s\n", rv$config_path))
+      path <- input$select_recent
+      if (!is.null(path) && file.exists(path)) {
+        rv$config_path <- path
+        updateTextInput(session, "config_path", value = path)
         updateActionButton(session, "run_btn", disabled = FALSE)
       }
     })
@@ -417,6 +434,7 @@ run_maxdiff_gui <- function() {
         div(class = "card",
           h4("Configuration Preview"),
           tags$p(tags$strong("File: "), basename(rv$config_path)),
+          tags$p(tags$strong("Path: "), tags$small(rv$config_path)),
           tags$p(tags$strong("Mode: "), rv$mode)
         )
       }
@@ -436,7 +454,7 @@ run_maxdiff_gui <- function() {
         rv$mode
       )
 
-      # Source module
+      # Source module and run
       tryCatch({
         old_wd <- getwd()
 
@@ -446,7 +464,7 @@ run_maxdiff_gui <- function() {
           stop("Module files not found. Please check installation.")
         }
 
-        # Create a temporary script to capture output
+        # Capture output
         withCallingHandlers({
           source(main_script, local = TRUE)
 
@@ -487,7 +505,7 @@ run_maxdiff_gui <- function() {
     output$status_ui <- renderUI({
       if (rv$is_running) {
         div(style = "color: #8b5cf6;", "Running analysis...")
-      } else if (!is.null(rv$config_path)) {
+      } else if (!is.null(rv$config_path) && file.exists(rv$config_path)) {
         div(class = "status-success", "Ready to run")
       } else {
         div(style = "color: #6c757d;", "Select a configuration file to begin")
