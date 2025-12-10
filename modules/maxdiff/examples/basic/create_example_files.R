@@ -90,7 +90,7 @@ create_example_files <- function(output_dir = ".") {
 
   # Sheet 3: DESIGN_SETTINGS
   design_settings <- data.frame(
-    Setting = c(
+    Parameter_Name = c(
       "Design_Type",
       "Items_Per_Task",
       "Tasks_Per_Respondent",
@@ -133,38 +133,39 @@ create_example_files <- function(output_dir = ".") {
 
   # Sheet 5: SEGMENT_SETTINGS
   segment_settings <- data.frame(
-    Segment_Name = c("Gender_Male", "Gender_Female", "Age_18_34", "Age_35_54", "Age_55_Plus"),
-    Segment_Variable = c("Gender", "Gender", "AgeGroup", "AgeGroup", "AgeGroup"),
+    Segment_ID = c("Gender_Male", "Gender_Female", "Age_18_34", "Age_35_54", "Age_55_Plus"),
+    Segment_Label = c("Male", "Female", "Age 18-34", "Age 35-54", "Age 55+"),
+    Variable_Name = c("Gender", "Gender", "AgeGroup", "AgeGroup", "AgeGroup"),
     Segment_Value = c("Male", "Female", "18-34", "35-54", "55+"),
     Include = c(1, 1, 1, 1, 1),
     stringsAsFactors = FALSE
   )
 
-  # Sheet 6: ANALYSIS_SETTINGS
-  analysis_settings <- data.frame(
-    Setting = c(
-      "Compute_Counts",
-      "Fit_Aggregate_Logit",
-      "Fit_HB",
+  # Sheet 6: OUTPUT_SETTINGS
+  output_settings <- data.frame(
+    Option_Name = c(
+      "Generate_Count_Scores",
+      "Generate_Aggregate_Logit",
+      "Generate_HB_Model",
       "Generate_Charts",
-      "Chart_Width",
-      "Chart_Height"
+      "Generate_Segment_Tables",
+      "Score_Rescale_Method"
     ),
     Value = c(
-      "TRUE",
-      "TRUE",
-      "FALSE",
-      "TRUE",
-      "10",
-      "8"
+      "Y",
+      "Y",
+      "N",
+      "Y",
+      "Y",
+      "0_100"
     ),
     Description = c(
       "Include count-based scores (Best%, Worst%, Net)",
       "Include aggregate logit model",
       "Include Hierarchical Bayes estimation (requires cmdstanr)",
       "Generate visualization charts",
-      "Chart width in inches",
-      "Chart height in inches"
+      "Generate segment-level analysis",
+      "Score rescaling method (RAW, 0_100, PROBABILITY)"
     ),
     stringsAsFactors = FALSE
   )
@@ -187,8 +188,8 @@ create_example_files <- function(output_dir = ".") {
   addWorksheet(wb_config, "SEGMENT_SETTINGS")
   writeData(wb_config, "SEGMENT_SETTINGS", segment_settings)
 
-  addWorksheet(wb_config, "ANALYSIS_SETTINGS")
-  writeData(wb_config, "ANALYSIS_SETTINGS", analysis_settings)
+  addWorksheet(wb_config, "OUTPUT_SETTINGS")
+  writeData(wb_config, "OUTPUT_SETTINGS", output_settings)
 
   config_path <- file.path(output_dir, "example_maxdiff_config.xlsx")
   saveWorkbook(wb_config, config_path, overwrite = TRUE)
