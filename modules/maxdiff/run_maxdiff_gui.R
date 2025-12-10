@@ -1,69 +1,47 @@
 # ==============================================================================
-# MAXDIFF MODULE - SHINY GUI LAUNCHER - TURAS V10.0
+# TURAS>MAXDIFF GUI - LAUNCHER
 # ==============================================================================
-# Graphical user interface for MaxDiff module
-# Part of Turas MaxDiff Module
-#
-# VERSION HISTORY:
-# Turas v10.0 - Initial release (2025-12)
-#
-# USAGE:
-# source("run_maxdiff_gui.R")
-# run_maxdiff_gui()
-#
-# Or from Turas launcher
+# Purpose: Launch MaxDiff design and analysis GUI
+# Location: modules/maxdiff/run_maxdiff_gui.R
+# Usage: source("modules/maxdiff/run_maxdiff_gui.R") then run_maxdiff_gui()
 # ==============================================================================
 
-#' Launch MaxDiff GUI
-#'
-#' Opens a Shiny interface for running MaxDiff design and analysis.
-#'
-#' @export
 run_maxdiff_gui <- function() {
 
-  # ===========================================================================
-  # SETUP
-  # ===========================================================================
+  # Required packages
+  required_packages <- c("shiny", "shinyFiles")
 
-  # Check and load required packages
-  required_packages <- c("shiny")
-  missing <- required_packages[!required_packages %in% installed.packages()[, "Package"]]
-
-  if (length(missing) > 0) {
-    message("Installing required packages: ", paste(missing, collapse = ", "))
-    install.packages(missing)
+  # Install missing packages
+  missing_packages <- required_packages[!required_packages %in% installed.packages()[,"Package"]]
+  if (length(missing_packages) > 0) {
+    message("Installing required packages: ", paste(missing_packages, collapse = ", "))
+    install.packages(missing_packages)
   }
 
+  # Load packages
   suppressPackageStartupMessages({
     library(shiny)
+    library(shinyFiles)
   })
 
-  # Determine paths
-  TURAS_HOME <- Sys.getenv("TURAS_ROOT")
-  if (!nzchar(TURAS_HOME)) {
-    TURAS_HOME <- getwd()
-    # Try to find Turas root
-    if (!file.exists(file.path(TURAS_HOME, "launch_turas.R"))) {
-      if (file.exists(file.path(dirname(TURAS_HOME), "launch_turas.R"))) {
-        TURAS_HOME <- dirname(TURAS_HOME)
-      } else if (file.exists(file.path(dirname(dirname(TURAS_HOME)), "launch_turas.R"))) {
-        TURAS_HOME <- dirname(dirname(TURAS_HOME))
-      }
-    }
-  }
+  # === CONFIGURATION ===
 
+  # Turas home directory
+  TURAS_HOME <- getwd()
+
+  # Module directory
   MODULE_DIR <- file.path(TURAS_HOME, "modules", "maxdiff")
-  RECENT_PROJECTS_FILE <- file.path(TURAS_HOME, ".maxdiff_recent_projects.rds")
 
-  # ===========================================================================
-  # HELPER FUNCTIONS
-  # ===========================================================================
+  # Recent projects file
+  RECENT_PROJECTS_FILE <- file.path(TURAS_HOME, ".recent_maxdiff_projects.rds")
+
+  # === HELPER FUNCTIONS ===
 
   load_recent_projects <- function() {
     if (file.exists(RECENT_PROJECTS_FILE)) {
-      tryCatch(readRDS(RECENT_PROJECTS_FILE), error = function(e) character(0))
+      tryCatch(readRDS(RECENT_PROJECTS_FILE), error = function(e) list())
     } else {
-      character(0)
+      list()
     }
   }
 
@@ -71,104 +49,116 @@ run_maxdiff_gui <- function() {
     tryCatch(saveRDS(projects, RECENT_PROJECTS_FILE), error = function(e) NULL)
   }
 
-  add_recent_project <- function(path) {
-    projects <- load_recent_projects()
-    projects <- unique(c(path, projects))
-    if (length(projects) > 10) projects <- projects[1:10]
-    save_recent_projects(projects)
+  add_recent_project <- function(project_info) {
+    recent <- load_recent_projects()
+    recent <- c(list(project_info), recent)
+    recent <- recent[!duplicated(sapply(recent, function(x) x$config_path))]
+    recent <- recent[1:min(5, length(recent))]
+    save_recent_projects(recent)
   }
 
-  # ===========================================================================
-  # UI
-  # ===========================================================================
+  # ==============================================================================
+  # SHINY UI
+  # ==============================================================================
 
   ui <- fluidPage(
-
     tags$head(
       tags$style(HTML("
-        body {
-          background-color: #f8f9fa;
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .main-container {
-          max-width: 900px;
-          margin: 30px auto;
+        .main-header {
+          background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+          color: white;
           padding: 30px;
-          background-color: white;
           border-radius: 10px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .header {
-          text-align: center;
-          margin-bottom: 30px;
-          padding-bottom: 20px;
-          border-bottom: 2px solid #8b5cf6;
-        }
-        .header h1 {
-          color: #2c3e50;
-          font-size: 28px;
-          margin-bottom: 5px;
-        }
-        .header p {
-          color: #6c757d;
-          font-size: 14px;
-        }
-        .card {
-          background-color: #f8f9fa;
-          border: 1px solid #dee2e6;
-          border-radius: 8px;
-          padding: 20px;
           margin-bottom: 20px;
         }
-        .card h4 {
-          color: #2c3e50;
-          margin-bottom: 15px;
-          font-size: 16px;
+        .card {
+          background: white;
+          border-radius: 10px;
+          padding: 20px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          margin-bottom: 20px;
         }
-        .btn-maxdiff {
-          background-color: #8b5cf6;
-          color: white;
+        .status-success {
+          background-color: #f0fff4;
+          border-left: 4px solid #48bb78;
+          padding: 15px;
+          margin: 10px 0;
+        }
+        .status-info {
+          background-color: #e7f3ff;
+          border-left: 4px solid #3182ce;
+          padding: 15px;
+          margin: 10px 0;
+        }
+        .status-warning {
+          background-color: #fffaf0;
+          border-left: 4px solid #ed8936;
+          padding: 15px;
+          margin: 10px 0;
+        }
+        .btn-primary {
+          background: #8b5cf6;
           border: none;
-          padding: 12px 24px;
-          font-size: 16px;
-          border-radius: 6px;
-          cursor: pointer;
-          width: 100%;
-          margin-top: 10px;
         }
-        .btn-maxdiff:hover {
-          background-color: #7c3aed;
+        .btn-primary:hover {
+          background: #6d28d9;
         }
-        .btn-maxdiff:disabled {
-          background-color: #c4b5fd;
-          cursor: not-allowed;
+        .btn-run {
+          background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+          border: none;
+          color: white;
+          font-weight: 700;
+          padding: 16px 40px;
+          font-size: 18px;
+          border-radius: 10px;
+        }
+        .file-display {
+          background: #f7fafc;
+          padding: 15px;
+          border-radius: 8px;
+          margin: 15px 0;
         }
         .console-output {
-          background-color: #1e293b;
+          background: #1a202c;
           color: #e2e8f0;
-          font-family: 'Consolas', 'Monaco', monospace;
-          font-size: 12px;
-          padding: 15px;
-          border-radius: 6px;
-          max-height: 400px;
+          padding: 20px;
+          border-radius: 8px;
+          font-family: monospace;
+          font-size: 13px;
+          max-height: 500px;
           overflow-y: auto;
           white-space: pre-wrap;
-          word-wrap: break-word;
+        }
+        .recent-project-item {
+          padding: 10px;
+          margin: 5px 0;
+          background: #f7fafc;
+          border-radius: 5px;
+          cursor: pointer;
+          border: 1px solid #e2e8f0;
+        }
+        .recent-project-item:hover {
+          background: #edf2f7;
+          border-color: #8b5cf6;
+        }
+        .file-label {
+          font-weight: 600;
+          color: #2d3748;
+          margin-top: 10px;
         }
         .mode-selector {
           display: flex;
           gap: 10px;
-          margin-bottom: 15px;
+          margin: 15px 0;
         }
         .mode-btn {
           flex: 1;
           padding: 15px;
-          border: 2px solid #dee2e6;
+          border: 2px solid #e2e8f0;
           border-radius: 8px;
           background: white;
           cursor: pointer;
           text-align: center;
-          transition: all 0.2s;
         }
         .mode-btn:hover {
           border-color: #8b5cf6;
@@ -177,135 +167,93 @@ run_maxdiff_gui <- function() {
           border-color: #8b5cf6;
           background-color: #f3e8ff;
         }
-        .mode-btn h5 {
-          margin: 0 0 5px 0;
-          color: #2c3e50;
-        }
-        .mode-btn p {
-          margin: 0;
-          font-size: 12px;
-          color: #6c757d;
-        }
-        .status-success {
-          color: #059669;
-          font-weight: bold;
-        }
-        .status-error {
-          color: #dc2626;
-          font-weight: bold;
-        }
-        .recent-projects {
-          margin-top: 10px;
-        }
-        .recent-item {
-          padding: 8px 12px;
-          background: white;
-          border: 1px solid #e5e7eb;
-          border-radius: 4px;
-          margin-bottom: 5px;
-          cursor: pointer;
-          font-size: 13px;
-          display: block;
-          text-decoration: none;
-          color: inherit;
-        }
-        .recent-item:hover {
-          background: #f3f4f6;
-          border-color: #8b5cf6;
-        }
-        .file-input-container {
-          display: flex;
-          gap: 10px;
-          align-items: center;
-        }
-        .file-input-container .form-control {
-          flex: 1;
-        }
       "))
     ),
 
-    div(class = "main-container",
+    # Header
+    div(class = "main-header",
+      h1("TURAS>MAXDIFF"),
+      p("Best-Worst Scaling Design & Analysis"),
+      p(style = "font-size: 14px; opacity: 0.9;",
+        "Part of Turas Analytics Toolkit")
+    ),
 
-      # Header
-      div(class = "header",
-        h1("MaxDiff Module"),
-        p("Best-Worst Scaling Design & Analysis")
-      ),
+    # Main content
+    fluidRow(
+      column(12,
 
-      # Mode Selection
-      div(class = "card",
-        h4("1. Select Mode"),
-        div(class = "mode-selector",
-          actionButton("mode_design", "",
-            class = "mode-btn",
-            tags$h5("DESIGN"),
-            tags$p("Generate experimental design")
+        # Step 1: Mode Selection
+        div(class = "card",
+          h3("1. Select Mode"),
+          div(class = "mode-selector",
+            actionButton("mode_design", "",
+              class = "mode-btn",
+              tags$h5("DESIGN"),
+              tags$p("Generate experimental design")
+            ),
+            actionButton("mode_analysis", "",
+              class = "mode-btn active",
+              tags$h5("ANALYSIS"),
+              tags$p("Analyze survey responses")
+            )
           ),
-          actionButton("mode_analysis", "",
-            class = "mode-btn active",
-            tags$h5("ANALYSIS"),
-            tags$p("Analyze survey responses")
+          textOutput("mode_description")
+        ),
+
+        # Step 2: File Selection
+        div(class = "card",
+          h3("2. Select Configuration File"),
+          p(style = "color: #666; font-size: 14px;",
+            "Select your MaxDiff configuration Excel file (.xlsx)"),
+
+          div(class = "file-label", "Configuration File:"),
+          div(style = "display: inline-block; margin-right: 10px;",
+            shinyFilesButton("config_file_btn",
+                          "Browse for config.xlsx",
+                          "Select MaxDiff config file",
+                          class = "btn btn-primary",
+                          icon = icon("file-excel"),
+                          multiple = FALSE)
+          ),
+          uiOutput("config_file_display"),
+
+          uiOutput("recent_ui")
+        ),
+
+        # Step 3: Run Button
+        uiOutput("run_ui"),
+
+        # Step 4: Console Output
+        div(class = "card",
+          h3("4. Analysis Output"),
+          div(class = "console-output",
+            verbatimTextOutput("console_text")
           )
-        ),
-        textOutput("mode_description")
-      ),
-
-      # Project Selection - use text input instead of shinyFiles
-      div(class = "card",
-        h4("2. Select Configuration File"),
-        div(class = "file-input-container",
-          textInput("config_path", NULL,
-                    placeholder = "Enter path to config file or use file upload below",
-                    width = "100%"),
-          actionButton("browse_btn", "Browse...", class = "btn-secondary")
-        ),
-        fileInput("config_upload", "Or upload config file:",
-                  accept = c(".xlsx", ".xls")),
-        uiOutput("recent_projects_ui"),
-        textOutput("file_status")
-      ),
-
-      # Config Preview
-      uiOutput("config_preview_ui"),
-
-      # Run Button
-      div(class = "card",
-        h4("3. Run MaxDiff"),
-        actionButton("run_btn", "Run MaxDiff Analysis",
-                    class = "btn-maxdiff",
-                    disabled = TRUE),
-        br(), br(),
-        uiOutput("status_ui")
-      ),
-
-      # Console Output
-      div(class = "card",
-        h4("Console Output"),
-        div(class = "console-output",
-          verbatimTextOutput("console_text")
         )
-      ),
-
-      # Footer
-      div(style = "text-align: center; color: #9ca3af; font-size: 12px; margin-top: 20px;",
-        sprintf("Turas MaxDiff Module v10.0 | %s", TURAS_HOME)
       )
     )
   )
 
-  # ===========================================================================
-  # SERVER
-  # ===========================================================================
+  # ==============================================================================
+  # SHINY SERVER
+  # ==============================================================================
 
   server <- function(input, output, session) {
 
     # Reactive values
     rv <- reactiveValues(
       mode = "ANALYSIS",
-      config_path = NULL,
-      is_running = FALSE,
-      console_output = "Ready to run MaxDiff analysis...\n"
+      config_path = NULL
     )
+
+    console_output <- reactiveVal("")
+    is_running <- reactiveVal(FALSE)
+
+    # File choosers - use simple paths like tracker
+    volumes <- c(Home = "~", Documents = "~/Documents", Desktop = "~/Desktop")
+
+    shinyFileChoose(input, "config_file_btn", roots = volumes, session = session,
+                   filetypes = c("", "xlsx", "xls"))
 
     # Mode selection
     observeEvent(input$mode_design, {
@@ -328,210 +276,274 @@ run_maxdiff_gui <- function() {
       }
     })
 
-    # Handle text input path
-    observeEvent(input$config_path, {
-      path <- trimws(input$config_path)
-      if (nzchar(path) && file.exists(path)) {
-        rv$config_path <- normalizePath(path)
-        add_recent_project(rv$config_path)
-        updateActionButton(session, "run_btn", disabled = FALSE)
-      } else if (nzchar(path)) {
-        rv$config_path <- NULL
-        updateActionButton(session, "run_btn", disabled = TRUE)
-      }
-    }, ignoreInit = TRUE)
-
-    # Handle file upload
-    observeEvent(input$config_upload, {
-      req(input$config_upload)
-      # Copy uploaded file to a permanent location
-      upload_path <- input$config_upload$datapath
-      file_name <- input$config_upload$name
-
-      # Save to module examples directory
-      dest_dir <- file.path(MODULE_DIR, "uploads")
-      if (!dir.exists(dest_dir)) dir.create(dest_dir, recursive = TRUE)
-
-      dest_path <- file.path(dest_dir, file_name)
-      file.copy(upload_path, dest_path, overwrite = TRUE)
-
-      rv$config_path <- dest_path
-      updateTextInput(session, "config_path", value = dest_path)
-      add_recent_project(dest_path)
-      updateActionButton(session, "run_btn", disabled = FALSE)
-
-      rv$console_output <- paste0(rv$console_output,
-                                  sprintf("\nUploaded: %s\n", file_name))
+    # Handle config file selection
+    observeEvent(input$config_file_btn, {
+      tryCatch({
+        if (!is.integer(input$config_file_btn)) {
+          file_path <- parseFilePaths(volumes, input$config_file_btn)
+          if (nrow(file_path) > 0) {
+            config_path <- as.character(file_path$datapath[1])
+            rv$config_path <- config_path
+          }
+        }
+      }, error = function(e) {
+        showNotification(paste("Error selecting file:", e$message), type = "error")
+      })
     })
 
-    # Browse button - show file dialog hint
-    observeEvent(input$browse_btn, {
-      showModal(modalDialog(
-        title = "Select Configuration File",
-        p("Enter the full path to your MaxDiff configuration file (.xlsx):"),
-        textInput("modal_path", NULL,
-                  value = file.path(MODULE_DIR, "examples", "basic"),
-                  width = "100%"),
-        p(tags$small("Example: ", code(file.path(MODULE_DIR, "examples", "basic", "example_maxdiff_config.xlsx")))),
-        footer = tagList(
-          modalButton("Cancel"),
-          actionButton("modal_ok", "OK", class = "btn-primary")
+    # Handle recent project selection
+    observeEvent(input$select_recent, {
+      req(input$select_recent)
+      recent <- load_recent_projects()
+      if (input$select_recent <= length(recent)) {
+        proj <- recent[[input$select_recent]]
+        rv$config_path <- proj$config_path
+        rv$mode <- proj$mode
+        if (proj$mode == "DESIGN") {
+          updateActionButton(session, "mode_design", class = "mode-btn active")
+          updateActionButton(session, "mode_analysis", class = "mode-btn")
+        } else {
+          updateActionButton(session, "mode_design", class = "mode-btn")
+          updateActionButton(session, "mode_analysis", class = "mode-btn active")
+        }
+      }
+    })
+
+    # Display config file
+    output$config_file_display <- renderUI({
+      if (is.null(rv$config_path)) {
+        div(class = "status-info",
+          icon("info-circle"), " No file selected"
         )
-      ))
-    })
-
-    observeEvent(input$modal_ok, {
-      path <- trimws(input$modal_path)
-      if (nzchar(path)) {
-        updateTextInput(session, "config_path", value = path)
-        removeModal()
-      }
-    })
-
-    output$file_status <- renderText({
-      if (!is.null(rv$config_path) && file.exists(rv$config_path)) {
-        paste("Selected:", basename(rv$config_path))
-      } else if (!is.null(input$config_path) && nzchar(input$config_path)) {
-        "File not found"
       } else {
-        ""
+        div(class = "file-display",
+          tags$strong(basename(rv$config_path)),
+          tags$br(),
+          tags$small(rv$config_path),
+          if (file.exists(rv$config_path)) {
+            div(class = "status-success", style = "margin-top: 10px;",
+              icon("check-circle"), " File found"
+            )
+          } else {
+            div(class = "status-warning", style = "margin-top: 10px;",
+              icon("exclamation-triangle"), " File not found"
+            )
+          }
+        )
       }
     })
 
     # Recent projects
-    output$recent_projects_ui <- renderUI({
+    output$recent_ui <- renderUI({
       recent <- load_recent_projects()
-      recent <- recent[file.exists(recent)]  # Filter existing files
+      if (length(recent) == 0) return(NULL)
 
-      if (length(recent) > 0) {
-        div(class = "recent-projects",
-          tags$small(tags$strong("Recent projects:")),
-          lapply(recent[1:min(3, length(recent))], function(path) {
-            tags$a(
-              href = "#",
-              class = "recent-item",
-              onclick = sprintf('Shiny.setInputValue("select_recent", "%s", {priority: "event"}); return false;',
-                               gsub("\\\\", "\\\\\\\\", path)),
-              basename(path)
+      div(
+        tags$hr(),
+        h4("Recent Projects"),
+        lapply(seq_along(recent), function(i) {
+          proj <- recent[[i]]
+          if (file.exists(proj$config_path)) {
+            tags$div(
+              class = "recent-project-item",
+              onclick = sprintf("Shiny.setInputValue('select_recent', %d, {priority: 'event'})", i),
+              tags$strong(basename(proj$config_path)),
+              tags$span(style = "float: right; color: #8b5cf6;", proj$mode),
+              tags$br(),
+              tags$small(style = "color: #666;", dirname(proj$config_path))
             )
-          })
-        )
-      }
-    })
-
-    observeEvent(input$select_recent, {
-      path <- input$select_recent
-      if (!is.null(path) && file.exists(path)) {
-        rv$config_path <- path
-        updateTextInput(session, "config_path", value = path)
-        updateActionButton(session, "run_btn", disabled = FALSE)
-      }
-    })
-
-    # Config preview
-    output$config_preview_ui <- renderUI({
-      if (!is.null(rv$config_path) && file.exists(rv$config_path)) {
-        div(class = "card",
-          h4("Configuration Preview"),
-          tags$p(tags$strong("File: "), basename(rv$config_path)),
-          tags$p(tags$strong("Path: "), tags$small(rv$config_path)),
-          tags$p(tags$strong("Mode: "), rv$mode)
-        )
-      }
-    })
-
-    # Run button
-    observeEvent(input$run_btn, {
-      req(rv$config_path)
-      req(!rv$is_running)
-
-      rv$is_running <- TRUE
-      updateActionButton(session, "run_btn", disabled = TRUE, label = "Running...")
-
-      rv$console_output <- sprintf(
-        "================================================================================\n%s\nStarting MaxDiff %s mode...\n================================================================================\n",
-        format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
-        rv$mode
-      )
-
-      # Source module and run
-      tryCatch({
-        old_wd <- getwd()
-
-        # Source main module
-        main_script <- file.path(MODULE_DIR, "R", "00_main.R")
-        if (!file.exists(main_script)) {
-          stop("Module files not found. Please check installation.")
-        }
-
-        # Capture output
-        withCallingHandlers({
-          source(main_script, local = TRUE)
-
-          result <- run_maxdiff(
-            config_path = rv$config_path,
-            verbose = TRUE
-          )
-
-          rv$console_output <- paste0(rv$console_output,
-                                      "\n================================================================================\n",
-                                      "COMPLETE\n",
-                                      "================================================================================\n")
-
-          if (!is.null(result$output_path)) {
-            rv$console_output <- paste0(rv$console_output,
-                                        sprintf("\nOutput saved to:\n%s\n", result$output_path))
           }
-
-        }, message = function(m) {
-          rv$console_output <- paste0(rv$console_output, m$message)
-        }, warning = function(w) {
-          rv$console_output <- paste0(rv$console_output, "Warning: ", w$message, "\n")
-          invokeRestart("muffleWarning")
         })
-
-        setwd(old_wd)
-
-      }, error = function(e) {
-        rv$console_output <- paste0(rv$console_output,
-                                    sprintf("\nERROR: %s\n", e$message))
-      }, finally = {
-        rv$is_running <- FALSE
-        updateActionButton(session, "run_btn", disabled = FALSE, label = "Run MaxDiff Analysis")
-      })
+      )
     })
 
-    # Status output
-    output$status_ui <- renderUI({
-      if (rv$is_running) {
-        div(style = "color: #8b5cf6;", "Running analysis...")
-      } else if (!is.null(rv$config_path) && file.exists(rv$config_path)) {
-        div(class = "status-success", "Ready to run")
-      } else {
-        div(style = "color: #6c757d;", "Select a configuration file to begin")
-      }
+    # Run button UI
+    output$run_ui <- renderUI({
+      if (is.null(rv$config_path)) return(NULL)
+
+      can_run <- !is.null(rv$config_path) && file.exists(rv$config_path)
+
+      div(class = "card",
+        h3("3. Run MaxDiff"),
+        if (!can_run) {
+          div(class = "status-warning",
+            icon("exclamation-triangle"), " Please select a valid configuration file"
+          )
+        },
+        div(style = "text-align: center; margin: 20px 0;",
+          actionButton("run_btn",
+                      paste("RUN MAXDIFF", rv$mode),
+                      class = "btn-run",
+                      icon = icon("play-circle"),
+                      disabled = !can_run || is_running())
+        )
+      )
     })
 
     # Console output
     output$console_text <- renderText({
-      rv$console_output
+      current_output <- console_output()
+
+      if (is.null(current_output) || length(current_output) == 0 || nchar(current_output[1]) == 0) {
+        "Console output will appear here when you run MaxDiff..."
+      } else {
+        if (length(current_output) > 1) {
+          paste(current_output, collapse = "\n")
+        } else {
+          current_output
+        }
+      }
+    })
+
+    # Run analysis
+    observeEvent(input$run_btn, {
+      req(rv$config_path)
+
+      is_running(TRUE)
+
+      # Clear previous console output
+      console_output("")
+
+      # Create progress indicator
+      progress <- Progress$new(session)
+      progress$set(message = paste("Running MaxDiff", rv$mode), value = 0)
+      on.exit(progress$close())
+
+      # Save current working directory
+      old_wd <- getwd()
+
+      # Capture all warnings
+      all_warnings <- character(0)
+      warning_handler <- function(w) {
+        all_warnings <<- c(all_warnings, conditionMessage(w))
+        invokeRestart("muffleWarning")
+      }
+
+      tryCatch(withCallingHandlers({
+        # Validate path
+        config_path <- rv$config_path
+        config_path <- normalizePath(config_path, mustWork = FALSE)
+
+        progress$set(value = 0.1, detail = "Validating inputs...")
+
+        if (!is.character(config_path) || length(config_path) != 1) {
+          stop("Invalid config path")
+        }
+
+        if (!file.exists(config_path)) {
+          stop("Config file not found: ", config_path)
+        }
+
+        # Build paths
+        run_script <- file.path(MODULE_DIR, "R", "00_main.R")
+
+        if (!file.exists(run_script)) {
+          stop("Could not find MaxDiff module at: ", run_script)
+        }
+
+        # Change to module directory
+        setwd(MODULE_DIR)
+
+        # Source main module
+        progress$set(value = 0.2, detail = "Loading MaxDiff modules...")
+        source(file.path("R", "00_main.R"))
+
+        # Run analysis and capture ALL console output
+        progress$set(value = 0.3, detail = "Running MaxDiff analysis...")
+
+        output_capture_file <- tempfile()
+        sink(output_capture_file, type = "output")
+
+        analysis_result <- tryCatch({
+          result <- run_maxdiff(
+            config_path = config_path,
+            verbose = TRUE
+          )
+          list(success = TRUE, result = result, error = NULL)
+
+        }, error = function(e) {
+          list(success = FALSE, result = NULL, error = e)
+
+        }, finally = {
+          sink(type = "output")
+        })
+
+        progress$set(value = 0.9, detail = "Finalizing...")
+
+        # Read captured output
+        captured_output <- readLines(output_capture_file, warn = FALSE)
+        unlink(output_capture_file)
+
+        # Display captured output in console
+        if (length(captured_output) > 0) {
+          console_output(paste(captured_output, collapse = "\n"))
+        } else {
+          console_output("MaxDiff completed but produced no console output.")
+        }
+
+        # Handle error from analysis
+        if (!analysis_result$success) {
+          stop(analysis_result$error$message)
+        }
+
+        # Save to recent projects
+        add_recent_project(list(
+          config_path = config_path,
+          mode = rv$mode
+        ))
+
+        # Update console with completion message
+        output_path <- if (!is.null(analysis_result$result$output_path)) {
+          analysis_result$result$output_path
+        } else {
+          "See output folder"
+        }
+
+        console_output(paste0(
+          console_output(),
+          sprintf("\n%s\n ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80)),
+          sprintf("\nOutput file saved to:\n%s\n", output_path)
+        ))
+
+        # Display warnings
+        if (length(all_warnings) > 0) {
+          warning_msg <- paste0("\n\nWarnings:\n", paste(all_warnings, collapse = "\n"))
+          console_output(paste0(console_output(), "\n", warning_msg))
+        }
+
+        progress$set(value = 1.0, detail = "Complete!")
+        showNotification("MaxDiff analysis completed!", type = "message", duration = 5)
+
+      }, warning = warning_handler), error = function(e) {
+        error_msg <- paste0(strrep("=", 80), "\nERROR: ", e$message, "\n", strrep("=", 80), "\n\n")
+        error_msg <- paste0(error_msg, "Full error:\n", paste(capture.output(print(e)), collapse = "\n"))
+        console_output(paste0(console_output(), "\n\n", error_msg))
+        showNotification(paste("Error:", e$message), type = "error", duration = 10)
+
+      }, finally = {
+        setwd(old_wd)
+        is_running(FALSE)
+      })
     })
   }
 
-  # ===========================================================================
-  # RUN APP
-  # ===========================================================================
+  # Launch
+  cat("\nLaunching Turas>MaxDiff GUI...\n\n")
+
+  # Set error logging
+  options(shiny.error = function() {
+    log_file <- file.path(tempdir(), "maxdiff_gui_error.log")
+    tryCatch({
+      cat("MAXDIFF GUI ERROR\n", file = log_file)
+      cat("================================================================================\n", file = log_file, append = TRUE)
+      cat("Time:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n", file = log_file, append = TRUE)
+      cat("Error:", geterrmessage(), "\n\n", file = log_file, append = TRUE)
+      cat("Traceback:\n", file = log_file, append = TRUE)
+      cat(paste(capture.output(traceback()), collapse = "\n"), file = log_file, append = TRUE)
+      cat("\n================================================================================\n", file = log_file, append = TRUE)
+      cat("\n\nError log written to:", log_file, "\n")
+    }, error = function(e) {})
+  })
 
   shinyApp(ui = ui, server = server)
-}
-
-
-# ==============================================================================
-# AUTO-RUN
-# ==============================================================================
-
-# When sourced directly, launch the GUI
-if (!interactive() || !exists("TURAS_LAUNCHER_ACTIVE")) {
-  app <- run_maxdiff_gui()
-  shiny::runApp(app, launch.browser = TRUE)
 }
