@@ -49,6 +49,14 @@ run_maxdiff_gui <- function() {
       .recent-item:hover { border-color: #8b5cf6; }
       .status-ok { color: #059669; }
       .status-err { color: #dc2626; }
+      .btn-browse { background: #6366f1; color: white; border: none; padding: 10px 20px; border-radius: 8px; margin-left: 10px; }
+      .btn-browse:hover { background: #4f46e5; }
+      .input-row { display: flex; align-items: center; }
+      .input-row .form-group { flex: 1; margin-bottom: 0; }
+      .progress-container { margin: 15px 0; }
+      .progress-bar-custom { height: 20px; background: #e5e7eb; border-radius: 10px; overflow: hidden; }
+      .progress-bar-fill { height: 100%; background: linear-gradient(90deg, #8b5cf6, #6d28d9); transition: width 0.3s ease; }
+      .progress-text { text-align: center; margin-top: 5px; font-size: 14px; color: #6b7280; }
     "))),
 
     div(class = "container",
@@ -67,7 +75,10 @@ run_maxdiff_gui <- function() {
 
       div(class = "card",
         h4("2. Configuration File"),
-        textInput("config_path", NULL, placeholder = "Enter full path to config.xlsx", width = "100%"),
+        div(class = "input-row",
+          textInput("config_path", NULL, placeholder = "Enter full path to config.xlsx", width = "100%"),
+          actionButton("browse_btn", "Browse...", class = "btn-browse")
+        ),
         tags$small("Example: ", tags$code(file.path(MODULE_DIR, "examples/basic/example_maxdiff_config.xlsx"))),
         uiOutput("file_status"),
         uiOutput("recent_ui")
@@ -75,7 +86,8 @@ run_maxdiff_gui <- function() {
 
       div(class = "card",
         h4("3. Run"),
-        actionButton("run_btn", "Run MaxDiff", class = "btn-run")
+        actionButton("run_btn", "Run MaxDiff", class = "btn-run"),
+        uiOutput("progress_ui")
       ),
 
       div(class = "card",
@@ -87,8 +99,31 @@ run_maxdiff_gui <- function() {
 
   # Server
   server <- function(input, output, session) {
-    rv <- reactiveValues(mode = "ANALYSIS")
+    rv <- reactiveValues(mode = "ANALYSIS", progress = 0, progress_text = "", show_progress = FALSE)
     console_out <- reactiveVal("Ready. Enter config path and click Run.")
+
+    # Browse button
+    observeEvent(input$browse_btn, {
+      tryCatch({
+        selected <- file.choose()
+        if (!is.null(selected) && nzchar(selected)) {
+          updateTextInput(session, "config_path", value = selected)
+        }
+      }, error = function(e) {
+        # User cancelled file selection
+      })
+    })
+
+    # Progress bar UI
+    output$progress_ui <- renderUI({
+      if (!rv$show_progress) return(NULL)
+      div(class = "progress-container",
+        div(class = "progress-bar-custom",
+          div(class = "progress-bar-fill", style = sprintf("width: %d%%;", rv$progress))
+        ),
+        div(class = "progress-text", rv$progress_text)
+      )
+    })
 
     # Mode buttons
     observeEvent(input$mode_design, {
@@ -149,6 +184,12 @@ run_maxdiff_gui <- function() {
     # Console
     output$console_text <- renderText({ console_out() })
 
+    # Helper to update progress
+    update_progress <- function(pct, text) {
+      rv$progress <- pct
+      rv$progress_text <- text
+    }
+
     # Run
     observeEvent(input$run_btn, {
       config_path <- trimws(input$config_path)
@@ -161,30 +202,50 @@ run_maxdiff_gui <- function() {
         return()
       }
 
+      # Show progress bar
+      rv$show_progress <- TRUE
+      update_progress(5, "Initializing...")
+
       console_out(paste0("Starting MaxDiff ", rv$mode, "...\n", strrep("=", 60), "\n"))
 
       old_wd <- getwd()
       tryCatch({
+        update_progress(10, "Loading MaxDiff module...")
         setwd(MODULE_DIR)
         source(file.path("R", "00_main.R"))
+
+        update_progress(20, "Reading configuration...")
 
         # Capture output
         tmp <- tempfile()
         sink(tmp, type = "output")
+
+        update_progress(30, "Processing...")
+
         result <- tryCatch({
           run_maxdiff(config_path = config_path, verbose = TRUE)
         }, finally = { sink(type = "output") })
+
+        update_progress(80, "Finalizing output...")
 
         captured <- paste(readLines(tmp, warn = FALSE), collapse = "\n")
         unlink(tmp)
 
         save_recent(config_path, rv$mode)
 
+        update_progress(100, "Complete!")
+
         out_path <- if (!is.null(result$output_path)) result$output_path else "output folder"
         console_out(paste0(captured, "\n", strrep("=", 60), "\nCOMPLETE\nOutput: ", out_path))
 
+        # Hide progress bar after delay
+        invalidateLater(2000, session)
+        rv$show_progress <- FALSE
+
       }, error = function(e) {
+        update_progress(0, "Error occurred")
         console_out(paste0(console_out(), "\nERROR: ", e$message))
+        rv$show_progress <- FALSE
       }, finally = {
         setwd(old_wd)
       })
