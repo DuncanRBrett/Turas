@@ -38,7 +38,7 @@ test_that("Tabs config_loader has expected functions", {
 # ==============================================================================
 
 test_that("Tracker config_loader has expected functions", {
-  source("modules/tracker/tracker_config_loader.R", local = TRUE)
+  source("../../modules/tracker/tracker_config_loader.R", local = TRUE)
 
   # Check that key functions exist
   expect_true(exists("load_tracking_config"))
@@ -47,7 +47,7 @@ test_that("Tracker config_loader has expected functions", {
 })
 
 test_that("Tracker get_setting retrieves values with defaults", {
-  source("modules/tracker/tracker_config_loader.R", local = TRUE)
+  source("../../modules/tracker/tracker_config_loader.R", local = TRUE)
 
   test_config <- list(
     settings = list(
@@ -66,7 +66,7 @@ test_that("Tracker get_setting retrieves values with defaults", {
 })
 
 test_that("Tracker parse_settings_to_list converts Y/N to logical", {
-  source("modules/tracker/tracker_config_loader.R", local = TRUE)
+  source("../../modules/tracker/tracker_config_loader.R", local = TRUE)
 
   settings_df <- data.frame(
     Setting = c("show_base", "show_significance", "decimal_places"),

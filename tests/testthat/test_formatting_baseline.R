@@ -59,7 +59,7 @@ test_that("Tabs excel_writer creates correct number formats with comma separator
 # ==============================================================================
 
 test_that("Tracker formatting_utils formats numbers with period separator", {
-  source("modules/tracker/formatting_utils.R", local = TRUE)
+  source("../../modules/tracker/formatting_utils.R", local = TRUE)
 
   result <- format_number_with_separator(95.5, decimal_places = 1, decimal_sep = ".")
 
@@ -68,7 +68,7 @@ test_that("Tracker formatting_utils formats numbers with period separator", {
 })
 
 test_that("Tracker formatting_utils formats numbers with comma separator", {
-  source("modules/tracker/formatting_utils.R", local = TRUE)
+  source("../../modules/tracker/formatting_utils.R", local = TRUE)
 
   result <- format_number_with_separator(95.5, decimal_places = 1, decimal_sep = ",")
 
@@ -77,7 +77,7 @@ test_that("Tracker formatting_utils formats numbers with comma separator", {
 })
 
 test_that("Tracker formatting handles vector inputs", {
-  source("modules/tracker/formatting_utils.R", local = TRUE)
+  source("../../modules/tracker/formatting_utils.R", local = TRUE)
 
   values <- c(10.5, 20.7, 30.9)
   result <- format_number_with_separator(values, decimal_places = 1, decimal_sep = ",")
@@ -90,7 +90,7 @@ test_that("Tracker formatting handles vector inputs", {
 })
 
 test_that("Tracker formatting handles NA values", {
-  source("modules/tracker/formatting_utils.R", local = TRUE)
+  source("../../modules/tracker/formatting_utils.R", local = TRUE)
 
   result <- format_number_with_separator(NA, decimal_places = 1, decimal_sep = ".")
 
@@ -98,7 +98,7 @@ test_that("Tracker formatting handles NA values", {
 })
 
 test_that("Tracker formatting handles NULL values", {
-  source("modules/tracker/formatting_utils.R", local = TRUE)
+  source("../../modules/tracker/formatting_utils.R", local = TRUE)
 
   result <- format_number_with_separator(NULL, decimal_places = 1, decimal_sep = ".")
 
@@ -106,7 +106,7 @@ test_that("Tracker formatting handles NULL values", {
 })
 
 test_that("Tracker formatting respects decimal_places parameter", {
-  source("modules/tracker/formatting_utils.R", local = TRUE)
+  source("../../modules/tracker/formatting_utils.R", local = TRUE)
 
   # 0 decimal places
   expect_equal(
