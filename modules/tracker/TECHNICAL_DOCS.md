@@ -434,6 +434,42 @@ write_banner_trend_table(wb, sheet_name, question_result, segment_name, config)
 
 **Quality:** HIGH - Complex Excel generation
 
+#### 9a. `tracker_dashboard_reports.R` (~800 lines) - NEW v2.2
+**Purpose:** Generate enhanced executive reports
+
+**Key Functions:**
+```r
+write_dashboard_output(trend_results, config, wave_data, output_path, include_sig_matrices)
+  # NEW v2.2: Generates executive dashboard with optional significance matrices
+
+write_trend_dashboard(wb, trend_results, config, sheet_name)
+  # Creates executive summary dashboard sheet
+
+write_all_significance_matrices(wb, trend_results, config)
+  # Generates significance matrices for all questions
+
+write_significance_matrix(wb, q_result, config, wave_ids)
+  # Generates matrix for a single question
+
+write_sig_matrix_output(trend_results, config, wave_data, output_path)
+  # NEW v2.2: Standalone significance matrix report
+```
+
+**Report Types (v2.2+):**
+- **Dashboard:** Executive summary with:
+  - All metrics in one view
+  - Latest value, vs previous wave, vs baseline
+  - Significance indicators (arrows)
+  - Status indicators (Good/Stable/Watch/Alert)
+  - Mini trend display across waves
+- **Sig Matrix:** Wave-pair significance comparisons:
+  - One sheet per question
+  - Matrix showing all wave-to-wave comparisons
+  - Color-coded significance (green=up, red=down)
+  - Change values with direction indicators
+
+**Quality:** HIGH - Executive reporting functionality
+
 #### 10. `run_tracker_gui.R` (689 lines)
 **Purpose:** Shiny-based GUI interface
 
@@ -662,6 +698,12 @@ write_tracker_output(trend_results, config, wave_data, "output.xlsx", banner_seg
 
 # Write wave history output (v2.0+)
 write_wave_history_output(trend_results, config, wave_data, "wave_history.xlsx", banner_segments)
+
+# Write dashboard output (v2.2+) - includes sig matrices by default
+write_dashboard_output(trend_results, config, wave_data, "dashboard.xlsx", include_sig_matrices = TRUE)
+
+# Write standalone significance matrix output (v2.2+)
+write_sig_matrix_output(trend_results, config, wave_data, "sig_matrix.xlsx")
 ```
 
 ---
@@ -698,7 +740,7 @@ COMP_CX          | Customer Experience Index     | Composite
 ```
 SettingName              | SettingValue
 project_name             | Q4 2024 Brand Tracking
-report_types             | detailed,wave_history
+report_types             | detailed,wave_history,dashboard,sig_matrix
 output_dir               | output/
 confidence_level         | 0.95
 min_base_size            | 30
@@ -710,7 +752,11 @@ show_significance        | TRUE
 
 **Common Settings:**
 - `project_name`: Project title
-- `report_types`: "detailed", "wave_history", or "detailed,wave_history"
+- `report_types`: Comma-separated list of report types to generate:
+  - `detailed`: Full detailed trend report (one sheet per question)
+  - `wave_history`: Wave history format (one row per question)
+  - `dashboard`: Executive summary with trend status indicators
+  - `sig_matrix`: Significance matrix for all wave-pair comparisons
 - `output_file`: Output filename (default: auto-generated)
 - `confidence_level`: Statistical confidence (default: 0.95)
 - `min_base_size`: Minimum n for sig testing (default: 30)

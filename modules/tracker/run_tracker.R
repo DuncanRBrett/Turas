@@ -37,6 +37,7 @@ source(file.path(script_dir, "trend_calculator.R"))
 source(file.path(script_dir, "banner_trends.R"))
 source(file.path(script_dir, "formatting_utils.R"))
 source(file.path(script_dir, "tracker_output.R"))
+source(file.path(script_dir, "tracker_dashboard_reports.R"))
 
 # Verify all required functions loaded successfully
 verify_tracker_environment <- function() {
@@ -50,6 +51,8 @@ verify_tracker_environment <- function() {
     "calculate_all_trends",
     "calculate_trends_with_banners",
     "write_tracker_output",
+    "write_dashboard_output",
+    "write_sig_matrix_output",
     "find_turas_root"
   )
 
@@ -143,7 +146,7 @@ run_tracker <- function(tracking_config_path,
   cat("================================================================================\n")
   cat(paste0("TURASTACKER - MVT ", phase_label, "\n"))
   cat("================================================================================\n")
-  cat(paste0("Version: 2.1 (2025-12-05) - Multi_Mention Category Mode Fix\n"))
+  cat(paste0("Version: 2.2 (2025-12-11) - Enhanced Reports: Dashboard & Significance Matrix\n"))
   cat(paste0("Started: ", format(start_time, "%Y-%m-%d %H:%M:%S"), "\n"))
   cat("\n")
 
@@ -259,7 +262,7 @@ run_tracker <- function(tracking_config_path,
   report_types <- trimws(strsplit(report_types_setting, ",")[[1]])
 
   # Validate report types
-  valid_types <- c("detailed", "wave_history")
+  valid_types <- c("detailed", "wave_history", "dashboard", "sig_matrix")
   invalid_types <- setdiff(report_types, valid_types)
   if (length(invalid_types) > 0) {
     warning(paste0("Invalid report types ignored: ", paste(invalid_types, collapse = ", ")))
@@ -326,6 +329,57 @@ run_tracker <- function(tracking_config_path,
       wave_data = wave_data,
       output_path = wave_history_path,
       banner_segments = banner_segments
+    )
+  }
+
+  if ("dashboard" %in% report_types) {
+    # Generate executive dashboard report
+    dashboard_path <- if (length(report_types) > 1) {
+      # Multiple report types - use specific filename
+      output_dir <- if (!is.null(output_path)) {
+        dirname(output_path)
+      } else {
+        get_setting(config, "output_dir", default = dirname(config$config_path))
+      }
+      project_name <- get_setting(config, "project_name", default = "Tracking")
+      project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
+      file.path(output_dir, paste0(project_name, "_Dashboard_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
+    } else {
+      # Single report type - use default output_path or auto-generate
+      NULL  # Let write_dashboard_output handle it
+    }
+
+    output_files$dashboard <- write_dashboard_output(
+      trend_results = trend_results,
+      config = config,
+      wave_data = wave_data,
+      output_path = dashboard_path,
+      include_sig_matrices = TRUE  # Dashboard includes sig matrices by default
+    )
+  }
+
+  if ("sig_matrix" %in% report_types) {
+    # Generate significance matrix report (standalone, without dashboard)
+    sig_matrix_path <- if (length(report_types) > 1) {
+      # Multiple report types - use specific filename
+      output_dir <- if (!is.null(output_path)) {
+        dirname(output_path)
+      } else {
+        get_setting(config, "output_dir", default = dirname(config$config_path))
+      }
+      project_name <- get_setting(config, "project_name", default = "Tracking")
+      project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
+      file.path(output_dir, paste0(project_name, "_SigMatrix_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
+    } else {
+      # Single report type - use default output_path or auto-generate
+      NULL  # Let write_sig_matrix_output handle it
+    }
+
+    output_files$sig_matrix <- write_sig_matrix_output(
+      trend_results = trend_results,
+      config = config,
+      wave_data = wave_data,
+      output_path = sig_matrix_path
     )
   }
 
