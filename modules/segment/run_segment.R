@@ -31,6 +31,13 @@ source(file.path(turas_root, "modules/segment/lib/segment_profile.R"))
 source(file.path(turas_root, "modules/segment/lib/segment_export.R"))
 source(file.path(turas_root, "modules/segment/lib/segment_outliers.R"))
 
+# Enhanced features (v10.1)
+source(file.path(turas_root, "modules/segment/lib/segment_profiling_enhanced.R"))
+source(file.path(turas_root, "modules/segment/lib/segment_scoring.R"))
+source(file.path(turas_root, "modules/segment/lib/segment_rules.R"))
+source(file.path(turas_root, "modules/segment/lib/segment_cards.R"))
+source(file.path(turas_root, "modules/segment/lib/segment_lca.R"))
+
 # ==============================================================================
 # MAIN SEGMENTATION FUNCTION
 # ==============================================================================

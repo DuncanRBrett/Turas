@@ -386,6 +386,257 @@ calculate_validation_metrics <- function(data, model, k, calculate_gap = FALSE) 
     # Skipped for now as it's not critical
     metrics$gap_statistic <- NA
   }
-  
+
   return(metrics)
+}
+
+
+# ==============================================================================
+# FEATURE 9: SIMPLE STABILITY CHECK
+# ==============================================================================
+
+#' Run Simple Stability Check
+#'
+#' Performs a quick stability check by running k-means with multiple random
+#' seeds and checking if segment assignments are consistent. Much faster than
+#' full bootstrap validation.
+#'
+#' @param data Data frame with clustering variables
+#' @param clustering_vars Character vector of clustering variable names
+#' @param k Integer, number of clusters
+#' @param n_runs Integer, number of different random seed runs (default: 5)
+#' @param nstart Integer, number of random starts per run (default: 50)
+#'
+#' @return List with stability_score, run_results, agreement_matrix, interpretation
+#' @export
+#' @examples
+#' stability <- check_stability_simple(
+#'   data = survey_data,
+#'   clustering_vars = c("q1", "q2", "q3", "q4", "q5"),
+#'   k = 4,
+#'   n_runs = 5
+#' )
+check_stability_simple <- function(data, clustering_vars, k, n_runs = 5, nstart = 50) {
+
+  cat("\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("STABILITY CHECK (Simple)\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("\n")
+
+  cat(sprintf("Running %d k-means iterations with different seeds...\n", n_runs))
+  cat(sprintf("  k = %d, nstart = %d per run\n\n", k, nstart))
+
+  # Prepare data
+  clustering_data <- scale(data[, clustering_vars, drop = FALSE])
+  n <- nrow(clustering_data)
+
+  # Store results from each run
+  run_results <- list()
+  all_clusters <- matrix(NA, nrow = n, ncol = n_runs)
+
+  base_seed <- as.integer(Sys.time())
+
+  for (run in 1:n_runs) {
+    seed <- base_seed + run * 1000
+    set.seed(seed)
+
+    model <- kmeans(clustering_data, centers = k, nstart = nstart)
+
+    run_results[[run]] <- list(
+      seed = seed,
+      model = model,
+      tot_withinss = model$tot.withinss
+    )
+
+    all_clusters[, run] <- model$cluster
+
+    cat(sprintf("  Run %d: tot.withinss = %.1f\n", run, model$tot.withinss))
+  }
+
+  # ===========================================================================
+  # CALCULATE PAIRWISE AGREEMENT
+  # ===========================================================================
+
+  # Calculate agreement between all pairs of runs
+  # Use Rand Index or simple agreement after alignment
+
+  agreement_scores <- numeric(0)
+  n_pairs <- n_runs * (n_runs - 1) / 2
+
+  for (i in 1:(n_runs - 1)) {
+    for (j in (i + 1):n_runs) {
+      # Calculate agreement using best cluster matching
+      agreement <- calculate_cluster_agreement(all_clusters[, i], all_clusters[, j])
+      agreement_scores <- c(agreement_scores, agreement)
+    }
+  }
+
+  # ===========================================================================
+  # CALCULATE STABILITY SCORE
+  # ===========================================================================
+
+  avg_agreement <- mean(agreement_scores)
+  min_agreement <- min(agreement_scores)
+  max_agreement <- max(agreement_scores)
+
+  # Overall stability score (0-100)
+  stability_score <- avg_agreement * 100
+
+  # ===========================================================================
+  # INTERPRETATION
+  # ===========================================================================
+
+  if (stability_score >= 90) {
+    interpretation <- "EXCELLENT: Very stable segmentation"
+    color <- "green"
+  } else if (stability_score >= 80) {
+    interpretation <- "GOOD: Reasonably stable segmentation"
+    color <- "green"
+  } else if (stability_score >= 70) {
+    interpretation <- "ACCEPTABLE: Some instability, consider fewer segments"
+    color <- "yellow"
+  } else if (stability_score >= 60) {
+    interpretation <- "MARGINAL: Significant instability, review clustering variables"
+    color <- "orange"
+  } else {
+    interpretation <- "POOR: Unstable segmentation, consider different approach"
+    color <- "red"
+  }
+
+  # ===========================================================================
+  # IDENTIFY BEST RUN
+  # ===========================================================================
+
+  # Best run = lowest total within-cluster sum of squares
+  withinss_values <- sapply(run_results, function(r) r$tot_withinss)
+  best_run_idx <- which.min(withinss_values)
+  best_model <- run_results[[best_run_idx]]$model
+
+  # ===========================================================================
+  # OUTPUT RESULTS
+  # ===========================================================================
+
+  cat("\n")
+  cat(rep("-", 60), "\n", sep = "")
+  cat("STABILITY RESULTS\n")
+  cat(rep("-", 60), "\n", sep = "")
+  cat("\n")
+
+  cat(sprintf("Stability Score: %.0f%%\n", stability_score))
+  cat(sprintf("Interpretation: %s\n", interpretation))
+  cat("\n")
+  cat(sprintf("Agreement between runs:\n"))
+  cat(sprintf("  Average: %.1f%%\n", avg_agreement * 100))
+  cat(sprintf("  Min: %.1f%%\n", min_agreement * 100))
+  cat(sprintf("  Max: %.1f%%\n", max_agreement * 100))
+  cat("\n")
+  cat(sprintf("Best run: #%d (seed = %d)\n", best_run_idx, run_results[[best_run_idx]]$seed))
+  cat("\n")
+
+  # Recommendation
+  if (stability_score < 70) {
+    cat("Recommendations:\n")
+    cat("  - Try fewer clusters (k-1)\n")
+    cat("  - Review and reduce clustering variables\n")
+    cat("  - Check for outliers that may cause instability\n")
+    cat("\n")
+  }
+
+  return(list(
+    stability_score = stability_score,
+    interpretation = interpretation,
+    avg_agreement = avg_agreement,
+    agreement_scores = agreement_scores,
+    run_results = run_results,
+    best_model = best_model,
+    best_run_idx = best_run_idx,
+    all_clusters = all_clusters
+  ))
+}
+
+
+#' Calculate Cluster Agreement Between Two Solutions
+#'
+#' Uses optimal matching to align cluster labels and calculate agreement.
+#'
+#' @param clusters1 Integer vector of cluster assignments
+#' @param clusters2 Integer vector of cluster assignments
+#' @return Numeric agreement score (0-1)
+#' @keywords internal
+calculate_cluster_agreement <- function(clusters1, clusters2) {
+
+  k <- max(c(clusters1, clusters2))
+  n <- length(clusters1)
+
+  # Create contingency table
+  cont_table <- table(clusters1, clusters2)
+
+  # Find optimal matching (greedy approach for simplicity)
+  # More sophisticated: Hungarian algorithm
+
+  matched <- logical(k)
+  total_matched <- 0
+
+  for (i in 1:k) {
+    if (i > nrow(cont_table)) next
+
+    # Find best unmatched column for this row
+    best_col <- 0
+    best_count <- 0
+
+    for (j in 1:k) {
+      if (j > ncol(cont_table)) next
+      if (!matched[j]) {
+        if (cont_table[i, j] > best_count) {
+          best_count <- cont_table[i, j]
+          best_col <- j
+        }
+      }
+    }
+
+    if (best_col > 0) {
+      matched[best_col] <- TRUE
+      total_matched <- total_matched + best_count
+    }
+  }
+
+  agreement <- total_matched / n
+
+  return(agreement)
+}
+
+
+#' Quick Stability Report
+#'
+#' Generate a simple stability report as text
+#'
+#' @param stability_result Result from check_stability_simple()
+#' @return Character string with report
+#' @export
+format_stability_report <- function(stability_result) {
+
+  report <- sprintf("
+STABILITY CHECK REPORT
+======================
+
+Stability Score: %.0f%% (%s)
+
+Runs Performed: %d
+Average Agreement: %.1f%%
+Range: %.1f%% - %.1f%%
+
+Best Run: #%d
+
+",
+    stability_result$stability_score,
+    stability_result$interpretation,
+    length(stability_result$run_results),
+    stability_result$avg_agreement * 100,
+    min(stability_result$agreement_scores) * 100,
+    max(stability_result$agreement_scores) * 100,
+    stability_result$best_run_idx
+  )
+
+  return(report)
 }

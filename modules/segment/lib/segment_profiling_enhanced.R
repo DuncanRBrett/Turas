@@ -331,3 +331,377 @@ create_enhanced_profile_report <- function(data, clusters, clustering_vars,
     effect_sizes = effect_sizes
   )))
 }
+
+
+# ==============================================================================
+# FEATURE 3: GOLDEN QUESTIONS IDENTIFIER
+# ==============================================================================
+
+#' Identify Golden Questions (Key Discriminating Variables)
+#'
+#' Finds the minimum set of variables needed to predict segment membership.
+#' Uses Random Forest variable importance if available, falls back to eta-squared
+#' from ANOVA.
+#'
+#' @param data Data frame with all variables
+#' @param clusters Integer vector of segment assignments
+#' @param clustering_vars Character vector of clustering variable names
+#' @param n_questions Integer, number of golden questions to identify (default: 3)
+#' @param question_labels Named vector of question labels (optional)
+#'
+#' @return List with golden_questions, importance_scores, importance_df
+#' @export
+#' @examples
+#' golden <- identify_golden_questions(
+#'   data = survey_data,
+#'   clusters = result$clusters,
+#'   clustering_vars = config$clustering_vars,
+#'   n_questions = 3
+#' )
+identify_golden_questions <- function(data, clusters, clustering_vars,
+                                       n_questions = 3, question_labels = NULL) {
+
+  cat("\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("IDENTIFYING GOLDEN QUESTIONS\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("\n")
+
+  # Prepare data
+  analysis_data <- data[, clustering_vars, drop = FALSE]
+  analysis_data$segment <- as.factor(clusters)
+
+  # Remove rows with missing values
+  complete_rows <- complete.cases(analysis_data)
+  analysis_data <- analysis_data[complete_rows, ]
+
+  cat(sprintf("Analyzing %d variables across %d segments...\n",
+              length(clustering_vars), length(unique(clusters))))
+
+  # ===========================================================================
+  # TRY RANDOM FOREST METHOD
+  # ===========================================================================
+
+  importance_scores <- NULL
+  method_used <- NULL
+  classification_accuracy <- NULL
+
+  if (requireNamespace("randomForest", quietly = TRUE)) {
+    cat("Using Random Forest for variable importance...\n")
+    method_used <- "Random Forest"
+
+    tryCatch({
+      # Fit random forest
+      rf_formula <- as.formula(paste("segment ~", paste(clustering_vars, collapse = " + ")))
+
+      rf_model <- randomForest::randomForest(
+        rf_formula,
+        data = analysis_data,
+        importance = TRUE,
+        ntree = 500
+      )
+
+      # Get importance (MeanDecreaseGini or MeanDecreaseAccuracy)
+      importance_matrix <- randomForest::importance(rf_model)
+
+      # Use MeanDecreaseAccuracy if available, otherwise MeanDecreaseGini
+      if ("MeanDecreaseAccuracy" %in% colnames(importance_matrix)) {
+        importance_scores <- importance_matrix[, "MeanDecreaseAccuracy"]
+      } else {
+        importance_scores <- importance_matrix[, "MeanDecreaseGini"]
+      }
+
+      # Calculate classification accuracy
+      predictions <- predict(rf_model, analysis_data)
+      classification_accuracy <- mean(predictions == analysis_data$segment)
+
+      cat(sprintf("✓ Random Forest fitted successfully\n"))
+      cat(sprintf("  Classification accuracy: %.1f%%\n", classification_accuracy * 100))
+
+    }, error = function(e) {
+      cat(sprintf("⚠ Random Forest failed: %s\n", e$message))
+      cat("  Falling back to eta-squared method...\n")
+      importance_scores <<- NULL
+    })
+  } else {
+    cat("randomForest not installed. Using eta-squared method...\n")
+    cat("  Install with: install.packages('randomForest')\n")
+  }
+
+  # ===========================================================================
+  # FALLBACK: ETA-SQUARED FROM ANOVA
+  # ===========================================================================
+
+  if (is.null(importance_scores)) {
+    method_used <- "ANOVA (eta-squared)"
+
+    importance_scores <- numeric(length(clustering_vars))
+    names(importance_scores) <- clustering_vars
+
+    for (var in clustering_vars) {
+      var_data <- analysis_data[[var]]
+
+      tryCatch({
+        anova_result <- aov(var_data ~ analysis_data$segment)
+        anova_summary <- summary(anova_result)
+
+        # Calculate eta-squared
+        ss_between <- anova_summary[[1]]$"Sum Sq"[1]
+        ss_total <- sum(anova_summary[[1]]$"Sum Sq")
+        eta_squared <- ss_between / ss_total
+
+        importance_scores[var] <- eta_squared
+
+      }, error = function(e) {
+        importance_scores[var] <- 0
+      })
+    }
+
+    cat(sprintf("✓ Eta-squared calculated for %d variables\n", length(clustering_vars)))
+  }
+
+  # ===========================================================================
+  # RANK AND SELECT TOP N
+  # ===========================================================================
+
+  # Sort by importance (descending)
+  sorted_idx <- order(importance_scores, decreasing = TRUE)
+  ranked_vars <- names(importance_scores)[sorted_idx]
+  ranked_scores <- importance_scores[sorted_idx]
+
+  # Select top n
+  n_questions <- min(n_questions, length(clustering_vars))
+  golden_questions <- ranked_vars[1:n_questions]
+  golden_scores <- ranked_scores[1:n_questions]
+
+  # ===========================================================================
+  # CREATE IMPORTANCE DATA FRAME
+  # ===========================================================================
+
+  importance_df <- data.frame(
+    Variable = ranked_vars,
+    Importance = round(ranked_scores, 4),
+    Rank = 1:length(ranked_vars),
+    Golden_Question = ranked_vars %in% golden_questions,
+    stringsAsFactors = FALSE
+  )
+
+  # Add labels if available
+  if (!is.null(question_labels)) {
+    importance_df$Label <- sapply(importance_df$Variable, function(v) {
+      if (v %in% names(question_labels)) question_labels[v] else v
+    }, USE.NAMES = FALSE)
+    # Reorder columns
+    importance_df <- importance_df[, c("Rank", "Variable", "Label", "Importance", "Golden_Question")]
+  }
+
+  # ===========================================================================
+  # CONSOLE OUTPUT
+  # ===========================================================================
+
+  cat("\n")
+  cat(sprintf("Top %d discriminating variables:\n", n_questions))
+  for (i in 1:n_questions) {
+    var_name <- golden_questions[i]
+    score <- golden_scores[i]
+
+    # Get label if available
+    display_name <- if (!is.null(question_labels) && var_name %in% names(question_labels)) {
+      paste0(var_name, ": ", question_labels[var_name])
+    } else {
+      var_name
+    }
+
+    cat(sprintf("  %d. %s (importance: %.2f)\n", i, display_name, score))
+  }
+
+  if (!is.null(classification_accuracy)) {
+    cat(sprintf("\nThese %d questions predict segment membership with %.0f%% accuracy.\n",
+                n_questions, classification_accuracy * 100))
+  }
+
+  cat(sprintf("\nMethod used: %s\n", method_used))
+  cat("\n")
+
+  return(list(
+    golden_questions = golden_questions,
+    importance_scores = importance_scores,
+    importance_df = importance_df,
+    n_questions = n_questions,
+    method = method_used,
+    classification_accuracy = classification_accuracy
+  ))
+}
+
+
+# ==============================================================================
+# FEATURE 10: VARIABLE IMPORTANCE RANKING
+# ==============================================================================
+
+#' Rank Variable Importance for Clustering
+#'
+#' Determines which clustering variables actually matter most for segment
+#' differentiation. Uses eta-squared from ANOVA and categorizes variables
+#' as "Essential", "Useful", or "Minimal Impact".
+#'
+#' @param data Data frame with all variables
+#' @param clusters Integer vector of segment assignments
+#' @param clustering_vars Character vector of clustering variable names
+#' @param question_labels Named vector of question labels (optional)
+#'
+#' @return List with ranking data frame, essential_vars, drop_candidates
+#' @export
+rank_variable_importance <- function(data, clusters, clustering_vars,
+                                      question_labels = NULL) {
+
+  cat("\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("VARIABLE IMPORTANCE FOR CLUSTERING\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("\n")
+
+  # Calculate eta-squared for each variable
+  eta_squared_values <- numeric(length(clustering_vars))
+  names(eta_squared_values) <- clustering_vars
+
+  for (var in clustering_vars) {
+    var_data <- data[[var]]
+
+    tryCatch({
+      complete_idx <- !is.na(var_data) & !is.na(clusters)
+      var_complete <- var_data[complete_idx]
+      clusters_complete <- clusters[complete_idx]
+
+      anova_result <- aov(var_complete ~ as.factor(clusters_complete))
+      anova_summary <- summary(anova_result)
+
+      ss_between <- anova_summary[[1]]$"Sum Sq"[1]
+      ss_total <- sum(anova_summary[[1]]$"Sum Sq")
+      eta_squared_values[var] <- ss_between / ss_total
+
+    }, error = function(e) {
+      eta_squared_values[var] <- 0
+    })
+  }
+
+  # ===========================================================================
+  # CATEGORIZE VARIABLES
+  # ===========================================================================
+
+  # Thresholds based on Cohen's guidelines for eta-squared:
+  # Small: 0.01, Medium: 0.06, Large: 0.14
+  # Our thresholds are more stringent for clustering context
+  essential_threshold <- 0.30  # Large effect
+  useful_threshold <- 0.10     # Medium-large effect
+  minimal_threshold <- 0.10    # Below this is minimal
+
+  # Sort by eta-squared
+  sorted_idx <- order(eta_squared_values, decreasing = TRUE)
+  sorted_vars <- clustering_vars[sorted_idx]
+  sorted_eta <- eta_squared_values[sorted_idx]
+
+  # Categorize
+  category <- character(length(sorted_vars))
+  for (i in seq_along(sorted_vars)) {
+    eta <- sorted_eta[i]
+    if (eta >= essential_threshold) {
+      category[i] <- "ESSENTIAL"
+    } else if (eta >= useful_threshold) {
+      category[i] <- "USEFUL"
+    } else {
+      category[i] <- "MINIMAL IMPACT"
+    }
+  }
+
+  # ===========================================================================
+  # CREATE RANKING DATA FRAME
+  # ===========================================================================
+
+  ranking_df <- data.frame(
+    Variable = sorted_vars,
+    Eta_Squared = round(sorted_eta, 4),
+    Rank = 1:length(sorted_vars),
+    Category = category,
+    stringsAsFactors = FALSE
+  )
+
+  # Add labels if available
+  if (!is.null(question_labels)) {
+    ranking_df$Label <- sapply(ranking_df$Variable, function(v) {
+      if (v %in% names(question_labels)) question_labels[v] else ""
+    }, USE.NAMES = FALSE)
+    ranking_df <- ranking_df[, c("Rank", "Variable", "Label", "Eta_Squared", "Category")]
+  }
+
+  # Identify essential and drop candidates
+  essential_vars <- sorted_vars[category == "ESSENTIAL"]
+  useful_vars <- sorted_vars[category == "USEFUL"]
+  drop_candidates <- sorted_vars[category == "MINIMAL IMPACT"]
+
+  # ===========================================================================
+  # CONSOLE OUTPUT
+  # ===========================================================================
+
+  cat("Variable importance for clustering:\n\n")
+
+  # Essential
+  if (length(essential_vars) > 0) {
+    cat(sprintf("ESSENTIAL (η² > %.2f):\n", essential_threshold))
+    for (var in essential_vars) {
+      display_name <- if (!is.null(question_labels) && var %in% names(question_labels)) {
+        paste0(var, ": ", substr(question_labels[var], 1, 40))
+      } else {
+        var
+      }
+      cat(sprintf("  %s: %.2f\n", display_name, eta_squared_values[var]))
+    }
+    cat("\n")
+  }
+
+  # Useful
+  if (length(useful_vars) > 0) {
+    cat(sprintf("USEFUL (η² %.2f-%.2f):\n", minimal_threshold, essential_threshold))
+    for (var in useful_vars) {
+      display_name <- if (!is.null(question_labels) && var %in% names(question_labels)) {
+        paste0(var, ": ", substr(question_labels[var], 1, 40))
+      } else {
+        var
+      }
+      cat(sprintf("  %s: %.2f\n", display_name, eta_squared_values[var]))
+    }
+    cat("\n")
+  }
+
+  # Minimal impact
+  if (length(drop_candidates) > 0) {
+    cat(sprintf("MINIMAL IMPACT (η² < %.2f):\n", minimal_threshold))
+    for (var in drop_candidates) {
+      display_name <- if (!is.null(question_labels) && var %in% names(question_labels)) {
+        paste0(var, ": ", substr(question_labels[var], 1, 40))
+      } else {
+        var
+      }
+      cat(sprintf("  %s: %.2f  ← Consider removing\n", display_name, eta_squared_values[var]))
+    }
+    cat("\n")
+  }
+
+  # Recommendation
+  if (length(drop_candidates) > 0) {
+    cat(sprintf("Suggestion: Variables %s contribute little.\n",
+                paste(drop_candidates, collapse = ", ")))
+    cat("Re-run without them for cleaner segments.\n")
+  } else {
+    cat("All variables contribute meaningfully to segment differentiation.\n")
+  }
+
+  cat("\n")
+
+  return(list(
+    ranking = ranking_df,
+    essential_vars = essential_vars,
+    useful_vars = useful_vars,
+    drop_candidates = drop_candidates,
+    eta_squared_values = eta_squared_values
+  ))
+}

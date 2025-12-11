@@ -346,3 +346,372 @@ compare_segment_distributions <- function(model_file, scoring_result) {
 
   return(comparison)
 }
+
+
+# ==============================================================================
+# FEATURE 2: RESPONDENT TYPING TOOL
+# ==============================================================================
+
+#' Type a Single Respondent to a Segment
+#'
+#' Classifies a single respondent (or small batch) using a saved segmentation model.
+#' Returns segment assignment with confidence score and distances to all centers.
+#'
+#' @param answers Named vector c(q1=8, q2=7, q3=9) OR single-row data frame
+#' @param model_file Path to saved .rds model file
+#'
+#' @return List with segment, segment_name, confidence, distances
+#' @export
+#' @examples
+#' # Single respondent
+#' result <- type_respondent(
+#'   answers = c(q1 = 8, q2 = 7, q3 = 9, q4 = 8, q5 = 9),
+#'   model_file = "output/seg_model.rds"
+#' )
+type_respondent <- function(answers, model_file) {
+
+  cat("\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("RESPONDENT TYPING\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("\n")
+
+  # ===========================================================================
+  # LOAD MODEL
+  # ===========================================================================
+
+  if (!file.exists(model_file)) {
+    stop(sprintf("Model file not found: %s", model_file), call. = FALSE)
+  }
+
+  model_data <- readRDS(model_file)
+
+  # Check if this is a k-means model
+  method <- model_data$method
+  if (is.null(method)) method <- "kmeans"
+
+  if (method == "lca") {
+    stop("This is an LCA model. Use type_respondent_lca() instead.", call. = FALSE)
+  }
+
+  # Extract required components
+  centers <- model_data$centers
+  clustering_vars <- model_data$clustering_vars
+  segment_names <- model_data$segment_names
+  scale_params <- model_data$scale_params
+  k <- model_data$k
+
+  cat(sprintf("Typing respondent against %d-segment model...\n", k))
+
+  # ===========================================================================
+  # VALIDATE ANSWERS
+  # ===========================================================================
+
+  # Convert named vector to data frame if needed
+  if (is.vector(answers) && !is.data.frame(answers)) {
+    answers <- as.data.frame(t(answers))
+  }
+
+  # Validate all clustering variables are present
+  missing_vars <- setdiff(clustering_vars, names(answers))
+  if (length(missing_vars) > 0) {
+    stop(sprintf("Missing variables in answers: %s\nRequired: %s",
+                 paste(missing_vars, collapse = ", "),
+                 paste(clustering_vars, collapse = ", ")),
+         call. = FALSE)
+  }
+
+  # Extract and order answers to match clustering variables
+  answer_values <- as.numeric(answers[1, clustering_vars])
+  names(answer_values) <- clustering_vars
+
+  # Check for missing values
+  if (any(is.na(answer_values))) {
+    missing <- clustering_vars[is.na(answer_values)]
+    stop(sprintf("Missing values for: %s", paste(missing, collapse = ", ")),
+         call. = FALSE)
+  }
+
+  # ===========================================================================
+  # STANDARDIZE USING MODEL PARAMETERS
+  # ===========================================================================
+
+  if (!is.null(scale_params) &&
+      !is.null(scale_params$center) &&
+      !is.null(scale_params$scale)) {
+
+    # Standardize using training parameters
+    standardized_values <- (answer_values - scale_params$center[clustering_vars]) /
+                           scale_params$scale[clustering_vars]
+    cat("  Standardized using model parameters\n")
+  } else {
+    standardized_values <- answer_values
+    cat("  Using raw values (model was not standardized)\n")
+  }
+
+  # ===========================================================================
+  # CALCULATE DISTANCES TO EACH CENTER
+  # ===========================================================================
+
+  distances <- numeric(k)
+  for (i in 1:k) {
+    center_vec <- centers[i, ]
+    distances[i] <- sqrt(sum((standardized_values - center_vec)^2))
+  }
+
+  names(distances) <- if (!is.null(segment_names)) segment_names else paste0("Segment_", 1:k)
+
+  # ===========================================================================
+  # DETERMINE ASSIGNMENT AND CONFIDENCE
+  # ===========================================================================
+
+  assigned_segment <- which.min(distances)
+  min_distance <- distances[assigned_segment]
+
+  # Calculate confidence (inverse of relative distance)
+  # Higher confidence = respondent is much closer to assigned segment than others
+  # Using softmax-like approach: confidence = exp(-d_min) / sum(exp(-d_all))
+  exp_neg_distances <- exp(-distances)
+  confidence <- exp_neg_distances[assigned_segment] / sum(exp_neg_distances)
+
+  # Get segment name
+  if (!is.null(segment_names) && length(segment_names) >= assigned_segment) {
+    assigned_name <- segment_names[assigned_segment]
+  } else {
+    assigned_name <- paste0("Segment ", assigned_segment)
+  }
+
+  # ===========================================================================
+  # OUTPUT RESULTS
+  # ===========================================================================
+
+  cat(sprintf("\n✓ Assigned to Segment %d: %s\n", assigned_segment, assigned_name))
+  cat(sprintf("  Confidence: %.0f%%\n", confidence * 100))
+  cat("\n  Distance to centers:\n")
+  for (i in 1:k) {
+    seg_label <- names(distances)[i]
+    marker <- if (i == assigned_segment) " ← ASSIGNED" else ""
+    cat(sprintf("    %s: %.2f%s\n", seg_label, distances[i], marker))
+  }
+  cat("\n")
+
+  return(list(
+    segment = assigned_segment,
+    segment_name = assigned_name,
+    confidence = confidence,
+    distances = distances,
+    standardized_values = standardized_values
+  ))
+}
+
+
+#' Type Multiple Respondents in Batch
+#'
+#' Wrapper for type_respondent() to classify multiple respondents at once.
+#'
+#' @param data Data frame with multiple respondents
+#' @param model_file Path to saved .rds model file
+#' @param id_var Name of ID variable in data
+#'
+#' @return Data frame with id, segment, segment_name, confidence
+#' @export
+#' @examples
+#' results <- type_respondents_batch(
+#'   data = new_respondents,
+#'   model_file = "output/seg_model.rds",
+#'   id_var = "respondent_id"
+#' )
+type_respondents_batch <- function(data, model_file, id_var) {
+
+  cat("\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("BATCH RESPONDENT TYPING\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("\n")
+
+  # ===========================================================================
+  # LOAD MODEL
+  # ===========================================================================
+
+  if (!file.exists(model_file)) {
+    stop(sprintf("Model file not found: %s", model_file), call. = FALSE)
+  }
+
+  model_data <- readRDS(model_file)
+
+  # Check method
+  method <- model_data$method
+  if (is.null(method)) method <- "kmeans"
+
+  if (method == "lca") {
+    stop("This is an LCA model. Use type_respondents_batch_lca() instead.", call. = FALSE)
+  }
+
+  # Extract required components
+  centers <- model_data$centers
+  clustering_vars <- model_data$clustering_vars
+  segment_names <- model_data$segment_names
+  scale_params <- model_data$scale_params
+  k <- model_data$k
+
+  cat(sprintf("Model: %d segments, %d variables\n", k, length(clustering_vars)))
+  cat(sprintf("Respondents to type: %d\n\n", nrow(data)))
+
+  # ===========================================================================
+  # VALIDATE DATA
+  # ===========================================================================
+
+  # Check ID variable
+  if (!id_var %in% names(data)) {
+    stop(sprintf("ID variable '%s' not found in data", id_var), call. = FALSE)
+  }
+
+  # Check clustering variables
+  missing_vars <- setdiff(clustering_vars, names(data))
+  if (length(missing_vars) > 0) {
+    stop(sprintf("Missing variables in data: %s", paste(missing_vars, collapse = ", ")),
+         call. = FALSE)
+  }
+
+  # ===========================================================================
+  # PROCESS EACH RESPONDENT
+  # ===========================================================================
+
+  results <- data.frame(
+    id = data[[id_var]],
+    segment = integer(nrow(data)),
+    segment_name = character(nrow(data)),
+    confidence = numeric(nrow(data)),
+    distance_to_center = numeric(nrow(data)),
+    stringsAsFactors = FALSE
+  )
+
+  # Add distance columns for each segment
+  for (i in 1:k) {
+    seg_col <- paste0("dist_seg_", i)
+    results[[seg_col]] <- numeric(nrow(data))
+  }
+
+  n_processed <- 0
+  n_errors <- 0
+
+  for (row_idx in 1:nrow(data)) {
+    if (row_idx %% 100 == 0) {
+      cat(sprintf("  Processing respondent %d/%d...\n", row_idx, nrow(data)))
+    }
+
+    tryCatch({
+      # Get answer values
+      answer_values <- as.numeric(data[row_idx, clustering_vars])
+      names(answer_values) <- clustering_vars
+
+      # Skip if any missing values
+      if (any(is.na(answer_values))) {
+        results$segment[row_idx] <- NA
+        results$segment_name[row_idx] <- NA
+        results$confidence[row_idx] <- NA
+        results$distance_to_center[row_idx] <- NA
+        n_errors <- n_errors + 1
+        next
+      }
+
+      # Standardize
+      if (!is.null(scale_params) &&
+          !is.null(scale_params$center) &&
+          !is.null(scale_params$scale)) {
+        standardized_values <- (answer_values - scale_params$center[clustering_vars]) /
+                               scale_params$scale[clustering_vars]
+      } else {
+        standardized_values <- answer_values
+      }
+
+      # Calculate distances
+      distances <- numeric(k)
+      for (i in 1:k) {
+        center_vec <- centers[i, ]
+        distances[i] <- sqrt(sum((standardized_values - center_vec)^2))
+      }
+
+      # Assign segment
+      assigned_segment <- which.min(distances)
+      min_distance <- distances[assigned_segment]
+
+      # Calculate confidence
+      exp_neg_distances <- exp(-distances)
+      confidence <- exp_neg_distances[assigned_segment] / sum(exp_neg_distances)
+
+      # Get segment name
+      if (!is.null(segment_names) && length(segment_names) >= assigned_segment) {
+        assigned_name <- segment_names[assigned_segment]
+      } else {
+        assigned_name <- paste0("Segment ", assigned_segment)
+      }
+
+      # Store results
+      results$segment[row_idx] <- assigned_segment
+      results$segment_name[row_idx] <- assigned_name
+      results$confidence[row_idx] <- round(confidence, 3)
+      results$distance_to_center[row_idx] <- round(min_distance, 3)
+
+      for (i in 1:k) {
+        results[[paste0("dist_seg_", i)]][row_idx] <- round(distances[i], 3)
+      }
+
+      n_processed <- n_processed + 1
+
+    }, error = function(e) {
+      results$segment[row_idx] <- NA
+      results$segment_name[row_idx] <- NA
+      results$confidence[row_idx] <- NA
+      n_errors <- n_errors + 1
+    })
+  }
+
+  # ===========================================================================
+  # SUMMARY
+  # ===========================================================================
+
+  cat("\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("TYPING COMPLETE\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat(sprintf("✓ Successfully typed: %d respondents\n", n_processed))
+  if (n_errors > 0) {
+    cat(sprintf("⚠ Errors (missing data): %d respondents\n", n_errors))
+  }
+
+  # Segment distribution
+  cat("\nSegment distribution:\n")
+  seg_table <- table(results$segment, useNA = "ifany")
+  for (seg in sort(unique(results$segment[!is.na(results$segment)]))) {
+    seg_name <- if (!is.null(segment_names) && length(segment_names) >= seg) {
+      segment_names[seg]
+    } else {
+      paste0("Segment ", seg)
+    }
+    seg_count <- sum(results$segment == seg, na.rm = TRUE)
+    seg_pct <- 100 * seg_count / n_processed
+    cat(sprintf("  %s: %d (%.1f%%)\n", seg_name, seg_count, seg_pct))
+  }
+
+  # Confidence summary
+  cat(sprintf("\nConfidence scores:\n"))
+  cat(sprintf("  Mean: %.1f%%\n", mean(results$confidence, na.rm = TRUE) * 100))
+  cat(sprintf("  Min:  %.1f%%\n", min(results$confidence, na.rm = TRUE) * 100))
+  cat(sprintf("  Max:  %.1f%%\n", max(results$confidence, na.rm = TRUE) * 100))
+
+  # Flag low confidence
+  low_conf_threshold <- 0.5
+  n_low_conf <- sum(results$confidence < low_conf_threshold, na.rm = TRUE)
+  if (n_low_conf > 0) {
+    cat(sprintf("\n⚠ %d respondents (%.1f%%) have confidence < %.0f%%\n",
+                n_low_conf, 100 * n_low_conf / n_processed, low_conf_threshold * 100))
+  }
+
+  cat("\n")
+
+  # Rename ID column to match input
+  names(results)[1] <- id_var
+
+  return(results)
+}

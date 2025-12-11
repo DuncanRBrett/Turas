@@ -428,6 +428,65 @@ validate_segment_config <- function(config) {
     mode = if (is.null(k_fixed)) "exploration" else "final"
   )
 
+  # ===========================================================================
+  # NEW ENHANCED FEATURES PARAMETERS
+  # ===========================================================================
+
+  # Golden Questions / Variable Importance
+  golden_questions_n <- get_numeric_config(config, "golden_questions_n",
+                                           default_value = 3, min = 1, max = 10)
+
+  # Auto Segment Naming
+  auto_name_style <- get_char_config(config, "auto_name_style",
+                                     default_value = "descriptive",
+                                     allowed_values = c("descriptive", "persona", "simple"))
+
+  # Demographic Variables for Profiling
+  demo_vars_str <- get_config_value(config, "demographic_vars", default_value = NULL)
+  demographic_vars <- if (!is.null(demo_vars_str) && nzchar(trimws(as.character(demo_vars_str)))) {
+    vars <- trimws(unlist(strsplit(demo_vars_str, ",")))
+    if (length(vars) == 1) {
+      vars <- trimws(unlist(strsplit(demo_vars_str, ";")))
+    }
+    vars
+  } else {
+    NULL
+  }
+
+  # Stability Check
+  run_stability_check <- get_logical_config(config, "run_stability_check",
+                                            default_value = FALSE)
+  stability_n_runs <- get_numeric_config(config, "stability_n_runs",
+                                         default_value = 5, min = 3, max = 20)
+
+  # Classification Rules
+  generate_rules <- get_logical_config(config, "generate_rules",
+                                       default_value = FALSE)
+  rules_max_depth <- get_numeric_config(config, "rules_max_depth",
+                                        default_value = 3, min = 1, max = 5)
+
+  # Segment Action Cards
+  generate_action_cards <- get_logical_config(config, "generate_action_cards",
+                                              default_value = FALSE)
+  scale_max <- get_numeric_config(config, "scale_max",
+                                  default_value = 10, min = 1, max = 100)
+
+  # LCA (Latent Class Analysis)
+  method_lca <- get_logical_config(config, "use_lca",
+                                   default_value = FALSE)
+
+  # Add new parameters to validated config
+  validated_config$golden_questions_n <- golden_questions_n
+  validated_config$auto_name_style <- auto_name_style
+  validated_config$demographic_vars <- demographic_vars
+  validated_config$run_stability_check <- run_stability_check
+  validated_config$stability_n_runs <- stability_n_runs
+  validated_config$generate_rules <- generate_rules
+  validated_config$rules_max_depth <- rules_max_depth
+  validated_config$generate_action_cards <- generate_action_cards
+  validated_config$scale_max <- scale_max
+  validated_config$use_lca <- method_lca
+
   # Success message
   cat(sprintf("✓ Configuration validated\n"))
   cat(sprintf("  Mode: %s\n", validated_config$mode))

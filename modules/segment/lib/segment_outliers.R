@@ -390,3 +390,293 @@ print_outlier_summary <- function(outlier_detection, outlier_handling,
 
   cat("\n")
 }
+
+
+# ==============================================================================
+# FEATURE 11: OUTLIER REVIEW SCREEN
+# ==============================================================================
+
+#' Generate Interactive Outlier Review Screen
+#'
+#' Creates a detailed review of outlier respondents showing their responses
+#' alongside segment means, allowing analysts to decide whether to keep or remove
+#' each flagged respondent.
+#'
+#' @param data Data frame with all variables
+#' @param outlier_result Result from detect_outliers_zscore() or detect_outliers_mahalanobis()
+#' @param clustering_vars Character vector of clustering variable names
+#' @param id_var Character, ID variable name
+#' @param clusters Integer vector of segment assignments (optional)
+#' @param segment_names Character vector of segment names (optional)
+#' @param question_labels Named vector of question labels (optional)
+#' @param output_path Path to save Excel review file
+#'
+#' @return List with review_df, summary, export_path
+#' @export
+#' @examples
+#' review <- review_outliers(
+#'   data = survey_data,
+#'   outlier_result = outlier_detection,
+#'   clustering_vars = config$clustering_vars,
+#'   id_var = "respondent_id",
+#'   output_path = "output/outlier_review.xlsx"
+#' )
+review_outliers <- function(data, outlier_result, clustering_vars, id_var,
+                            clusters = NULL, segment_names = NULL,
+                            question_labels = NULL, output_path = NULL) {
+
+  cat("\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("OUTLIER REVIEW SCREEN\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("\n")
+
+  # Get outlier flags
+  outlier_flags <- outlier_result$outlier_flags
+
+  n_outliers <- sum(outlier_flags, na.rm = TRUE)
+  n_total <- length(outlier_flags)
+
+  cat(sprintf("Total respondents: %d\n", n_total))
+  cat(sprintf("Flagged outliers: %d (%.1f%%)\n\n", n_outliers, 100 * n_outliers / n_total))
+
+  if (n_outliers == 0) {
+    cat("No outliers to review.\n\n")
+    return(list(
+      review_df = NULL,
+      n_outliers = 0,
+      summary = "No outliers detected"
+    ))
+  }
+
+  # ===========================================================================
+  # BUILD REVIEW DATA FRAME
+  # ===========================================================================
+
+  # Get outlier rows
+  outlier_idx <- which(outlier_flags)
+
+  # Calculate overall means
+  overall_means <- sapply(clustering_vars, function(v) mean(data[[v]], na.rm = TRUE))
+
+  # Calculate segment means if clusters provided
+  if (!is.null(clusters)) {
+    k <- length(unique(clusters))
+    segment_means <- matrix(NA, nrow = k, ncol = length(clustering_vars))
+    for (seg in 1:k) {
+      seg_data <- data[clusters == seg, clustering_vars, drop = FALSE]
+      segment_means[seg, ] <- sapply(seg_data, mean, na.rm = TRUE)
+    }
+    colnames(segment_means) <- clustering_vars
+    rownames(segment_means) <- if (!is.null(segment_names)) segment_names else paste0("Segment_", 1:k)
+  }
+
+  # Build review table
+  review_list <- list()
+
+  for (i in seq_along(outlier_idx)) {
+    idx <- outlier_idx[i]
+
+    row_data <- list(
+      Outlier_Rank = i,
+      ID = data[[id_var]][idx]
+    )
+
+    # Add cluster assignment if available
+    if (!is.null(clusters)) {
+      seg <- clusters[idx]
+      row_data$Segment <- seg
+      row_data$Segment_Name <- if (!is.null(segment_names)) segment_names[seg] else paste0("Segment ", seg)
+    }
+
+    # Add outlier severity info
+    if (!is.null(outlier_result$details)) {
+      row_data$Extreme_Vars <- outlier_result$details$extreme_vars[idx]
+      row_data$Max_Z_Score <- round(outlier_result$details$max_abs_z[idx], 2)
+      row_data$Problem_Vars <- outlier_result$details$extreme_var_names[idx]
+    }
+
+    # Add responses for each clustering variable
+    for (var in clustering_vars) {
+      var_value <- data[[var]][idx]
+      var_mean <- overall_means[var]
+      var_diff <- var_value - var_mean
+
+      # Create comparison column
+      row_data[[paste0(var, "_value")]] <- var_value
+      row_data[[paste0(var, "_vs_mean")]] <- sprintf("%.1f (mean: %.1f)",
+                                                      var_value, var_mean)
+    }
+
+    # Calculate overall deviation
+    var_values <- as.numeric(data[idx, clustering_vars])
+    row_data$Avg_Deviation <- round(mean(abs(var_values - overall_means)), 2)
+
+    # Add action column
+    row_data$Recommended_Action <- classify_outlier_action(
+      extreme_vars = outlier_result$details$extreme_vars[idx],
+      max_z = outlier_result$details$max_abs_z[idx]
+    )
+
+    review_list[[i]] <- row_data
+  }
+
+  # Convert to data frame
+  review_df <- do.call(rbind, lapply(review_list, function(x) {
+    as.data.frame(x, stringsAsFactors = FALSE)
+  }))
+
+  # ===========================================================================
+  # CREATE SUMMARY
+  # ===========================================================================
+
+  summary_df <- data.frame(
+    Metric = c("Total Respondents", "Outliers Flagged", "Percent Outliers",
+               "Avg Extreme Variables", "Max Z-Score Observed"),
+    Value = c(n_total, n_outliers,
+              sprintf("%.1f%%", 100 * n_outliers / n_total),
+              sprintf("%.1f", mean(outlier_result$details$extreme_vars[outlier_flags], na.rm = TRUE)),
+              sprintf("%.2f", max(outlier_result$details$max_abs_z[outlier_flags], na.rm = TRUE))),
+    stringsAsFactors = FALSE
+  )
+
+  # ===========================================================================
+  # CONSOLE OUTPUT
+  # ===========================================================================
+
+  cat("Outlier Review Summary:\n\n")
+
+  # Show top 5 most extreme outliers
+  top_n <- min(5, n_outliers)
+  cat(sprintf("Top %d most extreme outliers:\n", top_n))
+
+  for (i in 1:top_n) {
+    id_val <- review_df$ID[i]
+    extreme_vars <- review_df$Extreme_Vars[i]
+    max_z <- review_df$Max_Z_Score[i]
+    action <- review_df$Recommended_Action[i]
+
+    cat(sprintf("  %d. ID %s: %d extreme vars, max z=%.1f [%s]\n",
+                i, id_val, extreme_vars, max_z, action))
+  }
+
+  # ===========================================================================
+  # EXPORT TO EXCEL
+  # ===========================================================================
+
+  if (!is.null(output_path)) {
+    if (!requireNamespace("writexl", quietly = TRUE)) {
+      warning("Package 'writexl' not available. Cannot export to Excel.")
+    } else {
+      # Create sheets
+      sheets <- list(
+        "Summary" = summary_df,
+        "Outlier_Review" = review_df
+      )
+
+      # Add reference sheet with variable means
+      means_df <- data.frame(
+        Variable = clustering_vars,
+        Overall_Mean = round(overall_means, 2),
+        stringsAsFactors = FALSE
+      )
+
+      if (!is.null(question_labels)) {
+        means_df$Label <- sapply(clustering_vars, function(v) {
+          if (v %in% names(question_labels)) question_labels[v] else ""
+        })
+      }
+
+      sheets[["Variable_Reference"]] <- means_df
+
+      writexl::write_xlsx(sheets, output_path)
+      cat(sprintf("\n✓ Outlier review exported to: %s\n", basename(output_path)))
+    }
+  }
+
+  cat("\n")
+
+  return(list(
+    review_df = review_df,
+    summary = summary_df,
+    n_outliers = n_outliers,
+    export_path = output_path
+  ))
+}
+
+
+#' Classify Outlier Action Recommendation
+#'
+#' @param extreme_vars Number of extreme variables
+#' @param max_z Maximum z-score
+#' @return Character recommendation
+#' @keywords internal
+classify_outlier_action <- function(extreme_vars, max_z) {
+  if (is.na(extreme_vars) || is.na(max_z)) {
+    return("REVIEW")
+  }
+
+  if (extreme_vars >= 3 && max_z >= 4) {
+    return("REMOVE - Multiple extreme values")
+  } else if (max_z >= 5) {
+    return("REMOVE - Very extreme response")
+  } else if (extreme_vars >= 2 && max_z >= 3.5) {
+    return("LIKELY REMOVE")
+  } else if (extreme_vars == 1 && max_z >= 4) {
+    return("LIKELY KEEP - Single outlier")
+  } else {
+    return("KEEP - Borderline case")
+  }
+}
+
+
+#' Apply Outlier Decisions
+#'
+#' After manual review, apply keep/remove decisions to data
+#'
+#' @param data Original data frame
+#' @param decisions Data frame with ID and Decision columns
+#' @param id_var ID variable name
+#' @return Filtered data frame
+#' @export
+apply_outlier_decisions <- function(data, decisions, id_var) {
+
+  cat("\n")
+  cat("Applying outlier decisions...\n")
+
+  # Validate decisions
+  if (!"Decision" %in% names(decisions)) {
+    stop("decisions must have a 'Decision' column", call. = FALSE)
+  }
+
+  if (!id_var %in% names(decisions)) {
+    stop(sprintf("decisions must have '%s' column", id_var), call. = FALSE)
+  }
+
+  # Count decisions
+  n_keep <- sum(tolower(decisions$Decision) == "keep", na.rm = TRUE)
+  n_remove <- sum(tolower(decisions$Decision) == "remove", na.rm = TRUE)
+  n_total <- nrow(decisions)
+
+  cat(sprintf("  Total outliers reviewed: %d\n", n_total))
+  cat(sprintf("  Marked to keep: %d\n", n_keep))
+  cat(sprintf("  Marked to remove: %d\n", n_remove))
+
+  # Get IDs to remove
+  remove_ids <- decisions[[id_var]][tolower(decisions$Decision) == "remove"]
+
+  # Filter data
+  if (length(remove_ids) > 0) {
+    keep_rows <- !data[[id_var]] %in% remove_ids
+    filtered_data <- data[keep_rows, ]
+    cat(sprintf("\n✓ Removed %d outliers. %d records remaining.\n",
+                length(remove_ids), nrow(filtered_data)))
+  } else {
+    filtered_data <- data
+    cat("\n✓ No outliers removed.\n")
+  }
+
+  cat("\n")
+
+  return(filtered_data)
+}

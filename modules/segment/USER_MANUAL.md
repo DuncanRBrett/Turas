@@ -222,7 +222,20 @@ Check the full User Manual (`USER_MANUAL.md`) or Maintenance Manual (`MAINTENANC
 
 **Comprehensive Guide to Customer Segmentation with Turas**
 
-Version 1.0 | Last Updated: 2024
+Version 10.1 | Last Updated: December 2025
+
+**What's New in v10.1:**
+- Quick Run Function for programmatic segmentation
+- Respondent Typing Tool with confidence scores
+- Golden Questions Identifier
+- Auto Segment Naming
+- Segment Action Cards
+- Classification Rules
+- Demographic Profiling
+- Simple Stability Check
+- Variable Importance Ranking
+- Outlier Review Screen
+- Latent Class Analysis (LCA)
 
 ---
 
@@ -789,6 +802,358 @@ create_all_visualizations(
 - K-selection plots (exploration mode)
 - Profile heatmap
 - Spider/radar chart (if fmsb installed)
+
+---
+
+## 7.1 Enhanced Features (v10.1)
+
+The following new features enhance segmentation analysis with practical business-focused outputs.
+
+### Quick Run Function (Programmatic Segmentation)
+
+Run segmentation without creating an Excel config file:
+
+```r
+source("modules/segment/lib/segment_utils.R")
+
+# Exploration mode (finds optimal k)
+result <- run_segment_quick(
+  data = survey_data,
+  id_var = "respondent_id",
+  clustering_vars = c("q1", "q2", "q3", "q4", "q5"),
+  k = NULL,  # NULL = exploration mode
+  k_range = 3:6
+)
+
+# Final mode (with chosen k)
+result <- run_segment_quick(
+  data = survey_data,
+  id_var = "respondent_id",
+  clustering_vars = c("q1", "q2", "q3", "q4", "q5"),
+  k = 4
+)
+```
+
+### Respondent Typing Tool
+
+Classify new respondents using a saved segmentation model:
+
+```r
+source("modules/segment/lib/segment_scoring.R")
+
+# Single respondent
+result <- type_respondent(
+  answers = c(q1 = 8, q2 = 7, q3 = 9, q4 = 8, q5 = 9),
+  model_file = "output/seg_model.rds"
+)
+# Returns: segment, segment_name, confidence, distances
+
+# Multiple respondents
+results <- type_respondents_batch(
+  data = new_respondents,
+  model_file = "output/seg_model.rds",
+  id_var = "respondent_id"
+)
+```
+
+**Output includes**:
+- Assigned segment and name
+- Confidence score (0-100%)
+- Distance to each segment center
+- Low-confidence warnings
+
+### Golden Questions Identifier
+
+Find the minimum set of questions that best predict segment membership:
+
+```r
+source("modules/segment/lib/segment_profiling_enhanced.R")
+
+golden <- identify_golden_questions(
+  data = survey_data,
+  clusters = result$clusters,
+  clustering_vars = config$clustering_vars,
+  n_questions = 3,
+  question_labels = config$question_labels
+)
+
+# Output:
+# Top 3 discriminating variables:
+#   1. q3_service: Service satisfaction (importance: 0.42)
+#   2. q1_product: Product quality (importance: 0.38)
+#   3. q5_recommend: Likelihood to recommend (importance: 0.31)
+#
+# These 3 questions predict segment membership with 89% accuracy.
+```
+
+### Auto Segment Naming
+
+Generate meaningful segment names automatically:
+
+```r
+source("modules/segment/lib/segment_profile.R")
+
+names <- auto_name_segments(
+  data = survey_data,
+  clusters = result$clusters,
+  clustering_vars = config$clustering_vars,
+  name_style = "descriptive"  # or "persona"
+)
+
+# Output:
+#   Segment 1: High Performers (23%)
+#   Segment 2: Satisfied (51%)
+#   Segment 3: At-Risk (17%)
+#   Segment 4: Dissatisfied (9%)
+```
+
+### Segment Action Cards
+
+Generate executive-ready summaries for each segment:
+
+```r
+source("modules/segment/lib/segment_cards.R")
+
+cards <- generate_segment_cards(
+  data = survey_data,
+  clusters = result$clusters,
+  clustering_vars = config$clustering_vars,
+  segment_names = c("Advocates", "Satisfied", "At-Risk", "Detractors")
+)
+
+print_segment_cards(cards)
+
+# Output per segment:
+# ============================================================
+# SEGMENT: Advocates
+# ============================================================
+# Size: 150 respondents (25%)
+#
+# HEADLINE: High-satisfaction group with high service quality
+#
+# DEFINING TRAITS:
+#   - Service quality: 9.2 vs 7.1 overall (higher)
+#   - Product satisfaction: 8.8 vs 6.9 overall (higher)
+#
+# STRENGTHS:
+#   + Service quality (9.2/10)
+#   + Product satisfaction (8.8/10)
+#
+# PAIN POINTS:
+#   No major pain points identified
+#
+# RECOMMENDED ACTIONS:
+#   > Leverage as brand advocates
+#   > Gather testimonials/case studies
+#   > Offer referral programs
+
+# Export to Excel
+export_cards_excel(cards, "output/segment_cards.xlsx")
+```
+
+### Classification Rules
+
+Generate plain-English decision rules:
+
+```r
+source("modules/segment/lib/segment_rules.R")
+
+rules <- generate_segment_rules(
+  data = survey_data,
+  clusters = result$clusters,
+  clustering_vars = config$clustering_vars,
+  max_depth = 3
+)
+
+print_segment_rules(rules)
+
+# Output:
+# IF service_quality >= 7.5 AND product_satisfaction >= 7.0 THEN Advocates
+# IF service_quality < 5.0 AND value_perception < 5.5 THEN Detractors
+# ...
+# Overall rule accuracy: 85%
+```
+
+### Variable Importance Ranking
+
+Determine which variables matter most:
+
+```r
+source("modules/segment/lib/segment_profiling_enhanced.R")
+
+importance <- rank_variable_importance(
+  data = survey_data,
+  clusters = result$clusters,
+  clustering_vars = config$clustering_vars
+)
+
+# Output:
+# ESSENTIAL (eta-squared > 0.30):
+#   q3_service: 0.52
+#   q1_product: 0.45
+#
+# USEFUL (eta-squared 0.10-0.30):
+#   q5_recommend: 0.22
+#   q2_value: 0.18
+#
+# MINIMAL IMPACT (eta-squared < 0.10):
+#   q4_support: 0.08  <- Consider removing
+#
+# Suggestion: Variable q4_support contributes little.
+# Re-run without it for cleaner segments.
+```
+
+### Demographic Profiling
+
+Analyze segment composition by demographics:
+
+```r
+source("modules/segment/lib/segment_profile.R")
+
+demo_profile <- profile_demographics(
+  data = survey_data,
+  clusters = result$clusters,
+  demo_vars = c("gender", "age_group", "region", "income_bracket")
+)
+
+# Output:
+# Analyzing: gender
+#   Chi-squared test: Significant (p < 0.05)
+#
+# Analyzing: age_group
+#   Chi-squared test: Significant (p < 0.05)
+#
+# Analyzing: region
+#   Not significant (p = 0.234)
+
+export_demographic_profiles(demo_profile, "output/demo_profiles.xlsx")
+```
+
+### Simple Stability Check
+
+Quick stability verification (faster than bootstrap):
+
+```r
+source("modules/segment/lib/segment_validation.R")
+
+stability <- check_stability_simple(
+  data = survey_data,
+  clustering_vars = config$clustering_vars,
+  k = 4,
+  n_runs = 5
+)
+
+# Output:
+# Running 5 k-means iterations with different seeds...
+#   Run 1: tot.withinss = 1250.3
+#   Run 2: tot.withinss = 1248.7
+#   ...
+#
+# STABILITY RESULTS
+# -----------------
+# Stability Score: 92%
+# Interpretation: EXCELLENT - Very stable segmentation
+#
+# Agreement between runs:
+#   Average: 92.3%
+#   Min: 89.5%
+#   Max: 95.1%
+```
+
+### Outlier Review Screen
+
+Interactive review of flagged outliers:
+
+```r
+source("modules/segment/lib/segment_outliers.R")
+
+review <- review_outliers(
+  data = survey_data,
+  outlier_result = outlier_detection,
+  clustering_vars = config$clustering_vars,
+  id_var = "respondent_id",
+  output_path = "output/outlier_review.xlsx"
+)
+
+# Output:
+# Total respondents: 500
+# Flagged outliers: 12 (2.4%)
+#
+# Top 5 most extreme outliers:
+#   1. ID 1042: 4 extreme vars, max z=4.8 [REMOVE - Multiple extreme values]
+#   2. ID 2315: 3 extreme vars, max z=4.2 [LIKELY REMOVE]
+#   ...
+```
+
+### Latent Class Analysis (LCA)
+
+Alternative to k-means for categorical/ordinal data:
+
+```r
+source("modules/segment/lib/segment_lca.R")
+
+# Exploration mode
+lca_result <- run_lca(
+  data = survey_data,
+  id_var = "respondent_id",
+  clustering_vars = c("q1", "q2", "q3", "q4", "q5"),
+  n_classes = NULL,  # NULL = exploration
+  n_min = 2,
+  n_max = 6
+)
+
+# Final mode
+lca_final <- run_lca(
+  data = survey_data,
+  id_var = "respondent_id",
+  clustering_vars = c("q1", "q2", "q3", "q4", "q5"),
+  n_classes = 4
+)
+
+# Compare k-means vs LCA
+comparison <- compare_kmeans_lca(
+  data = survey_data,
+  id_var = "respondent_id",
+  clustering_vars = c("q1", "q2", "q3", "q4", "q5"),
+  k = 4
+)
+```
+
+**When to use LCA**:
+- Data is categorical (Yes/No, A/B/C)
+- Likert scales (1-5) treated as ordinal
+- Assumptions of k-means (continuous, normal) not met
+- Probabilistic class membership preferred
+
+### Configuration Parameters for Enhanced Features
+
+Add these to your config file to enable enhanced features:
+
+```
+# Golden Questions
+golden_questions_n = 3
+
+# Auto Naming
+auto_name_style = descriptive  # or "persona", "simple"
+
+# Demographics
+demographic_vars = gender,age_group,region,income
+
+# Stability Check
+run_stability_check = TRUE
+stability_n_runs = 5
+
+# Classification Rules
+generate_rules = TRUE
+rules_max_depth = 3
+
+# Action Cards
+generate_action_cards = TRUE
+scale_max = 10
+
+# LCA (instead of k-means)
+use_lca = FALSE
+```
 
 ---
 
