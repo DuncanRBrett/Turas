@@ -1,7 +1,7 @@
 # TurasTracker - Code Maintenance Guide
 
-**Version:** 10.0
-**Document Date:** December 2, 2025
+**Version:** 10.1
+**Document Date:** December 11, 2025
 **Audience:** Developers and System Maintainers  
 
 ---
@@ -43,6 +43,7 @@
 ├── trend_calculator.R         # Calculate trends & changes
 ├── banner_trends.R            # Banner breakout trends
 ├── tracker_output.R           # Excel output generation
+├── tracker_dashboard_reports.R # Dashboard & sig matrix reports (NEW v2.2)
 └── test_phase[1-3].R          # Test scripts
 ```
 
@@ -59,7 +60,9 @@ run_tracker.R
 │   └─→ question_mapper.R (extract_question_data)
 ├─→ banner_trends.R
 │   └─→ trend_calculator.R (reuses calculation functions)
-└─→ tracker_output.R
+├─→ tracker_output.R
+└─→ tracker_dashboard_reports.R (NEW v2.2)
+    └─→ tracker_config_loader.R (get_setting)
 ```
 
 ---
@@ -477,6 +480,78 @@ detect_banner_results(trend_results) → logical
 **Change Summary:**
 - `write_change_summary_sheet()` - Baseline vs. Latest comparison
 - Format: Question | Metric | Baseline | Latest | Abs Change | % Change
+
+---
+
+### 9. tracker_dashboard_reports.R (NEW v2.2)
+
+**Purpose:** Generate enhanced executive reports (Dashboard and Significance Matrices)
+
+**Key Functions:**
+
+#### write_dashboard_output()
+```r
+write_dashboard_output(trend_results, config, wave_data, output_path,
+                       include_sig_matrices = TRUE) → output_file_path
+```
+
+**Returns:** Path to generated dashboard Excel file
+
+#### write_trend_dashboard()
+```r
+write_trend_dashboard(wb, trend_results, config, sheet_name = "Trend_Dashboard")
+```
+
+**Creates executive summary sheet with:**
+- All metrics in single view
+- Latest value, vs previous wave, vs baseline comparisons
+- Significance indicators (↑ up, ↓ down, → no change)
+- Status indicators (Good/Stable/Watch/Alert) with color coding
+- Wave values for mini-trend visualization
+
+#### write_significance_matrix()
+```r
+write_significance_matrix(wb, q_result, config, wave_ids)
+```
+
+**Creates per-question matrix showing:**
+- All wave-to-wave comparisons (not just consecutive)
+- Change values with direction indicators
+- Color-coded significance (green=up, red=down)
+
+#### write_all_significance_matrices()
+```r
+write_all_significance_matrices(wb, trend_results, config)
+```
+
+**Wrapper:** Creates significance matrix for each question in trend_results
+
+#### write_sig_matrix_output()
+```r
+write_sig_matrix_output(trend_results, config, wave_data, output_path) → output_file_path
+```
+
+**Returns:** Path to standalone significance matrix Excel file
+
+#### Helper Functions:
+
+**Statistical:**
+- `calculate_pairwise_significance()` - Z-test (proportions) or T-test (means)
+- `calculate_change_significance()` - Wrapper for wave comparisons
+
+**Formatting:**
+- `sig_to_arrow()` - Convert significance code to ↑/↓/→
+- `format_metric_type_display()` - Convert metric type to display label
+- `format_metric_value_display()` - Format values with appropriate units
+- `format_change_value_display()` - Format changes with +/- signs
+
+**Status:**
+- `determine_trend_status()` - Calculate Good/Stable/Watch/Alert status
+- `get_sig_style()` - Get Excel style based on significance direction
+
+**Report Types Supported:**
+- `dashboard` - Full dashboard with sig matrices
+- `sig_matrix` - Standalone sig matrices only
 
 ---
 
@@ -1110,6 +1185,11 @@ error(logger, "Failed to load data")
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** November 2025
+**Document Version:** 1.1
+**Last Updated:** December 2025
 **Status:** Complete - Ready for Production
+
+**v1.1 Changes (December 2025):**
+- Added tracker_dashboard_reports.R module documentation
+- Added Dashboard and Sig Matrix report types
+- Updated Module Structure and Dependency Graph
