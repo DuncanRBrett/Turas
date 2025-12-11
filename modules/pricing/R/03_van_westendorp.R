@@ -2,279 +2,246 @@
 # TURAS PRICING MODULE - VAN WESTENDORP PRICE SENSITIVITY METER
 # ==============================================================================
 #
-# Purpose: Implement Van Westendorp PSM analysis methodology
-# Version: 1.0.0
-# Date: 2025-11-18
+# Purpose: Implement Van Westendorp PSM analysis using pricesensitivitymeter package
+#          Includes Newton-Miller-Smith (NMS) extension support
+# Version: 2.0.0
+# Date: 2025-12-11
 #
 # References:
-# - Van Westendorp, P. (1976). NSS Price Sensitivity Meter (PSM) -
-#   A new approach to study consumer perception of price
+# - Van Westendorp, P. (1976). NSS Price Sensitivity Meter (PSM)
+# - Newton, Miller, Smith (1993). NMS extension for purchase probability
 #
 # ==============================================================================
 
 #' Run Van Westendorp PSM Analysis
 #'
-#' Calculates price sensitivity metrics using the Van Westendorp methodology.
-#' Finds four key price points through cumulative distribution intersections:
-#' - PMC (Point of Marginal Cheapness)
-#' - OPP (Optimal Price Point)
-#' - IDP (Indifference Price Point)
-#' - PME (Point of Marginal Expensiveness)
+#' Wrapper around pricesensitivitymeter package providing consistent
+#' Turas interface and extended output formatting. Includes NMS extension
+#' for purchase probability calibration when purchase intent columns are provided.
 #'
 #' @param data Data frame containing price perception responses
-#' @param config Configuration list with Van Westendorp settings
+#' @param config Configuration list with van_westendorp settings
 #'
-#' @return List containing price points, curves, confidence intervals, and diagnostics
+#' @return List containing price_points, ranges, curves, nms_results,
+#'         descriptives, diagnostics
 #'
-#' @keywords internal
+#' @export
 run_van_westendorp <- function(data, config) {
+
+  # Load package
+  if (!requireNamespace("pricesensitivitymeter", quietly = TRUE)) {
+    stop("Package 'pricesensitivitymeter' required. Install with: install.packages('pricesensitivitymeter')",
+         call. = FALSE)
+  }
 
   vw <- config$van_westendorp
 
-  # Extract price columns
-  too_cheap <- data[[vw$col_too_cheap]]
-  cheap <- data[[vw$col_cheap]]
-  expensive <- data[[vw$col_expensive]]
-  too_expensive <- data[[vw$col_too_expensive]]
+  # ============================================================================
+  # STEP 1: Extract and validate columns
+  # ============================================================================
 
-  # Extract weights (if specified)
-  if (!is.na(config$weight_var) && config$weight_var %in% names(data)) {
-    weights <- data[[config$weight_var]]
-  } else {
-    weights <- rep(1, nrow(data))
+  required_cols <- c(vw$col_too_cheap, vw$col_cheap,
+                     vw$col_expensive, vw$col_too_expensive)
+
+  missing_cols <- required_cols[!required_cols %in% names(data)]
+  if (length(missing_cols) > 0) {
+    stop(sprintf("Columns not found: %s\nAvailable: %s",
+                 paste(missing_cols, collapse = ", "),
+                 paste(names(data), collapse = ", ")),
+         call. = FALSE)
   }
 
-  # Remove cases with any missing values
-  complete_cases <- !is.na(too_cheap) & !is.na(cheap) &
-    !is.na(expensive) & !is.na(too_expensive) &
-    !is.na(weights) & is.finite(weights) & weights > 0
+  too_cheap <- as.numeric(data[[vw$col_too_cheap]])
+  cheap <- as.numeric(data[[vw$col_cheap]])
+  expensive <- as.numeric(data[[vw$col_expensive]])
+  too_expensive <- as.numeric(data[[vw$col_too_expensive]])
 
-  too_cheap <- too_cheap[complete_cases]
-  cheap <- cheap[complete_cases]
-  expensive <- expensive[complete_cases]
-  too_expensive <- too_expensive[complete_cases]
-  weights <- weights[complete_cases]
+  # ============================================================================
+  # STEP 2: Check for NMS purchase intent columns
+  # ============================================================================
 
-  n_valid <- length(too_cheap)
-  effective_n <- sum(weights)  # Effective sample size for weighted data
+  has_nms <- !is.null(vw$col_pi_cheap) &&
+             !is.na(vw$col_pi_cheap) &&
+             vw$col_pi_cheap %in% names(data)
 
-  if (n_valid < 30) {
-    warning(sprintf("Low sample size for Van Westendorp analysis: n=%d (recommended minimum: 30)",
-                    n_valid), call. = FALSE)
+  pi_cheap <- NULL
+  pi_expensive <- NULL
+
+  if (has_nms) {
+    pi_cheap <- as.numeric(data[[vw$col_pi_cheap]])
+
+    if (!is.null(vw$col_pi_expensive) &&
+        !is.na(vw$col_pi_expensive) &&
+        vw$col_pi_expensive %in% names(data)) {
+      pi_expensive <- as.numeric(data[[vw$col_pi_expensive]])
+    }
   }
 
-  # Calculate cumulative distribution curves
-  curves <- calculate_vw_curves(too_cheap, cheap, expensive, too_expensive,
-                                weights = weights,
-                                interpolation = vw$interpolation_method %||% "linear")
+  # ============================================================================
+  # STEP 3: Run pricesensitivitymeter analysis
+  # ============================================================================
 
-  # Find intersection points
-  price_points <- find_vw_intersections(curves)
+  psm_args <- list(
+    toocheap = too_cheap,
+    cheap = cheap,
+    expensive = expensive,
+    tooexpensive = too_expensive,
+    validate = TRUE,
+    interpolate = TRUE,
+    interpolation_steps = 500
+  )
 
-  # Calculate acceptable and optimal ranges
+  # Add NMS parameters if available
+  if (has_nms) {
+    psm_args$pi_cheap <- pi_cheap
+    if (!is.null(pi_expensive)) {
+      psm_args$pi_expensive <- pi_expensive
+    }
+  }
+
+  psm_result <- do.call(pricesensitivitymeter::psm_analysis, psm_args)
+
+  # ============================================================================
+  # STEP 4: Extract and restructure results
+  # ============================================================================
+
+  # Core price points
+  price_points <- list(
+    PMC = psm_result$pricerange_lower,
+    OPP = psm_result$opp,
+    IDP = psm_result$idp,
+    PME = psm_result$pricerange_upper
+  )
+
+  # Ranges
   acceptable_range <- list(
     lower = price_points$PMC,
-    upper = price_points$PME
+    upper = price_points$PME,
+    width = price_points$PME - price_points$PMC
   )
 
   optimal_range <- list(
     lower = price_points$OPP,
-    upper = price_points$IDP
+    upper = price_points$IDP,
+    width = price_points$IDP - price_points$OPP
   )
 
-  # Calculate confidence intervals if requested
+  # Curves for plotting
+  curves <- data.frame(
+    price = psm_result$data_vanwestendorp$price,
+    too_cheap = psm_result$data_vanwestendorp$ecdf_toocheap,
+    not_cheap = psm_result$data_vanwestendorp$ecdf_not_cheap,
+    cheap = 1 - psm_result$data_vanwestendorp$ecdf_not_cheap,
+    not_expensive = psm_result$data_vanwestendorp$ecdf_not_expensive,
+    expensive = 1 - psm_result$data_vanwestendorp$ecdf_not_expensive,
+    too_expensive = psm_result$data_vanwestendorp$ecdf_tooexpensive,
+    stringsAsFactors = FALSE
+  )
+
+  # ============================================================================
+  # STEP 5: Extract NMS results if available
+  # ============================================================================
+
+  nms_results <- NULL
+
+  if (has_nms && !is.null(psm_result$pi_scale)) {
+    nms_results <- list(
+      trial_optimal = psm_result$price_optimal_trial,
+      revenue_optimal = psm_result$price_optimal_revenue,
+      data = psm_result$data_nms
+    )
+  }
+
+  # ============================================================================
+  # STEP 6: Calculate descriptive statistics
+  # ============================================================================
+
+  calc_desc <- function(x, name) {
+    x <- x[!is.na(x)]
+    data.frame(
+      variable = name,
+      n = length(x),
+      mean = mean(x),
+      median = median(x),
+      sd = sd(x),
+      min = min(x),
+      max = max(x),
+      stringsAsFactors = FALSE
+    )
+  }
+
+  descriptives <- rbind(
+    calc_desc(too_cheap, "Too Cheap"),
+    calc_desc(cheap, "Cheap/Bargain"),
+    calc_desc(expensive, "Expensive"),
+    calc_desc(too_expensive, "Too Expensive")
+  )
+
+  # ============================================================================
+  # STEP 7: Compile diagnostics
+  # ============================================================================
+
+  # Count valid cases
+  complete_cases <- !is.na(too_cheap) & !is.na(cheap) &
+                    !is.na(expensive) & !is.na(too_expensive)
+  n_total <- length(too_cheap)
+  n_valid <- sum(complete_cases)
+
+  # Check monotonicity violations
+  monotonic <- too_cheap[complete_cases] <= cheap[complete_cases] &
+               cheap[complete_cases] <= expensive[complete_cases] &
+               expensive[complete_cases] <= too_expensive[complete_cases]
+  n_violations <- sum(!monotonic)
+  violation_rate <- n_violations / n_valid
+
+  diagnostics <- list(
+    n_total = n_total,
+    n_valid = n_valid,
+    n_excluded = n_total - n_valid,
+    n_violations = n_violations,
+    violation_rate = violation_rate,
+    price_range = range(c(too_cheap, cheap, expensive, too_expensive), na.rm = TRUE),
+    has_nms = has_nms,
+    method = "van_westendorp"
+  )
+
+  # Add warning if violation rate high
+  if (violation_rate > 0.10) {
+    diagnostics$warning <- sprintf(
+      "%.1f%% of respondents gave illogical price sequences. Review data quality.",
+      violation_rate * 100
+    )
+  }
+
+  # ============================================================================
+  # STEP 8: Calculate confidence intervals if requested (using existing bootstrap)
+  # ============================================================================
+
   confidence_intervals <- NULL
   if (isTRUE(vw$calculate_confidence)) {
     confidence_intervals <- bootstrap_vw_confidence(
       too_cheap, cheap, expensive, too_expensive,
-      weights = weights,
+      weights = NULL,
       iterations = vw$bootstrap_iterations %||% 1000,
       level = vw$confidence_level %||% 0.95
     )
   }
 
-  # Calculate descriptive statistics
-  descriptives <- calculate_vw_descriptives(too_cheap, cheap, expensive, too_expensive,
-                                           weights = weights)
+  # ============================================================================
+  # STEP 9: Return structured results
+  # ============================================================================
 
-  # Return results
   list(
     price_points = price_points,
     acceptable_range = acceptable_range,
     optimal_range = optimal_range,
     curves = curves,
+    nms_results = nms_results,
     confidence_intervals = confidence_intervals,
     descriptives = descriptives,
-    diagnostics = list(
-      n_total = sum(complete_cases) + sum(!complete_cases),
-      n_valid = n_valid,
-      price_range = range(c(too_cheap, cheap, expensive, too_expensive)),
-      method = "van_westendorp"
-    )
+    diagnostics = diagnostics,
+    raw_psm = psm_result  # Keep for advanced users
   )
-}
-
-
-#' Calculate Van Westendorp Cumulative Curves
-#'
-#' Computes cumulative distribution functions for each price perception question.
-#'
-#' @param too_cheap Vector of "too cheap" prices
-#' @param cheap Vector of "bargain" prices
-#' @param expensive Vector of "expensive" prices
-#' @param too_expensive Vector of "too expensive" prices
-#' @param weights Vector of case weights (defaults to equal weights if NULL)
-#' @param interpolation Interpolation method ("linear" or "spline")
-#'
-#' @return Data frame with price points and cumulative percentages
-#'
-#' @keywords internal
-calculate_vw_curves <- function(too_cheap, cheap, expensive, too_expensive,
-                                weights = NULL,
-                                interpolation = "linear") {
-
-  # Default to equal weights if not provided
-  if (is.null(weights)) {
-    weights <- rep(1, length(too_cheap))
-  }
-
-  # Normalize weights to sum to 1
-  weights <- weights / sum(weights)
-
-  # Get all unique price points
-  all_prices <- sort(unique(c(too_cheap, cheap, expensive, too_expensive)))
-
-  # Create finer price grid for smoother curves
-  price_range <- range(all_prices)
-  price_grid <- seq(price_range[1], price_range[2], length.out = 200)
-
-  # Calculate cumulative percentages at each price point using weighted proportions
-  # Using weighted ECDF (empirical cumulative distribution function)
-
-  # "Too Cheap" curve: % who say price is too cheap (cumulative from high to low)
-  # At price P: weighted % of respondents whose "too cheap" price >= P
-  curve_too_cheap <- sapply(price_grid, function(p) sum(weights[too_cheap >= p]))
-
-  # "Not Cheap" curve (inverse of cheap): % who say price is NOT cheap
-  # At price P: weighted % of respondents whose "cheap" price <= P
-  curve_not_cheap <- sapply(price_grid, function(p) sum(weights[cheap <= p]))
-
-  # "Not Expensive" curve (inverse of expensive): % who say price is NOT expensive
-  # At price P: weighted % of respondents whose "expensive" price >= P
-  curve_not_expensive <- sapply(price_grid, function(p) sum(weights[expensive >= p]))
-
-  # "Too Expensive" curve: % who say price is too expensive
-  # At price P: weighted % of respondents whose "too expensive" price <= P
-  curve_too_expensive <- sapply(price_grid, function(p) sum(weights[too_expensive <= p]))
-
-  # Also calculate the "Cheap" and "Expensive" curves for IDP
-  curve_cheap <- 1 - curve_not_cheap
-  curve_expensive <- 1 - curve_not_expensive
-
-  # Return curves data frame
-  data.frame(
-    price = price_grid,
-    too_cheap = curve_too_cheap,
-    not_cheap = curve_not_cheap,
-    cheap = curve_cheap,
-    not_expensive = curve_not_expensive,
-    expensive = curve_expensive,
-    too_expensive = curve_too_expensive,
-    stringsAsFactors = FALSE
-  )
-}
-
-
-#' Find Van Westendorp Intersection Points
-#'
-#' Calculates the four key price points from curve intersections.
-#'
-#' @param curves Data frame of cumulative curves from calculate_vw_curves()
-#'
-#' @return Named list with PMC, OPP, IDP, and PME price points
-#'
-#' @keywords internal
-find_vw_intersections <- function(curves) {
-
-  price <- curves$price
-
-  # PMC (Point of Marginal Cheapness): Too Cheap x Not Cheap
-  # Where "too cheap" percentage equals "not cheap" percentage
-  pmc <- find_curve_intersection(price, curves$too_cheap, curves$not_cheap)
-
-  # OPP (Optimal Price Point): Too Cheap x Too Expensive
-  # Where "too cheap" percentage equals "too expensive" percentage
-  opp <- find_curve_intersection(price, curves$too_cheap, curves$too_expensive)
-
-  # IDP (Indifference Price Point): Cheap x Expensive
-  # Where "cheap" percentage equals "expensive" percentage
-  idp <- find_curve_intersection(price, curves$cheap, curves$expensive)
-
-  # PME (Point of Marginal Expensiveness): Not Expensive x Too Expensive
-  # Where "not expensive" percentage equals "too expensive" percentage
-  pme <- find_curve_intersection(price, curves$not_expensive, curves$too_expensive)
-
-  list(
-    PMC = pmc,
-    OPP = opp,
-    IDP = idp,
-    PME = pme
-  )
-}
-
-
-#' Find Intersection of Two Curves
-#'
-#' Uses linear interpolation to find where two curves intersect.
-#'
-#' @param x X-axis values (prices)
-#' @param y1 First curve y-values
-#' @param y2 Second curve y-values
-#'
-#' @return X-value at intersection point
-#'
-#' @keywords internal
-find_curve_intersection <- function(x, y1, y2) {
-
-  # Calculate difference
-  diff <- y1 - y2
-
-  # Find where sign changes (crossing point)
-  sign_changes <- which(diff[-1] * diff[-length(diff)] < 0)
-
-  if (length(sign_changes) == 0) {
-    # No intersection found
-    # Return the point where curves are closest
-    min_diff_idx <- which.min(abs(diff))
-    return(x[min_diff_idx])
-  }
-
-  # Use first intersection
-  idx <- sign_changes[1]
-
-  # Linear interpolation to find exact crossing point
-  x1 <- x[idx]
-  x2 <- x[idx + 1]
-  y1_1 <- y1[idx]
-  y1_2 <- y1[idx + 1]
-  y2_1 <- y2[idx]
-  y2_2 <- y2[idx + 1]
-
-  # Solve for intersection
-  # y1 = y1_1 + (y1_2 - y1_1) * t
-  # y2 = y2_1 + (y2_2 - y2_1) * t
-  # Set equal and solve for t
-  denom <- (y1_2 - y1_1) - (y2_2 - y2_1)
-
-  if (abs(denom) < 1e-10) {
-    # Parallel lines - return midpoint
-    return((x1 + x2) / 2)
-  }
-
-  t <- (y2_1 - y1_1) / denom
-  intersection_x <- x1 + (x2 - x1) * t
-
-  return(intersection_x)
 }
 
 
@@ -300,33 +267,56 @@ bootstrap_vw_confidence <- function(too_cheap, cheap, expensive, too_expensive,
   n <- length(too_cheap)
   alpha <- 1 - level
 
-  # Default to equal weights if not provided
-  if (is.null(weights)) {
-    weights <- rep(1, n)
+  # Remove NA cases for bootstrap
+  complete_idx <- !is.na(too_cheap) & !is.na(cheap) &
+                  !is.na(expensive) & !is.na(too_expensive)
+
+  too_cheap_c <- too_cheap[complete_idx]
+  cheap_c <- cheap[complete_idx]
+  expensive_c <- expensive[complete_idx]
+  too_expensive_c <- too_expensive[complete_idx]
+
+  n_c <- length(too_cheap_c)
+
+  if (n_c < 30) {
+    warning("Sample size too small for reliable bootstrap confidence intervals",
+            call. = FALSE)
   }
 
   # Storage for bootstrap results
   boot_results <- matrix(NA, nrow = iterations, ncol = 4)
   colnames(boot_results) <- c("PMC", "OPP", "IDP", "PME")
 
-  # Run bootstrap
+  # Run bootstrap using pricesensitivitymeter
   for (i in seq_len(iterations)) {
     # Resample respondents with replacement
-    idx <- sample(n, n, replace = TRUE)
+    idx <- sample(n_c, n_c, replace = TRUE)
 
-    boot_too_cheap <- too_cheap[idx]
-    boot_cheap <- cheap[idx]
-    boot_expensive <- expensive[idx]
-    boot_too_expensive <- too_expensive[idx]
-    boot_weights <- weights[idx]
+    boot_too_cheap <- too_cheap_c[idx]
+    boot_cheap <- cheap_c[idx]
+    boot_expensive <- expensive_c[idx]
+    boot_too_expensive <- too_expensive_c[idx]
 
-    # Calculate curves and intersections
-    curves <- calculate_vw_curves(boot_too_cheap, boot_cheap,
-                                  boot_expensive, boot_too_expensive,
-                                  weights = boot_weights)
-    points <- find_vw_intersections(curves)
+    # Run analysis
+    tryCatch({
+      psm_boot <- pricesensitivitymeter::psm_analysis(
+        toocheap = boot_too_cheap,
+        cheap = boot_cheap,
+        expensive = boot_expensive,
+        tooexpensive = boot_too_expensive,
+        validate = FALSE,
+        interpolate = TRUE
+      )
 
-    boot_results[i, ] <- c(points$PMC, points$OPP, points$IDP, points$PME)
+      boot_results[i, ] <- c(
+        psm_boot$pricerange_lower,
+        psm_boot$opp,
+        psm_boot$idp,
+        psm_boot$pricerange_upper
+      )
+    }, error = function(e) {
+      # Skip failed iterations
+    })
   }
 
   # Calculate percentile confidence intervals
@@ -342,59 +332,5 @@ bootstrap_vw_confidence <- function(too_cheap, cheap, expensive, too_expensive,
     ci_lower = ci_lower,
     ci_upper = ci_upper,
     stringsAsFactors = FALSE
-  )
-}
-
-
-#' Calculate Descriptive Statistics for Van Westendorp
-#'
-#' @param too_cheap Vector of "too cheap" prices
-#' @param cheap Vector of "bargain" prices
-#' @param expensive Vector of "expensive" prices
-#' @param too_expensive Vector of "too expensive" prices
-#' @param weights Vector of case weights (defaults to equal weights if NULL)
-#'
-#' @return Data frame with descriptive statistics
-#'
-#' @keywords internal
-calculate_vw_descriptives <- function(too_cheap, cheap, expensive, too_expensive,
-                                     weights = NULL) {
-
-  # Default to equal weights if not provided
-  if (is.null(weights)) {
-    weights <- rep(1, length(too_cheap))
-  }
-
-  calc_stats <- function(x, w, name) {
-    # Remove NAs
-    valid <- !is.na(x) & !is.na(w)
-    x_valid <- x[valid]
-    w_valid <- w[valid]
-
-    # Normalize weights
-    if (sum(w_valid) > 0) {
-      w_norm <- w_valid / sum(w_valid)
-    } else {
-      w_norm <- w_valid
-    }
-
-    data.frame(
-      variable = name,
-      n = sum(valid),
-      effective_n = sum(w_valid),
-      mean = if (sum(valid) > 0) sum(x_valid * w_norm) else NA_real_,
-      median = if (sum(valid) > 0) median(x_valid) else NA_real_,  # Weighted median is complex, using unweighted
-      sd = if (sum(valid) > 1) sqrt(sum(w_norm * (x_valid - sum(x_valid * w_norm))^2)) else NA_real_,
-      min = if (sum(valid) > 0) min(x_valid) else NA_real_,
-      max = if (sum(valid) > 0) max(x_valid) else NA_real_,
-      stringsAsFactors = FALSE
-    )
-  }
-
-  rbind(
-    calc_stats(too_cheap, weights, "Too Cheap"),
-    calc_stats(cheap, weights, "Cheap/Bargain"),
-    calc_stats(expensive, weights, "Expensive"),
-    calc_stats(too_expensive, weights, "Too Expensive")
   )
 }

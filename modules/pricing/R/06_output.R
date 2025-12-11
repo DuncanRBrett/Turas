@@ -3,25 +3,31 @@
 # ==============================================================================
 #
 # Purpose: Generate Excel output files with analysis results
-# Version: 1.0.0
-# Date: 2025-11-18
+# Version: 2.0.0
+# Date: 2025-12-11
 #
 # ==============================================================================
 
 #' Write Pricing Analysis Output
 #'
 #' Generates comprehensive Excel output file with analysis results.
+#' Includes NMS results, segment analysis, price ladder, and recommendation synthesis.
 #'
 #' @param results Analysis results
 #' @param plots List of plot objects
 #' @param validation Validation results
 #' @param config Configuration list
 #' @param output_file Path for output file
+#' @param segment_results Optional segment analysis results
+#' @param ladder_results Optional price ladder results
+#' @param synthesis Optional recommendation synthesis
 #'
 #' @return Invisible path to output file
 #'
 #' @keywords internal
-write_pricing_output <- function(results, plots, validation, config, output_file) {
+write_pricing_output <- function(results, plots, validation, config, output_file,
+                                 segment_results = NULL, ladder_results = NULL,
+                                 synthesis = NULL) {
 
   if (!requireNamespace("openxlsx", quietly = TRUE)) {
     stop("Package 'openxlsx' is required for Excel output", call. = FALSE)
@@ -503,6 +509,235 @@ write_pricing_output <- function(results, plots, validation, config, output_file
       openxlsx::writeData(wb, "Constrained_Optimization", const_df,
                           startRow = constraint_start + 2, headerStyle = header_style)
     }
+  }
+
+  # --------------------------------------------------------------------------
+  # NMS Results (Newton-Miller-Smith extension)
+  # --------------------------------------------------------------------------
+  if (method %in% c("van_westendorp", "both")) {
+    vw_results <- if (method == "both") results$van_westendorp else results
+
+    if (!is.null(vw_results$nms_results)) {
+      openxlsx::addWorksheet(wb, "VW_NMS_Results")
+
+      nms_df <- data.frame(
+        Metric = c("Trial Optimal Price", "Revenue Optimal Price"),
+        Price = c(
+          vw_results$nms_results$trial_optimal,
+          vw_results$nms_results$revenue_optimal
+        ),
+        Description = c(
+          "Price maximizing trial/adoption",
+          "Price maximizing expected revenue"
+        ),
+        stringsAsFactors = FALSE
+      )
+
+      openxlsx::writeData(wb, "VW_NMS_Results", nms_df, headerStyle = header_style)
+      openxlsx::addStyle(wb, "VW_NMS_Results", currency_style,
+                         rows = 2:3, cols = 2, gridExpand = TRUE)
+      openxlsx::setColWidths(wb, "VW_NMS_Results", cols = 1:3, widths = c(25, 15, 35))
+
+      # Add NMS data if available
+      if (!is.null(vw_results$nms_results$data)) {
+        nms_data_start <- 6
+        openxlsx::writeData(wb, "VW_NMS_Results", "NMS CURVE DATA",
+                            startRow = nms_data_start)
+        openxlsx::addStyle(wb, "VW_NMS_Results", subheader_style,
+                           rows = nms_data_start, cols = 1)
+        openxlsx::writeData(wb, "VW_NMS_Results", vw_results$nms_results$data,
+                            startRow = nms_data_start + 2, headerStyle = header_style)
+      }
+    }
+  }
+
+  # --------------------------------------------------------------------------
+  # Segment Analysis Results
+  # --------------------------------------------------------------------------
+  if (!is.null(segment_results)) {
+    openxlsx::addWorksheet(wb, "Segment_Comparison")
+
+    # Write comparison table
+    openxlsx::writeData(wb, "Segment_Comparison", segment_results$comparison_table,
+                        headerStyle = header_style)
+    openxlsx::setColWidths(wb, "Segment_Comparison",
+                           cols = 1:ncol(segment_results$comparison_table),
+                           widths = "auto")
+
+    # Add insights
+    if (length(segment_results$insights) > 0) {
+      insight_start <- nrow(segment_results$comparison_table) + 4
+      openxlsx::writeData(wb, "Segment_Comparison", "KEY SEGMENT INSIGHTS",
+                          startRow = insight_start)
+      openxlsx::addStyle(wb, "Segment_Comparison", subheader_style,
+                         rows = insight_start, cols = 1)
+
+      for (i in seq_along(segment_results$insights)) {
+        openxlsx::writeData(wb, "Segment_Comparison",
+                            paste0(i, ". ", segment_results$insights[i]),
+                            startRow = insight_start + 1 + i)
+      }
+    }
+  }
+
+  # --------------------------------------------------------------------------
+  # Price Ladder Results
+  # --------------------------------------------------------------------------
+  if (!is.null(ladder_results)) {
+    openxlsx::addWorksheet(wb, "Price_Ladder")
+
+    # Write tier table
+    openxlsx::writeData(wb, "Price_Ladder", ladder_results$tier_table,
+                        headerStyle = header_style)
+    openxlsx::addStyle(wb, "Price_Ladder", currency_style,
+                       rows = 2:(nrow(ladder_results$tier_table) + 1),
+                       cols = 2, gridExpand = TRUE)
+    openxlsx::setColWidths(wb, "Price_Ladder",
+                           cols = 1:ncol(ladder_results$tier_table),
+                           widths = "auto")
+
+    # Add notes
+    if (length(ladder_results$notes) > 0) {
+      notes_start <- nrow(ladder_results$tier_table) + 4
+      openxlsx::writeData(wb, "Price_Ladder", "LADDER NOTES",
+                          startRow = notes_start)
+      openxlsx::addStyle(wb, "Price_Ladder", subheader_style,
+                         rows = notes_start, cols = 1)
+
+      for (i in seq_along(ladder_results$notes)) {
+        openxlsx::writeData(wb, "Price_Ladder",
+                            paste0("* ", ladder_results$notes[i]),
+                            startRow = notes_start + 1 + i)
+      }
+    }
+
+    # Add diagnostics
+    if (!is.null(ladder_results$diagnostics)) {
+      diag_start <- notes_start + length(ladder_results$notes) + 4
+      openxlsx::writeData(wb, "Price_Ladder", "LADDER DIAGNOSTICS",
+                          startRow = diag_start)
+      openxlsx::addStyle(wb, "Price_Ladder", subheader_style,
+                         rows = diag_start, cols = 1)
+
+      diag_df <- data.frame(
+        Item = c("Anchor Price", "Anchor Source", "Anchor Tier",
+                 "Floor Price", "Ceiling Price", "Rounding Applied"),
+        Value = c(
+          sprintf("$%.2f", ladder_results$diagnostics$anchor_price),
+          ladder_results$diagnostics$anchor_source,
+          ladder_results$diagnostics$anchor_tier,
+          sprintf("$%.2f", ladder_results$diagnostics$floor_price),
+          sprintf("$%.2f", ladder_results$diagnostics$ceiling_price),
+          ladder_results$diagnostics$rounding_applied
+        ),
+        stringsAsFactors = FALSE
+      )
+      openxlsx::writeData(wb, "Price_Ladder", diag_df,
+                          startRow = diag_start + 2, headerStyle = header_style)
+    }
+  }
+
+  # --------------------------------------------------------------------------
+  # Recommendation Synthesis
+  # --------------------------------------------------------------------------
+  if (!is.null(synthesis)) {
+    openxlsx::addWorksheet(wb, "Recommendation")
+
+    # Primary recommendation
+    rec_df <- data.frame(
+      Item = c("Recommended Price", "Confidence Level", "Confidence Score", "Source"),
+      Value = c(
+        sprintf("%s%.2f", config$currency_symbol %||% "$", synthesis$recommendation$price),
+        synthesis$recommendation$confidence,
+        sprintf("%.0f%%", synthesis$recommendation$confidence_score * 100),
+        synthesis$recommendation$source
+      ),
+      stringsAsFactors = FALSE
+    )
+
+    openxlsx::writeData(wb, "Recommendation", "PRIMARY RECOMMENDATION",
+                        startRow = 1)
+    openxlsx::addStyle(wb, "Recommendation", subheader_style, rows = 1, cols = 1:2)
+    openxlsx::writeData(wb, "Recommendation", rec_df,
+                        startRow = 3, headerStyle = header_style)
+    openxlsx::setColWidths(wb, "Recommendation", cols = 1:2, widths = c(25, 40))
+
+    current_row <- 3 + nrow(rec_df) + 2
+
+    # Acceptable range
+    if (!is.null(synthesis$acceptable_range)) {
+      openxlsx::writeData(wb, "Recommendation", "ACCEPTABLE RANGE",
+                          startRow = current_row)
+      openxlsx::addStyle(wb, "Recommendation", subheader_style,
+                         rows = current_row, cols = 1:2)
+      current_row <- current_row + 1
+
+      range_df <- data.frame(
+        Boundary = c("Floor (PMC)", "Ceiling (PME)"),
+        Price = c(
+          sprintf("%s%.2f", config$currency_symbol %||% "$", synthesis$acceptable_range$lower),
+          sprintf("%s%.2f", config$currency_symbol %||% "$", synthesis$acceptable_range$upper)
+        ),
+        Note = c(synthesis$acceptable_range$lower_desc, synthesis$acceptable_range$upper_desc),
+        stringsAsFactors = FALSE
+      )
+      openxlsx::writeData(wb, "Recommendation", range_df,
+                          startRow = current_row + 1, headerStyle = header_style)
+      current_row <- current_row + nrow(range_df) + 3
+    }
+
+    # Evidence table
+    if (!is.null(synthesis$evidence_table)) {
+      openxlsx::writeData(wb, "Recommendation", "SUPPORTING EVIDENCE",
+                          startRow = current_row)
+      openxlsx::addStyle(wb, "Recommendation", subheader_style,
+                         rows = current_row, cols = 1:4)
+      openxlsx::writeData(wb, "Recommendation", synthesis$evidence_table,
+                          startRow = current_row + 2, headerStyle = header_style)
+      current_row <- current_row + nrow(synthesis$evidence_table) + 4
+    }
+
+    # Confidence factors
+    if (!is.null(synthesis$recommendation$confidence_score)) {
+      openxlsx::writeData(wb, "Recommendation", "CONFIDENCE FACTORS",
+                          startRow = current_row)
+      openxlsx::addStyle(wb, "Recommendation", subheader_style,
+                         rows = current_row, cols = 1)
+      current_row <- current_row + 1
+
+      # Get confidence object from synthesis if available
+      if (!is.null(synthesis$method_prices)) {
+        # Factors would be in a confidence object - write what we have
+        openxlsx::writeData(wb, "Recommendation",
+                            "See executive summary for detailed confidence assessment",
+                            startRow = current_row + 1)
+      }
+      current_row <- current_row + 4
+    }
+
+    # Risks
+    if (!is.null(synthesis$risks)) {
+      if (length(synthesis$risks$downside) > 0) {
+        openxlsx::writeData(wb, "Recommendation", "KEY RISKS",
+                            startRow = current_row)
+        openxlsx::addStyle(wb, "Recommendation", subheader_style,
+                           rows = current_row, cols = 1)
+        for (i in seq_along(synthesis$risks$downside)) {
+          openxlsx::writeData(wb, "Recommendation",
+                              paste0("* ", synthesis$risks$downside[i]),
+                              startRow = current_row + i)
+        }
+        current_row <- current_row + length(synthesis$risks$downside) + 3
+      }
+    }
+
+    # Executive Summary sheet
+    openxlsx::addWorksheet(wb, "Executive_Summary")
+    summary_lines <- strsplit(synthesis$executive_summary, "\n")[[1]]
+    for (i in seq_along(summary_lines)) {
+      openxlsx::writeData(wb, "Executive_Summary", summary_lines[i], startRow = i)
+    }
+    openxlsx::setColWidths(wb, "Executive_Summary", cols = 1, widths = 80)
   }
 
   # --------------------------------------------------------------------------

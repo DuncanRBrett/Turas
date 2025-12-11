@@ -434,6 +434,60 @@ apply_pricing_defaults <- function(settings) {
     settings$id_var <- NA_character_
   }
 
+  # --------------------------------------------------------------------------
+  # NMS Extension Settings (Van Westendorp)
+  # --------------------------------------------------------------------------
+  if (is.null(settings$van_westendorp)) {
+    settings$van_westendorp <- list()
+  }
+
+  # NMS purchase intent columns (optional)
+  settings$van_westendorp$col_pi_cheap <- settings$vw_col_pi_cheap %||%
+                                          settings$van_westendorp$col_pi_cheap %||%
+                                          NA_character_
+  settings$van_westendorp$col_pi_expensive <- settings$vw_col_pi_expensive %||%
+                                               settings$van_westendorp$col_pi_expensive %||%
+                                               NA_character_
+
+  # --------------------------------------------------------------------------
+  # Segmentation Settings
+  # --------------------------------------------------------------------------
+  settings$segmentation <- list(
+    segment_column = settings$segment_column %||% NA_character_,
+    min_segment_n = as.numeric(settings$min_segment_n %||% 50),
+    include_total = as.logical(settings$include_total %||% TRUE)
+  )
+
+  # Clean up empty segment_column
+  if (!is.na(settings$segmentation$segment_column) &&
+      settings$segmentation$segment_column == "") {
+    settings$segmentation$segment_column <- NA_character_
+  }
+
+  # --------------------------------------------------------------------------
+  # Price Ladder Settings
+  # --------------------------------------------------------------------------
+  settings$price_ladder <- list(
+    n_tiers = as.integer(settings$n_tiers %||% 3),
+    tier_names = settings$tier_names %||% "Value;Standard;Premium",
+    min_gap_pct = as.numeric(settings$min_gap_pct %||% 15),
+    max_gap_pct = as.numeric(settings$max_gap_pct %||% 50),
+    round_to = settings$round_to %||% "0.99",
+    anchor = settings$anchor %||% "Standard"
+  )
+
+  # --------------------------------------------------------------------------
+  # Synthesis Settings
+  # --------------------------------------------------------------------------
+  settings$synthesis <- list(
+    price_floor = if (!is.null(settings$price_floor) && !is.na(settings$price_floor)) {
+      as.numeric(settings$price_floor)
+    } else NA_real_,
+    price_ceiling = if (!is.null(settings$price_ceiling) && !is.na(settings$price_ceiling)) {
+      as.numeric(settings$price_ceiling)
+    } else NA_real_
+  )
+
   return(settings)
 }
 
@@ -486,13 +540,29 @@ create_pricing_config <- function(output_file = "pricing_config.xlsx",
       "output_file",
       "id_var",
       "weight_var",
-      "segment_vars",
       "unit_cost",
       "currency_symbol",
       "vw_monotonicity_behavior",
       "gg_monotonicity_behavior",
       "dk_codes",
-      "verbose"
+      "verbose",
+      "",
+      "# SEGMENTATION",
+      "segment_column",
+      "min_segment_n",
+      "include_total",
+      "",
+      "# PRICE LADDER",
+      "n_tiers",
+      "tier_names",
+      "min_gap_pct",
+      "max_gap_pct",
+      "round_to",
+      "anchor",
+      "",
+      "# CONSTRAINTS",
+      "price_floor",
+      "price_ceiling"
     ),
     Value = c(
       "My Pricing Study",
@@ -502,12 +572,28 @@ create_pricing_config <- function(output_file = "pricing_config.xlsx",
       "respondent_id",
       "",
       "",
-      "",
       "$",
       "flag_only",
       "smooth",
       "",
-      "TRUE"
+      "TRUE",
+      "",
+      "",
+      "",
+      "50",
+      "TRUE",
+      "",
+      "",
+      "3",
+      "Value;Standard;Premium",
+      "15",
+      "50",
+      "0.99",
+      "Standard",
+      "",
+      "",
+      "",
+      ""
     ),
     Description = c(
       "Project name for reports",
@@ -516,13 +602,29 @@ create_pricing_config <- function(output_file = "pricing_config.xlsx",
       "Path for output file",
       "Respondent ID column name",
       "Weight column name (optional)",
-      "Segment variables (comma-separated, optional)",
       "Unit cost for profit calculations (optional)",
       "Currency symbol for display",
       "VW monotonicity: drop, fix, or flag_only",
       "GG monotonicity: diagnostic_only or smooth",
       "Don't know codes (comma-separated, e.g., 98,99)",
-      "Show progress messages"
+      "Show progress messages",
+      "",
+      "Settings for segment-level analysis",
+      "Column containing segment labels (optional)",
+      "Minimum sample size per segment",
+      "Include total sample in comparison",
+      "",
+      "Settings for Good/Better/Best tier generation",
+      "Number of price tiers (2-4)",
+      "Tier names (semicolon-separated)",
+      "Minimum gap between tiers (%)",
+      "Maximum gap between tiers (%)",
+      "Price rounding: 0.99, 0.95, 0.00, none",
+      "Which tier anchors to optimal price",
+      "",
+      "Price constraints for recommendation",
+      "Minimum price constraint (optional)",
+      "Maximum price constraint (optional)"
     ),
     stringsAsFactors = FALSE
   )
@@ -549,7 +651,11 @@ create_pricing_config <- function(output_file = "pricing_config.xlsx",
         "calculate_confidence",
         "confidence_level",
         "bootstrap_iterations",
-        "price_decimals"
+        "price_decimals",
+        "",
+        "# NMS EXTENSION (Optional)",
+        "col_pi_cheap",
+        "col_pi_expensive"
       ),
       Value = c(
         "q1_too_cheap",
@@ -563,7 +669,11 @@ create_pricing_config <- function(output_file = "pricing_config.xlsx",
         "TRUE",
         "0.95",
         "1000",
-        "2"
+        "2",
+        "",
+        "",
+        "",
+        ""
       ),
       Description = c(
         "Column: 'At what price too cheap?'",
@@ -577,7 +687,11 @@ create_pricing_config <- function(output_file = "pricing_config.xlsx",
         "Calculate bootstrap confidence intervals",
         "Confidence level (0-1)",
         "Number of bootstrap iterations",
-        "Decimal places for price display"
+        "Decimal places for price display",
+        "",
+        "Newton-Miller-Smith purchase intent calibration",
+        "Purchase intent at 'bargain' price (0-100 scale)",
+        "Purchase intent at 'expensive' price (0-100 scale)"
       ),
       stringsAsFactors = FALSE
     )

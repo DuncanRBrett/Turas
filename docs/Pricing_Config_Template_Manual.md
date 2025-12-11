@@ -1,8 +1,8 @@
 # Pricing Config Template - User Manual
 
 **Template File:** `templates/Pricing_Config_Template.xlsx`
-**Version:** 10.0
-**Last Updated:** 4 December 2025
+**Version:** 11.0
+**Last Updated:** 11 December 2025
 
 ---
 
@@ -14,6 +14,14 @@ The Pricing Config Template configures pricing research analysis in TURAS. This 
 2. **Gabor-Granger** - Finds optimal revenue/profit-maximizing price points
 
 **You can run either method alone or both together** for comprehensive pricing insights.
+
+### New in Version 11.0
+
+- **NMS Extension** - Newton-Miller-Smith purchase intent calibration for Van Westendorp
+- **Segment Analysis** - Run pricing analysis across customer segments
+- **Price Ladder Builder** - Automatic Good/Better/Best tier generation
+- **Recommendation Synthesis** - Executive summary with confidence assessment
+- **Uses `pricesensitivitymeter` package** - Industry-standard PSM implementation
 
 ---
 
@@ -529,6 +537,207 @@ respondent_id | gg_180 | gg_200 | gg_220 | gg_240 | gg_260 | gg_280 | survey_wei
 
 ---
 
+## NMS Extension (Newton-Miller-Smith)
+
+The NMS extension calibrates Van Westendorp results with actual purchase intent data, providing more accurate revenue optimization.
+
+### What is NMS?
+
+Traditional Van Westendorp finds price *perception* points. NMS adds *behavioral* calibration by asking:
+- "At your bargain price, how likely would you be to purchase?" (0-100%)
+- "At your expensive price, how likely would you be to purchase?" (0-100%)
+
+### NMS Configuration (VanWestendorp Sheet)
+
+#### Setting: col_pi_cheap
+
+- **Purpose:** Column with purchase intent at bargain price
+- **Required:** NO (enables NMS if provided)
+- **Data Type:** Text (column name)
+- **Example:** `pi_bargain`
+
+#### Setting: col_pi_expensive
+
+- **Purpose:** Column with purchase intent at expensive price
+- **Required:** NO (optional, improves NMS accuracy)
+- **Data Type:** Text (column name)
+- **Example:** `pi_expensive`
+
+### NMS Output
+
+When NMS data is provided, the output includes:
+- **Trial Optimal Price** - Maximizes adoption/trial
+- **Revenue Optimal Price** - Maximizes expected revenue (price × purchase probability)
+
+---
+
+## Segment Analysis
+
+Run pricing analysis separately for each customer segment to identify pricing opportunities.
+
+### Segmentation Settings (Settings Sheet)
+
+#### Setting: segment_column
+
+- **Purpose:** Column containing segment labels
+- **Required:** NO (optional feature)
+- **Data Type:** Text (column name)
+- **Example:** `customer_segment`
+
+#### Setting: min_segment_n
+
+- **Purpose:** Minimum sample size to analyze a segment
+- **Required:** NO
+- **Default:** `50`
+- **Example:** `30`
+
+#### Setting: include_total
+
+- **Purpose:** Include total sample in comparison
+- **Required:** NO
+- **Default:** `TRUE`
+- **Example:** `TRUE`
+
+### Segment Analysis Output
+
+- **Segment_Comparison** sheet with price points by segment
+- **Automated insights** identifying:
+  - Non-overlapping price ranges (distinct tier opportunities)
+  - Segments supporting premium pricing
+  - Price-sensitive segments requiring caution
+  - Elasticity differences across segments
+
+---
+
+## Price Ladder Builder
+
+Automatically generates Good/Better/Best tier structure from pricing analysis.
+
+### Price Ladder Settings (Settings Sheet)
+
+#### Setting: n_tiers
+
+- **Purpose:** Number of price tiers
+- **Required:** NO
+- **Default:** `3`
+- **Valid Values:** 2, 3, or 4
+- **Example:** `3`
+
+#### Setting: tier_names
+
+- **Purpose:** Names for each tier
+- **Required:** NO
+- **Default:** `Value;Standard;Premium`
+- **Format:** Semicolon-separated
+- **Example:** `Economy;Standard;Premium;Ultra`
+
+#### Setting: min_gap_pct
+
+- **Purpose:** Minimum gap between tiers (%)
+- **Required:** NO
+- **Default:** `15`
+- **Logic:** Flags tiers too close together (cannibalization risk)
+- **Example:** `15`
+
+#### Setting: max_gap_pct
+
+- **Purpose:** Maximum gap between tiers (%)
+- **Required:** NO
+- **Default:** `50`
+- **Logic:** Flags tiers too far apart (market gap)
+- **Example:** `50`
+
+#### Setting: round_to
+
+- **Purpose:** Psychological price rounding
+- **Required:** NO
+- **Default:** `0.99`
+- **Valid Values:** `0.99`, `0.95`, `0.00`, `none`
+- **Example:** `0.99`
+
+#### Setting: anchor
+
+- **Purpose:** Which tier anchors to optimal price
+- **Required:** NO
+- **Default:** `Standard`
+- **Example:** `Standard`
+
+### Price Ladder Output
+
+- **Price_Ladder** sheet with:
+  - Tier names and prices
+  - Gap percentages between tiers
+  - Estimated purchase intent (if G-G available)
+  - Revenue index per tier
+  - Validation flags for gap issues
+
+---
+
+## Recommendation Synthesis
+
+Generates executive summary combining all analyses into actionable recommendation.
+
+### Constraint Settings (Settings Sheet)
+
+#### Setting: price_floor
+
+- **Purpose:** Minimum price constraint
+- **Required:** NO
+- **Logic:** Recommendation won't go below this
+- **Example:** `99.00`
+
+#### Setting: price_ceiling
+
+- **Purpose:** Maximum price constraint
+- **Required:** NO
+- **Logic:** Recommendation won't exceed this
+- **Example:** `299.00`
+
+### Synthesis Output
+
+- **Recommendation** sheet with:
+  - Primary recommended price
+  - Confidence level (HIGH/MEDIUM/LOW)
+  - Confidence score (0-100%)
+  - Source of recommendation
+  - Supporting evidence table
+  - Risk assessment
+
+- **Executive_Summary** sheet with:
+  - Formatted text report
+  - Key findings
+  - Confidence factors
+  - Next steps recommendations
+
+### Confidence Assessment Factors
+
+1. **Method Agreement** - Do VW, GG, and NMS agree?
+2. **Sample Size** - Is n adequate for reliable results?
+3. **Data Quality** - What's the violation rate?
+4. **Zone Fit** - Is recommendation within optimal zone?
+5. **Method Coverage** - How many methods triangulate?
+
+---
+
+## Output Sheets Reference
+
+| Sheet | When Created | Contents |
+|-------|--------------|----------|
+| Summary | Always | Project summary and key results |
+| VW_Price_Points | Van Westendorp | PMC, OPP, IDP, PME with ranges |
+| VW_NMS_Results | If NMS configured | Trial and revenue optimal prices |
+| VW_Curves | Van Westendorp | Curve data for custom charts |
+| GG_Demand_Curve | Gabor-Granger | Price points and purchase intent |
+| GG_Revenue_Curve | Gabor-Granger | Revenue optimization data |
+| Segment_Comparison | If segmentation | Price metrics by segment |
+| Price_Ladder | If VW available | Good/Better/Best tier prices |
+| Recommendation | Always | Synthesized recommendation |
+| Executive_Summary | Always | Formatted summary report |
+| Validation | If issues | Data quality details |
+| Configuration | Always | Analysis settings used |
+
+---
+
 ## Common Mistakes
 
 ### Mistake 1: Price Columns Don't Match
@@ -550,6 +759,16 @@ respondent_id | gg_180 | gg_200 | gg_220 | gg_240 | gg_260 | gg_280 | survey_wei
 
 **Problem:** Warning "Demand curve not monotonically decreasing"
 **Solution:** Use gg_monotonicity_behavior = smooth to fix
+
+### Mistake 5: NMS Package Not Installed
+
+**Problem:** Error "Package 'pricesensitivitymeter' required"
+**Solution:** Install with `install.packages("pricesensitivitymeter")`
+
+### Mistake 6: Segment Too Small
+
+**Problem:** Warning "Skipping segments with n < 50"
+**Solution:** Lower `min_segment_n` or combine small segments in data
 
 ---
 
