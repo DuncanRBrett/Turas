@@ -11,7 +11,6 @@ run_maxdiff_gui <- function() {
   library(shiny)
 
   # Paths
-
   TURAS_HOME <- getwd()
   MODULE_DIR <- file.path(TURAS_HOME, "modules", "maxdiff")
   RECENT_FILE <- file.path(TURAS_HOME, ".recent_maxdiff.rds")
@@ -33,6 +32,27 @@ run_maxdiff_gui <- function() {
     tryCatch(saveRDS(recent, RECENT_FILE), error = function(e) NULL)
   }
 
+  # File browser function using tcltk
+  browse_for_file <- function() {
+    if (requireNamespace("tcltk", quietly = TRUE)) {
+      tryCatch({
+        f <- tcltk::tk_choose.files(
+          default = "",
+          caption = "Select MaxDiff Config File",
+          multi = FALSE,
+          filters = matrix(c("Excel files", ".xlsx", "All files", "*"), 2, 2, byrow = TRUE)
+        )
+        if (length(f) > 0 && nzchar(f[1])) return(f[1])
+      }, error = function(e) NULL)
+    }
+    # Fallback to file.choose
+    tryCatch({
+      f <- file.choose()
+      if (!is.null(f) && nzchar(f)) return(f)
+    }, error = function(e) NULL)
+    return(NULL)
+  }
+
   # UI
   ui <- fluidPage(
     tags$head(tags$style(HTML("
@@ -49,14 +69,11 @@ run_maxdiff_gui <- function() {
       .recent-item:hover { border-color: #8b5cf6; }
       .status-ok { color: #059669; }
       .status-err { color: #dc2626; }
-      .btn-browse { background: #6366f1; color: white; border: none; padding: 10px 20px; border-radius: 8px; margin-left: 10px; }
+      .btn-browse { background: #6366f1; color: white; border: none; padding: 10px 20px; border-radius: 8px; margin-left: 10px; cursor: pointer; }
       .btn-browse:hover { background: #4f46e5; }
-      .input-row { display: flex; align-items: center; }
+      .input-row { display: flex; align-items: center; gap: 10px; }
       .input-row .form-group { flex: 1; margin-bottom: 0; }
-      .progress-container { margin: 15px 0; }
-      .progress-bar-custom { height: 20px; background: #e5e7eb; border-radius: 10px; overflow: hidden; }
-      .progress-bar-fill { height: 100%; background: linear-gradient(90deg, #8b5cf6, #6d28d9); transition: width 0.3s ease; }
-      .progress-text { text-align: center; margin-top: 5px; font-size: 14px; color: #6b7280; }
+      .shiny-notification { background: #8b5cf6; color: white; }
     "))),
 
     div(class = "container",
@@ -86,8 +103,7 @@ run_maxdiff_gui <- function() {
 
       div(class = "card",
         h4("3. Run"),
-        actionButton("run_btn", "Run MaxDiff", class = "btn-run"),
-        uiOutput("progress_ui")
+        actionButton("run_btn", "Run MaxDiff", class = "btn-run")
       ),
 
       div(class = "card",
@@ -99,30 +115,15 @@ run_maxdiff_gui <- function() {
 
   # Server
   server <- function(input, output, session) {
-    rv <- reactiveValues(mode = "ANALYSIS", progress = 0, progress_text = "", show_progress = FALSE)
+    rv <- reactiveValues(mode = "ANALYSIS")
     console_out <- reactiveVal("Ready. Enter config path and click Run.")
 
-    # Browse button
+    # Browse button - runs in session context
     observeEvent(input$browse_btn, {
-      tryCatch({
-        selected <- file.choose()
-        if (!is.null(selected) && nzchar(selected)) {
-          updateTextInput(session, "config_path", value = selected)
-        }
-      }, error = function(e) {
-        # User cancelled file selection
-      })
-    })
-
-    # Progress bar UI
-    output$progress_ui <- renderUI({
-      if (!rv$show_progress) return(NULL)
-      div(class = "progress-container",
-        div(class = "progress-bar-custom",
-          div(class = "progress-bar-fill", style = sprintf("width: %d%%;", rv$progress))
-        ),
-        div(class = "progress-text", rv$progress_text)
-      )
+      selected <- browse_for_file()
+      if (!is.null(selected) && nzchar(selected)) {
+        updateTextInput(session, "config_path", value = selected)
+      }
     })
 
     # Mode buttons
@@ -142,9 +143,9 @@ run_maxdiff_gui <- function() {
       p <- trimws(input$config_path)
       if (!nzchar(p)) return(NULL)
       if (file.exists(p)) {
-        tags$p(class = "status-ok", "✓ File found")
+        tags$p(class = "status-ok", "\u2713 File found")
       } else {
-        tags$p(class = "status-err", "✗ File not found")
+        tags$p(class = "status-err", "\u2717 File not found")
       }
     })
 
@@ -184,13 +185,7 @@ run_maxdiff_gui <- function() {
     # Console
     output$console_text <- renderText({ console_out() })
 
-    # Helper to update progress
-    update_progress <- function(pct, text) {
-      rv$progress <- pct
-      rv$progress_text <- text
-    }
-
-    # Run
+    # Run with built-in progress
     observeEvent(input$run_btn, {
       config_path <- trimws(input$config_path)
       if (!nzchar(config_path)) {
@@ -202,52 +197,47 @@ run_maxdiff_gui <- function() {
         return()
       }
 
-      # Show progress bar
-      rv$show_progress <- TRUE
-      update_progress(5, "Initializing...")
-
       console_out(paste0("Starting MaxDiff ", rv$mode, "...\n", strrep("=", 60), "\n"))
 
       old_wd <- getwd()
-      tryCatch({
-        update_progress(10, "Loading MaxDiff module...")
-        setwd(MODULE_DIR)
-        source(file.path("R", "00_main.R"))
 
-        update_progress(20, "Reading configuration...")
+      # Use Shiny's built-in progress indicator
+      withProgress(message = paste("Running MaxDiff", rv$mode), value = 0, {
 
-        # Capture output
-        tmp <- tempfile()
-        sink(tmp, type = "output")
+        tryCatch({
+          incProgress(0.1, detail = "Loading module...")
+          setwd(MODULE_DIR)
+          source(file.path("R", "00_main.R"))
 
-        update_progress(30, "Processing...")
+          incProgress(0.2, detail = "Reading configuration...")
 
-        result <- tryCatch({
-          run_maxdiff(config_path = config_path, verbose = TRUE)
-        }, finally = { sink(type = "output") })
+          # Capture output
+          tmp <- tempfile()
+          sink(tmp, type = "output")
 
-        update_progress(80, "Finalizing output...")
+          incProgress(0.1, detail = "Processing...")
 
-        captured <- paste(readLines(tmp, warn = FALSE), collapse = "\n")
-        unlink(tmp)
+          result <- tryCatch({
+            run_maxdiff(config_path = config_path, verbose = TRUE)
+          }, finally = { sink(type = "output") })
 
-        save_recent(config_path, rv$mode)
+          incProgress(0.4, detail = "Finalizing...")
 
-        update_progress(100, "Complete!")
+          captured <- paste(readLines(tmp, warn = FALSE), collapse = "\n")
+          unlink(tmp)
 
-        out_path <- if (!is.null(result$output_path)) result$output_path else "output folder"
-        console_out(paste0(captured, "\n", strrep("=", 60), "\nCOMPLETE\nOutput: ", out_path))
+          save_recent(config_path, rv$mode)
 
-        # Hide progress bar after delay
-        invalidateLater(2000, session)
-        rv$show_progress <- FALSE
+          incProgress(0.2, detail = "Complete!")
 
-      }, error = function(e) {
-        update_progress(0, "Error occurred")
-        console_out(paste0(console_out(), "\nERROR: ", e$message))
-        rv$show_progress <- FALSE
-      }, finally = {
-        setwd(old_wd)
+          out_path <- if (!is.null(result$output_path)) result$output_path else "output folder"
+          console_out(paste0(captured, "\n", strrep("=", 60), "\nCOMPLETE\nOutput: ", out_path))
+
+        }, error = function(e) {
+          console_out(paste0(console_out(), "\nERROR: ", e$message))
+        }, finally = {
+          setwd(old_wd)
+        })
       })
     })
   }
