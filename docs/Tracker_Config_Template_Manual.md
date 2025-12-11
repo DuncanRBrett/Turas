@@ -1,8 +1,8 @@
 # Tracker Config Template - User Manual
 
 **Template File:** `templates/Tracker_Config_Template.xlsx`
-**Version:** 10.0
-**Last Updated:** 4 December 2025
+**Version:** 10.1
+**Last Updated:** 11 December 2025
 
 ---
 
@@ -210,12 +210,14 @@ The template contains **5 sheets**:
 - **Purpose:** Which reports to generate
 - **Required:** YES
 - **Data Type:** Text (comma-separated)
-- **Valid Values:** `detailed`, `wave_history`
+- **Valid Values:** `detailed`, `wave_history`, `dashboard`, `sig_matrix`
 - **Logic:**
-  - `detailed` = Detailed wave-by-wave comparison
-  - `wave_history` = Historical trends
+  - `detailed` = Detailed wave-by-wave comparison (one sheet per question)
+  - `wave_history` = Historical trends (one row per metric, compact format)
+  - `dashboard` = Executive summary with all metrics, trend status, and significance matrices
+  - `sig_matrix` = Standalone significance matrices showing all wave-pair comparisons
   - Use comma to select multiple
-- **Example:** `detailed,wave_history`
+- **Example:** `detailed,wave_history,dashboard`
 
 ---
 
@@ -323,7 +325,7 @@ show_significance            | TRUE
 alpha                        | 0.05
 minimum_base                 | 5
 decimal_separator            | ,
-report_types                 | detailed,wave_history
+report_types                 | detailed,wave_history,dashboard
 ```
 
 ### TrackedQuestions Sheet
@@ -396,12 +398,34 @@ This config works together with Tracker_Question_Mapping_Template:
 
 ## Output Structure
 
-Analysis produces Excel file with:
+Analysis produces Excel files based on selected report_types:
 
-1. **Summary** - Wave overview
-2. **Question sheets** - One per tracked question with trends
-3. **Change_Summary** - All changes from baseline (with banners if configured)
-4. **Metadata** - Analysis settings
+### Detailed Report (`detailed`)
+- **Summary** - Wave overview with sample sizes
+- **Question sheets** - One per tracked question with full trend details
+- **Change_Summary** - All changes from baseline (with banners if configured)
+- **Metadata** - Analysis settings and data sources
+
+### Wave History Report (`wave_history`)
+- **Segment sheets** - One sheet per segment (Total, plus any banner segments)
+- Compact format with one row per metric
+- Shows values across all waves in columns
+
+### Dashboard Report (`dashboard`) - NEW
+Executive summary with visual indicators:
+- **Trend_Dashboard** - All metrics in one view with:
+  - Latest value, change vs previous wave, change vs baseline
+  - Significance indicators (↑ up, ↓ down, → no change)
+  - Status indicators (Good/Stable/Watch/Alert)
+  - Mini trend values across all waves
+- **Significance matrices** - One sheet per question showing all wave-pair comparisons
+
+### Significance Matrix Report (`sig_matrix`) - NEW
+Standalone significance analysis:
+- **One sheet per tracked question**
+- Matrix format showing change from any wave to any other wave
+- Color-coded cells: green (significant increase), red (significant decrease), grey (not significant)
+- Includes change values with direction indicators
 
 ---
 

@@ -5,13 +5,19 @@
 # Generates Excel output for tracking analysis.
 # Creates one sheet per question plus summary/metadata sheets.
 #
-# VERSION: 2.0.0 - Phase 2 Update
+# VERSION: 2.1.0 - Phase 2 Update (Enhanced Reports)
 # CHANGES: Now uses shared/formatting.R for consistent decimal separator handling
 #
 # PHASE 2 UPDATE:
 # - Decimal separator now properly respected (was hardcoded to "." before)
 # - Uses create_excel_number_format() from shared/formatting.R
 # - Fixes inconsistency with TurasTabs decimal separator behavior
+#
+# ENHANCED REPORTS (v2.1.0 - 2025-12-11):
+# - New report types: "dashboard" and "sig_matrix"
+# - Dashboard: Executive summary with trend status indicators
+# - Sig Matrix: Wave-pair significance comparison matrices
+# - See tracker_dashboard_reports.R for implementations
 #
 # ==============================================================================
 
