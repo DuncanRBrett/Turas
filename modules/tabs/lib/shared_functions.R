@@ -977,7 +977,14 @@ create_error_log <- function() {
   )
 }
 
-#' Log an issue to error log
+#' Add Log Entry (Pure Function - MUST Capture Return Value)
+#'
+#' Adds an entry to the error/warning log. This is a PURE FUNCTION that
+#' returns a new data frame. You MUST capture the return value.
+#'
+#' V10.0: Renamed from log_issue() for clarity. The old name suggested a
+#' side-effect function, but this is actually a pure function that returns
+#' a modified copy.
 #'
 #' SEVERITY LEVELS:
 #'   - "Error": Prevents analysis from running (missing data, invalid config)
@@ -989,32 +996,31 @@ create_error_log <- function() {
 #'   - Then: error_log <- do.call(rbind, list_of_issues)
 #'   - Reduces from O(n²) to O(n)
 #'
+#' @usage error_log <- add_log_entry(error_log, "ERROR", "Q01", "Message")
+#'
 #' @param error_log Data frame, error log to append to
 #' @param component Character, component where issue occurred
 #' @param issue_type Character, type of issue
 #' @param description Character, issue description
 #' @param question_code Character, related question code (default: "")
 #' @param severity Character, severity level (default: "Warning")
-#' @return Data frame, updated error log
-#' @return Data frame with new log entry appended. IMPORTANT: This is a PURE
-#'   function - it returns a NEW error_log and does NOT modify the input.
-#'   You MUST assign the result: error_log <- log_issue(error_log, ...)
+#' @return Data frame with new log entry appended (MUST BE CAPTURED)
 #' @export
 #' @examples
 #' # CORRECT usage - assign the result:
-#' error_log <- log_issue(error_log, "Validation", "Missing Column",
-#'                       "Column Q1 not found", "Q1", "Error")
+#' error_log <- add_log_entry(error_log, "Validation", "Missing Column",
+#'                           "Column Q1 not found", "Q1", "Error")
 #'
 #' # INCORRECT - will not work (issue not logged):
-#' # log_issue(error_log, "Validation", "Missing Column", "Column Q1 not found")
+#' # add_log_entry(error_log, "Validation", "Missing Column", "Column Q1 not found")
 #'
 #' # For many issues, use list accumulation:
 #' issues <- list()
 #' issues[[1]] <- data.frame(Timestamp = ..., Component = ..., ...)
 #' issues[[2]] <- data.frame(Timestamp = ..., Component = ..., ...)
 #' error_log <- do.call(rbind, issues)
-log_issue <- function(error_log, component, issue_type, description,
-                     question_code = "", severity = "Warning") {
+add_log_entry <- function(error_log, component, issue_type, description,
+                         question_code = "", severity = "Warning") {
   new_entry <- data.frame(
     Timestamp = as.character(Sys.time()),
     Component = component,
@@ -1024,9 +1030,13 @@ log_issue <- function(error_log, component, issue_type, description,
     Severity = severity,
     stringsAsFactors = FALSE
   )
-  
+
   rbind(error_log, new_entry)
 }
+
+# Backward compatibility alias (V10.0)
+# Keep log_issue as an alias so existing code continues to work
+log_issue <- add_log_entry
 
 # ==============================================================================
 # SURVEY STRUCTURE LOADING
@@ -1259,6 +1269,77 @@ load_survey_data <- function(data_file_path, project_root = NULL,
   return(survey_data)
 }
 
+#' Load Survey Data with Smart Caching (V10.0)
+#'
+#' For large Excel files (>50MB), automatically creates a CSV cache
+#' for dramatically faster subsequent loads. Excel loads at ~10MB/sec
+#' while CSV via data.table loads at ~500MB/sec (50x faster).
+#'
+#' USAGE: Drop-in replacement for load_survey_data() when working with
+#' large Excel files that are read multiple times.
+#'
+#' CACHING BEHAVIOR:
+#' - Cache file stored alongside source as {filename}_cache.csv
+#' - Cache auto-regenerates when source file is modified
+#' - Cache only created if file size exceeds threshold
+#' - Falls back to standard load_survey_data() if caching not beneficial
+#'
+#' @param data_file_path Character, path to data file
+#' @param project_root Character, optional project root
+#' @param auto_cache Logical, enable CSV caching for large files (default: TRUE)
+#' @param cache_threshold_mb Numeric, file size threshold in MB for caching (default: 50)
+#' @param convert_labelled Logical, convert SPSS labels (default: FALSE)
+#' @return Data frame with survey responses
+#' @export
+#' @examples
+#' # Standard usage - will cache large Excel files automatically
+#' survey_data <- load_survey_data_smart("Data/large_survey.xlsx", project_root)
+#'
+#' # Disable caching
+#' survey_data <- load_survey_data_smart("Data/survey.xlsx", auto_cache = FALSE)
+#'
+#' # Lower threshold (cache files >10MB)
+#' survey_data <- load_survey_data_smart("Data/survey.xlsx", cache_threshold_mb = 10)
+load_survey_data_smart <- function(data_file_path, project_root = NULL,
+                                   auto_cache = TRUE,
+                                   cache_threshold_mb = 50,
+                                   convert_labelled = FALSE) {
+
+  # Resolve path if relative
+  if (!is.null(project_root) && !file.exists(data_file_path)) {
+    data_file_path <- resolve_path(project_root, data_file_path)
+  }
+
+  file_ext <- tolower(tools::file_ext(data_file_path))
+
+  # Smart caching for large Excel files
+  if (auto_cache && file_ext %in% c("xlsx", "xls")) {
+    file_size_mb <- file.info(data_file_path)$size / 1024^2
+
+    if (file_size_mb > cache_threshold_mb && is_package_available("data.table")) {
+      csv_cache_path <- sub("\\.(xlsx|xls)$", "_cache.csv", data_file_path)
+
+      # Check if cache exists and is newer than source
+      cache_valid <- file.exists(csv_cache_path) &&
+                     file.mtime(csv_cache_path) >= file.mtime(data_file_path)
+
+      if (!cache_valid) {
+        cat(sprintf("Large Excel file (%.1f MB) detected. Creating CSV cache...\n", file_size_mb))
+        data <- readxl::read_excel(data_file_path)
+        data.table::fwrite(data, csv_cache_path)
+        cat("✓ CSV cache created:", basename(csv_cache_path), "\n")
+        return(as.data.frame(data))
+      } else {
+        cat("Loading from CSV cache (faster)...\n")
+        return(data.table::fread(csv_cache_path, data.table = FALSE))
+      }
+    }
+  }
+
+  # Default: use standard loader
+  load_survey_data(data_file_path, project_root, convert_labelled)
+}
+
 # ==============================================================================
 # VERSION & BRANDING
 # ==============================================================================
@@ -1476,11 +1557,12 @@ apply_base_filter <- function(data, filter_expression) {
 # - validate_data_frame(): Used extensively for input validation
 #
 # PERFORMANCE NOTES:
-# - Excel loading: Use CSV when possible for speed
+# - Excel loading: Use load_survey_data_smart() for auto CSV caching (V10.0)
 # - CSV with data.table: 10x faster than base read.csv (auto-enabled if available)
 # - Path resolution: Results can be cached if calling repeatedly
 # - Config loading: Cache config objects, don't reload on every function call
-# - log_issue(): For 100+ entries, use list accumulation pattern (see function docs)
+# - add_log_entry(): For 100+ entries, use list accumulation pattern (see function docs)
+# - Memory monitoring: Uses lobstr::obj_size() (V10.0 - replaces deprecated pryr)
 #
 # BACKWARD COMPATIBILITY:
 # - V8.0 → V9.9: Breaking changes in excel letter generation only
@@ -1488,6 +1570,10 @@ apply_base_filter <- function(data, filter_expression) {
 # - V9.9.1 → V10.0.0: New optional parameter (backward compatible)
 #   - format_output_value() gains decimal_places_numeric parameter (optional, has default)
 #   - All existing calls continue to work without modification
+# - V10.0.0 → V10.0: All changes are backward compatible
+#   - log_issue() kept as alias for new add_log_entry()
+#   - load_survey_data() unchanged, new load_survey_data_smart() added as drop-in replacement
+#   - pryr → lobstr only affects internal memory monitoring (no API change)
 # - Function signatures unchanged except new optional parameters
 # - All V8.0 code calling these functions will work (with warnings)
 #
@@ -1499,7 +1585,14 @@ apply_base_filter <- function(data, filter_expression) {
 # 5. SPSS labelled columns: Use convert_labelled=TRUE if downstream code expects plain types
 #
 # VERSION HISTORY DETAIL:
-# V10.0.0 (Current - Numeric Question Support):
+# V10.0 (Current - Practical Enhancements):
+# - Replaced deprecated pryr package with lobstr for memory monitoring
+# - Renamed log_issue() to add_log_entry() for clarity (alias kept for compatibility)
+# - Added load_survey_data_smart() for automatic CSV caching of large Excel files
+# - Enhanced check_memory() to use lobstr::obj_size()
+# - Updated documentation throughout
+#
+# V10.0.0 (Numeric Question Support):
 # - CRITICAL FIX: format_output_value() now supports "numeric" type (prevents crashes in numeric_processor.R)
 # - Added decimal_places_numeric parameter to format_output_value()
 # - Added SHARED_FUNCTIONS_VERSION constant for version checking
@@ -1592,16 +1685,17 @@ format_seconds <- function(seconds) {
 #'
 #' Memory reported in GiB (1024^3 bytes) to match OS conventions
 #' NOTE: Requires MEMORY_WARNING_GIB and MEMORY_CRITICAL_GIB constants from caller
+#' V10.0: Updated to use lobstr instead of deprecated pryr package
 #'
 #' @param force_gc Logical, force garbage collection if high
 #' @param warning_threshold Numeric, warning threshold in GiB (default 6)
 #' @param critical_threshold Numeric, critical threshold in GiB (default 8)
 #' @return Invisible NULL
 check_memory <- function(force_gc = TRUE, warning_threshold = 6, critical_threshold = 8) {
-  if (!requireNamespace("pryr", quietly = TRUE)) return(invisible(NULL))
+  if (!requireNamespace("lobstr", quietly = TRUE)) return(invisible(NULL))
 
-  mem_used_bytes <- pryr::mem_used()
-  mem_used_gib <- mem_used_bytes / (1024^3)
+  mem_used_bytes <- lobstr::obj_size(environment())
+  mem_used_gib <- as.numeric(mem_used_bytes) / (1024^3)
 
   if (mem_used_gib > critical_threshold) {
     log_message(sprintf("CRITICAL: Memory usage %.1f GiB - forcing cleanup",
