@@ -56,19 +56,20 @@ get_script_dir <- function() {
       sys.frame(i)$srcfile
     }, error = function(e) NULL)
 
-    if (!is.null(srcfile) && !is.null(srcfile$filename)) {
+    # Safely check srcfile - must be a list/environment with $filename
+    if (!is.null(srcfile) && is.list(srcfile) && !is.null(srcfile$filename)) {
       script_path <- srcfile$filename
       if (grepl("00_main\\.R$", script_path)) {
         return(dirname(normalizePath(script_path, mustWork = FALSE)))
       }
     }
 
-    # Also try ofile attribute
+    # Also try ofile attribute - must be character
     ofile <- tryCatch({
       sys.frame(i)$ofile
     }, error = function(e) NULL)
 
-    if (!is.null(ofile) && grepl("00_main\\.R$", ofile)) {
+    if (!is.null(ofile) && is.character(ofile) && length(ofile) == 1 && grepl("00_main\\.R$", ofile)) {
       return(dirname(normalizePath(ofile, mustWork = FALSE)))
     }
   }
