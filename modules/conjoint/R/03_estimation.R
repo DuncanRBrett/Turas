@@ -167,6 +167,19 @@ estimate_with_mlogit <- function(data, config, verbose = TRUE) {
 
   log_verbose("  → Fitting mlogit model...", verbose)
 
+  # Debug: Print data structure info before mlogit call
+  message(sprintf("    DEBUG: mlogit_data class = %s", paste(class(mlogit_data), collapse = ", ")))
+  message(sprintf("    DEBUG: mlogit_data dims = %d x %d", nrow(mlogit_data), ncol(mlogit_data)))
+  message(sprintf("    DEBUG: formula = %s", deparse(formula_obj)))
+  message(sprintf("    DEBUG: chosen column '%s' exists = %s",
+                  config$chosen_column, config$chosen_column %in% names(mlogit_data)))
+
+  # Check that attributes exist in mlogit_data
+  for (attr in config$attributes$AttributeName) {
+    exists_in_data <- attr %in% names(mlogit_data)
+    message(sprintf("    DEBUG: attr '%s' exists = %s", attr, exists_in_data))
+  }
+
   # Fit model
   model <- tryCatch({
     mlogit::mlogit(
@@ -176,6 +189,8 @@ estimate_with_mlogit <- function(data, config, verbose = TRUE) {
       print.level = 0
     )
   }, error = function(e) {
+    # Print more detailed error info
+    message(sprintf("    DEBUG: mlogit error details: %s", conditionMessage(e)))
     stop(create_error(
       "ESTIMATION",
       sprintf("mlogit estimation failed: %s", conditionMessage(e)),
