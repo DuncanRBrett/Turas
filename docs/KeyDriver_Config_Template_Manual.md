@@ -1,8 +1,8 @@
 # Key Driver Config Template - User Manual
 
 **Template File:** `templates/KeyDriver_Config_Template.xlsx`
-**Version:** 10.0
-**Last Updated:** 4 December 2025
+**Version:** 10.1
+**Last Updated:** December 2025
 
 ---
 
@@ -12,21 +12,33 @@ The Key Driver Config Template configures Key Driver Analysis in TURAS. This mod
 
 **Key Purpose:** Identify which factors matter most in driving customer satisfaction, NPS, loyalty, or other key business metrics.
 
-**Methods Used:** 4 statistical methods rank drivers by importance:
-1. **Shapley Values** (game theory) - Most robust, recommended ⭐
+**Methods Used:** 5+ statistical methods rank drivers by importance:
+1. **Shapley Values** (game theory) - Most robust, recommended
 2. **Relative Weights** (Johnson 2000) - Handles multicollinearity well
 3. **Beta Weights** (standardized coefficients) - Traditional, easy to interpret
 4. **Correlations** (bivariate) - Simple baseline
+5. **SHAP Analysis** (XGBoost/TreeSHAP) - NEW in v10.1
+
+**NEW in v10.1:**
+- **SHAP Analysis**: Machine learning-based importance using XGBoost and TreeSHAP
+- **Quadrant Charts**: Importance-Performance Analysis (IPA) visualizations
+- **Segment Comparison**: Compare driver importance across customer segments
+- **Enhanced Visualizations**: Beeswarm plots, waterfall plots, dependence plots
 
 ---
 
 ## Template Structure
 
-The template contains **3 sheets**:
+The template contains the following sheets:
 
-1. **Instructions** - Comprehensive methodology guide and weighting documentation
+### Required Sheets
+1. **Instructions** - Comprehensive methodology guide
 2. **Settings** - Analysis configuration
 3. **Variables** - Definition of outcome, drivers, and optional weight variable
+
+### Optional Sheets (NEW in v10.1)
+4. **Segments** - Segment definitions for comparison analysis
+5. **StatedImportance** - Self-reported importance for dual-importance analysis
 
 ---
 
@@ -37,21 +49,23 @@ The template contains **3 sheets**:
 **Action Required:** Review for understanding. This sheet is not read by the analysis code.
 
 **Key Content:**
-- Overview of 4 statistical methods
-- Workflow: data preparation → run analysis → review output
+- Overview of 5 statistical methods
+- Workflow: data preparation -> run analysis -> review output
 - Example results interpretation
 - Model diagnostics (R², VIF)
 - Detailed explanation of how weights affect each method
-- Known weighting issues and workarounds
+- SHAP analysis explanation (NEW)
+- Quadrant chart interpretation (NEW)
 
 **Important Weighting Information:**
-- **Correlations:** ✅ Properly weighted
-- **Regression:** ✅ Properly weighted
-- **Relative Weights:** ✅ Fully correct with weights (MOST TRUSTWORTHY)
-- **Beta Weights:** ⚠️ Minor inconsistency (weighted coefficients, unweighted SDs)
-- **Shapley Values:** ❌ Bug - subset models not weighted
+- **Correlations:** Properly weighted
+- **Regression:** Properly weighted
+- **Relative Weights:** Fully correct with weights (MOST TRUSTWORTHY)
+- **Beta Weights:** Minor inconsistency (weighted coefficients, unweighted SDs)
+- **Shapley Values:** Bug - subset models not weighted
+- **SHAP (XGBoost):** Properly weighted (NEW)
 
-**Recommendation:** When using weights, trust **Relative Weights** method as your primary importance metric.
+**Recommendation:** When using weights, trust **Relative Weights** or **SHAP** methods as your primary importance metrics.
 
 ---
 
@@ -61,49 +75,117 @@ The template contains **3 sheets**:
 
 **Required Columns:** 2 columns only (`Setting`, `Value`)
 
-### Field Specifications
+### Core Settings
 
 #### Setting: analysis_name
 
 - **Purpose:** Display name for analysis in output
 - **Required:** YES
 - **Data Type:** Text
-- **Valid Values:** Any descriptive text
-- **Logic:** **This is just a label for the config file and has no effect on the analysis**
 - **Example:** `Brand Health Drivers` or `Q1 2024 Satisfaction Analysis`
-- **Common Mistakes:** None - purely cosmetic
 
 #### Setting: data_file
 
 - **Purpose:** Path to respondent-level data file
 - **Required:** YES
 - **Data Type:** Text (file path)
-- **Valid Values:**
-  - Path to .csv, .xlsx, .sav, or .dta file
-  - Can be relative to config file or absolute path
-- **Logic:**
-  - Each row = one respondent
-  - Must contain all variables listed in Variables sheet
-  - Variables must be numeric (scales like 1-10)
-- **Example:** `/Projects/Test/keydriver_test_data.csv` or `../data/survey.xlsx`
-- **Common Mistakes:**
-  - File doesn't exist
-  - Variables not numeric
-  - Column names don't match Variables sheet
+- **Valid Values:** Path to .csv, .xlsx, .sav, or .dta file
+- **Example:** `/Projects/Test/keydriver_test_data.csv`
 
 #### Setting: output_file
 
 - **Purpose:** Path and name for results Excel file
-- **Required:** YES (but has default)
-- **Data Type:** Text (file path)
-- **Valid Values:** Path ending in .xlsx
-- **Default:** If not specified, creates `keydriver_results.xlsx` in config file directory
-- **Logic:** Creates multi-sheet Excel workbook with importance scores, rankings, diagnostics
+- **Required:** NO (has default)
+- **Default:** `keydriver_results.xlsx` in config file directory
 - **Example:** `/Projects/Test/keydriver_test_results.xlsx`
 
-**Important Notes:**
-- To use weights, define a variable with `Type = "Weight"` in the Variables sheet (NOT in Settings)
-- If you add other settings to Settings sheet, they will be loaded but ignored by analysis code
+### SHAP Analysis Settings (NEW in v10.1)
+
+#### Setting: enable_shap
+
+- **Purpose:** Enable SHAP analysis using XGBoost
+- **Required:** NO
+- **Default:** FALSE
+- **Valid Values:** TRUE, FALSE
+- **Logic:** When enabled, fits XGBoost model and calculates SHAP values
+- **Example:** `TRUE`
+
+#### Setting: n_trees
+
+- **Purpose:** Number of trees in XGBoost model
+- **Required:** NO
+- **Default:** 100
+- **Valid Values:** 50-1000 (100 recommended for most cases)
+- **Example:** `100`
+
+#### Setting: max_depth
+
+- **Purpose:** Maximum tree depth in XGBoost
+- **Required:** NO
+- **Default:** 6
+- **Valid Values:** 3-10 (6 recommended)
+- **Example:** `6`
+
+#### Setting: learning_rate
+
+- **Purpose:** XGBoost learning rate
+- **Required:** NO
+- **Default:** 0.1
+- **Valid Values:** 0.01-0.3
+- **Example:** `0.1`
+
+#### Setting: shap_sample_size
+
+- **Purpose:** Maximum observations for SHAP calculation
+- **Required:** NO
+- **Default:** 1000
+- **Valid Values:** 500-5000
+- **Logic:** Larger samples give more stable results but take longer
+- **Example:** `1000`
+
+#### Setting: include_interactions
+
+- **Purpose:** Calculate SHAP interaction values
+- **Required:** NO
+- **Default:** FALSE
+- **Valid Values:** TRUE, FALSE
+- **Logic:** When TRUE, shows how drivers interact with each other
+- **Example:** `FALSE`
+
+### Quadrant Analysis Settings (NEW in v10.1)
+
+#### Setting: enable_quadrant
+
+- **Purpose:** Enable Importance-Performance Analysis quadrant charts
+- **Required:** NO
+- **Default:** FALSE
+- **Valid Values:** TRUE, FALSE
+- **Example:** `TRUE`
+
+#### Setting: importance_source
+
+- **Purpose:** Which importance method to use for quadrant chart
+- **Required:** NO
+- **Default:** auto
+- **Valid Values:** auto, shap, relative_weights, regression, correlation
+- **Logic:** "auto" uses SHAP if enabled, otherwise Shapley values
+- **Example:** `auto`
+
+#### Setting: threshold_method
+
+- **Purpose:** How to determine quadrant boundary lines
+- **Required:** NO
+- **Default:** mean
+- **Valid Values:** mean, median, midpoint, custom
+- **Example:** `mean`
+
+#### Setting: normalize_axes
+
+- **Purpose:** Normalize axes to 0-100 scale
+- **Required:** NO
+- **Default:** TRUE
+- **Valid Values:** TRUE, FALSE
+- **Example:** `TRUE`
 
 ---
 
@@ -113,140 +195,95 @@ The template contains **3 sheets**:
 
 **Required Columns:** `VariableName`, `Type`, `Label`
 
-### Field Specifications
-
-#### Column: VariableName
+### Column: VariableName
 
 - **Purpose:** Column name in data file
 - **Required:** YES
-- **Data Type:** Text
-- **Valid Values:**
-  - Must match data file column name EXACTLY (case-sensitive)
-  - Must be numeric variable in data
-- **Logic:** Links config to actual data columns
-- **Example:** `overall_satisfaction`, `product_quality`, `survey_weight`
-- **Common Mistakes:**
-  - Case mismatch (data has `Satisfaction` but config has `satisfaction`)
-  - Typo doesn't match data
-  - Using non-numeric variable
+- **Data Type:** Text (must match data file column name EXACTLY)
 
-#### Column: Type
+### Column: Type
 
 - **Purpose:** Variable role in the analysis
 - **Required:** YES
-- **Data Type:** Text
 - **Valid Values:** `Outcome`, `Driver`, `Weight`
-- **Logic:**
-  - `Outcome` = Dependent variable you're trying to explain (exactly 1 required)
-  - `Driver` = Independent variables/predictors (3-15 recommended)
-  - `Weight` = Survey weight variable (0 or 1 allowed)
-- **Example:** `Outcome`, `Driver`, `Weight`
-- **Common Mistakes:**
-  - Multiple Outcome variables (only 1 allowed)
-  - Too few drivers (minimum 2, but 3+ recommended)
-  - Too many drivers (>15 makes Shapley computation slow)
 
-#### Column: Label
+### Column: Label
 
 - **Purpose:** Human-readable label for reports
 - **Required:** NO
-- **Data Type:** Text
-- **Valid Values:** Any descriptive text
 - **Default:** Uses VariableName if blank
-- **Logic:** Appears in output for readability
-- **Example:** `Overall Satisfaction`, `Product Quality`, `Survey Weight`
+
+### Variable Type Requirements
+
+| Type | Count | Description |
+|------|-------|-------------|
+| Outcome | Exactly 1 | Dependent variable (e.g., overall satisfaction) |
+| Driver | 3-15 recommended | Independent variables (predictors) |
+| Weight | 0 or 1 | Survey weight variable (optional) |
 
 ---
 
-## Variable Type Requirements
+## Sheet 4: Segments (Optional - NEW in v10.1)
 
-### Type: Outcome
+**Purpose:** Define customer segments for comparison analysis.
 
-- **Count Required:** Exactly 1
-- **What It Does:** Dependent variable you're trying to explain
-- **Examples:** `overall_satisfaction`, `nps_score`, `repurchase_intent`
-- **Data Requirements:**
-  - Must be numeric
-  - Typically a rating scale (1-10, 1-5, etc.)
-  - No missing values preferred (or will be excluded)
+**Required Columns:** `segment_name`, `segment_variable`, `segment_values`
 
-### Type: Driver
+### Column: segment_name
 
-- **Count Required:** 3-15 recommended
-- **What It Does:** Independent variables (predictors) that may influence the outcome
-- **Examples:** `product_quality`, `customer_service`, `delivery_speed`, `price_value`
-- **Data Requirements:**
-  - Must be numeric
-  - Typically same scale as outcome (1-10, 1-5, etc.)
-  - Should have reasonable variation (not all same value)
+- **Purpose:** Display name for the segment
+- **Example:** `Promoters`, `High Value Customers`
 
-**Driver Count Limits:**
-- **Minimum:** 2 drivers (but 3+ strongly recommended)
-- **Maximum:** 15 drivers (Shapley computation limit)
-- **Optimal:** 8-12 drivers for interpretability and model stability
+### Column: segment_variable
 
-### Type: Weight
+- **Purpose:** Variable name in data file used for segmentation
+- **Example:** `nps_group`, `customer_tier`
 
-- **Count Required:** 0 or 1 (optional)
-- **What It Does:** Survey weight variable for weighted analysis
-- **Example:** `survey_weight`, `Weight`, `final_weight`
-- **Data Requirements:**
-  - Must be numeric
-  - Must be >0 (positive weights only)
-  - NA weights will cause cases to be excluded
-- **Logic:**
-  - Only one weight variable allowed
-  - If multiple specified, uses first with warning
-  - Applies to all methods (with varying degrees of correctness - see Instructions sheet)
+### Column: segment_values
 
----
+- **Purpose:** Values to include in this segment (comma-separated if multiple)
+- **Example:** `Promoter` or `Gold,Platinum`
 
-## Data Requirements
-
-### Row Structure
-- **One row per respondent**
-- Each row contains outcome, all drivers, and optional weight
-
-### Variable Requirements
-- **Numeric variables only** (1-10 scales typical)
-- **Sufficient complete cases:** n ≥ max(30, 10 × number of drivers)
-  - Example: 6 drivers → need 60+ complete respondents
-  - Example: 10 drivers → need 100+ complete respondents
-
-### Example Data Structure
+### Example Segments Sheet
 
 ```
-respondent_id | overall_satisfaction | product_quality | customer_service | delivery | survey_weight
-1             | 8                    | 7               | 9                | 8        | 1.05
-2             | 6                    | 5               | 7                | 6        | 0.98
-3             | 9                    | 9               | 8                | 9        | 1.12
+segment_name     | segment_variable | segment_values
+-----------------+------------------+----------------
+Promoters        | nps_group        | Promoter
+Passives         | nps_group        | Passive
+Detractors       | nps_group        | Detractor
+High Value       | customer_tier    | Gold,Platinum
+Standard         | customer_tier    | Standard,Bronze
 ```
 
 ---
 
-## Complete Configuration Example
+## Sheet 5: StatedImportance (Optional - NEW in v10.1)
 
-### Customer Satisfaction Drivers Study
+**Purpose:** Provide self-reported importance scores for dual-importance analysis.
 
-**Settings sheet:**
-```
-Setting         | Value
-analysis_name   | Q1 2024 Customer Satisfaction Drivers
-data_file       | /data/satisfaction_survey.csv
-output_file     | /output/sat_drivers_Q1.xlsx
-```
+**Required Columns:** `driver`, plus one numeric importance column
 
-**Variables sheet:**
+### Purpose of Dual-Importance Analysis
+
+Compares:
+- **Derived importance** (statistical - what actually drives outcomes)
+- **Stated importance** (self-reported - what customers say matters)
+
+This reveals:
+- **Hidden Gems**: High derived, low stated (undervalued factors)
+- **False Priorities**: High stated, low derived (overvalued factors)
+
+### Example StatedImportance Sheet
+
 ```
-VariableName          | Type    | Label
-overall_satisfaction  | Outcome | Overall Satisfaction
-product_quality       | Driver  | Product Quality
-customer_service      | Driver  | Customer Service
-delivery_speed        | Driver  | Delivery Speed
-price_value           | Driver  | Price/Value Ratio
-website_ease          | Driver  | Website Ease of Use
-brand_reputation      | Driver  | Brand Reputation
-survey_weight         | Weight  | Survey Weight
+driver           | stated_importance
+-----------------+-------------------
+product_quality  | 85
+customer_service | 78
+delivery_speed   | 65
+price_value      | 92
+website_ease     | 45
 ```
 
 ---
@@ -267,42 +304,169 @@ source("modules/keydriver/R/04_output.R")
 results <- run_keydriver_analysis(
   config_file = "path/to/keydriver_config.xlsx"
 )
+
+# Access traditional importance
+print(results$importance)
+
+# Access SHAP results (if enabled)
+print(results$shap$importance)
+
+# View quadrant chart (if enabled)
+print(results$quadrant$plots$standard_ipa)
 ```
 
 ---
 
 ## Output Structure
 
-The analysis produces Excel file with **6 sheets**:
+The analysis produces Excel file with the following sheets:
 
-### 1. Importance Summary
-- All importance scores by method (Shapley, Relative Weights, Beta, Correlation)
-- Shows percentage contribution of each driver
-- Allows comparison across methods
+### Standard Output (always included)
 
-### 2. Method Rankings
-- Rank comparison across all 4 methods
-- Shows consistency/disagreement
-- **Average_Rank** column (use cautiously if weighted - includes buggy Shapley)
+1. **Importance Summary** - All importance scores by method
+2. **Method Rankings** - Rank comparison across methods
+3. **Model Summary** - R², VIF diagnostics, coefficients
+4. **Correlations** - Full correlation matrix
+5. **Charts** - Bar chart of importance
+6. **README** - Methodology documentation
 
-### 3. Model Summary
-- R² (model fit)
-- VIF (multicollinearity diagnostics)
-- Coefficients and p-values
-- Sample size
+### SHAP Output (when enable_shap = TRUE)
 
-### 4. Correlations
-- Full correlation matrix
-- All drivers vs outcome
-- Drivers vs drivers (check multicollinearity)
+7. **SHAP_Importance** - SHAP-based importance scores
+8. **SHAP_Model_Diagnostics** - XGBoost model performance
+9. **SHAP_Charts** - Beeswarm and waterfall plots
+10. **SHAP_Segment_Comparison** - If segments defined
+11. **SHAP_Interactions** - If include_interactions = TRUE
 
-### 5. Charts
-- Bar chart visualization of importance scores
-- Visual comparison across methods
+### Quadrant Output (when enable_quadrant = TRUE)
 
-### 6. README
-- Methodology documentation
-- How to interpret results
+12. **Quadrant_Summary** - All drivers with quadrant assignments
+13. **Action_Table** - Prioritized recommendations
+14. **Gap_Analysis** - Importance-performance gaps
+15. **Quadrant_Charts** - IPA quadrant visualization
+16. **Segment_Comparison** - If segments defined
+
+---
+
+## Understanding SHAP Analysis (NEW in v10.1)
+
+### What is SHAP?
+
+SHAP (SHapley Additive exPlanations) uses game theory to explain model predictions:
+- Based on XGBoost machine learning model
+- Captures non-linear relationships
+- Handles interactions between drivers
+- Provides individual-level explanations
+
+### SHAP Visualizations
+
+1. **Importance Bar Plot**: Mean |SHAP| for each driver
+2. **Beeswarm Plot**: Distribution of SHAP values showing:
+   - X-axis: Impact on prediction
+   - Color: Feature value (high/low)
+3. **Waterfall Plot**: Individual prediction breakdown
+4. **Dependence Plot**: How driver value affects importance
+
+### When to Use SHAP
+
+- Large datasets (n > 200)
+- Suspect non-linear relationships
+- Want individual-level explanations
+- Need to detect interactions
+
+### SHAP vs Traditional Methods
+
+| Aspect | Traditional | SHAP |
+|--------|-------------|------|
+| Model | Linear regression | XGBoost (non-linear) |
+| Interactions | Not captured | Detected and visualized |
+| Individual explanations | No | Yes (waterfall plots) |
+| Speed | Fast | Slower (ML model fitting) |
+| Sample size | Works with small n | Better with large n |
+
+---
+
+## Understanding Quadrant Charts (NEW in v10.1)
+
+### The IPA Framework
+
+Importance-Performance Analysis places drivers in 4 quadrants:
+
+```
+        HIGH IMPORTANCE
+             |
+   Q1        |        Q2
+CONCENTRATE  |   KEEP UP
+   HERE      |  GOOD WORK
+             |
+-------------+-------------  PERFORMANCE
+             |
+   Q3        |        Q4
+   LOW       |   POSSIBLE
+ PRIORITY    |   OVERKILL
+             |
+        LOW IMPORTANCE
+```
+
+### Quadrant Interpretation
+
+| Quadrant | Meaning | Action |
+|----------|---------|--------|
+| Q1 (Red) | Important but underperforming | IMPROVE - Priority investment |
+| Q2 (Green) | Important and performing well | MAINTAIN - Protect investment |
+| Q3 (Gray) | Low importance, low performance | MONITOR - Low priority |
+| Q4 (Yellow) | Low importance, high performance | REASSESS - Potential overkill |
+
+### Gap Analysis
+
+The gap score (Importance - Performance) helps prioritize:
+- **Positive gap**: Driver underperforming relative to importance
+- **Negative gap**: Driver overperforming relative to importance
+
+Focus on drivers with largest positive gaps for maximum impact.
+
+---
+
+## Complete Configuration Example
+
+### Settings Sheet
+
+```
+Setting              | Value
+---------------------+----------------------------------
+analysis_name        | Customer Satisfaction Drivers Q1
+data_file            | survey_data.csv
+output_file          | results/satisfaction_drivers.xlsx
+enable_shap          | TRUE
+enable_quadrant      | TRUE
+n_trees              | 100
+max_depth            | 6
+threshold_method     | mean
+```
+
+### Variables Sheet
+
+```
+VariableName         | Type    | Label
+---------------------+---------+------------------------
+overall_satisfaction | Outcome | Overall Satisfaction
+product_quality      | Driver  | Product Quality
+customer_service     | Driver  | Customer Service
+delivery_speed       | Driver  | Delivery Speed
+price_value          | Driver  | Price/Value Ratio
+website_ease         | Driver  | Website Ease of Use
+brand_reputation     | Driver  | Brand Reputation
+survey_weight        | Weight  | Survey Weight
+```
+
+### Segments Sheet (Optional)
+
+```
+segment_name | segment_variable | segment_values
+-------------+------------------+---------------
+Promoters    | nps_group        | Promoter
+Detractors   | nps_group        | Detractor
+```
 
 ---
 
@@ -311,194 +475,114 @@ The analysis produces Excel file with **6 sheets**:
 ### Example Output
 
 ```
-Driver               Shapley  RelWeight  Beta   Correlation  Average_Rank
-──────────────────────────────────────────────────────────────────────────
-Product Quality      32.5%    31.8%      28.4%   0.72        1.0  ← #1 driver
-Customer Service     24.1%    25.3%      26.1%   0.68        2.0  ← #2 driver
-Delivery             19.8%    18.9%      22.3%   0.58        3.0
-Brand Reputation     14.2%    15.1%      13.8%   0.51        4.0
-Website Ease          9.4%     8.9%       9.4%   0.44        5.0
+Driver               Shapley  RelWeight  Beta   SHAP   Correlation  Quadrant
+────────────────────────────────────────────────────────────────────────────────
+Product Quality      32.5%    31.8%      28.4%  35.2%  0.72        Q1
+Customer Service     24.1%    25.3%      26.1%  22.8%  0.68        Q2
+Delivery             19.8%    18.9%      22.3%  18.5%  0.58        Q2
+Brand Reputation     14.2%    15.1%      13.8%  14.1%  0.51        Q3
+Website Ease          9.4%     8.9%       9.4%   9.4%  0.44        Q4
 ```
 
 **Interpretation:**
-- **Product Quality is the #1 driver** (32.5% of impact via Shapley)
-- **Customer Service is #2** (24.1% of impact)
-- Focus improvement efforts on these two areas
-- **Method agreement is strong** = robust finding
-
-### Key Diagnostics to Check
-
-#### 1. Model R² (Model Summary sheet)
-
-- **R² > 0.60:** Good model fit - drivers explain outcome well
-- **R² 0.40-0.60:** Moderate fit - acceptable
-- **R² < 0.40:** Weak fit - may be missing important drivers
-
-#### 2. VIF (Variance Inflation Factor)
-
-- **VIF < 5:** Low multicollinearity ✅
-- **VIF 5-10:** Moderate multicollinearity (watch for instability)
-- **VIF > 10:** High multicollinearity ⚠️ (consider removing/combining drivers)
-
-**What is multicollinearity?** When drivers are highly correlated with each other, making it hard to separate their individual effects.
-
-#### 3. Method Agreement
-
-- **If all 4 methods rank drivers similarly:** Robust finding - trust the results
-- **If methods disagree significantly:** Check for multicollinearity (VIF), consider reducing drivers
+- **Product Quality is #1 driver** and in Q1 (needs improvement)
+- **Customer Service is #2** and in Q2 (maintain current performance)
+- **Website Ease** in Q4 suggests possible over-investment
 
 ---
 
-## Weighting Behavior
+## Troubleshooting
 
-### How Weights Work in Key Driver Analysis
+### SHAP Analysis Errors
 
-**If you specify a Weight variable:**
+#### "Package 'xgboost' required"
+Install required packages:
+```r
+install.packages(c("xgboost", "shapviz", "ggplot2"))
+```
 
-#### ✅ Correctly Weighted:
-- **Correlations** - Uses proper weighted covariance formulas
-- **Regression Model** - Uses weighted least squares (WLS)
-- **Relative Weights** - Fully correct (MOST TRUSTWORTHY WITH WEIGHTS)
+#### "Small sample size warning"
+SHAP works best with n > 200. Consider:
+- Using traditional methods for smaller samples
+- Collecting more data
 
-#### ⚠️ Partially Weighted:
-- **Beta Weights** - Uses weighted coefficients but unweighted standard deviations
-  - Still gives reasonable approximation
-  - Rankings likely correct even if percentages slightly off
+#### "SHAP analysis failed"
+Common causes:
+- Missing values in data
+- Non-numeric variables (must be numeric)
+- Highly correlated drivers (try removing some)
 
-#### ❌ Weighting Bug:
-- **Shapley Values** - Subset models are NOT weighted
-  - Importance scores may be incorrect with weights
-  - Don't trust Shapley method when using weights
+### Quadrant Chart Issues
 
-### Practical Guidance When Using Weights
+#### "Insufficient drivers for quadrant analysis"
+Need at least 4 drivers with valid importance and performance scores.
 
-**✅ Trust these outputs:**
-- Model Summary sheet (R², coefficients, VIF) - fully correct
-- **Relative Weights importance scores** - fully correct ⭐
-- Method Rankings based on Relative Weights - fully correct
-- Correlations sheet - fully correct
+#### "NA values in performance scores"
+Performance calculated as mean of driver variables. Ensure:
+- Driver variables exist in data
+- Variables are numeric
+- Not too many missing values
 
-**⚠️ Use with caution:**
-- Beta Weights - approximately correct
-- Average Rank - includes buggy Shapley
+### Common Mistakes
 
-**❌ Don't trust:**
-- Shapley Values importance percentages
-- Shapley-based rankings
-
-**RECOMMENDED:** Focus on **Relative Weights** column as your primary importance metric when using weights.
-
----
-
-## Common Mistakes and Troubleshooting
-
-### Mistake 1: Variable Name Mismatch
-
-**Problem:** Error "Variable 'product_quality' not found in data"
-**Solution:**
-- Check VariableName spelling matches data exactly
-- Check case (Product_Quality ≠ product_quality)
-- Open data file and copy exact column name
-
-### Mistake 2: No Outcome Variable
-
-**Problem:** Error "Exactly 1 Outcome variable required"
-**Solution:** Must have exactly one row with Type = Outcome in Variables sheet
-
-### Mistake 3: Too Few Drivers
-
-**Problem:** Warning about insufficient drivers
-**Solution:**
-- Minimum 2 drivers (3+ recommended)
-- Need at least 3 drivers for meaningful analysis
-
-### Mistake 4: Too Many Drivers
-
-**Problem:** Analysis very slow or memory error
-**Solution:**
-- Maximum 15 drivers for Shapley computation
-- Optimal 8-12 drivers
-- Consider removing less relevant drivers
-
-### Mistake 5: Non-Numeric Variables
-
-**Problem:** Error "Variables must be numeric"
-**Solution:**
-- All outcome and drivers must be numeric scales
-- Cannot use text/categorical variables directly
-- Recode categorical to numeric if needed
-
-### Mistake 6: Insufficient Sample Size
-
-**Problem:** Warning about sample size
-**Solution:**
-- Need n ≥ max(30, 10 × drivers)
-- 6 drivers → need 60+ respondents
-- 10 drivers → need 100+ respondents
-- Collect more data or reduce drivers
-
-### Mistake 7: High Multicollinearity
-
-**Problem:** VIF > 10 for some drivers
-**Solution:**
-- Drivers are too highly correlated
-- Remove or combine correlated drivers
-- Example: "Product quality" and "Product excellence" likely measure same thing
-
-### Mistake 8: Low R²
-
-**Problem:** R² < 0.40 (model explains little)
-**Solution:**
-- Missing important drivers - add more
-- Wrong outcome variable - reconsider what you're measuring
-- Drivers don't actually drive outcome
+1. **Variable Name Mismatch**: Check spelling and case match data file
+2. **No Outcome Variable**: Must have exactly one Type = "Outcome"
+3. **Too Many Drivers**: Maximum 15 for Shapley; SHAP handles more
+4. **Non-Numeric Variables**: All outcome and drivers must be numeric
+5. **Insufficient Sample Size**: Need n >= max(30, 10 x drivers)
 
 ---
 
 ## Sample Size Guidelines
 
-**Formula:** n ≥ max(30, 10 × number_of_drivers)
+| Drivers | Minimum n | Recommended n |
+|---------|-----------|---------------|
+| 3-5     | 50        | 100+          |
+| 6-8     | 80        | 200+          |
+| 9-12    | 120       | 300+          |
+| 13-15   | 150       | 400+          |
 
-**Examples:**
-- 3 drivers → minimum 30 respondents
-- 5 drivers → minimum 50 respondents
-- 6 drivers → minimum 60 respondents
-- 8 drivers → minimum 80 respondents
-- 10 drivers → minimum 100 respondents
-- 12 drivers → minimum 120 respondents
-
-**More is better:** These are minimums. For robust results, aim for 2-3× these values.
+For SHAP analysis, add 50% to recommended sample sizes.
 
 ---
 
-## Validation Rules
+## Best Practices
 
-The module validates:
+### 1. Choose the Right Method
 
-1. **Config File:**
-   - Settings sheet has required settings
-   - Variables sheet has required columns
+- **Small sample (n < 100)**: Use Relative Weights
+- **Large sample (n > 200)**: Enable SHAP
+- **Actionable insights**: Enable Quadrant charts
 
-2. **Variables:**
-   - Exactly 1 Outcome variable
-   - At least 2 Driver variables (3+ recommended)
-   - At most 1 Weight variable
-   - All VariableName exist in data file
-   - All variables are numeric
+### 2. Review All Methods
 
-3. **Data File:**
-   - File exists and is readable
-   - Contains all specified variables
-   - Sufficient complete cases (n ≥ max(30, 10 × drivers))
+If methods disagree substantially:
+- Check for multicollinearity (VIF)
+- Consider removing highly correlated drivers
+- Look for non-linear relationships (use SHAP)
 
-4. **Multicollinearity:**
-   - Warning if VIF > 5
-   - Error if VIF > 20 (too high to proceed)
+### 3. Use Segment Analysis
 
-5. **Weights (if specified):**
-   - Weight variable is numeric
-   - All weights are positive (>0)
-   - Warning if >10% NA weights
+Different customer groups may have different drivers:
+- Compare Promoters vs Detractors
+- Compare high-value vs standard customers
+- Tailor strategies by segment
+
+### 4. Validate with Business Knowledge
+
+Statistical importance should align with business logic:
+- Hidden gems reveal blind spots
+- False priorities may need communication change
+
+---
+
+## References
+
+- Shapley, L. S. (1953). A value for n-person games.
+- Johnson, J. W. (2000). A heuristic method for estimating relative weights.
+- Tonidandel, S., & LeBreton, J. M. (2011). Relative importance analysis.
+- Lundberg, S. M., & Lee, S. I. (2017). A unified approach to interpreting model predictions.
+- Martilla, J. A., & James, J. C. (1977). Importance-performance analysis.
 
 ---
 
