@@ -167,19 +167,6 @@ estimate_with_mlogit <- function(data, config, verbose = TRUE) {
 
   log_verbose("  → Fitting mlogit model...", verbose)
 
-  # Debug: Print data structure info before mlogit call
-  message(sprintf("    DEBUG: mlogit_data class = %s", paste(class(mlogit_data), collapse = ", ")))
-  message(sprintf("    DEBUG: mlogit_data dims = %d x %d", nrow(mlogit_data), ncol(mlogit_data)))
-  message(sprintf("    DEBUG: formula = %s", deparse(formula_obj)))
-  message(sprintf("    DEBUG: chosen column '%s' exists = %s",
-                  config$chosen_column, config$chosen_column %in% names(mlogit_data)))
-
-  # Check that attributes exist in mlogit_data
-  for (attr in config$attributes$AttributeName) {
-    exists_in_data <- attr %in% names(mlogit_data)
-    message(sprintf("    DEBUG: attr '%s' exists = %s", attr, exists_in_data))
-  }
-
   # Fit model
   model <- tryCatch({
     mlogit::mlogit(
@@ -189,8 +176,6 @@ estimate_with_mlogit <- function(data, config, verbose = TRUE) {
       print.level = 0
     )
   }, error = function(e) {
-    # Print more detailed error info
-    message(sprintf("    DEBUG: mlogit error details: %s", conditionMessage(e)))
     stop(create_error(
       "ESTIMATION",
       sprintf("mlogit estimation failed: %s", conditionMessage(e)),
@@ -221,12 +206,6 @@ estimate_with_mlogit <- function(data, config, verbose = TRUE) {
 #'
 #' @keywords internal
 prepare_mlogit_data <- function(data, config) {
-
-  message("    DEBUG prepare_mlogit_data: Starting...")
-  message(sprintf("    DEBUG: data has %d rows, %d cols", nrow(data), ncol(data)))
-  message(sprintf("    DEBUG: alternative_id_column = '%s'", config$alternative_id_column))
-  message(sprintf("    DEBUG: choice_set_column = '%s'", config$choice_set_column))
-  message(sprintf("    DEBUG: chosen_column = '%s'", config$chosen_column))
 
   # mlogit needs data in "long" format with specific structure
   # Need to create index columns: chid (choice situation), alt (alternative)
@@ -264,8 +243,6 @@ prepare_mlogit_data <- function(data, config) {
     ), call. = FALSE)
   }
 
-  message("    DEBUG: alt column created OK")
-
   # Create unique choice set ID combining respondent and choice_set
   # This ensures (chid, alt) is unique across all observations
   # Required for mlogit's dfidx when multiple respondents have same choice_set_id
@@ -275,37 +252,14 @@ prepare_mlogit_data <- function(data, config) {
           sep = "_")
   ))
 
-  message("    DEBUG: chid column created OK")
-
-  # Check if levels_list exists
-  message(sprintf("    DEBUG: config$attributes columns: %s",
-                  paste(names(config$attributes), collapse = ", ")))
-  has_levels_list <- "levels_list" %in% names(config$attributes)
-  message(sprintf("    DEBUG: has levels_list = %s", has_levels_list))
-  if (has_levels_list) {
-    message(sprintf("    DEBUG: levels_list length = %d", length(config$attributes$levels_list)))
-  }
-
   # Convert attributes to factors with correct reference level
   for (attr in config$attributes$AttributeName) {
-    message(sprintf("    DEBUG: Getting levels for '%s'...", attr))
     levels_vec <- get_attribute_levels(config, attr)
-    message(sprintf("    DEBUG: Got %d levels", length(levels_vec)))
 
-    # Set reference level based on baseline handling
-    if (config$baseline_handling == "first_level_zero") {
-      # First level is baseline
-      data[[attr]] <- factor(data[[attr]], levels = levels_vec)
-    } else {
-      # All levels explicit
-      data[[attr]] <- factor(data[[attr]], levels = levels_vec)
-    }
-    message(sprintf("    DEBUG: factor created for '%s' with %d levels", attr, length(levels_vec)))
+    # Convert to factor with specified level order
+    # First level becomes baseline (reference) for effect coding
+    data[[attr]] <- factor(data[[attr]], levels = levels_vec)
   }
-
-  message("    DEBUG: All factors created, calling dfidx...")
-  message(sprintf("    DEBUG: chosen_column '%s' in data = %s",
-                  config$chosen_column, config$chosen_column %in% names(data)))
 
   # Create mlogit.data object using dfidx package
   # Note: dfidx was moved to separate package in mlogit >= 1.1-0
@@ -505,12 +459,6 @@ extract_clogit_results <- function(model, data, config) {
 
   # Get coefficients
   coefs <- coef(model)
-
-  # DEBUG: Print coefficient names to diagnose I+G issue
-  message("    DEBUG clogit coefficient names:")
-  for (cn in names(coefs)) {
-    message(sprintf("      - '%s' = %.4f", cn, coefs[cn]))
-  }
   vcov_matrix <- vcov(model)
 
   # Check for NA coefficients
