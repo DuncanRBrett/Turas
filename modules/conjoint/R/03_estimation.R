@@ -479,6 +479,12 @@ extract_clogit_results <- function(model, data, config) {
 
   # Get coefficients
   coefs <- coef(model)
+
+  # DEBUG: Print coefficient names to diagnose I+G issue
+  message("    DEBUG clogit coefficient names:")
+  for (cn in names(coefs)) {
+    message(sprintf("      - '%s' = %.4f", cn, coefs[cn]))
+  }
   vcov_matrix <- vcov(model)
 
   # Check for NA coefficients
