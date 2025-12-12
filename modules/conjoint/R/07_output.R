@@ -4,14 +4,24 @@
 #
 # Module: Conjoint Analysis - Excel Output
 # Purpose: Create formatted Excel workbook with comprehensive results
-# Version: 2.0.0 (Enhanced Implementation)
-# Date: 2025-11-26
+# Version: 2.1.0 (8-Sheet Specification - Phase 2)
+# Date: 2025-12-12
+#
+# Output Structure (8 sheets per specification):
+#   1. Market Simulator    - Interactive what-if analysis tool
+#   2. Attribute Importance - Ranked importance scores
+#   3. Part-Worth Utilities - Zero-centered utilities by level
+#   4. Utility Chart Data   - Pre-formatted data for Excel charts
+#   5. Model Fit           - Diagnostic statistics and quality metrics
+#   6. Configuration       - Study design summary
+#   7. Raw Coefficients    - Uncentered model coefficients with std errors
+#   8. Data Summary        - Response counts, completion rates
 #
 # ==============================================================================
 
 #' Write Conjoint Results to Excel
 #'
-#' Creates formatted Excel workbook with enhanced conjoint analysis results
+#' Creates formatted Excel workbook with 8-sheet structure per specification
 #'
 #' @param utilities Utilities data frame
 #' @param importance Importance data frame
@@ -32,10 +42,9 @@ write_conjoint_output <- function(utilities, importance, diagnostics, model_resu
   positive_style <- create_positive_style()
   negative_style <- create_negative_style()
 
-  # Sheet 1: Executive Summary
-  create_executive_summary_sheet(wb, utilities, importance, diagnostics,
-                                 model_result, config, data_info,
-                                 header_style, title_style)
+  # Sheet 1: Market Simulator (ALWAYS generated - primary deliverable)
+  create_market_simulator_sheet(wb, utilities, importance, config, header_style)
+  create_simulator_data_sheet(wb, utilities, importance, header_style)
 
   # Sheet 2: Attribute Importance
   create_importance_sheet(wb, importance, header_style, positive_style)
@@ -43,21 +52,20 @@ write_conjoint_output <- function(utilities, importance, diagnostics, model_resu
   # Sheet 3: Part-Worth Utilities
   create_utilities_sheet(wb, utilities, header_style, positive_style, negative_style)
 
-  # Sheet 4: Model Diagnostics
-  create_diagnostics_sheet(wb, diagnostics, model_result, header_style)
+  # Sheet 4: Utility Chart Data
+  create_utility_chart_data_sheet(wb, utilities, importance, header_style)
 
-  # Sheet 5: Market Simulator (if enabled)
-  if (!is.null(config$generate_market_simulator) &&
-      safe_logical(config$generate_market_simulator, default = FALSE)) {
-    create_market_simulator_sheet(wb, utilities, importance, config, header_style)
-    create_simulator_data_sheet(wb, utilities, importance, header_style)
-  }
+  # Sheet 5: Model Fit
+  create_model_fit_sheet(wb, diagnostics, model_result, header_style)
 
-  # Sheet 6: Data Summary
-  create_data_summary_sheet(wb, data_info, config, header_style)
-
-  # Sheet 7: Configuration
+  # Sheet 6: Configuration
   create_configuration_sheet(wb, config, header_style)
+
+  # Sheet 7: Raw Coefficients
+  create_raw_coefficients_sheet(wb, model_result, header_style)
+
+  # Sheet 8: Data Summary
+  create_data_summary_sheet(wb, data_info, config, header_style)
 
   # Save workbook
   tryCatch({
@@ -73,85 +81,251 @@ write_conjoint_output <- function(utilities, importance, diagnostics, model_resu
 }
 
 
-#' Create Executive Summary Sheet
-#' @keywords internal
-create_executive_summary_sheet <- function(wb, utilities, importance, diagnostics,
-                                          model_result, config, data_info,
-                                          header_style, title_style) {
+# ==============================================================================
+# NEW SHEET FUNCTIONS FOR 8-SHEET SPECIFICATION
+# ==============================================================================
 
-  openxlsx::addWorksheet(wb, "Executive Summary")
+#' Create Utility Chart Data Sheet
+#'
+#' Pre-formatted data for easy Excel charting
+#'
+#' @keywords internal
+create_utility_chart_data_sheet <- function(wb, utilities, importance, header_style) {
+
+  openxlsx::addWorksheet(wb, "Utility Chart Data", tabColour = "#9DC3E6")
   row <- 1
 
-  # Title
-  openxlsx::writeData(wb, "Executive Summary", "CONJOINT ANALYSIS - EXECUTIVE SUMMARY",
+  # Section 1: Importance Chart Data
+  openxlsx::writeData(wb, "Utility Chart Data", "ATTRIBUTE IMPORTANCE (for bar chart)",
                      startRow = row, startCol = 1)
-  openxlsx::addStyle(wb, "Executive Summary", title_style, rows = row, cols = 1)
-  row <- row + 2
-
-  # Study Information
-  openxlsx::writeData(wb, "Executive Summary", "STUDY INFORMATION",
-                     startRow = row, startCol = 1)
-  openxlsx::addStyle(wb, "Executive Summary", header_style, rows = row, cols = 1)
+  openxlsx::addStyle(wb, "Utility Chart Data", header_style, rows = row, cols = 1:2)
   row <- row + 1
 
-  study_info <- data.frame(
-    Item = c("Analysis Type", "Estimation Method", "Sample Size",
-             "Choice Sets", "Total Observations"),
-    Value = c(
-      config$analysis_type,
-      model_result$method,
-      data_info$n_respondents,
-      data_info$n_choice_sets,
-      model_result$n_obs
-    ),
+  # Sort by importance
+  imp_sorted <- importance[order(-importance$Importance), ]
+  imp_chart <- data.frame(
+    Attribute = imp_sorted$Attribute,
+    Importance = imp_sorted$Importance,
     stringsAsFactors = FALSE
   )
+  openxlsx::writeData(wb, "Utility Chart Data", imp_chart, startRow = row, startCol = 1,
+                     headerStyle = header_style)
+  row <- row + nrow(imp_chart) + 3
 
-  openxlsx::writeData(wb, "Executive Summary", study_info, startRow = row, startCol = 1)
-  row <- row + nrow(study_info) + 2
-
-  # Top 3 Attributes
-  openxlsx::writeData(wb, "Executive Summary", "TOP 3 MOST IMPORTANT ATTRIBUTES",
+  # Section 2: Utilities by Attribute (for grouped bar charts)
+  openxlsx::writeData(wb, "Utility Chart Data", "UTILITIES BY ATTRIBUTE (for grouped bar charts)",
                      startRow = row, startCol = 1)
-  openxlsx::addStyle(wb, "Executive Summary", header_style, rows = row, cols = 1)
+  openxlsx::addStyle(wb, "Utility Chart Data", header_style, rows = row, cols = 1:3)
   row <- row + 1
 
-  top_attrs <- head(importance, 3)
-  top_attrs_display <- data.frame(
-    Rank = 1:nrow(top_attrs),
-    Attribute = top_attrs$Attribute,
-    Importance = sprintf("%.1f%%", top_attrs$Importance),
-    Interpretation = top_attrs$Interpretation,
-    stringsAsFactors = FALSE
-  )
+  # Create wide format for each attribute
+  for (attr in unique(utilities$Attribute)) {
+    attr_utils <- utilities[utilities$Attribute == attr, c("Level", "Utility")]
+    attr_utils <- attr_utils[order(-attr_utils$Utility), ]
 
-  openxlsx::writeData(wb, "Executive Summary", top_attrs_display,
-                     startRow = row, startCol = 1)
-  row <- row + nrow(top_attrs_display) + 2
-
-  # Model Fit (if choice-based)
-  if (model_result$method %in% c("mlogit", "clogit")) {
-    openxlsx::writeData(wb, "Executive Summary", "MODEL FIT",
-                       startRow = row, startCol = 1)
-    openxlsx::addStyle(wb, "Executive Summary", header_style, rows = row, cols = 1)
+    openxlsx::writeData(wb, "Utility Chart Data", attr, startRow = row, startCol = 1)
+    openxlsx::addStyle(wb, "Utility Chart Data",
+                      openxlsx::createStyle(textDecoration = "bold"),
+                      rows = row, cols = 1)
     row <- row + 1
 
-    fit_summary <- data.frame(
-      Metric = c("McFadden R²", "Hit Rate", "Quality"),
+    openxlsx::writeData(wb, "Utility Chart Data", attr_utils, startRow = row, startCol = 1,
+                       headerStyle = header_style)
+    row <- row + nrow(attr_utils) + 2
+  }
+
+  # Section 3: All utilities in long format (for pivot charts)
+  openxlsx::writeData(wb, "Utility Chart Data", "ALL UTILITIES - LONG FORMAT (for pivot charts)",
+                     startRow = row, startCol = 1)
+  openxlsx::addStyle(wb, "Utility Chart Data", header_style, rows = row, cols = 1:3)
+  row <- row + 1
+
+  chart_data <- utilities[, c("Attribute", "Level", "Utility")]
+  openxlsx::writeData(wb, "Utility Chart Data", chart_data, startRow = row, startCol = 1,
+                     headerStyle = header_style)
+
+  # Apply number formatting
+  num_style <- openxlsx::createStyle(numFmt = "0.000")
+  openxlsx::addStyle(wb, "Utility Chart Data", num_style,
+                    rows = (row + 1):(row + nrow(chart_data)),
+                    cols = 3, gridExpand = TRUE)
+
+  # Set column widths
+  openxlsx::setColWidths(wb, "Utility Chart Data", cols = 1:3, widths = c(20, 20, 15))
+
+  # Freeze top row
+  openxlsx::freezePane(wb, "Utility Chart Data", firstRow = TRUE)
+}
+
+
+#' Create Model Fit Sheet (replaces Model Diagnostics)
+#'
+#' Comprehensive fit statistics and quality metrics
+#'
+#' @keywords internal
+create_model_fit_sheet <- function(wb, diagnostics, model_result, header_style) {
+
+  openxlsx::addWorksheet(wb, "Model Fit", tabColour = "#70AD47")
+  row <- 1
+
+  # Section 1: Model Fit Statistics
+  openxlsx::writeData(wb, "Model Fit", "MODEL FIT STATISTICS",
+                     startRow = row, startCol = 1)
+  openxlsx::addStyle(wb, "Model Fit", header_style, rows = row, cols = 1:2)
+  row <- row + 1
+
+  if (!is.null(diagnostics$fit_statistics)) {
+    fit_stats <- data.frame(
+      Metric = c("McFadden R²", "Hit Rate", "Log-Likelihood", "AIC", "BIC"),
       Value = c(
-        sprintf("%.3f", diagnostics$fit_statistics$mcfadden_r2),
-        sprintf("%.1f%%", diagnostics$fit_statistics$hit_rate * 100),
-        diagnostics$quality_assessment$level
+        sprintf("%.4f", diagnostics$fit_statistics$mcfadden_r2 %||% NA),
+        sprintf("%.1f%%", (diagnostics$fit_statistics$hit_rate %||% 0) * 100),
+        sprintf("%.2f", diagnostics$fit_statistics$log_likelihood %||% NA),
+        sprintf("%.2f", diagnostics$fit_statistics$aic %||% NA),
+        sprintf("%.2f", diagnostics$fit_statistics$bic %||% NA)
+      ),
+      Interpretation = c(
+        "0.2-0.4 is considered good for choice models",
+        "% correctly predicted choices (random = 33% for 3 alternatives)",
+        "Higher (less negative) is better",
+        "Lower is better (penalizes complexity)",
+        "Lower is better (stronger complexity penalty)"
       ),
       stringsAsFactors = FALSE
     )
 
-    openxlsx::writeData(wb, "Executive Summary", fit_summary,
+    openxlsx::writeData(wb, "Model Fit", fit_stats, startRow = row, startCol = 1,
+                       headerStyle = header_style)
+    row <- row + nrow(fit_stats) + 2
+  }
+
+  # Section 2: Sample Information
+  openxlsx::writeData(wb, "Model Fit", "SAMPLE INFORMATION",
+                     startRow = row, startCol = 1)
+  openxlsx::addStyle(wb, "Model Fit", header_style, rows = row, cols = 1:2)
+  row <- row + 1
+
+  sample_info <- data.frame(
+    Metric = c("Total Observations", "Estimation Method", "Converged"),
+    Value = c(
+      as.character(model_result$n_obs %||% "N/A"),
+      model_result$method %||% "N/A",
+      if (!is.null(model_result$convergence$converged))
+        ifelse(model_result$convergence$converged, "Yes", "No") else "N/A"
+    ),
+    stringsAsFactors = FALSE
+  )
+
+  openxlsx::writeData(wb, "Model Fit", sample_info, startRow = row, startCol = 1,
+                     headerStyle = header_style)
+  row <- row + nrow(sample_info) + 2
+
+  # Section 3: Quality Assessment
+  if (!is.null(diagnostics$quality_assessment)) {
+    openxlsx::writeData(wb, "Model Fit", "QUALITY ASSESSMENT",
                        startRow = row, startCol = 1)
+    openxlsx::addStyle(wb, "Model Fit", header_style, rows = row, cols = 1:2)
+    row <- row + 1
+
+    qa <- diagnostics$quality_assessment
+    quality_df <- data.frame(
+      Item = c("Quality Level", "Recommendation"),
+      Value = c(qa$level %||% "N/A", qa$recommendation %||% "N/A"),
+      stringsAsFactors = FALSE
+    )
+
+    openxlsx::writeData(wb, "Model Fit", quality_df, startRow = row, startCol = 1,
+                       headerStyle = header_style)
   }
 
   # Set column widths
-  openxlsx::setColWidths(wb, "Executive Summary", cols = 1:4, widths = "auto")
+  openxlsx::setColWidths(wb, "Model Fit", cols = 1:3, widths = c(25, 20, 50))
+}
+
+
+#' Create Raw Coefficients Sheet
+#'
+#' Uncentered model coefficients with standard errors
+#'
+#' @keywords internal
+create_raw_coefficients_sheet <- function(wb, model_result, header_style) {
+
+  openxlsx::addWorksheet(wb, "Raw Coefficients", tabColour = "#BF8F00")
+  row <- 1
+
+  # Title
+  openxlsx::writeData(wb, "Raw Coefficients", "RAW MODEL COEFFICIENTS",
+                     startRow = row, startCol = 1)
+  openxlsx::addStyle(wb, "Raw Coefficients", header_style, rows = row, cols = 1:5)
+  row <- row + 2
+
+  # Build coefficients table
+  coefs <- model_result$coefficients
+  std_errors <- model_result$std_errors
+
+  if (!is.null(coefs) && length(coefs) > 0) {
+    # Calculate z-values and p-values
+    z_values <- coefs / std_errors
+    p_values <- 2 * (1 - pnorm(abs(z_values)))
+
+    # Create data frame
+    coef_df <- data.frame(
+      Coefficient = names(coefs),
+      Estimate = coefs,
+      Std_Error = std_errors,
+      z_value = z_values,
+      p_value = p_values,
+      Significance = ifelse(p_values < 0.001, "***",
+                     ifelse(p_values < 0.01, "**",
+                     ifelse(p_values < 0.05, "*",
+                     ifelse(p_values < 0.1, ".", "")))),
+      stringsAsFactors = FALSE,
+      row.names = NULL
+    )
+
+    # Write data
+    openxlsx::writeData(wb, "Raw Coefficients", coef_df, startRow = row, startCol = 1,
+                       headerStyle = header_style)
+
+    # Apply number formatting
+    num_style <- openxlsx::createStyle(numFmt = "0.0000")
+    openxlsx::addStyle(wb, "Raw Coefficients", num_style,
+                      rows = (row + 1):(row + nrow(coef_df)),
+                      cols = 2:5, gridExpand = TRUE)
+
+    row <- row + nrow(coef_df) + 2
+  } else {
+    openxlsx::writeData(wb, "Raw Coefficients", "No coefficients available",
+                       startRow = row, startCol = 1)
+    row <- row + 2
+  }
+
+  # Add legend
+  openxlsx::writeData(wb, "Raw Coefficients", "Significance codes:",
+                     startRow = row, startCol = 1)
+  row <- row + 1
+  openxlsx::writeData(wb, "Raw Coefficients",
+                     "*** p < 0.001, ** p < 0.01, * p < 0.05, . p < 0.1",
+                     startRow = row, startCol = 1)
+
+  # Add note about zero-centering
+  row <- row + 2
+  openxlsx::writeData(wb, "Raw Coefficients",
+                     "NOTE: These are uncentered coefficients from the model.",
+                     startRow = row, startCol = 1)
+  row <- row + 1
+  openxlsx::writeData(wb, "Raw Coefficients",
+                     "See 'Part-Worth Utilities' sheet for zero-centered utilities.",
+                     startRow = row, startCol = 1)
+
+  note_style <- openxlsx::createStyle(fontColour = "#666666", textDecoration = "italic")
+  openxlsx::addStyle(wb, "Raw Coefficients", note_style, rows = (row-1):row, cols = 1)
+
+  # Set column widths
+  openxlsx::setColWidths(wb, "Raw Coefficients", cols = 1:6, widths = c(30, 12, 12, 10, 12, 12))
+
+  # Freeze top row
+  openxlsx::freezePane(wb, "Raw Coefficients", firstRow = TRUE)
 }
 
 
@@ -215,55 +389,7 @@ create_utilities_sheet <- function(wb, utilities, header_style,
 }
 
 
-#' Create Diagnostics Sheet
-#' @keywords internal
-create_diagnostics_sheet <- function(wb, diagnostics, model_result, header_style) {
-
-  openxlsx::addWorksheet(wb, "Model Diagnostics")
-  row <- 1
-
-  # Model fit statistics
-  if (!is.null(diagnostics$fit_statistics)) {
-    openxlsx::writeData(wb, "Model Diagnostics", "MODEL FIT STATISTICS",
-                       startRow = row, startCol = 1)
-    openxlsx::addStyle(wb, "Model Diagnostics", header_style, rows = row, cols = 1:2)
-    row <- row + 1
-
-    fit_stats <- data.frame(
-      Metric = names(diagnostics$fit_statistics),
-      Value = sapply(diagnostics$fit_statistics, function(x) {
-        if (is.numeric(x)) sprintf("%.4f", x) else as.character(x)
-      }),
-      stringsAsFactors = FALSE
-    )
-
-    openxlsx::writeData(wb, "Model Diagnostics", fit_stats,
-                       startRow = row, startCol = 1)
-    row <- row + nrow(fit_stats) + 2
-  }
-
-  # Convergence information
-  openxlsx::writeData(wb, "Model Diagnostics", "CONVERGENCE INFORMATION",
-                     startRow = row, startCol = 1)
-  openxlsx::addStyle(wb, "Model Diagnostics", header_style, rows = row, cols = 1:2)
-  row <- row + 1
-
-  conv_info <- data.frame(
-    Item = c("Converged", "Code", "Message"),
-    Value = c(
-      model_result$convergence$converged,
-      model_result$convergence$code,
-      model_result$convergence$message
-    ),
-    stringsAsFactors = FALSE
-  )
-
-  openxlsx::writeData(wb, "Model Diagnostics", conv_info,
-                     startRow = row, startCol = 1)
-
-  # Set column widths
-  openxlsx::setColWidths(wb, "Model Diagnostics", cols = 1:2, widths = "auto")
-}
+# NOTE: create_diagnostics_sheet removed in v2.1.0, replaced by create_model_fit_sheet
 
 
 #' Create Data Summary Sheet

@@ -183,12 +183,20 @@ R² = 1 - (LogLik_full / LogLik_null)
 
 ## Output
 
-The module creates an Excel workbook with four sheets:
+The module creates an Excel workbook with 8 sheets (per specification v2.1):
 
-1. **Attribute Importance**: Ranked importance scores (%)
-2. **Part-Worth Utilities**: Utility values for each level
-3. **Model Fit**: R², RMSE, and other fit statistics
-4. **Configuration**: Study design summary
+| # | Sheet | Description |
+|---|-------|-------------|
+| 1 | **Market Simulator** | Interactive what-if analysis tool with dropdown product configuration |
+| 2 | **Attribute Importance** | Ranked importance scores (%) with interpretation |
+| 3 | **Part-Worth Utilities** | Zero-centered utility values for each level |
+| 4 | **Utility Chart Data** | Pre-formatted data for Excel charting |
+| 5 | **Model Fit** | McFadden R², hit rate, AIC/BIC, quality assessment |
+| 6 | **Configuration** | Study design summary and attribute definitions |
+| 7 | **Raw Coefficients** | Uncentered model coefficients with standard errors |
+| 8 | **Data Summary** | Response counts, completion rates, data quality |
+
+The **Market Simulator** sheet is the primary deliverable, allowing clients to configure products and see predicted market shares using multinomial logit calculations.
 
 ## Interpretation
 
@@ -261,7 +269,7 @@ The module creates an Excel workbook with four sheets:
 
 ---
 
-**Version**: 2.1.0 (Alchemer Integration)
+**Version**: 2.1.0 (Alchemer Integration + 8-Sheet Output)
 **Status**: Production - Full-featured conjoint analysis with market simulator
 **Compatibility**:
 - Direct Alchemer CBC export import ✅ (NEW in v2.1)
@@ -275,3 +283,7 @@ The module creates an Excel workbook with four sheets:
 - Automatic level name cleaning
 - Enhanced mlogit diagnostics
 - Configurable zero-centering
+- 8-sheet Excel output per specification (Phase 2)
+- Market Simulator always generated as primary deliverable
+- Utility Chart Data sheet for easy Excel charting
+- Raw Coefficients sheet with significance testing
