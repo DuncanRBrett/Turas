@@ -376,9 +376,10 @@ clean_alchemer_level <- function(values, attribute_name) {
   # Pattern 2: Binary/attribute prefix format "Attribute_Level"
   # e.g., "MSG_Present" -> "Present", "Salt_Reduced" -> "Reduced"
   # Only apply if ALL values start with the attribute name
-  attr_pattern <- paste0("^", attribute_name, "_")
-  if (all(grepl(attr_pattern, unique_values, ignore.case = TRUE))) {
-    return(gsub(attr_pattern, "", values, ignore.case = TRUE))
+  # Use fixed=TRUE to avoid issues with special regex characters (e.g., "I+G")
+  attr_prefix <- paste0(attribute_name, "_")
+  if (all(startsWith(unique_values, attr_prefix))) {
+    return(substring(values, nchar(attr_prefix) + 1))
   }
 
   # Pattern 3: Generic underscore prefix (attribute may have different name)
