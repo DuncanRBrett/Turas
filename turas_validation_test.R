@@ -305,24 +305,26 @@ run_validation_suite <- function(config_file = NULL, data_file = NULL) {
   # --- Step 4: Calculate Utilities ---
   cat("\n>>> Step 4: Calculating Utilities\n")
 
-  utilities_result <- tryCatch({
+  utilities_error <- NULL
+  utilities_df <- tryCatch({
     calculate_utilities(analysis_result, config)
   }, error = function(e) {
-    list(success = FALSE, error = e$message)
+    utilities_error <<- e$message
+    NULL
   })
 
-  if (is.null(utilities_result$utilities)) {
-    cat(sprintf("✗ UTILITIES CALCULATION FAILED: %s\n", utilities_result$error %||% "Unknown error"))
+  if (is.null(utilities_df) || !is.data.frame(utilities_df) || nrow(utilities_df) == 0) {
+    cat(sprintf("✗ UTILITIES CALCULATION FAILED: %s\n", utilities_error %||% "Unknown error"))
     return(invisible(NULL))
   }
 
-  analysis_result$utilities <- utilities_result$utilities
+  analysis_result$utilities <- utilities_df
   cat("✓ Utilities calculated\n")
 
   # --- Step 5: Calculate Importance ---
   cat("\n>>> Step 5: Calculating Importance\n")
 
-  importance <- calculate_attribute_importance(utilities_result$utilities, config)
+  importance <- calculate_attribute_importance(utilities_df, config)
   analysis_result$importance <- importance
 
   cat("✓ Importance calculated\n")
