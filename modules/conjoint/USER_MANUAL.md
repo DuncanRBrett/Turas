@@ -1,7 +1,7 @@
-# Enhanced Turas Conjoint Analysis - Quick Start Guide
+# Enhanced Turas Conjoint Analysis - User Manual
 
-**Version:** 2.0.0
-**Date:** 2025-11-27
+**Version:** 2.1.0 (Alchemer Integration)
+**Date:** 2025-12-12
 **Status:** Production Ready
 
 ---
@@ -12,12 +12,20 @@ The Enhanced Turas Conjoint Analysis module calculates part-worth utilities and 
 
 ### Key Features
 
+- **Alchemer CBC Import**: Direct import of Alchemer choice-based conjoint exports (NEW in v2.1)
 - **Multi-method estimation**: Auto-selects best method (mlogit → clogit fallback)
 - **Comprehensive validation**: 3-tier validation (Critical/Warning/Info)
 - **None option handling**: Auto-detects "none of these" options
 - **Statistical rigor**: Confidence intervals, p-values, significance testing
 - **Professional output**: 6-sheet Excel workbook with formatting
 - **User-friendly**: Clear error messages and progress reporting
+
+### What's New in v2.1
+
+- **Direct Alchemer Import**: No more manual data transformation! Import raw Alchemer CBC exports directly
+- **Auto Level Cleaning**: Alchemer level names like "Low_071" automatically cleaned to "Low"
+- **Enhanced mlogit Support**: Improved diagnostics and better error handling
+- **Zero-Centering Options**: Configurable utility centering methods
 
 ### What You Need
 
@@ -127,6 +135,12 @@ The configuration file is an Excel workbook (`.xlsx`) with two required sheets:
 - `generate_market_simulator`: TRUE/FALSE - generate simulator sheet
 - `include_diagnostics`: TRUE/FALSE - include detailed diagnostics
 
+**Alchemer-Specific Settings (NEW in v2.1):**
+- `data_source`: "alchemer" or "generic" - set to "alchemer" for Alchemer CBC exports
+- `clean_alchemer_levels`: TRUE/FALSE - auto-clean level names (e.g., "Low_071" → "Low")
+- `zero_center_utilities`: TRUE/FALSE - zero-center utilities within attributes
+- `base_level_method`: "first", "last", or "effects" - reference level coding
+
 ### Sheet 2: Attributes
 
 | AttributeName | AttributeLabel | NumLevels | Level1 | Level2 | Level3 | Level4 | ... |
@@ -177,6 +191,88 @@ resp_id,choice_set_id,alternative_id,Brand,Price,Screen_Size,Battery_Life,Camera
 - **Excel** (`.xlsx`)
 - **SPSS** (`.sav`) - requires `haven` package
 - **Stata** (`.dta`) - requires `haven` package
+
+---
+
+## Alchemer Data Import (NEW in v2.1)
+
+### Overview
+
+The Turas Conjoint module now supports **direct import of Alchemer CBC exports**. No manual data transformation required!
+
+### Alchemer Export Format
+
+Alchemer exports CBC data with this structure:
+
+| Column | Example | Description |
+|--------|---------|-------------|
+| ResponseID | 89 | Unique respondent identifier |
+| SetNumber | 1, 2, 3... | Choice task number |
+| CardNumber | 1, 2, 3 | Alternative within choice set |
+| [Attributes] | High_107 | Attribute level shown |
+| Score | 0 or 100 | 100 = chosen, 0 = not chosen |
+
+### Automatic Transformations
+
+When you set `data_source = "alchemer"` in your config, the module automatically:
+
+1. **Creates choice_set_id**: Combines ResponseID and SetNumber (e.g., "89_1")
+2. **Normalizes Score**: Converts 100 → 1, 0 → 0
+3. **Cleans level names**: "Low_071" → "Low", "MSG_Present" → "Present"
+4. **Renames columns**: ResponseID → resp_id, CardNumber → alternative_id
+
+### Example: Alchemer Workflow
+
+```r
+# 1. Create a simple config file with Alchemer settings
+#    In your config.xlsx Settings sheet, include:
+#
+#    | Setting | Value |
+#    |---------|-------|
+#    | data_source | alchemer |
+#    | data_file | DE_noodle_conjoint_raw.xlsx |
+#    | output_file | noodle_results.xlsx |
+
+# 2. Run the analysis - data is automatically transformed!
+results <- run_conjoint_analysis(
+  config_file = "my_alchemer_config.xlsx"
+)
+
+# 3. View results
+print(results$importance)
+```
+
+### Attribute Level Name Cleaning
+
+Alchemer encodes levels in various formats. Here's how they're cleaned:
+
+| Alchemer Format | Cleaned | Pattern |
+|-----------------|---------|---------|
+| Low_071 | Low | Price with numeric suffix |
+| Mid_089 | Mid | Price with numeric suffix |
+| High_107 | High | Price with numeric suffix |
+| MSG_Present | Present | Attribute_Level format |
+| MSG_Absent | Absent | Attribute_Level format |
+| Salt_Reduced | Reduced | Attribute_Level format |
+| A, B, C, D, E | A, B, C, D, E | Already clean (unchanged) |
+
+### Standalone Alchemer Import
+
+You can also use the Alchemer import function directly:
+
+```r
+# Import Alchemer data without running full analysis
+df <- import_alchemer_conjoint("DE_noodle_conjoint_raw.xlsx")
+
+# View the transformed data
+head(df)
+
+# Get attribute summary
+get_alchemer_attributes(df)
+
+# Auto-generate a config file
+config <- create_config_from_alchemer(df, "auto_generated_config.xlsx")
+```
 
 ---
 

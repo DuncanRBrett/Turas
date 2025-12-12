@@ -5,8 +5,13 @@
 # Module: Conjoint Analysis
 # Purpose: Calculate part-worth utilities and attribute importance from
 #          choice-based or rating-based conjoint data
-# Version: Turas v10.0
-# Date: 2025-11-26
+# Version: Turas v10.1 (Phase 1 - Alchemer Integration)
+# Date: 2025-12-12
+#
+# NEW IN v10.1:
+#   - Alchemer CBC export direct import (05_alchemer_import.R)
+#   - Enhanced mlogit estimation with better diagnostics
+#   - Improved zero-centering and importance calculations
 #
 # ==============================================================================
 
@@ -86,6 +91,7 @@ if (!dir.exists(.conjoint_module_dir)) {
 # Source all component files in order
 source(file.path(.conjoint_module_dir, "99_helpers.R"))      # Helper functions (must be first)
 source(file.path(.conjoint_module_dir, "01_config.R"))       # Configuration loading
+source(file.path(.conjoint_module_dir, "05_alchemer_import.R"))  # Alchemer data import (NEW)
 source(file.path(.conjoint_module_dir, "02_data.R"))         # Data loading and validation
 source(file.path(.conjoint_module_dir, "03_estimation.R"))   # Model estimation
 source(file.path(.conjoint_module_dir, "04_utilities.R"))    # Utilities calculation
@@ -178,7 +184,7 @@ run_conjoint_analysis <- function(config_file, data_file = NULL, output_file = N
   if (verbose) {
     cat("\n")
     cat(rep("=", 80), "\n", sep = "")
-    cat("TURAS CONJOINT ANALYSIS - Enhanced Version 2.0\n")
+    cat("TURAS CONJOINT ANALYSIS - Version 2.1 (Alchemer Integration)\n")
     cat(rep("=", 80), "\n", sep = "")
     cat("\n")
   }
@@ -335,7 +341,7 @@ run_conjoint_analysis <- function(config_file, data_file = NULL, output_file = N
       config = config,
       data_info = data_list,
       elapsed_time = as.numeric(elapsed),
-      version = "2.0.0"
+      version = "2.1.0"
     )
 
   }, error = function(e) {

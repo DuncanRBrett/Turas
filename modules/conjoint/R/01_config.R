@@ -1,11 +1,15 @@
 # ==============================================================================
-# CONJOINT CONFIG LOADER - ENHANCED
+# CONJOINT CONFIG LOADER - ENHANCED WITH ALCHEMER SUPPORT
 # ==============================================================================
 #
 # Module: Conjoint Analysis - Configuration
 # Purpose: Load and validate conjoint study configuration
-# Version: 2.0.0 (Enhanced Implementation)
-# Date: 2025-11-26
+# Version: 2.1.0 (Phase 1 - Alchemer Integration)
+# Date: 2025-12-12
+#
+# SUPPORTED DATA SOURCES:
+#   - alchemer: Direct Alchemer CBC export (ResponseID, SetNumber, etc.)
+#   - generic: Standard Turas format (resp_id, choice_set_id, etc.)
 #
 # ==============================================================================
 
@@ -172,14 +176,54 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
     confidence_level = safe_numeric(settings_list$confidence_level, 0.95),
     choice_type = settings_list$choice_type %||% "single",
 
-    # Column names (with defaults)
+    # =========================================================================
+    # ALCHEMER-SPECIFIC SETTINGS (Phase 1)
+    # =========================================================================
+
+    # Data source type: 'alchemer' for direct Alchemer CBC export,
+    # 'generic' for standard Turas format
+    data_source = settings_list$data_source %||% "generic",
+
+    # Whether to clean Alchemer level names (e.g., "Low_071" -> "Low")
+    clean_alchemer_levels = safe_logical(
+      settings_list$clean_alchemer_levels,
+      default = TRUE
+    ),
+
+    # Zero-centering method for utilities
+    # TRUE = zero-center within each attribute (recommended)
+    # FALSE = raw coefficients from model
+    zero_center_utilities = safe_logical(
+      settings_list$zero_center_utilities,
+      default = TRUE
+    ),
+
+    # Base level method for dummy coding
+    # 'first' = first level is reference (default)
+    # 'last' = last level is reference
+    # 'effects' = effects coding (sum to zero)
+    base_level_method = settings_list$base_level_method %||% "first",
+
+    # =========================================================================
+    # COLUMN NAMES (with defaults)
+    # =========================================================================
+
     respondent_id_column = settings_list$respondent_id_column %||% "resp_id",
     choice_set_column = settings_list$choice_set_column %||% "choice_set_id",
     chosen_column = settings_list$chosen_column %||% "chosen",
     alternative_id_column = settings_list$alternative_id_column %||% "alternative_id",
     rating_variable = settings_list$rating_variable %||% "rating",
 
-    # Feature flags
+    # Alchemer-specific column names (used when data_source = 'alchemer')
+    alchemer_response_id_column = settings_list$alchemer_response_id_column %||% "ResponseID",
+    alchemer_set_number_column = settings_list$alchemer_set_number_column %||% "SetNumber",
+    alchemer_card_number_column = settings_list$alchemer_card_number_column %||% "CardNumber",
+    alchemer_score_column = settings_list$alchemer_score_column %||% "Score",
+
+    # =========================================================================
+    # FEATURE FLAGS
+    # =========================================================================
+
     generate_market_simulator = safe_logical(
       settings_list$generate_market_simulator,
       default = TRUE
@@ -358,6 +402,34 @@ validate_config <- function(settings_list, attributes_df) {
       "choice_type = '%s' is a Phase 2 feature and may not be fully implemented yet",
       choice_type
     ))
+  }
+
+  # ===== ALCHEMER-SPECIFIC VALIDATION =====
+
+  # Validate data_source
+  data_source <- settings_list$data_source %||% "generic"
+  if (!data_source %in% c("alchemer", "generic")) {
+    errors <- c(errors, sprintf(
+      "data_source must be 'alchemer' or 'generic', got: %s",
+      data_source
+    ))
+  }
+
+  # Validate base_level_method
+  base_level_method <- settings_list$base_level_method %||% "first"
+  if (!base_level_method %in% c("first", "last", "effects")) {
+    errors <- c(errors, sprintf(
+      "base_level_method must be 'first', 'last', or 'effects', got: %s",
+      base_level_method
+    ))
+  }
+
+  # Info message for Alchemer source
+
+  if (data_source == "alchemer") {
+    warnings <- c(warnings,
+      "data_source = 'alchemer': Data will be transformed from Alchemer CBC format"
+    )
   }
 
   # Validate data_file is specified

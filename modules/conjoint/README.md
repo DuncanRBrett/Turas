@@ -6,12 +6,14 @@ The Conjoint Analysis module estimates consumer preferences for product/service 
 
 ## Features
 
+- **Direct Alchemer Import**: Import raw Alchemer CBC exports without preprocessing (NEW in v2.1)
 - **Rating-Based Conjoint**: OLS regression on preference ratings ✅
 - **Choice-Based Conjoint**: Conditional logit on discrete choices ✅ (Alchemer-style)
 - **Part-Worth Utilities**: Zero-centered utility estimates for each attribute level
 - **Attribute Importance**: Relative importance scores (% of total utility range)
 - **Formatted Output**: Excel workbook with all results and visualizations
 - **Model Fit Statistics**: McFadden's R², hit rate, AIC, BIC
+- **Auto Level Cleaning**: Automatic cleaning of Alchemer level names (e.g., "Low_071" → "Low")
 
 ## Quick Start
 
@@ -54,20 +56,43 @@ print(results$utilities)
 print(results$diagnostics$fit_statistics)
 ```
 
-### Example: Alchemer Choice-Based Conjoint
+### Example: Alchemer Choice-Based Conjoint (NEW in v2.1)
 
 ```r
-# For Alchemer CBC export data
+# For raw Alchemer CBC export data - no preprocessing needed!
+# Just set data_source = "alchemer" in your config
+
+# Option A: Full analysis with config file
 results <- run_conjoint_analysis(
-  config_file = "alchemer_config.xlsx",  # Set analysis_type = "choice"
-  data_file = "alchemer_choices.csv",    # One row per alternative
-  output_file = "cbc_results.xlsx"
+  config_file = "alchemer_config.xlsx"   # Contains data_source = "alchemer"
 )
+
+# Option B: Standalone import + analysis
+df <- import_alchemer_conjoint("DE_noodle_conjoint_raw.xlsx")
+config <- create_config_from_alchemer(df, "auto_config.xlsx")
 
 # Top 3 most important attributes
 top3 <- head(results$importance[order(-results$importance$Importance), ], 3)
 print(top3)
 ```
+
+### Alchemer Configuration Setup
+
+For Alchemer CBC exports, add these settings to your config file:
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| data_source | alchemer | Enable Alchemer import |
+| clean_alchemer_levels | TRUE | Auto-clean level names |
+| data_file | DE_noodle_raw.xlsx | Your Alchemer export file |
+| output_file | results.xlsx | Output file path |
+
+The module automatically transforms Alchemer format:
+- `ResponseID` → `resp_id`
+- `SetNumber` + `ResponseID` → `choice_set_id`
+- `CardNumber` → `alternative_id`
+- `Score` (0/100) → `chosen` (0/1)
+- Level names cleaned: "Low_071" → "Low", "MSG_Present" → "Present"
 
 ## Configuration File Format
 
@@ -236,12 +261,17 @@ The module creates an Excel workbook with four sheets:
 
 ---
 
-**Version**: 2.0.1
+**Version**: 2.1.0 (Alchemer Integration)
 **Status**: Production - Full-featured conjoint analysis with market simulator
 **Compatibility**:
+- Direct Alchemer CBC export import ✅ (NEW in v2.1)
 - Alchemer/SurveyGizmo CBC format ✅
 - Generic choice-based format ✅
 - Multi-respondent datasets ✅
 - Rating-based conjoint ✅
-**Last Updated**: 2025-11-29
-**Critical Fixes**: Multi-respondent validation, hit rate calculation, GUI integration (see MAINTENANCE_GUIDE.md)
+**Last Updated**: 2025-12-12
+**New in v2.1**:
+- Direct Alchemer CBC import (05_alchemer_import.R)
+- Automatic level name cleaning
+- Enhanced mlogit diagnostics
+- Configurable zero-centering

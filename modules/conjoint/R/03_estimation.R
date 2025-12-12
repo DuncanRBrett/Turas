@@ -4,8 +4,19 @@
 #
 # Module: Conjoint Analysis - Model Estimation
 # Purpose: Estimate choice models using mlogit (primary) and clogit (fallback)
-# Version: 2.0.0 (Enhanced Implementation)
-# Date: 2025-11-26
+# Version: 2.1.0 (Phase 1 - Alchemer Integration)
+# Date: 2025-12-12
+#
+# ESTIMATION METHODS:
+#   - mlogit: Primary engine, purpose-built for discrete choice analysis
+#   - clogit: Fallback using survival::clogit (Cox regression workaround)
+#   - auto: Try mlogit first, fall back to clogit if needed
+#
+# WHY MLOGIT OVER CLOGIT:
+#   - Purpose-built for discrete choice analysis
+#   - Native support for panel data structure
+#   - Better diagnostics and hypothesis testing
+#   - Industry standard in academic/commercial conjoint software
 #
 # ==============================================================================
 

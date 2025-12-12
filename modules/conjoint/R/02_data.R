@@ -1,22 +1,32 @@
 # ==============================================================================
-# CONJOINT DATA LOADING AND VALIDATION - ENHANCED
+# CONJOINT DATA LOADING AND VALIDATION - ENHANCED WITH ALCHEMER SUPPORT
 # ==============================================================================
 #
 # Module: Conjoint Analysis - Data Management
 # Purpose: Load, validate, and prepare conjoint data for analysis
-# Version: 2.0.0 (Enhanced Implementation)
-# Date: 2025-11-26
+# Version: 2.1.0 (Phase 1 - Alchemer Integration)
+# Date: 2025-12-12
+#
+# SUPPORTED DATA SOURCES:
+#   - alchemer: Uses import_alchemer_conjoint() for Alchemer CBC exports
+#   - generic: Standard Turas format loader
 #
 # ==============================================================================
 
 #' Load Conjoint Data
 #'
-#' Loads and validates conjoint experimental data with comprehensive checks
+#' Loads and validates conjoint experimental data with comprehensive checks.
+#' Automatically detects data source type (Alchemer or generic) from config
+#' and uses the appropriate loader.
 #'
 #' VALIDATION LEVELS:
 #'   - CRITICAL: Stop execution if failed
 #'   - WARNING: Continue but flag potential issues
 #'   - INFO: Informational messages
+#'
+#' SUPPORTED DATA SOURCES:
+#'   - alchemer: Alchemer CBC export (ResponseID, SetNumber, CardNumber, Score)
+#'   - generic: Standard Turas format (resp_id, choice_set_id, alternative_id, chosen)
 #'
 #' @param data_file Path to data file (CSV, XLSX, SAV, DTA)
 #' @param config Configuration list from load_conjoint_config()
@@ -37,11 +47,47 @@ load_conjoint_data <- function(data_file, config, verbose = TRUE) {
     ), call. = FALSE)
   }
 
-  # Load data based on file type
-  data <- load_data_by_type(data_file)
+  # Check data source type from config
+  data_source <- config$data_source %||% "generic"
 
-  # Convert to data frame (in case of tibble)
-  data <- as.data.frame(data, stringsAsFactors = FALSE)
+  # =========================================================================
+  # ALCHEMER DATA SOURCE
+  # =========================================================================
+  if (data_source == "alchemer") {
+    log_verbose("  Data source: Alchemer CBC export", verbose)
+
+    # Use Alchemer import function
+    data <- import_alchemer_conjoint(
+      file_path = data_file,
+      config = config,
+      clean_levels = config$clean_alchemer_levels %||% TRUE,
+      verbose = verbose
+    )
+
+    # Auto-detect attributes from imported data if not in config
+    if (is.null(config$attributes) || nrow(config$attributes) == 0) {
+      log_verbose("  Auto-detecting attributes from Alchemer data...", verbose)
+      config$attributes <- get_alchemer_attributes(data)
+
+      # Add levels_list for each attribute
+      config$attributes$levels_list <- lapply(
+        config$attributes$AttributeName,
+        function(attr) sort(unique(data[[attr]]))
+      )
+    }
+
+  # =========================================================================
+  # GENERIC DATA SOURCE
+  # =========================================================================
+  } else {
+    log_verbose("  Data source: Generic Turas format", verbose)
+
+    # Load data based on file type
+    data <- load_data_by_type(data_file)
+
+    # Convert to data frame (in case of tibble)
+    data <- as.data.frame(data, stringsAsFactors = FALSE)
+  }
 
   # Basic validation
   if (nrow(data) == 0) {

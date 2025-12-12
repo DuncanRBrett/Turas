@@ -1,7 +1,7 @@
 # Conjoint Analysis Module - Technical Documentation
 
-**Version:** 1.0 (Turas v10.0)
-**Last Updated:** December 6, 2025
+**Version:** 2.1.0 (Turas v10.1 - Alchemer Integration)
+**Last Updated:** December 12, 2025
 **Module Status:** ✅ Production Ready
 **Target Audience:** Developers, Technical Maintainers, Market Researchers
 
@@ -12,10 +12,11 @@
 1. [Module Overview](#1-module-overview)
 2. [Architecture](#2-architecture)
 3. [Core Components](#3-core-components)
-4. [Statistical Methods](#4-statistical-methods)
-5. [API Reference](#5-api-reference)
-6. [Extension Points](#6-extension-points)
-7. [Troubleshooting](#7-troubleshooting)
+4. [Alchemer Integration](#4-alchemer-integration) *(NEW in v2.1)*
+5. [Statistical Methods](#5-statistical-methods)
+6. [API Reference](#6-api-reference)
+7. [Extension Points](#7-extension-points)
+8. [Troubleshooting](#8-troubleshooting)
 
 ---
 
@@ -69,10 +70,11 @@ The Conjoint Analysis module estimates consumer preferences for product features
 ```
 modules/conjoint/R/
 ├── 00_main.R              # Main orchestration (~400 lines)
-├── 01_config.R            # Configuration loading (~350 lines)
-├── 02_data.R              # Data loading & validation (~450 lines)
+├── 01_config.R            # Configuration loading (~400 lines)
+├── 02_data.R              # Data loading & validation (~500 lines)
 ├── 03_estimation.R        # Model estimation (~800 lines)
 ├── 04_utilities.R         # Utility calculations (~600 lines)
+├── 05_alchemer_import.R   # Alchemer CBC import (NEW in v2.1, ~500 lines)
 ├── 05_simulator.R         # Product simulator (~500 lines)
 ├── 06_interactions.R      # Interaction effects (~400 lines)
 ├── 07_output.R            # Excel output (~900 lines)
@@ -83,7 +85,7 @@ modules/conjoint/R/
 └── 99_helpers.R           # Utilities (~500 lines)
 ```
 
-**Total:** ~5,800 lines
+**Total:** ~6,300 lines
 
 ### 2.2 Data Flow
 
@@ -236,9 +238,103 @@ predict_market_share <- function(products, part_worths) {
 
 ---
 
-## 4. Statistical Methods
+## 4. Alchemer Integration (NEW in v2.1)
 
-### 4.1 Effects Coding
+### 4.1 Overview
+
+Version 2.1 introduces direct import of Alchemer CBC (Choice-Based Conjoint) exports. This eliminates the need for manual data transformation and ensures data integrity.
+
+### 4.2 Data Transformation Pipeline
+
+```
+ALCHEMER EXPORT                      TURAS INTERNAL FORMAT
+═══════════════                      ════════════════════
+ResponseID ─────────────────────────→ resp_id
+SetNumber ──┬───────────────────────→ choice_set_id (combined)
+ResponseID ─┘                         format: "ResponseID_SetNumber"
+CardNumber ─────────────────────────→ alternative_id
+Score (0/100) ──────────────────────→ chosen (0/1)
+[Attributes] ───────────────────────→ [Cleaned Attributes]
+```
+
+### 4.3 Level Name Cleaning Patterns
+
+The `clean_alchemer_level()` function handles three patterns:
+
+**Pattern 1: Price Format**
+```
+"Low_071"  → "Low"
+"Mid_089"  → "Mid"
+"High_107" → "High"
+Regex: ^[A-Za-z]+_\d+$ → gsub("_\\d+$", "", value)
+```
+
+**Pattern 2: Attribute Prefix Format**
+```
+"MSG_Present"           → "Present"
+"MSG_Absent"            → "Absent"
+"PotassiumChloride_Present" → "Present"
+Regex: ^AttributeName_ → gsub("^AttrName_", "", value)
+```
+
+**Pattern 3: Already Clean**
+```
+"A", "B", "C", "D", "E" → unchanged
+Single letters or simple words pass through
+```
+
+### 4.4 Implementation Details
+
+**File:** `05_alchemer_import.R`
+
+**Key Functions:**
+
+```r
+# Main import function
+import_alchemer_conjoint(file_path, config = NULL, clean_levels = TRUE, verbose = TRUE)
+  # Returns: data.frame in Turas format
+
+# Level cleaning
+clean_alchemer_level(values, attribute_name)
+  # Returns: character vector with cleaned level names
+
+# Validation
+validate_alchemer_data(df, verbose = TRUE)
+  # Returns: list(is_valid, errors, warnings)
+
+# Helpers
+get_alchemer_attributes(df)
+  # Returns: data.frame(AttributeName, NumLevels, LevelNames)
+
+create_config_from_alchemer(df, output_file = NULL)
+  # Returns: config list, optionally saves to Excel
+```
+
+### 4.5 Configuration Settings
+
+New settings in config file for Alchemer:
+
+| Setting | Values | Default | Description |
+|---------|--------|---------|-------------|
+| data_source | "alchemer", "generic" | "generic" | Data source type |
+| clean_alchemer_levels | TRUE, FALSE | TRUE | Auto-clean level names |
+| zero_center_utilities | TRUE, FALSE | TRUE | Zero-center within attributes |
+| base_level_method | "first", "last", "effects" | "first" | Reference level coding |
+
+### 4.6 Validation Checks
+
+The Alchemer import performs these validations:
+
+1. **Required Columns**: ResponseID, SetNumber, CardNumber, Score
+2. **Unique Choice per Set**: Exactly one chosen alternative per choice set
+3. **Score Normalization**: Handles 0/1, 0/100, and other scales
+4. **Data Integrity**: No missing values in critical columns
+
+---
+
+## 5. Statistical Methods
+
+### 5.1 Effects Coding
 
 **Why Effects Coding:**
 - Centers part-worths around zero
