@@ -277,9 +277,20 @@ prepare_mlogit_data <- function(data, config) {
 
   message("    DEBUG: chid column created OK")
 
+  # Check if levels_list exists
+  message(sprintf("    DEBUG: config$attributes columns: %s",
+                  paste(names(config$attributes), collapse = ", ")))
+  has_levels_list <- "levels_list" %in% names(config$attributes)
+  message(sprintf("    DEBUG: has levels_list = %s", has_levels_list))
+  if (has_levels_list) {
+    message(sprintf("    DEBUG: levels_list length = %d", length(config$attributes$levels_list)))
+  }
+
   # Convert attributes to factors with correct reference level
   for (attr in config$attributes$AttributeName) {
+    message(sprintf("    DEBUG: Getting levels for '%s'...", attr))
     levels_vec <- get_attribute_levels(config, attr)
+    message(sprintf("    DEBUG: Got %d levels", length(levels_vec)))
 
     # Set reference level based on baseline handling
     if (config$baseline_handling == "first_level_zero") {
