@@ -92,15 +92,16 @@ extract_attribute_utilities <- function(attr, coefs, std_errors, config, model_r
 
   # Create pattern that matches either escaped or unescaped attribute name
   # e.g., for "I+G", match both "I+GPresent" and "`I+G`Present"
+  # Use character class [``] for backtick to avoid regex parsing issues
   attr_escaped <- gsub("([+*?^${}()|\\[\\]\\\\.])", "\\\\\\1", attr)
-  coef_pattern <- paste0("^(`?", attr_escaped, "`?)")
+  coef_pattern <- paste0("^[`]?", attr_escaped, "[`]?")
   attr_coef_indices <- grep(coef_pattern, names(coefs))
 
   if (length(attr_coef_indices) > 0) {
     # Extract level names from coefficient names
     coef_names <- names(coefs)[attr_coef_indices]
     # Remove both escaped and unescaped attribute name prefix
-    level_names <- gsub(paste0("^`?", attr_escaped, "`?"), "", coef_names)
+    level_names <- gsub(paste0("^[`]?", attr_escaped, "[`]?"), "", coef_names)
 
     # Assign coefficients
     for (i in seq_along(level_names)) {
