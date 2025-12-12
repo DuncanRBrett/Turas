@@ -271,32 +271,79 @@ run_validation_suite <- function(config_file = NULL, data_file = NULL) {
   
   # --- Step 3: Run Analysis ---
   cat("\n>>> Step 3: Running Analysis\n")
-  
+
   analysis_result <- tryCatch({
-    data_list <- list(data = import_result$data)
-    estimate_choice_mlogit(data_list, config)
+    # Build proper data_list structure
+    data_list <- list(
+      data = import_result$data,
+      n_respondents = import_result$n_respondents,
+      n_choice_sets = import_result$n_choice_sets,
+      n_profiles = nrow(import_result$data)
+    )
+
+    # Add required config fields
+    config$analysis_type <- "choice"
+    config$estimation_method <- "auto"
+    config$respondent_id_column <- "resp_id"
+    config$choice_set_column <- "choice_set_id"
+    config$chosen_column <- "chosen"
+    config$alternative_id_column <- "alternative_id"
+
+    # Use the main estimation function (handles mlogit/clogit fallback)
+    estimate_choice_model(data_list, config)
   }, error = function(e) {
     list(success = FALSE, error = e$message)
   })
   
-  if (is.null(analysis_result$utilities)) {
-    cat(sprintf("✗ ANALYSIS FAILED: %s\n", analysis_result$error))
+  if (is.null(analysis_result$coefficients)) {
+    cat(sprintf("✗ ANALYSIS FAILED: %s\n", analysis_result$error %||% "Unknown error"))
     return(invisible(NULL))
   }
-  
-  cat(sprintf("✓ Analysis complete using %s\n", analysis_result$engine %||% "unknown"))
-  
-  # --- Step 4: Calculate Importance ---
-  cat("\n>>> Step 4: Calculating Importance\n")
-  
-  importance <- calculate_attribute_importance(analysis_result$utilities, config)
+
+  cat(sprintf("✓ Analysis complete using %s\n", analysis_result$method %||% "unknown"))
+
+  # --- Step 4: Calculate Utilities ---
+  cat("\n>>> Step 4: Calculating Utilities\n")
+
+  utilities_result <- tryCatch({
+    calculate_utilities(analysis_result, config)
+  }, error = function(e) {
+    list(success = FALSE, error = e$message)
+  })
+
+  if (is.null(utilities_result$utilities)) {
+    cat(sprintf("✗ UTILITIES CALCULATION FAILED: %s\n", utilities_result$error %||% "Unknown error"))
+    return(invisible(NULL))
+  }
+
+  analysis_result$utilities <- utilities_result$utilities
+  cat("✓ Utilities calculated\n")
+
+  # --- Step 5: Calculate Importance ---
+  cat("\n>>> Step 5: Calculating Importance\n")
+
+  importance <- calculate_attribute_importance(utilities_result$utilities, config)
   analysis_result$importance <- importance
-  
+
   cat("✓ Importance calculated\n")
-  
-  # --- Step 5: Validate Results ---
-  cat("\n>>> Step 5: Validating Results\n")
-  
+
+  # Add fit statistics for validation
+  if (!is.null(analysis_result$loglik)) {
+    ll_null <- analysis_result$loglik["null"]
+    ll_fitted <- analysis_result$loglik["fitted"]
+    mcfadden_r2 <- 1 - (ll_fitted / ll_null)
+
+    analysis_result$fit <- list(
+      mcfadden_r2 = mcfadden_r2,
+      log_likelihood = ll_fitted,
+      aic = analysis_result$aic,
+      bic = analysis_result$bic
+    )
+  }
+
+  # --- Step 6: Validate Results ---
+  cat("\n>>> Step 6: Validating Results\n")
+
   validation <- validate_results(analysis_result, "DE_noodle")
   
   # --- Final Report ---
