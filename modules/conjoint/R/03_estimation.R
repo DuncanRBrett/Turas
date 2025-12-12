@@ -144,10 +144,27 @@ estimate_with_mlogit <- function(data, config, verbose = TRUE) {
   # Prepare data in mlogit format
   mlogit_data <- prepare_mlogit_data(data, config)
 
+  # Debug: show data structure
+  n_choice_sets <- length(unique(paste(data[[config$respondent_id_column]],
+                                       data[[config$choice_set_column]], sep = "_")))
+  log_verbose(sprintf("  → Data has %d rows, %d choice sets", nrow(data), n_choice_sets), verbose)
+
   # Build formula
   formula_obj <- build_mlogit_formula(config)
 
   log_verbose(sprintf("  → Formula: %s", deparse(formula_obj)), verbose)
+
+  # Verify all formula variables exist in data
+  attr_names <- config$attributes$AttributeName
+  missing_cols <- attr_names[!attr_names %in% names(data)]
+  if (length(missing_cols) > 0) {
+    stop(create_error(
+      "ESTIMATION",
+      sprintf("Attributes missing from data: %s", paste(missing_cols, collapse = ", ")),
+      "Check that attribute names in config match column names in data"
+    ), call. = FALSE)
+  }
+
   log_verbose("  → Fitting mlogit model...", verbose)
 
   # Fit model
@@ -277,6 +294,24 @@ prepare_mlogit_data <- function(data, config) {
 #'
 #' @keywords internal
 build_mlogit_formula <- function(config) {
+
+  # Validate inputs
+
+  if (is.null(config$attributes$AttributeName) || length(config$attributes$AttributeName) == 0) {
+    stop(create_error(
+      "ESTIMATION",
+      "No attributes found in config",
+      "Check that your configuration has attributes defined"
+    ), call. = FALSE)
+  }
+
+  if (is.null(config$chosen_column) || nchar(config$chosen_column) == 0) {
+    stop(create_error(
+      "ESTIMATION",
+      "chosen_column not specified in config",
+      "Check your configuration settings"
+    ), call. = FALSE)
+  }
 
   # Build formula: choice ~ attribute1 + attribute2 + ... | 0
   # The | 0 means no individual-specific variables
