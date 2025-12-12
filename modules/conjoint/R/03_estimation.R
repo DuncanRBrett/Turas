@@ -222,6 +222,12 @@ estimate_with_mlogit <- function(data, config, verbose = TRUE) {
 #' @keywords internal
 prepare_mlogit_data <- function(data, config) {
 
+  message("    DEBUG prepare_mlogit_data: Starting...")
+  message(sprintf("    DEBUG: data has %d rows, %d cols", nrow(data), ncol(data)))
+  message(sprintf("    DEBUG: alternative_id_column = '%s'", config$alternative_id_column))
+  message(sprintf("    DEBUG: choice_set_column = '%s'", config$choice_set_column))
+  message(sprintf("    DEBUG: chosen_column = '%s'", config$chosen_column))
+
   # mlogit needs data in "long" format with specific structure
   # Need to create index columns: chid (choice situation), alt (alternative)
 
@@ -258,6 +264,8 @@ prepare_mlogit_data <- function(data, config) {
     ), call. = FALSE)
   }
 
+  message("    DEBUG: alt column created OK")
+
   # Create unique choice set ID combining respondent and choice_set
   # This ensures (chid, alt) is unique across all observations
   # Required for mlogit's dfidx when multiple respondents have same choice_set_id
@@ -266,6 +274,8 @@ prepare_mlogit_data <- function(data, config) {
           data[[config$choice_set_column]],
           sep = "_")
   ))
+
+  message("    DEBUG: chid column created OK")
 
   # Convert attributes to factors with correct reference level
   for (attr in config$attributes$AttributeName) {
@@ -279,7 +289,12 @@ prepare_mlogit_data <- function(data, config) {
       # All levels explicit
       data[[attr]] <- factor(data[[attr]], levels = levels_vec)
     }
+    message(sprintf("    DEBUG: factor created for '%s' with %d levels", attr, length(levels_vec)))
   }
+
+  message("    DEBUG: All factors created, calling dfidx...")
+  message(sprintf("    DEBUG: chosen_column '%s' in data = %s",
+                  config$chosen_column, config$chosen_column %in% names(data)))
 
   # Create mlogit.data object using dfidx package
   # Note: dfidx was moved to separate package in mlogit >= 1.1-0
