@@ -1,6 +1,6 @@
 # Enhanced Turas Conjoint Analysis - User Manual
 
-**Version:** 2.1.0 (Alchemer Integration)
+**Version:** 2.1.0 (Alchemer Integration + 8-Sheet Output)
 **Date:** 2025-12-12
 **Status:** Production Ready
 
@@ -17,7 +17,7 @@ The Enhanced Turas Conjoint Analysis module calculates part-worth utilities and 
 - **Comprehensive validation**: 3-tier validation (Critical/Warning/Info)
 - **None option handling**: Auto-detects "none of these" options
 - **Statistical rigor**: Confidence intervals, p-values, significance testing
-- **Professional output**: 6-sheet Excel workbook with formatting
+- **Professional output**: 8-sheet Excel workbook with interactive Market Simulator
 - **User-friendly**: Clear error messages and progress reporting
 
 ### What's New in v2.1
@@ -26,6 +26,8 @@ The Enhanced Turas Conjoint Analysis module calculates part-worth utilities and 
 - **Auto Level Cleaning**: Alchemer level names like "Low_071" automatically cleaned to "Low"
 - **Enhanced mlogit Support**: Improved diagnostics and better error handling
 - **Zero-Centering Options**: Configurable utility centering methods
+- **8-Sheet Excel Output**: Market Simulator, Attribute Importance, Part-Worth Utilities, Utility Chart Data, Model Fit, Configuration, Raw Coefficients, Data Summary
+- **Market Simulator**: Always generated as primary deliverable for client what-if analysis
 
 ### What You Need
 
