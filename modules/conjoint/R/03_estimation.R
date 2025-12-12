@@ -90,7 +90,8 @@ estimate_auto_method <- function(data, config, verbose = TRUE) {
 
   # mlogit failed, try clogit
   log_verbose("  ⚠ mlogit failed, trying clogit fallback...", verbose)
-  log_verbose(sprintf("    mlogit error: %s", mlogit_result$error), verbose)
+  # Always print the mlogit error so user can diagnose
+  message(sprintf("    mlogit error: %s", mlogit_result$error))
 
   clogit_result <- tryCatch({
     estimate_with_clogit(data, config, verbose = FALSE)
@@ -121,12 +122,20 @@ estimate_auto_method <- function(data, config, verbose = TRUE) {
 #' @keywords internal
 estimate_with_mlogit <- function(data, config, verbose = TRUE) {
 
-  # Check if mlogit is available
+  # Check if mlogit and dfidx are available
   if (!requireNamespace("mlogit", quietly = TRUE)) {
     stop(create_error(
       "ESTIMATION",
       "Package 'mlogit' not installed",
       "Install with: install.packages('mlogit')"
+    ), call. = FALSE)
+  }
+
+  if (!requireNamespace("dfidx", quietly = TRUE)) {
+    stop(create_error(
+      "ESTIMATION",
+      "Package 'dfidx' not installed (required by mlogit)",
+      "Install with: install.packages('dfidx')"
     ), call. = FALSE)
   }
 
@@ -184,7 +193,7 @@ prepare_mlogit_data <- function(data, config) {
   # mlogit needs data in "long" format with specific structure
   # Need to create index columns: chid (choice situation), alt (alternative)
 
-  # Create alternative index if not present
+  # Create alternative index if not present - MUST be numeric for dfidx
   if (!config$alternative_id_column %in% names(data)) {
     data$alt <- ave(
       rep(1, nrow(data)),
@@ -192,7 +201,29 @@ prepare_mlogit_data <- function(data, config) {
       FUN = seq_along
     )
   } else {
-    data$alt <- data[[config$alternative_id_column]]
+    # Convert to numeric if character (e.g., "1", "2", "3" or "Card1", "Card2")
+    alt_vals <- data[[config$alternative_id_column]]
+    if (is.character(alt_vals) || is.factor(alt_vals)) {
+      # Try numeric conversion first, fall back to factor->numeric
+      numeric_vals <- suppressWarnings(as.numeric(as.character(alt_vals)))
+      if (any(is.na(numeric_vals) & !is.na(alt_vals))) {
+        # Has non-numeric values, use factor encoding
+        data$alt <- as.numeric(as.factor(alt_vals))
+      } else {
+        data$alt <- numeric_vals
+      }
+    } else {
+      data$alt <- as.numeric(alt_vals)
+    }
+  }
+
+  # Ensure alt has no NAs
+  if (any(is.na(data$alt))) {
+    stop(create_error(
+      "ESTIMATION",
+      "Alternative IDs contain missing values",
+      "Check your data for NA values in the alternative_id column"
+    ), call. = FALSE)
   }
 
   # Create unique choice set ID combining respondent and choice_set
@@ -221,13 +252,22 @@ prepare_mlogit_data <- function(data, config) {
   # Create mlogit.data object using dfidx package
   # Note: dfidx was moved to separate package in mlogit >= 1.1-0
   # idx: first column is choice set (chid), second is alternative (alt)
-  mlogit_data <- dfidx::dfidx(
-    data,
-    choice = config$chosen_column,
-    idx = c("chid", "alt"),
-    drop.index = FALSE,
-    ranked = FALSE
-  )
+  mlogit_data <- tryCatch({
+    dfidx::dfidx(
+      data,
+      choice = config$chosen_column,
+      idx = c("chid", "alt"),
+      drop.index = FALSE,
+      ranked = FALSE
+    )
+  }, error = function(e) {
+    stop(create_error(
+      "ESTIMATION",
+      sprintf("Failed to create mlogit data structure: %s", conditionMessage(e)),
+      "This usually means (chid, alt) combinations are not unique.",
+      "Check that each choice set has unique alternative IDs."
+    ), call. = FALSE)
+  })
 
   mlogit_data
 }
