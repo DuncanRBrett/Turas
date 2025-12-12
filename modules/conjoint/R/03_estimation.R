@@ -242,7 +242,17 @@ build_mlogit_formula <- function(config) {
   # The | 0 means no individual-specific variables
   # The attributes are alternative-specific
 
-  attr_terms <- paste(config$attributes$AttributeName, collapse = " + ")
+  # Escape attribute names with special characters using backticks
+  # e.g., "I+G" becomes "`I+G`" to prevent formula parsing issues
+  escaped_attrs <- sapply(config$attributes$AttributeName, function(attr) {
+    if (grepl("[^a-zA-Z0-9_.]", attr)) {
+      paste0("`", attr, "`")
+    } else {
+      attr
+    }
+  })
+
+  attr_terms <- paste(escaped_attrs, collapse = " + ")
   formula_str <- paste(config$chosen_column, "~", attr_terms, "| 0")
 
   as.formula(formula_str)
@@ -333,8 +343,17 @@ estimate_with_clogit <- function(data, config, verbose = TRUE) {
     data[[attr]] <- factor(data[[attr]], levels = levels_vec)
   }
 
-  # Build formula
-  attr_terms <- paste(config$attributes$AttributeName, collapse = " + ")
+  # Build formula with escaped attribute names
+  # Escape attribute names with special characters using backticks
+  escaped_attrs <- sapply(config$attributes$AttributeName, function(attr) {
+    if (grepl("[^a-zA-Z0-9_.]", attr)) {
+      paste0("`", attr, "`")
+    } else {
+      attr
+    }
+  })
+
+  attr_terms <- paste(escaped_attrs, collapse = " + ")
   formula_str <- paste(
     config$chosen_column, "~",
     attr_terms,

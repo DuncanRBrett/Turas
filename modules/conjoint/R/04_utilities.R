@@ -4,8 +4,11 @@
 #
 # Module: Conjoint Analysis - Part-Worth Utilities
 # Purpose: Calculate utilities, confidence intervals, and attribute importance
-# Version: 2.0.0 (Enhanced Implementation)
-# Date: 2025-11-26
+# Version: 2.1.0 (Phase 1 - Alchemer Integration)
+# Date: 2025-12-12
+#
+# NOTE: Handles attribute names with special characters (e.g., "I+G") by
+#       escaping regex patterns when matching coefficient names.
 #
 # ==============================================================================
 
@@ -84,14 +87,20 @@ extract_attribute_utilities <- function(attr, coefs, std_errors, config, model_r
   names(ses) <- all_levels
 
   # Find coefficients for this attribute
-  # Coefficient names have format: AttributeNameLevelName
-  coef_pattern <- paste0("^", attr)
+  # Coefficient names have format: AttributeNameLevelName or `AttributeName`LevelName
+  # Need to escape special regex characters in attribute name
+
+  # Create pattern that matches either escaped or unescaped attribute name
+  # e.g., for "I+G", match both "I+GPresent" and "`I+G`Present"
+  attr_escaped <- gsub("([+*?^${}()|\\[\\]\\\\.])", "\\\\\\1", attr)
+  coef_pattern <- paste0("^(`?", attr_escaped, "`?)")
   attr_coef_indices <- grep(coef_pattern, names(coefs))
 
   if (length(attr_coef_indices) > 0) {
     # Extract level names from coefficient names
     coef_names <- names(coefs)[attr_coef_indices]
-    level_names <- gsub(paste0("^", attr), "", coef_names)
+    # Remove both escaped and unescaped attribute name prefix
+    level_names <- gsub(paste0("^`?", attr_escaped, "`?"), "", coef_names)
 
     # Assign coefficients
     for (i in seq_along(level_names)) {

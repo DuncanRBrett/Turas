@@ -502,11 +502,45 @@ zero_center_utilities <- function(utilities) {
 
 
 # ==============================================================================
+# ATTRIBUTE NAME HANDLING
+# ==============================================================================
+
+#' Escape Attribute Name for Formula
+#'
+#' Wraps attribute names with special characters in backticks for safe use
+#' in R formulas. e.g., "I+G" becomes "`I+G`"
+#'
+#' @param attr Character, attribute name
+#' @return Character, escaped attribute name
+#' @keywords internal
+escape_attr_for_formula <- function(attr) {
+  if (grepl("[^a-zA-Z0-9_.]", attr)) {
+    paste0("`", attr, "`")
+  } else {
+    attr
+  }
+}
+
+
+#' Escape Attribute Name for Regex
+#'
+#' Escapes special regex characters in attribute names for pattern matching.
+#' e.g., "I+G" becomes "I\\+G"
+#'
+#' @param attr Character, attribute name
+#' @return Character, regex-safe attribute name
+#' @keywords internal
+escape_attr_for_regex <- function(attr) {
+  gsub("([+*?^${}()|\\[\\]\\\\.])", "\\\\\\1", attr)
+}
+
+
+# ==============================================================================
 # VERSION INFO
 # ==============================================================================
 
 #' Get module version
 #' @keywords internal
 get_conjoint_version <- function() {
-  "2.0.0"
+  "2.1.0"
 }
