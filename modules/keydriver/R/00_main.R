@@ -374,23 +374,33 @@ add_shap_to_importance <- function(importance, shap_importance) {
 
 #' Find Turas Root Directory
 #'
+#' Uses shared utility if available, otherwise falls back to local implementation.
 #' @keywords internal
 find_turas_root <- function() {
-  turas_root <- getwd()
-
-  if (basename(turas_root) != "Turas") {
-    # Try parent
-    if (file.exists(file.path(dirname(turas_root), "launch_turas.R"))) {
-      turas_root <- dirname(turas_root)
-    }
-    # Try going up one more level
-    if (basename(turas_root) != "Turas" &&
-        file.exists(file.path(dirname(dirname(turas_root)), "launch_turas.R"))) {
-      turas_root <- dirname(dirname(turas_root))
+  # Check if shared utility is available (from /modules/shared/lib/config_utils.R)
+  if (exists("TURAS_ROOT", envir = .GlobalEnv)) {
+    cached <- get("TURAS_ROOT", envir = .GlobalEnv)
+    if (!is.null(cached) && nzchar(cached)) {
+      return(cached)
     }
   }
 
-  turas_root
+  # Search up directory tree for Turas root markers
+  current_dir <- getwd()
+  while (current_dir != dirname(current_dir)) {
+    has_launch <- isTRUE(file.exists(file.path(current_dir, "launch_turas.R")))
+    has_turas_r <- isTRUE(file.exists(file.path(current_dir, "turas.R")))
+    has_shared <- isTRUE(dir.exists(file.path(current_dir, "shared")))
+    has_modules <- isTRUE(dir.exists(file.path(current_dir, "modules")))
+
+    if (has_launch || has_turas_r || (has_shared && has_modules)) {
+      assign("TURAS_ROOT", current_dir, envir = .GlobalEnv)
+      return(current_dir)
+    }
+    current_dir <- dirname(current_dir)
+  }
+
+  stop("Cannot locate Turas root directory", call. = FALSE)
 }
 
 

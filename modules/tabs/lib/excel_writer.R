@@ -14,12 +14,11 @@
 #
 # DEPENDENCIES:
 #   - openxlsx (Excel creation)
-#   - utilities.R (formatting, logging)
-#   - shared/formatting.R (number formatting - Phase 2 refactoring)
+#   - /modules/shared/lib/ (formatting, validation, config utilities)
 #
-# VERSION: 1.1.0 - Phase 2 Update
-# DATE: 2025-11-12
-# CHANGES: Now uses shared/formatting.R for consistent number formatting
+# VERSION: 1.2.0 - Uses consolidated shared utilities
+# DATE: 2025-12-13
+# CHANGES: Now uses /modules/shared/lib/ for consistent utilities
 # ==============================================================================
 
 # Require openxlsx
@@ -27,45 +26,24 @@ if (!requireNamespace("openxlsx", quietly = TRUE)) {
   stop("Package 'openxlsx' is required for excel_writer module")
 }
 
-# Load shared formatting module (Phase 2 refactoring)
-# Robust path resolution - searches up directory tree to find Turas root
-find_turas_root <- function() {
-  # Method 1: Check if TURAS_ROOT is already set
-  if (exists("TURAS_ROOT", envir = .GlobalEnv)) {
-    return(get("TURAS_ROOT", envir = .GlobalEnv))
-  }
-  
-  # Method 2: Start from current working directory
-  current_dir <- getwd()
-  
-  # Search up directory tree for Turas root markers
-  while (current_dir != dirname(current_dir)) {  # Stop at filesystem root
-    # Check for Turas root markers
-    if (file.exists(file.path(current_dir, "launch_turas.R")) ||
-        (dir.exists(file.path(current_dir, "shared")) && 
-         dir.exists(file.path(current_dir, "modules")))) {
-      return(current_dir)
-    }
-    current_dir <- dirname(current_dir)
-  }
-  
-  # Method 3: Try relative paths from module location
-  for (rel_path in c("../..", "../../..", "../../../..")) {
-    test_path <- normalizePath(file.path(rel_path, "shared", "formatting.R"), mustWork = FALSE)
-    if (file.exists(test_path)) {
-      return(normalizePath(dirname(dirname(test_path)), mustWork = TRUE))
-    }
-  }
-  
-  stop(paste0(
-    "Cannot locate Turas root directory.\n",
-    "Please ensure you're running from the Turas directory.\n",
-    "Current working directory: ", getwd()
-  ))
-}
+# Load shared utilities from consolidated location
+# Only load if not already available (avoid re-sourcing)
+if (!exists("find_turas_root", mode = "function")) {
+  .excel_writer_script_dir <- tryCatch({
+    dirname(sys.frame(1)$ofile)
+  }, error = function(e) getwd())
 
-turas_root <- find_turas_root()
-source(file.path(turas_root, "shared", "formatting.R"), local = TRUE)
+  .shared_lib_path <- file.path(dirname(.excel_writer_script_dir), "shared", "lib")
+  if (!dir.exists(.shared_lib_path)) {
+    .shared_lib_path <- file.path(getwd(), "modules", "shared", "lib")
+  }
+
+  source(file.path(.shared_lib_path, "validation_utils.R"), local = FALSE)
+  source(file.path(.shared_lib_path, "config_utils.R"), local = FALSE)
+  source(file.path(.shared_lib_path, "formatting_utils.R"), local = FALSE)
+
+  rm(.excel_writer_script_dir, .shared_lib_path)
+}
 
 
 # ==============================================================================
