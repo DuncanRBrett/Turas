@@ -5,8 +5,8 @@
 # Tests the Wave History report format implementation with real CCPB-CCS data.
 #
 # USAGE:
-#   setwd("~/Documents/Turas/modules/tracker")
-#   source("test_wave_history.R")
+#   Run from anywhere within Turas directory structure
+#   source("modules/tracker/test_wave_history.R")
 #
 # ==============================================================================
 

@@ -8,7 +8,27 @@ data_dir <- "/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Proje
 output_path <- "/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Projects/SACAP/SACS/04_CrossWave/01_Analysis/SACS_debug_output.xlsx"
 
 # Change to tracker directory
-setwd(file.path(Sys.getenv("TURAS_HOME"), "modules", "tracker"))
+# Find Turas root (portable path resolution)
+find_turas_root <- function() {
+  # Try environment variable first
+  if (Sys.getenv("TURAS_HOME") != "") {
+    return(Sys.getenv("TURAS_HOME"))
+  }
+
+  # Otherwise walk up directory tree
+  current_dir <- getwd()
+  while (current_dir != dirname(current_dir)) {
+    if (file.exists(file.path(current_dir, "launch_turas.R")) ||
+        dir.exists(file.path(current_dir, "modules"))) {
+      return(current_dir)
+    }
+    current_dir <- dirname(current_dir)
+  }
+  stop("Cannot locate Turas root directory. Set TURAS_HOME or run from within Turas directory.")
+}
+
+turas_root <- find_turas_root()
+setwd(file.path(turas_root, "modules", "tracker"))
 
 # Source run_tracker.R
 source("run_tracker.R")

@@ -38,6 +38,7 @@ cat("  Project root:", project_root, "\n")
 cat("  Module root:", module_root, "\n\n")
 
 # Config file path
+# CHANGE THIS PATH to your config file location for testing
 config_path <- "/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Projects/CCPB/CCPB_CSAT/03_Waves/CSAT2025/CCPB_CSAT2025_confidence_config.xlsx"
 
 # Check if config file exists

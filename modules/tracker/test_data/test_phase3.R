@@ -2,8 +2,22 @@
 # Test Script - Phase 3: Banner Breakouts & Composites
 # ==============================================================================
 
-# Set working directory
-setwd("/Users/duncan/Documents/Turas/modules/tracker")
+# Set working directory (portable path resolution)
+# Find Turas root by walking up directory tree
+find_turas_root <- function() {
+  current_dir <- getwd()
+  while (current_dir != dirname(current_dir)) {
+    if (file.exists(file.path(current_dir, "launch_turas.R")) ||
+        dir.exists(file.path(current_dir, "modules"))) {
+      return(current_dir)
+    }
+    current_dir <- dirname(current_dir)
+  }
+  stop("Cannot locate Turas root directory. Please run from within Turas directory structure.")
+}
+
+turas_root <- find_turas_root()
+setwd(file.path(turas_root, "modules/tracker"))
 
 cat("\n================================================================================\n")
 cat("TESTING TURASTACKER - PHASE 3: BANNER BREAKOUTS & COMPOSITES\n")

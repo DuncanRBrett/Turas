@@ -10,7 +10,21 @@
 
 # SETUP
 # Set working directory to tracker module
-setwd("/home/user/Turas/modules/tracker")
+# Find Turas root by walking up directory tree (portable path resolution)
+find_turas_root <- function() {
+  current_dir <- getwd()
+  while (current_dir != dirname(current_dir)) {
+    if (file.exists(file.path(current_dir, "launch_turas.R")) ||
+        dir.exists(file.path(current_dir, "modules"))) {
+      return(current_dir)
+    }
+    current_dir <- dirname(current_dir)
+  }
+  stop("Cannot locate Turas root directory. Please run from within Turas directory structure.")
+}
+
+turas_root <- find_turas_root()
+setwd(file.path(turas_root, "modules/tracker"))
 
 # Source all tracker modules
 source("run_tracker.R")
