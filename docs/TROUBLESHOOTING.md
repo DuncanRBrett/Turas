@@ -23,33 +23,30 @@ R's `sys.frame(1)$ofile` path detection is fragile and fails when:
 
 ### Solution: Use Robust Path Finding
 
-**All modules now use `find_turas_root()` function** with 3 fallback methods:
+**All modules now use `find_turas_root()` function** with caching and multiple detection methods:
 
 ```r
 find_turas_root <- function() {
-  # Method 1: Check if TURAS_ROOT is already set
+  # Check cached value first
   if (exists("TURAS_ROOT", envir = .GlobalEnv)) {
-    return(get("TURAS_ROOT", envir = .GlobalEnv))
+    cached <- get("TURAS_ROOT", envir = .GlobalEnv)
+    if (!is.null(cached) && nzchar(cached)) {
+      return(cached)
+    }
   }
 
-  # Method 2: Start from current working directory and search up
+  # Search up directory tree for Turas root markers
   current_dir <- getwd()
   while (current_dir != dirname(current_dir)) {
-    if (file.exists(file.path(current_dir, "launch_turas.R")) ||
-        (dir.exists(file.path(current_dir, "shared")) &&
-         dir.exists(file.path(current_dir, "modules")))) {
+    has_launch <- isTRUE(file.exists(file.path(current_dir, "launch_turas.R")))
+    has_turas_r <- isTRUE(file.exists(file.path(current_dir, "turas.R")))
+    has_modules_shared <- isTRUE(dir.exists(file.path(current_dir, "modules", "shared")))
+
+    if (has_launch || has_turas_r || has_modules_shared) {
+      assign("TURAS_ROOT", current_dir, envir = .GlobalEnv)
       return(current_dir)
     }
     current_dir <- dirname(current_dir)
-  }
-
-  # Method 3: Try relative paths from module location
-  for (rel_path in c("../..", "../../..", "../../../..")) {
-    test_path <- normalizePath(file.path(rel_path, "shared", "formatting.R"),
-                                mustWork = FALSE)
-    if (file.exists(test_path)) {
-      return(normalizePath(dirname(dirname(test_path)), mustWork = TRUE))
-    }
   }
 
   stop("Cannot locate Turas root directory.")
@@ -60,7 +57,7 @@ find_turas_root <- function() {
 
 **DO:**
 - ✅ Always use `find_turas_root()` at the start of module files
-- ✅ Source shared modules with: `source(file.path(turas_root, "shared", "formatting.R"))`
+- ✅ Source shared modules from consolidated location: `source(file.path(turas_root, "modules", "shared", "lib", "formatting_utils.R"))`
 - ✅ Use `file.path()` for all path construction (never paste paths with `/` or `\\`)
 - ✅ Test modules from different working directories
 
@@ -70,10 +67,20 @@ find_turas_root <- function() {
 - ❌ Assume current working directory is always the module directory
 - ❌ Use paste() or paste0() to build file paths
 
+### Shared Utilities Location
+All shared utilities are consolidated in `/modules/shared/lib/`:
+- `config_utils.R` - Path resolution and configuration
+- `formatting_utils.R` - Number and output formatting
+- `weights_utils.R` - Weight calculations
+- `validation_utils.R` - Input validation
+
 ### Files Using Robust Path Resolution
 - `modules/tabs/lib/excel_writer.R`
 - `modules/tracker/formatting_utils.R`
 - `modules/tracker/tracker_output.R`
+- `modules/keydriver/R/00_main.R`
+- `modules/conjoint/R/99_helpers.R`
+- `modules/maxdiff/R/utils.R`
 
 ---
 

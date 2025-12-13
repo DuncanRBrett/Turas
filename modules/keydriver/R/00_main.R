@@ -390,10 +390,9 @@ find_turas_root <- function() {
   while (current_dir != dirname(current_dir)) {
     has_launch <- isTRUE(file.exists(file.path(current_dir, "launch_turas.R")))
     has_turas_r <- isTRUE(file.exists(file.path(current_dir, "turas.R")))
-    has_shared <- isTRUE(dir.exists(file.path(current_dir, "shared")))
-    has_modules <- isTRUE(dir.exists(file.path(current_dir, "modules")))
+    has_modules_shared <- isTRUE(dir.exists(file.path(current_dir, "modules", "shared")))
 
-    if (has_launch || has_turas_r || (has_shared && has_modules)) {
+    if (has_launch || has_turas_r || has_modules_shared) {
       assign("TURAS_ROOT", current_dir, envir = .GlobalEnv)
       return(current_dir)
     }

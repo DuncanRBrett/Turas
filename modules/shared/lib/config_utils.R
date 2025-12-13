@@ -258,7 +258,7 @@ get_project_root <- function(config_file_path) {
 #' Find Turas root directory
 #'
 #' Searches up the directory tree to locate the Turas installation root.
-#' Looks for marker files/directories: launch_turas.R, modules/, shared/
+#' Looks for marker files/directories: launch_turas.R, turas.R, modules/shared/
 #'
 #' USAGE: Use to resolve paths to shared modules
 #' CACHING: Checks TURAS_ROOT global first for performance
@@ -267,8 +267,7 @@ get_project_root <- function(config_file_path) {
 #' @export
 find_turas_root <- function() {
   # Check cached value first
-
-if (exists("TURAS_ROOT", envir = .GlobalEnv)) {
+  if (exists("TURAS_ROOT", envir = .GlobalEnv)) {
     cached <- get("TURAS_ROOT", envir = .GlobalEnv)
     if (!is.null(cached) && nzchar(cached)) {
       return(cached)
@@ -282,10 +281,9 @@ if (exists("TURAS_ROOT", envir = .GlobalEnv)) {
   while (current_dir != dirname(current_dir)) {
     has_launch <- isTRUE(file.exists(file.path(current_dir, "launch_turas.R")))
     has_turas_r <- isTRUE(file.exists(file.path(current_dir, "turas.R")))
-    has_shared <- isTRUE(dir.exists(file.path(current_dir, "shared")))
-    has_modules <- isTRUE(dir.exists(file.path(current_dir, "modules")))
+    has_modules_shared <- isTRUE(dir.exists(file.path(current_dir, "modules", "shared")))
 
-    if (has_launch || has_turas_r || (has_shared && has_modules)) {
+    if (has_launch || has_turas_r || has_modules_shared) {
       # Cache for future calls
       assign("TURAS_ROOT", current_dir, envir = .GlobalEnv)
       return(current_dir)

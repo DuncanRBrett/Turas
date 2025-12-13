@@ -40,11 +40,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - `test_shared_formatting.R`
   - `test_shared_config.R`
 
-### Deprecated
-- Root `/shared/` directory - use `/modules/shared/lib/` instead
+### Removed
+- Root `/shared/` directory - fully removed, replaced by `/modules/shared/lib/`
   - `shared/formatting.R` → `modules/shared/lib/formatting_utils.R`
   - `shared/weights.R` → `modules/shared/lib/weights_utils.R`
   - `shared/config_utils.R` → `modules/shared/lib/config_utils.R`
+- Updated `find_turas_root()` detection to use `modules/shared` instead of deprecated `shared`
 
 ### Documentation
 - Added architecture notes to large files documenting target decomposition
