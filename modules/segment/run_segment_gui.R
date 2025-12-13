@@ -265,8 +265,11 @@ run_segment_gui <- function() {
       if (!is.null(input$select_config_btn) && !is.integer(input$select_config_btn)) {
         file_selected <- parseFilePaths(volumes, input$select_config_btn)
         if (nrow(file_selected) > 0) {
-          config_file(as.character(file_selected$datapath))
-          save_recent_project(as.character(file_selected$datapath))
+          # Expand tilde and normalize path (fixes OneDrive/home directory paths)
+          file_path_expanded <- normalizePath(path.expand(as.character(file_selected$datapath)),
+                                              winslash = "/", mustWork = FALSE)
+          config_file(file_path_expanded)
+          save_recent_project(file_path_expanded)
           analysis_result(NULL)  # Reset results when new file selected
         }
       }
@@ -279,8 +282,11 @@ run_segment_gui <- function() {
       recent_projects <- load_recent_projects()
       if (input$recent_project <= length(recent_projects)) {
         selected_path <- recent_projects[[input$recent_project]]
-        if (file.exists(selected_path)) {
-          config_file(selected_path)
+        # Expand tilde and normalize path (fixes OneDrive/home directory paths)
+        selected_path_expanded <- normalizePath(path.expand(selected_path),
+                                                winslash = "/", mustWork = FALSE)
+        if (file.exists(selected_path_expanded)) {
+          config_file(selected_path_expanded)
           analysis_result(NULL)
         } else {
           showNotification("Config file no longer exists at this location",

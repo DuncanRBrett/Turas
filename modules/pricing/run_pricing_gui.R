@@ -296,7 +296,10 @@ server <- function(input, output, session) {
     if (!is.null(input$config_file_button) && !is.integer(input$config_file_button)) {
       file_selected <- parseFilePaths(volumes, input$config_file_button)
       if (nrow(file_selected) > 0) {
-        rv$config_path <- as.character(file_selected$datapath)
+        # Expand tilde and normalize path (fixes OneDrive/home directory paths)
+        file_path_expanded <- normalizePath(path.expand(as.character(file_selected$datapath)),
+                                            winslash = "/", mustWork = FALSE)
+        rv$config_path <- file_path_expanded
       }
     }
   })
@@ -320,7 +323,10 @@ server <- function(input, output, session) {
   # Handle recent project selection
   observeEvent(input$recent_projects, {
     if (input$recent_projects != "") {
-      rv$config_path <- input$recent_projects
+      # Expand tilde and normalize path (fixes OneDrive/home directory paths)
+      config_path_expanded <- normalizePath(path.expand(input$recent_projects),
+                                            winslash = "/", mustWork = FALSE)
+      rv$config_path <- config_path_expanded
     }
   })
 

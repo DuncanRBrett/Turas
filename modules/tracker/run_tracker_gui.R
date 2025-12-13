@@ -229,7 +229,9 @@ run_tracker_gui <- function() {
         if (!is.integer(input$tracking_config_btn)) {
           file_path <- parseFilePaths(volumes, input$tracking_config_btn)
           if (nrow(file_path) > 0) {
-            tracking_path <- as.character(file_path$datapath[1])
+            # Expand tilde and normalize path (fixes OneDrive/home directory paths)
+            tracking_path <- normalizePath(path.expand(as.character(file_path$datapath[1])),
+                                          winslash = "/", mustWork = FALSE)
             files$tracking_config <- tracking_path
 
             # Auto-detect question mapping in same directory
@@ -295,7 +297,9 @@ run_tracker_gui <- function() {
         if (!is.integer(input$output_path_btn)) {
           file_path <- parseFilePaths(volumes, input$output_path_btn)
           if (nrow(file_path) > 0) {
-            files$output_path <- as.character(file_path$datapath[1])
+            # Expand tilde and normalize path (fixes OneDrive/home directory paths)
+            files$output_path <- normalizePath(path.expand(as.character(file_path$datapath[1])),
+                                              winslash = "/", mustWork = FALSE)
           }
         }
       }, error = function(e) {
@@ -309,10 +313,19 @@ run_tracker_gui <- function() {
       recent <- load_recent_projects()
       if (input$select_recent <= length(recent)) {
         proj <- recent[[input$select_recent]]
-        files$tracking_config <- proj$tracking_config
-        files$question_mapping <- proj$question_mapping
-        if (!is.null(proj$data_dir)) files$data_dir <- proj$data_dir
-        if (!is.null(proj$output_path)) files$output_path <- proj$output_path
+        # Expand tilde and normalize paths (fixes OneDrive/home directory paths)
+        files$tracking_config <- normalizePath(path.expand(proj$tracking_config),
+                                              winslash = "/", mustWork = FALSE)
+        files$question_mapping <- normalizePath(path.expand(proj$question_mapping),
+                                               winslash = "/", mustWork = FALSE)
+        if (!is.null(proj$data_dir)) {
+          files$data_dir <- normalizePath(path.expand(proj$data_dir),
+                                         winslash = "/", mustWork = FALSE)
+        }
+        if (!is.null(proj$output_path)) {
+          files$output_path <- normalizePath(path.expand(proj$output_path),
+                                            winslash = "/", mustWork = FALSE)
+        }
         if (!is.null(proj$use_banners)) {
           updateCheckboxInput(session, "use_banners", value = proj$use_banners)
         }

@@ -234,7 +234,10 @@ run_maxdiff_gui <- function() {
         if (!is.integer(input$config_btn)) {
           file_path <- parseFilePaths(volumes, input$config_btn)
           if (nrow(file_path) > 0) {
-            rv$config_path <- as.character(file_path$datapath[1])
+            # Expand tilde and normalize path (fixes OneDrive/home directory paths)
+            file_path_expanded <- normalizePath(path.expand(as.character(file_path$datapath[1])),
+                                                winslash = "/", mustWork = FALSE)
+            rv$config_path <- file_path_expanded
           }
         }
       }, error = function(e) {
@@ -261,7 +264,10 @@ run_maxdiff_gui <- function() {
       recent <- load_recent()
       if (input$select_recent <= length(recent)) {
         proj <- recent[[input$select_recent]]
-        rv$config_path <- proj$path
+        # Expand tilde and normalize path (fixes OneDrive/home directory paths)
+        config_path_expanded <- normalizePath(path.expand(proj$path),
+                                              winslash = "/", mustWork = FALSE)
+        rv$config_path <- config_path_expanded
         rv$mode <- proj$mode
         if (proj$mode == "DESIGN") {
           updateActionButton(session, "mode_design", class = "mode-btn active")
