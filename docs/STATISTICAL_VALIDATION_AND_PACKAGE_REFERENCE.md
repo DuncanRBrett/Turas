@@ -278,7 +278,7 @@ We maintain transparency about our development roadmap:
 
 | Enhancement | Modules Affected | Rationale |
 |-------------|-----------------|-----------|
-| Bootstrap significance tests | Tabs, Tracker | Non-parametric alternative for small samples |
+| Bootstrap significance tests | Tabs, Tracker | Non-parametric alternative for small samples (Note: Bootstrap CI already fully implemented in Confidence module) |
 | Bayesian significance testing | All | Better handling of uncertainty |
 | Interactive dashboards | All | Client self-service exploration |
 | API integration | All | Automated pipeline integration |
