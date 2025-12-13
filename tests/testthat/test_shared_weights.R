@@ -1,14 +1,15 @@
 # ==============================================================================
-# Tests for shared/weights.R
+# Tests for modules/shared/lib/weights_utils.R
 # ==============================================================================
 # Tests for the shared weight calculation and validation module.
 # This module provides consistent weight handling across all TURAS modules.
 #
 # Created as part of Phase 4: Shared Weights Module
+# Updated: Now uses consolidated /modules/shared/lib/ location
 # ==============================================================================
 
-# Source the module under test
-source("shared/weights.R", local = TRUE)
+# Source the module under test (new consolidated location)
+source("modules/shared/lib/weights_utils.R", local = TRUE)
 
 # ==============================================================================
 # Test: calculate_weight_efficiency
@@ -139,13 +140,13 @@ test_that("calculate_design_effect handles invalid input", {
 })
 
 # ==============================================================================
-# Test: validate_weights
+# Test: validate_weights_comprehensive
 # ==============================================================================
 
-test_that("validate_weights passes with valid weights", {
+test_that("validate_weights_comprehensive passes with valid weights", {
   weights <- c(0.5, 1, 1.5, 2, 2.5)
 
-  result <- validate_weights(weights)
+  result <- validate_weights_comprehensive(weights)
 
   expect_true(result$valid)
   expect_equal(result$n_total, 5)
@@ -155,63 +156,63 @@ test_that("validate_weights passes with valid weights", {
   expect_length(result$issues, 0)
 })
 
-test_that("validate_weights detects NA weights", {
+test_that("validate_weights_comprehensive detects NA weights", {
   weights <- c(1, 2, NA, 3)
 
-  result <- validate_weights(weights, allow_na = FALSE)
+  result <- validate_weights_comprehensive(weights, allow_na = FALSE)
 
   expect_false(result$valid)
   expect_equal(result$n_na, 1)
   expect_true(any(grepl("NA", result$issues)))
 })
 
-test_that("validate_weights allows NA when specified", {
+test_that("validate_weights_comprehensive allows NA when specified", {
   weights <- c(1, 2, NA, 3)
 
-  result <- validate_weights(weights, allow_na = TRUE)
+  result <- validate_weights_comprehensive(weights, allow_na = TRUE)
 
   # Should still be invalid due to other checks, but NA not in issues
   expect_equal(result$n_na, 1)
 })
 
-test_that("validate_weights detects zero weights", {
+test_that("validate_weights_comprehensive detects zero weights", {
   weights <- c(1, 2, 0, 3)
 
-  result <- validate_weights(weights)
+  result <- validate_weights_comprehensive(weights)
 
   expect_false(result$valid)
   expect_equal(result$n_zero, 1)
   expect_true(any(grepl("zero", result$issues)))
 })
 
-test_that("validate_weights detects negative weights", {
+test_that("validate_weights_comprehensive detects negative weights", {
   weights <- c(1, 2, -1, 3)
 
-  result <- validate_weights(weights)
+  result <- validate_weights_comprehensive(weights)
 
   expect_false(result$valid)
   expect_equal(result$n_negative, 1)
   expect_true(any(grepl("negative", result$issues)))
 })
 
-test_that("validate_weights checks min/max bounds", {
+test_that("validate_weights_comprehensive checks min/max bounds", {
   weights <- c(0.1, 1, 5, 10)
 
   # Too small
-  result <- validate_weights(weights, min_weight = 0.5)
+  result <- validate_weights_comprehensive(weights, min_weight = 0.5)
   expect_false(result$valid)
   expect_equal(result$n_too_small, 1)  # 0.1 is too small
 
   # Too large
-  result <- validate_weights(weights, max_weight = 7)
+  result <- validate_weights_comprehensive(weights, max_weight = 7)
   expect_false(result$valid)
   expect_equal(result$n_too_large, 1)  # 10 is too large
 })
 
-test_that("validate_weights returns all issues", {
+test_that("validate_weights_comprehensive returns all issues", {
   weights <- c(-1, 0, NA, 1, 2)
 
-  result <- validate_weights(weights, allow_na = FALSE)
+  result <- validate_weights_comprehensive(weights, allow_na = FALSE)
 
   expect_false(result$valid)
   expect_length(result$issues, 3)  # NA, zero, negative
@@ -323,25 +324,8 @@ test_that("standardize_weight_variable can skip validation", {
 })
 
 # ==============================================================================
-# Test: Consistency with Module Implementations
+# Test: Mathematical Correctness
 # ==============================================================================
-
-test_that("Shared calculate_weight_efficiency matches Tracker implementation", {
-  # Load Tracker implementation
-  source("modules/tracker/wave_loader.R", local = TRUE)
-
-  test_weights <- c(1, 1.5, 2, 2.5, 3)
-
-  # Calculate with both
-  tracker_result <- calculate_weight_efficiency(test_weights)
-
-  # Re-source shared to test
-  source("shared/weights.R", local = TRUE)
-  shared_result <- calculate_weight_efficiency(test_weights)
-
-  # Should be identical
-  expect_equal(shared_result, tracker_result)
-})
 
 test_that("Weight efficiency formula is mathematically correct", {
   # Test with known values
@@ -355,6 +339,17 @@ test_that("Weight efficiency formula is mathematically correct", {
 
   expect_equal(result, expected)
   expect_equal(round(result, 4), 4.0909)
+})
+
+test_that("Design effect equals n divided by effective n", {
+  weights <- c(1, 2, 3, 4, 5)
+  n <- length(weights)
+  eff_n <- calculate_weight_efficiency(weights)
+  expected_deff <- n / eff_n
+
+  result <- calculate_design_effect(weights)
+
+  expect_equal(result, expected_deff)
 })
 
 cat("\n✓ Shared weights module tests completed\n")

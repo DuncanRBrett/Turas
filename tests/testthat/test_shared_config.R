@@ -1,14 +1,18 @@
 # ==============================================================================
-# Tests for shared/config_utils.R
+# Tests for modules/shared/lib/config_utils.R
 # ==============================================================================
 # Tests for the shared configuration utilities module.
 # This module provides consistent config handling across all TURAS modules.
 #
 # Created as part of Phase 3: Shared Config Utilities
+# Updated: Now uses consolidated /modules/shared/lib/ location
 # ==============================================================================
 
-# Source the module under test
-source("shared/config_utils.R", local = TRUE)
+# Source required dependencies first
+source("modules/shared/lib/validation_utils.R", local = TRUE)
+
+# Source the module under test (new consolidated location)
+source("modules/shared/lib/config_utils.R", local = TRUE)
 
 # ==============================================================================
 # Test: parse_settings_to_list
@@ -324,49 +328,44 @@ test_that("validate_date_range fails with invalid dates", {
 })
 
 # ==============================================================================
-# Test: Consistency with Module Implementations
+# Test: find_turas_root
 # ==============================================================================
 
-test_that("Shared parse_settings matches Tracker implementation", {
-  # Load Tracker implementation
-  source("modules/tracker/tracker_config_loader.R", local = TRUE)
+test_that("find_turas_root returns a valid path", {
+  # This test verifies that find_turas_root can locate Turas
+  result <- find_turas_root()
 
-  settings_df <- data.frame(
-    Setting = c("decimal_separator", "show_base", "decimal_places"),
-    Value = c(",", "Y", "2"),
-    stringsAsFactors = FALSE
-  )
-
-  # Both should produce identical results
-  tracker_result <- parse_settings_to_list(settings_df)
-
-  # Re-source shared to test again
-  source("shared/config_utils.R", local = TRUE)
-  shared_result <- parse_settings_to_list(settings_df)
-
-  expect_equal(shared_result$decimal_separator, ",")
-  expect_equal(shared_result$show_base, TRUE)
-  expect_equal(shared_result$decimal_places, 2)
-
-  # Check types match
-  expect_type(shared_result$show_base, "logical")
-  expect_type(shared_result$decimal_places, "double")
+  expect_type(result, "character")
+  expect_true(nzchar(result))
+  # The path should exist
+  expect_true(dir.exists(result))
 })
 
-test_that("Shared get_setting works with both config styles", {
-  # Tracker-style
-  tracker_config <- list(
-    settings = list(decimal_separator = ",")
-  )
+test_that("find_turas_root finds correct markers", {
+  result <- find_turas_root()
 
-  # Tabs-style (flat)
-  tabs_config <- list(
-    decimal_separator = "."
-  )
+  # Should contain either modules/ and shared/ or turas.R
+  has_modules <- dir.exists(file.path(result, "modules"))
+  has_shared <- dir.exists(file.path(result, "shared"))
+  has_turas_r <- file.exists(file.path(result, "turas.R"))
 
-  expect_equal(get_setting(tracker_config, "decimal_separator"), ",")
-  expect_equal(get_setting(tabs_config, "decimal_separator"), ".")
+  expect_true(has_turas_r || (has_modules && has_shared))
+})
+
+test_that("find_turas_root caches result", {
+  # Clear cache first
+  if (exists("TURAS_ROOT", envir = .GlobalEnv)) {
+    rm("TURAS_ROOT", envir = .GlobalEnv)
+  }
+
+  # First call should set cache
+  result1 <- find_turas_root()
+  expect_true(exists("TURAS_ROOT", envir = .GlobalEnv))
+
+  # Second call should return cached value
+  result2 <- find_turas_root()
+  expect_equal(result1, result2)
 })
 
 cat("\n✓ Shared config utilities tests completed\n")
-cat("  All config functions validated and ready for module integration\n")
+cat("  All config functions validated\n")

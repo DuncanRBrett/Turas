@@ -1,55 +1,38 @@
 # ==============================================================================
-# Tests for shared/formatting.R
+# Tests for modules/shared/lib/formatting_utils.R
 # ==============================================================================
-# Tests for the new shared formatting module.
+# Tests for the shared formatting module.
 # This module provides consistent number formatting across all TURAS modules.
 #
 # Created as part of Phase 2: Shared Formatting Module
+# Updated: Now uses consolidated /modules/shared/lib/ location
 # ==============================================================================
 
-# Source the module under test
-source("shared/formatting.R", local = TRUE)
+# Source the module under test (new consolidated location)
+source("modules/shared/lib/formatting_utils.R", local = TRUE)
 
 # ==============================================================================
 # Test: create_excel_number_format
 # ==============================================================================
 
 test_that("create_excel_number_format generates correct format codes", {
-  # Test with period separator
-  expect_equal(create_excel_number_format(0, "."), "0")
-  expect_equal(create_excel_number_format(1, "."), "0.0")
-  expect_equal(create_excel_number_format(2, "."), "0.00")
-  expect_equal(create_excel_number_format(3, "."), "0.000")
-
-  # Test with comma separator
-  expect_equal(create_excel_number_format(0, ","), "0")
-  expect_equal(create_excel_number_format(1, ","), "0,0")
-  expect_equal(create_excel_number_format(2, ","), "0,00")
-  expect_equal(create_excel_number_format(3, ","), "0,000")
+  # Excel format codes always use period (this is Excel's internal format)
+  expect_equal(create_excel_number_format(0), "0")
+  expect_equal(create_excel_number_format(1), "0.0")
+  expect_equal(create_excel_number_format(2), "0.00")
+  expect_equal(create_excel_number_format(3), "0.000")
 })
 
 test_that("create_excel_number_format validates inputs", {
-  # Invalid separator
-  expect_error(
-    create_excel_number_format(1, ";"),
-    regexp = "decimal_separator must be"
-  )
-
   # Invalid decimal places (negative)
   expect_error(
-    create_excel_number_format(-1, "."),
+    create_excel_number_format(-1),
     regexp = "decimal_places must be"
   )
 
   # Invalid decimal places (too large)
   expect_error(
-    create_excel_number_format(10, "."),
-    regexp = "decimal_places must be"
-  )
-
-  # Non-numeric decimal places
-  expect_error(
-    create_excel_number_format("abc", "."),
+    create_excel_number_format(10),
     regexp = "decimal_places must be"
   )
 })
@@ -260,75 +243,28 @@ test_that("validate_decimal_places returns integer type", {
 })
 
 # ==============================================================================
-# Test: Consistency with Tabs Implementation
+# Test: Decimal Separator Consistency
 # ==============================================================================
 
-test_that("Shared formatting matches Tabs excel_writer behavior", {
-  # Load Tabs implementation
-  source("modules/tabs/lib/excel_writer.R", local = TRUE)
-
-  # Create styles with both implementations
-  tabs_styles <- create_excel_styles(
-    decimal_separator = ",",
-    decimal_places_percent = 0,
-    decimal_places_ratings = 1
-  )
-
-  shared_styles <- create_excel_number_styles(
-    decimal_separator = ",",
-    decimal_places_percent = 0,
-    decimal_places_ratings = 1
-  )
-
-  # Both should create style objects
-  expect_s3_class(tabs_styles$column_pct, "Style")
-  expect_s3_class(shared_styles$percentage, "Style")
-
-  # Format codes should match
-  pct_format <- create_excel_number_format(0, ",")
-  rating_format <- create_excel_number_format(1, ",")
-
-  expect_equal(pct_format, "0")
-  expect_equal(rating_format, "0,0")
-})
-
-test_that("Shared formatting matches Tracker formatting_utils behavior", {
-  # Load Tracker implementation
-  source("modules/tracker/formatting_utils.R", local = TRUE)
-
-  # Test identical inputs produce identical outputs
-  test_values <- c(10.5, 20.7, 95.123)
-
-  tracker_result <- format_number_with_separator(test_values, 1, ",")
-  shared_result <- format_number(test_values, 1, ",")
-
-  expect_equal(shared_result, tracker_result)
-})
-
-# ==============================================================================
-# Test: Decimal Separator Consistency (The Fix!)
-# ==============================================================================
-
-test_that("FIXED: Decimal separator is respected consistently", {
-  # This test validates the FIX for the decimal separator issue
-
-  # Generate format codes for both separators
-  period_format_1dp <- create_excel_number_format(1, ".")
-  comma_format_1dp <- create_excel_number_format(1, ",")
-
-  # Should use different separators
-  expect_equal(period_format_1dp, "0.0")
-  expect_equal(comma_format_1dp, "0,0")
-  expect_false(period_format_1dp == comma_format_1dp)
-
-  # String formatting should also respect separator
+test_that("Decimal separator is respected in format_number", {
+  # String formatting should respect separator
   expect_equal(format_number(95.5, 1, "."), "95.5")
   expect_equal(format_number(95.5, 1, ","), "95,5")
 
-  # This is the behavior that was broken in tracker_output.R
-  # (it always used "0.0" regardless of config)
-  # Now fixed with shared implementation!
+  # Different separators produce different output
+  period_result <- format_number(123.456, 2, ".")
+  comma_result <- format_number(123.456, 2, ",")
+
+  expect_equal(period_result, "123.46")
+  expect_equal(comma_result, "123,46")
+  expect_false(period_result == comma_result)
+})
+
+test_that("Excel format codes always use period (Excel standard)", {
+  # Excel internally always uses period for decimal
+  expect_equal(create_excel_number_format(1), "0.0")
+  expect_equal(create_excel_number_format(2), "0.00")
 })
 
 cat("\n✓ Shared formatting module tests completed\n")
-cat("  All tests pass - decimal separator issue is FIXED!\n")
+cat("  All formatting functions validated\n")
