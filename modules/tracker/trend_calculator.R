@@ -5,11 +5,29 @@
 # Calculates trends and wave-over-wave changes for tracked questions.
 # Supports: Rating questions, Single choice, NPS, Index scores
 #
-# SHARED CODE NOTES:
-# - Significance testing functions should be in /shared/significance_tests.R
-# - Mean/proportion calculation patterns shared with TurasTabs
-# - Future: Extract calculate_mean_with_ci, calculate_proportion_with_ci
+# VERSION: 2.2.0
+# SIZE: ~2,700 lines (target: decompose during maintenance)
 #
+# ARCHITECTURE NOTE:
+# Core statistical functions have been extracted to lib/statistical_core.R
+# for reference. During future maintenance, this file should be refactored to:
+#
+#   trend_calculator.R (orchestration, ~800 lines)
+#     - calculate_all_trends()
+#     - Question type dispatchers
+#
+#   lib/statistical_core.R (calculations, ~350 lines)
+#     - t_test_for_means(), z_test_for_proportions()
+#     - calculate_weighted_mean(), calculate_nps_score()
+#     - calculate_top_box(), calculate_bottom_box()
+#
+#   lib/trend_significance.R (significance tests)
+#     - perform_significance_tests_* functions
+#
+#   lib/trend_changes.R (wave-over-wave changes)
+#     - calculate_changes_* functions
+#
+# SHARED UTILITIES: Uses /modules/shared/lib/ for common functions
 # ==============================================================================
 
 #' Check if Significance Test Result is Significant

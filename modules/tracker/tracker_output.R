@@ -6,19 +6,33 @@
 # Creates one sheet per question plus summary/metadata sheets.
 #
 # VERSION: 2.2.0 - Uses consolidated shared utilities
-# CHANGES: Now uses /modules/shared/lib/ (consolidated location)
+# SIZE: ~2,180 lines (target: decompose during maintenance)
 #
-# PHASE 2 UPDATE:
-# - Decimal separator now properly respected (was hardcoded to "." before)
-# - Uses create_excel_number_format() from shared formatting utilities
-# - Fixes inconsistency with TurasTabs decimal separator behavior
+# ARCHITECTURE NOTE:
+# During future maintenance, this file should be refactored to:
 #
-# ENHANCED REPORTS (v2.1.0 - 2025-12-11):
-# - New report types: "dashboard" and "sig_matrix"
-# - Dashboard: Executive summary with trend status indicators
-# - Sig Matrix: Wave-pair significance comparison matrices
-# - See tracker_dashboard_reports.R for implementations
+#   tracker_output.R (orchestration, ~500 lines)
+#     - write_tracker_output()
+#     - Output format dispatchers
 #
+#   lib/output_excel.R (Excel generation, ~600 lines)
+#     - Workbook creation and formatting
+#     - Style management
+#
+#   lib/output_sheets.R (Sheet writers, ~500 lines)
+#     - write_question_sheet()
+#     - write_summary_sheet()
+#
+#   lib/output_formatting.R (Cell formatting, ~400 lines)
+#     - Significance highlighting
+#     - Number formatting
+#
+# SHARED UTILITIES: Uses /modules/shared/lib/ for common functions
+#
+# FEATURES:
+# - Decimal separator properly respected via shared formatting
+# - Report types: "detailed", "dashboard", "sig_matrix"
+# - See tracker_dashboard_reports.R for dashboard implementations
 # ==============================================================================
 
 # Load shared utilities from consolidated location
