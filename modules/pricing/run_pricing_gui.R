@@ -328,6 +328,8 @@ server <- function(input, output, session) {
   observeEvent(input$template_dir_button, {
     if (!is.null(input$template_dir_button) && !is.integer(input$template_dir_button)) {
       dir_selected <- parseDirPath(volumes, input$template_dir_button)
+      # Expand tilde and normalize path (fixes OneDrive/home directory paths)
+      dir_selected <- normalizePath(path.expand(dir_selected), winslash = "/", mustWork = FALSE)
       if (length(dir_selected) > 0) {
         rv$template_dir <- as.character(dir_selected)
       }

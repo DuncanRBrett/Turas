@@ -253,6 +253,8 @@ run_keydriver_gui <- function() {
     observeEvent(input$project_dir_btn, {
       if (!is.integer(input$project_dir_btn)) {
         dir_path <- parseDirPath(volumes, input$project_dir_btn)
+        # Expand tilde and normalize path (fixes OneDrive/home directory paths)
+        dir_path <- normalizePath(path.expand(dir_path), winslash = "/", mustWork = FALSE)
         if (length(dir_path) > 0 && dir.exists(dir_path)) {
           files$project_dir <- dir_path
           files$config_file <- NULL

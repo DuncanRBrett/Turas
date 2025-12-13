@@ -282,6 +282,8 @@ run_alchemerparser_gui <- function() {
     observeEvent(input$browse_dir, {
       if (!is.integer(input$browse_dir)) {
         dir_path <- shinyFiles::parseDirPath(volumes, input$browse_dir)
+        # Expand tilde and normalize path (fixes OneDrive/home directory paths)
+        dir_path <- normalizePath(path.expand(dir_path), winslash = "/", mustWork = FALSE)
         if (length(dir_path) > 0) {
           updateTextInput(session, "project_dir", value = as.character(dir_path))
         }

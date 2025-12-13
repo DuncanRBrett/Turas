@@ -204,6 +204,8 @@ run_confidence_gui <- function() {
     observeEvent(input$project_btn, {
       if (!is.integer(input$project_btn)) {
         dir_path <- parseDirPath(volumes, input$project_btn)
+        # Expand tilde and normalize path (fixes OneDrive/home directory paths)
+        dir_path <- normalizePath(path.expand(dir_path), winslash = "/", mustWork = FALSE)
         if (length(dir_path) > 0 && dir.exists(dir_path)) {
           configs <- detect_config_files(dir_path)
           project_data(list(
@@ -219,14 +221,16 @@ run_confidence_gui <- function() {
     # Handle recent project selection
     observeEvent(input$select_recent, {
       req(input$select_recent)
-      if (dir.exists(input$select_recent)) {
-        configs <- detect_config_files(input$select_recent)
+      # Expand tilde and normalize path (fixes OneDrive/home directory paths)
+      dir_path <- normalizePath(path.expand(input$select_recent), winslash = "/", mustWork = FALSE)
+      if (dir.exists(dir_path)) {
+        configs <- detect_config_files(dir_path)
         project_data(list(
-          path = input$select_recent,
+          path = dir_path,
           configs = configs,
           selected_config = if(length(configs) > 0) configs[1] else NULL
         ))
-        add_recent_project(input$select_recent)
+        add_recent_project(dir_path)
       }
     })
 
