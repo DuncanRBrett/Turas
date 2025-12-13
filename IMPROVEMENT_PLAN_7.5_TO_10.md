@@ -6,7 +6,7 @@
 |-------|--------|-------|
 | Phase 1: Foundation | **COMPLETE** | ADRs, READMEs, shared utilities consolidated |
 | Phase 2: Decomposition | **DOCUMENTED** | Architecture notes added; gradual refactoring during maintenance |
-| Phase 3: Test Coverage | Pending | Infrastructure ready for enhancement |
+| Phase 3: Test Coverage | **PARTIAL** | Tests updated for new paths; infrastructure ready |
 | Phase 4: Documentation | Pending | Core structure in place |
 
 ### What Was Done
@@ -25,6 +25,13 @@
 - Created `tracker/lib/statistical_core.R` as reference implementation
 - Documented target architecture in large file headers
 - No breaking changes to existing functionality
+
+**Phase 3 (Test Updates):**
+- Updated `test_shared_weights.R` to use consolidated location
+- Updated `test_shared_formatting.R` to use consolidated location
+- Updated `test_shared_config.R` to use consolidated location
+- Added tests for `find_turas_root()` function
+- Removed deprecated cross-module consistency tests
 
 ---
 
