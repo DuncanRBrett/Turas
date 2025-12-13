@@ -447,17 +447,27 @@ run_tabs_gui <- function() {
         showNotification("Analysis completed successfully!", type = "message", duration = 5)
 
       } else {
-        # Display error
+        # Display error with full details
+        error_msg <- analysis_result$error$message
+        error_call <- if (!is.null(analysis_result$error$call)) {
+          paste0("\nCall: ", deparse(analysis_result$error$call))
+        } else {
+          ""
+        }
+
         error_output <- paste0(
           console_output(),
           "\n\n",
           strrep("=", 80), "\n",
           "ERROR\n",
           strrep("=", 80), "\n",
-          analysis_result$error$message, "\n"
+          error_msg, "\n",
+          error_call, "\n",
+          "\nConfig file: ", file.path(data$path, data$selected_config), "\n",
+          "File exists: ", file.exists(file.path(data$path, data$selected_config)), "\n"
         )
         console_output(error_output)
-        showNotification(paste("Error:", analysis_result$error$message), type = "error", duration = 10)
+        showNotification(paste("Error:", error_msg), type = "error", duration = 10)
       }
 
       # Clean up global variables
