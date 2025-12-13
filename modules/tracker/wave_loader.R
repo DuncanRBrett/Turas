@@ -6,19 +6,32 @@
 # Supports both CSV and Excel formats.
 # Handles weighting variable application.
 #
-# VERSION: 2.0.0 - Phase 4 Update
+# VERSION: 2.1.0 - Uses consolidated shared utilities
 #
-# PHASE 4 UPDATE:
-# Shared weight utilities NOW AVAILABLE in shared/weights.R:
+# SHARED WEIGHT UTILITIES in /modules/shared/lib/weights_utils.R:
 # - calculate_weight_efficiency() - Effective sample size calculation
 # - calculate_design_effect() - Design effect (deff) calculation
-# - validate_weights() - Comprehensive weight validation
+# - validate_weights_comprehensive() - Comprehensive weight validation
 # - get_weight_summary() - Descriptive weight statistics
 # - standardize_weight_variable() - Create standardized weight column
-#
-# This module currently uses local calculate_weight_efficiency() function.
-# New code should use shared/weights.R functions for consistency.
 # ==============================================================================
+
+# Ensure shared utilities are available
+if (!exists("calculate_weight_efficiency", mode = "function")) {
+  .wl_script_dir <- tryCatch({
+    dirname(sys.frame(1)$ofile)
+  }, error = function(e) getwd())
+
+  .shared_lib_path <- file.path(dirname(.wl_script_dir), "shared", "lib")
+  if (!dir.exists(.shared_lib_path)) {
+    .shared_lib_path <- file.path(getwd(), "modules", "shared", "lib")
+  }
+
+  # Source weights_utils (it has no dependencies)
+  source(file.path(.shared_lib_path, "weights_utils.R"), local = FALSE)
+
+  rm(.wl_script_dir, .shared_lib_path)
+}
 
 #' Extract Categorical Question Codes
 #'
@@ -422,29 +435,8 @@ apply_wave_weights <- function(wave_df, weight_var, wave_id) {
 }
 
 
-#' Calculate Weight Efficiency
-#'
-#' Calculates effective sample size given a vector of weights.
-#' Efficiency = (sum of weights)^2 / sum of squared weights
-#'
-#' SHARED CODE NOTE: This should be extracted to /shared/weights.R
-#' Identical calculation used in TurasTabs
-#'
-#' @param weights Numeric vector of weight values
-#' @return Numeric. Effective sample size
-#'
-#' @keywords internal
-calculate_weight_efficiency <- function(weights) {
-  sum_weights <- sum(weights, na.rm = TRUE)
-  sum_weights_squared <- sum(weights^2, na.rm = TRUE)
-
-  if (sum_weights_squared == 0) {
-    return(0)
-  }
-
-  eff_n <- (sum_weights^2) / sum_weights_squared
-  return(eff_n)
-}
+# NOTE: calculate_weight_efficiency() is now provided by
+# /modules/shared/lib/weights_utils.R (sourced at top of this file)
 
 
 #' Validate Wave Data Structure

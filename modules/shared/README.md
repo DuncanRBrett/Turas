@@ -10,22 +10,30 @@ This shared module eliminates code duplication across Turas modules (tabs, track
 
 ```
 modules/shared/lib/
-├── config_utils.R      # Excel config loading and validation
+├── import_all.R        # Single-file import (recommended)
+├── config_utils.R      # Excel config loading, path handling, find_turas_root()
 ├── data_utils.R        # Data loading and type conversion
+├── validation_utils.R  # Input validation functions
 ├── logging_utils.R     # Logging, progress tracking, error tracking
-└── validation_utils.R  # Input validation functions
+├── formatting_utils.R  # Number formatting for Excel and text output
+└── weights_utils.R     # Weight efficiency and validation
 ```
 
 ## Usage
 
-In your module scripts, source the utilities you need:
-
+**Recommended: Use import_all.R**
 ```r
-# Source shared utilities
-source("../shared/lib/validation_utils.R")
-source("../shared/lib/config_utils.R")
-source("../shared/lib/data_utils.R")
-source("../shared/lib/logging_utils.R")
+# From any module - loads all utilities in correct dependency order
+turas_root <- find_turas_root()
+source(file.path(turas_root, "modules/shared/lib/import_all.R"))
+```
+
+**Alternative: Source individual files**
+```r
+# Source only what you need (respect dependency order)
+shared_path <- file.path(find_turas_root(), "modules/shared/lib")
+source(file.path(shared_path, "validation_utils.R"))  # First (no deps)
+source(file.path(shared_path, "config_utils.R"))      # Second
 ```
 
 ## Key Functions
@@ -36,6 +44,7 @@ source("../shared/lib/logging_utils.R")
 - `get_config_value(config, name, default, required)` - Safely retrieve config value
 - `get_numeric_config()`, `get_logical_config()`, `get_char_config()` - Typed getters
 - `resolve_path(base, relative)` - Platform-independent path resolution
+- `find_turas_root()` - Locate Turas installation root (cached)
 
 ### Data Loading (data_utils.R)
 
@@ -60,6 +69,22 @@ source("../shared/lib/logging_utils.R")
 - `log_progress(current, total, item, start_time)` - Progress tracking with ETA
 - `create_error_log()`, `log_issue()` - Structured error tracking
 - `print_toolkit_header(analysis_type, version)` - Branding header
+
+### Formatting (formatting_utils.R)
+
+- `format_number(x, decimal_places, separator)` - Format numbers with locale separator
+- `format_percentage(x, decimals, separator, sign)` - Format percentages
+- `create_excel_number_format(decimals)` - Excel numFmt codes
+- `create_excel_number_styles()` - openxlsx style objects
+- `validate_decimal_separator()`, `validate_decimal_places()` - Input validators
+
+### Weights (weights_utils.R)
+
+- `calculate_weight_efficiency(weights)` - Effective sample size
+- `calculate_design_effect(weights)` - Design effect (deff)
+- `validate_weights_comprehensive(weights)` - Full weight validation
+- `get_weight_summary(weights)` - Summary statistics
+- `standardize_weight_variable(df, var)` - Standardize weight column
 
 ## Design Principles
 

@@ -1,0 +1,56 @@
+# ==============================================================================
+# TURAS SHARED UTILITIES - UNIFIED IMPORT
+# ==============================================================================
+# Single entry point for loading all shared utilities
+#
+# USAGE:
+#   source(file.path(find_turas_root(), "modules/shared/lib/import_all.R"))
+#
+# Or if turas root not yet known:
+#   shared_path <- dirname(sys.frame(1)$ofile)  # Get this file's directory
+#   source(file.path(shared_path, "import_all.R"))
+#
+# LOADS:
+#   - validation_utils.R (must be first - no dependencies)
+#   - data_utils.R (depends on validation)
+#   - config_utils.R (depends on validation, data)
+#   - logging_utils.R (no dependencies)
+#   - formatting_utils.R (no dependencies)
+#   - weights_utils.R (no dependencies)
+# ==============================================================================
+
+# Determine this file's directory for relative sourcing
+.shared_lib_path <- if (sys.nframe() > 0 && !is.null(sys.frame(1)$ofile)) {
+  dirname(sys.frame(1)$ofile)
+} else {
+  # Fallback: try to find from working directory
+  test_paths <- c(
+    file.path(getwd(), "modules/shared/lib"),
+    file.path(dirname(getwd()), "shared/lib"),
+    file.path(dirname(dirname(getwd())), "modules/shared/lib")
+  )
+  found <- test_paths[dir.exists(test_paths)]
+  if (length(found) > 0) found[1] else stop("Cannot locate shared/lib directory")
+}
+
+# Source in dependency order
+# 1. Validation first (no dependencies)
+source(file.path(.shared_lib_path, "validation_utils.R"), local = FALSE)
+
+# 2. Data utils (uses validation)
+source(file.path(.shared_lib_path, "data_utils.R"), local = FALSE)
+
+# 3. Config utils (uses validation, includes find_turas_root)
+source(file.path(.shared_lib_path, "config_utils.R"), local = FALSE)
+
+# 4. Logging (independent)
+source(file.path(.shared_lib_path, "logging_utils.R"), local = FALSE)
+
+# 5. Formatting (independent)
+source(file.path(.shared_lib_path, "formatting_utils.R"), local = FALSE)
+
+# 6. Weights (independent)
+source(file.path(.shared_lib_path, "weights_utils.R"), local = FALSE)
+
+# Clean up
+rm(.shared_lib_path)

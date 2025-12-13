@@ -254,3 +254,48 @@ get_project_root <- function(config_file_path) {
 
   return(project_root)
 }
+
+#' Find Turas root directory
+#'
+#' Searches up the directory tree to locate the Turas installation root.
+#' Looks for marker files/directories: launch_turas.R, modules/, shared/
+#'
+#' USAGE: Use to resolve paths to shared modules
+#' CACHING: Checks TURAS_ROOT global first for performance
+#'
+#' @return Character, path to Turas root directory
+#' @export
+find_turas_root <- function() {
+  # Check cached value first
+
+if (exists("TURAS_ROOT", envir = .GlobalEnv)) {
+    cached <- get("TURAS_ROOT", envir = .GlobalEnv)
+    if (!is.null(cached) && nzchar(cached)) {
+      return(cached)
+    }
+  }
+
+  # Start from current working directory
+  current_dir <- getwd()
+
+  # Search up directory tree for Turas root markers
+  while (current_dir != dirname(current_dir)) {
+    has_launch <- isTRUE(file.exists(file.path(current_dir, "launch_turas.R")))
+    has_turas_r <- isTRUE(file.exists(file.path(current_dir, "turas.R")))
+    has_shared <- isTRUE(dir.exists(file.path(current_dir, "shared")))
+    has_modules <- isTRUE(dir.exists(file.path(current_dir, "modules")))
+
+    if (has_launch || has_turas_r || (has_shared && has_modules)) {
+      # Cache for future calls
+      assign("TURAS_ROOT", current_dir, envir = .GlobalEnv)
+      return(current_dir)
+    }
+    current_dir <- dirname(current_dir)
+  }
+
+  stop(paste0(
+    "Cannot locate Turas root directory.\n",
+    "Please run from within the Turas directory structure.\n",
+    "Current working directory: ", getwd()
+  ), call. = FALSE)
+}

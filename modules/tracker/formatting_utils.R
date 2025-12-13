@@ -4,52 +4,34 @@
 #
 # Number and text formatting utilities for output.
 #
-# VERSION: 2.0.0 - Phase 2 Update
-# CHANGES: Now uses shared/formatting.R for consistent formatting
+# VERSION: 2.1.0 - Uses consolidated shared utilities
+# CHANGES: Now uses /modules/shared/lib/ (consolidated location)
 # ==============================================================================
 
-# Load shared formatting module (Phase 2 refactoring)
-# Robust path resolution - searches up directory tree to find Turas root
-find_turas_root <- function() {
-  # Method 1: Check if TURAS_ROOT is already set
-  if (exists("TURAS_ROOT", envir = .GlobalEnv)) {
-    return(get("TURAS_ROOT", envir = .GlobalEnv))
-  }
-  
-  # Method 2: Start from current working directory
-  current_dir <- getwd()
-  
-  # Search up directory tree for Turas root markers
-  while (current_dir != dirname(current_dir)) {  # Stop at filesystem root
-    # Check for Turas root markers
-    # Use isTRUE() to ensure single logical value for R 4.2+ compatibility
-    has_launch <- isTRUE(file.exists(file.path(current_dir, "launch_turas.R")))
-    has_shared <- isTRUE(dir.exists(file.path(current_dir, "shared")))
-    has_modules <- isTRUE(dir.exists(file.path(current_dir, "modules")))
+# Load shared utilities from consolidated location
+# Determine path to shared/lib relative to this file
+.tracker_fmt_script_dir <- tryCatch({
+  dirname(sys.frame(1)$ofile)
+}, error = function(e) getwd())
 
-    if (has_launch || (has_shared && has_modules)) {
-      return(current_dir)
-    }
-    current_dir <- dirname(current_dir)
-  }
-  
-  # Method 3: Try relative paths from module location
-  for (rel_path in c("../..", "../../..", "../../../..")) {
-    test_path <- normalizePath(file.path(rel_path, "shared", "formatting.R"), mustWork = FALSE)
-    if (isTRUE(file.exists(test_path))) {
-      return(normalizePath(dirname(dirname(test_path)), mustWork = TRUE))
-    }
-  }
-  
-  stop(paste0(
-    "Cannot locate Turas root directory.\n",
-    "Please ensure you're running from the Turas directory.\n",
-    "Current working directory: ", getwd()
-  ))
+.shared_lib_path <- file.path(dirname(.tracker_fmt_script_dir), "shared", "lib")
+if (!dir.exists(.shared_lib_path)) {
+  # Fallback: search from current directory
+  .shared_lib_path <- file.path(getwd(), "modules", "shared", "lib")
 }
 
-turas_root <- find_turas_root()
-source(file.path(turas_root, "shared", "formatting.R"), local = FALSE)
+# Load dependencies in order (only if not already loaded)
+if (!exists("validate_char_param", mode = "function")) {
+  source(file.path(.shared_lib_path, "validation_utils.R"), local = FALSE)
+}
+if (!exists("find_turas_root", mode = "function")) {
+  source(file.path(.shared_lib_path, "config_utils.R"), local = FALSE)
+}
+if (!exists("format_number", mode = "function")) {
+  source(file.path(.shared_lib_path, "formatting_utils.R"), local = FALSE)
+}
+
+rm(.tracker_fmt_script_dir, .shared_lib_path)
 
 
 #' Format Number with Decimal Separator
@@ -98,4 +80,4 @@ apply_number_format_excel <- function(wb, sheet, rows, cols, decimal_places = 1,
 }
 
 
-message("Turas>Tracker formatting_utils module loaded (v2.0 - using shared/formatting.R)")
+message("Turas>Tracker formatting_utils module loaded (v2.1 - using modules/shared/lib/)")
