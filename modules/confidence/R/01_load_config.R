@@ -265,6 +265,12 @@ load_question_analysis_sheet <- function(config_path) {
   # Remove completely empty rows
   df <- df[!is.na(df$Question_ID) & df$Question_ID != "", ]
 
+  # Remove rows where Question_ID is actually a column header name
+  # (common Excel formatting issue where headers repeat in data)
+  header_names <- c("Run_MOE", "Run_Wilson", "Run_Bootstrap", "Run_Credible",
+                    "Question_ID", "Statistic_Type", "Categories")
+  df <- df[!df$Question_ID %in% header_names, ]
+
   # Check question limit (200 max)
   n_questions <- nrow(df)
   if (n_questions > 200) {
