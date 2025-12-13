@@ -248,14 +248,14 @@ run_maxdiff_gui <- function() {
     # Mode buttons
     observeEvent(input$mode_design, {
       rv$mode <- "DESIGN"
-      updateActionButton(session, "mode_design", class = "mode-btn active")
-      updateActionButton(session, "mode_analysis", class = "mode-btn")
+      # Note: updateActionButton doesn't support class parameter
+      # Button styling is handled by CSS based on rv$mode
     })
 
     observeEvent(input$mode_analysis, {
       rv$mode <- "ANALYSIS"
-      updateActionButton(session, "mode_design", class = "mode-btn")
-      updateActionButton(session, "mode_analysis", class = "mode-btn active")
+      # Note: updateActionButton doesn't support class parameter
+      # Button styling is handled by CSS based on rv$mode
     })
 
     # Handle recent project selection
@@ -269,13 +269,8 @@ run_maxdiff_gui <- function() {
                                               winslash = "/", mustWork = FALSE)
         rv$config_path <- config_path_expanded
         rv$mode <- proj$mode
-        if (proj$mode == "DESIGN") {
-          updateActionButton(session, "mode_design", class = "mode-btn active")
-          updateActionButton(session, "mode_analysis", class = "mode-btn")
-        } else {
-          updateActionButton(session, "mode_design", class = "mode-btn")
-          updateActionButton(session, "mode_analysis", class = "mode-btn active")
-        }
+        # Note: updateActionButton doesn't support class parameter
+        # Button styling is handled by CSS based on rv$mode
       }
     })
 
