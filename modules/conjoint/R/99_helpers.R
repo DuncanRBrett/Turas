@@ -4,10 +4,32 @@
 #
 # Module: Conjoint Analysis - Utilities
 # Purpose: Shared utility functions for conjoint analysis
-# Version: 2.0.0 (Enhanced Implementation)
-# Date: 2025-11-26
+# Version: 2.1.0 - Uses consolidated shared utilities
+# Date: 2025-12-13
 #
+# SHARED UTILITIES: Functions like safe_numeric, safe_logical are available
+# from /modules/shared/lib/data_utils.R. Local versions retained for
+# backward compatibility.
 # ==============================================================================
+
+# Load shared utilities if available
+if (!exists("safe_numeric", mode = "function")) {
+  .conjoint_helpers_dir <- tryCatch({
+    dirname(sys.frame(1)$ofile)
+  }, error = function(e) getwd())
+
+  .shared_lib_path <- file.path(dirname(dirname(.conjoint_helpers_dir)), "shared", "lib")
+  if (!dir.exists(.shared_lib_path)) {
+    .shared_lib_path <- file.path(getwd(), "modules", "shared", "lib")
+  }
+
+  if (dir.exists(.shared_lib_path) && file.exists(file.path(.shared_lib_path, "data_utils.R"))) {
+    source(file.path(.shared_lib_path, "data_utils.R"), local = FALSE)
+  }
+
+  if (exists(".conjoint_helpers_dir")) rm(.conjoint_helpers_dir)
+  if (exists(".shared_lib_path")) rm(.shared_lib_path)
+}
 
 # ==============================================================================
 # OPERATOR OVERLOADS

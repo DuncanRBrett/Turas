@@ -27,6 +27,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - `formatting_utils.R` - Sources from `/modules/shared/lib/`
   - `tracker_output.R` - Uses shared formatting
   - `wave_loader.R` - Uses shared weights utilities
+- Tabs module updated
+  - `lib/excel_writer.R` - Uses consolidated shared utilities
+- KeyDriver module updated
+  - `R/00_main.R` - Improved `find_turas_root()` with caching
+- Conjoint module updated
+  - `R/99_helpers.R` - Sources shared utilities when available
+- MaxDiff module updated
+  - `R/utils.R` - Sources shared utilities when available
 - Test files updated to use consolidated paths
   - `test_shared_weights.R`
   - `test_shared_formatting.R`

@@ -1,17 +1,38 @@
 # ==============================================================================
-# MAXDIFF MODULE - UTILITY FUNCTIONS - TURAS V10.0
+# MAXDIFF MODULE - UTILITY FUNCTIONS - TURAS V10.1
 # ==============================================================================
 # Common utility functions for MaxDiff analysis
 # Part of Turas MaxDiff Module
 #
 # VERSION HISTORY:
+# Turas v10.1 - Uses consolidated shared utilities (2025-12)
 # Turas v10.0 - Initial release (2025-12)
 #
-# DEPENDENCIES:
-# - None (base R only)
+# SHARED UTILITIES: Core functions available from /modules/shared/lib/
+# Local versions retained for backward compatibility.
 # ==============================================================================
 
-MAXDIFF_UTILS_VERSION <- "10.0"
+MAXDIFF_UTILS_VERSION <- "10.1"
+
+# Load shared utilities if available
+if (!exists("safe_numeric", mode = "function")) {
+  .maxdiff_utils_dir <- tryCatch({
+    dirname(sys.frame(1)$ofile)
+  }, error = function(e) getwd())
+
+  .shared_lib_path <- file.path(dirname(dirname(.maxdiff_utils_dir)), "shared", "lib")
+  if (!dir.exists(.shared_lib_path)) {
+    .shared_lib_path <- file.path(getwd(), "modules", "shared", "lib")
+  }
+
+  if (dir.exists(.shared_lib_path) && file.exists(file.path(.shared_lib_path, "data_utils.R"))) {
+    source(file.path(.shared_lib_path, "data_utils.R"), local = FALSE)
+    source(file.path(.shared_lib_path, "logging_utils.R"), local = FALSE)
+  }
+
+  if (exists(".maxdiff_utils_dir")) rm(.maxdiff_utils_dir)
+  if (exists(".shared_lib_path")) rm(.shared_lib_path)
+}
 
 # ==============================================================================
 # SAFE VALUE CHECKING (handles vectors)
