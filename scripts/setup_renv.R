@@ -42,6 +42,10 @@ if (file.exists("renv.lock")) {
   # Detect currently installed packages used by Turas
   cat("Scanning project for dependencies...\n")
 
+  # Provide consent for renv to modify project files
+  # (This bypasses the interactive prompt)
+  renv::consent(provided = TRUE)
+
   # Initialize renv (creates renv.lock)
   renv::init(
     project = getwd(),
