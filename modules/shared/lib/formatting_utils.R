@@ -105,12 +105,19 @@ format_number <- function(x, decimal_places = 1, decimal_separator = ".") {
   }
 
   decimal_places <- as.integer(decimal_places)
+
+  # Track NA positions to preserve them
+  na_positions <- is.na(x)
+
   x_rounded <- round(x, decimal_places)
   x_formatted <- format(x_rounded, nsmall = decimal_places, trim = TRUE)
 
   if (decimal_separator == ",") {
     x_formatted <- gsub("\\.", ",", x_formatted)
   }
+
+  # Restore NA values (format() converts NA to string "NA")
+  x_formatted[na_positions] <- NA_character_
 
   return(x_formatted)
 }

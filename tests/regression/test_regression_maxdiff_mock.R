@@ -24,6 +24,7 @@ maxdiff_dir <- file.path(turas_root, "modules", "maxdiff")
 
 # Source MaxDiff module files
 source(file.path(maxdiff_dir, "R", "utils.R"))
+source(file.path(maxdiff_dir, "R", "02_validation.R"))  # Contains compute_pair_frequencies
 source(file.path(maxdiff_dir, "R", "04_design.R"))
 source(file.path(maxdiff_dir, "R", "05_counts.R"))
 

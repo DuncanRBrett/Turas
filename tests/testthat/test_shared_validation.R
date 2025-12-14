@@ -105,12 +105,12 @@ test_that("validate_numeric_param checks NA", {
 
 test_that("validate_numeric_param checks min", {
   expect_true(validate_numeric_param(5, "test_param", min = 0))
-  expect_error(validate_numeric_param(-1, "test_param", min = 0), "minimum")
+  expect_error(validate_numeric_param(-1, "test_param", min = 0), "must be between")
 })
 
 test_that("validate_numeric_param checks max", {
   expect_true(validate_numeric_param(5, "test_param", max = 10))
-  expect_error(validate_numeric_param(15, "test_param", max = 10), "maximum")
+  expect_error(validate_numeric_param(15, "test_param", max = 10), "must be between")
 })
 
 test_that("validate_numeric_param uses param_name in errors", {
