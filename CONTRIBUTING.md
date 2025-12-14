@@ -58,13 +58,46 @@ data_path <- file.path(project_root, config$data_file)
 source("/Users/someone/Turas/modules/shared/lib/utils.R")
 ```
 
+## Package Management (renv)
+
+Turas uses `renv` for reproducible package management. This ensures everyone runs identical package versions.
+
+### First Time Setup
+
+```r
+# After cloning, restore packages from lockfile
+renv::restore()
+```
+
+### Adding a Package
+
+```r
+# 1. Install
+renv::install("newpackage")
+
+# 2. Update lockfile
+renv::snapshot()
+
+# 3. Commit renv.lock
+```
+
+### After Git Pull
+
+```r
+# If renv.lock changed
+renv::restore()
+```
+
+See `docs/RENV_GUIDE.md` for full documentation.
+
 ## Pull Request Process
 
 1. **Create feature branch** from main
 2. **Make changes** following code standards
 3. **Run tests**: `Rscript tests/testthat.R`
-4. **Update documentation** if APIs changed
-5. **Submit PR** with description of changes
+4. **Sync packages**: `renv::restore()` (if renv.lock changed)
+5. **Update documentation** if APIs changed
+6. **Submit PR** with description of changes
 
 ## Code Review Checklist
 

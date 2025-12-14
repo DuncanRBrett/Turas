@@ -8,6 +8,16 @@
 .Ruserdata
 *.Rproj
 
+# renv - Package Management
+# TRACKED: renv.lock, renv/activate.R, renv/settings.json, .Rprofile
+# IGNORED: renv/library (installed packages), renv/local, renv/cellar
+renv/library/
+renv/local/
+renv/cellar/
+renv/staging/
+renv/python/
+renv/.gitignore
+
 # Data files - DO NOT commit data to repository
 *.xlsx
 *.xls
