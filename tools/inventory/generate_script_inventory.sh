@@ -8,7 +8,8 @@
 # Note: For full featured analysis with HTML report, use generate_script_inventory.R
 # ==============================================================================
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 OUTPUT_CSV="${REPO_ROOT}/r_script_inventory_quick.csv"
 
 echo "=============================================================================="
