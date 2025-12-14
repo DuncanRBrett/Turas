@@ -24,8 +24,8 @@ SCRIPT_DIR <- tryCatch({
   getwd()
 })
 
-# Repository root (assuming this script is in the root)
-REPO_ROOT <- SCRIPT_DIR
+# Repository root (script is in tools/inventory, so go up 2 levels)
+REPO_ROOT <- normalizePath(file.path(SCRIPT_DIR, "..", ".."), mustWork = FALSE)
 
 # Output files
 OUTPUT_CSV <- file.path(REPO_ROOT, "r_script_inventory.csv")

@@ -9,10 +9,15 @@ This directory contains two scripts for generating a comprehensive inventory of 
 ### Option 1: Quick Bash Version (Recommended for basic inventory)
 
 ```bash
+# From repository root
+./tools/inventory/generate_script_inventory.sh
+
+# Or from the tools/inventory directory
+cd tools/inventory
 ./generate_script_inventory.sh
 ```
 
-**Output:** `r_script_inventory_quick.csv`
+**Output:** `r_script_inventory_quick.csv` (in repository root)
 
 This generates a CSV file with:
 - Script path and location
@@ -23,9 +28,15 @@ This generates a CSV file with:
 ### Option 2: Full R Version (Recommended for detailed analysis)
 
 ```bash
+# From repository root
+Rscript tools/inventory/generate_script_inventory.R
+
+# Or from the tools/inventory directory
+cd tools/inventory
 Rscript generate_script_inventory.R
-# or
-source("generate_script_inventory.R")
+
+# Or in RStudio
+source("tools/inventory/generate_script_inventory.R")
 ```
 
 **Output:**
@@ -126,14 +137,14 @@ Based on the latest inventory:
 ### Generate inventory and view in terminal
 
 ```bash
-./generate_script_inventory.sh
+./tools/inventory/generate_script_inventory.sh
 cat r_script_inventory_quick.csv | column -t -s,
 ```
 
 ### Generate full inventory with HTML report
 
 ```bash
-Rscript generate_script_inventory.R
+Rscript tools/inventory/generate_script_inventory.R
 # Then open r_script_inventory.html in your browser
 ```
 
@@ -164,10 +175,10 @@ Both scripts are designed to be rerun whenever needed:
 
 ```bash
 # Quick update (bash version) - runs in seconds
-./generate_script_inventory.sh
+./tools/inventory/generate_script_inventory.sh
 
 # Full analysis (R version) - may take 1-2 minutes
-Rscript generate_script_inventory.R
+Rscript tools/inventory/generate_script_inventory.R
 ```
 
 The scripts will overwrite previous reports, so you can run them:
@@ -187,17 +198,18 @@ The following directories are automatically excluded:
 
 | Script | Purpose |
 |--------|---------|
-| `generate_script_inventory.sh` | Bash version for quick inventory |
-| `generate_script_inventory.R` | R version for detailed analysis |
-| `SCRIPT_INVENTORY_README.md` | This documentation |
+| `tools/inventory/generate_script_inventory.sh` | Bash version for quick inventory |
+| `tools/inventory/generate_script_inventory.R` | R version for detailed analysis |
+| `tools/inventory/SCRIPT_INVENTORY_README.md` | This documentation |
+| `tools/inventory/inventory_summary.txt` | Sample summary output |
 
 ## Troubleshooting
 
 ### Bash script not running
 
 ```bash
-chmod +x generate_script_inventory.sh
-./generate_script_inventory.sh
+chmod +x tools/inventory/generate_script_inventory.sh
+./tools/inventory/generate_script_inventory.sh
 ```
 
 ### R script fails with "package not found"
@@ -207,15 +219,19 @@ The R script has minimal dependencies. If you encounter issues:
 ```r
 # The script should work with base R only
 # No additional packages required
-Rscript generate_script_inventory.R
+Rscript tools/inventory/generate_script_inventory.R
 ```
 
 ### No output generated
 
-Check that you're running from the Turas repository root:
+The scripts can be run from anywhere, but outputs are always saved to the repository root:
 
 ```bash
-cd /path/to/Turas
+# From repository root
+./tools/inventory/generate_script_inventory.sh
+
+# Or from the tools/inventory directory
+cd tools/inventory
 ./generate_script_inventory.sh
 ```
 
@@ -228,7 +244,7 @@ Track inventory in version control:
 ```bash
 #!/bin/bash
 # .git/hooks/pre-commit
-./generate_script_inventory.sh
+./tools/inventory/generate_script_inventory.sh
 git add r_script_inventory_quick.csv
 ```
 
@@ -240,7 +256,7 @@ Add to your build process:
 # .github/workflows/inventory.yml
 - name: Generate Script Inventory
   run: |
-    ./generate_script_inventory.sh
+    ./tools/inventory/generate_script_inventory.sh
     # Upload as artifact or commit to repo
 ```
 
@@ -250,7 +266,7 @@ Schedule automatic inventory generation:
 
 ```bash
 # crontab entry - first day of each month
-0 0 1 * * cd /path/to/Turas && Rscript generate_script_inventory.R
+0 0 1 * * cd /path/to/Turas && Rscript tools/inventory/generate_script_inventory.R
 ```
 
 ## Future Enhancements
@@ -269,9 +285,9 @@ Potential additions to the inventory tools:
 
 To improve the inventory tools:
 
-1. Edit `generate_script_inventory.sh` for bash version improvements
-2. Edit `generate_script_inventory.R` for R version enhancements
-3. Test with: `./generate_script_inventory.sh && Rscript generate_script_inventory.R`
+1. Edit `tools/inventory/generate_script_inventory.sh` for bash version improvements
+2. Edit `tools/inventory/generate_script_inventory.R` for R version enhancements
+3. Test with: `./tools/inventory/generate_script_inventory.sh && Rscript tools/inventory/generate_script_inventory.R`
 4. Update this README with new features
 
 ## Questions?
