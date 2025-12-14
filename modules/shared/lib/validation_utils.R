@@ -83,7 +83,15 @@ validate_data_frame <- function(data, required_cols = NULL, min_rows = 1,
 #' @export
 validate_numeric_param <- function(value, param_name, min = -Inf, max = Inf,
                                   allow_na = FALSE) {
-  # NA check
+  # Length check first (safe for any type)
+  if (length(value) != 1) {
+    stop(sprintf(
+      "%s must be a single numeric value, got: %s (length %d)",
+      param_name, class(value)[1], length(value)
+    ), call. = FALSE)
+  }
+
+  # NA check (safe now since we know length is 1)
   if (is.na(value)) {
     if (!allow_na) {
       stop(sprintf("%s cannot be NA", param_name), call. = FALSE)
@@ -91,8 +99,8 @@ validate_numeric_param <- function(value, param_name, min = -Inf, max = Inf,
     return(invisible(TRUE))
   }
 
-  # Type and length check
-  if (!is.numeric(value) || length(value) != 1) {
+  # Type check (after NA check, since NA can be logical)
+  if (!is.numeric(value)) {
     stop(sprintf(
       "%s must be a single numeric value, got: %s (length %d)",
       param_name, class(value)[1], length(value)

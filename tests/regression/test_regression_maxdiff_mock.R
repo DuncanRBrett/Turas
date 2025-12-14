@@ -119,9 +119,9 @@ test_that("compute_pair_frequencies counts correctly", {
   pair_freq <- compute_pair_frequencies(design, c("Item1_ID", "Item2_ID"))
 
   expect_equal(length(pair_freq), 3)  # A_B, A_C, B_C
-  expect_equal(pair_freq["A_B"], 1)
-  expect_equal(pair_freq["A_C"], 1)
-  expect_equal(pair_freq["B_C"], 2)
+  expect_equal(unname(pair_freq["A_B"]), 1)
+  expect_equal(unname(pair_freq["A_C"]), 1)
+  expect_equal(unname(pair_freq["B_C"]), 1)
 })
 
 # ==============================================================================
