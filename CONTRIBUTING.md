@@ -16,9 +16,23 @@ All development must follow the Architectural Decision Records in `/docs/adr/`:
 ├── README.md              # Required: Module overview
 ├── run_{module}.R         # Headless runner
 ├── run_{module}_gui.R     # Shiny launcher (if applicable)
-└── lib/
+└── lib/ or R/             # R script subfolder (see note below)
     └── [feature files]    # Max 800 lines each
 ```
+
+### Current Module Directory Patterns
+
+**Note:** Modules currently use different subfolder patterns for historical reasons:
+
+| Pattern | Modules | Notes |
+|---------|---------|-------|
+| `lib/` | tabs, segment, tracker | Original pattern |
+| `R/` | maxdiff, keydriver, conjoint, confidence, pricing | R package convention |
+| Mixed | tracker | 16 R files at root + `lib/` subfolder |
+
+**For new modules:** Use `R/` pattern (more common, follows R package convention).
+
+**When refactoring:** Normalize to the dominant pattern in that module.
 
 ### Shared Utilities
 Use consolidated shared utilities from `/modules/shared/lib/`:
