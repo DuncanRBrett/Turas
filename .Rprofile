@@ -7,8 +7,11 @@
 # IMPORTANT: After cloning Turas, run: renv::restore()
 # ==============================================================================
 
-# Activate renv for package management
-source("renv/activate.R")
+# Activate renv for package management (unless TURAS_SKIP_RENV is set for GUI modules)
+# GUIs don't need renv - skipping it speeds up launch time from 15s to 2-3s
+if (Sys.getenv("TURAS_SKIP_RENV") != "1") {
+  source("renv/activate.R")
+}
 
 # Optional: Set default CRAN mirror
 options(repos = c(CRAN = "https://cloud.r-project.org"))

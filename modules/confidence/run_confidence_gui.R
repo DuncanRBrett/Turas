@@ -8,14 +8,15 @@
 
 run_confidence_gui <- function() {
 
-  # Required packages
+  # Required packages - check and install if missing (fast method)
   required_packages <- c("shiny", "shinyFiles")
 
-  # Install missing packages
-  missing_packages <- required_packages[!required_packages %in% installed.packages()[,"Package"]]
-  if (length(missing_packages) > 0) {
-    message("Installing required packages: ", paste(missing_packages, collapse = ", "))
-    install.packages(missing_packages)
+  # Fast check using requireNamespace instead of installed.packages()
+  for (pkg in required_packages) {
+    if (!requireNamespace(pkg, quietly = TRUE)) {
+      message("Installing required package: ", pkg)
+      install.packages(pkg)
+    }
   }
 
   # Load packages

@@ -311,8 +311,10 @@ launch_turas <- function() {
     launch_module <- function(module_name, script_path) {
       # Standard launch for all modules
       # Set TURAS_LAUNCHER_ACTIVE to prevent auto-run in GUI files
+      # Set TURAS_SKIP_RENV to skip renv initialization for faster GUI loading
       launch_script <- sprintf('
 Sys.setenv(TURAS_ROOT = "%s")
+Sys.setenv(TURAS_SKIP_RENV = "1")
 setwd("%s")
 TURAS_LAUNCHER_ACTIVE <- TRUE
 source("%s")
