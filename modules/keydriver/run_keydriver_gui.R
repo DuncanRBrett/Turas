@@ -2,9 +2,6 @@
 # TURAS KEY DRIVER MODULE - GUI LAUNCHER
 # ==============================================================================
 
-library(shiny)
-library(shinyFiles)
-
 #' Run Key Driver Analysis GUI
 #'
 #' Launches a Shiny GUI for running key driver analysis.
@@ -12,6 +9,23 @@ library(shinyFiles)
 #' @return A shinyApp object
 #' @export
 run_keydriver_gui <- function() {
+
+  # Required packages - check and install if missing (fast method)
+  required_packages <- c("shiny", "shinyFiles")
+
+  # Fast check using requireNamespace instead of installed.packages()
+  for (pkg in required_packages) {
+    if (!requireNamespace(pkg, quietly = TRUE)) {
+      message("Installing required package: ", pkg)
+      install.packages(pkg)
+    }
+  }
+
+  # Load packages
+  suppressPackageStartupMessages({
+    library(shiny)
+    library(shinyFiles)
+  })
 
   # Get Turas root directory
   turas_root <- getwd()

@@ -4,7 +4,14 @@
 # Interactive GUI for AlchemerParser module
 # ==============================================================================
 
-library(shiny)
+# Fast package check - only install if needed, don't load yet
+if (!requireNamespace("shiny", quietly = TRUE)) {
+  message("Installing required package: shiny")
+  install.packages("shiny")
+}
+
+# Load shiny with suppressed messages
+suppressPackageStartupMessages(library(shiny))
 
 # Get script directory
 get_script_dir <- function() {
