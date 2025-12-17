@@ -156,6 +156,13 @@ launch_turas <- function() {
         .btn-maxdiff:hover {
           background-color: #7c3aed;
         }
+        .btn-catdriver {
+          background-color: #6366f1;
+          color: white;
+        }
+        .btn-catdriver:hover {
+          background-color: #4f46e5;
+        }
         .status-message {
           margin-top: 20px;
           padding: 15px;
@@ -283,6 +290,16 @@ launch_turas <- function() {
           ),
           actionButton("launch_maxdiff", "Launch MaxDiff",
                       class = "launch-btn btn-maxdiff")
+        ),
+
+        # Categorical Key Driver
+        div(class = "module-card",
+          div(class = "module-title", "📋 Categorical Key Driver"),
+          div(class = "module-description",
+            "Key driver analysis for categorical outcomes. Identify what drives binary, ordinal, or nominal outcomes using logistic regression with variable importance scores and odds ratios."
+          ),
+          actionButton("launch_catdriver", "Launch Categorical Key Driver",
+                      class = "launch-btn btn-catdriver")
         )
       ),
 
@@ -552,6 +569,27 @@ if ("%s" != "alchemerparser") {
 
       }, error = function(e) {
         status(paste("Error launching MaxDiff:", e$message))
+      })
+    })
+
+    # Launch Categorical Key Driver
+    observeEvent(input$launch_catdriver, {
+      status("Launching Categorical Key Driver in new tab...")
+
+      tryCatch({
+        launch_module("catdriver",
+                     file.path(turas_root, "modules/catdriver/run_catdriver_gui.R"))
+
+        later::later(function() {
+          status("Categorical Key Driver launched successfully!")
+        }, delay = 1)
+
+        later::later(function() {
+          status("")
+        }, delay = 4)
+
+      }, error = function(e) {
+        status(paste("Error launching Categorical Key Driver:", e$message))
       })
     })
   }

@@ -1,0 +1,472 @@
+# ==============================================================================
+# CATEGORICAL KEY DRIVER - DATA LOADING & VALIDATION
+# ==============================================================================
+#
+# Functions for loading survey data and validating it for analysis.
+#
+# Version: 1.0
+# Date: December 2024
+#
+# ==============================================================================
+
+#' Load Survey Data for Categorical Key Driver Analysis
+#'
+#' Loads data from various formats (CSV, Excel, SPSS) and performs
+#' initial validation.
+#'
+#' @param data_file Path to data file
+#' @param config Configuration list (for variable validation)
+#' @return Data frame ready for analysis
+#' @export
+load_catdriver_data <- function(data_file, config = NULL) {
+
+  # Validate file exists
+  if (!file.exists(data_file)) {
+    stop("Data file not found: ", data_file, call. = FALSE)
+  }
+
+  # Detect file format
+  file_ext <- tolower(tools::file_ext(data_file))
+
+  # Load based on format
+  data <- tryCatch({
+    switch(file_ext,
+      "csv" = load_csv_data(data_file),
+      "xlsx" = load_excel_data(data_file),
+      "xls" = load_excel_data(data_file),
+      "sav" = load_spss_data(data_file),
+      "dta" = load_stata_data(data_file),
+      stop("Unsupported file format: ", file_ext,
+           "\n\nSupported formats: csv, xlsx, xls, sav, dta")
+    )
+  }, error = function(e) {
+    stop("Failed to load data file: ", data_file,
+         "\n\nError: ", e$message,
+         call. = FALSE)
+  })
+
+  # Validate data frame
+  if (!is.data.frame(data)) {
+    stop("Data file did not produce a valid data frame", call. = FALSE)
+  }
+
+  if (nrow(data) == 0) {
+    stop("Data file is empty (0 rows)", call. = FALSE)
+  }
+
+  # Validate against config if provided
+  if (!is.null(config)) {
+    validate_config_against_data(config, data)
+  }
+
+  data
+}
+
+
+#' Load CSV Data
+#'
+#' @param file_path Path to CSV file
+#' @return Data frame
+#' @keywords internal
+load_csv_data <- function(file_path) {
+  # Try data.table for speed if available
+  if (requireNamespace("data.table", quietly = TRUE)) {
+    data <- data.table::fread(file_path, data.table = FALSE)
+  } else {
+    data <- read.csv(file_path, stringsAsFactors = FALSE)
+  }
+  data
+}
+
+
+#' Load Excel Data
+#'
+#' @param file_path Path to Excel file
+#' @return Data frame
+#' @keywords internal
+load_excel_data <- function(file_path) {
+  # Get sheet names
+  sheets <- openxlsx::getSheetNames(file_path)
+
+  # Use first sheet if "Data" doesn't exist
+  sheet_name <- if ("Data" %in% sheets) "Data" else sheets[1]
+
+  openxlsx::read.xlsx(file_path, sheet = sheet_name)
+}
+
+
+#' Load SPSS Data
+#'
+#' @param file_path Path to .sav file
+#' @return Data frame
+#' @keywords internal
+load_spss_data <- function(file_path) {
+  if (!requireNamespace("haven", quietly = TRUE)) {
+    stop("Package 'haven' required to read SPSS files. ",
+         "Install with: install.packages('haven')",
+         call. = FALSE)
+  }
+
+  data <- haven::read_sav(file_path)
+
+  # Convert haven_labelled to factors where appropriate
+  for (col in names(data)) {
+    if (inherits(data[[col]], "haven_labelled")) {
+      labels <- attr(data[[col]], "labels")
+      if (!is.null(labels)) {
+        data[[col]] <- haven::as_factor(data[[col]])
+      } else {
+        data[[col]] <- as.vector(data[[col]])
+      }
+    }
+  }
+
+  as.data.frame(data)
+}
+
+
+#' Load Stata Data
+#'
+#' @param file_path Path to .dta file
+#' @return Data frame
+#' @keywords internal
+load_stata_data <- function(file_path) {
+  if (!requireNamespace("haven", quietly = TRUE)) {
+    stop("Package 'haven' required to read Stata files. ",
+         "Install with: install.packages('haven')",
+         call. = FALSE)
+  }
+
+  data <- haven::read_dta(file_path)
+
+  # Convert labelled variables
+  for (col in names(data)) {
+    if (inherits(data[[col]], "haven_labelled")) {
+      labels <- attr(data[[col]], "labels")
+      if (!is.null(labels)) {
+        data[[col]] <- haven::as_factor(data[[col]])
+      } else {
+        data[[col]] <- as.vector(data[[col]])
+      }
+    }
+  }
+
+  as.data.frame(data)
+}
+
+
+# ==============================================================================
+# DATA VALIDATION FUNCTIONS
+# ==============================================================================
+
+#' Validate Data for Categorical Key Driver Analysis
+#'
+#' Performs comprehensive validation of data and produces a diagnostic report.
+#'
+#' @param data Data frame to validate
+#' @param config Configuration list
+#' @return List with validation results and diagnostics
+#' @export
+validate_catdriver_data <- function(data, config) {
+
+  diagnostics <- list(
+    original_n = nrow(data),
+    complete_n = NA,
+    pct_complete = NA,
+    missing_summary = NULL,
+    outcome_info = NULL,
+    driver_info = list(),
+    small_cells = list(),
+    warnings = character(0),
+    errors = character(0),
+    passed = TRUE
+  )
+
+  # ==========================================================================
+  # CHECK MISSING DATA
+  # ==========================================================================
+
+  # Get analysis variables
+  analysis_vars <- c(config$outcome_var, config$driver_vars)
+  if (!is.null(config$weight_var) && config$weight_var %in% names(data)) {
+    analysis_vars <- c(analysis_vars, config$weight_var)
+  }
+
+  # Calculate missing per variable
+  missing_summary <- data.frame(
+    Variable = analysis_vars,
+    Label = sapply(analysis_vars, function(v) get_var_label(config, v)),
+    N_Total = nrow(data),
+    N_Missing = sapply(analysis_vars, function(v) sum(is.na(data[[v]]))),
+    stringsAsFactors = FALSE
+  )
+  missing_summary$Pct_Missing <- round(100 * missing_summary$N_Missing / missing_summary$N_Total, 1)
+  missing_summary$N_Valid <- missing_summary$N_Total - missing_summary$N_Missing
+
+  diagnostics$missing_summary <- missing_summary
+
+  # Check for high missing rates
+  high_missing <- missing_summary$Pct_Missing > config$missing_threshold
+  if (any(high_missing)) {
+    high_vars <- missing_summary$Variable[high_missing]
+    diagnostics$warnings <- c(diagnostics$warnings,
+      paste0("High missing data (>", config$missing_threshold, "%) in: ",
+             paste(high_vars, collapse = ", ")))
+  }
+
+  # Calculate complete cases
+  complete_mask <- complete.cases(data[, analysis_vars, drop = FALSE])
+  diagnostics$complete_n <- sum(complete_mask)
+  diagnostics$pct_complete <- round(100 * diagnostics$complete_n / diagnostics$original_n, 1)
+
+  # Check minimum sample size
+  if (diagnostics$complete_n < config$min_sample_size) {
+    diagnostics$errors <- c(diagnostics$errors,
+      paste0("Insufficient complete cases: ", diagnostics$complete_n,
+             " (minimum ", config$min_sample_size, " required)"))
+    diagnostics$passed <- FALSE
+  }
+
+  # ==========================================================================
+  # VALIDATE OUTCOME VARIABLE
+  # ==========================================================================
+
+  outcome_data <- data[[config$outcome_var]]
+  outcome_clean <- na.omit(outcome_data)
+
+  outcome_info <- list(
+    variable = config$outcome_var,
+    label = config$outcome_label,
+    n_total = length(outcome_data),
+    n_valid = length(outcome_clean),
+    n_categories = length(unique(outcome_clean)),
+    categories = sort(unique(as.character(outcome_clean))),
+    counts = table(outcome_clean)
+  )
+
+  # Validate category count
+  if (outcome_info$n_categories < 2) {
+    diagnostics$errors <- c(diagnostics$errors,
+      "Outcome variable must have at least 2 categories")
+    diagnostics$passed <- FALSE
+  }
+
+  # Check for rare categories
+  rare_cats <- names(outcome_info$counts)[outcome_info$counts < 10]
+  if (length(rare_cats) > 0) {
+    diagnostics$warnings <- c(diagnostics$warnings,
+      paste0("Outcome has rare categories (<10 obs): ",
+             paste(rare_cats, collapse = ", ")))
+  }
+
+  diagnostics$outcome_info <- outcome_info
+
+  # ==========================================================================
+  # VALIDATE DRIVER VARIABLES
+  # ==========================================================================
+
+  for (driver_var in config$driver_vars) {
+    driver_data <- data[[driver_var]]
+    driver_clean <- na.omit(driver_data)
+
+    driver_info <- list(
+      variable = driver_var,
+      label = get_var_label(config, driver_var),
+      n_valid = length(driver_clean),
+      n_categories = length(unique(driver_clean)),
+      categories = sort(unique(as.character(driver_clean))),
+      counts = table(driver_clean),
+      is_numeric = is.numeric(driver_data),
+      is_categorical = is_categorical(driver_data)
+    )
+
+    # Check for zero variance
+    if (driver_info$n_categories < 2) {
+      diagnostics$warnings <- c(diagnostics$warnings,
+        paste0("Driver '", driver_var, "' has zero variance (only 1 value)"))
+    }
+
+    # Check for high cardinality
+    if (driver_info$n_categories > 20 && driver_info$is_categorical) {
+      diagnostics$warnings <- c(diagnostics$warnings,
+        paste0("Driver '", driver_var, "' has ", driver_info$n_categories,
+               " categories. Consider grouping."))
+    }
+
+    # Check for rare categories in categorical drivers
+    if (driver_info$is_categorical) {
+      rare_driver_cats <- names(driver_info$counts)[driver_info$counts < 10]
+      if (length(rare_driver_cats) > 0 && length(rare_driver_cats) < driver_info$n_categories) {
+        diagnostics$warnings <- c(diagnostics$warnings,
+          paste0("Driver '", driver_var, "' has rare categories (<10 obs): ",
+                 paste(head(rare_driver_cats, 3), collapse = ", "),
+                 if (length(rare_driver_cats) > 3) paste0(" +", length(rare_driver_cats) - 3, " more") else ""))
+      }
+    }
+
+    diagnostics$driver_info[[driver_var]] <- driver_info
+  }
+
+  # ==========================================================================
+  # CHECK CROSS-TABULATION FOR SMALL CELLS
+  # ==========================================================================
+
+  # Only check complete cases
+  data_complete <- data[complete_mask, , drop = FALSE]
+
+  for (driver_var in config$driver_vars) {
+    if (is_categorical(data_complete[[driver_var]])) {
+      tab <- table(data_complete[[driver_var]], data_complete[[config$outcome_var]])
+      small_cell_check <- detect_small_cells(tab, threshold = 5)
+
+      if (small_cell_check$has_small_cells) {
+        diagnostics$small_cells[[driver_var]] <- small_cell_check
+        diagnostics$warnings <- c(diagnostics$warnings,
+          paste0("Small cells (<5) in ", driver_var, " x ", config$outcome_var,
+                 " cross-tabulation"))
+      }
+    }
+  }
+
+  # ==========================================================================
+  # CALCULATE EVENTS PER PREDICTOR (for binary outcomes)
+  # ==========================================================================
+
+  if (outcome_info$n_categories == 2) {
+    # Count minority class
+    min_events <- min(outcome_info$counts)
+
+    # Count predictor terms (approximate)
+    n_terms <- sum(sapply(config$driver_vars, function(v) {
+      if (is_categorical(data[[v]])) {
+        max(1, length(unique(na.omit(data[[v]]))) - 1)
+      } else {
+        1
+      }
+    }))
+
+    events_per_predictor <- min_events / n_terms
+
+    if (events_per_predictor < 10) {
+      diagnostics$warnings <- c(diagnostics$warnings,
+        paste0("Low events per predictor: ", round(events_per_predictor, 1),
+               " (recommend 10+). Consider reducing number of predictors."))
+    }
+
+    diagnostics$events_per_predictor <- events_per_predictor
+  }
+
+  # ==========================================================================
+  # CHECK WEIGHT VARIABLE
+  # ==========================================================================
+
+  if (!is.null(config$weight_var)) {
+    if (!config$weight_var %in% names(data)) {
+      diagnostics$warnings <- c(diagnostics$warnings,
+        paste0("Weight variable '", config$weight_var, "' not found. Proceeding unweighted."))
+    } else {
+      weights <- data[[config$weight_var]]
+
+      if (!is.numeric(weights)) {
+        diagnostics$warnings <- c(diagnostics$warnings,
+          "Weight variable is not numeric. Proceeding unweighted.")
+      } else if (any(weights < 0, na.rm = TRUE)) {
+        diagnostics$warnings <- c(diagnostics$warnings,
+          "Weight variable contains negative values. These will be treated as 0.")
+      } else if (all(is.na(weights))) {
+        diagnostics$warnings <- c(diagnostics$warnings,
+          "Weight variable is entirely missing. Proceeding unweighted.")
+      }
+    }
+  }
+
+  diagnostics
+}
+
+
+#' Prepare Data for Analysis
+#'
+#' Filters to complete cases and prepares variables for modeling.
+#'
+#' @param data Raw data frame
+#' @param config Configuration list
+#' @param diagnostics Validation diagnostics
+#' @return List with analysis-ready data and metadata
+#' @keywords internal
+prepare_analysis_data <- function(data, config, diagnostics) {
+
+  # Get analysis variables
+  analysis_vars <- c(config$outcome_var, config$driver_vars)
+
+  # Add weight if present
+  has_weights <- FALSE
+  if (!is.null(config$weight_var) && config$weight_var %in% names(data)) {
+    weights <- data[[config$weight_var]]
+    if (is.numeric(weights) && !all(is.na(weights))) {
+      analysis_vars <- c(analysis_vars, config$weight_var)
+      has_weights <- TRUE
+    }
+  }
+
+  # Filter to complete cases
+  complete_mask <- complete.cases(data[, analysis_vars, drop = FALSE])
+  data_complete <- data[complete_mask, , drop = FALSE]
+
+  # Prepare weight vector
+  weights <- if (has_weights) {
+    w <- data_complete[[config$weight_var]]
+    w[is.na(w)] <- 0
+    w[w < 0] <- 0
+    w
+  } else {
+    rep(1, nrow(data_complete))
+  }
+
+  list(
+    data = data_complete,
+    weights = weights,
+    has_weights = has_weights,
+    n_original = nrow(data),
+    n_complete = nrow(data_complete),
+    n_excluded = nrow(data) - nrow(data_complete)
+  )
+}
+
+
+#' Generate Missing Data Report
+#'
+#' Creates a formatted summary of missing data for output.
+#'
+#' @param diagnostics Validation diagnostics
+#' @return Character string with formatted report
+#' @export
+format_missing_report <- function(diagnostics) {
+  lines <- character(0)
+
+  lines <- c(lines, "Missing data detected:")
+  lines <- c(lines, sprintf("- Original sample: %d respondents",
+                           diagnostics$original_n))
+  lines <- c(lines, sprintf("- Complete cases: %d respondents (%s%%)",
+                           diagnostics$complete_n, diagnostics$pct_complete))
+  lines <- c(lines, sprintf("- Excluded: %d respondents (%s%%)",
+                           diagnostics$original_n - diagnostics$complete_n,
+                           round(100 - diagnostics$pct_complete, 1)))
+
+  # Variables with highest missing
+  if (!is.null(diagnostics$missing_summary)) {
+    ms <- diagnostics$missing_summary
+    ms <- ms[order(-ms$Pct_Missing), ]
+    ms <- ms[ms$Pct_Missing > 0, ]
+
+    if (nrow(ms) > 0) {
+      lines <- c(lines, "")
+      lines <- c(lines, "Variables with missing data:")
+      for (i in 1:min(5, nrow(ms))) {
+        lines <- c(lines, sprintf("- %s: %s%% missing",
+                                 ms$Variable[i], ms$Pct_Missing[i]))
+      }
+    }
+  }
+
+  paste(lines, collapse = "\n")
+}

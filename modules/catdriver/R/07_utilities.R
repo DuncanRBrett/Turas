@@ -1,0 +1,626 @@
+# ==============================================================================
+# CATEGORICAL KEY DRIVER - UTILITIES
+# ==============================================================================
+#
+# Helper functions for the categorical key driver module.
+# These utilities support configuration, data handling, and output formatting.
+#
+# Version: 1.0
+# Date: December 2024
+#
+# ==============================================================================
+
+# ==============================================================================
+# SETTING CONVERSION HELPERS
+# ==============================================================================
+
+#' Convert Setting to Logical
+#'
+#' Handles Y/N, YES/NO, T/F, 1/0, TRUE/FALSE conversions.
+#'
+#' @param value Setting value (may be string, numeric, or logical)
+#' @param default Default if NULL/NA
+#' @return Logical value
+#' @keywords internal
+as_logical_setting <- function(value, default = FALSE) {
+  if (is.null(value) || (length(value) == 1 && is.na(value))) {
+    return(default)
+  }
+
+  if (is.logical(value)) {
+    return(value)
+  }
+
+  if (is.character(value)) {
+    return(tolower(trimws(value)) %in% c("true", "yes", "1", "on", "enabled", "t", "y"))
+  }
+
+  if (is.numeric(value)) {
+    return(value != 0)
+  }
+
+  default
+}
+
+
+#' Convert Setting to Numeric
+#'
+#' @param value Setting value
+#' @param default Default if NULL/NA
+#' @return Numeric value
+#' @keywords internal
+as_numeric_setting <- function(value, default = NA_real_) {
+  if (is.null(value) || (length(value) == 1 && is.na(value))) {
+    return(default)
+  }
+
+  if (is.numeric(value)) {
+    return(value)
+  }
+
+  if (is.character(value)) {
+    result <- suppressWarnings(as.numeric(value))
+    if (is.na(result)) {
+      return(default)
+    }
+    return(result)
+  }
+
+  default
+}
+
+
+#' Get Setting Value with Default
+#'
+#' Safely extract setting values from a list with fallback.
+#'
+#' @param settings Settings list
+#' @param name Setting name
+#' @param default Default value if not found
+#' @return Setting value or default
+#' @keywords internal
+get_setting <- function(settings, name, default = NULL) {
+  val <- settings[[name]]
+  if (is.null(val) || (length(val) == 1 && is.na(val))) {
+    return(default)
+  }
+  val
+}
+
+
+# ==============================================================================
+# TEXT FORMATTING HELPERS
+# ==============================================================================
+
+#' Format P-Value for Display
+#'
+#' @param p Numeric p-value
+#' @param digits Number of decimal places for regular values
+#' @return Character string of formatted p-value
+#' @keywords internal
+format_pvalue <- function(p, digits = 3) {
+  if (is.na(p)) return("NA")
+
+  if (p < 0.001) {
+    return("<0.001")
+  } else if (p < 0.01) {
+    return(sprintf("%.3f", p))
+  } else {
+    return(sprintf(paste0("%.", digits, "f"), p))
+  }
+}
+
+
+#' Get Significance Stars
+#'
+#' @param p Numeric p-value
+#' @return Character string with stars or "ns"
+#' @keywords internal
+get_sig_stars <- function(p) {
+  if (is.na(p)) return("")
+
+  if (p < 0.001) {
+    return("***")
+  } else if (p < 0.01) {
+    return("**")
+  } else if (p < 0.05) {
+    return("*")
+  } else {
+    return("ns")
+  }
+}
+
+
+#' Format Percentage
+#'
+#' @param value Numeric value (0-1 scale or 0-100 scale)
+#' @param digits Decimal places
+#' @param already_pct TRUE if value is already percentage (0-100)
+#' @return Formatted percentage string
+#' @keywords internal
+format_pct <- function(value, digits = 1, already_pct = FALSE) {
+  if (is.na(value)) return("NA")
+
+  if (!already_pct) {
+    value <- value * 100
+  }
+
+  sprintf(paste0("%.", digits, "f%%"), value)
+}
+
+
+#' Format Odds Ratio for Display
+#'
+#' @param or Odds ratio value
+#' @param digits Decimal places
+#' @return Formatted string
+#' @keywords internal
+format_or <- function(or, digits = 2) {
+  if (is.na(or)) return("NA")
+
+  if (abs(or) > 100) {
+    return(sprintf("%.0f", or))
+  } else if (abs(or) > 10) {
+    return(sprintf("%.1f", or))
+  } else {
+    return(sprintf(paste0("%.", digits, "f"), or))
+  }
+}
+
+
+#' Interpret Odds Ratio Effect Size
+#'
+#' Based on standard guidelines for OR interpretation.
+#'
+#' @param or Odds ratio value
+#' @return Character description of effect size
+#' @keywords internal
+interpret_or_effect <- function(or) {
+  if (is.na(or) || is.infinite(or)) return("Unknown")
+
+  # Convert OR to absolute scale (handle protective effects)
+  or_abs <- if (or < 1) 1/or else or
+
+  if (or_abs < 1.1) {
+    return("Negligible")
+  } else if (or_abs < 1.5) {
+    return("Small")
+  } else if (or_abs < 2.0) {
+    return("Medium")
+  } else if (or_abs < 3.0) {
+    return("Large")
+  } else {
+    return("Very Large")
+  }
+}
+
+
+#' Interpret Importance Percentage
+#'
+#' @param pct Importance percentage (0-100)
+#' @return Character description
+#' @keywords internal
+interpret_importance <- function(pct) {
+  if (is.na(pct)) return("Unknown")
+
+  if (pct > 30) {
+    return("Dominant driver")
+  } else if (pct > 15) {
+    return("Major driver")
+  } else if (pct > 5) {
+    return("Moderate driver")
+  } else {
+    return("Minor driver")
+  }
+}
+
+
+#' Interpret McFadden Pseudo-R2
+#'
+#' @param r2 McFadden R-squared value
+#' @return Character interpretation
+#' @keywords internal
+interpret_pseudo_r2 <- function(r2) {
+  if (is.na(r2)) return("Unknown")
+
+  if (r2 >= 0.4) {
+    return("Excellent fit")
+  } else if (r2 >= 0.2) {
+    return("Good fit")
+  } else if (r2 >= 0.1) {
+    return("Moderate fit")
+  } else {
+    return("Limited explanatory power")
+  }
+}
+
+
+# ==============================================================================
+# VARIABLE NAME HELPERS
+# ==============================================================================
+
+#' Clean Variable Name for Safe Use
+#'
+#' Removes special characters, spaces, and ensures valid R variable name.
+#'
+#' @param name Character string to clean
+#' @param max_length Maximum length (default 32)
+#' @return Cleaned variable name
+#' @keywords internal
+clean_var_name <- function(name, max_length = 32) {
+  if (is.na(name) || !nzchar(name)) return("unnamed")
+
+  # Replace spaces with underscores
+  cleaned <- gsub("\\s+", "_", name)
+
+  # Remove special characters (keep alphanumeric and underscore)
+  cleaned <- gsub("[^A-Za-z0-9_]", "", cleaned)
+
+  # Ensure doesn't start with number
+  if (grepl("^[0-9]", cleaned)) {
+    cleaned <- paste0("x", cleaned)
+  }
+
+  # Truncate if needed
+  if (nchar(cleaned) > max_length) {
+    cleaned <- substr(cleaned, 1, max_length)
+  }
+
+  # Handle empty result
+  if (!nzchar(cleaned)) {
+    cleaned <- "unnamed"
+  }
+
+  cleaned
+}
+
+
+#' Create Dummy Variable Name
+#'
+#' Creates standardized dummy variable name from base variable and category.
+#'
+#' @param base_var Base variable name
+#' @param category Category name
+#' @return Dummy variable name
+#' @keywords internal
+make_dummy_name <- function(base_var, category) {
+  # Clean category
+  clean_cat <- clean_var_name(as.character(category), max_length = 20)
+
+  # Combine
+  paste0(base_var, "_", clean_cat)
+}
+
+
+# ==============================================================================
+# DATA INSPECTION HELPERS
+# ==============================================================================
+
+#' Get Variable Summary
+#'
+#' Quick summary of a variable's type and unique values.
+#'
+#' @param x Vector to summarize
+#' @return List with type info and unique count
+#' @keywords internal
+var_summary <- function(x) {
+  list(
+    class = class(x)[1],
+    n_total = length(x),
+    n_missing = sum(is.na(x)),
+    n_unique = length(unique(na.omit(x))),
+    is_numeric = is.numeric(x),
+    is_factor = is.factor(x),
+    is_ordered = is.ordered(x)
+  )
+}
+
+
+#' Check if Variable is Categorical
+#'
+#' Determines if variable should be treated as categorical.
+#'
+#' @param x Vector to check
+#' @param max_unique Maximum unique values for numeric to be categorical
+#' @return Logical
+#' @keywords internal
+is_categorical <- function(x, max_unique = 10) {
+  if (is.factor(x) || is.character(x) || is.logical(x)) {
+    return(TRUE)
+  }
+
+  if (is.numeric(x)) {
+    n_unique <- length(unique(na.omit(x)))
+    return(n_unique <= max_unique)
+  }
+
+  FALSE
+}
+
+
+# ==============================================================================
+# CROSS-TABULATION HELPERS
+# ==============================================================================
+
+#' Safe Cross-Tabulation with Proportions
+#'
+#' Creates cross-tab with row proportions, handling edge cases.
+#'
+#' @param row_var Row variable (predictor)
+#' @param col_var Column variable (outcome)
+#' @return List with count and proportion tables
+#' @keywords internal
+safe_crosstab <- function(row_var, col_var) {
+  # Create count table
+  tab_count <- table(row_var, col_var, useNA = "no")
+
+  # Calculate row proportions safely
+  row_totals <- rowSums(tab_count)
+  tab_prop <- tab_count / ifelse(row_totals == 0, 1, row_totals)
+
+  list(
+    counts = tab_count,
+    proportions = tab_prop,
+    row_totals = row_totals,
+    col_totals = colSums(tab_count)
+  )
+}
+
+
+#' Detect Small Cells in Cross-Tabulation
+#'
+#' @param tab Cross-tabulation table (from table())
+#' @param threshold Minimum cell count (default 5)
+#' @return List with small cell locations and summary
+#' @keywords internal
+detect_small_cells <- function(tab, threshold = 5) {
+  small_cells <- which(tab < threshold & tab > 0, arr.ind = TRUE)
+
+  if (nrow(small_cells) == 0) {
+    return(list(
+      has_small_cells = FALSE,
+      n_small_cells = 0,
+      details = NULL
+    ))
+  }
+
+  # Build details
+  details <- data.frame(
+    row_category = rownames(tab)[small_cells[, 1]],
+    col_category = colnames(tab)[small_cells[, 2]],
+    count = apply(small_cells, 1, function(idx) tab[idx[1], idx[2]])
+  )
+
+  list(
+    has_small_cells = TRUE,
+    n_small_cells = nrow(small_cells),
+    details = details
+  )
+}
+
+
+# ==============================================================================
+# PATH HELPERS
+# ==============================================================================
+
+#' Check if Path is Absolute
+#'
+#' @param path File path to check
+#' @return Logical
+#' @keywords internal
+is_absolute_path <- function(path) {
+  if (is.null(path) || !nzchar(path)) return(FALSE)
+
+  # Windows absolute (C:\ or \\)
+  if (grepl("^[A-Za-z]:", path) || grepl("^\\\\\\\\", path)) {
+    return(TRUE)
+  }
+
+  # Unix absolute (/)
+  if (grepl("^/", path)) {
+    return(TRUE)
+  }
+
+  FALSE
+}
+
+
+#' Resolve Relative Path from Base Directory
+#'
+#' @param base_dir Base directory
+#' @param rel_path Relative path
+#' @return Absolute normalized path
+#' @keywords internal
+resolve_path <- function(base_dir, rel_path) {
+  if (is.null(rel_path) || is.na(rel_path) || !nzchar(rel_path)) {
+    return(NULL)
+  }
+
+  # Already absolute
+  if (is_absolute_path(rel_path)) {
+    return(normalizePath(rel_path, winslash = "/", mustWork = FALSE))
+  }
+
+  # Remove leading ./
+  rel_path <- gsub("^\\./", "", rel_path)
+
+  # Combine and normalize
+  full_path <- file.path(base_dir, rel_path)
+  normalizePath(full_path, winslash = "/", mustWork = FALSE)
+}
+
+
+# ==============================================================================
+# LOGGING HELPERS
+# ==============================================================================
+
+#' Print Status Message
+#'
+#' Consistent formatting for status messages.
+#'
+#' @param message Message text
+#' @param type Type: "info", "success", "warning", "error"
+#' @keywords internal
+log_message <- function(message, type = "info") {
+  prefix <- switch(type,
+    info = "   ",
+    success = "   \u2713 ",
+    warning = "   \u26A0 ",
+    error = "   \u2717 ",
+    "   "
+  )
+
+  cat(prefix, message, "\n", sep = "")
+}
+
+
+#' Print Section Header
+#'
+#' @param step_number Step number
+#' @param title Section title
+#' @keywords internal
+log_section <- function(step_number, title) {
+  cat("\n", step_number, ". ", title, "\n", sep = "")
+}
+
+
+# ==============================================================================
+# CONFIDENCE INTERVAL HELPERS
+# ==============================================================================
+
+#' Calculate Odds Ratio Confidence Interval
+#'
+#' @param or Odds ratio (point estimate)
+#' @param se Standard error of log(OR)
+#' @param conf_level Confidence level (default 0.95)
+#' @return Named vector with lower and upper bounds
+#' @keywords internal
+or_ci <- function(or, se, conf_level = 0.95) {
+  z <- qnorm(1 - (1 - conf_level) / 2)
+  log_or <- log(or)
+
+  c(
+    lower = exp(log_or - z * se),
+    upper = exp(log_or + z * se)
+  )
+}
+
+
+#' Format Confidence Interval
+#'
+#' @param lower Lower bound
+#' @param upper Upper bound
+#' @param digits Decimal places
+#' @return Formatted string like "1.23-4.56"
+#' @keywords internal
+format_ci <- function(lower, upper, digits = 2) {
+  if (is.na(lower) || is.na(upper)) return("-")
+
+  sprintf("%.*f-%.*f", digits, lower, digits, upper)
+}
+
+
+# ==============================================================================
+# MODEL DIAGNOSTIC HELPERS
+# ==============================================================================
+
+#' Calculate McFadden Pseudo R-squared
+#'
+#' @param model Fitted model (glm, polr, or multinom)
+#' @param null_model Optional null model for comparison
+#' @return Numeric pseudo R-squared value
+#' @keywords internal
+calc_mcfadden_r2 <- function(model, null_model = NULL) {
+  # Get log-likelihoods
+  ll_full <- logLik(model)[1]
+
+  if (!is.null(null_model)) {
+    ll_null <- logLik(null_model)[1]
+  } else {
+    # Try to get from model
+    if (inherits(model, "glm")) {
+      ll_null <- model$null.deviance / -2
+    } else {
+      # Approximate from model
+      warning("Null model not provided, R-squared may be approximate")
+      ll_null <- ll_full * 0.5  # Placeholder
+    }
+  }
+
+  1 - (ll_full / ll_null)
+}
+
+
+#' Check for Separation in Binary Model
+#'
+#' Detects perfect or quasi-complete separation.
+#'
+#' @param model Fitted glm model
+#' @return List with separation status and details
+#' @keywords internal
+check_separation <- function(model) {
+  coefs <- coef(model)
+  ses <- sqrt(diag(vcov(model)))
+
+  large_coef <- any(abs(coefs) > 10, na.rm = TRUE)
+  large_se <- any(ses > 100, na.rm = TRUE)
+
+  has_separation <- large_coef || large_se
+
+  problematic <- character(0)
+  if (has_separation) {
+    idx <- which(abs(coefs) > 10 | ses > 100)
+    problematic <- names(coefs)[idx]
+  }
+
+  list(
+    has_separation = has_separation,
+    problematic_vars = problematic,
+    message = if (has_separation) {
+      paste0("Possible separation detected in: ",
+             paste(problematic, collapse = ", "),
+             ". Consider collapsing rare categories.")
+    } else {
+      "No separation detected"
+    }
+  )
+}
+
+
+# ==============================================================================
+# LIST/DATA FRAME HELPERS
+# ==============================================================================
+
+#' Safe List Element Access
+#'
+#' @param lst List to access
+#' @param name Element name
+#' @param default Default if not found
+#' @return Element value or default
+#' @keywords internal
+safe_get <- function(lst, name, default = NULL) {
+  if (is.null(lst) || !name %in% names(lst)) {
+    return(default)
+  }
+  lst[[name]]
+}
+
+
+#' Combine Multiple Data Frames
+#'
+#' Safe rbind that handles empty data frames.
+#'
+#' @param ... Data frames to combine
+#' @return Combined data frame
+#' @keywords internal
+safe_rbind <- function(...) {
+  dfs <- list(...)
+  dfs <- dfs[!sapply(dfs, is.null)]
+  dfs <- dfs[sapply(dfs, function(x) nrow(x) > 0)]
+
+  if (length(dfs) == 0) {
+    return(data.frame())
+  }
+
+  do.call(rbind, dfs)
+}

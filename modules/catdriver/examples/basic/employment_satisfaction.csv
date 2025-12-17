@@ -1,0 +1,401 @@
+respondent_id,satisfaction,grade,campus,course_type,employment_field,years_experience,survey_weight
+1,Low,B,Cape Town,BCom,Operations,2,0.54
+2,Neutral,C,Cape Town,BCom,Operations,2,0.92
+3,High,A,Cape Town,BSocSci,Marketing,2,0.64
+4,High,D,Durban,BEng,Operations,9,0.62
+5,High,C,Johannesburg,BCom,Finance,1,0.93
+6,Low,D,Cape Town,BCom,IT,2,1.51
+7,High,B,Cape Town,BSocSci,Marketing,2,1.98
+8,High,B,Johannesburg,BEng,Marketing,6,1.1
+9,High,D,Durban,BEng,HR,9,1.19
+10,Neutral,C,Durban,BCom,Operations,1,2.0
+11,Low,B,Cape Town,BCom,HR,2,1.39
+12,Neutral,B,Durban,LLB,Finance,3,0.9
+13,Low,B,Durban,BSocSci,IT,5,1.26
+14,Neutral,D,Johannesburg,BSocSci,IT,3,1.67
+15,Low,B,Durban,BCom,IT,1,1.35
+16,Neutral,D,Johannesburg,LLB,Marketing,3,1.32
+17,High,C,Durban,BCom,Marketing,2,1.51
+18,High,C,Durban,BCom,Finance,1,0.83
+19,Neutral,D,Cape Town,LLB,Finance,2,1.23
+20,High,B,Johannesburg,BSocSci,HR,1,0.65
+21,Neutral,C,Durban,BEng,Finance,5,1.7
+22,Low,D,Durban,BCom,HR,9,1.16
+23,High,A,Cape Town,LLB,Finance,7,0.75
+24,Neutral,B,Durban,BCom,HR,6,1.18
+25,High,C,Online,BSocSci,Marketing,1,0.59
+26,Low,B,Durban,BCom,Operations,11,0.62
+27,High,C,Johannesburg,BCom,Operations,4,1.43
+28,High,C,Durban,LLB,IT,2,1.51
+29,Neutral,C,Johannesburg,BCom,Operations,1,0.82
+30,High,C,Johannesburg,BEng,Marketing,3,0.95
+31,High,A,Durban,BSocSci,Finance,1,0.67
+32,Neutral,D,Cape Town,BSocSci,Marketing,7,1.26
+33,High,C,Cape Town,BSocSci,Finance,,1.66
+34,Neutral,B,Johannesburg,BSocSci,Finance,10,1.54
+35,Low,D,Durban,BSocSci,Finance,8,1.69
+36,High,A,Cape Town,BCom,Operations,2,1.43
+37,High,C,Johannesburg,LLB,HR,,1.6
+38,High,C,Johannesburg,BEng,IT,5,1.07
+39,Neutral,D,Cape Town,LLB,Marketing,4,1.1
+40,Low,C,Johannesburg,BCom,Operations,1,1.82
+41,High,C,Online,BCom,IT,2,1.41
+42,Neutral,B,Durban,BCom,Finance,6,1.53
+43,High,A,Cape Town,BSocSci,IT,4,0.69
+44,High,A,Johannesburg,BCom,Operations,2,1.91
+45,High,B,Durban,BCom,Finance,1,1.68
+46,Neutral,B,Durban,BSocSci,Marketing,2,1.5
+47,Low,B,Online,BCom,Marketing,1,1.98
+48,High,B,Durban,BEng,HR,1,1.48
+49,High,D,Johannesburg,BCom,Marketing,4,1.2
+50,High,B,Cape Town,BCom,Operations,4,1.93
+51,High,A,Johannesburg,BSocSci,Operations,1,1.79
+52,High,B,Johannesburg,BCom,HR,2,0.62
+53,Neutral,C,Durban,BSocSci,Marketing,1,0.82
+54,Neutral,C,Durban,BCom,HR,3,1.54
+55,High,A,Durban,BCom,HR,11,1.13
+56,Neutral,B,Durban,BCom,HR,2,1.5
+57,High,B,Johannesburg,LLB,Operations,,1.09
+58,Low,B,Durban,BCom,Finance,2,1.18
+59,High,C,Cape Town,LLB,Finance,5,0.58
+60,Neutral,A,Cape Town,LLB,,,0.87
+61,High,A,Cape Town,BSocSci,Marketing,1,1.05
+62,High,B,Johannesburg,BEng,IT,1,0.97
+63,High,B,Durban,BEng,Marketing,5,1.78
+64,Low,B,Online,BEng,HR,1,1.47
+65,Neutral,D,Durban,BSocSci,HR,2,1.6
+66,Neutral,A,Johannesburg,BSocSci,HR,3,0.98
+67,High,C,Cape Town,BSocSci,Operations,2,0.54
+68,Neutral,A,Cape Town,BEng,Operations,2,0.52
+69,Neutral,A,Johannesburg,BSocSci,HR,3,1.69
+70,Low,D,Johannesburg,BCom,HR,2,1.99
+71,Neutral,B,Durban,BCom,Marketing,5,1.93
+72,Low,B,Johannesburg,BCom,Operations,14,1.75
+73,Neutral,C,Durban,BEng,Finance,3,1.55
+74,High,D,Durban,BEng,HR,2,1.95
+75,High,C,Cape Town,BCom,Operations,1,0.72
+76,Neutral,B,Online,BCom,Operations,4,1.66
+77,High,C,Cape Town,BSocSci,Operations,4,1.61
+78,Neutral,A,Cape Town,BSocSci,Marketing,1,1.11
+79,Neutral,B,Cape Town,BCom,HR,1,0.9
+80,High,B,Johannesburg,BCom,Marketing,8,1.74
+81,Low,D,Durban,BEng,IT,3,0.96
+82,Neutral,C,Durban,BSocSci,HR,4,0.54
+83,High,C,Johannesburg,BSocSci,,6,1.36
+84,Low,B,Durban,BSocSci,Operations,6,1.95
+85,Neutral,B,Durban,BCom,HR,2,1.92
+86,High,A,Durban,BCom,HR,6,0.5
+87,High,A,Cape Town,BSocSci,HR,5,0.81
+88,High,B,Durban,BSocSci,Operations,5,0.97
+89,Neutral,D,Cape Town,BEng,Finance,1,1.9
+90,High,C,Durban,BSocSci,HR,2,1.88
+91,High,B,Johannesburg,BCom,HR,6,0.9
+92,Neutral,D,Johannesburg,BSocSci,Marketing,3,1.0
+93,Neutral,B,Online,BEng,Marketing,1,1.66
+94,Neutral,D,Johannesburg,BEng,Marketing,1,1.25
+95,High,B,Johannesburg,BSocSci,HR,,0.72
+96,High,A,Cape Town,BEng,Operations,4,1.78
+97,High,A,Durban,BCom,HR,1,0.6
+98,High,B,Online,BEng,Finance,5,0.65
+99,Neutral,C,Cape Town,BCom,,2,0.87
+100,High,C,Cape Town,BCom,HR,1,1.87
+101,Neutral,D,Cape Town,BCom,,8,1.52
+102,Neutral,C,Durban,BSocSci,HR,3,0.95
+103,High,A,Cape Town,BCom,IT,2,1.97
+104,Neutral,B,Durban,BSocSci,Finance,5,1.75
+105,High,A,Cape Town,BEng,Marketing,4,1.58
+106,High,B,Durban,LLB,IT,1,1.05
+107,High,D,Durban,BSocSci,Operations,2,1.25
+108,Low,C,Online,LLB,IT,2,0.67
+109,Neutral,A,Online,BEng,HR,6,1.05
+110,Low,B,Durban,BSocSci,IT,6,1.91
+111,Low,D,Cape Town,BEng,Operations,1,1.74
+112,High,A,Durban,BCom,IT,1,0.85
+113,Neutral,B,Durban,LLB,Operations,5,0.73
+114,Low,C,Durban,BSocSci,Finance,1,1.17
+115,Neutral,C,Online,BCom,IT,2,1.95
+116,High,A,Cape Town,BCom,Finance,2,1.98
+117,Neutral,B,Johannesburg,BSocSci,Marketing,1,1.85
+118,High,D,Cape Town,BCom,Marketing,7,0.7
+119,High,C,Durban,BCom,Marketing,3,1.62
+120,High,B,Durban,BCom,Operations,6,1.8
+121,Neutral,B,Online,BCom,HR,1,1.57
+122,High,C,Durban,BCom,Operations,3,0.99
+123,High,A,Durban,BSocSci,Finance,4,1.65
+124,Neutral,B,Durban,BCom,HR,5,0.97
+125,Neutral,C,Online,BSocSci,Finance,1,0.64
+126,High,B,Durban,BSocSci,IT,2,1.81
+127,High,A,Online,BCom,IT,3,0.82
+128,Neutral,B,Cape Town,BEng,IT,6,1.77
+129,High,A,Durban,BSocSci,,6,0.9
+130,High,C,Durban,BCom,,3,1.1
+131,Neutral,D,Cape Town,BEng,HR,1,0.97
+132,High,C,Durban,BEng,Operations,1,1.16
+133,High,C,Durban,BCom,IT,2,1.52
+134,High,B,Cape Town,BCom,Finance,10,1.65
+135,Neutral,B,Cape Town,BSocSci,Marketing,5,1.25
+136,High,A,Cape Town,BEng,,,1.88
+137,High,A,Durban,BEng,Finance,12,0.76
+138,High,A,Johannesburg,BCom,Finance,3,1.29
+139,Neutral,C,Durban,BCom,Operations,3,0.79
+140,Neutral,B,Online,BSocSci,Finance,1,1.4
+141,High,B,Cape Town,BEng,Operations,2,1.89
+142,High,B,Durban,BEng,Marketing,3,1.45
+143,High,B,Durban,BCom,Finance,6,0.62
+144,High,A,Durban,BSocSci,Operations,5,0.56
+145,High,A,Cape Town,BSocSci,Finance,6,1.76
+146,Neutral,A,Durban,BCom,HR,4,1.05
+147,High,A,Johannesburg,BSocSci,,2,0.99
+148,Neutral,B,Cape Town,BEng,Operations,2,1.37
+149,Low,D,Online,BSocSci,Operations,1,1.34
+150,Neutral,B,Cape Town,BEng,Operations,4,1.26
+151,Low,D,Online,BCom,Marketing,1,0.62
+152,Neutral,A,Johannesburg,BEng,Finance,7,1.43
+153,Low,B,Cape Town,BSocSci,Marketing,1,1.05
+154,High,B,Durban,BEng,Marketing,2,1.71
+155,High,B,Durban,LLB,HR,6,1.25
+156,Low,C,Cape Town,BSocSci,Finance,7,1.33
+157,High,D,Johannesburg,BCom,IT,3,1.75
+158,High,D,Johannesburg,BEng,HR,3,0.85
+159,High,A,Cape Town,LLB,IT,1,0.93
+160,High,A,Cape Town,BEng,Finance,1,0.82
+161,High,D,Durban,BSocSci,Marketing,1,1.13
+162,Neutral,B,Cape Town,LLB,Finance,3,1.58
+163,Low,C,Durban,BSocSci,Finance,2,1.93
+164,High,B,Durban,BCom,Finance,14,0.88
+165,High,D,Durban,BEng,Operations,2,0.57
+166,High,B,Cape Town,BEng,HR,6,0.59
+167,Neutral,B,Cape Town,BCom,Finance,2,1.1
+168,High,A,Cape Town,BSocSci,Finance,2,0.69
+169,High,C,Johannesburg,BEng,Marketing,3,1.89
+170,High,B,Johannesburg,BCom,Marketing,2,0.62
+171,Neutral,B,Durban,BSocSci,IT,5,1.87
+172,Neutral,B,Durban,BEng,,2,1.27
+173,Low,B,Cape Town,BEng,HR,,0.6
+174,Neutral,B,Durban,BSocSci,HR,2,1.64
+175,Neutral,B,Durban,BSocSci,Finance,,0.78
+176,High,B,Cape Town,BEng,Marketing,2,1.87
+177,Low,B,Johannesburg,BSocSci,HR,6,1.95
+178,High,A,Johannesburg,BSocSci,IT,5,1.89
+179,High,B,Durban,BCom,Marketing,3,1.04
+180,Neutral,B,Online,BCom,Finance,27,1.58
+181,High,B,Johannesburg,BCom,Finance,4,1.02
+182,High,A,Durban,BCom,HR,7,1.75
+183,Neutral,B,Cape Town,LLB,Operations,7,0.88
+184,High,B,Cape Town,BCom,Operations,3,1.37
+185,High,C,Online,BCom,Finance,1,0.57
+186,High,B,Johannesburg,BEng,Finance,4,0.93
+187,High,A,Johannesburg,BSocSci,Finance,1,1.12
+188,Neutral,B,Cape Town,BEng,IT,1,1.06
+189,Neutral,B,Durban,BCom,Finance,10,1.8
+190,High,C,Online,BEng,IT,1,1.99
+191,High,B,Durban,BCom,HR,1,1.03
+192,Neutral,D,Johannesburg,BSocSci,Operations,,0.66
+193,Low,D,Durban,BSocSci,,3,1.04
+194,Neutral,C,Durban,BSocSci,Operations,1,1.96
+195,High,C,Durban,LLB,Marketing,2,0.56
+196,Neutral,D,Johannesburg,BSocSci,Operations,9,0.98
+197,High,C,Johannesburg,BSocSci,Operations,5,0.95
+198,High,A,Johannesburg,LLB,Finance,2,1.48
+199,High,A,Cape Town,BCom,Operations,4,1.76
+200,Neutral,D,Cape Town,LLB,Finance,2,1.12
+201,Neutral,C,Durban,BSocSci,Finance,3,1.34
+202,High,A,Durban,LLB,Operations,2,1.66
+203,High,B,Johannesburg,BSocSci,Marketing,2,1.91
+204,High,A,Johannesburg,BSocSci,HR,10,1.69
+205,Low,C,Johannesburg,BCom,IT,6,0.94
+206,High,C,Durban,BSocSci,HR,6,0.91
+207,Neutral,B,Cape Town,BEng,Finance,3,1.46
+208,Neutral,D,Johannesburg,BCom,Finance,13,0.74
+209,High,B,Durban,BSocSci,IT,4,1.86
+210,Neutral,D,Durban,BEng,Marketing,7,1.9
+211,High,D,Johannesburg,BCom,IT,1,1.35
+212,High,D,Cape Town,LLB,HR,1,1.26
+213,High,C,Durban,BEng,Marketing,,1.01
+214,High,C,Cape Town,BSocSci,HR,3,0.63
+215,Low,B,Cape Town,BCom,IT,2,0.9
+216,High,C,Durban,BCom,Marketing,1,0.96
+217,Neutral,C,Johannesburg,BEng,Finance,10,1.05
+218,High,C,Durban,BSocSci,IT,3,1.21
+219,High,B,Cape Town,BCom,Finance,3,1.04
+220,Neutral,A,Johannesburg,LLB,Operations,2,1.28
+221,Low,D,Durban,BCom,Finance,3,1.19
+222,Neutral,D,Johannesburg,BEng,Finance,3,0.57
+223,Low,C,Online,LLB,HR,,1.11
+224,High,B,Online,BSocSci,HR,9,1.07
+225,High,D,Johannesburg,BCom,Finance,3,1.29
+226,Neutral,B,Cape Town,BCom,Operations,2,0.84
+227,Low,B,Cape Town,BEng,Finance,2,1.65
+228,Low,A,Cape Town,BCom,,5,0.57
+229,Neutral,B,Cape Town,BCom,Finance,17,0.85
+230,High,A,Durban,BEng,Marketing,1,1.49
+231,Neutral,C,Cape Town,LLB,Marketing,2,1.24
+232,High,A,Johannesburg,BEng,HR,2,0.78
+233,Neutral,B,Cape Town,BEng,HR,3,1.95
+234,Low,B,Cape Town,BCom,HR,1,1.59
+235,Neutral,C,Johannesburg,BSocSci,Marketing,3,1.51
+236,Neutral,C,Online,BCom,Marketing,11,0.68
+237,High,A,Cape Town,BSocSci,Marketing,5,1.07
+238,Neutral,B,Cape Town,BSocSci,Finance,5,1.64
+239,Neutral,C,Durban,BCom,Marketing,,1.33
+240,High,B,Cape Town,BCom,Operations,3,1.48
+241,Neutral,B,Johannesburg,LLB,HR,5,1.03
+242,Neutral,D,Cape Town,BEng,Finance,7,0.61
+243,Low,A,Cape Town,BCom,Finance,1,1.26
+244,High,C,Johannesburg,BSocSci,HR,,1.3
+245,Low,C,Johannesburg,BSocSci,Operations,4,1.71
+246,Neutral,A,Cape Town,BCom,Operations,2,1.69
+247,High,D,Durban,BCom,IT,7,1.48
+248,High,A,Cape Town,BCom,Finance,5,0.62
+249,High,A,Durban,LLB,Operations,1,1.85
+250,High,B,Cape Town,LLB,IT,3,0.55
+251,High,A,Online,BSocSci,HR,2,1.35
+252,High,B,Johannesburg,BSocSci,Marketing,4,0.62
+253,Neutral,B,Cape Town,BCom,Operations,11,1.1
+254,Low,B,Cape Town,LLB,IT,2,0.78
+255,Neutral,B,Johannesburg,BCom,Finance,1,1.57
+256,High,B,Durban,BCom,,2,0.9
+257,Low,D,Durban,BSocSci,Finance,3,1.4
+258,High,B,Cape Town,BSocSci,Operations,13,1.36
+259,Neutral,C,Cape Town,BCom,Finance,2,0.95
+260,Neutral,B,Online,BEng,Operations,1,0.96
+261,High,A,Durban,BEng,IT,6,1.48
+262,Neutral,B,Durban,BSocSci,Marketing,12,0.94
+263,Neutral,B,Durban,BCom,HR,9,0.8
+264,Neutral,A,Johannesburg,BCom,Marketing,2,1.54
+265,High,A,Durban,BSocSci,Marketing,1,1.13
+266,Neutral,C,Durban,BSocSci,HR,6,1.04
+267,High,A,Durban,BCom,IT,4,1.34
+268,High,B,Online,BCom,Finance,,0.89
+269,Neutral,B,Durban,BSocSci,HR,4,1.54
+270,High,C,Durban,BCom,Finance,10,0.71
+271,Neutral,C,Cape Town,BSocSci,HR,3,0.6
+272,Neutral,D,Cape Town,BCom,Marketing,5,1.27
+273,Neutral,B,Durban,BSocSci,Marketing,4,1.09
+274,High,B,Durban,BSocSci,,2,1.56
+275,High,B,Johannesburg,BSocSci,Marketing,2,1.79
+276,High,B,Durban,BSocSci,IT,3,0.76
+277,High,B,Online,BSocSci,IT,2,0.77
+278,Neutral,B,Durban,BCom,Marketing,3,1.88
+279,Neutral,A,Cape Town,BCom,HR,7,1.93
+280,Low,B,Durban,BSocSci,HR,2,1.76
+281,Low,B,Cape Town,BEng,IT,2,1.67
+282,High,B,Durban,BSocSci,IT,6,1.05
+283,Low,A,Johannesburg,BSocSci,Finance,4,0.87
+284,Low,A,Cape Town,BEng,Finance,1,1.72
+285,Neutral,B,Johannesburg,BSocSci,Marketing,6,1.71
+286,Neutral,B,Durban,BCom,IT,2,1.79
+287,High,A,Cape Town,LLB,Finance,7,0.69
+288,Neutral,A,Johannesburg,BEng,HR,3,0.9
+289,Neutral,C,Durban,BEng,Operations,4,1.82
+290,Neutral,B,Durban,BEng,Finance,3,1.5
+291,Low,C,Durban,BCom,Marketing,2,0.93
+292,Low,B,Johannesburg,BEng,Finance,4,1.76
+293,High,D,Cape Town,BSocSci,HR,4,0.7
+294,Low,B,Online,BCom,IT,4,1.47
+295,Neutral,D,Johannesburg,BEng,Finance,1,1.22
+296,Low,D,Johannesburg,BCom,Finance,2,0.7
+297,Neutral,D,Johannesburg,BCom,IT,5,1.63
+298,High,D,Cape Town,BSocSci,,2,1.58
+299,Low,B,Durban,BSocSci,Finance,1,0.68
+300,Neutral,B,Durban,BEng,Finance,4,1.58
+301,High,C,Cape Town,BEng,Marketing,3,1.62
+302,Low,C,Johannesburg,LLB,Finance,4,0.61
+303,Low,A,Durban,BCom,Operations,3,0.76
+304,High,B,Cape Town,BSocSci,,9,1.92
+305,Neutral,C,Johannesburg,BEng,HR,3,1.42
+306,Neutral,C,Durban,BCom,Operations,3,1.64
+307,High,B,Durban,BSocSci,Marketing,1,1.15
+308,High,B,Durban,BEng,Finance,,0.71
+309,Neutral,D,Durban,BSocSci,IT,1,1.67
+310,High,C,Johannesburg,BCom,IT,2,1.96
+311,Neutral,B,Durban,BCom,Marketing,1,0.65
+312,High,B,Cape Town,BSocSci,,1,1.21
+313,Low,C,Online,BEng,HR,1,1.87
+314,High,C,Durban,BCom,Finance,6,1.97
+315,Low,A,Durban,BCom,IT,3,1.05
+316,High,C,Johannesburg,BCom,HR,5,1.6
+317,High,B,Cape Town,LLB,,4,1.54
+318,Low,D,Johannesburg,BCom,IT,3,0.86
+319,Low,B,Online,BEng,Marketing,3,1.55
+320,High,C,Cape Town,BCom,HR,3,1.15
+321,Neutral,A,Cape Town,BCom,IT,2,0.61
+322,High,C,Durban,BCom,HR,1,1.04
+323,Neutral,B,Durban,BEng,IT,4,0.56
+324,High,A,Cape Town,BCom,Operations,2,1.73
+325,High,C,Johannesburg,BSocSci,Finance,6,0.71
+326,High,D,Online,BCom,IT,10,0.63
+327,High,B,Cape Town,LLB,HR,1,1.77
+328,Neutral,A,Online,BCom,HR,2,0.54
+329,Low,B,Cape Town,BCom,Marketing,,1.43
+330,Neutral,C,Durban,BSocSci,IT,2,1.46
+331,Neutral,B,Online,BSocSci,,5,1.22
+332,Neutral,B,Durban,BCom,Finance,1,1.84
+333,Low,B,Online,BSocSci,Marketing,1,1.49
+334,High,C,Online,BCom,Marketing,14,1.08
+335,High,A,Cape Town,BCom,IT,1,1.55
+336,High,A,Durban,BCom,HR,1,0.56
+337,Neutral,D,Cape Town,BSocSci,Operations,1,1.58
+338,High,A,Durban,BCom,Marketing,7,1.79
+339,High,A,Online,BCom,IT,13,1.6
+340,High,C,Durban,BCom,Operations,9,1.68
+341,High,C,Cape Town,BCom,Marketing,1,1.55
+342,High,B,Johannesburg,BSocSci,IT,12,0.83
+343,High,B,Cape Town,BEng,IT,8,0.63
+344,High,B,Johannesburg,BSocSci,Marketing,2,1.68
+345,Low,B,Durban,BSocSci,HR,2,1.32
+346,Neutral,D,Johannesburg,BSocSci,Marketing,6,0.55
+347,Low,D,Cape Town,BCom,Marketing,3,1.85
+348,Neutral,D,Durban,BSocSci,,1,1.83
+349,Low,C,Cape Town,BCom,Operations,2,0.86
+350,Neutral,D,Johannesburg,BCom,HR,6,1.44
+351,Low,B,Cape Town,BSocSci,HR,2,1.1
+352,High,B,Cape Town,BSocSci,HR,2,0.89
+353,Neutral,B,Cape Town,BCom,Finance,2,1.31
+354,High,A,Durban,BEng,HR,4,1.9
+355,Neutral,B,Cape Town,BCom,Finance,8,1.7
+356,High,B,Cape Town,BEng,Marketing,6,0.69
+357,High,C,Durban,LLB,Operations,9,1.87
+358,Neutral,D,Durban,BCom,HR,1,1.55
+359,High,B,Cape Town,BCom,Operations,10,1.89
+360,Low,B,Cape Town,BSocSci,HR,4,1.36
+361,Low,B,Durban,BSocSci,HR,,1.83
+362,Neutral,C,Johannesburg,LLB,Finance,6,0.97
+363,High,A,Johannesburg,LLB,IT,2,1.74
+364,Neutral,C,Durban,BCom,HR,5,1.8
+365,High,A,Cape Town,BCom,Marketing,3,1.35
+366,High,C,Cape Town,BCom,,2,0.8
+367,Neutral,C,Durban,LLB,Marketing,4,0.77
+368,High,A,Durban,BCom,Finance,2,0.74
+369,High,B,Johannesburg,BSocSci,IT,3,1.8
+370,High,A,Durban,BCom,Finance,4,1.91
+371,High,B,Cape Town,BEng,HR,3,1.52
+372,High,A,Cape Town,BSocSci,IT,4,0.92
+373,Neutral,B,Durban,BCom,IT,5,1.84
+374,Low,C,Johannesburg,BEng,Operations,2,0.71
+375,Neutral,D,Cape Town,LLB,Finance,18,1.72
+376,High,C,Johannesburg,BSocSci,IT,7,1.76
+377,Neutral,A,Cape Town,BCom,Operations,1,1.52
+378,Low,C,Durban,BEng,IT,3,1.2
+379,Low,D,Durban,BSocSci,HR,3,1.8
+380,Neutral,C,Cape Town,BEng,Marketing,15,1.84
+381,Neutral,A,Johannesburg,BCom,IT,1,1.45
+382,Low,D,Johannesburg,BCom,HR,6,0.69
+383,Neutral,C,Durban,BSocSci,,5,1.93
+384,High,A,Durban,BCom,,1,1.82
+385,Low,C,Durban,BCom,Finance,2,1.59
+386,Neutral,B,Johannesburg,LLB,HR,1,1.92
+387,High,A,Cape Town,BEng,Finance,1,1.05
+388,Low,B,Johannesburg,BCom,Finance,1,0.66
+389,Low,A,Cape Town,BSocSci,IT,1,1.54
+390,Neutral,B,Johannesburg,BSocSci,Operations,2,1.85
+391,High,B,Cape Town,BEng,Operations,2,1.28
+392,High,C,Cape Town,BCom,Marketing,3,0.85
+393,Low,D,Cape Town,BSocSci,Finance,1,1.59
+394,High,A,Durban,LLB,Finance,1,0.56
+395,High,C,Durban,BEng,Finance,,0.71
+396,Neutral,B,Johannesburg,LLB,Finance,2,0.67
+397,Neutral,C,Johannesburg,BSocSci,HR,6,0.67
+398,Low,B,Online,BCom,Operations,3,1.16
+399,High,B,Durban,BEng,Marketing,3,1.83
+400,Low,C,Johannesburg,BCom,Operations,3,1.35
