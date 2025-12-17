@@ -328,10 +328,10 @@ launch_turas <- function() {
     launch_module <- function(module_name, script_path) {
       # Standard launch for all modules
       # Set TURAS_LAUNCHER_ACTIVE to prevent auto-run in GUI files
-      # Set TURAS_SKIP_RENV to skip renv initialization for faster GUI loading
+      # IMPORTANT: TURAS_SKIP_RENV must be set as env var BEFORE Rscript starts,
+      # so .Rprofile sees it and skips renv activation (saves ~9 seconds)
       launch_script <- sprintf('
 Sys.setenv(TURAS_ROOT = "%s")
-Sys.setenv(TURAS_SKIP_RENV = "1")
 setwd("%s")
 TURAS_LAUNCHER_ACTIVE <- TRUE
 source("%s")
@@ -361,12 +361,24 @@ if ("%s" != "alchemerparser") {
 
       writeLines(launch_script_wrapped, temp_script)
 
-      # Launch in background process
+      # Set TURAS_SKIP_RENV before launching so .Rprofile skips renv activation
+      # This is critical for fast GUI loading (~2s vs ~15s)
+      old_env <- Sys.getenv("TURAS_SKIP_RENV")
+      Sys.setenv(TURAS_SKIP_RENV = "1")
+
+      # Launch in background process (inherits environment with TURAS_SKIP_RENV=1)
       system2("Rscript",
               args = c(temp_script),
               wait = FALSE,
               stdout = log_file,
               stderr = log_file)
+
+      # Restore original env (though it doesn't matter much for parent process)
+      if (old_env == "") {
+        Sys.unsetenv("TURAS_SKIP_RENV")
+      } else {
+        Sys.setenv(TURAS_SKIP_RENV = old_env)
+      }
 
       # Check for errors after a delay
       later::later(function() {
