@@ -58,10 +58,18 @@ run_catdriver_model <- function(prep_data, config, weights = NULL) {
 run_binary_logistic <- function(formula, data, weights = NULL, config) {
 
   # Fit model
+  # Note: Avoid using 'weights' directly in glm() call due to conflict with stats::weights function
   model <- tryCatch({
     if (!is.null(weights) && length(weights) == nrow(data)) {
-      glm(formula, data = data, family = binomial(link = "logit"),
-          weights = weights)
+      # Check if weights are all equal (no actual weighting needed)
+      if (length(unique(weights)) == 1 && unique(weights)[1] == 1) {
+        glm(formula, data = data, family = binomial(link = "logit"))
+      } else {
+        # Add weights to data frame to avoid scoping issues
+        data$.wt <- weights
+        glm(formula, data = data, family = binomial(link = "logit"),
+            weights = .wt)
+      }
     } else {
       glm(formula, data = data, family = binomial(link = "logit"))
     }
@@ -186,10 +194,18 @@ run_ordinal_logistic <- function(formula, data, weights = NULL, config) {
   }
 
   # Fit model
+  # Note: Avoid using 'weights' directly due to conflict with stats::weights function
   model <- tryCatch({
     if (!is.null(weights) && length(weights) == nrow(data)) {
-      MASS::polr(formula, data = data, weights = weights,
-                 Hess = TRUE, method = "logistic")
+      # Check if weights are all equal (no actual weighting needed)
+      if (length(unique(weights)) == 1 && unique(weights)[1] == 1) {
+        MASS::polr(formula, data = data, Hess = TRUE, method = "logistic")
+      } else {
+        # Add weights to data frame to avoid scoping issues
+        data$.wt <- weights
+        MASS::polr(formula, data = data, weights = .wt,
+                   Hess = TRUE, method = "logistic")
+      }
     } else {
       MASS::polr(formula, data = data, Hess = TRUE, method = "logistic")
     }
@@ -430,10 +446,18 @@ run_multinomial_logistic <- function(formula, data, weights = NULL, config) {
   }
 
   # Fit model
+  # Note: Avoid using 'weights' directly due to conflict with stats::weights function
   model <- tryCatch({
     if (!is.null(weights) && length(weights) == nrow(data)) {
-      nnet::multinom(formula, data = data, weights = weights,
-                     trace = FALSE, maxit = 500)
+      # Check if weights are all equal (no actual weighting needed)
+      if (length(unique(weights)) == 1 && unique(weights)[1] == 1) {
+        nnet::multinom(formula, data = data, trace = FALSE, maxit = 500)
+      } else {
+        # Add weights to data frame to avoid scoping issues
+        data$.wt <- weights
+        nnet::multinom(formula, data = data, weights = .wt,
+                       trace = FALSE, maxit = 500)
+      }
     } else {
       nnet::multinom(formula, data = data, trace = FALSE, maxit = 500)
     }

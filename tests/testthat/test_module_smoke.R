@@ -89,6 +89,7 @@ test_that("All expected modules exist", {
     "tracker",
     "maxdiff",
     "keydriver",
+    "catdriver",
     "conjoint",
     "confidence",
     "segment",
@@ -110,7 +111,7 @@ test_that("All modules have README.md", {
 
   # Only check user-facing modules (not shared)
   user_modules <- c(
-    "tabs", "tracker", "maxdiff", "keydriver",
+    "tabs", "tracker", "maxdiff", "keydriver", "catdriver",
     "conjoint", "confidence", "segment", "pricing", "AlchemerParser"
   )
 

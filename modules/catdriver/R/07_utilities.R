@@ -151,20 +151,23 @@ format_pct <- function(value, digits = 1, already_pct = FALSE) {
 
 #' Format Odds Ratio for Display
 #'
-#' @param or Odds ratio value
+#' @param or Odds ratio value or vector
 #' @param digits Decimal places
-#' @return Formatted string
+#' @return Formatted string or vector of strings
 #' @keywords internal
 format_or <- function(or, digits = 2) {
-  if (is.na(or)) return("NA")
+  # Vectorized version
+  sapply(or, function(x) {
+    if (is.na(x)) return("NA")
 
-  if (abs(or) > 100) {
-    return(sprintf("%.0f", or))
-  } else if (abs(or) > 10) {
-    return(sprintf("%.1f", or))
-  } else {
-    return(sprintf(paste0("%.", digits, "f"), or))
-  }
+    if (abs(x) > 100) {
+      return(sprintf("%.0f", x))
+    } else if (abs(x) > 10) {
+      return(sprintf("%.1f", x))
+    } else {
+      return(sprintf(paste0("%.", digits, "f"), x))
+    }
+  }, USE.NAMES = FALSE)
 }
 
 

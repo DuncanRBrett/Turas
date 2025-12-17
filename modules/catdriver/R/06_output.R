@@ -315,7 +315,8 @@ generate_driver_insight <- function(driver_row, results, config) {
   max_or <- non_ref$odds_ratio[max_or_idx]
   ref_cat <- patterns$reference
 
-  if (is.na(max_or) || max_or <= 1) {
+  # Check for valid OR (handle NA and values <= 1)
+  if (length(max_or) == 0 || is.na(max_or) || max_or <= 1) {
     return(NULL)
   }
 
