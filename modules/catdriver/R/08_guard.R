@@ -11,6 +11,56 @@
 # ==============================================================================
 
 # ==============================================================================
+# REFUSAL MECHANISM (intentional, not crash)
+# ==============================================================================
+
+#' Refuse to Run with Clear Message
+#'
+#' Produces a clear "REFUSED TO RUN" message that looks intentional,
+#' not like a crash or error. Uses a custom condition class.
+#'
+#' @param title Short title for refusal reason
+#' @param problem Description of the problem
+#' @param why_it_matters Why this is a problem
+#' @param fix How to fix it
+#' @param details Optional additional details
+#' @keywords internal
+catdriver_refuse <- function(title, problem, why_it_matters, fix, details = NULL) {
+
+  msg <- paste0(
+    "\n",
+    "================================================================================\n",
+    "  CATDRIVER REFUSED TO RUN\n",
+    "================================================================================\n",
+    "  ", title, "\n",
+    "================================================================================\n\n",
+    "PROBLEM:\n",
+    "  ", problem, "\n\n",
+    "WHY THIS MATTERS:\n",
+    "  ", why_it_matters, "\n\n",
+    "HOW TO FIX:\n",
+    "  ", fix, "\n"
+  )
+
+  if (!is.null(details)) {
+    msg <- paste0(msg, "\nDETAILS:\n  ", details, "\n")
+  }
+
+  msg <- paste0(msg,
+    "\n================================================================================\n"
+  )
+
+  # Create a custom condition so it can be caught/handled specially
+  cond <- structure(
+    list(message = msg, call = NULL),
+    class = c("catdriver_refusal", "error", "condition")
+  )
+
+  stop(cond)
+}
+
+
+# ==============================================================================
 # GUARD STATE TRACKING
 # ==============================================================================
 
@@ -64,7 +114,7 @@ guard_flag_stability <- function(guard, flag) {
 
 #' Guard: Validate Outcome Type Declaration
 #'
-#' HARD ERROR if outcome type not explicitly declared.
+#' REFUSES if outcome type not explicitly declared.
 #'
 #' @param config Configuration list
 #' @keywords internal
@@ -72,26 +122,21 @@ guard_require_outcome_type <- function(config) {
   outcome_type <- config$outcome_type
 
   if (is.null(outcome_type) || outcome_type == "auto") {
-    stop(
-      "\n",
-      "=== CATDRIVER HARD ERROR ===\n",
-      "Outcome type must be explicitly declared in config.\n\n",
-      "REQUIRED: Add 'outcome_type' to Settings sheet.\n",
-      "VALID VALUES: binary, ordinal, multinomial\n\n",
-      "WHY: Auto-detection can produce incorrect model selection.\n",
-      "     Explicit declaration ensures you get the analysis you intend.\n",
-      call. = FALSE
+    catdriver_refuse(
+      title = "OUTCOME TYPE NOT DECLARED",
+      problem = "The 'outcome_type' setting is missing or set to 'auto'.",
+      why_it_matters = "Auto-detection can select the wrong model type, producing misleading results.",
+      fix = "Add 'outcome_type' to the Settings sheet.\nValid values: binary, ordinal, multinomial"
     )
   }
 
   valid_types <- c("binary", "ordinal", "multinomial")
   if (!outcome_type %in% valid_types) {
-    stop(
-      "\n",
-      "=== CATDRIVER HARD ERROR ===\n",
-      "Invalid outcome_type: '", outcome_type, "'\n\n",
-      "VALID VALUES: ", paste(valid_types, collapse = ", "), "\n",
-      call. = FALSE
+    catdriver_refuse(
+      title = "INVALID OUTCOME TYPE",
+      problem = paste0("outcome_type='", outcome_type, "' is not recognized."),
+      why_it_matters = "Unknown outcome types cannot be analyzed.",
+      fix = paste0("Change outcome_type to one of: ", paste(valid_types, collapse = ", "))
     )
   }
 

@@ -214,16 +214,49 @@ validate_catdriver_data <- function(data, config) {
              paste(high_vars, collapse = ", ")))
   }
 
-  # Calculate complete cases
-  complete_mask <- complete.cases(data[, analysis_vars, drop = FALSE])
-  diagnostics$complete_n <- sum(complete_mask)
-  diagnostics$pct_complete <- round(100 * diagnostics$complete_n / diagnostics$original_n, 1)
+  # ==========================================================================
+  # CALCULATE EFFECTIVE ANALYZABLE N (strategy-aware)
+  # ==========================================================================
+  #
+  # We do NOT use complete.cases() to determine if we have enough data.
+  # Instead, we compute the minimum rows that will remain AFTER applying
+  # the per-variable missing strategy:
+  #
+  # - Outcome missing: always dropped
+  # - Driver with drop_row strategy: dropped
+  # - Driver with missing_as_level strategy: kept (not counted against N)
+  # - Driver with error_if_missing: will hard-error later if any missing
+  #
+  # This prevents rejecting valid runs where drivers use missing_as_level.
 
-  # Check minimum sample size
-  if (diagnostics$complete_n < config$min_sample_size) {
+  # Start with rows that have non-missing outcome (these are always required)
+  outcome_valid_mask <- !is.na(data[[config$outcome_var]])
+  effective_n <- sum(outcome_valid_mask)
+
+  # For each driver, only subtract if strategy is "drop_row"
+  for (driver_var in config$driver_vars) {
+    strategy <- get_driver_setting(config, driver_var, "missing_strategy", "drop_row")
+
+    if (strategy == "drop_row") {
+      # These rows will be dropped - but only if outcome is also valid
+      # (outcome missing rows are already excluded)
+      driver_missing_in_valid <- is.na(data[[driver_var]]) & outcome_valid_mask
+      effective_n <- effective_n - sum(driver_missing_in_valid)
+      # Update mask for next driver (cumulative exclusion)
+      outcome_valid_mask <- outcome_valid_mask & !is.na(data[[driver_var]])
+    }
+    # For "missing_as_level" and "error_if_missing", don't subtract
+    # (missing_as_level keeps rows; error_if_missing will hard-stop later)
+  }
+
+  diagnostics$complete_n <- effective_n
+  diagnostics$pct_complete <- round(100 * effective_n / diagnostics$original_n, 1)
+
+  # Check minimum sample size against effective N
+  if (effective_n < config$min_sample_size) {
     diagnostics$errors <- c(diagnostics$errors,
-      paste0("Insufficient complete cases: ", diagnostics$complete_n,
-             " (minimum ", config$min_sample_size, " required)"))
+      paste0("Insufficient analyzable cases after applying missing strategy: ",
+             effective_n, " (minimum ", config$min_sample_size, " required)"))
     diagnostics$passed <- FALSE
   }
 

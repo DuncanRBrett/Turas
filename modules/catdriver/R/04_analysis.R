@@ -136,13 +136,49 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
         list(error = TRUE, message = e$message)
       })
     } else {
-      # No fallback available - continue with original model if it exists
-      if (is.list(model) && isTRUE(model$error)) {
-        guard_model_fit_success(model, fallback_available = FALSE)
+      # ========================================================================
+      # HARD STOP: Separation detected but no fallback available
+      # ========================================================================
+      #
+      # Default behavior: REFUSE to proceed with unreliable estimates.
+      # User can override with: allow_separation_without_fallback = TRUE
+      #
+      allow_separation <- isTRUE(config$allow_separation_without_fallback)
+
+      if (!allow_separation) {
+        stop(
+          "\n",
+          "================================================================================\n",
+          "  CATDRIVER REFUSED TO RUN - SEPARATION DETECTED\n",
+          "================================================================================\n\n",
+          "PROBLEM:\n",
+          "  The binary logistic model detected separation (or quasi-separation).\n",
+          "  This produces unreliable odds ratios (often infinite or near-zero).\n\n",
+          "REASON: ", fallback_reason, "\n\n",
+          "FALLBACK NOT AVAILABLE:\n",
+          "  The 'brglm2' package (Firth bias-reduced logistic regression) is not installed.\n",
+          "  This package provides stable estimates when separation occurs.\n\n",
+          "SOLUTIONS (in order of preference):\n",
+          "  1. Install brglm2: install.packages('brglm2')\n",
+          "  2. Collapse rare categories in predictors\n",
+          "  3. Remove the problematic predictor\n",
+          "  4. Set 'allow_separation_without_fallback = TRUE' in config (NOT RECOMMENDED)\n\n",
+          "================================================================================\n",
+          call. = FALSE
+        )
+      } else {
+        # User explicitly allowed proceeding - warn loudly
+        guard <- guard_warn(guard,
+          "SEPARATION DETECTED: Proceeding WITHOUT Firth fallback (user override). Results may be unreliable.",
+          "separation_override"
+        )
+        guard <- guard_flag_stability(guard, "Separation without fallback (user override)")
       }
-      # Otherwise use original model with warnings
-      warning("Separation detected but brglm2 package not available for Firth fallback. ",
-              "Consider installing brglm2.")
+
+      # If we get here with allow_separation=TRUE but model errored, still fail
+      if (is.list(model) && isTRUE(model$error)) {
+        stop("Model fitting failed and no fallback available: ", model$message, call. = FALSE)
+      }
     }
   }
 
