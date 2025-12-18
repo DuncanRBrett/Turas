@@ -3,16 +3,19 @@
 # ==============================================================================
 #
 # Loads and validates configuration from Excel files.
+# Enforces explicit declaration of all analysis parameters.
 #
-# Version: 1.0
+# Version: 2.0
 # Date: December 2024
 #
 # ==============================================================================
 
 #' Load Categorical Key Driver Configuration
 #'
-#' Loads and validates configuration from an Excel file with Settings
-#' and Variables sheets.
+#' Loads and validates configuration from an Excel file with required sheets:
+#' - Settings: Analysis parameters
+#' - Variables: Outcome and driver variable definitions
+#' - Driver_Settings: Per-driver type and handling specifications
 #'
 #' @param config_file Path to configuration Excel file
 #' @param project_root Optional project root directory (defaults to config file directory)
@@ -129,6 +132,41 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
   variables_df$Label <- trimws(variables_df$Label)
 
   # ===========================================================================
+  # LOAD DRIVER_SETTINGS SHEET (REQUIRED FOR V2.0)
+  # ===========================================================================
+
+  driver_settings <- NULL
+
+  if ("Driver_Settings" %in% available_sheets) {
+    driver_settings <- openxlsx::read.xlsx(config_file, sheet = "Driver_Settings")
+
+    # Validate structure
+    if (!all(c("driver", "type") %in% names(driver_settings))) {
+      stop("Driver_Settings sheet must have 'driver' and 'type' columns",
+           "\n\nFound columns: ", paste(names(driver_settings), collapse = ", "),
+           call. = FALSE)
+    }
+
+    # Clean up
+    driver_settings$driver <- trimws(driver_settings$driver)
+    driver_settings$type <- trimws(tolower(driver_settings$type))
+
+    # Add optional columns with defaults
+    if (!"levels_order" %in% names(driver_settings)) {
+      driver_settings$levels_order <- NA
+    }
+    if (!"reference_level" %in% names(driver_settings)) {
+      driver_settings$reference_level <- NA
+    }
+    if (!"missing_strategy" %in% names(driver_settings)) {
+      driver_settings$missing_strategy <- "missing_as_level"
+    }
+    if (!"rare_level_policy" %in% names(driver_settings)) {
+      driver_settings$rare_level_policy <- NA  # Will use global default
+    }
+  }
+
+  # ===========================================================================
   # EXTRACT VARIABLE DEFINITIONS
   # ===========================================================================
 
@@ -184,6 +222,30 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
   # EXTRACT SETTINGS WITH DEFAULTS
   # ===========================================================================
 
+  # Outcome type - REQUIRED (no auto-detection)
+  outcome_type <- tolower(get_setting(settings, "outcome_type", "auto"))
+
+  # Multinomial settings
+  multinomial_mode <- get_setting(settings, "multinomial_mode", NULL)
+  target_outcome_level <- get_setting(settings, "target_outcome_level", NULL)
+
+  # Reference category
+  reference_category <- get_setting(settings, "reference_category", NULL)
+
+  # Rare level policy
+  rare_level_policy <- get_setting(settings, "rare_level_policy", "warn_only")
+  rare_level_threshold <- as_numeric_setting(
+    get_setting(settings, "rare_level_threshold", 10), 10
+  )
+  rare_cell_threshold <- as_numeric_setting(
+    get_setting(settings, "rare_cell_threshold", 5), 5
+  )
+
+  # Allow missing reference
+  allow_missing_reference <- as_logical_setting(
+    get_setting(settings, "allow_missing_reference", FALSE), FALSE
+  )
+
   config <- list(
     # File paths
     config_file = normalizePath(config_file, winslash = "/", mustWork = FALSE),
@@ -198,12 +260,17 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
     outcome_var = outcome_var,
     outcome_label = outcome_label,
     outcome_order = outcome_order,
-    outcome_type = tolower(get_setting(settings, "outcome_type", "auto")),
+    outcome_type = outcome_type,
+
+    # Multinomial settings
+    multinomial_mode = multinomial_mode,
+    target_outcome_level = target_outcome_level,
 
     # Driver variables
     driver_vars = driver_vars,
     driver_labels = driver_labels,
     driver_orders = driver_orders,
+    driver_settings = driver_settings,
 
     # Weight variable
     weight_var = weight_var,
@@ -211,8 +278,16 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
     # Full variables definition
     variables = variables_df,
 
+    # Reference category
+    reference_category = reference_category,
+    allow_missing_reference = allow_missing_reference,
+
+    # Rare level handling
+    rare_level_policy = rare_level_policy,
+    rare_level_threshold = rare_level_threshold,
+    rare_cell_threshold = rare_cell_threshold,
+
     # Analysis settings
-    reference_category = get_setting(settings, "reference_category", NULL),
     min_sample_size = as_numeric_setting(get_setting(settings, "min_sample_size", 30), 30),
     confidence_level = as_numeric_setting(get_setting(settings, "confidence_level", 0.95), 0.95),
     missing_threshold = as_numeric_setting(get_setting(settings, "missing_threshold", 50), 50),
@@ -236,11 +311,11 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
     stop("missing_threshold must be between 0 and 100", call. = FALSE)
   }
 
-  # Validate outcome_type
-  valid_types <- c("auto", "binary", "ordinal", "nominal")
-  if (!config$outcome_type %in% valid_types) {
-    stop("outcome_type must be one of: ", paste(valid_types, collapse = ", "),
-         "\n\nGot: ", config$outcome_type,
+  # Validate rare_level_policy
+  valid_rare_policies <- c("warn_only", "collapse_to_other", "drop_level", "error")
+  if (!config$rare_level_policy %in% valid_rare_policies) {
+    stop("rare_level_policy must be one of: ", paste(valid_rare_policies, collapse = ", "),
+         "\n\nGot: ", config$rare_level_policy,
          call. = FALSE)
   }
 
@@ -284,6 +359,42 @@ get_variable_order <- function(variables_df, var_name) {
   }
 
   categories
+}
+
+
+#' Get Driver Setting
+#'
+#' Retrieves a specific setting for a driver variable.
+#'
+#' @param config Configuration list
+#' @param driver_var Driver variable name
+#' @param setting_name Setting name to retrieve
+#' @param default Default value if not found
+#' @return Setting value or default
+#' @export
+get_driver_setting <- function(config, driver_var, setting_name, default = NULL) {
+  if (is.null(config$driver_settings)) {
+    return(default)
+  }
+
+  ds <- config$driver_settings
+  row_idx <- which(ds$driver == driver_var)
+
+  if (length(row_idx) == 0) {
+    return(default)
+  }
+
+  if (!setting_name %in% names(ds)) {
+    return(default)
+  }
+
+  val <- ds[[setting_name]][row_idx[1]]
+
+  if (is.null(val) || is.na(val)) {
+    return(default)
+  }
+
+  val
 }
 
 

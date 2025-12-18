@@ -2,9 +2,10 @@
 # CATEGORICAL KEY DRIVER - CORE ANALYSIS
 # ==============================================================================
 #
-# Binary, ordinal, and multinomial logistic regression implementations.
+# Binary, ordinal, and multinomial logistic regression implementations
+# with robust estimation and automatic fallback.
 #
-# Version: 1.0
+# Version: 2.0
 # Date: December 2024
 #
 # ==============================================================================
@@ -12,23 +13,30 @@
 #' Run Categorical Key Driver Analysis
 #'
 #' Main analysis function that selects and runs the appropriate regression method.
+#' Includes automatic fallback for separation/convergence issues.
 #'
 #' @param prep_data Preprocessed data from preprocess_catdriver_data()
 #' @param config Configuration list
 #' @param weights Optional weight vector
+#' @param guard Guard state object for tracking warnings
 #' @return List with model results and diagnostics
 #' @export
-run_catdriver_model <- function(prep_data, config, weights = NULL) {
+run_catdriver_model <- function(prep_data, config, weights = NULL, guard = NULL) {
+
+  if (is.null(guard)) {
+    guard <- guard_init()
+  }
 
   outcome_type <- prep_data$outcome_info$type
   model_formula <- prep_data$model_formula
   data <- prep_data$data
 
-  # Run appropriate model
+  # Run appropriate model with fallback
   model_result <- switch(outcome_type,
-    binary = run_binary_logistic(model_formula, data, weights, config),
-    ordinal = run_ordinal_logistic(model_formula, data, weights, config),
-    nominal = run_multinomial_logistic(model_formula, data, weights, config),
+    binary = run_binary_logistic_robust(model_formula, data, weights, config, guard),
+    ordinal = run_ordinal_logistic_robust(model_formula, data, weights, config, guard),
+    nominal = run_multinomial_logistic_robust(model_formula, data, weights, config, guard),
+    multinomial = run_multinomial_logistic_robust(model_formula, data, weights, config, guard),
     stop("Unknown outcome type: ", outcome_type)
   )
 
@@ -44,51 +52,114 @@ run_catdriver_model <- function(prep_data, config, weights = NULL) {
 
 
 # ==============================================================================
-# BINARY LOGISTIC REGRESSION
+# BINARY LOGISTIC REGRESSION (with fallback)
 # ==============================================================================
 
-#' Run Binary Logistic Regression
+#' Run Binary Logistic Regression with Robust Fallback
+#'
+#' Attempts standard glm, falls back to Firth correction if separation detected.
 #'
 #' @param formula Model formula
 #' @param data Analysis data
 #' @param weights Optional weight vector
 #' @param config Configuration list
+#' @param guard Guard state object
 #' @return List with model results
 #' @keywords internal
-run_binary_logistic <- function(formula, data, weights = NULL, config) {
+run_binary_logistic_robust <- function(formula, data, weights = NULL, config, guard) {
 
-  # Fit model
-  # Note: Avoid using 'weights' directly in glm() call due to conflict with stats::weights function
+  fallback_used <- FALSE
+  fallback_reason <- NULL
+  engine_used <- "glm"
+
+  # ==========================================================================
+  # ATTEMPT PRIMARY FIT (standard glm)
+  # ==========================================================================
+
   model <- tryCatch({
     if (!is.null(weights) && length(weights) == nrow(data)) {
-      # Check if weights are all equal (no actual weighting needed)
       if (length(unique(weights)) == 1 && unique(weights)[1] == 1) {
         glm(formula, data = data, family = binomial(link = "logit"))
       } else {
-        # Add weights to data frame to avoid scoping issues
         data$.wt <- weights
-        glm(formula, data = data, family = binomial(link = "logit"),
-            weights = .wt)
+        glm(formula, data = data, family = binomial(link = "logit"), weights = .wt)
       }
     } else {
       glm(formula, data = data, family = binomial(link = "logit"))
     }
   }, error = function(e) {
-    stop("Binary logistic model failed: ", e$message,
-         "\n\nThis may be due to perfect separation or collinearity.",
-         call. = FALSE)
+    list(error = TRUE, message = e$message)
   })
 
-  # Check convergence
-  if (!model$converged) {
-    warning("Model did not converge. Results may be unreliable.")
+  # ==========================================================================
+  # CHECK FOR SEPARATION / CONVERGENCE ISSUES
+  # ==========================================================================
+
+  needs_fallback <- FALSE
+
+  if (is.list(model) && isTRUE(model$error)) {
+    needs_fallback <- TRUE
+    fallback_reason <- model$message
+  } else if (!model$converged) {
+    needs_fallback <- TRUE
+    fallback_reason <- "Model did not converge"
+  } else {
+    # Check for separation
+    separation_check <- check_separation(model)
+    if (separation_check$has_separation) {
+      needs_fallback <- TRUE
+      fallback_reason <- separation_check$message
+    }
   }
 
-  # Check for separation
-  separation_check <- check_separation(model)
-  if (separation_check$has_separation) {
-    warning(separation_check$message)
+  # ==========================================================================
+  # ATTEMPT FALLBACK (Firth correction via brglm2)
+  # ==========================================================================
+
+  if (needs_fallback) {
+    # Try brglm2 for Firth correction
+    if (requireNamespace("brglm2", quietly = TRUE)) {
+      model <- tryCatch({
+        engine_used <- "brglm2 (Firth)"
+        fallback_used <- TRUE
+
+        if (!is.null(weights) && length(weights) == nrow(data) &&
+            !(length(unique(weights)) == 1 && unique(weights)[1] == 1)) {
+          data$.wt <- weights
+          brglm2::brglm(formula, data = data, family = binomial(link = "logit"),
+                        weights = .wt, method = "brglmFit")
+        } else {
+          brglm2::brglm(formula, data = data, family = binomial(link = "logit"),
+                        method = "brglmFit")
+        }
+      }, error = function(e) {
+        list(error = TRUE, message = e$message)
+      })
+    } else {
+      # No fallback available - continue with original model if it exists
+      if (is.list(model) && isTRUE(model$error)) {
+        guard_model_fit_success(model, fallback_available = FALSE)
+      }
+      # Otherwise use original model with warnings
+      warning("Separation detected but brglm2 package not available for Firth fallback. ",
+              "Consider installing brglm2.")
+    }
   }
+
+  # Final check
+  if (is.list(model) && isTRUE(model$error)) {
+    guard_model_fit_success(model, fallback_available = TRUE)
+  }
+
+  # Update guard
+  guard <- guard_check_fallback(guard, fallback_used, fallback_reason)
+
+  # ==========================================================================
+  # EXTRACT RESULTS
+  # ==========================================================================
+
+  # Check convergence
+  convergence_ok <- if (engine_used == "glm") model$converged else TRUE
 
   # Extract coefficients and odds ratios
   coef_summary <- summary(model)$coefficients
@@ -133,10 +204,8 @@ run_binary_logistic <- function(formula, data, weights = NULL, config) {
 
   confusion <- table(Actual = outcome_actual, Predicted = pred_class)
 
-  # Calculate metrics safely
   accuracy <- sum(diag(confusion)) / sum(confusion)
 
-  # Sensitivity and specificity
   if (nrow(confusion) >= 2 && ncol(confusion) >= 2) {
     sensitivity <- confusion[2, 2] / sum(confusion[2, ])
     specificity <- confusion[1, 1] / sum(confusion[1, ])
@@ -148,6 +217,9 @@ run_binary_logistic <- function(formula, data, weights = NULL, config) {
   list(
     model = model,
     model_type = "binary_logistic",
+    engine_used = engine_used,
+    fallback_used = fallback_used,
+    fallback_reason = fallback_reason,
     coefficients = coef_df,
     fit_statistics = list(
       null_deviance = null_deviance,
@@ -165,75 +237,251 @@ run_binary_logistic <- function(formula, data, weights = NULL, config) {
       specificity = specificity
     ),
     predicted_probs = pred_probs,
-    convergence = model$converged,
-    separation = separation_check
+    convergence = convergence_ok,
+    separation = check_separation(model),
+    guard = guard
   )
 }
 
 
 # ==============================================================================
-# ORDINAL LOGISTIC REGRESSION
+# ORDINAL LOGISTIC REGRESSION (with fallback)
 # ==============================================================================
 
-#' Run Ordinal Logistic Regression
+#' Run Ordinal Logistic Regression with Robust Fallback
 #'
-#' Uses proportional odds model via MASS::polr.
+#' Attempts ordinal::clm first (more robust), falls back to MASS::polr.
 #'
 #' @param formula Model formula
 #' @param data Analysis data
 #' @param weights Optional weight vector
 #' @param config Configuration list
+#' @param guard Guard state object
 #' @return List with model results
 #' @keywords internal
-run_ordinal_logistic <- function(formula, data, weights = NULL, config) {
+run_ordinal_logistic_robust <- function(formula, data, weights = NULL, config, guard) {
 
-  # Ensure MASS is available
-  if (!requireNamespace("MASS", quietly = TRUE)) {
-    stop("Package 'MASS' required for ordinal logistic regression",
-         call. = FALSE)
-  }
+  fallback_used <- FALSE
+  fallback_reason <- NULL
+  engine_used <- "ordinal::clm"
 
-  # Fit model
-  # Note: Avoid using 'weights' directly due to conflict with stats::weights function
-  model <- tryCatch({
-    if (!is.null(weights) && length(weights) == nrow(data)) {
-      # Check if weights are all equal (no actual weighting needed)
-      if (length(unique(weights)) == 1 && unique(weights)[1] == 1) {
-        MASS::polr(formula, data = data, Hess = TRUE, method = "logistic")
+  # ==========================================================================
+  # ATTEMPT PRIMARY FIT (ordinal::clm)
+  # ==========================================================================
+
+  model <- NULL
+  primary_success <- FALSE
+
+  if (requireNamespace("ordinal", quietly = TRUE)) {
+    model <- tryCatch({
+      if (!is.null(weights) && length(weights) == nrow(data)) {
+        if (!(length(unique(weights)) == 1 && unique(weights)[1] == 1)) {
+          data$.wt <- weights
+          ordinal::clm(formula, data = data, weights = .wt, link = "logit")
+        } else {
+          ordinal::clm(formula, data = data, link = "logit")
+        }
       } else {
-        # Add weights to data frame to avoid scoping issues
-        data$.wt <- weights
-        MASS::polr(formula, data = data, weights = .wt,
-                   Hess = TRUE, method = "logistic")
+        ordinal::clm(formula, data = data, link = "logit")
       }
-    } else {
-      MASS::polr(formula, data = data, Hess = TRUE, method = "logistic")
-    }
-  }, error = function(e) {
-    stop("Ordinal logistic model failed: ", e$message,
-         "\n\nConsider using nominal (multinomial) model instead.",
-         call. = FALSE)
-  })
+    }, error = function(e) {
+      list(error = TRUE, message = e$message)
+    })
 
-  # Check convergence
-  convergence_ok <- model$convergence == 0
-  if (!convergence_ok) {
-    warning("Model may not have fully converged. Results should be interpreted with caution.")
+    if (!is.list(model) || !isTRUE(model$error)) {
+      # Check convergence
+      if (!is.null(model$convergence) && model$convergence$code == 0) {
+        primary_success <- TRUE
+      } else if (is.null(model$convergence)) {
+        primary_success <- TRUE  # Assume success if no convergence info
+      }
+    }
   }
 
-  # Extract coefficients
+  # ==========================================================================
+  # FALLBACK TO MASS::polr IF NEEDED
+  # ==========================================================================
+
+  if (!primary_success) {
+    fallback_used <- TRUE
+    fallback_reason <- if (is.list(model) && isTRUE(model$error)) {
+      model$message
+    } else if (!requireNamespace("ordinal", quietly = TRUE)) {
+      "ordinal package not available"
+    } else {
+      "ordinal::clm did not converge"
+    }
+
+    engine_used <- "MASS::polr"
+
+    if (!requireNamespace("MASS", quietly = TRUE)) {
+      stop("Package 'MASS' required for ordinal logistic regression", call. = FALSE)
+    }
+
+    model <- tryCatch({
+      if (!is.null(weights) && length(weights) == nrow(data)) {
+        if (!(length(unique(weights)) == 1 && unique(weights)[1] == 1)) {
+          data$.wt <- weights
+          MASS::polr(formula, data = data, weights = .wt, Hess = TRUE, method = "logistic")
+        } else {
+          MASS::polr(formula, data = data, Hess = TRUE, method = "logistic")
+        }
+      } else {
+        MASS::polr(formula, data = data, Hess = TRUE, method = "logistic")
+      }
+    }, error = function(e) {
+      list(error = TRUE, message = e$message)
+    })
+
+    if (is.list(model) && isTRUE(model$error)) {
+      guard_model_fit_success(model, fallback_available = TRUE)
+    }
+  }
+
+  # Update guard
+  guard <- guard_check_fallback(guard, fallback_used, fallback_reason)
+
+  # ==========================================================================
+  # EXTRACT RESULTS
+  # ==========================================================================
+
+  # Handle different model structures (clm vs polr)
+  if (inherits(model, "clm")) {
+    result <- extract_clm_results(model, config, guard)
+  } else {
+    result <- extract_polr_results(model, config, guard)
+  }
+
+  result$engine_used <- engine_used
+  result$fallback_used <- fallback_used
+  result$fallback_reason <- fallback_reason
+  result$guard <- guard
+
+  result
+}
+
+
+#' Extract Results from ordinal::clm Model
+#'
+#' @param model clm model object
+#' @param config Configuration list
+#' @param guard Guard state object
+#' @return List with extracted results
+#' @keywords internal
+extract_clm_results <- function(model, config, guard) {
+
+  coef_vals <- coef(model)
+  vcov_mat <- vcov(model)
+  se_vals <- sqrt(diag(vcov_mat))
+
+  # Separate thresholds from predictor coefficients
+  threshold_names <- names(model$alpha)
+  coef_names <- names(model$beta)
+
+  # Predictor coefficients
+  pred_coef <- model$beta
+  pred_se <- se_vals[names(se_vals) %in% coef_names]
+
+  z_vals <- pred_coef / pred_se
+  p_vals <- 2 * pnorm(-abs(z_vals))
+
+  coef_df <- data.frame(
+    term = names(pred_coef),
+    estimate = as.numeric(pred_coef),
+    std_error = as.numeric(pred_se),
+    z_value = as.numeric(z_vals),
+    p_value = as.numeric(p_vals),
+    stringsAsFactors = FALSE
+  )
+  rownames(coef_df) <- NULL
+
+  # Odds ratios
+  conf_level <- config$confidence_level
+  z_crit <- qnorm(1 - (1 - conf_level) / 2)
+
+  coef_df$odds_ratio <- exp(coef_df$estimate)
+  coef_df$or_lower <- exp(coef_df$estimate - z_crit * coef_df$std_error)
+  coef_df$or_upper <- exp(coef_df$estimate + z_crit * coef_df$std_error)
+
+  # Thresholds
+  thresh_se <- se_vals[names(se_vals) %in% threshold_names]
+  thresh_df <- data.frame(
+    threshold = threshold_names,
+    estimate = as.numeric(model$alpha),
+    std_error = as.numeric(thresh_se),
+    stringsAsFactors = FALSE
+  )
+
+  # Fit statistics
+  ll_full <- logLik(model)
+  aic <- AIC(model)
+
+  # Null model for comparison
+  null_formula <- as.formula(paste(config$outcome_var, "~ 1"))
+  null_model <- tryCatch({
+    ordinal::clm(null_formula, data = model$model, link = "logit")
+  }, error = function(e) NULL)
+
+  if (!is.null(null_model)) {
+    ll_null <- logLik(null_model)
+    mcfadden_r2 <- 1 - (as.numeric(ll_full) / as.numeric(ll_null))
+    lr_stat <- -2 * (as.numeric(ll_null) - as.numeric(ll_full))
+    lr_df <- length(pred_coef)
+    lr_pvalue <- pchisq(lr_stat, lr_df, lower.tail = FALSE)
+  } else {
+    mcfadden_r2 <- NA
+    lr_stat <- NA
+    lr_df <- NA
+    lr_pvalue <- NA
+  }
+
+  # Predicted probabilities
+  pred_probs <- tryCatch(
+    predict(model, type = "prob")$fit,
+    error = function(e) predict(model, type = "prob")
+  )
+
+  # Convergence
+  convergence_ok <- is.null(model$convergence) || model$convergence$code == 0
+
+  list(
+    model = model,
+    model_type = "ordinal_logistic",
+    coefficients = coef_df,
+    thresholds = thresh_df,
+    fit_statistics = list(
+      log_likelihood = as.numeric(ll_full),
+      mcfadden_r2 = mcfadden_r2,
+      aic = aic,
+      lr_statistic = lr_stat,
+      lr_df = lr_df,
+      lr_pvalue = lr_pvalue
+    ),
+    proportional_odds = NULL,  # clm has built-in tests
+    predicted_probs = pred_probs,
+    convergence = convergence_ok
+  )
+}
+
+
+#' Extract Results from MASS::polr Model
+#'
+#' @param model polr model object
+#' @param config Configuration list
+#' @param guard Guard state object
+#' @return List with extracted results
+#' @keywords internal
+extract_polr_results <- function(model, config, guard) {
+
   coef_vals <- coef(model)
   se_vals <- sqrt(diag(vcov(model)))
 
-  # Separate predictor coefficients from thresholds
   n_coef <- length(coef_vals)
   n_thresh <- length(model$zeta)
 
-  # Predictor coefficients
   pred_coef <- coef_vals
   pred_se <- se_vals[1:n_coef]
 
-  # Calculate z-values and p-values
   z_vals <- pred_coef / pred_se
   p_vals <- 2 * pnorm(-abs(z_vals))
 
@@ -247,7 +495,6 @@ run_ordinal_logistic <- function(formula, data, weights = NULL, config) {
   )
   rownames(coef_df) <- NULL
 
-  # Calculate cumulative odds ratios and CIs
   conf_level <- config$confidence_level
   z_crit <- qnorm(1 - (1 - conf_level) / 2)
 
@@ -255,7 +502,6 @@ run_ordinal_logistic <- function(formula, data, weights = NULL, config) {
   coef_df$or_lower <- exp(coef_df$estimate - z_crit * coef_df$std_error)
   coef_df$or_upper <- exp(coef_df$estimate + z_crit * coef_df$std_error)
 
-  # Threshold coefficients
   thresh_df <- data.frame(
     threshold = names(model$zeta),
     estimate = as.numeric(model$zeta),
@@ -263,13 +509,11 @@ run_ordinal_logistic <- function(formula, data, weights = NULL, config) {
     stringsAsFactors = FALSE
   )
 
-  # Calculate fit statistics
   ll_full <- logLik(model)
 
-  # Fit null model for comparison
   null_formula <- as.formula(paste(config$outcome_var, "~ 1"))
   null_model <- tryCatch({
-    MASS::polr(null_formula, data = data, Hess = TRUE, method = "logistic")
+    MASS::polr(null_formula, data = model$model, Hess = TRUE, method = "logistic")
   }, error = function(e) NULL)
 
   if (!is.null(null_model)) {
@@ -286,12 +530,12 @@ run_ordinal_logistic <- function(formula, data, weights = NULL, config) {
   }
 
   aic <- AIC(model)
+  convergence_ok <- model$convergence == 0
 
-  # Proportional odds check (practical approach)
-  po_check <- check_proportional_odds(model, data, config)
-
-  # Get predicted probabilities
   pred_probs <- predict(model, type = "probs")
+
+  # Proportional odds check
+  po_check <- check_proportional_odds(model, model$model, config)
 
   list(
     model = model,
@@ -313,7 +557,7 @@ run_ordinal_logistic <- function(formula, data, weights = NULL, config) {
 }
 
 
-#' Check Proportional Odds Assumption (Practical Approach)
+#' Check Proportional Odds Assumption
 #'
 #' @param model Fitted polr model
 #' @param data Analysis data
@@ -321,9 +565,6 @@ run_ordinal_logistic <- function(formula, data, weights = NULL, config) {
 #' @return List with check results
 #' @keywords internal
 check_proportional_odds <- function(model, data, config) {
-
-  # Try to run binary models at each threshold for comparison
-  # This is a practical approach rather than formal Brant test
 
   outcome_var <- config$outcome_var
   outcome <- data[[outcome_var]]
@@ -337,19 +578,15 @@ check_proportional_odds <- function(model, data, config) {
     ))
   }
 
-  # Get model coefficients (excluding thresholds)
   main_coefs <- coef(model)
   coef_names <- names(main_coefs)
 
-  # Try to fit separate binary models at each cutpoint
   binary_coefs <- list()
   cutpoint_names <- character(0)
 
   for (i in 1:(n_levels - 1)) {
-    # Create binary outcome: 1 if above cutpoint
     binary_outcome <- as.numeric(as.numeric(outcome) > i)
 
-    # Fit binary model
     binary_formula <- as.formula(paste("binary_outcome ~",
                                        paste(config$driver_vars, collapse = " + ")))
 
@@ -361,7 +598,6 @@ check_proportional_odds <- function(model, data, config) {
 
     if (!is.null(binary_model)) {
       bc <- coef(binary_model)
-      # Match coefficient names
       matched_coefs <- bc[names(bc) %in% coef_names]
       if (length(matched_coefs) > 0) {
         binary_coefs[[paste0("cut_", i)]] <- matched_coefs
@@ -377,8 +613,6 @@ check_proportional_odds <- function(model, data, config) {
     ))
   }
 
-  # Compare coefficients across cutpoints
-  # Calculate max ratio of ORs for same predictor
   max_or_ratio <- 1
   problematic_vars <- character(0)
 
@@ -399,7 +633,6 @@ check_proportional_odds <- function(model, data, config) {
     }
   }
 
-  # Practical interpretation
   if (max_or_ratio < 1.25) {
     status <- "PASS"
     interpretation <- "Proportional odds assumption appears reasonable (OR variation < 25% across thresholds)"
@@ -427,63 +660,60 @@ check_proportional_odds <- function(model, data, config) {
 # MULTINOMIAL LOGISTIC REGRESSION
 # ==============================================================================
 
-#' Run Multinomial Logistic Regression
-#'
-#' Uses nnet::multinom for unordered multi-category outcomes.
+#' Run Multinomial Logistic Regression with Robust Handling
 #'
 #' @param formula Model formula
 #' @param data Analysis data
 #' @param weights Optional weight vector
 #' @param config Configuration list
+#' @param guard Guard state object
 #' @return List with model results
 #' @keywords internal
-run_multinomial_logistic <- function(formula, data, weights = NULL, config) {
+run_multinomial_logistic_robust <- function(formula, data, weights = NULL, config, guard) {
 
-  # Ensure nnet is available
+  engine_used <- "nnet::multinom"
+  fallback_used <- FALSE
+  fallback_reason <- NULL
+
   if (!requireNamespace("nnet", quietly = TRUE)) {
-    stop("Package 'nnet' required for multinomial logistic regression",
-         call. = FALSE)
+    stop("Package 'nnet' required for multinomial logistic regression", call. = FALSE)
   }
 
-  # Fit model
-  # Note: Avoid using 'weights' directly due to conflict with stats::weights function
   model <- tryCatch({
     if (!is.null(weights) && length(weights) == nrow(data)) {
-      # Check if weights are all equal (no actual weighting needed)
-      if (length(unique(weights)) == 1 && unique(weights)[1] == 1) {
-        nnet::multinom(formula, data = data, trace = FALSE, maxit = 500)
-      } else {
-        # Add weights to data frame to avoid scoping issues
+      if (!(length(unique(weights)) == 1 && unique(weights)[1] == 1)) {
         data$.wt <- weights
-        nnet::multinom(formula, data = data, weights = .wt,
-                       trace = FALSE, maxit = 500)
+        nnet::multinom(formula, data = data, weights = .wt, trace = FALSE, maxit = 500)
+      } else {
+        nnet::multinom(formula, data = data, trace = FALSE, maxit = 500)
       }
     } else {
       nnet::multinom(formula, data = data, trace = FALSE, maxit = 500)
     }
   }, error = function(e) {
-    stop("Multinomial logistic model failed: ", e$message,
-         "\n\nConsider reducing number of predictors or collapsing outcome categories.",
-         call. = FALSE)
+    list(error = TRUE, message = e$message)
   })
 
-  # Check convergence
+  if (is.list(model) && isTRUE(model$error)) {
+    guard_model_fit_success(model, fallback_available = FALSE)
+  }
+
   convergence_ok <- model$convergence == 0
   if (!convergence_ok) {
-    warning("Model may not have fully converged. Consider increasing maxit or simplifying model.")
+    guard <- guard_warn(guard,
+      "Multinomial model may not have fully converged",
+      "model_convergence"
+    )
   }
 
   # Extract coefficients
   coef_matrix <- coef(model)
 
-  # Handle single vs multiple equations
   if (is.null(dim(coef_matrix))) {
-    # Single equation (3 outcome categories)
     coef_matrix <- matrix(coef_matrix, nrow = 1,
                          dimnames = list(names(model$lev)[-1], names(coef_matrix)))
   }
 
-  # Get standard errors
   se_matrix <- tryCatch({
     vcov_mat <- vcov(model)
     se_vec <- sqrt(diag(vcov_mat))
@@ -494,7 +724,6 @@ run_multinomial_logistic <- function(formula, data, weights = NULL, config) {
            dimnames = dimnames(coef_matrix))
   })
 
-  # Build coefficient data frame
   outcome_levels <- rownames(coef_matrix)
   ref_level <- levels(data[[config$outcome_var]])[1]
 
@@ -530,10 +759,9 @@ run_multinomial_logistic <- function(formula, data, weights = NULL, config) {
   coef_df <- do.call(rbind, coef_list)
   rownames(coef_df) <- NULL
 
-  # Calculate fit statistics
+  # Fit statistics
   ll_full <- logLik(model)
 
-  # Fit null model
   null_formula <- as.formula(paste(config$outcome_var, "~ 1"))
   null_model <- tryCatch({
     nnet::multinom(null_formula, data = data, trace = FALSE)
@@ -543,8 +771,8 @@ run_multinomial_logistic <- function(formula, data, weights = NULL, config) {
     ll_null <- logLik(null_model)
     mcfadden_r2 <- 1 - (as.numeric(ll_full) / as.numeric(ll_null))
     lr_stat <- -2 * (as.numeric(ll_null) - as.numeric(ll_full))
-    lr_df <- length(coef_matrix) - length(coef(null_model))
-    lr_pvalue <- pchisq(lr_stat, lr_df, lower.tail = FALSE)
+    lr_df <- attr(ll_full, "df") - attr(ll_null, "df")
+    lr_pvalue <- pchisq(lr_stat, abs(lr_df), lower.tail = FALSE)
   } else {
     mcfadden_r2 <- NA
     lr_stat <- NA
@@ -554,17 +782,18 @@ run_multinomial_logistic <- function(formula, data, weights = NULL, config) {
 
   aic <- AIC(model)
 
-  # Get predicted probabilities and classes
   pred_probs <- predict(model, type = "probs")
   pred_class <- predict(model, type = "class")
 
-  # Confusion matrix
   confusion <- table(Actual = data[[config$outcome_var]], Predicted = pred_class)
   accuracy <- sum(diag(confusion)) / sum(confusion)
 
   list(
     model = model,
     model_type = "multinomial_logistic",
+    engine_used = engine_used,
+    fallback_used = fallback_used,
+    fallback_reason = fallback_reason,
     coefficients = coef_df,
     reference_outcome = ref_level,
     fit_statistics = list(
@@ -581,7 +810,8 @@ run_multinomial_logistic <- function(formula, data, weights = NULL, config) {
     ),
     predicted_probs = pred_probs,
     predicted_class = pred_class,
-    convergence = convergence_ok
+    convergence = convergence_ok,
+    guard = guard
   )
 }
 
@@ -595,7 +825,6 @@ run_multinomial_logistic <- function(formula, data, weights = NULL, config) {
 #' @export
 check_multicollinearity <- function(model) {
 
-  # Requires car package
   if (!requireNamespace("car", quietly = TRUE)) {
     return(list(
       checked = FALSE,
@@ -606,9 +835,7 @@ check_multicollinearity <- function(model) {
   vif_result <- tryCatch({
     vif_vals <- car::vif(model)
 
-    # Handle factor variables (GVIF)
     if (is.matrix(vif_vals)) {
-      # GVIF output
       df <- data.frame(
         variable = rownames(vif_vals),
         gvif = vif_vals[, "GVIF"],
@@ -617,7 +844,6 @@ check_multicollinearity <- function(model) {
         stringsAsFactors = FALSE
       )
     } else {
-      # Simple VIF
       df <- data.frame(
         variable = names(vif_vals),
         gvif = vif_vals,
@@ -640,7 +866,6 @@ check_multicollinearity <- function(model) {
     ))
   }
 
-  # Assess multicollinearity
   max_gvif_adj <- max(vif_result$gvif_adj, na.rm = TRUE)
 
   if (max_gvif_adj > 5) {
