@@ -179,6 +179,7 @@ detect_predictor_type <- function(predictor_var, order_spec = NULL) {
 #' Prepare Outcome Variable
 #'
 #' Converts outcome variable to appropriate format for modeling.
+#' REFUSES with hard error if outcome type doesn't match data.
 #'
 #' @param data Data frame
 #' @param config Configuration list
@@ -192,6 +193,53 @@ prepare_outcome <- function(data, config, outcome_info) {
 
   # Get reference category
   ref_cat <- config$reference_category
+
+  # Get data categories
+  data_cats <- unique(as.character(na.omit(outcome_data)))
+  n_data_cats <- length(data_cats)
+
+  # ===========================================================================
+  # HARD VALIDATION: Refuse if outcome_type doesn't match data
+  # ===========================================================================
+
+  if (outcome_info$type == "binary") {
+    if (n_data_cats != 2) {
+      stop("OUTCOME TYPE MISMATCH: outcome_type='binary' specified but data has ",
+           n_data_cats, " categories.\n",
+           "Found categories: ", paste(data_cats, collapse = ", "), "\n",
+           "Action required: Set outcome_type='ordinal' or 'multinomial' in config,\n",
+           "or verify your data has exactly 2 outcome categories.",
+           call. = FALSE)
+    }
+  }
+
+  if (outcome_info$type == "ordinal" && !is.null(config$outcome_order)) {
+    # Check that all config categories exist in data
+    config_cats <- config$outcome_order
+    missing_in_data <- setdiff(config_cats, data_cats)
+    extra_in_data <- setdiff(data_cats, config_cats)
+
+    if (length(missing_in_data) > 0) {
+      stop("OUTCOME CATEGORY MISMATCH: Configured outcome categories not found in data.\n",
+           "Missing categories: ", paste(missing_in_data, collapse = ", "), "\n",
+           "Data categories: ", paste(data_cats, collapse = ", "), "\n",
+           "Action required: Update outcome Order in config to match data categories.",
+           call. = FALSE)
+    }
+
+    if (length(extra_in_data) > 0) {
+      stop("OUTCOME CATEGORY MISMATCH: Data contains outcome categories not in config.\n",
+           "Extra categories: ", paste(extra_in_data, collapse = ", "), "\n",
+           "Configured categories: ", paste(config_cats, collapse = ", "), "\n",
+           "Action required: Update outcome Order in config to include all data categories,\n",
+           "or clean data to only include expected categories.",
+           call. = FALSE)
+    }
+  }
+
+  # ===========================================================================
+  # PROCEED WITH OUTCOME PREPARATION
+  # ===========================================================================
 
   if (outcome_info$type == "binary") {
     # Convert to factor
@@ -209,20 +257,7 @@ prepare_outcome <- function(data, config, outcome_info) {
   } else if (outcome_info$type == "ordinal") {
     # Convert to ordered factor with specified order
     if (!is.null(outcome_info$categories)) {
-      # Match data values to categories
-      data_cats <- unique(as.character(outcome_data))
-      config_cats <- outcome_info$categories
-
-      # Find matching categories
-      matching_cats <- intersect(config_cats, data_cats)
-      if (length(matching_cats) < length(data_cats)) {
-        extra_cats <- setdiff(data_cats, config_cats)
-        warning("Some outcome categories not in specified order: ",
-                paste(extra_cats, collapse = ", "))
-        matching_cats <- c(matching_cats, extra_cats)
-      }
-
-      outcome_data <- factor(outcome_data, levels = matching_cats, ordered = TRUE)
+      outcome_data <- factor(outcome_data, levels = outcome_info$categories, ordered = TRUE)
     } else {
       outcome_data <- factor(outcome_data, ordered = TRUE)
     }
@@ -230,7 +265,7 @@ prepare_outcome <- function(data, config, outcome_info) {
     data[[outcome_var]] <- outcome_data
 
   } else {
-    # Nominal: unordered factor
+    # Nominal/Multinomial: unordered factor
     if (!is.factor(outcome_data)) {
       outcome_data <- factor(outcome_data)
     }

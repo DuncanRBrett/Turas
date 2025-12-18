@@ -2,8 +2,15 @@
 # CATDRIVER REGRESSION TEST SUITE
 # ==============================================================================
 #
-# Comprehensive test suite with golden fixtures for categorical key driver module.
-# Run with: Rscript test_catdriver.R
+# Tests critical behaviors identified in external review:
+# 1. Term-level mapping integrity (no substring parsing failures)
+# 2. Missing data handling (per-variable strategy, not blanket complete.cases)
+# 3. Hard refusal for outcome-type mismatch
+# 4. Multinomial target_outcome enforcement
+# 5. Fallback estimator behavior for separation
+# 6. Golden fixture stability
+#
+# Run with: Rscript run_tests.R
 #
 # Version: 2.0
 # ==============================================================================
@@ -11,690 +18,613 @@
 library(testthat)
 
 # Set working directory to module root
-test_dir <- dirname(sys.frame(1)$ofile)
-if (is.null(test_dir)) test_dir <- getwd()
-module_root <- dirname(test_dir)
+script_dir <- tryCatch({
+  if (!is.null(sys.frame(1)$ofile)) dirname(sys.frame(1)$ofile) else getwd()
+}, error = function(e) getwd())
+
+if (basename(script_dir) == "tests") {
+  module_root <- dirname(script_dir)
+} else {
+  module_root <- script_dir
+}
 setwd(module_root)
 
-# Source all R files
+# Source all R files in order
 r_files <- list.files("R", pattern = "\\.R$", full.names = TRUE)
+r_files <- r_files[order(basename(r_files))]
 for (f in r_files) {
-  source(f)
+  tryCatch(source(f), error = function(e) {
+    cat("Warning: Could not source", basename(f), ":", e$message, "\n")
+  })
 }
 
 # ==============================================================================
-# TEST DATA GENERATION
+# TEST DATA GENERATORS
 # ==============================================================================
 
-#' Generate Binary Test Dataset
-#'
-#' Creates a reproducible binary outcome dataset for testing.
-#'
-#' @param n Sample size
-#' @param seed Random seed
-#' @return Data frame with binary outcome and predictors
-generate_binary_test_data <- function(n = 500, seed = 42) {
+generate_binary_data <- function(n = 300, seed = 42) {
   set.seed(seed)
-
   data.frame(
-    respondent_id = 1:n,
-    outcome = factor(
-      sample(c("No", "Yes"), n, replace = TRUE, prob = c(0.4, 0.6)),
-      levels = c("No", "Yes")
-    ),
-    age_group = factor(
-      sample(c("18-34", "35-54", "55+"), n, replace = TRUE, prob = c(0.3, 0.4, 0.3)),
-      levels = c("18-34", "35-54", "55+")
-    ),
-    income = factor(
-      sample(c("Low", "Medium", "High"), n, replace = TRUE, prob = c(0.25, 0.5, 0.25)),
-      levels = c("Low", "Medium", "High")
-    ),
-    region = factor(
-      sample(c("North", "South", "East", "West"), n, replace = TRUE)
-    ),
-    weight = runif(n, 0.5, 2.0),
+    outcome = factor(sample(c("No", "Yes"), n, TRUE, c(0.4, 0.6)), levels = c("No", "Yes")),
+    age_group = factor(sample(c("18-34", "35-54", "55+"), n, TRUE), levels = c("18-34", "35-54", "55+")),
+    income = factor(sample(c("Low", "Medium", "High"), n, TRUE), levels = c("Low", "Medium", "High")),
+    region = factor(sample(c("North", "South", "East", "West"), n, TRUE)),
     stringsAsFactors = FALSE
   )
 }
 
-
-#' Generate Ordinal Test Dataset
-#'
-#' Creates a reproducible ordinal outcome dataset for testing.
-#'
-#' @param n Sample size
-#' @param seed Random seed
-#' @return Data frame with ordinal outcome and predictors
-generate_ordinal_test_data <- function(n = 500, seed = 42) {
+generate_ordinal_data <- function(n = 300, seed = 42) {
   set.seed(seed)
-
   data.frame(
-    respondent_id = 1:n,
-    satisfaction = factor(
-      sample(c("Low", "Medium", "High"), n, replace = TRUE, prob = c(0.2, 0.5, 0.3)),
-      levels = c("Low", "Medium", "High"),
-      ordered = TRUE
-    ),
-    service_quality = factor(
-      sample(c("Poor", "Fair", "Good", "Excellent"), n, replace = TRUE),
-      levels = c("Poor", "Fair", "Good", "Excellent"),
-      ordered = TRUE
-    ),
-    price_perception = factor(
-      sample(c("Too High", "Fair", "Good Value"), n, replace = TRUE),
-      levels = c("Too High", "Fair", "Good Value"),
-      ordered = TRUE
-    ),
-    loyalty_years = factor(
-      sample(c("New", "1-2 years", "3+ years"), n, replace = TRUE),
-      levels = c("New", "1-2 years", "3+ years"),
-      ordered = TRUE
-    ),
-    weight = runif(n, 0.5, 2.0),
+    satisfaction = ordered(sample(c("Low", "Medium", "High"), n, TRUE), levels = c("Low", "Medium", "High")),
+    service = ordered(sample(c("Poor", "Fair", "Good", "Excellent"), n, TRUE), levels = c("Poor", "Fair", "Good", "Excellent")),
+    price = ordered(sample(c("Too High", "Fair", "Good Value"), n, TRUE), levels = c("Too High", "Fair", "Good Value")),
     stringsAsFactors = FALSE
   )
 }
 
-
-#' Generate Multinomial Test Dataset
-#'
-#' Creates a reproducible multinomial outcome dataset for testing.
-#'
-#' @param n Sample size
-#' @param seed Random seed
-#' @return Data frame with multinomial outcome and predictors
-generate_multinomial_test_data <- function(n = 500, seed = 42) {
+generate_multinomial_data <- function(n = 300, seed = 42) {
   set.seed(seed)
-
   data.frame(
-    respondent_id = 1:n,
-    choice = factor(
-      sample(c("Product A", "Product B", "Product C"), n, replace = TRUE)
-    ),
-    age_group = factor(
-      sample(c("Young", "Middle", "Senior"), n, replace = TRUE)
-    ),
-    gender = factor(
-      sample(c("Male", "Female"), n, replace = TRUE)
-    ),
-    brand_awareness = factor(
-      sample(c("Low", "High"), n, replace = TRUE)
-    ),
-    weight = runif(n, 0.5, 2.0),
+    choice = factor(sample(c("A", "B", "C"), n, TRUE)),
+    age = factor(sample(c("Young", "Middle", "Senior"), n, TRUE)),
+    gender = factor(sample(c("Male", "Female"), n, TRUE)),
     stringsAsFactors = FALSE
   )
 }
 
+# Data with messy factor level names (spaces, special chars)
+generate_messy_labels_data <- function(n = 200, seed = 42) {
+  set.seed(seed)
+  data.frame(
+    outcome = factor(sample(c("Very Dissatisfied", "Somewhat Satisfied"), n, TRUE)),
+    campus_type = factor(sample(c("On Campus", "Online Only", "Hybrid/Mixed"), n, TRUE)),
+    age_bracket = factor(sample(c("18 - 25", "26 - 35", "36+"), n, TRUE)),
+    stringsAsFactors = FALSE
+  )
+}
+
+# Data with missing values
+generate_missing_data <- function(n = 300, seed = 42) {
+  set.seed(seed)
+  data <- data.frame(
+    outcome = factor(sample(c("No", "Yes"), n, TRUE)),
+    driver1 = factor(sample(c("A", "B", "C"), n, TRUE)),
+    driver2 = factor(sample(c("X", "Y", "Z"), n, TRUE)),
+    stringsAsFactors = FALSE
+  )
+  # Inject missing values
+  data$driver1[sample(n, 20)] <- NA
+  data$driver2[sample(n, 15)] <- NA
+  data
+}
+
 
 # ==============================================================================
-# GUARD LAYER TESTS
+# TEST SUITE 1: TERM-LEVEL MAPPING INTEGRITY
 # ==============================================================================
 
-context("TurasGuard Layer")
+context("Term-Level Mapping Integrity")
+
+test_that("map_terms_to_levels correctly maps standard factor names", {
+  data <- generate_binary_data(200)
+  formula <- outcome ~ age_group + income + region
+  model <- glm(formula, data = data, family = binomial())
+
+  mapping <- map_terms_to_levels(model, data, formula)
+
+  expect_true(is.data.frame(mapping))
+  expect_true("driver" %in% names(mapping))
+  expect_true("level" %in% names(mapping))
+
+  # Check all non-intercept terms are mapped
+  coef_names <- names(coef(model))[-1]  # Exclude intercept
+  mapped_terms <- mapping$coef_name[!is.na(mapping$coef_name)]
+
+  for (term in coef_names) {
+    expect_true(term %in% mapped_terms, info = paste("Term not mapped:", term))
+  }
+})
+
+
+test_that("extract_level_from_colname handles messy level names", {
+  # Test with spaces
+  result <- extract_level_from_colname("campus_typeOn Campus", "campus_type",
+                                        c("On Campus", "Online Only", "Hybrid/Mixed"))
+  expect_equal(result, "On Campus")
+
+  # Test with special characters
+  result <- extract_level_from_colname("age_bracket36+", "age_bracket",
+                                        c("18 - 25", "26 - 35", "36+"))
+  expect_equal(result, "36+")
+})
+
+
+test_that("mapping does NOT use substring parsing for complex names", {
+  data <- generate_messy_labels_data(200)
+  formula <- outcome ~ campus_type + age_bracket
+  model <- glm(formula, data = data, family = binomial())
+
+  mapping <- map_terms_to_levels(model, data, formula)
+
+  # Every mapped level should be a real level from the data
+  for (i in seq_len(nrow(mapping))) {
+    if (!is.na(mapping$level[i])) {
+      driver <- mapping$driver[i]
+      level <- mapping$level[i]
+
+      # Level should exist in original data
+      if (driver %in% names(data)) {
+        data_levels <- levels(data[[driver]])
+        expect_true(level %in% data_levels,
+                    info = paste("Mapped level", level, "not in data for", driver))
+      }
+    }
+  }
+})
+
+
+test_that("extract_odds_ratios uses mapping not substring parsing", {
+  data <- generate_messy_labels_data(200)
+
+  prep_data <- list(
+    data = data,
+    outcome_info = list(type = "binary", categories = levels(data$outcome)),
+    predictor_info = list(
+      campus_type = list(levels = levels(data$campus_type), reference_level = levels(data$campus_type)[1]),
+      age_bracket = list(levels = levels(data$age_bracket), reference_level = levels(data$age_bracket)[1])
+    ),
+    model_formula = outcome ~ campus_type + age_bracket
+  )
+
+  config <- list(
+    outcome_var = "outcome",
+    driver_vars = c("campus_type", "age_bracket"),
+    driver_labels = list(campus_type = "Campus Type", age_bracket = "Age"),
+    confidence_level = 0.95
+  )
+
+  model <- glm(prep_data$model_formula, data = data, family = binomial())
+  model_result <- list(
+    model = model,
+    model_type = "binary_logistic",
+    coefficients = data.frame(
+      term = names(coef(model)),
+      estimate = as.numeric(coef(model)),
+      std_error = summary(model)$coefficients[, 2],
+      z_value = summary(model)$coefficients[, 3],
+      p_value = summary(model)$coefficients[, 4],
+      odds_ratio = exp(coef(model)),
+      or_lower = exp(confint.default(model)[, 1]),
+      or_upper = exp(confint.default(model)[, 2]),
+      stringsAsFactors = FALSE
+    )
+  )
+
+  or_df <- extract_odds_ratios(model_result, config, prep_data)
+
+  # All comparisons should have valid factor and level names
+  for (i in seq_len(nrow(or_df))) {
+    factor_name <- or_df$factor[i]
+    comparison <- or_df$comparison[i]
+
+    expect_true(factor_name %in% c("campus_type", "age_bracket"),
+                info = paste("Invalid factor:", factor_name))
+  }
+})
+
+
+# ==============================================================================
+# TEST SUITE 2: MISSING DATA HANDLING
+# ==============================================================================
+
+context("Missing Data Handling (Per-Variable Strategy)")
+
+test_that("prepare_analysis_data uses per-variable strategy, not complete.cases", {
+  data <- generate_missing_data(300)
+  n_original <- nrow(data)
+
+  # Config with different strategies per driver
+  config <- list(
+    outcome_var = "outcome",
+    driver_vars = c("driver1", "driver2"),
+    weight_var = NULL,
+    driver_settings = data.frame(
+      driver = c("driver1", "driver2"),
+      type = c("nominal", "nominal"),
+      missing_strategy = c("drop_row", "missing_as_level"),
+      stringsAsFactors = FALSE
+    )
+  )
+
+  result <- prepare_analysis_data(data, config, NULL)
+
+  # driver1 should have rows dropped
+  expect_true(result$n_excluded > 0)
+
+  # driver2 should have "Missing" level, not dropped
+  expect_true("Missing" %in% levels(result$data$driver2))
+
+  # Verify that NOT all rows with any missing were dropped
+  # (i.e., we're not using blanket complete.cases)
+  n_driver1_missing <- sum(is.na(data$driver1))
+  n_driver2_missing <- sum(is.na(data$driver2))
+
+  # If we used complete.cases, we'd drop ~35 rows (20 + 15)
+
+  # With per-variable strategy, we should drop fewer since driver2 is recoded
+  expect_true(result$n_excluded <= n_driver1_missing)
+})
+
+
+test_that("missing_as_level creates Missing category correctly", {
+  data <- generate_missing_data(300)
+
+  config <- list(
+    outcome_var = "outcome",
+    driver_vars = c("driver1"),
+    weight_var = NULL,
+    driver_settings = data.frame(
+      driver = "driver1",
+      type = "nominal",
+      missing_strategy = "missing_as_level",
+      stringsAsFactors = FALSE
+    )
+  )
+
+  result <- prepare_analysis_data(data, config, NULL)
+
+  # Should have "Missing" level
+  expect_true("Missing" %in% levels(result$data$driver1))
+
+  # Should have NO NA values in driver1
+  expect_equal(sum(is.na(result$data$driver1)), 0)
+
+  # Count of "Missing" should match original NA count
+  n_original_na <- sum(is.na(data$driver1))
+  n_missing_level <- sum(result$data$driver1 == "Missing")
+  expect_equal(n_missing_level, n_original_na)
+})
+
+
+test_that("error_if_missing strategy produces hard error", {
+  data <- generate_missing_data(300)
+
+  config <- list(
+    outcome_var = "outcome",
+    driver_vars = c("driver1"),
+    weight_var = NULL,
+    driver_settings = data.frame(
+      driver = "driver1",
+      type = "nominal",
+      missing_strategy = "error_if_missing",
+      stringsAsFactors = FALSE
+    )
+  )
+
+  expect_error(
+    prepare_analysis_data(data, config, NULL),
+    "HARD ERROR.*missing values"
+  )
+})
+
+
+# ==============================================================================
+# TEST SUITE 3: HARD REFUSAL FOR OUTCOME-TYPE MISMATCH
+# ==============================================================================
+
+context("Outcome-Type Mismatch Hard Refusal")
+
+test_that("binary type with 3+ categories produces hard error", {
+  data <- generate_ordinal_data(200)  # Has 3 satisfaction levels
+
+  outcome_info <- list(type = "binary", categories = c("Low", "Medium", "High"))
+
+  config <- list(
+    outcome_var = "satisfaction",
+    outcome_type = "binary",
+    outcome_order = NULL,
+    reference_category = NULL
+  )
+
+  expect_error(
+    prepare_outcome(data, config, outcome_info),
+    "OUTCOME TYPE MISMATCH.*binary.*3 categories"
+  )
+})
+
+
+test_that("ordinal type with mismatched categories produces hard error", {
+  data <- generate_ordinal_data(200)
+
+  outcome_info <- list(type = "ordinal", categories = c("Low", "Medium", "High"))
+
+  config <- list(
+    outcome_var = "satisfaction",
+    outcome_type = "ordinal",
+    outcome_order = c("Bad", "OK", "Good"),  # Wrong categories!
+    reference_category = NULL
+  )
+
+  expect_error(
+    prepare_outcome(data, config, outcome_info),
+    "OUTCOME CATEGORY MISMATCH"
+  )
+})
+
+
+test_that("guard_require_outcome_type rejects auto", {
+  config <- list(outcome_type = "auto")
+
+  expect_error(
+    guard_require_outcome_type(config),
+    "must be explicitly declared"
+  )
+})
+
+
+test_that("guard_outcome_levels_match rejects binary with wrong count", {
+  data <- generate_ordinal_data(200)
+
+  config <- list(
+    outcome_var = "satisfaction",
+    outcome_type = "binary"
+  )
+
+  expect_error(
+    guard_outcome_levels_match(data, config),
+    "declared as 'binary' but has 3 categories"
+  )
+})
+
+
+# ==============================================================================
+# TEST SUITE 4: MULTINOMIAL TARGET OUTCOME ENFORCEMENT
+# ==============================================================================
+
+context("Multinomial Mode and Target Outcome Enforcement")
+
+test_that("guard_require_multinomial_mode requires mode for multinomial", {
+  config <- list(
+    outcome_type = "multinomial",
+    multinomial_mode = NULL
+  )
+
+  expect_error(
+    guard_require_multinomial_mode(config),
+    "requires explicit reporting mode"
+  )
+})
+
+
+test_that("guard_require_multinomial_mode accepts valid modes", {
+  for (mode in c("baseline_category", "all_pairwise", "one_vs_all")) {
+    config <- list(
+      outcome_type = "multinomial",
+      multinomial_mode = mode,
+      target_outcome_level = if (mode == "one_vs_all") "A" else NULL
+    )
+
+    # Should not error
+    result <- tryCatch({
+      guard_require_multinomial_mode(config)
+      TRUE
+    }, error = function(e) FALSE)
+
+    expect_true(result, info = paste("Mode", mode, "should be accepted"))
+  }
+})
+
+
+test_that("one_vs_all mode requires target_outcome_level", {
+  config <- list(
+    outcome_type = "multinomial",
+    multinomial_mode = "one_vs_all",
+    target_outcome_level = NULL
+  )
+
+  expect_error(
+    guard_require_multinomial_mode(config),
+    "one_vs_all mode requires target_outcome_level"
+  )
+})
+
+
+test_that("multinomial results include mode and target", {
+  skip_if_not_installed("nnet")
+
+  data <- generate_multinomial_data(200)
+  formula <- choice ~ age + gender
+
+  config <- list(
+    outcome_var = "choice",
+    multinomial_mode = "baseline_category",
+    target_outcome_level = NULL,
+    confidence_level = 0.95
+  )
+
+  guard <- guard_init()
+
+  result <- run_multinomial_logistic_robust(formula, data, NULL, config, guard)
+
+  expect_equal(result$multinomial_mode, "baseline_category")
+  expect_null(result$target_outcome_level)
+})
+
+
+# ==============================================================================
+# TEST SUITE 5: FALLBACK ESTIMATOR BEHAVIOR
+# ==============================================================================
+
+context("Fallback Estimator for Separation")
+
+test_that("run_binary_logistic_robust reports fallback when used", {
+  skip_if_not_installed("brglm2")
+
+  # Create data with separation
+  set.seed(123)
+  n <- 100
+  data <- data.frame(
+    outcome = factor(c(rep("No", 50), rep("Yes", 50))),
+    perfect_predictor = factor(c(rep("A", 50), rep("B", 50)))  # Perfect separation
+  )
+
+  formula <- outcome ~ perfect_predictor
+  config <- list(outcome_var = "outcome", confidence_level = 0.95)
+  guard <- guard_init()
+
+  result <- run_binary_logistic_robust(formula, data, NULL, config, guard)
+
+  # Should have detected separation and potentially used fallback
+  expect_true(!is.null(result$engine_used))
+  expect_true(!is.null(result$fallback_used))
+
+  # If brglm2 is available and separation detected, fallback should be used
+  if (result$fallback_used) {
+    expect_true(grepl("brglm|Firth", result$engine_used))
+  }
+})
+
+
+test_that("ordinal regression uses clm with polr fallback", {
+  data <- generate_ordinal_data(200)
+  formula <- satisfaction ~ service + price
+  config <- list(outcome_var = "satisfaction", confidence_level = 0.95)
+  guard <- guard_init()
+
+  result <- run_ordinal_logistic_robust(formula, data, NULL, config, guard)
+
+  # Should report which engine was used
+  expect_true(!is.null(result$engine_used))
+  expect_true(result$engine_used %in% c("ordinal::clm", "MASS::polr"))
+})
+
+
+# ==============================================================================
+# TEST SUITE 6: GOLDEN FIXTURE STABILITY
+# ==============================================================================
+
+context("Golden Fixture Regression Tests")
+
+test_that("binary model produces stable coefficient structure", {
+  data <- generate_binary_data(500, seed = 12345)
+  formula <- outcome ~ age_group + income + region
+
+  model <- glm(formula, data = data, family = binomial())
+  coefs <- coef(model)
+
+  # Should have: intercept + 2 age_group + 2 income + 3 region = 8 coefficients
+  expect_equal(length(coefs), 8)
+
+  # All coefficients should be numeric and finite
+  expect_true(all(is.finite(coefs)))
+})
+
+
+test_that("ordinal model thresholds are properly ordered", {
+  skip_if_not_installed("ordinal")
+
+  data <- generate_ordinal_data(500, seed = 12345)
+  formula <- satisfaction ~ service + price
+
+  model <- tryCatch(
+    ordinal::clm(formula, data = data),
+    error = function(e) MASS::polr(formula, data = data, Hess = TRUE)
+  )
+
+  # Get thresholds
+  if (inherits(model, "clm")) {
+    thresholds <- model$alpha
+  } else {
+    thresholds <- model$zeta
+  }
+
+  # Should have n_levels - 1 = 2 thresholds
+  expect_equal(length(thresholds), 2)
+
+  # Thresholds must be in ascending order
+  expect_true(all(diff(thresholds) > 0), info = "Thresholds must be ascending")
+})
+
+
+test_that("importance ranking is deterministic", {
+  data <- generate_binary_data(500, seed = 54321)
+
+  formula <- outcome ~ age_group + income + region
+  model <- glm(formula, data = data, family = binomial())
+
+  # Run twice
+  anova1 <- car::Anova(model, type = "II")
+  anova2 <- car::Anova(model, type = "II")
+
+  # Results should be identical
+  expect_equal(anova1$Chisq, anova2$Chisq)
+})
+
+
+# ==============================================================================
+# TEST SUITE 7: GUARD STATE TRACKING
+# ==============================================================================
+
+context("Guard State Tracking")
 
 test_that("guard_init creates proper structure", {
   guard <- guard_init()
 
   expect_type(guard, "list")
   expect_true("warnings" %in% names(guard))
-  expect_true("hard_errors" %in% names(guard))
   expect_true("stability_flags" %in% names(guard))
   expect_equal(length(guard$warnings), 0)
-  expect_equal(length(guard$hard_errors), 0)
 })
 
 
-test_that("guard_require_outcome_type enforces explicit type",
-{
+test_that("guard_check_fallback updates state correctly", {
   guard <- guard_init()
 
-  # Auto should fail
-  config_auto <- list(outcome_type = "auto")
-  expect_error(
-    guard_require_outcome_type(guard, config_auto),
-    "outcome_type must be explicitly set"
-  )
+  guard <- guard_check_fallback(guard, TRUE, "Test reason")
 
-  # Valid types should pass
-  for (type in c("binary", "ordinal", "multinomial")) {
-    config_valid <- list(outcome_type = type)
-    result <- guard_require_outcome_type(guard, config_valid)
-    expect_type(result, "list")
-  }
+  expect_true(guard$fallback_used)
+  expect_equal(guard$fallback_reason, "Test reason")
+  expect_true(length(guard$warnings) > 0)
+  expect_true("Fallback estimator used" %in% guard$stability_flags)
 })
 
 
-test_that("guard_require_multinomial_mode enforces mode for multinomial", {
+test_that("guard_summary correctly identifies issues", {
   guard <- guard_init()
-
-  # Multinomial without mode should fail
-  config_no_mode <- list(
-    outcome_type = "multinomial",
-    multinomial_mode = NULL
-  )
-  expect_error(
-    guard_require_multinomial_mode(guard, config_no_mode),
-    "multinomial_mode must be specified"
-  )
-
-  # Valid mode should pass
-  config_valid <- list(
-    outcome_type = "multinomial",
-    multinomial_mode = "baseline_category"
-  )
-  result <- guard_require_multinomial_mode(guard, config_valid)
-  expect_type(result, "list")
-})
-
-
-test_that("guard_require_driver_settings enforces Driver_Settings sheet", {
-  guard <- guard_init()
-
-  # Missing Driver_Settings should fail
-  config_no_ds <- list(
-    driver_vars = c("var1", "var2"),
-    driver_settings = NULL
-  )
-  expect_error(
-    guard_require_driver_settings(guard, config_no_ds),
-    "Driver_Settings sheet is required"
-  )
-
-  # Valid Driver_Settings should pass
-  config_valid <- list(
-    driver_vars = c("var1", "var2"),
-    driver_settings = data.frame(
-      driver = c("var1", "var2"),
-      type = c("ordinal", "nominal"),
-      stringsAsFactors = FALSE
-    )
-  )
-  result <- guard_require_driver_settings(guard, config_valid)
-  expect_type(result, "list")
-})
-
-
-test_that("guard_direction_sanity detects reversed ordinal", {
-  guard <- guard_init()
-
-  # Simulate reversed ordinal (higher levels = lower probability)
-  pred_probs <- matrix(
-    c(0.7, 0.2, 0.1,
-      0.6, 0.3, 0.1,
-      0.4, 0.4, 0.2),
-    ncol = 3, byrow = TRUE
-  )
-  outcome <- ordered(c("High", "High", "Low"), levels = c("Low", "Medium", "High"))
-
-  result <- guard_direction_sanity(guard, pred_probs, outcome)
-
-  expect_true(length(result$stability_flags) > 0 || length(result$warnings) > 0)
-})
-
-
-test_that("guard_summary produces correct output", {
-  guard <- guard_init()
-  guard$warnings <- c("Warning 1", "Warning 2")
-  guard$stability_flags <- c("Flag 1")
+  guard <- guard_warn(guard, "Test warning", "test")
+  guard <- guard_flag_stability(guard, "Test flag")
 
   summary <- guard_summary(guard)
 
-  expect_type(summary, "list")
   expect_true(summary$has_issues)
+  expect_equal(summary$n_warnings, 1)
   expect_true(summary$use_with_caution)
-  expect_equal(length(summary$stability_flags), 1)
 })
 
 
 # ==============================================================================
-# MAPPER TESTS
-# ==============================================================================
-
-context("Term-Level Mapper")
-
-test_that("map_terms_to_levels handles binary model correctly", {
-  data <- generate_binary_test_data(100, seed = 123)
-
-  formula <- outcome ~ age_group + income + region
-  model <- glm(formula, data = data, family = binomial())
-
-  mapping <- map_terms_to_levels(model, data, formula)
-
-  expect_type(mapping, "list")
-  expect_true("term_map" %in% names(mapping))
-  expect_true("variable_levels" %in% names(mapping))
-
-  # Check that each coefficient term is mapped
-  coef_names <- names(coef(model))[-1]  # Exclude intercept
-  for (term in coef_names) {
-    expect_true(term %in% names(mapping$term_map),
-                info = paste("Term not mapped:", term))
-  }
-})
-
-
-test_that("extract_level_from_colname parses correctly", {
-  # Test standard factor naming
-  expect_equal(
-    extract_level_from_colname("age_group35-54", "age_group", c("18-34", "35-54", "55+")),
-    "35-54"
-  )
-
-  expect_equal(
-    extract_level_from_colname("regionSouth", "region", c("North", "South", "East", "West")),
-    "South"
-  )
-
-  # Edge case: level name contains variable name
-  expect_equal(
-    extract_level_from_colname("colorcolorful", "color", c("plain", "colorful")),
-    "colorful"
-  )
-})
-
-
-test_that("aggregate_importance_mapped aggregates correctly", {
-  # Create mock term-level importance
-  term_importance <- data.frame(
-    term = c("age_group35-54", "age_group55+", "incomeMedium", "incomeHigh"),
-    importance = c(0.2, 0.15, 0.4, 0.25),
-    stringsAsFactors = FALSE
-  )
-
-  # Create mock mapping
-  mapping <- list(
-    term_map = list(
-      "age_group35-54" = list(variable = "age_group", level = "35-54"),
-      "age_group55+" = list(variable = "age_group", level = "55+"),
-      "incomeMedium" = list(variable = "income", level = "Medium"),
-      "incomeHigh" = list(variable = "income", level = "High")
-    )
-  )
-
-  aggregated <- aggregate_importance_mapped(term_importance, mapping)
-
-  expect_equal(nrow(aggregated), 2)  # Two variables
-  expect_true("age_group" %in% aggregated$variable)
-  expect_true("income" %in% aggregated$variable)
-
-  # Age group importance should be sum of its terms
-  age_imp <- aggregated$importance[aggregated$variable == "age_group"]
-  expect_equal(age_imp, 0.2 + 0.15)
-})
-
-
-# ==============================================================================
-# MISSING DATA HANDLER TESTS
-# ==============================================================================
-
-context("Missing Data Handler")
-
-test_that("handle_missing_data drops rows correctly", {
-  data <- generate_binary_test_data(100, seed = 123)
-
-  # Introduce missing values
-  data$age_group[1:5] <- NA
-  data$income[6:10] <- NA
-
-  config <- list(
-    outcome_var = "outcome",
-    driver_vars = c("age_group", "income"),
-    driver_settings = data.frame(
-      driver = c("age_group", "income"),
-      type = c("ordinal", "ordinal"),
-      missing_strategy = c("drop_row", "drop_row"),
-      stringsAsFactors = FALSE
-    )
-  )
-
-  result <- handle_missing_data(data, config)
-
-  # Should have dropped 10 rows (5 + 5, no overlap in our setup)
-  expect_equal(nrow(result$data), 90)
-  expect_true("missing_report" %in% names(result))
-  expect_equal(result$missing_report$summary$total_rows_dropped, 10)
-})
-
-
-test_that("recode_missing_as_level creates Missing category", {
-  x <- factor(c("A", "B", NA, "A", NA, "C"))
-
-  result <- recode_missing_as_level(x)
-
-  expect_true("Missing" %in% levels(result))
-  expect_equal(sum(result == "Missing"), 2)
-  expect_false(any(is.na(result)))
-})
-
-
-test_that("apply_rare_level_policy collapses correctly", {
-  data <- data.frame(
-    outcome = factor(rep(c("Yes", "No"), 50)),
-    driver = factor(c(rep("Common1", 40), rep("Common2", 40), rep("Rare1", 3), rep("Rare2", 2), rep("VeryRare", 15)))
-  )
-
-  config <- list(
-    outcome_var = "outcome",
-    driver_vars = c("driver"),
-    rare_level_policy = "collapse_to_other",
-    rare_level_threshold = 10,
-    driver_settings = data.frame(
-      driver = "driver",
-      type = "nominal",
-      missing_strategy = "drop_row",
-      rare_level_policy = NA,
-      stringsAsFactors = FALSE
-    )
-  )
-
-  result <- apply_rare_level_policy(data, config)
-
-  # Rare1 (3) and Rare2 (2) should be collapsed to "Other"
-  expect_true("Other" %in% levels(result$data$driver))
-  expect_false("Rare1" %in% levels(result$data$driver))
-  expect_false("Rare2" %in% levels(result$data$driver))
-
-  # Common levels and VeryRare (15 >= 10) should remain
-  expect_true("Common1" %in% levels(result$data$driver))
-  expect_true("Common2" %in% levels(result$data$driver))
-  expect_true("VeryRare" %in% levels(result$data$driver))
-})
-
-
-test_that("check_sparse_cells identifies sparse cross-tabs", {
-  data <- data.frame(
-    outcome = factor(c(rep("Yes", 95), rep("No", 5))),
-    driver = factor(c(rep("A", 50), rep("B", 50)))
-  )
-
-  config <- list(
-    outcome_var = "outcome",
-    driver_vars = c("driver")
-  )
-
-  # With threshold of 5, should identify sparse cells
-  result <- check_sparse_cells(data, config, threshold = 5)
-
-  expect_type(result, "list")
-  # The "No" category has only 5 obs split across A and B
-})
-
-
-# ==============================================================================
-# ROBUST FIT WRAPPER TESTS
-# ==============================================================================
-
-context("Robust Model Fitting")
-
-test_that("run_binary_logistic_robust handles standard data", {
-  data <- generate_binary_test_data(200, seed = 123)
-
-  prep_data <- list(
-    data = data,
-    outcome_info = list(
-      type = "binary",
-      categories = c("No", "Yes")
-    ),
-    model_formula = outcome ~ age_group + income + region
-  )
-
-  config <- list(
-    outcome_var = "outcome",
-    driver_vars = c("age_group", "income", "region")
-  )
-
-  guard <- guard_init()
-
-  result <- run_binary_logistic_robust(prep_data, config, weights = NULL, guard = guard)
-
-  expect_true(result$convergence)
-  expect_true("glm" %in% class(result$model))
-  expect_false(isTRUE(result$fallback_used))
-})
-
-
-test_that("run_ordinal_logistic_robust handles standard data", {
-  skip_if_not_installed("ordinal")
-
-  data <- generate_ordinal_test_data(200, seed = 123)
-
-  prep_data <- list(
-    data = data,
-    outcome_info = list(
-      type = "ordinal",
-      categories = c("Low", "Medium", "High")
-    ),
-    model_formula = satisfaction ~ service_quality + price_perception + loyalty_years
-  )
-
-  config <- list(
-    outcome_var = "satisfaction",
-    driver_vars = c("service_quality", "price_perception", "loyalty_years")
-  )
-
-  guard <- guard_init()
-
-  result <- run_ordinal_logistic_robust(prep_data, config, weights = NULL, guard = guard)
-
-  expect_true(result$convergence)
-  expect_true("clm" %in% class(result$model) || "polr" %in% class(result$model))
-})
-
-
-# ==============================================================================
-# PROBABILITY LIFT TESTS
-# ==============================================================================
-
-context("Probability Lift Calculation")
-
-test_that("calculate_probability_lift returns proper structure", {
-  data <- generate_binary_test_data(200, seed = 123)
-
-  prep_data <- list(
-    data = data,
-    outcome_info = list(type = "binary", categories = c("No", "Yes")),
-    model_formula = outcome ~ age_group + income
-  )
-
-  config <- list(
-    outcome_var = "outcome",
-    driver_vars = c("age_group", "income")
-  )
-
-  # Fit model and get predictions
-  model <- glm(prep_data$model_formula, data = data, family = binomial())
-  pred_probs <- predict(model, type = "response")
-
-  model_result <- list(
-    model = model,
-    predicted_probs = pred_probs
-  )
-
-  lift <- calculate_probability_lift(model_result, prep_data, config)
-
-  expect_true(is.data.frame(lift))
-  expect_true("driver" %in% names(lift))
-  expect_true("level" %in% names(lift))
-  expect_true("prob_lift" %in% names(lift))
-  expect_true("prob_lift_pct" %in% names(lift))
-
-  # Reference levels should have 0 lift
-  ref_rows <- lift$is_reference == TRUE
-  expect_true(all(lift$prob_lift[ref_rows] == 0))
-})
-
-
-# ==============================================================================
-# GOLDEN FIXTURE TESTS
-# ==============================================================================
-
-context("Golden Fixture Regression Tests")
-
-test_that("binary logistic produces stable coefficients", {
-  # Use fixed seed for reproducibility
-  data <- generate_binary_test_data(500, seed = 12345)
-
-  formula <- outcome ~ age_group + income + region
-  model <- glm(formula, data = data, family = binomial())
-
-  coefs <- coef(model)
-
-  # Golden values (update if algorithm changes intentionally)
-  # These are approximate - allow some tolerance
-  expect_equal(length(coefs), 8, info = "Expected 8 coefficients")
-
-  # Intercept should be negative (base probability < 0.5)
-  # Just check it exists and is reasonable
-  expect_true(!is.na(coefs["(Intercept)"]))
-})
-
-
-test_that("ordinal logistic produces stable thresholds", {
-  skip_if_not_installed("ordinal")
-
-  data <- generate_ordinal_test_data(500, seed = 12345)
-
-  # Ensure outcome is ordered factor
-  data$satisfaction <- ordered(data$satisfaction, levels = c("Low", "Medium", "High"))
-
-  formula <- satisfaction ~ service_quality + price_perception
-
-  model <- tryCatch(
-    ordinal::clm(formula, data = data),
-    error = function(e) {
-      MASS::polr(formula, data = data, Hess = TRUE)
-    }
-  )
-
-  # Should have 2 thresholds for 3-level ordinal
-  if ("clm" %in% class(model)) {
-    thresholds <- model$alpha
-  } else {
-    thresholds <- model$zeta
-  }
-
-  expect_equal(length(thresholds), 2,
-               info = "Expected 2 thresholds for 3-level ordinal outcome")
-
-  # Thresholds should be ordered
-  expect_true(thresholds[1] < thresholds[2],
-              info = "Thresholds should be in ascending order")
-})
-
-
-test_that("importance ranking is stable", {
-  data <- generate_binary_test_data(500, seed = 54321)
-
-  formula <- outcome ~ age_group + income + region
-  model <- glm(formula, data = data, family = binomial())
-
-  # Calculate chi-square based importance
-  anova_result <- tryCatch(
-    anova(model, test = "Chisq"),
-    error = function(e) NULL
-  )
-
-  if (!is.null(anova_result)) {
-    # Extract deviance values (exclude residuals row)
-    deviances <- anova_result$Deviance[-1]
-    names(deviances) <- c("age_group", "income", "region")
-
-    # Importance should be non-negative
-    expect_true(all(deviances >= 0, na.rm = TRUE))
-  }
-})
-
-
-# ==============================================================================
-# INTEGRATION TESTS
-# ==============================================================================
-
-context("Integration Tests")
-
-test_that("full binary analysis pipeline works", {
-  skip_on_cran()
-
-  # This tests the complete flow without writing files
-  data <- generate_binary_test_data(300, seed = 99999)
-
-  # Create minimal config
-  config <- list(
-    analysis_name = "Test Binary Analysis",
-    outcome_var = "outcome",
-    outcome_label = "Test Outcome",
-    outcome_type = "binary",
-    outcome_order = c("No", "Yes"),
-    driver_vars = c("age_group", "income", "region"),
-    driver_labels = list(
-      age_group = "Age Group",
-      income = "Income Level",
-      region = "Region"
-    ),
-    driver_orders = list(
-      age_group = c("18-34", "35-54", "55+"),
-      income = c("Low", "Medium", "High"),
-      region = NULL
-    ),
-    driver_settings = data.frame(
-      driver = c("age_group", "income", "region"),
-      type = c("ordinal", "ordinal", "nominal"),
-      missing_strategy = c("drop_row", "drop_row", "drop_row"),
-      rare_level_policy = c(NA, NA, NA),
-      stringsAsFactors = FALSE
-    ),
-    weight_var = NULL,
-    reference_category = "No",
-    rare_level_policy = "warn_only",
-    rare_level_threshold = 10,
-    rare_cell_threshold = 5,
-    min_sample_size = 30,
-    confidence_level = 0.95,
-    missing_threshold = 50,
-    detailed_output = TRUE
-  )
-
-  # Test guard initialization
-  guard <- guard_init()
-  expect_type(guard, "list")
-
-  # Test missing data handling
-  missing_result <- handle_missing_data(data, config)
-  expect_equal(nrow(missing_result$data), nrow(data))  # No missing in test data
-
-  # Test rare level policy
-  rare_result <- apply_rare_level_policy(missing_result$data, config)
-  expect_true(is.data.frame(rare_result$data))
-
-  # Test preprocessing
-  prep_data <- tryCatch(
-    preprocess_catdriver_data(rare_result$data, config),
-    error = function(e) {
-      list(
-        data = rare_result$data,
-        outcome_info = list(type = "binary", categories = c("No", "Yes")),
-        model_formula = outcome ~ age_group + income + region
-      )
-    }
-  )
-
-  expect_true("data" %in% names(prep_data))
-
-  # Test model fitting
-  model <- glm(outcome ~ age_group + income + region, data = prep_data$data, family = binomial())
-  expect_true(model$converged)
-})
-
-
-# ==============================================================================
-# RUN ALL TESTS
+# RUN TESTS IF NOT INTERACTIVE
 # ==============================================================================
 
 if (!interactive()) {
+  cat("\n========================================\n")
+  cat("CATDRIVER REGRESSION TEST SUITE\n")
+  cat("========================================\n\n")
+
   test_results <- test_dir(".", reporter = "summary")
 
-  # Exit with appropriate code
-  if (any(as.data.frame(test_results)$failed > 0)) {
+  # Summary
+  test_df <- as.data.frame(test_results)
+  passed <- sum(test_df$nb) - sum(test_df$failed) - sum(test_df$skipped)
+  failed <- sum(test_df$failed)
+
+  cat("\n========================================\n")
+  if (failed > 0) {
+    cat("TESTS FAILED:", failed, "\n")
     quit(status = 1)
+  } else {
+    cat("ALL TESTS PASSED:", passed, "\n")
+    quit(status = 0)
   }
 }

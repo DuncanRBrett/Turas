@@ -184,31 +184,33 @@ guard_require_multinomial_mode <- function(config) {
   }
 
   multinomial_mode <- config$multinomial_mode
+  valid_modes <- c("baseline_category", "all_pairwise", "one_vs_all")
 
-  if (is.null(multinomial_mode) || !multinomial_mode %in% c("per_outcome", "target_outcome")) {
+  if (is.null(multinomial_mode) || !multinomial_mode %in% valid_modes) {
     stop(
       "\n",
       "=== CATDRIVER HARD ERROR ===\n",
       "Multinomial outcome requires explicit reporting mode.\n\n",
       "REQUIRED: Add 'multinomial_mode' to Settings sheet.\n",
       "VALID VALUES:\n",
-      "  - 'per_outcome': Separate OR tables for each outcome vs reference\n",
-      "  - 'target_outcome': Single table for target outcome (requires target_outcome_level)\n\n",
+      "  - 'baseline_category': Compare all levels to one reference (default)\n",
+      "  - 'all_pairwise': Compare every pair of levels\n",
+      "  - 'one_vs_all': Compare each level vs. all others (requires target_outcome_level)\n\n",
       "WHY: Multinomial models produce multiple sets of odds ratios.\n",
       "     We refuse to guess which one you want to see.\n",
       call. = FALSE
     )
   }
 
-  if (multinomial_mode == "target_outcome") {
+  if (multinomial_mode == "one_vs_all") {
     target_level <- config$target_outcome_level
-    if (is.null(target_level) || !nzchar(target_level)) {
+    if (is.null(target_level) || is.na(target_level) || !nzchar(target_level)) {
       stop(
         "\n",
         "=== CATDRIVER HARD ERROR ===\n",
-        "target_outcome mode requires target_outcome_level.\n\n",
+        "one_vs_all mode requires target_outcome_level.\n\n",
         "REQUIRED: Add 'target_outcome_level' to Settings sheet.\n",
-        "VALUE: The outcome category you want to analyze.\n",
+        "VALUE: The outcome category you want to treat as 'success'.\n",
         call. = FALSE
       )
     }

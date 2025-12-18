@@ -662,6 +662,14 @@ check_proportional_odds <- function(model, data, config) {
 
 #' Run Multinomial Logistic Regression with Robust Handling
 #'
+#' Supports three multinomial modes (set in config$multinomial_mode):
+#' - "baseline_category": Compare all levels to reference (default)
+#' - "all_pairwise": Compare every pair of levels
+#' - "one_vs_all": Compare each level vs. all others combined
+#'
+#' When multinomial_mode="one_vs_all", config$target_outcome_level specifies
+#' which outcome level to treat as "success".
+#'
 #' @param formula Model formula
 #' @param data Analysis data
 #' @param weights Optional weight vector
@@ -678,6 +686,45 @@ run_multinomial_logistic_robust <- function(formula, data, weights = NULL, confi
   if (!requireNamespace("nnet", quietly = TRUE)) {
     stop("Package 'nnet' required for multinomial logistic regression", call. = FALSE)
   }
+
+  # ===========================================================================
+  # VALIDATE MULTINOMIAL MODE
+  # ===========================================================================
+
+  multinomial_mode <- config$multinomial_mode
+  if (is.null(multinomial_mode)) {
+    multinomial_mode <- "baseline_category"  # Default
+  }
+
+  valid_modes <- c("baseline_category", "all_pairwise", "one_vs_all")
+  if (!multinomial_mode %in% valid_modes) {
+    stop("Invalid multinomial_mode: '", multinomial_mode, "'\n",
+         "Must be one of: ", paste(valid_modes, collapse = ", "),
+         call. = FALSE)
+  }
+
+  # For one_vs_all mode, require target_outcome_level
+  target_outcome_level <- config$target_outcome_level
+  if (multinomial_mode == "one_vs_all") {
+    if (is.null(target_outcome_level) || is.na(target_outcome_level)) {
+      stop("HARD ERROR: multinomial_mode='one_vs_all' requires target_outcome_level.\n",
+           "Specify which outcome level to treat as 'success' in the config.",
+           call. = FALSE)
+    }
+
+    # Validate target level exists in data
+    outcome_levels <- levels(data[[config$outcome_var]])
+    if (!target_outcome_level %in% outcome_levels) {
+      stop("HARD ERROR: target_outcome_level='", target_outcome_level,
+           "' not found in outcome.\n",
+           "Available levels: ", paste(outcome_levels, collapse = ", "),
+           call. = FALSE)
+    }
+  }
+
+  # ===========================================================================
+  # FIT MODEL
+  # ===========================================================================
 
   model <- tryCatch({
     if (!is.null(weights) && length(weights) == nrow(data)) {
@@ -796,6 +843,8 @@ run_multinomial_logistic_robust <- function(formula, data, weights = NULL, confi
     fallback_reason = fallback_reason,
     coefficients = coef_df,
     reference_outcome = ref_level,
+    multinomial_mode = multinomial_mode,
+    target_outcome_level = target_outcome_level,
     fit_statistics = list(
       log_likelihood = as.numeric(ll_full),
       mcfadden_r2 = mcfadden_r2,

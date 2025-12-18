@@ -386,7 +386,14 @@ validate_catdriver_data <- function(data, config) {
 
 #' Prepare Data for Analysis
 #'
-#' Filters to complete cases and prepares variables for modeling.
+#' Applies per-variable missing data strategy as specified in Driver_Settings.
+#' DOES NOT use blanket complete.cases() deletion.
+#'
+#' Missing data strategy per variable (from Driver_Settings sheet):
+#' - outcome missing: ALWAYS drop the row
+#' - driver missing with "drop_row": drop the row
+#' - driver missing with "missing_as_level": recode to "Missing" level
+#' - driver missing with "error_if_missing": hard error if any missing
 #'
 #' @param data Raw data frame
 #' @param config Configuration list
@@ -395,40 +402,114 @@ validate_catdriver_data <- function(data, config) {
 #' @keywords internal
 prepare_analysis_data <- function(data, config, diagnostics) {
 
-  # Get analysis variables
-  analysis_vars <- c(config$outcome_var, config$driver_vars)
+  n_original <- nrow(data)
+  missing_report <- list()
 
-  # Add weight if present
-  has_weights <- FALSE
-  if (!is.null(config$weight_var) && config$weight_var %in% names(data)) {
-    weights <- data[[config$weight_var]]
-    if (is.numeric(weights) && !all(is.na(weights))) {
-      analysis_vars <- c(analysis_vars, config$weight_var)
-      has_weights <- TRUE
+  # ==========================================================================
+  # STEP 1: Handle outcome variable (ALWAYS drop rows with missing outcome)
+  # ==========================================================================
+
+  outcome_missing <- is.na(data[[config$outcome_var]])
+  n_outcome_missing <- sum(outcome_missing)
+
+  if (n_outcome_missing > 0) {
+    data <- data[!outcome_missing, , drop = FALSE]
+    missing_report$outcome <- list(
+      variable = config$outcome_var,
+      strategy = "drop_row",
+      n_missing = n_outcome_missing,
+      action = "dropped"
+    )
+  }
+
+  # ==========================================================================
+  # STEP 2: Handle each driver variable per its missing_strategy
+  # ==========================================================================
+
+  for (driver_var in config$driver_vars) {
+    # Get per-variable strategy from Driver_Settings
+    strategy <- get_driver_setting(config, driver_var, "missing_strategy", "drop_row")
+
+    driver_missing <- is.na(data[[driver_var]])
+    n_missing <- sum(driver_missing)
+
+    if (n_missing == 0) {
+      # No missing - nothing to do
+      next
+    }
+
+    if (strategy == "error_if_missing") {
+      # Hard error - refuse to proceed
+      stop("HARD ERROR: Variable '", driver_var, "' has ", n_missing,
+           " missing values but missing_strategy='error_if_missing'.\n",
+           "Either fix the data or change the missing_strategy in Driver_Settings.",
+           call. = FALSE)
+
+    } else if (strategy == "missing_as_level") {
+      # Recode missing to "Missing" level
+      var_data <- data[[driver_var]]
+
+      if (!is.factor(var_data)) {
+        var_data <- factor(var_data)
+      }
+
+      # Add "Missing" as a level and recode NAs
+      levels(var_data) <- c(levels(var_data), "Missing")
+      var_data[is.na(var_data)] <- "Missing"
+      data[[driver_var]] <- var_data
+
+      missing_report[[driver_var]] <- list(
+        variable = driver_var,
+        strategy = "missing_as_level",
+        n_missing = n_missing,
+        action = "recoded to 'Missing' level"
+      )
+
+    } else {
+      # Default: drop_row
+      data <- data[!driver_missing, , drop = FALSE]
+
+      missing_report[[driver_var]] <- list(
+        variable = driver_var,
+        strategy = "drop_row",
+        n_missing = n_missing,
+        action = "dropped"
+      )
     }
   }
 
-  # Filter to complete cases
-  complete_mask <- complete.cases(data[, analysis_vars, drop = FALSE])
-  data_complete <- data[complete_mask, , drop = FALSE]
+  # ==========================================================================
+  # STEP 3: Handle weights
+  # ==========================================================================
 
-  # Prepare weight vector
-  weights <- if (has_weights) {
-    w <- data_complete[[config$weight_var]]
-    w[is.na(w)] <- 0
-    w[w < 0] <- 0
-    w
-  } else {
-    rep(1, nrow(data_complete))
+  has_weights <- FALSE
+  weights <- rep(1, nrow(data))
+
+  if (!is.null(config$weight_var) && config$weight_var %in% names(data)) {
+    w <- data[[config$weight_var]]
+    if (is.numeric(w) && !all(is.na(w))) {
+      has_weights <- TRUE
+      w[is.na(w)] <- 1
+      w[w < 0] <- 0
+      weights <- w
+    }
   }
 
+  # ==========================================================================
+  # STEP 4: Compile result
+  # ==========================================================================
+
+  n_complete <- nrow(data)
+  n_excluded <- n_original - n_complete
+
   list(
-    data = data_complete,
+    data = data,
     weights = weights,
     has_weights = has_weights,
-    n_original = nrow(data),
-    n_complete = nrow(data_complete),
-    n_excluded = nrow(data) - nrow(data_complete)
+    n_original = n_original,
+    n_complete = n_complete,
+    n_excluded = n_excluded,
+    missing_report = missing_report
   )
 }
 
