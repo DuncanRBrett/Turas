@@ -389,15 +389,22 @@ run_catdriver_gui <- function() {
           turas_root <- dirname(turas_root)
         }
 
-        # Source module files
+        # Source module files in correct order
         output_text <- paste0(output_text, "Loading Categorical Key Driver module...\n\n")
         console_text(output_text)
 
         source(file.path(turas_root, "modules/catdriver/R/07_utilities.R"))
+        source(file.path(turas_root, "modules/catdriver/R/08_guard.R"))
+        source(file.path(turas_root, "modules/catdriver/R/08a_guards_hard.R"))
+        source(file.path(turas_root, "modules/catdriver/R/08b_guards_soft.R"))
         source(file.path(turas_root, "modules/catdriver/R/01_config.R"))
         source(file.path(turas_root, "modules/catdriver/R/02_validation.R"))
         source(file.path(turas_root, "modules/catdriver/R/03_preprocessing.R"))
+        source(file.path(turas_root, "modules/catdriver/R/09_mapper.R"))
+        source(file.path(turas_root, "modules/catdriver/R/10_missing.R"))
         source(file.path(turas_root, "modules/catdriver/R/04_analysis.R"))
+        source(file.path(turas_root, "modules/catdriver/R/04a_ordinal.R"))
+        source(file.path(turas_root, "modules/catdriver/R/04b_multinomial.R"))
         source(file.path(turas_root, "modules/catdriver/R/05_importance.R"))
         source(file.path(turas_root, "modules/catdriver/R/06_output.R"))
         source(file.path(turas_root, "modules/catdriver/R/00_main.R"))

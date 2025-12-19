@@ -85,14 +85,21 @@ modules/catdriver/
 When sourcing manually, files must be loaded in this order:
 
 ```r
-source("modules/catdriver/R/07_utilities.R")   # No dependencies
-source("modules/catdriver/R/01_config.R")       # Uses: 07_utilities
-source("modules/catdriver/R/02_validation.R")   # Uses: 07_utilities, 01_config
-source("modules/catdriver/R/03_preprocessing.R") # Uses: 07_utilities, 01_config
-source("modules/catdriver/R/04_analysis.R")     # Uses: 07_utilities
-source("modules/catdriver/R/05_importance.R")   # Uses: 07_utilities, 01_config
-source("modules/catdriver/R/06_output.R")       # Uses: 07_utilities, 01_config, 05_importance
-source("modules/catdriver/R/00_main.R")         # Uses: all above
+source("modules/catdriver/R/07_utilities.R")     # No dependencies
+source("modules/catdriver/R/08_guard.R")         # Uses: 07_utilities (refusal mechanism)
+source("modules/catdriver/R/08a_guards_hard.R")  # Uses: 08_guard
+source("modules/catdriver/R/08b_guards_soft.R")  # Uses: 08_guard
+source("modules/catdriver/R/01_config.R")        # Uses: 07_utilities, 08_guard
+source("modules/catdriver/R/02_validation.R")    # Uses: 07_utilities, 08_guard
+source("modules/catdriver/R/03_preprocessing.R") # Uses: 07_utilities, 08_guard
+source("modules/catdriver/R/09_mapper.R")        # Uses: 07_utilities, 08_guard
+source("modules/catdriver/R/10_missing.R")       # Uses: 07_utilities, 08_guard
+source("modules/catdriver/R/04_analysis.R")      # Uses: 07_utilities, 08_guard
+source("modules/catdriver/R/04a_ordinal.R")      # Uses: 07_utilities, 08_guard
+source("modules/catdriver/R/04b_multinomial.R")  # Uses: 07_utilities, 08_guard
+source("modules/catdriver/R/05_importance.R")    # Uses: 07_utilities, 08_guard
+source("modules/catdriver/R/06_output.R")        # Uses: 07_utilities
+source("modules/catdriver/R/00_main.R")          # Uses: all above
 ```
 
 ### External R Package Dependencies
