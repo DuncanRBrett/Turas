@@ -423,12 +423,19 @@ prepare_predictors <- function(data, config) {
       }
 
     } else if (pred_type$type == "ordinal") {
-      # Ordered factor
+      # Ordered factor - but use TREATMENT contrasts (not polynomial)
+      # This keeps coefficients level-based and mappable for Factor Patterns output
       if (!is.null(order_spec) && length(order_spec) > 0) {
         var_data <- factor(var_data, levels = order_spec, ordered = TRUE)
       } else {
         var_data <- factor(var_data, ordered = TRUE)
       }
+
+      # CRITICAL: Override default polynomial contrasts with treatment contrasts
+      # Polynomial contrasts (.L, .Q, .C) are not mappable to levels and would
+      # produce misleading Factor Patterns output. Treatment contrasts give us
+      # level-based coefficients that match the expected OR interpretation.
+      contrasts(var_data) <- contr.treatment(nlevels(var_data))
     }
 
     # Update data

@@ -203,13 +203,14 @@ map_terms_to_levels <- function(model, data, formula = NULL) {
 #' This works by checking which level, when appended to the variable name,
 #' matches the column name exactly.
 #'
-#' For ordinal variables with polynomial contrasts (e.g., .L, .Q, .C),
-#' returns a descriptive label instead of refusing.
+#' If polynomial contrasts are detected (e.g., .L, .Q, .C from ordinal factors),
+#' refuses with MAPPER_POLYNOMIAL_CONTRAST. This should not happen if preprocessing
+#' correctly forces treatment contrasts for ordinal predictors.
 #'
 #' @param col_name Design matrix column name
 #' @param var_name Variable name
 #' @param levels_vec Vector of factor levels
-#' @return Matched level or polynomial contrast label
+#' @return Matched level (refuses if no match or polynomial contrast detected)
 #' @keywords internal
 extract_level_from_colname <- function(col_name, var_name, levels_vec) {
   # Try each level
@@ -249,23 +250,30 @@ extract_level_from_colname <- function(col_name, var_name, levels_vec) {
       }
     }
 
-    # CHECK FOR POLYNOMIAL CONTRASTS (ordinal variables)
+    # CHECK FOR POLYNOMIAL CONTRASTS (ordinal variables) - REFUSE
     # These have suffixes like .L (linear), .Q (quadratic), .C (cubic), .^4, etc.
+    # Polynomial contrasts are NOT mappable to levels and would produce misleading
+    # Factor Patterns output. This should not happen if preprocessing correctly
+    # forces treatment contrasts for ordinal predictors.
     if (grepl("^\\.(L|Q|C|\\^[0-9]+)$", suffix)) {
-      # This is a polynomial contrast - return descriptive label
-      contrast_names <- list(
-        ".L" = "linear trend",
-        ".Q" = "quadratic trend",
-        ".C" = "cubic trend"
+      catdriver_refuse(
+        reason = "MAPPER_POLYNOMIAL_CONTRAST",
+        title = "POLYNOMIAL CONTRAST DETECTED",
+        problem = paste0(
+          "Predictor '", var_name, "' is using polynomial contrasts (", suffix, "). ",
+          "These cannot be mapped to factor levels for Factor Patterns output."
+        ),
+        why_it_matters = paste0(
+          "Polynomial contrast coefficients (.L=linear, .Q=quadratic, .C=cubic) represent ",
+          "trend effects, not comparisons between specific levels. Mapping them to levels ",
+          "would produce misleading odds ratio interpretations."
+        ),
+        fix = paste0(
+          "This usually indicates a bug in preprocessing. Ordinal predictors should use ",
+          "treatment contrasts, not polynomial contrasts. Check that the predictor is ",
+          "being processed correctly, or change its type to 'categorical' in Driver_Settings."
+        )
       )
-
-      if (suffix %in% names(contrast_names)) {
-        return(contrast_names[[suffix]])
-      } else if (grepl("^\\^", suffix)) {
-        return(paste0("polynomial^", gsub("\\^", "", suffix)))
-      } else {
-        return(paste0("ordinal contrast", suffix))
-      }
     }
   }
 
