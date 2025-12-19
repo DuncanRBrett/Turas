@@ -15,8 +15,9 @@
 #' Creates a reliable mapping from model coefficient names to original
 #' variable names and factor levels using model matrix attributes.
 #'
-#' This function NEVER uses substring matching or string slicing to
-#' determine factor levels. It uses R's model matrix infrastructure.
+#' CRITICAL: This function uses POSITIONAL MAPPING via the assign attribute,
+#' NOT string parsing. This is the only reliable approach because R's column
+#' naming can vary (e.g., "gradeB" vs "grade2" depending on factor encoding).
 #'
 #' @param model Fitted model object (glm, polr, or multinom)
 #' @param data Data frame used for fitting
@@ -108,80 +109,133 @@ map_terms_to_levels <- function(model, data, formula = NULL) {
   # Get xlevels (factor levels used in model)
   xlevels <- model$xlevels
   if (is.null(xlevels)) {
-    # Build from data
-    xlevels <- lapply(mf[, -1, drop = FALSE], function(x) {
-      if (is.factor(x)) levels(x) else NULL
-    })
-    xlevels <- xlevels[!sapply(xlevels, is.null)]
+    # Build from model frame - get levels for each factor variable
+    xlevels <- list()
+    for (var_name in term_labels) {
+      if (var_name %in% names(mf) && is.factor(mf[[var_name]])) {
+        xlevels[[var_name]] <- levels(mf[[var_name]])
+      }
+    }
   }
 
-  # Build mapping
+  # ============================================================================
+  # POSITIONAL MAPPING - The ONLY reliable approach
+  # ============================================================================
+  # For each term (predictor), we know:
+  # 1. Which columns belong to it (from assign_vec)
+  # 2. The order of non-reference levels (from xlevels)
+  # Column position within a term maps directly to non-reference level position.
+  #
+  # Example: grade with levels D, C, B, A (D=reference)
+  # - assign_vec will have positions for 3 columns (one per non-ref level)
+  # - Column 1 of this term = level C (position 2 in levels)
+  # - Column 2 of this term = level B (position 3 in levels)
+  # - Column 3 of this term = level A (position 4 in levels)
+  # ============================================================================
+
   mapping_list <- list()
   col_names <- colnames(mm)
 
-  for (i in seq_along(col_names)) {
-    col_name <- col_names[i]
-    term_idx <- assign_vec[i]
+  for (term_idx in seq_along(term_labels)) {
+    driver <- term_labels[term_idx]
 
-    # Skip intercept (term_idx = 0)
-    if (term_idx == 0) next
+    # Get all columns for this term
+    term_col_indices <- which(assign_vec == term_idx)
 
-    # Get the original term/variable name
-    if (term_idx <= length(term_labels)) {
-      driver <- term_labels[term_idx]
-    } else {
-      driver <- col_name
-    }
+    if (length(term_col_indices) == 0) next
 
     # Check if this is a factor variable
     is_factor_var <- driver %in% names(xlevels)
 
     if (is_factor_var) {
-      # Extract level from column name using xlevels
       levels_vec <- xlevels[[driver]]
       reference_level <- levels_vec[1]
+      non_ref_levels <- levels_vec[-1]  # All levels except reference
 
-      # Find which level this column represents
-      # Column name is typically "variablelevel" (no separator)
-      level <- extract_level_from_colname(col_name, driver, levels_vec)
+      # CRITICAL: Check for polynomial contrasts BEFORE positional mapping
+      # Polynomial contrast column names end in .L, .Q, .C, .^4, etc.
+      first_col_name <- col_names[term_col_indices[1]]
+      if (grepl("\\.(L|Q|C|\\^[0-9]+)$", first_col_name)) {
+        catdriver_refuse(
+          reason = "MAPPER_POLYNOMIAL_CONTRAST",
+          title = "POLYNOMIAL CONTRAST DETECTED",
+          problem = paste0(
+            "Predictor '", driver, "' is using polynomial contrasts. ",
+            "These cannot be mapped to factor levels for Factor Patterns output."
+          ),
+          why_it_matters = paste0(
+            "Polynomial contrast coefficients (.L=linear, .Q=quadratic, .C=cubic) represent ",
+            "trend effects, not comparisons between specific levels. Mapping them to levels ",
+            "would produce misleading odds ratio interpretations."
+          ),
+          fix = paste0(
+            "This usually indicates a bug in preprocessing. Ordinal predictors should use ",
+            "treatment contrasts, not polynomial contrasts. Check that the predictor is ",
+            "being processed correctly, or change its type to 'categorical' in Driver_Settings."
+          )
+        )
+      }
 
-      mapping_list[[length(mapping_list) + 1]] <- data.frame(
-        driver = driver,
-        level = level,
-        design_col = col_name,
-        coef_name = col_name,
-        reference_level = reference_level,
-        is_reference = FALSE,
-        stringsAsFactors = FALSE
-      )
+      # Verify column count matches non-reference level count
+      if (length(term_col_indices) != length(non_ref_levels)) {
+        catdriver_refuse(
+          reason = "MAPPER_COLUMN_COUNT_MISMATCH",
+          title = "TERM-TO-LEVEL MAPPING FAILED",
+          problem = paste0(
+            "Predictor '", driver, "' has ", length(term_col_indices),
+            " design matrix columns but ", length(non_ref_levels), " non-reference levels."
+          ),
+          why_it_matters = "Column count must match level count for positional mapping.",
+          fix = "Check that the factor is properly defined with correct contrasts.",
+          details = paste0(
+            "Columns: ", paste(col_names[term_col_indices], collapse = ", "), "\n",
+            "Non-ref levels: ", paste(non_ref_levels, collapse = ", ")
+          )
+        )
+      }
 
-      # Also add reference level entry (not in design matrix but needed for output)
-      # Only add once per driver
-      if (!any(sapply(mapping_list, function(x) {
-        x$driver == driver && x$is_reference
-      }))) {
+      # POSITIONAL MAPPING: column i of this term -> non_ref_levels[i]
+      for (j in seq_along(term_col_indices)) {
+        col_idx <- term_col_indices[j]
+        col_name <- col_names[col_idx]
+        level <- non_ref_levels[j]
+
         mapping_list[[length(mapping_list) + 1]] <- data.frame(
           driver = driver,
-          level = reference_level,
-          design_col = NA,
-          coef_name = NA,
+          level = level,
+          design_col = col_name,
+          coef_name = col_name,
           reference_level = reference_level,
-          is_reference = TRUE,
+          is_reference = FALSE,
           stringsAsFactors = FALSE
         )
       }
 
-    } else {
-      # Continuous variable or other
+      # Add reference level entry (not in design matrix but needed for output)
       mapping_list[[length(mapping_list) + 1]] <- data.frame(
         driver = driver,
-        level = NA,
-        design_col = col_name,
-        coef_name = col_name,
-        reference_level = NA,
-        is_reference = FALSE,
+        level = reference_level,
+        design_col = NA,
+        coef_name = NA,
+        reference_level = reference_level,
+        is_reference = TRUE,
         stringsAsFactors = FALSE
       )
+
+    } else {
+      # Continuous variable or other - single column per term
+      for (col_idx in term_col_indices) {
+        col_name <- col_names[col_idx]
+        mapping_list[[length(mapping_list) + 1]] <- data.frame(
+          driver = driver,
+          level = NA,
+          design_col = col_name,
+          coef_name = col_name,
+          reference_level = NA,
+          is_reference = FALSE,
+          stringsAsFactors = FALSE
+        )
+      }
     }
   }
 
@@ -192,111 +246,6 @@ map_terms_to_levels <- function(model, data, formula = NULL) {
   mapping$outcome_level <- NA
 
   mapping
-}
-
-
-#' Extract Level from Column Name Using Known Levels
-#'
-#' Given a column name like "CampusOnline" and knowing the variable is "Campus"
-#' with levels c("On Campus", "Online", "Hybrid"), extracts "Online".
-#'
-#' This works by checking which level, when appended to the variable name,
-#' matches the column name exactly.
-#'
-#' If polynomial contrasts are detected (e.g., .L, .Q, .C from ordinal factors),
-#' refuses with MAPPER_POLYNOMIAL_CONTRAST. This should not happen if preprocessing
-#' correctly forces treatment contrasts for ordinal predictors.
-#'
-#' @param col_name Design matrix column name
-#' @param var_name Variable name
-#' @param levels_vec Vector of factor levels
-#' @return Matched level (refuses if no match or polynomial contrast detected)
-#' @keywords internal
-extract_level_from_colname <- function(col_name, var_name, levels_vec) {
-  # Try each level
-  for (level in levels_vec) {
-    # R creates column names by concatenating variable name and level
-    # with special characters removed/replaced
-    expected_col <- paste0(var_name, level)
-
-    # Also try with make.names cleaning (handles spaces, special chars)
-    expected_col_clean <- paste0(var_name, make.names(level))
-
-    if (col_name == expected_col || col_name == expected_col_clean) {
-      return(level)
-    }
-  }
-
-  # Second pass: try more aggressive matching
-  # Remove variable name prefix and match remaining to levels
-  if (startsWith(col_name, var_name)) {
-    suffix <- substring(col_name, nchar(var_name) + 1)
-
-    # Direct match on suffix
-    for (level in levels_vec) {
-      if (suffix == level) return(level)
-      if (suffix == make.names(level)) return(level)
-      if (suffix == gsub("[^A-Za-z0-9]", "", level)) return(level)
-    }
-
-    # Fuzzy match: level starts with suffix or vice versa
-    # This handles truncation
-    for (level in levels_vec) {
-      level_clean <- gsub("[^A-Za-z0-9]", "", level)
-      suffix_clean <- gsub("[^A-Za-z0-9]", "", suffix)
-
-      if (tolower(level_clean) == tolower(suffix_clean)) {
-        return(level)
-      }
-    }
-
-    # CHECK FOR POLYNOMIAL CONTRASTS (ordinal variables) - REFUSE
-    # These have suffixes like .L (linear), .Q (quadratic), .C (cubic), .^4, etc.
-    # Polynomial contrasts are NOT mappable to levels and would produce misleading
-    # Factor Patterns output. This should not happen if preprocessing correctly
-    # forces treatment contrasts for ordinal predictors.
-    if (grepl("^\\.(L|Q|C|\\^[0-9]+)$", suffix)) {
-      catdriver_refuse(
-        reason = "MAPPER_POLYNOMIAL_CONTRAST",
-        title = "POLYNOMIAL CONTRAST DETECTED",
-        problem = paste0(
-          "Predictor '", var_name, "' is using polynomial contrasts (", suffix, "). ",
-          "These cannot be mapped to factor levels for Factor Patterns output."
-        ),
-        why_it_matters = paste0(
-          "Polynomial contrast coefficients (.L=linear, .Q=quadratic, .C=cubic) represent ",
-          "trend effects, not comparisons between specific levels. Mapping them to levels ",
-          "would produce misleading odds ratio interpretations."
-        ),
-        fix = paste0(
-          "This usually indicates a bug in preprocessing. Ordinal predictors should use ",
-          "treatment contrasts, not polynomial contrasts. Check that the predictor is ",
-          "being processed correctly, or change its type to 'categorical' in Driver_Settings."
-        )
-      )
-    }
-  }
-
-  # Hard refuse if we cannot map the level - no guessing allowed
-  if (startsWith(col_name, var_name)) {
-    catdriver_refuse(
-      reason = "MAPPER_LEVEL_MATCH_FAILED",
-      title = "TERM-TO-LEVEL MAPPING FAILED",
-      problem = paste0(
-        "Could not map design-matrix column '", col_name,
-        "' back to a known level of predictor '", var_name, "'."
-      ),
-      why_it_matters = "Without exact mapping, odds ratios can be assigned to the wrong category.",
-      fix = paste0(
-        "Check for unusual characters/spaces in the data levels, ",
-        "ensure predictors are proper factors, and consider simplifying labels. ",
-        "If needed, add a stable coding column (e.g., level codes) and map labels separately."
-      ),
-      details = paste0("Known levels: ", paste(levels_vec, collapse = " | "))
-    )
-  }
-
-  NA
 }
 
 

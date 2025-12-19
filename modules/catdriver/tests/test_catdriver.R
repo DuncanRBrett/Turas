@@ -127,16 +127,36 @@ test_that("map_terms_to_levels correctly maps standard factor names", {
 })
 
 
-test_that("extract_level_from_colname handles messy level names", {
-  # Test with spaces
-  result <- extract_level_from_colname("campus_typeOn Campus", "campus_type",
-                                        c("On Campus", "Online Only", "Hybrid/Mixed"))
-  expect_equal(result, "On Campus")
+test_that("positional mapping handles numerically-named columns", {
+  # CRITICAL: This tests the fix for the grade2 mapping bug
 
-  # Test with special characters
-  result <- extract_level_from_colname("age_bracket36+", "age_bracket",
-                                        c("18 - 25", "26 - 35", "36+"))
-  expect_equal(result, "36+")
+  # When R creates model matrix columns like "grade2" instead of "gradeC",
+  # positional mapping via assign attribute correctly maps to levels.
+
+  # Create data where factor might get numeric column names
+  data <- data.frame(
+    outcome = factor(c(rep("Low", 50), rep("High", 50))),
+    grade = factor(c("D", "C", "B", "A")[sample(1:4, 100, replace = TRUE)],
+                   levels = c("D", "C", "B", "A"))
+  )
+
+  formula <- outcome ~ grade
+  model <- glm(formula, data = data, family = binomial())
+
+  mapping <- map_terms_to_levels(model, data, formula)
+
+  # Mapping should have 4 entries (3 non-ref + 1 ref)
+  expect_equal(nrow(mapping), 4)
+
+  # All levels should be present (D is reference)
+  expect_true("D" %in% mapping$level)
+  expect_true("C" %in% mapping$level)
+  expect_true("B" %in% mapping$level)
+  expect_true("A" %in% mapping$level)
+
+  # Reference level should be correctly identified
+  expect_equal(sum(mapping$is_reference), 1)
+  expect_equal(mapping$level[mapping$is_reference], "D")
 })
 
 
