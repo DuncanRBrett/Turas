@@ -151,12 +151,14 @@ run_categorical_keydriver_impl <- function(config_file,
   diagnostics <- validate_catdriver_data(data, config)
 
   if (!diagnostics$passed) {
-    cat("\n")
-    log_message("ANALYSIS CANNOT PROCEED", "error")
-    for (err in diagnostics$errors) {
-      log_message(err, "error")
-    }
-    stop("Data validation failed. See errors above.", call. = FALSE)
+    catdriver_refuse(
+      reason = "DATA_VALIDATION_FAILED",
+      title = "DATA VALIDATION FAILED",
+      problem = "Data does not meet minimum requirements for analysis.",
+      why_it_matters = "Analysis cannot proceed with invalid or insufficient data.",
+      fix = "Review the errors below and correct your data or configuration.",
+      details = paste0("ERRORS:\n  - ", paste(diagnostics$errors, collapse = "\n  - "))
+    )
   }
 
   log_message(paste("Original sample:", diagnostics$original_n, "respondents"), "info")

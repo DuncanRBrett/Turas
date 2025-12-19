@@ -218,18 +218,18 @@ guard_direction_sanity <- function(guard, prep_data, model_result, config) {
 
   # If majority of checked comparisons mismatch, likely reversal
   if (checked > 2 && mismatches / checked > 0.5) {
-    stop(
-      "\n",
-      "=== CATDRIVER HARD ERROR ===\n",
-      "Direction sanity check FAILED.\n\n",
-      "Odds ratio directions do not align with raw data patterns.\n",
-      "This usually means the outcome ordering is reversed.\n\n",
-      "OUTCOME ORDER IN CONFIG: ", paste(outcome_levels, collapse = " < "), "\n\n",
-      "FIX: Check the 'Order' column for your outcome variable.\n",
-      "     Ensure Low values are listed BEFORE High values.\n",
-      "     For satisfaction: 'Dissatisfied; Neutral; Satisfied'\n",
-      "     NOT: 'Satisfied; Neutral; Dissatisfied'\n",
-      call. = FALSE
+    catdriver_refuse(
+      reason = "CFG_OUTCOME_ORDER_REVERSED",
+      title = "OUTCOME ORDER APPEARS REVERSED",
+      problem = "Odds ratio directions do not align with raw data patterns.",
+      why_it_matters = "This usually means the outcome ordering is backwards, producing inverted interpretations.",
+      fix = paste0(
+        "Check the 'Order' column for your outcome variable.\n",
+        "Ensure Low values are listed BEFORE High values.\n",
+        "For satisfaction: 'Dissatisfied;Neutral;Satisfied'\n",
+        "NOT: 'Satisfied;Neutral;Dissatisfied'"
+      ),
+      details = paste0("CURRENT ORDER: ", paste(outcome_levels, collapse = " < "))
     )
   }
 
@@ -240,6 +240,7 @@ guard_direction_sanity <- function(guard, prep_data, model_result, config) {
 #' Run All Pre-Analysis Guards
 #'
 #' Validates config and data before analysis begins.
+#' Runs all hard-error guards that use catdriver_refuse().
 #'
 #' @param config Configuration list
 #' @param data Data frame
@@ -248,11 +249,13 @@ guard_direction_sanity <- function(guard, prep_data, model_result, config) {
 guard_pre_analysis <- function(config, data) {
   guard <- guard_init()
 
-  # Hard error checks
+  # Hard error checks (all use catdriver_refuse for clean exits)
   guard_require_outcome_type(config)
   guard_outcome_levels_match(data, config)
-  guard_require_multinomial_mode(config)
-  guard_require_driver_settings(config)
+  guard_require_multinomial_mode(config)  # Only enforced for multinomial outcomes
+
+  guard_require_driver_settings(config)   # Validates Driver_Settings exists and is complete
+  guard_ordinal_levels_order(config)      # Ordinal drivers must have levels_order
 
   guard
 }

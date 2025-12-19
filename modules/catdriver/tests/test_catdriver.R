@@ -140,6 +140,35 @@ test_that("extract_level_from_colname handles messy level names", {
 })
 
 
+# H4: Messy label mapping test - comprehensive check
+test_that("H4: messy labels with spaces/punctuation are correctly mapped", {
+  data <- generate_messy_labels_data(200)
+  formula <- outcome ~ campus_type + age_bracket
+  model <- glm(formula, data = data, family = binomial())
+
+  mapping <- map_terms_to_levels(model, data, formula)
+
+  # All levels should be correctly mapped
+  for (var in c("campus_type", "age_bracket")) {
+    data_levels <- levels(data[[var]])
+    mapped_levels <- mapping$level[mapping$driver == var]
+
+    # Every non-reference level should be mapped
+    for (lvl in data_levels[-1]) {
+      expect_true(lvl %in% mapped_levels,
+                  info = paste("Level", lvl, "from", var, "should be in mapping"))
+    }
+  }
+
+  # Check specific messy level names
+  expect_true("On Campus" %in% mapping$level || "Online Only" %in% mapping$level,
+              info = "'On Campus' or 'Online Only' (with space) should be mapped")
+  expect_true("Hybrid/Mixed" %in% mapping$level,
+              info = "'Hybrid/Mixed' (with slash) should be mapped")
+  expect_true("36+" %in% mapping$level,
+              info = "'36+' (with plus) should be mapped")
+})
+
 test_that("mapping does NOT use substring parsing for complex names", {
   data <- generate_messy_labels_data(200)
   formula <- outcome ~ campus_type + age_bracket
@@ -379,12 +408,12 @@ test_that("guard_outcome_levels_match rejects binary with wrong count", {
 
 
 # ==============================================================================
-# TEST SUITE 4: MULTINOMIAL TARGET OUTCOME ENFORCEMENT
+# TEST SUITE 4: MULTINOMIAL TARGET OUTCOME ENFORCEMENT (H2)
 # ==============================================================================
 
 context("Multinomial Mode and Target Outcome Enforcement")
 
-test_that("guard_require_multinomial_mode requires mode for multinomial", {
+test_that("H2a: multinomial without multinomial_mode refuses with CFG_MULTINOMIAL_MODE_MISSING", {
   config <- list(
     outcome_type = "multinomial",
     multinomial_mode = NULL
@@ -392,8 +421,49 @@ test_that("guard_require_multinomial_mode requires mode for multinomial", {
 
   expect_error(
     guard_require_multinomial_mode(config),
-    "requires explicit reporting mode"
+    "CFG_MULTINOMIAL_MODE_MISSING|multinomial_mode"
   )
+})
+
+test_that("H2b: one_vs_all without target refuses with CFG_TARGET_OUTCOME_MISSING", {
+  config <- list(
+    outcome_type = "multinomial",
+    multinomial_mode = "one_vs_all",
+    target_outcome_level = NULL
+  )
+
+  expect_error(
+    guard_require_multinomial_mode(config),
+    "CFG_TARGET_OUTCOME_MISSING|target_outcome_level"
+  )
+})
+
+test_that("H2c: non-multinomial outcomes do not require multinomial settings", {
+  # Ordinal should NOT require multinomial_mode
+  config <- list(
+    outcome_type = "ordinal",
+    multinomial_mode = NULL
+  )
+
+  result <- tryCatch({
+    guard_require_multinomial_mode(config)
+    TRUE
+  }, error = function(e) FALSE)
+
+  expect_true(result, info = "Ordinal outcome should not require multinomial_mode")
+
+  # Binary should NOT require multinomial_mode
+  config2 <- list(
+    outcome_type = "binary",
+    multinomial_mode = NULL
+  )
+
+  result2 <- tryCatch({
+    guard_require_multinomial_mode(config2)
+    TRUE
+  }, error = function(e) FALSE)
+
+  expect_true(result2, info = "Binary outcome should not require multinomial_mode")
 })
 
 
@@ -416,17 +486,45 @@ test_that("guard_require_multinomial_mode accepts valid modes", {
 })
 
 
-test_that("one_vs_all mode requires target_outcome_level", {
+# ==============================================================================
+# TEST SUITE 4B: CONTINUOUS DRIVER NOT ALLOWED (H3)
+# ==============================================================================
+
+context("Continuous Driver Not Allowed")
+
+test_that("H3: continuous driver type refused with CFG_CONTINUOUS_DRIVER_NOT_ALLOWED", {
   config <- list(
-    outcome_type = "multinomial",
-    multinomial_mode = "one_vs_all",
-    target_outcome_level = NULL
+    driver_vars = c("age", "income"),
+    driver_settings = data.frame(
+      driver = c("age", "income"),
+      type = c("continuous", "categorical"),
+      stringsAsFactors = FALSE
+    )
   )
 
   expect_error(
-    guard_require_multinomial_mode(config),
-    "one_vs_all mode requires target_outcome_level"
+    guard_require_driver_settings(config),
+    "CFG_CONTINUOUS_DRIVER_NOT_ALLOWED|CONTINUOUS DRIVERS NOT ALLOWED"
   )
+})
+
+test_that("H3b: control_only type is accepted for continuous covariates", {
+  config <- list(
+    driver_vars = c("age", "income"),
+    driver_settings = data.frame(
+      driver = c("age", "income"),
+      type = c("control_only", "categorical"),
+      stringsAsFactors = FALSE
+    )
+  )
+
+  # Should NOT error - control_only is valid
+  result <- tryCatch({
+    guard_require_driver_settings(config)
+    TRUE
+  }, error = function(e) FALSE)
+
+  expect_true(result, info = "control_only should be accepted for continuous covariates")
 })
 
 

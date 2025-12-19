@@ -331,20 +331,27 @@ prepare_predictors <- function(data, config) {
           "nominal" = list(type = "nominal", needs_dummy = TRUE, n_dummies = NA),
           "ordinal" = list(type = "ordinal", needs_dummy = TRUE, n_dummies = NA),
           "binary" = list(type = "binary_categorical", needs_dummy = TRUE, n_dummies = 1),
-          "continuous" = list(type = "continuous", needs_dummy = FALSE, n_dummies = 0),
-          "numeric" = list(type = "continuous", needs_dummy = FALSE, n_dummies = 0),
-          # Unknown type - fall back to inference with warning
+          "control_only" = list(type = "control", needs_dummy = TRUE, n_dummies = NA),
+          # Unknown type - refuse (guards should have caught this)
           {
-            warning("Unknown type '", explicit_type, "' for driver '", var_name,
-                    "'. Using inference.")
-            detect_predictor_type(var_data, order_spec)
+            catdriver_refuse(
+              reason = "CFG_DRIVER_TYPE_UNKNOWN",
+              title = "UNKNOWN DRIVER TYPE",
+              problem = paste0("Driver '", var_name, "' has unknown type '", explicit_type, "'."),
+              why_it_matters = "Cannot determine how to treat this predictor.",
+              fix = "Set type to: categorical, ordinal, binary, or control_only"
+            )
           }
         )
       } else {
-        # No type specified - use inference with warning
-        warning("No type specified in Driver_Settings for '", var_name,
-                "'. Using inference.")
-        pred_type <- detect_predictor_type(var_data, order_spec)
+        # No type specified - refuse (guards should have caught this)
+        catdriver_refuse(
+          reason = "CFG_DRIVER_TYPE_MISSING",
+          title = "DRIVER TYPE MISSING",
+          problem = paste0("Driver '", var_name, "' has no type in Driver_Settings."),
+          why_it_matters = "All drivers must have explicit type declarations.",
+          fix = paste0("Add 'type' column entry for '", var_name, "' in Driver_Settings sheet.")
+        )
       }
 
     } else {
@@ -358,11 +365,18 @@ prepare_predictors <- function(data, config) {
     # PREPARE VARIABLE BASED ON TYPE
     # =========================================================================
 
-    if (pred_type$type == "continuous") {
-      # Keep as-is, ensure numeric
-      if (!is.numeric(var_data)) {
-        var_data <- as.numeric(as.character(var_data))
+    if (pred_type$type == "control") {
+      # Control variable - convert to factor but mark for exclusion from driver reports
+      if (!is.factor(var_data)) {
+        var_data <- factor(var_data)
       }
+      # Set reference level if specified
+      if (!is.null(explicit_ref) && !is.na(explicit_ref) && nzchar(explicit_ref)) {
+        if (explicit_ref %in% levels(var_data)) {
+          var_data <- relevel(var_data, ref = explicit_ref)
+        }
+      }
+      pred_type$exclude_from_driver_report <- TRUE
 
     } else if (pred_type$type %in% c("binary_categorical", "nominal", "high_cardinality")) {
       # Convert to factor
