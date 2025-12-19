@@ -479,15 +479,21 @@ aggregate_importance_mapped <- function(term_importance, mapping) {
 
 #' Validate Mapping Completeness
 #'
-#' Checks that all model terms can be mapped.
+#' Checks that all model terms can be mapped. This is a HARD GATE -
+#' if any coefficients are unmapped, the analysis refuses to proceed.
 #'
-#' @param mapping Term-level mapping
-#' @param model_coefs Model coefficient names
-#' @return TRUE if valid, stops with error otherwise
-#' @keywords internal
+#' @param mapping Term-level mapping from map_terms_to_levels() or map_multinomial_terms()
+#' @param model_coefs Model coefficient names (from names(coef(model)) or similar)
+#' @return TRUE if valid, refuses with catdriver_refuse() otherwise
+#' @export
 validate_mapping <- function(mapping, model_coefs) {
-  # Remove intercept
+  # Filter out terms that should not be mapped:
+  # 1. Intercept terms
+  # 2. Ordinal threshold parameters (e.g., "1|2", "2|3", "Low|Medium", etc.)
+  #    These are from polr/clm models and represent cut points, not predictors
+
   model_coefs <- model_coefs[!grepl("^\\(Intercept\\)", model_coefs)]
+  model_coefs <- model_coefs[!grepl("\\|", model_coefs)]  # Ordinal thresholds contain "|"
 
   if (nrow(mapping) == 0 && length(model_coefs) > 0) {
     catdriver_refuse(

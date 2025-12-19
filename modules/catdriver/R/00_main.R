@@ -364,6 +364,24 @@ run_categorical_keydriver_impl <- function(config_file,
     )
   })
 
+  # HARD GATE: Validate mapping covers all model coefficients (no silent partial mapping)
+  # Extract coefficient names based on model type
+  model_coef_names <- tryCatch({
+    coefs <- coef(model_result$model)
+    if (is.matrix(coefs)) {
+      # Multinomial: coef() returns matrix, column names are coefficient names
+      colnames(coefs)
+    } else {
+      # Binary/Ordinal: coef() returns named vector
+      names(coefs)
+    }
+  }, error = function(e) {
+    character(0)  # If we can't extract, validation will catch it
+  })
+
+  validate_mapping(term_mapping, model_coef_names)
+  log_message("Term mapping validated - all coefficients mapped", "info")
+
   # Extract odds ratios using canonical mapping (no legacy fallback)
   odds_ratios <- extract_odds_ratios_mapped(model_result, term_mapping, config)
   log_message(paste("Extracted", nrow(odds_ratios), "odds ratio comparisons"), "info")
