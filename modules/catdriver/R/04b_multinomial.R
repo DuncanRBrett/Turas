@@ -32,7 +32,13 @@ run_multinomial_logistic_robust <- function(formula, data, weights = NULL, confi
   fallback_reason <- NULL
 
   if (!requireNamespace("nnet", quietly = TRUE)) {
-    stop("Package 'nnet' required for multinomial logistic regression", call. = FALSE)
+    catdriver_refuse(
+      reason = "PKG_NNET_MISSING",
+      title = "REQUIRED PACKAGE MISSING",
+      problem = "Package 'nnet' is required for multinomial logistic regression but is not installed.",
+      why_it_matters = "Multinomial outcomes (3+ categories) require the nnet package to fit the model.",
+      fix = "Install the package with: install.packages('nnet')"
+    )
   }
 
   # ===========================================================================
@@ -46,27 +52,38 @@ run_multinomial_logistic_robust <- function(formula, data, weights = NULL, confi
 
   valid_modes <- c("baseline_category", "all_pairwise", "one_vs_all")
   if (!multinomial_mode %in% valid_modes) {
-    stop("Invalid multinomial_mode: '", multinomial_mode, "'\n",
-         "Must be one of: ", paste(valid_modes, collapse = ", "),
-         call. = FALSE)
+    catdriver_refuse(
+      reason = "CFG_INVALID_MULTINOMIAL_MODE",
+      title = "INVALID MULTINOMIAL MODE",
+      problem = paste0("multinomial_mode='", multinomial_mode, "' is not a valid option."),
+      why_it_matters = "The multinomial mode determines how outcome categories are compared.",
+      fix = paste0("Set multinomial_mode to one of: ", paste(valid_modes, collapse = ", "))
+    )
   }
 
   # For one_vs_all mode, require target_outcome_level
   target_outcome_level <- config$target_outcome_level
   if (multinomial_mode == "one_vs_all") {
     if (is.null(target_outcome_level) || is.na(target_outcome_level)) {
-      stop("HARD ERROR: multinomial_mode='one_vs_all' requires target_outcome_level.\n",
-           "Specify which outcome level to treat as 'success' in the config.",
-           call. = FALSE)
+      catdriver_refuse(
+        reason = "CFG_TARGET_LEVEL_MISSING",
+        title = "TARGET OUTCOME LEVEL REQUIRED",
+        problem = "multinomial_mode='one_vs_all' requires target_outcome_level to be specified.",
+        why_it_matters = "One-vs-all mode compares a specific level against all others combined.",
+        fix = "Add target_outcome_level to your config specifying which outcome level to treat as 'success'."
+      )
     }
 
     # Validate target level exists in data
     outcome_levels <- levels(data[[config$outcome_var]])
     if (!target_outcome_level %in% outcome_levels) {
-      stop("HARD ERROR: target_outcome_level='", target_outcome_level,
-           "' not found in outcome.\n",
-           "Available levels: ", paste(outcome_levels, collapse = ", "),
-           call. = FALSE)
+      catdriver_refuse(
+        reason = "CFG_TARGET_LEVEL_NOT_FOUND",
+        title = "TARGET OUTCOME LEVEL NOT IN DATA",
+        problem = paste0("target_outcome_level='", target_outcome_level, "' not found in outcome variable."),
+        why_it_matters = "The specified target level must exist in your data to use one-vs-all mode.",
+        fix = paste0("Set target_outcome_level to one of: ", paste(outcome_levels, collapse = ", "))
+      )
     }
   }
 

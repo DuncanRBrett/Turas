@@ -22,7 +22,13 @@ load_catdriver_data <- function(data_file, config = NULL) {
 
   # Validate file exists
   if (!file.exists(data_file)) {
-    stop("Data file not found: ", data_file, call. = FALSE)
+    catdriver_refuse(
+      reason = "DATA_FILE_NOT_FOUND",
+      title = "DATA FILE NOT FOUND",
+      problem = paste0("Data file not found: ", data_file),
+      why_it_matters = "Cannot run analysis without the data file.",
+      fix = "Check that the file path is correct and the file exists."
+    )
   }
 
   # Detect file format
@@ -36,22 +42,48 @@ load_catdriver_data <- function(data_file, config = NULL) {
       "xls" = load_excel_data(data_file),
       "sav" = load_spss_data(data_file),
       "dta" = load_stata_data(data_file),
-      stop("Unsupported file format: ", file_ext,
-           "\n\nSupported formats: csv, xlsx, xls, sav, dta")
+      catdriver_refuse(
+        reason = "DATA_FILE_FORMAT_UNSUPPORTED",
+        title = "UNSUPPORTED FILE FORMAT",
+        problem = paste0("File format '.", file_ext, "' is not supported."),
+        why_it_matters = "Can only load data from supported file formats.",
+        fix = "Convert your data to one of: csv, xlsx, xls, sav, dta"
+      )
     )
   }, error = function(e) {
-    stop("Failed to load data file: ", data_file,
-         "\n\nError: ", e$message,
-         call. = FALSE)
+    # Check if this is already a catdriver_refusal
+    if (inherits(e, "catdriver_refusal")) {
+      stop(e)  # Re-throw catdriver_refusal
+    }
+    catdriver_refuse(
+      reason = "DATA_FILE_LOAD_FAILED",
+      title = "FAILED TO LOAD DATA FILE",
+      problem = paste0("Could not load data file: ", data_file),
+      why_it_matters = "Cannot run analysis without successfully loading the data.",
+      fix = "Check that the file is valid and not corrupted.",
+      details = paste0("Error: ", e$message)
+    )
   })
 
   # Validate data frame
   if (!is.data.frame(data)) {
-    stop("Data file did not produce a valid data frame", call. = FALSE)
+    catdriver_refuse(
+      reason = "DATA_NOT_DATAFRAME",
+      title = "INVALID DATA FORMAT",
+      problem = "Data file did not produce a valid data frame.",
+      why_it_matters = "Analysis requires tabular data.",
+      fix = "Ensure your data file contains properly formatted tabular data."
+    )
   }
 
   if (nrow(data) == 0) {
-    stop("Data file is empty (0 rows)", call. = FALSE)
+    catdriver_refuse(
+      reason = "DATA_EMPTY",
+      title = "DATA FILE IS EMPTY",
+      problem = "Data file contains 0 rows.",
+      why_it_matters = "Cannot run analysis on empty data.",
+      fix = "Ensure your data file contains data rows (not just headers)."
+    )
   }
 
   # Validate against config if provided
@@ -102,9 +134,13 @@ load_excel_data <- function(file_path) {
 #' @keywords internal
 load_spss_data <- function(file_path) {
   if (!requireNamespace("haven", quietly = TRUE)) {
-    stop("Package 'haven' required to read SPSS files. ",
-         "Install with: install.packages('haven')",
-         call. = FALSE)
+    catdriver_refuse(
+      reason = "PKG_HAVEN_MISSING",
+      title = "REQUIRED PACKAGE MISSING",
+      problem = "Package 'haven' is required to read SPSS files (.sav) but is not installed.",
+      why_it_matters = "Cannot load SPSS data without the haven package.",
+      fix = "Install the package by running: install.packages('haven')"
+    )
   }
 
   data <- haven::read_sav(file_path)
@@ -132,9 +168,13 @@ load_spss_data <- function(file_path) {
 #' @keywords internal
 load_stata_data <- function(file_path) {
   if (!requireNamespace("haven", quietly = TRUE)) {
-    stop("Package 'haven' required to read Stata files. ",
-         "Install with: install.packages('haven')",
-         call. = FALSE)
+    catdriver_refuse(
+      reason = "PKG_HAVEN_MISSING",
+      title = "REQUIRED PACKAGE MISSING",
+      problem = "Package 'haven' is required to read Stata files (.dta) but is not installed.",
+      why_it_matters = "Cannot load Stata data without the haven package.",
+      fix = "Install the package by running: install.packages('haven')"
+    )
   }
 
   data <- haven::read_dta(file_path)
@@ -486,11 +526,17 @@ prepare_analysis_data <- function(data, config, diagnostics) {
     }
 
     if (strategy == "error_if_missing") {
-      # Hard error - refuse to proceed
-      stop("HARD ERROR: Variable '", driver_var, "' has ", n_missing,
-           " missing values but missing_strategy='error_if_missing'.\n",
-           "Either fix the data or change the missing_strategy in Driver_Settings.",
-           call. = FALSE)
+      # Policy refusal - explicit choice to not allow missing values
+      catdriver_refuse(
+        reason = "DATA_MISSING_NOT_ALLOWED",
+        title = "MISSING VALUES NOT ALLOWED",
+        problem = paste0("Variable '", driver_var, "' has ", n_missing, " missing value(s)."),
+        why_it_matters = paste0("The missing_strategy for this variable is 'error_if_missing', ",
+                                "which requires complete data."),
+        fix = paste0("Either:\n",
+                     "  1. Fix the missing values in your data, OR\n",
+                     "  2. Change missing_strategy to 'drop_row' or 'missing_as_level' in Driver_Settings")
+      )
 
     } else if (strategy == "missing_as_level") {
       # Recode missing to "Missing" level

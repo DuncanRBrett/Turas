@@ -29,8 +29,13 @@ detect_outcome_type <- function(outcome_var, order_spec = NULL, override_type = 
   # Validate minimum categories
 
   if (n_unique < 2) {
-    stop("Outcome variable must have at least 2 categories. Found: ", n_unique,
-         call. = FALSE)
+    catdriver_refuse(
+      reason = "CFG_OUTCOME_INSUFFICIENT_CATEGORIES",
+      title = "INSUFFICIENT OUTCOME CATEGORIES",
+      problem = paste0("Outcome variable has only ", n_unique, " unique value(s)."),
+      why_it_matters = "Logistic regression requires at least 2 distinct outcome categories.",
+      fix = "Check that your outcome variable has at least 2 different values in the data."
+    )
   }
 
   # Handle override
@@ -204,12 +209,16 @@ prepare_outcome <- function(data, config, outcome_info) {
 
   if (outcome_info$type == "binary") {
     if (n_data_cats != 2) {
-      stop("OUTCOME TYPE MISMATCH: outcome_type='binary' specified but data has ",
-           n_data_cats, " categories.\n",
-           "Found categories: ", paste(data_cats, collapse = ", "), "\n",
-           "Action required: Set outcome_type='ordinal' or 'multinomial' in config,\n",
-           "or verify your data has exactly 2 outcome categories.",
-           call. = FALSE)
+      catdriver_refuse(
+        reason = "CFG_OUTCOME_TYPE_MISMATCH",
+        title = "OUTCOME TYPE MISMATCH",
+        problem = paste0("outcome_type='binary' specified but data has ", n_data_cats, " categories."),
+        why_it_matters = "Binary logistic regression requires exactly 2 outcome categories.",
+        fix = paste0("Either:\n",
+                     "  1. Set outcome_type='ordinal' or 'multinomial' in Settings, OR\n",
+                     "  2. Verify your data has exactly 2 outcome categories"),
+        details = paste0("Found categories: ", paste(data_cats, collapse = ", "))
+      )
     }
   }
 
@@ -220,20 +229,29 @@ prepare_outcome <- function(data, config, outcome_info) {
     extra_in_data <- setdiff(data_cats, config_cats)
 
     if (length(missing_in_data) > 0) {
-      stop("OUTCOME CATEGORY MISMATCH: Configured outcome categories not found in data.\n",
-           "Missing categories: ", paste(missing_in_data, collapse = ", "), "\n",
-           "Data categories: ", paste(data_cats, collapse = ", "), "\n",
-           "Action required: Update outcome Order in config to match data categories.",
-           call. = FALSE)
+      catdriver_refuse(
+        reason = "CFG_OUTCOME_CATEGORY_MISMATCH",
+        title = "OUTCOME CATEGORY MISMATCH",
+        problem = "Configured outcome categories not found in data.",
+        why_it_matters = "All specified outcome categories must exist in the data.",
+        fix = "Update outcome Order in Variables sheet to match data categories.",
+        details = paste0("Missing categories: ", paste(missing_in_data, collapse = ", "), "\n",
+                         "Data categories: ", paste(data_cats, collapse = ", "))
+      )
     }
 
     if (length(extra_in_data) > 0) {
-      stop("OUTCOME CATEGORY MISMATCH: Data contains outcome categories not in config.\n",
-           "Extra categories: ", paste(extra_in_data, collapse = ", "), "\n",
-           "Configured categories: ", paste(config_cats, collapse = ", "), "\n",
-           "Action required: Update outcome Order in config to include all data categories,\n",
-           "or clean data to only include expected categories.",
-           call. = FALSE)
+      catdriver_refuse(
+        reason = "CFG_OUTCOME_CATEGORY_MISMATCH",
+        title = "OUTCOME CATEGORY MISMATCH",
+        problem = "Data contains outcome categories not in config.",
+        why_it_matters = "All data categories must be accounted for in the config.",
+        fix = paste0("Either:\n",
+                     "  1. Update outcome Order in Variables to include all data categories, OR\n",
+                     "  2. Clean data to only include expected categories"),
+        details = paste0("Extra categories: ", paste(extra_in_data, collapse = ", "), "\n",
+                         "Configured: ", paste(config_cats, collapse = ", "))
+      )
     }
   }
 
