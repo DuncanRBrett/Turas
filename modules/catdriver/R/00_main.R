@@ -376,7 +376,15 @@ run_categorical_keydriver_impl <- function(config_file,
       names(coefs)
     }
   }, error = function(e) {
-    character(0)  # If we can't extract, validation will catch it
+    # HARD REFUSAL - cannot validate mapping without coefficient names
+    catdriver_refuse(
+      reason = "MODEL_COEF_EXTRACT_FAILED",
+      title = "CANNOT VALIDATE TERM MAPPING",
+      problem = "Failed to extract coefficient names from the fitted model.",
+      why_it_matters = "Without coefficient names, CatDriver cannot prove that every model term is mapped correctly.",
+      fix = "Check model convergence and model type; ensure required packages are installed; then re-run.",
+      details = paste0("Error: ", e$message)
+    )
   })
 
   validate_mapping(term_mapping, model_coef_names)
