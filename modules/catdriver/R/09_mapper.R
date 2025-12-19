@@ -247,12 +247,23 @@ extract_level_from_colname <- function(col_name, var_name, levels_vec) {
     }
   }
 
-  # Return suffix as best guess (with warning)
+  # Hard refuse if we cannot map the level - no guessing allowed
   if (startsWith(col_name, var_name)) {
-    suffix <- substring(col_name, nchar(var_name) + 1)
-    warning("Could not exactly match level for column '", col_name,
-            "'. Using suffix: '", suffix, "'")
-    return(suffix)
+    catdriver_refuse(
+      reason = "MAPPER_LEVEL_MATCH_FAILED",
+      title = "TERM-TO-LEVEL MAPPING FAILED",
+      problem = paste0(
+        "Could not map design-matrix column '", col_name,
+        "' back to a known level of predictor '", var_name, "'."
+      ),
+      why_it_matters = "Without exact mapping, odds ratios can be assigned to the wrong category.",
+      fix = paste0(
+        "Check for unusual characters/spaces in the data levels, ",
+        "ensure predictors are proper factors, and consider simplifying labels. ",
+        "If needed, add a stable coding column (e.g., level codes) and map labels separately."
+      ),
+      details = paste0("Known levels: ", paste(levels_vec, collapse = " | "))
+    )
   }
 
   NA
@@ -496,7 +507,14 @@ validate_mapping <- function(mapping, model_coefs) {
   unmapped <- setdiff(model_coefs, mapped_terms)
 
   if (length(unmapped) > 0) {
-    warning("Some terms not in mapping: ", paste(unmapped, collapse = ", "))
+    catdriver_refuse(
+      reason = "MAPPER_UNMAPPED_COEFFICIENTS",
+      title = "UNMAPPED MODEL COEFFICIENTS",
+      problem = "Some model coefficients could not be mapped back to predictors/levels.",
+      why_it_matters = "This would make the odds ratio tables incomplete or incorrectly labeled.",
+      fix = "Investigate coefficient naming and ensure all categorical predictors are factors with stable level names.",
+      details = paste0("Unmapped coefficients: ", paste(unmapped, collapse = ", "))
+    )
   }
 
   invisible(TRUE)
