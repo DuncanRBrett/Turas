@@ -203,10 +203,13 @@ map_terms_to_levels <- function(model, data, formula = NULL) {
 #' This works by checking which level, when appended to the variable name,
 #' matches the column name exactly.
 #'
+#' For ordinal variables with polynomial contrasts (e.g., .L, .Q, .C),
+#' returns a descriptive label instead of refusing.
+#'
 #' @param col_name Design matrix column name
 #' @param var_name Variable name
 #' @param levels_vec Vector of factor levels
-#' @return Matched level or NA if no match
+#' @return Matched level or polynomial contrast label
 #' @keywords internal
 extract_level_from_colname <- function(col_name, var_name, levels_vec) {
   # Try each level
@@ -243,6 +246,25 @@ extract_level_from_colname <- function(col_name, var_name, levels_vec) {
 
       if (tolower(level_clean) == tolower(suffix_clean)) {
         return(level)
+      }
+    }
+
+    # CHECK FOR POLYNOMIAL CONTRASTS (ordinal variables)
+    # These have suffixes like .L (linear), .Q (quadratic), .C (cubic), .^4, etc.
+    if (grepl("^\\.(L|Q|C|\\^[0-9]+)$", suffix)) {
+      # This is a polynomial contrast - return descriptive label
+      contrast_names <- list(
+        ".L" = "linear trend",
+        ".Q" = "quadratic trend",
+        ".C" = "cubic trend"
+      )
+
+      if (suffix %in% names(contrast_names)) {
+        return(contrast_names[[suffix]])
+      } else if (grepl("^\\^", suffix)) {
+        return(paste0("polynomial^", gsub("\\^", "", suffix)))
+      } else {
+        return(paste0("ordinal contrast", suffix))
       }
     }
   }
