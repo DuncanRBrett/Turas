@@ -40,7 +40,13 @@ run_catdriver_model <- function(prep_data, config, weights = NULL, guard = NULL)
     ordinal = run_ordinal_logistic_robust(model_formula, data, weights, config, guard),
     nominal = run_multinomial_logistic_robust(model_formula, data, weights, config, guard),
     multinomial = run_multinomial_logistic_robust(model_formula, data, weights, config, guard),
-    stop("Unknown outcome type: ", outcome_type)
+    catdriver_refuse(
+      reason = "CFG_OUTCOME_TYPE_UNKNOWN",
+      title = "UNKNOWN OUTCOME TYPE",
+      problem = paste0("Outcome type '", outcome_type, "' is not recognized."),
+      why_it_matters = "CatDriver needs to know the outcome type to select the correct model.",
+      fix = "Set outcome_type to one of: binary, ordinal, multinomial"
+    )
   )
 
   # Add common model info
@@ -149,25 +155,19 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
       allow_separation <- isTRUE(config$allow_separation_without_fallback)
 
       if (!allow_separation) {
-        stop(
-          "\n",
-          "================================================================================\n",
-          "  CATDRIVER REFUSED TO RUN - SEPARATION DETECTED\n",
-          "================================================================================\n\n",
-          "PROBLEM:\n",
-          "  The binary logistic model detected separation (or quasi-separation).\n",
-          "  This produces unreliable odds ratios (often infinite or near-zero).\n\n",
-          "REASON: ", fallback_reason, "\n\n",
-          "FALLBACK NOT AVAILABLE:\n",
-          "  The 'brglm2' package (Firth bias-reduced logistic regression) is not installed.\n",
-          "  This package provides stable estimates when separation occurs.\n\n",
-          "SOLUTIONS (in order of preference):\n",
-          "  1. Install brglm2: install.packages('brglm2')\n",
-          "  2. Collapse rare categories in predictors\n",
-          "  3. Remove the problematic predictor\n",
-          "  4. Set 'allow_separation_without_fallback = TRUE' in config (NOT RECOMMENDED)\n\n",
-          "================================================================================\n",
-          call. = FALSE
+        catdriver_refuse(
+          reason = "MODEL_SEPARATION_NO_FALLBACK",
+          title = "SEPARATION DETECTED - NO FALLBACK AVAILABLE",
+          problem = paste0("The binary logistic model detected separation (or quasi-separation). ",
+                          "This produces unreliable odds ratios (often infinite or near-zero)."),
+          why_it_matters = paste0("Reason: ", fallback_reason, "\n",
+                                  "  The 'brglm2' package (Firth bias-reduced logistic regression) is not installed. ",
+                                  "This package provides stable estimates when separation occurs."),
+          fix = paste0("Solutions (in order of preference):\n",
+                      "  1. Install brglm2: install.packages('brglm2')\n",
+                      "  2. Collapse rare categories in predictors\n",
+                      "  3. Remove the problematic predictor\n",
+                      "  4. Set 'allow_separation_without_fallback = TRUE' in config (NOT RECOMMENDED)")
         )
       } else {
         # User explicitly allowed proceeding - warn loudly
@@ -180,7 +180,14 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
 
       # If we get here with allow_separation=TRUE but model errored, still fail
       if (is.list(model) && isTRUE(model$error)) {
-        stop("Model fitting failed and no fallback available: ", model$message, call. = FALSE)
+        catdriver_refuse(
+          reason = "MODEL_FIT_FAILED",
+          title = "MODEL FITTING FAILED",
+          problem = "Model fitting failed and no fallback is available.",
+          why_it_matters = "The logistic regression could not be estimated with the current data.",
+          fix = "Check your data for issues (too few observations, perfect collinearity, etc.).",
+          details = model$message
+        )
       }
     }
   }

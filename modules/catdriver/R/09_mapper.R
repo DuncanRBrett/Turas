@@ -41,7 +41,13 @@ map_terms_to_levels <- function(model, data, formula = NULL) {
   }
 
   if (is.null(formula)) {
-    stop("Cannot extract formula from model")
+    catdriver_refuse(
+      reason = "MAPPER_NO_FORMULA",
+      title = "CANNOT EXTRACT FORMULA FROM MODEL",
+      problem = "Could not extract the model formula for term mapping.",
+      why_it_matters = "Term-to-level mapping requires the formula to understand model structure.",
+      fix = "This may indicate a model type that is not fully supported. Please report this issue."
+    )
   }
 
   # Build model frame and matrix
@@ -51,7 +57,14 @@ map_terms_to_levels <- function(model, data, formula = NULL) {
       # Fallback for models that store model frame
       if (!is.null(model$model)) return(model$model)
       if (!is.null(model[["model"]])) return(model[["model"]])
-      stop("Cannot build model frame: ", e$message)
+      catdriver_refuse(
+        reason = "MAPPER_MODEL_FRAME_FAILED",
+        title = "CANNOT BUILD MODEL FRAME",
+        problem = "Could not construct the model frame for term mapping.",
+        why_it_matters = "The model frame is needed to understand the relationship between variables and coefficients.",
+        fix = "Check that all variables in the formula exist in the data.",
+        details = e$message
+      )
     }
   )
 
@@ -65,7 +78,14 @@ map_terms_to_levels <- function(model, data, formula = NULL) {
         mm_tmp <- model.matrix(formula, data = data)
         return(mm_tmp)
       }
-      stop("Cannot build model matrix: ", e$message)
+      catdriver_refuse(
+        reason = "MAPPER_MODEL_MATRIX_FAILED",
+        title = "CANNOT BUILD MODEL MATRIX",
+        problem = "Could not construct the model matrix for term mapping.",
+        why_it_matters = "The model matrix is needed to map coefficients back to original variables and levels.",
+        fix = "Check that all predictor variables are properly formatted (factors should have valid levels).",
+        details = e$message
+      )
     }
   )
 
@@ -459,7 +479,14 @@ validate_mapping <- function(mapping, model_coefs) {
   model_coefs <- model_coefs[!grepl("^\\(Intercept\\)", model_coefs)]
 
   if (nrow(mapping) == 0 && length(model_coefs) > 0) {
-    stop("Term mapping is empty but model has coefficients")
+    catdriver_refuse(
+      reason = "MAPPER_EMPTY_MAPPING",
+      title = "TERM MAPPING FAILED",
+      problem = "Term mapping is empty but the model has coefficients that need to be mapped.",
+      why_it_matters = "Without proper mapping, CatDriver cannot determine which coefficients belong to which variables.",
+      fix = "This may indicate a model structure issue. Check that your predictors are categorical factors.",
+      details = paste0("Unmapped coefficients: ", paste(model_coefs, collapse = ", "))
+    )
   }
 
   # Check all non-reference mapped

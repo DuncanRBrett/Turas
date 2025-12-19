@@ -24,7 +24,13 @@ calculate_importance <- function(model_result, config) {
   # Try car::Anova for Type II tests
   anova_result <- tryCatch({
     if (!requireNamespace("car", quietly = TRUE)) {
-      stop("Package 'car' required for importance calculation")
+      catdriver_refuse(
+        reason = "PKG_CAR_MISSING",
+        title = "REQUIRED PACKAGE MISSING",
+        problem = "Package 'car' is required for variable importance calculation but is not installed.",
+        why_it_matters = "Variable importance uses Type II Wald chi-square tests from car::Anova.",
+        fix = "Install the package with: install.packages('car')"
+      )
     }
 
     if (model_result$model_type == "multinomial_logistic") {
@@ -75,7 +81,14 @@ process_anova_results <- function(anova_result, config) {
       if (any(numeric_cols)) {
         chisq_col <- names(anova_df)[which(numeric_cols)[1]]
       } else {
-        stop("Cannot identify chi-square column in Anova output")
+        catdriver_refuse(
+          reason = "IMPORTANCE_ANOVA_UNEXPECTED",
+          title = "UNEXPECTED ANOVA OUTPUT FORMAT",
+          problem = "Cannot identify chi-square column in Anova output.",
+          why_it_matters = "Variable importance calculation requires chi-square statistics from the Anova output.",
+          fix = "This may indicate an incompatible version of the 'car' package. Try updating with: install.packages('car')",
+          details = paste0("Columns found: ", paste(colnames(anova_df), collapse = ", "))
+        )
       }
     }
 

@@ -75,7 +75,13 @@ run_ordinal_logistic_robust <- function(formula, data, weights = NULL, config, g
     engine_used <- "MASS::polr"
 
     if (!requireNamespace("MASS", quietly = TRUE)) {
-      stop("Package 'MASS' required for ordinal logistic regression", call. = FALSE)
+      catdriver_refuse(
+        reason = "PKG_MASS_MISSING",
+        title = "REQUIRED PACKAGE MISSING",
+        problem = "Package 'MASS' is required for ordinal logistic regression but is not installed.",
+        why_it_matters = "The primary engine (ordinal::clm) is unavailable and the fallback (MASS::polr) requires the MASS package.",
+        fix = "Install the package with: install.packages('MASS')"
+      )
     }
 
     model <- tryCatch({

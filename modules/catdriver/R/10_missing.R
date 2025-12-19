@@ -88,16 +88,17 @@ handle_missing_data <- function(data, config) {
         var_report$n_recoded <- n_missing
 
       } else if (strategy == "error_if_missing") {
-        # Hard error
-        stop(
-          "\n",
-          "=== CATDRIVER HARD ERROR ===\n",
-          "Missing values found in '", var_name, "' with error_if_missing strategy.\n\n",
-          "N missing: ", n_missing, " (", pct_missing, "%)\n\n",
-          "FIX: Either:\n",
-          "  1. Remove missing values from data before analysis, OR\n",
-          "  2. Change missing_strategy to 'drop_row' or 'missing_as_level'\n",
-          call. = FALSE
+        # Controlled refusal (not crash)
+        catdriver_refuse(
+          reason = "DATA_MISSING_NOT_ALLOWED",
+          title = "MISSING VALUES NOT ALLOWED",
+          problem = paste0("Missing values found in '", var_name, "' with error_if_missing strategy."),
+          why_it_matters = paste0("N missing: ", n_missing, " (", pct_missing, "%). ",
+                                  "The missing_strategy for this variable is 'error_if_missing', ",
+                                  "which requires complete data."),
+          fix = paste0("Either:\n",
+                      "  1. Remove missing values from data before analysis, OR\n",
+                      "  2. Change missing_strategy to 'drop_row' or 'missing_as_level' in Driver_Settings")
         )
       }
     }
@@ -319,16 +320,16 @@ apply_rare_level_policy <- function(data, config) {
         }
 
       } else if (policy == "error") {
-        stop(
-          "\n",
-          "=== CATDRIVER HARD ERROR ===\n",
-          "Rare levels found in '", var_name, "' with error policy.\n\n",
-          "Rare levels: ", paste(rare_levels, collapse = ", "), "\n",
-          "Threshold: N < ", global_threshold, "\n\n",
-          "FIX: Either:\n",
-          "  1. Increase rare_level_threshold, OR\n",
-          "  2. Change rare_level_policy to 'warn_only' or 'collapse_to_other'\n",
-          call. = FALSE
+        catdriver_refuse(
+          reason = "DATA_RARE_LEVELS_NOT_ALLOWED",
+          title = "RARE LEVELS NOT ALLOWED",
+          problem = paste0("Rare levels found in '", var_name, "' with error policy."),
+          why_it_matters = paste0("Rare levels: ", paste(rare_levels, collapse = ", "), ". ",
+                                  "Threshold: N < ", global_threshold, ". ",
+                                  "Levels with very few observations can cause model instability."),
+          fix = paste0("Either:\n",
+                      "  1. Increase rare_level_threshold, OR\n",
+                      "  2. Change rare_level_policy to 'warn_only' or 'collapse_to_other'")
         )
       }
     }
