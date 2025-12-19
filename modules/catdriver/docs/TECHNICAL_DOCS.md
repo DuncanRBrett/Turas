@@ -1,6 +1,6 @@
 # Categorical Key Driver Module - Technical Documentation
 
-**Version:** 1.0
+**Version:** 2.0
 **Date:** December 2024
 **Author:** Claude Code
 **For:** Maintenance and Development Reference
@@ -55,19 +55,29 @@ This means:
 ```
 modules/catdriver/
 ├── R/
-│   ├── 00_main.R           # Entry point, orchestration
-│   ├── 01_config.R         # Configuration loading
+│   ├── 00_main.R           # Entry point, orchestration, refusal handler
+│   ├── 01_config.R         # Configuration loading (uses catdriver_refuse)
 │   ├── 02_validation.R     # Data loading and validation
-│   ├── 03_preprocessing.R  # Variable type detection, preparation
-│   ├── 04_analysis.R       # Logistic regression models
+│   ├── 03_preprocessing.R  # Variable type detection, treatment contrasts
+│   ├── 04_analysis.R       # Model dispatcher
+│   ├── 04a_ordinal.R       # Ordinal logistic (ordinal::clm → MASS::polr fallback)
+│   ├── 04b_multinomial.R   # Multinomial logistic (nnet::multinom)
 │   ├── 05_importance.R     # Chi-square importance calculation
 │   ├── 06_output.R         # Excel workbook generation
-│   └── 07_utilities.R      # Helper functions (no external deps)
+│   ├── 06a_sheets_summary.R # Summary sheet formatting
+│   ├── 06b_sheets_detail.R  # Detail sheet formatting
+│   ├── 07_utilities.R      # Helper functions (no external deps)
+│   ├── 08_guard.R          # Refusal mechanism (catdriver_refuse)
+│   ├── 08a_guards_hard.R   # Hard validation guards
+│   ├── 08b_guards_soft.R   # Soft warning guards
+│   ├── 09_mapper.R         # Canonical term-to-level mapping (no guessing)
+│   └── 10_missing.R        # Missing data handling per Driver_Settings
 ├── run_catdriver_gui.R     # Shiny GUI launcher
 ├── README.md               # Quick start guide
 └── docs/
     ├── USER_MANUAL.md      # End-user documentation
-    └── TECHNICAL_DOCS.md   # This file
+    ├── TECHNICAL_DOCS.md   # This file
+    └── R_PACKAGES.md       # Package dependencies
 ```
 
 ### Internal Dependencies (Source Order)
@@ -290,6 +300,8 @@ detect_outcome_type()
 | confidence_level | numeric | No | 0.95 | 0 < x < 1 |
 | missing_threshold | numeric | No | 50 | 0-100 |
 | detailed_output | boolean | No | TRUE | TRUE/FALSE |
+| multinomial_mode | enum | No | "baseline_category" | baseline_category/all_pairwise/one_vs_all |
+| target_outcome_level | string | No | - | Required if multinomial_mode="one_vs_all" |
 
 ### Variables Sheet
 
@@ -304,6 +316,27 @@ detect_outcome_type()
 - Exactly 1 Outcome variable
 - At least 1 Driver variable
 - At most 1 Weight variable
+
+### Driver_Settings Sheet (Required)
+
+Per-driver configuration for type and missing data handling:
+
+| Column | Type | Required | Validation |
+|--------|------|----------|------------|
+| driver | string | **Yes** | Must match a Driver in Variables sheet |
+| type | enum | **Yes** | categorical/ordinal/binary |
+| reference_level | string | No | Must exist in data |
+| missing_strategy | enum | No | drop_row/missing_as_level/error_if_missing |
+
+**Type Handling:**
+- `categorical` / `nominal`: Unordered factor with treatment contrasts
+- `ordinal`: Ordered factor with **treatment contrasts** (not polynomial)
+- `binary`: Two-level factor
+
+**Missing Strategies:**
+- `drop_row`: Remove rows with missing values (default)
+- `missing_as_level`: Recode missing to "Missing / Not answered" level
+- `error_if_missing`: Refuse if any missing values present
 
 ---
 
@@ -365,34 +398,57 @@ detect_outcome_type()
 
 ## Error Handling Strategy
 
-### Error Categories
+### Core Principle: No Silent Degradation
 
-| Category | Handling | User Message |
-|----------|----------|--------------|
-| Config not found | Stop | File path with troubleshooting |
-| Missing required sheet | Stop | List available sheets |
-| Variable not in data | Stop | Show available columns |
-| Insufficient sample | Stop | Show N vs minimum |
-| Model non-convergence | Warning | Continue with caution note |
-| Perfect separation | Warning | Identify problematic variables |
-| High missing data | Warning | Show rates, suggest action |
-| Small cells | Warning | Identify combinations |
+CatDriver uses a strict "refuse rather than guess" philosophy. Any situation that could produce misleading output triggers a **controlled refusal** rather than continuing with potentially wrong results.
 
-### Error Message Format
+### The Refusal Mechanism (`catdriver_refuse`)
+
+All user-fixable errors use `catdriver_refuse()` instead of `stop()`. This produces clean, actionable messages:
 
 ```r
-stop(sprintf(
-  "Brief description: %s\n\nDetails:\n  - Point 1\n  - Point 2\n\nSuggestions:\n  1. Try this\n  2. Or this",
-  specific_value
-), call. = FALSE)
+catdriver_refuse(
+  reason = "CFG_FILE_NOT_FOUND",           # Programmatic code
+  title = "CONFIG FILE NOT FOUND",          # Display title
+  problem = "File does not exist: ...",     # What went wrong
+  why_it_matters = "Cannot proceed...",     # Why this matters
+  fix = "Check the path and re-run."        # How to fix it
+)
 ```
 
-### Graceful Degradation
+Refusals are caught by `with_refusal_handler()` at the top level for clean display without stack traces.
 
-1. **Missing `car` package:** Fall back to z-value importance
-2. **`haven` not installed:** Error only if .sav/.dta file loaded
-3. **Anova fails:** Use coefficient-based importance
-4. **VIF calculation fails:** Skip multicollinearity check
+### Error Categories
+
+| Category | Handling | Mechanism |
+|----------|----------|-----------|
+| Config not found | Refuse | `catdriver_refuse()` |
+| Missing required sheet | Refuse | `catdriver_refuse()` |
+| Variable not in data | Refuse | `catdriver_refuse()` |
+| Insufficient sample | Refuse | `catdriver_refuse()` |
+| Missing package | Refuse | `catdriver_refuse()` |
+| Unmapped coefficients | Refuse | `catdriver_refuse()` |
+| Polynomial contrasts detected | Refuse | `catdriver_refuse()` |
+| Separation (no brglm2) | Refuse | `catdriver_refuse()` |
+| Model non-convergence | Warning | `guard_warn()` |
+| High missing data | Warning | `guard_warn()` |
+| Small cells | Warning | `guard_warn()` |
+
+### Strict Mapping Validation
+
+The term-to-level mapper (09_mapper.R) enforces strict validation:
+
+1. **No guessing**: If a coefficient cannot be exactly matched to a factor level, refuse
+2. **No warnings-only**: If any coefficients are unmapped, refuse (not warn)
+3. **Polynomial contrast detection**: If `.L/.Q/.C` patterns detected, refuse (ordinal should use treatment contrasts)
+4. **Validation gate**: `validate_mapping()` is called in the main pipeline before OR extraction
+
+### Graceful Degradation (Where Appropriate)
+
+1. **Missing `ordinal` package:** Fall back to MASS::polr for ordinal models
+2. **Missing `brglm2` package:** Refuse if separation detected (user must install or override)
+3. **Missing `haven` package:** Refuse only if .sav/.dta file loaded
+4. **Anova fails:** Use coefficient-based importance as fallback
 
 ---
 
@@ -491,8 +547,8 @@ stop(sprintf(
 1. **No weighted ordinal/multinomial:** `polr()` supports weights, but `multinom()` support is limited
 2. **No robust standard errors:** Uses model-based SEs only
 3. **No interaction terms:** Formula is additive only
-4. **No multiple imputation:** Complete case analysis only
-5. **No Firth correction:** Separation handled by warning only
+4. **No multiple imputation:** Uses per-variable missing strategies (drop_row, missing_as_level)
+5. **Firth correction requires brglm2:** If package not installed and separation detected, analysis refuses
 
 ### Technical Limitations
 

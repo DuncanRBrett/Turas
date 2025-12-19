@@ -1,6 +1,6 @@
 # R Package Dependencies - Categorical Key Driver Module
 
-**Version:** 1.0
+**Version:** 2.0
 **Date:** December 2024
 
 ---
@@ -11,10 +11,12 @@ The Categorical Key Driver module requires the following R packages:
 
 | Package | Required | Purpose | CRAN | Notes |
 |---------|----------|---------|------|-------|
-| MASS | **Yes** | Ordinal logistic regression | Yes | Part of R recommended packages |
+| MASS | **Yes** | Ordinal logistic regression (fallback) | Yes | Part of R recommended packages |
 | nnet | **Yes** | Multinomial logistic regression | Yes | Part of R recommended packages |
 | car | **Yes** | Statistical tests and diagnostics | Yes | Widely used, well-maintained |
 | openxlsx | **Yes** | Excel file I/O | Yes | No Java dependency |
+| ordinal | Recommended | Ordinal logistic regression (primary) | Yes | More robust than MASS::polr |
+| brglm2 | Recommended | Firth bias-reduced logistic regression | Yes | Handles separation in binary models |
 | haven | No | SPSS/Stata file support | Yes | Only needed for .sav/.dta files |
 | shiny | GUI only | Web application framework | Yes | Only for GUI usage |
 | shinyFiles | GUI only | File browser widgets | Yes | Only for GUI usage |
@@ -39,7 +41,44 @@ The Categorical Key Driver module requires the following R packages:
 
 **License:** GPL-2 | GPL-3
 
-**Alternative Considered:** `ordinal::clm()` offers more flexibility but adds complexity and another dependency. MASS is sufficient for our needs and more widely available.
+**Alternative Considered:** `ordinal::clm()` is now used as the primary engine when available, with MASS::polr as fallback.
+
+---
+
+### ordinal (Regression Models for Ordinal Data)
+
+**Purpose:** Primary engine for ordinal logistic regression via `clm()` function.
+
+**Why This Package:**
+- More robust convergence than MASS::polr
+- Better handling of edge cases
+- Provides additional model diagnostics
+- Active maintenance
+
+**Functions Used:**
+- `clm()` - Cumulative link models for ordinal outcomes
+
+**License:** GPL-2 | GPL-3
+
+**Note:** This is the preferred ordinal engine. If not installed, falls back to MASS::polr automatically.
+
+---
+
+### brglm2 (Bias Reduction in Binomial-Response GLMs)
+
+**Purpose:** Firth bias-reduced logistic regression for handling separation.
+
+**Why This Package:**
+- Handles perfect/quasi-separation gracefully
+- Produces finite estimates when standard glm fails
+- Well-tested and maintained
+
+**Functions Used:**
+- `brglm()` - Bias-reduced GLM fitting
+
+**License:** GPL-3
+
+**Note:** Strongly recommended. If not installed and separation is detected, the analysis will refuse to proceed (unless explicitly overridden) because standard estimates are unreliable.
 
 ---
 
@@ -188,14 +227,29 @@ install.packages(c("MASS", "nnet", "car", "openxlsx"))
 
 Note: MASS and nnet are typically pre-installed as recommended packages.
 
+### Recommended Installation (With Fallback Engines)
+
+```r
+install.packages(c(
+  "MASS",        # Ordinal logistic (fallback)
+  "nnet",        # Multinomial logistic
+  "car",         # Statistical tests
+  "openxlsx",    # Excel I/O
+  "ordinal",     # Ordinal logistic (primary)
+  "brglm2"       # Firth correction for separation
+))
+```
+
 ### Full Installation (With GUI and SPSS/Stata Support)
 
 ```r
 install.packages(c(
-  "MASS",        # Ordinal logistic
+  "MASS",        # Ordinal logistic (fallback)
   "nnet",        # Multinomial logistic
   "car",         # Statistical tests
   "openxlsx",    # Excel I/O
+  "ordinal",     # Ordinal logistic (primary)
+  "brglm2",      # Firth correction for separation
   "haven",       # SPSS/Stata support
   "shiny",       # Web app framework
   "shinyFiles"   # File browser widgets
