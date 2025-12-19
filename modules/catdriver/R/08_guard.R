@@ -21,46 +21,131 @@
 #' Refuse to Run with Clear Message
 #'
 #' Produces a clear "REFUSED TO RUN" message that looks intentional,
-#' not like a crash or error. Uses a custom condition class.
+#' not like a crash or error. Uses a custom condition class that can
+#' be caught at the top level for clean display.
 #'
-#' @param title Short title for refusal reason
-#' @param problem Description of the problem
-#' @param why_it_matters Why this is a problem
-#' @param fix How to fix it
+#' @param reason Short code for refusal reason (for programmatic handling)
+#' @param message Detailed message explaining the refusal
+#' @param title Optional custom title (defaults to reason)
+#' @param problem Optional problem description (alternative interface)
+#' @param why_it_matters Optional explanation (alternative interface)
+#' @param fix Optional fix instructions (alternative interface)
 #' @param details Optional additional details
 #' @keywords internal
-catdriver_refuse <- function(title, problem, why_it_matters, fix, details = NULL) {
+catdriver_refuse <- function(reason = NULL, message = NULL,
+                             title = NULL, problem = NULL,
+                             why_it_matters = NULL, fix = NULL,
+                             details = NULL) {
 
-  msg <- paste0(
-    "\n",
-    "================================================================================\n",
-    "  CATDRIVER REFUSED TO RUN\n",
-    "================================================================================\n",
-    "  ", title, "\n",
-    "================================================================================\n\n",
-    "PROBLEM:\n",
-    "  ", problem, "\n\n",
-    "WHY THIS MATTERS:\n",
-    "  ", why_it_matters, "\n\n",
-    "HOW TO FIX:\n",
-    "  ", fix, "\n"
-  )
+  # Support both interfaces:
+  # 1. Simple: reason + message
+  # 2. Structured: title + problem + why_it_matters + fix
 
-  if (!is.null(details)) {
-    msg <- paste0(msg, "\nDETAILS:\n  ", details, "\n")
+  if (!is.null(message)) {
+    # Simple interface
+    display_title <- if (!is.null(title)) title else if (!is.null(reason)) reason else "Analysis Refused"
+
+    msg <- paste0(
+      "\n",
+      "================================================================================\n",
+      "  CATDRIVER REFUSED TO RUN\n",
+      "================================================================================\n",
+      "  ", display_title, "\n",
+      "================================================================================\n\n",
+      message, "\n",
+      "\n================================================================================\n"
+    )
+
+  } else if (!is.null(problem)) {
+    # Structured interface
+    display_title <- if (!is.null(title)) title else "Analysis Refused"
+
+    msg <- paste0(
+      "\n",
+      "================================================================================\n",
+      "  CATDRIVER REFUSED TO RUN\n",
+      "================================================================================\n",
+      "  ", display_title, "\n",
+      "================================================================================\n\n",
+      "PROBLEM:\n",
+      "  ", problem, "\n\n"
+    )
+
+    if (!is.null(why_it_matters)) {
+      msg <- paste0(msg, "WHY THIS MATTERS:\n  ", why_it_matters, "\n\n")
+    }
+
+    if (!is.null(fix)) {
+      msg <- paste0(msg, "HOW TO FIX:\n  ", fix, "\n")
+    }
+
+    if (!is.null(details)) {
+      msg <- paste0(msg, "\nDETAILS:\n  ", details, "\n")
+    }
+
+    msg <- paste0(msg, "\n================================================================================\n")
+
+  } else {
+    msg <- paste0(
+      "\n",
+      "================================================================================\n",
+      "  CATDRIVER REFUSED TO RUN\n",
+      "================================================================================\n",
+      "  No details provided\n",
+      "================================================================================\n"
+    )
   }
-
-  msg <- paste0(msg,
-    "\n================================================================================\n"
-  )
 
   # Create a custom condition so it can be caught/handled specially
   cond <- structure(
-    list(message = msg, call = NULL),
+    list(
+      message = msg,
+      reason = reason,
+      call = NULL
+    ),
     class = c("catdriver_refusal", "error", "condition")
   )
 
   stop(cond)
+}
+
+
+#' Run Analysis with Top-Level Refusal Handler
+#'
+#' Wraps the main analysis function to catch catdriver_refusal conditions
+#' and display them cleanly without a stack trace.
+#'
+#' @param expr Expression to evaluate (typically run_categorical_keydriver call)
+#' @return Result of expression, or NULL if refused
+#' @export
+with_refusal_handler <- function(expr) {
+  tryCatch(
+    expr,
+    catdriver_refusal = function(e) {
+      # Print the refusal message cleanly (no Error: prefix, no stack trace)
+      cat(conditionMessage(e))
+
+      # Return invisible NULL to indicate refusal
+      invisible(structure(
+        list(
+          refused = TRUE,
+          reason = e$reason,
+          message = conditionMessage(e)
+        ),
+        class = "catdriver_refusal_result"
+      ))
+    }
+  )
+}
+
+
+#' Check if Result was a Refusal
+#'
+#' @param result Result from with_refusal_handler()
+#' @return TRUE if analysis was refused
+#' @export
+is_refusal <- function(result) {
+  inherits(result, "catdriver_refusal_result") && isTRUE(result$refused)
 }
 
 

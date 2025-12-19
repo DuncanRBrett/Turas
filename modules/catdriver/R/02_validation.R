@@ -341,11 +341,25 @@ validate_catdriver_data <- function(data, config) {
   }
 
   # ==========================================================================
+
   # CHECK CROSS-TABULATION FOR SMALL CELLS
   # ==========================================================================
 
-  # Only check complete cases
-  data_complete <- data[complete_mask, , drop = FALSE]
+  # Build strategy-aware mask: include rows that will be analyzed
+  # (outcome non-missing, and drivers either non-missing or use missing_as_level)
+  analyzable_mask <- !is.na(data[[config$outcome_var]])
+
+  for (driver_var in config$driver_vars) {
+    strategy <- get_driver_setting(config, driver_var, "missing_strategy", "drop_row")
+    if (strategy == "drop_row") {
+      # These rows will be dropped, so exclude from analysis
+      analyzable_mask <- analyzable_mask & !is.na(data[[driver_var]])
+    }
+    # For missing_as_level, rows are kept (mask unchanged)
+    # For error_if_missing, we'll hard-stop later if any missing
+  }
+
+  data_complete <- data[analyzable_mask, , drop = FALSE]
 
   for (driver_var in config$driver_vars) {
     if (is_categorical(data_complete[[driver_var]])) {

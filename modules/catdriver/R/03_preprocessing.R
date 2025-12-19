@@ -288,6 +288,8 @@ prepare_outcome <- function(data, config, outcome_info) {
 #' Prepare Predictor Variables
 #'
 #' Converts predictor variables to appropriate format for modeling.
+#' Uses DRIVER_SETTINGS from config for explicit type and reference level.
+#' Falls back to inference ONLY when no Driver_Settings sheet exists.
 #'
 #' @param data Data frame
 #' @param config Configuration list
@@ -297,14 +299,65 @@ prepare_predictors <- function(data, config) {
 
   predictor_info <- list()
 
+  # Check if we have explicit Driver_Settings
+  has_driver_settings <- !is.null(config$driver_settings) &&
+                         is.data.frame(config$driver_settings) &&
+                         nrow(config$driver_settings) > 0
+
   for (var_name in config$driver_vars) {
     var_data <- data[[var_name]]
-    order_spec <- config$driver_orders[[var_name]]
 
-    # Detect type
-    pred_type <- detect_predictor_type(var_data, order_spec)
+    # =========================================================================
+    # GET TYPE AND SETTINGS FROM DRIVER_SETTINGS (explicit) OR INFER (fallback)
+    # =========================================================================
 
-    # Prepare based on type
+    if (has_driver_settings) {
+      # Use explicit settings from Driver_Settings sheet
+      explicit_type <- get_driver_setting(config, var_name, "type", NULL)
+      explicit_ref <- get_driver_setting(config, var_name, "reference_level", NULL)
+      explicit_order <- get_driver_setting(config, var_name, "levels_order", NULL)
+
+      # Parse levels_order if provided (semicolon-separated)
+      order_spec <- if (!is.null(explicit_order) && !is.na(explicit_order) && nzchar(explicit_order)) {
+        trimws(strsplit(explicit_order, ";")[[1]])
+      } else {
+        config$driver_orders[[var_name]]  # Fall back to Variables sheet order
+      }
+
+      # Map explicit type to internal representation
+      if (!is.null(explicit_type) && !is.na(explicit_type) && nzchar(explicit_type)) {
+        pred_type <- switch(tolower(explicit_type),
+          "categorical" = list(type = "nominal", needs_dummy = TRUE, n_dummies = NA),
+          "nominal" = list(type = "nominal", needs_dummy = TRUE, n_dummies = NA),
+          "ordinal" = list(type = "ordinal", needs_dummy = TRUE, n_dummies = NA),
+          "binary" = list(type = "binary_categorical", needs_dummy = TRUE, n_dummies = 1),
+          "continuous" = list(type = "continuous", needs_dummy = FALSE, n_dummies = 0),
+          "numeric" = list(type = "continuous", needs_dummy = FALSE, n_dummies = 0),
+          # Unknown type - fall back to inference with warning
+          {
+            warning("Unknown type '", explicit_type, "' for driver '", var_name,
+                    "'. Using inference.")
+            detect_predictor_type(var_data, order_spec)
+          }
+        )
+      } else {
+        # No type specified - use inference with warning
+        warning("No type specified in Driver_Settings for '", var_name,
+                "'. Using inference.")
+        pred_type <- detect_predictor_type(var_data, order_spec)
+      }
+
+    } else {
+      # No Driver_Settings sheet - use inference (legacy mode)
+      order_spec <- config$driver_orders[[var_name]]
+      pred_type <- detect_predictor_type(var_data, order_spec)
+      explicit_ref <- NULL
+    }
+
+    # =========================================================================
+    # PREPARE VARIABLE BASED ON TYPE
+    # =========================================================================
+
     if (pred_type$type == "continuous") {
       # Keep as-is, ensure numeric
       if (!is.numeric(var_data)) {
@@ -317,8 +370,16 @@ prepare_predictors <- function(data, config) {
         var_data <- factor(var_data)
       }
 
-      # Set reference level
-      if (!is.null(order_spec) && length(order_spec) > 0) {
+      # Set reference level - PREFER explicit from Driver_Settings
+      if (!is.null(explicit_ref) && !is.na(explicit_ref) && nzchar(explicit_ref)) {
+        if (explicit_ref %in% levels(var_data)) {
+          var_data <- relevel(var_data, ref = explicit_ref)
+        } else {
+          warning("Reference level '", explicit_ref, "' not found in '", var_name,
+                  "'. Using first level.")
+          var_data <- relevel(var_data, ref = levels(var_data)[1])
+        }
+      } else if (!is.null(order_spec) && length(order_spec) > 0) {
         # First in order spec is reference
         ref_level <- order_spec[1]
         if (ref_level %in% levels(var_data)) {
@@ -331,7 +392,7 @@ prepare_predictors <- function(data, config) {
 
     } else if (pred_type$type == "ordinal") {
       # Ordered factor
-      if (!is.null(order_spec)) {
+      if (!is.null(order_spec) && length(order_spec) > 0) {
         var_data <- factor(var_data, levels = order_spec, ordered = TRUE)
       } else {
         var_data <- factor(var_data, ordered = TRUE)
@@ -341,9 +402,15 @@ prepare_predictors <- function(data, config) {
     # Update data
     data[[var_name]] <- var_data
 
+    # Update n_dummies now that we know actual levels
+    if (is.factor(var_data)) {
+      pred_type$n_dummies <- length(levels(var_data)) - 1
+    }
+
     # Store info
     pred_type$reference_level <- if (is.factor(var_data)) levels(var_data)[1] else NA
     pred_type$levels <- if (is.factor(var_data)) levels(var_data) else unique(na.omit(var_data))
+    pred_type$source <- if (has_driver_settings) "driver_settings" else "inference"
     predictor_info[[var_name]] <- pred_type
   }
 

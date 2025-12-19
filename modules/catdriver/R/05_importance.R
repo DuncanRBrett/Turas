@@ -399,19 +399,33 @@ aggregate_dummy_importance <- function(importance_df, config, mapping = NULL) {
 }
 
 
-#' Extract Odds Ratios Summary
+#' Extract Odds Ratios Summary (DEPRECATED)
 #'
-#' Creates a summary of odds ratios by factor and category.
-#' Uses canonical mapping from R/09_mapper.R when available.
-#' NEVER uses substring parsing for term-to-level mapping.
+#' @description
+#' \lifecycle{deprecated}
+#'
+#' This function is DEPRECATED as of v2.0. Use extract_odds_ratios_mapped()
+#' with a canonical term mapping from map_terms_to_levels() instead.
+#'
+#' The main pipeline (run_categorical_keydriver) no longer calls this function.
+#' It exists only for backward compatibility and will be removed in a future version.
 #'
 #' @param model_result Model results
 #' @param config Configuration list
 #' @param prep_data Preprocessed data
 #' @param mapping Optional pre-computed mapping from map_terms_to_levels()
 #' @return Data frame with odds ratio summary
-#' @export
+#' @keywords internal
 extract_odds_ratios <- function(model_result, config, prep_data, mapping = NULL) {
+
+  # Deprecation warning
+
+  warning(
+    "extract_odds_ratios() is DEPRECATED as of v2.0.\n",
+    "Use extract_odds_ratios_mapped() with canonical term mapping instead.\n",
+    "This function will be removed in a future version.",
+    call. = FALSE
+  )
 
   coef_df <- model_result$coefficients
 

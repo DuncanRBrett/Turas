@@ -54,6 +54,40 @@ run_categorical_keydriver <- function(config_file,
                                       outcome_type = NULL) {
 
   # ==========================================================================
+  # TOP-LEVEL REFUSAL HANDLER
+  # ==========================================================================
+  # Catch catdriver_refusal conditions and display them cleanly
+  # without stack traces - they are intentional stops, not crashes.
+
+  tryCatch(
+    run_categorical_keydriver_impl(config_file, data_file, output_file, outcome_type),
+    catdriver_refusal = function(e) {
+      # Print the refusal message cleanly (no "Error:" prefix, no stack trace)
+      cat(conditionMessage(e))
+
+      # Return a refusal result object
+      invisible(structure(
+        list(
+          refused = TRUE,
+          reason = e$reason,
+          message = conditionMessage(e)
+        ),
+        class = "catdriver_refusal_result"
+      ))
+    }
+  )
+}
+
+
+#' Internal Implementation of Categorical Key Driver Analysis
+#'
+#' @keywords internal
+run_categorical_keydriver_impl <- function(config_file,
+                                           data_file = NULL,
+                                           output_file = NULL,
+                                           outcome_type = NULL) {
+
+  # ==========================================================================
   # INITIALIZATION
   # ==========================================================================
 
@@ -302,7 +336,7 @@ run_categorical_keydriver <- function(config_file,
 
   log_section(10, "Extracting detailed results...")
 
-  # Create term-level mapping
+  # Create term-level mapping (REQUIRED - no legacy fallback)
   term_mapping <- tryCatch({
     if (prep_data$outcome_info$type %in% c("multinomial", "nominal")) {
       map_multinomial_terms(model_result$model, prep_data$data,
@@ -312,18 +346,25 @@ run_categorical_keydriver <- function(config_file,
                          prep_data$model_formula)
     }
   }, error = function(e) {
-    warning("Could not create term mapping: ", e$message)
-    NULL
+    # HARD STOP - no legacy fallback allowed
+    catdriver_refuse(
+      reason = "term_mapping_failed",
+      message = paste0(
+        "Cannot create canonical term-to-level mapping.\n\n",
+        "Error: ", e$message, "\n\n",
+        "This mapping is required for correct odds ratio interpretation.\n",
+        "Possible causes:\n",
+        "  - Model did not converge properly\n",
+        "  - Unexpected coefficient naming from model\n",
+        "  - Data structure incompatible with expected design matrix\n\n",
+        "Please check your data and configuration, or contact support."
+      )
+    )
   })
 
-  # Extract odds ratios (using new mapper if available)
-  if (!is.null(term_mapping)) {
-    odds_ratios <- extract_odds_ratios_mapped(model_result, term_mapping, config)
-    log_message(paste("Extracted", nrow(odds_ratios), "odds ratio comparisons (mapped)"), "info")
-  } else {
-    odds_ratios <- extract_odds_ratios(model_result, config, prep_data)
-    log_message(paste("Extracted", nrow(odds_ratios), "odds ratio comparisons (legacy)"), "info")
-  }
+  # Extract odds ratios using canonical mapping (no legacy fallback)
+  odds_ratios <- extract_odds_ratios_mapped(model_result, term_mapping, config)
+  log_message(paste("Extracted", nrow(odds_ratios), "odds ratio comparisons"), "info")
 
   # Calculate probability lift (new in v2.0)
   prob_lift <- calculate_probability_lift(model_result, prep_data, config)
