@@ -406,6 +406,8 @@ run_catdriver_gui <- function() {
         source(file.path(turas_root, "modules/catdriver/R/04a_ordinal.R"))
         source(file.path(turas_root, "modules/catdriver/R/04b_multinomial.R"))
         source(file.path(turas_root, "modules/catdriver/R/05_importance.R"))
+        source(file.path(turas_root, "modules/catdriver/R/06a_sheets_summary.R"))
+        source(file.path(turas_root, "modules/catdriver/R/06b_sheets_detail.R"))
         source(file.path(turas_root, "modules/catdriver/R/06_output.R"))
         source(file.path(turas_root, "modules/catdriver/R/00_main.R"))
 

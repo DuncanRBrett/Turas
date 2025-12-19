@@ -287,9 +287,20 @@ guard_reference_not_missing <- function(config, prep_data) {
 
     if (!is.null(ref_level)) {
       # Check if reference is a missing indicator
-      missing_patterns <- c("missing", "not answered", "n/a", "na", "unknown", "refuse")
-      is_missing_ref <- any(sapply(missing_patterns, function(p) {
-        grepl(p, tolower(ref_level))
+      # IMPORTANT: Use word boundaries (\b) for short patterns to prevent false positives
+      # e.g., "na" would incorrectly match "Finance" without word boundaries
+      ref_lower <- tolower(ref_level)
+
+      # Short patterns that need word boundaries (could be substrings of valid levels)
+      missing_patterns_bounded <- c("^na$", "^n/a$", "^dk$", "^rf$", "\\bna\\b", "\\bn/a\\b")
+      # Longer patterns safe to match as substrings
+      missing_patterns_substring <- c("missing", "not answered", "not stated", "unknown",
+                                       "refused", "decline", "prefer not", "no response")
+
+      is_missing_ref <- any(sapply(missing_patterns_bounded, function(p) {
+        grepl(p, ref_lower)
+      })) || any(sapply(missing_patterns_substring, function(p) {
+        grepl(p, ref_lower, fixed = TRUE)
       }))
 
       if (is_missing_ref) {
