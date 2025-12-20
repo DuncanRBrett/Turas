@@ -681,6 +681,83 @@ test_that("T1: ordinal OR direction matches raw data proportions", {
   # OR should be substantially > 1 given the large difference
   expect_true(gradeA_row$odds_ratio > 2,
               info = "OR should be >> 1 given 70% vs 10% High")
+
+  # Sanity check using predicted probabilities (reviewer recommendation)
+  # Verify that predicted P(High) for A is greater than for D
+  fit <- result$model
+  pred_A <- predict(fit, newdata = data.frame(grade = factor("A", levels = levels(data$grade))), type = "prob")
+  pred_D <- predict(fit, newdata = data.frame(grade = factor("D", levels = levels(data$grade))), type = "prob")
+
+  # Extract probabilities - handle both clm and polr output formats
+  if (is.list(pred_A) && "fit" %in% names(pred_A)) {
+    prob_high_A <- pred_A$fit[, "High"]
+    prob_high_D <- pred_D$fit[, "High"]
+  } else if (is.matrix(pred_A)) {
+    prob_high_A <- pred_A[, "High"]
+    prob_high_D <- pred_D[, "High"]
+  } else {
+    prob_high_A <- pred_A["High"]
+    prob_high_D <- pred_D["High"]
+  }
+
+  expect_true(prob_high_A > prob_high_D,
+              info = paste0(
+                "Predicted P(High) should be greater for A than D. ",
+                "Got P(High|A)=", round(prob_high_A, 3),
+                ", P(High|D)=", round(prob_high_D, 3)
+              ))
+})
+
+
+# T2: Verify OR sign convention is consistent with coefficient sign
+# This tests the mathematical relationship between β and OR
+test_that("T2: ordinal OR matches coefficient sign convention", {
+  skip_if_not_installed("ordinal")
+
+  # Use the same data setup as T1
+  set.seed(42)
+  data <- data.frame(
+    satisfaction = ordered(
+      c(
+        sample(c("Low", "Neutral", "High"), 50, TRUE, c(0.7, 0.2, 0.1)),
+        sample(c("Low", "Neutral", "High"), 50, TRUE, c(0.1, 0.2, 0.7)),
+        sample(c("Low", "Neutral", "High"), 100, TRUE, c(0.4, 0.3, 0.3))
+      ),
+      levels = c("Low", "Neutral", "High")
+    ),
+    grade = factor(
+      c(rep("D", 50), rep("A", 50), rep("B", 50), rep("C", 50)),
+      levels = c("D", "C", "B", "A")
+    )
+  )
+
+  # Fit raw clm model (not through our wrapper) to check sign convention
+  raw_model <- ordinal::clm(satisfaction ~ grade, data = data)
+  raw_beta_A <- raw_model$beta["gradeA"]
+
+  # Per ordinal vignette: positive β means higher categories more likely
+  # A has higher satisfaction, so β_A should be positive
+  expect_true(raw_beta_A > 0,
+              info = paste0(
+                "clm should give positive β for A (higher satisfaction). ",
+                "Got β_A=", round(raw_beta_A, 3)
+              ))
+
+  # Now verify our extraction gives OR = exp(β)
+  config <- list(outcome_var = "satisfaction", confidence_level = 0.95)
+  guard <- guard_init()
+  result <- run_ordinal_logistic_robust(satisfaction ~ grade, data, NULL, config, guard)
+
+  gradeA_row <- result$coefficients[grepl("gradeA", result$coefficients$term), ]
+
+  # OR should be exp(β), so OR = exp(raw_beta_A)
+  expected_or <- exp(raw_beta_A)
+  expect_equal(gradeA_row$odds_ratio, expected_or, tolerance = 0.001,
+               info = paste0(
+                 "OR should equal exp(β). ",
+                 "Expected: ", round(expected_or, 3),
+                 ", Got: ", round(gradeA_row$odds_ratio, 3)
+               ))
 })
 
 
