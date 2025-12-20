@@ -330,6 +330,10 @@ check_multicollinearity <- function(model) {
     rownames(df) <- NULL
     df
   }, error = function(e) {
+    # VIF calculation failed - log explicitly (no silent fails per TRS)
+    msg <- sprintf("VIF diagnostics failed and were skipped: %s", conditionMessage(e))
+    cat(sprintf("   [WARN] %s\n", msg))
+    warning(msg, call. = FALSE)
     NULL
   })
 

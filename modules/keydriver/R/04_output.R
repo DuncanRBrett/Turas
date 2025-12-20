@@ -8,6 +8,11 @@ calculate_vif <- function(model) {
   # Get model matrix (excluding intercept)
   X <- stats::model.matrix(model)[, -1, drop = FALSE]
 
+  # VIF is only defined when there are at least 2 predictor terms
+  if (ncol(X) < 2) {
+    stop("Not enough predictors to compute VIF (need 2+ predictor terms).", call. = FALSE)
+  }
+
   # Calculate VIF for each predictor
   vif_vals <- numeric(ncol(X))
   names(vif_vals) <- colnames(X)
@@ -130,7 +135,10 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
                       rows = nrow(model_summary) + 4,
                       cols = 1:3, gridExpand = TRUE)
   }, error = function(e) {
-    # VIF calculation failed, skip
+    # VIF calculation failed - log explicitly (no silent fails per TRS)
+    msg <- sprintf("VIF diagnostics failed and were skipped: %s", conditionMessage(e))
+    cat(sprintf("   [WARN] %s\n", msg))
+    warning(msg, call. = FALSE)
     NULL
   })
 
