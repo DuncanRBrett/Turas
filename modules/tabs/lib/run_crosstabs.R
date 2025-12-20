@@ -65,11 +65,18 @@ check_dependencies <- function() {
   }
   
   if (length(missing) > 0) {
-    stop(sprintf(
-      "Missing required packages: %s\n\nInstall with:\n  install.packages(c(%s))",
-      paste(missing, collapse = ", "),
-      paste(sprintf('"%s"', missing), collapse = ", ")
-    ))
+    # TRS Refusal: PKG_MISSING_PACKAGES
+    tabs_refuse(
+      code = "PKG_MISSING_PACKAGES",
+      title = "Missing Required Packages",
+      problem = paste0("Required packages not installed: ", paste(missing, collapse = ", ")),
+      why_it_matters = "Crosstab analysis requires these packages to function properly.",
+      how_to_fix = c(
+        "Install the missing packages with:",
+        paste0("  install.packages(c(", paste(sprintf('"%s"', missing), collapse = ", "), "))")
+      ),
+      missing = missing
+    )
   }
   
   # Optional but recommended (V10.0: lobstr replaces deprecated pryr)
@@ -148,6 +155,9 @@ source(file.path(script_dir, "question_orchestrator.R"))
 # Composite Metrics Feature (V10.1)
 source(file.path(script_dir, "composite_processor.R"))
 source(file.path(script_dir, "summary_builder.R"))
+
+# TRS Guard Layer (v1.0)
+source(file.path(script_dir, "00_guard.R"))
 
 # ==============================================================================
 # LOGGING & MONITORING SYSTEM
@@ -230,7 +240,17 @@ format_output_value <- function(value, type = "frequency",
 print_toolkit_header("Crosstab Analysis - Turas v10.0")
 
 if (!exists("config_file")) {
-  stop("ERROR: config_file not defined. Run from Jupyter notebook.")
+  # TRS Refusal: CFG_NO_CONFIG_FILE
+  tabs_refuse(
+    code = "CFG_NO_CONFIG_FILE",
+    title = "Configuration File Not Defined",
+    problem = "The config_file variable is not defined.",
+    why_it_matters = "Analysis requires a configuration file to specify data sources and settings.",
+    how_to_fix = c(
+      "Run this script from the Jupyter notebook entry point",
+      "Or set config_file variable before sourcing this script"
+    )
+  )
 }
 
 project_root <- get_project_root(config_file)
@@ -249,7 +269,18 @@ structure_file <- get_config_value(config, "structure_file", required = TRUE)
 structure_file_path <- resolve_path(project_root, structure_file)
 
 if (!file.exists(structure_file_path)) {
-  stop(sprintf("Survey structure file not found: %s", structure_file_path))
+  # TRS Refusal: IO_STRUCTURE_FILE_NOT_FOUND
+  tabs_refuse(
+    code = "IO_STRUCTURE_FILE_NOT_FOUND",
+    title = "Survey Structure File Not Found",
+    problem = paste0("Cannot find survey structure file: ", basename(structure_file_path)),
+    why_it_matters = "The survey structure defines questions and options needed for crosstabs.",
+    how_to_fix = c(
+      "Check that the structure_file path in Settings is correct",
+      "Verify Survey_Structure.xlsx exists in your project folder"
+    ),
+    details = paste0("Expected path: ", structure_file_path)
+  )
 }
 
 output_subfolder <- get_config_value(config, "output_subfolder", "Crosstabs")
@@ -343,7 +374,18 @@ data_file <- get_config_value(survey_structure$project, "data_file", required = 
 data_file_path <- resolve_path(project_root, data_file)
 
 if (!file.exists(data_file_path)) {
-  stop(sprintf("Data file not found: %s", data_file_path))
+  # TRS Refusal: IO_DATA_FILE_NOT_FOUND
+  tabs_refuse(
+    code = "IO_DATA_FILE_NOT_FOUND",
+    title = "Data File Not Found",
+    problem = paste0("Cannot find data file: ", basename(data_file_path)),
+    why_it_matters = "The analysis requires survey data to produce crosstabs.",
+    how_to_fix = c(
+      "Check that the data_file path in Project sheet is correct",
+      "Verify the file exists at the specified location"
+    ),
+    details = paste0("Expected path: ", data_file_path)
+  )
 }
 
 survey_data <- load_survey_data_smart(data_file_path, project_root)
@@ -372,7 +414,19 @@ log_message("Loading question selection...", "INFO")
 selection_df <- tryCatch({
   readxl::read_excel(config_file, sheet = "Selection", col_types = "text")
 }, error = function(e) {
-  stop(sprintf("Failed to load Selection sheet: %s", conditionMessage(e)))
+  # TRS Refusal: IO_SELECTION_SHEET_FAILED
+  tabs_refuse(
+    code = "IO_SELECTION_SHEET_FAILED",
+    title = "Failed to Load Selection Sheet",
+    problem = "Could not read the Selection sheet from configuration file.",
+    why_it_matters = "The Selection sheet specifies which questions to analyze.",
+    how_to_fix = c(
+      "Verify the config file exists and is not corrupted",
+      "Check that a 'Selection' sheet exists in the file",
+      "Ensure the file is not open in another application"
+    ),
+    details = conditionMessage(e)
+  )
 })
 
 validate_data_frame(selection_df, c("QuestionCode"), 1)
@@ -395,7 +449,19 @@ selection_df$CreateIndex[is.na(selection_df$CreateIndex)] <- "N"
 crosstab_questions <- selection_df[selection_df$Include == "Y", ]
 
 if (nrow(crosstab_questions) == 0) {
-  stop("No questions selected for analysis (Include='Y')")
+  # TRS Refusal: CFG_NO_QUESTIONS_SELECTED
+  tabs_refuse(
+    code = "CFG_NO_QUESTIONS_SELECTED",
+    title = "No Questions Selected for Analysis",
+    problem = "No questions have Include='Y' in the Selection sheet.",
+    why_it_matters = "At least one question must be selected to produce crosstabs.",
+    how_to_fix = c(
+      "Open your config file",
+      "In the Selection sheet, set Include='Y' for questions to analyze",
+      "Save and re-run"
+    ),
+    details = paste0("Total questions in selection: ", nrow(selection_df))
+  )
 }
 
 log_message(sprintf("✓ Found %d questions to analyze", nrow(crosstab_questions)), "INFO")
@@ -423,8 +489,19 @@ if (!is.null(composite_defs) && nrow(composite_defs) > 0) {
   )
 
   if (!validation_result$is_valid) {
-    stop("Composite validation failed:\n",
-         paste(validation_result$errors, collapse = "\n"))
+    # TRS Refusal: CFG_COMPOSITE_VALIDATION_FAILED
+    tabs_refuse(
+      code = "CFG_COMPOSITE_VALIDATION_FAILED",
+      title = "Composite Definition Validation Failed",
+      problem = "One or more composite metric definitions are invalid.",
+      why_it_matters = "Invalid composites will produce incorrect or missing results.",
+      how_to_fix = c(
+        "Review the composite definitions in your config",
+        "Ensure all referenced questions exist",
+        "Check formula syntax is correct"
+      ),
+      details = paste(validation_result$errors, collapse = "\n")
+    )
   }
 
   if (length(validation_result$warnings) > 0) {
@@ -504,7 +581,18 @@ banner_info <- safe_execute(
 )
 
 if (is.null(banner_info)) {
-  stop("Banner structure creation failed")
+  # TRS Refusal: CFG_BANNER_CREATION_FAILED
+  tabs_refuse(
+    code = "CFG_BANNER_CREATION_FAILED",
+    title = "Failed to Create Banner Structure",
+    problem = "Could not create banner structure from configuration.",
+    why_it_matters = "Crosstabs require a valid banner to break down results by segments.",
+    how_to_fix = c(
+      "Check that at least one question has UseBanner='Y' in Selection sheet",
+      "Verify banner question has valid options defined",
+      "Check that banner question exists in the data"
+    )
+  )
 }
 
 log_message(sprintf("✓ Banner: %d columns", length(banner_info$columns)), "INFO")
@@ -548,11 +636,21 @@ run_significance_tests_for_row <- function(row_data, row_type, banner_structure,
   if (is.null(banner_structure) || is.null(banner_structure$letters)) return(list())
   
   if (!setequal(names(row_data), banner_structure$column_names)) {
-    stop(sprintf(
-      "Sig letter mapping mismatch:\n  Test data keys: %s\n  Banner columns: %s",
-      paste(head(names(row_data), 5), collapse = ", "),
-      paste(head(banner_structure$column_names, 5), collapse = ", ")
-    ))
+    # TRS Refusal: BUG_SIG_LETTER_MISMATCH
+    tabs_refuse(
+      code = "BUG_SIG_LETTER_MISMATCH",
+      title = "Significance Letter Mapping Mismatch",
+      problem = "Banner column names don't match test data keys.",
+      why_it_matters = "Significance letters would be incorrectly mapped to columns.",
+      how_to_fix = c(
+        "This is an internal error - please report it",
+        "Include the error details in your report"
+      ),
+      expected = banner_structure$column_names,
+      observed = names(row_data),
+      details = paste0("Test data keys: ", paste(head(names(row_data), 5), collapse = ", "),
+                       "\nBanner columns: ", paste(head(banner_structure$column_names, 5), collapse = ", "))
+    )
   }
   
   num_comparisons <- choose(length(row_data), 2)
@@ -944,11 +1042,19 @@ if (!is.null(composite_defs) && nrow(composite_defs) > 0) {
 
     log_message(sprintf("✓ Processed %d composite(s)", length(composite_results)), "INFO")
   }, error = function(e) {
-    error_msg <- sprintf("Error processing composites: %s\n\nCall stack:\n%s",
-                        e$message,
-                        paste(sys.calls(), collapse = "\n"))
-    log_message(error_msg, "ERROR")
-    stop(e)
+    # TRS Refusal: MODEL_COMPOSITE_PROCESSING_FAILED
+    tabs_refuse(
+      code = "MODEL_COMPOSITE_PROCESSING_FAILED",
+      title = "Composite Processing Failed",
+      problem = "An error occurred while processing composite metrics.",
+      why_it_matters = "Composite metrics are required outputs and cannot be skipped.",
+      how_to_fix = c(
+        "Check composite definitions for errors",
+        "Verify all referenced questions exist in data",
+        "Review the error details below"
+      ),
+      details = paste0("Error: ", e$message, "\n\nCall stack:\n", paste(sys.calls(), collapse = "\n"))
+    )
   })
 
   # Add composites to all_results so they appear in Crosstabs sheet
@@ -1073,11 +1179,19 @@ tryCatch({
                        SCRIPT_VERSION, TOTAL_COLUMN, VERY_SMALL_BASE_SIZE)
   log_message("✓ Summary sheet created", "INFO")
 }, error = function(e) {
-  cat("\n!!! ERROR in create_summary_sheet !!!\n")
-  cat("Error message:", e$message, "\n")
-  cat("Number of results:", length(all_results), "\n")
-  cat("Result codes:", paste(names(all_results), collapse = ", "), "\n\n")
-  stop(sprintf("Error creating Summary sheet: %s", e$message))
+  # TRS Refusal: IO_SUMMARY_SHEET_FAILED
+  tabs_refuse(
+    code = "IO_SUMMARY_SHEET_FAILED",
+    title = "Failed to Create Summary Sheet",
+    problem = "An error occurred while creating the Summary sheet.",
+    why_it_matters = "The Summary sheet provides an overview of the analysis results.",
+    how_to_fix = c(
+      "Check that all results were processed correctly",
+      "Review the error details below"
+    ),
+    details = paste0("Error: ", e$message, "\nNumber of results: ", length(all_results),
+                     "\nResult codes: ", paste(names(all_results), collapse = ", "))
+  )
 })
 
 # Build and write Index_Summary sheet (V10.1 Feature)
@@ -1114,15 +1228,20 @@ if (create_index_summary) {
       log_message("No metrics to include in Index_Summary", "INFO")
     }
   }, error = function(e) {
-    error_msg <- sprintf("Error creating Index_Summary: %s\n\nTraceback:\n%s",
-                        e$message,
-                        paste(capture.output(traceback()), collapse = "\n"))
-    log_message(error_msg, "ERROR")
-    cat("\n!!! INDEX_SUMMARY ERROR DETAILS !!!\n")
-    cat("Error message:", e$message, "\n")
-    cat("Call:", deparse(e$call), "\n\n")
-    print(traceback())
-    stop(e)
+    # TRS Refusal: IO_INDEX_SUMMARY_FAILED
+    tabs_refuse(
+      code = "IO_INDEX_SUMMARY_FAILED",
+      title = "Failed to Create Index Summary Sheet",
+      problem = "An error occurred while creating the Index_Summary sheet.",
+      why_it_matters = "The Index_Summary sheet consolidates key metrics for easy review.",
+      how_to_fix = c(
+        "Check that composite definitions are valid",
+        "Verify all referenced questions have results",
+        "Review the error details below"
+      ),
+      details = paste0("Error: ", e$message, "\n\nTraceback:\n",
+                       paste(capture.output(traceback()), collapse = "\n"))
+    )
   })
 }
 
@@ -1205,13 +1324,24 @@ for (q_code in names(all_results)) {
       cat(sprintf("  ✓ Completed %s\n", q_code))
     }
   }, error = function(e) {
-    cat(sprintf("\n!!! ERROR writing question %s !!!\n", q_code))
-    cat("Error message:", e$message, "\n")
-    cat("Question type:", question_results$question_type, "\n")
-    cat("Has table:", !is.null(question_results$table), "\n")
-    cat("Table rows:", if(!is.null(question_results$table)) nrow(question_results$table) else "NULL", "\n")
-    cat("Has bases:", !is.null(question_results$bases), "\n\n")
-    stop(sprintf("Error writing question %s: %s", q_code, e$message))
+    # TRS Refusal: IO_QUESTION_WRITE_FAILED
+    tabs_refuse(
+      code = "IO_QUESTION_WRITE_FAILED",
+      title = "Failed to Write Question to Excel",
+      problem = paste0("An error occurred while writing question '", q_code, "' to Excel."),
+      why_it_matters = "All questions must be written to produce complete crosstabs output.",
+      how_to_fix = c(
+        "Check that the question has valid results",
+        "Verify the question type is supported",
+        "Review the error details below"
+      ),
+      details = paste0("Question: ", q_code,
+                       "\nError: ", e$message,
+                       "\nQuestion type: ", question_results$question_type,
+                       "\nHas table: ", !is.null(question_results$table),
+                       "\nTable rows: ", if(!is.null(question_results$table)) nrow(question_results$table) else "NULL",
+                       "\nHas bases: ", !is.null(question_results$bases))
+    )
   })
 }
 
@@ -1235,7 +1365,19 @@ tryCatch({
   openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
   log_message(sprintf("✓ Saved: %s", output_path), "INFO")
 }, error = function(e) {
-  stop(sprintf("Failed to save Excel: %s", conditionMessage(e)))
+  # TRS Refusal: IO_EXCEL_SAVE_FAILED
+  tabs_refuse(
+    code = "IO_EXCEL_SAVE_FAILED",
+    title = "Failed to Save Excel File",
+    problem = "Could not save the Excel workbook to disk.",
+    why_it_matters = "The analysis results cannot be delivered without saving the file.",
+    how_to_fix = c(
+      "Check that the output directory is writable",
+      "Ensure the file is not open in another application",
+      "Verify there is sufficient disk space"
+    ),
+    details = paste0("Output path: ", output_path, "\nError: ", conditionMessage(e))
+  )
 })
 
 # ==============================================================================

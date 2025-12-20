@@ -718,12 +718,18 @@ calculate_weighted_mean <- function(values, weights) {
   if (!is.numeric(values)) {
     # Show sample of non-numeric values for debugging
     sample_values <- head(unique(values[!is.na(values)]), 5)
-    stop(paste0(
-      "Non-numeric data detected in question values. ",
-      "Expected numeric responses but found: ",
-      paste(sample_values, collapse = ", "),
-      ". Check that the data file has numeric values for this question."
-    ))
+    # TRS Refusal: DATA_NON_NUMERIC_VALUES
+    tracker_refuse(
+      code = "DATA_NON_NUMERIC_VALUES",
+      title = "Non-Numeric Data Detected",
+      problem = "Expected numeric responses but found text values.",
+      why_it_matters = "Weighted mean calculation requires numeric data.",
+      how_to_fix = c(
+        "Check that the data file has numeric values for this question",
+        "Verify question type is configured correctly"
+      ),
+      details = paste0("Sample values found: ", paste(sample_values, collapse = ", "))
+    )
   }
 
   # Remove NA values
@@ -1801,7 +1807,14 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
   source_questions <- get_composite_sources(question_map, q_code)
 
   if (is.null(source_questions) || length(source_questions) == 0) {
-    stop(paste0("No source questions defined for composite question: ", q_code))
+    # TRS Refusal: CFG_NO_COMPOSITE_SOURCES
+    tracker_refuse(
+      code = "CFG_NO_COMPOSITE_SOURCES",
+      title = "No Source Questions for Composite",
+      problem = paste0("Composite question '", q_code, "' has no source questions defined."),
+      why_it_matters = "Composites require source questions to calculate.",
+      how_to_fix = "Define source questions in the SourceQuestions column of the question mapping."
+    )
   }
 
   # Get TrackingSpecs

@@ -274,7 +274,18 @@ clean_wave_data <- function(wave_df, wave_id, categorical_cols = character(0)) {
 load_wave_data <- function(file_path, wave_id, categorical_cols = character(0)) {
 
   if (!file.exists(file_path)) {
-    stop(paste0("Data file not found for Wave ", wave_id, ": ", file_path))
+    # TRS Refusal: IO_WAVE_DATA_NOT_FOUND
+    tracker_refuse(
+      code = "IO_WAVE_DATA_NOT_FOUND",
+      title = "Wave Data File Not Found",
+      problem = paste0("Cannot find data file for Wave ", wave_id),
+      why_it_matters = "Cannot analyze trends without wave data.",
+      how_to_fix = c(
+        "Check that the DataFile path in config is correct",
+        "Verify the file exists at the specified location"
+      ),
+      details = paste0("Expected path: ", file_path)
+    )
   }
 
   # Detect file format from extension
@@ -285,7 +296,18 @@ load_wave_data <- function(file_path, wave_id, categorical_cols = character(0)) 
     wave_df <- tryCatch({
       read.csv(file_path, stringsAsFactors = FALSE, check.names = FALSE)
     }, error = function(e) {
-      stop(paste0("Error reading CSV file for Wave ", wave_id, ": ", e$message))
+      # TRS Refusal: IO_CSV_READ_FAILED
+      tracker_refuse(
+        code = "IO_CSV_READ_FAILED",
+        title = "Failed to Read CSV File",
+        problem = paste0("Error reading CSV file for Wave ", wave_id),
+        why_it_matters = "Cannot load wave data without successfully reading the file.",
+        how_to_fix = c(
+          "Check that the CSV file is valid",
+          "Verify the file is not corrupted or open in another application"
+        ),
+        details = e$message
+      )
     })
 
   } else if (file_ext %in% c("xlsx", "xls")) {
@@ -293,16 +315,46 @@ load_wave_data <- function(file_path, wave_id, categorical_cols = character(0)) 
     wave_df <- tryCatch({
       openxlsx::read.xlsx(file_path, sheet = 1, check.names = FALSE)
     }, error = function(e) {
-      stop(paste0("Error reading Excel file for Wave ", wave_id, ": ", e$message))
+      # TRS Refusal: IO_EXCEL_READ_FAILED
+      tracker_refuse(
+        code = "IO_EXCEL_READ_FAILED",
+        title = "Failed to Read Excel File",
+        problem = paste0("Error reading Excel file for Wave ", wave_id),
+        why_it_matters = "Cannot load wave data without successfully reading the file.",
+        how_to_fix = c(
+          "Check that the Excel file is valid",
+          "Verify the file is not corrupted or open in another application"
+        ),
+        details = e$message
+      )
     })
 
   } else {
-    stop(paste0("Unsupported file format for Wave ", wave_id, ": ", file_ext, " (expected csv, xlsx, or xls)"))
+    # TRS Refusal: IO_UNSUPPORTED_FORMAT
+    tracker_refuse(
+      code = "IO_UNSUPPORTED_FORMAT",
+      title = "Unsupported File Format",
+      problem = paste0("File format '", file_ext, "' is not supported for Wave ", wave_id),
+      why_it_matters = "Only CSV and Excel files can be loaded.",
+      how_to_fix = "Convert the data file to CSV (.csv) or Excel (.xlsx/.xls) format.",
+      details = paste0("File path: ", file_path)
+    )
   }
 
   # Basic validation
   if (nrow(wave_df) == 0) {
-    stop(paste0("Data file for Wave ", wave_id, " is empty"))
+    # TRS Refusal: DATA_EMPTY_WAVE
+    tracker_refuse(
+      code = "DATA_EMPTY_WAVE",
+      title = "Empty Wave Data",
+      problem = paste0("Data file for Wave ", wave_id, " contains no rows."),
+      why_it_matters = "Cannot analyze an empty data file.",
+      how_to_fix = c(
+        "Verify the correct data file was specified",
+        "Check that the file contains survey responses"
+      ),
+      details = paste0("File path: ", file_path)
+    )
   }
 
   # Clean data (handle comma decimals, DK values, etc.)
@@ -460,7 +512,19 @@ validate_wave_data <- function(wave_data, config, question_mapping) {
 
   missing_waves <- setdiff(expected_waves, loaded_waves)
   if (length(missing_waves) > 0) {
-    stop(paste0("Missing data for waves: ", paste(missing_waves, collapse = ", ")))
+    # TRS Refusal: DATA_MISSING_WAVES
+    tracker_refuse(
+      code = "DATA_MISSING_WAVES",
+      title = "Missing Wave Data",
+      problem = paste0(length(missing_waves), " wave(s) failed to load."),
+      why_it_matters = "All waves must be loaded for complete trend analysis.",
+      how_to_fix = c(
+        "Check that all wave data files exist",
+        "Verify file paths in configuration are correct"
+      ),
+      expected = expected_waves,
+      missing = missing_waves
+    )
   }
 
   # Validate each wave
@@ -469,7 +533,17 @@ validate_wave_data <- function(wave_data, config, question_mapping) {
 
     # Check weight_var exists
     if (!"weight_var" %in% names(wave_df)) {
-      stop(paste0("Wave ", wave_id, ": weight_var column not created"))
+      # TRS Refusal: BUG_WEIGHT_VAR_MISSING
+      tracker_refuse(
+        code = "BUG_WEIGHT_VAR_MISSING",
+        title = "Weight Variable Not Created",
+        problem = paste0("Wave ", wave_id, ": weight_var column was not created."),
+        why_it_matters = "Weight variable is required for weighted calculations.",
+        how_to_fix = c(
+          "This is an internal error - please report it",
+          "Check that weight configuration is correct"
+        )
+      )
     }
 
     # Check for tracked question variables

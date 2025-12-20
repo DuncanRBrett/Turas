@@ -38,7 +38,18 @@ load_tracking_config <- function(config_path) {
 
   # Validate file exists
   if (!file.exists(config_path)) {
-    stop(paste0("Configuration file not found: ", config_path))
+    # TRS Refusal: IO_CONFIG_FILE_NOT_FOUND
+    tracker_refuse(
+      code = "IO_CONFIG_FILE_NOT_FOUND",
+      title = "Tracking Configuration File Not Found",
+      problem = paste0("Cannot find configuration file: ", basename(config_path)),
+      why_it_matters = "Tracker analysis requires configuration to define waves and settings.",
+      how_to_fix = c(
+        "Check that the config file path is correct",
+        "Verify the file exists at the specified location"
+      ),
+      details = paste0("Expected path: ", config_path)
+    )
   }
 
   message("Loading tracking configuration from: ", basename(config_path))
@@ -50,21 +61,56 @@ load_tracking_config <- function(config_path) {
   waves <- tryCatch({
     openxlsx::read.xlsx(config_path, sheet = "Waves", detectDates = TRUE)
   }, error = function(e) {
-    stop(paste0("Error reading 'Waves' sheet: ", e$message))
+    # TRS Refusal: IO_WAVES_SHEET_FAILED
+    tracker_refuse(
+      code = "IO_WAVES_SHEET_FAILED",
+      title = "Failed to Load Waves Sheet",
+      problem = "Could not read the Waves sheet from configuration file.",
+      why_it_matters = "Wave definitions are required to identify data sources for tracking.",
+      how_to_fix = c(
+        "Verify the config file has a 'Waves' sheet",
+        "Check the file is not corrupted or open in another application"
+      ),
+      details = e$message
+    )
   })
 
   # Validate required columns in Waves
   required_wave_cols <- c("WaveID", "WaveName", "DataFile", "FieldworkStart", "FieldworkEnd")
   missing_cols <- setdiff(required_wave_cols, names(waves))
   if (length(missing_cols) > 0) {
-    stop(paste0("Missing required columns in Waves sheet: ", paste(missing_cols, collapse = ", ")))
+    # TRS Refusal: CFG_MISSING_WAVE_COLUMNS
+    tracker_refuse(
+      code = "CFG_MISSING_WAVE_COLUMNS",
+      title = "Missing Columns in Waves Sheet",
+      problem = "The Waves sheet is missing required columns.",
+      why_it_matters = "All columns are required to properly define each wave of data.",
+      how_to_fix = c(
+        "Add the missing columns to the Waves sheet",
+        "Required: WaveID, WaveName, DataFile, FieldworkStart, FieldworkEnd"
+      ),
+      expected = required_wave_cols,
+      observed = names(waves),
+      missing = missing_cols
+    )
   }
 
   # Load Settings sheet
   settings_df <- tryCatch({
     openxlsx::read.xlsx(config_path, sheet = "Settings")
   }, error = function(e) {
-    stop(paste0("Error reading 'Settings' sheet: ", e$message))
+    # TRS Refusal: IO_SETTINGS_SHEET_FAILED
+    tracker_refuse(
+      code = "IO_SETTINGS_SHEET_FAILED",
+      title = "Failed to Load Settings Sheet",
+      problem = "Could not read the Settings sheet from configuration file.",
+      why_it_matters = "Settings define analysis parameters like significance testing and decimal places.",
+      how_to_fix = c(
+        "Verify the config file has a 'Settings' sheet",
+        "Check the file format is correct"
+      ),
+      details = e$message
+    )
   })
 
   # SHARED CODE NOTE: Settings parsing is identical to TurasTabs
@@ -77,26 +123,68 @@ load_tracking_config <- function(config_path) {
   banner <- tryCatch({
     openxlsx::read.xlsx(config_path, sheet = "Banner")
   }, error = function(e) {
-    stop(paste0("Error reading 'Banner' sheet: ", e$message))
+    # TRS Refusal: IO_BANNER_SHEET_FAILED
+    tracker_refuse(
+      code = "IO_BANNER_SHEET_FAILED",
+      title = "Failed to Load Banner Sheet",
+      problem = "Could not read the Banner sheet from configuration file.",
+      why_it_matters = "Banner defines segment breakouts for trend analysis.",
+      how_to_fix = c(
+        "Verify the config file has a 'Banner' sheet",
+        "Check the file format is correct"
+      ),
+      details = e$message
+    )
   })
 
   # Validate banner structure
   required_banner_cols <- c("BreakVariable", "BreakLabel")
   missing_banner_cols <- setdiff(required_banner_cols, names(banner))
   if (length(missing_banner_cols) > 0) {
-    stop(paste0("Missing required columns in Banner sheet: ", paste(missing_banner_cols, collapse = ", ")))
+    # TRS Refusal: CFG_MISSING_BANNER_COLUMNS
+    tracker_refuse(
+      code = "CFG_MISSING_BANNER_COLUMNS",
+      title = "Missing Columns in Banner Sheet",
+      problem = "The Banner sheet is missing required columns.",
+      why_it_matters = "Banner columns are required to define segment breakouts.",
+      how_to_fix = c(
+        "Add the missing columns to the Banner sheet",
+        "Required: BreakVariable, BreakLabel"
+      ),
+      expected = required_banner_cols,
+      missing = missing_banner_cols
+    )
   }
 
   # Load TrackedQuestions sheet
   tracked_questions <- tryCatch({
     openxlsx::read.xlsx(config_path, sheet = "TrackedQuestions")
   }, error = function(e) {
-    stop(paste0("Error reading 'TrackedQuestions' sheet: ", e$message))
+    # TRS Refusal: IO_TRACKED_QUESTIONS_FAILED
+    tracker_refuse(
+      code = "IO_TRACKED_QUESTIONS_FAILED",
+      title = "Failed to Load TrackedQuestions Sheet",
+      problem = "Could not read the TrackedQuestions sheet from configuration file.",
+      why_it_matters = "TrackedQuestions defines which metrics to analyze across waves.",
+      how_to_fix = c(
+        "Verify the config file has a 'TrackedQuestions' sheet",
+        "Check the file format is correct"
+      ),
+      details = e$message
+    )
   })
 
   # Validate tracked questions
   if (!"QuestionCode" %in% names(tracked_questions)) {
-    stop("Missing required column 'QuestionCode' in TrackedQuestions sheet")
+    # TRS Refusal: CFG_MISSING_QUESTION_CODE_COLUMN
+    tracker_refuse(
+      code = "CFG_MISSING_QUESTION_CODE_COLUMN",
+      title = "Missing QuestionCode Column",
+      problem = "The TrackedQuestions sheet is missing the QuestionCode column.",
+      why_it_matters = "QuestionCode is required to identify questions for tracking.",
+      how_to_fix = "Add a QuestionCode column to the TrackedQuestions sheet.",
+      observed = names(tracked_questions)
+    )
   }
 
   message(paste0("  Loaded ", nrow(waves), " waves"))
@@ -133,7 +221,18 @@ load_question_mapping <- function(mapping_path) {
 
   # Validate file exists
   if (!file.exists(mapping_path)) {
-    stop(paste0("Question mapping file not found: ", mapping_path))
+    # TRS Refusal: IO_MAPPING_FILE_NOT_FOUND
+    tracker_refuse(
+      code = "IO_MAPPING_FILE_NOT_FOUND",
+      title = "Question Mapping File Not Found",
+      problem = paste0("Cannot find question mapping file: ", basename(mapping_path)),
+      why_it_matters = "Question mapping defines how questions correspond across waves.",
+      how_to_fix = c(
+        "Check that the mapping file path is correct",
+        "Verify the file exists at the specified location"
+      ),
+      details = paste0("Expected path: ", mapping_path)
+    )
   }
 
   message("Loading question mapping from: ", basename(mapping_path))
@@ -142,14 +241,38 @@ load_question_mapping <- function(mapping_path) {
   mapping <- tryCatch({
     openxlsx::read.xlsx(mapping_path, sheet = "QuestionMap")
   }, error = function(e) {
-    stop(paste0("Error reading 'QuestionMap' sheet: ", e$message))
+    # TRS Refusal: IO_QUESTIONMAP_SHEET_FAILED
+    tracker_refuse(
+      code = "IO_QUESTIONMAP_SHEET_FAILED",
+      title = "Failed to Load QuestionMap Sheet",
+      problem = "Could not read the QuestionMap sheet from mapping file.",
+      why_it_matters = "Question mapping is required to track questions across waves.",
+      how_to_fix = c(
+        "Verify the mapping file has a 'QuestionMap' sheet",
+        "Check the file format is correct"
+      ),
+      details = e$message
+    )
   })
 
   # Validate required columns
   required_cols <- c("QuestionCode", "QuestionText", "QuestionType")
   missing_cols <- setdiff(required_cols, names(mapping))
   if (length(missing_cols) > 0) {
-    stop(paste0("Missing required columns in QuestionMap sheet: ", paste(missing_cols, collapse = ", ")))
+    # TRS Refusal: CFG_MISSING_MAPPING_COLUMNS
+    tracker_refuse(
+      code = "CFG_MISSING_MAPPING_COLUMNS",
+      title = "Missing Columns in QuestionMap Sheet",
+      problem = "The QuestionMap sheet is missing required columns.",
+      why_it_matters = "These columns are required to properly define question mappings.",
+      how_to_fix = c(
+        "Add the missing columns to the QuestionMap sheet",
+        "Required: QuestionCode, QuestionText, QuestionType"
+      ),
+      expected = required_cols,
+      observed = names(mapping),
+      missing = missing_cols
+    )
   }
 
   # Find wave columns
@@ -169,7 +292,18 @@ load_question_mapping <- function(mapping_path) {
   }
 
   if (length(wave_cols) == 0) {
-    stop("No wave columns found in QuestionMap sheet. Expected columns with wave identifiers (e.g., W1, W2, W3 or Wave1, Wave2, Wave3)")
+    # TRS Refusal: CFG_NO_WAVE_COLUMNS
+    tracker_refuse(
+      code = "CFG_NO_WAVE_COLUMNS",
+      title = "No Wave Columns Found",
+      problem = "No wave columns found in QuestionMap sheet.",
+      why_it_matters = "Wave columns are required to map questions across data waves.",
+      how_to_fix = c(
+        "Add wave columns (e.g., W1, W2, W3 or Wave1, Wave2, Wave3)",
+        "Each wave column should contain the question code for that wave"
+      ),
+      observed = names(mapping)
+    )
   }
 
   message(paste0("  Loaded mapping for ", nrow(mapping), " questions across ", length(wave_cols), " waves"))
@@ -198,11 +332,27 @@ parse_settings_to_list <- function(settings_df) {
   } else if ("SettingName" %in% names(settings_df)) {
     "SettingName"
   } else {
-    stop("Settings sheet must have 'Setting' (or 'SettingName') and 'Value' columns")
+    # TRS Refusal: CFG_INVALID_SETTINGS_FORMAT
+    tracker_refuse(
+      code = "CFG_INVALID_SETTINGS_FORMAT",
+      title = "Invalid Settings Sheet Format",
+      problem = "Settings sheet must have 'Setting' (or 'SettingName') and 'Value' columns.",
+      why_it_matters = "Settings cannot be parsed without proper column structure.",
+      how_to_fix = "Add 'Setting' and 'Value' columns to the Settings sheet.",
+      observed = names(settings_df)
+    )
   }
 
   if (!"Value" %in% names(settings_df)) {
-    stop("Settings sheet must have 'Setting' (or 'SettingName') and 'Value' columns")
+    # TRS Refusal: CFG_MISSING_VALUE_COLUMN
+    tracker_refuse(
+      code = "CFG_MISSING_VALUE_COLUMN",
+      title = "Missing Value Column in Settings",
+      problem = "Settings sheet is missing the 'Value' column.",
+      why_it_matters = "Settings cannot be parsed without values.",
+      how_to_fix = "Add a 'Value' column to the Settings sheet.",
+      observed = names(settings_df)
+    )
   }
 
   # Create named list
@@ -248,7 +398,15 @@ validate_tracking_config <- function(config, question_mapping) {
 
   # Validate wave IDs are unique
   if (any(duplicated(config$waves$WaveID))) {
-    stop("Duplicate WaveIDs found in Waves sheet")
+    # TRS Refusal: CFG_DUPLICATE_WAVE_IDS
+    tracker_refuse(
+      code = "CFG_DUPLICATE_WAVE_IDS",
+      title = "Duplicate Wave IDs Found",
+      problem = "The Waves sheet contains duplicate WaveID values.",
+      why_it_matters = "Each wave must have a unique identifier.",
+      how_to_fix = "Ensure all WaveID values in the Waves sheet are unique.",
+      details = paste0("Duplicated: ", paste(config$waves$WaveID[duplicated(config$waves$WaveID)], collapse = ", "))
+    )
   }
 
   # Validate data files exist (if absolute paths provided)
@@ -264,7 +422,14 @@ validate_tracking_config <- function(config, question_mapping) {
   valid_date_rows <- !is.na(config$waves$FieldworkStart) & !is.na(config$waves$FieldworkEnd)
   if (any(valid_date_rows)) {
     if (!all(config$waves$FieldworkEnd[valid_date_rows] >= config$waves$FieldworkStart[valid_date_rows])) {
-      stop("FieldworkEnd must be >= FieldworkStart for all waves with dates specified")
+      # TRS Refusal: CFG_INVALID_FIELDWORK_DATES
+      tracker_refuse(
+        code = "CFG_INVALID_FIELDWORK_DATES",
+        title = "Invalid Fieldwork Date Range",
+        problem = "FieldworkEnd is before FieldworkStart for one or more waves.",
+        why_it_matters = "Invalid date ranges will cause incorrect wave ordering.",
+        how_to_fix = "Ensure FieldworkEnd >= FieldworkStart for all waves."
+      )
     }
   }
 
@@ -294,7 +459,14 @@ validate_tracking_config <- function(config, question_mapping) {
 
   # Validate banner structure
   if (nrow(config$banner) == 0) {
-    stop("Banner sheet is empty - at least Total must be defined")
+    # TRS Refusal: CFG_EMPTY_BANNER
+    tracker_refuse(
+      code = "CFG_EMPTY_BANNER",
+      title = "Empty Banner Sheet",
+      problem = "The Banner sheet is empty.",
+      why_it_matters = "At least a Total banner break must be defined for analysis.",
+      how_to_fix = "Add at least one row to the Banner sheet (typically 'Total')."
+    )
   }
 
   # Check for "Total" in banner

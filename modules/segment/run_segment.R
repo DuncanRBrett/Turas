@@ -38,6 +38,9 @@ source(file.path(turas_root, "modules/segment/lib/segment_rules.R"))
 source(file.path(turas_root, "modules/segment/lib/segment_cards.R"))
 source(file.path(turas_root, "modules/segment/lib/segment_lca.R"))
 
+# TRS Guard Layer (v1.0)
+source(file.path(turas_root, "modules/segment/lib/00_guard.R"))
+
 # ==============================================================================
 # MAIN SEGMENTATION FUNCTION
 # ==============================================================================

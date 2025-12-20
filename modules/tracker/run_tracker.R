@@ -39,6 +39,9 @@ source(file.path(script_dir, "formatting_utils.R"))
 source(file.path(script_dir, "tracker_output.R"))
 source(file.path(script_dir, "tracker_dashboard_reports.R"))
 
+# TRS Guard Layer (v1.0)
+source(file.path(script_dir, "00_guard.R"))
+
 # Verify all required functions loaded successfully
 verify_tracker_environment <- function() {
   required_functions <- c(
@@ -64,23 +67,36 @@ verify_tracker_environment <- function() {
   }
 
   if (length(missing_functions) > 0) {
-    stop(paste0(
-      "Tracker module initialization failed. Missing required functions:\n",
-      paste0("  - ", missing_functions, collapse = "\n"),
-      "\n\nThis usually means the tracker was run from the wrong directory.\n",
-      "Fix: Run from modules/tracker/ or set TURAS_ROOT environment variable."
-    ))
+    # TRS Refusal: PKG_MISSING_FUNCTIONS
+    tracker_refuse(
+      code = "PKG_MISSING_FUNCTIONS",
+      title = "Tracker Module Initialization Failed",
+      problem = "Required functions are not loaded.",
+      why_it_matters = "Tracker analysis cannot run without core functions.",
+      how_to_fix = c(
+        "Run from modules/tracker/ directory",
+        "Or set TURAS_ROOT environment variable"
+      ),
+      missing = missing_functions
+    )
   }
 
   # Verify shared formatting is accessible
   tryCatch({
     find_turas_root()
   }, error = function(e) {
-    stop(paste0(
-      "Cannot locate Turas root directory and shared/formatting.R.\n",
-      "Error: ", e$message, "\n",
-      "Fix: Run from modules/tracker/ or set TURAS_ROOT environment variable."
-    ))
+    # TRS Refusal: CFG_TURAS_ROOT_NOT_FOUND
+    tracker_refuse(
+      code = "CFG_TURAS_ROOT_NOT_FOUND",
+      title = "Turas Root Directory Not Found",
+      problem = "Cannot locate Turas root directory and shared/formatting.R.",
+      why_it_matters = "Tracker requires shared formatting functions to produce output.",
+      how_to_fix = c(
+        "Run from modules/tracker/ directory",
+        "Or set TURAS_ROOT environment variable"
+      ),
+      details = e$message
+    )
   })
 
   return(TRUE)
@@ -442,11 +458,27 @@ test_tracker_foundation <- function(use_synthetic_data = FALSE) {
 
   # Check if templates exist
   if (!file.exists(tracking_config_path)) {
-    stop(paste0("Template not found: ", tracking_config_path))
+    # TRS Refusal: IO_TEMPLATE_NOT_FOUND
+    tracker_refuse(
+      code = "IO_TEMPLATE_NOT_FOUND",
+      title = "Tracking Config Template Not Found",
+      problem = paste0("Cannot find template file: ", basename(tracking_config_path)),
+      why_it_matters = "Template files are required for testing.",
+      how_to_fix = "Verify tracking_config_template.xlsx exists in the tracker module directory.",
+      details = paste0("Expected path: ", tracking_config_path)
+    )
   }
 
   if (!file.exists(question_mapping_path)) {
-    stop(paste0("Template not found: ", question_mapping_path))
+    # TRS Refusal: IO_TEMPLATE_NOT_FOUND
+    tracker_refuse(
+      code = "IO_TEMPLATE_NOT_FOUND",
+      title = "Question Mapping Template Not Found",
+      problem = paste0("Cannot find template file: ", basename(question_mapping_path)),
+      why_it_matters = "Template files are required for testing.",
+      how_to_fix = "Verify question_mapping_template.xlsx exists in the tracker module directory.",
+      details = paste0("Expected path: ", question_mapping_path)
+    )
   }
 
   # For Phase 1, just test loading and validation

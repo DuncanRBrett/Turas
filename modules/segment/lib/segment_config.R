@@ -129,7 +129,14 @@ read_segment_config <- function(config_file) {
   config <- load_config_sheet(config_file, sheet_name = "Config")
 
   if (length(config) == 0) {
-    stop("Configuration file is empty or has no valid settings", call. = FALSE)
+    # TRS Refusal: CFG_EMPTY_CONFIG
+    segment_refuse(
+      code = "CFG_EMPTY_CONFIG",
+      title = "Empty Configuration File",
+      problem = "Configuration file is empty or has no valid settings.",
+      why_it_matters = "Segmentation requires configuration to run.",
+      how_to_fix = "Add settings to the Config sheet in the configuration file."
+    )
   }
 
   cat(sprintf("✓ Loaded %d configuration parameters\n", length(config)))
@@ -166,8 +173,14 @@ validate_segment_config <- function(config) {
   
 
   if (length(clustering_vars) < 2) {
-    stop("Must specify at least 2 clustering variables. Got: ", length(clustering_vars),
-         call. = FALSE)
+    # TRS Refusal: CFG_INSUFFICIENT_VARS
+    segment_refuse(
+      code = "CFG_INSUFFICIENT_VARS",
+      title = "Insufficient Clustering Variables",
+      problem = paste0("Only ", length(clustering_vars), " clustering variable(s) specified."),
+      why_it_matters = "Segmentation requires at least 2 variables to find meaningful clusters.",
+      how_to_fix = "Add more variables to the clustering_vars setting (comma-separated)."
+    )
   }
 
   if (length(clustering_vars) > 20) {
@@ -215,13 +228,26 @@ validate_segment_config <- function(config) {
 
   # Validate k relationships
   if (k_min >= k_max) {
-    stop(sprintf("k_min (%d) must be less than k_max (%d)", k_min, k_max),
-         call. = FALSE)
+    # TRS Refusal: CFG_INVALID_K_RANGE
+    segment_refuse(
+      code = "CFG_INVALID_K_RANGE",
+      title = "Invalid K Range",
+      problem = sprintf("k_min (%d) must be less than k_max (%d).", k_min, k_max),
+      why_it_matters = "Exploration mode needs a valid range of cluster counts to test.",
+      how_to_fix = "Set k_max to a value greater than k_min."
+    )
   }
 
   if (!is.null(k_fixed)) {
     if (k_fixed < 2) {
-      stop("k_fixed must be at least 2, got: ", k_fixed, call. = FALSE)
+      # TRS Refusal: CFG_INVALID_K_FIXED
+      segment_refuse(
+        code = "CFG_INVALID_K_FIXED",
+        title = "Invalid K Fixed Value",
+        problem = paste0("k_fixed must be at least 2, got: ", k_fixed),
+        why_it_matters = "A segment solution needs at least 2 clusters.",
+        how_to_fix = "Set k_fixed to 2 or greater."
+      )
     }
     if (k_fixed > 10) {
       warning("k_fixed = ", k_fixed,

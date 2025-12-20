@@ -97,7 +97,15 @@ validate_tracker_setup <- function(config, question_mapping, question_map, wave_
 
   # Stop if errors found
   if (length(validation_results$errors) > 0) {
-    stop("Validation failed with errors. Please fix the issues above and try again.")
+    # TRS Refusal: DATA_VALIDATION_FAILED
+    tracker_refuse(
+      code = "DATA_VALIDATION_FAILED",
+      title = "Data Validation Failed",
+      problem = paste0(length(validation_results$errors), " validation error(s) found."),
+      why_it_matters = "Cannot proceed with analysis until data issues are resolved.",
+      how_to_fix = "Review the validation errors above and fix each issue.",
+      details = paste(validation_results$errors, collapse = "\n")
+    )
   }
 
   cat("\n✓ Validation passed\n")
