@@ -624,6 +624,66 @@ test_that("ordinal regression uses clm with polr fallback", {
 
 context("Golden Fixture Regression Tests")
 
+# T1: CRITICAL - Ordinal OR sign test (C13 fix)
+# Verifies that OR > 1 means higher outcome category more likely
+test_that("T1: ordinal OR direction matches raw data proportions", {
+  skip_if_not_installed("ordinal")
+
+  # Create data where Group A clearly has HIGHER satisfaction than Group D
+  set.seed(42)
+  n <- 200
+  data <- data.frame(
+    satisfaction = ordered(
+      c(
+        # Group D: mostly Low (70% Low, 20% Neutral, 10% High)
+        sample(c("Low", "Neutral", "High"), 50, TRUE, c(0.7, 0.2, 0.1)),
+        # Group A: mostly High (10% Low, 20% Neutral, 70% High)
+        sample(c("Low", "Neutral", "High"), 50, TRUE, c(0.1, 0.2, 0.7)),
+        # Groups B and C: intermediate
+        sample(c("Low", "Neutral", "High"), 100, TRUE, c(0.4, 0.3, 0.3))
+      ),
+      levels = c("Low", "Neutral", "High")
+    ),
+    grade = factor(
+      c(rep("D", 50), rep("A", 50), rep("B", 50), rep("C", 50)),
+      levels = c("D", "C", "B", "A")  # D is reference
+    )
+  )
+
+  # Verify raw data: A should have higher % High than D
+  prop_high_A <- mean(data$satisfaction[data$grade == "A"] == "High")
+  prop_high_D <- mean(data$satisfaction[data$grade == "D"] == "High")
+  expect_true(prop_high_A > prop_high_D,
+              info = "Test setup: A should have higher High% than D")
+
+  # Fit ordinal model
+  formula <- satisfaction ~ grade
+  config <- list(outcome_var = "satisfaction", confidence_level = 0.95)
+  guard <- guard_init()
+
+  result <- run_ordinal_logistic_robust(formula, data, NULL, config, guard)
+
+  # Find OR for grade A (vs D reference)
+  coef_df <- result$coefficients
+  gradeA_row <- coef_df[grepl("gradeA|A$", coef_df$term), ]
+
+  expect_true(nrow(gradeA_row) == 1, info = "Should find exactly one gradeA coefficient")
+
+  # CRITICAL: OR > 1 should mean higher satisfaction more likely
+  # Since A has higher satisfaction than D, OR for A vs D should be > 1
+  expect_true(gradeA_row$odds_ratio > 1,
+              info = paste0(
+                "OR for A vs D should be > 1 (A more satisfied). ",
+                "Raw: A=", round(prop_high_A*100), "% High, D=", round(prop_high_D*100), "% High. ",
+                "Got OR=", round(gradeA_row$odds_ratio, 2)
+              ))
+
+  # OR should be substantially > 1 given the large difference
+  expect_true(gradeA_row$odds_ratio > 2,
+              info = "OR should be >> 1 given 70% vs 10% High")
+})
+
+
 test_that("binary model produces stable coefficient structure", {
   data <- generate_binary_data(500, seed = 12345)
   formula <- outcome ~ age_group + income + region
