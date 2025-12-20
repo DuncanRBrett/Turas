@@ -137,9 +137,11 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   if (enable_quadrant) cat("   [OK] Quadrant analysis enabled\n")
 
   # TRS: Print config fingerprint for traceability
-  config_mtime <- file.info(config$config_file)$mtime
+  # Use config_file parameter if config$config_file is not set
+  fingerprint_file <- if (!is.null(config$config_file)) config$config_file else config_file
+  config_mtime <- file.info(fingerprint_file)$mtime
   cat("\n   [CONFIG FINGERPRINT]\n")
-  cat("   Path: ", config$config_file, "\n", sep = "")
+  cat("   Path: ", fingerprint_file, "\n", sep = "")
   cat("   Modified: ", format(config_mtime, "%Y-%m-%d %H:%M:%S"), "\n", sep = "")
   cat("   Outcome: ", config$outcome_var, "\n", sep = "")
   cat("   Drivers: ", paste(config$driver_vars, collapse = ", "), "\n", sep = "")

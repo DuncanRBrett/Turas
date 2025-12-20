@@ -203,6 +203,7 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
   # Build configuration list
   # -----------------------------------------------------------------
   list(
+    config_file = normalizePath(config_file, winslash = "/", mustWork = FALSE),
     settings = settings_list,
     outcome_var = outcome_vars,
     driver_vars = driver_vars,
