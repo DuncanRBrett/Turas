@@ -168,11 +168,16 @@ calculate_beta_weights <- function(model, data, config) {
   # Check for aliased/missing coefficients (multicollinearity)
   missing_coefs <- names(coefs)[is.na(coefs)]
   if (length(missing_coefs) > 0) {
-    stop(
-      "The following drivers have aliased/NA coefficients (likely due to multicollinearity): ",
-      paste(missing_coefs, collapse = ", "),
-      ". Please remove or combine these variables and rerun the analysis.",
-      call. = FALSE
+    keydriver_refuse(
+      code = "MODEL_ALIASED_COEFFICIENTS",
+      title = "Aliased Coefficients (Multicollinearity)",
+      problem = paste0("The following drivers have aliased/NA coefficients: ", paste(missing_coefs, collapse = ", ")),
+      why_it_matters = "This is typically caused by multicollinearity (highly correlated predictors). The model cannot estimate unique effects for these variables.",
+      how_to_fix = c(
+        "Remove one of the correlated drivers",
+        "Or combine correlated drivers into a single composite variable",
+        "Then rerun the analysis"
+      )
     )
   }
 
@@ -182,15 +187,26 @@ calculate_beta_weights <- function(model, data, config) {
 
   # Additional safety checks (should have been caught in validation, but double-check)
   if (any(sd_x == 0)) {
-    stop(
-      "One or more drivers have zero variance; cannot compute standardized betas. Offending drivers: ",
-      paste(driver_vars[sd_x == 0], collapse = ", "),
-      call. = FALSE
+    keydriver_refuse(
+      code = "DATA_DRIVERS_ZERO_VARIANCE",
+      title = "Zero Variance Drivers",
+      problem = paste0("One or more drivers have zero variance: ", paste(driver_vars[sd_x == 0], collapse = ", ")),
+      why_it_matters = "Cannot compute standardized betas for variables with no variation.",
+      how_to_fix = c(
+        "Remove these zero-variance drivers from your analysis",
+        "Or check your data for issues (all identical values)"
+      )
     )
   }
 
   if (sd_y == 0) {
-    stop("Outcome variable has zero variance; key driver analysis is not defined.", call. = FALSE)
+    keydriver_refuse(
+      code = "DATA_OUTCOME_ZERO_VARIANCE",
+      title = "Zero Variance Outcome",
+      problem = "The outcome variable has zero variance (all values are identical).",
+      why_it_matters = "Key driver analysis is not defined when there is nothing to explain.",
+      how_to_fix = "Check your outcome variable - it should have variation in values."
+    )
   }
 
   # Standardized betas
@@ -240,11 +256,16 @@ calculate_relative_weights <- function(model, correlations, config) {
 
   # Check for severe multicollinearity (non-positive definite R_xx)
   if (any(vals < 1e-6)) {
-    stop(
-      "Predictor correlation matrix is singular or nearly singular (severe multicollinearity). ",
-      "Relative weights cannot be computed reliably. Consider removing or combining highly ",
-      "correlated drivers.",
-      call. = FALSE
+    keydriver_refuse(
+      code = "MODEL_SINGULAR_MATRIX",
+      title = "Singular Correlation Matrix",
+      problem = "Predictor correlation matrix is singular or nearly singular (severe multicollinearity).",
+      why_it_matters = "Relative weights cannot be computed reliably when drivers are too highly correlated.",
+      how_to_fix = c(
+        "Identify highly correlated driver pairs using a correlation matrix",
+        "Remove or combine drivers that are too similar",
+        "Aim for correlations below 0.9 between predictors"
+      )
     )
   }
 
@@ -310,11 +331,16 @@ calculate_shapley_values <- function(model, data, config) {
 
   # NEW: Guard against too many drivers for exact Shapley
   if (n > 15) {
-    stop(
-      "Too many drivers (", n, ") for exact Shapley decomposition. ",
-      "Please reduce the number of drivers (e.g., to <= 15) or implement ",
-      "an approximate Shapley method.",
-      call. = FALSE
+    keydriver_refuse(
+      code = "FEATURE_SHAPLEY_TOO_MANY_DRIVERS",
+      title = "Too Many Drivers for Exact Shapley",
+      problem = paste0("You have ", n, " drivers, but exact Shapley decomposition is computationally infeasible with more than 15."),
+      why_it_matters = "Exact Shapley requires evaluating 2^n subsets. With 15+ drivers this becomes prohibitively slow.",
+      how_to_fix = c(
+        "Reduce the number of drivers to 15 or fewer",
+        "Or use an alternative importance method (beta weights or relative weights)",
+        "In future versions, approximate Shapley methods may be available"
+      )
     )
   }
 

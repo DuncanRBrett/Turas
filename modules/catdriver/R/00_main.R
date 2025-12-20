@@ -126,6 +126,46 @@ run_categorical_keydriver_impl <- function(config_file,
   log_message(paste("Drivers:", length(config$driver_vars), "variables"), "info")
   log_message(paste("Data file:", basename(config$data_file)), "info")
 
+  # TRS: Print config fingerprint for traceability
+  config_mtime <- file.info(config$config_file)$mtime
+  cat("\n   [CONFIG FINGERPRINT]\n")
+  cat("   Path: ", config$config_file, "\n", sep = "")
+  cat("   Modified: ", format(config_mtime, "%Y-%m-%d %H:%M:%S"), "\n", sep = "")
+
+  # Show effective order sources for each driver
+  has_driver_settings <- !is.null(config$driver_settings) &&
+                         is.data.frame(config$driver_settings) &&
+                         nrow(config$driver_settings) > 0
+
+  for (drv in config$driver_vars) {
+    order_vec <- NULL
+    order_source <- "none"
+
+    if (has_driver_settings) {
+      settings_idx <- which(config$driver_settings$driver == drv)
+      if (length(settings_idx) > 0) {
+        settings_order <- config$driver_settings$levels_order[settings_idx[1]]
+        if (!is.null(settings_order) && !is.na(settings_order) && nzchar(trimws(settings_order))) {
+          order_vec <- trimws(strsplit(settings_order, ";")[[1]])
+          order_source <- "Driver_Settings"
+        }
+      }
+    }
+
+    if (is.null(order_vec) || length(order_vec) == 0) {
+      order_vec <- config$driver_orders[[drv]]
+      if (!is.null(order_vec) && length(order_vec) > 0) {
+        order_source <- "Variables"
+      }
+    }
+
+    if (!is.null(order_vec) && length(order_vec) > 0) {
+      cat("   Driver '", drv, "' order from ", order_source, ": [",
+          paste(order_vec, collapse = ";"), "]\n", sep = "")
+    }
+  }
+  cat("\n")
+
   # ==========================================================================
   # STEP 2: LOAD DATA
   # ==========================================================================

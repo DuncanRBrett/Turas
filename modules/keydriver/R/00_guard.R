@@ -369,14 +369,29 @@ validate_keydriver_mapping <- function(model, driver_vars, guard) {
   # Each coefficient should correspond to a driver
   # For continuous drivers, coef name = driver name
   unmapped <- setdiff(coef_names, driver_vars)
+  missing <- setdiff(driver_vars, coef_names)
 
-  if (length(unmapped) > 0) {
-    # This shouldn't happen for continuous key driver, but check anyway
-    guard <- guard_warn(guard,
-      paste0("Unmapped model terms: ", paste(unmapped, collapse = ", ")),
-      "mapping"
+  # TRS: Unmapped or missing terms is a HARD REFUSAL
+  # This prevents silently wrong driver attribution
+  if (length(unmapped) > 0 || length(missing) > 0) {
+    keydriver_refuse(
+      code = "MAPPER_COEFFICIENT_MISMATCH",
+      title = "Coefficient Mapping Failed",
+      problem = "Model coefficients do not match expected driver variables.",
+      why_it_matters = paste0(
+        "Unmapped coefficients cannot be attributed to drivers. ",
+        "This would produce wrong or incomplete importance scores."
+      ),
+      how_to_fix = c(
+        if (length(unmapped) > 0) paste0("Check why these coefficients are in the model: ", paste(unmapped, collapse = ", ")),
+        if (length(missing) > 0) paste0("Check why these drivers are missing: ", paste(missing, collapse = ", ")),
+        "Ensure all driver variables are numeric and have variation"
+      ),
+      expected = driver_vars,
+      observed = coef_names,
+      missing = if (length(missing) > 0) missing else NULL,
+      unmapped = if (length(unmapped) > 0) unmapped else NULL
     )
-    guard <- guard_flag_stability(guard, "Model has unmapped coefficients")
   }
 
   guard

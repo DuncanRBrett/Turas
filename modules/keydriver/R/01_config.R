@@ -228,13 +228,23 @@ validate_segments_sheet <- function(seg_df) {
   missing_cols <- setdiff(required_cols, names(seg_df))
 
   if (length(missing_cols) > 0) {
-    stop("Segments sheet missing required columns: ",
-         paste(missing_cols, collapse = ", "),
-         "\nRequired: segment_name, segment_variable, segment_values")
+    keydriver_refuse(
+      code = "CFG_SEGMENTS_MISSING_COLS",
+      title = "Segments Sheet Missing Columns",
+      problem = paste0("Segments sheet is missing required columns: ", paste(missing_cols, collapse = ", ")),
+      why_it_matters = "Segment analysis requires proper segment definitions.",
+      how_to_fix = "Add the missing columns to your Segments sheet: segment_name, segment_variable, segment_values"
+    )
   }
 
   if (nrow(seg_df) == 0) {
-    stop("Segments sheet has no rows")
+    keydriver_refuse(
+      code = "CFG_SEGMENTS_EMPTY",
+      title = "Segments Sheet Is Empty",
+      problem = "Segments sheet has no rows defined.",
+      why_it_matters = "Cannot perform segment analysis without segment definitions.",
+      how_to_fix = "Add at least one row to the Segments sheet with segment_name, segment_variable, and segment_values."
+    )
   }
 
   invisible(TRUE)
@@ -249,13 +259,25 @@ validate_stated_importance_sheet <- function(si_df) {
 
   # Must have driver column
   if (!"driver" %in% names(si_df)) {
-    stop("StatedImportance sheet must have 'driver' column")
+    keydriver_refuse(
+      code = "CFG_STATED_IMPORTANCE_MISSING_DRIVER",
+      title = "StatedImportance Missing Driver Column",
+      problem = "StatedImportance sheet must have a 'driver' column.",
+      why_it_matters = "The driver column identifies which driver variable each importance rating applies to.",
+      how_to_fix = "Add a 'driver' column to the StatedImportance sheet listing the driver variable names."
+    )
   }
 
   # Must have numeric importance column
   numeric_cols <- sapply(si_df, is.numeric)
   if (!any(numeric_cols)) {
-    stop("StatedImportance sheet must have at least one numeric column for importance values")
+    keydriver_refuse(
+      code = "CFG_STATED_IMPORTANCE_NO_NUMERIC",
+      title = "StatedImportance Has No Numeric Column",
+      problem = "StatedImportance sheet must have at least one numeric column for importance values.",
+      why_it_matters = "Stated importance values must be numeric for comparison with derived importance.",
+      how_to_fix = "Add a numeric column (e.g., 'stated_importance') with importance ratings."
+    )
   }
 
   # Standard column name

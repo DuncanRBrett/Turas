@@ -73,3 +73,6 @@ projects/
 cache/
 Cache/
 __pycache__/
+
+# Mac OS artifacts
+__MACOSX/

@@ -268,6 +268,52 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
   })
   names(driver_orders) <- driver_vars
 
+  # ===========================================================================
+  # TRS VALIDATION: Detect conflicting order specs (Variables vs Driver_Settings)
+  # ===========================================================================
+  # If both Variables.Order and Driver_Settings.levels_order are specified for
+  # the same driver and they differ, refuse - this is a configuration error.
+
+  if (!is.null(driver_settings) && is.data.frame(driver_settings) && nrow(driver_settings) > 0) {
+    for (drv in driver_vars) {
+      variables_order <- driver_orders[[drv]]
+      settings_idx <- which(driver_settings$driver == drv)
+
+      if (length(settings_idx) > 0) {
+        settings_order_raw <- driver_settings$levels_order[settings_idx[1]]
+
+        # Parse settings_order if it exists
+        if (!is.null(settings_order_raw) && !is.na(settings_order_raw) && nzchar(trimws(settings_order_raw))) {
+          settings_order <- trimws(strsplit(settings_order_raw, ";")[[1]])
+
+          # Both are specified - check for conflict
+          if (!is.null(variables_order) && length(variables_order) > 0) {
+            if (!identical(variables_order, settings_order)) {
+              catdriver_refuse(
+                reason = "CFG_ORDER_SPEC_CONFLICT",
+                title = "CONFLICTING ORDER SPECIFICATIONS",
+                problem = paste0("Driver '", drv, "' has different Order specifications in Variables sheet and Driver_Settings."),
+                why_it_matters = paste0(
+                  "Different order specs change factor level interpretation. ",
+                  "Driver_Settings.levels_order takes precedence, but having conflicting specs is confusing and error-prone."
+                ),
+                fix = c(
+                  "Option 1: Remove the Order column entry in Variables sheet for this driver",
+                  "Option 2: Make Variables.Order match Driver_Settings.levels_order exactly",
+                  "Recommended: Use Driver_Settings.levels_order as the single source of truth"
+                ),
+                details = paste0(
+                  "Variables.Order: ", paste(variables_order, collapse = ";"), "\n",
+                  "Driver_Settings.levels_order: ", paste(settings_order, collapse = ";")
+                )
+              )
+            }
+          }
+        }
+      }
+    }
+  }
+
   # Weight variable (optional)
   weight_rows <- variables_df$Type == "Weight"
   weight_var <- if (any(weight_rows)) {
