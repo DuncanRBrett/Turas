@@ -429,15 +429,22 @@ run_catdriver_gui <- function() {
         source(file.path(turas_root, "modules/catdriver/R/06_output.R"))
         source(file.path(turas_root, "modules/catdriver/R/00_main.R"))
 
-        # Capture analysis output
-        capture <- capture.output({
+        # Capture ALL analysis output (stdout, warnings, messages) - TRS v1.0 compliance
+        captured <- capture_console_all({
           results <- run_categorical_keydriver(
             config_file = files$config_file
           )
-        }, type = "output")
+        })
 
-        output_text <- paste0(output_text, paste(capture, collapse = "\n"))
-        output_text <- paste0(output_text, "\n\n\u2713 Analysis complete!")
+        output_text <- paste0(output_text, paste(captured$combined_output, collapse = "\n"))
+
+        if (captured$has_error) {
+          output_text <- paste0(output_text, "\n\n\u2717 Analysis failed - see error above")
+        } else if (captured$has_warnings) {
+          output_text <- paste0(output_text, "\n\n\u26a0 Analysis complete with warnings - review above")
+        } else {
+          output_text <- paste0(output_text, "\n\n\u2713 Analysis complete!")
+        }
 
       }, error = function(e) {
         output_text <<- paste0(output_text, "\n\n\u2717 Error: ", e$message)

@@ -38,22 +38,25 @@
 # 1. TRS Refusal infrastructure (TRS v1.0 - no dependencies, needed by all modules)
 source(file.path(.shared_lib_path, "trs_refusal.R"), local = FALSE)
 
-# 2. Validation (no dependencies)
+# 2. Console capture for Shiny GUIs (TRS v1.0 - ensures no silent failures in GUI)
+source(file.path(.shared_lib_path, "console_capture.R"), local = FALSE)
+
+# 3. Validation (no dependencies)
 source(file.path(.shared_lib_path, "validation_utils.R"), local = FALSE)
 
-# 3. Data utils (uses validation)
+# 4. Data utils (uses validation)
 source(file.path(.shared_lib_path, "data_utils.R"), local = FALSE)
 
-# 4. Config utils (uses validation, includes find_turas_root)
+# 5. Config utils (uses validation, includes find_turas_root)
 source(file.path(.shared_lib_path, "config_utils.R"), local = FALSE)
 
-# 5. Logging (independent)
+# 6. Logging (independent)
 source(file.path(.shared_lib_path, "logging_utils.R"), local = FALSE)
 
-# 6. Formatting (independent)
+# 7. Formatting (independent)
 source(file.path(.shared_lib_path, "formatting_utils.R"), local = FALSE)
 
-# 7. Weights (independent)
+# 8. Weights (independent)
 source(file.path(.shared_lib_path, "weights_utils.R"), local = FALSE)
 
 # Clean up

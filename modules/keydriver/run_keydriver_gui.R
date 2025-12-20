@@ -420,16 +420,23 @@ run_keydriver_gui <- function() {
         # 4. Source main entry point last (uses all the above)
         source(file.path(turas_root, "modules/keydriver/R/00_main.R"))
 
-        # Capture analysis output
+        # Capture ALL analysis output (stdout, warnings, messages) - TRS v1.0 compliance
         # Paths are read from config file Settings sheet
-        capture <- capture.output({
+        captured <- capture_console_all({
           results <- run_keydriver_analysis(
             config_file = files$config_file
           )
-        }, type = "output")
+        })
 
-        output_text <- paste0(output_text, paste(capture, collapse = "\n"))
-        output_text <- paste0(output_text, "\n\n✓ Analysis complete!")
+        output_text <- paste0(output_text, paste(captured$combined_output, collapse = "\n"))
+
+        if (captured$has_error) {
+          output_text <- paste0(output_text, "\n\n✗ Analysis failed - see error above")
+        } else if (captured$has_warnings) {
+          output_text <- paste0(output_text, "\n\n⚠ Analysis complete with warnings - review above")
+        } else {
+          output_text <- paste0(output_text, "\n\n✓ Analysis complete!")
+        }
 
       }, error = function(e) {
         output_text <<- paste0(output_text, "\n\n✗ Error: ", e$message)

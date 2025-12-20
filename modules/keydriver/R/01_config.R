@@ -171,32 +171,54 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
 
   # -----------------------------------------------------------------
   # NEW v10.1: Load optional Segments sheet
+  # TRS v1.0: If sheet is PRESENT but INVALID, must refuse (not warn & continue)
   # -----------------------------------------------------------------
   segments <- NULL
   if ("Segments" %in% available_sheets) {
-    segments <- tryCatch({
-      seg_df <- openxlsx::read.xlsx(config_file, sheet = "Segments")
-      validate_segments_sheet(seg_df)
-      seg_df
-    }, error = function(e) {
-      warning(sprintf("Could not load Segments sheet: %s", e$message))
-      NULL
-    })
+    # Sheet exists - must load successfully or refuse
+    seg_df <- tryCatch(
+      openxlsx::read.xlsx(config_file, sheet = "Segments"),
+      error = function(e) {
+        keydriver_refuse(
+          code = "CFG_SEGMENTS_READ_FAILED",
+          title = "Cannot Read Segments Sheet",
+          problem = paste0("Segments sheet exists but could not be read: ", e$message),
+          why_it_matters = "You added a Segments sheet, so analysis expects valid segment definitions.",
+          how_to_fix = c(
+            "Fix the Segments sheet format",
+            "Or remove the Segments sheet if you don't need segment analysis"
+          )
+        )
+      }
+    )
+    validate_segments_sheet(seg_df)  # Will refuse on validation failure
+    segments <- seg_df
   }
 
   # -----------------------------------------------------------------
   # NEW v10.1: Load optional StatedImportance sheet
+  # TRS v1.0: If sheet is PRESENT but INVALID, must refuse (not warn & continue)
   # -----------------------------------------------------------------
   stated_importance <- NULL
   if ("StatedImportance" %in% available_sheets) {
-    stated_importance <- tryCatch({
-      si_df <- openxlsx::read.xlsx(config_file, sheet = "StatedImportance")
-      validate_stated_importance_sheet(si_df)
-      si_df
-    }, error = function(e) {
-      warning(sprintf("Could not load StatedImportance sheet: %s", e$message))
-      NULL
-    })
+    # Sheet exists - must load successfully or refuse
+    si_df <- tryCatch(
+      openxlsx::read.xlsx(config_file, sheet = "StatedImportance"),
+      error = function(e) {
+        keydriver_refuse(
+          code = "CFG_STATED_IMPORTANCE_READ_FAILED",
+          title = "Cannot Read StatedImportance Sheet",
+          problem = paste0("StatedImportance sheet exists but could not be read: ", e$message),
+          why_it_matters = "You added a StatedImportance sheet, so analysis expects valid stated importance data.",
+          how_to_fix = c(
+            "Fix the StatedImportance sheet format",
+            "Or remove the StatedImportance sheet if you don't need stated importance analysis"
+          )
+        )
+      }
+    )
+    validate_stated_importance_sheet(si_df)  # Will refuse on validation failure
+    stated_importance <- si_df
   }
 
   # -----------------------------------------------------------------

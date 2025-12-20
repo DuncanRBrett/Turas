@@ -104,8 +104,18 @@ prepare_question_data <- function(question_code, base_filter,
     )
 
     if (is.null(filtered_data)) {
-      warning(sprintf("Skipping %s: filter failed", question_code), call. = FALSE)
-      return(NULL)
+      # TRS v1.0: Filter failures must refuse with explanation, not silently skip
+      tabs_refuse(
+        code = "DATA_FILTER_FAILED",
+        title = paste0("Base Filter Failed: ", question_code),
+        problem = paste0("Could not apply base filter '", base_filter, "' for question ", question_code),
+        why_it_matters = "This question cannot be processed without a valid filter. It will be missing from output.",
+        how_to_fix = c(
+          "Check that the filter expression in Survey_Structure is valid R syntax",
+          "Verify the filter column exists in your data",
+          "Check for typos in variable names"
+        )
+      )
     }
 
     # Extract weights for filtered rows
@@ -219,8 +229,18 @@ process_single_question <- function(question_code, prepared_data,
     )
 
     if (is.null(ranking_data)) {
-      warning(sprintf("Skipping %s: ranking failed", question_code), call. = FALSE)
-      return(NULL)
+      # TRS v1.0: Ranking failures must refuse with explanation
+      tabs_refuse(
+        code = "DATA_RANKING_EXTRACTION_FAILED",
+        title = paste0("Ranking Data Extraction Failed: ", question_code),
+        problem = paste0("Could not extract ranking data for question ", question_code),
+        why_it_matters = "This ranking question cannot be processed. It will be missing from output.",
+        how_to_fix = c(
+          "Check that ranking columns follow the expected naming pattern",
+          "Verify Ranking_Format in Survey_Structure is correct",
+          "Ensure ranking data contains valid numeric values"
+        )
+      )
     }
 
     # Build banner_data_list and weights_list
@@ -264,6 +284,7 @@ process_single_question <- function(question_code, prepared_data,
   } else if (question_info$Variable_Type == "Numeric") {
     # ---------------------------------------------------------------------
     # NUMERIC QUESTIONS
+    # TRS v1.0: Processing failures must refuse, not warn and continue
     # ---------------------------------------------------------------------
     individual_results <- tryCatch({
       process_numeric_question(
@@ -272,9 +293,17 @@ process_single_question <- function(question_code, prepared_data,
         banner_bases, config, is_weighted
       )
     }, error = function(e) {
-      warning(sprintf("Failed to process Numeric question %s: %s",
-                     question_code, conditionMessage(e)), call. = FALSE)
-      return(NULL)
+      tabs_refuse(
+        code = "DATA_NUMERIC_QUESTION_FAILED",
+        title = paste0("Failed to Process Numeric Question: ", question_code),
+        problem = paste0("Numeric question processing failed: ", conditionMessage(e)),
+        why_it_matters = "This question will be missing from output, producing incomplete results.",
+        how_to_fix = c(
+          "Check that the question data is in the expected numeric format",
+          "Verify the question configuration in Survey_Structure",
+          "Review the error message for specific issues"
+        )
+      )
     })
 
     question_table <- if (!is.null(individual_results)) {
@@ -286,6 +315,7 @@ process_single_question <- function(question_code, prepared_data,
   } else {
     # ---------------------------------------------------------------------
     # STANDARD QUESTIONS
+    # TRS v1.0: Processing failures must refuse, not warn and continue
     # ---------------------------------------------------------------------
     individual_results <- tryCatch({
       process_standard_question(filtered_data, question_info, question_options,
@@ -293,8 +323,17 @@ process_single_question <- function(question_code, prepared_data,
                       banner_bases, config,
                       is_weighted = is_weighted)
     }, error = function(e) {
-      warning(sprintf("Failed %s: %s", question_code, conditionMessage(e)), call. = FALSE)
-      return(NULL)
+      tabs_refuse(
+        code = "DATA_QUESTION_PROCESSING_FAILED",
+        title = paste0("Failed to Process Question: ", question_code),
+        problem = paste0("Question processing failed: ", conditionMessage(e)),
+        why_it_matters = "This question will be missing from output, producing incomplete results.",
+        how_to_fix = c(
+          "Check the question data and configuration",
+          "Verify response options match the data",
+          "Review the error message for specific issues"
+        )
+      )
     })
 
     boxcategory_results <- tryCatch({

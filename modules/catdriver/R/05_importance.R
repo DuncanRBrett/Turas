@@ -446,6 +446,7 @@ extract_odds_ratios <- function(model_result, config, prep_data, mapping = NULL)
   coef_df <- coef_df[!grepl("^\\(Intercept\\)", coef_df$term), ]
 
   # Build mapping if not provided - use model matrix infrastructure
+  # TRS v1.0: Mapping failures must REFUSE, not warn and continue (risk of silent wrong answers)
   if (is.null(mapping) && !is.null(model_result$model)) {
     mapping <- tryCatch({
       if (model_result$model_type == "multinomial_logistic") {
@@ -456,8 +457,17 @@ extract_odds_ratios <- function(model_result, config, prep_data, mapping = NULL)
                            prep_data$model_formula)
       }
     }, error = function(e) {
-      warning("Could not build term mapping: ", e$message)
-      NULL
+      catdriver_refuse(
+        code = "MAPPER_TERM_MAPPING_FAILED",
+        title = "Cannot Build Term Mapping",
+        problem = paste0("Failed to map model terms to driver levels: ", e$message),
+        why_it_matters = "Without proper term mapping, importance scores cannot be correctly attributed to driver levels. Analysis would produce incorrect results.",
+        how_to_fix = c(
+          "Check that all driver variables exist in your data file",
+          "Ensure driver variables have the expected factor levels",
+          "Review the error message above for specific issues"
+        )
+      )
     })
   }
 
