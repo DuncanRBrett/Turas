@@ -435,7 +435,14 @@ prepare_predictors <- function(data, config) {
       # Polynomial contrasts (.L, .Q, .C) are not mappable to levels and would
       # produce misleading Factor Patterns output. Treatment contrasts give us
       # level-based coefficients that match the expected OR interpretation.
-      contrasts(var_data) <- contr.treatment(nlevels(var_data))
+      #
+      # IMPORTANT: Set dimnames so columns are named with level labels (e.g., "C", "B", "A")
+      # not numeric indices (e.g., "2", "3", "4"). Without this, model.matrix() creates
+      # columns like "grade2" instead of "gradeC", breaking term-to-level mapping.
+      cm <- contr.treatment(nlevels(var_data))
+      rownames(cm) <- levels(var_data)
+      colnames(cm) <- levels(var_data)[-1]  # non-reference levels
+      contrasts(var_data) <- cm
     }
 
     # Update data
