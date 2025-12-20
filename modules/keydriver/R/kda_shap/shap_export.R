@@ -20,7 +20,13 @@
 export_shap_to_excel <- function(shap_results, wb = NULL, output_file = NULL) {
 
   if (!requireNamespace("openxlsx", quietly = TRUE)) {
-    stop("Package 'openxlsx' required for Excel export.", call. = FALSE)
+    keydriver_refuse(
+      code = "FEATURE_SHAP_OPENXLSX_MISSING",
+      title = "openxlsx Package Required",
+      problem = "Package 'openxlsx' is required for Excel export but not installed.",
+      why_it_matters = "SHAP results cannot be exported to Excel without openxlsx.",
+      how_to_fix = "Install openxlsx: install.packages('openxlsx')"
+    )
   }
 
   # Create workbook if not provided

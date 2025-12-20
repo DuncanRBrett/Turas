@@ -21,8 +21,13 @@
 fit_shap_model <- function(prep, config) {
 
   if (!requireNamespace("xgboost", quietly = TRUE)) {
-    stop("Package 'xgboost' required for SHAP analysis. Install with: install.packages('xgboost')",
-         call. = FALSE)
+    keydriver_refuse(
+      code = "FEATURE_SHAP_XGBOOST_MISSING",
+      title = "XGBoost Package Required",
+      problem = "Package 'xgboost' is required for SHAP analysis but not installed.",
+      why_it_matters = "SHAP values are calculated using XGBoost's TreeSHAP algorithm.",
+      how_to_fix = "Install xgboost: install.packages('xgboost')"
+    )
   }
 
   # Set default parameters

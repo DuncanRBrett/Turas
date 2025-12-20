@@ -164,8 +164,13 @@ create_feature_map <- function(X_raw, X_encoded) {
 calculate_shap_values <- function(model, prep, config) {
 
   if (!requireNamespace("shapviz", quietly = TRUE)) {
-    stop("Package 'shapviz' required for SHAP visualization. Install with: install.packages('shapviz')",
-         call. = FALSE)
+    keydriver_refuse(
+      code = "FEATURE_SHAP_SHAPVIZ_MISSING",
+      title = "shapviz Package Required",
+      problem = "Package 'shapviz' is required for SHAP analysis but not installed.",
+      why_it_matters = "shapviz provides the visualization infrastructure for SHAP values.",
+      how_to_fix = "Install shapviz: install.packages('shapviz')"
+    )
   }
 
   # Sample data if too large

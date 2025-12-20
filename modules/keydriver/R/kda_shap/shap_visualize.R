@@ -20,8 +20,13 @@
 generate_shap_plots <- function(shp, config) {
 
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    stop("Package 'ggplot2' required for SHAP plots. Install with: install.packages('ggplot2')",
-         call. = FALSE)
+    keydriver_refuse(
+      code = "FEATURE_SHAP_GGPLOT2_MISSING",
+      title = "ggplot2 Package Required",
+      problem = "Package 'ggplot2' is required for SHAP plots but not installed.",
+      why_it_matters = "SHAP visualizations are created using ggplot2.",
+      how_to_fix = "Install ggplot2: install.packages('ggplot2')"
+    )
   }
 
   plots <- list()

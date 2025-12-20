@@ -10,7 +10,9 @@ calculate_vif <- function(model) {
 
   # VIF is only defined when there are at least 2 predictor terms
   if (ncol(X) < 2) {
-    stop("Not enough predictors to compute VIF (need 2+ predictor terms).", call. = FALSE)
+    # Return NULL - VIF cannot be calculated with < 2 predictors
+    # This is not an error, just means multicollinearity check is not applicable
+    return(NULL)
   }
 
   # Calculate VIF for each predictor

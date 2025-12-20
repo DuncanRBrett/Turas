@@ -24,8 +24,13 @@
 run_segment_shap <- function(shp, data, segments) {
 
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    stop("Package 'ggplot2' required for segment comparison. Install with: install.packages('ggplot2')",
-         call. = FALSE)
+    keydriver_refuse(
+      code = "FEATURE_SHAP_GGPLOT2_MISSING",
+      title = "ggplot2 Package Required",
+      problem = "Package 'ggplot2' is required for segment comparison but not installed.",
+      why_it_matters = "SHAP segment visualizations require ggplot2.",
+      how_to_fix = "Install ggplot2: install.packages('ggplot2')"
+    )
   }
 
   results <- list()

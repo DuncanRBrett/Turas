@@ -104,8 +104,16 @@ extract_importance_scores <- function(kda_results, config) {
     return(normalize_importance(imp, config))
   }
 
-  stop("Cannot extract importance scores. Provide kda_results object or data frame with 'driver' and 'importance' columns.",
-       call. = FALSE)
+  keydriver_refuse(
+    code = "FEATURE_QUADRANT_NO_IMPORTANCE",
+    title = "Cannot Extract Importance Scores",
+    problem = "Could not extract importance scores from the provided results.",
+    why_it_matters = "Quadrant analysis requires importance scores to position drivers.",
+    how_to_fix = c(
+      "Ensure you pass valid KDA results with importance scores",
+      "Or provide a data frame with 'driver' and 'importance' columns"
+    )
+  )
 }
 
 
@@ -167,7 +175,16 @@ select_best_importance <- function(importance_df) {
     ))
   }
 
-  stop("No importance scores found in KDA results", call. = FALSE)
+  keydriver_refuse(
+    code = "FEATURE_QUADRANT_NO_IMPORTANCE_SCORES",
+    title = "No Importance Scores Found",
+    problem = "No importance scores could be found in the KDA results.",
+    why_it_matters = "Quadrant analysis requires importance scores to create the chart.",
+    how_to_fix = c(
+      "Ensure your KDA results contain importance scores",
+      "Check that analysis completed successfully before creating quadrant"
+    )
+  )
 }
 
 
@@ -213,7 +230,17 @@ calculate_performance_scores <- function(kda_results, data, performance_data, co
   # If pre-calculated performance provided
   if (!is.null(performance_data)) {
     if (!all(c("driver", "performance") %in% names(performance_data))) {
-      stop("performance_data must have 'driver' and 'performance' columns", call. = FALSE)
+      keydriver_refuse(
+        code = "FEATURE_QUADRANT_INVALID_PERFORMANCE_DATA",
+        title = "Invalid Performance Data Format",
+        problem = "Performance data must have 'driver' and 'performance' columns.",
+        why_it_matters = "Cannot map performance scores to drivers without proper column names.",
+        how_to_fix = c(
+          "Ensure your performance_data has columns named 'driver' and 'performance'",
+          "Column names are case-sensitive"
+        ),
+        observed = names(performance_data)
+      )
     }
     return(normalize_performance(performance_data, config))
   }
@@ -229,8 +256,16 @@ calculate_performance_scores <- function(kda_results, data, performance_data, co
   }
 
   if (is.null(data)) {
-    stop("Cannot calculate performance scores. Provide 'data' argument or performance_data.",
-         call. = FALSE)
+    keydriver_refuse(
+      code = "FEATURE_QUADRANT_NO_DATA",
+      title = "No Data for Performance Calculation",
+      problem = "Cannot calculate performance scores without data.",
+      why_it_matters = "Performance scores must be calculated from respondent data.",
+      how_to_fix = c(
+        "Provide the 'data' argument with your survey data",
+        "Or provide pre-calculated 'performance_data'"
+      )
+    )
   }
 
   # Get driver names
@@ -246,7 +281,16 @@ calculate_performance_scores <- function(kda_results, data, performance_data, co
   }
 
   if (is.null(drivers)) {
-    stop("Cannot determine driver variables for performance calculation.", call. = FALSE)
+    keydriver_refuse(
+      code = "FEATURE_QUADRANT_NO_DRIVERS",
+      title = "Cannot Determine Driver Variables",
+      problem = "Could not identify driver variables for performance calculation.",
+      why_it_matters = "Performance scores are calculated per driver variable.",
+      how_to_fix = c(
+        "Ensure KDA results contain driver variable information",
+        "Or provide a data frame with a 'driver' column"
+      )
+    )
   }
 
   # Get weight variable if available
@@ -365,10 +409,17 @@ validate_quadrant_inputs <- function(importance, performance) {
   )
 
   if (n_valid < 4) {
-    stop(sprintf(
-      "Insufficient drivers for quadrant analysis. Found: %d valid drivers. Required: >= 4",
-      n_valid
-    ), call. = FALSE)
+    keydriver_refuse(
+      code = "FEATURE_QUADRANT_INSUFFICIENT_DRIVERS",
+      title = "Insufficient Drivers for Quadrant Analysis",
+      problem = paste0("Found only ", n_valid, " valid drivers. Quadrant analysis requires at least 4."),
+      why_it_matters = "A meaningful quadrant chart needs multiple drivers to distribute across quadrants.",
+      how_to_fix = c(
+        "Ensure you have at least 4 driver variables in your analysis",
+        "Check that drivers have valid importance and performance scores"
+      ),
+      details = paste0("Valid drivers: ", n_valid, ", Required: >= 4")
+    )
   }
 
   invisible(TRUE)

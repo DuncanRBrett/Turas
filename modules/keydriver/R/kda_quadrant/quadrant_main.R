@@ -85,7 +85,16 @@ create_quadrant_analysis <- function(
 
   # Check required packages
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    stop("Package 'ggplot2' required for quadrant analysis.", call. = FALSE)
+    keydriver_refuse(
+      code = "FEATURE_QUADRANT_PACKAGES_MISSING",
+      title = "Missing Required Package for Quadrant Analysis",
+      problem = "Package 'ggplot2' is required for quadrant analysis but not installed.",
+      why_it_matters = "Quadrant charts cannot be generated without ggplot2.",
+      how_to_fix = c(
+        "Install ggplot2: install.packages('ggplot2')",
+        "Or disable quadrant analysis if not needed"
+      )
+    )
   }
 
   if (!requireNamespace("ggrepel", quietly = TRUE)) {

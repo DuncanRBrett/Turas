@@ -189,11 +189,18 @@ check_shap_packages <- function() {
   missing <- required[!sapply(required, requireNamespace, quietly = TRUE)]
 
   if (length(missing) > 0) {
-    stop(sprintf(
-      "Missing required packages for SHAP analysis: %s\nInstall with: install.packages(c('%s'))",
-      paste(missing, collapse = ", "),
-      paste(missing, collapse = "', '")
-    ), call. = FALSE)
+    keydriver_refuse(
+      code = "FEATURE_SHAP_PACKAGES_MISSING",
+      title = "Missing Required Packages for SHAP",
+      problem = paste0("SHAP analysis requires packages that are not installed: ",
+                       paste(missing, collapse = ", ")),
+      why_it_matters = "SHAP values cannot be calculated without these machine learning packages.",
+      how_to_fix = c(
+        paste0("Install missing packages: install.packages(c('",
+               paste(missing, collapse = "', '"), "'))"),
+        "Or disable SHAP analysis in your configuration if not needed"
+      )
+    )
   }
 
   # Check optional packages
@@ -254,19 +261,35 @@ validate_shap_inputs <- function(data, outcome, drivers, weights) {
 
   # Check outcome exists
   if (!outcome %in% names(data)) {
-    stop(sprintf(
-      "Outcome variable '%s' not found in data.\nAvailable columns: %s",
-      outcome, paste(head(names(data), 10), collapse = ", ")
-    ), call. = FALSE)
+    keydriver_refuse(
+      code = "FEATURE_SHAP_OUTCOME_NOT_FOUND",
+      title = "Outcome Variable Not Found",
+      problem = paste0("Outcome variable '", outcome, "' not found in data."),
+      why_it_matters = "SHAP analysis requires the outcome variable to be present in the data.",
+      how_to_fix = c(
+        "Check that the outcome variable name matches exactly (case-sensitive)",
+        "Verify the variable exists in your data file"
+      ),
+      expected = outcome,
+      observed = head(names(data), 10)
+    )
   }
 
   # Check drivers exist
   missing_drivers <- setdiff(drivers, names(data))
   if (length(missing_drivers) > 0) {
-    stop(sprintf(
-      "Driver variables not found in data: %s",
-      paste(missing_drivers, collapse = ", ")
-    ), call. = FALSE)
+    keydriver_refuse(
+      code = "FEATURE_SHAP_DRIVERS_NOT_FOUND",
+      title = "Driver Variables Not Found",
+      problem = paste0(length(missing_drivers), " driver variable(s) not found in data."),
+      why_it_matters = "SHAP analysis cannot calculate importance for missing drivers.",
+      how_to_fix = c(
+        "Check that variable names in config match data column names exactly",
+        "Variable names are case-sensitive"
+      ),
+      expected = drivers,
+      missing = missing_drivers
+    )
   }
 
   # Check minimum sample size
@@ -281,8 +304,16 @@ validate_shap_inputs <- function(data, outcome, drivers, weights) {
   if (is.numeric(data[[outcome]])) {
     outcome_sd <- sd(data[[outcome]], na.rm = TRUE)
     if (is.na(outcome_sd) || outcome_sd < 0.01) {
-      stop("Outcome variable has near-zero variance. Cannot fit meaningful model.",
-           call. = FALSE)
+      keydriver_refuse(
+        code = "FEATURE_SHAP_ZERO_VARIANCE",
+        title = "Outcome Has Near-Zero Variance",
+        problem = "Outcome variable has near-zero variance.",
+        why_it_matters = "Cannot fit a meaningful predictive model when outcome has no variation.",
+        how_to_fix = c(
+          "Check that your outcome variable has variation in its values",
+          "Ensure you're not filtering data to a subset with constant outcome"
+        )
+      )
     }
   }
 

@@ -19,7 +19,13 @@
 create_ipa_plot <- function(quad_data, config) {
 
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    stop("Package 'ggplot2' required for quadrant plots.", call. = FALSE)
+    keydriver_refuse(
+      code = "FEATURE_QUADRANT_GGPLOT2_MISSING",
+      title = "ggplot2 Package Required",
+      problem = "Package 'ggplot2' is required for quadrant plots but not installed.",
+      why_it_matters = "Quadrant charts are generated using ggplot2.",
+      how_to_fix = "Install ggplot2: install.packages('ggplot2')"
+    )
   }
 
   # Get thresholds
