@@ -2,8 +2,11 @@
 # KEY DRIVER CONFIG LOADER
 # ==============================================================================
 #
-# Version: Turas v10.1
+# Version: Turas v10.2 (TRS Integration)
 # Date: 2025-12
+#
+# NEW IN v10.2:
+#   - TRS v1.0 integration: Refusal framework for config errors
 #
 # NEW IN v10.1:
 #   - Support for Segments sheet
@@ -23,7 +26,16 @@
 load_keydriver_config <- function(config_file, project_root = NULL) {
 
   if (!file.exists(config_file)) {
-    stop("Configuration file not found: ", config_file, call. = FALSE)
+    keydriver_refuse(
+      code = "IO_CONFIG_NOT_FOUND",
+      title = "Configuration File Not Found",
+      problem = paste0("Configuration file does not exist: ", config_file),
+      why_it_matters = "Key driver analysis requires a configuration file to define variables and settings.",
+      how_to_fix = c(
+        "Check that the file path is correct",
+        "Ensure the file exists at the specified location"
+      )
+    )
   }
 
   # Set project root to config file directory if not specified
@@ -36,7 +48,18 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
 
   # Load settings (required)
   if (!"Settings" %in% available_sheets) {
-    stop("Required sheet 'Settings' not found in config file", call. = FALSE)
+    keydriver_refuse(
+      code = "CFG_SETTINGS_SHEET_MISSING",
+      title = "Settings Sheet Missing",
+      problem = "Required 'Settings' sheet not found in configuration file.",
+      why_it_matters = "The Settings sheet defines essential analysis parameters.",
+      how_to_fix = c(
+        "Add a 'Settings' sheet to your config Excel file",
+        "The sheet should have columns: Setting, Value"
+      ),
+      expected = "Settings",
+      observed = available_sheets
+    )
   }
   settings <- openxlsx::read.xlsx(config_file, sheet = "Settings")
   settings_list <- setNames(as.list(settings$Value), settings$Setting)
@@ -64,7 +87,20 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
 
   # Load variables definition (required)
   if (!"Variables" %in% available_sheets) {
-    stop("Required sheet 'Variables' not found in config file", call. = FALSE)
+    keydriver_refuse(
+      code = "CFG_VARIABLES_SHEET_MISSING",
+      title = "Variables Sheet Missing",
+      problem = "Required 'Variables' sheet not found in configuration file.",
+      why_it_matters = "The Variables sheet defines which variables are outcomes and drivers.",
+      how_to_fix = c(
+        "Add a 'Variables' sheet to your config Excel file",
+        "The sheet must have columns: VariableName, Type, Label",
+        "Set Type='Outcome' for your dependent variable",
+        "Set Type='Driver' for independent variables"
+      ),
+      expected = "Variables",
+      observed = available_sheets
+    )
   }
   variables <- openxlsx::read.xlsx(config_file, sheet = "Variables")
 
@@ -72,8 +108,16 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
   required_cols <- c("VariableName", "Type", "Label")
   missing_cols <- setdiff(required_cols, names(variables))
   if (length(missing_cols) > 0) {
-    stop("Missing required columns in Variables sheet: ",
-         paste(missing_cols, collapse = ", "), call. = FALSE)
+    keydriver_refuse(
+      code = "CFG_VARIABLES_COLUMNS_MISSING",
+      title = "Variables Sheet Missing Required Columns",
+      problem = paste0("Variables sheet is missing required columns: ", paste(missing_cols, collapse = ", ")),
+      why_it_matters = "These columns are needed to identify variables and their roles.",
+      how_to_fix = "Add the missing columns to your Variables sheet.",
+      expected = required_cols,
+      observed = names(variables),
+      missing = missing_cols
+    )
   }
 
   # Extract outcome and driver variables
@@ -81,18 +125,37 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
   driver_vars <- variables$VariableName[variables$Type == "Driver"]
 
   if (length(outcome_vars) == 0) {
-    stop("No outcome variable defined. Set Type='Outcome' for one variable.",
-         call. = FALSE)
+    keydriver_refuse(
+      code = "CFG_OUTCOME_MISSING",
+      title = "No Outcome Variable Defined",
+      problem = "No variable has Type='Outcome' in the Variables sheet.",
+      why_it_matters = "Key driver analysis requires an outcome (dependent) variable to analyze.",
+      how_to_fix = c(
+        "Open the Variables sheet in your config file",
+        "Set Type='Outcome' for your dependent variable",
+        "This should be the variable you want to explain/predict"
+      )
+    )
   }
 
   if (length(outcome_vars) > 1) {
-    warning("Multiple outcome variables found. Using first: ", outcome_vars[1])
+    # Warn but don't refuse - use first
+    cat(sprintf("   [WARN] Multiple outcome variables found. Using first: %s\n", outcome_vars[1]))
     outcome_vars <- outcome_vars[1]
   }
 
   if (length(driver_vars) == 0) {
-    stop("No driver variables defined. Set Type='Driver' for independent variables.",
-         call. = FALSE)
+    keydriver_refuse(
+      code = "CFG_DRIVERS_MISSING",
+      title = "No Driver Variables Defined",
+      problem = "No variables have Type='Driver' in the Variables sheet.",
+      why_it_matters = "Key driver analysis requires driver (independent) variables to determine importance.",
+      how_to_fix = c(
+        "Open the Variables sheet in your config file",
+        "Set Type='Driver' for each independent variable",
+        "You need at least 2 driver variables for meaningful analysis"
+      )
+    )
   }
 
   # Extract optional weight variable

@@ -11,7 +11,8 @@
 #   source(file.path(shared_path, "import_all.R"))
 #
 # LOADS:
-#   - validation_utils.R (must be first - no dependencies)
+#   - trs_refusal.R (TRS v1.0 - must be first - no dependencies)
+#   - validation_utils.R (no dependencies)
 #   - data_utils.R (depends on validation)
 #   - config_utils.R (depends on validation, data)
 #   - logging_utils.R (no dependencies)
@@ -34,22 +35,25 @@
 }
 
 # Source in dependency order
-# 1. Validation first (no dependencies)
+# 1. TRS Refusal infrastructure (TRS v1.0 - no dependencies, needed by all modules)
+source(file.path(.shared_lib_path, "trs_refusal.R"), local = FALSE)
+
+# 2. Validation (no dependencies)
 source(file.path(.shared_lib_path, "validation_utils.R"), local = FALSE)
 
-# 2. Data utils (uses validation)
+# 3. Data utils (uses validation)
 source(file.path(.shared_lib_path, "data_utils.R"), local = FALSE)
 
-# 3. Config utils (uses validation, includes find_turas_root)
+# 4. Config utils (uses validation, includes find_turas_root)
 source(file.path(.shared_lib_path, "config_utils.R"), local = FALSE)
 
-# 4. Logging (independent)
+# 5. Logging (independent)
 source(file.path(.shared_lib_path, "logging_utils.R"), local = FALSE)
 
-# 5. Formatting (independent)
+# 6. Formatting (independent)
 source(file.path(.shared_lib_path, "formatting_utils.R"), local = FALSE)
 
-# 6. Weights (independent)
+# 7. Weights (independent)
 source(file.path(.shared_lib_path, "weights_utils.R"), local = FALSE)
 
 # Clean up

@@ -1,6 +1,14 @@
 # ==============================================================================
 # KEY DRIVER DATA VALIDATION
 # ==============================================================================
+#
+# Version: Turas v10.2 (TRS Integration)
+# Date: 2025-12
+#
+# TRS v1.0 integration: Refusal framework for data validation errors.
+# All user-fixable issues produce actionable refusals, not crashes.
+#
+# ==============================================================================
 
 #' Load Key Driver Data
 #'
@@ -13,7 +21,17 @@
 load_keydriver_data <- function(data_file, config) {
 
   if (!file.exists(data_file)) {
-    stop("Data file not found: ", data_file, call. = FALSE)
+    keydriver_refuse(
+      code = "IO_DATA_NOT_FOUND",
+      title = "Data File Not Found",
+      problem = paste0("Data file does not exist: ", data_file),
+      why_it_matters = "Key driver analysis requires respondent data to analyze.",
+      how_to_fix = c(
+        "Check that the file path is correct",
+        "Ensure the file exists at the specified location",
+        "Check for typos in the file name"
+      )
+    )
   }
 
   # Detect file type and load
@@ -24,19 +42,41 @@ load_keydriver_data <- function(data_file, config) {
     "xlsx" = openxlsx::read.xlsx(data_file),
     "sav" = {
       if (!requireNamespace("haven", quietly = TRUE)) {
-        stop("Package 'haven' required for SPSS files. Install with: install.packages('haven')",
-             call. = FALSE)
+        keydriver_refuse(
+          code = "PKG_HAVEN_REQUIRED",
+          title = "Package 'haven' Required",
+          problem = "The 'haven' package is required to read SPSS files but is not installed.",
+          why_it_matters = "Cannot load .sav files without the haven package.",
+          how_to_fix = "Install the haven package: install.packages('haven')"
+        )
       }
       haven::read_sav(data_file)
     },
     "dta" = {
       if (!requireNamespace("haven", quietly = TRUE)) {
-        stop("Package 'haven' required for Stata files. Install with: install.packages('haven')",
-             call. = FALSE)
+        keydriver_refuse(
+          code = "PKG_HAVEN_REQUIRED",
+          title = "Package 'haven' Required",
+          problem = "The 'haven' package is required to read Stata files but is not installed.",
+          why_it_matters = "Cannot load .dta files without the haven package.",
+          how_to_fix = "Install the haven package: install.packages('haven')"
+        )
       }
       haven::read_dta(data_file)
     },
-    stop("Unsupported file format: ", file_ext, call. = FALSE)
+    keydriver_refuse(
+      code = "DATA_UNSUPPORTED_FORMAT",
+      title = "Unsupported File Format",
+      problem = paste0("File format '.", file_ext, "' is not supported."),
+      why_it_matters = "Key driver analysis can only read supported data formats.",
+      how_to_fix = c(
+        "Convert your data to a supported format:",
+        "  - .csv (CSV file)",
+        "  - .xlsx (Excel file)",
+        "  - .sav (SPSS file, requires 'haven' package)",
+        "  - .dta (Stata file, requires 'haven' package)"
+      )
+    )
   )
 
   # Convert to data frame
@@ -52,13 +92,36 @@ load_keydriver_data <- function(data_file, config) {
   # Validate required variables exist
   missing_vars <- setdiff(base_vars, names(data))
   if (length(missing_vars) > 0) {
-    stop("Missing variables in data: ", paste(missing_vars, collapse = ", "),
-         call. = FALSE)
+    keydriver_refuse(
+      code = "DATA_VARIABLES_NOT_FOUND",
+      title = "Required Variables Not Found in Data",
+      problem = paste0(length(missing_vars), " variable(s) specified in config are not in the data file."),
+      why_it_matters = "Cannot run analysis without all specified variables.",
+      how_to_fix = c(
+        "Check that variable names in config match data column names exactly",
+        "Variable names are case-sensitive",
+        "Check for extra spaces in column names"
+      ),
+      expected = base_vars,
+      observed = names(data),
+      missing = missing_vars
+    )
   }
 
   # Check weight variable exists if specified
   if (!is.null(weight_var) && !weight_var %in% names(data)) {
-    stop("Weight variable '", weight_var, "' not found in data.", call. = FALSE)
+    keydriver_refuse(
+      code = "DATA_WEIGHT_NOT_FOUND",
+      title = "Weight Variable Not Found",
+      problem = paste0("Weight variable '", weight_var, "' not found in data."),
+      why_it_matters = "Cannot apply weighting without the weight variable.",
+      how_to_fix = c(
+        "Check that the weight variable name matches exactly",
+        "Or remove the weight variable from your config if not needed"
+      ),
+      expected = weight_var,
+      observed = names(data)
+    )
   }
 
   # Select only relevant variables
@@ -92,41 +155,51 @@ load_keydriver_data <- function(data_file, config) {
   n_complete <- sum(complete_cases)
   n_missing <- nrow(data) - n_complete
 
-  if (n_missing > 0) {
-    warning(sprintf(
-      "%d rows will be excluded due to missing values and/or invalid weights (%.1f%%)",
-      n_missing, 100 * n_missing / nrow(data)
-    ))
-  }
+  # Note: Missing data warning is now handled by caller (logged, not warning())
 
-  # IMPROVED: Sample size rule based on number of drivers
+  # Sample size rule based on number of drivers
   # Rule of thumb: n >= max(30, 10 * number_of_drivers)
   n_drivers <- length(config$driver_vars)
   min_n <- max(30L, 10L * n_drivers)
 
   if (n_complete < min_n) {
-    stop(
-      sprintf(
-        "Insufficient complete cases (%d). Need at least %d given %d driver(s).",
-        n_complete, min_n, n_drivers
+    keydriver_refuse(
+      code = "DATA_INSUFFICIENT_SAMPLE",
+      title = "Insufficient Sample Size",
+      problem = sprintf("Only %d complete cases available. Need at least %d for %d drivers.",
+                       n_complete, min_n, n_drivers),
+      why_it_matters = "Insufficient sample size produces unreliable importance estimates.",
+      how_to_fix = c(
+        "Increase sample size (collect more data)",
+        "Reduce number of drivers",
+        "Address missing data issues",
+        paste0("Rule: need at least 10 cases per driver, minimum 30")
       ),
-      call. = FALSE
+      details = sprintf("Complete cases: %d | Required: %d | Drivers: %d",
+                       n_complete, min_n, n_drivers)
     )
   }
 
   # Filter to complete cases
   data <- data[complete_cases, , drop = FALSE]
 
-  # NEW: Zero-variance checks after filtering
+  # Zero-variance checks after filtering
   sds <- vapply(base_vars, function(v) stats::sd(data[[v]], na.rm = TRUE), numeric(1))
   zero_var <- sds == 0
 
   if (any(zero_var)) {
     offending <- base_vars[zero_var]
-    stop(
-      "The following variables have zero variance and cannot be used in key driver analysis: ",
-      paste(offending, collapse = ", "),
-      call. = FALSE
+    keydriver_refuse(
+      code = "DATA_ZERO_VARIANCE",
+      title = "Variables Have Zero Variance",
+      problem = paste0(length(offending), " variable(s) have zero variance (all values identical)."),
+      why_it_matters = "Variables with no variance cannot predict anything and will cause model failures.",
+      how_to_fix = c(
+        "Remove these variables from your analysis",
+        "Or check your data for issues",
+        "These variables have identical values for all respondents"
+      ),
+      missing = offending
     )
   }
 

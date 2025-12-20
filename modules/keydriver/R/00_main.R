@@ -5,8 +5,13 @@
 # Module: Key Driver Analysis (Relative Importance)
 # Purpose: Determine which independent variables (drivers) have the greatest
 #          impact on a dependent variable (outcome)
-# Version: Turas v10.1
+# Version: Turas v10.2 (TRS Integration)
 # Date: 2025-12
+#
+# NEW IN v10.2:
+#   - TRS v1.0 integration: Refusal framework, guard state, explicit status
+#   - No silent failures: All errors produce actionable refusals
+#   - PARTIAL status for degraded outputs (e.g., SHAP unavailable)
 #
 # NEW IN v10.1:
 #   - SHAP Analysis: Machine learning-based importance using XGBoost/TreeSHAP
@@ -77,17 +82,50 @@
 #' @export
 run_keydriver_analysis <- function(config_file, data_file = NULL, output_file = NULL) {
 
-  cat("\n")
-  cat(rep("=", 80), "\n", sep = "")
-  cat("TURAS KEY DRIVER ANALYSIS v10.1\n")
-  cat(rep("=", 80), "\n", sep = "")
-  cat("\n")
+  # ==========================================================================
+  # TRS REFUSAL HANDLER WRAPPER
+  # ==========================================================================
+  # Catches turas_refusal conditions and displays them cleanly
+  # without stack traces - they are intentional stops, not crashes.
 
-  # STEP 1: Load Configuration
+  keydriver_with_refusal_handler(
+    run_keydriver_analysis_impl(config_file, data_file, output_file)
+  )
+}
+
+
+#' Internal Implementation of Key Driver Analysis
+#'
+#' @keywords internal
+run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_file = NULL) {
+
+  # ==========================================================================
+  # INITIALIZATION
+  # ==========================================================================
+
+  start_time <- Sys.time()
+
+  # TRS start banner
+  trs_banner_start("KEY DRIVER ANALYSIS", "10.2")
+
+  # Initialize guard state for tracking warnings and issues
+  guard <- keydriver_guard_init()
+
+  # Track degraded outputs for PARTIAL status
+  degraded_reasons <- character(0)
+  affected_outputs <- character(0)
+
+  # ==========================================================================
+  # STEP 1: LOAD CONFIGURATION
+  # ==========================================================================
+
   cat("1. Loading configuration...\n")
   config <- load_keydriver_config(config_file)
-  cat(sprintf("   ✓ Outcome variable: %s\n", config$outcome_var))
-  cat(sprintf("   ✓ Driver variables: %d variables\n", length(config$driver_vars)))
+  cat(sprintf("   [OK] Outcome variable: %s\n", config$outcome_var))
+  cat(sprintf("   [OK] Driver variables: %d variables\n", length(config$driver_vars)))
+
+  # Validate config (hard gate)
+  validate_keydriver_config(config)
 
   # Check for optional features
   enable_shap <- isTRUE(config$settings$enable_shap) ||
@@ -95,14 +133,23 @@ run_keydriver_analysis <- function(config_file, data_file = NULL, output_file = 
   enable_quadrant <- isTRUE(config$settings$enable_quadrant) ||
                      isTRUE(as.logical(config$settings$enable_quadrant))
 
-  if (enable_shap) cat("   ✓ SHAP analysis enabled\n")
-  if (enable_quadrant) cat("   ✓ Quadrant analysis enabled\n")
+  if (enable_shap) cat("   [OK] SHAP analysis enabled\n")
+  if (enable_quadrant) cat("   [OK] Quadrant analysis enabled\n")
 
   # Get data_file from config if not provided
   if (is.null(data_file)) {
     data_file <- config$data_file
     if (is.null(data_file) || is.na(data_file)) {
-      stop("data_file not specified in function call or config Settings sheet", call. = FALSE)
+      keydriver_refuse(
+        code = "CFG_DATA_FILE_MISSING",
+        title = "Data File Not Specified",
+        problem = "No data file specified in function call or config Settings sheet.",
+        why_it_matters = "Key driver analysis requires respondent data to analyze.",
+        how_to_fix = c(
+          "Add 'data_file' to the Settings sheet in your config file",
+          "Or pass data_file parameter to run_keydriver_analysis()"
+        )
+      )
     }
   }
 
@@ -115,29 +162,70 @@ run_keydriver_analysis <- function(config_file, data_file = NULL, output_file = 
     }
   }
 
-  # STEP 2: Load and Validate Data
+  # ==========================================================================
+  # STEP 2: LOAD AND VALIDATE DATA
+  # ==========================================================================
+
   cat("\n2. Loading and validating data...\n")
   data <- load_keydriver_data(data_file, config)
-  cat(sprintf("   ✓ Loaded %d respondents\n", data$n_respondents))
-  cat(sprintf("   ✓ Complete cases: %d\n", data$n_complete))
+  cat(sprintf("   [OK] Loaded %d respondents\n", data$n_respondents))
+  cat(sprintf("   [OK] Complete cases: %d\n", data$n_complete))
+
+  # Report exclusions if any
+  if (data$n_missing > 0) {
+    cat(sprintf("   [INFO] Excluded %d rows with missing data (%.1f%%)\n",
+                data$n_missing, 100 * data$n_missing / (data$n_complete + data$n_missing)))
+  }
 
   # Store raw data in config for later use
   config$raw_data <- data$data
 
-  # STEP 3: Calculate Correlations
+  # ==========================================================================
+  # STEP 3: CALCULATE CORRELATIONS
+  # ==========================================================================
+
   cat("\n3. Calculating correlations...\n")
   correlations <- calculate_correlations(data$data, config)
-  cat("   ✓ Correlation matrix calculated\n")
+  cat("   [OK] Correlation matrix calculated\n")
 
-  # STEP 4: Fit Regression Model
+  # Check for high collinearity (soft warning, not hard stop)
+  cor_matrix <- correlations$matrix
+  driver_cors <- cor_matrix[config$driver_vars, config$driver_vars]
+  diag(driver_cors) <- 0  # Ignore self-correlations
+
+  high_cor_threshold <- 0.9
+  high_cors <- which(abs(driver_cors) > high_cor_threshold, arr.ind = TRUE)
+  if (nrow(high_cors) > 0) {
+    for (i in seq_len(nrow(high_cors))) {
+      if (high_cors[i, 1] < high_cors[i, 2]) {  # Avoid duplicates
+        var1 <- rownames(driver_cors)[high_cors[i, 1]]
+        var2 <- colnames(driver_cors)[high_cors[i, 2]]
+        cor_val <- driver_cors[high_cors[i, 1], high_cors[i, 2]]
+        guard <- guard_record_collinearity(guard, var1, var2, cor_val)
+        cat(sprintf("   [WARN] High collinearity: %s <-> %s (r=%.2f)\n", var1, var2, cor_val))
+      }
+    }
+  }
+
+  # ==========================================================================
+  # STEP 4: FIT REGRESSION MODEL
+  # ==========================================================================
+
   cat("\n4. Fitting regression model...\n")
   model <- fit_keydriver_model(data$data, config)
-  cat(sprintf("   ✓ Model R² = %.3f\n", summary(model)$r.squared))
+  r_squared <- summary(model)$r.squared
+  cat(sprintf("   [OK] Model R-squared = %.3f\n", r_squared))
 
-  # STEP 5: Calculate Importance Scores (Traditional Methods)
+  # Validate model mapping (ensure all drivers are in model)
+  guard <- validate_keydriver_mapping(model, config$driver_vars, guard)
+
+  # ==========================================================================
+  # STEP 5: CALCULATE IMPORTANCE SCORES (Traditional Methods)
+  # ==========================================================================
+
   cat("\n5. Calculating importance scores...\n")
   importance <- calculate_importance_scores(model, data$data, correlations, config)
-  cat("   ✓ Multiple importance methods calculated\n")
+  cat("   [OK] Multiple importance methods calculated\n")
 
   # Initialize results list
   results <- list(
@@ -146,23 +234,33 @@ run_keydriver_analysis <- function(config_file, data_file = NULL, output_file = 
     correlations = correlations,
     config = config,
     shap = NULL,
-    quadrant = NULL
+    quadrant = NULL,
+    guard = guard,
+    run_status = "PASS"
   )
 
-  # STEP 6: SHAP Analysis (if enabled)
-  shap_results <- NULL
+  # ==========================================================================
+  # STEP 6: SHAP ANALYSIS (if enabled)
+  # ==========================================================================
+
   if (enable_shap) {
     cat("\n6. Running SHAP analysis...\n")
     shap_results <- tryCatch({
       run_shap_analysis_internal(data$data, config)
     }, error = function(e) {
-      warning(sprintf("SHAP analysis failed: %s", e$message))
+      # SHAP failure is degradation, not hard stop
+      cat(sprintf("   [WARN] SHAP analysis failed: %s\n", e$message))
+      guard <<- guard_warn(guard, paste0("SHAP failed: ", e$message), "shap")
+      guard$shap_status <<- "failed"
+      degraded_reasons <<- c(degraded_reasons, paste0("SHAP analysis failed: ", e$message))
+      affected_outputs <<- c(affected_outputs, "SHAP importance", "SHAP plots")
       NULL
     })
 
     if (!is.null(shap_results)) {
       results$shap <- shap_results
-      cat("   ✓ SHAP analysis complete\n")
+      guard$shap_status <- "complete"
+      cat("   [OK] SHAP analysis complete\n")
 
       # Add SHAP importance to main importance table
       if (!is.null(shap_results$importance)) {
@@ -172,8 +270,10 @@ run_keydriver_analysis <- function(config_file, data_file = NULL, output_file = 
     }
   }
 
-  # STEP 7: Quadrant Analysis (if enabled)
-  quadrant_results <- NULL
+  # ==========================================================================
+  # STEP 7: QUADRANT ANALYSIS (if enabled)
+  # ==========================================================================
+
   if (enable_quadrant) {
     step_num <- if (enable_shap) "7" else "6"
     cat(sprintf("\n%s. Running quadrant analysis...\n", step_num))
@@ -181,17 +281,26 @@ run_keydriver_analysis <- function(config_file, data_file = NULL, output_file = 
     quadrant_results <- tryCatch({
       run_quadrant_analysis_internal(results, data$data, config)
     }, error = function(e) {
-      warning(sprintf("Quadrant analysis failed: %s", e$message))
+      # Quadrant failure is degradation, not hard stop
+      cat(sprintf("   [WARN] Quadrant analysis failed: %s\n", e$message))
+      guard <<- guard_warn(guard, paste0("Quadrant failed: ", e$message), "quadrant")
+      guard$quadrant_status <<- "failed"
+      degraded_reasons <<- c(degraded_reasons, paste0("Quadrant analysis failed: ", e$message))
+      affected_outputs <<- c(affected_outputs, "Quadrant charts", "IPA analysis")
       NULL
     })
 
     if (!is.null(quadrant_results)) {
       results$quadrant <- quadrant_results
-      cat("   ✓ Quadrant analysis complete\n")
+      guard$quadrant_status <- "complete"
+      cat("   [OK] Quadrant analysis complete\n")
     }
   }
 
-  # STEP 8: Generate Output
+  # ==========================================================================
+  # STEP 8: GENERATE OUTPUT
+  # ==========================================================================
+
   step_num <- 6 + (if (enable_shap) 1 else 0) + (if (enable_quadrant) 1 else 0)
   cat(sprintf("\n%d. Generating output file...\n", step_num))
 
@@ -199,13 +308,39 @@ run_keydriver_analysis <- function(config_file, data_file = NULL, output_file = 
     results = results,
     output_file = output_file
   )
-  cat(sprintf("   ✓ Results written to: %s\n", output_file))
+  cat(sprintf("   [OK] Results written to: %s\n", output_file))
 
-  cat("\n")
-  cat(rep("=", 80), "\n", sep = "")
-  cat("ANALYSIS COMPLETE\n")
-  cat(rep("=", 80), "\n", sep = "")
-  cat("\n")
+  # ==========================================================================
+  # DETERMINE FINAL STATUS
+  # ==========================================================================
+
+  guard_status <- keydriver_guard_summary(guard)
+  results$guard_summary <- guard_status
+
+  # Determine run_status
+  if (length(degraded_reasons) > 0) {
+    results$run_status <- "PARTIAL"
+    results$status <- trs_status_partial(
+      module = "KEYDRIVER",
+      degraded_reasons = degraded_reasons,
+      affected_outputs = affected_outputs
+    )
+  } else if (guard_status$has_issues) {
+    results$run_status <- "PASS"  # Still PASS, but with warnings
+  } else {
+    results$run_status <- "PASS"
+    results$status <- trs_status_pass(module = "KEYDRIVER")
+  }
+
+  # ==========================================================================
+  # COMPLETION
+  # ==========================================================================
+
+  end_time <- Sys.time()
+  elapsed <- round(as.numeric(difftime(end_time, start_time, units = "secs")), 1)
+
+  # TRS end banner
+  trs_banner_end("KEY DRIVER ANALYSIS", results$run_status, elapsed)
 
   # Print top drivers
   cat("TOP 5 DRIVERS:\n")
@@ -238,6 +373,14 @@ run_keydriver_analysis <- function(config_file, data_file = NULL, output_file = 
     cat(sprintf("  Q2 (Keep Up Good Work): %d drivers\n", q_counts["2"] %||% 0))
     cat(sprintf("  Q3 (Low Priority): %d drivers\n", q_counts["3"] %||% 0))
     cat(sprintf("  Q4 (Possible Overkill): %d drivers\n", q_counts["4"] %||% 0))
+  }
+
+  # Print warnings summary if any
+  if (guard_status$has_issues) {
+    cat("\nWARNINGS:\n")
+    for (flag in guard_status$stability_flags) {
+      cat(sprintf("  - %s\n", flag))
+    }
   }
 
   cat("\n")
