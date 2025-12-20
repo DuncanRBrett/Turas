@@ -105,7 +105,7 @@ trs_validate_code <- function(code) {
 #' @param code Refusal code (must follow TRS prefix convention, e.g., "CFG_MISSING_SHEET")
 #' @param title Short title for the refusal
 #' @param problem One-sentence description of what went wrong
-#' @param why_it_matters Explanation of analytical risk (why this matters)
+#' @param why_it_matters Explanation of analytical risk (MANDATORY per TRS governance)
 #' @param how_to_fix Explicit step-by-step instructions to resolve
 #' @param expected Expected entities/values (for diagnostics)
 #' @param observed Observed entities/values (for diagnostics)
@@ -119,7 +119,7 @@ trs_validate_code <- function(code) {
 turas_refuse <- function(code,
                          title,
                          problem,
-                         why_it_matters = NULL,
+                         why_it_matters,
                          how_to_fix,
                          expected = NULL,
                          observed = NULL,
@@ -128,7 +128,14 @@ turas_refuse <- function(code,
                          details = NULL,
                          module = "TURAS") {
 
-# Validate code format
+  # TRS GOVERNANCE: why_it_matters is MANDATORY (Patch D)
+  if (is.null(why_it_matters) || !nzchar(trimws(why_it_matters))) {
+    stop("TRS: why_it_matters is MANDATORY for all refusals. ",
+         "Every refusal must explain why the issue matters to users.",
+         call. = FALSE)
+  }
+
+  # Validate code format
   trs_validate_code(code)
 
   # Build the refusal message block

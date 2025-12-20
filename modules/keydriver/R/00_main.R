@@ -136,6 +136,14 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   if (enable_shap) cat("   [OK] SHAP analysis enabled\n")
   if (enable_quadrant) cat("   [OK] Quadrant analysis enabled\n")
 
+  # TRS: Print config fingerprint for traceability
+  config_mtime <- file.info(config$config_file)$mtime
+  cat("\n   [CONFIG FINGERPRINT]\n")
+  cat("   Path: ", config$config_file, "\n", sep = "")
+  cat("   Modified: ", format(config_mtime, "%Y-%m-%d %H:%M:%S"), "\n", sep = "")
+  cat("   Outcome: ", config$outcome_var, "\n", sep = "")
+  cat("   Drivers: ", paste(config$driver_vars, collapse = ", "), "\n", sep = "")
+
   # Get data_file from config if not provided
   if (is.null(data_file)) {
     data_file <- config$data_file
@@ -181,29 +189,89 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   config$raw_data <- data$data
 
   # ==========================================================================
+  # STEP 2.5: DETECT MIXED PREDICTORS & APPLY ENCODING POLICY
+  # ==========================================================================
+
+  # Check if there are any categorical predictors
+  has_mixed <- has_categorical_predictors(data$data, config$driver_vars)
+  config$has_mixed_predictors <- has_mixed
+
+  if (has_mixed) {
+    cat("\n   [MIXED PREDICTORS DETECTED]\n")
+
+    # Apply encoding policy (TRS-mandated)
+    encoding_result <- enforce_encoding_policy(
+      data = data$data,
+      driver_vars = config$driver_vars,
+      driver_settings = config$driver_settings,
+      allow_polynomial = FALSE
+    )
+
+    # Update data with encoded version
+    data$data <- encoding_result$data
+    config$encoding_report <- encoding_result$encoding_report
+
+    # Print encoding summary
+    print_encoding_summary(encoding_result$encoding_report)
+  }
+
+  # ==========================================================================
   # STEP 3: CALCULATE CORRELATIONS
   # ==========================================================================
 
   cat("\n3. Calculating correlations...\n")
-  correlations <- calculate_correlations(data$data, config)
-  cat("   [OK] Correlation matrix calculated\n")
 
-  # Check for high collinearity (soft warning, not hard stop) 
-  # chaged cor_matrix <- correlations$matrix to cor_matrix <- correlations
-  cor_matrix <- correlations
-  driver_cors <- cor_matrix[config$driver_vars, config$driver_vars]
-  diag(driver_cors) <- 0  # Ignore self-correlations
+  # For mixed predictors: only compute correlations for numeric drivers
+  if (has_mixed) {
+    numeric_drivers <- get_numeric_drivers(data$data, config$driver_vars)
+    if (length(numeric_drivers) < length(config$driver_vars)) {
+      cat("   [PARTIAL] Correlations computed for numeric drivers only\n")
+      cat(sprintf("   - %d of %d drivers are numeric\n",
+                  length(numeric_drivers), length(config$driver_vars)))
+      degraded_reasons <- c(degraded_reasons,
+                            "Correlations only computed for numeric drivers (categorical excluded)")
+      affected_outputs <- c(affected_outputs, "Correlation matrix", "Quadrant chart correlations")
 
-  high_cor_threshold <- 0.9
-  high_cors <- which(abs(driver_cors) > high_cor_threshold, arr.ind = TRUE)
-  if (nrow(high_cors) > 0) {
-    for (i in seq_len(nrow(high_cors))) {
-      if (high_cors[i, 1] < high_cors[i, 2]) {  # Avoid duplicates
-        var1 <- rownames(driver_cors)[high_cors[i, 1]]
-        var2 <- colnames(driver_cors)[high_cors[i, 2]]
-        cor_val <- driver_cors[high_cors[i, 1], high_cors[i, 2]]
-        guard <- guard_record_collinearity(guard, var1, var2, cor_val)
-        cat(sprintf("   [WARN] High collinearity: %s <-> %s (r=%.2f)\n", var1, var2, cor_val))
+      # Compute correlations only for numeric subset
+      if (length(numeric_drivers) >= 2) {
+        numeric_config <- config
+        numeric_config$driver_vars <- numeric_drivers
+        correlations <- calculate_correlations(data$data, numeric_config)
+      } else {
+        correlations <- NULL
+        cat("   [WARN] Not enough numeric drivers for correlation matrix\n")
+      }
+    } else {
+      # All drivers are numeric despite has_mixed being TRUE (edge case)
+      correlations <- calculate_correlations(data$data, config)
+    }
+  } else {
+    correlations <- calculate_correlations(data$data, config)
+  }
+
+  if (!is.null(correlations)) {
+    cat("   [OK] Correlation matrix calculated\n")
+
+    # Check for high collinearity (soft warning, not hard stop)
+    cor_matrix <- correlations
+    # Only check drivers that are in the correlation matrix
+    available_drivers <- intersect(config$driver_vars, rownames(cor_matrix))
+    if (length(available_drivers) >= 2) {
+      driver_cors <- cor_matrix[available_drivers, available_drivers]
+      diag(driver_cors) <- 0  # Ignore self-correlations
+
+      high_cor_threshold <- 0.9
+      high_cors <- which(abs(driver_cors) > high_cor_threshold, arr.ind = TRUE)
+      if (nrow(high_cors) > 0) {
+        for (i in seq_len(nrow(high_cors))) {
+          if (high_cors[i, 1] < high_cors[i, 2]) {  # Avoid duplicates
+            var1 <- rownames(driver_cors)[high_cors[i, 1]]
+            var2 <- colnames(driver_cors)[high_cors[i, 2]]
+            cor_val <- driver_cors[high_cors[i, 1], high_cors[i, 2]]
+            guard <- guard_record_collinearity(guard, var1, var2, cor_val)
+            cat(sprintf("   [WARN] High collinearity: %s <-> %s (r=%.2f)\n", var1, var2, cor_val))
+          }
+        }
       }
     }
   }
@@ -217,15 +285,46 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   r_squared <- summary(model)$r.squared
   cat(sprintf("   [OK] Model R-squared = %.3f\n", r_squared))
 
-  # Validate model mapping (ensure all drivers are in model)
-  guard <- validate_keydriver_mapping(model, config$driver_vars, guard)
+  # ==========================================================================
+  # STEP 4.5: BUILD TERM MAPPING (for mixed predictors)
+  # ==========================================================================
+
+  term_mapping <- NULL
+  if (has_mixed) {
+    cat("\n   [BUILDING TERM MAPPING]\n")
+
+    # Build model formula
+    formula_str <- paste(config$outcome_var, "~", paste(config$driver_vars, collapse = " + "))
+    model_formula <- stats::as.formula(formula_str)
+
+    # Build term-to-driver mapping
+    term_mapping <- build_term_mapping(model_formula, data$data, config$driver_vars)
+
+    # Validate mapping (TRS gate - REFUSES on mismatch)
+    validate_term_mapping(term_mapping, config$driver_vars)
+
+    # Print mapping summary
+    print_term_mapping_summary(term_mapping)
+  } else {
+    # For continuous-only, use old validation
+    guard <- validate_keydriver_mapping(model, config$driver_vars, guard)
+  }
 
   # ==========================================================================
-  # STEP 5: CALCULATE IMPORTANCE SCORES (Traditional Methods)
+  # STEP 5: CALCULATE IMPORTANCE SCORES
   # ==========================================================================
 
   cat("\n5. Calculating importance scores...\n")
-  importance <- calculate_importance_scores(model, data$data, correlations, config)
+
+  if (has_mixed && !is.null(term_mapping)) {
+    # Use mixed predictor importance calculation
+    cat("   Using driver-level aggregation for mixed predictors\n")
+    importance <- calculate_importance_mixed(model, data$data, config, term_mapping)
+  } else {
+    # Use traditional importance calculation
+    importance <- calculate_importance_scores(model, data$data, correlations, config)
+  }
+
   cat("   [OK] Multiple importance methods calculated\n")
 
   # Initialize results list
@@ -543,7 +642,16 @@ find_turas_root <- function() {
     current_dir <- dirname(current_dir)
   }
 
-  stop("Cannot locate Turas root directory", call. = FALSE)
+  keydriver_refuse(
+    code = "IO_TURAS_ROOT_NOT_FOUND",
+    title = "Cannot Locate Turas Root Directory",
+    problem = "Could not find the Turas root directory by searching parent directories.",
+    why_it_matters = "Turas needs to locate its module files to run analysis.",
+    how_to_fix = c(
+      "Ensure you are running from within the Turas project directory",
+      "The directory must contain 'launch_turas.R' or 'turas.R' or 'modules/shared/'"
+    )
+  )
 }
 
 

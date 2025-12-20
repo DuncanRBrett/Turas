@@ -423,3 +423,294 @@ calculate_shapley_values <- function(model, data, config) {
   names(shapley_pct) <- driver_vars
   unname(shapley_pct)
 }
+
+
+# ==============================================================================
+# MIXED PREDICTOR SUPPORT - DRIVER-LEVEL AGGREGATION
+# ==============================================================================
+
+#' Calculate Importance Scores for Mixed Predictors
+#'
+#' Main entry point for importance calculation with mixed predictors.
+#' Uses term-level calculation then aggregates to driver level.
+#'
+#' @param model Fitted model
+#' @param data Data frame
+#' @param config Configuration list
+#' @param term_mapping Result from build_term_mapping()
+#' @return Data frame with driver-level importance
+#' @export
+calculate_importance_mixed <- function(model, data, config, term_mapping) {
+
+  driver_vars <- config$driver_vars
+
+  # Initialize results
+  importance <- data.frame(
+    Driver = driver_vars,
+    Label = vapply(
+      driver_vars,
+      function(v) {
+        label <- config$variables$Label[config$variables$VariableName == v][1]
+        if (is.na(label) || is.null(label)) v else label
+      },
+      character(1)
+    ),
+    Type = term_mapping$predictor_info$type,
+    N_Terms = term_mapping$predictor_info$n_terms,
+    stringsAsFactors = FALSE
+  )
+
+  # METHOD 1: Aggregated Beta Weights
+  beta_res <- calculate_beta_weights_mixed(model, data, config, term_mapping)
+  importance$Beta_Weight <- beta_res$driver_importance
+  importance$Beta_Direction <- beta_res$driver_direction
+
+  # METHOD 2: Aggregated Relative Weights
+  importance$Relative_Weight <- calculate_relative_weights_mixed(model, data, config, term_mapping)
+
+  # METHOD 3: Shapley Values (still at driver level - uses driver in formula)
+  # Skip if any categorical predictors (Shapley handles whole driver naturally)
+  importance$Shapley_Value <- calculate_shapley_values(model, data, config)
+
+  # METHOD 4: Correlations - only for numeric drivers
+  numeric_drivers <- get_numeric_drivers(data, driver_vars)
+  correlations <- calculate_correlations(data, config)
+
+  importance$Correlation <- vapply(driver_vars, function(drv) {
+    if (drv %in% numeric_drivers) {
+      as.numeric(correlations[config$outcome_var, drv])
+    } else {
+      NA_real_  # Correlation not meaningful for categorical
+    }
+  }, numeric(1))
+
+  # Calculate ranks
+  importance$Beta_Rank <- rank(-abs(importance$Beta_Weight), ties.method = "average")
+  importance$RelWeight_Rank <- rank(-importance$Relative_Weight, ties.method = "average")
+  importance$Shapley_Rank <- rank(-importance$Shapley_Value, ties.method = "average")
+
+  # For correlation rank, only rank numeric drivers
+  corr_vals <- importance$Correlation
+  corr_vals[is.na(corr_vals)] <- 0  # NAs get lowest rank
+  importance$Corr_Rank <- rank(-abs(corr_vals), ties.method = "average")
+
+  # Average rank (exclude correlation for categorical drivers)
+  importance$Average_Rank <- rowMeans(importance[, c(
+    "Beta_Rank", "RelWeight_Rank", "Shapley_Rank"
+  )])
+
+  # Sort by Shapley
+  importance <- importance[order(-importance$Shapley_Value), ]
+  rownames(importance) <- NULL
+
+  importance
+}
+
+
+#' Calculate Beta Weights with Driver-Level Aggregation
+#'
+#' Computes standardized betas at term level, then aggregates to driver level.
+#'
+#' Aggregation method (per Mixed Predictor Spec):
+#'   driver_importance = sum(|beta_term|) over all terms belonging to driver
+#'
+#' @param model Fitted model
+#' @param data Data frame
+#' @param config Configuration
+#' @param term_mapping Term mapping result
+#' @return List with driver_importance and driver_direction
+#' @keywords internal
+calculate_beta_weights_mixed <- function(model, data, config, term_mapping) {
+
+  driver_vars <- config$driver_vars
+  outcome_var <- config$outcome_var
+  driver_terms <- term_mapping$driver_terms
+
+  # Get all coefficients (excluding intercept)
+  all_coefs <- stats::coef(model)
+  all_coefs <- all_coefs[names(all_coefs) != "(Intercept)"]
+
+  # Check for NA coefficients (aliased)
+  na_terms <- names(all_coefs)[is.na(all_coefs)]
+  if (length(na_terms) > 0) {
+    # Find which drivers these belong to
+    affected_drivers <- unique(term_mapping$term_map[na_terms])
+    affected_drivers <- affected_drivers[!is.na(affected_drivers) & nzchar(affected_drivers)]
+
+    if (length(affected_drivers) > 0) {
+      keydriver_refuse(
+        code = "MODEL_ALIASED_COEFFICIENTS",
+        title = "Aliased Coefficients (Multicollinearity)",
+        problem = paste0("Coefficients for some terms are NA due to perfect collinearity."),
+        why_it_matters = "Cannot compute importance for aliased terms. This typically means predictors are linearly dependent.",
+        how_to_fix = c(
+          "Check for redundant factor levels across drivers",
+          "Remove one of the collinear predictors",
+          "Check if any categorical driver has a level that is a subset of another"
+        ),
+        details = paste0("Affected terms: ", paste(na_terms, collapse = ", "))
+      )
+    }
+  }
+
+  # Build model.matrix for standardization
+  mm <- stats::model.matrix(model)
+  mm <- mm[, colnames(mm) != "(Intercept)", drop = FALSE]
+
+  # Calculate term-level standardized betas
+  sd_y <- sd(data[[outcome_var]], na.rm = TRUE)
+  term_betas <- numeric(length(all_coefs))
+  names(term_betas) <- names(all_coefs)
+
+  for (term in names(all_coefs)) {
+    if (!is.na(all_coefs[term]) && term %in% colnames(mm)) {
+      sd_x <- sd(mm[, term], na.rm = TRUE)
+      if (sd_x > 0 && sd_y > 0) {
+        term_betas[term] <- all_coefs[term] * (sd_x / sd_y)
+      }
+    }
+  }
+
+  # Aggregate to driver level
+  driver_importance <- numeric(length(driver_vars))
+  names(driver_importance) <- driver_vars
+  driver_direction <- character(length(driver_vars))
+  names(driver_direction) <- driver_vars
+
+  for (drv in driver_vars) {
+    terms <- driver_terms[[drv]]
+    if (length(terms) == 0) {
+      driver_importance[drv] <- 0
+      driver_direction[drv] <- "N/A"
+      next
+    }
+
+    # Get betas for this driver's terms
+    drv_betas <- term_betas[terms]
+    drv_betas <- drv_betas[!is.na(drv_betas)]
+
+    if (length(drv_betas) == 0) {
+      driver_importance[drv] <- 0
+      driver_direction[drv] <- "N/A"
+      next
+    }
+
+    # Aggregation: sum of absolute values
+    driver_importance[drv] <- sum(abs(drv_betas))
+
+    # Direction: sign of largest |beta|, or "mixed" if signs differ
+    max_idx <- which.max(abs(drv_betas))
+    if (all(drv_betas >= 0) || all(drv_betas <= 0)) {
+      driver_direction[drv] <- if (drv_betas[max_idx] >= 0) "positive" else "negative"
+    } else {
+      driver_direction[drv] <- "mixed"
+    }
+  }
+
+  # Normalize to percentages
+  sum_importance <- sum(driver_importance)
+  if (sum_importance > 0) {
+    driver_importance <- (driver_importance / sum_importance) * 100
+  }
+
+  list(
+    driver_importance = as.numeric(driver_importance),
+    driver_direction = as.character(driver_direction)
+  )
+}
+
+
+#' Calculate Relative Weights for Mixed Predictors
+#'
+#' Computes relative weights at term level (using model.matrix),
+#' then aggregates to driver level.
+#'
+#' @param model Fitted model
+#' @param data Data frame
+#' @param config Configuration
+#' @param term_mapping Term mapping result
+#' @return Numeric vector of driver-level relative weights (percentages)
+#' @keywords internal
+calculate_relative_weights_mixed <- function(model, data, config, term_mapping) {
+
+  driver_vars <- config$driver_vars
+  outcome_var <- config$outcome_var
+  driver_terms <- term_mapping$driver_terms
+
+  # Build model matrix (excluding intercept)
+  mm <- stats::model.matrix(model)
+  mm <- mm[, colnames(mm) != "(Intercept)", drop = FALSE]
+
+  # Get outcome
+  y <- data[[outcome_var]]
+
+  # Remove rows with NA
+  complete <- complete.cases(mm, y)
+  mm <- mm[complete, , drop = FALSE]
+  y <- y[complete]
+
+  # Correlation matrix of model matrix columns (terms)
+  R_xx <- cor(mm)
+  r_xy <- cor(mm, y)[, 1]
+
+  p <- ncol(mm)
+  term_names <- colnames(mm)
+
+  # Eigen decomposition
+  eig <- eigen(R_xx, symmetric = TRUE)
+  vals <- eig$values
+  vecs <- eig$vectors
+
+  # Guard against numerical negatives
+  vals[vals < 0] <- 0
+
+  # Check for near-singularity
+  if (any(vals < 1e-10)) {
+    # Matrix is near-singular - use fallback to beta weights
+    cat("   [WARN] Near-singular correlation matrix - using simplified relative weights\n")
+    # Fallback: use squared correlations as proxy
+    rw_term <- r_xy^2
+    rw_term[is.na(rw_term)] <- 0
+  } else {
+    # Standard Johnson relative weights at term level
+    Lambda_sqrt <- diag(sqrt(vals), nrow = p, ncol = p)
+    Lambda_inv_sqrt <- diag(1 / sqrt(vals), nrow = p, ncol = p)
+
+    Phi <- vecs %*% Lambda_sqrt
+    r_z_y <- Lambda_inv_sqrt %*% t(vecs) %*% r_xy
+    r2_z_y <- as.numeric(r_z_y)^2
+
+    Phi_sq <- Phi^2
+    rw_term <- as.numeric(Phi_sq %*% r2_z_y)
+  }
+
+  names(rw_term) <- term_names
+
+  # Aggregate to driver level
+  driver_rw <- numeric(length(driver_vars))
+  names(driver_rw) <- driver_vars
+
+  for (drv in driver_vars) {
+    terms <- driver_terms[[drv]]
+    if (length(terms) == 0) {
+      driver_rw[drv] <- 0
+      next
+    }
+
+    # Sum term-level relative weights for this driver
+    matching_terms <- intersect(terms, term_names)
+    if (length(matching_terms) > 0) {
+      driver_rw[drv] <- sum(rw_term[matching_terms], na.rm = TRUE)
+    } else {
+      driver_rw[drv] <- 0
+    }
+  }
+
+  # Normalize to percentages
+  sum_rw <- sum(driver_rw)
+  if (sum_rw > 0) {
+    driver_rw <- (driver_rw / sum_rw) * 100
+  }
+
+  as.numeric(driver_rw)
+}

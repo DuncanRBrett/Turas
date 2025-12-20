@@ -412,6 +412,7 @@ run_keydriver_gui <- function() {
 
         # 3. Source remaining module files in order
         source(file.path(turas_root, "modules/keydriver/R/01_config.R"))
+        source(file.path(turas_root, "modules/keydriver/R/02_term_mapping.R"))
         source(file.path(turas_root, "modules/keydriver/R/02_validation.R"))
         source(file.path(turas_root, "modules/keydriver/R/03_analysis.R"))
         source(file.path(turas_root, "modules/keydriver/R/04_output.R"))

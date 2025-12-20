@@ -66,21 +66,24 @@ catdriver_refuse <- function(reason = NULL, message = NULL,
   # Handle legacy interface (reason + message only)
   if (!is.null(message) && is.null(problem)) {
     # Legacy call: convert message to structured format
+    # why_it_matters is now MANDATORY per TRS governance
     turas_refuse(
       code = reason,
       title = if (!is.null(title)) title else gsub("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|PKG_|FEATURE_|BUG_)", "", reason),
       problem = message,
+      why_it_matters = if (!is.null(why_it_matters)) why_it_matters else "This issue prevents the analysis from producing valid results.",
       how_to_fix = if (!is.null(fix)) fix else "Review the error message above and correct your configuration or data.",
       details = details,
       module = "CATDRIVER"
     )
   } else {
     # Structured interface: pass through to turas_refuse
+    # why_it_matters is now MANDATORY per TRS governance
     turas_refuse(
       code = reason,
       title = if (!is.null(title)) title else gsub("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|PKG_|FEATURE_|BUG_)", "", reason),
       problem = if (!is.null(problem)) problem else "An error occurred in CatDriver analysis.",
-      why_it_matters = why_it_matters,
+      why_it_matters = if (!is.null(why_it_matters)) why_it_matters else "This issue prevents the analysis from producing valid results.",
       how_to_fix = if (!is.null(fix)) fix else "Review the error details and correct your configuration or data.",
       details = details,
       module = "CATDRIVER"

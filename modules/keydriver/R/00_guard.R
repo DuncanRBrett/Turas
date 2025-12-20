@@ -42,7 +42,7 @@
 keydriver_refuse <- function(code,
                              title,
                              problem,
-                             why_it_matters = NULL,
+                             why_it_matters,
                              how_to_fix,
                              expected = NULL,
                              observed = NULL,
