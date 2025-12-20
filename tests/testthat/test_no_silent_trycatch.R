@@ -25,6 +25,11 @@ testthat::test_that("No silent tryCatch error handlers exist", {
     "/tests/testthat/_snaps/"
   )
 
+  # files to skip (this test file contains example patterns that would false-positive)
+  skip_files <- c(
+    "test_no_silent_trycatch.R"
+  )
+
   # allowlist: exact matches to suppress known false positives.
   # Format: list(list(file="relative/path.R", line=123, why="..."), ...)
   allowlist <- list(
@@ -48,7 +53,16 @@ testthat::test_that("No silent tryCatch error handlers exist", {
 
   # ---- helpers ----
   is_skipped_path <- function(p) {
-    any(vapply(skip_dirs, function(d) grepl(d, p, fixed = TRUE), logical(1)))
+    # skip by directory
+    if (any(vapply(skip_dirs, function(d) grepl(d, p, fixed = TRUE), logical(1)))) {
+      return(TRUE)
+    }
+    # skip by filename
+    fname <- basename(p)
+    if (any(vapply(skip_files, function(f) fname == f, logical(1)))) {
+      return(TRUE)
+    }
+    FALSE
   }
 
   rel_path <- function(p) sub(paste0("^", root, "/?"), "", p)
