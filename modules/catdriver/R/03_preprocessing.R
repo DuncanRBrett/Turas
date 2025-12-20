@@ -402,14 +402,55 @@ prepare_predictors <- function(data, config) {
         var_data <- factor(var_data)
       }
 
+      # =======================================================================
+      # HARD VALIDATION: If order_spec provided, check levels match data
+      # =======================================================================
+      if (!is.null(order_spec) && length(order_spec) > 0) {
+        data_levels <- levels(var_data)
+        missing_in_data <- setdiff(order_spec, data_levels)
+        extra_in_data <- setdiff(data_levels, order_spec)
+
+        if (length(missing_in_data) > 0 || length(extra_in_data) > 0) {
+          catdriver_refuse(
+            reason = "MAPPER_DRIVER_LEVEL_MISMATCH",
+            title = "DRIVER LEVEL MISMATCH",
+            problem = paste0("Driver '", var_name, "' level specification doesn't match data."),
+            why_it_matters = paste0(
+              "The levels in your config must exactly match the values in your data. ",
+              "Mismatched levels would cause incorrect OR interpretations or silent data loss."
+            ),
+            fix = c(
+              "Update the Order column or levels_order in Driver_Settings to match your data values.",
+              if (length(missing_in_data) > 0)
+                paste0("Config levels not in data: ", paste(missing_in_data, collapse = ", ")),
+              if (length(extra_in_data) > 0)
+                paste0("Data values not in config: ", paste(extra_in_data, collapse = ", "))
+            ),
+            details = paste0(
+              "Config levels: ", paste(order_spec, collapse = ";"), "\n",
+              "Data levels: ", paste(data_levels, collapse = ";")
+            )
+          )
+        }
+      }
+
       # Set reference level - PREFER explicit from Driver_Settings
       if (!is.null(explicit_ref) && !is.na(explicit_ref) && nzchar(explicit_ref)) {
         if (explicit_ref %in% levels(var_data)) {
           var_data <- relevel(var_data, ref = explicit_ref)
         } else {
-          warning("Reference level '", explicit_ref, "' not found in '", var_name,
-                  "'. Using first level.")
-          var_data <- relevel(var_data, ref = levels(var_data)[1])
+          # REFUSE instead of warning - explicit ref level must exist
+          catdriver_refuse(
+            reason = "MAPPER_REFERENCE_LEVEL_NOT_FOUND",
+            title = "REFERENCE LEVEL NOT FOUND",
+            problem = paste0("Driver '", var_name, "' reference level '", explicit_ref,
+                           "' not found in data."),
+            why_it_matters = "The reference level must exist in the data to properly set contrasts.",
+            fix = c(
+              "Check that the reference_level in Driver_Settings matches a value in your data.",
+              paste0("Available levels: ", paste(levels(var_data), collapse = ", "))
+            )
+          )
         }
       } else if (!is.null(order_spec) && length(order_spec) > 0) {
         # First in order spec is reference
@@ -426,6 +467,36 @@ prepare_predictors <- function(data, config) {
       # Ordered factor - but use TREATMENT contrasts (not polynomial)
       # This keeps coefficients level-based and mappable for Factor Patterns output
       if (!is.null(order_spec) && length(order_spec) > 0) {
+        # =======================================================================
+        # HARD VALIDATION: Refuse if config levels don't match data levels
+        # =======================================================================
+        data_levels <- unique(as.character(na.omit(var_data)))
+        missing_in_data <- setdiff(order_spec, data_levels)
+        extra_in_data <- setdiff(data_levels, order_spec)
+
+        if (length(missing_in_data) > 0 || length(extra_in_data) > 0) {
+          catdriver_refuse(
+            reason = "MAPPER_DRIVER_LEVEL_MISMATCH",
+            title = "DRIVER LEVEL MISMATCH",
+            problem = paste0("Driver '", var_name, "' level specification doesn't match data."),
+            why_it_matters = paste0(
+              "The levels in your config must exactly match the values in your data. ",
+              "Mismatched levels would cause incorrect OR interpretations or silent data loss."
+            ),
+            fix = c(
+              "Update the Order column or levels_order in Driver_Settings to match your data values.",
+              if (length(missing_in_data) > 0)
+                paste0("Config levels not in data: ", paste(missing_in_data, collapse = ", ")),
+              if (length(extra_in_data) > 0)
+                paste0("Data values not in config: ", paste(extra_in_data, collapse = ", "))
+            ),
+            details = paste0(
+              "Config levels: ", paste(order_spec, collapse = ";"), "\n",
+              "Data levels: ", paste(data_levels, collapse = ";")
+            )
+          )
+        }
+
         var_data <- factor(var_data, levels = order_spec, ordered = TRUE)
       } else {
         var_data <- factor(var_data, ordered = TRUE)
