@@ -58,7 +58,9 @@ analyze_shap_interactions <- function(shp, config) {
         ) +
         turas_theme()
     }, error = function(e) {
-      # Skip if error
+      msg <- sprintf("SHAP interaction plot skipped for '%s': %s", v, conditionMessage(e))
+      cat(sprintf("   [WARN] %s\n", msg))
+      warning(msg, call. = FALSE)
     })
   }
 

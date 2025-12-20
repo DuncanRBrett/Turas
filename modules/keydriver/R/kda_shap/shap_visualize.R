@@ -334,7 +334,9 @@ create_interaction_plot <- function(shp, config) {
 
       plots[[v]] <- p
     }, error = function(e) {
-      # Silently skip if interactions not available
+      msg <- sprintf("SHAP interaction dependence plot skipped for '%s': %s", v, conditionMessage(e))
+      cat(sprintf("   [WARN] %s\n", msg))
+      warning(msg, call. = FALSE)
     })
   }
 
