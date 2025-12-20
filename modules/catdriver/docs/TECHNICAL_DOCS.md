@@ -98,7 +98,9 @@ source("modules/catdriver/R/04_analysis.R")      # Uses: 07_utilities, 08_guard
 source("modules/catdriver/R/04a_ordinal.R")      # Uses: 07_utilities, 08_guard
 source("modules/catdriver/R/04b_multinomial.R")  # Uses: 07_utilities, 08_guard
 source("modules/catdriver/R/05_importance.R")    # Uses: 07_utilities, 08_guard
-source("modules/catdriver/R/06_output.R")        # Uses: 07_utilities
+source("modules/catdriver/R/06a_sheets_summary.R") # Uses: 07_utilities
+source("modules/catdriver/R/06b_sheets_detail.R")  # Uses: 07_utilities
+source("modules/catdriver/R/06_output.R")        # Uses: 07_utilities, 06a, 06b
 source("modules/catdriver/R/00_main.R")          # Uses: all above
 ```
 
@@ -337,7 +339,7 @@ Per-driver configuration for type and missing data handling:
 
 **Type Handling:**
 - `categorical` / `nominal`: Unordered factor with treatment contrasts
-- `ordinal`: Ordered factor with **treatment contrasts** (not polynomial)
+- `ordinal`: Ordered factor with **treatment contrasts** (not polynomial). Contrast matrix dimnames are set to level labels so model matrix columns are named `gradeC` not `grade2`.
 - `binary`: Two-level factor
 
 **Missing Strategies:**
@@ -434,6 +436,7 @@ Refusals are caught by `with_refusal_handler()` at the top level for clean displ
 | Variable not in data | Refuse | `catdriver_refuse()` |
 | Insufficient sample | Refuse | `catdriver_refuse()` |
 | Missing package | Refuse | `catdriver_refuse()` |
+| Reference is missing indicator | Refuse | `catdriver_refuse()` (uses word boundaries to avoid false positives like "Finance" matching "na") |
 | Unmapped coefficients | Refuse | `catdriver_refuse()` |
 | Polynomial contrasts detected | Refuse | `catdriver_refuse()` |
 | Separation (no brglm2) | Refuse | `catdriver_refuse()` |
@@ -443,12 +446,14 @@ Refusals are caught by `with_refusal_handler()` at the top level for clean displ
 
 ### Strict Mapping Validation
 
-The term-to-level mapper (09_mapper.R) enforces strict validation:
+The term-to-level mapper (09_mapper.R) enforces strict validation using **positional mapping**:
 
-1. **No guessing**: If a coefficient cannot be exactly matched to a factor level, refuse
-2. **No warnings-only**: If any coefficients are unmapped, refuse (not warn)
-3. **Polynomial contrast detection**: If `.L/.Q/.C` patterns detected, refuse (ordinal should use treatment contrasts)
-4. **Validation gate**: `validate_mapping()` is called in the main pipeline before OR extraction
+1. **Positional mapping**: Uses `attr(model.matrix, "assign")` to map columns to terms by position, not string parsing. This is the only reliable approach since R's column naming can vary (`gradeC` vs `grade2`).
+2. **No guessing**: If a coefficient cannot be mapped, refuse
+3. **No warnings-only**: If any coefficients are unmapped, refuse (not warn)
+4. **Polynomial contrast detection**: If `.L/.Q/.C` patterns detected, refuse (ordinal should use treatment contrasts)
+5. **Column count verification**: Number of design matrix columns must match number of non-reference levels
+6. **Validation gate**: `validate_mapping()` is called in the main pipeline before OR extraction
 
 ### Graceful Degradation (Where Appropriate)
 
