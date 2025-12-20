@@ -162,16 +162,15 @@ extract_clm_results <- function(model, config, guard) {
   rownames(coef_df) <- NULL
 
   # Odds ratios
-  # NOTE: For ordinal models, the cumulative odds parameterization means:
-  #   exp(β) = odds of Y <= j (being in category j or BELOW)
-  # For intuitive interpretation (OR > 1 = higher outcome more likely),
-  # we negate the coefficient: exp(-β) = odds of Y > j (higher categories)
+  # NOTE: In proportional odds models (clm/polr), a positive coefficient means
+  # the predictor is associated with HIGHER values of the outcome.
+  # Therefore: exp(β) directly gives the odds ratio for higher outcomes.
   conf_level <- config$confidence_level
   z_crit <- qnorm(1 - (1 - conf_level) / 2)
 
-  coef_df$odds_ratio <- exp(-coef_df$estimate)  # Negate for intuitive interpretation
-  coef_df$or_lower <- exp(-coef_df$estimate - z_crit * coef_df$std_error)
-  coef_df$or_upper <- exp(-coef_df$estimate + z_crit * coef_df$std_error)
+  coef_df$odds_ratio <- exp(coef_df$estimate)
+  coef_df$or_lower <- exp(coef_df$estimate - z_crit * coef_df$std_error)
+  coef_df$or_upper <- exp(coef_df$estimate + z_crit * coef_df$std_error)
 
   # Thresholds
   thresh_se <- se_vals[names(se_vals) %in% threshold_names]
@@ -265,13 +264,13 @@ extract_polr_results <- function(model, config, guard) {
   )
   rownames(coef_df) <- NULL
 
-  # Odds ratios - same sign correction as clm (see note above)
+  # Odds ratios - same interpretation as clm (see note above)
   conf_level <- config$confidence_level
   z_crit <- qnorm(1 - (1 - conf_level) / 2)
 
-  coef_df$odds_ratio <- exp(-coef_df$estimate)  # Negate for intuitive interpretation
-  coef_df$or_lower <- exp(-coef_df$estimate - z_crit * coef_df$std_error)
-  coef_df$or_upper <- exp(-coef_df$estimate + z_crit * coef_df$std_error)
+  coef_df$odds_ratio <- exp(coef_df$estimate)
+  coef_df$or_lower <- exp(coef_df$estimate - z_crit * coef_df$std_error)
+  coef_df$or_upper <- exp(coef_df$estimate + z_crit * coef_df$std_error)
 
   thresh_df <- data.frame(
     threshold = names(model$zeta),

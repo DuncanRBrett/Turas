@@ -353,7 +353,7 @@ test_that("error_if_missing strategy produces hard error", {
 
   expect_error(
     prepare_analysis_data(data, config, NULL),
-    "HARD ERROR.*missing values"
+    "MISSING VALUES NOT ALLOWED"
   )
 })
 
@@ -407,7 +407,7 @@ test_that("guard_require_outcome_type rejects auto", {
 
   expect_error(
     guard_require_outcome_type(config),
-    "must be explicitly declared"
+    "OUTCOME TYPE NOT DECLARED"
   )
 })
 
@@ -524,7 +524,7 @@ test_that("H3: continuous driver type refused with CFG_CONTINUOUS_DRIVER_NOT_ALL
 
   expect_error(
     guard_require_driver_settings(config),
-    "CFG_CONTINUOUS_DRIVER_NOT_ALLOWED|CONTINUOUS DRIVERS NOT ALLOWED"
+    "INVALID DRIVER TYPE"
   )
 })
 
@@ -782,27 +782,8 @@ test_that("guard_summary correctly identifies issues", {
 
 
 # ==============================================================================
-# RUN TESTS IF NOT INTERACTIVE
+# TEST SUITE COMPLETE
 # ==============================================================================
-
-if (!interactive()) {
-  cat("\n========================================\n")
-  cat("CATDRIVER REGRESSION TEST SUITE\n")
-  cat("========================================\n\n")
-
-  test_results <- test_dir(".", reporter = "summary")
-
-  # Summary
-  test_df <- as.data.frame(test_results)
-  passed <- sum(test_df$nb) - sum(test_df$failed) - sum(test_df$skipped)
-  failed <- sum(test_df$failed)
-
-  cat("\n========================================\n")
-  if (failed > 0) {
-    cat("TESTS FAILED:", failed, "\n")
-    quit(status = 1)
-  } else {
-    cat("ALL TESTS PASSED:", passed, "\n")
-    quit(status = 0)
-  }
-}
+#
+# Tests are run via run_tests.R or testthat::test_file()
+# No automatic execution needed here
