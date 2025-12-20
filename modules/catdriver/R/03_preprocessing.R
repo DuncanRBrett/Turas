@@ -342,6 +342,17 @@ prepare_predictors <- function(data, config) {
         config$driver_orders[[var_name]]  # Fall back to Variables sheet order
       }
 
+      # TRS: Log the level specification source for traceability
+      if (!is.null(order_spec) && length(order_spec) > 0) {
+        order_source <- if (!is.null(explicit_order) && !is.na(explicit_order) && nzchar(explicit_order)) {
+          "Driver_Settings.levels_order"
+        } else {
+          "Variables.Order"
+        }
+        log_message(paste0("Driver '", var_name, "' levels from ", order_source, ": ",
+                          paste(order_spec, collapse = ";")), "info")
+      }
+
       # Map explicit type to internal representation
       if (!is.null(explicit_type) && !is.na(explicit_type) && nzchar(explicit_type)) {
         pred_type <- switch(tolower(explicit_type),
@@ -377,6 +388,12 @@ prepare_predictors <- function(data, config) {
       order_spec <- config$driver_orders[[var_name]]
       pred_type <- detect_predictor_type(var_data, order_spec)
       explicit_ref <- NULL
+
+      # TRS: Log the level specification source for traceability (legacy mode)
+      if (!is.null(order_spec) && length(order_spec) > 0) {
+        log_message(paste0("Driver '", var_name, "' levels from Variables.Order: ",
+                          paste(order_spec, collapse = ";")), "info")
+      }
     }
 
     # =========================================================================
@@ -407,6 +424,12 @@ prepare_predictors <- function(data, config) {
       # =======================================================================
       if (!is.null(order_spec) && length(order_spec) > 0) {
         data_levels <- levels(var_data)
+
+        # TRS: Log validation comparison
+        log_message(paste0("Validating '", var_name, "' - Config levels: [",
+                          paste(order_spec, collapse = ";"), "] vs Data levels: [",
+                          paste(data_levels, collapse = ";"), "]"), "info")
+
         missing_in_data <- setdiff(order_spec, data_levels)
         extra_in_data <- setdiff(data_levels, order_spec)
 
@@ -471,6 +494,12 @@ prepare_predictors <- function(data, config) {
         # HARD VALIDATION: Refuse if config levels don't match data levels
         # =======================================================================
         data_levels <- unique(as.character(na.omit(var_data)))
+
+        # TRS: Log validation comparison
+        log_message(paste0("Validating ordinal '", var_name, "' - Config levels: [",
+                          paste(order_spec, collapse = ";"), "] vs Data levels: [",
+                          paste(data_levels, collapse = ";"), "]"), "info")
+
         missing_in_data <- setdiff(order_spec, data_levels)
         extra_in_data <- setdiff(data_levels, order_spec)
 

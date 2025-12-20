@@ -404,11 +404,20 @@ run_keydriver_gui <- function() {
         output_text <- paste0(output_text, "Loading Key Driver module...\n\n")
         console_text(output_text)
 
-        source(file.path(turas_root, "modules/keydriver/R/00_main.R"))
+        # 1. Source shared TRS infrastructure first (required by all modules)
+        source(file.path(turas_root, "modules/shared/lib/import_all.R"))
+
+        # 2. Source guard file (defines keydriver_with_refusal_handler) BEFORE main
+        source(file.path(turas_root, "modules/keydriver/R/00_guard.R"))
+
+        # 3. Source remaining module files in order
         source(file.path(turas_root, "modules/keydriver/R/01_config.R"))
         source(file.path(turas_root, "modules/keydriver/R/02_validation.R"))
         source(file.path(turas_root, "modules/keydriver/R/03_analysis.R"))
         source(file.path(turas_root, "modules/keydriver/R/04_output.R"))
+
+        # 4. Source main entry point last (uses all the above)
+        source(file.path(turas_root, "modules/keydriver/R/00_main.R"))
 
         # Capture analysis output
         # Paths are read from config file Settings sheet

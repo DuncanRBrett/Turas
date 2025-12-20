@@ -407,6 +407,10 @@ run_catdriver_gui <- function() {
         output_text <- paste0(output_text, "Loading Categorical Key Driver module...\n\n")
         console_text(output_text)
 
+        # 1. Source shared TRS infrastructure first (required by guard files)
+        source(file.path(turas_root, "modules/shared/lib/import_all.R"))
+
+        # 2. Source CatDriver modules in dependency order
         source(file.path(turas_root, "modules/catdriver/R/07_utilities.R"))
         source(file.path(turas_root, "modules/catdriver/R/08_guard.R"))
         source(file.path(turas_root, "modules/catdriver/R/08a_guards_hard.R"))
