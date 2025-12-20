@@ -39,10 +39,13 @@ if (!exists("turas_refuse", mode = "function")) {
 
   possible_paths <- c(
     script_dir_path,
+    # When run from GUI, working dir is modules/tabs/lib, need to go up 2 levels
+    file.path(getwd(), "../../shared/lib/trs_refusal.R"),
+    # Standard Turas root path
     file.path(getwd(), "modules/shared/lib/trs_refusal.R"),
     file.path(Sys.getenv("TURAS_HOME"), "modules/shared/lib/trs_refusal.R"),
-    # Also try relative to script_dir if it exists (set by run_crosstabs.R)
-    if (exists("script_dir")) file.path(script_dir, "../shared/lib/trs_refusal.R") else NULL
+    # Relative to script_dir if it exists (set by run_crosstabs.R) - go up 2 levels
+    if (exists("script_dir")) file.path(script_dir, "../../shared/lib/trs_refusal.R") else NULL
   )
 
   # Filter out NULL paths
