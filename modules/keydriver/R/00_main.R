@@ -188,8 +188,9 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   correlations <- calculate_correlations(data$data, config)
   cat("   [OK] Correlation matrix calculated\n")
 
-  # Check for high collinearity (soft warning, not hard stop)
-  cor_matrix <- correlations$matrix
+  # Check for high collinearity (soft warning, not hard stop) 
+  # chaged cor_matrix <- correlations$matrix to cor_matrix <- correlations
+  cor_matrix <- correlations
   driver_cors <- cor_matrix[config$driver_vars, config$driver_vars]
   diag(driver_cors) <- 0  # Ignore self-correlations
 
