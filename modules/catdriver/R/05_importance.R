@@ -24,7 +24,13 @@ calculate_importance <- function(model_result, config) {
   # Try car::Anova for Type II tests
   anova_result <- tryCatch({
     if (!requireNamespace("car", quietly = TRUE)) {
-      stop("Package 'car' required for importance calculation")
+      catdriver_refuse(
+        reason = "PKG_CAR_MISSING",
+        title = "REQUIRED PACKAGE MISSING",
+        problem = "Package 'car' is required for variable importance calculation but is not installed.",
+        why_it_matters = "Variable importance uses Type II Wald chi-square tests from car::Anova.",
+        fix = "Install the package with: install.packages('car')"
+      )
     }
 
     if (model_result$model_type == "multinomial_logistic") {
@@ -75,7 +81,14 @@ process_anova_results <- function(anova_result, config) {
       if (any(numeric_cols)) {
         chisq_col <- names(anova_df)[which(numeric_cols)[1]]
       } else {
-        stop("Cannot identify chi-square column in Anova output")
+        catdriver_refuse(
+          reason = "IMPORTANCE_ANOVA_UNEXPECTED",
+          title = "UNEXPECTED ANOVA OUTPUT FORMAT",
+          problem = "Cannot identify chi-square column in Anova output.",
+          why_it_matters = "Variable importance calculation requires chi-square statistics from the Anova output.",
+          fix = "This may indicate an incompatible version of the 'car' package. Try updating with: install.packages('car')",
+          details = paste0("Columns found: ", paste(colnames(anova_df), collapse = ", "))
+        )
       }
     }
 
@@ -313,30 +326,64 @@ calculate_fallback_importance <- function(model_result, config) {
 
 #' Aggregate Dummy Variable Importance to Original Factor
 #'
+#' Uses the canonical mapper (R/09_mapper.R) when available, falls back
+#' to model.matrix introspection for reliable term-to-variable mapping.
+#' NEVER uses substring parsing.
+#'
 #' @param importance_df Data frame with term-level importance
 #' @param config Configuration list
+#' @param mapping Optional pre-computed mapping from map_terms_to_levels()
 #' @return Data frame with factor-level importance
 #' @keywords internal
-aggregate_dummy_importance <- function(importance_df, config) {
+aggregate_dummy_importance <- function(importance_df, config, mapping = NULL) {
 
-  # Match terms to original variables
+  # Match terms to original variables using proper introspection
   term_to_var <- character(nrow(importance_df))
 
   for (i in seq_len(nrow(importance_df))) {
     term <- importance_df$variable[i]
 
-    # Try to match to a driver variable
+    # First try: use mapping if available
+    if (!is.null(mapping)) {
+      match_idx <- which(mapping$coef_name == term | mapping$design_col == term)
+      if (length(match_idx) > 0) {
+        term_to_var[i] <- mapping$driver[match_idx[1]]
+        next
+      }
+    }
+
+    # Second try: exact match to driver variable names
+    if (term %in% config$driver_vars) {
+      term_to_var[i] <- term
+      next
+    }
+
+    # Third try: check contrasts/xlevels from model for reliable mapping
+    # This uses model matrix infrastructure instead of substring parsing
     matched <- FALSE
     for (driver_var in config$driver_vars) {
-      if (startsWith(term, driver_var)) {
-        term_to_var[i] <- driver_var
-        matched <- TRUE
-        break
+      # Get expected column names from model.matrix for this variable
+      # by checking if term matches the pattern R would generate
+      if (exists("prep_data") && !is.null(prep_data$predictor_info[[driver_var]])) {
+        levels_vec <- prep_data$predictor_info[[driver_var]]$levels
+        if (!is.null(levels_vec)) {
+          for (lvl in levels_vec[-1]) {  # Skip reference
+            expected_col <- paste0(driver_var, lvl)
+            expected_col_clean <- paste0(driver_var, make.names(lvl))
+            if (term == expected_col || term == expected_col_clean) {
+              term_to_var[i] <- driver_var
+              matched <- TRUE
+              break
+            }
+          }
+        }
+        if (matched) break
       }
     }
 
     if (!matched) {
-      # Keep as-is
+      # Final fallback: keep term as-is (it's likely already the variable name)
+      # Log a warning since we couldn't map it properly
       term_to_var[i] <- term
     }
   }
@@ -365,21 +412,54 @@ aggregate_dummy_importance <- function(importance_df, config) {
 }
 
 
-#' Extract Odds Ratios Summary
+#' Extract Odds Ratios Summary (DEPRECATED)
 #'
-#' Creates a summary of odds ratios by factor and category.
+#' @description
+#' \lifecycle{deprecated}
+#'
+#' This function is DEPRECATED as of v2.0. Use extract_odds_ratios_mapped()
+#' with a canonical term mapping from map_terms_to_levels() instead.
+#'
+#' The main pipeline (run_categorical_keydriver) no longer calls this function.
+#' It exists only for backward compatibility and will be removed in a future version.
 #'
 #' @param model_result Model results
 #' @param config Configuration list
 #' @param prep_data Preprocessed data
+#' @param mapping Optional pre-computed mapping from map_terms_to_levels()
 #' @return Data frame with odds ratio summary
-#' @export
-extract_odds_ratios <- function(model_result, config, prep_data) {
+#' @keywords internal
+extract_odds_ratios <- function(model_result, config, prep_data, mapping = NULL) {
+
+  # Deprecation warning
+
+  warning(
+    "extract_odds_ratios() is DEPRECATED as of v2.0.\n",
+    "Use extract_odds_ratios_mapped() with canonical term mapping instead.\n",
+    "This function will be removed in a future version.",
+    call. = FALSE
+  )
 
   coef_df <- model_result$coefficients
 
   # Remove intercept
   coef_df <- coef_df[!grepl("^\\(Intercept\\)", coef_df$term), ]
+
+  # Build mapping if not provided - use model matrix infrastructure
+  if (is.null(mapping) && !is.null(model_result$model)) {
+    mapping <- tryCatch({
+      if (model_result$model_type == "multinomial_logistic") {
+        map_multinomial_terms(model_result$model, prep_data$data,
+                             prep_data$model_formula, config$outcome_var)
+      } else {
+        map_terms_to_levels(model_result$model, prep_data$data,
+                           prep_data$model_formula)
+      }
+    }, error = function(e) {
+      warning("Could not build term mapping: ", e$message)
+      NULL
+    })
+  }
 
   # Parse term names to extract factor and level
   or_list <- list()
@@ -387,28 +467,57 @@ extract_odds_ratios <- function(model_result, config, prep_data) {
   for (i in seq_len(nrow(coef_df))) {
     term <- coef_df$term[i]
 
-    # Try to match to driver variables
+    # Try to match using proper mapping first
     matched_var <- NULL
     matched_level <- NULL
+    ref_level <- NA
 
-    for (driver_var in config$driver_vars) {
-      if (startsWith(term, driver_var)) {
-        matched_var <- driver_var
-        matched_level <- substring(term, nchar(driver_var) + 1)
-        break
+    if (!is.null(mapping)) {
+      # Use canonical mapping
+      match_idx <- which(mapping$coef_name == term & !mapping$is_reference)
+      if (length(match_idx) > 0) {
+        m <- mapping[match_idx[1], ]
+        matched_var <- m$driver
+        matched_level <- m$level
+        ref_level <- m$reference_level
       }
     }
 
+    # Fallback: exact match to driver variable (for continuous vars)
+    if (is.null(matched_var)) {
+      if (term %in% config$driver_vars) {
+        matched_var <- term
+        matched_level <- "per unit"
+      } else {
+        # Use predictor_info from prep_data for mapping via levels
+        for (driver_var in config$driver_vars) {
+          info <- prep_data$predictor_info[[driver_var]]
+          if (!is.null(info) && !is.null(info$levels)) {
+            for (lvl in info$levels[-1]) {  # Skip reference
+              expected_col <- paste0(driver_var, lvl)
+              expected_col_clean <- paste0(driver_var, make.names(lvl))
+              if (term == expected_col || term == expected_col_clean) {
+                matched_var <- driver_var
+                matched_level <- lvl
+                ref_level <- info$reference_level
+                break
+              }
+            }
+          }
+          if (!is.null(matched_var)) break
+        }
+      }
+    }
+
+    # Final fallback: use term as-is
     if (is.null(matched_var)) {
       matched_var <- term
       matched_level <- NA
     }
 
-    # Get reference level
-    ref_level <- if (!is.null(prep_data$predictor_info[[matched_var]])) {
-      prep_data$predictor_info[[matched_var]]$reference_level
-    } else {
-      NA
+    # Get reference level from prep_data if not already set
+    if (is.na(ref_level) && !is.null(prep_data$predictor_info[[matched_var]])) {
+      ref_level <- prep_data$predictor_info[[matched_var]]$reference_level
     }
 
     row_data <- data.frame(

@@ -29,8 +29,13 @@ detect_outcome_type <- function(outcome_var, order_spec = NULL, override_type = 
   # Validate minimum categories
 
   if (n_unique < 2) {
-    stop("Outcome variable must have at least 2 categories. Found: ", n_unique,
-         call. = FALSE)
+    catdriver_refuse(
+      reason = "CFG_OUTCOME_INSUFFICIENT_CATEGORIES",
+      title = "INSUFFICIENT OUTCOME CATEGORIES",
+      problem = paste0("Outcome variable has only ", n_unique, " unique value(s)."),
+      why_it_matters = "Logistic regression requires at least 2 distinct outcome categories.",
+      fix = "Check that your outcome variable has at least 2 different values in the data."
+    )
   }
 
   # Handle override
@@ -179,6 +184,7 @@ detect_predictor_type <- function(predictor_var, order_spec = NULL) {
 #' Prepare Outcome Variable
 #'
 #' Converts outcome variable to appropriate format for modeling.
+#' REFUSES with hard error if outcome type doesn't match data.
 #'
 #' @param data Data frame
 #' @param config Configuration list
@@ -192,6 +198,66 @@ prepare_outcome <- function(data, config, outcome_info) {
 
   # Get reference category
   ref_cat <- config$reference_category
+
+  # Get data categories
+  data_cats <- unique(as.character(na.omit(outcome_data)))
+  n_data_cats <- length(data_cats)
+
+  # ===========================================================================
+  # HARD VALIDATION: Refuse if outcome_type doesn't match data
+  # ===========================================================================
+
+  if (outcome_info$type == "binary") {
+    if (n_data_cats != 2) {
+      catdriver_refuse(
+        reason = "CFG_OUTCOME_TYPE_MISMATCH",
+        title = "OUTCOME TYPE MISMATCH",
+        problem = paste0("outcome_type='binary' specified but data has ", n_data_cats, " categories."),
+        why_it_matters = "Binary logistic regression requires exactly 2 outcome categories.",
+        fix = paste0("Either:\n",
+                     "  1. Set outcome_type='ordinal' or 'multinomial' in Settings, OR\n",
+                     "  2. Verify your data has exactly 2 outcome categories"),
+        details = paste0("Found categories: ", paste(data_cats, collapse = ", "))
+      )
+    }
+  }
+
+  if (outcome_info$type == "ordinal" && !is.null(config$outcome_order)) {
+    # Check that all config categories exist in data
+    config_cats <- config$outcome_order
+    missing_in_data <- setdiff(config_cats, data_cats)
+    extra_in_data <- setdiff(data_cats, config_cats)
+
+    if (length(missing_in_data) > 0) {
+      catdriver_refuse(
+        reason = "CFG_OUTCOME_CATEGORY_MISMATCH",
+        title = "OUTCOME CATEGORY MISMATCH",
+        problem = "Configured outcome categories not found in data.",
+        why_it_matters = "All specified outcome categories must exist in the data.",
+        fix = "Update outcome Order in Variables sheet to match data categories.",
+        details = paste0("Missing categories: ", paste(missing_in_data, collapse = ", "), "\n",
+                         "Data categories: ", paste(data_cats, collapse = ", "))
+      )
+    }
+
+    if (length(extra_in_data) > 0) {
+      catdriver_refuse(
+        reason = "CFG_OUTCOME_CATEGORY_MISMATCH",
+        title = "OUTCOME CATEGORY MISMATCH",
+        problem = "Data contains outcome categories not in config.",
+        why_it_matters = "All data categories must be accounted for in the config.",
+        fix = paste0("Either:\n",
+                     "  1. Update outcome Order in Variables to include all data categories, OR\n",
+                     "  2. Clean data to only include expected categories"),
+        details = paste0("Extra categories: ", paste(extra_in_data, collapse = ", "), "\n",
+                         "Configured: ", paste(config_cats, collapse = ", "))
+      )
+    }
+  }
+
+  # ===========================================================================
+  # PROCEED WITH OUTCOME PREPARATION
+  # ===========================================================================
 
   if (outcome_info$type == "binary") {
     # Convert to factor
@@ -209,20 +275,7 @@ prepare_outcome <- function(data, config, outcome_info) {
   } else if (outcome_info$type == "ordinal") {
     # Convert to ordered factor with specified order
     if (!is.null(outcome_info$categories)) {
-      # Match data values to categories
-      data_cats <- unique(as.character(outcome_data))
-      config_cats <- outcome_info$categories
-
-      # Find matching categories
-      matching_cats <- intersect(config_cats, data_cats)
-      if (length(matching_cats) < length(data_cats)) {
-        extra_cats <- setdiff(data_cats, config_cats)
-        warning("Some outcome categories not in specified order: ",
-                paste(extra_cats, collapse = ", "))
-        matching_cats <- c(matching_cats, extra_cats)
-      }
-
-      outcome_data <- factor(outcome_data, levels = matching_cats, ordered = TRUE)
+      outcome_data <- factor(outcome_data, levels = outcome_info$categories, ordered = TRUE)
     } else {
       outcome_data <- factor(outcome_data, ordered = TRUE)
     }
@@ -230,7 +283,7 @@ prepare_outcome <- function(data, config, outcome_info) {
     data[[outcome_var]] <- outcome_data
 
   } else {
-    # Nominal: unordered factor
+    # Nominal/Multinomial: unordered factor
     if (!is.factor(outcome_data)) {
       outcome_data <- factor(outcome_data)
     }
@@ -253,6 +306,8 @@ prepare_outcome <- function(data, config, outcome_info) {
 #' Prepare Predictor Variables
 #'
 #' Converts predictor variables to appropriate format for modeling.
+#' Uses DRIVER_SETTINGS from config for explicit type and reference level.
+#' Falls back to inference ONLY when no Driver_Settings sheet exists.
 #'
 #' @param data Data frame
 #' @param config Configuration list
@@ -262,19 +317,84 @@ prepare_predictors <- function(data, config) {
 
   predictor_info <- list()
 
+  # Check if we have explicit Driver_Settings
+  has_driver_settings <- !is.null(config$driver_settings) &&
+                         is.data.frame(config$driver_settings) &&
+                         nrow(config$driver_settings) > 0
+
   for (var_name in config$driver_vars) {
     var_data <- data[[var_name]]
-    order_spec <- config$driver_orders[[var_name]]
 
-    # Detect type
-    pred_type <- detect_predictor_type(var_data, order_spec)
+    # =========================================================================
+    # GET TYPE AND SETTINGS FROM DRIVER_SETTINGS (explicit) OR INFER (fallback)
+    # =========================================================================
 
-    # Prepare based on type
-    if (pred_type$type == "continuous") {
-      # Keep as-is, ensure numeric
-      if (!is.numeric(var_data)) {
-        var_data <- as.numeric(as.character(var_data))
+    if (has_driver_settings) {
+      # Use explicit settings from Driver_Settings sheet
+      explicit_type <- get_driver_setting(config, var_name, "type", NULL)
+      explicit_ref <- get_driver_setting(config, var_name, "reference_level", NULL)
+      explicit_order <- get_driver_setting(config, var_name, "levels_order", NULL)
+
+      # Parse levels_order if provided (semicolon-separated)
+      order_spec <- if (!is.null(explicit_order) && !is.na(explicit_order) && nzchar(explicit_order)) {
+        trimws(strsplit(explicit_order, ";")[[1]])
+      } else {
+        config$driver_orders[[var_name]]  # Fall back to Variables sheet order
       }
+
+      # Map explicit type to internal representation
+      if (!is.null(explicit_type) && !is.na(explicit_type) && nzchar(explicit_type)) {
+        pred_type <- switch(tolower(explicit_type),
+          "categorical" = list(type = "nominal", needs_dummy = TRUE, n_dummies = NA),
+          "nominal" = list(type = "nominal", needs_dummy = TRUE, n_dummies = NA),
+          "ordinal" = list(type = "ordinal", needs_dummy = TRUE, n_dummies = NA),
+          "binary" = list(type = "binary_categorical", needs_dummy = TRUE, n_dummies = 1),
+          "control_only" = list(type = "control", needs_dummy = TRUE, n_dummies = NA),
+          # Unknown type - refuse (guards should have caught this)
+          {
+            catdriver_refuse(
+              reason = "CFG_DRIVER_TYPE_UNKNOWN",
+              title = "UNKNOWN DRIVER TYPE",
+              problem = paste0("Driver '", var_name, "' has unknown type '", explicit_type, "'."),
+              why_it_matters = "Cannot determine how to treat this predictor.",
+              fix = "Set type to: categorical, ordinal, binary, or control_only"
+            )
+          }
+        )
+      } else {
+        # No type specified - refuse (guards should have caught this)
+        catdriver_refuse(
+          reason = "CFG_DRIVER_TYPE_MISSING",
+          title = "DRIVER TYPE MISSING",
+          problem = paste0("Driver '", var_name, "' has no type in Driver_Settings."),
+          why_it_matters = "All drivers must have explicit type declarations.",
+          fix = paste0("Add 'type' column entry for '", var_name, "' in Driver_Settings sheet.")
+        )
+      }
+
+    } else {
+      # No Driver_Settings sheet - use inference (legacy mode)
+      order_spec <- config$driver_orders[[var_name]]
+      pred_type <- detect_predictor_type(var_data, order_spec)
+      explicit_ref <- NULL
+    }
+
+    # =========================================================================
+    # PREPARE VARIABLE BASED ON TYPE
+    # =========================================================================
+
+    if (pred_type$type == "control") {
+      # Control variable - convert to factor but mark for exclusion from driver reports
+      if (!is.factor(var_data)) {
+        var_data <- factor(var_data)
+      }
+      # Set reference level if specified
+      if (!is.null(explicit_ref) && !is.na(explicit_ref) && nzchar(explicit_ref)) {
+        if (explicit_ref %in% levels(var_data)) {
+          var_data <- relevel(var_data, ref = explicit_ref)
+        }
+      }
+      pred_type$exclude_from_driver_report <- TRUE
 
     } else if (pred_type$type %in% c("binary_categorical", "nominal", "high_cardinality")) {
       # Convert to factor
@@ -282,8 +402,16 @@ prepare_predictors <- function(data, config) {
         var_data <- factor(var_data)
       }
 
-      # Set reference level
-      if (!is.null(order_spec) && length(order_spec) > 0) {
+      # Set reference level - PREFER explicit from Driver_Settings
+      if (!is.null(explicit_ref) && !is.na(explicit_ref) && nzchar(explicit_ref)) {
+        if (explicit_ref %in% levels(var_data)) {
+          var_data <- relevel(var_data, ref = explicit_ref)
+        } else {
+          warning("Reference level '", explicit_ref, "' not found in '", var_name,
+                  "'. Using first level.")
+          var_data <- relevel(var_data, ref = levels(var_data)[1])
+        }
+      } else if (!is.null(order_spec) && length(order_spec) > 0) {
         # First in order spec is reference
         ref_level <- order_spec[1]
         if (ref_level %in% levels(var_data)) {
@@ -295,20 +423,40 @@ prepare_predictors <- function(data, config) {
       }
 
     } else if (pred_type$type == "ordinal") {
-      # Ordered factor
-      if (!is.null(order_spec)) {
+      # Ordered factor - but use TREATMENT contrasts (not polynomial)
+      # This keeps coefficients level-based and mappable for Factor Patterns output
+      if (!is.null(order_spec) && length(order_spec) > 0) {
         var_data <- factor(var_data, levels = order_spec, ordered = TRUE)
       } else {
         var_data <- factor(var_data, ordered = TRUE)
       }
+
+      # CRITICAL: Override default polynomial contrasts with treatment contrasts
+      # Polynomial contrasts (.L, .Q, .C) are not mappable to levels and would
+      # produce misleading Factor Patterns output. Treatment contrasts give us
+      # level-based coefficients that match the expected OR interpretation.
+      #
+      # IMPORTANT: Set dimnames so columns are named with level labels (e.g., "C", "B", "A")
+      # not numeric indices (e.g., "2", "3", "4"). Without this, model.matrix() creates
+      # columns like "grade2" instead of "gradeC", breaking term-to-level mapping.
+      cm <- contr.treatment(nlevels(var_data))
+      rownames(cm) <- levels(var_data)
+      colnames(cm) <- levels(var_data)[-1]  # non-reference levels
+      contrasts(var_data) <- cm
     }
 
     # Update data
     data[[var_name]] <- var_data
 
+    # Update n_dummies now that we know actual levels
+    if (is.factor(var_data)) {
+      pred_type$n_dummies <- length(levels(var_data)) - 1
+    }
+
     # Store info
     pred_type$reference_level <- if (is.factor(var_data)) levels(var_data)[1] else NA
     pred_type$levels <- if (is.factor(var_data)) levels(var_data) else unique(na.omit(var_data))
+    pred_type$source <- if (has_driver_settings) "driver_settings" else "inference"
     predictor_info[[var_name]] <- pred_type
   }
 

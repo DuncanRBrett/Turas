@@ -22,7 +22,13 @@ load_catdriver_data <- function(data_file, config = NULL) {
 
   # Validate file exists
   if (!file.exists(data_file)) {
-    stop("Data file not found: ", data_file, call. = FALSE)
+    catdriver_refuse(
+      reason = "DATA_FILE_NOT_FOUND",
+      title = "DATA FILE NOT FOUND",
+      problem = paste0("Data file not found: ", data_file),
+      why_it_matters = "Cannot run analysis without the data file.",
+      fix = "Check that the file path is correct and the file exists."
+    )
   }
 
   # Detect file format
@@ -36,22 +42,48 @@ load_catdriver_data <- function(data_file, config = NULL) {
       "xls" = load_excel_data(data_file),
       "sav" = load_spss_data(data_file),
       "dta" = load_stata_data(data_file),
-      stop("Unsupported file format: ", file_ext,
-           "\n\nSupported formats: csv, xlsx, xls, sav, dta")
+      catdriver_refuse(
+        reason = "DATA_FILE_FORMAT_UNSUPPORTED",
+        title = "UNSUPPORTED FILE FORMAT",
+        problem = paste0("File format '.", file_ext, "' is not supported."),
+        why_it_matters = "Can only load data from supported file formats.",
+        fix = "Convert your data to one of: csv, xlsx, xls, sav, dta"
+      )
     )
   }, error = function(e) {
-    stop("Failed to load data file: ", data_file,
-         "\n\nError: ", e$message,
-         call. = FALSE)
+    # Check if this is already a catdriver_refusal
+    if (inherits(e, "catdriver_refusal")) {
+      stop(e)  # Re-throw catdriver_refusal
+    }
+    catdriver_refuse(
+      reason = "DATA_FILE_LOAD_FAILED",
+      title = "FAILED TO LOAD DATA FILE",
+      problem = paste0("Could not load data file: ", data_file),
+      why_it_matters = "Cannot run analysis without successfully loading the data.",
+      fix = "Check that the file is valid and not corrupted.",
+      details = paste0("Error: ", e$message)
+    )
   })
 
   # Validate data frame
   if (!is.data.frame(data)) {
-    stop("Data file did not produce a valid data frame", call. = FALSE)
+    catdriver_refuse(
+      reason = "DATA_NOT_DATAFRAME",
+      title = "INVALID DATA FORMAT",
+      problem = "Data file did not produce a valid data frame.",
+      why_it_matters = "Analysis requires tabular data.",
+      fix = "Ensure your data file contains properly formatted tabular data."
+    )
   }
 
   if (nrow(data) == 0) {
-    stop("Data file is empty (0 rows)", call. = FALSE)
+    catdriver_refuse(
+      reason = "DATA_EMPTY",
+      title = "DATA FILE IS EMPTY",
+      problem = "Data file contains 0 rows.",
+      why_it_matters = "Cannot run analysis on empty data.",
+      fix = "Ensure your data file contains data rows (not just headers)."
+    )
   }
 
   # Validate against config if provided
@@ -102,9 +134,13 @@ load_excel_data <- function(file_path) {
 #' @keywords internal
 load_spss_data <- function(file_path) {
   if (!requireNamespace("haven", quietly = TRUE)) {
-    stop("Package 'haven' required to read SPSS files. ",
-         "Install with: install.packages('haven')",
-         call. = FALSE)
+    catdriver_refuse(
+      reason = "PKG_HAVEN_MISSING",
+      title = "REQUIRED PACKAGE MISSING",
+      problem = "Package 'haven' is required to read SPSS files (.sav) but is not installed.",
+      why_it_matters = "Cannot load SPSS data without the haven package.",
+      fix = "Install the package by running: install.packages('haven')"
+    )
   }
 
   data <- haven::read_sav(file_path)
@@ -132,9 +168,13 @@ load_spss_data <- function(file_path) {
 #' @keywords internal
 load_stata_data <- function(file_path) {
   if (!requireNamespace("haven", quietly = TRUE)) {
-    stop("Package 'haven' required to read Stata files. ",
-         "Install with: install.packages('haven')",
-         call. = FALSE)
+    catdriver_refuse(
+      reason = "PKG_HAVEN_MISSING",
+      title = "REQUIRED PACKAGE MISSING",
+      problem = "Package 'haven' is required to read Stata files (.dta) but is not installed.",
+      why_it_matters = "Cannot load Stata data without the haven package.",
+      fix = "Install the package by running: install.packages('haven')"
+    )
   }
 
   data <- haven::read_dta(file_path)
@@ -214,16 +254,49 @@ validate_catdriver_data <- function(data, config) {
              paste(high_vars, collapse = ", ")))
   }
 
-  # Calculate complete cases
-  complete_mask <- complete.cases(data[, analysis_vars, drop = FALSE])
-  diagnostics$complete_n <- sum(complete_mask)
-  diagnostics$pct_complete <- round(100 * diagnostics$complete_n / diagnostics$original_n, 1)
+  # ==========================================================================
+  # CALCULATE EFFECTIVE ANALYZABLE N (strategy-aware)
+  # ==========================================================================
+  #
+  # We do NOT use complete.cases() to determine if we have enough data.
+  # Instead, we compute the minimum rows that will remain AFTER applying
+  # the per-variable missing strategy:
+  #
+  # - Outcome missing: always dropped
+  # - Driver with drop_row strategy: dropped
+  # - Driver with missing_as_level strategy: kept (not counted against N)
+  # - Driver with error_if_missing: will hard-error later if any missing
+  #
+  # This prevents rejecting valid runs where drivers use missing_as_level.
 
-  # Check minimum sample size
-  if (diagnostics$complete_n < config$min_sample_size) {
+  # Start with rows that have non-missing outcome (these are always required)
+  outcome_valid_mask <- !is.na(data[[config$outcome_var]])
+  effective_n <- sum(outcome_valid_mask)
+
+  # For each driver, only subtract if strategy is "drop_row"
+  for (driver_var in config$driver_vars) {
+    strategy <- get_driver_setting(config, driver_var, "missing_strategy", "drop_row")
+
+    if (strategy == "drop_row") {
+      # These rows will be dropped - but only if outcome is also valid
+      # (outcome missing rows are already excluded)
+      driver_missing_in_valid <- is.na(data[[driver_var]]) & outcome_valid_mask
+      effective_n <- effective_n - sum(driver_missing_in_valid)
+      # Update mask for next driver (cumulative exclusion)
+      outcome_valid_mask <- outcome_valid_mask & !is.na(data[[driver_var]])
+    }
+    # For "missing_as_level" and "error_if_missing", don't subtract
+    # (missing_as_level keeps rows; error_if_missing will hard-stop later)
+  }
+
+  diagnostics$complete_n <- effective_n
+  diagnostics$pct_complete <- round(100 * effective_n / diagnostics$original_n, 1)
+
+  # Check minimum sample size against effective N
+  if (effective_n < config$min_sample_size) {
     diagnostics$errors <- c(diagnostics$errors,
-      paste0("Insufficient complete cases: ", diagnostics$complete_n,
-             " (minimum ", config$min_sample_size, " required)"))
+      paste0("Insufficient analyzable cases after applying missing strategy: ",
+             effective_n, " (minimum ", config$min_sample_size, " required)"))
     diagnostics$passed <- FALSE
   }
 
@@ -308,11 +381,25 @@ validate_catdriver_data <- function(data, config) {
   }
 
   # ==========================================================================
+
   # CHECK CROSS-TABULATION FOR SMALL CELLS
   # ==========================================================================
 
-  # Only check complete cases
-  data_complete <- data[complete_mask, , drop = FALSE]
+  # Build strategy-aware mask: include rows that will be analyzed
+  # (outcome non-missing, and drivers either non-missing or use missing_as_level)
+  analyzable_mask <- !is.na(data[[config$outcome_var]])
+
+  for (driver_var in config$driver_vars) {
+    strategy <- get_driver_setting(config, driver_var, "missing_strategy", "drop_row")
+    if (strategy == "drop_row") {
+      # These rows will be dropped, so exclude from analysis
+      analyzable_mask <- analyzable_mask & !is.na(data[[driver_var]])
+    }
+    # For missing_as_level, rows are kept (mask unchanged)
+    # For error_if_missing, we'll hard-stop later if any missing
+  }
+
+  data_complete <- data[analyzable_mask, , drop = FALSE]
 
   for (driver_var in config$driver_vars) {
     if (is_categorical(data_complete[[driver_var]])) {
@@ -386,7 +473,14 @@ validate_catdriver_data <- function(data, config) {
 
 #' Prepare Data for Analysis
 #'
-#' Filters to complete cases and prepares variables for modeling.
+#' Applies per-variable missing data strategy as specified in Driver_Settings.
+#' DOES NOT use blanket complete.cases() deletion.
+#'
+#' Missing data strategy per variable (from Driver_Settings sheet):
+#' - outcome missing: ALWAYS drop the row
+#' - driver missing with "drop_row": drop the row
+#' - driver missing with "missing_as_level": recode to "Missing" level
+#' - driver missing with "error_if_missing": hard error if any missing
 #'
 #' @param data Raw data frame
 #' @param config Configuration list
@@ -395,40 +489,120 @@ validate_catdriver_data <- function(data, config) {
 #' @keywords internal
 prepare_analysis_data <- function(data, config, diagnostics) {
 
-  # Get analysis variables
-  analysis_vars <- c(config$outcome_var, config$driver_vars)
+  n_original <- nrow(data)
+  missing_report <- list()
 
-  # Add weight if present
-  has_weights <- FALSE
-  if (!is.null(config$weight_var) && config$weight_var %in% names(data)) {
-    weights <- data[[config$weight_var]]
-    if (is.numeric(weights) && !all(is.na(weights))) {
-      analysis_vars <- c(analysis_vars, config$weight_var)
-      has_weights <- TRUE
+  # ==========================================================================
+  # STEP 1: Handle outcome variable (ALWAYS drop rows with missing outcome)
+  # ==========================================================================
+
+  outcome_missing <- is.na(data[[config$outcome_var]])
+  n_outcome_missing <- sum(outcome_missing)
+
+  if (n_outcome_missing > 0) {
+    data <- data[!outcome_missing, , drop = FALSE]
+    missing_report$outcome <- list(
+      variable = config$outcome_var,
+      strategy = "drop_row",
+      n_missing = n_outcome_missing,
+      action = "dropped"
+    )
+  }
+
+  # ==========================================================================
+  # STEP 2: Handle each driver variable per its missing_strategy
+  # ==========================================================================
+
+  for (driver_var in config$driver_vars) {
+    # Get per-variable strategy from Driver_Settings
+    strategy <- get_driver_setting(config, driver_var, "missing_strategy", "drop_row")
+
+    driver_missing <- is.na(data[[driver_var]])
+    n_missing <- sum(driver_missing)
+
+    if (n_missing == 0) {
+      # No missing - nothing to do
+      next
+    }
+
+    if (strategy == "error_if_missing") {
+      # Policy refusal - explicit choice to not allow missing values
+      catdriver_refuse(
+        reason = "DATA_MISSING_NOT_ALLOWED",
+        title = "MISSING VALUES NOT ALLOWED",
+        problem = paste0("Variable '", driver_var, "' has ", n_missing, " missing value(s)."),
+        why_it_matters = paste0("The missing_strategy for this variable is 'error_if_missing', ",
+                                "which requires complete data."),
+        fix = paste0("Either:\n",
+                     "  1. Fix the missing values in your data, OR\n",
+                     "  2. Change missing_strategy to 'drop_row' or 'missing_as_level' in Driver_Settings")
+      )
+
+    } else if (strategy == "missing_as_level") {
+      # Recode missing to "Missing" level
+      var_data <- data[[driver_var]]
+
+      if (!is.factor(var_data)) {
+        var_data <- factor(var_data)
+      }
+
+      # Add "Missing" as a level and recode NAs
+      levels(var_data) <- c(levels(var_data), "Missing")
+      var_data[is.na(var_data)] <- "Missing"
+      data[[driver_var]] <- var_data
+
+      missing_report[[driver_var]] <- list(
+        variable = driver_var,
+        strategy = "missing_as_level",
+        n_missing = n_missing,
+        action = "recoded to 'Missing' level"
+      )
+
+    } else {
+      # Default: drop_row
+      data <- data[!driver_missing, , drop = FALSE]
+
+      missing_report[[driver_var]] <- list(
+        variable = driver_var,
+        strategy = "drop_row",
+        n_missing = n_missing,
+        action = "dropped"
+      )
     }
   }
 
-  # Filter to complete cases
-  complete_mask <- complete.cases(data[, analysis_vars, drop = FALSE])
-  data_complete <- data[complete_mask, , drop = FALSE]
+  # ==========================================================================
+  # STEP 3: Handle weights
+  # ==========================================================================
 
-  # Prepare weight vector
-  weights <- if (has_weights) {
-    w <- data_complete[[config$weight_var]]
-    w[is.na(w)] <- 0
-    w[w < 0] <- 0
-    w
-  } else {
-    rep(1, nrow(data_complete))
+  has_weights <- FALSE
+  weights <- rep(1, nrow(data))
+
+  if (!is.null(config$weight_var) && config$weight_var %in% names(data)) {
+    w <- data[[config$weight_var]]
+    if (is.numeric(w) && !all(is.na(w))) {
+      has_weights <- TRUE
+      w[is.na(w)] <- 1
+      w[w < 0] <- 0
+      weights <- w
+    }
   }
 
+  # ==========================================================================
+  # STEP 4: Compile result
+  # ==========================================================================
+
+  n_complete <- nrow(data)
+  n_excluded <- n_original - n_complete
+
   list(
-    data = data_complete,
+    data = data,
     weights = weights,
     has_weights = has_weights,
-    n_original = nrow(data),
-    n_complete = nrow(data_complete),
-    n_excluded = nrow(data) - nrow(data_complete)
+    n_original = n_original,
+    n_complete = n_complete,
+    n_excluded = n_excluded,
+    missing_report = missing_report
   )
 }
 
