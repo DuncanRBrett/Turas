@@ -135,11 +135,11 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
         if (!is.null(weights) && length(weights) == nrow(data) &&
             !(length(unique(weights)) == 1 && unique(weights)[1] == 1)) {
           data$.wt <- weights
-          brglm2::brglm(formula, data = data, family = binomial(link = "logit"),
-                        weights = .wt, method = "brglmFit")
+          glm(formula, data = data, family = binomial(link = "logit"),
+              weights = .wt, method = brglm2::brglm_fit)
         } else {
-          brglm2::brglm(formula, data = data, family = binomial(link = "logit"),
-                        method = "brglmFit")
+          glm(formula, data = data, family = binomial(link = "logit"),
+              method = brglm2::brglm_fit)
         }
       }, error = function(e) {
         list(error = TRUE, message = e$message)
