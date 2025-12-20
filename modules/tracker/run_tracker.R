@@ -28,6 +28,9 @@ script_dir <- tryCatch({
   getwd()
 })
 
+# TRS Guard Layer (v1.0) - MUST be loaded first before any module files
+source(file.path(script_dir, "00_guard.R"))
+
 source(file.path(script_dir, "constants.R"))
 source(file.path(script_dir, "tracker_config_loader.R"))
 source(file.path(script_dir, "wave_loader.R"))
@@ -38,9 +41,6 @@ source(file.path(script_dir, "banner_trends.R"))
 source(file.path(script_dir, "formatting_utils.R"))
 source(file.path(script_dir, "tracker_output.R"))
 source(file.path(script_dir, "tracker_dashboard_reports.R"))
-
-# TRS Guard Layer (v1.0)
-source(file.path(script_dir, "00_guard.R"))
 
 # Verify all required functions loaded successfully
 verify_tracker_environment <- function() {

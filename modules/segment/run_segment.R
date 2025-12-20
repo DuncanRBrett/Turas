@@ -15,6 +15,9 @@
 # Get Turas root directory
 turas_root <- Sys.getenv("TURAS_ROOT", getwd())
 
+# TRS Guard Layer (v1.0) - MUST be loaded first before any module files
+source(file.path(turas_root, "modules/segment/lib/00_guard.R"))
+
 # Shared utilities - use absolute paths
 source(file.path(turas_root, "modules/shared/lib/validation_utils.R"))
 source(file.path(turas_root, "modules/shared/lib/config_utils.R"))
@@ -37,9 +40,6 @@ source(file.path(turas_root, "modules/segment/lib/segment_scoring.R"))
 source(file.path(turas_root, "modules/segment/lib/segment_rules.R"))
 source(file.path(turas_root, "modules/segment/lib/segment_cards.R"))
 source(file.path(turas_root, "modules/segment/lib/segment_lca.R"))
-
-# TRS Guard Layer (v1.0)
-source(file.path(turas_root, "modules/segment/lib/00_guard.R"))
 
 # ==============================================================================
 # MAIN SEGMENTATION FUNCTION

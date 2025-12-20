@@ -48,6 +48,16 @@
 SCRIPT_VERSION <- "10.0"
 
 # ==============================================================================
+# TRS GUARD LAYER - Must be loaded FIRST
+# ==============================================================================
+
+# Determine script directory for sourcing
+script_dir <- if (exists("toolkit_path")) dirname(toolkit_path) else getwd()
+
+# TRS Guard Layer (v1.0) - MUST be loaded before any TRS refusal calls
+source(file.path(script_dir, "00_guard.R"))
+
+# ==============================================================================
 # DEPENDENCY CHECKS (Friendly error messages)
 # ==============================================================================
 
@@ -134,7 +144,7 @@ MAX_DECIMAL_PLACES <- 6
 # LOAD DEPENDENCIES
 # ==============================================================================
 
-script_dir <- if (exists("toolkit_path")) dirname(toolkit_path) else getwd()
+# script_dir already set above when loading TRS guard layer
 
 source(file.path(script_dir, "shared_functions.R"))
 source(file.path(script_dir, "validation.R"))
@@ -155,9 +165,6 @@ source(file.path(script_dir, "question_orchestrator.R"))
 # Composite Metrics Feature (V10.1)
 source(file.path(script_dir, "composite_processor.R"))
 source(file.path(script_dir, "summary_builder.R"))
-
-# TRS Guard Layer (v1.0)
-source(file.path(script_dir, "00_guard.R"))
 
 # ==============================================================================
 # LOGGING & MONITORING SYSTEM
