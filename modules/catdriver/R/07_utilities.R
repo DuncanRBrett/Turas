@@ -477,22 +477,24 @@ resolve_path <- function(base_dir, rel_path) {
 
 
 # ==============================================================================
-# LOGGING HELPERS
+# LOGGING HELPERS (TRS v1.0 Compliant)
 # ==============================================================================
 
 #' Print Status Message
 #'
-#' Consistent formatting for status messages.
+#' TRS v1.0 compliant formatting for status messages.
+#' Uses [OK], [INFO], [WARN], [PARTIAL], [ERROR] prefixes.
 #'
 #' @param message Message text
-#' @param type Type: "info", "success", "warning", "error"
+#' @param type Type: "info", "success", "warning", "error", "partial"
 #' @keywords internal
 log_message <- function(message, type = "info") {
   prefix <- switch(type,
-    info = "   ",
-    success = "   \u2713 ",
-    warning = "   \u26A0 ",
-    error = "   \u2717 ",
+    info = "   [INFO] ",
+    success = "   [OK] ",
+    warning = "   [WARN] ",
+    partial = "   [PARTIAL] ",
+    error = "   [ERROR] ",
     "   "
   )
 

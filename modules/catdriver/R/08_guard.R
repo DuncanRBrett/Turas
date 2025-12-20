@@ -16,7 +16,8 @@
 #   - 08a_guards_hard.R: Hard error guards (require functions)
 #   - 08b_guards_soft.R: Soft warning guards (check functions)
 #
-# Version: 2.1 (TRS Integration)
+# Version: 1.1 (TRS Hardening)
+# Compliance: TURAS_Categorical_Key_Driver_Hardening_v1.1.md
 # Date: December 2024
 #
 # ==============================================================================

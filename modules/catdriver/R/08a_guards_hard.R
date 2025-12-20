@@ -7,12 +7,13 @@
 #
 # All guards use catdriver_refuse() for clean, intentional refusals.
 # No stop() calls - refusals should look deliberate, not like crashes.
+# TRS v1.0: No warnings for degraded output - use PARTIAL status instead.
 #
 # Related modules:
 #   - 08_guard.R: Core guard framework and refusal mechanism
 #   - 08b_guards_soft.R: Soft warning guards
 #
-# Version: 2.0
+# Version: 1.1 (TRS Hardening)
 # ==============================================================================
 
 #' Guard: Validate Outcome Type Declaration
@@ -82,14 +83,13 @@ guard_outcome_levels_match <- function(data, config) {
       )
     }
 
-    # Check config levels exist in data
+    # TRS v1.0: Config levels missing from data is INFO, not warning
+    # These levels will simply be ignored - this is not a degraded output
     missing_from_data <- setdiff(config_levels, data_levels)
     if (length(missing_from_data) > 0) {
-      warning(
-        "Config declares outcome levels not found in data: ",
-        paste(missing_from_data, collapse = ", "),
-        "\nThese levels will be ignored."
-      )
+      cat("   [INFO] Config declares outcome levels not found in data: ",
+          paste(missing_from_data, collapse = ", "), "\n", sep = "")
+      cat("   [INFO] These levels will be ignored.\n")
     }
   }
 

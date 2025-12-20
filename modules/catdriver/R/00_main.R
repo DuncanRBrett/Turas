@@ -2,15 +2,23 @@
 # CATEGORICAL KEY DRIVER ANALYSIS - MAIN ENTRY POINT
 # ==============================================================================
 #
-# Version: 2.0
+# Version: 1.1 (TRS Hardening)
 # Date: December 2024
+# Compliance: TRS v1.0 (TURAS_Categorical_Key_Driver_Hardening_v1.1.md)
 #
 # This module performs key driver analysis for categorical outcomes using:
 # - Binary logistic regression (2-category outcomes)
 # - Ordinal logistic regression (ordered multi-category outcomes)
 # - Multinomial logistic regression (unordered multi-category outcomes)
 #
-# V2.0 Changes:
+# V1.1 (Hardening) Changes:
+# - Full TRS v1.0 compliance
+# - Explicit run_status tracking (PASS/PARTIAL)
+# - Warning elimination: degraded outputs via PARTIAL status
+# - TRS-compliant console banners
+# - All outputs include run_status, degraded, degraded_reasons
+#
+# V2.0 (Base) Features:
 # - TurasGuard layer for explicit hard/soft failure handling
 # - Canonical design-matrix mapper (no more substring parsing)
 # - Per-variable missing data strategies
@@ -91,16 +99,17 @@ run_categorical_keydriver_impl <- function(config_file,
   # INITIALIZATION
   # ==========================================================================
 
-  cat("\n")
-  cat("==============================================================================\n")
-  cat("  TURAS CATEGORICAL KEY DRIVER ANALYSIS v2.0\n")
-  cat("==============================================================================\n")
-  cat("\n")
-
   start_time <- Sys.time()
+
+  # TRS v1.0: Start banner
+  trs_banner_start("CATEGORICAL KEY DRIVER ANALYSIS", "1.1")
 
   # Initialize guard state for tracking warnings and issues
   guard <- guard_init()
+
+  # TRS v1.0: Track degraded outputs for PARTIAL status
+  degraded_reasons <- character(0)
+  affected_outputs <- character(0)
 
   # ==========================================================================
   # STEP 1: LOAD CONFIGURATION
@@ -227,24 +236,30 @@ run_categorical_keydriver_impl <- function(config_file,
   rare_result <- apply_rare_level_policy(data, config)
   data <- rare_result$data
 
-  # Report collapsing
+  # Report collapsing - TRS v1.0: track as degraded output
   n_collapsed <- sum(sapply(rare_result$collapse_report, function(x) {
     if (x$action == "collapsed") length(x$rare_levels) else 0
   }))
 
   if (n_collapsed > 0) {
-    log_message(paste("Collapsed", n_collapsed, "rare levels"), "warning")
+    cat("   [PARTIAL] Collapsed", n_collapsed, "rare levels\n")
     guard <- guard_check_collapsing(guard, rare_result$collapse_report)
+    degraded_reasons <- c(degraded_reasons,
+      paste0("Rare level collapsing applied: ", n_collapsed, " levels collapsed"))
+    affected_outputs <- c(affected_outputs, "Odds ratios", "Factor patterns")
   } else {
-    log_message("No rare level collapsing required", "success")
+    cat("   [OK] No rare level collapsing required\n")
   }
 
-  # Warn about sparse cells
+  # TRS v1.0: Sparse cells -> PARTIAL, not warning
   if (length(rare_result$cell_warnings) > 0) {
     for (var_name in names(rare_result$cell_warnings)) {
       warn_info <- rare_result$cell_warnings[[var_name]]
-      log_message(paste("Sparse cells in", var_name, "- min cell:", warn_info$min_cell), "warning")
+      cat("   [PARTIAL] Sparse cells in", var_name, "- min cell:", warn_info$min_cell, "\n")
+      degraded_reasons <- c(degraded_reasons,
+        paste0("Sparse cells in ", var_name, " (min cell: ", warn_info$min_cell, ")"))
     }
+    affected_outputs <- unique(c(affected_outputs, "Odds ratio confidence intervals"))
   }
 
   # ==========================================================================
@@ -301,17 +316,23 @@ run_categorical_keydriver_impl <- function(config_file,
     guard <- model_result$guard
   }
 
+  # TRS v1.0: Convergence issues -> PARTIAL status
   if (model_result$convergence) {
-    log_message("Model converged successfully", "success")
+    cat("   [OK] Model converged successfully\n")
   } else {
-    log_message("Model convergence warning - check results", "warning")
+    cat("   [PARTIAL] Model convergence warning - check results\n")
+    degraded_reasons <- c(degraded_reasons, "Model convergence warning - results may be unstable")
+    affected_outputs <- unique(c(affected_outputs, "Odds ratios", "Confidence intervals", "P-values"))
   }
 
-  # Report fallback usage
+  # TRS v1.0: Fallback usage -> PARTIAL status
   if (isTRUE(model_result$fallback_used)) {
-    log_message(paste("Fallback estimator used:", model_result$engine_used), "warning")
+    cat("   [PARTIAL] Fallback estimator used:", model_result$engine_used, "\n")
+    degraded_reasons <- c(degraded_reasons,
+      paste0("Fallback estimator used: ", model_result$engine_used))
+    affected_outputs <- unique(c(affected_outputs, "Standard errors"))
   } else if (!is.null(model_result$engine_used)) {
-    log_message(paste("Engine:", model_result$engine_used), "info")
+    cat("   [INFO] Engine:", model_result$engine_used, "\n")
   }
 
   # Report fit statistics
@@ -329,23 +350,28 @@ run_categorical_keydriver_impl <- function(config_file,
 
   guard <- guard_post_model(guard, prep_data, model_result, config)
 
-  # Check multicollinearity
+  # Check multicollinearity - TRS v1.0: track as PARTIAL
   vif_check <- check_multicollinearity(model_result$model)
   if (vif_check$checked) {
     if (vif_check$status == "WARNING") {
-      log_message(vif_check$interpretation, "warning")
+      cat("   [PARTIAL]", vif_check$interpretation, "\n")
       guard <- guard_check_multicollinearity(guard, vif_check)
+      degraded_reasons <- c(degraded_reasons, vif_check$interpretation)
+      affected_outputs <- unique(c(affected_outputs, "Relative importance scores"))
     } else {
-      log_message("Multicollinearity check: OK", "success")
+      cat("   [OK] Multicollinearity check: OK\n")
     }
   }
 
   # Report guard status
   guard_status <- guard_summary(guard)
   if (guard_status$has_issues) {
-    log_message(paste("Stability flags:", length(guard_status$stability_flags)), "warning")
+    cat("   [PARTIAL] Stability flags:", length(guard_status$stability_flags), "\n")
+    for (flag in guard_status$stability_flags) {
+      degraded_reasons <- c(degraded_reasons, flag)
+    }
   } else {
-    log_message("All quality checks passed", "success")
+    cat("   [OK] All quality checks passed\n")
   }
 
   # ==========================================================================
@@ -471,29 +497,44 @@ run_categorical_keydriver_impl <- function(config_file,
   log_message(paste("Output saved to:", basename(config$output_file)), "success")
 
   # ==========================================================================
+  # DETERMINE FINAL STATUS (TRS v1.0)
+  # ==========================================================================
+
+  # Deduplicate degraded reasons
+  degraded_reasons <- unique(degraded_reasons)
+  affected_outputs <- unique(affected_outputs)
+
+  # Determine run_status
+  if (length(degraded_reasons) > 0) {
+    run_status <- "PARTIAL"
+    status <- trs_status_partial(
+      module = "CATDRIVER",
+      degraded_reasons = degraded_reasons,
+      affected_outputs = affected_outputs
+    )
+  } else {
+    run_status <- "PASS"
+    status <- trs_status_pass(module = "CATDRIVER")
+  }
+
+  # Add status to results
+  results$run_status <- run_status
+  results$status <- status
+  results$degraded <- length(degraded_reasons) > 0
+  results$degraded_reasons <- degraded_reasons
+  results$affected_outputs <- affected_outputs
+
+  # ==========================================================================
   # COMPLETION
   # ==========================================================================
 
   end_time <- Sys.time()
   elapsed <- round(as.numeric(difftime(end_time, start_time, units = "secs")), 1)
 
-  cat("\n")
-  cat("==============================================================================\n")
-  cat("  ANALYSIS COMPLETE\n")
-  cat("==============================================================================\n")
-  cat("\n")
-  cat(sprintf("   Duration: %.1f seconds\n", elapsed))
+  # TRS v1.0: End banner with status
+  trs_banner_end("CATEGORICAL KEY DRIVER ANALYSIS", status, elapsed)
+
   cat(sprintf("   Output: %s\n", config$output_file))
-
-  # Report any warnings
-  if (guard_status$has_issues) {
-    cat("\n   WARNINGS:\n")
-    for (flag in guard_status$stability_flags) {
-      cat(sprintf("   - %s\n", flag))
-    }
-  }
-
-  cat("\n")
 
   # Print console summary
   print_console_summary(results, config)

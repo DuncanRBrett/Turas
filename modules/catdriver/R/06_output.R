@@ -3,12 +3,13 @@
 # ==============================================================================
 #
 # Core output generation: workbook creation and styles.
+# TRS v1.0: Includes Run Status sheet per hardening spec.
 #
 # Related modules:
 #   - 06a_sheets_summary.R: Executive summary and importance sheets
 #   - 06b_sheets_detail.R: Model summary, odds ratios, diagnostics
 #
-# Version: 2.0
+# Version: 1.1 (TRS Hardening)
 # Date: December 2024
 #
 # ==============================================================================
@@ -16,6 +17,7 @@
 #' Generate Excel Output
 #'
 #' Creates a formatted Excel workbook with all analysis results.
+#' TRS v1.0: Includes Run Status sheet with status, degraded flag, and reasons.
 #'
 #' @param results Full analysis results list
 #' @param config Configuration list
@@ -30,24 +32,27 @@ write_catdriver_output <- function(results, config, output_file) {
   # Define styles
   styles <- create_output_styles(wb)
 
-  # Sheet 1: Executive Summary
+  # TRS v1.0: Sheet 1 - Run Status (required per spec)
+  add_run_status_sheet(wb, results, styles)
+
+  # Sheet 2: Executive Summary
   add_executive_summary_sheet(wb, results, config, styles)
 
-  # Sheet 2: Importance Summary
+  # Sheet 3: Importance Summary
   add_importance_sheet(wb, results, config, styles)
 
-  # Sheet 3: Factor Patterns
+  # Sheet 4: Factor Patterns
   add_patterns_sheet(wb, results, config, styles)
 
-  # Sheet 4: Model Summary
+  # Sheet 5: Model Summary
   add_model_summary_sheet(wb, results, config, styles)
 
-  # Sheet 5: Odds Ratios (if detailed output)
+  # Sheet 6: Odds Ratios (if detailed output)
   if (config$detailed_output) {
     add_odds_ratios_sheet(wb, results, config, styles)
   }
 
-  # Sheet 6: Diagnostics (if detailed output)
+  # Sheet 7: Diagnostics (if detailed output)
   if (config$detailed_output) {
     add_diagnostics_sheet(wb, results, config, styles)
   }
@@ -56,6 +61,86 @@ write_catdriver_output <- function(results, config, output_file) {
   openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
 
   invisible(output_file)
+}
+
+
+#' Add Run Status Sheet (TRS v1.0)
+#'
+#' Creates the required Run Status sheet per TRS v1.0 spec.
+#'
+#' @param wb Workbook
+#' @param results Analysis results
+#' @param styles Style list
+#' @keywords internal
+add_run_status_sheet <- function(wb, results, styles) {
+
+  openxlsx::addWorksheet(wb, "Run Status")
+
+  # Build status data
+  run_status <- if (!is.null(results$run_status)) results$run_status else "PASS"
+  degraded <- if (!is.null(results$degraded)) results$degraded else FALSE
+  degraded_reasons <- if (!is.null(results$degraded_reasons)) results$degraded_reasons else character(0)
+  affected_outputs <- if (!is.null(results$affected_outputs)) results$affected_outputs else character(0)
+
+  # Write header
+  row <- 1
+  openxlsx::writeData(wb, "Run Status", "CATDRIVER RUN STATUS", startRow = row, startCol = 1)
+  openxlsx::addStyle(wb, "Run Status", styles$title, rows = row, cols = 1)
+  row <- row + 2
+
+  # Status row
+  openxlsx::writeData(wb, "Run Status", "run_status:", startRow = row, startCol = 1)
+  openxlsx::writeData(wb, "Run Status", run_status, startRow = row, startCol = 2)
+  if (run_status == "PASS") {
+    openxlsx::addStyle(wb, "Run Status", styles$success, rows = row, cols = 2)
+  } else if (run_status == "PARTIAL") {
+    openxlsx::addStyle(wb, "Run Status", styles$warning, rows = row, cols = 2)
+  }
+  row <- row + 1
+
+  # Degraded flag
+  openxlsx::writeData(wb, "Run Status", "degraded:", startRow = row, startCol = 1)
+  openxlsx::writeData(wb, "Run Status", if (degraded) "TRUE" else "FALSE", startRow = row, startCol = 2)
+  row <- row + 1
+
+  # Module
+  openxlsx::writeData(wb, "Run Status", "module:", startRow = row, startCol = 1)
+  openxlsx::writeData(wb, "Run Status", "CATDRIVER v1.1", startRow = row, startCol = 2)
+  row <- row + 1
+
+  # Timestamp
+  openxlsx::writeData(wb, "Run Status", "timestamp:", startRow = row, startCol = 1)
+  openxlsx::writeData(wb, "Run Status", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), startRow = row, startCol = 2)
+  row <- row + 2
+
+  # Degraded reasons (if any)
+  if (length(degraded_reasons) > 0) {
+    openxlsx::writeData(wb, "Run Status", "DEGRADED REASONS:", startRow = row, startCol = 1)
+    openxlsx::addStyle(wb, "Run Status", styles$section, rows = row, cols = 1)
+    row <- row + 1
+
+    for (reason in degraded_reasons) {
+      openxlsx::writeData(wb, "Run Status", paste0("- ", reason), startRow = row, startCol = 1)
+      row <- row + 1
+    }
+    row <- row + 1
+  }
+
+  # Affected outputs (if any)
+  if (length(affected_outputs) > 0) {
+    openxlsx::writeData(wb, "Run Status", "AFFECTED OUTPUTS:", startRow = row, startCol = 1)
+    openxlsx::addStyle(wb, "Run Status", styles$section, rows = row, cols = 1)
+    row <- row + 1
+
+    for (output in affected_outputs) {
+      openxlsx::writeData(wb, "Run Status", paste0("- ", output), startRow = row, startCol = 1)
+      row <- row + 1
+    }
+  }
+
+  # Set column widths
+  openxlsx::setColWidths(wb, "Run Status", cols = 1, widths = 25)
+  openxlsx::setColWidths(wb, "Run Status", cols = 2, widths = 60)
 }
 
 
