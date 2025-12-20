@@ -27,16 +27,63 @@
 # Source shared TRS infrastructure (if not already loaded)
 if (!exists("turas_refuse", mode = "function")) {
   # Try multiple paths to find trs_refusal.R
+  # Use tryCatch for sys.frame path since it fails in Jupyter/notebook contexts
+  script_dir_path <- tryCatch({
+    ofile <- sys.frame(1)$ofile
+    if (!is.null(ofile)) {
+      file.path(dirname(ofile), "../../shared/lib/trs_refusal.R")
+    } else {
+      NULL
+    }
+  }, error = function(e) NULL)
+
   possible_paths <- c(
-    file.path(dirname(sys.frame(1)$ofile), "../../shared/lib/trs_refusal.R"),
+    script_dir_path,
     file.path(getwd(), "modules/shared/lib/trs_refusal.R"),
-    file.path(Sys.getenv("TURAS_HOME"), "modules/shared/lib/trs_refusal.R")
+    file.path(Sys.getenv("TURAS_HOME"), "modules/shared/lib/trs_refusal.R"),
+    # Also try relative to script_dir if it exists (set by run_crosstabs.R)
+    if (exists("script_dir")) file.path(script_dir, "../shared/lib/trs_refusal.R") else NULL
   )
 
+  # Filter out NULL paths
+  possible_paths <- possible_paths[!sapply(possible_paths, is.null)]
+
+  trs_loaded <- FALSE
   for (path in possible_paths) {
     if (file.exists(path)) {
       source(path)
+      trs_loaded <- TRUE
       break
+    }
+  }
+
+  # If TRS not loaded, create stub functions to prevent errors
+  if (!trs_loaded) {
+    warning("TRS infrastructure not found. Using fallback error handling.")
+    turas_refuse <- function(code, title, problem, why_it_matters, how_to_fix, ...) {
+      stop(paste0("[", code, "] ", title, ": ", problem))
+    }
+    with_refusal_handler <- function(expr, module = "UNKNOWN") {
+      tryCatch(expr, error = function(e) stop(e))
+    }
+    guard_init <- function(module = "UNKNOWN") {
+      list(module = module, warnings = list(), stable = TRUE)
+    }
+    guard_warn <- function(guard, msg, category = "general") {
+      guard$warnings <- c(guard$warnings, list(list(msg = msg, category = category)))
+      guard
+    }
+    guard_flag_stability <- function(guard, reason) {
+      guard$stable <- FALSE
+      guard
+    }
+    guard_summary <- function(guard) {
+      list(module = guard$module, warning_count = length(guard$warnings),
+           is_stable = guard$stable, has_issues = length(guard$warnings) > 0)
+    }
+    trs_status_pass <- function(module) list(status = "PASS", module = module)
+    trs_status_partial <- function(module, degraded_reasons, affected_outputs) {
+      list(status = "PARTIAL", module = module, degraded_reasons = degraded_reasons)
     }
   }
 }
