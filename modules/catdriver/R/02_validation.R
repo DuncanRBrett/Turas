@@ -233,11 +233,12 @@ validate_catdriver_data <- function(data, config) {
   }
 
   # Calculate missing per variable
+  # Note: detect both NA and empty/whitespace strings as missing
   missing_summary <- data.frame(
     Variable = analysis_vars,
     Label = sapply(analysis_vars, function(v) get_var_label(config, v)),
     N_Total = nrow(data),
-    N_Missing = sapply(analysis_vars, function(v) sum(is.na(data[[v]]))),
+    N_Missing = sapply(analysis_vars, function(v) sum(is_missing_value(data[[v]]))),
     stringsAsFactors = FALSE
   )
   missing_summary$Pct_Missing <- round(100 * missing_summary$N_Missing / missing_summary$N_Total, 1)

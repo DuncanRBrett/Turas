@@ -70,6 +70,29 @@ as_numeric_setting <- function(value, default = NA_real_) {
 }
 
 
+#' Check for Missing Values
+#'
+#' Detects missing values including NA, empty strings, and whitespace-only strings.
+#' This is more robust than is.na() alone for data that may have been loaded
+#' from Excel or CSV where missing values appear as empty strings.
+#'
+#' @param x Vector to check
+#' @return Logical vector indicating missing values
+#' @export
+is_missing_value <- function(x) {
+  if (is.factor(x)) {
+    # For factors, check if the level is NA or represents empty/whitespace
+    is.na(x) | (as.character(x) %in% c("", " ")) | grepl("^\\s*$", as.character(x))
+  } else if (is.character(x)) {
+    # For strings, check NA, empty, or whitespace-only
+    is.na(x) | x == "" | grepl("^\\s*$", x)
+  } else {
+    # For other types (numeric, etc.), just check NA
+    is.na(x)
+  }
+}
+
+
 #' Get Setting Value with Default
 #'
 #' Safely extract setting values from a list with fallback.

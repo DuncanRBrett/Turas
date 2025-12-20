@@ -32,7 +32,7 @@ handle_missing_data <- function(data, config) {
   # ==========================================================================
 
   outcome_var <- config$outcome_var
-  outcome_missing <- is.na(data[[outcome_var]])
+  outcome_missing <- is_missing_value(data[[outcome_var]])
   n_outcome_missing <- sum(outcome_missing)
 
   missing_report$outcome <- list(
@@ -54,7 +54,7 @@ handle_missing_data <- function(data, config) {
 
   for (var_name in config$driver_vars) {
     var_data <- data[[var_name]]
-    var_missing <- is.na(var_data)
+    var_missing <- is_missing_value(var_data)
     n_missing <- sum(var_missing)
     pct_missing <- round(100 * n_missing / original_n, 1)
 
@@ -140,6 +140,7 @@ handle_missing_data <- function(data, config) {
 #' Recode Missing Values as Explicit Level
 #'
 #' Creates "Missing / Not answered" level for missing values.
+#' Handles both NA and empty/whitespace strings as missing.
 #'
 #' @param x Vector with missing values
 #' @return Factor with "Missing / Not answered" level
@@ -147,22 +148,24 @@ handle_missing_data <- function(data, config) {
 recode_missing_as_level <- function(x) {
   missing_label <- "Missing / Not answered"
 
+  # Identify all missing values (NA, empty strings, whitespace)
+  is_missing <- is_missing_value(x)
+
   if (is.factor(x)) {
-    # Add missing level
-    if (!missing_label %in% levels(x)) {
-      levels(x) <- c(levels(x), missing_label)
-    }
-    x[is.na(x)] <- missing_label
-    # Move missing to end
-    levels_order <- c(setdiff(levels(x), missing_label), missing_label)
-    x <- factor(x, levels = levels_order, ordered = is.ordered(x))
-  } else {
-    # Convert to factor
+    # Convert to character for easier manipulation
     x <- as.character(x)
-    x[is.na(x)] <- missing_label
-    x <- factor(x)
-    # Move missing to end
-    levels_order <- c(setdiff(levels(x), missing_label), missing_label)
+    x[is_missing] <- missing_label
+    # Rebuild factor with missing level at end
+    unique_vals <- unique(x[!is.na(x)])
+    levels_order <- c(setdiff(unique_vals, missing_label), missing_label)
+    x <- factor(x, levels = levels_order)
+  } else {
+    # Convert to character
+    x <- as.character(x)
+    x[is_missing] <- missing_label
+    # Build factor with missing level at end
+    unique_vals <- unique(x[!is.na(x)])
+    levels_order <- c(setdiff(unique_vals, missing_label), missing_label)
     x <- factor(x, levels = levels_order)
   }
 
