@@ -1,6 +1,16 @@
 # ==============================================================================
 # KEY DRIVER OUTPUT WRITER
 # ==============================================================================
+#
+# Version: Turas v10.3 (Continuous Key Driver Upgrade)
+# Date: 2025-12
+#
+# NEW IN v10.3:
+#   - Status table with run_status per spec
+#   - Method notes per driver
+#   - Enhanced output contract compliance
+#
+# ==============================================================================
 
 #' Calculate VIF (Variance Inflation Factor)
 #' @keywords internal
@@ -31,8 +41,16 @@ calculate_vif <- function(model) {
 
 #' Write Key Driver Results to Excel
 #'
+#' @param importance Importance data frame
+#' @param model Fitted model
+#' @param correlations Correlation matrix
+#' @param config Configuration list
+#' @param output_file Output file path
+#' @param run_status TRS run status (PASS, PARTIAL)
+#' @param status_details Optional list with status details
 #' @keywords internal
-write_keydriver_output <- function(importance, model, correlations, config, output_file) {
+write_keydriver_output <- function(importance, model, correlations, config, output_file,
+                                    run_status = "PASS", status_details = NULL) {
 
   wb <- openxlsx::createWorkbook()
 
@@ -218,7 +236,90 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
   }
 
   # ----------------------------------------------------------------------
-  # Sheet 6: README / Methodology
+  # Sheet 6: Run Status (TRS v10.3 Output Contract)
+  # ----------------------------------------------------------------------
+  openxlsx::addWorksheet(wb, "Run Status")
+
+  # Build status table
+  status_table <- data.frame(
+    Field = c(
+      "run_status",
+      "analysis_date",
+      "outcome_variable",
+      "n_drivers",
+      "sample_size",
+      "r_squared",
+      "primary_method",
+      "spec_version"
+    ),
+    Value = c(
+      run_status,
+      as.character(Sys.time()),
+      config$outcome_var,
+      length(config$driver_vars),
+      nobs(model),
+      round(summary(model)$r.squared, 4),
+      "partial_r2",
+      "TURAS-KD-CONTINUOUS-UPGRADE-v1.0"
+    ),
+    stringsAsFactors = FALSE
+  )
+
+  openxlsx::writeData(wb, "Run Status", status_table, startRow = 1)
+  openxlsx::addStyle(wb, "Run Status", header_style, rows = 1, cols = 1:2, gridExpand = TRUE)
+  openxlsx::setColWidths(wb, "Run Status", cols = 1:2, widths = c(25, 40))
+
+  # Add degraded reasons if PARTIAL
+  if (run_status == "PARTIAL" && !is.null(status_details)) {
+    start_row <- nrow(status_table) + 3
+    openxlsx::writeData(wb, "Run Status", "Degraded Outputs:", startRow = start_row, startCol = 1)
+
+    if (!is.null(status_details$degraded_reasons)) {
+      deg_df <- data.frame(
+        Reason = status_details$degraded_reasons,
+        stringsAsFactors = FALSE
+      )
+      openxlsx::writeData(wb, "Run Status", deg_df, startRow = start_row + 1, startCol = 1)
+    }
+
+    if (!is.null(status_details$affected_outputs)) {
+      aff_row <- start_row + length(status_details$degraded_reasons) + 3
+      openxlsx::writeData(wb, "Run Status", "Affected Outputs:", startRow = aff_row, startCol = 1)
+      aff_df <- data.frame(
+        Output = status_details$affected_outputs,
+        stringsAsFactors = FALSE
+      )
+      openxlsx::writeData(wb, "Run Status", aff_df, startRow = aff_row + 1, startCol = 1)
+    }
+  }
+
+  # Add driver-level method notes
+  if ("Method_Note" %in% names(importance) || "DriverType" %in% names(importance)) {
+    method_start <- if (run_status == "PARTIAL" && !is.null(status_details)) {
+      nrow(status_table) + length(status_details$degraded_reasons) +
+        length(status_details$affected_outputs) + 8
+    } else {
+      nrow(status_table) + 4
+    }
+
+    openxlsx::writeData(wb, "Run Status", "Driver Method Notes:", startRow = method_start, startCol = 1)
+
+    method_cols <- c("Driver")
+    if ("DriverType" %in% names(importance)) method_cols <- c(method_cols, "DriverType")
+    if ("AggMethod" %in% names(importance)) method_cols <- c(method_cols, "AggMethod")
+    if ("Method_Note" %in% names(importance)) method_cols <- c(method_cols, "Method_Note")
+
+    available_cols <- intersect(method_cols, names(importance))
+    if (length(available_cols) > 0) {
+      method_df <- importance[, available_cols, drop = FALSE]
+      openxlsx::writeData(wb, "Run Status", method_df, startRow = method_start + 1, startCol = 1)
+      openxlsx::addStyle(wb, "Run Status", header_style, rows = method_start + 1,
+                        cols = 1:length(available_cols), gridExpand = TRUE)
+    }
+  }
+
+  # ----------------------------------------------------------------------
+  # Sheet 7: README / Methodology
   # ----------------------------------------------------------------------
   openxlsx::addWorksheet(wb, "README")
 
@@ -295,7 +396,8 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
     "3. Model Summary - R², F-stat, RMSE, VIF diagnostics",
     "4. Correlations - Full correlation matrix",
     "5. Charts - Visual representation of driver impact",
-    "6. README - This documentation",
+    "6. Run Status - TRS run status and method notes (v10.3)",
+    "7. README - This documentation",
     "",
     "=== REFERENCES ===",
     "",

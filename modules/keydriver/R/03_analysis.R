@@ -1,6 +1,16 @@
 # ==============================================================================
 # KEY DRIVER ANALYSIS - CORE ALGORITHMS
 # ==============================================================================
+#
+# Version: Turas v10.3 (Continuous Key Driver Upgrade)
+# Date: 2025-12
+#
+# NEW IN v10.3:
+#   - partial_r2 aggregation for categorical drivers (per spec)
+#   - grouped_permutation method support
+#   - Driver-type aware importance calculation
+#
+# ==============================================================================
 
 # ------------------------------------------------------------------------------
 # Weighted correlation helpers
@@ -713,4 +723,262 @@ calculate_relative_weights_mixed <- function(model, data, config, term_mapping) 
   }
 
   as.numeric(driver_rw)
+}
+
+
+# ==============================================================================
+# v10.3: PARTIAL R² AGGREGATION FOR CATEGORICAL DRIVERS
+# ==============================================================================
+# Per TURAS-KD-CONTINUOUS-UPGRADE-v1.0:
+# - partial_r2 is the default aggregation method
+# - Computes R² contribution of the driver as a whole
+
+#' Calculate Partial R² for a Driver
+#'
+#' Computes the partial R² contribution of a driver by comparing
+#' the full model R² to a reduced model without the driver.
+#'
+#' partial_r2 = (R²_full - R²_reduced) / (1 - R²_reduced)
+#'
+#' This gives the proportion of unexplained variance that is explained
+#' by adding this driver to the model.
+#'
+#' @param data Data frame
+#' @param outcome_var Outcome variable name
+#' @param all_drivers All driver variable names
+#' @param target_driver The driver to calculate partial R² for
+#' @param weight_var Optional weight variable
+#' @return Partial R² value (0 to 1)
+#' @keywords internal
+calculate_partial_r2 <- function(data, outcome_var, all_drivers, target_driver, weight_var = NULL) {
+
+  # Build formula for full model
+  full_formula_str <- paste(outcome_var, "~", paste(all_drivers, collapse = " + "))
+  full_formula <- stats::as.formula(full_formula_str)
+
+  # Build formula for reduced model (without target driver)
+  other_drivers <- setdiff(all_drivers, target_driver)
+
+  if (length(other_drivers) == 0) {
+    # Only one driver - partial R² equals model R²
+    if (!is.null(weight_var)) {
+      full_model <- stats::lm(full_formula, data = data, weights = data[[weight_var]])
+    } else {
+      full_model <- stats::lm(full_formula, data = data)
+    }
+    return(summary(full_model)$r.squared)
+  }
+
+  reduced_formula_str <- paste(outcome_var, "~", paste(other_drivers, collapse = " + "))
+  reduced_formula <- stats::as.formula(reduced_formula_str)
+
+  # Fit both models
+  if (!is.null(weight_var)) {
+    full_model <- stats::lm(full_formula, data = data, weights = data[[weight_var]])
+    reduced_model <- stats::lm(reduced_formula, data = data, weights = data[[weight_var]])
+  } else {
+    full_model <- stats::lm(full_formula, data = data)
+    reduced_model <- stats::lm(reduced_formula, data = data)
+  }
+
+  r2_full <- summary(full_model)$r.squared
+  r2_reduced <- summary(reduced_model)$r.squared
+
+  # Partial R²
+  if (r2_reduced >= 1) {
+    # Edge case: reduced model explains everything
+    return(0)
+  }
+
+  partial_r2 <- (r2_full - r2_reduced) / (1 - r2_reduced)
+
+  # Clamp to [0, 1]
+  max(0, min(1, partial_r2))
+}
+
+
+#' Calculate Importance Using Partial R² Method
+#'
+#' Computes driver-level importance using partial R² for all drivers.
+#' This is the default method per TURAS-KD-CONTINUOUS-UPGRADE-v1.0.
+#'
+#' @param data Data frame
+#' @param config Configuration list
+#' @return Named numeric vector of partial R² values (summing to 100%)
+#' @export
+calculate_importance_partial_r2 <- function(data, config) {
+
+  outcome_var <- config$outcome_var
+  driver_vars <- config$driver_vars
+  weight_var <- config$weight_var
+
+  # Calculate partial R² for each driver
+  partial_r2_vals <- numeric(length(driver_vars))
+  names(partial_r2_vals) <- driver_vars
+
+  for (drv in driver_vars) {
+    partial_r2_vals[drv] <- calculate_partial_r2(
+      data = data,
+      outcome_var = outcome_var,
+      all_drivers = driver_vars,
+      target_driver = drv,
+      weight_var = weight_var
+    )
+  }
+
+  # Normalize to percentages
+  sum_pr2 <- sum(partial_r2_vals)
+  if (sum_pr2 > 0) {
+    partial_r2_vals <- (partial_r2_vals / sum_pr2) * 100
+  }
+
+  partial_r2_vals
+}
+
+
+#' Calculate Grouped Permutation Importance
+#'
+#' Computes driver-level importance using permutation-based approach.
+#' For categorical drivers, all dummy columns are permuted together.
+#'
+#' @param model Fitted model
+#' @param data Data frame
+#' @param config Configuration list
+#' @param n_permutations Number of permutations (default 50)
+#' @return Named numeric vector of permutation importance (summing to 100%)
+#' @export
+calculate_importance_permutation <- function(model, data, config, n_permutations = 50) {
+
+  outcome_var <- config$outcome_var
+  driver_vars <- config$driver_vars
+
+  # Get baseline MSE
+  y <- data[[outcome_var]]
+  y_pred <- predict(model, newdata = data)
+  baseline_mse <- mean((y - y_pred)^2)
+
+  # Calculate permutation importance for each driver
+  perm_importance <- numeric(length(driver_vars))
+  names(perm_importance) <- driver_vars
+
+  for (drv in driver_vars) {
+    mse_diffs <- numeric(n_permutations)
+
+    for (p in seq_len(n_permutations)) {
+      # Create permuted data
+      data_perm <- data
+      data_perm[[drv]] <- sample(data[[drv]])
+
+      # Predict and calculate MSE
+      y_pred_perm <- tryCatch(
+        predict(model, newdata = data_perm),
+        error = function(e) rep(NA, nrow(data_perm))
+      )
+
+      if (any(is.na(y_pred_perm))) {
+        mse_diffs[p] <- 0
+      } else {
+        mse_perm <- mean((y - y_pred_perm)^2)
+        mse_diffs[p] <- mse_perm - baseline_mse
+      }
+    }
+
+    # Importance = mean increase in MSE
+    perm_importance[drv] <- max(0, mean(mse_diffs))
+  }
+
+  # Normalize to percentages
+  sum_perm <- sum(perm_importance)
+  if (sum_perm > 0) {
+    perm_importance <- (perm_importance / sum_perm) * 100
+  }
+
+  perm_importance
+}
+
+
+#' Calculate Driver Importance Using Config-Specified Method
+#'
+#' Main entry point for importance calculation that respects the
+#' aggregation method specified in config for each driver.
+#'
+#' Per TURAS-KD-CONTINUOUS-UPGRADE-v1.0:
+#' - Continuous drivers: direct importance
+#' - Categorical drivers: grouped importance using specified method
+#'
+#' @param model Fitted model
+#' @param data Data frame
+#' @param config Configuration list
+#' @param term_mapping Term mapping result (optional, for mixed predictors)
+#' @return Data frame with driver-level importance
+#' @export
+calculate_importance_by_config <- function(model, data, config, term_mapping = NULL) {
+
+  driver_vars <- config$driver_vars
+  driver_settings <- config$driver_settings
+
+  # Initialize results
+  importance <- data.frame(
+    Driver = driver_vars,
+    Label = vapply(
+      driver_vars,
+      function(v) {
+        label <- config$variables$Label[config$variables$VariableName == v][1]
+        if (is.na(label) || is.null(label)) v else label
+      },
+      character(1)
+    ),
+    stringsAsFactors = FALSE
+  )
+
+  # Add driver type from config
+  if (!is.null(driver_settings)) {
+    importance$DriverType <- vapply(driver_vars, function(drv) {
+      get_driver_type(drv, driver_settings) %||% "continuous"
+    }, character(1))
+
+    importance$AggMethod <- vapply(driver_vars, function(drv) {
+      get_aggregation_method(drv, driver_settings) %||% "direct"
+    }, character(1))
+  } else {
+    # Fallback for old configs without driver_settings
+    importance$DriverType <- rep("continuous", length(driver_vars))
+    importance$AggMethod <- rep("direct", length(driver_vars))
+  }
+
+  # Calculate importance using primary method: Partial R²
+  # This gives exactly one score per driver
+  partial_r2_vals <- calculate_importance_partial_r2(data, config)
+  importance$Importance <- as.numeric(partial_r2_vals[driver_vars])
+
+  # Also calculate Shapley for comparison (if not too many drivers)
+  if (length(driver_vars) <= 15) {
+    shapley_vals <- calculate_shapley_values(model, data, config)
+    importance$Shapley_Value <- as.numeric(shapley_vals)
+  } else {
+    importance$Shapley_Value <- importance$Importance  # Use partial R² as proxy
+  }
+
+  # Calculate ranks
+  importance$Importance_Rank <- rank(-importance$Importance, ties.method = "average")
+
+  # Add method notes
+  importance$Method_Note <- vapply(seq_len(nrow(importance)), function(i) {
+    drv_type <- importance$DriverType[i]
+    agg_method <- importance$AggMethod[i]
+
+    if (drv_type == "categorical") {
+      paste0("grouped_", agg_method)
+    } else if (drv_type == "ordinal") {
+      "numeric_ordinal"
+    } else {
+      "direct"
+    }
+  }, character(1))
+
+  # Sort by importance
+  importance <- importance[order(-importance$Importance), ]
+  rownames(importance) <- NULL
+
+  importance
 }

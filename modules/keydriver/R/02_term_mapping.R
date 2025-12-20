@@ -11,10 +11,15 @@
 #   - build_term_mapping(): Build mapping from model coefficients to drivers
 #   - validate_term_mapping(): TRS mapping gate (REFUSES on mismatch)
 #   - enforce_encoding_policy(): Apply encoding policy for factors/ordered
-#   - get_predictor_info(): Get predictor type information for console output
+#   - validate_driver_type_consistency(): Check config vs data consistency
 #
-# Version: 1.0 (Mixed Predictor Support)
+# Version: 1.1 (Continuous Key Driver Upgrade)
 # Date: December 2024
+#
+# Updates in v1.1:
+#   - Uses config-declared driver_type instead of data inference
+#   - Validates data matches declared type
+#   - Stricter mapping validation per TURAS-KD-CONTINUOUS-UPGRADE-v1.0
 #
 # ==============================================================================
 
@@ -465,4 +470,246 @@ print_term_mapping_summary <- function(mapping) {
 
   cat(sprintf("   Total model terms: %d\n", length(mapping$all_terms)))
   cat("\n")
+}
+
+
+# ==============================================================================
+# v1.1: DRIVER TYPE CONSISTENCY VALIDATION
+# ==============================================================================
+# Per TURAS-KD-CONTINUOUS-UPGRADE-v1.0:
+# - Config-declared types must match data reality
+# - Mismatches trigger REFUSE
+
+#' Validate Driver Type Consistency
+#'
+#' Checks that the config-declared driver_type matches the actual data type.
+#' This prevents silent failures when config and data are inconsistent.
+#'
+#' @param data Data frame with driver variables
+#' @param driver_vars Character vector of driver variable names
+#' @param driver_settings Driver settings data frame from config
+#' @return TRUE if all validations pass (REFUSES on mismatch)
+#' @export
+validate_driver_type_consistency <- function(data, driver_vars, driver_settings) {
+
+  if (is.null(driver_settings)) {
+    # No driver settings - skip validation (backwards compatibility)
+    return(TRUE)
+  }
+
+  mismatches <- character(0)
+  type_issues <- character(0)
+
+  for (drv in driver_vars) {
+    if (!drv %in% names(data)) {
+      # Variable missing from data - handled elsewhere
+      next
+    }
+
+    declared_type <- get_driver_type(drv, driver_settings)
+    if (is.null(declared_type)) {
+      # No declared type - skip
+      next
+    }
+
+    var_data <- data[[drv]]
+    actual_type <- detect_actual_type(var_data)
+
+    # Check for mismatches
+    if (declared_type == "continuous") {
+      if (!is.numeric(var_data)) {
+        mismatches <- c(mismatches, paste0(drv, ": declared 'continuous' but data is ", actual_type))
+      }
+    } else if (declared_type == "categorical") {
+      # Categorical can be factor, character, or will be coerced
+      if (is.numeric(var_data)) {
+        # Numeric variable declared as categorical - this is allowed but may need review
+        # Check if it looks like a code (few unique values)
+        n_unique <- length(unique(var_data[!is.na(var_data)]))
+        if (n_unique > 20) {
+          type_issues <- c(type_issues, paste0(
+            drv, ": declared 'categorical' but has ", n_unique, " unique numeric values"
+          ))
+        }
+      }
+    } else if (declared_type == "ordinal") {
+      # Ordinal can be numeric, ordered factor, or factor
+      # Just verify it's not obviously wrong
+      if (is.character(var_data) && !is.ordered(factor(var_data))) {
+        # Character without natural ordering - warn but don't refuse
+        type_issues <- c(type_issues, paste0(
+          drv, ": declared 'ordinal' but is unordered character data"
+        ))
+      }
+    }
+
+    # Check for categorical drivers with insufficient levels
+    if (declared_type == "categorical") {
+      n_levels <- length(unique(var_data[!is.na(var_data)]))
+      if (n_levels < 2) {
+        mismatches <- c(mismatches, paste0(
+          drv, ": categorical driver must have ≥2 observed levels (found ", n_levels, ")"
+        ))
+      }
+    }
+  }
+
+  # Report hard mismatches (REFUSE)
+  if (length(mismatches) > 0) {
+    keydriver_refuse(
+      code = "DATA_DRIVER_TYPE_MISMATCH",
+      title = "Driver Type Mismatch Between Config and Data",
+      problem = paste0(length(mismatches), " driver(s) have mismatched types."),
+      why_it_matters = paste0(
+        "The declared driver_type in config must match the actual data. ",
+        "Mismatches can cause encoding errors or silently wrong importance scores."
+      ),
+      how_to_fix = c(
+        "Review and correct DriverType in the Variables sheet",
+        "Or ensure your data matches the declared types",
+        "Mismatched drivers listed below"
+      ),
+      missing = mismatches
+    )
+  }
+
+  # Report soft issues (warnings)
+  if (length(type_issues) > 0) {
+    for (issue in type_issues) {
+      cat(sprintf("   [WARN] %s\n", issue))
+    }
+  }
+
+  TRUE
+}
+
+
+#' Detect Actual Data Type
+#'
+#' Determines the apparent type of a variable from its data.
+#'
+#' @param x Vector to check
+#' @return Character string: "numeric", "factor", "ordered", "character", or "other"
+#' @keywords internal
+detect_actual_type <- function(x) {
+  if (is.ordered(x)) {
+    "ordered"
+  } else if (is.factor(x)) {
+    "factor"
+  } else if (is.numeric(x)) {
+    "numeric"
+  } else if (is.character(x)) {
+    "character"
+  } else if (is.logical(x)) {
+    "logical"
+  } else {
+    "other"
+  }
+}
+
+
+#' Build Term Mapping with Config Types
+#'
+#' Enhanced version of build_term_mapping that uses config-declared types
+#' instead of inferring from data.
+#'
+#' @param formula Model formula
+#' @param data Data frame with driver variables
+#' @param driver_vars Character vector of driver variable names
+#' @param driver_settings Driver settings from config
+#' @return List containing term_map, driver_terms, predictor_info
+#' @export
+build_term_mapping_v2 <- function(formula, data, driver_vars, driver_settings) {
+
+  # Build model matrix
+  mm <- stats::model.matrix(formula, data = data)
+  all_terms <- colnames(mm)
+  terms_to_map <- setdiff(all_terms, "(Intercept)")
+
+  # Initialize
+  term_map <- character(length(terms_to_map))
+  names(term_map) <- terms_to_map
+  driver_terms <- setNames(vector("list", length(driver_vars)), driver_vars)
+
+  # Predictor info from config (not inferred)
+  predictor_info <- data.frame(
+    driver = driver_vars,
+    type = vapply(driver_vars, function(drv) {
+      get_driver_type(drv, driver_settings) %||% "continuous"
+    }, character(1)),
+    n_terms = integer(length(driver_vars)),
+    reference_level = character(length(driver_vars)),
+    stringsAsFactors = FALSE
+  )
+
+  # Get reference levels
+  for (i in seq_along(driver_vars)) {
+    drv <- driver_vars[i]
+    drv_type <- predictor_info$type[i]
+
+    if (drv %in% names(data)) {
+      var_data <- data[[drv]]
+
+      if (drv_type == "categorical" || drv_type == "ordinal") {
+        if (is.factor(var_data)) {
+          predictor_info$reference_level[i] <- levels(var_data)[1]
+        } else if (is.character(var_data)) {
+          predictor_info$reference_level[i] <- sort(unique(var_data))[1]
+        } else {
+          predictor_info$reference_level[i] <- NA_character_
+        }
+      } else {
+        predictor_info$reference_level[i] <- NA_character_
+      }
+    }
+  }
+
+  # Map terms to drivers
+  for (i in seq_along(driver_vars)) {
+    drv <- driver_vars[i]
+    drv_type <- predictor_info$type[i]
+    matching_terms <- character(0)
+
+    for (term in terms_to_map) {
+      # Exact match
+      if (term == drv) {
+        matching_terms <- c(matching_terms, term)
+        term_map[term] <- drv
+        next
+      }
+
+      # Prefix match for factor levels
+      if (startsWith(term, drv) && nchar(term) > nchar(drv)) {
+        suffix <- substring(term, nchar(drv) + 1)
+
+        # Verify this is actually a level of this driver
+        if (drv %in% names(data)) {
+          var_data <- data[[drv]]
+          if (is.factor(var_data) || is.character(var_data)) {
+            var_levels <- if (is.factor(var_data)) levels(var_data) else unique(as.character(var_data))
+            if (suffix %in% var_levels) {
+              matching_terms <- c(matching_terms, term)
+              term_map[term] <- drv
+            }
+          }
+        }
+      }
+
+      # Handle TRUE/FALSE for logical
+      if (term %in% c(paste0(drv, "TRUE"), paste0(drv, "FALSE"))) {
+        matching_terms <- c(matching_terms, term)
+        term_map[term] <- drv
+      }
+    }
+
+    driver_terms[[drv]] <- matching_terms
+    predictor_info$n_terms[i] <- length(matching_terms)
+  }
+
+  list(
+    term_map = term_map,
+    driver_terms = driver_terms,
+    predictor_info = predictor_info,
+    all_terms = terms_to_map
+  )
 }

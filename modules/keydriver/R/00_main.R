@@ -5,8 +5,14 @@
 # Module: Key Driver Analysis (Relative Importance)
 # Purpose: Determine which independent variables (drivers) have the greatest
 #          impact on a dependent variable (outcome)
-# Version: Turas v10.2 (TRS Integration)
+# Version: Turas v10.3 (Continuous Key Driver Upgrade)
 # Date: 2025-12
+#
+# NEW IN v10.3:
+#   - Explicit driver_type declarations required (per TURAS-KD-CONTINUOUS-UPGRADE-v1.0)
+#   - Partial R² as primary importance method
+#   - Feature on_fail policies (refuse vs continue_with_flag)
+#   - Enhanced output contract with Run Status sheet
 #
 # NEW IN v10.2:
 #   - TRS v1.0 integration: Refusal framework, guard state, explicit status
@@ -106,7 +112,7 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   start_time <- Sys.time()
 
   # TRS start banner
-  trs_banner_start("KEY DRIVER ANALYSIS", "10.2")
+  trs_banner_start("KEY DRIVER ANALYSIS", "10.3")
 
   # Initialize guard state for tracking warnings and issues
   guard <- keydriver_guard_init()
@@ -185,6 +191,13 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   if (data$n_missing > 0) {
     cat(sprintf("   [INFO] Excluded %d rows with missing data (%.1f%%)\n",
                 data$n_missing, 100 * data$n_missing / (data$n_complete + data$n_missing)))
+  }
+
+  # v10.3: Validate driver type consistency (config vs data)
+  if (!is.null(config$driver_settings)) {
+    cat("   [VALIDATING] Driver type consistency...\n")
+    validate_driver_type_consistency(data$data, config$driver_vars, config$driver_settings)
+    cat("   [OK] Driver types match configuration\n")
   }
 
   # Store raw data in config for later use
@@ -345,18 +358,52 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   # STEP 6: SHAP ANALYSIS (if enabled)
   # ==========================================================================
 
+  # v10.3: Get on_fail policy from config
+  shap_on_fail <- if (!is.null(config$feature_policies$shap$on_fail)) {
+    config$feature_policies$shap$on_fail
+  } else {
+    "refuse"  # Default per spec
+  }
+
   if (enable_shap) {
     cat("\n6. Running SHAP analysis...\n")
+    cat(sprintf("   [POLICY] on_fail = %s\n", shap_on_fail))
+
     shap_results <- tryCatch({
       run_shap_analysis_internal(data$data, config)
     }, error = function(e) {
-      # SHAP failure is degradation, not hard stop
-      cat(sprintf("   [WARN] SHAP analysis failed: %s\n", e$message))
-      guard <<- guard_warn(guard, paste0("SHAP failed: ", e$message), "shap")
-      guard$shap_status <<- "failed"
-      degraded_reasons <<- c(degraded_reasons, paste0("SHAP analysis failed: ", e$message))
-      affected_outputs <<- c(affected_outputs, "SHAP importance", "SHAP plots")
-      NULL
+      # v10.3: Handle per on_fail policy
+      if (shap_on_fail == "refuse") {
+        # Refuse to continue
+        keydriver_refuse(
+          code = "FEATURE_SHAP_FAILED",
+          title = "SHAP Analysis Failed",
+          problem = paste0("SHAP analysis failed: ", e$message),
+          why_it_matters = paste0(
+            "SHAP analysis is enabled with on_fail='refuse' policy. ",
+            "Analysis cannot continue without successful SHAP completion."
+          ),
+          how_to_fix = c(
+            "Fix the underlying SHAP error",
+            "Or set shap_on_fail='continue_with_flag' in Settings",
+            "Or disable SHAP by setting enable_shap=FALSE"
+          )
+        )
+      } else {
+        # continue_with_flag - degraded output
+        cat("\n================================================================================\n")
+        cat("  [WARNING] SHAP ANALYSIS FAILED - CONTINUING WITH PARTIAL OUTPUT\n")
+        cat("================================================================================\n")
+        cat(sprintf("  Error: %s\n", e$message))
+        cat("  The analysis will continue but SHAP outputs will be missing.\n")
+        cat("================================================================================\n\n")
+
+        guard <<- guard_warn(guard, paste0("SHAP failed: ", e$message), "shap")
+        guard$shap_status <<- "failed"
+        degraded_reasons <<- c(degraded_reasons, paste0("SHAP analysis failed: ", e$message))
+        affected_outputs <<- c(affected_outputs, "SHAP importance", "SHAP plots")
+        NULL
+      }
     })
 
     if (!is.null(shap_results)) {
@@ -376,20 +423,53 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   # STEP 7: QUADRANT ANALYSIS (if enabled)
   # ==========================================================================
 
+  # v10.3: Get on_fail policy from config
+  quadrant_on_fail <- if (!is.null(config$feature_policies$quadrant$on_fail)) {
+    config$feature_policies$quadrant$on_fail
+  } else {
+    "refuse"  # Default per spec
+  }
+
   if (enable_quadrant) {
     step_num <- if (enable_shap) "7" else "6"
     cat(sprintf("\n%s. Running quadrant analysis...\n", step_num))
+    cat(sprintf("   [POLICY] on_fail = %s\n", quadrant_on_fail))
 
     quadrant_results <- tryCatch({
       run_quadrant_analysis_internal(results, data$data, config)
     }, error = function(e) {
-      # Quadrant failure is degradation, not hard stop
-      cat(sprintf("   [WARN] Quadrant analysis failed: %s\n", e$message))
-      guard <<- guard_warn(guard, paste0("Quadrant failed: ", e$message), "quadrant")
-      guard$quadrant_status <<- "failed"
-      degraded_reasons <<- c(degraded_reasons, paste0("Quadrant analysis failed: ", e$message))
-      affected_outputs <<- c(affected_outputs, "Quadrant charts", "IPA analysis")
-      NULL
+      # v10.3: Handle per on_fail policy
+      if (quadrant_on_fail == "refuse") {
+        # Refuse to continue
+        keydriver_refuse(
+          code = "FEATURE_QUADRANT_FAILED",
+          title = "Quadrant Analysis Failed",
+          problem = paste0("Quadrant analysis failed: ", e$message),
+          why_it_matters = paste0(
+            "Quadrant analysis is enabled with on_fail='refuse' policy. ",
+            "Analysis cannot continue without successful Quadrant completion."
+          ),
+          how_to_fix = c(
+            "Fix the underlying Quadrant error",
+            "Or set quadrant_on_fail='continue_with_flag' in Settings",
+            "Or disable Quadrant by setting enable_quadrant=FALSE"
+          )
+        )
+      } else {
+        # continue_with_flag - degraded output
+        cat("\n================================================================================\n")
+        cat("  [WARNING] QUADRANT ANALYSIS FAILED - CONTINUING WITH PARTIAL OUTPUT\n")
+        cat("================================================================================\n")
+        cat(sprintf("  Error: %s\n", e$message))
+        cat("  The analysis will continue but Quadrant outputs will be missing.\n")
+        cat("================================================================================\n\n")
+
+        guard <<- guard_warn(guard, paste0("Quadrant failed: ", e$message), "quadrant")
+        guard$quadrant_status <<- "failed"
+        degraded_reasons <<- c(degraded_reasons, paste0("Quadrant analysis failed: ", e$message))
+        affected_outputs <<- c(affected_outputs, "Quadrant charts", "IPA analysis")
+        NULL
+      }
     })
 
     if (!is.null(quadrant_results)) {
@@ -400,26 +480,14 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   }
 
   # ==========================================================================
-  # STEP 8: GENERATE OUTPUT
-  # ==========================================================================
-
-  step_num <- 6 + (if (enable_shap) 1 else 0) + (if (enable_quadrant) 1 else 0)
-  cat(sprintf("\n%d. Generating output file...\n", step_num))
-
-  write_keydriver_output_enhanced(
-    results = results,
-    output_file = output_file
-  )
-  cat(sprintf("   [OK] Results written to: %s\n", output_file))
-
-  # ==========================================================================
-  # DETERMINE FINAL STATUS
+  # DETERMINE FINAL STATUS (before output)
   # ==========================================================================
 
   guard_status <- keydriver_guard_summary(guard)
   results$guard_summary <- guard_status
 
   # Determine run_status
+  status_details <- NULL
   if (length(degraded_reasons) > 0) {
     results$run_status <- "PARTIAL"
     results$status <- trs_status_partial(
@@ -427,12 +495,33 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
       degraded_reasons = degraded_reasons,
       affected_outputs = affected_outputs
     )
+    status_details <- list(
+      degraded_reasons = degraded_reasons,
+      affected_outputs = affected_outputs
+    )
   } else if (guard_status$has_issues) {
     results$run_status <- "PASS"  # Still PASS, but with warnings
+    results$status <- trs_status_pass(module = "KEYDRIVER")
   } else {
     results$run_status <- "PASS"
     results$status <- trs_status_pass(module = "KEYDRIVER")
   }
+
+  # ==========================================================================
+  # STEP 8: GENERATE OUTPUT
+  # ==========================================================================
+
+  step_num <- 6 + (if (enable_shap) 1 else 0) + (if (enable_quadrant) 1 else 0)
+  cat(sprintf("\n%d. Generating output file...\n", step_num))
+
+  # v10.3: Pass run_status and status_details to output
+  write_keydriver_output_enhanced(
+    results = results,
+    output_file = output_file,
+    run_status = results$run_status,
+    status_details = status_details
+  )
+  cat(sprintf("   [OK] Results written to: %s\n", output_file))
 
   # ==========================================================================
   # COMPLETION
@@ -661,16 +750,24 @@ find_turas_root <- function() {
 #'
 #' Extended output writer that includes SHAP and Quadrant results.
 #'
+#' @param results Results list
+#' @param output_file Output file path
+#' @param run_status TRS run status (PASS, PARTIAL)
+#' @param status_details Optional list with status details
 #' @keywords internal
-write_keydriver_output_enhanced <- function(results, output_file) {
+write_keydriver_output_enhanced <- function(results, output_file,
+                                             run_status = "PASS",
+                                             status_details = NULL) {
 
-  # Use standard output first
+  # Use standard output first - v10.3: pass run_status
   write_keydriver_output(
     importance = results$importance,
     model = results$model,
     correlations = results$correlations,
     config = results$config,
-    output_file = output_file
+    output_file = output_file,
+    run_status = run_status,
+    status_details = status_details
   )
 
   # Then add SHAP and Quadrant sheets if available

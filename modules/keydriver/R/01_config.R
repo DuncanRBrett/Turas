@@ -2,8 +2,13 @@
 # KEY DRIVER CONFIG LOADER
 # ==============================================================================
 #
-# Version: Turas v10.2 (TRS Integration)
+# Version: Turas v10.3 (Continuous Key Driver Upgrade)
 # Date: 2025-12
+#
+# NEW IN v10.3:
+#   - Explicit driver_type declaration required per driver
+#   - aggregation_method support for categorical drivers
+#   - Stricter validation per TURAS-KD-CONTINUOUS-UPGRADE-v1.0
 #
 # NEW IN v10.2:
 #   - TRS v1.0 integration: Refusal framework for config errors
@@ -64,6 +69,14 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
   settings <- openxlsx::read.xlsx(config_file, sheet = "Settings")
   settings_list <- setNames(as.list(settings$Value), settings$Setting)
 
+  # -----------------------------------------------------------------
+  # v10.3: Parse on_fail policy for optional features
+  # Per TURAS-KD-CONTINUOUS-UPGRADE-v1.0:
+  # - Default: on_fail = refuse
+  # - Can be set to: refuse, continue_with_flag
+  # -----------------------------------------------------------------
+  feature_policies <- parse_feature_policies(settings_list)
+
   # Extract and resolve file paths from settings
   data_file <- settings_list$data_file
   output_file <- settings_list$output_file
@@ -104,7 +117,7 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
   }
   variables <- openxlsx::read.xlsx(config_file, sheet = "Variables")
 
-  # Validate variables sheet
+  # Validate variables sheet - base required columns
   required_cols <- c("VariableName", "Type", "Label")
   missing_cols <- setdiff(required_cols, names(variables))
   if (length(missing_cols) > 0) {
@@ -122,7 +135,17 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
 
   # Extract outcome and driver variables
   outcome_vars <- variables$VariableName[variables$Type == "Outcome"]
-  driver_vars <- variables$VariableName[variables$Type == "Driver"]
+  driver_rows <- variables[variables$Type == "Driver", , drop = FALSE]
+  driver_vars <- driver_rows$VariableName
+
+  # -----------------------------------------------------------------
+  # v10.3: Validate driver configuration per TURAS-KD-CONTINUOUS-UPGRADE-v1.0
+  # Each driver MUST have explicit driver_type declaration
+  # -----------------------------------------------------------------
+  driver_settings <- NULL
+  if (length(driver_vars) > 0) {
+    driver_settings <- validate_driver_declarations(driver_rows, variables)
+  }
 
   if (length(outcome_vars) == 0) {
     keydriver_refuse(
@@ -236,7 +259,11 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
     project_root = project_root,
     # NEW v10.1
     segments = segments,
-    stated_importance = stated_importance
+    stated_importance = stated_importance,
+    # NEW v10.3: Explicit driver settings per TURAS-KD-CONTINUOUS-UPGRADE-v1.0
+    driver_settings = driver_settings,
+    # NEW v10.3: Feature policies (on_fail behavior)
+    feature_policies = feature_policies
   )
 }
 
@@ -384,4 +411,294 @@ as_numeric_setting <- function(value, default = NA_real_) {
   }
 
   default
+}
+
+
+# ==============================================================================
+# v10.3: FEATURE POLICY PARSING
+# ==============================================================================
+# Per TURAS-KD-CONTINUOUS-UPGRADE-v1.0:
+# - Optional features must declare on_fail policy
+# - Default: refuse (if enabled and fails, refuse to produce output)
+# - Alternative: continue_with_flag (produce PARTIAL output)
+
+#' Parse Feature Policies from Settings
+#'
+#' Extracts on_fail policies for optional features from settings.
+#'
+#' Valid policies:
+#' - refuse: If feature fails, refuse to produce any output (default)
+#' - continue_with_flag: If feature fails, produce PARTIAL output with banner
+#'
+#' Settings keys (case-insensitive):
+#' - shap_on_fail: Policy for SHAP analysis
+#' - quadrant_on_fail: Policy for Quadrant analysis
+#'
+#' @param settings_list Named list of settings
+#' @return List with feature policies
+#' @keywords internal
+parse_feature_policies <- function(settings_list) {
+
+  valid_policies <- c("refuse", "continue_with_flag")
+
+  # Parse SHAP policy
+  shap_on_fail <- tolower(trimws(settings_list$shap_on_fail %||% "refuse"))
+  if (!shap_on_fail %in% valid_policies) {
+    shap_on_fail <- "refuse"  # Default to safer option
+  }
+
+  # Parse Quadrant policy
+  quadrant_on_fail <- tolower(trimws(settings_list$quadrant_on_fail %||% "refuse"))
+  if (!quadrant_on_fail %in% valid_policies) {
+    quadrant_on_fail <- "refuse"
+  }
+
+  list(
+    shap = list(
+      enabled = as_logical_setting(settings_list$enable_shap, FALSE),
+      on_fail = shap_on_fail
+    ),
+    quadrant = list(
+      enabled = as_logical_setting(settings_list$enable_quadrant, FALSE),
+      on_fail = quadrant_on_fail
+    )
+  )
+}
+
+
+#' Handle Feature Failure Per Policy
+#'
+#' Handles a feature failure according to the configured policy.
+#'
+#' @param feature_name Name of the feature (e.g., "SHAP", "Quadrant")
+#' @param policy Policy string: "refuse" or "continue_with_flag"
+#' @param error_message Error message from the failure
+#' @param guard Guard state for tracking
+#' @return Updated guard state (if continue) or refuses (if refuse policy)
+#' @export
+handle_feature_failure <- function(feature_name, policy, error_message, guard) {
+
+  if (policy == "refuse") {
+    # Refuse to continue - this is a hard stop
+    keydriver_refuse(
+      code = paste0("FEATURE_", toupper(feature_name), "_FAILED"),
+      title = paste0(feature_name, " Analysis Failed"),
+      problem = paste0(feature_name, " analysis failed: ", error_message),
+      why_it_matters = paste0(
+        "The ", feature_name, " feature is enabled with on_fail='refuse' policy. ",
+        "Analysis cannot continue without successful completion of this feature."
+      ),
+      how_to_fix = c(
+        paste0("Fix the underlying ", feature_name, " error (see message above)"),
+        paste0("Or set ", tolower(feature_name), "_on_fail='continue_with_flag' in Settings"),
+        paste0("Or disable ", feature_name, " by setting enable_", tolower(feature_name), "=FALSE")
+      )
+    )
+  } else {
+    # continue_with_flag - record as degradation
+    guard <- guard_warn(guard, paste0(feature_name, " failed: ", error_message), tolower(feature_name))
+
+    # Print prominent banner
+    cat("\n")
+    cat("================================================================================\n")
+    cat(sprintf("  [WARNING] %s ANALYSIS FAILED - CONTINUING WITH PARTIAL OUTPUT\n", toupper(feature_name)))
+    cat("================================================================================\n")
+    cat(sprintf("  Error: %s\n", error_message))
+    cat("  The analysis will continue but some outputs will be missing.\n")
+    cat("================================================================================\n\n")
+
+    guard
+  }
+}
+
+
+# ==============================================================================
+# v10.3: DRIVER DECLARATION VALIDATION
+# ==============================================================================
+# Per TURAS-KD-CONTINUOUS-UPGRADE-v1.0:
+# - Each driver MUST have explicit driver_type declaration
+# - Inference is forbidden
+# - aggregation_method required for categorical drivers
+
+#' Validate Driver Declarations
+#'
+#' Validates that each driver has required explicit declarations per
+#' TURAS-KD-CONTINUOUS-UPGRADE-v1.0 specification.
+#'
+#' Required fields per driver:
+#' - driver_name (from VariableName)
+#' - driver_type ∈ {continuous, ordinal, categorical}
+#' - source_column (from VariableName, must match data column)
+#' - aggregation_method (required only if categorical)
+#'
+#' @param driver_rows Data frame subset of Variables sheet with Type='Driver'
+#' @param variables Full variables data frame
+#' @return Data frame with validated driver settings
+#' @keywords internal
+validate_driver_declarations <- function(driver_rows, variables) {
+
+  # Valid driver types per spec
+  valid_driver_types <- c("continuous", "ordinal", "categorical")
+
+  # Valid aggregation methods per spec
+  valid_agg_methods <- c("partial_r2", "grouped_permutation", "grouped_shapley")
+
+  # Check if DriverType column exists
+  has_driver_type <- "DriverType" %in% names(driver_rows)
+
+  if (!has_driver_type) {
+    # v10.3 UPGRADE: DriverType column is now required
+    # Provide helpful migration message
+    keydriver_refuse(
+      code = "CFG_DRIVER_TYPE_MISSING",
+      title = "Driver Type Column Required",
+      problem = "The Variables sheet is missing the required 'DriverType' column.",
+      why_it_matters = paste0(
+        "Per TURAS-KD-CONTINUOUS-UPGRADE-v1.0, each driver must have an explicit ",
+        "driver_type declaration. Type inference is no longer permitted to ensure ",
+        "reproducible results and prevent silent failures."
+      ),
+      how_to_fix = c(
+        "Add a 'DriverType' column to the Variables sheet",
+        "For each driver row, set DriverType to one of: continuous, ordinal, categorical",
+        "continuous: for numeric predictors with no natural ordering breaks",
+        "ordinal: for ordered categories (will be treated as numeric by default)",
+        "categorical: for unordered categories (requires aggregation)"
+      ),
+      expected = "DriverType column with values: continuous, ordinal, categorical",
+      observed = names(driver_rows)
+    )
+  }
+
+  # Check if AggregationMethod column exists (needed for categorical)
+  has_agg_method <- "AggregationMethod" %in% names(driver_rows)
+
+  # Build driver settings data frame
+  n_drivers <- nrow(driver_rows)
+  driver_settings <- data.frame(
+    driver = driver_rows$VariableName,
+    driver_type = tolower(trimws(as.character(driver_rows$DriverType))),
+    aggregation_method = if (has_agg_method) {
+      tolower(trimws(as.character(driver_rows$AggregationMethod)))
+    } else {
+      rep(NA_character_, n_drivers)
+    },
+    reference_level = if ("ReferenceLevel" %in% names(driver_rows)) {
+      as.character(driver_rows$ReferenceLevel)
+    } else {
+      rep(NA_character_, n_drivers)
+    },
+    stringsAsFactors = FALSE
+  )
+
+  # Validate each driver
+  invalid_types <- character(0)
+  missing_agg <- character(0)
+  invalid_agg <- character(0)
+
+  for (i in seq_len(n_drivers)) {
+    drv <- driver_settings$driver[i]
+    drv_type <- driver_settings$driver_type[i]
+    agg_method <- driver_settings$aggregation_method[i]
+
+    # Check driver_type is valid
+    if (is.na(drv_type) || !drv_type %in% valid_driver_types) {
+      invalid_types <- c(invalid_types, paste0(drv, " (got: '", drv_type, "')"))
+    }
+
+    # Check aggregation_method for categorical drivers
+    if (!is.na(drv_type) && drv_type == "categorical") {
+      if (is.na(agg_method) || !nzchar(agg_method)) {
+        # Default to partial_r2 per spec
+        driver_settings$aggregation_method[i] <- "partial_r2"
+      } else if (!agg_method %in% valid_agg_methods) {
+        invalid_agg <- c(invalid_agg, paste0(drv, " (got: '", agg_method, "')"))
+      }
+    }
+  }
+
+  # Report invalid driver types
+  if (length(invalid_types) > 0) {
+    keydriver_refuse(
+      code = "CFG_INVALID_DRIVER_TYPE",
+      title = "Invalid Driver Type Declaration",
+      problem = paste0(length(invalid_types), " driver(s) have invalid or missing DriverType."),
+      why_it_matters = paste0(
+        "Driver type determines how the variable is encoded and how importance ",
+        "scores are calculated. Invalid types cannot be processed."
+      ),
+      how_to_fix = c(
+        "Set DriverType to one of: continuous, ordinal, categorical",
+        "Check for typos or extra spaces in DriverType values"
+      ),
+      expected = paste(valid_driver_types, collapse = ", "),
+      missing = invalid_types
+    )
+  }
+
+  # Report invalid aggregation methods
+  if (length(invalid_agg) > 0) {
+    keydriver_refuse(
+      code = "CFG_INVALID_AGGREGATION_METHOD",
+      title = "Invalid Aggregation Method",
+      problem = paste0(length(invalid_agg), " categorical driver(s) have invalid aggregation method."),
+      why_it_matters = paste0(
+        "Aggregation method determines how multiple coefficients from categorical ",
+        "drivers are combined into a single importance score."
+      ),
+      how_to_fix = c(
+        "Set AggregationMethod to one of: partial_r2, grouped_permutation, grouped_shapley",
+        "partial_r2 is the default and recommended method",
+        "grouped_shapley requires SHAP analysis to be enabled"
+      ),
+      expected = paste(valid_agg_methods, collapse = ", "),
+      missing = invalid_agg
+    )
+  }
+
+  driver_settings
+}
+
+
+#' Get Driver Type for a Variable
+#'
+#' Retrieves the declared driver type from config settings.
+#'
+#' @param driver_name Driver variable name
+#' @param driver_settings Driver settings data frame from config
+#' @return Driver type string or NULL if not found
+#' @export
+get_driver_type <- function(driver_name, driver_settings) {
+  if (is.null(driver_settings) || !is.data.frame(driver_settings)) {
+    return(NULL)
+  }
+  idx <- match(driver_name, driver_settings$driver)
+  if (is.na(idx)) {
+    return(NULL)
+  }
+  driver_settings$driver_type[idx]
+}
+
+
+#' Get Aggregation Method for a Driver
+#'
+#' Retrieves the aggregation method for categorical drivers.
+#'
+#' @param driver_name Driver variable name
+#' @param driver_settings Driver settings data frame from config
+#' @return Aggregation method string or NULL if not applicable
+#' @export
+get_aggregation_method <- function(driver_name, driver_settings) {
+  if (is.null(driver_settings) || !is.data.frame(driver_settings)) {
+    return(NULL)
+  }
+  idx <- match(driver_name, driver_settings$driver)
+  if (is.na(idx)) {
+    return(NULL)
+  }
+  agg <- driver_settings$aggregation_method[idx]
+  if (is.na(agg) || !nzchar(agg)) {
+    return(NULL)
+  }
+  agg
 }
