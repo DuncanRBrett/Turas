@@ -31,6 +31,41 @@ script_dir <- tryCatch({
 # TRS Guard Layer (v1.0) - MUST be loaded first before any module files
 source(file.path(script_dir, "00_guard.R"))
 
+# ==============================================================================
+# TRS RUN STATE INFRASTRUCTURE (v1.0)
+# ==============================================================================
+# Source TRS run state and banner helpers from shared/lib
+.source_trs_infrastructure_tracker <- function() {
+  possible_paths <- c(
+    file.path(script_dir, "..", "shared", "lib"),
+    file.path(getwd(), "modules", "shared", "lib"),
+    file.path(Sys.getenv("TURAS_HOME"), "modules", "shared", "lib")
+  )
+
+  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R", "turas_log.R")
+
+  for (trs_file in trs_files) {
+    loaded <- FALSE
+    for (p in possible_paths) {
+      fpath <- file.path(p, trs_file)
+      if (file.exists(fpath)) {
+        tryCatch({
+          source(fpath, local = FALSE)
+          loaded <- TRUE
+          break
+        }, error = function(e) NULL)
+      }
+    }
+  }
+}
+
+# Attempt to load TRS infrastructure
+tryCatch({
+  .source_trs_infrastructure_tracker()
+}, error = function(e) {
+  message("[TRS INFO] TRS infrastructure not fully loaded: ", e$message)
+})
+
 source(file.path(script_dir, "constants.R"))
 source(file.path(script_dir, "tracker_config_loader.R"))
 source(file.path(script_dir, "wave_loader.R"))
@@ -159,12 +194,26 @@ run_tracker <- function(tracking_config_path,
 
   phase_label <- if (use_banners) "PHASE 3: BANNER BREAKOUTS & COMPOSITES" else "PHASE 2: TREND CALCULATION & OUTPUT"
 
-  cat("================================================================================\n")
-  cat(paste0("TURASTACKER - MVT ", phase_label, "\n"))
-  cat("================================================================================\n")
-  cat(paste0("Version: 2.2 (2025-12-11) - Enhanced Reports: Dashboard & Significance Matrix\n"))
-  cat(paste0("Started: ", format(start_time, "%Y-%m-%d %H:%M:%S"), "\n"))
-  cat("\n")
+  # ===========================================================================
+  # TRS v1.0: Initialize Run State
+  # ===========================================================================
+  trs_state <- if (exists("turas_run_state_new", mode = "function")) {
+    turas_run_state_new("TRACKER")
+  } else {
+    NULL
+  }
+
+  # TRS v1.0: Start Banner
+  if (exists("turas_banner_start", mode = "function")) {
+    turas_banner_start("TRACKER", "2.2")
+  } else {
+    cat("================================================================================\n")
+    cat(paste0("TURASTACKER - MVT ", phase_label, "\n"))
+    cat("================================================================================\n")
+    cat(paste0("Version: 2.2 (2025-12-11) - Enhanced Reports: Dashboard & Significance Matrix\n"))
+    cat(paste0("Started: ", format(start_time, "%Y-%m-%d %H:%M:%S"), "\n"))
+    cat("\n")
+  }
 
   # ============================================================================
   # STEP 1: Load Configuration
@@ -318,7 +367,8 @@ run_tracker <- function(tracking_config_path,
       config = config,
       wave_data = wave_data,
       output_path = detailed_path,
-      banner_segments = banner_segments
+      banner_segments = banner_segments,
+      run_result = trs_state
     )
   }
 
@@ -344,7 +394,8 @@ run_tracker <- function(tracking_config_path,
       config = config,
       wave_data = wave_data,
       output_path = wave_history_path,
-      banner_segments = banner_segments
+      banner_segments = banner_segments,
+      run_result = trs_state
     )
   }
 
@@ -370,7 +421,8 @@ run_tracker <- function(tracking_config_path,
       config = config,
       wave_data = wave_data,
       output_path = dashboard_path,
-      include_sig_matrices = TRUE  # Dashboard includes sig matrices by default
+      include_sig_matrices = TRUE,  # Dashboard includes sig matrices by default
+      run_result = trs_state
     )
   }
 
@@ -395,7 +447,8 @@ run_tracker <- function(tracking_config_path,
       trend_results = trend_results,
       config = config,
       wave_data = wave_data,
-      output_path = sig_matrix_path
+      output_path = sig_matrix_path,
+      run_result = trs_state
     )
   }
 
@@ -406,27 +459,41 @@ run_tracker <- function(tracking_config_path,
   end_time <- Sys.time()
   elapsed <- as.numeric(difftime(end_time, start_time, units = "secs"))
 
-  cat("\n================================================================================\n")
-  cat("TRACKING ANALYSIS COMPLETE\n")
-  cat("================================================================================\n")
-  cat(paste0("Completed: ", format(end_time, "%Y-%m-%d %H:%M:%S"), "\n"))
-  cat(paste0("Elapsed time: ", round(elapsed, 1), " seconds\n"))
-  cat("\n")
-  cat("✓ Configuration loaded and validated\n")
-  cat("✓ Question mapping indexed\n")
-  cat("✓ Wave data loaded\n")
-  cat(paste0("✓ Trends calculated for ", length(trend_results), " questions\n"))
-
-  # Display output files
-  if (length(output_files) > 0) {
-    cat("✓ Output files generated:\n")
-    for (report_type in names(output_files)) {
-      cat(paste0("  - ", report_type, ": ", output_files[[report_type]], "\n"))
-    }
+  # ===========================================================================
+  # TRS v1.0: Retrieve Run Result and Display Final Banner
+  # ===========================================================================
+  run_result <- if (!is.null(trs_state) && exists("turas_run_state_get_result", mode = "function")) {
+    turas_run_state_get_result(trs_state)
+  } else {
+    NULL
   }
 
-  cat("\n")
-  cat("================================================================================\n\n")
+  # TRS v1.0: Final Banner
+  if (exists("turas_banner_final", mode = "function") && !is.null(run_result)) {
+    turas_banner_final("TRACKER", run_result)
+  } else {
+    cat("\n================================================================================\n")
+    cat("TRACKING ANALYSIS COMPLETE\n")
+    cat("================================================================================\n")
+    cat(paste0("Completed: ", format(end_time, "%Y-%m-%d %H:%M:%S"), "\n"))
+    cat(paste0("Elapsed time: ", round(elapsed, 1), " seconds\n"))
+    cat("\n")
+    cat("   Configuration loaded and validated\n")
+    cat("   Question mapping indexed\n")
+    cat("   Wave data loaded\n")
+    cat(paste0("   Trends calculated for ", length(trend_results), " questions\n"))
+
+    # Display output files
+    if (length(output_files) > 0) {
+      cat("   Output files generated:\n")
+      for (report_type in names(output_files)) {
+        cat(paste0("     - ", report_type, ": ", output_files[[report_type]], "\n"))
+      }
+    }
+
+    cat("\n")
+    cat("================================================================================\n\n")
+  }
 
   # Return output file path(s)
   # If single output, return as character; if multiple, return as named list

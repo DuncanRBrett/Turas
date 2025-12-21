@@ -52,8 +52,8 @@ fit_hb_model <- function(long_data, items, config, verbose = TRUE) {
   has_cmdstanr <- requireNamespace("cmdstanr", quietly = TRUE)
 
   if (!has_cmdstanr) {
-    # TRS INFO: Optional package not available, using fallback
-    message("[TRS INFO] cmdstanr package not available - using approximate HB method instead")
+    # TRS PARTIAL: Optional package not available, using fallback method
+    message("[TRS PARTIAL] MAXD_CMDSTANR_MISSING: cmdstanr package not available - using approximate HB method")
     message("[TRS INFO] For full HB estimation, install cmdstanr: https://mc-stan.org/cmdstanr/")
     return(fit_approximate_hb(long_data, items, config, verbose))
   }
@@ -90,7 +90,7 @@ fit_hb_model <- function(long_data, items, config, verbose = TRUE) {
     cmdstanr::cmdstan_model(stan_model_path)
   }, error = function(e) {
     message(sprintf(
-      "[TRS INFO] MAXD_STAN_COMPILE_FAILED: Stan model compilation failed: %s - using approximate method",
+      "[TRS PARTIAL] MAXD_STAN_COMPILE_FAILED: Stan model compilation failed: %s - using approximate method",
       conditionMessage(e)
     ))
     return(NULL)

@@ -123,16 +123,16 @@ score_new_data <- function(model_file, new_data, id_variable, output_file = NULL
             scoring_data[[var]][is.na(scoring_data[[var]])] <- mean_val
             cat(sprintf("    %s: mean = %.3f\n", var, mean_val))
           } else {
-            # TRS INFO: Fallback to batch mean for this variable
-            message(sprintf("[TRS INFO] No saved mean for variable '%s' - using current batch mean", var))
+            # TRS PARTIAL: Fallback to batch mean for this variable (may differ from training)
+            message(sprintf("[TRS PARTIAL] SEG_IMPUTE_FALLBACK: No saved mean for variable '%s' - using current batch mean", var))
             mean_val <- mean(scoring_data[[var]], na.rm = TRUE)
             scoring_data[[var]][is.na(scoring_data[[var]])] <- mean_val
           }
         }
       } else {
         # Fallback to batch means
-        # TRS INFO: Using batch means as fallback
-        message("[TRS INFO] Model does not contain saved imputation parameters - using current batch means")
+        # TRS PARTIAL: Using batch means instead of training parameters (may affect consistency)
+        message("[TRS PARTIAL] SEG_IMPUTE_NO_PARAMS: Model does not contain saved imputation parameters - using current batch means")
         for (var in vars_with_missing) {
           mean_val <- mean(scoring_data[[var]], na.rm = TRUE)
           scoring_data[[var]][is.na(scoring_data[[var]])] <- mean_val
@@ -150,16 +150,16 @@ score_new_data <- function(model_file, new_data, id_variable, output_file = NULL
             scoring_data[[var]][is.na(scoring_data[[var]])] <- median_val
             cat(sprintf("    %s: median = %.3f\n", var, median_val))
           } else {
-            # TRS INFO: Fallback to batch median for this variable
-            message(sprintf("[TRS INFO] No saved median for variable '%s' - using current batch median", var))
+            # TRS PARTIAL: Fallback to batch median for this variable (may differ from training)
+            message(sprintf("[TRS PARTIAL] SEG_IMPUTE_FALLBACK: No saved median for variable '%s' - using current batch median", var))
             median_val <- median(scoring_data[[var]], na.rm = TRUE)
             scoring_data[[var]][is.na(scoring_data[[var]])] <- median_val
           }
         }
       } else {
         # Fallback to batch medians
-        # TRS INFO: Using batch medians as fallback
-        message("[TRS INFO] Model does not contain saved imputation parameters - using current batch medians")
+        # TRS PARTIAL: Using batch medians instead of training parameters (may affect consistency)
+        message("[TRS PARTIAL] SEG_IMPUTE_NO_PARAMS: Model does not contain saved imputation parameters - using current batch medians")
         for (var in vars_with_missing) {
           median_val <- median(scoring_data[[var]], na.rm = TRUE)
           scoring_data[[var]][is.na(scoring_data[[var]])] <- median_val

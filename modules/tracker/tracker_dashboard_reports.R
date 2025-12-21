@@ -997,7 +997,7 @@ write_all_significance_matrices <- function(wb, trend_results, config) {
 #'
 #' @export
 write_dashboard_output <- function(trend_results, config, wave_data,
-                                   output_path = NULL, include_sig_matrices = TRUE) {
+                                   output_path = NULL, include_sig_matrices = TRUE, run_result = NULL) {
 
   cat("\n================================================================================\n")
   cat("WRITING DASHBOARD EXCEL OUTPUT\n")
@@ -1031,6 +1031,13 @@ write_dashboard_output <- function(trend_results, config, wave_data,
     write_all_significance_matrices(wb, trend_results, config)
   }
 
+  # ===========================================================================
+  # TRS v1.0: Add Run_Status Sheet
+  # ===========================================================================
+  if (!is.null(run_result) && exists("turas_write_run_status_sheet", mode = "function")) {
+    turas_write_run_status_sheet(wb, run_result)
+  }
+
   # Save workbook
   cat(paste0("\nSaving workbook...\n"))
   openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
@@ -1053,7 +1060,7 @@ write_dashboard_output <- function(trend_results, config, wave_data,
 #' @return Character. Path to created file
 #'
 #' @export
-write_sig_matrix_output <- function(trend_results, config, wave_data, output_path = NULL) {
+write_sig_matrix_output <- function(trend_results, config, wave_data, output_path = NULL, run_result = NULL) {
 
   cat("\n================================================================================\n")
   cat("WRITING SIGNIFICANCE MATRIX EXCEL OUTPUT\n")
@@ -1081,6 +1088,13 @@ write_sig_matrix_output <- function(trend_results, config, wave_data, output_pat
 
   # Write all significance matrices
   write_all_significance_matrices(wb, trend_results, config)
+
+  # ===========================================================================
+  # TRS v1.0: Add Run_Status Sheet
+  # ===========================================================================
+  if (!is.null(run_result) && exists("turas_write_run_status_sheet", mode = "function")) {
+    turas_write_run_status_sheet(wb, run_result)
+  }
 
   # Save workbook
   cat(paste0("\nSaving workbook...\n"))
