@@ -943,7 +943,8 @@ load_checkpoint <- function(checkpoint_file) {
                        length(checkpoint_data$processed)), "INFO")
     return(checkpoint_data)
   }, error = function(e) {
-    warning(sprintf("Failed to load checkpoint: %s", conditionMessage(e)))
+    # TRS v1.0: Make checkpoint load failure visible (not output-affecting, just informational)
+    message(sprintf("[TRS INFO] Checkpoint file exists but could not be loaded: %s\n  Starting fresh instead.", conditionMessage(e)))
     return(NULL)
   })
 }

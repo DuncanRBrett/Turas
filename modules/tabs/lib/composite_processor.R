@@ -56,8 +56,17 @@ load_composite_definitions <- function(survey_structure_file) {
 
     # Check if empty
     if (nrow(composite_defs) == 0) {
-      warning("Composite_Metrics sheet exists but is empty")
-      return(NULL)
+      # TRS v1.0: Empty Composite_Metrics sheet is a config error - refuse
+      tabs_refuse(
+        code = "CFG_COMPOSITE_SHEET_EMPTY",
+        title = "Empty Composite_Metrics Sheet",
+        problem = "The Composite_Metrics sheet exists but contains no definitions.",
+        why_it_matters = "If the sheet exists, Turas expects it to contain composite definitions. An empty sheet suggests incomplete configuration.",
+        how_to_fix = c(
+          "Add composite metric definitions to the Composite_Metrics sheet, or",
+          "Delete the Composite_Metrics sheet entirely if you don't need composites"
+        )
+      )
     }
 
     # Validate required columns

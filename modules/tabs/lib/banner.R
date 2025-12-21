@@ -150,8 +150,18 @@ process_banner_question <- function(banner_questions, banner_idx,
   ]
   
   if (nrow(question_info) == 0) {
-    warning(sprintf("Banner question not found in structure: %s", banner_code))
-    return(NULL)
+    # TRS v1.0: Banner question not found is a config error - refuse
+    tabs_refuse(
+      code = "CFG_BANNER_QUESTION_NOT_FOUND",
+      title = paste0("Banner Question Not Found: ", banner_code),
+      problem = paste0("Banner question '", banner_code, "' is listed in config but not found in Survey_Structure."),
+      why_it_matters = "The banner structure cannot be built without valid question definitions.",
+      how_to_fix = c(
+        "Check that the QuestionCode in Tabs_Config matches Survey_Structure",
+        "Verify the question exists in the Questions sheet",
+        "Check for typos in the question code"
+      )
+    )
   }
   
   question_info <- question_info[1, ]
@@ -216,8 +226,18 @@ process_banner_question <- function(banner_questions, banner_idx,
 process_standard_banner <- function(banner_code, question_info, options, start_col) {
   
   if (nrow(options) == 0) {
-    warning(sprintf("No options for banner question: %s", banner_code))
-    return(NULL)
+    # TRS v1.0: No options for banner is a config error - refuse
+    tabs_refuse(
+      code = "CFG_BANNER_NO_OPTIONS",
+      title = paste0("No Options for Banner: ", banner_code),
+      problem = paste0("Banner question '", banner_code, "' has no response options defined."),
+      why_it_matters = "Banner columns cannot be created without response options.",
+      how_to_fix = c(
+        "Add response options to the Options sheet for this question",
+        "Ensure ShowInOutput is set to 'Y' for options you want as banner columns",
+        "Check that the QuestionCode matches between Questions and Options sheets"
+      )
+    )
   }
   
   # Create column labels from DisplayText
@@ -263,8 +283,17 @@ process_boxcategory_banner <- function(banner_code, options, start_col) {
   box_categories <- box_categories[!is.na(box_categories) & box_categories != ""]
   
   if (length(box_categories) == 0) {
-    warning(sprintf("No BoxCategory values for banner: %s", banner_code))
-    return(NULL)
+    # TRS v1.0: No BoxCategory values is a config error - refuse
+    tabs_refuse(
+      code = "CFG_BANNER_NO_BOXCATEGORY",
+      title = paste0("No BoxCategory Values for Banner: ", banner_code),
+      problem = paste0("Banner '", banner_code, "' is configured as BoxCategory but no BoxCategory values are defined."),
+      why_it_matters = "BoxCategory banners require BoxCategory values in the Options sheet to create column groups.",
+      how_to_fix = c(
+        "Add BoxCategory values to the Options sheet for this question",
+        "Or change BannerBoxCategory to 'N' in Tabs_Config to use standard banner format"
+      )
+    )
   }
   
   # Create columns for each category
