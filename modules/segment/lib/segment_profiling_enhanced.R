@@ -421,11 +421,13 @@ identify_golden_questions <- function(data, clusters, clustering_vars,
     }, error = function(e) {
       cat(sprintf("⚠ Random Forest failed: %s\n", e$message))
       cat("  Falling back to eta-squared method...\n")
+      message(sprintf("[TRS PARTIAL] SEG_RF_FAILED: Random Forest failed (%s) - using eta-squared method", e$message))
       importance_scores <<- NULL
     })
   } else {
     cat("randomForest not installed. Using eta-squared method...\n")
     cat("  Install with: install.packages('randomForest')\n")
+    message("[TRS PARTIAL] SEG_RF_MISSING: randomForest package not available - using eta-squared method")
   }
 
   # ===========================================================================

@@ -67,7 +67,7 @@ if (!exists("find_turas_root", mode = "function")) {
 #' @return Character. Path to created file
 #'
 #' @export
-write_tracker_output <- function(trend_results, config, wave_data, output_path = NULL, banner_segments = NULL) {
+write_tracker_output <- function(trend_results, config, wave_data, output_path = NULL, banner_segments = NULL, run_result = NULL) {
 
   cat("\n================================================================================\n")
   cat("WRITING EXCEL OUTPUT\n")
@@ -119,11 +119,18 @@ write_tracker_output <- function(trend_results, config, wave_data, output_path =
 
   write_metadata_sheet(wb, config, wave_data, styles)
 
+  # ===========================================================================
+  # TRS v1.0: Add Run_Status Sheet
+  # ===========================================================================
+  if (!is.null(run_result) && exists("turas_write_run_status_sheet", mode = "function")) {
+    turas_write_run_status_sheet(wb, run_result)
+  }
+
   # Save workbook
   cat(paste0("\nSaving workbook...\n"))
   openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
 
-  cat(paste0("✓ Output written to: ", output_path, "\n"))
+  cat(paste0("\u2713 Output written to: ", output_path, "\n"))
   cat("================================================================================\n\n")
 
   return(output_path)
@@ -1806,7 +1813,7 @@ write_multi_mention_trend_table <- function(wb, sheet_name, result, wave_ids, co
 #' @return Character. Path to created file
 #'
 #' @export
-write_wave_history_output <- function(trend_results, config, wave_data, output_path = NULL, banner_segments = NULL) {
+write_wave_history_output <- function(trend_results, config, wave_data, output_path = NULL, banner_segments = NULL, run_result = NULL) {
 
   cat("\n================================================================================\n")
   cat("WRITING WAVE HISTORY EXCEL OUTPUT\n")
@@ -1864,11 +1871,18 @@ write_wave_history_output <- function(trend_results, config, wave_data, output_p
     write_wave_history_sheet(wb, "Total", trend_results, wave_ids, config, styles, segment_filter = NULL)
   }
 
+  # ===========================================================================
+  # TRS v1.0: Add Run_Status Sheet
+  # ===========================================================================
+  if (!is.null(run_result) && exists("turas_write_run_status_sheet", mode = "function")) {
+    turas_write_run_status_sheet(wb, run_result)
+  }
+
   # Save workbook
   cat(paste0("\nSaving workbook...\n"))
   openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
 
-  cat(paste0("✓ Wave History output written to: ", output_path, "\n"))
+  cat(paste0("\u2713 Wave History output written to: ", output_path, "\n"))
   cat("================================================================================\n\n")
 
   return(output_path)

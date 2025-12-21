@@ -100,6 +100,9 @@ estimate_auto_method <- function(data, config, verbose = TRUE) {
   })
 
   if (!inherits(clogit_result, "list") || clogit_result$success != FALSE) {
+    # TRS PARTIAL: Fallback estimator used
+    message(sprintf("[TRS PARTIAL] CONJ_MLOGIT_FALLBACK: mlogit failed, using clogit fallback (original error: %s)",
+                    mlogit_result$error))
     log_verbose("  ✓ clogit estimation successful", verbose)
     return(clogit_result)
   }

@@ -59,5 +59,23 @@ source(file.path(.shared_lib_path, "formatting_utils.R"), local = FALSE)
 # 8. Weights (independent)
 source(file.path(.shared_lib_path, "weights_utils.R"), local = FALSE)
 
+# 9. TRS Unified Logging (TRS v1.0)
+source(file.path(.shared_lib_path, "turas_log.R"), local = FALSE)
+
+# 10. TRS Run State Management (TRS v1.0)
+source(file.path(.shared_lib_path, "trs_run_state.R"), local = FALSE)
+
+# 11. TRS Run Status Excel Writer (TRS v1.0)
+source(file.path(.shared_lib_path, "trs_run_status_writer.R"), local = FALSE)
+
+# 12. TRS Banner (TRS v1.0)
+source(file.path(.shared_lib_path, "trs_banner.R"), local = FALSE)
+
+# 13. TRS Atomic Workbook Save (TRS v1.0)
+source(file.path(.shared_lib_path, "turas_save_workbook_atomic.R"), local = FALSE)
+
+# 14. TRS Excel Formula-Injection Protection (TRS v1.0)
+source(file.path(.shared_lib_path, "turas_excel_escape.R"), local = FALSE)
+
 # Clean up
 rm(.shared_lib_path)
