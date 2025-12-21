@@ -352,12 +352,11 @@ run_maxdiff_design_mode <- function(config, verbose = TRUE) {
   )
 
   if (!validation$valid) {
-    warning(
-      sprintf("Design validation found %d issues:\n  %s",
-              length(validation$issues),
-              paste(validation$issues, collapse = "\n  ")),
-      call. = FALSE
-    )
+    message(sprintf(
+      "[TRS INFO] MAXD_DESIGN_VALIDATION: Design validation found %d issues: %s",
+      length(validation$issues),
+      paste(validation$issues, collapse = "; ")
+    ))
   }
 
   # ==========================================================================
@@ -506,8 +505,7 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE) {
         verbose = verbose
       )
     }, error = function(e) {
-      warning(sprintf("Count score computation failed: %s", conditionMessage(e)),
-              call. = FALSE)
+      message(sprintf("[TRS PARTIAL] MAXD_COUNT_SCORE_FAILED: Count score computation failed: %s", conditionMessage(e)))
       warnings_list <- c(warnings_list, sprintf("Count scores: %s", conditionMessage(e)))
       NULL
     })
@@ -535,7 +533,7 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE) {
         fit_simple_logit(long_data, config$items, verbose)
       }
     }, error = function(e) {
-      warning(sprintf("Logit model failed: %s", conditionMessage(e)), call. = FALSE)
+      message(sprintf("[TRS PARTIAL] MAXD_LOGIT_FAILED: Logit model failed: %s", conditionMessage(e)))
       warnings_list <- c(warnings_list, sprintf("Logit model: %s", conditionMessage(e)))
       NULL
     })
@@ -568,7 +566,7 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE) {
         verbose = verbose
       )
     }, error = function(e) {
-      warning(sprintf("HB model failed: %s", conditionMessage(e)), call. = FALSE)
+      message(sprintf("[TRS PARTIAL] MAXD_HB_FAILED: HB model failed: %s", conditionMessage(e)))
       warnings_list <- c(warnings_list, sprintf("HB model: %s", conditionMessage(e)))
       NULL
     })
@@ -606,8 +604,7 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE) {
         verbose = verbose
       )
     }, error = function(e) {
-      warning(sprintf("Segment analysis failed: %s", conditionMessage(e)),
-              call. = FALSE)
+      message(sprintf("[TRS PARTIAL] MAXD_SEGMENT_FAILED: Segment analysis failed: %s", conditionMessage(e)))
       warnings_list <- c(warnings_list, sprintf("Segments: %s", conditionMessage(e)))
       NULL
     })
@@ -633,8 +630,7 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE) {
     chart_paths <- tryCatch({
       generate_maxdiff_charts(results_for_charts, config, verbose)
     }, error = function(e) {
-      warning(sprintf("Chart generation failed: %s", conditionMessage(e)),
-              call. = FALSE)
+      message(sprintf("[TRS PARTIAL] MAXD_CHART_FAILED: Chart generation failed: %s", conditionMessage(e)))
       warnings_list <- c(warnings_list, sprintf("Charts: %s", conditionMessage(e)))
       NULL
     })
@@ -662,8 +658,7 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE) {
   output_path <- tryCatch({
     generate_maxdiff_output(results, config, verbose)
   }, error = function(e) {
-    warning(sprintf("Output generation failed: %s", conditionMessage(e)),
-            call. = FALSE)
+    message(sprintf("[TRS PARTIAL] MAXD_OUTPUT_FAILED: Output generation failed: %s", conditionMessage(e)))
     NULL
   })
 

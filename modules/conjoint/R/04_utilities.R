@@ -32,11 +32,10 @@ calculate_utilities <- function(model_result, config, verbose = TRUE) {
 
   # Handle NA coefficients
   if (any(is.na(coefs))) {
-    warning(create_warning(
-      "UTILITIES",
-      sprintf("%d coefficients are NA (likely due to perfect separation)", sum(is.na(coefs))),
-      "These will be set to 0. Check your data quality."
-    ), call. = FALSE)
+    message(sprintf(
+      "[TRS INFO] CONJ_NA_COEFS_ZEROED: %d coefficients are NA (likely due to perfect separation) - setting to 0",
+      sum(is.na(coefs))
+    ))
     coefs[is.na(coefs)] <- 0
     std_errors[is.na(std_errors)] <- 0
   }
@@ -184,12 +183,7 @@ calculate_attribute_importance <- function(utilities, config, verbose = TRUE) {
   total_range <- sum(ranges$Range)
 
   if (total_range == 0) {
-    warning(create_warning(
-      "IMPORTANCE",
-      "Total utility range is zero - cannot calculate importance",
-      "Check your model estimation results"
-    ), call. = FALSE)
-
+    message("[TRS INFO] CONJ_ZERO_RANGE: Total utility range is zero - cannot calculate importance, setting all to 0")
     ranges$Importance <- 0
   } else {
     ranges$Importance <- (ranges$Range / total_range) * 100
@@ -369,7 +363,7 @@ calculate_hit_rate <- function(model_result, data, config) {
         idx <- which(x)
         if (length(idx) == 0L) return(NA_integer_)  # No choice (dirty data)
         if (length(idx) > 1L) {
-          warning(sprintf("Choice set has %d chosen alternatives; using first", length(idx)))
+          message(sprintf("[TRS INFO] CONJ_MULTI_CHOSEN: Choice set has %d chosen alternatives - using first", length(idx)))
           idx <- idx[1L]
         }
         idx
@@ -486,10 +480,7 @@ calculate_hit_rate <- function(model_result, data, config) {
     hit_rate
 
   }, error = function(e) {
-    warning(create_warning(
-      "DIAGNOSTICS",
-      sprintf("Could not calculate hit rate: %s", conditionMessage(e))
-    ), call. = FALSE)
+    message(sprintf("[TRS INFO] CONJ_HIT_RATE_FAILED: Could not calculate hit rate: %s", conditionMessage(e)))
     return(NA)
   })
 }

@@ -283,11 +283,7 @@ normalize_score_column <- function(score_values) {
   # Check for NA values
   if (any(is.na(score_values))) {
     n_na <- sum(is.na(score_values))
-    warning(create_warning(
-      "ALCHEMER_IMPORT",
-      sprintf("Found %d NA values in Score column", n_na),
-      "These will be treated as 'not chosen' (0)"
-    ), call. = FALSE)
+    message(sprintf("[TRS INFO] CONJ_ALCH_NA_SCORES: Found %d NA values in Score column - treating as 'not chosen' (0)", n_na))
     score_values[is.na(score_values)] <- 0
   }
 
@@ -306,11 +302,7 @@ normalize_score_column <- function(score_values) {
     chosen <- ifelse(score_values > 0, 1L, 0L)
   } else {
     # All zeros - this is a problem
-    warning(create_warning(
-      "ALCHEMER_IMPORT",
-      "All Score values are 0 or negative",
-      "This may indicate a data quality issue"
-    ), call. = FALSE)
+    message("[TRS INFO] CONJ_ALCH_ALL_ZERO_SCORES: All Score values are 0 or negative - this may indicate a data quality issue")
     chosen <- 0L
   }
 

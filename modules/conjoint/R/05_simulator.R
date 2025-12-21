@@ -104,10 +104,10 @@ calculate_product_utility <- function(product, utilities, verbose = FALSE) {
     util_row <- utilities[utilities$Attribute == attr & utilities$Level == level, ]
 
     if (nrow(util_row) == 0) {
-      warning(sprintf("No utility found for %s = %s. Using 0.", attr, level))
+      message(sprintf("[TRS INFO] CONJ_UTIL_NOT_FOUND: No utility found for %s = %s - using 0", attr, level))
       attr_utility <- 0
     } else if (nrow(util_row) > 1) {
-      warning(sprintf("Multiple utilities found for %s = %s. Using first.", attr, level))
+      message(sprintf("[TRS INFO] CONJ_UTIL_DUPLICATE: Multiple utilities found for %s = %s - using first", attr, level))
       attr_utility <- util_row$Utility[1]
     } else {
       attr_utility <- util_row$Utility[1]

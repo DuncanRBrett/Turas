@@ -89,10 +89,10 @@ fit_hb_model <- function(long_data, items, config, verbose = TRUE) {
   stan_model <- tryCatch({
     cmdstanr::cmdstan_model(stan_model_path)
   }, error = function(e) {
-    warning(sprintf(
-      "Stan model compilation failed: %s\nUsing approximate method.",
+    message(sprintf(
+      "[TRS INFO] MAXD_STAN_COMPILE_FAILED: Stan model compilation failed: %s - using approximate method",
       conditionMessage(e)
-    ), call. = FALSE)
+    ))
     return(NULL)
   })
 
@@ -115,10 +115,10 @@ fit_hb_model <- function(long_data, items, config, verbose = TRUE) {
       show_messages = verbose
     )
   }, error = function(e) {
-    warning(sprintf(
-      "MCMC sampling failed: %s\nUsing approximate method.",
+    message(sprintf(
+      "[TRS PARTIAL] MAXD_MCMC_FAILED: MCMC sampling failed: %s - using approximate method",
       conditionMessage(e)
-    ), call. = FALSE)
+    ))
     return(NULL)
   })
 

@@ -235,7 +235,7 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
   }
 
   if (length(outcome_vars) > 1) {
-    warning("Multiple outcome variables found. Using first: ", outcome_vars[1])
+    message(sprintf("[TRS INFO] CATD_MULTI_OUTCOME: Multiple outcome variables found - using first: %s", outcome_vars[1]))
     outcome_vars <- outcome_vars[1]
   }
 

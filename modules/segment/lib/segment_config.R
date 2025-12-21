@@ -187,9 +187,7 @@ validate_segment_config <- function(config) {
   }
 
   if (length(clustering_vars) > 20) {
-    warning("Using ", length(clustering_vars),
-            " clustering variables. Consider reducing for interpretability.",
-            call. = FALSE)
+    message(sprintf("[TRS INFO] SEG_MANY_CLUSTERING_VARS: Using %d clustering variables - consider reducing for interpretability", length(clustering_vars)))
   }
 
   # ===========================================================================
@@ -253,9 +251,7 @@ validate_segment_config <- function(config) {
       )
     }
     if (k_fixed > 10) {
-      warning("k_fixed = ", k_fixed,
-              " is quite large. Consider fewer segments for interpretability.",
-              call. = FALSE)
+      message(sprintf("[TRS INFO] SEG_LARGE_K_FIXED: k_fixed = %d is quite large - consider fewer segments for interpretability", k_fixed))
     }
   }
 
@@ -326,10 +322,10 @@ validate_segment_config <- function(config) {
   # Validate variable selection parameters
   if (variable_selection) {
     if (length(clustering_vars) <= max_clustering_vars) {
-      warning(sprintf(
-        "variable_selection enabled but clustering_vars (%d) already <= max_clustering_vars (%d). Skipping selection.",
+      message(sprintf(
+        "[TRS INFO] SEG_VAR_SELECT_SKIPPED: variable_selection enabled but clustering_vars (%d) already <= max_clustering_vars (%d) - skipping selection",
         length(clustering_vars), max_clustering_vars
-      ), call. = FALSE)
+      ))
     }
   }
 

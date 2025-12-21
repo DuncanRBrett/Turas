@@ -603,8 +603,9 @@ load_population_margins_sheet <- function(config_path) {
   df <- tryCatch(
     readxl::read_excel(config_path, sheet = sheet_name),
     error = function(e) {
-      warning(sprintf(
-        "Failed to read '%s' sheet: %s\nMargin comparison will be skipped.",
+      # TRS INFO: Optional sheet unreadable
+      message(sprintf(
+        "[TRS INFO] CONF_OPTIONAL_SHEET_UNREADABLE: Failed to read '%s' sheet: %s - margin comparison will be skipped",
         sheet_name,
         conditionMessage(e)
       ))
@@ -621,8 +622,9 @@ load_population_margins_sheet <- function(config_path) {
   missing_cols <- setdiff(required_cols, names(df))
 
   if (length(missing_cols) > 0) {
-    warning(sprintf(
-      "'%s' sheet missing required columns: %s\nMargin comparison will be skipped.",
+    # TRS INFO: Optional sheet missing columns
+    message(sprintf(
+      "[TRS INFO] CONF_OPTIONAL_SHEET_MISSING_COLS: '%s' sheet missing required columns: %s - margin comparison will be skipped",
       sheet_name,
       paste(missing_cols, collapse = ", ")
     ))
@@ -690,8 +692,9 @@ load_population_margins_sheet <- function(config_path) {
   for (var_name in names(var_sums)) {
     sum_val <- var_sums[var_name]
     if (abs(sum_val - 1.0) > 0.01) {
-      warning(sprintf(
-        "Population_Margins: Variable '%s' proportions sum to %.3f (should be 1.0)",
+      # TRS INFO: Margin proportions don't sum to 1
+      message(sprintf(
+        "[TRS INFO] CONF_MARGIN_SUM_WARNING: Population_Margins variable '%s' proportions sum to %.3f (should be 1.0)",
         var_name, sum_val
       ))
     }

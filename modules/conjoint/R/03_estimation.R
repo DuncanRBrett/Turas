@@ -186,11 +186,10 @@ estimate_with_mlogit <- function(data, config, verbose = TRUE) {
 
   # Check convergence
   if (!is.null(model$convergence) && model$convergence != 0) {
-    warning(create_warning(
-      "ESTIMATION",
-      sprintf("Model may not have converged properly (code: %d)", model$convergence),
-      "Results should be interpreted with caution."
-    ), call. = FALSE)
+    message(sprintf(
+      "[TRS INFO] CONJ_CONVERGENCE_WARNING: Model may not have converged properly (code: %d) - results should be interpreted with caution",
+      model$convergence
+    ))
   }
 
   log_verbose("  ✓ Model estimation complete", verbose)
@@ -353,7 +352,7 @@ extract_mlogit_results <- function(model, data, config) {
       summary(model)$logLik["null"]
     }, error = function(e) {
       # Last resort: estimate null model
-      warning("Could not extract null log-likelihood, estimating...")
+      message("[TRS INFO] CONJ_NULL_LL_ESTIMATED: Could not extract null log-likelihood - estimating from null model")
       null_formula <- as.formula(paste(config$chosen_column, "~ 1"))
       null_model <- mlogit::mlogit(null_formula, data = data)
       as.numeric(logLik(null_model))
@@ -463,11 +462,7 @@ extract_clogit_results <- function(model, data, config) {
 
   # Check for NA coefficients
   if (any(is.na(coefs))) {
-    warning(create_warning(
-      "ESTIMATION",
-      "Some coefficients could not be estimated (NA values)",
-      "This may indicate perfect separation or multicollinearity."
-    ), call. = FALSE)
+    message("[TRS INFO] CONJ_NA_COEFFICIENTS: Some coefficients could not be estimated (NA values) - this may indicate perfect separation or multicollinearity")
   }
 
   # Log-likelihoods

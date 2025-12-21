@@ -229,24 +229,24 @@ validate_survey_data <- function(survey_data, required_questions, weight_variabl
       ), call. = FALSE)
     }
 
-    # Warn about zero weights
+    # TRS INFO: Zero weights
     n_zero <- sum(valid_weights == 0, na.rm = TRUE)
     if (n_zero > 0) {
-      warning(sprintf(
-        "Weight variable '%s' contains %d zero values (these will be excluded from analysis)",
+      message(sprintf(
+        "[TRS INFO] CONF_WEIGHT_ZEROS: Weight variable '%s' contains %d zero values (these will be excluded from analysis)",
         weight_variable,
         n_zero
-      ), call. = FALSE)
+      ))
     }
 
-    # Warn about NA weights
+    # TRS INFO: NA weights
     n_na <- sum(is.na(survey_data[[weight_variable]]))
     if (n_na > 0) {
-      warning(sprintf(
-        "Weight variable '%s' contains %d NA values (these will be excluded from analysis)",
+      message(sprintf(
+        "[TRS INFO] CONF_WEIGHT_NAS: Weight variable '%s' contains %d NA values (these will be excluded from analysis)",
         weight_variable,
         n_na
-      ), call. = FALSE)
+      ))
     }
   }
 

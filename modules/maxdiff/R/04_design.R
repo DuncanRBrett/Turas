@@ -301,8 +301,7 @@ generate_optimal_design <- function(item_ids, items_per_task, tasks_per_responde
 
   # Check for AlgDesign package
   if (!requireNamespace("AlgDesign", quietly = TRUE)) {
-    warning("AlgDesign package not available. Falling back to BALANCED design.",
-            call. = FALSE)
+    message("[TRS INFO] MAXD_ALGDESIGN_MISSING: AlgDesign package not available - falling back to BALANCED design")
     return(generate_balanced_design(
       item_ids = item_ids,
       items_per_task = items_per_task,
@@ -347,10 +346,10 @@ generate_optimal_design <- function(item_ids, items_per_task, tasks_per_responde
         nRepeats = 5
       )
     }, error = function(e) {
-      warning(sprintf(
-        "AlgDesign optimization failed for version %d: %s",
+      message(sprintf(
+        "[TRS PARTIAL] MAXD_ALGDESIGN_FAILED: AlgDesign optimization failed for version %d: %s",
         v, conditionMessage(e)
-      ), call. = FALSE)
+      ))
       NULL
     })
 

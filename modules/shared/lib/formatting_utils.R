@@ -166,10 +166,10 @@ validate_decimal_separator <- function(decimal_separator, default = ".",
   decimal_separator <- as.character(decimal_separator)
 
   if (!decimal_separator %in% c(".", ",")) {
-    warning(sprintf(
-      "%s must be '.' or ',' (got: '%s'). Using default: '%s'",
+    message(sprintf(
+      "[TRS INFO] FMT_INVALID_DECIMAL_SEP: %s must be '.' or ',' (got: '%s') - using default: '%s'",
       param_name, decimal_separator, default
-    ), call. = FALSE)
+    ))
     return(default)
   }
 
@@ -192,10 +192,10 @@ validate_decimal_places <- function(decimal_places, default = 1,
   dp_numeric <- suppressWarnings(as.numeric(decimal_places))
 
   if (is.na(dp_numeric) || dp_numeric < 0 || dp_numeric > 6) {
-    warning(sprintf(
-      "%s must be an integer 0-6 (got: '%s'). Using default: %d",
+    message(sprintf(
+      "[TRS INFO] FMT_INVALID_DECIMAL_PLACES: %s must be an integer 0-6 (got: '%s') - using default: %d",
       param_name, decimal_places, default
-    ), call. = FALSE)
+    ))
     return(as.integer(default))
   }
 

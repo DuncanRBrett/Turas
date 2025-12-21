@@ -545,7 +545,7 @@ rescale_utilities <- function(utilities, method = "0_100") {
     return(100 * exp_u / sum(exp_u, na.rm = TRUE))
   }
 
-  warning(sprintf("Unknown rescale method: %s. Using RAW.", method))
+  message(sprintf("[TRS INFO] MAXD_UNKNOWN_RESCALE: Unknown rescale method: %s - using RAW", method))
   return(utilities)
 }
 

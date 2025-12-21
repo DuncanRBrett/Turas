@@ -121,7 +121,7 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
   # Print warnings if any
   if (length(validation_result$warnings) > 0) {
     for (warning_msg in validation_result$warnings) {
-      warning(create_warning("CONFIG", warning_msg), call. = FALSE)
+      message(sprintf("[TRS INFO] CONJ_CONFIG_WARNING: %s", warning_msg))
     }
   }
 

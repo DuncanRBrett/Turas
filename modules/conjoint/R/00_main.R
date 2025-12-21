@@ -33,17 +33,17 @@ suppressPackageStartupMessages({
 
   # Choice modeling
   if (!require(mlogit, quietly = TRUE)) {
-    warning("Package 'mlogit' not found. Install with: install.packages('mlogit')")
+    message("[TRS INFO] CONJ_PKG_MLOGIT_MISSING: Package 'mlogit' not found - install with: install.packages('mlogit')")
   }
 
   # Data indexing for mlogit (required for mlogit >= 1.1-0)
   if (!require(dfidx, quietly = TRUE)) {
-    warning("Package 'dfidx' not found. Install with: install.packages('dfidx')")
+    message("[TRS INFO] CONJ_PKG_DFIDX_MISSING: Package 'dfidx' not found - install with: install.packages('dfidx')")
   }
 
   # Fallback estimation
   if (!require(survival, quietly = TRUE)) {
-    warning("Package 'survival' not found. Install with: install.packages('survival')")
+    message("[TRS INFO] CONJ_PKG_SURVIVAL_MISSING: Package 'survival' not found - install with: install.packages('survival')")
   }
 })
 

@@ -226,7 +226,7 @@ load_config_sheet <- function(config_path, sheet_name) {
     )
 
     if (is.null(df) || nrow(df) == 0) {
-      warning(sprintf("Sheet '%s' is empty", sheet_name), call. = FALSE)
+      message(sprintf("[TRS INFO] MAXD_EMPTY_SHEET: Sheet '%s' is empty", sheet_name))
       return(data.frame())
     }
 
@@ -756,10 +756,10 @@ parse_output_settings <- function(df) {
   # Validate Score_Rescale_Method
   result$Score_Rescale_Method <- toupper(result$Score_Rescale_Method)
   if (!result$Score_Rescale_Method %in% c("RAW", "0_100", "PROBABILITY")) {
-    warning(sprintf(
-      "Invalid Score_Rescale_Method: '%s'. Using '0_100'.",
+    message(sprintf(
+      "[TRS INFO] MAXD_INVALID_RESCALE: Invalid Score_Rescale_Method: '%s' - using '0_100'",
       result$Score_Rescale_Method
-    ), call. = FALSE)
+    ))
     result$Score_Rescale_Method <- "0_100"
   }
 
@@ -767,10 +767,10 @@ parse_output_settings <- function(df) {
   result$Output_Item_Sort_Order <- toupper(result$Output_Item_Sort_Order)
   if (!result$Output_Item_Sort_Order %in% c("UTILITY_DESC", "UTILITY_ASC",
                                             "ITEM_ID", "DISPLAY_ORDER")) {
-    warning(sprintf(
-      "Invalid Output_Item_Sort_Order: '%s'. Using 'UTILITY_DESC'.",
+    message(sprintf(
+      "[TRS INFO] MAXD_INVALID_SORT: Invalid Output_Item_Sort_Order: '%s' - using 'UTILITY_DESC'",
       result$Output_Item_Sort_Order
-    ), call. = FALSE)
+    ))
     result$Output_Item_Sort_Order <- "UTILITY_DESC"
   }
 

@@ -92,7 +92,8 @@ write_confidence_output <- function(output_path,
                                     nps_results = list(),
                                     config = list(),
                                     warnings = character(),
-                                    decimal_sep = ".") {
+                                    decimal_sep = ".",
+                                    run_result = NULL) {
 
   # Validate decimal separator
   if (!decimal_sep %in% c(".", ",")) {
@@ -140,10 +141,31 @@ write_confidence_output <- function(output_path,
   # Sheet 9: Inputs
   add_inputs_sheet(wb, config, decimal_sep)
 
+  # Sheet 10: TRS Run_Status (always write if run_result provided)
+  if (!is.null(run_result)) {
+    # Source TRS run status writer if not already loaded
+    tryCatch({
+      if (!exists("turas_write_run_status_sheet", mode = "function")) {
+        trs_writer_path <- file.path(dirname(getwd()), "shared", "lib", "trs_run_status_writer.R")
+        if (!file.exists(trs_writer_path)) {
+          trs_writer_path <- file.path(getwd(), "modules", "shared", "lib", "trs_run_status_writer.R")
+        }
+        if (file.exists(trs_writer_path)) {
+          source(trs_writer_path)
+        }
+      }
+      if (exists("turas_write_run_status_sheet", mode = "function")) {
+        turas_write_run_status_sheet(wb, run_result)
+      }
+    }, error = function(e) {
+      message(sprintf("[TRS INFO] CONF_RUN_STATUS_WRITE_FAILED: Could not write Run_Status sheet: %s", e$message))
+    })
+  }
+
   # Save workbook
   tryCatch({
     openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
-    cat(sprintf("\n✓ Output written to: %s\n", output_path))
+    message(sprintf("\n[TRS INFO] Output written to: %s", output_path))
   }, error = function(e) {
     stop(sprintf(
       "Failed to save Excel file\nPath: %s\nError: %s\n\nTroubleshooting:\n  1. Check file is not open in Excel\n  2. Verify output directory exists\n  3. Check write permissions",

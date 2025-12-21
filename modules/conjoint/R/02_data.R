@@ -120,7 +120,7 @@ load_conjoint_data <- function(data_file, config, verbose = TRUE) {
   # Print warnings
   if (length(validation_result$warnings) > 0) {
     for (warning_msg in validation_result$warnings) {
-      warning(create_warning("DATA", warning_msg), call. = FALSE)
+      message(sprintf("[TRS INFO] CONJ_DATA_WARNING: %s", warning_msg))
     }
   }
 

@@ -221,7 +221,7 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
         }
       }
     }, error = function(e) {
-      warning(sprintf("Segment analysis failed: %s", e$message), call. = FALSE)
+      message(sprintf("[TRS PARTIAL] PRICE_SEGMENT_FAILED: Segment analysis failed: %s", e$message))
       cat(sprintf("   ! Segment analysis failed: %s\n", e$message))
     })
   }
@@ -248,7 +248,7 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
                     ladder_results$tier_table$price[i]))
       }
     }, error = function(e) {
-      warning(sprintf("Price ladder generation failed: %s", e$message), call. = FALSE)
+      message(sprintf("[TRS PARTIAL] PRICE_LADDER_FAILED: Price ladder generation failed: %s", e$message))
       cat(sprintf("   ! Price ladder generation failed: %s\n", e$message))
     })
   }
@@ -274,7 +274,7 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
                 synthesis$recommendation$confidence,
                 synthesis$recommendation$confidence_score * 100))
   }, error = function(e) {
-    warning(sprintf("Recommendation synthesis failed: %s", e$message), call. = FALSE)
+    message(sprintf("[TRS PARTIAL] PRICE_SYNTHESIS_FAILED: Recommendation synthesis failed: %s", e$message))
     cat(sprintf("   ! Synthesis failed: %s\n", e$message))
   })
 
@@ -488,7 +488,7 @@ run_pricing_analysis_from_config <- function(config) {
         }
       }
     }, error = function(e) {
-      warning(sprintf("Segment analysis failed: %s", e$message), call. = FALSE)
+      message(sprintf("[TRS PARTIAL] PRICE_SEGMENT_FAILED: Segment analysis failed: %s", e$message))
       cat(sprintf("   ! Segment analysis failed: %s\n", e$message))
     })
   }
@@ -515,7 +515,7 @@ run_pricing_analysis_from_config <- function(config) {
                     ladder_results$tier_table$price[i]))
       }
     }, error = function(e) {
-      warning(sprintf("Price ladder generation failed: %s", e$message), call. = FALSE)
+      message(sprintf("[TRS PARTIAL] PRICE_LADDER_FAILED: Price ladder generation failed: %s", e$message))
       cat(sprintf("   ! Price ladder generation failed: %s\n", e$message))
     })
   }
@@ -541,7 +541,7 @@ run_pricing_analysis_from_config <- function(config) {
                 synthesis$recommendation$confidence,
                 synthesis$recommendation$confidence_score * 100))
   }, error = function(e) {
-    warning(sprintf("Recommendation synthesis failed: %s", e$message), call. = FALSE)
+    message(sprintf("[TRS PARTIAL] PRICE_SYNTHESIS_FAILED: Recommendation synthesis failed: %s", e$message))
     cat(sprintf("   ! Synthesis failed: %s\n", e$message))
   })
 
