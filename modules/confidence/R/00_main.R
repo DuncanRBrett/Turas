@@ -52,6 +52,43 @@ if (file.exists(guard_path)) {
 }
 
 # ==============================================================================
+# TRS INFRASTRUCTURE (TRS v1.0)
+# ==============================================================================
+
+# Source TRS run state management
+source_trs_infrastructure <- function() {
+  base_dir <- get_script_dir_for_guard()
+
+  # Try multiple paths to find shared/lib
+  possible_paths <- c(
+    file.path(base_dir, "..", "..", "shared", "lib"),
+    file.path(base_dir, "..", "shared", "lib"),
+    file.path(getwd(), "modules", "shared", "lib"),
+    file.path(getwd(), "..", "shared", "lib")
+  )
+
+  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R")
+
+  for (shared_lib in possible_paths) {
+    if (dir.exists(shared_lib)) {
+      for (f in trs_files) {
+        fpath <- file.path(shared_lib, f)
+        if (file.exists(fpath)) {
+          source(fpath)
+        }
+      }
+      break
+    }
+  }
+}
+
+tryCatch({
+  source_trs_infrastructure()
+}, error = function(e) {
+  message(sprintf("[TRS INFO] CONF_TRS_LOAD: Could not load TRS infrastructure: %s", e$message))
+})
+
+# ==============================================================================
 # DEPENDENCIES
 # ==============================================================================
 
@@ -184,17 +221,31 @@ run_confidence_analysis_impl <- function(config_path,
                                          verbose = TRUE,
                                          stop_on_warnings = FALSE) {
 
-  # Start timer
-  start_time <- Sys.time()
+  # ==========================================================================
+  # TRS RUN STATE INITIALIZATION (TRS v1.0)
+  # ==========================================================================
 
-  if (verbose) {
+  # Create TRS run state for tracking events
+  trs_state <- if (exists("turas_run_state_new", mode = "function")) {
+    turas_run_state_new("CONFIDENCE")
+  } else {
+    NULL
+  }
+
+  # Print TRS start banner
+  if (exists("turas_print_start_banner", mode = "function")) {
+    turas_print_start_banner("CONFIDENCE", MAIN_VERSION)
+  } else if (verbose) {
     cat("\n")
     cat("================================================================================\n")
     cat("TURAS CONFIDENCE ANALYSIS MODULE\n")
     cat(sprintf("Version: %s\n", MAIN_VERSION))
-    cat(sprintf("Started: %s\n", format(start_time, "%Y-%m-%d %H:%M:%S")))
+    cat(sprintf("Started: %s\n", format(Sys.time(), "%Y-%m-%d %H:%M:%S")))
     cat("================================================================================\n\n")
   }
+
+  # Start timer
+  start_time <- Sys.time()
 
   # Initialize warnings collector
   warnings_list <- character()
@@ -235,6 +286,14 @@ run_confidence_analysis_impl <- function(config_path,
     weight_var <- NULL
   }
 
+  # ==========================================================================
+  # TRS WEIGHT VALIDATION (TRS v1.0 - REFUSE on missing configured weight)
+  # ==========================================================================
+  if (!is.null(weight_var) && weight_var != "") {
+    # Weight was configured - it MUST exist in data
+    # This will be checked after data load; prepare for refusal if missing
+  }
+
   survey_data <- tryCatch({
     load_survey_data(
       data_file_path = config$file_paths$Data_File,
@@ -252,6 +311,26 @@ run_confidence_analysis_impl <- function(config_path,
       cat(sprintf("  ✓ Weighted analysis using: %s\n", weight_var))
     } else {
       cat("  ✓ Unweighted analysis\n")
+    }
+  }
+
+  # ==========================================================================
+  # TRS WEIGHT REFUSAL CHECK (TRS v1.0)
+  # ==========================================================================
+  # If weight was configured but not found in data, REFUSE the run
+  if (!is.null(weight_var) && weight_var != "" && !weight_var %in% names(survey_data)) {
+    if (exists("turas_refuse", mode = "function")) {
+      turas_refuse(
+        "CONF_WEIGHT_MISSING",
+        "Configured weight variable not found in data",
+        sprintf("Weight variable '%s' specified in config but not present in data file", weight_var),
+        sprintf("Ensure column '%s' exists in the data file, or remove weight_variable from config", weight_var)
+      )
+    } else {
+      stop(sprintf(
+        "[TRS REFUSE] CONF_WEIGHT_MISSING: Weight variable '%s' not found in data",
+        weight_var
+      ), call. = FALSE)
     }
   }
 
@@ -423,6 +502,31 @@ run_confidence_analysis_impl <- function(config_path,
 
   output_path <- config$file_paths$Output_File
 
+  # ==========================================================================
+  # TRS: Log PARTIAL events for any warnings
+  # ==========================================================================
+  if (!is.null(trs_state) && length(warnings_list) > 0) {
+    for (warn in warnings_list) {
+      if (exists("turas_run_state_partial", mode = "function")) {
+        turas_run_state_partial(
+          trs_state,
+          "CONF_WARNING",
+          "Analysis warning",
+          problem = warn
+        )
+      }
+    }
+  }
+
+  # ==========================================================================
+  # TRS: Get run result for output
+  # ==========================================================================
+  run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+    turas_run_state_result(trs_state)
+  } else {
+    NULL
+  }
+
   tryCatch({
     write_confidence_output(
       output_path = output_path,
@@ -437,7 +541,8 @@ run_confidence_analysis_impl <- function(config_path,
         calculate_effective_n = config$study_settings$Calculate_Effective_N == "Y"
       ),
       warnings = warnings_list,
-      decimal_sep = config$study_settings$Decimal_Separator
+      decimal_sep = config$study_settings$Decimal_Separator,
+      run_result = run_result
     )
   }, error = function(e) {
     stop(sprintf("Failed to write output\nError: %s", conditionMessage(e)), call. = FALSE)
@@ -452,9 +557,6 @@ run_confidence_analysis_impl <- function(config_path,
 
   if (verbose) {
     cat("\n")
-    cat("================================================================================\n")
-    cat("ANALYSIS COMPLETE\n")
-    cat("================================================================================\n")
     cat(sprintf("Finished: %s\n", format(end_time, "%Y-%m-%d %H:%M:%S")))
     cat(sprintf("Elapsed time: %.1f seconds\n", elapsed))
     cat(sprintf("Questions processed: %d\n", n_questions))
@@ -462,10 +564,24 @@ run_confidence_analysis_impl <- function(config_path,
     cat(sprintf("Means: %d\n", length(mean_results)))
     cat(sprintf("Warnings: %d\n", length(warnings_list)))
     cat(sprintf("Output file: %s\n", output_path))
+  }
+
+  # ==========================================================================
+  # TRS FINAL BANNER (TRS v1.0)
+  # ==========================================================================
+  if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
+    turas_print_final_banner(run_result)
+  } else if (verbose) {
+    cat("================================================================================\n")
+    if (length(warnings_list) == 0) {
+      cat("[TRS PASS] CONFIDENCE - ANALYSIS COMPLETED SUCCESSFULLY\n")
+    } else {
+      cat(sprintf("[TRS PARTIAL] CONFIDENCE - ANALYSIS COMPLETED WITH %d WARNING(S)\n", length(warnings_list)))
+    }
     cat("================================================================================\n\n")
   }
 
-  # Return results
+  # Return results (include run_result for programmatic access)
   invisible(list(
     study_stats = study_stats,
     proportion_results = proportion_results,
@@ -473,7 +589,8 @@ run_confidence_analysis_impl <- function(config_path,
     nps_results = nps_results,
     warnings = warnings_list,
     config = config,
-    elapsed_seconds = elapsed
+    elapsed_seconds = elapsed,
+    run_result = run_result
   ))
 }
 

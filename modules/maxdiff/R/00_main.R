@@ -62,6 +62,43 @@ if (file.exists(.guard_path)) {
 }
 
 # ==============================================================================
+# TRS INFRASTRUCTURE (TRS v1.0)
+# ==============================================================================
+
+# Source TRS run state management
+.source_trs_infrastructure <- function() {
+  base_dir <- .get_script_dir_for_guard()
+
+  # Try multiple paths to find shared/lib
+  possible_paths <- c(
+    file.path(base_dir, "..", "..", "shared", "lib"),
+    file.path(base_dir, "..", "shared", "lib"),
+    file.path(getwd(), "modules", "shared", "lib"),
+    file.path(getwd(), "..", "shared", "lib")
+  )
+
+  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R")
+
+  for (shared_lib in possible_paths) {
+    if (dir.exists(shared_lib)) {
+      for (f in trs_files) {
+        fpath <- file.path(shared_lib, f)
+        if (file.exists(fpath)) {
+          source(fpath)
+        }
+      }
+      break
+    }
+  }
+}
+
+tryCatch({
+  .source_trs_infrastructure()
+}, error = function(e) {
+  message(sprintf("[TRS INFO] MAXD_TRS_LOAD: Could not load TRS infrastructure: %s", e$message))
+})
+
+# ==============================================================================
 # DEPENDENCIES
 # ==============================================================================
 
@@ -231,17 +268,31 @@ run_maxdiff <- function(config_path, project_root = NULL, verbose = TRUE) {
 #' @keywords internal
 run_maxdiff_impl <- function(config_path, project_root = NULL, verbose = TRUE) {
 
-  # Start timer
-  start_time <- Sys.time()
+  # ==========================================================================
+  # TRS RUN STATE INITIALIZATION (TRS v1.0)
+  # ==========================================================================
 
-  if (verbose) {
+  # Create TRS run state for tracking events
+  trs_state <- if (exists("turas_run_state_new", mode = "function")) {
+    turas_run_state_new("MAXDIFF")
+  } else {
+    NULL
+  }
+
+  # Print TRS start banner
+  if (exists("turas_print_start_banner", mode = "function")) {
+    turas_print_start_banner("MAXDIFF", MAXDIFF_VERSION)
+  } else if (verbose) {
     cat("\n")
     cat("================================================================================\n")
     cat("TURAS MAXDIFF MODULE\n")
     cat(sprintf("Version: %s\n", MAXDIFF_VERSION))
-    cat(sprintf("Started: %s\n", format(start_time, "%Y-%m-%d %H:%M:%S")))
+    cat(sprintf("Started: %s\n", format(Sys.time(), "%Y-%m-%d %H:%M:%S")))
     cat("================================================================================\n\n")
   }
+
+  # Start timer
+  start_time <- Sys.time()
 
   # ==========================================================================
   # STEP 1: LOAD CONFIGURATION
@@ -267,9 +318,9 @@ run_maxdiff_impl <- function(config_path, project_root = NULL, verbose = TRUE) {
   # ==========================================================================
 
   results <- if (config$mode == "DESIGN") {
-    run_maxdiff_design_mode(config, verbose)
+    run_maxdiff_design_mode(config, verbose, trs_state)
   } else {
-    run_maxdiff_analysis_mode(config, verbose)
+    run_maxdiff_analysis_mode(config, verbose, trs_state)
   }
 
   # ==========================================================================
@@ -278,22 +329,46 @@ run_maxdiff_impl <- function(config_path, project_root = NULL, verbose = TRUE) {
 
   end_time <- Sys.time()
   elapsed <- as.numeric(difftime(end_time, start_time, units = "secs"))
+  all_warnings <- results$warnings %||% character()
+
+  # ==========================================================================
+  # TRS: Get run result (use from results if already created in mode function)
+  # ==========================================================================
+  run_result <- if (!is.null(results$run_result)) {
+    results$run_result
+  } else if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+    turas_run_state_result(trs_state)
+  } else {
+    NULL
+  }
 
   if (verbose) {
     cat("\n")
-    cat("================================================================================\n")
-    cat("MAXDIFF MODULE COMPLETE\n")
-    cat("================================================================================\n")
     cat(sprintf("Finished: %s\n", format(end_time, "%Y-%m-%d %H:%M:%S")))
     cat(sprintf("Elapsed time: %.1f seconds\n", elapsed))
     if (!is.null(results$output_path)) {
       cat(sprintf("Output file: %s\n", results$output_path))
+    }
+  }
+
+  # ==========================================================================
+  # TRS FINAL BANNER (TRS v1.0)
+  # ==========================================================================
+  if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
+    turas_print_final_banner(run_result)
+  } else if (verbose) {
+    cat("================================================================================\n")
+    if (length(all_warnings) == 0) {
+      cat("[TRS PASS] MAXDIFF - MODULE COMPLETED SUCCESSFULLY\n")
+    } else {
+      cat(sprintf("[TRS PARTIAL] MAXDIFF - MODULE COMPLETED WITH %d WARNING(S)\n", length(all_warnings)))
     }
     cat("================================================================================\n\n")
   }
 
   results$elapsed_seconds <- elapsed
   results$config <- config
+  results$run_result <- run_result
 
   invisible(results)
 }
@@ -309,10 +384,11 @@ run_maxdiff_impl <- function(config_path, project_root = NULL, verbose = TRUE) {
 #'
 #' @param config Configuration object
 #' @param verbose Print progress
+#' @param trs_state TRS run state object (optional)
 #'
 #' @return List with design results
 #' @keywords internal
-run_maxdiff_design_mode <- function(config, verbose = TRUE) {
+run_maxdiff_design_mode <- function(config, verbose = TRUE, trs_state = NULL) {
 
   if (verbose) {
     cat("\n")
@@ -390,10 +466,11 @@ run_maxdiff_design_mode <- function(config, verbose = TRUE) {
 #'
 #' @param config Configuration object
 #' @param verbose Print progress
+#' @param trs_state TRS run state object (optional)
 #'
 #' @return List with analysis results
 #' @keywords internal
-run_maxdiff_analysis_mode <- function(config, verbose = TRUE) {
+run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) {
 
   if (verbose) {
     cat("\n")
@@ -637,6 +714,31 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE) {
   }
 
   # ==========================================================================
+  # TRS: Log PARTIAL events for any warnings (before output generation)
+  # ==========================================================================
+  if (!is.null(trs_state) && length(warnings_list) > 0) {
+    for (warn in warnings_list) {
+      if (exists("turas_run_state_partial", mode = "function")) {
+        turas_run_state_partial(
+          trs_state,
+          "MAXD_WARNING",
+          "Analysis warning",
+          problem = warn
+        )
+      }
+    }
+  }
+
+  # ==========================================================================
+  # TRS: Get run result (before output generation for Run_Status sheet)
+  # ==========================================================================
+  run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+    turas_run_state_result(trs_state)
+  } else {
+    NULL
+  }
+
+  # ==========================================================================
   # STEP 11: GENERATE EXCEL OUTPUT
   # ==========================================================================
 
@@ -652,11 +754,12 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE) {
     hb_results = hb_results,
     segment_results = segment_results,
     chart_paths = chart_paths,
-    warnings = warnings_list
+    warnings = warnings_list,
+    run_result = run_result
   )
 
   output_path <- tryCatch({
-    generate_maxdiff_output(results, config, verbose)
+    generate_maxdiff_output(results, config, verbose, run_result)
   }, error = function(e) {
     message(sprintf("[TRS PARTIAL] MAXD_OUTPUT_FAILED: Output generation failed: %s", conditionMessage(e)))
     NULL

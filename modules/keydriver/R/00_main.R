@@ -27,6 +27,76 @@
 #
 # ==============================================================================
 
+KEYDRIVER_VERSION <- "10.3"
+
+# ==============================================================================
+# TRS GUARD LAYER (Must be first)
+# ==============================================================================
+
+# Source TRS guard layer for refusal handling
+.get_script_dir_for_guard <- function() {
+  if (exists("script_dir_override", envir = globalenv())) {
+    return(get("script_dir_override", envir = globalenv()))
+  }
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) return(dirname(sub("^--file=", "", file_arg)))
+  return(getwd())
+}
+
+.guard_path <- file.path(.get_script_dir_for_guard(), "00_guard.R")
+if (!file.exists(.guard_path)) {
+  .guard_path <- file.path(.get_script_dir_for_guard(), "R", "00_guard.R")
+}
+if (!file.exists(.guard_path)) {
+  # Try modules path
+  .guard_path <- file.path(getwd(), "modules", "keydriver", "R", "00_guard.R")
+}
+if (file.exists(.guard_path)) {
+  source(.guard_path)
+}
+
+# ==============================================================================
+# TRS INFRASTRUCTURE (TRS v1.0)
+# ==============================================================================
+
+# Source TRS run state management
+.source_trs_infrastructure <- function() {
+  base_dir <- .get_script_dir_for_guard()
+
+  # Try multiple paths to find shared/lib
+  possible_paths <- c(
+    file.path(base_dir, "..", "..", "shared", "lib"),
+    file.path(base_dir, "..", "shared", "lib"),
+    file.path(getwd(), "modules", "shared", "lib"),
+    file.path(getwd(), "..", "shared", "lib")
+  )
+
+  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R")
+
+  for (shared_lib in possible_paths) {
+    if (dir.exists(shared_lib)) {
+      for (f in trs_files) {
+        fpath <- file.path(shared_lib, f)
+        if (file.exists(fpath)) {
+          source(fpath)
+        }
+      }
+      break
+    }
+  }
+}
+
+tryCatch({
+  .source_trs_infrastructure()
+}, error = function(e) {
+  message(sprintf("[TRS INFO] KD_TRS_LOAD: Could not load TRS infrastructure: %s", e$message))
+})
+
+# ==============================================================================
+# MAIN ENTRY POINT
+# ==============================================================================
+
 #' Run Key Driver Analysis
 #'
 #' Analyzes which variables drive an outcome using multiple statistical methods.
@@ -106,13 +176,24 @@ run_keydriver_analysis <- function(config_file, data_file = NULL, output_file = 
 run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_file = NULL) {
 
   # ==========================================================================
-  # INITIALIZATION
+  # TRS RUN STATE INITIALIZATION (TRS v1.0)
   # ==========================================================================
+
+  # Create TRS run state for tracking events
+  trs_state <- if (exists("turas_run_state_new", mode = "function")) {
+    turas_run_state_new("KEYDRIVER")
+  } else {
+    NULL
+  }
 
   start_time <- Sys.time()
 
-  # TRS start banner
-  trs_banner_start("KEY DRIVER ANALYSIS", "10.3")
+  # TRS start banner - use shared if available, fallback to local
+  if (exists("turas_print_start_banner", mode = "function")) {
+    turas_print_start_banner("KEYDRIVER", KEYDRIVER_VERSION)
+  } else {
+    trs_banner_start("KEY DRIVER ANALYSIS", "10.3")
+  }
 
   # Initialize guard state for tracking warnings and issues
   guard <- keydriver_guard_init()
@@ -530,8 +611,38 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   end_time <- Sys.time()
   elapsed <- round(as.numeric(difftime(end_time, start_time, units = "secs")), 1)
 
-  # TRS end banner
-  trs_banner_end("KEY DRIVER ANALYSIS", results$run_status, elapsed)
+  # ==========================================================================
+  # TRS: Log PARTIAL events for any degraded outputs
+  # ==========================================================================
+  if (!is.null(trs_state) && length(degraded_reasons) > 0) {
+    for (reason in degraded_reasons) {
+      if (exists("turas_run_state_partial", mode = "function")) {
+        turas_run_state_partial(
+          trs_state,
+          "KD_DEGRADED",
+          "Degraded output",
+          problem = reason
+        )
+      }
+    }
+  }
+
+  # ==========================================================================
+  # TRS: Get run result
+  # ==========================================================================
+  run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+    turas_run_state_result(trs_state)
+  } else {
+    NULL
+  }
+  results$run_result <- run_result
+
+  # TRS end banner - use shared if available, fallback to local
+  if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
+    turas_print_final_banner(run_result)
+  } else {
+    trs_banner_end("KEY DRIVER ANALYSIS", results$run_status, elapsed)
+  }
 
   # Print top drivers
   cat("TOP 5 DRIVERS:\n")

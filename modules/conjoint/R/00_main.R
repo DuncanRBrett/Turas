@@ -69,6 +69,43 @@ if (file.exists(.guard_path)) {
 }
 
 # ==============================================================================
+# TRS INFRASTRUCTURE (TRS v1.0)
+# ==============================================================================
+
+# Source TRS run state management
+.source_trs_infrastructure <- function() {
+  base_dir <- .get_guard_dir()
+
+  # Try multiple paths to find shared/lib
+  possible_paths <- c(
+    file.path(base_dir, "..", "..", "shared", "lib"),
+    file.path(base_dir, "..", "shared", "lib"),
+    file.path(getwd(), "modules", "shared", "lib"),
+    file.path(getwd(), "..", "shared", "lib")
+  )
+
+  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R")
+
+  for (shared_lib in possible_paths) {
+    if (dir.exists(shared_lib)) {
+      for (f in trs_files) {
+        fpath <- file.path(shared_lib, f)
+        if (file.exists(fpath)) {
+          source(fpath)
+        }
+      }
+      break
+    }
+  }
+}
+
+tryCatch({
+  .source_trs_infrastructure()
+}, error = function(e) {
+  message(sprintf("[TRS INFO] CONJ_TRS_LOAD: Could not load TRS infrastructure: %s", e$message))
+})
+
+# ==============================================================================
 # LOAD MODULE COMPONENTS
 # ==============================================================================
 
@@ -218,17 +255,30 @@ run_conjoint_analysis <- function(config_file, data_file = NULL, output_file = N
 run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_file = NULL,
                                        verbose = TRUE) {
 
-  # Start timing
-  start_time <- Sys.time()
+  # ==========================================================================
+  # TRS RUN STATE INITIALIZATION (TRS v1.0)
+  # ==========================================================================
 
-  # Print header
-  if (verbose) {
+  # Create TRS run state for tracking events
+  trs_state <- if (exists("turas_run_state_new", mode = "function")) {
+    turas_run_state_new("CONJOINT")
+  } else {
+    NULL
+  }
+
+  # Print TRS start banner
+  if (exists("turas_print_start_banner", mode = "function")) {
+    turas_print_start_banner("CONJOINT", "2.1")
+  } else if (verbose) {
     cat("\n")
     cat(rep("=", 80), "\n", sep = "")
     cat("TURAS CONJOINT ANALYSIS - Version 2.1 (Alchemer Integration)\n")
     cat(rep("=", 80), "\n", sep = "")
     cat("\n")
   }
+
+  # Start timing
+  start_time <- Sys.time()
 
   # Error handling wrapper
   result <- tryCatch({
@@ -347,6 +397,32 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
     # STEP 7: Generate Output
     if (verbose) cat("\n7. Generating Excel output...\n")
 
+    # ==========================================================================
+    # TRS: Log PARTIAL events for any warnings
+    # ==========================================================================
+    all_warnings <- c(config$validation$warnings, data_list$validation$warnings)
+    if (!is.null(trs_state) && length(all_warnings) > 0) {
+      for (warn in all_warnings) {
+        if (exists("turas_run_state_partial", mode = "function")) {
+          turas_run_state_partial(
+            trs_state,
+            "CONJ_WARNING",
+            "Analysis warning",
+            problem = warn
+          )
+        }
+      }
+    }
+
+    # ==========================================================================
+    # TRS: Get run result for output
+    # ==========================================================================
+    run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+      turas_run_state_result(trs_state)
+    } else {
+      NULL
+    }
+
     write_conjoint_output(
       utilities = utilities,
       importance = importance,
@@ -354,7 +430,8 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
       model_result = model_result,
       config = config,
       data_info = data_list,
-      output_file = config$output_file
+      output_file = config$output_file,
+      run_result = run_result
     )
 
     if (verbose) {
@@ -366,9 +443,21 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
 
     if (verbose) {
       cat("\n")
-      cat(rep("=", 80), "\n", sep = "")
-      cat("ANALYSIS COMPLETE\n")
       cat(sprintf("Total time: %.1f seconds\n", as.numeric(elapsed)))
+    }
+
+    # ==========================================================================
+    # TRS FINAL BANNER (TRS v1.0)
+    # ==========================================================================
+    if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
+      turas_print_final_banner(run_result)
+    } else if (verbose) {
+      cat(rep("=", 80), "\n", sep = "")
+      if (length(all_warnings) == 0) {
+        cat("[TRS PASS] CONJOINT - ANALYSIS COMPLETED SUCCESSFULLY\n")
+      } else {
+        cat(sprintf("[TRS PARTIAL] CONJOINT - ANALYSIS COMPLETED WITH %d WARNING(S)\n", length(all_warnings)))
+      }
       cat(rep("=", 80), "\n", sep = "")
       cat("\n")
     }
@@ -382,7 +471,8 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
       config = config,
       data_info = data_list,
       elapsed_time = as.numeric(elapsed),
-      version = "2.1.0"
+      version = "2.1.0",
+      run_result = run_result
     )
 
   }, error = function(e) {

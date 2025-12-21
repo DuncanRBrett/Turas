@@ -33,10 +33,11 @@ OUTPUT_VERSION <- "10.0"
 #' @param results List. Analysis results from run_maxdiff_analysis
 #' @param config List. Configuration object
 #' @param verbose Logical. Print progress messages
+#' @param run_result List. Optional TRS run result for Run_Status sheet
 #'
 #' @return Character. Path to output file
 #' @export
-generate_maxdiff_output <- function(results, config, verbose = TRUE) {
+generate_maxdiff_output <- function(results, config, verbose = TRUE, run_result = NULL) {
 
   if (verbose) {
     cat("\n")
@@ -122,6 +123,17 @@ generate_maxdiff_output <- function(results, config, verbose = TRUE) {
   if (config$mode == "DESIGN" && !is.null(results$design_result)) {
     if (verbose) log_message("Writing DESIGN sheets...", "INFO", verbose)
     write_design_sheets(wb, results, config, styles)
+  }
+
+  # ============================================================================
+  # TRS RUN_STATUS SHEET (TRS v1.0)
+  # ============================================================================
+
+  if (!is.null(run_result)) {
+    if (exists("turas_write_run_status_sheet", mode = "function")) {
+      if (verbose) log_message("Writing Run_Status sheet...", "INFO", verbose)
+      turas_write_run_status_sheet(wb, run_result)
+    }
   }
 
   # ============================================================================

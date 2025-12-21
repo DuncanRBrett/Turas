@@ -58,6 +58,48 @@ script_dir <- if (exists("toolkit_path")) dirname(toolkit_path) else getwd()
 source(file.path(script_dir, "00_guard.R"))
 
 # ==============================================================================
+# TRS INFRASTRUCTURE (TRS v1.0)
+# ==============================================================================
+
+# Source TRS run state management
+.source_trs_infrastructure_tabs <- function() {
+  # Try multiple paths to find shared/lib
+  possible_paths <- c(
+    file.path(script_dir, "..", "..", "shared", "lib"),
+    file.path(script_dir, "..", "shared", "lib"),
+    file.path(getwd(), "modules", "shared", "lib"),
+    file.path(getwd(), "..", "shared", "lib")
+  )
+
+  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R")
+
+  for (shared_lib in possible_paths) {
+    if (dir.exists(shared_lib)) {
+      for (f in trs_files) {
+        fpath <- file.path(shared_lib, f)
+        if (file.exists(fpath)) {
+          source(fpath)
+        }
+      }
+      break
+    }
+  }
+}
+
+tryCatch({
+  .source_trs_infrastructure_tabs()
+}, error = function(e) {
+  message(sprintf("[TRS INFO] TABS_TRS_LOAD: Could not load TRS infrastructure: %s", e$message))
+})
+
+# Create TRS run state for tracking events
+trs_state <- if (exists("turas_run_state_new", mode = "function")) {
+  turas_run_state_new("TABS")
+} else {
+  NULL
+}
+
+# ==============================================================================
 # DEPENDENCY CHECKS (Friendly error messages)
 # ==============================================================================
 
@@ -244,7 +286,12 @@ format_output_value <- function(value, type = "frequency",
 # STARTUP & CONFIG LOADING
 # ==============================================================================
 
-print_toolkit_header("Crosstab Analysis - Turas v10.0")
+# Print TRS start banner
+if (exists("turas_print_start_banner", mode = "function")) {
+  turas_print_start_banner("TABS", SCRIPT_VERSION)
+} else {
+  print_toolkit_header("Crosstab Analysis - Turas v10.0")
+}
 
 if (!exists("config_file")) {
   # TRS Refusal: CFG_NO_CONFIG_FILE
@@ -1297,122 +1344,80 @@ if (create_index_summary) {
 # Error log
 write_error_log_sheet(wb, error_log, styles)
 
-# TRS v1.0: Run Status sheet (always created, shows PASS or PARTIAL)
-tryCatch({
-  log_message("Creating Run Status sheet...", "INFO")
-  openxlsx::addWorksheet(wb, "Run_Status")
-
-  # Header row
-  status_row <- 1
-  openxlsx::writeData(wb, "Run_Status", "TRS Run Status Report", startRow = status_row, startCol = 1)
-  openxlsx::addStyle(wb, "Run_Status", styles$question, rows = status_row, cols = 1)
-  status_row <- status_row + 2
-
-  # Status line
-  status_color <- if (run_status == "PASS") "#28a745" else "#dc3545"  # Green or Red
-  status_style <- openxlsx::createStyle(
-    fontColour = status_color,
-    textDecoration = "bold",
-    fontSize = 14
-  )
-  openxlsx::writeData(wb, "Run_Status", sprintf("Overall Status: %s", run_status),
-                     startRow = status_row, startCol = 1)
-  openxlsx::addStyle(wb, "Run_Status", status_style, rows = status_row, cols = 1)
-  status_row <- status_row + 1
-
-  openxlsx::writeData(wb, "Run_Status",
-                     sprintf("Generated: %s", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
-                     startRow = status_row, startCol = 1)
-  status_row <- status_row + 1
-
-  openxlsx::writeData(wb, "Run_Status",
-                     sprintf("Questions processed: %d of %d",
-                             length(processed_questions),
-                             nrow(crosstab_questions)),
-                     startRow = status_row, startCol = 1)
-  status_row <- status_row + 2
-
-  if (run_status == "PARTIAL") {
-    # Warning style for headers
-    warning_style <- openxlsx::createStyle(
-      fontColour = "#dc3545",
-      textDecoration = "bold"
-    )
-
-    # Section 1: Skipped Questions (completely missing from output)
-    if (length(skipped_questions) > 0) {
-      openxlsx::writeData(wb, "Run_Status", "SKIPPED QUESTIONS (Missing from Output):",
-                         startRow = status_row, startCol = 1)
-      openxlsx::addStyle(wb, "Run_Status", warning_style, rows = status_row, cols = 1)
-      status_row <- status_row + 1
-
-      # Column headers
-      openxlsx::writeData(wb, "Run_Status", "Question Code", startRow = status_row, startCol = 1)
-      openxlsx::writeData(wb, "Run_Status", "Reason", startRow = status_row, startCol = 2)
-      openxlsx::writeData(wb, "Run_Status", "Stage", startRow = status_row, startCol = 3)
-      openxlsx::addStyle(wb, "Run_Status", styles$base,
-                        rows = status_row, cols = 1:3, gridExpand = TRUE)
-      status_row <- status_row + 1
-
-      # List each skipped question
-      for (skip_code in names(skipped_questions)) {
-        skip_info <- skipped_questions[[skip_code]]
-        openxlsx::writeData(wb, "Run_Status", skip_code,
-                           startRow = status_row, startCol = 1)
-        openxlsx::writeData(wb, "Run_Status", skip_info$reason,
-                           startRow = status_row, startCol = 2)
-        openxlsx::writeData(wb, "Run_Status", skip_info$stage,
-                           startRow = status_row, startCol = 3)
-        status_row <- status_row + 1
+# TRS v1.0: Log PARTIAL events to run state
+if (!is.null(trs_state)) {
+  # Log skipped questions as PARTIAL events
+  if (length(skipped_questions) > 0) {
+    for (skip_code in names(skipped_questions)) {
+      skip_info <- skipped_questions[[skip_code]]
+      if (exists("turas_run_state_partial", mode = "function")) {
+        turas_run_state_partial(
+          trs_state,
+          sprintf("TABS_SKIP_%s", skip_code),
+          sprintf("Question skipped: %s", skip_code),
+          problem = skip_info$reason,
+          stage = skip_info$stage
+        )
       }
-      status_row <- status_row + 1
     }
-
-    # Section 2: Questions with Missing Sections (partial output)
-    if (length(partial_questions) > 0) {
-      openxlsx::writeData(wb, "Run_Status", "QUESTIONS WITH MISSING SECTIONS (Incomplete Output):",
-                         startRow = status_row, startCol = 1)
-      openxlsx::addStyle(wb, "Run_Status", warning_style, rows = status_row, cols = 1)
-      status_row <- status_row + 1
-
-      # Column headers
-      openxlsx::writeData(wb, "Run_Status", "Question Code", startRow = status_row, startCol = 1)
-      openxlsx::writeData(wb, "Run_Status", "Missing Section", startRow = status_row, startCol = 2)
-      openxlsx::writeData(wb, "Run_Status", "Error", startRow = status_row, startCol = 3)
-      openxlsx::addStyle(wb, "Run_Status", styles$base,
-                        rows = status_row, cols = 1:3, gridExpand = TRUE)
-      status_row <- status_row + 1
-
-      # List each question with missing sections
-      for (pq_code in names(partial_questions)) {
-        pq_info <- partial_questions[[pq_code]]
-        for (section in pq_info$sections) {
-          openxlsx::writeData(wb, "Run_Status", pq_code,
-                             startRow = status_row, startCol = 1)
-          openxlsx::writeData(wb, "Run_Status", section$section,
-                             startRow = status_row, startCol = 2)
-          openxlsx::writeData(wb, "Run_Status", section$error,
-                             startRow = status_row, startCol = 3)
-          status_row <- status_row + 1
-        }
-      }
-      status_row <- status_row + 1
-    }
-
-    openxlsx::writeData(wb, "Run_Status",
-                       "To resolve: Fix the issues listed above and re-run the analysis.",
-                       startRow = status_row, startCol = 1)
-  } else {
-    # PASS status message
-    openxlsx::writeData(wb, "Run_Status",
-                       "All selected questions were processed successfully.",
-                       startRow = status_row, startCol = 1)
   }
 
-  # Set column widths
-  openxlsx::setColWidths(wb, "Run_Status", cols = 1:3, widths = c(20, 60, 25))
+  # Log partial questions as PARTIAL events
+  if (length(partial_questions) > 0) {
+    for (pq_code in names(partial_questions)) {
+      pq_info <- partial_questions[[pq_code]]
+      for (section in pq_info$sections) {
+        if (exists("turas_run_state_partial", mode = "function")) {
+          turas_run_state_partial(
+            trs_state,
+            sprintf("TABS_PARTIAL_%s", pq_code),
+            sprintf("Missing section in %s: %s", pq_code, section$section),
+            problem = section$error
+          )
+        }
+      }
+    }
+  }
+}
 
-  log_message(sprintf("✓ Run Status sheet created (status: %s)", run_status), "INFO")
+# TRS v1.0: Get run result for Run_Status sheet
+run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+  turas_run_state_result(trs_state)
+} else {
+  NULL
+}
+
+# TRS v1.0: Run_Status sheet (using standard writer)
+tryCatch({
+  log_message("Creating Run_Status sheet...", "INFO")
+
+  if (!is.null(run_result) && exists("turas_write_run_status_sheet", mode = "function")) {
+    # Use standard TRS writer
+    turas_write_run_status_sheet(wb, run_result)
+    log_message(sprintf("✓ Run_Status sheet created (status: %s)", run_result$status), "INFO")
+  } else {
+    # Fallback: Create basic Run_Status sheet manually
+    openxlsx::addWorksheet(wb, "Run_Status")
+
+    status_row <- 1
+    openxlsx::writeData(wb, "Run_Status", "TRS Run Status Report", startRow = status_row, startCol = 1)
+    openxlsx::addStyle(wb, "Run_Status", styles$question, rows = status_row, cols = 1)
+    status_row <- status_row + 2
+
+    status_color <- if (run_status == "PASS") "#28a745" else "#dc3545"
+    status_style <- openxlsx::createStyle(fontColour = status_color, textDecoration = "bold", fontSize = 14)
+    openxlsx::writeData(wb, "Run_Status", sprintf("Overall Status: %s", run_status), startRow = status_row, startCol = 1)
+    openxlsx::addStyle(wb, "Run_Status", status_style, rows = status_row, cols = 1)
+    status_row <- status_row + 1
+
+    openxlsx::writeData(wb, "Run_Status", sprintf("Generated: %s", format(Sys.time(), "%Y-%m-%d %H:%M:%S")), startRow = status_row, startCol = 1)
+    status_row <- status_row + 1
+
+    openxlsx::writeData(wb, "Run_Status", sprintf("Questions processed: %d of %d", length(processed_questions), nrow(crosstab_questions)), startRow = status_row, startCol = 1)
+
+    openxlsx::setColWidths(wb, "Run_Status", cols = 1:3, widths = c(20, 60, 25))
+    log_message(sprintf("✓ Run_Status sheet created (status: %s)", run_status), "INFO")
+  }
 }, error = function(e) {
   warning(sprintf("Failed to create Run_Status sheet: %s", conditionMessage(e)), call. = FALSE)
 })
@@ -1555,24 +1560,29 @@ tryCatch({
 
 elapsed <- difftime(Sys.time(), start_time, units = "secs")
 
-cat("\n")
-cat(paste(rep("=", 80), collapse=""), "\n")
-cat("ANALYSIS COMPLETE - TURAS V10.0 (CLEAN)\n")
-cat(paste(rep("=", 80), collapse=""), "\n\n")
-
-# TRS v1.0: Display run status prominently
-if (run_status == "PARTIAL") {
-  cat("⚠  TRS Status: PARTIAL (see Run_Status sheet for details)\n")
-  if (length(skipped_questions) > 0) {
-    cat(sprintf("⚠  Questions skipped: %d\n", length(skipped_questions)))
-  }
-  if (length(partial_questions) > 0) {
-    cat(sprintf("⚠  Questions with missing sections: %d\n", length(partial_questions)))
-  }
+# TRS v1.0: Print final banner
+if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
+  turas_print_final_banner(run_result)
 } else {
-  cat("✓ TRS Status: PASS\n")
+  cat("\n")
+  cat(paste(rep("=", 80), collapse=""), "\n")
+  cat("ANALYSIS COMPLETE - TURAS V10.0 (CLEAN)\n")
+  cat(paste(rep("=", 80), collapse=""), "\n\n")
+
+  # TRS v1.0: Display run status prominently
+  if (run_status == "PARTIAL") {
+    cat("⚠  TRS Status: PARTIAL (see Run_Status sheet for details)\n")
+    if (length(skipped_questions) > 0) {
+      cat(sprintf("⚠  Questions skipped: %d\n", length(skipped_questions)))
+    }
+    if (length(partial_questions) > 0) {
+      cat(sprintf("⚠  Questions with missing sections: %d\n", length(partial_questions)))
+    }
+  } else {
+    cat("✓ TRS Status: PASS\n")
+  }
+  cat("\n")
 }
-cat("\n")
 
 cat("✓ Project:", project_name, "\n")
 cat("✓ Questions:", length(all_results), "\n")
