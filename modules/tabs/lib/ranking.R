@@ -74,6 +74,47 @@ source_if_exists("weighting.R")
 source_if_exists("Scripts/weighting.R")
 
 # ==============================================================================
+# TRS v1.0: RANKING PARTIAL FAILURE TRACKING
+# ==============================================================================
+# Environment-based tracking of partial failures during ranking processing.
+# The orchestrator can call ranking_get_partial_failures() after processing
+# to collect any section-level failures that occurred.
+
+# Private environment to track partial failures
+.ranking_state <- new.env(parent = emptyenv())
+.ranking_state$partial_failures <- list()
+
+#' Reset ranking partial failures
+#' Call before processing each question
+#' @export
+ranking_reset_partial_failures <- function() {
+  .ranking_state$partial_failures <- list()
+  invisible(NULL)
+}
+
+#' Record a ranking partial failure
+#' @param section Character, the section that failed
+#' @param stage Character, the processing stage
+#' @param error Character, the error message
+#' @keywords internal
+ranking_record_partial_failure <- function(section, stage, error) {
+  .ranking_state$partial_failures[[length(.ranking_state$partial_failures) + 1]] <- list(
+    section = section,
+    stage = stage,
+    error = error
+  )
+  invisible(NULL)
+}
+
+#' Get ranking partial failures
+#' Call after processing to collect any failures
+#' @return List of partial failure records
+#' @export
+ranking_get_partial_failures <- function() {
+  return(.ranking_state$partial_failures)
+}
+
+# ==============================================================================
 # RANK DIRECTION NORMALIZATION (V9.9.2: NEW)
 # ==============================================================================
 
@@ -1097,6 +1138,13 @@ run_mean_rank_test <- function(ranks1, ranks2, weights1, weights2, mean1, mean2,
     test <- tryCatch({
       t.test(ranks1, ranks2, na.rm = TRUE)
     }, error = function(e) {
+      # TRS v1.0: Record partial failure instead of silent NULL
+      ranking_record_partial_failure(
+        section = "Ranking Significance Test",
+        stage = "t_test",
+        error = conditionMessage(e)
+      )
+      message(sprintf("[TRS PARTIAL] Ranking significance test failed: %s", conditionMessage(e)))
       return(NULL)
     })
 

@@ -235,6 +235,12 @@ process_single_question <- function(question_code, prepared_data,
     # ---------------------------------------------------------------------
     # RANKING QUESTIONS
     # ---------------------------------------------------------------------
+
+    # TRS v1.0: Reset ranking partial failures before processing
+    if (exists("ranking_reset_partial_failures", mode = "function")) {
+      ranking_reset_partial_failures()
+    }
+
     ranking_data <- safe_execute(
       extract_ranking_data(filtered_data, question_info, question_options),
       default = NULL,
@@ -292,6 +298,16 @@ process_single_question <- function(question_code, prepared_data,
       batch_rbind(question_results)
     } else {
       data.frame(stringsAsFactors = FALSE)
+    }
+
+    # TRS v1.0: Collect any ranking partial failures
+    if (exists("ranking_get_partial_failures", mode = "function")) {
+      ranking_failures <- ranking_get_partial_failures()
+      if (length(ranking_failures) > 0) {
+        for (rf in ranking_failures) {
+          partial_sections[[length(partial_sections) + 1]] <- rf
+        }
+      }
     }
 
   } else if (question_info$Variable_Type == "Numeric") {
