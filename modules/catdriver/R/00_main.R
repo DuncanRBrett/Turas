@@ -62,27 +62,14 @@ run_categorical_keydriver <- function(config_file,
                                       outcome_type = NULL) {
 
   # ==========================================================================
-  # TOP-LEVEL REFUSAL HANDLER
+  # TOP-LEVEL REFUSAL HANDLER (TRS v1.0)
   # ==========================================================================
-  # Catch catdriver_refusal conditions and display them cleanly
-  # without stack traces - they are intentional stops, not crashes.
+  # Use shared with_refusal_handler() to catch BOTH turas_refusal and
+  # catdriver_refusal conditions, plus unexpected errors. This ensures
+  # consistent handling per TRS v1.0 requirements.
 
-  tryCatch(
-    run_categorical_keydriver_impl(config_file, data_file, output_file, outcome_type),
-    catdriver_refusal = function(e) {
-      # Print the refusal message cleanly (no "Error:" prefix, no stack trace)
-      cat(conditionMessage(e))
-
-      # Return a refusal result object
-      invisible(structure(
-        list(
-          refused = TRUE,
-          reason = e$reason,
-          message = conditionMessage(e)
-        ),
-        class = "catdriver_refusal_result"
-      ))
-    }
+  with_refusal_handler(
+    run_categorical_keydriver_impl(config_file, data_file, output_file, outcome_type)
   )
 }
 

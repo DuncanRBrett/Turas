@@ -8,15 +8,26 @@
 
 run_tracker_gui <- function() {
 
-  # Required packages - check and install if missing (fast method)
+  # Required packages - check availability (TRS v1.0: no auto-install)
   required_packages <- c("shiny", "shinyFiles")
 
-  # Fast check using requireNamespace instead of installed.packages()
-  for (pkg in required_packages) {
-    if (!requireNamespace(pkg, quietly = TRUE)) {
-      message("Installing required package: ", pkg)
-      install.packages(pkg)
-    }
+  # Check for missing packages and refuse with clear instructions if any are missing
+  missing_packages <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
+  if (length(missing_packages) > 0) {
+    stop(
+      "\n================================================================================\n",
+      "  [REFUSE] PKG_MISSING_DEPENDENCY: Missing Required Packages\n",
+      "================================================================================\n\n",
+      "Problem:\n",
+      "  The following required packages are not installed: ", paste(missing_packages, collapse = ", "), "\n\n",
+      "Why it matters:\n",
+      "  The Tracker GUI cannot run without these packages.\n\n",
+      "How to fix:\n",
+      "  Run the following command in R:\n",
+      "    install.packages(c(", paste(sprintf('"%s"', missing_packages), collapse = ", "), "))\n\n",
+      "================================================================================\n",
+      call. = FALSE
+    )
   }
 
   # Load packages

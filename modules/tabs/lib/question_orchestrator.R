@@ -73,8 +73,18 @@ prepare_question_data <- function(question_code, base_filter,
   ]
 
   if (nrow(question_info) == 0) {
-    warning(sprintf("Question not found: %s", question_code), call. = FALSE)
-    return(NULL)
+    # TRS v1.0: Missing question must refuse with explanation, not silently skip
+    tabs_refuse(
+      code = "CFG_QUESTION_NOT_FOUND",
+      title = paste0("Question Not Found: ", question_code),
+      problem = paste0("Question '", question_code, "' is referenced in config but not found in Survey_Structure."),
+      why_it_matters = "This question will be missing from output, producing incomplete results.",
+      how_to_fix = c(
+        "Check that the QuestionCode in Selection sheet matches Questions sheet exactly",
+        "Verify the question exists in Survey_Structure.xlsx Questions sheet",
+        "Check for typos or case differences in the question code"
+      )
+    )
   }
 
   question_info <- question_info[1, ]

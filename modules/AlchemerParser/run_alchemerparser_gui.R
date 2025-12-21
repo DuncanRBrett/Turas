@@ -4,10 +4,22 @@
 # Interactive GUI for AlchemerParser module
 # ==============================================================================
 
-# Fast package check - only install if needed, don't load yet
+# Required package check (TRS v1.0: no auto-install)
 if (!requireNamespace("shiny", quietly = TRUE)) {
-  message("Installing required package: shiny")
-  install.packages("shiny")
+  stop(
+    "\n================================================================================\n",
+    "  [REFUSE] PKG_MISSING_DEPENDENCY: Missing Required Package\n",
+    "================================================================================\n\n",
+    "Problem:\n",
+    "  The required package 'shiny' is not installed.\n\n",
+    "Why it matters:\n",
+    "  The AlchemerParser GUI cannot run without this package.\n\n",
+    "How to fix:\n",
+    "  Run the following command in R:\n",
+    '    install.packages("shiny")\n\n',
+    "================================================================================\n",
+    call. = FALSE
+  )
 }
 
 # Load shiny with suppressed messages
