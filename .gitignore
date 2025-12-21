@@ -76,3 +76,4 @@ __pycache__/
 
 # Mac OS artifacts
 __MACOSX/
+*.zip
