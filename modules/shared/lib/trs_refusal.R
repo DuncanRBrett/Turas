@@ -781,6 +781,102 @@ trs_exclusion_summary <- function(exclusions, total_before = NULL, total_after =
 
 
 # ==============================================================================
+# PATH RESOLUTION (TRS v1.0 - Avoid setwd())
+# ==============================================================================
+
+#' Resolve TURAS Project Root
+#'
+#' Canonical function to find TURAS project root directory. This should be used
+#' instead of setwd() to maintain working directory stability in Shiny and
+#' multi-run contexts.
+#'
+#' Resolution order:
+#' 1. TURAS_HOME environment variable
+#' 2. Current working directory if it contains modules/ folder
+#' 3. Parent directories up to 5 levels
+#'
+#' @return Character string with absolute path to TURAS root
+#' @export
+turas_resolve_home <- function() {
+  # 1. Check environment variable
+  turas_home <- Sys.getenv("TURAS_HOME", "")
+  if (nzchar(turas_home) && dir.exists(turas_home) &&
+      dir.exists(file.path(turas_home, "modules"))) {
+    return(normalizePath(turas_home, mustWork = FALSE))
+  }
+
+  # 2. Check current working directory
+  wd <- getwd()
+  if (dir.exists(file.path(wd, "modules"))) {
+    return(normalizePath(wd, mustWork = FALSE))
+  }
+
+  # 3. Check parent directories (up to 5 levels)
+  check_dir <- wd
+  for (i in 1:5) {
+    check_dir <- dirname(check_dir)
+    if (dir.exists(file.path(check_dir, "modules"))) {
+      return(normalizePath(check_dir, mustWork = FALSE))
+    }
+  }
+
+  # 4. Return current directory as fallback with warning
+  warning("Could not resolve TURAS_HOME. Using current working directory.")
+  return(normalizePath(wd, mustWork = FALSE))
+}
+
+
+#' Resolve Path Relative to TURAS Root
+#'
+#' Creates an absolute path from a path relative to TURAS root.
+#' Use this instead of setwd() + relative paths.
+#'
+#' @param relative_path Character. Path relative to TURAS root
+#' @param must_exist Logical. If TRUE, refuses if path doesn't exist
+#' @return Character string with absolute path
+#' @export
+turas_path <- function(relative_path, must_exist = FALSE) {
+  root <- turas_resolve_home()
+  abs_path <- normalizePath(file.path(root, relative_path), mustWork = FALSE)
+
+  if (must_exist && !file.exists(abs_path)) {
+    turas_refuse(
+      code = "IO_PATH_NOT_FOUND",
+      title = "Required Path Not Found",
+      problem = paste0("Path '", relative_path, "' does not exist."),
+      why_it_matters = "Required file or directory is missing.",
+      how_to_fix = c(
+        paste0("Check that '", relative_path, "' exists in your project"),
+        paste0("Full path checked: ", abs_path)
+      ),
+      missing = abs_path
+    )
+  }
+
+  return(abs_path)
+}
+
+
+#' Resolve Module Path
+#'
+#' Creates an absolute path within a specific module.
+#'
+#' @param module Character. Module name (e.g., "tabs", "keydriver")
+#' @param relative_path Character. Path relative to module directory
+#' @return Character string with absolute path
+#' @export
+turas_module_path <- function(module, relative_path = "") {
+  root <- turas_resolve_home()
+  module_root <- file.path(root, "modules", module)
+
+  if (nzchar(relative_path)) {
+    return(normalizePath(file.path(module_root, relative_path), mustWork = FALSE))
+  }
+  return(normalizePath(module_root, mustWork = FALSE))
+}
+
+
+# ==============================================================================
 # BACKWARD COMPATIBILITY SUPPORT
 # ==============================================================================
 # These aliases support modules that may have been using older function names.
