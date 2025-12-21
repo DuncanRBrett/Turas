@@ -1011,8 +1011,30 @@ orchestration_result <- process_all_questions(
 
 all_results <- orchestration_result$all_results
 processed_questions <- orchestration_result$processed_questions
+run_status <- orchestration_result$run_status
+skipped_questions <- orchestration_result$skipped_questions
 
 cat("\n")
+
+# TRS v1.0: Mandatory PARTIAL status disclosure
+if (run_status == "PARTIAL") {
+  cat("\n")
+  cat(paste(rep("!", 80), collapse=""), "\n")
+  cat("[TRS PARTIAL] ANALYSIS COMPLETED WITH PARTIAL RESULTS\n")
+  cat(paste(rep("!", 80), collapse=""), "\n")
+  cat(sprintf("  %d questions were skipped during processing.\n", length(skipped_questions)))
+  cat("  The following questions are MISSING from your output:\n\n")
+  for (skip_code in names(skipped_questions)) {
+    skip_info <- skipped_questions[[skip_code]]
+    cat(sprintf("    - %s: %s (stage: %s)\n",
+                skip_code, skip_info$reason, skip_info$stage))
+  }
+  cat("\n")
+  cat("  ACTION REQUIRED: Review and fix the issues above, then re-run.\n")
+  cat("  A 'Run_Status' sheet will be included in your workbook.\n")
+  cat(paste(rep("!", 80), collapse=""), "\n\n")
+}
+
 log_message(sprintf("✓ Processed %d questions", length(all_results)), "INFO")
 
 if (config_obj$enable_checkpointing && file.exists(checkpoint_file)) {
@@ -1255,6 +1277,91 @@ if (create_index_summary) {
 # Error log
 write_error_log_sheet(wb, error_log, styles)
 
+# TRS v1.0: Run Status sheet (always created, shows PASS or PARTIAL)
+tryCatch({
+  log_message("Creating Run Status sheet...", "INFO")
+  openxlsx::addWorksheet(wb, "Run_Status")
+
+  # Header row
+  status_row <- 1
+  openxlsx::writeData(wb, "Run_Status", "TRS Run Status Report", startRow = status_row, startCol = 1)
+  openxlsx::addStyle(wb, "Run_Status", styles$question, rows = status_row, cols = 1)
+  status_row <- status_row + 2
+
+  # Status line
+  status_color <- if (run_status == "PASS") "#28a745" else "#dc3545"  # Green or Red
+  status_style <- openxlsx::createStyle(
+    fontColour = status_color,
+    textDecoration = "bold",
+    fontSize = 14
+  )
+  openxlsx::writeData(wb, "Run_Status", sprintf("Overall Status: %s", run_status),
+                     startRow = status_row, startCol = 1)
+  openxlsx::addStyle(wb, "Run_Status", status_style, rows = status_row, cols = 1)
+  status_row <- status_row + 1
+
+  openxlsx::writeData(wb, "Run_Status",
+                     sprintf("Generated: %s", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
+                     startRow = status_row, startCol = 1)
+  status_row <- status_row + 1
+
+  openxlsx::writeData(wb, "Run_Status",
+                     sprintf("Questions processed: %d of %d",
+                             length(processed_questions),
+                             nrow(crosstab_questions)),
+                     startRow = status_row, startCol = 1)
+  status_row <- status_row + 2
+
+  if (run_status == "PARTIAL" && length(skipped_questions) > 0) {
+    # Warning header
+    warning_style <- openxlsx::createStyle(
+      fontColour = "#dc3545",
+      textDecoration = "bold"
+    )
+    openxlsx::writeData(wb, "Run_Status", "SKIPPED QUESTIONS (Action Required):",
+                       startRow = status_row, startCol = 1)
+    openxlsx::addStyle(wb, "Run_Status", warning_style, rows = status_row, cols = 1)
+    status_row <- status_row + 1
+
+    # Column headers for skipped questions table
+    openxlsx::writeData(wb, "Run_Status", "Question Code", startRow = status_row, startCol = 1)
+    openxlsx::writeData(wb, "Run_Status", "Reason", startRow = status_row, startCol = 2)
+    openxlsx::writeData(wb, "Run_Status", "Stage", startRow = status_row, startCol = 3)
+    openxlsx::addStyle(wb, "Run_Status", styles$base,
+                      rows = status_row, cols = 1:3, gridExpand = TRUE)
+    status_row <- status_row + 1
+
+    # List each skipped question
+    for (skip_code in names(skipped_questions)) {
+      skip_info <- skipped_questions[[skip_code]]
+      openxlsx::writeData(wb, "Run_Status", skip_code,
+                         startRow = status_row, startCol = 1)
+      openxlsx::writeData(wb, "Run_Status", skip_info$reason,
+                         startRow = status_row, startCol = 2)
+      openxlsx::writeData(wb, "Run_Status", skip_info$stage,
+                         startRow = status_row, startCol = 3)
+      status_row <- status_row + 1
+    }
+
+    status_row <- status_row + 1
+    openxlsx::writeData(wb, "Run_Status",
+                       "To resolve: Fix the issues listed above and re-run the analysis.",
+                       startRow = status_row, startCol = 1)
+  } else {
+    # PASS status message
+    openxlsx::writeData(wb, "Run_Status",
+                       "All selected questions were processed successfully.",
+                       startRow = status_row, startCol = 1)
+  }
+
+  # Set column widths
+  openxlsx::setColWidths(wb, "Run_Status", cols = 1:3, widths = c(20, 60, 25))
+
+  log_message(sprintf("✓ Run Status sheet created (status: %s)", run_status), "INFO")
+}, error = function(e) {
+  warning(sprintf("Failed to create Run_Status sheet: %s", conditionMessage(e)), call. = FALSE)
+})
+
 # V9.9.5: Sample Composition sheet (SAFE - separate sheet)
 if (config_obj$create_sample_composition) {
   log_message("Creating sample composition sheet...", "INFO")
@@ -1397,6 +1504,15 @@ cat("\n")
 cat(paste(rep("=", 80), collapse=""), "\n")
 cat("ANALYSIS COMPLETE - TURAS V10.0 (CLEAN)\n")
 cat(paste(rep("=", 80), collapse=""), "\n\n")
+
+# TRS v1.0: Display run status prominently
+if (run_status == "PARTIAL") {
+  cat("⚠  TRS Status: PARTIAL (see Run_Status sheet for details)\n")
+  cat(sprintf("⚠  Questions skipped: %d\n", length(skipped_questions)))
+} else {
+  cat("✓ TRS Status: PASS\n")
+}
+cat("\n")
 
 cat("✓ Project:", project_name, "\n")
 cat("✓ Questions:", length(all_results), "\n")
