@@ -318,9 +318,9 @@ run_maxdiff_impl <- function(config_path, project_root = NULL, verbose = TRUE) {
   # ==========================================================================
 
   results <- if (config$mode == "DESIGN") {
-    run_maxdiff_design_mode(config, verbose)
+    run_maxdiff_design_mode(config, verbose, trs_state)
   } else {
-    run_maxdiff_analysis_mode(config, verbose)
+    run_maxdiff_analysis_mode(config, verbose, trs_state)
   }
 
   # ==========================================================================
@@ -329,28 +329,14 @@ run_maxdiff_impl <- function(config_path, project_root = NULL, verbose = TRUE) {
 
   end_time <- Sys.time()
   elapsed <- as.numeric(difftime(end_time, start_time, units = "secs"))
-
-  # ==========================================================================
-  # TRS: Log PARTIAL events for any warnings
-  # ==========================================================================
   all_warnings <- results$warnings %||% character()
-  if (!is.null(trs_state) && length(all_warnings) > 0) {
-    for (warn in all_warnings) {
-      if (exists("turas_run_state_partial", mode = "function")) {
-        turas_run_state_partial(
-          trs_state,
-          "MAXD_WARNING",
-          "Analysis warning",
-          problem = warn
-        )
-      }
-    }
-  }
 
   # ==========================================================================
-  # TRS: Get run result
+  # TRS: Get run result (use from results if already created in mode function)
   # ==========================================================================
-  run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+  run_result <- if (!is.null(results$run_result)) {
+    results$run_result
+  } else if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
     turas_run_state_result(trs_state)
   } else {
     NULL
@@ -398,10 +384,11 @@ run_maxdiff_impl <- function(config_path, project_root = NULL, verbose = TRUE) {
 #'
 #' @param config Configuration object
 #' @param verbose Print progress
+#' @param trs_state TRS run state object (optional)
 #'
 #' @return List with design results
 #' @keywords internal
-run_maxdiff_design_mode <- function(config, verbose = TRUE) {
+run_maxdiff_design_mode <- function(config, verbose = TRUE, trs_state = NULL) {
 
   if (verbose) {
     cat("\n")
@@ -479,10 +466,11 @@ run_maxdiff_design_mode <- function(config, verbose = TRUE) {
 #'
 #' @param config Configuration object
 #' @param verbose Print progress
+#' @param trs_state TRS run state object (optional)
 #'
 #' @return List with analysis results
 #' @keywords internal
-run_maxdiff_analysis_mode <- function(config, verbose = TRUE) {
+run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) {
 
   if (verbose) {
     cat("\n")
@@ -726,6 +714,31 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE) {
   }
 
   # ==========================================================================
+  # TRS: Log PARTIAL events for any warnings (before output generation)
+  # ==========================================================================
+  if (!is.null(trs_state) && length(warnings_list) > 0) {
+    for (warn in warnings_list) {
+      if (exists("turas_run_state_partial", mode = "function")) {
+        turas_run_state_partial(
+          trs_state,
+          "MAXD_WARNING",
+          "Analysis warning",
+          problem = warn
+        )
+      }
+    }
+  }
+
+  # ==========================================================================
+  # TRS: Get run result (before output generation for Run_Status sheet)
+  # ==========================================================================
+  run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+    turas_run_state_result(trs_state)
+  } else {
+    NULL
+  }
+
+  # ==========================================================================
   # STEP 11: GENERATE EXCEL OUTPUT
   # ==========================================================================
 
@@ -741,11 +754,12 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE) {
     hb_results = hb_results,
     segment_results = segment_results,
     chart_paths = chart_paths,
-    warnings = warnings_list
+    warnings = warnings_list,
+    run_result = run_result
   )
 
   output_path <- tryCatch({
-    generate_maxdiff_output(results, config, verbose)
+    generate_maxdiff_output(results, config, verbose, run_result)
   }, error = function(e) {
     message(sprintf("[TRS PARTIAL] MAXD_OUTPUT_FAILED: Output generation failed: %s", conditionMessage(e)))
     NULL

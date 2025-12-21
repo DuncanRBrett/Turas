@@ -8,6 +8,53 @@
 # Source config utilities for label formatting
 source("modules/segment/lib/segment_config.R")
 
+#' Create Run_Status Data Frame for writexl
+#'
+#' @param run_result TRS run result object
+#' @return Data frame for Run_Status sheet
+#' @keywords internal
+create_run_status_df <- function(run_result) {
+  if (is.null(run_result)) return(NULL)
+
+  # Build summary section
+  summary_rows <- data.frame(
+    Field = c("Module", "Status", "Event_Count", "Timestamp"),
+    Value = c(
+      run_result$module %||% "SEGMENT",
+      run_result$status %||% "UNKNOWN",
+      as.character(length(run_result$events)),
+      format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+    ),
+    stringsAsFactors = FALSE
+  )
+
+  # Add events if any
+  if (length(run_result$events) > 0) {
+    # Add blank row
+    summary_rows <- rbind(summary_rows, data.frame(Field = "", Value = "", stringsAsFactors = FALSE))
+    summary_rows <- rbind(summary_rows, data.frame(Field = "EVENTS", Value = "", stringsAsFactors = FALSE))
+
+    for (i in seq_along(run_result$events)) {
+      e <- run_result$events[[i]]
+      event_str <- sprintf("[%s] %s: %s",
+                           e$level %||% "INFO",
+                           e$code %||% "",
+                           e$title %||% "")
+      summary_rows <- rbind(summary_rows, data.frame(
+        Field = sprintf("Event_%d", i),
+        Value = event_str,
+        stringsAsFactors = FALSE
+      ))
+    }
+  }
+
+  return(summary_rows)
+}
+
+#' Null coalesce operator
+#' @keywords internal
+`%||%` <- function(x, y) if (is.null(x) || length(x) == 0) y else x
+
 #' Export segment assignments file
 #'
 #' DESIGN: Simple join table (respondent_id, segment, segment_name, outlier_flag)
@@ -51,15 +98,16 @@ export_segment_assignments <- function(data, clusters, segment_names, id_var, ou
 #' Export exploration mode k selection report
 #'
 #' DESIGN: Multi-tab Excel with metrics comparison and profiles
-#' TABS: Metrics_Comparison, Profile_K3, Profile_K4, etc.
+#' TABS: Metrics_Comparison, Profile_K3, Profile_K4, etc., Run_Status
 #'
 #' @param exploration_result Result from run_kmeans_exploration()
 #' @param metrics_result Result from calculate_exploration_metrics()
 #' @param recommendation Result from recommend_k()
 #' @param output_path Character, output file path
+#' @param run_result TRS run result object (optional)
 #' @export
 export_exploration_report <- function(exploration_result, metrics_result,
-                                      recommendation, output_path) {
+                                      recommendation, output_path, run_result = NULL) {
   cat(sprintf("Exporting exploration report to: %s\n", basename(output_path)))
 
   data_list <- exploration_result$data_list
@@ -233,6 +281,14 @@ export_exploration_report <- function(exploration_result, metrics_result,
     }
   }
 
+  # Add Run_Status sheet (TRS v1.0)
+  if (!is.null(run_result)) {
+    run_status_df <- create_run_status_df(run_result)
+    if (!is.null(run_status_df)) {
+      profile_sheets[["Run_Status"]] <- run_status_df
+    }
+  }
+
   # Write all sheets to Excel
   writexl::write_xlsx(profile_sheets, output_path)
 
@@ -244,15 +300,16 @@ export_exploration_report <- function(exploration_result, metrics_result,
 #' Export final segmentation report
 #'
 #' DESIGN: Comprehensive multi-tab report for final solution
-#' TABS: Summary, Segment_Profiles, Validation, Assignments
+#' TABS: Summary, Segment_Profiles, Validation, Assignments, Run_Status
 #'
 #' @param final_result Result from run_kmeans_final()
 #' @param profile_result Result from create_full_segment_profile()
 #' @param validation_metrics Validation metrics list
 #' @param output_path Character, output file path
+#' @param run_result TRS run result object (optional)
 #' @export
 export_final_report <- function(final_result, profile_result, validation_metrics,
-                                 output_path) {
+                                 output_path, run_result = NULL) {
   cat(sprintf("Exporting final segmentation report to: %s\n", basename(output_path)))
 
   data_list <- final_result$data_list
@@ -492,6 +549,14 @@ export_final_report <- function(final_result, profile_result, validation_metrics
       }
 
       sheets[["VarSel_Statistics"]] <- var_stats
+    }
+  }
+
+  # Add Run_Status sheet (TRS v1.0)
+  if (!is.null(run_result)) {
+    run_status_df <- create_run_status_df(run_result)
+    if (!is.null(run_status_df)) {
+      sheets[["Run_Status"]] <- run_status_df
     }
   }
 

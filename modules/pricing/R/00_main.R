@@ -370,22 +370,6 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
   plots <- generate_pricing_plots(analysis_results, config)
   cat(sprintf("   Generated %d plot(s)\n", length(plots)))
 
-  # --------------------------------------------------------------------------
-  # STEP 8: Generate Output
-  # --------------------------------------------------------------------------
-  cat("\n8. Generating output file...\n")
-  write_pricing_output(
-    results = analysis_results,
-    plots = plots,
-    validation = validation,
-    config = config,
-    output_file = output_file,
-    segment_results = segment_results,
-    ladder_results = ladder_results,
-    synthesis = synthesis
-  )
-  cat(sprintf("   Results written to: %s\n", output_file))
-
   # ==========================================================================
   # TRS: Log PARTIAL events for any warnings
   # ==========================================================================
@@ -403,13 +387,30 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
   }
 
   # ==========================================================================
-  # TRS: Get run result
+  # TRS: Get run result (before output generation)
   # ==========================================================================
   run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
     turas_run_state_result(trs_state)
   } else {
     NULL
   }
+
+  # --------------------------------------------------------------------------
+  # STEP 8: Generate Output
+  # --------------------------------------------------------------------------
+  cat("\n8. Generating output file...\n")
+  write_pricing_output(
+    results = analysis_results,
+    plots = plots,
+    validation = validation,
+    config = config,
+    output_file = output_file,
+    segment_results = segment_results,
+    ladder_results = ladder_results,
+    synthesis = synthesis,
+    run_result = run_result
+  )
+  cat(sprintf("   Results written to: %s\n", output_file))
 
   # ==========================================================================
   # TRS FINAL BANNER (TRS v1.0)

@@ -27,7 +27,7 @@
 #' @keywords internal
 write_pricing_output <- function(results, plots, validation, config, output_file,
                                  segment_results = NULL, ladder_results = NULL,
-                                 synthesis = NULL) {
+                                 synthesis = NULL, run_result = NULL) {
 
   if (!requireNamespace("openxlsx", quietly = TRUE)) {
     stop("Package 'openxlsx' is required for Excel output", call. = FALSE)
@@ -760,6 +760,15 @@ write_pricing_output <- function(results, plots, validation, config, output_file
 
   openxlsx::writeData(wb, "Configuration", config_df, headerStyle = header_style)
   openxlsx::setColWidths(wb, "Configuration", cols = 1:2, widths = c(25, 50))
+
+  # --------------------------------------------------------------------------
+  # TRS Run_Status Sheet (TRS v1.0)
+  # --------------------------------------------------------------------------
+  if (!is.null(run_result)) {
+    if (exists("turas_write_run_status_sheet", mode = "function")) {
+      turas_write_run_status_sheet(wb, run_result)
+    }
+  }
 
   # --------------------------------------------------------------------------
   # Save Workbook

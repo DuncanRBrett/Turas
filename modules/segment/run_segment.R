@@ -148,6 +148,15 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
     cat("PHASE 3: GENERATING OUTPUTS\n")
     cat(paste(rep("=", 80), collapse = ""), "\n\n")
 
+    # ==========================================================================
+    # TRS: Get run result (before output generation for Run_Status sheet)
+    # ==========================================================================
+    run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+      turas_run_state_result(trs_state)
+    } else {
+      NULL
+    }
+
     # Create output folder
     output_folder <- create_output_folder(config$output_folder,
                                            config$create_dated_folder)
@@ -160,7 +169,8 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
       exploration_result = exploration_result,
       metrics_result = metrics_result,
       recommendation = recommendation,
-      output_path = report_path
+      output_path = report_path,
+      run_result = run_result
     )
 
     # ===========================================================================
@@ -178,15 +188,6 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
     cat(sprintf("  3. Update config file: set k_fixed = %d\n", recommendation$recommended_k))
     cat(sprintf("  4. Re-run: turas_segment_from_config(\"%s\")\n", basename(config_file)))
     cat("\n")
-
-    # ==========================================================================
-    # TRS: Get run result
-    # ==========================================================================
-    run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
-      turas_run_state_result(trs_state)
-    } else {
-      NULL
-    }
 
     # ==========================================================================
     # TRS FINAL BANNER (TRS v1.0)
@@ -266,6 +267,15 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
     cat("PHASE 4: GENERATING OUTPUTS\n")
     cat(paste(rep("=", 80), collapse = ""), "\n\n")
 
+    # ==========================================================================
+    # TRS: Get run result (before output generation for Run_Status sheet)
+    # ==========================================================================
+    run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+      turas_run_state_result(trs_state)
+    } else {
+      NULL
+    }
+
     # Create output folder
     output_folder <- create_output_folder(config$output_folder,
                                            config$create_dated_folder)
@@ -291,7 +301,8 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
       final_result = final_result,
       profile_result = profile_result,
       validation_metrics = validation_metrics,
-      output_path = report_path
+      output_path = report_path,
+      run_result = run_result
     )
 
     # Save model object
@@ -342,15 +353,6 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
     cat(sprintf("  Average silhouette: %.3f\n", validation_metrics$avg_silhouette))
     cat(sprintf("  Observations: %d\n", nrow(data_list$data)))
     cat("\n")
-
-    # ==========================================================================
-    # TRS: Get run result
-    # ==========================================================================
-    run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
-      turas_run_state_result(trs_state)
-    } else {
-      NULL
-    }
 
     # ==========================================================================
     # TRS FINAL BANNER (TRS v1.0)
