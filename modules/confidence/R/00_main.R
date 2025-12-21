@@ -31,6 +31,27 @@
 MAIN_VERSION <- "10.0"
 
 # ==============================================================================
+# TRS GUARD LAYER (Must be first)
+# ==============================================================================
+
+# Source TRS guard layer for refusal handling
+get_script_dir_for_guard <- function() {
+  if (exists("script_dir_override")) return(script_dir_override)
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) return(dirname(sub("^--file=", "", file_arg)))
+  return(getwd())
+}
+
+guard_path <- file.path(get_script_dir_for_guard(), "00_guard.R")
+if (!file.exists(guard_path)) {
+  guard_path <- file.path(get_script_dir_for_guard(), "R", "00_guard.R")
+}
+if (file.exists(guard_path)) {
+  source(guard_path)
+}
+
+# ==============================================================================
 # DEPENDENCIES
 # ==============================================================================
 
@@ -138,6 +159,30 @@ tryCatch({
 run_confidence_analysis <- function(config_path,
                                     verbose = TRUE,
                                     stop_on_warnings = FALSE) {
+
+  # ==========================================================================
+  # TRS REFUSAL HANDLER WRAPPER (TRS v1.0)
+  # ==========================================================================
+  # Catches turas_refusal conditions and displays them cleanly
+  # without stack traces - they are intentional stops, not crashes.
+
+  if (exists("confidence_with_refusal_handler", mode = "function")) {
+    confidence_with_refusal_handler(
+      run_confidence_analysis_impl(config_path, verbose, stop_on_warnings)
+    )
+  } else {
+    # Fallback if guard not loaded
+    run_confidence_analysis_impl(config_path, verbose, stop_on_warnings)
+  }
+}
+
+
+#' Internal Implementation of Confidence Analysis
+#'
+#' @keywords internal
+run_confidence_analysis_impl <- function(config_path,
+                                         verbose = TRUE,
+                                         stop_on_warnings = FALSE) {
 
   # Start timer
   start_time <- Sys.time()

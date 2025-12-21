@@ -48,6 +48,27 @@ suppressPackageStartupMessages({
 })
 
 # ==============================================================================
+# TRS GUARD LAYER
+# ==============================================================================
+
+# Source TRS guard layer for refusal handling
+.get_guard_dir <- function() {
+  dir <- tryCatch(dirname(sys.frame(1)$ofile), error = function(e) "")
+  if (is.null(dir) || length(dir) == 0 || dir == "") {
+    wd <- getwd()
+    if (file.exists(file.path(wd, "modules/conjoint/R/00_guard.R"))) {
+      return(file.path(wd, "modules/conjoint/R"))
+    }
+  }
+  return(dir)
+}
+
+.guard_path <- file.path(.get_guard_dir(), "00_guard.R")
+if (file.exists(.guard_path)) {
+  source(.guard_path)
+}
+
+# ==============================================================================
 # LOAD MODULE COMPONENTS
 # ==============================================================================
 
@@ -176,6 +197,26 @@ rm(.conjoint_module_dir)
 #' @export
 run_conjoint_analysis <- function(config_file, data_file = NULL, output_file = NULL,
                                   verbose = TRUE) {
+
+  # ==========================================================================
+  # TRS REFUSAL HANDLER WRAPPER (TRS v1.0)
+  # ==========================================================================
+
+  if (exists("conjoint_with_refusal_handler", mode = "function")) {
+    conjoint_with_refusal_handler(
+      run_conjoint_analysis_impl(config_file, data_file, output_file, verbose)
+    )
+  } else {
+    run_conjoint_analysis_impl(config_file, data_file, output_file, verbose)
+  }
+}
+
+
+#' Internal Implementation of Conjoint Analysis
+#'
+#' @keywords internal
+run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_file = NULL,
+                                       verbose = TRUE) {
 
   # Start timing
   start_time <- Sys.time()

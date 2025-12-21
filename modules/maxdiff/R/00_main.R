@@ -39,6 +39,29 @@
 MAXDIFF_VERSION <- "10.0"
 
 # ==============================================================================
+# TRS GUARD LAYER (Must be first)
+# ==============================================================================
+
+# Source TRS guard layer for refusal handling
+.get_script_dir_for_guard <- function() {
+  if (exists("script_dir_override", envir = globalenv())) {
+    return(get("script_dir_override", envir = globalenv()))
+  }
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) return(dirname(sub("^--file=", "", file_arg)))
+  return(getwd())
+}
+
+.guard_path <- file.path(.get_script_dir_for_guard(), "00_guard.R")
+if (!file.exists(.guard_path)) {
+  .guard_path <- file.path(.get_script_dir_for_guard(), "R", "00_guard.R")
+}
+if (file.exists(.guard_path)) {
+  source(.guard_path)
+}
+
+# ==============================================================================
 # DEPENDENCIES
 # ==============================================================================
 
@@ -189,9 +212,27 @@ tryCatch({
 #' @export
 run_maxdiff <- function(config_path, project_root = NULL, verbose = TRUE) {
 
-  # Start timer
+  # ==========================================================================
+  # TRS REFUSAL HANDLER WRAPPER (TRS v1.0)
+  # ==========================================================================
 
-start_time <- Sys.time()
+  if (exists("maxdiff_with_refusal_handler", mode = "function")) {
+    maxdiff_with_refusal_handler(
+      run_maxdiff_impl(config_path, project_root, verbose)
+    )
+  } else {
+    run_maxdiff_impl(config_path, project_root, verbose)
+  }
+}
+
+
+#' Internal Implementation of MaxDiff Analysis
+#'
+#' @keywords internal
+run_maxdiff_impl <- function(config_path, project_root = NULL, verbose = TRUE) {
+
+  # Start timer
+  start_time <- Sys.time()
 
   if (verbose) {
     cat("\n")
