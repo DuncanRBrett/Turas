@@ -123,16 +123,16 @@ score_new_data <- function(model_file, new_data, id_variable, output_file = NULL
             scoring_data[[var]][is.na(scoring_data[[var]])] <- mean_val
             cat(sprintf("    %s: mean = %.3f\n", var, mean_val))
           } else {
-            warning(sprintf("No saved mean for variable '%s', using current batch mean", var),
-                   call. = FALSE)
+            # TRS INFO: Fallback to batch mean for this variable
+            message(sprintf("[TRS INFO] No saved mean for variable '%s' - using current batch mean", var))
             mean_val <- mean(scoring_data[[var]], na.rm = TRUE)
             scoring_data[[var]][is.na(scoring_data[[var]])] <- mean_val
           }
         }
       } else {
-        # Fallback to batch means (with warning)
-        warning("Model does not contain saved imputation parameters. Using current batch means.",
-               call. = FALSE)
+        # Fallback to batch means
+        # TRS INFO: Using batch means as fallback
+        message("[TRS INFO] Model does not contain saved imputation parameters - using current batch means")
         for (var in vars_with_missing) {
           mean_val <- mean(scoring_data[[var]], na.rm = TRUE)
           scoring_data[[var]][is.na(scoring_data[[var]])] <- mean_val
@@ -150,16 +150,16 @@ score_new_data <- function(model_file, new_data, id_variable, output_file = NULL
             scoring_data[[var]][is.na(scoring_data[[var]])] <- median_val
             cat(sprintf("    %s: median = %.3f\n", var, median_val))
           } else {
-            warning(sprintf("No saved median for variable '%s', using current batch median", var),
-                   call. = FALSE)
+            # TRS INFO: Fallback to batch median for this variable
+            message(sprintf("[TRS INFO] No saved median for variable '%s' - using current batch median", var))
             median_val <- median(scoring_data[[var]], na.rm = TRUE)
             scoring_data[[var]][is.na(scoring_data[[var]])] <- median_val
           }
         }
       } else {
-        # Fallback to batch medians (with warning)
-        warning("Model does not contain saved imputation parameters. Using current batch medians.",
-               call. = FALSE)
+        # Fallback to batch medians
+        # TRS INFO: Using batch medians as fallback
+        message("[TRS INFO] Model does not contain saved imputation parameters - using current batch medians")
         for (var in vars_with_missing) {
           median_val <- median(scoring_data[[var]], na.rm = TRUE)
           scoring_data[[var]][is.na(scoring_data[[var]])] <- median_val
@@ -274,7 +274,8 @@ score_new_data <- function(model_file, new_data, id_variable, output_file = NULL
       # CSV export
       write.csv(results, output_file, row.names = FALSE)
     } else {
-      warning("Unsupported output format. Use .xlsx or .csv", call. = FALSE)
+      # TRS INFO: Unsupported format, skip export
+      message("[TRS INFO] Unsupported output format - use .xlsx or .csv. Export skipped.")
     }
 
     cat("✓ Results exported\n")
@@ -318,7 +319,8 @@ compare_segment_distributions <- function(model_file, scoring_result) {
   model_data <- readRDS(model_file)
 
   if (is.null(model_data$original_distribution)) {
-    warning("Original segment distribution not saved in model file", call. = FALSE)
+    # TRS INFO: Comparison not possible without original distribution
+    message("[TRS INFO] Original segment distribution not saved in model file - comparison not available")
     return(NULL)
   }
 

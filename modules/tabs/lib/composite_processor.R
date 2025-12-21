@@ -106,12 +106,22 @@ load_composite_definitions <- function(survey_structure_file) {
     # Remove rows with blank CompositeCode
     blank_codes <- is.na(composite_defs$CompositeCode) | composite_defs$CompositeCode == ""
     if (any(blank_codes)) {
-      warning(sprintf("Skipping %d row(s) with blank CompositeCode", sum(blank_codes)))
+      message(sprintf("[TRS INFO] Removing %d row(s) with blank CompositeCode", sum(blank_codes)))
       composite_defs <- composite_defs[!blank_codes, ]
     }
 
+    # TRS v1.0: If sheet exists but becomes empty after cleaning, refuse
     if (nrow(composite_defs) == 0) {
-      return(NULL)
+      tabs_refuse(
+        code = "CFG_COMPOSITE_SHEET_EMPTY_AFTER_CLEANING",
+        title = "Composite Sheet Empty After Cleaning",
+        problem = "The Composite_Metrics sheet exists but all rows have blank CompositeCode.",
+        why_it_matters = "If the Composite_Metrics sheet is present, Turas expects at least one valid composite definition. An empty sheet after cleaning indicates incomplete configuration.",
+        how_to_fix = c(
+          "Add valid composite definitions with non-blank CompositeCode values, or",
+          "Delete the Composite_Metrics sheet entirely if you don't need composites"
+        )
+      )
     }
 
     return(composite_defs)

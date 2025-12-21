@@ -313,10 +313,9 @@ get_weight_variable <- function(config_file_path) {
     return(NULL)
   }, error = function(e) {
     # If can't read config, assume unweighted
-    warning(sprintf(
-      "Could not read weight variable from config: %s\nAssuming unweighted data",
-      e$message
-    ), call. = FALSE)
+    # TRS INFO: Unable to read weight configuration
+    message(sprintf("[TRS INFO] Could not read weight variable from config: %s - assuming unweighted data",
+                   e$message))
     return(NULL)
   })
 

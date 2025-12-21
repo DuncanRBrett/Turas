@@ -46,21 +46,25 @@ format_variable_label <- function(variable, question_labels = NULL) {
 #' DESIGN: Two-column format (variable | label)
 #' EXAMPLE: q1 | Overall satisfaction with service
 #'
+#' TRS v1.0: Question labels are optional. If labels cannot be loaded,
+#' the module continues with variable codes only. All skip conditions
+#' log TRS INFO messages for visibility.
+#'
 #' @param labels_file Character, path to Excel labels file
 #' @return Named vector of labels (names = variable codes, values = labels)
 #' @export
 load_question_labels <- function(labels_file) {
   # Validate file exists
   if (!file.exists(labels_file)) {
-    warning(sprintf("Question labels file not found: %s\nContinuing without labels.",
-                   labels_file), call. = FALSE)
+    message(sprintf("[TRS INFO] Question labels file not found: %s - continuing without labels",
+                   labels_file))
     return(NULL)
   }
 
   # Validate extension
   if (!grepl("\\.(xlsx|xls)$", labels_file, ignore.case = TRUE)) {
-    warning(sprintf("Question labels file must be Excel format (.xlsx or .xls): %s\nContinuing without labels.",
-                   labels_file), call. = FALSE)
+    message(sprintf("[TRS INFO] Question labels file must be Excel format (.xlsx or .xls): %s - continuing without labels",
+                   labels_file))
     return(NULL)
   }
 
@@ -80,14 +84,13 @@ load_question_labels <- function(labels_file) {
     }
 
     if (is.null(labels_df)) {
-      warning("Could not read question labels file. Continuing without labels.", call. = FALSE)
+      message("[TRS INFO] Could not read question labels file - continuing without labels")
       return(NULL)
     }
 
     # Validate structure (must have at least 2 columns)
     if (ncol(labels_df) < 2) {
-      warning("Question labels file must have at least 2 columns (variable, label). Continuing without labels.",
-             call. = FALSE)
+      message("[TRS INFO] Question labels file must have at least 2 columns (variable, label) - continuing without labels")
       return(NULL)
     }
 
@@ -99,7 +102,7 @@ load_question_labels <- function(labels_file) {
     labels_df <- labels_df[!is.na(labels_df$variable) & !is.na(labels_df$label), ]
 
     if (nrow(labels_df) == 0) {
-      warning("Question labels file is empty. Continuing without labels.", call. = FALSE)
+      message("[TRS INFO] Question labels file is empty - continuing without labels")
       return(NULL)
     }
 
@@ -112,8 +115,8 @@ load_question_labels <- function(labels_file) {
     return(labels_vec)
 
   }, error = function(e) {
-    warning(sprintf("Error loading question labels: %s\nContinuing without labels.",
-                   e$message), call. = FALSE)
+    message(sprintf("[TRS INFO] Error loading question labels: %s - continuing without labels",
+                   e$message))
     return(NULL)
   })
 }

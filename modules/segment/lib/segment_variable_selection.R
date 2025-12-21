@@ -147,7 +147,8 @@ perform_factor_analysis <- function(data, candidate_vars, n_factors = NULL,
 
   # Check if psych package is available
   if (!requireNamespace("psych", quietly = TRUE)) {
-    warning("psych package not installed. Skipping factor analysis method.")
+    # TRS INFO: Optional package not available
+    message("[TRS INFO] psych package not installed - skipping factor analysis method")
     return(NULL)
   }
 
@@ -158,7 +159,8 @@ perform_factor_analysis <- function(data, candidate_vars, n_factors = NULL,
   fa_data_complete <- fa_data[complete.cases(fa_data), ]
 
   if (nrow(fa_data_complete) < 50) {
-    warning("Insufficient complete cases for factor analysis (< 50). Skipping.")
+    # TRS INFO: Insufficient data for factor analysis
+    message("[TRS INFO] Insufficient complete cases for factor analysis (< 50) - skipping")
     return(NULL)
   }
 

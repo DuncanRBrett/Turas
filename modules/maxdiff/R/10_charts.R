@@ -80,11 +80,9 @@ generate_maxdiff_charts <- function(results, config, verbose = TRUE) {
 
   # Check ggplot2
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    warning(
-      "Package 'ggplot2' is required for chart generation.\n",
-      "Install with: install.packages('ggplot2')",
-      call. = FALSE
-    )
+    # TRS INFO: Optional package not available for charts
+    message("[TRS INFO] Package 'ggplot2' not available - chart generation skipped")
+    message("[TRS INFO] Install with: install.packages('ggplot2')")
     return(NULL)
   }
 

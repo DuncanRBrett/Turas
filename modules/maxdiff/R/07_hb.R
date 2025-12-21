@@ -52,11 +52,9 @@ fit_hb_model <- function(long_data, items, config, verbose = TRUE) {
   has_cmdstanr <- requireNamespace("cmdstanr", quietly = TRUE)
 
   if (!has_cmdstanr) {
-    warning(
-      "cmdstanr package not available. Using approximate method instead.\n",
-      "For full HB estimation, install cmdstanr: https://mc-stan.org/cmdstanr/",
-      call. = FALSE
-    )
+    # TRS INFO: Optional package not available, using fallback
+    message("[TRS INFO] cmdstanr package not available - using approximate HB method instead")
+    message("[TRS INFO] For full HB estimation, install cmdstanr: https://mc-stan.org/cmdstanr/")
     return(fit_approximate_hb(long_data, items, config, verbose))
   }
 
