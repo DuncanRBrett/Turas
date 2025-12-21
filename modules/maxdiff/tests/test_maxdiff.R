@@ -257,9 +257,22 @@ run_maxdiff_tests <- function() {
 
 # Source module files first
 if (!exists("MAXDIFF_VERSION")) {
-  # Try to source module
-  script_dir <- dirname(sys.frame(1)$ofile)
-  if (is.null(script_dir)) script_dir <- "."
+  # Try to source module - use tryCatch for robustness
+  script_dir <- tryCatch({
+    dirname(sys.frame(1)$ofile)
+  }, error = function(e) {
+    # When run through testthat, sys.frame(1)$ofile may not exist
+    # Try to determine from current working directory
+    if (file.exists("modules/maxdiff/tests/test_maxdiff.R")) {
+      "modules/maxdiff/tests"
+    } else if (basename(getwd()) == "tests") {
+      getwd()
+    } else {
+      "."
+    }
+  })
+
+  if (is.null(script_dir) || script_dir == "") script_dir <- "."
 
   module_dir <- file.path(dirname(script_dir), "R")
   if (dir.exists(module_dir)) {

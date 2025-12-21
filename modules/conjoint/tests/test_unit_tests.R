@@ -16,8 +16,58 @@
 #
 # ==============================================================================
 
-# Setup
-setwd("/home/user/Turas")
+# Setup - Find Turas root dynamically
+script_dir <- tryCatch({
+  dirname(sys.frame(1)$ofile)
+}, error = function(e) {
+  # When run through Rscript, try to detect from working directory
+  cwd <- getwd()
+  # Check if we're in a module directory
+  if (basename(cwd) == "conjoint" && dir.exists("tests")) {
+    file.path(cwd, "tests")
+  } else {
+    cwd
+  }
+})
+
+# Navigate to Turas root from various starting points
+find_turas_root <- function(start_dir) {
+  # Try multiple strategies
+  candidates <- c(
+    # If we're in modules/conjoint/tests
+    if (basename(dirname(start_dir)) == "conjoint") {
+      dirname(dirname(dirname(start_dir)))
+    } else { NULL },
+    # If we're in modules/conjoint
+    if (basename(start_dir) == "conjoint" && basename(dirname(start_dir)) == "modules") {
+      dirname(dirname(start_dir))
+    } else { NULL },
+    # If we're already in tests directory
+    if (basename(start_dir) == "tests" && dir.exists(file.path(dirname(start_dir), "R"))) {
+      dirname(dirname(dirname(start_dir)))
+    } else { NULL },
+    # Current directory
+    start_dir
+  )
+
+  for (candidate in candidates) {
+    if (!is.null(candidate) && dir.exists(file.path(candidate, "modules", "conjoint"))) {
+      return(candidate)
+    }
+  }
+
+  return(NULL)
+}
+
+turas_root <- find_turas_root(script_dir)
+
+# Verify we found Turas root
+if (is.null(turas_root) || !dir.exists(file.path(turas_root, "modules", "conjoint"))) {
+  stop("Cannot find Turas root directory. Current dir: ", getwd(),
+       ", Script dir: ", script_dir)
+}
+
+setwd(turas_root)
 
 suppressPackageStartupMessages({
   library(mlogit)

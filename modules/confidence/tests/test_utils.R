@@ -154,7 +154,7 @@ test_validate_proportion <- function() {
   # Test 5: Error on NA
   error_caught <- FALSE
   tryCatch(
-    validate_proportion(NA),
+    validate_proportion(NA_real_),  # Use NA_real_ to ensure it's numeric NA
     error = function(e) {
       error_caught <<- TRUE
       stopifnot(grepl("NA values", e$message))

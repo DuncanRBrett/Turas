@@ -29,6 +29,19 @@ if (basename(script_dir) == "tests") {
 }
 setwd(module_root)
 
+# Source shared utilities first (required for TRS refusal functions)
+# modules/catdriver -> modules -> Turas -> modules/shared/lib
+turas_root <- dirname(dirname(module_root))
+shared_lib_path <- file.path(turas_root, "modules", "shared", "lib")
+if (dir.exists(shared_lib_path)) {
+  shared_files <- list.files(shared_lib_path, pattern = "\\.R$", full.names = TRUE)
+  for (f in shared_files) {
+    tryCatch(source(f), error = function(e) {
+      cat("Warning: Could not source shared", basename(f), ":", e$message, "\n")
+    })
+  }
+}
+
 # Source all R files in order
 r_files <- list.files("R", pattern = "\\.R$", full.names = TRUE)
 r_files <- r_files[order(basename(r_files))]
@@ -735,28 +748,28 @@ test_that("T2: ordinal OR matches coefficient sign convention", {
   raw_model <- ordinal::clm(satisfaction ~ grade, data = data)
   raw_beta_A <- raw_model$beta["gradeA"]
 
-  # EMPIRICAL: clm gives NEGATIVE β when higher categories are more likely
-  # A has higher satisfaction (70% High vs 10% for D), so β_A should be NEGATIVE
-  # This is opposite to naive reading of the formula but verified empirically
-  expect_true(raw_beta_A < 0,
+  # VERIFIED BEHAVIOR: clm gives POSITIVE β when higher categories are more likely
+  # A has higher satisfaction (70% High vs 10% for D), so β_A should be POSITIVE
+  # This is the STANDARD interpretation (same as logistic regression)
+  expect_true(raw_beta_A > 0,
               info = paste0(
-                "clm gives negative β for A (higher satisfaction) - this is the ",
-                "empirical sign convention. Got β_A=", round(raw_beta_A, 3)
+                "clm gives POSITIVE β for A (higher satisfaction) - this is the ",
+                "standard sign convention. Got β_A=", round(raw_beta_A, 3)
               ))
 
-  # Now verify our extraction gives OR = exp(-β)
+  # Now verify our extraction gives OR = exp(β) [NO NEGATION]
   config <- list(outcome_var = "satisfaction", confidence_level = 0.95)
   guard <- guard_init()
   result <- run_ordinal_logistic_robust(satisfaction ~ grade, data, NULL, config, guard)
 
   gradeA_row <- result$coefficients[grepl("gradeA", result$coefficients$term), ]
 
-  # OR should be exp(-β), so OR = exp(-raw_beta_A)
-  # With β_A < 0, this gives OR > 1 (intuitive for higher satisfaction)
-  expected_or <- exp(-raw_beta_A)
+  # OR should be exp(β), so OR = exp(raw_beta_A)
+  # With β_A > 0, this gives OR > 1 (intuitive for higher satisfaction)
+  expected_or <- unname(exp(raw_beta_A))  # Remove names attribute
   expect_equal(gradeA_row$odds_ratio, expected_or, tolerance = 0.001,
                info = paste0(
-                 "OR should equal exp(-β). ",
+                 "OR should equal exp(β). ",
                  "Expected: ", round(expected_or, 3),
                  ", Got: ", round(gradeA_row$odds_ratio, 3)
                ))

@@ -64,6 +64,27 @@ if (length(missing_optional) > 0) {
 }
 cat("\n")
 
+# Source shared utilities first (required for TRS refusal functions)
+cat("Loading shared utilities...\n")
+# modules/catdriver -> modules -> Turas -> modules/shared/lib
+turas_root <- dirname(dirname(module_root))
+shared_lib_path <- file.path(turas_root, "modules", "shared", "lib")
+if (dir.exists(shared_lib_path)) {
+  shared_files <- list.files(shared_lib_path, pattern = "\\.R$", full.names = TRUE)
+  for (f in shared_files) {
+    tryCatch({
+      source(f)
+      if (verbose) cat("  Loaded:", basename(f), "\n")
+    }, error = function(e) {
+      cat("  WARNING loading", basename(f), ":", e$message, "\n")
+    })
+  }
+  cat("  Shared utilities loaded\n")
+} else {
+  cat("  WARNING: Shared utilities not found at", shared_lib_path, "\n")
+}
+cat("\n")
+
 # Source module files
 cat("Loading module...\n")
 setwd(module_root)

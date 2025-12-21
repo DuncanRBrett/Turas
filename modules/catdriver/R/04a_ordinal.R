@@ -165,26 +165,30 @@ extract_clm_results <- function(model, config, guard) {
   # ODDS RATIO COMPUTATION - Proportional Odds Model Interpretation
   # ===========================================================================
   #
-  # The cumulative link model (ordinal::clm) uses:
-  #   logit(P(Y ≤ j)) = θ_j - X'β
+  # VERIFIED BEHAVIOR (via empirical testing):
+  #   Both ordinal::clm and MASS::polr use the parameterization:
+  #     logit(P(Y ≤ j)) = θ_j - X'β
   #
-  # EMPIRICAL OBSERVATION: clm returns β with sign such that:
-  #   - When higher Y categories are more likely, β is NEGATIVE
-  #   - This is opposite to naive reading of the formula
+  #   Despite the minus sign in the formula, both implementations return β with:
+  #     β > 0 when predictor → HIGHER outcome categories
+  #     β < 0 when predictor → LOWER outcome categories
   #
-  # Therefore, to get intuitive OR (OR > 1 = higher categories more likely):
-  #   OR = exp(-β)
+  #   This is the STANDARD interpretation (same as for linear/logistic regression).
   #
-  # This was verified empirically: grade A students (higher satisfaction)
-  # get β < 0, so exp(-β) > 1 correctly indicates higher satisfaction.
+  #   Therefore, for intuitive OR (OR > 1 = higher categories more likely):
+  #     OR = exp(β)   [NO NEGATION NEEDED]
+  #
+  #   Verified: Treatment group with mean satisfaction 3.87 vs Control 2.22
+  #   gives β = +2.44 (POSITIVE), and exp(β) = 11.5 correctly indicates
+  #   Treatment → higher satisfaction.
   # ===========================================================================
   conf_level <- config$confidence_level
   z_crit <- qnorm(1 - (1 - conf_level) / 2)
 
-  # OR for higher categories = exp(-β) due to clm sign convention
-  coef_df$odds_ratio <- exp(-coef_df$estimate)
-  coef_df$or_lower <- exp(-coef_df$estimate - z_crit * coef_df$std_error)
-  coef_df$or_upper <- exp(-coef_df$estimate + z_crit * coef_df$std_error)
+  # OR for higher categories = exp(β) [standard interpretation]
+  coef_df$odds_ratio <- exp(coef_df$estimate)
+  coef_df$or_lower <- exp(coef_df$estimate - z_crit * coef_df$std_error)
+  coef_df$or_upper <- exp(coef_df$estimate + z_crit * coef_df$std_error)
 
   # Thresholds
   thresh_se <- se_vals[names(se_vals) %in% threshold_names]
@@ -278,15 +282,16 @@ extract_polr_results <- function(model, config, guard) {
   )
   rownames(coef_df) <- NULL
 
-  # Odds ratios - same sign convention as clm (see detailed note in extract_clm_results)
-  # MASS::polr uses the same parameterization: logit(P(Y ≤ j)) = ζ_j - X'β
-  # We report OR = exp(-β) due to empirical sign convention
+  # Odds ratios - same STANDARD interpretation as clm (see detailed note above)
+  # MASS::polr uses parameterization: logit(P(Y ≤ j)) = ζ_j - X'β
+  # Despite the minus sign, polr returns β > 0 for predictors → higher outcomes
+  # Therefore: OR = exp(β) [NO NEGATION]
   conf_level <- config$confidence_level
   z_crit <- qnorm(1 - (1 - conf_level) / 2)
 
-  coef_df$odds_ratio <- exp(-coef_df$estimate)
-  coef_df$or_lower <- exp(-coef_df$estimate - z_crit * coef_df$std_error)
-  coef_df$or_upper <- exp(-coef_df$estimate + z_crit * coef_df$std_error)
+  coef_df$odds_ratio <- exp(coef_df$estimate)
+  coef_df$or_lower <- exp(coef_df$estimate - z_crit * coef_df$std_error)
+  coef_df$or_upper <- exp(coef_df$estimate + z_crit * coef_df$std_error)
 
   thresh_df <- data.frame(
     threshold = names(model$zeta),
