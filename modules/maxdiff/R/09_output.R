@@ -137,12 +137,19 @@ generate_maxdiff_output <- function(results, config, verbose = TRUE, run_result 
   }
 
   # ============================================================================
-  # SAVE WORKBOOK
+  # SAVE WORKBOOK (TRS v1.0: Use atomic save if available)
   # ============================================================================
 
   if (verbose) log_message("Saving workbook...", "INFO", verbose)
 
-  openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+  if (exists("turas_save_workbook_atomic", mode = "function")) {
+    save_result <- turas_save_workbook_atomic(wb, output_path, run_result = run_result, module = "MAXD")
+    if (!save_result$success) {
+      stop(sprintf("Failed to save Excel file: %s\nPath: %s", save_result$error, output_path), call. = FALSE)
+    }
+  } else {
+    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+  }
 
   if (verbose) {
     log_message(sprintf("Output saved: %s", output_path), "INFO", verbose)
@@ -693,8 +700,15 @@ generate_design_output <- function(design_result, config, verbose = TRUE) {
                      startRow = nrow(design_summary$summary) + 4, startCol = 1,
                      colNames = TRUE, headerStyle = styles$subheader)
 
-  # Save
-  openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+  # Save (TRS v1.0: Use atomic save if available)
+  if (exists("turas_save_workbook_atomic", mode = "function")) {
+    save_result <- turas_save_workbook_atomic(wb, output_path, module = "MAXD")
+    if (!save_result$success) {
+      stop(sprintf("Failed to save design file: %s", save_result$error), call. = FALSE)
+    }
+  } else {
+    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+  }
 
   if (verbose) {
     log_message(sprintf("Design saved: %s", output_path), "INFO", verbose)

@@ -1535,24 +1535,45 @@ if (!dir.exists(output_dir)) {
   log_message("✓ Created output directory", "INFO")
 }
 
-tryCatch({
-  openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
-  log_message(sprintf("✓ Saved: %s", output_path), "INFO")
-}, error = function(e) {
-  # TRS Refusal: IO_EXCEL_SAVE_FAILED
-  tabs_refuse(
-    code = "IO_EXCEL_SAVE_FAILED",
-    title = "Failed to Save Excel File",
-    problem = "Could not save the Excel workbook to disk.",
-    why_it_matters = "The analysis results cannot be delivered without saving the file.",
-    how_to_fix = c(
-      "Check that the output directory is writable",
-      "Ensure the file is not open in another application",
-      "Verify there is sufficient disk space"
-    ),
-    details = paste0("Output path: ", output_path, "\nError: ", conditionMessage(e))
-  )
-})
+# TRS v1.0: Use atomic save if available
+if (exists("turas_save_workbook_atomic", mode = "function")) {
+  save_result <- turas_save_workbook_atomic(wb, output_path, run_result = run_result, module = "TABS")
+  if (!save_result$success) {
+    tabs_refuse(
+      code = "IO_EXCEL_SAVE_FAILED",
+      title = "Failed to Save Excel File",
+      problem = "Could not save the Excel workbook to disk.",
+      why_it_matters = "The analysis results cannot be delivered without saving the file.",
+      how_to_fix = c(
+        "Check that the output directory is writable",
+        "Ensure the file is not open in another application",
+        "Verify there is sufficient disk space"
+      ),
+      details = paste0("Output path: ", output_path, "\nError: ", save_result$error)
+    )
+  } else {
+    log_message(sprintf("\u2713 Saved: %s", output_path), "INFO")
+  }
+} else {
+  tryCatch({
+    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+    log_message(sprintf("\u2713 Saved: %s", output_path), "INFO")
+  }, error = function(e) {
+    # TRS Refusal: IO_EXCEL_SAVE_FAILED
+    tabs_refuse(
+      code = "IO_EXCEL_SAVE_FAILED",
+      title = "Failed to Save Excel File",
+      problem = "Could not save the Excel workbook to disk.",
+      why_it_matters = "The analysis results cannot be delivered without saving the file.",
+      how_to_fix = c(
+        "Check that the output directory is writable",
+        "Ensure the file is not open in another application",
+        "Verify there is sufficient disk space"
+      ),
+      details = paste0("Output path: ", output_path, "\nError: ", conditionMessage(e))
+    )
+  })
+}
 
 # ==============================================================================
 # COMPLETION SUMMARY

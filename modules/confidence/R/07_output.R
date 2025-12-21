@@ -162,17 +162,30 @@ write_confidence_output <- function(output_path,
     })
   }
 
-  # Save workbook
-  tryCatch({
-    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+  # Save workbook (TRS v1.0: Use atomic save if available)
+  if (exists("turas_save_workbook_atomic", mode = "function")) {
+    save_result <- turas_save_workbook_atomic(wb, output_path, run_result = run_result, module = "CONF")
+    if (!save_result$success) {
+      stop(sprintf(
+        "Failed to save Excel file\nPath: %s\nError: %s\n\nTroubleshooting:\n  1. Check file is not open in Excel\n  2. Verify output directory exists\n  3. Check write permissions",
+        output_path,
+        save_result$error
+      ), call. = FALSE)
+    }
     message(sprintf("\n[TRS INFO] Output written to: %s", output_path))
-  }, error = function(e) {
-    stop(sprintf(
-      "Failed to save Excel file\nPath: %s\nError: %s\n\nTroubleshooting:\n  1. Check file is not open in Excel\n  2. Verify output directory exists\n  3. Check write permissions",
-      output_path,
-      conditionMessage(e)
-    ), call. = FALSE)
-  })
+  } else {
+    # Fallback to direct save
+    tryCatch({
+      openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+      message(sprintf("\n[TRS INFO] Output written to: %s", output_path))
+    }, error = function(e) {
+      stop(sprintf(
+        "Failed to save Excel file\nPath: %s\nError: %s\n\nTroubleshooting:\n  1. Check file is not open in Excel\n  2. Verify output directory exists\n  3. Check write permissions",
+        output_path,
+        conditionMessage(e)
+      ), call. = FALSE)
+    })
+  }
 
   invisible(TRUE)
 }

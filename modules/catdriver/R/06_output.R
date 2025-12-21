@@ -57,8 +57,15 @@ write_catdriver_output <- function(results, config, output_file) {
     add_diagnostics_sheet(wb, results, config, styles)
   }
 
-  # Save workbook
-  openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+  # Save workbook (TRS v1.0: Use atomic save if available)
+  if (exists("turas_save_workbook_atomic", mode = "function")) {
+    save_result <- turas_save_workbook_atomic(wb, output_file, module = "CATD")
+    if (!save_result$success) {
+      stop(sprintf("Failed to save Excel file: %s\nPath: %s", save_result$error, output_file), call. = FALSE)
+    }
+  } else {
+    openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+  }
 
   invisible(output_file)
 }

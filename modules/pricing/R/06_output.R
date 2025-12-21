@@ -771,9 +771,16 @@ write_pricing_output <- function(results, plots, validation, config, output_file
   }
 
   # --------------------------------------------------------------------------
-  # Save Workbook
+  # Save Workbook (TRS v1.0: Use atomic save if available)
   # --------------------------------------------------------------------------
-  openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+  if (exists("turas_save_workbook_atomic", mode = "function")) {
+    save_result <- turas_save_workbook_atomic(wb, output_file, run_result = run_result, module = "PRICE")
+    if (!save_result$success) {
+      stop(sprintf("Failed to save Excel file: %s\nPath: %s", save_result$error, output_file), call. = FALSE)
+    }
+  } else {
+    openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+  }
 
   # Save plots to same directory
   if (length(plots) > 0) {

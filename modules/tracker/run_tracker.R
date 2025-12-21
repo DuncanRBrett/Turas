@@ -320,6 +320,13 @@ run_tracker <- function(tracking_config_path,
   cat("\n[8/8] GENERATING OUTPUT\n")
   cat("================================================================================\n")
 
+  # TRS v1.0: Extract run_result BEFORE output generation so Run_Status sheets have complete data
+  run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+    turas_run_state_result(trs_state)
+  } else {
+    NULL
+  }
+
   # Check report_types setting to determine which outputs to generate
   report_types_setting <- get_setting(config, "report_types", default = "detailed")
 
@@ -368,7 +375,7 @@ run_tracker <- function(tracking_config_path,
       wave_data = wave_data,
       output_path = detailed_path,
       banner_segments = banner_segments,
-      run_result = trs_state
+      run_result = run_result
     )
   }
 
@@ -395,7 +402,7 @@ run_tracker <- function(tracking_config_path,
       wave_data = wave_data,
       output_path = wave_history_path,
       banner_segments = banner_segments,
-      run_result = trs_state
+      run_result = run_result
     )
   }
 
@@ -422,7 +429,7 @@ run_tracker <- function(tracking_config_path,
       wave_data = wave_data,
       output_path = dashboard_path,
       include_sig_matrices = TRUE,  # Dashboard includes sig matrices by default
-      run_result = trs_state
+      run_result = run_result
     )
   }
 
@@ -448,7 +455,7 @@ run_tracker <- function(tracking_config_path,
       config = config,
       wave_data = wave_data,
       output_path = sig_matrix_path,
-      run_result = trs_state
+      run_result = run_result
     )
   }
 
@@ -460,13 +467,8 @@ run_tracker <- function(tracking_config_path,
   elapsed <- as.numeric(difftime(end_time, start_time, units = "secs"))
 
   # ===========================================================================
-  # TRS v1.0: Retrieve Run Result and Display Final Banner
+  # TRS v1.0: Display Final Banner (run_result already extracted before output)
   # ===========================================================================
-  run_result <- if (!is.null(trs_state) && exists("turas_run_state_get_result", mode = "function")) {
-    turas_run_state_get_result(trs_state)
-  } else {
-    NULL
-  }
 
   # TRS v1.0: Final Banner
   if (exists("turas_banner_final", mode = "function") && !is.null(run_result)) {
