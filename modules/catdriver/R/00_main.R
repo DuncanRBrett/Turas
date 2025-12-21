@@ -153,13 +153,24 @@ run_categorical_keydriver_impl <- function(config_file,
                                            outcome_type = NULL) {
 
   # ==========================================================================
-  # INITIALIZATION
+  # TRS RUN STATE INITIALIZATION (TRS v1.0)
   # ==========================================================================
+
+  # Create TRS run state for tracking events
+  trs_state <- if (exists("turas_run_state_new", mode = "function")) {
+    turas_run_state_new("CATDRIVER")
+  } else {
+    NULL
+  }
 
   start_time <- Sys.time()
 
-  # TRS v1.0: Start banner
-  trs_banner_start("CATEGORICAL KEY DRIVER ANALYSIS", "1.1")
+  # TRS v1.0: Start banner - use shared if available, fallback to local
+  if (exists("turas_print_start_banner", mode = "function")) {
+    turas_print_start_banner("CATDRIVER", CATDRIVER_VERSION)
+  } else {
+    trs_banner_start("CATEGORICAL KEY DRIVER ANALYSIS", "1.1")
+  }
 
   # Initialize guard state for tracking warnings and issues
   guard <- guard_init()
@@ -588,8 +599,38 @@ run_categorical_keydriver_impl <- function(config_file,
   end_time <- Sys.time()
   elapsed <- round(as.numeric(difftime(end_time, start_time, units = "secs")), 1)
 
-  # TRS v1.0: End banner with status
-  trs_banner_end("CATEGORICAL KEY DRIVER ANALYSIS", status, elapsed)
+  # ==========================================================================
+  # TRS: Log PARTIAL events for any degraded outputs
+  # ==========================================================================
+  if (!is.null(trs_state) && length(degraded_reasons) > 0) {
+    for (reason in degraded_reasons) {
+      if (exists("turas_run_state_partial", mode = "function")) {
+        turas_run_state_partial(
+          trs_state,
+          "CATD_DEGRADED",
+          "Degraded output",
+          problem = reason
+        )
+      }
+    }
+  }
+
+  # ==========================================================================
+  # TRS: Get run result
+  # ==========================================================================
+  run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+    turas_run_state_result(trs_state)
+  } else {
+    NULL
+  }
+  results$run_result <- run_result
+
+  # TRS v1.0: End banner - use shared if available, fallback to local
+  if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
+    turas_print_final_banner(run_result)
+  } else {
+    trs_banner_end("CATEGORICAL KEY DRIVER ANALYSIS", status, elapsed)
+  }
 
   cat(sprintf("   Output: %s\n", config$output_file))
 
