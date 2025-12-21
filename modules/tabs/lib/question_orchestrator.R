@@ -224,6 +224,9 @@ process_single_question <- function(question_code, prepared_data,
   banner_bases <- prepared_data$banner_bases
   base_filter <- prepared_data$base_filter
 
+  # TRS v1.0: Track partial section failures (for PARTIAL status disclosure)
+  partial_sections <- list()
+
   # ===========================================================================
   # ROUTE BY QUESTION TYPE
   # ===========================================================================
@@ -352,6 +355,14 @@ process_single_question <- function(question_code, prepared_data,
                                banner_bases, config,
                                is_weighted = is_weighted)
     }, error = function(e) {
+      # TRS v1.0: Record partial section failure instead of silent NULL
+      partial_sections[[length(partial_sections) + 1]] <<- list(
+        section = "BoxCategory Summaries",
+        stage = "add_boxcategory_summaries",
+        error = conditionMessage(e)
+      )
+      message(sprintf("[TRS PARTIAL] %s: BoxCategory summaries failed - %s",
+                      question_code, conditionMessage(e)))
       return(NULL)
     })
 
@@ -405,6 +416,14 @@ process_single_question <- function(question_code, prepared_data,
                            banner_bases, question_row, config,
                            is_weighted = is_weighted)
     }, error = function(e) {
+      # TRS v1.0: Record partial section failure instead of silent NULL
+      partial_sections[[length(partial_sections) + 1]] <<- list(
+        section = "Summary Statistics",
+        stage = "add_summary_statistic",
+        error = conditionMessage(e)
+      )
+      message(sprintf("[TRS PARTIAL] %s: Summary statistics failed - %s",
+                      question_code, conditionMessage(e)))
       return(NULL)
     })
 
@@ -434,7 +453,8 @@ process_single_question <- function(question_code, prepared_data,
     question_type = question_info$Variable_Type,
     base_filter = base_filter,
     bases = banner_bases,
-    table = question_table
+    table = question_table,
+    partial_sections = partial_sections  # TRS v1.0: Track section-level failures
   ))
 }
 
@@ -480,6 +500,7 @@ process_all_questions <- function(questions_to_process, survey_data,
   all_results <- list()
   processed_questions <- processed_so_far
   skipped_questions <- list()  # TRS v1.0: Track skipped questions for PARTIAL status
+  partial_questions <- list()  # TRS v1.0: Track questions with missing sections
   processing_start <- Sys.time()
   checkpoint_counter <- 0
 
@@ -546,6 +567,14 @@ process_all_questions <- function(questions_to_process, survey_data,
     all_results[[current_question_code]] <- question_result
     processed_questions <- c(processed_questions, current_question_code)
 
+    # TRS v1.0: Track questions with partial section failures
+    if (length(question_result$partial_sections) > 0) {
+      partial_questions[[current_question_code]] <- list(
+        question_code = current_question_code,
+        sections = question_result$partial_sections
+      )
+    }
+
     # Checkpointing
     checkpoint_counter <- checkpoint_counter + 1
     if (checkpoint_config$enabled &&
@@ -555,18 +584,27 @@ process_all_questions <- function(questions_to_process, survey_data,
     }
   }
 
-  # TRS v1.0: Determine run status based on skipped questions
-  run_status <- if (length(skipped_questions) > 0) "PARTIAL" else "PASS"
+  # TRS v1.0: Determine run status based on skipped questions AND partial sections
+  has_skipped <- length(skipped_questions) > 0
+  has_partial <- length(partial_questions) > 0
+  run_status <- if (has_skipped || has_partial) "PARTIAL" else "PASS"
 
   if (run_status == "PARTIAL") {
-    message(sprintf("[TRS] Run completed with PARTIAL status: %d questions skipped",
-                    length(skipped_questions)))
+    if (has_skipped) {
+      message(sprintf("[TRS] Run completed with PARTIAL status: %d questions skipped",
+                      length(skipped_questions)))
+    }
+    if (has_partial) {
+      message(sprintf("[TRS] Run completed with PARTIAL status: %d questions have missing sections",
+                      length(partial_questions)))
+    }
   }
 
   return(list(
     all_results = all_results,
     processed_questions = processed_questions,
     skipped_questions = skipped_questions,
+    partial_questions = partial_questions,  # TRS v1.0: Questions with missing sections
     run_status = run_status
   ))
 }

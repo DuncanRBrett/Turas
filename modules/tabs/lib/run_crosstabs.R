@@ -1013,6 +1013,7 @@ all_results <- orchestration_result$all_results
 processed_questions <- orchestration_result$processed_questions
 run_status <- orchestration_result$run_status
 skipped_questions <- orchestration_result$skipped_questions
+partial_questions <- orchestration_result$partial_questions  # TRS v1.0: Questions with missing sections
 
 cat("\n")
 
@@ -1022,13 +1023,31 @@ if (run_status == "PARTIAL") {
   cat(paste(rep("!", 80), collapse=""), "\n")
   cat("[TRS PARTIAL] ANALYSIS COMPLETED WITH PARTIAL RESULTS\n")
   cat(paste(rep("!", 80), collapse=""), "\n")
-  cat(sprintf("  %d questions were skipped during processing.\n", length(skipped_questions)))
-  cat("  The following questions are MISSING from your output:\n\n")
-  for (skip_code in names(skipped_questions)) {
-    skip_info <- skipped_questions[[skip_code]]
-    cat(sprintf("    - %s: %s (stage: %s)\n",
-                skip_code, skip_info$reason, skip_info$stage))
+
+  # Report skipped questions
+  if (length(skipped_questions) > 0) {
+    cat(sprintf("\n  SKIPPED QUESTIONS: %d\n", length(skipped_questions)))
+    cat("  The following questions are MISSING from your output:\n\n")
+    for (skip_code in names(skipped_questions)) {
+      skip_info <- skipped_questions[[skip_code]]
+      cat(sprintf("    - %s: %s (stage: %s)\n",
+                  skip_code, skip_info$reason, skip_info$stage))
+    }
   }
+
+  # Report questions with missing sections
+  if (length(partial_questions) > 0) {
+    cat(sprintf("\n  QUESTIONS WITH MISSING SECTIONS: %d\n", length(partial_questions)))
+    cat("  The following questions have incomplete output:\n\n")
+    for (pq_code in names(partial_questions)) {
+      pq_info <- partial_questions[[pq_code]]
+      cat(sprintf("    - %s:\n", pq_code))
+      for (section in pq_info$sections) {
+        cat(sprintf("        * %s: %s\n", section$section, section$error))
+      }
+    }
+  }
+
   cat("\n")
   cat("  ACTION REQUIRED: Review and fix the issues above, then re-run.\n")
   cat("  A 'Run_Status' sheet will be included in your workbook.\n")
@@ -1312,38 +1331,73 @@ tryCatch({
                      startRow = status_row, startCol = 1)
   status_row <- status_row + 2
 
-  if (run_status == "PARTIAL" && length(skipped_questions) > 0) {
-    # Warning header
+  if (run_status == "PARTIAL") {
+    # Warning style for headers
     warning_style <- openxlsx::createStyle(
       fontColour = "#dc3545",
       textDecoration = "bold"
     )
-    openxlsx::writeData(wb, "Run_Status", "SKIPPED QUESTIONS (Action Required):",
-                       startRow = status_row, startCol = 1)
-    openxlsx::addStyle(wb, "Run_Status", warning_style, rows = status_row, cols = 1)
-    status_row <- status_row + 1
 
-    # Column headers for skipped questions table
-    openxlsx::writeData(wb, "Run_Status", "Question Code", startRow = status_row, startCol = 1)
-    openxlsx::writeData(wb, "Run_Status", "Reason", startRow = status_row, startCol = 2)
-    openxlsx::writeData(wb, "Run_Status", "Stage", startRow = status_row, startCol = 3)
-    openxlsx::addStyle(wb, "Run_Status", styles$base,
-                      rows = status_row, cols = 1:3, gridExpand = TRUE)
-    status_row <- status_row + 1
-
-    # List each skipped question
-    for (skip_code in names(skipped_questions)) {
-      skip_info <- skipped_questions[[skip_code]]
-      openxlsx::writeData(wb, "Run_Status", skip_code,
+    # Section 1: Skipped Questions (completely missing from output)
+    if (length(skipped_questions) > 0) {
+      openxlsx::writeData(wb, "Run_Status", "SKIPPED QUESTIONS (Missing from Output):",
                          startRow = status_row, startCol = 1)
-      openxlsx::writeData(wb, "Run_Status", skip_info$reason,
-                         startRow = status_row, startCol = 2)
-      openxlsx::writeData(wb, "Run_Status", skip_info$stage,
-                         startRow = status_row, startCol = 3)
+      openxlsx::addStyle(wb, "Run_Status", warning_style, rows = status_row, cols = 1)
+      status_row <- status_row + 1
+
+      # Column headers
+      openxlsx::writeData(wb, "Run_Status", "Question Code", startRow = status_row, startCol = 1)
+      openxlsx::writeData(wb, "Run_Status", "Reason", startRow = status_row, startCol = 2)
+      openxlsx::writeData(wb, "Run_Status", "Stage", startRow = status_row, startCol = 3)
+      openxlsx::addStyle(wb, "Run_Status", styles$base,
+                        rows = status_row, cols = 1:3, gridExpand = TRUE)
+      status_row <- status_row + 1
+
+      # List each skipped question
+      for (skip_code in names(skipped_questions)) {
+        skip_info <- skipped_questions[[skip_code]]
+        openxlsx::writeData(wb, "Run_Status", skip_code,
+                           startRow = status_row, startCol = 1)
+        openxlsx::writeData(wb, "Run_Status", skip_info$reason,
+                           startRow = status_row, startCol = 2)
+        openxlsx::writeData(wb, "Run_Status", skip_info$stage,
+                           startRow = status_row, startCol = 3)
+        status_row <- status_row + 1
+      }
       status_row <- status_row + 1
     }
 
-    status_row <- status_row + 1
+    # Section 2: Questions with Missing Sections (partial output)
+    if (length(partial_questions) > 0) {
+      openxlsx::writeData(wb, "Run_Status", "QUESTIONS WITH MISSING SECTIONS (Incomplete Output):",
+                         startRow = status_row, startCol = 1)
+      openxlsx::addStyle(wb, "Run_Status", warning_style, rows = status_row, cols = 1)
+      status_row <- status_row + 1
+
+      # Column headers
+      openxlsx::writeData(wb, "Run_Status", "Question Code", startRow = status_row, startCol = 1)
+      openxlsx::writeData(wb, "Run_Status", "Missing Section", startRow = status_row, startCol = 2)
+      openxlsx::writeData(wb, "Run_Status", "Error", startRow = status_row, startCol = 3)
+      openxlsx::addStyle(wb, "Run_Status", styles$base,
+                        rows = status_row, cols = 1:3, gridExpand = TRUE)
+      status_row <- status_row + 1
+
+      # List each question with missing sections
+      for (pq_code in names(partial_questions)) {
+        pq_info <- partial_questions[[pq_code]]
+        for (section in pq_info$sections) {
+          openxlsx::writeData(wb, "Run_Status", pq_code,
+                             startRow = status_row, startCol = 1)
+          openxlsx::writeData(wb, "Run_Status", section$section,
+                             startRow = status_row, startCol = 2)
+          openxlsx::writeData(wb, "Run_Status", section$error,
+                             startRow = status_row, startCol = 3)
+          status_row <- status_row + 1
+        }
+      }
+      status_row <- status_row + 1
+    }
+
     openxlsx::writeData(wb, "Run_Status",
                        "To resolve: Fix the issues listed above and re-run the analysis.",
                        startRow = status_row, startCol = 1)
@@ -1508,7 +1562,12 @@ cat(paste(rep("=", 80), collapse=""), "\n\n")
 # TRS v1.0: Display run status prominently
 if (run_status == "PARTIAL") {
   cat("⚠  TRS Status: PARTIAL (see Run_Status sheet for details)\n")
-  cat(sprintf("⚠  Questions skipped: %d\n", length(skipped_questions)))
+  if (length(skipped_questions) > 0) {
+    cat(sprintf("⚠  Questions skipped: %d\n", length(skipped_questions)))
+  }
+  if (length(partial_questions) > 0) {
+    cat(sprintf("⚠  Questions with missing sections: %d\n", length(partial_questions)))
+  }
 } else {
   cat("✓ TRS Status: PASS\n")
 }
