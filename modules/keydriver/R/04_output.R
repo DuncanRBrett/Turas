@@ -413,6 +413,13 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
                      colNames = FALSE)
   openxlsx::setColWidths(wb, "README", cols = 1, widths = 100)
 
-  # Save workbook
-  openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+  # Save workbook (TRS v1.0: Use atomic save if available)
+  if (exists("turas_save_workbook_atomic", mode = "function")) {
+    save_result <- turas_save_workbook_atomic(wb, output_file, module = "KDA")
+    if (!save_result$success) {
+      stop(sprintf("Failed to save Excel file: %s\nPath: %s", save_result$error, output_file), call. = FALSE)
+    }
+  } else {
+    openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+  }
 }

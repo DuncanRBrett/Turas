@@ -126,9 +126,16 @@ write_tracker_output <- function(trend_results, config, wave_data, output_path =
     turas_write_run_status_sheet(wb, run_result)
   }
 
-  # Save workbook
+  # Save workbook (TRS v1.0: Use atomic save if available)
   cat(paste0("\nSaving workbook...\n"))
-  openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+  if (exists("turas_save_workbook_atomic", mode = "function")) {
+    save_result <- turas_save_workbook_atomic(wb, output_path, run_result = run_result, module = "TRACKER")
+    if (!save_result$success) {
+      stop(sprintf("Failed to save Excel file: %s\nPath: %s", save_result$error, output_path), call. = FALSE)
+    }
+  } else {
+    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+  }
 
   cat(paste0("\u2713 Output written to: ", output_path, "\n"))
   cat("================================================================================\n\n")
@@ -1878,9 +1885,16 @@ write_wave_history_output <- function(trend_results, config, wave_data, output_p
     turas_write_run_status_sheet(wb, run_result)
   }
 
-  # Save workbook
+  # Save workbook (TRS v1.0: Use atomic save if available)
   cat(paste0("\nSaving workbook...\n"))
-  openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+  if (exists("turas_save_workbook_atomic", mode = "function")) {
+    save_result <- turas_save_workbook_atomic(wb, output_path, run_result = run_result, module = "TRACKER")
+    if (!save_result$success) {
+      stop(sprintf("Failed to save Excel file: %s\nPath: %s", save_result$error, output_path), call. = FALSE)
+    }
+  } else {
+    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+  }
 
   cat(paste0("\u2713 Wave History output written to: ", output_path, "\n"))
   cat("================================================================================\n\n")

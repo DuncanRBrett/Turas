@@ -92,17 +92,30 @@ write_conjoint_output <- function(utilities, importance, diagnostics, model_resu
     })
   }
 
-  # Save workbook
-  tryCatch({
-    openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
-  }, error = function(e) {
-    stop(create_error(
-      "OUTPUT",
-      sprintf("Failed to save Excel file: %s", conditionMessage(e)),
-      "Check that the file is not open in Excel and the directory is writable",
-      sprintf("Attempted path: %s", output_file)
-    ), call. = FALSE)
-  })
+  # Save workbook (TRS v1.0: Use atomic save if available)
+  if (exists("turas_save_workbook_atomic", mode = "function")) {
+    save_result <- turas_save_workbook_atomic(wb, output_file, run_result = run_result, module = "CONJ")
+    if (!save_result$success) {
+      stop(create_error(
+        "OUTPUT",
+        sprintf("Failed to save Excel file: %s", save_result$error),
+        "Check that the file is not open in Excel and the directory is writable",
+        sprintf("Attempted path: %s", output_file)
+      ), call. = FALSE)
+    }
+  } else {
+    # Fallback to direct save
+    tryCatch({
+      openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+    }, error = function(e) {
+      stop(create_error(
+        "OUTPUT",
+        sprintf("Failed to save Excel file: %s", conditionMessage(e)),
+        "Check that the file is not open in Excel and the directory is writable",
+        sprintf("Attempted path: %s", output_file)
+      ), call. = FALSE)
+    })
+  }
 }
 
 
