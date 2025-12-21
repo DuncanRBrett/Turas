@@ -29,6 +29,76 @@
 #
 # ==============================================================================
 
+CATDRIVER_VERSION <- "1.1"
+
+# ==============================================================================
+# TRS GUARD LAYER (Must be first)
+# ==============================================================================
+
+# Source TRS guard layer for refusal handling
+.get_script_dir_for_guard <- function() {
+  if (exists("script_dir_override", envir = globalenv())) {
+    return(get("script_dir_override", envir = globalenv()))
+  }
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) return(dirname(sub("^--file=", "", file_arg)))
+  return(getwd())
+}
+
+.guard_path <- file.path(.get_script_dir_for_guard(), "00_guard.R")
+if (!file.exists(.guard_path)) {
+  .guard_path <- file.path(.get_script_dir_for_guard(), "R", "00_guard.R")
+}
+if (!file.exists(.guard_path)) {
+  # Try modules path
+  .guard_path <- file.path(getwd(), "modules", "catdriver", "R", "00_guard.R")
+}
+if (file.exists(.guard_path)) {
+  source(.guard_path)
+}
+
+# ==============================================================================
+# TRS INFRASTRUCTURE (TRS v1.0)
+# ==============================================================================
+
+# Source TRS run state management
+.source_trs_infrastructure <- function() {
+  base_dir <- .get_script_dir_for_guard()
+
+  # Try multiple paths to find shared/lib
+  possible_paths <- c(
+    file.path(base_dir, "..", "..", "shared", "lib"),
+    file.path(base_dir, "..", "shared", "lib"),
+    file.path(getwd(), "modules", "shared", "lib"),
+    file.path(getwd(), "..", "shared", "lib")
+  )
+
+  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R")
+
+  for (shared_lib in possible_paths) {
+    if (dir.exists(shared_lib)) {
+      for (f in trs_files) {
+        fpath <- file.path(shared_lib, f)
+        if (file.exists(fpath)) {
+          source(fpath)
+        }
+      }
+      break
+    }
+  }
+}
+
+tryCatch({
+  .source_trs_infrastructure()
+}, error = function(e) {
+  message(sprintf("[TRS INFO] CATD_TRS_LOAD: Could not load TRS infrastructure: %s", e$message))
+})
+
+# ==============================================================================
+# MAIN ENTRY POINT
+# ==============================================================================
+
 #' Run Categorical Key Driver Analysis
 #'
 #' Main entry point for categorical key driver analysis. Reads configuration,

@@ -18,6 +18,17 @@ turas_root <- Sys.getenv("TURAS_ROOT", getwd())
 # TRS Guard Layer (v1.0) - MUST be loaded first before any module files
 source(file.path(turas_root, "modules/segment/lib/00_guard.R"))
 
+# TRS Infrastructure (v1.0)
+tryCatch({
+  source(file.path(turas_root, "modules/shared/lib/trs_run_state.R"))
+  source(file.path(turas_root, "modules/shared/lib/trs_banner.R"))
+  source(file.path(turas_root, "modules/shared/lib/trs_run_status_writer.R"))
+}, error = function(e) {
+  message(sprintf("[TRS INFO] SEG_TRS_LOAD: Could not load TRS infrastructure: %s", e$message))
+})
+
+SEGMENT_VERSION <- "10.0"
+
 # Shared utilities - use absolute paths
 source(file.path(turas_root, "modules/shared/lib/validation_utils.R"))
 source(file.path(turas_root, "modules/shared/lib/config_utils.R"))
@@ -62,14 +73,26 @@ source(file.path(turas_root, "modules/segment/lib/segment_lca.R"))
 #' # Final run mode (after setting k_fixed in config)
 #' result <- turas_segment_from_config("segment_config.xlsx")
 turas_segment_from_config <- function(config_file, verbose = TRUE) {
+  # ==========================================================================
+  # TRS RUN STATE INITIALIZATION (TRS v1.0)
+  # ==========================================================================
+
+  # Create TRS run state for tracking events
+  trs_state <- if (exists("turas_run_state_new", mode = "function")) {
+    turas_run_state_new("SEGMENT")
+  } else {
+    NULL
+  }
+
+  # Print TRS start banner
+  if (exists("turas_print_start_banner", mode = "function")) {
+    turas_print_start_banner("SEGMENT", SEGMENT_VERSION)
+  } else {
+    print_toolkit_header("Segmentation Analysis", version = "10.0")
+  }
+
   # Start timer
   start_time <- Sys.time()
-
-  # ===========================================================================
-  # HEADER
-  # ===========================================================================
-
-  print_toolkit_header("Segmentation Analysis", version = "10.0")
 
   cat(sprintf("Configuration file: %s\n", basename(config_file)))
   cat(sprintf("Start time: %s\n", format(start_time, "%Y-%m-%d %H:%M:%S")))
@@ -146,10 +169,6 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
 
     elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
 
-    cat("\n")
-    cat(paste(rep("=", 80), collapse = ""), "\n")
-    cat("EXPLORATION COMPLETE\n")
-    cat(paste(rep("=", 80), collapse = ""), "\n")
     cat(sprintf("✓ Analysis complete in %s\n", format_seconds(elapsed)))
     cat("\nOutputs:\n")
     cat(sprintf("  K selection report: %s\n", report_path))
@@ -160,6 +179,27 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
     cat(sprintf("  4. Re-run: turas_segment_from_config(\"%s\")\n", basename(config_file)))
     cat("\n")
 
+    # ==========================================================================
+    # TRS: Get run result
+    # ==========================================================================
+    run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+      turas_run_state_result(trs_state)
+    } else {
+      NULL
+    }
+
+    # ==========================================================================
+    # TRS FINAL BANNER (TRS v1.0)
+    # ==========================================================================
+    if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
+      turas_print_final_banner(run_result)
+    } else {
+      cat(paste(rep("=", 80), collapse = ""), "\n")
+      cat("[TRS PASS] SEGMENT EXPLORATION - COMPLETED SUCCESSFULLY\n")
+      cat(paste(rep("=", 80), collapse = ""), "\n")
+      cat("\n")
+    }
+
     # Return results
     return(invisible(list(
       mode = "exploration",
@@ -169,7 +209,8 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
       output_files = list(
         report = report_path
       ),
-      config = config
+      config = config,
+      run_result = run_result
     )))
 
   } else {
@@ -289,10 +330,6 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
 
     elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
 
-    cat("\n")
-    cat(paste(rep("=", 80), collapse = ""), "\n")
-    cat("SEGMENTATION COMPLETE\n")
-    cat(paste(rep("=", 80), collapse = ""), "\n")
     cat(sprintf("✓ Analysis complete in %s\n", format_seconds(elapsed)))
     cat("\nOutputs:\n")
     cat(sprintf("  Segment assignments: %s\n", assignments_path))
@@ -305,6 +342,27 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
     cat(sprintf("  Average silhouette: %.3f\n", validation_metrics$avg_silhouette))
     cat(sprintf("  Observations: %d\n", nrow(data_list$data)))
     cat("\n")
+
+    # ==========================================================================
+    # TRS: Get run result
+    # ==========================================================================
+    run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+      turas_run_state_result(trs_state)
+    } else {
+      NULL
+    }
+
+    # ==========================================================================
+    # TRS FINAL BANNER (TRS v1.0)
+    # ==========================================================================
+    if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
+      turas_print_final_banner(run_result)
+    } else {
+      cat(paste(rep("=", 80), collapse = ""), "\n")
+      cat("[TRS PASS] SEGMENT - ANALYSIS COMPLETED SUCCESSFULLY\n")
+      cat(paste(rep("=", 80), collapse = ""), "\n")
+      cat("\n")
+    }
 
     # Return results
     return(invisible(list(
@@ -320,7 +378,8 @@ turas_segment_from_config <- function(config_file, verbose = TRUE) {
         report = report_path,
         model = if (config$save_model) model_path else NULL
       ),
-      config = config
+      config = config,
+      run_result = run_result
     )))
   }
 }

@@ -30,9 +30,10 @@
 #' @param config Configuration
 #' @param data_info Data information list
 #' @param output_file Output file path
+#' @param run_result TRS run result (optional, for Run_Status sheet)
 #' @keywords internal
 write_conjoint_output <- function(utilities, importance, diagnostics, model_result,
-                                  config, data_info, output_file) {
+                                  config, data_info, output_file, run_result = NULL) {
 
   wb <- openxlsx::createWorkbook()
 
@@ -66,6 +67,30 @@ write_conjoint_output <- function(utilities, importance, diagnostics, model_resu
 
   # Sheet 8: Data Summary
   create_data_summary_sheet(wb, data_info, config, header_style)
+
+  # Sheet 9: TRS Run_Status (if run_result provided)
+  if (!is.null(run_result)) {
+    tryCatch({
+      if (!exists("turas_write_run_status_sheet", mode = "function")) {
+        # Try to source the writer
+        possible_paths <- c(
+          file.path(getwd(), "modules", "shared", "lib", "trs_run_status_writer.R"),
+          file.path(dirname(getwd()), "shared", "lib", "trs_run_status_writer.R")
+        )
+        for (p in possible_paths) {
+          if (file.exists(p)) {
+            source(p)
+            break
+          }
+        }
+      }
+      if (exists("turas_write_run_status_sheet", mode = "function")) {
+        turas_write_run_status_sheet(wb, run_result)
+      }
+    }, error = function(e) {
+      message(sprintf("[TRS INFO] CONJ_RUN_STATUS_WRITE_FAILED: Could not write Run_Status sheet: %s", e$message))
+    })
+  }
 
   # Save workbook
   tryCatch({

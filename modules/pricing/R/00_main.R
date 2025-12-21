@@ -11,6 +11,72 @@
 #
 # ==============================================================================
 
+PRICING_VERSION <- "11.0"
+
+# ==============================================================================
+# TRS GUARD LAYER (Must be first)
+# ==============================================================================
+
+# Source TRS guard layer for refusal handling
+.get_script_dir_for_guard <- function() {
+  if (exists("script_dir_override", envir = globalenv())) {
+    return(get("script_dir_override", envir = globalenv()))
+  }
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) return(dirname(sub("^--file=", "", file_arg)))
+  return(getwd())
+}
+
+.guard_path <- file.path(.get_script_dir_for_guard(), "00_guard.R")
+if (!file.exists(.guard_path)) {
+  .guard_path <- file.path(.get_script_dir_for_guard(), "R", "00_guard.R")
+}
+if (file.exists(.guard_path)) {
+  source(.guard_path)
+}
+
+# ==============================================================================
+# TRS INFRASTRUCTURE (TRS v1.0)
+# ==============================================================================
+
+# Source TRS run state management
+.source_trs_infrastructure <- function() {
+  base_dir <- .get_script_dir_for_guard()
+
+  # Try multiple paths to find shared/lib
+  possible_paths <- c(
+    file.path(base_dir, "..", "..", "shared", "lib"),
+    file.path(base_dir, "..", "shared", "lib"),
+    file.path(getwd(), "modules", "shared", "lib"),
+    file.path(getwd(), "..", "shared", "lib")
+  )
+
+  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R")
+
+  for (shared_lib in possible_paths) {
+    if (dir.exists(shared_lib)) {
+      for (f in trs_files) {
+        fpath <- file.path(shared_lib, f)
+        if (file.exists(fpath)) {
+          source(fpath)
+        }
+      }
+      break
+    }
+  }
+}
+
+tryCatch({
+  .source_trs_infrastructure()
+}, error = function(e) {
+  message(sprintf("[TRS INFO] PRICE_TRS_LOAD: Could not load TRS infrastructure: %s", e$message))
+})
+
+# ==============================================================================
+# MAIN ENTRY POINT
+# ==============================================================================
+
 #' Run Pricing Research Analysis
 #'
 #' Main entry point for pricing research analysis. Implements Van Westendorp
@@ -77,11 +143,30 @@
 #' @export
 run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NULL) {
 
-  cat("\n")
-  cat(rep("=", 80), "\n", sep = "")
-  cat("TURAS PRICING RESEARCH ANALYSIS v11.0\n")
-  cat(rep("=", 80), "\n", sep = "")
-  cat("\n")
+  # ==========================================================================
+  # TRS RUN STATE INITIALIZATION (TRS v1.0)
+  # ==========================================================================
+
+  # Create TRS run state for tracking events
+  trs_state <- if (exists("turas_run_state_new", mode = "function")) {
+    turas_run_state_new("PRICING")
+  } else {
+    NULL
+  }
+
+  # Print TRS start banner
+  if (exists("turas_print_start_banner", mode = "function")) {
+    turas_print_start_banner("PRICING", PRICING_VERSION)
+  } else {
+    cat("\n")
+    cat(rep("=", 80), "\n", sep = "")
+    cat("TURAS PRICING RESEARCH ANALYSIS v11.0\n")
+    cat(rep("=", 80), "\n", sep = "")
+    cat("\n")
+  }
+
+  # Track warnings
+  warnings_list <- character()
 
   # --------------------------------------------------------------------------
   # STEP 1: Load Configuration
@@ -301,11 +386,47 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
   )
   cat(sprintf("   Results written to: %s\n", output_file))
 
-  cat("\n")
-  cat(rep("=", 80), "\n", sep = "")
-  cat("ANALYSIS COMPLETE\n")
-  cat(rep("=", 80), "\n", sep = "")
-  cat("\n")
+  # ==========================================================================
+  # TRS: Log PARTIAL events for any warnings
+  # ==========================================================================
+  if (!is.null(trs_state) && length(warnings_list) > 0) {
+    for (warn in warnings_list) {
+      if (exists("turas_run_state_partial", mode = "function")) {
+        turas_run_state_partial(
+          trs_state,
+          "PRICE_WARNING",
+          "Analysis warning",
+          problem = warn
+        )
+      }
+    }
+  }
+
+  # ==========================================================================
+  # TRS: Get run result
+  # ==========================================================================
+  run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+    turas_run_state_result(trs_state)
+  } else {
+    NULL
+  }
+
+  # ==========================================================================
+  # TRS FINAL BANNER (TRS v1.0)
+  # ==========================================================================
+  if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
+    turas_print_final_banner(run_result)
+  } else {
+    cat("\n")
+    cat(rep("=", 80), "\n", sep = "")
+    if (length(warnings_list) == 0) {
+      cat("[TRS PASS] PRICING - ANALYSIS COMPLETED SUCCESSFULLY\n")
+    } else {
+      cat(sprintf("[TRS PARTIAL] PRICING - ANALYSIS COMPLETED WITH %d WARNING(S)\n", length(warnings_list)))
+    }
+    cat(rep("=", 80), "\n", sep = "")
+    cat("\n")
+  }
 
   # Return results
   invisible(list(
@@ -316,7 +437,8 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
     synthesis = synthesis,
     plots = plots,
     diagnostics = validation,
-    config = config
+    config = config,
+    run_result = run_result
   ))
 }
 
