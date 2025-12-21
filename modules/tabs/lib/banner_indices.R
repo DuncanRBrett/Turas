@@ -170,13 +170,24 @@ create_multi_mention_indices <- function(data, banner_code, question_info,
 #' @return Named list of integer vectors
 #' @export
 create_single_choice_indices <- function(data, banner_code, banner_data_info) {
-  
+
   subset_indices <- list()
-  
+
   # Check if column exists
   if (!banner_code %in% names(data)) {
-    warning(sprintf("Banner column not found in data: %s", banner_code))
-    return(subset_indices)
+    # TRS v1.0: Banner column missing is a configuration error - refuse with clear message
+    tabs_refuse(
+      code = "CFG_BANNER_COLUMN_NOT_FOUND",
+      title = paste0("Banner Column Missing: ", banner_code),
+      problem = paste0("Banner column '", banner_code, "' is configured but not found in the data file."),
+      why_it_matters = "Cannot create banner breakouts without this column. Analysis would produce incomplete crosstabs.",
+      how_to_fix = c(
+        "Check that the banner column name in Banner_Config matches the column name in your data exactly",
+        "Verify the column exists in your data file (check for typos, case sensitivity)",
+        "If the column was renamed, update the Banner_Config sheet accordingly"
+      ),
+      missing = banner_code
+    )
   }
   
   # Process each option
@@ -298,13 +309,24 @@ create_boxcat_multi_indices <- function(data, banner_code, question_info,
 #' @return Named list of integer vectors
 #' @export
 create_boxcat_single_indices <- function(data, banner_code, banner_data_info) {
-  
+
   subset_indices <- list()
-  
+
   # Check if column exists
   if (!banner_code %in% names(data)) {
-    warning(sprintf("Banner column not found in data: %s", banner_code))
-    return(subset_indices)
+    # TRS v1.0: Banner column missing is a configuration error - refuse with clear message
+    tabs_refuse(
+      code = "CFG_BANNER_COLUMN_NOT_FOUND",
+      title = paste0("Banner Column Missing: ", banner_code),
+      problem = paste0("Banner column '", banner_code, "' is configured for BoxCategory but not found in the data file."),
+      why_it_matters = "Cannot create banner breakouts without this column. Analysis would produce incomplete crosstabs.",
+      how_to_fix = c(
+        "Check that the banner column name in Banner_Config matches the column name in your data exactly",
+        "Verify the column exists in your data file (check for typos, case sensitivity)",
+        "If the column was renamed, update the Banner_Config sheet accordingly"
+      ),
+      missing = banner_code
+    )
   }
   
   # Process each box category

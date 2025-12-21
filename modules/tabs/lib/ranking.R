@@ -749,19 +749,24 @@ calculate_percent_ranked_first <- function(ranking_matrix, item_name, weights = 
   if (!is.matrix(ranking_matrix) && !is.data.frame(ranking_matrix)) {
     stop("ranking_matrix must be a matrix or data.frame", call. = FALSE)
   }
-  
+
   if (!is.character(item_name) || length(item_name) != 1) {
     stop("item_name must be a single character string", call. = FALSE)
   }
-  
+
   if (!item_name %in% colnames(ranking_matrix)) {
-    warning(sprintf("Item '%s' not found in ranking matrix", item_name), call. = FALSE)
-    return(list(
-      count = 0,
-      base = 0,
-      percentage = NA_real_,
-      effective_n = 0
-    ))
+    # TRS v1.0: Ranking item not found is a configuration/data mismatch
+    tabs_refuse(
+      code = "DATA_RANKING_ITEM_NOT_FOUND",
+      title = paste0("Ranking Item Missing: ", item_name),
+      problem = paste0("Ranking item '", item_name, "' is not found in the ranking matrix for calculate_percent_ranked_first."),
+      why_it_matters = "Cannot calculate 'percent ranked first' for a missing item. Results would be incomplete.",
+      how_to_fix = c(
+        "Check that the ranking item exists in the data",
+        "Verify the item name matches the column name in data exactly"
+      ),
+      missing = item_name
+    )
   }
   
   # Extract item ranks
@@ -850,18 +855,23 @@ calculate_percent_top_n <- function(ranking_matrix, item_name, top_n = 3,
   }
   
   if (!item_name %in% colnames(ranking_matrix)) {
-    warning(sprintf("Item '%s' not found in ranking matrix", item_name), call. = FALSE)
-    return(list(
-      count = 0,
-      base = 0,
-      percentage = NA_real_,
-      effective_n = 0
-    ))
+    # TRS v1.0: Ranking item not found is a configuration/data mismatch
+    tabs_refuse(
+      code = "DATA_RANKING_ITEM_NOT_FOUND",
+      title = paste0("Ranking Item Missing: ", item_name),
+      problem = paste0("Ranking item '", item_name, "' is not found in the ranking matrix for calculate_percent_top_n."),
+      why_it_matters = "Cannot calculate 'percent in top N' for a missing item. Results would be incomplete.",
+      how_to_fix = c(
+        "Check that the ranking item exists in the data",
+        "Verify the item name matches the column name in data exactly"
+      ),
+      missing = item_name
+    )
   }
-  
+
   # Extract item ranks
   item_ranks <- ranking_matrix[, item_name]
-  
+
   # Default weights
   if (is.null(weights)) {
     weights <- rep(1, length(item_ranks))
@@ -916,14 +926,24 @@ calculate_mean_rank <- function(ranking_matrix, item_name, weights = NULL) {
   if (!is.matrix(ranking_matrix) && !is.data.frame(ranking_matrix)) {
     stop("ranking_matrix must be a matrix or data.frame", call. = FALSE)
   }
-  
+
   if (!is.character(item_name) || length(item_name) != 1) {
     stop("item_name must be a single character string", call. = FALSE)
   }
-  
+
   if (!item_name %in% colnames(ranking_matrix)) {
-    warning(sprintf("Item '%s' not found in ranking matrix", item_name), call. = FALSE)
-    return(NA_real_)
+    # TRS v1.0: Ranking item not found is a configuration/data mismatch
+    tabs_refuse(
+      code = "DATA_RANKING_ITEM_NOT_FOUND",
+      title = paste0("Ranking Item Missing: ", item_name),
+      problem = paste0("Ranking item '", item_name, "' is not found in the ranking matrix for calculate_mean_rank."),
+      why_it_matters = "Cannot calculate mean rank for a missing item. Results would be incomplete.",
+      how_to_fix = c(
+        "Check that the ranking item exists in the data",
+        "Verify the item name matches the column name in data exactly"
+      ),
+      missing = item_name
+    )
   }
   
   # Extract item ranks

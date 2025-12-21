@@ -101,6 +101,7 @@ calculate_all_trends <- function(config, question_map, wave_data) {
   wave_ids <- config$waves$WaveID
 
   trend_results <- list()
+  skipped_questions <- list()  # TRS v1.0: Track skipped questions for PARTIAL status
 
   for (q_code in tracked_questions) {
     cat(paste0("\n", strrep("=", 80), "\n"))
@@ -110,7 +111,13 @@ calculate_all_trends <- function(config, question_map, wave_data) {
     metadata <- get_question_metadata(question_map, q_code)
 
     if (is.null(metadata)) {
-      warning(paste0("  Question ", q_code, " not found in mapping - skipping"))
+      # TRS v1.0: Record skipped question for PARTIAL status
+      skipped_questions[[q_code]] <- list(
+        question_code = q_code,
+        reason = "Question not found in mapping",
+        stage = "get_question_metadata"
+      )
+      message(paste0("[TRS PARTIAL] Question ", q_code, " not found in mapping - skipping"))
       next
     }
 
@@ -135,17 +142,41 @@ calculate_all_trends <- function(config, question_map, wave_data) {
         # Use enhanced version (supports TrackingSpecs, backward compatible)
         calculate_composite_trend_enhanced(q_code, question_map, wave_data, config)
       } else if (q_type == "open_end") {
-        warning(paste0("  Open-end questions cannot be tracked - skipping"))
+        # TRS v1.0: Record unsupported type for PARTIAL status
+        skipped_questions[[q_code]] <- list(
+          question_code = q_code,
+          reason = "Open-end questions cannot be tracked",
+          stage = "type_check"
+        )
+        message(paste0("[TRS PARTIAL] Open-end question ", q_code, " cannot be tracked - skipping"))
         NULL
       } else if (q_type == "ranking") {
-        warning(paste0("  Ranking questions not yet supported in tracker - skipping"))
+        # TRS v1.0: Record unsupported type for PARTIAL status
+        skipped_questions[[q_code]] <- list(
+          question_code = q_code,
+          reason = "Ranking questions not yet supported in tracker",
+          stage = "type_check"
+        )
+        message(paste0("[TRS PARTIAL] Ranking question ", q_code, " not supported - skipping"))
         NULL
       } else {
-        warning(paste0("  Question type '", q_type_raw, "' not supported - skipping"))
+        # TRS v1.0: Record unsupported type for PARTIAL status
+        skipped_questions[[q_code]] <- list(
+          question_code = q_code,
+          reason = paste0("Question type '", q_type_raw, "' not supported"),
+          stage = "type_check"
+        )
+        message(paste0("[TRS PARTIAL] Question type '", q_type_raw, "' not supported - skipping"))
         NULL
       }
     }, error = function(e) {
-      warning(paste0("  Error calculating trend for ", q_code, ": ", e$message))
+      # TRS v1.0: Record error for PARTIAL status
+      skipped_questions[[q_code]] <<- list(
+        question_code = q_code,
+        reason = paste0("Error calculating trend: ", e$message),
+        stage = "calculation"
+      )
+      message(paste0("[TRS PARTIAL] Error calculating trend for ", q_code, ": ", e$message))
       NULL
     })
 
@@ -157,7 +188,19 @@ calculate_all_trends <- function(config, question_map, wave_data) {
 
   cat(paste0("\nCompleted trend calculation for ", length(trend_results), " questions\n"))
 
-  return(trend_results)
+  # TRS v1.0: Determine run status and return with metadata
+  run_status <- if (length(skipped_questions) > 0) "PARTIAL" else "PASS"
+
+  if (run_status == "PARTIAL") {
+    message(sprintf("[TRS] Trend calculation completed with PARTIAL status: %d questions skipped",
+                    length(skipped_questions)))
+  }
+
+  return(list(
+    trends = trend_results,
+    skipped_questions = skipped_questions,
+    run_status = run_status
+  ))
 }
 
 

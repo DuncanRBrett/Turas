@@ -82,21 +82,53 @@ process_standard_question <- function(data, question_info, question_options,
   if (is_multi_mention) {
     num_columns <- suppressWarnings(as.numeric(question_info$Columns))
     if (is.na(num_columns) || num_columns < 1) {
-      warning(sprintf("Invalid column count for %s", question_col))
-      return(NULL)
+      # TRS v1.0: Invalid column count is a configuration error
+      tabs_refuse(
+        code = "CFG_INVALID_COLUMN_COUNT",
+        title = paste0("Invalid Column Count: ", question_col),
+        problem = paste0("Multi-mention question '", question_col, "' has invalid Columns value in Survey_Structure."),
+        why_it_matters = "Cannot process multi-mention questions without a valid column count.",
+        how_to_fix = c(
+          "Check the Columns field for this question in Survey_Structure.xlsx",
+          "Ensure Columns contains a positive integer indicating the number of response columns"
+        )
+      )
     }
-    
+
     question_cols <- paste0(question_col, "_", seq_len(num_columns))
     existing_cols <- question_cols[question_cols %in% names(data)]
-    
+
     if (!length(existing_cols)) {
-      warning(sprintf("No multi-mention columns for %s", question_col))
-      return(NULL)
+      # TRS v1.0: No multi-mention columns is a data/config mismatch
+      tabs_refuse(
+        code = "DATA_MULTI_MENTION_COLUMNS_NOT_FOUND",
+        title = paste0("Multi-Mention Columns Missing: ", question_col),
+        problem = paste0("No columns found for multi-mention question '", question_col, "'. Expected columns like ", question_col, "_1, ", question_col, "_2, etc."),
+        why_it_matters = "Cannot process this question without its data columns.",
+        how_to_fix = c(
+          paste0("Verify the data file contains columns named like: ", paste(question_cols[1:min(3, length(question_cols))], collapse = ", ")),
+          "Check that the QuestionCode in Survey_Structure matches the column name prefix in data",
+          "Verify the Columns count matches the actual number of columns in data"
+        ),
+        expected = question_cols,
+        missing = question_cols
+      )
     }
   } else {
     if (!question_col %in% names(data)) {
-      warning(sprintf("Question column not found: %s", question_col))
-      return(NULL)
+      # TRS v1.0: Question column not found is a data/config mismatch
+      tabs_refuse(
+        code = "DATA_QUESTION_COLUMN_NOT_FOUND",
+        title = paste0("Question Column Missing: ", question_col),
+        problem = paste0("Question column '", question_col, "' is configured but not found in the data file."),
+        why_it_matters = "Cannot produce crosstab for this question without its data column.",
+        how_to_fix = c(
+          "Check that the QuestionCode in Survey_Structure matches the column name in data exactly",
+          "Verify the column exists in your data file (check for typos, case sensitivity)",
+          "If the column was renamed, update Survey_Structure accordingly"
+        ),
+        missing = question_col
+      )
     }
   }
   

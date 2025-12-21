@@ -479,6 +479,7 @@ process_all_questions <- function(questions_to_process, survey_data,
 
   all_results <- list()
   processed_questions <- processed_so_far
+  skipped_questions <- list()  # TRS v1.0: Track skipped questions for PARTIAL status
   processing_start <- Sys.time()
   checkpoint_counter <- 0
 
@@ -512,7 +513,13 @@ process_all_questions <- function(questions_to_process, survey_data,
     )
 
     if (is.null(prepared_data)) {
-      warning(sprintf("Skipping %s: preparation failed", current_question_code), call. = FALSE)
+      # TRS v1.0: Record skipped question for PARTIAL status disclosure
+      skipped_questions[[current_question_code]] <- list(
+        question_code = current_question_code,
+        reason = "Preparation failed (unexpected - check data and config)",
+        stage = "prepare_question_data"
+      )
+      message(sprintf("[TRS PARTIAL] Skipping %s: preparation failed unexpectedly", current_question_code))
       next
     }
 
@@ -525,7 +532,13 @@ process_all_questions <- function(questions_to_process, survey_data,
     )
 
     if (is.null(question_result)) {
-      warning(sprintf("Skipping %s: processing failed", current_question_code), call. = FALSE)
+      # TRS v1.0: Record skipped question for PARTIAL status disclosure
+      skipped_questions[[current_question_code]] <- list(
+        question_code = current_question_code,
+        reason = "Processing failed (unexpected - check question configuration)",
+        stage = "process_single_question"
+      )
+      message(sprintf("[TRS PARTIAL] Skipping %s: processing failed unexpectedly", current_question_code))
       next
     }
 
@@ -542,9 +555,19 @@ process_all_questions <- function(questions_to_process, survey_data,
     }
   }
 
+  # TRS v1.0: Determine run status based on skipped questions
+  run_status <- if (length(skipped_questions) > 0) "PARTIAL" else "PASS"
+
+  if (run_status == "PARTIAL") {
+    message(sprintf("[TRS] Run completed with PARTIAL status: %d questions skipped",
+                    length(skipped_questions)))
+  }
+
   return(list(
     all_results = all_results,
-    processed_questions = processed_questions
+    processed_questions = processed_questions,
+    skipped_questions = skipped_questions,
+    run_status = run_status
   ))
 }
 

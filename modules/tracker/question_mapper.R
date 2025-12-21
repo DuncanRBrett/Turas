@@ -249,8 +249,19 @@ extract_question_data <- function(wave_df, wave_id, standard_code, question_map)
 
   # Check if variable exists in data
   if (!wave_code %in% names(wave_df)) {
-    warning(paste0("Question ", wave_code, " not found in Wave ", wave_id, " data"))
-    return(NULL)
+    # TRS v1.0: Mapped question not found in wave data is a data/config mismatch
+    tracker_refuse(
+      code = "DATA_QUESTION_NOT_FOUND",
+      title = paste0("Mapped Question Missing in Wave ", wave_id),
+      problem = paste0("Question '", wave_code, "' is mapped for Wave ", wave_id, " but not found in the data file."),
+      why_it_matters = "Cannot calculate trends for this question. Results would be incomplete.",
+      how_to_fix = c(
+        paste0("Check that column '", wave_code, "' exists in Wave ", wave_id, " data file"),
+        "Verify the question mapping in QuestionMapping.xlsx is correct",
+        "Check for typos or case differences in the column name"
+      ),
+      missing = wave_code
+    )
   }
 
   # Extract data
