@@ -236,9 +236,9 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
   }
 
   # ----------------------------------------------------------------------
-  # Sheet 6: Run Status (TRS v10.3 Output Contract)
+  # Sheet 6: Run_Status (TRS v10.3 Output Contract)
   # ----------------------------------------------------------------------
-  openxlsx::addWorksheet(wb, "Run Status")
+  openxlsx::addWorksheet(wb, "Run_Status")
 
   # Build status table
   status_table <- data.frame(
@@ -265,31 +265,31 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
     stringsAsFactors = FALSE
   )
 
-  openxlsx::writeData(wb, "Run Status", status_table, startRow = 1)
-  openxlsx::addStyle(wb, "Run Status", header_style, rows = 1, cols = 1:2, gridExpand = TRUE)
-  openxlsx::setColWidths(wb, "Run Status", cols = 1:2, widths = c(25, 40))
+  openxlsx::writeData(wb, "Run_Status", status_table, startRow = 1)
+  openxlsx::addStyle(wb, "Run_Status", header_style, rows = 1, cols = 1:2, gridExpand = TRUE)
+  openxlsx::setColWidths(wb, "Run_Status", cols = 1:2, widths = c(25, 40))
 
   # Add degraded reasons if PARTIAL
   if (run_status == "PARTIAL" && !is.null(status_details)) {
     start_row <- nrow(status_table) + 3
-    openxlsx::writeData(wb, "Run Status", "Degraded Outputs:", startRow = start_row, startCol = 1)
+    openxlsx::writeData(wb, "Run_Status", "Degraded Outputs:", startRow = start_row, startCol = 1)
 
     if (!is.null(status_details$degraded_reasons)) {
       deg_df <- data.frame(
         Reason = status_details$degraded_reasons,
         stringsAsFactors = FALSE
       )
-      openxlsx::writeData(wb, "Run Status", deg_df, startRow = start_row + 1, startCol = 1)
+      openxlsx::writeData(wb, "Run_Status", deg_df, startRow = start_row + 1, startCol = 1)
     }
 
     if (!is.null(status_details$affected_outputs)) {
       aff_row <- start_row + length(status_details$degraded_reasons) + 3
-      openxlsx::writeData(wb, "Run Status", "Affected Outputs:", startRow = aff_row, startCol = 1)
+      openxlsx::writeData(wb, "Run_Status", "Affected Outputs:", startRow = aff_row, startCol = 1)
       aff_df <- data.frame(
         Output = status_details$affected_outputs,
         stringsAsFactors = FALSE
       )
-      openxlsx::writeData(wb, "Run Status", aff_df, startRow = aff_row + 1, startCol = 1)
+      openxlsx::writeData(wb, "Run_Status", aff_df, startRow = aff_row + 1, startCol = 1)
     }
   }
 
@@ -302,7 +302,7 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
       nrow(status_table) + 4
     }
 
-    openxlsx::writeData(wb, "Run Status", "Driver Method Notes:", startRow = method_start, startCol = 1)
+    openxlsx::writeData(wb, "Run_Status", "Driver Method Notes:", startRow = method_start, startCol = 1)
 
     method_cols <- c("Driver")
     if ("DriverType" %in% names(importance)) method_cols <- c(method_cols, "DriverType")
@@ -312,8 +312,8 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
     available_cols <- intersect(method_cols, names(importance))
     if (length(available_cols) > 0) {
       method_df <- importance[, available_cols, drop = FALSE]
-      openxlsx::writeData(wb, "Run Status", method_df, startRow = method_start + 1, startCol = 1)
-      openxlsx::addStyle(wb, "Run Status", header_style, rows = method_start + 1,
+      openxlsx::writeData(wb, "Run_Status", method_df, startRow = method_start + 1, startCol = 1)
+      openxlsx::addStyle(wb, "Run_Status", header_style, rows = method_start + 1,
                         cols = 1:length(available_cols), gridExpand = TRUE)
     }
   }
@@ -396,7 +396,7 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
     "3. Model Summary - R², F-stat, RMSE, VIF diagnostics",
     "4. Correlations - Full correlation matrix",
     "5. Charts - Visual representation of driver impact",
-    "6. Run Status - TRS run status and method notes (v10.3)",
+    "6. Run_Status - TRS run status and method notes (v10.3)",
     "7. README - This documentation",
     "",
     "=== REFERENCES ===",

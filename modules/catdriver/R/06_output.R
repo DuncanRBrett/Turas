@@ -3,7 +3,7 @@
 # ==============================================================================
 #
 # Core output generation: workbook creation and styles.
-# TRS v1.0: Includes Run Status sheet per hardening spec.
+# TRS v1.0: Includes Run_Status sheet per hardening spec.
 #
 # Related modules:
 #   - 06a_sheets_summary.R: Executive summary and importance sheets
@@ -17,7 +17,7 @@
 #' Generate Excel Output
 #'
 #' Creates a formatted Excel workbook with all analysis results.
-#' TRS v1.0: Includes Run Status sheet with status, degraded flag, and reasons.
+#' TRS v1.0: Includes Run_Status sheet with status, degraded flag, and reasons.
 #'
 #' @param results Full analysis results list
 #' @param config Configuration list
@@ -32,7 +32,7 @@ write_catdriver_output <- function(results, config, output_file) {
   # Define styles
   styles <- create_output_styles(wb)
 
-  # TRS v1.0: Sheet 1 - Run Status (required per spec)
+  # TRS v1.0: Sheet 1 - Run_Status (required per spec)
   add_run_status_sheet(wb, results, styles)
 
   # Sheet 2: Executive Summary
@@ -64,9 +64,9 @@ write_catdriver_output <- function(results, config, output_file) {
 }
 
 
-#' Add Run Status Sheet (TRS v1.0)
+#' Add Run_Status Sheet (TRS v1.0)
 #'
-#' Creates the required Run Status sheet per TRS v1.0 spec.
+#' Creates the required Run_Status sheet per TRS v1.0 spec.
 #'
 #' @param wb Workbook
 #' @param results Analysis results
@@ -74,7 +74,7 @@ write_catdriver_output <- function(results, config, output_file) {
 #' @keywords internal
 add_run_status_sheet <- function(wb, results, styles) {
 
-  openxlsx::addWorksheet(wb, "Run Status")
+  openxlsx::addWorksheet(wb, "Run_Status")
 
   # Build status data
   run_status <- if (!is.null(results$run_status)) results$run_status else "PASS"
@@ -84,43 +84,43 @@ add_run_status_sheet <- function(wb, results, styles) {
 
   # Write header
   row <- 1
-  openxlsx::writeData(wb, "Run Status", "CATDRIVER RUN STATUS", startRow = row, startCol = 1)
-  openxlsx::addStyle(wb, "Run Status", styles$title, rows = row, cols = 1)
+  openxlsx::writeData(wb, "Run_Status", "CATDRIVER RUN STATUS", startRow = row, startCol = 1)
+  openxlsx::addStyle(wb, "Run_Status", styles$title, rows = row, cols = 1)
   row <- row + 2
 
   # Status row
-  openxlsx::writeData(wb, "Run Status", "run_status:", startRow = row, startCol = 1)
-  openxlsx::writeData(wb, "Run Status", run_status, startRow = row, startCol = 2)
+  openxlsx::writeData(wb, "Run_Status", "run_status:", startRow = row, startCol = 1)
+  openxlsx::writeData(wb, "Run_Status", run_status, startRow = row, startCol = 2)
   if (run_status == "PASS") {
-    openxlsx::addStyle(wb, "Run Status", styles$success, rows = row, cols = 2)
+    openxlsx::addStyle(wb, "Run_Status", styles$success, rows = row, cols = 2)
   } else if (run_status == "PARTIAL") {
-    openxlsx::addStyle(wb, "Run Status", styles$warning, rows = row, cols = 2)
+    openxlsx::addStyle(wb, "Run_Status", styles$warning, rows = row, cols = 2)
   }
   row <- row + 1
 
   # Degraded flag
-  openxlsx::writeData(wb, "Run Status", "degraded:", startRow = row, startCol = 1)
-  openxlsx::writeData(wb, "Run Status", if (degraded) "TRUE" else "FALSE", startRow = row, startCol = 2)
+  openxlsx::writeData(wb, "Run_Status", "degraded:", startRow = row, startCol = 1)
+  openxlsx::writeData(wb, "Run_Status", if (degraded) "TRUE" else "FALSE", startRow = row, startCol = 2)
   row <- row + 1
 
   # Module
-  openxlsx::writeData(wb, "Run Status", "module:", startRow = row, startCol = 1)
-  openxlsx::writeData(wb, "Run Status", "CATDRIVER v1.1", startRow = row, startCol = 2)
+  openxlsx::writeData(wb, "Run_Status", "module:", startRow = row, startCol = 1)
+  openxlsx::writeData(wb, "Run_Status", "CATDRIVER v1.1", startRow = row, startCol = 2)
   row <- row + 1
 
   # Timestamp
-  openxlsx::writeData(wb, "Run Status", "timestamp:", startRow = row, startCol = 1)
-  openxlsx::writeData(wb, "Run Status", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), startRow = row, startCol = 2)
+  openxlsx::writeData(wb, "Run_Status", "timestamp:", startRow = row, startCol = 1)
+  openxlsx::writeData(wb, "Run_Status", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), startRow = row, startCol = 2)
   row <- row + 2
 
   # Degraded reasons (if any)
   if (length(degraded_reasons) > 0) {
-    openxlsx::writeData(wb, "Run Status", "DEGRADED REASONS:", startRow = row, startCol = 1)
-    openxlsx::addStyle(wb, "Run Status", styles$section, rows = row, cols = 1)
+    openxlsx::writeData(wb, "Run_Status", "DEGRADED REASONS:", startRow = row, startCol = 1)
+    openxlsx::addStyle(wb, "Run_Status", styles$section, rows = row, cols = 1)
     row <- row + 1
 
     for (reason in degraded_reasons) {
-      openxlsx::writeData(wb, "Run Status", paste0("- ", reason), startRow = row, startCol = 1)
+      openxlsx::writeData(wb, "Run_Status", paste0("- ", reason), startRow = row, startCol = 1)
       row <- row + 1
     }
     row <- row + 1
@@ -128,19 +128,19 @@ add_run_status_sheet <- function(wb, results, styles) {
 
   # Affected outputs (if any)
   if (length(affected_outputs) > 0) {
-    openxlsx::writeData(wb, "Run Status", "AFFECTED OUTPUTS:", startRow = row, startCol = 1)
-    openxlsx::addStyle(wb, "Run Status", styles$section, rows = row, cols = 1)
+    openxlsx::writeData(wb, "Run_Status", "AFFECTED OUTPUTS:", startRow = row, startCol = 1)
+    openxlsx::addStyle(wb, "Run_Status", styles$section, rows = row, cols = 1)
     row <- row + 1
 
     for (output in affected_outputs) {
-      openxlsx::writeData(wb, "Run Status", paste0("- ", output), startRow = row, startCol = 1)
+      openxlsx::writeData(wb, "Run_Status", paste0("- ", output), startRow = row, startCol = 1)
       row <- row + 1
     }
   }
 
   # Set column widths
-  openxlsx::setColWidths(wb, "Run Status", cols = 1, widths = 25)
-  openxlsx::setColWidths(wb, "Run Status", cols = 2, widths = 60)
+  openxlsx::setColWidths(wb, "Run_Status", cols = 1, widths = 25)
+  openxlsx::setColWidths(wb, "Run_Status", cols = 2, widths = 60)
 }
 
 
