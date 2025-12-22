@@ -1281,6 +1281,32 @@ write_index_summary_sheet <- function(wb, summary_table, banner_info,
     internal_keys  # Fallback to internal keys
   }
 
+  # Write banner labels row (above column options)
+  # This shows the BannerLabel for each banner group
+  if (!is.null(banner_info$banner_headers) && nrow(banner_info$banner_headers) > 0) {
+    # Create banner label row with empty first cell for "Metric" column
+    banner_label_row <- rep("", length(column_labels) + 1)
+
+    for (i in seq_len(nrow(banner_info$banner_headers))) {
+      start_col <- banner_info$banner_headers$start_col[i]
+      label <- banner_info$banner_headers$label[i]
+
+      # Adjust for the "Metric" column offset (column 1)
+      # banner_headers start_col is 2-based (after Total), we need 1-based for our array
+      if (start_col <= length(banner_label_row)) {
+        banner_label_row[start_col] <- label
+      }
+    }
+
+    openxlsx::writeData(wb, "Index_Summary", t(banner_label_row),
+                        startCol = 1, startRow = current_row, colNames = FALSE)
+    openxlsx::addStyle(wb, "Index_Summary", styles$banner,
+                       rows = current_row, cols = 1:length(banner_label_row),
+                       gridExpand = TRUE)
+    current_row <- current_row + 1
+  }
+
+  # Write column options row
   headers <- c("Metric", column_labels)
 
   openxlsx::writeData(wb, "Index_Summary", t(headers),
