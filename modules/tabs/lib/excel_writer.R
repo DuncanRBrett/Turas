@@ -1233,25 +1233,12 @@ write_index_summary_sheet <- function(wb, summary_table, banner_info,
     halign = "left"
   )
 
-  # Data cell style - use same decimal places as crosstab index but without bold
-  # Get decimal places from config (same source as crosstab styles)
-  decimal_places_for_summary <- if (!is.null(config$decimal_places_index) &&
-                                     length(config$decimal_places_index) > 0) {
-    config$decimal_places_index
-  } else if (!is.null(config$decimal_places_ratings) &&
-             length(config$decimal_places_ratings) > 0) {
-    config$decimal_places_ratings
-  } else {
-    1  # Default to 1 decimal place
-  }
-
-  # Use shared formatting function for consistency with crosstabs
-  num_format <- create_excel_number_format(decimal_places_for_summary)
-
+  # Data cell style - use General format to display values as-is
+  # Values are already formatted correctly when extracted from crosstab results
   data_style <- openxlsx::createStyle(
     fontSize = 10,
     halign = "right",
-    numFmt = num_format
+    numFmt = "General"
   )
 
   # Write title section
