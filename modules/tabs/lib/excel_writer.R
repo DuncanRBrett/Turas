@@ -285,12 +285,47 @@ create_excel_styles <- function(decimal_separator = ".",
 #' @return Integer, next row number
 #' @export
 write_banner_headers <- function(wb, sheet, banner_info, styles) {
-  
+
   current_row <- 1
-  
-  # Write banner labels
+
+  # Write banner group labels row (BannerLabel from config)
+  # This row shows the grouping labels above the column options
+  if (!is.null(banner_info$banner_headers) && nrow(banner_info$banner_headers) > 0) {
+    # Create banner label row: "", "" for Question/Type columns, then labels at start positions
+    banner_label_row <- rep("", length(banner_info$column_labels) + 2)
+
+    for (i in seq_len(nrow(banner_info$banner_headers))) {
+      start_col <- banner_info$banner_headers$start_col[i]
+      label <- banner_info$banner_headers$label[i]
+
+      # start_col is 2-based (after Total at position 2), add 2 for Question/Type columns
+      col_idx <- start_col + 1  # +1 because array is 1-based and we have Question, Type before
+      if (col_idx <= length(banner_label_row)) {
+        banner_label_row[col_idx] <- label
+      }
+    }
+
+    openxlsx::writeData(
+      wb, sheet,
+      t(as.matrix(banner_label_row)),
+      startRow = current_row,
+      startCol = 1,
+      colNames = FALSE
+    )
+
+    openxlsx::addStyle(
+      wb, sheet, styles$banner,
+      rows = current_row,
+      cols = 1:length(banner_label_row),
+      gridExpand = TRUE
+    )
+
+    current_row <- current_row + 1
+  }
+
+  # Write column options row
   header_data <- c("Question", "Type", banner_info$column_labels)
-  
+
   openxlsx::writeData(
     wb, sheet,
     t(as.matrix(header_data)),
@@ -298,7 +333,7 @@ write_banner_headers <- function(wb, sheet, banner_info, styles) {
     startCol = 1,
     colNames = FALSE
   )
-  
+
   # Apply banner style
   openxlsx::addStyle(
     wb, sheet, styles$banner,
@@ -306,11 +341,11 @@ write_banner_headers <- function(wb, sheet, banner_info, styles) {
     cols = 1:length(header_data),
     gridExpand = TRUE
   )
-  
+
   # Write column letters (A, B, C, etc.)
   current_row <- current_row + 1
   letter_data <- c("", "", banner_info$letters)
-  
+
   openxlsx::writeData(
     wb, sheet,
     t(as.matrix(letter_data)),
@@ -318,7 +353,7 @@ write_banner_headers <- function(wb, sheet, banner_info, styles) {
     startCol = 1,
     colNames = FALSE
   )
-  
+
   # Apply letter style
   openxlsx::addStyle(
     wb, sheet, styles$letter,
@@ -326,7 +361,7 @@ write_banner_headers <- function(wb, sheet, banner_info, styles) {
     cols = 3:length(letter_data),
     gridExpand = TRUE
   )
-  
+
   return(current_row + 1)
 }
 
