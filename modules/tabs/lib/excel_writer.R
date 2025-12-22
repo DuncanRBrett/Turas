@@ -298,8 +298,8 @@ write_banner_headers <- function(wb, sheet, banner_info, styles) {
       start_col <- banner_info$banner_headers$start_col[i]
       label <- banner_info$banner_headers$label[i]
 
-      # start_col is 2-based (after Total at position 2), add 2 for Question/Type columns
-      col_idx <- start_col + 1  # +1 because array is 1-based and we have Question, Type before
+      # start_col is 2-based (starts after Total), add 2 for Question/Type columns
+      col_idx <- start_col + 2  # +2 for Question and Type columns
       if (col_idx <= length(banner_label_row)) {
         banner_label_row[col_idx] <- label
       }
@@ -1327,9 +1327,10 @@ write_index_summary_sheet <- function(wb, summary_table, banner_info,
       label <- banner_info$banner_headers$label[i]
 
       # Adjust for the "Metric" column offset (column 1)
-      # banner_headers start_col is 2-based (after Total), we need 1-based for our array
-      if (start_col <= length(banner_label_row)) {
-        banner_label_row[start_col] <- label
+      # banner_headers start_col is 2-based (after Total), add 1 for Metric column
+      col_idx <- start_col + 1  # +1 for Metric column
+      if (col_idx <= length(banner_label_row)) {
+        banner_label_row[col_idx] <- label
       }
     }
 
