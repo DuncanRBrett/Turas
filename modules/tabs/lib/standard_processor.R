@@ -882,7 +882,7 @@ identify_top_bottom_categories <- function(ordered_cats) {
 create_net_positive_row <- function(top_category, bottom_category, row_counts_top,
                                    row_counts_bottom, banner_bases, internal_keys, config) {
   net_positive_row <- data.frame(
-    RowLabel = sprintf("NET POSITIVE (%s - %s)", bottom_category, top_category),
+    RowLabel = sprintf("NET POSITIVE (%s - %s)", top_category, bottom_category),
     RowType = "Column %",
     stringsAsFactors = FALSE
   )
@@ -900,7 +900,7 @@ create_net_positive_row <- function(top_category, bottom_category, row_counts_to
     if (weighted_base > 0) {
       top_pct <- (row_counts_top[key] / weighted_base) * 100
       bottom_pct <- (row_counts_bottom[key] / weighted_base) * 100
-      net_pct <- bottom_pct - top_pct
+      net_pct <- top_pct - bottom_pct
       net_pct_values[key] <- net_pct
     } else {
       net_pct_values[key] <- NA_real_

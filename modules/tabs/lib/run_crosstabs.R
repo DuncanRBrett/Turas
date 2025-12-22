@@ -414,6 +414,12 @@ if ("Index_Weight" %in% names(survey_structure$options)) {
   survey_structure$options$Index_Weight <- as.numeric(survey_structure$options$Index_Weight)
 }
 
+# Convert DisplayOrder to numeric for proper sorting (not alphabetical)
+# Without this, "1", "10", "2" sorts alphabetically instead of numerically
+if ("DisplayOrder" %in% names(survey_structure$options)) {
+  survey_structure$options$DisplayOrder <- as.numeric(survey_structure$options$DisplayOrder)
+}
+
 log_message("✓ Survey structure loaded", "INFO")
 
 # Load composite definitions (V10.1 Feature - validation happens after data load)
