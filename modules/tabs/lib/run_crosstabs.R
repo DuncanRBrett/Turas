@@ -408,6 +408,12 @@ survey_structure$options$ExcludeFromIndex <- as.character(survey_structure$optio
 survey_structure$options$ShowInOutput[is.na(survey_structure$options$ShowInOutput)] <- "Y"
 survey_structure$options$ExcludeFromIndex[is.na(survey_structure$options$ExcludeFromIndex)] <- "N"
 
+# Convert Index_Weight to numeric for Likert index calculations
+# (Options sheet is loaded as text, but Index_Weight needs to be numeric for arithmetic)
+if ("Index_Weight" %in% names(survey_structure$options)) {
+  survey_structure$options$Index_Weight <- as.numeric(survey_structure$options$Index_Weight)
+}
+
 log_message("✓ Survey structure loaded", "INFO")
 
 # Load composite definitions (V10.1 Feature - validation happens after data load)
