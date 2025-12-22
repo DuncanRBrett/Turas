@@ -1246,7 +1246,12 @@ write_index_summary_sheet <- function(wb, summary_table, banner_info,
   }
 
   # Create number format string (e.g., "0.00" for 2 decimal places)
-  num_format <- paste0("0.", paste(rep("0", decimal_places_for_summary), collapse = ""))
+  # Handle 0 decimal places case to avoid "0." format which displays incorrectly
+  if (decimal_places_for_summary > 0) {
+    num_format <- paste0("0.", paste(rep("0", decimal_places_for_summary), collapse = ""))
+  } else {
+    num_format <- "0"
+  }
 
   data_style <- openxlsx::createStyle(
     fontSize = 10,

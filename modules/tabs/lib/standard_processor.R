@@ -856,17 +856,18 @@ identify_top_bottom_categories <- function(ordered_cats) {
     return(NULL)
   }
 
-  # Top is first
-  top_category <- ordered_cats[1]
+  # Bottom box is first (lowest DisplayOrder = lowest satisfaction scores)
+  bottom_category <- ordered_cats[1]
 
-  # Exclude DK/NA from bottom
+  # Exclude DK/NA from top box selection
   non_dk_cats <- ordered_cats[!grepl("DK|NA|Don't Know|Not Applicable",
                                      ordered_cats, ignore.case = TRUE)]
 
   if (length(non_dk_cats) < 2) {
-    bottom_category <- ordered_cats[length(ordered_cats)]
+    top_category <- ordered_cats[length(ordered_cats)]
   } else {
-    bottom_category <- non_dk_cats[length(non_dk_cats)]
+    # Top box is last non-DK (highest DisplayOrder = highest satisfaction scores)
+    top_category <- non_dk_cats[length(non_dk_cats)]
   }
 
   # Skip if Top and Bottom are the same
