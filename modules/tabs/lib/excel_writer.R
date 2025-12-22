@@ -1233,35 +1233,26 @@ write_index_summary_sheet <- function(wb, summary_table, banner_info,
     halign = "left"
   )
 
-  # Data cell style - use the same index_style from crosstabs for consistency
-  # This ensures Index Summary decimals match the crosstab index decimals
-  data_style <- if (!is.null(styles$index_style)) {
-    styles$index_style
+  # Data cell style - use same decimal places as crosstab index but without bold
+  # Get decimal places from config (same source as crosstab styles)
+  decimal_places_for_summary <- if (!is.null(config$decimal_places_index) &&
+                                     length(config$decimal_places_index) > 0) {
+    config$decimal_places_index
+  } else if (!is.null(config$decimal_places_ratings) &&
+             length(config$decimal_places_ratings) > 0) {
+    config$decimal_places_ratings
   } else {
-    # Fallback: create style using config decimal places
-    decimal_places_for_summary <- if (!is.null(config$decimal_places_index) &&
-                                       length(config$decimal_places_index) > 0) {
-      config$decimal_places_index
-    } else if (!is.null(config$decimal_places_ratings) &&
-               length(config$decimal_places_ratings) > 0) {
-      config$decimal_places_ratings
-    } else {
-      1  # Default to 1 decimal place
-    }
-
-    # Create number format string
-    if (decimal_places_for_summary > 0) {
-      num_format <- paste0("0.", paste(rep("0", decimal_places_for_summary), collapse = ""))
-    } else {
-      num_format <- "0"
-    }
-
-    openxlsx::createStyle(
-      fontSize = 10,
-      halign = "right",
-      numFmt = num_format
-    )
+    1  # Default to 1 decimal place
   }
+
+  # Use shared formatting function for consistency with crosstabs
+  num_format <- create_excel_number_format(decimal_places_for_summary)
+
+  data_style <- openxlsx::createStyle(
+    fontSize = 10,
+    halign = "right",
+    numFmt = num_format
+  )
 
   # Write title section
   openxlsx::writeData(wb, "Index_Summary", "INDEX & RATING SUMMARY",
