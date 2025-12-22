@@ -5,7 +5,7 @@
 # Purpose: Analyze all R scripts in the Turas repository and generate a
 #          comprehensive inventory with metrics and refactoring assessments
 # Usage: source("generate_script_inventory.R") or Rscript generate_script_inventory.R
-# Output: Creates CSV and HTML reports in the repository root
+# Output: Creates CSV and HTML reports in structure/ directory
 # Version: 1.0.0
 # Date: 2025-12-14
 # ==============================================================================
@@ -27,9 +27,15 @@ SCRIPT_DIR <- tryCatch({
 # Repository root (script is in tools/inventory, so go up 2 levels)
 REPO_ROOT <- normalizePath(file.path(SCRIPT_DIR, "..", ".."), mustWork = FALSE)
 
-# Output files
-OUTPUT_CSV <- file.path(REPO_ROOT, "r_script_inventory.csv")
-OUTPUT_HTML <- file.path(REPO_ROOT, "r_script_inventory.html")
+# Output files - save to structure/ directory
+OUTPUT_DIR <- file.path(REPO_ROOT, "structure")
+OUTPUT_CSV <- file.path(OUTPUT_DIR, "r_script_inventory.csv")
+OUTPUT_HTML <- file.path(OUTPUT_DIR, "r_script_inventory.html")
+
+# Ensure output directory exists
+if (!dir.exists(OUTPUT_DIR)) {
+  dir.create(OUTPUT_DIR, recursive = TRUE)
+}
 
 # Directories to exclude from analysis
 EXCLUDE_DIRS <- c("renv", ".git", ".Rproj.user")

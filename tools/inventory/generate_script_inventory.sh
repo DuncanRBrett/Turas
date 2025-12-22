@@ -4,13 +4,17 @@
 # ==============================================================================
 # Purpose: Quick bash-based inventory generator (simpler than R version)
 # Usage: ./generate_script_inventory.sh
-# Output: Creates CSV report in the repository root
+# Output: Creates CSV report in structure/ directory
 # Note: For full featured analysis with HTML report, use generate_script_inventory.R
 # ==============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-OUTPUT_CSV="${REPO_ROOT}/r_script_inventory_quick.csv"
+OUTPUT_DIR="${REPO_ROOT}/structure"
+OUTPUT_CSV="${OUTPUT_DIR}/r_script_inventory_quick.csv"
+
+# Ensure output directory exists
+mkdir -p "$OUTPUT_DIR"
 
 echo "=============================================================================="
 echo "TURAS R SCRIPT INVENTORY GENERATOR (Quick Bash Version)"

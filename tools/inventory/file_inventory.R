@@ -4,16 +4,16 @@
 # =============================================================================
 # Purpose: Conduct a comprehensive inventory of all files in the Turas project
 # Author: The Research LampPost (Pty) Ltd
-# Usage: source("tools/file_inventory.R") or Rscript tools/file_inventory.R
-# Output: Creates TURAS_FILE_INVENTORY.csv and prints summary to console
+# Usage: source("tools/inventory/file_inventory.R") or Rscript tools/inventory/file_inventory.R
+# Output: Creates structure/TURAS_FILE_INVENTORY.csv and prints summary to console
 # =============================================================================
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 
-# Set the root directory (adjust if running from different location)
-TURAS_ROOT <- normalizePath(file.path(dirname(sys.frame(1)$ofile), ".."),
+# Set the root directory (script is in tools/inventory, so go up 2 levels)
+TURAS_ROOT <- normalizePath(file.path(dirname(sys.frame(1)$ofile), "..", ".."),
                             mustWork = FALSE)
 if (is.null(sys.frame(1)$ofile)) {
   # Running interactively or via source()
@@ -21,10 +21,19 @@ if (is.null(sys.frame(1)$ofile)) {
   if (!file.exists(file.path(TURAS_ROOT, "Turas.Rproj"))) {
     TURAS_ROOT <- normalizePath(file.path(TURAS_ROOT, ".."), mustWork = FALSE)
   }
+  if (!file.exists(file.path(TURAS_ROOT, "Turas.Rproj"))) {
+    TURAS_ROOT <- normalizePath(file.path(TURAS_ROOT, ".."), mustWork = FALSE)
+  }
 }
 
-# Output file
-OUTPUT_FILE <- file.path(TURAS_ROOT, "TURAS_FILE_INVENTORY.csv")
+# Ensure structure directory exists
+STRUCTURE_DIR <- file.path(TURAS_ROOT, "structure")
+if (!dir.exists(STRUCTURE_DIR)) {
+  dir.create(STRUCTURE_DIR, recursive = TRUE)
+}
+
+# Output file - save to structure/ directory
+OUTPUT_FILE <- file.path(TURAS_ROOT, "structure", "TURAS_FILE_INVENTORY.csv")
 
 # Directories to exclude from inventory
 EXCLUDE_DIRS <- c(".git", ".Rproj.user", "__pycache__", ".idea", "node_modules")
