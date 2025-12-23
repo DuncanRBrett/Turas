@@ -1,7 +1,6 @@
 # Turas Tabs Module
 
-**Version:** 10.0
-**Date:** 22 December 2025
+**Version:** 10.0 **Date:** 22 December 2025
 
 Cross-tabulation and survey data analysis engine for market research.
 
@@ -13,7 +12,7 @@ Turas Tabs transforms survey data into professional cross-tabulation reports. Po
 
 The fastest way to get started:
 
-```r
+``` r
 # From the Turas root directory
 source("turas.R")
 turas_load("tabs")
@@ -24,7 +23,7 @@ run_tabs_analysis("path/to/your/project")
 
 Or use the graphical interface:
 
-```r
+``` r
 source("modules/tabs/run_tabs_gui.R")
 ```
 
@@ -32,26 +31,26 @@ source("modules/tabs/run_tabs_gui.R")
 
 Before running an analysis, you'll need three things:
 
-1. **Survey_Structure.xlsx** - Defines your questions, response options, and composite metrics
-2. **Tabs_Config.xlsx** - Specifies analysis settings and which questions to analyze
-3. **Data file** - Your survey responses (Excel, CSV, or SPSS format)
+1.  **Survey_Structure.xlsx** - Defines your questions, response options, and composite metrics
+2.  **Tabs_Config.xlsx** - Specifies analysis settings and which questions to analyze
+3.  **Data file** - Your survey responses (Excel, CSV, or SPSS format)
 
 Both template files are available in the `templates/` subfolder of this documentation.
 
 ## Key Features
 
-- Cross-tabulation with statistical significance testing
-- Support for multiple question types: Single, Multi, Rating, NPS, Ranking, Numeric, Composite
-- Weighted data analysis with design effect (DEFF) calculations
-- Banner breakout analysis across demographic segments
-- Configurable Excel output with professional formatting
+-   Cross-tabulation with statistical significance testing
+-   Support for multiple question types: Single, Multi, Rating, NPS, Ranking, Numeric, Composite
+-   Weighted data analysis with design effect (DEFF) calculations
+-   Banner breakout analysis across demographic segments
+-   Configurable Excel output with professional formatting
 
 ## Documentation
 
 This documentation pack contains everything you need:
 
 | Document | Purpose |
-|----------|---------|
+|----|----|
 | [02_TABS_OVERVIEW.md](02_TABS_OVERVIEW.md) | High-level introduction and capabilities |
 | [03_REFERENCE_GUIDE.md](03_REFERENCE_GUIDE.md) | Complete feature reference |
 | [04_USER_MANUAL.md](04_USER_MANUAL.md) | Step-by-step usage instructions |
@@ -61,24 +60,20 @@ This documentation pack contains everything you need:
 
 ## Dependencies
 
-**Required:**
-- openxlsx (Excel file I/O)
-- readxl (Excel reading)
+**Required:** - openxlsx (Excel file I/O) - readxl (Excel reading)
 
-**Optional:**
-- haven (SPSS file support)
-- data.table (faster CSV processing)
+**Optional:** - haven (SPSS file support) - data.table (faster CSV processing)
 
 Install with:
 
-```r
+``` r
 install.packages(c("openxlsx", "readxl"))
 install.packages(c("haven", "data.table"))  # optional
 ```
 
 ## Module Structure
 
-```
+```         
 modules/tabs/
 ├── run_tabs.R              # Main entry point
 ├── run_tabs_gui.R          # GUI interface

@@ -1,12 +1,19 @@
+---
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
 # Turas Tabs - Technical Documentation
 
-**Version:** 10.0
-**Date:** 22 December 2025
-**Audience:** Developers, Technical Contributors, Module Maintainers
+**Version:** 10.0 **Date:** 22 December 2025 **Audience:** Developers,
+Technical Contributors, Module Maintainers
 
-This document covers the internal architecture, code structure, and implementation details of the Tabs module. For user-facing documentation, see the [User Manual](04_USER_MANUAL.md).
+This document covers the internal architecture, code structure, and
+implementation details of the Tabs module. For user-facing
+documentation, see the [User Manual](04_USER_MANUAL.md).
 
----
+------------------------------------------------------------------------
 
 ## Architecture Overview
 
@@ -14,16 +21,16 @@ This document covers the internal architecture, code structure, and implementati
 
 Tabs follows a pipeline architecture with clear separation of concerns:
 
-```
+```         
 Input → Load → Validate → Process → Calculate → Write → Output
 ```
 
-The design emphasizes:
-- **Modularity:** Each component has a single responsibility
-- **Testability:** Functions are pure where possible with explicit dependencies
-- **Fail-Fast:** Validation occurs early with clear error messages
-- **Memory Efficiency:** Vectorized operations, minimal data duplication
-- **Extensibility:** New question types can be added without modifying core logic
+The design emphasizes: - **Modularity:** Each component has a single
+responsibility - **Testability:** Functions are pure where possible with
+explicit dependencies - **Fail-Fast:** Validation occurs early with
+clear error messages - **Memory Efficiency:** Vectorized operations,
+minimal data duplication - **Extensibility:** New question types can be
+added without modifying core logic
 
 ### Design Patterns
 
@@ -31,19 +38,23 @@ The module uses several established patterns:
 
 **Pipeline Pattern:** Data flows through sequential processing stages.
 
-**Strategy Pattern:** Different processors handle different question types. The dispatcher routes to the appropriate processor based on question type.
+**Strategy Pattern:** Different processors handle different question
+types. The dispatcher routes to the appropriate processor based on
+question type.
 
-**Factory Pattern:** The question dispatcher creates processor instances based on configuration.
+**Factory Pattern:** The question dispatcher creates processor instances
+based on configuration.
 
-**Builder Pattern:** The Excel writer constructs complex output incrementally, adding sheets and formatting as it goes.
+**Builder Pattern:** The Excel writer constructs complex output
+incrementally, adding sheets and formatting as it goes.
 
----
+------------------------------------------------------------------------
 
 ## Module Structure
 
 ### File Organization
 
-```
+```         
 modules/tabs/
 ├── run_tabs.R                    # Main entry point
 ├── run_tabs_gui.R                # Shiny GUI interface
@@ -70,18 +81,16 @@ Total lines of code: approximately 9,500.
 
 ### Dependencies
 
-**Required R Packages:**
-- openxlsx: Excel file I/O
-- readxl: Reading Excel configuration files
+**Required R Packages:** - openxlsx: Excel file I/O - readxl: Reading
+Excel configuration files
 
-**Optional R Packages:**
-- data.table: High-performance data operations (faster CSV reading)
-- haven: SPSS file support
+**Optional R Packages:** - data.table: High-performance data operations
+(faster CSV reading) - haven: SPSS file support
 
-**Internal Dependencies:**
-Currently standalone. Future versions may integrate with shared Turas utilities.
+**Internal Dependencies:** Currently standalone. Future versions may
+integrate with shared Turas utilities.
 
----
+------------------------------------------------------------------------
 
 ## Core Components
 
@@ -91,25 +100,28 @@ Loads and parses Excel configuration files into R data structures.
 
 **Key Functions:**
 
-```r
+``` r
 load_crosstab_configuration(config_file, project_root = NULL)
 ```
-Returns a list containing:
-- `config`: Parsed settings
-- `paths`: Resolved file paths
-- `selection`: Banner and stub question selections
-- `validation`: Validation results
-- `project_root`: Project directory path
 
-```r
+Returns a list containing: - `config`: Parsed settings - `paths`:
+Resolved file paths - `selection`: Banner and stub question selections -
+`validation`: Validation results - `project_root`: Project directory
+path
+
+``` r
 load_config_settings(config_file, sheet_name = "Settings")
 ```
-Reads the Settings sheet and returns a named list. Handles duplicate detection, type conversion, and NA handling.
 
-```r
+Reads the Settings sheet and returns a named list. Handles duplicate
+detection, type conversion, and NA handling.
+
+``` r
 get_config_value(config_list, setting_name, default_value = NULL, required = FALSE)
 ```
-Safely retrieves a configuration value with a default fallback. Stops execution if required = TRUE and the value is missing.
+
+Safely retrieves a configuration value with a default fallback. Stops
+execution if required = TRUE and the value is missing.
 
 ### Validation Module (validation.R)
 
@@ -117,41 +129,37 @@ Comprehensive input validation with clear error messages.
 
 **Key Functions:**
 
-```r
+``` r
 validate_survey_structure(survey_structure, error_log = NULL)
 ```
-Validates the Survey Structure file:
-- Required columns present (QuestionCode, QuestionText, Variable_Type)
-- No duplicate QuestionCodes
-- Valid Variable_Type values
-- Questions have matching options
-- No orphan options
 
-```r
+Validates the Survey Structure file: - Required columns present
+(QuestionCode, QuestionText, Variable_Type) - No duplicate
+QuestionCodes - Valid Variable_Type values - Questions have matching
+options - No orphan options
+
+``` r
 validate_survey_data(data, survey_structure, error_log = NULL)
 ```
-Validates the survey data file:
-- Required question columns exist
-- Data types match expectations
-- No completely empty columns
-- Multi-mention column counts match structure
 
-```r
+Validates the survey data file: - Required question columns exist - Data
+types match expectations - No completely empty columns - Multi-mention
+column counts match structure
+
+``` r
 validate_weights(weights, data, error_log = NULL,
                  weight_na_threshold = 10,
                  weight_zero_threshold = 5,
                  weight_deff_warning = 3)
 ```
-Validates weight values:
-- Weights are numeric
-- Length matches data
-- NA count below threshold
-- Zero count below threshold
-- DEFF below warning threshold
+
+Validates weight values: - Weights are numeric - Length matches data -
+NA count below threshold - Zero count below threshold - DEFF below
+warning threshold
 
 **Error Log Structure:**
 
-```r
+``` r
 error_log <- list(
   errors = list(),    # Critical issues (stop execution)
   warnings = list(),  # Non-critical issues
@@ -159,73 +167,62 @@ error_log <- list(
 )
 ```
 
-Each entry contains:
-- `source`: Which component detected the issue
-- `category`: What type of issue
-- `message`: What went wrong
-- `details`: Additional context
-- `severity`: Error, Warning, or Info
+Each entry contains: - `source`: Which component detected the issue -
+`category`: What type of issue - `message`: What went wrong - `details`:
+Additional context - `severity`: Error, Warning, or Info
 
 ### Question Orchestrator (question_orchestrator.R)
 
 Prepares question data for processing.
 
-```r
+``` r
 prepare_question_data(question_code, base_filter,
                       survey_data, survey_structure,
                       banner_info, master_weights)
 ```
 
-Returns a list containing:
-- `question_info`: Metadata for the question
-- `question_options`: Response options
-- `filtered_data`: Data with base filter applied
-- `question_weights`: Weights for filtered data
-- `banner_row_indices`: Row indices by banner column
-- `banner_bases`: Base sizes by banner column
-- `base_filter`: The applied filter expression
+Returns a list containing: - `question_info`: Metadata for the
+question - `question_options`: Response options - `filtered_data`: Data
+with base filter applied - `question_weights`: Weights for filtered
+data - `banner_row_indices`: Row indices by banner column -
+`banner_bases`: Base sizes by banner column - `base_filter`: The applied
+filter expression
 
-**Processing steps:**
-1. Load metadata from structure
-2. Extract question options
-3. Apply base filter (if specified)
-4. Create row indices for each banner column
-5. Calculate base sizes (unweighted, weighted, effective)
+**Processing steps:** 1. Load metadata from structure 2. Extract
+question options 3. Apply base filter (if specified) 4. Create row
+indices for each banner column 5. Calculate base sizes (unweighted,
+weighted, effective)
 
 ### Question Dispatcher (question_dispatcher.R)
 
 Routes questions to the appropriate processor based on type.
 
-```r
+``` r
 process_question(question_code, base_filter, survey_data,
                  survey_structure, banner_info, master_weights,
                  config, error_log)
 ```
 
-**Routing logic:**
-- Composite questions → composite_processor
-- Single_Mention, Multi_Mention, Ranking → standard_processor
-- Numeric, Rating, NPS, Likert → numeric_processor
+**Routing logic:** - Composite questions → composite_processor -
+Single_Mention, Multi_Mention, Ranking → standard_processor - Numeric,
+Rating, NPS, Likert → numeric_processor
 
 ### Standard Processor (standard_processor.R)
 
 Processes Single_Mention and Multi_Mention questions.
 
-```r
+``` r
 process_standard_question(prepared_data, config, error_log)
 ```
 
-**Algorithm:**
-1. For each response option:
-   - Calculate weighted counts across banner columns
-   - Create frequency row (if enabled)
-   - Create percentage row
-   - Calculate significance (if enabled)
-2. Combine rows into result table
-3. Return structured result object
+**Algorithm:** 1. For each response option: - Calculate weighted counts
+across banner columns - Create frequency row (if enabled) - Create
+percentage row - Calculate significance (if enabled) 2. Combine rows
+into result table 3. Return structured result object
 
 **Result structure:**
-```r
+
+``` r
 list(
   question_code = "Q01",
   question_text = "Which brand do you prefer?",
@@ -245,25 +242,21 @@ list(
 
 Processes Numeric, Rating, NPS, and Likert questions.
 
-```r
+``` r
 process_numeric_question(prepared_data, config, error_log)
 ```
 
-**Rating Questions:**
-- Shows frequency and percentage for each scale point
-- Calculates weighted mean
-- Optional: Top-2-Box, Bottom-2-Box percentages
-- Significance testing on means (t-test)
+**Rating Questions:** - Shows frequency and percentage for each scale
+point - Calculates weighted mean - Optional: Top-2-Box, Bottom-2-Box
+percentages - Significance testing on means (t-test)
 
-**NPS Questions:**
-- Calculates Detractor, Passive, Promoter percentages
-- Calculates NPS score (Promoters - Detractors)
-- Significance testing on NPS score
+**NPS Questions:** - Calculates Detractor, Passive, Promoter
+percentages - Calculates NPS score (Promoters - Detractors) -
+Significance testing on NPS score
 
-**Numeric Questions:**
-- Calculates mean, median (optional), mode (optional), standard deviation
-- Optional: Min/Max, percentiles
-- Significance testing on means
+**Numeric Questions:** - Calculates mean, median (optional), mode
+(optional), standard deviation - Optional: Min/Max, percentiles -
+Significance testing on means
 
 ### Cell Calculator (cell_calculator.R)
 
@@ -271,28 +264,32 @@ Core calculation functions for cells and rows.
 
 **Key Functions:**
 
-```r
+``` r
 calculate_row_counts(data, banner_row_indices, option_text,
                      question_col, is_multi_mention, existing_cols,
                      internal_keys, master_weights)
 ```
-Calculates weighted counts for one response option across all banner columns. Returns a named numeric vector.
 
-```r
+Calculates weighted counts for one response option across all banner
+columns. Returns a named numeric vector.
+
+``` r
 calculate_weighted_percentage(weighted_count, weighted_base)
 ```
+
 Safely calculates percentage with zero-division handling.
 
-```r
+``` r
 create_percentage_row(row_counts, banner_bases, internal_keys,
                       display_text, show_label = TRUE, decimal_places = 0)
 ```
+
 Creates a formatted percentage row for the output table.
 
-**Memory Optimization:**
-The module uses index-based subsetting to avoid weight duplication:
+**Memory Optimization:** The module uses index-based subsetting to avoid
+weight duplication:
 
-```r
+``` r
 # Efficient: Use master_weights[row_idx]
 subset_weights <- master_weights[row_idx]
 
@@ -305,7 +302,8 @@ subset_weights <- rep(master_weights, each = n)
 Manages banner (column) structure and indexing.
 
 **Banner Structure:**
-```r
+
+``` r
 banner_info <- list(
   display_labels = c("Total", "Male", "Female", "18-34", "35-54", "55+"),
   internal_keys = c("Total", "Q99_Male", "Q99_Female", "Q98_18-34", ...),
@@ -316,11 +314,14 @@ banner_info <- list(
 ```
 
 **Banner Index Creation:**
-```r
+
+``` r
 create_banner_row_indices(data, banner_info)
 ```
+
 Returns row indices for each banner column:
-```r
+
+``` r
 list(
   Total = 1:500,
   Q99_Male = c(1, 3, 5, ...),
@@ -335,51 +336,62 @@ Weight loading, validation, and base calculations.
 
 **Key Functions:**
 
-```r
+``` r
 load_weights(data, weight_column)
 ```
-Loads weight column from data. Returns vector of weights or vector of 1s if no weighting.
 
-```r
+Loads weight column from data. Returns vector of weights or vector of 1s
+if no weighting.
+
+``` r
 calculate_weighted_base(data, question_info, weights)
 ```
+
 Calculates three base sizes: unweighted, weighted, effective.
 
-```r
+``` r
 calculate_deff(weights)
 ```
+
 Calculates Design Effect using coefficient of variation method:
-```r
+
+``` r
 DEFF = 1 + CV²
 ```
+
 where CV = standard deviation of weights / mean of weights.
 
-```r
+``` r
 calculate_effective_base(weighted_base, deff)
 ```
+
 Calculates effective sample size: n_effective = n_weighted / DEFF
 
 ### Excel Writer (excel_writer.R)
 
 Formats and writes results to Excel workbook.
 
-```r
+``` r
 write_crosstab_excel(all_results, config, output_file)
 ```
-Creates complete crosstab workbook with one sheet per question, formatted with colors, borders, and number formats.
 
-```r
+Creates complete crosstab workbook with one sheet per question,
+formatted with colors, borders, and number formats.
+
+``` r
 format_crosstab_sheet(wb, sheet_name, question_result, config)
 ```
-Formats one question sheet with headers, percentage formats, significance highlighting, and frozen panes.
 
----
+Formats one question sheet with headers, percentage formats,
+significance highlighting, and frozen panes.
+
+------------------------------------------------------------------------
 
 ## Data Flow
 
 ### Complete Pipeline
 
-```
+```         
 1. CONFIGURATION LOADING
    - Load Tabs_Config.xlsx (Settings, Selection sheets)
    - Load Survey_Structure.xlsx (Questions, Options, Composite_Metrics)
@@ -425,7 +437,7 @@ Formats one question sheet with headers, percentage formats, significance highli
 
 ### Memory Management
 
-```
+```         
 Configuration (small) → kept in memory
 Survey Structure (medium) → kept in memory
 Survey Data (large) → kept in memory
@@ -440,14 +452,12 @@ All Results (medium) → written to Excel, then discarded
 Excel Workbook (large) → written to disk, memory freed
 ```
 
-**Optimization Strategies:**
-1. Keep master weights and data without duplication
-2. Use index-based subsetting
-3. Process questions sequentially, discard intermediate results
-4. Write Excel incrementally for many questions
-5. Call gc() after large operations
+**Optimization Strategies:** 1. Keep master weights and data without
+duplication 2. Use index-based subsetting 3. Process questions
+sequentially, discard intermediate results 4. Write Excel incrementally
+for many questions 5. Call gc() after large operations
 
----
+------------------------------------------------------------------------
 
 ## Statistical Algorithms
 
@@ -455,19 +465,20 @@ Excel Workbook (large) → written to disk, memory freed
 
 Used for categorical data (Single_Mention, Multi_Mention).
 
-```r
+``` r
 chi_square <- sum((O - E)^2 / E)
 df <- (n_rows - 1) * (n_cols - 1)
 p_value <- pchisq(chi_square, df, lower.tail = FALSE)
 ```
 
-Where O = observed count, E = expected count = (row total × column total) / grand total.
+Where O = observed count, E = expected count = (row total × column
+total) / grand total.
 
 ### Z-Test for Proportions
 
 Used for comparing two proportions.
 
-```r
+``` r
 p1 <- count1 / base1
 p2 <- count2 / base2
 p_pool <- (count1 + count2) / (base1 + base2)
@@ -480,7 +491,7 @@ p_value <- 2 * pnorm(-abs(z))
 
 Used for comparing means (Welch's t-test with unequal variances).
 
-```r
+``` r
 mean1 <- weighted.mean(values1, weights1)
 mean2 <- weighted.mean(values2, weights2)
 var1 <- weighted.var(values1, weights1)
@@ -495,7 +506,7 @@ p_value <- 2 * pt(-abs(t), df)
 
 ### Design Effect
 
-```r
+``` r
 weight_mean <- mean(weights)
 weight_sd <- sd(weights)
 cv <- weight_sd / weight_mean
@@ -503,16 +514,18 @@ deff <- 1 + cv^2
 n_effective <- n_weighted / deff
 ```
 
----
+------------------------------------------------------------------------
 
 ## Extension Points
 
 ### Adding a New Question Type
 
-1. **Define the type** in Survey_Structure Questions sheet (Variable_Type column)
+1.  **Define the type** in Survey_Structure Questions sheet
+    (Variable_Type column)
 
-2. **Create processor** in new file `lib/custom_processor.R`:
-```r
+2.  **Create processor** in new file `lib/custom_processor.R`:
+
+``` r
 process_custom_question <- function(prepared_data, config, error_log) {
   # Extract prepared data
   question_info <- prepared_data$question_info
@@ -534,22 +547,25 @@ process_custom_question <- function(prepared_data, config, error_log) {
 }
 ```
 
-3. **Update dispatcher** in `question_dispatcher.R`:
-```r
+3.  **Update dispatcher** in `question_dispatcher.R`:
+
+``` r
 if (question_type == "Custom_Type") {
   result <- process_custom_question(prepared_data, config, error_log)
 }
 ```
 
-4. **Source new file** in `run_crosstabs.R`:
-```r
+4.  **Source new file** in `run_crosstabs.R`:
+
+``` r
 source(file.path(script_dir, "custom_processor.R"))
 ```
 
 ### Adding a New Statistical Test
 
-1. **Add test function** in `lib/statistical_tests.R`:
-```r
+1.  **Add test function** in `lib/statistical_tests.R`:
+
+``` r
 calculate_custom_test <- function(count1, base1, count2, base2, alpha = 0.05) {
   # Perform test
   # ...
@@ -561,47 +577,52 @@ calculate_custom_test <- function(count1, base1, count2, base2, alpha = 0.05) {
 }
 ```
 
-2. **Update processors** to use the new test when configured.
+2.  **Update processors** to use the new test when configured.
 
-3. **Document** the new option in configuration.
+3.  **Document** the new option in configuration.
 
----
+------------------------------------------------------------------------
 
 ## Performance Benchmarks
 
 Tested on MacBook Pro M1:
 
-| Dataset Size | Questions | Banner Cols | Time |
-|--------------|-----------|-------------|------|
-| 500 rows | 20 | 5 | 2-3 seconds |
-| 2,000 rows | 50 | 10 | 8-12 seconds |
-| 10,000 rows | 100 | 15 | 45-60 seconds |
-| 50,000 rows | 200 | 20 | 5-8 minutes |
+| Dataset Size | Questions | Banner Cols | Time          |
+|--------------|-----------|-------------|---------------|
+| 500 rows     | 20        | 5           | 2-3 seconds   |
+| 2,000 rows   | 50        | 10          | 8-12 seconds  |
+| 10,000 rows  | 100       | 15          | 45-60 seconds |
+| 50,000 rows  | 200       | 20          | 5-8 minutes   |
 
-**Memory Usage:**
-- 10,000 rows × 100 cols: ~200 MB RAM
-- 50,000 rows × 200 cols: ~1 GB RAM
+**Memory Usage:** - 10,000 rows × 100 cols: \~200 MB RAM - 50,000 rows ×
+200 cols: \~1 GB RAM
 
----
+------------------------------------------------------------------------
 
 ## Known Issues
 
 ### CR-TABS-001: Undefined Constant
-- **Location:** validation.R line ~1260
-- **Issue:** MAX_DECIMAL_PLACES used but not defined
-- **Workaround:** Add `MAX_DECIMAL_PLACES <- 6` at top of validation.R
+
+-   **Location:** validation.R line \~1260
+-   **Issue:** MAX_DECIMAL_PLACES used but not defined
+-   **Workaround:** Add `MAX_DECIMAL_PLACES <- 6` at top of validation.R
 
 ### CR-TABS-002: Global Namespace Pollution
-- **Location:** excel_writer.R line ~68
-- **Issue:** `source(..., local = FALSE)` loads into global environment
-- **Workaround:** Load dependencies before excel_writer
+
+-   **Location:** excel_writer.R line \~68
+-   **Issue:** `source(..., local = FALSE)` loads into global
+    environment
+-   **Workaround:** Load dependencies before excel_writer
 
 ### CR-TABS-003: Misleading Function Name
-- **Location:** shared_functions.R line ~992
-- **Issue:** `log_issue()` is pure function but name suggests side effect
-- **Workaround:** Always capture return value: `error_log <- log_issue(error_log, ...)`
 
----
+-   **Location:** shared_functions.R line \~992
+-   **Issue:** `log_issue()` is pure function but name suggests side
+    effect
+-   **Workaround:** Always capture return value:
+    `error_log <- log_issue(error_log, ...)`
+
+------------------------------------------------------------------------
 
 ## Testing
 
@@ -611,7 +632,7 @@ Estimated coverage is under 10% (mostly manual testing).
 
 ### Recommended Test Structure
 
-```
+```         
 modules/tabs/tests/
 ├── test_config_loader.R
 ├── test_validation.R
@@ -632,7 +653,7 @@ modules/tabs/tests/
 
 ### Unit Test Example
 
-```r
+``` r
 library(testthat)
 
 test_that("calculate_weighted_percentage handles zero base", {
@@ -646,13 +667,13 @@ test_that("calculate_weighted_percentage calculates correctly", {
 })
 ```
 
----
+------------------------------------------------------------------------
 
 ## Code Style Guidelines
 
 ### Naming Conventions
 
-```r
+``` r
 # Functions: snake_case
 calculate_weighted_percentage <- function(...) { }
 
@@ -668,7 +689,7 @@ MAX_DECIMAL_PLACES <- 6
 
 ### Documentation Standards
 
-```r
+``` r
 #' Function Title
 #'
 #' Detailed description of what the function does.
@@ -683,33 +704,36 @@ my_function <- function(param1, param2) {
 }
 ```
 
----
+------------------------------------------------------------------------
 
 ## Debugging
 
 ### Common Diagnostic Steps
 
 **Configuration issues:**
-```r
+
+``` r
 file.exists("Tabs_Config.xlsx")  # Should be TRUE
 getwd()  # Check working directory
 ```
 
 **Question not found:**
-```r
+
+``` r
 questions <- readxl::read_excel("Survey_Structure.xlsx", sheet = "Questions")
 "Q01" %in% questions$QuestionCode
 ```
 
 **Weight issues:**
-```r
+
+``` r
 summary(data$weight)
 hist(data$weight)
 ```
 
 ### Enabling Debug Output
 
-```r
+``` r
 DEBUG <- TRUE
 
 if (DEBUG) {
@@ -721,7 +745,7 @@ if (DEBUG) {
 
 ### Interactive Debugging
 
-```r
+``` r
 process_question <- function(...) {
   browser()  # Execution pauses here
   # ... rest of function
@@ -730,7 +754,7 @@ process_question <- function(...) {
 
 ### Profiling
 
-```r
+``` r
 Rprof("profile.out")
 result <- run_crosstabs(...)
 Rprof(NULL)

@@ -1,36 +1,48 @@
+---
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
 # Turas Tabs - Template Reference
 
-**Version:** 10.0
-**Date:** 22 December 2025
+**Version:** 10.0 **Date:** 22 December 2025
 
-This document explains every field in both configuration templates. When you're filling in a template and wondering "what does this field do?", this is your reference.
+This document explains every field in both configuration templates. When
+you're filling in a template and wondering "what does this field do?",
+this is your reference.
 
-The templates are in the `templates/` subfolder:
-- `Crosstab_Config_Template.xlsx` - Analysis configuration
-- `Survey_Structure_Template.xlsx` - Survey definition
+The templates are in the `templates/` subfolder: -
+`Crosstab_Config_Template.xlsx` - Analysis configuration -
+`Survey_Structure_Template.xlsx` - Survey definition
 
----
+------------------------------------------------------------------------
 
 # Chapter 1: Crosstab Config Template
 
-The Crosstab Config template controls how your analysis runs. It tells Tabs where to find files, which questions to analyze, and how to format the output.
+The Crosstab Config template controls how your analysis runs. It tells
+Tabs where to find files, which questions to analyze, and how to format
+the output.
 
 ## Template Structure
 
 The template has four sheets:
 
-1. **Instructions** - Usage guidance (not read by Tabs)
-2. **Settings** - Analysis configuration parameters
-3. **Selection** - Which questions to analyze and use as banners
-4. **Base Filters** - Example filter syntax (reference only)
+1.  **Instructions** - Usage guidance (not read by Tabs)
+2.  **Settings** - Analysis configuration parameters
+3.  **Selection** - Which questions to analyze and use as banners
+4.  **Base Filters** - Example filter syntax (reference only)
 
----
+------------------------------------------------------------------------
 
 ## Settings Sheet
 
-The Settings sheet uses a simple two-column format: `Setting` and `Value`. Each row defines one configuration option.
+The Settings sheet uses a simple two-column format: `Setting` and
+`Value`. Each row defines one configuration option.
 
-The settings are organized into logical groups. When copying to your working file, you only need the Setting and Value columns - the section headers in the template are for your reference only.
+The settings are organized into logical groups. When copying to your
+working file, you only need the Setting and Value columns - the section
+headers in the template are for your reference only.
 
 ### File Path Settings
 
@@ -40,14 +52,15 @@ The settings are organized into logical groups. When copying to your working fil
 
 **Required:** Yes
 
-**What to enter:** The path to your Survey_Structure.xlsx file, relative to your project folder.
+**What to enter:** The path to your Survey_Structure.xlsx file, relative
+to your project folder.
 
-**Examples:**
-- `Survey_Structure.xlsx` (same folder as config)
-- `Config/Survey_Structure.xlsx` (in a subfolder)
-- `-` (use hyphen if the structure file is in the same directory with default name)
+**Examples:** - `Survey_Structure.xlsx` (same folder as config) -
+`Config/Survey_Structure.xlsx` (in a subfolder) - `-` (use hyphen if the
+structure file is in the same directory with default name)
 
-**If it's wrong:** Tabs will fail with "Survey Structure file not found".
+**If it's wrong:** Tabs will fail with "Survey Structure file not
+found".
 
 #### output_subfolder
 
@@ -55,14 +68,12 @@ The settings are organized into logical groups. When copying to your working fil
 
 **Required:** Yes
 
-**What to enter:** A folder name. Tabs creates it inside your project's Output folder if it doesn't exist.
+**What to enter:** A folder name. Tabs creates it inside your project's
+Output folder if it doesn't exist.
 
 **Default:** `Crosstabs`
 
-**Examples:**
-- `Crosstabs`
-- `Wave1_Results`
-- `Client_Deliverable`
+**Examples:** - `Crosstabs` - `Wave1_Results` - `Client_Deliverable`
 
 #### output_filename
 
@@ -74,10 +85,8 @@ The settings are organized into logical groups. When copying to your working fil
 
 **Default:** `Crosstabs.xlsx`
 
-**Examples:**
-- `Crosstabs.xlsx`
-- `Brand_Tracker_Q1_2024.xlsx`
-- `Results.xlsx`
+**Examples:** - `Crosstabs.xlsx` - `Brand_Tracker_Q1_2024.xlsx` -
+`Results.xlsx`
 
 #### output_format
 
@@ -89,11 +98,11 @@ The settings are organized into logical groups. When copying to your working fil
 
 **Default:** `xlsx`
 
-**What each option does:**
-- `xlsx` creates a single Excel workbook with multiple sheets (recommended for most uses)
-- `csv` creates separate CSV files for each question (useful for importing into other systems)
+**What each option does:** - `xlsx` creates a single Excel workbook with
+multiple sheets (recommended for most uses) - `csv` creates separate CSV
+files for each question (useful for importing into other systems)
 
----
+------------------------------------------------------------------------
 
 ### Weighting Settings
 
@@ -107,31 +116,35 @@ The settings are organized into logical groups. When copying to your working fil
 
 **Default:** `FALSE`
 
-**When to use TRUE:** When your data file contains a weight column and you want weighted results.
+**When to use TRUE:** When your data file contains a weight column and
+you want weighted results.
 
-**When to use FALSE:** When you want unweighted counts and percentages (raw sample data).
+**When to use FALSE:** When you want unweighted counts and percentages
+(raw sample data).
 
-**Important:** If you set this to TRUE, you must also specify weight_variable.
+**Important:** If you set this to TRUE, you must also specify
+weight_variable.
 
 #### weight_variable
 
-**What it does:** Tells Tabs which column in your data contains weight values.
+**What it does:** Tells Tabs which column in your data contains weight
+values.
 
 **Required:** Only if apply_weighting = TRUE
 
-**What to enter:** The exact column name from your data file, or `-` if not using weights.
+**What to enter:** The exact column name from your data file, or `-` if
+not using weights.
 
-**Examples:**
-- `Weight`
-- `survey_weight`
-- `Weight_Final`
-- `-` (if apply_weighting = FALSE)
+**Examples:** - `Weight` - `survey_weight` - `Weight_Final` - `-` (if
+apply_weighting = FALSE)
 
-**If it's wrong:** Tabs will fail with "Weight variable not found in data".
+**If it's wrong:** Tabs will fail with "Weight variable not found in
+data".
 
 #### show_unweighted_n
 
-**What it does:** Controls whether the output shows the actual respondent count (before weighting).
+**What it does:** Controls whether the output shows the actual
+respondent count (before weighting).
 
 **Required:** Yes
 
@@ -139,13 +152,17 @@ The settings are organized into logical groups. When copying to your working fil
 
 **Default:** `TRUE`
 
-**Why you'd want TRUE:** Clients often want to see both the weighted population estimate and the actual sample size. The unweighted count tells you how many people actually answered.
+**Why you'd want TRUE:** Clients often want to see both the weighted
+population estimate and the actual sample size. The unweighted count
+tells you how many people actually answered.
 
-**Why you'd want FALSE:** If you only want to show weighted figures and don't want to clutter the output with multiple base rows.
+**Why you'd want FALSE:** If you only want to show weighted figures and
+don't want to clutter the output with multiple base rows.
 
 #### show_effective_n
 
-**What it does:** Controls whether the output shows the effective sample size (accounts for weighting efficiency loss).
+**What it does:** Controls whether the output shows the effective sample
+size (accounts for weighting efficiency loss).
 
 **Required:** Yes
 
@@ -153,15 +170,22 @@ The settings are organized into logical groups. When copying to your working fil
 
 **Default:** `TRUE`
 
-**What effective N means:** When you weight data, some respondents count more than others. This reduces your effective statistical power. Effective N tells you how many unweighted respondents your weighted sample is equivalent to for statistical purposes.
+**What effective N means:** When you weight data, some respondents count
+more than others. This reduces your effective statistical power.
+Effective N tells you how many unweighted respondents your weighted
+sample is equivalent to for statistical purposes.
 
-**Why you'd want TRUE:** Understanding the real precision of your estimates. If weighted N is 1,000 but effective N is 600, you have less precision than the raw number suggests.
+**Why you'd want TRUE:** Understanding the real precision of your
+estimates. If weighted N is 1,000 but effective N is 600, you have less
+precision than the raw number suggests.
 
-**Why you'd want FALSE:** If you don't need to communicate this level of detail.
+**Why you'd want FALSE:** If you don't need to communicate this level of
+detail.
 
 #### weight_label
 
-**What it does:** Sets the label shown in output to indicate weighted values.
+**What it does:** Sets the label shown in output to indicate weighted
+values.
 
 **Required:** Yes
 
@@ -169,16 +193,15 @@ The settings are organized into logical groups. When copying to your working fil
 
 **Default:** `Weighted`
 
-**Examples:**
-- `Weighted`
-- `Population Estimate`
-- `Final Weight`
+**Examples:** - `Weighted` - `Population Estimate` - `Final Weight`
 
-This label appears in the output so readers know which rows are weighted.
+This label appears in the output so readers know which rows are
+weighted.
 
 #### weight_na_threshold
 
-**What it does:** Sets the percentage of NA (missing) weights that triggers a warning.
+**What it does:** Sets the percentage of NA (missing) weights that
+triggers a warning.
 
 **Required:** Yes
 
@@ -186,11 +209,14 @@ This label appears in the output so readers know which rows are weighted.
 
 **Default:** `10`
 
-**How it works:** If more than this percentage of weight values are missing, Tabs warns you. A high percentage of missing weights suggests a problem with your data or weight variable specification.
+**How it works:** If more than this percentage of weight values are
+missing, Tabs warns you. A high percentage of missing weights suggests a
+problem with your data or weight variable specification.
 
 #### weight_zero_threshold
 
-**What it does:** Sets the percentage of zero weights that triggers a warning.
+**What it does:** Sets the percentage of zero weights that triggers a
+warning.
 
 **Required:** Yes
 
@@ -198,11 +224,14 @@ This label appears in the output so readers know which rows are weighted.
 
 **Default:** `5`
 
-**How it works:** Zero weights effectively remove respondents from the analysis. If too many weights are zero, it might indicate a weighting problem.
+**How it works:** Zero weights effectively remove respondents from the
+analysis. If too many weights are zero, it might indicate a weighting
+problem.
 
 #### weight_deff_warning
 
-**What it does:** Sets the Design Effect (DEFF) threshold that triggers a warning.
+**What it does:** Sets the Design Effect (DEFF) threshold that triggers
+a warning.
 
 **Required:** Yes
 
@@ -210,11 +239,16 @@ This label appears in the output so readers know which rows are weighted.
 
 **Default:** `3`
 
-**What DEFF means:** DEFF measures how much your weighting reduces statistical efficiency. A DEFF of 1.0 means no loss (all weights equal). A DEFF of 2.0 means your sample is only worth half its nominal size for statistical purposes.
+**What DEFF means:** DEFF measures how much your weighting reduces
+statistical efficiency. A DEFF of 1.0 means no loss (all weights equal).
+A DEFF of 2.0 means your sample is only worth half its nominal size for
+statistical purposes.
 
-**Why 3 is the default:** A DEFF above 3 usually indicates problematic weighting - extreme weight values, high variance in weights, or an inadequate weighting scheme.
+**Why 3 is the default:** A DEFF above 3 usually indicates problematic
+weighting - extreme weight values, high variance in weights, or an
+inadequate weighting scheme.
 
----
+------------------------------------------------------------------------
 
 ### Display Settings
 
@@ -228,13 +262,16 @@ This label appears in the output so readers know which rows are weighted.
 
 **Default:** `TRUE`
 
-**When to use TRUE:** When you want to see both counts and percentages. Useful for checking base sizes and understanding absolute numbers.
+**When to use TRUE:** When you want to see both counts and percentages.
+Useful for checking base sizes and understanding absolute numbers.
 
-**When to use FALSE:** When you only want percentages and want cleaner, more compact tables.
+**When to use FALSE:** When you only want percentages and want cleaner,
+more compact tables.
 
 #### show_percent_column
 
-**What it does:** Controls whether output shows column percentages (the most common type of crosstab percentage).
+**What it does:** Controls whether output shows column percentages (the
+most common type of crosstab percentage).
 
 **Required:** Yes
 
@@ -242,9 +279,12 @@ This label appears in the output so readers know which rows are weighted.
 
 **Default:** `TRUE`
 
-**What column percentages mean:** Each cell shows the percentage within its column. For example, if 200 out of 500 males are "Very Satisfied", that cell shows 40%.
+**What column percentages mean:** Each cell shows the percentage within
+its column. For example, if 200 out of 500 males are "Very Satisfied",
+that cell shows 40%.
 
-**When to use TRUE:** Almost always. Column percentages are the standard for crosstabs.
+**When to use TRUE:** Almost always. Column percentages are the standard
+for crosstabs.
 
 #### show_percent_row
 
@@ -256,13 +296,17 @@ This label appears in the output so readers know which rows are weighted.
 
 **Default:** `FALSE`
 
-**What row percentages mean:** Each cell shows the percentage within its row. For example, if 200 males and 150 females are "Very Satisfied", the male cell shows 57% (200/350) and the female cell shows 43% (150/350).
+**What row percentages mean:** Each cell shows the percentage within its
+row. For example, if 200 males and 150 females are "Very Satisfied", the
+male cell shows 57% (200/350) and the female cell shows 43% (150/350).
 
-**When to use TRUE:** When you want to see how each response option breaks down across banner columns. Less common than column percentages.
+**When to use TRUE:** When you want to see how each response option
+breaks down across banner columns. Less common than column percentages.
 
 #### decimal_separator
 
-**What it does:** Sets which character separates whole numbers from decimals.
+**What it does:** Sets which character separates whole numbers from
+decimals.
 
 **Required:** Yes
 
@@ -270,15 +314,15 @@ This label appears in the output so readers know which rows are weighted.
 
 **Default:** `,`
 
-**Examples:**
-- `.` produces 8.2 (US/UK format)
-- `,` produces 8,2 (European format)
+**Examples:** - `.` produces 8.2 (US/UK format) - `,` produces 8,2
+(European format)
 
 This only affects display formatting; calculations are unaffected.
 
 #### decimal_places_percent
 
-**What it does:** Sets how many decimal places to show for percentage values.
+**What it does:** Sets how many decimal places to show for percentage
+values.
 
 **Required:** Yes
 
@@ -286,16 +330,15 @@ This only affects display formatting; calculations are unaffected.
 
 **Default:** `0`
 
-**Examples:**
-- `0` produces 45%
-- `1` produces 45.3%
-- `2` produces 45.28%
+**Examples:** - `0` produces 45% - `1` produces 45.3% - `2` produces
+45.28%
 
 Most market research uses 0 or 1 decimal place for percentages.
 
 #### decimal_places_ratings
 
-**What it does:** Sets how many decimal places to show for Rating question means.
+**What it does:** Sets how many decimal places to show for Rating
+question means.
 
 **Required:** Yes
 
@@ -303,15 +346,14 @@ Most market research uses 0 or 1 decimal place for percentages.
 
 **Default:** `1`
 
-**Examples:**
-- `1` produces 3.8
-- `2` produces 3.82
+**Examples:** - `1` produces 3.8 - `2` produces 3.82
 
 Rating means typically show 1 or 2 decimal places.
 
 #### decimal_places_index
 
-**What it does:** Sets how many decimal places to show for Likert index scores.
+**What it does:** Sets how many decimal places to show for Likert index
+scores.
 
 **Required:** Yes
 
@@ -331,16 +373,18 @@ Index scores are usually displayed with 1 decimal place.
 
 **Default:** `TRUE`
 
-**What this affects:** When a cell has a zero base (no respondents), dividing to get a percentage produces an undefined result.
+**What this affects:** When a cell has a zero base (no respondents),
+dividing to get a percentage produces an undefined result.
 
-- `TRUE` shows an empty cell (cleaner look)
-- `FALSE` shows "0" or "0%"
+-   `TRUE` shows an empty cell (cleaner look)
+-   `FALSE` shows "0" or "0%"
 
----
+------------------------------------------------------------------------
 
 ### BoxCategory Settings
 
-BoxCategory lets you group response options into summary categories (like "Top 2 Box").
+BoxCategory lets you group response options into summary categories
+(like "Top 2 Box").
 
 #### boxcategory_frequency
 
@@ -352,11 +396,13 @@ BoxCategory lets you group response options into summary categories (like "Top 2
 
 **Default:** `FALSE`
 
-Usually you just want the percentage for summary categories, not the counts.
+Usually you just want the percentage for summary categories, not the
+counts.
 
 #### boxcategory_percent_column
 
-**What it does:** Controls whether BoxCategory summaries show column percentages.
+**What it does:** Controls whether BoxCategory summaries show column
+percentages.
 
 **Required:** Yes
 
@@ -364,11 +410,13 @@ Usually you just want the percentage for summary categories, not the counts.
 
 **Default:** `TRUE`
 
-This is the main way BoxCategory summaries are displayed - as a percentage of the column.
+This is the main way BoxCategory summaries are displayed - as a
+percentage of the column.
 
 #### boxcategory_percent_row
 
-**What it does:** Controls whether BoxCategory summaries show row percentages.
+**What it does:** Controls whether BoxCategory summaries show row
+percentages.
 
 **Required:** Yes
 
@@ -378,7 +426,7 @@ This is the main way BoxCategory summaries are displayed - as a percentage of th
 
 Row percentages are uncommon for BoxCategory summaries.
 
----
+------------------------------------------------------------------------
 
 ### Significance Testing Settings
 
@@ -392,9 +440,11 @@ Row percentages are uncommon for BoxCategory summaries.
 
 **Default:** `TRUE`
 
-**When to use TRUE:** When you want to know if differences between banner columns are statistically meaningful.
+**When to use TRUE:** When you want to know if differences between
+banner columns are statistically meaningful.
 
-**When to use FALSE:** When you just want descriptive statistics without testing, or when sample sizes are too small for valid testing.
+**When to use FALSE:** When you just want descriptive statistics without
+testing, or when sample sizes are too small for valid testing.
 
 #### alpha
 
@@ -406,16 +456,18 @@ Row percentages are uncommon for BoxCategory summaries.
 
 **Default:** `0.05`
 
-**What it means:**
-- `0.05` = 95% confidence level (most common)
-- `0.10` = 90% confidence level (more lenient, finds more "significant" differences)
-- `0.01` = 99% confidence level (stricter, fewer false positives)
+**What it means:** - `0.05` = 95% confidence level (most common) -
+`0.10` = 90% confidence level (more lenient, finds more "significant"
+differences) - `0.01` = 99% confidence level (stricter, fewer false
+positives)
 
-A lower alpha means you need stronger evidence to declare a difference significant.
+A lower alpha means you need stronger evidence to declare a difference
+significant.
 
 #### significance_min_base
 
-**What it does:** Sets the minimum sample size required for significance testing.
+**What it does:** Sets the minimum sample size required for significance
+testing.
 
 **Required:** Yes
 
@@ -423,9 +475,12 @@ A lower alpha means you need stronger evidence to declare a difference significa
 
 **Default:** `30`
 
-**Why this matters:** Statistical tests become unreliable with very small samples. If a banner column has fewer respondents than this threshold, significance tests won't be performed for that column.
+**Why this matters:** Statistical tests become unreliable with very
+small samples. If a banner column has fewer respondents than this
+threshold, significance tests won't be performed for that column.
 
-**What 30 means:** This is a common statistical rule of thumb. You can lower it (to 20) if needed, but be aware results become less reliable.
+**What 30 means:** This is a common statistical rule of thumb. You can
+lower it (to 20) if needed, but be aware results become less reliable.
 
 #### bonferroni_correction
 
@@ -437,13 +492,18 @@ A lower alpha means you need stronger evidence to declare a difference significa
 
 **Default:** `TRUE`
 
-**What it does when TRUE:** Adjusts the significance threshold to account for making many comparisons simultaneously. This reduces false positives but makes it harder to find significant differences.
+**What it does when TRUE:** Adjusts the significance threshold to
+account for making many comparisons simultaneously. This reduces false
+positives but makes it harder to find significant differences.
 
-**What it does when FALSE:** Uses the unadjusted alpha level for each comparison. You'll find more "significant" differences, but some may be false positives.
+**What it does when FALSE:** Uses the unadjusted alpha level for each
+comparison. You'll find more "significant" differences, but some may be
+false positives.
 
-**When to use TRUE:** When you have many banner columns and want to be conservative about claiming differences are real.
+**When to use TRUE:** When you have many banner columns and want to be
+conservative about claiming differences are real.
 
----
+------------------------------------------------------------------------
 
 ### Ranking Settings
 
@@ -451,7 +511,8 @@ These settings only affect Ranking question types.
 
 #### ranking_tie_threshold_pct
 
-**What it does:** Sets the percentage of tied rankings that triggers a warning.
+**What it does:** Sets the percentage of tied rankings that triggers a
+warning.
 
 **Required:** Yes
 
@@ -459,11 +520,14 @@ These settings only affect Ranking question types.
 
 **Default:** `5`
 
-**What it means:** If more than this percentage of respondents gave tied ranks (same rank to multiple items), Tabs warns you. Ties can indicate data quality issues or ambiguous instructions.
+**What it means:** If more than this percentage of respondents gave tied
+ranks (same rank to multiple items), Tabs warns you. Ties can indicate
+data quality issues or ambiguous instructions.
 
 #### ranking_gap_threshold_pct
 
-**What it does:** Sets the percentage of ranking gaps that triggers a warning.
+**What it does:** Sets the percentage of ranking gaps that triggers a
+warning.
 
 **Required:** Yes
 
@@ -471,7 +535,9 @@ These settings only affect Ranking question types.
 
 **Default:** `5`
 
-**What it means:** A gap occurs when a respondent skips a rank position (ranks items 1, 2, and 4, skipping 3). High gap percentages may indicate data problems.
+**What it means:** A gap occurs when a respondent skips a rank position
+(ranks items 1, 2, and 4, skipping 3). High gap percentages may indicate
+data problems.
 
 #### ranking_completeness_threshold_pct
 
@@ -483,7 +549,8 @@ These settings only affect Ranking question types.
 
 **Default:** `80`
 
-**What it means:** If fewer than this percentage of respondents completed all ranking positions, Tabs warns you.
+**What it means:** If fewer than this percentage of respondents
+completed all ranking positions, Tabs warns you.
 
 #### ranking_min_base
 
@@ -491,13 +558,14 @@ These settings only affect Ranking question types.
 
 **Note:** This setting is not currently implemented and has no effect.
 
----
+------------------------------------------------------------------------
 
 ### Performance Settings
 
 #### enable_checkpointing
 
-**What it does:** Controls whether Tabs saves progress during long analyses.
+**What it does:** Controls whether Tabs saves progress during long
+analyses.
 
 **Required:** Yes
 
@@ -505,11 +573,14 @@ These settings only affect Ranking question types.
 
 **Default:** `TRUE`
 
-**When to use TRUE:** For large surveys with many questions. If something goes wrong partway through, you may be able to recover partial results.
+**When to use TRUE:** For large surveys with many questions. If
+something goes wrong partway through, you may be able to recover partial
+results.
 
-**When to use FALSE:** For faster processing on small surveys where recovery isn't needed.
+**When to use FALSE:** For faster processing on small surveys where
+recovery isn't needed.
 
----
+------------------------------------------------------------------------
 
 ### Numeric Question Settings
 
@@ -529,7 +600,8 @@ These settings affect Numeric question type output.
 
 #### show_numeric_mode
 
-**What it does:** Controls whether Numeric questions show mode (most frequent value).
+**What it does:** Controls whether Numeric questions show mode (most
+frequent value).
 
 **Required:** Yes
 
@@ -541,7 +613,8 @@ These settings affect Numeric question type output.
 
 #### show_numeric_outliers
 
-**What it does:** Controls whether to report outlier counts for Numeric questions.
+**What it does:** Controls whether to report outlier counts for Numeric
+questions.
 
 **Required:** Yes
 
@@ -553,7 +626,8 @@ Outliers are detected using the IQR method.
 
 #### exclude_outliers_from_stats
 
-**What it does:** Controls whether outliers are removed before calculating mean and standard deviation.
+**What it does:** Controls whether outliers are removed before
+calculating mean and standard deviation.
 
 **Required:** Yes
 
@@ -561,7 +635,8 @@ Outliers are detected using the IQR method.
 
 **Default:** `FALSE`
 
-**When to use TRUE:** When you want robust statistics that aren't influenced by extreme values.
+**When to use TRUE:** When you want robust statistics that aren't
+influenced by extreme values.
 
 #### outlier_method
 
@@ -585,7 +660,7 @@ Currently only IQR (Interquartile Range) method is supported.
 
 **Default:** `1`
 
----
+------------------------------------------------------------------------
 
 ### Summary Sheet Settings
 
@@ -599,11 +674,13 @@ Currently only IQR (Interquartile Range) method is supported.
 
 **Default:** `Y`
 
-**What the Index_Summary is:** A single sheet showing all mean/index scores across questions. Useful for quickly comparing averages.
+**What the Index_Summary is:** A single sheet showing all mean/index
+scores across questions. Useful for quickly comparing averages.
 
 #### index_summary_show_sections
 
-**What it does:** Controls whether to group metrics by section in the summary.
+**What it does:** Controls whether to group metrics by section in the
+summary.
 
 **Required:** Yes
 
@@ -615,7 +692,8 @@ Sections are defined by the SectionLabel field in Composite_Metrics.
 
 #### index_summary_show_base_sizes
 
-**What it does:** Controls whether to show base sizes at the bottom of Index_Summary.
+**What it does:** Controls whether to show base sizes at the bottom of
+Index_Summary.
 
 **Required:** Yes
 
@@ -625,7 +703,8 @@ Sections are defined by the SectionLabel field in Composite_Metrics.
 
 #### index_summary_show_composites
 
-**What it does:** Controls whether to include composite scores in Index_Summary.
+**What it does:** Controls whether to include composite scores in
+Index_Summary.
 
 **Required:** Yes
 
@@ -643,13 +722,14 @@ Sections are defined by the SectionLabel field in Composite_Metrics.
 
 **Default:** `1`
 
----
+------------------------------------------------------------------------
 
 ### Additional Settings
 
 #### show_standard_deviation
 
-**What it does:** Controls whether to show standard deviation for rating/numeric questions.
+**What it does:** Controls whether to show standard deviation for
+rating/numeric questions.
 
 **Required:** No
 
@@ -659,7 +739,8 @@ Sections are defined by the SectionLabel field in Composite_Metrics.
 
 #### test_net_differences
 
-**What it does:** Controls whether to test significance of net difference scores.
+**What it does:** Controls whether to test significance of net
+difference scores.
 
 **Required:** No
 
@@ -669,7 +750,8 @@ Sections are defined by the SectionLabel field in Composite_Metrics.
 
 #### create_sample_composition
 
-**What it does:** Controls whether to create a sample composition summary sheet.
+**What it does:** Controls whether to create a sample composition
+summary sheet.
 
 **Required:** No
 
@@ -677,7 +759,8 @@ Sections are defined by the SectionLabel field in Composite_Metrics.
 
 **Default:** `FALSE`
 
-The sample composition sheet shows how your sample breaks down across banner columns.
+The sample composition sheet shows how your sample breaks down across
+banner columns.
 
 #### enable_chi_square
 
@@ -691,7 +774,8 @@ The sample composition sheet shows how your sample breaks down across banner col
 
 #### show_net_positive
 
-**What it does:** Controls whether to show net positive scores for Likert questions.
+**What it does:** Controls whether to show net positive scores for
+Likert questions.
 
 **Required:** No
 
@@ -701,7 +785,7 @@ The sample composition sheet shows how your sample breaks down across banner col
 
 Net positive = percentage positive minus percentage negative.
 
----
+------------------------------------------------------------------------
 
 ## Selection Sheet
 
@@ -713,50 +797,58 @@ The Selection sheet tells Tabs which questions to analyze and how.
 
 **Required:** Yes
 
-**What to enter:** The question code exactly as it appears in Survey_Structure and your data file.
+**What to enter:** The question code exactly as it appears in
+Survey_Structure and your data file.
 
-**Important for multi-mention:** Use the root code only (Q01, not Q01_1, Q01_2, etc.).
+**Important for multi-mention:** Use the root code only (Q01, not Q01_1,
+Q01_2, etc.).
 
-**Examples:**
-- `Q01`
-- `Gender`
-- `satisfaction_overall`
+**Examples:** - `Q01` - `Gender` - `satisfaction_overall`
 
 ### Column: Include
 
-**What it does:** Controls whether this question is analyzed as a stub (row question).
+**What it does:** Controls whether this question is analyzed as a stub
+(row question).
 
 **Required:** Yes
 
 **What to enter:** `Y` or `N`
 
-- `Y` = Include this question in the crosstabs output
-- `N` = Skip this question
+-   `Y` = Include this question in the crosstabs output
+-   `N` = Skip this question
 
 ### Column: UseBanner
 
-**What it does:** Controls whether this question is used as a banner (column) variable.
+**What it does:** Controls whether this question is used as a banner
+(column) variable.
 
 **Required:** No
 
 **What to enter:** `Y` or `N`
 
-- `Y` = Use this question's response options as banner columns
-- `N` = Don't use as banner
+-   `Y` = Use this question's response options as banner columns
+-   `N` = Don't use as banner
 
-**A question can be both:** Setting Include=Y and UseBanner=Y means the question appears both as a stub (analyzed) and as a banner (used for breakouts).
+**A question can be both:** Setting Include=Y and UseBanner=Y means the
+question appears both as a stub (analyzed) and as a banner (used for
+breakouts).
 
 ### Column: BannerBoxCategory
 
-**What it does:** Controls whether to use BoxCategory groupings for banner display.
+**What it does:** Controls whether to use BoxCategory groupings for
+banner display.
 
 **Required:** No
 
 **What to enter:** `Y` or `N`
 
-**What it does when Y:** Instead of showing each response option as a separate banner column, shows the BoxCategory groups defined in Survey_Structure Options sheet.
+**What it does when Y:** Instead of showing each response option as a
+separate banner column, shows the BoxCategory groups defined in
+Survey_Structure Options sheet.
 
-**Example:** An age question might have options 18-24, 25-34, 35-44, 45-54, 55+. With BoxCategory, you could group these as "Under 35", "35-54", "55+" for a simpler banner.
+**Example:** An age question might have options 18-24, 25-34, 35-44,
+45-54, 55+. With BoxCategory, you could group these as "Under 35",
+"35-54", "55+" for a simpler banner.
 
 ### Column: BannerLabel
 
@@ -766,11 +858,7 @@ The Selection sheet tells Tabs which questions to analyze and how.
 
 **What to enter:** Descriptive text.
 
-**Examples:**
-- `Gender`
-- `Age Group`
-- `Region`
-- `Total`
+**Examples:** - `Gender` - `Age Group` - `Region` - `Total`
 
 This appears as the column group header in output.
 
@@ -782,25 +870,24 @@ This appears as the column group header in output.
 
 **What to enter:** A number (1, 2, 3...).
 
-Lower numbers appear further left. Typically:
-- 1 = Total
-- 2 = First demographic (e.g., Gender)
-- 3 = Second demographic (e.g., Age)
+Lower numbers appear further left. Typically: - 1 = Total - 2 = First
+demographic (e.g., Gender) - 3 = Second demographic (e.g., Age)
 
 ### Column: CreateIndex
 
-**What it does:** Controls whether to calculate a mean or index score for this question.
+**What it does:** Controls whether to calculate a mean or index score
+for this question.
 
 **Required:** No
 
 **What to enter:** `Y` or `N`
 
-**What it does when Y:**
-- For Rating questions: Calculates weighted mean
-- For Likert questions: Calculates index using Index_Weight values
-- For NPS questions: Calculates NPS score
+**What it does when Y:** - For Rating questions: Calculates weighted
+mean - For Likert questions: Calculates index using Index_Weight
+values - For NPS questions: Calculates NPS score
 
-**When to use Y:** For any question where an average or score is meaningful.
+**When to use Y:** For any question where an average or score is
+meaningful.
 
 ### Column: BaseFilter
 
@@ -810,50 +897,55 @@ Lower numbers appear further left. Typically:
 
 **What to enter:** An R filter expression, or leave blank for no filter.
 
-**Examples:**
-- `Q1 == "Male"` (only male respondents)
-- `Q16 %in% c("Store", "Online")` (only certain purchase channels)
-- `Q30 >= 5 & Q30 <= 20` (purchase quantity between 5 and 20)
-- `Q1 == "Female" & Q2 %in% c("18-34", "35-44")` (females aged 18-44)
-- `!is.na(Q20)` (only respondents who answered Q20)
+**Examples:** - `Q1 == "Male"` (only male respondents) -
+`Q16 %in% c("Store", "Online")` (only certain purchase channels) -
+`Q30 >= 5 & Q30 <= 20` (purchase quantity between 5 and 20) -
+`Q1 == "Female" & Q2 %in% c("18-34", "35-44")` (females aged 18-44) -
+`!is.na(Q20)` (only respondents who answered Q20)
 
 ### Column: QuestionText
 
-**What it does:** Reference information only - has no effect on processing.
+**What it does:** Reference information only - has no effect on
+processing.
 
 **Required:** No
 
 **What to enter:** The question text for your reference.
 
-This column is ignored by Tabs. It's there so you can see what each question is without switching to the Survey_Structure file.
+This column is ignored by Tabs. It's there so you can see what each
+question is without switching to the Survey_Structure file.
 
----
+------------------------------------------------------------------------
 
 ## Base Filters Sheet
 
-This sheet is for reference only - Tabs doesn't read it. It shows example filter syntax to help you write BaseFilter expressions.
+This sheet is for reference only - Tabs doesn't read it. It shows
+example filter syntax to help you write BaseFilter expressions.
 
----
+------------------------------------------------------------------------
 
 # Chapter 2: Survey Structure Template
 
-The Survey Structure template defines your entire survey - questions, response options, and composite metrics. This is the master reference used by Tabs (and potentially other Turas modules).
+The Survey Structure template defines your entire survey - questions,
+response options, and composite metrics. This is the master reference
+used by Tabs (and potentially other Turas modules).
 
 ## Template Structure
 
 The template has five sheets:
 
-1. **Instructions** - Usage guidance (not read by Tabs)
-2. **Project** - Project metadata and settings
-3. **Questions** - All survey questions
-4. **Options** - Response options for each question
-5. **Composite_Metrics** - Calculated composite scores
+1.  **Instructions** - Usage guidance (not read by Tabs)
+2.  **Project** - Project metadata and settings
+3.  **Questions** - All survey questions
+4.  **Options** - Response options for each question
+5.  **Composite_Metrics** - Calculated composite scores
 
----
+------------------------------------------------------------------------
 
 ## Project Sheet
 
-The Project sheet stores metadata about your project. This information appears in output and helps document your analysis.
+The Project sheet stores metadata about your project. This information
+appears in output and helps document your analysis.
 
 ### Setting: project_name
 
@@ -871,7 +963,8 @@ The Project sheet stores metadata about your project. This information appears i
 
 **Required:** Yes
 
-**What to enter:** A short code, typically matching your project folder name.
+**What to enter:** A short code, typically matching your project folder
+name.
 
 **Example:** `BrandTracker_Q1`
 
@@ -995,7 +1088,7 @@ The Project sheet stores metadata about your project. This information appears i
 
 **Example:** `Weighted to census demographics`
 
----
+------------------------------------------------------------------------
 
 ## Questions Sheet
 
@@ -1003,31 +1096,26 @@ The Questions sheet lists every question in your survey.
 
 ### Column: QuestionCode
 
-**What it does:** Uniquely identifies each question. This must match the column name in your data file.
+**What it does:** Uniquely identifies each question. This must match the
+column name in your data file.
 
 **Required:** Yes
 
 **What to enter:** The column name from your data file.
 
-**Rules:**
-- Must be unique across all questions
-- Must match the data column exactly (case-sensitive)
-- For multi-mention questions: use the root code only (Q01, not Q01_1)
-- Avoid special characters and spaces
+**Rules:** - Must be unique across all questions - Must match the data
+column exactly (case-sensitive) - For multi-mention questions: use the
+root code only (Q01, not Q01_1) - Avoid special characters and spaces
 
-**Examples:**
-- `Q01`
-- `satisfaction_overall`
-- `NPS_score`
+**Examples:** - `Q01` - `satisfaction_overall` - `NPS_score`
 
-**Common mistakes:**
-- Including _1 suffix for multi-mention (use root code)
-- Spaces in the code
-- Case mismatch with data file
+**Common mistakes:** - Including \_1 suffix for multi-mention (use root
+code) - Spaces in the code - Case mismatch with data file
 
 ### Column: QuestionText
 
-**What it does:** Stores the question wording as it should appear in output.
+**What it does:** Stores the question wording as it should appear in
+output.
 
 **Required:** Yes
 
@@ -1045,39 +1133,40 @@ The Questions sheet lists every question in your survey.
 
 **Valid types and when to use them:**
 
-**Single_Mention** - For pick-one questions where respondents choose exactly one option.
-- Example: Gender, Yes/No questions, "Which brand do you prefer?"
-- Data format: One column with the selected value
+**Single_Mention** - For pick-one questions where respondents choose
+exactly one option. - Example: Gender, Yes/No questions, "Which brand do
+you prefer?" - Data format: One column with the selected value
 
-**Multi_Mention** - For check-all-that-apply questions where respondents can select multiple options.
-- Example: "Which brands are you aware of?", "Which features do you use?"
-- Data format: Multiple columns (Q01_1, Q01_2, Q01_3, etc.)
+**Multi_Mention** - For check-all-that-apply questions where respondents
+can select multiple options. - Example: "Which brands are you aware
+of?", "Which features do you use?" - Data format: Multiple columns
+(Q01_1, Q01_2, Q01_3, etc.)
 
-**Likert** - For agreement scales where you want to calculate an index score using custom weights.
-- Example: Strongly Disagree to Strongly Agree
-- Data format: One column with the response value
-- Requires: Index_Weight in Options sheet
+**Likert** - For agreement scales where you want to calculate an index
+score using custom weights. - Example: Strongly Disagree to Strongly
+Agree - Data format: One column with the response value - Requires:
+Index_Weight in Options sheet
 
-**Rating** - For numeric rating scales where you want to calculate a mean.
-- Example: Rate from 1-10, Satisfaction 1-5
-- Data format: One column with the numeric value
+**Rating** - For numeric rating scales where you want to calculate a
+mean. - Example: Rate from 1-10, Satisfaction 1-5 - Data format: One
+column with the numeric value
 
-**NPS** - For Net Promoter Score questions (0-10 scale).
-- Example: "How likely are you to recommend us?"
-- Data format: One column with values 0-10
-- Automatically calculates Promoters, Passives, Detractors, and NPS score
+**NPS** - For Net Promoter Score questions (0-10 scale). - Example: "How
+likely are you to recommend us?" - Data format: One column with values
+0-10 - Automatically calculates Promoters, Passives, Detractors, and NPS
+score
 
-**Ranking** - For questions where respondents rank items in order.
-- Example: "Rank your top 3 preferred brands"
-- Data format: Depends on Ranking_Format setting
+**Ranking** - For questions where respondents rank items in order. -
+Example: "Rank your top 3 preferred brands" - Data format: Depends on
+Ranking_Format setting
 
-**Open_End** - For text responses. These are not analyzed numerically.
-- Example: "Please explain your answer"
-- Usually excluded from Tabs analysis
+**Open_End** - For text responses. These are not analyzed numerically. -
+Example: "Please explain your answer" - Usually excluded from Tabs
+analysis
 
-**Numeric** - For open-ended numeric responses where you want statistics.
-- Example: Age (exact number), income, quantity purchased
-- Data format: One column with numeric values
+**Numeric** - For open-ended numeric responses where you want
+statistics. - Example: Age (exact number), income, quantity purchased -
+Data format: One column with numeric values
 
 ### Column: Columns
 
@@ -1087,11 +1176,14 @@ The Questions sheet lists every question in your survey.
 
 **What to enter:** An integer, 1 or greater.
 
-**When to use 1:** Single_Mention, Rating, NPS, Numeric, Likert - these all use one column.
+**When to use 1:** Single_Mention, Rating, NPS, Numeric, Likert - these
+all use one column.
 
-**When to use more than 1:** Multi_Mention and Ranking questions that span multiple columns.
+**When to use more than 1:** Multi_Mention and Ranking questions that
+span multiple columns.
 
-**Example:** If you have Q01_1, Q01_2, Q01_3, Q01_4, Q01_5 for a multi-mention question, enter `5`.
+**Example:** If you have Q01_1, Q01_2, Q01_3, Q01_4, Q01_5 for a
+multi-mention question, enter `5`.
 
 ### Column: Ranking_Format
 
@@ -1101,17 +1193,19 @@ The Questions sheet lists every question in your survey.
 
 **What to enter:** `Position` or `Item`
 
-**Position format:** Each item has its own column containing the rank position.
-- Example: Columns Brand_A_Rank, Brand_B_Rank, Brand_C_Rank
-- Values might be 2, 1, 3 (meaning Brand B was first, Brand A second, Brand C third)
+**Position format:** Each item has its own column containing the rank
+position. - Example: Columns Brand_A_Rank, Brand_B_Rank, Brand_C_Rank -
+Values might be 2, 1, 3 (meaning Brand B was first, Brand A second,
+Brand C third)
 
-**Item format:** Each rank position has its own column containing the item name.
-- Example: Columns Rank_1, Rank_2, Rank_3
-- Values might be "Brand B", "Brand A", "Brand C"
+**Item format:** Each rank position has its own column containing the
+item name. - Example: Columns Rank_1, Rank_2, Rank_3 - Values might be
+"Brand B", "Brand A", "Brand C"
 
 ### Column: Ranking_Positions
 
-**What it does:** Specifies how many rank positions respondents assigned.
+**What it does:** Specifies how many rank positions respondents
+assigned.
 
 **Required:** Only if Variable_Type = Ranking
 
@@ -1155,9 +1249,11 @@ This helps organize questions in output or reports.
 
 ### Column: Min_Value
 
-**What it does:** Specifies the minimum expected value for Numeric questions.
+**What it does:** Specifies the minimum expected value for Numeric
+questions.
 
-**Required:** Only if Variable_Type = Numeric and you want validation or binning
+**Required:** Only if Variable_Type = Numeric and you want validation or
+binning
 
 **What to enter:** A number.
 
@@ -1165,15 +1261,17 @@ This helps organize questions in output or reports.
 
 ### Column: Max_Value
 
-**What it does:** Specifies the maximum expected value for Numeric questions.
+**What it does:** Specifies the maximum expected value for Numeric
+questions.
 
-**Required:** Only if Variable_Type = Numeric and you want validation or binning
+**Required:** Only if Variable_Type = Numeric and you want validation or
+binning
 
 **What to enter:** A number.
 
 **Example:** `100` for maximum age
 
----
+------------------------------------------------------------------------
 
 ## Options Sheet
 
@@ -1191,7 +1289,8 @@ The Options sheet lists all response options for each question.
 
 **For multi-mention questions:** Use the first column's code (Q01_1).
 
-**Important:** Every question that appears in output needs options defined here, except Numeric and Open_End types.
+**Important:** Every question that appears in output needs options
+defined here, except Numeric and Open_End types.
 
 ### Column: OptionText
 
@@ -1199,27 +1298,28 @@ The Options sheet lists all response options for each question.
 
 **Required:** Yes
 
-**What to enter:** The exact value from your data - must match precisely.
+**What to enter:** The exact value from your data - must match
+precisely.
 
-**Examples:**
-- If your data has `1` for Male, enter `1`
-- If your data has `Male`, enter `Male`
-- If your data has `very_satisfied`, enter `very_satisfied`
+**Examples:** - If your data has `1` for Male, enter `1` - If your data
+has `Male`, enter `Male` - If your data has `very_satisfied`, enter
+`very_satisfied`
 
-**Critical:** This is case-sensitive and must be an exact match. If your data has "1" and you enter "Male", the option won't be recognized.
+**Critical:** This is case-sensitive and must be an exact match. If your
+data has "1" and you enter "Male", the option won't be recognized.
 
 ### Column: DisplayText
 
-**What it does:** Specifies how this option should be labelled in output.
+**What it does:** Specifies how this option should be labelled in
+output.
 
 **Required:** Yes
 
 **What to enter:** The label you want users to see.
 
-**Examples:**
-- OptionText `1` → DisplayText `Male`
-- OptionText `5` → DisplayText `Very satisfied (5)`
-- OptionText `very_satisfied` → DisplayText `Very Satisfied`
+**Examples:** - OptionText `1` → DisplayText `Male` - OptionText `5` →
+DisplayText `Very satisfied (5)` - OptionText `very_satisfied` →
+DisplayText `Very Satisfied`
 
 This is where you make cryptic data codes human-readable.
 
@@ -1231,7 +1331,8 @@ This is where you make cryptic data codes human-readable.
 
 **What to enter:** An integer (1, 2, 3...).
 
-Lower numbers appear first. If not specified, options appear in the order they're listed.
+Lower numbers appear first. If not specified, options appear in the
+order they're listed.
 
 ### Column: ShowInOutput
 
@@ -1241,39 +1342,42 @@ Lower numbers appear first. If not specified, options appear in the order they'r
 
 **What to enter:** `Y` or leave blank.
 
-- `Y` = Include in output
-- Blank = Exclude from output
+-   `Y` = Include in output
+-   Blank = Exclude from output
 
-**When to exclude:** You might have internal codes or "Don't know" responses you don't want to display.
+**When to exclude:** You might have internal codes or "Don't know"
+responses you don't want to display.
 
 ### Column: ExcludeFromIndex
 
-**What it does:** Controls whether this option is excluded from mean/index calculations.
+**What it does:** Controls whether this option is excluded from
+mean/index calculations.
 
 **Required:** No
 
 **What to enter:** `Y` or leave blank.
 
-**When to use Y:** For "Don't know", "Not applicable", or other responses that shouldn't be included in average calculations.
+**When to use Y:** For "Don't know", "Not applicable", or other
+responses that shouldn't be included in average calculations.
 
-**Example:** On a 1-5 satisfaction scale, you might have a code 9 for "Don't know". Set ExcludeFromIndex = Y so it doesn't affect the mean.
+**Example:** On a 1-5 satisfaction scale, you might have a code 9 for
+"Don't know". Set ExcludeFromIndex = Y so it doesn't affect the mean.
 
 ### Column: Index_Weight
 
 **What it does:** Specifies the numeric weight for index calculations.
 
-**Required:** Only if CreateIndex = Y for this question in Selection sheet
+**Required:** Only if CreateIndex = Y for this question in Selection
+sheet
 
-**What to enter:** A number (can be negative or positive, typically -100 to 100).
+**What to enter:** A number (can be negative or positive, typically -100
+to 100).
 
 **For Rating questions:** Usually the scale value (1, 2, 3, 4, 5).
 
-**For Likert questions:** Custom weights for calculating an index. Example:
-- Strongly Disagree = -100
-- Disagree = -50
-- Neutral = 0
-- Agree = 50
-- Strongly Agree = 100
+**For Likert questions:** Custom weights for calculating an index.
+Example: - Strongly Disagree = -100 - Disagree = -50 - Neutral = 0 -
+Agree = 50 - Strongly Agree = 100
 
 ### Column: BoxCategory
 
@@ -1283,21 +1387,21 @@ Lower numbers appear first. If not specified, options appear in the order they'r
 
 **What to enter:** A category label.
 
-**How it works:** Options with the same BoxCategory are combined when displaying summaries.
+**How it works:** Options with the same BoxCategory are combined when
+displaying summaries.
 
-**Example 1 - Summary statistics:** For a 5-point satisfaction scale:
-- Options 1, 2 → BoxCategory = "Dissatisfied"
-- Option 3 → BoxCategory = "Neutral"
-- Options 4, 5 → BoxCategory = "Satisfied"
+**Example 1 - Summary statistics:** For a 5-point satisfaction scale: -
+Options 1, 2 → BoxCategory = "Dissatisfied" - Option 3 → BoxCategory =
+"Neutral" - Options 4, 5 → BoxCategory = "Satisfied"
 
 Output can then show "Satisfied" as a single percentage.
 
-**Example 2 - Banner simplification:** For age bands:
-- 18-24, 25-34 → BoxCategory = "Under 35"
-- 35-44, 45-54 → BoxCategory = "35-54"
-- 55+ → BoxCategory = "55+"
+**Example 2 - Banner simplification:** For age bands: - 18-24, 25-34 →
+BoxCategory = "Under 35" - 35-44, 45-54 → BoxCategory = "35-54" - 55+ →
+BoxCategory = "55+"
 
-When BannerBoxCategory = Y, the banner shows these three groups instead of five.
+When BannerBoxCategory = Y, the banner shows these three groups instead
+of five.
 
 ### Column: Min
 
@@ -1307,20 +1411,23 @@ When BannerBoxCategory = Y, the banner shows these three groups instead of five.
 
 **What to enter:** A number.
 
-**How it works with Max:** Together, Min and Max define a bin range for Numeric questions.
+**How it works with Max:** Together, Min and Max define a bin range for
+Numeric questions.
 
 **Example:** For age bins:
 
 | QuestionCode | OptionText | DisplayText | Min | Max |
 |--------------|------------|-------------|-----|-----|
-| Age | 18-24 | 18-24 | 18 | 24 |
-| Age | 25-34 | 25-34 | 25 | 34 |
-| Age | 35-44 | 35-44 | 35 | 44 |
-| Age | 45+ | 45+ | 45 | 100 |
+| Age          | 18-24      | 18-24       | 18  | 24  |
+| Age          | 25-34      | 25-34       | 25  | 34  |
+| Age          | 35-44      | 35-44       | 35  | 44  |
+| Age          | 45+        | 45+         | 45  | 100 |
 
-Respondents with age values falling within each range get binned accordingly.
+Respondents with age values falling within each range get binned
+accordingly.
 
-**Important:** Make sure bins don't overlap. Each value should fall into exactly one bin.
+**Important:** Make sure bins don't overlap. Each value should fall into
+exactly one bin.
 
 ### Column: Max
 
@@ -1332,11 +1439,12 @@ Respondents with age values falling within each range get binned accordingly.
 
 See Min column for examples.
 
----
+------------------------------------------------------------------------
 
 ## Composite_Metrics Sheet
 
-The Composite_Metrics sheet defines calculated scores that combine multiple questions.
+The Composite_Metrics sheet defines calculated scores that combine
+multiple questions.
 
 ### Column: CompositeCode
 
@@ -1346,10 +1454,8 @@ The Composite_Metrics sheet defines calculated scores that combine multiple ques
 
 **What to enter:** A unique code, conventionally starting with `COMP_`.
 
-**Examples:**
-- `COMP_SAT_OVERALL`
-- `COMP_BRAND_HEALTH`
-- `COMP_ENGAGEMENT`
+**Examples:** - `COMP_SAT_OVERALL` - `COMP_BRAND_HEALTH` -
+`COMP_ENGAGEMENT`
 
 ### Column: CompositeLabel
 
@@ -1359,10 +1465,8 @@ The Composite_Metrics sheet defines calculated scores that combine multiple ques
 
 **What to enter:** A descriptive label.
 
-**Examples:**
-- `Overall Satisfaction Index`
-- `Brand Health Score`
-- `Employee Engagement`
+**Examples:** - `Overall Satisfaction Index` - `Brand Health Score` -
+`Employee Engagement`
 
 ### Column: CalculationType
 
@@ -1372,15 +1476,15 @@ The Composite_Metrics sheet defines calculated scores that combine multiple ques
 
 **What to enter:** `Mean`, `Sum`, or `WeightedMean`
 
-**Mean:** Simple average of source question values.
-- If Q1=4, Q2=5, Q3=3, composite = (4+5+3)/3 = 4.0
+**Mean:** Simple average of source question values. - If Q1=4, Q2=5,
+Q3=3, composite = (4+5+3)/3 = 4.0
 
-**Sum:** Total of source question values.
-- Same example: composite = 4+5+3 = 12
+**Sum:** Total of source question values. - Same example: composite =
+4+5+3 = 12
 
-**WeightedMean:** Weighted average using the Weights column.
-- If weights are 1, 2, 1 for three questions with values 4, 5, 3:
-- composite = (4×1 + 5×2 + 3×1) / (1+2+1) = 17/4 = 4.25
+**WeightedMean:** Weighted average using the Weights column. - If
+weights are 1, 2, 1 for three questions with values 4, 5, 3: - composite
+= (4×1 + 5×2 + 3×1) / (1+2+1) = 17/4 = 4.25
 
 ### Column: SourceQuestions
 
@@ -1390,35 +1494,36 @@ The Composite_Metrics sheet defines calculated scores that combine multiple ques
 
 **What to enter:** Comma-separated question codes.
 
-**Examples:**
-- `Q01,Q02,Q03`
-- `SAT_PRODUCT,SAT_SERVICE,SAT_VALUE`
+**Examples:** - `Q01,Q02,Q03` - `SAT_PRODUCT,SAT_SERVICE,SAT_VALUE`
 
-**Requirements:**
-- All listed questions must exist in the Questions sheet
-- All questions should be the same type (all Rating, all Likert, or all Numeric)
-- Values must be combinable in a meaningful way
+**Requirements:** - All listed questions must exist in the Questions
+sheet - All questions should be the same type (all Rating, all Likert,
+or all Numeric) - Values must be combinable in a meaningful way
 
 ### Column: Weights
 
-**What it does:** Specifies the weight for each source question in WeightedMean calculations.
+**What it does:** Specifies the weight for each source question in
+WeightedMean calculations.
 
 **Required:** Only if CalculationType = WeightedMean
 
-**What to enter:** Comma-separated numbers matching the count of SourceQuestions.
+**What to enter:** Comma-separated numbers matching the count of
+SourceQuestions.
 
-**Example:** If SourceQuestions = `Q01,Q02,Q03` and you want Q02 to count twice as much:
-- Weights = `1,2,1`
+**Example:** If SourceQuestions = `Q01,Q02,Q03` and you want Q02 to
+count twice as much: - Weights = `1,2,1`
 
 ### Column: ExcludeFromSummary
 
-**What it does:** Controls whether this composite appears in the Index_Summary sheet.
+**What it does:** Controls whether this composite appears in the
+Index_Summary sheet.
 
 **Required:** No
 
 **What to enter:** `Y` or leave blank.
 
-**When to use Y:** For internal composites you don't want clients to see.
+**When to use Y:** For internal composites you don't want clients to
+see.
 
 ### Column: SectionLabel
 
@@ -1430,7 +1535,8 @@ The Composite_Metrics sheet defines calculated scores that combine multiple ques
 
 **Example:** `Satisfaction Metrics`, `Brand Health`
 
-Composites with the same SectionLabel are grouped together in the summary.
+Composites with the same SectionLabel are grouped together in the
+summary.
 
 ### Column: Notes
 
@@ -1442,31 +1548,28 @@ Composites with the same SectionLabel are grouped together in the summary.
 
 **Example:** `Updated weighting methodology in 2024`
 
----
+------------------------------------------------------------------------
 
 ## Validation
 
 When Tabs processes your templates, it validates:
 
-**Questions Sheet:**
-- QuestionCode is unique across all questions
-- Variable_Type is one of the valid values
-- All required columns are present
-- Multi-mention questions have matching column counts
+**Questions Sheet:** - QuestionCode is unique across all questions -
+Variable_Type is one of the valid values - All required columns are
+present - Multi-mention questions have matching column counts
 
-**Options Sheet:**
-- Every QuestionCode exists in the Questions sheet
-- OptionText is not empty
-- For Rating/Likert with CreateIndex: Index_Weight is present
+**Options Sheet:** - Every QuestionCode exists in the Questions sheet -
+OptionText is not empty - For Rating/Likert with CreateIndex:
+Index_Weight is present
 
-**Composite_Metrics Sheet:**
-- All SourceQuestions exist in Questions sheet
-- Weights count matches SourceQuestions count (if WeightedMean)
-- All source questions are compatible types
+**Composite_Metrics Sheet:** - All SourceQuestions exist in Questions
+sheet - Weights count matches SourceQuestions count (if WeightedMean) -
+All source questions are compatible types
 
-Validation errors are collected and reported together, so you can fix all issues in one pass.
+Validation errors are collected and reported together, so you can fix
+all issues in one pass.
 
----
+------------------------------------------------------------------------
 
 ## Common Mistakes and Solutions
 
@@ -1474,34 +1577,40 @@ Validation errors are collected and reported together, so you can fix all issues
 
 **Symptom:** "Question Q01 not found in data"
 
-**Fix:** Check that QuestionCode exactly matches your data column name. This is case-sensitive - Q01 is different from q01.
+**Fix:** Check that QuestionCode exactly matches your data column name.
+This is case-sensitive - Q01 is different from q01.
 
-### Multi-mention with _1 suffix
+### Multi-mention with \_1 suffix
 
 **Symptom:** Multi-mention question not analyzed correctly
 
-**Fix:** In the Questions sheet, use the root code (Q01) without the _1 suffix. The Columns field tells Tabs how many columns to look for.
+**Fix:** In the Questions sheet, use the root code (Q01) without the \_1
+suffix. The Columns field tells Tabs how many columns to look for.
 
 ### OptionText doesn't match data
 
 **Symptom:** Percentages show 0% or options don't appear
 
-**Fix:** OptionText must exactly match values in your data. If your data has "1" for Male, use "1" as OptionText, not "Male".
+**Fix:** OptionText must exactly match values in your data. If your data
+has "1" for Male, use "1" as OptionText, not "Male".
 
 ### Missing Index_Weight for Rating
 
 **Symptom:** Mean calculation shows NA or incorrect values
 
-**Fix:** For Rating questions where CreateIndex = Y, each option needs an Index_Weight value matching the numeric scale (1, 2, 3, 4, 5).
+**Fix:** For Rating questions where CreateIndex = Y, each option needs
+an Index_Weight value matching the numeric scale (1, 2, 3, 4, 5).
 
 ### Composite SourceQuestions don't exist
 
 **Symptom:** Composite calculation fails
 
-**Fix:** All questions listed in SourceQuestions must exist in the Questions sheet with exactly matching codes.
+**Fix:** All questions listed in SourceQuestions must exist in the
+Questions sheet with exactly matching codes.
 
 ### Overlapping numeric bins
 
 **Symptom:** Some values counted twice or placed in wrong bin
 
-**Fix:** Ensure your Min and Max values create non-overlapping ranges. If one bin ends at 34, the next should start at 35.
+**Fix:** Ensure your Min and Max values create non-overlapping ranges.
+If one bin ends at 34, the next should start at 35.
