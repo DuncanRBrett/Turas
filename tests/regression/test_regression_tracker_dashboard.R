@@ -17,9 +17,9 @@ if (basename(getwd()) == "regression") {
 test_that("Tracker Dashboard: Helper functions work correctly", {
   # Load dashboard module (paths relative to project root)
   suppressMessages({
-    source("modules/tracker/formatting_utils.R")
-    source("modules/tracker/tracker_output.R")
-    source("modules/tracker/tracker_dashboard_reports.R")
+    source("modules/tracker/lib/formatting_utils.R")
+    source("modules/tracker/lib/tracker_output.R")
+    source("modules/tracker/lib/tracker_dashboard_reports.R")
   })
 
   # Test sig_to_arrow function
@@ -60,9 +60,9 @@ test_that("Tracker Dashboard: Helper functions work correctly", {
 test_that("Tracker Dashboard: Main export functions exist", {
   # Load dashboard module (paths relative to project root)
   suppressMessages({
-    source("modules/tracker/formatting_utils.R")
-    source("modules/tracker/tracker_output.R")
-    source("modules/tracker/tracker_dashboard_reports.R")
+    source("modules/tracker/lib/formatting_utils.R")
+    source("modules/tracker/lib/tracker_output.R")
+    source("modules/tracker/lib/tracker_dashboard_reports.R")
   })
 
   # Check that new export functions exist
@@ -77,9 +77,9 @@ test_that("Tracker Dashboard: Main export functions exist", {
 test_that("Tracker Dashboard: Format metric type display works", {
   # Load dashboard module (paths relative to project root)
   suppressMessages({
-    source("modules/tracker/formatting_utils.R")
-    source("modules/tracker/tracker_output.R")
-    source("modules/tracker/tracker_dashboard_reports.R")
+    source("modules/tracker/lib/formatting_utils.R")
+    source("modules/tracker/lib/tracker_output.R")
+    source("modules/tracker/lib/tracker_dashboard_reports.R")
   })
 
   # Test format_metric_type_display if it exists
@@ -93,9 +93,9 @@ test_that("Tracker Dashboard: Format metric type display works", {
 test_that("Tracker Dashboard: Significance style selection works", {
   # Load dashboard module (paths relative to project root)
   suppressMessages({
-    source("modules/tracker/formatting_utils.R")
-    source("modules/tracker/tracker_output.R")
-    source("modules/tracker/tracker_dashboard_reports.R")
+    source("modules/tracker/lib/formatting_utils.R")
+    source("modules/tracker/lib/tracker_output.R")
+    source("modules/tracker/lib/tracker_dashboard_reports.R")
   })
 
   # Create mock styles
