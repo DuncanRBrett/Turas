@@ -29,7 +29,7 @@ script_dir <- tryCatch({
 })
 
 # TRS Guard Layer (v1.0) - MUST be loaded first before any module files
-source(file.path(script_dir, "00_guard.R"))
+source(file.path(script_dir, "lib", "00_guard.R"))
 
 # ==============================================================================
 # TRS RUN STATE INFRASTRUCTURE (v1.0)
@@ -66,16 +66,16 @@ tryCatch({
   message("[TRS INFO] TRS infrastructure not fully loaded: ", e$message)
 })
 
-source(file.path(script_dir, "constants.R"))
-source(file.path(script_dir, "tracker_config_loader.R"))
-source(file.path(script_dir, "wave_loader.R"))
-source(file.path(script_dir, "question_mapper.R"))
-source(file.path(script_dir, "validation_tracker.R"))
-source(file.path(script_dir, "trend_calculator.R"))
-source(file.path(script_dir, "banner_trends.R"))
-source(file.path(script_dir, "formatting_utils.R"))
-source(file.path(script_dir, "tracker_output.R"))
-source(file.path(script_dir, "tracker_dashboard_reports.R"))
+source(file.path(script_dir, "lib", "constants.R"))
+source(file.path(script_dir, "lib", "tracker_config_loader.R"))
+source(file.path(script_dir, "lib", "wave_loader.R"))
+source(file.path(script_dir, "lib", "question_mapper.R"))
+source(file.path(script_dir, "lib", "validation_tracker.R"))
+source(file.path(script_dir, "lib", "trend_calculator.R"))
+source(file.path(script_dir, "lib", "banner_trends.R"))
+source(file.path(script_dir, "lib", "formatting_utils.R"))
+source(file.path(script_dir, "lib", "tracker_output.R"))
+source(file.path(script_dir, "lib", "tracker_dashboard_reports.R"))
 
 # Verify all required functions loaded successfully
 verify_tracker_environment <- function() {
