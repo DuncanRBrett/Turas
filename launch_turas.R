@@ -163,6 +163,13 @@ launch_turas <- function() {
         .btn-catdriver:hover {
           background-color: #4f46e5;
         }
+        .btn-weighting {
+          background-color: #0ea5e9;
+          color: white;
+        }
+        .btn-weighting:hover {
+          background-color: #0284c7;
+        }
         .status-message {
           margin-top: 20px;
           padding: 15px;
@@ -300,6 +307,16 @@ launch_turas <- function() {
           ),
           actionButton("launch_catdriver", "Launch Categorical Key Driver",
                       class = "launch-btn btn-catdriver")
+        ),
+
+        # Weighting
+        div(class = "module-card",
+          div(class = "module-title", "⚖️ Weighting"),
+          div(class = "module-description",
+            "Calculate survey weights using design or rim weighting methods. Adjust for stratified samples or match demographic targets with iterative proportional fitting (raking)."
+          ),
+          actionButton("launch_weighting", "Launch Weighting",
+                      class = "launch-btn btn-weighting")
         )
       ),
 
@@ -602,6 +619,27 @@ if ("%s" != "alchemerparser") {
 
       }, error = function(e) {
         status(paste("Error launching Categorical Key Driver:", e$message))
+      })
+    })
+
+    # Launch Weighting
+    observeEvent(input$launch_weighting, {
+      status("Launching Weighting in new tab...")
+
+      tryCatch({
+        launch_module("weighting",
+                     file.path(turas_root, "modules/weighting/run_weighting_gui.R"))
+
+        later::later(function() {
+          status("Weighting launched successfully!")
+        }, delay = 1)
+
+        later::later(function() {
+          status("")
+        }, delay = 4)
+
+      }, error = function(e) {
+        status(paste("Error launching Weighting:", e$message))
       })
     })
   }
