@@ -10,6 +10,14 @@ The MaxDiff module provides comprehensive Best-Worst Scaling (BWS) design genera
 - **DESIGN mode**: Generate optimal experimental designs for MaxDiff studies
 - **ANALYSIS mode**: Analyze survey responses and compute preference utilities
 
+## What is MaxDiff?
+
+MaxDiff (Maximum Difference Scaling), also known as Best-Worst Scaling, is a research technique for measuring the relative importance or preference of multiple items. In each task, respondents are shown a subset of items and asked to select:
+- The **BEST** (most important/preferred) item
+- The **WORST** (least important/preferred) item
+
+This approach forces trade-offs and produces more discriminating results than traditional rating scales.
+
 ## Key Features
 
 - Excel-based configuration for non-technical users
@@ -40,6 +48,38 @@ run_maxdiff("path/to/maxdiff_config.xlsx")
 2. Click "MaxDiff" button
 3. Browse to select your configuration file
 4. Click "Run"
+
+## Typical Workflow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  1. CREATE CONFIG    Create Excel workbook with items       │
+│         ↓            and settings                           │
+├─────────────────────────────────────────────────────────────┤
+│  2. DESIGN MODE      Generate experimental design           │
+│         ↓            (run module with Mode = DESIGN)        │
+├─────────────────────────────────────────────────────────────┤
+│  3. PROGRAM SURVEY   Use design file to build survey        │
+│         ↓            in your survey platform                │
+├─────────────────────────────────────────────────────────────┤
+│  4. COLLECT DATA     Field your survey                      │
+│         ↓                                                   │
+├─────────────────────────────────────────────────────────────┤
+│  5. ANALYSIS MODE    Analyse responses                      │
+│                      (run module with Mode = ANALYSIS)      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Documentation
+
+This module includes comprehensive documentation:
+
+1. **[Marketing Guide](MARKETING.md)** - Client-facing overview of MaxDiff capabilities
+2. **[Authoritative Guide](AUTHORITATIVE_GUIDE.md)** - Deep dive into Turas MaxDiff methodology
+3. **[User Manual](USER_MANUAL.md)** - Complete setup and usage guide
+4. **[Template Guide](maxdiff_config_template.xlsx)** - Excel configuration template
+5. **[Technical Reference](TECHNICAL_REFERENCE.md)** - Developer documentation
+6. **[Example Workflows](EXAMPLE_WORKFLOWS.md)** - Practical step-by-step examples
 
 ## Configuration
 
@@ -127,18 +167,29 @@ modules/maxdiff/
 │   └── utils.R            # Utilities
 ├── stan/
 │   └── maxdiff_hb.stan    # Stan model
-├── run_maxdiff_gui.R      # Shiny GUI
-├── README.md              # This file
-└── examples/basic/        # Example files
+├── docs/
+│   ├── README.md              # This file
+│   ├── MARKETING.md           # Client-facing overview
+│   ├── AUTHORITATIVE_GUIDE.md # Deep methodology guide
+│   ├── USER_MANUAL.md         # Complete user guide
+│   ├── TECHNICAL_REFERENCE.md # Developer documentation
+│   ├── EXAMPLE_WORKFLOWS.md   # Practical examples
+│   └── maxdiff_config_template.xlsx  # Excel template
+├── templates/
+│   └── create_maxdiff_template.R  # Template generator
+├── tests/
+│   └── test_maxdiff.R     # Unit tests
+├── examples/
+│   └── basic/             # Example files
+└── run_maxdiff_gui.R      # Shiny GUI
 ```
 
-## Documentation
-
-For detailed documentation, see:
-
-- **[User Manual](docs/USER_MANUAL.md)** - Step-by-step guide for researchers
-- **[Technical Reference](docs/TECHNICAL_REFERENCE.md)** - API documentation for developers
-
 ## Support
+
+For detailed information:
+- **Users**: See [User Manual](USER_MANUAL.md) for step-by-step instructions
+- **Clients**: See [Marketing Guide](MARKETING.md) for capabilities overview
+- **Developers**: See [Technical Reference](TECHNICAL_REFERENCE.md) for API documentation
+- **Examples**: See [Example Workflows](EXAMPLE_WORKFLOWS.md) for practical use cases
 
 For issues or questions, consult the documentation or contact the development team.
