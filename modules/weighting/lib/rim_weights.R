@@ -132,12 +132,13 @@ calculate_rim_weights <- function(data,
   anesrake_targets <- target_list
 
   # Set up anesrake call
+
   rake_result <- tryCatch({
-    anesrake::anesrake(
+    # Build arguments list (omit cap if NULL)
+    anes_args <- list(
       inputter = anesrake_targets,
       dataframe = rake_data,
       caseid = rake_data[[caseid_col]],
-      cap = cap_weights,
       choosemethod = "total",
       type = "pctlim",
       pctlim = convergence_tolerance,
@@ -145,6 +146,13 @@ calculate_rim_weights <- function(data,
       force1 = TRUE,  # Force weights to average 1
       verbose = verbose
     )
+
+    # Add cap only if not NULL
+    if (!is.null(cap_weights)) {
+      anes_args$cap <- cap_weights
+    }
+
+    do.call(anesrake::anesrake, anes_args)
   }, error = function(e) {
     stop(sprintf(
       "\nRim weighting calculation failed:\n  %s\n\nTroubleshooting:\n  1. Check all target categories exist in data\n  2. Ensure no missing values in weighting variables\n  3. Try reducing number of variables or relaxing tolerance",
@@ -156,7 +164,11 @@ calculate_rim_weights <- function(data,
   weights <- rake_result$weightvec
 
   # Check convergence
-  converged <- rake_result$converge
+  # Note: rake_result$converge is a character string, not logical
+  # "Complete convergence was achieved" = converged
+  # Other values indicate non-convergence
+  converge_text <- rake_result$converge
+  converged <- grepl("Complete convergence", converge_text, ignore.case = TRUE)
   iterations <- rake_result$iterations
 
   if (!converged && !force_convergence) {
