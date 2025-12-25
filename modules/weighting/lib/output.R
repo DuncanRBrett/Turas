@@ -235,14 +235,129 @@ generate_weighting_report <- function(weighting_results, output_file, verbose = 
     strrep("=", 80)
   )
 
-  # Write report
-  writeLines(report_lines, output_file)
+  # Write report based on file extension
+  file_ext <- tolower(tools::file_ext(output_file))
 
-  if (verbose) {
-    message("  Report saved to: ", output_file)
-  }
+  tryCatch({
+    if (file_ext == "txt" || file_ext == "") {
+      # Plain text report
+      writeLines(report_lines, output_file)
 
-  return(invisible(output_file))
+    } else if (file_ext %in% c("xlsx", "xls")) {
+      # Excel report - convert to structured tables
+      if (!requireNamespace("openxlsx", quietly = TRUE)) {
+        stop("Package 'openxlsx' required for Excel diagnostics. Install with: install.packages('openxlsx')",
+             call. = FALSE)
+      }
+
+      wb <- openxlsx::createWorkbook()
+
+      # Summary sheet
+      openxlsx::addWorksheet(wb, "Summary")
+      summary_text <- paste(report_lines[1:which(report_lines == strrep("-", 80))[2] + 10], collapse = "\n")
+      openxlsx::writeData(wb, "Summary", summary_text)
+
+      # Per-weight sheets
+      for (weight_name in weighting_results$weight_names) {
+        result <- weighting_results$weight_results[[weight_name]]
+        sheet_name <- gsub("[^A-Za-z0-9_]", "_", weight_name)  # Clean sheet name
+        sheet_name <- substr(sheet_name, 1, 31)  # Excel max sheet name length
+
+        openxlsx::addWorksheet(wb, sheet_name)
+
+        row_num <- 1
+
+        # Weight header
+        openxlsx::writeData(wb, sheet_name, weight_name, startCol = 1, startRow = row_num)
+        openxlsx::addStyle(wb, sheet_name,
+                          style = openxlsx::createStyle(fontSize = 14, textDecoration = "bold"),
+                          rows = row_num, cols = 1)
+        row_num <- row_num + 2
+
+        # Diagnostics tables
+        if (!is.null(result$diagnostics)) {
+          diag <- result$diagnostics
+
+          # Sample size
+          openxlsx::writeData(wb, sheet_name, "Sample Size", startCol = 1, startRow = row_num)
+          row_num <- row_num + 1
+          sample_df <- data.frame(
+            Metric = c("Total cases", "Valid weights", "Invalid (NA/zero)"),
+            Value = c(diag$sample_size$n_total, diag$sample_size$n_valid,
+                     diag$sample_size$n_na + diag$sample_size$n_zero)
+          )
+          openxlsx::writeData(wb, sheet_name, sample_df, startRow = row_num)
+          row_num <- row_num + nrow(sample_df) + 2
+
+          # Weight distribution
+          openxlsx::writeData(wb, sheet_name, "Weight Distribution", startCol = 1, startRow = row_num)
+          row_num <- row_num + 1
+          dist_df <- data.frame(
+            Statistic = c("Min", "Q1", "Median", "Q3", "Max", "Mean", "SD", "CV"),
+            Value = c(diag$distribution$min, diag$distribution$q1, diag$distribution$median,
+                     diag$distribution$q3, diag$distribution$max, diag$distribution$mean,
+                     diag$distribution$sd, diag$distribution$cv)
+          )
+          openxlsx::writeData(wb, sheet_name, dist_df, startRow = row_num)
+          row_num <- row_num + nrow(dist_df) + 2
+
+          # Effective sample size
+          openxlsx::writeData(wb, sheet_name, "Effective Sample Size", startCol = 1, startRow = row_num)
+          row_num <- row_num + 1
+          eff_df <- data.frame(
+            Metric = c("Effective N", "Design effect", "Efficiency"),
+            Value = c(diag$effective_sample$effective_n, diag$effective_sample$design_effect,
+                     paste0(round(diag$effective_sample$efficiency, 1), "%"))
+          )
+          openxlsx::writeData(wb, sheet_name, eff_df, startRow = row_num)
+          row_num <- row_num + nrow(eff_df) + 2
+
+          # Quality assessment
+          openxlsx::writeData(wb, sheet_name, "Quality Assessment", startCol = 1, startRow = row_num)
+          row_num <- row_num + 1
+          openxlsx::writeData(wb, sheet_name,
+                             data.frame(Status = diag$quality$status),
+                             startRow = row_num)
+          row_num <- row_num + 2
+        }
+
+        # Rim margins
+        if (!is.null(result$rim_result) && !is.null(result$rim_result$margins)) {
+          openxlsx::writeData(wb, sheet_name, "Rim Target Achievement", startCol = 1, startRow = row_num)
+          row_num <- row_num + 1
+          openxlsx::writeData(wb, sheet_name, result$rim_result$margins, startRow = row_num)
+          row_num <- row_num + nrow(result$rim_result$margins) + 2
+        }
+
+        # Design stratum details
+        if (!is.null(result$design_result) && !is.null(result$design_result$stratum_summary)) {
+          openxlsx::writeData(wb, sheet_name, "Stratum Details", startCol = 1, startRow = row_num)
+          row_num <- row_num + 1
+          openxlsx::writeData(wb, sheet_name, result$design_result$stratum_summary, startRow = row_num)
+        }
+      }
+
+      openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+
+    } else {
+      stop(sprintf(
+        "Unsupported diagnostics format: .%s\nSupported formats: .txt, .xlsx",
+        file_ext
+      ), call. = FALSE)
+    }
+
+    if (verbose) {
+      message("  Report saved to: ", output_file)
+    }
+
+    return(invisible(output_file))
+
+  }, error = function(e) {
+    stop(sprintf(
+      "Failed to write diagnostics file: %s\n\nError: %s",
+      output_file, conditionMessage(e)
+    ), call. = FALSE)
+  })
 }
 
 #' Print Run Summary

@@ -60,6 +60,11 @@ The Weight_Config.xlsx file has the following sheets:
    save_diagnostics    | Y
    diagnostics_file    | output/weight_diagnostics.txt
 
+   SUPPORTED FILE FORMATS:
+   - data_file: .csv, .xlsx, .xls, .sav (SPSS)
+   - output_file: .csv, .xlsx
+   - diagnostics_file: .txt (plain text), .xlsx (structured tables)
+
 2. WEIGHT_SPECIFICATIONS (Required)
    Define each weight to calculate:
 

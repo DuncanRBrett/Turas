@@ -28,11 +28,11 @@ general_data <- data.frame(
     "diagnostics_file"
   ),
   Value = c(
-    "Example2_Rim_Weighting",
-    "sample_data.csv",
-    "weighted_data.csv",
+    "Consumer_Panel_Study",
+    "data/consumer_panel.csv",
+    "output/consumer_panel_weighted.csv",
     "Y",
-    "diagnostics.txt"
+    "output/diagnostics.txt"
   ),
   stringsAsFactors = FALSE
 )
@@ -82,22 +82,23 @@ addWorksheet(wb, "Rim_Targets")
 rim_targets <- data.frame(
   weight_name = c(
     "population_weight", "population_weight", "population_weight",
+    "population_weight", "population_weight", "population_weight",
     "population_weight", "population_weight",
     "population_weight", "population_weight", "population_weight"
   ),
   variable = c(
-    "Age", "Age", "Age",
-    "Gender", "Gender",
-    "Region", "Region", "Region"
+    "age", "age", "age", "age", "age", "age",
+    "gender", "gender",
+    "region", "region", "region"
   ),
   category = c(
-    "18-34", "35-54", "55+",
+    "18-24", "25-34", "35-44", "45-54", "55-64", "65+",
     "Male", "Female",
     "Urban", "Suburban", "Rural"
   ),
   target_percent = c(
-    30, 40, 30,
-    48, 52,
+    13, 18, 17, 17, 16, 19,
+    49, 51,
     35, 45, 20
   ),
   stringsAsFactors = FALSE
@@ -105,9 +106,9 @@ rim_targets <- data.frame(
 
 writeData(wb, "Rim_Targets", rim_targets)
 cat("  ✓ Rim_Targets sheet created\n")
-cat("    - Age: 30% 18-34, 40% 35-54, 30% 55+\n")
-cat("    - Gender: 48% Male, 52% Female\n")
-cat("    - Region: 35% Urban, 45% Suburban, 20% Rural\n")
+cat("    - age: 13% 18-24, 18% 25-34, 17% 35-44, 17% 45-54, 16% 55-64, 19% 65+\n")
+cat("    - gender: 49% Male, 51% Female\n")
+cat("    - region: 35% Urban, 45% Suburban, 20% Rural\n")
 
 # ==============================================================================
 # Sheet 5: Advanced_Settings
@@ -116,18 +117,19 @@ addWorksheet(wb, "Advanced_Settings")
 
 advanced <- data.frame(
   weight_name = "population_weight",
-  max_iterations = 50,
+  max_iterations = 100,
   convergence_tolerance = 1e-7,
+  force_convergence = "N",
   calibration_method = "raking",
-  weight_bounds = "0.3,3.0",
+  weight_bounds = "0.1,10.0",
   stringsAsFactors = FALSE
 )
 
 writeData(wb, "Advanced_Settings", advanced)
 cat("  ✓ Advanced_Settings sheet created\n")
 cat("    - calibration_method: raking\n")
-cat("    - weight_bounds: 0.3,3.0\n")
-cat("    - max_iterations: 50\n")
+cat("    - weight_bounds: 0.1,10.0\n")
+cat("    - max_iterations: 100\n")
 cat("    - convergence_tolerance: 1e-7\n")
 
 # ==============================================================================
