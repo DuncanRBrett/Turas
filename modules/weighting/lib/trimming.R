@@ -316,12 +316,12 @@ rescale_after_trimming <- function(original_weights, trimmed_weights) {
 #' Iterative Trimming with Convergence
 #'
 #' For rim weights, applies trimming then re-rakes to maintain margins.
-#' This is an advanced technique for complex weighting scenarios.
+#' Uses survey::calibrate() with built-in weight bounds.
 #'
 #' @param data Data frame, survey data
 #' @param target_list Named list of rim targets
-#' @param cap Numeric, maximum weight
-#' @param max_outer_iterations Integer, max trimming iterations
+#' @param cap Numeric, maximum weight (upper bound)
+#' @param max_outer_iterations Integer, max trimming iterations (unused, kept for API compatibility)
 #' @param verbose Logical, print progress
 #' @return List with final weights and iteration details
 #' @export
@@ -331,24 +331,19 @@ iterative_rim_trim <- function(data,
                                max_outer_iterations = 5,
                                verbose = FALSE) {
 
-  check_anesrake_available()
-
   if (verbose) {
     message("\nIterative rim weighting with trimming...")
     message("  Cap: ", cap)
-    message("  Max outer iterations: ", max_outer_iterations)
   }
 
-  # Initial rim weighting with cap built in
+  # survey::calibrate() handles weight bounds during calibration
+  # No need for iterative trim-and-rerake with this approach
   result <- calculate_rim_weights(
     data = data,
     target_list = target_list,
-    cap = cap,
+    cap_weights = cap,  # Fixed: was 'cap', now 'cap_weights'
     verbose = verbose
   )
-
-  # The anesrake package handles iterative capping internally when cap is specified
-  # So this wrapper primarily exists for custom trim-and-rerake strategies
 
   return(result)
 }

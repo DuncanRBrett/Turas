@@ -357,6 +357,9 @@ resolve_config_path <- function(path, base_path) {
     return(NULL)
   }
 
+  # Expand home directory (~)
+  path <- path.expand(path)
+
   # Remove leading ./ if present
   path <- gsub("^\\./", "", path)
 

@@ -164,10 +164,22 @@ run_weighting <- function(config_file,
 
   # Load shared utilities if available
   tryCatch({
-    turas_root <- find_turas_root()
-    shared_import <- file.path(turas_root, "modules", "shared", "lib", "import_all.R")
-    if (file.exists(shared_import)) {
-      source(shared_import)
+    # Find TURAS root by looking for modules/shared directory
+    turas_root <- NULL
+    check_path <- module_dir
+    for (i in 1:5) {
+      if (dir.exists(file.path(check_path, "modules", "shared"))) {
+        turas_root <- check_path
+        break
+      }
+      check_path <- dirname(check_path)
+    }
+
+    if (!is.null(turas_root)) {
+      shared_import <- file.path(turas_root, "modules", "shared", "lib", "import_all.R")
+      if (file.exists(shared_import)) {
+        source(shared_import)
+      }
     }
   }, error = function(e) {
     # Shared utilities not available - continue without them

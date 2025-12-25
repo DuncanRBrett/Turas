@@ -167,12 +167,10 @@ calculate_rim_weights <- function(data,
     # Check for unmatched levels - REFUSE if validation missed this
     n_na <- sum(is.na(rake_data[[var]]))
     if (n_na > 0) {
+      unmatched_vals <- paste(unique(as.character(data[[var]][is.na(rake_data[[var]])])), collapse = ", ")
       stop(sprintf(
-        "Variable '%s': %d values not in target categories.\n",
-        "This should have been caught by validation.\n",
-        "Unmatched values: %s",
-        var, n_na,
-        paste(unique(as.character(data[[var]][is.na(rake_data[[var]])])), collapse = ", ")
+        "Variable '%s': %d values not in target categories.\nThis should have been caught by validation.\nUnmatched values: %s",
+        var, n_na, unmatched_vals
       ), call. = FALSE)
     }
   }
@@ -301,6 +299,10 @@ calculate_rim_weights <- function(data,
 
   # Calculate g-weights (calibration factors) if base weights were provided
   if (!is.null(base_weights)) {
+    # Protect against division by zero or near-zero base weights
+    if (any(starting_weights <= 0, na.rm = TRUE)) {
+      stop("Base weights must be positive. Found zero or negative values.", call. = FALSE)
+    }
     g_weights <- final_weights / starting_weights
   } else {
     g_weights <- final_weights  # If starting from 1, g = final
@@ -432,7 +434,20 @@ calculate_rim_weights_from_config <- function(data, config, weight_name,
   # Can be single value or comma-separated "lower,upper"
   bounds_setting <- get_advanced_setting(config, weight_name, "weight_bounds", "0.3,3.0")
   if (is.character(bounds_setting) && grepl(",", bounds_setting)) {
-    bounds <- as.numeric(strsplit(bounds_setting, ",")[[1]])
+    parts <- strsplit(bounds_setting, ",")[[1]]
+    if (length(parts) != 2) {
+      stop(sprintf(
+        "Invalid weight_bounds format: '%s'. Expected 'lower,upper' (e.g., '0.3,3.0') or single value.",
+        bounds_setting
+      ), call. = FALSE)
+    }
+    bounds <- as.numeric(parts)
+    if (any(is.na(bounds))) {
+      stop(sprintf(
+        "Invalid weight_bounds values: '%s'. Both lower and upper must be numeric.",
+        bounds_setting
+      ), call. = FALSE)
+    }
   } else {
     bounds <- c(0.3, as.numeric(bounds_setting))  # Interpret as upper bound only
   }
