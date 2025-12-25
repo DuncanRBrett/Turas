@@ -16,6 +16,7 @@
 # ==============================================================================
 
 library(shiny)
+library(shinyFiles)
 
 #' Run Weighting Module GUI
 #'
@@ -214,11 +215,22 @@ run_weighting_gui <- function(launch_browser = TRUE) {
       conditionalPanel(
         condition = "input.input_method == 'folder'",
 
-        textInput("project_folder", "Project Folder Path",
-                  placeholder = "e.g., /Users/duncan/Documents/Turas/modules/weighting/examples/example2_rim_weights",
-                  width = "100%"),
+        fluidRow(
+          column(9,
+            textInput("project_folder", "Project Folder Path",
+                      placeholder = "e.g., /Users/duncan/Documents/Turas/modules/weighting/examples/example2_rim_weights",
+                      width = "100%")
+          ),
+          column(3,
+            div(style = "margin-top: 25px;",
+              shinyDirButton("folder_browse", "Browse...",
+                           title = "Select project folder",
+                           class = "btn btn-default")
+            )
+          )
+        ),
         div(class = "help-text",
-            "Enter the folder path containing your Weight_Config.xlsx and data file"),
+            "Select or enter the folder path containing your Weight_Config.xlsx and data file"),
 
         textInput("config_filename", "Config File Name",
                   value = "Weight_Config.xlsx",
@@ -295,6 +307,21 @@ run_weighting_gui <- function(launch_browser = TRUE) {
       log = "",
       running = FALSE
     )
+
+    # Folder browser setup
+    volumes <- c(Home = fs::path_home(), getVolumes()())
+    shinyDirChoose(input, "folder_browse", roots = volumes, session = session)
+
+    # Update text input when folder is selected
+    observeEvent(input$folder_browse, {
+      if (!is.null(input$folder_browse)) {
+        # Get selected path
+        selected_path <- parseDirPath(volumes, input$folder_browse)
+        if (length(selected_path) > 0) {
+          updateTextInput(session, "project_folder", value = selected_path)
+        }
+      }
+    })
 
     # Log capture function
     add_log <- function(msg) {
