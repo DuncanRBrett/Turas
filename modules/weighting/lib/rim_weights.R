@@ -47,17 +47,17 @@ check_survey_available <- function() {
 
 #' Calculate Rim Weights
 #'
-#' Calculates rim weights using survey package's rake() function.
-#' Performs iterative proportional fitting to match marginal distributions.
+#' Calculates rim weights using survey package's calibrate() function.
+#' Supports multiple calibration methods and weight bounds during fitting.
 #'
 #' @param data Data frame, survey data
 #' @param target_list Named list, variable -> named vector of target proportions (0-1 scale)
 #' @param caseid Character, name of ID column (default: NULL = not used)
-#' @param max_iterations Integer, maximum raking iterations (default: 50)
+#' @param max_iterations Integer, maximum calibration iterations (default: 50)
 #' @param convergence_tolerance Numeric, convergence epsilon (default: 1e-7)
-#' @param force_convergence Logical, deprecated (survey::rake errors if doesn't converge)
-#' @param cap_weights Numeric, weight bounds applied after raking as c(lower, upper) or single upper value (default: NULL)
-#' @param calibration_method Character, deprecated (rake() only does raking method)
+#' @param force_convergence Logical, deprecated (survey::calibrate() errors if doesn't converge)
+#' @param cap_weights Numeric, weight bounds during calibration as c(lower, upper) or single upper value (default: c(0.3, 3.0))
+#' @param calibration_method Character, calibration function: "raking" (default), "linear", "logit"
 #' @param verbose Logical, print progress messages (default: FALSE)
 #' @return List with $weights, $converged, $iterations, $margins, $design
 #' @export
@@ -101,26 +101,34 @@ calculate_rim_weights <- function(data,
   }
 
   # Handle cap_weights parameter
-  # Can be: NULL (no bounds), single value (upper only), or c(lower, upper)
-  bounds <- NULL
-  if (!is.null(cap_weights)) {
-    if (length(cap_weights) == 1) {
-      bounds <- c(0.3, cap_weights)  # Use provided upper, default lower
-    } else if (length(cap_weights) == 2) {
-      bounds <- cap_weights
-    } else {
-      stop("cap_weights must be NULL, single value, or c(lower, upper)", call. = FALSE)
-    }
+  # Can be: NULL, single value (upper only), or c(lower, upper)
+  if (is.null(cap_weights)) {
+    bounds <- c(0.3, 3.0)  # Reasonable defaults
+  } else if (length(cap_weights) == 1) {
+    bounds <- c(0.3, cap_weights)  # Use provided upper, default lower
+  } else if (length(cap_weights) == 2) {
+    bounds <- cap_weights
+  } else {
+    stop("cap_weights must be NULL, single value, or c(lower, upper)", call. = FALSE)
+  }
+
+  # Validate calibration method
+  valid_methods <- c("raking", "linear", "logit")
+  if (!tolower(calibration_method) %in% valid_methods) {
+    stop(sprintf(
+      "calibration_method must be one of: %s\nGot: '%s'",
+      paste(valid_methods, collapse = ", "),
+      calibration_method
+    ), call. = FALSE)
   }
 
   if (verbose) {
-    message("\nCalculating rim weights using survey::rake()...")
+    message("\nCalculating rim weights using survey::calibrate()...")
     message("  Variables: ", paste(names(target_list), collapse = ", "))
+    message("  Method: ", calibration_method)
+    message("  Weight bounds: [", bounds[1], ", ", bounds[2], "]")
     message("  Max iterations: ", max_iterations)
     message("  Convergence epsilon: ", convergence_tolerance)
-    if (!is.null(bounds)) {
-      message("  Weight bounds (post-rake): [", bounds[1], ", ", bounds[2], "]")
-    }
   }
 
   # Prepare data for calibration
@@ -160,117 +168,86 @@ calculate_rim_weights <- function(data,
     weights = rep(1, nrow(rake_data))  # Initial weights = 1
   )
 
-  # Build sample margins (list of formulas, one per variable)
-  sample_margins <- lapply(names(target_list), function(v) {
-    as.formula(paste0("~", v))
-  })
+  # Build calibration formula
+  # Format: ~var1 + var2 + ...
+  formula <- as.formula(paste("~", paste(names(target_list), collapse = " + ")))
 
-  # Convert target_list to population margins (dataframes with Freq column)
-  # Use total sample size as base
-  base_n <- nrow(rake_data)
-  population_margins <- lapply(names(target_list), function(var) {
+  # Convert target_list to population margins for calibrate()
+  # calibrate() needs a SINGLE VECTOR of all population totals in formula order
+  # We use a base count (1000) - the actual number doesn't matter, only proportions
+  base_n <- 1000
+
+  # Build population vector in the order that calibrate() expects
+  population <- c()
+  for (var in names(target_list)) {
     props <- target_list[[var]]
-    counts <- round(props * base_n)
+    counts <- props * base_n
+    population <- c(population, counts)
+  }
 
-    # Create dataframe with variable levels and frequencies
-    df <- data.frame(
-      level = names(props),
-      Freq = as.numeric(counts),
-      stringsAsFactors = FALSE
-    )
-    # Set the column name to match the variable name
-    colnames(df)[1] <- var
-    df
-  })
-
-  # Rake using survey package
-  # Note: survey::rake() does iterative proportional fitting for marginal distributions
+  # Calibrate using survey package
   calibrated <- tryCatch({
-    survey::rake(
+    survey::calibrate(
       design = svy_design,
-      sample.margins = sample_margins,
-      population.margins = population_margins,
-      control = list(
-        maxit = max_iterations,
-        epsilon = convergence_tolerance
-        # Note: bounds not supported in rake(), applied via trimming after
-      )
+      formula = formula,
+      population = population,
+      calfun = tolower(calibration_method),
+      bounds = bounds,                    # Weight bounds DURING calibration
+      maxit = max_iterations,
+      epsilon = convergence_tolerance,
+      force = FALSE,                      # Error if doesn't converge
+      trim = NULL,                        # Don't trim (bounds handle it)
+      bounds.const = FALSE
     )
   }, error = function(e) {
     # Provide helpful error message
     err_msg <- conditionMessage(e)
 
     # Check for common issues
-    if (grepl("did not converge|convergence", err_msg, ignore.case = TRUE)) {
+    if (grepl("did not converge", err_msg, ignore.case = TRUE)) {
       stop(paste0(
         "\nRim weighting did not converge after ", max_iterations, " iterations.\n\n",
         "Options:\n",
         "  1. Increase max_iterations (currently ", max_iterations, ")\n",
-        "  2. Relax convergence_tolerance (currently ", convergence_tolerance, ")\n",
-        "  3. Reduce number of rim variables (currently ", length(target_list), ")\n",
-        "  4. Check for conflicting population targets\n\n",
+        "  2. Relax weight bounds (currently [", bounds[1], ", ", bounds[2], "])\n",
+        "  3. Try calibration_method = 'linear' (more flexible than raking)\n",
+        "  4. Reduce number of rim variables (currently ", length(target_list), ")\n\n",
         "Original error: ", err_msg, "\n"
       ), call. = FALSE)
-    } else if (grepl("margin|stratif", err_msg, ignore.case = TRUE)) {
+    } else if (grepl("bounds", err_msg, ignore.case = TRUE)) {
       stop(paste0(
-        "\nMargin specification error.\n\n",
-        "Check:\n",
-        "  1. All target categories exist in data\n",
-        "  2. Factor levels match target names exactly\n",
-        "  3. No missing values in weighting variables\n\n",
+        "\nWeight bounds issue during calibration.\n\n",
+        "Try:\n",
+        "  1. Widen bounds (currently [", bounds[1], ", ", bounds[2], "])\n",
+        "  2. Use calibration_method = 'linear' or 'logit'\n",
+        "  3. Check target proportions are realistic\n\n",
         "Original error: ", err_msg, "\n"
       ), call. = FALSE)
     } else {
       stop(paste0(
-        "\nRim weighting (rake) failed:\n  ", err_msg, "\n\n",
+        "\nRim weighting calibration failed:\n  ", err_msg, "\n\n",
         "Troubleshooting:\n",
         "  1. Check all target categories exist in data\n",
         "  2. Ensure no missing values in weighting variables\n",
-        "  3. Verify target proportions sum to 1.0 per variable\n",
-        "  4. Check factor levels match target category names\n"
+        "  3. Verify target proportions sum to 1.0 per variable\n"
       ), call. = FALSE)
     }
   })
 
-  # Extract weights from raked design
+  # Extract weights from calibrated design
   weights_full <- rep(NA_real_, nrow(data))  # Initialize with NA for excluded rows
-  weights_raked <- weights(calibrated)
+  weights_full[complete_idx] <- weights(calibrated)  # Fill in calibrated weights
 
-  # Apply weight trimming if bounds specified
-  # Note: survey::rake() doesn't support bounds during process, so we trim after
-  weights_trimmed <- weights_raked
-  if (!is.null(bounds) && !is.null(cap_weights)) {
-    lower_bound <- bounds[1]
-    upper_bound <- bounds[2]
-
-    # Cap weights
-    n_below <- sum(weights_raked < lower_bound)
-    n_above <- sum(weights_raked > upper_bound)
-
-    if (n_below > 0 || n_above > 0) {
-      weights_trimmed <- pmax(lower_bound, pmin(upper_bound, weights_raked))
-
-      # Re-normalize to maintain total weight
-      weights_trimmed <- weights_trimmed * (sum(weights_raked) / sum(weights_trimmed))
-
-      if (verbose) {
-        message(sprintf("  Applied bounds [%.2f, %.2f]: %d weights trimmed (%d below, %d above)",
-                       lower_bound, upper_bound, n_below + n_above, n_below, n_above))
-      }
-    }
-  }
-
-  weights_full[complete_idx] <- weights_trimmed
-
-  # survey::rake() converges or errors, so converged = TRUE if we got here
+  # survey::calibrate() always converges or errors
+  # So converged = TRUE if we got here
   converged <- TRUE
 
-  # survey doesn't track iterations explicitly
+  # survey doesn't track iterations explicitly, estimate based on verbosity
   # (This is a limitation vs anesrake, but convergence is more robust)
   iterations <- NA_integer_
 
   if (verbose) {
-    message("  Raking successful")
+    message("  Calibration successful")
     message(sprintf("  Weight range: [%.3f, %.3f]",
                    min(weights_full, na.rm = TRUE),
                    max(weights_full, na.rm = TRUE)))
@@ -382,133 +359,80 @@ calculate_rim_weights_from_config <- function(data, config, weight_name, verbose
 
 #' Calculate Achieved Margins
 #'
-#' Compares target vs achieved marginal distributions.
+#' Computes weighted margins and compares to targets.
 #'
-#' @param data Data frame with factor variables
+#' @param data Data frame with rim variables
 #' @param target_list Named list of target proportions
 #' @param weights Numeric vector of weights
-#' @return Data frame with comparison
+#' @return Data frame with achieved vs target margins
 #' @keywords internal
 calculate_achieved_margins <- function(data, target_list, weights) {
-  results <- data.frame(
-    variable = character(0),
-    category = character(0),
-    target_pct = numeric(0),
-    achieved_pct = numeric(0),
-    diff_pct = numeric(0),
-    stringsAsFactors = FALSE
-  )
+
+  margins_list <- list()
 
   for (var in names(target_list)) {
-    targets <- target_list[[var]]
+    target_props <- target_list[[var]]
 
-    for (cat in names(targets)) {
-      target_pct <- targets[cat] * 100
+    for (cat in names(target_props)) {
+      # Calculate weighted proportion
+      in_cat <- data[[var]] == cat
+      in_cat[is.na(in_cat)] <- FALSE
 
-      # Calculate weighted percentage
-      in_cat <- data[[var]] == cat & !is.na(data[[var]])
-      achieved_pct <- 100 * sum(weights[in_cat]) / sum(weights[!is.na(data[[var]])])
+      achieved_pct <- sum(weights[in_cat]) / sum(weights) * 100
+      target_pct <- target_props[cat] * 100
 
-      results <- rbind(results, data.frame(
+      margins_list[[length(margins_list) + 1]] <- data.frame(
         variable = var,
         category = cat,
         target_pct = target_pct,
         achieved_pct = achieved_pct,
         diff_pct = achieved_pct - target_pct,
         stringsAsFactors = FALSE
-      ))
+      )
     }
   }
 
-  return(results)
+  do.call(rbind, margins_list)
 }
 
-#' Print Rim Weight Summary
+#' Print Rim Weighting Summary
 #'
-#' Prints a formatted summary of rim weight calculation.
+#' Displays a formatted summary of rim weighting results.
 #'
-#' @param result List, result from calculate_rim_weights_from_config
+#' @param result List returned from calculate_rim_weights
 #' @param weight_name Character, name of the weight
 #' @export
-print_rim_summary <- function(result, weight_name) {
+print_rim_summary <- function(result, weight_name = "rim_weight") {
+
   cat("\n")
   cat(strrep("=", 70), "\n")
-  cat("RIM WEIGHT SUMMARY: ", weight_name, "\n")
-  cat(strrep("=", 70), "\n")
-  cat("\nMethod: Rim Weighting via survey::calibrate()\n")
-  cat("Calibration function: ", result$method, "\n")
+  cat("RIM WEIGHTING SUMMARY:", weight_name, "\n")
+  cat(strrep("=", 70), "\n\n")
 
-  if (result$converged) {
-    cat("Convergence: SUCCESS\n")
-  } else {
-    cat("Convergence: NOT CONVERGED\n")
+  cat("Method: Rim Weighting via survey::calibrate()\n")
+  cat("Calibration Method:", result$method, "\n")
+  cat("Convergence:", if(result$converged) "✓ Converged" else "✗ Did not converge", "\n")
+  if (!is.na(result$iterations)) {
+    cat("Iterations:", result$iterations, "\n")
   }
+  cat("Weight Bounds: [", result$bounds[1], ", ", result$bounds[2], "]\n\n", sep = "")
 
-  if (!is.null(result$bounds)) {
-    cat(sprintf("Weight bounds: [%.2f, %.2f]\n", result$bounds[1], result$bounds[2]))
-  }
-
-  cat("Variables: ", paste(result$rim_variables, collapse = ", "), "\n")
-
-  if (!is.null(result$n_excluded) && result$n_excluded > 0) {
-    cat(sprintf("Excluded rows (missing data): %d\n", result$n_excluded))
-  }
-
-  cat("\nTarget Achievement:\n")
-  cat(strrep("-", 65), "\n")
-  cat(sprintf("%-15s %-15s %10s %10s %10s\n",
-              "Variable", "Category", "Target%", "Achieved%", "Diff%"))
-  cat(strrep("-", 65), "\n")
-
-  for (i in seq_len(nrow(result$margins))) {
-    row <- result$margins[i, ]
-    diff_str <- sprintf("%+.1f", row$diff_pct)
-    cat(sprintf("%-15s %-15s %10.1f %10.1f %10s\n",
-                row$variable,
-                row$category,
-                row$target_pct,
-                row$achieved_pct,
-                diff_str))
-  }
-
-  cat(strrep("-", 65), "\n")
+  valid_weights <- result$weights[!is.na(result$weights)]
+  cat("WEIGHT STATISTICS:\n")
+  cat(sprintf("  Sample size:      %d\n", length(result$weights)))
+  cat(sprintf("  Valid weights:    %d\n", length(valid_weights)))
+  cat(sprintf("  Excluded (NA):    %d\n", result$n_excluded))
+  cat(sprintf("  Min weight:       %.3f\n", min(valid_weights)))
+  cat(sprintf("  Max weight:       %.3f\n", max(valid_weights)))
+  cat(sprintf("  Mean weight:      %.3f\n", mean(valid_weights)))
+  cat(sprintf("  Median weight:    %.3f\n", median(valid_weights)))
   cat("\n")
-}
 
-#' Prepare Rim Variables
-#'
-#' Prepares data frame variables for rim weighting by converting to factors
-#' with appropriate levels.
-#'
-#' @param data Data frame, survey data
-#' @param target_list Named list of target proportions
-#' @return Data frame with converted variables
-#' @keywords internal
-prepare_rim_variables <- function(data, target_list) {
-  for (var in names(target_list)) {
-    if (!var %in% names(data)) {
-      stop(sprintf("Variable '%s' not found in data", var), call. = FALSE)
-    }
-
-    target_levels <- names(target_list[[var]])
-
-    # Convert to character first, then to factor
-    data[[var]] <- as.character(data[[var]])
-
-    # Check for values not in targets
-    unique_vals <- unique(data[[var]])
-    unique_vals <- unique_vals[!is.na(unique_vals)]
-    missing_in_targets <- setdiff(unique_vals, target_levels)
-
-    if (length(missing_in_targets) > 0) {
-      warning(sprintf(
-        "Variable '%s' has values not in targets: %s\nThese will be treated as NA.",
-        var, paste(missing_in_targets, collapse = ", ")
-      ), call. = FALSE)
-    }
-
-    data[[var]] <- factor(data[[var]], levels = target_levels)
+  if (!is.null(result$margins)) {
+    cat("ACHIEVED MARGINS:\n\n")
+    print(result$margins, row.names = FALSE)
+    cat("\n")
   }
 
-  return(data)
+  cat(strrep("=", 70), "\n")
 }
