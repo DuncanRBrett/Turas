@@ -124,9 +124,10 @@ trim_weights <- function(weights,
 #' @param weights Numeric vector of weights
 #' @param spec Named list, weight specification from config
 #' @param verbose Logical, print progress messages
+#' @param warn_threshold Numeric, percentage threshold for warning (default: 5)
 #' @return List with trimming results (or original weights if no trimming)
 #' @export
-apply_trimming_from_config <- function(weights, spec, verbose = FALSE) {
+apply_trimming_from_config <- function(weights, spec, verbose = FALSE, warn_threshold = 5) {
 
   # Check if trimming is configured
   apply_trim <- !is.null(spec$apply_trimming) &&
@@ -176,11 +177,11 @@ apply_trimming_from_config <- function(weights, spec, verbose = FALSE) {
 
   result$trimming_applied <- TRUE
 
-  # Warn if many weights trimmed
-  if (result$pct_trimmed > 5) {
+  # Warn if many weights trimmed (configurable threshold)
+  if (result$pct_trimmed > warn_threshold) {
     warning(sprintf(
-      "%.1f%% of weights were trimmed. This may introduce bias.\nConsider reviewing targets or adjusting trim threshold.",
-      result$pct_trimmed
+      "%.1f%% of weights were trimmed (threshold: %.1f%%). This may introduce bias.\nConsider reviewing targets or adjusting trim threshold.",
+      result$pct_trimmed, warn_threshold
     ), call. = FALSE)
   }
 

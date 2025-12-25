@@ -31,6 +31,13 @@
 #' @return Invisible TRUE if available, stops with error if not
 #' @keywords internal
 check_survey_available <- function() {
+  # Use TRS guard if available
+  if (exists("guard_survey_available", mode = "function")) {
+    guard_survey_available()
+    return(invisible(TRUE))
+  }
+
+  # Fallback to local check
   if (!requireNamespace("survey", quietly = TRUE)) {
     stop(paste0(
       "\n",

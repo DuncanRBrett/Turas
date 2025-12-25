@@ -73,15 +73,17 @@ diagnose_weights <- function(weights,
   # ============================================================================
   # Distribution Statistics
   # ============================================================================
+  mean_w <- mean(valid_weights)
+  sd_w <- sd(valid_weights)
   results$distribution <- list(
     min = min(valid_weights),
     q1 = unname(quantile(valid_weights, 0.25)),
     median = median(valid_weights),
     q3 = unname(quantile(valid_weights, 0.75)),
     max = max(valid_weights),
-    mean = mean(valid_weights),
-    sd = sd(valid_weights),
-    cv = sd(valid_weights) / mean(valid_weights),
+    mean = mean_w,
+    sd = sd_w,
+    cv = if (mean_w > 0) sd_w / mean_w else NA_real_,  # Guard against div/0
     sum = sum(valid_weights)
   )
 
@@ -222,15 +224,17 @@ assess_weight_quality <- function(diagnostics) {
     issues <- c(issues, "Rim weighting did not converge. Targets may not be achieved.")
   }
 
-  # Check NA/zero rates
-  na_zero_pct <- 100 * (diagnostics$sample_size$n_na + diagnostics$sample_size$n_zero) /
-                 diagnostics$sample_size$n_total
-  if (na_zero_pct > 5) {
-    if (status == "GOOD") status <- "ACCEPTABLE"
-    issues <- c(issues, sprintf(
-      "%.1f%% of cases have NA or zero weights.",
-      na_zero_pct
-    ))
+  # Check NA/zero rates (guard against division by zero)
+  n_total <- diagnostics$sample_size$n_total
+  if (n_total > 0) {
+    na_zero_pct <- 100 * (diagnostics$sample_size$n_na + diagnostics$sample_size$n_zero) / n_total
+    if (na_zero_pct > 5) {
+      if (status == "GOOD") status <- "ACCEPTABLE"
+      issues <- c(issues, sprintf(
+        "%.1f%% of cases have NA or zero weights.",
+        na_zero_pct
+      ))
+    }
   }
 
   # Build recommendations

@@ -194,11 +194,11 @@ validate_rim_config <- function(data, rim_targets, weight_name) {
       ))
     }
 
-    # Check targets sum to 100
+    # Check targets sum to 100 (with 1% tolerance for rounding)
     target_sum <- sum(var_targets$target_percent, na.rm = TRUE)
-    if (abs(target_sum - 100) > 0.1) {
+    if (abs(target_sum - 100) > 1.0) {
       errors <- c(errors, sprintf(
-        "Targets for variable '%s' sum to %.2f%%, must sum to 100%%",
+        "Targets for variable '%s' sum to %.2f%%, must sum to 100%% (±1%%)",
         var, target_sum
       ))
     }
@@ -304,7 +304,8 @@ validate_calculated_weights <- function(weights, label = "Weights") {
     results$min <- min(valid_weights)
     results$max <- max(valid_weights)
     results$mean <- mean(valid_weights)
-    results$cv <- sd(valid_weights) / mean(valid_weights)
+    # Guard against division by zero in CV calculation
+    results$cv <- if (results$mean > 0) sd(valid_weights) / results$mean else NA_real_
 
     # Calculate design effect
     sum_w <- sum(valid_weights)

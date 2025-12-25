@@ -22,8 +22,10 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
     message("Config file: ", basename(config_file))
   }
 
-  # Validate file exists
-  if (!file.exists(config_file)) {
+  # Validate file exists (use TRS guard if available)
+  if (exists("guard_config_file", mode = "function")) {
+    guard_config_file(config_file)
+  } else if (!file.exists(config_file)) {
     stop(sprintf(
       "\nConfig file not found: %s\n\nPlease check:\n  1. File path is correct\n  2. File exists in specified location",
       config_file
@@ -37,13 +39,16 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
   required_sheets <- c("General", "Weight_Specifications")
   available_sheets <- readxl::excel_sheets(config_file)
 
-  missing_sheets <- setdiff(required_sheets, available_sheets)
-  if (length(missing_sheets) > 0) {
-    stop(sprintf(
-      "\nMissing required sheets in config file: %s\n\nFound sheets: %s\n\nPlease add the missing sheets to your config file.",
-      paste(missing_sheets, collapse = ", "),
-      paste(available_sheets, collapse = ", ")
-    ), call. = FALSE)
+  # Validate required sheets (use TRS guard if available)
+  for (sheet in required_sheets) {
+    if (exists("guard_required_sheet", mode = "function")) {
+      guard_required_sheet(config_file, sheet, available_sheets)
+    } else if (!sheet %in% available_sheets) {
+      stop(sprintf(
+        "\nMissing required sheet '%s' in config file.\n\nFound sheets: %s\n\nPlease add the missing sheet to your config file.",
+        sheet, paste(available_sheets, collapse = ", ")
+      ), call. = FALSE)
+    }
   }
 
   # ============================================================================
