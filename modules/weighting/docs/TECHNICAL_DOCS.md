@@ -58,6 +58,7 @@ modules/weighting/
 ├── run_weighting.R              # Main entry point (CLI + API)
 ├── run_weighting_gui.R          # Shiny GUI launcher
 ├── lib/
+│   ├── 00_guard.R               # TRS guard system (loaded first)
 │   ├── config_loader.R          # Configuration parsing
 │   ├── validation.R             # Input validation
 │   ├── design_weights.R         # Design weight calculation
@@ -90,13 +91,14 @@ modules/weighting/
 
 Files must be sourced in dependency order:
 
-1. validation.R (no dependencies)
-2. config_loader.R (uses validation.R)
-3. design_weights.R (uses validation.R, config_loader.R)
-4. rim_weights.R (uses validation.R, config_loader.R)
-5. trimming.R (standalone)
-6. diagnostics.R (standalone)
-7. output.R (uses diagnostics.R)
+1. 00_guard.R (TRS guard system - must load first)
+2. validation.R (no dependencies)
+3. config_loader.R (uses validation.R)
+4. design_weights.R (uses validation.R, config_loader.R)
+5. rim_weights.R (uses validation.R, config_loader.R)
+6. trimming.R (standalone)
+7. diagnostics.R (standalone)
+8. output.R (uses diagnostics.R)
 
 ---
 
@@ -188,22 +190,30 @@ list(
 
 ### 3.4 Rim Weights (rim_weights.R)
 
-**Primary Function:** `calculate_rim_weights(data, target_list, caseid_col = NULL, max_iterations = 50, convergence_tolerance = 1e-7, calibration_method = "raking", weight_bounds = c(0.3, 3.0), verbose = TRUE)`
+**Primary Function:** `calculate_rim_weights(data, target_list, base_weights = NULL, max_iterations = 50, convergence_tolerance = 1e-7, cap_weights = c(0.3, 3.0), calibration_method = "raking", verbose = FALSE)`
 
 **Algorithm:** Uses survey package's calibrate() function for modern calibration.
 
 **v2.0 Implementation (survey::calibrate):**
 ```r
-# Create survey design
+# Set up starting weights (base weights or unit weights)
+if (is.null(base_weights)) {
+  starting_weights <- rep(1, nrow(data))
+} else {
+  starting_weights <- base_weights  # For rim-on-design weighting
+}
+
+# Create survey design with starting weights
 svy_design <- survey::svydesign(
   ids = ~1,
   data = data,
-  weights = rep(1, nrow(data))
+  weights = starting_weights
 )
 
 # Build calibration formula and population margins
 formula <- as.formula(paste("~", paste(names(target_list), collapse = " + ")))
-population <- lapply(target_list, function(props) round(props * 1000))
+base_n <- sum(starting_weights)  # CRITICAL: Uses actual sample, not hard-coded 1000
+population <- c("(Intercept)" = base_n, ...)  # Target totals
 
 # Calibrate with bounds DURING fitting
 calibrated <- survey::calibrate(
@@ -211,7 +221,7 @@ calibrated <- survey::calibrate(
   formula = formula,
   population = population,
   calfun = calibration_method,  # "raking", "linear", or "logit"
-  bounds = weight_bounds,       # Applied DURING calibration!
+  bounds = cap_weights,         # Applied DURING calibration!
   maxit = max_iterations,
   epsilon = convergence_tolerance
 )
@@ -222,19 +232,29 @@ weights <- weights(calibrated)
 **Key v2.0 Improvements:**
 - Weight bounds applied **DURING** calibration (not after)
 - Multiple calibration methods: raking, linear, logit
+- **Base weights support**: Rim-on-design weighting (calibrate on top of existing weights)
 - Returns full survey design object for variance estimation
 - Better convergence with logit method for bounded weights
+- Uses actual sample size for base_n (not hard-coded 1000)
+
+**Base Weights (Rim-on-Design):**
+When `base_weights` is provided, calibration adjusts those weights rather than starting from 1:
+- Use case: Apply rim weighting on top of existing design weights
+- Final weights = base_weights × g-weights (calibration factors)
+- Returns both final weights and g-weights in result
 
 **Return Value:**
 ```r
 list(
-  weights = numeric_vector,
-  converged = logical,          # survey errors if not converged
-  iterations = NA_integer_,     # survey doesn't expose iteration count
+  weights = numeric_vector,       # Final weights (full length, NA for excluded)
+  g_weights = numeric_vector,     # Calibration factors (final/base)
+  converged = logical,            # TRUE if we got here (survey errors otherwise)
+  iterations = NA_integer_,       # survey doesn't expose iteration count
   margins = data.frame(
     variable, category, target_pct, achieved_pct, diff_pct
   ),
-  design = survey.design         # NEW: Full design object
+  design = survey.design,         # Full design object for variance estimation
+  diagnostics = list(...)         # n_total, n_used, n_excluded, sum_weights, etc.
 )
 ```
 
