@@ -136,15 +136,16 @@ create_weight_config_template <- function(output_path = NULL) {
 
   advanced <- data.frame(
     weight_name = c("population_weight"),
-    max_iterations = c(25),
-    convergence_tolerance = c(0.01),
-    force_convergence = c("N"),
+    max_iterations = c(50),
+    convergence_tolerance = c(1e-7),
+    calibration_method = c("raking"),
+    weight_bounds = c("0.3,3.0"),
     stringsAsFactors = FALSE
   )
 
   writeData(wb, "Advanced_Settings", advanced)
-  setColWidths(wb, "Advanced_Settings", cols = 1:4, widths = c(20, 15, 22, 18))
-  addStyle(wb, "Advanced_Settings", headerStyle, rows = 1, cols = 1:4, gridExpand = TRUE)
+  setColWidths(wb, "Advanced_Settings", cols = 1:5, widths = c(20, 15, 22, 18, 15))
+  addStyle(wb, "Advanced_Settings", headerStyle, rows = 1, cols = 1:5, gridExpand = TRUE)
 
   # ============================================================================
   # Sheet 6: Instructions
@@ -152,7 +153,7 @@ create_weight_config_template <- function(output_path = NULL) {
   addWorksheet(wb, "Instructions")
 
   instructions <- c(
-    "TURAS WEIGHTING MODULE - CONFIGURATION TEMPLATE",
+    "TURAS WEIGHTING MODULE - CONFIGURATION TEMPLATE v2.0",
     "",
     "This template helps you configure survey weighting calculations.",
     "",
@@ -186,10 +187,11 @@ create_weight_config_template <- function(output_path = NULL) {
     "   - category: Value in the variable column",
     "   - target_percent: Target percentage (must sum to 100 per variable)",
     "",
-    "5. Advanced_Settings (Optional) - Rim weighting parameters",
-    "   - max_iterations: Maximum iterations for convergence (default: 25)",
-    "   - convergence_tolerance: When to stop (default: 0.01 = 1%)",
-    "   - force_convergence: Return weights even if not converged (Y/N)",
+    "5. Advanced_Settings (Optional) - Rim weighting parameters (v2.0)",
+    "   - max_iterations: Maximum iterations for convergence (default: 50)",
+    "   - convergence_tolerance: Precision threshold (default: 1e-7)",
+    "   - calibration_method: 'raking' (default), 'linear', or 'logit'",
+    "   - weight_bounds: Weight limits during calibration (e.g., '0.3,3.0')",
     "",
     "USAGE:",
     "",
@@ -205,8 +207,10 @@ create_weight_config_template <- function(output_path = NULL) {
     "- Design weights: Ensure all stratum categories exist in your data",
     "- For rim weighting, max 5 variables recommended",
     "- Start with apply_trimming=N, then add if needed",
+    "- v2.0: Use calibration_method='logit' for better bounded convergence",
+    "- v2.0: Weight bounds applied DURING calibration (superior to trimming)",
     "",
-    "For more information, see the module README."
+    "For more information, see the module README and USER_GUIDE.md."
   )
 
   writeData(wb, "Instructions", data.frame(Instructions = instructions))
