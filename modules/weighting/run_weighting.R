@@ -410,8 +410,9 @@ run_cli <- function() {
   })
 }
 
-# Run CLI if executed directly
-if (!interactive() && identical(environment(), globalenv())) {
+# Run CLI if executed directly (but not if being sourced by GUI launcher)
+if (!interactive() && identical(environment(), globalenv()) &&
+    (!exists("TURAS_LAUNCHER_ACTIVE") || !TURAS_LAUNCHER_ACTIVE)) {
   run_cli()
 }
 

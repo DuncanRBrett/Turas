@@ -202,14 +202,47 @@ run_weighting_gui <- function(launch_browser = TRUE) {
         p("Calculate survey weights using design or rim weighting methods")
       ),
 
-      # Configuration Section
-      div(class = "section-title", "1. Select Configuration File"),
+      # Method Selection
+      div(class = "section-title", "1. Select Input Method"),
 
-      fileInput("config_file", "Weight_Config.xlsx",
-                accept = c(".xlsx", ".xls"),
-                width = "100%"),
-      div(class = "help-text",
-          "Upload your Weight_Config.xlsx file with weight specifications"),
+      radioButtons("input_method", NULL,
+                   choices = c("Browse to folder (recommended for large files)" = "folder",
+                              "Upload files" = "upload"),
+                   selected = "folder"),
+
+      # Folder Selection (conditional)
+      conditionalPanel(
+        condition = "input.input_method == 'folder'",
+
+        textInput("project_folder", "Project Folder Path",
+                  placeholder = "e.g., /Users/duncan/Documents/Turas/modules/weighting/examples/example2_rim_weights",
+                  width = "100%"),
+        div(class = "help-text",
+            "Enter the folder path containing your Weight_Config.xlsx and data file"),
+
+        textInput("config_filename", "Config File Name",
+                  value = "Weight_Config.xlsx",
+                  width = "100%"),
+        div(class = "help-text",
+            "Name of the config file in the folder above")
+      ),
+
+      # File Upload (conditional)
+      conditionalPanel(
+        condition = "input.input_method == 'upload'",
+
+        fileInput("config_file", "Weight_Config.xlsx",
+                  accept = c(".xlsx", ".xls"),
+                  width = "100%"),
+        div(class = "help-text",
+            "Upload your Weight_Config.xlsx file"),
+
+        fileInput("data_file", "Survey Data (CSV, XLSX, or SPSS)",
+                  accept = c(".csv", ".xlsx", ".xls", ".sav"),
+                  width = "100%"),
+        div(class = "help-text",
+            "Upload your survey data file")
+      ),
 
       # Options Section
       div(class = "section-title", "2. Options"),
@@ -282,21 +315,56 @@ run_weighting_gui <- function(launch_browser = TRUE) {
     # Run weighting analysis
     observeEvent(input$run_weighting, {
 
-      # Validate file uploaded
-      req(input$config_file)
-
       # Reset state
       rv$result <- NULL
       rv$log <- ""
       rv$running <- TRUE
 
       add_log("Starting weighting analysis...")
-      add_log(paste("Config file:", input$config_file$name))
-      add_log(strrep("-", 50))
 
       tryCatch({
-        # Get uploaded file path
-        config_path <- input$config_file$datapath
+        # Determine config and data paths based on input method
+        if (input$input_method == "folder") {
+          # Folder method - validate inputs
+          req(input$project_folder)
+          req(input$config_filename)
+
+          project_folder <- input$project_folder
+          config_filename <- input$config_filename
+
+          # Validate folder exists
+          if (!dir.exists(project_folder)) {
+            stop("Project folder not found: ", project_folder)
+          }
+
+          config_path <- file.path(project_folder, config_filename)
+
+          # Validate config file exists
+          if (!file.exists(config_path)) {
+            stop("Config file not found: ", config_path)
+          }
+
+          add_log(paste("Project folder:", project_folder))
+          add_log(paste("Config file:", config_filename))
+          add_log("Using files in place (no upload - memory efficient)")
+
+          # Don't override data_file - let config resolve it
+          data_path <- NULL
+
+        } else {
+          # Upload method - validate files uploaded
+          req(input$config_file)
+          req(input$data_file)
+
+          config_path <- input$config_file$datapath
+          data_path <- input$data_file$datapath
+
+          add_log(paste("Config file:", input$config_file$name))
+          add_log(paste("Data file:", input$data_file$name))
+          add_log("Using uploaded files")
+        }
+
+        add_log(strrep("-", 50))
 
         # Run weighting with progress updates
         add_log("Loading configuration...")
@@ -306,6 +374,7 @@ run_weighting_gui <- function(launch_browser = TRUE) {
           result <- withCallingHandlers({
             run_weighting(
               config_file = config_path,
+              data_file = data_path,
               verbose = TRUE
             )
           }, message = function(m) {
