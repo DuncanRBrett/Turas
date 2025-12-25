@@ -1,7 +1,7 @@
 ================================================================================
 TURAS WEIGHTING MODULE
 ================================================================================
-Version: 1.0
+Version: 2.0
 Date: December 2025
 ================================================================================
 
@@ -26,12 +26,10 @@ Required R packages:
   - readxl (Excel file reading)
   - dplyr (data manipulation)
   - openxlsx (Excel output)
-
-Optional (for rim weighting):
-  - anesrake (iterative proportional fitting)
+  - survey (rim weighting/calibration)
 
 Install with:
-  install.packages(c("readxl", "dplyr", "openxlsx", "anesrake"))
+  install.packages(c("readxl", "dplyr", "openxlsx", "survey"))
 
 
 QUICK START
@@ -107,9 +105,10 @@ The Weight_Config.xlsx file has the following sheets:
    ------------|----------------|----------------------|------------------
    pop_weight  | 25             | 0.01                 | N
 
-   - max_iterations: Maximum raking iterations (default: 25)
-   - convergence_tolerance: Stop when margins within % (default: 0.01 = 1%)
-   - force_convergence: Return weights even if not converged (default: N)
+   - max_iterations: Maximum raking iterations (default: 50)
+   - convergence_tolerance: Stop when margins within % (default: 1e-7)
+   - calibration_method: "raking", "linear", or "logit" (default: raking)
+   - weight_bounds: Weight limits during calibration (default: 0.3,3.0)
 
 
 DESIGN WEIGHTS
@@ -150,10 +149,11 @@ Use cases:
   - General population surveys
 
 Notes:
-  - Requires anesrake package: install.packages("anesrake")
+  - Requires survey package: install.packages("survey")
   - Maximum 5 variables recommended for convergence
   - All categories must exist in data
   - No missing values allowed in rim variables
+  - Weight bounds applied DURING calibration (v2.0 improvement)
 
 
 WEIGHT TRIMMING
@@ -240,12 +240,13 @@ This creates a pre-populated template with example data.
 
 TROUBLESHOOTING
 ---------------
-1. "Package 'anesrake' not installed"
-   Run: install.packages("anesrake")
+1. "Package 'survey' not installed"
+   Run: install.packages("survey")
 
 2. "Rim weighting did not converge"
-   - Increase max_iterations (try 50)
-   - Relax convergence_tolerance (try 0.02)
+   - Increase max_iterations (try 100)
+   - Try different calibration_method (logit handles bounds better)
+   - Adjust weight_bounds if needed
    - Reduce number of rim variables
    - Check for impossible target combinations
 
@@ -282,7 +283,7 @@ modules/weighting/
     config_loader.R        Load Weight_Config.xlsx
     validation.R           Input validation
     design_weights.R       Design weight calculation
-    rim_weights.R          Rim weight calculation (anesrake wrapper)
+    rim_weights.R          Rim weight calculation (survey::calibrate)
     trimming.R             Weight capping/trimming
     diagnostics.R          Quality diagnostics
     output.R               Report generation
@@ -296,9 +297,13 @@ REFERENCES
 Kish, L. (1965). Survey Sampling. John Wiley & Sons.
   - Effective sample size formula
 
-DeBell, M. & Krosnick, J.A. (2009). Computing Weights for American
-National Election Study Survey Data. ANES Technical Report.
-  - anesrake methodology
+Lumley, T. (2023). survey: Analysis of complex survey samples.
+R package version 4.2+. https://CRAN.R-project.org/package=survey
+  - Calibration methodology (survey::calibrate)
+
+Deville, J.C. & Särndal, C.E. (1992). Calibration estimators in survey sampling.
+Journal of the American Statistical Association, 87(418), 376-382.
+  - Theoretical foundation for calibration weighting
 
 
 SUPPORT

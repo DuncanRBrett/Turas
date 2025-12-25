@@ -245,31 +245,50 @@ Each variable should sum to 100: - Gender: 48 + 52 = 100 ✓ - Age_Group:
 | Column | Required | Type | Default | Description |
 |--------------|--------------|--------------|--------------|----------------|
 | weight_name | Yes | Text | \- | Must match Weight_Specifications |
-| max_iterations | No | Integer | 25 | Maximum raking iterations |
-| convergence_tolerance | No | Number | 0.01 | Stop when margins within this % |
-| force_convergence | No | Y/N | N | Return weights even if not converged |
+| max_iterations | No | Integer | 50 | Maximum raking iterations |
+| convergence_tolerance | No | Number | 1e-7 | Convergence precision threshold |
+| calibration_method | No | Text | raking | Calibration method: "raking", "linear", or "logit" |
+| weight_bounds | No | Text | 0.3,3.0 | Weight bounds: "lower,upper" or single value |
 
 ### Parameter Guidelines
 
-**max_iterations** - Default: 25 - Increase to: 50 if convergence
-fails - Maximum useful: 100 (if not converged by then, likely won't)
+**max_iterations** (v2.0 default: 50)
+- Default: 50 (increased from 25 in v1.0)
+- Increase to: 100 if convergence fails
+- Maximum useful: 200 (if not converged by then, likely won't)
 
-**convergence_tolerance** - Default: 0.01 (1%) - Means: Stop when all
-margins are within 1% of target - Relax to: 0.02 or 0.05 if convergence
-is difficult
+**convergence_tolerance** (v2.0 default: 1e-7)
+- Default: 1e-7 (0.00001%, very tight)
+- v1.0 used 0.01 (1%) - now much more precise
+- survey::calibrate uses epsilon convergence (not percentage)
 
-**force_convergence** - Default: N (refuse if not converged) - Set to: Y
-only when you accept approximate weights - Warning: Targets may not be
-exactly achieved
+**calibration_method** (NEW in v2.0)
+- **"raking"** (default): Traditional iterative proportional fitting
+- **"linear"**: Linear calibration (Newton-Raphson)
+- **"logit"**: Logistic calibration (best for bounded weights, prevents extreme values)
+- Recommendation: Use "logit" if having convergence issues with bounds
+
+**weight_bounds** (NEW in v2.0)
+- Default: "0.3,3.0" (weights between 0.3 and 3.0)
+- Format: "lower,upper" (e.g., "0.2,5") or single value (e.g., "5" means 0.3 to 5)
+- **CRITICAL v2.0 IMPROVEMENT**: Bounds applied **DURING** calibration, not after
+- Prevents extreme weights during fitting (not post-trimming)
+- Use with calibration_method="logit" for best results
 
 ### Example
 
-```         
-| weight_name | max_iterations | convergence_tolerance | force_convergence |
-|-------------|----------------|----------------------|-------------------|
-| pop_weight  | 50             | 0.01                 | N                 |
-| relaxed_wt  | 30             | 0.05                 | Y                 |
 ```
+| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds |
+|-------------|----------------|----------------------|-------------------|---------------|
+| pop_weight  | 50             | 1e-7                 | raking            | 0.3,3.0       |
+| strict_wt   | 100            | 1e-8                 | logit             | 0.5,2.0       |
+| relaxed_wt  | 50             | 1e-6                 | linear            | 5             |
+```
+
+**Interpretation:**
+- **pop_weight**: Standard raking with default bounds [0.3, 3.0]
+- **strict_wt**: Tight bounds [0.5, 2.0] using logit method for stability
+- **relaxed_wt**: Single value "5" means bounds [0.3, 5.0]
 
 ------------------------------------------------------------------------
 
@@ -322,10 +341,10 @@ exactly achieved
 
 ### Advanced_Settings Sheet
 
-```         
-| weight_name | max_iterations | convergence_tolerance | force_convergence |
-|-------------|----------------|----------------------|-------------------|
-| demo_weight | 30             | 0.01                 | N                 |
+```
+| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds |
+|-------------|----------------|----------------------|-------------------|---------------|
+| demo_weight | 50             | 1e-7                 | raking            | 0.3,3.0       |
 ```
 
 ------------------------------------------------------------------------
@@ -379,4 +398,4 @@ This creates a template with example data that you can modify.
 
 ------------------------------------------------------------------------
 
-*TURAS Weighting Module - Template Reference v1.0*
+*TURAS Weighting Module - Template Reference v2.0*

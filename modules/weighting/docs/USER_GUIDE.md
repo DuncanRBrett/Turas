@@ -63,8 +63,12 @@ specifications:
 ### Step 1: Install Required Packages
 
 ``` r
-install.packages(c("readxl", "dplyr", "openxlsx"))
-install.packages("anesrake")  # Required for rim weighting
+# Install all required packages
+install.packages(c("readxl", "dplyr", "openxlsx", "survey"))
+
+# Verify survey package installation
+library(survey)
+packageVersion("survey")  # Should show 4.x or higher
 ```
 
 ### Step 2: Create Configuration File
@@ -170,9 +174,13 @@ For rim weights, specify target percentages:
 
 Fine-tune rim weighting parameters:
 
-| weight_name | max_iterations | convergence_tolerance | force_convergence |
-|-------------|----------------|-----------------------|-------------------|
-| pop_weight  | 25             | 0.01                  | N                 |
+| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds |
+|-------------|----------------|----------------------|-------------------|---------------|
+| pop_weight  | 50             | 1e-7                 | raking            | 0.3,3.0       |
+
+**New in v2.0:**
+- **calibration_method**: "raking" (default), "linear", or "logit"
+- **weight_bounds**: Lower and upper bounds (e.g., "0.3,3.0" or single value "5")
 
 ------------------------------------------------------------------------
 
@@ -232,14 +240,17 @@ off - General population: Sample doesn't match population demographics
 
 ### How It Works
 
-Rim weighting (also called "raking") iteratively adjusts weights until
-all target margins are matched:
+Rim weighting (also called "raking" or "calibration") iteratively adjusts
+weights until all target margins are matched:
 
 1.  Start with all weights = 1
 2.  Adjust weights to match Gender targets
 3.  Adjust weights to match Age targets
 4.  Adjust weights to match Region targets
 5.  Repeat until all margins converge
+
+**v2.0 uses survey::calibrate()**: Modern calibration with weight bounds
+applied during fitting (not after), preventing extreme weights.
 
 ### Setting Up Rim Weights
 
@@ -273,9 +284,11 @@ solution).
 (e.g., 80% male AND 80% young women) - Too many variables with too few
 respondents - Categories in targets have no respondents
 
-**If convergence fails:** 1. Increase `max_iterations` (try 50) 2. Relax
-`convergence_tolerance` (try 0.02) 3. Reduce number of rim variables 4.
-Set `force_convergence = Y` (use with caution)
+**If convergence fails:**
+1. Increase `max_iterations` (try 100)
+2. Try `calibration_method = "logit"` (better for bounded weights)
+3. Adjust `weight_bounds` if needed
+4. Reduce number of rim variables
 
 ------------------------------------------------------------------------
 
@@ -555,4 +568,4 @@ For issues with the TURAS Weighting Module:
 
 ------------------------------------------------------------------------
 
-*TURAS Weighting Module v1.0 \| December 2025*
+*TURAS Weighting Module v2.0 \| December 2025*

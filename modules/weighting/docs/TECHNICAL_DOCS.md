@@ -42,9 +42,9 @@ Config File → Config Loader → Validator → Weight Calculator → Trimmer �
 - readxl: Excel file reading
 - dplyr: Data manipulation
 - openxlsx: Excel writing
+- survey: Rim weighting/calibration (required if method=rim)
 
 **Optional:**
-- anesrake: Rim weighting (required if method=rim)
 - haven: SPSS file reading
 
 ---
@@ -61,7 +61,7 @@ modules/weighting/
 │   ├── config_loader.R          # Configuration parsing
 │   ├── validation.R             # Input validation
 │   ├── design_weights.R         # Design weight calculation
-│   ├── rim_weights.R            # Rim weighting (anesrake wrapper)
+│   ├── rim_weights.R            # Rim weighting (survey::calibrate)
 │   ├── trimming.R               # Weight capping/trimming
 │   ├── diagnostics.R            # Quality diagnostics
 │   └── output.R                 # Report generation
@@ -188,34 +188,53 @@ list(
 
 ### 3.4 Rim Weights (rim_weights.R)
 
-**Primary Function:** `calculate_rim_weights(data, target_list, caseid, max_iterations, convergence_tolerance, force_convergence, cap_weights, verbose)`
+**Primary Function:** `calculate_rim_weights(data, target_list, caseid_col = NULL, max_iterations = 50, convergence_tolerance = 1e-7, calibration_method = "raking", weight_bounds = c(0.3, 3.0), verbose = TRUE)`
 
-**Algorithm:** Uses anesrake package for iterative proportional fitting (raking).
+**Algorithm:** Uses survey package's calibrate() function for modern calibration.
 
-**anesrake Integration:**
+**v2.0 Implementation (survey::calibrate):**
 ```r
-anesrake::anesrake(
-  inputter = target_list,    # Named list of target proportions
-  dataframe = data,
-  caseid = id_vector,
-  cap = cap_weights,
-  choosemethod = "total",
-  type = "pctlim",
-  pctlim = convergence_tolerance,
-  maxit = max_iterations,
-  force1 = TRUE              # Force mean weight = 1
+# Create survey design
+svy_design <- survey::svydesign(
+  ids = ~1,
+  data = data,
+  weights = rep(1, nrow(data))
 )
+
+# Build calibration formula and population margins
+formula <- as.formula(paste("~", paste(names(target_list), collapse = " + ")))
+population <- lapply(target_list, function(props) round(props * 1000))
+
+# Calibrate with bounds DURING fitting
+calibrated <- survey::calibrate(
+  design = svy_design,
+  formula = formula,
+  population = population,
+  calfun = calibration_method,  # "raking", "linear", or "logit"
+  bounds = weight_bounds,       # Applied DURING calibration!
+  maxit = max_iterations,
+  epsilon = convergence_tolerance
+)
+
+weights <- weights(calibrated)
 ```
+
+**Key v2.0 Improvements:**
+- Weight bounds applied **DURING** calibration (not after)
+- Multiple calibration methods: raking, linear, logit
+- Returns full survey design object for variance estimation
+- Better convergence with logit method for bounded weights
 
 **Return Value:**
 ```r
 list(
   weights = numeric_vector,
-  converged = logical,
-  iterations = integer,
+  converged = logical,          # survey errors if not converged
+  iterations = NA_integer_,     # survey doesn't expose iteration count
   margins = data.frame(
     variable, category, target_pct, achieved_pct, diff_pct
-  )
+  ),
+  design = survey.design         # NEW: Full design object
 )
 ```
 
@@ -373,7 +392,7 @@ The module implements TURAS Reliability Standard (TRS) v1.0:
 | DATA_ | Data integrity errors | DATA_MISSING_VALUES |
 | IO_ | File/path errors | IO_FILE_NOT_FOUND |
 | MODEL_ | Model fitting errors | MODEL_NO_CONVERGENCE |
-| PKG_ | Missing dependencies | PKG_ANESRAKE_MISSING |
+| PKG_ | Missing dependencies | PKG_SURVEY_MISSING |
 
 ### 5.3 TRS Integration Points
 
@@ -395,20 +414,23 @@ if (!file.exists(config_file)) {
 
 **Rim Convergence:**
 ```r
-if (!converged && !force_convergence) {
+# v2.0: survey::calibrate() errors on non-convergence
+tryCatch({
+  calibrated <- survey::calibrate(...)
+}, error = function(e) {
   turas_refuse(
     code = "MODEL_RIM_NO_CONVERGENCE",
     title = "Rim Weighting Did Not Converge",
-    problem = sprintf("Failed to converge after %d iterations", iterations),
-    why_it_matters = "Target margins will not be achieved",
+    problem = sprintf("Calibration failed: %s", e$message),
+    why_it_matters = "Target margins cannot be achieved with current settings",
     how_to_fix = c(
-      "Increase max_iterations in Advanced_Settings",
-      "Relax convergence_tolerance",
-      "Reduce number of rim variables",
-      "Set force_convergence=Y to accept approximate weights"
+      "Increase max_iterations in Advanced_Settings (try 100)",
+      "Try calibration_method='logit' (better for bounded weights)",
+      "Adjust weight_bounds if needed",
+      "Reduce number of rim variables"
     )
   )
-}
+})
 ```
 
 ### 5.4 Guard State Usage
@@ -735,10 +757,12 @@ covr::package_coverage("modules/weighting")
 
 - Kish, L. (1965). *Survey Sampling*. John Wiley & Sons.
 - Deming, W.E. & Stephan, F.F. (1940). On a least squares adjustment of a sampled frequency table when the expected marginal totals are known. *Annals of Mathematical Statistics*, 11(4), 427-444.
+- Deville, J.C. & Särndal, C.E. (1992). Calibration estimators in survey sampling. *Journal of the American Statistical Association*, 87(418), 376-382.
 
-### anesrake Package
+### survey Package
 
-- DeBell, M. & Krosnick, J.A. (2009). Computing Weights for American National Election Study Survey Data. ANES Technical Report.
+- Lumley, T. (2023). *survey: Analysis of complex survey samples*. R package version 4.2+. https://CRAN.R-project.org/package=survey
+- Lumley, T. (2010). *Complex Surveys: A Guide to Analysis Using R*. John Wiley & Sons.
 
 ### TRS Specification
 
@@ -746,4 +770,4 @@ covr::package_coverage("modules/weighting")
 
 ---
 
-*TURAS Weighting Module - Technical Documentation v1.0*
+*TURAS Weighting Module - Technical Documentation v2.0*
