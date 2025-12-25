@@ -2,13 +2,13 @@
 # TURAS WEIGHTING MODULE - MAIN ENTRY POINT
 # ==============================================================================
 #
-# Version: 1.0
-# Date: 2025-12-24
+# Version: 2.0
+# Date: 2025-12-25
 #
 # DESCRIPTION:
 # Calculates survey weights using industry-standard methods:
 #   - Design weights for stratified samples
-#   - Rim weights (raking) for quota/panel samples
+#   - Rim weights (raking) using survey::calibrate()
 #
 # USAGE:
 #   result <- run_weighting("path/to/Weight_Config.xlsx")
@@ -18,12 +18,12 @@
 #   Rscript run_weighting.R path/to/Weight_Config.xlsx
 #
 # DEPENDENCIES:
-#   Required: readxl, dplyr, openxlsx
-#   Optional: anesrake (for rim weighting)
+#   Required: readxl, dplyr, openxlsx, survey
+#   Optional: haven (for SPSS files)
 #
 # ==============================================================================
 
-SCRIPT_VERSION <- "1.0"
+SCRIPT_VERSION <- "2.0"
 
 # ==============================================================================
 # MODULE INITIALIZATION
@@ -71,6 +71,7 @@ source_module_libs <- function(module_dir) {
 
   # Source in dependency order
   lib_files <- c(
+    "00_guard.R",      # TRS guard system - must load first
     "validation.R",
     "config_loader.R",
     "design_weights.R",
@@ -95,7 +96,7 @@ source_module_libs <- function(module_dir) {
 #' Verifies required packages are installed.
 #' @keywords internal
 check_required_packages <- function() {
-  required <- c("readxl", "dplyr")
+  required <- c("readxl", "dplyr", "survey", "openxlsx")
 
   missing <- required[!sapply(required, requireNamespace, quietly = TRUE)]
 
