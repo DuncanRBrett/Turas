@@ -203,58 +203,42 @@ run_weighting_gui <- function(launch_browser = TRUE) {
         p("Calculate survey weights using design or rim weighting methods")
       ),
 
-      # Method Selection
-      div(class = "section-title", "1. Select Input Method"),
+      # Folder Selection
+      div(class = "section-title", "1. Select Project Folder"),
 
-      radioButtons("input_method", NULL,
-                   choices = c("Browse to folder (recommended for large files)" = "folder",
-                              "Upload files" = "upload"),
-                   selected = "folder"),
-
-      # Folder Selection (conditional)
+      # Recent folders dropdown
       conditionalPanel(
-        condition = "input.input_method == 'folder'",
+        condition = "output.has_recent_folders",
+        selectInput("recent_folder", "Recent Folders",
+                    choices = NULL,
+                    width = "100%"),
+        div(class = "help-text", style = "margin-top: -10px; margin-bottom: 15px;",
+            "Select from recently used folders or browse/enter path below")
+      ),
 
-        fluidRow(
-          column(9,
-            textInput("project_folder", "Project Folder Path",
-                      placeholder = "e.g., /Users/duncan/Documents/Turas/modules/weighting/examples/example2_rim_weights",
-                      width = "100%")
-          ),
-          column(3,
-            div(style = "margin-top: 25px;",
-              shinyDirButton("folder_browse", "Browse...",
-                           title = "Select project folder",
-                           class = "btn btn-default")
-            )
-          )
+      # Folder path with browse button
+      fluidRow(
+        column(9,
+          textInput("project_folder", "Project Folder Path",
+                    placeholder = "e.g., /Users/duncan/Documents/Turas/modules/weighting/examples/example2_rim_weights",
+                    width = "100%")
         ),
-        div(class = "help-text",
-            "Select or enter the folder path containing your Weight_Config.xlsx and data file"),
-
-        textInput("config_filename", "Config File Name",
-                  value = "Weight_Config.xlsx",
-                  width = "100%"),
-        div(class = "help-text",
-            "Name of the config file in the folder above")
+        column(3,
+          div(style = "margin-top: 25px;",
+            shinyDirButton("folder_browse", "Browse...",
+                         title = "Select project folder",
+                         class = "btn btn-default")
+          )
+        )
       ),
+      div(class = "help-text",
+          "Select or enter the folder path containing your Weight_Config.xlsx and data file"),
 
-      # File Upload (conditional)
-      conditionalPanel(
-        condition = "input.input_method == 'upload'",
-
-        fileInput("config_file", "Weight_Config.xlsx",
-                  accept = c(".xlsx", ".xls"),
-                  width = "100%"),
-        div(class = "help-text",
-            "Upload your Weight_Config.xlsx file"),
-
-        fileInput("data_file", "Survey Data (CSV, XLSX, or SPSS)",
-                  accept = c(".csv", ".xlsx", ".xls", ".sav"),
-                  width = "100%"),
-        div(class = "help-text",
-            "Upload your survey data file")
-      ),
+      textInput("config_filename", "Config File Name",
+                value = "Weight_Config.xlsx",
+                width = "100%"),
+      div(class = "help-text",
+          "Name of the config file in the folder above"),
 
       # Options Section
       div(class = "section-title", "2. Options"),
@@ -305,14 +289,52 @@ run_weighting_gui <- function(launch_browser = TRUE) {
     rv <- reactiveValues(
       result = NULL,
       log = "",
-      running = FALSE
+      running = FALSE,
+      recent_folders = character(0)
     )
+
+    # Recent folders file location (persistent across sessions)
+    # Use user's home directory to persist between sessions
+    recent_folders_file <- file.path(fs::path_home(), ".turas_weighting_recent_folders.rds")
+
+    # Load recent folders on startup
+    observe({
+      if (file.exists(recent_folders_file)) {
+        rv$recent_folders <- tryCatch(
+          readRDS(recent_folders_file),
+          error = function(e) character(0)
+        )
+      }
+    })
+
+    # Update recent folders dropdown
+    observe({
+      if (length(rv$recent_folders) > 0) {
+        # Create named list for dropdown (display basename, value is full path)
+        choices <- setNames(rv$recent_folders, basename(rv$recent_folders))
+        updateSelectInput(session, "recent_folder",
+                         choices = c("-- Select recent folder --" = "", choices))
+      }
+    })
+
+    # Flag for whether recent folders exist
+    output$has_recent_folders <- reactive({
+      length(rv$recent_folders) > 0
+    })
+    outputOptions(output, "has_recent_folders", suspendWhenHidden = FALSE)
+
+    # When recent folder selected, update text input
+    observeEvent(input$recent_folder, {
+      if (!is.null(input$recent_folder) && input$recent_folder != "") {
+        updateTextInput(session, "project_folder", value = input$recent_folder)
+      }
+    })
 
     # Folder browser setup
     volumes <- c(Home = fs::path_home(), getVolumes()())
     shinyDirChoose(input, "folder_browse", roots = volumes, session = session)
 
-    # Update text input when folder is selected
+    # Update text input when folder is selected via browser
     observeEvent(input$folder_browse, {
       if (!is.null(input$folder_browse)) {
         # Get selected path
@@ -322,6 +344,30 @@ run_weighting_gui <- function(launch_browser = TRUE) {
         }
       }
     })
+
+    # Function to add folder to recent list
+    add_to_recent_folders <- function(folder_path) {
+      if (!is.null(folder_path) && nzchar(folder_path) && dir.exists(folder_path)) {
+        # Normalize path
+        folder_path <- normalizePath(folder_path, winslash = "/")
+
+        # Remove if already exists (will re-add at top)
+        rv$recent_folders <- setdiff(rv$recent_folders, folder_path)
+
+        # Add to front, limit to 10 most recent
+        rv$recent_folders <- c(folder_path, rv$recent_folders)
+        if (length(rv$recent_folders) > 10) {
+          rv$recent_folders <- rv$recent_folders[1:10]
+        }
+
+        # Save to file
+        tryCatch({
+          saveRDS(rv$recent_folders, recent_folders_file)
+        }, error = function(e) {
+          # Silently fail if can't save
+        })
+      }
+    }
 
     # Log capture function
     add_log <- function(msg) {
@@ -350,48 +396,34 @@ run_weighting_gui <- function(launch_browser = TRUE) {
       add_log("Starting weighting analysis...")
 
       tryCatch({
-        # Determine config and data paths based on input method
-        if (input$input_method == "folder") {
-          # Folder method - validate inputs
-          req(input$project_folder)
-          req(input$config_filename)
+        # Validate inputs
+        req(input$project_folder)
+        req(input$config_filename)
 
-          project_folder <- input$project_folder
-          config_filename <- input$config_filename
+        project_folder <- input$project_folder
+        config_filename <- input$config_filename
 
-          # Validate folder exists
-          if (!dir.exists(project_folder)) {
-            stop("Project folder not found: ", project_folder)
-          }
-
-          config_path <- file.path(project_folder, config_filename)
-
-          # Validate config file exists
-          if (!file.exists(config_path)) {
-            stop("Config file not found: ", config_path)
-          }
-
-          add_log(paste("Project folder:", project_folder))
-          add_log(paste("Config file:", config_filename))
-          add_log("Using files in place (no upload - memory efficient)")
-
-          # Don't override data_file - let config resolve it
-          data_path <- NULL
-
-        } else {
-          # Upload method - validate files uploaded
-          req(input$config_file)
-          req(input$data_file)
-
-          config_path <- input$config_file$datapath
-          data_path <- input$data_file$datapath
-
-          add_log(paste("Config file:", input$config_file$name))
-          add_log(paste("Data file:", input$data_file$name))
-          add_log("Using uploaded files")
+        # Validate folder exists
+        if (!dir.exists(project_folder)) {
+          stop("Project folder not found: ", project_folder)
         }
 
+        config_path <- file.path(project_folder, config_filename)
+
+        # Validate config file exists
+        if (!file.exists(config_path)) {
+          stop("Config file not found: ", config_path)
+        }
+
+        # Add to recent folders
+        add_to_recent_folders(project_folder)
+
+        add_log(paste("Project folder:", project_folder))
+        add_log(paste("Config file:", config_filename))
         add_log(strrep("-", 50))
+
+        # Don't override data_file - let config resolve it
+        data_path <- NULL
 
         # Run weighting with progress updates
         add_log("Loading configuration...")
