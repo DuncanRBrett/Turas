@@ -41,6 +41,30 @@ run_weighting_gui <- function(launch_browser = TRUE) {
     }
   }, error = function(e) getwd())
 
+  # Find TURAS root for shared utilities
+  turas_root <- tryCatch({
+    root <- Sys.getenv("TURAS_ROOT", "")
+    if (nzchar(root) && dir.exists(file.path(root, "modules"))) {
+      root
+    } else {
+      # Try to find from module directory
+      check <- dirname(dirname(module_dir))
+      if (dir.exists(file.path(check, "modules", "shared"))) {
+        check
+      } else {
+        NULL
+      }
+    }
+  }, error = function(e) NULL)
+
+  # Source shared console capture for TRS compliance (no silent failures in GUI)
+  if (!is.null(turas_root)) {
+    console_capture_file <- file.path(turas_root, "modules", "shared", "lib", "console_capture.R")
+    if (file.exists(console_capture_file)) {
+      source(console_capture_file, local = FALSE)
+    }
+  }
+
   # Source module libraries
   lib_dir <- file.path(module_dir, "lib")
   if (dir.exists(lib_dir)) {
@@ -244,9 +268,9 @@ run_weighting_gui <- function(launch_browser = TRUE) {
       rv$log <- paste0(rv$log, msg, "\n")
     }
 
-    # Progress log output
-    output$progress_log <- renderText({
-      rv$log
+    # Progress log output (R 4.2+ compatible - use renderPrint with cat)
+    output$progress_log <- renderPrint({
+      cat(rv$log)
     })
 
     # Has results flag
@@ -277,15 +301,26 @@ run_weighting_gui <- function(launch_browser = TRUE) {
         # Run weighting with progress updates
         add_log("Loading configuration...")
 
-        result <- withCallingHandlers({
-          run_weighting(
-            config_file = config_path,
-            verbose = TRUE
-          )
-        }, message = function(m) {
-          add_log(conditionMessage(m))
-          invokeRestart("muffleMessage")
-        })
+        # Use capture.output for TRS compliance - all console output visible in GUI
+        output_capture <- capture.output({
+          result <- withCallingHandlers({
+            run_weighting(
+              config_file = config_path,
+              verbose = TRUE
+            )
+          }, message = function(m) {
+            cat(conditionMessage(m), "\n")
+            invokeRestart("muffleMessage")
+          }, warning = function(w) {
+            cat("WARNING:", conditionMessage(w), "\n")
+            invokeRestart("muffleWarning")
+          })
+        }, type = "output")
+
+        # Add captured output to log
+        if (length(output_capture) > 0) {
+          add_log(paste(output_capture, collapse = "\n"))
+        }
 
         rv$result <- result
 
