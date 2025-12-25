@@ -42,7 +42,8 @@ test_modules <- list(
   list(name = "Conjoint", file = "test_regression_conjoint_mock.R", status = "implemented"),
   list(name = "Pricing", file = "test_regression_pricing_mock.R", status = "implemented"),
   list(name = "Tracker", file = "test_regression_tracker_mock.R", status = "implemented"),
-  list(name = "MaxDiff", file = "test_regression_maxdiff_mock.R", status = "implemented")
+  list(name = "MaxDiff", file = "test_regression_maxdiff_mock.R", status = "implemented"),
+  list(name = "Weighting", file = "test_regression_weighting_mock.R", status = "implemented")
 )
 
 # Define shared utility tests (from tests/testthat/)
