@@ -173,16 +173,50 @@ calculate_rim_weights <- function(data,
   formula <- as.formula(paste("~", paste(names(target_list), collapse = " + ")))
 
   # Convert target_list to population margins for calibrate()
-  # calibrate() needs a SINGLE VECTOR of all population totals in formula order
-  # We use a base count (1000) - the actual number doesn't matter, only proportions
+  # calibrate() needs population totals matching the model matrix structure
+  # The model matrix includes an intercept and dummy variables (omitting reference levels)
   base_n <- 1000
 
-  # Build population vector in the order that calibrate() expects
-  population <- c()
-  for (var in names(target_list)) {
-    props <- target_list[[var]]
-    counts <- props * base_n
-    population <- c(population, counts)
+  # Create model matrix to determine structure
+  mm <- model.matrix(formula, data = rake_data)
+  mm_colnames <- colnames(mm)
+
+  # Build population vector to match model matrix columns
+  population <- numeric(length(mm_colnames))
+
+  for (i in seq_along(mm_colnames)) {
+    col_name <- mm_colnames[i]
+
+    if (col_name == "(Intercept)") {
+      # Intercept: total population
+      population[i] <- base_n
+
+    } else {
+      # Dummy variable: format is "variableCategory" (e.g., "age25-34")
+      # Extract variable name and category
+      found <- FALSE
+      for (var in names(target_list)) {
+        # Check if column name starts with variable name
+        if (startsWith(col_name, var)) {
+          # Extract category (everything after variable name)
+          category <- substring(col_name, nchar(var) + 1)
+
+          # Look up target proportion
+          if (category %in% names(target_list[[var]])) {
+            population[i] <- target_list[[var]][category] * base_n
+            found <- TRUE
+            break
+          }
+        }
+      }
+
+      if (!found) {
+        stop(sprintf(
+          "Could not find target for model matrix column '%s'",
+          col_name
+        ), call. = FALSE)
+      }
+    }
   }
 
   # Calibrate using survey package
