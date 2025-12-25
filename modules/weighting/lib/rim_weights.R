@@ -200,35 +200,31 @@ calculate_rim_weights <- function(data,
 
     # Check for common issues
     if (grepl("did not converge", err_msg, ignore.case = TRUE)) {
-      stop(sprintf(
-        "\nRim weighting did not converge after %d iterations.\n\n",
+      stop(paste0(
+        "\nRim weighting did not converge after ", max_iterations, " iterations.\n\n",
         "Options:\n",
-        "  1. Increase max_iterations (currently %d)\n",
-        "  2. Relax weight bounds (currently [%.2f, %.2f])\n",
+        "  1. Increase max_iterations (currently ", max_iterations, ")\n",
+        "  2. Relax weight bounds (currently [", bounds[1], ", ", bounds[2], "])\n",
         "  3. Try calibration_method = 'linear' (more flexible than raking)\n",
-        "  4. Reduce number of rim variables (currently %d)\n\n",
-        "Original error: %s",
-        max_iterations, max_iterations, bounds[1], bounds[2],
-        length(target_list), err_msg
+        "  4. Reduce number of rim variables (currently ", length(target_list), ")\n\n",
+        "Original error: ", err_msg, "\n"
       ), call. = FALSE)
     } else if (grepl("bounds", err_msg, ignore.case = TRUE)) {
-      stop(sprintf(
+      stop(paste0(
         "\nWeight bounds issue during calibration.\n\n",
         "Try:\n",
-        "  1. Widen bounds (currently [%.2f, %.2f])\n",
+        "  1. Widen bounds (currently [", bounds[1], ", ", bounds[2], "])\n",
         "  2. Use calibration_method = 'linear' or 'logit'\n",
         "  3. Check target proportions are realistic\n\n",
-        "Original error: %s",
-        bounds[1], bounds[2], err_msg
+        "Original error: ", err_msg, "\n"
       ), call. = FALSE)
     } else {
-      stop(sprintf(
-        "\nRim weighting calibration failed:\n  %s\n\n",
+      stop(paste0(
+        "\nRim weighting calibration failed:\n  ", err_msg, "\n\n",
         "Troubleshooting:\n",
         "  1. Check all target categories exist in data\n",
         "  2. Ensure no missing values in weighting variables\n",
-        "  3. Verify target proportions sum to 1.0 per variable",
-        err_msg
+        "  3. Verify target proportions sum to 1.0 per variable\n"
       ), call. = FALSE)
     }
   })
