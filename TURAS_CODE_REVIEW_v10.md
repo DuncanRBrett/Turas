@@ -392,9 +392,8 @@ Turas is a highly sophisticated, enterprise-grade survey analytics platform with
 
 **Improvements Needed:**
 1. **TRS compliance:** Not yet fully TRS v1.0 compliant
-2. **anesrake dependency:** Package archived on CRAN - risk of unavailability
-3. **Alternative engines:** Consider `survey::rake` as fallback
-4. **Performance:** Large raking jobs (10+ dimensions) can be slow
+2. **Defensive fallback:** Add `survey::rake()` fallback for robustness (anesrake is available but defensive programming recommended)
+3. **Performance:** Large raking jobs (10+ dimensions) can be slow
 
 ---
 
@@ -468,8 +467,8 @@ Turas is a highly sophisticated, enterprise-grade survey analytics platform with
 
 **Improvements Needed:**
 1. **renv.lock exists but not enforced** - reproducibility at risk
-2. **CRAN vs archived packages:** anesrake archived, ordinal not on CRAN
-3. **Minimum vs full install unclear** - documentation needed
+2. **Dependency documentation:** See DEPENDENCY_RESOLUTION_GUIDE.md for package status
+3. **Minimum vs full install unclear** - documentation needed (see R_PACKAGES_REFERENCE.md)
 
 ### Performance Considerations
 
@@ -530,9 +529,11 @@ Turas is a highly sophisticated, enterprise-grade survey analytics platform with
    - Follow TRS_Implementation_Guide.md
    - Ensures zero silent failures across platform
 
-2. **Resolve CRAN Package Risks**
-   - **anesrake** (Weighting): Archived on CRAN - implement `survey::rake` fallback
-   - **ordinal** (CatDriver): Not on CRAN - document installation or add MASS::polr fallback
+2. **Package Dependency Verification**
+   - ✅ **UPDATE:** Both anesrake and ordinal ARE available on CRAN (verified 2025-12-25)
+   - See DEPENDENCY_RESOLUTION_GUIDE.md for installation instructions
+   - **Defensive measure:** Add `survey::rake()` fallback to Weighting module
+   - **CatDriver:** Already has MASS::polr fallback (no action needed)
 
 3. **Standardize Dependency Loading**
    - Audit all library() calls - convert to requireNamespace()

@@ -334,12 +334,23 @@ if (length(missing) > 0) {
 
 ## PACKAGE RISK ASSESSMENT
 
-### ⚠️ HIGH RISK (Action Required)
+### ✅ STATUS UPDATE (2025-12-25)
 
-| Package | Issue | Impact | Mitigation |
-|---------|-------|--------|------------|
-| **anesrake** | Archived on CRAN | Weighting module may break | Implement `survey::rake()` fallback |
-| **ordinal** | Not on CRAN | Installation friction | Document install OR enforce MASS::polr fallback |
+**Previous Assessment Corrected:** Both packages flagged as high-risk are actually **AVAILABLE on CRAN**.
+
+| Package | Previous Status | Actual Status | Verified |
+|---------|----------------|---------------|----------|
+| **anesrake** | "Archived" ❌ | ✅ Available v0.80 | [CRAN](https://cran.r-project.org/web/packages/anesrake/) |
+| **ordinal** | "Not on CRAN" ❌ | ✅ Available on CRAN | [CRAN](https://cran.r-project.org/web/packages/ordinal/) |
+
+**See DEPENDENCY_RESOLUTION_GUIDE.md for detailed installation instructions and verification.**
+
+### 🟢 LOW RISK (Defensive Measures Recommended)
+
+| Package | Recommendation | Priority | Mitigation |
+|---------|---------------|----------|------------|
+| **anesrake** | Add `survey::rake()` fallback | Medium | Defensive programming (package is available) |
+| **ordinal** | Already has MASS::polr fallback | ✅ Done | No action needed (see CatDriver 04a_ordinal.R) |
 
 ### ⚠️ MEDIUM RISK (Monitor)
 
