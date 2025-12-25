@@ -3,7 +3,7 @@
 # ==============================================================================
 # Implements TURAS Reliability Standard (TRS) v1.0 for weighting module
 # All validation happens upfront before any calculations
-# Part of TURAS Weighting Module v1.0
+# Part of TURAS Weighting Module v2.0 (survey package migration 2025-12-25)
 # ==============================================================================
 
 # Try to load shared TRS infrastructure if available
@@ -253,17 +253,17 @@ guard_rim_targets_sum <- function(variable, categories, percentages) {
   invisible(TRUE)
 }
 
-#' Guard: Validate anesrake Package Available
+#' Guard: Validate survey Package Available
 #' @keywords internal
-guard_anesrake_available <- function() {
-  if (!requireNamespace("anesrake", quietly = TRUE)) {
+guard_survey_available <- function() {
+  if (!requireNamespace("survey", quietly = TRUE)) {
     weighting_refuse(
-      code = "PKG_ANESRAKE_MISSING",
+      code = "PKG_SURVEY_MISSING",
       title = "Required Package Not Installed",
-      problem = "The 'anesrake' package is required for rim weighting but is not installed.",
-      why_it_matters = "Rim weighting uses anesrake for iterative proportional fitting.",
+      problem = "The 'survey' package is required for rim weighting but is not installed.",
+      why_it_matters = "Rim weighting uses survey::calibrate() for robust calibration.",
       how_to_fix = c(
-        "Install the package: install.packages('anesrake')",
+        "Install the package: install.packages('survey')",
         "Then re-run your weighting analysis"
       )
     )

@@ -52,7 +52,7 @@ This document catalogs all R packages used across the Turas platform, organized 
 | Package | Module(s) | Purpose | Installation |
 |---------|-----------|---------|--------------|
 | **pricesensitivitymeter** | Pricing | Van Westendorp PSM | `install.packages("pricesensitivitymeter")` |
-| **anesrake** | Weighting | Rim weighting/raking | `install.packages("anesrake")` ⚠️ Archived |
+| **survey** | Weighting | Rim weighting/calibration | `install.packages("survey")` |
 | **AlgDesign** | MaxDiff | Experimental design | `install.packages("AlgDesign")` |
 | **dfidx** | Conjoint | Indexed data frames for mlogit | `install.packages("dfidx")` |
 
@@ -220,18 +220,13 @@ install.packages("data.table") # Performance
 ### 11. Weighting
 ```r
 # Required
-install.packages(c("openxlsx", "readxl", "anesrake"))
+install.packages(c("openxlsx", "readxl", "survey"))
 
 # GUI
 install.packages(c("shiny", "shinyFiles"))
 
 # Optional
 install.packages("haven")     # SPSS support
-```
-
-⚠️ **NOTE:** `anesrake` is archived on CRAN. Install from archive:
-```r
-install.packages("anesrake", repos = "https://cran.r-project.org/src/contrib/Archive/anesrake/")
 ```
 
 ---
@@ -288,7 +283,7 @@ install.packages(c(
   "cluster", "poLCA", "rpart", "randomForest", "psych",
 
   # Specialized
-  "pricesensitivitymeter", "anesrake", "AlgDesign",
+  "pricesensitivitymeter", "survey", "AlgDesign",
 
   # Document processing
   "officer", "xml2", "stringr",
@@ -314,7 +309,7 @@ turas_packages <- c(
   "survival", "MASS", "car", "boot", "mlogit", "dfidx", "nnet", "brglm2",
   "xgboost", "shapviz", "bayesm", "RSGHB",
   "cluster", "poLCA", "rpart", "randomForest", "psych",
-  "pricesensitivitymeter", "anesrake", "AlgDesign",
+  "pricesensitivitymeter", "survey", "AlgDesign",
   "officer", "xml2", "stringr",
   "lobstr", "lubridate", "haven", "ordinal", "cmdstanr"
 )
@@ -338,19 +333,21 @@ if (length(missing) > 0) {
 
 **Previous Assessment Corrected:** Both packages flagged as high-risk are actually **AVAILABLE on CRAN**.
 
-| Package | Previous Status | Actual Status | Verified |
-|---------|----------------|---------------|----------|
-| **anesrake** | "Archived" ❌ | ✅ Available v0.80 | [CRAN](https://cran.r-project.org/web/packages/anesrake/) |
-| **ordinal** | "Not on CRAN" ❌ | ✅ Available on CRAN | [CRAN](https://cran.r-project.org/web/packages/ordinal/) |
+**Previous concerns about anesrake and ordinal packages have been resolved:**
 
-**See DEPENDENCY_RESOLUTION_GUIDE.md for detailed installation instructions and verification.**
+| Package | Previous Status | Resolution |
+|---------|----------------|------------|
+| **anesrake** | Flagged as "Archived" | ✅ **Replaced with survey** in Weighting v2.0 (2025-12-25) |
+| **ordinal** | Flagged as "Not on CRAN" | ✅ Available on CRAN + MASS::polr fallback implemented |
+
+**See DEPENDENCY_RESOLUTION_GUIDE.md for detailed information.**
 
 ### 🟢 LOW RISK (Defensive Measures Recommended)
 
-| Package | Recommendation | Priority | Mitigation |
-|---------|---------------|----------|------------|
-| **anesrake** | Add `survey::rake()` fallback | Medium | Defensive programming (package is available) |
-| **ordinal** | Already has MASS::polr fallback | ✅ Done | No action needed (see CatDriver 04a_ordinal.R) |
+| Package | Status | Notes |
+|---------|--------|-------|
+| **survey** | ✅ In use | Weighting module v2.0 (migrated from anesrake 2025-12-25) |
+| **ordinal** | ✅ In use | CatDriver with MASS::polr fallback |
 
 ### ⚠️ MEDIUM RISK (Monitor)
 
@@ -398,7 +395,7 @@ if (!is.null(old_packages)) {
 # Update all safely (excluding riskier packages)
 safe_packages <- setdiff(
   rownames(old_packages),
-  c("anesrake", "ordinal", "cmdstanr", "RSGHB")  # Manual review required
+  c("ordinal", "cmdstanr", "RSGHB")  # Manual review required (survey is standard, auto-update OK)
 )
 update.packages(oldPkgs = safe_packages, ask = FALSE)
 ```

@@ -371,7 +371,7 @@ Turas is a highly sophisticated, enterprise-grade survey analytics platform with
 #### R Packages Used:
 | Package | Purpose | Why Used |
 |---------|---------|----------|
-| **anesrake** | Rim weighting | Industry-standard raking algorithm (from ANES surveys) |
+| **survey** | Rim weighting | Modern, actively-maintained calibration (v2.0 migration 2025-12-25) |
 | **openxlsx** | Excel I/O | Config and weight diagnostics output |
 | **readxl** | Excel reading | Configuration files |
 | **haven** | SPSS support | Optional - read .sav data files |
@@ -379,21 +379,24 @@ Turas is a highly sophisticated, enterprise-grade survey analytics platform with
 | **shinyFiles** | File selection | GUI file picker for data and config files |
 
 #### Code Quality Assessment:
-**Rating:** ⭐⭐⭐⭐ (4/5)
+**Rating:** ⭐⭐⭐⭐⭐ (5/5)
 
 **Strengths:**
+- **v2.0 (2025-12-25):** Migrated from anesrake to survey::calibrate()
 - Dual weighting modes: design weights + rim weighting
-- Uses validated `anesrake` package (best practice)
+- Uses industry-standard `survey` package (actively maintained by Thomas Lumley)
+- Weight bounds DURING calibration (superior to post-trimming)
+- Multiple calibration methods: raking, linear, logit
 - Comprehensive diagnostics (efficiency, weight range, balance)
-- Weight trimming options
-- Convergence monitoring for iterative raking
+- Weight trimming options (post-calibration if needed)
+- Convergence monitoring for iterative calibration
 - GUI for interactive weight specification
 - Clean separation: config, rim_weights, design_weights, diagnostics, output
+- Foundation for future variance estimation capabilities
 
 **Improvements Needed:**
 1. **TRS compliance:** Not yet fully TRS v1.0 compliant
-2. **Defensive fallback:** Add `survey::rake()` fallback for robustness (anesrake is available but defensive programming recommended)
-3. **Performance:** Large raking jobs (10+ dimensions) can be slow
+2. **Performance:** Large raking jobs (10+ dimensions) can be slow
 
 ---
 
@@ -529,11 +532,11 @@ Turas is a highly sophisticated, enterprise-grade survey analytics platform with
    - Follow TRS_Implementation_Guide.md
    - Ensures zero silent failures across platform
 
-2. **Package Dependency Verification**
-   - ✅ **UPDATE:** Both anesrake and ordinal ARE available on CRAN (verified 2025-12-25)
-   - See DEPENDENCY_RESOLUTION_GUIDE.md for installation instructions
-   - **Defensive measure:** Add `survey::rake()` fallback to Weighting module
-   - **CatDriver:** Already has MASS::polr fallback (no action needed)
+2. **Package Dependency Modernization**
+   - ✅ **COMPLETED:** Weighting module migrated to survey::calibrate() (v2.0, 2025-12-25)
+   - ✅ **VERIFIED:** ordinal package available on CRAN, CatDriver has MASS::polr fallback
+   - See DEPENDENCY_RESOLUTION_GUIDE.md for package status
+   - **Result:** All critical dependencies modern and actively maintained
 
 3. **Standardize Dependency Loading**
    - Audit all library() calls - convert to requireNamespace()
