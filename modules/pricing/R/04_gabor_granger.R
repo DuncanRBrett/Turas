@@ -342,6 +342,403 @@ calculate_demand_curve <- function(gg_data) {
 }
 
 
+# ==============================================================================
+# DEMAND CURVE SMOOTHING OPTIONS
+# ==============================================================================
+
+#' Smooth Demand Curve
+#'
+#' Applies smoothing to demand curve to reduce noise while enforcing monotonicity.
+#' Multiple algorithms available for different use cases.
+#'
+#' @param demand_curve Data frame from calculate_demand_curve()
+#' @param method Smoothing method: "none", "cummax", "isotonic", "loess", "pava"
+#' @param span LOESS span parameter (0-1, default 0.75). Lower = less smoothing.
+#' @param preserve_endpoints Logical, if TRUE keeps first/last points unchanged
+#' @param verbose Logical, print smoothing diagnostics
+#'
+#' @return Data frame with smoothed purchase_intent column and original values
+#'   preserved in purchase_intent_raw
+#'
+#' @details
+#' Smoothing methods:
+#' - "none": No smoothing, raw data returned
+#' - "cummax": Simple cumulative maximum (fast, but can create steps)
+#' - "isotonic": Pool Adjacent Violators Algorithm (PAVA) - best for monotonicity
+#' - "loess": Local polynomial regression with post-hoc monotonicity enforcement
+#' - "pava": Alias for "isotonic"
+#'
+#' The isotonic/PAVA method is recommended for most cases as it:
+#' 1. Guarantees monotonically decreasing output
+#' 2. Minimizes squared deviations from original data
+#' 3. Is statistically optimal for monotone regression
+#'
+#' @export
+#' @examples
+#' # Apply isotonic smoothing to noisy demand curve
+#' smoothed <- smooth_demand_curve(demand_curve, method = "isotonic")
+#'
+#' # Apply LOESS for more aggressive smoothing
+#' smoothed <- smooth_demand_curve(demand_curve, method = "loess", span = 0.5)
+smooth_demand_curve <- function(demand_curve,
+                                 method = c("isotonic", "cummax", "loess", "pava", "none"),
+                                 span = 0.75,
+                                 preserve_endpoints = FALSE,
+                                 verbose = FALSE) {
+
+  method <- match.arg(method)
+
+  # Handle pava as alias for isotonic
+
+  if (method == "pava") method <- "isotonic"
+
+  # Store original values
+  demand_curve$purchase_intent_raw <- demand_curve$purchase_intent
+
+  if (method == "none") {
+    if (verbose) message("Smoothing: none (raw data)")
+    return(demand_curve)
+  }
+
+  # Remove NA values for smoothing
+  valid_idx <- !is.na(demand_curve$purchase_intent)
+  if (sum(valid_idx) < 3) {
+    warning("Insufficient valid data points for smoothing", call. = FALSE)
+    return(demand_curve)
+  }
+
+  prices <- demand_curve$price[valid_idx]
+  intent <- demand_curve$purchase_intent[valid_idx]
+
+  # Apply smoothing method
+  smoothed <- switch(method,
+    "cummax" = smooth_cummax(prices, intent, verbose),
+    "isotonic" = smooth_isotonic(prices, intent, verbose),
+    "loess" = smooth_loess_monotone(prices, intent, span, verbose)
+  )
+
+  # Preserve endpoints if requested
+  if (preserve_endpoints && length(smoothed) > 2) {
+    smoothed[1] <- intent[1]
+    smoothed[length(smoothed)] <- intent[length(smoothed)]
+  }
+
+  # Update demand curve with smoothed values
+  demand_curve$purchase_intent[valid_idx] <- smoothed
+
+  # Add smoothing metadata
+  attr(demand_curve, "smoothing_method") <- method
+  attr(demand_curve, "smoothing_span") <- if (method == "loess") span else NA
+
+  if (verbose) {
+    rmse <- sqrt(mean((intent - smoothed)^2))
+    message(sprintf("Smoothing RMSE: %.4f", rmse))
+  }
+
+  return(demand_curve)
+}
+
+
+#' Cumulative Maximum Smoothing (Simple)
+#'
+#' Enforces monotonicity using cumulative maximum from high to low price.
+#' Fast but can create step-like patterns.
+#'
+#' @param prices Numeric vector of prices (ascending order)
+#' @param intent Numeric vector of purchase intent values
+#' @param verbose Logical, print diagnostics
+#' @return Smoothed purchase intent vector
+#' @keywords internal
+smooth_cummax <- function(prices, intent, verbose = FALSE) {
+  # Reverse to go from high price to low price
+  n <- length(intent)
+  rev_intent <- intent[n:1]
+
+  # Cumulative maximum ensures monotonically increasing (from high to low price)
+  # which means monotonically decreasing from low to high price
+  smoothed_rev <- cummax(rev_intent)
+
+  # Reverse back
+  smoothed <- smoothed_rev[n:1]
+
+  if (verbose) {
+    n_adjusted <- sum(smoothed != intent)
+    message(sprintf("Cummax smoothing: %d of %d points adjusted", n_adjusted, n))
+  }
+
+  return(smoothed)
+}
+
+
+#' Isotonic Regression Smoothing (PAVA)
+#'
+#' Pool Adjacent Violators Algorithm for monotone regression.
+#' Optimal in the sense of minimizing squared error subject to monotonicity.
+#'
+#' @param prices Numeric vector of prices (ascending order)
+#' @param intent Numeric vector of purchase intent values
+#' @param verbose Logical, print diagnostics
+#' @return Smoothed purchase intent vector (monotonically decreasing with price)
+#' @keywords internal
+smooth_isotonic <- function(prices, intent, verbose = FALSE) {
+  n <- length(intent)
+
+  if (n <= 1) return(intent)
+
+  # PAVA for monotonically DECREASING function
+  # We want: intent[1] >= intent[2] >= ... >= intent[n] as price increases
+
+  # Initialize with original values
+  y <- intent
+  w <- rep(1, n)  # weights (could be sample sizes if weighted)
+
+  # Pool adjacent violators
+  # Work from left to right, pooling when violation found
+  i <- 1
+  while (i < n) {
+    if (y[i] < y[i + 1]) {
+      # Violation: demand increased with price
+      # Pool blocks
+      j <- i + 1
+
+      # Find extent of violation
+      while (j <= n && y[i] < y[j]) {
+        j <- j + 1
+      }
+      j <- j - 1
+
+      # Pool all points from i to j
+      # Weighted mean of pooled block
+      pooled_sum <- sum(y[i:j] * w[i:j])
+      pooled_weight <- sum(w[i:j])
+      pooled_mean <- pooled_sum / pooled_weight
+
+      # Assign pooled value
+      y[i:j] <- pooled_mean
+      w[i:j] <- pooled_weight / (j - i + 1)
+
+      # Step back to check for new violations
+      if (i > 1) i <- i - 1
+    } else {
+      i <- i + 1
+    }
+  }
+
+  if (verbose) {
+    n_adjusted <- sum(abs(y - intent) > 1e-10)
+    message(sprintf("Isotonic smoothing (PAVA): %d of %d points adjusted", n_adjusted, n))
+  }
+
+  return(y)
+}
+
+
+#' LOESS Smoothing with Monotonicity Enforcement
+#'
+#' Local polynomial regression followed by isotonic projection.
+#' Good for noisy data where underlying curve is smooth.
+#'
+#' @param prices Numeric vector of prices
+#' @param intent Numeric vector of purchase intent values
+#' @param span LOESS span parameter (0-1)
+#' @param verbose Logical, print diagnostics
+#' @return Smoothed purchase intent vector
+#' @keywords internal
+smooth_loess_monotone <- function(prices, intent, span = 0.75, verbose = FALSE) {
+  n <- length(intent)
+
+  if (n < 4) {
+    # Not enough points for LOESS, fall back to isotonic
+    if (verbose) message("Too few points for LOESS, using isotonic")
+    return(smooth_isotonic(prices, intent, verbose))
+  }
+
+  # Fit LOESS
+  tryCatch({
+    loess_fit <- loess(intent ~ prices, span = span, degree = 1)
+    loess_pred <- predict(loess_fit, newdata = data.frame(prices = prices))
+
+    # Bound predictions to [0, 1]
+    loess_pred <- pmax(0, pmin(1, loess_pred))
+
+    # Apply isotonic regression to enforce monotonicity
+    smoothed <- smooth_isotonic(prices, loess_pred, verbose = FALSE)
+
+    if (verbose) {
+      message(sprintf("LOESS smoothing (span=%.2f) with isotonic projection", span))
+    }
+
+    return(smoothed)
+
+  }, error = function(e) {
+    warning("LOESS smoothing failed, falling back to isotonic: ", e$message,
+            call. = FALSE)
+    return(smooth_isotonic(prices, intent, verbose))
+  })
+}
+
+
+#' Interpolate Demand Curve to Finer Price Grid
+#'
+#' Creates a smooth demand curve at arbitrary price points using
+#' monotone interpolation (monotone cubic spline).
+#'
+#' @param demand_curve Data frame with price and purchase_intent columns
+#' @param new_prices Numeric vector of prices to interpolate at
+#' @param method Interpolation method: "linear", "spline", "pchip"
+#'
+#' @return Data frame with interpolated demand at new_prices
+#'
+#' @details
+#' Methods:
+#' - "linear": Linear interpolation between points (preserves monotonicity)
+#' - "spline": Cubic spline with post-hoc monotonicity enforcement
+#' - "pchip": Piecewise Cubic Hermite Interpolating Polynomial (monotone)
+#'
+#' @export
+interpolate_demand_curve <- function(demand_curve,
+                                      new_prices,
+                                      method = c("linear", "spline", "pchip")) {
+
+  method <- match.arg(method)
+
+  prices <- demand_curve$price
+  intent <- demand_curve$purchase_intent
+
+  # Remove NA values
+  valid <- !is.na(intent)
+  prices <- prices[valid]
+  intent <- intent[valid]
+
+  if (length(prices) < 2) {
+    stop("Need at least 2 valid data points for interpolation", call. = FALSE)
+  }
+
+  # Interpolate based on method
+  if (method == "linear") {
+    interp <- approx(prices, intent, xout = new_prices, rule = 2)$y
+
+  } else if (method == "spline") {
+    # Cubic spline interpolation
+    spline_fit <- splinefun(prices, intent, method = "natural")
+    interp <- spline_fit(new_prices)
+    # Enforce monotonicity
+    interp <- smooth_isotonic(new_prices, interp, verbose = FALSE)
+    # Bound to [0, 1]
+    interp <- pmax(0, pmin(1, interp))
+
+  } else if (method == "pchip") {
+    # Piecewise cubic Hermite - naturally monotone preserving
+    # Implementation using linear + cubic blending
+    interp <- pchip_interpolate(prices, intent, new_prices)
+  }
+
+  # Bound to valid range
+  interp <- pmax(0, pmin(1, interp))
+
+  data.frame(
+    price = new_prices,
+    purchase_intent = interp,
+    interpolated = TRUE,
+    stringsAsFactors = FALSE
+  )
+}
+
+
+#' PCHIP Interpolation (Monotone Preserving)
+#'
+#' Piecewise Cubic Hermite Interpolating Polynomial.
+#' Preserves monotonicity of the original data.
+#'
+#' @param x Known x values (must be strictly increasing)
+#' @param y Known y values
+#' @param xi Interpolation points
+#' @return Interpolated y values at xi
+#' @keywords internal
+pchip_interpolate <- function(x, y, xi) {
+  n <- length(x)
+
+  if (n < 2) {
+    return(rep(y[1], length(xi)))
+  }
+
+  # Calculate slopes
+  h <- diff(x)
+  delta <- diff(y) / h
+
+  # Calculate derivative estimates at each point
+  # Use harmonic mean to preserve monotonicity
+  d <- numeric(n)
+
+  # Interior points
+  for (i in 2:(n-1)) {
+    if (delta[i-1] * delta[i] > 0) {
+      # Same sign - use weighted harmonic mean
+      w1 <- 2 * h[i] + h[i-1]
+      w2 <- h[i] + 2 * h[i-1]
+      d[i] <- (w1 + w2) / (w1 / delta[i-1] + w2 / delta[i])
+    } else {
+      # Different signs or zero - set to zero for monotonicity
+      d[i] <- 0
+    }
+  }
+
+  # Endpoints
+  d[1] <- pchip_endpoint_deriv(h[1], h[2], delta[1], delta[2])
+  d[n] <- pchip_endpoint_deriv(h[n-1], h[n-2], delta[n-1], delta[n-2])
+
+  # Interpolate at each xi
+  yi <- numeric(length(xi))
+
+  for (k in seq_along(xi)) {
+    xk <- xi[k]
+
+    # Handle extrapolation
+    if (xk <= x[1]) {
+      yi[k] <- y[1]
+    } else if (xk >= x[n]) {
+      yi[k] <- y[n]
+    } else {
+      # Find interval
+      i <- findInterval(xk, x)
+      i <- min(i, n - 1)
+
+      # Hermite basis interpolation
+      t <- (xk - x[i]) / h[i]
+      t2 <- t * t
+      t3 <- t2 * t
+
+      h00 <- 2*t3 - 3*t2 + 1
+      h10 <- t3 - 2*t2 + t
+      h01 <- -2*t3 + 3*t2
+      h11 <- t3 - t2
+
+      yi[k] <- h00 * y[i] + h10 * h[i] * d[i] +
+               h01 * y[i+1] + h11 * h[i] * d[i+1]
+    }
+  }
+
+  return(yi)
+}
+
+
+#' PCHIP Endpoint Derivative
+#' @keywords internal
+pchip_endpoint_deriv <- function(h1, h2, del1, del2) {
+  # One-sided three-point estimate
+  d <- ((2 * h1 + h2) * del1 - h1 * del2) / (h1 + h2)
+
+  # Ensure monotonicity
+  if (sign(d) != sign(del1)) {
+    d <- 0
+  } else if ((sign(del1) != sign(del2)) && (abs(d) > abs(3 * del1))) {
+    d <- 3 * del1
+  }
+
+  return(d)
+}
+
+
 #' Calculate Revenue Curve
 #'
 #' Computes expected revenue and profit indices at each price point.

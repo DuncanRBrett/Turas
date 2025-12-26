@@ -454,3 +454,124 @@ pricing_status_partial <- function(degraded_reasons,
   }
   status
 }
+
+
+#' Create Pricing REFUSE Status
+#'
+#' TRS v1.0 compliant REFUSE status for pricing module.
+#' Used when analysis cannot proceed due to critical issues.
+#'
+#' @param code Refusal code (e.g., "DATA_INSUFFICIENT", "CFG_INVALID")
+#' @param reason Human-readable explanation of why analysis was refused
+#' @return TRS status object with status="REFUSE"
+#' @export
+pricing_status_refuse <- function(code = NULL, reason = NULL) {
+  if (exists("trs_status_refuse", mode = "function")) {
+    trs_status_refuse(module = "PRICING", code = code, reason = reason)
+  } else {
+    # Fallback if shared TRS infrastructure not loaded
+    list(
+      status = "REFUSE",
+      module = "PRICING",
+      code = code,
+      reason = reason,
+      timestamp = Sys.time()
+    )
+  }
+}
+
+
+#' Determine Pricing Execution Status
+#'
+#' TRS v1.0 compliant status determination based on guard state and analysis results.
+#' Returns one of: PASS, PARTIAL, REFUSE, ERROR
+#'
+#' @param guard Guard state object from pricing_guard_init()
+#' @param analysis_type Character, type of analysis performed ("VW", "GG", "combined")
+#' @param n_respondents Integer, number of respondents analyzed
+#' @param optimal_price Numeric, optimal price found (NULL if not found)
+#' @param price_points_valid Integer, number of valid price points
+#' @param violation_rate Numeric, rate of monotonicity/logical violations (0-1)
+#' @return TRS status object with execution state and details
+#' @export
+#'
+#' @details
+#' Status determination logic:
+#' - PASS: All quality checks pass, optimal price found
+#' - PARTIAL: Analysis ran but with warnings (small samples, high violation rate, etc.)
+#' - REFUSE: Critical issues prevent valid analysis (already handled via pricing_refuse())
+#' - ERROR: Unexpected error during analysis
+#'
+#' Quality thresholds:
+#' - Min respondents for PASS: 30
+#' - Max violation rate for PASS: 10%
+#' - Min price points for PASS: 3
+pricing_determine_status <- function(guard,
+                                     analysis_type = NULL,
+                                     n_respondents = NULL,
+                                     optimal_price = NULL,
+                                     price_points_valid = NULL,
+                                     violation_rate = NULL) {
+
+  summary <- pricing_guard_summary(guard)
+  degraded_reasons <- character(0)
+  affected_outputs <- character(0)
+
+  # Check for sample size issues
+  if (!is.null(n_respondents) && n_respondents < 30) {
+    degraded_reasons <- c(degraded_reasons,
+                          sprintf("Low sample size: n=%d (recommended: 30+)", n_respondents))
+    affected_outputs <- c(affected_outputs, "confidence_intervals", "price_elasticity")
+  }
+
+  # Check for high violation rate (monotonicity or logical order)
+  if (!is.null(violation_rate) && violation_rate > 0.10) {
+    degraded_reasons <- c(degraded_reasons,
+                          sprintf("High violation rate: %.1f%% (threshold: 10%%)", violation_rate * 100))
+    affected_outputs <- c(affected_outputs, "demand_curve", "optimal_price")
+  }
+
+  # Check for price point issues from guard
+  if (length(summary$price_point_issues) > 0) {
+    n_issues <- length(summary$price_point_issues)
+    degraded_reasons <- c(degraded_reasons,
+                          sprintf("%d price point(s) with data quality issues", n_issues))
+    affected_outputs <- c(affected_outputs, "price_sensitivity")
+  }
+
+  # Check if optimal price was found
+  if (is.null(optimal_price) || is.na(optimal_price)) {
+    degraded_reasons <- c(degraded_reasons, "Optimal price not identified")
+    affected_outputs <- c(affected_outputs, "optimal_price", "revenue_optimization")
+  }
+
+  # Check stability flag
+  if (!summary$is_stable) {
+    degraded_reasons <- c(degraded_reasons, "Analysis stability compromised")
+    affected_outputs <- c(affected_outputs, "all_outputs")
+  }
+
+  # Determine final status
+  if (length(degraded_reasons) == 0) {
+    # PASS: All checks passed
+    status <- pricing_status_pass(
+      analysis_type = analysis_type,
+      n_respondents = n_respondents,
+      optimal_price = optimal_price
+    )
+  } else {
+    # PARTIAL: Analysis ran with warnings
+    status <- pricing_status_partial(
+      degraded_reasons = degraded_reasons,
+      affected_outputs = unique(affected_outputs),
+      price_issues = names(summary$price_point_issues)
+    )
+    status$details$analysis_type <- analysis_type
+    status$details$n_respondents <- n_respondents
+    status$details$optimal_price <- optimal_price
+    status$details$price_points_valid <- price_points_valid
+    status$details$violation_rate <- violation_rate
+  }
+
+  return(status)
+}
