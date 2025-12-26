@@ -122,6 +122,8 @@ check_required_packages <- function() {
 #' @param data_file Character, optional override for data file path (NULL = use config)
 #' @param return_data Logical, return data frame in result (default: TRUE)
 #' @param verbose Logical, print progress messages (default: TRUE)
+#' @param progress_callback Function, optional callback for progress updates (for GUI).
+#'   Called with (value, message) where value is 0-1 and message is status text.
 #' @return List with elements:
 #'   \item{data}{Data frame with weight columns added}
 #'   \item{diagnostics}{List of diagnostic results per weight}
@@ -138,13 +140,23 @@ check_required_packages <- function() {
 run_weighting <- function(config_file,
                           data_file = NULL,
                           return_data = TRUE,
-                          verbose = TRUE) {
+                          verbose = TRUE,
+                          progress_callback = NULL) {
 
   start_time <- Sys.time()
+
+  # Helper to update progress
+  update_progress <- function(value, message) {
+    if (!is.null(progress_callback) && is.function(progress_callback)) {
+      progress_callback(value, message)
+    }
+  }
 
   # ============================================================================
   # Initialization
   # ============================================================================
+  update_progress(0.05, "Initializing weighting module...")
+
   if (verbose) {
     cat("\n")
     cat(strrep("=", 80), "\n")
@@ -188,11 +200,14 @@ run_weighting <- function(config_file,
   # ============================================================================
   # Load Configuration
   # ============================================================================
+  update_progress(0.10, "Loading configuration...")
   config <- load_weighting_config(config_file, verbose = verbose)
 
   # ============================================================================
   # Load Survey Data
   # ============================================================================
+  update_progress(0.15, "Loading survey data...")
+
   # Use override data_file if provided, otherwise use config
   if (!is.null(data_file)) {
     data_path <- data_file
@@ -247,9 +262,12 @@ run_weighting <- function(config_file,
   # ============================================================================
   # Calculate Weights
   # ============================================================================
+  update_progress(0.20, "Preparing weight calculations...")
+
   weight_specs <- config$weight_specifications
   weight_names <- as.character(weight_specs$weight_name)
   weight_results <- list()
+  n_weights <- nrow(weight_specs)
 
   if (verbose) {
     message("\n", strrep("=", 80))
@@ -261,6 +279,11 @@ run_weighting <- function(config_file,
     spec <- as.list(weight_specs[i, ])
     weight_name <- spec$weight_name
     method <- tolower(spec$method)
+
+    # Progress: distribute 0.20 to 0.80 across weights
+    weight_progress <- 0.20 + (0.60 * (i - 1) / n_weights)
+    update_progress(weight_progress, sprintf("Calculating weight %d/%d: %s (%s)...",
+                                              i, n_weights, weight_name, method))
 
     if (verbose) {
       message("\n", strrep("-", 70))
@@ -334,6 +357,8 @@ run_weighting <- function(config_file,
   # ============================================================================
   # Write Outputs
   # ============================================================================
+  update_progress(0.85, "Writing output files...")
+
   output_file <- NULL
   diagnostics_file <- NULL
 
@@ -342,6 +367,8 @@ run_weighting <- function(config_file,
     output_file <- config$general$output_file_resolved
     write_weighted_data(data, output_file, verbose = verbose)
   }
+
+  update_progress(0.90, "Generating diagnostics report...")
 
   # Save diagnostics if configured
   if (config$general$save_diagnostics && !is.null(config$general$diagnostics_file_resolved)) {
@@ -361,6 +388,8 @@ run_weighting <- function(config_file,
   # ============================================================================
   # Build Return Value
   # ============================================================================
+  update_progress(0.95, "Finalizing results...")
+
   result <- list(
     data = if (return_data) data else NULL,
     weight_names = weight_names,
@@ -377,6 +406,8 @@ run_weighting <- function(config_file,
     elapsed <- difftime(Sys.time(), start_time, units = "secs")
     cat("Completed in ", round(elapsed, 1), " seconds\n\n", sep = "")
   }
+
+  update_progress(1.0, "Complete!")
 
   return(result)
 }
