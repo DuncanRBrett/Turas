@@ -438,3 +438,115 @@ conjoint_status_partial <- function(degraded_reasons,
   }
   status
 }
+
+
+#' Create Conjoint REFUSE Status
+#'
+#' Creates a TRS-compliant REFUSE status for the conjoint module.
+#' Use this when the module cannot proceed due to user-fixable issues.
+#'
+#' @param code Refusal code (e.g., "CFG_NO_ATTRIBUTES", "DATA_INSUFFICIENT_CHOICES")
+#' @param reason Human-readable reason for refusal
+#' @return TRS status object with REFUSE state
+#' @export
+conjoint_status_refuse <- function(code = NULL, reason = NULL) {
+  trs_status_refuse(
+    module = "CONJOINT",
+    code = code,
+    reason = reason
+  )
+}
+
+
+#' Determine Final Run Status from Guard State
+#'
+#' Analyzes the guard state accumulated during conjoint analysis to determine
+#' the final TRS execution status (PASS, PARTIAL, REFUSE, ERROR).
+#'
+#' Decision logic:
+#' - PASS: No warnings, converged model, no design issues
+#' - PARTIAL: Has warnings or design issues but produced valid output
+#' - REFUSE: Critical validation failures (handled via conjoint_refuse())
+#'
+#' @param guard Guard state object from conjoint_guard_init()
+#' @param n_attributes Integer, number of attributes analyzed (NULL if failed)
+#' @param n_respondents Integer, number of respondents (NULL if failed)
+#' @param model_type Character, estimation method used (NULL if failed)
+#' @param mcfadden_r2 Numeric, McFadden R-squared value (NULL if not calculated)
+#' @return TRS status object (PASS or PARTIAL)
+#' @export
+conjoint_determine_status <- function(guard,
+                                      n_attributes = NULL,
+                                      n_respondents = NULL,
+                                      model_type = NULL,
+                                      mcfadden_r2 = NULL) {
+
+  # Get guard summary
+  summary <- conjoint_guard_summary(guard)
+
+  # Collect degradation reasons
+  degraded_reasons <- character(0)
+  affected_outputs <- character(0)
+
+  # Check for design issues
+  if (length(summary$design_issues) > 0) {
+    degraded_reasons <- c(degraded_reasons,
+      sprintf("%d attribute(s) have design issues", length(summary$design_issues)))
+    affected_outputs <- c(affected_outputs, "part_worth_utilities", "attribute_importance")
+  }
+
+  # Check for estimation warnings
+  if (length(summary$estimation_warnings) > 0) {
+    degraded_reasons <- c(degraded_reasons,
+      sprintf("%d estimation warning(s)", length(summary$estimation_warnings)))
+    affected_outputs <- c(affected_outputs, "model_coefficients", "confidence_intervals")
+  }
+
+  # Check convergence status
+  if (!is.null(summary$convergence_status) && !summary$convergence_status$converged) {
+    degraded_reasons <- c(degraded_reasons, "Model did not fully converge")
+    affected_outputs <- c(affected_outputs, "all_outputs")
+  }
+
+  # Check model fit quality via McFadden R²
+  if (!is.null(mcfadden_r2)) {
+    if (mcfadden_r2 < 0.1) {
+      degraded_reasons <- c(degraded_reasons,
+        sprintf("Poor model fit (McFadden R²=%.3f, threshold=0.1)", mcfadden_r2))
+      affected_outputs <- c(affected_outputs, "market_simulator", "predictions")
+    } else if (mcfadden_r2 < 0.2) {
+      degraded_reasons <- c(degraded_reasons,
+        sprintf("Marginal model fit (McFadden R²=%.3f, good=0.2+)", mcfadden_r2))
+      affected_outputs <- c(affected_outputs, "market_simulator")
+    }
+  }
+
+  # Check stability flags
+  if (length(summary$stability_flags) > 0) {
+    degraded_reasons <- c(degraded_reasons, summary$stability_flags)
+    affected_outputs <- c(affected_outputs, "result_stability")
+  }
+
+  # Determine final status
+  if (length(degraded_reasons) > 0) {
+    status <- conjoint_status_partial(
+      degraded_reasons = unique(degraded_reasons),
+      affected_outputs = unique(affected_outputs),
+      estimation_warnings = summary$estimation_warnings
+    )
+  } else {
+    status <- conjoint_status_pass(
+      n_attributes = n_attributes,
+      n_respondents = n_respondents,
+      model_type = model_type
+    )
+  }
+
+  # Add model fit to status details
+  if (!is.null(mcfadden_r2)) {
+    if (is.null(status$details)) status$details <- list()
+    status$details$mcfadden_r2 <- mcfadden_r2
+  }
+
+  status
+}

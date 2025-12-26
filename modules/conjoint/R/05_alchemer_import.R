@@ -430,7 +430,7 @@ clean_levels_with_config <- function(df, config) {
 
 
 # ==============================================================================
-# DATA VALIDATION
+# DATA VALIDATION - COMPREHENSIVE ALCHEMER CHECKS
 # ==============================================================================
 
 #' Validate Alchemer Data
@@ -440,7 +440,7 @@ clean_levels_with_config <- function(df, config) {
 #'
 #' @param df Data frame in Turas format
 #' @param verbose Logical. Print validation messages
-#' @return List with is_valid, errors, and warnings
+#' @return List with is_valid, errors, warnings, and data quality metrics
 #'
 #' @details
 #' Validation checks include:
@@ -449,6 +449,9 @@ clean_levels_with_config <- function(df, config) {
 #'   \item Consistent number of alternatives per choice set
 #'   \item No missing values in critical columns
 #'   \item Valid binary values for chosen column (0/1)
+#'   \item Minimum respondent count (>= 30 recommended)
+#'   \item Attribute level variation across choice sets
+#'   \item Duplicate response detection
 #' }
 #'
 #' @export
@@ -456,6 +459,11 @@ validate_alchemer_data <- function(df, verbose = TRUE) {
 
   errors <- character()
   warnings <- character()
+  info <- character()
+
+  # ===========================================================================
+  # CRITICAL CHECKS (prevent analysis)
+  # ===========================================================================
 
   # Check 1: Exactly one chosen alternative per choice set
   choices_per_set <- aggregate(chosen ~ choice_set_id, data = df, FUN = sum)
@@ -463,47 +471,44 @@ validate_alchemer_data <- function(df, verbose = TRUE) {
   # Choice sets with no selection
   no_choice_sets <- choices_per_set$choice_set_id[choices_per_set$chosen == 0]
   if (length(no_choice_sets) > 0) {
-    warnings <- c(warnings, sprintf(
-      "Found %d choice sets with no selection (may indicate 'none' choices): %s...",
-      length(no_choice_sets),
-      paste(head(no_choice_sets, 3), collapse = ", ")
-    ))
+    pct_no_choice <- 100 * length(no_choice_sets) / nrow(choices_per_set)
+    if (pct_no_choice > 50) {
+      errors <- c(errors, sprintf(
+        "%.1f%% of choice sets have no selection - data may be corrupted",
+        pct_no_choice
+      ))
+    } else {
+      warnings <- c(warnings, sprintf(
+        "Found %d choice sets with no selection (%.1f%%) - may indicate 'none' choices",
+        length(no_choice_sets), pct_no_choice
+      ))
+    }
   }
 
   # Choice sets with multiple selections (error)
   multi_choice_sets <- choices_per_set$choice_set_id[choices_per_set$chosen > 1]
   if (length(multi_choice_sets) > 0) {
     errors <- c(errors, sprintf(
-      "Found %d choice sets with MULTIPLE selections (invalid): %s",
+      "Found %d choice sets with MULTIPLE selections (invalid CBC data): %s",
       length(multi_choice_sets),
       paste(head(multi_choice_sets, 5), collapse = ", ")
     ))
   }
 
-  # Check 2: Consistent number of alternatives per set
-  alts_per_set <- aggregate(alternative_id ~ choice_set_id, data = df, FUN = length)
-  unique_alt_counts <- unique(alts_per_set$alternative_id)
-
-  if (length(unique_alt_counts) > 1) {
-    warnings <- c(warnings, sprintf(
-      "Inconsistent alternatives per choice set: %s",
-      paste(unique_alt_counts, collapse = ", ")
-    ))
-  }
-
-  # Check 3: No missing values in critical columns
+  # Check 2: No missing values in critical columns
   critical_cols <- c("resp_id", "choice_set_id", "alternative_id", "chosen")
   for (col in critical_cols) {
     if (col %in% names(df) && any(is.na(df[[col]]))) {
       n_missing <- sum(is.na(df[[col]]))
+      pct_missing <- 100 * n_missing / nrow(df)
       errors <- c(errors, sprintf(
-        "Column '%s' has %d missing values (NAs not allowed)",
-        col, n_missing
+        "Column '%s' has %d missing values (%.1f%%) - NAs not allowed in critical columns",
+        col, n_missing, pct_missing
       ))
     }
   }
 
-  # Check 4: Valid binary values for chosen
+  # Check 3: Valid binary values for chosen
   if ("chosen" %in% names(df)) {
     chosen_vals <- unique(df$chosen)
     if (!all(chosen_vals %in% c(0, 1))) {
@@ -514,32 +519,191 @@ validate_alchemer_data <- function(df, verbose = TRUE) {
     }
   }
 
-  # Report validation results
+  # ===========================================================================
+  # WARNING CHECKS (may affect quality)
+  # ===========================================================================
+
+  # Check 4: Consistent number of alternatives per set
+  alts_per_set <- aggregate(alternative_id ~ choice_set_id, data = df, FUN = length)
+  unique_alt_counts <- unique(alts_per_set$alternative_id)
+
+  if (length(unique_alt_counts) > 1) {
+    warnings <- c(warnings, sprintf(
+      "Inconsistent alternatives per choice set: %s (may indicate partial responses)",
+      paste(unique_alt_counts, collapse = ", ")
+    ))
+  }
+
+  # Check 5: Minimum respondent count
+  n_respondents <- length(unique(df$resp_id))
+  if (n_respondents < 30) {
+    warnings <- c(warnings, sprintf(
+      "Low respondent count: %d (recommend 30+ for stable estimates)",
+      n_respondents
+    ))
+  } else if (n_respondents < 100) {
+    info <- c(info, sprintf(
+      "Respondent count: %d (adequate, 100+ recommended for segments)",
+      n_respondents
+    ))
+  }
+
+  # Check 6: Choices per respondent
+  choices_per_resp <- aggregate(choice_set_id ~ resp_id, data = df,
+                                 FUN = function(x) length(unique(x)))
+  min_choices <- min(choices_per_resp$choice_set_id)
+  max_choices <- max(choices_per_resp$choice_set_id)
+
+  if (min_choices < 3) {
+    warnings <- c(warnings, sprintf(
+      "Some respondents have very few choices: min=%d (recommend 6+ per respondent)",
+      min_choices
+    ))
+  }
+
+  if (max_choices != min_choices) {
+    info <- c(info, sprintf(
+      "Choices per respondent vary: %d to %d",
+      min_choices, max_choices
+    ))
+  }
+
+  # Check 7: Attribute level variation (detect always/never chosen levels)
+  system_cols <- c("resp_id", "choice_set_id", "alternative_id", "chosen")
+  attribute_cols <- setdiff(names(df), system_cols)
+
+  for (attr in attribute_cols) {
+    level_choice_rates <- aggregate(chosen ~ df[[attr]], data = df, FUN = mean)
+    names(level_choice_rates) <- c("level", "choice_rate")
+
+    # Levels never chosen
+    never_chosen <- level_choice_rates$level[level_choice_rates$choice_rate == 0]
+    if (length(never_chosen) > 0) {
+      warnings <- c(warnings, sprintf(
+        "Attribute '%s': Level(s) never chosen: %s (may cause estimation issues)",
+        attr, paste(never_chosen, collapse = ", ")
+      ))
+    }
+
+    # Levels always chosen when present
+    always_chosen <- level_choice_rates$level[level_choice_rates$choice_rate == 1]
+    if (length(always_chosen) > 0) {
+      warnings <- c(warnings, sprintf(
+        "Attribute '%s': Level(s) always chosen: %s (may cause estimation issues)",
+        attr, paste(always_chosen, collapse = ", ")
+      ))
+    }
+  }
+
+  # Check 8: Duplicate respondent IDs with same responses (potential test data)
+  if (n_respondents >= 2) {
+    # Check for duplicate response patterns
+    resp_patterns <- aggregate(chosen ~ resp_id, data = df,
+                                FUN = function(x) paste(x, collapse = ""))
+    dup_patterns <- resp_patterns$resp_id[duplicated(resp_patterns$chosen)]
+    if (length(dup_patterns) > 0 && length(dup_patterns) > n_respondents * 0.1) {
+      warnings <- c(warnings, sprintf(
+        "%d respondents have identical response patterns (may indicate test/duplicate data)",
+        length(dup_patterns)
+      ))
+    }
+  }
+
+  # ===========================================================================
+  # REPORT RESULTS
+  # ===========================================================================
+
   is_valid <- length(errors) == 0
 
   if (verbose) {
     if (is_valid) {
       log_verbose("  Data validation passed", verbose)
     } else {
-      log_verbose(sprintf("  Data validation FAILED: %d errors", length(errors)), verbose)
+      log_verbose(sprintf("  Data validation FAILED: %d critical error(s)", length(errors)), verbose)
+      for (e in errors) {
+        log_verbose(sprintf("    [ERROR] %s", e), verbose)
+      }
     }
 
     if (length(warnings) > 0) {
-      log_verbose(sprintf("  %d validation warnings", length(warnings)), verbose)
+      log_verbose(sprintf("  %d validation warning(s):", length(warnings)), verbose)
       for (w in warnings) {
-        log_verbose(sprintf("    - %s", w), verbose)
+        log_verbose(sprintf("    [WARN] %s", w), verbose)
+      }
+    }
+
+    if (length(info) > 0 && verbose) {
+      for (i in info) {
+        log_verbose(sprintf("    [INFO] %s", i), verbose)
       }
     }
   }
+
+  # Calculate quality score (0-100)
+  quality_score <- 100
+  quality_score <- quality_score - length(errors) * 25
+  quality_score <- quality_score - length(warnings) * 5
+  quality_score <- max(0, quality_score)
 
   list(
     is_valid = is_valid,
     errors = errors,
     warnings = warnings,
+    info = info,
     n_choice_sets = nrow(choices_per_set),
-    n_respondents = length(unique(df$resp_id)),
-    alternatives_per_set = unique_alt_counts
+    n_respondents = n_respondents,
+    alternatives_per_set = unique_alt_counts,
+    choices_per_respondent = c(min = min_choices, max = max_choices),
+    quality_score = quality_score
   )
+}
+
+
+#' Validate Alchemer Import with TRS Refusal
+#'
+#' Wrapper that performs validation and issues TRS-compliant refusal if
+#' critical errors are found.
+#'
+#' @param df Data frame to validate
+#' @param verbose Logical. Print messages
+#' @return Validation result (invisible) or raises TRS refusal
+#' @keywords internal
+validate_alchemer_with_refusal <- function(df, verbose = TRUE) {
+
+  validation <- validate_alchemer_data(df, verbose = verbose)
+
+  if (!validation$is_valid) {
+    # Try to load conjoint_refuse if available
+    if (exists("conjoint_refuse", mode = "function")) {
+      conjoint_refuse(
+        code = "DATA_ALCHEMER_INVALID",
+        title = "Alchemer Data Validation Failed",
+        problem = paste(validation$errors, collapse = "; "),
+        why_it_matters = "Invalid CBC data cannot be used for conjoint analysis. The model will not converge or will produce unreliable estimates.",
+        how_to_fix = c(
+          "Check the Alchemer export for data quality issues",
+          "Ensure each respondent selected exactly one alternative per choice set",
+          "Verify the Score column contains valid 0/1 or 0/100 values",
+          "Re-export the data from Alchemer if corrupted"
+        ),
+        details = sprintf(
+          "Respondents: %d, Choice sets: %d, Errors: %d, Warnings: %d",
+          validation$n_respondents,
+          validation$n_choice_sets,
+          length(validation$errors),
+          length(validation$warnings)
+        )
+      )
+    } else {
+      stop(create_error(
+        "ALCHEMER_VALIDATION",
+        "Data validation failed",
+        paste(validation$errors, collapse = "\n")
+      ), call. = FALSE)
+    }
+  }
+
+  invisible(validation)
 }
 
 
