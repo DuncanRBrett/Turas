@@ -54,7 +54,7 @@ the Questions sheet.
 For each question in your survey, add a row with:
 
 | Column | What to Enter |
-|-------------------------|----------------------------------------------|
+|----|----|
 | QuestionCode | The column name in your data file (e.g., Q01, Gender, Satisfaction) |
 | QuestionText | The question wording as you want it to appear in output |
 | Variable_Type | The question type (see below) |

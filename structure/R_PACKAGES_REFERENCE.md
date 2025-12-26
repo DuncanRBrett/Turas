@@ -1,16 +1,17 @@
 # TURAS PLATFORM - R PACKAGES REFERENCE
-**Last Updated:** 2025-12-25
-**Platform Version:** Turas v10.0+
+
+**Last Updated:** 2025-12-25 **Platform Version:** Turas v10.0+
 
 This document catalogs all R packages used across the Turas platform, organized by module and functionality.
 
----
+------------------------------------------------------------------------
 
 ## COMPLETE PACKAGE LIST (Alphabetical)
 
 ### Core Dependencies (Used by 5+ modules)
+
 | Package | Modules Using | Purpose | Installation |
-|---------|---------------|---------|--------------|
+|----|----|----|----|
 | **openxlsx** | All 11 modules | Excel writing with formatting | `install.packages("openxlsx")` |
 | **readxl** | All 11 modules | Excel reading (config files) | `install.packages("readxl")` |
 | **ggplot2** | 7 modules | Visualization | `install.packages("ggplot2")` |
@@ -18,8 +19,9 @@ This document catalogs all R packages used across the Turas platform, organized 
 | **dplyr** | 5 modules | Data manipulation | `install.packages("dplyr")` |
 
 ### Statistical Modeling Packages
+
 | Package | Module(s) | Purpose | Installation |
-|---------|-----------|---------|--------------|
+|----|----|----|----|
 | **stats** | Base R | Linear models, kmeans, glm | Included in base R |
 | **survival** | Conjoint, MaxDiff | Conditional logit (clogit) | `install.packages("survival")` |
 | **mlogit** | Conjoint | Multinomial logit choice models | `install.packages("mlogit")` |
@@ -28,8 +30,9 @@ This document catalogs all R packages used across the Turas platform, organized 
 | **boot** | Confidence | Bootstrap confidence intervals | `install.packages("boot")` |
 
 ### Advanced Analytics Packages
+
 | Package | Module(s) | Purpose | Installation |
-|---------|-----------|---------|--------------|
+|----|----|----|----|
 | **xgboost** | KeyDriver | Gradient boosting for SHAP | `install.packages("xgboost")` |
 | **shapviz** | KeyDriver | SHAP visualization | `install.packages("shapviz")` |
 | **bayesm** | Conjoint | Hierarchical Bayes (choice models) | `install.packages("bayesm")` |
@@ -40,8 +43,9 @@ This document catalogs all R packages used across the Turas platform, organized 
 | **nnet** | CatDriver | Multinomial regression | `install.packages("nnet")` |
 
 ### Clustering & Segmentation
+
 | Package | Module(s) | Purpose | Installation |
-|---------|-----------|---------|--------------|
+|----|----|----|----|
 | **cluster** | Segment, MaxDiff | Silhouette, gap statistic | `install.packages("cluster")` |
 | **poLCA** | Segment | Latent class analysis | `install.packages("poLCA")` |
 | **rpart** | Segment | Decision tree rules | `install.packages("rpart")` |
@@ -49,53 +53,60 @@ This document catalogs all R packages used across the Turas platform, organized 
 | **psych** | Segment | Factor analysis, alpha | `install.packages("psych")` |
 
 ### Specialized Methodologies
+
 | Package | Module(s) | Purpose | Installation |
-|---------|-----------|---------|--------------|
+|----|----|----|----|
 | **pricesensitivitymeter** | Pricing | Van Westendorp PSM | `install.packages("pricesensitivitymeter")` |
 | **survey** | Weighting | Rim weighting/calibration | `install.packages("survey")` |
 | **AlgDesign** | MaxDiff | Experimental design | `install.packages("AlgDesign")` |
 | **dfidx** | Conjoint | Indexed data frames for mlogit | `install.packages("dfidx")` |
 
 ### Document Processing
+
 | Package | Module(s) | Purpose | Installation |
-|---------|-----------|---------|--------------|
+|----|----|----|----|
 | **officer** | AlchemerParser | Read Word documents (.docx) | `install.packages("officer")` |
 | **xml2** | AlchemerParser | XML parsing (Word internals) | `install.packages("xml2")` |
 | **stringr** | AlchemerParser | String manipulation | `install.packages("stringr")` |
 
 ### Data Performance
+
 | Package | Module(s) | Purpose | Installation |
-|---------|-----------|---------|--------------|
+|----|----|----|----|
 | **data.table** | Multiple (optional) | Fast data operations | `install.packages("data.table")` |
 | **writexl** | Segment, Shared | Fast Excel writing | `install.packages("writexl")` |
 
 ### Visualization Helpers
+
 | Package | Module(s) | Purpose | Installation |
-|---------|-----------|---------|--------------|
+|----|----|----|----|
 | **ggrepel** | KeyDriver | Non-overlapping labels | `install.packages("ggrepel")` |
 | **patchwork** | KeyDriver | Combine ggplot2 plots | `install.packages("patchwork")` |
 | **viridis** | KeyDriver | Colorblind-friendly palettes | `install.packages("viridis")` |
 | **fmsb** | Segment | Radar/spider charts | `install.packages("fmsb")` |
 
 ### GUI & Interactivity
+
 | Package | Module(s) | Purpose | Installation |
-|---------|-----------|---------|--------------|
+|----|----|----|----|
 | **shiny** | All GUIs | Interactive web interfaces | `install.packages("shiny")` |
 | **shinyFiles** | Weighting, others | File picker widgets | `install.packages("shinyFiles")` |
 
 ### Utilities
+
 | Package | Module(s) | Purpose | Installation |
-|---------|-----------|---------|--------------|
+|----|----|----|----|
 | **lobstr** | Tabs | Memory profiling (replaced pryr) | `install.packages("lobstr")` |
 | **lubridate** | Tracker | Date parsing and manipulation | `install.packages("lubridate")` |
 | **tidyr** | Conjoint | Data reshaping | `install.packages("tidyr")` |
 
----
+------------------------------------------------------------------------
 
 ## PACKAGES BY MODULE
 
 ### 1. AlchemerParser
-```r
+
+``` r
 # Required
 install.packages(c("openxlsx", "readxl", "officer", "xml2", "stringr"))
 
@@ -104,7 +115,8 @@ install.packages("data.table")  # Performance boost for large surveys
 ```
 
 ### 2. Tabs
-```r
+
+``` r
 # Required
 install.packages(c("openxlsx", "readxl"))
 
@@ -114,7 +126,8 @@ install.packages("data.table")   # Fast operations
 ```
 
 ### 3. Tracker
-```r
+
+``` r
 # Required
 install.packages(c("openxlsx", "readxl", "dplyr", "lubridate"))
 
@@ -123,7 +136,8 @@ install.packages("data.table")   # Multi-wave performance
 ```
 
 ### 4. Confidence
-```r
+
+``` r
 # Required
 install.packages(c("openxlsx", "readxl", "boot"))
 
@@ -133,7 +147,8 @@ install.packages("dplyr")        # Group-wise operations
 ```
 
 ### 5. Segment
-```r
+
+``` r
 # Required (core)
 install.packages(c("openxlsx", "readxl", "writexl", "cluster"))
 
@@ -148,7 +163,8 @@ install.packages("haven")         # SPSS support
 ```
 
 ### 6. Conjoint
-```r
+
+``` r
 # Required (core)
 install.packages(c("openxlsx", "readxl", "mlogit", "dfidx", "survival"))
 
@@ -161,7 +177,8 @@ install.packages("RSGHB")     # HB method 2
 ```
 
 ### 7. KeyDriver
-```r
+
+``` r
 # Required (core)
 install.packages(c("openxlsx", "readxl", "car"))
 
@@ -177,7 +194,8 @@ install.packages("haven")     # SPSS support
 ```
 
 ### 8. Pricing
-```r
+
+``` r
 # Required
 install.packages(c("openxlsx", "readxl", "pricesensitivitymeter", "ggplot2"))
 
@@ -186,7 +204,8 @@ install.packages("haven")     # SPSS support
 ```
 
 ### 9. MaxDiff
-```r
+
+``` r
 # Required (design)
 install.packages(c("openxlsx", "AlgDesign"))
 
@@ -202,7 +221,8 @@ install.packages("cluster")
 ```
 
 ### 10. CatDriver
-```r
+
+``` r
 # Required (core)
 install.packages(c("openxlsx", "readxl", "MASS", "nnet", "car"))
 
@@ -218,7 +238,8 @@ install.packages("data.table") # Performance
 ```
 
 ### 11. Weighting
-```r
+
+``` r
 # Required
 install.packages(c("openxlsx", "readxl", "survey"))
 
@@ -229,12 +250,13 @@ install.packages(c("shiny", "shinyFiles"))
 install.packages("haven")     # SPSS support
 ```
 
----
+------------------------------------------------------------------------
 
 ## INSTALLATION SCRIPTS
 
 ### Minimum Installation (Core Platform)
-```r
+
+``` r
 # Install all core dependencies for basic Turas functionality
 install.packages(c(
   # Excel I/O
@@ -258,7 +280,8 @@ install.packages(c(
 ```
 
 ### Full Installation (All Features)
-```r
+
+``` r
 # Install all packages for complete Turas functionality
 install.packages(c(
   # Core I/O
@@ -300,7 +323,8 @@ install.packages("ordinal", repos="http://www.r-project.org")
 ```
 
 ### Check Installed Packages
-```r
+
+``` r
 # Check which Turas packages are installed
 turas_packages <- c(
   "openxlsx", "readxl", "writexl", "dplyr", "tidyr", "data.table",
@@ -325,7 +349,7 @@ if (length(missing) > 0) {
 }
 ```
 
----
+------------------------------------------------------------------------
 
 ## PACKAGE RISK ASSESSMENT
 
@@ -336,7 +360,7 @@ if (length(missing) > 0) {
 **Previous concerns about anesrake and ordinal packages have been resolved:**
 
 | Package | Previous Status | Resolution |
-|---------|----------------|------------|
+|----|----|----|
 | **anesrake** | Flagged as "Archived" | ✅ **Replaced with survey** in Weighting v2.0 (2025-12-25) |
 | **ordinal** | Flagged as "Not on CRAN" | ✅ Available on CRAN + MASS::polr fallback implemented |
 
@@ -345,14 +369,14 @@ if (length(missing) > 0) {
 ### 🟢 LOW RISK (Defensive Measures Recommended)
 
 | Package | Status | Notes |
-|---------|--------|-------|
+|----|----|----|
 | **survey** | ✅ In use | Weighting module v2.0 (migrated from anesrake 2025-12-25) |
 | **ordinal** | ✅ In use | CatDriver with MASS::polr fallback |
 
 ### ⚠️ MEDIUM RISK (Monitor)
 
 | Package | Issue | Impact | Mitigation |
-|---------|-------|--------|------------|
+|----|----|----|----|
 | **cmdstanr** | Complex install (requires Stan) | MaxDiff HB unavailable | Clear installation docs, graceful degradation |
 | **RSGHB** | Low maintenance | Conjoint HB limited | Prefer bayesm, monitor package status |
 
@@ -360,32 +384,30 @@ if (length(missing) > 0) {
 
 All other packages are actively maintained on CRAN with stable APIs.
 
----
+------------------------------------------------------------------------
 
 ## PERFORMANCE-CRITICAL PACKAGES
 
 These packages provide significant performance benefits:
 
-1. **data.table** - 10-100x faster than base R for large datasets
-2. **xgboost** - GPU-accelerated if CUDA available
-3. **writexl** - 2-3x faster than openxlsx for simple writes
-4. **lobstr** - Efficient memory profiling
+1.  **data.table** - 10-100x faster than base R for large datasets
+2.  **xgboost** - GPU-accelerated if CUDA available
+3.  **writexl** - 2-3x faster than openxlsx for simple writes
+4.  **lobstr** - Efficient memory profiling
 
-**Recommendation:** Make data.table standard (not optional) for modules handling >10k rows.
+**Recommendation:** Make data.table standard (not optional) for modules handling \>10k rows.
 
----
+------------------------------------------------------------------------
 
 ## PACKAGE UPDATE POLICY
 
 **Current State:** No automated update policy
 
-**Recommended Policy:**
-1. **Major updates:** Test in development environment before production
-2. **Minor updates:** Safe to apply after brief smoke test
-3. **Patch updates:** Apply immediately (security fixes)
+**Recommended Policy:** 1. **Major updates:** Test in development environment before production 2. **Minor updates:** Safe to apply after brief smoke test 3. **Patch updates:** Apply immediately (security fixes)
 
 **Implementation:**
-```r
+
+``` r
 # Check for outdated packages
 old_packages <- old.packages()
 if (!is.null(old_packages)) {
@@ -400,32 +422,34 @@ safe_packages <- setdiff(
 update.packages(oldPkgs = safe_packages, ask = FALSE)
 ```
 
----
+------------------------------------------------------------------------
 
 ## SUPPORT & TROUBLESHOOTING
 
 ### Common Installation Issues
 
 **Issue:** Package compilation fails on Windows
-```r
+
+``` r
 # Solution: Install pre-compiled binaries
 install.packages("package_name", type = "win.binary")
 ```
 
 **Issue:** MASS::polr vs ordinal::clm
-```r
+
+``` r
 # CatDriver prefers ordinal::clm but falls back to MASS::polr
 # If ordinal install fails, MASS is sufficient
 ```
 
 **Issue:** cmdstanr not found
-```r
+
+``` r
 # Stan requires separate installation
 # See: https://mc-stan.org/docs/cmdstan-guide/cmdstan-installation.html
 # Then: install.packages("cmdstanr", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
 ```
 
----
+------------------------------------------------------------------------
 
-**Maintained by:** Turas Development Team
-**Questions:** See module-specific USER_MANUAL.md files
+**Maintained by:** Turas Development Team **Questions:** See module-specific USER_MANUAL.md files
