@@ -414,3 +414,108 @@ segment_status_partial <- function(degraded_reasons,
   }
   status
 }
+
+
+#' Create Segment REFUSE Status
+#'
+#' Creates a TRS-compliant REFUSE status for the segmentation module.
+#' Use this when the module cannot proceed due to user-fixable issues.
+#'
+#' @param code Refusal code (e.g., "CFG_NO_VARIABLES", "DATA_INSUFFICIENT_SAMPLE")
+#' @param reason Human-readable reason for refusal
+#' @return TRS status object with REFUSE state
+#' @export
+segment_status_refuse <- function(code = NULL, reason = NULL) {
+  trs_status_refuse(
+    module = "SEGMENT",
+    code = code,
+    reason = reason
+  )
+}
+
+
+#' Determine Final Run Status from Guard State
+#'
+#' Analyzes the guard state accumulated during segmentation to determine
+#' the final TRS execution status (PASS, PARTIAL, REFUSE, ERROR).
+#'
+#' Decision logic:
+#' - PASS: No warnings, no stability flags, no dropped variables
+#' - PARTIAL: Has warnings or dropped variables but produced valid output
+#' - REFUSE: Critical validation failures (handled via segment_refuse())
+#'
+#' @param guard Guard state object from segment_guard_init()
+#' @param clusters_created Integer, number of clusters successfully created (NULL if failed)
+#' @param cases_assigned Integer, number of cases assigned to clusters (NULL if failed)
+#' @param silhouette_score Numeric, average silhouette score (NULL if not calculated)
+#' @return TRS status object (PASS or PARTIAL)
+#' @export
+segment_determine_status <- function(guard,
+                                     clusters_created = NULL,
+                                     cases_assigned = NULL,
+                                     silhouette_score = NULL) {
+
+  # Get guard summary
+  summary <- segment_guard_summary(guard)
+
+  # Collect degradation reasons
+  degraded_reasons <- character(0)
+  affected_outputs <- character(0)
+
+
+  # Check for dropped variables
+  if (length(summary$dropped_variables) > 0) {
+    degraded_reasons <- c(degraded_reasons,
+      sprintf("%d variable(s) dropped during processing", length(summary$dropped_variables)))
+    affected_outputs <- c(affected_outputs, "cluster_centers", "variable_profiles")
+  }
+
+  # Check for low variance variables
+  if (length(summary$low_variance_variables) > 0) {
+    degraded_reasons <- c(degraded_reasons,
+      sprintf("%d variable(s) have low variance", length(summary$low_variance_variables)))
+    affected_outputs <- c(affected_outputs, "cluster_separation")
+  }
+
+  # Check for outliers removed
+  if (!is.null(summary$outliers_removed) && summary$outliers_removed > 0) {
+    degraded_reasons <- c(degraded_reasons,
+      sprintf("%d outlier(s) removed from clustering", summary$outliers_removed))
+    affected_outputs <- c(affected_outputs, "segment_assignments")
+  }
+
+  # Check cluster quality via silhouette
+  if (!is.null(silhouette_score) && silhouette_score < 0.25) {
+    degraded_reasons <- c(degraded_reasons,
+      sprintf("Low cluster quality (silhouette=%.3f, threshold=0.25)", silhouette_score))
+    affected_outputs <- c(affected_outputs, "segment_interpretability")
+  }
+
+  # Check stability flags
+  if (length(summary$stability_flags) > 0) {
+    degraded_reasons <- c(degraded_reasons, summary$stability_flags)
+    affected_outputs <- c(affected_outputs, "result_stability")
+  }
+
+  # Determine final status
+  if (length(degraded_reasons) > 0) {
+    status <- segment_status_partial(
+      degraded_reasons = unique(degraded_reasons),
+      affected_outputs = unique(affected_outputs),
+      dropped_variables = summary$dropped_variables
+    )
+  } else {
+    status <- segment_status_pass(
+      n_clusters = clusters_created,
+      n_cases = cases_assigned
+    )
+  }
+
+  # Add silhouette to status details
+  if (!is.null(silhouette_score)) {
+    if (is.null(status$details)) status$details <- list()
+    status$details$silhouette_score <- silhouette_score
+  }
+
+  status
+}
