@@ -1,10 +1,11 @@
 # ==============================================================================
-# MAXDIFF MODULE - DESIGN GENERATION - TURAS V10.0
+# MAXDIFF MODULE - DESIGN GENERATION - TURAS V10.1
 # ==============================================================================
 # Experimental design generation for MaxDiff studies
 # Part of Turas MaxDiff Module
 #
 # VERSION HISTORY:
+# Turas v10.1 - Exposed AlgDesign parameters, enhanced documentation (2025-12)
 # Turas v10.0 - Initial release (2025-12)
 #
 # DESIGN TYPES:
@@ -13,11 +14,47 @@
 # - RANDOM: Pure random allocation (for testing)
 #
 # DEPENDENCIES:
-# - AlgDesign (for OPTIMAL designs)
+# - AlgDesign (for OPTIMAL designs) - OPTIONAL but recommended
 # - utils.R
+#
+# ==============================================================================
+# ALGDESIGN CONFIGURATION
+# ==============================================================================
+#
+# When using OPTIMAL design type, the following AlgDesign parameters can be
+# configured in your design_settings:
+#
+# BASIC PARAMETERS:
+#   Max_Design_Iterations  - Maximum Federov iterations (default: 10000)
+#   nRepeats               - Number of random starts (default: 5)
+#   Approximate            - Use approximate algorithm for large problems (default: FALSE)
+#
+# ADVANCED PARAMETERS:
+#   Augment                - Augment existing design (default: FALSE)
+#   Rows                   - Starting rows for augmentation (default: NULL)
+#   Criterion              - Optimization criterion: "D", "A", "I" (default: "D")
+#
+# EXAMPLE:
+#   design_settings <- list(
+#     Design_Type = "OPTIMAL",
+#     Items_Per_Task = 4,
+#     Tasks_Per_Respondent = 12,
+#     Num_Versions = 4,
+#     Max_Design_Iterations = 15000,
+#     nRepeats = 10,
+#     Approximate = FALSE,
+#     Criterion = "D"
+#   )
+#
+# EFFICIENCY GUIDELINES:
+#   - D-efficiency > 0.95: Excellent design
+#   - D-efficiency > 0.85: Good design
+#   - D-efficiency > 0.70: Acceptable design
+#   - D-efficiency < 0.70: Consider regenerating
+#
 # ==============================================================================
 
-DESIGN_VERSION <- "10.0"
+DESIGN_VERSION <- "10.1"
 
 # ==============================================================================
 # MAIN DESIGN GENERATOR
@@ -286,15 +323,29 @@ generate_balanced_candidate <- function(item_ids, items_per_task, tasks_per_resp
 #' Generate Optimal Design
 #'
 #' Generates D-optimal design using AlgDesign package.
+#' Supports configurable optimization parameters for fine-tuning.
 #'
 #' @param item_ids Character vector. Item IDs
 #' @param items_per_task Integer. Items per task
 #' @param tasks_per_respondent Integer. Tasks per respondent
 #' @param n_versions Integer. Number of versions
-#' @param settings Design settings list
+#' @param settings Design settings list with optional AlgDesign parameters:
+#'   - Max_Design_Iterations: Maximum Federov iterations (default: 10000)
+#'   - nRepeats: Number of random starts (default: 5)
+#'   - Approximate: Use approximate algorithm (default: FALSE)
+#'   - Criterion: Optimization criterion "D", "A", or "I" (default: "D")
 #' @param verbose Logical. Print progress
 #'
 #' @return Data frame with design matrix
+#'
+#' @details
+#' This function uses the Federov exchange algorithm from AlgDesign to find
+#' D-optimal (or A-optimal, I-optimal) designs for MaxDiff studies.
+#'
+#' Increasing nRepeats improves the chance of finding the global optimum
+#' but increases computation time. For large problems (>20 items), consider
+#' setting Approximate = TRUE.
+#'
 #' @keywords internal
 generate_optimal_design <- function(item_ids, items_per_task, tasks_per_respondent,
                                     n_versions, settings, verbose = TRUE) {
@@ -314,8 +365,23 @@ generate_optimal_design <- function(item_ids, items_per_task, tasks_per_responde
 
   n_items <- length(item_ids)
 
+  # Extract AlgDesign parameters with defaults
+  max_iterations <- settings$Max_Design_Iterations %||% 10000
+  n_repeats <- settings$nRepeats %||% 5
+  use_approximate <- isTRUE(settings$Approximate)
+  criterion <- settings$Criterion %||% "D"
+
+  # Validate criterion
+  criterion <- match.arg(toupper(criterion), c("D", "A", "I"))
+
   if (verbose) {
     log_message("Using AlgDesign for optimal design...", "INFO", verbose)
+    log_message(sprintf("  Max iterations: %d", max_iterations), "INFO", verbose)
+    log_message(sprintf("  Random starts (nRepeats): %d", n_repeats), "INFO", verbose)
+    log_message(sprintf("  Criterion: %s-optimal", criterion), "INFO", verbose)
+    if (use_approximate) {
+      log_message("  Mode: Approximate (faster for large problems)", "INFO", verbose)
+    }
   }
 
   # Generate candidate set (all possible tasks)
@@ -328,23 +394,46 @@ generate_optimal_design <- function(item_ids, items_per_task, tasks_per_responde
     ), "INFO", verbose)
   }
 
+  # Check if problem is large and suggest approximate mode
+  if (nrow(candidate_tasks) > 10000 && !use_approximate) {
+    if (verbose) {
+      log_message("Note: Large candidate set. Consider Approximate = TRUE for faster optimization.", "INFO", verbose)
+    }
+  }
+
   # Run optimization for each version
   design_rows <- list()
+  version_efficiencies <- numeric(n_versions)
 
   for (v in 1:n_versions) {
     if (verbose) {
-      log_message(sprintf("Optimizing version %d...", v), "INFO", verbose)
+      log_message(sprintf("Optimizing version %d of %d...", v, n_versions), "INFO", verbose)
     }
 
     # Select optimal tasks using Federov algorithm
     optimal_result <- tryCatch({
-      AlgDesign::optFederov(
-        ~ .,
-        data = candidate_tasks,
-        nTrials = tasks_per_respondent,
-        maxIteration = settings$Max_Design_Iterations,
-        nRepeats = 5
-      )
+      if (use_approximate) {
+        # Use approximate algorithm for large problems
+        AlgDesign::optFederov(
+          ~ .,
+          data = candidate_tasks,
+          nTrials = tasks_per_respondent,
+          maxIteration = max_iterations,
+          nRepeats = n_repeats,
+          approximate = TRUE,
+          criterion = criterion
+        )
+      } else {
+        # Standard exact algorithm
+        AlgDesign::optFederov(
+          ~ .,
+          data = candidate_tasks,
+          nTrials = tasks_per_respondent,
+          maxIteration = max_iterations,
+          nRepeats = n_repeats,
+          criterion = criterion
+        )
+      }
     }, error = function(e) {
       message(sprintf(
         "[TRS PARTIAL] MAXD_ALGDESIGN_FAILED: AlgDesign optimization failed for version %d: %s",
@@ -355,10 +444,19 @@ generate_optimal_design <- function(item_ids, items_per_task, tasks_per_responde
 
     if (is.null(optimal_result)) {
       # Fall back to random selection
+      if (verbose) {
+        log_message(sprintf("  Version %d: Using random selection (fallback)", v), "WARN", verbose)
+      }
       selected_rows <- sample(1:nrow(candidate_tasks), tasks_per_respondent)
       selected_tasks <- candidate_tasks[selected_rows, ]
+      version_efficiencies[v] <- NA
     } else {
       selected_tasks <- optimal_result$design
+      version_efficiencies[v] <- optimal_result$D %||% NA
+
+      if (verbose && !is.null(optimal_result$D)) {
+        log_message(sprintf("  Version %d: D-efficiency = %.4f", v, optimal_result$D), "INFO", verbose)
+      }
     }
 
     # Convert to design format
@@ -382,7 +480,73 @@ generate_optimal_design <- function(item_ids, items_per_task, tasks_per_responde
     }
   }
 
+  # Log overall efficiency
+  if (verbose) {
+    mean_eff <- mean(version_efficiencies, na.rm = TRUE)
+    if (!is.na(mean_eff)) {
+      log_message(sprintf("Mean D-efficiency across versions: %.4f", mean_eff), "INFO", verbose)
+    }
+  }
+
   do.call(rbind, design_rows)
+}
+
+
+#' Get AlgDesign Recommended Settings
+#'
+#' Returns recommended AlgDesign settings based on problem size.
+#'
+#' @param n_items Number of items in study
+#' @param items_per_task Number of items per task
+#' @param tasks_per_respondent Tasks per respondent
+#' @param n_versions Number of design versions
+#'
+#' @return List with recommended settings and notes
+#' @export
+get_algdesign_recommendations <- function(n_items, items_per_task,
+                                          tasks_per_respondent, n_versions) {
+
+  # Calculate problem size
+  n_candidates <- choose(n_items, items_per_task)
+  complexity <- n_candidates * tasks_per_respondent * n_versions
+
+  settings <- list(
+    Max_Design_Iterations = 10000,
+    nRepeats = 5,
+    Approximate = FALSE,
+    Criterion = "D"
+  )
+
+  notes <- character(0)
+
+  # Adjust based on complexity
+  if (n_candidates > 10000) {
+    settings$Approximate <- TRUE
+    settings$Max_Design_Iterations <- 5000
+    notes <- c(notes, "Large candidate set - using approximate algorithm")
+  }
+
+  if (n_items > 20) {
+    settings$nRepeats <- 10
+    notes <- c(notes, "Many items - increased random starts")
+  }
+
+  if (tasks_per_respondent > 15) {
+    settings$Max_Design_Iterations <- 15000
+    notes <- c(notes, "Many tasks - increased max iterations")
+  }
+
+  # Estimate runtime
+  estimated_runtime <- complexity / 1e6 * settings$nRepeats
+  if (settings$Approximate) {
+    estimated_runtime <- estimated_runtime * 0.3
+  }
+
+  settings$notes <- notes
+  settings$estimated_runtime_minutes <- round(estimated_runtime, 1)
+  settings$n_candidates <- n_candidates
+
+  return(settings)
 }
 
 
