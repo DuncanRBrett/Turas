@@ -5,8 +5,16 @@
 # Calculates trends and wave-over-wave changes for tracked questions.
 # Supports: Rating questions, Single choice, NPS, Index scores
 #
-# VERSION: 2.2.0
+# VERSION: 2.3.0 - Added parallel calculation support
 # SIZE: ~2,700 lines (target: decompose during maintenance)
+#
+# PARALLEL PROCESSING:
+# When processing many tracked questions (10+), trend calculations can be
+# parallelized using the future/future.apply framework.
+#
+# To enable: calculate_all_trends(..., parallel = TRUE)
+# Requirements: future, future.apply packages installed
+# Fallback: Sequential calculation if packages not available
 #
 # ARCHITECTURE NOTE:
 # Core statistical functions have been extracted to lib/statistical_core.R
@@ -51,12 +59,26 @@ is_significant <- function(sig_test) {
 #'
 #' Main function to calculate trends across waves for all tracked questions.
 #'
+#' @section Parallel Processing:
+#' When parallel = TRUE and many questions exist (10+), trend calculations
+#' are performed in parallel using the future/future.apply framework.
+#' This can significantly speed up processing for large tracker studies.
+#'
+#' Requirements for parallel processing:
+#' - future and future.apply packages installed
+#' - At least 10 tracked questions (overhead not worth it for fewer)
+#'
+#' If packages are not available, falls back to sequential processing.
+#'
 #' @param config Configuration object
 #' @param question_map Question map index
 #' @param wave_data List of wave data frames
+#' @param parallel Logical. If TRUE, attempt parallel calculation. Default FALSE.
 #' @return List containing trend results for each question
 #'
 #' @export
+
+
 #' Normalize Question Type
 #'
 #' Maps question types to standardized internal types.
@@ -91,7 +113,7 @@ normalize_question_type <- function(q_type) {
 }
 
 
-calculate_all_trends <- function(config, question_map, wave_data) {
+calculate_all_trends <- function(config, question_map, wave_data, parallel = FALSE) {
 
   cat("\n================================================================================\n")
   cat("CALCULATING TRENDS\n")
@@ -99,90 +121,238 @@ calculate_all_trends <- function(config, question_map, wave_data) {
 
   tracked_questions <- config$tracked_questions$QuestionCode
   wave_ids <- config$waves$WaveID
+  n_questions <- length(tracked_questions)
 
-  trend_results <- list()
-  skipped_questions <- list()  # TRS v1.0: Track skipped questions for PARTIAL status
+  # ---------------------------------------------------------------------------
+  # PARALLEL PROCESSING SETUP
+  # ---------------------------------------------------------------------------
+  # Use parallel processing when:
+  # 1. parallel = TRUE requested
+  # 2. At least 10 questions (overhead not worth it for fewer)
+  # 3. Required packages are available
+  use_parallel <- FALSE
+  if (parallel && n_questions >= 10) {
+    if (requireNamespace("future", quietly = TRUE) &&
+        requireNamespace("future.apply", quietly = TRUE)) {
+      use_parallel <- TRUE
+      cat(paste0("Using parallel calculation for ", n_questions, " questions\n"))
+    } else {
+      cat("Note: parallel=TRUE requested but future/future.apply packages not installed.\n")
+      cat("Falling back to sequential calculation. Install packages for parallel support.\n")
+    }
+  }
 
-  for (q_code in tracked_questions) {
-    cat(paste0("\n", strrep("=", 80), "\n"))
-    cat(paste0("Processing question: ", q_code, "\n"))
-
-    # Get question metadata
-    metadata <- get_question_metadata(question_map, q_code)
-
-    if (is.null(metadata)) {
-      # TRS v1.0: Record skipped question for PARTIAL status
-      skipped_questions[[q_code]] <- list(
-        question_code = q_code,
-        reason = "Question not found in mapping",
-        stage = "get_question_metadata"
-      )
-      message(paste0("[TRS PARTIAL] Question ", q_code, " not found in mapping - skipping"))
-      next
+  if (use_parallel) {
+    # ---------------------------------------------------------------------------
+    # PARALLEL TREND CALCULATION
+    # ---------------------------------------------------------------------------
+    # Set up parallel plan if not already configured
+    if (!future::plan() %in% c("multisession", "multicore", "cluster")) {
+      old_plan <- future::plan(future::multisession,
+                               workers = min(n_questions, parallel::detectCores() - 1))
+      on.exit(future::plan(old_plan), add = TRUE)
     }
 
-    # Normalize question type to internal standard
-    q_type_raw <- metadata$QuestionType
-    q_type <- normalize_question_type(q_type_raw)
-    cat(paste0("  Type: ", q_type_raw, " (normalized: ", q_type, ")\n"))
+    cat("Calculating trends in parallel...\n")
 
-    trend_result <- tryCatch({
-      if (q_type == "rating") {
-        # Use enhanced version (supports TrackingSpecs, backward compatible)
-        calculate_rating_trend_enhanced(q_code, question_map, wave_data, config)
-      } else if (q_type == "nps") {
-        calculate_nps_trend(q_code, question_map, wave_data, config)
-      } else if (q_type == "single_choice") {
-        # Use enhanced version (supports TrackingSpecs, backward compatible)
-        calculate_single_choice_trend_enhanced(q_code, question_map, wave_data, config)
-      } else if (q_type == "multi_choice" || q_type_raw == "Multi_Mention") {
-        # Multi-mention support (Enhancement Phase 2)
-        calculate_multi_mention_trend(q_code, question_map, wave_data, config)
-      } else if (q_type == "composite") {
-        # Use enhanced version (supports TrackingSpecs, backward compatible)
-        calculate_composite_trend_enhanced(q_code, question_map, wave_data, config)
-      } else if (q_type == "open_end") {
-        # TRS v1.0: Record unsupported type for PARTIAL status
-        skipped_questions[[q_code]] <- list(
-          question_code = q_code,
-          reason = "Open-end questions cannot be tracked",
-          stage = "type_check"
-        )
-        message(paste0("[TRS PARTIAL] Open-end question ", q_code, " cannot be tracked - skipping"))
-        NULL
-      } else if (q_type == "ranking") {
-        # TRS v1.0: Record unsupported type for PARTIAL status
-        skipped_questions[[q_code]] <- list(
-          question_code = q_code,
-          reason = "Ranking questions not yet supported in tracker",
-          stage = "type_check"
-        )
-        message(paste0("[TRS PARTIAL] Ranking question ", q_code, " not supported - skipping"))
-        NULL
-      } else {
-        # TRS v1.0: Record unsupported type for PARTIAL status
-        skipped_questions[[q_code]] <- list(
-          question_code = q_code,
-          reason = paste0("Question type '", q_type_raw, "' not supported"),
-          stage = "type_check"
-        )
-        message(paste0("[TRS PARTIAL] Question type '", q_type_raw, "' not supported - skipping"))
-        NULL
+    # Define the calculation function for a single question
+    calculate_single_trend <- function(q_code) {
+      # Get question metadata
+      metadata <- get_question_metadata(question_map, q_code)
+
+      if (is.null(metadata)) {
+        return(list(
+          q_code = q_code,
+          result = NULL,
+          skipped = list(
+            question_code = q_code,
+            reason = "Question not found in mapping",
+            stage = "get_question_metadata"
+          )
+        ))
       }
-    }, error = function(e) {
-      # TRS v1.0: Record error for PARTIAL status
-      skipped_questions[[q_code]] <<- list(
-        question_code = q_code,
-        reason = paste0("Error calculating trend: ", e$message),
-        stage = "calculation"
-      )
-      message(paste0("[TRS PARTIAL] Error calculating trend for ", q_code, ": ", e$message))
-      NULL
-    })
 
-    if (!is.null(trend_result)) {
-      trend_results[[q_code]] <- trend_result
-      cat(paste0("  ✓ Trend calculated\n"))
+      # Normalize question type
+      q_type_raw <- metadata$QuestionType
+      q_type <- normalize_question_type(q_type_raw)
+
+      trend_result <- tryCatch({
+        if (q_type == "rating") {
+          calculate_rating_trend_enhanced(q_code, question_map, wave_data, config)
+        } else if (q_type == "nps") {
+          calculate_nps_trend(q_code, question_map, wave_data, config)
+        } else if (q_type == "single_choice") {
+          calculate_single_choice_trend_enhanced(q_code, question_map, wave_data, config)
+        } else if (q_type == "multi_choice" || q_type_raw == "Multi_Mention") {
+          calculate_multi_mention_trend(q_code, question_map, wave_data, config)
+        } else if (q_type == "composite") {
+          calculate_composite_trend_enhanced(q_code, question_map, wave_data, config)
+        } else if (q_type == "open_end") {
+          return(list(
+            q_code = q_code,
+            result = NULL,
+            skipped = list(
+              question_code = q_code,
+              reason = "Open-end questions cannot be tracked",
+              stage = "type_check"
+            )
+          ))
+        } else if (q_type == "ranking") {
+          return(list(
+            q_code = q_code,
+            result = NULL,
+            skipped = list(
+              question_code = q_code,
+              reason = "Ranking questions not yet supported in tracker",
+              stage = "type_check"
+            )
+          ))
+        } else {
+          return(list(
+            q_code = q_code,
+            result = NULL,
+            skipped = list(
+              question_code = q_code,
+              reason = paste0("Question type '", q_type_raw, "' not supported"),
+              stage = "type_check"
+            )
+          ))
+        }
+      }, error = function(e) {
+        return(list(
+          q_code = q_code,
+          result = NULL,
+          skipped = list(
+            question_code = q_code,
+            reason = paste0("Error calculating trend: ", e$message),
+            stage = "calculation"
+          )
+        ))
+      })
+
+      # If we got a trend result (not an early return), wrap it
+      if (!is.null(trend_result) && !is.list(trend_result) ||
+          (is.list(trend_result) && is.null(trend_result$skipped))) {
+        return(list(
+          q_code = q_code,
+          result = trend_result,
+          skipped = NULL
+        ))
+      }
+
+      return(trend_result)
+    }
+
+    # Run calculations in parallel
+    parallel_results <- future.apply::future_lapply(
+      tracked_questions,
+      calculate_single_trend,
+      future.seed = TRUE
+    )
+
+    # Collect results
+    trend_results <- list()
+    skipped_questions <- list()
+
+    for (res in parallel_results) {
+      if (!is.null(res$result)) {
+        trend_results[[res$q_code]] <- res$result
+        cat(paste0("  ✓ ", res$q_code, " - trend calculated\n"))
+      }
+      if (!is.null(res$skipped)) {
+        skipped_questions[[res$q_code]] <- res$skipped
+        cat(paste0("  ⊘ ", res$q_code, " - skipped: ", res$skipped$reason, "\n"))
+      }
+    }
+
+  } else {
+    # ---------------------------------------------------------------------------
+    # SEQUENTIAL TREND CALCULATION (default)
+    # ---------------------------------------------------------------------------
+    trend_results <- list()
+    skipped_questions <- list()  # TRS v1.0: Track skipped questions for PARTIAL status
+
+    for (q_code in tracked_questions) {
+      cat(paste0("\n", strrep("=", 80), "\n"))
+      cat(paste0("Processing question: ", q_code, "\n"))
+
+      # Get question metadata
+      metadata <- get_question_metadata(question_map, q_code)
+
+      if (is.null(metadata)) {
+        # TRS v1.0: Record skipped question for PARTIAL status
+        skipped_questions[[q_code]] <- list(
+          question_code = q_code,
+          reason = "Question not found in mapping",
+          stage = "get_question_metadata"
+        )
+        message(paste0("[TRS PARTIAL] Question ", q_code, " not found in mapping - skipping"))
+        next
+      }
+
+      # Normalize question type to internal standard
+      q_type_raw <- metadata$QuestionType
+      q_type <- normalize_question_type(q_type_raw)
+      cat(paste0("  Type: ", q_type_raw, " (normalized: ", q_type, ")\n"))
+
+      trend_result <- tryCatch({
+        if (q_type == "rating") {
+          # Use enhanced version (supports TrackingSpecs, backward compatible)
+          calculate_rating_trend_enhanced(q_code, question_map, wave_data, config)
+        } else if (q_type == "nps") {
+          calculate_nps_trend(q_code, question_map, wave_data, config)
+        } else if (q_type == "single_choice") {
+          # Use enhanced version (supports TrackingSpecs, backward compatible)
+          calculate_single_choice_trend_enhanced(q_code, question_map, wave_data, config)
+        } else if (q_type == "multi_choice" || q_type_raw == "Multi_Mention") {
+          # Multi-mention support (Enhancement Phase 2)
+          calculate_multi_mention_trend(q_code, question_map, wave_data, config)
+        } else if (q_type == "composite") {
+          # Use enhanced version (supports TrackingSpecs, backward compatible)
+          calculate_composite_trend_enhanced(q_code, question_map, wave_data, config)
+        } else if (q_type == "open_end") {
+          # TRS v1.0: Record unsupported type for PARTIAL status
+          skipped_questions[[q_code]] <- list(
+            question_code = q_code,
+            reason = "Open-end questions cannot be tracked",
+            stage = "type_check"
+          )
+          message(paste0("[TRS PARTIAL] Open-end question ", q_code, " cannot be tracked - skipping"))
+          NULL
+        } else if (q_type == "ranking") {
+          # TRS v1.0: Record unsupported type for PARTIAL status
+          skipped_questions[[q_code]] <- list(
+            question_code = q_code,
+            reason = "Ranking questions not yet supported in tracker",
+            stage = "type_check"
+          )
+          message(paste0("[TRS PARTIAL] Ranking question ", q_code, " not supported - skipping"))
+          NULL
+        } else {
+          # TRS v1.0: Record unsupported type for PARTIAL status
+          skipped_questions[[q_code]] <- list(
+            question_code = q_code,
+            reason = paste0("Question type '", q_type_raw, "' not supported"),
+            stage = "type_check"
+          )
+          message(paste0("[TRS PARTIAL] Question type '", q_type_raw, "' not supported - skipping"))
+          NULL
+        }
+      }, error = function(e) {
+        # TRS v1.0: Record error for PARTIAL status
+        skipped_questions[[q_code]] <<- list(
+          question_code = q_code,
+          reason = paste0("Error calculating trend: ", e$message),
+          stage = "calculation"
+        )
+        message(paste0("[TRS PARTIAL] Error calculating trend for ", q_code, ": ", e$message))
+        NULL
+      })
+
+      if (!is.null(trend_result)) {
+        trend_results[[q_code]] <- trend_result
+        cat(paste0("  ✓ Trend calculated\n"))
+      }
     }
   }
 

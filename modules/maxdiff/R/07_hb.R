@@ -1,10 +1,11 @@
 # ==============================================================================
-# MAXDIFF MODULE - HIERARCHICAL BAYES ESTIMATION - TURAS V10.0
+# MAXDIFF MODULE - HIERARCHICAL BAYES ESTIMATION - TURAS V10.1
 # ==============================================================================
 # Hierarchical Bayes model for individual-level utility estimation
 # Part of Turas MaxDiff Module
 #
 # VERSION HISTORY:
+# Turas v10.1 - Enhanced diagnostics, installation docs (2025-12)
 # Turas v10.0 - Initial release (2025-12)
 #
 # MODEL:
@@ -13,11 +14,44 @@
 # Sigma ~ LKJ(2) * half-t(3) - Correlation and scale priors
 #
 # DEPENDENCIES:
-# - cmdstanr (for Stan interface)
+# - cmdstanr (for Stan interface) - OPTIONAL but recommended
 # - utils.R
+#
+# ==============================================================================
+# CMDSTANR INSTALLATION GUIDE
+# ==============================================================================
+#
+# cmdstanr is the recommended interface to Stan for HB estimation.
+# If not installed, Turas will use an approximate empirical Bayes method.
+#
+# INSTALLATION STEPS:
+#
+# 1. Install cmdstanr package (not on CRAN, use R-universe):
+#    install.packages("cmdstanr", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
+#
+# 2. Install CmdStan toolchain (C++ compiler):
+#    cmdstanr::check_cmdstan_toolchain()
+#    # If issues on Windows, run: cmdstanr::install_cmdstan_toolchain()
+#
+# 3. Install CmdStan itself:
+#    cmdstanr::install_cmdstan()
+#
+# TROUBLESHOOTING:
+#
+# - Windows: Requires Rtools. Install from https://cran.r-project.org/bin/windows/Rtools/
+# - Mac: Requires Xcode Command Line Tools. Run: xcode-select --install
+# - Linux: Requires g++ and make. Install via package manager.
+#
+# VERIFICATION:
+#    library(cmdstanr)
+#    cmdstanr::cmdstan_path()  # Should return CmdStan installation path
+#    cmdstanr::cmdstan_version()  # Should return version number
+#
+# For detailed instructions, see: https://mc-stan.org/cmdstanr/articles/cmdstanr.html
+#
 # ==============================================================================
 
-HB_VERSION <- "10.0"
+HB_VERSION <- "10.1"
 
 # ==============================================================================
 # MAIN HB ESTIMATOR
@@ -507,6 +541,411 @@ fit_approximate_hb <- function(long_data, items, config, verbose = TRUE) {
       n_items = n_items
     )
   )
+}
+
+
+# ==============================================================================
+# AUTOMATED HB CONVERGENCE DIAGNOSTICS
+# ==============================================================================
+
+#' Check HB Convergence Automatically
+#'
+#' Comprehensive automated checking of MCMC convergence diagnostics.
+#' Evaluates R-hat, ESS, divergences, and tree depth issues.
+#'
+#' @param fit CmdStanMCMC object from cmdstanr
+#' @param parameters Character vector of parameter names to check (NULL = all mu params)
+#' @param verbose Logical, print diagnostic summary
+#'
+#' @return List with convergence diagnostics:
+#'   - converged: Logical, overall convergence status
+#'   - rhat_max: Maximum R-hat across parameters
+#'   - rhat_issues: Parameters with R-hat > 1.05
+#'   - ess_min: Minimum effective sample size
+#'   - ess_issues: Parameters with ESS < 400
+#'   - n_divergences: Number of divergent transitions
+#'   - n_max_treedepth: Number of max treedepth exceedances
+#'   - recommendations: Character vector of recommendations
+#'   - quality_score: 0-100 quality score
+#'
+#' @export
+#'
+#' @details
+#' Convergence thresholds (based on Stan recommendations):
+#' - R-hat: Should be < 1.01 (warning at 1.05, critical at 1.10)
+#' - ESS (bulk): Should be > 400 (warning at 100)
+#' - Divergences: Should be 0 (any divergence is concerning)
+#' - Max treedepth: Should be 0 (indicates adaptation issues)
+#'
+#' Quality score interpretation:
+#' - 90-100: Excellent convergence
+#' - 70-89: Good convergence, minor warnings
+#' - 50-69: Acceptable, some concerns
+#' - < 50: Poor convergence, results unreliable
+check_hb_convergence_auto <- function(fit, parameters = NULL, verbose = TRUE) {
+
+  diagnostics <- list(
+    converged = TRUE,
+    rhat_max = NA_real_,
+    rhat_issues = character(0),
+    ess_min = NA_real_,
+    ess_issues = character(0),
+    n_divergences = 0L,
+    n_max_treedepth = 0L,
+    recommendations = character(0),
+    quality_score = 100
+  )
+
+  # Get summary
+  summary_df <- tryCatch({
+    fit$summary()
+  }, error = function(e) {
+    diagnostics$converged <- FALSE
+    diagnostics$recommendations <- c(diagnostics$recommendations,
+                                     "Failed to extract model summary")
+    diagnostics$quality_score <- 0
+    return(NULL)
+  })
+
+  if (is.null(summary_df)) {
+    return(diagnostics)
+  }
+
+  # Filter to population parameters (mu) if not specified
+  if (is.null(parameters)) {
+    parameters <- grep("^mu\\[", summary_df$variable, value = TRUE)
+  }
+
+  param_summary <- summary_df[summary_df$variable %in% parameters, ]
+
+  if (nrow(param_summary) == 0) {
+    diagnostics$recommendations <- c(diagnostics$recommendations,
+                                     "No matching parameters found for convergence check")
+    return(diagnostics)
+  }
+
+  # ============================================================================
+  # CHECK 1: R-hat (Split R-hat for chain mixing)
+  # ============================================================================
+
+  if ("rhat" %in% names(param_summary)) {
+    rhat_values <- param_summary$rhat
+    rhat_values <- rhat_values[!is.na(rhat_values)]
+
+    if (length(rhat_values) > 0) {
+      diagnostics$rhat_max <- max(rhat_values)
+
+      # Check for issues
+      high_rhat <- param_summary$variable[!is.na(param_summary$rhat) & param_summary$rhat > 1.05]
+      diagnostics$rhat_issues <- high_rhat
+
+      if (diagnostics$rhat_max > 1.10) {
+        diagnostics$converged <- FALSE
+        diagnostics$quality_score <- diagnostics$quality_score - 40
+        diagnostics$recommendations <- c(diagnostics$recommendations,
+                                         "CRITICAL: R-hat > 1.10 indicates chains have not mixed",
+                                         "Increase iterations or check model specification")
+      } else if (diagnostics$rhat_max > 1.05) {
+        diagnostics$quality_score <- diagnostics$quality_score - 20
+        diagnostics$recommendations <- c(diagnostics$recommendations,
+                                         "WARNING: R-hat > 1.05 indicates potential mixing issues",
+                                         "Consider increasing warmup iterations")
+      } else if (diagnostics$rhat_max > 1.01) {
+        diagnostics$quality_score <- diagnostics$quality_score - 5
+      }
+    }
+  }
+
+  # ============================================================================
+  # CHECK 2: Effective Sample Size (ESS)
+  # ============================================================================
+
+  if ("ess_bulk" %in% names(param_summary)) {
+    ess_values <- param_summary$ess_bulk
+    ess_values <- ess_values[!is.na(ess_values)]
+
+    if (length(ess_values) > 0) {
+      diagnostics$ess_min <- min(ess_values)
+
+      # Check for issues
+      low_ess <- param_summary$variable[!is.na(param_summary$ess_bulk) & param_summary$ess_bulk < 400]
+      diagnostics$ess_issues <- low_ess
+
+      if (diagnostics$ess_min < 100) {
+        diagnostics$converged <- FALSE
+        diagnostics$quality_score <- diagnostics$quality_score - 30
+        diagnostics$recommendations <- c(diagnostics$recommendations,
+                                         "CRITICAL: ESS < 100 indicates insufficient sampling",
+                                         "Increase the number of iterations substantially")
+      } else if (diagnostics$ess_min < 400) {
+        diagnostics$quality_score <- diagnostics$quality_score - 15
+        diagnostics$recommendations <- c(diagnostics$recommendations,
+                                         "WARNING: ESS < 400 may affect posterior accuracy",
+                                         "Consider increasing iterations")
+      }
+    }
+  }
+
+  # ============================================================================
+  # CHECK 3: Divergent Transitions
+  # ============================================================================
+
+  tryCatch({
+    sampler_diag <- fit$sampler_diagnostics()
+    if ("divergent__" %in% colnames(sampler_diag)) {
+      diagnostics$n_divergences <- sum(sampler_diag[, "divergent__"])
+
+      if (diagnostics$n_divergences > 0) {
+        pct_divergent <- 100 * diagnostics$n_divergences / nrow(sampler_diag)
+
+        if (pct_divergent > 1) {
+          diagnostics$converged <- FALSE
+          diagnostics$quality_score <- diagnostics$quality_score - 30
+          diagnostics$recommendations <- c(diagnostics$recommendations,
+                                           sprintf("CRITICAL: %.1f%% divergent transitions", pct_divergent),
+                                           "Consider reparameterizing model or increasing adapt_delta")
+        } else {
+          diagnostics$quality_score <- diagnostics$quality_score - 10
+          diagnostics$recommendations <- c(diagnostics$recommendations,
+                                           sprintf("WARNING: %d divergent transitions detected", diagnostics$n_divergences),
+                                           "Monitor carefully; may affect some individual estimates")
+        }
+      }
+    }
+
+    # Check max treedepth
+    if ("treedepth__" %in% colnames(sampler_diag)) {
+      diagnostics$n_max_treedepth <- sum(sampler_diag[, "treedepth__"] >= 10)
+
+      if (diagnostics$n_max_treedepth > 0) {
+        diagnostics$quality_score <- diagnostics$quality_score - 5
+        diagnostics$recommendations <- c(diagnostics$recommendations,
+                                         sprintf("%d iterations hit max treedepth", diagnostics$n_max_treedepth),
+                                         "Consider increasing max_treedepth if many")
+      }
+    }
+  }, error = function(e) {
+    # Sampler diagnostics not available
+  })
+
+  # ============================================================================
+  # Ensure quality score is bounded
+  # ============================================================================
+
+  diagnostics$quality_score <- max(0, diagnostics$quality_score)
+
+  # ============================================================================
+  # Print summary if verbose
+  # ============================================================================
+
+  if (verbose) {
+    cat("\n")
+    cat(paste(rep("=", 60), collapse = ""), "\n")
+    cat("HB CONVERGENCE DIAGNOSTICS\n")
+    cat(paste(rep("=", 60), collapse = ""), "\n\n")
+
+    status <- if (diagnostics$converged) "CONVERGED" else "NOT CONVERGED"
+    status_color <- if (diagnostics$converged) "" else "[!] "
+    cat(sprintf("Overall Status: %s%s\n", status_color, status))
+    cat(sprintf("Quality Score: %d/100\n\n", diagnostics$quality_score))
+
+    cat("Diagnostic Summary:\n")
+    cat(sprintf("  Max R-hat:      %.4f %s\n",
+                diagnostics$rhat_max,
+                if (!is.na(diagnostics$rhat_max) && diagnostics$rhat_max > 1.05) "[!]" else "[OK]"))
+    cat(sprintf("  Min ESS:        %.0f %s\n",
+                diagnostics$ess_min,
+                if (!is.na(diagnostics$ess_min) && diagnostics$ess_min < 400) "[!]" else "[OK]"))
+    cat(sprintf("  Divergences:    %d %s\n",
+                diagnostics$n_divergences,
+                if (diagnostics$n_divergences > 0) "[!]" else "[OK]"))
+    cat(sprintf("  Max Treedepth:  %d %s\n",
+                diagnostics$n_max_treedepth,
+                if (diagnostics$n_max_treedepth > 0) "[?]" else "[OK]"))
+
+    if (length(diagnostics$rhat_issues) > 0) {
+      cat(sprintf("\n  R-hat issues (%d params): %s\n",
+                  length(diagnostics$rhat_issues),
+                  paste(head(diagnostics$rhat_issues, 5), collapse = ", ")))
+    }
+
+    if (length(diagnostics$ess_issues) > 0) {
+      cat(sprintf("  ESS issues (%d params): %s\n",
+                  length(diagnostics$ess_issues),
+                  paste(head(diagnostics$ess_issues, 5), collapse = ", ")))
+    }
+
+    if (length(diagnostics$recommendations) > 0) {
+      cat("\nRecommendations:\n")
+      for (rec in diagnostics$recommendations) {
+        cat(sprintf("  - %s\n", rec))
+      }
+    }
+
+    cat("\n")
+  }
+
+  return(diagnostics)
+}
+
+
+#' Get Quick Convergence Summary
+#'
+#' Returns a one-line convergence summary suitable for logging.
+#'
+#' @param diagnostics Output from check_hb_convergence_auto()
+#' @return Character string with summary
+#' @export
+summarize_hb_convergence <- function(diagnostics) {
+  status <- if (diagnostics$converged) "OK" else "FAIL"
+
+  sprintf(
+    "HB Convergence: %s (Score: %d, R-hat: %.3f, ESS: %.0f, Div: %d)",
+    status,
+    diagnostics$quality_score,
+    diagnostics$rhat_max,
+    diagnostics$ess_min,
+    diagnostics$n_divergences
+  )
+}
+
+
+#' Check CmdStanR Availability
+#'
+#' Checks if cmdstanr is installed and properly configured.
+#' Provides helpful installation instructions if not.
+#'
+#' @param verbose Logical, print status messages
+#' @return List with:
+#'   - available: Logical, TRUE if cmdstanr is ready to use
+#'   - package_installed: Logical, TRUE if package is installed
+#'   - cmdstan_installed: Logical, TRUE if CmdStan is installed
+#'   - cmdstan_path: Character, path to CmdStan (or NA)
+#'   - cmdstan_version: Character, CmdStan version (or NA)
+#'   - install_instructions: Character vector of installation steps if needed
+#' @export
+check_cmdstanr_availability <- function(verbose = TRUE) {
+
+  result <- list(
+    available = FALSE,
+    package_installed = FALSE,
+    cmdstan_installed = FALSE,
+    cmdstan_path = NA_character_,
+    cmdstan_version = NA_character_,
+    install_instructions = character(0)
+  )
+
+  # Check package installation
+  result$package_installed <- requireNamespace("cmdstanr", quietly = TRUE)
+
+  if (!result$package_installed) {
+    result$install_instructions <- c(
+      "cmdstanr package not installed. To install:",
+      "",
+      "1. Install cmdstanr from R-universe:",
+      '   install.packages("cmdstanr", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))',
+      "",
+      "2. Install C++ toolchain:",
+      "   cmdstanr::check_cmdstan_toolchain()",
+      "",
+      "3. Install CmdStan:",
+      "   cmdstanr::install_cmdstan()",
+      "",
+      "For more details: https://mc-stan.org/cmdstanr/"
+    )
+
+    if (verbose) {
+      cat("\n[TRS INFO] cmdstanr not available\n")
+      cat(paste(result$install_instructions, collapse = "\n"))
+      cat("\n")
+    }
+
+    return(result)
+  }
+
+  # Check CmdStan installation
+  tryCatch({
+    result$cmdstan_path <- cmdstanr::cmdstan_path()
+    result$cmdstan_version <- cmdstanr::cmdstan_version()
+    result$cmdstan_installed <- TRUE
+    result$available <- TRUE
+
+    if (verbose) {
+      cat(sprintf("\n[TRS INFO] cmdstanr available\n"))
+      cat(sprintf("  CmdStan path: %s\n", result$cmdstan_path))
+      cat(sprintf("  CmdStan version: %s\n", result$cmdstan_version))
+    }
+
+  }, error = function(e) {
+    result$install_instructions <- c(
+      "cmdstanr package installed but CmdStan not found.",
+      "",
+      "To install CmdStan:",
+      "   cmdstanr::install_cmdstan()",
+      "",
+      "If installation fails, check toolchain:",
+      "   cmdstanr::check_cmdstan_toolchain()"
+    )
+
+    if (verbose) {
+      cat("\n[TRS INFO] CmdStan not installed\n")
+      cat(paste(result$install_instructions, collapse = "\n"))
+      cat("\n")
+    }
+  })
+
+  return(result)
+}
+
+
+#' Get Recommended HB Settings
+#'
+#' Returns recommended HB settings based on data characteristics.
+#'
+#' @param n_respondents Number of respondents
+#' @param n_items Number of items
+#' @param n_tasks_per_resp Number of tasks per respondent
+#' @return List with recommended settings
+#' @export
+get_recommended_hb_settings <- function(n_respondents, n_items, n_tasks_per_resp) {
+
+  # Base recommendations
+  settings <- list(
+    chains = 4,
+    warmup = 1000,
+    iterations = 2000,
+    adapt_delta = 0.95,
+    max_treedepth = 10
+  )
+
+  # Adjust based on complexity
+  complexity <- n_respondents * n_items
+
+  if (complexity > 10000) {
+    # Large study - may need more iterations
+    settings$iterations <- 3000
+    settings$warmup <- 1500
+  }
+
+  if (n_items > 20) {
+    # Many items - increase adapt_delta
+    settings$adapt_delta <- 0.99
+  }
+
+  if (n_tasks_per_resp < 10) {
+    # Few tasks per respondent - individual estimates may be noisy
+    settings$iterations <- 4000
+    settings$warmup <- 2000
+  }
+
+  # Add notes
+  settings$notes <- c(
+    sprintf("Recommended for: %d respondents, %d items", n_respondents, n_items),
+    sprintf("Expected runtime: ~%.0f minutes", complexity / 1000 * settings$iterations / 1000),
+    "Increase iterations if R-hat > 1.05 or ESS < 400"
+  )
+
+  return(settings)
 }
 
 

@@ -1,20 +1,38 @@
 # ==============================================================================
-# CONFIDENCE - TRS GUARD LAYER
+# CONFIDENCE - TRS GUARD LAYER (TRS v1.0 COMPLIANT)
 # ==============================================================================
 #
 # TRS v1.0 integration for the Confidence Interval module.
 # Implements refusal, guard state, and validation gates per TRS standard.
 #
 # This module provides:
-#   - confidence_refuse() - module-specific refusal wrapper
+#   - confidence_refuse() - module-specific refusal wrapper (TRS v1.0 compliant)
 #   - confidence_with_refusal_handler() - wraps main analysis with TRS handling
 #   - confidence_guard_init() - initialize guard state with confidence-specific fields
 #   - Validation helpers for confidence-specific requirements
+#   - Sample size validation with metric-specific thresholds
+#   - Bootstrap iteration tracking
+#
+# TRS v1.0 EXECUTION STATES:
+#   PASS    - All outputs valid and complete
+#   PARTIAL - Outputs produced with declared degradation
+#   REFUSE  - User-fixable issue; no outputs produced
+#   ERROR   - Internal Turas bug
+#
+# TRS v1.0 REFUSAL CODE PREFIXES:
+#   CFG_     - Configuration errors
+#   DATA_    - Data integrity errors
+#   IO_      - File or path errors
+#   MODEL_   - Model fitting errors
+#   MAPPER_  - Mapping / coverage errors
+#   PKG_     - Missing dependency errors
+#   FEATURE_ - Optional feature failures
+#   BUG_     - Internal logic failures
 #
 # Related:
 #   - modules/shared/lib/trs_refusal.R - shared TRS infrastructure
 #
-# Version: 1.0 (TRS Integration)
+# Version: 1.1 (Full TRS v1.0 Compliance)
 # Date: December 2024
 #
 # ==============================================================================
@@ -65,16 +83,26 @@ if (!exists("turas_refuse", mode = "function")) {
 
 #' Refuse to Run with TRS-Compliant Message (Confidence)
 #'
-#' @param code Refusal code (will be prefixed if needed)
+#' Module-specific refusal wrapper that delegates to shared TRS infrastructure.
+#' Automatically prefixes codes with CFG_ if no valid prefix is present.
+#'
+#' TRS v1.0 Compliance:
+#' - All refusals include mandatory why_it_matters explanation
+#' - Diagnostics section shows expected/observed/missing/unmapped for clarity
+#' - Refusal codes follow TRS prefix convention
+#'
+#' @param code Refusal code (will be prefixed with CFG_ if needed)
 #' @param title Short title for the refusal
 #' @param problem One-sentence description of what went wrong
-#' @param why_it_matters Explanation of analytical risk (MANDATORY)
+#' @param why_it_matters Explanation of analytical risk (MANDATORY per TRS v1.0)
 #' @param how_to_fix Explicit step-by-step instructions to resolve
 #' @param expected Expected entities (for diagnostics)
 #' @param observed Observed entities (for diagnostics)
 #' @param missing Missing entities (for diagnostics)
+#' @param unmapped Unmapped/extra entities (for diagnostics, TRS v1.0)
 #' @param details Additional diagnostic details
 #'
+#' @return Never returns - always throws a turas_refusal condition
 #' @keywords internal
 confidence_refuse <- function(code,
                               title,
@@ -84,8 +112,10 @@ confidence_refuse <- function(code,
                               expected = NULL,
                               observed = NULL,
                               missing = NULL,
+                              unmapped = NULL,
                               details = NULL) {
 
+  # TRS v1.0: Validate code prefix, add default if missing
   if (!grepl("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|PKG_|FEATURE_|BUG_)", code)) {
     code <- paste0("CFG_", code)
   }
@@ -99,6 +129,7 @@ confidence_refuse <- function(code,
     expected = expected,
     observed = observed,
     missing = missing,
+    unmapped = unmapped,
     details = details,
     module = "CONFIDENCE"
   )
@@ -127,17 +158,33 @@ confidence_with_refusal_handler <- function(expr) {
 
 #' Initialize Confidence Guard State
 #'
-#' @return Guard state list
+#' Creates a guard state object with confidence-specific fields for tracking
+#' issues during analysis. This follows TRS v1.0 guard state pattern.
+#'
+#' Confidence-specific fields:
+#' - zero_cells: Variables with zero counts in categories
+#' - small_samples: Variables with sample sizes below threshold
+#' - method_used: CI method used (MOE, Wilson, Bootstrap, Bayesian)
+#' - confidence_level: Confidence level used
+#' - bounds_capped: Whether bounds were capped to [0,1]
+#' - bootstrap_iterations: Number of bootstrap iterations performed
+#' - questions_processed: Count of successfully processed questions
+#' - questions_skipped: List of skipped questions with reasons
+#'
+#' @return Guard state list with confidence-specific extensions
 #' @export
 confidence_guard_init <- function() {
   guard <- guard_init(module = "CONFIDENCE")
 
-  # Add Confidence-specific fields
+  # Confidence-specific fields (TRS v1.0 compliant)
   guard$zero_cells <- list()
   guard$small_samples <- list()
   guard$method_used <- NULL
   guard$confidence_level <- NULL
   guard$bounds_capped <- FALSE
+  guard$bootstrap_iterations <- NULL
+  guard$questions_processed <- 0
+  guard$questions_skipped <- list()
 
   guard
 }
@@ -173,23 +220,72 @@ guard_record_small_sample <- function(guard, variable, n) {
 
 #' Get Confidence Guard Summary
 #'
+#' Creates a comprehensive summary of all guard state issues for output/logging.
+#' Includes confidence-specific fields for CI calculations.
+#'
 #' @param guard Guard state object
-#' @return List with summary info
+#' @return List with summary info including confidence-specific issues
 #' @export
 confidence_guard_summary <- function(guard) {
   summary <- guard_summary(guard)
 
+  # Add confidence-specific summary fields
   summary$zero_cells <- guard$zero_cells
   summary$small_samples <- guard$small_samples
   summary$method_used <- guard$method_used
   summary$confidence_level <- guard$confidence_level
   summary$bounds_capped <- guard$bounds_capped
+  summary$bootstrap_iterations <- guard$bootstrap_iterations
+  summary$questions_processed <- guard$questions_processed
+  summary$questions_skipped <- guard$questions_skipped
 
+  # TRS v1.0: has_issues flag includes all confidence-specific issues
   summary$has_issues <- summary$has_issues ||
                         length(guard$zero_cells) > 0 ||
-                        length(guard$small_samples) > 0
+                        length(guard$small_samples) > 0 ||
+                        length(guard$questions_skipped) > 0
 
   summary
+}
+
+
+#' Record Skipped Question
+#'
+#' Records when a question is skipped during processing.
+#' TRS v1.0: Skipped questions contribute to PARTIAL status.
+#'
+#' @param guard Guard state object
+#' @param question_id Question identifier
+#' @param reason Reason for skipping
+#' @return Updated guard state
+#' @keywords internal
+guard_record_skipped_question <- function(guard, question_id, reason) {
+  guard$questions_skipped[[question_id]] <- list(
+    question_id = question_id,
+    reason = reason,
+    timestamp = Sys.time()
+  )
+
+  guard <- guard_warn(guard,
+    paste0("Question ", question_id, " skipped: ", reason),
+    category = "skipped"
+  )
+
+  invisible(guard)
+}
+
+
+#' Record Bootstrap Iterations
+#'
+#' Records the number of bootstrap iterations used for tracking.
+#'
+#' @param guard Guard state object
+#' @param iterations Number of bootstrap iterations
+#' @return Updated guard state
+#' @keywords internal
+guard_record_bootstrap_iterations <- function(guard, iterations) {
+  guard$bootstrap_iterations <- iterations
+  invisible(guard)
 }
 
 
@@ -400,21 +496,124 @@ confidence_status_pass <- function(n_estimates = NULL, method = NULL, confidence
 
 #' Create Confidence PARTIAL Status
 #'
+#' For use when execution continues with declared degradation.
+#' Common reasons for PARTIAL in confidence module:
+#' - Zero cells in proportion calculations
+#' - Small sample sizes (n < 30)
+#' - Bootstrap sampling issues
+#' - Some questions skipped due to data issues
+#'
 #' @param degraded_reasons Character vector of degradation reasons
 #' @param affected_outputs Character vector of affected outputs
 #' @param zero_cells Character vector of zero cell issues
+#' @param skipped_questions List of skipped questions with reasons
 #' @return TRS status object
 #' @export
 confidence_status_partial <- function(degraded_reasons,
                                       affected_outputs,
-                                      zero_cells = NULL) {
+                                      zero_cells = NULL,
+                                      skipped_questions = NULL) {
   status <- trs_status_partial(
     module = "CONFIDENCE",
     degraded_reasons = degraded_reasons,
     affected_outputs = affected_outputs
   )
+
+  # Add confidence-specific details
+  status$details <- list()
   if (!is.null(zero_cells) && length(zero_cells) > 0) {
-    status$details <- list(zero_cells = zero_cells)
+    status$details$zero_cells <- zero_cells
   }
+  if (!is.null(skipped_questions) && length(skipped_questions) > 0) {
+    status$details$skipped_questions <- skipped_questions
+  }
+
   status
+}
+
+
+#' Create Confidence REFUSE Status
+#'
+#' Creates a REFUSE status object for cases where analysis cannot proceed.
+#' TRS v1.0: REFUSE means user-fixable issue, no outputs produced.
+#'
+#' @param code Refusal code
+#' @param reason Refusal reason
+#' @return TRS status object with REFUSE state
+#' @export
+confidence_status_refuse <- function(code = NULL, reason = NULL) {
+  trs_status_refuse(
+    module = "CONFIDENCE",
+    code = code,
+    reason = reason
+  )
+}
+
+
+#' Determine Final Run Status from Guard State
+#'
+#' Analyzes guard state to determine appropriate TRS run status.
+#' TRS v1.0: Uses guard warnings and issues to determine PASS vs PARTIAL.
+#'
+#' @param guard Guard state object
+#' @param questions_processed Number of questions successfully processed
+#' @param skipped_questions List of skipped questions with reasons
+#' @return TRS status object (PASS or PARTIAL)
+#' @export
+confidence_determine_status <- function(guard,
+                                        questions_processed = NULL,
+                                        skipped_questions = NULL) {
+
+  summary <- confidence_guard_summary(guard)
+
+  # Determine if any degradation occurred
+  has_degradation <- summary$has_issues ||
+                     length(summary$zero_cells) > 0 ||
+                     length(summary$small_samples) > 0 ||
+                     (!is.null(skipped_questions) && length(skipped_questions) > 0)
+
+  if (has_degradation) {
+    # Build degradation reasons
+    degraded_reasons <- character(0)
+
+    if (length(summary$zero_cells) > 0) {
+      degraded_reasons <- c(degraded_reasons,
+        paste0(length(summary$zero_cells), " variable(s) with zero cells")
+      )
+    }
+
+    if (length(summary$small_samples) > 0) {
+      degraded_reasons <- c(degraded_reasons,
+        paste0(length(summary$small_samples), " variable(s) with small samples (n < 30)")
+      )
+    }
+
+    if (!is.null(skipped_questions) && length(skipped_questions) > 0) {
+      degraded_reasons <- c(degraded_reasons,
+        paste0(length(skipped_questions), " question(s) skipped")
+      )
+    }
+
+    # Build affected outputs list
+    affected_outputs <- "Confidence intervals may be less reliable for affected variables"
+    if (length(summary$zero_cells) > 0) {
+      affected_outputs <- c(affected_outputs,
+        paste0("Zero cell warnings: ", paste(names(summary$zero_cells), collapse = ", "))
+      )
+    }
+
+    return(confidence_status_partial(
+      degraded_reasons = degraded_reasons,
+      affected_outputs = affected_outputs,
+      zero_cells = names(summary$zero_cells),
+      skipped_questions = skipped_questions
+    ))
+  }
+
+  # All good - return PASS
+  confidence_status_pass(
+    n_estimates = questions_processed,
+    method = summary$method_used,
+    confidence_level = summary$confidence_level
+  )
 }

@@ -3,7 +3,108 @@
 # ==============================================================================
 # Feature 12: Alternative to k-means for categorical/ordinal data
 # Part of Turas Segmentation Module
+#
+# LCA is preferred over k-means when:
+#   - Variables are categorical or ordinal (Likert scales)
+#   - You want probabilistic class membership (soft clustering)
+#   - You need fit statistics (AIC, BIC) for model comparison
+#
+# Key functions:
+#   - run_lca(): Main LCA function (exploration or final mode)
+#   - calculate_entropy_rsquared(): Classification quality metric
+#   - create_lca_profiles(): Generate class response profiles
+#   - type_respondent_lca(): Classify new respondents using saved model
+#   - compare_kmeans_lca(): Compare both methods on same data
+#
+# Package dependency: poLCA (required for LCA)
 # ==============================================================================
+
+
+# ==============================================================================
+# ENTROPY R-SQUARED (CLASSIFICATION QUALITY)
+# ==============================================================================
+
+#' Calculate Entropy R-Squared for LCA Model
+#'
+#' Entropy R-squared measures classification certainty. Values closer to 1
+#' indicate respondents are clearly assigned to one class. Values near 0
+#' indicate fuzzy boundaries between classes.
+#'
+#' Interpretation:
+#'   > 0.80: Excellent classification quality
+#'   0.60 - 0.80: Good classification quality
+#'   0.40 - 0.60: Moderate classification quality
+#'   < 0.40: Poor classification quality (consider different k)
+#'
+#' @param posterior Matrix of posterior probabilities (n x k)
+#' @param class_probs Vector of class proportions (length k)
+#' @return Numeric, entropy R-squared value between 0 and 1
+#' @export
+#' @examples
+#' # After running LCA:
+#' entropy_rsq <- calculate_entropy_rsquared(lca_result$posterior, lca_result$P)
+calculate_entropy_rsquared <- function(posterior, class_probs) {
+
+  if (is.null(posterior) || !is.matrix(posterior)) {
+    warning("Posterior probabilities required for entropy calculation")
+    return(NA_real_)
+  }
+
+  n <- nrow(posterior)
+  k <- ncol(posterior)
+
+  if (k < 2) {
+    return(1.0)  # Perfect classification with single class
+  }
+
+  # Calculate entropy of posterior probabilities
+  # E_k = -sum(p * log(p)) for each respondent, then average
+  posterior_entropy <- 0
+  for (i in 1:n) {
+    p <- posterior[i, ]
+    # Avoid log(0) by filtering zeros
+    p <- p[p > 0]
+    posterior_entropy <- posterior_entropy + sum(-p * log(p))
+  }
+  posterior_entropy <- posterior_entropy / n
+
+  # Calculate maximum possible entropy (uniform distribution)
+  max_entropy <- -sum(class_probs * log(class_probs))
+
+  # If max entropy is 0, return NA (shouldn't happen with k >= 2)
+  if (max_entropy == 0) {
+    return(NA_real_)
+  }
+
+  # Entropy R-squared = 1 - (observed entropy / max entropy)
+  entropy_rsq <- 1 - (posterior_entropy / max_entropy)
+
+  # Bound to [0, 1]
+  entropy_rsq <- max(0, min(1, entropy_rsq))
+
+  return(entropy_rsq)
+}
+
+
+#' Interpret Entropy R-Squared Value
+#'
+#' @param entropy_rsq Numeric entropy R-squared value
+#' @return Character interpretation
+#' @keywords internal
+interpret_entropy_rsquared <- function(entropy_rsq) {
+  if (is.na(entropy_rsq)) {
+    return("Unknown (calculation failed)")
+  } else if (entropy_rsq >= 0.80) {
+    return("Excellent - clear class separation")
+  } else if (entropy_rsq >= 0.60) {
+    return("Good - adequate class separation")
+  } else if (entropy_rsq >= 0.40) {
+    return("Moderate - some overlap between classes")
+  } else {
+    return("Poor - consider different number of classes")
+  }
+}
+
 
 #' Run Latent Class Analysis (LCA)
 #'
@@ -41,14 +142,33 @@ run_lca <- function(data, id_var, clustering_vars, n_classes = NULL,
   cat("\n")
 
   # ===========================================================================
-  # CHECK POLCA PACKAGE
+  # CHECK POLCA PACKAGE (TRS-compliant refusal)
   # ===========================================================================
 
   if (!requireNamespace("poLCA", quietly = TRUE)) {
-    stop("Package 'poLCA' required for Latent Class Analysis.\n",
-         "Install with: install.packages('poLCA')\n\n",
-         "Alternative: Use standard k-means with method='kmeans' in config.",
-         call. = FALSE)
+    # Source guard layer if not already loaded
+    if (!exists("segment_refuse", mode = "function")) {
+      guard_path <- file.path(dirname(sys.frame(1)$ofile), "00_guard.R")
+      if (file.exists(guard_path)) source(guard_path)
+    }
+
+    if (exists("segment_refuse", mode = "function")) {
+      segment_refuse(
+        code = "PKG_POLCA_MISSING",
+        title = "poLCA Package Not Installed",
+        problem = "The 'poLCA' package is required for Latent Class Analysis but is not installed.",
+        why_it_matters = "LCA cannot be performed without the poLCA package. This package provides the statistical algorithms for fitting latent class models.",
+        how_to_fix = c(
+          "Install poLCA: install.packages('poLCA')",
+          "Or use k-means clustering: Set method='kmeans' in your config"
+        )
+      )
+    } else {
+      stop("Package 'poLCA' required for Latent Class Analysis.\n",
+           "Install with: install.packages('poLCA')\n\n",
+           "Alternative: Use standard k-means with method='kmeans' in config.",
+           call. = FALSE)
+    }
   }
 
   # ===========================================================================
@@ -233,6 +353,12 @@ run_lca <- function(data, id_var, clustering_vars, n_classes = NULL,
     class_probs <- model$posterior
 
     # =========================================================================
+    # CALCULATE CLASSIFICATION QUALITY
+    # =========================================================================
+
+    entropy_rsq <- calculate_entropy_rsquared(class_probs, model$P)
+
+    # =========================================================================
     # OUTPUT RESULTS
     # =========================================================================
 
@@ -243,6 +369,8 @@ run_lca <- function(data, id_var, clustering_vars, n_classes = NULL,
     cat(sprintf("  AIC: %.1f\n", model$aic))
     cat(sprintf("  BIC: %.1f\n", model$bic))
     cat(sprintf("  G-squared: %.1f (df = %d)\n", model$Gsq, model$resid.df))
+    cat(sprintf("  Entropy R-sq: %.3f (%s)\n", entropy_rsq,
+                interpret_entropy_rsquared(entropy_rsq)))
 
     cat("\nClass Distribution:\n")
     class_table <- table(classes)
@@ -309,12 +437,14 @@ run_lca <- function(data, id_var, clustering_vars, n_classes = NULL,
       k = n_classes,
       classes = classes,
       class_probabilities = class_probs,
+      entropy_rsquared = entropy_rsq,
       fit_statistics = data.frame(
         llik = model$llik,
         AIC = model$aic,
         BIC = model$bic,
         Gsq = model$Gsq,
-        df = model$resid.df
+        df = model$resid.df,
+        entropy_rsq = entropy_rsq
       ),
       profiles = profiles,
       output_files = list(

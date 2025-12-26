@@ -192,6 +192,26 @@ run_weighting_gui <- function(launch_browser = TRUE) {
         .metric-good { color: #28a745; }
         .metric-acceptable { color: #ffc107; }
         .metric-poor { color: #dc3545; }
+        .shiny-notification {
+          position: fixed;
+          top: calc(50% - 100px);
+          left: calc(50% - 200px);
+          width: 400px;
+        }
+        .progress {
+          height: 25px;
+          border-radius: 6px;
+          margin-bottom: 10px;
+        }
+        .progress-bar {
+          font-size: 14px;
+          line-height: 25px;
+          font-weight: 600;
+        }
+        .shiny-progress .progress-text {
+          font-size: 14px;
+          font-weight: 500;
+        }
       "))
     ),
 
@@ -395,73 +415,84 @@ run_weighting_gui <- function(launch_browser = TRUE) {
 
       add_log("Starting weighting analysis...")
 
-      tryCatch({
-        # Validate inputs
-        req(input$project_folder)
-        req(input$config_filename)
+      # Use withProgress for visual progress bar
+      withProgress(message = "Calculating Weights", value = 0, {
 
-        project_folder <- input$project_folder
-        config_filename <- input$config_filename
+        tryCatch({
+          # Validate inputs
+          req(input$project_folder)
+          req(input$config_filename)
 
-        # Validate folder exists
-        if (!dir.exists(project_folder)) {
-          stop("Project folder not found: ", project_folder)
-        }
+          project_folder <- input$project_folder
+          config_filename <- input$config_filename
 
-        config_path <- file.path(project_folder, config_filename)
+          # Validate folder exists
+          if (!dir.exists(project_folder)) {
+            stop("Project folder not found: ", project_folder)
+          }
 
-        # Validate config file exists
-        if (!file.exists(config_path)) {
-          stop("Config file not found: ", config_path)
-        }
+          config_path <- file.path(project_folder, config_filename)
 
-        # Add to recent folders
-        add_to_recent_folders(project_folder)
+          # Validate config file exists
+          if (!file.exists(config_path)) {
+            stop("Config file not found: ", config_path)
+          }
 
-        add_log(paste("Project folder:", project_folder))
-        add_log(paste("Config file:", config_filename))
-        add_log(strrep("-", 50))
+          # Add to recent folders
+          add_to_recent_folders(project_folder)
 
-        # Don't override data_file - let config resolve it
-        data_path <- NULL
+          add_log(paste("Project folder:", project_folder))
+          add_log(paste("Config file:", config_filename))
+          add_log(strrep("-", 50))
 
-        # Run weighting with progress updates
-        add_log("Loading configuration...")
+          # Don't override data_file - let config resolve it
+          data_path <- NULL
 
-        # Use capture.output for TRS compliance - all console output visible in GUI
-        output_capture <- capture.output({
-          result <- withCallingHandlers({
-            run_weighting(
-              config_file = config_path,
-              data_file = data_path,
-              verbose = TRUE
-            )
-          }, message = function(m) {
-            cat(conditionMessage(m), "\n")
-            invokeRestart("muffleMessage")
-          }, warning = function(w) {
-            cat("WARNING:", conditionMessage(w), "\n")
-            invokeRestart("muffleWarning")
-          })
-        }, type = "output")
+          # Create progress callback for run_weighting
+          progress_callback <- function(value, message) {
+            setProgress(value = value, detail = message)
+          }
 
-        # Add captured output to log
-        if (length(output_capture) > 0) {
-          add_log(paste(output_capture, collapse = "\n"))
-        }
+          # Run weighting with progress updates
+          add_log("Loading configuration...")
 
-        rv$result <- result
+          # Use capture.output for TRS compliance - all console output visible in GUI
+          output_capture <- capture.output({
+            result <- withCallingHandlers({
+              run_weighting(
+                config_file = config_path,
+                data_file = data_path,
+                verbose = TRUE,
+                progress_callback = progress_callback
+              )
+            }, message = function(m) {
+              cat(conditionMessage(m), "\n")
+              invokeRestart("muffleMessage")
+            }, warning = function(w) {
+              cat("WARNING:", conditionMessage(w), "\n")
+              invokeRestart("muffleWarning")
+            })
+          }, type = "output")
 
-        add_log(strrep("-", 50))
-        add_log("Weighting completed successfully!")
-        add_log(paste("Weights created:", paste(result$weight_names, collapse = ", ")))
+          # Add captured output to log
+          if (length(output_capture) > 0) {
+            add_log(paste(output_capture, collapse = "\n"))
+          }
 
-      }, error = function(e) {
-        add_log(strrep("=", 50))
-        add_log("ERROR:")
-        add_log(conditionMessage(e))
-        add_log(strrep("=", 50))
-      })
+          rv$result <- result
+
+          add_log(strrep("-", 50))
+          add_log("Weighting completed successfully!")
+          add_log(paste("Weights created:", paste(result$weight_names, collapse = ", ")))
+
+        }, error = function(e) {
+          add_log(strrep("=", 50))
+          add_log("ERROR:")
+          add_log(conditionMessage(e))
+          add_log(strrep("=", 50))
+        })
+
+      })  # End withProgress
 
       rv$running <- FALSE
     })

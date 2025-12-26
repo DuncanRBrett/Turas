@@ -436,3 +436,157 @@ maxdiff_status_partial <- function(degraded_reasons,
   }
   status
 }
+
+
+#' Create MaxDiff REFUSE Status
+#'
+#' TRS v1.0 compliant REFUSE status for MaxDiff module.
+#' Used when analysis cannot proceed due to critical issues.
+#'
+#' @param code Refusal code (e.g., "DATA_INSUFFICIENT", "CFG_INVALID")
+#' @param reason Human-readable explanation of why analysis was refused
+#' @return TRS status object with status="REFUSE"
+#' @export
+maxdiff_status_refuse <- function(code = NULL, reason = NULL) {
+  if (exists("trs_status_refuse", mode = "function")) {
+    trs_status_refuse(module = "MAXDIFF", code = code, reason = reason)
+  } else {
+    # Fallback if shared TRS infrastructure not loaded
+    list(
+      status = "REFUSE",
+      module = "MAXDIFF",
+      code = code,
+      reason = reason,
+      timestamp = Sys.time()
+    )
+  }
+}
+
+
+#' Determine MaxDiff Execution Status
+#'
+#' TRS v1.0 compliant status determination based on guard state and analysis results.
+#' Returns one of: PASS, PARTIAL, REFUSE, ERROR
+#'
+#' @param guard Guard state object from maxdiff_guard_init()
+#' @param n_items Integer, number of items analyzed
+#' @param n_respondents Integer, number of respondents
+#' @param estimation_method Character, method used ("counts", "logit", "hb", "approximate_hb")
+#' @param hb_converged Logical, whether HB estimation converged (NULL if not HB)
+#' @param rhat_max Numeric, maximum R-hat across parameters (NULL if not HB)
+#' @param ess_min Numeric, minimum effective sample size (NULL if not HB)
+#' @param n_divergences Integer, number of divergent transitions (NULL if not HB)
+#' @return TRS status object with execution state and details
+#' @export
+#'
+#' @details
+#' Status determination logic:
+#' - PASS: All quality checks pass, estimation successful
+#' - PARTIAL: Analysis ran but with warnings (design imbalance, HB issues, etc.)
+#' - REFUSE: Critical issues prevent valid analysis (already handled via maxdiff_refuse())
+#' - ERROR: Unexpected error during analysis
+#'
+#' Quality thresholds:
+#' - Min respondents for PASS: 30
+#' - Max R-hat for PASS: 1.05
+#' - Min ESS for PASS: 400
+#' - Max divergences for PASS: 0
+maxdiff_determine_status <- function(guard,
+                                      n_items = NULL,
+                                      n_respondents = NULL,
+                                      estimation_method = NULL,
+                                      hb_converged = NULL,
+                                      rhat_max = NULL,
+                                      ess_min = NULL,
+                                      n_divergences = NULL) {
+
+  summary <- maxdiff_guard_summary(guard)
+  degraded_reasons <- character(0)
+  affected_outputs <- character(0)
+
+  # Check for sample size issues
+  if (!is.null(n_respondents) && n_respondents < 30) {
+    degraded_reasons <- c(degraded_reasons,
+                          sprintf("Low sample size: n=%d (recommended: 30+)", n_respondents))
+    affected_outputs <- c(affected_outputs, "confidence_intervals", "individual_utilities")
+  }
+
+  # Check for design imbalance
+  if (length(summary$design_balance) > 0) {
+    n_imbalanced <- length(summary$design_balance)
+    degraded_reasons <- c(degraded_reasons,
+                          sprintf("%d item(s) with design imbalance", n_imbalanced))
+    affected_outputs <- c(affected_outputs, "utility_estimates", "item_rankings")
+  }
+
+  # Check HB convergence if applicable
+  if (!is.null(estimation_method) && estimation_method %in% c("hb", "cmdstanr")) {
+
+    # Check R-hat
+    if (!is.null(rhat_max) && rhat_max > 1.05) {
+      degraded_reasons <- c(degraded_reasons,
+                            sprintf("HB convergence issue: max R-hat = %.3f (threshold: 1.05)", rhat_max))
+      affected_outputs <- c(affected_outputs, "individual_utilities", "population_means")
+    }
+
+    # Check ESS
+    if (!is.null(ess_min) && ess_min < 400) {
+      degraded_reasons <- c(degraded_reasons,
+                            sprintf("Low effective sample size: min ESS = %.0f (recommended: 400+)", ess_min))
+      affected_outputs <- c(affected_outputs, "posterior_uncertainty")
+    }
+
+    # Check divergences
+    if (!is.null(n_divergences) && n_divergences > 0) {
+      degraded_reasons <- c(degraded_reasons,
+                            sprintf("%d divergent transitions detected", n_divergences))
+      affected_outputs <- c(affected_outputs, "individual_utilities", "posterior_estimates")
+    }
+
+    # Check convergence flag
+    if (!is.null(hb_converged) && !hb_converged) {
+      degraded_reasons <- c(degraded_reasons, "HB estimation did not converge")
+      affected_outputs <- c(affected_outputs, "all_hb_outputs")
+    }
+  }
+
+  # Check if approximate HB was used (fallback)
+  if (!is.null(estimation_method) && estimation_method == "approximate_hb") {
+    degraded_reasons <- c(degraded_reasons,
+                          "Using approximate HB (cmdstanr not available)")
+    affected_outputs <- c(affected_outputs, "individual_utilities", "posterior_uncertainty")
+  }
+
+  # Check stability flag
+  if (!summary$is_stable) {
+    degraded_reasons <- c(degraded_reasons, "Analysis stability compromised")
+    affected_outputs <- c(affected_outputs, "all_outputs")
+  }
+
+  # Determine final status
+  if (length(degraded_reasons) == 0) {
+    # PASS: All checks passed
+    status <- maxdiff_status_pass(
+      n_items = n_items,
+      n_respondents = n_respondents,
+      method = estimation_method
+    )
+  } else {
+    # PARTIAL: Analysis ran with warnings
+    status <- maxdiff_status_partial(
+      degraded_reasons = degraded_reasons,
+      affected_outputs = unique(affected_outputs),
+      imbalanced_items = names(summary$design_balance)
+    )
+    status$details$n_items <- n_items
+    status$details$n_respondents <- n_respondents
+    status$details$estimation_method <- estimation_method
+    status$details$hb_diagnostics <- list(
+      rhat_max = rhat_max,
+      ess_min = ess_min,
+      n_divergences = n_divergences
+    )
+  }
+
+  return(status)
+}
