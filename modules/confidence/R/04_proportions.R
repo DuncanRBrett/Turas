@@ -238,12 +238,22 @@ calculate_proportion_ci_wilson <- function(p, n, conf_level = 0.95) {
 #' - Handles weighted data naturally
 #' - Can capture asymmetry in sampling distribution
 #'
+#' PARALLEL PROCESSING:
+#' When parallel = TRUE and B >= 5000, bootstrap iterations are computed
+#' in parallel using the future/future.apply framework. This can significantly
+#' speed up calculations for large B values (e.g., 10,000 iterations).
+#'
+#' Requirements for parallel processing:
+#' - future and future.apply packages installed
+#' - B >= 5000 iterations (overhead not worth it for fewer)
+#'
 #' @param data Vector. Data values (typically binary: 0/1 or response codes)
 #' @param categories Vector. Categories to count as "success" (e.g., c(1) or c(4,5))
 #' @param weights Vector. Survey weights (NULL for unweighted)
 #' @param B Integer. Number of bootstrap iterations (default 5000)
 #' @param conf_level Numeric. Confidence level (default 0.95)
 #' @param seed Integer. Random seed for reproducibility (optional)
+#' @param parallel Logical. If TRUE, use parallel processing. Default FALSE.
 #'
 #' @return List with elements:
 #'   \describe{
@@ -252,7 +262,7 @@ calculate_proportion_ci_wilson <- function(p, n, conf_level = 0.95) {
 #'     \item{boot_se}{Bootstrap standard error}
 #'     \item{boot_mean}{Bootstrap mean (should be close to observed p)}
 #'     \item{boot_samples}{Vector of all bootstrap proportions (for diagnostics)}
-#'     \item{method}{"Bootstrap (percentile)"}
+#'     \item{method}{"Bootstrap (percentile)" or "Bootstrap (percentile, parallel)"}
 #'   }
 #'
 #' @examples
@@ -260,9 +270,10 @@ calculate_proportion_ci_wilson <- function(p, n, conf_level = 0.95) {
 #' data <- c(rep(1, 450), rep(0, 550))  # 45% success
 #' result <- bootstrap_proportion_ci(data, categories = 1, B = 5000)
 #'
-#' # Weighted
+#' # Weighted with parallel processing
 #' result <- bootstrap_proportion_ci(data, categories = c(4,5),
-#'                                    weights = weights_vector, B = 5000)
+#'                                    weights = weights_vector, B = 10000,
+#'                                    parallel = TRUE)
 #'
 #' @references
 #' Efron, B., & Tibshirani, R. J. (1994). An introduction to the bootstrap.
@@ -272,7 +283,8 @@ calculate_proportion_ci_wilson <- function(p, n, conf_level = 0.95) {
 #' @date 2025-11-12
 #' @export
 bootstrap_proportion_ci <- function(data, categories, weights = NULL,
-                                    B = 5000, conf_level = 0.95, seed = NULL) {
+                                    B = 5000, conf_level = 0.95, seed = NULL,
+                                    parallel = FALSE) {
   # Input validation
   if (!is.numeric(data) && !is.character(data) && !is.factor(data)) {
     stop("data must be numeric, character, or factor", call. = FALSE)
@@ -300,25 +312,80 @@ bootstrap_proportion_ci <- function(data, categories, weights = NULL,
     }
   }
 
-  # Initialize bootstrap results
-  boot_proportions <- numeric(B)
-
-  # Bootstrap loop
-  for (i in 1:B) {
-    # Resample indices with replacement
-    boot_indices <- sample(1:n, size = n, replace = TRUE)
-    boot_data <- data[boot_indices]
-
-    if (is_weighted) {
-      boot_weights <- weights[boot_indices]
-      # Calculate weighted proportion for this bootstrap sample
-      in_category <- boot_data %in% categories
-      boot_proportions[i] <- sum(boot_weights[in_category]) / sum(boot_weights)
-    } else {
-      # Calculate unweighted proportion
-      in_category <- boot_data %in% categories
-      boot_proportions[i] <- mean(in_category)
+  # ---------------------------------------------------------------------------
+  # PARALLEL BOOTSTRAP (for high B values)
+  # ---------------------------------------------------------------------------
+  use_parallel <- FALSE
+  if (parallel && B >= 5000) {
+    if (requireNamespace("future", quietly = TRUE) &&
+        requireNamespace("future.apply", quietly = TRUE)) {
+      use_parallel <- TRUE
     }
+  }
+
+  if (use_parallel) {
+    # Set up parallel plan if not already configured
+    current_plan <- future::plan()
+    if (!inherits(current_plan, c("multisession", "multicore", "cluster"))) {
+      n_workers <- min(4, parallel::detectCores() - 1)
+      old_plan <- future::plan(future::multisession, workers = n_workers)
+      on.exit(future::plan(old_plan), add = TRUE)
+    }
+
+    # Split B into chunks for parallel processing
+    n_workers <- future::nbrOfWorkers()
+    chunk_size <- ceiling(B / n_workers)
+    chunks <- split(1:B, ceiling(seq_along(1:B) / chunk_size))
+
+    # Define bootstrap function for a chunk
+    boot_chunk <- function(indices, data, categories, weights, is_weighted, n, seed_base) {
+      if (!is.null(seed_base)) set.seed(seed_base + indices[1])
+      results <- numeric(length(indices))
+      for (j in seq_along(indices)) {
+        boot_indices <- sample(1:n, size = n, replace = TRUE)
+        boot_data <- data[boot_indices]
+        if (is_weighted) {
+          boot_weights <- weights[boot_indices]
+          in_category <- boot_data %in% categories
+          results[j] <- sum(boot_weights[in_category]) / sum(boot_weights)
+        } else {
+          in_category <- boot_data %in% categories
+          results[j] <- mean(in_category)
+        }
+      }
+      results
+    }
+
+    # Run parallel bootstrap
+    boot_results <- future.apply::future_lapply(
+      chunks, boot_chunk,
+      data = data, categories = categories, weights = weights,
+      is_weighted = is_weighted, n = n, seed_base = seed,
+      future.seed = TRUE
+    )
+    boot_proportions <- unlist(boot_results)
+    method <- "Bootstrap (percentile, parallel)"
+
+  } else {
+    # ---------------------------------------------------------------------------
+    # SEQUENTIAL BOOTSTRAP (default)
+    # ---------------------------------------------------------------------------
+    boot_proportions <- numeric(B)
+
+    for (i in 1:B) {
+      boot_indices <- sample(1:n, size = n, replace = TRUE)
+      boot_data <- data[boot_indices]
+
+      if (is_weighted) {
+        boot_weights <- weights[boot_indices]
+        in_category <- boot_data %in% categories
+        boot_proportions[i] <- sum(boot_weights[in_category]) / sum(boot_weights)
+      } else {
+        in_category <- boot_data %in% categories
+        boot_proportions[i] <- mean(in_category)
+      }
+    }
+    method <- "Bootstrap (percentile)"
   }
 
   # Calculate percentile confidence interval
@@ -336,7 +403,7 @@ bootstrap_proportion_ci <- function(data, categories, weights = NULL,
     boot_se = boot_se,
     boot_mean = boot_mean,
     boot_samples = boot_proportions,
-    method = "Bootstrap (percentile)",
+    method = method,
     B = B,
     warnings = character()
   ))

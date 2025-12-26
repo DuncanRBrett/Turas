@@ -201,11 +201,21 @@ calculate_mean_ci <- function(values, weights = NULL, conf_level = 0.95) {
 #' - Can capture asymmetry in sampling distribution
 #' - Works well for skewed data
 #'
+#' PARALLEL PROCESSING:
+#' When parallel = TRUE and B >= 5000, bootstrap iterations are computed
+#' in parallel using the future/future.apply framework. This can significantly
+#' speed up calculations for large B values (e.g., 10,000 iterations).
+#'
+#' Requirements for parallel processing:
+#' - future and future.apply packages installed
+#' - B >= 5000 iterations (overhead not worth it for fewer)
+#'
 #' @param values Numeric vector. Data values
 #' @param weights Numeric vector. Survey weights (NULL for unweighted)
 #' @param B Integer. Number of bootstrap iterations (default 5000)
 #' @param conf_level Numeric. Confidence level (default 0.95)
 #' @param seed Integer. Random seed for reproducibility (optional)
+#' @param parallel Logical. If TRUE, use parallel processing. Default FALSE.
 #'
 #' @return List with elements:
 #'   \describe{
@@ -214,7 +224,7 @@ calculate_mean_ci <- function(values, weights = NULL, conf_level = 0.95) {
 #'     \item{boot_se}{Bootstrap standard error}
 #'     \item{boot_mean}{Bootstrap mean (should be close to observed mean)}
 #'     \item{boot_samples}{Vector of all bootstrap means (for diagnostics)}
-#'     \item{method}{"Bootstrap (percentile)"}
+#'     \item{method}{"Bootstrap (percentile)" or "Bootstrap (percentile, parallel)"}
 #'   }
 #'
 #' @examples
@@ -222,8 +232,9 @@ calculate_mean_ci <- function(values, weights = NULL, conf_level = 0.95) {
 #' ratings <- rnorm(1000, mean = 7.5, sd = 1.8)
 #' result <- bootstrap_mean_ci(ratings, B = 5000)
 #'
-#' # Weighted
-#' result <- bootstrap_mean_ci(ratings, weights = weights_vector, B = 5000)
+#' # Weighted with parallel processing
+#' result <- bootstrap_mean_ci(ratings, weights = weights_vector, B = 10000,
+#'                              parallel = TRUE)
 #'
 #' @references
 #' Efron, B., & Tibshirani, R. J. (1994). An introduction to the bootstrap.
@@ -233,7 +244,8 @@ calculate_mean_ci <- function(values, weights = NULL, conf_level = 0.95) {
 #' @date 2025-11-12
 #' @export
 bootstrap_mean_ci <- function(values, weights = NULL, B = 5000,
-                              conf_level = 0.95, seed = NULL) {
+                              conf_level = 0.95, seed = NULL,
+                              parallel = FALSE) {
   # Input validation
   if (!is.numeric(values)) {
     stop("values must be numeric", call. = FALSE)
@@ -270,21 +282,76 @@ bootstrap_mean_ci <- function(values, weights = NULL, B = 5000,
     stop("weights must have same length as values", call. = FALSE)
   }
 
-  # Initialize bootstrap results
-  boot_means <- numeric(B)
-
-  # Bootstrap loop
-  for (i in 1:B) {
-    # Resample indices with replacement
-    boot_indices <- sample(1:n, size = n, replace = TRUE)
-    boot_values <- values[boot_indices]
-
-    if (is_weighted) {
-      boot_weights <- weights[boot_indices]
-      boot_means[i] <- sum(boot_values * boot_weights) / sum(boot_weights)
-    } else {
-      boot_means[i] <- mean(boot_values)
+  # ---------------------------------------------------------------------------
+  # PARALLEL BOOTSTRAP (for high B values)
+  # ---------------------------------------------------------------------------
+  use_parallel <- FALSE
+  if (parallel && B >= 5000) {
+    if (requireNamespace("future", quietly = TRUE) &&
+        requireNamespace("future.apply", quietly = TRUE)) {
+      use_parallel <- TRUE
     }
+  }
+
+  if (use_parallel) {
+    # Set up parallel plan if not already configured
+    current_plan <- future::plan()
+    if (!inherits(current_plan, c("multisession", "multicore", "cluster"))) {
+      n_workers <- min(4, parallel::detectCores() - 1)
+      old_plan <- future::plan(future::multisession, workers = n_workers)
+      on.exit(future::plan(old_plan), add = TRUE)
+    }
+
+    # Split B into chunks for parallel processing
+    n_workers <- future::nbrOfWorkers()
+    chunk_size <- ceiling(B / n_workers)
+    chunks <- split(1:B, ceiling(seq_along(1:B) / chunk_size))
+
+    # Define bootstrap function for a chunk
+    boot_chunk <- function(indices, values, weights, is_weighted, n, seed_base) {
+      if (!is.null(seed_base)) set.seed(seed_base + indices[1])
+      results <- numeric(length(indices))
+      for (j in seq_along(indices)) {
+        boot_indices <- sample(1:n, size = n, replace = TRUE)
+        boot_values <- values[boot_indices]
+        if (is_weighted) {
+          boot_weights <- weights[boot_indices]
+          results[j] <- sum(boot_values * boot_weights) / sum(boot_weights)
+        } else {
+          results[j] <- mean(boot_values)
+        }
+      }
+      results
+    }
+
+    # Run parallel bootstrap
+    boot_results <- future.apply::future_lapply(
+      chunks, boot_chunk,
+      values = values, weights = weights,
+      is_weighted = is_weighted, n = n, seed_base = seed,
+      future.seed = TRUE
+    )
+    boot_means <- unlist(boot_results)
+    method <- "Bootstrap (percentile, parallel)"
+
+  } else {
+    # ---------------------------------------------------------------------------
+    # SEQUENTIAL BOOTSTRAP (default)
+    # ---------------------------------------------------------------------------
+    boot_means <- numeric(B)
+
+    for (i in 1:B) {
+      boot_indices <- sample(1:n, size = n, replace = TRUE)
+      boot_values <- values[boot_indices]
+
+      if (is_weighted) {
+        boot_weights <- weights[boot_indices]
+        boot_means[i] <- sum(boot_values * boot_weights) / sum(boot_weights)
+      } else {
+        boot_means[i] <- mean(boot_values)
+      }
+    }
+    method <- "Bootstrap (percentile)"
   }
 
   # Calculate percentile confidence interval
@@ -302,7 +369,7 @@ bootstrap_mean_ci <- function(values, weights = NULL, B = 5000,
     boot_se = boot_se,
     boot_mean = boot_mean,
     boot_samples = boot_means,
-    method = "Bootstrap (percentile)",
+    method = method,
     B = B,
     warnings = character()
   ))

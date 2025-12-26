@@ -1,10 +1,15 @@
 # ==============================================================================
-# CONFIG LOADER V1.0.0
+# CONFIG LOADER V1.1.0
 # ==============================================================================
 # Functions for loading and validating confidence analysis configuration
 # Part of Turas Confidence Analysis Module
 #
 # VERSION HISTORY:
+# V1.1.0 - Configurable question limit (2024-12)
+#          - Question limit now configurable via Max_Questions setting
+#          - Default remains 200 for backward compatibility
+#          - Valid range: 1-1000 questions
+#
 # V1.0.0 - Initial release (2025-11-12)
 #          - Load confidence_config.xlsx (3 sheets)
 #          - Comprehensive input validation
@@ -16,7 +21,11 @@
 # - utils.R (for validation helpers)
 # ==============================================================================
 
-CONFIG_LOADER_VERSION <- "1.0.0"
+CONFIG_LOADER_VERSION <- "1.1.0"
+
+# Default question limit (can be overridden in Study_Settings)
+DEFAULT_MAX_QUESTIONS <- 200
+MAX_QUESTION_LIMIT <- 1000  # Absolute maximum for performance reasons
 
 # ==============================================================================
 # DEPENDENCIES
@@ -49,15 +58,19 @@ source_if_exists("utils.R")
 #' Reads and parses the confidence_config.xlsx file containing three sheets:
 #' - File_Paths: Paths to input/output files
 #' - Study_Settings: Study-level settings (DEFF, confidence level, etc.)
-#' - Question_Analysis: Question-level analysis specifications (up to 200)
+#' - Question_Analysis: Question-level analysis specifications
+#'
+#' The maximum number of questions is configurable via Max_Questions in Study_Settings.
+#' Default is 200, maximum is 1000.
 #'
 #' @param config_path Character. Path to confidence_config.xlsx file
 #'
-#' @return Named list with three elements:
+#' @return Named list with elements:
 #'   \describe{
 #'     \item{file_paths}{Data frame from File_Paths sheet}
 #'     \item{study_settings}{Data frame from Study_Settings sheet}
-#'     \item{question_analysis}{Data frame from Question_Analysis sheet (max 200 rows)}
+#'     \item{question_analysis}{Data frame from Question_Analysis sheet}
+#'     \item{max_questions}{Configured maximum questions limit}
 #'   }
 #'
 #' @examples
@@ -83,7 +96,20 @@ load_confidence_config <- function(config_path) {
 
   file_paths <- load_file_paths_sheet(config_path)
   study_settings <- load_study_settings_sheet(config_path)
-  question_analysis <- load_question_analysis_sheet(config_path)
+
+  # Get max_questions from Study_Settings if specified (optional setting)
+  max_questions <- DEFAULT_MAX_QUESTIONS
+  if ("Max_Questions" %in% study_settings$Setting) {
+    max_questions_row <- study_settings[study_settings$Setting == "Max_Questions", ]
+    if (nrow(max_questions_row) > 0 && !is.na(max_questions_row$Value[1])) {
+      parsed_max <- as.integer(max_questions_row$Value[1])
+      if (!is.na(parsed_max) && parsed_max > 0) {
+        max_questions <- min(parsed_max, MAX_QUESTION_LIMIT)
+      }
+    }
+  }
+
+  question_analysis <- load_question_analysis_sheet(config_path, max_questions)
   population_margins <- load_population_margins_sheet(config_path)
 
   cat(sprintf("✓ Configuration loaded successfully\n"))
@@ -93,7 +119,7 @@ load_confidence_config <- function(config_path) {
     cat("  - File paths: (optional sheet not provided)\n")
   }
   cat(sprintf("  - Study settings: %d parameters\n", nrow(study_settings)))
-  cat(sprintf("  - Question analysis: %d questions (max 200)\n", nrow(question_analysis)))
+  cat(sprintf("  - Question analysis: %d questions (max %d)\n", nrow(question_analysis), max_questions))
   if (!is.null(population_margins)) {
     cat(sprintf("  - Population margins: %d targets\n", nrow(population_margins)))
   } else {
@@ -114,7 +140,8 @@ load_confidence_config <- function(config_path) {
     study_settings = study_settings_list,
     question_analysis = question_analysis,
     population_margins = population_margins,
-    config_file_path = config_path
+    config_file_path = config_path,
+    max_questions = max_questions  # Configured question limit
   )
 
   return(config)
@@ -230,11 +257,29 @@ load_study_settings_sheet <- function(config_path) {
 
 #' Load Question_Analysis sheet
 #'
+#' Loads and validates the Question_Analysis sheet from the config file.
+#' The maximum number of questions is configurable via the max_questions parameter.
+#'
 #' @param config_path Character. Path to config file
-#' @return Data frame with question analysis specifications (max 200 rows)
+#' @param max_questions Integer. Maximum allowed questions (default: DEFAULT_MAX_QUESTIONS)
+#' @return Data frame with question analysis specifications
 #' @keywords internal
-load_question_analysis_sheet <- function(config_path) {
+load_question_analysis_sheet <- function(config_path, max_questions = NULL) {
   sheet_name <- "Question_Analysis"
+
+  # Use default if not specified
+  if (is.null(max_questions)) {
+    max_questions <- DEFAULT_MAX_QUESTIONS
+  }
+
+  # Ensure max_questions doesn't exceed absolute maximum
+  if (max_questions > MAX_QUESTION_LIMIT) {
+    warning(sprintf(
+      "Max_Questions (%d) exceeds absolute limit (%d). Using %d.",
+      max_questions, MAX_QUESTION_LIMIT, MAX_QUESTION_LIMIT
+    ))
+    max_questions <- MAX_QUESTION_LIMIT
+  }
 
   # Read sheet
   df <- tryCatch(
@@ -271,12 +316,13 @@ load_question_analysis_sheet <- function(config_path) {
                     "Question_ID", "Statistic_Type", "Categories")
   df <- df[!df$Question_ID %in% header_names, ]
 
-  # Check question limit (200 max)
+  # Check question limit (configurable, default 200)
   n_questions <- nrow(df)
-  if (n_questions > 200) {
+  if (n_questions > max_questions) {
     stop(sprintf(
-      "Question limit exceeded: %d questions specified (maximum 200)",
-      n_questions
+      "Question limit exceeded: %d questions specified (maximum %d). Set Max_Questions in Study_Settings to increase.",
+      n_questions,
+      max_questions
     ), call. = FALSE)
   }
 
