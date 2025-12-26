@@ -560,3 +560,204 @@ tabs_status_partial <- function(degraded_reasons,
   }
   status
 }
+
+
+#' Create Tabs REFUSE Status (TRS v1.0)
+#'
+#' Creates a REFUSE status when analysis cannot proceed due to
+#' critical data or configuration issues.
+#'
+#' @param code Character. TRS refusal code (e.g., "DATA_NO_RESPONDENTS")
+#' @param reason Character. Human-readable explanation of why analysis was refused
+#' @return TRS status object with status="REFUSE"
+#' @export
+tabs_status_refuse <- function(code = NULL, reason = NULL) {
+  if (exists("trs_status_refuse", mode = "function")) {
+    trs_status_refuse(module = "TABS", code = code, reason = reason)
+  } else {
+    # Fallback if shared TRS infrastructure not loaded
+    list(
+      status = "REFUSE",
+      module = "TABS",
+      code = code,
+      reason = reason,
+      timestamp = Sys.time()
+    )
+  }
+}
+
+
+#' Determine Tabs Execution Status (TRS v1.0)
+#'
+#' Determines the overall execution status based on analysis results
+#' and guard state. Returns PASS, PARTIAL, REFUSE, or ERROR.
+#'
+#' TRS v1.0 QUALITY THRESHOLDS:
+#' - Minimum respondents: 30 (configurable via min_respondents)
+#' - Maximum skip rate: 20% of questions skipped triggers PARTIAL
+#' - Maximum empty base rate: 10% of questions with empty bases triggers PARTIAL
+#' - Banner coverage: At least one banner column required
+#'
+#' @param guard Guard state object from tabs_guard_init()
+#' @param n_questions_processed Integer. Number of questions successfully processed
+#' @param n_questions_total Integer. Total questions attempted
+#' @param n_respondents Integer. Number of respondents in analysis
+#' @param banner_columns Integer. Number of banner columns created
+#' @param min_respondents Integer. Minimum required respondents (default: 30)
+#' @param error_count Integer. Number of errors encountered (default: 0)
+#' @return TRS status object
+#' @export
+#'
+#' @examples
+#' guard <- tabs_guard_init()
+#' status <- tabs_determine_status(
+#'   guard = guard,
+#'   n_questions_processed = 50,
+#'   n_questions_total = 55,
+#'   n_respondents = 500,
+#'   banner_columns = 12
+#' )
+tabs_determine_status <- function(guard,
+                                   n_questions_processed = NULL,
+                                   n_questions_total = NULL,
+                                   n_respondents = NULL,
+                                   banner_columns = NULL,
+                                   min_respondents = 30,
+                                   error_count = 0) {
+
+  # Get guard summary for warning/issue analysis
+  summary <- tabs_guard_summary(guard)
+
+  # Initialize degradation tracking
+  degraded_reasons <- character(0)
+  affected_outputs <- character(0)
+
+  # ===========================================================================
+  # REFUSE CONDITIONS (analysis cannot proceed)
+  # ===========================================================================
+
+  # Critical error encountered
+  if (error_count > 0) {
+    return(tabs_status_refuse(
+      code = "BUG_EXECUTION_ERROR",
+      reason = sprintf("Analysis failed with %d error(s)", error_count)
+    ))
+  }
+
+  # No respondents
+  if (!is.null(n_respondents) && n_respondents == 0) {
+    return(tabs_status_refuse(
+      code = "DATA_NO_RESPONDENTS",
+      reason = "No respondents available after filtering"
+    ))
+  }
+
+  # Below minimum respondent threshold
+  if (!is.null(n_respondents) && n_respondents < min_respondents) {
+    return(tabs_status_refuse(
+      code = "DATA_INSUFFICIENT_SAMPLE",
+      reason = sprintf(
+        "Respondent count (%d) below minimum threshold (%d)",
+        n_respondents, min_respondents
+      )
+    ))
+  }
+
+  # No banner columns
+  if (!is.null(banner_columns) && banner_columns == 0) {
+    return(tabs_status_refuse(
+      code = "CFG_NO_BANNER",
+      reason = "No banner columns created - cannot produce crosstabs"
+    ))
+  }
+
+  # No questions processed
+  if (!is.null(n_questions_processed) && n_questions_processed == 0) {
+    return(tabs_status_refuse(
+      code = "DATA_NO_QUESTIONS",
+      reason = "No questions could be processed"
+    ))
+  }
+
+  # ===========================================================================
+  # PARTIAL CONDITIONS (analysis completed with degradation)
+  # ===========================================================================
+
+  # Check skip rate
+  if (!is.null(n_questions_processed) && !is.null(n_questions_total) &&
+      n_questions_total > 0) {
+    n_skipped <- n_questions_total - n_questions_processed
+    skip_rate <- n_skipped / n_questions_total
+
+    if (skip_rate > 0.20) {
+      degraded_reasons <- c(degraded_reasons, sprintf(
+        "High skip rate: %d of %d questions (%.1f%%) skipped",
+        n_skipped, n_questions_total, skip_rate * 100
+      ))
+      affected_outputs <- c(affected_outputs, "question_coverage")
+    }
+  }
+
+  # Check empty base questions
+  if (length(summary$empty_base_questions) > 0) {
+    n_empty <- length(summary$empty_base_questions)
+    if (!is.null(n_questions_total) && n_questions_total > 0) {
+      empty_rate <- n_empty / n_questions_total
+      if (empty_rate > 0.10) {
+        degraded_reasons <- c(degraded_reasons, sprintf(
+          "High empty base rate: %d questions with zero respondents",
+          n_empty
+        ))
+        affected_outputs <- c(affected_outputs, "base_sizes")
+      }
+    }
+  }
+
+  # Check skipped questions from guard
+  if (length(summary$skipped_questions) > 0) {
+    degraded_reasons <- c(degraded_reasons, sprintf(
+      "%d question(s) skipped due to data issues",
+      length(summary$skipped_questions)
+    ))
+    affected_outputs <- c(affected_outputs, "skipped_questions")
+  }
+
+  # Check banner issues
+  if (length(summary$banner_issues) > 0) {
+    degraded_reasons <- c(degraded_reasons, sprintf(
+      "%d banner issue(s) encountered",
+      length(summary$banner_issues)
+    ))
+    affected_outputs <- c(affected_outputs, "banner_structure")
+  }
+
+  # Check option mapping issues
+  if (length(summary$option_mapping_issues) > 0) {
+    degraded_reasons <- c(degraded_reasons, sprintf(
+      "%d option mapping issue(s) encountered",
+      length(summary$option_mapping_issues)
+    ))
+    affected_outputs <- c(affected_outputs, "option_mapping")
+  }
+
+  # Check guard stability flag
+  if (!summary$is_stable) {
+    degraded_reasons <- c(degraded_reasons, "Analysis flagged as unstable")
+    affected_outputs <- c(affected_outputs, "stability")
+  }
+
+  # ===========================================================================
+  # RETURN STATUS
+  # ===========================================================================
+
+  if (length(degraded_reasons) > 0) {
+    return(tabs_status_partial(
+      degraded_reasons = degraded_reasons,
+      affected_outputs = unique(affected_outputs),
+      skipped_questions = summary$skipped_questions
+    ))
+  }
+
+  # All checks passed
+  tabs_status_pass(results_count = n_questions_processed)
+}
