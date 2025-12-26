@@ -154,7 +154,7 @@ CustomerID | Segment    | Q01_Satisfaction | Q02_NPS
 **Options Sheet:**
 
 | QuestionCode | OptionText | DisplayText           | ShowInOutput | Index_Weight |
-|---------------|---------------|---------------|---------------|---------------|
+|--------------|------------|-----------------------|--------------|--------------|
 | Q01          | 1          | Very dissatisfied (1) | Y            | 1            |
 | Q01          | 2          | Dissatisfied (2)      | Y            | 2            |
 | Q01          | 3          | Neutral (3)           | Y            | 3            |
@@ -610,7 +610,7 @@ Values indicate the rank position each brand received (1=first choice,
 **Questions Sheet:**
 
 | QuestionCode | QuestionText | Variable_Type | Ranking_Format | Ranking_Positions | Ranking_Direction |
-|------------|------------|------------|------------|------------|------------|
+|----|----|----|----|----|----|
 | Brand_Ranking | Rank your top 3 brands | Ranking | Position | 3 | BestToWorst |
 
 ### Expected Output
