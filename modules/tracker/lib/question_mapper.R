@@ -8,11 +8,118 @@
 # This is tracker-specific functionality (not needed in TurasTabs).
 #
 # ==============================================================================
+# WAVE MAPPING ARCHITECTURE
+# ==============================================================================
+#
+# The question mapper creates a BIDIRECTIONAL INDEX for efficient lookups:
+#
+#   1. STANDARD → WAVE MAPPING (standard_to_wave)
+#      Maps standardized question codes to wave-specific variable names.
+#      Structure: list(StandardCode = list(WaveID = "VarName", ...))
+#
+#      Example:
+#        $Q_SAT = list(W1 = "Q10", W2 = "Q11", W3 = "Q12")
+#        $Q_NPS = list(W1 = "Q15", W2 = "Q15", W3 = "Q15")
+#
+#      Use case: "What is the variable name for Q_SAT in Wave 2?" → "Q11"
+#
+#   2. WAVE → STANDARD MAPPING (wave_to_standard)
+#      Reverse lookup: maps wave-specific codes back to standard codes.
+#      Structure: list("WaveID:VarName" = "StandardCode")
+#
+#      Example:
+#        $`W1:Q10` = "Q_SAT"
+#        $`W2:Q11` = "Q_SAT"
+#        $`W3:Q12` = "Q_SAT"
+#
+#      Use case: "What standard code does W2:Q11 map to?" → "Q_SAT"
+#
+# WHY BIDIRECTIONAL MAPPING?
+#   - Forward lookup: For extracting data when processing each wave
+#   - Reverse lookup: For debugging/validation when checking data sources
+#   - Both are O(1) hash table lookups for performance
+#
+# HANDLING QUESTION RENUMBERING:
+#   Surveys often renumber questions between waves when:
+#   - New questions are inserted
+#   - Sections are reordered
+#   - Questions are removed
+#
+#   The mapper abstracts this away so trend calculations can work with
+#   stable "StandardCode" identifiers regardless of wave-specific numbering.
+#
+# ==============================================================================
+# TRACKINGSPECS SYSTEM
+# ==============================================================================
+#
+# TrackingSpecs allow per-question customization of which metrics to track.
+#
+# SYNTAX:
+#   - Comma-separated list of specs: "mean,top2_box,range:9-10"
+#   - Blank/NULL = use defaults for question type
+#
+# RATING QUESTIONS:
+#   - mean: Track mean score
+#   - top_box, top2_box, top3_box: % in top N boxes
+#   - bottom_box, bottom2_box: % in bottom N boxes
+#   - distribution: Full frequency distribution
+#   - range:X-Y: Custom range (e.g., range:9-10 for % scoring 9-10)
+#
+# NPS QUESTIONS:
+#   - nps_score: Net Promoter Score
+#   - promoters_pct, passives_pct, detractors_pct: Individual segments
+#   - full: All NPS metrics
+#
+# SINGLE CHOICE QUESTIONS:
+#   - all: Track all response options
+#   - top3: Track top 3 most frequent options
+#   - category:X: Track specific category (e.g., category:Very Satisfied)
+#
+# MULTI-MENTION QUESTIONS:
+#   - auto: Auto-detect and track all option columns (Q30_1, Q30_2, ...)
+#   - any: Track % mentioning any option
+#   - count_mean: Average number of mentions per respondent
+#   - option:Q30_1: Track specific option column
+#   - category:text: Search for text value across option columns
+#
+# ==============================================================================
 
 #' Build Question Map Index
 #'
 #' Creates an indexed structure for efficient question lookups across waves.
 #' Builds a bidirectional map: StandardCode → WaveCode and WaveCode → StandardCode
+#'
+#' @section Mapping Algorithm:
+#' The function processes the question_mapping data frame row by row:
+#'
+#' 1. For each question (row), extract the StandardCode from QuestionCode column
+#' 2. For each wave defined in config:
+#'    - Look for a column matching the WaveID (e.g., "W1", "W2")
+#'    - Extract the wave-specific variable name from that column
+#'    - Create bidirectional mapping entries
+#' 3. Store all non-wave columns as question metadata (QuestionType, QuestionText, etc.)
+#'
+#' @section Example Input (question_mapping data frame):
+#' ```
+#' | QuestionCode | QuestionType | W1   | W2   | W3   |
+#' |--------------|--------------|------|------|------|
+#' | Q_SAT        | Rating       | Q10  | Q11  | Q12  |
+#' | Q_NPS        | NPS          | Q15  | Q15  | Q15  |
+#' | Q_NEW        | Rating       | NA   | Q20  | Q20  |
+#' ```
+#'
+#' @section Example Output:
+#' ```
+#' $standard_to_wave
+#'   $Q_SAT = list(W1 = "Q10", W2 = "Q11", W3 = "Q12")
+#'   $Q_NPS = list(W1 = "Q15", W2 = "Q15", W3 = "Q15")
+#'   $Q_NEW = list(W2 = "Q20", W3 = "Q20")  # Note: W1 missing (question not in Wave 1)
+#'
+#' $wave_to_standard
+#'   $`W1:Q10` = "Q_SAT"
+#'   $`W2:Q11` = "Q_SAT"
+#'   ...
+#' ```
 #'
 #' @param question_mapping Data frame. Question mapping from load_question_mapping()
 #' @param config List. Configuration object (for wave definitions)
@@ -26,42 +133,54 @@ build_question_map_index <- function(question_mapping, config) {
 
   message("Building question map index...")
 
-  # Get wave IDs from config
+  # Get wave IDs from config (e.g., c("W1", "W2", "W3"))
+  # These must match column names in question_mapping
   wave_ids <- config$waves$WaveID
 
-  # Initialize mapping structures
-  standard_to_wave <- list()
-  wave_to_standard <- list()
+  # Initialize mapping structures (R lists used as hash tables)
+  # Both provide O(1) lookup by key
+  standard_to_wave <- list()  # StandardCode → list(WaveID → VarName)
+  wave_to_standard <- list()  # "WaveID:VarName" → StandardCode
 
-  # Process each question
+  # ---------------------------------------------------------------------------
+  # STEP 1: Process each question row to build bidirectional mappings
+  # ---------------------------------------------------------------------------
   for (i in 1:nrow(question_mapping)) {
+    # Extract and clean the standardized question code
     standard_code <- trimws(as.character(question_mapping$QuestionCode[i]))
 
-    # Initialize list for this standard code
+    # Initialize empty wave map for this standard code
     standard_to_wave[[standard_code]] <- list()
 
-    # Map to each wave
+    # ---------------------------------------------------------------------------
+    # STEP 2: For each wave, extract the wave-specific variable name
+    # ---------------------------------------------------------------------------
     for (wave_idx in seq_along(wave_ids)) {
       wave_id <- wave_ids[wave_idx]
-      # FIXED: Use actual WaveID instead of hardcoded "Wave" + index
-      # This allows for flexible wave naming like W1, W2, W3 or Wave1, Wave2, Wave3
+
+      # The wave column name in question_mapping matches the WaveID
+      # This allows flexible wave naming: W1, W2, W3 OR Wave1, Wave2, Wave3
       wave_col <- wave_id
 
-      # Get wave-specific code
+      # Check if this wave has a column in the mapping
       if (wave_col %in% names(question_mapping)) {
         wave_code <- question_mapping[[wave_col]][i]
 
-        # Trim whitespace from wave codes (common issue with Excel data)
+        # Clean whitespace (common issue with Excel data)
         if (!is.na(wave_code)) {
           wave_code <- trimws(as.character(wave_code))
         }
 
-        # Only map if code exists for this wave
+        # Only create mapping if wave code exists (not NA, not empty)
+        # A blank cell means this question doesn't exist in this wave
         if (!is.na(wave_code) && wave_code != "") {
-          # Standard → Wave mapping
+          # FORWARD MAPPING: StandardCode → WaveCode
+          # Used when: "I need to extract Q_SAT data from Wave 2"
           standard_to_wave[[standard_code]][[wave_id]] <- wave_code
 
-          # Wave → Standard mapping (reverse lookup)
+          # REVERSE MAPPING: WaveCode → StandardCode
+          # Key format: "WaveID:VarName" (e.g., "W2:Q11")
+          # Used when: "What standard question is W2:Q11?"
           wave_key <- paste0(wave_id, ":", wave_code)
           wave_to_standard[[wave_key]] <- standard_code
         }
@@ -69,13 +188,12 @@ build_question_map_index <- function(question_mapping, config) {
     }
   }
 
-  # Extract metadata - keep all non-wave columns for future extensibility
-  # This includes QuestionCode, QuestionText, QuestionType, SourceQuestions, etc.
-  # FIXED: Use actual wave IDs from config instead of regex pattern
-  # This supports flexible wave naming (W1, W2, W3 or Wave1, Wave2, Wave3)
+  # ---------------------------------------------------------------------------
+  # STEP 3: Extract question metadata (all non-wave columns)
+  # ---------------------------------------------------------------------------
+  # Metadata includes: QuestionCode, QuestionText, QuestionType, TrackingSpecs, etc.
+  # This allows future extensibility - new metadata columns are automatically preserved
   wave_cols <- wave_ids
-
-  # Get all columns except wave columns
   metadata_cols <- setdiff(names(question_mapping), wave_cols)
   metadata <- question_mapping[, metadata_cols, drop = FALSE]
 
@@ -337,12 +455,42 @@ validate_question_mapping <- function(config, question_map, wave_data) {
 # ==============================================================================
 # TRACKINGSPECS SUPPORT (Enhancement Phase 1)
 # ==============================================================================
+#
+# TrackingSpecs allows users to customize which metrics are calculated and
+# reported for each tracked question. This provides flexibility without
+# requiring changes to the core calculation engine.
+#
+# FLOW:
+# 1. User specifies TrackingSpecs in question_mapping.xlsx (optional column)
+# 2. get_tracking_specs() retrieves the spec string for a question
+# 3. validate_tracking_specs() checks syntax validity
+# 4. Question-type-specific calculators parse and apply the specs
+#
+# DEFAULT BEHAVIOR (when TrackingSpecs is blank):
+# - Rating: mean, top2_box
+# - NPS: nps_score, promoters_pct, detractors_pct
+# - Single_Choice: all response options
+# - Multi_Mention: auto-detected options
+#
+# ==============================================================================
 
 #' Get Tracking Specs for Question
 #'
 #' Retrieves the TrackingSpecs string for a question from the question mapping.
 #' TrackingSpecs is an optional column that allows customization of which metrics
 #' to track (e.g., "mean,top2_box" or "option:Q30_1,any").
+#'
+#' @section How TrackingSpecs Works:
+#' 1. The TrackingSpecs column in question_mapping.xlsx contains comma-separated
+#'    metric specifications
+#' 2. Each spec can be a simple keyword (e.g., "mean") or a pattern-based spec
+#'    (e.g., "range:9-10", "category:Very Satisfied")
+#' 3. If blank or missing, the question type's default metrics are used
+#'
+#' @section Examples:
+#' - "mean,top2_box" → Track mean and top-2-box percentage for a rating question
+#' - "category:Very Satisfied,category:Satisfied" → Track specific response options
+#' - "auto" → Auto-detect all option columns for multi-mention questions
 #'
 #' @param question_map List. Question map index from build_question_map_index()
 #' @param question_code Character. Question code
@@ -351,17 +499,18 @@ validate_question_mapping <- function(config, question_map, wave_data) {
 #' @export
 get_tracking_specs <- function(question_map, question_code) {
 
-  # Trim whitespace from question_code (defensive - handles whitespace in tracked_questions)
+  # Defensive: trim whitespace from question_code
+  # This handles common issues with whitespace in tracked_questions list
   question_code <- trimws(as.character(question_code))
 
   metadata_df <- question_map$question_metadata
 
-  # Check if TrackingSpecs column exists
+  # TrackingSpecs column is optional - if not present, return NULL (use defaults)
   if (!"TrackingSpecs" %in% names(metadata_df)) {
     return(NULL)
   }
 
-  # Find question row (use which() to avoid NA issues)
+  # Find question row using which() to avoid NA comparison issues
   q_row_idx <- which(metadata_df$QuestionCode == question_code)
   if (length(q_row_idx) == 0) {
     return(NULL)
@@ -370,7 +519,7 @@ get_tracking_specs <- function(question_map, question_code) {
 
   tracking_specs <- q_row$TrackingSpecs[1]
 
-  # Return NULL if blank/NA
+  # Return NULL if blank/NA - this triggers default behavior in calculators
   if (is.na(tracking_specs) || trimws(tracking_specs) == "") {
     return(NULL)
   }
@@ -427,22 +576,47 @@ get_composite_sources <- function(question_map, question_code) {
 #' Validates that TrackingSpecs string contains valid specifications for
 #' the given question type.
 #'
+#' @section Validation Rules:
+#' The validator checks two things:
+#' 1. Each spec is valid for the given question type
+#' 2. Pattern-based specs (range:, category:, option:) have correct syntax
+#'
+#' @section Valid Specs by Question Type:
+#' \describe{
+#'   \item{Rating}{mean, top_box, top2_box, top3_box, bottom_box, bottom2_box, distribution, range:X-Y}
+#'   \item{NPS}{nps_score, promoters_pct, passives_pct, detractors_pct, full}
+#'   \item{Single_Choice}{all, top3, category:X}
+#'   \item{Multi_Mention}{auto, any, count_mean, count_distribution, option:X, category:X}
+#'   \item{Composite}{mean, top_box, top2_box, top3_box, distribution, range:X-Y}
+#' }
+#'
+#' @section Pattern-Based Specs:
+#' \describe{
+#'   \item{range:X-Y}{Track % in custom range. X must be <= Y. (Rating/Composite only)}
+#'   \item{category:text}{Track specific category by text value. (Single_Choice/Multi_Mention)}
+#'   \item{option:varname}{Track specific option column. (Multi_Mention only)}
+#' }
+#'
 #' @param specs_str Character. TrackingSpecs string (e.g., "mean,top2_box")
 #' @param question_type Character. Question type (e.g., "Rating", "NPS", "Single_Choice")
-#' @return List with $valid (logical) and $message (character)
+#' @return List with $valid (logical) and $message (character describing any errors)
 #'
 #' @export
 validate_tracking_specs <- function(specs_str, question_type) {
 
-  # If NULL or empty, always valid (uses defaults)
+  # NULL or empty specs are always valid - means "use defaults"
   if (is.null(specs_str) || trimws(specs_str) == "") {
     return(list(valid = TRUE, message = ""))
   }
 
-  # Normalize question type for comparison
+  # Normalize question type for case-insensitive comparison
   q_type_normalized <- tolower(trimws(question_type))
 
-  # Define valid specs by question type
+  # ---------------------------------------------------------------------------
+  # VALID SPECS REGISTRY
+  # ---------------------------------------------------------------------------
+  # Each question type has a defined set of valid spec keywords.
+  # Pattern-based specs (range:, category:, option:) are validated separately.
   VALID_SPECS <- list(
     rating = c("mean", "top_box", "top2_box", "top3_box",
                "bottom_box", "bottom2_box", "distribution"),

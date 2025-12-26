@@ -6,7 +6,16 @@
 # Supports both CSV and Excel formats.
 # Handles weighting variable application.
 #
-# VERSION: 2.1.0 - Uses consolidated shared utilities
+# VERSION: 2.2.0 - Added parallel loading support
+#
+# PARALLEL PROCESSING:
+# When processing large multi-wave datasets (5+ waves), parallel loading
+# can significantly reduce load times. Parallelization uses the 'future'
+# and 'future.apply' packages if available.
+#
+# To enable: load_all_waves(..., parallel = TRUE)
+# Requirements: future, future.apply packages installed
+# Fallback: Sequential loading if packages not available
 #
 # SHARED WEIGHT UTILITIES in /modules/shared/lib/weights_utils.R:
 # - calculate_weight_efficiency() - Effective sample size calculation
@@ -101,13 +110,26 @@ extract_categorical_question_codes <- function(config = NULL, question_mapping =
 #' Loads data for all waves defined in tracking configuration.
 #' Resolves file paths, applies weighting, and performs validation.
 #'
+#' @section Parallel Loading:
+#' When parallel = TRUE and multiple waves exist, waves are loaded in parallel
+#' using the future/future.apply framework. This can significantly speed up
+#' loading for large multi-wave datasets.
+#'
+#' Requirements for parallel loading:
+#' - future and future.apply packages installed
+#' - At least 3 waves (overhead not worth it for fewer)
+#' - Sufficient memory for multiple datasets in parallel
+#'
+#' If packages are not available, falls back to sequential loading with a message.
+#'
 #' @param config List. Configuration object from load_tracking_config()
 #' @param data_dir Character. Directory containing wave data files (if relative paths used)
 #' @param question_mapping Data frame. Question mapping (optional, for determining categorical questions)
+#' @param parallel Logical. If TRUE, attempt parallel loading of waves. Default FALSE.
 #' @return List of data frames, one per wave, with names as WaveIDs
 #'
 #' @export
-load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL) {
+load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL, parallel = FALSE) {
 
   cat("Loading wave data files...\n")
 
@@ -120,35 +142,111 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL) {
                    if (length(categorical_cols) > 10) " ..." else "", "\n"))
   }
 
-  wave_data <- list()
+  n_waves <- nrow(config$waves)
 
-  for (i in 1:nrow(config$waves)) {
-    wave_id <- config$waves$WaveID[i]
-    wave_name <- config$waves$WaveName[i]
-    data_file <- config$waves$DataFile[i]
-
-    cat(paste0("  Loading Wave ", wave_id, ": ", wave_name, "\n"))
-
-    # Resolve file path
-    file_path <- resolve_data_file_path(data_file, data_dir)
-
-    # Load wave data (passing categorical question codes to preserve)
-    wave_df <- load_wave_data(file_path, wave_id, categorical_cols)
-
-    # Apply weighting if specified
-    weight_var <- get_wave_weight_var(config, wave_id)
-    if (!is.null(weight_var) && weight_var != "") {
-      wave_df <- apply_wave_weights(wave_df, weight_var, wave_id)
+  # ---------------------------------------------------------------------------
+  # PARALLEL LOADING (for large multi-wave datasets)
+  # ---------------------------------------------------------------------------
+  # Use parallel loading when:
+  # 1. parallel = TRUE requested
+  # 2. At least 3 waves (overhead not worth it for fewer)
+  # 3. Required packages are available
+  use_parallel <- FALSE
+  if (parallel && n_waves >= 3) {
+    if (requireNamespace("future", quietly = TRUE) &&
+        requireNamespace("future.apply", quietly = TRUE)) {
+      use_parallel <- TRUE
+      cat(paste0("  Using parallel loading for ", n_waves, " waves\n"))
     } else {
-      cat("    No weighting variable specified for this wave\n")
-      # Create default weight of 1
-      wave_df$weight_var <- 1
+      cat("  Note: parallel=TRUE requested but future/future.apply packages not installed.\n")
+      cat("  Falling back to sequential loading. Install packages for parallel support.\n")
+    }
+  }
+
+  if (use_parallel) {
+    # Set up parallel plan if not already configured
+    if (!future::plan() %in% c("multisession", "multicore", "cluster")) {
+      # Use multisession for cross-platform compatibility
+      old_plan <- future::plan(future::multisession, workers = min(n_waves, parallel::detectCores() - 1))
+      on.exit(future::plan(old_plan), add = TRUE)
     }
 
-    # Store in list
-    wave_data[[wave_id]] <- wave_df
+    # Prepare wave info for parallel processing
+    wave_info <- lapply(1:n_waves, function(i) {
+      list(
+        wave_id = config$waves$WaveID[i],
+        wave_name = config$waves$WaveName[i],
+        data_file = config$waves$DataFile[i],
+        weight_var = get_wave_weight_var(config, config$waves$WaveID[i])
+      )
+    })
 
-    cat(paste0("    Loaded ", nrow(wave_df), " records\n"))
+    # Load waves in parallel
+    cat("  Loading waves in parallel...\n")
+    wave_results <- future.apply::future_lapply(wave_info, function(info) {
+      # Resolve file path
+      file_path <- resolve_data_file_path(info$data_file, data_dir)
+
+      # Load wave data
+      wave_df <- load_wave_data(file_path, info$wave_id, categorical_cols)
+
+      # Apply weighting
+      if (!is.null(info$weight_var) && info$weight_var != "") {
+        wave_df <- apply_wave_weights(wave_df, info$weight_var, info$wave_id)
+      } else {
+        wave_df$weight_var <- 1
+      }
+
+      list(
+        wave_id = info$wave_id,
+        wave_name = info$wave_name,
+        data = wave_df,
+        n_records = nrow(wave_df)
+      )
+    }, future.seed = TRUE)
+
+    # Collect results into wave_data list
+    wave_data <- list()
+    for (result in wave_results) {
+      wave_data[[result$wave_id]] <- result$data
+      cat(paste0("  Loaded Wave ", result$wave_id, ": ", result$wave_name,
+                 " (", result$n_records, " records)\n"))
+    }
+
+  } else {
+    # ---------------------------------------------------------------------------
+    # SEQUENTIAL LOADING (default)
+    # ---------------------------------------------------------------------------
+    wave_data <- list()
+
+    for (i in 1:n_waves) {
+      wave_id <- config$waves$WaveID[i]
+      wave_name <- config$waves$WaveName[i]
+      data_file <- config$waves$DataFile[i]
+
+      cat(paste0("  Loading Wave ", wave_id, ": ", wave_name, "\n"))
+
+      # Resolve file path
+      file_path <- resolve_data_file_path(data_file, data_dir)
+
+      # Load wave data (passing categorical question codes to preserve)
+      wave_df <- load_wave_data(file_path, wave_id, categorical_cols)
+
+      # Apply weighting if specified
+      weight_var <- get_wave_weight_var(config, wave_id)
+      if (!is.null(weight_var) && weight_var != "") {
+        wave_df <- apply_wave_weights(wave_df, weight_var, wave_id)
+      } else {
+        cat("    No weighting variable specified for this wave\n")
+        # Create default weight of 1
+        wave_df$weight_var <- 1
+      }
+
+      # Store in list
+      wave_data[[wave_id]] <- wave_df
+
+      cat(paste0("    Loaded ", nrow(wave_df), " records\n"))
+    }
   }
 
   cat(paste0("Successfully loaded ", length(wave_data), " waves\n"))
