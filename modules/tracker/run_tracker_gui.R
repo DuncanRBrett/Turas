@@ -695,7 +695,25 @@ run_tracker_gui <- function() {
 
         # Source run_tracker.R
         progress$set(value = 0.2, detail = "Loading tracker modules...")
-        source("run_tracker.R")
+        cat("[Tracker GUI] Current directory:", getwd(), "\n")
+        cat("[Tracker GUI] Sourcing run_tracker.R...\n")
+
+        tryCatch({
+          source("run_tracker.R")
+          cat("[Tracker GUI] run_tracker.R loaded successfully\n")
+        }, error = function(e) {
+          gui_refuse(
+            code = "IO_SOURCE_FAILED",
+            title = "Failed to Load Tracker Module",
+            problem = paste0("Could not source run_tracker.R: ", e$message),
+            why_it_matters = "The tracker module must be loaded before analysis can run.",
+            how_to_fix = c(
+              "Check that all tracker module files exist in modules/tracker/",
+              "Verify no syntax errors in the R files",
+              paste0("Current directory: ", getwd())
+            )
+          )
+        })
 
         # Run analysis and capture ALL console output
         progress$set(value = 0.3, detail = "Running tracker analysis...")
