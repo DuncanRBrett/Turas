@@ -31,26 +31,35 @@ write_catdriver_output <- function(results, config, output_file) {
 
   # Check if output directory exists
   if (!dir.exists(output_dir)) {
-    stop(sprintf(
-      "Output directory does not exist: %s\n  Create the directory first or specify a different output path.",
-      output_dir
-    ), call. = FALSE)
+    catdriver_refuse(
+      reason = "IO_OUTPUT_DIR_NOT_FOUND",
+      title = "OUTPUT DIRECTORY NOT FOUND",
+      problem = paste0("Output directory does not exist: ", output_dir),
+      why_it_matters = "Cannot write results without a valid output directory.",
+      fix = "Create the directory first or specify a different output path."
+    )
   }
 
   # Check if output directory is writable
   if (file.access(output_dir, mode = 2) != 0) {
-    stop(sprintf(
-      "Output directory is not writable: %s\n  Check directory permissions.",
-      output_dir
-    ), call. = FALSE)
+    catdriver_refuse(
+      reason = "IO_OUTPUT_DIR_NOT_WRITABLE",
+      title = "OUTPUT DIRECTORY NOT WRITABLE",
+      problem = paste0("Output directory is not writable: ", output_dir),
+      why_it_matters = "Cannot save results if the directory does not allow write access.",
+      fix = "Check directory permissions or specify a different output path."
+    )
   }
 
   # Check if output file exists and is writable (if it exists)
   if (file.exists(output_file) && file.access(output_file, mode = 2) != 0) {
-    stop(sprintf(
-      "Cannot overwrite existing output file: %s\n  Check file permissions or specify a different filename.",
-      output_file
-    ), call. = FALSE)
+    catdriver_refuse(
+      reason = "IO_OUTPUT_FILE_NOT_WRITABLE",
+      title = "CANNOT OVERWRITE OUTPUT FILE",
+      problem = paste0("Cannot overwrite existing output file: ", output_file),
+      why_it_matters = "The existing file is locked or has restricted permissions.",
+      fix = "Close the file if open in Excel, check file permissions, or specify a different filename."
+    )
   }
 
   # Create workbook
@@ -88,7 +97,14 @@ write_catdriver_output <- function(results, config, output_file) {
   if (exists("turas_save_workbook_atomic", mode = "function")) {
     save_result <- turas_save_workbook_atomic(wb, output_file, module = "CATD")
     if (!save_result$success) {
-      stop(sprintf("Failed to save Excel file: %s\nPath: %s", save_result$error, output_file), call. = FALSE)
+      catdriver_refuse(
+        reason = "IO_SAVE_FAILED",
+        title = "FAILED TO SAVE OUTPUT FILE",
+        problem = paste0("Failed to save Excel file: ", save_result$error),
+        why_it_matters = "Analysis results could not be written to the output file.",
+        fix = "Check disk space, file permissions, and ensure the file is not open in Excel.",
+        details = paste0("Output path: ", output_file)
+      )
     }
   } else {
     openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)

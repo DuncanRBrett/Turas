@@ -611,18 +611,42 @@ run_tracker_gui <- function() {
 
         # Ensure character
         if (!is.character(tracking_config) || length(tracking_config) != 1) {
-          stop("Invalid tracking config path: not a single character string")
+          gui_refuse(
+            code = "CFG_INVALID_PATH",
+            title = "Invalid Tracking Config Path",
+            problem = "Tracking config path is not a single character string.",
+            why_it_matters = "The tracker requires a valid file path to locate the configuration.",
+            how_to_fix = "Select a valid tracking_config.xlsx file using the file browser."
+          )
         }
         if (!is.character(question_mapping) || length(question_mapping) != 1) {
-          stop("Invalid question mapping path: not a single character string")
+          gui_refuse(
+            code = "CFG_INVALID_PATH",
+            title = "Invalid Question Mapping Path",
+            problem = "Question mapping path is not a single character string.",
+            why_it_matters = "The tracker requires a valid file path to locate the question mapping.",
+            how_to_fix = "Ensure a question_mapping.xlsx file exists in the same directory as the config."
+          )
         }
 
         # Validate files exist
         if (!file.exists(tracking_config)) {
-          stop("Tracking config file not found: ", tracking_config)
+          gui_refuse(
+            code = "IO_FILE_NOT_FOUND",
+            title = "Tracking Config File Not Found",
+            problem = paste0("Tracking config file not found: ", tracking_config),
+            why_it_matters = "The tracker cannot run without a valid configuration file.",
+            how_to_fix = "Verify the file exists at the specified path or select a different file."
+          )
         }
         if (!file.exists(question_mapping)) {
-          stop("Question mapping file not found: ", question_mapping)
+          gui_refuse(
+            code = "IO_FILE_NOT_FOUND",
+            title = "Question Mapping File Not Found",
+            problem = paste0("Question mapping file not found: ", question_mapping),
+            why_it_matters = "The tracker cannot map survey questions without the mapping file.",
+            how_to_fix = "Ensure question_mapping.xlsx exists in the same directory as tracking_config.xlsx."
+          )
         }
 
         # Auto-set data_dir to same directory as config files if not specified
@@ -648,7 +672,13 @@ run_tracker_gui <- function() {
         run_script <- file.path(tracker_dir, "run_tracker.R")
 
         if (!file.exists(run_script)) {
-          stop("Could not find run_tracker.R at: ", run_script)
+          gui_refuse(
+            code = "IO_SCRIPT_NOT_FOUND",
+            title = "Tracker Module Not Found",
+            problem = paste0("Could not find run_tracker.R at: ", run_script),
+            why_it_matters = "The tracker analysis script is required to run the analysis.",
+            how_to_fix = "Ensure the Turas installation is complete and run_tracker.R exists in modules/tracker/."
+          )
         }
 
         # Change to tracker directory
