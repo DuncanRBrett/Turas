@@ -29,20 +29,44 @@ script_dir <- tryCatch({
   } else if (exists("toolkit_path") && !is.null(toolkit_path) && length(toolkit_path) > 0 && nzchar(toolkit_path[1])) {
     dirname(toolkit_path[1])
   } else {
-    # Fallback: look for the tracker directory
+    # Fallback: search for the tracker directory
+    # Check multiple possible locations
     candidates <- c(
       file.path(getwd(), "modules", "tracker"),
-      getwd()
+      file.path(dirname(getwd()), "modules", "tracker"),
+      Sys.getenv("TURAS_HOME", unset = NA)
     )
-    found <- candidates[dir.exists(candidates)][1]
-    if (is.na(found)) getwd() else found
+    # Filter to valid candidates
+    candidates <- candidates[!is.na(candidates)]
+    # Check which ones exist and have lib/00_guard.R
+    valid <- sapply(candidates, function(p) {
+      file.exists(file.path(p, "lib", "00_guard.R"))
+    })
+    if (any(valid)) {
+      candidates[valid][1]
+    } else {
+      # Last resort - assume current directory structure
+      getwd()
+    }
   }
 }, error = function(e) {
   getwd()
 })
 
 # TRS Guard Layer (v1.0) - MUST be loaded first before any module files
-source(file.path(script_dir, "lib", "00_guard.R"))
+.guard_path <- file.path(script_dir, "lib", "00_guard.R")
+if (!file.exists(.guard_path)) {
+  stop(paste0(
+    "Cannot find Tracker module files.\n",
+    "  Expected: ", .guard_path, "\n",
+    "  script_dir: ", script_dir, "\n",
+    "  toolkit_path set: ", exists("toolkit_path"), "\n",
+    "  Working directory: ", getwd(), "\n\n",
+    "Please ensure toolkit_path is set to the path of run_tracker.R before sourcing."
+  ))
+}
+source(.guard_path)
+rm(.guard_path)
 
 # ==============================================================================
 # TRS RUN STATE INFRASTRUCTURE (v1.0)
