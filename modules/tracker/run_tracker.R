@@ -298,19 +298,36 @@ run_tracker <- function(tracking_config_path,
   if (use_banners) {
     # Phase 3: Calculate trends with banner breakouts
     banner_segments <- get_banner_segments(config, wave_data)
-    trend_results <- calculate_trends_with_banners(
+    trend_calc_result <- calculate_trends_with_banners(
       config = config,
       question_map = question_map,
       wave_data = wave_data
     )
   } else {
     # Phase 2: Calculate simple trends (Total only)
-    trend_results <- calculate_all_trends(
+    trend_calc_result <- calculate_all_trends(
       config = config,
       question_map = question_map,
       wave_data = wave_data
     )
     banner_segments <- NULL
+  }
+
+  # Extract the actual trends from the wrapper structure
+  # calculate_all_trends returns: list(trends=..., skipped_questions=..., run_status=...)
+  if (is.list(trend_calc_result) && "trends" %in% names(trend_calc_result)) {
+    trend_results <- trend_calc_result$trends
+    skipped_questions <- trend_calc_result$skipped_questions
+    trend_run_status <- trend_calc_result$run_status
+    cat(paste0("\n  Trends calculated for ", length(trend_results), " questions\n"))
+    if (length(skipped_questions) > 0) {
+      cat(paste0("  Skipped: ", length(skipped_questions), " questions\n"))
+    }
+  } else {
+    # Backward compatibility: if already a simple list of trends
+    trend_results <- trend_calc_result
+    skipped_questions <- list()
+    trend_run_status <- "PASS"
   }
 
 
@@ -325,6 +342,40 @@ run_tracker <- function(tracking_config_path,
     turas_run_state_result(trs_state)
   } else {
     NULL
+  }
+
+  # ===========================================================================
+  # Resolve output directory and validate it exists
+  # ===========================================================================
+  # Priority: 1) output_path parameter, 2) output_dir setting, 3) config file directory
+  base_output_dir <- if (!is.null(output_path)) {
+    dirname(output_path)
+  } else {
+    output_dir_setting <- get_setting(config, "output_dir", default = NULL)
+    if (!is.null(output_dir_setting) && nzchar(trimws(output_dir_setting))) {
+      trimws(output_dir_setting)
+    } else {
+      dirname(config$config_path)
+    }
+  }
+
+  # Ensure output directory exists (create if needed)
+  if (!dir.exists(base_output_dir)) {
+    cat(paste0("  Creating output directory: ", base_output_dir, "\n"))
+    tryCatch({
+      dir.create(base_output_dir, recursive = TRUE, showWarnings = FALSE)
+    }, error = function(e) {
+      warning(paste0("Could not create output directory: ", base_output_dir, ". Using config directory."))
+      base_output_dir <<- dirname(config$config_path)
+    })
+  }
+
+  # Check for output_file setting (used when single report type)
+  output_file_setting <- get_setting(config, "output_file", default = NULL)
+
+  cat(paste0("  Output directory: ", base_output_dir, "\n"))
+  if (!is.null(output_file_setting) && nzchar(trimws(output_file_setting))) {
+    cat(paste0("  Output file setting: ", output_file_setting, "\n"))
   }
 
   # Check report_types setting to determine which outputs to generate
@@ -354,19 +405,17 @@ run_tracker <- function(tracking_config_path,
 
   if ("detailed" %in% report_types) {
     # Generate detailed trend report
-    detailed_path <- if (length(report_types) > 1) {
-      # Multiple report types - use specific filename
-      output_dir <- if (!is.null(output_path)) {
-        dirname(output_path)
-      } else {
-        get_setting(config, "output_dir", default = dirname(config$config_path))
-      }
+    detailed_path <- if (!is.null(output_path)) {
+      # Explicit output_path parameter takes priority
+      output_path
+    } else if (length(report_types) == 1 && !is.null(output_file_setting) && nzchar(trimws(output_file_setting))) {
+      # Single report type with output_file setting - use it directly
+      file.path(base_output_dir, trimws(output_file_setting))
+    } else {
+      # Auto-generate filename
       project_name <- get_setting(config, "project_name", default = "Tracking")
       project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
-      file.path(output_dir, paste0(project_name, "_Tracker_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
-    } else {
-      # Single report type - use default output_path
-      output_path
+      file.path(base_output_dir, paste0(project_name, "_Tracker_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
     }
 
     output_files$detailed <- write_tracker_output(
@@ -381,19 +430,14 @@ run_tracker <- function(tracking_config_path,
 
   if ("wave_history" %in% report_types) {
     # Generate wave history report
-    wave_history_path <- if (length(report_types) > 1) {
-      # Multiple report types - use specific filename
-      output_dir <- if (!is.null(output_path)) {
-        dirname(output_path)
-      } else {
-        get_setting(config, "output_dir", default = dirname(config$config_path))
-      }
+    wave_history_path <- if (length(report_types) == 1 && !is.null(output_file_setting) && nzchar(trimws(output_file_setting))) {
+      # Single report type with output_file setting - use it directly
+      file.path(base_output_dir, trimws(output_file_setting))
+    } else {
+      # Auto-generate filename
       project_name <- get_setting(config, "project_name", default = "Tracking")
       project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
-      file.path(output_dir, paste0(project_name, "_WaveHistory_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
-    } else {
-      # Single report type - use default output_path or auto-generate
-      NULL  # Let write_wave_history_output handle it
+      file.path(base_output_dir, paste0(project_name, "_WaveHistory_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
     }
 
     output_files$wave_history <- write_wave_history_output(
@@ -408,19 +452,14 @@ run_tracker <- function(tracking_config_path,
 
   if ("dashboard" %in% report_types) {
     # Generate executive dashboard report
-    dashboard_path <- if (length(report_types) > 1) {
-      # Multiple report types - use specific filename
-      output_dir <- if (!is.null(output_path)) {
-        dirname(output_path)
-      } else {
-        get_setting(config, "output_dir", default = dirname(config$config_path))
-      }
+    dashboard_path <- if (length(report_types) == 1 && !is.null(output_file_setting) && nzchar(trimws(output_file_setting))) {
+      # Single report type with output_file setting - use it directly
+      file.path(base_output_dir, trimws(output_file_setting))
+    } else {
+      # Auto-generate filename
       project_name <- get_setting(config, "project_name", default = "Tracking")
       project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
-      file.path(output_dir, paste0(project_name, "_Dashboard_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
-    } else {
-      # Single report type - use default output_path or auto-generate
-      NULL  # Let write_dashboard_output handle it
+      file.path(base_output_dir, paste0(project_name, "_Dashboard_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
     }
 
     output_files$dashboard <- write_dashboard_output(
@@ -435,19 +474,14 @@ run_tracker <- function(tracking_config_path,
 
   if ("sig_matrix" %in% report_types) {
     # Generate significance matrix report (standalone, without dashboard)
-    sig_matrix_path <- if (length(report_types) > 1) {
-      # Multiple report types - use specific filename
-      output_dir <- if (!is.null(output_path)) {
-        dirname(output_path)
-      } else {
-        get_setting(config, "output_dir", default = dirname(config$config_path))
-      }
+    sig_matrix_path <- if (length(report_types) == 1 && !is.null(output_file_setting) && nzchar(trimws(output_file_setting))) {
+      # Single report type with output_file setting - use it directly
+      file.path(base_output_dir, trimws(output_file_setting))
+    } else {
+      # Auto-generate filename
       project_name <- get_setting(config, "project_name", default = "Tracking")
       project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
-      file.path(output_dir, paste0(project_name, "_SigMatrix_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
-    } else {
-      # Single report type - use default output_path or auto-generate
-      NULL  # Let write_sig_matrix_output handle it
+      file.path(base_output_dir, paste0(project_name, "_SigMatrix_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
     }
 
     output_files$sig_matrix <- write_sig_matrix_output(

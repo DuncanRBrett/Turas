@@ -542,12 +542,23 @@ write_trend_dashboard <- function(wb, trend_results, config, sheet_name = "Trend
   # ===========================================================================
 
   current_row <- header_row + 1
+  rows_written <- 0
+
+  # Debug: show what we're iterating over
+  if (length(trend_results) == 0) {
+    message("  WARNING: No trend results to display in dashboard")
+  } else {
+    message(paste0("  Processing ", length(trend_results), " questions for dashboard..."))
+  }
 
   for (q_code in names(trend_results)) {
     q_result <- trend_results[[q_code]]
 
     # Skip if no wave_results
-    if (is.null(q_result$wave_results)) next
+    if (is.null(q_result$wave_results)) {
+      message(paste0("    Skipping ", q_code, ": no wave_results"))
+      next
+    }
 
     # Extract wave values
     wave_values <- sapply(wave_ids, function(wid) {
@@ -678,6 +689,14 @@ write_trend_dashboard <- function(wb, trend_results, config, sheet_name = "Trend
                        rows = current_row, cols = col)
 
     current_row <- current_row + 1
+    rows_written <- rows_written + 1
+  }
+
+  # Report how many rows were written
+  if (rows_written == 0) {
+    message("  WARNING: No data rows written to dashboard. Check that trend_results contains valid wave_results.")
+  } else {
+    message(paste0("  Dashboard: ", rows_written, " question rows written"))
   }
 
   # ===========================================================================
@@ -965,14 +984,33 @@ write_significance_matrix <- function(wb, q_result, config, wave_ids) {
 write_all_significance_matrices <- function(wb, trend_results, config) {
 
   wave_ids <- config$waves$WaveID
+  matrices_written <- 0
+
+  # Debug: show what we're iterating over
+  if (length(trend_results) == 0) {
+    message("  WARNING: No trend results to display in significance matrices")
+  } else {
+    message(paste0("  Processing ", length(trend_results), " questions for significance matrices..."))
+  }
 
   for (q_code in names(trend_results)) {
     q_result <- trend_results[[q_code]]
 
     # Skip if no wave_results
-    if (is.null(q_result$wave_results)) next
+    if (is.null(q_result$wave_results)) {
+      message(paste0("    Skipping ", q_code, ": no wave_results"))
+      next
+    }
 
     write_significance_matrix(wb, q_result, config, wave_ids)
+    matrices_written <- matrices_written + 1
+  }
+
+  # Report how many matrices were written
+  if (matrices_written == 0) {
+    message("  WARNING: No significance matrices written. Check that trend_results contains valid wave_results.")
+  } else {
+    message(paste0("  Sig Matrix: ", matrices_written, " matrices written"))
   }
 
   invisible(wb)
@@ -1007,13 +1045,29 @@ write_dashboard_output <- function(trend_results, config, wave_data,
   if (is.null(output_path)) {
     output_dir <- get_setting(config, "output_dir", default = NULL)
 
-    if (is.null(output_dir)) {
+    if (is.null(output_dir) || !nzchar(trimws(output_dir))) {
       output_dir <- dirname(config$config_path)
     }
 
-    project_name <- get_setting(config, "project_name", default = "Tracking")
-    project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
-    filename <- paste0(project_name, "_Dashboard_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+    # Ensure output directory exists
+    if (!dir.exists(output_dir)) {
+      tryCatch({
+        dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+      }, error = function(e) {
+        warning(paste0("Could not create output directory: ", output_dir, ". Using config directory."))
+        output_dir <<- dirname(config$config_path)
+      })
+    }
+
+    # Check for output_file setting first, otherwise auto-generate
+    output_file <- get_setting(config, "output_file", default = NULL)
+    if (!is.null(output_file) && nzchar(trimws(output_file))) {
+      filename <- trimws(output_file)
+    } else {
+      project_name <- get_setting(config, "project_name", default = "Tracking")
+      project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
+      filename <- paste0(project_name, "_Dashboard_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+    }
 
     output_path <- file.path(output_dir, filename)
   }
@@ -1077,13 +1131,29 @@ write_sig_matrix_output <- function(trend_results, config, wave_data, output_pat
   if (is.null(output_path)) {
     output_dir <- get_setting(config, "output_dir", default = NULL)
 
-    if (is.null(output_dir)) {
+    if (is.null(output_dir) || !nzchar(trimws(output_dir))) {
       output_dir <- dirname(config$config_path)
     }
 
-    project_name <- get_setting(config, "project_name", default = "Tracking")
-    project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
-    filename <- paste0(project_name, "_SigMatrix_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+    # Ensure output directory exists
+    if (!dir.exists(output_dir)) {
+      tryCatch({
+        dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+      }, error = function(e) {
+        warning(paste0("Could not create output directory: ", output_dir, ". Using config directory."))
+        output_dir <<- dirname(config$config_path)
+      })
+    }
+
+    # Check for output_file setting first, otherwise auto-generate
+    output_file <- get_setting(config, "output_file", default = NULL)
+    if (!is.null(output_file) && nzchar(trimws(output_file))) {
+      filename <- trimws(output_file)
+    } else {
+      project_name <- get_setting(config, "project_name", default = "Tracking")
+      project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
+      filename <- paste0(project_name, "_SigMatrix_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+    }
 
     output_path <- file.path(output_dir, filename)
   }
