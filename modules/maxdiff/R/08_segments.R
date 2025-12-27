@@ -6,12 +6,142 @@
 #
 # VERSION HISTORY:
 # Turas v10.0 - Initial release (2025-12)
+# Turas v10.1 - Security fix: safe expression evaluation (2024-12)
 #
 # DEPENDENCIES:
 # - utils.R
 # ==============================================================================
 
-SEGMENTS_VERSION <- "10.0"
+SEGMENTS_VERSION <- "10.1"
+
+# ==============================================================================
+# SAFE EXPRESSION EVALUATION
+# ==============================================================================
+
+# Blacklisted function names that could be dangerous
+.UNSAFE_FUNCTIONS <- c(
+
+  "system", "system2", "shell", "shell.exec",
+  "Sys.setenv", "Sys.unsetenv",
+  "file.remove", "file.rename", "unlink", "file.create", "file.copy",
+  "download.file", "source", "eval", "parse",
+  "library", "require", "loadNamespace", "attachNamespace",
+  "assign", "rm", "remove", "get", "exists",
+  "writeLines", "writeChar", "writeBin", "write.csv", "write.table",
+  "save", "save.image", "saveRDS",
+  "setwd", "Sys.chmod", "Sys.umask",
+  "options", "Sys.setlocale",
+  "q", "quit", "stop", "stopifnot"
+)
+
+#' Validate expression for safe evaluation
+#'
+#' Checks that an R expression only contains safe operations.
+#' Prevents code injection by blocking dangerous function calls.
+#'
+#' @param expr_text Character. Expression text to validate
+#' @param allowed_vars Character vector. Variable names allowed in expression
+#' @return Logical TRUE if safe, otherwise throws error
+#' @keywords internal
+validate_safe_expression <- function(expr_text, allowed_vars = NULL) {
+  if (is.null(expr_text) || !nzchar(trimws(expr_text))) {
+    return(TRUE)
+  }
+
+
+  # Parse the expression to check its structure
+  parsed <- tryCatch({
+    parse(text = expr_text)
+  }, error = function(e) {
+    stop(sprintf(
+      "Invalid expression syntax: %s\n  Error: %s",
+      expr_text, conditionMessage(e)
+    ), call. = FALSE)
+  })
+
+  # Get all function calls in the expression
+  expr_calls <- all.names(parsed, functions = TRUE, unique = TRUE)
+
+  # Check for unsafe function calls
+  unsafe_found <- intersect(tolower(expr_calls), tolower(.UNSAFE_FUNCTIONS))
+  if (length(unsafe_found) > 0) {
+    stop(sprintf(
+      "Expression contains unsafe function calls: %s\n  Expression: %s",
+      paste(unsafe_found, collapse = ", "), expr_text
+    ), call. = FALSE)
+  }
+
+  # Check for assignment operators which could be used maliciously
+  if (grepl("<-|<<-|->|->>|=(?!=)", expr_text, perl = TRUE)) {
+    # Allow == and != but not assignment =
+    if (grepl("(?<![=!<>])=(?!=)", expr_text, perl = TRUE)) {
+      stop(sprintf(
+        "Expression contains assignment operator (use == for comparison): %s",
+        expr_text
+      ), call. = FALSE)
+    }
+  }
+
+  # If allowed_vars specified, validate only those variables are used
+  if (!is.null(allowed_vars) && length(allowed_vars) > 0) {
+    expr_names <- all.names(parsed, functions = FALSE, unique = TRUE)
+    # Filter out operators and literals
+    expr_vars <- expr_names[!expr_names %in% c(
+      "==", "!=", "<", ">", "<=", ">=", "&", "|", "!",
+      "+", "-", "*", "/", "^", "%%", "%/%", "%in%",
+      "c", "TRUE", "FALSE", "NA", "NULL", "Inf", "NaN",
+      "if", "else", "ifelse", "is.na", "is.null",
+      "as.character", "as.numeric", "as.integer", "as.logical",
+      "toupper", "tolower", "trimws", "nchar", "substr", "paste", "paste0",
+      "sum", "mean", "min", "max", "length", "abs", "round", "floor", "ceiling"
+    )]
+
+    # Remove numeric literals
+    expr_vars <- expr_vars[!grepl("^[0-9.]+$", expr_vars)]
+    # Remove quoted strings (they show up as variable names after parsing)
+    expr_vars <- expr_vars[!grepl("^['\"].*['\"]$", expr_vars)]
+
+    unknown_vars <- setdiff(expr_vars, allowed_vars)
+    if (length(unknown_vars) > 0) {
+      stop(sprintf(
+        "Expression references unknown variables: %s\n  Available: %s",
+        paste(unknown_vars, collapse = ", "),
+        paste(head(allowed_vars, 20), collapse = ", ")
+      ), call. = FALSE)
+    }
+  }
+
+  return(TRUE)
+}
+
+#' Safely evaluate expression within data context
+#'
+#' Evaluates an R expression after validating it for safety.
+#'
+#' @param expr_text Character. Expression to evaluate
+#' @param data Data frame. Context for evaluation
+#' @param context Character. Description for error messages
+#' @return Result of expression evaluation
+#' @keywords internal
+safe_eval_expression <- function(expr_text, data, context = "expression") {
+  # Validate expression is safe
+
+  validate_safe_expression(expr_text, allowed_vars = names(data))
+
+  # Parse and evaluate in controlled environment
+  parsed <- parse(text = expr_text)
+
+  result <- tryCatch({
+    eval(parsed, envir = data, enclos = baseenv())
+  }, error = function(e) {
+    stop(sprintf(
+      "Error evaluating %s: %s\n  Expression: %s",
+      context, conditionMessage(e), expr_text
+    ), call. = FALSE)
+  })
+
+  return(result)
+}
 
 # ==============================================================================
 # MAIN SEGMENT ANALYZER
@@ -155,9 +285,10 @@ compute_single_segment <- function(long_data, resp_data, seg_var, seg_def,
 
   # Apply segment definition if provided
   if (!is.null(seg_def) && !is.na(seg_def) && nzchar(trimws(seg_def))) {
-    # Evaluate expression to create segment variable
+    # Safely evaluate expression to create segment variable
+    # Uses validated evaluation to prevent code injection
     resp_data$segment_value <- tryCatch({
-      eval(parse(text = seg_def), envir = resp_data)
+      safe_eval_expression(seg_def, resp_data, context = sprintf("segment '%s'", seg_id))
     }, error = function(e) {
       if (verbose) {
         log_message(sprintf(

@@ -6,13 +6,112 @@
 #
 # VERSION HISTORY:
 # Turas v10.0 - Initial release (2025-12)
+# Turas v10.1 - Security fix: safe filter expression evaluation (2024-12)
 #
 # DEPENDENCIES:
 # - openxlsx, readxl (Excel reading)
 # - utils.R
 # ==============================================================================
 
-DATA_VERSION <- "10.0"
+DATA_VERSION <- "10.1"
+
+# ==============================================================================
+# SAFE EXPRESSION EVALUATION FOR FILTERS
+# ==============================================================================
+
+# Blacklisted function names that could be dangerous
+.UNSAFE_FILTER_FUNCTIONS <- c(
+  "system", "system2", "shell", "shell.exec",
+  "Sys.setenv", "Sys.unsetenv",
+  "file.remove", "file.rename", "unlink", "file.create", "file.copy",
+  "download.file", "source", "eval", "parse",
+  "library", "require", "loadNamespace", "attachNamespace",
+  "assign", "rm", "remove", "get", "exists",
+  "writeLines", "writeChar", "writeBin", "write.csv", "write.table",
+  "save", "save.image", "saveRDS",
+  "setwd", "Sys.chmod", "Sys.umask",
+  "options", "Sys.setlocale",
+  "q", "quit", "stop", "stopifnot"
+)
+
+#' Validate filter expression for safe evaluation
+#'
+#' @param expr_text Character. Filter expression text
+#' @param allowed_vars Character vector. Column names allowed in expression
+#' @return Logical TRUE if safe, otherwise throws error
+#' @keywords internal
+validate_filter_expression <- function(expr_text, allowed_vars) {
+  if (is.null(expr_text) || !nzchar(trimws(expr_text))) {
+    return(TRUE)
+  }
+
+  # Parse the expression to check its structure
+  parsed <- tryCatch({
+    parse(text = expr_text)
+  }, error = function(e) {
+    stop(sprintf(
+      "Invalid filter expression syntax: %s\n  Error: %s",
+      expr_text, conditionMessage(e)
+    ), call. = FALSE)
+  })
+
+  # Get all function calls in the expression
+  expr_calls <- all.names(parsed, functions = TRUE, unique = TRUE)
+
+  # Check for unsafe function calls
+  unsafe_found <- intersect(tolower(expr_calls), tolower(.UNSAFE_FILTER_FUNCTIONS))
+  if (length(unsafe_found) > 0) {
+    stop(sprintf(
+      "Filter expression contains unsafe function calls: %s\n  Expression: %s",
+      paste(unsafe_found, collapse = ", "), expr_text
+    ), call. = FALSE)
+  }
+
+  # Check for assignment operators
+  if (grepl("<-|<<-|->|->>", expr_text, perl = TRUE)) {
+    stop(sprintf(
+      "Filter expression contains assignment operator: %s",
+      expr_text
+    ), call. = FALSE)
+  }
+
+  # Single = is allowed in subset() context for column selection, but check for abuse
+  if (grepl("(?<![=!<>])=(?!=)", expr_text, perl = TRUE)) {
+    stop(sprintf(
+      "Filter expression contains assignment operator (use == for comparison): %s",
+      expr_text
+    ), call. = FALSE)
+  }
+
+  # Validate variable names if provided
+  if (!is.null(allowed_vars) && length(allowed_vars) > 0) {
+    expr_names <- all.names(parsed, functions = FALSE, unique = TRUE)
+
+    # Filter out operators, literals, and safe functions
+    expr_vars <- expr_names[!expr_names %in% c(
+      "==", "!=", "<", ">", "<=", ">=", "&", "|", "!", "&&", "||",
+      "+", "-", "*", "/", "^", "%%", "%/%", "%in%",
+      "c", "TRUE", "FALSE", "NA", "NULL", "Inf", "NaN",
+      "is.na", "is.null", "!is.na", "!is.null",
+      "as.character", "as.numeric", "as.integer",
+      "toupper", "tolower", "trimws", "grepl", "grep"
+    )]
+
+    # Remove numeric literals
+    expr_vars <- expr_vars[!grepl("^[0-9.]+$", expr_vars)]
+
+    unknown_vars <- setdiff(expr_vars, allowed_vars)
+    if (length(unknown_vars) > 0) {
+      stop(sprintf(
+        "Filter expression references unknown columns: %s\n  Available columns: %s",
+        paste(unknown_vars, collapse = ", "),
+        paste(head(allowed_vars, 15), collapse = ", ")
+      ), call. = FALSE)
+    }
+  }
+
+  return(TRUE)
+}
 
 # ==============================================================================
 # DATA LOADING
@@ -133,6 +232,9 @@ load_design_file <- function(file_path, verbose = TRUE) {
 
 #' Apply filter expression to data
 #'
+#' Applies a filter expression to data after validating it for safety.
+#' Prevents code injection by blocking dangerous function calls.
+#'
 #' @param data Data frame. Survey data
 #' @param filter_expr Character. R filter expression (e.g., "Wave == 2025")
 #' @param verbose Logical. Print progress messages
@@ -147,11 +249,18 @@ apply_filter_expression <- function(data, filter_expr, verbose = TRUE) {
 
   n_before <- nrow(data)
 
+  # Validate filter expression for safety before evaluation
+  validate_filter_expression(filter_expr, allowed_vars = names(data))
+
+  # Now safe to evaluate - uses subset() which evaluates in data context
   filtered <- tryCatch({
-    subset(data, eval(parse(text = filter_expr)))
+    # Parse once (already validated above)
+    parsed_expr <- parse(text = filter_expr)
+    # Evaluate in restricted environment (baseenv prevents access to global functions)
+    subset(data, eval(parsed_expr, envir = data, enclos = baseenv()))
   }, error = function(e) {
     stop(sprintf(
-      "Invalid filter expression: %s\n  Error: %s",
+      "Filter expression evaluation error: %s\n  Error: %s",
       filter_expr, conditionMessage(e)
     ), call. = FALSE)
   })

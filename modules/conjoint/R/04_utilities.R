@@ -297,7 +297,13 @@ calculate_choice_fit_stats <- function(model_result, data, config) {
     pull(n_alts) %>%
     mean()
 
-  chance_rate <- 1 / alts_per_set
+  # Guard against division by zero
+  if (is.na(alts_per_set) || alts_per_set == 0) {
+    message("[TRS INFO] CONJ_ZERO_ALTS: Average alternatives per set is zero or NA - cannot calculate chance rate")
+    chance_rate <- NA_real_
+  } else {
+    chance_rate <- 1 / alts_per_set
+  }
 
   list(
     mcfadden_r2 = mcfadden_r2,

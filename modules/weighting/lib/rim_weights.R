@@ -493,6 +493,13 @@ calculate_achieved_margins <- function(data, target_list, weights) {
 
   margins_list <- list()
 
+  # Guard against division by zero
+  total_weight <- sum(weights, na.rm = TRUE)
+  if (total_weight == 0) {
+    warning("Total weight is zero, cannot calculate achieved margins", call. = FALSE)
+    return(NULL)
+  }
+
   for (var in names(target_list)) {
     target_props <- target_list[[var]]
 
@@ -501,7 +508,7 @@ calculate_achieved_margins <- function(data, target_list, weights) {
       in_cat <- data[[var]] == cat
       in_cat[is.na(in_cat)] <- FALSE
 
-      achieved_pct <- sum(weights[in_cat]) / sum(weights) * 100
+      achieved_pct <- sum(weights[in_cat], na.rm = TRUE) / total_weight * 100
       target_pct <- target_props[cat] * 100
 
       margins_list[[length(margins_list) + 1]] <- data.frame(

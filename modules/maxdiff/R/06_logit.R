@@ -85,9 +85,12 @@ fit_aggregate_logit <- function(long_data, items, weighted = TRUE,
   non_anchor_items <- setdiff(included_items, anchor_item)
 
   # Create item indicator variables
+  # IMPORTANT: Multiply by sign to handle worst choices correctly
+  # For best choices (sign=1), indicators are positive
+  # For worst choices (sign=-1), indicators are negated (as per MaxDiff theory)
   for (item_id in non_anchor_items) {
     safe_name <- make.names(paste0("item_", item_id))
-    logit_data[[safe_name]] <- as.numeric(logit_data$item_id == item_id)
+    logit_data[[safe_name]] <- as.numeric(logit_data$item_id == item_id) * logit_data$sign
   }
 
   # Formula with item indicators

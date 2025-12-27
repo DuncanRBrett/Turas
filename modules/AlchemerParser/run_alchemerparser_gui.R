@@ -56,7 +56,8 @@ for (f in r_files) {
 
 # Check required packages
 check_dependencies <- function() {
-  required_packages <- c("readxl", "openxlsx", "officer", "shiny", "shinyFiles", "fs")
+  # DT package added for interactive data table displays
+  required_packages <- c("readxl", "openxlsx", "officer", "shiny", "shinyFiles", "fs", "DT")
   missing_packages <- character(0)
 
   for (pkg in required_packages) {
