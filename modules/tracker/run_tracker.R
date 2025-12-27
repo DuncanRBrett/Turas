@@ -35,24 +35,25 @@ script_dir <- tryCatch({
   } else if (exists("toolkit_path") && !is.null(toolkit_path) && length(toolkit_path) > 0 && nzchar(toolkit_path[1])) {
     dirname(toolkit_path[1])
   } else {
-    # Fallback: search for the tracker directory
-    # Check multiple possible locations
-    candidates <- c(
-      file.path(getwd(), "modules", "tracker"),
-      file.path(dirname(getwd()), "modules", "tracker"),
-      Sys.getenv("TURAS_HOME", unset = NA)
-    )
-    # Filter to valid candidates
-    candidates <- candidates[!is.na(candidates)]
-    # Check which ones exist and have lib/00_guard.R
-    valid <- sapply(candidates, function(p) {
-      file.exists(file.path(p, "lib", "00_guard.R"))
-    })
-    if (any(valid)) {
-      candidates[valid][1]
-    } else {
-      # Last resort - assume current directory structure
+    # Check if we're ALREADY in the tracker directory (GUI sets wd before sourcing)
+    if (file.exists(file.path(getwd(), "lib", "00_guard.R"))) {
       getwd()
+    } else {
+      # Fallback: search for the tracker directory
+      candidates <- c(
+        file.path(getwd(), "modules", "tracker"),
+        file.path(dirname(getwd()), "modules", "tracker"),
+        Sys.getenv("TURAS_HOME", unset = NA)
+      )
+      candidates <- candidates[!is.na(candidates)]
+      valid <- sapply(candidates, function(p) {
+        file.exists(file.path(p, "lib", "00_guard.R"))
+      })
+      if (any(valid)) {
+        candidates[valid][1]
+      } else {
+        getwd()
+      }
     }
   }
 }, error = function(e) {
