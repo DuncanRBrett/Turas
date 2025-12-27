@@ -18,20 +18,12 @@
 # ==============================================================================
 
 # Debug: Write to log file (same location as GUI debug log)
-.tracker_debug_log <- tryCatch({
-  # Try to find the debug log from GUI, or create one in temp
-  candidates <- c(
-    file.path(Sys.getenv("TURAS_HOME", unset = getwd()), "tracker_gui_debug.log"),
-    file.path(getwd(), "..", "..", "tracker_gui_debug.log"),
-    file.path(tempdir(), "tracker_debug.log")
-  )
-  for (f in candidates) {
-    if (file.exists(f) || file.exists(dirname(f))) {
-      f
-    }
-  }
-  candidates[1]  # Default to first
-}, error = function(e) file.path(tempdir(), "tracker_debug.log"))
+# The GUI log is at TURAS_HOME/tracker_gui_debug.log
+# When sourced from GUI, getwd() is already modules/tracker, so go up 2 levels
+.tracker_debug_log <- file.path(getwd(), "..", "..", "tracker_gui_debug.log")
+if (!file.exists(dirname(.tracker_debug_log))) {
+  .tracker_debug_log <- file.path(tempdir(), "tracker_debug.log")
+}
 
 .write_tracker_debug <- function(...) {
   msg <- paste0(format(Sys.time(), "%H:%M:%S"), " [run_tracker.R] ", paste(..., collapse = " "), "\n")
