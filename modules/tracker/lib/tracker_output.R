@@ -145,35 +145,58 @@ write_tracker_output <- function(trend_results, config, wave_data, output_path =
   cat("WRITING EXCEL OUTPUT\n")
   cat("================================================================================\n\n")
 
+  # Debug: Check inputs
+  cat("[DEBUG] trend_results type:", class(trend_results)[1], "length:", length(trend_results), "\n")
+  cat("[DEBUG] config type:", class(config)[1], "\n")
+  cat("[DEBUG] wave_data type:", class(wave_data)[1], "length:", length(wave_data), "\n")
+  cat("[DEBUG] output_path:", if (is.null(output_path)) "NULL" else output_path, "\n")
+
   # Detect if results have banner breakouts
+  cat("[DEBUG] Calling detect_banner_results...\n")
   has_banners <- detect_banner_results(trend_results)
+  cat("[DEBUG] has_banners:", has_banners, "\n")
 
   if (has_banners) {
     cat("  Detected banner breakout results\n")
   }
 
   # Determine output path
+  cat("[DEBUG] Calling resolve_output_path...\n")
   output_path <- resolve_output_path(output_path, config)
+  cat("[DEBUG] resolved output_path:", output_path, "\n")
 
   cat(paste0("Output file: ", output_path, "\n"))
 
   # Create workbook
+  cat("[DEBUG] Creating workbook...\n")
   wb <- openxlsx::createWorkbook()
+  cat("[DEBUG] Workbook created OK\n")
 
   # Create styles
+  cat("[DEBUG] Creating styles...\n")
   styles <- create_tracker_styles()
+  cat("[DEBUG] Styles created OK\n")
 
   # Write sheets
+  cat("[DEBUG] Writing summary sheet...\n")
   write_summary_sheet(wb, config, wave_data, trend_results, styles, banner_segments)
+  cat("[DEBUG] Summary sheet written OK\n")
 
   if (has_banners) {
+    cat("[DEBUG] Writing trend sheets with banners...\n")
     write_trend_sheets_with_banners(wb, trend_results, config, styles)
+    cat("[DEBUG] Writing change summary sheet...\n")
     write_change_summary_sheet(wb, trend_results, config, styles)
+    cat("[DEBUG] Banner sheets written OK\n")
   } else {
+    cat("[DEBUG] Writing trend sheets...\n")
     write_trend_sheets(wb, trend_results, config, styles)
+    cat("[DEBUG] Trend sheets written OK\n")
   }
 
+  cat("[DEBUG] Writing metadata sheet...\n")
   write_metadata_sheet(wb, config, wave_data, styles)
+  cat("[DEBUG] Metadata sheet written OK\n")
 
   # ===========================================================================
   # TRS v1.0: Add Run_Status Sheet
