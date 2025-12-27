@@ -44,8 +44,10 @@
 # TRS GUARD LAYER - Must be loaded FIRST
 # ==============================================================================
 
-# Determine script directory for sourcing
-script_dir <- if (exists("toolkit_path")) dirname(toolkit_path) else getwd()
+# Determine script directory for sourcing (only if not already set by parent)
+if (!exists("script_dir")) {
+  script_dir <- if (exists("toolkit_path")) dirname(toolkit_path) else getwd()
+}
 
 # TRS Guard Layer (v1.0) - MUST be loaded before any TRS refusal calls
 source(file.path(script_dir, "00_guard.R"))

@@ -31,6 +31,20 @@
 SCRIPT_VERSION <- "10.0"
 
 # ==============================================================================
+# DETERMINE SCRIPT DIRECTORY
+# ==============================================================================
+
+# Must be defined BEFORE sourcing any modules
+script_dir <- if (exists("toolkit_path")) dirname(toolkit_path) else {
+  # Try to determine from this script's location
+  tryCatch({
+    dirname(sys.frame(1)$ofile)
+  }, error = function(e) {
+    getwd()
+  })
+}
+
+# ==============================================================================
 # LOAD SUB-MODULES (NEW IN V10.0)
 # ==============================================================================
 
