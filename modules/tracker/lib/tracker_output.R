@@ -444,13 +444,17 @@ write_trend_sheets <- function(wb, trend_results, config, styles) {
   message(paste0("  Writing ", length(trend_results), " trend sheets..."))
 
   wave_ids <- config$waves$WaveID
+  cat("[DEBUG] wave_ids:", paste(wave_ids, collapse=", "), "length:", length(wave_ids), "\n")
 
   for (q_code in names(trend_results)) {
+    cat("[DEBUG] Processing question:", q_code, "\n")
     result <- trend_results[[q_code]]
+    cat("[DEBUG]   metric_type:", result$metric_type, "\n")
 
     # Create safe sheet name (max 31 chars, no special chars)
     sheet_name <- substr(q_code, 1, 31)
     sheet_name <- gsub("[\\[\\]\\*/\\\\?:]", "_", sheet_name)
+    cat("[DEBUG]   sheet_name:", sheet_name, "\n")
 
     openxlsx::addWorksheet(wb, sheet_name)
 
@@ -467,6 +471,7 @@ write_trend_sheets <- function(wb, trend_results, config, styles) {
     current_row <- current_row + 2
 
     # Write trend table based on metric type
+    cat("[DEBUG]   Calling write function for metric_type:", result$metric_type, "\n")
     if (result$metric_type == "mean") {
       current_row <- write_mean_trend_table(wb, sheet_name, result, wave_ids, config, styles, current_row)
 
@@ -485,7 +490,9 @@ write_trend_sheets <- function(wb, trend_results, config, styles) {
     } else if (result$metric_type == "multi_mention") {
       current_row <- write_multi_mention_trend_table(wb, sheet_name, result, wave_ids, config, styles, current_row)
     }
+    cat("[DEBUG]   Done with question:", q_code, "\n")
   }
+  cat("[DEBUG] All trend sheets written\n")
 }
 
 
