@@ -72,11 +72,50 @@ normalize_question_type <- function(q_type) {
 #' @return List with t_stat, df, p_value, significant, alpha
 #' @keywords internal
 t_test_for_means <- function(mean1, sd1, n1, mean2, sd2, n2, alpha = DEFAULT_ALPHA) {
-  pooled_var <- ((n1 - 1) * sd1^2 + (n2 - 1) * sd2^2) / (n1 + n2 - 2)
+  # Guard against insufficient sample sizes for pooled t-test
+  # Need at least 2 observations in each group (df = n1 + n2 - 2 > 0)
+  df <- n1 + n2 - 2
+  if (df <= 0) {
+    return(list(
+      t_stat = NA_real_,
+      df = df,
+      p_value = NA_real_,
+      significant = FALSE,
+      alpha = alpha,
+      error = "Insufficient sample size: need at least 2 observations per group for pooled t-test"
+    ))
+  }
+
+  # Guard against zero sample sizes which would cause division by zero
+
+  if (n1 <= 0 || n2 <= 0) {
+    return(list(
+      t_stat = NA_real_,
+      df = df,
+      p_value = NA_real_,
+      significant = FALSE,
+      alpha = alpha,
+      error = "Sample sizes must be positive"
+    ))
+  }
+
+  pooled_var <- ((n1 - 1) * sd1^2 + (n2 - 1) * sd2^2) / df
   pooled_sd <- sqrt(pooled_var)
   se <- pooled_sd * sqrt(1/n1 + 1/n2)
+
+  # Guard against zero standard error
+  if (is.na(se) || se == 0) {
+    return(list(
+      t_stat = NA_real_,
+      df = df,
+      p_value = NA_real_,
+      significant = FALSE,
+      alpha = alpha,
+      error = "Cannot calculate t-statistic: standard error is zero"
+    ))
+  }
+
   t_stat <- (mean2 - mean1) / se
-  df <- n1 + n2 - 2
   p_value <- 2 * pt(-abs(t_stat), df)
   significant <- p_value < alpha
 

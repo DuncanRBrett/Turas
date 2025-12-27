@@ -182,7 +182,21 @@ generate_crosstab_config <- function(questions) {
     }
   }
 
-  # Combine into data frame
+  # Combine into data frame, guarding against empty list
+  if (length(rows) == 0) {
+    return(data.frame(
+      QuestionCode = character(0),
+      Include = logical(0),
+      UseBanner = logical(0),
+      BannerBoxCategory = character(0),
+      BannerLabel = character(0),
+      DisplayOrder = integer(0),
+      CreateIndex = character(0),
+      BaseFilter = character(0),
+      QuestionText = character(0),
+      stringsAsFactors = FALSE
+    ))
+  }
   do.call(rbind, rows)
 }
 
@@ -272,9 +286,43 @@ generate_survey_structure <- function(questions) {
     }
   }
 
+  # Guard against empty lists - return empty data frames with correct structure
+  questions_df <- if (length(question_rows) == 0) {
+    data.frame(
+      QuestionCode = character(0),
+      QuestionText = character(0),
+      Variable_Type = character(0),
+      Columns = integer(0),
+      Ranking_Format = character(0),
+      Ranking_Positions = character(0),
+      Ranking_Direction = character(0),
+      Category = character(0),
+      Notes = character(0),
+      stringsAsFactors = FALSE
+    )
+  } else {
+    do.call(rbind, question_rows)
+  }
+
+  options_df <- if (length(option_rows) == 0) {
+    data.frame(
+      QuestionCode = character(0),
+      OptionText = character(0),
+      DisplayText = character(0),
+      DisplayOrder = character(0),
+      ShowInOutput = character(0),
+      ExcludeFromIndex = character(0),
+      Index_Weight = character(0),
+      BoxCategory = character(0),
+      stringsAsFactors = FALSE
+    )
+  } else {
+    do.call(rbind, option_rows)
+  }
+
   list(
-    questions = do.call(rbind, question_rows),
-    options = do.call(rbind, option_rows)
+    questions = questions_df,
+    options = options_df
   )
 }
 

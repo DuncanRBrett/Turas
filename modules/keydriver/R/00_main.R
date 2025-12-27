@@ -471,7 +471,7 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
           )
         )
       } else {
-        # continue_with_flag - degraded output
+        # continue_with_flag - return structured failure result instead of superassignment
         cat("\n================================================================================\n")
         cat("  [WARNING] SHAP ANALYSIS FAILED - CONTINUING WITH PARTIAL OUTPUT\n")
         cat("================================================================================\n")
@@ -479,13 +479,19 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
         cat("  The analysis will continue but SHAP outputs will be missing.\n")
         cat("================================================================================\n\n")
 
-        guard <<- guard_warn(guard, paste0("SHAP failed: ", e$message), "shap")
-        guard$shap_status <<- "failed"
-        degraded_reasons <<- c(degraded_reasons, paste0("SHAP analysis failed: ", e$message))
-        affected_outputs <<- c(affected_outputs, "SHAP importance", "SHAP plots")
-        NULL
+        # Return a structured failure marker instead of using superassignment
+        list(.failed = TRUE, error_message = e$message)
       }
     })
+
+    # Handle SHAP failure result without superassignment
+    if (is.list(shap_results) && isTRUE(shap_results$.failed)) {
+      guard <- guard_warn(guard, paste0("SHAP failed: ", shap_results$error_message), "shap")
+      guard$shap_status <- "failed"
+      degraded_reasons <- c(degraded_reasons, paste0("SHAP analysis failed: ", shap_results$error_message))
+      affected_outputs <- c(affected_outputs, "SHAP importance", "SHAP plots")
+      shap_results <- NULL  # Clear the failure marker
+    }
 
     if (!is.null(shap_results)) {
       results$shap <- shap_results
@@ -537,7 +543,7 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
           )
         )
       } else {
-        # continue_with_flag - degraded output
+        # continue_with_flag - return structured failure result instead of superassignment
         cat("\n================================================================================\n")
         cat("  [WARNING] QUADRANT ANALYSIS FAILED - CONTINUING WITH PARTIAL OUTPUT\n")
         cat("================================================================================\n")
@@ -545,13 +551,19 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
         cat("  The analysis will continue but Quadrant outputs will be missing.\n")
         cat("================================================================================\n\n")
 
-        guard <<- guard_warn(guard, paste0("Quadrant failed: ", e$message), "quadrant")
-        guard$quadrant_status <<- "failed"
-        degraded_reasons <<- c(degraded_reasons, paste0("Quadrant analysis failed: ", e$message))
-        affected_outputs <<- c(affected_outputs, "Quadrant charts", "IPA analysis")
-        NULL
+        # Return a structured failure marker instead of using superassignment
+        list(.failed = TRUE, error_message = e$message)
       }
     })
+
+    # Handle Quadrant failure result without superassignment
+    if (is.list(quadrant_results) && isTRUE(quadrant_results$.failed)) {
+      guard <- guard_warn(guard, paste0("Quadrant failed: ", quadrant_results$error_message), "quadrant")
+      guard$quadrant_status <- "failed"
+      degraded_reasons <- c(degraded_reasons, paste0("Quadrant analysis failed: ", quadrant_results$error_message))
+      affected_outputs <- c(affected_outputs, "Quadrant charts", "IPA analysis")
+      quadrant_results <- NULL  # Clear the failure marker
+    }
 
     if (!is.null(quadrant_results)) {
       results$quadrant <- quadrant_results

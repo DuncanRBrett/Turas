@@ -16,6 +16,14 @@
 #' @return Data frame with profile statistics
 #' @export
 create_segment_profiles <- function(data, clusters, var_names = NULL) {
+  # Validate clusters length matches data rows
+  if (length(clusters) != nrow(data)) {
+    stop(sprintf(
+      "Clusters length (%d) does not match data rows (%d). Ensure clusters were generated from the same data.",
+      length(clusters), nrow(data)
+    ), call. = FALSE)
+  }
+
   if (is.null(var_names)) {
     var_names <- names(data)
   }

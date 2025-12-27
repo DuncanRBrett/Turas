@@ -100,6 +100,25 @@ map_terms_to_levels <- function(model, data, formula = NULL) {
     assign_vec <- attr(model.matrix(tt, data = mf), "assign")
   }
 
+  # Validate assign_vec dimensions match model matrix
+  if (is.null(assign_vec)) {
+    catdriver_refuse(
+      reason = "MAPPER_ASSIGN_VEC_MISSING",
+      title = "MISSING ASSIGNMENT VECTOR",
+      problem = "Could not obtain term assignment vector from model matrix.",
+      why_it_matters = "The assignment vector is needed to map coefficients to their original variables.",
+      fix = "This is an internal error. Please report this issue with your configuration."
+    )
+  }
+
+  # Check that assign_vec length matches model matrix columns
+  if (length(assign_vec) != ncol(mm)) {
+    log_message(sprintf(
+      "Assignment vector length (%d) does not match model matrix columns (%d). May affect term mapping.",
+      length(assign_vec), ncol(mm)
+    ), "warn")
+  }
+
   # Get term labels (predictor names)
   term_labels <- attr(tt, "term.labels")
 

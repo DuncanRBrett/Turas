@@ -228,11 +228,26 @@ compute_wtp_summary <- function(wtp_df) {
   var_wtp <- sum(w_norm * (x - mean_wtp)^2)
   sd_wtp <- sqrt(var_wtp)
 
+  # Guard against empty vector before calculating summary statistics
+  n_obs <- length(x)
+  if (n_obs == 0) {
+    return(data.frame(
+      n = 0L,
+      effective_n = 0,
+      mean = NA_real_,
+      median = NA_real_,
+      sd = NA_real_,
+      min = NA_real_,
+      max = NA_real_,
+      stringsAsFactors = FALSE
+    ))
+  }
+
   # Unweighted median (weighted median is complex)
   median_wtp <- median(x)
 
   data.frame(
-    n = length(x),
+    n = n_obs,
     effective_n = sum(w),
     mean = mean_wtp,
     median = median_wtp,

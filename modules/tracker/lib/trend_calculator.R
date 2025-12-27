@@ -231,8 +231,10 @@ calculate_all_trends <- function(config, question_map, wave_data, parallel = FAL
       })
 
       # If we got a trend result (not an early return), wrap it
-      if (!is.null(trend_result) && !is.list(trend_result) ||
-          (is.list(trend_result) && is.null(trend_result$skipped))) {
+      # Fixed operator precedence: use explicit parentheses for clarity
+      # Condition: result is non-null AND (either not a list, OR a list without skipped field)
+      if (!is.null(trend_result) &&
+          (!is.list(trend_result) || is.null(trend_result$skipped))) {
         return(list(
           q_code = q_code,
           result = trend_result,

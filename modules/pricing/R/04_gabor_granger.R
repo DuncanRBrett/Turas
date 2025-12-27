@@ -286,10 +286,13 @@ check_gg_monotonicity <- function(gg_data) {
     }
   }
 
+  n_resp <- length(respondents)
+
   list(
     violations = violations,
-    n_respondents = length(respondents),
-    violation_rate = violations / length(respondents)
+    n_respondents = n_resp,
+    # Guard against division by zero when no respondents
+    violation_rate = if (n_resp > 0) violations / n_resp else NA_real_
   )
 }
 

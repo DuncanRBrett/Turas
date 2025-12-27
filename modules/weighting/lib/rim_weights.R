@@ -198,6 +198,29 @@ calculate_rim_weights <- function(data,
     rake_data <- rake_data[complete_idx, , drop = FALSE]
   }
 
+  # Validate data frame size after complete case removal
+  if (nrow(rake_data) == 0) {
+    stop("No complete cases remain after removing rows with missing weighting variables.\n",
+         "All rows have NA values in at least one weighting variable.\n",
+         "Check your data for missing values in the weighting variables.",
+         call. = FALSE)
+  }
+
+  # Minimum sample size check for reliable weighting
+  n_target_cats <- sum(sapply(target_list, length))
+  min_recommended <- n_target_cats * 10
+  if (nrow(rake_data) < n_target_cats) {
+    stop(sprintf(
+      "Sample size (%d) is less than the number of target categories (%d).\n",
+      nrow(rake_data), n_target_cats
+    ), "Weighting requires more observations than weighting cells.", call. = FALSE)
+  } else if (nrow(rake_data) < min_recommended && verbose) {
+    message(sprintf(
+      "  Warning: Sample size (%d) is small relative to target categories (%d).\n  Recommended minimum: %d (10 per category)",
+      nrow(rake_data), n_target_cats, min_recommended
+    ))
+  }
+
   # Set up starting weights
   if (is.null(base_weights)) {
     starting_weights <- rep(1, nrow(rake_data))
@@ -493,6 +516,13 @@ calculate_achieved_margins <- function(data, target_list, weights) {
 
   margins_list <- list()
 
+  # Guard against division by zero
+  total_weight <- sum(weights, na.rm = TRUE)
+  if (total_weight == 0) {
+    warning("Total weight is zero, cannot calculate achieved margins", call. = FALSE)
+    return(NULL)
+  }
+
   for (var in names(target_list)) {
     target_props <- target_list[[var]]
 
@@ -501,7 +531,7 @@ calculate_achieved_margins <- function(data, target_list, weights) {
       in_cat <- data[[var]] == cat
       in_cat[is.na(in_cat)] <- FALSE
 
-      achieved_pct <- sum(weights[in_cat]) / sum(weights) * 100
+      achieved_pct <- sum(weights[in_cat], na.rm = TRUE) / total_weight * 100
       target_pct <- target_props[cat] * 100
 
       margins_list[[length(margins_list) + 1]] <- data.frame(

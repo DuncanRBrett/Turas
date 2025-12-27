@@ -224,24 +224,37 @@ validate_vw_data <- function(data, config, verbose = TRUE) {
   # ============================================================================
 
   if (n_complete > 0) {
-    median_price <- median(all_prices[all_prices > 0], na.rm = TRUE)
-    iqr_price <- IQR(all_prices[all_prices > 0], na.rm = TRUE)
+    positive_prices <- all_prices[all_prices > 0]
+    # Guard against empty positive price vector
+    if (length(positive_prices) == 0) {
+      median_price <- NA_real_
+      iqr_price <- NA_real_
+    } else {
+      median_price <- median(positive_prices, na.rm = TRUE)
+      iqr_price <- IQR(positive_prices, na.rm = TRUE)
+    }
 
     # Extreme if > 10x median or < 0.01x median
-    extreme_low <- sum(all_prices < median_price * 0.01)
-    extreme_high <- sum(all_prices > median_price * 10)
-    n_extreme <- extreme_low + extreme_high
+    # Guard: only check for extremes if we have a valid median
+    if (!is.na(median_price) && median_price > 0) {
+      extreme_low <- sum(all_prices < median_price * 0.01, na.rm = TRUE)
+      extreme_high <- sum(all_prices > median_price * 10, na.rm = TRUE)
+      n_extreme <- extreme_low + extreme_high
 
-    checks$no_extreme_outliers <- n_extreme < n_complete * 4 * 0.05  # < 5% extreme
+      checks$no_extreme_outliers <- n_extreme < n_complete * 4 * 0.05  # < 5% extreme
 
-    if (!checks$no_extreme_outliers) {
-      issues <- c(issues, sprintf(
-        "%d extreme price values detected (>10x or <0.01x median)",
-        n_extreme
-      ))
-      recommendations <- c(recommendations,
-        "Review extreme values for data entry errors"
-      )
+      if (!checks$no_extreme_outliers) {
+        issues <- c(issues, sprintf(
+          "%d extreme price values detected (>10x or <0.01x median)",
+          n_extreme
+        ))
+        recommendations <- c(recommendations,
+          "Review extreme values for data entry errors"
+        )
+      }
+    } else {
+      # Cannot check outliers without valid median
+      checks$no_extreme_outliers <- TRUE
     }
   } else {
     checks$no_extreme_outliers <- FALSE
