@@ -17,19 +17,45 @@
 #
 # ==============================================================================
 
-# Debug: Confirm run_tracker.R is starting
-cat("[Tracker] run_tracker.R starting...\n")
+# Debug: Write to log file (same location as GUI debug log)
+.tracker_debug_log <- tryCatch({
+  # Try to find the debug log from GUI, or create one in temp
+  candidates <- c(
+    file.path(Sys.getenv("TURAS_HOME", unset = getwd()), "tracker_gui_debug.log"),
+    file.path(getwd(), "..", "..", "tracker_gui_debug.log"),
+    file.path(tempdir(), "tracker_debug.log")
+  )
+  for (f in candidates) {
+    if (file.exists(f) || file.exists(dirname(f))) {
+      f
+    }
+  }
+  candidates[1]  # Default to first
+}, error = function(e) file.path(tempdir(), "tracker_debug.log"))
+
+.write_tracker_debug <- function(...) {
+  msg <- paste0(format(Sys.time(), "%H:%M:%S"), " [run_tracker.R] ", paste(..., collapse = " "), "\n")
+  cat(msg)
+  tryCatch(cat(msg, file = .tracker_debug_log, append = TRUE), error = function(e) NULL)
+}
+
+.write_tracker_debug("=== run_tracker.R STARTING ===")
+.write_tracker_debug("getwd() =", getwd())
 
 # Load required libraries
+.write_tracker_debug("Loading openxlsx...")
 library(openxlsx)
+.write_tracker_debug("openxlsx loaded OK")
 
 # Debug: Show what toolkit_path is set to
-cat("[Tracker Debug] toolkit_path = ", if (exists("toolkit_path")) toolkit_path else "NOT SET", "\n")
+.write_tracker_debug("toolkit_path =", if (exists("toolkit_path")) toolkit_path else "NOT SET")
 
 # Source module files
 # When run from GUI or Jupyter, sys.frame(1)$ofile may be NULL
+.write_tracker_debug("Detecting script_dir...")
 script_dir <- tryCatch({
   ofile <- sys.frame(1)$ofile
+  .write_tracker_debug("sys.frame(1)$ofile =", if (is.null(ofile)) "NULL" else ofile)
   if (!is.null(ofile) && length(ofile) > 0 && nzchar(ofile)) {
     dirname(ofile)
   } else if (exists("toolkit_path") && !is.null(toolkit_path) && length(toolkit_path) > 0 && nzchar(toolkit_path[1])) {
@@ -37,6 +63,7 @@ script_dir <- tryCatch({
   } else {
     # Check if we're ALREADY in the tracker directory (GUI sets wd before sourcing)
     if (file.exists(file.path(getwd(), "lib", "00_guard.R"))) {
+      .write_tracker_debug("Already in tracker dir (found lib/00_guard.R)")
       getwd()
     } else {
       # Fallback: search for the tracker directory
@@ -57,14 +84,17 @@ script_dir <- tryCatch({
     }
   }
 }, error = function(e) {
+  .write_tracker_debug("script_dir detection error:", e$message)
   getwd()
 })
 
-cat("[Tracker Debug] script_dir = ", script_dir, "\n")
-cat("[Tracker Debug] Looking for: ", file.path(script_dir, "lib", "00_guard.R"), "\n")
+.write_tracker_debug("script_dir =", script_dir)
 
 # TRS Guard Layer (v1.0) - MUST be loaded first before any module files
 .guard_path <- file.path(script_dir, "lib", "00_guard.R")
+.write_tracker_debug("guard_path =", .guard_path)
+.write_tracker_debug("guard_path exists:", file.exists(.guard_path))
+
 if (!file.exists(.guard_path)) {
   stop(paste0(
     "Cannot find Tracker module files.\n",
@@ -75,7 +105,9 @@ if (!file.exists(.guard_path)) {
     "Please ensure toolkit_path is set to the path of run_tracker.R before sourcing."
   ))
 }
+.write_tracker_debug("About to source guard layer...")
 source(.guard_path)
+.write_tracker_debug("Guard layer loaded OK")
 rm(.guard_path)
 
 # ==============================================================================
