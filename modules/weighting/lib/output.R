@@ -45,15 +45,29 @@ write_weighted_data <- function(data, output_file, verbose = TRUE) {
       write.csv(data, output_file, row.names = FALSE)
     } else if (file_ext %in% c("xlsx", "xls")) {
       if (!requireNamespace("openxlsx", quietly = TRUE)) {
-        stop("Package 'openxlsx' required for Excel output. Install with: install.packages('openxlsx')",
-             call. = FALSE)
+        weighting_refuse(
+          code = "PKG_OPENXLSX_MISSING",
+          title = "Required Package Not Installed",
+          problem = "The 'openxlsx' package is required for Excel output but is not installed.",
+          why_it_matters = "Cannot write weighted data to Excel format without this package.",
+          how_to_fix = c(
+            "Install the package: install.packages('openxlsx')",
+            "Or use CSV format instead (change output_file extension to .csv)"
+          )
+        )
       }
       openxlsx::write.xlsx(data, output_file, rowNames = FALSE)
     } else {
-      stop(sprintf(
-        "Unsupported output format: .%s\nSupported formats: .csv, .xlsx",
-        file_ext
-      ), call. = FALSE)
+      weighting_refuse(
+        code = "IO_UNSUPPORTED_FORMAT",
+        title = "Unsupported Output Format",
+        problem = sprintf("Cannot write to format: .%s", file_ext),
+        why_it_matters = "Data cannot be saved in unsupported formats.",
+        how_to_fix = c(
+          "Use a supported format: .csv or .xlsx",
+          "Change the output_file extension in your config"
+        )
+      )
     }
 
     if (verbose) {
@@ -63,11 +77,18 @@ write_weighted_data <- function(data, output_file, verbose = TRUE) {
     return(invisible(output_file))
 
   }, error = function(e) {
-    stop(sprintf(
-      "Failed to write output file: %s\n\nError: %s\n\nTroubleshooting:\n  1. Check directory permissions\n  2. Ensure file is not open in another program\n  3. Verify disk space available",
-      output_file,
-      conditionMessage(e)
-    ), call. = FALSE)
+    weighting_refuse(
+      code = "IO_WRITE_FAILED",
+      title = "Failed to Write Output File",
+      problem = sprintf("Could not write weighted data to: %s", output_file),
+      why_it_matters = "Weighted data was calculated but could not be saved.",
+      how_to_fix = c(
+        "Check directory permissions",
+        "Ensure file is not open in another program",
+        "Verify disk space is available"
+      ),
+      details = conditionMessage(e)
+    )
   })
 }
 
@@ -246,8 +267,16 @@ generate_weighting_report <- function(weighting_results, output_file, verbose = 
     } else if (file_ext %in% c("xlsx", "xls")) {
       # Excel report - convert to structured tables
       if (!requireNamespace("openxlsx", quietly = TRUE)) {
-        stop("Package 'openxlsx' required for Excel diagnostics. Install with: install.packages('openxlsx')",
-             call. = FALSE)
+        weighting_refuse(
+          code = "PKG_OPENXLSX_MISSING",
+          title = "Required Package Not Installed",
+          problem = "The 'openxlsx' package is required for Excel diagnostics but is not installed.",
+          why_it_matters = "Cannot write diagnostics report to Excel format without this package.",
+          how_to_fix = c(
+            "Install the package: install.packages('openxlsx')",
+            "Or use .txt format instead for plain text report"
+          )
+        )
       }
 
       wb <- openxlsx::createWorkbook()
@@ -337,13 +366,38 @@ generate_weighting_report <- function(weighting_results, output_file, verbose = 
         }
       }
 
-      openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+      # Use atomic save if available (TRS v1.0)
+      if (exists("turas_save_workbook_atomic", mode = "function")) {
+        save_result <- turas_save_workbook_atomic(wb, output_file, module = "WEIGHTING")
+        if (!save_result$success) {
+          weighting_refuse(
+            code = "IO_ATOMIC_SAVE_FAILED",
+            title = "Failed to Save Diagnostics Report",
+            problem = sprintf("Atomic save failed for: %s", output_file),
+            why_it_matters = "Diagnostics report could not be saved safely.",
+            how_to_fix = c(
+              "Check directory permissions",
+              "Ensure file is not open in another program",
+              "Verify disk space is available"
+            ),
+            details = save_result$error
+          )
+        }
+      } else {
+        openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+      }
 
     } else {
-      stop(sprintf(
-        "Unsupported diagnostics format: .%s\nSupported formats: .txt, .xlsx",
-        file_ext
-      ), call. = FALSE)
+      weighting_refuse(
+        code = "IO_UNSUPPORTED_FORMAT",
+        title = "Unsupported Diagnostics Format",
+        problem = sprintf("Cannot write diagnostics to format: .%s", file_ext),
+        why_it_matters = "Diagnostics report cannot be saved in unsupported formats.",
+        how_to_fix = c(
+          "Use a supported format: .txt or .xlsx",
+          "Change the diagnostics_file extension in your config"
+        )
+      )
     }
 
     if (verbose) {
@@ -353,10 +407,18 @@ generate_weighting_report <- function(weighting_results, output_file, verbose = 
     return(invisible(output_file))
 
   }, error = function(e) {
-    stop(sprintf(
-      "Failed to write diagnostics file: %s\n\nError: %s",
-      output_file, conditionMessage(e)
-    ), call. = FALSE)
+    weighting_refuse(
+      code = "IO_DIAGNOSTICS_WRITE_FAILED",
+      title = "Failed to Write Diagnostics File",
+      problem = sprintf("Could not write diagnostics report to: %s", output_file),
+      why_it_matters = "Weighting completed but diagnostics could not be saved.",
+      how_to_fix = c(
+        "Check directory permissions",
+        "Ensure file is not open in another program",
+        "Verify disk space is available"
+      ),
+      details = conditionMessage(e)
+    )
   })
 }
 
