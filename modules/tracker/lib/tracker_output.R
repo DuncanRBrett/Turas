@@ -85,15 +85,31 @@ write_tracker_output <- function(trend_results, config, wave_data, output_path =
     # Get output directory from settings or use config file location
     output_dir <- get_setting(config, "output_dir", default = NULL)
 
-    if (is.null(output_dir)) {
+    if (is.null(output_dir) || !nzchar(trimws(output_dir))) {
       # Default to same directory as config file
       output_dir <- dirname(config$config_path)
     }
 
-    # Generate filename
-    project_name <- get_setting(config, "project_name", default = "Tracking")
-    project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)  # Sanitize
-    filename <- paste0(project_name, "_Tracker_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+    # Ensure output directory exists
+    if (!dir.exists(output_dir)) {
+      tryCatch({
+        dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+      }, error = function(e) {
+        warning(paste0("Could not create output directory: ", output_dir, ". Using config directory."))
+        output_dir <<- dirname(config$config_path)
+      })
+    }
+
+    # Check for output_file setting first, otherwise auto-generate
+    output_file <- get_setting(config, "output_file", default = NULL)
+    if (!is.null(output_file) && nzchar(trimws(output_file))) {
+      filename <- trimws(output_file)
+    } else {
+      # Generate filename
+      project_name <- get_setting(config, "project_name", default = "Tracking")
+      project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)  # Sanitize
+      filename <- paste0(project_name, "_Tracker_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+    }
 
     # Combine directory and filename
     output_path <- file.path(output_dir, filename)
@@ -1838,15 +1854,31 @@ write_wave_history_output <- function(trend_results, config, wave_data, output_p
     # Get output directory from settings or use config file location
     output_dir <- get_setting(config, "output_dir", default = NULL)
 
-    if (is.null(output_dir)) {
+    if (is.null(output_dir) || !nzchar(trimws(output_dir))) {
       # Default to same directory as config file
       output_dir <- dirname(config$config_path)
     }
 
-    # Generate filename
-    project_name <- get_setting(config, "project_name", default = "Tracking")
-    project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)  # Sanitize
-    filename <- paste0(project_name, "_WaveHistory_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+    # Ensure output directory exists
+    if (!dir.exists(output_dir)) {
+      tryCatch({
+        dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+      }, error = function(e) {
+        warning(paste0("Could not create output directory: ", output_dir, ". Using config directory."))
+        output_dir <<- dirname(config$config_path)
+      })
+    }
+
+    # Check for output_file setting first, otherwise auto-generate
+    output_file <- get_setting(config, "output_file", default = NULL)
+    if (!is.null(output_file) && nzchar(trimws(output_file))) {
+      filename <- trimws(output_file)
+    } else {
+      # Generate filename
+      project_name <- get_setting(config, "project_name", default = "Tracking")
+      project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)  # Sanitize
+      filename <- paste0(project_name, "_WaveHistory_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+    }
 
     # Combine directory and filename
     output_path <- file.path(output_dir, filename)

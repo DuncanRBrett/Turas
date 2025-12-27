@@ -1007,13 +1007,29 @@ write_dashboard_output <- function(trend_results, config, wave_data,
   if (is.null(output_path)) {
     output_dir <- get_setting(config, "output_dir", default = NULL)
 
-    if (is.null(output_dir)) {
+    if (is.null(output_dir) || !nzchar(trimws(output_dir))) {
       output_dir <- dirname(config$config_path)
     }
 
-    project_name <- get_setting(config, "project_name", default = "Tracking")
-    project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
-    filename <- paste0(project_name, "_Dashboard_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+    # Ensure output directory exists
+    if (!dir.exists(output_dir)) {
+      tryCatch({
+        dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+      }, error = function(e) {
+        warning(paste0("Could not create output directory: ", output_dir, ". Using config directory."))
+        output_dir <<- dirname(config$config_path)
+      })
+    }
+
+    # Check for output_file setting first, otherwise auto-generate
+    output_file <- get_setting(config, "output_file", default = NULL)
+    if (!is.null(output_file) && nzchar(trimws(output_file))) {
+      filename <- trimws(output_file)
+    } else {
+      project_name <- get_setting(config, "project_name", default = "Tracking")
+      project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
+      filename <- paste0(project_name, "_Dashboard_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+    }
 
     output_path <- file.path(output_dir, filename)
   }
@@ -1077,13 +1093,29 @@ write_sig_matrix_output <- function(trend_results, config, wave_data, output_pat
   if (is.null(output_path)) {
     output_dir <- get_setting(config, "output_dir", default = NULL)
 
-    if (is.null(output_dir)) {
+    if (is.null(output_dir) || !nzchar(trimws(output_dir))) {
       output_dir <- dirname(config$config_path)
     }
 
-    project_name <- get_setting(config, "project_name", default = "Tracking")
-    project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
-    filename <- paste0(project_name, "_SigMatrix_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+    # Ensure output directory exists
+    if (!dir.exists(output_dir)) {
+      tryCatch({
+        dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+      }, error = function(e) {
+        warning(paste0("Could not create output directory: ", output_dir, ". Using config directory."))
+        output_dir <<- dirname(config$config_path)
+      })
+    }
+
+    # Check for output_file setting first, otherwise auto-generate
+    output_file <- get_setting(config, "output_file", default = NULL)
+    if (!is.null(output_file) && nzchar(trimws(output_file))) {
+      filename <- trimws(output_file)
+    } else {
+      project_name <- get_setting(config, "project_name", default = "Tracking")
+      project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
+      filename <- paste0(project_name, "_SigMatrix_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+    }
 
     output_path <- file.path(output_dir, filename)
   }
