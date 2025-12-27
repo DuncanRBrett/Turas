@@ -8,25 +8,72 @@
 
 run_tracker_gui <- function() {
 
+  # ==============================================================================
+  # TRS v1.0: Load shared refusal infrastructure for proper error handling
+  # ==============================================================================
+  TURAS_HOME <- getwd()
+  trs_refusal_path <- file.path(TURAS_HOME, "modules", "shared", "lib", "trs_refusal.R")
+
+  # Define local refusal function (used if shared infrastructure unavailable)
+  # This ensures TRS-compliant error messages even before full infrastructure loads
+  gui_refuse <- function(code, title, problem, why_it_matters, how_to_fix, details = NULL) {
+    # Ensure code has valid TRS prefix
+    if (!grepl("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|PKG_|FEATURE_|BUG_)", code)) {
+      code <- paste0("CFG_", code)
+    }
+
+    msg <- paste0(
+      "\n", strrep("=", 80), "\n",
+      "  [REFUSE] ", code, ": ", title, "\n",
+      strrep("=", 80), "\n\n",
+      "Problem:\n  ", problem, "\n\n",
+      "Why it matters:\n  ", why_it_matters, "\n\n",
+      "How to fix:\n  ", how_to_fix, "\n"
+    )
+    if (!is.null(details)) {
+      msg <- paste0(msg, "\nDetails:\n  ", details, "\n")
+    }
+    msg <- paste0(msg, "\n", strrep("=", 80), "\n")
+    stop(msg, call. = FALSE)
+  }
+
+  # Try to load TRS infrastructure for turas_refuse
+  if (file.exists(trs_refusal_path)) {
+    tryCatch({
+      source(trs_refusal_path, local = FALSE)
+      # If turas_refuse is now available, use it instead of gui_refuse
+      if (exists("turas_refuse", mode = "function")) {
+        gui_refuse <- function(code, title, problem, why_it_matters, how_to_fix, details = NULL) {
+          turas_refuse(
+            code = code,
+            title = title,
+            problem = problem,
+            why_it_matters = why_it_matters,
+            how_to_fix = how_to_fix,
+            details = details,
+            module = "TRACKER"
+          )
+        }
+      }
+    }, error = function(e) {
+      # Silently continue with local gui_refuse if TRS load fails
+    })
+  }
+
   # Required packages - check availability (TRS v1.0: no auto-install)
   required_packages <- c("shiny", "shinyFiles")
 
   # Check for missing packages and refuse with clear instructions if any are missing
   missing_packages <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
   if (length(missing_packages) > 0) {
-    stop(
-      "\n================================================================================\n",
-      "  [REFUSE] PKG_MISSING_DEPENDENCY: Missing Required Packages\n",
-      "================================================================================\n\n",
-      "Problem:\n",
-      "  The following required packages are not installed: ", paste(missing_packages, collapse = ", "), "\n\n",
-      "Why it matters:\n",
-      "  The Tracker GUI cannot run without these packages.\n\n",
-      "How to fix:\n",
-      "  Run the following command in R:\n",
-      "    install.packages(c(", paste(sprintf('"%s"', missing_packages), collapse = ", "), "))\n\n",
-      "================================================================================\n",
-      call. = FALSE
+    gui_refuse(
+      code = "PKG_MISSING_DEPENDENCY",
+      title = "Missing Required Packages",
+      problem = paste0("The following required packages are not installed: ",
+                       paste(missing_packages, collapse = ", ")),
+      why_it_matters = "The Tracker GUI cannot run without these packages.",
+      how_to_fix = paste0("Run the following command in R:\n    install.packages(c(",
+                          paste(sprintf('"%s"', missing_packages), collapse = ", "), "))")
     )
   }
 
