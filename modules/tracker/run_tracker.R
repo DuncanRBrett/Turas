@@ -139,6 +139,7 @@ tryCatch({
 
 # Helper to source with better error messages
 .safe_source <- function(file_name) {
+  .write_tracker_debug("Sourcing:", file_name)
   fpath <- file.path(script_dir, "lib", file_name)
   if (!file.exists(fpath)) {
     stop(paste0(
@@ -149,8 +150,10 @@ tryCatch({
     ))
   }
   source(fpath)
+  .write_tracker_debug("  OK:", file_name)
 }
 
+.write_tracker_debug("About to source lib files...")
 .safe_source("constants.R")
 .safe_source("tracker_config_loader.R")
 .safe_source("wave_loader.R")
@@ -161,6 +164,7 @@ tryCatch({
 .safe_source("formatting_utils.R")
 .safe_source("tracker_output.R")
 .safe_source("tracker_dashboard_reports.R")
+.write_tracker_debug("All lib files loaded OK")
 rm(.safe_source)
 
 # Verify all required functions loaded successfully
