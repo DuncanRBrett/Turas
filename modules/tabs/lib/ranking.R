@@ -133,17 +133,30 @@ ranking_get_partial_failures <- function() {
 #' @examples
 #' # Data has 1=worst, 5=best → flip to 1=best, 5=worst
 #' normalized <- normalize_rank_direction(matrix, 5, "WorstToBest")
-normalize_rank_direction <- function(ranking_matrix, num_positions, 
+normalize_rank_direction <- function(ranking_matrix, num_positions,
                                     direction = c("BestToWorst", "WorstToBest")) {
   # Input validation
   if (!is.matrix(ranking_matrix) && !is.data.frame(ranking_matrix)) {
-    stop("ranking_matrix must be a matrix or data.frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: ranking_matrix",
+      problem = "The ranking_matrix argument must be a matrix or data.frame.",
+      why_it_matters = "Rank direction normalization requires a matrix structure to flip rank values.",
+      how_to_fix = "Provide a matrix or data.frame object for ranking_matrix"
+    )
   }
-  
+
   if (!is.numeric(num_positions) || length(num_positions) != 1 || num_positions < 1) {
-    stop("num_positions must be a single positive integer", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_VALUE",
+      title = "Invalid Argument Value: num_positions",
+      problem = sprintf("The num_positions argument must be a single positive integer, got: %s",
+                       paste(num_positions, collapse = ", ")),
+      why_it_matters = "The number of ranking positions is needed to flip ranks (e.g., 1 becomes 5 in a 5-position ranking).",
+      how_to_fix = "Provide a single positive integer for num_positions (e.g., 5 for ranking 1-5)"
+    )
   }
-  
+
   direction <- match.arg(direction)
   
   # If already Best-to-Worst, return as-is
@@ -330,24 +343,55 @@ validate_ranking_matrix <- function(ranking_matrix, num_positions, item_names = 
                                    completeness_threshold_pct = 80) {
   # Input validation
   if (!is.matrix(ranking_matrix) && !is.data.frame(ranking_matrix)) {
-    stop("ranking_matrix must be a matrix or data.frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: ranking_matrix",
+      problem = "The ranking_matrix argument must be a matrix or data.frame.",
+      why_it_matters = "Ranking validation requires a matrix structure to check data quality across items and respondents.",
+      how_to_fix = "Provide a matrix or data.frame object for ranking_matrix"
+    )
   }
-  
+
   if (!is.numeric(num_positions) || length(num_positions) != 1 || num_positions < 1) {
-    stop("num_positions must be a single positive integer", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_VALUE",
+      title = "Invalid Argument Value: num_positions",
+      problem = sprintf("The num_positions argument must be a single positive integer, got: %s",
+                       paste(num_positions, collapse = ", ")),
+      why_it_matters = "The number of ranking positions determines the valid range for rank values during validation.",
+      how_to_fix = "Provide a single positive integer for num_positions (e.g., 5 for ranking 1-5)"
+    )
   }
-  
+
   # Validate thresholds
   if (!is.numeric(tie_threshold_pct) || tie_threshold_pct < 0 || tie_threshold_pct > 100) {
-    stop("tie_threshold_pct must be between 0 and 100", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_VALUE",
+      title = "Invalid Argument Value: tie_threshold_pct",
+      problem = sprintf("The tie_threshold_pct must be between 0 and 100, got: %s", tie_threshold_pct),
+      why_it_matters = "Threshold percentages must be valid percentages to determine when to flag tied ranks as a data quality issue.",
+      how_to_fix = "Provide a value between 0 and 100 for tie_threshold_pct"
+    )
   }
-  
+
   if (!is.numeric(gap_threshold_pct) || gap_threshold_pct < 0 || gap_threshold_pct > 100) {
-    stop("gap_threshold_pct must be between 0 and 100", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_VALUE",
+      title = "Invalid Argument Value: gap_threshold_pct",
+      problem = sprintf("The gap_threshold_pct must be between 0 and 100, got: %s", gap_threshold_pct),
+      why_it_matters = "Threshold percentages must be valid percentages to determine when to flag gaps in ranks as a data quality issue.",
+      how_to_fix = "Provide a value between 0 and 100 for gap_threshold_pct"
+    )
   }
-  
+
   if (!is.numeric(completeness_threshold_pct) || completeness_threshold_pct < 0 || completeness_threshold_pct > 100) {
-    stop("completeness_threshold_pct must be between 0 and 100", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_VALUE",
+      title = "Invalid Argument Value: completeness_threshold_pct",
+      problem = sprintf("The completeness_threshold_pct must be between 0 and 100, got: %s", completeness_threshold_pct),
+      why_it_matters = "Threshold percentages must be valid percentages to determine minimum acceptable data completeness.",
+      how_to_fix = "Provide a value between 0 and 100 for completeness_threshold_pct"
+    )
   }
   
   # V9.9.3: Fail-fast numeric check before conversion
@@ -359,10 +403,17 @@ validate_ranking_matrix <- function(ranking_matrix, num_positions, item_names = 
     })]
     
     if (length(bad_cols) > 0) {
-      stop(
-        "Ranking columns not numeric: ", 
-        paste(bad_cols, collapse = ", "),
-        call. = FALSE
+      tabs_refuse(
+        code = "DATA_INVALID_TYPE",
+        title = "Non-Numeric Ranking Columns",
+        problem = sprintf("Ranking columns must be numeric, but these are not: %s",
+                         paste(bad_cols, collapse = ", ")),
+        why_it_matters = "Character columns in ranking data will cause as.matrix() to silently convert the entire matrix to character, breaking all numeric calculations.",
+        how_to_fix = c(
+          "Ensure all ranking columns contain numeric values only",
+          "Check for text values that should be coded as numbers",
+          "Verify data import preserved numeric types"
+        )
       )
     }
     
@@ -439,7 +490,13 @@ extract_question_metadata <- function(question_info) {
   question_code <- question_info$QuestionCode
 
   if (is.null(question_code) || is.na(question_code) || question_code == "") {
-    stop("question_info must contain valid QuestionCode", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_MISSING_REQUIRED",
+      title = "Missing Required Field: QuestionCode",
+      problem = "The question_info must contain a valid QuestionCode.",
+      why_it_matters = "QuestionCode is required to identify which question is being processed and to locate its data columns.",
+      how_to_fix = "Ensure question_info data frame has a non-empty QuestionCode field"
+    )
   }
 
   return(question_code)
@@ -449,20 +506,26 @@ extract_question_metadata <- function(question_info) {
 #' @keywords internal
 validate_ranking_format_field <- function(question_code, question_info) {
   if (!"Ranking_Format" %in% names(question_info)) {
-    stop(sprintf(
-      "Question %s: Ranking_Format column missing. Add Ranking_Format to Survey_Structure.",
-      question_code
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "CFG_MISSING_SETTING",
+      title = "Missing Configuration: Ranking_Format",
+      problem = sprintf("Question %s is missing the Ranking_Format column.", question_code),
+      why_it_matters = "Ranking_Format determines how to extract ranking data (Position format vs Item format).",
+      how_to_fix = "Add Ranking_Format column to Survey_Structure with value 'Position' or 'Item'"
+    )
   }
 
   ranking_format <- question_info$Ranking_Format
 
   if (is.na(ranking_format) || !ranking_format %in% c("Position", "Item")) {
-    stop(sprintf(
-      "Question %s: Invalid Ranking_Format '%s'. Must be 'Position' or 'Item'.",
-      question_code,
-      ranking_format
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "CFG_INVALID_VALUE",
+      title = "Invalid Configuration: Ranking_Format",
+      problem = sprintf("Question %s has invalid Ranking_Format '%s'. Must be 'Position' or 'Item'.",
+                       question_code, ranking_format),
+      why_it_matters = "Only 'Position' and 'Item' ranking formats are supported for data extraction.",
+      how_to_fix = "Set Ranking_Format to either 'Position' or 'Item' in Survey_Structure"
+    )
   }
 
   return(ranking_format)
@@ -482,10 +545,13 @@ get_num_positions <- function(question_code, question_info) {
   }
 
   if (is.na(num_positions) || num_positions < 1) {
-    stop(sprintf(
-      "Question %s: Invalid Ranking_Positions. Must be positive integer.",
-      question_code
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "CFG_INVALID_VALUE",
+      title = "Invalid Configuration: Ranking_Positions",
+      problem = sprintf("Question %s has invalid Ranking_Positions. Must be a positive integer.", question_code),
+      why_it_matters = "Ranking_Positions defines how many rank positions are available (e.g., 5 for ranks 1-5).",
+      how_to_fix = "Set Ranking_Positions or Columns to a positive integer in Survey_Structure"
+    )
   }
 
   return(num_positions)
@@ -555,15 +621,33 @@ normalize_direction_if_needed <- function(question_info, result, num_positions) 
 extract_ranking_data <- function(data, question_info, option_info, config = NULL) {
   # Input validation
   if (!is.data.frame(data) || nrow(data) == 0) {
-    stop("data must be a non-empty data frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: data",
+      problem = "The data argument must be a non-empty data frame.",
+      why_it_matters = "Survey data is required to extract ranking information for analysis.",
+      how_to_fix = "Provide a data frame with at least one row of survey data"
+    )
   }
-  
+
   if (!is.data.frame(question_info) || nrow(question_info) == 0) {
-    stop("question_info must be a non-empty data frame row", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: question_info",
+      problem = "The question_info argument must be a non-empty data frame row.",
+      why_it_matters = "Question metadata is required to understand ranking format and configuration.",
+      how_to_fix = "Provide a data frame row with question metadata from Survey_Structure"
+    )
   }
-  
+
   if (!is.data.frame(option_info)) {
-    stop("option_info must be a data frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: option_info",
+      problem = "The option_info argument must be a data frame.",
+      why_it_matters = "Option metadata defines which items are being ranked.",
+      how_to_fix = "Provide a data frame with option metadata from Survey_Structure"
+    )
   }
   
   # Extract and validate question metadata (delegated to helpers)
@@ -573,10 +657,13 @@ extract_ranking_data <- function(data, question_info, option_info, config = NULL
 
   # Validate options exist
   if (nrow(option_info) == 0) {
-    stop(sprintf(
-      "Question %s: No options defined. Add options to Survey_Structure.",
-      question_code
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "CFG_MISSING_SETTING",
+      title = "Missing Configuration: Ranking Options",
+      problem = sprintf("Question %s has no options defined.", question_code),
+      why_it_matters = "Ranking questions require options to define which items are being ranked.",
+      how_to_fix = "Add ranking items to the options table in Survey_Structure for this question"
+    )
   }
 
   # Extract based on format
@@ -631,10 +718,13 @@ extract_position_format <- function(data, question_code, option_info, num_positi
   item_codes <- trimws(as.character(option_info$OptionText))
   
   if (length(items) == 0 || length(item_codes) == 0) {
-    stop(sprintf(
-      "Question %s: Options missing DisplayText or OptionText",
-      question_code
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "CFG_MISSING_SETTING",
+      title = "Missing Configuration: Option Fields",
+      problem = sprintf("Question %s options are missing DisplayText or OptionText.", question_code),
+      why_it_matters = "DisplayText and OptionText are required to identify ranking items and their column names.",
+      how_to_fix = "Ensure all options have both DisplayText and OptionText in Survey_Structure"
+    )
   }
   
   # Build expected column names
@@ -654,11 +744,17 @@ extract_position_format <- function(data, question_code, option_info, num_positi
   existing_cols <- ranking_cols[ranking_cols %in% names(data)]
   
   if (length(existing_cols) == 0) {
-    stop(sprintf(
-      "Question %s: No ranking columns found in data. Expected: %s",
-      question_code,
-      paste(head(ranking_cols, 5), collapse = ", ")
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "DATA_COLUMN_NOT_FOUND",
+      title = "Ranking Columns Not Found",
+      problem = sprintf("Question %s: No ranking columns found in data.", question_code),
+      why_it_matters = "Without ranking columns, no ranking data can be extracted for analysis.",
+      how_to_fix = c(
+        sprintf("Expected columns: %s", paste(head(ranking_cols, 5), collapse = ", ")),
+        "Check that data column names match Survey_Structure option codes",
+        "Verify data import preserved ranking columns"
+      )
+    )
   }
   
   # Extract ranking matrix
@@ -700,10 +796,13 @@ extract_item_format <- function(data, question_code, option_info, num_positions)
   item_values <- trimws(as.character(option_info$OptionText))
   
   if (length(items) == 0 || length(item_values) == 0) {
-    stop(sprintf(
-      "Question %s: Options missing DisplayText or OptionText",
-      question_code
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "CFG_MISSING_SETTING",
+      title = "Missing Configuration: Option Fields",
+      problem = sprintf("Question %s options are missing DisplayText or OptionText.", question_code),
+      why_it_matters = "DisplayText and OptionText are required to identify ranking items and match them to responses.",
+      how_to_fix = "Ensure all options have both DisplayText and OptionText in Survey_Structure"
+    )
   }
   
   # Build expected column names
@@ -713,11 +812,17 @@ extract_item_format <- function(data, question_code, option_info, num_positions)
   existing_cols <- ranking_cols[ranking_cols %in% names(data)]
   
   if (length(existing_cols) == 0) {
-    stop(sprintf(
-      "Question %s: No ranking columns found. Expected: %s",
-      question_code,
-      paste(ranking_cols, collapse = ", ")
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "DATA_COLUMN_NOT_FOUND",
+      title = "Ranking Columns Not Found",
+      problem = sprintf("Question %s: No ranking columns found in data.", question_code),
+      why_it_matters = "Without ranking columns, no ranking data can be extracted for Item format analysis.",
+      how_to_fix = c(
+        sprintf("Expected columns: %s", paste(ranking_cols, collapse = ", ")),
+        "Check that data has columns matching pattern: QuestionCode_Rank1, QuestionCode_Rank2, etc.",
+        "Verify data import preserved ranking columns"
+      )
+    )
   }
   
   # Extract ranking data
@@ -743,11 +848,18 @@ extract_item_format <- function(data, question_code, option_info, num_positions)
     )
     
     if (is.na(rank_position) || rank_position < 1 || rank_position > num_positions) {
-      stop(sprintf(
-        "Question %s: Cannot parse rank position from column name '%s'",
-        question_code,
-        col_name
-      ), call. = FALSE)
+      tabs_refuse(
+        code = "DATA_INVALID_FORMAT",
+        title = "Invalid Rank Column Name",
+        problem = sprintf("Question %s: Cannot parse rank position from column name '%s'.",
+                         question_code, col_name),
+        why_it_matters = "Item format ranking requires column names matching the pattern QuestionCode_Rank# to determine rank positions.",
+        how_to_fix = c(
+          "Ensure ranking columns follow the pattern: QuestionCode_Rank1, QuestionCode_Rank2, etc.",
+          sprintf("Expected rank position between 1 and %d", num_positions),
+          "Check data column naming conventions"
+        )
+      )
     }
     
     # V9.9.2: Get item responses (trimmed for matching hygiene)
@@ -788,11 +900,24 @@ extract_item_format <- function(data, question_code, option_info, num_positions)
 calculate_percent_ranked_first <- function(ranking_matrix, item_name, weights = NULL) {
   # Input validation
   if (!is.matrix(ranking_matrix) && !is.data.frame(ranking_matrix)) {
-    stop("ranking_matrix must be a matrix or data.frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: ranking_matrix",
+      problem = "The ranking_matrix argument must be a matrix or data.frame.",
+      why_it_matters = "Calculating percent ranked first requires a matrix structure to identify rank values.",
+      how_to_fix = "Provide a matrix or data.frame object for ranking_matrix"
+    )
   }
 
   if (!is.character(item_name) || length(item_name) != 1) {
-    stop("item_name must be a single character string", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: item_name",
+      problem = sprintf("The item_name argument must be a single character string, got: %s",
+                       class(item_name)),
+      why_it_matters = "Item name is required to identify which ranking column to calculate first place percentage for.",
+      how_to_fix = "Provide a single character string for item_name matching a column in ranking_matrix"
+    )
   }
 
   if (!item_name %in% colnames(ranking_matrix)) {
@@ -817,16 +942,19 @@ calculate_percent_ranked_first <- function(ranking_matrix, item_name, weights = 
   if (is.null(weights)) {
     weights <- rep(1, length(item_ranks))
   }
-  
+
   # Validate weights length
   if (length(weights) != length(item_ranks)) {
-    stop(sprintf(
-      "weights length (%d) must match ranking_matrix rows (%d)",
-      length(weights),
-      length(item_ranks)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "ARG_LENGTH_MISMATCH",
+      title = "Argument Length Mismatch: weights",
+      problem = sprintf("The weights length (%d) must match ranking_matrix rows (%d).",
+                       length(weights), length(item_ranks)),
+      why_it_matters = "Each respondent row requires exactly one weight value for weighted first place calculations.",
+      how_to_fix = "Provide a weights vector with the same length as the number of rows in ranking_matrix"
+    )
   }
-  
+
   # Identify respondents who ranked this item first
   ranked_first <- !is.na(item_ranks) & item_ranks == 1
   
@@ -873,15 +1001,35 @@ calculate_percent_top_n <- function(ranking_matrix, item_name, top_n = 3,
                                    num_positions = NULL, weights = NULL) {
   # Input validation
   if (!is.matrix(ranking_matrix) && !is.data.frame(ranking_matrix)) {
-    stop("ranking_matrix must be a matrix or data.frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: ranking_matrix",
+      problem = "The ranking_matrix argument must be a matrix or data.frame.",
+      why_it_matters = "Top-N calculations require a matrix structure to identify ranks across respondents.",
+      how_to_fix = "Provide a matrix or data.frame object for ranking_matrix"
+    )
   }
-  
+
   if (!is.character(item_name) || length(item_name) != 1) {
-    stop("item_name must be a single character string", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: item_name",
+      problem = sprintf("The item_name argument must be a single character string, got: %s",
+                       class(item_name)),
+      why_it_matters = "Item name is required to identify which ranking column to analyze for top-N percentage.",
+      how_to_fix = "Provide a single character string for item_name matching a column in ranking_matrix"
+    )
   }
-  
+
   if (!is.numeric(top_n) || length(top_n) != 1 || top_n < 1) {
-    stop("top_n must be a single positive integer", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_VALUE",
+      title = "Invalid Argument Value: top_n",
+      problem = sprintf("The top_n argument must be a single positive integer, got: %s",
+                       paste(top_n, collapse = ", ")),
+      why_it_matters = "Top-N value determines which rank positions count as 'top' (e.g., top 3 box).",
+      how_to_fix = "Provide a single positive integer for top_n (e.g., 3 for top 3 box)"
+    )
   }
   
   # V9.9.2: Guard top_n vs available positions
@@ -917,16 +1065,19 @@ calculate_percent_top_n <- function(ranking_matrix, item_name, top_n = 3,
   if (is.null(weights)) {
     weights <- rep(1, length(item_ranks))
   }
-  
+
   # Validate weights length
   if (length(weights) != length(item_ranks)) {
-    stop(sprintf(
-      "weights length (%d) must match ranking_matrix rows (%d)",
-      length(weights),
-      length(item_ranks)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "ARG_LENGTH_MISMATCH",
+      title = "Argument Length Mismatch: weights",
+      problem = sprintf("The weights length (%d) must match ranking_matrix rows (%d).",
+                       length(weights), length(item_ranks)),
+      why_it_matters = "Each respondent row requires exactly one weight value for weighted top-N calculations.",
+      how_to_fix = "Provide a weights vector with the same length as the number of rows in ranking_matrix"
+    )
   }
-  
+
   # Identify respondents who ranked this item in top N
   ranked_top_n <- !is.na(item_ranks) & item_ranks <= top_n
   
@@ -965,11 +1116,24 @@ calculate_percent_top_n <- function(ranking_matrix, item_name, top_n = 3,
 calculate_mean_rank <- function(ranking_matrix, item_name, weights = NULL) {
   # Input validation
   if (!is.matrix(ranking_matrix) && !is.data.frame(ranking_matrix)) {
-    stop("ranking_matrix must be a matrix or data.frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: ranking_matrix",
+      problem = "The ranking_matrix argument must be a matrix or data.frame.",
+      why_it_matters = "Mean rank calculation requires a matrix structure to compute average ranks.",
+      how_to_fix = "Provide a matrix or data.frame object for ranking_matrix"
+    )
   }
 
   if (!is.character(item_name) || length(item_name) != 1) {
-    stop("item_name must be a single character string", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: item_name",
+      problem = sprintf("The item_name argument must be a single character string, got: %s",
+                       class(item_name)),
+      why_it_matters = "Item name is required to identify which ranking column to compute mean rank for.",
+      how_to_fix = "Provide a single character string for item_name matching a column in ranking_matrix"
+    )
   }
 
   if (!item_name %in% colnames(ranking_matrix)) {
@@ -994,25 +1158,28 @@ calculate_mean_rank <- function(ranking_matrix, item_name, weights = NULL) {
   if (is.null(weights)) {
     weights <- rep(1, length(item_ranks))
   }
-  
+
   # Validate weights length
   if (length(weights) != length(item_ranks)) {
-    stop(sprintf(
-      "weights length (%d) must match ranking_matrix rows (%d)",
-      length(weights),
-      length(item_ranks)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "ARG_LENGTH_MISMATCH",
+      title = "Argument Length Mismatch: weights",
+      problem = sprintf("The weights length (%d) must match ranking_matrix rows (%d).",
+                       length(weights), length(item_ranks)),
+      why_it_matters = "Each respondent row requires exactly one weight value for weighted mean rank calculation.",
+      how_to_fix = "Provide a weights vector with the same length as the number of rows in ranking_matrix"
+    )
   }
-  
+
   # Filter to valid ranks
   valid_idx <- !is.na(item_ranks)
   valid_ranks <- item_ranks[valid_idx]
   valid_weights <- weights[valid_idx]
-  
+
   if (length(valid_ranks) == 0) {
     return(NA_real_)
   }
-  
+
   # Calculate weighted mean
   if (all(valid_weights == 1)) {
     # Unweighted - simple mean
@@ -1037,13 +1204,26 @@ calculate_mean_rank <- function(ranking_matrix, item_name, weights = NULL) {
 calculate_rank_variance <- function(ranking_matrix, item_name, weights = NULL) {
   # Input validation
   if (!is.matrix(ranking_matrix) && !is.data.frame(ranking_matrix)) {
-    stop("ranking_matrix must be a matrix or data.frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: ranking_matrix",
+      problem = "The ranking_matrix argument must be a matrix or data.frame.",
+      why_it_matters = "Variance calculation requires a matrix structure to compute rank variance.",
+      how_to_fix = "Provide a matrix or data.frame object for ranking_matrix"
+    )
   }
-  
+
   if (!is.character(item_name) || length(item_name) != 1) {
-    stop("item_name must be a single character string", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: item_name",
+      problem = sprintf("The item_name argument must be a single character string, got: %s",
+                       class(item_name)),
+      why_it_matters = "Item name is required to identify which ranking column to compute variance for.",
+      how_to_fix = "Provide a single character string for item_name matching a column in ranking_matrix"
+    )
   }
-  
+
   if (!item_name %in% colnames(ranking_matrix)) {
     return(NA_real_)
   }
@@ -1055,21 +1235,24 @@ calculate_rank_variance <- function(ranking_matrix, item_name, weights = NULL) {
   if (is.null(weights)) {
     weights <- rep(1, length(item_ranks))
   }
-  
+
   # Validate weights length
   if (length(weights) != length(item_ranks)) {
-    stop(sprintf(
-      "weights length (%d) must match ranking_matrix rows (%d)",
-      length(weights),
-      length(item_ranks)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "ARG_LENGTH_MISMATCH",
+      title = "Argument Length Mismatch: weights",
+      problem = sprintf("The weights length (%d) must match ranking_matrix rows (%d).",
+                       length(weights), length(item_ranks)),
+      why_it_matters = "Each respondent row requires exactly one weight value for weighted variance calculation.",
+      how_to_fix = "Provide a weights vector with the same length as the number of rows in ranking_matrix"
+    )
   }
-  
+
   # Filter to valid ranks
   valid_idx <- !is.na(item_ranks)
   valid_ranks <- item_ranks[valid_idx]
   valid_weights <- weights[valid_idx]
-  
+
   if (length(valid_ranks) < 2) {
     return(NA_real_)
   }
@@ -1186,11 +1369,24 @@ compare_mean_ranks <- function(ranking_matrix1, ranking_matrix2, item_name,
                               alpha = 0.05, min_base = 10) {
   # Input validation
   if (!is.numeric(alpha) || length(alpha) != 1 || alpha <= 0 || alpha >= 1) {
-    stop("alpha must be between 0 and 1", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_VALUE",
+      title = "Invalid Argument Value: alpha",
+      problem = sprintf("The alpha significance level must be between 0 and 1 (exclusive), got: %s", alpha),
+      why_it_matters = "Alpha determines the significance threshold for statistical tests (typically 0.05).",
+      how_to_fix = "Provide a value between 0 and 1 for alpha (e.g., 0.05 for 95% confidence)"
+    )
   }
-  
+
   if (!is.numeric(min_base) || length(min_base) != 1 || min_base < 1) {
-    stop("min_base must be a positive integer", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_VALUE",
+      title = "Invalid Argument Value: min_base",
+      problem = sprintf("The min_base must be a positive integer, got: %s",
+                       paste(min_base, collapse = ", ")),
+      why_it_matters = "Minimum base size ensures sufficient sample for reliable significance testing.",
+      how_to_fix = "Provide a positive integer for min_base (e.g., 10 or 30)"
+    )
   }
   
   # Calculate means
@@ -1365,19 +1561,45 @@ create_ranking_rows_for_item <- function(ranking_matrix, item_name, banner_data_
                                         add_legend = TRUE) {
   # Input validation
   if (!is.matrix(ranking_matrix) && !is.data.frame(ranking_matrix)) {
-    stop("ranking_matrix must be a matrix or data.frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: ranking_matrix",
+      problem = "The ranking_matrix argument must be a matrix or data.frame.",
+      why_it_matters = "Crosstab row creation requires a matrix structure to calculate metrics across banner columns.",
+      how_to_fix = "Provide a matrix or data.frame object for ranking_matrix"
+    )
   }
-  
+
   if (!is.character(item_name) || length(item_name) != 1) {
-    stop("item_name must be a single character string", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: item_name",
+      problem = sprintf("The item_name argument must be a single character string, got: %s",
+                       class(item_name)),
+      why_it_matters = "Item name identifies which ranking item to create crosstab rows for.",
+      how_to_fix = "Provide a single character string for item_name matching a column in ranking_matrix"
+    )
   }
-  
+
   if (!is.list(banner_data_list)) {
-    stop("banner_data_list must be a list", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: banner_data_list",
+      problem = sprintf("The banner_data_list argument must be a list, got: %s", class(banner_data_list)),
+      why_it_matters = "Banner data list contains data subsets for each banner column needed for crosstab.",
+      how_to_fix = "Provide a list of data frames, one for each banner column"
+    )
   }
-  
+
   if (!is.character(internal_keys)) {
-    stop("internal_keys must be a character vector", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: internal_keys",
+      problem = sprintf("The internal_keys argument must be a character vector, got: %s",
+                       class(internal_keys)),
+      why_it_matters = "Internal keys identify which banner columns to include in the crosstab.",
+      how_to_fix = "Provide a character vector of banner column keys"
+    )
   }
   
   # V9.9.2: Guard top_n vs num_positions
@@ -1593,21 +1815,45 @@ check_ranking_options <- function(question_code, options_info, error_log) {
 validate_ranking_question <- function(question_info, options_info, error_log) {
   # Input validation
   if (!is.data.frame(question_info) || nrow(question_info) == 0) {
-    stop("question_info must be a non-empty data frame row", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: question_info",
+      problem = "The question_info argument must be a non-empty data frame row.",
+      why_it_matters = "Question metadata is required to validate ranking question configuration.",
+      how_to_fix = "Provide a data frame row with question metadata from Survey_Structure"
+    )
   }
-  
+
   if (!is.data.frame(options_info)) {
-    stop("options_info must be a data frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: options_info",
+      problem = sprintf("The options_info argument must be a data frame, got: %s", class(options_info)),
+      why_it_matters = "Options metadata is required to validate that ranking items are properly configured.",
+      how_to_fix = "Provide a data frame with option metadata from Survey_Structure"
+    )
   }
-  
+
   if (!is.data.frame(error_log)) {
-    stop("error_log must be a data frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Argument Type: error_log",
+      problem = sprintf("The error_log argument must be a data frame, got: %s", class(error_log)),
+      why_it_matters = "Error log is used to record validation issues found during ranking question validation.",
+      how_to_fix = "Provide a data frame for error_log with standard error logging columns"
+    )
   }
-  
+
   question_code <- question_info$QuestionCode
 
   if (is.null(question_code) || is.na(question_code)) {
-    stop("question_info must contain QuestionCode", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_MISSING_REQUIRED",
+      title = "Missing Required Field: QuestionCode",
+      problem = "The question_info must contain a QuestionCode.",
+      why_it_matters = "QuestionCode is required to identify which question is being validated.",
+      how_to_fix = "Ensure question_info data frame has a non-null QuestionCode field"
+    )
   }
 
   # Run all ranking question validation checks (delegated to helpers)

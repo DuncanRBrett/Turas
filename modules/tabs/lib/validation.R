@@ -307,15 +307,33 @@ check_multi_mention_questions <- function(questions_df, error_log) {
 validate_survey_structure <- function(survey_structure, error_log, verbose = TRUE) {
   # Input validation
   if (!is.list(survey_structure)) {
-    stop("survey_structure must be a list", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid survey_structure Type",
+      problem = "survey_structure must be a list but received a non-list object.",
+      why_it_matters = "The validation function requires survey_structure to be a list containing questions and options.",
+      how_to_fix = "Ensure survey_structure is a list with $questions and $options elements."
+    )
   }
 
   if (!is.data.frame(error_log)) {
-    stop("error_log must be a data frame (use create_error_log())", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid error_log Type",
+      problem = "error_log must be a data frame but received a non-data-frame object.",
+      why_it_matters = "The validation function requires error_log to track issues during validation.",
+      how_to_fix = "Create error_log using create_error_log() before calling this function."
+    )
   }
 
   if (!"questions" %in% names(survey_structure) || !"options" %in% names(survey_structure)) {
-    stop("survey_structure must contain $questions and $options data frames", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_MISSING_ELEMENT",
+      title = "Missing Required Elements",
+      problem = "survey_structure must contain both $questions and $options elements.",
+      why_it_matters = "Both questions and options tables are required for survey structure validation.",
+      how_to_fix = "Ensure survey_structure list has both $questions and $options data frames."
+    )
   }
 
   if (verbose) cat("Validating survey structure...\n")
@@ -325,25 +343,50 @@ validate_survey_structure <- function(survey_structure, error_log, verbose = TRU
 
   # Validate questions_df structure
   if (!is.data.frame(questions_df) || nrow(questions_df) == 0) {
-    stop("survey_structure$questions must be a non-empty data frame", call. = FALSE)
+    tabs_refuse(
+      code = "DATA_INVALID_STRUCTURE",
+      title = "Invalid Questions Structure",
+      problem = "survey_structure$questions must be a non-empty data frame but is either not a data frame or has zero rows.",
+      why_it_matters = "The questions table is essential for defining survey structure and must contain question definitions.",
+      how_to_fix = "Ensure survey_structure$questions is a valid data frame with at least one row."
+    )
   }
 
   required_q_cols <- c("QuestionCode", "Variable_Type")
   missing_q_cols <- setdiff(required_q_cols, names(questions_df))
   if (length(missing_q_cols) > 0) {
-    stop(sprintf(
-      "survey_structure$questions missing required columns: %s",
-      paste(missing_q_cols, collapse = ", ")
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "DATA_MISSING_COLUMNS",
+      title = "Missing Required Columns",
+      problem = sprintf("survey_structure$questions is missing required columns: %s",
+                       paste(missing_q_cols, collapse = ", ")),
+      why_it_matters = "QuestionCode and Variable_Type columns are mandatory for processing survey questions.",
+      how_to_fix = c(
+        sprintf("Add the following columns to questions table: %s", paste(missing_q_cols, collapse = ", ")),
+        "Verify the questions table structure matches the expected format"
+      )
+    )
   }
 
   # Validate options_df structure
   if (!is.data.frame(options_df)) {
-    stop("survey_structure$options must be a data frame", call. = FALSE)
+    tabs_refuse(
+      code = "DATA_INVALID_STRUCTURE",
+      title = "Invalid Options Structure",
+      problem = "survey_structure$options must be a data frame but received a non-data-frame object.",
+      why_it_matters = "The options table is required for defining response options for survey questions.",
+      how_to_fix = "Ensure survey_structure$options is a valid data frame."
+    )
   }
 
   if (nrow(options_df) > 0 && !"QuestionCode" %in% names(options_df)) {
-    stop("survey_structure$options must contain QuestionCode column", call. = FALSE)
+    tabs_refuse(
+      code = "DATA_MISSING_COLUMNS",
+      title = "Missing QuestionCode Column",
+      problem = "survey_structure$options must contain a QuestionCode column.",
+      why_it_matters = "QuestionCode column is required to link options to their respective questions.",
+      how_to_fix = "Add a QuestionCode column to the options table."
+    )
   }
 
   # V9.9.2: Trim whitespace on codes before duplicate checks
@@ -576,19 +619,43 @@ check_single_column <- function(question, survey_data, numeric_types, error_log)
 validate_data_structure <- function(survey_data, survey_structure, error_log, verbose = TRUE) {
   # Input validation
   if (!is.data.frame(survey_data)) {
-    stop("survey_data must be a data frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid survey_data Type",
+      problem = "survey_data must be a data frame but received a non-data-frame object.",
+      why_it_matters = "The validation function requires survey_data to be a data frame containing survey responses.",
+      how_to_fix = "Ensure survey_data is a valid data frame before calling this function."
+    )
   }
 
   if (nrow(survey_data) == 0) {
-    stop("survey_data is empty (0 rows)", call. = FALSE)
+    tabs_refuse(
+      code = "DATA_EMPTY",
+      title = "Empty Survey Data",
+      problem = "survey_data has zero rows - no data to validate.",
+      why_it_matters = "Cannot perform data validation on an empty dataset.",
+      how_to_fix = "Ensure survey_data contains at least one row of data."
+    )
   }
 
   if (!is.list(survey_structure) || !"questions" %in% names(survey_structure)) {
-    stop("survey_structure must contain $questions", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_MISSING_ELEMENT",
+      title = "Missing Questions Element",
+      problem = "survey_structure must be a list containing a $questions element.",
+      why_it_matters = "The questions table is required to validate the survey data structure.",
+      how_to_fix = "Ensure survey_structure is a list with a $questions data frame."
+    )
   }
 
   if (!is.data.frame(error_log)) {
-    stop("error_log must be a data frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid error_log Type",
+      problem = "error_log must be a data frame but received a non-data-frame object.",
+      why_it_matters = "The validation function requires error_log to track issues during validation.",
+      how_to_fix = "Create error_log using create_error_log() before calling this function."
+    )
   }
 
   if (verbose) cat("Validating data structure...\n")
@@ -596,7 +663,13 @@ validate_data_structure <- function(survey_data, survey_structure, error_log, ve
   questions_df <- survey_structure$questions
 
   if (!is.data.frame(questions_df) || nrow(questions_df) == 0) {
-    stop("survey_structure$questions must be a non-empty data frame", call. = FALSE)
+    tabs_refuse(
+      code = "DATA_INVALID_STRUCTURE",
+      title = "Invalid Questions Structure",
+      problem = "survey_structure$questions must be a non-empty data frame.",
+      why_it_matters = "The questions table is required to validate survey data columns and types.",
+      how_to_fix = "Ensure survey_structure$questions is a valid data frame with at least one row."
+    )
   }
 
   # V9.9.5: Extended numeric types to include integer64
@@ -929,19 +1002,43 @@ check_weight_distribution <- function(valid_weights, weight_values, weight_varia
 validate_weighting_config <- function(survey_structure, survey_data, config, error_log, verbose = TRUE) {
   # Input validation
   if (!is.list(survey_structure) || !"project" %in% names(survey_structure)) {
-    stop("survey_structure must contain $project", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_MISSING_ELEMENT",
+      title = "Missing Project Element",
+      problem = "survey_structure must be a list containing a $project element.",
+      why_it_matters = "The project metadata is required for weighting configuration validation.",
+      how_to_fix = "Ensure survey_structure is a list with a $project element."
+    )
   }
 
   if (!is.data.frame(survey_data)) {
-    stop("survey_data must be a data frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid survey_data Type",
+      problem = "survey_data must be a data frame but received a non-data-frame object.",
+      why_it_matters = "The validation function requires survey_data to check weighting variables.",
+      how_to_fix = "Ensure survey_data is a valid data frame."
+    )
   }
 
   if (!is.list(config)) {
-    stop("config must be a list", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid config Type",
+      problem = "config must be a list but received a non-list object.",
+      why_it_matters = "The validation function requires config to be a list containing configuration settings.",
+      how_to_fix = "Ensure config is a valid list with weighting settings."
+    )
   }
 
   if (!is.data.frame(error_log)) {
-    stop("error_log must be a data frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid error_log Type",
+      problem = "error_log must be a data frame but received a non-data-frame object.",
+      why_it_matters = "The validation function requires error_log to track issues during validation.",
+      how_to_fix = "Create error_log using create_error_log() before calling this function."
+    )
   }
 
   # Check if weighting is enabled
@@ -1367,11 +1464,23 @@ check_output_format <- function(config, error_log, verbose) {
 validate_crosstab_config <- function(config, survey_structure, survey_data, error_log, verbose = TRUE) {
   # Input validation
   if (!is.list(config)) {
-    stop("config must be a list", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid config Type",
+      problem = "config must be a list but received a non-list object.",
+      why_it_matters = "The validation function requires config to be a list containing crosstab configuration settings.",
+      how_to_fix = "Ensure config is a valid list with crosstab settings."
+    )
   }
 
   if (!is.data.frame(error_log)) {
-    stop("error_log must be a data frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid error_log Type",
+      problem = "error_log must be a data frame but received a non-data-frame object.",
+      why_it_matters = "The validation function requires error_log to track issues during validation.",
+      how_to_fix = "Create error_log using create_error_log() before calling this function."
+    )
   }
 
   if (verbose) cat("Validating crosstab configuration...\n")
@@ -2288,15 +2397,33 @@ validate_base_sizes_for_testing <- function(base_sizes,
 run_all_validations <- function(survey_structure, survey_data, config, verbose = TRUE) {
   # Input validation (fail fast)
   if (!is.list(survey_structure)) {
-    stop("survey_structure must be a list", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid survey_structure Type",
+      problem = "survey_structure must be a list but received a non-list object.",
+      why_it_matters = "The validation orchestrator requires survey_structure to be a list for comprehensive validation.",
+      how_to_fix = "Ensure survey_structure is a valid list with questions, options, and project elements."
+    )
   }
-  
+
   if (!is.data.frame(survey_data)) {
-    stop("survey_data must be a data frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid survey_data Type",
+      problem = "survey_data must be a data frame but received a non-data-frame object.",
+      why_it_matters = "The validation orchestrator requires survey_data to be a data frame for comprehensive validation.",
+      how_to_fix = "Ensure survey_data is a valid data frame."
+    )
   }
-  
+
   if (!is.list(config)) {
-    stop("config must be a list", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid config Type",
+      problem = "config must be a list but received a non-list object.",
+      why_it_matters = "The validation orchestrator requires config to be a list for comprehensive validation.",
+      how_to_fix = "Ensure config is a valid list with all required configuration settings."
+    )
   }
   
   # Header (if verbose)
@@ -2325,7 +2452,17 @@ run_all_validations <- function(survey_structure, survey_data, config, verbose =
       cat("  ", conditionMessage(e), "\n")
       cat("\n")
     }
-    stop("Validation could not complete. Fix critical errors before proceeding.", call. = FALSE)
+    tabs_refuse(
+      code = "ENV_INTERNAL_ERROR",
+      title = "Validation Process Failed",
+      problem = sprintf("Validation could not complete due to an internal error: %s", conditionMessage(e)),
+      why_it_matters = "The validation process encountered an unexpected error and cannot proceed.",
+      how_to_fix = c(
+        "Fix critical errors in the input data or configuration",
+        "Review the error message for details",
+        "Ensure all required data structures are properly formatted"
+      )
+    )
   })
   
   # Report results (if verbose)
@@ -2393,11 +2530,17 @@ run_all_validations <- function(survey_structure, survey_data, config, verbose =
       if (verbose) {
         cat(strrep("=", 80), "\n", sep = "")
       }
-      stop(sprintf(
-        "\nValidation failed with %d error(s). Fix errors before proceeding.%s",
-        n_errors,
-        if (verbose) "\nSee error details above." else ""
-      ), call. = FALSE)
+      tabs_refuse(
+        code = "ENV_VALIDATION_FAILED",
+        title = "Validation Failed",
+        problem = sprintf("Validation failed with %d error(s). Cannot proceed with analysis.", n_errors),
+        why_it_matters = "Critical validation errors must be resolved before processing can continue.",
+        how_to_fix = c(
+          if (verbose) "See error details above" else "Run validation with verbose=TRUE to see detailed errors",
+          "Fix all reported errors in the survey structure, data, or configuration",
+          "Re-run validation after corrections"
+        )
+      )
     }
   }
   
