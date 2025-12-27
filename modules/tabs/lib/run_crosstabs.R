@@ -37,8 +37,15 @@ SCRIPT_VERSION <- "10.0"
 # Must be defined BEFORE sourcing any modules
 # toolkit_path should be set by the calling notebook/script to point to this file
 script_dir <- tryCatch({
-  if (exists("toolkit_path") && !is.null(toolkit_path) && length(toolkit_path) > 0 && nchar(toolkit_path) > 0) {
-    dirname(toolkit_path)
+  # Check if toolkit_path is usable
+  tp_valid <- exists("toolkit_path") &&
+              !is.null(toolkit_path) &&
+              length(toolkit_path) >= 1 &&
+              !is.na(toolkit_path[1]) &&
+              nzchar(toolkit_path[1])
+
+  if (tp_valid) {
+    dirname(toolkit_path[1])
   } else {
     # Fallback: look for the lib directory relative to working directory
     candidates <- c(
