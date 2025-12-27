@@ -20,6 +20,13 @@
 # Load required libraries
 library(openxlsx)
 
+# Debug: Show what toolkit_path is set to
+if (exists("toolkit_path")) {
+  message("[Tracker Debug] toolkit_path = ", toolkit_path)
+} else {
+  message("[Tracker Debug] toolkit_path is NOT set")
+}
+
 # Source module files
 # When run from GUI or Jupyter, sys.frame(1)$ofile may be NULL
 script_dir <- tryCatch({
@@ -52,6 +59,9 @@ script_dir <- tryCatch({
 }, error = function(e) {
   getwd()
 })
+
+message("[Tracker Debug] script_dir = ", script_dir)
+message("[Tracker Debug] Looking for: ", file.path(script_dir, "lib", "00_guard.R"))
 
 # TRS Guard Layer (v1.0) - MUST be loaded first before any module files
 .guard_path <- file.path(script_dir, "lib", "00_guard.R")
@@ -103,16 +113,31 @@ tryCatch({
   message("[TRS INFO] TRS infrastructure not fully loaded: ", e$message)
 })
 
-source(file.path(script_dir, "lib", "constants.R"))
-source(file.path(script_dir, "lib", "tracker_config_loader.R"))
-source(file.path(script_dir, "lib", "wave_loader.R"))
-source(file.path(script_dir, "lib", "question_mapper.R"))
-source(file.path(script_dir, "lib", "validation_tracker.R"))
-source(file.path(script_dir, "lib", "trend_calculator.R"))
-source(file.path(script_dir, "lib", "banner_trends.R"))
-source(file.path(script_dir, "lib", "formatting_utils.R"))
-source(file.path(script_dir, "lib", "tracker_output.R"))
-source(file.path(script_dir, "lib", "tracker_dashboard_reports.R"))
+# Helper to source with better error messages
+.safe_source <- function(file_name) {
+  fpath <- file.path(script_dir, "lib", file_name)
+  if (!file.exists(fpath)) {
+    stop(paste0(
+      "Cannot find Tracker module file: ", file_name, "\n",
+      "  Expected: ", fpath, "\n",
+      "  script_dir: ", script_dir, "\n",
+      "  Please check toolkit_path is set correctly."
+    ))
+  }
+  source(fpath)
+}
+
+.safe_source("constants.R")
+.safe_source("tracker_config_loader.R")
+.safe_source("wave_loader.R")
+.safe_source("question_mapper.R")
+.safe_source("validation_tracker.R")
+.safe_source("trend_calculator.R")
+.safe_source("banner_trends.R")
+.safe_source("formatting_utils.R")
+.safe_source("tracker_output.R")
+.safe_source("tracker_dashboard_reports.R")
+rm(.safe_source)
 
 # Verify all required functions loaded successfully
 verify_tracker_environment <- function() {
