@@ -698,10 +698,11 @@ run_tracker_gui <- function() {
 
         # Source run_tracker.R
         progress$set(value = 0.2, detail = "Loading tracker modules...")
-        cat("[Tracker GUI] file.exists('run_tracker.R') =", file.exists("run_tracker.R"), "\n")
+        cat("[Tracker GUI] file.exists(run_script) =", file.exists(run_script), "\n")
 
         tryCatch({
-          source("run_tracker.R")
+          # Use full path (run_script) that was already verified to exist
+          source(run_script)
           cat("[Tracker GUI] run_tracker.R loaded successfully\n")
         }, error = function(e) {
           gui_refuse(
