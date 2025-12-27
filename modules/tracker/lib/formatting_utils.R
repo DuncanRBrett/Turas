@@ -9,36 +9,44 @@
 # ==============================================================================
 
 # Load shared utilities from consolidated location
-# Determine path to shared/lib relative to this file
-.tracker_fmt_script_dir <- tryCatch({
-  ofile <- sys.frame(1)$ofile
-  if (!is.null(ofile) && length(ofile) > 0 && nzchar(ofile)) {
-    dirname(ofile)
-  } else if (exists("script_dir") && !is.null(script_dir) && length(script_dir) > 0 && nzchar(script_dir[1])) {
-    file.path(script_dir[1], "lib")
-  } else {
-    getwd()
-  }
-}, error = function(e) getwd())
+# Find the shared/lib path - try multiple locations
+.shared_lib_path <- NULL
+.shared_lib_candidates <- c(
+  # If script_dir is set (from parent run_tracker.R), go up to modules/shared/lib
+  if (exists("script_dir") && !is.null(script_dir) && length(script_dir) > 0 && nzchar(script_dir[1])) {
+    file.path(dirname(script_dir[1]), "shared", "lib")  # ../shared/lib from tracker dir
+  } else NULL,
+  # Try relative to current working directory
+  file.path(getwd(), "..", "shared", "lib"),
+  file.path(getwd(), "modules", "shared", "lib"),
+  # Try TURAS_HOME if set
+  file.path(Sys.getenv("TURAS_HOME", unset = ""), "modules", "shared", "lib")
+)
+.shared_lib_candidates <- .shared_lib_candidates[!is.null(.shared_lib_candidates) & nzchar(.shared_lib_candidates)]
 
-.shared_lib_path <- file.path(dirname(.tracker_fmt_script_dir), "shared", "lib")
-if (!dir.exists(.shared_lib_path)) {
-  # Fallback: search from current directory
-  .shared_lib_path <- file.path(getwd(), "modules", "shared", "lib")
+for (.candidate in .shared_lib_candidates) {
+  if (dir.exists(.candidate)) {
+    .shared_lib_path <- .candidate
+    break
+  }
 }
 
 # Load dependencies in order (only if not already loaded)
-if (!exists("validate_char_param", mode = "function")) {
-  source(file.path(.shared_lib_path, "validation_utils.R"), local = FALSE)
-}
-if (!exists("find_turas_root", mode = "function")) {
-  source(file.path(.shared_lib_path, "config_utils.R"), local = FALSE)
-}
-if (!exists("format_number", mode = "function")) {
-  source(file.path(.shared_lib_path, "formatting_utils.R"), local = FALSE)
+if (!is.null(.shared_lib_path)) {
+  if (!exists("validate_char_param", mode = "function") && file.exists(file.path(.shared_lib_path, "validation_utils.R"))) {
+    source(file.path(.shared_lib_path, "validation_utils.R"), local = FALSE)
+  }
+  if (!exists("find_turas_root", mode = "function") && file.exists(file.path(.shared_lib_path, "config_utils.R"))) {
+    source(file.path(.shared_lib_path, "config_utils.R"), local = FALSE)
+  }
+  if (!exists("format_number", mode = "function") && file.exists(file.path(.shared_lib_path, "formatting_utils.R"))) {
+    source(file.path(.shared_lib_path, "formatting_utils.R"), local = FALSE)
+  }
 }
 
-rm(.tracker_fmt_script_dir, .shared_lib_path)
+rm(list = c(".shared_lib_path", ".shared_lib_candidates", ".candidate")[
+  c(".shared_lib_path", ".shared_lib_candidates", ".candidate") %in% ls(all.names = TRUE)
+])
 
 
 #' Format Number with Decimal Separator
