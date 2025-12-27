@@ -24,7 +24,13 @@ DATA_LOADER_VERSION <- "1.0.0"
 # ==============================================================================
 
 if (!require("readxl", quietly = TRUE)) {
-  stop("Package 'readxl' is required. Install with: install.packages('readxl')", call. = FALSE)
+  confidence_refuse(
+    code = "PKG_READXL_MISSING",
+    title = "Required Package Not Installed",
+    problem = "Package 'readxl' is required but not installed",
+    why_it_matters = "The readxl package is required to read Excel data files.",
+    how_to_fix = "Install the package with: install.packages('readxl')"
+  )
 }
 
 # Source utils
@@ -77,17 +83,34 @@ load_survey_data <- function(data_file_path,
 
   # Validate file exists
   if (!file.exists(data_file_path)) {
-    stop(sprintf("Data file not found: %s", data_file_path), call. = FALSE)
+    confidence_refuse(
+      code = "IO_DATA_FILE_NOT_FOUND",
+      title = "Data File Not Found",
+      problem = sprintf("Data file not found: %s", data_file_path),
+      why_it_matters = "Survey data is required for confidence interval calculations.",
+      how_to_fix = c(
+        "Verify the data file path in the config is correct",
+        "Ensure the file exists in the specified location"
+      )
+    )
   }
 
   # Detect file format
   file_ext <- tolower(tools::file_ext(data_file_path))
 
   if (!file_ext %in% c("csv", "xlsx", "xls")) {
-    stop(sprintf(
-      "Unsupported file format: .%s\nSupported formats: .csv, .xlsx, .xls",
-      file_ext
-    ), call. = FALSE)
+    confidence_refuse(
+      code = "IO_UNSUPPORTED_FORMAT",
+      title = "Unsupported File Format",
+      problem = sprintf("Unsupported file format: .%s", file_ext),
+      why_it_matters = "Only CSV and Excel formats are supported for data files.",
+      how_to_fix = c(
+        "Convert the data file to one of these formats: .csv, .xlsx, .xls",
+        "Update the Data_File path in config to point to a supported format"
+      ),
+      observed = file_ext,
+      expected = c("csv", "xlsx", "xls")
+    )
   }
 
   if (verbose) {
@@ -138,14 +161,27 @@ load_data_file <- function(data_file_path, file_ext, verbose) {
           read.csv(data_file_path, stringsAsFactors = FALSE, check.names = FALSE)
         }
       },
-      stop(sprintf("Unsupported file extension: .%s", file_ext))
+      confidence_refuse(
+        code = "IO_UNSUPPORTED_FORMAT",
+        title = "Unsupported File Extension",
+        problem = sprintf("Unsupported file extension: .%s", file_ext),
+        why_it_matters = "Only supported file formats can be loaded.",
+        how_to_fix = "Use a supported format: .csv, .xlsx, or .xls"
+      )
     )
   }, error = function(e) {
-    stop(sprintf(
-      "Failed to load data file\nFile: %s\nError: %s\n\nTroubleshooting:\n  1. Verify file is not corrupted\n  2. Ensure file is not open in Excel\n  3. Check file has data (not empty)\n  4. For CSV: verify correct delimiter and encoding",
-      basename(data_file_path),
-      conditionMessage(e)
-    ), call. = FALSE)
+    confidence_refuse(
+      code = "IO_DATA_LOAD_FAILED",
+      title = "Failed to Load Data File",
+      problem = sprintf("Failed to load data file: %s - %s", basename(data_file_path), conditionMessage(e)),
+      why_it_matters = "Survey data must be successfully loaded before analysis can proceed.",
+      how_to_fix = c(
+        "Verify file is not corrupted",
+        "Ensure file is not open in Excel",
+        "Check file has data (not empty)",
+        "For CSV: verify correct delimiter and encoding"
+      )
+    )
   })
 
   # Convert to standard data.frame if needed
@@ -175,17 +211,35 @@ load_data_file <- function(data_file_path, file_ext, verbose) {
 validate_survey_data <- function(survey_data, required_questions, weight_variable) {
   # Check it's a data frame
   if (!is.data.frame(survey_data)) {
-    stop("Survey data must be a data frame", call. = FALSE)
+    confidence_refuse(
+      code = "DATA_INVALID_TYPE",
+      title = "Invalid Data Type",
+      problem = "Survey data must be a data frame",
+      why_it_matters = "Analysis requires properly structured tabular data.",
+      how_to_fix = "Ensure the data file is properly formatted as a table"
+    )
   }
 
   # Check has rows
   if (nrow(survey_data) == 0) {
-    stop("Survey data has no rows", call. = FALSE)
+    confidence_refuse(
+      code = "DATA_NO_ROWS",
+      title = "Data File is Empty",
+      problem = "Survey data has no rows",
+      why_it_matters = "Analysis requires at least one respondent.",
+      how_to_fix = "Ensure the data file contains response data"
+    )
   }
 
   # Check has columns
   if (ncol(survey_data) == 0) {
-    stop("Survey data has no columns", call. = FALSE)
+    confidence_refuse(
+      code = "DATA_NO_COLUMNS",
+      title = "Data File Has No Columns",
+      problem = "Survey data has no columns",
+      why_it_matters = "Analysis requires question variables.",
+      how_to_fix = "Ensure the data file contains variable columns"
+    )
   }
 
   # Check required questions exist
@@ -193,40 +247,68 @@ validate_survey_data <- function(survey_data, required_questions, weight_variabl
     missing_questions <- setdiff(required_questions, names(survey_data))
 
     if (length(missing_questions) > 0) {
-      stop(sprintf(
-        "Required question(s) not found in data: %s\n\nAvailable columns:\n  %s",
-        paste(missing_questions, collapse = ", "),
-        paste(head(names(survey_data), 20), collapse = ", ")
-      ), call. = FALSE)
+      confidence_refuse(
+        code = "DATA_MISSING_QUESTIONS",
+        title = "Required Questions Not Found in Data",
+        problem = "One or more required question columns are missing from the data file",
+        why_it_matters = "All specified questions must exist in the data for analysis.",
+        how_to_fix = c(
+          "Verify question IDs in the config match column names in the data",
+          "Check for typos in question IDs",
+          "Ensure all required columns are present in the data file"
+        ),
+        expected = required_questions,
+        observed = names(survey_data),
+        missing = missing_questions,
+        details = sprintf("Available columns: %s", paste(head(names(survey_data), 20), collapse = ", "))
+      )
     }
   }
 
   # Check weight variable exists (if specified)
   if (!is.null(weight_variable) && weight_variable != "") {
     if (!weight_variable %in% names(survey_data)) {
-      stop(sprintf(
-        "Weight variable '%s' not found in data\n\nAvailable columns:\n  %s",
-        weight_variable,
-        paste(head(names(survey_data), 20), collapse = ", ")
-      ), call. = FALSE)
+      confidence_refuse(
+        code = "DATA_WEIGHT_NOT_FOUND",
+        title = "Weight Variable Not Found",
+        problem = sprintf("Weight variable '%s' not found in data", weight_variable),
+        why_it_matters = "The specified weight variable must exist for weighted analysis.",
+        how_to_fix = c(
+          sprintf("Verify that column '%s' exists in the data file", weight_variable),
+          "Check for typos in the weight variable name",
+          "Or remove weight_variable from config for unweighted analysis"
+        ),
+        expected = weight_variable,
+        observed = names(survey_data),
+        details = sprintf("Available columns: %s", paste(head(names(survey_data), 20), collapse = ", "))
+      )
     }
 
     # Validate weight variable is numeric
     if (!is.numeric(survey_data[[weight_variable]])) {
-      stop(sprintf(
-        "Weight variable '%s' must be numeric (found: %s)",
-        weight_variable,
-        class(survey_data[[weight_variable]])[1]
-      ), call. = FALSE)
+      confidence_refuse(
+        code = "DATA_WEIGHT_NOT_NUMERIC",
+        title = "Weight Variable Must Be Numeric",
+        problem = sprintf("Weight variable '%s' must be numeric (found: %s)", weight_variable, class(survey_data[[weight_variable]])[1]),
+        why_it_matters = "Weights must be numeric values for proper calculation.",
+        how_to_fix = sprintf("Convert the '%s' column to numeric type in the data file", weight_variable)
+      )
     }
 
     # Check for negative weights
     valid_weights <- survey_data[[weight_variable]][!is.na(survey_data[[weight_variable]])]
     if (any(valid_weights < 0)) {
-      stop(sprintf(
-        "Weight variable '%s' contains negative values (design weights cannot be negative)",
-        weight_variable
-      ), call. = FALSE)
+      confidence_refuse(
+        code = "DATA_NEGATIVE_WEIGHTS",
+        title = "Weight Variable Contains Negative Values",
+        problem = sprintf("Weight variable '%s' contains negative values", weight_variable),
+        why_it_matters = "Design weights cannot be negative - they represent sampling probability inversions.",
+        how_to_fix = c(
+          "Check the weighting calculation for errors",
+          "Ensure all weights are positive or zero",
+          "Verify the correct weight variable was specified"
+        )
+      )
     }
 
     # TRS INFO: Zero weights
@@ -269,7 +351,13 @@ validate_survey_data <- function(survey_data, required_questions, weight_variabl
 #' @keywords internal
 extract_required_questions <- function(question_analysis_df) {
   if (!"Question_ID" %in% names(question_analysis_df)) {
-    stop("question_analysis_df must have 'Question_ID' column", call. = FALSE)
+    confidence_refuse(
+      code = "CFG_MISSING_QUESTION_ID_COLUMN",
+      title = "Missing Question_ID Column",
+      problem = "question_analysis_df must have 'Question_ID' column",
+      why_it_matters = "Question IDs are required to identify which variables to analyze.",
+      how_to_fix = "Ensure the Question_Analysis sheet has a 'Question_ID' column"
+    )
   }
 
   question_ids <- unique(question_analysis_df$Question_ID)

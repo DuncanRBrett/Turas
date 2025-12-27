@@ -44,11 +44,20 @@ load_survey_data <- function(data_file_path, project_root = NULL,
   file_ext <- tolower(tools::file_ext(data_file_path))
 
   if (!file_ext %in% SUPPORTED_DATA_FORMATS) {
-    stop(sprintf(
-      "Unsupported file type: .%s\n\nSupported formats: %s",
-      file_ext,
-      paste0(".", SUPPORTED_DATA_FORMATS, collapse = ", ")
-    ), call. = FALSE)
+    turas_refuse(
+      code = "IO_UNSUPPORTED_FILE_FORMAT",
+      title = "Unsupported Data File Format",
+      problem = sprintf("File type '.%s' is not supported for data loading.", file_ext),
+      why_it_matters = "Only specific file formats can be reliably loaded and processed.",
+      how_to_fix = c(
+        sprintf("Convert your data file to one of the supported formats: %s",
+                paste0(".", SUPPORTED_DATA_FORMATS, collapse = ", ")),
+        "Most software can export to .xlsx or .csv format",
+        "For SPSS files, ensure the file extension is .sav"
+      ),
+      expected = SUPPORTED_DATA_FORMATS,
+      observed = file_ext
+    )
   }
 
   # Load data with format-specific handling
@@ -68,9 +77,17 @@ load_survey_data <- function(data_file_path, project_root = NULL,
       "sav"  = {
         # SPSS support via haven package
         if (!requireNamespace("haven", quietly = TRUE)) {
-          stop(
-            ".sav files require the 'haven' package\n\nInstall with:\n  install.packages('haven')",
-            call. = FALSE
+          turas_refuse(
+            code = "PKG_HAVEN_MISSING",
+            title = "Missing Required Package: haven",
+            problem = "SPSS .sav files require the 'haven' package, which is not installed.",
+            why_it_matters = "The haven package is needed to read SPSS data files.",
+            how_to_fix = c(
+              "Install the haven package by running:",
+              "  install.packages('haven')",
+              "Then retry loading your data",
+              "Alternative: Convert your .sav file to .csv or .xlsx format"
+            )
           )
         }
 
@@ -86,27 +103,64 @@ load_survey_data <- function(data_file_path, project_root = NULL,
       }
     )
   }, error = function(e) {
-    stop(sprintf(
-      "Failed to load data file\nFile: %s\nError: %s\n\nTroubleshooting:\n  1. Verify file is not corrupted\n  2. Check file is not open in another program\n  3. For Excel: try saving as .csv and retry\n  4. Check file permissions",
-      basename(data_file_path),
-      conditionMessage(e)
-    ), call. = FALSE)
+    turas_refuse(
+      code = "IO_DATA_LOAD_FAILED",
+      title = "Failed to Load Data File",
+      problem = sprintf("Could not load data file: %s", basename(data_file_path)),
+      why_it_matters = "Survey data must be loaded successfully to proceed with analysis.",
+      how_to_fix = c(
+        "Verify the file is not corrupted by opening it manually",
+        "Ensure the file is not currently open in another program (Excel, SPSS, etc.)",
+        "For Excel files: try saving as .csv format and retry",
+        "Check file permissions to ensure it's readable",
+        "Verify the file format matches its extension"
+      ),
+      details = conditionMessage(e)
+    )
   })
 
   # Validate loaded data
   if (!is.data.frame(survey_data)) {
-    stop(sprintf(
-      "Data file loaded but is not a data frame (got: %s)",
-      paste(class(survey_data), collapse = ", ")
-    ), call. = FALSE)
+    turas_refuse(
+      code = "DATA_INVALID_STRUCTURE",
+      title = "Invalid Data Structure",
+      problem = "Data file loaded but is not in the expected data frame format.",
+      why_it_matters = "Turas requires data in a standard tabular (rows and columns) format.",
+      how_to_fix = c(
+        "Ensure your data is in a standard table format",
+        "Check that the file contains a single data table, not multiple sheets or complex structures",
+        "For Excel files: ensure data starts at cell A1 with column headers in row 1",
+        sprintf("Data type detected: %s", paste(class(survey_data), collapse = ", "))
+      )
+    )
   }
 
   if (nrow(survey_data) == 0) {
-    stop("Data file is empty (0 rows)", call. = FALSE)
+    turas_refuse(
+      code = "DATA_EMPTY_FILE",
+      title = "Empty Data File",
+      problem = "Data file contains no rows of data.",
+      why_it_matters = "Analysis cannot proceed without survey responses.",
+      how_to_fix = c(
+        "Check that you're loading the correct file",
+        "Verify the file contains actual data rows, not just column headers",
+        "Ensure data export completed successfully from your survey platform"
+      )
+    )
   }
 
   if (ncol(survey_data) == 0) {
-    stop("Data file has no columns", call. = FALSE)
+    turas_refuse(
+      code = "DATA_NO_COLUMNS",
+      title = "Data File Has No Columns",
+      problem = "Data file contains no columns.",
+      why_it_matters = "Analysis requires data columns corresponding to survey questions.",
+      how_to_fix = c(
+        "Check that you're loading the correct file",
+        "Verify the file structure is a valid table with column headers",
+        "Ensure the data export included all necessary columns"
+      )
+    )
   }
 
   # Success message

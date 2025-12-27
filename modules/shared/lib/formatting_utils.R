@@ -17,7 +17,19 @@
 #' @export
 create_excel_number_format <- function(decimal_places = 1, decimal_separator = ".") {
   if (!is.numeric(decimal_places) || decimal_places < 0 || decimal_places > 6) {
-    stop("decimal_places must be an integer between 0 and 6", call. = FALSE)
+    turas_refuse(
+      code = "CFG_INVALID_DECIMAL_PLACES",
+      title = "Invalid Decimal Places Setting",
+      problem = "decimal_places parameter must be an integer between 0 and 6.",
+      why_it_matters = "Excel number formatting requires valid decimal place specifications.",
+      how_to_fix = c(
+        sprintf("Current value: %s", as.character(decimal_places)),
+        "Change decimal_places to a whole number between 0 and 6",
+        "Example: 0 for whole numbers, 1 for one decimal place, 2 for two decimal places"
+      ),
+      expected = "integer 0-6",
+      observed = as.character(decimal_places)
+    )
   }
 
   decimal_places <- as.integer(decimal_places)
@@ -52,7 +64,17 @@ create_excel_number_styles <- function(decimal_separator = ".",
                                        font_name = "Aptos",
                                        font_size = 12) {
   if (!requireNamespace("openxlsx", quietly = TRUE)) {
-    stop("Package 'openxlsx' is required for Excel style creation", call. = FALSE)
+    turas_refuse(
+      code = "PKG_OPENXLSX_MISSING",
+      title = "Missing Required Package: openxlsx",
+      problem = "Excel style creation requires the 'openxlsx' package, which is not installed.",
+      why_it_matters = "The openxlsx package is needed to format Excel output.",
+      how_to_fix = c(
+        "Install the openxlsx package by running:",
+        "  install.packages('openxlsx')",
+        "Then retry your analysis"
+      )
+    )
   }
 
   fmt_pct <- create_excel_number_format(decimal_places_percent)
@@ -97,11 +119,35 @@ format_number <- function(x, decimal_places = 1, decimal_separator = ".") {
   if (all(is.na(x))) return(as.character(x))
 
   if (!decimal_separator %in% c(".", ",")) {
-    stop("decimal_separator must be '.' or ','", call. = FALSE)
+    turas_refuse(
+      code = "CFG_INVALID_DECIMAL_SEPARATOR",
+      title = "Invalid Decimal Separator",
+      problem = "decimal_separator must be either '.' or ','",
+      why_it_matters = "Only period and comma are supported as decimal separators for number formatting.",
+      how_to_fix = c(
+        sprintf("Current value: '%s'", decimal_separator),
+        "Change decimal_separator to either '.' (period) or ',' (comma)",
+        "Period is standard in English locales, comma in many European locales"
+      ),
+      expected = c(".", ","),
+      observed = decimal_separator
+    )
   }
 
   if (!is.numeric(decimal_places) || decimal_places < 0 || decimal_places > 6) {
-    stop("decimal_places must be an integer between 0 and 6", call. = FALSE)
+    turas_refuse(
+      code = "CFG_INVALID_DECIMAL_PLACES",
+      title = "Invalid Decimal Places Setting",
+      problem = "decimal_places parameter must be an integer between 0 and 6.",
+      why_it_matters = "Number formatting requires valid decimal place specifications.",
+      how_to_fix = c(
+        sprintf("Current value: %s", as.character(decimal_places)),
+        "Change decimal_places to a whole number between 0 and 6",
+        "Example: 0 for whole numbers, 1 for one decimal place, 2 for two decimal places"
+      ),
+      expected = "integer 0-6",
+      observed = as.character(decimal_places)
+    )
   }
 
   decimal_places <- as.integer(decimal_places)

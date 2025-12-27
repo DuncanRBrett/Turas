@@ -25,11 +25,29 @@ create_banner_structure <- function(selection_df, survey_structure) {
   
   # Validate inputs
   if (is.null(selection_df) || !is.data.frame(selection_df)) {
-    stop("selection_df must be a data frame")
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid selection_df Type",
+      problem = "selection_df must be a data frame but received NULL or non-data-frame object.",
+      why_it_matters = "The banner structure cannot be built without a valid selection data frame.",
+      how_to_fix = c(
+        "Verify selection_df is loaded correctly from the Selection sheet",
+        "Check that the input is a data.frame object, not NULL or other type"
+      )
+    )
   }
-  
+
   if (!"QuestionCode" %in% names(selection_df)) {
-    stop("selection_df must have QuestionCode column")
+    tabs_refuse(
+      code = "CFG_MISSING_COLUMN",
+      title = "Missing QuestionCode Column",
+      problem = "selection_df must have a QuestionCode column, but it is missing.",
+      why_it_matters = "QuestionCode is required to identify which questions are selected for the banner.",
+      how_to_fix = c(
+        "Add a QuestionCode column to the Selection sheet",
+        "Check the column name spelling (case-sensitive)"
+      )
+    )
   }
   
   # Extract banner questions
@@ -448,21 +466,39 @@ validate_banner_structure <- function(banner_structure) {
   missing <- setdiff(required_elements, names(banner_structure))
   
   if (length(missing) > 0) {
-    stop(sprintf(
-      "Banner structure missing required elements: %s",
-      paste(missing, collapse = ", ")
-    ))
+    tabs_refuse(
+      code = "DATA_INVALID_STRUCTURE",
+      title = "Invalid Banner Structure",
+      problem = sprintf("Banner structure missing required elements: %s", paste(missing, collapse = ", ")),
+      why_it_matters = "A complete banner structure is required for crosstab generation.",
+      how_to_fix = c(
+        "This is an internal error - the banner structure was not built correctly",
+        "Check the banner creation logic in banner.R"
+      )
+    )
   }
-  
+
   # Check lengths match
   n_cols <- length(banner_structure$columns)
-  
+
   if (length(banner_structure$internal_keys) != n_cols) {
-    stop("Banner structure: internal_keys length doesn't match columns")
+    tabs_refuse(
+      code = "DATA_LENGTH_MISMATCH",
+      title = "Banner Structure Length Mismatch",
+      problem = "Banner structure: internal_keys length doesn't match columns length.",
+      why_it_matters = "All banner structure vectors must have the same length for proper column mapping.",
+      how_to_fix = "This is an internal error - check banner creation logic"
+    )
   }
-  
+
   if (length(banner_structure$letters) != n_cols) {
-    stop("Banner structure: letters length doesn't match columns")
+    tabs_refuse(
+      code = "DATA_LENGTH_MISMATCH",
+      title = "Banner Structure Length Mismatch",
+      problem = "Banner structure: letters length doesn't match columns length.",
+      why_it_matters = "All banner structure vectors must have the same length for proper significance testing.",
+      how_to_fix = "This is an internal error - check banner creation logic"
+    )
   }
   
   return(TRUE)

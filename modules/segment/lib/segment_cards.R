@@ -435,7 +435,13 @@ export_cards_text <- function(cards_result, output_path) {
 export_cards_excel <- function(cards_result, output_path) {
 
   if (!requireNamespace("writexl", quietly = TRUE)) {
-    stop("Package 'writexl' required for Excel export", call. = FALSE)
+    segment_refuse(
+      code = "PKG_WRITEXL_MISSING",
+      title = "Package writexl Required",
+      problem = "Package 'writexl' is not installed.",
+      why_it_matters = "Excel export requires the writexl package.",
+      how_to_fix = "Install the package with: install.packages('writexl')"
+    )
   }
 
   # Create multiple sheets

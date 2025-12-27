@@ -50,17 +50,29 @@ estimate_choice_model <- function(data_list, config, verbose = TRUE) {
   } else if (method == "clogit") {
     result <- estimate_with_clogit(data, config, verbose)
   } else if (method == "hb") {
-    stop(create_error(
-      "ESTIMATION",
-      "Hierarchical Bayes (HB) not yet implemented",
-      "This is a Phase 2 feature. Use 'auto', 'mlogit', or 'clogit' for now."
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "EST_HB_NOT_IMPLEMENTED",
+      title = "Hierarchical Bayes Not Implemented",
+      problem = "Hierarchical Bayes (HB) estimation is not yet implemented.",
+      why_it_matters = "HB provides individual-level utilities but requires complex MCMC estimation.",
+      how_to_fix = c(
+        "This is a Phase 2 feature",
+        "Use 'auto', 'mlogit', or 'clogit' for now",
+        "OR see modules/conjoint/R/11_hierarchical_bayes.R for framework"
+      )
+    )
   } else {
-    stop(create_error(
-      "ESTIMATION",
-      sprintf("Unknown estimation method: %s", method),
-      "Valid methods: auto, mlogit, clogit, hb"
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "EST_INVALID_METHOD",
+      title = "Unknown Estimation Method",
+      problem = sprintf("Unknown estimation method: %s", method),
+      why_it_matters = "Only specific estimation methods are supported for conjoint analysis.",
+      how_to_fix = c(
+        "Valid methods: auto, mlogit, clogit, hb",
+        "Set 'estimation_method' in your configuration",
+        sprintf("You specified: %s", method)
+      )
+    )
   }
 
   result
@@ -108,13 +120,18 @@ estimate_auto_method <- function(data, config, verbose = TRUE) {
   }
 
   # Both failed
-  stop(create_error(
-    "ESTIMATION",
-    "All estimation methods failed",
-    sprintf("mlogit error: %s\nclogit error: %s",
-            mlogit_result$error, clogit_result$error),
-    "Check your data quality. Run validate_conjoint_data() for diagnostics."
-  ), call. = FALSE)
+  conjoint_refuse(
+    code = "EST_ALL_METHODS_FAILED",
+    title = "All Estimation Methods Failed",
+    problem = "Both mlogit and clogit estimation failed.",
+    why_it_matters = "Cannot complete analysis without a successful model estimation.",
+    how_to_fix = c(
+      "Check your data quality - run validate_conjoint_data() for diagnostics",
+      sprintf("mlogit error: %s", mlogit_result$error),
+      sprintf("clogit error: %s", clogit_result$error),
+      "Common causes: perfect separation, missing data, or insufficient variation"
+    )
+  )
 }
 
 
@@ -127,19 +144,23 @@ estimate_with_mlogit <- function(data, config, verbose = TRUE) {
 
   # Check if mlogit and dfidx are available
   if (!requireNamespace("mlogit", quietly = TRUE)) {
-    stop(create_error(
-      "ESTIMATION",
-      "Package 'mlogit' not installed",
-      "Install with: install.packages('mlogit')"
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "PKG_MLOGIT_MISSING",
+      title = "Required Package Not Installed",
+      problem = "Package 'mlogit' is not installed.",
+      why_it_matters = "mlogit is the primary estimation engine for discrete choice models in conjoint analysis.",
+      how_to_fix = "Install with: install.packages('mlogit')"
+    )
   }
 
   if (!requireNamespace("dfidx", quietly = TRUE)) {
-    stop(create_error(
-      "ESTIMATION",
-      "Package 'dfidx' not installed (required by mlogit)",
-      "Install with: install.packages('dfidx')"
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "PKG_DFIDX_MISSING",
+      title = "Required Package Not Installed",
+      problem = "Package 'dfidx' is not installed (required by mlogit).",
+      why_it_matters = "dfidx provides the data structure required for mlogit estimation.",
+      how_to_fix = "Install with: install.packages('dfidx')"
+    )
   }
 
   log_verbose("  → Preparing data for mlogit...", verbose)
@@ -161,11 +182,17 @@ estimate_with_mlogit <- function(data, config, verbose = TRUE) {
   attr_names <- config$attributes$AttributeName
   missing_cols <- attr_names[!attr_names %in% names(data)]
   if (length(missing_cols) > 0) {
-    stop(create_error(
-      "ESTIMATION",
-      sprintf("Attributes missing from data: %s", paste(missing_cols, collapse = ", ")),
-      "Check that attribute names in config match column names in data"
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "EST_MISSING_ATTRIBUTES",
+      title = "Attributes Missing From Data",
+      problem = sprintf("Attributes missing from data: %s", paste(missing_cols, collapse = ", ")),
+      why_it_matters = "All attributes defined in configuration must exist as columns in the data for estimation.",
+      how_to_fix = c(
+        "Check that attribute names in config match column names in data exactly (case-sensitive)",
+        sprintf("Missing: %s", paste(missing_cols, collapse = ", ")),
+        sprintf("Available in data: %s", paste(names(data), collapse = ", "))
+      )
+    )
   }
 
   log_verbose("  → Fitting mlogit model...", verbose)
@@ -179,12 +206,18 @@ estimate_with_mlogit <- function(data, config, verbose = TRUE) {
       print.level = 0
     )
   }, error = function(e) {
-    stop(create_error(
-      "ESTIMATION",
-      sprintf("mlogit estimation failed: %s", conditionMessage(e)),
-      "This may indicate perfect separation or other data quality issues.",
-      "Try running with estimation_method = 'clogit' or check your data."
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "EST_MLOGIT_FAILED",
+      title = "mlogit Estimation Failed",
+      problem = sprintf("mlogit estimation failed: %s", conditionMessage(e)),
+      why_it_matters = "Model estimation failed, preventing calculation of part-worth utilities.",
+      how_to_fix = c(
+        "This may indicate perfect separation or other data quality issues",
+        "Try running with estimation_method = 'clogit' in your config",
+        "OR check your data for: perfect separation, insufficient variation, or missing values",
+        "Run validate_conjoint_data() for detailed diagnostics"
+      )
+    )
   })
 
   # Check convergence
@@ -238,11 +271,17 @@ prepare_mlogit_data <- function(data, config) {
 
   # Ensure alt has no NAs
   if (any(is.na(data$alt))) {
-    stop(create_error(
-      "ESTIMATION",
-      "Alternative IDs contain missing values",
-      "Check your data for NA values in the alternative_id column"
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "EST_MISSING_ALT_IDS",
+      title = "Alternative IDs Contain Missing Values",
+      problem = "Alternative IDs (alt column) contain NA values.",
+      why_it_matters = "mlogit requires valid alternative identifiers for each choice option.",
+      how_to_fix = c(
+        "Check your data for NA values in the alternative_id column",
+        "Ensure every row has a valid alternative identifier",
+        "OR set alternative_id_column in config if using a different column"
+      )
+    )
   }
 
   # Create unique choice set ID combining respondent and choice_set
@@ -275,12 +314,18 @@ prepare_mlogit_data <- function(data, config) {
       ranked = FALSE
     )
   }, error = function(e) {
-    stop(create_error(
-      "ESTIMATION",
-      sprintf("Failed to create mlogit data structure: %s", conditionMessage(e)),
-      "This usually means (chid, alt) combinations are not unique.",
-      "Check that each choice set has unique alternative IDs."
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "EST_MLOGIT_DATA_STRUCTURE_FAILED",
+      title = "Failed to Create mlogit Data Structure",
+      problem = sprintf("Failed to create mlogit data structure: %s", conditionMessage(e)),
+      why_it_matters = "mlogit requires a specific data format with unique (choice_id, alternative_id) combinations.",
+      how_to_fix = c(
+        "This usually means (chid, alt) combinations are not unique",
+        "Check that each choice set has unique alternative IDs",
+        "Verify your data has proper choice_set_id and alternative_id columns",
+        "Ensure no duplicate rows within the same choice set"
+      )
+    )
   })
 
   mlogit_data
@@ -295,19 +340,29 @@ build_mlogit_formula <- function(config) {
   # Validate inputs
 
   if (is.null(config$attributes$AttributeName) || length(config$attributes$AttributeName) == 0) {
-    stop(create_error(
-      "ESTIMATION",
-      "No attributes found in config",
-      "Check that your configuration has attributes defined"
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "EST_NO_ATTRIBUTES",
+      title = "No Attributes Found",
+      problem = "No attributes found in configuration.",
+      why_it_matters = "Conjoint analysis requires attributes to estimate utilities.",
+      how_to_fix = c(
+        "Check that your configuration has attributes defined in the Attributes sheet",
+        "Ensure the Attributes sheet has at least one row with AttributeName, NumLevels, and LevelNames"
+      )
+    )
   }
 
   if (is.null(config$chosen_column) || nchar(config$chosen_column) == 0) {
-    stop(create_error(
-      "ESTIMATION",
-      "chosen_column not specified in config",
-      "Check your configuration settings"
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "EST_CHOSEN_COLUMN_MISSING",
+      title = "Chosen Column Not Specified",
+      problem = "chosen_column not specified in configuration.",
+      why_it_matters = "The chosen column indicates which alternative was selected in each choice set.",
+      how_to_fix = c(
+        "Check your configuration settings",
+        "Set 'chosen_column' in the Settings sheet (typically 'chosen' or 'selected')"
+      )
+    )
   }
 
   # Build formula: choice ~ attribute1 + attribute2 + ... | 0
@@ -440,11 +495,18 @@ estimate_with_clogit <- function(data, config, verbose = TRUE) {
   model <- tryCatch({
     survival::clogit(formula_obj, data = data)
   }, error = function(e) {
-    stop(create_error(
-      "ESTIMATION",
-      sprintf("clogit estimation failed: %s", conditionMessage(e)),
-      "Check your data for perfect separation or other quality issues."
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "EST_CLOGIT_FAILED",
+      title = "clogit Estimation Failed",
+      problem = sprintf("clogit estimation failed: %s", conditionMessage(e)),
+      why_it_matters = "Fallback estimation method failed, preventing calculation of part-worth utilities.",
+      how_to_fix = c(
+        "Check your data for perfect separation or other quality issues",
+        "Verify data has sufficient variation in choices",
+        "Run validate_conjoint_data() for detailed diagnostics",
+        "Common causes: all respondents choosing the same levels, or insufficient sample size"
+      )
+    )
   })
 
   log_verbose("  ✓ Model estimation complete", verbose)
@@ -515,11 +577,17 @@ estimate_rating_based_conjoint <- function(data_list, config, verbose = TRUE) {
   rating_var <- config$rating_variable
 
   if (!rating_var %in% names(data)) {
-    stop(create_error(
-      "ESTIMATION",
-      sprintf("Rating variable '%s' not found in data", rating_var),
-      "Check the 'rating_variable' setting in your config file."
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "EST_RATING_VAR_MISSING",
+      title = "Rating Variable Not Found",
+      problem = sprintf("Rating variable '%s' not found in data", rating_var),
+      why_it_matters = "Rating-based conjoint requires a rating column with numeric preference scores.",
+      how_to_fix = c(
+        "Check the 'rating_variable' setting in your config file",
+        sprintf("Expected column: %s", rating_var),
+        sprintf("Available columns: %s", paste(names(data), collapse = ", "))
+      )
+    )
   }
 
   # Convert attributes to factors

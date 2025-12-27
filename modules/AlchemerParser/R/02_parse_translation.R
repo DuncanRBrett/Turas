@@ -29,14 +29,29 @@ parse_translation_export <- function(file_path, verbose = FALSE) {
 
   # Check file exists
   if (!file.exists(file_path)) {
-    stop(sprintf("Translation export file not found: %s", file_path),
-         call. = FALSE)
+    alchemerparser_refuse(
+      code = "IO_FILE_NOT_FOUND",
+      title = "Translation Export File Not Found",
+      problem = sprintf("Cannot find translation export file: %s", basename(file_path)),
+      why_it_matters = "Translation export is required to get question and option texts.",
+      how_to_fix = c(
+        "Verify the file path is correct",
+        "Check that the file exists at the specified location",
+        "Export the translation file from Alchemer if missing"
+      ),
+      details = paste0("Expected path: ", file_path)
+    )
   }
 
   # Load required package
   if (!requireNamespace("readxl", quietly = TRUE)) {
-    stop("Package 'readxl' is required. Install with: install.packages('readxl')",
-         call. = FALSE)
+    alchemerparser_refuse(
+      code = "PKG_MISSING_DEPENDENCY",
+      title = "Missing Required Package",
+      problem = "Package 'readxl' is not installed.",
+      why_it_matters = "AlchemerParser requires 'readxl' to parse Excel translation exports.",
+      how_to_fix = "Run: install.packages('readxl')"
+    )
   }
 
   # Read translation export
@@ -48,9 +63,19 @@ parse_translation_export <- function(file_path, verbose = FALSE) {
   missing_cols <- setdiff(required_cols, names(translation_data))
 
   if (length(missing_cols) > 0) {
-    stop(sprintf("Translation file missing required columns: %s",
-                paste(missing_cols, collapse = ", ")),
-         call. = FALSE)
+    alchemerparser_refuse(
+      code = "DATA_INVALID_STRUCTURE",
+      title = "Invalid Translation File Structure",
+      problem = "Translation export file is missing required columns.",
+      why_it_matters = "Cannot parse translation data without required column structure.",
+      how_to_fix = c(
+        "Re-export the translation file from Alchemer",
+        "Ensure the export includes all required columns",
+        "Do not modify the translation file structure after export"
+      ),
+      expected = c("Key", "Default Text"),
+      missing = missing_cols
+    )
   }
 
   # Extract questions and options

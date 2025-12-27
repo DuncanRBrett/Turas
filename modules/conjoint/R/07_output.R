@@ -96,24 +96,36 @@ write_conjoint_output <- function(utilities, importance, diagnostics, model_resu
   if (exists("turas_save_workbook_atomic", mode = "function")) {
     save_result <- turas_save_workbook_atomic(wb, output_file, run_result = run_result, module = "CONJ")
     if (!save_result$success) {
-      stop(create_error(
-        "OUTPUT",
-        sprintf("Failed to save Excel file: %s", save_result$error),
-        "Check that the file is not open in Excel and the directory is writable",
-        sprintf("Attempted path: %s", output_file)
-      ), call. = FALSE)
+      conjoint_refuse(
+        code = "IO_OUTPUT_SAVE_FAILED",
+        title = "Failed to Save Excel Output",
+        problem = sprintf("Failed to save Excel file: %s", save_result$error),
+        why_it_matters = "Results cannot be delivered if the output file cannot be saved.",
+        how_to_fix = c(
+          "Check that the file is not open in Excel",
+          "Verify the directory is writable",
+          "Ensure sufficient disk space is available"
+        ),
+        details = sprintf("Attempted path: %s", output_file)
+      )
     }
   } else {
     # Fallback to direct save
     tryCatch({
       openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
     }, error = function(e) {
-      stop(create_error(
-        "OUTPUT",
-        sprintf("Failed to save Excel file: %s", conditionMessage(e)),
-        "Check that the file is not open in Excel and the directory is writable",
-        sprintf("Attempted path: %s", output_file)
-      ), call. = FALSE)
+      conjoint_refuse(
+        code = "IO_OUTPUT_SAVE_FAILED_DIRECT",
+        title = "Failed to Save Excel Output",
+        problem = sprintf("Failed to save Excel file: %s", conditionMessage(e)),
+        why_it_matters = "Results cannot be delivered if the output file cannot be saved.",
+        how_to_fix = c(
+          "Check that the file is not open in Excel",
+          "Verify the directory is writable",
+          "Ensure sufficient disk space is available"
+        ),
+        details = sprintf("Attempted path: %s", output_file)
+      )
     })
   }
 }

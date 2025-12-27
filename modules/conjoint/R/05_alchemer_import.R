@@ -88,11 +88,13 @@ import_alchemer_conjoint <- function(file_path,
 
   # Validate file exists
   if (!file.exists(file_path)) {
-    stop(create_error(
-      "ALCHEMER_IMPORT",
-      sprintf("File not found: %s", file_path),
-      "Verify the file path is correct and the file exists"
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "IO_ALCHEMER_FILE_NOT_FOUND",
+      title = "Alchemer Import File Not Found",
+      problem = sprintf("File not found: %s", file_path),
+      why_it_matters = "Cannot import conjoint data if the source file doesn't exist.",
+      how_to_fix = "Verify the file path is correct and the file exists at that location"
+    )
   }
 
   # Load file based on extension
@@ -146,11 +148,16 @@ import_alchemer_conjoint <- function(file_path,
   validation_result <- validate_alchemer_data(df, verbose)
 
   if (!validation_result$is_valid) {
-    stop(create_error(
-      "ALCHEMER_IMPORT",
-      "Data validation failed",
-      paste(validation_result$errors, collapse = "\n   ")
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "DATA_ALCHEMER_VALIDATION_FAILED",
+      title = "Alchemer Data Validation Failed",
+      problem = "Imported data contains critical errors",
+      why_it_matters = "Invalid CBC data cannot be used for conjoint analysis and will produce unreliable or incorrect estimates.",
+      how_to_fix = paste(validation_result$errors, collapse = "; "),
+      details = sprintf("Found %d error(s) and %d warning(s)",
+                       length(validation_result$errors),
+                       length(validation_result$warnings))
+    )
   }
 
   # Report summary
@@ -199,14 +206,26 @@ load_alchemer_file <- function(file_path, verbose = TRUE) {
                      check.names = FALSE, na.strings = c("", "NA", "N/A"))
 
     } else {
-      stop(sprintf("Unsupported file format: .%s (use .xlsx or .csv)", file_ext))
+      conjoint_refuse(
+        code = "IO_ALCHEMER_UNSUPPORTED_FORMAT",
+        title = "Unsupported File Format",
+        problem = sprintf("Unsupported file format: .%s", file_ext),
+        why_it_matters = "Only Excel (.xlsx, .xls) and CSV (.csv) formats are supported for Alchemer imports.",
+        how_to_fix = "Convert your file to .xlsx or .csv format"
+      )
     }
   }, error = function(e) {
-    stop(create_error(
-      "ALCHEMER_IMPORT",
-      sprintf("Failed to load file: %s", conditionMessage(e)),
-      "Check that the file is not corrupted or open in another program"
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "IO_ALCHEMER_LOAD_FAILED",
+      title = "Failed to Load Alchemer File",
+      problem = sprintf("Failed to load file: %s", conditionMessage(e)),
+      why_it_matters = "Cannot proceed with import if the file cannot be read.",
+      how_to_fix = c(
+        "Check that the file is not corrupted",
+        "Ensure the file is not open in another program",
+        "Verify you have read permissions for the file"
+      )
+    )
   })
 
   # Convert to data frame (in case of tibble)
@@ -241,13 +260,15 @@ validate_alchemer_columns <- function(df) {
     }
 
     if (length(still_missing) > 0) {
-      stop(create_error(
-        "ALCHEMER_IMPORT",
-        sprintf("Missing required Alchemer columns: %s",
-               paste(still_missing, collapse = ", ")),
-        "Ensure you're using a raw Alchemer CBC export file",
-        sprintf("Found columns: %s", paste(head(names(df), 10), collapse = ", "))
-      ), call. = FALSE)
+      conjoint_refuse(
+        code = "DATA_ALCHEMER_MISSING_COLUMNS",
+        title = "Missing Required Alchemer Columns",
+        problem = sprintf("Missing required Alchemer columns: %s",
+                         paste(still_missing, collapse = ", ")),
+        why_it_matters = "Alchemer CBC exports must contain ResponseID, SetNumber, CardNumber, and Score columns to be imported.",
+        how_to_fix = "Ensure you're using a raw Alchemer CBC export file (not a processed or summarized version)",
+        details = sprintf("Found columns: %s", paste(head(names(df), 10), collapse = ", "))
+      )
     }
 
     # Rename columns to expected case
@@ -695,11 +716,13 @@ validate_alchemer_with_refusal <- function(df, verbose = TRUE) {
         )
       )
     } else {
-      stop(create_error(
-        "ALCHEMER_VALIDATION",
-        "Data validation failed",
-        paste(validation$errors, collapse = "\n")
-      ), call. = FALSE)
+      conjoint_refuse(
+        code = "DATA_ALCHEMER_INVALID_FALLBACK",
+        title = "Alchemer Data Validation Failed",
+        problem = "Data validation failed",
+        why_it_matters = "Invalid CBC data cannot be used for conjoint analysis.",
+        how_to_fix = paste(validation$errors, collapse = "; ")
+      )
     }
   }
 

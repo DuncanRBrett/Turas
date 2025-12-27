@@ -26,6 +26,35 @@
 SCRIPT_VERSION <- "2.0"
 
 # ==============================================================================
+# TRS v1.0: Early refusal function (used before guard layer loads)
+# ==============================================================================
+
+#' Early Refusal Function
+#'
+#' Used for TRS-compliant errors before the guard layer is loaded.
+#' @keywords internal
+weighting_early_refuse <- function(code, title, problem, why_it_matters, how_to_fix, details = NULL) {
+  # Ensure code has valid TRS prefix
+  if (!grepl("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|PKG_|FEATURE_|BUG_)", code)) {
+    code <- paste0("CFG_", code)
+  }
+
+  msg <- paste0(
+    "\n", strrep("=", 80), "\n",
+    "  [REFUSE] ", code, ": ", title, "\n",
+    strrep("=", 80), "\n\n",
+    "Problem:\n  ", problem, "\n\n",
+    "Why it matters:\n  ", why_it_matters, "\n\n",
+    "How to fix:\n  ", how_to_fix, "\n"
+  )
+  if (!is.null(details)) {
+    msg <- paste0(msg, "\nDetails:\n  ", details, "\n")
+  }
+  msg <- paste0(msg, "\n", strrep("=", 80), "\n")
+  stop(msg, call. = FALSE)
+}
+
+# ==============================================================================
 # MODULE INITIALIZATION
 # ==============================================================================
 
@@ -52,7 +81,13 @@ get_module_dir <- function() {
     }
   }
 
-  stop("Cannot locate weighting module directory", call. = FALSE)
+  weighting_early_refuse(
+    code = "IO_MODULE_NOT_FOUND",
+    title = "Weighting Module Directory Not Found",
+    problem = "Cannot locate the weighting module directory.",
+    why_it_matters = "The weighting module needs to find its library files to run.",
+    how_to_fix = "Ensure you are running from the Turas root directory or the weighting module directory."
+  )
 }
 
 #' Source Module Libraries
@@ -63,10 +98,13 @@ source_module_libs <- function(module_dir) {
   lib_dir <- file.path(module_dir, "lib")
 
   if (!dir.exists(lib_dir)) {
-    stop(sprintf(
-      "Module library directory not found: %s",
-      lib_dir
-    ), call. = FALSE)
+    weighting_early_refuse(
+      code = "IO_LIB_DIR_NOT_FOUND",
+      title = "Module Library Directory Not Found",
+      problem = paste0("Module library directory not found: ", lib_dir),
+      why_it_matters = "The weighting module cannot load its required library files.",
+      how_to_fix = "Ensure the Turas installation is complete and the lib/ directory exists."
+    )
   }
 
   # Source in dependency order
@@ -101,11 +139,14 @@ check_required_packages <- function() {
   missing <- required[!sapply(required, requireNamespace, quietly = TRUE)]
 
   if (length(missing) > 0) {
-    stop(sprintf(
-      "\nRequired packages not installed: %s\n\nInstall with:\n  install.packages(c(%s))",
-      paste(missing, collapse = ", "),
-      paste(sprintf('"%s"', missing), collapse = ", ")
-    ), call. = FALSE)
+    weighting_early_refuse(
+      code = "PKG_MISSING_DEPENDENCY",
+      title = "Missing Required Packages",
+      problem = paste0("Required packages not installed: ", paste(missing, collapse = ", ")),
+      why_it_matters = "The weighting module cannot run without these packages.",
+      how_to_fix = paste0("Install with: install.packages(c(",
+                          paste(sprintf('"%s"', missing), collapse = ", "), "))")
+    )
   }
 }
 
@@ -222,10 +263,13 @@ run_weighting <- function(config_file,
 
   # Check file exists
   if (!file.exists(data_path)) {
-    stop(sprintf(
-      "\nData file not found: %s\n\nPlease check:\n  1. File path in configuration\n  2. File exists at specified location",
-      data_path
-    ), call. = FALSE)
+    weighting_refuse(
+      code = "IO_DATA_FILE_NOT_FOUND",
+      title = "Data File Not Found",
+      problem = paste0("Data file not found: ", data_path),
+      why_it_matters = "Cannot calculate weights without survey data.",
+      how_to_fix = "Check the file path in configuration and ensure the file exists at the specified location."
+    )
   }
 
   # Load data based on file type
@@ -238,18 +282,33 @@ run_weighting <- function(config_file,
       read.csv(data_path, stringsAsFactors = FALSE)
     } else if (file_ext == "sav") {
       if (!requireNamespace("haven", quietly = TRUE)) {
-        stop("Package 'haven' required to read SPSS files. Install with: install.packages('haven')",
-             call. = FALSE)
+        weighting_refuse(
+          code = "PKG_HAVEN_MISSING",
+          title = "Package 'haven' Required",
+          problem = "Package 'haven' is required to read SPSS files but is not installed.",
+          why_it_matters = "Cannot load SPSS (.sav) format data without the haven package.",
+          how_to_fix = "Install with: install.packages('haven')"
+        )
       }
       haven::read_sav(data_path)
     } else {
-      stop(sprintf("Unsupported data file format: .%s", file_ext), call. = FALSE)
+      weighting_refuse(
+        code = "IO_UNSUPPORTED_FORMAT",
+        title = "Unsupported Data File Format",
+        problem = paste0("Unsupported data file format: .", file_ext),
+        why_it_matters = "The weighting module can only read Excel, CSV, and SPSS files.",
+        how_to_fix = "Convert your data to .xlsx, .csv, or .sav format."
+      )
     }
   }, error = function(e) {
-    stop(sprintf(
-      "Failed to load data file: %s\n\nError: %s",
-      data_path, conditionMessage(e)
-    ), call. = FALSE)
+    weighting_refuse(
+      code = "IO_DATA_LOAD_FAILED",
+      title = "Failed to Load Data File",
+      problem = paste0("Failed to load data file: ", data_path),
+      why_it_matters = "Cannot proceed with weighting without valid survey data.",
+      how_to_fix = "Check the file is not corrupted and has the correct format.",
+      details = conditionMessage(e)
+    )
   })
 
   data <- as.data.frame(data)
@@ -321,7 +380,13 @@ run_weighting <- function(config_file,
       }
 
     } else {
-      stop(sprintf("Unknown weighting method: %s", method), call. = FALSE)
+      weighting_refuse(
+        code = "CFG_UNKNOWN_METHOD",
+        title = "Unknown Weighting Method",
+        problem = paste0("Unknown weighting method: ", method),
+        why_it_matters = "Cannot calculate weights with an unrecognized method.",
+        how_to_fix = "Use one of: 'design', 'rim', or 'rake' as the weighting method."
+      )
     }
 
     # Apply trimming if configured

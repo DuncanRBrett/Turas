@@ -34,11 +34,17 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
 
   # Validate config file exists
   if (!file.exists(config_file)) {
-    stop(create_error(
-      "CONFIG",
-      sprintf("Configuration file not found: %s", config_file),
-      "Verify the file path is correct and file exists"
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "IO_CONFIG_FILE_NOT_FOUND",
+      title = "Configuration File Not Found",
+      problem = sprintf("Configuration file not found: %s", config_file),
+      why_it_matters = "The configuration file defines the conjoint study design, attributes, and analysis settings.",
+      how_to_fix = c(
+        "Verify the file path is correct",
+        "Check that the file exists at the specified location",
+        sprintf("Expected file: %s", config_file)
+      )
+    )
   }
 
   # Set project root to config file directory if not specified
@@ -52,22 +58,32 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
   settings_df <- tryCatch({
     openxlsx::read.xlsx(config_file, sheet = "Settings")
   }, error = function(e) {
-    stop(create_error(
-      "CONFIG",
-      "Failed to load Settings sheet",
-      "Verify the Excel file has a sheet named 'Settings' with 'Setting' and 'Value' columns",
-      sprintf("File: %s", config_file)
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "CFG_SETTINGS_SHEET_MISSING",
+      title = "Settings Sheet Not Found",
+      problem = "Failed to load Settings sheet from configuration file.",
+      why_it_matters = "The Settings sheet contains essential analysis parameters like data file paths and estimation method.",
+      how_to_fix = c(
+        "Verify the Excel file has a sheet named 'Settings'",
+        "Ensure the sheet has 'Setting' and 'Value' columns",
+        sprintf("File: %s", config_file)
+      )
+    )
   })
 
   # Validate Settings sheet structure
   if (!all(c("Setting", "Value") %in% names(settings_df))) {
-    stop(create_error(
-      "CONFIG",
-      "Settings sheet missing required columns",
-      "Settings sheet must have 'Setting' and 'Value' columns",
-      sprintf("Found columns: %s", paste(names(settings_df), collapse = ", "))
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "CFG_SETTINGS_INVALID_FORMAT",
+      title = "Settings Sheet Format Invalid",
+      problem = "Settings sheet missing required columns.",
+      why_it_matters = "The Settings sheet must follow the standard format to be parsed correctly.",
+      how_to_fix = c(
+        "Settings sheet must have 'Setting' and 'Value' columns",
+        sprintf("Found columns: %s", paste(names(settings_df), collapse = ", ")),
+        "Refer to the configuration template for the correct format"
+      )
+    )
   }
 
   # Convert to named list
@@ -83,24 +99,34 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
   attributes_df <- tryCatch({
     openxlsx::read.xlsx(config_file, sheet = "Attributes")
   }, error = function(e) {
-    stop(create_error(
-      "CONFIG",
-      "Failed to load Attributes sheet",
-      "Verify the Excel file has a sheet named 'Attributes'",
-      sprintf("File: %s", config_file)
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "CFG_ATTRIBUTES_SHEET_MISSING",
+      title = "Attributes Sheet Not Found",
+      problem = "Failed to load Attributes sheet from configuration file.",
+      why_it_matters = "The Attributes sheet defines the product features and levels that will be tested in the conjoint study.",
+      how_to_fix = c(
+        "Verify the Excel file has a sheet named 'Attributes'",
+        "This sheet should contain attribute definitions with columns: AttributeName, NumLevels, LevelNames",
+        sprintf("File: %s", config_file)
+      )
+    )
   })
 
   # Validate Attributes sheet structure
   required_cols <- c("AttributeName", "NumLevels", "LevelNames")
   missing_cols <- setdiff(required_cols, names(attributes_df))
   if (length(missing_cols) > 0) {
-    stop(create_error(
-      "CONFIG",
-      "Attributes sheet missing required columns",
-      sprintf("Add these columns: %s", paste(missing_cols, collapse = ", ")),
-      "Required: AttributeName, NumLevels, LevelNames"
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "CFG_ATTRIBUTES_INVALID_FORMAT",
+      title = "Attributes Sheet Format Invalid",
+      problem = sprintf("Attributes sheet missing required columns: %s", paste(missing_cols, collapse = ", ")),
+      why_it_matters = "All three columns are required to properly define the conjoint study attributes and their levels.",
+      how_to_fix = c(
+        sprintf("Add these columns: %s", paste(missing_cols, collapse = ", ")),
+        "Required columns: AttributeName, NumLevels, LevelNames",
+        "Refer to the configuration template for the correct format"
+      )
+    )
   }
 
   # Parse level names
@@ -110,12 +136,17 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
   validation_result <- validate_config(settings_list, attributes_df)
 
   if (!validation_result$is_valid) {
-    error_msg <- create_error(
-      "CONFIG",
-      "Configuration validation failed",
-      paste(validation_result$errors, collapse = "\n → ")
+    conjoint_refuse(
+      code = "CFG_VALIDATION_FAILED",
+      title = "Configuration Validation Failed",
+      problem = "Configuration contains errors that prevent analysis.",
+      why_it_matters = "Invalid configuration will lead to incorrect or failed analysis.",
+      how_to_fix = c(
+        "Review and fix the following errors:",
+        validation_result$errors
+      ),
+      details = paste(validation_result$errors, collapse = "; ")
     )
-    stop(error_msg, call. = FALSE)
   }
 
   # Print warnings if any
@@ -477,12 +508,17 @@ resolve_config_path <- function(path, base_path, setting_name, must_exist = TRUE
 
   # Check file exists if required
   if (must_exist && !file.exists(resolved_path)) {
-    stop(create_error(
-      "CONFIG",
-      sprintf("File specified in '%s' not found", setting_name),
-      "Verify the file path is correct",
-      sprintf("Looking for: %s", resolved_path)
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "IO_CONFIG_PATH_NOT_FOUND",
+      title = "Configuration File Path Invalid",
+      problem = sprintf("File specified in '%s' not found", setting_name),
+      why_it_matters = "The configuration references a file that doesn't exist, preventing the analysis from loading required data.",
+      how_to_fix = c(
+        "Verify the file path is correct in your config",
+        sprintf("Looking for: %s", resolved_path),
+        "Check if the path is relative (resolved from config directory) or absolute"
+      )
+    )
   }
 
   resolved_path

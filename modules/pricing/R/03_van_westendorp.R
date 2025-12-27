@@ -437,8 +437,13 @@ run_van_westendorp <- function(data, config, validate = TRUE) {
 
   # Load package
   if (!requireNamespace("pricesensitivitymeter", quietly = TRUE)) {
-    stop("Package 'pricesensitivitymeter' required. Install with: install.packages('pricesensitivitymeter')",
-         call. = FALSE)
+    pricing_refuse(
+      code = "PKG_PSM_MISSING",
+      title = "Required Package Missing",
+      problem = "Package 'pricesensitivitymeter' is not installed",
+      why_it_matters = "Cannot run Van Westendorp analysis without the pricesensitivitymeter package",
+      how_to_fix = "Install the package: install.packages('pricesensitivitymeter')"
+    )
   }
 
   vw <- config$van_westendorp
@@ -461,10 +466,19 @@ run_van_westendorp <- function(data, config, validate = TRUE) {
 
   missing_cols <- required_cols[!required_cols %in% names(data)]
   if (length(missing_cols) > 0) {
-    stop(sprintf("Columns not found: %s\nAvailable: %s",
-                 paste(missing_cols, collapse = ", "),
-                 paste(names(data), collapse = ", ")),
-         call. = FALSE)
+    pricing_refuse(
+      code = "DATA_VW_COLUMNS_MISSING",
+      title = "Van Westendorp Columns Not Found",
+      problem = sprintf("%d required column(s) missing from data", length(missing_cols)),
+      why_it_matters = "Cannot run Van Westendorp analysis without all 4 price perception questions",
+      how_to_fix = c(
+        "Verify column names in configuration match data exactly (case-sensitive)",
+        "Check that all 4 VW questions are present in the data file"
+      ),
+      missing = missing_cols,
+      observed = names(data),
+      expected = required_cols
+    )
   }
 
   too_cheap <- as.numeric(data[[vw$col_too_cheap]])

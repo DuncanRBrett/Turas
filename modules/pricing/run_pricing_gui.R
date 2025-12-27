@@ -16,6 +16,20 @@
 #' @export
 run_pricing_gui <- function() {
 
+  # Early refuse function for errors before guard layer loads
+  early_refuse <- function(code, title, problem, why_it_matters, how_to_fix) {
+    msg <- paste0(
+      "\n", strrep("=", 80), "\n",
+      "  [REFUSE] ", code, ": ", title, "\n",
+      strrep("=", 80), "\n\n",
+      "Problem:\n  ", problem, "\n\n",
+      "Why it matters:\n  ", why_it_matters, "\n\n",
+      "How to fix:\n  ", how_to_fix, "\n",
+      "\n", strrep("=", 80), "\n"
+    )
+    stop(msg, call. = FALSE)
+  }
+
   # Source module files
   # Try multiple methods to find script location
   get_script_dir <- function() {
@@ -59,10 +73,13 @@ run_pricing_gui <- function() {
   required_packages <- c("shiny", "readxl", "openxlsx", "shinyFiles", "shinyjs")
   missing <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
   if (length(missing) > 0) {
-    stop(sprintf("Missing required packages: %s\nInstall with: install.packages(c('%s'))",
-                 paste(missing, collapse = ", "),
-                 paste(missing, collapse = "', '")),
-         call. = FALSE)
+    early_refuse(
+      code = "PKG_MISSING_DEPENDENCY",
+      title = "Missing Required Packages",
+      problem = sprintf("The following packages are not installed: %s", paste(missing, collapse = ", ")),
+      why_it_matters = "The Pricing GUI requires these packages for interactive analysis",
+      how_to_fix = sprintf("Install missing packages with: install.packages(c('%s'))", paste(missing, collapse = "', '"))
+    )
   }
 
   library(shiny)

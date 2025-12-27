@@ -6,6 +6,35 @@
 # Usage: source("modules/tabs/run_tabs_gui.R") then run_tabs_gui()
 # ==============================================================================
 
+# ==============================================================================
+# TRS v1.0: EARLY REFUSAL FUNCTION (GUI ENTRY POINT)
+# ==============================================================================
+# This GUI entry point runs before tabs_refuse() is available, so we need
+# a local implementation that formats TRS-compliant errors.
+
+early_refuse <- function(code, title, problem, why_it_matters, how_to_fix) {
+  # Format TRS-compliant error message
+  msg <- paste0(
+    "\n", strrep("=", 80), "\n",
+    "  [REFUSE] ", code, ": ", title, "\n",
+    strrep("=", 80), "\n\n",
+    "Problem:\n",
+    "  ", problem, "\n\n",
+    "Why it matters:\n",
+    "  ", why_it_matters, "\n\n",
+    "How to fix:\n"
+  )
+
+  # Add fix steps
+  for (i in seq_along(how_to_fix)) {
+    msg <- paste0(msg, "  ", i, ". ", how_to_fix[i], "\n")
+  }
+
+  msg <- paste0(msg, "\n", strrep("=", 80), "\n")
+
+  stop(msg, call. = FALSE)
+}
+
 run_tabs_gui <- function() {
 
   # Required packages - check availability (TRS v1.0: no auto-install)
@@ -14,19 +43,14 @@ run_tabs_gui <- function() {
   # Check for missing packages and refuse with clear instructions if any are missing
   missing_packages <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
   if (length(missing_packages) > 0) {
-    stop(
-      "\n================================================================================\n",
-      "  [REFUSE] PKG_MISSING_DEPENDENCY: Missing Required Packages\n",
-      "================================================================================\n\n",
-      "Problem:\n",
-      "  The following required packages are not installed: ", paste(missing_packages, collapse = ", "), "\n\n",
-      "Why it matters:\n",
-      "  The Tabs GUI cannot run without these packages.\n\n",
-      "How to fix:\n",
-      "  Run the following command in R:\n",
-      "    install.packages(c(", paste(sprintf('"%s"', missing_packages), collapse = ", "), "))\n\n",
-      "================================================================================\n",
-      call. = FALSE
+    early_refuse(
+      code = "PKG_MISSING_DEPENDENCY",
+      title = "Missing Required Packages",
+      problem = paste0("The following required packages are not installed: ", paste(missing_packages, collapse = ", ")),
+      why_it_matters = "The Tabs GUI cannot run without these packages.",
+      how_to_fix = c(
+        paste0("Run the following command in R: install.packages(c(", paste(sprintf('"%s"', missing_packages), collapse = ", "), "))")
+      )
     )
   }
 

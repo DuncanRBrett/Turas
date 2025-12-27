@@ -22,7 +22,17 @@ load_pricing_data <- function(data_file, config) {
 
   # Validate file exists
   if (!file.exists(data_file)) {
-    stop(sprintf("Data file not found: %s", data_file), call. = FALSE)
+    pricing_refuse(
+      code = "IO_DATA_NOT_FOUND",
+      title = "Data File Not Found",
+      problem = sprintf("Could not locate data file at: %s", data_file),
+      why_it_matters = "Cannot run analysis without survey data",
+      how_to_fix = c(
+        "Check the file path in your configuration",
+        "Ensure the data file exists at the specified location",
+        "Use absolute paths or paths relative to the configuration file"
+      )
+    )
   }
 
   # Determine file type
@@ -34,30 +44,68 @@ load_pricing_data <- function(data_file, config) {
     "csv" = read.csv(data_file, stringsAsFactors = FALSE, na.strings = c("", "NA", "N/A", "-99")),
     "xlsx" = {
       if (!requireNamespace("readxl", quietly = TRUE)) {
-        stop("Package 'readxl' is required for Excel files", call. = FALSE)
+        pricing_refuse(
+          code = "PKG_READXL_MISSING",
+          title = "Required Package Missing",
+          problem = "Package 'readxl' is not installed",
+          why_it_matters = "Cannot read Excel data files without readxl package",
+          how_to_fix = "Install the package: install.packages('readxl')"
+        )
       }
       as.data.frame(readxl::read_excel(data_file))
     },
     "xls" = {
       if (!requireNamespace("readxl", quietly = TRUE)) {
-        stop("Package 'readxl' is required for Excel files", call. = FALSE)
+        pricing_refuse(
+          code = "PKG_READXL_MISSING",
+          title = "Required Package Missing",
+          problem = "Package 'readxl' is not installed",
+          why_it_matters = "Cannot read Excel data files without readxl package",
+          how_to_fix = "Install the package: install.packages('readxl')"
+        )
       }
       as.data.frame(readxl::read_excel(data_file))
     },
     "sav" = {
       if (!requireNamespace("haven", quietly = TRUE)) {
-        stop("Package 'haven' is required for SPSS files", call. = FALSE)
+        pricing_refuse(
+          code = "PKG_HAVEN_MISSING",
+          title = "Required Package Missing",
+          problem = "Package 'haven' is not installed",
+          why_it_matters = "Cannot read SPSS data files without haven package",
+          how_to_fix = "Install the package: install.packages('haven')"
+        )
       }
       as.data.frame(haven::read_sav(data_file))
     },
     "dta" = {
       if (!requireNamespace("haven", quietly = TRUE)) {
-        stop("Package 'haven' is required for Stata files", call. = FALSE)
+        pricing_refuse(
+          code = "PKG_HAVEN_MISSING",
+          title = "Required Package Missing",
+          problem = "Package 'haven' is not installed",
+          why_it_matters = "Cannot read Stata data files without haven package",
+          how_to_fix = "Install the package: install.packages('haven')"
+        )
       }
       as.data.frame(haven::read_dta(data_file))
     },
     "rds" = readRDS(data_file),
-    stop(sprintf("Unsupported file format: %s", file_ext), call. = FALSE)
+    pricing_refuse(
+      code = "IO_UNSUPPORTED_FORMAT",
+      title = "Unsupported File Format",
+      problem = sprintf("File format '.%s' is not supported", file_ext),
+      why_it_matters = "Cannot load data from unrecognized file types",
+      how_to_fix = c(
+        "Convert your data to a supported format:",
+        "  - CSV (.csv)",
+        "  - Excel (.xlsx, .xls)",
+        "  - SPSS (.sav)",
+        "  - Stata (.dta)",
+        "  - R Data (.rds)"
+      ),
+      observed = file_ext
+    )
   )
 
   # Recode "don't know" codes to NA
@@ -138,10 +186,19 @@ validate_pricing_data <- function(data, config) {
 
     missing_cols <- required_cols[!required_cols %in% names(data)]
     if (length(missing_cols) > 0) {
-      stop(sprintf("Van Westendorp columns not found in data: %s\nAvailable columns: %s",
-                   paste(missing_cols, collapse = ", "),
-                   paste(names(data), collapse = ", ")),
-           call. = FALSE)
+      pricing_refuse(
+        code = "DATA_VW_COLUMNS_MISSING",
+        title = "Van Westendorp Columns Not Found",
+        problem = sprintf("%d Van Westendorp column(s) missing from data", length(missing_cols)),
+        why_it_matters = "Cannot run Van Westendorp analysis without all 4 price perception questions",
+        how_to_fix = c(
+          "Verify column names in configuration match data exactly (case-sensitive)",
+          "Check that all 4 VW questions are present in the data file"
+        ),
+        missing = missing_cols,
+        observed = names(data),
+        expected = required_cols
+      )
     }
   }
 
@@ -151,17 +208,36 @@ validate_pricing_data <- function(data, config) {
     if (gg$data_format == "wide") {
       missing_cols <- gg$response_columns[!gg$response_columns %in% names(data)]
       if (length(missing_cols) > 0) {
-        stop(sprintf("Gabor-Granger response columns not found in data: %s",
-                     paste(missing_cols, collapse = ", ")),
-             call. = FALSE)
+        pricing_refuse(
+          code = "DATA_GG_COLUMNS_MISSING",
+          title = "Gabor-Granger Columns Not Found",
+          problem = sprintf("%d Gabor-Granger column(s) missing from data", length(missing_cols)),
+          why_it_matters = "Cannot run Gabor-Granger analysis without purchase intent responses at each price point",
+          how_to_fix = c(
+            "Verify response column names in configuration match data exactly (case-sensitive)",
+            "Ensure all price point columns are present in the data file"
+          ),
+          missing = missing_cols,
+          observed = names(data)
+        )
       }
     } else {
       required_cols <- c(gg$price_column, gg$response_column)
       missing_cols <- required_cols[!required_cols %in% names(data)]
       if (length(missing_cols) > 0) {
-        stop(sprintf("Gabor-Granger columns not found in data: %s",
-                     paste(missing_cols, collapse = ", ")),
-             call. = FALSE)
+        pricing_refuse(
+          code = "DATA_GG_COLUMNS_MISSING",
+          title = "Gabor-Granger Columns Not Found",
+          problem = sprintf("%d Gabor-Granger column(s) missing from data", length(missing_cols)),
+          why_it_matters = "Cannot run Gabor-Granger analysis in long format without price and response columns",
+          how_to_fix = c(
+            "Verify column names in configuration match data exactly (case-sensitive)",
+            "Check that price_column and response_column are present in the data file"
+          ),
+          missing = missing_cols,
+          observed = names(data),
+          expected = required_cols
+        )
       }
     }
   }
@@ -173,10 +249,18 @@ validate_pricing_data <- function(data, config) {
   weight_summary <- NULL
   if (!is.na(config$weight_var)) {
     if (!config$weight_var %in% names(data)) {
-      stop(sprintf("Weight variable '%s' not found in data.\nAvailable columns: %s",
-                   config$weight_var,
-                   paste(names(data), collapse = ", ")),
-           call. = FALSE)
+      pricing_refuse(
+        code = "DATA_WEIGHT_VAR_MISSING",
+        title = "Weight Variable Not Found",
+        problem = sprintf("Weight column '%s' not found in data", config$weight_var),
+        why_it_matters = "Cannot apply weighting without the specified weight variable",
+        how_to_fix = c(
+          "Verify weight_var name in configuration matches data exactly (case-sensitive)",
+          "Remove weight_var from configuration if weighting not needed"
+        ),
+        observed = names(data),
+        expected = config$weight_var
+      )
     }
 
     # Coerce to numeric

@@ -10,25 +10,43 @@
 #' @export
 run_keydriver_gui <- function() {
 
+  # Early refuse function for GUI entry point (TRS v1.0)
+  # GUI entry points cannot use full TRS infrastructure before packages are loaded
+  early_refuse <- function(code, title, problem, why_it_matters, how_to_fix) {
+    msg <- paste0(
+      "\n================================================================================\n",
+      sprintf("  [REFUSE] %s: %s\n", code, title),
+      "================================================================================\n\n",
+      "Problem:\n",
+      "  ", problem, "\n\n",
+      "Why it matters:\n",
+      "  ", why_it_matters, "\n\n",
+      "How to fix:\n"
+    )
+    for (step in how_to_fix) {
+      msg <- paste0(msg, "  ", step, "\n")
+    }
+    msg <- paste0(msg, "\n================================================================================\n")
+    stop(msg, call. = FALSE)
+  }
+
   # Required packages - check availability (TRS v1.0: no auto-install)
   required_packages <- c("shiny", "shinyFiles")
 
   # Check for missing packages and refuse with clear instructions if any are missing
   missing_packages <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
   if (length(missing_packages) > 0) {
-    stop(
-      "\n================================================================================\n",
-      "  [REFUSE] PKG_MISSING_DEPENDENCY: Missing Required Packages\n",
-      "================================================================================\n\n",
-      "Problem:\n",
-      "  The following required packages are not installed: ", paste(missing_packages, collapse = ", "), "\n\n",
-      "Why it matters:\n",
-      "  The KeyDriver GUI cannot run without these packages.\n\n",
-      "How to fix:\n",
-      "  Run the following command in R:\n",
-      "    install.packages(c(", paste(sprintf('"%s"', missing_packages), collapse = ", "), "))\n\n",
-      "================================================================================\n",
-      call. = FALSE
+    early_refuse(
+      code = "PKG_MISSING_DEPENDENCY",
+      title = "Missing Required Packages",
+      problem = sprintf("The following required packages are not installed: %s",
+                       paste(missing_packages, collapse = ", ")),
+      why_it_matters = "The KeyDriver GUI cannot run without these packages.",
+      how_to_fix = c(
+        "Run the following command in R:",
+        sprintf("  install.packages(c(%s))",
+               paste(sprintf('"%s"', missing_packages), collapse = ", "))
+      )
     )
   }
 

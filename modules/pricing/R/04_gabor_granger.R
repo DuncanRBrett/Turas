@@ -132,9 +132,19 @@ prepare_gg_wide_data <- function(data, gg_config, main_config) {
   response_cols <- gg_config$response_columns
 
   if (length(prices) != length(response_cols)) {
-    stop(sprintf("Number of prices (%d) must match number of response columns (%d)",
-                 length(prices), length(response_cols)),
-         call. = FALSE)
+    pricing_refuse(
+      code = "DATA_GG_PRICE_MISMATCH",
+      title = "Price-Response Column Mismatch",
+      problem = sprintf("Number of prices (%d) does not match number of response columns (%d)",
+                       length(prices), length(response_cols)),
+      why_it_matters = "Each price point must have a corresponding response column",
+      how_to_fix = c(
+        "Verify that price_sequence and response_columns have the same number of elements",
+        "Check GaborGranger sheet in configuration for matching counts"
+      ),
+      observed = sprintf("%d response columns", length(response_cols)),
+      expected = sprintf("%d prices", length(prices))
+    )
   }
 
   # Create respondent IDs if not present
@@ -614,7 +624,19 @@ interpolate_demand_curve <- function(demand_curve,
   intent <- intent[valid]
 
   if (length(prices) < 2) {
-    stop("Need at least 2 valid data points for interpolation", call. = FALSE)
+    pricing_refuse(
+      code = "DATA_GG_INSUFFICIENT_POINTS",
+      title = "Insufficient Data Points",
+      problem = sprintf("Only %d valid price point(s) available for interpolation", length(prices)),
+      why_it_matters = "Need at least 2 price points to interpolate demand curve",
+      how_to_fix = c(
+        "Check that demand curve contains valid responses for at least 2 price points",
+        "Review data quality and ensure sufficient non-missing responses",
+        "Consider using more price points in your survey design"
+      ),
+      observed = length(prices),
+      expected = "at least 2"
+    )
   }
 
   # Interpolate based on method
@@ -783,7 +805,17 @@ find_optimal_price <- function(revenue_curve, metric = "revenue") {
 
   if (metric == "profit") {
     if (!"profit_index" %in% names(revenue_curve)) {
-      stop("Profit index not found in revenue_curve. Specify unit_cost in config.", call. = FALSE)
+      pricing_refuse(
+        code = "CFG_MISSING_UNIT_COST",
+        title = "Unit Cost Not Specified",
+        problem = "Cannot optimize for profit without unit_cost in configuration",
+        why_it_matters = "Profit calculation requires knowing the cost per unit sold",
+        how_to_fix = c(
+          "Add 'unit_cost' to the GaborGranger sheet in your configuration",
+          "Or change metric to 'revenue' instead of 'profit'"
+        ),
+        expected = "unit_cost setting in GaborGranger configuration"
+      )
     }
     optimal_idx <- which.max(revenue_curve$profit_index)
     result <- list(

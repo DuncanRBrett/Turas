@@ -27,13 +27,29 @@ parse_data_export_map <- function(file_path, verbose = FALSE) {
 
   # Check file exists
   if (!file.exists(file_path)) {
-    stop(sprintf("Data export map file not found: %s", file_path), call. = FALSE)
+    alchemerparser_refuse(
+      code = "IO_FILE_NOT_FOUND",
+      title = "Data Export Map File Not Found",
+      problem = sprintf("Cannot find data export map file: %s", basename(file_path)),
+      why_it_matters = "Data export map is required to understand column structure from Alchemer.",
+      how_to_fix = c(
+        "Verify the file path is correct",
+        "Check that the file exists at the specified location",
+        "Export the data map from Alchemer if missing"
+      ),
+      details = paste0("Expected path: ", file_path)
+    )
   }
 
   # Load required package
   if (!requireNamespace("readxl", quietly = TRUE)) {
-    stop("Package 'readxl' is required. Install with: install.packages('readxl')",
-         call. = FALSE)
+    alchemerparser_refuse(
+      code = "PKG_MISSING_DEPENDENCY",
+      title = "Missing Required Package",
+      problem = "Package 'readxl' is not installed.",
+      why_it_matters = "AlchemerParser requires 'readxl' to parse Excel data export maps.",
+      how_to_fix = "Run: install.packages('readxl')"
+    )
   }
 
   # Read first two rows (no column names)

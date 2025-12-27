@@ -27,8 +27,13 @@ generate_output_files <- function(questions, project_name, output_dir,
 
   # Check required package
   if (!requireNamespace("openxlsx", quietly = TRUE)) {
-    stop("Package 'openxlsx' is required. Install with: install.packages('openxlsx')",
-         call. = FALSE)
+    alchemerparser_refuse(
+      code = "PKG_MISSING_DEPENDENCY",
+      title = "Missing Required Package",
+      problem = "Package 'openxlsx' is not installed.",
+      why_it_matters = "AlchemerParser requires 'openxlsx' to generate Excel output files.",
+      how_to_fix = "Run: install.packages('openxlsx')"
+    )
   }
 
   # Generate file paths with "_parsed" suffix to distinguish from templates

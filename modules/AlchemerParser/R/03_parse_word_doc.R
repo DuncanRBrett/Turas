@@ -24,13 +24,29 @@ parse_word_questionnaire <- function(file_path, verbose = FALSE) {
 
   # Check file exists
   if (!file.exists(file_path)) {
-    stop(sprintf("Questionnaire file not found: %s", file_path), call. = FALSE)
+    alchemerparser_refuse(
+      code = "IO_FILE_NOT_FOUND",
+      title = "Questionnaire File Not Found",
+      problem = sprintf("Cannot find questionnaire file: %s", basename(file_path)),
+      why_it_matters = "Word questionnaire is required to extract question type hints and structure.",
+      how_to_fix = c(
+        "Verify the file path is correct",
+        "Check that the file exists at the specified location",
+        "Export the questionnaire from Alchemer if missing"
+      ),
+      details = paste0("Expected path: ", file_path)
+    )
   }
 
   # Load required package
   if (!requireNamespace("officer", quietly = TRUE)) {
-    stop("Package 'officer' is required. Install with: install.packages('officer')",
-         call. = FALSE)
+    alchemerparser_refuse(
+      code = "PKG_MISSING_DEPENDENCY",
+      title = "Missing Required Package",
+      problem = "Package 'officer' is not installed.",
+      why_it_matters = "AlchemerParser requires 'officer' to parse Word documents.",
+      how_to_fix = "Run: install.packages('officer')"
+    )
   }
 
   # Read Word document

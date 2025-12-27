@@ -221,7 +221,13 @@ generate_config_template <- function(data_file, output_file, mode = "exploration
   } else if (grepl("\\.(xlsx|xls)$", data_file, ignore.case = TRUE)) {
     data <- readxl::read_excel(data_file, n_max = 5)
   } else {
-    stop("Data file must be CSV or Excel format", call. = FALSE)
+    segment_refuse(
+      code = "IO_INVALID_FILE_FORMAT",
+      title = "Invalid Data File Format",
+      problem = "Data file must be CSV or Excel format.",
+      why_it_matters = "The module can only read CSV (.csv) or Excel (.xlsx, .xls) files.",
+      how_to_fix = "Convert your data to CSV or Excel format and try again."
+    )
   }
 
   var_names <- names(data)
@@ -681,36 +687,64 @@ run_segment_quick <- function(data, id_var, clustering_vars, k = NULL,
 
   # Check data is a data frame
   if (!is.data.frame(data)) {
-    stop("data must be a data frame", call. = FALSE)
+    segment_refuse(
+      code = "DATA_INVALID_TYPE",
+      title = "Invalid Data Type",
+      problem = "Data must be a data frame.",
+      why_it_matters = "Segmentation requires a properly structured data frame.",
+      how_to_fix = "Ensure data parameter is a data.frame object."
+    )
   }
 
   # Check ID variable exists
   if (!id_var %in% names(data)) {
-    stop(sprintf("ID variable '%s' not found in data. Available columns: %s",
-                 id_var, paste(head(names(data), 10), collapse = ", ")),
-         call. = FALSE)
+    segment_refuse(
+      code = "CFG_ID_VAR_MISSING",
+      title = "ID Variable Not Found",
+      problem = sprintf("ID variable '%s' not found in data.", id_var),
+      why_it_matters = "An ID variable is required to identify respondents.",
+      how_to_fix = c(
+        "Check that the ID variable name matches your data exactly",
+        sprintf("Available columns: %s", paste(head(names(data), 10), collapse = ", "))
+      )
+    )
   }
 
   # Check clustering variables exist
   missing_vars <- setdiff(clustering_vars, names(data))
   if (length(missing_vars) > 0) {
-    stop(sprintf("Clustering variables not found in data: %s",
-                 paste(missing_vars, collapse = ", ")),
-         call. = FALSE)
+    segment_refuse(
+      code = "CFG_CLUSTERING_VARS_MISSING",
+      title = "Clustering Variables Not Found",
+      problem = sprintf("Clustering variables not found in data: %s", paste(missing_vars, collapse = ", ")),
+      why_it_matters = "All specified clustering variables must exist in the data.",
+      how_to_fix = "Check that variable names match data column names exactly (case-sensitive)."
+    )
   }
 
   # Check clustering variables are numeric
   for (var in clustering_vars) {
     if (!is.numeric(data[[var]])) {
-      stop(sprintf("Clustering variable '%s' must be numeric", var),
-           call. = FALSE)
+      segment_refuse(
+        code = "DATA_NON_NUMERIC_VAR",
+        title = "Non-Numeric Clustering Variable",
+        problem = sprintf("Clustering variable '%s' must be numeric but is %s.", var, class(data[[var]])[1]),
+        why_it_matters = "K-means clustering requires numeric variables.",
+        how_to_fix = sprintf("Convert '%s' to numeric or remove it from clustering_vars.", var)
+      )
     }
   }
 
   # Validate k
   if (!is.null(k)) {
     if (!is.numeric(k) || k < 2) {
-      stop("k must be an integer >= 2", call. = FALSE)
+      segment_refuse(
+        code = "CFG_INVALID_K",
+        title = "Invalid Number of Clusters",
+        problem = sprintf("k must be an integer >= 2 (received: %s).", as.character(k)),
+        why_it_matters = "Clustering requires at least 2 segments.",
+        how_to_fix = "Set k to an integer value of 2 or greater."
+      )
     }
     k <- as.integer(k)
   }
@@ -829,8 +863,17 @@ run_segment_quick <- function(data, id_var, clustering_vars, k = NULL,
   }
 
   if (nrow(data) < 50) {
-    stop(sprintf("Only %d valid rows remaining. Need at least 50.", nrow(data)),
-         call. = FALSE)
+    segment_refuse(
+      code = "DATA_INSUFFICIENT_SAMPLE",
+      title = "Insufficient Sample Size",
+      problem = sprintf("Only %d valid rows remaining. Need at least 50.", nrow(data)),
+      why_it_matters = "Small samples produce unreliable clustering results.",
+      how_to_fix = c(
+        "Increase sample size",
+        "Review missing data handling strategy",
+        "Check data quality and filtering"
+      )
+    )
   }
 
   # Standardize data

@@ -138,7 +138,16 @@ source_module_files <- function(base_dir = NULL) {
     }
 
     if (!file.exists(file_path)) {
-      stop(sprintf("Required module file not found: %s", file), call. = FALSE)
+      confidence_refuse(
+        code = "IO_MODULE_FILE_MISSING",
+        title = "Required Module File Not Found",
+        problem = sprintf("Required module file not found: %s", file),
+        why_it_matters = "The confidence module requires all component files to function properly.",
+        how_to_fix = c(
+          sprintf("Verify that %s exists in the module directory", file),
+          "Ensure the module installation is complete"
+        )
+      )
     }
 
     source(file_path)
@@ -149,10 +158,17 @@ source_module_files <- function(base_dir = NULL) {
 tryCatch({
   source_module_files()
 }, error = function(e) {
-  stop(sprintf(
-    "Failed to load module files\nError: %s\n\nPlease ensure all R files are in the correct location.",
-    conditionMessage(e)
-  ), call. = FALSE)
+  confidence_refuse(
+    code = "IO_MODULE_LOAD_FAILED",
+    title = "Failed to Load Module Files",
+    problem = sprintf("Failed to load module files: %s", conditionMessage(e)),
+    why_it_matters = "All module component files must be loaded before analysis can proceed.",
+    how_to_fix = c(
+      "Ensure all R files are in the correct location",
+      "Check that files are not corrupted",
+      "Verify file permissions allow reading"
+    )
+  )
 })
 
 
@@ -259,7 +275,18 @@ run_confidence_analysis_impl <- function(config_path,
   config <- tryCatch({
     load_confidence_config(config_path)
   }, error = function(e) {
-    stop(sprintf("Failed to load configuration\nError: %s", conditionMessage(e)), call. = FALSE)
+    confidence_refuse(
+      code = "CFG_LOAD_FAILED",
+      title = "Failed to Load Configuration",
+      problem = sprintf("Failed to load configuration: %s", conditionMessage(e)),
+      why_it_matters = "Valid configuration is required to specify analysis parameters.",
+      how_to_fix = c(
+        "Verify the config file path is correct",
+        "Ensure the config file is a valid Excel file (.xlsx)",
+        "Check that the file is not open in Excel",
+        "Validate all required sheets and columns are present"
+      )
+    )
   })
 
   if (verbose) {
@@ -302,7 +329,18 @@ run_confidence_analysis_impl <- function(config_path,
       verbose = verbose
     )
   }, error = function(e) {
-    stop(sprintf("Failed to load survey data\nError: %s", conditionMessage(e)), call. = FALSE)
+    confidence_refuse(
+      code = "DATA_LOAD_FAILED",
+      title = "Failed to Load Survey Data",
+      problem = sprintf("Failed to load survey data: %s", conditionMessage(e)),
+      why_it_matters = "Survey data is required for confidence interval calculations.",
+      how_to_fix = c(
+        "Verify the data file path in the config is correct",
+        "Ensure the data file exists and is accessible",
+        "Check that the file format is supported (CSV, XLSX)",
+        "Verify the file contains the required question columns"
+      )
+    )
   })
 
   if (verbose) {
@@ -327,10 +365,13 @@ run_confidence_analysis_impl <- function(config_path,
         sprintf("Ensure column '%s' exists in the data file, or remove weight_variable from config", weight_var)
       )
     } else {
-      stop(sprintf(
-        "[TRS REFUSE] CONF_WEIGHT_MISSING: Weight variable '%s' not found in data",
-        weight_var
-      ), call. = FALSE)
+      confidence_refuse(
+        code = "DATA_WEIGHT_NOT_FOUND",
+        title = "Configured Weight Variable Not Found",
+        problem = sprintf("Weight variable '%s' specified in config but not present in data file", weight_var),
+        why_it_matters = "The specified weight variable must exist in the data for weighted analysis.",
+        how_to_fix = sprintf("Ensure column '%s' exists in the data file, or remove weight_variable from config", weight_var)
+      )
     }
   }
 
@@ -488,7 +529,18 @@ run_confidence_analysis_impl <- function(config_path,
       for (i in seq_along(warnings_list)) {
         cat(sprintf("  %d. %s\n", i, warnings_list[i]))
       }
-      stop("Analysis stopped due to warnings (stop_on_warnings = TRUE)", call. = FALSE)
+      confidence_refuse(
+        code = "DATA_QUALITY_WARNINGS",
+        title = "Analysis Stopped Due to Warnings",
+        problem = sprintf("Analysis encountered %d warning(s) and stop_on_warnings is enabled", length(warnings_list)),
+        why_it_matters = "Data quality warnings may indicate issues that could affect result reliability.",
+        how_to_fix = c(
+          "Review the warnings listed above",
+          "Address data quality issues in the source data",
+          "Or run with stop_on_warnings = FALSE to proceed despite warnings"
+        ),
+        details = warnings_list
+      )
     }
   } else {
     if (verbose) cat("  ✓ No warnings detected\n")
@@ -545,7 +597,18 @@ run_confidence_analysis_impl <- function(config_path,
       run_result = run_result
     )
   }, error = function(e) {
-    stop(sprintf("Failed to write output\nError: %s", conditionMessage(e)), call. = FALSE)
+    confidence_refuse(
+      code = "IO_OUTPUT_WRITE_FAILED",
+      title = "Failed to Write Output",
+      problem = sprintf("Failed to write output: %s", conditionMessage(e)),
+      why_it_matters = "Analysis results cannot be saved without successful output generation.",
+      how_to_fix = c(
+        "Ensure the output directory exists and is writable",
+        "Check that the output file is not open in Excel",
+        "Verify sufficient disk space is available",
+        "Check file permissions"
+      )
+    )
   })
 
   # ============================================================================

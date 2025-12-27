@@ -227,7 +227,17 @@ calculate_separation_metrics <- function(data, clusters, clustering_vars) {
 
   # Validate that we have enough data points for the number of clusters
   if (n <= k) {
-    stop(sprintf("Cannot calculate Calinski-Harabasz index: n (%d) must be greater than k (%d)", n, k), call. = FALSE)
+    segment_refuse(
+      code = "DATA_INSUFFICIENT_FOR_CH",
+      title = "Insufficient Data for Calinski-Harabasz Index",
+      problem = sprintf("Cannot calculate Calinski-Harabasz index: n (%d) must be greater than k (%d)", n, k),
+      why_it_matters = "The CH index requires more observations than clusters for valid calculation.",
+      how_to_fix = c(
+        "Increase sample size",
+        "Reduce number of clusters (k)",
+        "Review data filtering and missing data handling"
+      )
+    )
   }
 
   ch_index <- (bgss / (k - 1)) / (wgss / (n - k))
@@ -283,7 +293,13 @@ calculate_separation_metrics <- function(data, clusters, clustering_vars) {
 #' @export
 calculate_exploration_metrics <- function(exploration_result) {
   if (!requireNamespace("cluster", quietly = TRUE)) {
-    stop("Package 'cluster' is required for exploration metrics. Install with: install.packages('cluster')", call. = FALSE)
+    segment_refuse(
+      code = "PKG_CLUSTER_MISSING",
+      title = "Package cluster Required",
+      problem = "Package 'cluster' is not installed.",
+      why_it_matters = "The cluster package is required for calculating exploration metrics (silhouette analysis).",
+      how_to_fix = "Install the package with: install.packages('cluster')"
+    )
   }
 
   models <- exploration_result$models
@@ -362,7 +378,13 @@ recommend_k <- function(metrics_df, min_segment_size_pct) {
 #' @export
 calculate_validation_metrics <- function(data, model, k, calculate_gap = FALSE) {
   if (!requireNamespace("cluster", quietly = TRUE)) {
-    stop("Package 'cluster' is required for validation metrics. Install with: install.packages('cluster')", call. = FALSE)
+    segment_refuse(
+      code = "PKG_CLUSTER_MISSING",
+      title = "Package cluster Required",
+      problem = "Package 'cluster' is not installed.",
+      why_it_matters = "The cluster package is required for calculating validation metrics (silhouette analysis).",
+      how_to_fix = "Install the package with: install.packages('cluster')"
+    )
   }
 
   # Calculate silhouette

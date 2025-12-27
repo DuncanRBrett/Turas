@@ -21,7 +21,17 @@ if (!exists("TURAS_HOME")) {
   }
   
   if (!exists("TURAS_HOME")) {
-    stop("Cannot find Turas. Please run from Turas directory or set TURAS_HOME")
+    tabs_refuse(
+      code = "ENV_TURAS_HOME_NOT_SET",
+      title = "Turas Environment Not Initialized",
+      problem = "TURAS_HOME environment variable is not set. The Turas framework has not been loaded.",
+      why_it_matters = "Cannot locate Turas modules and libraries without TURAS_HOME. The Tabs analysis cannot proceed.",
+      how_to_fix = c(
+        "Run turas.R from the Turas root directory first: source('turas.R')",
+        "Ensure you are working from within the Turas project directory",
+        "If running standalone, set TURAS_HOME manually: TURAS_HOME <- '/path/to/Turas'"
+      )
+    )
   }
 }
 

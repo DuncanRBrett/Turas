@@ -21,20 +21,44 @@ detect_outliers_zscore <- function(data, clustering_vars, threshold = 3.0,
 
   # Validate inputs
   if (!is.data.frame(data)) {
-    stop("data must be a data frame")
+    segment_refuse(
+      code = "DATA_INVALID_TYPE",
+      title = "Invalid Data Type",
+      problem = "Data must be a data frame.",
+      why_it_matters = "Outlier detection requires properly structured data.",
+      how_to_fix = "Ensure data parameter is a data.frame object."
+    )
   }
 
   if (!all(clustering_vars %in% names(data))) {
     missing <- clustering_vars[!clustering_vars %in% names(data)]
-    stop("Clustering variables not found in data: ", paste(missing, collapse = ", "))
+    segment_refuse(
+      code = "CFG_CLUSTERING_VARS_MISSING",
+      title = "Clustering Variables Not Found",
+      problem = sprintf("Clustering variables not found in data: %s", paste(missing, collapse = ", ")),
+      why_it_matters = "All specified clustering variables must exist in the data for outlier detection.",
+      how_to_fix = "Check that variable names match data column names exactly."
+    )
   }
 
   if (!is.numeric(threshold) || threshold <= 0) {
-    stop("threshold must be a positive number")
+    segment_refuse(
+      code = "CFG_INVALID_THRESHOLD",
+      title = "Invalid Outlier Threshold",
+      problem = sprintf("Threshold must be a positive number (received: %s).", as.character(threshold)),
+      why_it_matters = "Outlier detection requires a valid positive threshold value.",
+      how_to_fix = "Set outlier_threshold to a positive number (typical values: 2.5-3.5)."
+    )
   }
 
   if (!is.numeric(min_vars) || min_vars < 1) {
-    stop("min_vars must be >= 1")
+    segment_refuse(
+      code = "CFG_INVALID_MIN_VARS",
+      title = "Invalid min_vars Setting",
+      problem = sprintf("min_vars must be >= 1 (received: %s).", as.character(min_vars)),
+      why_it_matters = "min_vars determines how many variables must be extreme to flag an outlier.",
+      how_to_fix = "Set outlier_min_vars to an integer >= 1."
+    )
   }
 
   # Extract clustering variables
@@ -97,12 +121,24 @@ detect_outliers_mahalanobis <- function(data, clustering_vars, alpha = 0.001) {
 
   # Validate inputs
   if (!is.data.frame(data)) {
-    stop("data must be a data frame")
+    segment_refuse(
+      code = "DATA_INVALID_TYPE",
+      title = "Invalid Data Type",
+      problem = "Data must be a data frame.",
+      why_it_matters = "Mahalanobis distance calculation requires properly structured data.",
+      how_to_fix = "Ensure data parameter is a data.frame object."
+    )
   }
 
   if (!all(clustering_vars %in% names(data))) {
     missing <- clustering_vars[!clustering_vars %in% names(data)]
-    stop("Clustering variables not found in data: ", paste(missing, collapse = ", "))
+    segment_refuse(
+      code = "CFG_CLUSTERING_VARS_MISSING",
+      title = "Clustering Variables Not Found",
+      problem = sprintf("Clustering variables not found in data: %s", paste(missing, collapse = ", ")),
+      why_it_matters = "All specified clustering variables must exist in the data for outlier detection.",
+      how_to_fix = "Check that variable names match data column names exactly."
+    )
   }
 
   # Extract clustering variables
@@ -126,10 +162,17 @@ detect_outliers_mahalanobis <- function(data, clustering_vars, alpha = 0.001) {
   p <- ncol(cluster_data_complete)
 
   if (n < 3 * p) {
-    stop(sprintf(
-      "Mahalanobis distance requires more observations relative to variables.\n  Observations (n): %d\n  Variables (p): %d\n  Minimum required: %d (3 * p)\n  Recommended: %d (5 * p)\n\nOptions:\n  1. Use 'z_score' outlier method instead\n  2. Reduce number of clustering variables\n  3. Increase sample size",
-      n, p, 3 * p, 5 * p
-    ), call. = FALSE)
+    segment_refuse(
+      code = "DATA_INSUFFICIENT_FOR_MAHALANOBIS",
+      title = "Insufficient Sample Size for Mahalanobis Distance",
+      problem = sprintf("Need more observations relative to variables for Mahalanobis distance. Current: n=%d, p=%d. Minimum: %d (3*p).", n, p, 3 * p),
+      why_it_matters = "Mahalanobis distance requires stable covariance matrix estimation, which needs sufficient observations.",
+      how_to_fix = c(
+        "Use 'zscore' outlier method instead",
+        "Reduce number of clustering variables",
+        sprintf("Increase sample size to at least %d (recommended: %d)", 3 * p, 5 * p)
+      )
+    )
   }
 
   if (n < 5 * p) {
@@ -154,9 +197,18 @@ detect_outliers_mahalanobis <- function(data, clustering_vars, alpha = 0.001) {
       cov = cov_matrix
     )
   }, error = function(e) {
-    stop("Could not calculate Mahalanobis distance. Covariance matrix may be singular.\n",
-         "This can happen with highly correlated variables or small sample sizes.\n",
-         "Consider using z-score method instead.")
+    segment_refuse(
+      code = "MODEL_MAHALANOBIS_FAILED",
+      title = "Mahalanobis Distance Calculation Failed",
+      problem = sprintf("Could not calculate Mahalanobis distance: %s", conditionMessage(e)),
+      why_it_matters = "The covariance matrix may be singular, preventing distance calculation.",
+      how_to_fix = c(
+        "Use 'zscore' outlier method instead",
+        "Check for highly correlated variables and remove some",
+        "Increase sample size",
+        "Review variable selection"
+      )
+    )
   })
 
   # Determine threshold using chi-square distribution
@@ -191,7 +243,13 @@ handle_outliers <- function(data, outlier_flags, handling = "flag") {
   # Validate handling strategy
   valid_strategies <- c("none", "flag", "remove")
   if (!handling %in% valid_strategies) {
-    stop("handling must be one of: ", paste(valid_strategies, collapse = ", "))
+    segment_refuse(
+      code = "CFG_INVALID_HANDLING",
+      title = "Invalid Outlier Handling Strategy",
+      problem = sprintf("Outlier handling '%s' is not recognized.", handling),
+      why_it_matters = "Outlier handling requires a valid strategy.",
+      how_to_fix = sprintf("Set outlier_handling to one of: %s", paste(valid_strategies, collapse = ", "))
+    )
   }
 
   # Count outliers
@@ -646,11 +704,23 @@ apply_outlier_decisions <- function(data, decisions, id_var) {
 
   # Validate decisions
   if (!"Decision" %in% names(decisions)) {
-    stop("decisions must have a 'Decision' column", call. = FALSE)
+    segment_refuse(
+      code = "DATA_MISSING_DECISION_COL",
+      title = "Missing Decision Column",
+      problem = "Decisions data frame must have a 'Decision' column.",
+      why_it_matters = "The Decision column is required to determine which outliers to keep or remove.",
+      how_to_fix = "Add a 'Decision' column to your decisions data frame with values 'keep' or 'remove'."
+    )
   }
 
   if (!id_var %in% names(decisions)) {
-    stop(sprintf("decisions must have '%s' column", id_var), call. = FALSE)
+    segment_refuse(
+      code = "DATA_MISSING_ID_COL",
+      title = "Missing ID Column in Decisions",
+      problem = sprintf("Decisions data frame must have '%s' column.", id_var),
+      why_it_matters = "The ID column is required to match decisions to specific respondents.",
+      how_to_fix = sprintf("Add a '%s' column to your decisions data frame matching your data IDs.", id_var)
+    )
   }
 
   # Count decisions

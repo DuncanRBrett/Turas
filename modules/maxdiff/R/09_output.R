@@ -47,7 +47,13 @@ generate_maxdiff_output <- function(results, config, verbose = TRUE, run_result 
 
   # Check openxlsx
   if (!requireNamespace("openxlsx", quietly = TRUE)) {
-    stop("Package 'openxlsx' is required for Excel output", call. = FALSE)
+    maxdiff_refuse(
+      code = "PKG_OPENXLSX_MISSING",
+      title = "Required Package Not Installed",
+      problem = "Package 'openxlsx' is required but not installed",
+      why_it_matters = "Excel output generation depends on the openxlsx package",
+      how_to_fix = "Install the openxlsx package: install.packages('openxlsx')"
+    )
   }
 
   # Determine output path
@@ -145,7 +151,19 @@ generate_maxdiff_output <- function(results, config, verbose = TRUE, run_result 
   if (exists("turas_save_workbook_atomic", mode = "function")) {
     save_result <- turas_save_workbook_atomic(wb, output_path, run_result = run_result, module = "MAXD")
     if (!save_result$success) {
-      stop(sprintf("Failed to save Excel file: %s\nPath: %s", save_result$error, output_path), call. = FALSE)
+      maxdiff_refuse(
+        code = "IO_EXCEL_SAVE_FAILED",
+        title = "Excel File Save Failed",
+        problem = sprintf("Failed to save Excel output file: %s", save_result$error),
+        why_it_matters = "Results cannot be saved to Excel file",
+        how_to_fix = c(
+          "Check that output folder has write permissions",
+          "Ensure output file is not open in Excel",
+          "Verify sufficient disk space available",
+          "Check path is valid and accessible"
+        ),
+        details = sprintf("Path: %s\nError: %s", output_path, save_result$error)
+      )
     }
   } else {
     openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
@@ -656,7 +674,13 @@ generate_design_output <- function(design_result, config, verbose = TRUE) {
 
   # Check openxlsx
   if (!requireNamespace("openxlsx", quietly = TRUE)) {
-    stop("Package 'openxlsx' is required for Excel output", call. = FALSE)
+    maxdiff_refuse(
+      code = "PKG_OPENXLSX_MISSING",
+      title = "Required Package Not Installed",
+      problem = "Package 'openxlsx' is required but not installed",
+      why_it_matters = "Excel output generation depends on the openxlsx package",
+      how_to_fix = "Install the openxlsx package: install.packages('openxlsx')"
+    )
   }
 
   # Determine output path
@@ -704,7 +728,18 @@ generate_design_output <- function(design_result, config, verbose = TRUE) {
   if (exists("turas_save_workbook_atomic", mode = "function")) {
     save_result <- turas_save_workbook_atomic(wb, output_path, module = "MAXD")
     if (!save_result$success) {
-      stop(sprintf("Failed to save design file: %s", save_result$error), call. = FALSE)
+      maxdiff_refuse(
+        code = "IO_DESIGN_FILE_SAVE_FAILED",
+        title = "Design File Save Failed",
+        problem = sprintf("Failed to save design Excel file: %s", save_result$error),
+        why_it_matters = "Design file cannot be saved for use in survey or analysis",
+        how_to_fix = c(
+          "Check that output folder has write permissions",
+          "Ensure output file is not open in Excel",
+          "Verify sufficient disk space available"
+        ),
+        details = sprintf("Path: %s\nError: %s", output_path, save_result$error)
+      )
     }
   } else {
     openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)

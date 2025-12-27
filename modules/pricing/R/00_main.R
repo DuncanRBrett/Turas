@@ -182,7 +182,13 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
   if (is.null(data_file)) {
     data_file <- config$data_file
     if (is.null(data_file) || is.na(data_file)) {
-      stop("data_file not specified in function call or config Settings sheet", call. = FALSE)
+      pricing_refuse(
+        code = "CFG_MISSING_DATA_FILE",
+        title = "Data File Not Specified",
+        problem = "No data file path provided in function call or configuration",
+        why_it_matters = "Cannot load survey data without knowing which file to read",
+        how_to_fix = "Add 'data_file' to the Settings sheet in your configuration, or pass data_file parameter when calling run_pricing_analysis()"
+      )
     }
   }
 
@@ -276,8 +282,20 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
     )
 
   } else {
-    stop(sprintf("Unknown analysis method: '%s'. Use 'van_westendorp', 'gabor_granger', or 'both'",
-                 config$analysis_method), call. = FALSE)
+    pricing_refuse(
+      code = "CFG_INVALID_METHOD",
+      title = "Unknown Analysis Method",
+      problem = sprintf("Analysis method '%s' is not recognized", config$analysis_method),
+      why_it_matters = "Cannot run analysis without a valid methodology",
+      how_to_fix = c(
+        "Set analysis_method in Settings sheet to one of:",
+        "  - 'van_westendorp' for price sensitivity meter",
+        "  - 'gabor_granger' for demand curve analysis",
+        "  - 'both' for combined analysis"
+      ),
+      observed = config$analysis_method,
+      expected = c("van_westendorp", "gabor_granger", "both")
+    )
   }
 
   # --------------------------------------------------------------------------
@@ -474,7 +492,13 @@ run_pricing_analysis_from_config <- function(config) {
   # Get data_file from config
   data_file <- config$data_file
   if (is.null(data_file) || is.na(data_file)) {
-    stop("data_file not specified in config", call. = FALSE)
+    pricing_refuse(
+      code = "CFG_MISSING_DATA_FILE",
+      title = "Data File Not Specified",
+      problem = "No data file path found in configuration",
+      why_it_matters = "Cannot load survey data without knowing which file to read",
+      how_to_fix = "Add 'data_file' to the Settings sheet in your configuration"
+    )
   }
 
   # Get output_file from config
@@ -581,8 +605,20 @@ run_pricing_analysis_from_config <- function(config) {
     )
 
   } else {
-    stop(sprintf("Unknown analysis method: '%s'. Use 'van_westendorp', 'gabor_granger', or 'both'",
-                 config$analysis_method), call. = FALSE)
+    pricing_refuse(
+      code = "CFG_INVALID_METHOD",
+      title = "Unknown Analysis Method",
+      problem = sprintf("Analysis method '%s' is not recognized", config$analysis_method),
+      why_it_matters = "Cannot run analysis without a valid methodology",
+      how_to_fix = c(
+        "Set analysis_method in Settings sheet to one of:",
+        "  - 'van_westendorp' for price sensitivity meter",
+        "  - 'gabor_granger' for demand curve analysis",
+        "  - 'both' for combined analysis"
+      ),
+      observed = config$analysis_method,
+      expected = c("van_westendorp", "gabor_granger", "both")
+    )
   }
 
   # --------------------------------------------------------------------------

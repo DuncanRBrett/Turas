@@ -18,10 +18,13 @@
 create_segment_profiles <- function(data, clusters, var_names = NULL) {
   # Validate clusters length matches data rows
   if (length(clusters) != nrow(data)) {
-    stop(sprintf(
-      "Clusters length (%d) does not match data rows (%d). Ensure clusters were generated from the same data.",
-      length(clusters), nrow(data)
-    ), call. = FALSE)
+    segment_refuse(
+      code = "DATA_CLUSTER_MISMATCH",
+      title = "Cluster Length Mismatch",
+      problem = sprintf("Clusters length (%d) does not match data rows (%d).", length(clusters), nrow(data)),
+      why_it_matters = "Profile calculations require aligned cluster assignments and data rows.",
+      how_to_fix = "Ensure clusters were generated from the same data without filtering."
+    )
   }
 
   if (is.null(var_names)) {
@@ -32,7 +35,13 @@ create_segment_profiles <- function(data, clusters, var_names = NULL) {
   var_names <- intersect(var_names, names(data))
 
   if (length(var_names) == 0) {
-    stop("No valid variables to profile", call. = FALSE)
+    segment_refuse(
+      code = "CFG_NO_VARIABLES",
+      title = "No Variables to Profile",
+      problem = "No valid variables found to profile.",
+      why_it_matters = "Profiling requires at least one valid variable in the data.",
+      how_to_fix = "Check that your data contains the specified profile variables."
+    )
   }
 
   # Get unique segments
@@ -458,7 +467,16 @@ profile_demographics <- function(data, clusters, demo_vars,
   }
 
   if (length(available_vars) == 0) {
-    stop("No demographic variables found in data", call. = FALSE)
+    segment_refuse(
+      code = "CFG_NO_DEMO_VARS",
+      title = "No Demographic Variables Found",
+      problem = "None of the specified demographic variables exist in the data.",
+      why_it_matters = "Demographic profiling requires at least one demographic variable.",
+      how_to_fix = c(
+        "Check that demographic variable names match data column names exactly",
+        "Ensure demo_vars parameter contains valid variable names"
+      )
+    )
   }
 
   # Separate categorical and numeric variables
@@ -650,7 +668,13 @@ profile_demographics <- function(data, clusters, demo_vars,
 export_demographic_profiles <- function(demo_result, output_path) {
 
   if (!requireNamespace("writexl", quietly = TRUE)) {
-    stop("Package 'writexl' required for Excel export", call. = FALSE)
+    segment_refuse(
+      code = "PKG_WRITEXL_MISSING",
+      title = "Package writexl Required",
+      problem = "Package 'writexl' is not installed.",
+      why_it_matters = "Excel export requires the writexl package.",
+      how_to_fix = "Install the package with: install.packages('writexl')"
+    )
   }
 
   sheets <- list()

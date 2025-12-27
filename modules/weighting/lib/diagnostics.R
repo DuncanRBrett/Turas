@@ -419,7 +419,13 @@ save_diagnostics_to_file <- function(diag, file_path) {
 compare_weights <- function(weight_list, verbose = TRUE) {
 
   if (!is.list(weight_list) || length(weight_list) < 2) {
-    stop("weight_list must be a list with at least 2 weight vectors", call. = FALSE)
+    weighting_refuse(
+      code = "DATA_INVALID_COMPARISON_INPUT",
+      title = "Invalid Weight Comparison Input",
+      problem = "weight_list must be a list containing at least 2 weight vectors to compare",
+      why_it_matters = "Weight comparison requires multiple weight vectors to generate meaningful comparative metrics",
+      how_to_fix = "Provide a named list with at least 2 weight vectors (e.g., list(weight1 = w1, weight2 = w2))"
+    )
   }
 
   comparison <- data.frame(

@@ -160,12 +160,18 @@ estimate_best_worst_model <- function(data_list,
   validation <- validate_best_worst_data(data_list$data, config)
 
   if (length(validation$critical) > 0) {
-    stop(create_error(
-      "BEST_WORST_DATA",
-      "Best-worst data validation failed",
-      "Check that data has 'best' and 'worst' columns with valid selections",
-      paste(validation$critical, collapse = "; ")
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "DATA_BEST_WORST_VALIDATION_FAILED",
+      title = "Best-Worst Data Validation Failed",
+      problem = "Best-worst data validation failed",
+      why_it_matters = "Invalid best-worst data cannot be used for MaxDiff or BWS analysis.",
+      how_to_fix = c(
+        "Check that data has 'best' and 'worst' columns",
+        "Ensure exactly one best and one worst selection per choice set",
+        "Verify best and worst selections are different alternatives"
+      ),
+      details = paste(validation$critical, collapse = "; ")
+    )
   }
 
   if (verbose) {
@@ -188,7 +194,13 @@ estimate_best_worst_model <- function(data_list,
   } else if (method == "simultaneous") {
     result <- estimate_best_worst_simultaneous(choice_data, config, verbose)
   } else {
-    stop(sprintf("Unknown best-worst method: %s", method))
+    conjoint_refuse(
+      code = "CFG_BEST_WORST_UNKNOWN_METHOD",
+      title = "Unknown Best-Worst Method",
+      problem = sprintf("Unknown best-worst method: %s", method),
+      why_it_matters = "Best-worst scaling requires a valid estimation method.",
+      how_to_fix = "Use 'sequential' or 'simultaneous' as the method parameter"
+    )
   }
 
   # Add best-worst flag
@@ -315,7 +327,13 @@ estimate_best_worst_simultaneous <- function(data, config, verbose = TRUE) {
 calculate_best_worst_utilities <- function(model_result, config, verbose = TRUE) {
 
   if (!model_result$is_best_worst) {
-    stop("Model is not a best-worst scaling model")
+    conjoint_refuse(
+      code = "MODEL_NOT_BEST_WORST",
+      title = "Not a Best-Worst Model",
+      problem = "Model is not a best-worst scaling model",
+      why_it_matters = "Best-worst utility calculation requires a model estimated with best-worst data.",
+      how_to_fix = "Use estimate_best_worst_model() to estimate a best-worst model first"
+    )
   }
 
   # Use standard utility calculation

@@ -428,14 +428,22 @@ run_weighting_gui <- function(launch_browser = TRUE) {
 
           # Validate folder exists
           if (!dir.exists(project_folder)) {
-            stop("Project folder not found: ", project_folder)
+            stop(paste0(
+              "[REFUSE] IO_PROJECT_DIR_NOT_FOUND: Project Folder Not Found\n\n",
+              "Problem: Project folder not found: ", project_folder, "\n\n",
+              "How to fix: Select a valid project folder using the Browse button."
+            ), call. = FALSE)
           }
 
           config_path <- file.path(project_folder, config_filename)
 
           # Validate config file exists
           if (!file.exists(config_path)) {
-            stop("Config file not found: ", config_path)
+            stop(paste0(
+              "[REFUSE] IO_CONFIG_FILE_NOT_FOUND: Config File Not Found\n\n",
+              "Problem: Config file not found: ", config_path, "\n\n",
+              "How to fix: Ensure the Weight_Config.xlsx file exists in the project folder."
+            ), call. = FALSE)
           }
 
           # Add to recent folders

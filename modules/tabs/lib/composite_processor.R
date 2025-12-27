@@ -35,7 +35,16 @@ load_composite_definitions <- function(survey_structure_file) {
 
   # Check if file exists
   if (!file.exists(survey_structure_file)) {
-    stop("Survey structure file not found: ", survey_structure_file)
+    tabs_refuse(
+      code = "IO_FILE_NOT_FOUND",
+      title = "Survey Structure File Not Found",
+      problem = paste0("Survey structure file not found: ", survey_structure_file),
+      why_it_matters = "Cannot load composite definitions without the Survey_Structure.xlsx file.",
+      how_to_fix = c(
+        "Verify the file path is correct",
+        "Check that Survey_Structure.xlsx exists in the expected location"
+      )
+    )
   }
 
   # Check if Composite_Metrics sheet exists
@@ -74,8 +83,16 @@ load_composite_definitions <- function(survey_structure_file) {
     missing_cols <- setdiff(required_cols, names(composite_defs))
 
     if (length(missing_cols) > 0) {
-      stop("Composite_Metrics sheet missing required columns: ",
-           paste(missing_cols, collapse = ", "))
+      tabs_refuse(
+        code = "CFG_MISSING_COLUMN",
+        title = "Missing Columns in Composite_Metrics",
+        problem = paste0("Composite_Metrics sheet missing required columns: ", paste(missing_cols, collapse = ", ")),
+        why_it_matters = "These columns are required to define composite metrics properly.",
+        how_to_fix = c(
+          "Add the missing columns to the Composite_Metrics sheet",
+          "Required columns: CompositeCode, CompositeLabel, CalculationType, SourceQuestions"
+        )
+      )
     }
 
     # Clean data
@@ -127,7 +144,17 @@ load_composite_definitions <- function(survey_structure_file) {
     return(composite_defs)
 
   }, error = function(e) {
-    stop("Error loading Composite_Metrics sheet: ", e$message)
+    tabs_refuse(
+      code = "IO_READ_ERROR",
+      title = "Error Loading Composite_Metrics Sheet",
+      problem = paste0("Error loading Composite_Metrics sheet: ", e$message),
+      why_it_matters = "Cannot process composite metrics without successfully loading the sheet.",
+      how_to_fix = c(
+        "Verify the Excel file is not corrupted",
+        "Check that the sheet name is 'Composite_Metrics' (case-sensitive)",
+        "Ensure the file is not open in Excel"
+      )
+    )
   })
 }
 
@@ -293,7 +320,16 @@ calculate_composite_values <- function(data_subset, source_questions,
 
   # Validate calculation_type
   if (is.null(calculation_type) || length(calculation_type) == 0) {
-    stop("calculation_type cannot be NULL or empty")
+    tabs_refuse(
+      code = "ARG_MISSING_VALUE",
+      title = "Missing Calculation Type",
+      problem = "calculation_type cannot be NULL or empty.",
+      why_it_matters = "Calculation type is required to determine how to compute the composite value.",
+      how_to_fix = c(
+        "Specify a CalculationType in the Composite_Metrics sheet",
+        "Valid values: Mean, Sum, WeightedMean"
+      )
+    )
   }
 
   if (nrow(data_subset) == 0) {
@@ -338,7 +374,16 @@ calculate_composite_values <- function(data_subset, source_questions,
   } else if (calculation_type == "WeightedMean") {
     # Weighted mean: sum(values * weights) / sum(weights for non-NA values)
     if (is.null(weights)) {
-      stop("WeightedMean requires weights parameter")
+      tabs_refuse(
+        code = "ARG_MISSING_VALUE",
+        title = "Missing Weights for WeightedMean",
+        problem = "WeightedMean calculation type requires weights parameter.",
+        why_it_matters = "Cannot calculate weighted mean without calculation weights.",
+        how_to_fix = c(
+          "Add Weights column to Composite_Metrics sheet",
+          "Specify comma-separated weight values for each source question"
+        )
+      )
     }
 
     for (i in 1:nrow(source_values_matrix)) {
@@ -359,7 +404,13 @@ calculate_composite_values <- function(data_subset, source_questions,
   # If weight_vector provided, return weighted mean
   if (!is.null(weight_vector)) {
     if (length(weight_vector) != length(composite_values)) {
-      stop("weight_vector length doesn't match data rows")
+      tabs_refuse(
+        code = "DATA_LENGTH_MISMATCH",
+        title = "Weight Vector Length Mismatch",
+        problem = "weight_vector length doesn't match data rows.",
+        why_it_matters = "Survey weights must match the number of data rows for proper weighted analysis.",
+        how_to_fix = "This is an internal error - check weight extraction logic"
+      )
     }
     return(weighted.mean(composite_values, w = weight_vector, na.rm = TRUE))
   }
@@ -402,7 +453,16 @@ process_composite_question <- function(composite_def, data, questions_df,
   first_source <- questions_df[questions_df$QuestionCode == source_questions[1], ]
 
   if (nrow(first_source) == 0) {
-    stop(sprintf("Source question '%s' not found in questions_df", source_questions[1]))
+    tabs_refuse(
+      code = "CFG_QUESTION_NOT_FOUND",
+      title = "Composite Source Question Not Found",
+      problem = sprintf("Source question '%s' not found in questions_df.", source_questions[1]),
+      why_it_matters = "All source questions must exist in Survey_Structure for composite calculation.",
+      how_to_fix = c(
+        "Check that the source question code exists in the Questions sheet",
+        "Verify spelling and case sensitivity of QuestionCode"
+      )
+    )
   }
 
   source_type <- first_source$Variable_Type[1]

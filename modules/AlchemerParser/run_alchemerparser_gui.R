@@ -4,21 +4,35 @@
 # Interactive GUI for AlchemerParser module
 # ==============================================================================
 
-# Required package check (TRS v1.0: no auto-install)
-if (!requireNamespace("shiny", quietly = TRUE)) {
-  stop(
+# Early refuse function for use before TRS guard is loaded
+early_refuse <- function(code, title, problem, why_it_matters, how_to_fix) {
+  message <- paste0(
     "\n================================================================================\n",
-    "  [REFUSE] PKG_MISSING_DEPENDENCY: Missing Required Package\n",
+    "  [REFUSE] ", code, ": ", title, "\n",
     "================================================================================\n\n",
     "Problem:\n",
-    "  The required package 'shiny' is not installed.\n\n",
+    "  ", problem, "\n\n",
     "Why it matters:\n",
-    "  The AlchemerParser GUI cannot run without this package.\n\n",
-    "How to fix:\n",
-    "  Run the following command in R:\n",
-    '    install.packages("shiny")\n\n',
-    "================================================================================\n",
-    call. = FALSE
+    "  ", why_it_matters, "\n\n",
+    "How to fix:\n"
+  )
+
+  for (step in how_to_fix) {
+    message <- paste0(message, "  - ", step, "\n")
+  }
+
+  message <- paste0(message, "\n================================================================================\n")
+  stop(message, call. = FALSE)
+}
+
+# Required package check (TRS v1.0: no auto-install)
+if (!requireNamespace("shiny", quietly = TRUE)) {
+  early_refuse(
+    code = "PKG_MISSING_DEPENDENCY",
+    title = "Missing Required Package",
+    problem = "The required package 'shiny' is not installed.",
+    why_it_matters = "The AlchemerParser GUI cannot run without this package.",
+    how_to_fix = "Run: install.packages('shiny')"
   )
 }
 
@@ -67,10 +81,18 @@ check_dependencies <- function() {
   }
 
   if (length(missing_packages) > 0) {
-    stop(sprintf("Missing required packages: %s\nInstall with: install.packages(c(%s))",
-                paste(missing_packages, collapse = ", "),
+    early_refuse(
+      code = "PKG_MISSING_DEPENDENCIES",
+      title = "Missing Required Packages",
+      problem = paste0("The following packages are required but not installed: ",
+                      paste(missing_packages, collapse = ", ")),
+      why_it_matters = "AlchemerParser GUI cannot run without these dependencies.",
+      how_to_fix = c(
+        sprintf("Run: install.packages(c(%s))",
                 paste0("'", missing_packages, "'", collapse = ", ")),
-         call. = FALSE)
+        "Then restart R and try again"
+      )
+    )
   }
 }
 

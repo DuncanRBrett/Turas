@@ -26,10 +26,13 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
   if (exists("guard_config_file", mode = "function")) {
     guard_config_file(config_file)
   } else if (!file.exists(config_file)) {
-    stop(sprintf(
-      "\nConfig file not found: %s\n\nPlease check:\n  1. File path is correct\n  2. File exists in specified location",
-      config_file
-    ), call. = FALSE)
+    weighting_refuse(
+      code = "CFG_FILE_NOT_FOUND",
+      title = "Configuration file not found",
+      problem = sprintf("The specified config file does not exist: %s", config_file),
+      why_it_matters = "The weighting module cannot load configuration without the config file",
+      how_to_fix = "Check that the file path is correct and the file exists in the specified location"
+    )
   }
 
   # Get project root (directory containing config file)
@@ -44,10 +47,13 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
     if (exists("guard_required_sheet", mode = "function")) {
       guard_required_sheet(config_file, sheet, available_sheets)
     } else if (!sheet %in% available_sheets) {
-      stop(sprintf(
-        "\nMissing required sheet '%s' in config file.\n\nFound sheets: %s\n\nPlease add the missing sheet to your config file.",
-        sheet, paste(available_sheets, collapse = ", ")
-      ), call. = FALSE)
+      weighting_refuse(
+        code = "CFG_MISSING_SHEET",
+        title = "Required configuration sheet missing",
+        problem = sprintf("Missing required sheet '%s' in config file", sheet),
+        why_it_matters = "All required sheets must be present for proper configuration",
+        how_to_fix = sprintf("Add the '%s' sheet to your config file. Found sheets: %s", sheet, paste(available_sheets, collapse = ", "))
+      )
     }
   }
 
@@ -59,10 +65,13 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
   general_df <- tryCatch({
     readxl::read_excel(config_file, sheet = "General")
   }, error = function(e) {
-    stop(sprintf(
-      "Failed to read 'General' sheet: %s",
-      conditionMessage(e)
-    ), call. = FALSE)
+    weighting_refuse(
+      code = "IO_SHEET_READ_ERROR",
+      title = "Failed to read General sheet",
+      problem = sprintf("Could not read 'General' sheet from config file: %s", conditionMessage(e)),
+      why_it_matters = "The General sheet contains essential configuration settings",
+      how_to_fix = "Check that the General sheet is not corrupted and is properly formatted as an Excel sheet"
+    )
   })
 
   # Parse General sheet (Setting | Value format)
@@ -70,11 +79,23 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
 
   # Validate required general settings
   if (is.null(general$project_name) || is.na(general$project_name)) {
-    stop("'project_name' is required in General settings", call. = FALSE)
+    weighting_refuse(
+      code = "CFG_MISSING_SETTING",
+      title = "Missing required setting: project_name",
+      problem = "The 'project_name' setting is missing or empty in the General sheet",
+      why_it_matters = "Project name is required to identify the weighting project",
+      how_to_fix = "Add a row in the General sheet with Setting = 'project_name' and a valid Value"
+    )
   }
 
   if (is.null(general$data_file) || is.na(general$data_file)) {
-    stop("'data_file' is required in General settings", call. = FALSE)
+    weighting_refuse(
+      code = "CFG_MISSING_SETTING",
+      title = "Missing required setting: data_file",
+      problem = "The 'data_file' setting is missing or empty in the General sheet",
+      why_it_matters = "Data file path is required to locate the input data for weighting",
+      how_to_fix = "Add a row in the General sheet with Setting = 'data_file' and a valid file path as Value"
+    )
   }
 
   # Resolve data file path relative to config location
@@ -94,7 +115,13 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
 
   if (save_diag) {
     if (is.null(general$diagnostics_file) || is.na(general$diagnostics_file)) {
-      stop("'diagnostics_file' required when save_diagnostics = Y", call. = FALSE)
+      weighting_refuse(
+        code = "CFG_MISSING_SETTING",
+        title = "Missing required setting: diagnostics_file",
+        problem = "The 'diagnostics_file' setting is missing but save_diagnostics = Y",
+        why_it_matters = "When diagnostics are enabled, a file path is required to save the output",
+        how_to_fix = "Add a row in the General sheet with Setting = 'diagnostics_file' and a valid file path, or set save_diagnostics = N"
+      )
     }
     general$diagnostics_file_resolved <- resolve_config_path(general$diagnostics_file, project_root)
   } else {
@@ -117,35 +144,51 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
   weight_specs_df <- tryCatch({
     readxl::read_excel(config_file, sheet = "Weight_Specifications")
   }, error = function(e) {
-    stop(sprintf(
-      "Failed to read 'Weight_Specifications' sheet: %s",
-      conditionMessage(e)
-    ), call. = FALSE)
+    weighting_refuse(
+      code = "IO_SHEET_READ_ERROR",
+      title = "Failed to read Weight_Specifications sheet",
+      problem = sprintf("Could not read 'Weight_Specifications' sheet from config file: %s", conditionMessage(e)),
+      why_it_matters = "The Weight_Specifications sheet defines which weights to calculate",
+      how_to_fix = "Check that the Weight_Specifications sheet is not corrupted and is properly formatted as an Excel sheet"
+    )
   })
 
   if (nrow(weight_specs_df) == 0) {
-    stop("Weight_Specifications sheet is empty. At least one weight must be defined.", call. = FALSE)
+    weighting_refuse(
+      code = "CFG_EMPTY_SHEET",
+      title = "Weight_Specifications sheet is empty",
+      problem = "The Weight_Specifications sheet contains no weight definitions",
+      why_it_matters = "At least one weight must be defined to run the weighting module",
+      how_to_fix = "Add at least one weight specification row with weight_name and method columns"
+    )
   }
 
   # Validate required columns
   required_cols <- c("weight_name", "method")
   missing_cols <- setdiff(required_cols, names(weight_specs_df))
   if (length(missing_cols) > 0) {
-    stop(sprintf(
-      "Weight_Specifications missing required columns: %s\nFound: %s",
-      paste(missing_cols, collapse = ", "),
-      paste(names(weight_specs_df), collapse = ", ")
-    ), call. = FALSE)
+    weighting_refuse(
+      code = "CFG_MISSING_COLUMNS",
+      title = "Weight_Specifications missing required columns",
+      problem = sprintf("Missing required columns: %s", paste(missing_cols, collapse = ", ")),
+      why_it_matters = "These columns are essential for defining weight specifications",
+      how_to_fix = sprintf("Add the missing columns to Weight_Specifications sheet. Found: %s. Required: %s",
+                          paste(names(weight_specs_df), collapse = ", "),
+                          paste(required_cols, collapse = ", "))
+    )
   }
 
   # Check for duplicate weight names
   weight_names <- weight_specs_df$weight_name
   if (any(duplicated(weight_names))) {
     dups <- unique(weight_names[duplicated(weight_names)])
-    stop(sprintf(
-      "Duplicate weight names in Weight_Specifications: %s",
-      paste(dups, collapse = ", ")
-    ), call. = FALSE)
+    weighting_refuse(
+      code = "DATA_DUPLICATE_VALUES",
+      title = "Duplicate weight names found",
+      problem = sprintf("Weight_Specifications contains duplicate weight names: %s", paste(dups, collapse = ", ")),
+      why_it_matters = "Each weight must have a unique name to avoid conflicts",
+      how_to_fix = "Remove or rename duplicate weight entries in the Weight_Specifications sheet"
+    )
   }
 
   # Validate each weight specification
@@ -153,11 +196,13 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
     spec <- as.list(weight_specs_df[i, ])
     validation <- validate_weight_spec(spec)
     if (!validation$valid) {
-      stop(sprintf(
-        "\nInvalid weight specification for '%s':\n  %s",
-        spec$weight_name,
-        paste(validation$errors, collapse = "\n  ")
-      ), call. = FALSE)
+      weighting_refuse(
+        code = "DATA_INVALID_SPEC",
+        title = "Invalid weight specification",
+        problem = sprintf("Weight specification for '%s' has validation errors", spec$weight_name),
+        why_it_matters = "All weight specifications must be valid to ensure correct weight calculation",
+        how_to_fix = sprintf("Fix the following issues:\n  %s", paste(validation$errors, collapse = "\n  "))
+      )
     }
   }
 
@@ -177,10 +222,13 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
   if (has_design) {
     if (!"Design_Targets" %in% available_sheets) {
       design_weights <- weight_specs_df$weight_name[tolower(weight_specs_df$method) == "design"]
-      stop(sprintf(
-        "\nDesign_Targets sheet required for design weight(s): %s\n\nPlease add a Design_Targets sheet to your config file.",
-        paste(design_weights, collapse = ", ")
-      ), call. = FALSE)
+      weighting_refuse(
+        code = "CFG_MISSING_SHEET",
+        title = "Design_Targets sheet required",
+        problem = sprintf("Design_Targets sheet is missing but required for design weight(s): %s", paste(design_weights, collapse = ", ")),
+        why_it_matters = "Design weights require population targets defined in the Design_Targets sheet",
+        how_to_fix = "Add a Design_Targets sheet to your config file with columns: weight_name, stratum_variable, stratum_category, population_size"
+      )
     }
 
     if (verbose) message("\nLoading Design Targets...")
@@ -188,21 +236,28 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
     design_targets <- tryCatch({
       readxl::read_excel(config_file, sheet = "Design_Targets")
     }, error = function(e) {
-      stop(sprintf(
-        "Failed to read 'Design_Targets' sheet: %s",
-        conditionMessage(e)
-      ), call. = FALSE)
+      weighting_refuse(
+        code = "IO_SHEET_READ_ERROR",
+        title = "Failed to read Design_Targets sheet",
+        problem = sprintf("Could not read 'Design_Targets' sheet from config file: %s", conditionMessage(e)),
+        why_it_matters = "The Design_Targets sheet contains population targets needed for design weights",
+        how_to_fix = "Check that the Design_Targets sheet is not corrupted and is properly formatted as an Excel sheet"
+      )
     })
 
     # Validate required columns
     required_cols <- c("weight_name", "stratum_variable", "stratum_category", "population_size")
     missing_cols <- setdiff(required_cols, names(design_targets))
     if (length(missing_cols) > 0) {
-      stop(sprintf(
-        "Design_Targets missing required columns: %s\nFound: %s",
-        paste(missing_cols, collapse = ", "),
-        paste(names(design_targets), collapse = ", ")
-      ), call. = FALSE)
+      weighting_refuse(
+        code = "CFG_MISSING_COLUMNS",
+        title = "Design_Targets missing required columns",
+        problem = sprintf("Missing required columns: %s", paste(missing_cols, collapse = ", ")),
+        why_it_matters = "These columns are essential for defining design weight targets",
+        how_to_fix = sprintf("Add the missing columns to Design_Targets sheet. Found: %s. Required: %s",
+                            paste(names(design_targets), collapse = ", "),
+                            paste(required_cols, collapse = ", "))
+      )
     }
 
     # Ensure population_size is numeric
@@ -222,10 +277,13 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
   if (has_rim) {
     if (!"Rim_Targets" %in% available_sheets) {
       rim_weights <- weight_specs_df$weight_name[tolower(weight_specs_df$method) == "rim"]
-      stop(sprintf(
-        "\nRim_Targets sheet required for rim weight(s): %s\n\nPlease add a Rim_Targets sheet to your config file.",
-        paste(rim_weights, collapse = ", ")
-      ), call. = FALSE)
+      weighting_refuse(
+        code = "CFG_MISSING_SHEET",
+        title = "Rim_Targets sheet required",
+        problem = sprintf("Rim_Targets sheet is missing but required for rim weight(s): %s", paste(rim_weights, collapse = ", ")),
+        why_it_matters = "Rim weights require target percentages defined in the Rim_Targets sheet",
+        how_to_fix = "Add a Rim_Targets sheet to your config file with columns: weight_name, variable, category, target_percent"
+      )
     }
 
     if (verbose) message("\nLoading Rim Targets...")
@@ -233,21 +291,28 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
     rim_targets <- tryCatch({
       readxl::read_excel(config_file, sheet = "Rim_Targets")
     }, error = function(e) {
-      stop(sprintf(
-        "Failed to read 'Rim_Targets' sheet: %s",
-        conditionMessage(e)
-      ), call. = FALSE)
+      weighting_refuse(
+        code = "IO_SHEET_READ_ERROR",
+        title = "Failed to read Rim_Targets sheet",
+        problem = sprintf("Could not read 'Rim_Targets' sheet from config file: %s", conditionMessage(e)),
+        why_it_matters = "The Rim_Targets sheet contains target percentages needed for rim weights",
+        how_to_fix = "Check that the Rim_Targets sheet is not corrupted and is properly formatted as an Excel sheet"
+      )
     })
 
     # Validate required columns
     required_cols <- c("weight_name", "variable", "category", "target_percent")
     missing_cols <- setdiff(required_cols, names(rim_targets))
     if (length(missing_cols) > 0) {
-      stop(sprintf(
-        "Rim_Targets missing required columns: %s\nFound: %s",
-        paste(missing_cols, collapse = ", "),
-        paste(names(rim_targets), collapse = ", ")
-      ), call. = FALSE)
+      weighting_refuse(
+        code = "CFG_MISSING_COLUMNS",
+        title = "Rim_Targets missing required columns",
+        problem = sprintf("Missing required columns: %s", paste(missing_cols, collapse = ", ")),
+        why_it_matters = "These columns are essential for defining rim weight targets",
+        how_to_fix = sprintf("Add the missing columns to Rim_Targets sheet. Found: %s. Required: %s",
+                            paste(names(rim_targets), collapse = ", "),
+                            paste(required_cols, collapse = ", "))
+      )
     }
 
     # Ensure target_percent is numeric
@@ -333,10 +398,13 @@ parse_settings_sheet <- function(df) {
   }
 
   if (is.null(setting_col) || is.null(value_col)) {
-    stop(sprintf(
-      "General sheet must have 'Setting' and 'Value' columns.\nFound: %s",
-      paste(names(df), collapse = ", ")
-    ), call. = FALSE)
+    weighting_refuse(
+      code = "CFG_MISSING_COLUMNS",
+      title = "General sheet missing required columns",
+      problem = "General sheet must have 'Setting' and 'Value' columns",
+      why_it_matters = "The General sheet uses a Setting/Value format to define configuration",
+      how_to_fix = sprintf("Add 'Setting' and 'Value' columns to the General sheet. Found columns: %s", paste(names(df), collapse = ", "))
+    )
   }
 
   # Convert to named list
@@ -426,11 +494,15 @@ get_weight_spec <- function(config, weight_name) {
   spec_row <- specs[specs$weight_name == weight_name, , drop = FALSE]
 
   if (nrow(spec_row) == 0) {
-    stop(sprintf(
-      "Weight '%s' not found in specifications.\nAvailable: %s",
-      weight_name,
-      paste(specs$weight_name, collapse = ", ")
-    ), call. = FALSE)
+    weighting_refuse(
+      code = "CFG_WEIGHT_NOT_FOUND",
+      title = "Weight specification not found",
+      problem = sprintf("Weight '%s' not found in Weight_Specifications sheet", weight_name),
+      why_it_matters = "Cannot retrieve specification for a weight that is not defined",
+      how_to_fix = sprintf("Use one of the available weights: %s. Or add '%s' to the Weight_Specifications sheet",
+                          paste(specs$weight_name, collapse = ", "),
+                          weight_name)
+    )
   }
 
   return(as.list(spec_row[1, ]))

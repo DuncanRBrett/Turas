@@ -157,8 +157,17 @@ parse_level_names <- function(level_string) {
 get_attribute_levels <- function(config, attribute_name) {
   idx <- which(config$attributes$AttributeName == attribute_name)
   if (length(idx) == 0) {
-    stop(sprintf("Attribute '%s' not found in configuration", attribute_name),
-         call. = FALSE)
+    conjoint_refuse(
+      code = "CFG_ATTRIBUTE_NOT_FOUND",
+      title = "Attribute Not Found in Configuration",
+      problem = sprintf("Attribute '%s' not found in configuration", attribute_name),
+      why_it_matters = "Cannot retrieve levels for an attribute that doesn't exist in the configuration.",
+      how_to_fix = c(
+        sprintf("Requested attribute: %s", attribute_name),
+        sprintf("Available attributes: %s", paste(config$attributes$AttributeName, collapse = ", ")),
+        "Check attribute names match exactly (case-sensitive)"
+      )
+    )
   }
 
   config$attributes$levels_list[[idx]]

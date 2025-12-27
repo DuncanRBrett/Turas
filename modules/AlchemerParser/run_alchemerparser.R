@@ -33,6 +33,27 @@ for (f in r_files) {
   source(f, local = FALSE)
 }
 
+# Early refuse function for use before TRS guard is loaded
+early_refuse <- function(code, title, problem, why_it_matters, how_to_fix) {
+  message <- paste0(
+    "\n================================================================================\n",
+    "  [REFUSE] ", code, ": ", title, "\n",
+    "================================================================================\n\n",
+    "Problem:\n",
+    "  ", problem, "\n\n",
+    "Why it matters:\n",
+    "  ", why_it_matters, "\n\n",
+    "How to fix:\n"
+  )
+
+  for (step in how_to_fix) {
+    message <- paste0(message, "  - ", step, "\n")
+  }
+
+  message <- paste0(message, "\n================================================================================\n")
+  stop(message, call. = FALSE)
+}
+
 # Check required packages
 check_dependencies <- function() {
   required_packages <- c("readxl", "openxlsx", "officer")
@@ -45,19 +66,18 @@ check_dependencies <- function() {
   }
 
   if (length(missing_packages) > 0) {
-    cat("\n")
-    cat("==============================================================================\n")
-    cat("  MISSING DEPENDENCIES\n")
-    cat("==============================================================================\n")
-    cat("The following packages are required but not installed:\n\n")
-    for (pkg in missing_packages) {
-      cat(sprintf("  - %s\n", pkg))
-    }
-    cat("\nTo install, run:\n")
-    cat(sprintf("  install.packages(c(%s))\n",
-               paste0("'", missing_packages, "'", collapse = ", ")))
-    cat("==============================================================================\n\n")
-    stop("Missing required packages", call. = FALSE)
+    early_refuse(
+      code = "PKG_MISSING_DEPENDENCIES",
+      title = "Missing Required Packages",
+      problem = paste0("The following packages are required but not installed: ",
+                      paste(missing_packages, collapse = ", ")),
+      why_it_matters = "AlchemerParser cannot run without these dependencies.",
+      how_to_fix = c(
+        sprintf("Run: install.packages(c(%s))",
+                paste0("'", missing_packages, "'", collapse = ", ")),
+        "Then restart R and try again"
+      )
+    )
   }
 }
 

@@ -649,27 +649,52 @@ create_empty_row <- function(internal_keys, row_label = "", row_type = "") {
 #' @return TRUE if valid, stops with error if not
 #' @export
 validate_row_counts <- function(row_counts, internal_keys) {
-  
+
   if (!is.numeric(row_counts)) {
-    stop("row_counts must be numeric")
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid row_counts Type",
+      problem = "row_counts must be a numeric vector.",
+      why_it_matters = "Cannot validate row counts with non-numeric data. Cell calculations require numeric counts.",
+      how_to_fix = c(
+        "Ensure row_counts is a numeric vector",
+        "Check that cell calculations produced numeric results",
+        "Verify the input data is properly formatted"
+      )
+    )
   }
-  
+
   if (length(row_counts) != length(internal_keys)) {
-    stop(sprintf(
-      "row_counts length (%d) doesn't match internal_keys (%d)",
-      length(row_counts),
-      length(internal_keys)
-    ))
+    tabs_refuse(
+      code = "ARG_LENGTH_MISMATCH",
+      title = "Row Counts Length Mismatch",
+      problem = sprintf("row_counts length (%d) doesn't match internal_keys length (%d).",
+                       length(row_counts), length(internal_keys)),
+      why_it_matters = "Each banner column must have exactly one count value. Mismatched lengths indicate a calculation error.",
+      how_to_fix = c(
+        "Check that row counts were calculated for all banner columns",
+        "Verify the internal_keys match the banner structure",
+        "Review the cell calculation logic for missing columns"
+      )
+    )
   }
-  
+
   missing_keys <- setdiff(internal_keys, names(row_counts))
   if (length(missing_keys) > 0) {
-    stop(sprintf(
-      "row_counts missing keys: %s",
-      paste(head(missing_keys, 5), collapse = ", ")
-    ))
+    tabs_refuse(
+      code = "ARG_MISSING_KEYS",
+      title = "Missing Row Count Keys",
+      problem = sprintf("row_counts is missing required keys: %s",
+                       paste(head(missing_keys, 5), collapse = ", ")),
+      why_it_matters = "Each banner column (internal key) must have a corresponding count. Missing keys indicate incomplete calculations.",
+      how_to_fix = c(
+        sprintf("Ensure counts are calculated for: %s", paste(head(missing_keys, 3), collapse = ", ")),
+        "Check that banner column structure matches internal keys",
+        "Review the row calculation logic for all columns"
+      )
+    )
   }
-  
+
   return(TRUE)
 }
 

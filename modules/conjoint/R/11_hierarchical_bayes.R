@@ -154,24 +154,26 @@ estimate_hierarchical_bayes <- function(data_list,
   hb_req <- check_hb_requirements()
 
   if (!hb_req$any_available) {
-    stop(create_error(
-      "HIERARCHICAL_BAYES",
-      "No HB package available",
-      "Install bayesm or RSGHB package for Hierarchical Bayes estimation",
-      hb_req$install_instructions
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "PKG_HB_NOT_INSTALLED",
+      title = "Hierarchical Bayes Package Not Available",
+      problem = "No HB package available",
+      why_it_matters = "Hierarchical Bayes estimation requires specialized MCMC packages (bayesm or RSGHB).",
+      how_to_fix = hb_req$install_instructions
+    )
   }
 
   # Validate data
   validation <- validate_hb_data(data_list, config)
 
   if (length(validation$critical) > 0) {
-    stop(create_error(
-      "HB_DATA",
-      "Data validation failed for HB estimation",
-      "Check data requirements",
-      paste(validation$critical, collapse = "; ")
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "DATA_HB_VALIDATION_FAILED",
+      title = "Data Validation Failed for HB Estimation",
+      problem = "Data validation failed for HB estimation",
+      why_it_matters = "Hierarchical Bayes requires sufficient data per respondent to estimate individual-level utilities.",
+      how_to_fix = paste(validation$critical, collapse = "; ")
+    )
   }
 
   # Print warnings
@@ -205,7 +207,13 @@ estimate_hierarchical_bayes <- function(data_list,
     result <- estimate_hb_rsghb(data_list, config, mcmc_iterations,
                                  burn_in, thin, verbose)
   } else {
-    stop(sprintf("Unknown HB package: %s", package))
+    conjoint_refuse(
+      code = "CFG_HB_UNKNOWN_PACKAGE",
+      title = "Unknown HB Package",
+      problem = sprintf("Unknown HB package: %s", package),
+      why_it_matters = "Hierarchical Bayes estimation requires a valid package specification.",
+      how_to_fix = "Use 'bayesm', 'RSGHB', or 'auto' as the package parameter"
+    )
   }
 
   result$is_hierarchical_bayes <- TRUE
@@ -226,7 +234,13 @@ estimate_hb_bayesm <- function(data_list, config, mcmc_iterations,
                                 burn_in, thin, verbose) {
 
   if (!requireNamespace("bayesm", quietly = TRUE)) {
-    stop("Package 'bayesm' required. Install with: install.packages('bayesm')")
+    conjoint_refuse(
+      code = "PKG_BAYESM_NOT_INSTALLED",
+      title = "bayesm Package Not Installed",
+      problem = "Package 'bayesm' required for HB estimation",
+      why_it_matters = "Hierarchical Bayes estimation with bayesm method requires the bayesm package.",
+      how_to_fix = "Install bayesm with: install.packages('bayesm')"
+    )
   }
 
   if (verbose) {
@@ -243,16 +257,17 @@ estimate_hb_bayesm <- function(data_list, config, mcmc_iterations,
   # 3. Running MCMC
   # 4. Extracting and processing draws
 
-  stop(create_error(
-    "HB_IMPLEMENTATION",
-    "Hierarchical Bayes estimation framework not fully implemented",
-    "This requires custom data preparation for bayesm package",
-    paste(
-      "See bayesm documentation: ?bayesm::rhierMnlRwMixture\n",
-      "Example code structure is provided in this file.\n",
-      "Contact development team for full implementation."
+  conjoint_refuse(
+    code = "EST_HB_BAYESM_NOT_IMPLEMENTED",
+    title = "Hierarchical Bayes with bayesm Not Fully Implemented",
+    problem = "Hierarchical Bayes estimation framework not fully implemented",
+    why_it_matters = "This requires custom data preparation for bayesm package that is not yet completed.",
+    how_to_fix = c(
+      "See bayesm documentation: ?bayesm::rhierMnlRwMixture",
+      "Example code structure is provided in this file",
+      "Contact development team for full implementation"
     )
-  ), call. = FALSE)
+  )
 
   # FRAMEWORK CODE (not executed):
   #
@@ -306,17 +321,24 @@ estimate_hb_rsghb <- function(data_list, config, mcmc_iterations,
                                burn_in, thin, verbose) {
 
   if (!requireNamespace("RSGHB", quietly = TRUE)) {
-    stop("Package 'RSGHB' required. Install with: install.packages('RSGHB')")
+    conjoint_refuse(
+      code = "PKG_RSGHB_NOT_INSTALLED",
+      title = "RSGHB Package Not Installed",
+      problem = "Package 'RSGHB' required for HB estimation",
+      why_it_matters = "Hierarchical Bayes estimation with RSGHB method requires the RSGHB package.",
+      how_to_fix = "Install RSGHB with: install.packages('RSGHB')"
+    )
   }
 
   # FRAMEWORK CODE (similar to bayesm)
 
-  stop(create_error(
-    "HB_IMPLEMENTATION",
-    "Hierarchical Bayes estimation with RSGHB not fully implemented",
-    "This requires custom data preparation for RSGHB package",
-    "See RSGHB documentation for implementation details"
-  ), call. = FALSE)
+  conjoint_refuse(
+    code = "EST_HB_RSGHB_NOT_IMPLEMENTED",
+    title = "Hierarchical Bayes with RSGHB Not Fully Implemented",
+    problem = "Hierarchical Bayes estimation with RSGHB not fully implemented",
+    why_it_matters = "This requires custom data preparation for RSGHB package that is not yet completed.",
+    how_to_fix = "See RSGHB documentation for implementation details"
+  )
 }
 
 
@@ -334,7 +356,13 @@ estimate_hb_rsghb <- function(data_list, config, mcmc_iterations,
 calculate_individual_utilities <- function(hb_result, config, respondent_id = NULL) {
 
   if (!hb_result$is_hierarchical_bayes) {
-    stop("Model is not a Hierarchical Bayes model")
+    conjoint_refuse(
+      code = "MODEL_NOT_HB",
+      title = "Not a Hierarchical Bayes Model",
+      problem = "Model is not a Hierarchical Bayes model",
+      why_it_matters = "Individual-level utilities can only be extracted from Hierarchical Bayes models.",
+      how_to_fix = "Use estimate_hierarchical_bayes() to estimate an HB model first"
+    )
   }
 
   # Extract individual betas
@@ -348,7 +376,13 @@ calculate_individual_utilities <- function(hb_result, config, respondent_id = NU
   # Convert to utilities data frame
   # (Implementation would depend on how betas are stored)
 
-  stop("Individual utilities extraction not fully implemented")
+  conjoint_refuse(
+    code = "EST_HB_INDIVIDUAL_UTILS_NOT_IMPLEMENTED",
+    title = "Individual Utilities Extraction Not Implemented",
+    problem = "Individual utilities extraction not fully implemented",
+    why_it_matters = "This functionality requires additional development to extract and format individual-level parameters.",
+    how_to_fix = "Contact development team for full implementation"
+  )
 }
 
 
@@ -826,7 +860,13 @@ calculate_split_rhat <- function(draws_matrix) {
 prepare_trace_plot_data <- function(hb_result, parameters = NULL, thin_factor = NULL) {
 
   if (is.null(hb_result$mcmc_draws)) {
-    stop("No MCMC draws available for trace plots")
+    conjoint_refuse(
+      code = "DATA_HB_NO_MCMC_DRAWS",
+      title = "No MCMC Draws Available",
+      problem = "No MCMC draws available for trace plots",
+      why_it_matters = "Trace plots require MCMC samples to visualize chain convergence.",
+      how_to_fix = "Ensure HB estimation was run with save_draws=TRUE"
+    )
   }
 
   draws <- as.matrix(hb_result$mcmc_draws)
@@ -916,7 +956,13 @@ summarize_hb_diagnostics <- function(diagnostics) {
 summarize_heterogeneity <- function(hb_result) {
 
   if (!hb_result$is_hierarchical_bayes) {
-    stop("Model is not a Hierarchical Bayes model")
+    conjoint_refuse(
+      code = "MODEL_NOT_HB_HETEROGENEITY",
+      title = "Not a Hierarchical Bayes Model",
+      problem = "Model is not a Hierarchical Bayes model",
+      why_it_matters = "Heterogeneity analysis requires individual-level estimates from HB models.",
+      how_to_fix = "Use estimate_hierarchical_bayes() to estimate an HB model first"
+    )
   }
 
   # Calculate dispersion measures for each parameter
@@ -924,7 +970,13 @@ summarize_heterogeneity <- function(hb_result) {
   # - Range
   # - Percentiles
 
-  stop("Heterogeneity summary not fully implemented")
+  conjoint_refuse(
+    code = "EST_HB_HETEROGENEITY_NOT_IMPLEMENTED",
+    title = "Heterogeneity Summary Not Implemented",
+    problem = "Heterogeneity summary not fully implemented",
+    why_it_matters = "This functionality requires additional development to calculate and summarize preference heterogeneity.",
+    how_to_fix = "Contact development team for full implementation"
+  )
 }
 
 

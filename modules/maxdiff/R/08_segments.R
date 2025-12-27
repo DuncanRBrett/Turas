@@ -53,10 +53,18 @@ validate_safe_expression <- function(expr_text, allowed_vars = NULL) {
   parsed <- tryCatch({
     parse(text = expr_text)
   }, error = function(e) {
-    stop(sprintf(
-      "Invalid expression syntax: %s\n  Error: %s",
-      expr_text, conditionMessage(e)
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "DATA_INVALID_SEGMENT_SYNTAX",
+      title = "Invalid Segment Expression Syntax",
+      problem = sprintf("Segment definition has invalid R syntax: %s", conditionMessage(e)),
+      why_it_matters = "Cannot create segment variable with invalid R syntax",
+      how_to_fix = c(
+        "Check segment definition for syntax errors",
+        "Ensure balanced parentheses and quotes",
+        "Use valid R operators and functions"
+      ),
+      details = sprintf("Expression: %s\nError: %s", expr_text, conditionMessage(e))
+    )
   })
 
   # Get all function calls in the expression
@@ -65,20 +73,32 @@ validate_safe_expression <- function(expr_text, allowed_vars = NULL) {
   # Check for unsafe function calls
   unsafe_found <- intersect(tolower(expr_calls), tolower(.UNSAFE_FUNCTIONS))
   if (length(unsafe_found) > 0) {
-    stop(sprintf(
-      "Expression contains unsafe function calls: %s\n  Expression: %s",
-      paste(unsafe_found, collapse = ", "), expr_text
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "DATA_UNSAFE_SEGMENT_FUNCTION",
+      title = "Unsafe Function in Segment Definition",
+      problem = sprintf("Segment expression contains unsafe function calls: %s", paste(unsafe_found, collapse = ", ")),
+      why_it_matters = "Security risk - unsafe functions could modify files or system state",
+      how_to_fix = c(
+        "Remove unsafe functions from segment definition",
+        "Use only safe comparison, logical, and transformation functions",
+        "Avoid system calls, file operations, and global assignments"
+      ),
+      details = sprintf("Expression: %s\nUnsafe functions: %s", expr_text, paste(unsafe_found, collapse = ", "))
+    )
   }
 
   # Check for assignment operators which could be used maliciously
   if (grepl("<-|<<-|->|->>|=(?!=)", expr_text, perl = TRUE)) {
     # Allow == and != but not assignment =
     if (grepl("(?<![=!<>])=(?!=)", expr_text, perl = TRUE)) {
-      stop(sprintf(
-        "Expression contains assignment operator (use == for comparison): %s",
-        expr_text
-      ), call. = FALSE)
+      maxdiff_refuse(
+        code = "DATA_SEGMENT_USE_DOUBLE_EQUALS",
+        title = "Use == for Comparison in Segment",
+        problem = "Segment expression uses = instead of == for comparison",
+        why_it_matters = "Single = is assignment; use == for logical comparison",
+        how_to_fix = "Replace = with == in segment expression for comparisons",
+        details = sprintf("Expression: %s", expr_text)
+      )
     }
   }
 
@@ -103,11 +123,19 @@ validate_safe_expression <- function(expr_text, allowed_vars = NULL) {
 
     unknown_vars <- setdiff(expr_vars, allowed_vars)
     if (length(unknown_vars) > 0) {
-      stop(sprintf(
-        "Expression references unknown variables: %s\n  Available: %s",
-        paste(unknown_vars, collapse = ", "),
-        paste(head(allowed_vars, 20), collapse = ", ")
-      ), call. = FALSE)
+      maxdiff_refuse(
+        code = "DATA_SEGMENT_UNKNOWN_VARIABLE",
+        title = "Unknown Variable in Segment Definition",
+        problem = sprintf("Segment expression references unknown variables: %s", paste(unknown_vars, collapse = ", ")),
+        why_it_matters = "Cannot create segment from variables not in dataset",
+        how_to_fix = c(
+          "Check variable names match exactly (case-sensitive)",
+          "Verify variables exist in survey data",
+          "Use one of the available variables listed below"
+        ),
+        expected = paste(head(allowed_vars, 20), collapse = ", "),
+        observed = paste(unknown_vars, collapse = ", ")
+      )
     }
   }
 
@@ -134,10 +162,18 @@ safe_eval_expression <- function(expr_text, data, context = "expression") {
   result <- tryCatch({
     eval(parsed, envir = data, enclos = baseenv())
   }, error = function(e) {
-    stop(sprintf(
-      "Error evaluating %s: %s\n  Expression: %s",
-      context, conditionMessage(e), expr_text
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "DATA_SEGMENT_EVALUATION_ERROR",
+      title = "Segment Expression Evaluation Error",
+      problem = sprintf("Error evaluating segment %s: %s", context, conditionMessage(e)),
+      why_it_matters = "Cannot create segment variable due to evaluation error",
+      how_to_fix = c(
+        "Check segment expression syntax",
+        "Verify variable names match data",
+        "Ensure data types are compatible with operations"
+      ),
+      details = sprintf("Expression: %s\nError: %s", expr_text, conditionMessage(e))
+    )
   })
 
   return(result)

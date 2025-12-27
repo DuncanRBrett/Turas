@@ -96,7 +96,13 @@ source_if_exists("03_study_level.R")
 calculate_mean_ci <- function(values, weights = NULL, conf_level = 0.95) {
   # Input validation
   if (!is.numeric(values)) {
-    stop("values must be numeric", call. = FALSE)
+    confidence_refuse(
+      code = "DATA_INVALID_TYPE",
+      title = "Values Must Be Numeric",
+      problem = "values must be numeric for mean calculation",
+      why_it_matters = "Mean confidence intervals require numeric data.",
+      how_to_fix = "Ensure the values are numeric (not character or factor)"
+    )
   }
 
   # Remove NA values
@@ -117,7 +123,13 @@ calculate_mean_ci <- function(values, weights = NULL, conf_level = 0.95) {
 
   n_actual <- length(values)
   if (n_actual < 2) {
-    stop("Need at least 2 values to calculate confidence interval", call. = FALSE)
+    confidence_refuse(
+      code = "DATA_INSUFFICIENT_SAMPLE",
+      title = "Insufficient Sample Size",
+      problem = "Need at least 2 values to calculate confidence interval",
+      why_it_matters = "Standard error calculation requires at least 2 observations.",
+      how_to_fix = "Ensure the variable has at least 2 non-missing values"
+    )
   }
 
   # Determine if weighted
@@ -126,7 +138,13 @@ calculate_mean_ci <- function(values, weights = NULL, conf_level = 0.95) {
   # Calculate mean and SD
   if (is_weighted) {
     if (length(weights) != n_actual) {
-      stop("weights must have same length as values", call. = FALSE)
+      confidence_refuse(
+        code = "DATA_WEIGHT_LENGTH_MISMATCH",
+        title = "Weights Length Mismatch",
+        problem = "weights must have same length as values",
+        why_it_matters = "Each observation must have a corresponding weight.",
+        how_to_fix = sprintf("Ensure weights vector has length %d to match values", n_actual)
+      )
     }
 
     # Weighted mean
@@ -248,7 +266,13 @@ bootstrap_mean_ci <- function(values, weights = NULL, B = 5000,
                               parallel = FALSE) {
   # Input validation
   if (!is.numeric(values)) {
-    stop("values must be numeric", call. = FALSE)
+    confidence_refuse(
+      code = "DATA_INVALID_TYPE",
+      title = "Values Must Be Numeric",
+      problem = "values must be numeric for bootstrap mean calculation",
+      why_it_matters = "Bootstrap mean intervals require numeric data.",
+      how_to_fix = "Ensure the values are numeric (not character or factor)"
+    )
   }
 
   # Remove NA values
@@ -265,7 +289,13 @@ bootstrap_mean_ci <- function(values, weights = NULL, B = 5000,
 
   n <- length(values)
   if (n < 2) {
-    stop("Need at least 2 values for bootstrap", call. = FALSE)
+    confidence_refuse(
+      code = "DATA_INSUFFICIENT_SAMPLE",
+      title = "Insufficient Sample Size for Bootstrap",
+      problem = "Need at least 2 values for bootstrap",
+      why_it_matters = "Bootstrap resampling requires at least 2 observations.",
+      how_to_fix = "Ensure the variable has at least 2 non-missing values"
+    )
   }
 
   validate_sample_size(B, "B", min_n = 1000)
@@ -279,7 +309,13 @@ bootstrap_mean_ci <- function(values, weights = NULL, B = 5000,
   is_weighted <- !is.null(weights) && length(weights) > 0
 
   if (is_weighted && length(weights) != n) {
-    stop("weights must have same length as values", call. = FALSE)
+    confidence_refuse(
+      code = "DATA_WEIGHT_LENGTH_MISMATCH",
+      title = "Weights Length Mismatch",
+      problem = "weights must have same length as values",
+      why_it_matters = "Each observation must have a corresponding weight.",
+      how_to_fix = sprintf("Ensure weights vector has length %d to match values", n)
+    )
   }
 
   # ---------------------------------------------------------------------------
@@ -440,7 +476,13 @@ credible_interval_mean <- function(values, weights = NULL, conf_level = 0.95,
                                    prior_n = NULL) {
   # Input validation
   if (!is.numeric(values)) {
-    stop("values must be numeric", call. = FALSE)
+    confidence_refuse(
+      code = "DATA_INVALID_TYPE",
+      title = "Values Must Be Numeric",
+      problem = "values must be numeric for Bayesian credible interval",
+      why_it_matters = "Bayesian credible intervals require numeric data.",
+      how_to_fix = "Ensure the values are numeric (not character or factor)"
+    )
   }
 
   # Remove NA values
@@ -457,7 +499,13 @@ credible_interval_mean <- function(values, weights = NULL, conf_level = 0.95,
 
   n_actual <- length(values)
   if (n_actual < 2) {
-    stop("Need at least 2 values to calculate credible interval", call. = FALSE)
+    confidence_refuse(
+      code = "DATA_INSUFFICIENT_SAMPLE",
+      title = "Insufficient Sample Size",
+      problem = "Need at least 2 values to calculate credible interval",
+      why_it_matters = "Bayesian inference requires at least 2 observations.",
+      how_to_fix = "Ensure the variable has at least 2 non-missing values"
+    )
   }
 
   validate_conf_level(conf_level)
@@ -491,15 +539,33 @@ credible_interval_mean <- function(values, weights = NULL, conf_level = 0.95,
   } else {
     # Informed prior
     if (is.null(prior_sd)) {
-      stop("prior_sd is required when prior_mean is specified", call. = FALSE)
+      confidence_refuse(
+        code = "CFG_MISSING_PRIOR_SD",
+        title = "Missing Prior SD",
+        problem = "prior_sd is required when prior_mean is specified",
+        why_it_matters = "Informed Bayesian priors require both mean and SD parameters.",
+        how_to_fix = "Specify Prior_SD in the config or remove Prior_Mean for uninformed prior"
+      )
     }
 
     if (!is.numeric(prior_mean) || !is.numeric(prior_sd)) {
-      stop("prior_mean and prior_sd must be numeric", call. = FALSE)
+      confidence_refuse(
+        code = "CFG_INVALID_PRIOR_TYPE",
+        title = "Invalid Prior Parameter Type",
+        problem = "prior_mean and prior_sd must be numeric",
+        why_it_matters = "Prior parameters must be numeric for Bayesian calculations.",
+        how_to_fix = "Ensure Prior_Mean and Prior_SD are numeric values"
+      )
     }
 
     if (prior_sd <= 0) {
-      stop("prior_sd must be positive", call. = FALSE)
+      confidence_refuse(
+        code = "CFG_INVALID_PRIOR_SD",
+        title = "Invalid Prior SD",
+        problem = "prior_sd must be positive",
+        why_it_matters = "Standard deviation must be positive.",
+        how_to_fix = "Specify a positive value for Prior_SD"
+      )
     }
 
     # Default prior_n to 100 if not specified

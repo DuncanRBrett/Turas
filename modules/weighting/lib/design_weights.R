@@ -35,19 +35,33 @@ calculate_design_weights <- function(data,
 
   # Validate inputs
   if (!is.data.frame(data) || nrow(data) == 0) {
-    stop("data must be a non-empty data frame", call. = FALSE)
+    weighting_refuse(
+      code = "DATA_INVALID_INPUT",
+      title = "Invalid Input Data",
+      problem = "data must be a non-empty data frame",
+      why_it_matters = "Design weights cannot be calculated without valid survey data",
+      how_to_fix = "Provide a data frame with at least one row of survey data"
+    )
   }
 
   if (!stratum_variable %in% names(data)) {
-    stop(sprintf(
-      "Stratum variable '%s' not found in data.\nAvailable columns: %s",
-      stratum_variable,
-      paste(head(names(data), 15), collapse = ", ")
-    ), call. = FALSE)
+    weighting_refuse(
+      code = "CFG_INVALID_COLUMN",
+      title = "Stratum Variable Not Found",
+      problem = sprintf("Stratum variable '%s' not found in data", stratum_variable),
+      why_it_matters = "Design weights require a valid stratification column to group observations",
+      how_to_fix = sprintf("Use one of these available columns: %s", paste(head(names(data), 15), collapse = ", "))
+    )
   }
 
   if (!is.numeric(population_sizes) || is.null(names(population_sizes))) {
-    stop("population_sizes must be a named numeric vector", call. = FALSE)
+    weighting_refuse(
+      code = "CFG_INVALID_POPULATION_SIZES",
+      title = "Invalid Population Sizes Format",
+      problem = "population_sizes must be a named numeric vector",
+      why_it_matters = "Population sizes must map stratum categories to their counts for weight calculation",
+      how_to_fix = "Provide a named numeric vector like c('Category1' = 1000, 'Category2' = 500)"
+    )
   }
 
   if (verbose) {
@@ -147,21 +161,26 @@ calculate_design_weights_from_config <- function(data, config, weight_name, verb
   targets <- get_design_targets(config, weight_name)
 
   if (is.null(targets) || nrow(targets) == 0) {
-    stop(sprintf(
-      "No design targets found for weight '%s'",
-      weight_name
-    ), call. = FALSE)
+    weighting_refuse(
+      code = "CFG_MISSING_TARGETS",
+      title = "No Design Targets Found",
+      problem = sprintf("No design targets found for weight '%s'", weight_name),
+      why_it_matters = "Design weights require population targets to calculate stratum weights",
+      how_to_fix = sprintf("Add design targets for '%s' in the configuration file", weight_name)
+    )
   }
 
   # Validate configuration against data
   validation <- validate_design_config(data, targets, weight_name)
 
   if (!validation$valid) {
-    stop(sprintf(
-      "\nDesign weight configuration validation failed for '%s':\n  %s",
-      weight_name,
-      paste(validation$errors, collapse = "\n  ")
-    ), call. = FALSE)
+    weighting_refuse(
+      code = "CFG_VALIDATION_FAILED",
+      title = "Design Weight Configuration Invalid",
+      problem = sprintf("Configuration validation failed for weight '%s'", weight_name),
+      why_it_matters = "Invalid configuration prevents correct weight calculation",
+      how_to_fix = paste(validation$errors, collapse = "; ")
+    )
   }
 
   if (length(validation$warnings) > 0) {
@@ -313,7 +332,13 @@ normalize_design_weights <- function(weights, target_sum = NULL) {
 #' @export
 calculate_grossing_weights <- function(weights, population_total) {
   if (!is.numeric(population_total) || population_total <= 0) {
-    stop("population_total must be a positive number", call. = FALSE)
+    weighting_refuse(
+      code = "DATA_INVALID_POPULATION_TOTAL",
+      title = "Invalid Population Total",
+      problem = "population_total must be a positive number",
+      why_it_matters = "Grossing weights require a valid population total to scale sample weights",
+      how_to_fix = "Provide a positive numeric value for population_total"
+    )
   }
 
   valid_idx <- !is.na(weights) & is.finite(weights) & weights > 0

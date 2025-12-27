@@ -39,17 +39,13 @@ check_survey_available <- function() {
 
   # Fallback to local check
   if (!requireNamespace("survey", quietly = TRUE)) {
-    stop(paste0(
-      "\n",
-      strrep("=", 70), "\n",
-      "PACKAGE REQUIRED: survey\n",
-      strrep("=", 70), "\n\n",
-      "The 'survey' package is required for rim weighting but is not installed.\n\n",
-      "To install, run:\n",
-      "  install.packages('survey')\n\n",
-      "This package provides robust, industry-standard survey calibration\n",
-      "and raking algorithms.\n"
-    ), call. = FALSE)
+    weighting_refuse(
+      code = "CFG_SURVEY_PKG_MISSING",
+      title = "Survey package not installed",
+      problem = "The 'survey' package is required for rim weighting but is not installed.",
+      why_it_matters = "Rim weighting requires the survey package for calibration and raking algorithms.",
+      how_to_fix = "Install the survey package by running: install.packages('survey')"
+    )
   }
   invisible(TRUE)
 }
@@ -97,33 +93,56 @@ calculate_rim_weights <- function(data,
 
   # Validate inputs
   if (!is.data.frame(data) || nrow(data) == 0) {
-    stop("data must be a non-empty data frame", call. = FALSE)
+    weighting_refuse(
+      code = "DATA_INVALID_INPUT",
+      title = "Invalid input data",
+      problem = "The data parameter must be a non-empty data frame.",
+      why_it_matters = "Rim weighting requires valid survey data to calculate weights.",
+      how_to_fix = "Ensure you pass a data frame with at least one row to the data parameter."
+    )
   }
 
   if (!is.list(target_list) || length(target_list) == 0) {
-    stop("target_list must be a non-empty named list", call. = FALSE)
+    weighting_refuse(
+      code = "CFG_INVALID_TARGETS",
+      title = "Invalid target list",
+      problem = "The target_list parameter must be a non-empty named list.",
+      why_it_matters = "Rim weighting requires target proportions to calibrate weights against.",
+      how_to_fix = "Provide a named list where each element contains target proportions for a weighting variable."
+    )
   }
 
   # Validate all target variables exist
   missing_vars <- setdiff(names(target_list), names(data))
   if (length(missing_vars) > 0) {
-    stop(sprintf(
-      "Target variables not found in data: %s\nAvailable: %s",
-      paste(missing_vars, collapse = ", "),
-      paste(head(names(data), 15), collapse = ", ")
-    ), call. = FALSE)
+    weighting_refuse(
+      code = "CFG_MISSING_VARS",
+      title = "Target variables not found in data",
+      problem = sprintf("Target variables not found in data: %s", paste(missing_vars, collapse = ", ")),
+      why_it_matters = "All weighting variables must exist in the data to calculate rim weights.",
+      how_to_fix = sprintf("Check that these variables exist in your data. Available variables: %s", paste(head(names(data), 15), collapse = ", "))
+    )
   }
 
   # Validate base_weights if provided
   if (!is.null(base_weights)) {
     if (length(base_weights) != nrow(data)) {
-      stop(sprintf(
-        "base_weights length (%d) must match data rows (%d)",
-        length(base_weights), nrow(data)
-      ), call. = FALSE)
+      weighting_refuse(
+        code = "DATA_WEIGHT_MISMATCH",
+        title = "Base weights length mismatch",
+        problem = sprintf("base_weights length (%d) must match data rows (%d)", length(base_weights), nrow(data)),
+        why_it_matters = "Each row in the data must have a corresponding base weight for rim-on-design weighting.",
+        how_to_fix = sprintf("Provide a base_weights vector with exactly %d elements to match your data.", nrow(data))
+      )
     }
     if (any(base_weights[!is.na(base_weights)] <= 0)) {
-      stop("base_weights must be positive (or NA)", call. = FALSE)
+      weighting_refuse(
+        code = "DATA_INVALID_WEIGHTS",
+        title = "Invalid base weights",
+        problem = "base_weights must be positive (or NA).",
+        why_it_matters = "Weights must be positive values for the calibration algorithm to work correctly.",
+        how_to_fix = "Check your base_weights vector and ensure all non-NA values are greater than 0."
+      )
     }
   }
 
@@ -136,17 +155,25 @@ calculate_rim_weights <- function(data,
   } else if (length(cap_weights) == 2) {
     bounds <- cap_weights
   } else {
-    stop("cap_weights must be NULL, single value, or c(lower, upper)", call. = FALSE)
+    weighting_refuse(
+      code = "CFG_INVALID_BOUNDS",
+      title = "Invalid weight bounds format",
+      problem = "cap_weights must be NULL, single value, or c(lower, upper).",
+      why_it_matters = "Weight bounds control the range of final weights during calibration.",
+      how_to_fix = "Provide cap_weights as NULL (for defaults), a single number (upper bound), or c(lower, upper)."
+    )
   }
 
   # Validate calibration method
   valid_methods <- c("raking", "linear", "logit")
   if (!tolower(calibration_method) %in% valid_methods) {
-    stop(sprintf(
-      "calibration_method must be one of: %s\nGot: '%s'",
-      paste(valid_methods, collapse = ", "),
-      calibration_method
-    ), call. = FALSE)
+    weighting_refuse(
+      code = "CFG_INVALID_METHOD",
+      title = "Invalid calibration method",
+      problem = sprintf("calibration_method must be one of: %s. Got: '%s'", paste(valid_methods, collapse = ", "), calibration_method),
+      why_it_matters = "The calibration method determines how weights are adjusted to match targets.",
+      how_to_fix = sprintf("Use one of the supported methods: %s", paste(valid_methods, collapse = ", "))
+    )
   }
 
   if (verbose) {
@@ -175,10 +202,13 @@ calculate_rim_weights <- function(data,
     n_na <- sum(is.na(rake_data[[var]]))
     if (n_na > 0) {
       unmatched_vals <- paste(unique(as.character(data[[var]][is.na(rake_data[[var]])])), collapse = ", ")
-      stop(sprintf(
-        "Variable '%s': %d values not in target categories.\nThis should have been caught by validation.\nUnmatched values: %s",
-        var, n_na, unmatched_vals
-      ), call. = FALSE)
+      weighting_refuse(
+        code = "DATA_UNMATCHED_VALUES",
+        title = "Data values not in target categories",
+        problem = sprintf("Variable '%s': %d values not in target categories. Unmatched values: %s", var, n_na, unmatched_vals),
+        why_it_matters = "All data values must match one of the defined target categories for rim weighting.",
+        how_to_fix = "Either add these categories to your targets or recode the data values to match existing target categories."
+      )
     }
   }
 
@@ -200,20 +230,26 @@ calculate_rim_weights <- function(data,
 
   # Validate data frame size after complete case removal
   if (nrow(rake_data) == 0) {
-    stop("No complete cases remain after removing rows with missing weighting variables.\n",
-         "All rows have NA values in at least one weighting variable.\n",
-         "Check your data for missing values in the weighting variables.",
-         call. = FALSE)
+    weighting_refuse(
+      code = "DATA_NO_COMPLETE_CASES",
+      title = "No complete cases for weighting",
+      problem = "No complete cases remain after removing rows with missing weighting variables. All rows have NA values in at least one weighting variable.",
+      why_it_matters = "Rim weighting requires complete data for all weighting variables.",
+      how_to_fix = "Check your data for missing values in the weighting variables and either impute them or exclude those variables from weighting."
+    )
   }
 
   # Minimum sample size check for reliable weighting
   n_target_cats <- sum(sapply(target_list, length))
   min_recommended <- n_target_cats * 10
   if (nrow(rake_data) < n_target_cats) {
-    stop(sprintf(
-      "Sample size (%d) is less than the number of target categories (%d).\n",
-      nrow(rake_data), n_target_cats
-    ), "Weighting requires more observations than weighting cells.", call. = FALSE)
+    weighting_refuse(
+      code = "DATA_INSUFFICIENT_SAMPLE",
+      title = "Insufficient sample size",
+      problem = sprintf("Sample size (%d) is less than the number of target categories (%d).", nrow(rake_data), n_target_cats),
+      why_it_matters = "Weighting requires more observations than weighting cells for reliable estimates.",
+      how_to_fix = sprintf("Increase your sample size to at least %d cases or reduce the number of target categories.", n_target_cats)
+    )
   } else if (nrow(rake_data) < min_recommended && verbose) {
     message(sprintf(
       "  Warning: Sample size (%d) is small relative to target categories (%d).\n  Recommended minimum: %d (10 per category)",
@@ -295,32 +331,29 @@ calculate_rim_weights <- function(data,
 
     # Check for common issues
     if (grepl("did not converge", err_msg, ignore.case = TRUE)) {
-      stop(paste0(
-        "\nRim weighting did not converge after ", max_iterations, " iterations.\n\n",
-        "Options:\n",
-        "  1. Increase max_iterations (currently ", max_iterations, ")\n",
-        "  2. Relax weight bounds (currently [", bounds[1], ", ", bounds[2], "])\n",
-        "  3. Try calibration_method = 'logit' (better for bounded weights)\n",
-        "  4. Reduce number of rim variables (currently ", length(target_list), ")\n\n",
-        "Original error: ", err_msg, "\n"
-      ), call. = FALSE)
+      weighting_refuse(
+        code = "MODEL_NO_CONVERGENCE",
+        title = "Rim weighting did not converge",
+        problem = sprintf("Rim weighting did not converge after %d iterations. Original error: %s", max_iterations, err_msg),
+        why_it_matters = "Convergence is required to produce reliable weights that match target distributions.",
+        how_to_fix = sprintf("Try: 1) Increase max_iterations (currently %d), 2) Relax weight bounds (currently [%s, %s]), 3) Use calibration_method = 'logit', or 4) Reduce rim variables (currently %d)", max_iterations, bounds[1], bounds[2], length(target_list))
+      )
     } else if (grepl("bounds", err_msg, ignore.case = TRUE)) {
-      stop(paste0(
-        "\nWeight bounds issue during calibration.\n\n",
-        "Try:\n",
-        "  1. Widen bounds (currently [", bounds[1], ", ", bounds[2], "])\n",
-        "  2. Use calibration_method = 'linear' or 'logit'\n",
-        "  3. Check target proportions are realistic\n\n",
-        "Original error: ", err_msg, "\n"
-      ), call. = FALSE)
+      weighting_refuse(
+        code = "MODEL_BOUNDS_ISSUE",
+        title = "Weight bounds issue during calibration",
+        problem = sprintf("Weight bounds issue during calibration. Original error: %s", err_msg),
+        why_it_matters = "The specified weight bounds may be too restrictive for achieving the target distributions.",
+        how_to_fix = sprintf("Try: 1) Widen bounds (currently [%s, %s]), 2) Use calibration_method = 'linear' or 'logit', or 3) Check target proportions are realistic", bounds[1], bounds[2])
+      )
     } else {
-      stop(paste0(
-        "\nRim weighting calibration failed:\n  ", err_msg, "\n\n",
-        "Troubleshooting:\n",
-        "  1. Check all target categories exist in data\n",
-        "  2. Ensure no missing values in weighting variables\n",
-        "  3. Verify target proportions sum to 1.0 per variable\n"
-      ), call. = FALSE)
+      weighting_refuse(
+        code = "MODEL_CALIBRATION_FAILED",
+        title = "Rim weighting calibration failed",
+        problem = sprintf("Rim weighting calibration failed: %s", err_msg),
+        why_it_matters = "Calibration failure prevents weight calculation.",
+        how_to_fix = "Check: 1) All target categories exist in data, 2) No missing values in weighting variables, 3) Target proportions sum to 1.0 per variable"
+      )
     }
   })
 
@@ -331,7 +364,13 @@ calculate_rim_weights <- function(data,
   if (!is.null(base_weights)) {
     # Protect against division by zero or near-zero base weights
     if (any(starting_weights <= 0, na.rm = TRUE)) {
-      stop("Base weights must be positive. Found zero or negative values.", call. = FALSE)
+      weighting_refuse(
+        code = "DATA_INVALID_WEIGHTS",
+        title = "Invalid base weights",
+        problem = "Base weights must be positive. Found zero or negative values.",
+        why_it_matters = "Division by zero or negative weights will produce invalid calibration factors.",
+        how_to_fix = "Ensure all base weights are positive values greater than 0."
+      )
     }
     g_weights <- final_weights / starting_weights
   } else {
@@ -405,21 +444,26 @@ calculate_rim_weights_from_config <- function(data, config, weight_name,
   targets_df <- get_rim_targets(config, weight_name)
 
   if (is.null(targets_df) || nrow(targets_df) == 0) {
-    stop(sprintf(
-      "No rim targets found for weight '%s'",
-      weight_name
-    ), call. = FALSE)
+    weighting_refuse(
+      code = "CFG_NO_TARGETS",
+      title = "No rim targets found",
+      problem = sprintf("No rim targets found for weight '%s'", weight_name),
+      why_it_matters = "Rim weighting requires target proportions to calibrate against.",
+      how_to_fix = sprintf("Define rim targets for '%s' in your configuration file.", weight_name)
+    )
   }
 
   # Validate configuration against data
   validation <- validate_rim_config(data, targets_df, weight_name)
 
   if (!validation$valid) {
-    stop(sprintf(
-      "\nRim weight configuration validation failed for '%s':\n  %s",
-      weight_name,
-      paste(validation$errors, collapse = "\n  ")
-    ), call. = FALSE)
+    weighting_refuse(
+      code = "CFG_VALIDATION_FAILED",
+      title = "Configuration validation failed",
+      problem = sprintf("Rim weight configuration validation failed for '%s': %s", weight_name, paste(validation$errors, collapse = "; ")),
+      why_it_matters = "Configuration errors prevent proper weight calculation.",
+      how_to_fix = "Review and fix the validation errors in your rim weighting configuration."
+    )
   }
 
   if (length(validation$warnings) > 0) {
@@ -445,10 +489,13 @@ calculate_rim_weights_from_config <- function(data, config, weight_name,
   base_weights <- NULL
   if (!is.null(base_weight_column)) {
     if (!base_weight_column %in% names(data)) {
-      stop(sprintf(
-        "base_weight_column '%s' not found in data",
-        base_weight_column
-      ), call. = FALSE)
+      weighting_refuse(
+        code = "CFG_MISSING_COLUMN",
+        title = "Base weight column not found",
+        problem = sprintf("base_weight_column '%s' not found in data", base_weight_column),
+        why_it_matters = "The specified base weight column must exist in the data for rim-on-design weighting.",
+        how_to_fix = sprintf("Check that column '%s' exists in your data, or update the base_weight_column parameter.", base_weight_column)
+      )
     }
     base_weights <- data[[base_weight_column]]
   }
@@ -466,17 +513,23 @@ calculate_rim_weights_from_config <- function(data, config, weight_name,
   if (is.character(bounds_setting) && grepl(",", bounds_setting)) {
     parts <- strsplit(bounds_setting, ",")[[1]]
     if (length(parts) != 2) {
-      stop(sprintf(
-        "Invalid weight_bounds format: '%s'. Expected 'lower,upper' (e.g., '0.3,3.0') or single value.",
-        bounds_setting
-      ), call. = FALSE)
+      weighting_refuse(
+        code = "CFG_INVALID_BOUNDS_FORMAT",
+        title = "Invalid weight bounds format",
+        problem = sprintf("Invalid weight_bounds format: '%s'. Expected 'lower,upper' (e.g., '0.3,3.0') or single value.", bounds_setting),
+        why_it_matters = "Weight bounds must be specified correctly to control the range of calibrated weights.",
+        how_to_fix = "Use format 'lower,upper' (e.g., '0.3,3.0') or provide a single upper bound value."
+      )
     }
     bounds <- as.numeric(parts)
     if (any(is.na(bounds))) {
-      stop(sprintf(
-        "Invalid weight_bounds values: '%s'. Both lower and upper must be numeric.",
-        bounds_setting
-      ), call. = FALSE)
+      weighting_refuse(
+        code = "CFG_INVALID_BOUNDS_VALUES",
+        title = "Invalid weight bounds values",
+        problem = sprintf("Invalid weight_bounds values: '%s'. Both lower and upper must be numeric.", bounds_setting),
+        why_it_matters = "Weight bounds must be numeric values for the calibration algorithm.",
+        how_to_fix = "Ensure both lower and upper bounds are valid numeric values (e.g., '0.3,3.0')."
+      )
     }
   } else {
     bounds <- c(0.3, as.numeric(bounds_setting))  # Interpret as upper bound only

@@ -43,9 +43,13 @@ generate_segment_rules <- function(data, clusters, clustering_vars,
   # ===========================================================================
 
   if (!requireNamespace("rpart", quietly = TRUE)) {
-    stop("Package 'rpart' required for classification rules.\n",
-         "Install with: install.packages('rpart')",
-         call. = FALSE)
+    segment_refuse(
+      code = "PKG_RPART_MISSING",
+      title = "Package rpart Required",
+      problem = "Package 'rpart' is not installed.",
+      why_it_matters = "The rpart package is required for generating classification rules using decision trees.",
+      how_to_fix = "Install the package with: install.packages('rpart')"
+    )
   }
 
   # ===========================================================================

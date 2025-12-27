@@ -37,7 +37,13 @@ OUTPUT_VERSION <- "10.0"
 # ==============================================================================
 
 if (!require("openxlsx", quietly = TRUE)) {
-  stop("Package 'openxlsx' is required. Install with: install.packages('openxlsx')", call. = FALSE)
+  confidence_refuse(
+    code = "PKG_OPENXLSX_MISSING",
+    title = "Required Package Not Installed",
+    problem = "Package 'openxlsx' is required but not installed",
+    why_it_matters = "The openxlsx package is required to write Excel output files.",
+    how_to_fix = "Install the package with: install.packages('openxlsx')"
+  )
 }
 
 source_if_exists <- function(file_path) {
@@ -97,7 +103,13 @@ write_confidence_output <- function(output_path,
 
   # Validate decimal separator
   if (!decimal_sep %in% c(".", ",")) {
-    stop("decimal_sep must be either '.' or ','", call. = FALSE)
+    confidence_refuse(
+      code = "CFG_INVALID_DECIMAL_SEPARATOR",
+      title = "Invalid Decimal Separator",
+      problem = "decimal_sep must be either '.' or ','",
+      why_it_matters = "Decimal separator determines number formatting in output.",
+      how_to_fix = "Set Decimal_Separator in config to either '.' or ','"
+    )
   }
 
   # Validate output path before creating workbook
@@ -105,26 +117,45 @@ write_confidence_output <- function(output_path,
 
   # Check if output directory exists
   if (!dir.exists(output_dir)) {
-    stop(sprintf(
-      "Output directory does not exist: %s\n  Create the directory first or specify a different output path.",
-      output_dir
-    ), call. = FALSE)
+    confidence_refuse(
+      code = "IO_OUTPUT_DIR_NOT_FOUND",
+      title = "Output Directory Does Not Exist",
+      problem = sprintf("Output directory does not exist: %s", output_dir),
+      why_it_matters = "Output files cannot be created without a valid directory.",
+      how_to_fix = c(
+        "Create the output directory first",
+        "Or specify a different output path in the config"
+      )
+    )
   }
 
   # Check if output directory is writable
   if (file.access(output_dir, mode = 2) != 0) {
-    stop(sprintf(
-      "Output directory is not writable: %s\n  Check directory permissions.",
-      output_dir
-    ), call. = FALSE)
+    confidence_refuse(
+      code = "IO_OUTPUT_DIR_NOT_WRITABLE",
+      title = "Output Directory Not Writable",
+      problem = sprintf("Output directory is not writable: %s", output_dir),
+      why_it_matters = "Write permissions are required to save output files.",
+      how_to_fix = c(
+        "Check directory permissions",
+        "Ensure you have write access to the directory"
+      )
+    )
   }
 
   # Check if output file exists and is writable (if it exists)
   if (file.exists(output_path) && file.access(output_path, mode = 2) != 0) {
-    stop(sprintf(
-      "Cannot overwrite existing output file: %s\n  Check file permissions or specify a different filename.",
-      output_path
-    ), call. = FALSE)
+    confidence_refuse(
+      code = "IO_OUTPUT_FILE_NOT_WRITABLE",
+      title = "Cannot Overwrite Output File",
+      problem = sprintf("Cannot overwrite existing output file: %s", output_path),
+      why_it_matters = "File must be writable to save updated results.",
+      how_to_fix = c(
+        "Close the file if it's open in Excel",
+        "Check file permissions",
+        "Or specify a different filename in the config"
+      )
+    )
   }
 
   # Guard check: ensure we have some results to write
@@ -203,11 +234,19 @@ write_confidence_output <- function(output_path,
   if (exists("turas_save_workbook_atomic", mode = "function")) {
     save_result <- turas_save_workbook_atomic(wb, output_path, run_result = run_result, module = "CONF")
     if (!save_result$success) {
-      stop(sprintf(
-        "Failed to save Excel file\nPath: %s\nError: %s\n\nTroubleshooting:\n  1. Check file is not open in Excel\n  2. Verify output directory exists\n  3. Check write permissions",
-        output_path,
-        save_result$error
-      ), call. = FALSE)
+      confidence_refuse(
+        code = "IO_EXCEL_SAVE_FAILED",
+        title = "Failed to Save Excel File",
+        problem = sprintf("Failed to save Excel file: %s", save_result$error),
+        why_it_matters = "Output file could not be written to disk.",
+        how_to_fix = c(
+          "Check file is not open in Excel",
+          "Verify output directory exists",
+          "Check write permissions",
+          "Ensure sufficient disk space"
+        ),
+        details = sprintf("Output path: %s", output_path)
+      )
     }
     message(sprintf("\n[TRS INFO] Output written to: %s", output_path))
   } else {
@@ -216,11 +255,19 @@ write_confidence_output <- function(output_path,
       openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
       message(sprintf("\n[TRS INFO] Output written to: %s", output_path))
     }, error = function(e) {
-      stop(sprintf(
-        "Failed to save Excel file\nPath: %s\nError: %s\n\nTroubleshooting:\n  1. Check file is not open in Excel\n  2. Verify output directory exists\n  3. Check write permissions",
-        output_path,
-        conditionMessage(e)
-      ), call. = FALSE)
+      confidence_refuse(
+        code = "IO_EXCEL_SAVE_FAILED",
+        title = "Failed to Save Excel File",
+        problem = sprintf("Failed to save Excel file: %s", conditionMessage(e)),
+        why_it_matters = "Output file could not be written to disk.",
+        how_to_fix = c(
+          "Check file is not open in Excel",
+          "Verify output directory exists",
+          "Check write permissions",
+          "Ensure sufficient disk space"
+        ),
+        details = sprintf("Output path: %s", output_path)
+      )
     })
   }
 

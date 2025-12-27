@@ -438,32 +438,62 @@ calculate_banner_bases <- function(banner_row_indices, master_weights,
 #' @return TRUE if valid, stops with error if not
 #' @export
 validate_banner_indices <- function(banner_row_indices, data_rows) {
-  
+
   if (is.null(banner_row_indices$row_indices)) {
-    stop("Banner indices missing row_indices element")
+    tabs_refuse(
+      code = "DATA_INVALID_STRUCTURE",
+      title = "Invalid Banner Indices Structure",
+      problem = "Banner indices missing row_indices element.",
+      why_it_matters = "row_indices is required for subsetting data by banner columns.",
+      how_to_fix = "This is an internal error - check banner indices creation logic"
+    )
   }
-  
+
   if (!is.list(banner_row_indices$row_indices)) {
-    stop("row_indices must be a list")
+    tabs_refuse(
+      code = "DATA_INVALID_TYPE",
+      title = "Invalid row_indices Type",
+      problem = "row_indices must be a list.",
+      why_it_matters = "row_indices must be a named list of integer vectors for proper banner subsetting.",
+      how_to_fix = "This is an internal error - check banner indices creation logic"
+    )
   }
-  
+
   if (length(banner_row_indices$row_indices) == 0) {
-    stop("row_indices is empty")
+    tabs_refuse(
+      code = "DATA_EMPTY",
+      title = "Empty row_indices",
+      problem = "row_indices list is empty.",
+      why_it_matters = "At least one banner column (Total) should have row indices.",
+      how_to_fix = "This is an internal error - check banner indices creation logic"
+    )
   }
-  
+
   # Check each index vector
   for (key in names(banner_row_indices$row_indices)) {
     idx <- banner_row_indices$row_indices[[key]]
-    
+
     if (!is.numeric(idx) && !is.integer(idx)) {
-      stop(sprintf("Indices for '%s' must be numeric", key))
+      tabs_refuse(
+        code = "DATA_INVALID_TYPE",
+        title = "Invalid Index Type",
+        problem = sprintf("Indices for '%s' must be numeric.", key),
+        why_it_matters = "Row indices must be numeric for subsetting data frames.",
+        how_to_fix = "This is an internal error - check banner indices creation logic"
+      )
     }
-    
+
     if (any(idx < 1 | idx > data_rows)) {
-      stop(sprintf("Indices for '%s' out of range (1-%d)", key, data_rows))
+      tabs_refuse(
+        code = "DATA_OUT_OF_RANGE",
+        title = "Index Out of Range",
+        problem = sprintf("Indices for '%s' are out of range (valid: 1-%d).", key, data_rows),
+        why_it_matters = "Row indices must be within the valid range of data rows.",
+        how_to_fix = "This is an internal error - check banner indices creation logic"
+      )
     }
   }
-  
+
   return(TRUE)
 }
 

@@ -35,7 +35,17 @@ synthesize_recommendation <- function(vw_results = NULL,
   # ============================================================================
 
   if (is.null(vw_results) && is.null(gg_results)) {
-    stop("At least one of vw_results or gg_results must be provided", call. = FALSE)
+    pricing_refuse(
+      code = "DATA_NO_RESULTS",
+      title = "No Analysis Results Provided",
+      problem = "At least one of vw_results or gg_results must be provided",
+      why_it_matters = "Cannot synthesize recommendation without pricing analysis results",
+      how_to_fix = c(
+        "Run Van Westendorp or Gabor-Granger analysis first",
+        "Pass the results to synthesize_recommendation()"
+      ),
+      expected = "vw_results and/or gg_results"
+    )
   }
 
   synth_config <- config$synthesis %||% list()

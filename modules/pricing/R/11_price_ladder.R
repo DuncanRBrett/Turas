@@ -28,7 +28,17 @@ build_price_ladder <- function(vw_results = NULL, gg_results = NULL, config = NU
   # ============================================================================
 
   if (is.null(vw_results) && is.null(gg_results)) {
-    stop("At least one of vw_results or gg_results must be provided", call. = FALSE)
+    pricing_refuse(
+      code = "DATA_NO_RESULTS",
+      title = "No Analysis Results Provided",
+      problem = "At least one of vw_results or gg_results must be provided",
+      why_it_matters = "Cannot build price ladder without pricing analysis results",
+      how_to_fix = c(
+        "Run Van Westendorp or Gabor-Granger analysis first",
+        "Pass the results to build_price_ladder()"
+      ),
+      expected = "vw_results and/or gg_results"
+    )
   }
 
   # Get config with defaults
@@ -36,7 +46,15 @@ build_price_ladder <- function(vw_results = NULL, gg_results = NULL, config = NU
 
   n_tiers <- as.integer(ladder_config$n_tiers %||% 3)
   if (n_tiers < 2 || n_tiers > 4) {
-    stop("n_tiers must be between 2 and 4", call. = FALSE)
+    pricing_refuse(
+      code = "CFG_INVALID_N_TIERS",
+      title = "Invalid Number of Tiers",
+      problem = sprintf("n_tiers is %d, but must be between 2 and 4", n_tiers),
+      why_it_matters = "Price ladder requires 2-4 tiers for meaningful differentiation",
+      how_to_fix = "Set n_tiers in PriceLadder configuration to 2, 3, or 4",
+      observed = n_tiers,
+      expected = "2, 3, or 4"
+    )
   }
 
   tier_names_raw <- ladder_config$tier_names %||% switch(as.character(n_tiers),
@@ -47,8 +65,18 @@ build_price_ladder <- function(vw_results = NULL, gg_results = NULL, config = NU
   tier_names <- trimws(strsplit(tier_names_raw, ";")[[1]])
 
   if (length(tier_names) != n_tiers) {
-    stop(sprintf("tier_names has %d names but n_tiers is %d",
-                 length(tier_names), n_tiers), call. = FALSE)
+    pricing_refuse(
+      code = "CFG_TIER_NAMES_MISMATCH",
+      title = "Tier Names Count Mismatch",
+      problem = sprintf("%d tier names provided but n_tiers is %d", length(tier_names), n_tiers),
+      why_it_matters = "Each tier must have exactly one name",
+      how_to_fix = c(
+        "Adjust tier_names in PriceLadder configuration to match n_tiers",
+        "Use semicolon-separated names (e.g., 'Value;Standard;Premium' for 3 tiers)"
+      ),
+      observed = sprintf("%d tier names: %s", length(tier_names), paste(tier_names, collapse = ", ")),
+      expected = sprintf("%d tier names", n_tiers)
+    )
   }
 
   min_gap <- as.numeric(ladder_config$min_gap_pct %||% 15) / 100
@@ -96,7 +124,17 @@ build_price_ladder <- function(vw_results = NULL, gg_results = NULL, config = NU
     anchor_price <- reference_prices$vw_optimal
     anchor_source <- "Van Westendorp OPP-IDP midpoint"
   } else {
-    stop("Cannot determine anchor price from results", call. = FALSE)
+    pricing_refuse(
+      code = "DATA_NO_ANCHOR_PRICE",
+      title = "Cannot Determine Anchor Price",
+      problem = "No suitable anchor price found in analysis results",
+      why_it_matters = "Price ladder requires an anchor point to build tier structure",
+      how_to_fix = c(
+        "Ensure Van Westendorp or Gabor-Granger results contain valid price recommendations",
+        "Check that analysis results have expected price points"
+      ),
+      expected = "Valid price recommendation in vw_results or gg_results"
+    )
   }
 
   # ============================================================================

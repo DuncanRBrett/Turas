@@ -111,27 +111,35 @@ validate_data_frame <- function(data, required_cols = NULL, min_rows = 1,
                                max_rows = Inf, param_name = "data") {
   # Type check
   if (!is.data.frame(data)) {
-    stop(sprintf(
-      "%s must be a data frame, got: %s", 
-      param_name, 
-      paste(class(data), collapse = ", ")
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Data Type",
+      problem = sprintf("%s must be a data frame, got: %s", param_name, paste(class(data), collapse = ", ")),
+      why_it_matters = "Data validation requires a proper data frame structure to check rows and columns.",
+      how_to_fix = sprintf("Pass a data frame to %s. Use as.data.frame() to convert if needed.", param_name)
+    )
   }
   
   # Row count check
   n_rows <- nrow(data)
   if (n_rows < min_rows) {
-    stop(sprintf(
-      "%s must have at least %d rows, has %d", 
-      param_name, min_rows, n_rows
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "DATA_INSUFFICIENT_ROWS",
+      title = "Insufficient Data Rows",
+      problem = sprintf("%s must have at least %d rows, has %d", param_name, min_rows, n_rows),
+      why_it_matters = "Analysis requires a minimum number of data rows to produce meaningful results.",
+      how_to_fix = sprintf("Ensure your dataset contains at least %d rows before processing.", min_rows)
+    )
   }
   
   if (n_rows > max_rows) {
-    stop(sprintf(
-      "%s exceeds maximum %d rows, has %d", 
-      param_name, max_rows, n_rows
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "DATA_EXCEEDS_MAX_ROWS",
+      title = "Data Exceeds Maximum Rows",
+      problem = sprintf("%s exceeds maximum %d rows, has %d", param_name, max_rows, n_rows),
+      why_it_matters = "Processing very large datasets may cause memory issues or performance problems.",
+      how_to_fix = sprintf("Reduce dataset to %d rows or fewer, or adjust the max_rows parameter.", max_rows)
+    )
   }
   
   # Column check
@@ -139,13 +147,16 @@ validate_data_frame <- function(data, required_cols = NULL, min_rows = 1,
     missing <- setdiff(required_cols, names(data))
     if (length(missing) > 0) {
       available_preview <- head(names(data), 10)
-      stop(sprintf(
-        "%s missing required columns: %s\n\nAvailable columns: %s%s", 
-        param_name, 
-        paste(missing, collapse = ", "),
-        paste(available_preview, collapse = ", "),
-        if (ncol(data) > 10) sprintf(" ... (%d more)", ncol(data) - 10) else ""
-      ), call. = FALSE)
+      tabs_refuse(
+        code = "DATA_MISSING_COLUMNS",
+        title = "Missing Required Columns",
+        problem = sprintf("%s missing required columns: %s", param_name, paste(missing, collapse = ", ")),
+        why_it_matters = "Analysis cannot proceed without the required data columns.",
+        how_to_fix = sprintf("Available columns: %s%s. Ensure your data includes: %s",
+          paste(available_preview, collapse = ", "),
+          if (ncol(data) > 10) sprintf(" ... (%d more)", ncol(data) - 10) else "",
+          paste(missing, collapse = ", "))
+      )
     }
   }
   
@@ -171,25 +182,37 @@ validate_numeric_param <- function(value, param_name, min = -Inf, max = Inf,
   # NA check
   if (is.na(value)) {
     if (!allow_na) {
-      stop(sprintf("%s cannot be NA", param_name), call. = FALSE)
+      tabs_refuse(
+        code = "ARG_NA_NOT_ALLOWED",
+        title = "NA Value Not Allowed",
+        problem = sprintf("%s cannot be NA", param_name),
+        why_it_matters = "This parameter requires a valid numeric value to proceed with calculations.",
+        how_to_fix = sprintf("Provide a valid numeric value for %s instead of NA.", param_name)
+      )
     }
     return(invisible(TRUE))
   }
   
   # Type and length check
   if (!is.numeric(value) || length(value) != 1) {
-    stop(sprintf(
-      "%s must be a single numeric value, got: %s (length %d)", 
-      param_name, class(value)[1], length(value)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_NUMERIC",
+      title = "Invalid Numeric Parameter",
+      problem = sprintf("%s must be a single numeric value, got: %s (length %d)", param_name, class(value)[1], length(value)),
+      why_it_matters = "Numeric parameters must be single values for proper validation and calculations.",
+      how_to_fix = sprintf("Provide a single numeric value for %s (e.g., 0.95 instead of c(0.95, 0.99)).", param_name)
+    )
   }
   
   # Range check
   if (value < min || value > max) {
-    stop(sprintf(
-      "%s must be between %g and %g, got: %g", 
-      param_name, min, max, value
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "ARG_OUT_OF_RANGE",
+      title = "Parameter Out of Range",
+      problem = sprintf("%s must be between %g and %g, got: %g", param_name, min, max, value),
+      why_it_matters = "Values outside the valid range can produce incorrect or meaningless results.",
+      how_to_fix = sprintf("Set %s to a value between %g and %g.", param_name, min, max)
+    )
   }
   
   invisible(TRUE)
@@ -206,11 +229,13 @@ validate_numeric_param <- function(value, param_name, min = -Inf, max = Inf,
 #' @export
 validate_logical_param <- function(value, param_name) {
   if (!is.logical(value) || length(value) != 1 || is.na(value)) {
-    stop(sprintf(
-      "%s must be TRUE or FALSE, got: %s", 
-      param_name, 
-      if (is.null(value)) "NULL" else as.character(value)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_LOGICAL",
+      title = "Invalid Logical Parameter",
+      problem = sprintf("%s must be TRUE or FALSE, got: %s", param_name, if (is.null(value)) "NULL" else as.character(value)),
+      why_it_matters = "Logical parameters control critical analysis behavior and must be explicitly TRUE or FALSE.",
+      how_to_fix = sprintf("Set %s to either TRUE or FALSE (not NA, NULL, or other values).", param_name)
+    )
   }
   invisible(TRUE)
 }
@@ -230,26 +255,35 @@ validate_char_param <- function(value, param_name, allowed_values = NULL,
                                allow_empty = FALSE) {
   # Type check
   if (!is.character(value) || length(value) != 1 || is.na(value)) {
-    stop(sprintf(
-      "%s must be a single character value, got: %s", 
-      param_name, 
-      if (is.null(value)) "NULL" else class(value)[1]
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_CHARACTER",
+      title = "Invalid Character Parameter",
+      problem = sprintf("%s must be a single character value, got: %s", param_name, if (is.null(value)) "NULL" else class(value)[1]),
+      why_it_matters = "Character parameters must be valid strings for configuration and file operations.",
+      how_to_fix = sprintf("Provide a single character string for %s (e.g., \"value\" not c(\"val1\", \"val2\")).", param_name)
+    )
   }
   
   # Empty check
   if (!allow_empty && nchar(trimws(value)) == 0) {
-    stop(sprintf("%s cannot be empty", param_name), call. = FALSE)
+    tabs_refuse(
+      code = "ARG_EMPTY_STRING",
+      title = "Empty String Not Allowed",
+      problem = sprintf("%s cannot be empty", param_name),
+      why_it_matters = "Empty strings cannot be used for meaningful configuration or data operations.",
+      how_to_fix = sprintf("Provide a non-empty value for %s.", param_name)
+    )
   }
   
   # Allowed values check
   if (!is.null(allowed_values) && !value %in% allowed_values) {
-    stop(sprintf(
-      "%s must be one of: %s\nGot: '%s'", 
-      param_name, 
-      paste(allowed_values, collapse = ", "), 
-      value
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_VALUE",
+      title = "Invalid Parameter Value",
+      problem = sprintf("%s must be one of: %s. Got: '%s'", param_name, paste(allowed_values, collapse = ", "), value),
+      why_it_matters = "Only specific values are supported for this parameter to ensure correct behavior.",
+      how_to_fix = sprintf("Set %s to one of the allowed values: %s", param_name, paste(allowed_values, collapse = ", "))
+    )
   }
   
   invisible(TRUE)
@@ -288,14 +322,14 @@ validate_file_path <- function(file_path, param_name = "file_path",
     # Provide helpful context
     dir_part <- dirname(file_path)
     file_part <- basename(file_path)
-    
-    stop(sprintf(
-      "%s: File not found\n  Path: %s\n  Directory exists: %s\n  Looking for: %s\n\nTroubleshooting:\n  1. Check spelling and case sensitivity\n  2. Verify file is in correct location\n  3. Check file permissions",
-      param_name,
-      file_path,
-      if (dir.exists(dir_part)) "YES" else "NO",
-      file_part
-    ), call. = FALSE)
+
+    tabs_refuse(
+      code = "IO_FILE_NOT_FOUND",
+      title = "File Not Found",
+      problem = sprintf("%s: File not found at path: %s", param_name, file_path),
+      why_it_matters = sprintf("The file is required for processing. Directory exists: %s", if (dir.exists(dir_part)) "YES" else "NO"),
+      how_to_fix = sprintf("Looking for: %s. Check: 1) spelling and case sensitivity, 2) file is in correct location, 3) file permissions", file_part)
+    )
   }
   
   # Extension check (V9.9.1: Now works for output files too)
@@ -305,12 +339,13 @@ validate_file_path <- function(file_path, param_name = "file_path",
     
     # Check extension is present and valid
     if (!nzchar(file_ext) || !file_ext %in% required_extensions) {
-      stop(sprintf(
-        "%s: Invalid file type\n  Expected: %s\n  Got: .%s\n\nNote: This prevents typos like 'output.csvx' from causing errors later.",
-        param_name,
-        paste0(".", required_extensions, collapse = " or "),
-        if (nzchar(file_ext)) file_ext else "(no extension)"
-      ), call. = FALSE)
+      tabs_refuse(
+        code = "IO_INVALID_FILE_TYPE",
+        title = "Invalid File Type",
+        problem = sprintf("%s: Expected %s, got .%s", param_name, paste0(".", required_extensions, collapse = " or "), if (nzchar(file_ext)) file_ext else "(no extension)"),
+        why_it_matters = "File type validation prevents typos (like 'output.csvx') from causing errors later in processing.",
+        how_to_fix = sprintf("Use a file with one of these extensions: %s", paste0(".", required_extensions, collapse = " or "))
+      )
     }
   }
   
@@ -362,11 +397,13 @@ load_config_sheet <- function(file_path, sheet_name = "Settings") {
     
     # Validate structure
     if (!all(c("Setting", "Value") %in% names(config_df))) {
-      stop(sprintf(
-        "Config sheet '%s' must have 'Setting' and 'Value' columns.\nFound: %s",
-        sheet_name,
-        paste(names(config_df), collapse = ", ")
-      ))
+      tabs_refuse(
+        code = "CFG_INVALID_STRUCTURE",
+        title = "Invalid Config Structure",
+        problem = sprintf("Config sheet '%s' must have 'Setting' and 'Value' columns. Found: %s", sheet_name, paste(names(config_df), collapse = ", ")),
+        why_it_matters = "Configuration sheets must follow the standard two-column format for proper parsing.",
+        how_to_fix = "Add 'Setting' and 'Value' column headers to your configuration sheet."
+      )
     }
     
     # Check for data
@@ -381,11 +418,13 @@ load_config_sheet <- function(file_path, sheet_name = "Settings") {
     
     duplicates <- setting_names[duplicated(setting_names)]
     if (length(duplicates) > 0) {
-      stop(sprintf(
-        "Config sheet '%s' contains duplicate Setting names: %s\n\nThis is dangerous in production - the last value would silently override earlier ones.\nPlease fix the config file to have unique Setting names.",
-        sheet_name,
-        paste(unique(duplicates), collapse = ", ")
-      ), call. = FALSE)
+      tabs_refuse(
+        code = "CFG_DUPLICATE_SETTINGS",
+        title = "Duplicate Configuration Settings",
+        problem = sprintf("Config sheet '%s' contains duplicate Setting names: %s", sheet_name, paste(unique(duplicates), collapse = ", ")),
+        why_it_matters = "Duplicate settings are dangerous in production - the last value would silently override earlier ones, causing unpredictable behavior.",
+        how_to_fix = "Remove duplicate Setting names from the config file to ensure each setting has a unique name."
+      )
     }
     
     # Convert to named list
@@ -405,12 +444,13 @@ load_config_sheet <- function(file_path, sheet_name = "Settings") {
     return(config_list)
     
   }, error = function(e) {
-    stop(sprintf(
-      "Failed to load config sheet '%s' from %s\nError: %s\n\nTroubleshooting:\n  1. Verify sheet name exists\n  2. Check file is not corrupted\n  3. Ensure file is not open in Excel",
-      sheet_name,
-      basename(file_path),
-      conditionMessage(e)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "IO_CONFIG_LOAD_FAILED",
+      title = "Failed to Load Config Sheet",
+      problem = sprintf("Failed to load config sheet '%s' from %s. Error: %s", sheet_name, basename(file_path), conditionMessage(e)),
+      why_it_matters = "Configuration is required to run the analysis with correct parameters.",
+      how_to_fix = "Troubleshooting: 1) Verify sheet name exists, 2) Check file is not corrupted, 3) Ensure file is not open in Excel"
+    )
   })
 }
 
@@ -441,11 +481,13 @@ get_config_value <- function(config_list, setting_name, default_value = NULL,
   # Handle missing value
   if (is.null(value) || (length(value) == 1 && is.na(value))) {
     if (required && is.null(default_value)) {
-      stop(sprintf(
-        "Required setting '%s' not found in configuration\n\nAvailable settings:\n  %s",
-        setting_name,
-        paste(head(names(config_list), 20), collapse = "\n  ")
-      ), call. = FALSE)
+      tabs_refuse(
+        code = "CFG_MISSING_SETTING",
+        title = "Missing Required Setting",
+        problem = sprintf("Required setting '%s' not found in configuration", setting_name),
+        why_it_matters = "This setting is required for the analysis to proceed correctly.",
+        how_to_fix = sprintf("Add '%s' to your configuration. Available settings: %s", setting_name, paste(head(names(config_list), 20), collapse = ", "))
+      )
     }
     return(default_value)
   }
@@ -489,11 +531,13 @@ get_numeric_config <- function(config_list, setting_name, default_value = NULL,
   numeric_value <- suppressWarnings(as.numeric(value))
   
   if (is.na(numeric_value)) {
-    stop(sprintf(
-      "Setting '%s' must be numeric, got: %s",
-      setting_name,
-      if (is.null(value)) "NULL" else as.character(value)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "CFG_INVALID_NUMERIC",
+      title = "Invalid Numeric Setting",
+      problem = sprintf("Setting '%s' must be numeric, got: %s", setting_name, if (is.null(value)) "NULL" else as.character(value)),
+      why_it_matters = "Numeric settings are required for calculations and threshold comparisons.",
+      how_to_fix = sprintf("Set '%s' to a valid numeric value in your configuration (e.g., 0.95 or 100).", setting_name)
+    )
   }
   
   # Validate range
@@ -580,7 +624,13 @@ get_char_config <- function(config_list, setting_name, default_value = NULL,
 resolve_path <- function(base_path, relative_path) {
   # Validate inputs
   if (is.null(base_path) || is.na(base_path) || base_path == "") {
-    stop("base_path cannot be empty", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_EMPTY_PATH",
+      title = "Empty Base Path",
+      problem = "base_path cannot be empty",
+      why_it_matters = "A valid base path is required to resolve relative file paths correctly.",
+      how_to_fix = "Provide a valid directory path as the base_path parameter."
+    )
   }
   
   if (is.null(relative_path) || is.na(relative_path) || relative_path == "") {
@@ -798,13 +848,16 @@ validate_column_exists <- function(data, column_name, friendly_name = NULL) {
   
   if (!column_name %in% names(data)) {
     available_preview <- head(names(data), 10)
-    stop(sprintf(
-      "Required column '%s' (%s) not found in data\n\nAvailable columns:\n  %s%s",
-      friendly_name,
-      column_name,
-      paste(available_preview, collapse = "\n  "),
-      if (ncol(data) > 10) sprintf("\n  ... (%d more columns)", ncol(data) - 10) else ""
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "DATA_COLUMN_NOT_FOUND",
+      title = "Required Column Not Found",
+      problem = sprintf("Required column '%s' (%s) not found in data", friendly_name, column_name),
+      why_it_matters = "This column is required for the analysis to proceed.",
+      how_to_fix = sprintf("Available columns: %s%s. Ensure your data includes the '%s' column.",
+        paste(available_preview, collapse = ", "),
+        if (ncol(data) > 10) sprintf(" ... (%d more)", ncol(data) - 10) else "",
+        column_name)
+    )
   }
   
   invisible(TRUE)
@@ -1085,11 +1138,13 @@ load_survey_structure <- function(structure_file_path, project_root = NULL) {
     options_df <- readxl::read_excel(structure_file_path, sheet = "Options", col_types = "text")
     
   }, error = function(e) {
-    stop(sprintf(
-      "Failed to load survey structure\nFile: %s\nError: %s\n\nTroubleshooting:\n  1. Verify file has sheets: Project, Questions, Options\n  2. Check file is not corrupted\n  3. Ensure file is not open in Excel",
-      basename(structure_file_path),
-      conditionMessage(e)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "IO_STRUCTURE_LOAD_FAILED",
+      title = "Failed to Load Survey Structure",
+      problem = sprintf("Failed to load survey structure from %s. Error: %s", basename(structure_file_path), conditionMessage(e)),
+      why_it_matters = "Survey structure is required to understand questions, options, and data layout.",
+      how_to_fix = "Troubleshooting: 1) Verify file has sheets: Project, Questions, Options, 2) Check file is not corrupted, 3) Ensure file is not open in Excel"
+    )
   })
   
   # Validate Questions sheet structure
@@ -1097,12 +1152,15 @@ load_survey_structure <- function(structure_file_path, project_root = NULL) {
   missing_q <- setdiff(required_question_cols, names(questions_df))
   
   if (length(missing_q) > 0) {
-    stop(sprintf(
-      "Questions sheet missing required columns: %s\n\nFound columns: %s\n\nRequired columns: %s",
-      paste(missing_q, collapse = ", "),
-      paste(names(questions_df), collapse = ", "),
-      paste(required_question_cols, collapse = ", ")
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "DATA_INVALID_QUESTIONS_STRUCTURE",
+      title = "Invalid Questions Sheet Structure",
+      problem = sprintf("Questions sheet missing required columns: %s", paste(missing_q, collapse = ", ")),
+      why_it_matters = "Questions sheet must have standard columns to define survey structure properly.",
+      how_to_fix = sprintf("Found columns: %s. Required columns: %s. Add missing columns to your Questions sheet.",
+        paste(names(questions_df), collapse = ", "),
+        paste(required_question_cols, collapse = ", "))
+    )
   }
   
   # Validate Options sheet structure
@@ -1110,12 +1168,15 @@ load_survey_structure <- function(structure_file_path, project_root = NULL) {
   missing_o <- setdiff(required_option_cols, names(options_df))
   
   if (length(missing_o) > 0) {
-    stop(sprintf(
-      "Options sheet missing required columns: %s\n\nFound columns: %s\n\nRequired columns: %s",
-      paste(missing_o, collapse = ", "),
-      paste(names(options_df), collapse = ", "),
-      paste(required_option_cols, collapse = ", ")
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "DATA_INVALID_OPTIONS_STRUCTURE",
+      title = "Invalid Options Sheet Structure",
+      problem = sprintf("Options sheet missing required columns: %s", paste(missing_o, collapse = ", ")),
+      why_it_matters = "Options sheet must have standard columns to define answer choices properly.",
+      how_to_fix = sprintf("Found columns: %s. Required columns: %s. Add missing columns to your Options sheet.",
+        paste(names(options_df), collapse = ", "),
+        paste(required_option_cols, collapse = ", "))
+    )
   }
   
   # Success message
@@ -1191,11 +1252,13 @@ load_survey_data <- function(data_file_path, project_root = NULL,
   file_ext <- tolower(tools::file_ext(data_file_path))
   
   if (!file_ext %in% SUPPORTED_DATA_FORMATS) {
-    stop(sprintf(
-      "Unsupported file type: .%s\n\nSupported formats: %s",
-      file_ext,
-      paste0(".", SUPPORTED_DATA_FORMATS, collapse = ", ")
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "IO_UNSUPPORTED_FORMAT",
+      title = "Unsupported File Format",
+      problem = sprintf("Unsupported file type: .%s", file_ext),
+      why_it_matters = "Only specific file formats are supported for reliable data loading.",
+      how_to_fix = sprintf("Convert your file to one of these supported formats: %s", paste0(".", SUPPORTED_DATA_FORMATS, collapse = ", "))
+    )
   }
   
   # Load data with format-specific handling
@@ -1215,9 +1278,12 @@ load_survey_data <- function(data_file_path, project_root = NULL,
       "sav"  = {
         # SPSS support via haven package
         if (!is_package_available("haven")) {
-          stop(
-            ".sav files require the 'haven' package\n\nInstall with:\n  install.packages('haven')",
-            call. = FALSE
+          tabs_refuse(
+            code = "ENV_MISSING_PACKAGE",
+            title = "Missing Required Package",
+            problem = ".sav files require the 'haven' package which is not installed",
+            why_it_matters = "The haven package is required to read SPSS (.sav) data files.",
+            how_to_fix = "Install the package with: install.packages('haven')"
           )
         }
         
@@ -1236,27 +1302,44 @@ load_survey_data <- function(data_file_path, project_root = NULL,
       }
     )
   }, error = function(e) {
-    stop(sprintf(
-      "Failed to load data file\nFile: %s\nError: %s\n\nTroubleshooting:\n  1. Verify file is not corrupted\n  2. Check file is not open in another program\n  3. For Excel: try saving as .csv and retry\n  4. Check file permissions",
-      basename(data_file_path),
-      conditionMessage(e)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "IO_DATA_LOAD_FAILED",
+      title = "Failed to Load Data File",
+      problem = sprintf("Failed to load data file %s. Error: %s", basename(data_file_path), conditionMessage(e)),
+      why_it_matters = "Survey data must be loaded successfully to perform any analysis.",
+      how_to_fix = "Troubleshooting: 1) Verify file is not corrupted, 2) Check file is not open in another program, 3) For Excel: try saving as .csv and retry, 4) Check file permissions"
+    )
   })
   
   # Validate loaded data
   if (!is.data.frame(survey_data)) {
-    stop(sprintf(
-      "Data file loaded but is not a data frame (got: %s)",
-      paste(class(survey_data), collapse = ", ")
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "DATA_INVALID_TYPE",
+      title = "Invalid Data Type",
+      problem = sprintf("Data file loaded but is not a data frame (got: %s)", paste(class(survey_data), collapse = ", ")),
+      why_it_matters = "Survey data must be in data frame format for processing.",
+      how_to_fix = "Ensure your data file contains tabular data (rows and columns), not other R objects."
+    )
   }
   
   if (nrow(survey_data) == 0) {
-    stop("Data file is empty (0 rows)", call. = FALSE)
+    tabs_refuse(
+      code = "DATA_EMPTY_FILE",
+      title = "Empty Data File",
+      problem = "Data file is empty (0 rows)",
+      why_it_matters = "Cannot perform analysis on an empty dataset.",
+      how_to_fix = "Ensure your data file contains at least one row of survey responses."
+    )
   }
   
   if (ncol(survey_data) == 0) {
-    stop("Data file has no columns", call. = FALSE)
+    tabs_refuse(
+      code = "DATA_NO_COLUMNS",
+      title = "No Columns in Data",
+      problem = "Data file has no columns",
+      why_it_matters = "Survey data must have columns representing questions and responses.",
+      how_to_fix = "Ensure your data file has proper column headers and data columns."
+    )
   }
   
   # Success message
@@ -1398,10 +1481,13 @@ clean_filter_expression <- function(filter_expression) {
 check_filter_security <- function(filter_expression) {
   # Security: Check for dangerous characters
   if (grepl("[^A-Za-z0-9_$.()&|!<>= +*/,'\"\\[\\]%:-]", filter_expression)) {
-    stop(sprintf(
-      "Filter contains potentially unsafe characters: '%s'",
-      filter_expression
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "ARG_UNSAFE_FILTER",
+      title = "Unsafe Filter Characters",
+      problem = sprintf("Filter contains potentially unsafe characters: '%s'", filter_expression),
+      why_it_matters = "Filter expressions are evaluated as code and must be sanitized to prevent code injection.",
+      how_to_fix = "Use only standard R operators and alphanumeric characters in your filter expression."
+    )
   }
 
   # Check for dangerous patterns
@@ -1414,10 +1500,13 @@ check_filter_security <- function(filter_expression) {
 
   for (pattern in dangerous_patterns) {
     if (grepl(pattern, filter_expression, ignore.case = TRUE)) {
-      stop(sprintf(
-        "Filter contains unsafe pattern: '%s' not allowed",
-        gsub("\\\\s\\*\\\\\\(", "(", pattern)
-      ), call. = FALSE)
+      tabs_refuse(
+        code = "ARG_DANGEROUS_FILTER",
+        title = "Dangerous Filter Pattern",
+        problem = sprintf("Filter contains unsafe pattern: '%s' not allowed", gsub("\\\\s\\*\\\\\\(", "(", pattern)),
+        why_it_matters = "This pattern could execute arbitrary code and poses a security risk.",
+        how_to_fix = "Use only simple data filtering expressions (e.g., 'Age >= 18', 'Region == \"North\"')."
+      )
     }
   }
 
@@ -1429,19 +1518,24 @@ check_filter_security <- function(filter_expression) {
 validate_filter_result <- function(filter_result, data, filter_expression) {
   # Check return type
   if (!is.logical(filter_result)) {
-    stop(sprintf(
-      "Filter must return logical vector, got: %s",
-      class(filter_result)[1]
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "DATA_INVALID_FILTER_RESULT",
+      title = "Invalid Filter Result Type",
+      problem = sprintf("Filter must return logical vector, got: %s", class(filter_result)[1]),
+      why_it_matters = "Filter expressions must evaluate to TRUE/FALSE for each row to determine inclusion.",
+      how_to_fix = "Ensure your filter expression uses comparison operators (==, !=, <, >, <=, >=, &, |) that return logical values."
+    )
   }
 
   # Check length
   if (length(filter_result) != nrow(data)) {
-    stop(sprintf(
-      "Filter returned %d values but data has %d rows",
-      length(filter_result),
-      nrow(data)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "DATA_FILTER_LENGTH_MISMATCH",
+      title = "Filter Length Mismatch",
+      problem = sprintf("Filter returned %d values but data has %d rows", length(filter_result), nrow(data)),
+      why_it_matters = "Filter must evaluate to one TRUE/FALSE value per data row for proper subsetting.",
+      how_to_fix = "Check that your filter expression references column names correctly and doesn't use aggregation functions."
+    )
   }
 
   # Replace NAs with FALSE
@@ -1478,7 +1572,13 @@ validate_filter_result <- function(filter_result, data, filter_expression) {
 apply_base_filter <- function(data, filter_expression) {
   # Validate inputs
   if (!is.data.frame(data) || nrow(data) == 0) {
-    stop("data must be a non-empty data frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_DATA",
+      title = "Invalid Data Argument",
+      problem = "data must be a non-empty data frame",
+      why_it_matters = "Filter operations require valid data to process.",
+      how_to_fix = "Ensure you pass a non-empty data frame to apply_base_filter()."
+    )
   }
 
   # Empty/null filter = return all data with row indices
@@ -1490,7 +1590,13 @@ apply_base_filter <- function(data, filter_expression) {
 
   # Validate filter is safe
   if (!is.character(filter_expression) || length(filter_expression) != 1) {
-    stop("filter_expression must be a single character string", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_FILTER_TYPE",
+      title = "Invalid Filter Expression Type",
+      problem = "filter_expression must be a single character string",
+      why_it_matters = "Filter expressions must be text strings containing R code to evaluate.",
+      how_to_fix = "Pass a single character string (e.g., 'Age >= 18') not a vector or other type."
+    )
   }
 
   # Clean and validate filter expression (delegated to helpers)
@@ -1517,11 +1623,13 @@ apply_base_filter <- function(data, filter_expression) {
     return(filtered_data)
 
   }, error = function(e) {
-    stop(sprintf(
-      "Filter evaluation failed: %s\nExpression: '%s'",
-      conditionMessage(e),
-      filter_expression
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "DATA_FILTER_EVAL_FAILED",
+      title = "Filter Evaluation Failed",
+      problem = sprintf("Filter evaluation failed: %s", conditionMessage(e)),
+      why_it_matters = "The filter expression could not be evaluated against the data.",
+      how_to_fix = sprintf("Expression: '%s'. Check that column names exist in the data and syntax is valid R code.", filter_expression)
+    )
   })
 }        
         
@@ -1718,20 +1826,43 @@ check_memory <- function(force_gc = TRUE, warning_threshold = 6, critical_thresh
 #' @export
 validate_weights <- function(weights, data_rows, allow_zero = TRUE) {
   if (!is.numeric(weights)) {
-    stop("Weights must be numeric, got: ", class(weights)[1])
+    tabs_refuse(
+      code = "ARG_INVALID_WEIGHTS_TYPE",
+      title = "Invalid Weights Type",
+      problem = sprintf("Weights must be numeric, got: %s", class(weights)[1]),
+      why_it_matters = "Weights must be numeric values to properly weight survey responses.",
+      how_to_fix = "Ensure weights are a numeric vector (use as.numeric() if needed)."
+    )
   }
 
   if (length(weights) != data_rows) {
-    stop(sprintf("Weight vector length (%d) must match data rows (%d)",
-                length(weights), data_rows))
+    tabs_refuse(
+      code = "DATA_WEIGHTS_LENGTH_MISMATCH",
+      title = "Weights Length Mismatch",
+      problem = sprintf("Weight vector length (%d) must match data rows (%d)", length(weights), data_rows),
+      why_it_matters = "Each data row must have exactly one corresponding weight value.",
+      how_to_fix = sprintf("Ensure your weight vector has exactly %d values, one per data row.", data_rows)
+    )
   }
 
   if (any(weights < 0, na.rm = TRUE)) {
-    stop("Weights cannot be negative")
+    tabs_refuse(
+      code = "DATA_NEGATIVE_WEIGHTS",
+      title = "Negative Weights Not Allowed",
+      problem = "Weights cannot be negative",
+      why_it_matters = "Negative weights would produce meaningless statistical results.",
+      how_to_fix = "Check your weighting data - all weight values must be >= 0."
+    )
   }
 
   if (!allow_zero && all(weights == 0)) {
-    stop("All weights are zero")
+    tabs_refuse(
+      code = "DATA_ALL_ZERO_WEIGHTS",
+      title = "All Weights Are Zero",
+      problem = "All weights are zero",
+      why_it_matters = "Zero weights mean no data will be counted in the analysis.",
+      how_to_fix = "Check your weighting data - at least some weights must be non-zero."
+    )
   }
 
   n_na <- sum(is.na(weights))

@@ -172,10 +172,20 @@ standardize_weight_variable <- function(data_df,
                                        validate = TRUE,
                                        context_name = "Data") {
   if (!weight_var %in% names(data_df)) {
-    stop(sprintf(
-      "%s: Weight variable '%s' not found.\nAvailable: %s",
-      context_name, weight_var, paste(names(data_df), collapse = ", ")
-    ), call. = FALSE)
+    turas_refuse(
+      code = "DATA_WEIGHT_COLUMN_NOT_FOUND",
+      title = "Weight Column Not Found",
+      problem = sprintf("Weight variable '%s' not found in %s.", weight_var, context_name),
+      why_it_matters = "The specified weight variable must exist in the data for weighted analysis.",
+      how_to_fix = c(
+        "Verify the weight column name is spelled correctly (case-sensitive)",
+        sprintf("Looking for: '%s'", weight_var),
+        "Check the available column names listed below",
+        "Ensure the weight column exists in your data file"
+      ),
+      missing = weight_var,
+      observed = names(data_df)
+    )
   }
 
   weights <- data_df[[weight_var]]
@@ -183,10 +193,18 @@ standardize_weight_variable <- function(data_df,
   if (validate) {
     validation <- validate_weights_comprehensive(weights, allow_na = FALSE)
     if (!validation$valid) {
-      stop(sprintf(
-        "%s: Invalid weights:\n  %s",
-        context_name, paste(validation$issues, collapse = "\n  ")
-      ), call. = FALSE)
+      turas_refuse(
+        code = "DATA_INVALID_WEIGHTS",
+        title = "Invalid Weight Values",
+        problem = sprintf("%s contains invalid weight values.", context_name),
+        why_it_matters = "Weight values must be valid for proper weighted analysis.",
+        how_to_fix = c(
+          "Review the weight calculation or source",
+          "Issues found:",
+          paste("  -", validation$issues)
+        ),
+        details = paste(validation$issues, collapse = "; ")
+      )
     }
   }
 
