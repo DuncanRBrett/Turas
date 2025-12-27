@@ -8,6 +8,10 @@
 
 run_tracker_gui <- function() {
 
+  # Version marker for debugging
+  cat("[Tracker GUI] Version 2.0 - Starting...\n")
+  cat("[Tracker GUI] Working directory:", getwd(), "\n")
+
   # ==============================================================================
   # TRS v1.0: Load shared refusal infrastructure for proper error handling
   # ==============================================================================
@@ -670,6 +674,11 @@ run_tracker_gui <- function() {
         # Build paths
         tracker_dir <- file.path(TURAS_HOME, "modules", "tracker")
         run_script <- file.path(tracker_dir, "run_tracker.R")
+
+        cat("[Tracker GUI] TURAS_HOME:", TURAS_HOME, "\n")
+        cat("[Tracker GUI] tracker_dir:", tracker_dir, "\n")
+        cat("[Tracker GUI] run_script:", run_script, "\n")
+        cat("[Tracker GUI] run_script exists:", file.exists(run_script), "\n")
 
         if (!file.exists(run_script)) {
           gui_refuse(
