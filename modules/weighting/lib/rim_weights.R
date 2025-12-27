@@ -198,6 +198,29 @@ calculate_rim_weights <- function(data,
     rake_data <- rake_data[complete_idx, , drop = FALSE]
   }
 
+  # Validate data frame size after complete case removal
+  if (nrow(rake_data) == 0) {
+    stop("No complete cases remain after removing rows with missing weighting variables.\n",
+         "All rows have NA values in at least one weighting variable.\n",
+         "Check your data for missing values in the weighting variables.",
+         call. = FALSE)
+  }
+
+  # Minimum sample size check for reliable weighting
+  n_target_cats <- sum(sapply(target_list, length))
+  min_recommended <- n_target_cats * 10
+  if (nrow(rake_data) < n_target_cats) {
+    stop(sprintf(
+      "Sample size (%d) is less than the number of target categories (%d).\n",
+      nrow(rake_data), n_target_cats
+    ), "Weighting requires more observations than weighting cells.", call. = FALSE)
+  } else if (nrow(rake_data) < min_recommended && verbose) {
+    message(sprintf(
+      "  Warning: Sample size (%d) is small relative to target categories (%d).\n  Recommended minimum: %d (10 per category)",
+      nrow(rake_data), n_target_cats, min_recommended
+    ))
+  }
+
   # Set up starting weights
   if (is.null(base_weights)) {
     starting_weights <- rep(1, nrow(rake_data))

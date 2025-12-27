@@ -539,7 +539,20 @@ prepare_predictors <- function(data, config) {
       # IMPORTANT: Set dimnames so columns are named with level labels (e.g., "C", "B", "A")
       # not numeric indices (e.g., "2", "3", "4"). Without this, model.matrix() creates
       # columns like "grade2" instead of "gradeC", breaking term-to-level mapping.
-      cm <- contr.treatment(nlevels(var_data))
+
+      # Validate sufficient levels for contrast matrix
+      n_levels <- nlevels(var_data)
+      if (n_levels < 2) {
+        catdriver_refuse(
+          reason = "CFG_ORDINAL_INSUFFICIENT_LEVELS",
+          title = "INSUFFICIENT ORDINAL LEVELS",
+          problem = paste0("Ordinal variable '", var_name, "' has only ", n_levels, " level(s)."),
+          why_it_matters = "Ordinal contrasts require at least 2 levels to create meaningful comparisons.",
+          fix = "Check that your data has multiple levels for this variable, or change type to 'continuous'."
+        )
+      }
+
+      cm <- contr.treatment(n_levels)
       rownames(cm) <- levels(var_data)
       colnames(cm) <- levels(var_data)[-1]  # non-reference levels
       contrasts(var_data) <- cm

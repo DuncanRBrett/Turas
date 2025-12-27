@@ -100,6 +100,43 @@ write_confidence_output <- function(output_path,
     stop("decimal_sep must be either '.' or ','", call. = FALSE)
   }
 
+  # Validate output path before creating workbook
+  output_dir <- dirname(output_path)
+
+  # Check if output directory exists
+  if (!dir.exists(output_dir)) {
+    stop(sprintf(
+      "Output directory does not exist: %s\n  Create the directory first or specify a different output path.",
+      output_dir
+    ), call. = FALSE)
+  }
+
+  # Check if output directory is writable
+  if (file.access(output_dir, mode = 2) != 0) {
+    stop(sprintf(
+      "Output directory is not writable: %s\n  Check directory permissions.",
+      output_dir
+    ), call. = FALSE)
+  }
+
+  # Check if output file exists and is writable (if it exists)
+  if (file.exists(output_path) && file.access(output_path, mode = 2) != 0) {
+    stop(sprintf(
+      "Cannot overwrite existing output file: %s\n  Check file permissions or specify a different filename.",
+      output_path
+    ), call. = FALSE)
+  }
+
+  # Guard check: ensure we have some results to write
+  has_results <- (!is.null(study_level_stats) && nrow(study_level_stats) > 0) ||
+                 length(proportion_results) > 0 ||
+                 length(mean_results) > 0 ||
+                 length(nps_results) > 0
+
+  if (!has_results) {
+    warning("No analysis results to write. Output file will contain summary/methodology only.", call. = FALSE)
+  }
+
   # Create workbook
   wb <- openxlsx::createWorkbook()
 

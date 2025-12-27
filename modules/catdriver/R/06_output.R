@@ -26,6 +26,33 @@
 #' @export
 write_catdriver_output <- function(results, config, output_file) {
 
+  # Validate output file path before creating workbook
+  output_dir <- dirname(output_file)
+
+  # Check if output directory exists
+  if (!dir.exists(output_dir)) {
+    stop(sprintf(
+      "Output directory does not exist: %s\n  Create the directory first or specify a different output path.",
+      output_dir
+    ), call. = FALSE)
+  }
+
+  # Check if output directory is writable
+  if (file.access(output_dir, mode = 2) != 0) {
+    stop(sprintf(
+      "Output directory is not writable: %s\n  Check directory permissions.",
+      output_dir
+    ), call. = FALSE)
+  }
+
+  # Check if output file exists and is writable (if it exists)
+  if (file.exists(output_file) && file.access(output_file, mode = 2) != 0) {
+    stop(sprintf(
+      "Cannot overwrite existing output file: %s\n  Check file permissions or specify a different filename.",
+      output_file
+    ), call. = FALSE)
+  }
+
   # Create workbook
   wb <- openxlsx::createWorkbook()
 
