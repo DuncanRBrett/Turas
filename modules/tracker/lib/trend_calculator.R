@@ -80,12 +80,20 @@
 # Note: statistical_core.R, constants.R, and tracker_data_loader.R should
 # already be loaded by run_tracker.R before this file
 
-# Source the refactored trend calculation modules
-source(file.path(.trend_calc_dir, "trend_helpers.R"))
-source(file.path(.trend_calc_dir, "trend_statistics.R"))
-source(file.path(.trend_calc_dir, "trend_changes.R"))
-source(file.path(.trend_calc_dir, "trend_significance.R"))
-source(file.path(.trend_calc_dir, "trend_question_types.R"))
+# Source the refactored trend calculation modules with checks
+.tc_safe_source <- function(fname) {
+  fpath <- file.path(.trend_calc_dir, fname)
+  if (!file.exists(fpath)) {
+    stop(paste0("Cannot find: ", fpath, "\n  .trend_calc_dir=", .trend_calc_dir))
+  }
+  source(fpath)
+}
+.tc_safe_source("trend_helpers.R")
+.tc_safe_source("trend_statistics.R")
+.tc_safe_source("trend_changes.R")
+.tc_safe_source("trend_significance.R")
+.tc_safe_source("trend_question_types.R")
+rm(.tc_safe_source)
 
 
 # ==============================================================================

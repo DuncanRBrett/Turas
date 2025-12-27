@@ -92,10 +92,18 @@ if (!exists("find_turas_root", mode = "function")) {
   }, error = function(e) getwd())
 }
 
-# Source the refactored output modules
-source(file.path(.output_lib_dir, "tracker_output_tables.R"))
-source(file.path(.output_lib_dir, "tracker_output_banners.R"))
-source(file.path(.output_lib_dir, "tracker_output_history.R"))
+# Source the refactored output modules with checks
+.to_safe_source <- function(fname) {
+  fpath <- file.path(.output_lib_dir, fname)
+  if (!file.exists(fpath)) {
+    stop(paste0("Cannot find: ", fpath, "\n  .output_lib_dir=", .output_lib_dir))
+  }
+  source(fpath)
+}
+.to_safe_source("tracker_output_tables.R")
+.to_safe_source("tracker_output_banners.R")
+.to_safe_source("tracker_output_history.R")
+rm(.to_safe_source)
 
 
 # ==============================================================================

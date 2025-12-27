@@ -17,15 +17,14 @@
 #
 # ==============================================================================
 
+# Debug: Confirm run_tracker.R is starting
+cat("[Tracker] run_tracker.R starting...\n")
+
 # Load required libraries
 library(openxlsx)
 
 # Debug: Show what toolkit_path is set to
-if (exists("toolkit_path")) {
-  message("[Tracker Debug] toolkit_path = ", toolkit_path)
-} else {
-  message("[Tracker Debug] toolkit_path is NOT set")
-}
+cat("[Tracker Debug] toolkit_path = ", if (exists("toolkit_path")) toolkit_path else "NOT SET", "\n")
 
 # Source module files
 # When run from GUI or Jupyter, sys.frame(1)$ofile may be NULL
@@ -60,8 +59,8 @@ script_dir <- tryCatch({
   getwd()
 })
 
-message("[Tracker Debug] script_dir = ", script_dir)
-message("[Tracker Debug] Looking for: ", file.path(script_dir, "lib", "00_guard.R"))
+cat("[Tracker Debug] script_dir = ", script_dir, "\n")
+cat("[Tracker Debug] Looking for: ", file.path(script_dir, "lib", "00_guard.R"), "\n")
 
 # TRS Guard Layer (v1.0) - MUST be loaded first before any module files
 .guard_path <- file.path(script_dir, "lib", "00_guard.R")
