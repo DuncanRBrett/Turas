@@ -675,10 +675,19 @@ run_tracker_gui <- function() {
         tracker_dir <- file.path(TURAS_HOME, "modules", "tracker")
         run_script <- file.path(tracker_dir, "run_tracker.R")
 
-        cat("[Tracker GUI] TURAS_HOME:", TURAS_HOME, "\n")
-        cat("[Tracker GUI] tracker_dir:", tracker_dir, "\n")
-        cat("[Tracker GUI] run_script:", run_script, "\n")
-        cat("[Tracker GUI] run_script exists:", file.exists(run_script), "\n")
+        # Write debug info to a log file (persists for inspection)
+        debug_log <- file.path(TURAS_HOME, "tracker_gui_debug.log")
+        write_debug <- function(...) {
+          msg <- paste0(format(Sys.time(), "%H:%M:%S"), " ", paste(..., collapse = " "), "\n")
+          cat(msg)  # Also to console
+          cat(msg, file = debug_log, append = TRUE)
+        }
+        cat("", file = debug_log)  # Clear/create log file
+        write_debug("=== Tracker GUI Debug Log ===")
+        write_debug("TURAS_HOME:", TURAS_HOME)
+        write_debug("tracker_dir:", tracker_dir)
+        write_debug("run_script:", run_script)
+        write_debug("run_script exists:", file.exists(run_script))
 
         if (!file.exists(run_script)) {
           gui_refuse(
@@ -691,17 +700,15 @@ run_tracker_gui <- function() {
         }
 
         # Change to tracker directory
-        cat("[Tracker GUI] tracker_dir =", tracker_dir, "\n")
-        cat("[Tracker GUI] tracker_dir exists:", dir.exists(tracker_dir), "\n")
+        write_debug("tracker_dir exists:", dir.exists(tracker_dir))
         setwd(tracker_dir)
-        cat("[Tracker GUI] After setwd, getwd() =", getwd(), "\n")
+        write_debug("After setwd, getwd() =", getwd())
 
         # Source run_tracker.R
         progress$set(value = 0.2, detail = "Loading tracker modules...")
-        cat("[Tracker GUI] run_script =", run_script, "\n")
-        cat("[Tracker GUI] file.exists(run_script) =", file.exists(run_script), "\n")
-        cat("[Tracker GUI] file.access(run_script, mode=4) =", file.access(run_script, mode = 4), "\n")
-        cat("[Tracker GUI] file.info(run_script)$size =", file.info(run_script)$size, "\n")
+        write_debug("file.exists(run_script) =", file.exists(run_script))
+        write_debug("file.access(run_script, mode=4) =", file.access(run_script, mode = 4))
+        write_debug("file.info(run_script)$size =", file.info(run_script)$size)
 
         # Try reading first line to test file access
         test_read <- tryCatch({
@@ -710,14 +717,18 @@ run_tracker_gui <- function() {
         }, error = function(e) {
           paste0("FAILED: ", e$message)
         })
-        cat("[Tracker GUI] Test read first line:", test_read, "\n")
+        write_debug("Test read first line:", test_read)
 
         tryCatch({
           # Use full path (run_script) that was already verified to exist
-          cat("[Tracker GUI] About to call source()...\n")
+          write_debug("About to call source(run_script)...")
           source(run_script)
-          cat("[Tracker GUI] run_tracker.R loaded successfully\n")
+          write_debug("run_tracker.R loaded successfully")
         }, error = function(e) {
+          write_debug("SOURCE FAILED:", e$message)
+          write_debug("Error class:", class(e)[1])
+          write_debug("Full error:", paste(capture.output(print(e)), collapse = " | "))
+          write_debug("Check debug log at:", debug_log)
           gui_refuse(
             code = "IO_SOURCE_FAILED",
             title = "Failed to Load Tracker Module",
@@ -727,7 +738,8 @@ run_tracker_gui <- function() {
               "Check that all tracker module files exist in modules/tracker/",
               "Verify no syntax errors in the R files",
               paste0("Current directory: ", getwd()),
-              paste0("run_script path: ", run_script)
+              paste0("run_script path: ", run_script),
+              paste0("Debug log: ", debug_log)
             )
           )
         })
