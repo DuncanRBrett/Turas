@@ -698,10 +698,23 @@ run_tracker_gui <- function() {
 
         # Source run_tracker.R
         progress$set(value = 0.2, detail = "Loading tracker modules...")
+        cat("[Tracker GUI] run_script =", run_script, "\n")
         cat("[Tracker GUI] file.exists(run_script) =", file.exists(run_script), "\n")
+        cat("[Tracker GUI] file.access(run_script, mode=4) =", file.access(run_script, mode = 4), "\n")
+        cat("[Tracker GUI] file.info(run_script)$size =", file.info(run_script)$size, "\n")
+
+        # Try reading first line to test file access
+        test_read <- tryCatch({
+          first_line <- readLines(run_script, n = 1, warn = FALSE)
+          paste0("OK: '", substr(first_line, 1, 50), "...'")
+        }, error = function(e) {
+          paste0("FAILED: ", e$message)
+        })
+        cat("[Tracker GUI] Test read first line:", test_read, "\n")
 
         tryCatch({
           # Use full path (run_script) that was already verified to exist
+          cat("[Tracker GUI] About to call source()...\n")
           source(run_script)
           cat("[Tracker GUI] run_tracker.R loaded successfully\n")
         }, error = function(e) {
@@ -713,7 +726,8 @@ run_tracker_gui <- function() {
             how_to_fix = c(
               "Check that all tracker module files exist in modules/tracker/",
               "Verify no syntax errors in the R files",
-              paste0("Current directory: ", getwd())
+              paste0("Current directory: ", getwd()),
+              paste0("run_script path: ", run_script)
             )
           )
         })
