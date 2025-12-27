@@ -691,8 +691,17 @@ run_tracker_gui <- function() {
         # Run analysis and capture ALL console output
         progress$set(value = 0.3, detail = "Running tracker analysis...")
 
-        output_capture_file <- tempfile()
-        sink(output_capture_file, type = "output")
+        # Create temp file explicitly (tempfile() only returns path, doesn't create file)
+        output_capture_file <- tempfile(fileext = ".txt")
+        file.create(output_capture_file)
+
+        # Try to capture output, but don't fail if sink doesn't work
+        sink_active <- tryCatch({
+          sink(output_capture_file, type = "output")
+          TRUE
+        }, error = function(e) {
+          FALSE
+        })
 
         analysis_result <- tryCatch({
           output_file <- run_tracker(
@@ -708,15 +717,25 @@ run_tracker_gui <- function() {
           list(success = FALSE, output_file = NULL, error = e)
 
         }, finally = {
-          # Always restore console output
-          sink(type = "output")
+          # Always restore console output if sink was active
+          if (sink_active) {
+            tryCatch(sink(type = "output"), error = function(e) NULL)
+          }
         })
 
         progress$set(value = 0.9, detail = "Finalizing...")
 
         # Read captured output (available even if error occurred)
-        captured_output <- readLines(output_capture_file, warn = FALSE)
-        unlink(output_capture_file)
+        captured_output <- tryCatch({
+          if (file.exists(output_capture_file)) {
+            readLines(output_capture_file, warn = FALSE)
+          } else {
+            character(0)
+          }
+        }, error = function(e) {
+          character(0)
+        })
+        tryCatch(unlink(output_capture_file), error = function(e) NULL)
 
         # Display captured output in console
         if (length(captured_output) > 0) {
