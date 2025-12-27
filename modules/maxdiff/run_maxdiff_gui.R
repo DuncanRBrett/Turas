@@ -44,6 +44,23 @@ run_maxdiff_gui <- function() {
 
   # === HELPER FUNCTIONS ===
 
+  # Early refuse for TRS-compliant errors within GUI context
+  early_refuse <- function(code, title, problem, why_it_matters, how_to_fix, details = NULL) {
+    msg <- paste0(
+      "\n", strrep("=", 80), "\n",
+      "  [REFUSE] ", code, ": ", title, "\n",
+      strrep("=", 80), "\n\n",
+      "Problem:\n  ", problem, "\n\n",
+      "Why it matters:\n  ", why_it_matters, "\n\n",
+      "How to fix:\n  ", how_to_fix, "\n"
+    )
+    if (!is.null(details)) {
+      msg <- paste0(msg, "\nDetails:\n  ", details, "\n")
+    }
+    msg <- paste0(msg, "\n", strrep("=", 80), "\n")
+    stop(msg, call. = FALSE)
+  }
+
   load_recent <- function() {
     if (file.exists(RECENT_FILE)) {
       tryCatch(readRDS(RECENT_FILE), error = function(e) list())
@@ -398,11 +415,23 @@ run_maxdiff_gui <- function() {
         progress$set(value = 0.1, detail = "Validating inputs...")
 
         if (!is.character(config_path) || length(config_path) != 1) {
-          stop("Invalid config path: not a single character string")
+          early_refuse(
+            code = "CFG_INVALID_PATH",
+            title = "Invalid Configuration Path",
+            problem = "The config path is not a valid single character string",
+            why_it_matters = "MaxDiff analysis requires a valid path to the configuration file",
+            how_to_fix = "Select a configuration file using the file browser"
+          )
         }
 
         if (!file.exists(config_path)) {
-          stop("Config file not found: ", config_path)
+          early_refuse(
+            code = "IO_CONFIG_NOT_FOUND",
+            title = "Configuration File Not Found",
+            problem = sprintf("Config file does not exist: %s", config_path),
+            why_it_matters = "MaxDiff analysis cannot proceed without the configuration file",
+            how_to_fix = "Verify the file path is correct and the file exists"
+          )
         }
 
         progress$set(value = 0.2, detail = "Loading MaxDiff module...")

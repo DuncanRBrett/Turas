@@ -1097,7 +1097,16 @@ write_dashboard_output <- function(trend_results, config, wave_data,
   if (exists("turas_save_workbook_atomic", mode = "function")) {
     save_result <- turas_save_workbook_atomic(wb, output_path, run_result = run_result, module = "TRACKER")
     if (!save_result$success) {
-      stop(sprintf("Failed to save Excel file: %s\nPath: %s", save_result$error, output_path), call. = FALSE)
+      tracker_refuse(
+        code = "IO_SAVE_FAILED",
+        title = "Excel Save Failed",
+        problem = sprintf("Failed to save Excel file: %s", save_result$error),
+        why_it_matters = "The tracker output could not be written to disk",
+        how_to_fix = c("Check that the output directory exists and is writable",
+                       "Ensure the file is not open in another program",
+                       "Verify sufficient disk space is available"),
+        details = list(output_path = output_path, error = save_result$error)
+      )
     }
   } else {
     openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
@@ -1178,7 +1187,16 @@ write_sig_matrix_output <- function(trend_results, config, wave_data, output_pat
   if (exists("turas_save_workbook_atomic", mode = "function")) {
     save_result <- turas_save_workbook_atomic(wb, output_path, run_result = run_result, module = "TRACKER")
     if (!save_result$success) {
-      stop(sprintf("Failed to save Excel file: %s\nPath: %s", save_result$error, output_path), call. = FALSE)
+      tracker_refuse(
+        code = "IO_SAVE_FAILED",
+        title = "Excel Save Failed",
+        problem = sprintf("Failed to save Excel file: %s", save_result$error),
+        why_it_matters = "The tracker output could not be written to disk",
+        how_to_fix = c("Check that the output directory exists and is writable",
+                       "Ensure the file is not open in another program",
+                       "Verify sufficient disk space is available"),
+        details = list(output_path = output_path, error = save_result$error)
+      )
     }
   } else {
     openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
