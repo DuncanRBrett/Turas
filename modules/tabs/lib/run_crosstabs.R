@@ -35,14 +35,23 @@ SCRIPT_VERSION <- "10.0"
 # ==============================================================================
 
 # Must be defined BEFORE sourcing any modules
-script_dir <- if (exists("toolkit_path")) dirname(toolkit_path) else {
-  # Try to determine from this script's location
-  tryCatch({
-    dirname(sys.frame(1)$ofile)
-  }, error = function(e) {
-    getwd()
-  })
-}
+# toolkit_path should be set by the calling notebook/script to point to this file
+script_dir <- tryCatch({
+  if (exists("toolkit_path") && !is.null(toolkit_path) && length(toolkit_path) > 0 && nchar(toolkit_path) > 0) {
+    dirname(toolkit_path)
+  } else {
+    # Fallback: look for the lib directory relative to working directory
+    candidates <- c(
+      file.path(getwd(), "modules", "tabs", "lib"),
+      file.path(dirname(getwd()), "modules", "tabs", "lib"),
+      getwd()
+    )
+    found <- candidates[dir.exists(candidates)][1]
+    if (is.na(found)) getwd() else found
+  }
+}, error = function(e) {
+  getwd()
+})
 
 # ==============================================================================
 # LOAD SUB-MODULES (NEW IN V10.0)
