@@ -471,24 +471,38 @@ write_trend_sheets <- function(wb, trend_results, config, styles) {
     current_row <- current_row + 2
 
     # Write trend table based on metric type
-    cat("[DEBUG]   Calling write function for metric_type:", result$metric_type, "\n")
-    if (result$metric_type == "mean") {
+    # Guard against NULL/empty metric_type which causes "argument is of length zero"
+    metric_type <- if (is.null(result$metric_type) || length(result$metric_type) == 0 || !nzchar(result$metric_type)) {
+      "unknown"
+    } else {
+      result$metric_type
+    }
+    cat("[DEBUG]   Calling write function for metric_type:", metric_type, "\n")
+
+    if (metric_type == "mean") {
       current_row <- write_mean_trend_table(wb, sheet_name, result, wave_ids, config, styles, current_row)
 
-    } else if (result$metric_type == "nps") {
+    } else if (metric_type == "nps") {
       current_row <- write_nps_trend_table(wb, sheet_name, result, wave_ids, config, styles, current_row)
 
-    } else if (result$metric_type == "proportions") {
+    } else if (metric_type == "proportions") {
       current_row <- write_proportions_trend_table(wb, sheet_name, result, wave_ids, config, styles, current_row)
 
-    } else if (result$metric_type == "rating_enhanced") {
+    } else if (metric_type == "rating_enhanced") {
       current_row <- write_enhanced_rating_trend_table(wb, sheet_name, result, wave_ids, config, styles, current_row)
 
-    } else if (result$metric_type == "composite_enhanced") {
+    } else if (metric_type == "composite_enhanced") {
       current_row <- write_enhanced_composite_trend_table(wb, sheet_name, result, wave_ids, config, styles, current_row)
 
-    } else if (result$metric_type == "multi_mention") {
+    } else if (metric_type == "multi_mention") {
       current_row <- write_multi_mention_trend_table(wb, sheet_name, result, wave_ids, config, styles, current_row)
+
+    } else {
+      # Unknown metric type - write a placeholder and continue
+      warning(paste0("Unknown metric_type '", metric_type, "' for question ", q_code))
+      openxlsx::writeData(wb, sheet_name, paste0("Unknown metric type: ", metric_type),
+                          startRow = current_row, startCol = 1, colNames = FALSE)
+      current_row <- current_row + 1
     }
     cat("[DEBUG]   Done with question:", q_code, "\n")
   }
