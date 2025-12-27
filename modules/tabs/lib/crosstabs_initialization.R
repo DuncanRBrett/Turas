@@ -45,8 +45,14 @@
 # ==============================================================================
 
 # Determine script directory for sourcing (only if not already set by parent)
-if (!exists("script_dir")) {
-  script_dir <- if (exists("toolkit_path")) dirname(toolkit_path) else getwd()
+if (!exists("script_dir") || is.null(script_dir) || length(script_dir) == 0 || !nzchar(script_dir[1])) {
+  script_dir <- tryCatch({
+    if (exists("toolkit_path") && !is.null(toolkit_path) && length(toolkit_path) > 0 && nzchar(toolkit_path[1])) {
+      dirname(toolkit_path[1])
+    } else {
+      getwd()
+    }
+  }, error = function(e) getwd())
 }
 
 # TRS Guard Layer (v1.0) - MUST be loaded before any TRS refusal calls

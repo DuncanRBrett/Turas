@@ -113,14 +113,26 @@ source_if_exists <- function(file_path, envir = parent.frame()) {
 # ==============================================================================
 
 # Determine the directory containing this script
-SHARED_FUNCTIONS_DIR <- getSrcDirectory(function() {})
-if (SHARED_FUNCTIONS_DIR == "") {
-  # Fallback for interactive use or when getSrcDirectory doesn't work
-  SHARED_FUNCTIONS_DIR <- dirname(sys.frame(1)$ofile)
-  if (is.null(SHARED_FUNCTIONS_DIR) || SHARED_FUNCTIONS_DIR == "") {
-    SHARED_FUNCTIONS_DIR <- getwd()
+SHARED_FUNCTIONS_DIR <- tryCatch({
+  dir <- getSrcDirectory(function() {})
+  if (is.null(dir) || length(dir) == 0 || !nzchar(dir)) {
+    # Fallback: try to get from script_dir if already set
+    if (exists("script_dir") && !is.null(script_dir) && length(script_dir) > 0 && nzchar(script_dir[1])) {
+      script_dir[1]
+    } else {
+      # Last resort: use working directory
+      getwd()
+    }
+  } else {
+    dir
   }
-}
+}, error = function(e) {
+  if (exists("script_dir") && !is.null(script_dir) && length(script_dir) > 0 && nzchar(script_dir[1])) {
+    script_dir[1]
+  } else {
+    getwd()
+  }
+})
 
 # Load all module files
 cat("Loading shared functions modules...\n")
