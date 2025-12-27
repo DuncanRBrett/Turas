@@ -46,8 +46,13 @@ fit_aggregate_logit <- function(long_data, items, weighted = TRUE,
 
   # Check for survival package and load it (needed for strata function in formula)
   if (!requireNamespace("survival", quietly = TRUE)) {
-    stop("Package 'survival' is required for logit estimation.\n  Install with: install.packages('survival')",
-         call. = FALSE)
+    maxdiff_refuse(
+      code = "PKG_SURVIVAL_MISSING",
+      title = "Required Package Not Installed",
+      problem = "Package 'survival' is required but not installed",
+      why_it_matters = "Aggregate logit estimation depends on the survival package for conditional logit models",
+      how_to_fix = "Install the survival package: install.packages('survival')"
+    )
   }
 
   # Load survival package to make strata() available for formula
@@ -77,7 +82,17 @@ fit_aggregate_logit <- function(long_data, items, weighted = TRUE,
   logit_data <- prepare_logit_data(long_data, included_items, anchor_item)
 
   if (nrow(logit_data) == 0) {
-    stop("No valid choice data for logit estimation", call. = FALSE)
+    maxdiff_refuse(
+      code = "DATA_NO_VALID_CHOICES",
+      title = "No Valid Choice Data",
+      problem = "No valid choice data available for logit estimation",
+      why_it_matters = "Logit model requires at least some valid best/worst choice pairs",
+      how_to_fix = c(
+        "Check that survey data contains valid responses",
+        "Verify that best and worst choices are properly coded",
+        "Ensure design and survey data are correctly matched"
+      )
+    )
   }
 
   # Build formula
@@ -116,10 +131,19 @@ fit_aggregate_logit <- function(long_data, items, weighted = TRUE,
       )
     }
   }, error = function(e) {
-    stop(sprintf(
-      "Logit model fitting failed:\n  Error: %s",
-      conditionMessage(e)
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "MODEL_LOGIT_FIT_FAILED",
+      title = "Logit Model Fitting Failed",
+      problem = sprintf("Conditional logit model failed to converge: %s", conditionMessage(e)),
+      why_it_matters = "Without a fitted logit model, aggregate utility estimates cannot be computed",
+      how_to_fix = c(
+        "Check data quality for perfect separation or multicollinearity",
+        "Verify sufficient variation in choices across items",
+        "Consider using count-based scores as alternative",
+        "Check for items that are always or never chosen"
+      ),
+      details = conditionMessage(e)
+    )
   })
 
   # Extract utilities

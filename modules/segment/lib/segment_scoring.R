@@ -33,7 +33,17 @@ score_new_data <- function(model_file, new_data, id_variable, output_file = NULL
   cat(sprintf("Loading model from: %s\n", basename(model_file)))
 
   if (!file.exists(model_file)) {
-    stop(sprintf("Model file not found: %s", model_file), call. = FALSE)
+    segment_refuse(
+      code = "IO_MODEL_FILE_MISSING",
+      title = "Model File Not Found",
+      problem = sprintf("Model file not found: %s", model_file),
+      why_it_matters = "Cannot score new data without a saved model file.",
+      how_to_fix = c(
+        "Check that the model file path is correct",
+        "Ensure the model was saved with save_model=TRUE",
+        "Verify the file has not been moved or deleted"
+      )
+    )
   }
 
   model_data <- readRDS(model_file)
@@ -42,8 +52,16 @@ score_new_data <- function(model_file, new_data, id_variable, output_file = NULL
   required_elements <- c("model", "config", "centers", "clustering_vars")
   missing <- setdiff(required_elements, names(model_data))
   if (length(missing) > 0) {
-    stop(sprintf("Invalid model file. Missing elements: %s",
-                paste(missing, collapse = ", ")), call. = FALSE)
+    segment_refuse(
+      code = "DATA_INVALID_MODEL",
+      title = "Invalid Model File",
+      problem = sprintf("Model file is missing required elements: %s", paste(missing, collapse = ", ")),
+      why_it_matters = "A complete model file is required for scoring.",
+      how_to_fix = c(
+        "Re-run the segmentation to generate a new model file",
+        "Ensure the model file was not corrupted"
+      )
+    )
   }
 
   config <- model_data$config
@@ -67,14 +85,25 @@ score_new_data <- function(model_file, new_data, id_variable, output_file = NULL
 
   # Check ID variable exists
   if (!id_variable %in% names(new_data)) {
-    stop(sprintf("ID variable '%s' not found in new data", id_variable), call. = FALSE)
+    segment_refuse(
+      code = "CFG_ID_VAR_MISSING",
+      title = "ID Variable Not Found",
+      problem = sprintf("ID variable '%s' not found in new data.", id_variable),
+      why_it_matters = "An ID variable is required to identify scored respondents.",
+      how_to_fix = sprintf("Ensure new_data contains a column named '%s'.", id_variable)
+    )
   }
 
   # Check clustering variables exist
   missing_vars <- setdiff(clustering_vars, names(new_data))
   if (length(missing_vars) > 0) {
-    stop(sprintf("Missing clustering variables in new data: %s",
-                paste(missing_vars, collapse = ", ")), call. = FALSE)
+    segment_refuse(
+      code = "DATA_MISSING_VARIABLES",
+      title = "Missing Clustering Variables",
+      problem = sprintf("Missing clustering variables in new data: %s", paste(missing_vars, collapse = ", ")),
+      why_it_matters = "All clustering variables from the model are required to score respondents.",
+      how_to_fix = sprintf("Ensure new_data contains: %s", paste(missing_vars, collapse = ", "))
+    )
   }
 
   cat(sprintf("✓ New data validated\n"))
@@ -170,7 +199,17 @@ score_new_data <- function(model_file, new_data, id_variable, output_file = NULL
   }
 
   if (nrow(scoring_data) == 0) {
-    stop("No valid cases remaining after missing data handling", call. = FALSE)
+    segment_refuse(
+      code = "DATA_NO_VALID_CASES",
+      title = "No Valid Cases Remaining",
+      problem = "No valid cases remaining after missing data handling.",
+      why_it_matters = "Cannot score respondents if all cases have missing data.",
+      how_to_fix = c(
+        "Check for excessive missing data in new_data",
+        "Consider using mean or median imputation instead of listwise deletion",
+        "Ensure new data is properly formatted"
+      )
+    )
   }
 
   # Standardize if model was standardized
@@ -181,8 +220,13 @@ score_new_data <- function(model_file, new_data, id_variable, output_file = NULL
     if (is.null(scale_params) ||
         is.null(scale_params$center) ||
         is.null(scale_params$scale)) {
-      stop("Model was standardized, but no scale parameters were found in the saved model.",
-           call. = FALSE)
+      segment_refuse(
+        code = "DATA_MISSING_SCALE_PARAMS",
+        title = "Missing Scale Parameters",
+        problem = "Model was standardized, but no scale parameters were found in the saved model.",
+        why_it_matters = "Cannot apply correct standardization without training scale parameters.",
+        how_to_fix = "Re-run the segmentation to generate a model with scale parameters."
+      )
     }
 
     # Align scale parameters with clustering variables
@@ -191,8 +235,13 @@ score_new_data <- function(model_file, new_data, id_variable, output_file = NULL
 
     # Safety check for missing parameters
     if (any(is.na(scale_center)) || any(is.na(scale_scale))) {
-      stop("Scale parameters are missing for one or more clustering variables.",
-           call. = FALSE)
+      segment_refuse(
+        code = "DATA_INCOMPLETE_SCALE_PARAMS",
+        title = "Incomplete Scale Parameters",
+        problem = "Scale parameters are missing for one or more clustering variables.",
+        why_it_matters = "All clustering variables need scale parameters for consistent scoring.",
+        how_to_fix = "Re-run the segmentation to generate complete scale parameters."
+      )
     }
 
     # Apply training standardization parameters to new data
@@ -383,7 +432,17 @@ type_respondent <- function(answers, model_file) {
   # ===========================================================================
 
   if (!file.exists(model_file)) {
-    stop(sprintf("Model file not found: %s", model_file), call. = FALSE)
+    segment_refuse(
+      code = "IO_MODEL_FILE_MISSING",
+      title = "Model File Not Found",
+      problem = sprintf("Model file not found: %s", model_file),
+      why_it_matters = "Cannot type respondent without a saved model file.",
+      how_to_fix = c(
+        "Check that the model file path is correct",
+        "Ensure the model was saved with save_model=TRUE",
+        "Verify the file has not been moved or deleted"
+      )
+    )
   }
 
   model_data <- readRDS(model_file)
@@ -393,7 +452,13 @@ type_respondent <- function(answers, model_file) {
   if (is.null(method)) method <- "kmeans"
 
   if (method == "lca") {
-    stop("This is an LCA model. Use type_respondent_lca() instead.", call. = FALSE)
+    segment_refuse(
+      code = "MODEL_TYPE_MISMATCH",
+      title = "Wrong Model Type",
+      problem = "This is an LCA model.",
+      why_it_matters = "type_respondent() only works with k-means models.",
+      how_to_fix = "Use type_respondent_lca() for LCA models instead."
+    )
   }
 
   # Extract required components
@@ -417,10 +482,13 @@ type_respondent <- function(answers, model_file) {
   # Validate all clustering variables are present
   missing_vars <- setdiff(clustering_vars, names(answers))
   if (length(missing_vars) > 0) {
-    stop(sprintf("Missing variables in answers: %s\nRequired: %s",
-                 paste(missing_vars, collapse = ", "),
-                 paste(clustering_vars, collapse = ", ")),
-         call. = FALSE)
+    segment_refuse(
+      code = "DATA_MISSING_VARIABLES",
+      title = "Missing Variables in Answers",
+      problem = sprintf("Missing variables in answers: %s", paste(missing_vars, collapse = ", ")),
+      why_it_matters = "All clustering variables are required to type the respondent.",
+      how_to_fix = sprintf("Provide values for all variables: %s", paste(clustering_vars, collapse = ", "))
+    )
   }
 
   # Extract and order answers to match clustering variables
@@ -430,8 +498,13 @@ type_respondent <- function(answers, model_file) {
   # Check for missing values
   if (any(is.na(answer_values))) {
     missing <- clustering_vars[is.na(answer_values)]
-    stop(sprintf("Missing values for: %s", paste(missing, collapse = ", ")),
-         call. = FALSE)
+    segment_refuse(
+      code = "DATA_MISSING_VALUES",
+      title = "Missing Values in Answers",
+      problem = sprintf("Missing values for: %s", paste(missing, collapse = ", ")),
+      why_it_matters = "All clustering variables need values to type the respondent.",
+      how_to_fix = sprintf("Provide numeric values for: %s", paste(missing, collapse = ", "))
+    )
   }
 
   # ===========================================================================
@@ -536,7 +609,17 @@ type_respondents_batch <- function(data, model_file, id_var) {
   # ===========================================================================
 
   if (!file.exists(model_file)) {
-    stop(sprintf("Model file not found: %s", model_file), call. = FALSE)
+    segment_refuse(
+      code = "IO_MODEL_FILE_MISSING",
+      title = "Model File Not Found",
+      problem = sprintf("Model file not found: %s", model_file),
+      why_it_matters = "Cannot type respondents without a saved model file.",
+      how_to_fix = c(
+        "Check that the model file path is correct",
+        "Ensure the model was saved with save_model=TRUE",
+        "Verify the file has not been moved or deleted"
+      )
+    )
   }
 
   model_data <- readRDS(model_file)
@@ -546,7 +629,13 @@ type_respondents_batch <- function(data, model_file, id_var) {
   if (is.null(method)) method <- "kmeans"
 
   if (method == "lca") {
-    stop("This is an LCA model. Use type_respondents_batch_lca() instead.", call. = FALSE)
+    segment_refuse(
+      code = "MODEL_TYPE_MISMATCH",
+      title = "Wrong Model Type",
+      problem = "This is an LCA model.",
+      why_it_matters = "type_respondents_batch() only works with k-means models.",
+      how_to_fix = "Use type_respondents_batch_lca() for LCA models instead."
+    )
   }
 
   # Extract required components
@@ -565,14 +654,25 @@ type_respondents_batch <- function(data, model_file, id_var) {
 
   # Check ID variable
   if (!id_var %in% names(data)) {
-    stop(sprintf("ID variable '%s' not found in data", id_var), call. = FALSE)
+    segment_refuse(
+      code = "CFG_ID_VAR_MISSING",
+      title = "ID Variable Not Found",
+      problem = sprintf("ID variable '%s' not found in data.", id_var),
+      why_it_matters = "An ID variable is required to identify typed respondents.",
+      how_to_fix = sprintf("Ensure data contains a column named '%s'.", id_var)
+    )
   }
 
   # Check clustering variables
   missing_vars <- setdiff(clustering_vars, names(data))
   if (length(missing_vars) > 0) {
-    stop(sprintf("Missing variables in data: %s", paste(missing_vars, collapse = ", ")),
-         call. = FALSE)
+    segment_refuse(
+      code = "DATA_MISSING_VARIABLES",
+      title = "Missing Clustering Variables",
+      problem = sprintf("Missing variables in data: %s", paste(missing_vars, collapse = ", ")),
+      why_it_matters = "All clustering variables are required to type respondents.",
+      how_to_fix = sprintf("Ensure data contains: %s", paste(missing_vars, collapse = ", "))
+    )
   }
 
   # ===========================================================================

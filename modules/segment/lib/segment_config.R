@@ -294,10 +294,13 @@ validate_segment_config <- function(config) {
 
   # Validate outlier parameters
   if (outlier_detection && outlier_min_vars > length(clustering_vars)) {
-    stop(sprintf(
-      "outlier_min_vars (%d) cannot exceed number of clustering variables (%d)",
-      outlier_min_vars, length(clustering_vars)
-    ), call. = FALSE)
+    segment_refuse(
+      code = "CFG_INVALID_OUTLIER_MIN_VARS",
+      title = "Invalid outlier_min_vars Setting",
+      problem = sprintf("outlier_min_vars (%d) cannot exceed number of clustering variables (%d).", outlier_min_vars, length(clustering_vars)),
+      why_it_matters = "min_vars must be less than or equal to the number of clustering variables.",
+      how_to_fix = sprintf("Set outlier_min_vars to a value between 1 and %d.", length(clustering_vars))
+    )
   }
 
   # Variable selection
@@ -337,10 +340,13 @@ validate_segment_config <- function(config) {
   allowed_metrics <- c("silhouette", "elbow", "gap")
   invalid_metrics <- setdiff(k_selection_metrics, allowed_metrics)
   if (length(invalid_metrics) > 0) {
-    stop(sprintf("Invalid k_selection_metrics: %s\nAllowed: %s",
-                paste(invalid_metrics, collapse = ", "),
-                paste(allowed_metrics, collapse = ", ")),
-         call. = FALSE)
+    segment_refuse(
+      code = "CFG_INVALID_METRICS",
+      title = "Invalid k_selection_metrics",
+      problem = sprintf("Invalid k_selection_metrics: %s", paste(invalid_metrics, collapse = ", ")),
+      why_it_matters = "Only valid metrics can be used for k selection.",
+      how_to_fix = sprintf("Use only these metrics: %s", paste(allowed_metrics, collapse = ", "))
+    )
   }
 
   # Output settings
@@ -359,11 +365,16 @@ validate_segment_config <- function(config) {
   # If segment names provided and k_fixed set, validate count
   if (!identical(segment_names, "auto") && !is.null(k_fixed)) {
     if (length(segment_names) != k_fixed) {
-      stop(sprintf(
-        "Number of segment_names (%d) must match k_fixed (%d)\nGot: %s",
-        length(segment_names), k_fixed,
-        paste(segment_names, collapse = ", ")
-      ), call. = FALSE)
+      segment_refuse(
+        code = "CFG_SEGMENT_NAMES_MISMATCH",
+        title = "Segment Names Count Mismatch",
+        problem = sprintf("Number of segment_names (%d) must match k_fixed (%d).", length(segment_names), k_fixed),
+        why_it_matters = "Each segment needs a unique name.",
+        how_to_fix = c(
+          sprintf("Provide exactly %d segment names", k_fixed),
+          sprintf("Current names (%d): %s", length(segment_names), paste(segment_names, collapse = ", "))
+        )
+      )
     }
   }
 

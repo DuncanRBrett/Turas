@@ -353,8 +353,18 @@ run_kmeans_single <- function(data,
       return(result)
 
     }, error = function(e) {
-      stop(sprintf("K-means clustering failed for k=%d: %s", k, conditionMessage(e)),
-           call. = FALSE)
+      segment_refuse(
+        code = "MODEL_KMEANS_FAILED",
+        title = "K-means Clustering Failed",
+        problem = sprintf("K-means clustering failed for k=%d: %s", k, conditionMessage(e)),
+        why_it_matters = "The clustering algorithm could not converge or encountered an error.",
+        how_to_fix = c(
+          "Check data for extreme values or outliers",
+          "Try a different value of k",
+          "Increase nstart parameter for more robust initialization",
+          "Ensure data has been properly standardized"
+        )
+      )
     })
   }
 }

@@ -129,7 +129,18 @@ generate_maxdiff_design <- function(items, design_settings, seed = 12345, verbos
       n_versions = n_versions,
       verbose = verbose
     ),
-    stop(sprintf("Unknown design type: %s", design_type), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_UNKNOWN_DESIGN_TYPE",
+      title = "Unknown Design Type",
+      problem = sprintf("Design type '%s' is not recognized", design_type),
+      why_it_matters = "Valid design type is required to generate experimental design",
+      how_to_fix = c(
+        "Use one of the supported design types: BALANCED, OPTIMAL, or RANDOM",
+        "Check DESIGN_SETTINGS sheet for typos in Design_Type field"
+      ),
+      expected = "One of: BALANCED, OPTIMAL, RANDOM",
+      observed = design_type
+    )
   )
 
   # Compute diagnostics
@@ -252,7 +263,20 @@ generate_balanced_design <- function(item_ids, items_per_task, tasks_per_respond
   }
 
   if (is.null(best_design)) {
-    stop("Failed to generate valid design", call. = FALSE)
+    maxdiff_refuse(
+      code = "MODEL_DESIGN_GENERATION_FAILED",
+      title = "Design Generation Failed",
+      problem = "Failed to generate a valid balanced design after all iterations",
+      why_it_matters = "A valid experimental design is required for MaxDiff analysis",
+      how_to_fix = c(
+        "Increase Max_Design_Iterations in DESIGN_SETTINGS",
+        "Try OPTIMAL design type instead of BALANCED",
+        "Reduce number of items per task or tasks per respondent",
+        "Check that Items_Per_Task is not too large relative to total items"
+      ),
+      details = sprintf("Max iterations: %d, Efficiency threshold: %.2f",
+                       max_iterations, efficiency_threshold)
+    )
   }
 
   return(best_design)

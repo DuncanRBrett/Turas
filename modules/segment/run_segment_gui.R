@@ -12,20 +12,13 @@ run_segment_gui <- function() {
   missing_pkgs <- required_pkgs[!sapply(required_pkgs, requireNamespace, quietly = TRUE)]
 
   if (length(missing_pkgs) > 0) {
-    stop(
-      "\n================================================================================\n",
-      "  [REFUSE] PKG_MISSING_DEPENDENCY: Missing Required Packages\n",
-      "================================================================================\n\n",
-      "Problem:\n",
-      "  The following required packages are not installed: ", paste(missing_pkgs, collapse = ", "), "\n\n",
-      "Why it matters:\n",
-      "  The Segment GUI cannot run without these packages.\n\n",
-      "How to fix:\n",
-      "  Run the following command in R:\n",
-      "    install.packages(c(", paste(sprintf('"%s"', missing_pkgs), collapse = ", "), "))\n\n",
-      "================================================================================\n",
-      call. = FALSE
-    )
+    stop(paste0(
+      "[REFUSE] PKG_MISSING_DEPENDENCY: Missing Required Packages\n\n",
+      "Problem: The following required packages are not installed: ", paste(missing_pkgs, collapse = ", "), "\n\n",
+      "Why it matters: The Segment GUI cannot run without these packages.\n\n",
+      "How to fix: Run the following command in R:\n",
+      "  install.packages(c(", paste(sprintf('"%s"', missing_pkgs), collapse = ", "), "))\n"
+    ), call. = FALSE)
   }
 
   # Load required libraries

@@ -49,10 +49,18 @@ validate_filter_expression <- function(expr_text, allowed_vars) {
   parsed <- tryCatch({
     parse(text = expr_text)
   }, error = function(e) {
-    stop(sprintf(
-      "Invalid filter expression syntax: %s\n  Error: %s",
-      expr_text, conditionMessage(e)
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "DATA_INVALID_FILTER_SYNTAX",
+      title = "Invalid Filter Expression Syntax",
+      problem = sprintf("Filter expression has invalid R syntax: %s", conditionMessage(e)),
+      why_it_matters = "Cannot apply data filtering with invalid R syntax",
+      how_to_fix = c(
+        "Check filter expression for syntax errors",
+        "Ensure balanced parentheses and quotes",
+        "Use valid R comparison operators (==, !=, <, >, etc.)"
+      ),
+      details = sprintf("Expression: %s\nError: %s", expr_text, conditionMessage(e))
+    )
   })
 
   # Get all function calls in the expression
@@ -61,26 +69,45 @@ validate_filter_expression <- function(expr_text, allowed_vars) {
   # Check for unsafe function calls
   unsafe_found <- intersect(tolower(expr_calls), tolower(.UNSAFE_FILTER_FUNCTIONS))
   if (length(unsafe_found) > 0) {
-    stop(sprintf(
-      "Filter expression contains unsafe function calls: %s\n  Expression: %s",
-      paste(unsafe_found, collapse = ", "), expr_text
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "DATA_UNSAFE_FILTER_FUNCTION",
+      title = "Unsafe Function in Filter Expression",
+      problem = sprintf("Filter expression contains unsafe function calls: %s", paste(unsafe_found, collapse = ", ")),
+      why_it_matters = "Security risk - unsafe functions could modify files or system state",
+      how_to_fix = c(
+        "Remove unsafe functions from filter expression",
+        "Use only safe comparison and logical operators",
+        "Avoid system calls, file operations, and assignment operators"
+      ),
+      details = sprintf("Expression: %s\nUnsafe functions: %s", expr_text, paste(unsafe_found, collapse = ", "))
+    )
   }
 
   # Check for assignment operators
   if (grepl("<-|<<-|->|->>", expr_text, perl = TRUE)) {
-    stop(sprintf(
-      "Filter expression contains assignment operator: %s",
-      expr_text
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "DATA_FILTER_HAS_ASSIGNMENT",
+      title = "Assignment Operator in Filter",
+      problem = "Filter expression contains assignment operator (<-, ->, etc.)",
+      why_it_matters = "Filter expressions should only test conditions, not modify data",
+      how_to_fix = c(
+        "Remove assignment operators from filter expression",
+        "Use == for comparison instead of ="
+      ),
+      details = sprintf("Expression: %s", expr_text)
+    )
   }
 
   # Single = is allowed in subset() context for column selection, but check for abuse
   if (grepl("(?<![=!<>])=(?!=)", expr_text, perl = TRUE)) {
-    stop(sprintf(
-      "Filter expression contains assignment operator (use == for comparison): %s",
-      expr_text
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "DATA_FILTER_USE_DOUBLE_EQUALS",
+      title = "Use == for Comparison",
+      problem = "Filter expression uses = instead of == for comparison",
+      why_it_matters = "Single = is assignment; use == for logical comparison",
+      how_to_fix = "Replace = with == in filter expression for comparisons",
+      details = sprintf("Expression: %s", expr_text)
+    )
   }
 
   # Validate variable names if provided
@@ -102,11 +129,19 @@ validate_filter_expression <- function(expr_text, allowed_vars) {
 
     unknown_vars <- setdiff(expr_vars, allowed_vars)
     if (length(unknown_vars) > 0) {
-      stop(sprintf(
-        "Filter expression references unknown columns: %s\n  Available columns: %s",
-        paste(unknown_vars, collapse = ", "),
-        paste(head(allowed_vars, 15), collapse = ", ")
-      ), call. = FALSE)
+      maxdiff_refuse(
+        code = "DATA_FILTER_UNKNOWN_COLUMN",
+        title = "Unknown Column in Filter",
+        problem = sprintf("Filter expression references columns not in data: %s", paste(unknown_vars, collapse = ", ")),
+        why_it_matters = "Cannot filter on columns that don't exist in the dataset",
+        how_to_fix = c(
+          "Check column names match exactly (case-sensitive)",
+          "Verify columns exist in survey data file",
+          "Use one of the available columns listed below"
+        ),
+        expected = paste(head(allowed_vars, 15), collapse = ", "),
+        observed = paste(unknown_vars, collapse = ", ")
+      )
     }
   }
 
@@ -141,23 +176,59 @@ load_survey_data <- function(file_path, sheet = 1, verbose = TRUE) {
       if (verbose) log_message("Loading Excel data...", "INFO", verbose)
 
       if (!requireNamespace("openxlsx", quietly = TRUE)) {
-        stop("Package 'openxlsx' is required for Excel files", call. = FALSE)
+        maxdiff_refuse(
+          code = "PKG_OPENXLSX_MISSING",
+          title = "Required Package Not Installed",
+          problem = "Package 'openxlsx' is required but not installed",
+          why_it_matters = "Cannot read Excel data files without openxlsx package",
+          how_to_fix = "Install the openxlsx package: install.packages('openxlsx')"
+        )
       }
 
       openxlsx::read.xlsx(file_path, sheet = sheet, colNames = TRUE,
                           detectDates = TRUE)
     } else {
-      stop(sprintf("Unsupported file format: %s", ext), call. = FALSE)
+      maxdiff_refuse(
+        code = "IO_UNSUPPORTED_FILE_FORMAT",
+        title = "Unsupported File Format",
+        problem = sprintf("File format '.%s' is not supported", ext),
+        why_it_matters = "Can only read CSV and Excel (.xlsx, .xls) files",
+        how_to_fix = c(
+          "Convert file to CSV or Excel format",
+          "Supported formats: .csv, .xlsx, .xls"
+        ),
+        expected = "File with extension: .csv, .xlsx, or .xls",
+        observed = sprintf(".%s", ext)
+      )
     }
   }, error = function(e) {
-    stop(sprintf(
-      "Failed to load data file:\n  Path: %s\n  Error: %s",
-      file_path, conditionMessage(e)
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "IO_DATA_FILE_READ_ERROR",
+      title = "Failed to Load Data File",
+      problem = sprintf("Error reading survey data file: %s", conditionMessage(e)),
+      why_it_matters = "Cannot proceed with analysis without survey data",
+      how_to_fix = c(
+        "Check file is not corrupted or locked",
+        "Verify file format matches extension (.csv, .xlsx)",
+        "Ensure file has correct permissions",
+        "Try opening file in Excel/text editor to verify contents"
+      ),
+      details = sprintf("Path: %s\nError: %s", file_path, conditionMessage(e))
+    )
   })
 
   if (nrow(data) == 0) {
-    stop("Data file is empty (0 rows)", call. = FALSE)
+    maxdiff_refuse(
+      code = "DATA_EMPTY_FILE",
+      title = "Empty Data File",
+      problem = "Survey data file contains no rows",
+      why_it_matters = "Cannot analyze empty dataset",
+      how_to_fix = c(
+        "Check that correct data file was specified",
+        "Verify data was exported correctly from survey platform",
+        "Ensure file contains header row and at least one data row"
+      )
+    )
   }
 
   if (verbose) {
@@ -185,7 +256,13 @@ load_design_file <- function(file_path, verbose = TRUE) {
   if (verbose) log_message("Loading design file...", "INFO", verbose)
 
   if (!requireNamespace("openxlsx", quietly = TRUE)) {
-    stop("Package 'openxlsx' is required for design files", call. = FALSE)
+    maxdiff_refuse(
+      code = "PKG_OPENXLSX_MISSING",
+      title = "Required Package Not Installed",
+      problem = "Package 'openxlsx' is required but not installed",
+      why_it_matters = "Cannot read Excel design files without openxlsx package",
+      how_to_fix = "Install the openxlsx package: install.packages('openxlsx')"
+    )
   }
 
   # Get sheet names
@@ -197,14 +274,33 @@ load_design_file <- function(file_path, verbose = TRUE) {
   design <- tryCatch({
     openxlsx::read.xlsx(file_path, sheet = design_sheet, colNames = TRUE)
   }, error = function(e) {
-    stop(sprintf(
-      "Failed to load design file:\n  Path: %s\n  Error: %s",
-      file_path, conditionMessage(e)
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "IO_DESIGN_FILE_READ_ERROR",
+      title = "Failed to Load Design File",
+      problem = sprintf("Error reading design file: %s", conditionMessage(e)),
+      why_it_matters = "Design file is required to match survey responses to items",
+      how_to_fix = c(
+        "Check file is not corrupted or locked",
+        "Verify file is valid Excel format (.xlsx, .xls)",
+        "Ensure DESIGN sheet exists in workbook",
+        "Check file has correct permissions"
+      ),
+      details = sprintf("Path: %s\nError: %s", file_path, conditionMessage(e))
+    )
   })
 
   if (nrow(design) == 0) {
-    stop("Design file is empty", call. = FALSE)
+    maxdiff_refuse(
+      code = "DATA_EMPTY_DESIGN",
+      title = "Empty Design File",
+      problem = "Design file contains no rows",
+      why_it_matters = "Design matrix is required to map survey tasks to items",
+      how_to_fix = c(
+        "Verify design was generated successfully",
+        "Check DESIGN sheet in Excel file has data",
+        "Re-run design generation if needed"
+      )
+    )
   }
 
   # Ensure Version and Task_Number are integers
@@ -259,10 +355,18 @@ apply_filter_expression <- function(data, filter_expr, verbose = TRUE) {
     # Evaluate in restricted environment (baseenv prevents access to global functions)
     subset(data, eval(parsed_expr, envir = data, enclos = baseenv()))
   }, error = function(e) {
-    stop(sprintf(
-      "Filter expression evaluation error: %s\n  Error: %s",
-      filter_expr, conditionMessage(e)
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "DATA_FILTER_EVALUATION_ERROR",
+      title = "Filter Expression Evaluation Error",
+      problem = sprintf("Error evaluating filter expression: %s", conditionMessage(e)),
+      why_it_matters = "Cannot apply data filter due to evaluation error",
+      how_to_fix = c(
+        "Check filter expression syntax",
+        "Verify column names match data",
+        "Ensure data types match comparison operators"
+      ),
+      details = sprintf("Expression: %s\nError: %s", filter_expr, conditionMessage(e))
+    )
   })
 
   n_after <- nrow(filtered)
@@ -275,10 +379,19 @@ apply_filter_expression <- function(data, filter_expr, verbose = TRUE) {
   }
 
   if (n_after == 0) {
-    stop(sprintf(
-      "Filter expression removed all rows:\n  Expression: %s",
-      filter_expr
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "DATA_FILTER_REMOVED_ALL_ROWS",
+      title = "Filter Removed All Data",
+      problem = "Filter expression removed all rows from dataset",
+      why_it_matters = "Cannot analyze empty dataset after filtering",
+      how_to_fix = c(
+        "Check filter expression is correct",
+        "Verify filter criteria matches actual data values",
+        "Review data to ensure expected values exist",
+        "Consider broadening filter criteria"
+      ),
+      details = sprintf("Expression: %s\nRows before: %d, Rows after: 0", filter_expr, n_before)
+    )
   }
 
   return(filtered)
@@ -331,7 +444,17 @@ build_maxdiff_long <- function(data, survey_mapping, design, config, verbose = T
   n_tasks <- nrow(best_mapping)
 
   if (n_tasks == 0) {
-    stop("No BEST_CHOICE fields found in survey mapping", call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_NO_BEST_CHOICE_FIELDS",
+      title = "No Best Choice Fields Defined",
+      problem = "Survey mapping does not define any BEST_CHOICE fields",
+      why_it_matters = "MaxDiff requires best choice data to estimate utilities",
+      how_to_fix = c(
+        "Add BEST_CHOICE field mappings to SURVEY_MAPPING sheet",
+        "Ensure Field_Type column contains 'BEST_CHOICE' entries",
+        "Verify survey question fields are mapped correctly"
+      )
+    )
   }
 
   # Get item columns in design
@@ -412,7 +535,18 @@ build_maxdiff_long <- function(data, survey_mapping, design, config, verbose = T
   long_data <- do.call(rbind, long_data_list)
 
   if (is.null(long_data) || nrow(long_data) == 0) {
-    stop("Failed to create long format data (0 rows)", call. = FALSE)
+    maxdiff_refuse(
+      code = "DATA_LONG_FORMAT_FAILED",
+      title = "Failed to Create Long Format Data",
+      problem = "Data reshaping produced zero rows",
+      why_it_matters = "Long format data is required for all MaxDiff analyses",
+      how_to_fix = c(
+        "Check that survey data has valid responses",
+        "Verify survey mapping matches actual column names",
+        "Ensure design versions match survey data",
+        "Check that respondent ID column exists and has values"
+      )
+    )
   }
 
   # Add task identifier

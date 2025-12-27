@@ -313,10 +313,17 @@ get_stan_model_path <- function() {
     }
   }
 
-  stop(
-    "Stan model file not found. Expected at:\n  ",
-    paste(possible_paths, collapse = "\n  "),
-    call. = FALSE
+  maxdiff_refuse(
+    code = "IO_STAN_MODEL_NOT_FOUND",
+    title = "Stan Model File Not Found",
+    problem = "Cannot locate maxdiff_hb.stan file",
+    why_it_matters = "HB estimation requires the Stan model specification file",
+    how_to_fix = c(
+      "Ensure stan/maxdiff_hb.stan exists in the module directory",
+      "Check TURAS_ROOT environment variable points to correct location"
+    ),
+    expected = "Stan model at: modules/maxdiff/stan/maxdiff_hb.stan",
+    details = paste("Searched paths:", paste(possible_paths, collapse = "\n  "))
   )
 }
 

@@ -206,7 +206,18 @@ source_module_files <- function(base_dir = NULL) {
     }
 
     if (!file.exists(file_path)) {
-      stop(sprintf("Required module file not found: %s", file), call. = FALSE)
+      maxdiff_refuse(
+        code = "IO_MODULE_FILE_NOT_FOUND",
+        title = "Module File Not Found",
+        problem = sprintf("Required module file not found: %s", file),
+        why_it_matters = "All module files must be present for MaxDiff to function",
+        how_to_fix = c(
+          "Ensure all R files are in the modules/maxdiff/R directory",
+          "Verify complete module installation",
+          "Re-download or reinstall module if files are missing"
+        ),
+        details = sprintf("Looking for: %s", file)
+      )
     }
 
     source(file_path)
@@ -217,10 +228,19 @@ source_module_files <- function(base_dir = NULL) {
 tryCatch({
   source_module_files()
 }, error = function(e) {
-  stop(sprintf(
-    "Failed to load module files\nError: %s\n\nPlease ensure all R files are in the correct location.",
-    conditionMessage(e)
-  ), call. = FALSE)
+  maxdiff_refuse(
+    code = "IO_MODULE_LOAD_FAILED",
+    title = "Failed to Load Module Files",
+    problem = sprintf("Error loading module files: %s", conditionMessage(e)),
+    why_it_matters = "All module files must load successfully for MaxDiff to function",
+    how_to_fix = c(
+      "Check all R files are in modules/maxdiff/R directory",
+      "Verify no syntax errors in module files",
+      "Ensure file permissions allow reading",
+      "Check R version compatibility"
+    ),
+    details = conditionMessage(e)
+  )
 })
 
 
@@ -303,8 +323,19 @@ run_maxdiff_impl <- function(config_path, project_root = NULL, verbose = TRUE) {
   config <- tryCatch({
     load_maxdiff_config(config_path, project_root)
   }, error = function(e) {
-    stop(sprintf("Failed to load configuration\nError: %s", conditionMessage(e)),
-         call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_LOAD_FAILED",
+      title = "Failed to Load Configuration",
+      problem = sprintf("Error loading configuration file: %s", conditionMessage(e)),
+      why_it_matters = "Valid configuration is required to run MaxDiff analysis",
+      how_to_fix = c(
+        "Check configuration Excel file is valid",
+        "Verify all required sheets exist",
+        "Ensure configuration values are correct types",
+        "Review error message for specific issue"
+      ),
+      details = conditionMessage(e)
+    )
   })
 
   if (verbose) {
@@ -411,8 +442,19 @@ run_maxdiff_design_mode <- function(config, verbose = TRUE, trs_state = NULL) {
       verbose = verbose
     )
   }, error = function(e) {
-    stop(sprintf("Design generation failed\nError: %s", conditionMessage(e)),
-         call. = FALSE)
+    maxdiff_refuse(
+      code = "MODEL_DESIGN_FAILED",
+      title = "Design Generation Failed",
+      problem = sprintf("Error generating experimental design: %s", conditionMessage(e)),
+      why_it_matters = "Valid experimental design is required for MaxDiff study",
+      how_to_fix = c(
+        "Check design settings are valid",
+        "Verify Items_Per_Task is not too large",
+        "Try different Design_Type (BALANCED, OPTIMAL, or RANDOM)",
+        "Ensure sufficient items are included"
+      ),
+      details = conditionMessage(e)
+    )
   })
 
   # ==========================================================================
@@ -490,8 +532,19 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
   design <- tryCatch({
     load_design_file(config$project_settings$Design_File, verbose)
   }, error = function(e) {
-    stop(sprintf("Failed to load design file\nError: %s", conditionMessage(e)),
-         call. = FALSE)
+    maxdiff_refuse(
+      code = "IO_DESIGN_LOAD_FAILED",
+      title = "Failed to Load Design File",
+      problem = sprintf("Error loading design file: %s", conditionMessage(e)),
+      why_it_matters = "Design file is required to map survey responses to items",
+      how_to_fix = c(
+        "Check design file path is correct",
+        "Verify file is valid Excel format",
+        "Ensure DESIGN sheet exists in workbook",
+        "Re-generate design file if corrupted"
+      ),
+      details = conditionMessage(e)
+    )
   })
 
   # ==========================================================================
@@ -507,8 +560,19 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
       verbose = verbose
     )
   }, error = function(e) {
-    stop(sprintf("Failed to load survey data\nError: %s", conditionMessage(e)),
-         call. = FALSE)
+    maxdiff_refuse(
+      code = "IO_DATA_LOAD_FAILED",
+      title = "Failed to Load Survey Data",
+      problem = sprintf("Error loading survey data file: %s", conditionMessage(e)),
+      why_it_matters = "Survey data is required for MaxDiff analysis",
+      how_to_fix = c(
+        "Check data file path is correct",
+        "Verify file format is CSV or Excel",
+        "Ensure file is not corrupted or locked",
+        "Check file has correct sheet name (if Excel)"
+      ),
+      details = conditionMessage(e)
+    )
   })
 
   # Apply filter if specified
@@ -535,10 +599,19 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
   )
 
   if (!data_validation$valid) {
-    stop(sprintf(
-      "Data validation failed:\n  %s",
-      paste(data_validation$issues, collapse = "\n  ")
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "DATA_VALIDATION_FAILED",
+      title = "Data Validation Failed",
+      problem = "Survey data failed validation checks",
+      why_it_matters = "Data must pass validation before analysis can proceed",
+      how_to_fix = c(
+        "Review validation issues listed below",
+        "Check survey mapping matches data columns",
+        "Verify design matches survey structure",
+        "Ensure data has required fields and valid values"
+      ),
+      details = paste(data_validation$issues, collapse = "\n  ")
+    )
   }
 
   warnings_list <- c(warnings_list, data_validation$warnings)
@@ -558,8 +631,19 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
       verbose = verbose
     )
   }, error = function(e) {
-    stop(sprintf("Data reshaping failed\nError: %s", conditionMessage(e)),
-         call. = FALSE)
+    maxdiff_refuse(
+      code = "DATA_RESHAPE_FAILED",
+      title = "Data Reshaping Failed",
+      problem = sprintf("Error converting data to long format: %s", conditionMessage(e)),
+      why_it_matters = "Long format data is required for all MaxDiff analyses",
+      how_to_fix = c(
+        "Check survey mapping is correct",
+        "Verify column names match mapping",
+        "Ensure design and data are compatible",
+        "Check for missing or invalid response values"
+      ),
+      details = conditionMessage(e)
+    )
   })
 
   # Compute study summary

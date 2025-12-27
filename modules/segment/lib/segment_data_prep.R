@@ -41,11 +41,17 @@ load_segment_data <- function(config) {
 
   ids <- data[[config$id_variable]]
   if (anyDuplicated(ids)) {
-    stop(sprintf(
-      "ID variable '%s' contains %d duplicate values. IDs must be unique.",
-      config$id_variable,
-      sum(duplicated(ids))
-    ), call. = FALSE)
+    segment_refuse(
+      code = "DATA_DUPLICATE_IDS",
+      title = "Duplicate ID Values",
+      problem = sprintf("ID variable '%s' contains %d duplicate values.", config$id_variable, sum(duplicated(ids))),
+      why_it_matters = "Unique IDs are required to identify each respondent correctly.",
+      how_to_fix = c(
+        "Remove duplicate rows from your data",
+        "Ensure each respondent has a unique ID",
+        "Check for data processing errors that may have created duplicates"
+      )
+    )
   }
 
   # Validate clustering variables exist
@@ -64,10 +70,17 @@ load_segment_data <- function(config) {
   }
 
   if (length(non_numeric) > 0) {
-    stop(sprintf(
-      "Clustering variables must be numeric. Non-numeric variables:\n  %s",
-      paste(non_numeric, collapse = "\n  ")
-    ), call. = FALSE)
+    segment_refuse(
+      code = "DATA_NON_NUMERIC_VARS",
+      title = "Non-Numeric Clustering Variables",
+      problem = sprintf("%d clustering variable(s) are not numeric.", length(non_numeric)),
+      why_it_matters = "K-means clustering requires all variables to be numeric.",
+      how_to_fix = c(
+        "Convert variables to numeric format",
+        "Remove non-numeric variables from clustering_vars",
+        sprintf("Non-numeric variables: %s", paste(non_numeric, collapse = ", "))
+      )
+    )
   }
 
   # Extract clustering data
@@ -219,8 +232,17 @@ handle_missing_data <- function(data_list) {
     )
 
     if (config$missing_data == "refuse") {
-      stop(msg, "\n\nRefusing to proceed. Please clean data or adjust threshold.",
-           call. = FALSE)
+      segment_refuse(
+        code = "DATA_EXCESSIVE_MISSING",
+        title = "Excessive Missing Data",
+        problem = msg,
+        why_it_matters = "High levels of missing data reduce sample size and may bias results.",
+        how_to_fix = c(
+          "Clean your data to reduce missing values",
+          sprintf("Increase missing_threshold above %.0f%%", config$missing_threshold),
+          "Use a different missing data handling strategy (mean_imputation, median_imputation, or listwise_deletion)"
+        )
+      )
     } else {
       warning(msg, call. = FALSE)
     }
@@ -329,10 +351,16 @@ standardize_data <- function(data_list) {
   # Check for zero variance variables
   zero_var_vars <- names(scale_params$scale)[scale_params$scale == 0]
   if (length(zero_var_vars) > 0) {
-    stop(sprintf(
-      "Variables with zero variance cannot be standardized:\n  %s\n\nThese variables have no variation and should be removed.",
-      paste(zero_var_vars, collapse = "\n  ")
-    ), call. = FALSE)
+    segment_refuse(
+      code = "DATA_ZERO_VARIANCE",
+      title = "Zero Variance Variables",
+      problem = sprintf("%d variable(s) have zero variance (all values are identical).", length(zero_var_vars)),
+      why_it_matters = "Variables with no variation cannot be standardized and provide no information for clustering.",
+      how_to_fix = c(
+        "Remove these variables from clustering_vars",
+        sprintf("Zero variance variables: %s", paste(zero_var_vars, collapse = ", "))
+      )
+    )
   }
 
   cat("✓ Data standardized (z-scores)\n")
@@ -399,7 +427,13 @@ detect_and_handle_outliers <- function(data_list) {
       alpha = config$outlier_alpha
     )
   } else {
-    stop("Unknown outlier detection method: ", config$outlier_method, call. = FALSE)
+    segment_refuse(
+      code = "CFG_INVALID_OUTLIER_METHOD",
+      title = "Unknown Outlier Detection Method",
+      problem = sprintf("Outlier method '%s' is not recognized.", config$outlier_method),
+      why_it_matters = "Outlier detection requires a valid method.",
+      how_to_fix = "Set outlier_method to either 'zscore' or 'mahalanobis' in your configuration."
+    )
   }
 
   # Handle outliers according to strategy
@@ -469,10 +503,17 @@ pre_clustering_checks <- function(data_list) {
   min_required_n <- config$k_max * 50
   cat(sprintf("Sample size: %d\n", n_obs))
   if (n_obs < min_required_n) {
-    stop(sprintf(
-      "Sample size (%d) insufficient for k=%d\nMinimum required: %d (50 obs per cluster)",
-      n_obs, config$k_max, min_required_n
-    ), call. = FALSE)
+    segment_refuse(
+      code = "DATA_INSUFFICIENT_SAMPLE",
+      title = "Insufficient Sample Size for k_max",
+      problem = sprintf("Sample size (%d) is insufficient for k=%d.", n_obs, config$k_max),
+      why_it_matters = "Each cluster needs at least 50 observations for stable results.",
+      how_to_fix = c(
+        sprintf("Increase sample size to at least %d observations", min_required_n),
+        sprintf("Reduce k_max to %d or lower", floor(n_obs / 50)),
+        "Review data filtering and missing data handling to retain more observations"
+      )
+    )
   }
   cat(sprintf("✓ Sufficient for k_max=%d\n", config$k_max))
 

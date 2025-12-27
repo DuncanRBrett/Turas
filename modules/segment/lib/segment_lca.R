@@ -163,11 +163,6 @@ run_lca <- function(data, id_var, clustering_vars, n_classes = NULL,
           "Or use k-means clustering: Set method='kmeans' in your config"
         )
       )
-    } else {
-      stop("Package 'poLCA' required for Latent Class Analysis.\n",
-           "Install with: install.packages('poLCA')\n\n",
-           "Alternative: Use standard k-means with method='kmeans' in config.",
-           call. = FALSE)
     }
   }
 
@@ -180,9 +175,13 @@ run_lca <- function(data, id_var, clustering_vars, n_classes = NULL,
   # Check variables exist
   missing_vars <- setdiff(clustering_vars, names(data))
   if (length(missing_vars) > 0) {
-    stop(sprintf("Variables not found in data: %s",
-                 paste(missing_vars, collapse = ", ")),
-         call. = FALSE)
+    segment_refuse(
+      code = "CFG_CLUSTERING_VARS_MISSING",
+      title = "Clustering Variables Not Found",
+      problem = sprintf("Variables not found in data: %s", paste(missing_vars, collapse = ", ")),
+      why_it_matters = "All specified clustering variables must exist in the data for LCA.",
+      how_to_fix = "Check that variable names match data column names exactly (case-sensitive)."
+    )
   }
 
   # LCA requires positive integers (categories starting at 1)
@@ -294,7 +293,18 @@ run_lca <- function(data, id_var, clustering_vars, n_classes = NULL,
     # =========================================================================
 
     if (nrow(fit_stats) == 0) {
-      stop("No LCA models could be fitted", call. = FALSE)
+      segment_refuse(
+        code = "MODEL_LCA_FAILED",
+        title = "LCA Model Fitting Failed",
+        problem = "No LCA models could be fitted successfully.",
+        why_it_matters = "LCA requires valid categorical data and sufficient sample size.",
+        how_to_fix = c(
+          "Check that all variables are categorical or ordinal",
+          "Ensure sufficient sample size for the number of classes",
+          "Try reducing the number of clustering variables",
+          "Verify data quality and remove invalid responses"
+        )
+      )
     }
 
     # Select based on BIC (lower is better)
@@ -571,14 +581,29 @@ export_lca_exploration <- function(fit_stats, models, output_path) {
 type_respondent_lca <- function(answers, model_file) {
 
   if (!file.exists(model_file)) {
-    stop(sprintf("Model file not found: %s", model_file), call. = FALSE)
+    segment_refuse(
+      code = "IO_MODEL_FILE_MISSING",
+      title = "Model File Not Found",
+      problem = sprintf("Model file not found: %s", model_file),
+      why_it_matters = "Cannot score respondents without a saved model file.",
+      how_to_fix = c(
+        "Check that the model file path is correct",
+        "Ensure the model was saved with save_model=TRUE in the config",
+        "Verify the file has not been moved or deleted"
+      )
+    )
   }
 
   model_data <- readRDS(model_file)
 
   if (model_data$method != "lca") {
-    stop("This is not an LCA model. Use type_respondent() for k-means models.",
-         call. = FALSE)
+    segment_refuse(
+      code = "MODEL_TYPE_MISMATCH",
+      title = "Wrong Model Type",
+      problem = "This is not an LCA model.",
+      why_it_matters = "type_respondent_lca() only works with LCA models.",
+      how_to_fix = "Use type_respondent() for k-means models instead."
+    )
   }
 
   model <- model_data$model
@@ -588,8 +613,13 @@ type_respondent_lca <- function(answers, model_file) {
   # Validate answers
   missing_vars <- setdiff(clustering_vars, names(answers))
   if (length(missing_vars) > 0) {
-    stop(sprintf("Missing variables: %s", paste(missing_vars, collapse = ", ")),
-         call. = FALSE)
+    segment_refuse(
+      code = "DATA_MISSING_VARIABLES",
+      title = "Missing Variables in Answers",
+      problem = sprintf("Missing variables: %s", paste(missing_vars, collapse = ", ")),
+      why_it_matters = "All clustering variables are required to classify the respondent.",
+      how_to_fix = sprintf("Provide values for: %s", paste(missing_vars, collapse = ", "))
+    )
   }
 
   # Prepare data for prediction

@@ -118,7 +118,13 @@ log_progress <- function(current, total, message = "Progress", verbose = TRUE) {
 #' @keywords internal
 validate_option <- function(value, allowed, param_name, case_sensitive = FALSE) {
   if (is_missing_value(value)) {
-    stop(sprintf("%s is required but was NULL or NA", param_name), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_PARAMETER_MISSING",
+      title = "Required Parameter Missing",
+      problem = sprintf("Parameter '%s' is required but was NULL or NA", param_name),
+      why_it_matters = "Configuration parameter is required for analysis",
+      how_to_fix = sprintf("Provide a value for %s in configuration", param_name)
+    )
   }
   # Take first element if vector
   if (length(value) > 1) value <- value[1]
@@ -127,12 +133,15 @@ validate_option <- function(value, allowed, param_name, case_sensitive = FALSE) 
   check_allowed <- if (case_sensitive) allowed else toupper(allowed)
 
   if (!check_value %in% check_allowed) {
-    stop(sprintf(
-      "%s must be one of: %s\n  Got: '%s'",
-      param_name,
-      paste(allowed, collapse = ", "),
-      value
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_INVALID_OPTION",
+      title = "Invalid Configuration Option",
+      problem = sprintf("Invalid value for %s: '%s'", param_name, value),
+      why_it_matters = "Parameter must be one of the allowed values",
+      how_to_fix = sprintf("Use one of the allowed values: %s", paste(allowed, collapse = ", ")),
+      expected = paste(allowed, collapse = ", "),
+      observed = value
+    )
   }
 
   return(value)
@@ -153,7 +162,13 @@ validate_numeric_range <- function(value, param_name,
                                    min_val = -Inf, max_val = Inf,
                                    allow_na = FALSE) {
   if (is.null(value) || length(value) == 0) {
-    stop(sprintf("%s is required but was NULL", param_name), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_PARAMETER_MISSING",
+      title = "Required Parameter Missing",
+      problem = sprintf("Parameter '%s' is required but was NULL", param_name),
+      why_it_matters = "Numeric parameter is required for configuration",
+      how_to_fix = sprintf("Provide a numeric value for %s", param_name)
+    )
   }
 
   # Take first element if vector
@@ -161,18 +176,37 @@ validate_numeric_range <- function(value, param_name,
 
   if (is.na(value)) {
     if (allow_na) return(value)
-    stop(sprintf("%s is required but was NA", param_name), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_PARAMETER_NA",
+      title = "Parameter is NA",
+      problem = sprintf("Parameter '%s' is required but was NA", param_name),
+      why_it_matters = "Valid numeric value is required",
+      how_to_fix = sprintf("Provide a non-NA value for %s", param_name)
+    )
   }
 
   if (!is.numeric(value)) {
-    stop(sprintf("%s must be numeric, got: %s", param_name, class(value)), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_PARAMETER_WRONG_TYPE",
+      title = "Invalid Parameter Type",
+      problem = sprintf("Parameter '%s' must be numeric, got: %s", param_name, class(value)),
+      why_it_matters = "Numeric type is required for this parameter",
+      how_to_fix = sprintf("Provide a numeric value for %s", param_name),
+      expected = "numeric",
+      observed = class(value)
+    )
   }
 
   if (value < min_val || value > max_val) {
-    stop(sprintf(
-      "%s must be between %s and %s\n  Got: %s",
-      param_name, min_val, max_val, value
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_PARAMETER_OUT_OF_RANGE",
+      title = "Parameter Out of Range",
+      problem = sprintf("Parameter '%s' = %s is outside valid range", param_name, value),
+      why_it_matters = "Parameter must be within specified bounds",
+      how_to_fix = sprintf("Set %s between %s and %s", param_name, min_val, max_val),
+      expected = sprintf("[%s, %s]", min_val, max_val),
+      observed = sprintf("%s", value)
+    )
   }
 
   return(value)
@@ -189,7 +223,13 @@ validate_numeric_range <- function(value, param_name,
 #' @keywords internal
 validate_positive_integer <- function(value, param_name, min_val = 1) {
   if (is_missing_value(value)) {
-    stop(sprintf("%s is required but was NULL or NA", param_name), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_PARAMETER_MISSING",
+      title = "Required Parameter Missing",
+      problem = sprintf("Parameter '%s' is required but was NULL or NA", param_name),
+      why_it_matters = "Integer parameter is required for configuration",
+      how_to_fix = sprintf("Provide an integer value for %s", param_name)
+    )
   }
 
   # Take first element if vector
@@ -198,11 +238,25 @@ validate_positive_integer <- function(value, param_name, min_val = 1) {
   value <- suppressWarnings(as.integer(value))
 
   if (is.na(value)) {
-    stop(sprintf("%s must be an integer", param_name), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_PARAMETER_NOT_INTEGER",
+      title = "Parameter Not an Integer",
+      problem = sprintf("Parameter '%s' must be an integer", param_name),
+      why_it_matters = "Integer type is required for this parameter",
+      how_to_fix = sprintf("Provide a valid integer value for %s", param_name)
+    )
   }
 
   if (value < min_val) {
-    stop(sprintf("%s must be >= %d, got: %d", param_name, min_val, value), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_PARAMETER_TOO_SMALL",
+      title = "Parameter Value Too Small",
+      problem = sprintf("Parameter '%s' = %d is below minimum allowed", param_name, value),
+      why_it_matters = sprintf("Parameter must be >= %d", min_val),
+      how_to_fix = sprintf("Set %s to at least %d", param_name, min_val),
+      expected = sprintf(">= %d", min_val),
+      observed = sprintf("%d", value)
+    )
   }
 
   return(value)
@@ -220,32 +274,58 @@ validate_positive_integer <- function(value, param_name, min_val = 1) {
 #' @keywords internal
 validate_file_path <- function(path, param_name, must_exist = TRUE, extensions = NULL) {
   if (is.null(path) || length(path) == 0) {
-    stop(sprintf("%s is required but was empty or NA", param_name), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_PATH_MISSING",
+      title = "File Path Missing",
+      problem = sprintf("Parameter '%s' is required but was empty or NA", param_name),
+      why_it_matters = "File path is required to locate input/output files",
+      how_to_fix = sprintf("Provide a valid file path for %s", param_name)
+    )
   }
 
   # Take first element if vector
   if (length(path) > 1) path <- path[1]
 
   if (is.na(path) || !nzchar(trimws(path))) {
-    stop(sprintf("%s is required but was empty or NA", param_name), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_PATH_EMPTY",
+      title = "Empty File Path",
+      problem = sprintf("Parameter '%s' is required but was empty or NA", param_name),
+      why_it_matters = "Valid file path is required",
+      how_to_fix = sprintf("Provide a non-empty file path for %s", param_name)
+    )
   }
 
   path <- normalizePath(path, mustWork = FALSE)
 
   if (must_exist && !file.exists(path)) {
-    stop(sprintf(
-      "%s: File not found\n  Path: %s",
-      param_name, path
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "IO_FILE_NOT_FOUND",
+      title = "File Not Found",
+      problem = sprintf("File not found for %s", param_name),
+      why_it_matters = "Required file must exist to proceed",
+      how_to_fix = c(
+        "Check file path is correct",
+        "Verify file exists at specified location",
+        "Check for typos in file name or path"
+      ),
+      details = sprintf("Path: %s", path)
+    )
   }
 
   if (!is.null(extensions)) {
     ext <- tolower(tools::file_ext(path))
     if (!ext %in% tolower(extensions)) {
-      stop(sprintf(
-        "%s must have extension: %s\n  Got: %s",
-        param_name, paste(extensions, collapse = ", "), ext
-      ), call. = FALSE)
+      maxdiff_refuse(
+        code = "IO_INVALID_FILE_EXTENSION",
+        title = "Invalid File Extension",
+        problem = sprintf("File '%s' has wrong extension", basename(path)),
+        why_it_matters = "File must have correct extension for its type",
+        how_to_fix = sprintf("Use file with extension: %s", paste(extensions, collapse = ", ")),
+        expected = paste(extensions, collapse = ", "),
+        observed = ext,
+        details = sprintf("Path: %s", path)
+      )
     }
   }
 
@@ -263,14 +343,26 @@ validate_file_path <- function(path, param_name, must_exist = TRUE, extensions =
 #' @keywords internal
 validate_directory_path <- function(path, param_name, create = TRUE) {
   if (is.null(path) || length(path) == 0) {
-    stop(sprintf("%s is required but was empty or NA", param_name), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_PATH_MISSING",
+      title = "Directory Path Missing",
+      problem = sprintf("Parameter '%s' is required but was empty or NA", param_name),
+      why_it_matters = "Directory path is required for output location",
+      how_to_fix = sprintf("Provide a valid directory path for %s", param_name)
+    )
   }
 
   # Take first element if vector
   if (length(path) > 1) path <- path[1]
 
   if (is.na(path) || !nzchar(trimws(path))) {
-    stop(sprintf("%s is required but was empty or NA", param_name), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_PATH_EMPTY",
+      title = "Empty Directory Path",
+      problem = sprintf("Parameter '%s' is required but was empty or NA", param_name),
+      why_it_matters = "Valid directory path is required",
+      how_to_fix = sprintf("Provide a non-empty directory path for %s", param_name)
+    )
   }
 
   path <- normalizePath(path, mustWork = FALSE)
@@ -280,16 +372,32 @@ validate_directory_path <- function(path, param_name, create = TRUE) {
       tryCatch({
         dir.create(path, recursive = TRUE)
       }, error = function(e) {
-        stop(sprintf(
-          "Failed to create directory for %s\n  Path: %s\n  Error: %s",
-          param_name, path, conditionMessage(e)
-        ), call. = FALSE)
+        maxdiff_refuse(
+          code = "IO_DIRECTORY_CREATE_FAILED",
+          title = "Failed to Create Directory",
+          problem = sprintf("Cannot create directory for %s: %s", param_name, conditionMessage(e)),
+          why_it_matters = "Output directory must be created to save results",
+          how_to_fix = c(
+            "Check write permissions for parent directory",
+            "Verify path is valid and accessible",
+            "Ensure no file exists with same name as directory"
+          ),
+          details = sprintf("Path: %s\nError: %s", path, conditionMessage(e))
+        )
       })
     } else {
-      stop(sprintf(
-        "%s: Directory not found\n  Path: %s",
-        param_name, path
-      ), call. = FALSE)
+      maxdiff_refuse(
+        code = "IO_DIRECTORY_NOT_FOUND",
+        title = "Directory Not Found",
+        problem = sprintf("Directory not found for %s", param_name),
+        why_it_matters = "Required directory must exist",
+        how_to_fix = c(
+          "Check directory path is correct",
+          "Create directory manually",
+          "Enable automatic directory creation"
+        ),
+        details = sprintf("Path: %s", path)
+      )
     }
   }
 

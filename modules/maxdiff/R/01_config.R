@@ -71,8 +71,13 @@ load_maxdiff_config <- function(config_path, project_root = NULL) {
   # ============================================================================
 
   if (!requireNamespace("openxlsx", quietly = TRUE)) {
-    stop("Package 'openxlsx' is required. Install with: install.packages('openxlsx')",
-         call. = FALSE)
+    maxdiff_refuse(
+      code = "PKG_OPENXLSX_MISSING",
+      title = "Required Package Not Installed",
+      problem = "Package 'openxlsx' is required but not installed",
+      why_it_matters = "Configuration loading requires openxlsx to read Excel files",
+      how_to_fix = "Install the openxlsx package: install.packages('openxlsx')"
+    )
   }
 
   # ============================================================================
@@ -83,10 +88,19 @@ load_maxdiff_config <- function(config_path, project_root = NULL) {
   available_sheets <- tryCatch({
     openxlsx::getSheetNames(config_path)
   }, error = function(e) {
-    stop(sprintf(
-      "Cannot read Excel file:\n  Path: %s\n  Error: %s",
-      config_path, conditionMessage(e)
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "IO_CONFIG_FILE_READ_ERROR",
+      title = "Cannot Read Configuration File",
+      problem = sprintf("Error reading Excel configuration file: %s", conditionMessage(e)),
+      why_it_matters = "Configuration file must be readable to load settings",
+      how_to_fix = c(
+        "Check file is not corrupted",
+        "Verify file is valid Excel format (.xlsx, .xls)",
+        "Ensure file is not locked or open in Excel",
+        "Check file has correct permissions"
+      ),
+      details = sprintf("Path: %s\nError: %s", config_path, conditionMessage(e))
+    )
   })
 
   # Required sheets
@@ -94,11 +108,20 @@ load_maxdiff_config <- function(config_path, project_root = NULL) {
   missing_sheets <- setdiff(required_sheets, available_sheets)
 
   if (length(missing_sheets) > 0) {
-    stop(sprintf(
-      "Configuration file is missing required sheets:\n  Missing: %s\n  Available: %s",
-      paste(missing_sheets, collapse = ", "),
-      paste(available_sheets, collapse = ", ")
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_MISSING_SHEETS",
+      title = "Missing Required Configuration Sheets",
+      problem = sprintf("Configuration file missing required sheets: %s", paste(missing_sheets, collapse = ", ")),
+      why_it_matters = "Required sheets must exist in configuration workbook",
+      how_to_fix = c(
+        "Add missing sheets to configuration file",
+        "Use template configuration file",
+        "Check sheet names are spelled correctly (case-sensitive)"
+      ),
+      expected = paste(required_sheets, collapse = ", "),
+      missing = paste(missing_sheets, collapse = ", "),
+      details = sprintf("Available sheets: %s", paste(available_sheets, collapse = ", "))
+    )
   }
 
   # ============================================================================
@@ -111,10 +134,15 @@ load_maxdiff_config <- function(config_path, project_root = NULL) {
   # Determine mode
   mode <- toupper(project_settings$Mode)
   if (!mode %in% c("DESIGN", "ANALYSIS")) {
-    stop(sprintf(
-      "Invalid Mode in PROJECT_SETTINGS: '%s'\n  Must be 'DESIGN' or 'ANALYSIS'",
-      project_settings$Mode
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_INVALID_MODE",
+      title = "Invalid Mode Setting",
+      problem = sprintf("Invalid Mode in PROJECT_SETTINGS: '%s'", project_settings$Mode),
+      why_it_matters = "Mode must be either DESIGN or ANALYSIS",
+      how_to_fix = "Set Mode to 'DESIGN' or 'ANALYSIS' in PROJECT_SETTINGS sheet",
+      expected = "DESIGN or ANALYSIS",
+      observed = project_settings$Mode
+    )
   }
 
   # ============================================================================
@@ -133,7 +161,17 @@ load_maxdiff_config <- function(config_path, project_root = NULL) {
     design_settings_raw <- load_config_sheet(config_path, "DESIGN_SETTINGS")
     design_settings <- parse_design_settings(design_settings_raw, nrow(items))
   } else if (mode == "DESIGN") {
-    stop("DESIGN_SETTINGS sheet is required when Mode = DESIGN", call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_DESIGN_SETTINGS_MISSING",
+      title = "DESIGN_SETTINGS Sheet Missing",
+      problem = "DESIGN_SETTINGS sheet is required when Mode = DESIGN",
+      why_it_matters = "Design generation requires design parameters",
+      how_to_fix = c(
+        "Add DESIGN_SETTINGS sheet to configuration file",
+        "Use template configuration for design mode",
+        "Or change Mode to ANALYSIS if not generating design"
+      )
+    )
   }
 
   # ============================================================================
@@ -145,7 +183,17 @@ load_maxdiff_config <- function(config_path, project_root = NULL) {
     survey_mapping_raw <- load_config_sheet(config_path, "SURVEY_MAPPING")
     survey_mapping <- parse_survey_mapping(survey_mapping_raw)
   } else if (mode == "ANALYSIS") {
-    stop("SURVEY_MAPPING sheet is required when Mode = ANALYSIS", call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_SURVEY_MAPPING_MISSING",
+      title = "SURVEY_MAPPING Sheet Missing",
+      problem = "SURVEY_MAPPING sheet is required when Mode = ANALYSIS",
+      why_it_matters = "Analysis requires mapping of survey columns to MaxDiff fields",
+      how_to_fix = c(
+        "Add SURVEY_MAPPING sheet to configuration file",
+        "Use template configuration for analysis mode",
+        "Define field mappings for survey columns"
+      )
+    )
   }
 
   # ============================================================================
@@ -233,10 +281,20 @@ load_config_sheet <- function(config_path, sheet_name) {
     return(df)
 
   }, error = function(e) {
-    stop(sprintf(
-      "Error reading sheet '%s':\n  File: %s\n  Error: %s",
-      sheet_name, basename(config_path), conditionMessage(e)
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "IO_CONFIG_SHEET_READ_ERROR",
+      title = "Error Reading Configuration Sheet",
+      problem = sprintf("Error reading sheet '%s': %s", sheet_name, conditionMessage(e)),
+      why_it_matters = "All configuration sheets must be readable",
+      how_to_fix = c(
+        "Check sheet is not corrupted",
+        "Verify sheet has valid structure",
+        "Ensure column headers are present",
+        "Check for invalid cell formats"
+      ),
+      details = sprintf("File: %s\nSheet: %s\nError: %s",
+                       basename(config_path), sheet_name, conditionMessage(e))
+    )
   })
 }
 
@@ -260,12 +318,24 @@ parse_project_settings <- function(df, project_root) {
     if ("Setting" %in% names(df)) {
       names(df)[names(df) == "Setting"] <- "Setting_Name"
     } else {
-      stop("PROJECT_SETTINGS must have 'Setting_Name' column", call. = FALSE)
+      maxdiff_refuse(
+        code = "CFG_MISSING_COLUMN",
+        title = "Missing Required Column",
+        problem = "PROJECT_SETTINGS must have 'Setting_Name' column",
+        why_it_matters = "Setting_Name column is required to identify settings",
+        how_to_fix = "Add 'Setting_Name' column to PROJECT_SETTINGS sheet"
+      )
     }
   }
 
   if (!"Value" %in% names(df)) {
-    stop("PROJECT_SETTINGS must have 'Value' column", call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_MISSING_COLUMN",
+      title = "Missing Required Column",
+      problem = "PROJECT_SETTINGS must have 'Value' column",
+      why_it_matters = "Value column is required for setting values",
+      how_to_fix = "Add 'Value' column to PROJECT_SETTINGS sheet"
+    )
   }
 
   # Convert to named list
@@ -276,16 +346,28 @@ parse_project_settings <- function(df, project_root) {
   required <- c("Project_Name", "Mode")
   missing <- setdiff(required, names(settings))
   if (length(missing) > 0) {
-    stop(sprintf(
-      "PROJECT_SETTINGS missing required settings: %s",
-      paste(missing, collapse = ", ")
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_MISSING_SETTINGS",
+      title = "Missing Required Settings",
+      problem = sprintf("PROJECT_SETTINGS missing required settings: %s", paste(missing, collapse = ", ")),
+      why_it_matters = "Required project settings must be defined",
+      how_to_fix = "Add missing settings to PROJECT_SETTINGS sheet",
+      missing = paste(missing, collapse = ", ")
+    )
   }
 
   # Validate Mode
   settings$Mode <- toupper(trimws(as.character(settings$Mode)))
   if (!settings$Mode %in% c("DESIGN", "ANALYSIS")) {
-    stop("Mode must be 'DESIGN' or 'ANALYSIS'", call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_INVALID_MODE",
+      title = "Invalid Mode Value",
+      problem = sprintf("Mode must be 'DESIGN' or 'ANALYSIS', got: '%s'", settings$Mode),
+      why_it_matters = "Valid mode is required to determine workflow",
+      how_to_fix = "Set Mode to either 'DESIGN' or 'ANALYSIS'",
+      expected = "DESIGN or ANALYSIS",
+      observed = settings$Mode
+    )
   }
 
   # Clean Project_Name (no spaces)
@@ -374,11 +456,16 @@ parse_items_sheet <- function(df) {
   missing_cols <- setdiff(required_cols, names(df))
 
   if (length(missing_cols) > 0) {
-    stop(sprintf(
-      "ITEMS sheet missing required columns: %s\n  Found: %s",
-      paste(missing_cols, collapse = ", "),
-      paste(names(df), collapse = ", ")
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_ITEMS_MISSING_COLUMNS",
+      title = "ITEMS Sheet Missing Required Columns",
+      problem = sprintf("ITEMS sheet missing required columns: %s", paste(missing_cols, collapse = ", ")),
+      why_it_matters = "Required columns must exist to define items",
+      how_to_fix = "Add missing columns to ITEMS sheet",
+      expected = paste(required_cols, collapse = ", "),
+      missing = paste(missing_cols, collapse = ", "),
+      details = sprintf("Found columns: %s", paste(names(df), collapse = ", "))
+    )
   }
 
   # Clean Item_IDs
@@ -387,19 +474,27 @@ parse_items_sheet <- function(df) {
   # Check for NA Item_IDs
   na_rows <- which(is.na(df$Item_ID))
   if (length(na_rows) > 0) {
-    stop(sprintf(
-      "ITEMS sheet has empty Item_ID values in rows: %s",
-      paste(na_rows + 1, collapse = ", ")  # +1 for header row
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_ITEMS_EMPTY_ID",
+      title = "Empty Item IDs in ITEMS Sheet",
+      problem = sprintf("ITEMS sheet has empty Item_ID values in rows: %s", paste(na_rows + 1, collapse = ", ")),
+      why_it_matters = "All items must have a unique identifier",
+      how_to_fix = "Provide Item_ID values for all rows in ITEMS sheet",
+      details = sprintf("Rows with empty Item_ID: %s", paste(na_rows + 1, collapse = ", "))
+    )
   }
 
   # Check for duplicate Item_IDs
   dup_ids <- df$Item_ID[duplicated(df$Item_ID)]
   if (length(dup_ids) > 0) {
-    stop(sprintf(
-      "ITEMS sheet has duplicate Item_IDs: %s",
-      paste(unique(dup_ids), collapse = ", ")
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_ITEMS_DUPLICATE_ID",
+      title = "Duplicate Item IDs",
+      problem = sprintf("ITEMS sheet has duplicate Item_IDs: %s", paste(unique(dup_ids), collapse = ", ")),
+      why_it_matters = "Each item must have a unique identifier",
+      how_to_fix = "Ensure all Item_ID values are unique in ITEMS sheet",
+      details = sprintf("Duplicate IDs: %s", paste(unique(dup_ids), collapse = ", "))
+    )
   }
 
   # Set defaults for optional columns
@@ -431,19 +526,29 @@ parse_items_sheet <- function(df) {
   # Validate at least 2 included items
   n_included <- sum(df$Include == 1)
   if (n_included < 2) {
-    stop(sprintf(
-      "ITEMS sheet must have at least 2 items with Include=1\n  Found: %d included items",
-      n_included
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_ITEMS_INSUFFICIENT",
+      title = "Insufficient Items Included",
+      problem = sprintf("ITEMS sheet must have at least 2 items with Include=1, found: %d", n_included),
+      why_it_matters = "MaxDiff requires at least 2 items to compare",
+      how_to_fix = "Set Include=1 for at least 2 items in ITEMS sheet",
+      expected = "At least 2 items with Include=1",
+      observed = sprintf("%d items", n_included)
+    )
   }
 
   # Validate exactly 0 or 1 anchor item
   n_anchor <- sum(df$Anchor_Item == 1)
   if (n_anchor > 1) {
-    stop(sprintf(
-      "ITEMS sheet can have at most 1 Anchor_Item\n  Found: %d anchor items",
-      n_anchor
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_ITEMS_MULTIPLE_ANCHORS",
+      title = "Multiple Anchor Items",
+      problem = sprintf("ITEMS sheet can have at most 1 Anchor_Item, found: %d", n_anchor),
+      why_it_matters = "Only one item can be designated as the anchor/reference item",
+      how_to_fix = "Set Anchor_Item=1 for at most one item",
+      expected = "0 or 1 anchor item",
+      observed = sprintf("%d anchor items", n_anchor)
+    )
   }
 
   return(df)
@@ -470,13 +575,25 @@ parse_design_settings <- function(df, n_items) {
     } else if ("Parameter" %in% names(df)) {
       names(df)[names(df) == "Parameter"] <- "Parameter_Name"
     } else {
-      stop("DESIGN_SETTINGS must have 'Parameter_Name' column", call. = FALSE)
+      maxdiff_refuse(
+        code = "CFG_MISSING_COLUMN",
+        title = "Missing Required Column",
+        problem = "DESIGN_SETTINGS must have 'Parameter_Name' column",
+        why_it_matters = "Parameter_Name column is required to identify settings",
+        how_to_fix = "Add 'Parameter_Name' column to DESIGN_SETTINGS sheet"
+      )
     }
   }
 
   value_col <- intersect(c("Value", "Setting_Value"), names(df))[1]
   if (is.na(value_col)) {
-    stop("DESIGN_SETTINGS must have 'Value' column", call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_MISSING_COLUMN",
+      title = "Missing Required Column",
+      problem = "DESIGN_SETTINGS must have 'Value' column",
+      why_it_matters = "Value column is required for parameter values",
+      how_to_fix = "Add 'Value' column to DESIGN_SETTINGS sheet"
+    )
   }
 
   # Convert to named list
@@ -493,10 +610,16 @@ parse_design_settings <- function(df, n_items) {
     min_val = 2
   )
   if (result$Items_Per_Task > n_items) {
-    stop(sprintf(
-      "Items_Per_Task (%d) cannot exceed number of items (%d)",
-      result$Items_Per_Task, n_items
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_ITEMS_PER_TASK_TOO_LARGE",
+      title = "Items Per Task Exceeds Total Items",
+      problem = sprintf("Items_Per_Task (%d) cannot exceed number of items (%d)",
+                       result$Items_Per_Task, n_items),
+      why_it_matters = "Cannot show more items per task than total items available",
+      how_to_fix = sprintf("Set Items_Per_Task to %d or less", n_items),
+      expected = sprintf("<= %d", n_items),
+      observed = sprintf("%d", result$Items_Per_Task)
+    )
   }
 
   # Tasks_Per_Respondent (required)
@@ -516,10 +639,16 @@ parse_design_settings <- function(df, n_items) {
   # Design_Type
   result$Design_Type <- toupper(settings$Design_Type %||% "BALANCED")
   if (!result$Design_Type %in% c("BALANCED", "RANDOM", "OPTIMAL")) {
-    stop(sprintf(
-      "Design_Type must be BALANCED, RANDOM, or OPTIMAL\n  Got: '%s'",
-      result$Design_Type
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_INVALID_DESIGN_TYPE",
+      title = "Invalid Design Type",
+      problem = sprintf("Design_Type must be BALANCED, RANDOM, or OPTIMAL, got: '%s'",
+                       result$Design_Type),
+      why_it_matters = "Valid design type is required for design generation",
+      how_to_fix = "Set Design_Type to BALANCED, RANDOM, or OPTIMAL",
+      expected = "BALANCED, RANDOM, or OPTIMAL",
+      observed = result$Design_Type
+    )
   }
 
   # Boolean settings
@@ -580,11 +709,16 @@ parse_survey_mapping <- function(df) {
   missing_cols <- setdiff(required_cols, names(df))
 
   if (length(missing_cols) > 0) {
-    stop(sprintf(
-      "SURVEY_MAPPING sheet missing required columns: %s\n  Found: %s",
-      paste(missing_cols, collapse = ", "),
-      paste(names(df), collapse = ", ")
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_SURVEY_MAPPING_MISSING_COLUMNS",
+      title = "SURVEY_MAPPING Missing Required Columns",
+      problem = sprintf("SURVEY_MAPPING sheet missing required columns: %s", paste(missing_cols, collapse = ", ")),
+      why_it_matters = "Required columns must exist to map survey fields",
+      how_to_fix = "Add missing columns to SURVEY_MAPPING sheet",
+      expected = paste(required_cols, collapse = ", "),
+      missing = paste(missing_cols, collapse = ", "),
+      details = sprintf("Found columns: %s", paste(names(df), collapse = ", "))
+    )
   }
 
   # Normalize field types
@@ -595,25 +729,47 @@ parse_survey_mapping <- function(df) {
 
   invalid_types <- setdiff(unique(df$Field_Type), valid_types)
   if (length(invalid_types) > 0) {
-    stop(sprintf(
-      "SURVEY_MAPPING has invalid Field_Type values: %s\n  Valid types: %s",
-      paste(invalid_types, collapse = ", "),
-      paste(valid_types, collapse = ", ")
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_SURVEY_MAPPING_INVALID_TYPE",
+      title = "Invalid Field Type in SURVEY_MAPPING",
+      problem = sprintf("SURVEY_MAPPING has invalid Field_Type values: %s", paste(invalid_types, collapse = ", ")),
+      why_it_matters = "Field_Type must be one of the recognized types",
+      how_to_fix = sprintf("Use only valid Field_Type values: %s", paste(valid_types, collapse = ", ")),
+      expected = paste(valid_types, collapse = ", "),
+      observed = paste(invalid_types, collapse = ", ")
+    )
   }
 
   # Must have VERSION field
   if (!"VERSION" %in% df$Field_Type) {
-    stop("SURVEY_MAPPING must include a VERSION field type", call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_SURVEY_MAPPING_NO_VERSION",
+      title = "Missing VERSION Field in SURVEY_MAPPING",
+      problem = "SURVEY_MAPPING must include a VERSION field type",
+      why_it_matters = "VERSION field is required to map design versions to survey data",
+      how_to_fix = "Add a row with Field_Type = VERSION in SURVEY_MAPPING sheet"
+    )
   }
 
   # Must have at least one BEST_CHOICE and one WORST_CHOICE
   if (!"BEST_CHOICE" %in% df$Field_Type) {
-    stop("SURVEY_MAPPING must include at least one BEST_CHOICE field type", call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_SURVEY_MAPPING_NO_BEST",
+      title = "Missing BEST_CHOICE Field in SURVEY_MAPPING",
+      problem = "SURVEY_MAPPING must include at least one BEST_CHOICE field type",
+      why_it_matters = "BEST_CHOICE fields are required to identify best choices in survey data",
+      how_to_fix = "Add rows with Field_Type = BEST_CHOICE in SURVEY_MAPPING sheet for each task"
+    )
   }
 
   if (!"WORST_CHOICE" %in% df$Field_Type) {
-    stop("SURVEY_MAPPING must include at least one WORST_CHOICE field type", call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_SURVEY_MAPPING_NO_WORST",
+      title = "Missing WORST_CHOICE Field in SURVEY_MAPPING",
+      problem = "SURVEY_MAPPING must include at least one WORST_CHOICE field type",
+      why_it_matters = "WORST_CHOICE fields are required to identify worst choices in survey data",
+      how_to_fix = "Add rows with Field_Type = WORST_CHOICE in SURVEY_MAPPING sheet for each task"
+    )
   }
 
   # Add Task_Number column if missing
@@ -665,11 +821,16 @@ parse_segment_settings <- function(df) {
   missing_cols <- setdiff(required_cols, names(df))
 
   if (length(missing_cols) > 0) {
-    stop(sprintf(
-      "SEGMENT_SETTINGS sheet missing required columns: %s\n  Found: %s",
-      paste(missing_cols, collapse = ", "),
-      paste(names(df), collapse = ", ")
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_SEGMENT_SETTINGS_MISSING_COLUMNS",
+      title = "SEGMENT_SETTINGS Missing Required Columns",
+      problem = sprintf("SEGMENT_SETTINGS sheet missing required columns: %s", paste(missing_cols, collapse = ", ")),
+      why_it_matters = "Required columns must exist to define segments",
+      how_to_fix = "Add missing columns to SEGMENT_SETTINGS sheet",
+      expected = paste(required_cols, collapse = ", "),
+      missing = paste(missing_cols, collapse = ", "),
+      details = sprintf("Found columns: %s", paste(names(df), collapse = ", "))
+    )
   }
 
   # Clean Segment_IDs
@@ -678,10 +839,14 @@ parse_segment_settings <- function(df) {
   # Check for duplicates
   dup_ids <- df$Segment_ID[duplicated(df$Segment_ID)]
   if (length(dup_ids) > 0) {
-    stop(sprintf(
-      "SEGMENT_SETTINGS has duplicate Segment_IDs: %s",
-      paste(unique(dup_ids), collapse = ", ")
-    ), call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_SEGMENT_DUPLICATE_ID",
+      title = "Duplicate Segment IDs",
+      problem = sprintf("SEGMENT_SETTINGS has duplicate Segment_IDs: %s", paste(unique(dup_ids), collapse = ", ")),
+      why_it_matters = "Each segment must have a unique identifier",
+      how_to_fix = "Ensure all Segment_ID values are unique in SEGMENT_SETTINGS sheet",
+      details = sprintf("Duplicate IDs: %s", paste(unique(dup_ids), collapse = ", "))
+    )
   }
 
   # Set defaults for optional columns
@@ -714,12 +879,24 @@ parse_output_settings <- function(df) {
   # Expect Option_Name and Value columns (or similar)
   name_col <- intersect(c("Option_Name", "Setting_Name", "Option"), names(df))[1]
   if (is.na(name_col)) {
-    stop("OUTPUT_SETTINGS must have 'Option_Name' column", call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_MISSING_COLUMN",
+      title = "Missing Required Column",
+      problem = "OUTPUT_SETTINGS must have 'Option_Name' column",
+      why_it_matters = "Option_Name column is required to identify output settings",
+      how_to_fix = "Add 'Option_Name' column to OUTPUT_SETTINGS sheet"
+    )
   }
 
   value_col <- intersect(c("Value", "Setting_Value"), names(df))[1]
   if (is.na(value_col)) {
-    stop("OUTPUT_SETTINGS must have 'Value' column", call. = FALSE)
+    maxdiff_refuse(
+      code = "CFG_MISSING_COLUMN",
+      title = "Missing Required Column",
+      problem = "OUTPUT_SETTINGS must have 'Value' column",
+      why_it_matters = "Value column is required for output setting values",
+      how_to_fix = "Add 'Value' column to OUTPUT_SETTINGS sheet"
+    )
   }
 
   # Convert to named list
@@ -831,17 +1008,32 @@ validate_config_cross_references <- function(project_settings, items,
   if (mode == "DESIGN") {
     # Check Items_Per_Task
     if (design_settings$Items_Per_Task > n_included) {
-      stop(sprintf(
-        "Items_Per_Task (%d) exceeds number of included items (%d)",
-        design_settings$Items_Per_Task, n_included
-      ), call. = FALSE)
+      maxdiff_refuse(
+        code = "CFG_ITEMS_PER_TASK_EXCEEDS_TOTAL",
+        title = "Items Per Task Exceeds Available Items",
+        problem = sprintf("Items_Per_Task (%d) exceeds number of included items (%d)",
+                         design_settings$Items_Per_Task, n_included),
+        why_it_matters = "Cannot show more items per task than are included in study",
+        how_to_fix = c(
+          sprintf("Reduce Items_Per_Task to %d or less", n_included),
+          "Or include more items in ITEMS sheet (set Include=1)"
+        ),
+        expected = sprintf("<= %d", n_included),
+        observed = sprintf("%d", design_settings$Items_Per_Task)
+      )
     }
 
     # Validate Output_Folder
     if (is.null(project_settings$Output_Folder) ||
         is.na(project_settings$Output_Folder) ||
         !nzchar(project_settings$Output_Folder)) {
-      stop("Output_Folder is required in PROJECT_SETTINGS", call. = FALSE)
+      maxdiff_refuse(
+        code = "CFG_OUTPUT_FOLDER_MISSING",
+        title = "Output Folder Not Specified",
+        problem = "Output_Folder is required in PROJECT_SETTINGS for DESIGN mode",
+        why_it_matters = "Output folder must be specified to save design file",
+        how_to_fix = "Add Output_Folder setting to PROJECT_SETTINGS sheet"
+      )
     }
   }
 
@@ -854,30 +1046,57 @@ validate_config_cross_references <- function(project_settings, items,
     if (is.null(project_settings$Raw_Data_File) ||
         is.na(project_settings$Raw_Data_File) ||
         !nzchar(project_settings$Raw_Data_File)) {
-      stop("Raw_Data_File is required in PROJECT_SETTINGS for ANALYSIS mode",
-           call. = FALSE)
+      maxdiff_refuse(
+        code = "CFG_RAW_DATA_FILE_MISSING",
+        title = "Raw Data File Not Specified",
+        problem = "Raw_Data_File is required in PROJECT_SETTINGS for ANALYSIS mode",
+        why_it_matters = "Survey data file must be specified for analysis",
+        how_to_fix = "Add Raw_Data_File setting to PROJECT_SETTINGS sheet with path to survey data"
+      )
     }
 
     if (!file.exists(project_settings$Raw_Data_File)) {
-      stop(sprintf(
-        "Raw_Data_File not found:\n  Path: %s",
-        project_settings$Raw_Data_File
-      ), call. = FALSE)
+      maxdiff_refuse(
+        code = "IO_RAW_DATA_FILE_NOT_FOUND",
+        title = "Raw Data File Not Found",
+        problem = "Raw_Data_File not found at specified path",
+        why_it_matters = "Survey data file must exist to perform analysis",
+        how_to_fix = c(
+          "Check file path is correct",
+          "Verify file exists at specified location",
+          "Use absolute path or path relative to configuration file"
+        ),
+        details = sprintf("Path: %s", project_settings$Raw_Data_File)
+      )
     }
 
     # Validate Design_File
     if (is.null(project_settings$Design_File) ||
         is.na(project_settings$Design_File) ||
         !nzchar(project_settings$Design_File)) {
-      stop("Design_File is required in PROJECT_SETTINGS for ANALYSIS mode",
-           call. = FALSE)
+      maxdiff_refuse(
+        code = "CFG_DESIGN_FILE_MISSING",
+        title = "Design File Not Specified",
+        problem = "Design_File is required in PROJECT_SETTINGS for ANALYSIS mode",
+        why_it_matters = "Design file must be specified to map survey structure",
+        how_to_fix = "Add Design_File setting to PROJECT_SETTINGS sheet with path to design file"
+      )
     }
 
     if (!file.exists(project_settings$Design_File)) {
-      stop(sprintf(
-        "Design_File not found:\n  Path: %s",
-        project_settings$Design_File
-      ), call. = FALSE)
+      maxdiff_refuse(
+        code = "IO_DESIGN_FILE_NOT_FOUND",
+        title = "Design File Not Found",
+        problem = "Design_File not found at specified path",
+        why_it_matters = "Design file must exist to perform analysis",
+        how_to_fix = c(
+          "Check file path is correct",
+          "Verify file exists at specified location",
+          "Generate design file first if in DESIGN mode",
+          "Use absolute path or path relative to configuration file"
+        ),
+        details = sprintf("Path: %s", project_settings$Design_File)
+      )
     }
 
     # Count tasks from survey mapping
@@ -885,10 +1104,16 @@ validate_config_cross_references <- function(project_settings, items,
     n_worst <- sum(survey_mapping$Field_Type == "WORST_CHOICE")
 
     if (n_best != n_worst) {
-      stop(sprintf(
-        "SURVEY_MAPPING must have equal BEST_CHOICE and WORST_CHOICE entries\n  BEST_CHOICE: %d\n  WORST_CHOICE: %d",
-        n_best, n_worst
-      ), call. = FALSE)
+      maxdiff_refuse(
+        code = "CFG_SURVEY_MAPPING_UNEQUAL_CHOICES",
+        title = "Unequal Best and Worst Choice Mappings",
+        problem = sprintf("SURVEY_MAPPING must have equal BEST_CHOICE and WORST_CHOICE entries (BEST: %d, WORST: %d)",
+                         n_best, n_worst),
+        why_it_matters = "Each task must have both best and worst choice fields",
+        how_to_fix = "Ensure SURVEY_MAPPING has same number of BEST_CHOICE and WORST_CHOICE rows",
+        expected = "Equal number of BEST_CHOICE and WORST_CHOICE",
+        observed = sprintf("BEST: %d, WORST: %d", n_best, n_worst)
+      )
     }
   }
 
@@ -905,12 +1130,20 @@ validate_config_cross_references <- function(project_settings, items,
         tryCatch({
           parse(text = seg_def)
         }, error = function(e) {
-          stop(sprintf(
-            "Invalid R expression in Segment_Def for segment '%s':\n  Expression: %s\n  Error: %s",
-            segment_settings$Segment_ID[i],
-            seg_def,
-            conditionMessage(e)
-          ), call. = FALSE)
+          maxdiff_refuse(
+            code = "CFG_SEGMENT_INVALID_EXPRESSION",
+            title = "Invalid Segment Definition Expression",
+            problem = sprintf("Invalid R expression in Segment_Def for segment '%s'",
+                             segment_settings$Segment_ID[i]),
+            why_it_matters = "Segment definition must be valid R code",
+            how_to_fix = c(
+              "Check segment definition syntax",
+              "Ensure balanced parentheses and quotes",
+              "Use valid R operators"
+            ),
+            details = sprintf("Segment: %s\nExpression: %s\nError: %s",
+                             segment_settings$Segment_ID[i], seg_def, conditionMessage(e))
+          )
         })
       }
     }
