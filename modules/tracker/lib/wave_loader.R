@@ -27,26 +27,36 @@
 
 # Ensure shared utilities are available
 if (!exists("calculate_weight_efficiency", mode = "function")) {
-  .wl_script_dir <- tryCatch({
-    ofile <- sys.frame(1)$ofile
-    if (!is.null(ofile) && length(ofile) > 0 && nzchar(ofile)) {
-      dirname(ofile)
-    } else if (exists("script_dir") && !is.null(script_dir) && length(script_dir) > 0 && nzchar(script_dir[1])) {
-      file.path(script_dir[1], "lib")
-    } else {
-      getwd()
-    }
-  }, error = function(e) getwd())
+  # Find the shared/lib path - try multiple locations
+  .shared_lib_path <- NULL
+  .shared_lib_candidates <- c(
+    # If script_dir is set (from parent run_tracker.R), go up to modules/shared/lib
+    if (exists("script_dir") && !is.null(script_dir) && length(script_dir) > 0 && nzchar(script_dir[1])) {
+      file.path(dirname(script_dir[1]), "shared", "lib")  # ../shared/lib from tracker dir
+    } else NULL,
+    # Try relative to current working directory
+    file.path(getwd(), "..", "shared", "lib"),
+    file.path(getwd(), "modules", "shared", "lib"),
+    # Try TURAS_HOME if set
+    file.path(Sys.getenv("TURAS_HOME", unset = ""), "modules", "shared", "lib")
+  )
+  .shared_lib_candidates <- .shared_lib_candidates[!is.null(.shared_lib_candidates) & nzchar(.shared_lib_candidates)]
 
-  .shared_lib_path <- file.path(dirname(.wl_script_dir), "shared", "lib")
-  if (!dir.exists(.shared_lib_path)) {
-    .shared_lib_path <- file.path(getwd(), "modules", "shared", "lib")
+  for (.candidate in .shared_lib_candidates) {
+    if (dir.exists(.candidate)) {
+      .shared_lib_path <- .candidate
+      break
+    }
   }
 
-  # Source weights_utils (it has no dependencies)
-  source(file.path(.shared_lib_path, "weights_utils.R"), local = FALSE)
+  if (!is.null(.shared_lib_path) && file.exists(file.path(.shared_lib_path, "weights_utils.R"))) {
+    # Source weights_utils (it has no dependencies)
+    source(file.path(.shared_lib_path, "weights_utils.R"), local = FALSE)
+  }
 
-  rm(.wl_script_dir, .shared_lib_path)
+  rm(list = c(".shared_lib_path", ".shared_lib_candidates", ".candidate")[
+    c(".shared_lib_path", ".shared_lib_candidates", ".candidate") %in% ls(all.names = TRUE)
+  ])
 }
 
 #' Extract Categorical Question Codes
