@@ -85,23 +85,19 @@ if (!exists("source_if_exists")) {
   }
 }
 
-# Source shared utilities
-source_if_exists("shared_functions.R")
-source_if_exists("Scripts/shared_functions.R")
-source_if_exists("weighting.R")
-source_if_exists("Scripts/weighting.R")
+# Determine module directory (script_dir should be set by run_crosstabs.R)
+.ranking_dir <- if (exists("script_dir") && !is.null(script_dir) && length(script_dir) > 0 && nzchar(script_dir[1])) {
+  script_dir[1]
+} else {
+  getwd()
+}
 
 # Source ranking modules (V10.0: Modular architecture)
-source_if_exists("ranking_validation.R")
-source_if_exists("modules/tabs/lib/ranking_validation.R")
-source_if_exists("ranking_extraction.R")
-source_if_exists("modules/tabs/lib/ranking_extraction.R")
-source_if_exists("ranking_calculations.R")
-source_if_exists("modules/tabs/lib/ranking_calculations.R")
-source_if_exists("ranking_statistics.R")
-source_if_exists("modules/tabs/lib/ranking_statistics.R")
-source_if_exists("ranking_banners.R")
-source_if_exists("modules/tabs/lib/ranking_banners.R")
+source_if_exists(file.path(.ranking_dir, "ranking_validation.R"))
+source_if_exists(file.path(.ranking_dir, "ranking_extraction.R"))
+source_if_exists(file.path(.ranking_dir, "ranking_calculations.R"))
+source_if_exists(file.path(.ranking_dir, "ranking_statistics.R"))
+source_if_exists(file.path(.ranking_dir, "ranking_banners.R"))
 
 # ==============================================================================
 # TRS v1.0: RANKING PARTIAL FAILURE TRACKING

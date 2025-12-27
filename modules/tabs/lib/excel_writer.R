@@ -87,17 +87,14 @@ if (!exists("find_turas_root", mode = "function")) {
 # ==============================================================================
 
 # Find the lib directory where this file is located
-.excel_lib_path <- if (exists(".turas_root")) {
+# Use script_dir which should be set by run_crosstabs.R
+.excel_lib_path <- if (exists("script_dir") && !is.null(script_dir) && length(script_dir) > 0 && nzchar(script_dir[1])) {
+  script_dir[1]
+} else if (exists(".turas_root")) {
   file.path(.turas_root, "modules", "tabs", "lib")
 } else {
-  # Fallback: determine from current file path
-  .this_file <- sys.frame(1)$ofile
-  if (!is.null(.this_file)) {
-    dirname(.this_file)
-  } else {
-    # Last resort: assume we're already in lib
-    getwd()
-  }
+  # Last resort: assume we're already in lib
+  getwd()
 }
 
 # Source sub-modules

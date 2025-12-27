@@ -70,36 +70,34 @@ if (!exists("source_if_exists")) {
   }
 }
 
-source_if_exists("shared_functions.R")
-source_if_exists("Scripts/shared_functions.R")
+# Determine module directory (script_dir should be set by run_crosstabs.R)
+.weighting_dir <- if (exists("script_dir") && !is.null(script_dir) && length(script_dir) > 0 && nzchar(script_dir[1])) {
+  script_dir[1]
+} else {
+  getwd()
+}
 
 # ==============================================================================
 # SOURCE WEIGHTING MODULES (V10.0: MODULAR ARCHITECTURE)
 # ==============================================================================
 
 # Weight extraction and validation
-source_if_exists("weighting_validation.R")
-source_if_exists("modules/tabs/lib/weighting_validation.R")
+source_if_exists(file.path(.weighting_dir, "weighting_validation.R"))
 
 # Core weighted calculations
-source_if_exists("weighting_calculations.R")
-source_if_exists("modules/tabs/lib/weighting_calculations.R")
+source_if_exists(file.path(.weighting_dir, "weighting_calculations.R"))
 
 # Base calculations for different question types
-source_if_exists("weighting_bases.R")
-source_if_exists("modules/tabs/lib/weighting_bases.R")
+source_if_exists(file.path(.weighting_dir, "weighting_bases.R"))
 
 # Significance testing (z-test, t-test)
-source_if_exists("weighting_tests.R")
-source_if_exists("modules/tabs/lib/weighting_tests.R")
+source_if_exists(file.path(.weighting_dir, "weighting_tests.R"))
 
 # Advanced tests (chi-square, net difference)
-source_if_exists("weighting_advanced.R")
-source_if_exists("modules/tabs/lib/weighting_advanced.R")
+source_if_exists(file.path(.weighting_dir, "weighting_advanced.R"))
 
 # Summary and diagnostics
-source_if_exists("weighting_summary.R")
-source_if_exists("modules/tabs/lib/weighting_summary.R")
+source_if_exists(file.path(.weighting_dir, "weighting_summary.R"))
 
 # ==============================================================================
 # MAINTENANCE DOCUMENTATION

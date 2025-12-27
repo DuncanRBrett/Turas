@@ -40,9 +40,8 @@ SCRIPT_VERSION <- "10.1"
 source_if_exists <- function(file_path) {
   if (file.exists(file_path)) {
     tryCatch({
-      # V9.9.2: Use sys.source with local environment to avoid global pollution
-      # while still making functions available in caller's environment
-      sys.source(file_path, envir = environment())
+      # Source into global environment so functions remain accessible
+      source(file_path, local = FALSE)
       invisible(NULL)
     }, error = function(e) {
       warning(sprintf(
@@ -55,25 +54,25 @@ source_if_exists <- function(file_path) {
   }
 }
 
-# Try to source shared_functions.R from expected locations
-source_if_exists("shared_functions.R")
-source_if_exists("Scripts/shared_functions.R")
+# Determine validation module directory (script_dir should be set by run_crosstabs.R)
+.validation_dir <- if (exists("script_dir") && !is.null(script_dir) && length(script_dir) > 0 && nzchar(script_dir[1])) {
+  script_dir[1]
+} else {
+  # Fallback: try to determine from this file's location
+  tryCatch({
+    dirname(sys.frame(1)$ofile)
+  }, error = function(e) {
+    getwd()
+  })
+}
 
-# Source validation modules
-source_if_exists("modules/tabs/lib/validation_structure.R")
-source_if_exists("modules/tabs/lib/validation_data.R")
-source_if_exists("modules/tabs/lib/validation_weighting.R")
-source_if_exists("modules/tabs/lib/validation_config.R")
-source_if_exists("modules/tabs/lib/validation_statistical.R")
-source_if_exists("modules/tabs/lib/validation_numeric.R")
-
-# Fallback for direct sourcing (when run from different working directories)
-source_if_exists("validation_structure.R")
-source_if_exists("validation_data.R")
-source_if_exists("validation_weighting.R")
-source_if_exists("validation_config.R")
-source_if_exists("validation_statistical.R")
-source_if_exists("validation_numeric.R")
+# Source validation modules from the same directory as this file
+source_if_exists(file.path(.validation_dir, "validation_structure.R"))
+source_if_exists(file.path(.validation_dir, "validation_data.R"))
+source_if_exists(file.path(.validation_dir, "validation_weighting.R"))
+source_if_exists(file.path(.validation_dir, "validation_config.R"))
+source_if_exists(file.path(.validation_dir, "validation_statistical.R"))
+source_if_exists(file.path(.validation_dir, "validation_numeric.R"))
 
 # ==============================================================================
 # HELPER FUNCTIONS (V9.9.2)
