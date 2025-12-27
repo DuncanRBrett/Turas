@@ -691,12 +691,14 @@ run_tracker_gui <- function() {
         }
 
         # Change to tracker directory
+        cat("[Tracker GUI] tracker_dir =", tracker_dir, "\n")
+        cat("[Tracker GUI] tracker_dir exists:", dir.exists(tracker_dir), "\n")
         setwd(tracker_dir)
+        cat("[Tracker GUI] After setwd, getwd() =", getwd(), "\n")
 
         # Source run_tracker.R
         progress$set(value = 0.2, detail = "Loading tracker modules...")
-        cat("[Tracker GUI] Current directory:", getwd(), "\n")
-        cat("[Tracker GUI] Sourcing run_tracker.R...\n")
+        cat("[Tracker GUI] file.exists('run_tracker.R') =", file.exists("run_tracker.R"), "\n")
 
         tryCatch({
           source("run_tracker.R")
