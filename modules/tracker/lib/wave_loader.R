@@ -28,7 +28,14 @@
 # Ensure shared utilities are available
 if (!exists("calculate_weight_efficiency", mode = "function")) {
   .wl_script_dir <- tryCatch({
-    dirname(sys.frame(1)$ofile)
+    ofile <- sys.frame(1)$ofile
+    if (!is.null(ofile) && length(ofile) > 0 && nzchar(ofile)) {
+      dirname(ofile)
+    } else if (exists("script_dir") && !is.null(script_dir) && length(script_dir) > 0 && nzchar(script_dir[1])) {
+      file.path(script_dir[1], "lib")
+    } else {
+      getwd()
+    }
   }, error = function(e) getwd())
 
   .shared_lib_path <- file.path(dirname(.wl_script_dir), "shared", "lib")

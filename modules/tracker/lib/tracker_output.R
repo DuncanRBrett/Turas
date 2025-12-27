@@ -54,7 +54,14 @@
 # Note: formatting_utils.R should already be loaded by run_tracker.R
 if (!exists("find_turas_root", mode = "function")) {
   .output_script_dir <- tryCatch({
-    dirname(sys.frame(1)$ofile)
+    ofile <- sys.frame(1)$ofile
+    if (!is.null(ofile) && length(ofile) > 0 && nzchar(ofile)) {
+      dirname(ofile)
+    } else if (exists("script_dir") && !is.null(script_dir) && length(script_dir) > 0 && nzchar(script_dir[1])) {
+      file.path(script_dir[1], "lib")
+    } else {
+      getwd()
+    }
   }, error = function(e) getwd())
 
   .shared_lib_path <- file.path(dirname(.output_script_dir), "shared", "lib")
@@ -72,9 +79,16 @@ if (!exists("find_turas_root", mode = "function")) {
 # Get the directory of this file for sourcing helper modules
 .output_lib_dir <- if (exists("TRACKER_LIB_DIR")) {
   TRACKER_LIB_DIR
+} else if (exists("script_dir") && !is.null(script_dir) && length(script_dir) > 0 && nzchar(script_dir[1])) {
+  file.path(script_dir[1], "lib")
 } else {
   tryCatch({
-    dirname(sys.frame(1)$ofile)
+    ofile <- sys.frame(1)$ofile
+    if (!is.null(ofile) && length(ofile) > 0 && nzchar(ofile)) {
+      dirname(ofile)
+    } else {
+      getwd()
+    }
   }, error = function(e) getwd())
 }
 

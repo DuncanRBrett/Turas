@@ -63,8 +63,17 @@
 # Get the directory of this file
 .trend_calc_dir <- if (exists("TRACKER_LIB_DIR")) {
   TRACKER_LIB_DIR
+} else if (exists("script_dir") && !is.null(script_dir) && length(script_dir) > 0 && nzchar(script_dir[1])) {
+  file.path(script_dir[1], "lib")
 } else {
-  dirname(sys.frame(1)$ofile)
+  tryCatch({
+    ofile <- sys.frame(1)$ofile
+    if (!is.null(ofile) && length(ofile) > 0 && nzchar(ofile)) {
+      dirname(ofile)
+    } else {
+      getwd()
+    }
+  }, error = function(e) getwd())
 }
 
 # Source dependencies in correct order

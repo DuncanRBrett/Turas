@@ -27,7 +27,14 @@
 
 # Get script directory for sourcing guard layer
 .stat_script_dir <- tryCatch({
-  dirname(sys.frame(1)$ofile)
+  ofile <- sys.frame(1)$ofile
+  if (!is.null(ofile) && length(ofile) > 0 && nzchar(ofile)) {
+    dirname(ofile)
+  } else if (exists("script_dir") && !is.null(script_dir) && length(script_dir) > 0 && nzchar(script_dir[1])) {
+    file.path(script_dir[1], "lib")
+  } else {
+    getwd()
+  }
 }, error = function(e) getwd())
 
 # Source TRS guard layer if not already loaded

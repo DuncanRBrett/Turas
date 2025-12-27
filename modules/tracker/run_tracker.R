@@ -21,9 +21,22 @@
 library(openxlsx)
 
 # Source module files
-# When run from GUI, sys.frame(1)$ofile is NULL, so use getwd() as fallback
+# When run from GUI or Jupyter, sys.frame(1)$ofile may be NULL
 script_dir <- tryCatch({
-  dirname(sys.frame(1)$ofile)
+  ofile <- sys.frame(1)$ofile
+  if (!is.null(ofile) && length(ofile) > 0 && nzchar(ofile)) {
+    dirname(ofile)
+  } else if (exists("toolkit_path") && !is.null(toolkit_path) && length(toolkit_path) > 0 && nzchar(toolkit_path[1])) {
+    dirname(toolkit_path[1])
+  } else {
+    # Fallback: look for the tracker directory
+    candidates <- c(
+      file.path(getwd(), "modules", "tracker"),
+      getwd()
+    )
+    found <- candidates[dir.exists(candidates)][1]
+    if (is.na(found)) getwd() else found
+  }
 }, error = function(e) {
   getwd()
 })
@@ -553,7 +566,17 @@ test_tracker_foundation <- function(use_synthetic_data = FALSE) {
 
   cat("Running tracker foundation test...\n\n")
 
-  script_dir <- dirname(sys.frame(1)$ofile)
+  # Get script directory safely
+  script_dir <- tryCatch({
+    ofile <- sys.frame(1)$ofile
+    if (!is.null(ofile) && length(ofile) > 0 && nzchar(ofile)) {
+      dirname(ofile)
+    } else {
+      file.path(getwd(), "modules", "tracker")
+    }
+  }, error = function(e) {
+    file.path(getwd(), "modules", "tracker")
+  })
 
   # Use template config files
   tracking_config_path <- file.path(script_dir, "tracking_config_template.xlsx")
