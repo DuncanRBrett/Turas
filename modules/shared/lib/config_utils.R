@@ -34,11 +34,20 @@ load_config_sheet <- function(file_path, sheet_name = "Settings") {
 
     # Validate structure
     if (!all(c("Setting", "Value") %in% names(config_df))) {
-      stop(sprintf(
-        "Config sheet '%s' must have 'Setting' and 'Value' columns.\nFound: %s",
-        sheet_name,
-        paste(names(config_df), collapse = ", ")
-      ))
+      turas_refuse(
+        code = "CFG_INVALID_SHEET_STRUCTURE",
+        title = "Invalid Configuration Sheet Structure",
+        problem = sprintf("Config sheet '%s' must have 'Setting' and 'Value' columns, but these were not found.", sheet_name),
+        why_it_matters = "Configuration cannot be loaded without the required column structure.",
+        how_to_fix = c(
+          sprintf("Open %s in Excel", basename(file_path)),
+          sprintf("Navigate to the '%s' sheet", sheet_name),
+          "Ensure the sheet has exactly two columns named 'Setting' and 'Value'",
+          sprintf("Current columns found: %s", paste(names(config_df), collapse = ", "))
+        ),
+        expected = c("Setting", "Value"),
+        observed = names(config_df)
+      )
     }
 
     # Check for data
@@ -53,11 +62,19 @@ load_config_sheet <- function(file_path, sheet_name = "Settings") {
 
     duplicates <- setting_names[duplicated(setting_names)]
     if (length(duplicates) > 0) {
-      stop(sprintf(
-        "Config sheet '%s' contains duplicate Setting names: %s\n\nThis is dangerous in production - the last value would silently override earlier ones.\nPlease fix the config file to have unique Setting names.",
-        sheet_name,
-        paste(unique(duplicates), collapse = ", ")
-      ), call. = FALSE)
+      turas_refuse(
+        code = "CFG_DUPLICATE_SETTINGS",
+        title = "Duplicate Setting Names in Configuration",
+        problem = sprintf("Config sheet '%s' contains duplicate Setting names.", sheet_name),
+        why_it_matters = "Duplicate settings are dangerous - the last value would silently override earlier ones, leading to unpredictable behavior.",
+        how_to_fix = c(
+          sprintf("Open %s in Excel", basename(file_path)),
+          sprintf("Navigate to the '%s' sheet", sheet_name),
+          "Find and remove or rename the duplicate Setting names listed below",
+          "Ensure each Setting name appears only once"
+        ),
+        observed = unique(duplicates)
+      )
     }
 
     # Convert to named list
@@ -77,12 +94,19 @@ load_config_sheet <- function(file_path, sheet_name = "Settings") {
     return(config_list)
 
   }, error = function(e) {
-    stop(sprintf(
-      "Failed to load config sheet '%s' from %s\nError: %s\n\nTroubleshooting:\n  1. Verify sheet name exists\n  2. Check file is not corrupted\n  3. Ensure file is not open in Excel",
-      sheet_name,
-      basename(file_path),
-      conditionMessage(e)
-    ), call. = FALSE)
+    turas_refuse(
+      code = "IO_CONFIG_LOAD_FAILED",
+      title = "Failed to Load Configuration Sheet",
+      problem = sprintf("Could not load sheet '%s' from %s", sheet_name, basename(file_path)),
+      why_it_matters = "Configuration must be loaded to proceed with analysis.",
+      how_to_fix = c(
+        "Verify the sheet name exists in the Excel file",
+        "Check that the file is not corrupted",
+        "Ensure the file is not currently open in Excel",
+        "Try opening the file manually to verify it's accessible"
+      ),
+      details = conditionMessage(e)
+    )
   })
 }
 
@@ -113,11 +137,19 @@ get_config_value <- function(config_list, setting_name, default_value = NULL,
   # Handle missing value
   if (is.null(value) || (length(value) == 1 && is.na(value))) {
     if (required && is.null(default_value)) {
-      stop(sprintf(
-        "Required setting '%s' not found in configuration\n\nAvailable settings:\n  %s",
-        setting_name,
-        paste(head(names(config_list), 20), collapse = "\n  ")
-      ), call. = FALSE)
+      turas_refuse(
+        code = "CFG_REQUIRED_SETTING_MISSING",
+        title = "Required Configuration Setting Missing",
+        problem = sprintf("Required setting '%s' not found in configuration.", setting_name),
+        why_it_matters = "This setting is required for the analysis to proceed.",
+        how_to_fix = c(
+          "Add the missing setting to your configuration file",
+          sprintf("Setting name: '%s'", setting_name),
+          "Check the available settings listed below to ensure correct spelling"
+        ),
+        missing = setting_name,
+        observed = head(names(config_list), 20)
+      )
     }
     return(default_value)
   }
@@ -146,11 +178,19 @@ get_numeric_config <- function(config_list, setting_name, default_value = NULL,
   numeric_value <- suppressWarnings(as.numeric(value))
 
   if (is.na(numeric_value)) {
-    stop(sprintf(
-      "Setting '%s' must be numeric, got: %s",
-      setting_name,
-      if (is.null(value)) "NULL" else as.character(value)
-    ), call. = FALSE)
+    turas_refuse(
+      code = "CFG_INVALID_NUMERIC_VALUE",
+      title = "Invalid Numeric Configuration Value",
+      problem = sprintf("Setting '%s' must be numeric.", setting_name),
+      why_it_matters = "Numeric settings must contain valid numbers for calculations to work correctly.",
+      how_to_fix = c(
+        sprintf("Open your configuration file and locate setting '%s'", setting_name),
+        "Ensure the value is a valid number (e.g., 0.95, 100, -5)",
+        "Remove any text, special characters, or formatting"
+      ),
+      expected = "numeric value",
+      observed = if (is.null(value)) "NULL" else as.character(value)
+    )
   }
 
   # Validate range
@@ -218,7 +258,17 @@ get_char_config <- function(config_list, setting_name, default_value = NULL,
 resolve_path <- function(base_path, relative_path) {
   # Validate inputs
   if (is.null(base_path) || is.na(base_path) || base_path == "") {
-    stop("base_path cannot be empty", call. = FALSE)
+    turas_refuse(
+      code = "IO_INVALID_BASE_PATH",
+      title = "Invalid Base Path",
+      problem = "base_path parameter cannot be empty or NULL.",
+      why_it_matters = "A valid base path is required to resolve relative file paths.",
+      how_to_fix = c(
+        "Ensure base_path parameter is provided",
+        "Check that the path is a valid directory",
+        "Use an absolute path or ensure the directory exists"
+      )
+    )
   }
 
   if (is.null(relative_path) || is.na(relative_path) || relative_path == "") {
@@ -291,9 +341,19 @@ find_turas_root <- function() {
     current_dir <- dirname(current_dir)
   }
 
-  stop(paste0(
-    "Cannot locate Turas root directory.\n",
-    "Please run from within the Turas directory structure.\n",
-    "Current working directory: ", getwd()
-  ), call. = FALSE)
+  turas_refuse(
+    code = "IO_TURAS_ROOT_NOT_FOUND",
+    title = "Cannot Locate Turas Root Directory",
+    problem = "Could not find the Turas root directory by searching up from the current location.",
+    why_it_matters = "Turas needs to locate its root directory to access shared modules and resources.",
+    how_to_fix = c(
+      "Ensure you are running from within the Turas directory structure",
+      "Check that one of these files/folders exists in your Turas installation:",
+      "  - launch_turas.R",
+      "  - turas.R",
+      "  - modules/shared/",
+      sprintf("Current working directory: %s", getwd()),
+      "Consider setting the TURAS_ROOT environment variable to point to your Turas installation"
+    )
+  )
 }

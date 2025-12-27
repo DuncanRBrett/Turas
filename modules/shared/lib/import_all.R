@@ -31,7 +31,29 @@
     file.path(dirname(dirname(getwd())), "modules/shared/lib")
   )
   found <- test_paths[dir.exists(test_paths)]
-  if (length(found) > 0) found[1] else stop("Cannot locate shared/lib directory")
+  if (length(found) > 0) {
+    found[1]
+  } else {
+    # Cannot use turas_refuse here as trs_refusal.R hasn't been loaded yet
+    # Provide TRS-style error message manually
+    stop(paste0(
+      "\n", paste0(rep("=", 80), collapse = ""), "\n",
+      "  [REFUSE] IO_SHARED_LIB_NOT_FOUND: Cannot Locate Shared Library Directory\n",
+      paste0(rep("=", 80), collapse = ""), "\n\n",
+      "Problem:\n",
+      "  Cannot locate the modules/shared/lib directory from the current location.\n\n",
+      "Why it matters:\n",
+      "  Turas shared utilities must be found to load required functions.\n\n",
+      "How to fix:\n",
+      "  1. Ensure you are running from within the Turas directory structure\n",
+      "  2. Check that modules/shared/lib/ exists in your Turas installation\n",
+      "  3. Verify your working directory is set correctly\n",
+      "  4. Current working directory: ", getwd(), "\n",
+      "  5. Searched in:\n",
+      paste0("     - ", test_paths, collapse = "\n"), "\n\n",
+      paste0(rep("=", 80), collapse = ""), "\n"
+    ), call. = FALSE)
+  }
 }
 
 # Source in dependency order

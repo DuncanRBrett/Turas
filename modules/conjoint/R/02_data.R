@@ -39,12 +39,17 @@ load_conjoint_data <- function(data_file, config, verbose = TRUE) {
 
   # Validate file exists
   if (!file.exists(data_file)) {
-    stop(create_error(
-      "DATA",
-      sprintf("Data file not found: %s", data_file),
-      "Verify the file path is correct",
-      sprintf("Expected location: %s", data_file)
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "IO_DATA_FILE_NOT_FOUND",
+      title = "Data File Not Found",
+      problem = sprintf("Data file not found: %s", data_file),
+      why_it_matters = "The data file contains the survey responses needed for conjoint analysis.",
+      how_to_fix = c(
+        "Verify the file path is correct in your configuration",
+        "Check that the file exists at the specified location",
+        sprintf("Expected location: %s", data_file)
+      )
+    )
   }
 
   # Check data source type from config
@@ -91,11 +96,17 @@ load_conjoint_data <- function(data_file, config, verbose = TRUE) {
 
   # Basic validation
   if (nrow(data) == 0) {
-    stop(create_error(
-      "DATA",
-      "Data file is empty",
-      "Ensure your data export contains rows"
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "DATA_FILE_EMPTY",
+      title = "Data File Is Empty",
+      problem = "Data file contains no rows.",
+      why_it_matters = "Cannot perform analysis without survey response data.",
+      how_to_fix = c(
+        "Ensure your data export contains rows",
+        "Check that the survey has responses",
+        sprintf("File: %s", data_file)
+      )
+    )
   }
 
   log_verbose(sprintf("  ✓ Loaded %d rows", nrow(data)), verbose)
@@ -109,12 +120,17 @@ load_conjoint_data <- function(data_file, config, verbose = TRUE) {
 
   # Handle validation results
   if (!validation_result$is_valid) {
-    error_msg <- create_error(
-      "DATA",
-      "Data validation failed",
-      paste(validation_result$errors, collapse = "\n → ")
+    conjoint_refuse(
+      code = "DATA_VALIDATION_FAILED",
+      title = "Data Validation Failed",
+      problem = "Data file contains errors that prevent analysis.",
+      why_it_matters = "Invalid data structure or values will cause analysis to fail or produce incorrect results.",
+      how_to_fix = c(
+        "Review and fix the following validation errors:",
+        validation_result$errors
+      ),
+      details = paste(validation_result$errors, collapse = "; ")
     )
-    stop(error_msg, call. = FALSE)
   }
 
   # Print warnings
@@ -164,18 +180,31 @@ load_data_by_type <- function(data_file) {
         require_package("haven", "Package 'haven' required for Stata files.\nInstall with: install.packages('haven')")
         haven::read_dta(data_file)
       },
-      stop(create_error(
-        "DATA",
-        sprintf("Unsupported file format: .%s", file_ext),
-        "Supported formats: CSV, XLSX, XLS, SAV (SPSS), DTA (Stata)"
-      ), call. = FALSE)
+      conjoint_refuse(
+        code = "IO_UNSUPPORTED_FILE_FORMAT",
+        title = "Unsupported File Format",
+        problem = sprintf("Unsupported file format: .%s", file_ext),
+        why_it_matters = "The data loader can only read specific file formats.",
+        how_to_fix = c(
+          "Convert your data to a supported format",
+          "Supported formats: CSV, XLSX, XLS, SAV (SPSS), DTA (Stata)",
+          sprintf("Your file: %s", basename(data_file))
+        )
+      )
     )
   }, error = function(e) {
-    stop(create_error(
-      "DATA",
-      sprintf("Failed to load data file: %s", conditionMessage(e)),
-      "Check that the file is not corrupted or open in another program"
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "IO_DATA_FILE_READ_ERROR",
+      title = "Data File Read Failed",
+      problem = sprintf("Failed to load data file: %s", conditionMessage(e)),
+      why_it_matters = "Cannot proceed with analysis without loading the survey response data.",
+      how_to_fix = c(
+        "Check that the file is not corrupted",
+        "Ensure the file is not open in another program",
+        "Verify the file format matches its extension",
+        sprintf("File: %s", data_file)
+      )
+    )
   })
 
   data

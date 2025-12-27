@@ -30,7 +30,13 @@ write_pricing_output <- function(results, plots, validation, config, output_file
                                  synthesis = NULL, run_result = NULL) {
 
   if (!requireNamespace("openxlsx", quietly = TRUE)) {
-    stop("Package 'openxlsx' is required for Excel output", call. = FALSE)
+    pricing_refuse(
+      code = "PKG_OPENXLSX_MISSING",
+      title = "Required Package Missing",
+      problem = "Package 'openxlsx' is not installed",
+      why_it_matters = "Cannot write Excel output files without openxlsx package",
+      how_to_fix = "Install the package: install.packages('openxlsx')"
+    )
   }
 
   # Create output directory if needed
@@ -776,7 +782,19 @@ write_pricing_output <- function(results, plots, validation, config, output_file
   if (exists("turas_save_workbook_atomic", mode = "function")) {
     save_result <- turas_save_workbook_atomic(wb, output_file, run_result = run_result, module = "PRICE")
     if (!save_result$success) {
-      stop(sprintf("Failed to save Excel file: %s\nPath: %s", save_result$error, output_file), call. = FALSE)
+      pricing_refuse(
+        code = "IO_SAVE_FAILED",
+        title = "Failed to Save Excel File",
+        problem = sprintf("Could not write output file: %s", save_result$error),
+        why_it_matters = "Results cannot be saved and will be lost",
+        how_to_fix = c(
+          "Check write permissions for the output directory",
+          "Ensure the file is not open in another program",
+          "Verify sufficient disk space is available"
+        ),
+        observed = sprintf("Error: %s", save_result$error),
+        expected = sprintf("File saved to: %s", output_file)
+      )
     }
   } else {
     openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)

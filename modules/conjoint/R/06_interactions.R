@@ -43,13 +43,26 @@ specify_interactions <- function(attributes,
   if (length(interactions) > 0) {
     for (int in interactions) {
       if (length(int) < 2) {
-        stop("Each interaction must involve at least 2 attributes")
+        conjoint_refuse(
+          code = "CFG_INTERACTION_TOO_FEW_ATTRS",
+          title = "Invalid Interaction Specification",
+          problem = "Each interaction must involve at least 2 attributes",
+          why_it_matters = "Interaction effects test how the effect of one attribute depends on another, requiring at least two attributes.",
+          how_to_fix = "Specify interactions as character vectors with 2+ attribute names, e.g., c('Price', 'Brand')"
+        )
       }
 
       missing_attrs <- setdiff(int, attributes)
       if (length(missing_attrs) > 0) {
-        stop(sprintf("Interaction attributes not found: %s",
-                     paste(missing_attrs, collapse = ", ")))
+        conjoint_refuse(
+          code = "CFG_INTERACTION_ATTR_NOT_FOUND",
+          title = "Interaction Attributes Not Found",
+          problem = sprintf("Interaction attributes not found: %s",
+                           paste(missing_attrs, collapse = ", ")),
+          why_it_matters = "All attributes in an interaction must exist in your conjoint design.",
+          how_to_fix = sprintf("Ensure these attributes are in your configuration: %s",
+                              paste(missing_attrs, collapse = ", "))
+        )
       }
     }
   }
@@ -119,7 +132,13 @@ estimate_with_interactions <- function(data_list,
       data_with_int, config_with_int, verbose = verbose
     )
   } else {
-    stop("Interaction effects only supported with mlogit estimation method")
+    conjoint_refuse(
+      code = "MODEL_INTERACTION_METHOD_NOT_SUPPORTED",
+      title = "Interaction Effects Not Supported for This Method",
+      problem = "Interaction effects only supported with mlogit estimation method",
+      why_it_matters = "Only multinomial logit models can estimate interaction effects in the current implementation.",
+      how_to_fix = "Set estimation_method to 'mlogit' or 'auto' in your configuration"
+    )
   }
 
   # Add interaction information to result
@@ -189,7 +208,13 @@ add_interactions_to_config <- function(config, interaction_spec) {
 estimate_mlogit_with_interactions <- function(data, config, verbose = TRUE) {
 
   if (!requireNamespace("mlogit", quietly = TRUE)) {
-    stop("Package 'mlogit' required for interaction effects. Install with: install.packages('mlogit')")
+    conjoint_refuse(
+      code = "PKG_MLOGIT_NOT_INSTALLED",
+      title = "mlogit Package Not Installed",
+      problem = "Package 'mlogit' required for interaction effects",
+      why_it_matters = "Interaction effects estimation requires the mlogit package for multinomial logit models.",
+      how_to_fix = "Install mlogit with: install.packages('mlogit')"
+    )
   }
 
   # Prepare formula with interactions
@@ -210,12 +235,18 @@ estimate_mlogit_with_interactions <- function(data, config, verbose = TRUE) {
       reflevel = 1  # First alternative as reference
     )
   }, error = function(e) {
-    stop(create_error(
-      "ESTIMATION",
-      sprintf("mlogit with interactions failed: %s", conditionMessage(e)),
-      "Try reducing number of interactions or check for perfect separation",
-      sprintf("Formula: %s", deparse(formula))
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "EST_MLOGIT_INTERACTION_FAILED",
+      title = "mlogit with Interactions Failed",
+      problem = sprintf("mlogit with interactions failed: %s", conditionMessage(e)),
+      why_it_matters = "The model could not be estimated with the specified interaction terms.",
+      how_to_fix = c(
+        "Try reducing the number of interactions",
+        "Check for perfect separation in the data",
+        "Ensure sufficient observations for all interaction combinations"
+      ),
+      details = sprintf("Formula: %s", deparse(formula))
+    )
   })
 
   # Extract results
@@ -258,7 +289,13 @@ build_interaction_formula <- function(config) {
 analyze_interaction <- function(model_result, interaction_term, config) {
 
   if (!model_result$has_interactions) {
-    stop("Model does not include interaction effects")
+    conjoint_refuse(
+      code = "MODEL_NO_INTERACTIONS",
+      title = "Model Has No Interaction Effects",
+      problem = "Model does not include interaction effects",
+      why_it_matters = "Cannot analyze interactions if the model wasn't estimated with interaction terms.",
+      how_to_fix = "Re-estimate the model using estimate_with_interactions() to include interaction effects"
+    )
   }
 
   int_name <- paste(interaction_term, collapse = "_x_")
@@ -267,7 +304,13 @@ analyze_interaction <- function(model_result, interaction_term, config) {
   int_coefs <- model_result$coefficients[grepl(int_name, names(model_result$coefficients))]
 
   if (length(int_coefs) == 0) {
-    stop(sprintf("Interaction %s not found in model", int_name))
+    conjoint_refuse(
+      code = "MODEL_INTERACTION_NOT_FOUND",
+      title = "Interaction Term Not Found",
+      problem = sprintf("Interaction %s not found in model", int_name),
+      why_it_matters = "The requested interaction was not included when the model was estimated.",
+      how_to_fix = sprintf("Ensure '%s' is included in the interaction specification when estimating the model", int_name)
+    )
   }
 
   # Parse interaction combinations

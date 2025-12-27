@@ -37,11 +37,23 @@ predict_market_shares <- function(products,
 
   # Input validation
   if (!is.list(products) || length(products) == 0) {
-    stop("'products' must be a non-empty list of product configurations")
+    conjoint_refuse(
+      code = "CFG_SIMULATOR_INVALID_PRODUCTS",
+      title = "Invalid Products Configuration",
+      problem = "'products' must be a non-empty list of product configurations",
+      why_it_matters = "The market simulator requires at least one product configuration to predict market shares.",
+      how_to_fix = "Provide a list of product configurations, each as a named list of attribute levels"
+    )
   }
 
   if (!all(c("Attribute", "Level", "Utility") %in% names(utilities))) {
-    stop("'utilities' must have columns: Attribute, Level, Utility")
+    conjoint_refuse(
+      code = "DATA_SIMULATOR_INVALID_UTILITIES",
+      title = "Invalid Utilities Data Frame",
+      problem = "'utilities' must have columns: Attribute, Level, Utility",
+      why_it_matters = "The market simulator needs part-worth utilities to calculate product preferences.",
+      how_to_fix = "Ensure utilities data frame has 'Attribute', 'Level', and 'Utility' columns"
+    )
   }
 
   # Default availability (all products equally available)
@@ -50,7 +62,13 @@ predict_market_shares <- function(products,
   }
 
   if (length(availability) != length(products)) {
-    stop("'availability' must have same length as number of products")
+    conjoint_refuse(
+      code = "CFG_SIMULATOR_AVAILABILITY_MISMATCH",
+      title = "Availability Vector Length Mismatch",
+      problem = "'availability' must have same length as number of products",
+      why_it_matters = "Each product needs an availability weight to calculate accurate market shares.",
+      how_to_fix = sprintf("Provide %d availability values (one per product), or leave NULL for equal availability", length(products))
+    )
   }
 
   # Calculate total utility for each product
@@ -63,7 +81,13 @@ predict_market_shares <- function(products,
     logit = predict_shares_logit(product_utilities, availability),
     first_choice = predict_shares_first_choice(product_utilities, availability),
     randomized_first_choice = predict_shares_randomized_first_choice(product_utilities, availability),
-    stop(sprintf("Unknown method: %s. Use 'logit', 'first_choice', or 'randomized_first_choice'", method))
+    conjoint_refuse(
+      code = "CFG_SIMULATOR_UNKNOWN_METHOD",
+      title = "Unknown Simulation Method",
+      problem = sprintf("Unknown method: %s", method),
+      why_it_matters = "The simulator requires a valid prediction method to calculate market shares.",
+      how_to_fix = "Use one of: 'logit', 'first_choice', or 'randomized_first_choice'"
+    )
   )
 
   # Create result data frame
@@ -303,7 +327,13 @@ sensitivity_two_way <- function(base_product,
 compare_scenarios <- function(scenarios, utilities, method = "logit") {
 
   if (!is.list(scenarios) || is.null(names(scenarios))) {
-    stop("'scenarios' must be a named list of product configurations")
+    conjoint_refuse(
+      code = "CFG_SIMULATOR_INVALID_SCENARIOS",
+      title = "Invalid Scenarios Configuration",
+      problem = "'scenarios' must be a named list of product configurations",
+      why_it_matters = "Scenario comparison requires named scenarios to distinguish between different market conditions.",
+      how_to_fix = "Provide a named list where each element is a scenario name with corresponding product configurations"
+    )
   }
 
   results <- lapply(names(scenarios), function(scenario_name) {

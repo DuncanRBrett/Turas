@@ -417,7 +417,19 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
   if (exists("turas_save_workbook_atomic", mode = "function")) {
     save_result <- turas_save_workbook_atomic(wb, output_file, module = "KDA")
     if (!save_result$success) {
-      stop(sprintf("Failed to save Excel file: %s\nPath: %s", save_result$error, output_file), call. = FALSE)
+      keydriver_refuse(
+        code = "IO_OUTPUT_ERROR",
+        title = "Failed to Save Output File",
+        problem = sprintf("Could not save Excel output file to '%s'.", output_file),
+        why_it_matters = "Results cannot be delivered without the output file. Analysis is complete but unusable.",
+        how_to_fix = c(
+          "Check that the output directory exists and is writable",
+          "Ensure the file is not open in Excel or locked by another process",
+          "Verify you have write permissions for the target directory",
+          sprintf("Error details: %s", save_result$error)
+        ),
+        details = sprintf("Attempted path: %s", output_file)
+      )
     }
   } else {
     openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)

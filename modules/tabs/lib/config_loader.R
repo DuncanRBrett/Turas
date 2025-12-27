@@ -26,7 +26,16 @@ load_crosstab_configuration <- function(config_file, project_root = NULL) {
   
   # Validate config file exists
   if (!file.exists(config_file)) {
-    stop(sprintf("Configuration file not found: %s", config_file))
+    tabs_refuse(
+      code = "IO_FILE_NOT_FOUND",
+      title = "Configuration File Not Found",
+      problem = sprintf("Configuration file not found: %s", config_file),
+      why_it_matters = "Cannot load crosstab configuration without the config file.",
+      how_to_fix = c(
+        "Verify the config file path is correct",
+        "Check that the file exists in the specified location"
+      )
+    )
   }
   
   # Determine project root if not provided
@@ -84,11 +93,16 @@ load_config_settings <- function(config_file, sheet_name = "Settings") {
     
     # Validate structure
     if (!all(c("Setting", "Value") %in% names(config_df))) {
-      stop(sprintf(
-        "Config sheet '%s' must have 'Setting' and 'Value' columns.\nFound: %s",
-        sheet_name,
-        paste(names(config_df), collapse = ", ")
-      ))
+      tabs_refuse(
+        code = "CFG_INVALID_STRUCTURE",
+        title = "Invalid Config Sheet Structure",
+        problem = sprintf("Config sheet '%s' must have 'Setting' and 'Value' columns.\nFound: %s", sheet_name, paste(names(config_df), collapse = ", ")),
+        why_it_matters = "The Settings sheet requires specific column names for proper configuration loading.",
+        how_to_fix = c(
+          "Add 'Setting' and 'Value' columns to the config sheet",
+          "Check column name spelling (case-sensitive)"
+        )
+      )
     }
     
     # Check for data
@@ -103,11 +117,16 @@ load_config_settings <- function(config_file, sheet_name = "Settings") {
     
     duplicates <- setting_names[duplicated(setting_names)]
     if (length(duplicates) > 0) {
-      stop(sprintf(
-        "Config sheet '%s' contains duplicate Setting names: %s\nPlease ensure all Setting names are unique.",
-        sheet_name,
-        paste(unique(duplicates), collapse = ", ")
-      ), call. = FALSE)
+      tabs_refuse(
+        code = "CFG_DUPLICATE_SETTING",
+        title = "Duplicate Configuration Settings",
+        problem = sprintf("Config sheet '%s' contains duplicate Setting names: %s", sheet_name, paste(unique(duplicates), collapse = ", ")),
+        why_it_matters = "Duplicate settings cause ambiguity - only the last value would be used.",
+        how_to_fix = c(
+          "Remove or rename duplicate Setting rows in the config sheet",
+          "Ensure all Setting names are unique"
+        )
+      )
     }
     
     # Convert to named list
@@ -123,12 +142,17 @@ load_config_settings <- function(config_file, sheet_name = "Settings") {
     return(config_list)
     
   }, error = function(e) {
-    stop(sprintf(
-      "Failed to load config sheet '%s' from %s\nError: %s",
-      sheet_name,
-      basename(config_file),
-      conditionMessage(e)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "IO_READ_ERROR",
+      title = "Failed to Load Config Sheet",
+      problem = sprintf("Failed to load config sheet '%s' from %s\nError: %s", sheet_name, basename(config_file), conditionMessage(e)),
+      why_it_matters = "Cannot proceed without loading configuration settings.",
+      how_to_fix = c(
+        "Verify the Excel file is not corrupted",
+        "Check that the sheet exists in the file",
+        "Ensure the file is not open in Excel"
+      )
+    )
   })
 }
 
@@ -150,11 +174,17 @@ get_config_value <- function(config_list, setting_name, default_value = NULL,
   # Handle missing value
   if (is.null(value) || (length(value) == 1 && is.na(value))) {
     if (required && is.null(default_value)) {
-      stop(sprintf(
-        "Required setting '%s' not found in configuration\n\nAvailable settings:\n  %s",
-        setting_name,
-        paste(head(names(config_list), 20), collapse = "\n  ")
-      ), call. = FALSE)
+      tabs_refuse(
+        code = "CFG_MISSING_SETTING",
+        title = "Required Setting Not Found",
+        problem = sprintf("Required setting '%s' not found in configuration.", setting_name),
+        why_it_matters = "This setting is required for the analysis to run properly.",
+        how_to_fix = c(
+          sprintf("Add '%s' to the Settings sheet", setting_name),
+          "Check available settings listed in the error message"
+        ),
+        missing = setting_name
+      )
     }
     return(default_value)
   }
@@ -315,7 +345,16 @@ resolve_config_paths <- function(settings, project_root) {
   
   # Validate structure file exists
   if (!file.exists(structure_path)) {
-    stop(sprintf("Survey structure file not found: %s", structure_path))
+    tabs_refuse(
+      code = "IO_FILE_NOT_FOUND",
+      title = "Survey Structure File Not Found",
+      problem = sprintf("Survey structure file not found: %s", structure_path),
+      why_it_matters = "Cannot proceed without the Survey_Structure.xlsx file.",
+      how_to_fix = c(
+        "Verify the structure_file path in Settings is correct",
+        "Check that Survey_Structure.xlsx exists at the specified location"
+      )
+    )
   }
   
   # Read the Project sheet from Survey_Structure to get data_file
@@ -326,7 +365,17 @@ resolve_config_paths <- function(settings, project_root) {
     data_file <- data_file_row$Value[1]
     survey_data_path <- resolve_path(project_root, data_file)
   } else {
-    stop("data_file not found in Survey_Structure.xlsx Project sheet")
+    tabs_refuse(
+      code = "CFG_MISSING_SETTING",
+      title = "Missing data_file Setting",
+      problem = "data_file not found in Survey_Structure.xlsx Project sheet.",
+      why_it_matters = "The data_file setting specifies which data file to analyze.",
+      how_to_fix = c(
+        "Add a row with Setting='data_file' to the Project sheet",
+        "Set Value to the path of your data file (e.g., 'Data/survey.xlsx')"
+      ),
+      missing = "data_file"
+    )
   }
   
   # Get output directory
@@ -358,11 +407,23 @@ resolve_config_paths <- function(settings, project_root) {
 resolve_path <- function(base_path, relative_path) {
   
   if (is.null(base_path) || is.na(base_path) || base_path == "") {
-    stop("base_path cannot be empty", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_VALUE",
+      title = "Invalid Base Path",
+      problem = "base_path cannot be empty.",
+      why_it_matters = "A valid base path is required to resolve relative file paths.",
+      how_to_fix = "This is an internal error - check path resolution logic"
+    )
   }
-  
+
   if (is.null(relative_path) || is.na(relative_path) || relative_path == "") {
-    stop("relative_path cannot be empty", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_VALUE",
+      title = "Invalid Relative Path",
+      problem = "relative_path cannot be empty.",
+      why_it_matters = "A valid relative path is required to resolve to an absolute path.",
+      how_to_fix = "This is an internal error - check path resolution logic"
+    )
   }
   
   # Handle absolute paths
@@ -402,10 +463,16 @@ load_question_selection <- function(config_file) {
     missing_cols <- setdiff(required_cols, names(selection_df))
     
     if (length(missing_cols) > 0) {
-      stop(sprintf(
-        "Selection sheet missing required columns: %s",
-        paste(missing_cols, collapse = ", ")
-      ))
+      tabs_refuse(
+        code = "CFG_MISSING_COLUMN",
+        title = "Missing Columns in Selection Sheet",
+        problem = sprintf("Selection sheet missing required columns: %s", paste(missing_cols, collapse = ", ")),
+        why_it_matters = "The Selection sheet requires QuestionCode to identify which questions to include.",
+        how_to_fix = c(
+          "Add a QuestionCode column to the Selection sheet",
+          "Check column name spelling (case-sensitive)"
+        )
+      )
     }
     
     # Apply defaults for optional columns
@@ -435,11 +502,29 @@ load_question_selection <- function(config_file) {
     stub_questions <- selection_df[selection_df$Include == "Y", ]
     
     if (nrow(banner_questions) == 0) {
-      stop("No banner questions selected (UseBanner='Y')")
+      tabs_refuse(
+        code = "CFG_NO_BANNER_QUESTIONS",
+        title = "No Banner Questions Selected",
+        problem = "No banner questions selected (UseBanner='Y').",
+        why_it_matters = "At least one banner question is required for crosstab analysis.",
+        how_to_fix = c(
+          "Set UseBanner='Y' for at least one question in the Selection sheet",
+          "Banner questions define the columns of the crosstab"
+        )
+      )
     }
-    
+
     if (nrow(stub_questions) == 0) {
-      stop("No stub questions selected (Include='Y')")
+      tabs_refuse(
+        code = "CFG_NO_STUB_QUESTIONS",
+        title = "No Stub Questions Selected",
+        problem = "No stub questions selected (Include='Y').",
+        why_it_matters = "At least one stub question is required for crosstab analysis.",
+        how_to_fix = c(
+          "Set Include='Y' for at least one question in the Selection sheet",
+          "Stub questions define the rows of the crosstab"
+        )
+      )
     }
     
     cat(sprintf("  Found %d banner questions\n", nrow(banner_questions)))
@@ -452,10 +537,17 @@ load_question_selection <- function(config_file) {
     ))
     
   }, error = function(e) {
-    stop(sprintf(
-      "Failed to load Selection sheet: %s",
-      conditionMessage(e)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "IO_READ_ERROR",
+      title = "Failed to Load Selection Sheet",
+      problem = sprintf("Failed to load Selection sheet: %s", conditionMessage(e)),
+      why_it_matters = "The Selection sheet defines which questions to include in analysis.",
+      how_to_fix = c(
+        "Verify the Excel file is not corrupted",
+        "Check that Selection sheet exists",
+        "Ensure the file is not open in Excel"
+      )
+    )
   })
 }
 
@@ -569,7 +661,13 @@ validate_configuration <- function(config_obj, paths, selection) {
     for (i in issues) {
       cat(sprintf("  - %s\n", i))
     }
-    stop("Configuration validation failed", call. = FALSE)
+    tabs_refuse(
+      code = "CFG_VALIDATION_FAILED",
+      title = "Configuration Validation Failed",
+      problem = "Configuration validation found critical errors that prevent analysis.",
+      why_it_matters = "The configuration must be valid for the analysis to run properly.",
+      how_to_fix = "Fix the validation errors listed above"
+    )
   }
   
   return(list(

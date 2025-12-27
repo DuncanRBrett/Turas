@@ -23,7 +23,16 @@
 
 # Require openxlsx
 if (!requireNamespace("openxlsx", quietly = TRUE)) {
-  stop("Package 'openxlsx' is required for excel_writer module")
+  tabs_refuse(
+    code = "PKG_MISSING_DEPENDENCY",
+    title = "Missing Required Package: openxlsx",
+    problem = "The 'openxlsx' package is not installed. This package is required for Excel output.",
+    why_it_matters = "Cannot write crosstab results to Excel format without openxlsx. The excel_writer module cannot function.",
+    how_to_fix = c(
+      "Install the package: install.packages('openxlsx')",
+      "Then reload the Tabs module"
+    )
+  )
 }
 
 # Load shared utilities from consolidated location
@@ -40,7 +49,18 @@ if (!exists("find_turas_root", mode = "function")) {
       }
       current_dir <- dirname(current_dir)
     }
-    stop("Cannot locate Turas root directory")
+    tabs_refuse(
+      code = "ENV_TURAS_ROOT_NOT_FOUND",
+      title = "Cannot Locate Turas Root Directory",
+      problem = "Could not find Turas root directory by searching for launch_turas.R or modules/ directory.",
+      why_it_matters = "Cannot load shared utilities without locating the Turas root. The excel_writer module cannot initialize.",
+      how_to_fix = c(
+        "Ensure you are running from within a Turas project directory structure",
+        "Verify that launch_turas.R exists in the Turas root",
+        "Check that the modules/ directory exists",
+        "Run from the correct working directory"
+      )
+    )
   }
 
   .turas_root <- .find_root()

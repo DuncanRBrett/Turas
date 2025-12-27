@@ -76,11 +76,16 @@ apply_error_repair_policy <- function(weights, weight_variable, n_rows) {
   if (n_infinite > 0) issues <- c(issues, sprintf("%d infinite values", n_infinite))
 
   if (length(issues) > 0) {
-    stop(sprintf(
-      "Weight column '%s' has problems with repair='error': %s",
-      weight_variable,
-      paste(issues, collapse = ", ")
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "DATA_INVALID_WEIGHTS",
+      title = "Invalid Weight Values",
+      problem = sprintf("Weight column '%s' has problems with repair='error': %s", weight_variable, paste(issues, collapse = ", ")),
+      why_it_matters = "Weight repair policy is set to 'error' which requires all weights to be valid.",
+      how_to_fix = c(
+        "Fix the weight column data to remove NA, zero, negative, or infinite values",
+        "Or use repair='exclude' to automatically exclude invalid weights"
+      )
+    )
   }
 
   return(weights)
@@ -97,12 +102,16 @@ apply_exclude_repair_policy <- function(weights, weight_variable) {
 
   # Negative weights are a design error - always stop
   if (n_negative > 0) {
-    stop(sprintf(
-      "Weight column '%s' contains %d negative values (%.1f%%).\nDesign weights cannot be negative. Fix data before analysis.",
-      weight_variable,
-      n_negative,
-      100 * n_negative / n_total
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "DATA_NEGATIVE_WEIGHTS",
+      title = "Negative Weight Values",
+      problem = sprintf("Weight column '%s' contains %d negative values (%.1f%%).", weight_variable, n_negative, 100 * n_negative / n_total),
+      why_it_matters = "Design weights cannot be negative - this indicates a data quality issue.",
+      how_to_fix = c(
+        "Fix the weight column data to remove negative values",
+        "Check weight calculation or data import process"
+      )
+    )
   }
 
   # NA weights - exclude (set to 0)
@@ -243,7 +252,13 @@ get_weight_vector <- function(data, weight_variable, repair = c("exclude", "coer
   
   # Validate data
   if (!is.data.frame(data) || nrow(data) == 0) {
-    stop("data must be a non-empty data frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid Data Argument",
+      problem = "data must be a non-empty data frame.",
+      why_it_matters = "Cannot extract weights from invalid or empty data.",
+      how_to_fix = "This is an internal error - check that data is loaded correctly"
+    )
   }
   
   # No weighting requested
@@ -265,20 +280,27 @@ get_weight_vector <- function(data, weight_variable, repair = c("exclude", "coer
   
   # Type check
   if (!is.numeric(weights)) {
-    stop(sprintf(
-      "Weight column '%s' must be numeric, got: %s",
-      weight_variable,
-      class(weights)[1]
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "DATA_INVALID_TYPE",
+      title = "Invalid Weight Column Type",
+      problem = sprintf("Weight column '%s' must be numeric, got: %s", weight_variable, class(weights)[1]),
+      why_it_matters = "Weights must be numeric for weighted analysis calculations.",
+      how_to_fix = c(
+        "Convert weight column to numeric type",
+        "Check that weight column contains numbers, not text"
+      )
+    )
   }
   
   # Length check (should always match, but safety check)
   if (length(weights) != nrow(data)) {
-    stop(sprintf(
-      "Weight vector length (%d) does not match data rows (%d)",
-      length(weights),
-      nrow(data)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "DATA_LENGTH_MISMATCH",
+      title = "Weight Vector Length Mismatch",
+      problem = sprintf("Weight vector length (%d) does not match data rows (%d).", length(weights), nrow(data)),
+      why_it_matters = "Every row must have a corresponding weight value.",
+      how_to_fix = "This is an internal error - check weight extraction logic"
+    )
   }
   
   # V9.9.2: Comprehensive diagnostics
@@ -291,10 +313,16 @@ get_weight_vector <- function(data, weight_variable, repair = c("exclude", "coer
   
   # Check for fatal issue
   if (n_positive_finite == 0) {
-    stop(sprintf(
-      "Weight column '%s' has no positive finite values. Cannot perform weighted analysis.",
-      weight_variable
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "DATA_NO_VALID_WEIGHTS",
+      title = "No Valid Weight Values",
+      problem = sprintf("Weight column '%s' has no positive finite values.", weight_variable),
+      why_it_matters = "Cannot perform weighted analysis without at least some valid weight values.",
+      how_to_fix = c(
+        "Check weight column data quality",
+        "Ensure at least some weights are positive finite numbers"
+      )
+    )
   }
   
   # V9.9.2: Apply repair policy (delegated to focused helpers)
@@ -409,11 +437,13 @@ calculate_effective_n <- function(weights) {
 weighted_variance <- function(values, weights) {
   # Validate inputs
   if (length(values) != length(weights)) {
-    stop(sprintf(
-      "values and weights must have same length (got %d and %d)",
-      length(values),
-      length(weights)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "ARG_LENGTH_MISMATCH",
+      title = "Values and Weights Length Mismatch",
+      problem = sprintf("values and weights must have same length (got %d and %d).", length(values), length(weights)),
+      why_it_matters = "Each value must have a corresponding weight for variance calculation.",
+      how_to_fix = "This is an internal error - check function call"
+    )
   }
   
   # Keep only valid observations
@@ -456,11 +486,13 @@ weighted_variance <- function(values, weights) {
 calculate_weighted_count <- function(condition_vector, weights) {
   # V9.9.2: Stop on length mismatch (not return 0)
   if (length(condition_vector) != length(weights)) {
-    stop(sprintf(
-      "Condition vector (%d) and weights (%d) have different lengths",
-      length(condition_vector),
-      length(weights)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "ARG_LENGTH_MISMATCH",
+      title = "Condition Vector and Weights Length Mismatch",
+      problem = sprintf("Condition vector (%d) and weights (%d) have different lengths.", length(condition_vector), length(weights)),
+      why_it_matters = "Each row's condition must have a corresponding weight value.",
+      how_to_fix = "This is an internal error - check function call"
+    )
   }
   
   # V9.9.2: Explicit NA handling - treat NA as FALSE
@@ -602,23 +634,43 @@ calculate_single_response_base <- function(data_subset, question_code, question_
 calculate_weighted_base <- function(data_subset, question_info, weights) {
   # Validate inputs
   if (!is.data.frame(data_subset)) {
-    stop("data_subset must be a data frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid data_subset Type",
+      problem = "data_subset must be a data frame.",
+      why_it_matters = "Cannot calculate weighted base from invalid data structure.",
+      how_to_fix = "This is an internal error - check function call"
+    )
   }
 
   if (!is.data.frame(question_info) || nrow(question_info) == 0) {
-    stop("question_info must be a non-empty data frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid question_info Type",
+      problem = "question_info must be a non-empty data frame.",
+      why_it_matters = "Question metadata is required to determine base calculation method.",
+      how_to_fix = "This is an internal error - check function call"
+    )
   }
 
   if (!is.numeric(weights)) {
-    stop("weights must be numeric", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid weights Type",
+      problem = "weights must be numeric.",
+      why_it_matters = "Weights must be numeric for base calculations.",
+      how_to_fix = "This is an internal error - check function call"
+    )
   }
 
   if (length(weights) != nrow(data_subset)) {
-    stop(sprintf(
-      "Weight vector length (%d) must match data rows (%d)",
-      length(weights),
-      nrow(data_subset)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "ARG_LENGTH_MISMATCH",
+      title = "Weights Length Mismatch",
+      problem = sprintf("Weight vector length (%d) must match data rows (%d).", length(weights), nrow(data_subset)),
+      why_it_matters = "Each row must have a corresponding weight value.",
+      how_to_fix = "This is an internal error - check function call"
+    )
   }
 
   # Empty data
@@ -692,11 +744,13 @@ calculate_weighted_percentage <- function(weighted_count, weighted_base,
 calculate_weighted_mean <- function(values, weights) {
   # V9.9.3: Stop on length mismatch (fail fast)
   if (length(values) != length(weights)) {
-    stop(sprintf(
-      "values (%d) and weights (%d) have different lengths",
-      length(values),
-      length(weights)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "ARG_LENGTH_MISMATCH",
+      title = "Values and Weights Length Mismatch",
+      problem = sprintf("values (%d) and weights (%d) have different lengths.", length(values), length(weights)),
+      why_it_matters = "Each value must have a corresponding weight for mean calculation.",
+      how_to_fix = "This is an internal error - check function call"
+    )
   }
   
   # Remove NAs and keep only positive finite weights
@@ -762,11 +816,23 @@ weighted_z_test_proportions <- function(count1, base1, count2, base2,
                                        alpha = 0.05) {
   # V9.9.4: Parameter validation (makes function hard to misuse)
   if (!is.numeric(alpha) || length(alpha) != 1 || alpha <= 0 || alpha >= 1) {
-    stop("alpha must be a single numeric value between 0 and 1", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_VALUE",
+      title = "Invalid Alpha Parameter",
+      problem = "alpha must be a single numeric value between 0 and 1.",
+      why_it_matters = "Alpha defines the significance level for statistical tests (e.g., 0.05 for 95% confidence).",
+      how_to_fix = "Set alpha to a value between 0 and 1 (typically 0.05 or 0.01)"
+    )
   }
-  
+
   if (!is.numeric(min_base) || length(min_base) != 1 || min_base < 1) {
-    stop("min_base must be a single numeric value >= 1", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_VALUE",
+      title = "Invalid min_base Parameter",
+      problem = "min_base must be a single numeric value >= 1.",
+      why_it_matters = "min_base defines the minimum sample size required for statistical testing.",
+      how_to_fix = "Set min_base to a positive integer (typically 30 or more)"
+    )
   }
   
   # Validate inputs
@@ -936,11 +1002,23 @@ weighted_t_test_means <- function(values1, values2,
                                  alpha = 0.05) {
   # V9.9.4: Parameter validation
   if (!is.numeric(alpha) || length(alpha) != 1 || alpha <= 0 || alpha >= 1) {
-    stop("alpha must be a single numeric value between 0 and 1", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_VALUE",
+      title = "Invalid Alpha Parameter",
+      problem = "alpha must be a single numeric value between 0 and 1.",
+      why_it_matters = "Alpha defines the significance level for statistical tests.",
+      how_to_fix = "Set alpha to a value between 0 and 1 (typically 0.05 or 0.01)"
+    )
   }
 
   if (!is.numeric(min_base) || length(min_base) != 1 || min_base < 1) {
-    stop("min_base must be a single numeric value >= 1", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_VALUE",
+      title = "Invalid min_base Parameter",
+      problem = "min_base must be a single numeric value >= 1.",
+      why_it_matters = "min_base defines the minimum sample size required for statistical testing.",
+      how_to_fix = "Set min_base to a positive integer (typically 30 or more)"
+    )
   }
 
   # Default to unit weights if not provided
@@ -949,19 +1027,23 @@ weighted_t_test_means <- function(values1, values2,
 
   # V9.9.3: Validate lengths
   if (length(values1) != length(weights1)) {
-    stop(sprintf(
-      "values1 (%d) and weights1 (%d) have different lengths",
-      length(values1),
-      length(weights1)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "ARG_LENGTH_MISMATCH",
+      title = "Values1 and Weights1 Length Mismatch",
+      problem = sprintf("values1 (%d) and weights1 (%d) have different lengths.", length(values1), length(weights1)),
+      why_it_matters = "Each value must have a corresponding weight for t-test calculation.",
+      how_to_fix = "This is an internal error - check function call"
+    )
   }
 
   if (length(values2) != length(weights2)) {
-    stop(sprintf(
-      "values2 (%d) and weights2 (%d) have different lengths",
-      length(values2),
-      length(weights2)
-    ), call. = FALSE)
+    tabs_refuse(
+      code = "ARG_LENGTH_MISMATCH",
+      title = "Values2 and Weights2 Length Mismatch",
+      problem = sprintf("values2 (%d) and weights2 (%d) have different lengths.", length(values2), length(weights2)),
+      why_it_matters = "Each value must have a corresponding weight for t-test calculation.",
+      how_to_fix = "This is an internal error - check function call"
+    )
   }
 
   # Prepare analytic sample (delegated to helper)
@@ -1128,15 +1210,33 @@ create_chi_square_failure <- function(warning_msg, chi_sq = NA_real_, df = NA_in
 chi_square_test <- function(observed_matrix, min_expected = 5, alpha = 0.05) {
   # Parameter validation
   if (!is.matrix(observed_matrix) && !is.data.frame(observed_matrix)) {
-    stop("observed_matrix must be a matrix or data.frame", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_TYPE",
+      title = "Invalid observed_matrix Type",
+      problem = "observed_matrix must be a matrix or data.frame.",
+      why_it_matters = "Chi-square test requires a matrix of observed counts.",
+      how_to_fix = "This is an internal error - check function call"
+    )
   }
 
   if (!is.numeric(alpha) || length(alpha) != 1 || alpha <= 0 || alpha >= 1) {
-    stop("alpha must be between 0 and 1", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_VALUE",
+      title = "Invalid Alpha Parameter",
+      problem = "alpha must be between 0 and 1.",
+      why_it_matters = "Alpha defines the significance level for the chi-square test.",
+      how_to_fix = "Set alpha to a value between 0 and 1 (typically 0.05 or 0.01)"
+    )
   }
 
   if (!is.numeric(min_expected) || length(min_expected) != 1 || min_expected < 1) {
-    stop("min_expected must be a positive number", call. = FALSE)
+    tabs_refuse(
+      code = "ARG_INVALID_VALUE",
+      title = "Invalid min_expected Parameter",
+      problem = "min_expected must be a positive number.",
+      why_it_matters = "min_expected defines the threshold for chi-square validity warnings.",
+      how_to_fix = "Set min_expected to a positive value (typically 5)"
+    )
   }
 
   # Prepare and clean matrix (delegated to helper)

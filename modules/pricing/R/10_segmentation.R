@@ -30,15 +30,31 @@ run_segmented_analysis <- function(data, config, method) {
   seg_config <- config$segmentation
 
   if (is.null(seg_config$segment_column) || is.na(seg_config$segment_column)) {
-    stop("segment_column must be specified in configuration", call. = FALSE)
+    pricing_refuse(
+      code = "CFG_MISSING_SEGMENT_COLUMN",
+      title = "Segment Column Not Specified",
+      problem = "No segment_column specified in segmentation configuration",
+      why_it_matters = "Cannot run segmented analysis without knowing which column contains segment definitions",
+      how_to_fix = "Add 'segment_column' to the Segmentation sheet in your configuration",
+      expected = "segment_column setting"
+    )
   }
 
   seg_col <- seg_config$segment_column
 
   if (!seg_col %in% names(data)) {
-    stop(sprintf("Segment column '%s' not found. Available: %s",
-                 seg_col, paste(names(data), collapse = ", ")),
-         call. = FALSE)
+    pricing_refuse(
+      code = "DATA_SEGMENT_COLUMN_MISSING",
+      title = "Segment Column Not Found",
+      problem = sprintf("Segment column '%s' not found in data", seg_col),
+      why_it_matters = "Cannot segment data without the specified segment variable",
+      how_to_fix = c(
+        "Verify segment_column name matches data exactly (case-sensitive)",
+        "Check that the column exists in your data file"
+      ),
+      observed = names(data),
+      expected = seg_col
+    )
   }
 
   min_n <- seg_config$min_segment_n %||% 50
@@ -47,8 +63,19 @@ run_segmented_analysis <- function(data, config, method) {
   # Validate method
   valid_methods <- c("van_westendorp", "gabor_granger")
   if (!method %in% valid_methods) {
-    stop(sprintf("Method must be one of: %s", paste(valid_methods, collapse = ", ")),
-         call. = FALSE)
+    pricing_refuse(
+      code = "CFG_INVALID_SEGMENT_METHOD",
+      title = "Invalid Segmentation Method",
+      problem = sprintf("Method '%s' is not recognized", method),
+      why_it_matters = "Cannot run segmented analysis with unknown methodology",
+      how_to_fix = c(
+        "Specify method as one of:",
+        "  - 'van_westendorp' for price sensitivity meter",
+        "  - 'gabor_granger' for demand curve analysis"
+      ),
+      observed = method,
+      expected = valid_methods
+    )
   }
 
   # ============================================================================
@@ -65,10 +92,19 @@ run_segmented_analysis <- function(data, config, method) {
   run_segments <- names(segment_counts)[segment_counts >= min_n]
 
   if (length(run_segments) == 0) {
-    stop(sprintf("No segments have n >= %d. Counts: %s",
-                 min_n,
-                 paste(names(segment_counts), segment_counts, sep = "=", collapse = ", ")),
-         call. = FALSE)
+    pricing_refuse(
+      code = "DATA_NO_VALID_SEGMENTS",
+      title = "No Segments Meet Minimum Size",
+      problem = sprintf("No segments have at least %d respondents", min_n),
+      why_it_matters = "Cannot run analysis on segments that are too small for reliable results",
+      how_to_fix = c(
+        "Lower min_segment_n in Segmentation configuration",
+        "Combine small segments into larger groups",
+        "Collect more data to increase segment sizes"
+      ),
+      observed = sprintf("Segment counts: %s", paste(names(segment_counts), segment_counts, sep = "=", collapse = ", ")),
+      expected = sprintf("At least one segment with n >= %d", min_n)
+    )
   }
 
   if (length(skip_segments) > 0) {
@@ -168,7 +204,17 @@ run_pricing_method <- function(data, config, method) {
   switch(method,
     van_westendorp = run_van_westendorp(data, config),
     gabor_granger = run_gabor_granger(data, config),
-    stop(sprintf("Unknown method: %s", method), call. = FALSE)
+    pricing_refuse(
+      code = "CFG_INVALID_METHOD",
+      title = "Unknown Analysis Method",
+      problem = sprintf("Method '%s' is not recognized", method),
+      why_it_matters = "Cannot run analysis with unknown methodology",
+      how_to_fix = c(
+        "Use 'van_westendorp' or 'gabor_granger'"
+      ),
+      observed = method,
+      expected = c("van_westendorp", "gabor_granger")
+    )
   )
 }
 

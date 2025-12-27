@@ -287,11 +287,23 @@ bootstrap_proportion_ci <- function(data, categories, weights = NULL,
                                     parallel = FALSE) {
   # Input validation
   if (!is.numeric(data) && !is.character(data) && !is.factor(data)) {
-    stop("data must be numeric, character, or factor", call. = FALSE)
+    confidence_refuse(
+      code = "DATA_INVALID_TYPE",
+      title = "Invalid Data Type for Bootstrap",
+      problem = "data must be numeric, character, or factor",
+      why_it_matters = "Bootstrap requires valid data types for resampling.",
+      how_to_fix = "Ensure the data is in a valid format (numeric, character, or factor)"
+    )
   }
 
   if (length(data) == 0) {
-    stop("data is empty", call. = FALSE)
+    confidence_refuse(
+      code = "DATA_EMPTY",
+      title = "Empty Data for Bootstrap",
+      problem = "data is empty",
+      why_it_matters = "Bootstrap requires at least one observation.",
+      how_to_fix = "Ensure the data contains valid values"
+    )
   }
 
   validate_sample_size(B, "B", min_n = 1000)
@@ -308,7 +320,13 @@ bootstrap_proportion_ci <- function(data, categories, weights = NULL,
   # Validate weights if provided
   if (is_weighted) {
     if (length(weights) != n) {
-      stop("weights must have same length as data", call. = FALSE)
+      confidence_refuse(
+        code = "DATA_WEIGHT_LENGTH_MISMATCH",
+        title = "Weights Length Mismatch",
+        problem = "weights must have same length as data",
+        why_it_matters = "Each observation must have a corresponding weight.",
+        how_to_fix = sprintf("Ensure weights vector has length %d to match data", n)
+      )
     }
   }
 

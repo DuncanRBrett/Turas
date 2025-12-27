@@ -37,14 +37,28 @@ find_constrained_optimal <- function(demand_curve, objective = c("revenue", "pro
   # Apply constraints
   if (!is.null(constraints$min_volume)) {
     if (!"volume" %in% names(demand_curve)) {
-      stop("min_volume constraint requires market_size parameter", call. = FALSE)
+      pricing_refuse(
+        code = "CFG_MISSING_MARKET_SIZE",
+        title = "Market Size Required",
+        problem = "min_volume constraint requires market_size parameter",
+        why_it_matters = "Cannot enforce volume constraints without knowing total market size",
+        how_to_fix = "Provide market_size parameter when calling find_constrained_optimal()",
+        expected = "market_size parameter"
+      )
     }
     feasible <- feasible & (demand_curve$volume >= constraints$min_volume)
   }
 
   if (!is.null(constraints$min_revenue)) {
     if (!"revenue_index" %in% names(demand_curve)) {
-      stop("revenue_index not found in demand_curve", call. = FALSE)
+      pricing_refuse(
+        code = "DATA_REVENUE_INDEX_MISSING",
+        title = "Revenue Index Not Found",
+        problem = "min_revenue constraint requires revenue_index in demand curve",
+        why_it_matters = "Cannot enforce revenue constraints without revenue calculation",
+        how_to_fix = "Ensure demand_curve was generated with revenue_index column",
+        expected = "revenue_index column in demand_curve"
+      )
     }
     # Scale to total market if market_size provided
     rev_total <- if (!is.null(market_size)) {
@@ -57,7 +71,17 @@ find_constrained_optimal <- function(demand_curve, objective = c("revenue", "pro
 
   if (!is.null(constraints$min_profit)) {
     if (!"profit_index" %in% names(demand_curve)) {
-      stop("profit_index not found in demand_curve. Specify unit_cost in config.", call. = FALSE)
+      pricing_refuse(
+        code = "CFG_MISSING_UNIT_COST",
+        title = "Unit Cost Required for Profit Constraint",
+        problem = "min_profit constraint requires profit_index in demand curve",
+        why_it_matters = "Cannot enforce profit constraints without knowing unit cost",
+        how_to_fix = c(
+          "Add 'unit_cost' to the GaborGranger sheet in your configuration",
+          "Or remove min_profit constraint"
+        ),
+        expected = "unit_cost setting to calculate profit_index"
+      )
     }
     # Scale to total market
     prof_total <- if (!is.null(market_size)) {
@@ -70,7 +94,17 @@ find_constrained_optimal <- function(demand_curve, objective = c("revenue", "pro
 
   if (!is.null(constraints$min_margin_pct)) {
     if (!"margin" %in% names(demand_curve)) {
-      stop("margin not found in demand_curve. Specify unit_cost in config.", call. = FALSE)
+      pricing_refuse(
+        code = "CFG_MISSING_UNIT_COST",
+        title = "Unit Cost Required for Margin Constraint",
+        problem = "min_margin_pct constraint requires margin in demand curve",
+        why_it_matters = "Cannot enforce margin constraints without knowing unit cost",
+        how_to_fix = c(
+          "Add 'unit_cost' to the GaborGranger sheet in your configuration",
+          "Or remove min_margin_pct constraint"
+        ),
+        expected = "unit_cost setting to calculate margin"
+      )
     }
     margin_pct <- (demand_curve$margin / demand_curve$price) * 100
     feasible <- feasible & (margin_pct >= constraints$min_margin_pct)
@@ -105,7 +139,17 @@ find_constrained_optimal <- function(demand_curve, objective = c("revenue", "pro
     idx <- which.max(feasible_prices$revenue_index)
   } else {
     if (!"profit_index" %in% names(feasible_prices)) {
-      stop("profit_index required for profit objective. Specify unit_cost.", call. = FALSE)
+      pricing_refuse(
+        code = "CFG_MISSING_UNIT_COST",
+        title = "Unit Cost Required for Profit Optimization",
+        problem = "Cannot optimize for profit without unit_cost",
+        why_it_matters = "Profit calculation requires knowing the cost per unit sold",
+        how_to_fix = c(
+          "Add 'unit_cost' to the GaborGranger sheet in your configuration",
+          "Or change objective to 'revenue' instead of 'profit'"
+        ),
+        expected = "unit_cost setting"
+      )
     }
     idx <- which.max(feasible_prices$profit_index)
   }
@@ -201,7 +245,14 @@ find_price_for_revenue <- function(demand_curve, target_revenue, market_size = N
 find_price_for_profit <- function(demand_curve, target_profit, market_size = NULL) {
 
   if (!"profit_index" %in% names(demand_curve)) {
-    stop("profit_index not found. Specify unit_cost in config.", call. = FALSE)
+    pricing_refuse(
+      code = "CFG_MISSING_UNIT_COST",
+      title = "Unit Cost Required for Profit Target",
+      problem = "Cannot find price for profit target without unit_cost",
+      why_it_matters = "Profit calculation requires knowing the cost per unit sold",
+      how_to_fix = "Add 'unit_cost' to the GaborGranger sheet in your configuration",
+      expected = "unit_cost setting"
+    )
   }
 
   profit <- if (!is.null(market_size)) {
@@ -399,7 +450,17 @@ find_continuous_optimal <- function(demand_curve,
     }
   } else {
     if (is.null(unit_cost)) {
-      stop("unit_cost required for profit optimization", call. = FALSE)
+      pricing_refuse(
+        code = "CFG_MISSING_UNIT_COST",
+        title = "Unit Cost Required for Profit Optimization",
+        problem = "Cannot optimize for profit without unit_cost parameter",
+        why_it_matters = "Profit calculation requires knowing the cost per unit sold",
+        how_to_fix = c(
+          "Provide unit_cost parameter to find_continuous_optimal()",
+          "Or change objective to 'revenue' instead of 'profit'"
+        ),
+        expected = "unit_cost parameter"
+      )
     }
     obj_func <- function(p) {
       d <- intent_func(p)
@@ -685,7 +746,17 @@ find_pareto_frontier <- function(demand_curve,
 
   if (isTRUE(objectives$profit)) {
     if (is.null(unit_cost)) {
-      stop("unit_cost required for profit objective", call. = FALSE)
+      pricing_refuse(
+        code = "CFG_MISSING_UNIT_COST",
+        title = "Unit Cost Required for Profit Objective",
+        problem = "Cannot calculate profit without unit_cost parameter",
+        why_it_matters = "Profit calculation requires knowing the cost per unit sold",
+        how_to_fix = c(
+          "Provide unit_cost parameter to find_pareto_frontier()",
+          "Or remove profit from objectives list"
+        ),
+        expected = "unit_cost parameter"
+      )
     }
     results$profit <- (results$price - unit_cost) * results$purchase_intent
   }

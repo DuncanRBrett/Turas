@@ -310,12 +310,17 @@ validate_none_choices <- function(data, config) {
 
   if (any(chosen_per_set$n_chosen != 1)) {
     bad_sets <- chosen_per_set[[config$choice_set_column]][chosen_per_set$n_chosen != 1]
-    stop(create_error(
-      "DATA",
-      sprintf("Invalid choice counts in %d choice sets", length(bad_sets)),
-      "Each choice set must have exactly ONE chosen alternative (including 'none')",
-      sprintf("Problem choice sets: %s", paste(head(bad_sets, 5), collapse = ", "))
-    ), call. = FALSE)
+    conjoint_refuse(
+      code = "DATA_INVALID_NONE_CHOICES",
+      title = "Invalid Choice Counts With None Option",
+      problem = sprintf("Invalid choice counts in %d choice sets", length(bad_sets)),
+      why_it_matters = "Each choice set must have exactly ONE chosen alternative (including 'none' option).",
+      how_to_fix = c(
+        "Check your data for choice sets with 0 or multiple selections",
+        sprintf("Problem choice sets: %s", paste(head(bad_sets, 5), collapse = ", ")),
+        "Verify none option is properly coded as a chosen alternative"
+      )
+    )
   }
 
   # Check 2: If none is chosen, no other alternative should be chosen
@@ -332,12 +337,17 @@ validate_none_choices <- function(data, config) {
       )
 
     if (nrow(other_chosen_in_none_sets) > 0) {
-      stop(create_error(
-        "DATA",
-        "Some choice sets have both 'none' and another alternative selected",
-        "When 'none' is chosen, no other alternative should be chosen",
-        "Check your Alchemer data export for errors"
-      ), call. = FALSE)
+      conjoint_refuse(
+        code = "DATA_NONE_DOUBLE_SELECTION",
+        title = "Multiple Selections With None Option",
+        problem = "Some choice sets have both 'none' and another alternative selected.",
+        why_it_matters = "When 'none' is chosen, no other alternative should be selected - this creates ambiguous choice data.",
+        how_to_fix = c(
+          "Check your Alchemer data export for errors",
+          sprintf("Found %d problematic choice sets", nrow(other_chosen_in_none_sets)),
+          "Ensure 'none' selections are mutually exclusive with product selections"
+        )
+      )
     }
   }
 

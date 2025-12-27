@@ -34,7 +34,17 @@ run_alchemerparser <- function(project_dir,
 
   # Validate inputs
   if (!dir.exists(project_dir)) {
-    stop(sprintf("Project directory not found: %s", project_dir), call. = FALSE)
+    alchemerparser_refuse(
+      code = "IO_DIR_NOT_FOUND",
+      title = "Project Directory Not Found",
+      problem = sprintf("Cannot find project directory: %s", project_dir),
+      why_it_matters = "AlchemerParser requires access to input files in the specified directory.",
+      how_to_fix = c(
+        "Check that the directory path is correct",
+        "Verify the directory exists",
+        "Check for typos in the path"
+      )
+    )
   }
 
   if (is.null(output_dir)) {
@@ -284,11 +294,31 @@ locate_input_files <- function(project_dir, project_name = NULL, verbose = TRUE)
                         value = TRUE, ignore.case = TRUE)
 
   if (length(questionnaire) == 0) {
-    stop("Questionnaire file not found (*_questionnaire.docx)", call. = FALSE)
+    alchemerparser_refuse(
+      code = "IO_QUESTIONNAIRE_NOT_FOUND",
+      title = "Questionnaire File Not Found",
+      problem = "No questionnaire file found in project directory.",
+      why_it_matters = "AlchemerParser requires the Word questionnaire to parse survey structure.",
+      how_to_fix = c(
+        "Ensure the questionnaire file is named *_questionnaire.docx",
+        "Check that the file is in the project directory",
+        "Verify the file has .docx or .doc extension"
+      )
+    )
   }
   if (length(questionnaire) > 1) {
-    stop("Multiple questionnaire files found. Please specify project_name.",
-         call. = FALSE)
+    alchemerparser_refuse(
+      code = "IO_MULTIPLE_QUESTIONNAIRES",
+      title = "Multiple Questionnaire Files Found",
+      problem = "Found multiple *_questionnaire.docx files in directory.",
+      why_it_matters = "Cannot determine which questionnaire to parse when multiple files exist.",
+      how_to_fix = c(
+        "Specify the project_name parameter to disambiguate",
+        "Remove extra questionnaire files from the directory",
+        "Keep only one questionnaire file per project directory"
+      ),
+      observed = paste("Found:", length(questionnaire), "files")
+    )
   }
 
   # Extract project name from questionnaire if not provided
@@ -304,8 +334,17 @@ locate_input_files <- function(project_dir, project_name = NULL, verbose = TRUE)
                    value = TRUE, ignore.case = TRUE)
 
   if (length(data_map) == 0) {
-    stop(sprintf("Data export map not found (%s_data_export_map.xlsx)",
-                project_name), call. = FALSE)
+    alchemerparser_refuse(
+      code = "IO_DATA_MAP_NOT_FOUND",
+      title = "Data Export Map Not Found",
+      problem = sprintf("No data export map found for project '%s'.", project_name),
+      why_it_matters = "Data export map is required to understand data column structure.",
+      how_to_fix = c(
+        sprintf("Ensure the file is named %s_data_export_map.xlsx", project_name),
+        "Export the data map from Alchemer survey settings",
+        "Check that the file is in the project directory"
+      )
+    )
   }
 
   # Find translation export
@@ -314,8 +353,17 @@ locate_input_files <- function(project_dir, project_name = NULL, verbose = TRUE)
                       value = TRUE, ignore.case = TRUE)
 
   if (length(translation) == 0) {
-    stop(sprintf("Translation export not found (%s_translation-export.xls)",
-                project_name), call. = FALSE)
+    alchemerparser_refuse(
+      code = "IO_TRANSLATION_NOT_FOUND",
+      title = "Translation Export Not Found",
+      problem = sprintf("No translation export found for project '%s'.", project_name),
+      why_it_matters = "Translation export is required to get question and option texts.",
+      how_to_fix = c(
+        sprintf("Ensure the file is named %s_translation-export.xls", project_name),
+        "Export the translation file from Alchemer",
+        "Check that the file is in the project directory"
+      )
+    )
   }
 
   return(list(

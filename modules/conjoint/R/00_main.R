@@ -23,12 +23,24 @@
 suppressPackageStartupMessages({
   # Data manipulation
   if (!require(dplyr, quietly = TRUE)) {
-    stop("Package 'dplyr' is required. Install with: install.packages('dplyr')")
+    conjoint_refuse(
+      code = "PKG_DPLYR_MISSING",
+      title = "Required Package Not Installed",
+      problem = "Package 'dplyr' is required but not installed.",
+      why_it_matters = "The Conjoint module relies on dplyr for data manipulation operations. Without it, analysis cannot proceed.",
+      how_to_fix = "Install the package with: install.packages('dplyr')"
+    )
   }
 
   # Excel I/O
   if (!require(openxlsx, quietly = TRUE)) {
-    stop("Package 'openxlsx' is required. Install with: install.packages('openxlsx')")
+    conjoint_refuse(
+      code = "PKG_OPENXLSX_MISSING",
+      title = "Required Package Not Installed",
+      problem = "Package 'openxlsx' is required but not installed.",
+      why_it_matters = "The Conjoint module requires openxlsx to read configuration files and write output workbooks.",
+      how_to_fix = "Install the package with: install.packages('openxlsx')"
+    )
   }
 
   # Choice modeling
@@ -140,10 +152,17 @@ tryCatch({
 
 # Validate the directory exists
 if (!dir.exists(.conjoint_module_dir)) {
-  stop(sprintf(
-    "Could not locate conjoint module directory. Expected: %s\nCurrent working directory: %s",
-    .conjoint_module_dir, getwd()
-  ))
+  conjoint_refuse(
+    code = "IO_MODULE_DIR_NOT_FOUND",
+    title = "Module Directory Not Found",
+    problem = sprintf("Could not locate conjoint module directory at: %s", .conjoint_module_dir),
+    why_it_matters = "The module cannot load required component files without access to its directory.",
+    how_to_fix = c(
+      sprintf("Current working directory: %s", getwd()),
+      "Set your working directory to the Turas root folder",
+      "Or ensure the conjoint module is properly installed"
+    )
+  )
 }
 
 # Source all component files in order
@@ -496,7 +515,7 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
       cat("\n")
     }
 
-    # Re-throw error for caller to handle
+    # Re-throw error for caller to handle (already a conjoint_refuse or other structured error)
     stop(e)
   })
 

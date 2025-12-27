@@ -8,25 +8,46 @@
 
 run_confidence_gui <- function() {
 
+  # === EARLY REFUSE FUNCTION (for GUI entry point before guard layer loaded) ===
+  # This is a local refuse function since the guard layer may not be loaded yet
+  early_refuse <- function(code, title, problem, why_it_matters, how_to_fix) {
+    msg <- paste0(
+      "\n", strrep("=", 80), "\n",
+      "  [REFUSE] ", code, ": ", title, "\n",
+      strrep("=", 80), "\n\n",
+      "Problem:\n",
+      "  ", problem, "\n\n",
+      "Why it matters:\n",
+      "  ", why_it_matters, "\n\n",
+      "How to fix:\n"
+    )
+
+    if (is.character(how_to_fix) && length(how_to_fix) > 1) {
+      for (fix in how_to_fix) {
+        msg <- paste0(msg, "  - ", fix, "\n")
+      }
+    } else {
+      msg <- paste0(msg, "  ", how_to_fix, "\n")
+    }
+
+    msg <- paste0(msg, "\n", strrep("=", 80), "\n")
+    stop(msg, call. = FALSE)
+  }
+
   # Required packages - check availability (TRS v1.0: no auto-install)
   required_packages <- c("shiny", "shinyFiles")
 
   # Check for missing packages and refuse with clear instructions if any are missing
   missing_packages <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
   if (length(missing_packages) > 0) {
-    stop(
-      "\n================================================================================\n",
-      "  [REFUSE] PKG_MISSING_DEPENDENCY: Missing Required Packages\n",
-      "================================================================================\n\n",
-      "Problem:\n",
-      "  The following required packages are not installed: ", paste(missing_packages, collapse = ", "), "\n\n",
-      "Why it matters:\n",
-      "  The Confidence GUI cannot run without these packages.\n\n",
-      "How to fix:\n",
-      "  Run the following command in R:\n",
-      "    install.packages(c(", paste(sprintf('"%s"', missing_packages), collapse = ", "), "))\n\n",
-      "================================================================================\n",
-      call. = FALSE
+    early_refuse(
+      code = "PKG_MISSING_DEPENDENCY",
+      title = "Missing Required Packages",
+      problem = sprintf("The following required packages are not installed: %s",
+                       paste(missing_packages, collapse = ", ")),
+      why_it_matters = "The Confidence GUI cannot run without these packages.",
+      how_to_fix = sprintf("Run the following command in R:\n  install.packages(c(%s))",
+                          paste(sprintf('"%s"', missing_packages), collapse = ", "))
     )
   }
 
@@ -365,11 +386,29 @@ run_confidence_gui <- function() {
         config_path <- file.path(data$path, data$selected_config)
 
         if (!dir.exists(confidence_dir)) {
-          stop("Could not find confidence module at: ", confidence_dir)
+          early_refuse(
+            code = "IO_MODULE_DIR_NOT_FOUND",
+            title = "Confidence Module Directory Not Found",
+            problem = sprintf("Could not find confidence module at: %s", confidence_dir),
+            why_it_matters = "The module directory must exist to run the analysis.",
+            how_to_fix = c(
+              "Verify you are running from the Turas root directory",
+              "Ensure the modules/confidence directory exists"
+            )
+          )
         }
 
         if (!file.exists(config_path)) {
-          stop("Could not find config file at: ", config_path)
+          early_refuse(
+            code = "IO_CONFIG_FILE_NOT_FOUND",
+            title = "Config File Not Found",
+            problem = sprintf("Could not find config file at: %s", config_path),
+            why_it_matters = "The configuration file is required to run the analysis.",
+            how_to_fix = c(
+              "Verify the config file exists in the selected project directory",
+              "Check the file name is correct"
+            )
+          )
         }
 
         # Update console

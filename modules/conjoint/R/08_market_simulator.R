@@ -548,7 +548,13 @@ create_simulator_data_sheet <- function(wb, utilities, importance, header_style)
 #'
 #' @return Character: Excel column letter (A, B, ..., Z, AA, AB, ...)
 int2col <- function(col) {
-  if (col <= 0) stop("Column number must be positive")
+  if (col <= 0) conjoint_refuse(
+    code = "INT_COL_INVALID",
+    title = "Invalid Column Number",
+    problem = "Column number must be positive.",
+    why_it_matters = "Excel column conversion requires a positive integer.",
+    how_to_fix = sprintf("Provided column number: %d (must be >= 1)", col)
+  )
 
   result <- ""
   while (col > 0) {

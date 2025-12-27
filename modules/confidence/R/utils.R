@@ -44,15 +44,33 @@ UTILS_VERSION <- "10.0"
 format_decimal <- function(x, decimal_sep = ".", digits = 2) {
   # Input validation
   if (!is.numeric(x)) {
-    stop("x must be numeric", call. = FALSE)
+    confidence_refuse(
+      code = "DATA_INVALID_TYPE",
+      title = "Invalid Type for Formatting",
+      problem = "x must be numeric",
+      why_it_matters = "Only numeric values can be formatted with decimal separators.",
+      how_to_fix = "Ensure the input is numeric"
+    )
   }
 
   if (!decimal_sep %in% c(".", ",")) {
-    stop("decimal_sep must be either '.' or ','", call. = FALSE)
+    confidence_refuse(
+      code = "CFG_INVALID_DECIMAL_SEPARATOR",
+      title = "Invalid Decimal Separator",
+      problem = "decimal_sep must be either '.' or ','",
+      why_it_matters = "Only period or comma are valid decimal separators.",
+      how_to_fix = "Use either '.' or ',' for decimal_sep"
+    )
   }
 
   if (!is.numeric(digits) || digits < 0 || digits != as.integer(digits)) {
-    stop("digits must be a non-negative integer", call. = FALSE)
+    confidence_refuse(
+      code = "CFG_INVALID_DIGITS",
+      title = "Invalid Digits Parameter",
+      problem = "digits must be a non-negative integer",
+      why_it_matters = "Decimal places must be specified as a whole number.",
+      how_to_fix = "Specify digits as a non-negative integer (e.g., 2, 3)"
+    )
   }
 
   # Format with period first (R standard)
@@ -97,11 +115,23 @@ format_output_df <- function(df, decimal_sep = ".", digits = 2,
                               exclude_cols = c("Base_n", "Effective_n")) {
   # Input validation
   if (!is.data.frame(df)) {
-    stop("df must be a data frame", call. = FALSE)
+    confidence_refuse(
+      code = "DATA_INVALID_TYPE",
+      title = "Invalid Type for Output Formatting",
+      problem = "df must be a data frame",
+      why_it_matters = "Output formatting requires a properly structured data frame.",
+      how_to_fix = "Ensure the input is a data frame"
+    )
   }
 
   if (!decimal_sep %in% c(".", ",")) {
-    stop("decimal_sep must be either '.' or ','", call. = FALSE)
+    confidence_refuse(
+      code = "CFG_INVALID_DECIMAL_SEPARATOR",
+      title = "Invalid Decimal Separator",
+      problem = "decimal_sep must be either '.' or ','",
+      why_it_matters = "Only period or comma are valid decimal separators.",
+      how_to_fix = "Use either '.' or ',' for decimal_sep"
+    )
   }
 
   # Make a copy to avoid modifying original
@@ -138,15 +168,33 @@ format_output_df <- function(df, decimal_sep = ".", digits = 2,
 #' @keywords internal
 validate_proportion <- function(p, param_name = "proportion") {
   if (!is.numeric(p)) {
-    stop(sprintf("%s must be numeric", param_name), call. = FALSE)
+    confidence_refuse(
+      code = "DATA_INVALID_TYPE",
+      title = "Invalid Proportion Type",
+      problem = sprintf("%s must be numeric", param_name),
+      why_it_matters = "Proportions must be numeric values for calculations.",
+      how_to_fix = sprintf("Ensure %s is numeric", param_name)
+    )
   }
 
   if (any(is.na(p))) {
-    stop(sprintf("%s contains NA values", param_name), call. = FALSE)
+    confidence_refuse(
+      code = "DATA_CONTAINS_NA",
+      title = "Proportion Contains NA Values",
+      problem = sprintf("%s contains NA values", param_name),
+      why_it_matters = "NA values prevent proper proportion calculations.",
+      how_to_fix = sprintf("Remove or handle NA values in %s", param_name)
+    )
   }
 
   if (any(p < 0 | p > 1)) {
-    stop(sprintf("%s must be between 0 and 1", param_name), call. = FALSE)
+    confidence_refuse(
+      code = "DATA_OUT_OF_RANGE",
+      title = "Proportion Out of Range",
+      problem = sprintf("%s must be between 0 and 1", param_name),
+      why_it_matters = "Proportions are by definition between 0 and 1.",
+      how_to_fix = sprintf("Ensure all values in %s are in the range [0, 1]", param_name)
+    )
   }
 
   invisible(TRUE)
@@ -166,19 +214,43 @@ validate_proportion <- function(p, param_name = "proportion") {
 #' @keywords internal
 validate_sample_size <- function(n, param_name = "n", min_n = 1) {
   if (!is.numeric(n)) {
-    stop(sprintf("%s must be numeric", param_name), call. = FALSE)
+    confidence_refuse(
+      code = "DATA_INVALID_TYPE",
+      title = "Invalid Sample Size Type",
+      problem = sprintf("%s must be numeric", param_name),
+      why_it_matters = "Sample sizes must be numeric values.",
+      how_to_fix = sprintf("Ensure %s is numeric", param_name)
+    )
   }
 
   if (any(is.na(n))) {
-    stop(sprintf("%s contains NA values", param_name), call. = FALSE)
+    confidence_refuse(
+      code = "DATA_CONTAINS_NA",
+      title = "Sample Size Contains NA",
+      problem = sprintf("%s contains NA values", param_name),
+      why_it_matters = "NA values prevent proper sample size validation.",
+      how_to_fix = sprintf("Remove or handle NA values in %s", param_name)
+    )
   }
 
   if (any(n < min_n)) {
-    stop(sprintf("%s must be >= %d", param_name, min_n), call. = FALSE)
+    confidence_refuse(
+      code = "DATA_INSUFFICIENT_SAMPLE",
+      title = "Sample Size Too Small",
+      problem = sprintf("%s must be >= %d", param_name, min_n),
+      why_it_matters = sprintf("Minimum sample size of %d is required for valid analysis.", min_n),
+      how_to_fix = sprintf("Ensure %s is at least %d", param_name, min_n)
+    )
   }
 
   if (any(n != as.integer(n))) {
-    stop(sprintf("%s must be an integer", param_name), call. = FALSE)
+    confidence_refuse(
+      code = "DATA_NON_INTEGER",
+      title = "Sample Size Must Be Integer",
+      problem = sprintf("%s must be an integer", param_name),
+      why_it_matters = "Sample sizes must be whole numbers.",
+      how_to_fix = sprintf("Ensure %s contains only integer values", param_name)
+    )
   }
 
   invisible(TRUE)
@@ -197,22 +269,43 @@ validate_sample_size <- function(n, param_name = "n", min_n = 1) {
 #' @keywords internal
 validate_conf_level <- function(conf_level, allowed_values = c(0.90, 0.95, 0.99)) {
   if (!is.numeric(conf_level)) {
-    stop("conf_level must be numeric", call. = FALSE)
+    confidence_refuse(
+      code = "CFG_INVALID_CONF_LEVEL_TYPE",
+      title = "Invalid Confidence Level Type",
+      problem = "conf_level must be numeric",
+      why_it_matters = "Confidence level must be a numeric value.",
+      how_to_fix = "Specify conf_level as a numeric value (e.g., 0.95)"
+    )
   }
 
   if (is.na(conf_level)) {
-    stop("conf_level cannot be NA", call. = FALSE)
+    confidence_refuse(
+      code = "CFG_CONF_LEVEL_NA",
+      title = "Confidence Level is NA",
+      problem = "conf_level cannot be NA",
+      why_it_matters = "Confidence level must be specified for analysis.",
+      how_to_fix = "Set Confidence_Level in config to a valid value (e.g., 0.95)"
+    )
   }
 
   if (conf_level <= 0 || conf_level >= 1) {
-    stop("conf_level must be between 0 and 1", call. = FALSE)
+    confidence_refuse(
+      code = "CFG_CONF_LEVEL_OUT_OF_RANGE",
+      title = "Confidence Level Out of Range",
+      problem = "conf_level must be between 0 and 1",
+      why_it_matters = "Confidence levels are probabilities and must be in (0, 1).",
+      how_to_fix = "Set Confidence_Level to a value between 0 and 1 (e.g., 0.95)"
+    )
   }
 
   if (!is.null(allowed_values) && !conf_level %in% allowed_values) {
-    stop(sprintf(
-      "conf_level must be one of: %s",
-      paste(allowed_values, collapse = ", ")
-    ), call. = FALSE)
+    confidence_refuse(
+      code = "CFG_CONF_LEVEL_NOT_ALLOWED",
+      title = "Confidence Level Not in Allowed Values",
+      problem = sprintf("conf_level must be one of: %s", paste(allowed_values, collapse = ", ")),
+      why_it_matters = "Only specific confidence levels are supported.",
+      how_to_fix = sprintf("Set Confidence_Level to one of: %s", paste(allowed_values, collapse = ", "))
+    )
   }
 
   invisible(TRUE)
@@ -230,15 +323,33 @@ validate_conf_level <- function(conf_level, allowed_values = c(0.90, 0.95, 0.99)
 #' @keywords internal
 validate_decimal_separator <- function(decimal_sep) {
   if (!is.character(decimal_sep)) {
-    stop("decimal_sep must be a character string", call. = FALSE)
+    confidence_refuse(
+      code = "CFG_INVALID_DECIMAL_SEP_TYPE",
+      title = "Invalid Decimal Separator Type",
+      problem = "decimal_sep must be a character string",
+      why_it_matters = "Decimal separator must be specified as a character.",
+      how_to_fix = "Set Decimal_Separator as a character value"
+    )
   }
 
   if (length(decimal_sep) != 1) {
-    stop("decimal_sep must be a single character", call. = FALSE)
+    confidence_refuse(
+      code = "CFG_DECIMAL_SEP_LENGTH",
+      title = "Invalid Decimal Separator Length",
+      problem = "decimal_sep must be a single character",
+      why_it_matters = "Decimal separator must be a single character.",
+      how_to_fix = "Set Decimal_Separator to either '.' or ','"
+    )
   }
 
   if (!decimal_sep %in% c(".", ",")) {
-    stop("decimal_sep must be either '.' or ','", call. = FALSE)
+    confidence_refuse(
+      code = "CFG_INVALID_DECIMAL_SEPARATOR",
+      title = "Invalid Decimal Separator Value",
+      problem = "decimal_sep must be either '.' or ','",
+      why_it_matters = "Only period or comma are valid decimal separators.",
+      how_to_fix = "Set Decimal_Separator to either '.' or ','"
+    )
   }
 
   invisible(TRUE)
@@ -257,19 +368,36 @@ validate_decimal_separator <- function(decimal_sep) {
 #' @keywords internal
 validate_question_limit <- function(n_questions, max_questions = 200) {
   if (!is.numeric(n_questions) || n_questions != as.integer(n_questions)) {
-    stop("n_questions must be an integer", call. = FALSE)
+    confidence_refuse(
+      code = "CFG_INVALID_QUESTION_COUNT",
+      title = "Invalid Question Count",
+      problem = "n_questions must be an integer",
+      why_it_matters = "Number of questions must be a whole number.",
+      how_to_fix = "Ensure n_questions is an integer value"
+    )
   }
 
   if (n_questions < 1) {
-    stop("n_questions must be at least 1", call. = FALSE)
+    confidence_refuse(
+      code = "CFG_NO_QUESTIONS",
+      title = "No Questions Specified",
+      problem = "n_questions must be at least 1",
+      why_it_matters = "At least one question is required for analysis.",
+      how_to_fix = "Specify at least one question in the config"
+    )
   }
 
   if (n_questions > max_questions) {
-    stop(sprintf(
-      "Question limit exceeded: %d questions specified (maximum %d)",
-      n_questions,
-      max_questions
-    ), call. = FALSE)
+    confidence_refuse(
+      code = "CFG_QUESTION_LIMIT_EXCEEDED",
+      title = "Question Limit Exceeded",
+      problem = sprintf("Question limit exceeded: %d questions specified (maximum %d)", n_questions, max_questions),
+      why_it_matters = "The module has limits to ensure reasonable performance.",
+      how_to_fix = c(
+        "Reduce the number of questions in the config",
+        sprintf("Or increase Max_Questions setting (current max: %d)", max_questions)
+      )
+    )
   }
 
   invisible(TRUE)

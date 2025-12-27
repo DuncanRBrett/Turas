@@ -33,7 +33,13 @@ MAX_QUESTION_LIMIT <- 1000  # Absolute maximum for performance reasons
 
 # Load required packages
 if (!require("readxl", quietly = TRUE)) {
-  stop("Package 'readxl' is required but not installed. Please install it with: install.packages('readxl')", call. = FALSE)
+  confidence_refuse(
+    code = "PKG_READXL_MISSING",
+    title = "Required Package Not Installed",
+    problem = "Package 'readxl' is required but not installed",
+    why_it_matters = "The readxl package is required to read Excel configuration files.",
+    how_to_fix = "Install the package with: install.packages('readxl')"
+  )
 }
 
 # Source utils
@@ -83,12 +89,27 @@ source_if_exists("utils.R")
 load_confidence_config <- function(config_path) {
   # Validate config file exists
   if (!file.exists(config_path)) {
-    stop(sprintf("Config file not found: %s", config_path), call. = FALSE)
+    confidence_refuse(
+      code = "IO_CONFIG_FILE_NOT_FOUND",
+      title = "Config File Not Found",
+      problem = sprintf("Config file not found: %s", config_path),
+      why_it_matters = "Configuration file is required to specify analysis parameters.",
+      how_to_fix = c(
+        "Verify the config file path is correct",
+        "Ensure the file exists in the specified location"
+      )
+    )
   }
 
   # Validate file extension
   if (!grepl("\\.xlsx$", tolower(config_path))) {
-    stop(sprintf("Config file must be .xlsx format: %s", config_path), call. = FALSE)
+    confidence_refuse(
+      code = "CFG_INVALID_FORMAT",
+      title = "Invalid Config File Format",
+      problem = sprintf("Config file must be .xlsx format: %s", config_path),
+      why_it_matters = "Configuration files must be in Excel format for proper parsing.",
+      how_to_fix = "Save the configuration file as .xlsx format"
+    )
   }
 
   # Load each sheet
@@ -171,18 +192,33 @@ load_file_paths_sheet <- function(config_path) {
   df <- tryCatch(
     readxl::read_excel(config_path, sheet = sheet_name),
     error = function(e) {
-      stop(sprintf("Failed to read '%s' sheet: %s", sheet_name, e$message), call. = FALSE)
+      confidence_refuse(
+        code = "IO_CONFIG_SHEET_READ_FAILED",
+        title = "Failed to Read Config Sheet",
+        problem = sprintf("Failed to read '%s' sheet: %s", sheet_name, e$message),
+        why_it_matters = "Configuration sheets must be readable to proceed with analysis.",
+        how_to_fix = c(
+          "Ensure the Excel file is not corrupted",
+          "Check that the file is not open in Excel",
+          sprintf("Verify that the '%s' sheet exists in the config file", sheet_name)
+        )
+      )
     }
   )
 
   # Validate structure
   required_cols <- c("Parameter", "Value")
   if (!all(required_cols %in% names(df))) {
-    stop(sprintf(
-      "'%s' sheet must have columns: %s",
-      sheet_name,
-      paste(required_cols, collapse = ", ")
-    ), call. = FALSE)
+    confidence_refuse(
+      code = "CFG_MISSING_COLUMNS",
+      title = "Missing Required Columns",
+      problem = sprintf("'%s' sheet must have columns: %s", sheet_name, paste(required_cols, collapse = ", ")),
+      why_it_matters = "Required columns ensure proper configuration structure.",
+      how_to_fix = sprintf("Add the required columns to the '%s' sheet: %s", sheet_name, paste(required_cols, collapse = ", ")),
+      expected = required_cols,
+      observed = names(df),
+      missing = setdiff(required_cols, names(df))
+    )
   }
 
   # Required parameters (simplified for standalone module)
@@ -194,11 +230,16 @@ load_file_paths_sheet <- function(config_path) {
   # Check all required parameters present
   missing_params <- setdiff(required_params, df$Parameter)
   if (length(missing_params) > 0) {
-    stop(sprintf(
-      "'%s' sheet missing required parameters: %s",
-      sheet_name,
-      paste(missing_params, collapse = ", ")
-    ), call. = FALSE)
+    confidence_refuse(
+      code = "CFG_MISSING_PARAMETERS",
+      title = "Missing Required Parameters",
+      problem = sprintf("'%s' sheet missing required parameters", sheet_name),
+      why_it_matters = "Required parameters ensure complete configuration specification.",
+      how_to_fix = sprintf("Add the required parameters to the '%s' sheet", sheet_name),
+      expected = required_params,
+      observed = df$Parameter,
+      missing = missing_params
+    )
   }
 
   return(df)
@@ -217,18 +258,33 @@ load_study_settings_sheet <- function(config_path) {
   df <- tryCatch(
     readxl::read_excel(config_path, sheet = sheet_name),
     error = function(e) {
-      stop(sprintf("Failed to read '%s' sheet: %s", sheet_name, e$message), call. = FALSE)
+      confidence_refuse(
+        code = "IO_CONFIG_SHEET_READ_FAILED",
+        title = "Failed to Read Config Sheet",
+        problem = sprintf("Failed to read '%s' sheet: %s", sheet_name, e$message),
+        why_it_matters = "Configuration sheets must be readable to proceed with analysis.",
+        how_to_fix = c(
+          "Ensure the Excel file is not corrupted",
+          "Check that the file is not open in Excel",
+          sprintf("Verify that the '%s' sheet exists in the config file", sheet_name)
+        )
+      )
     }
   )
 
   # Validate structure
   required_cols <- c("Setting", "Value")
   if (!all(required_cols %in% names(df))) {
-    stop(sprintf(
-      "'%s' sheet must have columns: %s",
-      sheet_name,
-      paste(required_cols, collapse = ", ")
-    ), call. = FALSE)
+    confidence_refuse(
+      code = "CFG_MISSING_COLUMNS",
+      title = "Missing Required Columns",
+      problem = sprintf("'%s' sheet must have columns: %s", sheet_name, paste(required_cols, collapse = ", ")),
+      why_it_matters = "Required columns ensure proper configuration structure.",
+      how_to_fix = sprintf("Add the required columns to the '%s' sheet: %s", sheet_name, paste(required_cols, collapse = ", ")),
+      expected = required_cols,
+      observed = names(df),
+      missing = setdiff(required_cols, names(df))
+    )
   }
 
   # Required settings (using readable PascalCase names)
@@ -244,11 +300,16 @@ load_study_settings_sheet <- function(config_path) {
   # Check all required settings present
   missing_settings <- setdiff(required_settings, df$Setting)
   if (length(missing_settings) > 0) {
-    stop(sprintf(
-      "'%s' sheet missing required settings: %s",
-      sheet_name,
-      paste(missing_settings, collapse = ", ")
-    ), call. = FALSE)
+    confidence_refuse(
+      code = "CFG_MISSING_SETTINGS",
+      title = "Missing Required Settings",
+      problem = sprintf("'%s' sheet missing required settings", sheet_name),
+      why_it_matters = "Required settings ensure complete analysis specification.",
+      how_to_fix = sprintf("Add the required settings to the '%s' sheet", sheet_name),
+      expected = required_settings,
+      observed = df$Setting,
+      missing = missing_settings
+    )
   }
 
   return(df)
@@ -285,7 +346,17 @@ load_question_analysis_sheet <- function(config_path, max_questions = NULL) {
   df <- tryCatch(
     readxl::read_excel(config_path, sheet = sheet_name),
     error = function(e) {
-      stop(sprintf("Failed to read '%s' sheet: %s", sheet_name, e$message), call. = FALSE)
+      confidence_refuse(
+        code = "IO_CONFIG_SHEET_READ_FAILED",
+        title = "Failed to Read Config Sheet",
+        problem = sprintf("Failed to read '%s' sheet: %s", sheet_name, e$message),
+        why_it_matters = "Configuration sheets must be readable to proceed with analysis.",
+        how_to_fix = c(
+          "Ensure the Excel file is not corrupted",
+          "Check that the file is not open in Excel",
+          sprintf("Verify that the '%s' sheet exists in the config file", sheet_name)
+        )
+      )
     }
   )
 
@@ -300,11 +371,16 @@ load_question_analysis_sheet <- function(config_path, max_questions = NULL) {
 
   missing_cols <- setdiff(required_cols, names(df))
   if (length(missing_cols) > 0) {
-    stop(sprintf(
-      "'%s' sheet missing required columns: %s",
-      sheet_name,
-      paste(missing_cols, collapse = ", ")
-    ), call. = FALSE)
+    confidence_refuse(
+      code = "CFG_MISSING_COLUMNS",
+      title = "Missing Required Columns",
+      problem = sprintf("'%s' sheet must have required columns", sheet_name),
+      why_it_matters = "Required columns ensure proper question specification structure.",
+      how_to_fix = sprintf("Add the required columns to the '%s' sheet", sheet_name),
+      expected = required_cols,
+      observed = names(df),
+      missing = missing_cols
+    )
   }
 
   # Remove completely empty rows
@@ -319,15 +395,26 @@ load_question_analysis_sheet <- function(config_path, max_questions = NULL) {
   # Check question limit (configurable, default 200)
   n_questions <- nrow(df)
   if (n_questions > max_questions) {
-    stop(sprintf(
-      "Question limit exceeded: %d questions specified (maximum %d). Set Max_Questions in Study_Settings to increase.",
-      n_questions,
-      max_questions
-    ), call. = FALSE)
+    confidence_refuse(
+      code = "CFG_QUESTION_LIMIT_EXCEEDED",
+      title = "Question Limit Exceeded",
+      problem = sprintf("Question limit exceeded: %d questions specified (maximum %d)", n_questions, max_questions),
+      why_it_matters = "The module has limits to ensure reasonable performance.",
+      how_to_fix = c(
+        "Reduce the number of questions in the Question_Analysis sheet",
+        sprintf("Or set Max_Questions in Study_Settings to increase (max: %d)", MAX_QUESTION_LIMIT)
+      )
+    )
   }
 
   if (n_questions == 0) {
-    stop("'Question_Analysis' sheet contains no questions", call. = FALSE)
+    confidence_refuse(
+      code = "CFG_NO_QUESTIONS",
+      title = "No Questions Specified",
+      problem = "'Question_Analysis' sheet contains no questions",
+      why_it_matters = "At least one question is required for analysis.",
+      how_to_fix = "Add question specifications to the Question_Analysis sheet"
+    )
   }
 
   return(df)
@@ -722,10 +809,17 @@ load_population_margins_sheet <- function(config_path) {
 
   # Stop if validation errors
   if (length(errors) > 0) {
-    stop(sprintf(
-      "Population_Margins validation errors:\n%s",
-      paste("  -", errors, collapse = "\n")
-    ), call. = FALSE)
+    confidence_refuse(
+      code = "CFG_INVALID_POPULATION_MARGINS",
+      title = "Invalid Population Margins Configuration",
+      problem = "Population_Margins sheet has validation errors",
+      why_it_matters = "Valid population margins are required for representativeness checking.",
+      how_to_fix = c(
+        "Fix the validation errors listed below:",
+        errors
+      ),
+      details = errors
+    )
   }
 
   # Convert Category_Code to character (handles both numeric and text)
@@ -795,7 +889,13 @@ get_file_path <- function(file_paths_df, param_name) {
   idx <- which(file_paths_df$Parameter == param_name)
 
   if (length(idx) == 0) {
-    stop(sprintf("File path parameter not found: %s", param_name), call. = FALSE)
+    confidence_refuse(
+      code = "CFG_PARAMETER_NOT_FOUND",
+      title = "File Path Parameter Not Found",
+      problem = sprintf("File path parameter not found: %s", param_name),
+      why_it_matters = "Required file path parameters must be specified in configuration.",
+      how_to_fix = sprintf("Add the parameter '%s' to the File_Paths sheet", param_name)
+    )
   }
 
   return(file_paths_df$Value[idx[1]])

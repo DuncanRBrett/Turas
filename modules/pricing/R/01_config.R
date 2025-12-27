@@ -22,19 +22,46 @@ load_pricing_config <- function(config_file) {
 
   # Validate config file exists
   if (!file.exists(config_file)) {
-    stop(sprintf("Configuration file not found: %s", config_file), call. = FALSE)
+    pricing_refuse(
+      code = "IO_CONFIG_NOT_FOUND",
+      title = "Configuration File Not Found",
+      problem = sprintf("Could not locate configuration file at: %s", config_file),
+      why_it_matters = "Cannot run analysis without configuration specifying data sources and methods",
+      how_to_fix = c(
+        "Check the file path is correct",
+        "Ensure the configuration file exists",
+        "Use create_pricing_config() to generate a template if needed"
+      )
+    )
   }
 
   # Load Settings sheet
   if (!requireNamespace("readxl", quietly = TRUE)) {
-    stop("Package 'readxl' is required. Install with: install.packages('readxl')", call. = FALSE)
+    pricing_refuse(
+      code = "PKG_READXL_MISSING",
+      title = "Required Package Missing",
+      problem = "Package 'readxl' is not installed",
+      why_it_matters = "Cannot read Excel configuration files without readxl package",
+      how_to_fix = "Install the package: install.packages('readxl')"
+    )
   }
 
   # Get available sheets
   sheets <- readxl::excel_sheets(config_file)
 
   if (!"Settings" %in% sheets) {
-    stop("Configuration file must contain a 'Settings' sheet", call. = FALSE)
+    pricing_refuse(
+      code = "CFG_MISSING_SETTINGS_SHEET",
+      title = "Missing Settings Sheet",
+      problem = "Configuration file does not contain required 'Settings' sheet",
+      why_it_matters = "The Settings sheet contains core configuration needed for analysis",
+      how_to_fix = c(
+        "Add a 'Settings' sheet to your configuration file",
+        "Use create_pricing_config() to generate a properly formatted template"
+      ),
+      observed = sheets,
+      expected = "Settings"
+    )
   }
 
   # Read Settings sheet
@@ -42,7 +69,18 @@ load_pricing_config <- function(config_file) {
 
   # Validate Settings sheet structure
   if (!all(c("Setting", "Value") %in% names(settings_raw))) {
-    stop("Settings sheet must contain 'Setting' and 'Value' columns", call. = FALSE)
+    pricing_refuse(
+      code = "CFG_INVALID_SETTINGS_FORMAT",
+      title = "Invalid Settings Sheet Format",
+      problem = "Settings sheet must have 'Setting' and 'Value' columns",
+      why_it_matters = "Cannot parse configuration without proper column structure",
+      how_to_fix = c(
+        "Ensure Settings sheet has two columns: 'Setting' and 'Value'",
+        "Use create_pricing_config() to generate a properly formatted template"
+      ),
+      observed = names(settings_raw),
+      expected = c("Setting", "Value")
+    )
   }
 
   # Convert to named list
@@ -141,16 +179,37 @@ validate_required_settings <- function(settings) {
                        sapply(settings[required], function(x) is.null(x) || is.na(x))]
 
   if (length(missing) > 0) {
-    stop(sprintf("Missing required settings: %s", paste(missing, collapse = ", ")),
-         call. = FALSE)
+    pricing_refuse(
+      code = "CFG_MISSING_REQUIRED",
+      title = "Missing Required Configuration Settings",
+      problem = sprintf("Required setting(s) not found: %s", paste(missing, collapse = ", ")),
+      why_it_matters = "Cannot run analysis without essential configuration parameters",
+      how_to_fix = c(
+        "Add the missing settings to your Settings sheet:",
+        sprintf("  - %s", paste(missing, collapse = "\n  - "))
+      ),
+      missing = missing,
+      expected = required
+    )
   }
 
   # Validate analysis_method value
   valid_methods <- c("van_westendorp", "gabor_granger", "both")
   if (!tolower(settings$analysis_method) %in% valid_methods) {
-    stop(sprintf("Invalid analysis_method: '%s'. Must be one of: %s",
-                 settings$analysis_method, paste(valid_methods, collapse = ", ")),
-         call. = FALSE)
+    pricing_refuse(
+      code = "CFG_INVALID_METHOD",
+      title = "Invalid Analysis Method",
+      problem = sprintf("Analysis method '%s' is not recognized", settings$analysis_method),
+      why_it_matters = "Cannot run analysis without specifying a valid methodology",
+      how_to_fix = c(
+        "Set analysis_method in Settings sheet to one of:",
+        "  - 'van_westendorp' for price sensitivity meter",
+        "  - 'gabor_granger' for demand curve analysis",
+        "  - 'both' for combined analysis"
+      ),
+      observed = settings$analysis_method,
+      expected = valid_methods
+    )
   }
 }
 
@@ -165,7 +224,18 @@ load_van_westendorp_config <- function(config_file) {
   vw_raw <- readxl::read_excel(config_file, sheet = "VanWestendorp")
 
   if (!all(c("Setting", "Value") %in% names(vw_raw))) {
-    stop("VanWestendorp sheet must contain 'Setting' and 'Value' columns", call. = FALSE)
+    pricing_refuse(
+      code = "CFG_INVALID_VW_FORMAT",
+      title = "Invalid Van Westendorp Sheet Format",
+      problem = "VanWestendorp sheet must have 'Setting' and 'Value' columns",
+      why_it_matters = "Cannot parse Van Westendorp configuration without proper column structure",
+      how_to_fix = c(
+        "Ensure VanWestendorp sheet has two columns: 'Setting' and 'Value'",
+        "Use create_pricing_config() to generate a properly formatted template"
+      ),
+      observed = names(vw_raw),
+      expected = c("Setting", "Value")
+    )
   }
 
   vw <- setNames(as.list(vw_raw$Value), vw_raw$Setting)
@@ -201,7 +271,18 @@ load_gabor_granger_config <- function(config_file) {
   gg_raw <- readxl::read_excel(config_file, sheet = "GaborGranger")
 
   if (!all(c("Setting", "Value") %in% names(gg_raw))) {
-    stop("GaborGranger sheet must contain 'Setting' and 'Value' columns", call. = FALSE)
+    pricing_refuse(
+      code = "CFG_INVALID_GG_FORMAT",
+      title = "Invalid Gabor-Granger Sheet Format",
+      problem = "GaborGranger sheet must have 'Setting' and 'Value' columns",
+      why_it_matters = "Cannot parse Gabor-Granger configuration without proper column structure",
+      how_to_fix = c(
+        "Ensure GaborGranger sheet has two columns: 'Setting' and 'Value'",
+        "Use create_pricing_config() to generate a properly formatted template"
+      ),
+      observed = names(gg_raw),
+      expected = c("Setting", "Value")
+    )
   }
 
   gg <- setNames(as.list(gg_raw$Value), gg_raw$Setting)
@@ -508,13 +589,23 @@ create_pricing_config <- function(output_file = "pricing_config.xlsx",
                                   overwrite = FALSE) {
 
   if (file.exists(output_file) && !overwrite) {
-    stop(sprintf("File already exists: %s. Use overwrite=TRUE to replace.", output_file),
-         call. = FALSE)
+    pricing_refuse(
+      code = "IO_FILE_EXISTS",
+      title = "Output File Already Exists",
+      problem = sprintf("File already exists at: %s", output_file),
+      why_it_matters = "Will not overwrite existing file without explicit permission",
+      how_to_fix = "Set overwrite=TRUE to replace the existing file, or specify a different output_file path"
+    )
   }
 
   if (!requireNamespace("openxlsx", quietly = TRUE)) {
-    stop("Package 'openxlsx' is required. Install with: install.packages('openxlsx')",
-         call. = FALSE)
+    pricing_refuse(
+      code = "PKG_OPENXLSX_MISSING",
+      title = "Required Package Missing",
+      problem = "Package 'openxlsx' is not installed",
+      why_it_matters = "Cannot create Excel configuration template without openxlsx package",
+      how_to_fix = "Install the package: install.packages('openxlsx')"
+    )
   }
 
   wb <- openxlsx::createWorkbook()

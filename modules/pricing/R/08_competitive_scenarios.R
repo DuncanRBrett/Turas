@@ -25,8 +25,17 @@ simulate_choice <- function(wtp_df, prices, allow_no_purchase = TRUE, market_siz
 
   brand_names <- names(prices)
   if (is.null(brand_names) || any(brand_names == "")) {
-    stop("prices must be a named numeric vector (e.g., c(brand_a = 40, brand_b = 45))",
-         call. = FALSE)
+    pricing_refuse(
+      code = "DATA_PRICES_NOT_NAMED",
+      title = "Price Vector Must Be Named",
+      problem = "Prices must be a named numeric vector with brand names",
+      why_it_matters = "Cannot run competitive simulation without identifying which brand has which price",
+      how_to_fix = c(
+        "Provide prices as a named vector",
+        "Example: c(brand_a = 40, brand_b = 45, brand_c = 38)"
+      ),
+      expected = "Named numeric vector"
+    )
   }
 
   # Expand: one row per respondent per brand
@@ -105,7 +114,18 @@ simulate_scenarios <- function(wtp_df, scenarios, scenario_names = NULL,
                                allow_no_purchase = TRUE, market_size = NULL) {
 
   if (!is.data.frame(scenarios)) {
-    stop("scenarios must be a data frame with brand names as columns", call. = FALSE)
+    pricing_refuse(
+      code = "DATA_SCENARIOS_INVALID",
+      title = "Invalid Scenarios Format",
+      problem = "Scenarios must be a data frame with brand names as columns",
+      why_it_matters = "Cannot run scenario analysis without properly formatted scenario data",
+      how_to_fix = c(
+        "Provide scenarios as a data frame",
+        "Each row represents a scenario",
+        "Each column represents a brand's price in that scenario"
+      ),
+      expected = "Data frame with brand prices as columns"
+    )
   }
 
   n_scenarios <- nrow(scenarios)
@@ -113,7 +133,18 @@ simulate_scenarios <- function(wtp_df, scenarios, scenario_names = NULL,
   if (is.null(scenario_names)) {
     scenario_names <- paste0("S", seq_len(n_scenarios))
   } else if (length(scenario_names) != n_scenarios) {
-    stop("Length of scenario_names must match number of scenarios", call. = FALSE)
+    pricing_refuse(
+      code = "DATA_SCENARIO_NAMES_MISMATCH",
+      title = "Scenario Names Count Mismatch",
+      problem = sprintf("%d scenario names provided but %d scenarios in data", length(scenario_names), n_scenarios),
+      why_it_matters = "Each scenario must have exactly one name",
+      how_to_fix = c(
+        "Provide one name per scenario row",
+        "Or omit scenario_names to use default names (S1, S2, etc.)"
+      ),
+      observed = length(scenario_names),
+      expected = n_scenarios
+    )
   }
 
   # Run simulation for each scenario
