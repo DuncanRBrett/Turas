@@ -1,44 +1,51 @@
+---
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
 # Turas Confidence Module - Technical Documentation
 
-**Version:** 2.0.0
-**Last Updated:** December 2025
-**Audience:** Developers, Technical Maintainers
+**Version:** 2.0.0 **Last Updated:** December 2025 **Audience:**
+Developers, Technical Maintainers
 
----
+------------------------------------------------------------------------
 
 ## Table of Contents
 
-1. [Architecture Overview](#architecture-overview)
-2. [Code Structure](#code-structure)
-3. [Data Flow](#data-flow)
-4. [Core Components](#core-components)
-5. [Configuration System](#configuration-system)
-6. [Statistical Implementations](#statistical-implementations)
-7. [Testing Framework](#testing-framework)
-8. [Error Handling](#error-handling)
-9. [Performance Considerations](#performance-considerations)
+1.  [Architecture Overview](#architecture-overview)
+2.  [Code Structure](#code-structure)
+3.  [Data Flow](#data-flow)
+4.  [Core Components](#core-components)
+5.  [Configuration System](#configuration-system)
+6.  [Statistical Implementations](#statistical-implementations)
+7.  [Testing Framework](#testing-framework)
+8.  [Error Handling](#error-handling)
+9.  [Performance Considerations](#performance-considerations)
 10. [Extension Points](#extension-points)
 11. [Code Style Guidelines](#code-style-guidelines)
 12. [Maintenance Procedures](#maintenance-procedures)
-13. [Troubleshooting Development Issues](#troubleshooting-development-issues)
+13. [Troubleshooting Development
+    Issues](#troubleshooting-development-issues)
 14. [Version Control](#version-control)
 15. [Dependencies](#dependencies)
 
----
+------------------------------------------------------------------------
 
-## Architecture Overview
+## Architecture Overview {#architecture-overview}
 
 ### Design Principles
 
-1. **Modularity:** Each R file has a single responsibility
-2. **Testability:** Functions are pure and testable in isolation
-3. **Robustness:** Comprehensive validation and error handling
-4. **Performance:** Optimized for typical survey datasets (1K-10K respondents)
-5. **Maintainability:** Clear naming, documentation, and structure
+1.  **Modularity:** Each R file has a single responsibility
+2.  **Testability:** Functions are pure and testable in isolation
+3.  **Robustness:** Comprehensive validation and error handling
+4.  **Performance:** Optimized for typical survey datasets (1K-10K
+    respondents)
+5.  **Maintainability:** Clear naming, documentation, and structure
 
 ### Module Structure
 
-```
+```         
 modules/confidence/
 ├── R/                          # Core R code
 │   ├── utils.R                 # Utility functions
@@ -60,9 +67,9 @@ modules/confidence/
 └── examples/                   # Example configs and data
 ```
 
----
+------------------------------------------------------------------------
 
-## Code Structure
+## Code Structure {#code-structure}
 
 ### File Responsibilities
 
@@ -70,7 +77,7 @@ modules/confidence/
 
 Utility functions used across the module:
 
-```r
+``` r
 format_number_for_output()  # Decimal separator formatting
 parse_codes()               # Parse comma-separated code lists
 calculate_effective_n()     # Kish effective sample size
@@ -79,13 +86,13 @@ is_package_available()      # Check package availability
 
 **Dependencies:** None (base R only)
 
----
+------------------------------------------------------------------------
 
 #### R/01_load_config.R
 
 Configuration file loading and validation.
 
-```r
+``` r
 load_confidence_config(config_path) -> list
 
 # Returns:
@@ -97,19 +104,16 @@ list(
 )
 ```
 
-**Validation Rules:**
-- Sheet existence checks
-- Required column validation
-- Value range checks
-- 200 question limit enforcement
+**Validation Rules:** - Sheet existence checks - Required column
+validation - Value range checks - 200 question limit enforcement
 
----
+------------------------------------------------------------------------
 
 #### R/02_load_data.R
 
 Data file loading with format detection.
 
-```r
+``` r
 load_survey_data(data_file_path, verbose) -> data.frame
 
 # Supported formats:
@@ -117,57 +121,56 @@ load_survey_data(data_file_path, verbose) -> data.frame
 # - XLSX (via readxl::read_excel)
 ```
 
-**Performance:** Uses `data.table::fread()` for CSV (5-10x faster than base R).
+**Performance:** Uses `data.table::fread()` for CSV (5-10x faster than
+base R).
 
----
+------------------------------------------------------------------------
 
 #### R/03_study_level.R
 
 Study-level statistics and diagnostics.
 
-```r
+``` r
 calculate_study_level_stats(data, weights) -> data.frame
 compute_weight_concentration(weights) -> data.frame
 compute_margin_comparison(data, weights, targets) -> data.frame
 ```
 
-**Calculations:**
-- Effective n: `n_eff = (sum(w))^2 / sum(w^2)`
-- DEFF: `n_actual / n_eff`
-- Weight concentration: Top K% share of total weight
+**Calculations:** - Effective n: `n_eff = (sum(w))^2 / sum(w^2)` - DEFF:
+`n_actual / n_eff` - Weight concentration: Top K% share of total weight
 
----
+------------------------------------------------------------------------
 
 #### R/04_proportions.R
 
 Proportion confidence interval methods.
 
-```r
+``` r
 calculate_proportion_ci_normal(p, n, conf_level)
 calculate_proportion_ci_wilson(p, n, conf_level)
 bootstrap_proportion_ci(data, categories, weights, B, conf_level)
 credible_interval_proportion(p, n, conf_level, prior_mean, prior_n)
 ```
 
----
+------------------------------------------------------------------------
 
 #### R/05_means.R
 
 Mean confidence interval methods.
 
-```r
+``` r
 calculate_mean_ci_t(values, conf_level)
 bootstrap_mean_ci(values, weights, B, conf_level)
 credible_interval_mean(mean, sd, n, conf_level, prior_mean, prior_sd, prior_n)
 ```
 
----
+------------------------------------------------------------------------
 
 #### R/06_nps.R
 
 NPS calculations (integrated in 00_main.R).
 
-```r
+``` r
 process_nps_question(q_row, survey_data, weight_var, config)
 
 # Steps:
@@ -177,13 +180,13 @@ process_nps_question(q_row, survey_data, weight_var, config)
 # 4. Apply CI methods
 ```
 
----
+------------------------------------------------------------------------
 
 #### R/07_output.R
 
 Excel workbook generation.
 
-```r
+``` r
 write_confidence_output(results, config, output_path)
 
 # Creates workbook with:
@@ -198,13 +201,13 @@ write_confidence_output(results, config, output_path)
 # 9. Inputs
 ```
 
----
+------------------------------------------------------------------------
 
 #### R/00_main.R
 
 Main orchestration script.
 
-```r
+``` r
 run_confidence_analysis(config_path, verbose = TRUE) -> list
 
 # Execution flow:
@@ -217,15 +220,16 @@ run_confidence_analysis(config_path, verbose = TRUE) -> list
 ```
 
 **Version Constant:**
-```r
+
+``` r
 MAIN_VERSION <- "2.0.0"
 ```
 
----
+------------------------------------------------------------------------
 
-## Data Flow
+## Data Flow {#data-flow}
 
-```
+```         
 Config File (Excel)
     ↓
 load_confidence_config()
@@ -250,15 +254,16 @@ write_confidence_output()
 [Excel Workbook]
 ```
 
----
+------------------------------------------------------------------------
 
-## Core Components
+## Core Components {#core-components}
 
 ### Values/Weights Alignment
 
-**Critical Pattern:** Always align values and weights to avoid mismatched CIs.
+**Critical Pattern:** Always align values and weights to avoid
+mismatched CIs.
 
-```r
+``` r
 # CORRECT pattern:
 valid_value_idx <- !is.na(values) & is.finite(values)
 
@@ -276,7 +281,7 @@ if (!is.null(weights)) {
 
 Handles text-formatted numeric columns:
 
-```r
+``` r
 if (!is.numeric(values)) {
   values_converted <- suppressWarnings(as.numeric(values))
   n_non_missing_before <- sum(!is.na(values) & values != "")
@@ -295,7 +300,7 @@ if (!is.numeric(values)) {
 
 Check for optional columns before accessing:
 
-```r
+``` r
 use_wilson_flag <- if ("Use_Wilson" %in% names(q_row)) {
   q_row$Use_Wilson
 } else {
@@ -303,13 +308,13 @@ use_wilson_flag <- if ("Use_Wilson" %in% names(q_row)) {
 }
 ```
 
----
+------------------------------------------------------------------------
 
-## Configuration System
+## Configuration System {#configuration-system}
 
 ### Config Object Structure
 
-```r
+``` r
 config <- list(
   file_paths = data.frame(
     Parameter = c("Data_File", "Output_Path"),
@@ -335,20 +340,20 @@ config <- list(
 
 ### Validation Rules
 
-| Parameter | Valid Values | Default |
-|-----------|--------------|---------|
-| Confidence_Level | 0.90, 0.95, 0.99 | 0.95 |
-| Bootstrap_Iterations | 1000-10000 | 5000 |
-| Decimal_Separator | "." or "," | "." |
-| Calculate_Effective_N | "Y" or "N" | "Y" |
+| Parameter             | Valid Values     | Default |
+|-----------------------|------------------|---------|
+| Confidence_Level      | 0.90, 0.95, 0.99 | 0.95    |
+| Bootstrap_Iterations  | 1000-10000       | 5000    |
+| Decimal_Separator     | "." or ","       | "."     |
+| Calculate_Effective_N | "Y" or "N"       | "Y"     |
 
----
+------------------------------------------------------------------------
 
-## Statistical Implementations
+## Statistical Implementations {#statistical-implementations}
 
 ### Effective Sample Size
 
-```r
+``` r
 calculate_effective_n <- function(weights) {
   if (is.null(weights) || length(weights) == 0) return(length(weights))
   n_eff <- (sum(weights))^2 / sum(weights^2)
@@ -358,7 +363,7 @@ calculate_effective_n <- function(weights) {
 
 ### Bootstrap Resampling
 
-```r
+``` r
 bootstrap_proportion_ci <- function(data, categories, weights, B, conf_level) {
   n <- length(data)
   boot_props <- numeric(B)
@@ -386,7 +391,7 @@ bootstrap_proportion_ci <- function(data, categories, weights, B, conf_level) {
 
 ### Bayesian (Beta-Binomial)
 
-```r
+``` r
 # Prior: Beta(α, β)
 # Posterior: Beta(α + x, β + n - x)
 
@@ -396,13 +401,13 @@ bootstrap_proportion_ci <- function(data, categories, weights, B, conf_level) {
 # Credible interval from posterior quantiles
 ```
 
----
+------------------------------------------------------------------------
 
-## Testing Framework
+## Testing Framework {#testing-framework}
 
 ### Test Suite Structure
 
-```
+```         
 tests/
 ├── test_representativeness.R  # Quota checking
 ├── test_nps.R                 # NPS calculations
@@ -412,7 +417,7 @@ tests/
 
 ### Running Tests
 
-```r
+``` r
 # Individual tests
 source("modules/confidence/tests/test_representativeness.R")
 source("modules/confidence/tests/test_nps.R")
@@ -424,7 +429,7 @@ source("modules/confidence/tests/test_real_config_ccpb.R")
 
 ### Writing Tests
 
-```r
+``` r
 test_that("Description of test", {
   # Setup
   data <- create_test_data()
@@ -439,20 +444,20 @@ test_that("Description of test", {
 })
 ```
 
----
+------------------------------------------------------------------------
 
-## Error Handling
+## Error Handling {#error-handling}
 
 ### Strategy
 
-1. **Configuration Errors:** Stop with clear message
-2. **Data Loading Errors:** Stop with file path and reason
-3. **Question-Level Errors:** Log warning, continue processing
-4. **Output Errors:** Log warning, attempt to continue
+1.  **Configuration Errors:** Stop with clear message
+2.  **Data Loading Errors:** Stop with file path and reason
+3.  **Question-Level Errors:** Log warning, continue processing
+4.  **Output Errors:** Log warning, attempt to continue
 
 ### Error Message Template
 
-```r
+``` r
 stop(sprintf(
   "Configuration Error: [Specific Issue]\n\n",
   "Location: [Sheet/Parameter]\n",
@@ -464,7 +469,7 @@ stop(sprintf(
 
 ### Warning Collection
 
-```r
+``` r
 warnings_list <- character()
 
 if (some_issue) {
@@ -475,62 +480,62 @@ if (some_issue) {
 }
 ```
 
----
+------------------------------------------------------------------------
 
-## Performance Considerations
+## Performance Considerations {#performance-considerations}
 
 ### Benchmarks
 
-| Task | Dataset Size | Time |
-|------|--------------|------|
-| Config + Data load | 10K × 50 | ~1 sec |
-| Wilson CI (1 question) | 10K | <0.1 sec |
-| Bootstrap CI (5K iter) | 1K | ~1 sec |
-| Bootstrap CI (5K iter) | 10K | ~10 sec |
-| Full analysis (50Q) | 1K | ~30 sec |
+| Task                   | Dataset Size | Time      |
+|------------------------|--------------|-----------|
+| Config + Data load     | 10K × 50     | \~1 sec   |
+| Wilson CI (1 question) | 10K          | \<0.1 sec |
+| Bootstrap CI (5K iter) | 1K           | \~1 sec   |
+| Bootstrap CI (5K iter) | 10K          | \~10 sec  |
+| Full analysis (50Q)    | 1K           | \~30 sec  |
 
 ### Optimization Techniques
 
-1. **Fast CSV Loading:** `data.table::fread()`
-2. **Vectorized Operations:** Avoid loops where possible
-3. **Preallocate Vectors:** `boot_props <- numeric(B)`
-4. **Avoid Unnecessary Computation:** Calculate once, reuse
+1.  **Fast CSV Loading:** `data.table::fread()`
+2.  **Vectorized Operations:** Avoid loops where possible
+3.  **Preallocate Vectors:** `boot_props <- numeric(B)`
+4.  **Avoid Unnecessary Computation:** Calculate once, reuse
 
----
+------------------------------------------------------------------------
 
-## Extension Points
+## Extension Points {#extension-points}
 
 ### Adding New CI Methods
 
-1. Create function in 04_proportions.R or 05_means.R
-2. Add config column (e.g., `Run_NewMethod`)
-3. Add processing logic in 00_main.R
-4. Update output in 07_output.R
-5. Add tests
-6. Update documentation
+1.  Create function in 04_proportions.R or 05_means.R
+2.  Add config column (e.g., `Run_NewMethod`)
+3.  Add processing logic in 00_main.R
+4.  Update output in 07_output.R
+5.  Add tests
+6.  Update documentation
 
 ### Adding New Question Types
 
-1. Create processing function
-2. Update dispatcher in 00_main.R
-3. Add output sheet in 07_output.R
-4. Update config validation
-5. Add tests
-6. Update documentation
+1.  Create processing function
+2.  Update dispatcher in 00_main.R
+3.  Add output sheet in 07_output.R
+4.  Update config validation
+5.  Add tests
+6.  Update documentation
 
----
+------------------------------------------------------------------------
 
-## Code Style Guidelines
+## Code Style Guidelines {#code-style-guidelines}
 
 ### Naming Conventions
 
-- **Functions:** `snake_case` (e.g., `calculate_effective_n`)
-- **Variables:** `snake_case` (e.g., `study_level_stats`)
-- **Constants:** `SCREAMING_SNAKE_CASE` (e.g., `MAIN_VERSION`)
+-   **Functions:** `snake_case` (e.g., `calculate_effective_n`)
+-   **Variables:** `snake_case` (e.g., `study_level_stats`)
+-   **Constants:** `SCREAMING_SNAKE_CASE` (e.g., `MAIN_VERSION`)
 
 ### Function Structure
 
-```r
+``` r
 function_name <- function(param1, param2, param3 = default) {
   # Brief description
 
@@ -547,7 +552,7 @@ function_name <- function(param1, param2, param3 = default) {
 
 ### Comments
 
-```r
+``` r
 # ========================================================================
 # SECTION NAME
 # ========================================================================
@@ -557,31 +562,29 @@ function_name <- function(param1, param2, param3 = default) {
 # -------------------------------------------------------------------------
 ```
 
----
+------------------------------------------------------------------------
 
-## Maintenance Procedures
+## Maintenance Procedures {#maintenance-procedures}
 
 ### Before Each Release
 
-- [ ] Run full test suite
-- [ ] Test with real config files
-- [ ] Update version number in all locations
-- [ ] Update documentation
-- [ ] Test GUI and command line
-- [ ] Verify backward compatibility
+-   [ ] Run full test suite
+-   [ ] Test with real config files
+-   [ ] Update version number in all locations
+-   [ ] Update documentation
+-   [ ] Test GUI and command line
+-   [ ] Verify backward compatibility
 
 ### Updating Version Number
 
-Locations to update:
-1. `R/00_main.R` → `MAIN_VERSION`
-2. `README.md` → Version badge
-3. `docs/` → All documentation files
+Locations to update: 1. `R/00_main.R` → `MAIN_VERSION` 2. `README.md` →
+Version badge 3. `docs/` → All documentation files
 
 ### Adding New Sheet to Output
 
-1. Create function in 07_output.R:
+1.  Create function in 07_output.R:
 
-```r
+``` r
 add_mysheet_detail <- function(wb, data, config) {
   sheet_name <- "MySheet"
   openxlsx::addWorksheet(wb, sheet_name)
@@ -590,50 +593,50 @@ add_mysheet_detail <- function(wb, data, config) {
 }
 ```
 
-2. Call from `write_confidence_output()`:
+2.  Call from `write_confidence_output()`:
 
-```r
+``` r
 wb <- add_mysheet_detail(wb, results$mysheet_data, config)
 ```
 
----
+------------------------------------------------------------------------
 
-## Troubleshooting Development Issues
+## Troubleshooting Development Issues {#troubleshooting-development-issues}
 
 ### "Function not found"
 
-**Cause:** Sourcing order incorrect
-**Fix:** Source files in order: utils → 01 → 02 → ... → 00
+**Cause:** Sourcing order incorrect **Fix:** Source files in order:
+utils → 01 → 02 → ... → 00
 
 ### Bootstrap Taking Too Long
 
-**Cause:** Too many iterations or large dataset
-**Fix:** Reduce B for testing, or optimize sampling code
+**Cause:** Too many iterations or large dataset **Fix:** Reduce B for
+testing, or optimize sampling code
 
 ### Excel Output Fails
 
-**Cause:** Permission issues or file already open
-**Fix:** Check permissions, close Excel
+**Cause:** Permission issues or file already open **Fix:** Check
+permissions, close Excel
 
 ### Tests Failing After Changes
 
-**Cause:** Breaking changes to API
-**Fix:** Update tests, add regression tests
+**Cause:** Breaking changes to API **Fix:** Update tests, add regression
+tests
 
----
+------------------------------------------------------------------------
 
-## Version Control
+## Version Control {#version-control}
 
 ### Branches
 
-- `main`: Production-ready code
-- `develop`: Integration branch
-- `feature/xxx`: Feature development
-- `bugfix/xxx`: Bug fixes
+-   `main`: Production-ready code
+-   `develop`: Integration branch
+-   `feature/xxx`: Feature development
+-   `bugfix/xxx`: Bug fixes
 
 ### Commit Messages
 
-```
+```         
 Fix: Description of fix
 Feat: Description of new feature
 Docs: Documentation update
@@ -645,32 +648,32 @@ Refactor: Code restructuring
 
 **Semantic Versioning:** MAJOR.MINOR.PATCH
 
-- **MAJOR:** Breaking changes
-- **MINOR:** New features (backward compatible)
-- **PATCH:** Bug fixes only
+-   **MAJOR:** Breaking changes
+-   **MINOR:** New features (backward compatible)
+-   **PATCH:** Bug fixes only
 
----
+------------------------------------------------------------------------
 
-## Dependencies
+## Dependencies {#dependencies}
 
 ### Required Packages
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| `readxl` | ≥1.4.0 | Read Excel config |
-| `openxlsx` | ≥4.2.5 | Write Excel output |
-| `data.table` | ≥1.14.0 | Fast CSV loading |
+| Package      | Version | Purpose            |
+|--------------|---------|--------------------|
+| `readxl`     | ≥1.4.0  | Read Excel config  |
+| `openxlsx`   | ≥4.2.5  | Write Excel output |
+| `data.table` | ≥1.14.0 | Fast CSV loading   |
 
 ### Optional Packages
 
-| Package | Purpose |
-|---------|---------|
-| `dplyr` | Data manipulation (fallback available) |
-| `testthat` | Unit testing |
+| Package    | Purpose                                |
+|------------|----------------------------------------|
+| `dplyr`    | Data manipulation (fallback available) |
+| `testthat` | Unit testing                           |
 
 ### Checking Dependencies
 
-```r
+``` r
 check_dependencies <- function() {
   required <- c("readxl", "openxlsx", "data.table")
   missing <- character(0)
@@ -692,13 +695,13 @@ check_dependencies <- function() {
 }
 ```
 
----
+------------------------------------------------------------------------
 
 ## API Reference
 
 ### Main Entry Point
 
-```r
+``` r
 run_confidence_analysis(
   config_path,     # Path to Excel config
   verbose = TRUE   # Print progress
@@ -706,7 +709,8 @@ run_confidence_analysis(
 ```
 
 **Returns:**
-```r
+
+``` r
 list(
   study_level_stats = data.frame(...),
   proportion_results = list(...),
@@ -719,45 +723,44 @@ list(
 
 ### Key Functions
 
-| Function | File | Purpose |
-|----------|------|---------|
-| `load_confidence_config()` | 01_load_config.R | Load config |
-| `load_survey_data()` | 02_load_data.R | Load data |
-| `calculate_study_level_stats()` | 03_study_level.R | DEFF, n_eff |
-| `calculate_proportion_ci_normal()` | 04_proportions.R | MOE |
-| `calculate_proportion_ci_wilson()` | 04_proportions.R | Wilson |
-| `bootstrap_proportion_ci()` | 04_proportions.R | Bootstrap |
-| `credible_interval_proportion()` | 04_proportions.R | Bayesian |
-| `calculate_mean_ci_t()` | 05_means.R | t-dist |
-| `bootstrap_mean_ci()` | 05_means.R | Bootstrap |
-| `credible_interval_mean()` | 05_means.R | Bayesian |
-| `write_confidence_output()` | 07_output.R | Excel output |
+| Function                           | File             | Purpose      |
+|------------------------------------|------------------|--------------|
+| `load_confidence_config()`         | 01_load_config.R | Load config  |
+| `load_survey_data()`               | 02_load_data.R   | Load data    |
+| `calculate_study_level_stats()`    | 03_study_level.R | DEFF, n_eff  |
+| `calculate_proportion_ci_normal()` | 04_proportions.R | MOE          |
+| `calculate_proportion_ci_wilson()` | 04_proportions.R | Wilson       |
+| `bootstrap_proportion_ci()`        | 04_proportions.R | Bootstrap    |
+| `credible_interval_proportion()`   | 04_proportions.R | Bayesian     |
+| `calculate_mean_ci_t()`            | 05_means.R       | t-dist       |
+| `bootstrap_mean_ci()`              | 05_means.R       | Bootstrap    |
+| `credible_interval_mean()`         | 05_means.R       | Bayesian     |
+| `write_confidence_output()`        | 07_output.R      | Excel output |
 
----
+------------------------------------------------------------------------
 
 ## Future Development
 
 ### Phase 3 Possibilities
 
-- Banner column support
-- Multiple comparison adjustments
-- Subgroup analysis
-- Trend analysis
-- Interactive dashboard
-- API mode
-- Parallel processing
+-   Banner column support
+-   Multiple comparison adjustments
+-   Subgroup analysis
+-   Trend analysis
+-   Interactive dashboard
+-   API mode
+-   Parallel processing
 
 ### Enhancements
 
-- Auto-detect question types
-- Smart prior selection
-- Adaptive bootstrap
-- Result caching
-- Export to other formats
+-   Auto-detect question types
+-   Smart prior selection
+-   Adaptive bootstrap
+-   Result caching
+-   Export to other formats
 
----
+------------------------------------------------------------------------
 
 **End of Technical Documentation**
 
-*Turas Confidence Module v2.0.0*
-*Last Updated: December 2025*
+*Turas Confidence Module v2.0.0* *Last Updated: December 2025*
