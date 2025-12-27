@@ -542,12 +542,23 @@ write_trend_dashboard <- function(wb, trend_results, config, sheet_name = "Trend
   # ===========================================================================
 
   current_row <- header_row + 1
+  rows_written <- 0
+
+  # Debug: show what we're iterating over
+  if (length(trend_results) == 0) {
+    message("  WARNING: No trend results to display in dashboard")
+  } else {
+    message(paste0("  Processing ", length(trend_results), " questions for dashboard..."))
+  }
 
   for (q_code in names(trend_results)) {
     q_result <- trend_results[[q_code]]
 
     # Skip if no wave_results
-    if (is.null(q_result$wave_results)) next
+    if (is.null(q_result$wave_results)) {
+      message(paste0("    Skipping ", q_code, ": no wave_results"))
+      next
+    }
 
     # Extract wave values
     wave_values <- sapply(wave_ids, function(wid) {
@@ -678,6 +689,14 @@ write_trend_dashboard <- function(wb, trend_results, config, sheet_name = "Trend
                        rows = current_row, cols = col)
 
     current_row <- current_row + 1
+    rows_written <- rows_written + 1
+  }
+
+  # Report how many rows were written
+  if (rows_written == 0) {
+    message("  WARNING: No data rows written to dashboard. Check that trend_results contains valid wave_results.")
+  } else {
+    message(paste0("  Dashboard: ", rows_written, " question rows written"))
   }
 
   # ===========================================================================
@@ -965,14 +984,33 @@ write_significance_matrix <- function(wb, q_result, config, wave_ids) {
 write_all_significance_matrices <- function(wb, trend_results, config) {
 
   wave_ids <- config$waves$WaveID
+  matrices_written <- 0
+
+  # Debug: show what we're iterating over
+  if (length(trend_results) == 0) {
+    message("  WARNING: No trend results to display in significance matrices")
+  } else {
+    message(paste0("  Processing ", length(trend_results), " questions for significance matrices..."))
+  }
 
   for (q_code in names(trend_results)) {
     q_result <- trend_results[[q_code]]
 
     # Skip if no wave_results
-    if (is.null(q_result$wave_results)) next
+    if (is.null(q_result$wave_results)) {
+      message(paste0("    Skipping ", q_code, ": no wave_results"))
+      next
+    }
 
     write_significance_matrix(wb, q_result, config, wave_ids)
+    matrices_written <- matrices_written + 1
+  }
+
+  # Report how many matrices were written
+  if (matrices_written == 0) {
+    message("  WARNING: No significance matrices written. Check that trend_results contains valid wave_results.")
+  } else {
+    message(paste0("  Sig Matrix: ", matrices_written, " matrices written"))
   }
 
   invisible(wb)

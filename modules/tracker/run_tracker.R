@@ -298,19 +298,36 @@ run_tracker <- function(tracking_config_path,
   if (use_banners) {
     # Phase 3: Calculate trends with banner breakouts
     banner_segments <- get_banner_segments(config, wave_data)
-    trend_results <- calculate_trends_with_banners(
+    trend_calc_result <- calculate_trends_with_banners(
       config = config,
       question_map = question_map,
       wave_data = wave_data
     )
   } else {
     # Phase 2: Calculate simple trends (Total only)
-    trend_results <- calculate_all_trends(
+    trend_calc_result <- calculate_all_trends(
       config = config,
       question_map = question_map,
       wave_data = wave_data
     )
     banner_segments <- NULL
+  }
+
+  # Extract the actual trends from the wrapper structure
+  # calculate_all_trends returns: list(trends=..., skipped_questions=..., run_status=...)
+  if (is.list(trend_calc_result) && "trends" %in% names(trend_calc_result)) {
+    trend_results <- trend_calc_result$trends
+    skipped_questions <- trend_calc_result$skipped_questions
+    trend_run_status <- trend_calc_result$run_status
+    cat(paste0("\n  Trends calculated for ", length(trend_results), " questions\n"))
+    if (length(skipped_questions) > 0) {
+      cat(paste0("  Skipped: ", length(skipped_questions), " questions\n"))
+    }
+  } else {
+    # Backward compatibility: if already a simple list of trends
+    trend_results <- trend_calc_result
+    skipped_questions <- list()
+    trend_run_status <- "PASS"
   }
 
 
