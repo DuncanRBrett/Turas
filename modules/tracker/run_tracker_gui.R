@@ -800,35 +800,45 @@ run_tracker_gui <- function() {
           console_output("Tracker completed but produced no console output.")
         }
 
-        # Extract output_file
+        # Handle success/failure
         if (analysis_result$success) {
           output_file <- analysis_result$output_file
+
+          # Save to recent projects
+          add_recent_project(list(
+            tracking_config = tracking_config,
+            question_mapping = question_mapping,
+            data_dir = data_dir,
+            output_path = output_path,
+            use_banners = input$use_banners
+          ))
+
+          # Update console with completion message
+          console_output(paste0(
+            console_output(),
+            sprintf("\n%s\n✓ ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80)),
+            sprintf("\nOutput file saved to:\n%s\n", output_file)
+          ))
+
+          # Display any warnings that occurred
+          if (length(all_warnings) > 0) {
+            warning_msg <- paste0("\n\nWarnings encountered:\n", paste(all_warnings, collapse = "\n"))
+            console_output(paste0(console_output(), "\n", warning_msg))
+          }
+
+          progress$set(value = 1.0, detail = "Complete!")
+          showNotification("Tracking analysis completed successfully!", type = "message", duration = 5)
+        } else {
+          # Analysis failed - report the error
+          error_msg <- paste0(
+            strrep("=", 80), "\n",
+            "ANALYSIS FAILED\n",
+            strrep("=", 80), "\n\n",
+            "Error: ", analysis_result$error$message, "\n"
+          )
+          console_output(paste0(console_output(), "\n\n", error_msg))
+          showNotification(paste("Analysis failed:", analysis_result$error$message), type = "error", duration = 10)
         }
-
-        # Save to recent projects
-        add_recent_project(list(
-          tracking_config = tracking_config,
-          question_mapping = question_mapping,
-          data_dir = data_dir,
-          output_path = output_path,
-          use_banners = input$use_banners
-        ))
-
-        # Update console with completion message
-        console_output(paste0(
-          console_output(),
-          sprintf("\n%s\n✓ ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80)),
-          sprintf("\nOutput file saved to:\n%s\n", output_file)
-        ))
-
-        # Display any warnings that occurred
-        if (length(all_warnings) > 0) {
-          warning_msg <- paste0("\n\nWarnings encountered:\n", paste(all_warnings, collapse = "\n"))
-          console_output(paste0(console_output(), "\n", warning_msg))
-        }
-
-        progress$set(value = 1.0, detail = "Complete!")
-        showNotification("Tracking analysis completed successfully!", type = "message", duration = 5)
 
       }, warning = warning_handler), error = function(e) {
         error_msg <- paste0(strrep("=", 80), "\nERROR: ", e$message, "\n", strrep("=", 80), "\n\n")
