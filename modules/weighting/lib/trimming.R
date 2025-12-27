@@ -40,11 +40,23 @@ trim_weights <- function(weights,
 
   # Validate inputs
   if (!is.numeric(weights)) {
-    stop("weights must be a numeric vector", call. = FALSE)
+    weighting_refuse(
+      code = "DATA_INVALID_TYPE",
+      title = "Invalid Weight Type",
+      problem = "The weights parameter is not a numeric vector",
+      why_it_matters = "Weight trimming requires numeric values to calculate thresholds and apply caps",
+      how_to_fix = "Ensure weights is a numeric vector before calling trim_weights()"
+    )
   }
 
   if (!is.numeric(value) || length(value) != 1 || is.na(value)) {
-    stop("value must be a single numeric value", call. = FALSE)
+    weighting_refuse(
+      code = "DATA_INVALID_PARAMETER",
+      title = "Invalid Trim Value",
+      problem = "The value parameter must be a single non-NA numeric value",
+      why_it_matters = "The trimming threshold must be a well-defined numeric value to cap weights",
+      how_to_fix = "Provide a single numeric value for the value parameter (e.g., value = 5 or value = 0.95)"
+    )
   }
 
   # Get valid weights for calculation
@@ -67,7 +79,13 @@ trim_weights <- function(weights,
   # Determine threshold based on method
   if (method == "cap") {
     if (value <= 0) {
-      stop("For 'cap' method, value must be positive", call. = FALSE)
+      weighting_refuse(
+        code = "CFG_INVALID_CAP",
+        title = "Invalid Cap Value",
+        problem = sprintf("Cap value must be positive, but got %s", value),
+        why_it_matters = "A negative or zero cap would set all weights to zero or negative, making the data unusable",
+        how_to_fix = "Set value to a positive number (e.g., value = 5 for a maximum weight of 5)"
+      )
     }
     threshold <- value
 
@@ -77,7 +95,13 @@ trim_weights <- function(weights,
 
   } else if (method == "percentile") {
     if (value <= 0 || value >= 1) {
-      stop("For 'percentile' method, value must be between 0 and 1 (e.g., 0.95)", call. = FALSE)
+      weighting_refuse(
+        code = "CFG_INVALID_PERCENTILE",
+        title = "Invalid Percentile Value",
+        problem = sprintf("Percentile value must be between 0 and 1, but got %s", value),
+        why_it_matters = "Percentiles represent proportions of the distribution and must be in the range (0, 1)",
+        how_to_fix = "Use a value between 0 and 1, such as 0.95 for the 95th percentile or 0.99 for the 99th percentile"
+      )
     }
     threshold <- quantile(weights[valid_idx], probs = value, na.rm = TRUE)
 
@@ -204,11 +228,23 @@ trim_weights_two_sided <- function(weights,
                                    verbose = FALSE) {
 
   if (lower_pct >= upper_pct) {
-    stop("lower_pct must be less than upper_pct", call. = FALSE)
+    weighting_refuse(
+      code = "CFG_INVALID_PERCENTILE_RANGE",
+      title = "Invalid Percentile Range",
+      problem = sprintf("lower_pct (%s) must be less than upper_pct (%s)", lower_pct, upper_pct),
+      why_it_matters = "Two-sided trimming requires a valid range with the lower bound below the upper bound",
+      how_to_fix = "Ensure lower_pct < upper_pct (e.g., lower_pct = 0.01, upper_pct = 0.99)"
+    )
   }
 
   if (lower_pct <= 0 || upper_pct >= 1) {
-    stop("Percentiles must be between 0 and 1 (exclusive)", call. = FALSE)
+    weighting_refuse(
+      code = "CFG_PERCENTILE_OUT_OF_BOUNDS",
+      title = "Percentiles Out of Bounds",
+      problem = sprintf("Percentiles must be in range (0, 1), but got lower_pct = %s, upper_pct = %s", lower_pct, upper_pct),
+      why_it_matters = "Percentiles at exactly 0 or 1 would trim all or no weights, defeating the purpose of two-sided trimming",
+      how_to_fix = "Use percentiles strictly between 0 and 1 (e.g., lower_pct = 0.01, upper_pct = 0.99)"
+    )
   }
 
   valid_idx <- !is.na(weights) & is.finite(weights) & weights > 0
