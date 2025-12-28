@@ -17,11 +17,12 @@
 # DEPENDENCIES:
 #   - cell_calculator.R (calculate_summary_statistic)
 #   - banner.R (banner structure)
-#   - weighting.R (test_sig_mean)
+#   - weighting.R (weighted_t_test_means for significance testing)
 #   - shared_functions.R (utilities)
 #
-# VERSION: 1.0.0
-# DATE: 2025-11-06
+# VERSION: 1.0.1
+# DATE: 2025-12-28
+# V10.1 FIX: Changed from non-existent test_sig_mean to weighted_t_test_means
 # ==============================================================================
 
 #' Load Composite Definitions
@@ -736,26 +737,34 @@ test_composite_significance <- function(data, composite_code, source_questions,
       # Get sig test parameters safely
       alpha <- if (!is.null(config$alpha)) config$alpha else 0.05
       bonf_corr <- !is.null(config$bonferroni_correction) && config$bonferroni_correction
+      min_base <- if (!is.null(config$significance_min_base)) config$significance_min_base else 30
 
-      # Test significance using t-test for means
-      sig_result <- test_sig_mean(
-        values_a = values_a,
-        values_b = values_b,
-        weights_a = weights_a,
-        weights_b = weights_b,
-        alpha = alpha,
-        bonferroni_correction = bonf_corr,
-        num_comparisons = choose(length(internal_keys), 2)
+      # Apply Bonferroni correction if enabled
+      test_alpha <- if (bonf_corr) {
+        alpha / choose(length(internal_keys), 2)
+      } else {
+        alpha
+      }
+
+      # Test significance using weighted t-test for means
+      # V10.1 FIX: Use weighted_t_test_means instead of non-existent test_sig_mean
+      sig_result <- weighted_t_test_means(
+        values1 = values_a,
+        values2 = values_b,
+        weights1 = weights_a,
+        weights2 = weights_b,
+        min_base = min_base,
+        alpha = test_alpha
       )
 
-      if (!is.null(sig_result) && sig_result$is_significant) {
-        # A > B
-        if (sig_result$direction == "A>B") {
-          # Add B's letter to A's significance
+      if (!is.null(sig_result) && sig_result$significant) {
+        # Determine direction: higher=TRUE means values1 > values2 (A > B)
+        if (sig_result$higher) {
+          # A > B: Add B's letter to A's significance
           sig_letters[key_a] <- paste0(sig_letters[key_a],
                                        banner_info$sig_letters[key_b])
-        } else if (sig_result$direction == "B>A") {
-          # Add A's letter to B's significance
+        } else {
+          # B > A: Add A's letter to B's significance
           sig_letters[key_b] <- paste0(sig_letters[key_b],
                                        banner_info$sig_letters[key_a])
         }
