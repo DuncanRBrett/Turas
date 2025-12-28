@@ -355,11 +355,27 @@ run_categorical_keydriver_impl <- function(config_file,
 
   # Prepare weights
   weights <- NULL
+  weight_diagnostics <- NULL
   if (!is.null(config$weight_var) && config$weight_var %in% names(data)) {
     weights <- data[[config$weight_var]]
     weights[is.na(weights)] <- 1
     weights[weights < 0] <- 0
     log_message(paste("Using weights from:", config$weight_var), "info")
+
+    # Calculate weight diagnostics
+    weight_diagnostics <- calculate_weight_diagnostics(weights)
+    if (!is.null(weight_diagnostics)) {
+      log_message(paste("Weight range:", round(weight_diagnostics$min_weight, 3),
+                        "-", round(weight_diagnostics$max_weight, 3)), "info")
+      log_message(paste("Effective n:", round(weight_diagnostics$effective_n, 0),
+                        "(design effect:", round(weight_diagnostics$design_effect, 2), ")"), "info")
+      if (weight_diagnostics$has_extreme_weights) {
+        cat("   [PARTIAL] Extreme weights detected (ratio > 10)\n")
+        degraded_reasons <- c(degraded_reasons,
+          paste0("Extreme weights detected (max/min = ", round(weight_diagnostics$weight_ratio, 1), ")"))
+        affected_outputs <- c(affected_outputs, "Standard errors", "Confidence intervals")
+      }
+    }
   }
 
   # Preprocess variables
@@ -549,6 +565,51 @@ run_categorical_keydriver_impl <- function(config_file,
   odds_ratios <- extract_odds_ratios_mapped(model_result, term_mapping, config)
   log_message(paste("Extracted", nrow(odds_ratios), "odds ratio comparisons"), "info")
 
+  # Bootstrap confidence intervals (optional)
+  bootstrap_results <- NULL
+  if (isTRUE(config$bootstrap_ci) && prep_data$outcome_info$type != "multinomial") {
+    log_message(paste0("Running bootstrap (", config$bootstrap_reps, " resamples)..."), "info")
+    cat("   [INFO] Bootstrap may take 1-3 minutes\n")
+
+    # Build formula for bootstrap
+    boot_formula <- as.formula(paste(
+      config$outcome_var, "~",
+      paste(config$driver_vars, collapse = " + ")
+    ))
+
+    bootstrap_results <- run_bootstrap_or(
+      data = prep_data$analysis_data,
+      formula = boot_formula,
+      outcome_type = prep_data$outcome_info$type,
+      weights = weights,
+      n_boot = config$bootstrap_reps,
+      conf_level = config$confidence_level,
+      progress_callback = NULL  # Could add GUI callback here
+    )
+
+    if (!is.null(bootstrap_results)) {
+      log_message(paste0("Bootstrap complete (", bootstrap_results$n_successful, "/",
+                         bootstrap_results$n_boot, " successful)"), "success")
+
+      # Add bootstrap columns to odds_ratios
+      for (i in seq_len(nrow(odds_ratios))) {
+        term <- odds_ratios$term[i]
+        if (term %in% bootstrap_results$term) {
+          idx <- which(bootstrap_results$term == term)
+          odds_ratios$boot_median_or[i] <- bootstrap_results$median_or[idx]
+          odds_ratios$boot_ci_lower[i] <- bootstrap_results$ci_lower[idx]
+          odds_ratios$boot_ci_upper[i] <- bootstrap_results$ci_upper[idx]
+          odds_ratios$sign_stability[i] <- bootstrap_results$sign_consistency[idx]
+        } else {
+          odds_ratios$boot_median_or[i] <- NA
+          odds_ratios$boot_ci_lower[i] <- NA
+          odds_ratios$boot_ci_upper[i] <- NA
+          odds_ratios$sign_stability[i] <- NA
+        }
+      }
+    }
+  }
+
   # Calculate probability lift (new in v2.0)
   prob_lift <- calculate_probability_lift(model_result, prep_data, config)
 
@@ -599,6 +660,8 @@ run_categorical_keydriver_impl <- function(config_file,
     guard = guard,
     guard_summary = guard_status,
     multicollinearity = vif_check,
+    weight_diagnostics = weight_diagnostics,
+    bootstrap_results = bootstrap_results,
     config = config,
     # TRS v1.0: Include status fields for Run_Status sheet
     run_status = run_status,

@@ -397,6 +397,10 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
     missing_threshold = as_numeric_setting(get_setting(settings, "missing_threshold", 50), 50),
     detailed_output = as_logical_setting(get_setting(settings, "detailed_output", TRUE), TRUE),
 
+    # Bootstrap settings (optional - off by default for speed)
+    bootstrap_ci = as_logical_setting(get_setting(settings, "bootstrap_ci", FALSE), FALSE),
+    bootstrap_reps = as_numeric_setting(get_setting(settings, "bootstrap_reps", 200), 200),
+
     # Raw settings for reference
     settings = settings
   )

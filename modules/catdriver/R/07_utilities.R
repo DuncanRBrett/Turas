@@ -652,3 +652,230 @@ safe_rbind <- function(...) {
 
   do.call(rbind, dfs)
 }
+
+
+# ==============================================================================
+# WEIGHT DIAGNOSTICS
+# ==============================================================================
+
+#' Calculate Weight Diagnostics
+#'
+#' Computes diagnostic statistics for survey weights including min, max,
+#' coefficient of variation, and effective sample size (Kish design effect).
+#'
+#' @param weights Numeric vector of weights
+#' @return List with weight diagnostics:
+#'   - min_weight: Minimum weight
+#'   - max_weight: Maximum weight
+#'   - mean_weight: Mean weight
+#'   - cv_weight: Coefficient of variation (SD/mean)
+#'   - effective_n: Kish effective sample size = (sum(w))^2 / sum(w^2)
+#'   - design_effect: Kish design effect = n / effective_n
+#'   - has_extreme_weights: TRUE if max/min > 10
+#' @export
+calculate_weight_diagnostics <- function(weights) {
+
+  if (is.null(weights) || length(weights) == 0) {
+    return(NULL)
+  }
+
+  # Remove NA and zero weights for diagnostics
+  w <- weights[!is.na(weights) & weights > 0]
+
+  if (length(w) == 0) {
+    return(NULL)
+  }
+
+  n <- length(w)
+  sum_w <- sum(w)
+  sum_w2 <- sum(w^2)
+
+  min_w <- min(w)
+  max_w <- max(w)
+  mean_w <- mean(w)
+  sd_w <- sd(w)
+
+  # Coefficient of variation
+  cv_w <- if (mean_w > 0) sd_w / mean_w else NA
+
+  # Kish effective sample size: (sum(w))^2 / sum(w^2)
+  effective_n <- if (sum_w2 > 0) (sum_w^2) / sum_w2 else n
+
+  # Design effect: actual n / effective n
+  design_effect <- if (effective_n > 0) n / effective_n else 1
+
+  # Flag extreme weights (max/min > 10 is concerning)
+  weight_ratio <- if (min_w > 0) max_w / min_w else Inf
+  has_extreme <- weight_ratio > 10
+
+  list(
+    n_weights = n,
+    min_weight = min_w,
+    max_weight = max_w,
+    mean_weight = mean_w,
+    sd_weight = sd_w,
+    cv_weight = cv_w,
+    effective_n = effective_n,
+    design_effect = design_effect,
+    weight_ratio = weight_ratio,
+    has_extreme_weights = has_extreme
+  )
+}
+
+
+# ==============================================================================
+# BOOTSTRAP CONFIDENCE INTERVALS
+# ==============================================================================
+
+#' Run Bootstrap Analysis for Odds Ratios
+#'
+#' Performs bootstrap resampling to compute percentile confidence intervals
+#' and sign stability for odds ratios. More robust than model-based CIs for
+#' non-probability samples.
+#'
+#' @param data Analysis data frame
+#' @param formula Model formula
+#' @param outcome_type Type of outcome ("binary", "ordinal", "multinomial")
+#' @param weights Optional weight vector
+#' @param n_boot Number of bootstrap resamples (default 200)
+#' @param conf_level Confidence level (default 0.95)
+#' @param progress_callback Optional progress callback function
+#' @return List with bootstrap results:
+#'   - boot_or: Matrix of bootstrap odds ratios (n_boot x n_terms)
+#'   - median_or: Median odds ratio for each term
+#'   - ci_lower: Lower percentile CI
+#'   - ci_upper: Upper percentile CI
+#'   - sign_consistency: Proportion of bootstrap samples with same sign as median
+#'   - n_successful: Number of successful bootstrap fits
+#' @export
+run_bootstrap_or <- function(data, formula, outcome_type, weights = NULL,
+                             n_boot = 200, conf_level = 0.95,
+                             progress_callback = NULL) {
+
+  # Get term names from initial fit
+  initial_model <- fit_model_for_bootstrap(data, formula, outcome_type, weights)
+  if (is.null(initial_model)) {
+    warning("Initial model fit failed - cannot run bootstrap")
+    return(NULL)
+  }
+
+  term_names <- names(initial_model$coefficients)
+  # Remove threshold terms for ordinal models
+  term_names <- term_names[!grepl("^[0-9]+\\|[0-9]+$", term_names)]
+
+  n_terms <- length(term_names)
+  n_obs <- nrow(data)
+
+  # Initialize storage
+  boot_or <- matrix(NA, nrow = n_boot, ncol = n_terms)
+  colnames(boot_or) <- term_names
+
+  successful_boots <- 0
+
+  for (b in seq_len(n_boot)) {
+    # Update progress every 10 iterations
+    if (!is.null(progress_callback) && b %% 10 == 0) {
+      progress_callback(b / n_boot, paste0("Bootstrap ", b, "/", n_boot))
+    }
+
+    # Resample with replacement
+    boot_idx <- sample(seq_len(n_obs), n_obs, replace = TRUE)
+    boot_data <- data[boot_idx, , drop = FALSE]
+    boot_weights <- if (!is.null(weights)) weights[boot_idx] else NULL
+
+    # Fit model to bootstrap sample
+    boot_model <- tryCatch({
+      fit_model_for_bootstrap(boot_data, formula, outcome_type, boot_weights)
+    }, error = function(e) NULL)
+
+    if (!is.null(boot_model)) {
+      # Extract coefficients
+      coefs <- boot_model$coefficients
+      # Match to term names (some may be missing if level not in resample)
+      for (term in term_names) {
+        if (term %in% names(coefs)) {
+          boot_or[b, term] <- exp(coefs[[term]])
+        }
+      }
+      successful_boots <- successful_boots + 1
+    }
+  }
+
+  # Calculate summary statistics
+  alpha <- 1 - conf_level
+  results <- list(
+    term = term_names,
+    n_boot = n_boot,
+    n_successful = successful_boots,
+    boot_or_matrix = boot_or
+  )
+
+  # For each term, calculate stats
+  results$median_or <- apply(boot_or, 2, median, na.rm = TRUE)
+  results$ci_lower <- apply(boot_or, 2, quantile, probs = alpha/2, na.rm = TRUE)
+  results$ci_upper <- apply(boot_or, 2, quantile, probs = 1 - alpha/2, na.rm = TRUE)
+  results$iqr_lower <- apply(boot_or, 2, quantile, probs = 0.10, na.rm = TRUE)
+  results$iqr_upper <- apply(boot_or, 2, quantile, probs = 0.90, na.rm = TRUE)
+
+  # Sign consistency: % of boots where OR direction matches median
+  # (OR > 1 vs OR < 1, excluding OR = 1)
+  median_sign <- sign(log(results$median_or))
+  sign_consistency <- sapply(seq_len(n_terms), function(i) {
+    boot_signs <- sign(log(boot_or[, i]))
+    mean(boot_signs == median_sign[i], na.rm = TRUE)
+  })
+  results$sign_consistency <- sign_consistency
+
+  results
+}
+
+
+#' Fit Model for Bootstrap (Internal)
+#'
+#' Helper function to fit logistic model for bootstrap resampling.
+#'
+#' @param data Data frame
+#' @param formula Model formula
+#' @param outcome_type Outcome type
+#' @param weights Optional weights
+#' @return Fitted model or NULL if failed
+#' @keywords internal
+fit_model_for_bootstrap <- function(data, formula, outcome_type, weights = NULL) {
+
+  model <- tryCatch({
+    if (outcome_type == "binary") {
+      if (!is.null(weights)) {
+        glm(formula, data = data, family = binomial(), weights = weights)
+      } else {
+        glm(formula, data = data, family = binomial())
+      }
+    } else if (outcome_type == "ordinal") {
+      if (requireNamespace("ordinal", quietly = TRUE)) {
+        if (!is.null(weights)) {
+          data$.wt <- weights
+          ordinal::clm(formula, data = data, weights = .wt, link = "logit")
+        } else {
+          ordinal::clm(formula, data = data, link = "logit")
+        }
+      } else if (requireNamespace("MASS", quietly = TRUE)) {
+        if (!is.null(weights)) {
+          MASS::polr(formula, data = data, weights = weights, Hess = TRUE)
+        } else {
+          MASS::polr(formula, data = data, Hess = TRUE)
+        }
+      } else {
+        NULL
+      }
+    } else {
+      # Multinomial - skip for bootstrap (too complex)
+      NULL
+    }
+  }, error = function(e) NULL, warning = function(w) NULL)
+
+  # For ordinal::clm, coefficients are in $beta
+  if (!is.null(model) && inherits(model, "clm")) {
+    model$coefficients <- model$beta
+  }
+
+  model
+}
