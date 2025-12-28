@@ -66,10 +66,10 @@ if (!exists("find_turas_root", mode = "function")) {
 
   rm(.output_script_dir, .shared_lib_path)
 }
-
-# Load extracted modules
-source(file.path(dirname(sys.frame(1)$ofile), "metric_types.R"))
-source(file.path(dirname(sys.frame(1)$ofile), "output_formatting.R"))
+# NOTE: Required modules are loaded by run_tracker.R in the correct order:
+# - metric_types.R (metric type constants and validation)
+# - output_formatting.R (Excel style definitions)
+# ==============================================================================
 
 #' Write Tracker Output to Excel
 #'

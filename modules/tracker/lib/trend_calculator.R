@@ -37,12 +37,12 @@
 #
 # SHARED UTILITIES: Uses /modules/shared/lib/ for common functions
 # ==============================================================================
-
-# Load extracted modules
-source(file.path(dirname(sys.frame(1)$ofile), "metric_types.R"))
-source(file.path(dirname(sys.frame(1)$ofile), "trend_changes.R"))
-source(file.path(dirname(sys.frame(1)$ofile), "trend_significance.R"))
-
+# NOTE: Required modules are loaded by run_tracker.R in the correct order:
+# - metric_types.R (metric type constants and validation)
+# - statistical_core.R (core statistical functions)
+# - trend_changes.R (wave-over-wave change calculations)
+# - trend_significance.R (significance testing functions)
+# ==============================================================================
 
 #' Calculate Trends for All Questions
 #'

@@ -11,9 +11,10 @@
 # - metric_types.R (metric type constants and validation)
 #
 # ==============================================================================
+# NOTE: Required modules are loaded by run_tracker.R in the correct order:
+# - metric_types.R (metric type constants and validation)
+# ==============================================================================
 
-# Source metric type constants and validation functions
-source(file.path(dirname(sys.frame(1)$ofile), "metric_types.R"))
 # WAVE MAPPING ARCHITECTURE
 # ==============================================================================
 #

@@ -13,9 +13,9 @@
 # - metric_types.R (metric type constants and validation)
 #
 # ==============================================================================
-
-# Source metric type constants and validation functions
-source(file.path(dirname(sys.frame(1)$ofile), "metric_types.R"))
+# NOTE: Required modules are loaded by run_tracker.R in the correct order:
+# - metric_types.R (metric type constants and validation)
+# ==============================================================================
 
 #' Calculate Trends with Banner Breakouts
 #'
