@@ -579,7 +579,7 @@ run_categorical_keydriver_impl <- function(config_file,
     ))
 
     bootstrap_results <- run_bootstrap_or(
-      data = prep_data$analysis_data,
+      data = prep_data$data,
       formula = boot_formula,
       outcome_type = prep_data$outcome_info$type,
       weights = weights,
