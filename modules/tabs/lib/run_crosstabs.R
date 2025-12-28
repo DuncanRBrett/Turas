@@ -189,7 +189,7 @@ MAX_DECIMAL_PLACES <- 6
 # script_dir already set above when loading TRS guard layer
 
 source(file.path(script_dir, "shared_functions.R"))
-source(file.path(script_dir, "validation.R"))
+source(file.path(script_dir, "validation/orchestrator.R"))
 source(file.path(script_dir, "weighting.R"))
 source(file.path(script_dir, "ranking.R"))
 
