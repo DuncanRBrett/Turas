@@ -24,8 +24,12 @@
 
 # Source shared functions for log_issue() and tabs_refuse()
 if (!exists("log_issue")) {
-  script_dir <- dirname(sys.frame(1)$ofile)
-  if (is.null(script_dir) || is.na(script_dir)) script_dir <- getwd()
+  script_dir <- tryCatch({
+    dirname(sys.frame(1)$ofile)
+  }, error = function(e) getwd())
+  if (is.null(script_dir) || is.na(script_dir) || length(script_dir) == 0) {
+    script_dir <- getwd()
+  }
   source(file.path(dirname(script_dir), "shared_functions.R"), local = FALSE)
 }
 

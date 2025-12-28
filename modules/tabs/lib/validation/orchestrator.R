@@ -43,8 +43,12 @@ if (!exists("log_issue")) {
 }
 
 # Source all validation modules
-validation_dir <- dirname(sys.frame(1)$ofile)
-if (is.null(validation_dir) || is.na(validation_dir)) validation_dir <- getwd()
+validation_dir <- tryCatch({
+  dirname(sys.frame(1)$ofile)
+}, error = function(e) getwd())
+if (is.null(validation_dir) || is.na(validation_dir) || length(validation_dir) == 0) {
+  validation_dir <- getwd()
+}
 
 source(file.path(validation_dir, "structure_validators.R"), local = FALSE)
 source(file.path(validation_dir, "data_validators.R"), local = FALSE)
