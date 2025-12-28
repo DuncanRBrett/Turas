@@ -54,6 +54,10 @@ SCRIPT_VERSION <- "10.0"
 # Determine script directory for sourcing
 script_dir <- if (exists("toolkit_path")) dirname(toolkit_path) else getwd()
 
+# Cache lib directory for Phase 2 subdirectory support (V10.1)
+# This MUST be set before sourcing any modules that use tabs_lib_path()
+assign(".tabs_lib_dir", script_dir, envir = globalenv())
+
 # TRS Guard Layer (v1.0) - MUST be loaded before any TRS refusal calls
 source(file.path(script_dir, "00_guard.R"))
 

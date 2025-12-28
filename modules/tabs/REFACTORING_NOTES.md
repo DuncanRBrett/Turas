@@ -228,19 +228,111 @@ However, when writing new code:
    - Extract reusable functions
    - Use clear, descriptive names
 
+## Phase 2 - Subdirectory Refactoring (V10.1)
+
+### Problem Solved
+
+Phase 1 worked because all extracted files stayed in the same `lib/` directory. Phase 2 required creating subdirectories (`validation/`, `ranking/`), which broke the `script_dir` sourcing mechanism.
+
+**Root Cause**: The global `script_dir` variable points to `lib/`. When files tried to source from subdirectories using `source(file.path(script_dir, "data_validators.R"))`, R looked in `lib/` instead of `lib/validation/`.
+
+### Solution Implemented
+
+Added two helper functions to `shared_functions.R`:
+
+1. **`tabs_lib_path(...)`** - Builds paths relative to lib directory
+   ```r
+   tabs_lib_path()  # Returns lib directory
+   tabs_lib_path("validation", "data_validators.R")  # Returns full path
+   ```
+
+2. **`tabs_source(...)`** - Sources files from subdirectories reliably
+   ```r
+   tabs_source("validation", "structure_validators.R")
+   ```
+
+**Key Changes**:
+- `run_crosstabs.R`: Added `.tabs_lib_dir` cache at startup
+- `shared_functions.R`: Added `tabs_lib_path()` and `tabs_source()` functions
+- All files use the cached lib directory for subdirectory sourcing
+
+### Phase 2 Completed Work
+
+#### validation/structure_validators.R (208 lines) - NEW
+Extracted structure validation helper functions:
+- `check_duplicate_questions()`
+- `check_missing_options()`
+- `check_orphan_options()`
+- `check_variable_types()`
+- `check_ranking_questions()`
+- `check_multi_mention_questions()`
+
+**validation.R**: Reduced from 2,688 to 2,526 lines (162 lines extracted)
+
+### Pattern for Future Phase 2 Refactoring
+
+When extracting functions to a subdirectory:
+
+1. **Create the subdirectory**:
+   ```bash
+   mkdir -p lib/validation/
+   ```
+
+2. **Create the extracted module** with header:
+   ```r
+   # ==============================================================================
+   # MODULE_NAME - V10.1 (Phase 2 Refactoring)
+   # ==============================================================================
+   # Description
+   # Extracted from parent.R for better modularity
+   # ...
+   ```
+
+3. **Update the parent file** to source the submodule:
+   ```r
+   if (exists("tabs_source", mode = "function")) {
+     tabs_source("subdirectory", "module.R")
+   } else {
+     # Fallback for backward compatibility
+     .dir <- tryCatch(dirname(sys.frame(1)$ofile), error = function(e) getwd())
+     .path <- file.path(.dir, "subdirectory", "module.R")
+     if (file.exists(.path)) source(.path)
+   }
+   ```
+
+4. **Remove the extracted functions** from parent, leaving a documentation comment
+
+### Remaining Phase 2 Work
+
+#### validation.R - Additional Splits
+| Target File | Estimated Lines | Functions |
+|-------------|-----------------|-----------|
+| validation/data_validators.R | ~300 | Type/range/length validation |
+| validation/config_validators.R | ~200 | Settings/thresholds/defaults |
+| validation/weight_validators.R | ~250 | Weight validation functions |
+
+#### ranking.R - Split Plan
+| Target File | Estimated Lines | Functions |
+|-------------|-----------------|-----------|
+| ranking/ranking_extraction.R | ~400 | Data extraction functions |
+| ranking/ranking_metrics.R | ~350 | Metric calculations |
+| ranking/ranking_validation.R | ~200 | Question validation |
+| ranking/ranking_crosstabs.R | ~250 | Crosstab row creation |
+
 ## Conclusion
 
-This refactoring represents Phase 1 of modernizing the Tabs module codebase. The focus was on extracting common utilities and creating helper functions for the most critical files.
+This refactoring represents Phase 1 and early Phase 2 of modernizing the Tabs module codebase.
 
 **Key Achievements**:
-- ✓ Created 5 new focused utility modules
-- ✓ Improved code organization and maintainability
+- ✓ Created 5 new focused utility modules (Phase 1)
+- ✓ Solved subdirectory sourcing problem (Phase 2)
+- ✓ Created `tabs_lib_path()` and `tabs_source()` helpers
+- ✓ Extracted validation/structure_validators.R (208 lines)
 - ✓ Maintained 100% backward compatibility
-- ✓ Reduced effective complexity of large files
-- ✓ Established patterns for future refactoring
+- ✓ Established patterns for future subdirectory refactoring
 
 **Next Steps**:
-- Complete Phase 2 refactorings (validation.R, ranking.R)
+- Continue Phase 2 extractions (remaining validation.R, ranking.R)
 - Add comprehensive unit tests
 - Document module APIs
 - Performance profiling and optimization
@@ -248,5 +340,5 @@ This refactoring represents Phase 1 of modernizing the Tabs module codebase. The
 ---
 
 **Date**: December 28, 2025
-**Version**: 10.0
+**Version**: 10.1
 **Author**: Claude Code Refactoring

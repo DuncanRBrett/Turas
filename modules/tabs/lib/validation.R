@@ -1,10 +1,14 @@
 # ==============================================================================
-# VALIDATION V9.9.5 - PRODUCTION RELEASE
+# VALIDATION V10.1 - PHASE 2 REFACTORING
 # ==============================================================================
 # Input validation and data quality checks
 # Part of R Survey Analytics Toolkit
 #
 # VERSION HISTORY:
+# V10.1  - Phase 2 refactoring (2025-12-28)
+#          - EXTRACTED: Structure validators to validation/structure_validators.R
+#          - ADDED: tabs_source() for subdirectory loading
+#          - Reduced file size by 162 lines
 # V9.9.5 - External review fixes (2025-10-16)
 #          - FIXED: Added integer64 and labelled type support
 #          - FIXED: Made weight validation thresholds configurable
@@ -65,6 +69,24 @@ source_if_exists("shared_functions.R")
 source_if_exists("Scripts/shared_functions.R")
 
 # ==============================================================================
+# SOURCE PHASE 2 SUBMODULES (V10.1)
+# ==============================================================================
+# V10.1: Structure validation functions extracted to validation/structure_validators.R
+# Use tabs_source() for reliable subdirectory loading
+
+if (exists("tabs_source", mode = "function")) {
+  # Use the Phase 2 sourcing mechanism
+  tabs_source("validation", "structure_validators.R")
+} else {
+  # Fallback: try to source directly (less reliable but maintains backward compat)
+  .validation_dir <- tryCatch(dirname(sys.frame(1)$ofile), error = function(e) getwd())
+  .structure_validators_path <- file.path(.validation_dir, "validation", "structure_validators.R")
+  if (file.exists(.structure_validators_path)) {
+    source(.structure_validators_path)
+  }
+}
+
+# ==============================================================================
 # HELPER FUNCTIONS (V9.9.2)
 # ==============================================================================
 
@@ -89,197 +111,17 @@ is_blank <- function(x) {
 }
 
 # ==============================================================================
-# SURVEY STRUCTURE VALIDATION (V9.9.2)
+# SURVEY STRUCTURE VALIDATION (V10.1 - Phase 2 Refactoring)
 # ==============================================================================
-
-# ------------------------------------------------------------------------------
-# SURVEY STRUCTURE HELPER FUNCTIONS (Internal)
-# ------------------------------------------------------------------------------
-
-#' Check for duplicate question codes
-#' @keywords internal
-check_duplicate_questions <- function(questions_df, error_log) {
-  dup_questions <- questions_df$QuestionCode[duplicated(questions_df$QuestionCode)]
-  if (length(dup_questions) > 0) {
-    error_log <- log_issue(
-      error_log,
-      "Validation",
-      "Duplicate Questions",
-      sprintf("Duplicate QuestionCodes found: %s. Each question must have unique code.",
-              paste(unique(dup_questions), collapse = ", ")),
-      "",
-      "Error"
-    )
-  }
-  return(error_log)
-}
-
-#' Check for questions without options
-#' @keywords internal
-check_missing_options <- function(questions_df, options_df, error_log) {
-  question_codes <- unique(questions_df$QuestionCode)
-  option_questions <- unique(options_df$QuestionCode)
-
-  questions_no_options <- setdiff(question_codes, option_questions)
-  open_end_questions <- questions_df$QuestionCode[questions_df$Variable_Type == "Open_End"]
-  numeric_questions <- questions_df$QuestionCode[questions_df$Variable_Type == "Numeric"]
-  multi_mention_questions <- questions_df$QuestionCode[questions_df$Variable_Type == "Multi_Mention"]
-
-  # Exclude Open_End, Numeric, and Multi_Mention from this check
-  # Multi_Mention options use column names (Q01_1, Q01_2) not base code (Q01)
-  questions_no_options <- setdiff(questions_no_options, c(open_end_questions, numeric_questions, multi_mention_questions))
-
-  if (length(questions_no_options) > 0) {
-    error_log <- log_issue(
-      error_log,
-      "Validation",
-      "Missing Options",
-      sprintf("Questions without options (may cause errors): %s",
-              paste(questions_no_options, collapse = ", ")),
-      "",
-      "Warning"
-    )
-  }
-  return(error_log)
-}
-
-#' Check for options without matching questions
-#' @keywords internal
-check_orphan_options <- function(questions_df, options_df, error_log) {
-  question_codes <- unique(questions_df$QuestionCode)
-  option_questions <- unique(options_df$QuestionCode)
-
-  # For Multi_Mention, generate expected column codes
-  valid_option_codes <- question_codes
-
-  for (i in seq_len(nrow(questions_df))) {
-    if (questions_df$Variable_Type[i] == "Multi_Mention") {
-      q_code <- questions_df$QuestionCode[i]
-      num_cols <- suppressWarnings(as.numeric(questions_df$Columns[i]))
-
-      if (!is.na(num_cols) && num_cols > 0) {
-        # Add Q01_1, Q01_2, ..., Q01_N to valid codes
-        multi_cols <- paste0(q_code, "_", seq_len(num_cols))
-        valid_option_codes <- c(valid_option_codes, multi_cols)
-      }
-    }
-  }
-
-  orphan_options <- setdiff(option_questions, valid_option_codes)
-  if (length(orphan_options) > 0) {
-    error_log <- log_issue(
-      error_log,
-      "Validation",
-      "Orphan Options",
-      sprintf("Options exist for non-existent questions: %s. Remove these from options table.",
-              paste(orphan_options, collapse = ", ")),
-      "",
-      "Warning"
-    )
-  }
-  return(error_log)
-}
-
-#' Validate Variable_Type values
-#' @keywords internal
-check_variable_types <- function(questions_df, error_log) {
-  valid_types <- c(
-    "Single_Response", "Multi_Mention", "Rating", "Likert", "NPS",
-    "Ranking", "Numeric", "Open_End", "Grid_Single", "Grid_Multi"
-  )
-
-  invalid_types <- questions_df$Variable_Type[!questions_df$Variable_Type %in% valid_types]
-  if (length(invalid_types) > 0) {
-    error_log <- log_issue(
-      error_log,
-      "Validation",
-      "Invalid Variable_Type",
-      sprintf(
-        "Invalid Variable_Type values found: %s. Valid types: %s",
-        paste(unique(invalid_types), collapse = ", "),
-        paste(valid_types, collapse = ", ")
-      ),
-      "",
-      "Error"
-    )
-  }
-  return(error_log)
-}
-
-#' Validate Ranking questions have Ranking_Format
-#' @keywords internal
-check_ranking_questions <- function(questions_df, error_log) {
-  ranking_questions <- questions_df[questions_df$Variable_Type == "Ranking", ]
-  if (nrow(ranking_questions) > 0) {
-    if (!"Ranking_Format" %in% names(questions_df)) {
-      error_log <- log_issue(
-        error_log,
-        "Validation",
-        "Missing Ranking_Format Column",
-        "Ranking questions exist but Ranking_Format column missing in questions table. Add this column.",
-        "",
-        "Error"
-      )
-    } else {
-      missing_format <- ranking_questions$QuestionCode[
-        is.na(ranking_questions$Ranking_Format) |
-        trimws(ranking_questions$Ranking_Format) == ""
-      ]
-      if (length(missing_format) > 0) {
-        error_log <- log_issue(
-          error_log,
-          "Validation",
-          "Missing Ranking_Format Values",
-          sprintf(
-            "Ranking questions missing format specification: %s. Specify 'Best_to_Worst' or 'Worst_to_Best'.",
-            paste(missing_format, collapse = ", ")
-          ),
-          "",
-          "Error"
-        )
-      }
-    }
-  }
-  return(error_log)
-}
-
-#' Validate Multi_Mention questions have Columns specified
-#' @keywords internal
-check_multi_mention_questions <- function(questions_df, error_log) {
-  multi_questions <- questions_df[questions_df$Variable_Type == "Multi_Mention", ]
-  if (nrow(multi_questions) > 0) {
-    if (!"Columns" %in% names(questions_df)) {
-      error_log <- log_issue(
-        error_log,
-        "Validation",
-        "Missing Columns Specification",
-        "Multi_Mention questions exist but Columns column missing. Add this column.",
-        "",
-        "Error"
-      )
-    } else {
-      missing_cols <- multi_questions$QuestionCode[
-        is.na(multi_questions$Columns) |
-        trimws(as.character(multi_questions$Columns)) == "" |
-        suppressWarnings(is.na(as.numeric(multi_questions$Columns)))
-      ]
-      if (length(missing_cols) > 0) {
-        error_log <- log_issue(
-          error_log,
-          "Validation",
-          "Missing Columns Values",
-          sprintf(
-            "Multi_Mention questions missing Columns specification: %s. Specify number of response columns.",
-            paste(missing_cols, collapse = ", ")
-          ),
-          "",
-          "Error"
-        )
-      }
-    }
-  }
-  return(error_log)
-}
+# V10.1: Structure helper functions extracted to validation/structure_validators.R
+# Functions available after sourcing:
+#   - check_duplicate_questions()
+#   - check_missing_options()
+#   - check_orphan_options()
+#   - check_variable_types()
+#   - check_ranking_questions()
+#   - check_multi_mention_questions()
+# ==============================================================================
 
 # ------------------------------------------------------------------------------
 # MAIN VALIDATION FUNCTION

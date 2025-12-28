@@ -68,6 +68,77 @@ if (!exists("script_dir")) {
   }, error = function(e) getwd())
 }
 
+# Cache the lib directory for reliable subdirectory sourcing (V10.1 Phase 2 Support)
+if (!exists(".tabs_lib_dir", envir = globalenv())) {
+  assign(".tabs_lib_dir", script_dir, envir = globalenv())
+}
+
+#' Get path to file within tabs lib directory (V10.1 - Phase 2 Refactoring Support)
+#'
+#' This function provides reliable path resolution for sourcing files from
+#' subdirectories within the tabs/lib directory. It uses the cached lib path
+#' set when run_crosstabs.R or shared_functions.R is first sourced.
+#'
+#' @param ... Path components to join (e.g., "validation", "data_validators.R")
+#' @param must_exist Logical, if TRUE stops with error if path doesn't exist
+#' @return Character, full path to the file or directory
+#' @examples
+#' tabs_lib_path()  # Returns lib directory
+#' tabs_lib_path("validation", "data_validators.R")  # Returns path to submodule
+#' @export
+tabs_lib_path <- function(..., must_exist = FALSE) {
+  lib_dir <- if (exists(".tabs_lib_dir", envir = globalenv())) {
+    get(".tabs_lib_dir", envir = globalenv())
+  } else if (exists("script_dir")) {
+    script_dir
+  } else {
+    getwd()
+  }
+
+  args <- list(...)
+  if (length(args) == 0) {
+    return(lib_dir)
+  }
+
+  path <- do.call(file.path, c(list(lib_dir), args))
+
+  if (must_exist && !file.exists(path)) {
+    if (exists("tabs_refuse", mode = "function")) {
+      tabs_refuse(
+        code = "IO_FILE_NOT_FOUND",
+        title = "Module File Not Found",
+        problem = sprintf("Cannot find required file: %s", path),
+        why_it_matters = "The tabs module requires this file to function correctly.",
+        how_to_fix = c(
+          "Verify the file exists in the expected location.",
+          sprintf("Expected path: %s", path)
+        )
+      )
+    } else {
+      stop(sprintf("Module file not found: %s", path), call. = FALSE)
+    }
+  }
+
+  path
+}
+
+#' Source a file from tabs lib subdirectory (V10.1 - Phase 2 Support)
+#'
+#' Convenience function for sourcing files from subdirectories of the tabs lib.
+#' Handles path resolution and provides clear error messages on failure.
+#'
+#' @param ... Path components relative to lib directory
+#' @param local Logical, passed to source() - FALSE sources into global env
+#' @return Invisible NULL
+#' @examples
+#' tabs_source("validation", "data_validators.R")  # Source from validation/
+#' @export
+tabs_source <- function(..., local = FALSE) {
+  path <- tabs_lib_path(..., must_exist = TRUE)
+  source(path, local = local)
+  invisible(NULL)
+}
+
 # Source modular utilities
 source(file.path(script_dir, "type_utils.R"), local = FALSE)
 source(file.path(script_dir, "config_utils.R"), local = FALSE)
