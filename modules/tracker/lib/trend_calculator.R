@@ -5,8 +5,8 @@
 # Calculates trends and wave-over-wave changes for tracked questions.
 # Supports: Rating questions, Single choice, NPS, Index scores
 #
-# VERSION: 2.3.0 - Added parallel calculation support
-# SIZE: ~2,700 lines (target: decompose during maintenance)
+# VERSION: 2.4.0 - Refactored to use extracted modules
+# SIZE: ~2,262 lines (refactored from ~2,700)
 #
 # PARALLEL PROCESSING:
 # When processing many tracked questions (10+), trend calculations can be
@@ -38,21 +38,10 @@
 # SHARED UTILITIES: Uses /modules/shared/lib/ for common functions
 # ==============================================================================
 
-#' Check if Significance Test Result is Significant
-#'
-#' Safe helper function to check if a significance test result indicates significance.
-#' Handles NULL, NA, and missing values gracefully.
-#'
-#' @param sig_test Significance test result object (may be NULL or have $significant field)
-#' @return Logical. TRUE if test is significant, FALSE otherwise (including NULL/NA cases)
-#'
-#' @keywords internal
-is_significant <- function(sig_test) {
-  # Use isTRUE to safely handle NULL, NA, and non-logical values
-  return(isTRUE(!is.null(sig_test) &&
-                !is.na(sig_test$significant) &&
-                sig_test$significant))
-}
+# Load extracted modules
+source(file.path(dirname(sys.frame(1)$ofile), "metric_types.R"))
+source(file.path(dirname(sys.frame(1)$ofile), "trend_changes.R"))
+source(file.path(dirname(sys.frame(1)$ofile), "trend_significance.R"))
 
 
 #' Calculate Trends for All Questions
@@ -440,7 +429,7 @@ calculate_rating_trend <- function(q_code, question_map, wave_data, config) {
   # Perform significance testing
   sig_tests <- perform_significance_tests_means(wave_results, wave_ids, config)
 
-  return(list(
+  result <- list(
     question_code = q_code,
     question_text = metadata$QuestionText,
     question_type = metadata$QuestionType,
@@ -448,7 +437,10 @@ calculate_rating_trend <- function(q_code, question_map, wave_data, config) {
     wave_results = wave_results,
     changes = changes,
     significance = sig_tests
-  ))
+  )
+
+  validate_result_metric_type(result, context = "calculate_rating_trend")
+  return(result)
 }
 
 
@@ -498,7 +490,7 @@ calculate_nps_trend <- function(q_code, question_map, wave_data, config) {
   # Significance testing for NPS (treat as proportion difference)
   sig_tests <- perform_significance_tests_nps(wave_results, wave_ids, config)
 
-  return(list(
+  result <- list(
     question_code = q_code,
     question_text = metadata$QuestionText,
     question_type = metadata$QuestionType,
@@ -506,7 +498,10 @@ calculate_nps_trend <- function(q_code, question_map, wave_data, config) {
     wave_results = wave_results,
     changes = changes,
     significance = sig_tests
-  ))
+  )
+
+  validate_result_metric_type(result, context = "calculate_nps_trend")
+  return(result)
 }
 
 
@@ -573,7 +568,7 @@ calculate_single_choice_trend <- function(q_code, question_map, wave_data, confi
     )
   }
 
-  return(list(
+  result <- list(
     question_code = q_code,
     question_text = metadata$QuestionText,
     question_type = metadata$QuestionType,
@@ -582,7 +577,10 @@ calculate_single_choice_trend <- function(q_code, question_map, wave_data, confi
     wave_results = wave_results,
     changes = changes,
     significance = sig_tests
-  ))
+  )
+
+  validate_result_metric_type(result, context = "calculate_single_choice_trend")
+  return(result)
 }
 
 
@@ -746,7 +744,7 @@ calculate_single_choice_trend_enhanced <- function(q_code, question_map, wave_da
     )
   }
 
-  return(list(
+  result <- list(
     question_code = q_code,
     question_text = metadata$QuestionText,
     question_type = metadata$QuestionType,
@@ -756,7 +754,10 @@ calculate_single_choice_trend_enhanced <- function(q_code, question_map, wave_da
     wave_results = wave_results,
     changes = changes,
     significance = sig_tests
-  ))
+  )
+
+  validate_result_metric_type(result, context = "calculate_single_choice_trend_enhanced")
+  return(result)
 }
 
 
@@ -816,7 +817,7 @@ calculate_composite_trend <- function(q_code, question_map, wave_data, config) {
   # Perform significance testing
   sig_tests <- perform_significance_tests_means(wave_results, wave_ids, config)
 
-  return(list(
+  result <- list(
     question_code = q_code,
     question_text = metadata$QuestionText,
     question_type = metadata$QuestionType,
@@ -825,7 +826,10 @@ calculate_composite_trend <- function(q_code, question_map, wave_data, config) {
     wave_results = wave_results,
     changes = changes,
     significance = sig_tests
-  ))
+  )
+
+  validate_result_metric_type(result, context = "calculate_composite_trend")
+  return(result)
 }
 
 
@@ -1094,351 +1098,6 @@ calculate_proportions <- function(values, weights, codes) {
     n_unweighted = length(values),
     n_weighted = total_weight,
     eff_n = eff_n
-  ))
-}
-
-
-#' Calculate Wave-over-Wave Changes
-#'
-#' @keywords internal
-calculate_changes <- function(wave_results, wave_ids, metric_name, sub_metric = NULL) {
-
-  changes <- list()
-
-  for (i in 2:length(wave_ids)) {
-    wave_id <- wave_ids[i]
-    prev_wave_id <- wave_ids[i - 1]
-
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
-
-    # Get metric values
-    if (!is.null(sub_metric)) {
-      # For proportions, access by sub_metric (response code)
-      sub_metric_str <- as.character(sub_metric)
-      current_val <- if (!is.null(current[[metric_name]]) && sub_metric_str %in% names(current[[metric_name]])) {
-        current[[metric_name]][[sub_metric_str]]
-      } else {
-        NA
-      }
-      previous_val <- if (!is.null(previous[[metric_name]]) && sub_metric_str %in% names(previous[[metric_name]])) {
-        previous[[metric_name]][[sub_metric_str]]
-      } else {
-        NA
-      }
-    } else {
-      current_val <- current[[metric_name]]
-      previous_val <- previous[[metric_name]]
-    }
-
-    # Calculate changes
-    if (!is.na(current_val) && !is.na(previous_val)) {
-      absolute_change <- current_val - previous_val
-      # Avoid division by zero
-      percentage_change <- if (previous_val == 0) {
-        NA  # Cannot calculate percentage change from zero baseline
-      } else {
-        (absolute_change / previous_val) * 100
-      }
-
-      changes[[paste0(prev_wave_id, "_to_", wave_id)]] <- list(
-        from_wave = prev_wave_id,
-        to_wave = wave_id,
-        from_value = previous_val,
-        to_value = current_val,
-        absolute_change = absolute_change,
-        percentage_change = percentage_change,
-        direction = if (absolute_change > 0) "up" else if (absolute_change < 0) "down" else "stable"
-      )
-    } else {
-      changes[[paste0(prev_wave_id, "_to_", wave_id)]] <- list(
-        from_wave = prev_wave_id,
-        to_wave = wave_id,
-        from_value = previous_val,
-        to_value = current_val,
-        absolute_change = NA,
-        percentage_change = NA,
-        direction = "unavailable"
-      )
-    }
-  }
-
-  return(changes)
-}
-
-
-#' Perform Significance Tests for Means
-#'
-#' SHARED CODE NOTE: T-test logic should be in /shared/significance_tests.R
-#' This is identical to TurasTabs t-test implementation
-#'
-#' NOTE: Uses effective N (eff_n) instead of unweighted N to properly account
-#' for design effects from weighting. This provides more accurate p-values when
-#' weights vary substantially across respondents.
-#'
-#' @keywords internal
-perform_significance_tests_means <- function(wave_results, wave_ids, config) {
-
-  alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
-  min_base <- get_setting(config, "minimum_base", default = DEFAULT_MINIMUM_BASE)
-
-  sig_tests <- list()
-
-  # Test consecutive waves
-  for (i in 2:length(wave_ids)) {
-    wave_id <- wave_ids[i]
-    prev_wave_id <- wave_ids[i - 1]
-
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
-
-    # Get effective N (or fall back to n_unweighted if eff_n not available)
-    current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else current$n_unweighted
-    previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else previous$n_unweighted
-
-    # Check if both available and have sufficient base (using effective N)
-    if (current$available && previous$available &&
-        current_eff_n >= min_base && previous_eff_n >= min_base) {
-
-      # Two-sample t-test for means (using effective N)
-      # SHARED CODE NOTE: Extract to shared/significance_tests.R::t_test_means()
-      t_result <- t_test_for_means(
-        mean1 = previous$mean,
-        sd1 = previous$sd,
-        n1 = previous_eff_n,
-        mean2 = current$mean,
-        sd2 = current$sd,
-        n2 = current_eff_n,
-        alpha = alpha
-      )
-
-      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- t_result
-    } else {
-      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- list(
-        significant = FALSE,
-        reason = "insufficient_base_or_unavailable"
-      )
-    }
-  }
-
-  return(sig_tests)
-}
-
-
-#' Perform Significance Tests for Proportions
-#'
-#' SHARED CODE NOTE: Z-test logic should be in /shared/significance_tests.R
-#'
-#' NOTE: Uses effective N (eff_n) instead of unweighted N to properly account
-#' for design effects from weighting. This provides more accurate p-values when
-#' weights vary substantially across respondents.
-#'
-#' @keywords internal
-perform_significance_tests_proportions <- function(wave_results, wave_ids, config, response_code) {
-
-  alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
-  min_base <- get_setting(config, "minimum_base", default = DEFAULT_MINIMUM_BASE)
-
-  sig_tests <- list()
-
-  # Test consecutive waves
-  for (i in 2:length(wave_ids)) {
-    wave_id <- wave_ids[i]
-    prev_wave_id <- wave_ids[i - 1]
-
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
-
-    # Get effective N (or fall back to n_unweighted if eff_n not available)
-    current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else current$n_unweighted
-    previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else previous$n_unweighted
-
-    if (current$available && previous$available &&
-        current_eff_n >= min_base && previous_eff_n >= min_base) {
-
-      # Get proportions for this response code
-      response_code_str <- as.character(response_code)
-
-      # Check if response code exists in both waves
-      if (!is.null(previous$proportions) && response_code_str %in% names(previous$proportions) &&
-          !is.null(current$proportions) && response_code_str %in% names(current$proportions)) {
-
-        p1 <- previous$proportions[[response_code_str]] / 100  # Convert to proportion
-        p2 <- current$proportions[[response_code_str]] / 100
-
-        # Z-test for proportions (using effective N)
-        # SHARED CODE NOTE: Extract to shared/significance_tests.R::z_test_proportions()
-        z_result <- z_test_for_proportions(
-          p1 = p1,
-          n1 = previous_eff_n,
-          p2 = p2,
-          n2 = current_eff_n,
-          alpha = alpha
-        )
-
-        sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- z_result
-      } else {
-        sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- list(
-          significant = FALSE,
-          reason = "response_code_not_found"
-        )
-      }
-    } else {
-      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- list(
-        significant = FALSE,
-        reason = "insufficient_base_or_unavailable"
-      )
-    }
-  }
-
-  return(sig_tests)
-}
-
-
-#' Perform Significance Tests for NPS
-#'
-#' NOTE: Uses effective N (eff_n) instead of unweighted N to properly account
-#' for design effects from weighting.
-#'
-#' @keywords internal
-perform_significance_tests_nps <- function(wave_results, wave_ids, config) {
-
-  # NPS is a difference of proportions, so we test the NPS score directly
-  # This is a simplified approach for MVT
-  # Could be enhanced with proper proportion difference testing
-
-  alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
-  min_base <- get_setting(config, "minimum_base", default = DEFAULT_MINIMUM_BASE)
-
-  sig_tests <- list()
-
-  for (i in 2:length(wave_ids)) {
-    wave_id <- wave_ids[i]
-    prev_wave_id <- wave_ids[i - 1]
-
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
-
-    # Get effective N (or fall back to n_unweighted if eff_n not available)
-    current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else current$n_unweighted
-    previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else previous$n_unweighted
-
-    if (current$available && previous$available &&
-        current_eff_n >= min_base && previous_eff_n >= min_base) {
-
-      # Calculate z-test for NPS difference
-      # NPS is on -100 to +100 scale, convert to proportion scale (0-1)
-      nps_diff <- current$nps - previous$nps
-
-      # Approximate standard error for NPS difference (using effective N)
-      # Using conservative estimate: SE = sqrt((100^2 / n1) + (100^2 / n2))
-      # This assumes worst-case variance for NPS scale
-      se_nps <- sqrt((10000 / current_eff_n) + (10000 / previous_eff_n))
-
-      # Calculate z-statistic
-      z_stat <- abs(nps_diff) / se_nps
-
-      # Critical value for two-tailed test (e.g., 1.96 for 95% confidence)
-      z_critical <- qnorm(1 - alpha/2)
-
-      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- list(
-        significant = z_stat > z_critical,
-        nps_difference = nps_diff,
-        z_statistic = z_stat,
-        p_value = 2 * (1 - pnorm(abs(z_stat))),
-        note = "Z-test for NPS difference (conservative SE estimate, uses effective N)"
-      )
-    } else {
-      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- list(
-        significant = FALSE,
-        reason = "insufficient_base_or_unavailable"
-      )
-    }
-  }
-
-  return(sig_tests)
-}
-
-
-#' T-Test for Means
-#'
-#' Two-sample t-test for comparing means.
-#'
-#' SHARED CODE NOTE: This should be extracted to /shared/significance_tests.R
-#' Identical to TurasTabs t-test implementation
-#'
-#' @keywords internal
-t_test_for_means <- function(mean1, sd1, n1, mean2, sd2, n2, alpha = DEFAULT_ALPHA) {
-
-  # Pooled standard deviation
-  pooled_var <- ((n1 - 1) * sd1^2 + (n2 - 1) * sd2^2) / (n1 + n2 - 2)
-  pooled_sd <- sqrt(pooled_var)
-
-  # Standard error
-  se <- pooled_sd * sqrt(1/n1 + 1/n2)
-
-  # T statistic
-  t_stat <- (mean2 - mean1) / se
-
-  # Degrees of freedom
-  df <- n1 + n2 - 2
-
-  # P-value (two-tailed)
-  p_value <- 2 * pt(-abs(t_stat), df)
-
-  # Significant?
-  significant <- p_value < alpha
-
-  return(list(
-    t_stat = t_stat,
-    df = df,
-    p_value = p_value,
-    significant = significant,
-    alpha = alpha
-  ))
-}
-
-
-#' Z-Test for Proportions
-#'
-#' Two-sample z-test for comparing proportions.
-#'
-#' SHARED CODE NOTE: This should be extracted to /shared/significance_tests.R
-#' Identical to TurasTabs z-test implementation
-#'
-#' @keywords internal
-z_test_for_proportions <- function(p1, n1, p2, n2, alpha = DEFAULT_ALPHA) {
-
-  # Pooled proportion
-  p_pooled <- (p1 * n1 + p2 * n2) / (n1 + n2)
-
-  # Standard error
-  se <- sqrt(p_pooled * (1 - p_pooled) * (1/n1 + 1/n2))
-
-  # Handle zero SE
-  if (se == 0) {
-    return(list(
-      z_stat = 0,
-      p_value = 1,
-      significant = FALSE,
-      alpha = alpha
-    ))
-  }
-
-  # Z statistic
-  z_stat <- (p2 - p1) / se
-
-  # P-value (two-tailed)
-  p_value <- 2 * pnorm(-abs(z_stat))
-
-  # Significant?
-  significant <- p_value < alpha
-
-  return(list(
-    z_stat = z_stat,
-    p_value = p_value,
-    significant = significant,
-    alpha = alpha
   ))
 }
 
@@ -1801,7 +1460,7 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
     }
   }
 
-  return(list(
+  result <- list(
     question_code = q_code,
     question_text = metadata$QuestionText,
     question_type = metadata$QuestionType,
@@ -1810,130 +1469,10 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
     wave_results = wave_results,
     changes = changes,
     significance = significance
-  ))
-}
+  )
 
-
-#' Calculate Changes for a Specific Metric
-#'
-#' Helper function to calculate wave-over-wave changes for enhanced metrics.
-#'
-#' @keywords internal
-calculate_changes_for_metric <- function(wave_results, wave_ids, metric_name) {
-
-  changes <- list()
-
-  for (i in 2:length(wave_ids)) {
-    wave_id <- wave_ids[i]
-    prev_wave_id <- wave_ids[i - 1]
-
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
-
-    # Get metric values
-    current_val <- if (current$available && !is.null(current$metrics[[metric_name]])) {
-      current$metrics[[metric_name]]
-    } else {
-      NA
-    }
-
-    previous_val <- if (previous$available && !is.null(previous$metrics[[metric_name]])) {
-      previous$metrics[[metric_name]]
-    } else {
-      NA
-    }
-
-    # Calculate changes
-    if (!is.na(current_val) && !is.na(previous_val)) {
-      absolute_change <- current_val - previous_val
-      percentage_change <- if (previous_val == 0) {
-        NA
-      } else {
-        (absolute_change / previous_val) * 100
-      }
-
-      changes[[paste0(prev_wave_id, "_to_", wave_id)]] <- list(
-        from_wave = prev_wave_id,
-        to_wave = wave_id,
-        from_value = previous_val,
-        to_value = current_val,
-        absolute_change = absolute_change,
-        percentage_change = percentage_change,
-        direction = if (absolute_change > 0) "up" else if (absolute_change < 0) "down" else "stable"
-      )
-    } else {
-      changes[[paste0(prev_wave_id, "_to_", wave_id)]] <- list(
-        from_wave = prev_wave_id,
-        to_wave = wave_id,
-        from_value = previous_val,
-        to_value = current_val,
-        absolute_change = NA,
-        percentage_change = NA,
-        direction = NA
-      )
-    }
-  }
-
-  return(changes)
-}
-
-
-#' Perform Significance Tests for Enhanced Metric
-#'
-#' Performs significance testing for proportion-based metrics (top_box, range, etc.).
-#'
-#' NOTE: Uses effective N (eff_n) instead of unweighted N to properly account
-#' for design effects from weighting.
-#'
-#' @keywords internal
-perform_significance_tests_for_metric <- function(wave_results, wave_ids, metric_name,
-                                                   config, test_type = "proportion") {
-
-  alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
-  sig_tests <- list()
-
-  for (i in 2:length(wave_ids)) {
-    wave_id <- wave_ids[i]
-    prev_wave_id <- wave_ids[i - 1]
-
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
-
-    # Check availability
-    if (!current$available || !previous$available) {
-      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
-      next
-    }
-
-    # Get metric values
-    current_val <- current$metrics[[metric_name]]
-    previous_val <- previous$metrics[[metric_name]]
-
-    if (is.na(current_val) || is.na(previous_val)) {
-      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
-      next
-    }
-
-    # Get effective N (or fall back to n_unweighted if eff_n not available)
-    current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else current$n_unweighted
-    previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else previous$n_unweighted
-
-    # Perform test based on type
-    if (test_type == "proportion") {
-      # Convert percentages to proportions
-      p1 <- previous_val / 100
-      p2 <- current_val / 100
-
-      test_result <- z_test_for_proportions(p1, previous_eff_n, p2, current_eff_n, alpha)
-    } else {
-      # Would use t-test for means, but this function is for proportions
-      test_result <- NA
-    }
-
-    sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- test_result
-  }
-
-  return(sig_tests)
+  validate_result_metric_type(result, context = "calculate_rating_trend_enhanced")
+  return(result)
 }
 
 
@@ -2155,7 +1694,7 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
     }
   }
 
-  return(list(
+  result <- list(
     question_code = q_code,
     question_text = metadata$QuestionText,
     question_type = metadata$QuestionType,
@@ -2165,7 +1704,10 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
     wave_results = wave_results,
     changes = changes,
     significance = significance
-  ))
+  )
+
+  validate_result_metric_type(result, context = "calculate_composite_trend_enhanced")
+  return(result)
 }
 
 
@@ -2450,7 +1992,7 @@ calculate_multi_mention_trend_categories <- function(q_code, question_map, wave_
     )
   }
 
-  return(list(
+  result <- list(
     question_code = q_code,
     question_text = metadata$QuestionText,
     question_type = metadata$QuestionType,
@@ -2461,7 +2003,10 @@ calculate_multi_mention_trend_categories <- function(q_code, question_map, wave_
     changes = changes,
     significance = significance,
     metadata = metadata
-  ))
+  )
+
+  validate_result_metric_type(result, context = "calculate_multi_mention_trend_categories")
+  return(result)
 }
 
 
@@ -2700,7 +2245,7 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
     )
   }
 
-  return(list(
+  result <- list(
     question_code = q_code,
     question_text = metadata$QuestionText,
     question_type = metadata$QuestionType,
@@ -2710,227 +2255,8 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
     wave_results = wave_results,
     changes = changes,
     significance = significance
-  ))
-}
+  )
 
-
-#' Calculate Changes for Multi-Mention Option
-#'
-#' @keywords internal
-calculate_changes_for_multi_mention_option <- function(wave_results, wave_ids, column_name) {
-
-  changes <- list()
-
-  for (i in 2:length(wave_ids)) {
-    wave_id <- wave_ids[i]
-    prev_wave_id <- wave_ids[i - 1]
-
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
-
-    # Get mention proportions
-    current_val <- if (current$available && !is.null(current$mention_proportions[[column_name]])) {
-      current$mention_proportions[[column_name]]
-    } else {
-      NA
-    }
-
-    previous_val <- if (previous$available && !is.null(previous$mention_proportions[[column_name]])) {
-      previous$mention_proportions[[column_name]]
-    } else {
-      NA
-    }
-
-    # Calculate changes
-    if (!is.na(current_val) && !is.na(previous_val)) {
-      absolute_change <- current_val - previous_val
-      percentage_change <- if (previous_val == 0) {
-        NA
-      } else {
-        (absolute_change / previous_val) * 100
-      }
-
-      changes[[paste0(prev_wave_id, "_to_", wave_id)]] <- list(
-        from_wave = prev_wave_id,
-        to_wave = wave_id,
-        from_value = previous_val,
-        to_value = current_val,
-        absolute_change = absolute_change,
-        percentage_change = percentage_change,
-        direction = if (absolute_change > 0) "up" else if (absolute_change < 0) "down" else "stable"
-      )
-    } else {
-      changes[[paste0(prev_wave_id, "_to_", wave_id)]] <- list(
-        from_wave = prev_wave_id,
-        to_wave = wave_id,
-        from_value = previous_val,
-        to_value = current_val,
-        absolute_change = NA,
-        percentage_change = NA,
-        direction = NA
-      )
-    }
-  }
-
-  return(changes)
-}
-
-
-#' Calculate Changes for Multi-Mention Additional Metric
-#'
-#' @keywords internal
-calculate_changes_for_multi_mention_metric <- function(wave_results, wave_ids, metric_name) {
-
-  changes <- list()
-
-  for (i in 2:length(wave_ids)) {
-    wave_id <- wave_ids[i]
-    prev_wave_id <- wave_ids[i - 1]
-
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
-
-    current_val <- if (current$available && !is.null(current$additional_metrics[[metric_name]])) {
-      current$additional_metrics[[metric_name]]
-    } else {
-      NA
-    }
-
-    previous_val <- if (previous$available && !is.null(previous$additional_metrics[[metric_name]])) {
-      previous$additional_metrics[[metric_name]]
-    } else {
-      NA
-    }
-
-    if (!is.na(current_val) && !is.na(previous_val)) {
-      absolute_change <- current_val - previous_val
-      percentage_change <- if (previous_val == 0) {
-        NA
-      } else {
-        (absolute_change / previous_val) * 100
-      }
-
-      changes[[paste0(prev_wave_id, "_to_", wave_id)]] <- list(
-        from_wave = prev_wave_id,
-        to_wave = wave_id,
-        from_value = previous_val,
-        to_value = current_val,
-        absolute_change = absolute_change,
-        percentage_change = percentage_change,
-        direction = if (absolute_change > 0) "up" else if (absolute_change < 0) "down" else "stable"
-      )
-    } else {
-      changes[[paste0(prev_wave_id, "_to_", wave_id)]] <- list(
-        from_wave = prev_wave_id,
-        to_wave = wave_id,
-        from_value = previous_val,
-        to_value = current_val,
-        absolute_change = NA,
-        percentage_change = NA,
-        direction = NA
-      )
-    }
-  }
-
-  return(changes)
-}
-
-
-#' Perform Significance Tests for Multi-Mention Option
-#'
-#' Uses z-test for proportions (same as single-choice questions).
-#'
-#' NOTE: Uses effective N (eff_n) instead of unweighted N to properly account
-#' for design effects from weighting.
-#'
-#' @keywords internal
-perform_significance_tests_multi_mention <- function(wave_results, wave_ids, column_name, config) {
-
-  alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
-  sig_tests <- list()
-
-  for (i in 2:length(wave_ids)) {
-    wave_id <- wave_ids[i]
-    prev_wave_id <- wave_ids[i - 1]
-
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
-
-    if (!current$available || !previous$available) {
-      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
-      next
-    }
-
-    current_val <- current$mention_proportions[[column_name]]
-    previous_val <- previous$mention_proportions[[column_name]]
-
-    if (is.na(current_val) || is.na(previous_val)) {
-      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
-      next
-    }
-
-    # Get effective N (or fall back to n_unweighted if eff_n not available)
-    current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else current$n_unweighted
-    previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else previous$n_unweighted
-
-    # Convert percentages to proportions
-    p1 <- previous_val / 100
-    p2 <- current_val / 100
-
-    test_result <- z_test_for_proportions(p1, previous_eff_n, p2, current_eff_n, alpha)
-    sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- test_result
-  }
-
-  return(sig_tests)
-}
-
-
-#' Perform Significance Tests for Multi-Mention Additional Metric
-#'
-#' @keywords internal
-perform_significance_tests_multi_mention_metric <- function(wave_results, wave_ids, metric_name, config) {
-
-  alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
-  sig_tests <- list()
-
-  for (i in 2:length(wave_ids)) {
-    wave_id <- wave_ids[i]
-    prev_wave_id <- wave_ids[i - 1]
-
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
-
-    if (!current$available || !previous$available) {
-      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
-      next
-    }
-
-    current_val <- current$additional_metrics[[metric_name]]
-    previous_val <- previous$additional_metrics[[metric_name]]
-
-    if (is.na(current_val) || is.na(previous_val)) {
-      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
-      next
-    }
-
-    # Get effective N (or fall back to n_unweighted if eff_n not available)
-    current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else current$n_unweighted
-    previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else previous$n_unweighted
-
-    # For "any" metric, use z-test for proportions (using effective N)
-    # For "count_mean", use t-test (but need raw values - skip for now)
-    if (metric_name == "any_mention_pct") {
-      p1 <- previous_val / 100
-      p2 <- current_val / 100
-
-      test_result <- z_test_for_proportions(p1, previous_eff_n, p2, current_eff_n, alpha)
-      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- test_result
-    } else {
-      # For count_mean, we'd need the raw count values for t-test
-      # Skip significance testing for now
-      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
-    }
-  }
-
-  return(sig_tests)
+  validate_result_metric_type(result, context = "calculate_multi_mention_trend")
+  return(result)
 }

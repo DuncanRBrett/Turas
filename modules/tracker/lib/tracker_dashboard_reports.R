@@ -14,8 +14,12 @@
 #   - openxlsx (Excel output)
 #   - shared/formatting.R (decimal separator handling)
 #   - tracker_output.R (shared styles and utilities)
+#   - metric_types.R (metric type constants and validation)
 #
 # ==============================================================================
+
+# Source metric type constants and validation functions
+source(file.path(dirname(sys.frame(1)$ofile), "metric_types.R"))
 
 
 # ==============================================================================
@@ -97,19 +101,30 @@ determine_trend_status <- function(prev_sig, base_sig, styles) {
 #'
 #' @keywords internal
 format_metric_type_display <- function(metric_type) {
-  type_lower <- tolower(metric_type)
-  switch(type_lower,
-         "proportion" = "%",
-         "proportions" = "%",
-         "mean" = "Mean",
-         "rating" = "Mean",
-         "rating_enhanced" = "Mean",
-         "nps" = "NPS",
-         "top2_box" = "T2B%",
-         "top_box" = "TB%",
-         "composite_enhanced" = "Index",
-         "multi_mention" = "%",
-         metric_type)
+  # Validate metric type
+  validate_metric_type(metric_type, context = "format_metric_type_display")
+
+  # Map metric types to display labels using constants
+  if (metric_type == METRIC_TYPES$PROPORTIONS) {
+    return("%")
+  } else if (metric_type == METRIC_TYPES$MEAN) {
+    return("Mean")
+  } else if (metric_type == METRIC_TYPES$RATING_ENHANCED) {
+    return("Mean")
+  } else if (metric_type == METRIC_TYPES$NPS) {
+    return("NPS")
+  } else if (metric_type == METRIC_TYPES$COMPOSITE_ENHANCED) {
+    return("Index")
+  } else if (metric_type == METRIC_TYPES$COMPOSITE) {
+    return("Index")
+  } else if (metric_type == METRIC_TYPES$MULTI_MENTION) {
+    return("%")
+  } else if (metric_type == METRIC_TYPES$CATEGORY_MENTIONS) {
+    return("%")
+  }
+
+  # Fallback for any unhandled types
+  return(metric_type)
 }
 
 
@@ -126,17 +141,19 @@ format_metric_type_display <- function(metric_type) {
 format_metric_value_display <- function(value, metric_type, decimal_places = 1) {
   if (is.na(value) || is.null(value)) return("\u2014")  # em-dash
 
-  type_lower <- tolower(metric_type)
+  # Validate metric type
+  validate_metric_type(metric_type, context = "format_metric_value_display")
 
-  if (type_lower %in% c("proportion", "proportions", "top2_box", "top_box", "multi_mention")) {
+  # Check if proportion-based metric using helper function
+  if (is_proportion_metric(metric_type)) {
     # Percentage types - value is already in percentage form (0-100)
     return(paste0(round(value, decimal_places), "%"))
-  } else if (type_lower == "nps") {
+  } else if (is_nps_metric(metric_type)) {
     # NPS is typically shown as integer
     return(as.character(round(value, 0)))
   }
 
-  # Default: show with decimal places
+  # Default: show with decimal places (numeric metrics)
   return(as.character(round(value, decimal_places)))
 }
 
@@ -154,13 +171,12 @@ format_metric_value_display <- function(value, metric_type, decimal_places = 1) 
 format_change_value_display <- function(change, metric_type, decimal_places = 1) {
   if (is.na(change) || is.null(change)) return("\u2014")  # em-dash
 
+  # Validate metric type
+  validate_metric_type(metric_type, context = "format_change_value_display")
+
   sign_char <- if (change >= 0) "+" else ""
-  type_lower <- tolower(metric_type)
 
-  if (type_lower %in% c("proportion", "proportions", "top2_box", "top_box", "multi_mention")) {
-    return(paste0(sign_char, round(change, decimal_places)))
-  }
-
+  # Format change value (same formatting regardless of type for change values)
   return(paste0(sign_char, round(change, decimal_places)))
 }
 
@@ -177,38 +193,44 @@ format_change_value_display <- function(change, metric_type, decimal_places = 1)
 extract_primary_metric <- function(wave_result, metric_type) {
   if (is.null(wave_result) || !wave_result$available) return(NA)
 
-  type_lower <- tolower(metric_type)
+  # Validate metric type
+  validate_metric_type(metric_type, context = "extract_primary_metric")
 
-  result <- switch(type_lower,
-         "proportion" = {
-           if (!is.null(wave_result$proportion)) wave_result$proportion * 100 else NA
-         },
-         "proportions" = {
-           # For proportions, we need to handle differently - get first proportion
-           if (!is.null(wave_result$proportions) && length(wave_result$proportions) > 0) {
-             wave_result$proportions[1] * 100
-           } else NA
-         },
-         "mean" = wave_result$mean,
-         "rating" = wave_result$mean,
-         "rating_enhanced" = wave_result$mean,
-         "nps" = wave_result$nps,
-         "top2_box" = {
-           if (!is.null(wave_result$top2_box_pct)) wave_result$top2_box_pct else NA
-         },
-         "top_box" = {
-           if (!is.null(wave_result$top_box_pct)) wave_result$top_box_pct else NA
-         },
-         "composite_enhanced" = wave_result$mean,
-         "multi_mention" = {
-           # For multi-mention, extract first item proportion
-           if (!is.null(wave_result$item_proportions) && length(wave_result$item_proportions) > 0) {
-             wave_result$item_proportions[1] * 100
-           } else NA
-         },
-         wave_result$mean)  # default to mean
+  # Extract based on metric type using constants
+  if (metric_type == METRIC_TYPES$PROPORTIONS) {
+    # For proportions, get first proportion
+    if (!is.null(wave_result$proportions) && length(wave_result$proportions) > 0) {
+      return(wave_result$proportions[1] * 100)
+    } else if (!is.null(wave_result$proportion)) {
+      return(wave_result$proportion * 100)
+    }
+    return(NA)
+  } else if (metric_type == METRIC_TYPES$MEAN) {
+    return(wave_result$mean)
+  } else if (metric_type == METRIC_TYPES$RATING_ENHANCED) {
+    return(wave_result$mean)
+  } else if (metric_type == METRIC_TYPES$NPS) {
+    return(wave_result$nps)
+  } else if (metric_type == METRIC_TYPES$COMPOSITE) {
+    return(wave_result$mean)
+  } else if (metric_type == METRIC_TYPES$COMPOSITE_ENHANCED) {
+    return(wave_result$mean)
+  } else if (metric_type == METRIC_TYPES$MULTI_MENTION) {
+    # For multi-mention, extract first item proportion
+    if (!is.null(wave_result$item_proportions) && length(wave_result$item_proportions) > 0) {
+      return(wave_result$item_proportions[1] * 100)
+    }
+    return(NA)
+  } else if (metric_type == METRIC_TYPES$CATEGORY_MENTIONS) {
+    # For category mentions, extract first category proportion
+    if (!is.null(wave_result$category_proportions) && length(wave_result$category_proportions) > 0) {
+      return(wave_result$category_proportions[1] * 100)
+    }
+    return(NA)
+  }
 
-  return(result)
+  # Default fallback: try to get mean
+  return(if (!is.null(wave_result$mean)) wave_result$mean else NA)
 }
 
 
@@ -240,10 +262,12 @@ calculate_pairwise_significance <- function(from_result, to_result, metric_type,
   if (is.null(from_result) || is.null(to_result)) return(default_return)
   if (!isTRUE(from_result$available) || !isTRUE(to_result$available)) return(default_return)
 
-  tryCatch({
-    type_lower <- tolower(metric_type)
+  # Validate metric type
+  validate_metric_type(metric_type, context = "calculate_pairwise_significance")
 
-    if (type_lower %in% c("proportion", "proportions", "top2_box", "top_box", "multi_mention")) {
+  tryCatch({
+    # Use helper functions to determine metric type category
+    if (is_proportion_metric(metric_type)) {
       # Two-proportion z-test
       p1 <- if (!is.null(from_result$proportion)) {
         from_result$proportion
@@ -282,8 +306,8 @@ calculate_pairwise_significance <- function(from_result, to_result, metric_type,
       z <- (p2 - p1) / se
       p_value <- 2 * pnorm(-abs(z))
 
-    } else if (type_lower %in% c("mean", "rating", "rating_enhanced", "composite_enhanced")) {
-      # Two-sample t-test (Welch's approximation)
+    } else if (is_numeric_metric(metric_type)) {
+      # Two-sample t-test (Welch's approximation) for numeric metrics
       m1 <- from_result$mean
       m2 <- to_result$mean
       sd1 <- from_result$sd
@@ -309,7 +333,7 @@ calculate_pairwise_significance <- function(from_result, to_result, metric_type,
       p_value <- 2 * pt(-abs(t_stat), df)
       z <- t_stat  # Use t_stat for direction
 
-    } else if (type_lower == "nps") {
+    } else if (is_nps_metric(metric_type)) {
       # NPS significance test (simplified approach)
       nps1 <- from_result$nps
       nps2 <- to_result$nps

@@ -5,27 +5,39 @@
 # Generates Excel output for tracking analysis.
 # Creates one sheet per question plus summary/metadata sheets.
 #
-# VERSION: 2.2.0 - Uses consolidated shared utilities
-# SIZE: ~2,180 lines (target: decompose during maintenance)
+# VERSION: 2.3.0 - Refactored to use extracted modules
+# SIZE: ~2,110 lines (reduced via module extraction)
+#
+# REFACTORING STATUS:
+# Phase 1 - Completed (2025-12-28):
+#   - Extracted metric_types.R: Metric type constants and validation
+#   - Extracted output_formatting.R: Excel style creation
+#   - Updated all metric_type comparisons to use METRIC_TYPES constants
+#   - Added validation in key functions: write_trend_sheets, write_banner_trend_table,
+#     extract_wave_history_metrics
 #
 # ARCHITECTURE NOTE:
-# During future maintenance, this file should be refactored to:
+# Future maintenance should continue decomposition:
 #
-#   tracker_output.R (orchestration, ~500 lines)
+#   tracker_output.R (orchestration, current file)
 #     - write_tracker_output()
 #     - Output format dispatchers
 #
+#   lib/metric_types.R (EXTRACTED - Complete)
+#     - METRIC_TYPES constants
+#     - Validation functions
+#
+#   lib/output_formatting.R (EXTRACTED - Complete)
+#     - create_tracker_styles()
+#     - Excel style definitions
+#
+#   Future targets:
 #   lib/output_excel.R (Excel generation, ~600 lines)
 #     - Workbook creation and formatting
-#     - Style management
 #
 #   lib/output_sheets.R (Sheet writers, ~500 lines)
 #     - write_question_sheet()
 #     - write_summary_sheet()
-#
-#   lib/output_formatting.R (Cell formatting, ~400 lines)
-#     - Significance highlighting
-#     - Number formatting
 #
 # SHARED UTILITIES: Uses /modules/shared/lib/ for common functions
 #
@@ -54,6 +66,10 @@ if (!exists("find_turas_root", mode = "function")) {
 
   rm(.output_script_dir, .shared_lib_path)
 }
+
+# Load extracted modules
+source(file.path(dirname(sys.frame(1)$ofile), "metric_types.R"))
+source(file.path(dirname(sys.frame(1)$ofile), "output_formatting.R"))
 
 #' Write Tracker Output to Excel
 #'
@@ -169,81 +185,6 @@ write_tracker_output <- function(trend_results, config, wave_data, output_path =
 }
 
 
-#' Create Tracker Styles
-#'
-#' SHARED CODE NOTE: Should use /shared/excel_styles.R::create_standard_styles()
-#'
-#' @keywords internal
-create_tracker_styles <- function() {
-
-  list(
-    title = openxlsx::createStyle(
-      fontSize = 14,
-      textDecoration = "bold",
-      halign = "left"
-    ),
-    header = openxlsx::createStyle(
-      fontSize = 11,
-      textDecoration = "bold",
-      halign = "center",
-      valign = "center",
-      fgFill = "#4472C4",
-      fontColour = "#FFFFFF",
-      border = "TopBottomLeftRight",
-      borderColour = "#FFFFFF",
-      wrapText = TRUE
-    ),
-    wave_header = openxlsx::createStyle(
-      fontSize = 11,
-      textDecoration = "bold",
-      halign = "center",
-      fgFill = "#B4C7E7",
-      border = "TopBottomLeftRight"
-    ),
-    metric_label = openxlsx::createStyle(
-      fontSize = 10,
-      halign = "left",
-      valign = "center",
-      indent = 1
-    ),
-    data_number = openxlsx::createStyle(
-      fontSize = 10,
-      halign = "center",
-      valign = "center",
-      numFmt = "0.0"
-    ),
-    data_percent = openxlsx::createStyle(
-      fontSize = 10,
-      halign = "center",
-      valign = "center",
-      numFmt = "0"
-    ),
-    data_integer = openxlsx::createStyle(
-      fontSize = 10,
-      halign = "center",
-      valign = "center",
-      numFmt = "0"
-    ),
-    change_positive = openxlsx::createStyle(
-      fontSize = 10,
-      halign = "center",
-      fontColour = "#008000"
-    ),
-    change_negative = openxlsx::createStyle(
-      fontSize = 10,
-      halign = "center",
-      fontColour = "#C00000"
-    ),
-    significant = openxlsx::createStyle(
-      fontSize = 10,
-      halign = "center",
-      textDecoration = "bold",
-      fontColour = "#0000FF"
-    )
-  )
-}
-
-
 #' Write Summary Sheet
 #'
 #' Creates summary sheet with project info and wave overview.
@@ -350,23 +291,26 @@ write_trend_sheets <- function(wb, trend_results, config, styles) {
                         startRow = current_row, startCol = 1, colNames = FALSE)
     current_row <- current_row + 2
 
+    # Validate metric type
+    validate_metric_type(result$metric_type, context = "write_trend_sheets")
+
     # Write trend table based on metric type
-    if (result$metric_type == "mean") {
+    if (result$metric_type == METRIC_TYPES$MEAN) {
       current_row <- write_mean_trend_table(wb, sheet_name, result, wave_ids, config, styles, current_row)
 
-    } else if (result$metric_type == "nps") {
+    } else if (result$metric_type == METRIC_TYPES$NPS) {
       current_row <- write_nps_trend_table(wb, sheet_name, result, wave_ids, config, styles, current_row)
 
-    } else if (result$metric_type == "proportions") {
+    } else if (result$metric_type == METRIC_TYPES$PROPORTIONS) {
       current_row <- write_proportions_trend_table(wb, sheet_name, result, wave_ids, config, styles, current_row)
 
-    } else if (result$metric_type == "rating_enhanced") {
+    } else if (result$metric_type == METRIC_TYPES$RATING_ENHANCED) {
       current_row <- write_enhanced_rating_trend_table(wb, sheet_name, result, wave_ids, config, styles, current_row)
 
-    } else if (result$metric_type == "composite_enhanced") {
+    } else if (result$metric_type == METRIC_TYPES$COMPOSITE_ENHANCED) {
       current_row <- write_enhanced_composite_trend_table(wb, sheet_name, result, wave_ids, config, styles, current_row)
 
-    } else if (result$metric_type == "multi_mention") {
+    } else if (result$metric_type == METRIC_TYPES$MULTI_MENTION) {
       current_row <- write_multi_mention_trend_table(wb, sheet_name, result, wave_ids, config, styles, current_row)
     }
   }
@@ -859,8 +803,11 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
                     rows = current_row, cols = 1:length(headers), gridExpand = TRUE)
   current_row <- current_row + 1
 
+  # Validate metric type
+  validate_metric_type(first_seg$metric_type, context = "write_banner_trend_table")
+
   # Write metric rows based on question type
-  if (first_seg$metric_type == "mean" || first_seg$metric_type == "composite") {
+  if (first_seg$metric_type == METRIC_TYPES$MEAN || first_seg$metric_type == METRIC_TYPES$COMPOSITE) {
     # Mean row - write label and numbers separately
     openxlsx::writeData(wb, sheet_name, "Mean",
                         startRow = current_row, startCol = 1, colNames = FALSE)
@@ -893,7 +840,7 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
                       rows = current_row, cols = 2:length(headers), gridExpand = TRUE, stack = TRUE)
     current_row <- current_row + 1
 
-  } else if (first_seg$metric_type == "rating_enhanced" || first_seg$metric_type == "composite_enhanced") {
+  } else if (first_seg$metric_type == METRIC_TYPES$RATING_ENHANCED || first_seg$metric_type == METRIC_TYPES$COMPOSITE_ENHANCED) {
     # Enhanced metrics - write row for each metric in tracking_specs
     for (metric_name in first_seg$tracking_specs) {
       metric_lower <- tolower(trimws(metric_name))
@@ -960,7 +907,7 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
       current_row <- current_row + 1
     }
 
-  } else if (first_seg$metric_type == "proportions") {
+  } else if (first_seg$metric_type == METRIC_TYPES$PROPORTIONS) {
     # Proportions - write row for each response code
     for (code in first_seg$response_codes) {
       # Write label
@@ -998,7 +945,7 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
       current_row <- current_row + 1
     }
 
-  } else if (first_seg$metric_type == "nps") {
+  } else if (first_seg$metric_type == METRIC_TYPES$NPS) {
     # NPS rows
     metrics <- c("NPS Score", "% Promoters", "% Passives", "% Detractors")
 
@@ -1088,7 +1035,7 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
 
       # For proportions, show ALL response codes; for enhanced metrics, show first metric only
       changes_to_show <- if (is_nested) {
-        if (total_result$metric_type == "proportions") {
+        if (total_result$metric_type == METRIC_TYPES$PROPORTIONS) {
           # Show all response codes for proportions
           total_result$changes
         } else {
@@ -1135,7 +1082,7 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
 
           # For proportions, change is nested by response code, then by wave comparison
           # For other metrics, change is the wave comparison directly
-          if (total_result$metric_type == "proportions" && is_nested) {
+          if (total_result$metric_type == METRIC_TYPES$PROPORTIONS && is_nested) {
             # Nested by response code - iterate through wave comparisons for this code
             response_code <- change_name
             for (comp_name in names(change)) {
@@ -1303,7 +1250,7 @@ write_change_summary_sheet <- function(wb, banner_results, config, styles) {
       total_result <- question_segments[["Total"]]
 
       # Determine which metrics to show
-      if (total_result$metric_type == "rating_enhanced" || total_result$metric_type == "composite_enhanced") {
+      if (total_result$metric_type == METRIC_TYPES$RATING_ENHANCED || total_result$metric_type == METRIC_TYPES$COMPOSITE_ENHANCED) {
         # Enhanced metrics - write a row for each tracked metric
         for (metric_spec in total_result$tracking_specs) {
           metric_lower <- tolower(trimws(metric_spec))
@@ -1390,14 +1337,14 @@ write_change_summary_sheet <- function(wb, banner_results, config, styles) {
         latest_val <- NA
 
         # Get baseline and latest values
-        if (total_result$metric_type == "mean" || total_result$metric_type == "composite") {
+        if (total_result$metric_type == METRIC_TYPES$MEAN || total_result$metric_type == METRIC_TYPES$COMPOSITE) {
           if (total_result$wave_results[[baseline_wave]]$available) {
             baseline_val <- total_result$wave_results[[baseline_wave]]$mean
           }
           if (total_result$wave_results[[latest_wave]]$available) {
             latest_val <- total_result$wave_results[[latest_wave]]$mean
           }
-        } else if (total_result$metric_type == "nps") {
+        } else if (total_result$metric_type == METRIC_TYPES$NPS) {
           if (total_result$wave_results[[baseline_wave]]$available) {
             baseline_val <- total_result$wave_results[[baseline_wave]]$nps
           }
@@ -2128,7 +2075,10 @@ extract_wave_history_metrics <- function(q_result) {
 
   metric_type <- q_result$metric_type
 
-  if (metric_type == "rating_enhanced" || metric_type == "composite_enhanced") {
+  # Validate metric type
+  validate_metric_type(metric_type, context = "extract_wave_history_metrics")
+
+  if (metric_type == METRIC_TYPES$RATING_ENHANCED || metric_type == METRIC_TYPES$COMPOSITE_ENHANCED) {
     # Enhanced metrics - use tracking_specs
     for (spec in q_result$tracking_specs) {
       spec_lower <- tolower(trimws(spec))
@@ -2163,15 +2113,15 @@ extract_wave_history_metrics <- function(q_result) {
       )
     }
 
-  } else if (metric_type == "mean" || metric_type == "composite") {
+  } else if (metric_type == METRIC_TYPES$MEAN || metric_type == METRIC_TYPES$COMPOSITE) {
     # Simple mean
     metrics[[1]] <- list(metric_key = "mean", label = "Mean")
 
-  } else if (metric_type == "nps") {
+  } else if (metric_type == METRIC_TYPES$NPS) {
     # NPS score
     metrics[[1]] <- list(metric_key = "nps", label = "NPS")
 
-  } else if (metric_type == "proportions") {
+  } else if (metric_type == METRIC_TYPES$PROPORTIONS) {
     # Proportions - track ALL response codes
     if (!is.null(q_result$response_codes) && length(q_result$response_codes) > 0) {
       for (code in q_result$response_codes) {
@@ -2182,7 +2132,7 @@ extract_wave_history_metrics <- function(q_result) {
       }
     }
 
-  } else if (metric_type == "multi_mention") {
+  } else if (metric_type == METRIC_TYPES$MULTI_MENTION) {
     # Multi-mention - track each column
     if (!is.null(q_result$tracked_columns)) {
       for (col_name in q_result$tracked_columns) {
@@ -2193,7 +2143,7 @@ extract_wave_history_metrics <- function(q_result) {
       }
     }
 
-  } else if (metric_type == "category_mentions") {
+  } else if (metric_type == METRIC_TYPES$CATEGORY_MENTIONS) {
     # Multi-mention category mode - track each category
     if (!is.null(q_result$response_categories)) {
       for (category in q_result$response_categories) {
@@ -2217,7 +2167,7 @@ extract_wave_history_metrics <- function(q_result) {
 extract_metric_value <- function(wave_result, metric_key, question_metric_type) {
 
   # Handle enhanced metrics (stored in metrics list)
-  if (question_metric_type == "rating_enhanced" || question_metric_type == "composite_enhanced") {
+  if (question_metric_type == METRIC_TYPES$RATING_ENHANCED || question_metric_type == METRIC_TYPES$COMPOSITE_ENHANCED) {
     if (!is.null(wave_result$metrics) && !is.null(wave_result$metrics[[metric_key]])) {
       return(wave_result$metrics[[metric_key]])
     }

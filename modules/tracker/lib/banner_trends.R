@@ -9,7 +9,13 @@
 # - Banner processing patterns similar to TurasTabs banner_builder.R
 # - Future: Extract get_banner_segments() to /shared/banner_utils.R
 #
+# DEPENDENCIES:
+# - metric_types.R (metric type constants and validation)
+#
 # ==============================================================================
+
+# Source metric type constants and validation functions
+source(file.path(dirname(sys.frame(1)$ofile), "metric_types.R"))
 
 #' Calculate Trends with Banner Breakouts
 #'

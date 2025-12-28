@@ -7,7 +7,13 @@
 #
 # This is tracker-specific functionality (not needed in TurasTabs).
 #
+# DEPENDENCIES:
+# - metric_types.R (metric type constants and validation)
+#
 # ==============================================================================
+
+# Source metric type constants and validation functions
+source(file.path(dirname(sys.frame(1)$ofile), "metric_types.R"))
 # WAVE MAPPING ARCHITECTURE
 # ==============================================================================
 #
