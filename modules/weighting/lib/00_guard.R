@@ -30,12 +30,17 @@
   if (!is.null(turas_root)) {
     trs_file <- file.path(turas_root, "modules", "shared", "lib", "trs_refusal.R")
     log_file <- file.path(turas_root, "modules", "shared", "lib", "turas_log.R")
+    atomic_file <- file.path(turas_root, "modules", "shared", "lib", "turas_save_workbook_atomic.R")
 
     if (file.exists(trs_file) && !exists("turas_refuse", mode = "function")) {
       source(trs_file, local = FALSE)
     }
     if (file.exists(log_file) && !exists("turas_log", mode = "function")) {
       source(log_file, local = FALSE)
+    }
+    # TRS v1.0: Load atomic workbook save to prevent file corruption on network/OneDrive folders
+    if (file.exists(atomic_file) && !exists("turas_save_workbook_atomic", mode = "function")) {
+      source(atomic_file, local = FALSE)
     }
   }
 }

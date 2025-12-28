@@ -56,7 +56,41 @@ write_weighted_data <- function(data, output_file, verbose = TRUE) {
           )
         )
       }
-      openxlsx::write.xlsx(data, output_file, rowNames = FALSE)
+
+      # TRS v1.0: Use atomic save to prevent file corruption on network/OneDrive folders
+      if (exists("turas_save_workbook_atomic", mode = "function")) {
+        wb <- openxlsx::createWorkbook()
+        openxlsx::addWorksheet(wb, "Weighted_Data")
+        openxlsx::writeData(wb, "Weighted_Data", data, rowNames = FALSE)
+
+        save_result <- turas_save_workbook_atomic(wb, output_file, module = "WEIGHTING")
+        if (!save_result$success) {
+          weighting_refuse(
+            code = "IO_ATOMIC_SAVE_FAILED",
+            title = "Failed to Save Weighted Data File",
+            problem = sprintf("Atomic save failed for: %s", output_file),
+            why_it_matters = "Weighted data was calculated but could not be saved safely.",
+            how_to_fix = c(
+              "Check directory permissions",
+              "Ensure file is not open in another program",
+              "Verify disk space is available"
+            ),
+            details = save_result$error
+          )
+        }
+      } else {
+        weighting_refuse(
+          code = "IO_ATOMIC_SAVE_UNAVAILABLE",
+          title = "Atomic Save Not Available",
+          problem = "The turas_save_workbook_atomic function is required but not loaded.",
+          why_it_matters = "Direct file saves risk corruption on network/OneDrive-synced folders.",
+          how_to_fix = c(
+            "Ensure Turas shared library is accessible",
+            "Verify modules/shared/lib/turas_save_workbook_atomic.R exists",
+            "Contact support if the problem persists"
+          )
+        )
+      }
     } else {
       weighting_refuse(
         code = "IO_UNSUPPORTED_FORMAT",
@@ -366,7 +400,7 @@ generate_weighting_report <- function(weighting_results, output_file, verbose = 
         }
       }
 
-      # Use atomic save if available (TRS v1.0)
+      # TRS v1.0: Use atomic save to prevent file corruption on network/OneDrive folders
       if (exists("turas_save_workbook_atomic", mode = "function")) {
         save_result <- turas_save_workbook_atomic(wb, output_file, module = "WEIGHTING")
         if (!save_result$success) {
@@ -384,7 +418,17 @@ generate_weighting_report <- function(weighting_results, output_file, verbose = 
           )
         }
       } else {
-        openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+        weighting_refuse(
+          code = "IO_ATOMIC_SAVE_UNAVAILABLE",
+          title = "Atomic Save Not Available",
+          problem = "The turas_save_workbook_atomic function is required but not loaded.",
+          why_it_matters = "Direct file saves risk corruption on network/OneDrive-synced folders.",
+          how_to_fix = c(
+            "Ensure Turas shared library is accessible",
+            "Verify modules/shared/lib/turas_save_workbook_atomic.R exists",
+            "Contact support if the problem persists"
+          )
+        )
       }
 
     } else {
