@@ -22,13 +22,14 @@
 
 # Source shared functions
 if (!exists("log_issue")) {
-  script_dir <- tryCatch({
+  # Use local variable to avoid overwriting global script_dir
+  this_script_dir <- tryCatch({
     dirname(sys.frame(1)$ofile)
   }, error = function(e) getwd())
-  if (is.null(script_dir) || is.na(script_dir) || length(script_dir) == 0) {
-    script_dir <- getwd()
+  if (is.null(this_script_dir) || is.na(this_script_dir) || length(this_script_dir) == 0) {
+    this_script_dir <- getwd()
   }
-  source(file.path(dirname(script_dir), "shared_functions.R"), local = FALSE)
+  source(file.path(dirname(this_script_dir), "shared_functions.R"), local = FALSE)
 }
 
 # ==============================================================================
