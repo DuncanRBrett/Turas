@@ -127,27 +127,38 @@ is_significant <- function(sig_test) {
 #'
 #' @keywords internal
 normalize_question_type <- function(q_type) {
-  # Map TurasTabs types to internal tracker types
+  # Handle NULL/empty input
+  if (is.null(q_type) || length(q_type) == 0 || !nzchar(q_type)) {
+    return("unknown")
+  }
+
+  # Normalize input: trim whitespace
+  q_type_clean <- trimws(q_type)
+
+  # Map TurasTabs types to internal tracker types (case-insensitive keys)
   type_map <- c(
-    "Single_Response" = "single_choice",
-    "SingleChoice" = "single_choice",
-    "Multi_Mention" = "multi_choice",
-    "MultiChoice" = "multi_choice",
-    "Rating" = "rating",
-    "Likert" = "rating",  # Treat Likert same as Rating
-    "NPS" = "nps",
-    "Index" = "rating",  # Index scores treated as ratings
-    "Numeric" = "rating",  # Numeric treated as rating
-    "Open_End" = "open_end",
-    "OpenEnd" = "open_end",
-    "Ranking" = "ranking",
-    "Composite" = "composite"
+    "single_response" = "single_choice",
+    "singlechoice" = "single_choice",
+    "single_choice" = "single_choice",
+    "multi_mention" = "multi_choice",
+    "multichoice" = "multi_choice",
+    "multi_choice" = "multi_choice",
+    "rating" = "rating",
+    "likert" = "rating",  # Treat Likert same as Rating
+    "nps" = "nps",
+    "index" = "rating",  # Index scores treated as ratings
+    "numeric" = "rating",  # Numeric treated as rating
+    "open_end" = "open_end",
+    "openend" = "open_end",
+    "ranking" = "ranking",
+    "composite" = "composite"
   )
 
-  normalized <- type_map[q_type]
+  # Lookup using lowercase key for case-insensitive matching
+  normalized <- type_map[tolower(q_type_clean)]
 
   if (is.na(normalized)) {
-    return(tolower(q_type))  # Return lowercase if not in map
+    return(tolower(q_type_clean))  # Return lowercase if not in map
   }
 
   return(as.character(normalized))
