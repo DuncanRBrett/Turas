@@ -48,6 +48,13 @@ detect_outcome_type <- function(outcome_var, order_spec = NULL, override_type = 
       type <- "nominal"
     }
 
+    # Use order_spec if provided for ordinal; otherwise sort alphabetically
+    cat_order <- if (!is.null(order_spec) && type == "ordinal") {
+      order_spec
+    } else {
+      sort(as.character(categories))
+    }
+
     return(list(
       type = type,
       method = switch(type,
@@ -56,7 +63,7 @@ detect_outcome_type <- function(outcome_var, order_spec = NULL, override_type = 
         nominal = "multinomial_logistic"
       ),
       n_categories = n_unique,
-      categories = sort(as.character(categories)),
+      categories = cat_order,
       is_ordered = type == "ordinal"
     ))
   }
