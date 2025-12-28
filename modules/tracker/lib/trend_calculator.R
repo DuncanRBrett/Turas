@@ -186,6 +186,13 @@ normalize_question_type <- function(q_type) {
 #' @export
 calculate_all_trends <- function(config, question_map, wave_data, parallel = FALSE) {
 
+  # Debug: Write to log file at start of calculation
+  if (exists(".write_tracker_debug", mode = "function")) {
+    .write_tracker_debug("=== calculate_all_trends STARTING ===")
+    .write_tracker_debug("n_tracked_questions:", length(config$tracked_questions$QuestionCode))
+    .write_tracker_debug("n_waves:", length(config$waves$WaveID))
+  }
+
   cat("\n================================================================================\n")
   cat("CALCULATING TRENDS\n")
   cat("================================================================================\n")
@@ -263,6 +270,21 @@ calculate_all_trends <- function(config, question_map, wave_data, parallel = FAL
 #' @keywords internal
 calculate_trends_sequential <- function(tracked_questions, question_map, wave_data, config, wave_ids) {
 
+  # Direct debug function that always writes to log file
+  .calc_debug <- function(...) {
+    msg <- paste0(format(Sys.time(), "%H:%M:%S"), " [CALC] ", paste(..., collapse = " "), "\n")
+    cat(msg)
+    # Write directly to log file to bypass any sink()
+    log_path <- file.path(getwd(), "..", "..", "tracker_gui_debug.log")
+    if (!file.exists(dirname(log_path))) {
+      log_path <- file.path(tempdir(), "tracker_debug.log")
+    }
+    tryCatch(cat(msg, file = log_path, append = TRUE), error = function(e) NULL)
+  }
+
+  .calc_debug("=== calculate_trends_sequential STARTING ===")
+  .calc_debug("n_tracked_questions:", length(tracked_questions))
+
   trend_results <- list()
   skipped_questions <- list()  # TRS v1.0: Track skipped questions for PARTIAL status
 
@@ -287,6 +309,7 @@ calculate_trends_sequential <- function(tracked_questions, question_map, wave_da
     # Normalize question type to internal standard
     q_type_raw <- metadata$QuestionType
     q_type <- normalize_question_type(q_type_raw)
+    .calc_debug("Question:", q_code, "type_raw:", q_type_raw, "->", q_type)
     cat(paste0("  Type: ", q_type_raw, " (normalized: ", q_type, ")\n"))
 
     # Dispatch to appropriate calculator
@@ -294,28 +317,29 @@ calculate_trends_sequential <- function(tracked_questions, question_map, wave_da
       q_code, q_type, q_type_raw, question_map, wave_data, config, skipped_questions
     )
 
-    # Debug: Check what we got back - use the global debug function if available
-    debug_msg <- paste0(
-      "[CALC] q_code=", q_code,
-      " type=", q_type_raw, "->", q_type,
-      " result=", if (is.null(trend_result)) "NULL" else paste0("list(", length(names(trend_result)), ")"),
-      " metric_type=", if (!is.null(trend_result$metric_type)) trend_result$metric_type else "NULL"
-    )
-    cat(debug_msg, "\n")
-    # Use the global debug log function from run_tracker.R if available
-    if (exists(".write_tracker_debug", mode = "function")) {
-      .write_tracker_debug(debug_msg)
+    # Debug: Check what we got back
+    .calc_debug("Result for", q_code, ":")
+    .calc_debug("  is.null:", is.null(trend_result))
+    if (!is.null(trend_result)) {
+      .calc_debug("  names:", paste(names(trend_result), collapse = ", "))
+      .calc_debug("  metric_type:", if (is.null(trend_result$metric_type)) "NULL" else trend_result$metric_type)
     }
 
     # Handle skipped questions (returned as list with $skipped)
     if (is.list(trend_result) && !is.null(trend_result$skipped)) {
       skipped_questions[[q_code]] <- trend_result$skipped
+      .calc_debug("  SKIPPED:", trend_result$skipped$reason)
       cat(paste0("  SKIPPED: ", trend_result$skipped$reason, "\n"))
     } else if (!is.null(trend_result)) {
       trend_results[[q_code]] <- trend_result
+      .calc_debug("  STORED in trend_results")
       cat(paste0("  ✓ Trend calculated\n"))
     }
   }
+
+  .calc_debug("=== calculate_trends_sequential COMPLETED ===")
+  .calc_debug("trend_results length:", length(trend_results))
+  .calc_debug("trend_results names:", paste(names(trend_results), collapse = ", "))
 
   return(list(
     trend_results = trend_results,
@@ -500,6 +524,14 @@ calculate_single_question_trend <- function(q_code, q_type, q_type_raw, question
 
   }, error = function(e) {
     # TRS v1.0: Record error for PARTIAL status
+    # Debug: Log the error to the file
+    error_msg <- paste0(format(Sys.time(), "%H:%M:%S"), " [ERROR] ", q_code, ": ", e$message, "\n")
+    log_path <- file.path(getwd(), "..", "..", "tracker_gui_debug.log")
+    if (!file.exists(dirname(log_path))) {
+      log_path <- file.path(tempdir(), "tracker_debug.log")
+    }
+    tryCatch(cat(error_msg, file = log_path, append = TRUE), error = function(e2) NULL)
+
     message(paste0("[TRS PARTIAL] Error calculating trend for ", q_code, ": ", e$message))
     return(list(
       skipped = list(

@@ -441,20 +441,41 @@ write_summary_sheet <- function(wb, config, wave_data, trend_results, styles, ba
 #' @keywords internal
 write_trend_sheets <- function(wb, trend_results, config, styles) {
 
+  # Debug helper that writes to both console and log file
+  .debug_output <- function(...) {
+    msg <- paste0("[OUTPUT DEBUG] ", paste(..., collapse = " "), "\n")
+    cat(msg)
+    # Also write to log file directly to bypass sink()
+    if (exists(".write_tracker_debug", mode = "function")) {
+      .write_tracker_debug(...)
+    } else {
+      # Fallback: write directly to log file
+      log_path <- file.path(getwd(), "..", "..", "tracker_gui_debug.log")
+      if (!file.exists(dirname(log_path))) {
+        log_path <- file.path(tempdir(), "tracker_debug.log")
+      }
+      tryCatch(cat(msg, file = log_path, append = TRUE), error = function(e) NULL)
+    }
+  }
+
   message(paste0("  Writing ", length(trend_results), " trend sheets..."))
+  .debug_output("=== write_trend_sheets called ===")
+  .debug_output("trend_results length:", length(trend_results))
+  .debug_output("trend_results names:", paste(names(trend_results), collapse = ", "))
 
   wave_ids <- config$waves$WaveID
-  cat("[DEBUG] wave_ids:", paste(wave_ids, collapse=", "), "length:", length(wave_ids), "\n")
+  .debug_output("wave_ids:", paste(wave_ids, collapse=", "), "length:", length(wave_ids))
 
   for (q_code in names(trend_results)) {
-    cat("[DEBUG] Processing question:", q_code, "\n")
+    .debug_output("Processing question:", q_code)
     result <- trend_results[[q_code]]
-    cat("[DEBUG]   metric_type:", result$metric_type, "\n")
+    .debug_output("  result names:", paste(names(result), collapse = ", "))
+    .debug_output("  metric_type raw:", if (is.null(result$metric_type)) "NULL" else result$metric_type)
 
     # Create safe sheet name (max 31 chars, no special chars)
     sheet_name <- substr(q_code, 1, 31)
     sheet_name <- gsub("[\\[\\]\\*/\\\\?:]", "_", sheet_name)
-    cat("[DEBUG]   sheet_name:", sheet_name, "\n")
+    .debug_output("  sheet_name:", sheet_name)
 
     openxlsx::addWorksheet(wb, sheet_name)
 
@@ -473,11 +494,12 @@ write_trend_sheets <- function(wb, trend_results, config, styles) {
     # Write trend table based on metric type
     # Guard against NULL/empty metric_type which causes "argument is of length zero"
     metric_type <- if (is.null(result$metric_type) || length(result$metric_type) == 0 || !nzchar(result$metric_type)) {
+      .debug_output("  WARNING: metric_type is NULL/empty, setting to 'unknown'")
       "unknown"
     } else {
       result$metric_type
     }
-    cat("[DEBUG]   Calling write function for metric_type:", metric_type, "\n")
+    .debug_output("  Final metric_type:", metric_type)
 
     if (metric_type == "mean") {
       current_row <- write_mean_trend_table(wb, sheet_name, result, wave_ids, config, styles, current_row)
@@ -499,14 +521,15 @@ write_trend_sheets <- function(wb, trend_results, config, styles) {
 
     } else {
       # Unknown metric type - write a placeholder and continue
+      .debug_output("  ERROR: Unknown metric_type '", metric_type, "' - writing placeholder")
       warning(paste0("Unknown metric_type '", metric_type, "' for question ", q_code))
       openxlsx::writeData(wb, sheet_name, paste0("Unknown metric type: ", metric_type),
                           startRow = current_row, startCol = 1, colNames = FALSE)
       current_row <- current_row + 1
     }
-    cat("[DEBUG]   Done with question:", q_code, "\n")
+    .debug_output("  Done with question:", q_code)
   }
-  cat("[DEBUG] All trend sheets written\n")
+  .debug_output("=== All trend sheets written ===")
 }
 
 

@@ -153,8 +153,22 @@ calculate_rating_trend <- function(q_code, question_map, wave_data, config) {
 #' @keywords internal
 calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, config) {
 
+  # Debug helper
+  .rating_debug <- function(...) {
+    msg <- paste0(format(Sys.time(), "%H:%M:%S"), " [RATING] ", paste(..., collapse = " "), "\n")
+    cat(msg)
+    log_path <- file.path(getwd(), "..", "..", "tracker_gui_debug.log")
+    if (!file.exists(dirname(log_path))) {
+      log_path <- file.path(tempdir(), "tracker_debug.log")
+    }
+    tryCatch(cat(msg, file = log_path, append = TRUE), error = function(e) NULL)
+  }
+
+  .rating_debug("=== calculate_rating_trend_enhanced called for:", q_code, "===")
+
   wave_ids <- config$waves$WaveID
   metadata <- get_question_metadata(question_map, q_code)
+  .rating_debug("metadata:", if (is.null(metadata)) "NULL" else "OK")
 
   # Get TrackingSpecs
   tracking_specs <- get_tracking_specs(question_map, q_code)
@@ -270,7 +284,7 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
     }
   }
 
-  return(list(
+  result <- list(
     question_code = q_code,
     question_text = metadata$QuestionText,
     question_type = metadata$QuestionType,
@@ -279,7 +293,12 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
     wave_results = wave_results,
     changes = changes,
     significance = significance
-  ))
+  )
+
+  .rating_debug("Returning result for", q_code, "with metric_type:", result$metric_type)
+  .rating_debug("=== calculate_rating_trend_enhanced COMPLETE for:", q_code, "===")
+
+  return(result)
 }
 
 
