@@ -136,9 +136,22 @@ add_odds_ratios_sheet <- function(wb, results, config, styles) {
 
   or_df <- results$odds_ratios
 
+  # Check if bootstrap results are available
+  has_bootstrap <- "boot_median_or" %in% names(or_df) && any(!is.na(or_df$boot_median_or))
+
   # Select columns for output
   out_cols <- c("factor_label", "comparison", "reference",
                 "or_formatted", "ci_formatted", "p_formatted", "significance", "effect")
+
+  # Add bootstrap columns if available
+  if (has_bootstrap) {
+    # Format bootstrap columns
+    or_df$boot_or_formatted <- format_or(or_df$boot_median_or)
+    or_df$boot_ci_formatted <- mapply(format_ci, or_df$boot_ci_lower, or_df$boot_ci_upper)
+    or_df$sign_stability_pct <- paste0(round(or_df$sign_stability * 100, 0), "%")
+
+    out_cols <- c(out_cols, "boot_or_formatted", "boot_ci_formatted", "sign_stability_pct")
+  }
 
   # Handle multinomial (has outcome_level column)
   if ("outcome_level" %in% names(or_df)) {
@@ -147,9 +160,15 @@ add_odds_ratios_sheet <- function(wb, results, config, styles) {
 
   out_df <- or_df[, out_cols, drop = FALSE]
 
-  # Rename columns
+  # Rename columns (model-based labels for transparency with non-probability samples)
   col_names <- c("Factor", "Comparison", "Reference", "Odds Ratio",
-                 "95% CI", "P-Value", "Sig.", "Effect")
+                 "95% CI (model-based)", "P-Value (model-based)", "Sig.", "Effect")
+
+  # Add bootstrap column names
+  if (has_bootstrap) {
+    col_names <- c(col_names, "Bootstrap OR (median)", "Bootstrap 95% CI", "Sign Stability")
+  }
+
   if ("outcome_level" %in% names(or_df)) {
     col_names <- c("Outcome Level", col_names)
   }

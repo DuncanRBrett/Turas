@@ -237,12 +237,13 @@ add_importance_sheet <- function(wb, results, config, styles) {
   df <- results$importance[, c("rank", "variable", "label", "importance_pct",
                                "chi_square", "p_value", "significance", "effect_size")]
 
+  # Column names with model-based labels for transparency
   names(df) <- c("Rank", "Factor", "Label", "Importance %", "Chi-Square",
-                 "P-Value", "Sig.", "Effect Size")
+                 "P-Value (model-based)", "Sig.", "Effect Size")
 
   # Format numeric columns
   df$`Chi-Square` <- round(df$`Chi-Square`, 2)
-  df$`P-Value` <- sapply(df$`P-Value`, format_pvalue)
+  df$`P-Value (model-based)` <- sapply(df$`P-Value (model-based)`, format_pvalue)
 
   # Write data
   openxlsx::writeData(wb, "Importance Summary", df, startRow = 1, startCol = 1,
@@ -324,7 +325,7 @@ add_patterns_sheet <- function(wb, results, config, styles) {
     out_df$`OR vs Ref` <- ifelse(pattern_df$is_reference, "1.00 (ref)",
                                  format_or(pattern_df$odds_ratio))
 
-    out_df$`95% CI` <- ifelse(pattern_df$is_reference, "-",
+    out_df$`95% CI (model-based)` <- ifelse(pattern_df$is_reference, "-",
                               mapply(format_ci, pattern_df$or_lower, pattern_df$or_upper))
 
     out_df$Effect <- pattern_df$effect

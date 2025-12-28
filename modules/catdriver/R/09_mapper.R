@@ -349,6 +349,7 @@ extract_odds_ratios_mapped <- function(model_result, mapping, config, conf_level
         m <- mapping[match_idx[1], ]
 
         or_list[[length(or_list) + 1]] <- data.frame(
+          term = row$term,  # Raw coefficient name for bootstrap matching
           factor = m$driver,
           factor_label = get_var_label(config, m$driver),
           comparison = m$level,
@@ -382,6 +383,7 @@ extract_odds_ratios_mapped <- function(model_result, mapping, config, conf_level
         m <- mapping[match_idx[1], ]
 
         or_list[[length(or_list) + 1]] <- data.frame(
+          term = term,  # Raw coefficient name for bootstrap matching
           factor = m$driver,
           factor_label = get_var_label(config, m$driver),
           comparison = m$level,
@@ -395,6 +397,7 @@ extract_odds_ratios_mapped <- function(model_result, mapping, config, conf_level
       } else {
         # Continuous variable - use term as is
         or_list[[length(or_list) + 1]] <- data.frame(
+          term = term,  # Raw coefficient name for bootstrap matching
           factor = term,
           factor_label = get_var_label(config, term),
           comparison = "per unit",
