@@ -258,7 +258,7 @@ Added two helper functions to `shared_functions.R`:
 
 ### Phase 2 Completed Work
 
-#### validation/structure_validators.R (208 lines) - NEW
+#### validation/structure_validators.R (208 lines) - COMPLETE
 Extracted structure validation helper functions:
 - `check_duplicate_questions()`
 - `check_missing_options()`
@@ -267,7 +267,35 @@ Extracted structure validation helper functions:
 - `check_ranking_questions()`
 - `check_multi_mention_questions()`
 
-**validation.R**: Reduced from 2,688 to 2,526 lines (162 lines extracted)
+#### validation/weight_validators.R (375 lines) - COMPLETE
+Extracted weight validation helper functions:
+- `check_weighting_enabled()`
+- `check_weight_variable()`
+- `check_weight_column_exists()`
+- `check_weight_values_valid()`
+- `check_weight_distribution()`
+- `validate_weighting_config()`
+
+#### validation/config_validators.R (253 lines) - COMPLETE
+Extracted config validation helper functions:
+- `check_alpha_config()`
+- `check_min_base()`
+- `check_decimal_places()`
+- `check_numeric_settings()`
+- `check_output_format()`
+- `validate_crosstab_config()`
+
+#### validation/data_validators.R (320 lines) - COMPLETE
+Extracted data validation helper functions:
+- `check_multi_mention_columns()`
+- `check_single_column()`
+- `check_numeric_min_max()`
+- `check_bin_structure()`
+- `check_bin_overlaps()`
+- `check_bin_coverage()`
+- `validate_numeric_question()`
+
+**validation.R**: Reduced from 2,688 to 1,661 lines (1,027 lines extracted total)
 
 ### Pattern for Future Phase 2 Refactoring
 
@@ -304,14 +332,16 @@ When extracting functions to a subdirectory:
 
 ### Remaining Phase 2 Work
 
-#### validation.R - Additional Splits
-| Target File | Estimated Lines | Functions |
-|-------------|-----------------|-----------|
-| validation/data_validators.R | ~300 | Type/range/length validation |
-| validation/config_validators.R | ~200 | Settings/thresholds/defaults |
-| validation/weight_validators.R | ~250 | Weight validation functions |
+#### validation.R - COMPLETE
+All validation helper functions have been extracted to subdirectory modules:
+- validation/structure_validators.R (208 lines)
+- validation/weight_validators.R (375 lines)
+- validation/config_validators.R (253 lines)
+- validation/data_validators.R (320 lines)
 
-#### ranking.R - Split Plan
+Total: 1,156 lines extracted, validation.R reduced to 1,661 lines
+
+#### ranking.R - Split Plan (Next Priority)
 | Target File | Estimated Lines | Functions |
 |-------------|-----------------|-----------|
 | ranking/ranking_extraction.R | ~400 | Data extraction functions |
@@ -321,18 +351,23 @@ When extracting functions to a subdirectory:
 
 ## Conclusion
 
-This refactoring represents Phase 1 and early Phase 2 of modernizing the Tabs module codebase.
+This refactoring represents Phase 1 and Phase 2 completion of modernizing the Tabs module codebase.
 
 **Key Achievements**:
 - ✓ Created 5 new focused utility modules (Phase 1)
 - ✓ Solved subdirectory sourcing problem (Phase 2)
 - ✓ Created `tabs_lib_path()` and `tabs_source()` helpers
-- ✓ Extracted validation/structure_validators.R (208 lines)
+- ✓ Extracted validation.R into 4 subdirectory modules (Phase 2 Complete):
+  - validation/structure_validators.R (208 lines)
+  - validation/weight_validators.R (375 lines)
+  - validation/config_validators.R (253 lines)
+  - validation/data_validators.R (320 lines)
+- ✓ Reduced validation.R from 2,688 to 1,661 lines (38% reduction)
 - ✓ Maintained 100% backward compatibility
 - ✓ Established patterns for future subdirectory refactoring
 
 **Next Steps**:
-- Continue Phase 2 extractions (remaining validation.R, ranking.R)
+- Continue Phase 2 extractions (ranking.R)
 - Add comprehensive unit tests
 - Document module APIs
 - Performance profiling and optimization
