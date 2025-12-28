@@ -725,26 +725,40 @@ run_tracker_gui <- function() {
           console_output("Tracker completed but produced no console output.")
         }
 
-        # Extract output_file
+        # Extract output_file and show completion message
         if (analysis_result$success) {
           output_file <- analysis_result$output_file
+
+          # Save to recent projects
+          add_recent_project(list(
+            tracking_config = tracking_config,
+            question_mapping = question_mapping,
+            data_dir = data_dir,
+            output_path = output_path,
+            use_banners = input$use_banners
+          ))
+
+          # Update console with completion message
+          completion_msg <- sprintf("\n%s\n✓ ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80))
+          if (is.list(output_file)) {
+            # Multiple output files
+            completion_msg <- paste0(completion_msg, "\nOutput files saved to:\n")
+            for (report_type in names(output_file)) {
+              completion_msg <- paste0(completion_msg, sprintf("  %s: %s\n", report_type, output_file[[report_type]]))
+            }
+          } else {
+            # Single output file
+            completion_msg <- paste0(completion_msg, sprintf("\nOutput file saved to:\n%s\n", output_file))
+          }
+          console_output(paste0(console_output(), completion_msg))
+        } else {
+          # Analysis failed
+          error_msg <- sprintf("\n%s\n✗ ANALYSIS FAILED\n%s\n", strrep("=", 80), strrep("=", 80))
+          if (!is.null(analysis_result$error)) {
+            error_msg <- paste0(error_msg, sprintf("\nError: %s\n", analysis_result$error$message))
+          }
+          console_output(paste0(console_output(), error_msg))
         }
-
-        # Save to recent projects
-        add_recent_project(list(
-          tracking_config = tracking_config,
-          question_mapping = question_mapping,
-          data_dir = data_dir,
-          output_path = output_path,
-          use_banners = input$use_banners
-        ))
-
-        # Update console with completion message
-        console_output(paste0(
-          console_output(),
-          sprintf("\n%s\n✓ ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80)),
-          sprintf("\nOutput file saved to:\n%s\n", output_file)
-        ))
 
         # Display any warnings that occurred
         if (length(all_warnings) > 0) {

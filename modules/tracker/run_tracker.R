@@ -67,13 +67,21 @@ tryCatch({
 })
 
 source(file.path(script_dir, "lib", "constants.R"))
+# Load metric types module (required by most other modules)
+source(file.path(script_dir, "lib", "metric_types.R"))
 source(file.path(script_dir, "lib", "tracker_config_loader.R"))
 source(file.path(script_dir, "lib", "wave_loader.R"))
 source(file.path(script_dir, "lib", "question_mapper.R"))
 source(file.path(script_dir, "lib", "validation_tracker.R"))
+source(file.path(script_dir, "lib", "statistical_core.R"))
+# Load trend calculation modules
+source(file.path(script_dir, "lib", "trend_changes.R"))
+source(file.path(script_dir, "lib", "trend_significance.R"))
 source(file.path(script_dir, "lib", "trend_calculator.R"))
 source(file.path(script_dir, "lib", "banner_trends.R"))
 source(file.path(script_dir, "lib", "formatting_utils.R"))
+# Load output modules
+source(file.path(script_dir, "lib", "output_formatting.R"))
 source(file.path(script_dir, "lib", "tracker_output.R"))
 source(file.path(script_dir, "lib", "tracker_dashboard_reports.R"))
 

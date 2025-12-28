@@ -7,7 +7,14 @@
 #
 # This is tracker-specific functionality (not needed in TurasTabs).
 #
+# DEPENDENCIES:
+# - metric_types.R (metric type constants and validation)
+#
 # ==============================================================================
+# NOTE: Required modules are loaded by run_tracker.R in the correct order:
+# - metric_types.R (metric type constants and validation)
+# ==============================================================================
+
 # WAVE MAPPING ARCHITECTURE
 # ==============================================================================
 #
