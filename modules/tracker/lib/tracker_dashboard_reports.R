@@ -97,6 +97,26 @@ determine_trend_status <- function(prev_sig, base_sig, styles) {
 #'
 #' @keywords internal
 format_metric_type_display <- function(metric_type) {
+  # Guard against NULL/NA/empty metric_type
+  if (is.null(metric_type) || length(metric_type) == 0 || is.na(metric_type) || !nzchar(trimws(metric_type))) {
+    tracker_refuse(
+      code = "DATA_MISSING_METRIC_TYPE",
+      title = "Missing metric type in dashboard",
+      problem = "A question result is missing its metric_type field",
+      why_it_matters = "The dashboard cannot display metric information without knowing the metric type",
+      how_to_fix = c(
+        "Check that all trend calculator functions set metric_type in their results",
+        "Verify question_mapper.R maps question types to valid calculators",
+        "Look for questions where the trend calculation may have failed silently"
+      ),
+      details = list(
+        metric_type_value = metric_type,
+        metric_type_class = class(metric_type),
+        metric_type_length = length(metric_type)
+      )
+    )
+  }
+
   type_lower <- tolower(metric_type)
   switch(type_lower,
          "proportion" = "%",
@@ -108,7 +128,9 @@ format_metric_type_display <- function(metric_type) {
          "top2_box" = "T2B%",
          "top_box" = "TB%",
          "composite_enhanced" = "Index",
+         "composite" = "Index",
          "multi_mention" = "%",
+         "category_mentions" = "%",
          metric_type)
 }
 
@@ -177,6 +199,27 @@ format_change_value_display <- function(change, metric_type, decimal_places = 1)
 extract_primary_metric <- function(wave_result, metric_type) {
   if (is.null(wave_result) || !wave_result$available) return(NA)
 
+  # Guard against NULL/NA/empty metric_type
+  if (is.null(metric_type) || length(metric_type) == 0 || is.na(metric_type) || !nzchar(trimws(metric_type))) {
+    tracker_refuse(
+      code = "DATA_MISSING_METRIC_TYPE",
+      title = "Missing metric type when extracting metric value",
+      problem = "Cannot extract primary metric because metric_type is NULL/NA/empty",
+      why_it_matters = "The system cannot determine which metric value to extract without a metric type",
+      how_to_fix = c(
+        "Check that all trend calculator functions set metric_type in their results",
+        "Verify question_mapper.R maps question types to valid calculators",
+        "Look for questions where the trend calculation may have failed silently"
+      ),
+      details = list(
+        metric_type_value = metric_type,
+        metric_type_class = class(metric_type),
+        metric_type_length = length(metric_type),
+        wave_result_names = names(wave_result)
+      )
+    )
+  }
+
   type_lower <- tolower(metric_type)
 
   result <- switch(type_lower,
@@ -200,10 +243,17 @@ extract_primary_metric <- function(wave_result, metric_type) {
            if (!is.null(wave_result$top_box_pct)) wave_result$top_box_pct else NA
          },
          "composite_enhanced" = wave_result$mean,
+         "composite" = wave_result$mean,
          "multi_mention" = {
            # For multi-mention, extract first item proportion
            if (!is.null(wave_result$item_proportions) && length(wave_result$item_proportions) > 0) {
              wave_result$item_proportions[1] * 100
+           } else NA
+         },
+         "category_mentions" = {
+           # For category mentions, extract first category proportion
+           if (!is.null(wave_result$category_proportions) && length(wave_result$category_proportions) > 0) {
+             wave_result$category_proportions[1] * 100
            } else NA
          },
          wave_result$mean)  # default to mean

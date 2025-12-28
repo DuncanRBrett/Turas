@@ -56,13 +56,22 @@ perform_significance_tests_means <- function(wave_results, wave_ids, config) {
     current <- wave_results[[wave_id]]
     previous <- wave_results[[prev_wave_id]]
 
-    # Get effective N (or fall back to n_unweighted if eff_n not available)
-    current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else current$n_unweighted
-    previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else previous$n_unweighted
+    # Guard: Check if both waves are available before accessing metrics
+    if (!isTRUE(current$available) || !isTRUE(previous$available)) {
+      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- list(
+        significant = FALSE,
+        reason = "insufficient_base_or_unavailable"
+      )
+      next
+    }
 
-    # Check if both available and have sufficient base (using effective N)
-    if (current$available && previous$available &&
-        current_eff_n >= min_base && previous_eff_n >= min_base) {
+    # Get effective N (or fall back to n_unweighted if eff_n not available)
+    # Guard against NULL by defaulting to 0
+    current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else if (!is.null(current$n_unweighted)) current$n_unweighted else 0
+    previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else if (!is.null(previous$n_unweighted)) previous$n_unweighted else 0
+
+    # Check if both have sufficient base (using effective N)
+    if (current_eff_n >= min_base && previous_eff_n >= min_base) {
 
       # Two-sample t-test for means (using effective N)
       # SHARED CODE NOTE: Extract to shared/significance_tests.R::t_test_means()
@@ -113,12 +122,21 @@ perform_significance_tests_proportions <- function(wave_results, wave_ids, confi
     current <- wave_results[[wave_id]]
     previous <- wave_results[[prev_wave_id]]
 
-    # Get effective N (or fall back to n_unweighted if eff_n not available)
-    current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else current$n_unweighted
-    previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else previous$n_unweighted
+    # Guard: Check if both waves are available before accessing metrics
+    if (!isTRUE(current$available) || !isTRUE(previous$available)) {
+      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- list(
+        significant = FALSE,
+        reason = "insufficient_base_or_unavailable"
+      )
+      next
+    }
 
-    if (current$available && previous$available &&
-        current_eff_n >= min_base && previous_eff_n >= min_base) {
+    # Get effective N (or fall back to n_unweighted if eff_n not available)
+    # Guard against NULL by defaulting to 0
+    current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else if (!is.null(current$n_unweighted)) current$n_unweighted else 0
+    previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else if (!is.null(previous$n_unweighted)) previous$n_unweighted else 0
+
+    if (current_eff_n >= min_base && previous_eff_n >= min_base) {
 
       # Get proportions for this response code
       response_code_str <- as.character(response_code)
@@ -183,12 +201,21 @@ perform_significance_tests_nps <- function(wave_results, wave_ids, config) {
     current <- wave_results[[wave_id]]
     previous <- wave_results[[prev_wave_id]]
 
-    # Get effective N (or fall back to n_unweighted if eff_n not available)
-    current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else current$n_unweighted
-    previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else previous$n_unweighted
+    # Guard: Check if both waves are available before accessing metrics
+    if (!isTRUE(current$available) || !isTRUE(previous$available)) {
+      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- list(
+        significant = FALSE,
+        reason = "insufficient_base_or_unavailable"
+      )
+      next
+    }
 
-    if (current$available && previous$available &&
-        current_eff_n >= min_base && previous_eff_n >= min_base) {
+    # Get effective N (or fall back to n_unweighted if eff_n not available)
+    # Guard against NULL by defaulting to 0
+    current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else if (!is.null(current$n_unweighted)) current$n_unweighted else 0
+    previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else if (!is.null(previous$n_unweighted)) previous$n_unweighted else 0
+
+    if (current_eff_n >= min_base && previous_eff_n >= min_base) {
 
       # Calculate z-test for NPS difference
       # NPS is on -100 to +100 scale, convert to proportion scale (0-1)
@@ -245,8 +272,8 @@ perform_significance_tests_for_metric <- function(wave_results, wave_ids, metric
     current <- wave_results[[wave_id]]
     previous <- wave_results[[prev_wave_id]]
 
-    # Check availability
-    if (!current$available || !previous$available) {
+    # Guard: Check availability using isTRUE to handle NA/NULL safely
+    if (!isTRUE(current$available) || !isTRUE(previous$available)) {
       sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
       next
     }
@@ -261,8 +288,9 @@ perform_significance_tests_for_metric <- function(wave_results, wave_ids, metric
     }
 
     # Get effective N (or fall back to n_unweighted if eff_n not available)
-    current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else current$n_unweighted
-    previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else previous$n_unweighted
+    # Guard against NULL by defaulting to 0
+    current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else if (!is.null(current$n_unweighted)) current$n_unweighted else 0
+    previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else if (!is.null(previous$n_unweighted)) previous$n_unweighted else 0
 
     # Perform test based on type
     if (test_type == "proportion") {
@@ -303,7 +331,8 @@ perform_significance_tests_multi_mention <- function(wave_results, wave_ids, col
     current <- wave_results[[wave_id]]
     previous <- wave_results[[prev_wave_id]]
 
-    if (!current$available || !previous$available) {
+    # Guard: Check availability using isTRUE to handle NA/NULL safely
+    if (!isTRUE(current$available) || !isTRUE(previous$available)) {
       sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
       next
     }
@@ -317,8 +346,9 @@ perform_significance_tests_multi_mention <- function(wave_results, wave_ids, col
     }
 
     # Get effective N (or fall back to n_unweighted if eff_n not available)
-    current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else current$n_unweighted
-    previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else previous$n_unweighted
+    # Guard against NULL by defaulting to 0
+    current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else if (!is.null(current$n_unweighted)) current$n_unweighted else 0
+    previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else if (!is.null(previous$n_unweighted)) previous$n_unweighted else 0
 
     # Convert percentages to proportions
     p1 <- previous_val / 100
@@ -347,7 +377,8 @@ perform_significance_tests_multi_mention_metric <- function(wave_results, wave_i
     current <- wave_results[[wave_id]]
     previous <- wave_results[[prev_wave_id]]
 
-    if (!current$available || !previous$available) {
+    # Guard: Check availability using isTRUE to handle NA/NULL safely
+    if (!isTRUE(current$available) || !isTRUE(previous$available)) {
       sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
       next
     }
@@ -361,8 +392,9 @@ perform_significance_tests_multi_mention_metric <- function(wave_results, wave_i
     }
 
     # Get effective N (or fall back to n_unweighted if eff_n not available)
-    current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else current$n_unweighted
-    previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else previous$n_unweighted
+    # Guard against NULL by defaulting to 0
+    current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else if (!is.null(current$n_unweighted)) current$n_unweighted else 0
+    previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else if (!is.null(previous$n_unweighted)) previous$n_unweighted else 0
 
     # For "any" metric, use z-test for proportions (using effective N)
     # For "count_mean", use t-test (but need raw values - skip for now)

@@ -159,6 +159,7 @@ tryCatch({
 .safe_source("wave_loader.R")
 .safe_source("question_mapper.R")
 .safe_source("validation_tracker.R")
+.safe_source("statistical_core.R")  # Core statistical tests - must load before trend_calculator.R
 .safe_source("trend_calculator.R")
 .safe_source("banner_trends.R")
 .safe_source("formatting_utils.R")

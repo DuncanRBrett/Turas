@@ -305,7 +305,16 @@ calculate_trend_for_segment <- function(q_code, question_map, wave_data, config,
       NULL
     }
   }, error = function(e) {
-    warning(paste0("  Error calculating trend for ", q_code, " in segment ", segment_name, ": ", e$message))
+    # Enhanced error reporting with stack trace
+    error_msg <- paste0("  Error calculating trend for ", q_code, " in segment ", segment_name, ": ", e$message)
+    if (!is.null(e$call)) {
+      error_msg <- paste0(error_msg, "\n  Call: ", deparse(e$call)[1])
+    }
+    warning(error_msg)
+    # Print traceback for debugging
+    traceback_lines <- sys.calls()
+    cat("\n  TRACEBACK:\n")
+    print(traceback_lines)
     NULL
   })
 
