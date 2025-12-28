@@ -66,6 +66,9 @@ if (!exists("script_dir")) {
   script_dir <- tryCatch({
     dirname(sys.frame(1)$ofile)
   }, error = function(e) getwd())
+  if (is.null(script_dir) || is.na(script_dir) || length(script_dir) == 0) {
+    script_dir <- getwd()
+  }
 }
 
 # Source modular utilities

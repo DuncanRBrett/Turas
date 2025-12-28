@@ -18,8 +18,14 @@
 
 # Source type utilities for safe_logical
 if (!exists("safe_logical")) {
-  script_dir <- if (exists("script_dir")) script_dir else dirname(sys.frame(1)$ofile)
-  if (is.null(script_dir) || is.na(script_dir)) script_dir <- getwd()
+  if (!exists("script_dir")) {
+    script_dir <- tryCatch({
+      dirname(sys.frame(1)$ofile)
+    }, error = function(e) getwd())
+    if (is.null(script_dir) || is.na(script_dir) || length(script_dir) == 0) {
+      script_dir <- getwd()
+    }
+  }
   source(file.path(script_dir, "type_utils.R"))
 }
 
