@@ -48,6 +48,13 @@ detect_outcome_type <- function(outcome_var, order_spec = NULL, override_type = 
       type <- "nominal"
     }
 
+    # Use order_spec if provided for ordinal; otherwise sort alphabetically
+    cat_order <- if (!is.null(order_spec) && type == "ordinal") {
+      order_spec
+    } else {
+      sort(as.character(categories))
+    }
+
     return(list(
       type = type,
       method = switch(type,
@@ -56,7 +63,7 @@ detect_outcome_type <- function(outcome_var, order_spec = NULL, override_type = 
         nominal = "multinomial_logistic"
       ),
       n_categories = n_unique,
-      categories = sort(as.character(categories)),
+      categories = cat_order,
       is_ordered = type == "ordinal"
     ))
   }
@@ -487,8 +494,10 @@ prepare_predictors <- function(data, config) {
       }
 
     } else if (pred_type$type == "ordinal") {
-      # Ordered factor - but use TREATMENT contrasts (not polynomial)
-      # This keeps coefficients level-based and mappable for Factor Patterns output
+      # Ordinal predictor - use UNORDERED factor with levels in semantic order
+      # CRITICAL: Do NOT use ordered=TRUE for predictors passed to ordinal::clm
+      # because clm handles ordered factors differently, causing sign inversions.
+      # Instead, create unordered factor with levels in the correct order.
       if (!is.null(order_spec) && length(order_spec) > 0) {
         # =======================================================================
         # HARD VALIDATION: Refuse if config levels don't match data levels
@@ -526,9 +535,20 @@ prepare_predictors <- function(data, config) {
           )
         }
 
-        var_data <- factor(var_data, levels = order_spec, ordered = TRUE)
+        # CRITICAL FIX: Use ordered = FALSE for ordinal PREDICTORS
+        # =========================================================
+        # ordinal::clm internally handles ordered factors differently than
+        # regular factors, which can cause coefficient sign inversions even
+        # when treatment contrasts are explicitly set. By creating an unordered
+        # factor with levels in the specified order, we get:
+        # 1. Levels remain in correct semantic order (D < C < B < A)
+        # 2. Treatment contrasts work as expected
+        # 3. clm() treats it as a regular categorical predictor
+        # 4. Coefficients have correct sign (OR > 1 when higher levels
+        #    have higher outcome probability)
+        var_data <- factor(var_data, levels = order_spec, ordered = FALSE)
       } else {
-        var_data <- factor(var_data, ordered = TRUE)
+        var_data <- factor(var_data, ordered = FALSE)
       }
 
       # CRITICAL: Override default polynomial contrasts with treatment contrasts

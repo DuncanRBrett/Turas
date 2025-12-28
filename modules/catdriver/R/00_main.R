@@ -109,6 +109,8 @@ tryCatch({
 #' @param data_file Optional override for data file path
 #' @param output_file Optional override for output file path
 #' @param outcome_type Optional override: "binary", "ordinal", or "multinomial"
+#' @param progress_callback Optional callback function for GUI progress updates.
+#'   Function should accept (value, message) where value is 0-1 progress.
 #'
 #' @return List containing:
 #'   - model_result: Fitted regression model and statistics
@@ -129,7 +131,8 @@ tryCatch({
 run_categorical_keydriver <- function(config_file,
                                       data_file = NULL,
                                       output_file = NULL,
-                                      outcome_type = NULL) {
+                                      outcome_type = NULL,
+                                      progress_callback = NULL) {
 
   # ==========================================================================
   # TOP-LEVEL REFUSAL HANDLER (TRS v1.0)
@@ -139,7 +142,7 @@ run_categorical_keydriver <- function(config_file,
   # consistent handling per TRS v1.0 requirements.
 
   with_refusal_handler(
-    run_categorical_keydriver_impl(config_file, data_file, output_file, outcome_type)
+    run_categorical_keydriver_impl(config_file, data_file, output_file, outcome_type, progress_callback)
   )
 }
 
@@ -150,11 +153,19 @@ run_categorical_keydriver <- function(config_file,
 run_categorical_keydriver_impl <- function(config_file,
                                            data_file = NULL,
                                            output_file = NULL,
-                                           outcome_type = NULL) {
+                                           outcome_type = NULL,
+                                           progress_callback = NULL) {
 
   # ==========================================================================
   # TRS RUN STATE INITIALIZATION (TRS v1.0)
   # ==========================================================================
+
+  # Helper function for progress updates (11 steps total)
+  update_progress <- function(step, message) {
+    if (!is.null(progress_callback) && is.function(progress_callback)) {
+      progress_callback(step / 11, message)
+    }
+  }
 
   # Create TRS run state for tracking events
   trs_state <- if (exists("turas_run_state_new", mode = "function")) {
@@ -183,6 +194,7 @@ run_categorical_keydriver_impl <- function(config_file,
   # STEP 1: LOAD CONFIGURATION
   # ==========================================================================
 
+  update_progress(1, "Loading configuration...")
   log_section(1, "Loading configuration...")
 
   config <- load_catdriver_config(config_file)
@@ -247,6 +259,7 @@ run_categorical_keydriver_impl <- function(config_file,
   # STEP 2: LOAD DATA
   # ==========================================================================
 
+  update_progress(2, "Loading data...")
   log_section(2, "Loading data...")
 
   data <- load_catdriver_data(config$data_file, config)
@@ -257,6 +270,7 @@ run_categorical_keydriver_impl <- function(config_file,
   # STEP 3: RUN PRE-ANALYSIS GUARDS
   # ==========================================================================
 
+  update_progress(3, "Validating configuration and data...")
   log_section(3, "Validating configuration and data...")
 
   # Run guard validations (will hard error if critical issues)
@@ -284,6 +298,7 @@ run_categorical_keydriver_impl <- function(config_file,
   # STEP 4: HANDLE MISSING DATA
   # ==========================================================================
 
+  update_progress(4, "Handling missing data...")
   log_section(4, "Handling missing data...")
 
   missing_result <- handle_missing_data(data, config)
@@ -299,6 +314,7 @@ run_categorical_keydriver_impl <- function(config_file,
   # STEP 5: APPLY RARE LEVEL POLICY
   # ==========================================================================
 
+  update_progress(5, "Applying rare level policy...")
   log_section(5, "Applying rare level policy...")
 
   rare_result <- apply_rare_level_policy(data, config)
@@ -334,6 +350,7 @@ run_categorical_keydriver_impl <- function(config_file,
   # STEP 6: PREPROCESS DATA
   # ==========================================================================
 
+  update_progress(6, "Preparing data for analysis...")
   log_section(6, "Preparing data for analysis...")
 
   # Prepare weights
@@ -362,6 +379,7 @@ run_categorical_keydriver_impl <- function(config_file,
   # STEP 7: FIT MODEL
   # ==========================================================================
 
+  update_progress(7, "Fitting regression model...")
   log_section(7, "Fitting regression model...")
 
   method_label <- switch(prep_data$outcome_info$type,
@@ -414,6 +432,7 @@ run_categorical_keydriver_impl <- function(config_file,
   # STEP 8: POST-MODEL GUARDS
   # ==========================================================================
 
+  update_progress(8, "Running post-model validations...")
   log_section(8, "Running post-model validations...")
 
   guard <- guard_post_model(guard, prep_data, model_result, config)
@@ -446,6 +465,7 @@ run_categorical_keydriver_impl <- function(config_file,
   # STEP 9: CALCULATE IMPORTANCE
   # ==========================================================================
 
+  update_progress(9, "Calculating variable importance...")
   log_section(9, "Calculating variable importance...")
 
   importance <- calculate_importance(model_result, config)
@@ -470,6 +490,7 @@ run_categorical_keydriver_impl <- function(config_file,
   # STEP 10: EXTRACT DETAILED RESULTS
   # ==========================================================================
 
+  update_progress(10, "Extracting detailed results...")
   log_section(10, "Extracting detailed results...")
 
   # Create term-level mapping (REQUIRED - no legacy fallback)
@@ -539,33 +560,11 @@ run_categorical_keydriver_impl <- function(config_file,
   # STEP 11: GENERATE OUTPUT
   # ==========================================================================
 
+  update_progress(11, "Generating Excel output...")
   log_section(11, "Generating Excel output...")
 
-  # Compile all results
-  results <- list(
-    model_result = model_result,
-    importance = importance,
-    odds_ratios = odds_ratios,
-    probability_lift = prob_lift,
-    factor_patterns = factor_patterns,
-    prep_data = prep_data,
-    term_mapping = term_mapping,
-    missing_report = missing_result$missing_report,
-    collapse_report = rare_result$collapse_report,
-    diagnostics = diagnostics,
-    guard = guard,
-    guard_summary = guard_status,
-    multicollinearity = vif_check,
-    config = config
-  )
-
-  # Write Excel output
-  write_catdriver_output(results, config, config$output_file)
-
-  log_message(paste("Output saved to:", basename(config$output_file)), "success")
-
   # ==========================================================================
-  # DETERMINE FINAL STATUS (TRS v1.0)
+  # DETERMINE FINAL STATUS (TRS v1.0) - Must happen BEFORE output generation
   # ==========================================================================
 
   # Deduplicate degraded reasons
@@ -585,12 +584,34 @@ run_categorical_keydriver_impl <- function(config_file,
     status <- trs_status_pass(module = "CATDRIVER")
   }
 
-  # Add status to results
-  results$run_status <- run_status
-  results$status <- status
-  results$degraded <- length(degraded_reasons) > 0
-  results$degraded_reasons <- degraded_reasons
-  results$affected_outputs <- affected_outputs
+  # Compile all results (including status for Run_Status sheet)
+  results <- list(
+    model_result = model_result,
+    importance = importance,
+    odds_ratios = odds_ratios,
+    probability_lift = prob_lift,
+    factor_patterns = factor_patterns,
+    prep_data = prep_data,
+    term_mapping = term_mapping,
+    missing_report = missing_result$missing_report,
+    collapse_report = rare_result$collapse_report,
+    diagnostics = diagnostics,
+    guard = guard,
+    guard_summary = guard_status,
+    multicollinearity = vif_check,
+    config = config,
+    # TRS v1.0: Include status fields for Run_Status sheet
+    run_status = run_status,
+    status = status,
+    degraded = length(degraded_reasons) > 0,
+    degraded_reasons = degraded_reasons,
+    affected_outputs = affected_outputs
+  )
+
+  # Write Excel output
+  write_catdriver_output(results, config, config$output_file)
+
+  log_message(paste("Output saved to:", basename(config$output_file)), "success")
 
   # ==========================================================================
   # COMPLETION

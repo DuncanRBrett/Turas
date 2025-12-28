@@ -407,59 +407,79 @@ run_catdriver_gui <- function() {
       # Capture output
       output_text <- ""
 
-      tryCatch({
-        # Get Turas root
-        turas_root <- getwd()
-        if (basename(turas_root) != "Turas") {
-          turas_root <- dirname(turas_root)
-        }
+      # Use withProgress for visual progress bar
+      withProgress(message = "Running Key Driver Analysis", value = 0, {
 
-        # Source module files in correct order
-        output_text <- paste0(output_text, "Loading Categorical Key Driver module...\n\n")
-        console_text(output_text)
+        tryCatch({
+          # Get Turas root
+          turas_root <- getwd()
+          if (basename(turas_root) != "Turas") {
+            turas_root <- dirname(turas_root)
+          }
 
-        # 1. Source shared TRS infrastructure first (required by guard files)
-        source(file.path(turas_root, "modules/shared/lib/import_all.R"))
+          # Source module files in correct order
+          output_text <- paste0(output_text, "Loading Categorical Key Driver module...\n\n")
+          console_text(output_text)
+          setProgress(value = 0.05, detail = "Loading modules...")
 
-        # 2. Source CatDriver modules in dependency order
-        source(file.path(turas_root, "modules/catdriver/R/07_utilities.R"))
-        source(file.path(turas_root, "modules/catdriver/R/08_guard.R"))
-        source(file.path(turas_root, "modules/catdriver/R/08a_guards_hard.R"))
-        source(file.path(turas_root, "modules/catdriver/R/08b_guards_soft.R"))
-        source(file.path(turas_root, "modules/catdriver/R/01_config.R"))
-        source(file.path(turas_root, "modules/catdriver/R/02_validation.R"))
-        source(file.path(turas_root, "modules/catdriver/R/03_preprocessing.R"))
-        source(file.path(turas_root, "modules/catdriver/R/09_mapper.R"))
-        source(file.path(turas_root, "modules/catdriver/R/10_missing.R"))
-        source(file.path(turas_root, "modules/catdriver/R/04_analysis.R"))
-        source(file.path(turas_root, "modules/catdriver/R/04a_ordinal.R"))
-        source(file.path(turas_root, "modules/catdriver/R/04b_multinomial.R"))
-        source(file.path(turas_root, "modules/catdriver/R/05_importance.R"))
-        source(file.path(turas_root, "modules/catdriver/R/06a_sheets_summary.R"))
-        source(file.path(turas_root, "modules/catdriver/R/06b_sheets_detail.R"))
-        source(file.path(turas_root, "modules/catdriver/R/06_output.R"))
-        source(file.path(turas_root, "modules/catdriver/R/00_main.R"))
+          # 1. Source shared TRS infrastructure first (required by guard files)
+          source(file.path(turas_root, "modules/shared/lib/import_all.R"))
 
-        # Capture ALL analysis output (stdout, warnings, messages) - TRS v1.0 compliance
-        captured <- capture_console_all({
-          results <- run_categorical_keydriver(
-            config_file = files$config_file
-          )
+          # 2. Source CatDriver modules in dependency order
+          source(file.path(turas_root, "modules/catdriver/R/07_utilities.R"))
+          source(file.path(turas_root, "modules/catdriver/R/08_guard.R"))
+          source(file.path(turas_root, "modules/catdriver/R/08a_guards_hard.R"))
+          source(file.path(turas_root, "modules/catdriver/R/08b_guards_soft.R"))
+          source(file.path(turas_root, "modules/catdriver/R/01_config.R"))
+          source(file.path(turas_root, "modules/catdriver/R/02_validation.R"))
+          source(file.path(turas_root, "modules/catdriver/R/03_preprocessing.R"))
+          source(file.path(turas_root, "modules/catdriver/R/09_mapper.R"))
+          source(file.path(turas_root, "modules/catdriver/R/10_missing.R"))
+          source(file.path(turas_root, "modules/catdriver/R/04_analysis.R"))
+          source(file.path(turas_root, "modules/catdriver/R/04a_ordinal.R"))
+          source(file.path(turas_root, "modules/catdriver/R/04b_multinomial.R"))
+          source(file.path(turas_root, "modules/catdriver/R/05_importance.R"))
+          source(file.path(turas_root, "modules/catdriver/R/06a_sheets_summary.R"))
+          source(file.path(turas_root, "modules/catdriver/R/06b_sheets_detail.R"))
+          source(file.path(turas_root, "modules/catdriver/R/06_output.R"))
+          source(file.path(turas_root, "modules/catdriver/R/00_main.R"))
+
+          setProgress(value = 0.1, detail = "Starting analysis...")
+
+          # Create progress callback for run_categorical_keydriver
+          progress_callback <- function(value, message) {
+            # Scale progress: 0.1-0.95 for analysis steps (leaving room for loading/finishing)
+            scaled_value <- 0.1 + (value * 0.85)
+            setProgress(value = scaled_value, detail = message)
+          }
+
+          # Capture ALL analysis output (stdout, warnings, messages) - TRS v1.0 compliance
+          captured <- capture_console_all({
+            results <- run_categorical_keydriver(
+              config_file = files$config_file,
+              progress_callback = progress_callback
+            )
+          })
+
+          setProgress(value = 0.98, detail = "Finalizing...")
+
+          output_text <- paste0(output_text, paste(captured$combined_output, collapse = "\n"))
+
+          if (captured$has_error) {
+            output_text <- paste0(output_text, "\n\n\u2717 Analysis failed - see error above")
+          } else if (captured$has_warnings) {
+            output_text <- paste0(output_text, "\n\n\u26a0 Analysis complete with warnings - review above")
+          } else {
+            output_text <- paste0(output_text, "\n\n\u2713 Analysis complete!")
+          }
+
+          setProgress(value = 1, detail = "Done!")
+
+        }, error = function(e) {
+          output_text <<- paste0(output_text, "\n\n\u2717 Error: ", e$message)
         })
 
-        output_text <- paste0(output_text, paste(captured$combined_output, collapse = "\n"))
-
-        if (captured$has_error) {
-          output_text <- paste0(output_text, "\n\n\u2717 Analysis failed - see error above")
-        } else if (captured$has_warnings) {
-          output_text <- paste0(output_text, "\n\n\u26a0 Analysis complete with warnings - review above")
-        } else {
-          output_text <- paste0(output_text, "\n\n\u2713 Analysis complete!")
-        }
-
-      }, error = function(e) {
-        output_text <<- paste0(output_text, "\n\n\u2717 Error: ", e$message)
-      })
+      })  # End withProgress
 
       console_text(output_text)
       is_running(FALSE)
