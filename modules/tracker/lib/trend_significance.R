@@ -26,6 +26,11 @@
 #' for design effects from weighting. This provides more accurate p-values when
 #' weights vary substantially across respondents.
 #'
+#' COMPATIBILITY: Handles both old structure (mean/sd at top level) and
+#' enhanced structure (mean/sd inside metrics sub-list) to support both
+#' legacy calculate_rating_trend and new calculate_rating_trend_enhanced/
+#' calculate_composite_trend_enhanced functions.
+#'
 #' @param wave_results List of wave results indexed by wave ID
 #' @param wave_ids Vector of wave IDs in chronological order
 #' @param config Configuration list
@@ -50,17 +55,24 @@ perform_significance_tests_means <- function(wave_results, wave_ids, config) {
     current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else current$n_unweighted
     previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else previous$n_unweighted
 
+    # Get mean and sd values - handle both old structure (mean/sd at top level)
+    # and enhanced structure (mean/sd inside metrics sub-list)
+    current_mean <- if (!is.null(current$mean)) current$mean else current$metrics$mean
+    current_sd <- if (!is.null(current$sd)) current$sd else current$metrics$sd
+    previous_mean <- if (!is.null(previous$mean)) previous$mean else previous$metrics$mean
+    previous_sd <- if (!is.null(previous$sd)) previous$sd else previous$metrics$sd
+
     # Check if both available and have sufficient base (using effective N)
     if (current$available && previous$available &&
         current_eff_n >= min_base && previous_eff_n >= min_base) {
 
       # Two-sample t-test for means (using effective N)
       t_result <- t_test_for_means(
-        mean1 = previous$mean,
-        sd1 = previous$sd,
+        mean1 = previous_mean,
+        sd1 = previous_sd,
         n1 = previous_eff_n,
-        mean2 = current$mean,
-        sd2 = current$sd,
+        mean2 = current_mean,
+        sd2 = current_sd,
         n2 = current_eff_n,
         alpha = alpha
       )
