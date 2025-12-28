@@ -567,7 +567,8 @@ run_categorical_keydriver_impl <- function(config_file,
 
   # Bootstrap confidence intervals (optional)
   bootstrap_results <- NULL
-  if (isTRUE(config$bootstrap_ci) && prep_data$outcome_info$type != "multinomial") {
+  do_bootstrap <- as.logical(config$bootstrap_ci) %in% TRUE
+  if (do_bootstrap && prep_data$outcome_info$type != "multinomial") {
     log_message(paste0("Running bootstrap (", config$bootstrap_reps, " resamples)..."), "info")
     cat("   [INFO] Bootstrap may take 1-3 minutes\n")
 
