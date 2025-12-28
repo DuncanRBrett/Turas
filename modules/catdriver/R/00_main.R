@@ -592,21 +592,23 @@ run_categorical_keydriver_impl <- function(config_file,
       log_message(paste0("Bootstrap complete (", bootstrap_results$n_successful, "/",
                          bootstrap_results$n_boot, " successful)"), "success")
 
+      # Initialize bootstrap columns with NA
+      odds_ratios$boot_median_or <- NA_real_
+      odds_ratios$boot_ci_lower <- NA_real_
+      odds_ratios$boot_ci_upper <- NA_real_
+      odds_ratios$sign_stability <- NA_real_
+
       # Add bootstrap columns to odds_ratios
       for (i in seq_len(nrow(odds_ratios))) {
         term <- odds_ratios$term[i]
-        if (term %in% bootstrap_results$term) {
-          idx <- which(bootstrap_results$term == term)
+        idx <- which(bootstrap_results$term == term)
+        if (length(idx) == 1) {
           odds_ratios$boot_median_or[i] <- bootstrap_results$median_or[idx]
           odds_ratios$boot_ci_lower[i] <- bootstrap_results$ci_lower[idx]
           odds_ratios$boot_ci_upper[i] <- bootstrap_results$ci_upper[idx]
           odds_ratios$sign_stability[i] <- bootstrap_results$sign_consistency[idx]
-        } else {
-          odds_ratios$boot_median_or[i] <- NA
-          odds_ratios$boot_ci_lower[i] <- NA
-          odds_ratios$boot_ci_upper[i] <- NA
-          odds_ratios$sign_stability[i] <- NA
         }
+        # If idx is empty or multiple matches, leave as NA (already initialized)
       }
     }
   }
