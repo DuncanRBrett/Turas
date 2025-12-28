@@ -26,7 +26,7 @@ if (!exists("safe_logical")) {
       script_dir <- getwd()
     }
   }
-  source(file.path(script_dir, "type_utils.R"))
+  source(file.path(script_dir, "type_utils.R"), local = FALSE)
 }
 
 # ==============================================================================
