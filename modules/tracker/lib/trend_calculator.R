@@ -294,22 +294,18 @@ calculate_trends_sequential <- function(tracked_questions, question_map, wave_da
       q_code, q_type, q_type_raw, question_map, wave_data, config, skipped_questions
     )
 
-    # Debug: Check what we got back - write to log file too
+    # Debug: Check what we got back - use the global debug function if available
     debug_msg <- paste0(
-      "  [CALC DEBUG] q_code=", q_code,
-      " q_type_raw=", q_type_raw,
-      " q_type=", q_type,
+      "[CALC] q_code=", q_code,
+      " type=", q_type_raw, "->", q_type,
       " result=", if (is.null(trend_result)) "NULL" else paste0("list(", length(names(trend_result)), ")"),
       " metric_type=", if (!is.null(trend_result$metric_type)) trend_result$metric_type else "NULL"
     )
     cat(debug_msg, "\n")
-    # Also write to debug log file
-    tryCatch({
-      log_path <- file.path(getwd(), "..", "..", "tracker_gui_debug.log")
-      if (file.exists(log_path)) {
-        cat(format(Sys.time(), "%H:%M:%S"), debug_msg, "\n", file = log_path, append = TRUE)
-      }
-    }, error = function(e) NULL)
+    # Use the global debug log function from run_tracker.R if available
+    if (exists(".write_tracker_debug", mode = "function")) {
+      .write_tracker_debug(debug_msg)
+    }
 
     # Handle skipped questions (returned as list with $skipped)
     if (is.list(trend_result) && !is.null(trend_result$skipped)) {
