@@ -294,9 +294,21 @@ calculate_trends_sequential <- function(tracked_questions, question_map, wave_da
       q_code, q_type, q_type_raw, question_map, wave_data, config, skipped_questions
     )
 
+    # Debug: Check what we got back
+    cat(paste0("  Result: ", if (is.null(trend_result)) "NULL" else paste0("list with ", length(names(trend_result)), " elements"), "\n"))
+    if (!is.null(trend_result) && is.list(trend_result)) {
+      cat(paste0("  Elements: ", paste(names(trend_result), collapse=", "), "\n"))
+      if (!is.null(trend_result$metric_type)) {
+        cat(paste0("  metric_type: ", trend_result$metric_type, "\n"))
+      } else {
+        cat(paste0("  metric_type: NULL/missing\n"))
+      }
+    }
+
     # Handle skipped questions (returned as list with $skipped)
     if (is.list(trend_result) && !is.null(trend_result$skipped)) {
       skipped_questions[[q_code]] <- trend_result$skipped
+      cat(paste0("  SKIPPED: ", trend_result$skipped$reason, "\n"))
     } else if (!is.null(trend_result)) {
       trend_results[[q_code]] <- trend_result
       cat(paste0("  ✓ Trend calculated\n"))
