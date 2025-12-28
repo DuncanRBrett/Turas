@@ -985,9 +985,16 @@ get_banner_variable_label <- function(banner_info, banner_idx, banner_code) {
 }
 
 #' Find matching rows for banner category
+#' @param data Survey data frame
+#' @param banner_code Banner question code
+#' @param cat_name Category name (DisplayText for display)
+#' @param cat_options BoxCategory options to match (OptionText values)
+#' @param is_boxcategory Whether this is a box/category banner
+#' @param question_info Question information
+#' @param option_text OptionText value for matching (for standard banners)
 #' @keywords internal
 find_category_matches <- function(data, banner_code, cat_name, cat_options,
-                                 is_boxcategory, question_info) {
+                                 is_boxcategory, question_info, option_text = NULL) {
   if (is_boxcategory) {
     # BoxCategory banner
     if (question_info$Variable_Type == "Multi_Mention") {
@@ -996,16 +1003,20 @@ find_category_matches <- function(data, banner_code, cat_name, cat_options,
         banner_cols <- paste0(banner_code, "_", seq_len(num_cols))
         existing_cols <- banner_cols[banner_cols %in% names(data)]
 
-        matching_rows <- Reduce(`|`, lapply(existing_cols, function(col) {
-          Reduce(`|`, lapply(cat_options, function(opt) {
-            safe_equal(data[[col]], opt) & !is.na(data[[col]])
+        if (length(existing_cols) == 0 || is.null(cat_options) || length(cat_options) == 0) {
+          matching_rows <- rep(FALSE, nrow(data))
+        } else {
+          matching_rows <- Reduce(`|`, lapply(existing_cols, function(col) {
+            Reduce(`|`, lapply(cat_options, function(opt) {
+              safe_equal(data[[col]], opt) & !is.na(data[[col]])
+            }))
           }))
-        }))
+        }
       } else {
         matching_rows <- rep(FALSE, nrow(data))
       }
     } else {
-      if (banner_code %in% names(data)) {
+      if (banner_code %in% names(data) && !is.null(cat_options) && length(cat_options) > 0) {
         matching_rows <- Reduce(`|`, lapply(cat_options, function(opt) {
           safe_equal(data[[banner_code]], opt) & !is.na(data[[banner_code]])
         }))
@@ -1014,9 +1025,16 @@ find_category_matches <- function(data, banner_code, cat_name, cat_options,
       }
     }
   } else {
-    # Standard banner
+    # Standard banner - use option_text (OptionText from survey structure) for matching
+    # V10.1 FIX: Previously used cat_name (DisplayText) which doesn't match data values
+    match_value <- if (!is.null(option_text) && nchar(trimws(option_text)) > 0) {
+      option_text
+    } else {
+      cat_name  # Fallback to cat_name if option_text not provided
+    }
+
     if (banner_code %in% names(data)) {
-      matching_rows <- safe_equal(data[[banner_code]], cat_name) &
+      matching_rows <- safe_equal(data[[banner_code]], match_value) &
                       !is.na(data[[banner_code]])
     } else {
       matching_rows <- rep(FALSE, nrow(data))
@@ -1119,10 +1137,21 @@ create_sample_composition_sheet <- function(wb, data, banner_info, master_weight
           NULL
         }
 
+        # V10.1 FIX: Get OptionText for standard banner matching
+        # DisplayText is used for display, but data contains OptionText values
+        option_text <- NULL
+        if (!banner_data$is_boxcategory && !is.null(banner_data$options)) {
+          # Find the option matching this display text
+          opt_idx <- which(banner_data$options$DisplayText == cat_name)
+          if (length(opt_idx) > 0) {
+            option_text <- banner_data$options$OptionText[opt_idx[1]]
+          }
+        }
+
         # Find matching rows (delegated to helper)
         row_idx <- find_category_matches(
           data, banner_code, cat_name, cat_options,
-          banner_data$is_boxcategory, question_info
+          banner_data$is_boxcategory, question_info, option_text
         )
 
         # Calculate composition stats (delegated to helper)

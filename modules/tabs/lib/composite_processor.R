@@ -668,9 +668,53 @@ test_composite_significance <- function(data, composite_code, source_questions,
     for (j in (i + 1):length(internal_keys)) {
       key_b <- internal_keys[j]
 
-      # Get subsets
+      # Get subsets - handle NULL subsets like main calculation does
       idx_a <- banner_info$subsets[[key_a]]
       idx_b <- banner_info$subsets[[key_b]]
+
+      # Handle NULL subsets (same logic as main composite calculation)
+      if (is.null(idx_a) || length(idx_a) == 0) {
+        if (grepl("^TOTAL::", key_a)) {
+          idx_a <- 1:nrow(data)
+        } else {
+          key_parts_a <- strsplit(key_a, "::")[[1]]
+          if (length(key_parts_a) >= 2) {
+            banner_question_a <- key_parts_a[1]
+            banner_value_a <- key_parts_a[length(key_parts_a)]
+            if (banner_question_a %in% names(data)) {
+              idx_a <- which(as.character(data[[banner_question_a]]) == banner_value_a)
+            } else {
+              idx_a <- integer(0)
+            }
+          } else {
+            idx_a <- 1:nrow(data)
+          }
+        }
+      }
+
+      if (is.null(idx_b) || length(idx_b) == 0) {
+        if (grepl("^TOTAL::", key_b)) {
+          idx_b <- 1:nrow(data)
+        } else {
+          key_parts_b <- strsplit(key_b, "::")[[1]]
+          if (length(key_parts_b) >= 2) {
+            banner_question_b <- key_parts_b[1]
+            banner_value_b <- key_parts_b[length(key_parts_b)]
+            if (banner_question_b %in% names(data)) {
+              idx_b <- which(as.character(data[[banner_question_b]]) == banner_value_b)
+            } else {
+              idx_b <- integer(0)
+            }
+          } else {
+            idx_b <- 1:nrow(data)
+          }
+        }
+      }
+
+      # Skip comparison if either subset is empty
+      if (length(idx_a) == 0 || length(idx_b) == 0) {
+        next
+      }
 
       data_a <- data[idx_a, ]
       data_b <- data[idx_b, ]
