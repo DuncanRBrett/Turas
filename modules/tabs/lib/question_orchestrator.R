@@ -537,8 +537,8 @@ process_all_questions <- function(questions_to_process, survey_data,
                        current_question_code, processing_start)
     }
 
-    # Memory check every 10 questions
-    if (q_idx %% 10 == 0) {
+    # Memory check every 20 questions (V10.1: reduced frequency for better performance)
+    if (q_idx %% 20 == 0) {
       check_memory(force_gc = TRUE)
     }
 
