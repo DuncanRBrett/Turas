@@ -294,16 +294,22 @@ calculate_trends_sequential <- function(tracked_questions, question_map, wave_da
       q_code, q_type, q_type_raw, question_map, wave_data, config, skipped_questions
     )
 
-    # Debug: Check what we got back
-    cat(paste0("  Result: ", if (is.null(trend_result)) "NULL" else paste0("list with ", length(names(trend_result)), " elements"), "\n"))
-    if (!is.null(trend_result) && is.list(trend_result)) {
-      cat(paste0("  Elements: ", paste(names(trend_result), collapse=", "), "\n"))
-      if (!is.null(trend_result$metric_type)) {
-        cat(paste0("  metric_type: ", trend_result$metric_type, "\n"))
-      } else {
-        cat(paste0("  metric_type: NULL/missing\n"))
+    # Debug: Check what we got back - write to log file too
+    debug_msg <- paste0(
+      "  [CALC DEBUG] q_code=", q_code,
+      " q_type_raw=", q_type_raw,
+      " q_type=", q_type,
+      " result=", if (is.null(trend_result)) "NULL" else paste0("list(", length(names(trend_result)), ")"),
+      " metric_type=", if (!is.null(trend_result$metric_type)) trend_result$metric_type else "NULL"
+    )
+    cat(debug_msg, "\n")
+    # Also write to debug log file
+    tryCatch({
+      log_path <- file.path(getwd(), "..", "..", "tracker_gui_debug.log")
+      if (file.exists(log_path)) {
+        cat(format(Sys.time(), "%H:%M:%S"), debug_msg, "\n", file = log_path, append = TRUE)
       }
-    }
+    }, error = function(e) NULL)
 
     # Handle skipped questions (returned as list with $skipped)
     if (is.list(trend_result) && !is.null(trend_result$skipped)) {
