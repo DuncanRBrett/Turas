@@ -55,6 +55,26 @@ SUPPORTED_DATA_FORMATS <- c("xlsx", "xls", "csv", "sav")
 SUPPORTED_CONFIG_FORMATS <- c("xlsx", "xls")
 
 # ==============================================================================
+# SOURCE MODULAR UTILITIES (V10.0 REFACTORING)
+# ==============================================================================
+# V10.0: Refactored large shared_functions.R into focused utility modules
+# This section sources all modular utilities for better maintainability
+# ==============================================================================
+
+# Determine script directory
+if (!exists("script_dir")) {
+  script_dir <- tryCatch({
+    dirname(sys.frame(1)$ofile)
+  }, error = function(e) getwd())
+}
+
+# Source modular utilities
+source(file.path(script_dir, "type_utils.R"), local = FALSE)
+source(file.path(script_dir, "config_utils.R"), local = FALSE)
+source(file.path(script_dir, "logging_utils.R"), local = FALSE)
+source(file.path(script_dir, "excel_utils.R"), local = FALSE)
+
+# ==============================================================================
 # DEPENDENCY MANAGEMENT
 # ==============================================================================
 
