@@ -541,31 +541,8 @@ run_categorical_keydriver_impl <- function(config_file,
 
   log_section(11, "Generating Excel output...")
 
-  # Compile all results
-  results <- list(
-    model_result = model_result,
-    importance = importance,
-    odds_ratios = odds_ratios,
-    probability_lift = prob_lift,
-    factor_patterns = factor_patterns,
-    prep_data = prep_data,
-    term_mapping = term_mapping,
-    missing_report = missing_result$missing_report,
-    collapse_report = rare_result$collapse_report,
-    diagnostics = diagnostics,
-    guard = guard,
-    guard_summary = guard_status,
-    multicollinearity = vif_check,
-    config = config
-  )
-
-  # Write Excel output
-  write_catdriver_output(results, config, config$output_file)
-
-  log_message(paste("Output saved to:", basename(config$output_file)), "success")
-
   # ==========================================================================
-  # DETERMINE FINAL STATUS (TRS v1.0)
+  # DETERMINE FINAL STATUS (TRS v1.0) - Must happen BEFORE output generation
   # ==========================================================================
 
   # Deduplicate degraded reasons
@@ -585,12 +562,34 @@ run_categorical_keydriver_impl <- function(config_file,
     status <- trs_status_pass(module = "CATDRIVER")
   }
 
-  # Add status to results
-  results$run_status <- run_status
-  results$status <- status
-  results$degraded <- length(degraded_reasons) > 0
-  results$degraded_reasons <- degraded_reasons
-  results$affected_outputs <- affected_outputs
+  # Compile all results (including status for Run_Status sheet)
+  results <- list(
+    model_result = model_result,
+    importance = importance,
+    odds_ratios = odds_ratios,
+    probability_lift = prob_lift,
+    factor_patterns = factor_patterns,
+    prep_data = prep_data,
+    term_mapping = term_mapping,
+    missing_report = missing_result$missing_report,
+    collapse_report = rare_result$collapse_report,
+    diagnostics = diagnostics,
+    guard = guard,
+    guard_summary = guard_status,
+    multicollinearity = vif_check,
+    config = config,
+    # TRS v1.0: Include status fields for Run_Status sheet
+    run_status = run_status,
+    status = status,
+    degraded = length(degraded_reasons) > 0,
+    degraded_reasons = degraded_reasons,
+    affected_outputs = affected_outputs
+  )
+
+  # Write Excel output
+  write_catdriver_output(results, config, config$output_file)
+
+  log_message(paste("Output saved to:", basename(config$output_file)), "success")
 
   # ==========================================================================
   # COMPLETION
