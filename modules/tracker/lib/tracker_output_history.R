@@ -324,7 +324,12 @@ write_wave_history_sheet <- function(wb, sheet_name, trend_results, wave_ids, co
 extract_wave_history_metrics <- function(q_result) {
   metrics <- list()
 
+  # Guard against NULL/empty metric_type
   metric_type <- q_result$metric_type
+  if (is.null(metric_type) || length(metric_type) == 0 || !nzchar(metric_type)) {
+    warning(paste0("Question ", q_result$question_code, " has no metric_type, skipping wave history"))
+    return(metrics)  # Return empty list
+  }
 
   if (metric_type == "rating_enhanced" || metric_type == "composite_enhanced") {
     # Enhanced metrics - use tracking_specs
@@ -413,6 +418,11 @@ extract_wave_history_metrics <- function(q_result) {
 #'
 #' @keywords internal
 extract_metric_value <- function(wave_result, metric_key, question_metric_type) {
+
+  # Guard against NULL/empty metric_type
+  if (is.null(question_metric_type) || length(question_metric_type) == 0 || !nzchar(question_metric_type)) {
+    return(NA)
+  }
 
   # Handle enhanced metrics (stored in metrics list)
   if (question_metric_type == "rating_enhanced" || question_metric_type == "composite_enhanced") {
