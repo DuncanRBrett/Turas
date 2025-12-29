@@ -87,13 +87,18 @@ dispatch_proportion_ci <- function(p, n_eff, values, categories, weights,
   run_boot_flag <- q_row$Run_Bootstrap
   if (!is.null(run_boot_flag) && !is.na(run_boot_flag) && toupper(run_boot_flag) == "Y") {
     boot_iter <- as.integer(config$study_settings$Bootstrap_Iterations)
-    result$bootstrap <- bootstrap_proportion_ci(
-      data       = values,
-      categories = categories,
-      weights    = weights,
-      B          = boot_iter,
-      conf_level = conf_level
-    )
+    tryCatch({
+      result$bootstrap <- bootstrap_proportion_ci(
+        data       = values,
+        categories = categories,
+        weights    = weights,
+        B          = boot_iter,
+        conf_level = conf_level
+      )
+    }, error = function(e) {
+      warnings_list <<- c(warnings_list,
+        sprintf("Question %s: Bootstrap CI failed - %s", q_id, conditionMessage(e)))
+    })
   }
 
   # -------------------------------------------------------------------------
@@ -104,16 +109,27 @@ dispatch_proportion_ci <- function(p, n_eff, values, categories, weights,
     prior_mean <- if (!is.null(q_row$Prior_Mean) && !is.na(q_row$Prior_Mean)) q_row$Prior_Mean else NULL
     prior_n    <- if (!is.null(q_row$Prior_N) && !is.na(q_row$Prior_N)) q_row$Prior_N else NULL
 
-    # Use effective n for weighted data
-    n_bayes <- if (!is.null(weights)) n_eff else length(values)
+    # Validate prior_mean is in valid range for proportion (0-1)
+    if (!is.null(prior_mean) && (prior_mean < 0 || prior_mean > 1)) {
+      warnings_list <- c(warnings_list,
+        sprintf("Question %s: Prior_Mean=%.2f invalid for proportion (must be 0-1), Bayesian CI skipped", q_id, prior_mean))
+    } else {
+      # Use effective n for weighted data
+      n_bayes <- if (!is.null(weights)) n_eff else length(values)
 
-    result$bayesian <- credible_interval_proportion(
-      p          = p,
-      n          = n_bayes,
-      conf_level = conf_level,
-      prior_mean = prior_mean,
-      prior_n    = prior_n
-    )
+      tryCatch({
+        result$bayesian <- credible_interval_proportion(
+          p          = p,
+          n          = n_bayes,
+          conf_level = conf_level,
+          prior_mean = prior_mean,
+          prior_n    = prior_n
+        )
+      }, error = function(e) {
+        warnings_list <<- c(warnings_list,
+          sprintf("Question %s: Bayesian CI failed - %s", q_id, conditionMessage(e)))
+      })
+    }
   }
 
   result$warnings <- warnings_list
