@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Tracker - Technical Documentation
 
-**Version:** 10.0 **Last Updated:** 22 December 2025 **Target
+**Version:** 10.1 **Last Updated:** 28 December 2025 **Target
 Audience:** Developers, Technical Contributors, Module Maintainers
 
 ------------------------------------------------------------------------
@@ -22,6 +22,7 @@ Audience:** Developers, Technical Contributors, Module Maintainers
 7.  [Performance](#performance)
 8.  [Shared Code Strategy](#shared-code-strategy)
 9.  [Known Issues](#known-issues)
+10. [Recent Changes (v10.1)](#recent-changes-v101)
 
 ------------------------------------------------------------------------
 
@@ -60,7 +61,11 @@ shinyFiles (>= 0.9.0) # File selection in GUI
 
 ## Module Components {#module-components}
 
-### Core Modules (12 files)
+### Core Modules (16 files)
+
+**Note:** As of v10.1 (December 2025), the tracker module underwent a
+refactoring to extract shared functionality into dedicated modules. This
+improved code maintainability and reduced duplication.
 
 #### run_tracker.R (\~620 lines)
 
@@ -153,7 +158,7 @@ columns) - Question mapping (tracked questions exist, types valid) -
 Wave data (files loadable, weights valid) - Consistency (sample sizes,
 naming)
 
-#### trend_calculator.R (\~800 lines)
+#### trend_calculator.R (\~2,260 lines)
 
 **Purpose:** Calculate trends and statistical significance
 
@@ -171,12 +176,9 @@ calculate_multi_mention_trend(q_code, question_map, wave_data, config)
 calculate_composite_trend_enhanced(q_code, question_map, wave_data, config)
 ```
 
-**Statistical Testing:**
-
-``` r
-test_proportion_trend(p1, n1, p2, n2, alpha)  # Z-test
-test_mean_trend(mean1, sd1, n1, mean2, sd2, n2, alpha)  # T-test
-```
+**Dependencies:** Delegates statistical testing and change calculations to
+extracted modules (trend_significance.R, trend_changes.R). Validates all
+results using metric_types.R validation functions.
 
 #### banner_trends.R (\~400 lines)
 
@@ -195,7 +197,7 @@ filter_wave_data_to_segment(wave_data, segment_def)
   # Filters wave data to specific segment
 ```
 
-#### tracker_output.R (\~500 lines)
+#### tracker_output.R (\~2,197 lines)
 
 **Purpose:** Generate Excel reports
 
@@ -208,6 +210,9 @@ write_tracker_output(trend_results, config, wave_data, output_path, banner_segme
 write_wave_history_output(trend_results, config, wave_data, output_path, banner_segments)
   # Generates wave history report
 ```
+
+**Dependencies:** Uses output_formatting.R for Excel style creation and
+metric_types.R constants for consistent metric type checking.
 
 #### tracker_dashboard_reports.R (\~800 lines)
 
@@ -256,6 +261,122 @@ toggle - Real-time console output
 
 **Defines:** - Default settings - Valid question types - Valid
 TrackingSpecs options - Error messages
+
+### Extracted Modules (v10.1 - December 2025)
+
+These modules were extracted from trend_calculator.R and tracker_output.R
+to reduce code duplication and improve maintainability.
+
+#### metric_types.R (\~272 lines)
+
+**Purpose:** Metric type constants and validation
+
+**Key Exports:**
+
+``` r
+METRIC_TYPES <- list(
+  MEAN = "mean",
+  NPS = "nps",
+  PROPORTIONS = "proportions",
+  RATING_ENHANCED = "rating_enhanced",
+  COMPOSITE = "composite",
+  COMPOSITE_ENHANCED = "composite_enhanced",
+  MULTI_MENTION = "multi_mention",
+  CATEGORY_MENTIONS = "category_mentions"
+)
+
+validate_metric_type(metric_type, context = "unknown")
+  # Validates metric type is non-NULL and in valid set
+
+validate_result_metric_type(result, context = "unknown")
+  # Validates that a trend result has valid metric_type field
+```
+
+**Rationale:** Centralizes metric type constants to prevent typos and
+inconsistencies. Provides validation functions used throughout the
+codebase to ensure data integrity.
+
+#### trend_changes.R (\~298 lines)
+
+**Purpose:** Wave-over-wave change calculations
+
+**Key Functions:**
+
+``` r
+calculate_changes(wave_results, wave_ids, metric_name)
+  # Legacy: Calculates changes for simple metrics (mean, nps)
+
+calculate_changes_for_metric(wave_results, wave_ids, metric_name)
+  # Enhanced: Calculates changes for metrics in enhanced structure
+
+calculate_changes_for_multi_mention_option(wave_results, wave_ids, column_name)
+  # Calculates changes for multi-mention options
+
+calculate_changes_for_multi_mention_metric(wave_results, wave_ids)
+  # Calculates changes for multi-mention metrics
+```
+
+**Returns:** Change objects with from_wave, to_wave, from_value, to_value,
+absolute_change, percentage_change, and direction.
+
+**Rationale:** Extracted from trend_calculator.R to eliminate duplication
+across different question type calculators.
+
+#### trend_significance.R (\~406 lines)
+
+**Purpose:** Unified significance testing framework
+
+**Key Functions:**
+
+``` r
+perform_significance_tests_means(wave_results, wave_ids, config)
+  # T-tests for means (handles both old and enhanced structures)
+
+perform_significance_tests_proportions(wave_results, wave_ids, config, response_code)
+  # Z-tests for proportions
+
+perform_significance_tests_nps(wave_results, wave_ids, config)
+  # Z-tests for NPS scores
+
+perform_significance_tests_for_metric(wave_results, wave_ids, metric_name, config, test_type)
+  # Tests for enhanced metrics (top_box, bottom_box, custom ranges)
+
+perform_significance_tests_multi_mention(wave_results, wave_ids, column_name, config)
+  # Tests for multi-mention options
+
+perform_significance_tests_multi_mention_metric(wave_results, wave_ids, config)
+  # Tests for multi-mention metrics
+```
+
+**Compatibility:** As of v10.1, perform_significance_tests_means() handles
+both legacy structure (mean/sd at top level) and enhanced structure
+(mean/sd in metrics sub-list). This ensures backward compatibility while
+supporting new enhanced question types.
+
+**Rationale:** Consolidates all significance testing logic in one place,
+eliminating duplication and making it easier to maintain statistical
+methods.
+
+**Bug Fix (v10.1):** Fixed structure mismatch where enhanced calculators
+store mean/sd in metrics sub-list but significance tests expected them at
+top level. Added compatibility layer to check both locations.
+
+#### output_formatting.R (\~92 lines)
+
+**Purpose:** Excel style definitions and formatting utilities
+
+**Key Functions:**
+
+``` r
+create_tracker_styles()
+  # Creates standardized Excel cell styles for tracker reports
+  # Returns: list(header, subheader, data_number, data_text,
+  #               change_positive, change_negative, sig_yes, sig_no, ...)
+```
+
+**Rationale:** Extracted from tracker_output.R to provide consistent
+styling across all output functions and eliminate duplicate style
+definitions.
 
 ------------------------------------------------------------------------
 
@@ -373,6 +494,8 @@ list(
 
 ### Trend Result Structure
 
+**Legacy Structure (mean, nps, proportions, composite):**
+
 ``` r
 list(
   question_code = "Q_SAT",
@@ -402,6 +525,60 @@ list(
   )
 )
 ```
+
+**Enhanced Structure (rating_enhanced, composite_enhanced):**
+
+``` r
+list(
+  question_code = "Q_SAT",
+  question_text = "Overall satisfaction",
+  question_type = "Rating",
+  metric_type = "rating_enhanced",
+  tracking_specs = c("mean", "top_box", "top2_box"),
+  wave_results = list(
+    W1 = list(
+      available = TRUE,
+      metrics = list(mean = 7.5, top_box = 42.3, top2_box = 68.1),
+      n_unweighted = 500,
+      n_weighted = 500,
+      values = c(...),  # Raw values
+      weights = c(...)  # Weights
+    ),
+    W2 = list(
+      available = TRUE,
+      metrics = list(mean = 7.8, top_box = 45.1, top2_box = 71.2),
+      n_unweighted = 520,
+      n_weighted = 520,
+      values = c(...),
+      weights = c(...)
+    ),
+    ...
+  ),
+  changes = list(
+    mean = list(
+      W1_to_W2 = list(from_wave = "W1", to_wave = "W2",
+                      from_value = 7.5, to_value = 7.8,
+                      absolute_change = 0.3, percentage_change = 4.0,
+                      direction = "up"),
+      ...
+    ),
+    top_box = list(...),
+    top2_box = list(...)
+  ),
+  significance = list(
+    mean = list(
+      W1_vs_W2 = list(t_stat = 2.15, p_value = 0.032, significant = TRUE),
+      ...
+    ),
+    top_box = list(...),
+    top2_box = list(...)
+  )
+)
+```
+
+**Key Difference:** Enhanced metrics store values in `wave_results$metrics`
+sub-list and organize changes/significance by metric name, allowing
+multiple metrics per question.
 
 ------------------------------------------------------------------------
 
@@ -624,6 +801,29 @@ RESOLVED - Description: Category mode showed blank values - Root Cause:
 Data loader converted sub-columns to numeric - Fix: Modified
 wave_loader.R to protect sub-columns from numeric conversion
 
+**ISSUE-003: Banner Trends Composite Enhanced Bug** (v10.1) - Status:
+RESOLVED - Description: Banner trend calculations for composite_enhanced
+questions failed with "missing value where TRUE/FALSE needed" error,
+causing NULL metric_type in results - Root Cause: Structure mismatch
+between enhanced calculators (store mean/sd in `wave_results$metrics`
+sub-list) and significance testing (expected mean/sd at top level) - Fix:
+Updated `perform_significance_tests_means()` in trend_significance.R to
+handle both legacy structure (mean/sd at top level) and enhanced structure
+(mean/sd in metrics sub-list) with compatibility layer - Impact: Fixed all
+composite enhanced and rating enhanced questions in banner breakouts while
+maintaining backward compatibility with legacy calculators - Date
+Resolved: 28 December 2025
+
+**ISSUE-004: Refactoring Code Duplication** (v10.1) - Status: RESOLVED -
+Description: Large files (trend_calculator.R ~2,700 lines,
+tracker_output.R ~2,247 lines) contained duplicate code for statistical
+testing, change calculations, and formatting - Solution: Extracted shared
+functionality into 4 new modules: metric_types.R (272 lines),
+trend_changes.R (298 lines), trend_significance.R (406 lines),
+output_formatting.R (92 lines) - Impact: Reduced duplication by ~450
+lines, improved maintainability, centralized validation and constants -
+Date Completed: 28 December 2025
+
 ### Known Limitations
 
 1.  **Test Coverage:** \~15% automated
@@ -700,6 +900,47 @@ docs: Update USER_MANUAL with TrackingSpecs examples
 test: Add unit tests for top box calculation
 refactor: Extract shared validation functions
 ```
+
+------------------------------------------------------------------------
+
+## Recent Changes (v10.1)
+
+### December 2025 Refactoring
+
+**Objective:** Reduce code duplication, improve maintainability, and
+centralize validation.
+
+**Changes:**
+
+1.  **Extracted metric_types.R** - Centralized metric type constants
+    (METRIC_TYPES) - Created validation functions
+    (validate_metric_type, validate_result_metric_type) - Replaced 22+
+    string literals with constants across codebase
+
+2.  **Extracted trend_changes.R** - Consolidated 4 change calculation
+    functions - Eliminated duplication across question type calculators -
+    Provides consistent change calculation interface
+
+3.  **Extracted trend_significance.R** - Unified 6 significance testing
+    functions - Fixed structure mismatch bug (ISSUE-003) - Added
+    compatibility layer for legacy and enhanced structures - Centralized
+    all statistical testing logic
+
+4.  **Extracted output_formatting.R** - Consolidated Excel style
+    creation - Eliminated duplicate style definitions - Provides
+    consistent formatting across all outputs
+
+**Code Reduction:** - trend_calculator.R: ~2,700 → ~2,260 lines (16%
+reduction) - tracker_output.R: ~2,247 → ~2,197 lines (2% reduction) -
+Total duplication reduced: \~450 lines
+
+**Validation Added:** - Added validation to 9 result-returning functions
+in trend_calculator.R - Added validation to 3 critical functions in
+tracker_output.R - Added validation to 6 functions in
+tracker_dashboard_reports.R
+
+**Backward Compatibility:** All changes maintain full backward
+compatibility with existing projects and data structures.
 
 ------------------------------------------------------------------------
 
