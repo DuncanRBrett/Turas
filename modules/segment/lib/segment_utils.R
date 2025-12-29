@@ -18,6 +18,7 @@
 #   6. Seed & RNG Management
 #   7. Quick Run Helper Functions (internal)
 #   8. Quick Run Main Function (public API)
+#   9. RNG State Utilities
 #
 # ==============================================================================
 
@@ -717,7 +718,6 @@ set_segmentation_seed <- function(config) {
 #' @return Validated k value (possibly coerced to integer)
 #' @keywords internal
 .validate_quick_inputs <- function(data, id_var, clustering_vars, k, k_range) {
-
 
   # Check data is a data frame
   if (!is.data.frame(data)) {

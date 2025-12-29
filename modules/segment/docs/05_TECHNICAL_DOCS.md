@@ -1,7 +1,7 @@
 # Turas Segmentation Module - Technical Documentation
 
-**Version:** 10.0
-**Last Updated:** 22 December 2025
+**Version:** 10.1
+**Last Updated:** 29 December 2024
 **Target Audience:** Developers, Technical Maintainers, Data Scientists
 
 ---
@@ -216,7 +216,48 @@ modules/segment/
 | segment_scoring.R | Score new data | `score_new_data()`, `type_respondent()` |
 | segment_export.R | Excel output | `write_segment_results()` |
 | segment_visualization.R | Charts | `plot_elbow()`, `plot_silhouette()` |
-| segment_utils.R | Utilities | `run_segment_quick()` |
+| segment_utils.R | Utilities & Quick Run | See [segment_utils.R Structure](#segment_utilsr-structure) |
+
+### segment_utils.R Structure
+
+**Refactored December 2024** for improved maintainability and testability.
+
+The file is organized into 9 sections:
+
+| Section | Functions | Purpose |
+|---------|-----------|---------|
+| 1. Shared Infrastructure | `.source_shared_utils()` | Dynamic loading of shared validation utilities |
+| 2. Package Dependencies | `check_segment_dependencies()`, `get_minimum_install_cmd()`, `get_full_install_cmd()` | Dependency checking and install commands |
+| 3. Config Template | `generate_config_template()` | Create starter Excel config files |
+| 4. Input Validation | `validate_input_data()` | Comprehensive data quality checks |
+| 5. Project Init | `initialize_segmentation_project()` | Set up project folder structure |
+| 6. Seed Management | `set_segmentation_seed()` | Centralized seed handling |
+| 7. Quick Run Helpers | `.validate_quick_inputs()`, `.build_quick_config()`, `.prepare_quick_data()`, `.run_quick_exploration()`, `.run_quick_final()` | Internal helper functions (see below) |
+| 8. Quick Run Main | `run_segment_quick()` | Public API orchestrator |
+| 9. RNG Utilities | `get_rng_state()`, `restore_rng_state()`, `validate_seed_reproducibility()` | RNG state management |
+
+**Quick Run Helper Functions (Internal):**
+
+The `run_segment_quick()` function delegates to specialized helpers:
+
+```
+run_segment_quick()
+    │
+    ├── .validate_quick_inputs()    # Validate data, variables, k parameter
+    │
+    ├── .build_quick_config()       # Build config list from parameters
+    │
+    ├── .prepare_quick_data()       # Handle missing data, standardize
+    │
+    └── .run_quick_exploration()    # If k=NULL: test multiple k values
+        OR
+        .run_quick_final()          # If k=integer: run with fixed k
+```
+
+This decomposition improves:
+- **Testability**: Each helper can be unit tested independently
+- **Maintainability**: Single-responsibility functions are easier to modify
+- **Readability**: Main function is ~60 lines (was 423 lines)
 
 ---
 
@@ -576,15 +617,77 @@ turas_segment_from_config(config_file, data_file = NULL, output_folder = NULL)
 ### Quick Run Function
 
 ```r
-run_segment_quick(data, id_var, clustering_vars, k = NULL, k_range = 3:6, ...)
+run_segment_quick(
+  data,
+  id_var,
+  clustering_vars,
+  k = NULL,
+  k_range = 3:6,
+  profile_vars = NULL,
+  output_folder = "output/",
+  seed = 123,
+  question_labels = NULL,
+  standardize = TRUE,
+  nstart = 50,
+  outlier_detection = FALSE,
+  missing_data = "listwise_deletion",
+  segment_names = "auto"
+)
 ```
 
 **Arguments:**
-- `data`: Data frame with survey data
+- `data`: Data frame with survey data (already loaded in memory)
 - `id_var`: Name of ID column
-- `clustering_vars`: Character vector of variable names
-- `k`: Fixed k (NULL = exploration mode)
-- `k_range`: Range for exploration
+- `clustering_vars`: Character vector of clustering variable names
+- `k`: Fixed k value (integer) or NULL for exploration mode
+- `k_range`: Integer vector for exploration (default: 3:6)
+- `profile_vars`: Character vector or NULL (auto-detect if NULL)
+- `output_folder`: Output folder path (default: "output/")
+- `seed`: Random seed for reproducibility (default: 123)
+- `question_labels`: Named vector of question labels or NULL
+- `standardize`: Whether to standardize data (default: TRUE)
+- `nstart`: Number of random starts for k-means (default: 50)
+- `outlier_detection`: Enable outlier detection (default: FALSE)
+- `missing_data`: Handling method: "listwise_deletion", "mean_imputation", "median_imputation"
+- `segment_names`: Segment naming: "auto" or character vector
+
+**Returns:**
+
+*Exploration Mode (k = NULL):*
+```r
+list(
+  mode = "exploration",
+  recommendation = list(recommended_k, ...),
+  metrics = list(metrics_df, ...),
+  models = list(...),
+  output_files = list(report = "path/to/report.xlsx"),
+  config = list(...)
+)
+```
+
+*Final Mode (k = integer):*
+```r
+list(
+  mode = "final",
+  k = integer,
+  model = kmeans_object,
+  clusters = integer_vector,
+  segment_names = character_vector,
+  validation = list(avg_silhouette, ...),
+  profiles = list(...),
+  output_files = list(assignments, report, model),
+  config = list(...)
+)
+```
+
+**Internal Architecture:**
+
+The function delegates to 5 internal helper functions:
+1. `.validate_quick_inputs()` - Validates all input parameters
+2. `.build_quick_config()` - Creates config list from parameters
+3. `.prepare_quick_data()` - Handles missing data and standardization
+4. `.run_quick_exploration()` - Runs exploration mode (multiple k)
+5. `.run_quick_final()` - Runs final mode (fixed k)
 
 ### Scoring Function
 
@@ -770,6 +873,29 @@ run_all_segment_tests()
 - Check for errors in R console
 - Update to latest code version
 - Verify R 4.2+ compatibility patterns
+
+### Version History
+
+**v10.1 (December 2024) - segment_utils.R Refactoring**
+
+Major refactoring of `segment_utils.R` for improved maintainability:
+
+*Changes:*
+- Extracted `run_segment_quick()` from 423 lines to ~60 lines orchestrator
+- Created 5 internal helper functions (`.validate_quick_inputs()`, `.build_quick_config()`, `.prepare_quick_data()`, `.run_quick_exploration()`, `.run_quick_final()`)
+- Added shared infrastructure integration for validation utilities
+- Organized file into 9 clearly-labeled sections
+- Added comprehensive roxygen documentation
+
+*Benefits:*
+- Each helper function can be unit tested independently
+- Single-responsibility functions are easier to modify
+- Clear separation between validation, configuration, and execution
+- Fallback stubs ensure file works standalone if shared utils unavailable
+
+*Backward Compatibility:*
+- Public API unchanged - `run_segment_quick()` signature identical
+- All existing scripts will continue to work without modification
 
 ---
 
