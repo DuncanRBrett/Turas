@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Tabs - Technical Documentation
 
-**Version:** 10.0 **Date:** 22 December 2025 **Audience:** Developers,
+**Version:** 10.1 **Date:** 29 December 2025 **Audience:** Developers,
 Technical Contributors, Module Maintainers
 
 This document covers the internal architecture, code structure, and
@@ -48,36 +48,67 @@ based on configuration.
 **Builder Pattern:** The Excel writer constructs complex output
 incrementally, adding sheets and formatting as it goes.
 
+**Modular Extraction Pattern (Phase 2):** Large modules are decomposed
+into a core orchestration file with specialized submodules in dedicated
+subdirectories. The core file sources submodules using `tabs_source()`
+with fallback patterns for backward compatibility:
+
+``` r
+if (exists("tabs_source", mode = "function")) {
+  tabs_source("validation", "structure_validators.R")
+} else {
+  # Fallback for direct sourcing
+  source(file.path(.validation_dir, "structure_validators.R"))
+}
+```
+
 ------------------------------------------------------------------------
 
 ## Module Structure
 
 ### File Organization
 
-```         
+```
 modules/tabs/
 ├── run_tabs.R                    # Main entry point
 ├── run_tabs_gui.R                # Shiny GUI interface
 ├── lib/
-│   ├── run_crosstabs.R           # Core orchestration (~1,800 lines)
-│   ├── config_loader.R           # Configuration management (~450 lines)
-│   ├── validation.R              # Input validation (~1,400 lines)
-│   ├── question_orchestrator.R   # Question preparation (~200 lines)
-│   ├── question_dispatcher.R     # Question type routing (~350 lines)
-│   ├── standard_processor.R      # Single/Multi processing (~550 lines)
-│   ├── numeric_processor.R       # Numeric/Rating/NPS processing (~400 lines)
-│   ├── composite_processor.R     # Composite metrics (~300 lines)
-│   ├── ranking.R                 # Ranking question processing (~250 lines)
-│   ├── cell_calculator.R         # Cell/row calculations (~450 lines)
-│   ├── banner.R                  # Banner structure (~300 lines)
-│   ├── banner_indices.R          # Banner indexing (~250 lines)
-│   ├── weighting.R               # Weight calculations (~400 lines)
-│   ├── shared_functions.R        # Utilities (~1,640 lines)
-│   ├── excel_writer.R            # Excel output (~600 lines)
-│   └── summary_builder.R         # Summary statistics (~200 lines)
+│   ├── 00_guard.R                # Path resolution & sourcing utilities (~763 lines)
+│   ├── run_crosstabs.R           # Core orchestration (~1,715 lines)
+│   ├── run_crosstabs_helpers.R   # Helper functions (~291 lines)
+│   ├── config_loader.R           # Configuration management (~729 lines)
+│   ├── config_utils.R            # Configuration utilities (~267 lines)
+│   ├── validation.R              # Input validation core (~1,664 lines)
+│   ├── question_orchestrator.R   # Question preparation (~667 lines)
+│   ├── question_dispatcher.R     # Question type routing (~420 lines)
+│   ├── standard_processor.R      # Single/Multi processing (~1,312 lines)
+│   ├── numeric_processor.R       # Numeric/Rating/NPS processing (~581 lines)
+│   ├── composite_processor.R     # Composite metrics (~839 lines)
+│   ├── ranking.R                 # Ranking question processing (~1,019 lines)
+│   ├── cell_calculator.R         # Cell/row calculations (~756 lines)
+│   ├── banner.R                  # Banner structure (~588 lines)
+│   ├── banner_indices.R          # Banner indexing (~555 lines)
+│   ├── weighting.R               # Weight calculations (~1,590 lines)
+│   ├── shared_functions.R        # Utilities (~2,001 lines)
+│   ├── excel_writer.R            # Excel output (~1,561 lines)
+│   ├── excel_utils.R             # Excel utilities (~151 lines)
+│   ├── summary_builder.R         # Summary statistics (~626 lines)
+│   ├── logging_utils.R           # Logging utilities (~189 lines)
+│   ├── type_utils.R              # Type utilities (~166 lines)
+│   │
+│   ├── validation/               # Validation submodules (Phase 2)
+│   │   ├── structure_validators.R   # Survey structure validation (~208 lines)
+│   │   ├── weight_validators.R      # Weight validation (~375 lines)
+│   │   ├── config_validators.R      # Configuration validation (~253 lines)
+│   │   └── data_validators.R        # Data type/format validation (~398 lines)
+│   │
+│   └── ranking/                  # Ranking submodules (Phase 2)
+│       ├── ranking_validation.R     # Ranking question validation (~200 lines)
+│       ├── ranking_metrics.R        # Metric calculations (~557 lines)
+│       └── ranking_crosstabs.R      # Crosstab row creation (~307 lines)
 ```
 
-Total lines of code: approximately 9,500.
+Total lines of code: approximately 20,750 (including submodules).
 
 ### Dependencies
 
@@ -93,6 +124,44 @@ integrate with shared Turas utilities.
 ------------------------------------------------------------------------
 
 ## Core Components
+
+### Guard Module (00_guard.R)
+
+Infrastructure module providing path resolution and sourcing utilities.
+This module enables the modular architecture by providing reliable
+submodule loading regardless of invocation context.
+
+**Key Functions:**
+
+``` r
+tabs_lib_path()
+```
+
+Returns the path to the lib directory. Uses global caching for performance
+and handles various invocation scenarios (RStudio, command line, sourced).
+
+``` r
+tabs_source(subdir, filename)
+```
+
+Sources a file from a subdirectory of lib. Provides reliable path
+resolution for submodules:
+
+``` r
+# Example usage in validation.R
+tabs_source("validation", "structure_validators.R")
+# Loads: lib/validation/structure_validators.R
+```
+
+``` r
+tabs_refuse(message, error_log = NULL)
+```
+
+TRS (Turas Refusal Standard) error handling. Logs an error and stops
+execution with a clear message.
+
+**Global Variables:**
+- `.tabs_lib_dir`: Cached library directory path
 
 ### Configuration Loader (config_loader.R)
 
@@ -125,9 +194,20 @@ execution if required = TRUE and the value is missing.
 
 ### Validation Module (validation.R)
 
-Comprehensive input validation with clear error messages.
+Comprehensive input validation with clear error messages. The validation
+module has been refactored into a core file with four specialized submodules.
 
-**Key Functions:**
+**Module Structure:**
+
+```
+validation.R                      # Core validation orchestration
+├── validation/structure_validators.R   # Survey structure validation
+├── validation/weight_validators.R      # Weight validation
+├── validation/config_validators.R      # Configuration validation
+└── validation/data_validators.R        # Data type/format validation
+```
+
+**Key Functions (Core):**
 
 ``` r
 validate_survey_structure(survey_structure, error_log = NULL)
@@ -156,6 +236,42 @@ validate_weights(weights, data, error_log = NULL,
 Validates weight values: - Weights are numeric - Length matches data -
 NA count below threshold - Zero count below threshold - DEFF below
 warning threshold
+
+**Submodule: structure_validators.R**
+
+Validates survey structure file integrity:
+- `check_required_columns()` - Verifies required columns exist
+- `check_duplicate_codes()` - Detects duplicate QuestionCodes
+- `check_variable_types()` - Validates Variable_Type values
+- `check_orphan_options()` - Finds options without parent questions
+
+**Submodule: weight_validators.R**
+
+Validates weight column and values:
+- `check_weight_column()` - Verifies weight column exists
+- `check_weight_numeric()` - Validates numeric type
+- `check_weight_length()` - Confirms length matches data
+- `check_weight_thresholds()` - Checks NA/zero thresholds
+- `check_weight_deff()` - Calculates and validates design effect
+
+**Submodule: config_validators.R**
+
+Validates configuration settings:
+- `check_config_required()` - Verifies required settings present
+- `check_config_paths()` - Validates file path settings
+- `check_config_types()` - Validates setting value types
+- `check_banner_selection()` - Validates banner question selection
+
+**Submodule: data_validators.R**
+
+Validates data types and formats:
+- `check_multi_mention_columns()` - Validates multi-mention column counts
+- `check_single_column()` - Validates single column existence
+- `check_numeric_min_max()` - Validates numeric range constraints
+- `check_bin_structure()` - Validates binning configuration
+- `check_bin_overlaps()` - Detects overlapping bins
+- `check_bin_coverage()` - Validates bin coverage
+- `validate_numeric_question()` - Comprehensive numeric validation
 
 **Error Log Structure:**
 
@@ -204,8 +320,8 @@ process_question(question_code, base_filter, survey_data,
 ```
 
 **Routing logic:** - Composite questions → composite_processor -
-Single_Mention, Multi_Mention, Ranking → standard_processor - Numeric,
-Rating, NPS, Likert → numeric_processor
+Single_Mention, Multi_Mention → standard_processor - Ranking →
+ranking_processor - Numeric, Rating, NPS, Likert → numeric_processor
 
 ### Standard Processor (standard_processor.R)
 
@@ -257,6 +373,61 @@ Significance testing on NPS score
 **Numeric Questions:** - Calculates mean, median (optional), mode
 (optional), standard deviation - Optional: Min/Max, percentiles -
 Significance testing on means
+
+### Ranking Processor (ranking.R)
+
+Processes Ranking questions. The ranking module has been refactored into
+a core file with three specialized submodules.
+
+**Module Structure:**
+
+```
+ranking.R                         # Core ranking orchestration
+├── ranking/ranking_validation.R  # Ranking question validation
+├── ranking/ranking_metrics.R     # Metric calculations
+└── ranking/ranking_crosstabs.R   # Crosstab row creation
+```
+
+``` r
+process_ranking_question(prepared_data, config, error_log)
+```
+
+**Ranking Format Support:**
+- **Position Format:** Each column represents a rank position (1st, 2nd, etc.)
+- **Item Format:** Each column represents an item being ranked
+
+**Key Metrics:**
+- Percent ranked first
+- Percent in top N
+- Mean rank
+- Rank variance
+
+**Submodule: ranking_validation.R**
+
+Validates ranking question configuration:
+- `check_ranking_format()` - Validates Ranking_Format setting
+- `check_ranking_positions()` - Validates position configuration
+- `check_ranking_options()` - Validates ranking options
+- `validate_ranking_question()` - Comprehensive validation
+
+**Submodule: ranking_metrics.R**
+
+Calculates ranking-specific metrics:
+- `calculate_percent_ranked_first()` - Percent choosing item as #1
+- `calculate_percent_top_n()` - Percent choosing item in top N
+- `calculate_mean_rank()` - Weighted mean rank for each item
+- `calculate_rank_variance()` - Variance of rank positions
+- `prepare_rank_comparison_data()` - Prepares data for statistical tests
+- `run_mean_rank_test()` - Statistical test on mean ranks
+- `compare_mean_ranks()` - Compares mean ranks across banner columns
+
+**Submodule: ranking_crosstabs.R**
+
+Creates crosstab output rows:
+- `get_banner_subset_and_weights()` - Extracts banner-specific data
+- `format_ranking_value()` - Formats ranking values for output
+- `calculate_banner_ranking_metrics()` - Calculates metrics per banner
+- `create_ranking_rows_for_item()` - Creates output rows for each item
 
 ### Cell Calculator (cell_calculator.R)
 
