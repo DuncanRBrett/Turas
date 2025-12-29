@@ -292,7 +292,7 @@ dispatch_nps_ci <- function(nps_stats, values, promoter_codes, detractor_codes,
         boot_weights <- weights[boot_idx]
         total_w_boot <- sum(boot_weights)
 
-        if (total_w_boot > 0) {
+        if (isTRUE(total_w_boot > 0)) {
           is_prom_boot <- boot_values %in% promoter_codes
           is_detr_boot <- boot_values %in% detractor_codes
 
