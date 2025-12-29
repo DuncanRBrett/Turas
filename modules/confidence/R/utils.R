@@ -469,7 +469,9 @@ check_extreme_proportion <- function(p, threshold = 0.10) {
 #'
 #' @keywords internal
 parse_codes <- function(codes_string) {
-  if (is.na(codes_string) || codes_string == "") {
+  # Handle NULL, NA, or empty string
+  if (is.null(codes_string) || length(codes_string) == 0 ||
+      (length(codes_string) == 1 && (is.na(codes_string) || codes_string == ""))) {
     return(NULL)
   }
 
