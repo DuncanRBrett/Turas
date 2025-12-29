@@ -1,12 +1,12 @@
 ---
-editor_options: 
-  markdown: 
+editor_options:
+  markdown:
     wrap: 72
 ---
 
 # Turas Tabs - Technical Documentation
 
-**Version:** 10.0 **Date:** 22 December 2025 **Audience:** Developers,
+**Version:** 10.2 **Date:** 29 December 2025 **Audience:** Developers,
 Technical Contributors, Module Maintainers
 
 This document covers the internal architecture, code structure, and
@@ -19,22 +19,29 @@ documentation, see the [User Manual](04_USER_MANUAL.md).
 
 ### Design Philosophy
 
-Tabs follows a pipeline architecture with clear separation of concerns:
+Tabs follows an **orchestrator pattern** with clear separation of concerns:
 
-```         
-Input → Load → Validate → Process → Calculate → Write → Output
+```
+Config → Data → Validate → Process → Output
+  ↓        ↓        ↓          ↓         ↓
+load_    load_    run_      run_     create_
+config   data    validation analysis workbook
 ```
 
-The design emphasizes: - **Modularity:** Each component has a single
-responsibility - **Testability:** Functions are pure where possible with
-explicit dependencies - **Fail-Fast:** Validation occurs early with
-clear error messages - **Memory Efficiency:** Vectorized operations,
-minimal data duplication - **Extensibility:** New question types can be
-added without modifying core logic
+The design emphasizes:
+- **Orchestrator Pattern:** Main script coordinates focused modules
+- **Modularity:** Each component has a single responsibility
+- **Testability:** Functions are pure where possible with explicit dependencies
+- **Fail-Fast:** Validation occurs early with clear error messages
+- **Memory Efficiency:** Vectorized operations, minimal data duplication
+- **Extensibility:** New question types can be added without modifying core logic
 
 ### Design Patterns
 
 The module uses several established patterns:
+
+**Orchestrator Pattern (V10.2):** The main `run_crosstabs.R` file coordinates
+high-level functions, delegating implementation to focused modules.
 
 **Pipeline Pattern:** Data flows through sequential processing stages.
 
@@ -52,16 +59,40 @@ incrementally, adding sheets and formatting as it goes.
 
 ## Module Structure
 
-### File Organization
+### File Organization (V10.2 - Refactored)
 
-```         
+```
 modules/tabs/
 ├── run_tabs.R                    # Main entry point
 ├── run_tabs_gui.R                # Shiny GUI interface
+├── REFACTORING_NOTES.md          # Refactoring documentation
 ├── lib/
-│   ├── run_crosstabs.R           # Core orchestration (~1,800 lines)
+│   ├── run_crosstabs.R           # Core orchestrator (~580 lines)
+│   ├── shared_functions.R        # Shared utilities orchestrator (~334 lines)
+│   ├── 00_guard.R                # TRS error handling (~763 lines)
+│   │
+│   ├── # --- Utility Modules (Phase 1/3) ---
+│   ├── type_utils.R              # Type conversion utilities (~166 lines)
+│   ├── logging_utils.R           # Logging utilities (~189 lines)
+│   ├── config_utils.R            # Config helper utilities (~267 lines)
+│   ├── excel_utils.R             # Excel formatting utilities (~151 lines)
+│   ├── path_utils.R              # Path resolution utilities (~208 lines)
+│   ├── validation_utils.R        # Validation utilities (~428 lines)
+│   ├── data_loader.R             # Data loading utilities (~362 lines)
+│   ├── filter_utils.R            # Filter expression utilities (~211 lines)
+│   ├── run_crosstabs_helpers.R   # Crosstabs helper functions (~291 lines)
+│   │
+│   ├── # --- Crosstabs Modules (Phase 4) ---
+│   ├── crosstabs/
+│   │   ├── checkpoint.R          # Checkpoint system (~146 lines)
+│   │   ├── crosstabs_config.R    # Configuration loading (~242 lines)
+│   │   ├── data_setup.R          # Data and weight setup (~316 lines)
+│   │   ├── analysis_runner.R     # Processing orchestration (~534 lines)
+│   │   └── workbook_builder.R    # Excel output creation (~649 lines)
+│   │
+│   ├── # --- Core Processing Modules ---
 │   ├── config_loader.R           # Configuration management (~450 lines)
-│   ├── validation.R              # Input validation (~1,400 lines)
+│   ├── validation.R              # Input validation orchestrator (~1,400 lines)
 │   ├── question_orchestrator.R   # Question preparation (~200 lines)
 │   ├── question_dispatcher.R     # Question type routing (~350 lines)
 │   ├── standard_processor.R      # Single/Multi processing (~550 lines)
@@ -72,12 +103,23 @@ modules/tabs/
 │   ├── banner.R                  # Banner structure (~300 lines)
 │   ├── banner_indices.R          # Banner indexing (~250 lines)
 │   ├── weighting.R               # Weight calculations (~400 lines)
-│   ├── shared_functions.R        # Utilities (~1,640 lines)
 │   ├── excel_writer.R            # Excel output (~600 lines)
-│   └── summary_builder.R         # Summary statistics (~200 lines)
+│   ├── summary_builder.R         # Summary statistics (~200 lines)
+│   │
+│   ├── # --- Subdirectory Modules (Phase 2) ---
+│   ├── validation/               # Validation subdirectory modules
+│   │   ├── structure_validators.R
+│   │   ├── data_validators.R
+│   │   ├── config_validators.R
+│   │   └── composite_validators.R
+│   └── ranking/                  # Ranking subdirectory modules
+│       ├── ranking_processor.R
+│       ├── ranking_metrics.R
+│       └── ranking_crosstabs.R
 ```
 
-Total lines of code: approximately 9,500.
+Total lines of code: approximately 11,000 (including new modules).
+Organized into 18+ focused modules.
 
 ### Dependencies
 
@@ -387,9 +429,213 @@ significance highlighting, and frozen panes.
 
 ------------------------------------------------------------------------
 
+## Crosstabs Orchestration Modules (V10.2)
+
+The Phase 4 refactoring introduced focused modules in `lib/crosstabs/` that
+implement the orchestrator pattern for `run_crosstabs.R`.
+
+### Main Execution Flow
+
+``` r
+# STEP 1: LOAD CONFIGURATION
+config_result <- load_crosstabs_config(config_file)
+
+# STEP 2: LOAD DATA
+data_result <- load_crosstabs_data(config_result)
+
+# STEP 3: RUN ANALYSIS
+analysis_result <- run_crosstabs_analysis(config_result, data_result)
+
+# STEP 4: CREATE EXCEL OUTPUT
+workbook_result <- create_crosstabs_workbook(...)
+
+# STEP 5: COMPLETION SUMMARY
+```
+
+### Checkpoint Module (crosstabs/checkpoint.R)
+
+Manages checkpoint state for resuming interrupted analysis runs.
+
+**Key Functions:**
+
+``` r
+save_checkpoint(checkpoint_file, all_results, processed_questions)
+```
+
+Saves current analysis progress to disk as an RDS file.
+
+``` r
+load_checkpoint(checkpoint_file)
+```
+
+Loads saved progress. Returns NULL if no checkpoint exists.
+
+``` r
+setup_checkpointing(enable_checkpointing, checkpoint_file, crosstab_questions)
+```
+
+Initializes checkpoint state. Returns list with `all_results`,
+`processed_questions`, `remaining_questions`, and `resumed` flag.
+
+``` r
+cleanup_checkpoint(checkpoint_file)
+```
+
+Removes checkpoint file after successful completion.
+
+### Configuration Module (crosstabs/crosstabs_config.R)
+
+Handles configuration loading and config object building.
+
+**Key Functions:**
+
+``` r
+load_crosstabs_config(config_file)
+```
+
+Main entry point. Returns list containing:
+- `project_root`: Project directory path
+- `config_file`: Path to config file
+- `config_obj`: All configuration settings
+- `structure_file_path`: Path to survey structure
+- `output_path`: Full output file path
+
+``` r
+build_config_object(config, default_alpha, default_min_base)
+```
+
+Builds the config_obj list with all analysis settings including weighting,
+display options, decimal places, and significance testing parameters.
+
+### Data Setup Module (crosstabs/data_setup.R)
+
+Manages survey structure, data, and weight setup.
+
+**Key Functions:**
+
+``` r
+load_crosstabs_data(config_result)
+```
+
+Main entry point. Returns list containing:
+- `survey_structure`: Questions, options, project info
+- `survey_data`: Survey response data
+- `composite_defs`: Composite metric definitions
+- `master_weights`: Weight vector
+- `effective_n`: Effective sample size
+- `selection_df`: Question selection
+- `crosstab_questions`: Filtered questions to process
+
+``` r
+load_and_validate_structure(structure_file_path, project_root)
+```
+
+Loads and validates the survey structure file.
+
+``` r
+setup_weights(survey_data, config_obj)
+```
+
+Configures weighting. Returns `master_weights`, `effective_n`, `is_weighted`.
+
+``` r
+load_question_selection(config_file)
+```
+
+Loads and validates the Selection sheet from config file.
+
+### Analysis Runner Module (crosstabs/analysis_runner.R)
+
+Orchestrates the main analysis processing.
+
+**Key Functions:**
+
+``` r
+run_crosstabs_analysis(config_result, data_result, checkpoint_frequency, total_column)
+```
+
+Main entry point. Returns list containing:
+- `all_results`: All question results
+- `composite_results`: Composite metric results
+- `banner_info`: Banner structure
+- `error_log`: Validation issues
+- `run_status`: "PASS" or "PARTIAL"
+- `skipped_questions`: Questions that couldn't be processed
+- `partial_questions`: Questions with missing sections
+
+``` r
+run_validation(survey_structure, survey_data, config_obj, composite_defs)
+```
+
+Runs comprehensive validation including composite definition validation.
+
+``` r
+create_banner_safe(selection_df, survey_structure)
+```
+
+Creates banner structure with error handling.
+
+``` r
+process_questions(remaining_questions, survey_data, ...)
+```
+
+Processes all questions using the question orchestrator.
+
+``` r
+process_composites(composite_defs, survey_data, survey_structure, banner_info, config_obj)
+```
+
+Processes composite metrics.
+
+### Workbook Builder Module (crosstabs/workbook_builder.R)
+
+Creates and populates the Excel workbook.
+
+**Key Functions:**
+
+``` r
+create_crosstabs_workbook(all_results, composite_results, ...)
+```
+
+Main entry point. Creates complete workbook with all sheets:
+- Summary sheet
+- Index_Summary sheet (if composites defined)
+- Error Log sheet
+- Run_Status sheet
+- Sample Composition sheet (if enabled)
+- Crosstabs sheet with all questions
+
+Returns list with `output_path`, `run_result`, `project_name`.
+
+``` r
+get_style_config(config_obj)
+```
+
+Extracts decimal places and separator settings with safe defaults.
+
+``` r
+write_crosstabs_sheet(wb, all_results, banner_info, config_obj, styles)
+```
+
+Creates and populates the main Crosstabs sheet.
+
+``` r
+write_single_question(wb, sheet, question_results, q_code, ...)
+```
+
+Writes a single question's results to the sheet.
+
+``` r
+save_workbook_safe(wb, output_path, run_result)
+```
+
+Saves workbook with TRS atomic save if available.
+
+------------------------------------------------------------------------
+
 ## Data Flow
 
-### Complete Pipeline
+### Complete Pipeline (V10.2 - Refactored)
 
 ```         
 1. CONFIGURATION LOADING
@@ -601,26 +847,36 @@ Tested on MacBook Pro M1:
 
 ## Known Issues
 
-### CR-TABS-001: Undefined Constant
+### CR-TABS-001: Undefined Constant ✓ RESOLVED (V10.2)
 
 -   **Location:** validation.R line \~1260
 -   **Issue:** MAX_DECIMAL_PLACES used but not defined
--   **Workaround:** Add `MAX_DECIMAL_PLACES <- 6` at top of validation.R
+-   **Resolution:** Constants now defined in run_crosstabs.R and available
+    to all modules through proper sourcing order.
 
-### CR-TABS-002: Global Namespace Pollution
+### CR-TABS-002: Global Namespace Pollution ✓ RESOLVED (V10.2)
 
 -   **Location:** excel_writer.R line \~68
--   **Issue:** `source(..., local = FALSE)` loads into global
-    environment
--   **Workaround:** Load dependencies before excel_writer
+-   **Issue:** `source(..., local = FALSE)` loads into global environment
+-   **Resolution:** Modules now use `tabs_source()` helper which handles
+    proper dependency loading order. The orchestrator pattern ensures
+    dependencies are loaded before they are needed.
 
-### CR-TABS-003: Misleading Function Name
+### CR-TABS-003: Misleading Function Name ✓ RESOLVED (V10.1)
 
 -   **Location:** shared_functions.R line \~992
--   **Issue:** `log_issue()` is pure function but name suggests side
-    effect
--   **Workaround:** Always capture return value:
-    `error_log <- log_issue(error_log, ...)`
+-   **Issue:** `log_issue()` is pure function but name suggests side effect
+-   **Resolution:** Function renamed to `add_log_entry()` in V10.1.
+    Original `log_issue()` kept as alias for backward compatibility.
+
+### CR-TABS-004: Large Monolithic Files (V10.2 Status)
+
+-   **Original Issue:** Several files over 1,000 lines
+-   **V10.2 Status:**
+    -   `run_crosstabs.R`: Reduced from 1,716 to 580 lines ✓
+    -   `shared_functions.R`: Reduced from 2,001 to 334 lines ✓
+    -   `standard_processor.R`: 1,312 lines (future refactoring candidate)
+    -   `validation.R`: 1,400 lines (orchestrates subdirectory modules)
 
 ------------------------------------------------------------------------
 
