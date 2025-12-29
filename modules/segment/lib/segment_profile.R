@@ -694,6 +694,18 @@ export_demographic_profiles <- function(demo_result, output_path) {
     sheets[[sheet_name]] <- demo_result$numeric_profiles[[var]]
   }
 
-  writexl::write_xlsx(sheets, output_path)
+  # TRS v1.0: Use atomic save if available
+  if (exists("turas_save_writexl_atomic", mode = "function")) {
+    save_result <- turas_save_writexl_atomic(
+      sheets = sheets,
+      file_path = output_path,
+      module = "SEGMENT"
+    )
+    if (!save_result$success) {
+      warning(sprintf("[SEGMENT] Failed to save demographic profiles: %s", save_result$error))
+    }
+  } else {
+    writexl::write_xlsx(sheets, output_path)
+  }
   cat(sprintf("✓ Demographic profiles exported to: %s\n", basename(output_path)))
 }

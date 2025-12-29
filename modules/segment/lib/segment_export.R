@@ -87,8 +87,19 @@ export_segment_assignments <- function(data, clusters, segment_names, id_var, ou
   # Rename first column to match original ID variable name
   names(assignments)[1] <- id_var
 
-  # Write to Excel
-  writexl::write_xlsx(assignments, output_path)
+  # Write to Excel (TRS v1.0: Use atomic save if available)
+  if (exists("turas_save_writexl_atomic", mode = "function")) {
+    save_result <- turas_save_writexl_atomic(
+      sheets = list(Assignments = assignments),
+      file_path = output_path,
+      module = "SEGMENT"
+    )
+    if (!save_result$success) {
+      warning(sprintf("[SEGMENT] Failed to save assignments: %s", save_result$error))
+    }
+  } else {
+    writexl::write_xlsx(assignments, output_path)
+  }
 
   cat(sprintf("✓ Exported %d segment assignments\n", nrow(assignments)))
 
@@ -289,8 +300,19 @@ export_exploration_report <- function(exploration_result, metrics_result,
     }
   }
 
-  # Write all sheets to Excel
-  writexl::write_xlsx(profile_sheets, output_path)
+  # Write all sheets to Excel (TRS v1.0: Use atomic save if available)
+  if (exists("turas_save_writexl_atomic", mode = "function")) {
+    save_result <- turas_save_writexl_atomic(
+      sheets = profile_sheets,
+      file_path = output_path,
+      module = "SEGMENT"
+    )
+    if (!save_result$success) {
+      warning(sprintf("[SEGMENT] Failed to save exploration report: %s", save_result$error))
+    }
+  } else {
+    writexl::write_xlsx(profile_sheets, output_path)
+  }
 
   cat(sprintf("✓ Exported exploration report with %d sheets\n", length(profile_sheets)))
 
@@ -560,8 +582,19 @@ export_final_report <- function(final_result, profile_result, validation_metrics
     }
   }
 
-  # Write to Excel
-  writexl::write_xlsx(sheets, output_path)
+  # Write to Excel (TRS v1.0: Use atomic save if available)
+  if (exists("turas_save_writexl_atomic", mode = "function")) {
+    save_result <- turas_save_writexl_atomic(
+      sheets = sheets,
+      file_path = output_path,
+      module = "SEGMENT"
+    )
+    if (!save_result$success) {
+      warning(sprintf("[SEGMENT] Failed to save final report: %s", save_result$error))
+    }
+  } else {
+    writexl::write_xlsx(sheets, output_path)
+  }
 
   cat(sprintf("✓ Exported final report with %d sheets\n", length(sheets)))
 

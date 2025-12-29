@@ -318,10 +318,21 @@ create_enhanced_profile_report <- function(data, clusters, clustering_vars,
   
   sheets[["Effect_Sizes"]] <- effect_summary
 
-  # Write to Excel
+  # Write to Excel (TRS v1.0: Use atomic save if available)
   cat("Exporting enhanced profile report...\n")
-  writexl::write_xlsx(sheets, output_path)
-  
+  if (exists("turas_save_writexl_atomic", mode = "function")) {
+    save_result <- turas_save_writexl_atomic(
+      sheets = sheets,
+      file_path = output_path,
+      module = "SEGMENT"
+    )
+    if (!save_result$success) {
+      warning(sprintf("[SEGMENT] Failed to save enhanced profile report: %s", save_result$error))
+    }
+  } else {
+    writexl::write_xlsx(sheets, output_path)
+  }
+
   cat(sprintf("✓ Enhanced profile report saved to: %s\n", basename(output_path)))
   cat(sprintf("  Sheets: %d\n\n", length(sheets)))
 

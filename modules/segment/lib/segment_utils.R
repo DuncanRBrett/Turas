@@ -416,8 +416,19 @@ generate_config_template <- function(data_file, output_file, mode = "exploration
     stringsAsFactors = FALSE
   )
 
-  # Write to Excel
-  writexl::write_xlsx(list(Config = config_df), output_file)
+  # Write to Excel (TRS v1.0: Use atomic save if available)
+  if (exists("turas_save_writexl_atomic", mode = "function")) {
+    save_result <- turas_save_writexl_atomic(
+      sheets = list(Config = config_df),
+      file_path = output_file,
+      module = "SEGMENT"
+    )
+    if (!save_result$success) {
+      warning(sprintf("[SEGMENT] Failed to save config template: %s", save_result$error))
+    }
+  } else {
+    writexl::write_xlsx(list(Config = config_df), output_file)
+  }
 
   cat(sprintf("✓ Config template saved to: %s\n", output_file))
   cat("\nIMPORTANT: Edit the following required fields:\n")

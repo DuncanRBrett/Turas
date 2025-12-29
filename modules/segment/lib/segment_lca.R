@@ -412,13 +412,37 @@ run_lca <- function(data, id_var, clustering_vars, n_classes = NULL,
     )
 
     assignments_path <- file.path(output_folder, "lca_class_assignments.xlsx")
-    writexl::write_xlsx(assignments, assignments_path)
+    # TRS v1.0: Use atomic save if available
+    if (exists("turas_save_writexl_atomic", mode = "function")) {
+      save_result <- turas_save_writexl_atomic(
+        sheets = list(Assignments = assignments),
+        file_path = assignments_path,
+        module = "SEGMENT"
+      )
+      if (!save_result$success) {
+        warning(sprintf("[SEGMENT] Failed to save LCA assignments: %s", save_result$error))
+      }
+    } else {
+      writexl::write_xlsx(assignments, assignments_path)
+    }
     cat(sprintf("\n✓ Class assignments saved to: %s\n", basename(assignments_path)))
 
     # Export profiles
     profiles <- create_lca_profiles(model, clustering_vars, question_labels)
     profiles_path <- file.path(output_folder, "lca_class_profiles.xlsx")
-    writexl::write_xlsx(profiles, profiles_path)
+    # TRS v1.0: Use atomic save if available
+    if (exists("turas_save_writexl_atomic", mode = "function")) {
+      save_result <- turas_save_writexl_atomic(
+        sheets = profiles,
+        file_path = profiles_path,
+        module = "SEGMENT"
+      )
+      if (!save_result$success) {
+        warning(sprintf("[SEGMENT] Failed to save LCA profiles: %s", save_result$error))
+      }
+    } else {
+      writexl::write_xlsx(profiles, profiles_path)
+    }
     cat(sprintf("✓ Class profiles saved to: %s\n", basename(profiles_path)))
 
     # Save model
@@ -565,7 +589,19 @@ export_lca_exploration <- function(fit_stats, models, output_path) {
     }
   }
 
-  writexl::write_xlsx(sheets, output_path)
+  # TRS v1.0: Use atomic save if available
+  if (exists("turas_save_writexl_atomic", mode = "function")) {
+    save_result <- turas_save_writexl_atomic(
+      sheets = sheets,
+      file_path = output_path,
+      module = "SEGMENT"
+    )
+    if (!save_result$success) {
+      warning(sprintf("[SEGMENT] Failed to save LCA exploration report: %s", save_result$error))
+    }
+  } else {
+    writexl::write_xlsx(sheets, output_path)
+  }
   cat(sprintf("✓ LCA exploration report saved to: %s\n", basename(output_path)))
 }
 

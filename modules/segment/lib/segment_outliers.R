@@ -647,7 +647,19 @@ review_outliers <- function(data, outlier_result, clustering_vars, id_var,
 
       sheets[["Variable_Reference"]] <- means_df
 
-      writexl::write_xlsx(sheets, output_path)
+      # TRS v1.0: Use atomic save if available
+      if (exists("turas_save_writexl_atomic", mode = "function")) {
+        save_result <- turas_save_writexl_atomic(
+          sheets = sheets,
+          file_path = output_path,
+          module = "SEGMENT"
+        )
+        if (!save_result$success) {
+          warning(sprintf("[SEGMENT] Failed to save outlier review: %s", save_result$error))
+        }
+      } else {
+        writexl::write_xlsx(sheets, output_path)
+      }
       cat(sprintf("\n✓ Outlier review exported to: %s\n", basename(output_path)))
     }
   }

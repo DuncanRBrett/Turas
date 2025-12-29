@@ -317,8 +317,19 @@ score_new_data <- function(model_file, new_data, id_variable, output_file = NULL
 
     # Determine file type
     if (grepl("\\.xlsx$", output_file, ignore.case = TRUE)) {
-      # Excel export
-      writexl::write_xlsx(list(Assignments = results), output_file)
+      # Excel export (TRS v1.0: Use atomic save if available)
+      if (exists("turas_save_writexl_atomic", mode = "function")) {
+        save_result <- turas_save_writexl_atomic(
+          sheets = list(Assignments = results),
+          file_path = output_file,
+          module = "SEGMENT"
+        )
+        if (!save_result$success) {
+          warning(sprintf("[SEGMENT] Failed to save scoring results: %s", save_result$error))
+        }
+      } else {
+        writexl::write_xlsx(list(Assignments = results), output_file)
+      }
     } else if (grepl("\\.csv$", output_file, ignore.case = TRUE)) {
       # CSV export
       write.csv(results, output_file, row.names = FALSE)
