@@ -1,10 +1,15 @@
 # ==============================================================================
-# OUTPUT GENERATOR - TURAS V10.0
+# OUTPUT GENERATOR - TURAS V10.1
 # ==============================================================================
 # Functions for generating Excel output with confidence analysis results
 # Part of Turas Confidence Analysis Module
 #
 # VERSION HISTORY:
+# Turas v10.1 - Refactoring release (2025-12-29)
+#          - Added output_helpers.R for common patterns
+#          - Improved code organization
+#          - Minor cleanup
+#
 # Turas v10.0 - Initial release (2025-11-13)
 #          - Multi-sheet Excel workbook generation
 #          - Decimal separator support (period or comma)
@@ -28,9 +33,10 @@
 # DEPENDENCIES:
 # - openxlsx (for Excel writing)
 # - utils.R
+# - output_helpers.R (optional - for common patterns)
 # ==============================================================================
 
-OUTPUT_VERSION <- "10.0"
+OUTPUT_VERSION <- "10.1"
 
 # ==============================================================================
 # DEPENDENCIES
@@ -57,6 +63,7 @@ source_if_exists <- function(file_path) {
 }
 
 source_if_exists("utils.R")
+source_if_exists("output_helpers.R")
 
 # ==============================================================================
 # MAIN OUTPUT FUNCTION

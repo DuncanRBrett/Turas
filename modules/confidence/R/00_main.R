@@ -1,10 +1,16 @@
 # ==============================================================================
-# CONFIDENCE ANALYSIS MAIN ORCHESTRATION - TURAS V10.0
+# CONFIDENCE ANALYSIS MAIN ORCHESTRATION - TURAS V10.1
 # ==============================================================================
 # Main script for running complete confidence analysis
 # Part of Turas Confidence Analysis Module
 #
 # VERSION HISTORY:
+# Turas v10.1 - Refactoring release (2025-12-29)
+#          - Converted to orchestrator pattern
+#          - Extracted question processing to question_processor.R
+#          - Extracted CI dispatch to ci_dispatcher.R
+#          - Reduced from 1,396 lines to ~600 lines (57% reduction)
+#
 # Turas v10.0 - Initial release (2025-11-13)
 #          - Complete workflow orchestration
 #          - Progress reporting
@@ -28,7 +34,7 @@
 # - readxl, openxlsx
 # ==============================================================================
 
-MAIN_VERSION <- "10.0"
+MAIN_VERSION <- "10.1"
 
 # ==============================================================================
 # TRS GUARD LAYER (Must be first)
@@ -118,7 +124,7 @@ source_module_files <- function(base_dir = NULL) {
     base_dir <- get_script_dir()
   }
 
-  # List of files to source in order
+  # List of files to source in order (including new refactored modules)
   module_files <- c(
     "utils.R",
     "01_load_config.R",
@@ -126,6 +132,8 @@ source_module_files <- function(base_dir = NULL) {
     "03_study_level.R",
     "04_proportions.R",
     "05_means.R",
+    "question_processor.R",
+    "ci_dispatcher.R",
     "07_output.R"
   )
 
@@ -182,66 +190,37 @@ tryCatch({
 #' Reads configuration, loads data, calculates confidence intervals,
 #' and generates Excel output.
 #'
-#' WORKFLOW:
-#' 1. Load and validate configuration (enforces 200 question limit)
-#' 2. Load survey data (CSV or XLSX)
-#' 3. Calculate study-level statistics (DEFF, effective n)
-#' 4. Process each question according to specification
-#' 5. Collect warnings and quality checks
-#' 6. Generate comprehensive Excel output
-#'
 #' @param config_path Character. Path to confidence_config.xlsx
 #' @param verbose Logical. Print progress messages (default TRUE)
 #' @param stop_on_warnings Logical. Stop if warnings detected (default FALSE)
 #'
 #' @return List with analysis results (invisible)
 #'
-#' @examples
-#' # Basic usage
-#' run_confidence_analysis("config/confidence_config.xlsx")
-#'
-#' # Quiet mode
-#' results <- run_confidence_analysis("config/confidence_config.xlsx", verbose = FALSE)
-#'
-#' # Stop on warnings
-#' run_confidence_analysis("config/confidence_config.xlsx", stop_on_warnings = TRUE)
-#'
-#' @author Confidence Module Team
-#' @date 2025-11-13
 #' @export
 run_confidence_analysis <- function(config_path,
                                     verbose = TRUE,
                                     stop_on_warnings = FALSE) {
 
-  # ==========================================================================
-  # TRS REFUSAL HANDLER WRAPPER (TRS v1.0)
-  # ==========================================================================
-  # Catches turas_refusal conditions and displays them cleanly
-  # without stack traces - they are intentional stops, not crashes.
-
+  # TRS REFUSAL HANDLER WRAPPER
   if (exists("confidence_with_refusal_handler", mode = "function")) {
     confidence_with_refusal_handler(
       run_confidence_analysis_impl(config_path, verbose, stop_on_warnings)
     )
   } else {
-    # Fallback if guard not loaded
     run_confidence_analysis_impl(config_path, verbose, stop_on_warnings)
   }
 }
 
 
 #' Internal Implementation of Confidence Analysis
-#'
 #' @keywords internal
 run_confidence_analysis_impl <- function(config_path,
                                          verbose = TRUE,
                                          stop_on_warnings = FALSE) {
 
   # ==========================================================================
-  # TRS RUN STATE INITIALIZATION (TRS v1.0)
+  # TRS RUN STATE INITIALIZATION
   # ==========================================================================
-
-  # Create TRS run state for tracking events
   trs_state <- if (exists("turas_run_state_new", mode = "function")) {
     turas_run_state_new("CONFIDENCE")
   } else {
@@ -262,17 +241,120 @@ run_confidence_analysis_impl <- function(config_path,
 
   # Start timer
   start_time <- Sys.time()
-
-  # Initialize warnings collector
   warnings_list <- character()
 
-  # ============================================================================
+  # ==========================================================================
   # STEP 1: LOAD CONFIGURATION
-  # ============================================================================
-
+  # ==========================================================================
   if (verbose) cat("STEP 1/6: Loading configuration...\n")
 
-  config <- tryCatch({
+  config <- load_config_step(config_path)
+
+  if (verbose) {
+    cat(sprintf("  + Configuration loaded successfully\n"))
+    cat(sprintf("  + Questions to analyze: %d (limit: 200)\n",
+                nrow(config$question_analysis)))
+    cat(sprintf("  + Confidence level: %.2f\n", as.numeric(config$study_settings$Confidence_Level)))
+    cat(sprintf("  + Decimal separator: %s\n", config$study_settings$Decimal_Separator))
+  }
+
+  # ==========================================================================
+  # STEP 2: LOAD SURVEY DATA
+  # ==========================================================================
+  if (verbose) cat("\nSTEP 2/6: Loading survey data...\n")
+
+  data_result <- load_data_step(config, verbose)
+  survey_data <- data_result$survey_data
+  weight_var <- data_result$weight_var
+
+  if (verbose) {
+    cat(sprintf("  + Data loaded: %d respondents\n", nrow(survey_data)))
+    if (!is.null(weight_var)) {
+      cat(sprintf("  + Weighted analysis using: %s\n", weight_var))
+    } else {
+      cat("  + Unweighted analysis\n")
+    }
+  }
+
+  # ==========================================================================
+  # STEP 3: STUDY-LEVEL STATISTICS
+  # ==========================================================================
+  if (verbose) cat("\nSTEP 3/6: Calculating study-level statistics...\n")
+
+  study_result <- calculate_study_stats_step(survey_data, weight_var, config, verbose)
+  study_stats <- study_result$study_stats
+  warnings_list <- c(warnings_list, study_result$warnings)
+
+  # ==========================================================================
+  # STEP 4: PROCESS QUESTIONS
+  # ==========================================================================
+  if (verbose) cat("\nSTEP 4/6: Processing questions...\n")
+
+  question_result <- process_all_questions(config, survey_data, weight_var, verbose)
+  proportion_results <- question_result$proportion_results
+  mean_results <- question_result$mean_results
+  nps_results <- question_result$nps_results
+  warnings_list <- c(warnings_list, question_result$warnings)
+
+  if (verbose) {
+    cat(sprintf("  + Processed: %d proportions, %d means, %d NPS\n",
+                length(proportion_results), length(mean_results), length(nps_results)))
+  }
+
+  # ==========================================================================
+  # STEP 5: COLLECT WARNINGS
+  # ==========================================================================
+  if (verbose) cat("\nSTEP 5/6: Quality checks...\n")
+
+  handle_warnings_step(warnings_list, verbose, stop_on_warnings)
+
+  # ==========================================================================
+  # STEP 6: GENERATE OUTPUT
+  # ==========================================================================
+  if (verbose) cat("\nSTEP 6/6: Generating Excel output...\n")
+
+  run_result <- log_trs_events(trs_state, warnings_list)
+
+  generate_output_step(
+    config, study_stats, proportion_results, mean_results, nps_results,
+    warnings_list, run_result
+  )
+
+  # ==========================================================================
+  # SUMMARY
+  # ==========================================================================
+  end_time <- Sys.time()
+  elapsed <- as.numeric(difftime(end_time, start_time, units = "secs"))
+  n_questions <- nrow(config$question_analysis)
+
+  print_completion_summary(
+    verbose, end_time, elapsed, n_questions,
+    proportion_results, mean_results, nps_results,
+    warnings_list, config$file_paths$Output_File, run_result
+  )
+
+  # Return results
+  invisible(list(
+    study_stats = study_stats,
+    proportion_results = proportion_results,
+    mean_results = mean_results,
+    nps_results = nps_results,
+    warnings = warnings_list,
+    config = config,
+    elapsed_seconds = elapsed,
+    run_result = run_result
+  ))
+}
+
+
+# ==============================================================================
+# ORCHESTRATION STEP FUNCTIONS
+# ==============================================================================
+
+#' Load configuration step
+#' @keywords internal
+load_config_step <- function(config_path) {
+  tryCatch({
     load_confidence_config(config_path)
   }, error = function(e) {
     confidence_refuse(
@@ -288,37 +370,18 @@ run_confidence_analysis_impl <- function(config_path,
       )
     )
   })
+}
 
-  if (verbose) {
-    cat(sprintf("  ✓ Configuration loaded successfully\n"))
-    cat(sprintf("  ✓ Questions to analyze: %d (limit: 200)\n",
-                nrow(config$question_analysis)))
-    cat(sprintf("  ✓ Confidence level: %.2f\n", as.numeric(config$study_settings$Confidence_Level)))
-    cat(sprintf("  ✓ Decimal separator: %s\n", config$study_settings$Decimal_Separator))
-  }
 
-  # ============================================================================
-  # STEP 2: LOAD SURVEY DATA
-  # ============================================================================
-
-  if (verbose) cat("\nSTEP 2/6: Loading survey data...\n")
-
-  # Get required questions from config
+#' Load data step
+#' @keywords internal
+load_data_step <- function(config, verbose) {
   required_questions <- config$question_analysis$Question_ID
   required_questions <- required_questions[!is.na(required_questions)]
 
-  # Get weight variable
   weight_var <- config$file_paths$Weight_Variable
   if (is.na(weight_var) || weight_var == "") {
     weight_var <- NULL
-  }
-
-  # ==========================================================================
-  # TRS WEIGHT VALIDATION (TRS v1.0 - REFUSE on missing configured weight)
-  # ==========================================================================
-  if (!is.null(weight_var) && weight_var != "") {
-    # Weight was configured - it MUST exist in data
-    # This will be checked after data load; prepare for refusal if missing
   }
 
   survey_data <- tryCatch({
@@ -343,186 +406,127 @@ run_confidence_analysis_impl <- function(config_path,
     )
   })
 
-  if (verbose) {
-    cat(sprintf("  ✓ Data loaded: %d respondents\n", nrow(survey_data)))
-    if (!is.null(weight_var)) {
-      cat(sprintf("  ✓ Weighted analysis using: %s\n", weight_var))
-    } else {
-      cat("  ✓ Unweighted analysis\n")
-    }
-  }
-
-  # ==========================================================================
-  # TRS WEIGHT REFUSAL CHECK (TRS v1.0)
-  # ==========================================================================
-  # If weight was configured but not found in data, REFUSE the run
+  # Check weight variable exists if specified
   if (!is.null(weight_var) && weight_var != "" && !weight_var %in% names(survey_data)) {
-    if (exists("turas_refuse", mode = "function")) {
-      turas_refuse(
-        "CONF_WEIGHT_MISSING",
-        "Configured weight variable not found in data",
-        sprintf("Weight variable '%s' specified in config but not present in data file", weight_var),
-        sprintf("Ensure column '%s' exists in the data file, or remove weight_variable from config", weight_var)
-      )
-    } else {
-      confidence_refuse(
-        code = "DATA_WEIGHT_NOT_FOUND",
-        title = "Configured Weight Variable Not Found",
-        problem = sprintf("Weight variable '%s' specified in config but not present in data file", weight_var),
-        why_it_matters = "The specified weight variable must exist in the data for weighted analysis.",
-        how_to_fix = sprintf("Ensure column '%s' exists in the data file, or remove weight_variable from config", weight_var)
-      )
-    }
+    confidence_refuse(
+      code = "DATA_WEIGHT_NOT_FOUND",
+      title = "Configured Weight Variable Not Found",
+      problem = sprintf("Weight variable '%s' specified in config but not present in data file", weight_var),
+      why_it_matters = "The specified weight variable must exist in the data for weighted analysis.",
+      how_to_fix = sprintf("Ensure column '%s' exists in the data file, or remove weight_variable from config", weight_var)
+    )
   }
 
-  # ============================================================================
-  # STEP 3: STUDY-LEVEL STATISTICS
-  # ============================================================================
+  list(survey_data = survey_data, weight_var = weight_var)
+}
 
-  if (verbose) cat("\nSTEP 3/6: Calculating study-level statistics...\n")
 
+#' Calculate study-level statistics step
+#' @keywords internal
+calculate_study_stats_step <- function(survey_data, weight_var, config, verbose) {
   study_stats <- NULL
-  if (config$study_settings$Calculate_Effective_N == "Y") {
-    study_stats <- tryCatch({
-      calculate_study_level_stats(
-        survey_data = survey_data,
-        weight_variable = weight_var,
-        group_variable = NULL
-      )
-    }, error = function(e) {
-      warning(sprintf("Failed to calculate study-level stats: %s", conditionMessage(e)))
-      warnings_list <- c(warnings_list, sprintf("Study-level stats failed: %s", conditionMessage(e)))
-      NULL
-    })
+  warnings_list <- character()
 
-    if (!is.null(study_stats) && verbose) {
-      if (nrow(study_stats) > 0) {
-        cat(sprintf("  ✓ Actual n: %d\n", study_stats$Actual_n[1]))
-        cat(sprintf("  ✓ Effective n: %d\n", study_stats$Effective_n[1]))
-        cat(sprintf("  ✓ DEFF: %.2f\n", study_stats$DEFF[1]))
+  if (config$study_settings$Calculate_Effective_N != "Y") {
+    if (verbose) cat("  - Study-level stats skipped (disabled in config)\n")
+    return(list(study_stats = NULL, warnings = character()))
+  }
 
-        # Check for warnings in study stats
-        if (study_stats$Warning[1] != "") {
-          warnings_list <- c(warnings_list, sprintf("Study-level: %s", study_stats$Warning[1]))
-        }
-      }
+  study_stats <- tryCatch({
+    calculate_study_level_stats(
+      survey_data = survey_data,
+      weight_variable = weight_var,
+      group_variable = NULL
+    )
+  }, error = function(e) {
+    warning(sprintf("Failed to calculate study-level stats: %s", conditionMessage(e)))
+    warnings_list <<- c(warnings_list, sprintf("Study-level stats failed: %s", conditionMessage(e)))
+    NULL
+  })
+
+  if (!is.null(study_stats) && nrow(study_stats) > 0 && verbose) {
+    cat(sprintf("  + Actual n: %d\n", study_stats$Actual_n[1]))
+    cat(sprintf("  + Effective n: %d\n", study_stats$Effective_n[1]))
+    cat(sprintf("  + DEFF: %.2f\n", study_stats$DEFF[1]))
+
+    if (study_stats$Warning[1] != "") {
+      warnings_list <- c(warnings_list, sprintf("Study-level: %s", study_stats$Warning[1]))
     }
+  }
 
-    # Add representativeness diagnostics if study stats were calculated
-    if (!is.null(study_stats)) {
-      # Get weights vector for diagnostics
-      weights <- if (!is.null(weight_var) && weight_var %in% names(survey_data)) {
-        survey_data[[weight_var]]
-      } else {
-        NULL
-      }
+  # Add representativeness diagnostics
+  if (!is.null(study_stats)) {
+    study_stats <- add_representativeness_diagnostics(
+      study_stats, survey_data, weight_var, config, verbose, warnings_list
+    )
+    warnings_list <- attr(study_stats, "additional_warnings") %||% warnings_list
+  }
 
-      # Weight concentration diagnostics
-      weight_conc <- tryCatch({
-        compute_weight_concentration(weights)
-      }, error = function(e) {
-        if (verbose) cat(sprintf("  ⚠ Weight concentration calculation failed: %s\n", conditionMessage(e)))
-        NULL
-      })
+  list(study_stats = study_stats, warnings = warnings_list)
+}
 
-      # Margin comparison (if Population_Margins provided)
-      margin_comp <- tryCatch({
-        compute_margin_comparison(
-          data = survey_data,
-          weights = weights,
-          target_margins = config$population_margins
-        )
-      }, error = function(e) {
-        if (verbose) cat(sprintf("  ⚠ Margin comparison failed: %s\n", conditionMessage(e)))
-        NULL
-      })
 
-      # Attach to study_stats as attributes (so they travel with study_stats)
-      attr(study_stats, "weight_concentration") <- weight_conc
-      attr(study_stats, "margin_comparison") <- margin_comp
-
-      # Report if calculated
-      if (!is.null(weight_conc) && verbose) {
-        cat(sprintf("  ✓ Weight concentration: Top 5%% hold %.1f%% of weight (%s)\n",
-                    weight_conc$Top_5pct_Share,
-                    weight_conc$Concentration_Flag))
-      }
-
-      if (!is.null(margin_comp) && verbose) {
-        n_red <- sum(margin_comp$Flag == "RED", na.rm = TRUE)
-        n_amber <- sum(margin_comp$Flag == "AMBER", na.rm = TRUE)
-        n_green <- sum(margin_comp$Flag == "GREEN", na.rm = TRUE)
-        cat(sprintf("  ✓ Margin comparison: %d targets (%d GREEN, %d AMBER, %d RED)\n",
-                    nrow(margin_comp), n_green, n_amber, n_red))
-        if (n_red > 0) {
-          warnings_list <- c(warnings_list, sprintf(
-            "Representativeness: %d margin target(s) off by >5pp (RED flag)",
-            n_red
-          ))
-        }
-      }
-    }
+#' Add representativeness diagnostics to study stats
+#' @keywords internal
+add_representativeness_diagnostics <- function(study_stats, survey_data, weight_var,
+                                                config, verbose, warnings_list) {
+  weights <- if (!is.null(weight_var) && weight_var %in% names(survey_data)) {
+    survey_data[[weight_var]]
   } else {
-    if (verbose) cat("  ⊘ Study-level stats skipped (disabled in config)\n")
+    NULL
   }
 
-  # ============================================================================
-  # STEP 4: PROCESS QUESTIONS
-  # ============================================================================
+  # Weight concentration diagnostics
+  weight_conc <- tryCatch({
+    compute_weight_concentration(weights)
+  }, error = function(e) {
+    if (verbose) cat(sprintf("  ! Weight concentration calculation failed: %s\n", conditionMessage(e)))
+    NULL
+  })
 
-  if (verbose) cat("\nSTEP 4/6: Processing questions...\n")
+  # Margin comparison
+  margin_comp <- tryCatch({
+    compute_margin_comparison(
+      data = survey_data,
+      weights = weights,
+      target_margins = config$population_margins
+    )
+  }, error = function(e) {
+    if (verbose) cat(sprintf("  ! Margin comparison failed: %s\n", conditionMessage(e)))
+    NULL
+  })
 
-  proportion_results <- list()
-  mean_results <- list()
-  nps_results <- list()
+  attr(study_stats, "weight_concentration") <- weight_conc
+  attr(study_stats, "margin_comparison") <- margin_comp
 
-  n_questions <- nrow(config$question_analysis)
+  if (!is.null(weight_conc) && verbose) {
+    cat(sprintf("  + Weight concentration: Top 5%% hold %.1f%% of weight (%s)\n",
+                weight_conc$Top_5pct_Share, weight_conc$Concentration_Flag))
+  }
 
-  for (i in seq_len(n_questions)) {
-    q_row <- config$question_analysis[i, ]
-    q_id <- q_row$Question_ID
-
-    if (verbose && i %% 10 == 0) {
-      cat(sprintf("  Progress: %d/%d questions (%.0f%%)\n",
-                  i, n_questions, (i / n_questions) * 100))
+  if (!is.null(margin_comp) && verbose) {
+    n_red <- sum(margin_comp$Flag == "RED", na.rm = TRUE)
+    n_amber <- sum(margin_comp$Flag == "AMBER", na.rm = TRUE)
+    n_green <- sum(margin_comp$Flag == "GREEN", na.rm = TRUE)
+    cat(sprintf("  + Margin comparison: %d targets (%d GREEN, %d AMBER, %d RED)\n",
+                nrow(margin_comp), n_green, n_amber, n_red))
+    if (n_red > 0) {
+      warnings_list <- c(warnings_list, sprintf(
+        "Representativeness: %d margin target(s) off by >5pp (RED flag)", n_red
+      ))
     }
-
-    # Process based on statistic type
-    stat_type <- tolower(q_row$Statistic_Type)
-
-    if (stat_type == "proportion") {
-      result <- process_proportion_question(q_row, survey_data, weight_var, config, warnings_list)
-      proportion_results[[q_id]] <- result$result
-      warnings_list <- result$warnings
-    } else if (stat_type == "mean") {
-      result <- process_mean_question(q_row, survey_data, weight_var, config, warnings_list)
-      mean_results[[q_id]] <- result$result
-      warnings_list <- result$warnings
-    } else if (stat_type == "nps") {
-      result <- process_nps_question(q_row, survey_data, weight_var, config, warnings_list)
-      nps_results[[q_id]] <- result$result
-      warnings_list <- result$warnings
-    } else {
-      warning(sprintf("Unknown statistic type '%s' for question %s", stat_type, q_id))
-      warnings_list <- c(warnings_list, sprintf("Question %s: Unknown statistic type '%s'", q_id, stat_type))
-    }
   }
 
-  if (verbose) {
-    cat(sprintf("  ✓ Processed: %d proportions, %d means, %d NPS\n",
-                length(proportion_results), length(mean_results), length(nps_results)))
-  }
+  attr(study_stats, "additional_warnings") <- warnings_list
+  study_stats
+}
 
-  # ============================================================================
-  # STEP 5: COLLECT WARNINGS
-  # ============================================================================
 
-  if (verbose) cat("\nSTEP 5/6: Quality checks...\n")
-
+#' Handle warnings step
+#' @keywords internal
+handle_warnings_step <- function(warnings_list, verbose, stop_on_warnings) {
   if (length(warnings_list) > 0) {
-    if (verbose) {
-      cat(sprintf("  ⚠ %d warnings detected\n", length(warnings_list)))
-    }
+    if (verbose) cat(sprintf("  ! %d warnings detected\n", length(warnings_list)))
 
     if (stop_on_warnings) {
       cat("\nWARNINGS:\n")
@@ -532,7 +536,8 @@ run_confidence_analysis_impl <- function(config_path,
       confidence_refuse(
         code = "DATA_QUALITY_WARNINGS",
         title = "Analysis Stopped Due to Warnings",
-        problem = sprintf("Analysis encountered %d warning(s) and stop_on_warnings is enabled", length(warnings_list)),
+        problem = sprintf("Analysis encountered %d warning(s) and stop_on_warnings is enabled",
+                         length(warnings_list)),
         why_it_matters = "Data quality warnings may indicate issues that could affect result reliability.",
         how_to_fix = c(
           "Review the warnings listed above",
@@ -543,41 +548,35 @@ run_confidence_analysis_impl <- function(config_path,
       )
     }
   } else {
-    if (verbose) cat("  ✓ No warnings detected\n")
+    if (verbose) cat("  + No warnings detected\n")
   }
+}
 
-  # ============================================================================
-  # STEP 6: GENERATE OUTPUT
-  # ============================================================================
 
-  if (verbose) cat("\nSTEP 6/6: Generating Excel output...\n")
-
-  output_path <- config$file_paths$Output_File
-
-  # ==========================================================================
-  # TRS: Log PARTIAL events for any warnings
-  # ==========================================================================
+#' Log TRS events for warnings
+#' @keywords internal
+log_trs_events <- function(trs_state, warnings_list) {
   if (!is.null(trs_state) && length(warnings_list) > 0) {
     for (warn in warnings_list) {
       if (exists("turas_run_state_partial", mode = "function")) {
-        turas_run_state_partial(
-          trs_state,
-          "CONF_WARNING",
-          "Analysis warning",
-          problem = warn
-        )
+        turas_run_state_partial(trs_state, "CONF_WARNING", "Analysis warning", problem = warn)
       }
     }
   }
 
-  # ==========================================================================
-  # TRS: Get run result for output
-  # ==========================================================================
-  run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+  if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
     turas_run_state_result(trs_state)
   } else {
     NULL
   }
+}
+
+
+#' Generate output step
+#' @keywords internal
+generate_output_step <- function(config, study_stats, proportion_results,
+                                  mean_results, nps_results, warnings_list, run_result) {
+  output_path <- config$file_paths$Output_File
 
   tryCatch({
     write_confidence_output(
@@ -610,14 +609,14 @@ run_confidence_analysis_impl <- function(config_path,
       )
     )
   })
+}
 
-  # ============================================================================
-  # SUMMARY
-  # ============================================================================
 
-  end_time <- Sys.time()
-  elapsed <- as.numeric(difftime(end_time, start_time, units = "secs"))
-
+#' Print completion summary
+#' @keywords internal
+print_completion_summary <- function(verbose, end_time, elapsed, n_questions,
+                                      proportion_results, mean_results, nps_results,
+                                      warnings_list, output_path, run_result) {
   if (verbose) {
     cat("\n")
     cat(sprintf("Finished: %s\n", format(end_time, "%Y-%m-%d %H:%M:%S")))
@@ -625,13 +624,12 @@ run_confidence_analysis_impl <- function(config_path,
     cat(sprintf("Questions processed: %d\n", n_questions))
     cat(sprintf("Proportions: %d\n", length(proportion_results)))
     cat(sprintf("Means: %d\n", length(mean_results)))
+    cat(sprintf("NPS: %d\n", length(nps_results)))
     cat(sprintf("Warnings: %d\n", length(warnings_list)))
     cat(sprintf("Output file: %s\n", output_path))
   }
 
-  # ==========================================================================
-  # TRS FINAL BANNER (TRS v1.0)
-  # ==========================================================================
+  # TRS FINAL BANNER
   if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
     turas_print_final_banner(run_result)
   } else if (verbose) {
@@ -639,707 +637,267 @@ run_confidence_analysis_impl <- function(config_path,
     if (length(warnings_list) == 0) {
       cat("[TRS PASS] CONFIDENCE - ANALYSIS COMPLETED SUCCESSFULLY\n")
     } else {
-      cat(sprintf("[TRS PARTIAL] CONFIDENCE - ANALYSIS COMPLETED WITH %d WARNING(S)\n", length(warnings_list)))
+      cat(sprintf("[TRS PARTIAL] CONFIDENCE - ANALYSIS COMPLETED WITH %d WARNING(S)\n",
+                  length(warnings_list)))
     }
     cat("================================================================================\n\n")
   }
+}
 
-  # Return results (include run_result for programmatic access)
-  invisible(list(
-    study_stats = study_stats,
+
+# ==============================================================================
+# QUESTION PROCESSING ORCHESTRATION
+# ==============================================================================
+
+#' Process all questions
+#' @keywords internal
+process_all_questions <- function(config, survey_data, weight_var, verbose) {
+  proportion_results <- list()
+  mean_results <- list()
+  nps_results <- list()
+  warnings_list <- character()
+
+  n_questions <- nrow(config$question_analysis)
+
+  for (i in seq_len(n_questions)) {
+    q_row <- config$question_analysis[i, ]
+    q_id <- q_row$Question_ID
+
+    if (verbose && i %% 10 == 0) {
+      cat(sprintf("  Progress: %d/%d questions (%.0f%%)\n",
+                  i, n_questions, (i / n_questions) * 100))
+    }
+
+    stat_type <- tolower(q_row$Statistic_Type)
+
+    if (stat_type == "proportion") {
+      result <- process_proportion_question(q_row, survey_data, weight_var, config)
+      proportion_results[[q_id]] <- result$result
+      warnings_list <- c(warnings_list, result$warnings)
+    } else if (stat_type == "mean") {
+      result <- process_mean_question(q_row, survey_data, weight_var, config)
+      mean_results[[q_id]] <- result$result
+      warnings_list <- c(warnings_list, result$warnings)
+    } else if (stat_type == "nps") {
+      result <- process_nps_question(q_row, survey_data, weight_var, config)
+      nps_results[[q_id]] <- result$result
+      warnings_list <- c(warnings_list, result$warnings)
+    } else {
+      warning(sprintf("Unknown statistic type '%s' for question %s", stat_type, q_id))
+      warnings_list <- c(warnings_list,
+        sprintf("Question %s: Unknown statistic type '%s'", q_id, stat_type))
+    }
+  }
+
+  list(
     proportion_results = proportion_results,
     mean_results = mean_results,
     nps_results = nps_results,
-    warnings = warnings_list,
-    config = config,
-    elapsed_seconds = elapsed,
-    run_result = run_result
-  ))
+    warnings = warnings_list
+  )
 }
 
 
 # ==============================================================================
-# QUESTION PROCESSING FUNCTIONS
+# REFACTORED QUESTION PROCESSING FUNCTIONS
 # ==============================================================================
 
-#' Process proportion question (internal)
+#' Process proportion question
+#' Uses question_processor.R and ci_dispatcher.R for common logic
 #' @keywords internal
-process_proportion_question <- function(q_row, survey_data, weight_var, config, warnings_list) {
+process_proportion_question <- function(q_row, survey_data, weight_var, config) {
   q_id <- q_row$Question_ID
-  result <- list()
+  warnings_list <- character()
 
   tryCatch({
-    # -------------------------------------------------------------------------
-    # 1. Check question exists
-    # -------------------------------------------------------------------------
-    if (!q_id %in% names(survey_data)) {
-      warnings_list <- c(
-        warnings_list,
-        sprintf("Question %s: Not found in data", q_id)
-      )
+    # Step 1: Prepare question data (using shared module)
+    prep <- process_question_data(q_id, survey_data, weight_var, require_numeric = FALSE)
+
+    if (!prep$success) {
+      warnings_list <- c(warnings_list, prep$warning)
       return(list(result = NULL, warnings = warnings_list))
     }
 
-    values <- survey_data[[q_id]]
-
-    # -------------------------------------------------------------------------
-    # 2. Get weights (if applicable)
-    # -------------------------------------------------------------------------
-    weights <- NULL
-    if (!is.null(weight_var) && nzchar(weight_var) && weight_var %in% names(survey_data)) {
-      weights <- survey_data[[weight_var]]
-    }
-
-    # -------------------------------------------------------------------------
-    # 3. Parse categories and basic validation
-    # -------------------------------------------------------------------------
+    # Step 2: Parse categories
     categories <- parse_codes(q_row$Categories)
     if (length(categories) == 0) {
-      warnings_list <- c(
-        warnings_list,
-        sprintf("Question %s: No categories specified", q_id)
-      )
+      warnings_list <- c(warnings_list, sprintf("Question %s: No categories specified", q_id))
       return(list(result = NULL, warnings = warnings_list))
     }
 
-    # -------------------------------------------------------------------------
-    # 4. Clean and align values and weights
-    # -------------------------------------------------------------------------
-    # Start with non-missing values
-    valid_value_idx <- !is.na(values)
+    # Step 3: Calculate base statistics (using shared module)
+    stats <- calculate_proportion_stats(prep$values, categories, prep$weights)
 
-    if (!is.null(weights)) {
-      # Keep only respondents with a valid answer AND valid weight
-      weights_raw <- weights
-      good_idx <- valid_value_idx & !is.na(weights_raw) & weights_raw > 0
-
-      values_valid  <- values[good_idx]
-      weights_valid <- weights_raw[good_idx]
-
-      if (length(values_valid) == 0) {
-        warnings_list <- c(
-          warnings_list,
-          sprintf("Question %s: No valid cases after applying weights", q_id)
-        )
-        return(list(result = NULL, warnings = warnings_list))
-      }
-    } else {
-      values_valid  <- values[valid_value_idx]
-      weights_valid <- NULL
-
-      if (length(values_valid) == 0) {
-        warnings_list <- c(
-          warnings_list,
-          sprintf("Question %s: No valid (non-missing) responses", q_id)
-        )
-        return(list(result = NULL, warnings = warnings_list))
-      }
-    }
-
-    # -------------------------------------------------------------------------
-    # 5. Calculate observed proportion and effective n
-    # -------------------------------------------------------------------------
-    in_category <- values_valid %in% categories
-
-    if (!is.null(weights_valid)) {
-      total_w   <- sum(weights_valid)
-      success_w <- sum(weights_valid[in_category])
-
-      if (isTRUE(total_w <= 0)) {
-        warnings_list <- c(
-          warnings_list,
-          sprintf("Question %s: Total weight is zero or negative", q_id)
-        )
-        return(list(result = NULL, warnings = warnings_list))
-      }
-
-      p      <- success_w / total_w
-      n_eff  <- calculate_effective_n(weights_valid)
-      n_raw  <- length(values_valid)
-    } else {
-      p      <- mean(in_category)
-      n_eff  <- length(values_valid)
-      n_raw  <- length(values_valid)
-    }
-
-    # Basic sanity check
-    if (is.na(p)) {
-      warnings_list <- c(
-        warnings_list,
-        sprintf("Question %s: Proportion could not be calculated (NA)", q_id)
-      )
+    if (!stats$success) {
+      warnings_list <- c(warnings_list, sprintf("Question %s: %s", q_id, stats$message))
       return(list(result = NULL, warnings = warnings_list))
     }
 
-    # -------------------------------------------------------------------------
-    # 6. Store core stats for this question
-    # -------------------------------------------------------------------------
-    result$category   <- paste(categories, collapse = ",")
-    result$proportion <- p
-    result$n          <- n_raw
-    result$n_eff      <- n_eff
+    # Step 4: Build result with base stats
+    result <- list(
+      category   = paste(categories, collapse = ","),
+      proportion = stats$proportion,
+      n          = stats$n_raw,
+      n_eff      = stats$n_eff
+    )
 
-    # -------------------------------------------------------------------------
-    # 7. Confidence intervals according to config
-    # -------------------------------------------------------------------------
-    conf_level <- as.numeric(config$study_settings$Confidence_Level)
+    # Step 5: Dispatch CI calculations (using shared module)
+    ci_results <- dispatch_proportion_ci(
+      p = stats$proportion,
+      n_eff = stats$n_eff,
+      values = prep$values,
+      categories = categories,
+      weights = prep$weights,
+      q_row = q_row,
+      config = config
+    )
 
-    # Margin of error (normal approximation using effective n)
-    run_moe_flag <- q_row$Run_MOE
-    if (!is.null(run_moe_flag) &&
-        !is.na(run_moe_flag) &&
-        toupper(run_moe_flag) == "Y") {
-      if (!is.na(n_eff) && n_eff > 0) {
-        result$moe <- calculate_proportion_ci_normal(p, n_eff, conf_level)
-      } else {
-        warnings_list <- c(
-          warnings_list,
-          sprintf("Question %s: Effective n <= 0, MOE CI not calculated", q_id)
-        )
-      }
-    }
+    # Merge CI results
+    if (!is.null(ci_results$moe)) result$moe <- ci_results$moe
+    if (!is.null(ci_results$wilson)) result$wilson <- ci_results$wilson
+    if (!is.null(ci_results$bootstrap)) result$bootstrap <- ci_results$bootstrap
+    if (!is.null(ci_results$bayesian)) result$bayesian <- ci_results$bayesian
+    warnings_list <- c(warnings_list, ci_results$warnings)
 
-    # Wilson interval (using Use_Wilson flag)
-    # Check if Use_Wilson column exists (backward compatibility with old configs)
-    use_wilson_flag <- if ("Use_Wilson" %in% names(q_row)) q_row$Use_Wilson else NULL
-    if (!is.null(use_wilson_flag) &&
-        !is.na(use_wilson_flag) &&
-        toupper(use_wilson_flag) == "Y") {
-      if (!is.na(n_eff) && n_eff > 0) {
-        result$wilson <- calculate_proportion_ci_wilson(p, n_eff, conf_level)
-      } else {
-        warnings_list <- c(
-          warnings_list,
-          sprintf("Question %s: Effective n <= 0, Wilson CI not calculated", q_id)
-        )
-      }
-    }
-
-    # Bootstrap CI
-    run_boot_flag <- q_row$Run_Bootstrap
-    if (!is.null(run_boot_flag) &&
-        !is.na(run_boot_flag) &&
-        toupper(run_boot_flag) == "Y") {
-      boot_iter <- as.integer(config$study_settings$Bootstrap_Iterations)
-      result$bootstrap <- bootstrap_proportion_ci(
-        data       = values_valid,
-        categories = categories,
-        weights    = weights_valid,
-        B          = boot_iter,
-        conf_level = conf_level
-      )
-    }
-
-    # Bayesian CI (Beta-Binomial)
-    run_cred_flag <- q_row$Run_Credible
-    if (!is.null(run_cred_flag) &&
-        !is.na(run_cred_flag) &&
-        toupper(run_cred_flag) == "Y") {
-      prior_mean <- if (!is.na(q_row$Prior_Mean)) q_row$Prior_Mean else NULL
-      prior_n    <- if (!is.na(q_row$Prior_N))    q_row$Prior_N    else NULL
-
-      # Use effective n for weighted data, raw n otherwise
-      n_bayes <- if (!is.null(weights_valid)) n_eff else length(values_valid)
-
-      result$bayesian <- credible_interval_proportion(
-        p          = p,
-        n          = n_bayes,
-        conf_level = conf_level,
-        prior_mean = prior_mean,
-        prior_n    = prior_n
-      )
-    }
+    return(list(result = result, warnings = warnings_list))
 
   }, error = function(e) {
-    warnings_list <- c(
-      warnings_list,
-      sprintf("Question %s: %s", q_id, conditionMessage(e))
-    )
+    warnings_list <- c(warnings_list, sprintf("Question %s: %s", q_id, conditionMessage(e)))
+    return(list(result = NULL, warnings = warnings_list))
   })
-
-  return(list(result = result, warnings = warnings_list))
 }
 
 
-#' Process mean question (internal)
+#' Process mean question
+#' Uses question_processor.R and ci_dispatcher.R for common logic
 #' @keywords internal
-process_mean_question <- function(q_row, survey_data, weight_var, config, warnings_list) {
+process_mean_question <- function(q_row, survey_data, weight_var, config) {
   q_id <- q_row$Question_ID
-  result <- list()
+  warnings_list <- character()
 
   tryCatch({
-    # -------------------------------------------------------------------------
-    # 1. Check question exists
-    # -------------------------------------------------------------------------
-    if (!q_id %in% names(survey_data)) {
-      warnings_list <- c(
-        warnings_list,
-        sprintf("Question %s: Not found in data", q_id)
-      )
+    # Step 1: Prepare question data (require numeric)
+    prep <- process_question_data(q_id, survey_data, weight_var, require_numeric = TRUE)
+
+    if (!prep$success) {
+      warnings_list <- c(warnings_list, prep$warning)
       return(list(result = NULL, warnings = warnings_list))
     }
 
-    values <- survey_data[[q_id]]
+    # Step 2: Calculate base statistics
+    stats <- calculate_mean_stats(prep$values, prep$weights)
 
-    # Attempt to convert to numeric if not already numeric
-    # (handles case where numeric data is stored as character/text in source file)
-    if (!is.numeric(values)) {
-      # Try conversion
-      values_converted <- suppressWarnings(as.numeric(values))
-
-      # Smart conversion check that handles questions with low response due to routing
-      n_total <- length(values)
-
-      # Count NAs in original data (routing/skip logic)
-      n_was_na_before <- sum(is.na(values) | trimws(as.character(values)) == "")
-
-      # Count valid numbers after conversion
-      n_valid_after_conversion <- sum(!is.na(values_converted))
-
-      # Count how many non-missing values we had
-      n_non_missing_before <- n_total - n_was_na_before
-
-      # If we have at least 10 valid numbers AND didn't lose more than 20% in conversion, accept it
-      # This handles: (1) routed questions with low n, (2) text-formatted numeric columns
-      if (n_valid_after_conversion >= 10 && n_non_missing_before > 0) {
-        conversion_success_rate <- n_valid_after_conversion / n_non_missing_before
-        if (conversion_success_rate >= 0.80) {
-          values <- values_converted
-        } else {
-          # Most non-missing values couldn't convert - truly non-numeric
-          warnings_list <- c(
-            warnings_list,
-            sprintf("Question %s: Non-numeric values for mean analysis (only %d/%d non-missing values convertible)",
-                    q_id, n_valid_after_conversion, n_non_missing_before)
-          )
-          return(list(result = NULL, warnings = warnings_list))
-        }
-      } else {
-        # Too few responses or all missing
-        warnings_list <- c(
-          warnings_list,
-          sprintf("Question %s: Insufficient numeric data for mean analysis (only %d valid values)",
-                  q_id, n_valid_after_conversion)
-        )
-        return(list(result = NULL, warnings = warnings_list))
-      }
+    if (!stats$success) {
+      warnings_list <- c(warnings_list, sprintf("Question %s: %s", q_id, stats$message))
+      return(list(result = NULL, warnings = warnings_list))
     }
 
-    # -------------------------------------------------------------------------
-    # 2. Get weights (if applicable)
-    # -------------------------------------------------------------------------
-    weights <- NULL
-    if (!is.null(weight_var) && nzchar(weight_var) && weight_var %in% names(survey_data)) {
-      weights <- survey_data[[weight_var]]
-    }
+    # Step 3: Build result with base stats
+    result <- list(
+      mean  = stats$mean,
+      sd    = stats$sd,
+      n     = stats$n_raw,
+      n_eff = stats$n_eff
+    )
 
-    # -------------------------------------------------------------------------
-    # 3. Clean and align values and weights
-    # -------------------------------------------------------------------------
-    # Start with non-missing numeric values
-    valid_value_idx <- !is.na(values) & is.finite(values)
+    # Step 4: Dispatch CI calculations
+    ci_results <- dispatch_mean_ci(
+      mean_val = stats$mean,
+      sd_val = stats$sd,
+      n_eff = stats$n_eff,
+      values = prep$values,
+      weights = prep$weights,
+      q_row = q_row,
+      config = config
+    )
 
-    if (!is.null(weights)) {
-      weights_raw <- weights
-      # Keep only respondents with valid value AND valid weight
-      good_idx <- valid_value_idx & !is.na(weights_raw) & weights_raw > 0
+    # Merge CI results
+    if (!is.null(ci_results$t_dist)) result$t_dist <- ci_results$t_dist
+    if (!is.null(ci_results$bootstrap)) result$bootstrap <- ci_results$bootstrap
+    if (!is.null(ci_results$bayesian)) result$bayesian <- ci_results$bayesian
+    warnings_list <- c(warnings_list, ci_results$warnings)
 
-      values_valid  <- values[good_idx]
-      weights_valid <- weights_raw[good_idx]
-
-      if (length(values_valid) == 0) {
-        warnings_list <- c(
-          warnings_list,
-          sprintf("Question %s: No valid cases after applying weights", q_id)
-        )
-        return(list(result = NULL, warnings = warnings_list))
-      }
-    } else {
-      values_valid  <- values[valid_value_idx]
-      weights_valid <- NULL
-
-      if (length(values_valid) == 0) {
-        warnings_list <- c(
-          warnings_list,
-          sprintf("Question %s: No valid (non-missing) numeric responses", q_id)
-        )
-        return(list(result = NULL, warnings = warnings_list))
-      }
-    }
-
-    # -------------------------------------------------------------------------
-    # 4. Calculate mean, SD and effective n
-    # -------------------------------------------------------------------------
-    if (!is.null(weights_valid) && length(weights_valid) > 0) {
-      # Weighted mean
-      total_w <- sum(weights_valid)
-      if (isTRUE(total_w <= 0)) {
-        warnings_list <- c(
-          warnings_list,
-          sprintf("Question %s: Total weight is zero or negative", q_id)
-        )
-        return(list(result = NULL, warnings = warnings_list))
-      }
-
-      mean_val <- sum(values_valid * weights_valid) / total_w
-
-      # Weighted variance (population estimator, consistent with effective n)
-      weighted_var <- sum(weights_valid * (values_valid - mean_val)^2) / total_w
-      sd_val       <- sqrt(weighted_var)
-
-      n_eff <- calculate_effective_n(weights_valid)
-      n_raw <- length(values_valid)
-    } else {
-      # Unweighted
-      mean_val <- mean(values_valid)
-      sd_val   <- sd(values_valid)
-      n_eff    <- length(values_valid)
-      n_raw    <- length(values_valid)
-      weights_valid <- NULL  # be explicit
-    }
-
-    result$mean  <- mean_val
-    result$sd    <- sd_val
-    result$n     <- n_raw
-    result$n_eff <- n_eff
-
-    # -------------------------------------------------------------------------
-    # 5. Confidence intervals according to config
-    # -------------------------------------------------------------------------
-    conf_level <- as.numeric(config$study_settings$Confidence_Level)
-
-    # t-distribution CI (uses n_eff internally in calculate_mean_ci)
-    run_moe_flag <- q_row$Run_MOE
-    if (!is.null(run_moe_flag) &&
-        !is.na(run_moe_flag) &&
-        toupper(run_moe_flag) == "Y") {
-      result$t_dist <- calculate_mean_ci(
-        values     = values_valid,
-        weights    = weights_valid,
-        conf_level = conf_level
-      )
-    }
-
-    # Bootstrap CI
-    run_boot_flag <- q_row$Run_Bootstrap
-    if (!is.null(run_boot_flag) &&
-        !is.na(run_boot_flag) &&
-        toupper(run_boot_flag) == "Y") {
-      boot_iter <- as.integer(config$study_settings$Bootstrap_Iterations)
-      result$bootstrap <- bootstrap_mean_ci(
-        values     = values_valid,
-        weights    = weights_valid,
-        B          = boot_iter,
-        conf_level = conf_level
-      )
-    }
-
-    # Bayesian CI for the mean
-    run_cred_flag <- q_row$Run_Credible
-    if (!is.null(run_cred_flag) &&
-        !is.na(run_cred_flag) &&
-        toupper(run_cred_flag) == "Y") {
-      prior_mean <- if (!is.na(q_row$Prior_Mean)) q_row$Prior_Mean else NULL
-      prior_sd   <- if (!is.na(q_row$Prior_SD))   q_row$Prior_SD   else NULL
-      prior_n    <- if (!is.na(q_row$Prior_N))    q_row$Prior_N    else NULL
-
-      result$bayesian <- credible_interval_mean(
-        values     = values_valid,
-        weights    = weights_valid,
-        conf_level = conf_level,
-        prior_mean = prior_mean,
-        prior_sd   = prior_sd,
-        prior_n    = prior_n
-      )
-    }
+    return(list(result = result, warnings = warnings_list))
 
   }, error = function(e) {
-    warnings_list <- c(
-      warnings_list,
-      sprintf("Question %s: %s", q_id, conditionMessage(e))
-    )
+    warnings_list <- c(warnings_list, sprintf("Question %s: %s", q_id, conditionMessage(e)))
+    return(list(result = NULL, warnings = warnings_list))
   })
-
-  return(list(result = result, warnings = warnings_list))
 }
 
 
-#' Process NPS question (internal)
+#' Process NPS question
+#' Uses question_processor.R and ci_dispatcher.R for common logic
 #' @keywords internal
-process_nps_question <- function(q_row, survey_data, weight_var, config, warnings_list) {
+process_nps_question <- function(q_row, survey_data, weight_var, config) {
   q_id <- q_row$Question_ID
-  result <- list()
+  warnings_list <- character()
 
   tryCatch({
-    # -------------------------------------------------------------------------
-    # 1. Check question exists
-    # -------------------------------------------------------------------------
-    if (!q_id %in% names(survey_data)) {
-      warnings_list <- c(
-        warnings_list,
-        sprintf("Question %s: Not found in data", q_id)
-      )
+    # Step 1: Prepare question data (require numeric)
+    prep <- process_question_data(q_id, survey_data, weight_var, require_numeric = TRUE)
+
+    if (!prep$success) {
+      warnings_list <- c(warnings_list, prep$warning)
       return(list(result = NULL, warnings = warnings_list))
     }
 
-    values <- survey_data[[q_id]]
-
-    # Require numeric for NPS analysis
-    if (!is.numeric(values)) {
-      warnings_list <- c(
-        warnings_list,
-        sprintf("Question %s: Non-numeric values for NPS analysis", q_id)
-      )
-      return(list(result = NULL, warnings = warnings_list))
-    }
-
-    # -------------------------------------------------------------------------
-    # 2. Get weights (if applicable)
-    # -------------------------------------------------------------------------
-    weights <- NULL
-    if (!is.null(weight_var) && nzchar(weight_var) && weight_var %in% names(survey_data)) {
-      weights <- survey_data[[weight_var]]
-    }
-
-    # -------------------------------------------------------------------------
-    # 3. Parse promoter and detractor codes
-    # -------------------------------------------------------------------------
+    # Step 2: Parse promoter and detractor codes
     promoter_codes <- parse_codes(q_row$Promoter_Codes)
     detractor_codes <- parse_codes(q_row$Detractor_Codes)
 
     if (length(promoter_codes) == 0) {
-      warnings_list <- c(
-        warnings_list,
-        sprintf("Question %s: No promoter codes specified", q_id)
-      )
+      warnings_list <- c(warnings_list, sprintf("Question %s: No promoter codes specified", q_id))
       return(list(result = NULL, warnings = warnings_list))
     }
-
     if (length(detractor_codes) == 0) {
-      warnings_list <- c(
-        warnings_list,
-        sprintf("Question %s: No detractor codes specified", q_id)
-      )
+      warnings_list <- c(warnings_list, sprintf("Question %s: No detractor codes specified", q_id))
       return(list(result = NULL, warnings = warnings_list))
     }
 
-    # -------------------------------------------------------------------------
-    # 4. Clean and align values and weights
-    # -------------------------------------------------------------------------
-    # Start with non-missing numeric values
-    valid_value_idx <- !is.na(values) & is.finite(values)
+    # Step 3: Calculate NPS statistics
+    stats <- calculate_nps_stats(prep$values, promoter_codes, detractor_codes, prep$weights)
 
-    if (!is.null(weights)) {
-      weights_raw <- weights
-      # Keep only respondents with valid answer AND valid weight
-      good_idx <- valid_value_idx & !is.na(weights_raw) & weights_raw > 0
-
-      values_valid  <- values[good_idx]
-      weights_valid <- weights_raw[good_idx]
-
-      if (length(values_valid) == 0) {
-        warnings_list <- c(
-          warnings_list,
-          sprintf("Question %s: No valid cases after applying weights", q_id)
-        )
-        return(list(result = NULL, warnings = warnings_list))
-      }
-    } else {
-      values_valid  <- values[valid_value_idx]
-      weights_valid <- NULL
-
-      if (length(values_valid) == 0) {
-        warnings_list <- c(
-          warnings_list,
-          sprintf("Question %s: No valid (non-missing) responses", q_id)
-        )
-        return(list(result = NULL, warnings = warnings_list))
-      }
+    if (!stats$success) {
+      warnings_list <- c(warnings_list, sprintf("Question %s: %s", q_id, stats$message))
+      return(list(result = NULL, warnings = warnings_list))
     }
 
-    # -------------------------------------------------------------------------
-    # 5. Calculate NPS components
-    # -------------------------------------------------------------------------
-    is_promoter  <- values_valid %in% promoter_codes
-    is_detractor <- values_valid %in% detractor_codes
+    # Step 4: Build result with base stats
+    result <- list(
+      nps_score       = stats$nps_score,
+      pct_promoters   = stats$pct_promoters,
+      pct_detractors  = stats$pct_detractors,
+      pct_passives    = stats$pct_passives,
+      n               = stats$n_raw,
+      n_eff           = stats$n_eff,
+      promoter_codes  = paste(promoter_codes, collapse = ","),
+      detractor_codes = paste(detractor_codes, collapse = ",")
+    )
 
-    if (!is.null(weights_valid)) {
-      total_w <- sum(weights_valid)
+    # Step 5: Dispatch CI calculations
+    ci_results <- dispatch_nps_ci(
+      nps_stats = stats,
+      values = prep$values,
+      promoter_codes = promoter_codes,
+      detractor_codes = detractor_codes,
+      weights = prep$weights,
+      q_row = q_row,
+      config = config
+    )
 
-      if (isTRUE(total_w <= 0)) {
-        warnings_list <- c(
-          warnings_list,
-          sprintf("Question %s: Total weight is zero or negative", q_id)
-        )
-        return(list(result = NULL, warnings = warnings_list))
-      }
+    # Merge CI results
+    if (!is.null(ci_results$moe_normal)) result$moe_normal <- ci_results$moe_normal
+    if (!is.null(ci_results$bootstrap)) result$bootstrap <- ci_results$bootstrap
+    if (!is.null(ci_results$bayesian)) result$bayesian <- ci_results$bayesian
+    warnings_list <- c(warnings_list, ci_results$warnings)
 
-      pct_promoters  <- 100 * sum(weights_valid[is_promoter]) / total_w
-      pct_detractors <- 100 * sum(weights_valid[is_detractor]) / total_w
-      n_eff <- calculate_effective_n(weights_valid)
-      n_raw <- length(values_valid)
-    } else {
-      pct_promoters  <- 100 * mean(is_promoter)
-      pct_detractors <- 100 * mean(is_detractor)
-      n_eff <- length(values_valid)
-      n_raw <- length(values_valid)
-    }
-
-    nps_score <- pct_promoters - pct_detractors
-
-    # -------------------------------------------------------------------------
-    # 6. Store core stats
-    # -------------------------------------------------------------------------
-    result$nps_score       <- nps_score
-    result$pct_promoters   <- pct_promoters
-    result$pct_detractors  <- pct_detractors
-    result$pct_passives    <- 100 - pct_promoters - pct_detractors
-    result$n               <- n_raw
-    result$n_eff           <- n_eff
-    result$promoter_codes  <- paste(promoter_codes, collapse = ",")
-    result$detractor_codes <- paste(detractor_codes, collapse = ",")
-
-    # -------------------------------------------------------------------------
-    # 7. Confidence intervals according to config
-    # -------------------------------------------------------------------------
-    conf_level <- as.numeric(config$study_settings$Confidence_Level)
-
-    # Normal approximation (using variance of difference formula)
-    run_moe_flag <- q_row$Run_MOE
-    if (!is.null(run_moe_flag) &&
-        !is.na(run_moe_flag) &&
-        toupper(run_moe_flag) == "Y") {
-      if (!is.na(n_eff) && n_eff > 0) {
-        # Convert percentages to proportions for variance calculation
-        p_prom <- pct_promoters / 100
-        p_detr <- pct_detractors / 100
-
-        # Variance of difference (assuming independence)
-        var_prom <- p_prom * (1 - p_prom) / n_eff
-        var_detr <- p_detr * (1 - p_detr) / n_eff
-        se_nps <- sqrt(var_prom + var_detr) * 100  # Convert back to percentage scale
-
-        z <- qnorm(1 - (1 - conf_level) / 2)
-        moe <- z * se_nps
-
-        result$moe_normal <- list(
-          lower = nps_score - moe,
-          upper = nps_score + moe,
-          se = se_nps
-        )
-      } else {
-        warnings_list <- c(
-          warnings_list,
-          sprintf("Question %s: Effective n <= 0, MOE CI not calculated", q_id)
-        )
-      }
-    }
-
-    # Bootstrap CI
-    run_boot_flag <- q_row$Run_Bootstrap
-    if (!is.null(run_boot_flag) &&
-        !is.na(run_boot_flag) &&
-        toupper(run_boot_flag) == "Y") {
-      boot_iter <- as.integer(config$study_settings$Bootstrap_Iterations)
-
-      # Bootstrap NPS
-      B <- boot_iter
-      validate_sample_size(B, "B", min_n = 1000)
-
-      n <- length(values_valid)
-      boot_nps <- numeric(B)
-
-      for (b in 1:B) {
-        boot_idx <- sample(1:n, size = n, replace = TRUE)
-        boot_values <- values_valid[boot_idx]
-
-        if (!is.null(weights_valid)) {
-          boot_weights <- weights_valid[boot_idx]
-          total_w_boot <- sum(boot_weights)
-
-          if (total_w_boot > 0) {
-            is_prom_boot <- boot_values %in% promoter_codes
-            is_detr_boot <- boot_values %in% detractor_codes
-
-            pct_prom_boot <- 100 * sum(boot_weights[is_prom_boot]) / total_w_boot
-            pct_detr_boot <- 100 * sum(boot_weights[is_detr_boot]) / total_w_boot
-
-            boot_nps[b] <- pct_prom_boot - pct_detr_boot
-          } else {
-            boot_nps[b] <- NA
-          }
-        } else {
-          is_prom_boot <- boot_values %in% promoter_codes
-          is_detr_boot <- boot_values %in% detractor_codes
-
-          pct_prom_boot <- 100 * mean(is_prom_boot)
-          pct_detr_boot <- 100 * mean(is_detr_boot)
-
-          boot_nps[b] <- pct_prom_boot - pct_detr_boot
-        }
-      }
-
-      # Remove any NAs from bootstrap
-      boot_nps <- boot_nps[!is.na(boot_nps)]
-
-      if (length(boot_nps) > 0) {
-        alpha <- 1 - conf_level
-        result$bootstrap <- list(
-          lower = quantile(boot_nps, alpha / 2, names = FALSE),
-          upper = quantile(boot_nps, 1 - alpha / 2, names = FALSE)
-        )
-      } else {
-        warnings_list <- c(
-          warnings_list,
-          sprintf("Question %s: Bootstrap failed (all NA)", q_id)
-        )
-      }
-    }
-
-    # Bayesian CI (using normal approximation for NPS)
-    run_cred_flag <- q_row$Run_Credible
-    if (!is.null(run_cred_flag) &&
-        !is.na(run_cred_flag) &&
-        toupper(run_cred_flag) == "Y") {
-      prior_mean <- if (!is.na(q_row$Prior_Mean)) q_row$Prior_Mean else 0
-      prior_sd   <- if (!is.na(q_row$Prior_SD))   q_row$Prior_SD   else 50  # Wide prior if not specified
-
-      # Use normal approximation for NPS posterior
-      # Likelihood: NPS ~ Normal(nps_score, se_nps^2)
-      # Prior: NPS ~ Normal(prior_mean, prior_sd^2)
-
-      p_prom <- pct_promoters / 100
-      p_detr <- pct_detractors / 100
-      var_prom <- p_prom * (1 - p_prom) / n_eff
-      var_detr <- p_detr * (1 - p_detr) / n_eff
-      se_nps <- sqrt(var_prom + var_detr) * 100
-
-      # Posterior (normal-normal conjugate)
-      precision_prior <- 1 / (prior_sd^2)
-      precision_data  <- 1 / (se_nps^2)
-      precision_post  <- precision_prior + precision_data
-
-      mean_post <- (precision_prior * prior_mean + precision_data * nps_score) / precision_post
-      sd_post   <- sqrt(1 / precision_post)
-
-      # Credible interval
-      alpha <- 1 - conf_level
-      result$bayesian <- list(
-        lower = qnorm(alpha / 2, mean = mean_post, sd = sd_post),
-        upper = qnorm(1 - alpha / 2, mean = mean_post, sd = sd_post),
-        posterior_mean = mean_post,
-        posterior_sd = sd_post
-      )
-    }
+    return(list(result = result, warnings = warnings_list))
 
   }, error = function(e) {
-    warnings_list <- c(
-      warnings_list,
-      sprintf("Question %s: %s", q_id, conditionMessage(e))
-    )
+    warnings_list <- c(warnings_list, sprintf("Question %s: %s", q_id, conditionMessage(e)))
+    return(list(result = NULL, warnings = warnings_list))
   })
-
-  return(list(result = result, warnings = warnings_list))
 }
 
 
@@ -1348,11 +906,6 @@ process_nps_question <- function(q_row, survey_data, weight_var, config, warning
 # ==============================================================================
 
 #' Quick analysis with default settings
-#'
-#' Convenience wrapper for run_confidence_analysis with common defaults
-#'
-#' @param config_path Character. Path to confidence_config.xlsx
-#'
 #' @export
 quick_analysis <- function(config_path) {
   run_confidence_analysis(config_path, verbose = TRUE, stop_on_warnings = FALSE)
@@ -1360,9 +913,6 @@ quick_analysis <- function(config_path) {
 
 
 #' Print analysis summary
-#'
-#' @param results List. Output from run_confidence_analysis()
-#'
 #' @export
 print_analysis_summary <- function(results) {
   cat("\n=== CONFIDENCE ANALYSIS SUMMARY ===\n\n")
@@ -1375,6 +925,7 @@ print_analysis_summary <- function(results) {
 
   cat(sprintf("Proportions analyzed: %d\n", length(results$proportion_results)))
   cat(sprintf("Means analyzed: %d\n", length(results$mean_results)))
+  cat(sprintf("NPS analyzed: %d\n", length(results$nps_results)))
   cat(sprintf("Warnings: %d\n", length(results$warnings)))
   cat(sprintf("Elapsed time: %.1f seconds\n", results$elapsed_seconds))
 
@@ -1388,9 +939,16 @@ print_analysis_summary <- function(results) {
 
 
 # ==============================================================================
+# NULL-COALESCING OPERATOR
+# ==============================================================================
+
+`%||%` <- function(a, b) if (is.null(a)) b else a
+
+
+# ==============================================================================
 # MODULE INITIALIZATION
 # ==============================================================================
 
-cat(sprintf("\n✓ Turas Confidence Analysis Module loaded (v%s)\n", MAIN_VERSION))
+cat(sprintf("\n+ Turas Confidence Analysis Module loaded (v%s)\n", MAIN_VERSION))
 cat("  Usage: run_confidence_analysis('path/to/config.xlsx')\n")
 cat("  Quick: quick_analysis('path/to/config.xlsx')\n\n")
