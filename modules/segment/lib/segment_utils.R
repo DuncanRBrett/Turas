@@ -3,11 +3,72 @@
 # ==============================================================================
 # Helper functions: config generation, data validation, logging, dependencies
 # Part of Turas Segmentation Module
+#
+# REFACTORED: December 2024
+#   - Extracted run_segment_quick() into smaller, testable functions
+#   - Integrated shared validation utilities
+#   - Improved separation of concerns
+#
+# CONTENTS:
+#   1. Shared Infrastructure (imports)
+#   2. Package Dependency Management
+#   3. Configuration Template Generation
+#   4. Input Data Validation
+#   5. Project Initialization
+#   6. Seed & RNG Management
+#   7. Quick Run Helper Functions (internal)
+#   8. Quick Run Main Function (public API)
+#
 # ==============================================================================
 
 
 # ==============================================================================
-# PACKAGE DEPENDENCY MANAGEMENT
+# 1. SHARED INFRASTRUCTURE
+# ==============================================================================
+
+# Source shared utilities for validation and data handling
+# These provide consistent error handling across all Turas modules
+
+.source_shared_utils <- function() {
+  # Determine module root path
+  script_dir <- tryCatch({
+    if (sys.nframe() > 0) dirname(sys.frame(1)$ofile) else NULL
+  }, error = function(e) NULL)
+
+  possible_roots <- c(
+    if (!is.null(script_dir)) file.path(script_dir, "../..") else NULL,
+    file.path(getwd(), "modules"),
+    Sys.getenv("TURAS_HOME", ""),
+    Sys.getenv("TURAS_ROOT", getwd())
+  )
+
+  for (root in possible_roots) {
+    if (is.null(root) || root == "") next
+    validation_path <- file.path(root, "shared/lib/validation_utils.R")
+    if (file.exists(validation_path)) {
+      source(validation_path, local = FALSE)
+      return(invisible(TRUE))
+    }
+  }
+
+  # Fallback: define minimal stubs if shared utils not found
+  if (!exists("validate_data_frame", mode = "function")) {
+    validate_data_frame <- function(data, ...) invisible(TRUE)
+  }
+  if (!exists("validate_column_exists", mode = "function")) {
+    validate_column_exists <- function(data, col, ...) {
+      if (!col %in% names(data)) stop(sprintf("Column '%s' not found", col))
+    }
+  }
+  invisible(FALSE)
+}
+
+# Initialize shared utilities on load
+.source_shared_utils()
+
+
+# ==============================================================================
+# 2. PACKAGE DEPENDENCY MANAGEMENT
 # ==============================================================================
 #
 # MINIMUM INSTALL (core k-means functionality):
@@ -199,6 +260,10 @@ get_full_install_cmd <- function() {
   invisible(cmd)
 }
 
+# ==============================================================================
+# 3. CONFIGURATION TEMPLATE GENERATION
+# ==============================================================================
+
 #' Generate Configuration Template
 #'
 #' Creates a template configuration Excel file for a new segmentation project
@@ -363,14 +428,19 @@ generate_config_template <- function(data_file, output_file, mode = "exploration
 }
 
 
+# ==============================================================================
+# 4. INPUT DATA VALIDATION
+# ==============================================================================
+
 #' Validate Input Data Quality
 #'
-#' Performs comprehensive validation of input data before segmentation
+#' Performs comprehensive validation of input data before segmentation.
+#' This function provides detailed diagnostics for data quality issues.
 #'
 #' @param data Data frame to validate
 #' @param id_variable Name of ID variable
 #' @param clustering_vars Character vector of clustering variables
-#' @return List with validation results
+#' @return List with validation results (valid, errors, warnings, issues, n_respondents, n_complete)
 #' @export
 validate_input_data <- function(data, id_variable, clustering_vars) {
 
@@ -510,6 +580,10 @@ validate_input_data <- function(data, id_variable, clustering_vars) {
 }
 
 
+# ==============================================================================
+# 5. PROJECT INITIALIZATION
+# ==============================================================================
+
 #' Initialize Segmentation Project
 #'
 #' Sets up a new segmentation project with folder structure and config template
@@ -517,8 +591,9 @@ validate_input_data <- function(data, id_variable, clustering_vars) {
 #' @param project_name Name of the project
 #' @param data_file Path to survey data
 #' @param base_folder Base folder for project (default: "projects/")
+#' @return Invisible list with project_folder and config_file paths
 #' @export
-initialize_segmentation_project <- function(project_name, data_file, 
+initialize_segmentation_project <- function(project_name, data_file,
                                             base_folder = "projects/") {
 
   cat("\n")
@@ -587,7 +662,7 @@ DATA FILE:
 
 
 # ==============================================================================
-# REPRODUCIBILITY & SEED MANAGEMENT
+# 6. SEED & RNG MANAGEMENT
 # ==============================================================================
 
 #' Set Seed for Reproducibility
@@ -623,67 +698,26 @@ set_segmentation_seed <- function(config) {
 
 
 # ==============================================================================
-# FEATURE 1: QUICK RUN FUNCTION
+# 7. QUICK RUN HELPER FUNCTIONS (Internal)
+# ==============================================================================
+# These functions are extracted from run_segment_quick() for better
+# testability, maintainability, and separation of concerns.
 # ==============================================================================
 
-#' Run Segmentation Without Excel Config File
+#' Validate Quick Run Inputs
 #'
-#' Convenience function to run segmentation programmatically without needing
-#' to create an Excel configuration file. Useful for quick analysis and scripting.
+#' Internal function to validate inputs for run_segment_quick().
+#' Checks data structure, variable existence, and parameter validity.
 #'
-#' @param data Data frame (already loaded)
-#' @param id_var Character, ID column name
+#' @param data Data frame to validate
+#' @param id_var ID variable name
 #' @param clustering_vars Character vector of clustering variable names
-#' @param k Integer or NULL. If NULL, runs exploration mode. If integer, runs final mode.
-#' @param k_range Integer vector for exploration mode (default: 3:6)
-#' @param profile_vars Character vector or NULL (auto-detect if NULL)
-#' @param output_folder Character, path for outputs (default: "output/")
-#' @param seed Integer, random seed (default: 123)
-#' @param question_labels Named vector of question labels or NULL
-#' @param standardize Logical, standardize data before clustering (default: TRUE)
-#' @param nstart Integer, number of random starts for k-means (default: 50)
-#' @param outlier_detection Logical, enable outlier detection (default: FALSE)
-#' @param missing_data Character, missing data handling method (default: "listwise_deletion")
-#' @param segment_names Character vector of segment names or "auto"
-#'
-#' @return Same structure as turas_segment_from_config()
-#' @export
-#' @examples
-#' # Exploration mode
-#' result <- run_segment_quick(
-#'   data = survey_data,
-#'   id_var = "respondent_id",
-#'   clustering_vars = c("q1", "q2", "q3", "q4", "q5"),
-#'   k = NULL,  # exploration mode
-#'   k_range = 3:6
-#' )
-#'
-#' # Final mode with fixed k
-#' result <- run_segment_quick(
-#'   data = survey_data,
-#'   id_var = "respondent_id",
-#'   clustering_vars = c("q1", "q2", "q3", "q4", "q5"),
-#'   k = 4
-#' )
-run_segment_quick <- function(data, id_var, clustering_vars, k = NULL,
-                               k_range = 3:6, profile_vars = NULL,
-                               output_folder = "output/", seed = 123,
-                               question_labels = NULL, standardize = TRUE,
-                               nstart = 50, outlier_detection = FALSE,
-                               missing_data = "listwise_deletion",
-                               segment_names = "auto") {
+#' @param k Number of clusters (NULL for exploration mode)
+#' @param k_range Range of k values for exploration
+#' @return Validated k value (possibly coerced to integer)
+#' @keywords internal
+.validate_quick_inputs <- function(data, id_var, clustering_vars, k, k_range) {
 
-  cat("\n")
-  cat(rep("=", 80), "\n", sep = "")
-  cat("TURAS QUICK SEGMENTATION\n")
-  cat(rep("=", 80), "\n", sep = "")
-  cat("\n")
-
-  # ===========================================================================
-  # VALIDATE INPUTS
-  # ===========================================================================
-
-  cat("Validating inputs...\n")
 
   # Check data is a data frame
   if (!is.data.frame(data)) {
@@ -716,7 +750,8 @@ run_segment_quick <- function(data, id_var, clustering_vars, k = NULL,
     segment_refuse(
       code = "CFG_CLUSTERING_VARS_MISSING",
       title = "Clustering Variables Not Found",
-      problem = sprintf("Clustering variables not found in data: %s", paste(missing_vars, collapse = ", ")),
+      problem = sprintf("Clustering variables not found in data: %s",
+                        paste(missing_vars, collapse = ", ")),
       why_it_matters = "All specified clustering variables must exist in the data.",
       how_to_fix = "Check that variable names match data column names exactly (case-sensitive)."
     )
@@ -728,7 +763,8 @@ run_segment_quick <- function(data, id_var, clustering_vars, k = NULL,
       segment_refuse(
         code = "DATA_NON_NUMERIC_VAR",
         title = "Non-Numeric Clustering Variable",
-        problem = sprintf("Clustering variable '%s' must be numeric but is %s.", var, class(data[[var]])[1]),
+        problem = sprintf("Clustering variable '%s' must be numeric but is %s.",
+                          var, class(data[[var]])[1]),
         why_it_matters = "K-means clustering requires numeric variables.",
         how_to_fix = sprintf("Convert '%s' to numeric or remove it from clustering_vars.", var)
       )
@@ -746,20 +782,39 @@ run_segment_quick <- function(data, id_var, clustering_vars, k = NULL,
         how_to_fix = "Set k to an integer value of 2 or greater."
       )
     }
-    k <- as.integer(k)
+    return(as.integer(k))
   }
 
-  cat(sprintf("✓ Input validation passed\n"))
-  cat(sprintf("  Respondents: %d\n", nrow(data)))
-  cat(sprintf("  Clustering variables: %d\n", length(clustering_vars)))
-  cat(sprintf("  Mode: %s\n", if (is.null(k)) "Exploration" else "Final"))
-  cat("\n")
+  return(k)
+}
 
-  # ===========================================================================
-  # BUILD CONFIG LIST
-  # ===========================================================================
 
-  config <- list(
+#' Build Quick Run Configuration
+#'
+#' Internal function to build a configuration list from quick run parameters.
+#' Creates a config structure compatible with the full segmentation pipeline.
+#'
+#' @param id_var ID variable name
+#' @param clustering_vars Clustering variable names
+#' @param k Number of clusters (NULL for exploration)
+#' @param k_range Range of k values
+#' @param profile_vars Profile variable names
+#' @param output_folder Output folder path
+#' @param seed Random seed
+#' @param question_labels Optional question labels
+#' @param standardize Whether to standardize data
+#' @param nstart Number of random starts
+#' @param outlier_detection Whether to detect outliers
+#' @param missing_data Missing data handling method
+#' @param segment_names Segment naming method
+#' @return Configuration list
+#' @keywords internal
+.build_quick_config <- function(id_var, clustering_vars, k, k_range,
+                                 profile_vars, output_folder, seed,
+                                 question_labels, standardize, nstart,
+                                 outlier_detection, missing_data,
+                                 segment_names) {
+  list(
     # Data (not file-based)
     data_file = "[in-memory data]",
     data_sheet = "Data",
@@ -820,16 +875,31 @@ run_segment_quick <- function(data, id_var, clustering_vars, k = NULL,
     # Mode detection
     mode = if (is.null(k)) "exploration" else "final"
   )
+}
 
-  # ===========================================================================
-  # PREPARE DATA
-  # ===========================================================================
+
+#' Prepare Data for Quick Run
+#'
+#' Internal function to prepare data for clustering. Handles missing data,
+#' standardization, and builds the data_list structure.
+#'
+#' @param data Data frame
+#' @param config Configuration list
+#' @param seed Random seed
+#' @return List with prepared data (data_list structure)
+#' @keywords internal
+.prepare_quick_data <- function(data, config, seed) {
 
   cat("Preparing data...\n")
 
   # Set seed
   set.seed(seed)
   cat(sprintf("🎲 Seed set: %d\n", seed))
+
+  clustering_vars <- config$clustering_vars
+  missing_data <- config$missing_data
+  standardize <- config$standardize
+  id_var <- config$id_variable
 
   # Handle missing data
   n_original <- nrow(data)
@@ -892,23 +962,24 @@ run_segment_quick <- function(data, id_var, clustering_vars, k = NULL,
   }
 
   # Auto-detect profile variables if not specified
+  profile_vars <- config$profile_vars
   if (is.null(profile_vars)) {
     all_numeric_vars <- names(data)[sapply(data, is.numeric)]
     profile_vars <- setdiff(all_numeric_vars, c(id_var, clustering_vars))
     if (length(profile_vars) > 0) {
       cat(sprintf("  Auto-detected %d profile variables\n", length(profile_vars)))
     }
-    config$profile_vars <- profile_vars
   }
 
   cat("✓ Data preparation complete\n\n")
 
   # Build data_list structure
-  data_list <- list(
+  list(
     data = data,
     scaled_data = scaled_data,
     clustering_data = clustering_data,
     config = config,
+    profile_vars = profile_vars,
     scale_params = scale_params,
     imputation_params = NULL,
     n_original = n_original,
@@ -916,180 +987,318 @@ run_segment_quick <- function(data, id_var, clustering_vars, k = NULL,
     outlier_result = NULL,
     outlier_handling = NULL
   )
-
-  # ===========================================================================
-  # RUN CLUSTERING
-  # ===========================================================================
-
-  # Create output folder
-  output_folder <- create_output_folder(config$output_folder,
-                                         config$create_dated_folder)
-
-  if (is.null(k)) {
-    # =========================================================================
-    # EXPLORATION MODE
-    # =========================================================================
-
-    cat("EXPLORATION MODE\n")
-    cat(rep("-", 40), "\n", sep = "")
-    cat(sprintf("Testing k = %d to %d\n\n", min(k_range), max(k_range)))
-
-    # Run clustering for multiple k values
-    exploration_result <- run_kmeans_exploration(data_list)
-
-    # Calculate validation metrics
-    metrics_result <- calculate_exploration_metrics(exploration_result)
-
-    # Recommend optimal k
-    recommendation <- recommend_k(metrics_result$metrics_df,
-                                   config$min_segment_size_pct)
-
-    # Export exploration report
-    report_filename <- paste0(config$output_prefix, "k_selection_report.xlsx")
-    report_path <- file.path(output_folder, report_filename)
-
-    export_exploration_report(
-      exploration_result = exploration_result,
-      metrics_result = metrics_result,
-      recommendation = recommendation,
-      output_path = report_path
-    )
-
-    cat("\n")
-    cat(rep("=", 80), "\n", sep = "")
-    cat("EXPLORATION COMPLETE\n")
-    cat(rep("=", 80), "\n", sep = "")
-    cat(sprintf("✓ Recommended k: %d\n", recommendation$recommended_k))
-    cat(sprintf("  Output: %s\n", report_path))
-    cat(sprintf("\nTo run final segmentation:\n"))
-    cat(sprintf("  result <- run_segment_quick(data, \"%s\", clustering_vars, k = %d)\n",
-                id_var, recommendation$recommended_k))
-    cat("\n")
-
-    return(invisible(list(
-      mode = "exploration",
-      recommendation = recommendation,
-      metrics = metrics_result,
-      models = exploration_result$models,
-      output_files = list(report = report_path),
-      config = config
-    )))
-
-  } else {
-    # =========================================================================
-    # FINAL MODE
-    # =========================================================================
-
-    cat("FINAL MODE\n")
-    cat(rep("-", 40), "\n", sep = "")
-    cat(sprintf("Running with k = %d\n\n", k))
-
-    # Run clustering with fixed k
-    final_result <- run_kmeans_final(data_list)
-
-    # Calculate validation metrics
-    validation_metrics <- calculate_validation_metrics(
-      data = data_list$scaled_data,
-      model = final_result$model,
-      k = final_result$k,
-      calculate_gap = FALSE
-    )
-
-    # Create segment profiles
-    profile_result <- create_full_segment_profile(
-      data = data_list$data,
-      clusters = final_result$clusters,
-      clustering_vars = config$clustering_vars,
-      profile_vars = config$profile_vars
-    )
-
-    # Generate segment names
-    if (identical(segment_names, "auto")) {
-      segment_names_final <- generate_segment_names(final_result$k, method = "simple")
-    } else {
-      segment_names_final <- segment_names
-    }
-
-    # Export segment assignments
-    assignments_filename <- paste0(config$output_prefix, "segment_assignments.xlsx")
-    assignments_path <- file.path(output_folder, assignments_filename)
-
-    export_segment_assignments(
-      data = data_list$data,
-      clusters = final_result$clusters,
-      segment_names = segment_names_final,
-      id_var = config$id_variable,
-      output_path = assignments_path,
-      outlier_flags = data_list$outlier_flags
-    )
-
-    # Export full report
-    report_filename <- paste0(config$output_prefix, "segmentation_report.xlsx")
-    report_path <- file.path(output_folder, report_filename)
-
-    export_final_report(
-      final_result = final_result,
-      profile_result = profile_result,
-      validation_metrics = validation_metrics,
-      output_path = report_path
-    )
-
-    # Save model object
-    model_filename <- paste0(config$output_prefix, "model.rds")
-    model_path <- file.path(output_folder, model_filename)
-
-    segment_dist <- table(final_result$clusters)
-
-    model_object <- list(
-      model = final_result$model,
-      k = final_result$k,
-      clusters = final_result$clusters,
-      centers = final_result$model$centers,
-      segment_names = segment_names_final,
-      clustering_vars = config$clustering_vars,
-      id_variable = config$id_variable,
-      scale_params = data_list$scale_params,
-      imputation_params = NULL,
-      original_distribution = segment_dist,
-      seed = seed,
-      config = config,
-      timestamp = Sys.time(),
-      date_created = Sys.time(),
-      turas_version = "1.0",
-      method = "kmeans"
-    )
-
-    saveRDS(model_object, model_path)
-
-    cat("\n")
-    cat(rep("=", 80), "\n", sep = "")
-    cat("SEGMENTATION COMPLETE\n")
-    cat(rep("=", 80), "\n", sep = "")
-    cat(sprintf("✓ Created %d segments\n", final_result$k))
-    cat(sprintf("  Silhouette: %.3f\n", validation_metrics$avg_silhouette))
-    cat(sprintf("  Assignments: %s\n", assignments_path))
-    cat(sprintf("  Report: %s\n", report_path))
-    cat(sprintf("  Model: %s\n", model_path))
-    cat("\n")
-
-    return(invisible(list(
-      mode = "final",
-      k = final_result$k,
-      model = final_result$model,
-      clusters = final_result$clusters,
-      segment_names = segment_names_final,
-      validation = validation_metrics,
-      profiles = profile_result,
-      output_files = list(
-        assignments = assignments_path,
-        report = report_path,
-        model = model_path
-      ),
-      config = config
-    )))
-  }
 }
 
+
+#' Run Quick Exploration Mode
+#'
+#' Internal function to run exploration mode clustering.
+#' Tests multiple k values and recommends optimal k.
+#'
+#' @param data_list Prepared data list
+#' @param config Configuration list
+#' @param output_folder Output folder path
+#' @param id_var ID variable name (for output message)
+#' @return List with exploration results
+#' @keywords internal
+.run_quick_exploration <- function(data_list, config, output_folder, id_var) {
+
+  k_range <- config$k_min:config$k_max
+
+  cat("EXPLORATION MODE\n")
+  cat(rep("-", 40), "\n", sep = "")
+  cat(sprintf("Testing k = %d to %d\n\n", min(k_range), max(k_range)))
+
+  # Run clustering for multiple k values
+  exploration_result <- run_kmeans_exploration(data_list)
+
+  # Calculate validation metrics
+  metrics_result <- calculate_exploration_metrics(exploration_result)
+
+  # Recommend optimal k
+  recommendation <- recommend_k(metrics_result$metrics_df,
+                                 config$min_segment_size_pct)
+
+  # Export exploration report
+  report_filename <- paste0(config$output_prefix, "k_selection_report.xlsx")
+  report_path <- file.path(output_folder, report_filename)
+
+  export_exploration_report(
+    exploration_result = exploration_result,
+    metrics_result = metrics_result,
+    recommendation = recommendation,
+    output_path = report_path
+  )
+
+  cat("\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("EXPLORATION COMPLETE\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat(sprintf("✓ Recommended k: %d\n", recommendation$recommended_k))
+  cat(sprintf("  Output: %s\n", report_path))
+  cat(sprintf("\nTo run final segmentation:\n"))
+  cat(sprintf("  result <- run_segment_quick(data, \"%s\", clustering_vars, k = %d)\n",
+              id_var, recommendation$recommended_k))
+  cat("\n")
+
+  list(
+    mode = "exploration",
+    recommendation = recommendation,
+    metrics = metrics_result,
+    models = exploration_result$models,
+    output_files = list(report = report_path),
+    config = config
+  )
+}
+
+
+#' Run Quick Final Mode
+#'
+#' Internal function to run final mode clustering with a fixed k.
+#' Creates segments, profiles, and exports results.
+#'
+#' @param data_list Prepared data list
+#' @param config Configuration list
+#' @param k Number of clusters
+#' @param segment_names Segment naming method or vector
+#' @param output_folder Output folder path
+#' @param seed Random seed
+#' @return List with final segmentation results
+#' @keywords internal
+.run_quick_final <- function(data_list, config, k, segment_names,
+                              output_folder, seed) {
+
+  cat("FINAL MODE\n")
+  cat(rep("-", 40), "\n", sep = "")
+  cat(sprintf("Running with k = %d\n\n", k))
+
+  # Run clustering with fixed k
+  final_result <- run_kmeans_final(data_list)
+
+  # Calculate validation metrics
+  validation_metrics <- calculate_validation_metrics(
+    data = data_list$scaled_data,
+    model = final_result$model,
+    k = final_result$k,
+    calculate_gap = FALSE
+  )
+
+  # Get profile vars from data_list (may have been auto-detected)
+  profile_vars <- data_list$profile_vars
+  if (is.null(profile_vars)) {
+    profile_vars <- config$profile_vars
+  }
+
+  # Create segment profiles
+  profile_result <- create_full_segment_profile(
+    data = data_list$data,
+    clusters = final_result$clusters,
+    clustering_vars = config$clustering_vars,
+    profile_vars = profile_vars
+  )
+
+  # Generate segment names
+  if (identical(segment_names, "auto")) {
+    segment_names_final <- generate_segment_names(final_result$k, method = "simple")
+  } else {
+    segment_names_final <- segment_names
+  }
+
+  # Export segment assignments
+  assignments_filename <- paste0(config$output_prefix, "segment_assignments.xlsx")
+  assignments_path <- file.path(output_folder, assignments_filename)
+
+  export_segment_assignments(
+    data = data_list$data,
+    clusters = final_result$clusters,
+    segment_names = segment_names_final,
+    id_var = config$id_variable,
+    output_path = assignments_path,
+    outlier_flags = data_list$outlier_flags
+  )
+
+  # Export full report
+  report_filename <- paste0(config$output_prefix, "segmentation_report.xlsx")
+  report_path <- file.path(output_folder, report_filename)
+
+  export_final_report(
+    final_result = final_result,
+    profile_result = profile_result,
+    validation_metrics = validation_metrics,
+    output_path = report_path
+  )
+
+  # Save model object
+  model_filename <- paste0(config$output_prefix, "model.rds")
+  model_path <- file.path(output_folder, model_filename)
+
+  segment_dist <- table(final_result$clusters)
+
+  model_object <- list(
+    model = final_result$model,
+    k = final_result$k,
+    clusters = final_result$clusters,
+    centers = final_result$model$centers,
+    segment_names = segment_names_final,
+    clustering_vars = config$clustering_vars,
+    id_variable = config$id_variable,
+    scale_params = data_list$scale_params,
+    imputation_params = NULL,
+    original_distribution = segment_dist,
+    seed = seed,
+    config = config,
+    timestamp = Sys.time(),
+    date_created = Sys.time(),
+    turas_version = "1.0",
+    method = "kmeans"
+  )
+
+  saveRDS(model_object, model_path)
+
+  cat("\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("SEGMENTATION COMPLETE\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat(sprintf("✓ Created %d segments\n", final_result$k))
+  cat(sprintf("  Silhouette: %.3f\n", validation_metrics$avg_silhouette))
+  cat(sprintf("  Assignments: %s\n", assignments_path))
+  cat(sprintf("  Report: %s\n", report_path))
+  cat(sprintf("  Model: %s\n", model_path))
+  cat("\n")
+
+  list(
+    mode = "final",
+    k = final_result$k,
+    model = final_result$model,
+    clusters = final_result$clusters,
+    segment_names = segment_names_final,
+    validation = validation_metrics,
+    profiles = profile_result,
+    output_files = list(
+      assignments = assignments_path,
+      report = report_path,
+      model = model_path
+    ),
+    config = config
+  )
+}
+
+
+# ==============================================================================
+# 8. QUICK RUN MAIN FUNCTION (Public API)
+# ==============================================================================
+
+#' Run Segmentation Without Excel Config File
+#'
+#' Convenience function to run segmentation programmatically without needing
+#' to create an Excel configuration file. Useful for quick analysis and scripting.
+#'
+#' This function orchestrates the segmentation workflow by delegating to
+#' specialized helper functions for validation, configuration, data preparation,
+#' and execution.
+#'
+#' @param data Data frame (already loaded)
+#' @param id_var Character, ID column name
+#' @param clustering_vars Character vector of clustering variable names
+#' @param k Integer or NULL. If NULL, runs exploration mode. If integer, runs final mode.
+#' @param k_range Integer vector for exploration mode (default: 3:6)
+#' @param profile_vars Character vector or NULL (auto-detect if NULL)
+#' @param output_folder Character, path for outputs (default: "output/")
+#' @param seed Integer, random seed (default: 123)
+#' @param question_labels Named vector of question labels or NULL
+#' @param standardize Logical, standardize data before clustering (default: TRUE)
+#' @param nstart Integer, number of random starts for k-means (default: 50)
+#' @param outlier_detection Logical, enable outlier detection (default: FALSE)
+#' @param missing_data Character, missing data handling method (default: "listwise_deletion")
+#' @param segment_names Character vector of segment names or "auto"
+#'
+#' @return List with segmentation results. Structure depends on mode:
+#'   - Exploration: mode, recommendation, metrics, models, output_files, config
+#'   - Final: mode, k, model, clusters, segment_names, validation, profiles, output_files, config
+#' @export
+#' @examples
+#' # Exploration mode - find optimal k
+#' result <- run_segment_quick(
+#'   data = survey_data,
+#'   id_var = "respondent_id",
+#'   clustering_vars = c("q1", "q2", "q3", "q4", "q5"),
+#'   k = NULL,
+#'   k_range = 3:6
+#' )
+#'
+#' # Final mode - run with fixed k
+#' result <- run_segment_quick(
+#'   data = survey_data,
+#'   id_var = "respondent_id",
+#'   clustering_vars = c("q1", "q2", "q3", "q4", "q5"),
+#'   k = 4
+#' )
+run_segment_quick <- function(data, id_var, clustering_vars, k = NULL,
+                               k_range = 3:6, profile_vars = NULL,
+                               output_folder = "output/", seed = 123,
+                               question_labels = NULL, standardize = TRUE,
+                               nstart = 50, outlier_detection = FALSE,
+                               missing_data = "listwise_deletion",
+                               segment_names = "auto") {
+
+  cat("\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("TURAS QUICK SEGMENTATION\n")
+  cat(rep("=", 80), "\n", sep = "")
+  cat("\n")
+
+  # Step 1: Validate inputs
+  cat("Validating inputs...\n")
+  k <- .validate_quick_inputs(data, id_var, clustering_vars, k, k_range)
+  cat(sprintf("✓ Input validation passed\n"))
+  cat(sprintf("  Respondents: %d\n", nrow(data)))
+  cat(sprintf("  Clustering variables: %d\n", length(clustering_vars)))
+  cat(sprintf("  Mode: %s\n", if (is.null(k)) "Exploration" else "Final"))
+  cat("\n")
+
+  # Step 2: Build configuration
+  config <- .build_quick_config(
+    id_var = id_var,
+    clustering_vars = clustering_vars,
+    k = k,
+    k_range = k_range,
+    profile_vars = profile_vars,
+    output_folder = output_folder,
+    seed = seed,
+    question_labels = question_labels,
+    standardize = standardize,
+    nstart = nstart,
+    outlier_detection = outlier_detection,
+    missing_data = missing_data,
+    segment_names = segment_names
+  )
+
+  # Step 3: Prepare data
+  data_list <- .prepare_quick_data(data, config, seed)
+
+  # Update config with auto-detected profile vars
+  config$profile_vars <- data_list$profile_vars
+  data_list$config <- config
+
+  # Step 4: Create output folder
+  output_folder_path <- create_output_folder(config$output_folder,
+                                              config$create_dated_folder)
+
+  # Step 5: Run appropriate mode
+  if (is.null(k)) {
+    result <- .run_quick_exploration(data_list, config, output_folder_path, id_var)
+  } else {
+    result <- .run_quick_final(data_list, config, k, segment_names,
+                                output_folder_path, seed)
+  }
+
+  return(invisible(result))
+}
+
+
+# ==============================================================================
+# 9. RNG STATE UTILITIES
+# ==============================================================================
 
 #' Get Current RNG State
 #'
