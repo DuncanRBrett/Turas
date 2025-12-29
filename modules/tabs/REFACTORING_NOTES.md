@@ -480,9 +480,149 @@ shared_functions.R now sources modules in dependency order:
 **Total reduction**: 2,001 → 334 lines (83% reduction in orchestrator)
 **New modules total**: 1,209 lines (well-organized, focused code)
 
+## Phase 4 - run_crosstabs.R Orchestrator Refactoring (V10.2)
+
+### Overview
+
+Phase 4 completed the major refactoring of `run_crosstabs.R`, converting it from a 1,716-line procedural script into a lean ~580-line orchestrator that coordinates focused modules.
+
+### Problem Statement
+
+`run_crosstabs.R` was 1,716 lines of primarily procedural code containing:
+- Configuration loading and validation
+- Data loading and weight setup
+- Question processing loop
+- Composite metric processing
+- Excel workbook creation
+- Completion summary
+
+This made it difficult to test, maintain, and understand the overall flow.
+
+### Solution Implemented
+
+Converted `run_crosstabs.R` into an **orchestrator** that:
+1. Sets up TRS infrastructure and constants
+2. Sources all required modules
+3. Calls high-level functions in a clear sequence:
+   - `load_crosstabs_config()` → Load configuration
+   - `load_crosstabs_data()` → Load all data
+   - `run_crosstabs_analysis()` → Process questions
+   - `create_crosstabs_workbook()` → Create Excel output
+4. Prints completion summary
+
+### New Modules Created (Phase 4)
+
+#### 1. `crosstabs/checkpoint.R` (146 lines)
+**Purpose**: Checkpoint system for resuming interrupted runs
+
+**Functions**:
+- `save_checkpoint()` - Save analysis progress to disk
+- `load_checkpoint()` - Load saved progress
+- `setup_checkpointing()` - Initialize checkpoint state
+- `cleanup_checkpoint()` - Remove checkpoint after success
+- `get_checkpoint_path()` - Build checkpoint file path
+
+#### 2. `crosstabs/crosstabs_config.R` (242 lines)
+**Purpose**: Configuration loading and config object building
+
+**Functions**:
+- `validate_config_file()` - Validate config file exists
+- `load_crosstabs_settings()` - Load settings from config
+- `build_config_object()` - Build config_obj with all settings
+- `get_output_path()` - Construct output file path
+- `load_crosstabs_config()` - Main entry point
+
+#### 3. `crosstabs/data_setup.R` (316 lines)
+**Purpose**: Survey structure, data, and weight setup
+
+**Functions**:
+- `load_and_validate_structure()` - Load survey structure
+- `prepare_options_columns()` - Prepare options dataframe
+- `load_composite_definitions_safe()` - Load composite definitions
+- `load_and_validate_data()` - Load survey data
+- `setup_weights()` - Configure weighting
+- `load_question_selection()` - Load question selection
+- `load_crosstabs_data()` - Main entry point
+
+#### 4. `crosstabs/analysis_runner.R` (534 lines)
+**Purpose**: Main analysis processing orchestration
+
+**Functions**:
+- `run_validation()` - Run all validations
+- `create_banner_safe()` - Create banner structure
+- `estimate_runtime()` - Estimate processing time
+- `print_config_summary()` - Print configuration summary
+- `process_questions()` - Process all questions
+- `print_partial_status()` - Print partial status disclosure
+- `process_composites()` - Process composite metrics
+- `add_composites_to_results()` - Add composites to results
+- `run_crosstabs_analysis()` - Main entry point
+
+#### 5. `crosstabs/workbook_builder.R` (649 lines)
+**Purpose**: Excel workbook creation and population
+
+**Functions**:
+- `get_style_config()` - Extract style configuration
+- `build_project_info()` - Build project info for summary
+- `log_partial_to_trs()` - Log partial results to TRS
+- `create_summary_sheet_safe()` - Create summary sheet
+- `create_index_summary_safe()` - Create index summary sheet
+- `create_run_status_sheet()` - Create run status sheet
+- `write_single_question()` - Write single question to sheet
+- `write_crosstabs_sheet()` - Write main crosstabs sheet
+- `save_workbook_safe()` - Save workbook with error handling
+- `create_crosstabs_workbook()` - Main entry point
+
+### File Size Comparison
+
+#### Before Phase 4
+| File | Lines | Status |
+|------|-------|--------|
+| run_crosstabs.R | 1,716 | Monolithic procedural script |
+
+#### After Phase 4
+| File | Lines | Status |
+|------|-------|--------|
+| run_crosstabs.R | 580 | ✓ Lean orchestrator |
+| **New: checkpoint.R** | 146 | ✓ Focused module |
+| **New: crosstabs_config.R** | 242 | ✓ Focused module |
+| **New: data_setup.R** | 316 | ✓ Focused module |
+| **New: analysis_runner.R** | 534 | ✓ Focused module |
+| **New: workbook_builder.R** | 649 | ✓ Focused module |
+
+**Orchestrator reduction**: 1,716 → 580 lines (66% reduction)
+**New modules total**: 1,887 lines (well-organized, focused code)
+
+### Main Execution Flow
+
+```r
+# STEP 1: LOAD CONFIGURATION
+config_result <- load_crosstabs_config(config_file)
+
+# STEP 2: LOAD DATA
+data_result <- load_crosstabs_data(config_result)
+
+# STEP 3: RUN ANALYSIS
+analysis_result <- run_crosstabs_analysis(config_result, data_result)
+
+# STEP 4: CREATE EXCEL OUTPUT
+workbook_result <- create_crosstabs_workbook(...)
+
+# STEP 5: COMPLETION SUMMARY
+# Print results summary
+```
+
+### Benefits Achieved
+
+1. **Clarity**: Main script shows clear 5-step flow
+2. **Testability**: Each module can be tested independently
+3. **Maintainability**: Changes are localized to specific modules
+4. **Reusability**: Functions can be called from other contexts
+5. **Debugging**: Easier to identify where issues occur
+
 ## Conclusion
 
-This refactoring represents Phase 1, Phase 2, and Phase 3 completion of modernizing the Tabs module codebase.
+This refactoring represents Phase 1, Phase 2, Phase 3, and Phase 4 completion of modernizing the Tabs module codebase.
 
 **Key Achievements**:
 - ✓ Created 5 new focused utility modules (Phase 1)
@@ -490,16 +630,17 @@ This refactoring represents Phase 1, Phase 2, and Phase 3 completion of moderniz
 - ✓ Created `tabs_lib_path()` and `tabs_source()` helpers
 - ✓ Extracted validation.R into 4 subdirectory modules (Phase 2)
 - ✓ Extracted ranking.R into 3 subdirectory modules (Phase 2)
-- ✓ **Refactored shared_functions.R from 2,001 to 334 lines (Phase 3)**
-- ✓ **Created 4 new focused utility modules (Phase 3)**:
-  - validation_utils.R (428 lines)
-  - path_utils.R (208 lines)
-  - data_loader.R (362 lines)
-  - filter_utils.R (211 lines)
-- ✓ **Removed all duplicated functions** from shared_functions.R
-- ✓ **Established proper module dependency order**
+- ✓ Refactored shared_functions.R from 2,001 to 334 lines (Phase 3)
+- ✓ Created 4 new focused utility modules (Phase 3)
+- ✓ **Refactored run_crosstabs.R from 1,716 to 580 lines (Phase 4)**
+- ✓ **Created 5 new crosstabs/ modules (Phase 4)**:
+  - checkpoint.R (146 lines)
+  - crosstabs_config.R (242 lines)
+  - data_setup.R (316 lines)
+  - analysis_runner.R (534 lines)
+  - workbook_builder.R (649 lines)
+- ✓ **Implemented orchestrator pattern** for run_crosstabs.R
 - ✓ Maintained 100% backward compatibility
-- ✓ Established patterns for future refactoring
 
 **Complete Statistics**:
 | Phase | Files Affected | Lines Extracted | Reduction |
@@ -507,11 +648,13 @@ This refactoring represents Phase 1, Phase 2, and Phase 3 completion of moderniz
 | Phase 1 | 5 new modules | 1,084 lines | N/A (new) |
 | Phase 2 | validation.R, ranking.R | 1,938 lines | 40% avg |
 | Phase 3 | shared_functions.R | 1,667 lines | 83% |
-| **Total** | **13 modules created** | **4,689 lines organized** | - |
+| Phase 4 | run_crosstabs.R | 1,887 lines | 66% |
+| **Total** | **18 modules created** | **6,576 lines organized** | - |
 
 **Current Module Structure**:
 ```
 lib/
+├── run_crosstabs.R (580 lines - orchestrator) ← Phase 4
 ├── shared_functions.R (334 lines - orchestrator)
 ├── 00_guard.R (763 lines - TRS error handling)
 ├── validation_utils.R (428 lines) ← Phase 3
@@ -523,6 +666,12 @@ lib/
 ├── data_loader.R (362 lines) ← Phase 3
 ├── filter_utils.R (211 lines) ← Phase 3
 ├── run_crosstabs_helpers.R (291 lines) ← Phase 1
+├── crosstabs/ ← Phase 4
+│   ├── checkpoint.R (146 lines)
+│   ├── crosstabs_config.R (242 lines)
+│   ├── data_setup.R (316 lines)
+│   ├── analysis_runner.R (534 lines)
+│   └── workbook_builder.R (649 lines)
 ├── validation/ (7 modules) ← Phase 2
 └── ranking/ (3 modules) ← Phase 2
 ```
@@ -531,11 +680,11 @@ lib/
 - Add comprehensive unit tests for all new modules
 - Document module APIs with examples
 - Performance profiling and optimization
-- Consider run_crosstabs.R refactoring (1,715 lines remaining)
 - Consider standard_processor.R refactoring (1,312 lines)
+- Consider excel_writer.R modularization (if needed)
 
 ---
 
 **Date**: December 29, 2025
-**Version**: 10.1
+**Version**: 10.2
 **Author**: Claude Code Refactoring
