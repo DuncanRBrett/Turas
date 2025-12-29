@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Tracker Module
 
-**Version:** 10.0 **Last Updated:** 22 December 2025
+**Version:** 10.1 **Last Updated:** 28 December 2025
 
 Time-series tracking and trend analysis for longitudinal survey studies.
 
@@ -61,7 +61,7 @@ template documentation.
 
 ## Module Architecture
 
-```         
+```
 tracker/
 ├── run_tracker.R           # Main entry point
 ├── run_tracker_gui.R       # Shiny GUI
@@ -76,8 +76,15 @@ tracker/
     ├── banner_trends.R         # Banner breakouts
     ├── formatting_utils.R      # Formatting helpers
     ├── tracker_output.R        # Excel output
-    └── tracker_dashboard_reports.R # Dashboard reports
+    ├── tracker_dashboard_reports.R # Dashboard reports
+    ├── metric_types.R          # Metric constants & validation (v10.1)
+    ├── trend_changes.R         # Change calculations (v10.1)
+    ├── trend_significance.R    # Significance testing (v10.1)
+    └── output_formatting.R     # Excel styles (v10.1)
 ```
+
+**Note:** Version 10.1 (December 2025) introduced 4 new extracted modules
+to reduce code duplication and improve maintainability.
 
 ------------------------------------------------------------------------
 
