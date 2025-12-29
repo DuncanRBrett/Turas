@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Confidence Analysis Module
 
-**Version:** 2.0.0 **Last Updated:** December 2025 **Status:**
+**Version:** 10.1 **Last Updated:** December 2025 **Status:**
 Production Ready
 
 ------------------------------------------------------------------------
@@ -117,6 +117,14 @@ The module generates an Excel workbook with:
 ------------------------------------------------------------------------
 
 ## Version History
+
+### v10.1 (December 2025)
+
+-   **Refactoring release:** Orchestrator pattern architecture
+-   Extracted shared logic to focused modules (question_processor.R, ci_dispatcher.R, output_helpers.R)
+-   Improved error handling with clear warnings
+-   Fixed NULL/NA handling in config validation
+-   31% code reduction in main orchestration script
 
 ### v2.0.0 (December 2025)
 
