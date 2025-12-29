@@ -341,13 +341,13 @@ All validation helper functions have been extracted to subdirectory modules:
 
 Total: 1,156 lines extracted, validation.R reduced to 1,661 lines
 
-#### ranking.R - Split Plan (Next Priority)
-| Target File | Estimated Lines | Functions |
-|-------------|-----------------|-----------|
-| ranking/ranking_extraction.R | ~400 | Data extraction functions |
-| ranking/ranking_metrics.R | ~350 | Metric calculations |
-| ranking/ranking_validation.R | ~200 | Question validation |
-| ranking/ranking_crosstabs.R | ~250 | Crosstab row creation |
+#### ranking.R - COMPLETE
+All ranking helper functions have been extracted to subdirectory modules:
+- ranking/ranking_validation.R (200 lines)
+- ranking/ranking_metrics.R (557 lines)
+- ranking/ranking_crosstabs.R (307 lines)
+
+Total: 1,064 lines extracted, ranking.R reduced to 1,018 lines (47% reduction)
 
 ## Conclusion
 
@@ -357,23 +357,34 @@ This refactoring represents Phase 1 and Phase 2 completion of modernizing the Ta
 - ✓ Created 5 new focused utility modules (Phase 1)
 - ✓ Solved subdirectory sourcing problem (Phase 2)
 - ✓ Created `tabs_lib_path()` and `tabs_source()` helpers
-- ✓ Extracted validation.R into 4 subdirectory modules (Phase 2 Complete):
+- ✓ Extracted validation.R into 4 subdirectory modules:
   - validation/structure_validators.R (208 lines)
   - validation/weight_validators.R (375 lines)
   - validation/config_validators.R (253 lines)
   - validation/data_validators.R (320 lines)
 - ✓ Reduced validation.R from 2,688 to 1,661 lines (38% reduction)
+- ✓ Extracted ranking.R into 3 subdirectory modules:
+  - ranking/ranking_validation.R (200 lines)
+  - ranking/ranking_metrics.R (557 lines)
+  - ranking/ranking_crosstabs.R (307 lines)
+- ✓ Reduced ranking.R from 1,929 to 1,018 lines (47% reduction)
 - ✓ Maintained 100% backward compatibility
 - ✓ Established patterns for future subdirectory refactoring
 
+**Phase 2 Complete Statistics**:
+- validation.R: 2,688 → 1,661 lines (1,027 lines extracted)
+- ranking.R: 1,929 → 1,018 lines (911 lines extracted)
+- Total: 1,938 lines extracted to 7 subdirectory modules
+
 **Next Steps**:
-- Continue Phase 2 extractions (ranking.R)
 - Add comprehensive unit tests
 - Document module APIs
 - Performance profiling and optimization
+- Consider shared_functions.R refactoring (1,910 lines)
+- Consider run_crosstabs.R refactoring (1,711 lines)
 
 ---
 
-**Date**: December 28, 2025
+**Date**: December 29, 2025
 **Version**: 10.1
 **Author**: Claude Code Refactoring
