@@ -618,7 +618,8 @@ validate_question_analysis <- function(question_df) {
 
     # Validate Categories (required for proportion, must be empty for mean/nps)
     if (stat_type == "proportion") {
-      if (is.na(row$Categories) || row$Categories == "") {
+      cats <- row$Categories
+      if (is.null(cats) || (length(cats) == 1 && (is.na(cats) || cats == ""))) {
         errors <- c(errors, sprintf(
           "%s: Categories required for Statistic_Type='proportion'",
           q_id
@@ -628,10 +629,12 @@ validate_question_analysis <- function(question_df) {
 
     # Validate NPS codes (required for nps type)
     if (stat_type == "nps") {
-      if (is.na(row$Promoter_Codes) || row$Promoter_Codes == "") {
+      prom <- row$Promoter_Codes
+      detr <- row$Detractor_Codes
+      if (is.null(prom) || (length(prom) == 1 && (is.na(prom) || prom == ""))) {
         errors <- c(errors, sprintf("%s: Promoter_Codes required for NPS", q_id))
       }
-      if (is.na(row$Detractor_Codes) || row$Detractor_Codes == "") {
+      if (is.null(detr) || (length(detr) == 1 && (is.na(detr) || detr == ""))) {
         errors <- c(errors, sprintf("%s: Detractor_Codes required for NPS", q_id))
       }
     }
@@ -659,8 +662,10 @@ validate_question_analysis <- function(question_df) {
     }
 
     # Validate priors (if Run_Credible = Y and Prior_Mean specified)
-    if (run_cred == "Y" && !is.na(row$Prior_Mean) && row$Prior_Mean != "") {
-      prior_mean <- suppressWarnings(as.numeric(row$Prior_Mean))
+    pm <- row$Prior_Mean
+    pm_valid <- !is.null(pm) && length(pm) == 1 && !is.na(pm) && pm != ""
+    if (run_cred == "Y" && pm_valid) {
+      prior_mean <- suppressWarnings(as.numeric(pm))
       if (is.na(prior_mean)) {
         errors <- c(errors, sprintf("%s: Prior_Mean must be numeric", q_id))
       } else {
@@ -679,14 +684,16 @@ validate_question_analysis <- function(question_df) {
         }
         # For means and NPS, Prior_SD is required
         if (stat_type %in% c("mean", "nps")) {
-          if (is.na(row$Prior_SD) || row$Prior_SD == "") {
+          ps <- row$Prior_SD
+          ps_missing <- is.null(ps) || (length(ps) == 1 && (is.na(ps) || ps == ""))
+          if (ps_missing) {
             errors <- c(errors, sprintf(
               "%s: Prior_SD required when Prior_Mean specified for %s",
               q_id,
               stat_type
             ))
           } else {
-            prior_sd <- suppressWarnings(as.numeric(row$Prior_SD))
+            prior_sd <- suppressWarnings(as.numeric(ps))
             if (is.na(prior_sd) || prior_sd <= 0) {
               errors <- c(errors, sprintf(
                 "%s: Prior_SD must be positive numeric",
