@@ -1,10 +1,14 @@
 # ==============================================================================
-# RANKING V9.9.3 - PRODUCTION RELEASE (EXTERNAL REVIEW FIX)
+# RANKING V10.1 - PHASE 2 REFACTORING
 # ==============================================================================
 # Functions for ranking question analysis with statistical rigor
 # Part of R Survey Analytics Toolkit
 #
 # VERSION HISTORY:
+# V10.1  - Phase 2 refactoring (2025-12-29)
+#          - EXTRACTED: Question validation to ranking/ranking_validation.R
+#          - ADDED: tabs_source() for subdirectory loading
+#          - Reduced file size: 1,929 -> 1,783 lines (146 lines extracted)
 # V9.9.3 - External review fix (2025-10-16)
 #          - FIXED: Fail-fast numeric coercion guard in validate_ranking_matrix()
 #          - Prevents silent character matrix conversion
@@ -43,7 +47,7 @@
 # - Worst-to-Best: 1 = worst, higher = better (auto-normalized to Best-to-Worst)
 # ==============================================================================
 
-SCRIPT_VERSION <- "10.0"
+SCRIPT_VERSION <- "10.1"
 
 # ==============================================================================
 # DEPENDENCIES
@@ -72,6 +76,24 @@ source_if_exists("shared_functions.R")
 source_if_exists("Scripts/shared_functions.R")
 source_if_exists("weighting.R")
 source_if_exists("Scripts/weighting.R")
+
+# ==============================================================================
+# SOURCE PHASE 2 SUBMODULES (V10.1)
+# ==============================================================================
+# V10.1: Ranking validation functions extracted to ranking/ranking_validation.R
+# Use tabs_source() for reliable subdirectory loading
+
+if (exists("tabs_source", mode = "function")) {
+  # Use the Phase 2 sourcing mechanism
+  tabs_source("ranking", "ranking_validation.R")
+} else {
+  # Fallback: try to source directly (less reliable but maintains backward compat)
+  .ranking_dir <- tryCatch(dirname(sys.frame(1)$ofile), error = function(e) getwd())
+  .ranking_validation_path <- file.path(.ranking_dir, "ranking", "ranking_validation.R")
+  if (file.exists(.ranking_validation_path)) {
+    source(.ranking_validation_path)
+  }
+}
 
 # ==============================================================================
 # TRS v1.0: RANKING PARTIAL FAILURE TRACKING
@@ -1690,179 +1712,15 @@ create_ranking_rows_for_item <- function(ranking_matrix, item_name, banner_data_
 }
 
 # ==============================================================================
-# RANKING QUESTION VALIDATION HELPERS (INTERNAL)
+# RANKING QUESTION VALIDATION (V10.1 - Phase 2 Refactoring)
 # ==============================================================================
-
-#' Check Ranking_Format field
-#' @keywords internal
-check_ranking_format <- function(question_code, question_info, error_log) {
-  if (!"Ranking_Format" %in% names(question_info) ||
-      is.na(question_info$Ranking_Format) ||
-      trimws(question_info$Ranking_Format) == "") {
-    error_log <- log_issue(
-      error_log,
-      "Ranking",
-      "Missing Ranking_Format",
-      sprintf(
-        "Ranking question %s missing Ranking_Format. Add 'Position' or 'Item' to Survey_Structure.",
-        question_code
-      ),
-      question_code,
-      "Error"
-    )
-  } else if (!question_info$Ranking_Format %in% c("Position", "Item")) {
-    error_log <- log_issue(
-      error_log,
-      "Ranking",
-      "Invalid Ranking_Format",
-      sprintf(
-        "Question %s: Ranking_Format must be 'Position' or 'Item', got: '%s'",
-        question_code,
-        question_info$Ranking_Format
-      ),
-      question_code,
-      "Error"
-    )
-  }
-
-  return(error_log)
-}
-
-#' Check Ranking_Positions field
-#' @keywords internal
-check_ranking_positions <- function(question_code, question_info, error_log) {
-  has_positions <- FALSE
-
-  if ("Ranking_Positions" %in% names(question_info)) {
-    positions <- suppressWarnings(as.numeric(question_info$Ranking_Positions))
-
-    if (!is.na(positions) && positions > 0) {
-      has_positions <- TRUE
-    }
-  }
-
-  if (!has_positions && "Columns" %in% names(question_info)) {
-    columns <- suppressWarnings(as.numeric(question_info$Columns))
-
-    if (!is.na(columns) && columns > 0) {
-      has_positions <- TRUE
-    }
-  }
-
-  if (!has_positions) {
-    error_log <- log_issue(
-      error_log,
-      "Ranking",
-      "Missing Ranking_Positions",
-      sprintf(
-        "Ranking question %s missing Ranking_Positions or Columns. Specify number of rank positions.",
-        question_code
-      ),
-      question_code,
-      "Error"
-    )
-  }
-
-  return(error_log)
-}
-
-#' Check ranking options exist and are complete
-#' @keywords internal
-check_ranking_options <- function(question_code, options_info, error_log) {
-  if (nrow(options_info) == 0) {
-    error_log <- log_issue(
-      error_log,
-      "Ranking",
-      "No Options",
-      sprintf(
-        "Ranking question %s has no options. Add items to rank in Survey_Structure options table.",
-        question_code
-      ),
-      question_code,
-      "Error"
-    )
-  } else {
-    # Check options have required fields
-    if (!"DisplayText" %in% names(options_info) || !"OptionText" %in% names(options_info)) {
-      error_log <- log_issue(
-        error_log,
-        "Ranking",
-        "Incomplete Options",
-        sprintf(
-          "Ranking question %s options missing DisplayText or OptionText columns.",
-          question_code
-        ),
-        question_code,
-        "Error"
-      )
-    }
-  }
-
-  return(error_log)
-}
-
+# V10.1: Ranking question validation functions extracted to ranking/ranking_validation.R
+# Functions available after sourcing:
+#   - check_ranking_format()
+#   - check_ranking_positions()
+#   - check_ranking_options()
+#   - validate_ranking_question()
 # ==============================================================================
-# RANKING VALIDATION (V9.9.1)
-# ==============================================================================
-
-#' Validate ranking question setup in Survey_Structure
-#'
-#' @param question_info Question metadata row
-#' @param options_info Options metadata for this question
-#' @param error_log Error log data frame
-#' @return Updated error log data frame
-#' @export
-validate_ranking_question <- function(question_info, options_info, error_log) {
-  # Input validation
-  if (!is.data.frame(question_info) || nrow(question_info) == 0) {
-    tabs_refuse(
-      code = "ARG_INVALID_TYPE",
-      title = "Invalid Argument Type: question_info",
-      problem = "The question_info argument must be a non-empty data frame row.",
-      why_it_matters = "Question metadata is required to validate ranking question configuration.",
-      how_to_fix = "Provide a data frame row with question metadata from Survey_Structure"
-    )
-  }
-
-  if (!is.data.frame(options_info)) {
-    tabs_refuse(
-      code = "ARG_INVALID_TYPE",
-      title = "Invalid Argument Type: options_info",
-      problem = sprintf("The options_info argument must be a data frame, got: %s", class(options_info)),
-      why_it_matters = "Options metadata is required to validate that ranking items are properly configured.",
-      how_to_fix = "Provide a data frame with option metadata from Survey_Structure"
-    )
-  }
-
-  if (!is.data.frame(error_log)) {
-    tabs_refuse(
-      code = "ARG_INVALID_TYPE",
-      title = "Invalid Argument Type: error_log",
-      problem = sprintf("The error_log argument must be a data frame, got: %s", class(error_log)),
-      why_it_matters = "Error log is used to record validation issues found during ranking question validation.",
-      how_to_fix = "Provide a data frame for error_log with standard error logging columns"
-    )
-  }
-
-  question_code <- question_info$QuestionCode
-
-  if (is.null(question_code) || is.na(question_code)) {
-    tabs_refuse(
-      code = "ARG_MISSING_REQUIRED",
-      title = "Missing Required Field: QuestionCode",
-      problem = "The question_info must contain a QuestionCode.",
-      why_it_matters = "QuestionCode is required to identify which question is being validated.",
-      how_to_fix = "Ensure question_info data frame has a non-null QuestionCode field"
-    )
-  }
-
-  # Run all ranking question validation checks (delegated to helpers)
-  error_log <- check_ranking_format(question_code, question_info, error_log)
-  error_log <- check_ranking_positions(question_code, question_info, error_log)
-  error_log <- check_ranking_options(question_code, options_info, error_log)
-
-  return(error_log)
-}
 
 # ==============================================================================
 # MAINTENANCE DOCUMENTATION
@@ -1926,5 +1784,5 @@ validate_ranking_question <- function(question_info, options_info, error_log) {
 # 5. "top_n exceeds positions": Auto-clamped with warning
 #
 # ==============================================================================
-# END OF RANKING.R V9.9.3 - PRODUCTION RELEASE
+# END OF RANKING.R V10.1 - PHASE 2 REFACTORING
 # ==============================================================================
