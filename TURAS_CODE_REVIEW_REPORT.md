@@ -21,7 +21,7 @@ and professional code organization.
 ### Overall Assessment: **B+ (Good with Improvements Needed)**
 
 | Category | Grade | Assessment |
-|-------------------------|------------------|-----------------------------|
+|----|----|----|
 | **Architecture** | A | Excellent modular design, clear separation of concerns |
 | **TRS Compliance** | A- | Excellent implementation, minor gaps in some modules |
 | **Error Handling** | B+ | Comprehensive but with edge case gaps |
@@ -57,7 +57,7 @@ and professional code organization.
 ### 2. Division by Zero Risks
 
 | Module | Location | Issue |
-|-----------------------|-----------------------------|---------------------|
+|----|----|----|
 | Conjoint | `04_utilities.R:300-311` | `chance_rate = 1 / alts_per_set` not guarded |
 | Pricing | `04_gabor_granger.R:292` | `violations / length(respondents)` unguarded |
 | Weighting | `rim_weights.R:504` | `sum(weights)` could be zero |
@@ -66,7 +66,7 @@ and professional code organization.
 ### 3. Empty Data Frame Crashes
 
 | Module | Location | Issue |
-|-----------------------|-----------------------------|---------------------|
+|----|----|----|
 | AlchemerParser | `06_output.R:186, 276-277` | `do.call(rbind, rows)` on empty list crashes |
 | Tabs | Multiple locations | Empty base handling incomplete |
 | MaxDiff | `06_logit.R:185` | Tasks with no choices silently skipped |
@@ -213,7 +213,7 @@ TRS refusal functions
 ### Statistical Packages
 
 | Package | Module(s) | Purpose | Assessment |
-|-----------------|------------------|-----------------|--------------------|
+|----|----|----|----|
 | survey | Weighting | RIM weighting/calibration | **Best choice** - industry standard |
 | ordinal | CatDriver | Ordinal regression | Good, falls back to MASS::polr |
 | MASS | Multiple | General statistics | Base R, reliable |
@@ -288,7 +288,7 @@ TRS refusal functions
 All statistical methods have been verified for correctness:
 
 | Method | Module(s) | Verification Status |
-|-----------------|-------------------|------------------------------------|
+|----|----|----|
 | Weighted Mean/SD | All | ✓ Correct (Σ(x·w) / Σ(w)) |
 | Effective N (Kish) | All | ✓ Correct ((Σw)² / Σw²) |
 | Design Effect | Weighting, Tabs | ✓ Correct (1 + CV²) |
