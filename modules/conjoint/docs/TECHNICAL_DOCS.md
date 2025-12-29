@@ -50,7 +50,7 @@ modules/conjoint/
 │   ├── 08_market_simulator.R  # Market simulator (~650 lines)
 │   ├── 09_none_handling.R     # NONE option logic (~350 lines)
 │   ├── 10_best_worst.R        # BWS scaling (~400 lines)
-│   ├── 11_hierarchical_bayes.R# HB estimation (~500 lines)
+│   ├── 11_hierarchical_bayes.R# HB estimation (PLACEHOLDER - see HB_IMPLEMENTATION_SPEC.md)
 │   └── 99_helpers.R           # Utilities (~500 lines)
 ├── tests/                      # Test suite
 ├── examples/                   # Example configs and data
@@ -632,7 +632,19 @@ Update in:
 | Package | Purpose |
 |---------|---------|
 | `dplyr` | Data manipulation |
-| `bayesm` | Hierarchical Bayes (future) |
+| `bayesm` | Hierarchical Bayes (Phase 2 - see HB_IMPLEMENTATION_SPEC.md) |
+| `RSGHB` | Alternative HB engine (Phase 2) |
+| `coda` | Enhanced MCMC diagnostics |
+
+### Shared Dependencies
+
+The conjoint module uses shared utilities from `modules/shared/lib/`:
+
+| File | Purpose |
+|------|---------|
+| `hb_diagnostics.R` | MCMC convergence diagnostics for HB estimation |
+| `trs_refusal.R` | Standardized error handling |
+| `config_utils.R` | Configuration utilities |
 
 ### Checking Dependencies
 
@@ -656,6 +668,16 @@ check_dependencies <- function() {
 ---
 
 ## Extension Points
+
+### Hierarchical Bayes Implementation (Phase 2)
+
+HB estimation is planned but not yet implemented. For full implementation details:
+- **Specification:** `docs/HB_IMPLEMENTATION_SPEC.md`
+- **Placeholder:** `R/11_hierarchical_bayes.R`
+- **Shared diagnostics:** `modules/shared/lib/hb_diagnostics.R`
+
+Current status: The file provides API stubs and references the spec document.
+When implemented, use `estimation_method = "hb"` in configuration.
 
 ### Adding New Estimation Methods
 
