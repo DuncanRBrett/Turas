@@ -668,7 +668,14 @@ process_all_questions <- function(config, survey_data, weight_var, verbose) {
                   i, n_questions, (i / n_questions) * 100))
     }
 
-    stat_type <- tolower(q_row$Statistic_Type)
+    stat_type <- tolower(as.character(q_row$Statistic_Type))
+
+    # Handle NA or empty statistic type
+    if (is.na(stat_type) || stat_type == "") {
+      warnings_list <- c(warnings_list,
+        sprintf("Question %s: Statistic_Type is missing or empty", q_id))
+      next
+    }
 
     if (stat_type == "proportion") {
       result <- process_proportion_question(q_row, survey_data, weight_var, config)
