@@ -101,8 +101,8 @@ dispatch_proportion_ci <- function(p, n_eff, values, categories, weights,
   # -------------------------------------------------------------------------
   run_cred_flag <- q_row$Run_Credible
   if (!is.null(run_cred_flag) && !is.na(run_cred_flag) && toupper(run_cred_flag) == "Y") {
-    prior_mean <- if (!is.na(q_row$Prior_Mean)) q_row$Prior_Mean else NULL
-    prior_n    <- if (!is.na(q_row$Prior_N))    q_row$Prior_N    else NULL
+    prior_mean <- if (!is.null(q_row$Prior_Mean) && !is.na(q_row$Prior_Mean)) q_row$Prior_Mean else NULL
+    prior_n    <- if (!is.null(q_row$Prior_N) && !is.na(q_row$Prior_N)) q_row$Prior_N else NULL
 
     # Use effective n for weighted data
     n_bayes <- if (!is.null(weights)) n_eff else length(values)
@@ -187,9 +187,9 @@ dispatch_mean_ci <- function(mean_val, sd_val, n_eff, values, weights,
   # -------------------------------------------------------------------------
   run_cred_flag <- q_row$Run_Credible
   if (!is.null(run_cred_flag) && !is.na(run_cred_flag) && toupper(run_cred_flag) == "Y") {
-    prior_mean <- if (!is.na(q_row$Prior_Mean)) q_row$Prior_Mean else NULL
-    prior_sd   <- if (!is.na(q_row$Prior_SD))   q_row$Prior_SD   else NULL
-    prior_n    <- if (!is.na(q_row$Prior_N))    q_row$Prior_N    else NULL
+    prior_mean <- if (!is.null(q_row$Prior_Mean) && !is.na(q_row$Prior_Mean)) q_row$Prior_Mean else NULL
+    prior_sd   <- if (!is.null(q_row$Prior_SD) && !is.na(q_row$Prior_SD)) q_row$Prior_SD else NULL
+    prior_n    <- if (!is.null(q_row$Prior_N) && !is.na(q_row$Prior_N)) q_row$Prior_N else NULL
 
     result$bayesian <- credible_interval_mean(
       values     = values,
@@ -334,8 +334,8 @@ dispatch_nps_ci <- function(nps_stats, values, promoter_codes, detractor_codes,
   # -------------------------------------------------------------------------
   run_cred_flag <- q_row$Run_Credible
   if (!is.null(run_cred_flag) && !is.na(run_cred_flag) && toupper(run_cred_flag) == "Y") {
-    prior_mean <- if (!is.na(q_row$Prior_Mean)) q_row$Prior_Mean else 0
-    prior_sd   <- if (!is.na(q_row$Prior_SD))   q_row$Prior_SD   else 50  # Wide prior
+    prior_mean <- if (!is.null(q_row$Prior_Mean) && !is.na(q_row$Prior_Mean)) q_row$Prior_Mean else 0
+    prior_sd   <- if (!is.null(q_row$Prior_SD) && !is.na(q_row$Prior_SD)) q_row$Prior_SD else 50  # Wide prior
 
     # Calculate SE for NPS
     p_prom <- pct_promoters / 100
