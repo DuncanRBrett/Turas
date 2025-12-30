@@ -212,17 +212,27 @@ assess sample representativeness.
 
 **Statistical Methods Implemented:**
 
-*For Proportions:*
-- **Normal approximation** – CI = p ± z × √(p(1-p)/n)
+*For Proportions (4 methods):*
+- **Normal approximation (MOE)** – CI = p ± z × √(p(1-p)/n)
 - **Wilson score interval** – Better coverage for extreme proportions and small samples
+- **Bootstrap percentile** – Non-parametric resampling, configurable iterations (default 5,000)
+- **Bayesian credible interval** – Beta-Binomial conjugate prior with configurable prior parameters
 
-*For Means:*
+*For Means (3 methods):*
 - **t-distribution CI** – mean ± t_crit × (SD/√n)
+- **Bootstrap percentile** – Non-parametric resampling for non-normal distributions
+- **Bayesian credible interval** – Normal-Normal conjugate with prior mean/SD/n
+
+*For NPS (3 methods):*
+- **Normal approximation** – Delta method for NPS variance
+- **Bootstrap percentile** – Resamples full dataset, calculates NPS each iteration
+- **Bayesian credible interval** – Dirichlet-based modeling of promoter/detractor proportions
 
 *Sample Quality:*
 - **Kish effective sample size** – n_eff = (Σw)² / Σw²
 - **Design effect (DEFF)** – Measures efficiency loss from weighting
 - **CI adjustment for DEFF** – Proper uncertainty quantification for weighted data
+- **Weighted bootstrap** – Accounts for survey weights in resampling
 
 **Refactoring Notes:**
 - Reduced from 1,396 lines to ~600 lines (57% reduction)
@@ -230,7 +240,8 @@ assess sample representativeness.
 - 200 question limit check (protective, configurable)
 
 **Validation:** Methods follow Brown, Cai & DasGupta (2001) for interval
-estimation and Kish (1965) for design effects.
+estimation, Kish (1965) for design effects, Efron & Tibshirani (1993) for
+bootstrap methods, and Gelman et al. (2013) for Bayesian inference.
 
 **Statistical Rigor Rating:** 8/10
 
