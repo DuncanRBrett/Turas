@@ -212,17 +212,27 @@ assess sample representativeness.
 
 **Statistical Methods Implemented:**
 
-*For Proportions:*
-- **Normal approximation** – CI = p ± z × √(p(1-p)/n)
+*For Proportions (4 methods):*
+- **Normal approximation (MOE)** – CI = p ± z × √(p(1-p)/n)
 - **Wilson score interval** – Better coverage for extreme proportions and small samples
+- **Bootstrap percentile** – Non-parametric resampling, configurable iterations (default 5,000)
+- **Bayesian credible interval** – Beta-Binomial conjugate prior with configurable prior parameters
 
-*For Means:*
+*For Means (3 methods):*
 - **t-distribution CI** – mean ± t_crit × (SD/√n)
+- **Bootstrap percentile** – Non-parametric resampling for non-normal distributions
+- **Bayesian credible interval** – Normal-Normal conjugate with prior mean/SD/n
+
+*For NPS (3 methods):*
+- **Normal approximation** – Delta method for NPS variance
+- **Bootstrap percentile** – Resamples full dataset, calculates NPS each iteration
+- **Bayesian credible interval** – Dirichlet-based modeling of promoter/detractor proportions
 
 *Sample Quality:*
 - **Kish effective sample size** – n_eff = (Σw)² / Σw²
 - **Design effect (DEFF)** – Measures efficiency loss from weighting
 - **CI adjustment for DEFF** – Proper uncertainty quantification for weighted data
+- **Weighted bootstrap** – Accounts for survey weights in resampling
 
 **Refactoring Notes:**
 - Reduced from 1,396 lines to ~600 lines (57% reduction)
@@ -230,7 +240,8 @@ assess sample representativeness.
 - 200 question limit check (protective, configurable)
 
 **Validation:** Methods follow Brown, Cai & DasGupta (2001) for interval
-estimation and Kish (1965) for design effects.
+estimation, Kish (1965) for design effects, Efron & Tibshirani (1993) for
+bootstrap methods, and Gelman et al. (2013) for Bayesian inference.
 
 **Statistical Rigor Rating:** 8/10
 
@@ -247,7 +258,9 @@ relative importance, and machine learning.
 | **xgboost** | 10M+ | Gradient boosting for SHAP | Industry-leading ML library, used by Kaggle winners |
 | **shapviz** | 500K+ | SHAP value visualization | Implements Lundberg & Lee (2017) TreeSHAP algorithm |
 | **ggplot2** | 50M+ | Visualization | Most-cited R visualization package |
+| **ggrepel** | 5M+ | Smart label placement | Prevents label overlap in quadrant charts |
 | **openxlsx** | 15M+ | Excel output | Industry standard |
+| **haven** | 20M+ | SPSS/Stata import (optional) | Statistical software interoperability |
 
 **Statistical Methods Implemented:**
 
@@ -324,6 +337,7 @@ CatDriver uses R's actual model matrix to create a canonical mapping, ensuring c
 | **ggplot2** | 50M+ | Visualization | Industry standard |
 | **readxl/openxlsx** | 30M+/15M+ | Excel I/O | Posit-maintained |
 | **scales** | 15M+ | Axis formatting | ggplot2 companion package |
+| **haven** | 20M+ | SPSS/Stata import (optional) | Statistical software interoperability |
 
 **Statistical Methods Implemented:**
 
@@ -358,6 +372,8 @@ implements Gabor & Granger (1966). NMS follows Newton, Miller & Smith (1993).
 | **dfidx** | 1M+ | Data indexing for mlogit | Required companion to mlogit (v1.1+) |
 | **survival** | 20M+ | Conditional logit (fallback) | R's premier survival analysis package |
 | **dplyr** | 50M+ | Data manipulation | Most popular data package |
+| **tidyr** | 40M+ | Data reshaping | Part of tidyverse ecosystem |
+| **readxl** | 30M+ | Excel configuration import | Posit-maintained |
 | **openxlsx** | 15M+ | Excel I/O | Industry standard |
 
 **Statistical Methods Implemented:**
@@ -367,6 +383,11 @@ implements Gabor & Granger (1966). NMS follows Newton, Miller & Smith (1993).
 - **Part-worth utilities** – Attribute level values from coefficients
 - **Zero-centering** – Utilities centered within attributes for interpretation
 - **Attribute importance** – Range-based importance calculation
+- **Market simulator** – Interactive Excel sheet with:
+  - Product configuration with dropdowns
+  - Automatic market share calculations
+  - Sensitivity analysis
+  - Share of preference visualization
 - **Alchemer CBC import** – Direct import from Alchemer choice-based conjoint exports
 
 **v10.1 Enhancements:**
@@ -389,11 +410,15 @@ authored by Yves Croissant (University of the Reunion), a leading econometrician
 
 | Package | CRAN Downloads | Purpose in Turas | Why Trusted |
 |---------|----------------|------------------|-------------|
-| **cluster** | 15M+ | Silhouette analysis | Part of R's recommended packages |
+| **cluster** | 15M+ | Silhouette analysis, gap statistic | Part of R's recommended packages |
 | **MASS** | 30M+ | Linear Discriminant Analysis | Venables & Ripley's classic package |
 | **poLCA** | 500K+ | Latent Class Analysis | Standard LCA implementation |
 | **Base R stats** | Built-in | K-means clustering | R Foundation maintained |
+| **readxl** | 30M+ | Excel configuration import | Posit-maintained |
 | **writexl** | 5M+ | Excel output | Fast, dependency-free Excel writing |
+| **rpart** | 10M+ | Decision trees for rules | Part of R's recommended packages |
+| **ggplot2** | 50M+ | Visualization (optional) | Industry standard |
+| **haven** | 20M+ | SPSS/Stata import (optional) | Statistical software interoperability |
 
 **Statistical Methods Implemented:**
 
@@ -431,13 +456,16 @@ Rousseeuw (1987). LCA uses Lazarsfeld & Henry (1968).
 | Package | CRAN Downloads | Purpose in Turas | Why Trusted |
 |---------|----------------|------------------|-------------|
 | **survival** | 20M+ | Conditional logit for aggregate analysis | R's premier survival package, Mayo Clinic maintained |
-| **cmdstanr** | 500K+ | Hierarchical Bayes via Stan | Stan is the gold standard for Bayesian inference |
+| **cmdstanr** | 500K+ | Hierarchical Bayes via Stan (optional) | Stan is the gold standard for Bayesian inference |
+| **AlgDesign** | 500K+ | D-optimal experimental design | Purpose-built for design optimization |
 | **ggplot2** | 50M+ | Visualization | Industry standard |
 | **openxlsx** | 15M+ | Excel I/O | Industry standard |
 
 **Statistical Methods Implemented:**
 
-- **Design generation** – Balanced incomplete block designs for efficient experiments
+- **Design generation** – Balanced incomplete block designs via AlgDesign
+  - D-optimal efficiency maximization
+  - Federov algorithm for design optimization
 - **Count analysis** – Best%, Worst%, Net Score descriptive statistics
 - **Aggregate logit** – Population-level utility estimation via conditional logit
   - Uses survival::clogit (Terry Therneau, Mayo Clinic)
@@ -507,6 +535,8 @@ All modules share common infrastructure from `modules/shared/lib/`:
 | **config_utils.R** | Configuration parsing | — |
 | **data_utils.R** | Data manipulation utilities | — |
 | **weights_utils.R** | Weight handling utilities | — |
+| **hb_diagnostics.R** | Hierarchical Bayes convergence diagnostics (Rhat, ESS) | — |
+| **turas_excel_escape.R** | Excel special character handling | — |
 
 ### Refusal Code Taxonomy
 
@@ -553,13 +583,13 @@ Turas uses established methods correctly. It is not cutting-edge statistical res
 | **Tabs** | Base R, openxlsx, readxl | 70M+ | Kish (1965) |
 | **Weighting** | survey, dplyr | 60M+ | Deming & Stephan (1940) |
 | **Tracker** | Base R, openxlsx | 15M+ | Standard parametric inference |
-| **Confidence** | Base R, openxlsx | 15M+ | Kish (1965), Brown et al. (2001) |
-| **KeyDriver** | xgboost, shapviz, ggplot2 | 60M+ | Lundberg & Lee (2017) |
+| **Confidence** | Base R, openxlsx | 15M+ | Kish (1965), Brown et al. (2001), Efron & Tibshirani (1993) |
+| **KeyDriver** | xgboost, shapviz, ggplot2 | 70M+ | Lundberg & Lee (2017) |
 | **CatDriver** | MASS, nnet | 45M+ | Agresti (2002), McCullagh (1980) |
-| **Pricing** | pricesensitivitymeter, ggplot2 | 50M+ | Van Westendorp (1976) |
-| **Conjoint** | mlogit, survival, dplyr | 70M+ | McFadden (1974) – Nobel Prize |
-| **Segment** | cluster, MASS, poLCA | 45M+ | Hartigan & Wong (1979) |
-| **MaxDiff** | survival, cmdstanr | 25M+ | Louviere (1983), Carpenter (2017) |
+| **Pricing** | pricesensitivitymeter, ggplot2 | 55M+ | Van Westendorp (1976) |
+| **Conjoint** | mlogit, survival, dplyr, tidyr | 110M+ | McFadden (1974) – Nobel Prize |
+| **Segment** | cluster, MASS, poLCA, rpart | 60M+ | Hartigan & Wong (1979) |
+| **MaxDiff** | survival, cmdstanr, AlgDesign | 25M+ | Louviere (1983), Carpenter (2017) |
 
 ---
 
@@ -621,10 +651,13 @@ regulatory submissions.
 - Brown, L.D., Cai, T.T., & DasGupta, A. (2001). Interval estimation for a binomial proportion. *Statistical Science*, 16(2), 101-133.
 - Carpenter, B., et al. (2017). Stan: A probabilistic programming language. *Journal of Statistical Software*, 76(1).
 - Deming, W.E., & Stephan, F.F. (1940). On a least squares adjustment of a sampled frequency table. *Annals of Mathematical Statistics*, 11(4), 427-444.
+- Efron, B., & Tibshirani, R.J. (1993). *An Introduction to the Bootstrap*. Chapman & Hall/CRC.
 - Gabor, A., & Granger, C.W.J. (1966). Price as an indicator of quality. *Economica*, 33(129), 43-70.
+- Gelman, A., Carlin, J.B., Stern, H.S., Dunson, D.B., Vehtari, A., & Rubin, D.B. (2013). *Bayesian Data Analysis* (3rd ed.). Chapman & Hall/CRC.
 - Hartigan, J.A., & Wong, M.A. (1979). Algorithm AS 136: A k-means clustering algorithm. *Applied Statistics*, 28(1), 100-108.
 - Johnson, J.W. (2000). A heuristic method for estimating the relative weight of predictor variables. *Multivariate Behavioral Research*, 35(1), 1-19.
 - Kish, L. (1965). *Survey Sampling*. John Wiley & Sons.
+- Lazarsfeld, P.F., & Henry, N.W. (1968). *Latent Structure Analysis*. Houghton Mifflin.
 - Lindeman, R.H., Merenda, P.F., & Gold, R.Z. (1980). *Introduction to Bivariate and Multivariate Analysis*. Scott, Foresman.
 - Louviere, J.J., & Woodworth, G. (1983). Design and analysis of simulated consumer choice. *Journal of Marketing Research*, 20(4), 350-367.
 - Lundberg, S.M., & Lee, S.I. (2017). A unified approach to interpreting model predictions. *Advances in Neural Information Processing Systems*, 30.
@@ -633,6 +666,7 @@ regulatory submissions.
 - Newton, D., Miller, J., & Smith, P. (1993). A market acceptance extension to traditional price sensitivity measurement. *Proceedings of the American Marketing Association*.
 - Rousseeuw, P.J. (1987). Silhouettes: A graphical aid to the interpretation and validation of cluster analysis. *Journal of Computational and Applied Mathematics*, 20, 53-65.
 - Van Westendorp, P. (1976). NSS Price Sensitivity Meter. *ESOMAR Congress*.
+- Wilson, E.B. (1927). Probable inference, the law of succession, and statistical inference. *Journal of the American Statistical Association*, 22(158), 209-212.
 
 ---
 
