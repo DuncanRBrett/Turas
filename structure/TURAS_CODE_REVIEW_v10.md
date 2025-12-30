@@ -41,7 +41,7 @@ coverage could be expanded
 #### R Packages Used:
 
 | Package | Purpose | Why Used |
-|-----------------------|-----------------------|--------------------------|
+|----|----|----|
 | **openxlsx** | Excel writing | Write Tabs config, survey structure, and data headers |
 | **readxl** | Excel reading | Read data export map and translation export files |
 | **officer** | Word document parsing | Extract question text from .docx questionnaire |
@@ -71,7 +71,7 @@ more specific about Word document format requirements
 #### R Packages Used:
 
 | Package | Purpose | Why Used |
-|-----------------------|-----------------------|--------------------------|
+|----|----|----|
 | **openxlsx** | Excel writing | Write formatted crosstab outputs with styling |
 | **readxl** | Excel reading | Read configuration and data files |
 | **lobstr** | Memory profiling | Monitor memory usage (replaced deprecated `pryr` in v10.0) |
@@ -100,7 +100,7 @@ implementations could use more unit tests
 #### R Packages Used:
 
 | Package        | Purpose           | Why Used                                  |
-|-----------------------|-----------------------|--------------------------|
+|----------------|-------------------|-------------------------------------------|
 | **openxlsx**   | Excel I/O         | Read configs and write tracking reports   |
 | **readxl**     | Excel reading     | Alternative Excel reader for configs      |
 | **data.table** | Fast operations   | Efficient handling of multi-wave datasets |
@@ -131,7 +131,7 @@ Wilson)
 #### R Packages Used:
 
 | Package | Purpose | Why Used |
-|-----------------------|-----------------------|--------------------------|
+|----|----|----|
 | **openxlsx** | Excel I/O | Read config and write confidence interval outputs |
 | **readxl** | Excel reading | Configuration file parsing |
 | **boot** | Bootstrap CI | Compute bootstrap confidence intervals |
@@ -163,7 +163,7 @@ variable selection
 #### R Packages Used:
 
 | Package | Purpose | Why Used |
-|-----------------------|-----------------------|--------------------------|
+|----|----|----|
 | **stats** | K-means clustering | Built-in R kmeans() - fast and reliable |
 | **cluster** | Cluster validation | Silhouette analysis, gap statistic for optimal k |
 | **MASS** | Discriminant analysis | LDA for segment validation and profiling |
@@ -204,7 +204,7 @@ experiments
 #### R Packages Used:
 
 | Package | Purpose | Why Used |
-|-----------------------|-----------------------|--------------------------|
+|----|----|----|
 | **mlogit** | Multinomial logit | Primary estimation engine for choice models |
 | **dfidx** | Data indexing | Required by mlogit \>= 1.1-0 for indexed data frames |
 | **survival** | Conditional logit | Fallback estimation engine (clogit) |
@@ -241,7 +241,7 @@ NPS, etc.)
 #### R Packages Used:
 
 | Package | Purpose | Why Used |
-|-----------------------|-----------------------|--------------------------|
+|----|----|----|
 | **stats** | Linear regression | Base lm() for relative importance |
 | **car** | Partial R² | Type II ANOVA for partial R² (primary method) |
 | **xgboost** | Gradient boosting | SHAP analysis - ML-based importance |
@@ -281,7 +281,7 @@ Gabor-Granger)
 #### R Packages Used:
 
 | Package | Purpose | Why Used |
-|-----------------------|-----------------------|--------------------------|
+|----|----|----|
 | **pricesensitivitymeter** | Van Westendorp PSM | Validated implementation of PSM with NMS extension |
 | **ggplot2** | Visualization | PSM curves, demand curves, price ladders |
 | **openxlsx** | Excel I/O | Config and comprehensive output reports |
@@ -315,7 +315,7 @@ estimation
 #### R Packages Used:
 
 | Package | Purpose | Why Used |
-|-----------------------|-----------------------|--------------------------|
+|----|----|----|
 | **AlgDesign** | Experimental design | Generate balanced incomplete block designs |
 | **survival** | Conditional logit | Aggregate logit estimation (clogit) |
 | **cmdstanr** | Hierarchical Bayes | Individual-level scores via Stan MCMC |
@@ -349,7 +349,7 @@ automated
 #### R Packages Used:
 
 | Package | Purpose | Why Used |
-|-----------------------|-----------------------|--------------------------|
+|----|----|----|
 | **stats** | Logistic regression | Built-in glm() for binary/multinomial models |
 | **MASS** | Ordinal regression | polr() for proportional odds models |
 | **ordinal** | Ordinal regression | clm() - superior to MASS::polr (preferred when available) |
@@ -389,7 +389,7 @@ needs user guide
 #### R Packages Used:
 
 | Package | Purpose | Why Used |
-|-----------------------|-----------------------|--------------------------|
+|----|----|----|
 | **survey** | Rim weighting | Modern, actively-maintained calibration (v2.0 migration 2025-12-25) |
 | **openxlsx** | Excel I/O | Config and weight diagnostics output |
 | **readxl** | Excel reading | Configuration files |
@@ -425,7 +425,7 @@ slow
 #### R Packages Used:
 
 | Package | Purpose | Why Used |
-|-----------------------|-----------------------|--------------------------|
+|----|----|----|
 | **openxlsx** | Excel I/O | Shared Excel operations, TRS status writer |
 | **readxl** | Excel reading | Config reading utilities |
 | **writexl** | Fast Excel writing | Atomic workbook save (TRS v1.0) |

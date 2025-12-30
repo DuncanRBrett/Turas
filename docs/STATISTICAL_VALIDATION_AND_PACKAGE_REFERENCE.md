@@ -70,7 +70,7 @@ records in their respective domains.
 testing for survey data.
 
 | Package | CRAN Downloads | Purpose in Turas | Why Trusted |
-|----------------|------------------|----------------------|----------------|
+|----|----|----|----|
 | **openxlsx** | 15M+ | Excel report generation | Industry standard for Excel I/O in R |
 | **readxl** | 30M+ | Excel data import | Developed by RStudio/Posit, rigorously tested |
 | **data.table** | 25M+ | High-performance data processing | Powers data analysis at major tech companies |
@@ -97,7 +97,7 @@ survey analysis.
 significance testing.
 
 | Package | CRAN Downloads | Purpose in Turas | Why Trusted |
-|----------------|------------------|----------------------|----------------|
+|----|----|----|----|
 | **openxlsx** | 15M+ | Excel I/O and formatting | Industry standard |
 | **Base R stats** | Built-in | t-tests, z-tests, distributions | R Foundation maintained |
 
@@ -152,7 +152,7 @@ estimation and Kish (1965) for design effects.
 relative weights, and machine learning.
 
 | Package | CRAN Downloads | Purpose in Turas | Why Trusted |
-|----------------|------------------|----------------------|----------------|
+|----|----|----|----|
 | **xgboost** | 10M+ | Gradient boosting for SHAP | Industry-leading ML library, used by Kaggle winners |
 | **shapviz** | 500K+ | SHAP value calculation | Implements Lundberg & Lee (2017) TreeSHAP algorithm |
 | **ggplot2** | 50M+ | Visualization | Most-cited R visualization package |
@@ -179,7 +179,7 @@ Lundberg & Lee (2017), cited 15,000+ times.
 optimization.
 
 | Package | CRAN Downloads | Purpose in Turas | Why Trusted |
-|----------------|------------------|----------------------|----------------|
+|----|----|----|----|
 | **pricesensitivitymeter** | 100K+ | Van Westendorp PSM | Purpose-built for pricing research |
 | **ggplot2** | 50M+ | Visualization | Industry standard |
 | **readxl/openxlsx** | 30M+/15M+ | Excel I/O | Posit-maintained |
@@ -206,7 +206,7 @@ implements Gabor & Granger (1966).
 trade-offs.
 
 | Package | CRAN Downloads | Purpose in Turas | Why Trusted |
-|----------------|------------------|----------------------|----------------|
+|----|----|----|----|
 | **mlogit** | 2M+ | Multinomial logit estimation | **Gold standard** for discrete choice in R |
 | **dfidx** | 1M+ | Data indexing for mlogit | Required companion to mlogit |
 | **survival** | 20M+ | Conditional logit (fallback) | R's premier survival analysis package |
@@ -237,7 +237,7 @@ authored by Yves Croissant, a leading econometrician.
 **Purpose:** K-means clustering, validation, and segment profiling.
 
 | Package | CRAN Downloads | Purpose in Turas | Why Trusted |
-|----------------|------------------|----------------------|----------------|
+|----|----|----|----|
 | **cluster** | 15M+ | Silhouette analysis | Part of R's recommended packages |
 | **MASS** | 30M+ | Linear Discriminant Analysis | Venables & Ripley's classic package |
 | **readxl/writexl** | 30M+/5M+ | Excel I/O | Posit-maintained |
@@ -265,7 +265,7 @@ Rousseeuw (1987). LCA uses Lazarsfeld & Henry (1968).
 scale.
 
 | Package | CRAN Downloads | Purpose in Turas | Why Trusted |
-|----------------|------------------|----------------------|----------------|
+|----|----|----|----|
 | **survival** | 20M+ | Conditional logit for aggregate analysis | R's premier survival package |
 | **cmdstanr** | 500K+ | Hierarchical Bayes via Stan | Stan is the gold standard for Bayesian inference |
 | **AlgDesign** | 500K+ | D-optimal experimental design | Purpose-built for design optimization |
@@ -290,7 +290,7 @@ Bayesian platform available.
 ## Summary: Package Reliability Matrix
 
 | Module | Primary Packages | Total CRAN Downloads | Academic Citations |
-|----------------|-----------------|---------------------|-------------------|
+|----|----|----|----|
 | **Tabs** | Base R, openxlsx, readxl | 70M+ | Core R |
 | **Tracker** | Base R, openxlsx | 15M+ | Core R |
 | **Confidence** | Base R, dplyr, openxlsx | 65M+ | Core R |
@@ -309,7 +309,7 @@ We maintain transparency about our development roadmap:
 ### Currently In Development
 
 | Module | Enhancement | Status | Expected Benefit |
-|----------------|------------------|----------------|------------------------|
+|----|----|----|----|
 | **Conjoint** | Hierarchical Bayes (bayesm) | Framework complete | Individual-level utilities, better heterogeneity handling |
 | **MaxDiff** | Enhanced HB diagnostics | Active | Improved convergence reporting |
 | **All Modules** | Automated unit testing | Ongoing | Regression prevention |
@@ -317,7 +317,7 @@ We maintain transparency about our development roadmap:
 ### Under Consideration
 
 | Enhancement | Modules Affected | Rationale |
-|-----------------------|------------------------------|--------------------|
+|----|----|----|
 | Bootstrap significance tests | Tabs, Tracker | Non-parametric alternative for small samples (Note: Bootstrap CI already fully implemented in Confidence module) |
 | Bayesian significance testing | All | Better handling of uncertainty |
 | Interactive dashboards | All | Client self-service exploration |
