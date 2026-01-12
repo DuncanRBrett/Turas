@@ -58,12 +58,35 @@ run_weighting_gui <- function(launch_browser = TRUE) {
     }
   }, error = function(e) NULL)
 
-  # Source shared console capture for TRS compliance (no silent failures in GUI)
+  # Source shared library for TRS compliance (includes atomic save, console capture, etc.)
+  shared_loaded <- FALSE
   if (!is.null(turas_root)) {
-    console_capture_file <- file.path(turas_root, "modules", "shared", "lib", "console_capture.R")
-    if (file.exists(console_capture_file)) {
-      source(console_capture_file, local = FALSE)
+    shared_import <- file.path(turas_root, "modules", "shared", "lib", "import_all.R")
+    if (file.exists(shared_import)) {
+      tryCatch({
+        source(shared_import, local = FALSE)
+        shared_loaded <- TRUE
+      }, error = function(e) {
+        warning(paste("Failed to load shared library:", e$message), call. = FALSE)
+      })
     }
+
+    # Fallback to just console capture if full import failed
+    if (!shared_loaded) {
+      console_capture_file <- file.path(turas_root, "modules", "shared", "lib", "console_capture.R")
+      if (file.exists(console_capture_file)) {
+        source(console_capture_file, local = FALSE)
+      }
+    }
+  }
+
+  # Warn if shared library not loaded
+  if (!shared_loaded) {
+    warning(
+      "Shared library not loaded. Some features may not work correctly.\n",
+      "  Expected location: ", if (!is.null(turas_root)) file.path(turas_root, "modules/shared/lib/import_all.R") else "[TURAS root not found]",
+      call. = FALSE
+    )
   }
 
   # Source module libraries
@@ -84,6 +107,23 @@ run_weighting_gui <- function(launch_browser = TRUE) {
   main_file <- file.path(module_dir, "run_weighting.R")
   if (file.exists(main_file)) {
     source(main_file, local = FALSE)
+  }
+
+  # ===========================================================================
+  # HELPER FUNCTIONS
+  # ===========================================================================
+
+  # Detect weight config files in directory
+  detect_config_files <- function(dir) {
+    if (!dir.exists(dir)) return(character(0))
+    files <- list.files(dir, pattern = "\\.xlsx$", full.names = FALSE, ignore.case = TRUE)
+    config_patterns <- c("weight.*config", "config.*weight", "weighting.*config", "config")
+    detected <- character(0)
+    for (pattern in config_patterns) {
+      matches <- grep(pattern, files, ignore.case = TRUE, value = TRUE)
+      detected <- c(detected, matches)
+    }
+    unique(detected)
   }
 
   # ===========================================================================
@@ -254,11 +294,15 @@ run_weighting_gui <- function(launch_browser = TRUE) {
       div(class = "help-text",
           "Select or enter the folder path containing your Weight_Config.xlsx and data file"),
 
-      textInput("config_filename", "Config File Name",
-                value = "Weight_Config.xlsx",
-                width = "100%"),
-      div(class = "help-text",
-          "Name of the config file in the folder above"),
+      # Config file selector (shows when folder is selected)
+      conditionalPanel(
+        condition = "output.folder_selected",
+        div(style = "margin-top: 20px;",
+          uiOutput("config_selector"),
+          div(class = "help-text",
+              "Select a config file from the detected files in the folder above, or enter a custom filename")
+        )
+      ),
 
       # Options Section
       div(class = "section-title", "2. Options"),
@@ -310,7 +354,8 @@ run_weighting_gui <- function(launch_browser = TRUE) {
       result = NULL,
       log = "",
       running = FALSE,
-      recent_folders = character(0)
+      recent_folders = character(0),
+      selected_config = NULL
     )
 
     # Recent folders file location (persistent across sessions)
@@ -389,6 +434,78 @@ run_weighting_gui <- function(launch_browser = TRUE) {
       }
     }
 
+    # Folder selected flag
+    output$folder_selected <- reactive({
+      !is.null(input$project_folder) &&
+      nzchar(input$project_folder) &&
+      dir.exists(input$project_folder)
+    })
+    outputOptions(output, "folder_selected", suspendWhenHidden = FALSE)
+
+    # Config file selector UI
+    output$config_selector <- renderUI({
+      req(input$project_folder)
+      if (!dir.exists(input$project_folder)) {
+        return(NULL)
+      }
+
+      configs <- detect_config_files(input$project_folder)
+
+      if (length(configs) > 0) {
+        # Show detected config files as radio buttons
+        tagList(
+          radioButtons("config_select",
+                      label = "Detected config files:",
+                      choices = configs,
+                      selected = if (!is.null(rv$selected_config) && rv$selected_config %in% configs) {
+                        rv$selected_config
+                      } else {
+                        configs[1]
+                      }),
+          # Option for custom filename
+          checkboxInput("use_custom_config", "Use custom filename", value = FALSE),
+          conditionalPanel(
+            condition = "input.use_custom_config == true",
+            textInput("custom_config_name", "Custom config filename:",
+                     value = "Weight_Config.xlsx",
+                     placeholder = "e.g., My_Weight_Config.xlsx")
+          )
+        )
+      } else {
+        # No configs detected, show text input
+        tagList(
+          div(style = "color: #ffc107; margin-bottom: 10px;",
+              icon("exclamation-triangle"), " No config files detected in folder"),
+          textInput("custom_config_name", "Config filename:",
+                   value = "Weight_Config.xlsx",
+                   placeholder = "e.g., Weight_Config.xlsx")
+        )
+      }
+    })
+
+    # Handle config selection
+    observeEvent(input$config_select, {
+      if (!is.null(input$config_select)) {
+        rv$selected_config <- input$config_select
+      }
+    })
+
+    # Handle custom config toggle
+    observeEvent(input$use_custom_config, {
+      if (input$use_custom_config && !is.null(input$custom_config_name)) {
+        rv$selected_config <- input$custom_config_name
+      } else if (!input$use_custom_config && !is.null(input$config_select)) {
+        rv$selected_config <- input$config_select
+      }
+    })
+
+    # Handle custom config name input
+    observeEvent(input$custom_config_name, {
+      if (input$use_custom_config || is.null(input$config_select)) {
+        rv$selected_config <- input$custom_config_name
+      }
+    })
+
     # Log capture function
     add_log <- function(msg) {
       rv$log <- paste0(rv$log, msg, "\n")
@@ -421,10 +538,10 @@ run_weighting_gui <- function(launch_browser = TRUE) {
         tryCatch({
           # Validate inputs
           req(input$project_folder)
-          req(input$config_filename)
+          req(rv$selected_config)
 
           project_folder <- input$project_folder
-          config_filename <- input$config_filename
+          config_filename <- rv$selected_config
 
           # Validate folder exists
           if (!dir.exists(project_folder)) {

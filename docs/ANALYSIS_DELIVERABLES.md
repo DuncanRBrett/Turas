@@ -25,7 +25,7 @@
   - segment (partial - source location TBD)
   - tabs
   - tracker (partial - source location TBD)
-  - weighting (partial - source location TBD)
+  - weighting
 
 **For Each Module:**
 1. Quality Review (code quality, structure, documentation, error handling)
@@ -293,10 +293,12 @@ Follow the pattern:
   - pricing ✓
   - tabs ✓
 
-- **Modules Partially Analyzed:** 3 of 11 (27%)
+- **Modules Partially Analyzed:** 2 of 11 (18%)
   - segment (structure unclear)
   - tracker (source location TBD)
-  - weighting (source location TBD)
+
+- **Modules Analyzed (weighting):** 1 additional
+  - weighting (v2.0 implemented at modules/weighting/)
 
 ### Deliverables Metrics
 

@@ -1,27 +1,45 @@
 # TURAS DEPENDENCY RESOLUTION GUIDE
+
+> **⚠️ IMPORTANT - DOCUMENT STATUS:**
+> This guide was created on 2025-12-25 and discusses `anesrake` as a dependency.
+> **AS OF v2.0 (2025-12-25), TURAS NO LONGER USES ANESRAKE.**
+> The weighting module migrated to `survey::calibrate()` for long-term maintainability.
+> This document is preserved for historical reference only.
+
 **Last Updated:** 2025-12-25
-**Status:** ✅ ALL DEPENDENCIES AVAILABLE ON CRAN
+**Status:** ⚠️ PARTIALLY OUTDATED - See notice above
 
 ---
 
 ## EXECUTIVE SUMMARY
 
-**GOOD NEWS:** After investigation, both packages flagged as potentially problematic are **AVAILABLE on CRAN**:
+**HISTORICAL NOTE:** This guide originally investigated two packages:
 
-| Package | Status | Installation | Last Verified |
-|---------|--------|--------------|---------------|
-| **anesrake** | ✅ Available | `install.packages("anesrake")` | July 22, 2025 |
-| **ordinal** | ✅ Available | `install.packages("ordinal")` | July 22, 2025 |
+| Package | Status | Current Use in TURAS v2.0 |
+|---------|--------|---------------------------|
+| **anesrake** | ✅ Available on CRAN | ❌ NO LONGER USED (replaced by survey::calibrate()) |
+| **ordinal** | ✅ Available on CRAN | ✅ STILL USED (CatDriver module) |
 
-The initial concern was based on historical information. Both packages are maintained and installable.
+**For current v2.0 dependencies, see the actual implementation in `modules/weighting/lib/rim_weights.R`.**
 
 ---
 
 ## PACKAGE STATUS INVESTIGATION
 
-### 1. anesrake (Weighting Module)
+### 1. anesrake (Weighting Module) - ⚠️ NO LONGER USED IN v2.0
 
-**Current Status:** ✅ **AVAILABLE ON CRAN**
+> **v2.0 MIGRATION NOTICE:**
+> As of v2.0 (2025-12-25), TURAS weighting module migrated from `anesrake` to `survey::calibrate()`.
+> Reasons for migration:
+> - Better long-term maintainability (survey package actively maintained by Thomas Lumley)
+> - More control over weight bounds during calibration (not just trimming after)
+> - Support for multiple calibration methods (raking, linear, logit)
+> - Foundation for future variance estimation capabilities
+>
+> See: `modules/weighting/lib/rim_weights.R` lines 12-17 for migration details.
+> The information below is preserved for historical reference only.
+
+**Historical Status:** ✅ **AVAILABLE ON CRAN** (but no longer used in TURAS v2.0+)
 
 **Evidence:**
 - [CRAN Package Page](https://cran.r-project.org/web/packages/anesrake/index.html)
@@ -29,21 +47,12 @@ The initial concern was based on historical information. Both packages are maint
 - Version: 0.80 (Date: 2018-04-27)
 - [GitHub Mirror](https://github.com/cran/anesrake)
 
-**Installation:**
-```r
-install.packages("anesrake")
-library(anesrake)
+**Historical Purpose in TURAS (pre-v2.0):**
+- Implemented iterative proportional fitting (raking) for survey weights
+- Adjusted sample weights to match multiple target marginal distributions
+- Was used by Weighting module for rim weighting
 
-# Verify installation
-packageVersion("anesrake")  # Should show 0.80
-```
-
-**Purpose in Turas:**
-- Implements iterative proportional fitting (raking) for survey weights
-- Adjusts sample weights to match multiple target marginal distributions
-- Used by Weighting module for rim weighting
-
-**File:** `modules/weighting/lib/rim_weights.R`
+**Current Implementation:** `modules/weighting/lib/rim_weights.R` now uses `survey::calibrate()` exclusively
 
 ---
 

@@ -321,8 +321,30 @@ CI = [NPS - MOE, NPS + MOE]
 **Bootstrap:** Resample full dataset, calculate NPS for each resample,
 take percentiles.
 
-**Bayesian:** Model promoter and detractor proportions with Dirichlet
-prior, sample from posterior.
+**Bayesian Credible Interval:**
+
+```
+Prior: Normal(μ₀, σ₀²) on NPS score
+Likelihood: Normal(NPS_obs, SE²)
+
+Posterior parameters:
+τ₀ = 1/σ₀² (prior precision)
+τ_data = 1/SE² (data precision)
+τ_post = τ₀ + τ_data
+μ_post = (τ₀*μ₀ + τ_data*NPS_obs) / τ_post
+σ_post = sqrt(1 / τ_post)
+
+CI = [qnorm(α/2, μ_post, σ_post), qnorm(1-α/2, μ_post, σ_post)]
+```
+
+**Note:** This uses a Normal-Normal conjugate prior on the NPS score
+directly, not a Dirichlet prior on the promoter/passive/detractor
+proportions. The SE for the observed NPS is calculated using the delta
+method from the promoter and detractor proportions.
+
+**Prior Specification:**
+- `prior_mean`: Expected NPS (e.g., from previous wave)
+- `prior_sd`: Uncertainty around prior (default = 50 for wide/uninformative)
 
 ------------------------------------------------------------------------
 

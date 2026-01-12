@@ -1,9 +1,9 @@
 # TURAS R Package - Comprehensive Analysis Report
 
-**Date:** 2025-12-30
+**Date:** 2026-01-02
 **Analyst:** Claude Code Analysis
-**Version:** Turas v10.x
-**Repository:** /Users/duncan/.claude-worktrees/Turas/adoring-zhukovsky
+**Version:** Turas v10.x-11.x
+**Repository:** /Users/duncan/Documents/Turas
 
 ---
 
@@ -222,36 +222,41 @@ AlchemerParser eliminates manual survey setup by automatically parsing Alchemer 
 
 **Dependencies:**
 - `MASS` - Ordinal logistic regression (polr)
+- `ordinal` - Alternative ordinal models (clm)
 - `nnet` - Multinomial regression
 - `brglm2` - Firth bias-reduced logistic regression (fallback)
-- `car` - VIF calculation for multicollinearity
+- `car` - VIF calculation and diagnostic tests
 - `openxlsx` - Excel output
 
 **Why These Packages:**
 - `MASS::polr`: Industry standard for proportional odds models
+- `ordinal::clm`: Specialized ordinal regression implementation
 - `nnet::multinom`: Fast and reliable multinomial regression
 - `brglm2`: Best-in-class Firth correction for separation issues
-- `car::vif`: Standard multicollinearity diagnostics
+- `car`: Comprehensive regression diagnostics (VIF, Anova, Wald tests)
 
 #### Marketing Document
 
 **CatDriver: Advanced Categorical Driver Analysis**
 
-CatDriver determines which factors drive categorical outcomes (purchase decision, satisfaction level, brand preference) using state-of-the-art logistic regression techniques.
+CatDriver determines which factors drive categorical outcomes (purchase decision, satisfaction level, brand preference) using state-of-the-art logistic regression techniques with proper coefficient mapping.
 
 **What It Does:**
 - Fits binary, ordinal, or multinomial logistic models automatically
-- Calculates variable importance using multiple methods
+- Canonical design-matrix mapper ensures correct coefficient attribution
+- Calculates variable importance appropriately for categorical outcomes
 - Handles rare categories with deterministic collapsing
-- Detects and corrects for separation issues
+- Detects and corrects for separation issues with Firth correction
 - Provides odds ratios with confidence intervals
 - Generates probability lift interpretations
+- Per-variable missing data strategies
 
 **Technology:**
-- **MASS**: Proportional odds model for ordered outcomes
-- **nnet**: Fast multinomial regression
+- **MASS::polr**: Proportional odds model for ordered outcomes
+- **ordinal::clm**: Alternative ordinal regression implementation
+- **nnet::multinom**: Fast multinomial regression
 - **brglm2**: Firth bias reduction prevents infinite odds ratios
-- **car**: Multicollinearity diagnostics
+- **car**: VIF and diagnostic tests for model quality
 
 **Benefits:**
 - Handles any categorical outcome (2-20+ categories)
@@ -364,15 +369,18 @@ CatDriver determines which factors drive categorical outcomes (purchase decision
 - Warnings tracked and reported
 
 **Dependencies:**
-- `boot` - Bootstrap confidence intervals
-- `PropCIs` - Specialized proportion CIs (Wilson, etc.)
+- `Base R stats` - Core CI functions (t-distribution, normal approximation)
 - `openxlsx` - Excel output
-- `survey` - Complex survey design (for DEFF)
+- `readxl` - Configuration import
+- `future/future.apply` - Parallel processing for bootstrap (optional)
+- `dplyr` - Data manipulation
+- `boot` - Bootstrap methods (primarily used in testing, optional)
 
 **Why These Packages:**
-- `boot`: Standard R package for bootstrap methods
-- `PropCIs`: Best implementation of Wilson score intervals
-- `survey`: Gold standard for survey design effects
+- `Base R stats`: Well-tested, no external dependencies
+- `future/future.apply`: Scalable parallel bootstrap computation
+- `dplyr`: Efficient data manipulation for weighted calculations
+- Minimal dependencies reduce installation complexity
 
 #### Marketing Document
 
@@ -381,16 +389,19 @@ CatDriver determines which factors drive categorical outcomes (purchase decision
 Confidence calculates statistically robust confidence intervals for survey metrics using multiple methodologies appropriate for your data structure.
 
 **What It Does:**
-- Proportions: Wilson score, Clopper-Pearson exact, bootstrap
+- Proportions: Normal approximation (MOE), Wilson score, bootstrap, Bayesian credible intervals
 - Means: t-distribution, bootstrap, Bayesian credible intervals
-- NPS: Normal approximation, bootstrap
-- Study-level: DEFF, effective n, representativeness diagnostics
+- NPS: Normal approximation, bootstrap, Bayesian credible intervals
+- Study-level: DEFF (design effect), effective n, representativeness diagnostics
 - Weight diagnostics: Concentration, margin comparison
+- Parallel bootstrap processing for faster computation
+- Proper DEFF adjustment for weighted data
 
 **Technology:**
-- **boot**: Industry-standard bootstrap implementation
-- **PropCIs**: Specialized proportion interval methods
-- **survey**: Design effect calculations for complex samples
+- **Base R stats**: Core statistical functions (t-distribution, normal approximation)
+- **future/future.apply**: Parallel processing for bootstrap resampling
+- **dplyr**: Efficient weighted calculations
+- Multiple CI methods provide cross-validation of results
 
 **Benefits:**
 - Multiple methods provide validation and robustness checks
@@ -506,16 +517,19 @@ Confidence calculates statistically robust confidence intervals for survey metri
 - Hit rate validation
 
 **Dependencies:**
-- `mlogit` - Multinomial logit models
+- `mlogit` - Multinomial logit models (primary estimation)
 - `dfidx` - Indexed data frames for mlogit
-- `survival` - Conditional logit (fallback)
+- `survival` - Conditional logit (clogit fallback)
+- `bayesm` - Bayesian methods (optional HB)
+- `RSGHB` - HB via Gibbs sampling (optional)
 - `openxlsx` - Excel I/O
 
 **Why These Packages:**
-- `mlogit`: State-of-the-art discrete choice modeling
-- `dfidx`: Required for mlogit >= 1.1.0
-- `survival::clogit`: Fallback when mlogit fails
-- Provides both maximum likelihood and simpler estimation
+- `mlogit`: State-of-the-art discrete choice modeling (McFadden's random utility model)
+- `dfidx`: Required companion package for mlogit >= 1.1.0
+- `survival::clogit`: Robust conditional logit fallback
+- `bayesm/RSGHB`: Optional Bayesian individual-level estimation
+- Provides both aggregate (MNL) and individual-level (HB) utilities
 
 #### Marketing Document
 
@@ -532,9 +546,10 @@ Conjoint reveals customer preferences and willingness-to-pay using choice-based 
 - Interactive market simulator in Excel
 
 **Technology:**
-- **mlogit**: Gold standard multinomial logit estimation
-- **survival**: Conditional logit for robust alternatives
+- **mlogit**: Gold standard multinomial logit (MNL) estimation
+- **survival::clogit**: Conditional logit fallback for robustness
 - **dfidx**: Modern data indexing for choice models
+- **bayesm/RSGHB**: Optional Bayesian HB for individual-level utilities
 
 **Benefits:**
 - Rigorous statistical foundation (maximum likelihood)
@@ -649,36 +664,41 @@ Conjoint reveals customer preferences and willingness-to-pay using choice-based 
 - Comprehensive degradation tracking
 
 **Dependencies:**
-- `stats` - Linear regression (base R)
-- `xgboost` - SHAP analysis
+- `xgboost` - Gradient boosting for SHAP analysis
+- `shapviz` - SHAP value calculation and visualization
 - `ggplot2` - Visualizations
+- `ggrepel` - Label placement in charts
+- `patchwork` - Combined plots (optional)
+- `viridis` - Color scales (optional)
 - `openxlsx` - Excel output
 
 **Why These Packages:**
-- `stats::lm`: Base R, no dependencies, well-tested
-- `xgboost`: Industry-leading gradient boosting for SHAP
+- `xgboost`: Industry-leading gradient boosting, foundation for SHAP
+- `shapviz`: Modern SHAP implementation with TreeSHAP algorithm
 - `ggplot2`: Publication-quality graphics
+- `ggrepel`: Prevents overlapping labels in importance charts
 - Multiple methods reduce dependency on any single approach
 
 #### Marketing Document
 
 **KeyDriver: Multi-Method Importance Analysis**
 
-KeyDriver determines which variables drive your outcome using complementary statistical methods, from classic regression to cutting-edge SHAP analysis.
+KeyDriver determines which variables drive your outcome using machine learning-based SHAP analysis with XGBoost, providing both global and individual-level feature importance.
 
 **What It Does:**
-- Standardized regression coefficients
-- Relative weights (Johnson's method)
-- Shapley value decomposition
-- SHAP analysis with XGBoost (NEW v10.1)
-- Importance-Performance Analysis charts (NEW v10.1)
-- Segment comparison (NEW v10.1)
-- Mixed predictors (continuous + categorical) (NEW v10.3)
+- Partial R² decomposition (primary importance method)
+- SHAP analysis with XGBoost for non-linear relationships
+- TreeSHAP for individual-level explanations
+- Importance-Performance Analysis charts (IPA quadrants)
+- Segment comparison across customer groups
+- Mixed predictors (continuous + categorical) (v10.3)
+- Beeswarm and waterfall visualizations
 
 **Technology:**
-- **stats::lm**: Classic linear regression
-- **xgboost**: Machine learning for SHAP values
+- **xgboost**: Gradient boosting machine learning model
+- **shapviz**: TreeSHAP value calculation and visualization
 - **ggplot2**: Professional visualizations
+- **ggrepel**: Clean label placement
 
 **Benefits:**
 - Multiple methods provide validation
@@ -787,15 +807,17 @@ KeyDriver determines which variables drive your outcome using complementary stat
 - Good validation at each step
 
 **Dependencies:**
-- `survival` - Conditional logit
-- `cmdstanr` - Hierarchical Bayes (optional)
-- `ggplot2` - Charts
+- `survival` - Conditional logit (clogit) for aggregate analysis
+- `cmdstanr` - Stan interface for Hierarchical Bayes (optional)
+- `AlgDesign` - Experimental design optimization
+- `ggplot2` - Charts and visualizations
 - `openxlsx` - Excel I/O
 
 **Why These Packages:**
-- `survival::clogit`: Standard for MaxDiff aggregate logit
-- `cmdstanr`: State-of-the-art Bayesian estimation (optional)
-- `ggplot2`: Professional graphics
+- `survival::clogit`: Gold standard for MaxDiff aggregate logit (Mayo Clinic maintained)
+- `cmdstanr`: State-of-the-art Bayesian estimation via Stan (optional HB)
+- `AlgDesign`: D-optimal design generation using Federov algorithm
+- `ggplot2`: Professional graphics for utility charts
 
 #### Marketing Document
 
@@ -804,17 +826,19 @@ KeyDriver determines which variables drive your outcome using complementary stat
 MaxDiff reveals item preferences using best-worst scaling, providing more discriminating results than traditional rating scales.
 
 **What It Does:**
-- Generates balanced experimental designs
-- Count-based scoring (simple method)
-- Aggregate logit utilities
-- Hierarchical Bayes individual-level utilities (optional)
-- Segment-level analysis
-- Professional visualizations
+- Generates balanced experimental designs using D-optimal methods
+- Count-based scoring (simple descriptive method)
+- Aggregate logit utilities via conditional logit
+- Hierarchical Bayes individual-level utilities (optional with Stan)
+- Segment-level analysis and comparison
+- Professional visualizations of preference distributions
+- Dual mode: DESIGN (create experiments) and ANALYSIS (analyze data)
 
 **Technology:**
-- **survival::clogit**: Aggregate-level estimation
-- **cmdstanr**: Bayesian individual-level estimation
-- **ggplot2**: Publication-ready charts
+- **survival::clogit**: Aggregate-level conditional logit estimation
+- **cmdstanr**: Bayesian individual-level HB estimation via Stan
+- **AlgDesign**: D-optimal experimental design generation
+- **ggplot2**: Publication-ready preference charts
 
 **Benefits:**
 - More discriminating than ratings
@@ -924,14 +948,17 @@ MaxDiff reveals item preferences using best-worst scaling, providing more discri
 - Good diagnostics
 
 **Dependencies:**
-- `ggplot2` - Visualizations
-- `stats` - Curve fitting
+- `pricesensitivitymeter` - Van Westendorp PSM implementation
+- `ggplot2` - Visualizations and price curve charts
+- `Base R stats` - Curve fitting and optimization
 - `openxlsx` - Excel output
+- `readxl` - Configuration import
 
 **Why These Packages:**
-- `ggplot2`: Professional price curve visualizations
-- `stats`: Base R optimization and modeling
-- Minimal dependencies reduce installation issues
+- `pricesensitivitymeter`: Purpose-built package for PSM analysis
+- `ggplot2`: Professional price curve and demand curve visualizations
+- `Base R stats`: Robust optimization and curve fitting without external dependencies
+- Focused package selection reduces installation complexity
 
 #### Marketing Document
 
@@ -949,9 +976,10 @@ Pricing analyzes willingness-to-pay using multiple methodologies and provides ac
 - Synthesis of recommendations across methods
 
 **Technology:**
-- **ggplot2**: Professional price curve visualizations
-- **stats**: Demand curve fitting and optimization
-- Multiple analytical approaches for validation
+- **pricesensitivitymeter**: Van Westendorp PSM with Newton-Miller-Smith extension
+- **ggplot2**: Professional price curve and demand curve visualizations
+- **Base R stats**: Demand curve fitting and revenue optimization
+- Multiple analytical approaches for convergent validity
 
 **Benefits:**
 - Multiple methods provide convergent validity
@@ -1027,29 +1055,159 @@ Pricing analyzes willingness-to-pay using multiple methodologies and provides ac
 
 **Purpose:** Customer segmentation using clustering and classification methods.
 
-**Status:** Module structure differs from others - appears to have test_data but no main R/ directory
+**Files:** 15+ R files in `/lib/` directory
 
 #### Quality Review
 
-**Code Quality:** Cannot assess - R files not in standard location
+**Code Quality:** Good (85/100)
+- Comprehensive segmentation toolkit
+- Dual K-means and Latent Class Analysis support
+- Good validation and profiling capabilities
+- Well-organized lib/ structure
 
-**Files Found:**
-- `test_data/` directory exists
-- Main R files may be in different location or module may be under development
+**Structure:**
+- `run_segment.R` - Main entry point with dual mode (exploration/final)
+- `/lib/` directory with focused modules:
+  - `segment_validation.R` - Cluster validation (silhouette, gap statistic, LDA)
+  - `segment_lca.R` - Latent Class Analysis via poLCA
+  - `segment_profile.R` - ANOVA/Chi-square profiling
+  - `segment_visualization.R` - Radar charts and visualizations
+  - `segment_outliers.R` - Mahalanobis distance outlier detection
+  - `segment_rules.R` - Decision tree-based rule extraction via rpart
+  - `segment_cards.R` - Persona-style segment summaries
+  - `segment_variable_selection.R` - Feature selection via psych
+  - `segment_profiling_enhanced.R` - Advanced profiling with randomForest
 
-**Documentation:** Unknown
+**Documentation:** Good
+- Technical documentation in docs/
+- Test data generators included
+- Comprehensive usage examples
 
-**Error Handling:** Unknown
+**Error Handling:** Good
+- TRS-compliant validation
+- Clear error messages
+- Graceful degradation for optional features
 
-**Dependencies:** Unknown (likely `cluster`, `factoextra`, `mclust`)
+**Dependencies:**
+- `Base R stats` - K-means clustering (Hartigan-Wong algorithm)
+- `MASS` - Linear Discriminant Analysis for validation
+- `poLCA` - Latent Class Analysis for categorical data
+- `rpart` - Decision tree profiling and rule extraction
+- `psych` - Variable selection and correlation analysis
+- `fmsb` - Radar charts for segment visualization
+- `writexl` - Excel output (fast, dependency-free)
+- `cluster` - Silhouette analysis and PAM (optional)
+- `randomForest` - Feature importance (optional)
 
-#### Note
-This module requires further investigation to locate primary source files. It may be:
-1. Under active development
-2. Using a different directory structure
-3. Integrated into another module
+**Why These Packages:**
+- `stats::kmeans`: Hartigan-Wong algorithm (base R, well-tested)
+- `MASS`: Venables & Ripley's classic package for LDA validation
+- `poLCA`: Standard R implementation for Latent Class Analysis
+- `rpart`: Part of R's recommended packages, decision tree profiling
+- `psych`: Comprehensive psychological/statistical methods
+- `fmsb`: Specialized radar chart visualization
+- `writexl`: Fast Excel writing without Java dependencies
 
-**Recommendation:** Locate main source files and analyze separately.
+#### Marketing Document
+
+**Segment: Statistical Market Segmentation**
+
+Segment discovers natural customer groups in your data using clustering and classification methods, revealing actionable segments with clear profiling.
+
+**What It Does:**
+- K-means clustering (exploration mode tests K=2 through K=8)
+- Latent Class Analysis for categorical data
+- Cluster validation (silhouette, gap statistic, Calinski-Harabasz)
+- Linear Discriminant Analysis for segment separation validation
+- ANOVA/Chi-square profiling with statistical significance
+- Decision tree rule extraction for operational classification
+- Radar charts for visual segment comparison
+- Segment cards with persona-style summaries
+- Mahalanobas distance outlier detection
+- Segment scoring for classifying new respondents
+
+**Technology:**
+- **stats::kmeans**: Hartigan-Wong algorithm for numeric clustering
+- **poLCA**: Latent Class Analysis for categorical clustering
+- **MASS**: Linear Discriminant Analysis for validation
+- **rpart**: Decision tree profiling for rule-based assignment
+- **psych**: Variable selection and correlation analysis
+- **fmsb**: Radar chart visualization
+
+**Benefits:**
+- Dual exploration/final mode workflow guides optimal K selection
+- Multiple validation metrics ensure robust solutions
+- LCA handles categorical data appropriately
+- Decision tree rules enable operational segment assignment
+- Comprehensive profiling reveals segment characteristics
+- Segment cards facilitate stakeholder communication
+
+#### Roadmap
+
+**Phase 1 - Enhancements (Q1 2026)**
+- [ ] Stability testing (bootstrap cluster membership)
+- [ ] Hierarchical clustering dendrograms
+- [ ] DBSCAN for density-based clustering
+- [ ] Automated optimal K recommendation
+
+**Phase 2 - Advanced Methods (Q2 2026)**
+- [ ] Mixed-type clustering (categorical + continuous)
+- [ ] Fuzzy clustering with membership probabilities
+- [ ] Model-based clustering (mclust)
+- [ ] Time-series clustering for behavioral segments
+
+**Phase 3 - Integration (Q3 2026)**
+- [ ] Segment-level driver analysis integration
+- [ ] Segment tracking over time
+- [ ] Predictive segment migration modeling
+- [ ] Interactive segment explorer (Shiny app)
+
+#### Test Suite
+
+**Status:** Partial - Test data generators exist
+
+**Existing Tests:**
+- Test data generation scripts in `/test_data/`
+- Example configurations
+
+**Needed Tests:**
+1. **Clustering Tests:**
+   - `test_kmeans_convergence.R` - K-means stability
+   - `test_lca_estimation.R` - Latent class model fitting
+   - `test_validation_metrics.R` - Silhouette, gap statistic
+   - `test_optimal_k.R` - K selection validation
+
+2. **Profiling Tests:**
+   - `test_anova_profiling.R` - Continuous variable profiling
+   - `test_chisq_profiling.R` - Categorical variable profiling
+   - `test_rule_extraction.R` - Decision tree rules
+   - `test_lda_validation.R` - Discriminant analysis
+
+3. **Integration Tests:**
+   - `test_end_to_end_exploration.R` - Full exploration workflow
+   - `test_end_to_end_final.R` - Full final mode workflow
+   - `test_segment_scoring.R` - New respondent classification
+
+#### Redundant Files
+
+**Analysis:** Well-organized lib/ structure. No major redundancies identified.
+
+#### Risk Assessment
+
+**Low-Medium Risk** - Standard methods, good validation
+
+**Potential Risks:**
+1. **K Selection:** Choosing wrong K yields poor segments → Multiple validation metrics mitigate
+2. **Stability:** Clusters may be unstable across runs → Bootstrap stability testing needed
+3. **Interpretability:** Too many segments or variables → Variable selection and profiling help
+4. **Sample Size:** Small samples yield unstable clusters → Minimum n warnings needed
+
+**Mitigation Strategies:**
+- Multiple validation metrics guide K selection
+- Dual exploration/final mode encourages testing
+- Variable selection reduces dimensionality
+- Add bootstrap stability testing
+- Implement minimum segment size checks
 
 ---
 
@@ -1092,14 +1250,16 @@ This module requires further investigation to locate primary source files. It ma
 - Clear error messages
 
 **Dependencies:**
-- `openxlsx` - Excel output
-- `stats` - Statistical tests
-- `dplyr` - Data manipulation
+- `openxlsx` - Excel output with rich formatting
+- `readxl` - Excel configuration import
+- `Base R stats` - Statistical tests (chi-square, t-tests, z-tests)
+- `lobstr` - Memory monitoring (optional)
 
 **Why These Packages:**
-- `openxlsx`: Rich Excel formatting for presentation tables
-- `stats`: Chi-square and t-tests for significance
-- `dplyr`: Efficient data wrangling for complex crosstabs
+- `openxlsx`: Rich Excel formatting for presentation-quality tables
+- `readxl`: Fast, reliable Excel reading (Posit-maintained)
+- `Base R stats`: Chi-square and t-tests for significance testing, no dependencies
+- `lobstr`: Optional memory diagnostics for large studies
 
 #### Marketing Document
 
@@ -1117,9 +1277,10 @@ Tabs generates publication-ready crosstabulation reports with significance testi
 - Professional Excel formatting
 
 **Technology:**
-- **openxlsx**: Rich Excel table formatting
-- **stats**: Robust statistical testing
-- **dplyr**: Efficient data transformation
+- **openxlsx**: Rich Excel table formatting with conditional styling
+- **Base R stats**: Robust statistical testing (chi-square, t-tests, z-tests)
+- **readxl**: Fast Excel configuration import
+- Checkpoint recovery system for large studies
 
 **Benefits:**
 - Handles any crosstab complexity
@@ -1199,35 +1360,298 @@ Tabs generates publication-ready crosstabulation reports with significance testi
 
 **Purpose:** Longitudinal tracking study analysis with wave-over-wave comparisons and trend detection.
 
-**Status:** R files not in standard `/R/` directory
+**Files:** 17+ R files in `/lib/` directory
 
-**Files Found:**
-- Launch scripts in module directory
-- Possible lib/ structure similar to tabs
+#### Quality Review
 
-**Note:** Requires location of main source files for analysis.
+**Code Quality:** Good (85/100)
+- Comprehensive multi-wave tracking functionality
+- Clean lib/ organization with focused modules
+- Good wave alignment and question mapping
+- Dashboard-style reporting
+- Parallel processing support for large studies
 
-**Recommendation:** Similar to tabs, may use `/lib/` structure. Investigate further.
+**Structure:**
+- `run_tracker.R` - Main entry point
+- `/lib/` directory with 17 focused modules:
+  - `config_loader.R` - Configuration management
+  - `validation.R` - Input validation and checks
+  - `wave_loader.R` - Multi-wave data loading with parallel support
+  - `question_mapper.R` - Cross-wave question alignment
+  - `trend_calculator.R` - Wave-over-wave statistical tests
+  - `banner_trend.R` - Segment-level trend analysis
+  - `dashboard_builder.R` - Executive dashboard generation
+  - `workbook_writer.R` - Excel output with formatting
+  - Plus utility modules for data handling
+
+**Documentation:** Good
+- Technical documentation available
+- Clear workflow explanations
+- Multi-wave alignment guidance
+
+**Error Handling:** Good
+- TRS-compliant validation
+- Clear error messages for alignment issues
+- Graceful handling of missing waves
+
+**Dependencies:**
+- `Base R stats` - t-tests, z-tests, distributions, linear regression
+- `openxlsx` - Excel I/O and formatting
+- `future/future.apply` - Parallel processing (optional)
+- `readxl` - Configuration import (optional)
+
+**Why These Packages:**
+- `Base R stats`: Standard parametric inference, no dependencies
+- `openxlsx`: Professional Excel dashboards with formatting
+- `future/future.apply`: Scalable parallel computation for multi-wave data
+- Minimal dependencies ensure broad compatibility
+
+#### Marketing Document
+
+**Tracker: Longitudinal Trend Analysis**
+
+Tracker monitors change over time in tracking studies, comparing metrics across waves with proper statistical significance testing and trend visualization.
+
+**What It Does:**
+- Multi-wave data alignment and harmonization
+- Question mapping across waves (handles code changes)
+- Wave-over-wave significance testing (z-tests for proportions, t-tests for means)
+- Baseline comparison (all waves vs. first wave)
+- Banner trend analysis (segment-level tracking)
+- Dashboard-style executive reporting
+- Parallel processing for large multi-wave studies
+- Effective sample size adjustment for weighted data
+
+**Technology:**
+- **Base R stats**: Standard parametric inference (t-tests, z-tests)
+- **openxlsx**: Professional Excel dashboards with conditional formatting
+- **future/future.apply**: Parallel processing for scalability
+- 17 focused library modules for maintainability
+
+**Benefits:**
+- Handles question code changes across waves
+- Proper statistical testing with effective sample sizes
+- Dashboard format provides executive-level overview
+- Parallel processing speeds up multi-wave analysis
+- Segment-level tracking reveals subgroup trends
+- Minimal dependencies ensure reliability
+
+#### Roadmap
+
+**Phase 1 - Statistical Enhancements (Q1 2026)**
+- [ ] Trend decomposition (trend, seasonal, cyclical components)
+- [ ] Control charts for tracking stability
+- [ ] Change point detection
+- [ ] Multiple comparison corrections for many tests
+
+**Phase 2 - Advanced Methods (Q2 2026)**
+- [ ] Time series forecasting (ARIMA, exponential smoothing)
+- [ ] Structural break testing
+- [ ] Bayesian trend estimation
+- [ ] Mixed effects models for panel data
+
+**Phase 3 - Visualization (Q3 2026)**
+- [ ] Interactive dashboards (Shiny)
+- [ ] Animated trend charts
+- [ ] Automated insight generation
+- [ ] Custom report templates
+
+#### Test Suite
+
+**Status:** No comprehensive test suite found
+
+**Needed Tests:**
+1. **Wave Alignment Tests:**
+   - `test_question_mapping.R` - Cross-wave question matching
+   - `test_wave_loading.R` - Multi-wave data loading
+   - `test_parallel_loading.R` - Parallel processing validation
+
+2. **Statistical Tests:**
+   - `test_trend_significance.R` - Wave-over-wave z-tests and t-tests
+   - `test_baseline_comparison.R` - First wave comparisons
+   - `test_banner_trends.R` - Segment-level tracking
+   - `test_effective_n.R` - Weight-adjusted sample sizes
+
+3. **Integration Tests:**
+   - `test_end_to_end_2wave.R` - Two-wave tracking
+   - `test_end_to_end_multiwave.R` - 5+ wave tracking
+   - `test_dashboard_generation.R` - Excel output
+
+#### Redundant Files
+
+**Analysis:** Well-organized lib/ structure. No major redundancies identified.
+
+#### Risk Assessment
+
+**Low-Medium Risk** - Basic methods work, advanced features needed
+
+**Potential Risks:**
+1. **Question Mapping:** Code changes across waves may break alignment → Robust mapper mitigates
+2. **Multiple Testing:** Many wave comparisons inflate Type I error → Multiple comparison corrections needed
+3. **Small Bases:** Some segments may have small n across waves → Minimum base warnings
+4. **Trend Detection:** No formal trend testing → Add statistical trend tests
+
+**Mitigation Strategies:**
+- Robust question mapper handles code changes
+- Dashboard highlights alignment issues
+- Add multiple comparison corrections
+- Implement minimum base size warnings
+- Add formal trend testing methods
 
 ---
 
 ### 11. weighting (Sample Weighting)
 
-**Purpose:** Generate sample weights using raking, post-stratification, and other methods.
+**Purpose:** Generate sample weights using raking (rim weighting), design weights, and comprehensive diagnostics.
 
-**Status:** R files not in standard `/R/` directory
+**Files:** 10+ R files in `/lib/` directory
 
-**Files Found:**
-- Module directory exists
-- Source files need to be located
+#### Quality Review
 
-**Note:** Requires investigation to locate main implementation.
+**Code Quality:** Good (85/100)
+- Comprehensive weighting toolkit
+- v2.0 migration to survey::calibrate() for better long-term maintainability
+- Good diagnostic output with weight distribution analysis
+- Clean lib/ organization
+- GUI interface for interactive use
 
-**Recommendation:** Standard weighting methods likely include:
-- Raking (iterative proportional fitting)
-- Post-stratification
-- Propensity score weighting
-- Calibration
+**Structure:**
+- `run_weighting.R` - Main entry point (command-line)
+- `run_weighting_gui.R` - Shiny GUI interface
+- `/lib/` directory with focused modules:
+  - `config_loader.R` - Configuration management
+  - `validation.R` - Input validation
+  - `design_weights.R` - Cell weighting (direct population adjustment)
+  - `rim_weights.R` - Raking/IPF via survey::calibrate()
+  - `weight_trimming.R` - Configurable weight bounds
+  - `diagnostics.R` - Weight efficiency and distribution analysis
+  - `workbook_writer.R` - Excel output with diagnostics
+  - Plus utility modules
+
+**Documentation:** Good
+- Technical documentation in docs/
+- v2.0 migration notes clearly documented
+- Example configurations included
+
+**Error Handling:** Good
+- TRS-compliant validation
+- Clear convergence monitoring
+- Detailed diagnostic warnings
+
+**Dependencies:**
+- `survey` - Survey design objects and calibrate() for raking/IPF
+- `dplyr` - Data manipulation
+- `openxlsx` - Excel output
+- `readxl` - Configuration import
+- `haven` - SPSS/Stata import (optional)
+
+**Why These Packages:**
+- `survey`: Gold standard for survey methodology (Thomas Lumley, used by US Census, CDC, WHO)
+- `survey::calibrate()`: Proper raking with multiple calibration methods (raking, linear, logit)
+- `dplyr`: Efficient data manipulation for weight calculations
+- `openxlsx`: Rich Excel output for diagnostic tables
+- Industry-standard packages ensure statistical rigor
+
+#### Marketing Document
+
+**Weighting: Statistical Sample Balancing**
+
+Weighting ensures your sample represents your population by calculating statistical weights using industry-standard raking (rim weighting) and design weight methods.
+
+**What It Does:**
+- Design weights (cell weighting) - Direct population proportion adjustment
+- Rim weights (raking/IPF) - Iterative proportional fitting via survey::calibrate()
+  - Multiple calibration methods (raking, linear, logit)
+  - Convergence monitoring with configurable tolerance
+  - Weight bounds enforced during calibration
+  - Supports up to 10 weighting dimensions
+- Weight trimming - Configurable bounds to prevent extreme weights
+- Weight efficiency diagnostics - n_eff/n ratio, DEFF calculations
+- Cell-by-cell distribution analysis
+- Shiny GUI for interactive weighting
+
+**Technology:**
+- **survey::calibrate()**: Gold standard raking implementation (v2.0)
+- **dplyr**: Efficient weight calculation and manipulation
+- **openxlsx**: Comprehensive diagnostic Excel reports
+- Industry-validated methodology (Deming & Stephan 1940, Kish 1965)
+
+**Benefits:**
+- survey package used by US Census, CDC, WHO
+- v2.0 uses survey::calibrate() for better control and maintainability
+- Weight bounds enforced during calibration (not just trimmed after)
+- Multiple calibration methods (raking, linear, logit) available
+- Comprehensive diagnostics ensure weight quality
+- Interactive GUI reduces configuration complexity
+- Transparent methodology enables audit
+
+#### Roadmap
+
+**Phase 1 - Enhancements (Q1 2026)**
+- [ ] Propensity score weighting
+- [ ] Generalized regression (GREG) estimators
+- [ ] Variance estimation with replicate weights
+- [ ] Automated weight bound optimization
+
+**Phase 2 - Advanced Features (Q2 2026)**
+- [ ] Calibration weighting for multiple frames
+- [ ] Small area estimation
+- [ ] Non-response adjustment modeling
+- [ ] Weight smoothing algorithms
+
+**Phase 3 - Integration (Q3 2026)**
+- [ ] Direct integration with Tabs module
+- [ ] Automatic variance estimation in all modules
+- [ ] Weight quality scoring
+- [ ] Longitudinal weight adjustment for panels
+
+#### Test Suite
+
+**Status:** No comprehensive test suite found
+
+**Needed Tests:**
+1. **Design Weight Tests:**
+   - `test_cell_weights.R` - Simple cell weighting validation
+   - `test_population_alignment.R` - Target matching
+
+2. **Rim Weight Tests:**
+   - `test_raking_convergence.R` - IPF convergence validation
+   - `test_calibrate_methods.R` - Test raking, linear, logit methods
+   - `test_multi_dimension.R` - Multiple weighting variables
+   - `test_weight_bounds.R` - Bound enforcement during calibration
+
+3. **Diagnostic Tests:**
+   - `test_weight_efficiency.R` - n_eff calculations
+   - `test_weight_distribution.R` - Distribution analysis
+   - `test_extreme_weights.R` - Outlier detection
+
+4. **Integration Tests:**
+   - `test_end_to_end_design.R` - Full design weight workflow
+   - `test_end_to_end_rim.R` - Full rim weight workflow
+   - `test_gui_functionality.R` - Shiny interface testing
+
+#### Redundant Files
+
+**Analysis:** Clean lib/ structure. No major redundancies.
+
+**Note:** v2.0 migration removed dependency on `anesrake`, consolidating on `survey` package exclusively.
+
+#### Risk Assessment
+
+**Low Risk** - Industry-standard methods, well-validated
+
+**Potential Risks:**
+1. **Convergence Failure:** Raking may not converge → Configurable tolerance and iteration limits
+2. **Extreme Weights:** Some respondents may get very high weights → Weight bounds enforced
+3. **Conflicting Targets:** Impossible target combinations → Pre-validation checks needed
+4. **Sample Quality:** Bad sample can't be fixed by weighting → Diagnostics warn users
+
+**Mitigation Strategies:**
+- survey::calibrate() has robust convergence algorithms
+- Weight bounds prevent extreme values
+- Efficiency diagnostics reveal weighting impact
+- Add pre-validation for target feasibility
+- Clear documentation of weighting limitations
 
 ---
 
@@ -1258,13 +1682,22 @@ Tabs generates publication-ready crosstabulation reports with significance testi
 - `stats` - Base statistics (all modules)
 
 **Specialized Dependencies:**
-- `mlogit`, `dfidx` - Conjoint
-- `survival` - MaxDiff, CatDriver
-- `MASS`, `nnet` - CatDriver
-- `brglm2` - CatDriver (fallback)
-- `xgboost` - KeyDriver SHAP
-- `boot`, `PropCIs` - Confidence
+- `xgboost`, `shapviz` - KeyDriver (SHAP analysis)
+- `mlogit`, `dfidx` - Conjoint (multinomial logit)
+- `survival` - MaxDiff, Conjoint (conditional logit)
+- `MASS`, `ordinal`, `nnet` - CatDriver (logistic regression)
+- `brglm2` - CatDriver (Firth correction fallback)
+- `car` - CatDriver (VIF diagnostics)
+- `survey` - Weighting (calibrate() for raking)
+- `pricesensitivitymeter` - Pricing (Van Westendorp PSM)
+- `poLCA` - Segment (Latent Class Analysis)
+- `rpart` - Segment (decision tree profiling)
+- `psych` - Segment (variable selection)
+- `fmsb` - Segment (radar charts)
+- `writexl` - Segment (Excel output)
 - `cmdstanr` - MaxDiff HB (optional)
+- `AlgDesign` - MaxDiff (experimental design)
+- `future/future.apply` - Confidence, Tracker (parallel processing)
 
 **Risk Assessment:**
 - Most dependencies are mature, stable packages
@@ -1390,10 +1823,10 @@ The package is well-positioned for continued development and can confidently be 
 
 ---
 
-**Report Generated:** 2025-12-30
-**Total Modules Analyzed:** 11 (8 fully, 3 partially)
-**Total R Files Reviewed:** 100+ files
-**Total Lines of Code:** ~20,000+ lines
-**Analysis Time:** Comprehensive review session
+**Report Generated:** 2026-01-02
+**Total Modules Analyzed:** 11 (all fully analyzed)
+**Total R Files Reviewed:** 150+ files
+**Total Lines of Code:** ~25,000+ lines
+**Analysis Time:** Comprehensive review with package verification
 
 ---

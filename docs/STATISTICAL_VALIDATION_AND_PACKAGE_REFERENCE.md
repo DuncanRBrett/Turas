@@ -89,8 +89,8 @@ Turas exclusively uses CRAN-published packages with established track records in
 |----|----|----|----|
 | **openxlsx** | 15M+ | Excel report generation | Industry standard for Excel I/O in R |
 | **readxl** | 30M+ | Excel data import | Developed by RStudio/Posit, rigorously tested |
+| **Base R stats** | Built-in | Chi-square tests, proportion tests | Part of R core, maintained by R Foundation |
 | **lobstr** | 1M+ | Memory monitoring (optional) | Diagnostic support for large datasets |
-| **Base R stats** | Built-in | Core statistical functions | Part of R core, maintained by R Foundation |
 
 **Statistical Methods Implemented:**
 
@@ -112,20 +112,24 @@ Turas exclusively uses CRAN-published packages with established track records in
 
 **Version:** 2.0 **Purpose:** Design weights and rim weights (raking/IPF) with diagnostics.
 
+> **v2.0 MIGRATION (2025-12-25):** Previously used `anesrake` for rim weighting. Now uses `survey::calibrate()` exclusively for better long-term maintainability, more control over weight bounds during calibration, support for multiple calibration methods (raking, linear, logit), and foundation for future variance estimation capabilities.
+
 | Package | CRAN Downloads | Purpose in Turas | Why Trusted |
 |----|----|----|----|
-| **survey** | 10M+ | Raking/IPF algorithms | **Gold standard** – Used by US Census, CDC, WHO |
-| **readxl** | 30M+ | Configuration import | Posit-maintained |
+| **survey** | 10M+ | Survey design objects & calibrate() for raking/IPF | **Gold standard** – Used by US Census, CDC, WHO |
 | **dplyr** | 50M+ | Data manipulation | Most popular R data package |
 | **openxlsx** | 15M+ | Excel output | Industry standard |
+| **readxl** | 30M+ | Configuration import | Posit-maintained |
 | **haven** | 20M+ | SPSS/Stata import (optional) | Statistical software interoperability |
 
 **Statistical Methods Implemented:**
 
 -   **Design weights (cell weighting)** – Direct population proportion adjustment
--   **Rim weights (raking/IPF)** – Iterative proportional fitting to marginal totals
+-   **Rim weights (raking/IPF)** – Iterative proportional fitting via `survey::calibrate()`
     -   Convergence monitoring with configurable tolerance
     -   Multiple dimensions supported (up to 10)
+    -   Calibration methods: raking (default), linear, logit
+    -   Weight bounds enforced during calibration (not just trimming after)
 -   **Weight trimming** – Configurable bounds to prevent extreme weights
 -   **Weight efficiency** – n_eff/n ratio reporting
 -   **Diagnostic output** – Cell-by-cell weight distribution analysis
@@ -146,8 +150,10 @@ The `survey` package by Thomas Lumley (University of Auckland, formerly UCLA) is
 
 | Package | CRAN Downloads | Purpose in Turas | Why Trusted |
 |----|----|----|----|
+| **Base R stats** | Built-in | t-tests, z-tests, distributions, linear regression | R Foundation maintained |
 | **openxlsx** | 15M+ | Excel I/O and formatting | Industry standard |
-| **Base R stats** | Built-in | t-tests, z-tests, distributions | R Foundation maintained |
+| **future/future.apply** | 5M+/2M+ | Parallel processing (optional) | Scalable computation for multi-wave data |
+| **readxl** | 30M+ | Configuration import (optional) | Posit-maintained |
 
 **Statistical Methods Implemented:**
 
@@ -172,9 +178,12 @@ The `survey` package by Thomas Lumley (University of Auckland, formerly UCLA) is
 
 | Package | CRAN Downloads | Purpose in Turas | Why Trusted |
 |----|----|----|----|
+| **Base R stats** | Built-in | Core CI functions | R Foundation maintained |
+| **openxlsx** | 15M+ | Excel output | Industry standard |
 | **readxl** | 30M+ | Configuration import | Posit-maintained |
-| **openxlsx** | 15M+ | Report generation | Industry standard |
-| **Base R stats** | Built-in | Core statistical functions | R Foundation maintained |
+| **future/future.apply** | 5M+/2M+ | Parallel processing | Scalable bootstrap computation |
+| **dplyr** | 50M+ | Data manipulation | Most popular R data package |
+| **boot** | 5M+ | Bootstrap methods (primarily in testing) | Optional for testing only |
 
 **Statistical Methods Implemented:**
 
@@ -182,7 +191,7 @@ The `survey` package by Thomas Lumley (University of Auckland, formerly UCLA) is
 
 *For Means (3 methods):* - **t-distribution CI** – mean ± t_crit × (SD/√n) - **Bootstrap percentile** – Non-parametric resampling for non-normal distributions - **Bayesian credible interval** – Normal-Normal conjugate with prior mean/SD/n
 
-*For NPS (3 methods):* - **Normal approximation** – Delta method for NPS variance - **Bootstrap percentile** – Resamples full dataset, calculates NPS each iteration - **Bayesian credible interval** – Dirichlet-based modeling of promoter/detractor proportions
+*For NPS (3 methods):* - **Normal approximation** – Delta method for NPS variance - **Bootstrap percentile** – Resamples full dataset, calculates NPS each iteration - **Bayesian credible interval** – Normal-Normal conjugate prior applied to NPS score (not Dirichlet)
 
 *Sample Quality:* - **Kish effective sample size** – n_eff = (Σw)² / Σw² - **Design effect (DEFF)** – Measures efficiency loss from weighting - **CI adjustment for DEFF** – Proper uncertainty quantification for weighted data - **Weighted bootstrap** – Accounts for survey weights in resampling
 
@@ -200,12 +209,13 @@ The `survey` package by Thomas Lumley (University of Auckland, formerly UCLA) is
 
 | Package | CRAN Downloads | Purpose in Turas | Why Trusted |
 |----|----|----|----|
-| **xgboost** | 10M+ | Gradient boosting for SHAP | Industry-leading ML library, used by Kaggle winners |
-| **shapviz** | 500K+ | SHAP value visualization | Implements Lundberg & Lee (2017) TreeSHAP algorithm |
+| **xgboost** | 10M+ | Gradient boosting ML model | Industry-leading ML library, used by Kaggle winners |
+| **shapviz** | 500K+ | SHAP value calculation | Implements Lundberg & Lee (2017) TreeSHAP algorithm |
 | **ggplot2** | 50M+ | Visualization | Most-cited R visualization package |
-| **ggrepel** | 5M+ | Smart label placement | Prevents label overlap in quadrant charts |
+| **ggrepel** | 5M+ | Label placement | Prevents label overlap in charts |
+| **patchwork** | 3M+ | Combined plots | Plot composition and layout |
+| **viridis** | 2M+ | Color scales | Perceptually uniform color mapping |
 | **openxlsx** | 15M+ | Excel output | Industry standard |
-| **haven** | 20M+ | SPSS/Stata import (optional) | Statistical software interoperability |
 
 **Statistical Methods Implemented:**
 
@@ -233,9 +243,11 @@ The `survey` package by Thomas Lumley (University of Auckland, formerly UCLA) is
 
 | Package | CRAN Downloads | Purpose in Turas | Why Trusted |
 |----|----|----|----|
-| **MASS** | 30M+ | Ordinal logistic regression (polr) | Venables & Ripley, R Core Team maintained |
-| **nnet** | 15M+ | Multinomial logistic regression | Part of R's recommended packages |
-| **Base R stats** | Built-in | Binary logistic regression (glm) | R Foundation maintained |
+| **MASS::polr** | 30M+ | Proportional odds logistic regression | Venables & Ripley, R Core Team maintained |
+| **ordinal::clm** | 500K+ | Alternative proportional odds model | Specialized ordinal regression implementation |
+| **nnet::multinom** | 15M+ | Multinomial logistic regression | Part of R's recommended packages |
+| **brglm2** | 200K+ | Bias-reduced logistic (Firth correction) | Handles separation in logistic models |
+| **car** | 5M+ | Diagnostic tests (Anova, Wald) | Comprehensive regression diagnostics |
 | **openxlsx** | 15M+ | Excel output | Industry standard |
 
 **Statistical Methods Implemented:**
@@ -269,11 +281,11 @@ CatDriver uses R's actual model matrix to create a canonical mapping, ensuring c
 
 | Package | CRAN Downloads | Purpose in Turas | Why Trusted |
 |----|----|----|----|
-| **pricesensitivitymeter** | 100K+ | Van Westendorp PSM | Purpose-built for pricing research |
-| **ggplot2** | 50M+ | Visualization | Industry standard |
-| **readxl/openxlsx** | 30M+/15M+ | Excel I/O | Posit-maintained |
-| **scales** | 15M+ | Axis formatting | ggplot2 companion package |
-| **haven** | 20M+ | SPSS/Stata import (optional) | Statistical software interoperability |
+| **pricesensitivitymeter** | 100K+ | Van Westendorp PSM implementation | Purpose-built for pricing research |
+| **ggplot2** | 50M+ | Price curve visualization | Industry standard |
+| **openxlsx** | 15M+ | Excel output | Industry standard |
+| **readxl** | 30M+ | Configuration import | Posit-maintained |
+| **Base R stats** | Built-in | Curve fitting | R Foundation maintained |
 
 **Statistical Methods Implemented:**
 
@@ -302,27 +314,34 @@ CatDriver uses R's actual model matrix to create a canonical mapping, ensuring c
 
 | Package | CRAN Downloads | Purpose in Turas | Why Trusted |
 |----|----|----|----|
-| **mlogit** | 2M+ | Multinomial logit estimation | **Gold standard** for discrete choice in R |
-| **dfidx** | 1M+ | Data indexing for mlogit | Required companion to mlogit (v1.1+) |
-| **survival** | 20M+ | Conditional logit (fallback) | R's premier survival analysis package |
-| **dplyr** | 50M+ | Data manipulation | Most popular data package |
-| **tidyr** | 40M+ | Data reshaping | Part of tidyverse ecosystem |
-| **readxl** | 30M+ | Excel configuration import | Posit-maintained |
-| **openxlsx** | 15M+ | Excel I/O | Industry standard |
+| **mlogit** | 2M+ | Multinomial logit estimation (primary) | **Gold standard** for discrete choice in R |
+| **dfidx** | 1M+ | Indexed data frames for mlogit | Required companion to mlogit (v1.1+) |
+| **survival::clogit** | 20M+ | Conditional logit (fallback) | R's premier survival analysis package |
+| **openxlsx** | 15M+ | Excel output | Industry standard |
+
+**Future (Phase 2 - Not Yet Implemented):**
+| **bayesm** | 300K+ | Hierarchical Bayes (planned) | Bayesian choice modeling |
+| **RSGHB** | 100K+ | Alternative HB implementation (planned) | Gibbs sampling for HB |
 
 **Statistical Methods Implemented:**
 
--   **Multinomial logit (MNL)** – Standard discrete choice model: P(i\|S) = exp(βᵢ)/Σexp(βⱼ)
--   **Conditional logistic regression** – Robust fallback using survival::clogit
--   **Part-worth utilities** – Attribute level values from coefficients
--   **Zero-centering** – Utilities centered within attributes for interpretation
--   **Attribute importance** – Range-based importance calculation
+-   **Multinomial logit (MNL)** – Aggregate choice model: P(i\|S) = exp(βᵢ)/Σexp(βⱼ) via mlogit package
+-   **Conditional logit** – Fallback estimation using survival::clogit
+-   **Auto estimation** – Tries mlogit first, falls back to clogit if needed
+-   **Part-worth utilities** – Attribute level values from model coefficients
+-   **Zero-centering** – Utilities centered within attributes for interpretability
+-   **Attribute importance** – Range-based importance (max utility - min utility per attribute)
 -   **Market simulator** – Interactive Excel sheet with:
     -   Product configuration with dropdowns
-    -   Automatic market share calculations
+    -   Automatic market share calculations from utilities
     -   Sensitivity analysis
     -   Share of preference visualization
 -   **Alchemer CBC import** – Direct import from Alchemer choice-based conjoint exports
+
+**Not Yet Implemented (Phase 2):**
+-   Hierarchical Bayes (HB) for individual-level utilities
+-   Mixed logit (random parameters)
+-   Interaction effects estimation
 
 **v10.1 Enhancements:** - Enhanced mlogit estimation with better diagnostics - Improved zero-centering calculations - Direct Alchemer CBC export import
 
@@ -338,15 +357,15 @@ CatDriver uses R's actual model matrix to create a canonical mapping, ensuring c
 
 | Package | CRAN Downloads | Purpose in Turas | Why Trusted |
 |----|----|----|----|
-| **cluster** | 15M+ | Silhouette analysis, gap statistic | Part of R's recommended packages |
+| **Base R stats::kmeans** | Built-in | K-means clustering | R Foundation maintained |
+| **cluster** | 15M+ | PAM, CLARA, silhouette analysis | Part of R's recommended packages |
 | **MASS** | 30M+ | Linear Discriminant Analysis | Venables & Ripley's classic package |
 | **poLCA** | 500K+ | Latent Class Analysis | Standard LCA implementation |
-| **Base R stats** | Built-in | K-means clustering | R Foundation maintained |
-| **readxl** | 30M+ | Excel configuration import | Posit-maintained |
+| **rpart** | 10M+ | Decision tree profiling | Part of R's recommended packages |
+| **psych** | 3M+ | Variable selection | Psychological and statistical methods |
+| **fmsb** | 200K+ | Radar charts | Radial/spider visualization |
 | **writexl** | 5M+ | Excel output | Fast, dependency-free Excel writing |
-| **rpart** | 10M+ | Decision trees for rules | Part of R's recommended packages |
-| **ggplot2** | 50M+ | Visualization (optional) | Industry standard |
-| **haven** | 20M+ | SPSS/Stata import (optional) | Statistical software interoperability |
+| **randomForest** | 2M+ | Feature importance (optional) | ML-based segmentation validation |
 
 **Statistical Methods Implemented:**
 
@@ -378,11 +397,11 @@ CatDriver uses R's actual model matrix to create a canonical mapping, ensuring c
 
 | Package | CRAN Downloads | Purpose in Turas | Why Trusted |
 |----|----|----|----|
-| **survival** | 20M+ | Conditional logit for aggregate analysis | R's premier survival package, Mayo Clinic maintained |
-| **cmdstanr** | 500K+ | Hierarchical Bayes via Stan (optional) | Stan is the gold standard for Bayesian inference |
-| **AlgDesign** | 500K+ | D-optimal experimental design | Purpose-built for design optimization |
+| **survival::clogit** | 20M+ | Conditional logit for aggregate analysis | R's premier survival package, Mayo Clinic maintained |
+| **cmdstanr** | 500K+ | Stan interface for HB estimation | Gold standard for Bayesian inference |
+| **AlgDesign** | 500K+ | Experimental design optimization | Purpose-built for design optimization |
 | **ggplot2** | 50M+ | Visualization | Industry standard |
-| **openxlsx** | 15M+ | Excel I/O | Industry standard |
+| **openxlsx** | 15M+ | Excel output | Industry standard |
 
 **Statistical Methods Implemented:**
 
