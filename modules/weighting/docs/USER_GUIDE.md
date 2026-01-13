@@ -131,7 +131,7 @@ Supported data formats: .csv, .xlsx, .xls, .sav
 Define each weight you want to calculate:
 
 | weight_name | method | description | apply_trimming | trim_method | trim_value |
-|------------|------------|------------|------------|------------|------------|
+|----|----|----|----|----|----|
 | seg_weight | design | Segment weights | Y | cap | 5 |
 | pop_weight | rim | Population adjustment | Y | percentile | 0.95 |
 
@@ -175,12 +175,12 @@ For rim weights, specify target percentages:
 Fine-tune rim weighting parameters:
 
 | weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds |
-|-------------|----------------|----------------------|-------------------|---------------|
-| pop_weight  | 50             | 1e-7                 | raking            | 0.3,3.0       |
+|----|----|----|----|----|
+| pop_weight | 50 | 1e-7 | raking | 0.3,3.0 |
 
-**New in v2.0:**
-- **calibration_method**: "raking" (default), "linear", or "logit"
-- **weight_bounds**: Lower and upper bounds (e.g., "0.3,3.0" or single value "5")
+**New in v2.0:** - **calibration_method**: "raking" (default), "linear",
+or "logit" - **weight_bounds**: Lower and upper bounds (e.g., "0.3,3.0"
+or single value "5")
 
 ------------------------------------------------------------------------
 
@@ -240,8 +240,8 @@ off - General population: Sample doesn't match population demographics
 
 ### How It Works
 
-Rim weighting (also called "raking" or "calibration") iteratively adjusts
-weights until all target margins are matched:
+Rim weighting (also called "raking" or "calibration") iteratively
+adjusts weights until all target margins are matched:
 
 1.  Start with all weights = 1
 2.  Adjust weights to match Gender targets
@@ -284,11 +284,9 @@ solution).
 (e.g., 80% male AND 80% young women) - Too many variables with too few
 respondents - Categories in targets have no respondents
 
-**If convergence fails:**
-1. Increase `max_iterations` (try 100)
-2. Try `calibration_method = "logit"` (better for bounded weights)
-3. Adjust `weight_bounds` if needed
-4. Reduce number of rim variables
+**If convergence fails:** 1. Increase `max_iterations` (try 100) 2. Try
+`calibration_method = "logit"` (better for bounded weights) 3. Adjust
+`weight_bounds` if needed 4. Reduce number of rim variables
 
 ------------------------------------------------------------------------
 

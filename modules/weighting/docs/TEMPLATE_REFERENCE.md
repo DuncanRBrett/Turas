@@ -35,14 +35,14 @@ Weight_Config.xlsx
 ### Required Settings
 
 | Setting      | Type | Description                    | Example                   |
-|----------------|----------------|-----------------------|----------------|
+|--------------|------|--------------------------------|---------------------------|
 | project_name | Text | Project identifier for reports | `Customer_Survey_Q4_2025` |
 | data_file    | Path | Path to survey data file       | `data/responses.csv`      |
 
 ### Optional Settings
 
 | Setting | Type | Default | Description |
-|----------------|----------------|----------------|-----------------------|
+|----|----|----|----|
 | output_file | Path | (none) | Path to save weighted data |
 | save_diagnostics | Y/N | N | Save diagnostic report to file |
 | diagnostics_file | Path | (none) | Path for diagnostic report (required if save_diagnostics=Y) |
@@ -243,7 +243,7 @@ Each variable should sum to 100: - Gender: 48 + 52 = 100 ✓ - Age_Group:
 ### Columns
 
 | Column | Required | Type | Default | Description |
-|--------------|--------------|--------------|--------------|----------------|
+|----|----|----|----|----|
 | weight_name | Yes | Text | \- | Must match Weight_Specifications |
 | max_iterations | No | Integer | 50 | Maximum raking iterations |
 | convergence_tolerance | No | Number | 1e-7 | Convergence precision threshold |
@@ -252,32 +252,30 @@ Each variable should sum to 100: - Gender: 48 + 52 = 100 ✓ - Age_Group:
 
 ### Parameter Guidelines
 
-**max_iterations** (v2.0 default: 50)
-- Default: 50 (increased from 25 in v1.0)
-- Increase to: 100 if convergence fails
-- Maximum useful: 200 (if not converged by then, likely won't)
+**max_iterations** (v2.0 default: 50) - Default: 50 (increased from 25
+in v1.0) - Increase to: 100 if convergence fails - Maximum useful: 200
+(if not converged by then, likely won't)
 
-**convergence_tolerance** (v2.0 default: 1e-7)
-- Default: 1e-7 (0.00001%, very tight)
-- v1.0 used 0.01 (1%) - now much more precise
-- survey::calibrate uses epsilon convergence (not percentage)
+**convergence_tolerance** (v2.0 default: 1e-7) - Default: 1e-7
+(0.00001%, very tight) - v1.0 used 0.01 (1%) - now much more precise -
+survey::calibrate uses epsilon convergence (not percentage)
 
-**calibration_method** (NEW in v2.0)
-- **"raking"** (default): Traditional iterative proportional fitting
-- **"linear"**: Linear calibration (Newton-Raphson)
-- **"logit"**: Logistic calibration (best for bounded weights, prevents extreme values)
-- Recommendation: Use "logit" if having convergence issues with bounds
+**calibration_method** (NEW in v2.0) - **"raking"** (default):
+Traditional iterative proportional fitting - **"linear"**: Linear
+calibration (Newton-Raphson) - **"logit"**: Logistic calibration (best
+for bounded weights, prevents extreme values) - Recommendation: Use
+"logit" if having convergence issues with bounds
 
-**weight_bounds** (NEW in v2.0)
-- Default: "0.3,3.0" (weights between 0.3 and 3.0)
-- Format: "lower,upper" (e.g., "0.2,5") or single value (e.g., "5" means 0.3 to 5)
-- **CRITICAL v2.0 IMPROVEMENT**: Bounds applied **DURING** calibration, not after
-- Prevents extreme weights during fitting (not post-trimming)
-- Use with calibration_method="logit" for best results
+**weight_bounds** (NEW in v2.0) - Default: "0.3,3.0" (weights between
+0.3 and 3.0) - Format: "lower,upper" (e.g., "0.2,5") or single value
+(e.g., "5" means 0.3 to 5) - **CRITICAL v2.0 IMPROVEMENT**: Bounds
+applied **DURING** calibration, not after - Prevents extreme weights
+during fitting (not post-trimming) - Use with calibration_method="logit"
+for best results
 
 ### Example
 
-```
+```         
 | weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds |
 |-------------|----------------|----------------------|-------------------|---------------|
 | pop_weight  | 50             | 1e-7                 | raking            | 0.3,3.0       |
@@ -285,10 +283,10 @@ Each variable should sum to 100: - Gender: 48 + 52 = 100 ✓ - Age_Group:
 | relaxed_wt  | 50             | 1e-6                 | linear            | 5             |
 ```
 
-**Interpretation:**
-- **pop_weight**: Standard raking with default bounds [0.3, 3.0]
-- **strict_wt**: Tight bounds [0.5, 2.0] using logit method for stability
-- **relaxed_wt**: Single value "5" means bounds [0.3, 5.0]
+**Interpretation:** - **pop_weight**: Standard raking with default
+bounds [0.3, 3.0] - **strict_wt**: Tight bounds [0.5, 2.0] using logit
+method for stability - **relaxed_wt**: Single value "5" means bounds
+[0.3, 5.0]
 
 ------------------------------------------------------------------------
 
@@ -341,7 +339,7 @@ Each variable should sum to 100: - Gender: 48 + 52 = 100 ✓ - Age_Group:
 
 ### Advanced_Settings Sheet
 
-```
+```         
 | weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds |
 |-------------|----------------|----------------------|-------------------|---------------|
 | demo_weight | 50             | 1e-7                 | raking            | 0.3,3.0       |
