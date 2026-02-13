@@ -256,24 +256,24 @@ check_numeric_min_max <- function(question_code, question_info, survey_data, err
 check_bin_structure <- function(question_code, option_info, error_log) {
   if (nrow(option_info) == 0) return(error_log)
 
-  if (!all(c("Bin_Min", "Bin_Max") %in% names(option_info))) {
+  if (!all(c("Min", "Max") %in% names(option_info))) {
     error_log <- log_issue(error_log, "Validation", "Missing Bin Columns",
-      sprintf("Question %s: Bins defined but missing Bin_Min or Bin_Max columns.", question_code),
+      sprintf("Question %s: Bins defined but missing Min or Max columns.", question_code),
       question_code, "Error")
     return(error_log)
   }
 
   for (i in seq_len(nrow(option_info))) {
-    bin_min <- suppressWarnings(as.numeric(option_info$Bin_Min[i]))
-    bin_max <- suppressWarnings(as.numeric(option_info$Bin_Max[i]))
+    bin_min <- suppressWarnings(as.numeric(option_info$Min[i]))
+    bin_max <- suppressWarnings(as.numeric(option_info$Max[i]))
 
     if (is.na(bin_min) || is.na(bin_max)) {
       error_log <- log_issue(error_log, "Validation", "Invalid Bin Values",
-        sprintf("Question %s bin %d: Bin_Min or Bin_Max is not numeric.", question_code, i),
+        sprintf("Question %s bin %d: Min or Max is not numeric.", question_code, i),
         question_code, "Error")
     } else if (bin_min > bin_max) {
       error_log <- log_issue(error_log, "Validation", "Invalid Bin Range",
-        sprintf("Question %s bin %d: Bin_Min (%.2f) > Bin_Max (%.2f).", question_code, i, bin_min, bin_max),
+        sprintf("Question %s bin %d: Min (%.2f) > Max (%.2f).", question_code, i, bin_min, bin_max),
         question_code, "Error")
     }
   }
@@ -287,14 +287,14 @@ check_bin_overlaps <- function(question_code, option_info, error_log) {
   if (nrow(option_info) < 2) return(error_log)
 
   for (i in seq_len(nrow(option_info) - 1)) {
-    bin1_min <- suppressWarnings(as.numeric(option_info$Bin_Min[i]))
-    bin1_max <- suppressWarnings(as.numeric(option_info$Bin_Max[i]))
+    bin1_min <- suppressWarnings(as.numeric(option_info$Min[i]))
+    bin1_max <- suppressWarnings(as.numeric(option_info$Max[i]))
 
     if (is.na(bin1_min) || is.na(bin1_max)) next
 
     for (j in (i + 1):nrow(option_info)) {
-      bin2_min <- suppressWarnings(as.numeric(option_info$Bin_Min[j]))
-      bin2_max <- suppressWarnings(as.numeric(option_info$Bin_Max[j]))
+      bin2_min <- suppressWarnings(as.numeric(option_info$Min[j]))
+      bin2_max <- suppressWarnings(as.numeric(option_info$Max[j]))
 
       if (is.na(bin2_min) || is.na(bin2_max)) next
 
@@ -322,8 +322,8 @@ check_bin_coverage <- function(question_code, option_info, survey_data, error_lo
   data_min <- min(valid_numeric)
   data_max <- max(valid_numeric)
 
-  bins_min <- suppressWarnings(as.numeric(option_info$Bin_Min))
-  bins_max <- suppressWarnings(as.numeric(option_info$Bin_Max))
+  bins_min <- suppressWarnings(as.numeric(option_info$Min))
+  bins_max <- suppressWarnings(as.numeric(option_info$Max))
 
   valid_bins <- !is.na(bins_min) & !is.na(bins_max)
   if (!any(valid_bins)) return(error_log)
