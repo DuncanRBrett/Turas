@@ -775,7 +775,10 @@ build_sig_findings_section <- function(sig_findings, brand_colour) {
       comparisons_text <- paste(comp_parts, collapse = ", ")
     }
 
-    # Show: "Online campus +71 vs Total +52 — sig. higher than Cape Town (+42)"
+    # Metric descriptor (e.g., "Good or excellent", "NET POSITIVE", "Mean")
+    metric_desc <- f$metric_label %||% ""
+
+    # Show: "Good or excellent: 3rd yr 67% vs Total 59% — sig. higher than Honours (53%)"
     finding_text <- sprintf(
       "%s %s vs Total %s \u2014 sig. higher than %s",
       f$column_label, col_val_display, total_val_display, comparisons_text
@@ -789,7 +792,10 @@ build_sig_findings_section <- function(sig_findings, brand_colour) {
       htmltools::tags$div(
         class = "dash-sig-badges",
         htmltools::tags$span(class = "dash-sig-metric-badge", f$q_code),
-        htmltools::tags$span(class = "dash-sig-group-badge", f$banner_group)
+        htmltools::tags$span(class = "dash-sig-group-badge", f$banner_group),
+        if (nchar(metric_desc) > 0) {
+          htmltools::tags$span(class = "dash-sig-type-badge", metric_desc)
+        }
       ),
       if (nchar(q_text) > 0) {
         htmltools::tags$div(class = "dash-sig-question", q_text)
@@ -946,11 +952,11 @@ build_dashboard_css <- function(brand_colour) {
     }
     .dash-heatmap {
       border-radius: 8px; overflow-x: auto; border: 1px solid #e2e8f0;
-      background: #fff;
+      background: #fff; padding-bottom: 2px; margin-bottom: 8px;
     }
     .dash-hm-table {
       width: 100%; border-collapse: collapse; font-size: 12px;
-      font-variant-numeric: tabular-nums;
+      font-variant-numeric: tabular-nums; margin-bottom: 4px;
     }
     .dash-hm-header1 { border-bottom: 2px solid #1a2744; }
     .dash-hm-header2 { border-bottom: 1px solid #e2e8f0; }
@@ -1008,6 +1014,10 @@ build_dashboard_css <- function(brand_colour) {
     .dash-sig-group-badge {
       font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 3px;
       background: rgba(13,138,138,0.08); color: BRAND;
+    }
+    .dash-sig-type-badge {
+      font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 3px;
+      background: rgba(217,119,6,0.10); color: #b45309;
     }
     .dash-sig-question {
       font-size: 11px; color: #64748b; line-height: 1.3; margin-bottom: 4px;

@@ -78,6 +78,9 @@ transform_for_dashboard <- function(all_results, banner_info, config_obj) {
         type_label = req_type,
         metrics = section_metrics
       )
+    } else {
+      cat(sprintf("    [Dashboard] No metrics found for type '%s' across %d questions\n",
+                  req_type, length(all_results)))
     }
   }
 
@@ -181,9 +184,12 @@ detect_metric_by_type <- function(q_result, req_type, banner_info) {
     return(NULL)
   }
 
-  if (req_upper == "NPS") {
+  if (req_upper %in% c("NPS", "NPS SCORE")) {
+    # Match NPS Score rows: RowLabel contains "NPS" with RowType "Score" or "Average"
+    # Also match RowType "Score" alone (NPS is the only type producing Score rows)
     rows <- table[
-      grepl("NPS", table$RowLabel, ignore.case = TRUE) &
+      (grepl("NPS", table$RowLabel, ignore.case = TRUE) |
+       table$RowType == "Score") &
       table$RowType %in% c("Score", "Average"),
       , drop = FALSE
     ]
