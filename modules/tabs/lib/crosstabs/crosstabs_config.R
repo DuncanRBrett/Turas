@@ -180,7 +180,30 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     show_numeric_mode = safe_logical(get_config_value(config, "show_numeric_mode", FALSE)),
     show_numeric_outliers = safe_logical(get_config_value(config, "show_numeric_outliers", TRUE)),
     exclude_outliers_from_stats = safe_logical(get_config_value(config, "exclude_outliers_from_stats", FALSE)),
-    outlier_method = get_config_value(config, "outlier_method", "IQR")
+    outlier_method = get_config_value(config, "outlier_method", "IQR"),
+
+    # V10.3 HTML Report settings
+    html_report = safe_logical(get_config_value(config, "html_report", FALSE)),
+    brand_colour = get_config_value(config, "brand_colour", "#0d8a8a"),
+    project_title = get_config_value(config, "project_title", NULL),
+    embed_frequencies = safe_logical(get_config_value(config, "embed_frequencies", TRUE)),
+
+    # V10.4 Summary Dashboard settings
+    include_summary = safe_logical(get_config_value(config, "include_summary", TRUE)),
+    fieldwork_dates = get_config_value(config, "fieldwork_dates", NULL),
+    dashboard_metrics = get_config_value(config, "dashboard_metrics", "NET POSITIVE"),
+
+    # V10.4.2 Dashboard colour breaks & scales (all optional, sensible defaults)
+    dashboard_scale_mean    = safe_numeric(get_config_value(config, "dashboard_scale_mean", 10)),
+    dashboard_scale_index   = safe_numeric(get_config_value(config, "dashboard_scale_index", 10)),
+    dashboard_green_net     = safe_numeric(get_config_value(config, "dashboard_green_net", 30)),
+    dashboard_amber_net     = safe_numeric(get_config_value(config, "dashboard_amber_net", 0)),
+    dashboard_green_mean    = safe_numeric(get_config_value(config, "dashboard_green_mean", 7)),
+    dashboard_amber_mean    = safe_numeric(get_config_value(config, "dashboard_amber_mean", 5)),
+    dashboard_green_index   = safe_numeric(get_config_value(config, "dashboard_green_index", 7)),
+    dashboard_amber_index   = safe_numeric(get_config_value(config, "dashboard_amber_index", 5)),
+    dashboard_green_custom  = safe_numeric(get_config_value(config, "dashboard_green_custom", 60)),
+    dashboard_amber_custom  = safe_numeric(get_config_value(config, "dashboard_amber_custom", 40))
   )
 }
 

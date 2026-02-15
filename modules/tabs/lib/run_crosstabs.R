@@ -179,6 +179,9 @@ tabs_source("crosstabs", "data_setup.R")
 tabs_source("crosstabs", "analysis_runner.R")
 tabs_source("crosstabs", "workbook_builder.R")
 
+# V10.3: HTML Report module (loaded conditionally, sources its own submodules)
+tabs_source("html_report", "99_html_report_main.R")
+
 # ==============================================================================
 # SIGNIFICANCE TESTING FUNCTIONS
 # ==============================================================================
@@ -514,6 +517,34 @@ workbook_result <- create_crosstabs_workbook(
   total_column = TOTAL_COLUMN,
   very_small_base = VERY_SMALL_BASE_SIZE
 )
+
+# ==============================================================================
+# STEP 4b: GENERATE HTML REPORT (if enabled)
+# ==============================================================================
+
+if (isTRUE(config_result$config_obj$html_report)) {
+  html_output_path <- sub("\\.xlsx$", ".html", config_result$output_path)
+
+  html_result <- tryCatch({
+    generate_html_report(
+      all_results = analysis_result$all_results,
+      banner_info = analysis_result$banner_info,
+      config_obj = config_result$config_obj,
+      output_path = html_output_path
+    )
+  }, error = function(e) {
+    cat("\n[WARNING] HTML report generation failed:", e$message, "\n")
+    cat("  Traceback:\n")
+    cat(paste("  ", traceback(e), collapse = "\n"), "\n")
+    cat("  The Excel output was not affected.\n\n")
+    NULL
+  })
+
+  if (!is.null(html_result) && html_result$status == "PASS") {
+    cat(sprintf("  HTML Report: %s (%.1f MB)\n",
+        html_result$output_file, html_result$file_size_mb))
+  }
+}
 
 # ==============================================================================
 # STEP 5: COMPLETION SUMMARY
