@@ -20,7 +20,8 @@ for (.hr_file in c("00_html_guard.R", "01_data_transformer.R",
                     "02_table_builder.R", "03_page_builder.R",
                     "04_html_writer.R",
                     "05_dashboard_transformer.R",
-                    "06_dashboard_builder.R")) {
+                    "06_dashboard_builder.R",
+                    "07_chart_builder.R")) {
   .hr_path <- file.path(.html_report_dir, .hr_file)
   if (file.exists(.hr_path)) {
     source(.hr_path)
@@ -45,7 +46,8 @@ rm(.hr_file, .hr_path)
 #'   \item{file_size_mb}{File size in MB (if PASS)}
 #'   \item{n_questions}{Number of questions rendered (if PASS)}
 #' @export
-generate_html_report <- function(all_results, banner_info, config_obj, output_path) {
+generate_html_report <- function(all_results, banner_info, config_obj, output_path,
+                                  survey_structure = NULL) {
 
   start_time <- Sys.time()
 
@@ -184,12 +186,46 @@ generate_html_report <- function(all_results, banner_info, config_obj, output_pa
   cat(sprintf("    %d tables built successfully\n", length(tables)))
 
   # ============================================================================
+  # STEP 3b: BUILD CHARTS (if enabled)
+  # ============================================================================
+  charts <- list()
+  if (isTRUE(config_obj$show_charts)) {
+    cat("  Step 3b: Building SVG charts...\n")
+    options_df <- if (!is.null(survey_structure) && !is.null(survey_structure$options)) {
+      survey_structure$options
+    } else {
+      NULL
+    }
+
+    if (!is.null(options_df)) {
+      for (q_code in names(html_data$questions)) {
+        tryCatch({
+          chart <- build_question_chart(
+            question_data = html_data$questions[[q_code]],
+            options_df = options_df,
+            config_obj = config_obj
+          )
+          if (!is.null(chart)) {
+            charts[[q_code]] <- chart
+          }
+        }, error = function(e) {
+          cat(sprintf("    [WARNING] Failed to build chart for %s: %s\n", q_code, e$message))
+        })
+      }
+      cat(sprintf("    %d charts built successfully\n", length(charts)))
+    } else {
+      cat("    [INFO] No survey structure options available — charts skipped\n")
+    }
+  }
+
+  # ============================================================================
   # STEP 4: ASSEMBLE HTML PAGE
   # ============================================================================
   cat("  Step 4: Assembling HTML page...\n")
 
   page <- tryCatch({
-    build_html_page(html_data, tables, config_obj, dashboard_html = dashboard_html)
+    build_html_page(html_data, tables, config_obj,
+                    dashboard_html = dashboard_html, charts = charts)
   }, error = function(e) {
     cat("\n=== TURAS ERROR ===\n")
     cat("Code: CALC_PAGE_BUILD_FAILED\n")

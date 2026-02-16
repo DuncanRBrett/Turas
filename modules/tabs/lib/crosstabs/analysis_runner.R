@@ -405,6 +405,27 @@ add_composites_to_results <- function(all_results, composite_results, banner_inf
       comp_code
     }
 
+    # Get bases from the first source question (composites share the same
+    # respondent pool as their source questions, so bases match)
+    comp_bases <- NULL
+    if (!is.null(comp_result$metadata$source_questions)) {
+      for (src_q in comp_result$metadata$source_questions) {
+        if (!is.null(all_results[[src_q]]) && !is.null(all_results[[src_q]]$bases)) {
+          comp_bases <- all_results[[src_q]]$bases
+          break
+        }
+      }
+    }
+    # Fallback: use first available question's bases
+    if (is.null(comp_bases)) {
+      for (result in all_results) {
+        if (!is.null(result$bases)) {
+          comp_bases <- result$bases
+          break
+        }
+      }
+    }
+
     # Convert to standard result format
     all_results[[comp_code]] <- list(
       question_code = comp_code,
@@ -412,7 +433,7 @@ add_composites_to_results <- function(all_results, composite_results, banner_inf
       question_type = "Composite",
       base_filter = NA,
       table = comp_result$question_table,
-      bases = banner_info$base_sizes
+      bases = comp_bases
     )
   }
 

@@ -51,6 +51,8 @@ All settings go in the **Settings sheet** of your config workbook
 | `embed_frequencies` | `TRUE` | Include frequency counts (n=) inside table cells. Set `FALSE` to reduce file size |
 | `include_summary` | `TRUE` | Show the Summary Dashboard tab. Set `FALSE` for crosstabs-only |
 | `fieldwork_dates` | *(none)* | Text shown in the metadata strip (e.g., "Sep - Nov 2025") |
+| `show_charts` | `FALSE` | Set to `TRUE` to enable inline SVG charts below crosstab tables |
+| `index_descriptor` | *(none)* | Descriptive text shown below the Index row label explaining the scale (e.g., "Strongly disagree(1) = 1 to Strongly agree(5) = 5") |
 
 ### Dashboard Metrics
 
@@ -221,6 +223,8 @@ Everything else defaults. Green \>= +30, Amber \>= 0, Red \< 0.
 | `fieldwork_dates` | `Sep - Nov 2025` |
 | `embed_frequencies` | `TRUE` |
 | `include_summary` | `TRUE` |
+| `show_charts` | `TRUE` |
+| `index_descriptor` | `Strongly disagree(1) = 1 to Strongly agree(5) = 5` |
 | `dashboard_metrics` | `NPS Score, NET POSITIVE, Index, Good or excellent` |
 | `dashboard_scale_mean` | `10` |
 | `dashboard_scale_index` | `100` |
@@ -310,11 +314,15 @@ Course, Age). The Total column is always visible.
 |------------------------|------------------------|------------------------|
 | **Heatmap** (checkbox) | Toggles background colours on percentage cells | ON |
 | **Show count** (checkbox) | Shows/hides frequency counts (n=) below percentages | OFF |
+| **Chart** (checkbox) | Shows/hides inline SVG charts below each table | OFF |
 
 > **Important:** The "Show count" toggle only works when
 > `embed_frequencies = TRUE` in your config. If set to `FALSE`, the
 > counts are not included in the HTML file and the toggle has nothing to
 > show.
+>
+> The "Chart" toggle only appears when `show_charts = TRUE` in your
+> config.
 
 ### Table Features
 
@@ -326,16 +334,86 @@ Course, Age). The Total column is always visible.
     bases under 30
 -   **NET rows** — Highlighted with beige background
 -   **Mean/Index rows** — Highlighted with pale yellow, italic values
+-   **Index descriptor** — When `index_descriptor` is set in config,
+    a small annotation appears below the Index row label explaining
+    the scale weights (e.g., "Strongly disagree(1) = 1 to Strongly
+    agree(5) = 5")
 -   **Base row** — Shows sample size per column
+
+### Inline Charts
+
+When `show_charts = TRUE`, each question gets an inline SVG chart
+displayed below its crosstab table. Charts are toggled on/off with
+the **Chart** checkbox in the controls bar.
+
+#### Chart Types
+
+| Question Type | Chart Style | What It Shows |
+|---------------|-------------|---------------|
+| Likert, Rating, NPS | **Stacked horizontal bar** | Category distribution as proportional segments |
+| Single_Response | **Horizontal bar chart** | Individual bars per category |
+
+#### Box Categories vs Individual Items
+
+Charts automatically detect **box categories** from the Survey
+Structure Options sheet. When box categories are defined for a
+question (e.g., Negative / Neutral / Positive), the chart shows
+those summary categories rather than individual scale points. If
+no box categories exist, individual response items are charted.
+
+#### Semantic Colours
+
+Known category labels are assigned meaningful colours automatically:
+
+| Label | Colour |
+|-------|--------|
+| Negative, Poor, Dissatisfied, Detractor | Warm red |
+| Neutral, Average, Passive, Undecided | Warm grey |
+| Positive, Good or excellent, Satisfied, Promoter | Green |
+
+Unknown labels fall back to a gradient of the configured
+`brand_colour`.
+
+#### Chart Labels
+
+Labels are sized dynamically to accommodate long text without
+truncation. Stacked bar legends wrap to multiple rows when needed.
 
 ### Export
 
-Each question table has two export buttons: - **Export Excel** —
-Downloads as `.xls` with formatting preserved - **Export CSV** —
-Downloads as plain `.csv`
+Each question table has export buttons:
+
+-   **Export Excel** — Downloads as `.xls` with formatting preserved
+-   **Export CSV** — Downloads as plain `.csv`
+-   **Export Chart** — Downloads the chart as a high-resolution PNG
+    (3x scale, presentation-ready). Only visible when charts are
+    toggled on.
+
+The exported PNG includes the question code and text as a title at
+the top, making it self-contained for pasting into PowerPoint or
+other presentations. The on-screen chart does not show this title
+(since the question card above already displays it).
 
 Exports respect the current state: if "Show count" is on, counts are
-included in the export.
+included in the table exports.
+
+### Print Report
+
+The **Print Report** button (🖨) in the controls bar generates a
+clean, paginated print layout:
+
+-   **All questions** are shown (not just the active one)
+-   **Active banner only** — prints whichever banner group is
+    currently selected (e.g., "by Campus")
+-   **One question per page** with page breaks between questions
+-   **Charts included** if they have content
+-   **UI elements hidden** — sidebar, toggles, export buttons, and
+    navigation are stripped from the printed output
+-   **Compact table styling** — smaller font and tighter padding for
+    better fit on paper
+
+To print a different banner, switch to it first (e.g., click "Age")
+then click Print Report again.
 
 ------------------------------------------------------------------------
 
@@ -422,6 +500,29 @@ categories, and banner complexity.
 | Cross-group comparisons (Campus vs Age) | Fixed in V10.4.3 — only same-group comparisons shown |
 | Letters instead of names | Fixed in V10.4.3 — shows column names and values |
 
+### Charts not appearing
+
+| Check | Fix |
+|------------------------------------|------------------------------------|
+| Is `show_charts = TRUE` in Settings? | Add the row to your Settings sheet |
+| No "Chart" checkbox in controls bar? | Charts require `show_charts = TRUE` |
+| Chart toggle is on but no chart for a question? | Charts require a Survey Structure file with an Options sheet. Composite metrics do not get charts |
+| Labels truncated in chart? | Fixed in V10.5.0 — label width is now dynamic based on longest label |
+
+### Chart export downloads blank or broken PNG
+
+| Check | Fix |
+|------------------------------------|------------------------------------|
+| Browser compatibility | Use Chrome, Edge, or Firefox. Safari may have issues with SVG-to-canvas rendering |
+| Very large chart | Try a smaller browser zoom level before exporting |
+
+### Index descriptor not showing
+
+| Check | Fix |
+|------------------------------------|------------------------------------|
+| Is `index_descriptor` set? | Add it to Settings with the scale description text |
+| Only shows on Index rows | The descriptor appears below the "Index" row label in Likert/Rating tables that have an Index row |
+
 ### Last heatmap row clipped in Safari
 
 | Check | Fix |
@@ -434,6 +535,8 @@ categories, and banner complexity.
 
 | Version | Changes |
 |------------------------------------|------------------------------------|
+| **V10.5.1** | Print Report button (all questions, active banner, one per page); compact print styling |
+| **V10.5.0** | Inline SVG charts (stacked bar for ordinal, horizontal bar for nominal); automatic box category detection from Survey Structure; semantic colour palette; PNG chart export with question title injection (3x resolution, PowerPoint-ready); configurable `index_descriptor` annotation for Index rows; dynamic chart label sizing; legend row wrapping |
 | **V10.4.3** | Resolved sig letter codes to column names + values; banner group labels instead of Q codes; full question text with wrapping; metric type badge on sig findings; NPS Score config matching; Safari table clipping fix |
 | **V10.4.2** | Configurable colour breaks via Settings; configurable Mean/Index scale; colour legend with actual thresholds; sig findings show value vs Total context |
 | **V10.4.1** | Multi-section dashboard (one section per metric type); heatmap Excel export; custom metric type support |

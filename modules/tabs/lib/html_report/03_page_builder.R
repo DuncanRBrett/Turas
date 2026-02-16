@@ -17,7 +17,7 @@
 #' @return htmltools::browsable tagList
 #' @export
 build_html_page <- function(html_data, tables, config_obj,
-                            dashboard_html = NULL) {
+                            dashboard_html = NULL, charts = list()) {
 
   brand_colour <- config_obj$brand_colour %||% "#0d8a8a"
   project_title <- config_obj$project_title %||% "Crosstab Report"
@@ -34,8 +34,10 @@ build_html_page <- function(html_data, tables, config_obj,
     htmltools::tags$div(
       class = "content-area",
       build_banner_tabs(html_data$banner_groups, brand_colour),
-      build_controls(has_any_freq, has_any_pct, has_any_sig, brand_colour),
-      build_question_containers(html_data$questions, tables, html_data$banner_groups, config_obj),
+      build_controls(has_any_freq, has_any_pct, has_any_sig, brand_colour,
+                     has_charts = length(charts) > 0),
+      build_question_containers(html_data$questions, tables, html_data$banner_groups,
+                                config_obj, charts = charts),
       build_footer(config_obj, min_base)
     )
   )
@@ -130,6 +132,10 @@ build_css <- function(brand_colour) {
       color: rgba(255,255,255,0.6);
       font-size: 12px;
       margin-top: 4px;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
     }
     .main-layout {
       max-width: 1400px;
@@ -425,6 +431,7 @@ build_css <- function(brand_colour) {
     .ct-base-n { font-variant-numeric: tabular-nums; }
     .ct-low-base { color: #e8614d; font-weight: 700; }
     .ct-mean-val { font-variant-numeric: tabular-nums; }
+    .ct-index-desc { font-size: 9px; font-style: normal; color: #94a3b8; font-weight: 400; margin-top: 2px; }
     .ct-sig {
       display: inline-block;
       font-size: 9px;
@@ -459,6 +466,36 @@ build_css <- function(brand_colour) {
       border-bottom: 2px solid #e2e8f0;
       padding-bottom: 8px;
     }
+
+    /* Print button */
+    .print-btn {
+      padding: 6px 14px;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      background: #ffffff;
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.12s;
+    }
+    .print-btn:hover { background: #f8fafc; color: #1e293b; }
+
+    /* Chart wrapper */
+    .chart-wrapper {
+      padding: 20px 20px 12px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-top: none;
+    }
+    .chart-wrapper svg {
+      width: 100%;
+      max-width: 700px;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+    }
   '
 
   # Replace BRAND placeholder with actual brand colour
@@ -476,18 +513,24 @@ build_print_css <- function() {
   htmltools::tags$style(htmltools::HTML('
     @media print {
       .sidebar, .controls-bar, .banner-tabs, .table-actions,
-      .export-btn, .search-box, .toggle-label { display: none !important; }
+      .export-btn, .export-chart-btn, .search-box, .toggle-label,
+      .print-btn { display: none !important; }
       .main-layout { display: block !important; padding: 0 !important; }
       .content-area { width: 100% !important; }
-      .question-container { display: block !important; page-break-inside: avoid; margin-bottom: 24px; }
+      .question-container { display: block !important; page-break-inside: avoid; margin-bottom: 24px; page-break-after: always; }
+      .question-container:last-child { page-break-after: auto; }
       .header { padding: 12px 16px; }
       .question-title-card { padding: 8px 12px; }
       body { background: white; }
-      .table-wrapper { border: 1px solid #ccc; }
+      .table-wrapper { border: 1px solid #ccc; overflow: visible !important; }
       .ct-td.ct-label-col, .ct-th.ct-label-col { position: static; }
       .ct-low-base-dim { opacity: 1 !important; }
       .report-tabs { display: none !important; }
-      .tab-panel { display: block !important; page-break-before: always; }
+      .tab-panel { display: block !important; }
+      #tab-summary { display: none !important; }
+      .chart-wrapper { page-break-inside: avoid; }
+      .ct-table { font-size: 10px !important; }
+      .ct-th, .ct-td { padding: 3px 6px !important; }
     }
   '))
 }
@@ -552,7 +595,10 @@ build_tab_javascript <- function() {
 #' @return htmltools::div
 build_header <- function(project_title, brand_colour, total_n, n_questions) {
   meta_parts <- c()
-  if (!is.na(total_n)) meta_parts <- c(meta_parts, sprintf("n=%s", format(total_n, big.mark = ",")))
+  if (!is.na(total_n)) {
+    total_n_display <- round(as.numeric(total_n))
+    meta_parts <- c(meta_parts, sprintf("n=%s", format(total_n_display, big.mark = ",")))
+  }
   if (!is.na(n_questions)) meta_parts <- c(meta_parts, sprintf("%d Questions", n_questions))
 
   htmltools::tags$div(
@@ -560,10 +606,13 @@ build_header <- function(project_title, brand_colour, total_n, n_questions) {
     htmltools::tags$div(
       class = "header-inner",
       htmltools::tags$div(
-        htmltools::tags$div(class = "header-brand", "The Research Lamppost \u00B7 Turas Analytics"),
-        htmltools::tags$h1(class = "header-title", project_title),
-        htmltools::tags$div(class = "header-meta",
-          paste(c("Interactive Crosstab Explorer", meta_parts), collapse = " \u00B7 "))
+        class = "header-left",
+        htmltools::tags$div(
+          htmltools::tags$div(class = "header-brand", "The Research Lamppost \u00B7 Turas Analytics"),
+          htmltools::tags$h1(class = "header-title", project_title),
+          htmltools::tags$div(class = "header-meta",
+            paste(c("Interactive Crosstab Explorer", meta_parts), collapse = " \u00B7 "))
+        )
       ),
       htmltools::tags$div(
         style = "text-align:right",
@@ -667,7 +716,8 @@ build_banner_tabs <- function(banner_groups, brand_colour = "#0d8a8a") {
 #' @param has_any_sig Logical
 #' @param brand_colour Character
 #' @return htmltools::div
-build_controls <- function(has_any_freq, has_any_pct, has_any_sig, brand_colour = "#0d8a8a") {
+build_controls <- function(has_any_freq, has_any_pct, has_any_sig,
+                           brand_colour = "#0d8a8a", has_charts = FALSE) {
   controls <- list()
 
   if (has_any_pct) {
@@ -688,7 +738,23 @@ build_controls <- function(has_any_freq, has_any_pct, has_any_sig, brand_colour 
     ))
   }
 
-  if (length(controls) == 0) return(htmltools::tags$div())
+  if (has_charts) {
+    controls <- c(controls, list(
+      htmltools::tags$label(class = "toggle-label",
+        htmltools::tags$input(type = "checkbox", onchange = "toggleChart(this.checked)"),
+        "Chart"
+      )
+    ))
+  }
+
+  # Print button always available
+  controls <- c(controls, list(
+    htmltools::tags$button(
+      class = "print-btn",
+      onclick = "printReport()",
+      "\U0001F5A8 Print Report"
+    )
+  ))
 
   htmltools::tags$div(
     class = "controls-bar",
@@ -707,7 +773,8 @@ build_controls <- function(has_any_freq, has_any_pct, has_any_sig, brand_colour 
 #' @param banner_groups Named list of banner groups
 #' @param config_obj Configuration
 #' @return htmltools::tagList
-build_question_containers <- function(questions, tables, banner_groups, config_obj) {
+build_question_containers <- function(questions, tables, banner_groups,
+                                      config_obj, charts = list()) {
 
   first_group_name <- if (length(banner_groups) > 0) names(banner_groups)[1] else ""
 
@@ -716,6 +783,19 @@ build_question_containers <- function(questions, tables, banner_groups, config_o
     q_code <- q$q_code
     q_text <- q$question_text
     stat_label <- q$primary_stat
+
+    # Build chart div (hidden by default, toggled via JS)
+    # data-q-title carries the question text for chart export (title injection)
+    chart_div <- NULL
+    if (!is.null(charts[[q_code]])) {
+      chart_div <- htmltools::tags$div(
+        class = "chart-wrapper",
+        style = "display:none;",
+        `data-q-code` = q_code,
+        `data-q-title` = q_text,
+        charts[[q_code]]
+      )
+    }
 
     htmltools::tags$div(
       class = if (i == 1) "question-container active" else "question-container",
@@ -740,6 +820,7 @@ build_question_containers <- function(questions, tables, banner_groups, config_o
       htmltools::tags$div(class = "table-wrapper",
         tables[[q_code]]
       ),
+      chart_div,
       htmltools::tags$div(class = "table-actions",
         htmltools::tags$button(
           class = "export-btn",
@@ -751,7 +832,15 @@ build_question_containers <- function(questions, tables, banner_groups, config_o
           style = "margin-left:8px",
           onclick = sprintf("exportCSV('%s')", q_code),
           "\u2B73 Export CSV"
-        )
+        ),
+        if (!is.null(charts[[q_code]])) {
+          htmltools::tags$button(
+            class = "export-btn export-chart-btn",
+            style = "margin-left:8px;display:none",
+            onclick = sprintf("exportChartPNG('%s')", q_code),
+            "\U0001F4CA Export Chart"
+          )
+        }
       )
     )
   })
@@ -870,6 +959,143 @@ build_javascript <- function(html_data) {
       } else {
         main.classList.remove("show-freq");
       }
+    }
+
+    // ---- PRINT REPORT ----
+    // Shows all questions for the active banner and triggers browser print
+    function printReport() {
+      // Remember which question was active
+      var activeContainer = document.querySelector(".question-container.active");
+      var activeIndex = activeContainer ? activeContainer.id.replace("q-container-", "") : "0";
+
+      // Show all question containers for print
+      var allContainers = document.querySelectorAll(".question-container");
+      allContainers.forEach(function(el) {
+        el.classList.add("active");
+        el.style.display = "block";
+      });
+
+      // Show charts if they have content
+      document.querySelectorAll(".chart-wrapper").forEach(function(div) {
+        if (div.querySelector("svg")) {
+          div.style.display = "block";
+        }
+      });
+
+      // Trigger print
+      window.print();
+
+      // Restore original state after print dialog closes
+      allContainers.forEach(function(el) {
+        el.classList.remove("active");
+        el.style.display = "";
+      });
+      var restoreEl = document.getElementById("q-container-" + activeIndex);
+      if (restoreEl) restoreEl.classList.add("active");
+
+      // Restore chart visibility based on chart toggle state
+      var chartCheckbox = document.querySelector("input[onchange*=toggleChart]");
+      var chartsOn = chartCheckbox && chartCheckbox.checked;
+      document.querySelectorAll(".chart-wrapper").forEach(function(div) {
+        div.style.display = chartsOn ? "block" : "none";
+      });
+    }
+
+    // Chart toggle
+    function toggleChart(enabled) {
+      document.querySelectorAll(".chart-wrapper").forEach(function(div) {
+        div.style.display = enabled ? "block" : "none";
+      });
+      document.querySelectorAll(".export-chart-btn").forEach(function(btn) {
+        btn.style.display = enabled ? "inline-block" : "none";
+      });
+    }
+
+    // Chart PNG export — injects question title, renders via canvas, downloads PNG
+    function exportChartPNG(qCode) {
+      var container = document.querySelector(".question-container.active");
+      if (!container) return;
+      var wrapper = container.querySelector(".chart-wrapper");
+      if (!wrapper) return;
+      var origSvg = wrapper.querySelector("svg");
+      if (!origSvg) return;
+
+      var qTitle = wrapper.getAttribute("data-q-title") || "";
+      var qCodeLabel = wrapper.getAttribute("data-q-code") || qCode;
+
+      // Clone SVG so we can modify without affecting the page
+      var svgClone = origSvg.cloneNode(true);
+
+      // Parse original viewBox
+      var vb = svgClone.getAttribute("viewBox").split(" ").map(Number);
+      var origW = vb[2], origH = vb[3];
+
+      // Title dimensions
+      var titleFontSize = 14;
+      var titlePadding = 12;
+      var titleLineHeight = titleFontSize * 1.3;
+      // Title block: qCode + question text
+      var titleText = qCodeLabel + " — " + qTitle;
+      var titleBlockH = titlePadding + titleLineHeight + titlePadding;
+
+      // Expand viewBox to accommodate title at top
+      var newH = origH + titleBlockH;
+      svgClone.setAttribute("viewBox", "0 0 " + origW + " " + newH);
+
+      // Shift all existing content down by titleBlockH
+      var gWrap = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      gWrap.setAttribute("transform", "translate(0," + titleBlockH + ")");
+      while (svgClone.firstChild) {
+        gWrap.appendChild(svgClone.firstChild);
+      }
+      svgClone.appendChild(gWrap);
+
+      // Add white background
+      var bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      bgRect.setAttribute("x", "0");
+      bgRect.setAttribute("y", "0");
+      bgRect.setAttribute("width", origW);
+      bgRect.setAttribute("height", newH);
+      bgRect.setAttribute("fill", "#ffffff");
+      svgClone.insertBefore(bgRect, svgClone.firstChild);
+
+      // Add title text
+      var titleEl = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      titleEl.setAttribute("x", "10");
+      titleEl.setAttribute("y", String(titlePadding + titleFontSize));
+      titleEl.setAttribute("fill", "#1e293b");
+      titleEl.setAttribute("font-size", String(titleFontSize));
+      titleEl.setAttribute("font-weight", "600");
+      titleEl.setAttribute("font-family", "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif");
+      titleEl.textContent = titleText;
+      // Insert after background, before content group
+      svgClone.insertBefore(titleEl, gWrap);
+
+      // Render to canvas at 3x for crisp PNG (presentation quality)
+      var scale = 3;
+      var canvasW = origW * scale;
+      var canvasH = newH * scale;
+
+      var svgData = new XMLSerializer().serializeToString(svgClone);
+      var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+      var url = URL.createObjectURL(svgBlob);
+
+      var img = new Image();
+      img.onload = function() {
+        var canvas = document.createElement("canvas");
+        canvas.width = canvasW;
+        canvas.height = canvasH;
+        var ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvasW, canvasH);
+        ctx.drawImage(img, 0, 0, canvasW, canvasH);
+        URL.revokeObjectURL(url);
+
+        canvas.toBlob(function(blob) {
+          downloadBlob(blob, qCode + "_chart.png");
+        }, "image/png");
+      };
+      img.src = url;
     }
 
     // Extract table data as 2D array (shared by CSV and Excel export)

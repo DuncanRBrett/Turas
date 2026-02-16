@@ -307,7 +307,38 @@ build_config_object <- function(settings) {
     
     # Output settings
     output_subfolder = get_config_value(settings, "output_subfolder", "Crosstabs"),
-    output_filename = get_config_value(settings, "output_filename", "Crosstabs.xlsx")
+    output_filename = get_config_value(settings, "output_filename", "Crosstabs.xlsx"),
+    output_format = get_config_value(settings, "output_format", "xlsx"),
+
+    # V10.3 HTML report & branding
+    html_report = safe_logical(get_config_value(settings, "html_report", FALSE)),
+    project_title = get_config_value(settings, "project_title", "Crosstab Report"),
+    brand_colour = get_config_value(settings, "brand_colour", "#0d8a8a"),
+    embed_frequencies = safe_logical(get_config_value(settings, "embed_frequencies", TRUE)),
+
+    # V10.4 Summary Dashboard settings
+    include_summary = safe_logical(get_config_value(settings, "include_summary", TRUE)),
+    fieldwork_dates = get_config_value(settings, "fieldwork_dates", NULL),
+    dashboard_metrics = get_config_value(settings, "dashboard_metrics", "NET POSITIVE"),
+
+    # V10.4.2 Dashboard colour breaks & scales
+    dashboard_scale_mean    = safe_numeric(get_config_value(settings, "dashboard_scale_mean", 10)),
+    dashboard_scale_index   = safe_numeric(get_config_value(settings, "dashboard_scale_index", 10)),
+    dashboard_green_net     = safe_numeric(get_config_value(settings, "dashboard_green_net", 30)),
+    dashboard_amber_net     = safe_numeric(get_config_value(settings, "dashboard_amber_net", 0)),
+    dashboard_green_mean    = safe_numeric(get_config_value(settings, "dashboard_green_mean", 7)),
+    dashboard_amber_mean    = safe_numeric(get_config_value(settings, "dashboard_amber_mean", 5)),
+    dashboard_green_index   = safe_numeric(get_config_value(settings, "dashboard_green_index", 7)),
+    dashboard_amber_index   = safe_numeric(get_config_value(settings, "dashboard_amber_index", 5)),
+    dashboard_green_custom  = safe_numeric(get_config_value(settings, "dashboard_green_custom", 60)),
+    dashboard_amber_custom  = safe_numeric(get_config_value(settings, "dashboard_amber_custom", 40)),
+
+    # V10.4.3 Index descriptor
+    index_descriptor = get_config_value(settings, "index_descriptor", NULL),
+    create_index_summary = get_config_value(settings, "create_index_summary", NULL),
+
+    # V10.5.0 Inline SVG charts
+    show_charts = safe_logical(get_config_value(settings, "show_charts", FALSE))
   )
   
   # Validation

@@ -117,6 +117,15 @@ build_question_table <- function(question_data, banner_groups, config_obj,
 
     # Label cell
     label_html <- htmltools::htmlEscape(row_label)
+
+    # Add index scale description below Index row label
+    index_desc <- question_data$index_description
+    if (row_type == "mean" && grepl("^Index$", row_label, ignore.case = TRUE) &&
+        !is.null(index_desc)) {
+      label_html <- sprintf('%s<div class="ct-index-desc">%s</div>',
+                            label_html, htmltools::htmlEscape(index_desc))
+    }
+
     cells <- sprintf('<td class="ct-td ct-label-col">%s</td>', label_html)
 
     # Data cells
@@ -157,6 +166,30 @@ build_question_table <- function(question_data, banner_groups, config_obj,
       } else if (row_type == "mean") {
         # Mean/summary row
         cell_content <- sprintf('<span class="ct-mean-val">%s</span>', val)
+
+        # Heatmap for mean/index/average rows — relative within the row
+        if (!is.na(val_num)) {
+          # Collect all numeric values for this row across banner columns
+          row_vals <- suppressWarnings(as.numeric(
+            unlist(table_data[row_idx, all_internal_keys])
+          ))
+          row_vals <- row_vals[!is.na(row_vals)]
+          if (length(row_vals) >= 2) {
+            row_min <- min(row_vals)
+            row_max <- max(row_vals)
+            row_range <- row_max - row_min
+            if (row_range > 0) {
+              intensity <- min((val_num - row_min) / row_range, 1)
+              hr <- round(r + (248 - r) * (1 - intensity))
+              hg <- round(g + (248 - g) * (1 - intensity))
+              hb <- round(b + (248 - b) * (1 - intensity))
+              alpha <- round(0.08 + intensity * 0.35, 3)
+              cell_extra_class <- " ct-heatmap-cell"
+              cell_style <- sprintf(
+                ' data-heatmap="rgba(%d,%d,%d,%s)"', hr, hg, hb, alpha)
+            }
+          }
+        }
 
       } else {
         # Category or NET row — primary value

@@ -116,8 +116,8 @@ build_dashboard_panel <- function(dashboard_data, config_obj) {
   # Build components
   meta_strip <- build_metadata_strip(dashboard_data$metadata, brand_colour)
 
-  # Colour legend (uses actual thresholds)
-  colour_legend <- build_colour_legend(thresholds)
+  # Colour legend (uses actual thresholds + custom label from config)
+  colour_legend <- build_colour_legend(thresholds, config_obj)
 
   # Build per-section content: each metric type gets gauges + heatmap
   section_blocks <- list()
@@ -248,38 +248,81 @@ build_metadata_strip <- function(metadata, brand_colour) {
 #' Build Colour Legend Strip
 #'
 #' Shows the traffic light thresholds using actual configured values.
+#' Dynamically includes only the metric types that are actually configured.
 #'
 #' @param thresholds List from build_colour_thresholds()
+#' @param config_obj Configuration object (for dashboard_metrics and custom labels)
 #' @return htmltools::HTML
 #' @keywords internal
-build_colour_legend <- function(thresholds) {
+build_colour_legend <- function(thresholds, config_obj = NULL) {
 
-  # Format threshold display for each type
-  net_g <- thresholds$net$green
-  net_a <- thresholds$net$amber
-  mean_g <- thresholds$mean$green
-  mean_a <- thresholds$mean$amber
-  cust_g <- thresholds$custom$green
-  cust_a <- thresholds$custom$amber
+  # Determine which metric types are active from dashboard_metrics config
+  metrics_str <- if (!is.null(config_obj)) {
+    config_obj$dashboard_metrics %||% "NET POSITIVE"
+  } else {
+    "NET POSITIVE"
+  }
 
-  # Use \u2265 for ≥ and \u003c for < (HTML entity)
+  # Parse the comma-separated metrics list
+  metrics_list <- trimws(unlist(strsplit(as.character(metrics_str), ",")))
+  metrics_lower <- tolower(metrics_list)
+
+  has_net <- any(metrics_lower %in% c("net positive", "nps score", "nps"))
+  has_mean <- any(metrics_lower %in% c("mean", "average"))
+  # Custom = anything that is not net/nps/mean/index
+  known_types <- c("net positive", "nps score", "nps", "mean", "average", "index")
+  custom_labels <- metrics_list[!metrics_lower %in% known_types]
+  has_custom <- length(custom_labels) > 0
+  custom_label <- if (has_custom) custom_labels[1] else NULL
+
+  # Build threshold strings for each active metric type
+  build_tier <- function(label, parts) {
+    paste0(
+      '<span class="dash-legend-item">',
+      sprintf('<span class="dash-legend-dot dash-legend-%s"></span>', label),
+      paste(parts, collapse = ""),
+      '</span>'
+    )
+  }
+
+  # Strong tier parts
+  strong_parts <- character(0)
+  if (has_net) strong_parts <- c(strong_parts, sprintf('NET\u2265%+d', as.integer(thresholds$net$green)))
+  if (has_mean) strong_parts <- c(strong_parts, sprintf('Mean\u2265%.1f', thresholds$mean$green))
+  if (has_custom && !is.null(custom_label)) {
+    strong_parts <- c(strong_parts, sprintf('%s\u2265%d%%', htmltools::htmlEscape(custom_label), as.integer(thresholds$custom$green)))
+  }
+
+  # Moderate tier parts
+  moderate_parts <- character(0)
+  if (has_net) moderate_parts <- c(moderate_parts, sprintf('NET\u2265%+d', as.integer(thresholds$net$amber)))
+  if (has_mean) moderate_parts <- c(moderate_parts, sprintf('Mean\u2265%.1f', thresholds$mean$amber))
+  if (has_custom && !is.null(custom_label)) {
+    moderate_parts <- c(moderate_parts, sprintf('%s\u2265%d%%', htmltools::htmlEscape(custom_label), as.integer(thresholds$custom$amber)))
+  }
+
+  # Concern tier parts
+  concern_parts <- character(0)
+  if (has_net) concern_parts <- c(concern_parts, sprintf('NET&lt;%+d', as.integer(thresholds$net$amber)))
+  if (has_mean) concern_parts <- c(concern_parts, sprintf('Mean&lt;%.1f', thresholds$mean$amber))
+  if (has_custom && !is.null(custom_label)) {
+    concern_parts <- c(concern_parts, sprintf('%s&lt;%d%%', htmltools::htmlEscape(custom_label), as.integer(thresholds$custom$amber)))
+  }
+
   html <- paste0(
     '<div class="dash-legend">',
     '<span class="dash-legend-title">Colour Key:</span>',
     '<span class="dash-legend-item">',
     '<span class="dash-legend-dot dash-legend-green"></span>',
-    sprintf('Strong (NET\u2265%+d / Mean\u2265%.1f / %%\u2265%d)',
-            as.integer(net_g), mean_g, as.integer(cust_g)),
+    sprintf('Strong (%s)', paste(strong_parts, collapse = " / ")),
     '</span>',
     '<span class="dash-legend-item">',
     '<span class="dash-legend-dot dash-legend-amber"></span>',
-    sprintf('Moderate (NET\u2265%+d / Mean\u2265%.1f / %%\u2265%d)',
-            as.integer(net_a), mean_a, as.integer(cust_a)),
+    sprintf('Moderate (%s)', paste(moderate_parts, collapse = " / ")),
     '</span>',
     '<span class="dash-legend-item">',
     '<span class="dash-legend-dot dash-legend-red"></span>',
-    sprintf('Concern (NET&lt;%+d / Mean&lt;%.1f / %%&lt;%d)',
-            as.integer(net_a), mean_a, as.integer(cust_a)),
+    sprintf('Concern (%s)', paste(concern_parts, collapse = " / ")),
     '</span>',
     '</div>'
   )

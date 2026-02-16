@@ -135,7 +135,12 @@ classify_row_labels <- function(question_table, question_type = "Single_Choice")
     # Box-category labels with parenthetical ranges e.g. "Dissatisfied (1-5)"
     "\\(\\d+-\\d+\\)",
     # Common exclusion/composite categories
-    "^DK\\s*/\\s*NA$", "^DK/NA$", "^Don't know\\s*/", "^Refused\\s*/"
+    "^DK\\s*/\\s*NA$", "^DK/NA$", "^Don't know\\s*/", "^Refused\\s*/",
+    # Common box-category summary labels (Likert, satisfaction, sentiment)
+    "^Negative$", "^Neutral$", "^Positive$",
+    "^Would switch$", "^Would not switch$", "^Undecided$",
+    "^Poor\\s", "^Good or\\s", "^Below average",
+    "^Satisfied$", "^Dissatisfied$", "^Neither"
   )
 
   for (lbl in labels) {
@@ -367,14 +372,29 @@ transform_single_question <- function(q_result, banner_info, config_obj) {
     primary_stat
   )
 
+  # Index scale description for Likert questions
+  # Uses config$index_descriptor if set, otherwise NULL (no auto-generation)
+  index_description <- NULL
+  q_type <- q_result$question_type %||% "Unknown"
+  has_index_row <- any(table_data$.row_type == "mean" &
+                       grepl("^Index$", table_data$.row_label, ignore.case = TRUE))
+
+  if (has_index_row && q_type == "Likert") {
+    # Use the descriptor from config if provided
+    if (!is.null(config_obj$index_descriptor) && nzchar(config_obj$index_descriptor)) {
+      index_description <- config_obj$index_descriptor
+    }
+  }
+
   list(
     q_code = q_result$question_code,
     question_text = q_result$question_text %||% "",
-    question_type = q_result$question_type %||% "Unknown",
+    question_type = q_type,
     base_filter = q_result$base_filter,
     stats = stats,
     primary_stat = primary_stat_label,
-    table_data = table_data
+    table_data = table_data,
+    index_description = index_description
   )
 }
 

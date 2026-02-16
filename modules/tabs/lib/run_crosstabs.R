@@ -530,7 +530,8 @@ if (isTRUE(config_result$config_obj$html_report)) {
       all_results = analysis_result$all_results,
       banner_info = analysis_result$banner_info,
       config_obj = config_result$config_obj,
-      output_path = html_output_path
+      output_path = html_output_path,
+      survey_structure = data_result$survey_structure
     )
   }, error = function(e) {
     cat("\n[WARNING] HTML report generation failed:", e$message, "\n")
