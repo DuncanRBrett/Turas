@@ -60,10 +60,29 @@ get_semantic_colour <- function(label, index = 1, n_total = 3, brand_colour = "#
     "good or excellent (7-10)" = "#0d8a8a",
     "excellent"             = "#0d8a8a",
     "satisfied"             = "#0d8a8a",
+    "very satisfied (9-10)" = "#0d8a8a",
+    "very satisfied"        = "#0d8a8a",
     "promoter (9-10)"       = "#0d8a8a",
     "promoter"              = "#0d8a8a",
     "fully trust"           = "#0d8a8a",
-    "would not switch"      = "#0d8a8a"
+    "would not switch"      = "#0d8a8a",
+
+    # DK / NA / Not applicable (neutral grey -- distinct from data categories)
+    "dk"                    = "#b8b8b8",
+    "na"                    = "#b8b8b8",
+    "dk/na"                 = "#b8b8b8",
+    "dk / na"               = "#b8b8b8",
+    "don't know"            = "#b8b8b8",
+    "not applicable"        = "#b8b8b8",
+    "n/a"                   = "#b8b8b8",
+    "refused"               = "#b8b8b8",
+    "prefer not to say"     = "#b8b8b8",
+    "other"                 = "#c5c0b8",
+
+    # Average satisfaction / middle range (warm amber-stone)
+    "average satisfaction"  = "#d5cfc7",
+    "average satisfaction (6-8)" = "#d5cfc7",
+    "dissatisfied (1-5)"    = "#c0695c"
   )
 
   colour <- semantic_map[[label_lower]]
@@ -325,15 +344,78 @@ build_horizontal_bars_svg <- function(items, brand_colour = "#0d8a8a",
 # MAIN CHART BUILDER
 # ==============================================================================
 
+#' Extract Chart Row Indices
+#'
+#' Identifies which rows in table_data should be charted, based on
+#' box categories (if available) or individual category rows.
+#'
+#' @param table_data Data frame from transform_single_question()
+#' @param box_cat_labels Character vector of box category labels, or NULL
+#' @return Integer vector of row indices
+#' @keywords internal
+get_chart_row_indices <- function(table_data, box_cat_labels = NULL) {
+  if (!is.null(box_cat_labels)) {
+    indices <- integer(0)
+    for (cat_label in box_cat_labels) {
+      matching <- which(
+        table_data$.row_label == cat_label &
+        table_data$.row_type %in% c("net", "category")
+      )
+      if (length(matching) > 0) indices <- c(indices, matching[1])
+    }
+    indices
+  } else {
+    which(table_data$.row_type == "category")
+  }
+}
+
+
+#' Extract Chart Data for All Columns
+#'
+#' Reads pre-calculated values from table_data for all internal keys.
+#' Returns a structured list suitable for JSON embedding and JS chart rendering.
+#'
+#' @param table_data Data frame from transform_single_question()
+#' @param row_indices Integer vector from get_chart_row_indices()
+#' @param use_box_categories Logical, whether items are box categories
+#' @return List with items (labels) and columns (keyed by internal key)
+#' @keywords internal
+extract_all_column_chart_data <- function(table_data, row_indices, use_box_categories) {
+  # Get internal keys (non-dot-prefixed columns)
+  internal_keys <- grep("^\\.", names(table_data), value = TRUE, invert = TRUE)
+  if (length(internal_keys) == 0 || length(row_indices) == 0) return(NULL)
+
+  # Extract labels from the matching rows
+  labels <- table_data$.row_label[row_indices]
+
+  # Build column data: one entry per internal key, values aligned with labels
+  columns <- list()
+  for (key in internal_keys) {
+    vals <- suppressWarnings(as.numeric(table_data[[key]][row_indices]))
+    if (use_box_categories) vals <- abs(vals)
+    # Replace NA with 0 for charting
+    vals[is.na(vals)] <- 0
+    # Derive display name from key (e.g., "TOTAL::Total" -> "Total")
+    parts <- strsplit(key, "::", fixed = TRUE)[[1]]
+    display <- if (length(parts) >= 2) parts[2] else key
+    columns[[key]] <- list(display = display, values = vals)
+  }
+
+  list(labels = labels, columns = columns)
+}
+
+
 #' Build Chart for a Single Question
 #'
 #' Determines the appropriate chart type and builds an inline SVG chart.
-#' Uses BoxCategory from Survey Structure to decide what to chart.
+#' Also extracts chart data for ALL columns and returns it as a JSON-ready
+#' structure for JS-driven multi-column chart rendering.
 #'
 #' @param question_data List from transform_single_question()
 #' @param options_df Data frame, Options sheet from Survey Structure
 #' @param config_obj Configuration object
-#' @return htmltools::HTML object with SVG chart, or NULL if not chartable
+#' @return List with svg (htmltools::HTML) and chart_data (list for JSON),
+#'         or NULL if not chartable
 #' @export
 build_question_chart <- function(question_data, options_df, config_obj) {
 
@@ -362,100 +444,138 @@ build_question_chart <- function(question_data, options_df, config_obj) {
       box_cats <- q_options$BoxCategory
       box_cats <- box_cats[!is.na(box_cats) & nzchar(trimws(box_cats))]
       if (length(box_cats) > 0) {
-        # Get unique categories preserving display order
         seen <- character(0)
         for (bc in box_cats) {
           bc <- trimws(bc)
           if (!bc %in% seen) seen <- c(seen, bc)
         }
-        box_cat_labels <- seen
-        use_box_categories <- TRUE
-      }
-    }
-  }
-
-  # ------------------------------------------------------------------
-  # STEP 2: Extract chart data from table_data (Total column only)
-  # ------------------------------------------------------------------
-
-  # Find the Total column key (first internal key = TOTAL::Total)
-  internal_keys <- grep("^\\.", names(table_data), value = TRUE, invert = TRUE)
-  total_key <- internal_keys[1]  # First key is always Total
-
-  if (is.null(total_key) || !total_key %in% names(table_data)) {
-    return(NULL)
-  }
-
-  chart_items <- data.frame(
-    label = character(0),
-    value = numeric(0),
-    stringsAsFactors = FALSE
-  )
-
-  if (use_box_categories) {
-    # Chart the box category rows
-    for (cat_label in box_cat_labels) {
-      # Find matching row in table_data
-      # Box categories are classified as "net" type in the transformer
-      matching_rows <- which(
-        table_data$.row_label == cat_label &
-        table_data$.row_type %in% c("net", "category")
-      )
-
-      if (length(matching_rows) > 0) {
-        row_idx <- matching_rows[1]
-        val <- suppressWarnings(as.numeric(table_data[[total_key]][row_idx]))
-        if (!is.na(val)) {
-          chart_items <- rbind(chart_items, data.frame(
-            label = cat_label,
-            value = abs(val),  # Use absolute value for display
-            stringsAsFactors = FALSE
-          ))
+        # Filter out DK/NA-only box categories -- these are not substantive
+        # chart categories and should not trigger stacked bar mode
+        dk_na_patterns <- c("^dk$", "^na$", "^dk/na$", "^dk / na$",
+                            "^don't know$", "^not applicable$", "^n/a$",
+                            "^refused$", "^prefer not to say$", "^other$")
+        substantive <- vapply(seen, function(lbl) {
+          !any(grepl(paste(dk_na_patterns, collapse = "|"),
+                     tolower(trimws(lbl))))
+        }, logical(1))
+        if (sum(substantive) >= 2) {
+          box_cat_labels <- seen
+          use_box_categories <- TRUE
         }
-      }
-    }
-  } else {
-    # Chart individual category rows (not net, not mean, not base)
-    cat_rows <- which(table_data$.row_type == "category")
-    for (row_idx in cat_rows) {
-      label <- table_data$.row_label[row_idx]
-      val <- suppressWarnings(as.numeric(table_data[[total_key]][row_idx]))
-      if (!is.na(val) && val >= 0) {
-        chart_items <- rbind(chart_items, data.frame(
-          label = label,
-          value = val,
-          stringsAsFactors = FALSE
-        ))
+        # If only DK/NA categories exist, fall through to individual rows
       }
     }
   }
 
-  if (nrow(chart_items) == 0) return(NULL)
+  # ------------------------------------------------------------------
+  # STEP 2: Identify chart rows and extract data for ALL columns
+  # ------------------------------------------------------------------
+
+  row_indices <- get_chart_row_indices(table_data, box_cat_labels)
+  if (length(row_indices) == 0) return(NULL)
+
+  all_col_data <- extract_all_column_chart_data(
+    table_data, row_indices, use_box_categories
+  )
+  if (is.null(all_col_data)) return(NULL)
+
+  # Verify at least some non-zero values exist
+  total_key <- names(all_col_data$columns)[1]
+  total_vals <- all_col_data$columns[[total_key]]$values
+  if (all(total_vals == 0)) return(NULL)
 
   # ------------------------------------------------------------------
-  # STEP 3: Determine chart type and build SVG
+  # STEP 3: Build initial SVG (Total column only) and chart metadata
   # ------------------------------------------------------------------
 
   is_ordinal <- q_type %in% c("Likert", "Rating", "NPS") || use_box_categories
-  svg_markup <- ""
 
+  # Build chart_items for the initial Total-only SVG
+  chart_items <- data.frame(
+    label = all_col_data$labels,
+    value = total_vals,
+    stringsAsFactors = FALSE
+  )
+  chart_items <- chart_items[chart_items$value > 0, , drop = FALSE]
+  if (nrow(chart_items) == 0) return(NULL)
+
+  svg_markup <- ""
   if (is_ordinal && nrow(chart_items) >= 2) {
-    # Stacked horizontal bar — add colours
     chart_items$colour <- sapply(seq_len(nrow(chart_items)), function(i) {
       get_semantic_colour(
-        chart_items$label[i],
-        index = i,
-        n_total = nrow(chart_items),
-        brand_colour = brand_colour
+        chart_items$label[i], index = i,
+        n_total = nrow(chart_items), brand_colour = brand_colour
       )
     })
-    svg_markup <- build_stacked_bar_svg(chart_items, chart_id = gsub("[^a-zA-Z0-9]", "-", q_code))
+    svg_markup <- build_stacked_bar_svg(
+      chart_items, chart_id = gsub("[^a-zA-Z0-9]", "-", q_code)
+    )
   } else {
-    # Horizontal bar chart
     svg_markup <- build_horizontal_bars_svg(chart_items, brand_colour)
   }
 
   if (nchar(svg_markup) == 0) return(NULL)
 
-  htmltools::HTML(svg_markup)
+  # Build chart data for JSON embedding (JS reads this to rebuild charts)
+  chart_data <- list(
+    chart_type = if (is_ordinal && nrow(chart_items) >= 2) "stacked" else "horizontal",
+    labels = all_col_data$labels,
+    brand_colour = brand_colour,
+    columns = all_col_data$columns
+  )
+
+  # Add semantic colours for stacked charts
+  if (chart_data$chart_type == "stacked") {
+    chart_data$colours <- sapply(seq_along(all_col_data$labels), function(i) {
+      get_semantic_colour(
+        all_col_data$labels[i], index = i,
+        n_total = length(all_col_data$labels), brand_colour = brand_colour
+      )
+    })
+  }
+
+  # ------------------------------------------------------------------
+  # STEP 4: Extract priority metric per column (if configured)
+  # ------------------------------------------------------------------
+  # Supports comma-separated cascade: "Mean, NPS Score" tries Mean first,
+
+  # falls back to NPS Score if Mean row not found for this question.
+  priority_metric_cfg <- config_obj$priority_metric
+  if (!is.null(priority_metric_cfg) && nzchar(trimws(priority_metric_cfg))) {
+    metric_candidates <- trimws(strsplit(priority_metric_cfg, ",")[[1]])
+    internal_keys <- grep("^\\.", names(table_data), value = TRUE, invert = TRUE)
+    mean_rows <- which(table_data$.row_type == "mean")
+
+    # Try each candidate in priority order -- use first match
+    match_idx <- NULL
+    for (candidate in metric_candidates) {
+      for (mi in mean_rows) {
+        if (grepl(candidate, table_data$.row_label[mi], ignore.case = TRUE)) {
+          match_idx <- mi
+          break
+        }
+      }
+      if (!is.null(match_idx)) break
+    }
+
+    if (!is.null(match_idx)) {
+      metric_vals <- list()
+      for (key in internal_keys) {
+        val <- suppressWarnings(as.numeric(table_data[[key]][match_idx]))
+        metric_vals[[key]] <- if (!is.na(val)) val else NULL
+      }
+      # Determine decimal places from config (match metric type)
+      metric_decimals <- config_obj$decimal_places_ratings %||% 1
+      chart_data$priority_metric <- list(
+        label = table_data$.row_label[match_idx],
+        values = metric_vals,
+        decimals = metric_decimals
+      )
+    }
+  }
+
+  list(
+    svg = htmltools::HTML(svg_markup),
+    chart_data = chart_data
+  )
 }

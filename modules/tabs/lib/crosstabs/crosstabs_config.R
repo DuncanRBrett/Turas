@@ -209,7 +209,11 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     index_descriptor = get_config_value(config, "index_descriptor", NULL),
 
     # V10.5.0 Inline SVG charts
-    show_charts = safe_logical(get_config_value(config, "show_charts", FALSE))
+    show_charts = safe_logical(get_config_value(config, "show_charts", FALSE)),
+
+    # V10.6.0 Report enhancements
+    priority_metric = get_config_value(config, "priority_metric", NULL),
+    company_name = get_config_value(config, "company_name", "The Research Lamppost")
   )
 }
 
@@ -225,6 +229,69 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
 #' @export
 get_output_path <- function(project_root, output_subfolder, output_filename) {
   resolve_path(project_root, file.path(output_subfolder, output_filename))
+}
+
+
+# ==============================================================================
+# COMMENTS SHEET LOADER (V10.6.0)
+# ==============================================================================
+
+#' Load Optional Comments Sheet from Config Excel
+#'
+#' Reads a "Comments" sheet from the config workbook if it exists.
+#' Expected columns: QuestionCode, Comment.
+#' Returns a named list (keyed by question code) or NULL if sheet is absent.
+#'
+#' @param config_file Character, path to config Excel file
+#' @return Named list of comments keyed by QuestionCode, or NULL
+#' @keywords internal
+load_comments_sheet <- function(config_file) {
+  tryCatch({
+    sheets <- openxlsx::getSheetNames(config_file)
+    if (!"Comments" %in% sheets) return(NULL)
+
+    df <- openxlsx::read.xlsx(config_file, sheet = "Comments")
+    if (is.null(df) || nrow(df) == 0) return(NULL)
+
+    # Require QuestionCode and Comment columns
+    if (!all(c("QuestionCode", "Comment") %in% names(df))) {
+      cat("  [INFO] Comments sheet found but missing QuestionCode/Comment columns - skipped\n")
+      return(NULL)
+    }
+
+    # Filter valid rows
+    df <- df[!is.na(df$QuestionCode) & nzchar(trimws(df$QuestionCode)) &
+             !is.na(df$Comment) & nzchar(trimws(df$Comment)), , drop = FALSE]
+    if (nrow(df) == 0) return(NULL)
+
+    # Support optional Banner column for multi-banner comments
+    has_banner <- "Banner" %in% names(df)
+
+    # Build structure: comments[[q_code]] = list of list(banner, text)
+    comments <- list()
+    for (i in seq_len(nrow(df))) {
+      q_code <- trimws(df$QuestionCode[i])
+      banner <- if (has_banner && !is.na(df$Banner[i]) && nzchar(trimws(df$Banner[i]))) {
+        trimws(df$Banner[i])
+      } else {
+        NULL
+      }
+      entry <- list(banner = banner, text = trimws(df$Comment[i]))
+      if (is.null(comments[[q_code]])) {
+        comments[[q_code]] <- list(entry)
+      } else {
+        comments[[q_code]] <- c(comments[[q_code]], list(entry))
+      }
+    }
+
+    n_total <- sum(sapply(comments, length))
+    cat(sprintf("  [INFO] Loaded %d comments for %d questions from Comments sheet\n",
+                n_total, length(comments)))
+    comments
+  }, error = function(e) {
+    cat(sprintf("  [WARNING] Could not read Comments sheet: %s\n", e$message))
+    NULL
+  })
 }
 
 
@@ -251,6 +318,9 @@ load_crosstabs_config <- function(config_file) {
 
   # Build config object
   config_obj <- build_config_object(settings$config)
+
+  # Load optional Comments sheet (V10.6.0)
+  config_obj$comments <- load_comments_sheet(config_file)
 
   # Build output path
   output_path <- get_output_path(

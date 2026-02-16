@@ -59,7 +59,8 @@ build_html_page <- function(html_data, tables, config_obj,
         build_dashboard_css(brand_colour),
         build_print_css()
       ),
-      build_header(project_title, brand_colour, html_data$total_n, html_data$n_questions),
+      build_header(project_title, brand_colour, html_data$total_n, html_data$n_questions,
+                         company_name = config_obj$company_name %||% "The Research Lamppost"),
       build_report_tab_nav(brand_colour),
       dashboard_html,
       crosstab_panel,
@@ -76,7 +77,8 @@ build_html_page <- function(html_data, tables, config_obj,
         build_css(brand_colour),
         build_print_css()
       ),
-      build_header(project_title, brand_colour, html_data$total_n, html_data$n_questions),
+      build_header(project_title, brand_colour, html_data$total_n, html_data$n_questions,
+                         company_name = config_obj$company_name %||% "The Research Lamppost"),
       crosstab_content,
       build_javascript(html_data)
     )
@@ -498,6 +500,12 @@ build_css <- function(brand_colour) {
     }
     .chart-bar-group { transition: transform 0.3s ease; }
 
+    /* Chart column picker (inside chart-wrapper) */
+    .chart-col-picker {
+      display: flex; align-items: center; gap: 6px;
+      padding: 0 0 12px 0; flex-wrap: wrap;
+    }
+
     /* Column toggle chip bar */
     .col-chip-bar {
       display: flex; align-items: center; gap: 6px;
@@ -529,6 +537,35 @@ build_css <- function(brand_colour) {
     }
     th.ct-data-col[data-col-key] { cursor: pointer; user-select: none; }
     th.ct-data-col[data-col-key]:hover { background: #eef2f7; }
+
+    /* Key insight callout */
+    .insight-area { margin-top: 0; }
+    .insight-toggle {
+      padding: 5px 12px; border: 1px dashed #cbd5e1; border-radius: 4px;
+      background: transparent; color: #94a3b8; font-size: 11px; font-weight: 500;
+      cursor: pointer; font-family: inherit; transition: all 0.15s;
+      width: 100%;
+    }
+    .insight-toggle:hover { border-color: BRAND; color: BRAND; }
+    .insight-editor {
+      border-left: 3px solid BRAND; background: #f8fafa;
+      padding: 12px 16px; font-size: 13px; line-height: 1.6;
+      border-radius: 0 6px 6px 0; min-height: 40px; outline: none;
+      color: #1e293b; position: relative;
+    }
+    .insight-editor:empty::before {
+      content: attr(data-placeholder); color: #b0bec5; font-style: italic;
+    }
+    .insight-dismiss {
+      position: absolute; top: 6px; right: 8px; border: none; background: none;
+      color: #cbd5e1; font-size: 14px; cursor: pointer; padding: 2px 6px;
+      line-height: 1; border-radius: 3px;
+    }
+    .insight-dismiss:hover { color: #64748b; background: #e2e8f0; }
+    .insight-container {
+      border: 1px solid #e2e8f0; border-top: none; background: #f8fafa;
+      padding: 10px 16px; position: relative;
+    }
   '
 
   # Replace BRAND placeholder with actual brand colour
@@ -546,8 +583,11 @@ build_print_css <- function() {
   htmltools::tags$style(htmltools::HTML('
     @media print {
       .sidebar, .controls-bar, .banner-tabs, .table-actions,
-      .export-btn, .export-chart-btn, .search-box, .toggle-label,
-      .print-btn, .col-chip-bar, .ct-sort-indicator { display: none !important; }
+      .export-btn, .export-chart-btn, .export-slide-btn, .search-box,
+      .toggle-label, .print-btn, .col-chip-bar, .ct-sort-indicator,
+      .insight-toggle, .insight-dismiss,
+      .chart-col-picker { display: none !important; }
+      .insight-container:has(.insight-editor:not(:empty)) { display: block !important; }
       .main-layout { display: block !important; padding: 0 !important; }
       .content-area { width: 100% !important; }
       .question-container { display: block !important; page-break-inside: avoid; margin-bottom: 24px; page-break-after: always; }
@@ -562,8 +602,13 @@ build_print_css <- function() {
       .tab-panel { display: block !important; }
       #tab-summary { display: none !important; }
       .chart-wrapper { page-break-inside: avoid; }
-      .ct-table { font-size: 10px !important; }
-      .ct-th, .ct-td { padding: 3px 6px !important; }
+      .ct-table { font-size: 11px !important; }
+      .ct-th, .ct-td { padding: 4px 8px !important; }
+      .question-text { font-size: 14px !important; }
+      .question-code { font-size: 12px !important; }
+      .banner-tabs { display: flex !important; }
+      .banner-tab { display: none !important; }
+      .banner-tab.active { display: inline-block !important; background: #1a2744 !important; color: #fff !important; font-size: 10px !important; padding: 4px 10px !important; }
     }
   '))
 }
@@ -626,13 +671,16 @@ build_tab_javascript <- function() {
 #' @param total_n Numeric or NA
 #' @param n_questions Integer
 #' @return htmltools::div
-build_header <- function(project_title, brand_colour, total_n, n_questions) {
+build_header <- function(project_title, brand_colour, total_n, n_questions,
+                         company_name = "The Research Lamppost") {
   meta_parts <- c()
   if (!is.na(total_n)) {
     total_n_display <- round(as.numeric(total_n))
     meta_parts <- c(meta_parts, sprintf("n=%s", format(total_n_display, big.mark = ",")))
   }
   if (!is.na(n_questions)) meta_parts <- c(meta_parts, sprintf("%d Questions", n_questions))
+
+  brand_label <- paste0(company_name, " \u00B7 Turas Analytics")
 
   htmltools::tags$div(
     class = "header",
@@ -641,7 +689,7 @@ build_header <- function(project_title, brand_colour, total_n, n_questions) {
       htmltools::tags$div(
         class = "header-left",
         htmltools::tags$div(
-          htmltools::tags$div(class = "header-brand", "The Research Lamppost \u00B7 Turas Analytics"),
+          htmltools::tags$div(class = "header-brand", brand_label),
           htmltools::tags$h1(class = "header-title", project_title),
           htmltools::tags$div(class = "header-meta",
             paste(c("Interactive Crosstab Explorer", meta_parts), collapse = " \u00B7 "))
@@ -797,6 +845,88 @@ build_controls <- function(has_any_freq, has_any_pct, has_any_sig,
 }
 
 
+#' Build Key Insight Area
+#'
+#' Creates an editable insight callout for a question. Supports multi-banner
+#' comments: comment_entries is a list of list(banner, text) objects.
+#' The initial text shown is the first matching entry for the active banner,
+#' or the first global (banner=NULL) entry. All entries are embedded as JSON
+#' for JS to switch on banner change.
+#'
+#' @param q_code Character, question code
+#' @param comment_entries List of list(banner, text), or NULL
+#' @param first_banner Character, name of the first active banner group
+#' @return htmltools::tags$div
+#' @keywords internal
+build_insight_area <- function(q_code, comment_entries = NULL,
+                               first_banner = "") {
+  # Determine initial comment to show
+  initial_text <- NULL
+  if (!is.null(comment_entries) && length(comment_entries) > 0) {
+    # Try banner-specific first, then global
+    for (entry in comment_entries) {
+      if (!is.null(entry$banner) && entry$banner == first_banner) {
+        initial_text <- entry$text
+        break
+      }
+    }
+    if (is.null(initial_text)) {
+      for (entry in comment_entries) {
+        if (is.null(entry$banner)) {
+          initial_text <- entry$text
+          break
+        }
+      }
+    }
+  }
+  has_comment <- !is.null(initial_text) && nzchar(trimws(initial_text))
+
+  # Embed all comments as JSON for banner switching
+  comments_json <- if (!is.null(comment_entries) && length(comment_entries) > 0) {
+    as.character(jsonlite::toJSON(comment_entries, auto_unbox = TRUE))
+  } else {
+    NULL
+  }
+
+  htmltools::tags$div(
+    class = "insight-area",
+    `data-q-code` = q_code,
+    if (!is.null(comments_json)) htmltools::tagList(
+      htmltools::tags$script(
+        type = "application/json",
+        class = "insight-comments-data",
+        htmltools::HTML(comments_json)
+      )
+    ),
+    # Toggle button (hidden when comment is pre-filled)
+    htmltools::tags$button(
+      class = "insight-toggle",
+      style = if (has_comment) "display:none;" else NULL,
+      onclick = sprintf("toggleInsight('%s')", q_code),
+      if (has_comment) "Edit Insight" else "+ Add Insight"
+    ),
+    # Editable callout container
+    htmltools::tags$div(
+      class = "insight-container",
+      style = if (!has_comment) "display:none;" else NULL,
+      htmltools::tags$div(
+        class = "insight-editor",
+        contenteditable = "true",
+        `data-placeholder` = "Type key insight here\u2026",
+        `data-q-code` = q_code,
+        if (has_comment) initial_text
+      ),
+      htmltools::tags$button(
+        class = "insight-dismiss",
+        title = "Delete insight",
+        onclick = sprintf("dismissInsight('%s')", q_code),
+        "\u00D7"
+      )
+    )
+  )
+}
+
+
 #' Build Question Containers
 #'
 #' Creates a container div for each question holding its title and table.
@@ -811,6 +941,8 @@ build_question_containers <- function(questions, tables, banner_groups,
 
   first_group_name <- if (length(banner_groups) > 0) names(banner_groups)[1] else ""
 
+  comments <- config_obj$comments  # Named list or NULL
+
   containers <- lapply(seq_along(questions), function(i) {
     q <- questions[[i]]
     q_code <- q$q_code
@@ -818,17 +950,28 @@ build_question_containers <- function(questions, tables, banner_groups,
     stat_label <- q$primary_stat
 
     # Build chart div (hidden by default, toggled via JS)
-    # data-q-title carries the question text for chart export (title injection)
+    # charts[[q_code]] is a list with $svg and $chart_data, or NULL
     chart_div <- NULL
-    if (!is.null(charts[[q_code]])) {
+    chart_result <- charts[[q_code]]
+    has_chart <- !is.null(chart_result)
+    if (has_chart) {
+      # Embed chart data as JSON for JS-driven multi-column rendering
+      chart_json <- jsonlite::toJSON(chart_result$chart_data,
+                                      auto_unbox = TRUE, digits = 4)
       chart_div <- htmltools::tags$div(
         class = "chart-wrapper",
         style = "display:none;",
         `data-q-code` = q_code,
         `data-q-title` = q_text,
-        charts[[q_code]]
+        `data-chart-data` = as.character(chart_json),
+        chart_result$svg
       )
     }
+
+    # Build insight area (pre-filled from config if available)
+    comment_entries <- if (!is.null(comments)) comments[[q_code]] else NULL
+    insight_div <- build_insight_area(q_code, comment_entries,
+                                      first_banner = first_group_name)
 
     htmltools::tags$div(
       class = if (i == 1) "question-container active" else "question-container",
@@ -854,6 +997,7 @@ build_question_containers <- function(questions, tables, banner_groups,
         tables[[q_code]]
       ),
       chart_div,
+      insight_div,
       htmltools::tags$div(class = "table-actions",
         htmltools::tags$button(
           class = "export-btn",
@@ -866,12 +1010,20 @@ build_question_containers <- function(questions, tables, banner_groups,
           onclick = sprintf("exportCSV('%s')", q_code),
           "\u2B73 Export CSV"
         ),
-        if (!is.null(charts[[q_code]])) {
+        if (has_chart) {
           htmltools::tags$button(
             class = "export-btn export-chart-btn",
             style = "margin-left:8px;display:none",
             onclick = sprintf("exportChartPNG('%s')", q_code),
             "\U0001F4CA Export Chart"
+          )
+        },
+        if (has_chart) {
+          htmltools::tags$button(
+            class = "export-btn export-slide-btn",
+            style = "margin-left:8px;display:none",
+            onclick = sprintf("exportSlidePNG('%s')", q_code),
+            "\U0001F4C4 Export Slide"
           )
         }
       )
@@ -976,7 +1128,7 @@ build_javascript <- function(html_data) {
       // Reset sort when switching banner groups
       sortState = {};
       document.querySelectorAll(".ct-sort-indicator").forEach(function(ind) {
-        ind.textContent = " ⇅";
+        ind.textContent = " \\u21C5";
         ind.classList.remove("ct-sort-active");
       });
       Object.keys(originalRowOrder).forEach(function(tableId) {
@@ -993,6 +1145,12 @@ build_javascript <- function(html_data) {
       // Build column toggle chips for this group
       buildColumnChips(groupCode);
 
+      // Rebuild chart column pickers for new banner group
+      buildChartPickersForGroup(groupCode);
+
+      // Update insight text for new banner group
+      updateInsightsForBanner(activeName);
+
       // Re-apply hidden columns for this group
       if (hiddenColumns[groupCode]) {
         Object.keys(hiddenColumns[groupCode]).forEach(function(colKey) {
@@ -1003,7 +1161,7 @@ build_javascript <- function(html_data) {
       }
     }
 
-    // Heatmap toggle — reads data-heatmap attribute from cells
+    // Heatmap toggle - reads data-heatmap attribute from cells
     function toggleHeatmap(enabled) {
       heatmapEnabled = enabled;
       document.querySelectorAll(".ct-heatmap-cell").forEach(function(td) {
@@ -1047,6 +1205,15 @@ build_javascript <- function(html_data) {
         }
       });
 
+      // Show insights that have content
+      var insightStates = [];
+      document.querySelectorAll(".insight-container").forEach(function(container) {
+        var editor = container.querySelector(".insight-editor");
+        var hadContent = editor && editor.textContent.trim() !== "";
+        insightStates.push({ el: container, was: container.style.display });
+        if (hadContent) container.style.display = "block";
+      });
+
       // Trigger print
       window.print();
 
@@ -1064,6 +1231,11 @@ build_javascript <- function(html_data) {
       document.querySelectorAll(".chart-wrapper").forEach(function(div) {
         div.style.display = chartsOn ? "block" : "none";
       });
+
+      // Restore insight visibility
+      insightStates.forEach(function(state) {
+        state.el.style.display = state.was;
+      });
     }
 
     // Chart toggle
@@ -1074,9 +1246,513 @@ build_javascript <- function(html_data) {
       document.querySelectorAll(".export-chart-btn").forEach(function(btn) {
         btn.style.display = enabled ? "inline-block" : "none";
       });
+      document.querySelectorAll(".export-slide-btn").forEach(function(btn) {
+        btn.style.display = enabled ? "inline-block" : "none";
+      });
     }
 
-    // Chart PNG export — injects question title, renders via canvas, downloads PNG
+    // ---- Key Insight ----
+    function toggleInsight(qCode) {
+      var area = document.querySelector(".insight-area[data-q-code=\\"" + qCode + "\\"]");
+      if (!area) return;
+      var container = area.querySelector(".insight-container");
+      var btn = area.querySelector(".insight-toggle");
+      if (!container) return;
+      var isHidden = container.style.display === "none";
+      container.style.display = isHidden ? "block" : "none";
+      if (btn) {
+        btn.style.display = isHidden ? "none" : "block";
+      }
+      if (isHidden) {
+        var editor = container.querySelector(".insight-editor");
+        if (editor) {
+          editor.focus();
+          // Mark as user-edited on input so banner switch does not overwrite
+          if (!editor.getAttribute("data-has-listener")) {
+            editor.addEventListener("input", function() {
+              editor.setAttribute("data-user-edited", "1");
+            });
+            editor.setAttribute("data-has-listener", "1");
+          }
+        }
+      }
+    }
+
+    function dismissInsight(qCode) {
+      var area = document.querySelector(".insight-area[data-q-code=\\"" + qCode + "\\"]");
+      if (!area) return;
+      var container = area.querySelector(".insight-container");
+      var btn = area.querySelector(".insight-toggle");
+      var editor = area.querySelector(".insight-editor");
+      // Clear content entirely and hide
+      if (editor) editor.innerHTML = "";
+      if (container) container.style.display = "none";
+      if (btn) {
+        btn.style.display = "block";
+        btn.textContent = "+ Add Insight";
+      }
+    }
+
+    // Update insight editors when banner group changes
+    function updateInsightsForBanner(bannerName) {
+      document.querySelectorAll(".insight-area").forEach(function(area) {
+        var scriptEl = area.querySelector("script.insight-comments-data");
+        if (!scriptEl) return;
+        var comments;
+        try { comments = JSON.parse(scriptEl.textContent); } catch(e) { return; }
+        if (!comments || !comments.length) return;
+        var editor = area.querySelector(".insight-editor");
+        if (!editor) return;
+        // If user has typed custom text, do not overwrite
+        if (editor.getAttribute("data-user-edited")) return;
+        // Find matching comment: banner-specific first, then global
+        var match = null;
+        for (var i = 0; i < comments.length; i++) {
+          if (comments[i].banner && comments[i].banner === bannerName) {
+            match = comments[i].text; break;
+          }
+        }
+        if (!match) {
+          for (var i = 0; i < comments.length; i++) {
+            if (!comments[i].banner) { match = comments[i].text; break; }
+          }
+        }
+        var container = area.querySelector(".insight-container");
+        var btn = area.querySelector(".insight-toggle");
+        if (match) {
+          editor.textContent = match;
+          if (container) container.style.display = "block";
+          if (btn) btn.style.display = "none";
+        } else {
+          editor.innerHTML = "";
+          if (container) container.style.display = "none";
+          if (btn) { btn.style.display = "block"; btn.textContent = "+ Add Insight"; }
+        }
+      });
+    }
+
+  '
+
+  # Second JS block: chart column picker, multi-column charts, slide export
+  js_code2 <- '
+    // ---- Chart Column Picker ----
+    var chartColumnState = {}; // qCode -> { colKey: true/false }
+
+    // Get column keys that belong to the active banner group (+ Total)
+    function getChartKeysForGroup(chartData, groupCode) {
+      var allKeys = Object.keys(chartData.columns);
+      var totalKey = allKeys[0]; // First key is always Total
+
+      // Find keys belonging to this banner group by checking table column classes
+      var groupKeys = [totalKey];
+      var seen = {};
+      seen[totalKey] = true;
+      document.querySelectorAll("th.ct-data-col.bg-" + groupCode + "[data-col-key]").forEach(function(th) {
+        var key = th.getAttribute("data-col-key");
+        if (!seen[key] && chartData.columns[key]) {
+          seen[key] = true;
+          groupKeys.push(key);
+        }
+      });
+      return groupKeys;
+    }
+
+    function initChartColumnPickers() {
+      buildChartPickersForGroup(currentGroup);
+    }
+
+    function buildChartPickersForGroup(groupCode) {
+      // Remove existing pickers
+      document.querySelectorAll(".chart-col-picker").forEach(function(el) { el.remove(); });
+
+      document.querySelectorAll(".chart-wrapper[data-chart-data]").forEach(function(wrapper) {
+        var qCode = wrapper.getAttribute("data-q-code");
+        var data = JSON.parse(wrapper.getAttribute("data-chart-data"));
+        if (!data || !data.columns) return;
+
+        var keys = getChartKeysForGroup(data, groupCode);
+        if (keys.length === 0) return;
+
+        // Always init state so JS rebuild renders priority metrics
+        chartColumnState[qCode] = {};
+        chartColumnState[qCode][keys[0]] = true;
+
+        // Only show column picker when multiple columns available
+        if (keys.length > 1) {
+          var bar = document.createElement("div");
+          bar.className = "chart-col-picker";
+          bar.setAttribute("data-q-code", qCode);
+
+          var lbl = document.createElement("span");
+          lbl.className = "col-chip-label";
+          lbl.textContent = "Chart:";
+          bar.appendChild(lbl);
+
+          keys.forEach(function(key, idx) {
+            var chip = document.createElement("button");
+            chip.className = "col-chip" + (idx === 0 ? "" : " col-chip-off");
+            chip.setAttribute("data-col-key", key);
+            chip.textContent = data.columns[key].display;
+            chip.onclick = function() {
+              toggleChartColumn(qCode, key, chip);
+            };
+            bar.appendChild(chip);
+          });
+
+          var svg = wrapper.querySelector("svg");
+          if (svg) wrapper.insertBefore(bar, svg);
+        }
+
+        // Always rebuild chart via JS (renders priority metrics etc.)
+        rebuildChartSVG(qCode);
+      });
+    }
+
+    function toggleChartColumn(qCode, colKey, chipEl) {
+      if (!chartColumnState[qCode]) chartColumnState[qCode] = {};
+      var isOn = !!chartColumnState[qCode][colKey];
+      if (isOn) {
+        // Prevent deselecting the last column
+        var activeCount = Object.keys(chartColumnState[qCode]).filter(function(k) {
+          return chartColumnState[qCode][k];
+        }).length;
+        if (activeCount <= 1) return;
+        delete chartColumnState[qCode][colKey];
+        chipEl.classList.add("col-chip-off");
+      } else {
+        chartColumnState[qCode][colKey] = true;
+        chipEl.classList.remove("col-chip-off");
+      }
+      rebuildChartSVG(qCode);
+    }
+
+    function rebuildChartSVG(qCode) {
+      var wrapper = document.querySelector(".chart-wrapper[data-q-code=\\"" + qCode + "\\"]");
+      if (!wrapper) return;
+      var data = JSON.parse(wrapper.getAttribute("data-chart-data"));
+      if (!data) return;
+
+      var selectedKeys = Object.keys(chartColumnState[qCode] || {}).filter(function(k) {
+        return chartColumnState[qCode][k];
+      });
+      if (selectedKeys.length === 0) return;
+
+      var oldSvg = wrapper.querySelector("svg");
+      if (!oldSvg) return;
+
+      var svgMarkup = "";
+      if (data.chart_type === "stacked") {
+        svgMarkup = buildMultiStackedSVG(data, selectedKeys, qCode);
+      } else {
+        svgMarkup = buildMultiHorizontalSVG(data, selectedKeys);
+      }
+
+      if (!svgMarkup) return;
+      var temp = document.createElement("div");
+      temp.innerHTML = svgMarkup;
+      var newSvg = temp.querySelector("svg");
+      if (newSvg) oldSvg.replaceWith(newSvg);
+    }
+
+    // Build multi-column stacked bar SVG (one bar per selected column)
+    function buildMultiStackedSVG(data, selectedKeys, qCode) {
+      var barH = 36, barGap = 8, labelMargin = 10;
+      var hasPM = data.priority_metric && data.priority_metric.label;
+      var pmDecimals = (hasPM && data.priority_metric.decimals != null) ? data.priority_metric.decimals : 1;
+      var metricW = hasPM ? 90 : 0;
+      var barW = 680;
+      var headerH = hasPM ? 20 : 4;
+      // Calculate label column width for column names
+      var maxLabelLen = 0;
+      selectedKeys.forEach(function(k) {
+        var len = (data.columns[k].display || "").length;
+        if (len > maxLabelLen) maxLabelLen = len;
+      });
+      var colLabelW = Math.max(60, maxLabelLen * 7 + 16);
+      var barStartX = colLabelW;
+      var barUsable = barW - colLabelW - labelMargin - metricW;
+
+      var barCount = selectedKeys.length;
+      var legendY = headerH + barCount * (barH + barGap) + 16;
+      var labels = data.labels || [];
+      var colours = data.colours || [];
+
+      // Pre-calculate legend layout
+      var legPositions = [], legX = labelMargin, legRow = 0;
+      for (var li = 0; li < labels.length; li++) {
+        var legText = labels[li] + " (" + Math.round(data.columns[selectedKeys[0]].values[li]) + "%)";
+        var itemW = legText.length * 6 + 30;
+        if (legX + itemW > barW - labelMargin && li > 0) { legRow++; legX = labelMargin; }
+        legPositions.push({ x: legX, row: legRow, text: legText });
+        legX += itemW;
+      }
+      var legendRows = legRow + 1;
+      var totalH = legendY + legendRows * 18 + 8;
+
+      var clipId = "mc-clip-" + qCode.replace(/[^a-zA-Z0-9]/g, "-");
+      var p = [];
+      p.push("<svg xmlns=\\"http://www.w3.org/2000/svg\\" viewBox=\\"0 0 " + barW + " " + totalH + "\\" role=\\"img\\" aria-label=\\"Distribution chart\\" style=\\"font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;\\">");
+
+      // Priority metric header (right-aligned, above bars)
+      if (hasPM) {
+        p.push("<text x=\\"" + (barW - labelMargin) + "\\" y=\\"" + 14 + "\\" text-anchor=\\"end\\" fill=\\"#94a3b8\\" font-size=\\"9\\" font-weight=\\"600\\">" + escapeHtml(data.priority_metric.label) + "</text>");
+      }
+
+      selectedKeys.forEach(function(key, ki) {
+        var y = headerH + ki * (barH + barGap);
+        var vals = data.columns[key].values;
+        var total = 0;
+        vals.forEach(function(v) { total += v; });
+        if (total <= 0) return;
+
+        var cid = clipId + "-" + ki;
+        p.push("<defs><clipPath id=\\"" + cid + "\\"><rect x=\\"" + barStartX + "\\" y=\\"" + y + "\\" width=\\"" + barUsable + "\\" height=\\"" + barH + "\\" rx=\\"5\\" ry=\\"5\\"/></clipPath></defs>");
+
+        // Column label
+        p.push("<text x=\\"" + (colLabelW - 8) + "\\" y=\\"" + (y + barH / 2) + "\\" text-anchor=\\"end\\" dominant-baseline=\\"central\\" fill=\\"#374151\\" font-size=\\"11\\" font-weight=\\"600\\">" + escapeHtml(data.columns[key].display) + "</text>");
+
+        // Segments
+        var xOff = barStartX;
+        for (var si = 0; si < vals.length; si++) {
+          var segW = (vals[si] / total) * barUsable;
+          if (segW < 1) continue;
+          p.push("<rect x=\\"" + xOff + "\\" y=\\"" + y + "\\" width=\\"" + segW + "\\" height=\\"" + barH + "\\" fill=\\"" + (colours[si] || "#999") + "\\" clip-path=\\"url(#" + cid + ")\\"/>");
+
+          // Label inside if fits
+          var pctText = Math.round(vals[si]) + "%";
+          if (segW > 35) {
+            var tFill = getLuminance(colours[si] || "#999") > 0.65 ? "#5c4a3a" : "#ffffff";
+            p.push("<text x=\\"" + (xOff + segW / 2) + "\\" y=\\"" + (y + barH / 2) + "\\" text-anchor=\\"middle\\" dominant-baseline=\\"central\\" fill=\\"" + tFill + "\\" font-size=\\"11\\" font-weight=\\"600\\">" + pctText + "</text>");
+          }
+          xOff += segW;
+        }
+
+        // Priority metric value -- styled pill to the right of bar
+        if (hasPM) {
+          var pmVals = data.priority_metric.values || {};
+          var pmVal = pmVals[key];
+          if (pmVal != null) {
+            var pmText = pmVal.toFixed(pmDecimals);
+            var pmBoxX = barW - metricW + 4;
+            var pmBoxW = metricW - 14;
+            var pmBoxY = y + 4;
+            var pmBoxH = barH - 8;
+            p.push("<rect x=\\"" + pmBoxX + "\\" y=\\"" + pmBoxY + "\\" width=\\"" + pmBoxW + "\\" height=\\"" + pmBoxH + "\\" rx=\\"4\\" fill=\\"#f0fafa\\" stroke=\\"#d0e8e8\\" stroke-width=\\"1\\"/>");
+            p.push("<text x=\\"" + (pmBoxX + pmBoxW / 2) + "\\" y=\\"" + (y + barH / 2) + "\\" text-anchor=\\"middle\\" dominant-baseline=\\"central\\" fill=\\"#1a2744\\" font-size=\\"13\\" font-weight=\\"700\\">" + pmText + "</text>");
+          }
+        }
+      });
+
+      // Legend (uses first selected column values for display)
+      var firstVals = data.columns[selectedKeys[0]].values;
+      for (var li = 0; li < labels.length; li++) {
+        var pos = legPositions[li];
+        var legY = legendY + pos.row * 18;
+        var legLabel = labels[li] + " (" + Math.round(firstVals[li]) + "%)";
+        p.push("<circle cx=\\"" + (pos.x + 4.5) + "\\" cy=\\"" + (legY + 5) + "\\" r=\\"4.5\\" fill=\\"" + (colours[li] || "#999") + "\\"/>");
+        p.push("<text x=\\"" + (pos.x + 13) + "\\" y=\\"" + (legY + 9) + "\\" fill=\\"#64748b\\" font-size=\\"10.5\\">" + escapeHtml(legLabel) + "</text>");
+      }
+
+      p.push("</svg>");
+      return p.join("\\n");
+    }
+
+    // Wrap long label into 2 lines at nearest space to midpoint
+    function wrapLabel(label, maxChars) {
+      if (label.length <= maxChars) return [label];
+      var mid = Math.floor(label.length / 2);
+      var bestSplit = -1, bestDist = label.length;
+      for (var i = 0; i < label.length; i++) {
+        if (label[i] === " " && Math.abs(i - mid) < bestDist) {
+          bestDist = Math.abs(i - mid);
+          bestSplit = i;
+        }
+      }
+      if (bestSplit === -1) return [label];
+      return [label.substring(0, bestSplit), label.substring(bestSplit + 1)];
+    }
+
+    // Distinct colour palette from brand colour using HSL rotation
+    function getDistinctPalette(brandHex, count) {
+      var r = parseInt(brandHex.substr(1, 2), 16) / 255;
+      var g = parseInt(brandHex.substr(3, 2), 16) / 255;
+      var b = parseInt(brandHex.substr(5, 2), 16) / 255;
+      var mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      var h = 0, s = 0, l = (mx + mn) / 2;
+      if (mx !== mn) {
+        var d = mx - mn;
+        s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+        if (mx === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+        else if (mx === g) h = ((b - r) / d + 2) / 6;
+        else h = ((r - g) / d + 4) / 6;
+      }
+      var palette = [];
+      var offsets = [0, 35, 190, 60, 150];
+      for (var i = 0; i < count; i++) {
+        var oh = ((h * 360 + (offsets[i] || i * 72)) % 360) / 360;
+        var os = i === 0 ? s : Math.max(0.35, s * 0.8);
+        var ol = i === 0 ? l : Math.min(0.55, l + 0.05);
+        palette.push(hslToHex(oh, os, ol));
+      }
+      return palette;
+    }
+
+    function hslToHex(h, s, l) {
+      var r2, g2, b2;
+      if (s === 0) { r2 = g2 = b2 = l; }
+      else {
+        var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        var pp = 2 * l - q;
+        r2 = hue2rgb(pp, q, h + 1/3);
+        g2 = hue2rgb(pp, q, h);
+        b2 = hue2rgb(pp, q, h - 1/3);
+      }
+      return "#" + ((1 << 24) + (Math.round(r2 * 255) << 16) + (Math.round(g2 * 255) << 8) + Math.round(b2 * 255)).toString(16).slice(1);
+    }
+
+    function hue2rgb(p, q, t) {
+      if (t < 0) t += 1; if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    }
+
+    // Build multi-column horizontal bar SVG (grouped bars per category)
+    function buildMultiHorizontalSVG(data, selectedKeys) {
+      var labels = data.labels || [];
+      var nCols = selectedKeys.length;
+      var hasPM = data.priority_metric && data.priority_metric.label;
+      var pmDecimals = (hasPM && data.priority_metric.decimals != null) ? data.priority_metric.decimals : 1;
+      var barH = 22, subGap = 3, groupGap = 12;
+      var wrapThreshold = 30;
+
+      // Wrap labels and calculate widths
+      var wrappedLabels = labels.map(function(l) { return wrapLabel(l, wrapThreshold); });
+      var maxLine1 = 0, hasWrapped = false;
+      wrappedLabels.forEach(function(lines) {
+        if (lines[0].length > maxLine1) maxLine1 = lines[0].length;
+        if (lines.length > 1) hasWrapped = true;
+      });
+      var labelW = Math.max(160, maxLine1 * 6.2 + 16);
+      var valueW = 45, chartW = 680;
+      var barAreaW = chartW - labelW - valueW - 20;
+      if (barAreaW < 200) { chartW = labelW + valueW + 20 + 300; barAreaW = 300; }
+
+      // Find max value across selected columns
+      var maxVal = 0;
+      selectedKeys.forEach(function(key) {
+        data.columns[key].values.forEach(function(v) {
+          if (v > maxVal) maxVal = v;
+        });
+      });
+      if (maxVal <= 0) maxVal = 1;
+
+      var groupH = nCols * (barH + subGap) - subGap;
+      var wrapExtra = hasWrapped ? 10 : 0;
+      var topMargin = 4;
+      var barsH = topMargin;
+
+      // Pre-calculate group positions accounting for wrapped labels
+      var groupPositions = [];
+      wrappedLabels.forEach(function(lines) {
+        groupPositions.push(barsH);
+        var extra = lines.length > 1 ? 10 : 0;
+        barsH += groupH + groupGap + extra;
+      });
+
+      // Add space for priority metric pill strip below bars
+      var metricStripH = (hasPM && nCols > 0) ? 36 : 0;
+      var totalH = barsH + metricStripH;
+
+      // Distinct colour palette for columns
+      var bc = data.brand_colour || "#0d8a8a";
+      var colColours = nCols > 1 ? getDistinctPalette(bc, nCols) : [bc];
+
+      var p = [];
+      p.push("<svg xmlns=\\"http://www.w3.org/2000/svg\\" viewBox=\\"0 0 " + chartW + " " + totalH + "\\" role=\\"img\\" aria-label=\\"Bar chart\\" style=\\"font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;\\">");
+
+      labels.forEach(function(label, li) {
+        var groupY = groupPositions[li];
+        var lines = wrappedLabels[li];
+
+        selectedKeys.forEach(function(key, ki) {
+          var y = groupY + ki * (barH + subGap);
+          var val = data.columns[key].values[li] || 0;
+          var barW = Math.max((val / maxVal) * barAreaW, 2);
+          var pctText = Math.round(val) + "%";
+          var colour = colColours[ki];
+
+          // Category label only on first bar of group -- with wrapping
+          if (ki === 0) {
+            if (lines.length === 1) {
+              p.push("<text x=\\"" + (labelW - 8) + "\\" y=\\"" + (y + barH / 2) + "\\" text-anchor=\\"end\\" dominant-baseline=\\"central\\" fill=\\"#374151\\" font-size=\\"11\\" font-weight=\\"500\\">" + escapeHtml(lines[0]) + "</text>");
+            } else {
+              p.push("<text x=\\"" + (labelW - 8) + "\\" text-anchor=\\"end\\" fill=\\"#374151\\" font-size=\\"11\\" font-weight=\\"500\\">");
+              p.push("<tspan x=\\"" + (labelW - 8) + "\\" y=\\"" + (y + barH / 2 - 6) + "\\">" + escapeHtml(lines[0]) + "</tspan>");
+              p.push("<tspan x=\\"" + (labelW - 8) + "\\" dy=\\"13\\">" + escapeHtml(lines[1]) + "</tspan>");
+              p.push("</text>");
+            }
+          }
+
+          p.push("<rect x=\\"" + labelW + "\\" y=\\"" + y + "\\" width=\\"" + barW + "\\" height=\\"" + barH + "\\" rx=\\"3\\" fill=\\"" + colour + "\\" opacity=\\"0.85\\"/>");
+          p.push("<text x=\\"" + (labelW + barW + 8) + "\\" y=\\"" + (y + barH / 2) + "\\" dominant-baseline=\\"central\\" fill=\\"#64748b\\" font-size=\\"11\\" font-weight=\\"600\\">" + pctText + "</text>");
+
+          // Column name label (small, after percentage, only if multiple columns)
+          if (nCols > 1) {
+            var afterPct = labelW + barW + 8 + pctText.length * 7 + 6;
+            p.push("<text x=\\"" + afterPct + "\\" y=\\"" + (y + barH / 2) + "\\" dominant-baseline=\\"central\\" fill=\\"#94a3b8\\" font-size=\\"9\\">" + escapeHtml(data.columns[key].display) + "</text>");
+          }
+        });
+      });
+
+      // Priority metric pill strip below chart
+      if (hasPM) {
+        var pmY = barsH + 4;
+        p.push("<line x1=\\"" + labelW + "\\" x2=\\"" + (chartW - 10) + "\\" y1=\\"" + (pmY - 2) + "\\" y2=\\"" + (pmY - 2) + "\\" stroke=\\"#e2e8f0\\" stroke-width=\\"1\\"/>");
+        // Metric label
+        p.push("<text x=\\"" + (labelW - 8) + "\\" y=\\"" + (pmY + 16) + "\\" text-anchor=\\"end\\" fill=\\"#94a3b8\\" font-size=\\"9\\" font-weight=\\"600\\">" + escapeHtml(data.priority_metric.label) + "</text>");
+        // Pill badges for each column
+        var pillX = labelW;
+        selectedKeys.forEach(function(key, ki) {
+          var pmVals = data.priority_metric.values || {};
+          var pmVal = pmVals[key];
+          if (pmVal != null) {
+            var pmText = escapeHtml(data.columns[key].display) + " " + pmVal.toFixed(pmDecimals);
+            var pillW = pmText.length * 6.5 + 16;
+            p.push("<rect x=\\"" + pillX + "\\" y=\\"" + (pmY + 2) + "\\" width=\\"" + pillW + "\\" height=\\"" + 22 + "\\" rx=\\"11\\" fill=\\"#f0fafa\\" stroke=\\"#d0e8e8\\" stroke-width=\\"1\\"/>");
+            p.push("<text x=\\"" + (pillX + pillW / 2) + "\\" y=\\"" + (pmY + 16) + "\\" text-anchor=\\"middle\\" fill=\\"#1a2744\\" font-size=\\"10\\" font-weight=\\"600\\">" + pmText + "</text>");
+            pillX += pillW + 8;
+          }
+        });
+      }
+
+      p.push("</svg>");
+      return p.join("\\n");
+    }
+
+    function escapeHtml(s) {
+      return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function getLuminance(hex) {
+      var r = parseInt(hex.substr(1, 2), 16);
+      var g = parseInt(hex.substr(3, 2), 16);
+      var b = parseInt(hex.substr(5, 2), 16);
+      return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    }
+
+    function blendColour(hex, mix) {
+      var r = parseInt(hex.substr(1, 2), 16);
+      var g = parseInt(hex.substr(3, 2), 16);
+      var b = parseInt(hex.substr(5, 2), 16);
+      var fr = Math.round(255 - (255 - r) * mix);
+      var fg = Math.round(255 - (255 - g) * mix);
+      var fb = Math.round(255 - (255 - b) * mix);
+      return "#" + ((1 << 24) + (fr << 16) + (fg << 8) + fb).toString(16).slice(1);
+    }
+
+    // Chart PNG export - injects question title, renders via canvas, downloads PNG
     function exportChartPNG(qCode) {
       var container = document.querySelector(".question-container.active");
       if (!container) return;
@@ -1100,7 +1776,7 @@ build_javascript <- function(html_data) {
       var titlePadding = 12;
       var titleLineHeight = titleFontSize * 1.3;
       // Title block: qCode + question text
-      var titleText = qCodeLabel + " — " + qTitle;
+      var titleText = qCodeLabel + " - " + qTitle;
       var titleBlockH = titlePadding + titleLineHeight + titlePadding;
 
       // Expand viewBox to accommodate title at top
@@ -1163,6 +1839,174 @@ build_javascript <- function(html_data) {
       img.src = url;
     }
 
+  '
+
+  # Third JS block: slide export and data extraction
+  js_code3 <- '
+    // ---- Slide PNG Export ----
+    // Builds a presentation-quality SVG slide with title, base, chart,
+    // metrics strip, and insight -- then renders to PNG at 3x resolution.
+    function exportSlidePNG(qCode) {
+      var container = document.querySelector(".question-container.active");
+      if (!container) return;
+      var wrapper = container.querySelector(".chart-wrapper");
+      if (!wrapper) return;
+      var chartSvg = wrapper.querySelector("svg");
+      if (!chartSvg) return;
+
+      var qTitle = wrapper.getAttribute("data-q-title") || "";
+      var qCodeLabel = wrapper.getAttribute("data-q-code") || qCode;
+      var ns = "http://www.w3.org/2000/svg";
+      var W = 960, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
+
+      // ---- Gather data from DOM (pre-calculated, no recalculation) ----
+      // Base size
+      var baseText = "";
+      var baseRow = container.querySelector("tr.ct-row-base");
+      if (baseRow) {
+        var baseCells = baseRow.querySelectorAll("td:not([style*=none])");
+        if (baseCells.length > 1) baseText = "Base: n=" + baseCells[1].textContent.trim();
+      }
+
+      // Metrics (mean, index, NPS from table)
+      var metrics = [];
+      container.querySelectorAll("tr.ct-row-mean").forEach(function(row) {
+        var labelCell = row.querySelector("td.ct-label-col");
+        var dataCells = row.querySelectorAll("td:not(.ct-label-col):not([style*=none])");
+        if (labelCell && dataCells.length > 0) {
+          var label = labelCell.textContent.trim();
+          var val = dataCells[0].textContent.trim().split("\\n")[0].trim();
+          if (val && val !== "-") metrics.push(label + ": " + val);
+        }
+      });
+
+      // Insight text
+      var insightText = "";
+      var insightEditor = container.querySelector(".insight-editor");
+      if (insightEditor) insightText = insightEditor.textContent.trim();
+
+      // ---- Calculate slide layout ----
+      var pad = 28;
+      var titleY = pad + 16;
+      var metaY = titleY + 18;
+      var chartTop = metaY + 22;
+
+      // Clone chart SVG and measure
+      var chartClone = chartSvg.cloneNode(true);
+      var chartVB = chartClone.getAttribute("viewBox").split(" ").map(Number);
+      var chartOrigW = chartVB[2], chartOrigH = chartVB[3];
+      var chartScale = (W - pad * 2) / chartOrigW;
+      var chartDisplayH = chartOrigH * chartScale;
+
+      var metricsY = chartTop + chartDisplayH + 16;
+      var metricsH = metrics.length > 0 ? 32 : 0;
+      var insightY = metricsY + metricsH + (metricsH > 0 ? 8 : 0);
+      var insightH = insightText ? 40 : 0;
+      var totalH = insightY + insightH + pad;
+
+      // ---- Build slide SVG ----
+      var svg = document.createElementNS(ns, "svg");
+      svg.setAttribute("xmlns", ns);
+      svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
+      svg.setAttribute("style", "font-family:" + fontFamily + ";");
+
+      // White background
+      var bg = document.createElementNS(ns, "rect");
+      bg.setAttribute("width", W); bg.setAttribute("height", totalH);
+      bg.setAttribute("fill", "#ffffff");
+      svg.appendChild(bg);
+
+      // Title
+      var title = document.createElementNS(ns, "text");
+      title.setAttribute("x", pad); title.setAttribute("y", titleY);
+      title.setAttribute("fill", "#1a2744"); title.setAttribute("font-size", "16");
+      title.setAttribute("font-weight", "700");
+      title.textContent = qCodeLabel + " - " + qTitle;
+      svg.appendChild(title);
+
+      // Base + banner meta
+      var meta = document.createElementNS(ns, "text");
+      meta.setAttribute("x", pad); meta.setAttribute("y", metaY);
+      meta.setAttribute("fill", "#94a3b8"); meta.setAttribute("font-size", "11");
+      meta.textContent = baseText;
+      svg.appendChild(meta);
+
+      // Chart (embedded via <g> transform)
+      var chartG = document.createElementNS(ns, "g");
+      chartG.setAttribute("transform", "translate(" + pad + "," + chartTop + ") scale(" + chartScale + ")");
+      // Move all children from clone into group
+      while (chartClone.firstChild) chartG.appendChild(chartClone.firstChild);
+      svg.appendChild(chartG);
+
+      // Metrics strip
+      if (metrics.length > 0) {
+        var metricsStr = metrics.join("  |  ");
+        var mText = document.createElementNS(ns, "text");
+        mText.setAttribute("x", pad); mText.setAttribute("y", metricsY + 18);
+        mText.setAttribute("fill", "#5c4a2a"); mText.setAttribute("font-size", "12");
+        mText.setAttribute("font-weight", "600");
+        mText.textContent = metricsStr;
+        svg.appendChild(mText);
+
+        // Subtle line above metrics
+        var mLine = document.createElementNS(ns, "line");
+        mLine.setAttribute("x1", pad); mLine.setAttribute("x2", W - pad);
+        mLine.setAttribute("y1", metricsY); mLine.setAttribute("y2", metricsY);
+        mLine.setAttribute("stroke", "#e2e8f0"); mLine.setAttribute("stroke-width", "1");
+        svg.appendChild(mLine);
+      }
+
+      // Insight callout
+      if (insightText) {
+        // Accent line
+        var iLine = document.createElementNS(ns, "line");
+        iLine.setAttribute("x1", pad); iLine.setAttribute("x2", W - pad);
+        iLine.setAttribute("y1", insightY); iLine.setAttribute("y2", insightY);
+        iLine.setAttribute("stroke", "#e2e8f0"); iLine.setAttribute("stroke-width", "1");
+        svg.appendChild(iLine);
+
+        // Teal accent bar
+        var iBar = document.createElementNS(ns, "rect");
+        iBar.setAttribute("x", pad); iBar.setAttribute("y", insightY + 4);
+        iBar.setAttribute("width", "3"); iBar.setAttribute("height", "24");
+        iBar.setAttribute("fill", "#0d8a8a"); iBar.setAttribute("rx", "1.5");
+        svg.appendChild(iBar);
+
+        var iText = document.createElementNS(ns, "text");
+        iText.setAttribute("x", pad + 12); iText.setAttribute("y", insightY + 22);
+        iText.setAttribute("fill", "#374151"); iText.setAttribute("font-size", "12");
+        iText.setAttribute("font-style", "italic");
+        iText.textContent = insightText;
+        svg.appendChild(iText);
+      }
+
+      // ---- Render SVG to PNG at 3x ----
+      var scale = 3;
+      var svgData = new XMLSerializer().serializeToString(svg);
+      var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+      var url = URL.createObjectURL(svgBlob);
+
+      var img = new Image();
+      img.onload = function() {
+        var canvas = document.createElement("canvas");
+        canvas.width = W * scale;
+        canvas.height = totalH * scale;
+        var ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(function(blob) {
+          downloadBlob(blob, qCode + "_slide.png");
+        }, "image/png");
+      };
+      img.src = url;
+    }
+
+  '
+
+  # Fourth JS block: table export, CSV, Excel, column sort, init
+  js_code4 <- '
     // Extract table data as 2D array (shared by CSV and Excel export)
     function extractTableData(qCode) {
       var activeContainer = document.querySelector(".question-container.active");
@@ -1208,7 +2052,7 @@ build_javascript <- function(html_data) {
       downloadBlob(blob, qCode + "_crosstab.csv");
     }
 
-    // Excel export (Excel XML Spreadsheet format — .xls)
+    // Excel export (Excel XML Spreadsheet format - .xls)
     function exportExcel(qCode) {
       var data = extractTableData(qCode);
       if (!data) return;
@@ -1252,7 +2096,7 @@ build_javascript <- function(html_data) {
           var num = parseFloat(cell.replace(/[,%]/g, ""));
           var isNum = !isNaN(num) && cell.match(/^[\\d,\\.%\\s\\-]+$/);
           if (isNum && cell.indexOf("%") >= 0) {
-            // Percentage — store as number
+            // Percentage - store as number
             xml.push("<Cell ss:StyleID=\\"" + styleId + "\\"><Data ss:Type=\\"Number\\">" +
                       num + "</Data></Cell>");
           } else if (isNum && cell.trim() !== "") {
@@ -1364,7 +2208,7 @@ build_javascript <- function(html_data) {
       document.querySelectorAll("th.ct-data-col[data-col-key]").forEach(function(th) {
         var indicator = document.createElement("span");
         indicator.className = "ct-sort-indicator";
-        indicator.textContent = " ⇅";
+        indicator.textContent = " \\u21C5";
         th.appendChild(indicator);
 
         th.addEventListener("click", function() {
@@ -1401,17 +2245,17 @@ build_javascript <- function(html_data) {
 
       // Reset all indicators in this table
       table.querySelectorAll(".ct-sort-indicator").forEach(function(ind) {
-        ind.textContent = " ⇅";
+        ind.textContent = " \\u21C5";
         ind.classList.remove("ct-sort-active");
       });
 
       var indicator = clickedTh.querySelector(".ct-sort-indicator");
       if (indicator) {
         if (newDir === "desc") {
-          indicator.textContent = " ↓";
+          indicator.textContent = " \\u2193";
           indicator.classList.add("ct-sort-active");
         } else if (newDir === "asc") {
-          indicator.textContent = " ↑";
+          indicator.textContent = " \\u2191";
           indicator.classList.add("ct-sort-active");
         }
       }
@@ -1510,7 +2354,7 @@ build_javascript <- function(html_data) {
         return;
       }
 
-      // Build label → group map
+      // Build label -> group map
       var labelMap = {};
       groups.forEach(function(g) {
         var label = g.getAttribute("data-bar-label");
@@ -1544,14 +2388,28 @@ build_javascript <- function(html_data) {
       }
       toggleHeatmap(true);
       initSortHeaders();
+      initChartColumnPickers();
+      // Auto-show insights that have content (from config or save-as)
+      document.querySelectorAll(".insight-editor").forEach(function(editor) {
+        if (editor.textContent.trim()) {
+          var cont = editor.closest(".insight-container");
+          if (cont) cont.style.display = "block";
+          var area = editor.closest(".insight-area");
+          if (area) {
+            var btn = area.querySelector(".insight-toggle");
+            if (btn) btn.style.display = "none";
+          }
+        }
+      });
     });
   '
 
-  js_code <- gsub("BANNER_GROUPS_JSON",
+  js_full <- paste0(js_code, js_code2, js_code3, js_code4)
+  js_full <- gsub("BANNER_GROUPS_JSON",
                    jsonlite::toJSON(unname(group_codes), auto_unbox = FALSE),
-                   js_code, fixed = TRUE)
+                   js_full, fixed = TRUE)
 
-  htmltools::tags$script(htmltools::HTML(js_code))
+  htmltools::tags$script(htmltools::HTML(js_full))
 }
 
 

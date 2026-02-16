@@ -172,6 +172,7 @@ build_dashboard_panel <- function(dashboard_data, config_obj) {
       section_blocks,
       sig_section,
       build_heatmap_export_js(),
+      build_dashboard_interaction_js(),
       htmltools::tags$div(
         class = "dash-footer-note",
         htmltools::HTML(paste0(
@@ -371,8 +372,15 @@ build_gauge_section <- function(metrics, brand_colour, section_label, thresholds
     # Full question label (CSS handles wrapping)
     q_label <- metric$question_text
 
+    # Store display value for slide export
+    display_val <- format_gauge_value(total_val, metric$metric_type, thresholds)
+
     htmltools::tags$div(
       class = "dash-gauge-card",
+      `data-q-code` = metric$q_code,
+      `data-value` = display_val,
+      `data-q-text` = metric$question_text,
+      onclick = "toggleGaugeExclude(this)",
       htmltools::tags$span(class = type_class, type_label),
       htmltools::HTML(gauge_svg),
       htmltools::tags$div(
@@ -383,13 +391,42 @@ build_gauge_section <- function(metrics, brand_colour, section_label, thresholds
     )
   })
 
+  section_id <- gsub("[^a-zA-Z0-9]", "-", tolower(section_label))
+
   htmltools::tags$div(
     class = "dash-section",
+    `data-section-type` = section_label,
+    id = paste0("dash-sec-", section_id),
     htmltools::tags$div(class = "dash-section-title",
-      htmltools::HTML(htmltools::htmlEscape(section_label))
+      htmltools::HTML(htmltools::htmlEscape(section_label)),
+      htmltools::tags$button(
+        class = "dash-export-btn dash-slide-export-btn",
+        style = "margin-left:12px;",
+        onclick = sprintf("exportDashboardSlide('%s')", section_id),
+        htmltools::HTML("&#128196; Export Slide")
+      )
     ),
     htmltools::tags$div(class = "dash-gauges", gauge_cards)
   )
+}
+
+
+#' Format Gauge Display Value
+#'
+#' @param value Numeric
+#' @param metric_type Character
+#' @param thresholds List from build_colour_thresholds()
+#' @return Character display string
+#' @keywords internal
+format_gauge_value <- function(value, metric_type, thresholds) {
+  if (is.na(value)) return("N/A")
+  if (metric_type %in% c("net_positive", "nps_score")) {
+    paste0(ifelse(value >= 0, "+", ""), round(value))
+  } else if (metric_type == "custom") {
+    paste0(round(value), "%")
+  } else {
+    format(round(value, 1), nsmall = 1)
+  }
 }
 
 
@@ -776,6 +813,166 @@ build_heatmap_export_js <- function() {
 }
 
 
+#' Build Dashboard Slide Export & Gauge Toggle JavaScript
+#'
+#' @return htmltools::tags$script
+#' @keywords internal
+build_dashboard_interaction_js <- function() {
+  js <- '
+    function toggleGaugeExclude(card) {
+      card.classList.toggle("dash-gauge-excluded");
+    }
+
+    function exportDashboardSlide(sectionId) {
+      var section = document.getElementById("dash-sec-" + sectionId);
+      if (!section) return;
+      var cards = section.querySelectorAll(".dash-gauge-card:not(.dash-gauge-excluded)");
+      if (cards.length === 0) { alert("No gauges to export (all excluded)"); return; }
+
+      var ns = "http://www.w3.org/2000/svg";
+      var font = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
+      var W = 960, pad = 28;
+      var perRow = 5, cardW = 160, cardH = 140, gapX = 12, gapY = 16;
+
+      // Split into slides if > 20
+      var maxPerSlide = 20;
+      var totalCards = cards.length;
+      var slideCount = Math.ceil(totalCards / maxPerSlide);
+
+      for (var si = 0; si < slideCount; si++) {
+        var startIdx = si * maxPerSlide;
+        var endIdx = Math.min(startIdx + maxPerSlide, totalCards);
+        var slideCards = Array.from(cards).slice(startIdx, endIdx);
+        var rows = Math.ceil(slideCards.length / perRow);
+        var titleH = 36;
+        var gridH = rows * (cardH + gapY);
+        var legendH = 28;
+        var totalH = pad + titleH + gridH + legendH + pad;
+
+        var svg = document.createElementNS(ns, "svg");
+        svg.setAttribute("xmlns", ns);
+        svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
+        svg.setAttribute("style", "font-family:" + font + ";");
+
+        // White bg
+        var bg = document.createElementNS(ns, "rect");
+        bg.setAttribute("width", W); bg.setAttribute("height", totalH);
+        bg.setAttribute("fill", "#ffffff");
+        svg.appendChild(bg);
+
+        // Title
+        var title = document.createElementNS(ns, "text");
+        var sectionTitle = section.querySelector(".dash-section-title");
+        var titleText = sectionTitle ? sectionTitle.textContent.replace("Export Slide", "").trim() : sectionId;
+        if (slideCount > 1) titleText += " (" + (si + 1) + " of " + slideCount + ")";
+        title.setAttribute("x", pad); title.setAttribute("y", pad + 20);
+        title.setAttribute("fill", "#1a2744"); title.setAttribute("font-size", "18");
+        title.setAttribute("font-weight", "700");
+        title.textContent = titleText;
+        svg.appendChild(title);
+
+        // Gauge cards
+        var gridStartX = (W - (perRow * cardW + (perRow - 1) * gapX)) / 2;
+        slideCards.forEach(function(card, ci) {
+          var col = ci % perRow;
+          var row = Math.floor(ci / perRow);
+          var cx = gridStartX + col * (cardW + gapX);
+          var cy = pad + titleH + row * (cardH + gapY);
+
+          // Card bg
+          var cardBg = document.createElementNS(ns, "rect");
+          cardBg.setAttribute("x", cx); cardBg.setAttribute("y", cy);
+          cardBg.setAttribute("width", cardW); cardBg.setAttribute("height", cardH);
+          cardBg.setAttribute("rx", "6"); cardBg.setAttribute("fill", "#f8fafc");
+          cardBg.setAttribute("stroke", "#e2e8f0"); cardBg.setAttribute("stroke-width", "1");
+          svg.appendChild(cardBg);
+
+          // Clone the SVG gauge from the card
+          var gaugeEl = card.querySelector("svg");
+          if (gaugeEl) {
+            var gc = gaugeEl.cloneNode(true);
+            var gg = document.createElementNS(ns, "g");
+            var gScale = 0.7;
+            gg.setAttribute("transform", "translate(" + (cx + cardW/2 - 56) + "," + (cy + 8) + ") scale(" + gScale + ")");
+            while (gc.firstChild) gg.appendChild(gc.firstChild);
+            svg.appendChild(gg);
+          }
+
+          // Value text
+          var val = card.getAttribute("data-value") || "";
+          var valText = document.createElementNS(ns, "text");
+          valText.setAttribute("x", cx + cardW/2); valText.setAttribute("y", cy + 82);
+          valText.setAttribute("text-anchor", "middle"); valText.setAttribute("fill", "#1a2744");
+          valText.setAttribute("font-size", "14"); valText.setAttribute("font-weight", "700");
+          valText.textContent = val;
+          svg.appendChild(valText);
+
+          // Q code
+          var qCode = card.getAttribute("data-q-code") || "";
+          var qcText = document.createElementNS(ns, "text");
+          qcText.setAttribute("x", cx + cardW/2); qcText.setAttribute("y", cy + 98);
+          qcText.setAttribute("text-anchor", "middle"); qcText.setAttribute("fill", "#0d8a8a");
+          qcText.setAttribute("font-size", "9"); qcText.setAttribute("font-weight", "700");
+          qcText.textContent = qCode;
+          svg.appendChild(qcText);
+
+          // Question text (truncate to fit)
+          var qText = card.getAttribute("data-q-text") || "";
+          if (qText.length > 50) qText = qText.substring(0, 47) + "...";
+          // Split into 2 lines if long
+          var lines = [];
+          if (qText.length > 25) {
+            var mid = Math.floor(qText.length / 2);
+            var sp = qText.indexOf(" ", mid);
+            if (sp === -1) sp = mid;
+            lines = [qText.substring(0, sp), qText.substring(sp + 1)];
+          } else {
+            lines = [qText];
+          }
+          lines.forEach(function(line, li) {
+            var lt = document.createElementNS(ns, "text");
+            lt.setAttribute("x", cx + cardW/2); lt.setAttribute("y", cy + 112 + li * 12);
+            lt.setAttribute("text-anchor", "middle"); lt.setAttribute("fill", "#64748b");
+            lt.setAttribute("font-size", "8");
+            lt.textContent = line;
+            svg.appendChild(lt);
+          });
+        });
+
+        // Render to PNG
+        var scale = 3;
+        var svgData = new XMLSerializer().serializeToString(svg);
+        var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+        var url = URL.createObjectURL(svgBlob);
+        var img = new Image();
+        img.onload = (function(slideIdx, svgW, svgH, blobUrl) {
+          return function() {
+            var canvas = document.createElement("canvas");
+            canvas.width = svgW * scale; canvas.height = svgH * scale;
+            var ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            URL.revokeObjectURL(blobUrl);
+            canvas.toBlob(function(blob) {
+              var suffix = slideCount > 1 ? "_" + (slideIdx + 1) : "";
+              var a = document.createElement("a");
+              a.href = URL.createObjectURL(blob);
+              a.download = sectionId + "_dashboard" + suffix + ".png";
+              document.body.appendChild(a); a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(a.href);
+            }, "image/png");
+          };
+        })(si, W, totalH, url);
+        img.src = url;
+      }
+    }
+  '
+  htmltools::tags$script(htmltools::HTML(js))
+}
+
+
 # ==============================================================================
 # COMPONENT: SIGNIFICANT FINDINGS
 # ==============================================================================
@@ -957,7 +1154,12 @@ build_dashboard_css <- function(brand_colour) {
     .dash-gauge-card {
       background: #fff; border-radius: 8px; border: 1px solid #e2e8f0;
       padding: 16px; min-width: 220px; flex: 1; max-width: 320px;
-      text-align: center;
+      text-align: center; cursor: pointer; transition: all 0.2s;
+    }
+    .dash-gauge-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .dash-gauge-card.dash-gauge-excluded {
+      opacity: 0.3; filter: grayscale(1);
+      border-style: dashed;
     }
     .dash-gauge-label {
       font-size: 12px; color: #1e293b; margin-top: 8px; line-height: 1.4;
