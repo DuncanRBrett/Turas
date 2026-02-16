@@ -289,23 +289,31 @@ build_horizontal_bars_svg <- function(items, brand_colour = "#0d8a8a",
     pct_text <- sprintf("%g%%", round(val))
     bar_w <- max((val / max_val) * bar_area_width, 2)
 
+    # Wrap each bar in a <g> with data attributes for JS sort
+    svg_parts <- c(svg_parts, sprintf(
+      '<g class="chart-bar-group" data-bar-label="%s" data-bar-value="%g" data-bar-index="%d" transform="translate(0,%g)">',
+      htmltools::htmlEscape(label), val, i - 1L, y
+    ))
+
     # Category label (right-aligned in label area)
     svg_parts <- c(svg_parts, sprintf(
       '<text x="%d" y="%g" text-anchor="end" dominant-baseline="central" fill="#374151" font-size="11" font-weight="500">%s</text>',
-      label_width - 8, y + bar_height / 2, htmltools::htmlEscape(label)
+      label_width - 8, bar_height / 2, htmltools::htmlEscape(label)
     ))
 
     # Bar
     svg_parts <- c(svg_parts, sprintf(
-      '<rect x="%d" y="%g" width="%g" height="%d" rx="3" fill="%s" opacity="0.85"/>',
-      label_width, y, bar_w, bar_height, brand_colour
+      '<rect x="%d" y="0" width="%g" height="%d" rx="3" fill="%s" opacity="0.85"/>',
+      label_width, bar_w, bar_height, brand_colour
     ))
 
     # Value label (right of bar)
     svg_parts <- c(svg_parts, sprintf(
       '<text x="%g" y="%g" dominant-baseline="central" fill="#64748b" font-size="11" font-weight="600">%s</text>',
-      label_width + bar_w + 8, y + bar_height / 2, pct_text
+      label_width + bar_w + 8, bar_height / 2, pct_text
     ))
+
+    svg_parts <- c(svg_parts, '</g>')
   }
 
   svg_parts <- c(svg_parts, '</svg>')

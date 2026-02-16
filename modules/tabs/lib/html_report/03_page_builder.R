@@ -496,6 +496,39 @@ build_css <- function(brand_colour) {
       display: block;
       margin: 0 auto;
     }
+    .chart-bar-group { transition: transform 0.3s ease; }
+
+    /* Column toggle chip bar */
+    .col-chip-bar {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 12px; background: #fff;
+      border: 1px solid #e2e8f0; border-radius: 6px;
+      margin-bottom: 12px; flex-wrap: wrap;
+    }
+    .col-chip-label {
+      font-size: 11px; font-weight: 600; color: #64748b; margin-right: 4px;
+    }
+    .col-chip {
+      padding: 4px 10px; border: 1px solid #e2e8f0; border-radius: 16px;
+      background: #f0fafa; color: #1e293b; font-size: 11px; font-weight: 500;
+      cursor: pointer; font-family: inherit; transition: all 0.12s;
+    }
+    .col-chip:hover { border-color: BRAND; }
+    .col-chip-off {
+      background: #f1f5f9; color: #94a3b8;
+      text-decoration: line-through; opacity: 0.6;
+    }
+    .col-chip-off:hover { opacity: 0.8; }
+
+    /* Column sort indicators */
+    .ct-sort-indicator {
+      font-size: 10px; color: #94a3b8; margin-left: 2px;
+    }
+    .ct-sort-indicator.ct-sort-active {
+      color: BRAND; font-weight: 700;
+    }
+    th.ct-data-col[data-col-key] { cursor: pointer; user-select: none; }
+    th.ct-data-col[data-col-key]:hover { background: #eef2f7; }
   '
 
   # Replace BRAND placeholder with actual brand colour
@@ -514,7 +547,7 @@ build_print_css <- function() {
     @media print {
       .sidebar, .controls-bar, .banner-tabs, .table-actions,
       .export-btn, .export-chart-btn, .search-box, .toggle-label,
-      .print-btn { display: none !important; }
+      .print-btn, .col-chip-bar, .ct-sort-indicator { display: none !important; }
       .main-layout { display: block !important; padding: 0 !important; }
       .content-area { width: 100% !important; }
       .question-container { display: block !important; page-break-inside: avoid; margin-bottom: 24px; page-break-after: always; }
@@ -886,6 +919,9 @@ build_javascript <- function(html_data) {
     var bannerGroups = BANNER_GROUPS_JSON;
     var currentGroup = bannerGroups[0] || "";
     var heatmapEnabled = true;
+    var hiddenColumns = {};
+    var sortState = {};
+    var originalRowOrder = {};
 
     // Question navigation
     function selectQuestion(index) {
@@ -936,6 +972,35 @@ build_javascript <- function(html_data) {
           col.style.display = (code === groupCode) ? "" : "none";
         });
       });
+
+      // Reset sort when switching banner groups
+      sortState = {};
+      document.querySelectorAll(".ct-sort-indicator").forEach(function(ind) {
+        ind.textContent = " ⇅";
+        ind.classList.remove("ct-sort-active");
+      });
+      Object.keys(originalRowOrder).forEach(function(tableId) {
+        var table = document.getElementById(tableId);
+        if (!table) return;
+        var tbody = table.querySelector("tbody");
+        if (!tbody) return;
+        originalRowOrder[tableId].forEach(function(row) {
+          tbody.appendChild(row);
+        });
+        sortChartBars(table, null);
+      });
+
+      // Build column toggle chips for this group
+      buildColumnChips(groupCode);
+
+      // Re-apply hidden columns for this group
+      if (hiddenColumns[groupCode]) {
+        Object.keys(hiddenColumns[groupCode]).forEach(function(colKey) {
+          document.querySelectorAll("th[data-col-key=\\"" + colKey + "\\"], td[data-col-key=\\"" + colKey + "\\"]").forEach(function(el) {
+            el.style.display = "none";
+          });
+        });
+      }
     }
 
     // Heatmap toggle — reads data-heatmap attribute from cells
@@ -1225,12 +1290,260 @@ build_javascript <- function(html_data) {
       URL.revokeObjectURL(url);
     }
 
+    // ---- Column Toggle ----
+
+    function buildColumnChips(groupCode) {
+      var existing = document.getElementById("col-chip-bar");
+      if (existing) existing.remove();
+
+      var headers = document.querySelectorAll(
+        "th.ct-data-col.bg-" + groupCode + "[data-col-key]"
+      );
+      var seen = {};
+      var columns = [];
+      headers.forEach(function(th) {
+        var key = th.getAttribute("data-col-key");
+        if (!seen[key]) {
+          seen[key] = true;
+          var label = th.querySelector(".ct-header-text");
+          columns.push({ key: key, label: label ? label.textContent.trim() : key });
+        }
+      });
+
+      if (columns.length <= 1) return;
+
+      if (!hiddenColumns[groupCode]) hiddenColumns[groupCode] = {};
+
+      var bar = document.createElement("div");
+      bar.id = "col-chip-bar";
+      bar.className = "col-chip-bar";
+
+      var lbl = document.createElement("span");
+      lbl.className = "col-chip-label";
+      lbl.textContent = "Columns:";
+      bar.appendChild(lbl);
+
+      columns.forEach(function(col) {
+        var chip = document.createElement("button");
+        chip.className = "col-chip";
+        chip.setAttribute("data-col-key", col.key);
+        chip.textContent = col.label;
+        if (hiddenColumns[groupCode][col.key]) chip.classList.add("col-chip-off");
+        chip.onclick = function() { toggleColumn(groupCode, col.key, chip); };
+        bar.appendChild(chip);
+      });
+
+      var bannerTabs = document.querySelector(".banner-tabs");
+      if (bannerTabs) {
+        bannerTabs.parentNode.insertBefore(bar, bannerTabs.nextSibling);
+      }
+    }
+
+    function toggleColumn(groupCode, colKey, chipEl) {
+      if (!hiddenColumns[groupCode]) hiddenColumns[groupCode] = {};
+      var isHidden = !!hiddenColumns[groupCode][colKey];
+
+      if (isHidden) {
+        delete hiddenColumns[groupCode][colKey];
+        chipEl.classList.remove("col-chip-off");
+        document.querySelectorAll("th[data-col-key=\\"" + colKey + "\\"], td[data-col-key=\\"" + colKey + "\\"]").forEach(function(el) {
+          el.style.display = "";
+        });
+      } else {
+        hiddenColumns[groupCode][colKey] = true;
+        chipEl.classList.add("col-chip-off");
+        document.querySelectorAll("th[data-col-key=\\"" + colKey + "\\"], td[data-col-key=\\"" + colKey + "\\"]").forEach(function(el) {
+          el.style.display = "none";
+        });
+      }
+    }
+
+    // ---- Column Sort ----
+
+    function initSortHeaders() {
+      document.querySelectorAll("th.ct-data-col[data-col-key]").forEach(function(th) {
+        var indicator = document.createElement("span");
+        indicator.className = "ct-sort-indicator";
+        indicator.textContent = " ⇅";
+        th.appendChild(indicator);
+
+        th.addEventListener("click", function() {
+          var table = th.closest("table.ct-table");
+          if (!table) return;
+          sortByColumn(table, th.getAttribute("data-col-key"), th);
+        });
+      });
+    }
+
+    function sortByColumn(table, colKey, clickedTh) {
+      var tbody = table.querySelector("tbody");
+      if (!tbody) return;
+      var tableId = table.id;
+
+      if (!originalRowOrder[tableId]) {
+        originalRowOrder[tableId] = Array.from(tbody.querySelectorAll("tr"));
+      }
+
+      if (!sortState[tableId]) sortState[tableId] = { colKey: null, direction: "none" };
+      var state = sortState[tableId];
+      var newDir;
+      if (state.colKey !== colKey) {
+        newDir = "desc";
+      } else if (state.direction === "desc") {
+        newDir = "asc";
+      } else if (state.direction === "asc") {
+        newDir = "none";
+      } else {
+        newDir = "desc";
+      }
+      state.colKey = colKey;
+      state.direction = newDir;
+
+      // Reset all indicators in this table
+      table.querySelectorAll(".ct-sort-indicator").forEach(function(ind) {
+        ind.textContent = " ⇅";
+        ind.classList.remove("ct-sort-active");
+      });
+
+      var indicator = clickedTh.querySelector(".ct-sort-indicator");
+      if (indicator) {
+        if (newDir === "desc") {
+          indicator.textContent = " ↓";
+          indicator.classList.add("ct-sort-active");
+        } else if (newDir === "asc") {
+          indicator.textContent = " ↑";
+          indicator.classList.add("ct-sort-active");
+        }
+      }
+
+      if (newDir === "none") {
+        originalRowOrder[tableId].forEach(function(row) { tbody.appendChild(row); });
+        sortChartBars(table, null);
+        return;
+      }
+
+      // Separate sortable (category, not net) vs pinned rows
+      var allRows = Array.from(tbody.querySelectorAll("tr"));
+      var sortable = [];
+      var pinnedPositions = {};
+
+      allRows.forEach(function(row, idx) {
+        if (row.classList.contains("ct-row-category") &&
+            !row.classList.contains("ct-row-net")) {
+          sortable.push({ row: row, origIdx: idx });
+        } else {
+          pinnedPositions[idx] = row;
+        }
+      });
+
+      // Get sort values
+      sortable.forEach(function(item) {
+        var cell = item.row.querySelector("td[data-col-key=\\"" + colKey + "\\"]");
+        var raw = cell ? cell.getAttribute("data-sort-val") : null;
+        var val = raw !== null ? parseFloat(raw) : NaN;
+        item.sortVal = isNaN(val) ? null : val;
+      });
+
+      // Stable sort with null always last
+      sortable.sort(function(a, b) {
+        if (a.sortVal === null && b.sortVal === null) return a.origIdx - b.origIdx;
+        if (a.sortVal === null) return 1;
+        if (b.sortVal === null) return -1;
+        var diff = (newDir === "desc") ? b.sortVal - a.sortVal : a.sortVal - b.sortVal;
+        return diff !== 0 ? diff : a.origIdx - b.origIdx;
+      });
+
+      // Rebuild: pinned rows at original positions, sorted rows fill gaps
+      var result = new Array(allRows.length);
+      var keys = Object.keys(pinnedPositions);
+      for (var k = 0; k < keys.length; k++) {
+        result[parseInt(keys[k])] = pinnedPositions[keys[k]];
+      }
+      var si = 0;
+      for (var i = 0; i < result.length; i++) {
+        if (!result[i]) {
+          result[i] = sortable[si].row;
+          si++;
+        }
+      }
+
+      result.forEach(function(row) { tbody.appendChild(row); });
+
+      // Sort chart bars to match table sort order
+      var sortedLabels = sortable.map(function(item) {
+        var labelCell = item.row.querySelector("td.ct-label-col");
+        return labelCell ? labelCell.textContent.trim() : "";
+      });
+      sortChartBars(table, sortedLabels);
+    }
+
+    // Reorder horizontal bar chart to match table sort
+    function sortChartBars(table, sortedLabels) {
+      var container = table.closest(".question-container");
+      if (!container) return;
+      var svg = container.querySelector(".chart-wrapper svg");
+      if (!svg) return;
+      var barGroups = svg.querySelectorAll("g.chart-bar-group");
+      if (barGroups.length === 0) return;
+
+      // Read bar spacing from first two groups in current DOM order
+      // (positions are always recalculated, so DOM-first = visual-first)
+      var groups = Array.from(barGroups);
+      if (groups.length < 2) return;
+      var getY = function(g) {
+        var t = g.getAttribute("transform");
+        return parseFloat(t.replace(/[^\\d.\\-]/g, " ").trim().split(/\\s+/)[1] || "0");
+      };
+      var y0 = getY(groups[0]);
+      var y1 = getY(groups[1]);
+      var barStep = y1 - y0;
+
+      if (sortedLabels === null) {
+        // Reset to original order using data-bar-index
+        groups.sort(function(a, b) {
+          return parseInt(a.getAttribute("data-bar-index")) - parseInt(b.getAttribute("data-bar-index"));
+        });
+        groups.forEach(function(g, i) {
+          g.setAttribute("transform", "translate(0," + (y0 + i * barStep) + ")");
+          svg.appendChild(g);
+        });
+        return;
+      }
+
+      // Build label → group map
+      var labelMap = {};
+      groups.forEach(function(g) {
+        var label = g.getAttribute("data-bar-label");
+        if (label) labelMap[label] = g;
+      });
+
+      // Reorder: sorted labels first, then any unmatched groups keep position
+      var ordered = [];
+      sortedLabels.forEach(function(label) {
+        if (labelMap[label]) {
+          ordered.push(labelMap[label]);
+          delete labelMap[label];
+        }
+      });
+      // Append any remaining unmatched groups
+      Object.keys(labelMap).forEach(function(key) {
+        ordered.push(labelMap[key]);
+      });
+
+      // Apply new positions
+      ordered.forEach(function(g, i) {
+        g.setAttribute("transform", "translate(0," + (y0 + i * barStep) + ")");
+        svg.appendChild(g);
+      });
+    }
+
     // Initialize on DOM ready
     document.addEventListener("DOMContentLoaded", function() {
       if (bannerGroups.length > 0) {
         switchBannerGroup(bannerGroups[0], null);
       }
       toggleHeatmap(true);
+      initSortHeaders();
     });
   '
 

@@ -90,8 +90,9 @@ build_question_table <- function(question_data, banner_groups, config_obj,
     }
 
     header_cells <- paste0(header_cells, sprintf(
-      '<th class="ct-th ct-data-col %s"%s><div class="ct-header-text">%s</div>%s</th>',
+      '<th class="ct-th ct-data-col %s" data-col-key="%s"%s><div class="ct-header-text">%s</div>%s</th>',
       css_class,
+      htmltools::htmlEscape(key),
       if (is_total) ' style="color:#d4a843"' else "",
       htmltools::htmlEscape(display),
       letter_html
@@ -254,9 +255,16 @@ build_question_table <- function(question_data, banner_groups, config_obj,
         }
       }
 
+      # Sort value attribute (category rows only, not NET/base/mean)
+      sort_attr <- ""
+      if (row_type == "category" && !is_net && !is.na(val_num)) {
+        sort_attr <- sprintf(' data-sort-val="%s"', val_num)
+      }
+
       cells <- paste0(cells, sprintf(
-        '<td class="ct-td ct-data-col %s%s"%s>%s</td>',
-        css_class, cell_extra_class, cell_style, cell_content))
+        '<td class="ct-td ct-data-col %s%s" data-col-key="%s"%s%s>%s</td>',
+        css_class, cell_extra_class, htmltools::htmlEscape(key),
+        sort_attr, cell_style, cell_content))
     }
 
     data_rows <- paste0(data_rows, sprintf(
