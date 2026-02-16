@@ -831,10 +831,8 @@ build_dashboard_interaction_js <- function() {
 
       var ns = "http://www.w3.org/2000/svg";
       var font = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
-      var W = 960, pad = 28;
-      var perRow = 5, cardW = 160, cardH = 140, gapX = 12, gapY = 16;
-
-      // Split into slides if > 20
+      var W = 1000, pad = 30;
+      var perRow = 5, cardW = 170, cardH = 150, gapX = 14, gapY = 18;
       var maxPerSlide = 20;
       var totalCards = cards.length;
       var slideCount = Math.ceil(totalCards / maxPerSlide);
@@ -844,10 +842,9 @@ build_dashboard_interaction_js <- function() {
         var endIdx = Math.min(startIdx + maxPerSlide, totalCards);
         var slideCards = Array.from(cards).slice(startIdx, endIdx);
         var rows = Math.ceil(slideCards.length / perRow);
-        var titleH = 36;
+        var titleH = 40;
         var gridH = rows * (cardH + gapY);
-        var legendH = 28;
-        var totalH = pad + titleH + gridH + legendH + pad;
+        var totalH = pad + titleH + gridH + pad;
 
         var svg = document.createElementNS(ns, "svg");
         svg.setAttribute("xmlns", ns);
@@ -860,86 +857,124 @@ build_dashboard_interaction_js <- function() {
         bg.setAttribute("fill", "#ffffff");
         svg.appendChild(bg);
 
-        // Title
+        // Title bar with accent line
+        var accent = document.createElementNS(ns, "rect");
+        accent.setAttribute("x", pad); accent.setAttribute("y", pad);
+        accent.setAttribute("width", "4"); accent.setAttribute("height", "22");
+        accent.setAttribute("rx", "2"); accent.setAttribute("fill", "#0d8a8a");
+        svg.appendChild(accent);
+
         var title = document.createElementNS(ns, "text");
         var sectionTitle = section.querySelector(".dash-section-title");
         var titleText = sectionTitle ? sectionTitle.textContent.replace("Export Slide", "").trim() : sectionId;
         if (slideCount > 1) titleText += " (" + (si + 1) + " of " + slideCount + ")";
-        title.setAttribute("x", pad); title.setAttribute("y", pad + 20);
-        title.setAttribute("fill", "#1a2744"); title.setAttribute("font-size", "18");
+        title.setAttribute("x", pad + 12); title.setAttribute("y", pad + 17);
+        title.setAttribute("fill", "#1a2744"); title.setAttribute("font-size", "16");
         title.setAttribute("font-weight", "700");
         title.textContent = titleText;
         svg.appendChild(title);
 
-        // Gauge cards
+        // Gauge cards -- built from scratch, no cloning
         var gridStartX = (W - (perRow * cardW + (perRow - 1) * gapX)) / 2;
         slideCards.forEach(function(card, ci) {
           var col = ci % perRow;
           var row = Math.floor(ci / perRow);
           var cx = gridStartX + col * (cardW + gapX);
           var cy = pad + titleH + row * (cardH + gapY);
+          var midX = cx + cardW / 2;
 
-          // Card bg
+          // Card background
           var cardBg = document.createElementNS(ns, "rect");
           cardBg.setAttribute("x", cx); cardBg.setAttribute("y", cy);
           cardBg.setAttribute("width", cardW); cardBg.setAttribute("height", cardH);
-          cardBg.setAttribute("rx", "6"); cardBg.setAttribute("fill", "#f8fafc");
+          cardBg.setAttribute("rx", "8"); cardBg.setAttribute("fill", "#f8fafc");
           cardBg.setAttribute("stroke", "#e2e8f0"); cardBg.setAttribute("stroke-width", "1");
           svg.appendChild(cardBg);
 
-          // Clone the SVG gauge from the card
+          // Extract gauge colour and fill from the existing card SVG
+          var gaugeColour = "#059669";
+          var fillFrac = 0.5;
           var gaugeEl = card.querySelector("svg");
           if (gaugeEl) {
-            var gc = gaugeEl.cloneNode(true);
-            var gg = document.createElementNS(ns, "g");
-            var gScale = 0.7;
-            gg.setAttribute("transform", "translate(" + (cx + cardW/2 - 56) + "," + (cy + 8) + ") scale(" + gScale + ")");
-            while (gc.firstChild) gg.appendChild(gc.firstChild);
-            svg.appendChild(gg);
+            var paths = gaugeEl.querySelectorAll("path");
+            if (paths.length >= 2) {
+              gaugeColour = paths[1].getAttribute("stroke") || gaugeColour;
+              var da = paths[1].getAttribute("stroke-dasharray") || "";
+              var daParts = da.split(/[\\s,]+/);
+              if (daParts.length >= 1) {
+                var fillLen = parseFloat(daParts[0]) || 0;
+                fillFrac = Math.min(fillLen / 251.33, 1);
+              }
+            }
           }
 
-          // Value text
+          // Draw mini gauge arc (radius 40, centered in upper card area)
+          var gr = 40, gStroke = 8;
+          var gCx = midX, gCy = cy + 58;
+          var arcLen = Math.PI * gr;
+          var fillDash = (fillFrac * arcLen).toFixed(1);
+          var gapDash = (arcLen - fillFrac * arcLen + 1).toFixed(1);
+
+          // Background arc (grey)
+          var bgArc = document.createElementNS(ns, "path");
+          var arcD = "M " + (gCx - gr) + " " + gCy + " A " + gr + " " + gr + " 0 0 1 " + (gCx + gr) + " " + gCy;
+          bgArc.setAttribute("d", arcD); bgArc.setAttribute("fill", "none");
+          bgArc.setAttribute("stroke", "#e2e8f0"); bgArc.setAttribute("stroke-width", gStroke);
+          bgArc.setAttribute("stroke-linecap", "round");
+          svg.appendChild(bgArc);
+
+          // Coloured arc
+          var fgArc = document.createElementNS(ns, "path");
+          fgArc.setAttribute("d", arcD); fgArc.setAttribute("fill", "none");
+          fgArc.setAttribute("stroke", gaugeColour); fgArc.setAttribute("stroke-width", gStroke);
+          fgArc.setAttribute("stroke-linecap", "round");
+          fgArc.setAttribute("stroke-dasharray", fillDash + " " + gapDash);
+          svg.appendChild(fgArc);
+
+          // Value text (bold, centred below arc)
           var val = card.getAttribute("data-value") || "";
-          var valText = document.createElementNS(ns, "text");
-          valText.setAttribute("x", cx + cardW/2); valText.setAttribute("y", cy + 82);
-          valText.setAttribute("text-anchor", "middle"); valText.setAttribute("fill", "#1a2744");
-          valText.setAttribute("font-size", "14"); valText.setAttribute("font-weight", "700");
-          valText.textContent = val;
-          svg.appendChild(valText);
+          var valEl = document.createElementNS(ns, "text");
+          valEl.setAttribute("x", midX); valEl.setAttribute("y", gCy - 6);
+          valEl.setAttribute("text-anchor", "middle"); valEl.setAttribute("fill", gaugeColour);
+          valEl.setAttribute("font-size", "16"); valEl.setAttribute("font-weight", "700");
+          valEl.textContent = val;
+          svg.appendChild(valEl);
 
-          // Q code
+          // Q code (small, teal)
           var qCode = card.getAttribute("data-q-code") || "";
-          var qcText = document.createElementNS(ns, "text");
-          qcText.setAttribute("x", cx + cardW/2); qcText.setAttribute("y", cy + 98);
-          qcText.setAttribute("text-anchor", "middle"); qcText.setAttribute("fill", "#0d8a8a");
-          qcText.setAttribute("font-size", "9"); qcText.setAttribute("font-weight", "700");
-          qcText.textContent = qCode;
-          svg.appendChild(qcText);
+          var qcEl = document.createElementNS(ns, "text");
+          qcEl.setAttribute("x", midX); qcEl.setAttribute("y", gCy + 16);
+          qcEl.setAttribute("text-anchor", "middle"); qcEl.setAttribute("fill", "#0d8a8a");
+          qcEl.setAttribute("font-size", "10"); qcEl.setAttribute("font-weight", "700");
+          qcEl.textContent = qCode;
+          svg.appendChild(qcEl);
 
-          // Question text (truncate to fit)
+          // Question text (2 lines max, truncated)
           var qText = card.getAttribute("data-q-text") || "";
-          if (qText.length > 50) qText = qText.substring(0, 47) + "...";
-          // Split into 2 lines if long
-          var lines = [];
-          if (qText.length > 25) {
-            var mid = Math.floor(qText.length / 2);
-            var sp = qText.indexOf(" ", mid);
-            if (sp === -1) sp = mid;
-            lines = [qText.substring(0, sp), qText.substring(sp + 1)];
+          if (qText.length > 55) qText = qText.substring(0, 52) + "...";
+          var tLines = [];
+          if (qText.length > 28) {
+            var tMid = Math.floor(qText.length / 2);
+            var tSp = qText.indexOf(" ", tMid);
+            if (tSp === -1) tSp = qText.lastIndexOf(" ", tMid);
+            if (tSp === -1) tSp = tMid;
+            tLines = [qText.substring(0, tSp), qText.substring(tSp + 1)];
           } else {
-            lines = [qText];
+            tLines = [qText];
           }
-          lines.forEach(function(line, li) {
-            var lt = document.createElementNS(ns, "text");
-            lt.setAttribute("x", cx + cardW/2); lt.setAttribute("y", cy + 112 + li * 12);
-            lt.setAttribute("text-anchor", "middle"); lt.setAttribute("fill", "#64748b");
-            lt.setAttribute("font-size", "8");
-            lt.textContent = line;
-            svg.appendChild(lt);
+          tLines.forEach(function(tLine, tli) {
+            var tEl = document.createElementNS(ns, "text");
+            tEl.setAttribute("x", midX);
+            tEl.setAttribute("y", gCy + 30 + tli * 11);
+            tEl.setAttribute("text-anchor", "middle");
+            tEl.setAttribute("fill", "#64748b");
+            tEl.setAttribute("font-size", "8.5");
+            tEl.textContent = tLine;
+            svg.appendChild(tEl);
           });
         });
 
-        // Render to PNG
+        // Render to PNG at 3x
         var scale = 3;
         var svgData = new XMLSerializer().serializeToString(svg);
         var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
