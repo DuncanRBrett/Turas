@@ -318,6 +318,7 @@ build_config_object <- function(settings) {
     company_name = get_config_value(settings, "company_name", "The Research Lamppost"),
     client_name = get_config_value(settings, "client_name", NULL),
     logo_path = get_config_value(settings, "logo_path", NULL),
+    chart_bar_colour = get_config_value(settings, "chart_bar_colour", "#323367"),
     embed_frequencies = safe_logical(get_config_value(settings, "embed_frequencies", TRUE)),
 
     # V10.4 Summary Dashboard settings

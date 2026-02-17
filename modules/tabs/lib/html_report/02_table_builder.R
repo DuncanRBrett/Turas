@@ -171,8 +171,14 @@ build_question_table <- function(question_data, banner_groups, config_obj,
         }
 
       } else if (row_type == "mean") {
-        # Mean/summary row
-        cell_content <- sprintf('<span class="ct-mean-val">%s</span>', val)
+        # Mean/summary row — always show decimal places (e.g., 9.0 not 9)
+        decimal_places <- config_obj$decimal_places_ratings %||% 1
+        display_val <- if (!is.na(val_num)) {
+          sprintf(paste0("%.", decimal_places, "f"), val_num)
+        } else {
+          val
+        }
+        cell_content <- sprintf('<span class="ct-mean-val">%s</span>', display_val)
 
         # Heatmap for mean/index/average rows — relative within the row
         if (!is.na(val_num)) {

@@ -322,6 +322,33 @@ load_crosstabs_config <- function(config_file) {
   # Load optional Comments sheet (V10.6.0)
   config_obj$comments <- load_comments_sheet(config_file)
 
+  # Resolve logo_path against project root so HTML report gets an absolute path
+  if (!is.null(config_obj$logo_path) && nzchar(config_obj$logo_path)) {
+    logo_raw <- config_obj$logo_path
+    if (!file.exists(logo_raw)) {
+      # Try relative to project root, then config file directory
+      candidates <- c(
+        file.path(project_root, logo_raw),
+        file.path(dirname(config_file), logo_raw),
+        file.path(project_root, basename(logo_raw)),
+        file.path(dirname(config_file), basename(logo_raw))
+      )
+      for (cand in candidates) {
+        if (file.exists(cand)) {
+          config_obj$logo_path <- normalizePath(cand)
+          cat(sprintf("  Logo: resolved to %s\n", config_obj$logo_path))
+          break
+        }
+      }
+    } else {
+      config_obj$logo_path <- normalizePath(logo_raw)
+    }
+    if (!file.exists(config_obj$logo_path)) {
+      cat(sprintf("  [WARNING] Logo file not found: %s\n", logo_raw))
+      cat(sprintf("  Searched in: %s, %s\n", project_root, dirname(config_file)))
+    }
+  }
+
   # Build output path
   output_path <- get_output_path(
     project_root,

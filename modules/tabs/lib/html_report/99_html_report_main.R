@@ -260,6 +260,24 @@ generate_html_report <- function(all_results, banner_info, config_obj, output_pa
   logo_data_uri <- NULL
   if (!is.null(config_obj$logo_path) && nzchar(config_obj$logo_path)) {
     logo_file <- config_obj$logo_path
+
+    # Resolve logo path: try as-is, then relative to output dir, then working dir
+    if (!file.exists(logo_file)) {
+      candidates <- c(
+        file.path(dirname(output_path), logo_file),
+        file.path(dirname(output_path), "..", logo_file),
+        file.path(getwd(), logo_file),
+        file.path(getwd(), basename(logo_file))
+      )
+      for (cand in candidates) {
+        if (file.exists(cand)) {
+          logo_file <- normalizePath(cand)
+          cat(sprintf("    Logo: resolved to %s\n", logo_file))
+          break
+        }
+      }
+    }
+
     if (file.exists(logo_file)) {
       ext <- tolower(tools::file_ext(logo_file))
       if (ext == "svg") {

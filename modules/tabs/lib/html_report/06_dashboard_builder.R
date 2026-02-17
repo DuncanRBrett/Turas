@@ -928,18 +928,26 @@ build_dashboard_interaction_js <- function() {
           qcEl.textContent = qCode;
           svg.appendChild(qcEl);
 
-          // Question text (2 lines max, truncated)
+          // Question text (multi-line wrapping, no truncation)
           var qText = card.getAttribute("data-q-text") || "";
-          if (qText.length > 55) qText = qText.substring(0, 52) + "...";
+          var maxCharsPerLine = Math.floor((cardW - 12) / 5);
           var tLines = [];
-          if (qText.length > 28) {
-            var tMid = Math.floor(qText.length / 2);
-            var tSp = qText.indexOf(" ", tMid);
-            if (tSp === -1) tSp = qText.lastIndexOf(" ", tMid);
-            if (tSp === -1) tSp = tMid;
-            tLines = [qText.substring(0, tSp), qText.substring(tSp + 1)];
-          } else {
+          if (qText.length <= maxCharsPerLine) {
             tLines = [qText];
+          } else {
+            var words = qText.split(" ");
+            var current = "";
+            for (var wi = 0; wi < words.length; wi++) {
+              var test = current ? current + " " + words[wi] : words[wi];
+              if (test.length > maxCharsPerLine && current) {
+                tLines.push(current);
+                current = words[wi];
+              } else {
+                current = test;
+              }
+            }
+            if (current) tLines.push(current);
+            if (tLines.length > 4) tLines = tLines.slice(0, 4);
           }
           tLines.forEach(function(tLine, tli) {
             var tEl = document.createElementNS(ns, "text");

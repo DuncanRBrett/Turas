@@ -52,17 +52,17 @@ get_semantic_colour <- function(label, index = 1, n_total = 3, brand_colour = "#
     "dissatisfied"          = "#cf8a7c",
     "disagree"              = "#cf8a7c",
 
-    # Neutral / middle (soft warm grey)
-    "neutral"               = "#d5cfc7",
-    "average"               = "#d5cfc7",
-    "average (4-6)"         = "#d5cfc7",
-    "undecided"             = "#d5cfc7",
-    "passive (7-8)"         = "#d5cfc7",
-    "passive"               = "#d5cfc7",
-    "some trust"            = "#d5cfc7",
-    "neither agree nor disagree" = "#d5cfc7",
-    "average satisfaction"  = "#d5cfc7",
-    "average satisfaction (6-8)" = "#d5cfc7",
+    # Neutral / middle (warm amber/gold — distinct from DK/NA grey)
+    "neutral"               = "#e8c170",
+    "average"               = "#e8c170",
+    "average (4-6)"         = "#e8c170",
+    "undecided"             = "#e8c170",
+    "passive (7-8)"         = "#e8c170",
+    "passive"               = "#e8c170",
+    "some trust"            = "#e8c170",
+    "neither agree nor disagree" = "#e8c170",
+    "average satisfaction"  = "#e8c170",
+    "average satisfaction (6-8)" = "#e8c170",
 
     # Moderate positive (muted green)
     "satisfied"             = "#68a67d",
@@ -83,16 +83,16 @@ get_semantic_colour <- function(label, index = 1, n_total = 3, brand_colour = "#
     "would not switch"      = "#3d8b5e",
     "strongly agree"        = "#3d8b5e",
 
-    # DK / NA / Not applicable (neutral grey — distinct from data categories)
-    "dk"                    = "#b8b8b8",
-    "na"                    = "#b8b8b8",
-    "dk/na"                 = "#b8b8b8",
-    "dk / na"               = "#b8b8b8",
-    "don't know"            = "#b8b8b8",
-    "not applicable"        = "#b8b8b8",
-    "n/a"                   = "#b8b8b8",
-    "refused"               = "#b8b8b8",
-    "prefer not to say"     = "#b8b8b8",
+    # DK / NA / Not applicable (light silver-grey — clearly distinct from amber neutral)
+    "dk"                    = "#d4d4d4",
+    "na"                    = "#d4d4d4",
+    "dk/na"                 = "#d4d4d4",
+    "dk / na"               = "#d4d4d4",
+    "don't know"            = "#d4d4d4",
+    "not applicable"        = "#d4d4d4",
+    "n/a"                   = "#d4d4d4",
+    "refused"               = "#d4d4d4",
+    "prefer not to say"     = "#d4d4d4",
     "other"                 = "#c5c0b8"
   )
 
@@ -439,6 +439,7 @@ build_question_chart <- function(question_data, options_df, config_obj) {
   q_type <- question_data$question_type %||% "Unknown"
   table_data <- question_data$table_data
   brand_colour <- config_obj$brand_colour %||% "#323367"
+  chart_bar_colour <- config_obj$chart_bar_colour %||% "#323367"
 
   # Skip composite metrics (they only have a summary row)
   if (q_type == "Composite") return(NULL)
@@ -523,7 +524,7 @@ build_question_chart <- function(question_data, options_df, config_obj) {
       chart_items, chart_id = gsub("[^a-zA-Z0-9]", "-", q_code)
     )
   } else {
-    svg_markup <- build_horizontal_bars_svg(chart_items, brand_colour)
+    svg_markup <- build_horizontal_bars_svg(chart_items, chart_bar_colour)
   }
 
   if (nchar(svg_markup) == 0) return(NULL)
@@ -533,6 +534,7 @@ build_question_chart <- function(question_data, options_df, config_obj) {
     chart_type = if (is_ordinal && nrow(chart_items) >= 2) "stacked" else "horizontal",
     labels = all_col_data$labels,
     brand_colour = brand_colour,
+    chart_bar_colour = chart_bar_colour,
     columns = all_col_data$columns
   )
 

@@ -51,6 +51,46 @@ build_html_page <- function(html_data, tables, config_obj,
       crosstab_content
     )
 
+    pinned_panel <- htmltools::tags$div(
+      id = "tab-pinned",
+      class = "tab-panel",
+      htmltools::tags$div(
+        class = "pinned-views-container",
+        style = "max-width:1400px;margin:0 auto;padding:20px 32px;",
+        htmltools::tags$div(
+          class = "pinned-header",
+          style = "display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;",
+          htmltools::tags$div(
+            htmltools::tags$h2(style = "font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;", "Pinned Views"),
+            htmltools::tags$p(style = "font-size:12px;color:#64748b;", "Pin questions from the Crosstabs tab to create a curated set of key findings.")
+          ),
+          htmltools::tags$div(
+            style = "display:flex;gap:8px;",
+            htmltools::tags$button(
+              class = "export-btn",
+              onclick = "exportAllPinnedSlides()",
+              "\U0001F4E4 Export All Slides"
+            ),
+            htmltools::tags$button(
+              class = "export-btn",
+              onclick = "printPinnedViews()",
+              "\U0001F5A8 Print / Save PDF"
+            )
+          )
+        ),
+        htmltools::tags$div(id = "pinned-cards-container"),
+        htmltools::tags$div(
+          id = "pinned-empty-state",
+          style = "text-align:center;padding:60px 20px;color:#94a3b8;",
+          htmltools::tags$div(style = "font-size:36px;margin-bottom:12px;", "\U0001F4CC"),
+          htmltools::tags$div(style = "font-size:14px;font-weight:600;", "No pinned views yet"),
+          htmltools::tags$div(style = "font-size:12px;margin-top:4px;",
+            "Click the pin icon on any question in the Crosstabs tab to add it here.")
+        ),
+        htmltools::tags$script(type = "application/json", id = "pinned-views-data", "[]")
+      )
+    )
+
     page <- htmltools::tagList(
       htmltools::tags$head(
         htmltools::tags$meta(charset = "UTF-8"),
@@ -67,6 +107,7 @@ build_html_page <- function(html_data, tables, config_obj,
       build_report_tab_nav(brand_colour),
       dashboard_html,
       crosstab_panel,
+      pinned_panel,
       build_help_overlay(),
       build_javascript(html_data),
       build_tab_javascript()
@@ -330,6 +371,7 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       transition: all 0.12s;
     }
     .export-btn:hover { background: #f8fafc; color: #1e293b; }
+    .slide-menu-item:hover { background: #f1f5f9; }
     .footer {
       margin-top: 16px;
       padding: 12px 16px;
@@ -636,7 +678,8 @@ build_print_css <- function() {
   htmltools::tags$style(htmltools::HTML('
     @media print {
       .sidebar, .controls-bar, .banner-tabs, .table-actions,
-      .export-btn, .export-chart-btn, .export-slide-btn, .search-box,
+      .export-btn, .export-chart-btn, .export-slide-btn, .slide-export-group,
+      .slide-menu, .search-box, .pin-btn,
       .toggle-label, .print-btn, .col-chip-bar, .ct-sort-indicator,
       .insight-toggle, .insight-dismiss,
       .chart-col-picker { display: none !important; }
@@ -654,6 +697,7 @@ build_print_css <- function() {
       .report-tabs { display: none !important; }
       .tab-panel { display: block !important; }
       #tab-summary { display: none !important; }
+      #tab-pinned { display: none !important; }
       .chart-wrapper { page-break-inside: avoid; }
       .ct-table { font-size: 11px !important; }
       .ct-th, .ct-td { padding: 4px 8px !important; }
@@ -686,6 +730,13 @@ build_report_tab_nav <- function(brand_colour) {
       onclick = "switchReportTab('crosstabs')",
       `data-tab` = "crosstabs",
       "\U0001F4CB Crosstabs"
+    ),
+    htmltools::tags$button(
+      class = "report-tab",
+      onclick = "switchReportTab('pinned')",
+      `data-tab` = "pinned",
+      "\U0001F4CC Pinned Views",
+      htmltools::tags$span(class = "pin-count-badge", id = "pin-count-badge", style = "display:none;margin-left:4px;background:#323367;color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;", "0")
     )
   )
 }
@@ -993,7 +1044,7 @@ build_controls <- function(has_any_freq, has_any_pct, has_any_sig,
 #' @keywords internal
 build_insight_area <- function(q_code, comment_entries = NULL,
                                first_banner = "") {
-  # Determine initial comment to show
+  # Determine initial comment to show for the first (active) banner
   initial_text <- NULL
   if (!is.null(comment_entries) && length(comment_entries) > 0) {
     # Try banner-specific first, then global
@@ -1014,11 +1065,32 @@ build_insight_area <- function(q_code, comment_entries = NULL,
   }
   has_comment <- !is.null(initial_text) && nzchar(trimws(initial_text))
 
-  # Embed all comments as JSON for banner switching
+  # Embed all comments as JSON for banner switching (config-provided defaults)
   comments_json <- if (!is.null(comment_entries) && length(comment_entries) > 0) {
     as.character(jsonlite::toJSON(comment_entries, auto_unbox = TRUE))
   } else {
     NULL
+  }
+
+  # Build the per-banner JSON store from config comment entries
+  # Format: { "Banner Name": "text", ... }
+  store_obj <- list()
+  if (!is.null(comment_entries) && length(comment_entries) > 0) {
+    for (entry in comment_entries) {
+      banner_key <- if (!is.null(entry$banner) && nzchar(entry$banner)) {
+        entry$banner
+      } else {
+        first_banner  # Global comments go under the first banner
+      }
+      if (nzchar(banner_key) && !is.null(entry$text) && nzchar(trimws(entry$text))) {
+        store_obj[[banner_key]] <- entry$text
+      }
+    }
+  }
+  store_json <- if (length(store_obj) > 0) {
+    as.character(jsonlite::toJSON(store_obj, auto_unbox = TRUE))
+  } else {
+    ""
   }
 
   htmltools::tags$div(
@@ -1057,12 +1129,12 @@ build_insight_area <- function(q_code, comment_entries = NULL,
         "\u00D7"
       )
     ),
-    # Hidden textarea to persist insight text on browser Save As
+    # Hidden textarea persists per-banner insights as JSON: { "banner": "text", ... }
     htmltools::tags$textarea(
       class = "insight-store",
       `data-q-code` = q_code,
       style = "display:none;",
-      if (has_comment) initial_text else ""
+      store_json
     )
   )
 }
@@ -1120,8 +1192,20 @@ build_question_containers <- function(questions, tables, banner_groups,
       htmltools::tags$div(
         class = "question-title-card",
         htmltools::tags$div(class = "question-title-row",
+          style = "display:flex;align-items:center;",
           htmltools::tags$span(class = "question-code", q_code),
-          htmltools::tags$span(class = "question-text", q_text)
+          htmltools::tags$span(class = "question-text", style = "flex:1;", q_text),
+          htmltools::tags$button(
+            class = "pin-btn",
+            `data-q-code` = q_code,
+            onclick = sprintf("togglePin('%s')", q_code),
+            title = "Pin this view",
+            style = paste0(
+              "background:none;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;",
+              "font-size:14px;padding:3px 8px;margin-left:8px;color:#94a3b8;transition:all 0.15s;"
+            ),
+            "\U0001F4CC"
+          )
         ),
         htmltools::tags$div(class = "question-meta",
           htmltools::HTML(sprintf("Banner: <strong class=\"banner-name-label\">%s</strong> &middot; Showing %s",
@@ -1160,11 +1244,37 @@ build_question_containers <- function(questions, tables, banner_groups,
           )
         },
         if (has_chart) {
-          htmltools::tags$button(
-            class = "export-btn export-slide-btn",
-            style = "margin-left:8px;display:none",
-            onclick = sprintf("exportSlidePNG('%s')", q_code),
-            "\U0001F4C4 Export Slide"
+          htmltools::tags$div(
+            class = "slide-export-group",
+            style = "display:none;position:relative;margin-left:8px;",
+            htmltools::tags$button(
+              class = "export-btn export-slide-btn",
+              onclick = sprintf("toggleSlideMenu('%s')", q_code),
+              "\U0001F4C4 Export Slide \u25BE"
+            ),
+            htmltools::tags$div(
+              class = "slide-menu",
+              id = sprintf("slide-menu-%s", gsub("[^a-zA-Z0-9]", "-", q_code)),
+              style = "display:none;position:absolute;top:100%;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:100;min-width:160px;padding:4px 0;",
+              htmltools::tags$button(
+                class = "slide-menu-item",
+                style = "display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;font-family:inherit;",
+                onclick = sprintf("exportSlidePNG('%s','chart_table')", q_code),
+                "Chart + Table"
+              ),
+              htmltools::tags$button(
+                class = "slide-menu-item",
+                style = "display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;font-family:inherit;",
+                onclick = sprintf("exportSlidePNG('%s','chart')", q_code),
+                "Chart Only"
+              ),
+              htmltools::tags$button(
+                class = "slide-menu-item",
+                style = "display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;font-family:inherit;",
+                onclick = sprintf("exportSlidePNG('%s','table')", q_code),
+                "Table Only"
+              )
+            )
           )
         }
       )
@@ -1211,6 +1321,7 @@ build_javascript <- function(html_data) {
     build_js_core_navigation(),
     build_js_chart_picker(),
     build_js_slide_export(),
+    build_js_pinned_views(),
     build_js_table_export_and_init()
   )
 
@@ -1263,6 +1374,21 @@ build_js_core_navigation <- function() {
 
     // Banner group switching
     function switchBannerGroup(groupCode, btn) {
+      // Save all current insight editor text under the OLD banner before switching
+      var oldBannerName = getActiveBannerName();
+      document.querySelectorAll(".insight-area").forEach(function(area) {
+        var editor = area.querySelector(".insight-editor");
+        if (!editor) return;
+        var text = editor.textContent.trim();
+        var storeObj = getInsightStore(area);
+        if (text) {
+          storeObj[oldBannerName] = text;
+        } else {
+          delete storeObj[oldBannerName];
+        }
+        setInsightStore(area, storeObj);
+      });
+
       currentGroup = groupCode;
 
       // Update tab buttons
@@ -1427,8 +1553,8 @@ build_js_core_navigation <- function() {
       document.querySelectorAll(".export-chart-btn").forEach(function(btn) {
         btn.style.display = enabled ? "inline-block" : "none";
       });
-      document.querySelectorAll(".export-slide-btn").forEach(function(btn) {
-        btn.style.display = enabled ? "inline-block" : "none";
+      document.querySelectorAll(".slide-export-group").forEach(function(grp) {
+        grp.style.display = enabled ? "inline-block" : "none";
       });
     }
 
@@ -1480,7 +1606,56 @@ build_js_core_navigation <- function() {
       }
     }
 
-    // ---- Key Insight ----
+    // ---- Key Insight (per-banner) ----
+    // Each question stores insights as JSON: { "bannerName": "text", ... }
+    // in the hidden textarea.insight-store. This allows separate insights
+    // per banner group on the same question.
+
+    // Get the display name of the currently active banner group
+    function getActiveBannerName() {
+      var activeTab = document.querySelector(".banner-tab.active");
+      if (activeTab) return activeTab.getAttribute("data-banner-name") || activeTab.textContent.trim();
+      return "_default";
+    }
+
+    // Read the per-banner JSON store for a question
+    function getInsightStore(area) {
+      var store = area.querySelector("textarea.insight-store");
+      if (!store || !store.value || !store.value.trim()) return {};
+      try {
+        var parsed = JSON.parse(store.value);
+        // Handle legacy plain-text stores (upgrade to per-banner format)
+        if (typeof parsed === "string") {
+          var legacy = {};
+          legacy[getActiveBannerName()] = parsed;
+          return legacy;
+        }
+        return parsed;
+      } catch(e) {
+        // Legacy plain text — wrap under current banner
+        if (store.value.trim()) {
+          var legacy = {};
+          legacy[getActiveBannerName()] = store.value.trim();
+          return legacy;
+        }
+        return {};
+      }
+    }
+
+    // Write the per-banner JSON store for a question
+    function setInsightStore(area, obj) {
+      var store = area.querySelector("textarea.insight-store");
+      if (!store) return;
+      // Remove empty entries
+      var clean = {};
+      for (var k in obj) {
+        if (obj.hasOwnProperty(k) && obj[k] && obj[k].trim()) {
+          clean[k] = obj[k].trim();
+        }
+      }
+      store.value = Object.keys(clean).length > 0 ? JSON.stringify(clean) : "";
+    }
+
     function toggleInsight(qCode) {
       var area = document.querySelector(".insight-area[data-q-code=\\"" + qCode + "\\"]");
       if (!area) return;
@@ -1494,16 +1669,7 @@ build_js_core_navigation <- function() {
       }
       if (isHidden) {
         var editor = container.querySelector(".insight-editor");
-        if (editor) {
-          editor.focus();
-          // Mark as user-edited on input so banner switch does not overwrite
-          if (!editor.getAttribute("data-has-listener")) {
-            editor.addEventListener("input", function() {
-              editor.setAttribute("data-user-edited", "1");
-            });
-            editor.setAttribute("data-has-listener", "1");
-          }
-        }
+        if (editor) editor.focus();
       }
     }
 
@@ -1513,36 +1679,41 @@ build_js_core_navigation <- function() {
       var container = area.querySelector(".insight-container");
       var btn = area.querySelector(".insight-toggle");
       var editor = area.querySelector(".insight-editor");
-      // Clear content entirely and hide
+      // Clear content for current banner and hide
       if (editor) editor.innerHTML = "";
       if (container) container.style.display = "none";
       if (btn) {
         btn.style.display = "block";
         btn.textContent = "+ Add Insight";
       }
-      // Clear the hidden store too
+      // Remove this banner entry from the store
       syncInsight(qCode);
     }
 
-    // Sync insight editor text into hidden textarea (for Save As persistence)
+    // Sync insight editor text into hidden store under the current banner key
     function syncInsight(qCode) {
       var area = document.querySelector(".insight-area[data-q-code=\\"" + qCode + "\\"]");
       if (!area) return;
       var editor = area.querySelector(".insight-editor");
-      var store = area.querySelector("textarea.insight-store");
-      if (editor && store) {
-        store.value = editor.textContent.trim();
+      if (!editor) return;
+      var bannerName = getActiveBannerName();
+      var storeObj = getInsightStore(area);
+      var text = editor.textContent.trim();
+      if (text) {
+        storeObj[bannerName] = text;
+      } else {
+        delete storeObj[bannerName];
       }
+      setInsightStore(area, storeObj);
     }
 
     // Sync ALL insights into their hidden stores (called before save)
     function syncAllInsights() {
       document.querySelectorAll(".insight-area").forEach(function(area) {
         var editor = area.querySelector(".insight-editor");
-        var store = area.querySelector("textarea.insight-store");
-        if (editor && store) {
-          store.value = editor.textContent.trim();
-        }
+        if (!editor) return;
+        var qCode = area.getAttribute("data-q-code");
+        if (qCode) syncInsight(qCode);
       });
     }
 
@@ -1550,19 +1721,40 @@ build_js_core_navigation <- function() {
     function saveReportHTML() {
       syncAllInsights();
 
-      // Before serializing, also set contenteditable innerHTML from stores
-      // because contenteditable text may not survive outerHTML on all browsers
+      // Before serializing, clear editor contenteditable (data lives in textarea store)
+      // The hydrate function will restore editors from stores on re-open
       document.querySelectorAll(".insight-area").forEach(function(area) {
         var store = area.querySelector("textarea.insight-store");
         var editor = area.querySelector(".insight-editor");
-        if (store && editor && store.value) {
-          editor.textContent = store.value;
-          // Show the insight container
-          var container = area.querySelector(".insight-container");
-          if (container) container.style.display = "block";
-          var btn = area.querySelector(".insight-toggle");
-          if (btn) btn.style.display = "none";
+        var container = area.querySelector(".insight-container");
+        var btn = area.querySelector(".insight-toggle");
+        var storeObj = getInsightStore(area);
+        var hasAny = Object.keys(storeObj).length > 0;
+        // Show the insight container if any banner has content
+        if (hasAny) {
+          var bannerName = getActiveBannerName();
+          var currentText = storeObj[bannerName] || "";
+          if (editor) editor.textContent = currentText;
+          if (container) container.style.display = currentText ? "block" : "none";
+          if (btn) btn.style.display = currentText ? "none" : "block";
+        } else {
+          if (editor) editor.innerHTML = "";
+          if (container) container.style.display = "none";
+          if (btn) { btn.style.display = "block"; btn.textContent = "+ Add Insight"; }
         }
+      });
+
+      // Clean DOM to prevent bloat on repeated save-open-save cycles
+      // Remove elements that get rebuilt on DOMContentLoaded
+      var removedPickers = [];
+      document.querySelectorAll(".chart-col-picker").forEach(function(el) {
+        removedPickers.push({ parent: el.parentNode, next: el.nextSibling, el: el });
+        el.remove();
+      });
+      var removedIndicators = [];
+      document.querySelectorAll(".ct-sort-indicator").forEach(function(el) {
+        removedIndicators.push({ parent: el.parentNode, el: el });
+        el.remove();
       });
 
       // Serialize the full page
@@ -1571,59 +1763,78 @@ build_js_core_navigation <- function() {
       var title = document.querySelector(".header-title");
       var fname = title ? title.textContent.replace(/[^a-zA-Z0-9 ]/g, "").replace(/\\s+/g, "_") : "Report";
       downloadBlob(blob, fname + "_with_insights.html");
+
+      // Restore DOM elements for continued use
+      removedPickers.forEach(function(item) {
+        if (item.next) {
+          item.parent.insertBefore(item.el, item.next);
+        } else {
+          item.parent.appendChild(item.el);
+        }
+      });
+      removedIndicators.forEach(function(item) {
+        item.parent.appendChild(item.el);
+      });
     }
 
     // Hydrate insight editors from hidden textareas (when opening a saved HTML)
     function hydrateInsights() {
-      document.querySelectorAll("textarea.insight-store").forEach(function(store) {
-        var text = store.value;
-        if (!text) return;
-        var area = store.closest(".insight-area");
-        if (!area) return;
+      var bannerName = getActiveBannerName();
+      document.querySelectorAll(".insight-area").forEach(function(area) {
+        var storeObj = getInsightStore(area);
+        if (Object.keys(storeObj).length === 0) return;
+        var text = storeObj[bannerName] || "";
         var editor = area.querySelector(".insight-editor");
-        if (editor && !editor.textContent.trim()) {
+        var container = area.querySelector(".insight-container");
+        var btn = area.querySelector(".insight-toggle");
+        if (text && editor) {
           editor.textContent = text;
-          // Show the insight container
-          var container = area.querySelector(".insight-container");
           if (container) container.style.display = "block";
-          var btn = area.querySelector(".insight-toggle");
           if (btn) btn.style.display = "none";
         }
       });
     }
 
     // Update insight editors when banner group changes
+    // Note: saving under the old banner is done in switchBannerGroup BEFORE
+    // the active tab changes, so here we only need to load the new banner text.
     function updateInsightsForBanner(bannerName) {
       document.querySelectorAll(".insight-area").forEach(function(area) {
+        var storeObj = getInsightStore(area);
+        // Also merge in config-provided comments if store has no entry for this banner
         var scriptEl = area.querySelector("script.insight-comments-data");
-        if (!scriptEl) return;
-        var comments;
-        try { comments = JSON.parse(scriptEl.textContent); } catch(e) { return; }
-        if (!comments || !comments.length) return;
+        if (scriptEl && !storeObj[bannerName]) {
+          try {
+            var comments = JSON.parse(scriptEl.textContent);
+            if (comments && comments.length) {
+              for (var i = 0; i < comments.length; i++) {
+                if (comments[i].banner && comments[i].banner === bannerName) {
+                  storeObj[bannerName] = comments[i].text;
+                  break;
+                }
+              }
+              if (!storeObj[bannerName]) {
+                for (var i = 0; i < comments.length; i++) {
+                  if (!comments[i].banner) {
+                    storeObj[bannerName] = comments[i].text;
+                    break;
+                  }
+                }
+              }
+            }
+          } catch(e) { /* ignore parse errors */ }
+        }
+
+        var text = storeObj[bannerName] || "";
         var editor = area.querySelector(".insight-editor");
-        if (!editor) return;
-        // If user has typed custom text, do not overwrite
-        if (editor.getAttribute("data-user-edited")) return;
-        // Find matching comment: banner-specific first, then global
-        var match = null;
-        for (var i = 0; i < comments.length; i++) {
-          if (comments[i].banner && comments[i].banner === bannerName) {
-            match = comments[i].text; break;
-          }
-        }
-        if (!match) {
-          for (var i = 0; i < comments.length; i++) {
-            if (!comments[i].banner) { match = comments[i].text; break; }
-          }
-        }
         var container = area.querySelector(".insight-container");
         var btn = area.querySelector(".insight-toggle");
-        if (match) {
-          editor.textContent = match;
+        if (text) {
+          if (editor) editor.textContent = text;
           if (container) container.style.display = "block";
           if (btn) btn.style.display = "none";
         } else {
-          editor.innerHTML = "";
+          if (editor) editor.innerHTML = "";
           if (container) container.style.display = "none";
           if (btn) { btn.style.display = "block"; btn.textContent = "+ Add Insight"; }
         }
@@ -1790,6 +2001,23 @@ build_js_chart_picker <- function() {
       temp.innerHTML = svgMarkup;
       var newSvg = temp.querySelector("svg");
       if (newSvg) oldSvg.replaceWith(newSvg);
+
+      // Re-apply table sort order to the newly built chart
+      var container = wrapper.closest(".question-container");
+      if (container) {
+        var table = container.querySelector("table.ct-table");
+        if (table && sortState[table.id] && sortState[table.id].direction !== "none") {
+          var tbody = table.querySelector("tbody");
+          if (tbody) {
+            var sortedLabels = [];
+            tbody.querySelectorAll("tr.ct-row-category:not(.ct-row-net)").forEach(function(row) {
+              var labelCell = row.querySelector("td.ct-label-col");
+              if (labelCell) sortedLabels.push(getLabelText(labelCell));
+            });
+            sortChartBars(table, sortedLabels);
+          }
+        }
+      }
     }
 
     // Build multi-column stacked bar SVG (one bar per selected column)
@@ -2007,8 +2235,8 @@ build_js_chart_picker <- function() {
       var metricStripH = (hasPM && nCols > 0) ? 36 : 0;
       var totalH = barsH + metricStripH;
 
-      // Distinct colour palette for columns
-      var bc = data.brand_colour || "#323367";
+      // Distinct colour palette for columns — use chart_bar_colour for horizontal bars
+      var bc = data.chart_bar_colour || data.brand_colour || "#323367";
       var colColours = nCols > 1 ? getDistinctPalette(bc, nCols) : [bc];
 
       var p = [];
@@ -2199,13 +2427,10 @@ build_js_chart_picker <- function() {
 #' @keywords internal
 build_js_slide_export <- function() {
   '
-    // ---- Slide PNG Export ----
-    // Builds a presentation-quality SVG slide with title, base, chart,
-    // metrics strip, and insight -- then renders to PNG at 3x resolution.
-    // Text wraps via <tspan> elements for long titles and insights.
+    // ---- Slide PNG Export (Enhanced) ----
+    // Modes: "chart" (chart only), "table" (table only), "chart_table" (both side by side)
+    // PowerPoint landscape: 1280x720 base, rendered at 3x for high-res output.
 
-    // Helper: wrap text into lines that fit within maxWidth pixels
-    // charWidth = approx pixels per character at the given font size
     function wrapTextLines(text, maxWidth, charWidth) {
       if (!text) return [];
       var maxChars = Math.floor(maxWidth / charWidth);
@@ -2225,7 +2450,6 @@ build_js_slide_export <- function() {
       return lines;
     }
 
-    // Helper: create SVG <text> with <tspan> lines, returns { element, height }
     function createWrappedText(ns, lines, x, startY, lineHeight, attrs) {
       var el = document.createElementNS(ns, "text");
       el.setAttribute("x", x);
@@ -2240,20 +2464,145 @@ build_js_slide_export <- function() {
       return { element: el, height: lines.length * lineHeight };
     }
 
-    function exportSlidePNG(qCode) {
+    // Toggle slide export dropdown menu
+    function toggleSlideMenu(qCode) {
+      var menuId = "slide-menu-" + qCode.replace(/[^a-zA-Z0-9]/g, "-");
+      var menu = document.getElementById(menuId);
+      if (!menu) return;
+      var isOpen = menu.style.display !== "none";
+      // Close all slide menus first
+      document.querySelectorAll(".slide-menu").forEach(function(m) { m.style.display = "none"; });
+      if (!isOpen) {
+        menu.style.display = "block";
+        // Close on outside click
+        setTimeout(function() {
+          document.addEventListener("click", function closeMenu(e) {
+            if (!menu.contains(e.target)) {
+              menu.style.display = "none";
+              document.removeEventListener("click", closeMenu);
+            }
+          });
+        }, 10);
+      }
+    }
+
+    // Extract visible table data as array of rows for SVG rendering
+    function extractSlideTableData(container) {
+      var table = container.querySelector("table.ct-table");
+      if (!table) return null;
+      var rows = [];
+      var headerRow = [];
+      // Header: get visible columns
+      table.querySelectorAll("thead th").forEach(function(th) {
+        if (th.style.display === "none" || th.offsetParent === null) return;
+        var text = th.querySelector(".ct-header-text");
+        headerRow.push(text ? text.textContent.trim() : th.textContent.trim().split("\\n")[0].trim());
+      });
+      rows.push({ cells: headerRow, type: "header" });
+
+      // Body rows: skip excluded rows, get visible columns
+      table.querySelectorAll("tbody tr").forEach(function(tr) {
+        if (tr.classList.contains("ct-row-excluded")) return;
+        var cells = [];
+        var isBase = tr.classList.contains("ct-row-base");
+        var isMean = tr.classList.contains("ct-row-mean");
+        var isNet = tr.classList.contains("ct-row-net");
+        tr.querySelectorAll("td").forEach(function(td) {
+          if (td.style.display === "none" || td.offsetParent === null) return;
+          var text = td.textContent.trim().split("\\n")[0].trim();
+          // Clean up exclusion button text
+          text = text.replace(/[\\u2715\\u25CB]/g, "").trim();
+          cells.push(text);
+        });
+        if (cells.length > 0) {
+          rows.push({ cells: cells, type: isBase ? "base" : (isMean ? "mean" : (isNet ? "net" : "data")) });
+        }
+      });
+      return rows;
+    }
+
+    // Render table data into SVG elements at (x, y) with maxWidth
+    function renderTableSVG(ns, svgParent, tableData, x, y, maxWidth) {
+      if (!tableData || tableData.length === 0) return 0;
+      var nCols = tableData[0].cells.length;
+      if (nCols === 0) return 0;
+
+      var rowH = 18, headerH = 22, fontSize = 9, padX = 6;
+      // Calculate column widths: first col gets more space
+      var firstColW = Math.min(Math.max(maxWidth * 0.3, 120), 200);
+      var dataColW = nCols > 1 ? (maxWidth - firstColW) / (nCols - 1) : maxWidth;
+
+      var curY = y;
+      tableData.forEach(function(row, ri) {
+        var isHeader = row.type === "header";
+        var rH = isHeader ? headerH : rowH;
+
+        // Row background
+        var bgRect = document.createElementNS(ns, "rect");
+        bgRect.setAttribute("x", x); bgRect.setAttribute("y", curY);
+        bgRect.setAttribute("width", maxWidth); bgRect.setAttribute("height", rH);
+        if (isHeader) {
+          bgRect.setAttribute("fill", "#1a2744");
+        } else if (row.type === "base") {
+          bgRect.setAttribute("fill", "#fafbfc");
+        } else if (row.type === "mean") {
+          bgRect.setAttribute("fill", "#fef9e7");
+        } else if (row.type === "net") {
+          bgRect.setAttribute("fill", "#f5f0e8");
+        } else if (ri % 2 === 0) {
+          bgRect.setAttribute("fill", "#ffffff");
+        } else {
+          bgRect.setAttribute("fill", "#f9fafb");
+        }
+        svgParent.appendChild(bgRect);
+
+        // Cell text
+        row.cells.forEach(function(cellText, ci) {
+          var cellX = ci === 0 ? x + padX : x + firstColW + (ci - 1) * dataColW + padX;
+          var textEl = document.createElementNS(ns, "text");
+          textEl.setAttribute("x", cellX);
+          textEl.setAttribute("y", curY + rH / 2 + 1);
+          textEl.setAttribute("dominant-baseline", "central");
+          textEl.setAttribute("font-size", fontSize);
+          textEl.setAttribute("fill", isHeader ? "#ffffff" : (ci === 0 ? "#374151" : "#1e293b"));
+          if (isHeader || row.type === "net" || ci === 0) textEl.setAttribute("font-weight", "600");
+          if (row.type === "mean") textEl.setAttribute("font-style", "italic");
+          // Truncate long text to fit column
+          var maxChars = Math.floor((ci === 0 ? firstColW : dataColW) / (fontSize * 0.55));
+          textEl.textContent = cellText.length > maxChars ? cellText.substring(0, maxChars - 1) + "\\u2026" : cellText;
+          svgParent.appendChild(textEl);
+        });
+
+        // Row border
+        var borderLine = document.createElementNS(ns, "line");
+        borderLine.setAttribute("x1", x); borderLine.setAttribute("x2", x + maxWidth);
+        borderLine.setAttribute("y1", curY + rH); borderLine.setAttribute("y2", curY + rH);
+        borderLine.setAttribute("stroke", "#e2e8f0"); borderLine.setAttribute("stroke-width", "0.5");
+        svgParent.appendChild(borderLine);
+
+        curY += rH;
+      });
+
+      return curY - y;
+    }
+
+    function exportSlidePNG(qCode, mode) {
+      mode = mode || "chart";
       var container = document.querySelector(".question-container.active");
       if (!container) return;
       var wrapper = container.querySelector(".chart-wrapper");
-      if (!wrapper) return;
-      var chartSvg = wrapper.querySelector("svg");
-      if (!chartSvg) return;
+      // Close the menu
+      document.querySelectorAll(".slide-menu").forEach(function(m) { m.style.display = "none"; });
 
-      var qTitle = wrapper.getAttribute("data-q-title") || "";
-      var qCodeLabel = wrapper.getAttribute("data-q-code") || qCode;
       var ns = "http://www.w3.org/2000/svg";
-      var W = 960, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
+      var W = 1280, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
+      var pad = 28;
+      var usableW = W - pad * 2;
 
-      // ---- Gather data from DOM ----
+      var qTitle = wrapper ? wrapper.getAttribute("data-q-title") || "" : "";
+      var qCodeLabel = wrapper ? wrapper.getAttribute("data-q-code") || qCode : qCode;
+
+      // Gather base, banner, metrics, insight
       var baseText = "";
       var baseRow = container.querySelector("tr.ct-row-base");
       if (baseRow) {
@@ -2261,7 +2610,11 @@ build_js_slide_export <- function() {
         if (baseCells.length > 1) baseText = "Base: n=" + baseCells[1].textContent.trim();
       }
 
-      // Metrics (mean, index, NPS from table)
+      // Banner name
+      var bannerLabel = "";
+      var activeBannerTab = document.querySelector(".banner-tab.active");
+      if (activeBannerTab) bannerLabel = activeBannerTab.textContent.trim();
+
       var metrics = [];
       container.querySelectorAll("tr.ct-row-mean").forEach(function(row) {
         var labelCell = row.querySelector("td.ct-label-col");
@@ -2272,52 +2625,82 @@ build_js_slide_export <- function() {
           if (val && val !== "-") metrics.push(label + ": " + val);
         }
       });
-
-      // Filter out metric already shown as priority metric in chart
       try {
-        var chartDataStr = wrapper.getAttribute("data-chart-data");
-        if (chartDataStr) {
-          var chartData = JSON.parse(chartDataStr);
-          if (chartData.priority_metric && chartData.priority_metric.label) {
-            var pmLabel = chartData.priority_metric.label.toLowerCase();
-            metrics = metrics.filter(function(m) {
-              return m.toLowerCase().indexOf(pmLabel) !== 0;
-            });
+        if (wrapper) {
+          var chartDataStr = wrapper.getAttribute("data-chart-data");
+          if (chartDataStr) {
+            var cd = JSON.parse(chartDataStr);
+            if (cd.priority_metric && cd.priority_metric.label) {
+              var pmL = cd.priority_metric.label.toLowerCase();
+              metrics = metrics.filter(function(m) { return m.toLowerCase().indexOf(pmL) !== 0; });
+            }
           }
         }
-      } catch(e) { /* ignore parse errors */ }
+      } catch(e) {}
 
-      // Insight text
       var insightText = "";
       var insightEditor = container.querySelector(".insight-editor");
       if (insightEditor) insightText = insightEditor.textContent.trim();
 
-      // ---- Calculate layout with text wrapping ----
-      var pad = 28;
-      var usableW = W - pad * 2;
-
-      // Title: wrap at ~8.5px per char at font-size 16
+      // ---- Layout calculations ----
       var titleFullText = qCodeLabel + " - " + qTitle;
-      var titleLines = wrapTextLines(titleFullText, usableW, 8.5);
+      var titleLines = wrapTextLines(titleFullText, usableW, 9.5);
       var titleLineH = 20;
       var titleStartY = pad + 16;
       var titleBlockH = titleLines.length * titleLineH;
 
+      var metaText = [baseText, bannerLabel ? "Banner: " + bannerLabel : ""].filter(function(s) { return s; }).join(" \\u00B7 ");
       var metaY = titleStartY + titleBlockH + 4;
-      var chartTop = metaY + 18;
+      var contentTop = metaY + 18;
 
-      // Clone chart SVG and measure
-      var chartClone = chartSvg.cloneNode(true);
-      var chartVB = chartClone.getAttribute("viewBox").split(" ").map(Number);
-      var chartOrigW = chartVB[2], chartOrigH = chartVB[3];
-      var chartScale = usableW / chartOrigW;
-      var chartDisplayH = chartOrigH * chartScale;
+      // Determine content area dimensions based on mode
+      var showChart = mode === "chart" || mode === "chart_table";
+      var showTable = mode === "table" || mode === "chart_table";
 
-      var metricsY = chartTop + chartDisplayH + 16;
-      var metricsH = metrics.length > 0 ? 32 : 0;
+      var chartSvg = wrapper ? wrapper.querySelector("svg") : null;
+      var tableData = showTable ? extractSlideTableData(container) : null;
 
-      // Insight: wrap at ~6.5px per char at font-size 12
-      var insightLines = wrapTextLines(insightText, usableW - 16, 6.5);
+      // Content layout
+      var contentH = 0;
+      var chartClone, chartVB, chartOrigW, chartOrigH, chartScale, chartDisplayH;
+      var chartAreaW, tableAreaW, chartX, tableX;
+
+      if (mode === "chart_table" && chartSvg && tableData) {
+        // Side by side: table left, chart right
+        tableAreaW = Math.floor(usableW * 0.48);
+        chartAreaW = usableW - tableAreaW - 16;
+        tableX = pad;
+        chartX = pad + tableAreaW + 16;
+
+        chartClone = chartSvg.cloneNode(true);
+        chartVB = chartClone.getAttribute("viewBox").split(" ").map(Number);
+        chartOrigW = chartVB[2]; chartOrigH = chartVB[3];
+        chartScale = chartAreaW / chartOrigW;
+        chartDisplayH = chartOrigH * chartScale;
+
+        var tableH = tableData.length * 18 + 4;
+        contentH = Math.max(chartDisplayH, tableH);
+      } else if (showChart && chartSvg) {
+        chartClone = chartSvg.cloneNode(true);
+        chartVB = chartClone.getAttribute("viewBox").split(" ").map(Number);
+        chartOrigW = chartVB[2]; chartOrigH = chartVB[3];
+        chartScale = usableW / chartOrigW;
+        chartDisplayH = chartOrigH * chartScale;
+        chartX = pad;
+        chartAreaW = usableW;
+        contentH = chartDisplayH;
+      } else if (showTable && tableData) {
+        tableX = pad;
+        tableAreaW = usableW;
+        contentH = tableData.length * 18 + 4;
+      } else {
+        return;
+      }
+
+      var metricsY = contentTop + contentH + 12;
+      var metricsH = metrics.length > 0 ? 28 : 0;
+
+      var insightLines = wrapTextLines(insightText, usableW - 16, 7);
       var insightLineH = 17;
       var insightY = metricsY + metricsH + (metricsH > 0 ? 8 : 0);
       var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 10 : 0;
@@ -2330,66 +2713,67 @@ build_js_slide_export <- function() {
       svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
       svg.setAttribute("style", "font-family:" + fontFamily + ";");
 
-      // White background
       var bg = document.createElementNS(ns, "rect");
       bg.setAttribute("width", W); bg.setAttribute("height", totalH);
       bg.setAttribute("fill", "#ffffff");
       svg.appendChild(bg);
 
-      // Title (with wrapping)
+      // Title
       var titleResult = createWrappedText(ns, titleLines, pad, titleStartY, titleLineH,
         { fill: "#1a2744", "font-size": "16", "font-weight": "700" });
       svg.appendChild(titleResult.element);
 
-      // Base meta
-      var meta = document.createElementNS(ns, "text");
-      meta.setAttribute("x", pad); meta.setAttribute("y", metaY);
-      meta.setAttribute("fill", "#94a3b8"); meta.setAttribute("font-size", "11");
-      meta.textContent = baseText;
-      svg.appendChild(meta);
+      // Meta (base + banner)
+      var metaEl = document.createElementNS(ns, "text");
+      metaEl.setAttribute("x", pad); metaEl.setAttribute("y", metaY);
+      metaEl.setAttribute("fill", "#94a3b8"); metaEl.setAttribute("font-size", "11");
+      metaEl.textContent = metaText;
+      svg.appendChild(metaEl);
 
-      // Chart (embedded via <g> transform)
-      var chartG = document.createElementNS(ns, "g");
-      chartG.setAttribute("transform", "translate(" + pad + "," + chartTop + ") scale(" + chartScale + ")");
-      while (chartClone.firstChild) chartG.appendChild(chartClone.firstChild);
-      svg.appendChild(chartG);
+      // Table
+      if (showTable && tableData) {
+        renderTableSVG(ns, svg, tableData, tableX, contentTop, tableAreaW);
+      }
 
-      // Metrics strip (only metrics not already shown in chart)
+      // Chart
+      if (showChart && chartClone) {
+        var chartG = document.createElementNS(ns, "g");
+        chartG.setAttribute("transform", "translate(" + chartX + "," + contentTop + ") scale(" + chartScale + ")");
+        while (chartClone.firstChild) chartG.appendChild(chartClone.firstChild);
+        svg.appendChild(chartG);
+      }
+
+      // Metrics strip
       if (metrics.length > 0) {
-        var metricsStr = metrics.join("  |  ");
-        var mText = document.createElementNS(ns, "text");
-        mText.setAttribute("x", pad); mText.setAttribute("y", metricsY + 18);
-        mText.setAttribute("fill", "#5c4a2a"); mText.setAttribute("font-size", "12");
-        mText.setAttribute("font-weight", "600");
-        mText.textContent = metricsStr;
-        svg.appendChild(mText);
-
         var mLine = document.createElementNS(ns, "line");
         mLine.setAttribute("x1", pad); mLine.setAttribute("x2", W - pad);
         mLine.setAttribute("y1", metricsY); mLine.setAttribute("y2", metricsY);
         mLine.setAttribute("stroke", "#e2e8f0"); mLine.setAttribute("stroke-width", "1");
         svg.appendChild(mLine);
+        var mText = document.createElementNS(ns, "text");
+        mText.setAttribute("x", pad); mText.setAttribute("y", metricsY + 16);
+        mText.setAttribute("fill", "#5c4a2a"); mText.setAttribute("font-size", "11");
+        mText.setAttribute("font-weight", "600");
+        mText.textContent = metrics.join("  |  ");
+        svg.appendChild(mText);
       }
 
-      // Insight callout (with wrapping)
+      // Insight
       if (insightLines.length > 0) {
         var iLine = document.createElementNS(ns, "line");
         iLine.setAttribute("x1", pad); iLine.setAttribute("x2", W - pad);
         iLine.setAttribute("y1", insightY); iLine.setAttribute("y2", insightY);
         iLine.setAttribute("stroke", "#e2e8f0"); iLine.setAttribute("stroke-width", "1");
         svg.appendChild(iLine);
-
-        // Brand accent bar (height adjusts to text)
         var accentH = Math.max(24, insightLines.length * insightLineH);
         var iBar = document.createElementNS(ns, "rect");
         iBar.setAttribute("x", pad); iBar.setAttribute("y", insightY + 4);
         iBar.setAttribute("width", "3"); iBar.setAttribute("height", accentH);
         iBar.setAttribute("fill", "#323367"); iBar.setAttribute("rx", "1.5");
         svg.appendChild(iBar);
-
-        var insightResult = createWrappedText(ns, insightLines, pad + 12, insightY + 18, insightLineH,
+        var insResult = createWrappedText(ns, insightLines, pad + 12, insightY + 18, insightLineH,
           { fill: "#374151", "font-size": "12", "font-style": "italic" });
-        svg.appendChild(insightResult.element);
+        svg.appendChild(insResult.element);
       }
 
       // ---- Render SVG to PNG at 3x ----
@@ -2409,24 +2793,33 @@ build_js_slide_export <- function() {
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         URL.revokeObjectURL(url);
         canvas.toBlob(function(blob) {
-          downloadBlob(blob, qCode + "_slide.png");
+          var suffix = mode === "chart" ? "_chart" : (mode === "table" ? "_table" : "");
+          downloadBlob(blob, qCode + "_slide" + suffix + ".png");
         }, "image/png");
       };
       img.src = url;
     }
 
     // ---- Export All Insights as Standalone HTML ----
+    // Exports ALL insights across ALL banners, grouped by question
     function exportInsightsHTML() {
+      // First sync current editor text into stores
+      syncAllInsights();
+
       var insights = [];
-      document.querySelectorAll(".question-container").forEach(function(container) {
-        var editor = container.querySelector(".insight-editor");
-        if (!editor) return;
-        var text = editor.textContent.trim();
-        if (!text) return;
-        var wrapper = container.querySelector(".chart-wrapper");
-        var qCode = wrapper ? wrapper.getAttribute("data-q-code") : "";
+      document.querySelectorAll(".insight-area").forEach(function(area) {
+        var storeObj = getInsightStore(area);
+        var bannerKeys = Object.keys(storeObj);
+        if (bannerKeys.length === 0) return;
+        var qCode = area.getAttribute("data-q-code") || "";
+        var container = area.closest(".question-container");
+        var wrapper = container ? container.querySelector(".chart-wrapper") : null;
         var qTitle = wrapper ? wrapper.getAttribute("data-q-title") : "";
-        insights.push({ code: qCode, title: qTitle, text: text });
+        bannerKeys.forEach(function(banner) {
+          if (storeObj[banner] && storeObj[banner].trim()) {
+            insights.push({ code: qCode, title: qTitle, banner: banner, text: storeObj[banner].trim() });
+          }
+        });
       });
 
       if (insights.length === 0) {
@@ -2447,6 +2840,7 @@ build_js_slide_export <- function() {
       html += ".insight{margin-bottom:24px;padding:16px;border-left:3px solid #323367;background:#f8f9fb;border-radius:0 6px 6px 0;}";
       html += ".q-code{font-weight:700;color:#323367;font-size:13px;}";
       html += ".q-title{font-size:13px;color:#64748b;margin-bottom:8px;}";
+      html += ".banner-label{font-size:11px;color:#94a3b8;font-style:italic;margin-bottom:6px;}";
       html += ".q-text{font-size:14px;}";
       html += "@media print{body{margin:20px;}.insight{break-inside:avoid;}}";
       html += "</style></head><body>";
@@ -2457,6 +2851,7 @@ build_js_slide_export <- function() {
         html += "<div class=\\"insight\\">";
         html += "<div class=\\"q-code\\">" + item.code + "</div>";
         html += "<div class=\\"q-title\\">" + item.title + "</div>";
+        html += "<div class=\\"banner-label\\">Banner: " + item.banner + "</div>";
         html += "<div class=\\"q-text\\">" + item.text + "</div>";
         html += "</div>";
       });
@@ -2467,6 +2862,547 @@ build_js_slide_export <- function() {
       downloadBlob(blob, "Insights_" + pTitle.replace(/[^a-zA-Z0-9]/g, "_") + ".html");
     }
 
+  '
+}
+
+
+#' Build Pinned Views JavaScript
+#'
+#' Pin/unpin questions, render pinned view cards, reorder, persist to JSON,
+#' export all pinned views as individual slide PNGs.
+#'
+#' @return Character string of JavaScript code
+#' @keywords internal
+build_js_pinned_views <- function() {
+  '
+    // ---- Pinned Views ----
+    var pinnedViews = [];
+
+    function updatePinBadge() {
+      var badge = document.getElementById("pin-count-badge");
+      if (badge) {
+        badge.textContent = pinnedViews.length;
+        badge.style.display = pinnedViews.length > 0 ? "inline" : "none";
+      }
+      var empty = document.getElementById("pinned-empty-state");
+      var cards = document.getElementById("pinned-cards-container");
+      if (empty) empty.style.display = pinnedViews.length === 0 ? "block" : "none";
+      if (cards) cards.style.display = pinnedViews.length > 0 ? "block" : "none";
+    }
+
+    function savePinnedData() {
+      var store = document.getElementById("pinned-views-data");
+      if (store) store.textContent = JSON.stringify(pinnedViews);
+    }
+
+    function togglePin(qCode) {
+      var idx = pinnedViews.findIndex(function(p) { return p.qCode === qCode && p.bannerGroup === currentGroup; });
+      if (idx >= 0) {
+        pinnedViews.splice(idx, 1);
+        updatePinButton(qCode, false);
+      } else {
+        var pin = captureCurrentView(qCode);
+        if (pin) {
+          pinnedViews.push(pin);
+          updatePinButton(qCode, true);
+        }
+      }
+      savePinnedData();
+      renderPinnedCards();
+      updatePinBadge();
+    }
+
+    function updatePinButton(qCode, isPinned) {
+      document.querySelectorAll(".pin-btn[data-q-code=\\"" + qCode + "\\"]").forEach(function(btn) {
+        btn.style.color = isPinned ? "#323367" : "#94a3b8";
+        btn.style.borderColor = isPinned ? "#323367" : "#e2e8f0";
+        btn.title = isPinned ? "Unpin this view" : "Pin this view";
+      });
+    }
+
+    function captureCurrentView(qCode) {
+      var container = document.querySelector(".question-container .chart-wrapper[data-q-code=\\"" + qCode + "\\"]");
+      if (!container) container = document.querySelector(".chart-wrapper[data-q-code=\\"" + qCode + "\\"]");
+      var qContainer = container ? container.closest(".question-container") : null;
+      if (!qContainer) return null;
+
+      var wrapper = qContainer.querySelector(".chart-wrapper");
+      var qTitle = wrapper ? wrapper.getAttribute("data-q-title") || "" : "";
+      var chartDataStr = wrapper ? wrapper.getAttribute("data-chart-data") : null;
+
+      // Capture selected chart columns
+      var selectedCols = [];
+      if (chartColumnState[qCode]) {
+        selectedCols = Object.keys(chartColumnState[qCode]).filter(function(k) {
+          return chartColumnState[qCode][k];
+        });
+      }
+
+      // Capture excluded rows
+      var excludedRows = [];
+      if (window._chartExclusions && window._chartExclusions[qCode]) {
+        excludedRows = Object.keys(window._chartExclusions[qCode]);
+      }
+
+      // Capture insight text
+      var insightText = "";
+      var editor = qContainer.querySelector(".insight-editor");
+      if (editor) insightText = editor.textContent.trim();
+
+      // Capture table sort state
+      var table = qContainer.querySelector("table.ct-table");
+      var tableSortState = null;
+      if (table && sortState[table.id] && sortState[table.id].direction !== "none") {
+        tableSortState = { colKey: sortState[table.id].colKey, direction: sortState[table.id].direction };
+      }
+
+      // Capture visible table HTML (clone, remove hidden cols and excluded rows)
+      var tableClone = table ? table.cloneNode(true) : null;
+      if (tableClone) {
+        // Remove hidden columns
+        tableClone.querySelectorAll("[style*=\\"display: none\\"], [style*=\\"display:none\\"]").forEach(function(el) { el.remove(); });
+        // Remove excluded rows
+        tableClone.querySelectorAll(".ct-row-excluded").forEach(function(el) { el.remove(); });
+        // Remove sort indicators and exclude buttons
+        tableClone.querySelectorAll(".ct-sort-indicator, .row-exclude-btn").forEach(function(el) { el.remove(); });
+      }
+
+      // Capture chart SVG
+      var chartSvg = wrapper ? wrapper.querySelector("svg") : null;
+      var chartSvgStr = chartSvg ? new XMLSerializer().serializeToString(chartSvg) : "";
+
+      // Get active banner label
+      var bannerLabel = "";
+      var activeBannerTab = document.querySelector(".banner-tab.active");
+      if (activeBannerTab) bannerLabel = activeBannerTab.textContent.trim();
+
+      // Get base text
+      var baseText = "";
+      var baseRow = qContainer.querySelector("tr.ct-row-base");
+      if (baseRow) {
+        var baseCells = baseRow.querySelectorAll("td:not([style*=none])");
+        if (baseCells.length > 1) baseText = "n=" + baseCells[1].textContent.trim();
+      }
+
+      return {
+        id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+        qCode: qCode,
+        qTitle: qTitle,
+        bannerGroup: currentGroup,
+        bannerLabel: bannerLabel,
+        selectedColumns: selectedCols,
+        excludedRows: excludedRows,
+        insightText: insightText,
+        sortState: tableSortState,
+        tableHtml: tableClone ? tableClone.outerHTML : "",
+        chartSvg: chartSvgStr,
+        baseText: baseText,
+        timestamp: Date.now(),
+        order: pinnedViews.length
+      };
+    }
+
+    function renderPinnedCards() {
+      var container = document.getElementById("pinned-cards-container");
+      if (!container) return;
+      container.innerHTML = "";
+
+      pinnedViews.forEach(function(pin, idx) {
+        var card = document.createElement("div");
+        card.className = "pinned-card";
+        card.setAttribute("data-pin-id", pin.id);
+        card.style.cssText = "background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:16px;";
+
+        // Header with title, banner, base, controls
+        var header = document.createElement("div");
+        header.style.cssText = "display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;";
+        var titleDiv = document.createElement("div");
+        titleDiv.innerHTML = "<div style=\\"font-size:11px;color:#323367;font-weight:700;\\">" + escapeHtml(pin.qCode) + "</div>" +
+          "<div style=\\"font-size:14px;font-weight:600;color:#1e293b;\\">" + escapeHtml(pin.qTitle) + "</div>" +
+          "<div style=\\"font-size:11px;color:#94a3b8;margin-top:2px;\\">Banner: " + escapeHtml(pin.bannerLabel) +
+          (pin.baseText ? " \\u00B7 Base: " + escapeHtml(pin.baseText) : "") + "</div>";
+        header.appendChild(titleDiv);
+
+        var controls = document.createElement("div");
+        controls.style.cssText = "display:flex;gap:4px;flex-shrink:0;";
+        if (idx > 0) {
+          var upBtn = document.createElement("button");
+          upBtn.className = "export-btn";
+          upBtn.style.cssText = "padding:3px 8px;font-size:11px;";
+          upBtn.textContent = "\\u25B2";
+          upBtn.title = "Move up";
+          upBtn.onclick = function() { movePinned(idx, idx - 1); };
+          controls.appendChild(upBtn);
+        }
+        if (idx < pinnedViews.length - 1) {
+          var downBtn = document.createElement("button");
+          downBtn.className = "export-btn";
+          downBtn.style.cssText = "padding:3px 8px;font-size:11px;";
+          downBtn.textContent = "\\u25BC";
+          downBtn.title = "Move down";
+          downBtn.onclick = function() { movePinned(idx, idx + 1); };
+          controls.appendChild(downBtn);
+        }
+        var removeBtn = document.createElement("button");
+        removeBtn.className = "export-btn";
+        removeBtn.style.cssText = "padding:3px 8px;font-size:11px;color:#e8614d;";
+        removeBtn.textContent = "\\u2715";
+        removeBtn.title = "Remove pin";
+        removeBtn.onclick = function() { removePinned(pin.id, pin.qCode); };
+        controls.appendChild(removeBtn);
+        header.appendChild(controls);
+        card.appendChild(header);
+
+        // Content: table and chart side by side
+        var content = document.createElement("div");
+        content.style.cssText = "display:flex;gap:16px;align-items:flex-start;";
+
+        if (pin.tableHtml) {
+          var tableDiv = document.createElement("div");
+          tableDiv.style.cssText = "flex:1;overflow-x:auto;font-size:11px;";
+          tableDiv.innerHTML = pin.tableHtml;
+          // Scale down table for compact display
+          var tbl = tableDiv.querySelector("table");
+          if (tbl) tbl.style.cssText = "font-size:10px;width:100%;";
+          content.appendChild(tableDiv);
+        }
+
+        if (pin.chartSvg) {
+          var chartDiv = document.createElement("div");
+          chartDiv.style.cssText = "flex:1;";
+          chartDiv.innerHTML = pin.chartSvg;
+          content.appendChild(chartDiv);
+        }
+        card.appendChild(content);
+
+        // Insight
+        if (pin.insightText) {
+          var insightDiv = document.createElement("div");
+          insightDiv.style.cssText = "margin-top:12px;padding:10px 14px;border-left:3px solid #323367;background:#f8f9fb;border-radius:0 6px 6px 0;font-size:12px;color:#374151;font-style:italic;";
+          insightDiv.textContent = pin.insightText;
+          card.appendChild(insightDiv);
+        }
+
+        container.appendChild(card);
+      });
+    }
+
+    function movePinned(fromIdx, toIdx) {
+      if (toIdx < 0 || toIdx >= pinnedViews.length) return;
+      var item = pinnedViews.splice(fromIdx, 1)[0];
+      pinnedViews.splice(toIdx, 0, item);
+      savePinnedData();
+      renderPinnedCards();
+    }
+
+    function removePinned(pinId, qCode) {
+      pinnedViews = pinnedViews.filter(function(p) { return p.id !== pinId; });
+      updatePinButton(qCode, pinnedViews.some(function(p) { return p.qCode === qCode; }));
+      savePinnedData();
+      renderPinnedCards();
+      updatePinBadge();
+    }
+
+    function hydratePinnedViews() {
+      var store = document.getElementById("pinned-views-data");
+      if (!store) return;
+      try {
+        var data = JSON.parse(store.textContent);
+        if (Array.isArray(data) && data.length > 0) {
+          pinnedViews = data;
+          renderPinnedCards();
+          updatePinBadge();
+          // Update pin buttons
+          pinnedViews.forEach(function(pin) {
+            updatePinButton(pin.qCode, true);
+          });
+        }
+      } catch(e) {}
+    }
+
+    function exportAllPinnedSlides() {
+      if (pinnedViews.length === 0) {
+        alert("No pinned views to export.");
+        return;
+      }
+      var ns = "http://www.w3.org/2000/svg";
+      var W = 1280, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
+      var pad = 28;
+
+      pinnedViews.forEach(function(pin, idx) {
+        var usableW = W - pad * 2;
+        var titleFullText = pin.qCode + " - " + pin.qTitle;
+        var titleLines = wrapTextLines(titleFullText, usableW, 9.5);
+        var titleLineH = 20;
+        var titleStartY = pad + 16;
+        var titleBlockH = titleLines.length * titleLineH;
+        var metaText = "Base: " + (pin.baseText || "—") + " \\u00B7 Banner: " + (pin.bannerLabel || "");
+        var metaY = titleStartY + titleBlockH + 4;
+        var contentTop = metaY + 18;
+
+        // Parse chart SVG to get dimensions
+        var chartH = 0, hasChart = false;
+        var chartTemp = null;
+        if (pin.chartSvg) {
+          var tempDiv = document.createElement("div");
+          tempDiv.innerHTML = pin.chartSvg;
+          chartTemp = tempDiv.querySelector("svg");
+          if (chartTemp) {
+            hasChart = true;
+            var vb = chartTemp.getAttribute("viewBox");
+            if (vb) {
+              var parts = vb.split(" ").map(Number);
+              var cScale = (usableW * 0.5) / parts[2];
+              chartH = parts[3] * cScale;
+            }
+          }
+        }
+
+        // Approximate table height
+        var tableH = 0;
+        if (pin.tableHtml) {
+          var countRows = (pin.tableHtml.match(/<tr/g) || []).length;
+          tableH = countRows * 18 + 4;
+        }
+
+        var contentH = Math.max(chartH, tableH, 100);
+
+        // Insight
+        var insightLines = wrapTextLines(pin.insightText, usableW - 16, 7);
+        var insightLineH = 17;
+        var insightY = contentTop + contentH + 16;
+        var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 10 : 0;
+        var totalH = insightY + insightBlockH + pad;
+
+        var svg = document.createElementNS(ns, "svg");
+        svg.setAttribute("xmlns", ns);
+        svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
+        svg.setAttribute("style", "font-family:" + fontFamily + ";");
+
+        var bg = document.createElementNS(ns, "rect");
+        bg.setAttribute("width", W); bg.setAttribute("height", totalH);
+        bg.setAttribute("fill", "#ffffff");
+        svg.appendChild(bg);
+
+        var titleResult = createWrappedText(ns, titleLines, pad, titleStartY, titleLineH,
+          { fill: "#1a2744", "font-size": "16", "font-weight": "700" });
+        svg.appendChild(titleResult.element);
+
+        var metaEl = document.createElementNS(ns, "text");
+        metaEl.setAttribute("x", pad); metaEl.setAttribute("y", metaY);
+        metaEl.setAttribute("fill", "#94a3b8"); metaEl.setAttribute("font-size", "11");
+        metaEl.textContent = metaText;
+        svg.appendChild(metaEl);
+
+        // Render table from stored HTML
+        if (pin.tableHtml) {
+          var tDiv = document.createElement("div");
+          tDiv.innerHTML = pin.tableHtml;
+          var tRows = extractSlideTableData({ querySelector: function(sel) { return tDiv.querySelector(sel); }, querySelectorAll: function(sel) { return tDiv.querySelectorAll(sel); } });
+          if (tRows) {
+            var tableW = hasChart ? usableW * 0.48 : usableW;
+            renderTableSVG(ns, svg, tRows, pad, contentTop, tableW);
+          }
+        }
+
+        // Embed chart
+        if (hasChart && chartTemp) {
+          var chartClone = chartTemp.cloneNode(true);
+          var cvb = chartClone.getAttribute("viewBox").split(" ").map(Number);
+          var chartAreaW = pin.tableHtml ? usableW * 0.5 : usableW;
+          var chartX = pin.tableHtml ? pad + usableW * 0.5 + 8 : pad;
+          var cScale2 = chartAreaW / cvb[2];
+          var cG = document.createElementNS(ns, "g");
+          cG.setAttribute("transform", "translate(" + chartX + "," + contentTop + ") scale(" + cScale2 + ")");
+          while (chartClone.firstChild) cG.appendChild(chartClone.firstChild);
+          svg.appendChild(cG);
+        }
+
+        // Insight
+        if (insightLines.length > 0) {
+          var iL = document.createElementNS(ns, "line");
+          iL.setAttribute("x1", pad); iL.setAttribute("x2", W - pad);
+          iL.setAttribute("y1", insightY); iL.setAttribute("y2", insightY);
+          iL.setAttribute("stroke", "#e2e8f0"); iL.setAttribute("stroke-width", "1");
+          svg.appendChild(iL);
+          var aH = Math.max(24, insightLines.length * insightLineH);
+          var iB = document.createElementNS(ns, "rect");
+          iB.setAttribute("x", pad); iB.setAttribute("y", insightY + 4);
+          iB.setAttribute("width", "3"); iB.setAttribute("height", aH);
+          iB.setAttribute("fill", "#323367"); iB.setAttribute("rx", "1.5");
+          svg.appendChild(iB);
+          var insRes = createWrappedText(ns, insightLines, pad + 12, insightY + 18, insightLineH,
+            { fill: "#374151", "font-size": "12", "font-style": "italic" });
+          svg.appendChild(insRes.element);
+        }
+
+        // Render to PNG with delay between downloads
+        var scale = 3;
+        var svgData = new XMLSerializer().serializeToString(svg);
+        var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+        var url = URL.createObjectURL(svgBlob);
+        var slideNum = String(idx + 1).padStart(2, "0");
+
+        (function(slideUrl, sNum, qc) {
+          var sImg = new Image();
+          sImg.onload = function() {
+            var canvas = document.createElement("canvas");
+            canvas.width = W * scale; canvas.height = totalH * scale;
+            var ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(sImg, 0, 0, canvas.width, canvas.height);
+            URL.revokeObjectURL(slideUrl);
+            canvas.toBlob(function(blob) {
+              downloadBlob(blob, "pin_" + sNum + "_" + qc + "_slide.png");
+            }, "image/png");
+          };
+          sImg.src = slideUrl;
+        })(url, slideNum, pin.qCode);
+      });
+    }
+
+    // ---- Print Pinned Views to PDF ----
+    // Builds a temporary print layout with one pinned view per page,
+    // triggers window.print() (user can save to PDF), then restores DOM.
+    function printPinnedViews() {
+      if (pinnedViews.length === 0) {
+        alert("No pinned views to print. Pin questions from the Crosstabs tab first.");
+        return;
+      }
+
+      // Create a print overlay container
+      var overlay = document.createElement("div");
+      overlay.id = "pinned-print-overlay";
+      overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;z-index:99999;background:white;overflow:auto;";
+
+      // Add print-specific styles
+      var printStyle = document.createElement("style");
+      printStyle.id = "pinned-print-style";
+      printStyle.textContent = "@media print { " +
+        "body > *:not(#pinned-print-overlay) { display: none !important; } " +
+        "#pinned-print-overlay { position: static !important; overflow: visible !important; } " +
+        ".pinned-print-page { page-break-after: always; padding: 20px 32px; box-sizing: border-box; } " +
+        ".pinned-print-page:last-child { page-break-after: auto; } " +
+        ".pinned-print-header { margin-bottom: 16px; } " +
+        ".pinned-print-qcode { font-size: 12px; font-weight: 700; color: #323367; } " +
+        ".pinned-print-title { font-size: 16px; font-weight: 600; color: #1e293b; margin: 2px 0; } " +
+        ".pinned-print-meta { font-size: 11px; color: #64748b; } " +
+        ".pinned-print-content { display: flex; gap: 20px; align-items: flex-start; margin-top: 12px; } " +
+        ".pinned-print-table { flex: 1; overflow: visible; font-size: 11px; } " +
+        ".pinned-print-table table { width: 100%; border-collapse: collapse; font-size: 10px; } " +
+        ".pinned-print-table th, .pinned-print-table td { padding: 3px 6px; border: 1px solid #ddd; text-align: left; } " +
+        ".pinned-print-table th { background: #f1f5f9; font-weight: 600; font-size: 9px; } " +
+        ".pinned-print-chart { flex: 1; } " +
+        ".pinned-print-chart svg { width: 100%; height: auto; } " +
+        ".pinned-print-insight { margin-top: 12px; padding: 10px 14px; border-left: 3px solid #323367; " +
+        "  background: #f8f9fb; border-radius: 0 6px 6px 0; font-size: 12px; color: #374151; font-style: italic; } " +
+        ".pinned-print-page-num { text-align: right; font-size: 9px; color: #94a3b8; margin-top: 8px; } " +
+        "} " +
+        "@media screen { " +
+        "#pinned-print-overlay .pinned-print-page { " +
+        "  max-width: 900px; margin: 20px auto; padding: 32px; " +
+        "  border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; " +
+        "  box-shadow: 0 1px 3px rgba(0,0,0,0.1); } " +
+        ".pinned-print-content { display: flex; gap: 20px; } " +
+        ".pinned-print-table { flex: 1; overflow-x: auto; } " +
+        ".pinned-print-table table { font-size: 10px; width: 100%; border-collapse: collapse; } " +
+        ".pinned-print-table th, .pinned-print-table td { padding: 3px 6px; border: 1px solid #ddd; } " +
+        ".pinned-print-table th { background: #f1f5f9; font-weight: 600; font-size: 9px; } " +
+        ".pinned-print-chart { flex: 1; } " +
+        ".pinned-print-chart svg { width: 100%; height: auto; } " +
+        ".pinned-print-insight { margin-top: 12px; padding: 10px 14px; border-left: 3px solid #323367; " +
+        "  background: #f8f9fb; font-size: 12px; color: #374151; font-style: italic; } " +
+        "}";
+      document.head.appendChild(printStyle);
+
+      // Get project title for header
+      var projectTitle = document.querySelector(".header-title");
+      var pTitle = projectTitle ? projectTitle.textContent : "Report";
+
+      // Build one page per pinned view
+      pinnedViews.forEach(function(pin, idx) {
+        var page = document.createElement("div");
+        page.className = "pinned-print-page";
+
+        // Header
+        var hdr = document.createElement("div");
+        hdr.className = "pinned-print-header";
+        hdr.innerHTML = "<div class=\\"pinned-print-qcode\\">" + escapeHtml(pin.qCode) + "</div>" +
+          "<div class=\\"pinned-print-title\\">" + escapeHtml(pin.qTitle) + "</div>" +
+          "<div class=\\"pinned-print-meta\\">Banner: " + escapeHtml(pin.bannerLabel) +
+          (pin.baseText ? " \\u00B7 Base: " + escapeHtml(pin.baseText) : "") +
+          " \\u00B7 " + escapeHtml(pTitle) + "</div>";
+        page.appendChild(hdr);
+
+        // Content: table + chart
+        var content = document.createElement("div");
+        content.className = "pinned-print-content";
+
+        if (pin.tableHtml) {
+          var tableDiv = document.createElement("div");
+          tableDiv.className = "pinned-print-table";
+          tableDiv.innerHTML = pin.tableHtml;
+          content.appendChild(tableDiv);
+        }
+
+        if (pin.chartSvg) {
+          var chartDiv = document.createElement("div");
+          chartDiv.className = "pinned-print-chart";
+          chartDiv.innerHTML = pin.chartSvg;
+          content.appendChild(chartDiv);
+        }
+        page.appendChild(content);
+
+        // Insight
+        if (pin.insightText) {
+          var insDiv = document.createElement("div");
+          insDiv.className = "pinned-print-insight";
+          insDiv.textContent = pin.insightText;
+          page.appendChild(insDiv);
+        }
+
+        // Page number
+        var pgNum = document.createElement("div");
+        pgNum.className = "pinned-print-page-num";
+        pgNum.textContent = (idx + 1) + " of " + pinnedViews.length;
+        page.appendChild(pgNum);
+
+        overlay.appendChild(page);
+      });
+
+      document.body.appendChild(overlay);
+
+      // Clean up function
+      function cleanupPrintOverlay() {
+        var ov = document.getElementById("pinned-print-overlay");
+        if (ov) ov.remove();
+        var ps = document.getElementById("pinned-print-style");
+        if (ps) ps.remove();
+      }
+
+      // Listen for afterprint event (reliable in modern browsers)
+      var cleaned = false;
+      function onAfterPrint() {
+        if (cleaned) return;
+        cleaned = true;
+        window.removeEventListener("afterprint", onAfterPrint);
+        cleanupPrintOverlay();
+      }
+      window.addEventListener("afterprint", onAfterPrint);
+
+      // Small delay to let browser render, then print
+      setTimeout(function() {
+        window.print();
+        // Fallback cleanup if afterprint does not fire (some browsers)
+        setTimeout(function() {
+          if (!cleaned) {
+            cleaned = true;
+            cleanupPrintOverlay();
+          }
+        }, 2000);
+      }, 300);
+    }
   '
 }
 
@@ -2679,6 +3615,9 @@ build_js_table_export_and_init <- function() {
 
     function initSortHeaders() {
       document.querySelectorAll("th.ct-data-col[data-col-key]").forEach(function(th) {
+        // Skip if already initialized (e.g., from saved HTML re-open)
+        if (th.querySelector(".ct-sort-indicator")) return;
+
         var indicator = document.createElement("span");
         indicator.className = "ct-sort-indicator";
         indicator.textContent = " \\u21C5";
@@ -2864,6 +3803,8 @@ build_js_table_export_and_init <- function() {
       initChartColumnPickers();
       // Hydrate insights from hidden textareas (for saved HTML re-open)
       hydrateInsights();
+      // Hydrate pinned views from hidden JSON store
+      hydratePinnedViews();
       // Auto-show insights that have content (from config or save-as)
       document.querySelectorAll(".insight-editor").forEach(function(editor) {
         if (editor.textContent.trim()) {
