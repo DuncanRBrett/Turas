@@ -1058,6 +1058,7 @@ build_footer <- function(config_obj, min_base = 30) {
 
 #' Build JavaScript for Interactivity
 #'
+#' Assembles all JS from focused helper functions into a single script tag.
 #' Plain vanilla JavaScript — no HTMLWidgets, no React, no external deps.
 #'
 #' @param html_data The transformed data
@@ -1065,8 +1066,30 @@ build_footer <- function(config_obj, min_base = 30) {
 build_javascript <- function(html_data) {
   group_codes <- sapply(html_data$banner_groups, function(g) g$banner_code)
 
-  # Use gsub instead of sprintf to avoid % escaping issues in JS regex patterns
-  js_code <- '
+  js_full <- paste0(
+    build_js_core_navigation(),
+    build_js_chart_picker(),
+    build_js_slide_export(),
+    build_js_table_export_and_init()
+  )
+
+  js_full <- gsub("BANNER_GROUPS_JSON",
+                   jsonlite::toJSON(unname(group_codes), auto_unbox = FALSE),
+                   js_full, fixed = TRUE)
+
+  htmltools::tags$script(htmltools::HTML(js_full))
+}
+
+
+#' Build Core Navigation JavaScript
+#'
+#' Global state, question navigation, banner switching, heatmap toggle,
+#' frequency toggle, print, chart toggle, and insight/comment system.
+#'
+#' @return Character string of JavaScript code
+#' @keywords internal
+build_js_core_navigation <- function() {
+  '
     // Banner group codes
     var bannerGroups = BANNER_GROUPS_JSON;
     var currentGroup = bannerGroups[0] || "";
@@ -1332,9 +1355,18 @@ build_javascript <- function(html_data) {
     }
 
   '
+}
 
-  # Second JS block: chart column picker, multi-column charts, slide export
-  js_code2 <- '
+
+#' Build Chart Column Picker JavaScript
+#'
+#' Chart column picker, multi-column stacked/horizontal SVG builders,
+#' HSL colour utilities, and chart PNG export.
+#'
+#' @return Character string of JavaScript code
+#' @keywords internal
+build_js_chart_picker <- function() {
+  '
     // ---- Chart Column Picker ----
     var chartColumnState = {}; // qCode -> { colKey: true/false }
 
@@ -1840,9 +1872,18 @@ build_javascript <- function(html_data) {
     }
 
   '
+}
 
-  # Third JS block: slide export and data extraction
-  js_code3 <- '
+
+#' Build Slide Export JavaScript
+#'
+#' Presentation-quality SVG slide builder with title, base, chart,
+#' metrics strip, and insight — rendered to PNG at 3x resolution.
+#'
+#' @return Character string of JavaScript code
+#' @keywords internal
+build_js_slide_export <- function() {
+  '
     // ---- Slide PNG Export ----
     // Builds a presentation-quality SVG slide with title, base, chart,
     // metrics strip, and insight -- then renders to PNG at 3x resolution.
@@ -2004,9 +2045,18 @@ build_javascript <- function(html_data) {
     }
 
   '
+}
 
-  # Fourth JS block: table export, CSV, Excel, column sort, init
-  js_code4 <- '
+
+#' Build Table Export and Init JavaScript
+#'
+#' Table data extraction, CSV/Excel export, column toggle chips,
+#' column sort, downloadBlob utility, and DOMContentLoaded init.
+#'
+#' @return Character string of JavaScript code
+#' @keywords internal
+build_js_table_export_and_init <- function() {
+  '
     // Extract table data as 2D array (shared by CSV and Excel export)
     function extractTableData(qCode) {
       var activeContainer = document.querySelector(".question-container.active");
@@ -2403,17 +2453,6 @@ build_javascript <- function(html_data) {
       });
     });
   '
-
-  js_full <- paste0(js_code, js_code2, js_code3, js_code4)
-  js_full <- gsub("BANNER_GROUPS_JSON",
-                   jsonlite::toJSON(unname(group_codes), auto_unbox = FALSE),
-                   js_full, fixed = TRUE)
-
-  htmltools::tags$script(htmltools::HTML(js_full))
 }
 
 
-# Null-coalescing operator
-if (!exists("%||%", mode = "function")) {
-  `%||%` <- function(x, y) if (is.null(x)) y else x
-}

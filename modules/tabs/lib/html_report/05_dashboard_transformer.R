@@ -341,17 +341,7 @@ extract_sig_findings <- function(headline_metrics, banner_info) {
 
   key_to_group <- character(0)
 
-  # Build banner code to display label mapping from banner_headers
-  banner_code_to_label <- character(0)
-  if (!is.null(banner_info$banner_headers) && nrow(banner_info$banner_headers) > 0 &&
-      !is.null(banner_info$banner_info)) {
-    grp_codes <- names(banner_info$banner_info)
-    for (i in seq_along(grp_codes)) {
-      if (i <= nrow(banner_info$banner_headers)) {
-        banner_code_to_label[grp_codes[i]] <- banner_info$banner_headers$label[i]
-      }
-    }
-  }
+  banner_code_to_label <- build_banner_code_to_label(banner_info)
 
   if (!is.null(banner_info$banner_info)) {
     for (grp_name in names(banner_info$banner_info)) {
@@ -484,7 +474,3 @@ extract_sig_findings <- function(headline_metrics, banner_info) {
 }
 
 
-# Null-coalescing operator (if not already defined)
-if (!exists("%||%", mode = "function")) {
-  `%||%` <- function(x, y) if (is.null(x)) y else x
-}

@@ -373,7 +373,7 @@ build_gauge_section <- function(metrics, brand_colour, section_label, thresholds
     q_label <- metric$question_text
 
     # Store display value for slide export
-    display_val <- format_gauge_value(total_val, metric$metric_type, thresholds)
+    display_val <- format_gauge_value(total_val, metric$metric_type)
 
     htmltools::tags$div(
       class = "dash-gauge-card",
@@ -411,15 +411,19 @@ build_gauge_section <- function(metrics, brand_colour, section_label, thresholds
 }
 
 
-#' Format Gauge Display Value
+#' Format Metric Display Value
 #'
-#' @param value Numeric
-#' @param metric_type Character
-#' @param thresholds List from build_colour_thresholds()
+#' Formats a numeric metric value for display in gauges, heatmaps, and
+#' significance finding cards. Handles NET/NPS (signed integer), custom
+#' (percentage), and mean/index (1 decimal place).
+#'
+#' @param value Numeric value (may be NULL or NA)
+#' @param metric_type Character: "net_positive", "nps_score", "average",
+#'        "index", or "custom"
 #' @return Character display string
 #' @keywords internal
-format_gauge_value <- function(value, metric_type, thresholds) {
-  if (is.na(value)) return("N/A")
+format_gauge_value <- function(value, metric_type) {
+  if (is.null(value) || is.na(value)) return("N/A")
   if (metric_type %in% c("net_positive", "nps_score")) {
     paste0(ifelse(value >= 0, "+", ""), round(value))
   } else if (metric_type == "custom") {
@@ -474,15 +478,7 @@ build_svg_gauge <- function(value, metric_type, brand_colour, thresholds) {
   # Colour (from thresholds)
   colour <- get_gauge_colour(value, metric_type, thresholds)
 
-  # Display value
-  if (metric_type %in% c("net_positive", "nps_score")) {
-    disp <- paste0(ifelse(value >= 0, "+", ""), round(value))
-  } else if (metric_type == "custom") {
-    disp <- paste0(round(value), "%")
-  } else {
-    # Mean / Index — show 1 decimal
-    disp <- format(round(value, 1), nsmall = 1)
-  }
+  disp <- format_gauge_value(value, metric_type)
 
   # Build SVG
   svg <- paste0(
@@ -545,17 +541,7 @@ build_heatmap_grid <- function(metrics, banner_info, config_obj, thresholds,
   # Each banner group
   group_spans <- list()  # list of list(name, ncols) for header row 1
 
-  # Build banner code to display label mapping from banner_headers
-  banner_code_to_label <- character(0)
-  if (!is.null(banner_info$banner_headers) && nrow(banner_info$banner_headers) > 0 &&
-      !is.null(banner_info$banner_info)) {
-    grp_codes <- names(banner_info$banner_info)
-    for (i in seq_along(grp_codes)) {
-      if (i <= nrow(banner_info$banner_headers)) {
-        banner_code_to_label[grp_codes[i]] <- banner_info$banner_headers$label[i]
-      }
-    }
-  }
+  banner_code_to_label <- build_banner_code_to_label(banner_info)
 
   if (!is.null(banner_info$banner_info)) {
     for (grp_name in names(banner_info$banner_info)) {
@@ -676,14 +662,7 @@ build_heatmap_grid <- function(metrics, banner_info, config_obj, thresholds,
           if (is_total) " dash-hm-total" else ""
         ))
       } else {
-        # Format display value
-        if (metric$metric_type %in% c("net_positive", "nps_score")) {
-          disp <- paste0(ifelse(val >= 0, "+", ""), round(val))
-        } else if (metric$metric_type == "custom") {
-          disp <- paste0(round(val), "%")
-        } else {
-          disp <- format(round(val, 1), nsmall = 1)
-        }
+        disp <- format_gauge_value(val, metric$metric_type)
 
         bg_style <- get_heatmap_bg_style(val, metric$metric_type, thresholds)
         total_class <- if (is_total) " dash-hm-total" else ""
@@ -1025,26 +1004,14 @@ build_sig_findings_section <- function(sig_findings, brand_colour) {
   if (length(sig_findings) == 0) return(NULL)
 
   cards <- lapply(sig_findings, function(f) {
-    # Format the column value
-    format_val <- function(v, mtype) {
-      if (is.null(v) || is.na(v)) return("N/A")
-      if (mtype %in% c("net_positive", "nps_score")) {
-        paste0(ifelse(v >= 0, "+", ""), round(v))
-      } else if (mtype == "custom") {
-        paste0(round(v), "%")
-      } else {
-        format(round(v, 1), nsmall = 1)
-      }
-    }
-
-    col_val_display <- format_val(f$value, f$metric_type)
-    total_val_display <- format_val(f$total_value, f$metric_type)
+    col_val_display <- format_gauge_value(f$value, f$metric_type)
+    total_val_display <- format_gauge_value(f$total_value, f$metric_type)
 
     # Resolve comparison letters to "Cape Town (+42), Pretoria (+38)"
     comparisons_text <- f$sig_letters  # fallback: raw letters
     if (!is.null(f$resolved_comparisons) && length(f$resolved_comparisons) > 0) {
       comp_parts <- sapply(f$resolved_comparisons, function(comp) {
-        comp_val_display <- format_val(comp$value, f$metric_type)
+        comp_val_display <- format_gauge_value(comp$value, f$metric_type)
         paste0(comp$name, " (", comp_val_display, ")")
       })
       comparisons_text <- paste(comp_parts, collapse = ", ")
@@ -1419,7 +1386,3 @@ get_heatmap_bg_style <- function(value, metric_type, thresholds) {
 }
 
 
-# Null-coalescing operator (if not already defined)
-if (!exists("%||%", mode = "function")) {
-  `%||%` <- function(x, y) if (is.null(x)) y else x
-}

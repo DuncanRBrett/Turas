@@ -15,19 +15,41 @@
   dirname(sys.frame(1)$ofile %||% ".")
 }
 
-# Source all submodules
-for (.hr_file in c("00_html_guard.R", "01_data_transformer.R",
-                    "02_table_builder.R", "03_page_builder.R",
-                    "04_html_writer.R",
-                    "05_dashboard_transformer.R",
-                    "06_dashboard_builder.R",
-                    "07_chart_builder.R")) {
+# Source all submodules — fail loudly if any file is missing
+.hr_required_files <- c("00_html_guard.R", "01_data_transformer.R",
+                         "02_table_builder.R", "03_page_builder.R",
+                         "04_html_writer.R",
+                         "05_dashboard_transformer.R",
+                         "06_dashboard_builder.R",
+                         "07_chart_builder.R")
+
+.hr_missing <- character(0)
+for (.hr_file in .hr_required_files) {
   .hr_path <- file.path(.html_report_dir, .hr_file)
-  if (file.exists(.hr_path)) {
-    source(.hr_path)
+  if (!file.exists(.hr_path)) {
+    .hr_missing <- c(.hr_missing, .hr_file)
   }
 }
-rm(.hr_file, .hr_path)
+
+if (length(.hr_missing) > 0) {
+  cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
+  cat("│ Code: IO_HTML_SUBMODULE_MISSING\n")
+  cat("│ Missing files:\n")
+  for (.hr_f in .hr_missing) {
+    cat("│   -", .hr_f, "\n")
+  }
+  cat("│ Expected in:", .html_report_dir, "\n")
+  cat("│ Fix: Restore missing files or check html_report/ directory\n")
+  cat("└───────────────────────────────────────────────────────┘\n\n")
+  stop(sprintf("HTML report submodule(s) missing: %s", paste(.hr_missing, collapse = ", ")),
+       call. = FALSE)
+}
+
+for (.hr_file in .hr_required_files) {
+  .hr_path <- file.path(.html_report_dir, .hr_file)
+  source(.hr_path)
+}
+rm(.hr_file, .hr_path, .hr_required_files, .hr_missing)
 
 
 #' Generate HTML Crosstab Report
@@ -158,6 +180,7 @@ generate_html_report <- function(all_results, banner_info, config_obj, output_pa
   cat("  Step 3: Building HTML tables...\n")
 
   tables <- list()
+  table_failures <- character(0)
   for (q_code in names(html_data$questions)) {
     q_data <- html_data$questions[[q_code]]
 
@@ -170,6 +193,7 @@ generate_html_report <- function(all_results, banner_info, config_obj, output_pa
         table_id = table_id
       )
     }, error = function(e) {
+      table_failures <<- c(table_failures, q_code)
       cat(sprintf("    [WARNING] Failed to build table for %s: %s\n", q_code, e$message))
     })
   }
@@ -183,12 +207,19 @@ generate_html_report <- function(all_results, banner_info, config_obj, output_pa
     ))
   }
 
+  if (length(table_failures) > 0) {
+    cat(sprintf("    [WARNING] %d of %d questions failed to render: %s\n",
+                length(table_failures),
+                length(html_data$questions),
+                paste(table_failures, collapse = ", ")))
+  }
   cat(sprintf("    %d tables built successfully\n", length(tables)))
 
   # ============================================================================
   # STEP 3b: BUILD CHARTS (if enabled)
   # ============================================================================
   charts <- list()
+  chart_failures <- character(0)
   if (isTRUE(config_obj$show_charts)) {
     cat("  Step 3b: Building SVG charts...\n")
     options_df <- if (!is.null(survey_structure) && !is.null(survey_structure$options)) {
@@ -209,8 +240,13 @@ generate_html_report <- function(all_results, banner_info, config_obj, output_pa
             charts[[q_code]] <- chart
           }
         }, error = function(e) {
+          chart_failures <<- c(chart_failures, q_code)
           cat(sprintf("    [WARNING] Failed to build chart for %s: %s\n", q_code, e$message))
         })
+      }
+      if (length(chart_failures) > 0) {
+        cat(sprintf("    [WARNING] %d charts failed to render: %s\n",
+                    length(chart_failures), paste(chart_failures, collapse = ", ")))
       }
       cat(sprintf("    %d charts built successfully\n", length(charts)))
     } else {
@@ -259,23 +295,44 @@ generate_html_report <- function(all_results, banner_info, config_obj, output_pa
   # ============================================================================
   elapsed <- round(as.numeric(difftime(Sys.time(), start_time, units = "secs")), 1)
 
-  cat(sprintf("  Done! %.1f MB in %.1f seconds\n", write_result$file_size_mb, elapsed))
+  # Determine final status — PARTIAL if some questions/charts failed
+  has_failures <- length(table_failures) > 0 || length(chart_failures) > 0
+  final_status <- if (has_failures) "PARTIAL" else "PASS"
+
+  warnings <- character(0)
+  if (length(table_failures) > 0) {
+    warnings <- c(warnings,
+      sprintf("%d question(s) failed to render: %s",
+              length(table_failures), paste(table_failures, collapse = ", ")))
+  }
+  if (length(chart_failures) > 0) {
+    warnings <- c(warnings,
+      sprintf("%d chart(s) failed to render: %s",
+              length(chart_failures), paste(chart_failures, collapse = ", ")))
+  }
+
+  if (has_failures) {
+    cat(sprintf("  Done with warnings! %.1f MB in %.1f seconds\n",
+                write_result$file_size_mb, elapsed))
+    for (w in warnings) cat(sprintf("    [!] %s\n", w))
+  } else {
+    cat(sprintf("  Done! %.1f MB in %.1f seconds\n", write_result$file_size_mb, elapsed))
+  }
   cat(paste(rep("-", 60), collapse = ""), "\n\n")
 
   list(
-    status = "PASS",
+    status = final_status,
     message = sprintf("HTML report generated: %d questions, %.1f MB",
                       length(tables), write_result$file_size_mb),
     output_file = write_result$output_file,
     file_size_mb = write_result$file_size_mb,
     file_size_bytes = write_result$file_size_bytes,
     n_questions = length(tables),
-    elapsed_seconds = elapsed
+    elapsed_seconds = elapsed,
+    warnings = if (length(warnings) > 0) warnings else NULL,
+    table_failures = if (length(table_failures) > 0) table_failures else NULL,
+    chart_failures = if (length(chart_failures) > 0) chart_failures else NULL
   )
 }
 
 
-# Null-coalescing operator
-if (!exists("%||%", mode = "function")) {
-  `%||%` <- function(x, y) if (is.null(x)) y else x
-}

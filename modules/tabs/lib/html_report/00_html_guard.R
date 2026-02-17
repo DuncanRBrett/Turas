@@ -134,3 +134,38 @@ validate_html_report_inputs <- function(all_results, banner_info, config_obj) {
   # All checks passed
   list(status = "PASS", message = "HTML report inputs validated successfully")
 }
+
+
+# Null-coalescing operator — defined once here, used across all HTML report files
+if (!exists("%||%", mode = "function")) {
+  `%||%` <- function(x, y) if (is.null(x)) y else x
+}
+
+
+# ==============================================================================
+# SHARED UTILITIES — used by multiple HTML report files
+# ==============================================================================
+
+#' Build Banner Code to Display Label Mapping
+#'
+#' Maps internal banner group codes (e.g., "Q002") to user-facing display
+#' labels (e.g., "Campus") using banner_headers. Used by dashboard transformer
+#' and dashboard builder to show readable names instead of question codes.
+#'
+#' @param banner_info Banner structure from create_banner_structure()
+#' @return Named character vector: names are group codes, values are labels
+#' @keywords internal
+build_banner_code_to_label <- function(banner_info) {
+  mapping <- character(0)
+  if (!is.null(banner_info$banner_headers) &&
+      nrow(banner_info$banner_headers) > 0 &&
+      !is.null(banner_info$banner_info)) {
+    grp_codes <- names(banner_info$banner_info)
+    for (i in seq_along(grp_codes)) {
+      if (i <= nrow(banner_info$banner_headers)) {
+        mapping[grp_codes[i]] <- banner_info$banner_headers$label[i]
+      }
+    }
+  }
+  mapping
+}

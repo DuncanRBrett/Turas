@@ -283,7 +283,3 @@ build_question_table <- function(question_data, banner_groups, config_obj,
 }
 
 
-# Null-coalescing operator (if not already defined)
-if (!exists("%||%", mode = "function")) {
-  `%||%` <- function(x, y) if (is.null(x)) y else x
-}

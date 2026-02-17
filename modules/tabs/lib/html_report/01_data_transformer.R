@@ -2,7 +2,7 @@
 # HTML REPORT - DATA TRANSFORMER (V10.3)
 # ==============================================================================
 # Transforms all_results + banner_info into HTML-ready data structures
-# for reactable table rendering.
+# for plain HTML table rendering.
 # ==============================================================================
 
 
@@ -176,7 +176,7 @@ classify_row_labels <- function(question_table, question_type = "Single_Choice")
 #' Transform a Single Question for HTML Display
 #'
 #' Converts a question's table data.frame into a flat data.frame
-#' suitable for reactable, with hidden columns for sig/freq/base data.
+#' suitable for HTML table rendering, with hidden columns for sig/freq/base data.
 #'
 #' @param q_result Single element from all_results
 #' @param banner_info Banner structure
@@ -187,7 +187,7 @@ classify_row_labels <- function(question_table, question_type = "Single_Choice")
 #'   \item{question_type}{Question type}
 #'   \item{base_filter}{Filter text or NA}
 #'   \item{stats}{Available statistics (from detect_available_stats)}
-#'   \item{table_data}{Data.frame for reactable}
+#'   \item{table_data}{Data.frame for HTML table builder}
 #' @export
 transform_single_question <- function(q_result, banner_info, config_obj) {
 
@@ -461,7 +461,3 @@ transform_for_html <- function(all_results, banner_info, config_obj) {
 }
 
 
-# Null-coalescing operator (if not already defined)
-if (!exists("%||%", mode = "function")) {
-  `%||%` <- function(x, y) if (is.null(x)) y else x
-}
