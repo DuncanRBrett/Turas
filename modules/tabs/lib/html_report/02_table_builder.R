@@ -24,7 +24,7 @@ build_question_table <- function(question_data, banner_groups, config_obj,
   table_data <- question_data$table_data
   stats <- question_data$stats
   min_base <- config_obj$significance_min_base %||% 30
-  brand_colour <- config_obj$brand_colour %||% "#0d8a8a"
+  brand_colour <- config_obj$brand_colour %||% "#323367"
   has_sig <- stats$has_sig
   has_freq <- stats$has_freq && isTRUE(config_obj$embed_frequencies)
 
@@ -127,7 +127,13 @@ build_question_table <- function(question_data, banner_groups, config_obj,
                             label_html, htmltools::htmlEscape(index_desc))
     }
 
-    cells <- sprintf('<td class="ct-td ct-label-col">%s</td>', label_html)
+    # Add exclusion toggle button for category and NET rows (visible on hover)
+    # NET rows represent box categories in stacked charts
+    exclude_btn <- ""
+    if (row_type == "category" || (row_type == "net" && is_net)) {
+      exclude_btn <- '<button class="row-exclude-btn" onclick="toggleRowExclusion(this.closest(\'tr\'))" title="Exclude from chart">&#x2715;</button>'
+    }
+    cells <- sprintf('<td class="ct-td ct-label-col">%s%s</td>', label_html, exclude_btn)
 
     # Data cells
     for (key in all_internal_keys) {

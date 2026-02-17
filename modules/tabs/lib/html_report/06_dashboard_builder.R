@@ -106,7 +106,7 @@ get_thresholds_for_type <- function(metric_type, thresholds) {
 #' @export
 build_dashboard_panel <- function(dashboard_data, config_obj) {
 
-  brand_colour <- config_obj$brand_colour %||% "#0d8a8a"
+  brand_colour <- config_obj$brand_colour %||% "#323367"
   banner_info <- dashboard_data$banner_info
   metric_sections <- dashboard_data$metric_sections
 
@@ -525,7 +525,7 @@ build_heatmap_grid <- function(metrics, banner_info, config_obj, thresholds,
 
   if (length(metrics) == 0) return(NULL)
 
-  brand_colour <- config_obj$brand_colour %||% "#0d8a8a"
+  brand_colour <- config_obj$brand_colour %||% "#323367"
 
   # Build column structure: Total + each banner group's columns
   col_structure <- list()  # list of list(key, label, group)
@@ -840,7 +840,7 @@ build_dashboard_interaction_js <- function() {
         var accent = document.createElementNS(ns, "rect");
         accent.setAttribute("x", pad); accent.setAttribute("y", pad);
         accent.setAttribute("width", "4"); accent.setAttribute("height", "22");
-        accent.setAttribute("rx", "2"); accent.setAttribute("fill", "#0d8a8a");
+        accent.setAttribute("rx", "2"); accent.setAttribute("fill", "#323367");
         svg.appendChild(accent);
 
         var title = document.createElementNS(ns, "text");
@@ -923,7 +923,7 @@ build_dashboard_interaction_js <- function() {
           var qCode = card.getAttribute("data-q-code") || "";
           var qcEl = document.createElementNS(ns, "text");
           qcEl.setAttribute("x", midX); qcEl.setAttribute("y", gCy + 16);
-          qcEl.setAttribute("text-anchor", "middle"); qcEl.setAttribute("fill", "#0d8a8a");
+          qcEl.setAttribute("text-anchor", "middle"); qcEl.setAttribute("fill", "#323367");
           qcEl.setAttribute("font-size", "10"); qcEl.setAttribute("font-weight", "700");
           qcEl.textContent = qCode;
           svg.appendChild(qcEl);
@@ -1068,7 +1068,7 @@ build_sig_findings_section <- function(sig_findings, brand_colour) {
 #' @export
 build_dashboard_css <- function(brand_colour) {
 
-  bc <- brand_colour %||% "#0d8a8a"
+  bc <- brand_colour %||% "#323367"
 
   css_text <- '
     /* === REPORT TAB NAVIGATION === */

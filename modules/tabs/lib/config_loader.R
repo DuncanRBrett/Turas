@@ -313,7 +313,11 @@ build_config_object <- function(settings) {
     # V10.3 HTML report & branding
     html_report = safe_logical(get_config_value(settings, "html_report", FALSE)),
     project_title = get_config_value(settings, "project_title", "Crosstab Report"),
-    brand_colour = get_config_value(settings, "brand_colour", "#0d8a8a"),
+    brand_colour = get_config_value(settings, "brand_colour", "#323367"),
+    accent_colour = get_config_value(settings, "accent_colour", "#CC9900"),
+    company_name = get_config_value(settings, "company_name", "The Research Lamppost"),
+    client_name = get_config_value(settings, "client_name", NULL),
+    logo_path = get_config_value(settings, "logo_path", NULL),
     embed_frequencies = safe_logical(get_config_value(settings, "embed_frequencies", TRUE)),
 
     # V10.4 Summary Dashboard settings

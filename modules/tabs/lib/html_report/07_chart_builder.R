@@ -25,27 +25,34 @@
 #' @param brand_colour Character, hex brand colour
 #' @return Character, hex colour
 #' @keywords internal
-get_semantic_colour <- function(label, index = 1, n_total = 3, brand_colour = "#0d8a8a") {
+get_semantic_colour <- function(label, index = 1, n_total = 3, brand_colour = "#323367") {
 
   label_lower <- tolower(trimws(label))
 
   # Sentiment / satisfaction spectrum
-  # Palette: muted brick-red | pale warm stone | brand teal
+  # Red (negative) -> Amber (moderate negative) -> Grey (neutral) -> Green (positive)
+  # Muted, professional tones — not garish primaries
   semantic_map <- list(
-    # Negative end (muted brick-red)
+    # Strong negative (muted red)
     "negative"              = "#c0695c",
     "terrible or not good"  = "#c0695c",
     "poor (1-3)"            = "#c0695c",
     "poor"                  = "#c0695c",
     "below average or poor" = "#c0695c",
-    "below average"         = "#cf8a7c",
-    "dissatisfied"          = "#c0695c",
+    "dissatisfied (1-5)"    = "#c0695c",
     "detractor (0-6)"       = "#c0695c",
     "detractor"             = "#c0695c",
     "do not trust"          = "#c0695c",
     "would switch"          = "#c0695c",
+    "strongly disagree"     = "#c0695c",
+    "very dissatisfied"     = "#c0695c",
 
-    # Neutral / middle (pale warm stone — fades into background)
+    # Moderate negative (warm amber)
+    "below average"         = "#cf8a7c",
+    "dissatisfied"          = "#cf8a7c",
+    "disagree"              = "#cf8a7c",
+
+    # Neutral / middle (soft warm grey)
     "neutral"               = "#d5cfc7",
     "average"               = "#d5cfc7",
     "average (4-6)"         = "#d5cfc7",
@@ -53,21 +60,30 @@ get_semantic_colour <- function(label, index = 1, n_total = 3, brand_colour = "#
     "passive (7-8)"         = "#d5cfc7",
     "passive"               = "#d5cfc7",
     "some trust"            = "#d5cfc7",
+    "neither agree nor disagree" = "#d5cfc7",
+    "average satisfaction"  = "#d5cfc7",
+    "average satisfaction (6-8)" = "#d5cfc7",
 
-    # Positive end (brand teal)
-    "positive"              = "#0d8a8a",
-    "good or excellent"     = "#0d8a8a",
-    "good or excellent (7-10)" = "#0d8a8a",
-    "excellent"             = "#0d8a8a",
-    "satisfied"             = "#0d8a8a",
-    "very satisfied (9-10)" = "#0d8a8a",
-    "very satisfied"        = "#0d8a8a",
-    "promoter (9-10)"       = "#0d8a8a",
-    "promoter"              = "#0d8a8a",
-    "fully trust"           = "#0d8a8a",
-    "would not switch"      = "#0d8a8a",
+    # Moderate positive (muted green)
+    "satisfied"             = "#68a67d",
+    "above average"         = "#68a67d",
+    "agree"                 = "#68a67d",
+    "good"                  = "#68a67d",
 
-    # DK / NA / Not applicable (neutral grey -- distinct from data categories)
+    # Strong positive (rich green)
+    "positive"              = "#3d8b5e",
+    "good or excellent"     = "#3d8b5e",
+    "good or excellent (7-10)" = "#3d8b5e",
+    "excellent"             = "#3d8b5e",
+    "very satisfied (9-10)" = "#3d8b5e",
+    "very satisfied"        = "#3d8b5e",
+    "promoter (9-10)"       = "#3d8b5e",
+    "promoter"              = "#3d8b5e",
+    "fully trust"           = "#3d8b5e",
+    "would not switch"      = "#3d8b5e",
+    "strongly agree"        = "#3d8b5e",
+
+    # DK / NA / Not applicable (neutral grey — distinct from data categories)
     "dk"                    = "#b8b8b8",
     "na"                    = "#b8b8b8",
     "dk/na"                 = "#b8b8b8",
@@ -77,12 +93,7 @@ get_semantic_colour <- function(label, index = 1, n_total = 3, brand_colour = "#
     "n/a"                   = "#b8b8b8",
     "refused"               = "#b8b8b8",
     "prefer not to say"     = "#b8b8b8",
-    "other"                 = "#c5c0b8",
-
-    # Average satisfaction / middle range (warm amber-stone)
-    "average satisfaction"  = "#d5cfc7",
-    "average satisfaction (6-8)" = "#d5cfc7",
-    "dissatisfied (1-5)"    = "#c0695c"
+    "other"                 = "#c5c0b8"
   )
 
   colour <- semantic_map[[label_lower]]
@@ -272,7 +283,7 @@ build_stacked_bar_svg <- function(items, bar_width = 680, chart_id = NULL) {
 #' @param chart_width Numeric, total SVG width
 #' @return Character, SVG markup
 #' @keywords internal
-build_horizontal_bars_svg <- function(items, brand_colour = "#0d8a8a",
+build_horizontal_bars_svg <- function(items, brand_colour = "#323367",
                                       chart_width = 680) {
 
   if (nrow(items) == 0) return("")
@@ -283,10 +294,11 @@ build_horizontal_bars_svg <- function(items, brand_colour = "#0d8a8a",
   max_label_chars <- max(nchar(items$label), na.rm = TRUE)
   label_width <- max(160, ceiling(max_label_chars * 6.2) + 16)
   value_width <- 45
-  bar_area_width <- chart_width - label_width - value_width - 20
+  right_pad <- 50  # space for percentage text beyond bar end
+  bar_area_width <- chart_width - label_width - value_width - right_pad
   # If labels are very long, widen the SVG to keep bars usable
   if (bar_area_width < 200) {
-    chart_width <- label_width + value_width + 20 + 300
+    chart_width <- label_width + value_width + right_pad + 300
     bar_area_width <- 300
   }
   top_margin <- 4
@@ -426,7 +438,7 @@ build_question_chart <- function(question_data, options_df, config_obj) {
   q_code <- question_data$q_code
   q_type <- question_data$question_type %||% "Unknown"
   table_data <- question_data$table_data
-  brand_colour <- config_obj$brand_colour %||% "#0d8a8a"
+  brand_colour <- config_obj$brand_colour %||% "#323367"
 
   # Skip composite metrics (they only have a summary row)
   if (q_type == "Composite") return(NULL)

@@ -184,7 +184,7 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
 
     # V10.3 HTML Report settings
     html_report = safe_logical(get_config_value(config, "html_report", FALSE)),
-    brand_colour = get_config_value(config, "brand_colour", "#0d8a8a"),
+    brand_colour = get_config_value(config, "brand_colour", "#323367"),
     project_title = get_config_value(config, "project_title", NULL),
     embed_frequencies = safe_logical(get_config_value(config, "embed_frequencies", TRUE)),
 

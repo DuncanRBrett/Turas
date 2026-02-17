@@ -255,6 +255,38 @@ generate_html_report <- function(all_results, banner_info, config_obj, output_pa
   }
 
   # ============================================================================
+  # STEP 3c: PROCESS LOGO FOR EMBEDDING
+  # ============================================================================
+  logo_data_uri <- NULL
+  if (!is.null(config_obj$logo_path) && nzchar(config_obj$logo_path)) {
+    logo_file <- config_obj$logo_path
+    if (file.exists(logo_file)) {
+      ext <- tolower(tools::file_ext(logo_file))
+      if (ext == "svg") {
+        # SVG: read as text and embed directly (already small)
+        svg_content <- paste(readLines(logo_file, warn = FALSE), collapse = "\n")
+        logo_data_uri <- paste0("data:image/svg+xml;base64,",
+                                 base64enc::base64encode(charToRaw(svg_content)))
+        cat(sprintf("    Logo: embedded SVG (%s)\n", basename(logo_file)))
+      } else if (ext %in% c("png", "jpg", "jpeg")) {
+        # Raster: read raw bytes and base64 encode
+        mime <- if (ext == "png") "image/png" else "image/jpeg"
+        raw_bytes <- readBin(logo_file, "raw", file.info(logo_file)$size)
+        logo_data_uri <- paste0("data:", mime, ";base64,",
+                                 base64enc::base64encode(raw_bytes))
+        cat(sprintf("    Logo: embedded %s (%s, %.1f KB)\n",
+                    toupper(ext), basename(logo_file),
+                    file.info(logo_file)$size / 1024))
+      } else {
+        cat(sprintf("    [WARNING] Unsupported logo format: %s (use .svg, .png, or .jpg)\n", ext))
+      }
+    } else {
+      cat(sprintf("    [WARNING] Logo file not found: %s\n", logo_file))
+    }
+  }
+  config_obj$logo_data_uri <- logo_data_uri
+
+  # ============================================================================
   # STEP 4: ASSEMBLE HTML PAGE
   # ============================================================================
   cat("  Step 4: Assembling HTML page...\n")

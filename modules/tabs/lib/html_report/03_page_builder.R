@@ -19,7 +19,8 @@
 build_html_page <- function(html_data, tables, config_obj,
                             dashboard_html = NULL, charts = list()) {
 
-  brand_colour <- config_obj$brand_colour %||% "#0d8a8a"
+  brand_colour <- config_obj$brand_colour %||% "#323367"
+  accent_colour <- config_obj$accent_colour %||% "#CC9900"
   project_title <- config_obj$project_title %||% "Crosstab Report"
   min_base <- config_obj$significance_min_base %||% 30
   has_any_sig <- any(sapply(html_data$questions, function(q) q$stats$has_sig))
@@ -55,15 +56,18 @@ build_html_page <- function(html_data, tables, config_obj,
         htmltools::tags$meta(charset = "UTF-8"),
         htmltools::tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
         htmltools::tags$title(project_title),
-        build_css(brand_colour),
+        build_css(brand_colour, accent_colour),
         build_dashboard_css(brand_colour),
         build_print_css()
       ),
       build_header(project_title, brand_colour, html_data$total_n, html_data$n_questions,
-                         company_name = config_obj$company_name %||% "The Research Lamppost"),
+                         company_name = config_obj$company_name %||% "The Research Lamppost",
+                         client_name = config_obj$client_name,
+                         logo_data_uri = config_obj$logo_data_uri),
       build_report_tab_nav(brand_colour),
       dashboard_html,
       crosstab_panel,
+      build_help_overlay(),
       build_javascript(html_data),
       build_tab_javascript()
     )
@@ -74,12 +78,15 @@ build_html_page <- function(html_data, tables, config_obj,
         htmltools::tags$meta(charset = "UTF-8"),
         htmltools::tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
         htmltools::tags$title(project_title),
-        build_css(brand_colour),
+        build_css(brand_colour, accent_colour),
         build_print_css()
       ),
       build_header(project_title, brand_colour, html_data$total_n, html_data$n_questions,
-                         company_name = config_obj$company_name %||% "The Research Lamppost"),
+                         company_name = config_obj$company_name %||% "The Research Lamppost",
+                         client_name = config_obj$client_name,
+                         logo_data_uri = config_obj$logo_data_uri),
       crosstab_content,
+      build_help_overlay(),
       build_javascript(html_data)
     )
   }
@@ -92,11 +99,21 @@ build_html_page <- function(html_data, tables, config_obj,
 #'
 #' @param brand_colour Character hex colour
 #' @return htmltools::tags$style
-build_css <- function(brand_colour) {
+build_css <- function(brand_colour, accent_colour = "#CC9900") {
   # Use gsub instead of sprintf to avoid R's 8192 char format string limit
   bc <- brand_colour
+  ac <- accent_colour
 
   css_layout <- '
+    :root {
+      --ct-brand: BRAND;
+      --ct-accent: ACCENT;
+      --ct-text-primary: #1e293b;
+      --ct-text-secondary: #64748b;
+      --ct-bg-surface: #ffffff;
+      --ct-bg-muted: #f8f9fa;
+      --ct-border: #e2e8f0;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -427,6 +444,17 @@ build_css <- function(brand_colour) {
     .ct-row-category + .ct-row-mean > .ct-td { border-top: 2px solid #cbd5e1; }
     .ct-row-mean { background: #fef9e7; }
     .ct-row-mean .ct-td { font-style: italic; color: #6b5c1e; }
+    /* Row exclusion from chart */
+    .ct-row-excluded { opacity: 0.35; }
+    .ct-row-excluded .ct-label-col { text-decoration: line-through; }
+    .ct-label-col .row-exclude-btn {
+      display: none; cursor: pointer; border: none; background: none;
+      color: #94a3b8; font-size: 12px; margin-left: 4px; padding: 0 2px;
+      vertical-align: middle;
+    }
+    tr.ct-row-category:hover .ct-label-col .row-exclude-btn,
+    tr.ct-row-net:hover .ct-label-col .row-exclude-btn { display: inline; }
+    tr.ct-row-excluded .ct-label-col .row-exclude-btn { display: inline; color: #dc2626; }
     .ct-val { font-variant-numeric: tabular-nums; }
     .ct-val-net { font-weight: 700; }
     .ct-na { color: #cbd5e1; }
@@ -566,10 +594,35 @@ build_css <- function(brand_colour) {
       border: 1px solid #e2e8f0; border-top: none; background: #f8fafa;
       padding: 10px 16px; position: relative;
     }
+    /* Help overlay */
+    .help-overlay {
+      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6); z-index: 9999; cursor: pointer;
+    }
+    .help-overlay.active { display: flex; align-items: center; justify-content: center; }
+    .help-card {
+      background: #fff; border-radius: 12px; padding: 32px; max-width: 480px; width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3); cursor: default;
+    }
+    .help-card h2 { font-size: 18px; margin-bottom: 16px; color: BRAND; }
+    .help-card ul { list-style: none; padding: 0; }
+    .help-card li {
+      padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: #374151;
+    }
+    .help-card li:last-child { border-bottom: none; }
+    .help-card .help-key {
+      display: inline-block; background: #f1f5f9; border-radius: 4px;
+      padding: 2px 8px; font-weight: 600; color: BRAND; margin-right: 8px;
+      font-size: 12px; min-width: 90px; text-align: center;
+    }
+    .help-card .help-dismiss {
+      margin-top: 16px; text-align: center; color: #94a3b8; font-size: 12px;
+    }
   '
 
-  # Replace BRAND placeholder with actual brand colour
+  # Replace BRAND and ACCENT placeholders with actual colours
   css_text <- paste0(css_layout, css_tables)
+  css_text <- gsub("ACCENT", ac, css_text, fixed = TRUE)
   css_text <- gsub("BRAND", bc, css_text, fixed = TRUE)
 
   htmltools::tags$style(htmltools::HTML(css_text))
@@ -672,7 +725,9 @@ build_tab_javascript <- function() {
 #' @param n_questions Integer
 #' @return htmltools::div
 build_header <- function(project_title, brand_colour, total_n, n_questions,
-                         company_name = "The Research Lamppost") {
+                         company_name = "The Research Lamppost",
+                         client_name = NULL,
+                         logo_data_uri = NULL) {
   meta_parts <- c()
   if (!is.na(total_n)) {
     total_n_display <- round(as.numeric(total_n))
@@ -682,24 +737,92 @@ build_header <- function(project_title, brand_colour, total_n, n_questions,
 
   brand_label <- paste0(company_name, " \u00B7 Turas Analytics")
 
+  # Build logo element if available
+  logo_el <- NULL
+  if (!is.null(logo_data_uri) && nzchar(logo_data_uri)) {
+    logo_el <- htmltools::tags$img(
+      src = logo_data_uri,
+      alt = company_name,
+      class = "header-logo",
+      style = "height:36px;width:auto;margin-right:12px;vertical-align:middle;opacity:0.9;"
+    )
+  }
+
+  # Build client name element if provided
+  client_el <- NULL
+  if (!is.null(client_name) && nzchar(client_name)) {
+    client_el <- htmltools::tags$div(
+      class = "header-client",
+      style = "color:rgba(255,255,255,0.7);font-size:11px;margin-top:2px;",
+      paste0("Prepared for ", client_name)
+    )
+  }
+
   htmltools::tags$div(
     class = "header",
     htmltools::tags$div(
       class = "header-inner",
       htmltools::tags$div(
         class = "header-left",
+        style = "display:flex;align-items:center;",
+        logo_el,
         htmltools::tags$div(
           htmltools::tags$div(class = "header-brand", brand_label),
           htmltools::tags$h1(class = "header-title", project_title),
+          client_el,
           htmltools::tags$div(class = "header-meta",
             paste(c("Interactive Crosstab Explorer", meta_parts), collapse = " \u00B7 "))
         )
       ),
       htmltools::tags$div(
-        style = "text-align:right",
+        style = "text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px;",
+        htmltools::tags$button(
+          class = "help-btn",
+          onclick = "toggleHelpOverlay()",
+          title = "Show help guide",
+          style = paste0(
+            "width:28px;height:28px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.5);",
+            "background:transparent;color:rgba(255,255,255,0.8);font-size:14px;font-weight:700;",
+            "cursor:pointer;display:flex;align-items:center;justify-content:center;"
+          ),
+          "?"
+        ),
         htmltools::tags$div(style = "color:rgba(255,255,255,0.4);font-size:10px",
           "Generated by Turas")
       )
+    )
+  )
+}
+
+
+#' Build Help Overlay
+#'
+#' Creates a modal overlay with a quick-reference guide to interactive features.
+#' Shown on first visit (via localStorage) and toggled via the ? button.
+#'
+#' @return htmltools::tags$div
+#' @keywords internal
+build_help_overlay <- function() {
+  htmltools::tags$div(
+    class = "help-overlay",
+    id = "help-overlay",
+    onclick = "toggleHelpOverlay()",
+    htmltools::tags$div(
+      class = "help-card",
+      onclick = "event.stopPropagation()",
+      htmltools::tags$h2("Quick Guide"),
+      htmltools::tags$ul(
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Column headers"), "Click to sort rows by that column"),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Banner tabs"), "Switch between cross-tabulation groups"),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Column chips"), "Show/hide individual columns in the table"),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Chart toggle"), "Show or hide chart visualisations"),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Chart chips"), "Compare columns side-by-side in charts"),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "\u2715 on rows"), "Hover any data row to exclude it from the chart"),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "+ Add Insight"), "Add a text note to any question"),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Save Report"), "Download HTML with your insights embedded"),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Export buttons"), "Download chart PNG, slide PNG, CSV, or Excel")
+      ),
+      htmltools::tags$div(class = "help-dismiss", "Click anywhere to close")
     )
   )
 }
@@ -711,7 +834,7 @@ build_header <- function(project_title, brand_colour, total_n, n_questions,
 #' @param has_sig Logical
 #' @param brand_colour Character
 #' @return htmltools::div
-build_sidebar <- function(questions, has_sig = FALSE, brand_colour = "#0d8a8a") {
+build_sidebar <- function(questions, has_sig = FALSE, brand_colour = "#323367") {
   q_items <- lapply(seq_along(questions), function(i) {
     q <- questions[[i]]
     q_code <- q$q_code
@@ -773,7 +896,7 @@ build_sidebar <- function(questions, has_sig = FALSE, brand_colour = "#0d8a8a") 
 #' @param banner_groups Named list of banner groups
 #' @param brand_colour Character
 #' @return htmltools::div
-build_banner_tabs <- function(banner_groups, brand_colour = "#0d8a8a") {
+build_banner_tabs <- function(banner_groups, brand_colour = "#323367") {
   tabs <- lapply(seq_along(banner_groups), function(i) {
     grp_name <- names(banner_groups)[i]
     grp <- banner_groups[[i]]
@@ -798,7 +921,7 @@ build_banner_tabs <- function(banner_groups, brand_colour = "#0d8a8a") {
 #' @param brand_colour Character
 #' @return htmltools::div
 build_controls <- function(has_any_freq, has_any_pct, has_any_sig,
-                           brand_colour = "#0d8a8a", has_charts = FALSE) {
+                           brand_colour = "#323367", has_charts = FALSE) {
   controls <- list()
 
   if (has_any_pct) {
@@ -827,6 +950,16 @@ build_controls <- function(has_any_freq, has_any_pct, has_any_sig,
       )
     ))
   }
+
+  # Save Report button (saves HTML with insights embedded)
+  controls <- c(controls, list(
+    htmltools::tags$button(
+      class = "print-btn",
+      onclick = "saveReportHTML()",
+      style = "margin-right:6px;",
+      "\U0001F4BE Save Report"
+    )
+  ))
 
   # Print button always available
   controls <- c(controls, list(
@@ -914,6 +1047,7 @@ build_insight_area <- function(q_code, comment_entries = NULL,
         contenteditable = "true",
         `data-placeholder` = "Type key insight here\u2026",
         `data-q-code` = q_code,
+        oninput = sprintf("syncInsight('%s')", q_code),
         if (has_comment) initial_text
       ),
       htmltools::tags$button(
@@ -922,6 +1056,13 @@ build_insight_area <- function(q_code, comment_entries = NULL,
         onclick = sprintf("dismissInsight('%s')", q_code),
         "\u00D7"
       )
+    ),
+    # Hidden textarea to persist insight text on browser Save As
+    htmltools::tags$textarea(
+      class = "insight-store",
+      `data-q-code` = q_code,
+      style = "display:none;",
+      if (has_comment) initial_text else ""
     )
   )
 }
@@ -1148,8 +1289,15 @@ build_js_core_navigation <- function() {
         });
       });
 
-      // Reset sort when switching banner groups
+      // Reset sort and row exclusions when switching banner groups
       sortState = {};
+      excludedRows = {};
+      if (window._chartExclusions) window._chartExclusions = {};
+      document.querySelectorAll(".ct-row-excluded").forEach(function(row) {
+        row.classList.remove("ct-row-excluded");
+        var btn = row.querySelector(".row-exclude-btn");
+        if (btn) btn.textContent = "\\u2715";
+      });
       document.querySelectorAll(".ct-sort-indicator").forEach(function(ind) {
         ind.textContent = " \\u21C5";
         ind.classList.remove("ct-sort-active");
@@ -1204,6 +1352,16 @@ build_js_core_navigation <- function() {
         main.classList.add("show-freq");
       } else {
         main.classList.remove("show-freq");
+      }
+    }
+
+    // ---- HELP OVERLAY ----
+    function toggleHelpOverlay() {
+      var overlay = document.getElementById("help-overlay");
+      if (!overlay) return;
+      overlay.classList.toggle("active");
+      if (!overlay.classList.contains("active")) {
+        try { localStorage.setItem("turas-help-seen", "1"); } catch(e) {}
       }
     }
 
@@ -1274,6 +1432,54 @@ build_js_core_navigation <- function() {
       });
     }
 
+    // ---- Utility: extract label text from a td, ignoring button elements ----
+    function getLabelText(cell) {
+      var clone = cell.cloneNode(true);
+      var btns = clone.querySelectorAll(".row-exclude-btn");
+      btns.forEach(function(b) { b.remove(); });
+      return clone.textContent.trim();
+    }
+
+    // ---- Row Exclusion from Chart ----
+    var excludedRows = {};  // keyed by tableId -> Set of labels
+
+    function toggleRowExclusion(row) {
+      var table = row.closest("table.ct-table");
+      if (!table) return;
+      var tableId = table.id;
+      if (!excludedRows[tableId]) excludedRows[tableId] = {};
+      var labelCell = row.querySelector("td.ct-label-col");
+      if (!labelCell) return;
+      var label = getLabelText(labelCell);
+      var isExcluded = row.classList.toggle("ct-row-excluded");
+      if (isExcluded) {
+        excludedRows[tableId][label] = true;
+      } else {
+        delete excludedRows[tableId][label];
+      }
+      // Update button icon
+      var btn = row.querySelector(".row-exclude-btn");
+      if (btn) btn.textContent = isExcluded ? "\\u25CB" : "\\u2715";
+      // Rebuild chart with exclusions applied
+      var container = table.closest(".question-container");
+      if (container) {
+        var wrapper = container.querySelector(".chart-wrapper[data-q-code]");
+        if (wrapper) {
+          var qCode = wrapper.getAttribute("data-q-code");
+          rebuildChartWithExclusions(qCode, excludedRows[tableId]);
+        }
+      }
+    }
+
+    function rebuildChartWithExclusions(qCode, excluded) {
+      if (typeof rebuildChartSVG === "function") {
+        // Store exclusions so rebuildChartSVG can read them
+        if (!window._chartExclusions) window._chartExclusions = {};
+        window._chartExclusions[qCode] = excluded || {};
+        rebuildChartSVG(qCode);
+      }
+    }
+
     // ---- Key Insight ----
     function toggleInsight(qCode) {
       var area = document.querySelector(".insight-area[data-q-code=\\"" + qCode + "\\"]");
@@ -1314,6 +1520,76 @@ build_js_core_navigation <- function() {
         btn.style.display = "block";
         btn.textContent = "+ Add Insight";
       }
+      // Clear the hidden store too
+      syncInsight(qCode);
+    }
+
+    // Sync insight editor text into hidden textarea (for Save As persistence)
+    function syncInsight(qCode) {
+      var area = document.querySelector(".insight-area[data-q-code=\\"" + qCode + "\\"]");
+      if (!area) return;
+      var editor = area.querySelector(".insight-editor");
+      var store = area.querySelector("textarea.insight-store");
+      if (editor && store) {
+        store.value = editor.textContent.trim();
+      }
+    }
+
+    // Sync ALL insights into their hidden stores (called before save)
+    function syncAllInsights() {
+      document.querySelectorAll(".insight-area").forEach(function(area) {
+        var editor = area.querySelector(".insight-editor");
+        var store = area.querySelector("textarea.insight-store");
+        if (editor && store) {
+          store.value = editor.textContent.trim();
+        }
+      });
+    }
+
+    // Save the entire HTML report (with insights embedded) as a standalone file
+    function saveReportHTML() {
+      syncAllInsights();
+
+      // Before serializing, also set contenteditable innerHTML from stores
+      // because contenteditable text may not survive outerHTML on all browsers
+      document.querySelectorAll(".insight-area").forEach(function(area) {
+        var store = area.querySelector("textarea.insight-store");
+        var editor = area.querySelector(".insight-editor");
+        if (store && editor && store.value) {
+          editor.textContent = store.value;
+          // Show the insight container
+          var container = area.querySelector(".insight-container");
+          if (container) container.style.display = "block";
+          var btn = area.querySelector(".insight-toggle");
+          if (btn) btn.style.display = "none";
+        }
+      });
+
+      // Serialize the full page
+      var html = "<!DOCTYPE html>\\n" + document.documentElement.outerHTML;
+      var blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      var title = document.querySelector(".header-title");
+      var fname = title ? title.textContent.replace(/[^a-zA-Z0-9 ]/g, "").replace(/\\s+/g, "_") : "Report";
+      downloadBlob(blob, fname + "_with_insights.html");
+    }
+
+    // Hydrate insight editors from hidden textareas (when opening a saved HTML)
+    function hydrateInsights() {
+      document.querySelectorAll("textarea.insight-store").forEach(function(store) {
+        var text = store.value;
+        if (!text) return;
+        var area = store.closest(".insight-area");
+        if (!area) return;
+        var editor = area.querySelector(".insight-editor");
+        if (editor && !editor.textContent.trim()) {
+          editor.textContent = text;
+          // Show the insight container
+          var container = area.querySelector(".insight-container");
+          if (container) container.style.display = "block";
+          var btn = area.querySelector(".insight-toggle");
+          if (btn) btn.style.display = "none";
+        }
+      });
     }
 
     // Update insight editors when banner group changes
@@ -1469,14 +1745,44 @@ build_js_chart_picker <- function() {
       });
       if (selectedKeys.length === 0) return;
 
+      // Apply row exclusions: filter out excluded labels from chart data
+      var excluded = (window._chartExclusions && window._chartExclusions[qCode]) || {};
+      var filteredData = data;
+      if (Object.keys(excluded).length > 0) {
+        // Deep-copy data to avoid mutating the original
+        filteredData = JSON.parse(JSON.stringify(data));
+        var keepIdx = [];
+        for (var i = 0; i < filteredData.labels.length; i++) {
+          if (!excluded[filteredData.labels[i]]) keepIdx.push(i);
+        }
+        filteredData.labels = keepIdx.map(function(i) { return data.labels[i]; });
+        // Filter colours array too (used by stacked charts)
+        if (filteredData.colours) {
+          filteredData.colours = keepIdx.map(function(i) { return data.colours[i]; });
+        }
+        Object.keys(filteredData.columns).forEach(function(key) {
+          filteredData.columns[key].values = keepIdx.map(function(i) {
+            return data.columns[key].values[i];
+          });
+        });
+        if (filteredData.priority_metric && filteredData.priority_metric.values) {
+          var pmv = {};
+          Object.keys(filteredData.priority_metric.values).forEach(function(key) {
+            // Priority metric values are per-column, not per-row, so keep as-is
+            pmv[key] = filteredData.priority_metric.values[key];
+          });
+          filteredData.priority_metric.values = pmv;
+        }
+      }
+
       var oldSvg = wrapper.querySelector("svg");
       if (!oldSvg) return;
 
       var svgMarkup = "";
-      if (data.chart_type === "stacked") {
-        svgMarkup = buildMultiStackedSVG(data, selectedKeys, qCode);
+      if (filteredData.chart_type === "stacked") {
+        svgMarkup = buildMultiStackedSVG(filteredData, selectedKeys, qCode);
       } else {
-        svgMarkup = buildMultiHorizontalSVG(data, selectedKeys);
+        svgMarkup = buildMultiHorizontalSVG(filteredData, selectedKeys);
       }
 
       if (!svgMarkup) return;
@@ -1525,9 +1831,10 @@ build_js_chart_picker <- function() {
       var p = [];
       p.push("<svg xmlns=\\"http://www.w3.org/2000/svg\\" viewBox=\\"0 0 " + barW + " " + totalH + "\\" role=\\"img\\" aria-label=\\"Distribution chart\\" style=\\"font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;\\">");
 
-      // Priority metric header (right-aligned, above bars)
+      // Priority metric header (centred above metric pill box)
       if (hasPM) {
-        p.push("<text x=\\"" + (barW - labelMargin) + "\\" y=\\"" + 14 + "\\" text-anchor=\\"end\\" fill=\\"#94a3b8\\" font-size=\\"9\\" font-weight=\\"600\\">" + escapeHtml(data.priority_metric.label) + "</text>");
+        var pmHeaderX = (barW - metricW + 4) + (metricW - 14) / 2;
+        p.push("<text x=\\"" + pmHeaderX + "\\" y=\\"" + 14 + "\\" text-anchor=\\"middle\\" fill=\\"#94a3b8\\" font-size=\\"9\\" font-weight=\\"600\\">" + escapeHtml(data.priority_metric.label) + "</text>");
       }
 
       selectedKeys.forEach(function(key, ki) {
@@ -1667,9 +1974,12 @@ build_js_chart_picker <- function() {
         if (lines.length > 1) hasWrapped = true;
       });
       var labelW = Math.max(160, maxLine1 * 6.2 + 16);
-      var valueW = 45, chartW = 680;
-      var barAreaW = chartW - labelW - valueW - 20;
-      if (barAreaW < 200) { chartW = labelW + valueW + 20 + 300; barAreaW = 300; }
+      var valueW = 45;
+      // Right padding: percentage text (~35px) + column name (~80px for multi-col) + gap
+      var rightPad = nCols > 1 ? 130 : 50;
+      var chartW = 680;
+      var barAreaW = chartW - labelW - valueW - rightPad;
+      if (barAreaW < 200) { chartW = labelW + valueW + rightPad + 300; barAreaW = 300; }
 
       // Find max value across selected columns
       var maxVal = 0;
@@ -1698,7 +2008,7 @@ build_js_chart_picker <- function() {
       var totalH = barsH + metricStripH;
 
       // Distinct colour palette for columns
-      var bc = data.brand_colour || "#0d8a8a";
+      var bc = data.brand_colour || "#323367";
       var colColours = nCols > 1 ? getDistinctPalette(bc, nCols) : [bc];
 
       var p = [];
@@ -1708,8 +2018,11 @@ build_js_chart_picker <- function() {
         var groupY = groupPositions[li];
         var lines = wrappedLabels[li];
 
+        // Wrap each category group in <g> with data attributes for sort sync
+        p.push("<g class=\\"chart-bar-group\\" data-bar-label=\\"" + escapeHtml(label) + "\\" data-bar-index=\\"" + li + "\\" transform=\\"translate(0," + groupY + ")\\">");
+
         selectedKeys.forEach(function(key, ki) {
-          var y = groupY + ki * (barH + subGap);
+          var y = ki * (barH + subGap);
           var val = data.columns[key].values[li] || 0;
           var barW = Math.max((val / maxVal) * barAreaW, 2);
           var pctText = Math.round(val) + "%";
@@ -1736,6 +2049,8 @@ build_js_chart_picker <- function() {
             p.push("<text x=\\"" + afterPct + "\\" y=\\"" + (y + barH / 2) + "\\" dominant-baseline=\\"central\\" fill=\\"#94a3b8\\" font-size=\\"9\\">" + escapeHtml(data.columns[key].display) + "</text>");
           }
         });
+
+        p.push("</g>");
       });
 
       // Priority metric pill strip below chart
@@ -1887,6 +2202,44 @@ build_js_slide_export <- function() {
     // ---- Slide PNG Export ----
     // Builds a presentation-quality SVG slide with title, base, chart,
     // metrics strip, and insight -- then renders to PNG at 3x resolution.
+    // Text wraps via <tspan> elements for long titles and insights.
+
+    // Helper: wrap text into lines that fit within maxWidth pixels
+    // charWidth = approx pixels per character at the given font size
+    function wrapTextLines(text, maxWidth, charWidth) {
+      if (!text) return [];
+      var maxChars = Math.floor(maxWidth / charWidth);
+      if (text.length <= maxChars) return [text];
+      var words = text.split(" ");
+      var lines = [], current = "";
+      for (var i = 0; i < words.length; i++) {
+        var test = current ? current + " " + words[i] : words[i];
+        if (test.length > maxChars && current) {
+          lines.push(current);
+          current = words[i];
+        } else {
+          current = test;
+        }
+      }
+      if (current) lines.push(current);
+      return lines;
+    }
+
+    // Helper: create SVG <text> with <tspan> lines, returns { element, height }
+    function createWrappedText(ns, lines, x, startY, lineHeight, attrs) {
+      var el = document.createElementNS(ns, "text");
+      el.setAttribute("x", x);
+      for (var key in attrs) { el.setAttribute(key, attrs[key]); }
+      for (var i = 0; i < lines.length; i++) {
+        var tspan = document.createElementNS(ns, "tspan");
+        tspan.setAttribute("x", x);
+        tspan.setAttribute("y", startY + i * lineHeight);
+        tspan.textContent = lines[i];
+        el.appendChild(tspan);
+      }
+      return { element: el, height: lines.length * lineHeight };
+    }
+
     function exportSlidePNG(qCode) {
       var container = document.querySelector(".question-container.active");
       if (!container) return;
@@ -1900,8 +2253,7 @@ build_js_slide_export <- function() {
       var ns = "http://www.w3.org/2000/svg";
       var W = 960, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
 
-      // ---- Gather data from DOM (pre-calculated, no recalculation) ----
-      // Base size
+      // ---- Gather data from DOM ----
       var baseText = "";
       var baseRow = container.querySelector("tr.ct-row-base");
       if (baseRow) {
@@ -1921,29 +2273,56 @@ build_js_slide_export <- function() {
         }
       });
 
+      // Filter out metric already shown as priority metric in chart
+      try {
+        var chartDataStr = wrapper.getAttribute("data-chart-data");
+        if (chartDataStr) {
+          var chartData = JSON.parse(chartDataStr);
+          if (chartData.priority_metric && chartData.priority_metric.label) {
+            var pmLabel = chartData.priority_metric.label.toLowerCase();
+            metrics = metrics.filter(function(m) {
+              return m.toLowerCase().indexOf(pmLabel) !== 0;
+            });
+          }
+        }
+      } catch(e) { /* ignore parse errors */ }
+
       // Insight text
       var insightText = "";
       var insightEditor = container.querySelector(".insight-editor");
       if (insightEditor) insightText = insightEditor.textContent.trim();
 
-      // ---- Calculate slide layout ----
+      // ---- Calculate layout with text wrapping ----
       var pad = 28;
-      var titleY = pad + 16;
-      var metaY = titleY + 18;
-      var chartTop = metaY + 22;
+      var usableW = W - pad * 2;
+
+      // Title: wrap at ~8.5px per char at font-size 16
+      var titleFullText = qCodeLabel + " - " + qTitle;
+      var titleLines = wrapTextLines(titleFullText, usableW, 8.5);
+      var titleLineH = 20;
+      var titleStartY = pad + 16;
+      var titleBlockH = titleLines.length * titleLineH;
+
+      var metaY = titleStartY + titleBlockH + 4;
+      var chartTop = metaY + 18;
 
       // Clone chart SVG and measure
       var chartClone = chartSvg.cloneNode(true);
       var chartVB = chartClone.getAttribute("viewBox").split(" ").map(Number);
       var chartOrigW = chartVB[2], chartOrigH = chartVB[3];
-      var chartScale = (W - pad * 2) / chartOrigW;
+      var chartScale = usableW / chartOrigW;
       var chartDisplayH = chartOrigH * chartScale;
 
       var metricsY = chartTop + chartDisplayH + 16;
       var metricsH = metrics.length > 0 ? 32 : 0;
+
+      // Insight: wrap at ~6.5px per char at font-size 12
+      var insightLines = wrapTextLines(insightText, usableW - 16, 6.5);
+      var insightLineH = 17;
       var insightY = metricsY + metricsH + (metricsH > 0 ? 8 : 0);
-      var insightH = insightText ? 40 : 0;
-      var totalH = insightY + insightH + pad;
+      var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 10 : 0;
+
+      var totalH = insightY + insightBlockH + pad;
 
       // ---- Build slide SVG ----
       var svg = document.createElementNS(ns, "svg");
@@ -1957,15 +2336,12 @@ build_js_slide_export <- function() {
       bg.setAttribute("fill", "#ffffff");
       svg.appendChild(bg);
 
-      // Title
-      var title = document.createElementNS(ns, "text");
-      title.setAttribute("x", pad); title.setAttribute("y", titleY);
-      title.setAttribute("fill", "#1a2744"); title.setAttribute("font-size", "16");
-      title.setAttribute("font-weight", "700");
-      title.textContent = qCodeLabel + " - " + qTitle;
-      svg.appendChild(title);
+      // Title (with wrapping)
+      var titleResult = createWrappedText(ns, titleLines, pad, titleStartY, titleLineH,
+        { fill: "#1a2744", "font-size": "16", "font-weight": "700" });
+      svg.appendChild(titleResult.element);
 
-      // Base + banner meta
+      // Base meta
       var meta = document.createElementNS(ns, "text");
       meta.setAttribute("x", pad); meta.setAttribute("y", metaY);
       meta.setAttribute("fill", "#94a3b8"); meta.setAttribute("font-size", "11");
@@ -1975,11 +2351,10 @@ build_js_slide_export <- function() {
       // Chart (embedded via <g> transform)
       var chartG = document.createElementNS(ns, "g");
       chartG.setAttribute("transform", "translate(" + pad + "," + chartTop + ") scale(" + chartScale + ")");
-      // Move all children from clone into group
       while (chartClone.firstChild) chartG.appendChild(chartClone.firstChild);
       svg.appendChild(chartG);
 
-      // Metrics strip
+      // Metrics strip (only metrics not already shown in chart)
       if (metrics.length > 0) {
         var metricsStr = metrics.join("  |  ");
         var mText = document.createElementNS(ns, "text");
@@ -1989,7 +2364,6 @@ build_js_slide_export <- function() {
         mText.textContent = metricsStr;
         svg.appendChild(mText);
 
-        // Subtle line above metrics
         var mLine = document.createElementNS(ns, "line");
         mLine.setAttribute("x1", pad); mLine.setAttribute("x2", W - pad);
         mLine.setAttribute("y1", metricsY); mLine.setAttribute("y2", metricsY);
@@ -1997,28 +2371,25 @@ build_js_slide_export <- function() {
         svg.appendChild(mLine);
       }
 
-      // Insight callout
-      if (insightText) {
-        // Accent line
+      // Insight callout (with wrapping)
+      if (insightLines.length > 0) {
         var iLine = document.createElementNS(ns, "line");
         iLine.setAttribute("x1", pad); iLine.setAttribute("x2", W - pad);
         iLine.setAttribute("y1", insightY); iLine.setAttribute("y2", insightY);
         iLine.setAttribute("stroke", "#e2e8f0"); iLine.setAttribute("stroke-width", "1");
         svg.appendChild(iLine);
 
-        // Teal accent bar
+        // Brand accent bar (height adjusts to text)
+        var accentH = Math.max(24, insightLines.length * insightLineH);
         var iBar = document.createElementNS(ns, "rect");
         iBar.setAttribute("x", pad); iBar.setAttribute("y", insightY + 4);
-        iBar.setAttribute("width", "3"); iBar.setAttribute("height", "24");
-        iBar.setAttribute("fill", "#0d8a8a"); iBar.setAttribute("rx", "1.5");
+        iBar.setAttribute("width", "3"); iBar.setAttribute("height", accentH);
+        iBar.setAttribute("fill", "#323367"); iBar.setAttribute("rx", "1.5");
         svg.appendChild(iBar);
 
-        var iText = document.createElementNS(ns, "text");
-        iText.setAttribute("x", pad + 12); iText.setAttribute("y", insightY + 22);
-        iText.setAttribute("fill", "#374151"); iText.setAttribute("font-size", "12");
-        iText.setAttribute("font-style", "italic");
-        iText.textContent = insightText;
-        svg.appendChild(iText);
+        var insightResult = createWrappedText(ns, insightLines, pad + 12, insightY + 18, insightLineH,
+          { fill: "#374151", "font-size": "12", "font-style": "italic" });
+        svg.appendChild(insightResult.element);
       }
 
       // ---- Render SVG to PNG at 3x ----
@@ -2042,6 +2413,58 @@ build_js_slide_export <- function() {
         }, "image/png");
       };
       img.src = url;
+    }
+
+    // ---- Export All Insights as Standalone HTML ----
+    function exportInsightsHTML() {
+      var insights = [];
+      document.querySelectorAll(".question-container").forEach(function(container) {
+        var editor = container.querySelector(".insight-editor");
+        if (!editor) return;
+        var text = editor.textContent.trim();
+        if (!text) return;
+        var wrapper = container.querySelector(".chart-wrapper");
+        var qCode = wrapper ? wrapper.getAttribute("data-q-code") : "";
+        var qTitle = wrapper ? wrapper.getAttribute("data-q-title") : "";
+        insights.push({ code: qCode, title: qTitle, text: text });
+      });
+
+      if (insights.length === 0) {
+        alert("No insights to export. Add insights to questions first.");
+        return;
+      }
+
+      var projectTitle = document.querySelector(".header-title");
+      var pTitle = projectTitle ? projectTitle.textContent : "Report";
+      var now = new Date().toLocaleDateString();
+
+      var html = "<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\">";
+      html += "<title>Insights - " + pTitle + "</title>";
+      html += "<style>";
+      html += "body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#1e293b;line-height:1.6;}";
+      html += "h1{font-size:20px;margin-bottom:4px;}";
+      html += ".meta{color:#64748b;font-size:12px;margin-bottom:32px;}";
+      html += ".insight{margin-bottom:24px;padding:16px;border-left:3px solid #323367;background:#f8f9fb;border-radius:0 6px 6px 0;}";
+      html += ".q-code{font-weight:700;color:#323367;font-size:13px;}";
+      html += ".q-title{font-size:13px;color:#64748b;margin-bottom:8px;}";
+      html += ".q-text{font-size:14px;}";
+      html += "@media print{body{margin:20px;}.insight{break-inside:avoid;}}";
+      html += "</style></head><body>";
+      html += "<h1>Key Insights</h1>";
+      html += "<div class=\\"meta\\">" + pTitle + " &middot; " + now + " &middot; " + insights.length + " insight" + (insights.length > 1 ? "s" : "") + "</div>";
+
+      insights.forEach(function(item) {
+        html += "<div class=\\"insight\\">";
+        html += "<div class=\\"q-code\\">" + item.code + "</div>";
+        html += "<div class=\\"q-title\\">" + item.title + "</div>";
+        html += "<div class=\\"q-text\\">" + item.text + "</div>";
+        html += "</div>";
+      });
+
+      html += "</body></html>";
+
+      var blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      downloadBlob(blob, "Insights_" + pTitle.replace(/[^a-zA-Z0-9]/g, "_") + ".html");
     }
 
   '
@@ -2366,7 +2789,7 @@ build_js_table_export_and_init <- function() {
       // Sort chart bars to match table sort order
       var sortedLabels = sortable.map(function(item) {
         var labelCell = item.row.querySelector("td.ct-label-col");
-        return labelCell ? labelCell.textContent.trim() : "";
+        return labelCell ? getLabelText(labelCell) : "";
       });
       sortChartBars(table, sortedLabels);
     }
@@ -2439,6 +2862,8 @@ build_js_table_export_and_init <- function() {
       toggleHeatmap(true);
       initSortHeaders();
       initChartColumnPickers();
+      // Hydrate insights from hidden textareas (for saved HTML re-open)
+      hydrateInsights();
       // Auto-show insights that have content (from config or save-as)
       document.querySelectorAll(".insight-editor").forEach(function(editor) {
         if (editor.textContent.trim()) {
@@ -2451,6 +2876,12 @@ build_js_table_export_and_init <- function() {
           }
         }
       });
+      // Show help overlay on first visit
+      try {
+        if (!localStorage.getItem("turas-help-seen")) {
+          toggleHelpOverlay();
+        }
+      } catch(e) {}
     });
   '
 }

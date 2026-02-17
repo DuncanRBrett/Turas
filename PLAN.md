@@ -1,139 +1,418 @@
-# HTML Report Enhancements Plan
+# HTML Report Enhancement Plan — Round 2
 
 ## Overview
-Three enhancements to the HTML tabs report. All changes stay within the existing modular architecture, use only pre-calculated data from `table_data`, and maintain the single-file HTML output.
+
+15 improvements organised into 4 implementation phases. Each phase is self-contained
+and testable before moving to the next, so we never break working functionality.
 
 ---
 
-## Enhancement 1: Multi-Column Charts
+## Phase 1: Bug Fixes & Regressions (Items 1, 3, 4, 5, 7)
 
-**Goal:** Charts show selectable columns (not just Total). A separate "chart column picker" independent of the table column chips — so you can have a table with Total + all campuses, but a chart showing just Total + one selected campus.
+These are functional issues that need fixing regardless of any visual polish.
 
-### What changes
+### 1.1 — Chart-table sort sync regression (Item #1)
 
-**07_chart_builder.R** — Modify `build_question_chart()`:
-- Extract data for ALL internal keys (not just `total_key`) from `table_data`
-- Embed all column data as a JSON blob in a `data-chart-data` attribute on the chart wrapper div
-- Initial SVG still renders Total only (default)
-- For **stacked bars** (box categories): one stacked bar per selected column, labelled with column name on the left, shared legend at bottom
-- For **horizontal bars** (single response): grouped bars per category — one bar per selected column, colour-differentiated
-- Each bar/group gets `data-col-key` attributes for JS toggling
+**Root cause found:** The R-side chart builder (`07_chart_builder.R` line 311-315) wraps
+each horizontal bar in `<g class="chart-bar-group" data-bar-label="..." data-bar-index="...">`.
+However, `rebuildChartSVG()` is called on `DOMContentLoaded` by `initChartColumnPickers()`,
+which replaces the R-generated SVG with JS-generated SVG from `buildMultiHorizontalSVG()`.
+The JS version renders flat elements — no `<g>` wrapper, no `data-bar-label`, no `data-bar-index`.
+So `sortChartBars()` finds zero `g.chart-bar-group` elements and silently returns.
 
-**03_page_builder.R** — Add chart column picker UI + JS:
-- Chart column chip bar inside each `.chart-wrapper` (appears when charts are toggled on)
-- Chips default to Total only (others off)
-- Clicking a chip triggers JS to rebuild the SVG from the embedded JSON data — no R recalculation
-- JS functions: `buildChartChips()`, `toggleChartColumn()`, `rebuildChartSVG()`
-- Completely independent of table column visibility
+**Fix:** Add `<g class="chart-bar-group" data-bar-label="..." data-bar-index="...">` wrappers
+to **both** `buildMultiHorizontalSVG()` and `buildMultiStackedSVG()` in the JS chart picker code.
+Each category group of bars gets wrapped so `sortChartBars()` can find and reorder them.
 
-**Key constraint:** All values from pre-computed `table_data`. JS reads the embedded JSON and builds SVG elements. Zero recalculation.
+**Files:** `03_page_builder.R` (JS functions around lines 1654-1764)
 
-### SVG Layouts
-
-**Stacked bars (ordinal/box categories):**
-```
-          Total  ████████████████████████████████  (Negative | Neutral | Positive)
-         Online  ████████████████████████████████
-            Jhb  ████████████████████████████████
-                 ● Negative (23%)  ● Neutral (31%)  ● Positive (46%)
-```
-
-**Horizontal bars (single response):**
-```
-  Very Satisfied  ████████████████  68%  Total
-                  ██████████████    62%  Online
-       Satisfied  ████████████      55%  Total
-                  ██████████        48%  Online
-```
+**Risk:** Low — additive change, wrapping existing elements in `<g>` tags.
 
 ---
 
-## Enhancement 2: Key Insight Comment
+### 1.2 — Chart label truncation on right side (Item #3)
 
-**Goal:** Optional editable text area per question. Hybrid: config seeds comments, inline editing for tweaks before print/export.
+**Analysis:** The JS `buildMultiHorizontalSVG()` calculates `chartW = 680` and dynamically
+widens it if `barAreaW < 200`. However, the **value label** (`pctText`) and **column name**
+(for multi-column mode) are positioned at `labelW + barW + 8`, which can exceed the SVG
+viewBox width when bars are near 100%. The SVG has `overflow: hidden` by default.
 
-### What changes
+Similarly, in multi-column mode, the column name text after the percentage can run off the
+right edge: `afterPct = labelW + barW + 8 + pctText.length * 7 + 6`.
 
-**Config integration:**
-- `config_obj$comments` — optional named list: `list(Q001 = "Brand X leads...", Q003 = "...")`
-- If absent, just an "Add Insight" button per question
+**Fix:**
+- Increase right-side padding in the viewBox calculation (add ~60px margin)
+- Clip value text positioning to stay within viewBox bounds
+- Same adjustment needed in R-side `build_horizontal_bars_svg()` for consistency
 
-**03_page_builder.R** — Add insight area:
-- `build_insight_area(q_code, comment_text)` helper function
-- Placed between chart-wrapper and table-actions in `build_question_containers()`
-- If config has a comment → callout visible with pre-filled text, button says "Edit Insight"
-- If no config comment → hidden callout, button says "+ Add Insight"
-- `contenteditable` div for inline editing; persists in DOM for session
-- CSS: subtle callout (brand-colour left border, light background)
-- JS: `toggleInsight(qCode)` show/hide; placeholder via `::before` pseudo-element
-- Print CSS: shows callout if it has content, hides buttons
+**Files:** `03_page_builder.R` (JS), `07_chart_builder.R` (R)
 
-**99_html_report_main.R** — Pass `config_obj$comments` to `build_html_page()`
+**Risk:** Low — adjusting spacing calculations.
 
 ---
 
-## Enhancement 3: Slide Export (PNG)
+### 1.3 — Key metric title centred above metric box (Item #4)
 
-**Goal:** "Export Slide" button → presentation-quality PNG with question title, base, chart, key metrics (mean/index/NPS if available), and insight.
+**Analysis:** In the stacked bar chart, the priority metric header label is positioned at
+`text-anchor="end"` aligned to the right edge. The user wants it centred directly above
+the metric value pill/box.
 
-### What changes
+**Fix:** Calculate the metric box centre X position and use `text-anchor="middle"` with
+that X coordinate for the header label.
 
-**03_page_builder.R** — Add export slide button + JS:
-- "Export Slide" button in `.table-actions` (visible when chart is on)
-- JS function `exportSlidePNG(qCode)`:
-  1. Build entire slide as **pure SVG** (proven approach from existing `exportChartPNG`)
-  2. Fixed viewBox (960×540, 16:9 ratio)
-  3. Layout:
-     - Title: question code + text (top)
-     - Meta: base size (below title)
-     - Chart: clone visible SVG from chart-wrapper
-     - Metrics strip: scan table for mean/index/NPS rows, extract values from visible columns
-     - Insight: wrapped text at bottom (if present)
-  4. Render SVG → canvas at 3x → download PNG
+**Files:** `03_page_builder.R` (`buildMultiStackedSVG` around line 1529-1531), and the
+R-side equivalent in `07_chart_builder.R`.
 
-### Metrics extraction (JS, from DOM):
-- Scan `.ct-row-mean` rows in visible table
-- Read `.ct-label-col` text (Mean, Index, NPS Score, etc.) and cell `data-sort-val` values
-- Only include metrics that exist for this question
-- All pre-calculated — just reading from the table DOM
-
-### Slide Layout
-```
-┌──────────────────────────────────────────────────────────┐
-│  Q001 — How satisfied are you with our service?          │
-│  Base: n=1,000                                           │
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│  [Chart - stacked bars or horizontal bars]               │
-│                                                          │
-├──────────────────────────────────────────────────────────┤
-│  NET Positive: 67%  |  Mean: 7.2  |  Index: 7.4         │
-├──────────────────────────────────────────────────────────┤
-│  Brand X leads in satisfaction, driven by campus students │
-└──────────────────────────────────────────────────────────┘
-```
+**Risk:** Low — positioning adjustment.
 
 ---
 
-## Files Modified
+### 1.4 — Slide export text truncation + colour key (Item #5)
 
-| File | Enhancement | Changes |
-|------|-------------|---------|
-| `07_chart_builder.R` | 1 | Multi-column data extraction, embed JSON, multi-bar SVG builders |
-| `03_page_builder.R` | 1, 2, 3 | Chart column picker, insight area, slide export — all UI+CSS+JS |
-| `99_html_report_main.R` | 2 | Pass `comments` config through to page builder |
+**Analysis:** The slide export renders title text as a single SVG `<text>` element. SVG
+text doesn't wrap — if the question title is longer than the slide width (960px), it gets
+clipped. Same issue for insight text and metrics.
 
-**No new files.** All additions are functions within existing modules.
+Additionally, the stacked bar chart has no colour key on the slide (the legend is part of
+the chart SVG but may not be visible depending on chart type).
+
+**Fix:**
+- **Text wrapping:** Implement SVG `<tspan>` line-wrapping for title and insight text.
+  Estimate character width (~7px at font-size 16) and split at word boundaries when
+  text would exceed `W - 2*pad` pixels. Adjust subsequent Y positions accordingly.
+- **Colour key:** Ensure the legend from the chart SVG clone is preserved when embedding
+  in the slide. The chart clone already includes it, so this should work — verify and fix
+  if the legend is being cut off by the viewBox.
+
+**Files:** `03_page_builder.R` (`exportSlidePNG` function, lines 1885-2048)
+
+**Risk:** Medium — SVG text wrapping requires careful height recalculation.
+
+---
+
+### 1.5 — Don't duplicate mean on slide if shown in chart (Item #7)
+
+**Analysis:** The slide shows:
+1. The chart SVG (which already includes priority metric pills for mean/index)
+2. A separate "metrics strip" below the chart (extracted from table `ct-row-mean` rows)
+
+When mean is the priority metric, it appears twice — once in the chart pill and once in
+the metrics strip below.
+
+**Fix:** In `exportSlidePNG()`, detect if the chart already displays a priority metric
+(check `data-chart-data` JSON for `priority_metric.label`). If so, filter that metric
+from the `metrics[]` array before rendering the strip. Only show metrics in the strip
+that are NOT already visible in the chart.
+
+**Files:** `03_page_builder.R` (`exportSlidePNG`, around lines 1912-1922)
+
+**Risk:** Low — filtering logic before rendering.
+
+---
+
+## Phase 2: Branding & Visual Polish (Items 8, 9, 11, 12, 13)
+
+Professional appearance improvements using the TRL brand palette.
+
+### 2.1 — TRL brand colour scheme (Item #8)
+
+**Extracted from TRL Logo Colours_RGB.pptx:**
+
+| Role           | Hex       | RGB             |
+|----------------|-----------|-----------------|
+| Near-Black     | `#030303` | 3, 3, 3         |
+| Dark Navy      | `#323367` | 50, 51, 103     |
+| Gold           | `#CC9900` | 204, 153, 0     |
+| Burnt Orange   | `#E56B33` | 229, 107, 51    |
+
+**Proposed usage:**
+- **Primary brand:** Dark Navy `#323367` — header background, active states, brand accents
+- **Accent/highlight:** Gold `#CC9900` — active tab indicators, selected states, badges
+- **Secondary accent:** Burnt Orange `#E56B33` — hover states, secondary highlights
+- **Text:** Near-Black `#030303` — headings and primary body text
+
+**Important:** The current system uses `brand_colour` from config (default `#0d8a8a` teal).
+We should NOT hardcode TRL colours — instead, update the **default** brand_colour and add
+a configurable **accent_colour** option. The TRL colours become the new defaults but any
+client can override them in their Settings sheet.
+
+**Implementation:**
+- Add `accent_colour` config field (default: Gold `#CC9900`)
+- Update CSS colour variables to use brand + accent
+- Update chart colour palette generation to start from brand_colour
+- Keep everything configurable
+
+**Files:** `config_loader.R`, `03_page_builder.R` (CSS), `06_dashboard_builder.R` (CSS)
+
+**Risk:** Medium — touching CSS across multiple files. Test thoroughly.
+
+---
+
+### 2.2 — Professional colour/font consistency (Item #9)
+
+**Current state:** Mix of hardcoded colours throughout CSS (`#1a2744`, `#374151`, `#64748b`,
+`#f8f9fa`, etc.). Font stack is consistent (`-apple-system, BlinkMacSystemFont, Segoe UI,
+Roboto, sans-serif`).
+
+**Fix:**
+- Define a semantic colour palette at the top of `build_css()` using CSS custom properties:
+  ```css
+  :root {
+    --ct-brand: #323367;
+    --ct-accent: #CC9900;
+    --ct-text-primary: #1e293b;
+    --ct-text-secondary: #64748b;
+    --ct-bg-surface: #ffffff;
+    --ct-bg-muted: #f8f9fa;
+    --ct-border: #e2e8f0;
+  }
+  ```
+- Replace hardcoded colour values with CSS variables throughout
+- Ensure consistent font sizing: 11px data, 13px labels, 16px headings
+
+**Files:** `03_page_builder.R` (CSS section)
+
+**Risk:** Medium — many replacements, but purely visual. Side-by-side testing needed.
+
+---
+
+### 2.3 — Logo in report banner (Item #11)
+
+**Analysis:** `TRL Logo.png` is 1340x944px, 395KB (527KB base64). This is far too large
+to embed in every HTML report.
+
+**Solution:**
+1. Create a small optimised version (~32px height, ~45px width) as base64 PNG
+   OR use an SVG version if available
+2. Embed in the header-left div, before the brand text
+3. Use a config option `logo_base64` that can be overridden
+
+**Note:** We need to create a resized version. Options:
+- Ask Duncan to provide a small version (~4-8KB)
+- Generate one programmatically using R's `magick` package (if available)
+- Use a simple SVG placeholder that can be swapped
+
+**Recommendation:** Add a `logo_path` config option. At report generation time, read the
+image, resize to max 40px height, convert to base64, and embed. If `magick` isn't available,
+fall back to a simple text logo. If no logo_path specified, show no logo.
+
+**Files:** `config_loader.R`, `03_page_builder.R` (`build_header`), `99_html_report_main.R`
+
+**Risk:** Low-Medium — need to handle image processing gracefully. The `magick` package
+may not be installed (use `requireNamespace` check).
+
+---
+
+### 2.4 — Config whitelabel logo option (Item #12)
+
+This is effectively the same as 2.3 — the `logo_path` config field handles both:
+- Default: TRL logo (or no logo)
+- Whitelabel: client's own logo file path in Settings sheet
+
+**Config fields to add:**
+- `logo_path` — file path to logo image (default: NULL = no logo)
+- `company_name` — already exists (default: "The Research Lamppost")
+
+**Files:** `config_loader.R` (add `logo_path` field)
+
+---
+
+### 2.5 — Optional client label (Item #13)
+
+**Current header structure:**
+```
+[Brand label: "Company · Turas Analytics"]
+[Project Title]
+[Meta: "Interactive Crosstab Explorer · n=X · Y Questions"]
+```
+
+**Enhancement:** Add optional `client_name` field. When set, display as:
+```
+[Brand label: "Company · Turas Analytics"]
+[Project Title]
+[Client: "Prepared for ClientName"]     <-- NEW (subtle, right-aligned or below title)
+[Meta: ...]
+```
+
+**Config fields to add:**
+- `client_name` — client/organisation name (default: NULL = hidden)
+
+**Files:** `config_loader.R`, `03_page_builder.R` (`build_header`)
+
+**Risk:** Low — additive change to header.
+
+---
+
+## Phase 3: Chart Intelligence (Items 2, 10)
+
+Smarter chart behaviour.
+
+### 3.1 — Row greying / exclude from chart (Item #2)
+
+**Concept:** Allow users to click a row in the table to toggle it grey, which excludes that
+category from the chart. Similar to dashboard metric exclusion.
+
+**Implementation:**
+- Add a toggle icon or click handler on `ct-label-col` cells for category rows
+- Toggled rows get `ct-row-excluded` class (greyed out visually)
+- When chart is rebuilt, filter out excluded labels
+- Store exclusion state in a JS object keyed by table ID + label
+- Exclusions reset when switching banner groups (consistent with sort reset)
+
+**UI approach:** Small "eye" icon appears on hover in the label column. Click
+toggles exclusion. Greyed row has `opacity: 0.35` and strikethrough text.
+
+**Files:** `03_page_builder.R` (CSS + JS), `02_table_builder.R` (add icon element)
+
+**Risk:** Medium — new interactive feature. Needs thorough testing with sort + column toggle.
+
+---
+
+### 3.2 — Semantic chart colours (Item #10)
+
+**Concept:** For satisfaction-type scales, use colour semantics:
+- Red/negative end: "Very Dissatisfied", "Poor", "Strongly Disagree"
+- Green/positive end: "Very Satisfied", "Excellent", "Strongly Agree"
+- Neutral/grey: middle categories
+
+**Implementation approach:**
+- This is already partially implemented in `07_chart_builder.R` via `get_semantic_colour()`
+- The R-side builder assigns colours based on category position in the scale
+- The JS chart picker also needs this logic for rebuilt charts
+- Need to verify the colour mapping is working correctly and extend if needed
+
+**Colour palette for semantic scales:**
+- Strong negative: `#dc2626` (red-600)
+- Moderate negative: `#f97316` (orange-500)
+- Neutral: `#94a3b8` (slate-400)
+- Moderate positive: `#22c55e` (green-500)
+- Strong positive: `#16a34a` (green-600)
+
+**Config option:** `semantic_colours: TRUE/FALSE` (default TRUE for Likert/ordinal questions)
+The system should auto-detect ordinal scales vs nominal categories and only apply semantic
+colours to ordinal scales.
+
+**Files:** `07_chart_builder.R`, `03_page_builder.R` (JS colour logic)
+
+**Risk:** Medium — auto-detection of scale type needs to be reliable. False positives
+(applying semantic colours to nominal categories) would look wrong.
+
+---
+
+## Phase 4: Advanced Features (Items 6, 14, 15)
+
+### 4.1 — Save insights to HTML file (Item #6)
+
+**Concept:** Export a standalone HTML file containing all insights, organised by question.
+Must work cross-browser and cross-OS — open in any browser, print nicely.
+
+**Implementation options:**
+
+**Option A — Minimal HTML string download (Recommended):**
+- JavaScript collects all insight editors' text content
+- Builds a simple, self-contained HTML string with inline CSS
+- Downloads via `Blob` + `downloadBlob()` (same pattern as CSV/Excel export)
+- Clean formatting: question code, question text, insight text, separator
+- Includes project title, date, base info in header
+
+**Option B — JSON export:**
+- Export as JSON file that can be re-imported
+- More machine-readable but less user-friendly
+
+**Recommendation:** Option A. It's consistent with existing export patterns, works offline,
+opens in any browser, and prints cleanly. JSON could be added later as a secondary format.
+
+**Files:** `03_page_builder.R` (new JS function + button in controls area)
+
+**Risk:** Low — follows existing export patterns.
+
+---
+
+### 4.2 — Alternative chart types (Item #14)
+
+**User note:** "probably for a future phase"
+
+**Agreed — defer to future phase.** Current stacked bar + horizontal bar cover the core
+use cases well. When ready, candidates include:
+- Donut/pie charts (for single-response with few categories)
+- Line charts (for tracking data when tracker module integrates)
+- Grouped bar charts (already partially there with multi-column horizontal bars)
+
+**No action this round.**
+
+---
+
+### 4.3 — Tooltips / help system (Item #15)
+
+**User context:** Shared Perplexity analysis. Wants to discuss options — concerned that
+too much help could confuse rather than clarify.
+
+**Recommendation: "First-time help overlay" approach:**
+- A single "?" button in the header/controls area
+- Clicking it shows a semi-transparent overlay highlighting key interactive elements
+  with short labels: "Click to sort", "Toggle columns", "Add insight", etc.
+- Dismisses on click/ESC
+- Remembers dismissal in `localStorage` (shows automatically on first visit, optional after)
+- Lightweight: ~50 lines of JS, ~30 lines of CSS
+
+**Why this approach:**
+- **Non-intrusive:** Doesn't add persistent tooltips that clutter the UI
+- **Discoverable:** Users who need help can find the "?" button
+- **One-time:** After first view, stays out of the way
+- **Simple:** No tooltip library, no complex positioning logic
+- **Cross-browser:** Pure CSS overlay + JS toggle
+
+**Alternative considered:** Per-element tooltips on hover. Rejected because:
+- Adds visual noise
+- Positioning is fragile across screen sizes
+- Many elements to annotate
+- Can interfere with click targets
+
+**Files:** `03_page_builder.R` (CSS + JS + button in header)
+
+**Risk:** Low — completely additive, toggle-based.
+
+---
 
 ## Implementation Order
 
-1. **Enhancement 2** (key insight) — smallest, self-contained, needed by Enhancement 3
-2. **Enhancement 1** (multi-column charts) — core chart improvement, foundational for slide export
-3. **Enhancement 3** (slide export) — builds on both 1 and 2
+```
+Phase 1 (Bug Fixes)        <-- Do first, highest value
+  1.1 Sort sync regression
+  1.2 Label truncation
+  1.3 Metric title centering
+  1.4 Slide text wrapping + colour key
+  1.5 Slide mean deduplication
 
-## Principles
-- **Pre-calculated only** — all values from `table_data`, zero recalculation
-- **Zero new R dependencies** — pure SVG, vanilla JS, inline CSS
-- **Single file HTML** — everything embedded, no external resources
-- **Lean & modular** — small helper functions, no bloat
-- **Graceful degradation** — no chart data → no chart picker; no comments → just "Add Insight" button; no metrics rows → slide skips metrics strip
+Phase 2 (Branding)         <-- Do second, visual polish
+  2.1 Brand colour scheme
+  2.2 CSS custom properties + consistency
+  2.3 Logo in banner
+  2.4 Whitelabel config (part of 2.3)
+  2.5 Client label
+
+Phase 3 (Chart Intelligence) <-- Do third, new features
+  3.1 Row exclusion from charts
+  3.2 Semantic chart colours
+
+Phase 4 (Advanced)          <-- Do last
+  4.1 Insight export to HTML
+  4.3 Help overlay
+  4.2 Alternative charts --> DEFERRED
+```
+
+## Questions for Duncan
+
+1. **Brand colours (Item #8):** Should Dark Navy `#323367` replace the current teal
+   `#0d8a8a` as the default brand_colour? Or should we keep teal as default and only
+   switch to navy when TRL logo is used?
+
+2. **Logo (Item #11):** Can you provide a small version of the logo (~40px height)?
+   Or should I attempt to resize programmatically using the `magick` R package?
+
+3. **Semantic colours (Item #10):** Should semantic colours be opt-in (config flag) or
+   auto-detected based on question type? Auto-detection risks false positives on scales
+   where red/green semantics don't apply (e.g., frequency scales: "Daily, Weekly, Monthly").
+
+4. **Help overlay (Item #15):** The "?" button overlay approach — does this feel right?
+   Or would you prefer a different approach (e.g., a separate "Guide" page/tab)?
