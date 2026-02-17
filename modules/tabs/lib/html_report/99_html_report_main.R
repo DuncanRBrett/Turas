@@ -23,11 +23,21 @@
                          "06_dashboard_builder.R",
                          "07_chart_builder.R")
 
+# Also check for required JS files
+.hr_required_js <- c("core_navigation.js", "chart_picker.js", "slide_export.js",
+                      "pinned_views.js", "table_export_init.js")
+
 .hr_missing <- character(0)
 for (.hr_file in .hr_required_files) {
   .hr_path <- file.path(.html_report_dir, .hr_file)
   if (!file.exists(.hr_path)) {
     .hr_missing <- c(.hr_missing, .hr_file)
+  }
+}
+for (.hr_js in .hr_required_js) {
+  .hr_path <- file.path(.html_report_dir, "js", .hr_js)
+  if (!file.exists(.hr_path)) {
+    .hr_missing <- c(.hr_missing, file.path("js", .hr_js))
   }
 }
 
@@ -255,13 +265,16 @@ generate_html_report <- function(all_results, banner_info, config_obj, output_pa
   }
 
   # ============================================================================
-  # STEP 3c: PROCESS LOGO FOR EMBEDDING
+  # STEP 3c: PROCESS LOGOS FOR EMBEDDING
   # ============================================================================
-  logo_data_uri <- NULL
-  if (!is.null(config_obj$logo_path) && nzchar(config_obj$logo_path)) {
-    logo_file <- config_obj$logo_path
 
-    # Resolve logo path: try as-is, then relative to output dir, then working dir
+  # Helper: encode a single logo file as a base64 data URI
+  embed_logo <- function(logo_path, label) {
+    if (is.null(logo_path) || !nzchar(logo_path)) return(NULL)
+
+    logo_file <- logo_path
+
+    # Resolve path: try as-is, then relative to output dir, then working dir
     if (!file.exists(logo_file)) {
       candidates <- c(
         file.path(dirname(output_path), logo_file),
@@ -272,37 +285,46 @@ generate_html_report <- function(all_results, banner_info, config_obj, output_pa
       for (cand in candidates) {
         if (file.exists(cand)) {
           logo_file <- normalizePath(cand)
-          cat(sprintf("    Logo: resolved to %s\n", logo_file))
+          cat(sprintf("    %s: resolved to %s\n", label, logo_file))
           break
         }
       }
     }
 
-    if (file.exists(logo_file)) {
-      ext <- tolower(tools::file_ext(logo_file))
-      if (ext == "svg") {
-        # SVG: read as text and embed directly (already small)
-        svg_content <- paste(readLines(logo_file, warn = FALSE), collapse = "\n")
-        logo_data_uri <- paste0("data:image/svg+xml;base64,",
-                                 base64enc::base64encode(charToRaw(svg_content)))
-        cat(sprintf("    Logo: embedded SVG (%s)\n", basename(logo_file)))
-      } else if (ext %in% c("png", "jpg", "jpeg")) {
-        # Raster: read raw bytes and base64 encode
-        mime <- if (ext == "png") "image/png" else "image/jpeg"
-        raw_bytes <- readBin(logo_file, "raw", file.info(logo_file)$size)
-        logo_data_uri <- paste0("data:", mime, ";base64,",
-                                 base64enc::base64encode(raw_bytes))
-        cat(sprintf("    Logo: embedded %s (%s, %.1f KB)\n",
-                    toupper(ext), basename(logo_file),
-                    file.info(logo_file)$size / 1024))
-      } else {
-        cat(sprintf("    [WARNING] Unsupported logo format: %s (use .svg, .png, or .jpg)\n", ext))
-      }
+    if (!file.exists(logo_file)) {
+      cat(sprintf("    [WARNING] %s file not found: %s\n", label, logo_path))
+      return(NULL)
+    }
+
+    ext <- tolower(tools::file_ext(logo_file))
+    if (ext == "svg") {
+      svg_content <- paste(readLines(logo_file, warn = FALSE), collapse = "\n")
+      uri <- paste0("data:image/svg+xml;base64,",
+                     base64enc::base64encode(charToRaw(svg_content)))
+      cat(sprintf("    %s: embedded SVG (%s)\n", label, basename(logo_file)))
+      return(uri)
+    } else if (ext %in% c("png", "jpg", "jpeg")) {
+      mime <- if (ext == "png") "image/png" else "image/jpeg"
+      raw_bytes <- readBin(logo_file, "raw", file.info(logo_file)$size)
+      uri <- paste0("data:", mime, ";base64,",
+                     base64enc::base64encode(raw_bytes))
+      cat(sprintf("    %s: embedded %s (%s, %.1f KB)\n",
+                  label, toupper(ext), basename(logo_file),
+                  file.info(logo_file)$size / 1024))
+      return(uri)
     } else {
-      cat(sprintf("    [WARNING] Logo file not found: %s\n", logo_file))
+      cat(sprintf("    [WARNING] Unsupported %s format: %s (use .svg, .png, or .jpg)\n",
+                  label, ext))
+      return(NULL)
     }
   }
-  config_obj$logo_data_uri <- logo_data_uri
+
+  # Researcher logo: use researcher_logo_path, fall back to legacy logo_path
+  researcher_logo_src <- config_obj$researcher_logo_path %||% config_obj$logo_path
+  config_obj$researcher_logo_uri <- embed_logo(researcher_logo_src, "Researcher logo")
+
+  # Client logo: separate config field, no fallback
+  config_obj$client_logo_uri <- embed_logo(config_obj$client_logo_path, "Client logo")
 
   # ============================================================================
   # STEP 4: ASSEMBLE HTML PAGE

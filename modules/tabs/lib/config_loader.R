@@ -241,125 +241,40 @@ safe_numeric <- function(value, default = NA_real_) {
 # ==============================================================================
 # CONFIG OBJECT BUILDING
 # ==============================================================================
+# NOTE: The canonical build_config_object() is defined in
+# crosstabs/crosstabs_config.R and sourced AFTER this file.
+# This fallback is only used if config_loader.R is sourced standalone
+# (e.g. by other modules outside the tabs pipeline).
+# ==============================================================================
 
-#' Build Configuration Object
-#' 
-#' Builds the complete config object with all settings
-#' Applies defaults for missing values
-#' 
-#' @param settings Named list from load_config_settings()
-#' @return Structured configuration object
-#' @export
-build_config_object <- function(settings) {
-  
-  # Default constants
-  DEFAULT_ALPHA <- 0.05
-  DEFAULT_MIN_BASE <- 30
-  
-  config_obj <- list(
-    # Weighting settings
-    apply_weighting = safe_logical(get_config_value(settings, "apply_weighting", FALSE)),
-    weight_variable = get_config_value(settings, "weight_variable", NULL),
-    show_unweighted_n = safe_logical(get_config_value(settings, "show_unweighted_n", TRUE)),
-    show_effective_n = safe_logical(get_config_value(settings, "show_effective_n", TRUE)),
-    weight_label = get_config_value(settings, "weight_label", "Weighted"),
-    
-    # Display settings
-    decimal_separator = get_config_value(settings, "decimal_separator", "."),
-    show_frequency = safe_logical(get_config_value(settings, "show_frequency", TRUE)),
-    show_percent_column = safe_logical(get_config_value(settings, "show_percent_column", TRUE)),
-    show_percent_row = safe_logical(get_config_value(settings, "show_percent_row", FALSE)),
-    
-    # Box/Category settings
-    boxcategory_frequency = safe_logical(get_config_value(settings, "boxcategory_frequency", FALSE)),
-    boxcategory_percent_column = safe_logical(get_config_value(settings, "boxcategory_percent_column", TRUE)),
-    boxcategory_percent_row = safe_logical(get_config_value(settings, "boxcategory_percent_row", FALSE)),
-    
-    # Decimal places
-    decimal_places_percent = safe_numeric(get_config_value(settings, "decimal_places_percent", 0)),
-    decimal_places_ratings = safe_numeric(get_config_value(settings, "decimal_places_ratings", 1)),
-    decimal_places_index = safe_numeric(get_config_value(settings, "decimal_places_index", 1)),
-    decimal_places_numeric = safe_numeric(get_config_value(settings, "decimal_places_numeric", 1)),
-    
-    # Significance testing
-    enable_significance_testing = safe_logical(get_config_value(settings, "enable_significance_testing", TRUE)),
-    alpha = safe_numeric(get_config_value(settings, "alpha", DEFAULT_ALPHA)),
-    significance_min_base = safe_numeric(get_config_value(settings, "significance_min_base", DEFAULT_MIN_BASE)),
-    bonferroni_correction = safe_logical(get_config_value(settings, "bonferroni_correction", TRUE)),
-    enable_chi_square = safe_logical(get_config_value(settings, "enable_chi_square", FALSE)),
-    
-    # Advanced features
-    show_standard_deviation = safe_logical(get_config_value(settings, "show_standard_deviation", FALSE)),
-    test_net_differences = safe_logical(get_config_value(settings, "test_net_differences", FALSE)),
-    create_sample_composition = safe_logical(get_config_value(settings, "create_sample_composition", FALSE)),
-    show_net_positive = safe_logical(get_config_value(settings, "show_net_positive", FALSE)),
-    
-    # Numeric question settings
-    show_numeric_median = safe_logical(get_config_value(settings, "show_numeric_median", FALSE)),
-    show_numeric_mode = safe_logical(get_config_value(settings, "show_numeric_mode", FALSE)),
-    show_numeric_outliers = safe_logical(get_config_value(settings, "show_numeric_outliers", TRUE)),
-    exclude_outliers_from_stats = safe_logical(get_config_value(settings, "exclude_outliers_from_stats", FALSE)),
-    outlier_method = get_config_value(settings, "outlier_method", "IQR"),
-    
-    # System settings
-    enable_checkpointing = safe_logical(get_config_value(settings, "enable_checkpointing", TRUE)),
-    zero_division_as_blank = safe_logical(get_config_value(settings, "zero_division_as_blank", TRUE)),
-    
-    # Output settings
-    output_subfolder = get_config_value(settings, "output_subfolder", "Crosstabs"),
-    output_filename = get_config_value(settings, "output_filename", "Crosstabs.xlsx"),
-    output_format = get_config_value(settings, "output_format", "xlsx"),
+if (!exists("build_config_object", mode = "function")) {
+  #' Build Configuration Object (fallback)
+  #'
+  #' Delegating stub — the canonical version in crosstabs/crosstabs_config.R
 
-    # V10.3 HTML report & branding
-    html_report = safe_logical(get_config_value(settings, "html_report", FALSE)),
-    project_title = get_config_value(settings, "project_title", "Crosstab Report"),
-    brand_colour = get_config_value(settings, "brand_colour", "#323367"),
-    accent_colour = get_config_value(settings, "accent_colour", "#CC9900"),
-    company_name = get_config_value(settings, "company_name", "The Research Lamppost"),
-    client_name = get_config_value(settings, "client_name", NULL),
-    logo_path = get_config_value(settings, "logo_path", NULL),
-    chart_bar_colour = get_config_value(settings, "chart_bar_colour", "#323367"),
-    embed_frequencies = safe_logical(get_config_value(settings, "embed_frequencies", TRUE)),
+  #' is used when the full tabs pipeline runs.
+  #'
+  #' @param settings Named list from load_config_settings()
+  #' @return Structured configuration object
+  #' @export
+  build_config_object <- function(settings) {
+    cat("[WARNING] Using fallback build_config_object from config_loader.R.\n")
+    cat("  The canonical version in crosstabs/crosstabs_config.R was not loaded.\n")
 
-    # V10.4 Summary Dashboard settings
-    include_summary = safe_logical(get_config_value(settings, "include_summary", TRUE)),
-    fieldwork_dates = get_config_value(settings, "fieldwork_dates", NULL),
-    dashboard_metrics = get_config_value(settings, "dashboard_metrics", "NET POSITIVE"),
-
-    # V10.4.2 Dashboard colour breaks & scales
-    dashboard_scale_mean    = safe_numeric(get_config_value(settings, "dashboard_scale_mean", 10)),
-    dashboard_scale_index   = safe_numeric(get_config_value(settings, "dashboard_scale_index", 10)),
-    dashboard_green_net     = safe_numeric(get_config_value(settings, "dashboard_green_net", 30)),
-    dashboard_amber_net     = safe_numeric(get_config_value(settings, "dashboard_amber_net", 0)),
-    dashboard_green_mean    = safe_numeric(get_config_value(settings, "dashboard_green_mean", 7)),
-    dashboard_amber_mean    = safe_numeric(get_config_value(settings, "dashboard_amber_mean", 5)),
-    dashboard_green_index   = safe_numeric(get_config_value(settings, "dashboard_green_index", 7)),
-    dashboard_amber_index   = safe_numeric(get_config_value(settings, "dashboard_amber_index", 5)),
-    dashboard_green_custom  = safe_numeric(get_config_value(settings, "dashboard_green_custom", 60)),
-    dashboard_amber_custom  = safe_numeric(get_config_value(settings, "dashboard_amber_custom", 40)),
-
-    # V10.4.3 Row descriptors (annotation text below summary stat rows)
-    index_descriptor = get_config_value(settings, "index_descriptor", NULL),
-    mean_descriptor = get_config_value(settings, "mean_descriptor", NULL),
-    nps_descriptor = get_config_value(settings, "nps_descriptor", NULL),
-    create_index_summary = get_config_value(settings, "create_index_summary", NULL),
-
-    # V10.5.0 Inline SVG charts
-    show_charts = safe_logical(get_config_value(settings, "show_charts", FALSE))
-  )
-  
-  # Validation
-  if (config_obj$alpha <= 0 || config_obj$alpha >= 1) {
-    warning("Alpha must be between 0 and 1. Using default 0.05")
-    config_obj$alpha <- DEFAULT_ALPHA
+    list(
+      apply_weighting = safe_logical(get_config_value(settings, "apply_weighting", FALSE)),
+      weight_variable = get_config_value(settings, "weight_variable", NULL),
+      show_frequency = safe_logical(get_config_value(settings, "show_frequency", TRUE)),
+      show_percent_column = safe_logical(get_config_value(settings, "show_percent_column", TRUE)),
+      show_percent_row = safe_logical(get_config_value(settings, "show_percent_row", FALSE)),
+      enable_significance_testing = safe_logical(get_config_value(settings, "enable_significance_testing", TRUE)),
+      alpha = safe_numeric(get_config_value(settings, "alpha", 0.05)),
+      significance_min_base = safe_numeric(get_config_value(settings, "significance_min_base", 30)),
+      html_report = safe_logical(get_config_value(settings, "html_report", FALSE)),
+      brand_colour = get_config_value(settings, "brand_colour", "#323367"),
+      project_title = get_config_value(settings, "project_title", "Crosstab Report")
+    )
   }
-  
-  if (config_obj$significance_min_base < 1) {
-    warning("significance_min_base must be >= 1. Using default 30")
-    config_obj$significance_min_base <- DEFAULT_MIN_BASE
-  }
-  
-  return(config_obj)
 }
 
 # ==============================================================================

@@ -100,10 +100,13 @@ get_semantic_colour <- function(label, index = 1, n_total = 3, brand_colour = "#
   if (!is.null(colour)) return(colour)
 
   # Fallback: use brand colour with varying lightness
-  # Parse brand colour
+  # Parse brand colour (with validation)
   r <- strtoi(substr(brand_colour, 2, 3), 16L)
   g <- strtoi(substr(brand_colour, 4, 5), 16L)
   b <- strtoi(substr(brand_colour, 6, 7), 16L)
+  if (is.na(r) || is.na(g) || is.na(b)) {
+    r <- 50L; g <- 51L; b <- 103L  # fallback: #323367
+  }
 
   # Generate shades from light to dark
   if (n_total <= 1) return(brand_colour)
@@ -155,7 +158,7 @@ build_stacked_bar_svg <- function(items, bar_width = 680, chart_id = NULL) {
   leg_x <- label_margin
   leg_row <- 0
   for (i in seq_len(nrow(items))) {
-    legend_text <- sprintf("%s (%g%%)", items$label[i], round(items$value[i]))
+    legend_text <- items$label[i]
     item_width <- nchar(legend_text) * 6 + 30
     # Wrap to next row if this item would overflow
     if (leg_x + item_width > bar_width - label_margin && i > 1) {
@@ -432,6 +435,13 @@ extract_all_column_chart_data <- function(table_data, row_indices, use_box_categ
 build_question_chart <- function(question_data, options_df, config_obj) {
 
   if (is.null(question_data) || is.null(question_data$table_data)) {
+    return(NULL)
+  }
+
+  # Validate options_df structure if provided
+  if (!is.null(options_df) && !is.data.frame(options_df)) {
+    cat(sprintf("  [WARNING] build_question_chart: options_df is not a data.frame for %s\n",
+                question_data$q_code %||% "unknown"))
     return(NULL)
   }
 

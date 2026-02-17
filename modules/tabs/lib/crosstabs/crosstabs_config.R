@@ -185,7 +185,14 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # V10.3 HTML Report settings
     html_report = safe_logical(get_config_value(config, "html_report", FALSE)),
     brand_colour = get_config_value(config, "brand_colour", "#323367"),
+    accent_colour = get_config_value(config, "accent_colour", "#CC9900"),
     project_title = get_config_value(config, "project_title", NULL),
+    company_name = get_config_value(config, "company_name", "The Research Lamppost"),
+    client_name = get_config_value(config, "client_name", NULL),
+    researcher_logo_path = get_config_value(config, "researcher_logo_path", NULL),
+    client_logo_path = get_config_value(config, "client_logo_path", NULL),
+    logo_path = get_config_value(config, "logo_path", NULL),
+    chart_bar_colour = get_config_value(config, "chart_bar_colour", "#323367"),
     embed_frequencies = safe_logical(get_config_value(config, "embed_frequencies", TRUE)),
 
     # V10.4 Summary Dashboard settings
@@ -214,8 +221,7 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     show_charts = safe_logical(get_config_value(config, "show_charts", FALSE)),
 
     # V10.6.0 Report enhancements
-    priority_metric = get_config_value(config, "priority_metric", NULL),
-    company_name = get_config_value(config, "company_name", "The Research Lamppost")
+    priority_metric = get_config_value(config, "priority_metric", NULL)
   )
 }
 
@@ -324,32 +330,40 @@ load_crosstabs_config <- function(config_file) {
   # Load optional Comments sheet (V10.6.0)
   config_obj$comments <- load_comments_sheet(config_file)
 
-  # Resolve logo_path against project root so HTML report gets an absolute path
-  if (!is.null(config_obj$logo_path) && nzchar(config_obj$logo_path)) {
-    logo_raw <- config_obj$logo_path
-    if (!file.exists(logo_raw)) {
-      # Try relative to project root, then config file directory
-      candidates <- c(
-        file.path(project_root, logo_raw),
-        file.path(dirname(config_file), logo_raw),
-        file.path(project_root, basename(logo_raw)),
-        file.path(dirname(config_file), basename(logo_raw))
-      )
-      for (cand in candidates) {
-        if (file.exists(cand)) {
-          config_obj$logo_path <- normalizePath(cand)
-          cat(sprintf("  Logo: resolved to %s\n", config_obj$logo_path))
-          break
-        }
+  # Resolve logo paths against project root so HTML report gets absolute paths
+  # Helper: resolve a single logo path, trying multiple candidate locations
+  resolve_logo_path <- function(raw_path, label) {
+    if (is.null(raw_path) || !nzchar(raw_path)) return(NULL)
+    if (file.exists(raw_path)) {
+      resolved <- normalizePath(raw_path)
+      cat(sprintf("  %s: %s\n", label, basename(resolved)))
+      return(resolved)
+    }
+    candidates <- c(
+      file.path(project_root, raw_path),
+      file.path(dirname(config_file), raw_path),
+      file.path(project_root, basename(raw_path)),
+      file.path(dirname(config_file), basename(raw_path))
+    )
+    for (cand in candidates) {
+      if (file.exists(cand)) {
+        resolved <- normalizePath(cand)
+        cat(sprintf("  %s: resolved to %s\n", label, resolved))
+        return(resolved)
       }
-    } else {
-      config_obj$logo_path <- normalizePath(logo_raw)
     }
-    if (!file.exists(config_obj$logo_path)) {
-      cat(sprintf("  [WARNING] Logo file not found: %s\n", logo_raw))
-      cat(sprintf("  Searched in: %s, %s\n", project_root, dirname(config_file)))
-    }
+    cat(sprintf("  [WARNING] %s not found: %s\n", label, raw_path))
+    cat(sprintf("  Searched in: %s, %s\n", project_root, dirname(config_file)))
+    return(raw_path)
   }
+
+  config_obj$researcher_logo_path <- resolve_logo_path(
+    config_obj$researcher_logo_path, "Researcher logo")
+  config_obj$client_logo_path <- resolve_logo_path(
+    config_obj$client_logo_path, "Client logo")
+  # Legacy single logo_path: used as researcher logo fallback
+  config_obj$logo_path <- resolve_logo_path(
+    config_obj$logo_path, "Logo")
 
   # Build output path
   output_path <- get_output_path(

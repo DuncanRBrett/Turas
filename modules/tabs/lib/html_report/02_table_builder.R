@@ -21,6 +21,22 @@
 build_question_table <- function(question_data, banner_groups, config_obj,
                                   table_id = NULL) {
 
+  # Validate required inputs
+  if (is.null(question_data) || !is.list(question_data)) {
+    cat("  [WARNING] build_question_table: question_data is NULL or not a list\n")
+    return(NULL)
+  }
+  if (is.null(question_data$table_data) || !is.data.frame(question_data$table_data)) {
+    cat(sprintf("  [WARNING] build_question_table: missing table_data for %s\n",
+                question_data$q_code %||% "unknown"))
+    return(NULL)
+  }
+  if (is.null(question_data$stats) || !is.list(question_data$stats)) {
+    cat(sprintf("  [WARNING] build_question_table: missing stats for %s\n",
+                question_data$q_code %||% "unknown"))
+    return(NULL)
+  }
+
   table_data <- question_data$table_data
   stats <- question_data$stats
   min_base <- config_obj$significance_min_base %||% 30
@@ -28,10 +44,13 @@ build_question_table <- function(question_data, banner_groups, config_obj,
   has_sig <- stats$has_sig
   has_freq <- stats$has_freq && isTRUE(config_obj$embed_frequencies)
 
-  # Parse brand colour to RGB for heatmap
+  # Parse brand colour to RGB for heatmap (with validation)
   r <- strtoi(substr(brand_colour, 2, 3), 16L)
   g <- strtoi(substr(brand_colour, 4, 5), 16L)
   b <- strtoi(substr(brand_colour, 6, 7), 16L)
+  if (is.na(r) || is.na(g) || is.na(b)) {
+    r <- 50L; g <- 51L; b <- 103L  # fallback: #323367
+  }
 
   # Get visible internal keys (banner columns — exclude dot-prefixed metadata cols)
   all_internal_keys <- grep("^\\.", names(table_data), value = TRUE, invert = TRUE)
