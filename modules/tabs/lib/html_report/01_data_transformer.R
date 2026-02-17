@@ -372,17 +372,37 @@ transform_single_question <- function(q_result, banner_info, config_obj) {
     primary_stat
   )
 
-  # Index scale description for Likert questions
-  # Uses config$index_descriptor if set, otherwise NULL (no auto-generation)
-  index_description <- NULL
+  # Row descriptors — annotation text shown below summary stat rows
+  # Each descriptor is set via config and shown when the matching row type exists
   q_type <- q_result$question_type %||% "Unknown"
+
+  # Index descriptor (for Likert questions with an Index row)
+  index_description <- NULL
   has_index_row <- any(table_data$.row_type == "mean" &
                        grepl("^Index$", table_data$.row_label, ignore.case = TRUE))
-
   if (has_index_row && q_type == "Likert") {
-    # Use the descriptor from config if provided
     if (!is.null(config_obj$index_descriptor) && nzchar(config_obj$index_descriptor)) {
       index_description <- config_obj$index_descriptor
+    }
+  }
+
+  # Mean descriptor (for Rating/Likert questions with a Mean row)
+  mean_description <- NULL
+  has_mean_row <- any(table_data$.row_type == "mean" &
+                      grepl("^Mean$", table_data$.row_label, ignore.case = TRUE))
+  if (has_mean_row && q_type %in% c("Rating", "Likert")) {
+    if (!is.null(config_obj$mean_descriptor) && nzchar(config_obj$mean_descriptor)) {
+      mean_description <- config_obj$mean_descriptor
+    }
+  }
+
+  # NPS descriptor (for NPS questions with an NPS Score row)
+  nps_description <- NULL
+  has_nps_row <- any(table_data$.row_type == "mean" &
+                     grepl("NPS", table_data$.row_label, ignore.case = TRUE))
+  if (has_nps_row && q_type == "NPS") {
+    if (!is.null(config_obj$nps_descriptor) && nzchar(config_obj$nps_descriptor)) {
+      nps_description <- config_obj$nps_descriptor
     }
   }
 
@@ -394,7 +414,9 @@ transform_single_question <- function(q_result, banner_info, config_obj) {
     stats = stats,
     primary_stat = primary_stat_label,
     table_data = table_data,
-    index_description = index_description
+    index_description = index_description,
+    mean_description = mean_description,
+    nps_description = nps_description
   )
 }
 

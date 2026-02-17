@@ -119,12 +119,23 @@ build_question_table <- function(question_data, banner_groups, config_obj,
     # Label cell
     label_html <- htmltools::htmlEscape(row_label)
 
-    # Add index scale description below Index row label
-    index_desc <- question_data$index_description
-    if (row_type == "mean" && grepl("^Index$", row_label, ignore.case = TRUE) &&
-        !is.null(index_desc)) {
-      label_html <- sprintf('%s<div class="ct-index-desc">%s</div>',
-                            label_html, htmltools::htmlEscape(index_desc))
+    # Add descriptor annotations below summary stat row labels
+    if (row_type == "mean") {
+      desc_text <- NULL
+      if (grepl("^Index$", row_label, ignore.case = TRUE) &&
+          !is.null(question_data$index_description)) {
+        desc_text <- question_data$index_description
+      } else if (grepl("^Mean$", row_label, ignore.case = TRUE) &&
+                 !is.null(question_data$mean_description)) {
+        desc_text <- question_data$mean_description
+      } else if (grepl("NPS", row_label, ignore.case = TRUE) &&
+                 !is.null(question_data$nps_description)) {
+        desc_text <- question_data$nps_description
+      }
+      if (!is.null(desc_text)) {
+        label_html <- sprintf('%s<div class="ct-index-desc">%s</div>',
+                              label_html, htmltools::htmlEscape(desc_text))
+      }
     }
 
     # Add exclusion toggle button for category and NET rows (visible on hover)

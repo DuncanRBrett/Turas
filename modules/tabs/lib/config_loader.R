@@ -338,8 +338,10 @@ build_config_object <- function(settings) {
     dashboard_green_custom  = safe_numeric(get_config_value(settings, "dashboard_green_custom", 60)),
     dashboard_amber_custom  = safe_numeric(get_config_value(settings, "dashboard_amber_custom", 40)),
 
-    # V10.4.3 Index descriptor
+    # V10.4.3 Row descriptors (annotation text below summary stat rows)
     index_descriptor = get_config_value(settings, "index_descriptor", NULL),
+    mean_descriptor = get_config_value(settings, "mean_descriptor", NULL),
+    nps_descriptor = get_config_value(settings, "nps_descriptor", NULL),
     create_index_summary = get_config_value(settings, "create_index_summary", NULL),
 
     # V10.5.0 Inline SVG charts

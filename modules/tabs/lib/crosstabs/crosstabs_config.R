@@ -205,8 +205,10 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     dashboard_green_custom  = safe_numeric(get_config_value(config, "dashboard_green_custom", 60)),
     dashboard_amber_custom  = safe_numeric(get_config_value(config, "dashboard_amber_custom", 40)),
 
-    # V10.4.3 Index descriptor (shown below Index row in HTML crosstabs)
+    # V10.4.3 Row descriptors (shown below summary stat rows in HTML crosstabs)
     index_descriptor = get_config_value(config, "index_descriptor", NULL),
+    mean_descriptor = get_config_value(config, "mean_descriptor", NULL),
+    nps_descriptor = get_config_value(config, "nps_descriptor", NULL),
 
     # V10.5.0 Inline SVG charts
     show_charts = safe_logical(get_config_value(config, "show_charts", FALSE)),
