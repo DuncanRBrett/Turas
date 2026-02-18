@@ -161,8 +161,10 @@ function printReport() {
     el.style.display = "block";
   });
 
-  // Show charts if they have content
+  // Show charts if they have content — capture current state first for restore
+  var chartStates = [];
   document.querySelectorAll(".chart-wrapper").forEach(function(div) {
+    chartStates.push({ el: div, was: div.style.display });
     if (div.querySelector("svg")) {
       div.style.display = "block";
     }
@@ -188,11 +190,9 @@ function printReport() {
   var restoreEl = document.getElementById("q-container-" + activeIndex);
   if (restoreEl) restoreEl.classList.add("active");
 
-  // Restore chart visibility based on chart toggle state
-  var chartCheckbox = document.querySelector("input[onchange*=toggleChart]");
-  var chartsOn = chartCheckbox && chartCheckbox.checked;
-  document.querySelectorAll(".chart-wrapper").forEach(function(div) {
-    div.style.display = chartsOn ? "block" : "none";
+  // Restore chart visibility to pre-print state
+  chartStates.forEach(function(state) {
+    state.el.style.display = state.was;
   });
 
   // Restore insight visibility

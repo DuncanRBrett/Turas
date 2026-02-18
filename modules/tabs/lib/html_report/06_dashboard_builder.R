@@ -196,7 +196,7 @@ build_dashboard_panel <- function(dashboard_data, config_obj) {
 #' @keywords internal
 build_metadata_strip <- function(metadata, brand_colour) {
 
-  total_n_display <- if (!is.na(metadata$total_n)) {
+  total_n_display <- if (!is.null(metadata$total_n) && !is.na(metadata$total_n)) {
     format(round(metadata$total_n), big.mark = ",")
   } else {
     "N/A"
@@ -665,11 +665,12 @@ build_heatmap_grid <- function(metrics, banner_info, config_obj, thresholds,
         disp <- format_gauge_value(val, metric$metric_type)
 
         bg_style <- get_heatmap_bg_style(val, metric$metric_type, thresholds)
+        tier <- get_heatmap_tier(val, metric$metric_type, thresholds)
         total_class <- if (is_total) " dash-hm-total" else ""
 
         html <- paste0(html, sprintf(
-          '<td class="dash-hm-td%s" style="%s">%s</td>',
-          total_class, bg_style, htmltools::htmlEscape(disp)
+          '<td class="dash-hm-td%s" style="%s" data-tier="%s">%s</td>',
+          total_class, bg_style, tier, htmltools::htmlEscape(disp)
         ))
       }
     }
@@ -734,15 +735,12 @@ build_heatmap_export_js <- function() {
           var isHeader = cell.tagName === "TH" || rowIdx < 2;
           var styleId = isHeader ? "header" : "normal";
 
-          // Detect colour from inline style for data cells
-          if (!isHeader && cell.style.backgroundColor) {
-            var bg = cell.style.backgroundColor;
-            if (bg.indexOf("5,150,105") >= 0 || bg.indexOf("059669") >= 0) {
-              styleId = "green";
-            } else if (bg.indexOf("217,119,6") >= 0 || bg.indexOf("b45309") >= 0) {
-              styleId = "amber";
-            } else if (bg.indexOf("220,38,38") >= 0 || bg.indexOf("dc2626") >= 0) {
-              styleId = "red";
+          // Read colour tier from data attribute (inline style colours are
+          // normalised to rgb(r, g, b) by browsers, making string matching unreliable)
+          if (!isHeader) {
+            var tier = cell.getAttribute("data-tier");
+            if (tier === "green" || tier === "amber" || tier === "red") {
+              styleId = tier;
             }
           }
 
@@ -967,6 +965,12 @@ build_dashboard_interaction_js <- function() {
         var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
         var url = URL.createObjectURL(svgBlob);
         var img = new Image();
+        img.onerror = (function(blobUrl) {
+          return function() {
+            URL.revokeObjectURL(blobUrl);
+            alert("Dashboard export failed. Your browser may not support this operation. Try Chrome or Edge.");
+          };
+        })(url);
         img.onload = (function(slideIdx, svgW, svgH, blobUrl) {
           return function() {
             var canvas = document.createElement("canvas");
@@ -1290,6 +1294,11 @@ build_dashboard_css <- function(brand_colour) {
     /* === PRINT === */
     @media print {
       .dash-export-btn { display: none !important; }
+      .dash-gauge-circle, .dash-hm-td, .dash-meta-card,
+      .dash-sig-card, .dash-hm-th {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
     }
   '
 
@@ -1331,23 +1340,6 @@ get_gauge_colour <- function(value, metric_type, thresholds) {
   return("#dc2626")                         # Red
 }
 
-
-#' Get CSS Colour Class for a Value
-#'
-#' @param value Numeric
-#' @param metric_type Character
-#' @param thresholds List from build_colour_thresholds()
-#' @return Character CSS class suffix
-#' @keywords internal
-get_value_colour_class <- function(value, metric_type, thresholds) {
-  if (is.na(value)) return("dash-chip-neutral")
-
-  t <- get_thresholds_for_type(metric_type, thresholds)
-
-  if (value >= t$green) return("dash-chip-green")
-  if (value >= t$amber) return("dash-chip-amber")
-  return("dash-chip-red")
-}
 
 
 #' Get Heatmap Background Style for a Cell
@@ -1391,6 +1383,25 @@ get_heatmap_bg_style <- function(value, metric_type, thresholds) {
     return("background-color: rgba(217,119,6,0.10); color: #b45309;")
   }
   return("background-color: rgba(220,38,38,0.12); color: #dc2626;")
+}
+
+
+#' Get Heatmap Colour Tier for a Cell
+#'
+#' Returns "green", "amber", or "red" — used as a data-tier attribute so the
+#' client-side Excel export can read tier without parsing normalised rgb() strings.
+#'
+#' @param value Numeric
+#' @param metric_type Character
+#' @param thresholds List from build_colour_thresholds()
+#' @return Character: "green", "amber", or "red"
+#' @keywords internal
+get_heatmap_tier <- function(value, metric_type, thresholds) {
+  if (is.na(value)) return("")
+  t <- get_thresholds_for_type(metric_type, thresholds)
+  if (value >= t$green) return("green")
+  if (value >= t$amber) return("amber")
+  return("red")
 }
 
 

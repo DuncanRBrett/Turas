@@ -86,8 +86,8 @@ function captureCurrentView(qCode) {
     tableClone.querySelectorAll("[style*=\"display: none\"], [style*=\"display:none\"]").forEach(function(el) { el.remove(); });
     // Remove excluded rows
     tableClone.querySelectorAll(".ct-row-excluded").forEach(function(el) { el.remove(); });
-    // Remove sort indicators and exclude buttons
-    tableClone.querySelectorAll(".ct-sort-indicator, .row-exclude-btn").forEach(function(el) { el.remove(); });
+    // Remove sort indicators, exclude buttons, and frequency/significance annotations
+    tableClone.querySelectorAll(".ct-sort-indicator, .row-exclude-btn, .ct-freq, .ct-sig").forEach(function(el) { el.remove(); });
   }
 
   // Capture chart SVG
@@ -251,7 +251,11 @@ function exportAllPinnedSlides() {
   var ns = "http://www.w3.org/2000/svg";
   var W = 1280, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
   var pad = 28;
+  var scale = 3;
+  var DOWNLOAD_DELAY_MS = 600;
 
+  // Step 1: Build all SVG blobs upfront (synchronous)
+  var slides = [];
   pinnedViews.forEach(function(pin, idx) {
     var usableW = W - pad * 2;
     var titleFullText = pin.qCode + " - " + pin.qTitle;
@@ -259,7 +263,7 @@ function exportAllPinnedSlides() {
     var titleLineH = 20;
     var titleStartY = pad + 16;
     var titleBlockH = titleLines.length * titleLineH;
-    var metaText = "Base: " + (pin.baseText || "—") + " \u00B7 Banner: " + (pin.bannerLabel || "");
+    var metaText = "Base: " + (pin.baseText || "\u2014") + " \u00B7 Banner: " + (pin.bannerLabel || "");
     var metaY = titleStartY + titleBlockH + 4;
     var contentTop = metaY + 18;
 
@@ -359,30 +363,55 @@ function exportAllPinnedSlides() {
       svg.appendChild(insRes.element);
     }
 
-    // Render to PNG with delay between downloads
-    var scale = 3;
+    // Serialise SVG to blob URL
     var svgData = new XMLSerializer().serializeToString(svg);
     var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-    var url = URL.createObjectURL(svgBlob);
     var slideNum = String(idx + 1).padStart(2, "0");
 
-    (function(slideUrl, sNum, qc) {
-      var sImg = new Image();
-      sImg.onload = function() {
-        var canvas = document.createElement("canvas");
-        canvas.width = W * scale; canvas.height = totalH * scale;
-        var ctx = canvas.getContext("2d");
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(sImg, 0, 0, canvas.width, canvas.height);
-        URL.revokeObjectURL(slideUrl);
-        canvas.toBlob(function(blob) {
-          downloadBlob(blob, "pin_" + sNum + "_" + qc + "_slide.png");
-        }, "image/png");
-      };
-      sImg.src = slideUrl;
-    })(url, slideNum, pin.qCode);
+    slides.push({
+      url: URL.createObjectURL(svgBlob),
+      num: slideNum,
+      qCode: pin.qCode,
+      height: totalH
+    });
   });
+
+  // Step 2: Download slides sequentially with delay to avoid browser blocking
+  var downloaded = 0;
+  var failed = 0;
+
+  function downloadNext(i) {
+    if (i >= slides.length) {
+      if (failed > 0) {
+        alert("Exported " + downloaded + " of " + slides.length + " slides. " + failed + " failed.");
+      }
+      return;
+    }
+    var s = slides[i];
+    var sImg = new Image();
+    sImg.onerror = function() {
+      URL.revokeObjectURL(s.url);
+      failed++;
+      setTimeout(function() { downloadNext(i + 1); }, DOWNLOAD_DELAY_MS);
+    };
+    sImg.onload = function() {
+      var canvas = document.createElement("canvas");
+      canvas.width = W * scale; canvas.height = s.height * scale;
+      var ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(sImg, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(s.url);
+      canvas.toBlob(function(blob) {
+        downloadBlob(blob, "pin_" + s.num + "_" + s.qCode + "_slide.png");
+        downloaded++;
+        setTimeout(function() { downloadNext(i + 1); }, DOWNLOAD_DELAY_MS);
+      }, "image/png");
+    };
+    sImg.src = s.url;
+  }
+
+  downloadNext(0);
 }
 
 // ---- Print Pinned Views to PDF ----

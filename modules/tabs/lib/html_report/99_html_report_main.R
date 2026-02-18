@@ -12,7 +12,20 @@
 .html_report_dir <- if (exists(".tabs_lib_dir", envir = globalenv())) {
   file.path(get(".tabs_lib_dir", envir = globalenv()), "html_report")
 } else {
-  dirname(sys.frame(1)$ofile %||% ".")
+  # Fallback: attempt to determine path from the call stack. This is fragile
+  # and only works when this file is directly source()'d. Set .tabs_lib_dir
+  # in the calling environment before sourcing to avoid this path.
+  .ofile <- tryCatch(sys.frame(1)$ofile, error = function(e) NULL)
+  if (is.null(.ofile) || !nzchar(.ofile %||% "")) {
+    warning(paste(
+      "Cannot determine html_report directory: .tabs_lib_dir is not set",
+      "and sys.frame()$ofile is unavailable. JS files may not load.",
+      "Set .tabs_lib_dir before sourcing run_crosstabs.R."
+    ))
+    "."
+  } else {
+    dirname(.ofile)
+  }
 }
 
 # Source all submodules — fail loudly if any file is missing
@@ -293,6 +306,12 @@ generate_html_report <- function(all_results, banner_info, config_obj, output_pa
 
     if (!file.exists(logo_file)) {
       cat(sprintf("    [WARNING] %s file not found: %s\n", label, logo_path))
+      return(NULL)
+    }
+
+    if (!requireNamespace("base64enc", quietly = TRUE)) {
+      cat(sprintf("    [WARNING] %s skipped: package 'base64enc' is not installed\n", label))
+      cat("    Install it with: install.packages('base64enc')\n")
       return(NULL)
     }
 

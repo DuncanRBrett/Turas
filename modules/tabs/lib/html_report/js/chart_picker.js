@@ -1,4 +1,6 @@
 // ---- Chart Column Picker ----
+// Depends on: getLabelText() from core_navigation.js, sortChartBars() from table_export_init.js,
+//             downloadBlob() from table_export_init.js
 var chartColumnState = {}; // qCode -> { colKey: true/false }
 
 // Get column keys that belong to the active banner group (+ Total)
@@ -30,7 +32,8 @@ function buildChartPickersForGroup(groupCode) {
 
   document.querySelectorAll(".chart-wrapper[data-chart-data]").forEach(function(wrapper) {
     var qCode = wrapper.getAttribute("data-q-code");
-    var data = JSON.parse(wrapper.getAttribute("data-chart-data"));
+    var data;
+    try { data = JSON.parse(wrapper.getAttribute("data-chart-data")); } catch(e) { return; }
     if (!data || !data.columns) return;
 
     var keys = getChartKeysForGroup(data, groupCode);
@@ -92,7 +95,8 @@ function toggleChartColumn(qCode, colKey, chipEl) {
 function rebuildChartSVG(qCode) {
   var wrapper = document.querySelector(".chart-wrapper[data-q-code=\"" + qCode + "\"]");
   if (!wrapper) return;
-  var data = JSON.parse(wrapper.getAttribute("data-chart-data"));
+  var data;
+  try { data = JSON.parse(wrapper.getAttribute("data-chart-data")); } catch(e) { return; }
   if (!data) return;
 
   var selectedKeys = Object.keys(chartColumnState[qCode] || {}).filter(function(k) {
@@ -329,12 +333,28 @@ function hue2rgb(p, q, t) {
 
 // Build multi-column horizontal bar SVG (grouped bars per category)
 function buildMultiHorizontalSVG(data, selectedKeys) {
-  var labels = data.labels || [];
+  var allLabels = data.labels || [];
   var nCols = selectedKeys.length;
   var hasPM = data.priority_metric && data.priority_metric.label;
   var pmDecimals = (hasPM && data.priority_metric.decimals != null) ? data.priority_metric.decimals : 1;
   var barH = 22, subGap = 3, groupGap = 12;
   var wrapThreshold = 30;
+
+  // Filter out items where ALL selected columns have zero value
+  var keepIdx = [];
+  for (var fi = 0; fi < allLabels.length; fi++) {
+    var hasNonZero = false;
+    for (var fk = 0; fk < selectedKeys.length; fk++) {
+      if ((data.columns[selectedKeys[fk]].values[fi] || 0) > 0) { hasNonZero = true; break; }
+    }
+    if (hasNonZero) keepIdx.push(fi);
+  }
+  var labels = keepIdx.map(function(i) { return allLabels[i]; });
+  // Build a column-value lookup that maps to filtered indices
+  var filteredColumns = {};
+  selectedKeys.forEach(function(key) {
+    filteredColumns[key] = keepIdx.map(function(i) { return data.columns[key].values[i] || 0; });
+  });
 
   // Wrap labels and calculate widths
   var wrappedLabels = labels.map(function(l) { return wrapLabel(l, wrapThreshold); });
@@ -351,10 +371,10 @@ function buildMultiHorizontalSVG(data, selectedKeys) {
   var barAreaW = chartW - labelW - valueW - rightPad;
   if (barAreaW < 200) { chartW = labelW + valueW + rightPad + 300; barAreaW = 300; }
 
-  // Find max value across selected columns
+  // Find max value across selected columns (using filtered values)
   var maxVal = 0;
   selectedKeys.forEach(function(key) {
-    data.columns[key].values.forEach(function(v) {
+    filteredColumns[key].forEach(function(v) {
       if (v > maxVal) maxVal = v;
     });
   });
@@ -375,7 +395,10 @@ function buildMultiHorizontalSVG(data, selectedKeys) {
 
   // Add space for priority metric pill strip below bars
   var metricStripH = (hasPM && nCols > 0) ? 36 : 0;
-  var totalH = barsH + metricStripH;
+  // Extra padding if the last label wraps (second tspan line overflows below bar group)
+  var lastWrap = wrappedLabels.length > 0 && wrappedLabels[wrappedLabels.length - 1].length > 1;
+  var bottomPad = lastWrap ? 16 : 8;
+  var totalH = barsH + metricStripH + bottomPad;
 
   // Distinct colour palette for columns — use chart_bar_colour for horizontal bars
   var bc = data.chart_bar_colour || data.brand_colour || "#323367";
@@ -389,11 +412,12 @@ function buildMultiHorizontalSVG(data, selectedKeys) {
     var lines = wrappedLabels[li];
 
     // Wrap each category group in <g> with data attributes for sort sync
-    p.push("<g class=\"chart-bar-group\" data-bar-label=\"" + escapeHtml(label) + "\" data-bar-index=\"" + li + "\" transform=\"translate(0," + groupY + ")\">");
+    var origIndex = keepIdx[li];
+    p.push("<g class=\"chart-bar-group\" data-bar-label=\"" + escapeHtml(label) + "\" data-bar-index=\"" + origIndex + "\" transform=\"translate(0," + groupY + ")\">");
 
     selectedKeys.forEach(function(key, ki) {
       var y = ki * (barH + subGap);
-      var val = data.columns[key].values[li] || 0;
+      var val = filteredColumns[key][li] || 0;
       var barW = Math.max((val / maxVal) * barAreaW, 2);
       var pctText = Math.round(val) + "%";
       var colour = colColours[ki];
@@ -539,6 +563,10 @@ function exportChartPNG(qCode) {
   var url = URL.createObjectURL(svgBlob);
 
   var img = new Image();
+  img.onerror = function() {
+    URL.revokeObjectURL(url);
+    alert("Chart export failed. Your browser may not support this operation. Try Chrome or Edge.");
+  };
   img.onload = function() {
     var canvas = document.createElement("canvas");
     canvas.width = canvasW;

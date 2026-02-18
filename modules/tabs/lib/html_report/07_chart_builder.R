@@ -305,7 +305,8 @@ build_horizontal_bars_svg <- function(items, brand_colour = "#323367",
     bar_area_width <- 300
   }
   top_margin <- 4
-  total_height <- top_margin + nrow(items) * (bar_height + bar_gap)
+  bottom_pad <- 8
+  total_height <- top_margin + nrow(items) * (bar_height + bar_gap) + bottom_pad
   max_val <- max(items$value, na.rm = TRUE)
   if (max_val <= 0) max_val <- 1
 
@@ -476,7 +477,8 @@ build_question_chart <- function(question_data, options_df, config_obj) {
         # chart categories and should not trigger stacked bar mode
         dk_na_patterns <- c("^dk$", "^na$", "^dk/na$", "^dk / na$",
                             "^don't know$", "^not applicable$", "^n/a$",
-                            "^refused$", "^prefer not to say$", "^other$")
+                            "^refused$", "^prefer not to say$",
+                            "^other$")  # "Other" is non-substantive like DK/NA: a catch-all, not a real category
         substantive <- vapply(seen, function(lbl) {
           !any(grepl(paste(dk_na_patterns, collapse = "|"),
                      tolower(trimws(lbl))))

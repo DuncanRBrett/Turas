@@ -19,6 +19,15 @@
 build_html_page <- function(html_data, tables, config_obj,
                             dashboard_html = NULL, charts = list()) {
 
+  if (!requireNamespace("jsonlite", quietly = TRUE)) {
+    return(list(
+      status = "REFUSED",
+      code = "PKG_MISSING_JSONLITE",
+      message = "Required package 'jsonlite' is not installed",
+      how_to_fix = "Install it with: install.packages('jsonlite')"
+    ))
+  }
+
   brand_colour <- config_obj$brand_colour %||% "#323367"
   accent_colour <- config_obj$accent_colour %||% "#CC9900"
   project_title <- config_obj$project_title %||% "Crosstab Report"
@@ -104,7 +113,7 @@ build_html_page <- function(html_data, tables, config_obj,
                          company_name = config_obj$company_name %||% "The Research Lamppost",
                          client_name = config_obj$client_name,
                          researcher_logo_uri = config_obj$researcher_logo_uri,
-                         client_logo_uri = config_obj$client_logo_uri),
+                         apply_weighting = isTRUE(config_obj$apply_weighting)),
       build_report_tab_nav(brand_colour),
       dashboard_html,
       crosstab_panel,
@@ -127,7 +136,7 @@ build_html_page <- function(html_data, tables, config_obj,
                          company_name = config_obj$company_name %||% "The Research Lamppost",
                          client_name = config_obj$client_name,
                          researcher_logo_uri = config_obj$researcher_logo_uri,
-                         client_logo_uri = config_obj$client_logo_uri),
+                         apply_weighting = isTRUE(config_obj$apply_weighting)),
       crosstab_content,
       build_help_overlay(),
       build_javascript(html_data)
@@ -172,33 +181,6 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     .header-inner {
       max-width: 1400px;
       margin: 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .header-brand {
-      color: rgba(255,255,255,0.5);
-      font-size: 11px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      font-weight: 600;
-      margin-bottom: 4px;
-    }
-    .header-title {
-      color: #ffffff;
-      font-size: 22px;
-      font-weight: 700;
-      letter-spacing: -0.3px;
-    }
-    .header-meta {
-      color: rgba(255,255,255,0.6);
-      font-size: 12px;
-      margin-top: 4px;
-    }
-    .header-left {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     .main-layout {
@@ -687,7 +669,6 @@ build_print_css <- function() {
       .toggle-label, .print-btn, .col-chip-bar, .ct-sort-indicator,
       .insight-toggle, .insight-dismiss,
       .chart-col-picker { display: none !important; }
-      .insight-container:has(.insight-editor:not(:empty)) { display: block !important; }
       .main-layout { display: block !important; padding: 0 !important; }
       .content-area { width: 100% !important; }
       .question-container { display: block !important; page-break-inside: avoid; margin-bottom: 24px; page-break-after: always; }
@@ -710,6 +691,11 @@ build_print_css <- function() {
       .banner-tabs { display: flex !important; }
       .banner-tab { display: none !important; }
       .banner-tab.active { display: inline-block !important; background: #1a2744 !important; color: #fff !important; font-size: 10px !important; padding: 4px 10px !important; }
+      .ct-heatmap-cell, .ct-row-net, .ct-row-base, .ct-row-mean,
+      .ct-th, .banner-tab.active {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
     }
   '))
 }
@@ -774,26 +760,33 @@ build_tab_javascript <- function() {
 
 #' Build Header
 #'
-#' @param project_title Character
-#' @param brand_colour Character
-#' @param total_n Numeric or NA
-#' @param n_questions Integer
+#' Constructs the banner at the top of the HTML report. Layout:
+#' - Top row: [researcher logo] "Turas Tabs" / subtitle ... [? help button]
+#' - Study name (large, bold)
+#' - Prepared by / for line
+#' - Stats badge bar (n, questions, weighted/unweighted, updated date)
+#'
+#' @param project_title Character - study name from config
+#' @param brand_colour Character - hex colour for accent border
+#' @param total_n Numeric or NA - total sample size
+#' @param n_questions Integer - number of questions
+#' @param company_name Character - researcher / company name
+#' @param client_name Character or NULL - client organisation
+#' @param researcher_logo_uri Character or NULL - base64 data URI for logo
+#' @param apply_weighting Logical - whether weighting was applied
 #' @return htmltools::div
 build_header <- function(project_title, brand_colour, total_n, n_questions,
                          company_name = "The Research Lamppost",
                          client_name = NULL,
                          researcher_logo_uri = NULL,
-                         client_logo_uri = NULL) {
-  brand_label <- paste0(company_name, " \u00B7 Turas Analytics")
+                         apply_weighting = FALSE) {
 
-  # Shared logo style — both logos same height/width for consistency
+  # Researcher logo element (left of "Turas Tabs")
   logo_style <- paste0(
-    "height:26px;width:26px;object-fit:contain;",
+    "height:28px;width:28px;object-fit:contain;",
     "background:rgba(255,255,255,0.92);border-radius:4px;padding:3px;",
     "flex-shrink:0;"
   )
-
-  # Build researcher logo element
   researcher_logo_el <- NULL
   if (!is.null(researcher_logo_uri) && nzchar(researcher_logo_uri)) {
     researcher_logo_el <- htmltools::tags$img(
@@ -804,90 +797,139 @@ build_header <- function(project_title, brand_colour, total_n, n_questions,
     )
   }
 
-  # Build client logo element
-  client_logo_el <- NULL
-  if (!is.null(client_logo_uri) && nzchar(client_logo_uri)) {
-    client_logo_el <- htmltools::tags$img(
-      src = client_logo_uri,
-      alt = client_name %||% "Client",
-      class = "header-logo-client",
-      style = logo_style
-    )
-  }
-
-  # Row 1: [researcher logo] Researcher Name · Turas Analytics
-  brand_row <- htmltools::tags$div(
-    style = "display:flex;align-items:center;gap:8px;",
+  # --- Top row: [logo] Turas Tabs / subtitle  ...  [?] ---
+  branding_left <- htmltools::tags$div(
+    style = "display:flex;align-items:center;gap:10px;",
     researcher_logo_el,
     htmltools::tags$div(
-      style = "color:rgba(255,255,255,0.7);font-size:11px;letter-spacing:0.5px;",
-      brand_label
-    )
-  )
-
-  # Row 2: [client logo] Prepared for Client Name (only if client_name set)
-  client_row <- NULL
-  if (!is.null(client_name) && nzchar(client_name)) {
-    client_row <- htmltools::tags$div(
-      style = "display:flex;align-items:center;gap:8px;margin-top:3px;",
-      client_logo_el,
       htmltools::tags$div(
-        style = "color:rgba(255,255,255,0.7);font-size:11px;",
-        paste0("Prepared for ", client_name)
+        style = "color:#ffffff;font-size:20px;font-weight:700;line-height:1.2;letter-spacing:-0.3px;",
+        "Turas Tabs"
+      ),
+      htmltools::tags$div(
+        style = "color:rgba(255,255,255,0.50);font-size:11px;font-weight:400;",
+        "Interactive Crosstab Explorer"
       )
     )
-  }
-
-  # Row 3: Project Name (bold) · n=xxx · YY Questions (normal weight)
-  meta_parts <- c()
-  if (!is.na(total_n)) {
-    total_n_display <- round(as.numeric(total_n))
-    meta_parts <- c(meta_parts, sprintf("n=%s", format(total_n_display, big.mark = ",")))
-  }
-  if (!is.na(n_questions)) meta_parts <- c(meta_parts, sprintf("%d Questions", n_questions))
-
-  project_row <- htmltools::tags$div(
-    style = "margin-top:6px;color:#ffffff;font-size:13px;",
-    htmltools::tags$span(
-      style = "font-weight:700;",
-      project_title
-    ),
-    if (length(meta_parts) > 0) htmltools::tags$span(
-      style = "font-weight:400;color:rgba(255,255,255,0.7);",
-      paste0(" \u00B7 ", paste(meta_parts, collapse = " \u00B7 "))
-    )
   )
 
+  help_btn <- htmltools::tags$button(
+    class = "help-btn",
+    onclick = "toggleHelpOverlay()",
+    title = "Show help guide",
+    style = paste0(
+      "width:28px;height:28px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.5);",
+      "background:transparent;color:rgba(255,255,255,0.8);font-size:14px;font-weight:700;",
+      "cursor:pointer;display:flex;align-items:center;justify-content:center;"
+    ),
+    "?"
+  )
+
+  top_row <- htmltools::tags$div(
+    style = "display:flex;align-items:center;justify-content:space-between;",
+    branding_left,
+    help_btn
+  )
+
+  # --- Study name ---
+  study_row <- htmltools::tags$div(
+    style = "color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.3px;margin-top:16px;line-height:1.2;",
+    project_title
+  )
+
+  # --- Prepared by / for ---
+  prepared_parts <- c()
+  if (!is.null(company_name) && nzchar(company_name)) {
+    prepared_parts <- c(prepared_parts, paste0(
+      "Prepared by <span style=\"font-weight:600;\">",
+      htmltools::htmlEscape(company_name), "</span>"
+    ))
+  }
+  if (!is.null(client_name) && nzchar(client_name)) {
+    prepared_parts <- c(prepared_parts, paste0(
+      "for <span style=\"font-weight:600;\">",
+      htmltools::htmlEscape(client_name), "</span>"
+    ))
+  }
+
+  prepared_row <- NULL
+  if (length(prepared_parts) > 0) {
+    prepared_row <- htmltools::tags$div(
+      style = "color:rgba(255,255,255,0.65);font-size:13px;font-weight:400;margin-top:4px;line-height:1.3;",
+      htmltools::HTML(paste(prepared_parts, collapse = " "))
+    )
+  }
+
+  # --- Stats badge bar ---
+  badge_style <- paste0(
+    "display:inline-flex;align-items:center;padding:4px 12px;",
+    "font-size:12px;font-weight:600;color:rgba(255,255,255,0.85);"
+  )
+  separator_style <- paste0(
+    "width:1px;height:16px;background:rgba(255,255,255,0.20);flex-shrink:0;"
+  )
+
+  badge_items <- list()
+
+  # n badge
+
+  if (!is.na(total_n)) {
+    total_n_display <- round(as.numeric(total_n))
+    badge_items <- c(badge_items, list(htmltools::tags$span(
+      style = badge_style,
+      htmltools::HTML(paste0("n&nbsp;=&nbsp;", format(total_n_display, big.mark = ",")))
+    )))
+  }
+
+  # Questions badge
+  if (!is.na(n_questions)) {
+    badge_items <- c(badge_items, list(htmltools::tags$span(
+      style = badge_style,
+      htmltools::HTML(paste0("<span style=\"color:rgba(255,255,255,1);font-weight:700;\">",
+                             n_questions, "</span>&nbsp;Questions"))
+    )))
+  }
+
+  # Weighted / Unweighted badge
+  weight_label <- if (isTRUE(apply_weighting)) "Weighted" else "Unweighted"
+  badge_items <- c(badge_items, list(htmltools::tags$span(
+    style = badge_style, weight_label
+  )))
+
+  # Updated date badge (file generation date)
+  updated_label <- format(Sys.Date(), "Updated %b %Y")
+  badge_items <- c(badge_items, list(htmltools::tags$span(
+    style = badge_style, updated_label
+  )))
+
+  # Interleave badges with separators
+  badge_els <- list()
+  for (i in seq_along(badge_items)) {
+    if (i > 1) {
+      badge_els <- c(badge_els, list(htmltools::tags$span(style = separator_style)))
+    }
+    badge_els <- c(badge_els, list(badge_items[[i]]))
+  }
+
+  stats_bar <- htmltools::tags$div(
+    style = paste0(
+      "display:inline-flex;align-items:center;margin-top:12px;",
+      "border:1px solid rgba(255,255,255,0.15);border-radius:6px;",
+      "background:rgba(255,255,255,0.05);"
+    ),
+    badge_els
+  )
+
+  # --- Assemble header ---
   htmltools::tags$div(
     class = "header",
     htmltools::tags$div(
       class = "header-inner",
-      # LEFT: brand, client, project info
-      htmltools::tags$div(
-        class = "header-left",
-        brand_row,
-        client_row,
-        project_row
-      ),
-      # RIGHT: help button + "Interactive Crosstab Explorer · Generated by Turas"
-      htmltools::tags$div(
-        style = "display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:6px;",
-        htmltools::tags$button(
-          class = "help-btn",
-          onclick = "toggleHelpOverlay()",
-          title = "Show help guide",
-          style = paste0(
-            "width:28px;height:28px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.5);",
-            "background:transparent;color:rgba(255,255,255,0.8);font-size:14px;font-weight:700;",
-            "cursor:pointer;display:flex;align-items:center;justify-content:center;"
-          ),
-          "?"
-        ),
-        htmltools::tags$div(
-          style = "color:rgba(255,255,255,0.4);font-size:10px;text-align:right;",
-          "Interactive Crosstab Explorer \u00B7 Generated by Turas"
-        )
-      )
+      style = "display:flex;flex-direction:column;",
+      top_row,
+      study_row,
+      prepared_row,
+      stats_bar
     )
   )
 }
@@ -1213,7 +1255,9 @@ build_question_containers <- function(questions, tables, banner_groups,
     # charts[[q_code]] is a list with $svg and $chart_data, or NULL
     chart_div <- NULL
     chart_result <- charts[[q_code]]
-    has_chart <- !is.null(chart_result)
+    has_chart <- !is.null(chart_result) &&
+                 !is.null(chart_result$chart_data) &&
+                 !is.null(chart_result$svg)
     if (has_chart) {
       # Embed chart data as JSON for JS-driven multi-column rendering
       chart_json <- jsonlite::toJSON(chart_result$chart_data,
@@ -1389,7 +1433,20 @@ build_javascript <- function(html_data) {
   if (exists(".tabs_lib_dir", envir = globalenv())) {
     file.path(get(".tabs_lib_dir", envir = globalenv()), "html_report", "js")
   } else {
-    file.path(dirname(sys.frame(1)$ofile %||% "."), "js")
+    # Fallback: attempt to determine path from the call stack. This is fragile
+    # and only works when this file is directly source()'d. Set .tabs_lib_dir
+    # in the calling environment before sourcing to avoid this path.
+    .ofile <- tryCatch(sys.frame(1)$ofile, error = function(e) NULL)
+    if (is.null(.ofile) || !nzchar(.ofile %||% "")) {
+      warning(paste(
+        "Cannot determine JS directory: .tabs_lib_dir is not set",
+        "and sys.frame()$ofile is unavailable. JS files may not load.",
+        "Set .tabs_lib_dir before sourcing run_crosstabs.R."
+      ))
+      file.path(".", "js")
+    } else {
+      file.path(dirname(.ofile), "js")
+    }
   }
 )
 

@@ -32,17 +32,19 @@ write_html_report <- function(page, output_path) {
   # Ensure output directory exists
   output_dir <- dirname(output_path)
   if (!dir.exists(output_dir)) {
-    tryCatch({
+    dir_result <- tryCatch({
       dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+      NULL
     }, error = function(e) {
-      return(list(
+      list(
         status = "REFUSED",
         code = "IO_DIR_CREATE_FAILED",
         message = sprintf("Cannot create output directory: %s", output_dir),
         how_to_fix = "Check directory permissions and path validity",
         context = list(error = e$message)
-      ))
+      )
     })
+    if (!is.null(dir_result)) return(dir_result)
   }
 
   # Write the HTML file

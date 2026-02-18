@@ -1,6 +1,7 @@
 // ---- Slide PNG Export (Enhanced) ----
 // Modes: "chart" (chart only), "table" (table only), "chart_table" (both side by side)
 // PowerPoint landscape: 1280x720 base, rendered at 3x for high-res output.
+// Depends on: escapeHtml() defined in chart_picker.js (loaded before this file by build_javascript())
 
 function wrapTextLines(text, maxWidth, charWidth) {
   if (!text) return [];
@@ -63,9 +64,9 @@ function extractSlideTableData(container) {
   if (!table) return null;
   var rows = [];
   var headerRow = [];
-  // Header: get visible columns
+  // Header: get visible columns (use style.display only — offsetParent is null in detached DOM)
   table.querySelectorAll("thead th").forEach(function(th) {
-    if (th.style.display === "none" || th.offsetParent === null) return;
+    if (th.style.display === "none") return;
     var text = th.querySelector(".ct-header-text");
     headerRow.push(text ? text.textContent.trim() : th.textContent.trim().split("\n")[0].trim());
   });
@@ -79,11 +80,10 @@ function extractSlideTableData(container) {
     var isMean = tr.classList.contains("ct-row-mean");
     var isNet = tr.classList.contains("ct-row-net");
     tr.querySelectorAll("td").forEach(function(td) {
-      if (td.style.display === "none" || td.offsetParent === null) return;
-      var text = td.textContent.trim().split("\n")[0].trim();
-      // Clean up exclusion button text
-      text = text.replace(/[\u2715\u25CB]/g, "").trim();
-      cells.push(text);
+      if (td.style.display === "none") return;
+      var clone = td.cloneNode(true);
+      clone.querySelectorAll(".ct-freq, .ct-sig, .row-exclude-btn").forEach(function(el) { el.remove(); });
+      cells.push(clone.textContent.trim());
     });
     if (cells.length > 0) {
       rows.push({ cells: cells, type: isBase ? "base" : (isMean ? "mean" : (isNet ? "net" : "data")) });
@@ -354,6 +354,10 @@ function exportSlidePNG(qCode, mode) {
   var url = URL.createObjectURL(svgBlob);
 
   var img = new Image();
+  img.onerror = function() {
+    URL.revokeObjectURL(url);
+    alert("Slide export failed. Your browser may not support this operation. Try Chrome or Edge.");
+  };
   img.onload = function() {
     var canvas = document.createElement("canvas");
     canvas.width = W * scale;

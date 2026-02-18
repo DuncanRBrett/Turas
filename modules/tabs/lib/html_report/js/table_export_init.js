@@ -1,3 +1,4 @@
+// Depends on: getLabelText() from core_navigation.js, sortChartBars() from table_export_init.js (self)
 // Extract table data as 2D array (shared by CSV and Excel export)
 function extractTableData(qCode) {
   var activeContainer = document.querySelector(".question-container.active");
@@ -17,6 +18,8 @@ function extractTableData(qCode) {
       freqs.forEach(function(f) { f.remove(); });
       var sigs = clone.querySelectorAll(".ct-sig");
       sigs.forEach(function(s) { s.remove(); });
+      var btns = clone.querySelectorAll(".row-exclude-btn");
+      btns.forEach(function(b) { b.remove(); });
       rowData.push(clone.textContent.trim());
     });
     if (rowData.length > 0) data.push(rowData);
