@@ -171,18 +171,23 @@ function rebuildChartSVG(qCode) {
 // Build multi-column stacked bar SVG (one bar per selected column)
 function buildMultiStackedSVG(data, selectedKeys, qCode) {
   var barH = 36, barGap = 8, labelMargin = 10;
+  var singleBarMode = (selectedKeys.length === 1);
+  if (singleBarMode) barH = 50;
   var hasPM = data.priority_metric && data.priority_metric.label;
   var pmDecimals = (hasPM && data.priority_metric.decimals != null) ? data.priority_metric.decimals : 1;
   var metricW = hasPM ? 90 : 0;
   var barW = 680;
   var headerH = hasPM ? 20 : 4;
-  // Calculate label column width for column names
-  var maxLabelLen = 0;
-  selectedKeys.forEach(function(k) {
-    var len = (data.columns[k].display || "").length;
-    if (len > maxLabelLen) maxLabelLen = len;
-  });
-  var colLabelW = Math.max(60, maxLabelLen * 7 + 16);
+  // Calculate label column width for column names (skip in single-bar mode)
+  var colLabelW = 0;
+  if (!singleBarMode) {
+    var maxLabelLen = 0;
+    selectedKeys.forEach(function(k) {
+      var len = (data.columns[k].display || "").length;
+      if (len > maxLabelLen) maxLabelLen = len;
+    });
+    colLabelW = Math.max(60, maxLabelLen * 7 + 16);
+  }
   var barStartX = colLabelW;
   var barUsable = barW - colLabelW - labelMargin - metricW;
 
@@ -223,23 +228,44 @@ function buildMultiStackedSVG(data, selectedKeys, qCode) {
     var cid = clipId + "-" + ki;
     p.push("<defs><clipPath id=\"" + cid + "\"><rect x=\"" + barStartX + "\" y=\"" + y + "\" width=\"" + barUsable + "\" height=\"" + barH + "\" rx=\"5\" ry=\"5\"/></clipPath></defs>");
 
-    // Column label
-    p.push("<text x=\"" + (colLabelW - 8) + "\" y=\"" + (y + barH / 2) + "\" text-anchor=\"end\" dominant-baseline=\"central\" fill=\"#374151\" font-size=\"11\" font-weight=\"600\">" + escapeHtml(data.columns[key].display) + "</text>");
+    // Column label (skip in single-bar mode — no need to label "Total" alone)
+    if (!singleBarMode) {
+      p.push("<text x=\"" + (colLabelW - 8) + "\" y=\"" + (y + barH / 2) + "\" text-anchor=\"end\" dominant-baseline=\"central\" fill=\"#374151\" font-size=\"11\" font-weight=\"600\">" + escapeHtml(data.columns[key].display) + "</text>");
+    }
 
-    // Segments
+    // Segments — enforce minimum visible width so small % still appear
+    var minSegW = 4;
     var xOff = barStartX;
+    var deferredPills = [];  // small-segment pills drawn after all rects (layered on top)
     for (var si = 0; si < vals.length; si++) {
       var segW = (vals[si] / total) * barUsable;
-      if (segW < 1) continue;
+      if (vals[si] <= 0) continue;
+      // Ensure tiny segments are still visible as a sliver
+      if (segW < minSegW) segW = minSegW;
       p.push("<rect x=\"" + xOff + "\" y=\"" + y + "\" width=\"" + segW + "\" height=\"" + barH + "\" fill=\"" + (colours[si] || "#999") + "\" clip-path=\"url(#" + cid + ")\"/>");
 
-      // Label inside if fits
+      // Label: inside bar if wide enough; otherwise queue a coloured pill overlay
       var pctText = Math.round(vals[si]) + "%";
       if (segW > 35) {
         var tFill = getLuminance(colours[si] || "#999") > 0.65 ? "#5c4a3a" : "#ffffff";
         p.push("<text x=\"" + (xOff + segW / 2) + "\" y=\"" + (y + barH / 2) + "\" text-anchor=\"middle\" dominant-baseline=\"central\" fill=\"" + tFill + "\" font-size=\"11\" font-weight=\"600\">" + pctText + "</text>");
+      } else if (vals[si] >= 1) {
+        // Deferred: coloured pill matching segment colour, drawn on top of all rects
+        var pillW = pctText.length * 7 + 10;
+        var pillX = xOff;
+        var pillRight = barStartX + barUsable;
+        if (pillX + pillW > pillRight) pillW = pillRight - pillX;
+        var pillCol = colours[si] || "#999";
+        var pillText = getLuminance(pillCol) > 0.65 ? "#5c4a3a" : "#ffffff";
+        deferredPills.push({ x: pillX, y: y, w: pillW, h: barH, rx: 3, fill: pillCol, textFill: pillText, label: pctText });
       }
       xOff += segW;
+    }
+    // Draw small-segment pills on top of all segment rects
+    for (var pi = 0; pi < deferredPills.length; pi++) {
+      var dp = deferredPills[pi];
+      p.push("<rect x=\"" + dp.x + "\" y=\"" + dp.y + "\" width=\"" + dp.w + "\" height=\"" + dp.h + "\" rx=\"" + dp.rx + "\" fill=\"" + dp.fill + "\"/>");
+      p.push("<text x=\"" + (dp.x + dp.w / 2) + "\" y=\"" + (dp.y + dp.h / 2) + "\" text-anchor=\"middle\" dominant-baseline=\"central\" fill=\"" + dp.textFill + "\" font-size=\"10\" font-weight=\"600\">" + dp.label + "</text>");
     }
 
     // Priority metric value -- styled pill to the right of bar
@@ -473,6 +499,7 @@ function buildMultiHorizontalSVG(data, selectedKeys) {
 }
 
 function escapeHtml(s) {
+  if (s == null) return "";
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 

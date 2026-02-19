@@ -3,7 +3,7 @@
 # ==============================================================================
 # Validates inputs before HTML report generation.
 # Returns TRS refusals on invalid input, never uses stop().
-# No external dependencies required beyond htmltools (base R ecosystem).
+# Required packages: htmltools, jsonlite (checked at validation time).
 # ==============================================================================
 
 #' Validate Inputs for HTML Report Generation
@@ -18,13 +18,23 @@
 #' @export
 validate_html_report_inputs <- function(all_results, banner_info, config_obj) {
 
-  # Check htmltools is available
+  # Check required packages are available
   if (!requireNamespace("htmltools", quietly = TRUE)) {
     return(list(
       status = "REFUSED",
       code = "PKG_HTMLTOOLS_MISSING",
       message = "Package 'htmltools' is required for HTML report generation",
       how_to_fix = "Install htmltools: renv::install('htmltools')",
+      context = list(call = match.call())
+    ))
+  }
+
+  if (!requireNamespace("jsonlite", quietly = TRUE)) {
+    return(list(
+      status = "REFUSED",
+      code = "PKG_MISSING_JSONLITE",
+      message = "Package 'jsonlite' is required for HTML report generation",
+      how_to_fix = "Install jsonlite: renv::install('jsonlite')",
       context = list(call = match.call())
     ))
   }

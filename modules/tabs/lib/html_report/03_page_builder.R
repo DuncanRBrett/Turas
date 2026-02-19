@@ -17,7 +17,8 @@
 #' @return htmltools::browsable tagList
 #' @export
 build_html_page <- function(html_data, tables, config_obj,
-                            dashboard_html = NULL, charts = list()) {
+                            dashboard_html = NULL, charts = list(),
+                            source_filename = NULL) {
 
   if (!requireNamespace("jsonlite", quietly = TRUE)) {
     return(list(
@@ -84,6 +85,11 @@ build_html_page <- function(html_data, tables, config_obj,
               class = "export-btn",
               onclick = "printPinnedViews()",
               "\U0001F5A8 Print / Save PDF"
+            ),
+            htmltools::tags$button(
+              class = "export-btn",
+              onclick = "saveReportHTML()",
+              "\U0001F4BE Save Report"
             )
           )
         ),
@@ -100,10 +106,16 @@ build_html_page <- function(html_data, tables, config_obj,
       )
     )
 
+    # Build source-filename meta tag (used by saveReportHTML for _Updated.html naming)
+    source_meta <- if (!is.null(source_filename) && nzchar(source_filename)) {
+      htmltools::tags$meta(name = "turas-source-filename", content = source_filename)
+    }
+
     page <- htmltools::tagList(
       htmltools::tags$head(
         htmltools::tags$meta(charset = "UTF-8"),
         htmltools::tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
+        source_meta,
         htmltools::tags$title(project_title),
         build_css(brand_colour, accent_colour),
         build_dashboard_css(brand_colour),
@@ -128,6 +140,7 @@ build_html_page <- function(html_data, tables, config_obj,
       htmltools::tags$head(
         htmltools::tags$meta(charset = "UTF-8"),
         htmltools::tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
+        source_meta,
         htmltools::tags$title(project_title),
         build_css(brand_colour, accent_colour),
         build_print_css()
@@ -662,39 +675,201 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
 #' @return htmltools::tags$style
 build_print_css <- function() {
   htmltools::tags$style(htmltools::HTML('
+    @page { size: A4 landscape; margin: 10mm 12mm; }
+
     @media print {
-      .sidebar, .controls-bar, .banner-tabs, .table-actions,
+      /* === HIDE INTERACTIVE ELEMENTS === */
+      .sidebar, .controls-bar, .table-actions,
       .export-btn, .export-chart-btn, .export-slide-btn, .slide-export-group,
       .slide-menu, .search-box, .pin-btn,
       .toggle-label, .print-btn, .col-chip-bar, .ct-sort-indicator,
       .insight-toggle, .insight-dismiss,
-      .chart-col-picker { display: none !important; }
-      .main-layout { display: block !important; padding: 0 !important; }
-      .content-area { width: 100% !important; }
-      .question-container { display: block !important; page-break-inside: avoid; margin-bottom: 24px; page-break-after: always; }
+      .chart-col-picker, .help-overlay, .help-btn,
+      .report-tabs, .row-exclude-btn { display: none !important; }
+
+      /* === LAYOUT RESET === */
+      body {
+        background: white !important;
+        font-size: 16px;
+        line-height: 1.4;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .main-layout {
+        display: block !important;
+        padding: 0 !important;
+        max-width: none !important;
+      }
+      .content-area {
+        width: 100% !important;
+        max-width: none !important;
+      }
+
+      /* === HEADER - COMPACT === */
+      .header {
+        padding: 8px 0 6px 0 !important;
+        background: none !important;
+        border-bottom: 2px solid #1a2744 !important;
+        page-break-after: avoid;
+      }
+      .header-inner {
+        max-width: none !important;
+      }
+      .header-inner * { color: #1a2744 !important; }
+      .header-inner div[style*="font-size:28px"] {
+        font-size: 16px !important; font-weight: 700 !important;
+      }
+      .header-inner div[style*="font-size:22px"] {
+        font-size: 14px !important; margin-top: 4px !important;
+      }
+      .header-inner div[style*="font-size:12px"],
+      .header-inner div[style*="font-size:13px"] {
+        font-size: 10px !important;
+      }
+      .header-inner div[style*="width:64px"] {
+        width: 32px !important; height: 32px !important;
+      }
+      .header-logo {
+        height: 28px !important; width: 28px !important;
+      }
+
+      /* === QUESTION CONTAINERS === */
+      .question-container {
+        display: block !important;
+        page-break-inside: avoid;
+        page-break-after: always;
+        margin-bottom: 0;
+      }
       .question-container:last-child { page-break-after: auto; }
-      .header { padding: 12px 16px; }
-      .question-title-card { padding: 8px 12px; }
-      body { background: white; }
-      .table-wrapper { border: 1px solid #ccc; overflow: visible !important; }
-      .ct-td.ct-label-col, .ct-th.ct-label-col { position: static; }
+
+      /* === QUESTION TITLE CARD === */
+      .question-title-card {
+        padding: 6px 0 !important;
+        border: none !important;
+        border-bottom: 1px solid #e2e8f0 !important;
+        margin-bottom: 8px !important;
+        background: none !important;
+        border-radius: 0 !important;
+      }
+      .question-text { font-size: 16px !important; }
+      .question-code { font-size: 13px !important; }
+      .question-meta { font-size: 11px !important; }
+
+      /* === TABLE WRAPPER === */
+      .table-wrapper {
+        border: none !important;
+        border-radius: 0 !important;
+        overflow: visible !important;
+      }
+
+      /* === TABLE - DEFAULT TIER (1-6 data columns) === */
+      .ct-table {
+        font-size: 15px !important;
+        width: 100% !important;
+        table-layout: auto !important;
+      }
+      .ct-th {
+        font-size: 14px !important;
+        padding: 6px 10px !important;
+        border-bottom: 2px solid #1a2744 !important;
+        background: #f8f9fa !important;
+        min-width: 0 !important;
+        max-width: none !important;
+      }
+      .ct-td {
+        padding: 5px 10px !important;
+        border-bottom: 1px solid #e0e0e0 !important;
+        min-width: 0 !important;
+        max-width: none !important;
+      }
+      .ct-th.ct-label-col, .ct-td.ct-label-col {
+        position: static !important;
+        max-width: none !important;
+        text-align: left !important;
+      }
+      .ct-th { white-space: normal !important; word-wrap: break-word !important; overflow-wrap: break-word !important; }
+      .ct-td.ct-label-col { white-space: normal !important; word-wrap: break-word !important; overflow-wrap: break-word !important; }
+      .ct-th.ct-label-col { min-width: 200px !important; }
+      .ct-td.ct-label-col { font-size: 14px !important; }
+
+      /* === TIER 2: MEDIUM (7-10 data columns) === */
+      .ct-table.print-cols-medium { font-size: 14px !important; }
+      .print-cols-medium .ct-th { font-size: 13px !important; padding: 5px 8px !important; }
+      .print-cols-medium .ct-td { padding: 4px 8px !important; }
+      .print-cols-medium .ct-th.ct-label-col { min-width: 180px !important; }
+      .print-cols-medium .ct-td.ct-label-col { font-size: 13px !important; }
+
+      /* === TIER 3: COMPACT (11-14 data columns) === */
+      .ct-table.print-cols-compact { font-size: 13px !important; }
+      .print-cols-compact .ct-th { font-size: 12px !important; padding: 4px 6px !important; }
+      .print-cols-compact .ct-td { padding: 3px 6px !important; }
+      .print-cols-compact .ct-th.ct-label-col { min-width: 150px !important; }
+      .print-cols-compact .ct-td.ct-label-col { font-size: 12px !important; }
+      .print-cols-compact .ct-sig { font-size: 8px !important; }
+
+      /* === TIER 4: DENSE (15+ data columns) === */
+      .ct-table.print-cols-dense { font-size: 12px !important; }
+      .print-cols-dense .ct-th { font-size: 11px !important; padding: 3px 5px !important; }
+      .print-cols-dense .ct-td { padding: 3px 5px !important; }
+      .print-cols-dense .ct-th.ct-label-col { min-width: 130px !important; }
+      .print-cols-dense .ct-td.ct-label-col { font-size: 11px !important; }
+      .print-cols-dense .ct-sig { font-size: 7px !important; }
+      .print-cols-dense .ct-freq { font-size: 9px !important; }
+
+      /* === SIG BADGES (simplified for print) === */
+      .ct-sig {
+        font-size: 9px !important;
+        background: none !important;
+        color: #059669 !important;
+        padding: 0 !important;
+        margin-left: 2px !important;
+      }
+      .ct-freq { font-size: 10px !important; color: #666 !important; }
+
+      /* === LOW BASE - ensure visible in print === */
       .ct-low-base-dim { opacity: 1 !important; }
-      .report-tabs { display: none !important; }
-      .tab-panel { display: block !important; }
-      #tab-summary { display: none !important; }
-      #tab-pinned { display: none !important; }
-      .chart-wrapper { page-break-inside: avoid; }
-      .ct-table { font-size: 11px !important; }
-      .ct-th, .ct-td { padding: 4px 8px !important; }
-      .question-text { font-size: 14px !important; }
-      .question-code { font-size: 12px !important; }
-      .banner-tabs { display: flex !important; }
-      .banner-tab { display: none !important; }
-      .banner-tab.active { display: inline-block !important; background: #1a2744 !important; color: #fff !important; font-size: 10px !important; padding: 4px 10px !important; }
+
+      /* === COLOR PRESERVATION === */
       .ct-heatmap-cell, .ct-row-net, .ct-row-base, .ct-row-mean,
       .ct-th, .banner-tab.active {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+      }
+
+      /* === BANNER TAB INDICATOR === */
+      .banner-tabs {
+        display: flex !important;
+        border: none !important;
+        background: none !important;
+        margin-bottom: 4px !important;
+      }
+      .banner-tab { display: none !important; }
+      .banner-tab.active {
+        display: inline-block !important;
+        background: #1a2744 !important;
+        color: #fff !important;
+        font-size: 11px !important;
+        padding: 3px 10px !important;
+        border-radius: 3px !important;
+      }
+
+      /* === CHARTS === */
+      .chart-wrapper {
+        page-break-inside: avoid;
+        margin-top: 8px;
+      }
+
+      /* === TABS === */
+      .tab-panel { display: block !important; }
+      #tab-summary { display: none !important; }
+      #tab-pinned { display: none !important; }
+
+      /* === FOOTER === */
+      .footer {
+        font-size: 9px !important;
+        padding: 4px 0 !important;
+        border-top: 1px solid #ccc;
+        margin-top: 8px;
       }
     }
   '))
@@ -782,32 +957,39 @@ build_header <- function(project_title, brand_colour, total_n, n_questions,
                          apply_weighting = FALSE) {
 
   # Researcher logo element (left of "Turas Tabs")
-  logo_style <- paste0(
-    "height:28px;width:28px;object-fit:contain;",
-    "background:rgba(255,255,255,0.92);border-radius:4px;padding:3px;",
+  logo_container_style <- paste0(
+    "width:72px;height:72px;border-radius:12px;",
+    "background:transparent;",
+    "display:flex;align-items:center;justify-content:center;",
     "flex-shrink:0;"
+  )
+  logo_img_style <- paste0(
+    "height:56px;width:56px;object-fit:contain;"
   )
   researcher_logo_el <- NULL
   if (!is.null(researcher_logo_uri) && nzchar(researcher_logo_uri)) {
-    researcher_logo_el <- htmltools::tags$img(
-      src = researcher_logo_uri,
-      alt = company_name,
-      class = "header-logo",
-      style = logo_style
+    researcher_logo_el <- htmltools::tags$div(
+      style = logo_container_style,
+      htmltools::tags$img(
+        src = researcher_logo_uri,
+        alt = company_name,
+        class = "header-logo",
+        style = logo_img_style
+      )
     )
   }
 
   # --- Top row: [logo] Turas Tabs / subtitle  ...  [?] ---
   branding_left <- htmltools::tags$div(
-    style = "display:flex;align-items:center;gap:10px;",
+    style = "display:flex;align-items:center;gap:16px;",
     researcher_logo_el,
     htmltools::tags$div(
       htmltools::tags$div(
-        style = "color:#ffffff;font-size:20px;font-weight:700;line-height:1.2;letter-spacing:-0.3px;",
+        style = "color:#ffffff;font-size:28px;font-weight:700;line-height:1.2;letter-spacing:-0.3px;",
         "Turas Tabs"
       ),
       htmltools::tags$div(
-        style = "color:rgba(255,255,255,0.50);font-size:11px;font-weight:400;",
+        style = "color:rgba(255,255,255,0.50);font-size:12px;font-weight:400;margin-top:2px;",
         "Interactive Crosstab Explorer"
       )
     )
@@ -896,10 +1078,11 @@ build_header <- function(project_title, brand_colour, total_n, n_questions,
     style = badge_style, weight_label
   )))
 
-  # Updated date badge (file generation date)
-  updated_label <- format(Sys.Date(), "Updated %b %Y")
+  # Created date badge (file generation date; JS updates to "Last saved …" on save)
+  created_label <- format(Sys.Date(), "Created %b %Y")
   badge_items <- c(badge_items, list(htmltools::tags$span(
-    style = badge_style, updated_label
+    id = "header-date-badge",
+    style = badge_style, created_label
   )))
 
   # Interleave badges with separators

@@ -98,15 +98,33 @@ function renderTableSVG(ns, svgParent, tableData, x, y, maxWidth) {
   var nCols = tableData[0].cells.length;
   if (nCols === 0) return 0;
 
-  var rowH = 18, headerH = 22, fontSize = 9, padX = 6;
+  var baseRowH = 18, headerH = 22, fontSize = 9, padX = 6;
+  var lineH = fontSize + 3; // line height for wrapped text
   // Calculate column widths: first col gets more space
   var firstColW = Math.min(Math.max(maxWidth * 0.3, 120), 200);
   var dataColW = nCols > 1 ? (maxWidth - firstColW) / (nCols - 1) : maxWidth;
 
+  // Pre-compute per-row heights based on text wrapping needs
+  var rowHeights = tableData.map(function(row) {
+    var isHeader = row.type === "header";
+    var baseH = isHeader ? headerH : baseRowH;
+    var maxLines = 1;
+    row.cells.forEach(function(cellText, ci) {
+      var cellW = ci === 0 ? firstColW : dataColW;
+      var maxChars = Math.floor((cellW - padX * 2) / (fontSize * 0.55));
+      if (maxChars > 0 && cellText.length > maxChars) {
+        var lines = wrapTextLines(cellText, cellW - padX * 2, fontSize * 0.55);
+        var n = Math.min(lines.length, 3);
+        if (n > maxLines) maxLines = n;
+      }
+    });
+    return maxLines > 1 ? baseH + (maxLines - 1) * lineH : baseH;
+  });
+
   var curY = y;
   tableData.forEach(function(row, ri) {
     var isHeader = row.type === "header";
-    var rH = isHeader ? headerH : rowH;
+    var rH = rowHeights[ri];
 
     // Row background
     var bgRect = document.createElementNS(ns, "rect");
@@ -129,18 +147,39 @@ function renderTableSVG(ns, svgParent, tableData, x, y, maxWidth) {
 
     // Cell text
     row.cells.forEach(function(cellText, ci) {
+      var cellW = ci === 0 ? firstColW : dataColW;
       var cellX = ci === 0 ? x + padX : x + firstColW + (ci - 1) * dataColW + padX;
+      var maxChars = Math.floor((cellW - padX * 2) / (fontSize * 0.55));
       var textEl = document.createElementNS(ns, "text");
       textEl.setAttribute("x", cellX);
-      textEl.setAttribute("y", curY + rH / 2 + 1);
-      textEl.setAttribute("dominant-baseline", "central");
       textEl.setAttribute("font-size", fontSize);
       textEl.setAttribute("fill", isHeader ? "#ffffff" : (ci === 0 ? "#374151" : "#1e293b"));
       if (isHeader || row.type === "net" || ci === 0) textEl.setAttribute("font-weight", "600");
       if (row.type === "mean") textEl.setAttribute("font-style", "italic");
-      // Truncate long text to fit column
-      var maxChars = Math.floor((ci === 0 ? firstColW : dataColW) / (fontSize * 0.55));
-      textEl.textContent = cellText.length > maxChars ? cellText.substring(0, maxChars - 1) + "\u2026" : cellText;
+
+      // Wrap text if it exceeds column width
+      if (maxChars > 0 && cellText.length > maxChars) {
+        var lines = wrapTextLines(cellText, cellW - padX * 2, fontSize * 0.55);
+        var nLines = Math.min(lines.length, 3);
+        var blockH = nLines * lineH;
+        var startY = curY + (rH - blockH) / 2 + fontSize;
+        for (var li = 0; li < nLines; li++) {
+          var tspan = document.createElementNS(ns, "tspan");
+          tspan.setAttribute("x", cellX);
+          tspan.setAttribute("y", startY + li * lineH);
+          // Truncate last line if there are more lines remaining
+          if (li === nLines - 1 && lines.length > nLines) {
+            tspan.textContent = lines[li].substring(0, Math.max(maxChars - 1, 5)) + "\u2026";
+          } else {
+            tspan.textContent = lines[li];
+          }
+          textEl.appendChild(tspan);
+        }
+      } else {
+        textEl.setAttribute("y", curY + rH / 2 + 1);
+        textEl.setAttribute("dominant-baseline", "central");
+        textEl.textContent = cellText;
+      }
       svgParent.appendChild(textEl);
     });
 
@@ -231,52 +270,40 @@ function exportSlidePNG(qCode, mode) {
   var chartSvg = wrapper ? wrapper.querySelector("svg") : null;
   var tableData = showTable ? extractSlideTableData(container) : null;
 
-  // Content layout
-  var contentH = 0;
+  // Stacked layout: insight → chart → table
   var chartClone, chartVB, chartOrigW, chartOrigH, chartScale, chartDisplayH;
-  var chartAreaW, tableAreaW, chartX, tableX;
 
-  if (mode === "chart_table" && chartSvg && tableData) {
-    // Side by side: table left, chart right
-    tableAreaW = Math.floor(usableW * 0.48);
-    chartAreaW = usableW - tableAreaW - 16;
-    tableX = pad;
-    chartX = pad + tableAreaW + 16;
+  // 1. Insight dimensions
+  var insightLines = wrapTextLines(insightText, usableW - 16, 7);
+  var insightLineH = 17;
+  var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 24 : 0;
+  var insightY = contentTop;
 
-    chartClone = chartSvg.cloneNode(true);
-    chartVB = chartClone.getAttribute("viewBox").split(" ").map(Number);
-    chartOrigW = chartVB[2]; chartOrigH = chartVB[3];
-    chartScale = chartAreaW / chartOrigW;
-    chartDisplayH = chartOrigH * chartScale;
-
-    var tableH = tableData.length * 18 + 4;
-    contentH = Math.max(chartDisplayH, tableH);
-  } else if (showChart && chartSvg) {
+  // 2. Chart dimensions (full width)
+  var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 12 : 0);
+  chartDisplayH = 0;
+  if (showChart && chartSvg) {
     chartClone = chartSvg.cloneNode(true);
     chartVB = chartClone.getAttribute("viewBox").split(" ").map(Number);
     chartOrigW = chartVB[2]; chartOrigH = chartVB[3];
     chartScale = usableW / chartOrigW;
     chartDisplayH = chartOrigH * chartScale;
-    chartX = pad;
-    chartAreaW = usableW;
-    contentH = chartDisplayH;
-  } else if (showTable && tableData) {
-    tableX = pad;
-    tableAreaW = usableW;
-    contentH = tableData.length * 18 + 4;
-  } else {
-    return;
   }
 
-  var metricsY = contentTop + contentH + 12;
+  // 3. Table dimensions (full width)
+  var tableTopY = chartTopY + chartDisplayH + (chartDisplayH > 0 ? 12 : 0);
+  var tableH = 0;
+  if (showTable && tableData) {
+    tableH = tableData.length * 18 + 4;
+  }
+
+  // Metrics strip after table
+  var metricsY = tableTopY + tableH + 12;
   var metricsH = metrics.length > 0 ? 28 : 0;
 
-  var insightLines = wrapTextLines(insightText, usableW - 16, 7);
-  var insightLineH = 17;
-  var insightY = metricsY + metricsH + (metricsH > 0 ? 8 : 0);
-  var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 10 : 0;
+  var totalH = metricsY + metricsH + pad + 20;
 
-  var totalH = insightY + insightBlockH + pad;
+  if (!showChart && !showTable) return;
 
   // ---- Build slide SVG ----
   var svg = document.createElementNS(ns, "svg");
@@ -301,20 +328,42 @@ function exportSlidePNG(qCode, mode) {
   metaEl.textContent = metaText;
   svg.appendChild(metaEl);
 
-  // Table
-  if (showTable && tableData) {
-    renderTableSVG(ns, svg, tableData, tableX, contentTop, tableAreaW);
+  // Render stacked: insight → chart → table → metrics
+
+  // 1. Insight (first — the editorial takeaway)
+  if (insightLines.length > 0) {
+    var accentH = Math.max(28, insightLines.length * insightLineH + 12);
+    // Background fill for insight area
+    var insBg = document.createElementNS(ns, "rect");
+    insBg.setAttribute("x", pad); insBg.setAttribute("y", insightY + 2);
+    insBg.setAttribute("width", usableW); insBg.setAttribute("height", accentH);
+    insBg.setAttribute("rx", "4"); insBg.setAttribute("fill", "#f0f4ff");
+    svg.appendChild(insBg);
+    // Accent bar
+    var iBar = document.createElementNS(ns, "rect");
+    iBar.setAttribute("x", pad); iBar.setAttribute("y", insightY + 2);
+    iBar.setAttribute("width", "4"); iBar.setAttribute("height", accentH);
+    iBar.setAttribute("fill", "#323367"); iBar.setAttribute("rx", "2");
+    svg.appendChild(iBar);
+    var insResult = createWrappedText(ns, insightLines, pad + 14, insightY + 18, insightLineH,
+      { fill: "#1a2744", "font-size": "13", "font-weight": "500" });
+    svg.appendChild(insResult.element);
   }
 
-  // Chart
+  // 2. Chart (full width — visual pattern)
   if (showChart && chartClone) {
     var chartG = document.createElementNS(ns, "g");
-    chartG.setAttribute("transform", "translate(" + chartX + "," + contentTop + ") scale(" + chartScale + ")");
+    chartG.setAttribute("transform", "translate(" + pad + "," + chartTopY + ") scale(" + chartScale + ")");
     while (chartClone.firstChild) chartG.appendChild(chartClone.firstChild);
     svg.appendChild(chartG);
   }
 
-  // Metrics strip
+  // 3. Table (full width — detailed reference)
+  if (showTable && tableData) {
+    renderTableSVG(ns, svg, tableData, pad, tableTopY, usableW);
+  }
+
+  // 4. Metrics strip
   if (metrics.length > 0) {
     var mLine = document.createElementNS(ns, "line");
     mLine.setAttribute("x1", pad); mLine.setAttribute("x2", W - pad);
@@ -327,24 +376,6 @@ function exportSlidePNG(qCode, mode) {
     mText.setAttribute("font-weight", "600");
     mText.textContent = metrics.join("  |  ");
     svg.appendChild(mText);
-  }
-
-  // Insight
-  if (insightLines.length > 0) {
-    var iLine = document.createElementNS(ns, "line");
-    iLine.setAttribute("x1", pad); iLine.setAttribute("x2", W - pad);
-    iLine.setAttribute("y1", insightY); iLine.setAttribute("y2", insightY);
-    iLine.setAttribute("stroke", "#e2e8f0"); iLine.setAttribute("stroke-width", "1");
-    svg.appendChild(iLine);
-    var accentH = Math.max(24, insightLines.length * insightLineH);
-    var iBar = document.createElementNS(ns, "rect");
-    iBar.setAttribute("x", pad); iBar.setAttribute("y", insightY + 4);
-    iBar.setAttribute("width", "3"); iBar.setAttribute("height", accentH);
-    iBar.setAttribute("fill", "#323367"); iBar.setAttribute("rx", "1.5");
-    svg.appendChild(iBar);
-    var insResult = createWrappedText(ns, insightLines, pad + 12, insightY + 18, insightLineH,
-      { fill: "#374151", "font-size": "12", "font-style": "italic" });
-    svg.appendChild(insResult.element);
   }
 
   // ---- Render SVG to PNG at 3x ----

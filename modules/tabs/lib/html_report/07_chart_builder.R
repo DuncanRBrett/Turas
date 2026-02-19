@@ -411,9 +411,10 @@ extract_all_column_chart_data <- function(table_data, row_indices, use_box_categ
     if (use_box_categories) vals <- abs(vals)
     # Replace NA with 0 for charting
     vals[is.na(vals)] <- 0
-    # Derive display name from key (e.g., "TOTAL::Total" -> "Total")
+    # Derive display name from key (e.g., "TOTAL::Total" -> "Total",
+    # "Q002::BOXCAT::Online campus" -> "Online campus")
     parts <- strsplit(key, "::", fixed = TRUE)[[1]]
-    display <- if (length(parts) >= 2) parts[2] else key
+    display <- if (length(parts) >= 2) parts[length(parts)] else key
     columns[[key]] <- list(display = display, values = vals)
   }
 

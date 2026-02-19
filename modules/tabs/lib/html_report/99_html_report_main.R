@@ -350,9 +350,13 @@ generate_html_report <- function(all_results, banner_info, config_obj, output_pa
   # ============================================================================
   cat("  Step 4: Assembling HTML page...\n")
 
+  # Source filename without extension (for Save Report JS to use)
+  source_filename <- tools::file_path_sans_ext(basename(output_path))
+
   page <- tryCatch({
     build_html_page(html_data, tables, config_obj,
-                    dashboard_html = dashboard_html, charts = charts)
+                    dashboard_html = dashboard_html, charts = charts,
+                    source_filename = source_filename)
   }, error = function(e) {
     cat("\n=== TURAS ERROR ===\n")
     cat("Code: CALC_PAGE_BUILD_FAILED\n")

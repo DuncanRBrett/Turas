@@ -211,6 +211,7 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     dashboard_amber_index   = safe_numeric(get_config_value(config, "dashboard_amber_index", 5)),
     dashboard_green_custom  = safe_numeric(get_config_value(config, "dashboard_green_custom", 60)),
     dashboard_amber_custom  = safe_numeric(get_config_value(config, "dashboard_amber_custom", 40)),
+    dashboard_sort_gauges   = get_config_value(config, "dashboard_sort_gauges", "desc"),
 
     # V10.4.3 Row descriptors (shown below summary stat rows in HTML crosstabs)
     index_descriptor = get_config_value(config, "index_descriptor", NULL),

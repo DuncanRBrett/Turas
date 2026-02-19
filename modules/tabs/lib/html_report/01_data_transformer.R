@@ -65,7 +65,7 @@ build_banner_groups <- function(banner_info) {
       display_labels = if (!is.null(bq$columns)) bq$columns
                        else sapply(bq$internal_keys, function(k) {
                          parts <- strsplit(k, "::")[[1]]
-                         if (length(parts) >= 2) parts[2] else k
+                         if (length(parts) >= 2) parts[length(parts)] else k
                        }, USE.NAMES = FALSE)
     )
   }

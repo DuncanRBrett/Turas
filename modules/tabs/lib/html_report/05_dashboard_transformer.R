@@ -136,10 +136,22 @@ extract_dashboard_metadata <- function(all_results, banner_info, config_obj) {
     bg_names <- names(banner_info$banner_info)
   }
 
+  # Count only questions with a valid, non-empty table and required columns
+
+  # (mirrors the filtering in transform_for_html / 01_data_transformer.R)
+  n_valid <- 0L
+  for (q_code in names(all_results)) {
+    q <- all_results[[q_code]]
+    if (!is.null(q$table) && is.data.frame(q$table) && nrow(q$table) > 0 &&
+        all(c("RowLabel", "RowType") %in% names(q$table))) {
+      n_valid <- n_valid + 1L
+    }
+  }
+
   list(
     total_n = total_n,
     fieldwork_dates = config_obj$fieldwork_dates,
-    n_questions = length(all_results),
+    n_questions = n_valid,
     banner_group_names = bg_names,
     banner_group_count = length(bg_names)
   )

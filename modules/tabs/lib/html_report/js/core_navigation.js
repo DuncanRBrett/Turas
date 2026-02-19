@@ -179,6 +179,27 @@ function printReport() {
     if (hadContent) container.style.display = "block";
   });
 
+  // Add print tier classes based on visible column count per table
+  var tierClasses = [];
+  document.querySelectorAll("table.ct-table").forEach(function(table) {
+    var visibleCount = 0;
+    table.querySelectorAll("thead th.ct-data-col").forEach(function(th) {
+      if (th.style.display !== "none") visibleCount++;
+    });
+    var tierClass = "";
+    if (visibleCount >= 15) {
+      tierClass = "print-cols-dense";
+    } else if (visibleCount >= 11) {
+      tierClass = "print-cols-compact";
+    } else if (visibleCount >= 7) {
+      tierClass = "print-cols-medium";
+    }
+    if (tierClass) {
+      table.classList.add(tierClass);
+      tierClasses.push({ table: table, cls: tierClass });
+    }
+  });
+
   // Trigger print
   window.print();
 
@@ -198,6 +219,11 @@ function printReport() {
   // Restore insight visibility
   insightStates.forEach(function(state) {
     state.el.style.display = state.was;
+  });
+
+  // Remove print tier classes
+  tierClasses.forEach(function(item) {
+    item.table.classList.remove(item.cls);
   });
 }
 
@@ -377,6 +403,27 @@ function syncAllInsights() {
 function saveReportHTML() {
   syncAllInsights();
 
+  // Stamp the header date badge with "Last saved" timestamp
+  var dateBadge = document.getElementById("header-date-badge");
+  if (dateBadge) {
+    var now = new Date();
+    var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    var d = now.getDate();
+    var m = months[now.getMonth()];
+    var y = now.getFullYear();
+    var hh = String(now.getHours()).padStart(2, "0");
+    var mm = String(now.getMinutes()).padStart(2, "0");
+    dateBadge.textContent = "Last saved " + d + " " + m + " " + y + " " + hh + ":" + mm;
+  }
+
+  // Also sync any dashboard text-box editors into their stores
+  document.querySelectorAll(".dash-text-editor").forEach(function(editor) {
+    var store = editor.nextElementSibling;
+    if (store && store.tagName === "TEXTAREA") {
+      store.textContent = editor.innerHTML;
+    }
+  });
+
   // Before serializing, clear editor contenteditable (data lives in textarea store)
   // The hydrate function will restore editors from stores on re-open
   document.querySelectorAll(".insight-area").forEach(function(area) {
@@ -416,10 +463,17 @@ function saveReportHTML() {
   // Serialize the full page
   var html = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
   var blob = new Blob([html], { type: "text/html;charset=utf-8" });
-  var title = document.querySelector(".header-title");
-  var fname = title ? title.textContent.replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_") : "";
-  if (!fname) fname = "Report";
-  downloadBlob(blob, fname + "_with_insights.html");
+
+  // Derive filename: prefer original source filename + "_Updated", fall back to title
+  var sourceMeta = document.querySelector('meta[name="turas-source-filename"]');
+  var fname;
+  if (sourceMeta && sourceMeta.content) {
+    fname = sourceMeta.content;
+  } else {
+    var title = document.querySelector(".header-title");
+    fname = title ? title.textContent.replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_") : "Report";
+  }
+  downloadBlob(blob, fname + "_Updated.html");
 
   // Restore DOM elements for continued use
   removedPickers.forEach(function(item) {

@@ -131,7 +131,7 @@ build_dashboard_panel <- function(dashboard_data, config_obj) {
       if (length(metrics) == 0) next
 
       # Build gauges for this section
-      gauges <- build_gauge_section(metrics, brand_colour, type_label, thresholds)
+      gauges <- build_gauge_section(metrics, brand_colour, type_label, thresholds, config_obj)
 
       # Build heatmap for this section
       section_id <- paste0("hm-section-", i)
@@ -162,17 +162,35 @@ build_dashboard_panel <- function(dashboard_data, config_obj) {
     )
   }
 
+  # 2A: Embed metadata as data attributes for JS slide export
+  project_title <- config_obj$project_title %||% ""
+  company_name <- config_obj$company_name %||% ""
+  fieldwork_dates <- config_obj$fieldwork_dates %||% ""
+
   htmltools::tags$div(
     id = "tab-summary",
     class = "tab-panel active",
+    `data-project-title` = project_title,
+    `data-fieldwork` = fieldwork_dates,
+    `data-company` = company_name,
+    `data-brand-colour` = brand_colour,
     htmltools::tags$div(
       class = "dash-container",
       meta_strip,
       colour_legend,
+      build_dashboard_text_boxes(brand_colour),
       section_blocks,
       sig_section,
       build_heatmap_export_js(),
       build_dashboard_interaction_js(),
+      htmltools::tags$div(
+        style = "text-align:right;padding:8px 0 0 0;",
+        htmltools::tags$button(
+          class = "export-btn",
+          onclick = "saveReportHTML()",
+          "\U0001F4BE Save Report"
+        )
+      ),
       htmltools::tags$div(
         class = "dash-footer-note",
         htmltools::HTML(paste0(
@@ -333,6 +351,62 @@ build_colour_legend <- function(thresholds, config_obj = NULL) {
 
 
 # ==============================================================================
+# COMPONENT: DASHBOARD TEXT BOXES
+# ==============================================================================
+
+#' Build Dashboard Text Boxes
+#'
+#' Two editable text areas at the top of the dashboard:
+#' 1. Background & Method — for context about the study
+#' 2. Executive Summary — for key findings and recommendations
+#'
+#' Each has a pin button to save content to Pinned Views.
+#'
+#' @param brand_colour Character hex colour
+#' @return htmltools::tagList
+#' @keywords internal
+build_dashboard_text_boxes <- function(brand_colour) {
+
+  bc <- brand_colour %||% "#323367"
+
+  build_one_box <- function(box_id, title, placeholder) {
+    htmltools::tags$div(
+      class = "dash-text-box",
+      style = sprintf("border-left: 3px solid %s;", bc),
+      htmltools::tags$div(
+        class = "dash-text-box-header",
+        htmltools::tags$span(class = "dash-text-box-title", title),
+        htmltools::tags$button(
+          class = "dash-export-btn dash-pin-text-btn",
+          onclick = sprintf("pinDashboardText('%s')", box_id),
+          htmltools::HTML("&#128204; Pin to Views")
+        )
+      ),
+      htmltools::tags$div(
+        id = paste0("dash-text-", box_id),
+        class = "dash-text-editor",
+        contenteditable = "true",
+        `data-placeholder` = placeholder
+      )
+    )
+  }
+
+  htmltools::tagList(
+    build_one_box(
+      "background",
+      "Background & Method",
+      "Enter background, method, sample details..."
+    ),
+    build_one_box(
+      "execsummary",
+      "Executive Summary",
+      "Enter key findings and recommendations..."
+    )
+  )
+}
+
+
+# ==============================================================================
 # COMPONENT: KEY SCORE GAUGES
 # ==============================================================================
 
@@ -347,15 +421,70 @@ build_colour_legend <- function(thresholds, config_obj = NULL) {
 #' @param thresholds List from build_colour_thresholds()
 #' @return htmltools::tags$div
 #' @keywords internal
-build_gauge_section <- function(metrics, brand_colour, section_label, thresholds) {
+build_gauge_section <- function(metrics, brand_colour, section_label, thresholds,
+                                config_obj = list()) {
 
-  gauge_cards <- lapply(metrics, function(metric) {
-    total_val <- metric$values[["TOTAL::Total"]]
-    if (is.null(total_val) || is.na(total_val)) total_val <- NA_real_
+  # --- 1F: Sort gauges by Total value (configurable) ---
+  # Config values: "desc" (highest first), "asc" (lowest first), "original" (no sort)
+  sort_mode <- tolower(as.character(config_obj$dashboard_sort_gauges %||% "desc"))
+  # Backwards-compatible: legacy TRUE → "desc", FALSE → "original"
+  if (sort_mode %in% c("true", "1")) sort_mode <- "desc"
+  if (sort_mode %in% c("false", "0")) sort_mode <- "original"
 
-    # Build SVG gauge
+  total_vals <- sapply(metrics, function(m) {
+    v <- m$values[["TOTAL::Total"]]
+    if (is.null(v) || is.na(v)) -Inf else v
+  })
+  # Track original indices for JS re-sort to "original" order
+  original_indices <- seq_along(metrics)
+  if (sort_mode != "original" && length(metrics) > 1) {
+    sort_order <- order(total_vals, decreasing = (sort_mode == "desc"))
+    metrics <- metrics[sort_order]
+    total_vals <- total_vals[sort_order]
+    original_indices <- original_indices[sort_order]
+  }
+
+  # --- Pre-compute tier info for 1A, 1C, 1E ---
+  n_metrics <- length(metrics)
+  gauge_colours <- character(n_metrics)
+  for (i in seq_along(metrics)) {
+    v <- total_vals[i]
+    if (is.finite(v)) {
+      gauge_colours[i] <- get_gauge_colour(v, metrics[[i]]$metric_type, thresholds)
+    } else {
+      gauge_colours[i] <- "#94a3b8"
+    }
+  }
+
+  # 1E: Count tiers
+  n_green <- sum(gauge_colours == "#059669")
+  n_amber <- sum(gauge_colours == "#d97706")
+  n_red <- sum(gauge_colours == "#dc2626")
+
+  # 1C: Find best/worst indices (only when 3+ metrics with valid values)
+  finite_mask <- is.finite(total_vals)
+  best_idx <- NA_integer_
+  worst_idx <- NA_integer_
+  if (sum(finite_mask) >= 3) {
+    finite_vals <- total_vals
+    finite_vals[!finite_mask] <- NA_real_
+    best_idx <- which.max(finite_vals)
+    worst_idx <- which.min(finite_vals)
+  }
+
+  # 1D: Hero mode for single-item sections
+  is_hero <- (n_metrics == 1)
+
+  # --- Build gauge cards ---
+  gauge_cards <- lapply(seq_along(metrics), function(i) {
+    metric <- metrics[[i]]
+    total_val <- total_vals[i]
+    if (!is.finite(total_val)) total_val <- NA_real_
+    colour <- gauge_colours[i]
+
+    # Build SVG gauge (1D: larger for hero)
     gauge_svg <- build_svg_gauge(total_val, metric$metric_type,
-                                  brand_colour, thresholds)
+                                  brand_colour, thresholds, is_hero = is_hero)
 
     # Type badge
     type_label <- switch(metric$metric_type,
@@ -366,32 +495,76 @@ build_gauge_section <- function(metrics, brand_colour, section_label, thresholds
       "custom" = toupper(metric$metric_label),
       toupper(metric$metric_type)
     )
-
     type_class <- paste0("dash-type-badge dash-type-", metric$metric_type)
 
-    # Full question label (CSS handles wrapping)
     q_label <- metric$question_text
-
-    # Store display value for slide export
     display_val <- format_gauge_value(total_val, metric$metric_type)
 
+    # 1A: Colour-coded left border
+    card_style <- sprintf("border-left: 3px solid %s;", colour)
+
+    # 1D: Hero class
+    card_class <- if (is_hero) "dash-gauge-card dash-gauge-hero" else "dash-gauge-card"
+
+    # 1C: Best/Worst badge
+    callout_badge <- NULL
+    if (!is.na(best_idx) && i == best_idx) {
+      callout_badge <- htmltools::tags$span(
+        class = "dash-callout-badge dash-callout-best", "Highest")
+    } else if (!is.na(worst_idx) && i == worst_idx) {
+      callout_badge <- htmltools::tags$span(
+        class = "dash-callout-badge dash-callout-worst", "Lowest")
+    }
+
+    # 1G: Rank indicator
+    rank_el <- NULL
+    if (n_metrics > 1) {
+      rank_el <- htmltools::tags$span(class = "dash-gauge-rank",
+                                       paste0("#", i))
+    }
+
     htmltools::tags$div(
-      class = "dash-gauge-card",
+      class = card_class,
+      style = card_style,
       `data-q-code` = metric$q_code,
       `data-value` = display_val,
+      `data-value-num` = if (is.finite(total_val)) as.character(total_val) else "",
+      `data-original-idx` = as.character(original_indices[i]),
       `data-q-text` = metric$question_text,
       onclick = "toggleGaugeExclude(this)",
+      callout_badge,
       htmltools::tags$span(class = type_class, type_label),
       htmltools::HTML(gauge_svg),
       htmltools::tags$div(
         class = "dash-gauge-label",
         htmltools::tags$span(class = "dash-gauge-qcode", metric$q_code),
         q_label
-      )
+      ),
+      rank_el
     )
   })
 
   section_id <- gsub("[^a-zA-Z0-9]", "-", tolower(section_label))
+
+  # 1E: Build tier count badges for section header
+  tier_badges <- htmltools::tagList(
+    if (n_green > 0) htmltools::tags$span(
+      class = "dash-tier-pill dash-tier-green",
+      paste0(n_green, " Strong")),
+    if (n_amber > 0) htmltools::tags$span(
+      class = "dash-tier-pill dash-tier-amber",
+      paste0(n_amber, " Moderate")),
+    if (n_red > 0) htmltools::tags$span(
+      class = "dash-tier-pill dash-tier-red",
+      paste0(n_red, " Concern"))
+  )
+
+  # Sort toggle button label based on initial sort mode
+  sort_icon <- switch(sort_mode,
+    "asc"      = "&#9650; Low\u2192High",
+    "original" = "&#9679; Original",
+                 "&#9660; High\u2192Low"  # default "desc"
+  )
 
   htmltools::tags$div(
     class = "dash-section",
@@ -399,14 +572,23 @@ build_gauge_section <- function(metrics, brand_colour, section_label, thresholds
     id = paste0("dash-sec-", section_id),
     htmltools::tags$div(class = "dash-section-title",
       htmltools::HTML(htmltools::htmlEscape(section_label)),
+      tier_badges,
       htmltools::tags$button(
         class = "dash-export-btn dash-slide-export-btn",
         style = "margin-left:12px;",
         onclick = sprintf("exportDashboardSlide('%s')", section_id),
         htmltools::HTML("&#128196; Export Slide")
+      ),
+      htmltools::tags$button(
+        class = "dash-export-btn dash-sort-btn",
+        style = "margin-left:6px;",
+        onclick = sprintf("cycleSortGauges('%s')", section_id),
+        htmltools::HTML(sort_icon)
       )
     ),
-    htmltools::tags$div(class = "dash-gauges", gauge_cards)
+    htmltools::tags$div(class = "dash-gauges",
+                        `data-sort-mode` = sort_mode,
+                        gauge_cards)
   )
 }
 
@@ -443,12 +625,21 @@ format_gauge_value <- function(value, metric_type) {
 #' @param thresholds List from build_colour_thresholds()
 #' @return Character string of SVG markup
 #' @keywords internal
-build_svg_gauge <- function(value, metric_type, brand_colour, thresholds) {
+build_svg_gauge <- function(value, metric_type, brand_colour, thresholds,
+                            is_hero = FALSE) {
+
+  # Gauge dimensions: compact default, larger for hero
+
+  if (is_hero) {
+    svg_w <- 240; svg_h <- 144; font_size <- 32
+  } else {
+    svg_w <- 130; svg_h <- 78; font_size <- 28
+  }
 
   if (is.na(value)) {
     # Return a simple N/A gauge
     return(paste0(
-      '<svg viewBox="0 0 200 120" width="160" height="96">',
+      '<svg viewBox="0 0 200 120" width="', svg_w, '" height="', svg_h, '">',
       '<path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" ',
       'stroke="#e2e8f0" stroke-width="12" stroke-linecap="round"/>',
       '<text x="100" y="92" text-anchor="middle" ',
@@ -482,14 +673,14 @@ build_svg_gauge <- function(value, metric_type, brand_colour, thresholds) {
 
   # Build SVG
   svg <- paste0(
-    '<svg viewBox="0 0 200 120" width="160" height="96">',
+    '<svg viewBox="0 0 200 120" width="', svg_w, '" height="', svg_h, '">',
     '<path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" ',
     'stroke="#e2e8f0" stroke-width="12" stroke-linecap="round"/>',
     '<path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" ',
     'stroke="GAUGE_COLOUR" stroke-width="12" stroke-linecap="round" ',
     'stroke-dasharray="FILL_LEN REMAINDER"/>',
     '<text x="100" y="92" text-anchor="middle" ',
-    'font-size="28" font-weight="700" fill="GAUGE_COLOUR">DISP_VAL</text>',
+    'font-size="', font_size, '" font-weight="700" fill="GAUGE_COLOUR">DISP_VAL</text>',
     '</svg>'
   )
 
@@ -592,7 +783,8 @@ build_heatmap_grid <- function(metrics, banner_info, config_obj, thresholds,
   ))
   html <- paste0(html, '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">')
   html <- paste0(html, '<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/>')
-  html <- paste0(html, '<line x1="12" y1="15" x2="12" y2="3"/></svg> Export Excel</button></div>')
+  html <- paste0(html, '<line x1="12" y1="15" x2="12" y2="3"/></svg> Export Excel</button>')
+  html <- paste0(html, '</div>')
   html <- paste0(html, '<div class="dash-section-sub">All metrics across all banner groups &middot; Colour indicates strength</div>')
   html <- paste0(html, sprintf('<div class="dash-heatmap"><table class="dash-hm-table" id="%s">', safe_id))
 
@@ -800,11 +992,61 @@ build_dashboard_interaction_js <- function() {
       card.classList.toggle("dash-gauge-excluded");
     }
 
+    function cycleSortGauges(sectionId) {
+      var section = document.getElementById("dash-sec-" + sectionId);
+      if (!section) return;
+      var container = section.querySelector(".dash-gauges");
+      if (!container) return;
+      var current = container.getAttribute("data-sort-mode") || "desc";
+
+      // Cycle: desc -> asc -> original -> desc
+      var next = current === "desc" ? "asc" : current === "asc" ? "original" : "desc";
+      container.setAttribute("data-sort-mode", next);
+
+      var cards = Array.from(container.querySelectorAll(".dash-gauge-card"));
+      if (cards.length < 2) return;
+
+      if (next === "original") {
+        cards.sort(function(a, b) {
+          return parseInt(a.getAttribute("data-original-idx") || "0") -
+                 parseInt(b.getAttribute("data-original-idx") || "0");
+        });
+      } else {
+        cards.sort(function(a, b) {
+          var va = parseFloat(a.getAttribute("data-value-num")) || -Infinity;
+          var vb = parseFloat(b.getAttribute("data-value-num")) || -Infinity;
+          return next === "desc" ? vb - va : va - vb;
+        });
+      }
+
+      // Re-insert in new order and update rank labels
+      cards.forEach(function(card, i) {
+        container.appendChild(card);
+        var rank = card.querySelector(".dash-gauge-rank");
+        if (rank) rank.textContent = "#" + (i + 1);
+      });
+
+      // Update button label
+      var btn = section.querySelector(".dash-sort-btn");
+      if (btn) {
+        btn.innerHTML = next === "desc" ? "\\u25BC High\\u2192Low"
+                      : next === "asc" ? "\\u25B2 Low\\u2192High"
+                      : "\\u25CF Original";
+      }
+    }
+
     function exportDashboardSlide(sectionId) {
       var section = document.getElementById("dash-sec-" + sectionId);
       if (!section) return;
       var cards = section.querySelectorAll(".dash-gauge-card:not(.dash-gauge-excluded)");
       if (cards.length === 0) { alert("No gauges to export (all excluded)"); return; }
+
+      // 2A: Read embedded metadata
+      var summaryPanel = document.getElementById("tab-summary");
+      var projectTitle = summaryPanel ? (summaryPanel.getAttribute("data-project-title") || "") : "";
+      var fieldwork = summaryPanel ? (summaryPanel.getAttribute("data-fieldwork") || "") : "";
+      var companyName = summaryPanel ? (summaryPanel.getAttribute("data-company") || "") : "";
+      var brandColour = summaryPanel ? (summaryPanel.getAttribute("data-brand-colour") || "#323367") : "#323367";
 
       var ns = "http://www.w3.org/2000/svg";
       var font = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
@@ -814,14 +1056,36 @@ build_dashboard_interaction_js <- function() {
       var totalCards = cards.length;
       var slideCount = Math.ceil(totalCards / maxPerSlide);
 
+      // 2C: Count tier colours from all cards in this section
+      var nGreen = 0, nAmber = 0, nRed = 0;
+      cards.forEach(function(c) {
+        var g = c.querySelector("svg");
+        if (g) {
+          var ps = g.querySelectorAll("path");
+          if (ps.length >= 2) {
+            var sc = ps[1].getAttribute("stroke") || "";
+            if (sc === "#059669") nGreen++;
+            else if (sc === "#d97706") nAmber++;
+            else if (sc === "#dc2626") nRed++;
+          }
+        }
+      });
+
       for (var si = 0; si < slideCount; si++) {
         var startIdx = si * maxPerSlide;
         var endIdx = Math.min(startIdx + maxPerSlide, totalCards);
         var slideCards = Array.from(cards).slice(startIdx, endIdx);
-        var rows = Math.ceil(slideCards.length / perRow);
-        var titleH = 40;
-        var gridH = rows * (cardH + gapY);
-        var totalH = pad + titleH + gridH + pad;
+        var nRows = Math.ceil(slideCards.length / perRow);
+
+        // 2B: Brand header bar (48px)
+        var headerH = 48;
+        // 2C: Summary callout line (24px)
+        var calloutH = 24;
+        var sectionTitleH = 30;
+        var gridH = nRows * (cardH + gapY);
+        // 2E: Footer (30px)
+        var footerH = 30;
+        var totalH = headerH + pad + calloutH + sectionTitleH + gridH + pad + footerH;
 
         var svg = document.createElementNS(ns, "svg");
         svg.setAttribute("xmlns", ns);
@@ -834,39 +1098,94 @@ build_dashboard_interaction_js <- function() {
         bg.setAttribute("fill", "#ffffff");
         svg.appendChild(bg);
 
-        // Title bar with accent line
+        // 2B: Brand header bar — full width rect in brand colour
+        var headerBar = document.createElementNS(ns, "rect");
+        headerBar.setAttribute("x", "0"); headerBar.setAttribute("y", "0");
+        headerBar.setAttribute("width", W); headerBar.setAttribute("height", headerH);
+        headerBar.setAttribute("fill", brandColour);
+        svg.appendChild(headerBar);
+
+        // Project name (white, left)
+        if (projectTitle) {
+          var ptEl = document.createElementNS(ns, "text");
+          ptEl.setAttribute("x", pad); ptEl.setAttribute("y", headerH / 2 + 6);
+          ptEl.setAttribute("fill", "#ffffff"); ptEl.setAttribute("font-size", "16");
+          ptEl.setAttribute("font-weight", "700");
+          ptEl.textContent = projectTitle;
+          svg.appendChild(ptEl);
+        }
+
+        // Fieldwork + company (white, right)
+        var rightText = [fieldwork, companyName].filter(function(s) { return s; }).join("  \\u00B7  ");
+        if (rightText) {
+          var rtEl = document.createElementNS(ns, "text");
+          rtEl.setAttribute("x", W - pad); rtEl.setAttribute("y", headerH / 2 + 5);
+          rtEl.setAttribute("text-anchor", "end"); rtEl.setAttribute("fill", "rgba(255,255,255,0.85)");
+          rtEl.setAttribute("font-size", "11"); rtEl.setAttribute("font-weight", "500");
+          rtEl.textContent = rightText;
+          svg.appendChild(rtEl);
+        }
+
+        // 2C: Summary callout line below header
+        var calloutY = headerH + 16;
+        var calloutParts = [];
+        if (nGreen > 0) calloutParts.push(nGreen + " Strong");
+        if (nAmber > 0) calloutParts.push(nAmber + " Moderate");
+        if (nRed > 0) calloutParts.push(nRed + " Concern");
+        if (calloutParts.length > 0) {
+          var calloutText = totalCards + " of " + totalCards + " metrics: " + calloutParts.join(", ");
+          var coEl = document.createElementNS(ns, "text");
+          coEl.setAttribute("x", pad); coEl.setAttribute("y", calloutY + 12);
+          coEl.setAttribute("fill", "#64748b"); coEl.setAttribute("font-size", "11");
+          coEl.setAttribute("font-weight", "500");
+          coEl.textContent = calloutText;
+          svg.appendChild(coEl);
+        }
+
+        // Section title with accent line
+        var secTitleY = calloutY + calloutH + 4;
         var accent = document.createElementNS(ns, "rect");
-        accent.setAttribute("x", pad); accent.setAttribute("y", pad);
-        accent.setAttribute("width", "4"); accent.setAttribute("height", "22");
-        accent.setAttribute("rx", "2"); accent.setAttribute("fill", "#323367");
+        accent.setAttribute("x", pad); accent.setAttribute("y", secTitleY);
+        accent.setAttribute("width", "4"); accent.setAttribute("height", "20");
+        accent.setAttribute("rx", "2"); accent.setAttribute("fill", brandColour);
         svg.appendChild(accent);
 
         var title = document.createElementNS(ns, "text");
         var sectionTitle = section.querySelector(".dash-section-title");
         var titleText = sectionTitle ? sectionTitle.textContent.replace("Export Slide", "").trim() : sectionId;
+        // Remove tier pill text that gets concatenated
+        titleText = titleText.replace(/\\d+\\s*(Strong|Moderate|Concern)/g, "").trim();
         if (slideCount > 1) titleText += " (" + (si + 1) + " of " + slideCount + ")";
-        title.setAttribute("x", pad + 12); title.setAttribute("y", pad + 17);
-        title.setAttribute("fill", "#1a2744"); title.setAttribute("font-size", "16");
+        title.setAttribute("x", pad + 12); title.setAttribute("y", secTitleY + 15);
+        title.setAttribute("fill", "#1a2744"); title.setAttribute("font-size", "15");
         title.setAttribute("font-weight", "700");
         title.textContent = titleText;
         svg.appendChild(title);
 
-        // Gauge cards -- built from scratch, no cloning
+        // 2D: Gauge cards — with coloured top border, larger value, subtle shadow
+        var gridTopY = secTitleY + sectionTitleH;
         var gridStartX = (W - (perRow * cardW + (perRow - 1) * gapX)) / 2;
+
+        // SVG drop shadow filter
+        var defs = document.createElementNS(ns, "defs");
+        var filter = document.createElementNS(ns, "filter");
+        filter.setAttribute("id", "cardShadow");
+        filter.setAttribute("x", "-5%"); filter.setAttribute("y", "-5%");
+        filter.setAttribute("width", "110%"); filter.setAttribute("height", "120%");
+        var feFlood = document.createElementNS(ns, "feDropShadow");
+        feFlood.setAttribute("dx", "0"); feFlood.setAttribute("dy", "1");
+        feFlood.setAttribute("stdDeviation", "2");
+        feFlood.setAttribute("flood-color", "rgba(0,0,0,0.06)");
+        filter.appendChild(feFlood);
+        defs.appendChild(filter);
+        svg.appendChild(defs);
+
         slideCards.forEach(function(card, ci) {
           var col = ci % perRow;
           var row = Math.floor(ci / perRow);
           var cx = gridStartX + col * (cardW + gapX);
-          var cy = pad + titleH + row * (cardH + gapY);
+          var cy = gridTopY + row * (cardH + gapY);
           var midX = cx + cardW / 2;
-
-          // Card background
-          var cardBg = document.createElementNS(ns, "rect");
-          cardBg.setAttribute("x", cx); cardBg.setAttribute("y", cy);
-          cardBg.setAttribute("width", cardW); cardBg.setAttribute("height", cardH);
-          cardBg.setAttribute("rx", "8"); cardBg.setAttribute("fill", "#f8fafc");
-          cardBg.setAttribute("stroke", "#e2e8f0"); cardBg.setAttribute("stroke-width", "1");
-          svg.appendChild(cardBg);
 
           // Extract gauge colour and fill from the existing card SVG
           var gaugeColour = "#059669";
@@ -884,6 +1203,22 @@ build_dashboard_interaction_js <- function() {
               }
             }
           }
+
+          // Card background with subtle shadow
+          var cardBg = document.createElementNS(ns, "rect");
+          cardBg.setAttribute("x", cx); cardBg.setAttribute("y", cy);
+          cardBg.setAttribute("width", cardW); cardBg.setAttribute("height", cardH);
+          cardBg.setAttribute("rx", "8"); cardBg.setAttribute("fill", "#f8fafc");
+          cardBg.setAttribute("stroke", "#e2e8f0"); cardBg.setAttribute("stroke-width", "1");
+          cardBg.setAttribute("filter", "url(#cardShadow)");
+          svg.appendChild(cardBg);
+
+          // 2D: 3px coloured top border
+          var topBorder = document.createElementNS(ns, "rect");
+          topBorder.setAttribute("x", cx + 4); topBorder.setAttribute("y", cy);
+          topBorder.setAttribute("width", cardW - 8); topBorder.setAttribute("height", "3");
+          topBorder.setAttribute("rx", "1.5"); topBorder.setAttribute("fill", gaugeColour);
+          svg.appendChild(topBorder);
 
           // Draw mini gauge arc (radius 40, centered in upper card area)
           var gr = 40, gStroke = 8;
@@ -908,25 +1243,25 @@ build_dashboard_interaction_js <- function() {
           fgArc.setAttribute("stroke-dasharray", fillDash + " " + gapDash);
           svg.appendChild(fgArc);
 
-          // Value text (bold, centred below arc)
+          // 2D: Value text — larger font (20px instead of 16px)
           var val = card.getAttribute("data-value") || "";
           var valEl = document.createElementNS(ns, "text");
-          valEl.setAttribute("x", midX); valEl.setAttribute("y", gCy - 6);
+          valEl.setAttribute("x", midX); valEl.setAttribute("y", gCy - 4);
           valEl.setAttribute("text-anchor", "middle"); valEl.setAttribute("fill", gaugeColour);
-          valEl.setAttribute("font-size", "16"); valEl.setAttribute("font-weight", "700");
+          valEl.setAttribute("font-size", "20"); valEl.setAttribute("font-weight", "700");
           valEl.textContent = val;
           svg.appendChild(valEl);
 
-          // Q code (small, teal)
+          // Q code (small, brand colour)
           var qCode = card.getAttribute("data-q-code") || "";
           var qcEl = document.createElementNS(ns, "text");
           qcEl.setAttribute("x", midX); qcEl.setAttribute("y", gCy + 16);
-          qcEl.setAttribute("text-anchor", "middle"); qcEl.setAttribute("fill", "#323367");
+          qcEl.setAttribute("text-anchor", "middle"); qcEl.setAttribute("fill", brandColour);
           qcEl.setAttribute("font-size", "10"); qcEl.setAttribute("font-weight", "700");
           qcEl.textContent = qCode;
           svg.appendChild(qcEl);
 
-          // Question text (multi-line wrapping, no truncation)
+          // Question text (multi-line wrapping)
           var qText = card.getAttribute("data-q-text") || "";
           var maxCharsPerLine = Math.floor((cardW - 12) / 5);
           var tLines = [];
@@ -958,6 +1293,32 @@ build_dashboard_interaction_js <- function() {
             svg.appendChild(tEl);
           });
         });
+
+        // 2E: Footer — hairline + company (left) + page number (right)
+        var footerY = totalH - footerH;
+        var hairline = document.createElementNS(ns, "line");
+        hairline.setAttribute("x1", pad); hairline.setAttribute("y1", footerY);
+        hairline.setAttribute("x2", W - pad); hairline.setAttribute("y2", footerY);
+        hairline.setAttribute("stroke", "#e2e8f0"); hairline.setAttribute("stroke-width", "1");
+        svg.appendChild(hairline);
+
+        if (companyName) {
+          var ftCompany = document.createElementNS(ns, "text");
+          ftCompany.setAttribute("x", pad); ftCompany.setAttribute("y", footerY + 18);
+          ftCompany.setAttribute("fill", "#94a3b8"); ftCompany.setAttribute("font-size", "9");
+          ftCompany.setAttribute("font-weight", "500");
+          ftCompany.textContent = companyName;
+          svg.appendChild(ftCompany);
+        }
+
+        if (slideCount > 1) {
+          var ftPage = document.createElementNS(ns, "text");
+          ftPage.setAttribute("x", W - pad); ftPage.setAttribute("y", footerY + 18);
+          ftPage.setAttribute("text-anchor", "end");
+          ftPage.setAttribute("fill", "#94a3b8"); ftPage.setAttribute("font-size", "9");
+          ftPage.textContent = (si + 1) + " of " + slideCount;
+          svg.appendChild(ftPage);
+        }
 
         // Render to PNG at 3x
         var scale = 3;
@@ -1032,10 +1393,10 @@ build_sig_findings_section <- function(sig_findings, brand_colour) {
     # Metric descriptor (e.g., "Good or excellent", "NET POSITIVE", "Mean")
     metric_desc <- f$metric_label %||% ""
 
-    # Show: "Good or excellent: 3rd yr 67% vs Total 59% — sig. higher than Honours (53%)"
+    # Show: "10 - Restaurants (9.7) is sig. higher than 12 - Supermarket (9.1). The Total is 9.4"
     finding_text <- sprintf(
-      "%s %s vs Total %s \u2014 sig. higher than %s",
-      f$column_label, col_val_display, total_val_display, comparisons_text
+      "%s (%s) is sig. higher than %s. The Total is %s",
+      f$column_label, col_val_display, comparisons_text, total_val_display
     )
 
     # Full question text (no truncation — CSS handles wrapping)
@@ -1167,8 +1528,9 @@ build_dashboard_css <- function(brand_colour) {
     }
     .dash-gauge-card {
       background: #fff; border-radius: 8px; border: 1px solid #e2e8f0;
-      padding: 16px; min-width: 220px; flex: 1; max-width: 320px;
+      padding: 10px 12px; min-width: 170px; flex: 1; max-width: 240px;
       text-align: center; cursor: pointer; transition: all 0.2s;
+      position: relative;
     }
     .dash-gauge-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
     .dash-gauge-card.dash-gauge-excluded {
@@ -1176,23 +1538,102 @@ build_dashboard_css <- function(brand_colour) {
       border-style: dashed;
     }
     .dash-gauge-label {
-      font-size: 12px; color: #1e293b; margin-top: 8px; line-height: 1.4;
+      font-size: 11px; color: #1e293b; margin-top: 6px; line-height: 1.4;
       white-space: normal; word-wrap: break-word; overflow-wrap: break-word;
     }
     .dash-gauge-qcode {
-      font-size: 11px; font-weight: 700; color: BRAND;
+      font-size: 10px; font-weight: 700; color: BRAND;
       margin-right: 4px;
     }
     .dash-type-badge {
       display: inline-block; font-size: 9px; font-weight: 700;
       padding: 2px 8px; border-radius: 3px; letter-spacing: 0.5px;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
     .dash-type-net_positive { background: rgba(5,150,105,0.1); color: #059669; }
     .dash-type-nps_score { background: rgba(13,138,138,0.1); color: BRAND; }
     .dash-type-average { background: rgba(217,119,6,0.1); color: #b45309; }
     .dash-type-index { background: rgba(99,102,241,0.1); color: #4f46e5; }
     .dash-type-custom { background: rgba(100,116,139,0.1); color: #475569; }
+
+    /* === CALLOUT BADGES (Best/Worst) === */
+    .dash-callout-badge {
+      position: absolute; top: 6px; right: 6px;
+      font-size: 9px; font-weight: 700; padding: 2px 8px;
+      border-radius: 10px; letter-spacing: 0.3px;
+    }
+    .dash-callout-best {
+      background: rgba(5,150,105,0.12); color: #059669;
+      border: 1px solid rgba(5,150,105,0.25);
+    }
+    .dash-callout-worst {
+      background: rgba(220,38,38,0.10); color: #dc2626;
+      border: 1px solid rgba(220,38,38,0.25);
+    }
+
+    /* === HERO CARD (single-metric section) === */
+    .dash-gauge-hero {
+      max-width: 480px; min-width: 300px;
+      display: flex; flex-direction: row; align-items: center;
+      gap: 20px; padding: 16px 24px; text-align: left;
+    }
+    .dash-gauge-hero svg { flex-shrink: 0; }
+    .dash-gauge-hero .dash-gauge-label {
+      font-size: 13px; margin-top: 0;
+    }
+    .dash-gauge-hero .dash-type-badge { margin-bottom: 4px; }
+
+    /* === TIER PILLS (section header) === */
+    .dash-tier-pill {
+      display: inline-block; font-size: 10px; font-weight: 600;
+      padding: 2px 10px; border-radius: 10px; margin-left: 8px;
+      vertical-align: middle;
+    }
+    .dash-tier-green {
+      background: rgba(5,150,105,0.10); color: #059669;
+    }
+    .dash-tier-amber {
+      background: rgba(217,119,6,0.10); color: #b45309;
+    }
+    .dash-tier-red {
+      background: rgba(220,38,38,0.10); color: #dc2626;
+    }
+
+    /* === RANK INDICATOR === */
+    .dash-gauge-rank {
+      position: absolute; bottom: 6px; right: 8px;
+      font-size: 10px; font-weight: 700; color: #cbd5e1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* === SORT TOGGLE === */
+    .dash-sort-btn { font-size: 11px; padding: 4px 10px; }
+
+    /* === DASHBOARD TEXT BOXES === */
+    .dash-text-box {
+      background: #fff; border-radius: 8px; border: 1px solid #e2e8f0;
+      padding: 14px 18px; margin-bottom: 16px;
+    }
+    .dash-text-box-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px;
+    }
+    .dash-text-box-title {
+      font-size: 12px; font-weight: 700; color: #1a2744;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .dash-text-editor {
+      min-height: 60px; padding: 10px 12px; font-size: 13px;
+      line-height: 1.6; color: #1e293b; border: 1px solid #e2e8f0;
+      border-radius: 6px; outline: none; transition: border-color 0.15s;
+    }
+    .dash-text-editor:focus {
+      border-color: BRAND; box-shadow: 0 0 0 2px rgba(13,138,138,0.08);
+    }
+    .dash-text-editor:empty:before {
+      content: attr(data-placeholder);
+      color: #94a3b8; font-style: italic;
+    }
 
     /* === HEATMAP GRID === */
     .dash-heatmap-header {
@@ -1292,10 +1733,21 @@ build_dashboard_css <- function(brand_colour) {
     }
 
     /* === PRINT === */
+    @page { size: A4 landscape; margin: 10mm 12mm; }
     @media print {
       .dash-export-btn { display: none !important; }
-      .dash-gauge-circle, .dash-hm-td, .dash-meta-card,
-      .dash-sig-card, .dash-hm-th {
+      .dash-container { padding: 12px 0 !important; }
+      .dash-section-title { font-size: 16px !important; }
+      .dash-gauge-label { font-size: 13px !important; }
+      .dash-gauge-value { font-size: 14px !important; }
+      .dash-hm-td { font-size: 13px !important; padding: 4px 8px !important; }
+      .dash-hm-th { font-size: 12px !important; padding: 4px 8px !important; }
+      .dash-meta-value { font-size: 14px !important; }
+      .dash-meta-label { font-size: 11px !important; }
+      .dash-sig-text { font-size: 13px !important; }
+      .dash-gauge-circle, .dash-gauge-card, .dash-hm-td, .dash-meta-card,
+      .dash-sig-card, .dash-hm-th, .dash-callout-badge,
+      .dash-tier-pill, .dash-type-badge {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }

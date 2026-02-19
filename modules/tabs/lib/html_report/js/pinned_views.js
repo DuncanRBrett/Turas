@@ -140,10 +140,16 @@ function renderPinnedCards() {
     var header = document.createElement("div");
     header.style.cssText = "display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;";
     var titleDiv = document.createElement("div");
-    titleDiv.innerHTML = "<div style=\"font-size:11px;color:#323367;font-weight:700;\">" + escapeHtml(pin.qCode) + "</div>" +
-      "<div style=\"font-size:14px;font-weight:600;color:#1e293b;\">" + escapeHtml(pin.qTitle) + "</div>" +
-      "<div style=\"font-size:11px;color:#94a3b8;margin-top:2px;\">Banner: " + escapeHtml(pin.bannerLabel) +
-      (pin.baseText ? " \u00B7 Base: " + escapeHtml(pin.baseText) : "") + "</div>";
+    if (pin.pinType === "text_box" || pin.pinType === "heatmap") {
+      // Simplified header for dashboard pins (no qCode/banner)
+      titleDiv.innerHTML = "<div style=\"font-size:14px;font-weight:600;color:#1e293b;\">" + escapeHtml(pin.qTitle || "") + "</div>";
+    } else {
+      // Standard crosstab header
+      titleDiv.innerHTML = "<div style=\"font-size:11px;color:#323367;font-weight:700;\">" + escapeHtml(pin.qCode || "") + "</div>" +
+        "<div style=\"font-size:14px;font-weight:600;color:#1e293b;\">" + escapeHtml(pin.qTitle || "") + "</div>" +
+        "<div style=\"font-size:11px;color:#94a3b8;margin-top:2px;\">Banner: " + escapeHtml(pin.bannerLabel || "") +
+        (pin.baseText ? " \u00B7 Base: " + escapeHtml(pin.baseText) : "") + "</div>";
+    }
     header.appendChild(titleDiv);
 
     var controls = document.createElement("div");
@@ -176,34 +182,37 @@ function renderPinnedCards() {
     header.appendChild(controls);
     card.appendChild(header);
 
-    // Content: table and chart side by side
-    var content = document.createElement("div");
-    content.style.cssText = "display:flex;gap:16px;align-items:flex-start;";
-
-    if (pin.tableHtml) {
-      var tableDiv = document.createElement("div");
-      tableDiv.style.cssText = "flex:1;overflow-x:auto;font-size:11px;";
-      tableDiv.innerHTML = pin.tableHtml;
-      // Scale down table for compact display
-      var tbl = tableDiv.querySelector("table");
-      if (tbl) tbl.style.cssText = "font-size:10px;width:100%;";
-      content.appendChild(tableDiv);
-    }
-
-    if (pin.chartSvg) {
-      var chartDiv = document.createElement("div");
-      chartDiv.style.cssText = "flex:1;";
-      chartDiv.innerHTML = pin.chartSvg;
-      content.appendChild(chartDiv);
-    }
-    card.appendChild(content);
-
-    // Insight
+    // Content: stacked layout — insight, chart, table
+    // Insight first (the "so what")
     if (pin.insightText) {
       var insightDiv = document.createElement("div");
-      insightDiv.style.cssText = "margin-top:12px;padding:10px 14px;border-left:3px solid #323367;background:#f8f9fb;border-radius:0 6px 6px 0;font-size:12px;color:#374151;font-style:italic;";
+      if (pin.pinType === "text_box") {
+        // Text box pins: plain body text, no accent bar
+        insightDiv.style.cssText = "margin-bottom:12px;padding:16px 20px;background:#f8fafc;border-radius:8px;font-size:14px;line-height:1.7;color:#1e293b;font-weight:400;white-space:pre-wrap;";
+      } else {
+        // Standard crosstab insight: accent bar callout
+        insightDiv.style.cssText = "margin-bottom:12px;padding:14px 18px;border-left:4px solid #323367;background:linear-gradient(135deg,#f0f4ff 0%,#f8f9fb 100%);border-radius:0 8px 8px 0;font-size:13px;line-height:1.6;color:#1a2744;font-weight:500;box-shadow:0 1px 3px rgba(50,51,103,0.08);";
+      }
       insightDiv.textContent = pin.insightText;
       card.appendChild(insightDiv);
+    }
+
+    // Chart (visual pattern)
+    if (pin.chartSvg) {
+      var chartDiv = document.createElement("div");
+      chartDiv.style.cssText = "margin-bottom:12px;";
+      chartDiv.innerHTML = pin.chartSvg;
+      card.appendChild(chartDiv);
+    }
+
+    // Table (detailed reference)
+    if (pin.tableHtml) {
+      var tableDiv = document.createElement("div");
+      tableDiv.style.cssText = "overflow-x:auto;font-size:11px;";
+      tableDiv.innerHTML = pin.tableHtml;
+      var tbl = tableDiv.querySelector("table");
+      if (tbl) tbl.style.cssText = "font-size:10px;width:100%;table-layout:fixed;word-wrap:break-word;overflow-wrap:break-word;";
+      card.appendChild(tableDiv);
     }
 
     container.appendChild(card);
@@ -258,16 +267,28 @@ function exportAllPinnedSlides() {
   var slides = [];
   pinnedViews.forEach(function(pin, idx) {
     var usableW = W - pad * 2;
-    var titleFullText = pin.qCode + " - " + pin.qTitle;
+    var titleFullText = (pin.pinType === "text_box" || pin.pinType === "heatmap")
+      ? pin.qTitle
+      : pin.qCode + " - " + pin.qTitle;
     var titleLines = wrapTextLines(titleFullText, usableW, 9.5);
     var titleLineH = 20;
     var titleStartY = pad + 16;
     var titleBlockH = titleLines.length * titleLineH;
-    var metaText = "Base: " + (pin.baseText || "\u2014") + " \u00B7 Banner: " + (pin.bannerLabel || "");
+    var metaText = (pin.pinType === "text_box" || pin.pinType === "heatmap")
+      ? ""
+      : "Base: " + (pin.baseText || "\u2014") + " \u00B7 Banner: " + (pin.bannerLabel || "");
     var metaY = titleStartY + titleBlockH + 4;
     var contentTop = metaY + 18;
 
-    // Parse chart SVG to get dimensions
+    // Stacked layout: insight → chart → table
+    // 1. Insight dimensions
+    var insightLines = wrapTextLines(pin.insightText, usableW - 16, 7);
+    var insightLineH = 17;
+    var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 24 : 0;
+    var insightY = contentTop;
+
+    // 2. Chart dimensions (full width)
+    var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 12 : 0);
     var chartH = 0, hasChart = false;
     var chartTemp = null;
     if (pin.chartSvg) {
@@ -279,27 +300,21 @@ function exportAllPinnedSlides() {
         var vb = chartTemp.getAttribute("viewBox");
         if (vb) {
           var parts = vb.split(" ").map(Number);
-          var cScale = (usableW * 0.5) / parts[2];
+          var cScale = usableW / parts[2];
           chartH = parts[3] * cScale;
         }
       }
     }
 
-    // Approximate table height
+    // 3. Table dimensions (full width)
+    var tableTopY = chartTopY + chartH + (chartH > 0 ? 12 : 0);
     var tableH = 0;
     if (pin.tableHtml) {
       var countRows = (pin.tableHtml.match(/<tr/g) || []).length;
       tableH = countRows * 18 + 4;
     }
 
-    var contentH = Math.max(chartH, tableH, 100);
-
-    // Insight
-    var insightLines = wrapTextLines(pin.insightText, usableW - 16, 7);
-    var insightLineH = 17;
-    var insightY = contentTop + contentH + 16;
-    var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 10 : 0;
-    var totalH = insightY + insightBlockH + pad;
+    var totalH = tableTopY + tableH + pad + 20;
 
     var svg = document.createElementNS(ns, "svg");
     svg.setAttribute("xmlns", ns);
@@ -321,46 +336,53 @@ function exportAllPinnedSlides() {
     metaEl.textContent = metaText;
     svg.appendChild(metaEl);
 
-    // Render table from stored HTML
+    // Render stacked: insight → chart → table
+    var isTextBox = pin.pinType === "text_box";
+
+    // 1. Insight (first — the editorial takeaway)
+    if (insightLines.length > 0) {
+      var aH = Math.max(28, insightLines.length * insightLineH + 12);
+      // Background fill for insight area
+      var insBg = document.createElementNS(ns, "rect");
+      insBg.setAttribute("x", pad); insBg.setAttribute("y", insightY + 2);
+      insBg.setAttribute("width", usableW); insBg.setAttribute("height", aH);
+      insBg.setAttribute("rx", "4");
+      insBg.setAttribute("fill", isTextBox ? "#f8fafc" : "#f0f4ff");
+      svg.appendChild(insBg);
+      if (!isTextBox) {
+        // Accent bar (only for standard crosstab insights)
+        var iB = document.createElementNS(ns, "rect");
+        iB.setAttribute("x", pad); iB.setAttribute("y", insightY + 2);
+        iB.setAttribute("width", "4"); iB.setAttribute("height", aH);
+        iB.setAttribute("fill", "#323367"); iB.setAttribute("rx", "2");
+        svg.appendChild(iB);
+      }
+      var insFontSize = isTextBox ? "14" : "13";
+      var insXOffset = isTextBox ? 12 : 14;
+      var insRes = createWrappedText(ns, insightLines, pad + insXOffset, insightY + 18, insightLineH,
+        { fill: "#1a2744", "font-size": insFontSize, "font-weight": isTextBox ? "400" : "500" });
+      svg.appendChild(insRes.element);
+    }
+
+    // 2. Chart (full width — visual pattern)
+    if (hasChart && chartTemp) {
+      var chartClone = chartTemp.cloneNode(true);
+      var cvb = chartClone.getAttribute("viewBox").split(" ").map(Number);
+      var cScale2 = usableW / cvb[2];
+      var cG = document.createElementNS(ns, "g");
+      cG.setAttribute("transform", "translate(" + pad + "," + chartTopY + ") scale(" + cScale2 + ")");
+      while (chartClone.firstChild) cG.appendChild(chartClone.firstChild);
+      svg.appendChild(cG);
+    }
+
+    // 3. Table (full width — detailed reference)
     if (pin.tableHtml) {
       var tDiv = document.createElement("div");
       tDiv.innerHTML = pin.tableHtml;
       var tRows = extractSlideTableData({ querySelector: function(sel) { return tDiv.querySelector(sel); }, querySelectorAll: function(sel) { return tDiv.querySelectorAll(sel); } });
       if (tRows) {
-        var tableW = hasChart ? usableW * 0.48 : usableW;
-        renderTableSVG(ns, svg, tRows, pad, contentTop, tableW);
+        renderTableSVG(ns, svg, tRows, pad, tableTopY, usableW);
       }
-    }
-
-    // Embed chart
-    if (hasChart && chartTemp) {
-      var chartClone = chartTemp.cloneNode(true);
-      var cvb = chartClone.getAttribute("viewBox").split(" ").map(Number);
-      var chartAreaW = pin.tableHtml ? usableW * 0.5 : usableW;
-      var chartX = pin.tableHtml ? pad + usableW * 0.5 + 8 : pad;
-      var cScale2 = chartAreaW / cvb[2];
-      var cG = document.createElementNS(ns, "g");
-      cG.setAttribute("transform", "translate(" + chartX + "," + contentTop + ") scale(" + cScale2 + ")");
-      while (chartClone.firstChild) cG.appendChild(chartClone.firstChild);
-      svg.appendChild(cG);
-    }
-
-    // Insight
-    if (insightLines.length > 0) {
-      var iL = document.createElementNS(ns, "line");
-      iL.setAttribute("x1", pad); iL.setAttribute("x2", W - pad);
-      iL.setAttribute("y1", insightY); iL.setAttribute("y2", insightY);
-      iL.setAttribute("stroke", "#e2e8f0"); iL.setAttribute("stroke-width", "1");
-      svg.appendChild(iL);
-      var aH = Math.max(24, insightLines.length * insightLineH);
-      var iB = document.createElementNS(ns, "rect");
-      iB.setAttribute("x", pad); iB.setAttribute("y", insightY + 4);
-      iB.setAttribute("width", "3"); iB.setAttribute("height", aH);
-      iB.setAttribute("fill", "#323367"); iB.setAttribute("rx", "1.5");
-      svg.appendChild(iB);
-      var insRes = createWrappedText(ns, insightLines, pad + 12, insightY + 18, insightLineH,
-        { fill: "#374151", "font-size": "12", "font-style": "italic" });
-      svg.appendChild(insRes.element);
     }
 
     // Serialise SVG to blob URL
@@ -431,87 +453,122 @@ function printPinnedViews() {
   // Add print-specific styles
   var printStyle = document.createElement("style");
   printStyle.id = "pinned-print-style";
-  printStyle.textContent = "@media print { " +
+  printStyle.textContent = "@page { size: A4 landscape; margin: 10mm 12mm; } " +
+    "@media print { " +
     "body > *:not(#pinned-print-overlay) { display: none !important; } " +
     "#pinned-print-overlay { position: static !important; overflow: visible !important; } " +
-    ".pinned-print-page { page-break-after: always; padding: 20px 32px; box-sizing: border-box; } " +
+    ".pinned-print-page { page-break-after: always; padding: 12px 0; box-sizing: border-box; } " +
     ".pinned-print-page:last-child { page-break-after: auto; } " +
-    ".pinned-print-header { margin-bottom: 16px; } " +
-    ".pinned-print-qcode { font-size: 12px; font-weight: 700; color: #323367; } " +
+    ".pinned-print-header { margin-bottom: 10px; } " +
+    ".pinned-print-qcode { font-size: 13px; font-weight: 700; color: #323367; } " +
     ".pinned-print-title { font-size: 16px; font-weight: 600; color: #1e293b; margin: 2px 0; } " +
     ".pinned-print-meta { font-size: 11px; color: #64748b; } " +
-    ".pinned-print-content { display: flex; gap: 20px; align-items: flex-start; margin-top: 12px; } " +
-    ".pinned-print-table { flex: 1; overflow: visible; font-size: 11px; } " +
-    ".pinned-print-table table { width: 100%; border-collapse: collapse; font-size: 10px; } " +
-    ".pinned-print-table th, .pinned-print-table td { padding: 3px 6px; border: 1px solid #ddd; text-align: left; } " +
-    ".pinned-print-table th { background: #f1f5f9; font-weight: 600; font-size: 9px; } " +
-    ".pinned-print-chart { flex: 1; } " +
-    ".pinned-print-chart svg { width: 100%; height: auto; } " +
-    ".pinned-print-insight { margin-top: 12px; padding: 10px 14px; border-left: 3px solid #323367; " +
-    "  background: #f8f9fb; border-radius: 0 6px 6px 0; font-size: 12px; color: #374151; font-style: italic; } " +
-    ".pinned-print-page-num { text-align: right; font-size: 9px; color: #94a3b8; margin-top: 8px; } " +
+    ".pinned-print-insight { margin-bottom: 12px; padding: 12px 16px; border-left: 4px solid #323367; " +
+    "  background: #f0f4ff; border-radius: 0 6px 6px 0; font-size: 14px; font-weight: 500; " +
+    "  color: #1a2744; line-height: 1.5; " +
+    "  -webkit-print-color-adjust: exact; print-color-adjust: exact; } " +
+    ".pinned-print-chart { margin-bottom: 12px; } " +
+    ".pinned-print-chart svg { width: 100%; height: auto; max-height: 300px; } " +
+    ".pinned-print-table { overflow: visible; } " +
+    ".pinned-print-table table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; } " +
+    ".pinned-print-table th, .pinned-print-table td { padding: 4px 8px; border: 1px solid #ddd; text-align: left; word-wrap: break-word; overflow-wrap: break-word; } " +
+    ".pinned-print-table th { background: #f1f5f9; font-weight: 600; font-size: 12px; " +
+    "  -webkit-print-color-adjust: exact; print-color-adjust: exact; } " +
+    ".pinned-print-page-num { text-align: right; font-size: 9px; color: #94a3b8; margin-top: 4px; } " +
+    ".pinned-print-project-strip { padding: 0 0 8px 0; margin-bottom: 12px; border-bottom: 2px solid #323367; " +
+    "  page-break-after: avoid; page-break-inside: avoid; " +
+    "  -webkit-print-color-adjust: exact; print-color-adjust: exact; } " +
     "} " +
     "@media screen { " +
     "#pinned-print-overlay .pinned-print-page { " +
     "  max-width: 900px; margin: 20px auto; padding: 32px; " +
     "  border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; " +
     "  box-shadow: 0 1px 3px rgba(0,0,0,0.1); } " +
-    ".pinned-print-content { display: flex; gap: 20px; } " +
-    ".pinned-print-table { flex: 1; overflow-x: auto; } " +
+    ".pinned-print-insight { margin-bottom: 12px; padding: 10px 14px; border-left: 3px solid #323367; " +
+    "  background: #f8f9fb; font-size: 12px; color: #374151; } " +
+    ".pinned-print-chart { margin-bottom: 12px; } " +
+    ".pinned-print-chart svg { width: 100%; height: auto; } " +
+    ".pinned-print-table { overflow-x: auto; } " +
     ".pinned-print-table table { font-size: 10px; width: 100%; border-collapse: collapse; } " +
     ".pinned-print-table th, .pinned-print-table td { padding: 3px 6px; border: 1px solid #ddd; } " +
     ".pinned-print-table th { background: #f1f5f9; font-weight: 600; font-size: 9px; } " +
-    ".pinned-print-chart { flex: 1; } " +
-    ".pinned-print-chart svg { width: 100%; height: auto; } " +
-    ".pinned-print-insight { margin-top: 12px; padding: 10px 14px; border-left: 3px solid #323367; " +
-    "  background: #f8f9fb; font-size: 12px; color: #374151; font-style: italic; } " +
+    ".pinned-print-project-strip { padding: 12px 32px 8px 32px; margin-bottom: 12px; border-bottom: 2px solid #323367; } " +
     "}";
   document.head.appendChild(printStyle);
 
-  // Get project title for header
+  // Gather project header info from the main banner (same as Summary print)
   var projectTitle = document.querySelector(".header-title");
   var pTitle = projectTitle ? projectTitle.textContent : "Report";
+
+  // Read stats badges from the header badge bar (n, Questions, Weighted/Unweighted, date)
+  // Badge bar is the parent of #header-date-badge; its direct children alternate
+  // between badge spans (with padding) and separator spans (1px wide, height:16px).
+  var headerBadges = [];
+  var dateBadge = document.getElementById("header-date-badge");
+  if (dateBadge && dateBadge.parentNode) {
+    var children = dateBadge.parentNode.children;
+    for (var bi = 0; bi < children.length; bi++) {
+      var sp = children[bi];
+      // Skip separators (they have explicit height in inline style)
+      if (sp.style.height) continue;
+      var txt = sp.textContent.trim();
+      if (txt) headerBadges.push(txt);
+    }
+  }
+  var statsLine = headerBadges.join("  \u00B7  ");
+
+  // Project info strip — appears ONCE at the top (matches Summary print header)
+  var projStrip = document.createElement("div");
+  projStrip.className = "pinned-print-project-strip";
+  projStrip.innerHTML = "<div style=\"font-size:14px;font-weight:700;color:#323367;\">" + escapeHtml(pTitle) + "</div>" +
+    (statsLine ? "<div style=\"font-size:10px;color:#64748b;margin-top:2px;\">" + escapeHtml(statsLine) + "</div>" : "");
+  overlay.appendChild(projStrip);
 
   // Build one page per pinned view
   pinnedViews.forEach(function(pin, idx) {
     var page = document.createElement("div");
     page.className = "pinned-print-page";
 
-    // Header
+    // Header — adapt to pin type
     var hdr = document.createElement("div");
     hdr.className = "pinned-print-header";
-    hdr.innerHTML = "<div class=\"pinned-print-qcode\">" + escapeHtml(pin.qCode) + "</div>" +
-      "<div class=\"pinned-print-title\">" + escapeHtml(pin.qTitle) + "</div>" +
-      "<div class=\"pinned-print-meta\">Banner: " + escapeHtml(pin.bannerLabel) +
-      (pin.baseText ? " \u00B7 Base: " + escapeHtml(pin.baseText) : "") +
-      " \u00B7 " + escapeHtml(pTitle) + "</div>";
+    if (pin.pinType === "text_box" || pin.pinType === "heatmap") {
+      // Simplified header for dashboard pins (no qCode/banner)
+      hdr.innerHTML = "<div class=\"pinned-print-title\">" + escapeHtml(pin.qTitle) + "</div>";
+    } else {
+      hdr.innerHTML = "<div class=\"pinned-print-qcode\">" + escapeHtml(pin.qCode) + "</div>" +
+        "<div class=\"pinned-print-title\">" + escapeHtml(pin.qTitle) + "</div>" +
+        "<div class=\"pinned-print-meta\">Banner: " + escapeHtml(pin.bannerLabel) +
+        (pin.baseText ? " \u00B7 Base: " + escapeHtml(pin.baseText) : "") + "</div>";
+    }
     page.appendChild(hdr);
 
-    // Content: table + chart
-    var content = document.createElement("div");
-    content.className = "pinned-print-content";
-
-    if (pin.tableHtml) {
-      var tableDiv = document.createElement("div");
-      tableDiv.className = "pinned-print-table";
-      tableDiv.innerHTML = pin.tableHtml;
-      content.appendChild(tableDiv);
+    // Content: stacked — insight, chart, table
+    // Insight first (the "so what")
+    if (pin.insightText) {
+      var insDiv = document.createElement("div");
+      insDiv.className = "pinned-print-insight";
+      if (pin.pinType === "text_box") {
+        insDiv.style.cssText = "font-size:13px;line-height:1.7;font-weight:400;font-style:normal;border-left:none;background:#f8fafc;padding:12px 16px;border-radius:6px;white-space:pre-wrap;";
+      }
+      insDiv.textContent = pin.insightText;
+      page.appendChild(insDiv);
     }
 
+    // Chart (visual pattern)
     if (pin.chartSvg) {
       var chartDiv = document.createElement("div");
       chartDiv.className = "pinned-print-chart";
       chartDiv.innerHTML = pin.chartSvg;
-      content.appendChild(chartDiv);
+      page.appendChild(chartDiv);
     }
-    page.appendChild(content);
 
-    // Insight
-    if (pin.insightText) {
-      var insDiv = document.createElement("div");
-      insDiv.className = "pinned-print-insight";
-      insDiv.textContent = pin.insightText;
-      page.appendChild(insDiv);
+    // Table (detailed reference)
+    if (pin.tableHtml) {
+      var tableDiv = document.createElement("div");
+      tableDiv.className = "pinned-print-table";
+      tableDiv.innerHTML = pin.tableHtml;
+      page.appendChild(tableDiv);
     }
 
     // Page number
@@ -555,3 +612,35 @@ function printPinnedViews() {
     }, 2000);
   }, 300);
 }
+
+// ---- Dashboard Pin Functions (3B) ----
+
+function pinDashboardText(boxId) {
+  var editor = document.getElementById("dash-text-" + boxId);
+  var text = editor ? editor.innerText.trim() : "";
+  if (!text) { alert("Please enter text before pinning."); return; }
+
+  var title = boxId === "background" ? "Background & Method" : "Executive Summary";
+  var pin = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+    pinType: "text_box",
+    qCode: null,
+    qTitle: title,
+    bannerGroup: null,
+    bannerLabel: null,
+    selectedColumns: null,
+    excludedRows: null,
+    insightText: text,
+    sortState: null,
+    tableHtml: null,
+    chartSvg: null,
+    baseText: null,
+    timestamp: Date.now(),
+    order: pinnedViews.length
+  };
+  pinnedViews.push(pin);
+  savePinnedData();
+  renderPinnedCards();
+  updatePinBadge();
+}
+
