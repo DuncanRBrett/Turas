@@ -454,45 +454,75 @@ merge_validation_results <- function(results1, results2) {
 validate_all_tracking_specs <- function(config, question_map) {
   results <- list(errors = character(0), warnings = character(0), info = character(0))
 
-  # Check if TrackingSpecs column exists
-  has_tracking_specs <- "TrackingSpecs" %in% names(question_map$question_metadata)
+  # Check both locations for TrackingSpecs
+  has_config_specs <- "TrackingSpecs" %in% names(config$tracked_questions)
+  has_mapping_specs <- "TrackingSpecs" %in% names(question_map$question_metadata)
 
-  if (!has_tracking_specs) {
-    results$info <- c(results$info, "No TrackingSpecs column found (using defaults for all questions)")
+  if (!has_config_specs && !has_mapping_specs) {
+    results$info <- c(results$info, "No TrackingSpecs found (using defaults for all questions)")
     return(results)
+  }
+
+  if (has_config_specs) {
+    results$info <- c(results$info, "TrackingSpecs found in TrackedQuestions sheet")
+  }
+  if (has_mapping_specs) {
+    results$info <- c(results$info, "TrackingSpecs found in QuestionMap sheet (legacy location)")
   }
 
   tracked_questions <- config$tracked_questions$QuestionCode
   n_with_specs <- 0
 
   for (q_code in tracked_questions) {
-    # Get metadata
+    # Get metadata for question type
     metadata <- get_question_metadata(question_map, q_code)
 
     if (is.null(metadata)) {
       next  # Already validated in trackable_questions check
     }
 
-    # Get TrackingSpecs
-    tracking_specs <- get_tracking_specs(question_map, q_code)
+    # Get TrackingSpecs (checks config first, then mapping, then defaults)
+    tracking_specs <- get_tracking_specs(question_map, q_code, config = config)
 
     if (is.null(tracking_specs)) {
-      next  # No specs = use defaults (valid)
+      next  # No specs = use built-in defaults (valid)
     }
 
     n_with_specs <- n_with_specs + 1
 
-    # Validate specs syntax
+    # Validate specs syntax against question type
     validation <- validate_tracking_specs(tracking_specs, metadata$QuestionType)
 
     if (!validation$valid) {
       results$errors <- c(results$errors,
                          paste0("Question '", q_code, "': ", validation$message))
     } else {
-      # Additional contextual validation can go here
-      # For example, checking if specified categories exist in data
       results$info <- c(results$info,
                        paste0("Question '", q_code, "': TrackingSpecs validated (", tracking_specs, ")"))
+    }
+  }
+
+  # Validate baseline_wave setting if present
+  baseline_wave <- get_setting(config, "baseline_wave", default = NULL)
+  if (!is.null(baseline_wave) && !is.na(baseline_wave) && trimws(as.character(baseline_wave)) != "") {
+    baseline_wave <- trimws(as.character(baseline_wave))
+    if (!baseline_wave %in% config$waves$WaveID) {
+      results$errors <- c(results$errors,
+                         paste0("baseline_wave '", baseline_wave,
+                                "' not found in Waves sheet. Valid WaveIDs: ",
+                                paste(config$waves$WaveID, collapse = ", ")))
+    } else {
+      results$info <- c(results$info,
+                       paste0("Baseline wave set to: ", baseline_wave))
+    }
+  }
+
+  # Validate SortOrder values
+  if ("SortOrder" %in% names(config$tracked_questions)) {
+    sort_vals <- config$tracked_questions$SortOrder
+    if (any(is.na(sort_vals))) {
+      results$warnings <- c(results$warnings,
+                           "Some SortOrder values are non-numeric (row order used as default)")
     }
   }
 

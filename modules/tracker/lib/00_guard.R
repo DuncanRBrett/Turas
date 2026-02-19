@@ -552,6 +552,25 @@ validate_tracker_config <- function(config) {
     }
   }
 
+  # Validate baseline_wave setting (if specified, must be a valid WaveID)
+  if (!is.null(config$settings) && !is.null(config$waves)) {
+    baseline_wave <- get_setting(config, "baseline_wave", default = NULL)
+    if (!is.null(baseline_wave) && !is.na(baseline_wave) && trimws(as.character(baseline_wave)) != "") {
+      baseline_wave <- trimws(as.character(baseline_wave))
+      if (!baseline_wave %in% config$waves$WaveID) {
+        tracker_refuse(
+          code = "CFG_INVALID_BASELINE_WAVE",
+          title = "Invalid Baseline Wave",
+          problem = paste0("baseline_wave '", baseline_wave, "' is not a valid WaveID."),
+          why_it_matters = "Baseline wave must reference an existing wave for 'vs Baseline' comparisons.",
+          how_to_fix = paste0("Set baseline_wave to one of: ", paste(config$waves$WaveID, collapse = ", ")),
+          expected = config$waves$WaveID,
+          observed = baseline_wave
+        )
+      }
+    }
+  }
+
   invisible(TRUE)
 }
 

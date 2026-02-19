@@ -187,6 +187,31 @@ load_tracking_config <- function(config_path) {
     )
   }
 
+  # Add defaults for optional TrackedQuestions columns
+  # TrackingSpecs: analysis-level metric specification (moved from question_mapping)
+  if (!"TrackingSpecs" %in% names(tracked_questions)) {
+    tracked_questions$TrackingSpecs <- NA_character_
+  }
+  # MetricLabel: custom display label override
+  if (!"MetricLabel" %in% names(tracked_questions)) {
+    tracked_questions$MetricLabel <- NA_character_
+  }
+  # Section: grouping label for report sections (e.g., "Brand Health")
+  if (!"Section" %in% names(tracked_questions)) {
+    tracked_questions$Section <- NA_character_
+  }
+  # SortOrder: display ordering within section (defaults to row order)
+  if (!"SortOrder" %in% names(tracked_questions)) {
+    tracked_questions$SortOrder <- seq_len(nrow(tracked_questions))
+  } else {
+    # Convert to numeric, defaulting to row order for non-numeric values
+    tracked_questions$SortOrder <- suppressWarnings(as.numeric(tracked_questions$SortOrder))
+    na_rows <- is.na(tracked_questions$SortOrder)
+    if (any(na_rows)) {
+      tracked_questions$SortOrder[na_rows] <- which(na_rows)
+    }
+  }
+
   message(paste0("  Loaded ", nrow(waves), " waves"))
   message(paste0("  Loaded ", nrow(tracked_questions), " tracked questions"))
   message(paste0("  Loaded ", nrow(banner), " banner breakouts"))
@@ -500,4 +525,23 @@ get_setting <- function(config, setting_name, default = NULL) {
   } else {
     return(default)
   }
+}
+
+
+#' Get Baseline Wave ID
+#'
+#' Returns the baseline wave for "vs Baseline" comparisons in tracking reports.
+#' Uses the `baseline_wave` setting if specified, otherwise defaults to the
+#' first wave in the Waves sheet.
+#'
+#' @param config List. Configuration object from load_tracking_config()
+#' @return Character. WaveID of the baseline wave
+#'
+#' @export
+get_baseline_wave <- function(config) {
+  baseline <- get_setting(config, "baseline_wave", default = NULL)
+  if (is.null(baseline) || is.na(baseline) || trimws(as.character(baseline)) == "") {
+    return(config$waves$WaveID[1])
+  }
+  return(trimws(as.character(baseline)))
 }

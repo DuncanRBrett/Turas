@@ -483,16 +483,18 @@ validate_question_mapping <- function(config, question_map, wave_data) {
 
 #' Get Tracking Specs for Question
 #'
-#' Retrieves the TrackingSpecs string for a question from the question mapping.
-#' TrackingSpecs is an optional column that allows customization of which metrics
-#' to track (e.g., "mean,top2_box" or "option:Q30_1,any").
+#' Retrieves the TrackingSpecs string for a question. Checks multiple sources
+#' in priority order:
+#'
+#' 1. TrackedQuestions sheet in tracking_config.xlsx (primary, if config provided)
+#' 2. QuestionMap sheet in question_mapping.xlsx (legacy fallback)
+#' 3. Default specs from settings (default_rating_specs, default_nps_specs)
 #'
 #' @section How TrackingSpecs Works:
-#' 1. The TrackingSpecs column in question_mapping.xlsx contains comma-separated
-#'    metric specifications
+#' 1. TrackingSpecs contains comma-separated metric specifications
 #' 2. Each spec can be a simple keyword (e.g., "mean") or a pattern-based spec
 #'    (e.g., "range:9-10", "category:Very Satisfied")
-#' 3. If blank or missing, the question type's default metrics are used
+#' 3. If blank or missing everywhere, the question type's default metrics are used
 #'
 #' @section Examples:
 #' - "mean,top2_box" → Track mean and top-2-box percentage for a rating question
@@ -501,37 +503,99 @@ validate_question_mapping <- function(config, question_map, wave_data) {
 #'
 #' @param question_map List. Question map index from build_question_map_index()
 #' @param question_code Character. Question code
+#' @param config List. Optional. Configuration object from load_tracking_config().
+#'   When provided, TrackedQuestions$TrackingSpecs is checked first.
 #' @return Character. TrackingSpecs string, or NULL if not specified/blank
 #'
 #' @export
-get_tracking_specs <- function(question_map, question_code) {
+get_tracking_specs <- function(question_map, question_code, config = NULL) {
 
   # Defensive: trim whitespace from question_code
-  # This handles common issues with whitespace in tracked_questions list
   question_code <- trimws(as.character(question_code))
 
+  # Priority 1: Check config$tracked_questions$TrackingSpecs (new primary location)
+  if (!is.null(config) && !is.null(config$tracked_questions)) {
+    tq <- config$tracked_questions
+    if ("TrackingSpecs" %in% names(tq)) {
+      tq_idx <- which(trimws(as.character(tq$QuestionCode)) == question_code)
+      if (length(tq_idx) > 0) {
+        spec_val <- tq$TrackingSpecs[tq_idx[1]]
+        if (!is.na(spec_val) && trimws(as.character(spec_val)) != "") {
+          return(trimws(as.character(spec_val)))
+        }
+      }
+    }
+  }
+
+  # Priority 2: Check question_mapping metadata (legacy location)
   metadata_df <- question_map$question_metadata
+  if ("TrackingSpecs" %in% names(metadata_df)) {
+    q_row_idx <- which(metadata_df$QuestionCode == question_code)
+    if (length(q_row_idx) > 0) {
+      tracking_specs <- metadata_df$TrackingSpecs[q_row_idx[1]]
+      if (!is.na(tracking_specs) && trimws(tracking_specs) != "") {
+        message(paste0("  [INFO] TrackingSpecs for '", question_code,
+                       "' read from question_mapping (consider moving to TrackedQuestions sheet)"))
+        return(trimws(tracking_specs))
+      }
+    }
+  }
 
-  # TrackingSpecs column is optional - if not present, return NULL (use defaults)
-  if (!"TrackingSpecs" %in% names(metadata_df)) {
+  # Priority 3: Check default specs from settings
+  if (!is.null(config)) {
+    metadata <- get_question_metadata(question_map, question_code)
+    if (!is.null(metadata)) {
+      default_spec <- get_default_specs(config, metadata$QuestionType)
+      if (!is.null(default_spec)) {
+        return(default_spec)
+      }
+    }
+  }
+
+  # No specs found anywhere - calculators will use built-in defaults
+  return(NULL)
+}
+
+
+#' Get Default TrackingSpecs for a Question Type
+#'
+#' Returns the default TrackingSpecs from settings for a given question type.
+#' Users can set `default_rating_specs`, `default_nps_specs`, etc. in the
+#' Settings sheet to avoid repeating the same specs for every question.
+#'
+#' @param config List. Configuration object from load_tracking_config()
+#' @param question_type Character. Question type (e.g., "Rating", "NPS")
+#' @return Character. Default specs string, or NULL if not configured
+#'
+#' @export
+get_default_specs <- function(config, question_type) {
+  if (is.null(config) || is.null(question_type)) return(NULL)
+
+  q_type_lower <- tolower(trimws(question_type))
+
+  # Map question types to their default setting names
+  setting_name <- if (q_type_lower %in% c("rating", "likert", "index", "scale")) {
+    "default_rating_specs"
+  } else if (q_type_lower == "nps") {
+    "default_nps_specs"
+  } else if (q_type_lower %in% c("single_response", "singlechoice", "single_choice")) {
+    "default_single_response_specs"
+  } else if (q_type_lower %in% c("multi_mention", "multimention", "multi_response")) {
+    "default_multi_mention_specs"
+  } else if (q_type_lower == "composite") {
+    "default_composite_specs"
+  } else {
+    NULL
+  }
+
+  if (is.null(setting_name)) return(NULL)
+
+  spec_val <- get_setting(config, setting_name, default = NULL)
+  if (is.null(spec_val) || is.na(spec_val) || trimws(as.character(spec_val)) == "") {
     return(NULL)
   }
 
-  # Find question row using which() to avoid NA comparison issues
-  q_row_idx <- which(metadata_df$QuestionCode == question_code)
-  if (length(q_row_idx) == 0) {
-    return(NULL)
-  }
-  q_row <- metadata_df[q_row_idx[1], ]
-
-  tracking_specs <- q_row$TrackingSpecs[1]
-
-  # Return NULL if blank/NA - this triggers default behavior in calculators
-  if (is.na(tracking_specs) || trimws(tracking_specs) == "") {
-    return(NULL)
-  }
-
-  return(trimws(tracking_specs))
+  return(trimws(as.character(spec_val)))
 }
 
 
