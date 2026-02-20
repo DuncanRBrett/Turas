@@ -84,6 +84,18 @@ source(file.path(script_dir, "lib", "formatting_utils.R"))
 source(file.path(script_dir, "lib", "output_formatting.R"))
 source(file.path(script_dir, "lib", "tracker_output.R"))
 source(file.path(script_dir, "lib", "tracker_dashboard_reports.R"))
+# Load tracking crosstab modules
+source(file.path(script_dir, "lib", "tracking_crosstab_engine.R"))
+source(file.path(script_dir, "lib", "tracking_crosstab_excel.R"))
+# Load HTML report modules
+assign(".tracker_lib_dir", file.path(script_dir, "lib"), envir = globalenv())
+source(file.path(script_dir, "lib", "html_report", "00_html_guard.R"))
+source(file.path(script_dir, "lib", "html_report", "01_data_transformer.R"))
+source(file.path(script_dir, "lib", "html_report", "02_table_builder.R"))
+source(file.path(script_dir, "lib", "html_report", "05_chart_builder.R"))
+source(file.path(script_dir, "lib", "html_report", "03_page_builder.R"))
+source(file.path(script_dir, "lib", "html_report", "04_html_writer.R"))
+source(file.path(script_dir, "lib", "html_report", "99_html_report_main.R"))
 
 # Verify all required functions loaded successfully
 verify_tracker_environment <- function() {
@@ -99,6 +111,9 @@ verify_tracker_environment <- function() {
     "write_tracker_output",
     "write_dashboard_output",
     "write_sig_matrix_output",
+    "build_tracking_crosstab",
+    "write_tracking_crosstab_output",
+    "generate_tracker_html_report",
     "find_turas_root"
   )
 
@@ -393,7 +408,7 @@ run_tracker <- function(tracking_config_path,
   report_types <- trimws(strsplit(report_types_setting, ",")[[1]])
 
   # Validate report types
-  valid_types <- c("detailed", "wave_history", "dashboard", "sig_matrix")
+  valid_types <- c("detailed", "wave_history", "dashboard", "sig_matrix", "tracking_crosstab")
   invalid_types <- setdiff(report_types, valid_types)
   if (length(invalid_types) > 0) {
     warning(paste0("Invalid report types ignored: ", paste(invalid_types, collapse = ", ")))
@@ -499,6 +514,48 @@ run_tracker <- function(tracking_config_path,
       output_path = sig_matrix_path,
       run_result = run_result
     )
+  }
+
+  if ("tracking_crosstab" %in% report_types) {
+    # Generate tracking crosstab report
+    cat("\n  Building tracking crosstab...\n")
+
+    crosstab_data <- build_tracking_crosstab(
+      trend_results = trend_results,
+      config = config,
+      question_map = question_map,
+      banner_segments = banner_segments
+    )
+
+    # Excel output
+    crosstab_path <- if (length(report_types) == 1 && !is.null(output_file_setting) && nzchar(trimws(output_file_setting))) {
+      file.path(base_output_dir, trimws(output_file_setting))
+    } else {
+      project_name <- get_setting(config, "project_name", default = "Tracking")
+      project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
+      file.path(base_output_dir, paste0(project_name, "_TrackingCrosstab_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
+    }
+
+    output_files$tracking_crosstab <- write_tracking_crosstab_output(
+      crosstab_data = crosstab_data,
+      config = config,
+      output_path = crosstab_path,
+      run_result = run_result
+    )
+
+    # HTML report (if enabled)
+    html_report_setting <- get_setting(config, "html_report", default = "N")
+    if (toupper(trimws(as.character(html_report_setting))) %in% c("Y", "YES", "TRUE", "1")) {
+      html_path <- sub("\\.xlsx$", ".html", crosstab_path)
+      html_result <- generate_tracker_html_report(
+        crosstab_data = crosstab_data,
+        config = config,
+        output_path = html_path
+      )
+      if (html_result$status == "PASS") {
+        output_files$tracking_crosstab_html <- html_result$output_file
+      }
+    }
   }
 
 
