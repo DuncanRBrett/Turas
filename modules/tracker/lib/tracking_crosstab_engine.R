@@ -161,19 +161,25 @@ build_metric_rows_for_question <- function(q_code, q_trend, metric_type,
 
   # For each spec, build a metric_row
   for (spec_idx in seq_along(specs_list)) {
-    spec <- specs_list[spec_idx]
+    spec_original <- specs_list[spec_idx]
+
+    # Strip =Label from spec — extract core spec and optional custom label
+    parsed <- parse_spec_label(spec_original)
+    spec <- parsed$core
+    custom_label <- parsed$label
     spec_lower <- tolower(trimws(spec))
 
     # Skip distribution (not suitable for crosstab display)
     if (spec_lower == "distribution" || spec_lower == "count_distribution") next
 
-    # Generate label
+    # Generate label (pass custom_label for =Label support)
     label <- generate_metric_label(
       spec = spec,
       metric_label_override = metric_label_override,
       question_text = question_text,
       metric_type = metric_type,
-      specs_list = specs_list
+      specs_list = specs_list,
+      custom_label = custom_label
     )
 
     # Build segments data
@@ -436,12 +442,16 @@ build_empty_segment <- function(wave_ids) {
 #' Normalize Metric Name
 #'
 #' Converts spec syntax to the internal metric name used in wave_results.
-#' E.g., "range:9-10" → "range_9_10", "category:Yes" → "category_yes"
+#' E.g., "range:9-10" → "range_9_10", "category:Yes" → "category_yes",
+#' "box:Agree" → "box_agree"
 #'
 #' @keywords internal
 normalize_metric_name <- function(spec_lower) {
   if (grepl("^range:", spec_lower)) {
     gsub("[^a-z0-9_]", "_", spec_lower)
+  } else if (grepl("^box:", spec_lower)) {
+    box_name <- trimws(sub("^box:", "", spec_lower))
+    paste0("box_", gsub("[^a-z0-9_]", "_", tolower(box_name)))
   } else if (grepl("^category:", spec_lower)) {
     # Extract category name and normalize
     cat_name <- trimws(sub("^category:", "", spec_lower))
@@ -473,12 +483,15 @@ get_default_specs_list <- function(metric_type) {
 
 #' Generate Human-Readable Metric Label
 #'
-#' Produces a display label for a metric row. Uses the MetricLabel override
-#' if provided, otherwise generates from question text and spec.
+#' Produces a display label for a metric row. Uses the custom label from
+#' =Label syntax if provided, then MetricLabel override, otherwise generates
+#' from question text and spec.
 #'
+#' @param custom_label Character or NULL. Custom label from =Label syntax.
 #' @keywords internal
 generate_metric_label <- function(spec, metric_label_override, question_text,
-                                   metric_type, specs_list) {
+                                   metric_type, specs_list,
+                                   custom_label = NULL) {
 
   spec_lower <- tolower(trimws(spec))
 
@@ -488,36 +501,44 @@ generate_metric_label <- function(spec, metric_label_override, question_text,
   }
 
   # Build a descriptive suffix
-  suffix <- switch(spec_lower,
-    "mean" = "(Mean)",
-    "top_box" = "(Top Box)",
-    "top2_box" = "(Top 2 Box)",
-    "top3_box" = "(Top 3 Box)",
-    "bottom_box" = "(Bottom Box)",
-    "bottom2_box" = "(Bottom 2 Box)",
-    "nps_score" = "(NPS)",
-    "nps" = "(NPS)",
-    "promoters_pct" = "(% Promoters)",
-    "passives_pct" = "(% Passives)",
-    "detractors_pct" = "(% Detractors)",
-    "any" = "(% Any)",
-    "count_mean" = "(Mean Count)",
-    {
-      # Pattern-based specs
-      if (grepl("^range:", spec_lower)) {
-        range_part <- sub("^range:", "", spec_lower)
-        paste0("(Range ", range_part, ")")
-      } else if (grepl("^category:", spec_lower)) {
-        cat_part <- trimws(sub("^category:", "", spec))
-        paste0("(% ", cat_part, ")")
-      } else if (grepl("^option:", spec_lower)) {
-        opt_part <- sub("^option:", "", spec)
-        paste0("(", opt_part, ")")
-      } else {
-        paste0("(", spec, ")")
+  # If custom_label from =Label syntax is provided, use it
+  suffix <- if (!is.null(custom_label) && nzchar(custom_label)) {
+    paste0("(", custom_label, ")")
+  } else {
+    switch(spec_lower,
+      "mean" = "(Mean)",
+      "top_box" = "(Top Box)",
+      "top2_box" = "(Top 2 Box)",
+      "top3_box" = "(Top 3 Box)",
+      "bottom_box" = "(Bottom Box)",
+      "bottom2_box" = "(Bottom 2 Box)",
+      "nps_score" = "(NPS)",
+      "nps" = "(NPS)",
+      "promoters_pct" = "(% Promoters)",
+      "passives_pct" = "(% Passives)",
+      "detractors_pct" = "(% Detractors)",
+      "any" = "(% Any)",
+      "count_mean" = "(Mean Count)",
+      {
+        # Pattern-based specs
+        if (grepl("^range:", spec_lower)) {
+          range_part <- sub("^range:", "", spec_lower)
+          paste0("(Range ", range_part, ")")
+        } else if (grepl("^box:", spec_lower)) {
+          box_part <- trimws(sub("^box:", "", spec))
+          paste0("(% ", box_part, ")")
+        } else if (grepl("^category:", spec_lower)) {
+          cat_part <- trimws(sub("^category:", "", spec))
+          paste0("(% ", cat_part, ")")
+        } else if (grepl("^option:", spec_lower)) {
+          opt_part <- sub("^option:", "", spec)
+          paste0("(", opt_part, ")")
+        } else {
+          paste0("(", spec, ")")
+        }
       }
-    }
-  )
+    )
+  }
 
   # Use MetricLabel if available, else question_text
   base_label <- if (!is.na(metric_label_override) && metric_label_override != "") {

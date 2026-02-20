@@ -174,6 +174,8 @@ verify_tracker_environment()
 #' @param data_dir Character. Directory containing wave data files (for relative paths)
 #' @param output_path Character. Path for output file (default: auto-generated)
 #' @param use_banners Logical. If TRUE, calculate trends with banner breakouts (Phase 3). Default FALSE (Phase 2).
+#' @param enable_html Logical or NULL. If TRUE, generate HTML report alongside Excel.
+#'   If FALSE, skip HTML. If NULL (default), reads from config Settings sheet (html_report setting).
 #'
 #' @return Character. Path to generated Excel file
 #'
@@ -182,7 +184,8 @@ run_tracker <- function(tracking_config_path,
                         question_mapping_path,
                         data_dir = NULL,
                         output_path = NULL,
-                        use_banners = FALSE) {
+                        use_banners = FALSE,
+                        enable_html = NULL) {
 
   start_time <- Sys.time()
 
@@ -279,7 +282,9 @@ run_tracker <- function(tracking_config_path,
   cat("\n[4/6] LOADING WAVE DATA\n")
   cat("================================================================================\n")
 
-  wave_data <- load_all_waves(config, data_dir, question_mapping)
+  wave_load_result <- load_all_waves(config, data_dir, question_mapping)
+  wave_data <- wave_load_result$wave_data
+  wave_structures <- wave_load_result$wave_structures
 
   # Display wave summary
   wave_summary <- get_wave_summary(wave_data)
@@ -324,14 +329,16 @@ run_tracker <- function(tracking_config_path,
     trend_calc_result <- calculate_trends_with_banners(
       config = config,
       question_map = question_map,
-      wave_data = wave_data
+      wave_data = wave_data,
+      wave_structures = wave_structures
     )
   } else {
     # Phase 2: Calculate simple trends (Total only)
     trend_calc_result <- calculate_all_trends(
       config = config,
       question_map = question_map,
-      wave_data = wave_data
+      wave_data = wave_data,
+      wave_structures = wave_structures
     )
     banner_segments <- NULL
   }
@@ -543,9 +550,14 @@ run_tracker <- function(tracking_config_path,
       run_result = run_result
     )
 
-    # HTML report (if enabled)
-    html_report_setting <- get_setting(config, "html_report", default = "N")
-    if (toupper(trimws(as.character(html_report_setting))) %in% c("Y", "YES", "TRUE", "1")) {
+    # HTML report (if enabled via parameter override or config setting)
+    if (!is.null(enable_html)) {
+      generate_html <- isTRUE(enable_html)
+    } else {
+      html_report_setting <- get_setting(config, "html_report", default = "N")
+      generate_html <- toupper(trimws(as.character(html_report_setting))) %in% c("Y", "YES", "TRUE", "1")
+    }
+    if (generate_html) {
       html_path <- sub("\\.xlsx$", ".html", crosstab_path)
       html_result <- generate_tracker_html_report(
         crosstab_data = crosstab_data,

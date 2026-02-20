@@ -388,6 +388,9 @@ run_tracker_gui <- function() {
         if (!is.null(proj$use_banners)) {
           updateCheckboxInput(session, "use_banners", value = proj$use_banners)
         }
+        if (!is.null(proj$enable_html)) {
+          updateCheckboxInput(session, "enable_html", value = proj$enable_html)
+        }
       }
     })
 
@@ -515,7 +518,15 @@ run_tracker_gui <- function() {
                      "Calculate trends with banner breakouts (Phase 3)",
                      value = TRUE),
         p(style = "font-size: 13px; color: #666;",
-          "When enabled, calculates trends for Total and banner segments defined in config")
+          "When enabled, calculates trends for Total and banner segments defined in config"),
+
+        tags$hr(),
+
+        checkboxInput("enable_html",
+                     "Generate interactive HTML report",
+                     value = TRUE),
+        p(style = "font-size: 13px; color: #666;",
+          "Creates a self-contained HTML report with charts, filtering, and export features alongside the Excel output")
       )
     })
 
@@ -700,7 +711,8 @@ run_tracker_gui <- function() {
             question_mapping_path = question_mapping,
             data_dir = data_dir,
             output_path = output_path,
-            use_banners = input$use_banners
+            use_banners = input$use_banners,
+            enable_html = input$enable_html
           )
           list(success = TRUE, output_file = output_file, error = NULL)
 
@@ -735,7 +747,8 @@ run_tracker_gui <- function() {
             question_mapping = question_mapping,
             data_dir = data_dir,
             output_path = output_path,
-            use_banners = input$use_banners
+            use_banners = input$use_banners,
+            enable_html = input$enable_html
           ))
 
           # Update console with completion message

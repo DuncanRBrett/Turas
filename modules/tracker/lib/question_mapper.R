@@ -642,6 +642,48 @@ get_composite_sources <- function(question_map, question_code) {
 }
 
 
+#' Parse Spec Label
+#'
+#' Splits a tracking spec into its core spec and optional display label.
+#' Uses \code{=} as the delimiter. The label is purely cosmetic and does not
+#' affect calculation or metric name normalisation.
+#'
+#' @param spec Character. A single tracking spec (e.g., "mean=Average",
+#'   "range:4-5=Agree", "box:Agree=Top Box", "mean")
+#' @return List with:
+#'   \item{core}{Character. The core spec without label (e.g., "range:4-5")}
+#'   \item{label}{Character or NULL. The custom label if provided}
+#'
+#' @examples
+#' parse_spec_label("mean=Average")
+#' # list(core = "mean", label = "Average")
+#'
+#' parse_spec_label("range:4-5=Agree")
+#' # list(core = "range:4-5", label = "Agree")
+#'
+#' parse_spec_label("top2_box")
+#' # list(core = "top2_box", label = NULL)
+#'
+#' @export
+parse_spec_label <- function(spec) {
+  spec_trimmed <- trimws(spec)
+
+  # Split on first "=" only
+  eq_pos <- regexpr("=", spec_trimmed, fixed = TRUE)
+
+  if (eq_pos > 0) {
+    core <- trimws(substr(spec_trimmed, 1, eq_pos - 1))
+    label <- trimws(substr(spec_trimmed, eq_pos + 1, nchar(spec_trimmed)))
+    if (nchar(label) == 0) label <- NULL
+  } else {
+    core <- spec_trimmed
+    label <- NULL
+  }
+
+  list(core = core, label = label)
+}
+
+
 #' Validate Tracking Specs Syntax
 #'
 #' Validates that TrackingSpecs string contains valid specifications for
@@ -654,19 +696,25 @@ get_composite_sources <- function(question_map, question_code) {
 #'
 #' @section Valid Specs by Question Type:
 #' \describe{
-#'   \item{Rating}{mean, top_box, top2_box, top3_box, bottom_box, bottom2_box, distribution, range:X-Y}
+#'   \item{Rating}{mean, top_box, top2_box, top3_box, bottom_box, bottom2_box, distribution, range:X-Y, box:CATEGORY}
 #'   \item{NPS}{nps_score, promoters_pct, passives_pct, detractors_pct, full}
 #'   \item{Single_Choice}{all, top3, category:X}
 #'   \item{Multi_Mention}{auto, any, count_mean, count_distribution, option:X, category:X}
-#'   \item{Composite}{mean, top_box, top2_box, top3_box, distribution, range:X-Y}
+#'   \item{Composite}{mean, top_box, top2_box, top3_box, distribution, range:X-Y, box:CATEGORY}
 #' }
 #'
 #' @section Pattern-Based Specs:
 #' \describe{
 #'   \item{range:X-Y}{Track % in custom range. X must be <= Y. (Rating/Composite only)}
+#'   \item{box:CATEGORY}{Track % in a BoxCategory group from survey structure. (Rating/Composite only)}
 #'   \item{category:text}{Track specific category by text value. (Single_Choice/Multi_Mention)}
 #'   \item{option:varname}{Track specific option column. (Multi_Mention only)}
 #' }
+#'
+#' @section Custom Labels:
+#' Any spec can have an optional display label appended with \code{=}:
+#' \code{mean=Average}, \code{range:4-5=Agree}, \code{box:Agree=Top Box}.
+#' The label affects only the display name, not calculation or metric naming.
 #'
 #' @param specs_str Character. TrackingSpecs string (e.g., "mean,top2_box")
 #' @param question_type Character. Question type (e.g., "Rating", "NPS", "Single_Choice")
@@ -736,29 +784,32 @@ validate_tracking_specs <- function(specs_str, question_type) {
 
   # Validate each spec
   for (spec in specs) {
-    spec_lower <- tolower(spec)
+    # Strip optional =Label before validation (label is display-only)
+    parsed <- parse_spec_label(spec)
+    core_spec <- parsed$core
+    core_lower <- tolower(core_spec)
 
     # Check if it's a base valid spec
-    if (spec_lower %in% valid_for_type) {
+    if (core_lower %in% valid_for_type) {
       next
     }
 
     # Check for pattern-based specs
-    if (grepl("^range:", spec_lower)) {
+    if (grepl("^range:", core_lower)) {
       # Range specs only valid for rating/composite
       if (!q_type_key %in% c("rating", "composite")) {
         return(list(
           valid = FALSE,
-          message = paste0("'", spec, "' is only valid for Rating or Composite questions, not ", question_type)
+          message = paste0("'", core_spec, "' is only valid for Rating or Composite questions, not ", question_type)
         ))
       }
 
       # Validate range syntax: range:X-Y
-      range_part <- sub("^range:", "", spec_lower)
+      range_part <- sub("^range:", "", core_lower)
       if (!grepl("^[0-9]+-[0-9]+$", range_part)) {
         return(list(
           valid = FALSE,
-          message = paste0("Invalid range syntax: '", spec, "'. Expected format: range:X-Y (e.g., range:9-10)")
+          message = paste0("Invalid range syntax: '", core_spec, "'. Expected format: range:X-Y (e.g., range:9-10)")
         ))
       }
 
@@ -770,30 +821,42 @@ validate_tracking_specs <- function(specs_str, question_type) {
       if (is.na(range_min) || is.na(range_max) || range_min > range_max) {
         return(list(
           valid = FALSE,
-          message = paste0("Invalid range values in '", spec, "': min must be <= max")
+          message = paste0("Invalid range values in '", core_spec, "': min must be <= max")
         ))
       }
 
       next
     }
 
+    # Check for box specs (rating/likert questions with BoxCategory metadata)
+    if (grepl("^box:", core_lower)) {
+      if (!q_type_key %in% c("rating", "composite")) {
+        return(list(
+          valid = FALSE,
+          message = paste0("'", core_spec, "' is only valid for Rating or Composite questions, not ", question_type)
+        ))
+      }
+      # Box category name is validated at runtime (when structure is available)
+      next
+    }
+
     # Check for category specs (single_choice and multi_mention)
-    if (grepl("^category:", spec_lower)) {
+    if (grepl("^category:", core_lower)) {
       if (!q_type_key %in% c("single_choice", "multi_choice", "multi_mention")) {
         return(list(
           valid = FALSE,
-          message = paste0("'", spec, "' is only valid for Single_Choice or Multi_Mention questions, not ", question_type)
+          message = paste0("'", core_spec, "' is only valid for Single_Choice or Multi_Mention questions, not ", question_type)
         ))
       }
       next
     }
 
     # Check for option specs (multi_mention)
-    if (grepl("^option:", spec_lower)) {
+    if (grepl("^option:", core_lower)) {
       if (!q_type_key %in% c("multi_choice", "multi_mention")) {
         return(list(
           valid = FALSE,
-          message = paste0("'", spec, "' is only valid for Multi_Choice or Multi_Mention questions, not ", question_type)
+          message = paste0("'", core_spec, "' is only valid for Multi_Choice or Multi_Mention questions, not ", question_type)
         ))
       }
       next
@@ -802,9 +865,9 @@ validate_tracking_specs <- function(specs_str, question_type) {
     # If we get here, spec is invalid
     return(list(
       valid = FALSE,
-      message = paste0("Invalid spec '", spec, "' for question type ", question_type,
+      message = paste0("Invalid spec '", core_spec, "' for question type ", question_type,
                        ". Valid options: ", paste(valid_for_type, collapse = ", "),
-                       ", or pattern-based specs (range:, category:, option:)")
+                       ", or pattern-based specs (range:, category:, option:, box:)")
     ))
   }
 

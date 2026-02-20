@@ -28,7 +28,8 @@
 #' @return List of trend results organized by question → segment
 #'
 #' @export
-calculate_trends_with_banners <- function(config, question_map, wave_data) {
+calculate_trends_with_banners <- function(config, question_map, wave_data,
+                                          wave_structures = NULL) {
 
   message("\n================================================================================")
   message("CALCULATING TRENDS WITH BANNER BREAKOUTS")
@@ -66,7 +67,8 @@ calculate_trends_with_banners <- function(config, question_map, wave_data) {
         question_map = question_map,
         wave_data = segment_wave_data,
         config = config,
-        segment_name = seg_name
+        segment_name = seg_name,
+        wave_structures = wave_structures
       )
 
       if (!is.null(segment_trend)) {
@@ -271,7 +273,8 @@ filter_wave_data_to_segment <- function(wave_data, segment_def) {
 #' Delegates to Phase 2 trend calculation functions.
 #'
 #' @keywords internal
-calculate_trend_for_segment <- function(q_code, question_map, wave_data, config, segment_name) {
+calculate_trend_for_segment <- function(q_code, question_map, wave_data, config, segment_name,
+                                        wave_structures = NULL) {
 
   # Get question metadata
   metadata <- get_question_metadata(question_map, q_code)
@@ -287,19 +290,15 @@ calculate_trend_for_segment <- function(q_code, question_map, wave_data, config,
   # Route to appropriate calculator based on question type
   trend_result <- tryCatch({
     if (q_type == "rating") {
-      # Use enhanced version (supports TrackingSpecs, backward compatible)
-      calculate_rating_trend_enhanced(q_code, question_map, wave_data, config)
+      calculate_rating_trend_enhanced(q_code, question_map, wave_data, config, wave_structures)
     } else if (q_type == "nps") {
-      calculate_nps_trend(q_code, question_map, wave_data, config)
+      calculate_nps_trend(q_code, question_map, wave_data, config, wave_structures)
     } else if (q_type == "single_choice") {
-      # Use enhanced version (supports TrackingSpecs, backward compatible)
-      calculate_single_choice_trend_enhanced(q_code, question_map, wave_data, config)
+      calculate_single_choice_trend_enhanced(q_code, question_map, wave_data, config, wave_structures)
     } else if (q_type == "multi_choice" || q_type_raw == "Multi_Mention") {
-      # Multi-mention support (Enhancement Phase 2)
-      calculate_multi_mention_trend(q_code, question_map, wave_data, config)
+      calculate_multi_mention_trend(q_code, question_map, wave_data, config, wave_structures)
     } else if (q_type == "composite") {
-      # Use enhanced version (supports TrackingSpecs, backward compatible)
-      calculate_composite_trend_enhanced(q_code, question_map, wave_data, config)
+      calculate_composite_trend_enhanced(q_code, question_map, wave_data, config, wave_structures)
     } else if (q_type == "open_end") {
       warning(paste0("  Open-end questions cannot be tracked - skipping"))
       NULL

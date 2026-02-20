@@ -6,7 +6,7 @@
 # Supports both CSV and Excel formats.
 # Handles weighting variable application.
 #
-# VERSION: 2.2.0 - Added parallel loading support
+# VERSION: 2.3.0 - Added survey structure & config integration
 #
 # PARALLEL PROCESSING:
 # When processing large multi-wave datasets (5+ waves), parallel loading
@@ -110,6 +110,11 @@ extract_categorical_question_codes <- function(config = NULL, question_mapping =
 #' Loads data for all waves defined in tracking configuration.
 #' Resolves file paths, applies weighting, and performs validation.
 #'
+#' When StructureFile and/or ConfigFile columns exist in the Waves sheet,
+#' also loads per-wave survey structure (Options metadata) and crosstab
+#' config (weighting settings). These enable text-to-numeric mapping
+#' and box: spec support.
+#'
 #' @section Parallel Loading:
 #' When parallel = TRUE and multiple waves exist, waves are loaded in parallel
 #' using the future/future.apply framework. This can significantly speed up
@@ -126,7 +131,9 @@ extract_categorical_question_codes <- function(config = NULL, question_mapping =
 #' @param data_dir Character. Directory containing wave data files (if relative paths used)
 #' @param question_mapping Data frame. Question mapping (optional, for determining categorical questions)
 #' @param parallel Logical. If TRUE, attempt parallel loading of waves. Default FALSE.
-#' @return List of data frames, one per wave, with names as WaveIDs
+#' @return List with:
+#'   \item{wave_data}{Named list of data frames, one per wave}
+#'   \item{wave_structures}{Named list of structure data frames (NULL entries if no StructureFile)}
 #'
 #' @export
 load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL, parallel = FALSE) {
@@ -143,6 +150,18 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL, par
   }
 
   n_waves <- nrow(config$waves)
+
+  # Detect optional StructureFile / ConfigFile columns
+  has_structure_col <- "StructureFile" %in% names(config$waves)
+  has_config_col <- "ConfigFile" %in% names(config$waves)
+  config_dir <- if (!is.null(config$config_path)) dirname(config$config_path) else NULL
+
+  if (has_structure_col) {
+    cat("  StructureFile column detected — will load survey structures per wave\n")
+  }
+  if (has_config_col) {
+    cat("  ConfigFile column detected — will load crosstab configs per wave\n")
+  }
 
   # ---------------------------------------------------------------------------
   # PARALLEL LOADING (for large multi-wave datasets)
@@ -177,7 +196,9 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL, par
         wave_id = config$waves$WaveID[i],
         wave_name = config$waves$WaveName[i],
         data_file = config$waves$DataFile[i],
-        weight_var = get_wave_weight_var(config, config$waves$WaveID[i])
+        weight_var = get_wave_weight_var(config, config$waves$WaveID[i]),
+        structure_file = if (has_structure_col) config$waves$StructureFile[i] else NA,
+        config_file = if (has_config_col) config$waves$ConfigFile[i] else NA
       )
     })
 
@@ -190,8 +211,25 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL, par
       # Load wave data
       wave_df <- load_wave_data(file_path, info$wave_id, categorical_cols)
 
-      # Apply weighting
-      if (!is.null(info$weight_var) && info$weight_var != "") {
+      # Load structure if available
+      structure <- NULL
+      if (!is.na(info$structure_file) && nzchar(trimws(info$structure_file))) {
+        struct_path <- resolve_support_file_path(info$structure_file, data_dir, config_dir)
+        structure <- load_wave_structure(struct_path, info$wave_id)
+      }
+
+      # Load config and apply weighting
+      if (!is.na(info$config_file) && nzchar(trimws(info$config_file))) {
+        cfg_path <- resolve_support_file_path(info$config_file, data_dir, config_dir)
+        wave_cfg <- load_wave_config(cfg_path, info$wave_id)
+        if (wave_cfg$apply_weighting && !is.null(wave_cfg$weight_variable)) {
+          wave_df <- apply_wave_weights(wave_df, wave_cfg$weight_variable, info$wave_id)
+        } else if (!is.null(info$weight_var) && info$weight_var != "") {
+          wave_df <- apply_wave_weights(wave_df, info$weight_var, info$wave_id)
+        } else {
+          wave_df$weight_var <- 1
+        }
+      } else if (!is.null(info$weight_var) && info$weight_var != "") {
         wave_df <- apply_wave_weights(wave_df, info$weight_var, info$wave_id)
       } else {
         wave_df$weight_var <- 1
@@ -201,14 +239,17 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL, par
         wave_id = info$wave_id,
         wave_name = info$wave_name,
         data = wave_df,
+        structure = structure,
         n_records = nrow(wave_df)
       )
     }, future.seed = TRUE)
 
-    # Collect results into wave_data list
+    # Collect results
     wave_data <- list()
+    wave_structures <- list()
     for (result in wave_results) {
       wave_data[[result$wave_id]] <- result$data
+      wave_structures[[result$wave_id]] <- result$structure
       cat(paste0("  Loaded Wave ", result$wave_id, ": ", result$wave_name,
                  " (", result$n_records, " records)\n"))
     }
@@ -218,6 +259,7 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL, par
     # SEQUENTIAL LOADING (default)
     # ---------------------------------------------------------------------------
     wave_data <- list()
+    wave_structures <- list()
 
     for (i in 1:n_waves) {
       wave_id <- config$waves$WaveID[i]
@@ -232,14 +274,40 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL, par
       # Load wave data (passing categorical question codes to preserve)
       wave_df <- load_wave_data(file_path, wave_id, categorical_cols)
 
-      # Apply weighting if specified
-      weight_var <- get_wave_weight_var(config, wave_id)
-      if (!is.null(weight_var) && weight_var != "") {
-        wave_df <- apply_wave_weights(wave_df, weight_var, wave_id)
-      } else {
-        cat("    No weighting variable specified for this wave\n")
-        # Create default weight of 1
-        wave_df$weight_var <- 1
+      # --- Load survey structure if StructureFile provided ---
+      structure <- NULL
+      if (has_structure_col) {
+        struct_ref <- config$waves$StructureFile[i]
+        if (!is.na(struct_ref) && nzchar(trimws(struct_ref))) {
+          struct_path <- resolve_support_file_path(struct_ref, data_dir, config_dir)
+          structure <- load_wave_structure(struct_path, wave_id)
+        }
+      }
+      wave_structures[[wave_id]] <- structure
+
+      # --- Determine weighting: ConfigFile takes priority over WeightVar ---
+      weight_applied <- FALSE
+      if (has_config_col) {
+        cfg_ref <- config$waves$ConfigFile[i]
+        if (!is.na(cfg_ref) && nzchar(trimws(cfg_ref))) {
+          cfg_path <- resolve_support_file_path(cfg_ref, data_dir, config_dir)
+          wave_cfg <- load_wave_config(cfg_path, wave_id)
+          if (wave_cfg$apply_weighting && !is.null(wave_cfg$weight_variable)) {
+            wave_df <- apply_wave_weights(wave_df, wave_cfg$weight_variable, wave_id)
+            weight_applied <- TRUE
+          }
+        }
+      }
+
+      if (!weight_applied) {
+        # Fall back to WeightVar from Waves sheet or global setting
+        weight_var <- get_wave_weight_var(config, wave_id)
+        if (!is.null(weight_var) && weight_var != "") {
+          wave_df <- apply_wave_weights(wave_df, weight_var, wave_id)
+        } else {
+          cat("    No weighting variable specified for this wave\n")
+          wave_df$weight_var <- 1
+        }
       }
 
       # Store in list
@@ -251,7 +319,12 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL, par
 
   cat(paste0("Successfully loaded ", length(wave_data), " waves\n"))
 
-  return(wave_data)
+  # Return enriched result (backward compatible: callers that expect a plain
+  # list of data frames can access $wave_data; the wave_structures are new)
+  return(list(
+    wave_data = wave_data,
+    wave_structures = wave_structures
+  ))
 }
 
 
@@ -711,6 +784,377 @@ validate_wave_data <- function(wave_data, config, question_mapping) {
   cat("  Wave data validation completed\n")
 
   invisible(TRUE)
+}
+
+
+# ==============================================================================
+# SURVEY STRUCTURE & CONFIG INTEGRATION (V2.3.0)
+# ==============================================================================
+# These functions load per-wave Survey_Structure.xlsx and Crosstab_Config.xlsx
+# files to support:
+#   - Text-to-numeric value mapping (OptionText → Index_Weight)
+#   - BoxCategory grouping (box: spec in TrackingSpecs)
+#   - Per-wave weighting config from Crosstab_Config.xlsx
+# ==============================================================================
+
+
+#' Load Wave Survey Structure
+#'
+#' Reads the Options sheet from a Survey_Structure.xlsx file for a wave.
+#' Extracts option metadata: QuestionCode, OptionText, DisplayText,
+#' Index_Weight, BoxCategory.
+#'
+#' @param file_path Character. Full path to Survey_Structure.xlsx
+#' @param wave_id Character. Wave identifier for error messages
+#' @return Data frame with columns: QuestionCode, OptionText, DisplayText,
+#'   Index_Weight (numeric), BoxCategory (character or NA)
+#'
+#' @keywords internal
+load_wave_structure <- function(file_path, wave_id) {
+
+  if (!file.exists(file_path)) {
+    tracker_refuse(
+      code = "IO_STRUCTURE_FILE_NOT_FOUND",
+      title = "Survey Structure File Not Found",
+      problem = paste0("Cannot find survey structure file for Wave ", wave_id),
+      why_it_matters = "Survey structure is needed for text-to-numeric mapping and box categories.",
+      how_to_fix = c(
+        "Check that the StructureFile path in the Waves sheet is correct",
+        "Verify the Survey_Structure.xlsx file exists"
+      ),
+      details = paste0("Expected path: ", file_path)
+    )
+  }
+
+  # Read Options sheet
+  options_df <- tryCatch({
+    openxlsx::read.xlsx(file_path, sheet = "Options")
+  }, error = function(e) {
+    tracker_refuse(
+      code = "IO_STRUCTURE_READ_FAILED",
+      title = "Failed to Read Survey Structure",
+      problem = paste0("Could not read Options sheet from structure file for Wave ", wave_id),
+      why_it_matters = "Options sheet contains metadata needed for value mapping.",
+      how_to_fix = c(
+        "Verify the structure file has an 'Options' sheet",
+        "Check the file is not corrupted or open in another application"
+      ),
+      details = e$message
+    )
+  })
+
+  # Validate required columns
+  required_cols <- c("QuestionCode", "OptionText")
+  missing_cols <- setdiff(required_cols, names(options_df))
+  if (length(missing_cols) > 0) {
+    tracker_refuse(
+      code = "CFG_INVALID_STRUCTURE_FORMAT",
+      title = "Invalid Survey Structure Format",
+      problem = paste0("Options sheet for Wave ", wave_id, " is missing required columns: ",
+                       paste(missing_cols, collapse = ", ")),
+      why_it_matters = "QuestionCode and OptionText are required for value mapping.",
+      how_to_fix = "Add the missing columns to the Options sheet in your Survey_Structure.xlsx.",
+      observed = names(options_df)
+    )
+  }
+
+  # Ensure optional columns exist with defaults
+  if (!"DisplayText" %in% names(options_df)) {
+    options_df$DisplayText <- options_df$OptionText
+  }
+  if (!"Index_Weight" %in% names(options_df)) {
+    options_df$Index_Weight <- NA_real_
+  } else {
+    options_df$Index_Weight <- suppressWarnings(as.numeric(options_df$Index_Weight))
+  }
+  if (!"BoxCategory" %in% names(options_df)) {
+    options_df$BoxCategory <- NA_character_
+  }
+
+  # Keep only relevant columns
+  result <- options_df[, c("QuestionCode", "OptionText", "DisplayText",
+                            "Index_Weight", "BoxCategory"), drop = FALSE]
+
+  cat(paste0("    Loaded structure: ", length(unique(result$QuestionCode)),
+             " questions, ", nrow(result), " options\n"))
+
+  return(result)
+}
+
+
+#' Load Wave Crosstab Config (Weighting Settings)
+#'
+#' Reads the Settings sheet from a Crosstab_Config.xlsx file for a wave.
+#' Extracts weighting-related settings: apply_weighting, weight_variable.
+#'
+#' @param file_path Character. Full path to Crosstab_Config.xlsx
+#' @param wave_id Character. Wave identifier for error messages
+#' @return Named list with: apply_weighting (logical), weight_variable (character or NULL)
+#'
+#' @keywords internal
+load_wave_config <- function(file_path, wave_id) {
+
+  if (!file.exists(file_path)) {
+    tracker_refuse(
+      code = "IO_CONFIG_FILE_NOT_FOUND_WAVE",
+      title = "Crosstab Config File Not Found",
+      problem = paste0("Cannot find crosstab config file for Wave ", wave_id),
+      why_it_matters = "Crosstab config provides weighting settings for this wave.",
+      how_to_fix = c(
+        "Check that the ConfigFile path in the Waves sheet is correct",
+        "Verify the Crosstab_Config.xlsx file exists"
+      ),
+      details = paste0("Expected path: ", file_path)
+    )
+  }
+
+  # Read Settings sheet
+  settings_df <- tryCatch({
+    openxlsx::read.xlsx(file_path, sheet = "Settings")
+  }, error = function(e) {
+    tracker_refuse(
+      code = "IO_CONFIG_READ_FAILED_WAVE",
+      title = "Failed to Read Crosstab Config",
+      problem = paste0("Could not read Settings sheet from config file for Wave ", wave_id),
+      why_it_matters = "Settings sheet contains weighting configuration.",
+      how_to_fix = c(
+        "Verify the config file has a 'Settings' sheet",
+        "Check the file is not corrupted or open in another application"
+      ),
+      details = e$message
+    )
+  })
+
+  # Parse settings to named list
+  # Accept both Setting/Value and SettingName/Value column patterns
+  setting_col <- if ("Setting" %in% names(settings_df)) {
+    "Setting"
+  } else if ("SettingName" %in% names(settings_df)) {
+    "SettingName"
+  } else {
+    cat(paste0("    WARNING: Config file for Wave ", wave_id,
+               " has no Setting/SettingName column — using defaults\n"))
+    return(list(apply_weighting = FALSE, weight_variable = NULL))
+  }
+
+  if (!"Value" %in% names(settings_df)) {
+    cat(paste0("    WARNING: Config file for Wave ", wave_id,
+               " has no Value column — using defaults\n"))
+    return(list(apply_weighting = FALSE, weight_variable = NULL))
+  }
+
+  # Build lookup
+  settings <- as.list(settings_df$Value)
+  names(settings) <- settings_df[[setting_col]]
+
+  # Extract weighting settings
+  apply_weighting <- FALSE
+  weight_variable <- NULL
+
+  aw_val <- settings[["apply_weighting"]]
+  if (!is.null(aw_val) && !is.na(aw_val)) {
+    apply_weighting <- toupper(trimws(as.character(aw_val))) %in% c("TRUE", "Y", "YES", "1")
+  }
+
+  wv_val <- settings[["weight_variable"]]
+  if (!is.null(wv_val) && !is.na(wv_val) && nzchar(trimws(as.character(wv_val)))) {
+    weight_variable <- trimws(as.character(wv_val))
+  }
+
+  cat(paste0("    Config: weighting=", apply_weighting,
+             if (!is.null(weight_variable)) paste0(", var=", weight_variable) else "",
+             "\n"))
+
+  list(
+    apply_weighting = apply_weighting,
+    weight_variable = weight_variable
+  )
+}
+
+
+#' Resolve Question Values (Text → Numeric)
+#'
+#' Maps text response values to numeric Index_Weight values using the
+#' wave's survey structure. If data is already numeric, passes through
+#' unchanged. If no structure is provided, returns the original values.
+#'
+#' @param raw_values Vector. Raw response values from wave data
+#' @param wave_structure Data frame. Options metadata from load_wave_structure()
+#'   (or NULL if no structure available)
+#' @param q_code Character. Question code to look up in structure
+#' @return Numeric vector of resolved values (NA where mapping fails)
+#'
+#' @export
+resolve_question_values <- function(raw_values, wave_structure, q_code) {
+
+  # No structure → pass through
+  if (is.null(wave_structure)) {
+    return(raw_values)
+  }
+
+  # Already numeric → pass through
+  if (is.numeric(raw_values)) {
+    return(raw_values)
+  }
+
+  # Get options for this question from structure
+  q_options <- wave_structure[wave_structure$QuestionCode == q_code, , drop = FALSE]
+
+  if (nrow(q_options) == 0) {
+    # No structure entry for this question — try numeric conversion
+    result <- suppressWarnings(as.numeric(raw_values))
+    if (all(is.na(result[!is.na(raw_values)]))) {
+      warning(paste0("Question ", q_code, ": Text values found but no structure mapping available. ",
+                     "All values will be NA."))
+    }
+    return(result)
+  }
+
+  # Build text → Index_Weight lookup (case-insensitive)
+  lookup <- stats::setNames(q_options$Index_Weight,
+                            tolower(trimws(as.character(q_options$OptionText))))
+
+  # Map values
+  raw_lower <- tolower(trimws(as.character(raw_values)))
+  result <- lookup[raw_lower]
+  names(result) <- NULL
+
+  # Report unmapped values
+  unmapped <- !is.na(raw_values) & is.na(result)
+  if (any(unmapped)) {
+    unique_unmapped <- unique(raw_values[unmapped])
+    n_unmapped <- sum(unmapped)
+    # Try direct numeric conversion for unmapped values
+    numeric_attempt <- suppressWarnings(as.numeric(raw_values[unmapped]))
+    if (!all(is.na(numeric_attempt))) {
+      result[unmapped] <- numeric_attempt
+    } else {
+      warning(paste0("Question ", q_code, ": ", n_unmapped, " values could not be mapped: ",
+                     paste(head(unique_unmapped, 5), collapse = ", "),
+                     if (length(unique_unmapped) > 5) "..." else ""))
+    }
+  }
+
+  return(result)
+}
+
+
+#' Get Box Category Option Values
+#'
+#' Returns the Index_Weight values for all options matching a given
+#' BoxCategory for a question. Used by the box: spec type.
+#'
+#' @param wave_structure Data frame. Options metadata from load_wave_structure()
+#' @param q_code Character. Question code
+#' @param box_name Character. BoxCategory to match (case-insensitive)
+#' @return Numeric vector of Index_Weight values for matching options,
+#'   or NULL if no matches found
+#'
+#' @export
+get_box_options <- function(wave_structure, q_code, box_name) {
+
+  if (is.null(wave_structure)) {
+    tracker_refuse(
+      code = "CFG_NO_STRUCTURE_FOR_BOX",
+      title = "No Survey Structure for box: Spec",
+      problem = paste0("box:", box_name, " spec requires a StructureFile but none is provided"),
+      why_it_matters = "BoxCategory groupings come from the Survey Structure file.",
+      how_to_fix = c(
+        "Add a StructureFile column to the Waves sheet",
+        "Point it to the Survey_Structure.xlsx for each wave"
+      )
+    )
+  }
+
+  # Filter to this question
+  q_options <- wave_structure[wave_structure$QuestionCode == q_code, , drop = FALSE]
+
+  if (nrow(q_options) == 0) {
+    warning(paste0("Question ", q_code, ": No options found in survey structure"))
+    return(NULL)
+  }
+
+  # Check BoxCategory column has values
+  if (all(is.na(q_options$BoxCategory))) {
+    warning(paste0("Question ", q_code, ": BoxCategory column is empty in survey structure"))
+    return(NULL)
+  }
+
+  # Match by BoxCategory (case-insensitive)
+  box_lower <- tolower(trimws(box_name))
+  matching <- q_options[tolower(trimws(q_options$BoxCategory)) == box_lower, , drop = FALSE]
+
+  if (nrow(matching) == 0) {
+    available_cats <- unique(q_options$BoxCategory[!is.na(q_options$BoxCategory)])
+    warning(paste0("Question ", q_code, ": BoxCategory '", box_name,
+                   "' not found. Available: ", paste(available_cats, collapse = ", ")))
+    return(NULL)
+  }
+
+  # Return Index_Weight values
+  values <- matching$Index_Weight
+  values <- values[!is.na(values)]
+
+  if (length(values) == 0) {
+    warning(paste0("Question ", q_code, ": BoxCategory '", box_name,
+                   "' has no Index_Weight values"))
+    return(NULL)
+  }
+
+  return(values)
+}
+
+
+#' Resolve Structure/Config File Path
+#'
+#' Resolves a StructureFile or ConfigFile path, trying multiple candidate
+#' locations relative to data_dir and config_dir.
+#'
+#' @param file_ref Character. File path from Waves sheet
+#' @param data_dir Character. Directory containing wave data files
+#' @param config_dir Character. Directory containing the tracking config file
+#' @return Character. Resolved absolute path (may not exist — caller validates)
+#'
+#' @keywords internal
+resolve_support_file_path <- function(file_ref, data_dir = NULL, config_dir = NULL) {
+
+  if (is.null(file_ref) || is.na(file_ref) || !nzchar(trimws(file_ref))) {
+    return(NULL)
+  }
+
+  file_ref <- trimws(file_ref)
+
+  # If absolute and exists, use directly
+  if (file.exists(file_ref)) {
+    return(normalizePath(file_ref))
+  }
+
+  # Try relative to data_dir
+  if (!is.null(data_dir)) {
+    cand <- file.path(data_dir, file_ref)
+    if (file.exists(cand)) return(normalizePath(cand))
+  }
+
+  # Try relative to config_dir
+  if (!is.null(config_dir)) {
+    cand <- file.path(config_dir, file_ref)
+    if (file.exists(cand)) return(normalizePath(cand))
+  }
+
+  # Try basename in data_dir
+  if (!is.null(data_dir)) {
+    cand <- file.path(data_dir, basename(file_ref))
+    if (file.exists(cand)) return(normalizePath(cand))
+  }
+
+  # Try basename in config_dir
+  if (!is.null(config_dir)) {
+    cand <- file.path(config_dir, basename(file_ref))
+    if (file.exists(cand)) return(normalizePath(cand))
+  }
+
+  # Return original — caller will get a file-not-found error
+  return(file_ref)
 }
 
 

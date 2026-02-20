@@ -102,7 +102,8 @@ normalize_question_type <- function(q_type) {
 }
 
 
-calculate_all_trends <- function(config, question_map, wave_data, parallel = FALSE) {
+calculate_all_trends <- function(config, question_map, wave_data, parallel = FALSE,
+                                 wave_structures = NULL) {
 
   cat("\n================================================================================\n")
   cat("CALCULATING TRENDS\n")
@@ -167,15 +168,15 @@ calculate_all_trends <- function(config, question_map, wave_data, parallel = FAL
 
       trend_result <- tryCatch({
         if (q_type == "rating") {
-          calculate_rating_trend_enhanced(q_code, question_map, wave_data, config)
+          calculate_rating_trend_enhanced(q_code, question_map, wave_data, config, wave_structures)
         } else if (q_type == "nps") {
-          calculate_nps_trend(q_code, question_map, wave_data, config)
+          calculate_nps_trend(q_code, question_map, wave_data, config, wave_structures)
         } else if (q_type == "single_choice") {
-          calculate_single_choice_trend_enhanced(q_code, question_map, wave_data, config)
+          calculate_single_choice_trend_enhanced(q_code, question_map, wave_data, config, wave_structures)
         } else if (q_type == "multi_choice" || q_type_raw == "Multi_Mention") {
-          calculate_multi_mention_trend(q_code, question_map, wave_data, config)
+          calculate_multi_mention_trend(q_code, question_map, wave_data, config, wave_structures)
         } else if (q_type == "composite") {
-          calculate_composite_trend_enhanced(q_code, question_map, wave_data, config)
+          calculate_composite_trend_enhanced(q_code, question_map, wave_data, config, wave_structures)
         } else if (q_type == "open_end") {
           return(list(
             q_code = q_code,
@@ -289,18 +290,18 @@ calculate_all_trends <- function(config, question_map, wave_data, parallel = FAL
       trend_result <- tryCatch({
         if (q_type == "rating") {
           # Use enhanced version (supports TrackingSpecs, backward compatible)
-          calculate_rating_trend_enhanced(q_code, question_map, wave_data, config)
+          calculate_rating_trend_enhanced(q_code, question_map, wave_data, config, wave_structures)
         } else if (q_type == "nps") {
-          calculate_nps_trend(q_code, question_map, wave_data, config)
+          calculate_nps_trend(q_code, question_map, wave_data, config, wave_structures)
         } else if (q_type == "single_choice") {
           # Use enhanced version (supports TrackingSpecs, backward compatible)
-          calculate_single_choice_trend_enhanced(q_code, question_map, wave_data, config)
+          calculate_single_choice_trend_enhanced(q_code, question_map, wave_data, config, wave_structures)
         } else if (q_type == "multi_choice" || q_type_raw == "Multi_Mention") {
           # Multi-mention support (Enhancement Phase 2)
-          calculate_multi_mention_trend(q_code, question_map, wave_data, config)
+          calculate_multi_mention_trend(q_code, question_map, wave_data, config, wave_structures)
         } else if (q_type == "composite") {
           # Use enhanced version (supports TrackingSpecs, backward compatible)
-          calculate_composite_trend_enhanced(q_code, question_map, wave_data, config)
+          calculate_composite_trend_enhanced(q_code, question_map, wave_data, config, wave_structures)
         } else if (q_type == "open_end") {
           # TRS v1.0: Record unsupported type for PARTIAL status
           skipped_questions[[q_code]] <- list(
@@ -450,7 +451,8 @@ calculate_rating_trend <- function(q_code, question_map, wave_data, config) {
 #' NPS = % Promoters (9-10) - % Detractors (0-6)
 #'
 #' @keywords internal
-calculate_nps_trend <- function(q_code, question_map, wave_data, config) {
+calculate_nps_trend <- function(q_code, question_map, wave_data, config,
+                                wave_structures = NULL) {
 
   wave_ids <- config$waves$WaveID
   metadata <- get_question_metadata(question_map, q_code)
@@ -474,6 +476,11 @@ calculate_nps_trend <- function(q_code, question_map, wave_data, config) {
       )
       next
     }
+
+    # Resolve text → numeric using survey structure (if available)
+    wave_struct <- if (!is.null(wave_structures)) wave_structures[[wave_id]] else NULL
+    wave_col <- get_wave_question_code(question_map, q_code, wave_id)
+    q_data <- resolve_question_values(q_data, wave_struct, wave_col)
 
     # Calculate NPS
     result <- calculate_nps_score(
@@ -613,28 +620,31 @@ parse_single_choice_specs <- function(tracking_specs, all_codes) {
   )
 
   for (spec in specs) {
-    spec_lower <- tolower(trimws(spec))
+    # Strip =Label before processing (labels are display-only)
+    parsed <- parse_spec_label(spec)
+    core_spec <- parsed$core
+    core_lower <- tolower(trimws(core_spec))
 
-    if (spec_lower == "all") {
+    if (core_lower == "all") {
       # Track all codes
       result$mode <- "all"
       result$codes <- unique(c(result$codes, all_codes))
 
-    } else if (spec_lower == "top3") {
+    } else if (core_lower == "top3") {
       # Track top 3 most frequent codes (will need to determine from data)
       result$mode <- "top3"
       # Codes will be determined after calculating frequencies
 
-    } else if (startsWith(spec_lower, "category:")) {
+    } else if (startsWith(core_lower, "category:")) {
       # Specific category: "category:last week"
-      category_name <- sub("^category:", "", spec, ignore.case = TRUE)
+      category_name <- sub("^category:", "", core_spec, ignore.case = TRUE)
       category_name <- trimws(category_name)  # Remove any leading/trailing whitespace
       if (category_name != "") {  # Only add if not empty
         result$codes <- c(result$codes, category_name)
       }
 
     } else {
-      warning(paste0("Unknown Single_Choice spec: ", spec))
+      warning(paste0("Unknown Single_Choice spec: ", core_spec))
     }
   }
 
@@ -652,13 +662,14 @@ parse_single_choice_specs <- function(tracking_specs, all_codes) {
 #' Supports selective tracking via category: syntax.
 #'
 #' @keywords internal
-calculate_single_choice_trend_enhanced <- function(q_code, question_map, wave_data, config) {
+calculate_single_choice_trend_enhanced <- function(q_code, question_map, wave_data, config,
+                                                    wave_structures = NULL) {
 
   wave_ids <- config$waves$WaveID
   metadata <- get_question_metadata(question_map, q_code)
 
   # Get TrackingSpecs
-  tracking_specs <- get_tracking_specs(question_map, q_code)
+  tracking_specs <- get_tracking_specs(question_map, q_code, config = config)
 
   # Get all unique response codes across all waves
   all_codes <- character(0)
@@ -1341,13 +1352,14 @@ calculate_distribution <- function(values, weights) {
 #' Backward compatible - defaults to mean if no TrackingSpecs specified.
 #'
 #' @keywords internal
-calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, config) {
+calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, config,
+                                             wave_structures = NULL) {
 
   wave_ids <- config$waves$WaveID
   metadata <- get_question_metadata(question_map, q_code)
 
   # Get TrackingSpecs
-  tracking_specs <- get_tracking_specs(question_map, q_code)
+  tracking_specs <- get_tracking_specs(question_map, q_code, config = config)
 
   # Parse specs (default to "mean" if not specified)
   if (is.null(tracking_specs) || tracking_specs == "") {
@@ -1355,6 +1367,11 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
   } else {
     specs_list <- trimws(strsplit(tracking_specs, ",")[[1]])
   }
+
+  # Strip =Label from specs — labels are display-only, not used in calculation
+  # Store original specs for label lookup later
+  specs_original <- specs_list
+  specs_list <- vapply(specs_list, function(s) parse_spec_label(s)$core, character(1))
 
   # Calculate metrics for each wave
   wave_results <- list()
@@ -1372,6 +1389,11 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
       )
       next
     }
+
+    # Resolve text → numeric using survey structure (if available)
+    wave_struct <- if (!is.null(wave_structures)) wave_structures[[wave_id]] else NULL
+    wave_col <- get_wave_question_code(question_map, q_code, wave_id)
+    q_data <- resolve_question_values(q_data, wave_struct, wave_col)
 
     # Calculate each requested metric
     metrics <- list()
@@ -1405,9 +1427,31 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
         metrics$bottom2_box <- result$proportion
 
       } else if (grepl("^range:", spec_lower)) {
-        result <- calculate_custom_range(q_data, wave_df$weight_var, spec)
+        # Strip "range:" prefix before passing to calculate_custom_range
+        range_part <- sub("^range:", "", spec_lower)
+        result <- calculate_custom_range(q_data, wave_df$weight_var, range_part)
         metric_name <- gsub("[^a-z0-9_]", "_", spec_lower)  # Clean for list name
         metrics[[metric_name]] <- result$proportion
+
+      } else if (grepl("^box:", spec_lower)) {
+        # box:CATEGORY — calculate proportion of values in a BoxCategory group
+        box_name <- sub("^box:", "", spec)  # Preserve original case
+        box_values <- get_box_options(wave_struct, wave_col, box_name)
+        if (!is.null(box_values)) {
+          # Calculate weighted proportion of values matching box category
+          valid_idx <- which(!is.na(q_data) & !is.na(wave_df$weight_var) & wave_df$weight_var > 0)
+          if (length(valid_idx) > 0) {
+            in_box <- q_data[valid_idx] %in% box_values
+            proportion <- sum(wave_df$weight_var[valid_idx][in_box]) /
+                         sum(wave_df$weight_var[valid_idx]) * 100
+          } else {
+            proportion <- NA
+          }
+        } else {
+          proportion <- NA
+        }
+        metric_name <- paste0("box_", gsub("[^a-z0-9_]", "_", tolower(box_name)))
+        metrics[[metric_name]] <- proportion
 
       } else if (spec_lower == "distribution") {
         result <- calculate_distribution(q_data, wave_df$weight_var)
@@ -1436,6 +1480,9 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
     spec_lower <- tolower(trimws(spec))
     metric_name <- if (grepl("^range:", spec_lower)) {
       gsub("[^a-z0-9_]", "_", spec_lower)
+    } else if (grepl("^box:", spec_lower)) {
+      box_name <- sub("^box:", "", spec_lower)
+      paste0("box_", gsub("[^a-z0-9_]", "_", box_name))
     } else {
       spec_lower
     }
@@ -1466,6 +1513,7 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
     question_type = metadata$QuestionType,
     metric_type = "rating_enhanced",
     tracking_specs = specs_list,
+    tracking_specs_original = specs_original,
     wave_results = wave_results,
     changes = changes,
     significance = significance
@@ -1552,7 +1600,8 @@ calculate_composite_values_per_respondent <- function(wave_df, wave_id, source_q
 #' (mean, top_box, distribution, etc.) to those composite scores.
 #'
 #' @keywords internal
-calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, config) {
+calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, config,
+                                                wave_structures = NULL) {
 
   wave_ids <- config$waves$WaveID
   metadata <- get_question_metadata(question_map, q_code)
@@ -1572,7 +1621,7 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
   }
 
   # Get TrackingSpecs
-  tracking_specs <- get_tracking_specs(question_map, q_code)
+  tracking_specs <- get_tracking_specs(question_map, q_code, config = config)
 
   # Parse specs (default to "mean" if not specified)
   if (is.null(tracking_specs) || tracking_specs == "") {
@@ -1580,6 +1629,10 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
   } else {
     specs_list <- trimws(strsplit(tracking_specs, ",")[[1]])
   }
+
+  # Strip =Label from specs — labels are display-only
+  specs_original <- specs_list
+  specs_list <- vapply(specs_list, function(s) parse_spec_label(s)$core, character(1))
 
   # Calculate composite values and metrics for each wave
   wave_results <- list()
@@ -1641,9 +1694,29 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
         metrics$bottom2_box <- result$proportion
 
       } else if (grepl("^range:", spec_lower)) {
-        result <- calculate_custom_range(composite_values, wave_df$weight_var, spec)
+        range_part <- sub("^range:", "", spec_lower)
+        result <- calculate_custom_range(composite_values, wave_df$weight_var, range_part)
         metric_name <- gsub("[^a-z0-9_]", "_", spec_lower)
         metrics[[metric_name]] <- result$proportion
+
+      } else if (grepl("^box:", spec_lower)) {
+        box_name <- sub("^box:", "", spec)
+        wave_struct <- if (!is.null(wave_structures)) wave_structures[[wave_id]] else NULL
+        # Composite questions don't have a single wave column; use q_code as fallback
+        composite_wave_col <- tryCatch(
+          get_wave_question_code(question_map, q_code, wave_id),
+          error = function(e) q_code
+        )
+        box_values <- get_box_options(wave_struct, composite_wave_col, box_name)
+        if (!is.null(box_values) && length(valid_idx) > 0) {
+          in_box <- composite_values[valid_idx] %in% box_values
+          proportion <- sum(wave_df$weight_var[valid_idx][in_box]) /
+                       sum(wave_df$weight_var[valid_idx]) * 100
+        } else {
+          proportion <- NA
+        }
+        metric_name <- paste0("box_", gsub("[^a-z0-9_]", "_", tolower(box_name)))
+        metrics[[metric_name]] <- proportion
 
       } else if (spec_lower == "distribution") {
         result <- calculate_distribution(composite_values, wave_df$weight_var)
@@ -1671,6 +1744,9 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
     spec_lower <- tolower(trimws(spec))
     metric_name <- if (grepl("^range:", spec_lower)) {
       gsub("[^a-z0-9_]", "_", spec_lower)
+    } else if (grepl("^box:", spec_lower)) {
+      box_name <- sub("^box:", "", spec_lower)
+      paste0("box_", gsub("[^a-z0-9_]", "_", box_name))
     } else {
       spec_lower
     }
@@ -1700,6 +1776,7 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
     question_type = metadata$QuestionType,
     metric_type = "composite_enhanced",
     tracking_specs = specs_list,
+    tracking_specs_original = specs_original,
     source_questions = source_questions,
     wave_results = wave_results,
     changes = changes,
@@ -1784,9 +1861,12 @@ parse_multi_mention_specs <- function(tracking_specs, base_code, wave_df) {
   )
 
   for (spec in specs) {
-    spec_lower <- tolower(trimws(spec))
+    # Strip =Label before processing (labels are display-only)
+    parsed <- parse_spec_label(spec)
+    core_spec <- parsed$core
+    core_lower <- tolower(trimws(core_spec))
 
-    if (spec_lower == "auto") {
+    if (core_lower == "auto") {
       # Auto-detect all columns
       result$mode <- "auto"
       auto_cols <- detect_multi_mention_columns(wave_df, base_code)
@@ -1794,29 +1874,29 @@ parse_multi_mention_specs <- function(tracking_specs, base_code, wave_df) {
         result$columns <- unique(c(result$columns, auto_cols))
       }
 
-    } else if (startsWith(spec_lower, "option:")) {
+    } else if (startsWith(core_lower, "option:")) {
       # Specific option: "option:Q30_1"
-      col_name <- sub("^option:", "", spec, ignore.case = TRUE)
+      col_name <- sub("^option:", "", core_spec, ignore.case = TRUE)
       col_name <- trimws(col_name)  # Remove any leading/trailing whitespace
       if (col_name != "") {  # Only add if not empty
         result$columns <- c(result$columns, col_name)
       }
 
-    } else if (startsWith(spec_lower, "category:")) {
+    } else if (startsWith(core_lower, "category:")) {
       # Specific category text: "category:Internal store system"
-      category_name <- sub("^category:", "", spec, ignore.case = TRUE)
+      category_name <- sub("^category:", "", core_spec, ignore.case = TRUE)
       category_name <- trimws(category_name)  # Remove any leading/trailing whitespace
       if (category_name != "") {  # Only add if not empty
         result$mode <- "category"
         result$categories <- c(result$categories, category_name)
       }
 
-    } else if (spec_lower %in% c("any", "count_mean", "count_distribution")) {
+    } else if (core_lower %in% c("any", "count_mean", "count_distribution")) {
       # Additional metrics
-      result$additional_metrics <- c(result$additional_metrics, spec_lower)
+      result$additional_metrics <- c(result$additional_metrics, core_lower)
 
     } else {
-      warning(paste0("Unknown Multi_Mention spec: ", spec))
+      warning(paste0("Unknown Multi_Mention spec: ", core_spec))
     }
   }
 
@@ -1852,7 +1932,7 @@ calculate_multi_mention_trend_categories <- function(q_code, question_map, wave_
   metadata <- get_question_metadata(question_map, q_code)
 
   # Get TrackingSpecs
-  tracking_specs <- get_tracking_specs(question_map, q_code)
+  tracking_specs <- get_tracking_specs(question_map, q_code, config = config)
 
   # First pass: detect all multi-mention columns and gather unique categories
   wave_base_codes <- list()
@@ -2016,13 +2096,14 @@ calculate_multi_mention_trend_categories <- function(q_code, question_map, wave_
 #' Supports TrackingSpecs for selective option tracking and additional metrics.
 #'
 #' @keywords internal
-calculate_multi_mention_trend <- function(q_code, question_map, wave_data, config) {
+calculate_multi_mention_trend <- function(q_code, question_map, wave_data, config,
+                                          wave_structures = NULL) {
 
   wave_ids <- config$waves$WaveID
   metadata <- get_question_metadata(question_map, q_code)
 
   # Get TrackingSpecs
-  tracking_specs <- get_tracking_specs(question_map, q_code)
+  tracking_specs <- get_tracking_specs(question_map, q_code, config = config)
 
   # Parse specs to check mode (need to parse once to determine if category mode)
   # Find first wave where question exists (not NA)
