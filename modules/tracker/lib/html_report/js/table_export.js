@@ -200,7 +200,7 @@
     });
   };
 
-  // ---- Helpers ----
+  // ---- Helpers (exposed globally for reuse by metrics_view.js) ----
   function csvEscape(text) {
     if (!text) return "";
     text = text.replace(/"/g, '""');
@@ -226,5 +226,10 @@
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
+
+  // Expose helpers globally
+  window.csvEscape = csvEscape;
+  window.xmlEscape = xmlEscape;
+  window.downloadBlob = downloadBlob;
 
 })();

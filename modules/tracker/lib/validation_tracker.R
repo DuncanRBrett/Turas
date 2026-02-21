@@ -240,12 +240,28 @@ validate_mapping_structure <- function(question_mapping, config) {
     results$errors <- c(results$errors, "Duplicate QuestionCodes in mapping")
   }
 
-  # Validate question types
-  valid_types <- c("Rating", "SingleChoice", "MultiChoice", "Multi_Mention", "NPS", "Index", "OpenEnd", "Composite")
-  invalid_types <- setdiff(unique(question_mapping$QuestionType), valid_types)
+  # Validate question types (accept common aliases)
+  valid_types <- c("Rating", "SingleChoice", "MultiChoice", "Multi_Mention", "NPS",
+                   "Index", "OpenEnd", "Composite",
+                   # Common aliases
+                   "Likert", "Single_Response", "single_response", "likert",
+                   "single_choice", "multi_choice", "multi_mention",
+                   "rating", "nps", "composite", "index", "openend")
+  non_na_types <- unique(question_mapping$QuestionType)
+  non_na_types <- non_na_types[!is.na(non_na_types)]
+  invalid_types <- setdiff(non_na_types, valid_types)
   if (length(invalid_types) > 0) {
     results$warnings <- c(results$warnings,
                          paste0("Unknown question types: ", paste(invalid_types, collapse = ", ")))
+  }
+
+  # Warn about NA question types (but not as unknown types)
+  na_type_questions <- question_mapping$QuestionCode[is.na(question_mapping$QuestionType)]
+  if (length(na_type_questions) > 0) {
+    results$warnings <- c(results$warnings,
+                         paste0("Questions with missing QuestionType: ",
+                                paste(na_type_questions, collapse = ", "),
+                                ". Will attempt auto-detection from SourceQuestions column."))
   }
 
   results$info <- c(results$info, paste0("Mapped ", nrow(question_mapping), " questions"))
@@ -397,11 +413,9 @@ validate_banner_structure <- function(config, wave_data) {
   }
 
   # Validate break variables exist in data
+  # Banner sheet may have wave-specific column names (e.g., W2023=Q24, W2024=Q02)
   wave_ids <- names(wave_data)
   if (length(wave_ids) > 0) {
-    # Check first wave (assume consistent structure)
-    wave_df <- wave_data[[wave_ids[1]]]
-
     for (i in 1:nrow(banner)) {
       break_var <- banner$BreakVariable[i]
 
@@ -410,11 +424,25 @@ validate_banner_structure <- function(config, wave_data) {
         next
       }
 
-      # Check if variable exists
-      if (!break_var %in% names(wave_df)) {
-        results$warnings <- c(results$warnings,
-                             paste0("Banner variable '", break_var, "' not found in Wave ",
-                                   wave_ids[1], " data"))
+      for (wave_id in wave_ids) {
+        wave_df <- wave_data[[wave_id]]
+
+        # Check for wave-specific column name in the Banner sheet
+        wave_col <- break_var  # Default to abstract name
+        if (wave_id %in% names(banner)) {
+          wave_specific <- banner[[wave_id]][i]
+          if (!is.na(wave_specific) && trimws(as.character(wave_specific)) != "") {
+            wave_col <- trimws(as.character(wave_specific))
+          }
+        }
+
+        # Check if the wave-specific (or abstract) variable exists in data
+        if (!wave_col %in% names(wave_df)) {
+          results$warnings <- c(results$warnings,
+                               paste0("Banner variable '", break_var,
+                                     "' (column '", wave_col, "') not found in ",
+                                     wave_id, " data"))
+        }
       }
     }
   }
@@ -507,10 +535,21 @@ validate_all_tracking_specs <- function(config, question_map) {
   if (!is.null(baseline_wave) && !is.na(baseline_wave) && trimws(as.character(baseline_wave)) != "") {
     baseline_wave <- trimws(as.character(baseline_wave))
     if (!baseline_wave %in% config$waves$WaveID) {
-      results$errors <- c(results$errors,
-                         paste0("baseline_wave '", baseline_wave,
-                                "' not found in Waves sheet. Valid WaveIDs: ",
-                                paste(config$waves$WaveID, collapse = ", ")))
+      # Try fuzzy matching: prepend "W" if not already present
+      candidate <- if (!grepl("^W", baseline_wave)) paste0("W", baseline_wave) else baseline_wave
+      if (candidate %in% config$waves$WaveID) {
+        results$warnings <- c(results$warnings,
+                             paste0("baseline_wave '", baseline_wave,
+                                    "' auto-corrected to '", candidate,
+                                    "' to match WaveID format"))
+        results$info <- c(results$info,
+                         paste0("Baseline wave set to: ", candidate, " (auto-corrected)"))
+      } else {
+        results$errors <- c(results$errors,
+                           paste0("baseline_wave '", baseline_wave,
+                                  "' not found in Waves sheet. Valid WaveIDs: ",
+                                  paste(config$waves$WaveID, collapse = ", ")))
+      }
     } else {
       results$info <- c(results$info,
                        paste0("Baseline wave set to: ", baseline_wave))

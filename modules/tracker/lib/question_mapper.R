@@ -204,6 +204,51 @@ build_question_map_index <- function(question_mapping, config) {
   metadata_cols <- setdiff(names(question_mapping), wave_cols)
   metadata <- question_mapping[, metadata_cols, drop = FALSE]
 
+  # ---------------------------------------------------------------------------
+  # STEP 3b: Normalize question types and auto-detect composites
+  # ---------------------------------------------------------------------------
+  if ("QuestionType" %in% names(metadata)) {
+    # Type normalization map (common aliases → canonical types)
+    type_normalize <- c(
+      "Likert" = "Rating",
+      "likert" = "Rating",
+      "Single_Response" = "SingleChoice",
+      "single_response" = "SingleChoice",
+      "single_choice" = "SingleChoice",
+      "multi_choice" = "MultiChoice",
+      "multi_mention" = "Multi_Mention",
+      "rating" = "Rating",
+      "nps" = "NPS",
+      "composite" = "Composite",
+      "index" = "Index",
+      "openend" = "OpenEnd"
+    )
+
+    for (i in seq_len(nrow(metadata))) {
+      raw_type <- metadata$QuestionType[i]
+      q_code <- metadata$QuestionCode[i]
+
+      # Auto-detect Composite when type is NA but SourceQuestions is populated
+      if ((is.na(raw_type) || trimws(as.character(raw_type)) == "") &&
+          "SourceQuestions" %in% names(metadata)) {
+        src <- metadata$SourceQuestions[i]
+        if (!is.na(src) && trimws(as.character(src)) != "") {
+          metadata$QuestionType[i] <- "Composite"
+          message(paste0("  Auto-detected '", q_code, "' as Composite (has SourceQuestions)"))
+          next
+        }
+      }
+
+      # Normalize known aliases to canonical types
+      if (!is.na(raw_type)) {
+        canonical <- type_normalize[raw_type]
+        if (!is.na(canonical)) {
+          metadata$QuestionType[i] <- canonical
+        }
+      }
+    }
+  }
+
   message(paste0("  Indexed ", nrow(question_mapping), " questions across ", length(wave_ids), " waves"))
 
   return(list(
@@ -724,8 +769,16 @@ parse_spec_label <- function(spec) {
 validate_tracking_specs <- function(specs_str, question_type) {
 
   # NULL or empty specs are always valid - means "use defaults"
-  if (is.null(specs_str) || trimws(specs_str) == "") {
+  if (is.null(specs_str) || is.na(specs_str) || trimws(specs_str) == "") {
     return(list(valid = TRUE, message = ""))
+  }
+
+  # Handle NA question type
+  if (is.null(question_type) || is.na(question_type) || trimws(as.character(question_type)) == "") {
+    return(list(
+      valid = FALSE,
+      message = paste0("Unknown question type: ", question_type)
+    ))
   }
 
   # Normalize question type for case-insensitive comparison

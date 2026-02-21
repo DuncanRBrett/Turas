@@ -75,6 +75,11 @@
 #'
 #' @keywords internal
 normalize_question_type <- function(q_type) {
+  # Handle NA/NULL gracefully
+  if (is.null(q_type) || is.na(q_type) || trimws(as.character(q_type)) == "") {
+    return(NA_character_)
+  }
+
   # Map TurasTabs types to internal tracker types
   type_map <- c(
     "Single_Response" = "single_choice",

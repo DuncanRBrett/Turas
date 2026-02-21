@@ -523,8 +523,19 @@ run_tracker <- function(tracking_config_path,
     )
   }
 
-  if ("tracking_crosstab" %in% report_types) {
-    # Generate tracking crosstab report
+  # Determine if HTML report should be generated (check early — may need crosstab_data)
+  if (!is.null(enable_html)) {
+    generate_html <- isTRUE(enable_html)
+  } else {
+    html_report_setting <- get_setting(config, "html_report", default = "N")
+    generate_html <- toupper(trimws(as.character(html_report_setting))) %in% c("Y", "YES", "TRUE", "1")
+  }
+
+  # Build crosstab data if needed for tracking_crosstab report OR HTML report
+  needs_crosstab_data <- ("tracking_crosstab" %in% report_types) || generate_html
+  crosstab_data <- NULL
+
+  if (needs_crosstab_data) {
     cat("\n  Building tracking crosstab...\n")
 
     crosstab_data <- build_tracking_crosstab(
@@ -533,7 +544,9 @@ run_tracker <- function(tracking_config_path,
       question_map = question_map,
       banner_segments = banner_segments
     )
+  }
 
+  if ("tracking_crosstab" %in% report_types && !is.null(crosstab_data)) {
     # Excel output
     crosstab_path <- if (length(report_types) == 1 && !is.null(output_file_setting) && nzchar(trimws(output_file_setting))) {
       file.path(base_output_dir, trimws(output_file_setting))
@@ -549,24 +562,31 @@ run_tracker <- function(tracking_config_path,
       output_path = crosstab_path,
       run_result = run_result
     )
+  }
 
-    # HTML report (if enabled via parameter override or config setting)
-    if (!is.null(enable_html)) {
-      generate_html <- isTRUE(enable_html)
+  # HTML report — generated independently of report_types when enable_html is TRUE
+  if (generate_html && !is.null(crosstab_data)) {
+    # Derive HTML path from crosstab Excel path (if it exists) or generate standalone
+    if (!is.null(output_files$tracking_crosstab)) {
+      html_path <- sub("\\.xlsx$", ".html", output_files$tracking_crosstab)
     } else {
-      html_report_setting <- get_setting(config, "html_report", default = "N")
-      generate_html <- toupper(trimws(as.character(html_report_setting))) %in% c("Y", "YES", "TRUE", "1")
+      # No crosstab Excel — generate HTML path from project name
+      project_name <- get_setting(config, "project_name", default = "Tracking")
+      project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
+      html_path <- file.path(base_output_dir, paste0(project_name, "_TrackingReport_", format(Sys.Date(), "%Y%m%d"), ".html"))
     }
-    if (generate_html) {
-      html_path <- sub("\\.xlsx$", ".html", crosstab_path)
-      html_result <- generate_tracker_html_report(
-        crosstab_data = crosstab_data,
-        config = config,
-        output_path = html_path
-      )
-      if (html_result$status == "PASS") {
-        output_files$tracking_crosstab_html <- html_result$output_file
-      }
+
+    html_result <- generate_tracker_html_report(
+      crosstab_data = crosstab_data,
+      config = config,
+      output_path = html_path
+    )
+    if (html_result$status == "PASS") {
+      output_files$tracking_html <- html_result$output_file
+    } else {
+      cat("\n  WARNING: HTML report generation failed\n")
+      cat("  Code: ", html_result$code, "\n")
+      cat("  Message: ", html_result$message, "\n")
     }
   }
 

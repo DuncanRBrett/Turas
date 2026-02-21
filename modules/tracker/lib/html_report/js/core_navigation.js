@@ -241,6 +241,172 @@
     return labels[name] || "Other Metrics";
   }
 
+  // ---- Column Sorting for Segment Overview ----
+  var overviewSortState = { col: -1, dir: "desc" };
+
+  window.sortOverviewColumn = function(headerEl) {
+    var table = document.getElementById("tk-crosstab-table");
+    if (!table) return;
+
+    var colIndex = parseInt(headerEl.getAttribute("data-col-index"), 10);
+    if (isNaN(colIndex)) return;
+
+    // Toggle direction
+    var dir = "desc";
+    if (overviewSortState.col === colIndex && overviewSortState.dir === "desc") {
+      dir = "asc";
+    }
+    overviewSortState = { col: colIndex, dir: dir };
+
+    // Update sort indicators
+    table.querySelectorAll(".tk-sortable").forEach(function(th) {
+      th.classList.remove("sort-asc", "sort-desc");
+    });
+    headerEl.classList.add(dir === "asc" ? "sort-asc" : "sort-desc");
+
+    var tbody = table.querySelector("tbody");
+    var rows = Array.from(tbody.querySelectorAll("tr"));
+
+    // Group metric rows with their change rows
+    var groups = [];
+    var baseRow = null;
+    var i = 0;
+    while (i < rows.length) {
+      var row = rows[i];
+      if (row.classList.contains("tk-base-row")) {
+        baseRow = row;
+        i++;
+      } else if (row.classList.contains("tk-section-row")) {
+        i++;  // Skip section rows — they'll be removed during sort
+      } else if (row.classList.contains("tk-metric-row")) {
+        var group = { metric: row, changes: [], sortVal: 0 };
+        var cells = row.querySelectorAll("td");
+        if (colIndex < cells.length) {
+          group.sortVal = parseFloat(cells[colIndex].getAttribute("data-sort-val")) || 0;
+        }
+        i++;
+        while (i < rows.length && rows[i].classList.contains("tk-change-row")) {
+          group.changes.push(rows[i]);
+          i++;
+        }
+        groups.push(group);
+      } else {
+        i++;
+      }
+    }
+
+    // Sort groups
+    groups.sort(function(a, b) {
+      return dir === "desc" ? b.sortVal - a.sortVal : a.sortVal - b.sortVal;
+    });
+
+    // Rebuild tbody (no section rows when sorted by column)
+    while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+    groups.forEach(function(g) {
+      tbody.appendChild(g.metric);
+      g.changes.forEach(function(cr) { tbody.appendChild(cr); });
+    });
+    if (baseRow) tbody.appendChild(baseRow);
+  };
+
+
+  // ---- Metric Type Filter for Segment Overview ----
+  var overviewTypeFilter = "all";
+
+  window.filterOverviewByType = function(typeKey) {
+    overviewTypeFilter = typeKey;
+
+    // Update chip active state
+    document.querySelectorAll(".tk-overview-type-chip").forEach(function(chip) {
+      chip.classList.toggle("active", chip.getAttribute("data-type-filter") === typeKey);
+    });
+
+    applyOverviewFilters();
+  };
+
+
+  // ---- Row Search Filter for Segment Overview ----
+  var overviewSearchQuery = "";
+
+  window.filterOverviewRows = function(query) {
+    overviewSearchQuery = (query || "").toLowerCase();
+    applyOverviewFilters();
+  };
+
+
+  /**
+   * Apply combined type + text filters to Segment Overview table rows.
+   * Hides metric rows (+ associated change rows) that don't match.
+   * Hides section headers if all their child rows are hidden.
+   */
+  function applyOverviewFilters() {
+    var table = document.getElementById("tk-crosstab-table");
+    if (!table) return;
+
+    var rows = table.querySelectorAll("tbody tr.tk-metric-row");
+    rows.forEach(function(row) {
+      var typeAttr = row.getAttribute("data-metric-type") || "other";
+      var label = (row.querySelector(".tk-metric-label") || {}).textContent || "";
+
+      var typeMatch = overviewTypeFilter === "all" || typeAttr === overviewTypeFilter;
+      var textMatch = overviewSearchQuery === "" || label.toLowerCase().indexOf(overviewSearchQuery) >= 0;
+      var visible = typeMatch && textMatch;
+
+      row.classList.toggle("row-filtered", !visible);
+
+      // Also hide/show associated change rows
+      var metricId = row.getAttribute("data-metric-id");
+      if (metricId) {
+        table.querySelectorAll('.tk-change-row[data-metric-id="' + metricId + '"]').forEach(function(cr) {
+          cr.classList.toggle("row-filtered", !visible);
+        });
+      }
+    });
+
+    // Hide section headers with no visible children
+    table.querySelectorAll("tbody tr.tk-section-row").forEach(function(secRow) {
+      var next = secRow.nextElementSibling;
+      var hasVisible = false;
+      while (next && !next.classList.contains("tk-section-row")) {
+        if (next.classList.contains("tk-metric-row") && !next.classList.contains("row-filtered")) {
+          hasVisible = true;
+          break;
+        }
+        next = next.nextElementSibling;
+      }
+      secRow.style.display = hasVisible ? "" : "none";
+    });
+
+    // Also update sidebar items
+    document.querySelectorAll(".tk-sidebar-item").forEach(function(item) {
+      var metricId = item.getAttribute("data-metric-id");
+      var label = item.textContent.toLowerCase();
+      var textMatch = overviewSearchQuery === "" || label.indexOf(overviewSearchQuery) >= 0;
+      item.classList.toggle("hidden", !textMatch);
+    });
+  }
+
+
+  // ---- Collapsible Sections ----
+  window.toggleOverviewSection = function(sectionCell) {
+    var sectionRow = sectionCell.closest("tr");
+    if (!sectionRow) return;
+
+    var isCollapsed = sectionRow.classList.toggle("section-collapsed");
+
+    // Toggle all rows until next section row
+    var next = sectionRow.nextElementSibling;
+    while (next && !next.classList.contains("tk-section-row")) {
+      if (isCollapsed) {
+        next.classList.add("section-hidden");
+      } else {
+        next.classList.remove("section-hidden");
+      }
+      next = next.nextElementSibling;
+    }
+  };
+
+
   // ---- Help Overlay ----
   window.toggleHelpOverlay = function() {
     var overlay = document.getElementById("tk-help-overlay");

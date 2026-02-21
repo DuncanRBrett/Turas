@@ -521,7 +521,15 @@ validate_tracking_config <- function(config, question_mapping) {
 #' @export
 get_setting <- function(config, setting_name, default = NULL) {
   if (setting_name %in% names(config$settings)) {
-    return(config$settings[[setting_name]])
+    val <- config$settings[[setting_name]]
+    # Treat NA or empty string as "not set" — return default
+    if (is.null(val) || (length(val) == 1 && is.na(val))) {
+      return(default)
+    }
+    if (is.character(val) && length(val) == 1 && trimws(val) == "") {
+      return(default)
+    }
+    return(val)
   } else {
     return(default)
   }
@@ -543,5 +551,22 @@ get_baseline_wave <- function(config) {
   if (is.null(baseline) || is.na(baseline) || trimws(as.character(baseline)) == "") {
     return(config$waves$WaveID[1])
   }
-  return(trimws(as.character(baseline)))
+  baseline <- trimws(as.character(baseline))
+
+  # If exact match found, use it
+  if (baseline %in% config$waves$WaveID) {
+    return(baseline)
+  }
+
+  # Try auto-correcting: prepend "W" if not already present
+  if (!grepl("^W", baseline)) {
+    candidate <- paste0("W", baseline)
+    if (candidate %in% config$waves$WaveID) {
+      cat("  NOTE: baseline_wave '", baseline, "' auto-corrected to '", candidate, "'\n", sep = "")
+      return(candidate)
+    }
+  }
+
+  # No match found — return as-is (will be caught by guard/validator)
+  return(baseline)
 }

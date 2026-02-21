@@ -3,34 +3,42 @@
 # ==============================================================================
 # Generates inline SVG line charts and sparklines for tracking metrics.
 # All charts are self-contained SVG — no external dependencies.
-# VERSION: 1.0.0
+# VERSION: 2.0.0
+# ==============================================================================
+# CHANGES in v3.0.0:
+#   - Professional chart redesign: wider (960px), taller (380px)
+#   - Legend moved to horizontal row below chart (no truncation)
+#   - Dashed gridlines for cleaner look
+#   - Value label collision avoidance (vertical offset when overlapping)
+#   - Full plot width utilisation (right margin reduced from 140 to 20px)
+# CHANGES in v2.0.0:
+#   - Fixed percentage scale bug: values are already 0-100, no multiplication
+#   - Config-driven decimal places via decimal_config parameter
+#   - Proper metric-appropriate Y-axis ranges
+#   - Smooth lines: Catmull-Rom → cubic Bézier path conversion
 # ==============================================================================
 
 
 #' Build Line Chart SVG for a Metric
 #'
 #' Creates an SVG line chart showing metric values across waves.
-#' Supports multiple series (one per banner segment).
+#' Supports multiple series (one per banner segment). Uses smooth
+#' Catmull-Rom spline interpolation for line paths.
 #'
 #' @param chart_data List. Chart data from build_chart_data()
 #' @param config List. Tracker configuration
 #' @param active_segment Character. Currently active segment (highlighted)
+#' @param decimal_config List. Decimal places: dp_ratings, dp_pct, dp_nps
 #' @return htmltools::HTML SVG string
 #' @export
-build_line_chart <- function(chart_data, config, active_segment = NULL) {
+build_line_chart <- function(chart_data, config, active_segment = NULL,
+                              decimal_config = list(dp_ratings = 2, dp_pct = 0, dp_nps = 2)) {
 
   if (is.null(chart_data) || length(chart_data$series) == 0) return(NULL)
 
-  # Chart dimensions
-  width <- 700
-  height <- 320
-  margin <- list(top = 30, right = 140, bottom = 50, left = 60)
-  plot_w <- width - margin$left - margin$right
-  plot_h <- height - margin$top - margin$bottom
-
+  n_series <- length(chart_data$series)
   wave_labels <- chart_data$wave_labels
   n_waves <- length(wave_labels)
-
   if (n_waves < 2) return(NULL)
 
   # Collect all values across series for Y-axis scaling
@@ -38,35 +46,53 @@ build_line_chart <- function(chart_data, config, active_segment = NULL) {
   for (s in chart_data$series) {
     all_vals <- c(all_vals, s$values[!is.na(s$values)])
   }
-
   if (length(all_vals) == 0) return(NULL)
 
-  # Y-axis range with padding
-  y_min <- min(all_vals, na.rm = TRUE)
-  y_max <- max(all_vals, na.rm = TRUE)
-  y_range <- y_max - y_min
-  if (y_range == 0) y_range <- 1
+  # ---- Chart dimensions: wide, with bottom legend ----
+  width <- 960
+  # Legend row height depends on number of series (one horizontal row, wrapped if many)
+  legend_row_h <- 30
+  height <- 380 + legend_row_h
+  margin <- list(top = 30, right = 20, bottom = 80, left = 60)
+  plot_w <- width - margin$left - margin$right  # 880px
+  plot_h <- height - margin$top - margin$bottom - legend_row_h  # 240px
 
-  y_pad <- y_range * 0.15
-  y_axis_min <- y_min - y_pad
-  y_axis_max <- y_max + y_pad
+  # ---- Y-axis range: metric-appropriate fixed ranges ----
+  y_min_data <- min(all_vals, na.rm = TRUE)
+  y_max_data <- max(all_vals, na.rm = TRUE)
 
-  # Special handling for percentage (0-100 scale)
+  dp_pct <- decimal_config$dp_pct %||% 0
+  dp_ratings <- decimal_config$dp_ratings %||% 2
+  dp_nps <- decimal_config$dp_nps %||% 2
+
   if (chart_data$is_percentage) {
-    y_axis_min <- max(0, y_axis_min)
-    y_axis_max <- min(1, y_axis_max)
-    # Scale display to 0-100
-    scale_fn <- function(v) (v - y_axis_min) / (y_axis_max - y_axis_min) * plot_h
-    format_fn <- function(v) paste0(round(v * 100), "%")
+    y_axis_min <- 0
+    y_axis_max <- 100
+    format_fn <- function(v) paste0(format(round(v, dp_pct), nsmall = dp_pct), "%")
   } else if (chart_data$is_nps) {
-    y_axis_min <- max(-100, y_axis_min)
-    y_axis_max <- min(100, y_axis_max)
-    scale_fn <- function(v) (v - y_axis_min) / (y_axis_max - y_axis_min) * plot_h
-    format_fn <- function(v) sprintf("%+d", round(v))
+    y_axis_min <- -100
+    y_axis_max <- 100
+    format_fn <- function(v) sprintf("%+.*f", dp_nps, v)
   } else {
-    scale_fn <- function(v) (v - y_axis_min) / (y_axis_max - y_axis_min) * plot_h
-    format_fn <- function(v) format(round(v, 1), nsmall = 1)
+    if (y_max_data <= 5.5) {
+      y_axis_min <- 0
+      y_axis_max <- 5
+    } else if (y_max_data <= 10.5) {
+      y_axis_min <- 0
+      y_axis_max <- 10
+    } else {
+      y_range <- y_max_data - y_min_data
+      if (y_range == 0) y_range <- 1
+      y_pad <- y_range * 0.15
+      y_axis_min <- max(0, y_min_data - y_pad)
+      y_axis_max <- y_max_data + y_pad
+    }
+    format_fn <- function(v) format(round(v, dp_ratings), nsmall = dp_ratings)
   }
+
+  y_axis_range <- y_axis_max - y_axis_min
+  if (y_axis_range == 0) y_axis_range <- 1
+  scale_fn <- function(v) (v - y_axis_min) / y_axis_range * plot_h
 
   # Colour palette for segments
   brand_colour <- get_setting(config, "brand_colour", default = "#323367") %||% "#323367"
@@ -81,7 +107,7 @@ build_line_chart <- function(chart_data, config, active_segment = NULL) {
 
   # Background
   svg_parts <- c(svg_parts, sprintf(
-    '<rect width="%d" height="%d" fill="#ffffff" rx="4"/>',
+    '<rect width="%d" height="%d" fill="#ffffff" rx="6"/>',
     width, height
   ))
 
@@ -91,34 +117,41 @@ build_line_chart <- function(chart_data, config, active_segment = NULL) {
     margin$left, margin$top
   ))
 
-  # Gridlines and Y-axis labels
+  # Dashed gridlines and Y-axis labels
   n_gridlines <- 5
   grid_vals <- seq(y_axis_min, y_axis_max, length.out = n_gridlines)
   for (gv in grid_vals) {
     gy <- plot_h - scale_fn(gv)
     svg_parts <- c(svg_parts, sprintf(
-      '<line x1="0" y1="%.1f" x2="%d" y2="%.1f" stroke="#e8e8e8" stroke-width="1"/>',
+      '<line x1="0" y1="%.1f" x2="%d" y2="%.1f" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="4,4"/>',
       gy, plot_w, gy
     ))
     svg_parts <- c(svg_parts, sprintf(
-      '<text x="-8" y="%.1f" text-anchor="end" fill="#888" font-size="11" dy="0.35em">%s</text>',
+      '<text x="-10" y="%.1f" text-anchor="end" fill="#666" font-size="12" font-weight="500" dy="0.35em">%s</text>',
       gy, htmltools::htmlEscape(format_fn(gv))
     ))
   }
 
-  # X-axis labels
+  # X-axis labels — data-wave for JS filtering
   for (i in seq_len(n_waves)) {
     x_pos <- (i - 1) / (n_waves - 1) * plot_w
     svg_parts <- c(svg_parts, sprintf(
-      '<text x="%.1f" y="%d" text-anchor="middle" fill="#888" font-size="11">%s</text>',
-      x_pos, plot_h + 20, htmltools::htmlEscape(wave_labels[i])
+      '<text x="%.1f" y="%d" text-anchor="middle" fill="#666" font-size="13" font-weight="600" class="tk-chart-xaxis" data-wave="%s">%s</text>',
+      x_pos, plot_h + 24, htmltools::htmlEscape(chart_data$wave_ids[i]),
+      htmltools::htmlEscape(wave_labels[i])
     ))
     # Tick mark
     svg_parts <- c(svg_parts, sprintf(
-      '<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="#ccc" stroke-width="1"/>',
-      x_pos, plot_h, x_pos, plot_h + 4
+      '<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="#ccc" stroke-width="1" class="tk-chart-tick" data-wave="%s"/>',
+      x_pos, plot_h, x_pos, plot_h + 5,
+      htmltools::htmlEscape(chart_data$wave_ids[i])
     ))
   }
+
+  # ---- Collect all value labels for collision avoidance ----
+  # Structure: list of lists grouped by wave index, each containing (x, y, text, colour, seg_name, wave_id)
+  all_label_data <- vector("list", n_waves)
+  for (i in seq_len(n_waves)) all_label_data[[i]] <- list()
 
   # Plot lines and points for each series
   for (s_idx in seq_along(chart_data$series)) {
@@ -126,10 +159,8 @@ build_line_chart <- function(chart_data, config, active_segment = NULL) {
     colour <- segment_colours[s_idx]
     seg_name <- series$name
 
-    # Build path
-    path_points <- c()
+    xy_points <- list()
     point_circles <- c()
-    value_labels <- c()
 
     for (i in seq_len(n_waves)) {
       val <- series$values[i]
@@ -138,63 +169,180 @@ build_line_chart <- function(chart_data, config, active_segment = NULL) {
       x_pos <- (i - 1) / (n_waves - 1) * plot_w
       y_pos <- plot_h - scale_fn(val)
 
-      path_points <- c(path_points, sprintf("%.1f,%.1f", x_pos, y_pos))
+      xy_points[[length(xy_points) + 1]] <- c(x_pos, y_pos)
 
       # Data point circle
       point_circles <- c(point_circles, sprintf(
-        '<circle cx="%.1f" cy="%.1f" r="4" fill="%s" stroke="#fff" stroke-width="2" class="tk-chart-point" data-segment="%s" data-wave="%s" data-value="%s"/>',
+        '<circle cx="%.1f" cy="%.1f" r="5" fill="%s" stroke="#fff" stroke-width="2.5" class="tk-chart-point" data-segment="%s" data-wave="%s" data-value="%s"/>',
         x_pos, y_pos, colour,
         htmltools::htmlEscape(seg_name),
         htmltools::htmlEscape(chart_data$wave_ids[i]),
         htmltools::htmlEscape(format_fn(val))
       ))
 
-      # Value label above point
-      value_labels <- c(value_labels, sprintf(
-        '<text x="%.1f" y="%.1f" text-anchor="middle" fill="%s" font-size="10" font-weight="600">%s</text>',
-        x_pos, y_pos - 10, colour, htmltools::htmlEscape(format_fn(val))
-      ))
+      # Store label data for collision avoidance
+      all_label_data[[i]][[length(all_label_data[[i]]) + 1]] <- list(
+        x = x_pos, y = y_pos - 14, text = format_fn(val),
+        colour = colour, seg_name = seg_name,
+        wave_id = chart_data$wave_ids[i]
+      )
     }
 
-    # Draw line
-    if (length(path_points) >= 2) {
+    # Draw smooth path
+    if (length(xy_points) >= 2) {
       line_opacity <- if (!is.null(active_segment) && seg_name != active_segment) "0.3" else "1"
+      path_d <- build_smooth_path(xy_points)
+
       svg_parts <- c(svg_parts, sprintf(
-        '<polyline points="%s" fill="none" stroke="%s" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" opacity="%s" class="tk-chart-line" data-segment="%s"/>',
-        paste(path_points, collapse = " "), colour, line_opacity,
+        '<path d="%s" fill="none" stroke="%s" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" opacity="%s" class="tk-chart-line" data-segment="%s"/>',
+        path_d, colour, line_opacity,
         htmltools::htmlEscape(seg_name)
       ))
     }
 
-    # Draw points and labels
+    # Draw points on top of lines
     svg_parts <- c(svg_parts, paste(point_circles, collapse = "\n"))
-    svg_parts <- c(svg_parts, paste(value_labels, collapse = "\n"))
+  }
+
+  # ---- Resolve label collisions and draw value labels ----
+  min_label_gap <- 14  # minimum vertical gap between labels in pixels
+  for (wave_labels_at_x in all_label_data) {
+    if (length(wave_labels_at_x) == 0) next
+
+    # Sort by y position (ascending = top of SVG first)
+    y_vals <- vapply(wave_labels_at_x, function(lb) lb$y, numeric(1))
+    sorted_idx <- order(y_vals)
+    sorted_labels <- wave_labels_at_x[sorted_idx]
+
+    # Push overlapping labels apart
+    for (j in seq_along(sorted_labels)) {
+      if (j > 1) {
+        prev_y <- sorted_labels[[j - 1]]$y
+        if (sorted_labels[[j]]$y - prev_y < min_label_gap) {
+          sorted_labels[[j]]$y <- prev_y + min_label_gap
+        }
+      }
+    }
+
+    # Emit labels
+    for (lb in sorted_labels) {
+      svg_parts <- c(svg_parts, sprintf(
+        '<text x="%.1f" y="%.1f" text-anchor="middle" fill="%s" font-size="12" font-weight="700" class="tk-chart-label" data-segment="%s" data-wave="%s">%s</text>',
+        lb$x, lb$y, lb$colour,
+        htmltools::htmlEscape(lb$seg_name),
+        htmltools::htmlEscape(lb$wave_id),
+        htmltools::htmlEscape(lb$text)
+      ))
+    }
   }
 
   svg_parts <- c(svg_parts, '</g>')  # Close plot area group
 
-  # Legend (right side)
-  legend_x <- width - margin$right + 15
-  legend_y <- margin$top + 10
-
+  # ---- Legend: horizontal row below chart ----
+  legend_y <- height - legend_row_h + 8
+  # Calculate legend item widths: swatch(16) + gap(6) + text + spacing(24)
+  # Estimate text width: ~7px per character at font-size 12
+  legend_items <- list()
+  total_legend_w <- 0
   for (s_idx in seq_along(chart_data$series)) {
-    series <- chart_data$series[[s_idx]]
-    colour <- segment_colours[s_idx]
-    ly <- legend_y + (s_idx - 1) * 22
+    seg_label <- chart_data$series[[s_idx]]$name
+    item_w <- 16 + 6 + nchar(seg_label) * 7 + 24
+    legend_items[[s_idx]] <- list(
+      name = seg_label,
+      colour = segment_colours[s_idx],
+      w = item_w
+    )
+    total_legend_w <- total_legend_w + item_w
+  }
 
+  # Center the legend row
+  legend_start_x <- max(margin$left, (width - total_legend_w) / 2)
+  lx <- legend_start_x
+
+  for (item in legend_items) {
     svg_parts <- c(svg_parts, sprintf(
-      '<rect x="%d" y="%.1f" width="14" height="3" rx="1.5" fill="%s"/>',
-      legend_x, ly + 5, colour
+      '<g class="tk-chart-legend-item" data-segment="%s">',
+      htmltools::htmlEscape(item$name)
     ))
     svg_parts <- c(svg_parts, sprintf(
-      '<text x="%d" y="%.1f" fill="#444" font-size="11" dy="0.35em">%s</text>',
-      legend_x + 20, ly + 6, htmltools::htmlEscape(series$name)
+      '<rect x="%.1f" y="%.1f" width="16" height="4" rx="2" fill="%s"/>',
+      lx, legend_y + 4, item$colour
     ))
+    svg_parts <- c(svg_parts, sprintf(
+      '<text x="%.1f" y="%.1f" fill="#555" font-size="12" font-weight="600" dy="0.35em">%s</text>',
+      lx + 22, legend_y + 5, htmltools::htmlEscape(item$name)
+    ))
+    svg_parts <- c(svg_parts, '</g>')
+    lx <- lx + item$w
   }
 
   svg_parts <- c(svg_parts, '</svg>')
 
   htmltools::HTML(paste(svg_parts, collapse = "\n"))
+}
+
+
+#' Build Smooth SVG Path from Points (Catmull-Rom → Cubic Bézier)
+#'
+#' Converts a sequence of (x, y) points into a smooth SVG path string
+#' using Catmull-Rom spline interpolation converted to cubic Bézier curves.
+#' For 2 points, draws a straight line. For 3+ points, applies smoothing.
+#'
+#' @param points List of numeric vectors c(x, y)
+#' @param tension Numeric. Catmull-Rom tension (0 = sharp, 1 = very smooth). Default 0.5
+#' @return Character. SVG path d-attribute string
+#' @keywords internal
+build_smooth_path <- function(points, tension = 0.5) {
+
+  n <- length(points)
+  if (n < 2) return("")
+
+  # Start path at first point
+  d <- sprintf("M%.1f,%.1f", points[[1]][1], points[[1]][2])
+
+  # For exactly 2 points, straight line
+
+  if (n == 2) {
+    d <- paste0(d, sprintf(" L%.1f,%.1f", points[[2]][1], points[[2]][2]))
+    return(d)
+  }
+
+  # Catmull-Rom to cubic Bézier conversion
+  # For each segment between points[i] and points[i+1], we need:
+  #   p0 = points[i-1] (or reflected for first segment)
+  #   p1 = points[i]
+  #   p2 = points[i+1]
+  #   p3 = points[i+2] (or reflected for last segment)
+  alpha <- tension / 3
+
+  for (i in seq_len(n - 1)) {
+    p1 <- points[[i]]
+    p2 <- points[[i + 1]]
+
+    # Get surrounding points (with reflection for edges)
+    if (i == 1) {
+      p0 <- c(2 * p1[1] - p2[1], 2 * p1[2] - p2[2])  # reflect p2 through p1
+    } else {
+      p0 <- points[[i - 1]]
+    }
+
+    if (i == n - 1) {
+      p3 <- c(2 * p2[1] - p1[1], 2 * p2[2] - p1[2])  # reflect p1 through p2
+    } else {
+      p3 <- points[[i + 2]]
+    }
+
+    # Control points for cubic Bézier
+    cp1x <- p1[1] + alpha * (p2[1] - p0[1])
+    cp1y <- p1[2] + alpha * (p2[2] - p0[2])
+    cp2x <- p2[1] - alpha * (p3[1] - p1[1])
+    cp2y <- p2[2] - alpha * (p3[2] - p1[2])
+
+    d <- paste0(d, sprintf(" C%.1f,%.1f %.1f,%.1f %.1f,%.1f",
+                            cp1x, cp1y, cp2x, cp2y, p2[1], p2[2]))
+  }
+
+  d
 }
 
 

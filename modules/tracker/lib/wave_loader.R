@@ -149,6 +149,21 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL, par
                    if (length(categorical_cols) > 10) " ..." else "", "\n"))
   }
 
+  # Build per-wave set of mapped column names from question_mapping
+  # Only these columns (plus categorical_cols) will be cleaned/converted
+  # Unmapped columns are left untouched — no reason to process them
+  mapped_cols_per_wave <- list()
+  if (!is.null(question_mapping)) {
+    wave_ids_cfg <- config$waves$WaveID
+    for (wid in wave_ids_cfg) {
+      if (wid %in% names(question_mapping)) {
+        wave_col_names <- question_mapping[[wid]]
+        valid <- wave_col_names[!is.na(wave_col_names) & trimws(as.character(wave_col_names)) != ""]
+        mapped_cols_per_wave[[wid]] <- unique(trimws(as.character(valid)))
+      }
+    }
+  }
+
   n_waves <- nrow(config$waves)
 
   # Detect optional StructureFile / ConfigFile columns
@@ -209,7 +224,8 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL, par
       file_path <- resolve_data_file_path(info$data_file, data_dir)
 
       # Load wave data
-      wave_df <- load_wave_data(file_path, info$wave_id, categorical_cols)
+      wave_mapped <- mapped_cols_per_wave[[info$wave_id]]
+      wave_df <- load_wave_data(file_path, info$wave_id, categorical_cols, wave_mapped)
 
       # Load structure if available
       structure <- NULL
@@ -271,8 +287,9 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL, par
       # Resolve file path
       file_path <- resolve_data_file_path(data_file, data_dir)
 
-      # Load wave data (passing categorical question codes to preserve)
-      wave_df <- load_wave_data(file_path, wave_id, categorical_cols)
+      # Load wave data (passing categorical + mapped column codes)
+      wave_mapped <- mapped_cols_per_wave[[wave_id]]
+      wave_df <- load_wave_data(file_path, wave_id, categorical_cols, wave_mapped)
 
       # --- Load survey structure if StructureFile provided ---
       structure <- NULL
@@ -335,16 +352,21 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL, par
 #' - DK/Don't Know/Prefer not to say -> NA
 #' - Other non-response codes -> NA
 #'
+#' Only columns that are mapped in the question mapping are processed.
+#' Unmapped columns (e.g., open-ended follow-ups like Q01_2) are left untouched.
 #' Categorical questions (Single_Response, Multi_Mention) are preserved as text.
 #' Numeric questions (Rating, Likert, NPS) are converted to numeric.
 #'
 #' @param wave_df Data frame. Wave data
 #' @param wave_id Character. Wave identifier for messages
 #' @param categorical_cols Character vector. Question codes to preserve as categorical/text (optional)
+#' @param mapped_cols Character vector. Column names that are mapped in question_mapping for this wave.
+#'   When provided, only these columns are cleaned. Unmapped columns are skipped entirely.
 #' @return Cleaned data frame
 #'
 #' @keywords internal
-clean_wave_data <- function(wave_df, wave_id, categorical_cols = character(0)) {
+clean_wave_data <- function(wave_df, wave_id, categorical_cols = character(0),
+                            mapped_cols = NULL) {
 
   n_cleaned <- 0
 
@@ -352,7 +374,25 @@ clean_wave_data <- function(wave_df, wave_id, categorical_cols = character(0)) {
   non_response_codes <- c("DK", "Don't Know", "Don't know", "NS", "NR",
                           "Prefer not to say", "Refused", "N/A", "NA")
 
+  # Build the full set of columns to process: mapped columns + categorical columns
+  # If mapped_cols is provided, ONLY process those columns (plus categorical)
+  # This prevents touching unmapped columns like open-ended follow-ups (Q01_2, etc.)
+  cols_to_process <- if (!is.null(mapped_cols)) {
+    unique(c(mapped_cols, categorical_cols))
+  } else {
+    NULL  # NULL = process all columns (legacy behaviour)
+  }
+
   for (col_name in names(wave_df)) {
+
+    # If we know the mapped columns, skip anything not in the set
+    if (!is.null(cols_to_process)) {
+      base_code <- sub("_[0-9]+$", "", col_name)
+      if (!(col_name %in% cols_to_process) && !(base_code %in% cols_to_process)) {
+        next
+      }
+    }
+
     col_data <- wave_df[[col_name]]
 
     # Skip if already numeric
@@ -403,21 +443,23 @@ clean_wave_data <- function(wave_df, wave_id, categorical_cols = character(0)) {
         # Try converting to numeric
         col_numeric <- suppressWarnings(as.numeric(col_data))
 
-        # If conversion created NAs where there weren't any, report it
+        # Count how many non-NA values survived numeric conversion
+        n_original_non_na <- sum(!is.na(original_col))
+        n_numeric_non_na <- sum(!is.na(col_numeric))
         new_nas <- sum(is.na(col_numeric)) - sum(is.na(original_col))
-        if (new_nas > 0) {
-          n_cleaned <- n_cleaned + 1
-          if (is_question_col && new_nas == length(original_col[!is.na(original_col)])) {
-            # All non-NA values were converted to NA - this is a problem
-            cat(paste0("    WARNING: ", col_name, ": All ", new_nas, " values are non-numeric (converted to NA). Check data source.\n"))
-          } else {
-            cat(paste0("    ", col_name, ": Converted ", new_nas, " non-numeric values to NA\n"))
-          }
-        }
 
-        # For question columns, use the numeric version even if all values are NA
-        # This ensures consistent data types for question responses
-        if (is_question_col || sum(!is.na(col_numeric)) > 0) {
+        if (n_original_non_na > 0 && n_numeric_non_na == 0) {
+          # ALL non-NA values were non-numeric: this is a text column (e.g., open-ended)
+          # Preserve as-is — do NOT convert to NA
+          cat(paste0("    ", col_name, ": Text column (", n_original_non_na,
+                     " non-numeric values) — preserved as text\n"))
+          # Don't modify wave_df[[col_name]]
+        } else if (new_nas > 0) {
+          n_cleaned <- n_cleaned + 1
+          cat(paste0("    ", col_name, ": Converted ", new_nas, " non-numeric values to NA\n"))
+          wave_df[[col_name]] <- col_numeric
+        } else {
+          # Clean numeric conversion (no new NAs)
           wave_df[[col_name]] <- col_numeric
         }
       }
@@ -439,10 +481,14 @@ clean_wave_data <- function(wave_df, wave_id, categorical_cols = character(0)) {
 #' @param file_path Character. Full path to data file
 #' @param wave_id Character. Wave identifier for error messages
 #' @param categorical_cols Character vector. Question codes to preserve as categorical/text (optional)
+#' @param mapped_cols Character vector. Column names mapped in question_mapping for this wave (optional).
+#'   When provided, only these columns (plus categorical_cols) are cleaned/converted.
+#'   Unmapped columns are left untouched.
 #' @return Data frame containing wave data
 #'
 #' @keywords internal
-load_wave_data <- function(file_path, wave_id, categorical_cols = character(0)) {
+load_wave_data <- function(file_path, wave_id, categorical_cols = character(0),
+                           mapped_cols = NULL) {
 
   if (!file.exists(file_path)) {
     # TRS Refusal: IO_WAVE_DATA_NOT_FOUND
@@ -529,8 +575,8 @@ load_wave_data <- function(file_path, wave_id, categorical_cols = character(0)) 
   }
 
   # Clean data (handle comma decimals, DK values, etc.)
-  # Categorical questions are preserved as text (not converted to numeric)
-  wave_df <- clean_wave_data(wave_df, wave_id, categorical_cols)
+  # Only mapped columns are processed — unmapped columns are left untouched
+  wave_df <- clean_wave_data(wave_df, wave_id, categorical_cols, mapped_cols)
 
   return(wave_df)
 }

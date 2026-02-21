@@ -53,18 +53,21 @@ build_tracking_table <- function(html_data, config) {
   }
   parts <- c(parts, '</tr>')
 
-  # Row 2: Wave headers (repeated per segment)
+  # Row 2: Wave headers (repeated per segment, clickable for column sorting)
   parts <- c(parts, '<tr class="tk-wave-header-row">')
+  col_idx <- 1  # 0 is the label column
   for (seg_idx in seq_along(segments)) {
     seg_name <- segments[seg_idx]
     for (w_idx in seq_along(waves)) {
       parts <- c(parts, sprintf(
-        '<th class="tk-th tk-wave-header bg-%s" data-segment="%s" data-wave="%s">%s</th>',
+        '<th class="tk-th tk-wave-header tk-sortable bg-%s" data-segment="%s" data-wave="%s" data-col-index="%d" onclick="sortOverviewColumn(this)" title="Click to sort">%s</th>',
         make_css_safe(seg_name),
         htmltools::htmlEscape(seg_name),
         htmltools::htmlEscape(waves[w_idx]),
+        col_idx,
         htmltools::htmlEscape(wave_labels[w_idx])
       ))
+      col_idx <- col_idx + 1
     }
   }
   parts <- c(parts, '</tr>')
@@ -82,20 +85,22 @@ build_tracking_table <- function(html_data, config) {
 
     section <- if (is.na(mr$section) || mr$section == "") "(Ungrouped)" else mr$section
 
-    # Section divider
+    # Section divider (clickable to collapse/expand)
     if (section != current_section) {
       current_section <- section
       parts <- c(parts, sprintf(
-        '<tr class="tk-section-row"><td colspan="%d" class="tk-section-cell">%s</td></tr>',
+        '<tr class="tk-section-row"><td colspan="%d" class="tk-section-cell" onclick="toggleOverviewSection(this)"><span class="section-chevron">&#x25BC;</span> %s</td></tr>',
         total_cols, htmltools::htmlEscape(section)
       ))
     }
 
     # ---- Metric value row ----
+    m_type <- classify_metric_type(mr$metric_name)
     parts <- c(parts, sprintf(
-      '<tr class="tk-metric-row" data-metric-id="%s" data-q-code="%s" data-chart=\'%s\'>',
+      '<tr class="tk-metric-row" data-metric-id="%s" data-q-code="%s" data-metric-type="%s" data-chart=\'%s\'>',
       mr$metric_id,
       htmltools::htmlEscape(mr$question_code),
+      m_type,
       chart_json
     ))
 
@@ -132,9 +137,12 @@ build_tracking_table <- function(html_data, config) {
 
         # Sort value for column sorting
         sort_val <- if (!is.na(cell$value)) cell$value else ""
+        is_latest <- (wid == waves[n_waves])
+        latest_class <- if (is_latest) " tk-latest-wave" else ""
 
         parts <- c(parts, sprintf(
-          '<td class="tk-td tk-value-cell bg-%s" data-segment="%s" data-wave="%s" data-sort-val="%s" data-n="%s">%s</td>',
+          '<td class="tk-td tk-value-cell%s bg-%s" data-segment="%s" data-wave="%s" data-sort-val="%s" data-n="%s">%s</td>',
+          latest_class,
           make_css_safe(seg_name),
           htmltools::htmlEscape(seg_name),
           htmltools::htmlEscape(wid),

@@ -3,7 +3,7 @@
 # ==============================================================================
 # Entry point for HTML report generation.
 # Pipeline: Guard -> Transform -> Build Tables + Charts -> Assemble -> Write
-# VERSION: 1.0.0
+# VERSION: 2.0.0
 # ==============================================================================
 
 
@@ -58,10 +58,12 @@ generate_tracker_html_report <- function(crosstab_data, config, output_path) {
     }
   )
 
-  # Build line charts for each metric
+  # Build line charts for each metric (pass decimal_config for formatting)
+  decimal_cfg <- html_data$decimal_config %||% list(dp_ratings = 2, dp_pct = 0, dp_nps = 2)
   charts <- lapply(seq_along(html_data$chart_data), function(i) {
     tryCatch(
-      build_line_chart(html_data$chart_data[[i]], config),
+      build_line_chart(html_data$chart_data[[i]], config,
+                        decimal_config = decimal_cfg),
       error = function(e) {
         cat(sprintf("    [WARN] Chart build failed for metric %d: %s\n", i, e$message))
         NULL
