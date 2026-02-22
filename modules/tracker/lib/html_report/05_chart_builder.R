@@ -224,6 +224,25 @@ build_line_chart <- function(chart_data, config, active_segment = NULL,
       }
     }
 
+    # Clamp labels within plot area bounds
+    n_labels <- length(sorted_labels)
+    if (n_labels > 0) {
+      last_y <- sorted_labels[[n_labels]]$y
+      if (last_y > plot_h - 4) {
+        # Labels exceed bottom — redistribute evenly within available range
+        total_needed <- (n_labels - 1) * min_label_gap
+        first_y <- sorted_labels[[1]]$y
+        start_y <- max(4, min(first_y, plot_h - 4 - total_needed))
+        for (j in seq_along(sorted_labels)) {
+          sorted_labels[[j]]$y <- start_y + (j - 1) * min_label_gap
+        }
+      }
+      # Final clamp for each label
+      for (j in seq_along(sorted_labels)) {
+        sorted_labels[[j]]$y <- max(4, min(sorted_labels[[j]]$y, plot_h - 4))
+      }
+    }
+
     # Emit labels
     for (lb in sorted_labels) {
       svg_parts <- c(svg_parts, sprintf(

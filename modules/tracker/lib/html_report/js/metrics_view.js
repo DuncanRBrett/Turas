@@ -13,6 +13,7 @@
 var activeSegments = {};   // { segmentName: true/false }
 var activeWaves = {};      // { waveId: true/false }
 var chipStateInitialised = false;
+var selectedSegment = null; // Segment whose chart labels are shown (only one at a time)
 
 /**
  * Initialise chip state from the first metric panel's default chips.
@@ -26,7 +27,14 @@ function initChipState() {
   if (firstPanel) {
     firstPanel.querySelectorAll(".tk-segment-chip").forEach(function(chip) {
       var seg = chip.getAttribute("data-segment");
-      if (seg) activeSegments[seg] = chip.classList.contains("active");
+      if (seg) {
+        var isActive = chip.classList.contains("active");
+        activeSegments[seg] = isActive;
+        // Set first active segment as selected
+        if (isActive && selectedSegment === null) {
+          selectedSegment = seg;
+        }
+      }
     });
     firstPanel.querySelectorAll(".tk-wave-chip").forEach(function(chip) {
       var wid = chip.getAttribute("data-wave");
@@ -49,7 +57,9 @@ function applyChipState(panel) {
     var seg = chip.getAttribute("data-segment");
     if (seg && seg in activeSegments) {
       var isActive = activeSegments[seg];
+      var isSelected = (seg === selectedSegment);
       chip.classList.toggle("active", isActive);
+      chip.classList.toggle("selected", isActive && isSelected);
 
       // Table rows
       panel.querySelectorAll("tr[data-segment=\"" + seg + "\"]").forEach(function(el) {
@@ -59,9 +69,20 @@ function applyChipState(panel) {
         el.classList.toggle("segment-hidden", !isActive);
       });
 
-      // Chart elements
-      panel.querySelectorAll(".mv-chart-area [data-segment=\"" + seg + "\"]").forEach(function(el) {
+      // Chart elements: lines, points, legend — visible when segment is ACTIVE
+      panel.querySelectorAll(".mv-chart-area path[data-segment=\"" + seg + "\"]").forEach(function(el) {
         el.style.display = isActive ? "" : "none";
+      });
+      panel.querySelectorAll(".mv-chart-area circle[data-segment=\"" + seg + "\"]").forEach(function(el) {
+        el.style.display = isActive ? "" : "none";
+      });
+      panel.querySelectorAll(".mv-chart-area .tk-chart-legend-item[data-segment=\"" + seg + "\"]").forEach(function(el) {
+        el.style.display = isActive ? "" : "none";
+      });
+
+      // Chart LABELS — visible only when segment is ACTIVE AND SELECTED
+      panel.querySelectorAll(".mv-chart-area .tk-chart-label[data-segment=\"" + seg + "\"]").forEach(function(el) {
+        el.style.display = (isActive && isSelected) ? "" : "none";
       });
     }
   });
@@ -92,9 +113,13 @@ function applyChipState(panel) {
         el.classList.toggle("wave-hidden", !isActive);
       });
 
-      // Chart elements
-      panel.querySelectorAll(".mv-chart-area [data-wave=\"" + wid + "\"]").forEach(function(el) {
-        el.style.display = isActive ? "" : "none";
+      // Chart elements (points and labels for this wave)
+      panel.querySelectorAll(".mv-chart-area circle[data-wave=\"" + wid + "\"]").forEach(function(el) {
+        // Only hide if wave is hidden; segment visibility is handled above
+        if (!isActive) el.style.display = "none";
+      });
+      panel.querySelectorAll(".mv-chart-area .tk-chart-label[data-wave=\"" + wid + "\"]").forEach(function(el) {
+        if (!isActive) el.style.display = "none";
       });
     }
   });
@@ -162,12 +187,25 @@ function toggleSegmentGroupExpand(metricId, groupName, headerBtn) {
     for (var i = 0; i < groupSegs.length; i++) {
       activeSegments[groupSegs[i]] = false;
     }
+    // If selected segment was in this group, find next active
+    var found = false;
+    for (var j = 0; j < groupSegs.length; j++) {
+      if (groupSegs[j] === selectedSegment) { found = true; break; }
+    }
+    if (found) {
+      selectedSegment = null;
+      for (var key in activeSegments) {
+        if (activeSegments[key]) { selectedSegment = key; break; }
+      }
+    }
   } else {
     // Expand: show chips and activate all segments
     groupDiv.classList.add("expanded");
     for (var i = 0; i < groupSegs.length; i++) {
       activeSegments[groupSegs[i]] = true;
     }
+    // Set first segment of group as selected
+    selectedSegment = groupSegs[0];
   }
 
   // Apply to all panels so state persists across metric switches
@@ -221,42 +259,19 @@ function toggleSegmentChip(metricId, segmentName, chip) {
   // Store in global state
   activeSegments[segmentName] = isActive;
 
-  var panel = document.getElementById("mv-" + metricId);
-  if (!panel) return;
-
-  // Show/hide table rows for this segment
-  panel.querySelectorAll("tr[data-segment=\"" + segmentName + "\"]").forEach(function(el) {
-    el.classList.toggle("segment-hidden", !isActive);
-  });
-  // Also handle td cells with data-segment (for segment overview table compatibility)
-  panel.querySelectorAll("td[data-segment=\"" + segmentName + "\"], th[data-segment=\"" + segmentName + "\"]").forEach(function(el) {
-    el.classList.toggle("segment-hidden", !isActive);
-  });
-
-  // Show/hide chart elements for this segment (lines, points, labels)
-  panel.querySelectorAll(".mv-chart-area [data-segment=\"" + segmentName + "\"]").forEach(function(el) {
-    el.style.display = isActive ? "" : "none";
-  });
-
-  // Update group header active state and expand/collapse
-  var groupAttr = chip.getAttribute("data-group");
-  if (groupAttr && typeof SEGMENT_GROUPS !== "undefined" && SEGMENT_GROUPS.groups && SEGMENT_GROUPS.groups[groupAttr]) {
-    var gSegs = SEGMENT_GROUPS.groups[groupAttr];
-    var anyGroupActive = false;
-    for (var gi = 0; gi < gSegs.length; gi++) {
-      if (activeSegments[gSegs[gi]]) { anyGroupActive = true; break; }
+  // If activating a segment, make it the selected segment (for chart labels)
+  if (isActive) {
+    selectedSegment = segmentName;
+  } else if (segmentName === selectedSegment) {
+    // If deactivating the selected segment, find next active segment
+    selectedSegment = null;
+    for (var key in activeSegments) {
+      if (activeSegments[key]) { selectedSegment = key; break; }
     }
-    panel.querySelectorAll('.mv-segment-group-header[data-group="' + groupAttr + '"]').forEach(function(h) {
-      h.classList.toggle("active", anyGroupActive);
-    });
-    // Collapse group if no segments are active
-    panel.querySelectorAll('.mv-segment-group[data-group="' + groupAttr + '"]').forEach(function(gDiv) {
-      if (!anyGroupActive) gDiv.classList.remove("expanded");
-    });
   }
 
-  // Rebuild chart paths since segment visibility changed
-  rebuildChartLines(panel);
+  // Apply state to ALL panels (so chip visual state persists across metric switches)
+  applyChipStateAllPanels();
 }
 
 /**

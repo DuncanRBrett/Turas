@@ -703,8 +703,8 @@ test_that("HTML report with multiple segments", {
 
   content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
   expect_true(grepl("Cape Town", content))
-  expect_true(grepl("tk-segment-tab", content))
-  expect_true(grepl("All Segments", content))
+  expect_true(grepl("tk-segment-select", content))  # Dropdown replaces tab bar
+  expect_true(grepl("segment-selector", content))    # Segment selector present
 
   unlink(output_path)
 })
@@ -1269,6 +1269,271 @@ test_that("Wave chip CSS styles are present", {
   expect_true(grepl("tk-wave-chip\\.active", content))
   expect_true(grepl("tk-wave-chip:not", content))
   expect_true(grepl("mv-wave-chips-label", content))
+
+  unlink(output_path)
+})
+
+
+# ==============================================================================
+# TESTS: Summary Table, Segment Selector, Sidebar, Sort-By, Row-Hide, Pinned Toolbar
+# ==============================================================================
+
+test_that("Summary metrics table is present on summary tab", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # Summary metrics table wrapper and class
+  expect_true(grepl("summary-metrics-table-wrap", content))
+  expect_true(grepl("summary-metrics-table", content))
+  expect_true(grepl("Metrics Overview", content))
+
+  unlink(output_path)
+})
+
+test_that("Segment selector dropdown replaces tab bar", {
+  crosstab_data <- create_test_crosstab_data()
+  crosstab_data$banner_segments <- c("Total", "Male", "Female")
+  crosstab_data$metadata$n_segments <- 3
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # Dropdown selector present
+  expect_true(grepl("tk-segment-select", content))
+  expect_true(grepl("segment-selector", content))
+  expect_true(grepl("switchSegment\\(this\\.value\\)", content))
+
+  # Options for each segment
+  expect_true(grepl("option value=\"Total\"", content, fixed = TRUE))
+  expect_true(grepl("option value=\"Male\"", content, fixed = TRUE))
+
+  unlink(output_path)
+})
+
+test_that("Overview sidebar shows segments instead of metrics", {
+  crosstab_data <- create_test_crosstab_data()
+  crosstab_data$banner_segments <- c("Total", "Group_A", "Group_B")
+  crosstab_data$metadata$n_segments <- 3
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # Sidebar shows "Segments" header
+  expect_true(grepl("tk-sidebar-header", content))
+  expect_true(grepl("Segments", content))
+
+  # Sidebar contains segment items
+  expect_true(grepl("tk-seg-sidebar-item", content))
+  expect_true(grepl("tk-seg-dot", content))
+
+  unlink(output_path)
+})
+
+test_that("Sort by dropdown is present in controls", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # Sort by dropdown
+  expect_true(grepl("sort-by-select", content))
+  expect_true(grepl("sortOverviewBy", content))
+  expect_true(grepl("Original Order", content))
+  expect_true(grepl("metric_name", content))  # Sort option value
+
+  unlink(output_path)
+})
+
+test_that("Row hide buttons are present in overview table", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # Row hide button
+  expect_true(grepl("tk-row-hide-btn", content))
+  expect_true(grepl("toggleRowVisibility", content))
+
+  unlink(output_path)
+})
+
+test_that("Pinned tab has export toolbar", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # Pinned toolbar
+  expect_true(grepl("pinned-toolbar", content))
+  expect_true(grepl("exportAllPinsPNG", content))
+  expect_true(grepl("printAllPins", content))
+  expect_true(grepl("saveReportHTML", content))
+
+  unlink(output_path)
+})
+
+test_that("Selected segment CSS class is present", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # Selected segment CSS
+  expect_true(grepl("tk-segment-chip\\.selected", content))
+
+  unlink(output_path)
+})
+
+test_that("Segment header row is no longer in the HTML (single-row header used)", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # Segment header row should NOT be in HTML at all (removed, not just hidden)
+  expect_false(grepl("tk-segment-header-row", content))
+  # Should NOT have rowspan="2" in the table
+  expect_false(grepl('rowspan="2"', content, fixed = TRUE))
+  # Wave header row should include Metric header cell
+  expect_true(grepl("tk-wave-header-row", content))
+
+  unlink(output_path)
+})
+
+test_that("Print CSS for pinned views is present", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # Print CSS for pinned-only printing
+  expect_true(grepl("print-pinned-only", content))
+
+  unlink(output_path)
+})
+
+test_that("JS includes sortOverviewBy and toggleRowVisibility functions", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # Core navigation JS functions
+  expect_true(grepl("sortOverviewBy", content))
+  expect_true(grepl("toggleRowVisibility", content))
+  expect_true(grepl("restoreOriginalOrder", content))
+
+  # Metrics view JS - selected segment
+  expect_true(grepl("selectedSegment", content))
+
+  # Pinned views export functions
+  expect_true(grepl("exportPinnedCardPNG", content))
+  expect_true(grepl("exportAllPinsPNG", content))
+  expect_true(grepl("printAllPins", content))
+  expect_true(grepl("saveReportHTML", content))
+
+  unlink(output_path)
+})
+
+
+# ==============================================================================
+# ROUND 2 FIXES — New Tests
+# ==============================================================================
+
+test_that("Row hidden CSS uses opacity instead of display:none", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # Should have opacity-based grey-out (not display:none)
+  expect_true(grepl("row-hidden-user.*opacity", content))
+  # Should have Show All button
+  expect_true(grepl("showAllHiddenRows", content))
+  # Should have hidden-rows-indicator
+  expect_true(grepl("hidden-rows-indicator", content))
+
+  unlink(output_path)
+})
+
+test_that("Summary metrics table has base row", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  html_data <- transform_tracker_for_html(crosstab_data, config)
+  table_html <- as.character(build_summary_metrics_table(html_data))
+
+  expect_true(grepl("tk-base-row", table_html))
+  expect_true(grepl("Base \\(n\\)", table_html))
+})
+
+test_that("Summary tab has insight boxes above metrics table", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # Background editor (div id=) should appear before summary-metrics-table-wrap (div class=)
+  # Use the div element patterns to match HTML structure, not CSS definitions
+  bg_pos <- regexpr('id="summary-background-editor"', content)
+  table_pos <- regexpr('class="summary-metrics-table-wrap"', content)
+  expect_true(bg_pos[1] > 0)
+  expect_true(table_pos[1] > 0)
+  expect_true(bg_pos[1] < table_pos[1])
+
+  # Pin/export buttons on summary sections
+  expect_true(grepl("pinSummarySection", content))
+  expect_true(grepl("exportSummarySlide", content))
+
+  unlink(output_path)
+})
+
+test_that("Segment Overview has insight area and pin/export buttons", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # Overview insight editor
+  expect_true(grepl("overview-insight-editor", content))
+  # Overview pin/export JS functions
+  expect_true(grepl("pinOverviewView", content))
+  expect_true(grepl("toggleOverviewInsight", content))
+  expect_true(grepl("exportOverviewSlide", content))
+
+  unlink(output_path)
+})
+
+test_that("JS includes overview and summary pin/export functions", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # Overview functions in core_navigation.js
+  expect_true(grepl("pinOverviewView", content))
+  expect_true(grepl("dismissOverviewInsight", content))
+  expect_true(grepl("showAllHiddenRows", content))
+  expect_true(grepl("updateHiddenRowsIndicator", content))
+
+  # Summary pin/export functions in pinned_views.js
+  expect_true(grepl("pinSummarySection", content))
+  expect_true(grepl("exportSummarySlide", content))
 
   unlink(output_path)
 })

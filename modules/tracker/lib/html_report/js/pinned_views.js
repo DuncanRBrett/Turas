@@ -178,15 +178,18 @@ function updatePinButton(metricId, isPinned) {
 function renderPinnedCards() {
   var container = document.getElementById("pinned-cards-container");
   var emptyState = document.getElementById("pinned-empty-state");
+  var toolbar = document.getElementById("pinned-toolbar");
   if (!container) return;
 
   if (pinnedViews.length === 0) {
     container.innerHTML = "";
     if (emptyState) emptyState.style.display = "block";
+    if (toolbar) toolbar.style.display = "none";
     return;
   }
 
   if (emptyState) emptyState.style.display = "none";
+  if (toolbar) toolbar.style.display = "flex";
 
   var html = "";
   for (var i = 0; i < pinnedViews.length; i++) {
@@ -197,6 +200,7 @@ function renderPinnedCards() {
     html += "<div class=\"pinned-card-header\">";
     html += "<h3 class=\"pinned-card-title\">" + escapeHtml(pin.metricTitle) + "</h3>";
     html += "<div class=\"pinned-card-actions\">";
+    html += "<button class=\"tk-btn tk-btn-sm\" onclick=\"exportPinnedCardPNG('" + pin.id + "')\" title=\"Export as PNG\">&#x1F4F8;</button>";
     if (i > 0) {
       html += "<button class=\"tk-btn tk-btn-sm\" onclick=\"movePinned(" + i + "," + (i - 1) + ")\" title=\"Move up\">\u2191</button>";
     }
@@ -206,17 +210,19 @@ function renderPinnedCards() {
     html += "<button class=\"tk-btn tk-btn-sm\" onclick=\"removePinned('" + pin.id + "','" + pin.metricId + "')\" title=\"Remove pin\">\u00d7</button>";
     html += "</div></div>";
 
+    // Insight (above chart/table for prominence)
+    if (pin.insightText) {
+      html += "<div class=\"pinned-card-insight\">" + pin.insightText + "</div>";
+    }
+
     // Chart (if captured and was visible)
     if (pin.chartSvg && pin.chartVisible !== false) {
       html += "<div class=\"pinned-card-chart\">" + pin.chartSvg + "</div>";
     }
 
     // Table
-    html += "<div class=\"pinned-card-body\">" + pin.tableHtml + "</div>";
-
-    // Insight
-    if (pin.insightText) {
-      html += "<div class=\"pinned-card-insight\">" + pin.insightText + "</div>";
+    if (pin.tableHtml) {
+      html += "<div class=\"pinned-card-body\">" + pin.tableHtml + "</div>";
     }
 
     // Meta
@@ -304,6 +310,305 @@ function escapeHtml(str) {
   div.textContent = str;
   return div.innerHTML;
 }
+
+// ==============================================================================
+// Export Functions
+// ==============================================================================
+
+/**
+ * Export a single pinned card as PNG using SVG foreignObject approach.
+ * @param {string} pinId - The pin ID
+ */
+function exportPinnedCardPNG(pinId) {
+  var card = document.querySelector('.pinned-card[data-pin-id="' + pinId + '"]');
+  if (!card) return;
+
+  var clone = card.cloneNode(true);
+
+  // Remove action buttons from clone
+  var actions = clone.querySelector(".pinned-card-actions");
+  if (actions) actions.parentNode.removeChild(actions);
+
+  // Inline critical styles
+  inlineStyles(clone);
+
+  var cardWidth = card.offsetWidth || 800;
+  var cardHeight = card.offsetHeight || 600;
+  var scale = 3;
+
+  // Build SVG with foreignObject
+  var svgNS = "http://www.w3.org/2000/svg";
+  var svgStr = '<svg xmlns="' + svgNS + '" width="' + (cardWidth * scale) + '" height="' + (cardHeight * scale) + '">';
+  svgStr += '<foreignObject width="' + cardWidth + '" height="' + cardHeight + '" transform="scale(' + scale + ')">';
+  svgStr += '<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:14px;color:#2c2c2c;background:#fff;">';
+  svgStr += clone.outerHTML;
+  svgStr += '</div></foreignObject></svg>';
+
+  var svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+  var svgUrl = URL.createObjectURL(svgBlob);
+
+  var canvas = document.createElement("canvas");
+  canvas.width = cardWidth * scale;
+  canvas.height = cardHeight * scale;
+  var ctx = canvas.getContext("2d");
+
+  var img = new Image();
+  img.onload = function() {
+    ctx.drawImage(img, 0, 0);
+    canvas.toBlob(function(blob) {
+      if (!blob) return;
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "pinned_" + pinId + ".png";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    }, "image/png");
+    URL.revokeObjectURL(svgUrl);
+  };
+  img.onerror = function() {
+    // Fallback: try simple canvas approach
+    URL.revokeObjectURL(svgUrl);
+    exportPinnedCardFallback(card, pinId);
+  };
+  img.src = svgUrl;
+}
+
+/**
+ * Fallback PNG export using a simple canvas render.
+ */
+function exportPinnedCardFallback(card, pinId) {
+  var title = card.querySelector(".pinned-card-title");
+  var titleText = title ? title.textContent : "Pinned View";
+
+  var canvas = document.createElement("canvas");
+  var w = 800, h = 400, scale = 3;
+  canvas.width = w * scale;
+  canvas.height = h * scale;
+  var ctx = canvas.getContext("2d");
+  ctx.scale(scale, scale);
+
+  // Background
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, w, h);
+
+  // Header
+  var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367";
+  ctx.fillStyle = brandColour;
+  ctx.fillRect(0, 0, w, 50);
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 18px -apple-system, sans-serif";
+  ctx.fillText(titleText, 16, 34);
+
+  // Content placeholder
+  ctx.fillStyle = "#666";
+  ctx.font = "13px -apple-system, sans-serif";
+  ctx.fillText("See HTML report for full interactive view", 16, 80);
+
+  canvas.toBlob(function(blob) {
+    if (!blob) return;
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "pinned_" + pinId + ".png";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  }, "image/png");
+}
+
+/**
+ * Inline computed styles on an element tree (for SVG foreignObject rendering).
+ */
+function inlineStyles(el) {
+  if (el.nodeType !== 1) return;
+  var computed = window.getComputedStyle(el);
+  var important = [
+    "font-family", "font-size", "font-weight", "color", "background-color",
+    "background", "border", "border-radius", "padding", "margin",
+    "display", "text-align", "line-height", "white-space",
+    "border-bottom", "border-top", "overflow"
+  ];
+  for (var i = 0; i < important.length; i++) {
+    el.style[important[i]] = computed.getPropertyValue(important[i]);
+  }
+  for (var c = 0; c < el.children.length; c++) {
+    inlineStyles(el.children[c]);
+  }
+}
+
+/**
+ * Export all pinned cards as individual PNGs with a 300ms delay between each.
+ */
+function exportAllPinsPNG() {
+  if (pinnedViews.length === 0) return;
+
+  var idx = 0;
+  function exportNext() {
+    if (idx >= pinnedViews.length) return;
+    exportPinnedCardPNG(pinnedViews[idx].id);
+    idx++;
+    setTimeout(exportNext, 300);
+  }
+  exportNext();
+}
+
+/**
+ * Print all pinned views as a single document (for Save as PDF).
+ * Adds body class to hide everything except the pinned tab.
+ */
+function printAllPins() {
+  // Switch to pinned tab
+  if (typeof switchReportTab === "function") {
+    switchReportTab("pinned");
+  }
+
+  // Add print class
+  document.body.classList.add("print-pinned-only");
+
+  // Slight delay for repaint, then print
+  setTimeout(function() {
+    window.print();
+    // Remove class after print dialog
+    setTimeout(function() {
+      document.body.classList.remove("print-pinned-only");
+    }, 500);
+  }, 200);
+}
+
+/**
+ * Save the entire HTML report with all pins and insights.
+ * Persists pin data and insight editors to the HTML, then downloads.
+ */
+function saveReportHTML() {
+  // Save current pin data to JSON store
+  savePinnedData();
+
+  // Save insight editor contents to hidden textareas
+  document.querySelectorAll(".insight-editor").forEach(function(editor) {
+    var store = editor.closest(".insight-area");
+    if (store) {
+      var textarea = store.querySelector(".insight-store");
+      if (textarea) textarea.value = editor.innerHTML;
+    }
+  });
+
+  // Save summary editor contents
+  document.querySelectorAll(".summary-editor").forEach(function(editor) {
+    editor.setAttribute("data-saved-content", editor.innerHTML);
+  });
+
+  // Capture full document HTML
+  var htmlContent = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+
+  // Download
+  var blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  var projectTitle = document.querySelector(".tk-header-project");
+  var filename = projectTitle ? projectTitle.textContent.trim().replace(/[^a-zA-Z0-9_-]/g, "_") : "tracking_report";
+  a.download = filename + "_with_pins.html";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
+
+// ==============================================================================
+// Summary Section Pin & Export
+// ==============================================================================
+
+/**
+ * Pin a summary section (background or findings) to Pinned Views.
+ * @param {string} sectionType - "background" or "findings"
+ */
+function pinSummarySection(sectionType) {
+  var editorId = sectionType === "background"
+    ? "summary-background-editor"
+    : "summary-findings-editor";
+  var editor = document.getElementById(editorId);
+  if (!editor || !editor.innerHTML.trim()) {
+    alert("Add content before pinning.");
+    return;
+  }
+
+  var title = sectionType === "background" ? "Background & Method" : "Summary";
+  var pinObj = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+    metricId: "summary-" + sectionType,
+    metricTitle: title,
+    visibleSegments: [],
+    tableHtml: "",
+    chartSvg: "",
+    chartVisible: false,
+    insightText: editor.innerHTML,
+    timestamp: Date.now(),
+    order: pinnedViews.length
+  };
+
+  pinnedViews.push(pinObj);
+  renderPinnedCards();
+  updatePinBadge();
+  savePinnedData();
+}
+
+/**
+ * Export a summary section as a slide PNG.
+ * @param {string} sectionType - "background" or "findings"
+ */
+function exportSummarySlide(sectionType) {
+  var sectionId = sectionType === "background"
+    ? "summary-section-background"
+    : "summary-section-findings";
+  var section = document.getElementById(sectionId);
+  if (!section) return;
+
+  var clone = section.cloneNode(true);
+  var controls = clone.querySelector(".summary-section-controls");
+  if (controls) controls.parentNode.removeChild(controls);
+  inlineStyles(clone);
+
+  var w = section.offsetWidth || 800;
+  var h = Math.max(section.offsetHeight || 300, 200);
+  var scale = 3;
+
+  var svgNS = "http://www.w3.org/2000/svg";
+  var svgStr = '<svg xmlns="' + svgNS + '" width="' + (w * scale) + '" height="' + (h * scale) + '">';
+  svgStr += '<foreignObject width="' + w + '" height="' + h + '" transform="scale(' + scale + ')">';
+  svgStr += '<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:14px;color:#2c2c2c;background:#fff;">';
+  svgStr += clone.outerHTML;
+  svgStr += '</div></foreignObject></svg>';
+
+  var svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+  var svgUrl = URL.createObjectURL(svgBlob);
+  var canvas = document.createElement("canvas");
+  canvas.width = w * scale;
+  canvas.height = h * scale;
+  var ctx = canvas.getContext("2d");
+
+  var img = new Image();
+  img.onload = function() {
+    ctx.drawImage(img, 0, 0);
+    canvas.toBlob(function(blob) {
+      if (!blob) return;
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "summary_" + sectionType + ".png";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    }, "image/png");
+    URL.revokeObjectURL(svgUrl);
+  };
+  img.onerror = function() {
+    URL.revokeObjectURL(svgUrl);
+  };
+  img.src = svgUrl;
+}
+
 
 document.addEventListener("DOMContentLoaded", function() {
   hydratePinnedViews();

@@ -33,28 +33,11 @@ build_tracking_table <- function(html_data, config) {
   parts <- c(parts, '<div class="tk-table-wrapper">')
   parts <- c(parts, '<table class="tk-table" id="tk-crosstab-table">')
 
-  # ---- THEAD: Segment header + Wave header ----
+  # ---- THEAD: Single header row (Metric + wave columns per segment) ----
   parts <- c(parts, '<thead>')
-
-  # Row 1: Segment headers (merged across wave columns)
-  parts <- c(parts, '<tr class="tk-segment-header-row">')
-  parts <- c(parts, '<th class="tk-th tk-label-col tk-sticky-col" rowspan="2">Metric</th>')
-
-  for (seg_idx in seq_along(segments)) {
-    seg_name <- segments[seg_idx]
-    seg_colour <- segment_colours[seg_idx]
-    parts <- c(parts, sprintf(
-      '<th class="tk-th tk-segment-header bg-%s" colspan="%d" data-segment="%s" style="background-color:%s;color:#fff">%s</th>',
-      make_css_safe(seg_name), n_waves,
-      htmltools::htmlEscape(seg_name),
-      seg_colour,
-      htmltools::htmlEscape(seg_name)
-    ))
-  }
-  parts <- c(parts, '</tr>')
-
-  # Row 2: Wave headers (repeated per segment, clickable for column sorting)
   parts <- c(parts, '<tr class="tk-wave-header-row">')
+  parts <- c(parts, '<th class="tk-th tk-label-col tk-sticky-col">Metric</th>')
+
   col_idx <- 1  # 0 is the label column
   for (seg_idx in seq_along(segments)) {
     seg_name <- segments[seg_idx]
@@ -115,7 +98,8 @@ build_tracking_table <- function(html_data, config) {
     }
 
     parts <- c(parts, sprintf(
-      '<td class="tk-td tk-label-col tk-sticky-col"><span class="tk-metric-label">%s</span><span class="tk-sparkline-wrap">%s</span></td>',
+      '<td class="tk-td tk-label-col tk-sticky-col"><button class="tk-row-hide-btn" onclick="toggleRowVisibility(\'%s\')" title="Hide this metric">&#x1F441;</button><span class="tk-metric-label">%s</span><span class="tk-sparkline-wrap">%s</span></td>',
+      mr$metric_id,
       htmltools::htmlEscape(mr$metric_label),
       sparkline_svg
     ))

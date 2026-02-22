@@ -1,8 +1,10 @@
 // ==============================================================================
 // TurasTracker HTML Report - Core Navigation
 // ==============================================================================
-// Handles metric navigation, banner switching, change row toggles,
-// sparkline visibility, and view switching.
+// Handles metric navigation, segment switching (dropdown + sidebar),
+// change row toggles, sparkline visibility, view switching,
+// column sorting, metric type filter, row search, sort-by-metric,
+// collapsible sections, and row hide/show.
 // ==============================================================================
 
 (function() {
@@ -11,6 +13,8 @@
   // ---- State ----
   var currentSegment = SEGMENTS[0] || "Total";
   var changeRowState = { "vs-prev": false, "vs-base": false };
+  var originalRowOrder = [];  // Captured on DOMContentLoaded for "Original Order" sort
+  var hiddenMetrics = {};     // { metricId: true } — user-hidden rows
 
   // ---- Metric Navigation ----
   window.selectMetric = function(metricId) {
@@ -49,28 +53,27 @@
   window.switchSegment = function(segmentName) {
     currentSegment = segmentName;
 
-    // Update tab active state
-    var tabs = document.querySelectorAll(".tk-segment-tab");
-    tabs.forEach(function(tab) {
-      tab.classList.toggle("tk-tab-active", tab.getAttribute("data-segment") === segmentName);
+    // Update dropdown value (in case called from sidebar click)
+    var dropdown = document.getElementById("segment-selector");
+    if (dropdown && dropdown.value !== segmentName) {
+      dropdown.value = segmentName;
+    }
+
+    // Update sidebar active state
+    document.querySelectorAll(".tk-seg-sidebar-item").forEach(function(item) {
+      item.classList.toggle("active", item.getAttribute("data-segment") === segmentName);
     });
 
-    // Show/hide columns
-    if (segmentName === "__ALL__") {
-      // Show all columns
-      var allCells = document.querySelectorAll("[data-segment]");
-      allCells.forEach(function(cell) {
-        cell.classList.remove("segment-hidden");
-      });
-    } else {
-      // Show only matching segment columns
-      SEGMENTS.forEach(function(seg) {
-        var cells = document.querySelectorAll('[data-segment="' + seg + '"]');
-        cells.forEach(function(cell) {
+    // Show only matching segment columns in the overview table
+    SEGMENTS.forEach(function(seg) {
+      var cells = document.querySelectorAll('[data-segment="' + seg + '"]');
+      cells.forEach(function(cell) {
+        // Only toggle cells inside the overview table, not the metrics panels
+        if (cell.closest("#tab-overview") || cell.closest(".tk-table-panel")) {
           cell.classList.toggle("segment-hidden", seg !== segmentName);
-        });
+        }
       });
-    }
+    });
 
     // Update sparklines for the selected segment
     updateSparklines(segmentName);
@@ -117,7 +120,7 @@
 
   // ---- Group By Switching ----
   window.switchGroupBy = function(mode) {
-    var tbody = document.querySelector(".tk-table tbody");
+    var tbody = document.querySelector("#tk-crosstab-table tbody");
     if (!tbody) return;
 
     var rows = Array.from(tbody.querySelectorAll("tr"));
@@ -155,13 +158,11 @@
         var sB = (b.metric.querySelector(".tk-metric-label") || {}).textContent || "";
         return sA.localeCompare(sB);
       });
-      // Re-insert with section headers (based on data-chart section)
       rebuildTableWithSections(tbody, metricGroups, function(row) {
         var container = document.querySelector('.tk-chart-container[data-metric-id="' + row.getAttribute("data-metric-id") + '"]');
         return container ? container.getAttribute("data-section") : "(Ungrouped)";
       });
     } else if (mode === "metric_type") {
-      // Group by metric name (mean, nps, top2_box, etc.)
       rebuildTableWithSections(tbody, metricGroups, function(row) {
         var chartData = row.getAttribute("data-chart");
         if (chartData) {
@@ -177,18 +178,19 @@
         return row.getAttribute("data-q-code") || "(Unknown)";
       });
     }
+
+    // Reset sort-by dropdown to original when switching group-by
+    var sortSelect = document.getElementById("sort-by-select");
+    if (sortSelect) sortSelect.value = "original";
   };
 
   function rebuildTableWithSections(tbody, metricGroups, sectionFn) {
-    // Preserve base row
     var baseRow = tbody.querySelector(".tk-base-row");
 
-    // Clear tbody
     while (tbody.firstChild) {
       tbody.removeChild(tbody.firstChild);
     }
 
-    // Group metrics
     var groups = {};
     metricGroups.forEach(function(g) {
       var section = sectionFn(g.metric);
@@ -196,19 +198,17 @@
       groups[section].push(g);
     });
 
-    // Sort sections
     var sectionKeys = Object.keys(groups).sort();
-
-    var totalCols = document.querySelectorAll(".tk-segment-header-row th").length;
+    var totalCols = 1 + SEGMENTS.length * N_WAVES;
 
     sectionKeys.forEach(function(sec) {
-      // Section header row
       var secRow = document.createElement("tr");
       secRow.className = "tk-section-row";
       var secCell = document.createElement("td");
       secCell.className = "tk-section-cell";
       secCell.colSpan = totalCols;
-      secCell.textContent = sec;
+      secCell.innerHTML = "<span class=\"section-chevron\">&#x25BC;</span> " + sec;
+      secCell.setAttribute("onclick", "toggleOverviewSection(this)");
       secRow.appendChild(secCell);
       tbody.appendChild(secRow);
 
@@ -220,7 +220,6 @@
       });
     });
 
-    // Re-append base row
     if (baseRow) tbody.appendChild(baseRow);
   }
 
@@ -307,6 +306,10 @@
       g.changes.forEach(function(cr) { tbody.appendChild(cr); });
     });
     if (baseRow) tbody.appendChild(baseRow);
+
+    // Reset sort-by dropdown when user column-sorts
+    var sortSelect = document.getElementById("sort-by-select");
+    if (sortSelect) sortSelect.value = "original";
   };
 
 
@@ -376,14 +379,133 @@
       }
       secRow.style.display = hasVisible ? "" : "none";
     });
+  }
 
-    // Also update sidebar items
-    document.querySelectorAll(".tk-sidebar-item").forEach(function(item) {
-      var metricId = item.getAttribute("data-metric-id");
-      var label = item.textContent.toLowerCase();
-      var textMatch = overviewSearchQuery === "" || label.indexOf(overviewSearchQuery) >= 0;
-      item.classList.toggle("hidden", !textMatch);
+
+  // ---- Sort Overview By (Metric Name / Original Order) ----
+  window.sortOverviewBy = function(mode) {
+    var table = document.getElementById("tk-crosstab-table");
+    if (!table) return;
+    var tbody = table.querySelector("tbody");
+    if (!tbody) return;
+
+    // Clear column sort indicators
+    table.querySelectorAll(".tk-sortable").forEach(function(th) {
+      th.classList.remove("sort-asc", "sort-desc");
     });
+    overviewSortState = { col: -1, dir: "desc" };
+
+    if (mode === "original") {
+      // Restore original row order
+      restoreOriginalOrder(tbody);
+      return;
+    }
+
+    // Gather metric groups (metric row + change rows)
+    var rows = Array.from(tbody.querySelectorAll("tr"));
+    var sectionRows = [];
+    var metricGroups = [];
+    var baseRow = null;
+    var i = 0;
+
+    while (i < rows.length) {
+      var row = rows[i];
+      if (row.classList.contains("tk-base-row")) {
+        baseRow = row;
+        i++;
+      } else if (row.classList.contains("tk-section-row")) {
+        i++;
+      } else if (row.classList.contains("tk-metric-row")) {
+        var label = (row.querySelector(".tk-metric-label") || {}).textContent || "";
+        var group = { metric: row, changes: [], label: label };
+        i++;
+        while (i < rows.length && rows[i].classList.contains("tk-change-row")) {
+          group.changes.push(rows[i]);
+          i++;
+        }
+        metricGroups.push(group);
+      } else {
+        i++;
+      }
+    }
+
+    // Sort by label
+    var descending = mode === "metric_name_desc";
+    metricGroups.sort(function(a, b) {
+      var cmp = a.label.localeCompare(b.label);
+      return descending ? -cmp : cmp;
+    });
+
+    // Rebuild tbody (no section headers when sorted alphabetically)
+    while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+    metricGroups.forEach(function(g) {
+      tbody.appendChild(g.metric);
+      g.changes.forEach(function(cr) { tbody.appendChild(cr); });
+    });
+    if (baseRow) tbody.appendChild(baseRow);
+  };
+
+  /**
+   * Restore original row order captured on DOMContentLoaded.
+   */
+  function restoreOriginalOrder(tbody) {
+    if (originalRowOrder.length === 0) return;
+
+    // Detach all rows
+    var baseRow = tbody.querySelector(".tk-base-row");
+    while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+
+    // Re-insert in original order
+    for (var i = 0; i < originalRowOrder.length; i++) {
+      tbody.appendChild(originalRowOrder[i]);
+    }
+    if (baseRow) tbody.appendChild(baseRow);
+  }
+
+
+  // ---- Row Hide/Show (grey out, not full hide) ----
+  window.toggleRowVisibility = function(metricId) {
+    var table = document.getElementById("tk-crosstab-table");
+    if (!table) return;
+
+    var isHidden = !hiddenMetrics[metricId];
+    hiddenMetrics[metricId] = isHidden;
+
+    // Toggle grey-out on metric row and its change rows
+    var metricRow = table.querySelector('.tk-metric-row[data-metric-id="' + metricId + '"]');
+    if (metricRow) {
+      metricRow.classList.toggle("row-hidden-user", isHidden);
+      // Toggle eye button visual state
+      var btn = metricRow.querySelector(".tk-row-hide-btn");
+      if (btn) btn.classList.toggle("row-greyed", isHidden);
+    }
+    table.querySelectorAll('.tk-change-row[data-metric-id="' + metricId + '"]').forEach(function(cr) {
+      cr.classList.toggle("row-hidden-user", isHidden);
+    });
+
+    updateHiddenRowsIndicator();
+  };
+
+  window.showAllHiddenRows = function() {
+    var table = document.getElementById("tk-crosstab-table");
+    if (!table) return;
+
+    table.querySelectorAll(".row-hidden-user").forEach(function(el) {
+      el.classList.remove("row-hidden-user");
+    });
+    table.querySelectorAll(".tk-row-hide-btn.row-greyed").forEach(function(btn) {
+      btn.classList.remove("row-greyed");
+    });
+    hiddenMetrics = {};
+    updateHiddenRowsIndicator();
+  };
+
+  function updateHiddenRowsIndicator() {
+    var count = Object.keys(hiddenMetrics).filter(function(k) { return hiddenMetrics[k]; }).length;
+    var indicator = document.getElementById("hidden-rows-indicator");
+    var countEl = document.getElementById("hidden-rows-count");
+    if (indicator) indicator.style.display = count > 0 ? "flex" : "none";
+    if (countEl) countEl.textContent = count + " greyed out";
   }
 
 
@@ -407,6 +529,124 @@
   };
 
 
+  // ---- Overview Insight ----
+  window.toggleOverviewInsight = function() {
+    var area = document.querySelector("#tab-overview .insight-area");
+    if (!area) return;
+    var toggleBtn = area.querySelector(".insight-toggle");
+    var container = area.querySelector(".insight-container");
+    if (container.style.display === "none" || container.style.display === "") {
+      container.style.display = "block";
+      if (toggleBtn) toggleBtn.style.display = "none";
+      var editor = container.querySelector(".insight-editor");
+      if (editor) editor.focus();
+    } else {
+      container.style.display = "none";
+      if (toggleBtn) toggleBtn.style.display = "";
+    }
+  };
+
+  window.dismissOverviewInsight = function() {
+    var area = document.querySelector("#tab-overview .insight-area");
+    if (!area) return;
+    var editor = area.querySelector(".insight-editor");
+    var container = area.querySelector(".insight-container");
+    var toggleBtn = area.querySelector(".insight-toggle");
+    if (editor) editor.innerHTML = "";
+    if (container) container.style.display = "none";
+    if (toggleBtn) toggleBtn.style.display = "";
+  };
+
+  // ---- Overview Pin ----
+  window.pinOverviewView = function() {
+    var tablePanel = document.querySelector("#tab-overview .tk-table-panel");
+    var chartPanel = document.getElementById("tk-chart-panel");
+    var insightEditor = document.getElementById("overview-insight-editor");
+
+    // Clone table, remove hidden/filtered elements
+    var cleanHtml = "";
+    if (tablePanel && tablePanel.style.display !== "none") {
+      var clone = tablePanel.cloneNode(true);
+      clone.querySelectorAll(".segment-hidden").forEach(function(el) { el.parentNode.removeChild(el); });
+      clone.querySelectorAll(".row-hidden-user").forEach(function(el) { el.parentNode.removeChild(el); });
+      clone.querySelectorAll(".row-filtered").forEach(function(el) { el.parentNode.removeChild(el); });
+      cleanHtml = clone.innerHTML;
+    }
+
+    // Chart SVG
+    var chartSvg = "";
+    var chartVisible = false;
+    if (chartPanel && chartPanel.style.display !== "none") {
+      chartVisible = true;
+      chartSvg = chartPanel.innerHTML;
+    }
+
+    var pinObj = {
+      id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+      metricId: "overview-" + currentSegment,
+      metricTitle: "Segment Overview: " + currentSegment,
+      visibleSegments: [currentSegment],
+      tableHtml: cleanHtml,
+      chartSvg: chartSvg,
+      chartVisible: chartVisible,
+      insightText: insightEditor ? insightEditor.innerHTML : "",
+      timestamp: Date.now(),
+      order: pinnedViews.length
+    };
+
+    pinnedViews.push(pinObj);
+    if (typeof renderPinnedCards === "function") renderPinnedCards();
+    if (typeof updatePinBadge === "function") updatePinBadge();
+    if (typeof savePinnedData === "function") savePinnedData();
+  };
+
+  // ---- Overview Slide Export ----
+  window.exportOverviewSlide = function() {
+    var content = document.querySelector("#tab-overview .tk-content");
+    if (!content) return;
+
+    // Use slide export for overview table
+    if (typeof exportSlidePNG === "function") {
+      var firstMetric = document.querySelector("#tk-crosstab-table .tk-metric-row");
+      if (firstMetric) {
+        exportSlidePNG(firstMetric.getAttribute("data-metric-id"), "table");
+        return;
+      }
+    }
+
+    // Fallback: export the overview content area as PNG
+    var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367";
+    var canvas = document.createElement("canvas");
+    var w = 1280, h = 720, scale = 3;
+    canvas.width = w * scale;
+    canvas.height = h * scale;
+    var ctx = canvas.getContext("2d");
+    ctx.scale(scale, scale);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = brandColour;
+    ctx.fillRect(0, 0, w, 60);
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 22px -apple-system, sans-serif";
+    ctx.fillText("Segment Overview: " + currentSegment, 30, 40);
+    ctx.fillStyle = "#666";
+    ctx.font = "13px -apple-system, sans-serif";
+    ctx.fillText("See HTML report for full interactive table", 30, 90);
+
+    canvas.toBlob(function(blob) {
+      if (!blob) return;
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "overview_" + currentSegment + ".png";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    }, "image/png");
+  };
+
+
   // ---- Help Overlay ----
   window.toggleHelpOverlay = function() {
     var overlay = document.getElementById("tk-help-overlay");
@@ -417,11 +657,22 @@
 
   // ---- Init ----
   document.addEventListener("DOMContentLoaded", function() {
-    // If only one segment, no need to switch
+    // Capture original row order (for "Original Order" sort)
+    var tbody = document.querySelector("#tk-crosstab-table tbody");
+    if (tbody) {
+      var rows = tbody.querySelectorAll("tr:not(.tk-base-row)");
+      originalRowOrder = Array.from(rows);
+    }
+
+    // If only one segment, hide segment selector
     if (SEGMENTS.length <= 1) {
-      // Hide segment tabs
-      var tabBar = document.querySelector(".tk-segment-tabs");
-      if (tabBar) tabBar.style.display = "none";
+      var selector = document.querySelector(".tk-segment-selector");
+      if (selector) selector.style.display = "none";
+    }
+
+    // Switch to first segment to apply initial column visibility
+    if (SEGMENTS.length > 0) {
+      window.switchSegment(SEGMENTS[0]);
     }
   });
 

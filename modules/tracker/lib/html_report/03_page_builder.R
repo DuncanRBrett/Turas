@@ -53,12 +53,12 @@ build_tracker_page <- function(html_data, table_html, charts, config) {
         build_metrics_tab(html_data, charts, config)
       ),
 
-      # Tab 3: Segment Overview (legacy table view)
+      # Tab 3: Segment Overview
       htmltools::tags$div(id = "tab-overview", class = "tab-panel",
         htmltools::tags$div(class = "tk-layout",
-          build_tracker_sidebar(html_data, config),
+          build_overview_sidebar(html_data, config),
           htmltools::tags$main(class = "tk-content",
-            build_segment_tabs(html_data, config, brand_colour),
+            build_segment_selector(html_data, config, brand_colour),
             build_controls(html_data, config),
             htmltools::tags$div(class = "tk-main-area",
               htmltools::tags$div(class = "tk-table-panel", table_html),
@@ -66,6 +66,30 @@ build_tracker_page <- function(html_data, table_html, charts, config) {
                 id = "tk-chart-panel",
                 style = "display:none",
                 build_chart_containers(html_data, charts, config)
+              )
+            ),
+            # Overview actions: Pin + Export + Insight
+            htmltools::tags$div(class = "overview-actions-bar",
+              htmltools::tags$button(class = "tk-btn",
+                onclick = "pinOverviewView()",
+                htmltools::HTML("&#x1F4CC; Pin Current View")),
+              htmltools::tags$button(class = "tk-btn",
+                onclick = "exportOverviewSlide()",
+                htmltools::HTML("&#x1F4F8; Export Slide"))
+            ),
+            htmltools::tags$div(class = "insight-area",
+              htmltools::tags$button(class = "insight-toggle",
+                onclick = "toggleOverviewInsight()", "+ Add Insight"),
+              htmltools::tags$div(class = "insight-container", style = "display:none",
+                htmltools::tags$div(class = "insight-editor",
+                  contenteditable = "true",
+                  `data-placeholder` = "Type overview insight here...",
+                  id = "overview-insight-editor",
+                  oninput = ""),
+                htmltools::tags$button(class = "insight-dismiss",
+                  title = "Delete insight",
+                  onclick = "dismissOverviewInsight()",
+                  htmltools::HTML("&times;"))
               )
             )
           )
@@ -174,8 +198,16 @@ build_summary_tab <- function(html_data, config) {
       )
     ),
 
-    # Background & Method insight box
-    htmltools::tags$div(class = "summary-insight-box",
+    # Background & Method insight box (above metrics table)
+    htmltools::tags$div(class = "summary-insight-box", id = "summary-section-background",
+      htmltools::tags$div(class = "summary-section-controls",
+        htmltools::tags$button(class = "tk-btn tk-btn-sm",
+          onclick = "pinSummarySection('background')",
+          htmltools::HTML("&#x1F4CC; Pin")),
+        htmltools::tags$button(class = "tk-btn tk-btn-sm",
+          onclick = "exportSummarySlide('background')",
+          htmltools::HTML("&#x1F4F8; Export Slide"))
+      ),
       htmltools::tags$h3(class = "summary-insight-title", "Background & Method"),
       htmltools::tags$div(
         class = "insight-editor summary-editor",
@@ -185,8 +217,16 @@ build_summary_tab <- function(html_data, config) {
       )
     ),
 
-    # Summary insight box
-    htmltools::tags$div(class = "summary-insight-box",
+    # Summary insight box (above metrics table)
+    htmltools::tags$div(class = "summary-insight-box", id = "summary-section-findings",
+      htmltools::tags$div(class = "summary-section-controls",
+        htmltools::tags$button(class = "tk-btn tk-btn-sm",
+          onclick = "pinSummarySection('findings')",
+          htmltools::HTML("&#x1F4CC; Pin")),
+        htmltools::tags$button(class = "tk-btn tk-btn-sm",
+          onclick = "exportSummarySlide('findings')",
+          htmltools::HTML("&#x1F4F8; Export Slide"))
+      ),
       htmltools::tags$h3(class = "summary-insight-title", "Summary"),
       htmltools::tags$div(
         class = "insight-editor summary-editor",
@@ -194,8 +234,87 @@ build_summary_tab <- function(html_data, config) {
         `data-placeholder` = "Add key findings and summary here...",
         id = "summary-findings-editor"
       )
-    )
+    ),
+
+    # Metrics Overview table (Total segment by wave) — at bottom
+    build_summary_metrics_table(html_data)
   )
+}
+
+
+#' Build Summary Metrics Table
+#'
+#' Compact read-only table showing Total segment values by wave.
+#' Displayed on the Summary tab for a quick overview of all metrics.
+#'
+#' @param html_data List. Output from transform_tracker_for_html()
+#' @return htmltools::HTML object
+#' @keywords internal
+build_summary_metrics_table <- function(html_data) {
+
+  seg_name <- html_data$segments[1]  # Total (or first segment)
+  waves <- html_data$waves
+  wave_labels <- html_data$wave_labels
+
+  parts <- c()
+  parts <- c(parts, '<div class="summary-metrics-table-wrap">')
+  parts <- c(parts, '<h3 class="summary-insight-title">Metrics Overview</h3>')
+  parts <- c(parts, '<table class="tk-table summary-metrics-table">')
+
+  # Header
+  parts <- c(parts, '<thead><tr>')
+  parts <- c(parts, '<th class="tk-th tk-label-col">Metric</th>')
+  for (wl in wave_labels) {
+    parts <- c(parts, sprintf('<th class="tk-th">%s</th>', htmltools::htmlEscape(wl)))
+  }
+  parts <- c(parts, '</tr></thead>')
+
+  # Body
+  parts <- c(parts, '<tbody>')
+  current_section <- ""
+  total_cols <- 1 + length(waves)
+
+  for (mr in html_data$metric_rows) {
+    section <- if (is.na(mr$section) || mr$section == "") "(Ungrouped)" else mr$section
+    if (section != current_section) {
+      current_section <- section
+      parts <- c(parts, sprintf(
+        '<tr class="tk-section-row"><td colspan="%d" class="tk-section-cell">%s</td></tr>',
+        total_cols, htmltools::htmlEscape(section)
+      ))
+    }
+
+    cells <- mr$segment_cells[[seg_name]]
+    parts <- c(parts, '<tr class="tk-metric-row">')
+    parts <- c(parts, sprintf(
+      '<td class="tk-td tk-label-col"><span class="tk-metric-label">%s</span></td>',
+      htmltools::htmlEscape(mr$metric_label)
+    ))
+
+    for (wid in waves) {
+      cell <- cells[[wid]]
+      val_display <- if (!is.null(cell)) cell$display_value else "&mdash;"
+      parts <- c(parts, sprintf('<td class="tk-td tk-value-cell">%s</td>', val_display))
+    }
+    parts <- c(parts, '</tr>')
+  }
+
+  # Base (n) row
+  if (length(html_data$metric_rows) > 0) {
+    first_metric <- html_data$metric_rows[[1]]
+    base_cells <- first_metric$segment_cells[[seg_name]]
+    parts <- c(parts, '<tr class="tk-base-row">')
+    parts <- c(parts, '<td class="tk-td tk-label-col tk-base-label">Base (n)</td>')
+    for (wid in waves) {
+      cell <- base_cells[[wid]]
+      n_display <- if (!is.null(cell) && !is.na(cell$n)) cell$n else ""
+      parts <- c(parts, sprintf('<td class="tk-td tk-base-cell">%s</td>', n_display))
+    }
+    parts <- c(parts, '</tr>')
+  }
+
+  parts <- c(parts, '</tbody></table></div>')
+  htmltools::HTML(paste(parts, collapse = "\n"))
 }
 
 
@@ -666,6 +785,16 @@ build_metric_table <- function(mr, html_data, sparkline_data, segments, segment_
 build_pinned_tab <- function() {
 
   htmltools::tags$div(class = "pinned-tab-content",
+    # Export toolbar (hidden when no pins)
+    htmltools::tags$div(class = "pinned-toolbar", id = "pinned-toolbar",
+                         style = "display:none",
+      htmltools::tags$button(class = "tk-btn", onclick = "exportAllPinsPNG()",
+                              htmltools::HTML("&#x1F4F8; Export All as PNGs")),
+      htmltools::tags$button(class = "tk-btn", onclick = "printAllPins()",
+                              htmltools::HTML("&#x1F5A8; Print / Save PDF")),
+      htmltools::tags$button(class = "tk-btn", onclick = "saveReportHTML()",
+                              htmltools::HTML("&#x1F4BE; Save Report HTML"))
+    ),
     htmltools::tags$div(id = "pinned-cards-container"),
     htmltools::tags$div(
       id = "pinned-empty-state",
@@ -752,79 +881,109 @@ build_tracker_header <- function(html_data, config, brand_colour) {
 
 
 # ==============================================================================
-# SIDEBAR (for Segment Overview tab)
+# SIDEBAR (for Segment Overview tab) — Shows segments for quick switching
 # ==============================================================================
 
+#' Build Overview Sidebar
+#'
+#' Shows segment list for quick switching (replaces old metric sidebar).
+#' Each segment is a clickable item that switches the dropdown and table.
+#'
 #' @keywords internal
-build_tracker_sidebar <- function(html_data, config) {
+build_overview_sidebar <- function(html_data, config) {
+
+  segments <- html_data$segments
+  segment_group_info <- derive_segment_groups(segments)
+  brand_colour <- get_setting(config, "brand_colour", default = "#323367") %||% "#323367"
+  segment_colours <- get_segment_colours(segments, brand_colour)
 
   items <- c()
-  current_section <- ""
 
-  for (i in seq_along(html_data$metric_rows)) {
-    mr <- html_data$metric_rows[[i]]
-    section <- if (is.na(mr$section) || mr$section == "") "(Ungrouped)" else mr$section
+  # Helper: escape segment name for JS string inside onclick attribute
+  js_escape_seg <- function(name) gsub("'", "\\\\'", htmltools::htmlEscape(name))
 
-    if (section != current_section) {
-      current_section <- section
-      items <- c(items, sprintf(
-        '<div class="tk-sidebar-section">%s</div>',
-        htmltools::htmlEscape(section)
-      ))
-    }
-
+  # Standalone segments (Total)
+  for (seg_name in segment_group_info$standalone) {
+    s_idx <- match(seg_name, segments)
+    seg_colour <- segment_colours[s_idx]
+    active_class <- if (s_idx == 1) " active" else ""
     items <- c(items, sprintf(
-      '<a class="tk-sidebar-item" href="#%s" data-metric-id="%s" onclick="selectMetric(\'%s\');return false;">%s</a>',
-      mr$metric_id, mr$metric_id, mr$metric_id,
-      htmltools::htmlEscape(mr$metric_label)
+      '<a class="tk-sidebar-item tk-seg-sidebar-item%s" data-segment="%s" href="#" onclick="switchSegment(\'%s\');return false;"><span class="tk-seg-dot" style="background:%s"></span>%s</a>',
+      active_class, htmltools::htmlEscape(seg_name),
+      js_escape_seg(seg_name), seg_colour,
+      htmltools::htmlEscape(seg_name)
     ))
   }
 
+  # Grouped segments
+  for (group_name in names(segment_group_info$groups)) {
+    group_segs <- segment_group_info$groups[[group_name]]
+
+    items <- c(items, sprintf(
+      '<div class="tk-sidebar-section">%s</div>',
+      htmltools::htmlEscape(group_name)
+    ))
+
+    for (seg_name in group_segs) {
+      s_idx <- match(seg_name, segments)
+      seg_colour <- segment_colours[s_idx]
+      display_label <- sub(paste0("^", group_name, "_"), "", seg_name)
+      items <- c(items, sprintf(
+        '<a class="tk-sidebar-item tk-seg-sidebar-item" data-segment="%s" href="#" onclick="switchSegment(\'%s\');return false;"><span class="tk-seg-dot" style="background:%s"></span>%s</a>',
+        htmltools::htmlEscape(seg_name),
+        js_escape_seg(seg_name), seg_colour,
+        htmltools::htmlEscape(display_label)
+      ))
+    }
+  }
+
   htmltools::tags$aside(class = "tk-sidebar",
-    htmltools::tags$div(class = "tk-sidebar-search",
-      htmltools::tags$input(
-        type = "text",
-        class = "tk-search-input",
-        placeholder = "Search metrics...",
-        oninput = "filterMetrics(this.value)"
-      )
-    ),
+    htmltools::tags$div(class = "tk-sidebar-header", "Segments"),
     htmltools::tags$nav(class = "tk-sidebar-nav",
       htmltools::HTML(paste(items, collapse = "\n"))
     )
   )
 }
 
-
-# ==============================================================================
-# SEGMENT TABS (for Segment Overview tab)
-# ==============================================================================
-
+#' Build Tracker Sidebar (legacy, for backward compat in tests)
 #' @keywords internal
-build_segment_tabs <- function(html_data, config, brand_colour) {
+build_tracker_sidebar <- function(html_data, config) {
+  build_overview_sidebar(html_data, config)
+}
+
+
+# ==============================================================================
+# SEGMENT SELECTOR (dropdown for Segment Overview tab)
+# ==============================================================================
+
+#' Build Segment Selector Dropdown
+#'
+#' Replaces the old tab bar with a single dropdown to switch between
+#' segments in the Segment Overview table. Shows one segment at a time.
+#'
+#' @keywords internal
+build_segment_selector <- function(html_data, config, brand_colour) {
   segments <- html_data$segments
 
   if (length(segments) <= 1) return(htmltools::tags$div())
 
-  tabs <- c()
-  for (seg_idx in seq_along(segments)) {
-    seg_name <- segments[seg_idx]
-    active_class <- if (seg_idx == 1) " tk-tab-active" else ""
-    tabs <- c(tabs, sprintf(
-      '<button class="tk-segment-tab%s" data-segment="%s" onclick="switchSegment(\'%s\')">%s</button>',
-      active_class,
-      htmltools::htmlEscape(seg_name),
+  options <- c()
+  for (seg_name in segments) {
+    options <- c(options, sprintf(
+      '<option value="%s">%s</option>',
       htmltools::htmlEscape(seg_name),
       htmltools::htmlEscape(seg_name)
     ))
   }
 
-  tabs <- c(tabs, sprintf(
-    '<button class="tk-segment-tab" data-segment="__ALL__" onclick="switchSegment(\'__ALL__\')">All Segments</button>'
-  ))
-
-  htmltools::tags$div(class = "tk-segment-tabs",
-    htmltools::HTML(paste(tabs, collapse = "\n"))
+  htmltools::tags$div(class = "tk-segment-selector",
+    htmltools::tags$label(class = "tk-control-label", "Segment:"),
+    htmltools::tags$select(
+      class = "tk-select tk-segment-select",
+      id = "segment-selector",
+      onchange = "switchSegment(this.value)",
+      htmltools::HTML(paste(options, collapse = "\n"))
+    )
   )
 }
 
@@ -910,6 +1069,24 @@ build_controls <- function(html_data, config) {
         htmltools::tags$option(value = "metric_type", "Metric Type"),
         htmltools::tags$option(value = "question", "Question")
       )
+    ),
+
+    htmltools::tags$div(class = "tk-control-group",
+      htmltools::tags$span(class = "tk-control-label", "Sort by:"),
+      htmltools::tags$select(class = "tk-select", id = "sort-by-select",
+                              onchange = "sortOverviewBy(this.value)",
+        htmltools::tags$option(value = "original", selected = "selected", "Original Order"),
+        htmltools::tags$option(value = "metric_name", "Metric Name (A\u2192Z)"),
+        htmltools::tags$option(value = "metric_name_desc", "Metric Name (Z\u2192A)")
+      )
+    ),
+
+    # Hidden rows indicator (shown when rows are greyed out)
+    htmltools::tags$div(class = "tk-control-group", id = "hidden-rows-indicator",
+      style = "display:none",
+      htmltools::tags$span(class = "tk-control-label", id = "hidden-rows-count", "0 greyed out"),
+      htmltools::tags$button(class = "tk-btn tk-btn-sm",
+                              onclick = "showAllHiddenRows()", "Show All")
     ),
 
     htmltools::tags$div(class = "tk-control-group tk-export-group",
@@ -1085,9 +1262,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .summary-stat-card { flex: 1; min-width: 140px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px 16px; text-align: center; }
 .stat-number { font-size: 28px; font-weight: 700; color: var(--brand); }
 .stat-label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
-.summary-insight-box { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 20px; }
+.summary-insight-box { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 20px; position: relative; }
 .summary-insight-title { font-size: 16px; font-weight: 700; color: var(--brand); margin-bottom: 12px; }
 .summary-editor { min-height: 80px; }
+.summary-section-controls { float: right; display: flex; gap: 4px; }
 
 /* ---- METRICS BY SEGMENT TAB ---- */
 .metrics-tab-layout { display: flex; min-height: calc(100vh - 180px); }
@@ -1159,11 +1337,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .tk-sidebar-item.hidden { display: none; }
 .tk-content { flex: 1; padding: 20px 24px; overflow-x: auto; }
 
-/* Segment tabs */
-.tk-segment-tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
-.tk-segment-tab { padding: 8px 18px; border: 1px solid var(--border); background: var(--card); border-radius: 6px 6px 0 0; font-size: 13px; cursor: pointer; transition: all 0.15s; color: var(--text); }
-.tk-segment-tab:hover { background: #f0f0f0; }
-.tk-segment-tab.tk-tab-active { background: var(--brand); color: #fff; border-color: var(--brand); font-weight: 600; }
+/* Segment selector dropdown (replaces old tab bar) */
+.tk-segment-selector { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.tk-segment-select { padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-weight: 600; background: var(--card); cursor: pointer; min-width: 180px; }
+
+/* Segment header row removed from HTML (single-row header used instead) */
+
+/* Segment sidebar items */
+.tk-seg-sidebar-item { display: flex; align-items: center; gap: 8px; }
+/* Overview actions bar (pin + export + insight) */
+.overview-actions-bar { display: flex; gap: 8px; margin-top: 16px; padding: 10px 0; }
+.tk-sidebar-header { padding: 14px 16px 8px; font-size: 12px; font-weight: 700; color: var(--brand); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+
+/* Summary metrics table */
+.summary-metrics-table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 20px; overflow-x: auto; }
+.summary-metrics-table { font-size: 13px; }
+.summary-metrics-table .tk-section-cell { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; padding: 12px 16px 4px; border: none; background: none; }
 
 /* Controls */
 .tk-controls { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; padding: 10px 16px; background: var(--card); border-radius: 8px; border: 1px solid var(--border); }
@@ -1277,6 +1466,22 @@ body.hide-sparklines .tk-sparkline-wrap { display: none; }
 /* Segment column visibility */
 .segment-hidden { display: none !important; }
 
+/* Selected segment chip (for chart label focus) */
+.tk-segment-chip.selected { box-shadow: 0 0 0 2px var(--chip-color, var(--brand)); }
+
+/* Row hide eye icon (grey out instead of hide — click again to restore) */
+.tk-row-hide-btn { background: none; border: none; cursor: pointer; font-size: 14px; padding: 0 4px; opacity: 0.3; transition: opacity 0.15s; line-height: 1; }
+.tk-row-hide-btn:hover { opacity: 1; }
+.tk-row-hide-btn.row-greyed { opacity: 1; color: #c0392b; }
+.tk-metric-row.row-hidden-user { opacity: 0.25; }
+.tk-metric-row.row-hidden-user td { background: #f5f5f5 !important; }
+.tk-change-row.row-hidden-user { opacity: 0.25; }
+.tk-change-row.row-hidden-user td { background: #f5f5f5 !important; }
+
+/* Pinned toolbar */
+.pinned-toolbar { display: flex; gap: 8px; padding: 16px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.pinned-toolbar .tk-btn { font-size: 13px; padding: 8px 16px; }
+
 /* ---- INSIGHT STYLES ---- */
 .insight-area { margin-top: 16px; }
 .insight-toggle { padding: 6px 14px; border: 1px dashed #cbd5e1; border-radius: 6px; background: transparent; color: #94a3b8; font-size: 12px; font-weight: 500; cursor: pointer; width: 100%; text-align: left; font-family: inherit; }
@@ -1297,7 +1502,7 @@ body.hide-sparklines .tk-sparkline-wrap { display: none; }
 .pinned-card-chart { padding: 16px 20px; border-bottom: 1px solid var(--border); text-align: center; }
 .pinned-card-chart svg { max-width: 100%; height: auto; }
 .pinned-card-body { padding: 16px 20px; overflow-x: auto; }
-.pinned-card-insight { padding: 12px 20px; border-top: 1px solid var(--border); background: #f8fafa; border-left: 3px solid var(--brand); font-size: 13px; color: var(--text); }
+.pinned-card-insight { padding: 12px 20px; border-bottom: 1px solid var(--border); background: #f8fafa; border-left: 3px solid var(--brand); font-size: 13px; color: var(--text); }
 .pinned-card-meta { padding: 8px 20px; font-size: 11px; color: var(--text-muted); border-top: 1px solid #f0f0f0; }
 
 /* ---- HELP OVERLAY ---- */
@@ -1317,7 +1522,8 @@ body.hide-sparklines .tk-sparkline-wrap { display: none; }
 @media print {
   .tk-sidebar, .mv-sidebar, .tk-controls, .mv-controls, .tk-segment-tabs,
   .tk-chart-actions, .tk-help-overlay, .report-tabs, .mv-segment-chips,
-  .insight-toggle, .insight-dismiss, .mv-pin-btn, .pinned-card-actions { display: none !important; }
+  .insight-toggle, .insight-dismiss, .mv-pin-btn, .pinned-card-actions,
+  .pinned-toolbar, .tk-segment-selector, .tk-row-hide-btn { display: none !important; }
   .tk-layout, .metrics-tab-layout { display: block; }
   .tk-content, .mv-content { padding: 0; }
   .tk-table-wrapper { border: none; overflow: visible; }
@@ -1327,6 +1533,16 @@ body.hide-sparklines .tk-sparkline-wrap { display: none; }
   .tab-panel:first-child { page-break-before: auto; }
   .tk-header { padding: 8px 16px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .tk-footer { position: fixed; bottom: 0; }
+}
+
+/* Print pinned views only (activated by JS class on body) */
+@media print {
+  body.print-pinned-only .tk-header, body.print-pinned-only .report-tabs,
+  body.print-pinned-only .tab-panel:not(#tab-pinned),
+  body.print-pinned-only .tk-footer { display: none !important; }
+  body.print-pinned-only #tab-pinned { display: block !important; page-break-before: auto; }
+  body.print-pinned-only .pinned-card { page-break-inside: avoid; margin-bottom: 24px; }
+  body.print-pinned-only .pinned-card-chart svg { max-width: 100%; height: auto; }
 }
 '
 
