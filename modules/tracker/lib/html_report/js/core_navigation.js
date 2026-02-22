@@ -75,8 +75,19 @@
       });
     });
 
+    // Update "Showing" label
+    var showingEl = document.getElementById("tk-segment-showing");
+    if (showingEl) {
+      showingEl.innerHTML = "Showing: <strong>" + segmentName + "</strong>";
+    }
+
     // Update sparklines for the selected segment
     updateSparklines(segmentName);
+
+    // Rebuild combined overview chart for new segment
+    if (typeof onOverviewSegmentChanged === "function") {
+      onOverviewSegmentChanged();
+    }
   };
 
   function updateSparklines(segmentName) {
@@ -220,7 +231,7 @@
       });
     });
 
-    if (baseRow) tbody.appendChild(baseRow);
+    if (baseRow) tbody.insertBefore(baseRow, tbody.firstChild);
   }
 
   function formatMetricType(name) {
@@ -305,7 +316,7 @@
       tbody.appendChild(g.metric);
       g.changes.forEach(function(cr) { tbody.appendChild(cr); });
     });
-    if (baseRow) tbody.appendChild(baseRow);
+    if (baseRow) tbody.insertBefore(baseRow, tbody.firstChild);
 
     // Reset sort-by dropdown when user column-sorts
     var sortSelect = document.getElementById("sort-by-select");
@@ -442,7 +453,7 @@
       tbody.appendChild(g.metric);
       g.changes.forEach(function(cr) { tbody.appendChild(cr); });
     });
-    if (baseRow) tbody.appendChild(baseRow);
+    if (baseRow) tbody.insertBefore(baseRow, tbody.firstChild);
   };
 
   /**
@@ -459,7 +470,7 @@
     for (var i = 0; i < originalRowOrder.length; i++) {
       tbody.appendChild(originalRowOrder[i]);
     }
-    if (baseRow) tbody.appendChild(baseRow);
+    if (baseRow) tbody.insertBefore(baseRow, tbody.firstChild);
   }
 
 
@@ -654,6 +665,40 @@
       overlay.style.display = overlay.style.display === "none" ? "flex" : "none";
     }
   };
+
+  // ---- Summary Tab: Metric Type Filter ----
+  window.filterSummaryByType = function(typeKey) {
+    // Update chip active state
+    document.querySelectorAll(".summary-type-chip").forEach(function(chip) {
+      chip.classList.toggle("active", chip.getAttribute("data-type-filter") === typeKey);
+    });
+
+    // Filter rows in summary metrics table
+    var table = document.getElementById("summary-metrics-table");
+    if (!table) return;
+
+    var rows = table.querySelectorAll("tbody tr.tk-metric-row");
+    rows.forEach(function(row) {
+      var rowType = row.getAttribute("data-metric-type") || "other";
+      var visible = typeKey === "all" || rowType === typeKey;
+      row.style.display = visible ? "" : "none";
+    });
+
+    // Hide section headers with no visible children
+    table.querySelectorAll("tbody tr.tk-section-row").forEach(function(secRow) {
+      var next = secRow.nextElementSibling;
+      var hasVisible = false;
+      while (next && !next.classList.contains("tk-section-row")) {
+        if (next.classList.contains("tk-metric-row") && next.style.display !== "none") {
+          hasVisible = true;
+          break;
+        }
+        next = next.nextElementSibling;
+      }
+      secRow.style.display = hasVisible ? "" : "none";
+    });
+  };
+
 
   // ---- Init ----
   document.addEventListener("DOMContentLoaded", function() {

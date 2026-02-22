@@ -703,8 +703,8 @@ test_that("HTML report with multiple segments", {
 
   content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
   expect_true(grepl("Cape Town", content))
-  expect_true(grepl("tk-segment-select", content))  # Dropdown replaces tab bar
-  expect_true(grepl("segment-selector", content))    # Segment selector present
+  expect_true(grepl("tk-seg-sidebar-item", content))  # Sidebar segment items
+  expect_true(grepl("switchSegment", content))        # Segment switching present
 
   unlink(output_path)
 })
@@ -944,7 +944,7 @@ test_that("Metrics by Segment tab has per-metric table with sparkline", {
   expect_true(grepl("tk-sparkline", content))
 
   # Base (n) row
-  expect_true(grepl("Base \\(n\\)", content))
+  expect_true(grepl("Base \\(n=\\)", content))
 
   unlink(output_path)
 })
@@ -1293,7 +1293,7 @@ test_that("Summary metrics table is present on summary tab", {
   unlink(output_path)
 })
 
-test_that("Segment selector dropdown replaces tab bar", {
+test_that("Segment switching uses sidebar (not dropdown)", {
   crosstab_data <- create_test_crosstab_data()
   crosstab_data$banner_segments <- c("Total", "Male", "Female")
   crosstab_data$metadata$n_segments <- 3
@@ -1302,14 +1302,13 @@ test_that("Segment selector dropdown replaces tab bar", {
   result <- generate_tracker_html_report(crosstab_data, config, output_path)
   content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
 
-  # Dropdown selector present
-  expect_true(grepl("tk-segment-select", content))
-  expect_true(grepl("segment-selector", content))
-  expect_true(grepl("switchSegment\\(this\\.value\\)", content))
+  # Sidebar is present with segment items
+  expect_true(grepl("tk-sidebar", content))
+  expect_true(grepl("tk-seg-sidebar-item", content))
+  expect_true(grepl("switchSegment", content))
 
-  # Options for each segment
-  expect_true(grepl("option value=\"Total\"", content, fixed = TRUE))
-  expect_true(grepl("option value=\"Male\"", content, fixed = TRUE))
+  # Sidebar shows segment count
+  expect_true(grepl("Segments \\(3\\)", content))
 
   unlink(output_path)
 })
@@ -1476,7 +1475,7 @@ test_that("Summary metrics table has base row", {
   table_html <- as.character(build_summary_metrics_table(html_data))
 
   expect_true(grepl("tk-base-row", table_html))
-  expect_true(grepl("Base \\(n\\)", table_html))
+  expect_true(grepl("Base \\(n=\\)", table_html))
 })
 
 test_that("Summary tab has insight boxes above metrics table", {
@@ -1536,4 +1535,523 @@ test_that("JS includes overview and summary pin/export functions", {
   expect_true(grepl("exportSummarySlide", content))
 
   unlink(output_path)
+})
+
+
+# ==============================================================================
+# PHASE 1: CSS Variable Alignment + Export Button + Low Base CSS
+# ==============================================================================
+
+test_that("CSS contains aligned Turas design tokens (--ct-* prefix)", {
+  css_output <- build_tracker_css("#323367", "#CC9900")
+
+  # Shared Turas tokens (matching Turas Tabs)
+  expect_true(grepl("--ct-brand:", css_output, fixed = TRUE))
+  expect_true(grepl("--ct-accent:", css_output, fixed = TRUE))
+  expect_true(grepl("--ct-text-primary: #1e293b", css_output, fixed = TRUE))
+  expect_true(grepl("--ct-text-secondary: #64748b", css_output, fixed = TRUE))
+  expect_true(grepl("--ct-bg-surface: #ffffff", css_output, fixed = TRUE))
+  expect_true(grepl("--ct-bg-muted: #f8f9fa", css_output, fixed = TRUE))
+  expect_true(grepl("--ct-border: #e2e8f0", css_output, fixed = TRUE))
+
+  # Module variables updated to match Tabs
+  expect_true(grepl("--text: #1e293b", css_output, fixed = TRUE))
+  expect_true(grepl("--text-muted: #64748b", css_output, fixed = TRUE))
+  expect_true(grepl("--border: #e2e8f0", css_output, fixed = TRUE))
+  expect_true(grepl("--sidebar-w: 280px", css_output, fixed = TRUE))
+})
+
+test_that("CSS contains export-btn class matching Turas Tabs style", {
+  css_output <- build_tracker_css("#323367", "#CC9900")
+
+  expect_true(grepl(".export-btn", css_output, fixed = TRUE))
+  expect_true(grepl(".export-btn:hover", css_output, fixed = TRUE))
+})
+
+test_that("CSS contains low-base warning classes", {
+  css_output <- build_tracker_css("#323367", "#CC9900")
+
+  expect_true(grepl(".tk-low-base", css_output, fixed = TRUE))
+  expect_true(grepl("#dc2626", css_output, fixed = TRUE))  # Red colour
+  expect_true(grepl(".tk-low-base-dim", css_output, fixed = TRUE))
+  expect_true(grepl("opacity: 0.45", css_output, fixed = TRUE))
+})
+
+test_that("CSS contains header action button dark variant", {
+  css_output <- build_tracker_css("#323367", "#CC9900")
+
+  expect_true(grepl(".tk-header-actions", css_output, fixed = TRUE))
+  expect_true(grepl(".tk-header .export-btn", css_output, fixed = TRUE))
+})
+
+
+# ==============================================================================
+# Phase 2: Base Row at TOP + Low Base Warning
+# ==============================================================================
+
+test_that("Segment Overview table has base row as first row in tbody", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  html_data <- transform_tracker_for_html(crosstab_data, config)
+
+  table <- build_tracking_table(html_data, config)
+  table_str <- as.character(table)
+
+  # Base row should appear BEFORE any metric row in the HTML
+  base_pos <- regexpr("tk-base-row", table_str)
+  metric_pos <- regexpr("tk-metric-row", table_str)
+  expect_true(base_pos > 0)
+  expect_true(metric_pos > 0)
+  expect_true(base_pos < metric_pos, info = "Base row should come before metric rows")
+
+  # Base row should contain "Base (n=)"
+  expect_true(grepl("Base \\(n=\\)", table_str))
+})
+
+test_that("Summary metrics table has base row as first row in tbody", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  html_data <- transform_tracker_for_html(crosstab_data, config)
+
+  table <- build_summary_metrics_table(html_data)
+  table_str <- as.character(table)
+
+  # Base row should appear BEFORE any section or metric row
+  base_pos <- regexpr("tk-base-row", table_str)
+  metric_pos <- regexpr("tk-metric-row", table_str)
+  expect_true(base_pos > 0)
+  expect_true(metric_pos > 0)
+  expect_true(base_pos < metric_pos, info = "Base row should come before metric rows in summary table")
+})
+
+test_that("Per-metric table has base row as first row in tbody", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  html_data <- transform_tracker_for_html(crosstab_data, config)
+
+  brand_colour <- "#323367"
+  segments <- html_data$segments
+  segment_colours <- get_segment_colours(segments, brand_colour)
+  mr <- html_data$metric_rows[[1]]
+  sparkline_data <- html_data$sparkline_data[[1]]
+
+  table_html <- build_metric_table(mr, html_data, sparkline_data, segments, segment_colours, brand_colour)
+
+  # Base row should appear BEFORE any metric row
+  base_pos <- regexpr("tk-base-row", table_html)
+  metric_pos <- regexpr("tk-metric-row", table_html)
+  expect_true(base_pos > 0, info = "Per-metric table should have a base row")
+  expect_true(metric_pos > 0)
+  expect_true(base_pos < metric_pos, info = "Base row should come before metric rows in per-metric table")
+
+  # Base row should contain "Base (n=)"
+  expect_true(grepl("Base \\(n=\\)", table_html))
+})
+
+test_that("Low base warning shows when n < 30 in segment overview", {
+  crosstab_data <- create_test_crosstab_data()
+  # Set n to low value (25) for W2
+  crosstab_data$metrics[[1]]$segments$Total$n$W2 <- 25L
+
+  config <- create_test_config()
+  html_data <- transform_tracker_for_html(crosstab_data, config)
+
+  table <- build_tracking_table(html_data, config)
+  table_str <- as.character(table)
+
+  # Should have low-base warning class
+  expect_true(grepl("tk-low-base", table_str, fixed = TRUE))
+  # Should contain the warning icon (&#x26A0; = ⚠)
+  expect_true(grepl("&#x26A0;", table_str, fixed = TRUE))
+  # The value 25 should be inside the low-base span
+  expect_true(grepl("25", table_str, fixed = TRUE))
+})
+
+test_that("Low base dims data cells when n < 30", {
+  crosstab_data <- create_test_crosstab_data()
+  # Set n to low value for W2
+  crosstab_data$metrics[[1]]$segments$Total$n$W2 <- 25L
+
+  config <- create_test_config()
+  html_data <- transform_tracker_for_html(crosstab_data, config)
+
+  table <- build_tracking_table(html_data, config)
+  table_str <- as.character(table)
+
+  # Data cells for that wave should have dim class
+  expect_true(grepl("tk-low-base-dim", table_str, fixed = TRUE))
+})
+
+test_that("Low base warning shows in summary metrics table when n < 30", {
+  crosstab_data <- create_test_crosstab_data()
+  crosstab_data$metrics[[1]]$segments$Total$n$W2 <- 25L
+
+  config <- create_test_config()
+  html_data <- transform_tracker_for_html(crosstab_data, config)
+
+  table <- build_summary_metrics_table(html_data, min_base = 30L)
+  table_str <- as.character(table)
+
+  expect_true(grepl("tk-low-base", table_str, fixed = TRUE))
+  expect_true(grepl("&#x26A0;", table_str, fixed = TRUE))
+})
+
+test_that("Low base warning shows in per-metric table when n < 30", {
+  crosstab_data <- create_test_crosstab_data()
+  crosstab_data$metrics[[1]]$segments$Total$n$W2 <- 25L
+
+  config <- create_test_config()
+  html_data <- transform_tracker_for_html(crosstab_data, config)
+
+  brand_colour <- "#323367"
+  segments <- html_data$segments
+  segment_colours <- get_segment_colours(segments, brand_colour)
+  mr <- html_data$metric_rows[[1]]
+  sparkline_data <- html_data$sparkline_data[[1]]
+
+  table_html <- build_metric_table(mr, html_data, sparkline_data, segments, segment_colours, brand_colour, min_base = 30L)
+
+  # Should have base row with low-base warning
+  expect_true(grepl("tk-low-base", table_html, fixed = TRUE))
+  # Should dim data cells
+  expect_true(grepl("tk-low-base-dim", table_html, fixed = TRUE))
+})
+
+test_that("JS sort functions use insertBefore to keep base row at top", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # All sort functions should use insertBefore for base row (not appendChild)
+  expect_true(grepl("insertBefore(baseRow, tbody.firstChild)", content, fixed = TRUE))
+  # Should NOT have appendChild(baseRow) for base row
+  expect_false(grepl("appendChild(baseRow)", content, fixed = TRUE))
+
+  unlink(output_path)
+})
+
+test_that("Summary metrics table has id and data-metric-type attributes", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  html_data <- transform_tracker_for_html(crosstab_data, config)
+
+  table <- build_summary_metrics_table(html_data)
+  table_str <- as.character(table)
+
+  # Should have id for JS targeting
+  expect_true(grepl('id="summary-metrics-table"', table_str, fixed = TRUE))
+  # Metric rows should have data-metric-type
+  expect_true(grepl('data-metric-type="mean"', table_str, fixed = TRUE))
+  expect_true(grepl('data-metric-type="nps"', table_str, fixed = TRUE))
+})
+
+
+# ==============================================================================
+# Phase 3: Save Report Button on Every Screen
+# ==============================================================================
+
+test_that("Report tab nav contains Save Report and Print buttons with export-btn class", {
+  # Save Report and Print moved from header to the report-tabs bar in the body
+  tab_nav <- build_report_tab_nav("#323367")
+  nav_str <- as.character(tab_nav)
+
+  # Save Report button
+  expect_true(grepl("saveReportHTML", nav_str, fixed = TRUE))
+  expect_true(grepl("Save Report", nav_str, fixed = TRUE))
+  # Print button
+  expect_true(grepl("printReport", nav_str, fixed = TRUE))
+  expect_true(grepl("Print", nav_str, fixed = TRUE))
+  # export-btn class on buttons
+  expect_true(grepl("export-btn", nav_str, fixed = TRUE))
+  # Tab actions container
+  expect_true(grepl("tk-tab-actions", nav_str, fixed = TRUE))
+})
+
+
+# ==============================================================================
+# Phase 4: Summary Tab Enhancements
+# ==============================================================================
+
+test_that("Summary tab has metric type filter chips", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  html_data <- transform_tracker_for_html(crosstab_data, config)
+
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # Should have type filter chips on summary tab
+  expect_true(grepl("summary-type-filter", content, fixed = TRUE))
+  expect_true(grepl("summary-type-chip", content, fixed = TRUE))
+  expect_true(grepl("filterSummaryByType", content, fixed = TRUE))
+
+  unlink(output_path)
+})
+
+test_that("Summary tab has action buttons (Export Excel, Pin, Export Slide)", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  html_data <- transform_tracker_for_html(crosstab_data, config)
+
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # Action buttons present
+  expect_true(grepl("exportSummaryExcel", content, fixed = TRUE))
+  expect_true(grepl("pinSummaryTable", content, fixed = TRUE))
+  expect_true(grepl("exportSummaryTableSlide", content, fixed = TRUE))
+  # Buttons use export-btn class
+  expect_true(grepl("summary-actions", content, fixed = TRUE))
+
+  unlink(output_path)
+})
+
+test_that("JS has filterSummaryByType function", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  expect_true(grepl("window.filterSummaryByType", content, fixed = TRUE))
+  expect_true(grepl("summary-metrics-table", content, fixed = TRUE))
+
+  unlink(output_path)
+})
+
+test_that("JS has exportSummaryExcel, pinSummaryTable, exportSummaryTableSlide functions", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  expect_true(grepl("function exportSummaryExcel", content, fixed = TRUE))
+  expect_true(grepl("function pinSummaryTable", content, fixed = TRUE))
+  expect_true(grepl("function exportSummaryTableSlide", content, fixed = TRUE))
+
+  unlink(output_path)
+})
+
+
+# ==============================================================================
+# Phase 5: Metric by Segment — Button Styling + Export Slide
+# ==============================================================================
+
+test_that("Metric panels use export-btn class instead of old mv-export-btn", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  html_data <- transform_tracker_for_html(crosstab_data, config)
+
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # Export and Pin buttons should use export-btn class
+  expect_true(grepl('class="export-btn" onclick="exportMetricExcel', content, fixed = TRUE))
+  expect_true(grepl('class="export-btn" onclick="pinMetricView', content, fixed = TRUE))
+
+  # Old mv-export-btn / mv-pin-btn classes should NOT be used on these buttons
+  expect_false(grepl('class="tk-btn mv-export-btn"', content, fixed = TRUE))
+  expect_false(grepl('class="tk-btn mv-pin-btn"', content, fixed = TRUE))
+
+  unlink(output_path)
+})
+
+test_that("Metric panels have Export Slide button", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  html_data <- transform_tracker_for_html(crosstab_data, config)
+
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # Export Slide button present
+  expect_true(grepl("Export Slide", content, fixed = TRUE))
+  expect_true(grepl('exportSlidePNG', content, fixed = TRUE))
+
+  unlink(output_path)
+})
+
+
+# ==============================================================================
+# Phase 6: Segment Overview Sidebar + Colour Bar
+# ==============================================================================
+
+test_that("Overview table has segment indicator row with colour cells", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  html_data <- transform_tracker_for_html(crosstab_data, config)
+
+  table <- build_tracking_table(html_data, config)
+  table_str <- as.character(table)
+
+  # Should have segment indicator row
+  expect_true(grepl("tk-segment-indicator-row", table_str, fixed = TRUE))
+  expect_true(grepl("tk-segment-indicator", table_str, fixed = TRUE))
+})
+
+test_that("Overview table has 'Showing' label above table", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  html_data <- transform_tracker_for_html(crosstab_data, config)
+
+  table <- build_tracking_table(html_data, config)
+  table_str <- as.character(table)
+
+  expect_true(grepl("tk-segment-showing", table_str, fixed = TRUE))
+  expect_true(grepl("Showing:", table_str, fixed = TRUE))
+})
+
+test_that("JS switchSegment updates the Showing label", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  expect_true(grepl("tk-segment-showing", content, fixed = TRUE))
+  # JS should update the label
+  expect_true(grepl("getElementById(\"tk-segment-showing\")", content, fixed = TRUE))
+
+  unlink(output_path)
+})
+
+test_that("CSS has segment indicator and showing label styles", {
+  css_output <- build_tracker_css("#323367", "#CC9900")
+
+  expect_true(grepl(".tk-segment-indicator", css_output, fixed = TRUE))
+  expect_true(grepl(".tk-segment-showing", css_output, fixed = TRUE))
+})
+
+
+# ==============================================================================
+# Phase 7: Segment Overview Chart — Additive Row Selection
+# ==============================================================================
+
+test_that("Overview table metric rows have 'Add to Chart' button", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  html_data <- transform_tracker_for_html(crosstab_data, config)
+
+  table <- build_tracking_table(html_data, config)
+  table_str <- as.character(table)
+
+  # Add to chart button
+  expect_true(grepl("tk-add-chart-btn", table_str, fixed = TRUE))
+  expect_true(grepl("addToChart", table_str, fixed = TRUE))
+})
+
+test_that("Chart containers start hidden (additive selection)", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # Chart containers should be hidden by default
+  expect_true(grepl('class="tk-chart-container"', content, fixed = TRUE))
+  # Chart header with selection count
+  expect_true(grepl("tk-chart-count", content, fixed = TRUE))
+  expect_true(grepl("Charts (0 selected)", content, fixed = TRUE))
+
+  unlink(output_path)
+})
+
+test_that("JS has addToChart, removeFromChart, getChartSelection functions", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  expect_true(grepl("window.addToChart", content, fixed = TRUE))
+  expect_true(grepl("window.removeFromChart", content, fixed = TRUE))
+  expect_true(grepl("window.getChartSelection", content, fixed = TRUE))
+  expect_true(grepl("window.exportSelectedChartsSlide", content, fixed = TRUE))
+  expect_true(grepl("window.pinSelectedCharts", content, fixed = TRUE))
+
+  unlink(output_path)
+})
+
+test_that("Chart panel has header with Export Slide and Pin buttons", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  expect_true(grepl("tk-chart-header", content, fixed = TRUE))
+  expect_true(grepl("exportSelectedChartsSlide", content, fixed = TRUE))
+  expect_true(grepl("pinSelectedCharts", content, fixed = TRUE))
+  expect_true(grepl("tk-chart-remove-btn", content, fixed = TRUE))
+
+  unlink(output_path)
+})
+
+
+# ==============================================================================
+# Phase 8: Pinned Views as PNG
+# ==============================================================================
+
+test_that("JS has pngDataUrl handling in pin objects", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # captureMetricView should store pngDataUrl
+  expect_true(grepl("pngDataUrl", content, fixed = TRUE))
+  # capturePinAsPng function should exist
+  expect_true(grepl("capturePinAsPng", content, fixed = TRUE))
+
+  unlink(output_path)
+})
+
+test_that("Pinned card renders PNG image when pngDataUrl exists", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  # renderPinnedCards should check for pngDataUrl and render <img>
+  expect_true(grepl("pinned-card-png", content, fixed = TRUE))
+  expect_true(grepl("pin.pngDataUrl", content, fixed = TRUE))
+
+  unlink(output_path)
+})
+
+test_that("CSS has pinned-card-png style for PNG images", {
+  css_output <- build_tracker_css("#323367", "#CC9900")
+  expect_true(grepl("pinned-card-png", css_output, fixed = TRUE))
+  expect_true(grepl("max-width: 100%", css_output, fixed = TRUE))
+})
+
+
+# ==============================================================================
+# Phase 9: Code Cleanup
+# ==============================================================================
+
+test_that("Top-level container has data-report-module='tracker' attribute", {
+  crosstab_data <- create_test_crosstab_data()
+  config <- create_test_config()
+  output_path <- tempfile(fileext = ".html")
+  result <- generate_tracker_html_report(crosstab_data, config, output_path)
+  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+
+  expect_true(grepl('data-report-module="tracker"', content, fixed = TRUE))
+
+  unlink(output_path)
+})
+
+test_that("Legacy build_tracker_sidebar function is removed", {
+  # build_tracker_sidebar was a passthrough wrapper — now removed
+  expect_false(exists("build_tracker_sidebar", mode = "function"))
 })

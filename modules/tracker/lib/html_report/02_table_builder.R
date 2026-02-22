@@ -12,6 +12,7 @@
 #' Creates the complete HTML table for the tracking crosstab.
 #' Rows = metrics with change sub-rows.
 #' Columns = waves, shown per active banner segment.
+#' Base row appears at the top with low-base warnings when n < min_base.
 #'
 #' @param html_data List. Output from transform_tracker_for_html()
 #' @param config List. Tracker configuration
@@ -23,18 +24,44 @@ build_tracking_table <- function(html_data, config) {
   wave_labels <- html_data$wave_labels
   segments <- html_data$segments
   n_waves <- length(waves)
+  min_base <- as.integer(get_setting(config, "significance_min_base", default = 30) %||% 30)
 
   brand_colour <- get_setting(config, "brand_colour", default = "#323367") %||% "#323367"
   segment_colours <- get_segment_colours(segments, brand_colour)
 
   parts <- c()
 
+  # "Showing" label above table
+  first_seg <- segments[1]
+  parts <- c(parts, sprintf(
+    '<div class="tk-segment-showing" id="tk-segment-showing">Showing: <strong>%s</strong></div>',
+    htmltools::htmlEscape(first_seg)
+  ))
+
   # Table wrapper
   parts <- c(parts, '<div class="tk-table-wrapper">')
   parts <- c(parts, '<table class="tk-table" id="tk-crosstab-table">')
 
-  # ---- THEAD: Single header row (Metric + wave columns per segment) ----
+  # ---- THEAD: Segment indicator row + wave header row ----
   parts <- c(parts, '<thead>')
+
+  # Segment colour indicator row
+  parts <- c(parts, '<tr class="tk-segment-indicator-row">')
+  parts <- c(parts, '<th class="tk-segment-indicator tk-sticky-col"></th>')  # Empty label cell
+  for (seg_idx in seq_along(segments)) {
+    seg_name <- segments[seg_idx]
+    seg_colour <- segment_colours[seg_idx]
+    for (w_idx in seq_along(waves)) {
+      parts <- c(parts, sprintf(
+        '<th class="tk-segment-indicator bg-%s" data-segment="%s" style="background-color:%s"></th>',
+        make_css_safe(seg_name),
+        htmltools::htmlEscape(seg_name),
+        seg_colour
+      ))
+    }
+  }
+  parts <- c(parts, '</tr>')
+
   parts <- c(parts, '<tr class="tk-wave-header-row">')
   parts <- c(parts, '<th class="tk-th tk-label-col tk-sticky-col">Metric</th>')
 
@@ -56,10 +83,39 @@ build_tracking_table <- function(html_data, config) {
   parts <- c(parts, '</tr>')
   parts <- c(parts, '</thead>')
 
-  # ---- TBODY: Section headers + Metric rows ----
+  # ---- TBODY: Base row at top, then section headers + metric rows ----
   parts <- c(parts, '<tbody>')
-  current_section <- ""
   total_cols <- 1 + length(segments) * n_waves
+
+  # Base (n) row at the TOP of the table
+  if (length(html_data$metric_rows) > 0) {
+    parts <- c(parts, '<tr class="tk-base-row">')
+    parts <- c(parts, '<td class="tk-td tk-label-col tk-sticky-col tk-base-label">Base (n=)</td>')
+    first_metric <- html_data$metric_rows[[1]]
+    for (seg_idx in seq_along(segments)) {
+      seg_name <- segments[seg_idx]
+      cells <- first_metric$segment_cells[[seg_name]]
+      for (wid in waves) {
+        cell <- cells[[wid]]
+        n_val <- if (!is.null(cell) && !is.na(cell$n)) cell$n else NA
+        if (!is.na(n_val) && n_val < min_base) {
+          n_display <- sprintf('<span class="tk-low-base">%s &#x26A0;</span>', n_val)
+        } else {
+          n_display <- if (!is.na(n_val)) as.character(n_val) else ""
+        }
+        parts <- c(parts, sprintf(
+          '<td class="tk-td tk-base-cell bg-%s" data-segment="%s" data-n="%s">%s</td>',
+          make_css_safe(seg_name),
+          htmltools::htmlEscape(seg_name),
+          if (!is.na(n_val)) n_val else "",
+          n_display
+        ))
+      }
+    }
+    parts <- c(parts, '</tr>')
+  }
+
+  current_section <- ""
 
   for (m_idx in seq_along(html_data$metric_rows)) {
     mr <- html_data$metric_rows[[m_idx]]
@@ -98,10 +154,11 @@ build_tracking_table <- function(html_data, config) {
     }
 
     parts <- c(parts, sprintf(
-      '<td class="tk-td tk-label-col tk-sticky-col"><button class="tk-row-hide-btn" onclick="toggleRowVisibility(\'%s\')" title="Hide this metric">&#x1F441;</button><span class="tk-metric-label">%s</span><span class="tk-sparkline-wrap">%s</span></td>',
+      '<td class="tk-td tk-label-col tk-sticky-col"><button class="tk-row-hide-btn" onclick="toggleRowVisibility(\'%s\')" title="Hide this metric">&#x1F441;</button><span class="tk-metric-label">%s</span><span class="tk-sparkline-wrap">%s</span><button class="tk-add-chart-btn" data-metric-id="%s" onclick="addToChart(\'%s\')" title="Add to chart">&#x1F4C8;</button></td>',
       mr$metric_id,
       htmltools::htmlEscape(mr$metric_label),
-      sparkline_svg
+      sparkline_svg,
+      mr$metric_id, mr$metric_id
     ))
 
     # Data cells per segment per wave
@@ -123,10 +180,13 @@ build_tracking_table <- function(html_data, config) {
         sort_val <- if (!is.na(cell$value)) cell$value else ""
         is_latest <- (wid == waves[n_waves])
         latest_class <- if (is_latest) " tk-latest-wave" else ""
+        # Dim cells with low base
+        low_base_class <- if (!is.na(cell$n) && cell$n < min_base) " tk-low-base-dim" else ""
 
         parts <- c(parts, sprintf(
-          '<td class="tk-td tk-value-cell%s bg-%s" data-segment="%s" data-wave="%s" data-sort-val="%s" data-n="%s">%s</td>',
+          '<td class="tk-td tk-value-cell%s%s bg-%s" data-segment="%s" data-wave="%s" data-sort-val="%s" data-n="%s">%s</td>',
           latest_class,
+          low_base_class,
           make_css_safe(seg_name),
           htmltools::htmlEscape(seg_name),
           htmltools::htmlEscape(wid),
@@ -193,28 +253,7 @@ build_tracking_table <- function(html_data, config) {
     parts <- c(parts, '</tr>')
   }
 
-  # Base row at bottom
-  parts <- c(parts, sprintf(
-    '<tr class="tk-base-row"><td class="tk-td tk-label-col tk-sticky-col tk-base-label">Base (n)</td>'
-  ))
-  for (seg_idx in seq_along(segments)) {
-    seg_name <- segments[seg_idx]
-    # Use first metric's n values as representative
-    first_metric <- html_data$metric_rows[[1]]
-    cells <- first_metric$segment_cells[[seg_name]]
-
-    for (wid in waves) {
-      cell <- cells[[wid]]
-      n_display <- if (!is.null(cell) && !is.na(cell$n)) cell$n else ""
-      parts <- c(parts, sprintf(
-        '<td class="tk-td tk-base-cell bg-%s" data-segment="%s">%s</td>',
-        make_css_safe(seg_name),
-        htmltools::htmlEscape(seg_name),
-        n_display
-      ))
-    }
-  }
-  parts <- c(parts, '</tr>')
+  # Base row removed from bottom — now rendered at top of tbody
 
   parts <- c(parts, '</tbody>')
   parts <- c(parts, '</table>')

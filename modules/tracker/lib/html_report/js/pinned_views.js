@@ -141,7 +141,7 @@ function captureMetricView(metricId) {
     chartSvg = chartClone.innerHTML;
   }
 
-  return {
+  var pinObj = {
     id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
     metricId: metricId,
     metricTitle: titleEl ? titleEl.textContent : metricId,
@@ -150,9 +150,94 @@ function captureMetricView(metricId) {
     chartSvg: chartSvg,
     chartVisible: chartVisible,
     insightText: insightEditor ? insightEditor.innerHTML : "",
+    pngDataUrl: null,
     timestamp: Date.now(),
     order: pinnedViews.length
   };
+
+  // Attempt PNG capture via foreignObject SVG → canvas
+  capturePinAsPng(panel, pinObj);
+
+  return pinObj;
+}
+
+
+/**
+ * Capture a DOM element as a PNG data URL using foreignObject SVG → canvas.
+ * Stores the result in pinObj.pngDataUrl asynchronously. The pinned card
+ * will re-render once the PNG is available.
+ * @param {HTMLElement} sourceEl - The DOM element to capture
+ * @param {Object} pinObj - The pin object to update with pngDataUrl
+ */
+function capturePinAsPng(sourceEl, pinObj) {
+  if (!sourceEl) return;
+
+  var w = sourceEl.offsetWidth || 800;
+  var h = sourceEl.offsetHeight || 400;
+  var scale = 2;
+
+  // Clone and inline styles
+  var clone = sourceEl.cloneNode(true);
+
+  // Remove controls, buttons, etc from the clone
+  clone.querySelectorAll(".mv-controls, .mv-segment-chips, .mv-wave-chips, .insight-area, .mv-segment-grouped").forEach(function(el) {
+    el.parentNode.removeChild(el);
+  });
+  clone.querySelectorAll("button").forEach(function(el) {
+    el.parentNode.removeChild(el);
+  });
+
+  inlineStyles(clone);
+
+  var svgNs = "http://www.w3.org/2000/svg";
+  var svg = document.createElementNS(svgNs, "svg");
+  svg.setAttribute("width", w);
+  svg.setAttribute("height", h);
+  svg.setAttribute("xmlns", svgNs);
+
+  var foreignObject = document.createElementNS(svgNs, "foreignObject");
+  foreignObject.setAttribute("width", "100%");
+  foreignObject.setAttribute("height", "100%");
+
+  var body = document.createElement("div");
+  body.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+  body.style.width = w + "px";
+  body.style.fontFamily = "-apple-system, BlinkMacSystemFont, sans-serif";
+  body.style.fontSize = "13px";
+  body.style.background = "#ffffff";
+  body.appendChild(clone);
+  foreignObject.appendChild(body);
+  svg.appendChild(foreignObject);
+
+  var svgData = new XMLSerializer().serializeToString(svg);
+  var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+  var svgUrl = URL.createObjectURL(svgBlob);
+
+  var img = new Image();
+  img.onload = function() {
+    var canvas = document.createElement("canvas");
+    canvas.width = w * scale;
+    canvas.height = h * scale;
+    var ctx = canvas.getContext("2d");
+    ctx.scale(scale, scale);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+
+    try {
+      pinObj.pngDataUrl = canvas.toDataURL("image/png");
+      // Re-render pinned cards to show PNG
+      renderPinnedCards();
+    } catch (e) {
+      // Security/tainted canvas — fallback to HTML rendering
+    }
+
+    URL.revokeObjectURL(svgUrl);
+  };
+  img.onerror = function() {
+    URL.revokeObjectURL(svgUrl);
+  };
+  img.src = svgUrl;
 }
 
 /**
@@ -210,19 +295,29 @@ function renderPinnedCards() {
     html += "<button class=\"tk-btn tk-btn-sm\" onclick=\"removePinned('" + pin.id + "','" + pin.metricId + "')\" title=\"Remove pin\">\u00d7</button>";
     html += "</div></div>";
 
-    // Insight (above chart/table for prominence)
+    // Editable insight (each pin has its own independent insight)
+    html += "<div class=\"pinned-card-insight-area\">";
     if (pin.insightText) {
-      html += "<div class=\"pinned-card-insight\">" + pin.insightText + "</div>";
+      html += "<div class=\"pinned-card-insight-editor insight-editor\" contenteditable=\"true\" data-pin-id=\"" + pin.id + "\" oninput=\"syncPinnedInsight('" + pin.id + "',this)\">" + pin.insightText + "</div>";
+    } else {
+      html += "<button class=\"insight-toggle pinned-insight-toggle\" onclick=\"showPinnedInsight('" + pin.id + "',this)\">+ Add Insight</button>";
+      html += "<div class=\"pinned-card-insight-editor insight-editor\" contenteditable=\"true\" data-pin-id=\"" + pin.id + "\" oninput=\"syncPinnedInsight('" + pin.id + "',this)\" style=\"display:none\" data-placeholder=\"Type insight for this pin...\"></div>";
     }
+    html += "</div>";
 
-    // Chart (if captured and was visible)
-    if (pin.chartSvg && pin.chartVisible !== false) {
-      html += "<div class=\"pinned-card-chart\">" + pin.chartSvg + "</div>";
-    }
+    // PNG snapshot (preferred) or fallback to HTML
+    if (pin.pngDataUrl) {
+      html += "<div class=\"pinned-card-body\"><img class=\"pinned-card-png\" src=\"" + pin.pngDataUrl + "\" alt=\"" + escapeHtml(pin.metricTitle) + "\"></div>";
+    } else {
+      // Chart (if captured and was visible)
+      if (pin.chartSvg && pin.chartVisible !== false) {
+        html += "<div class=\"pinned-card-chart\">" + pin.chartSvg + "</div>";
+      }
 
-    // Table
-    if (pin.tableHtml) {
-      html += "<div class=\"pinned-card-body\">" + pin.tableHtml + "</div>";
+      // Table
+      if (pin.tableHtml) {
+        html += "<div class=\"pinned-card-body\">" + pin.tableHtml + "</div>";
+      }
     }
 
     // Meta
@@ -268,6 +363,31 @@ function updatePinBadge() {
     badge.textContent = pinnedViews.length;
     badge.style.display = pinnedViews.length > 0 ? "inline-block" : "none";
   }
+}
+
+/**
+ * Show the insight editor on a pinned card
+ */
+function showPinnedInsight(pinId, btn) {
+  var editor = btn.nextElementSibling;
+  if (editor) {
+    editor.style.display = "block";
+    editor.focus();
+  }
+  btn.style.display = "none";
+}
+
+/**
+ * Sync a pinned card's insight text to the pinnedViews data
+ */
+function syncPinnedInsight(pinId, editor) {
+  for (var i = 0; i < pinnedViews.length; i++) {
+    if (pinnedViews[i].id === pinId) {
+      pinnedViews[i].insightText = editor.innerHTML;
+      break;
+    }
+  }
+  savePinnedData();
 }
 
 /**
@@ -485,6 +605,19 @@ function saveReportHTML() {
   // Save current pin data to JSON store
   savePinnedData();
 
+  // Stamp the header date badge with "Last saved" timestamp (like Turas Tabs)
+  var dateBadge = document.getElementById("header-date-badge");
+  if (dateBadge) {
+    var now = new Date();
+    var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    var d = now.getDate();
+    var m = months[now.getMonth()];
+    var y = now.getFullYear();
+    var hh = String(now.getHours()).padStart(2, "0");
+    var mm = String(now.getMinutes()).padStart(2, "0");
+    dateBadge.textContent = "Last saved " + d + " " + m + " " + y + " " + hh + ":" + mm;
+  }
+
   // Save insight editor contents to hidden textareas
   document.querySelectorAll(".insight-editor").forEach(function(editor) {
     var store = editor.closest(".insight-area");
@@ -607,6 +740,146 @@ function exportSummarySlide(sectionType) {
     URL.revokeObjectURL(svgUrl);
   };
   img.src = svgUrl;
+}
+
+
+// ---- Summary Table Actions ----
+
+/**
+ * Export the summary metrics table as Excel XML.
+ */
+function exportSummaryExcel() {
+  var table = document.getElementById("summary-metrics-table");
+  if (!table) return;
+
+  var xml = '<?xml version="1.0"?>\n';
+  xml += '<?mso-application progid="Excel.Sheet"?>\n';
+  xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\n';
+  xml += ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n';
+
+  xml += '<Styles>\n';
+  xml += '<Style ss:ID="Default"><Font ss:FontName="Calibri" ss:Size="11"/></Style>\n';
+  xml += '<Style ss:ID="Title"><Font ss:FontName="Calibri" ss:Size="14" ss:Bold="1"/></Style>\n';
+  xml += '<Style ss:ID="Header"><Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1"/><Interior ss:Color="#D9E2F3" ss:Pattern="Solid"/></Style>\n';
+  xml += '</Styles>\n';
+
+  xml += '<Worksheet ss:Name="Summary"><Table>\n';
+
+  // Title row
+  xml += '<Row><Cell ss:StyleID="Title"><Data ss:Type="String">Summary Metrics Overview</Data></Cell></Row>\n';
+  xml += '<Row></Row>\n';
+
+  // Headers
+  var headerRow = table.querySelector("thead tr");
+  if (headerRow) {
+    xml += '<Row>\n';
+    headerRow.querySelectorAll("th").forEach(function(th) {
+      xml += '<Cell ss:StyleID="Header"><Data ss:Type="String">' + xmlEscape(th.textContent.trim()) + '</Data></Cell>\n';
+    });
+    xml += '</Row>\n';
+  }
+
+  // Body rows (skip hidden)
+  table.querySelectorAll("tbody tr").forEach(function(tr) {
+    if (tr.style.display === "none") return;
+    if (tr.classList.contains("tk-base-row")) {
+      xml += '<Row>\n';
+      tr.querySelectorAll("td").forEach(function(td) {
+        xml += '<Cell><Data ss:Type="String">' + xmlEscape(td.textContent.trim()) + '</Data></Cell>\n';
+      });
+      xml += '</Row>\n';
+      return;
+    }
+    if (tr.classList.contains("tk-section-row")) {
+      xml += '<Row><Cell><Data ss:Type="String">' + xmlEscape(tr.textContent.trim()) + '</Data></Cell></Row>\n';
+      return;
+    }
+    xml += '<Row>\n';
+    tr.querySelectorAll("td").forEach(function(td) {
+      var label = td.querySelector(".tk-metric-label");
+      var text = label ? label.textContent.trim() : td.textContent.trim();
+      xml += '<Cell><Data ss:Type="String">' + xmlEscape(text) + '</Data></Cell>\n';
+    });
+    xml += '</Row>\n';
+  });
+
+  xml += '</Table>\n</Worksheet>\n</Workbook>';
+  downloadBlob(xml, "summary_metrics.xls", "application/vnd.ms-excel");
+}
+
+/**
+ * Pin the summary metrics table as a view.
+ */
+function pinSummaryTable() {
+  var table = document.getElementById("summary-metrics-table");
+  if (!table) return;
+
+  var clone = table.cloneNode(true);
+  // Remove hidden rows
+  clone.querySelectorAll("tr").forEach(function(tr) {
+    if (tr.style.display === "none") tr.parentNode.removeChild(tr);
+  });
+
+  var pinObj = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+    metricId: "summary-metrics-table",
+    metricTitle: "Summary Metrics Overview",
+    visibleSegments: [],
+    tableHtml: '<div class="tk-table-wrapper">' + clone.outerHTML + '</div>',
+    chartSvg: "",
+    chartVisible: false,
+    insightText: "",
+    timestamp: Date.now(),
+    order: pinnedViews.length
+  };
+
+  pinnedViews.push(pinObj);
+  renderPinnedCards();
+  updatePinBadge();
+  savePinnedData();
+}
+
+/**
+ * Export summary metrics table as a slide PNG.
+ */
+function exportSummaryTableSlide() {
+  var table = document.getElementById("summary-metrics-table");
+  if (!table) return;
+
+  var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367";
+  var slideW = 1280, slideH = 720, scale = 3;
+  var canvas = document.createElement("canvas");
+  canvas.width = slideW * scale;
+  canvas.height = slideH * scale;
+  var ctx = canvas.getContext("2d");
+  ctx.scale(scale, scale);
+
+  // Background
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, slideW, slideH);
+
+  // Header bar
+  ctx.fillStyle = brandColour;
+  ctx.fillRect(0, 0, slideW, 60);
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 22px -apple-system, sans-serif";
+  ctx.fillText("Summary Metrics Overview", 30, 40);
+
+  // Table placeholder
+  ctx.fillStyle = "#666";
+  ctx.font = "13px -apple-system, sans-serif";
+  ctx.fillText("See HTML report for full interactive table", 30, 90);
+
+  canvas.toBlob(function(blob) {
+    if (!blob) return;
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "summary_metrics_slide.png";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  }, "image/png");
 }
 
 

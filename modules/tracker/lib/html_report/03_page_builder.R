@@ -41,7 +41,7 @@ build_tracker_page <- function(html_data, table_html, charts, config) {
     build_report_tab_nav(brand_colour),
 
     # ---- TAB PANELS ----
-    htmltools::tags$div(class = "tk-tab-panels",
+    htmltools::tags$div(class = "tk-tab-panels", `data-report-module` = "tracker",
 
       # Tab 1: Summary
       htmltools::tags$div(id = "tab-summary", class = "tab-panel active",
@@ -58,7 +58,6 @@ build_tracker_page <- function(html_data, table_html, charts, config) {
         htmltools::tags$div(class = "tk-layout",
           build_overview_sidebar(html_data, config),
           htmltools::tags$main(class = "tk-content",
-            build_segment_selector(html_data, config, brand_colour),
             build_controls(html_data, config),
             htmltools::tags$div(class = "tk-main-area",
               htmltools::tags$div(class = "tk-table-panel", table_html),
@@ -159,6 +158,21 @@ build_report_tab_nav <- function(brand_colour) {
           "0"
         )
       )
+    ),
+    # Spacer pushes action buttons to the right
+    htmltools::tags$div(style = "flex:1"),
+    # Save Report + Print buttons (body-level, not in header)
+    htmltools::tags$div(class = "tk-tab-actions",
+      htmltools::tags$button(
+        class = "export-btn",
+        onclick = "saveReportHTML()",
+        "\U0001F4BE Save Report"
+      ),
+      htmltools::tags$button(
+        class = "export-btn",
+        onclick = "printReport()",
+        "\U0001F5A8 Print"
+      )
     )
   )
 }
@@ -236,9 +250,52 @@ build_summary_tab <- function(html_data, config) {
       )
     ),
 
+    # Metric type filter chips (only if more than one type present)
+    htmltools::HTML(build_summary_type_filter(html_data)),
+
+    # Action buttons bar
+    htmltools::tags$div(class = "summary-actions",
+      htmltools::tags$button(class = "export-btn",
+        onclick = "exportSummaryExcel()",
+        htmltools::HTML("&#x1F4CA; Export Excel")),
+      htmltools::tags$button(class = "export-btn",
+        onclick = "pinSummaryTable()",
+        htmltools::HTML("&#x1F4CC; Pin Table")),
+      htmltools::tags$button(class = "export-btn",
+        onclick = "exportSummaryTableSlide()",
+        htmltools::HTML("&#x1F4F8; Export Slide"))
+    ),
+
     # Metrics Overview table (Total segment by wave) — at bottom
     build_summary_metrics_table(html_data)
   )
+}
+
+
+#' Build Summary Tab Type Filter Chips
+#' @keywords internal
+build_summary_type_filter <- function(html_data) {
+  metric_types_present <- unique(vapply(html_data$metric_rows, function(mr) {
+    classify_metric_type(mr$metric_name)
+  }, character(1)))
+
+  if (length(metric_types_present) <= 1) return("")
+
+  type_label_map <- list(mean = "Mean / Rating", pct = "% / Top Box", nps = "NPS", other = "Other")
+  chips <- c('<div class="summary-type-filter">')
+  chips <- c(chips,
+    '<button class="summary-type-chip active" data-type-filter="all" onclick="filterSummaryByType(\'all\')">All</button>'
+  )
+  for (mt in c("mean", "pct", "nps", "other")) {
+    if (mt %in% metric_types_present) {
+      chips <- c(chips, sprintf(
+        '<button class="summary-type-chip" data-type-filter="%s" onclick="filterSummaryByType(\'%s\')">%s</button>',
+        mt, mt, type_label_map[[mt]]
+      ))
+    }
+  }
+  chips <- c(chips, '</div>')
+  paste(chips, collapse = "\n")
 }
 
 
@@ -250,7 +307,7 @@ build_summary_tab <- function(html_data, config) {
 #' @param html_data List. Output from transform_tracker_for_html()
 #' @return htmltools::HTML object
 #' @keywords internal
-build_summary_metrics_table <- function(html_data) {
+build_summary_metrics_table <- function(html_data, min_base = 30L) {
 
   seg_name <- html_data$segments[1]  # Total (or first segment)
   waves <- html_data$waves
@@ -259,7 +316,7 @@ build_summary_metrics_table <- function(html_data) {
   parts <- c()
   parts <- c(parts, '<div class="summary-metrics-table-wrap">')
   parts <- c(parts, '<h3 class="summary-insight-title">Metrics Overview</h3>')
-  parts <- c(parts, '<table class="tk-table summary-metrics-table">')
+  parts <- c(parts, '<table class="tk-table summary-metrics-table" id="summary-metrics-table">')
 
   # Header
   parts <- c(parts, '<thead><tr>')
@@ -271,10 +328,42 @@ build_summary_metrics_table <- function(html_data) {
 
   # Body
   parts <- c(parts, '<tbody>')
-  current_section <- ""
   total_cols <- 1 + length(waves)
 
+  # Base (n=) row at TOP
+  if (length(html_data$metric_rows) > 0) {
+    first_metric <- html_data$metric_rows[[1]]
+    base_cells <- first_metric$segment_cells[[seg_name]]
+    parts <- c(parts, '<tr class="tk-base-row">')
+    parts <- c(parts, '<td class="tk-td tk-label-col tk-base-label">Base (n=)</td>')
+    for (wid in waves) {
+      cell <- base_cells[[wid]]
+      n_val <- if (!is.null(cell) && !is.na(cell$n)) cell$n else NA
+      if (!is.na(n_val) && n_val < min_base) {
+        n_display <- sprintf('<span class="tk-low-base">%s &#x26A0;</span>', n_val)
+      } else {
+        n_display <- if (!is.na(n_val)) as.character(n_val) else ""
+      }
+      parts <- c(parts, sprintf('<td class="tk-td tk-base-cell">%s</td>', n_display))
+    }
+    parts <- c(parts, '</tr>')
+  }
+
+  # Reorder metrics: grouped sections first, "(Ungrouped)" at bottom
+  grouped_metrics <- list()
+  ungrouped_metrics <- list()
   for (mr in html_data$metric_rows) {
+    section <- if (is.na(mr$section) || mr$section == "") "(Ungrouped)" else mr$section
+    if (section == "(Ungrouped)") {
+      ungrouped_metrics <- c(ungrouped_metrics, list(mr))
+    } else {
+      grouped_metrics <- c(grouped_metrics, list(mr))
+    }
+  }
+  ordered_metrics <- c(grouped_metrics, ungrouped_metrics)
+
+  current_section <- ""
+  for (mr in ordered_metrics) {
     section <- if (is.na(mr$section) || mr$section == "") "(Ungrouped)" else mr$section
     if (section != current_section) {
       current_section <- section
@@ -284,8 +373,11 @@ build_summary_metrics_table <- function(html_data) {
       ))
     }
 
+    m_type <- classify_metric_type(mr$metric_name)
     cells <- mr$segment_cells[[seg_name]]
-    parts <- c(parts, '<tr class="tk-metric-row">')
+    parts <- c(parts, sprintf(
+      '<tr class="tk-metric-row" data-metric-type="%s">', m_type
+    ))
     parts <- c(parts, sprintf(
       '<td class="tk-td tk-label-col"><span class="tk-metric-label">%s</span></td>',
       htmltools::htmlEscape(mr$metric_label)
@@ -294,21 +386,12 @@ build_summary_metrics_table <- function(html_data) {
     for (wid in waves) {
       cell <- cells[[wid]]
       val_display <- if (!is.null(cell)) cell$display_value else "&mdash;"
-      parts <- c(parts, sprintf('<td class="tk-td tk-value-cell">%s</td>', val_display))
-    }
-    parts <- c(parts, '</tr>')
-  }
-
-  # Base (n) row
-  if (length(html_data$metric_rows) > 0) {
-    first_metric <- html_data$metric_rows[[1]]
-    base_cells <- first_metric$segment_cells[[seg_name]]
-    parts <- c(parts, '<tr class="tk-base-row">')
-    parts <- c(parts, '<td class="tk-td tk-label-col tk-base-label">Base (n)</td>')
-    for (wid in waves) {
-      cell <- base_cells[[wid]]
-      n_display <- if (!is.null(cell) && !is.na(cell$n)) cell$n else ""
-      parts <- c(parts, sprintf('<td class="tk-td tk-base-cell">%s</td>', n_display))
+      # Dim cells with low base
+      low_base_class <- ""
+      if (!is.null(cell) && !is.na(cell$n) && cell$n < min_base) {
+        low_base_class <- " tk-low-base-dim"
+      }
+      parts <- c(parts, sprintf('<td class="tk-td tk-value-cell%s">%s</td>', low_base_class, val_display))
     }
     parts <- c(parts, '</tr>')
   }
@@ -369,20 +452,31 @@ build_metrics_tab <- function(html_data, charts, config) {
     type_filter_html <- paste(type_chips, collapse = "\n")
   }
 
+  n_metrics <- length(html_data$metric_rows)
+
   htmltools::tags$div(class = "metrics-tab-layout",
     htmltools::tags$aside(class = "mv-sidebar",
-      htmltools::tags$div(class = "mv-sidebar-search",
-        htmltools::tags$input(
-          type = "text",
-          class = "tk-search-input",
-          placeholder = "Search metrics...",
-          oninput = "filterMetricNav(this.value)"
+      htmltools::tags$div(class = "mv-sidebar-inner",
+        htmltools::tags$div(class = "mv-sidebar-search",
+          htmltools::tags$input(
+            type = "text",
+            class = "tk-search-input",
+            placeholder = "Search metrics...",
+            oninput = "filterMetricNav(this.value)"
+          )
+        ),
+        htmltools::HTML(type_filter_html),
+        sig_toggle,
+        htmltools::tags$div(class = "mv-sidebar-nav-wrap",
+          htmltools::tags$div(class = "mv-sidebar-nav-header",
+            sprintf("Metrics (%d)", n_metrics)
+          ),
+          htmltools::tags$div(class = "mv-sidebar-nav-scroll",
+            htmltools::tags$nav(class = "mv-sidebar-nav",
+              htmltools::HTML(metric_nav)
+            )
+          )
         )
-      ),
-      htmltools::HTML(type_filter_html),
-      sig_toggle,
-      htmltools::tags$nav(class = "mv-sidebar-nav",
-        htmltools::HTML(metric_nav)
       )
     ),
     htmltools::tags$main(class = "mv-content",
@@ -440,34 +534,53 @@ classify_metric_type <- function(metric_name) {
 
 
 #' Build Metric Navigation List
+#'
+#' Groups metrics by section. Ungrouped metrics are placed at the bottom
+#' of the list rather than at the top.
+#'
 #' @keywords internal
 build_metric_nav_list <- function(html_data) {
 
-  items <- c()
+  # Collect items into grouped vs ungrouped buckets
+  grouped_items <- c()
+  ungrouped_items <- c()
   current_section <- ""
+  first_metric_idx <- NULL
 
   for (i in seq_along(html_data$metric_rows)) {
     mr <- html_data$metric_rows[[i]]
     section <- if (is.na(mr$section) || mr$section == "") "(Ungrouped)" else mr$section
+    is_ungrouped <- (section == "(Ungrouped)")
+
+    if (is.null(first_metric_idx)) first_metric_idx <- i
+
+    item_html <- c()
 
     if (section != current_section) {
       current_section <- section
-      items <- c(items, sprintf(
+      item_html <- c(item_html, sprintf(
         '<div class="mv-nav-section">%s</div>',
         htmltools::htmlEscape(section)
       ))
     }
 
-    active_class <- if (i == 1) " active" else ""
+    active_class <- if (i == first_metric_idx) " active" else ""
     m_type <- classify_metric_type(mr$metric_name)
-    items <- c(items, sprintf(
+    item_html <- c(item_html, sprintf(
       '<a class="tk-metric-nav-item%s" data-metric-id="%s" data-metric-type="%s" href="#" onclick="selectTrackerMetric(\'%s\');return false;">%s</a>',
       active_class, mr$metric_id, m_type, mr$metric_id,
       htmltools::htmlEscape(mr$metric_label)
     ))
+
+    if (is_ungrouped) {
+      ungrouped_items <- c(ungrouped_items, item_html)
+    } else {
+      grouped_items <- c(grouped_items, item_html)
+    }
   }
 
-  paste(items, collapse = "\n")
+  # Output grouped sections first, then ungrouped at bottom
+  paste(c(grouped_items, ungrouped_items), collapse = "\n")
 }
 
 
@@ -476,6 +589,7 @@ build_metric_nav_list <- function(html_data) {
 build_metric_panels <- function(html_data, charts, config, segments, segment_colours) {
 
   brand_colour <- get_setting(config, "brand_colour", default = "#323367") %||% "#323367"
+  min_base <- as.integer(get_setting(config, "significance_min_base", default = 30) %||% 30)
   segment_group_info <- derive_segment_groups(segments)
   panels <- c()
 
@@ -595,13 +709,17 @@ build_metric_panels <- function(html_data, charts, config, segments, segment_col
     ))
     panel_parts <- c(panel_parts, '</div>')
 
-    # Export + Pin buttons
+    # Export + Pin + Slide buttons
     panel_parts <- c(panel_parts, sprintf(
-      '<button class="tk-btn mv-export-btn" onclick="exportMetricExcel(\'%s\')" title="Export to Excel">&#x1F4CA; Export</button>',
+      '<button class="export-btn" onclick="exportMetricExcel(\'%s\')" title="Export to Excel">&#x1F4CA; Export</button>',
       mr$metric_id
     ))
     panel_parts <- c(panel_parts, sprintf(
-      '<button class="tk-btn mv-pin-btn" onclick="pinMetricView(\'%s\')" title="Pin this view">&#x1F4CC; Pin</button>',
+      '<button class="export-btn" onclick="pinMetricView(\'%s\')" title="Pin this view">&#x1F4CC; Pin</button>',
+      mr$metric_id
+    ))
+    panel_parts <- c(panel_parts, sprintf(
+      '<button class="export-btn" onclick="exportSlidePNG(\'%s\',\'table\')" title="Export as slide">&#x1F4F8; Export Slide</button>',
       mr$metric_id
     ))
 
@@ -609,7 +727,7 @@ build_metric_panels <- function(html_data, charts, config, segments, segment_col
 
     # ---- Table Area ----
     panel_parts <- c(panel_parts, '<div class="mv-table-area">')
-    panel_parts <- c(panel_parts, build_metric_table(mr, html_data, sparkline_data, segments, segment_colours, brand_colour))
+    panel_parts <- c(panel_parts, build_metric_table(mr, html_data, sparkline_data, segments, segment_colours, brand_colour, min_base))
     panel_parts <- c(panel_parts, '</div>')
 
     # ---- Chart Area ----
@@ -652,11 +770,12 @@ build_metric_panels <- function(html_data, charts, config, segments, segment_col
 #' Wave columns can be hidden via wave chips.
 #'
 #' @keywords internal
-build_metric_table <- function(mr, html_data, sparkline_data, segments, segment_colours, brand_colour) {
+build_metric_table <- function(mr, html_data, sparkline_data, segments, segment_colours, brand_colour, min_base = 30L) {
 
   waves <- html_data$waves
   wave_labels <- html_data$wave_labels
   n_waves <- length(waves)
+  min_base <- as.integer(min_base)
 
   parts <- c()
   parts <- c(parts, '<div class="tk-table-wrapper">')
@@ -679,8 +798,32 @@ build_metric_table <- function(mr, html_data, sparkline_data, segments, segment_
   parts <- c(parts, '</tr>')
   parts <- c(parts, '</thead>')
 
-  # ---- TBODY: One row per segment ----
+  # ---- TBODY: Single Total base row at top, then one row per segment ----
   parts <- c(parts, '<tbody>')
+
+  # Base (n=) row at TOP — Total segment only (always visible)
+  total_seg <- segments[1]  # Total is always first
+  total_cells <- mr$segment_cells[[total_seg]]
+  if (!is.null(total_cells)) {
+    parts <- c(parts, '<tr class="tk-base-row">')
+    parts <- c(parts, '<td class="tk-td tk-label-col tk-base-label">Base (n=)</td>')
+    for (wid in waves) {
+      cell <- total_cells[[wid]]
+      n_val <- if (!is.null(cell) && !is.na(cell$n)) cell$n else NA
+      if (!is.na(n_val) && n_val < min_base) {
+        n_display <- sprintf('<span class="tk-low-base">%s &#x26A0;</span>', n_val)
+      } else {
+        n_display <- if (!is.na(n_val)) as.character(n_val) else ""
+      }
+      parts <- c(parts, sprintf(
+        '<td class="tk-td tk-base-cell" data-wave="%s" data-n="%s">%s</td>',
+        htmltools::htmlEscape(wid),
+        if (!is.na(n_val)) n_val else "",
+        n_display
+      ))
+    }
+    parts <- c(parts, '</tr>')
+  }
 
   for (s_idx in seq_along(segments)) {
     seg_name <- segments[s_idx]
@@ -719,8 +862,10 @@ build_metric_table <- function(mr, html_data, sparkline_data, segments, segment_
       # Value + n= frequency underneath (hidden by default)
       sort_val <- if (!is.na(cell$value)) cell$value else ""
       n_display <- if (!is.na(cell$n)) sprintf('<div class="tk-freq">n=%s</div>', cell$n) else ""
+      low_base_class <- if (!is.na(cell$n) && cell$n < min_base) " tk-low-base-dim" else ""
       parts <- c(parts, sprintf(
-        '<td class="tk-td tk-value-cell" data-wave="%s" data-segment="%s" data-sort-val="%s"><span class="tk-val">%s</span>%s</td>',
+        '<td class="tk-td tk-value-cell%s" data-wave="%s" data-segment="%s" data-sort-val="%s"><span class="tk-val">%s</span>%s</td>',
+        low_base_class,
         htmltools::htmlEscape(wid),
         htmltools::htmlEscape(seg_name),
         sort_val,
@@ -845,7 +990,7 @@ build_tracker_header <- function(html_data, config, brand_colour) {
     sprintf('<span class="tk-badge-item"><strong>%d</strong> Metrics</span>', n_metrics),
     sprintf('<span class="tk-badge-item"><strong>%d</strong> Waves</span>', n_waves),
     sprintf('<span class="tk-badge-item"><strong>%d</strong> Segment%s</span>', n_segments, if (n_segments > 1) "s" else ""),
-    sprintf('<span class="tk-badge-item">Created %s</span>', htmltools::htmlEscape(created_date))
+    sprintf('<span class="tk-badge-item" id="header-date-badge">Created %s</span>', htmltools::htmlEscape(created_date))
   )
   badge_bar <- paste(
     '<div class="tk-badge-bar">',
@@ -855,7 +1000,7 @@ build_tracker_header <- function(html_data, config, brand_colour) {
 
   htmltools::tags$header(class = "tk-header",
     htmltools::tags$div(class = "tk-header-inner",
-      # Top row: Logo + Branding ... Help button
+      # Top row: Logo + Branding ... Action buttons + Help
       htmltools::tags$div(class = "tk-header-top",
         htmltools::tags$div(class = "tk-header-brand",
           htmltools::HTML(researcher_logo_html),
@@ -864,8 +1009,10 @@ build_tracker_header <- function(html_data, config, brand_colour) {
             htmltools::tags$div(class = "tk-brand-subtitle", "Interactive Tracking Report")
           )
         ),
-        htmltools::tags$button(class = "tk-help-btn",
-                                onclick = "toggleHelpOverlay()", "?")
+        htmltools::tags$div(class = "tk-header-actions",
+          htmltools::tags$button(class = "tk-help-btn",
+                                  onclick = "toggleHelpOverlay()", "?")
+        )
       ),
       # Project title
       htmltools::tags$div(class = "tk-header-project", project_name),
@@ -938,19 +1085,20 @@ build_overview_sidebar <- function(html_data, config) {
   }
 
   htmltools::tags$aside(class = "tk-sidebar",
-    htmltools::tags$div(class = "tk-sidebar-header", "Segments"),
-    htmltools::tags$nav(class = "tk-sidebar-nav",
-      htmltools::HTML(paste(items, collapse = "\n"))
+    htmltools::tags$div(class = "tk-sidebar-inner",
+      htmltools::tags$div(class = "tk-sidebar-nav-card",
+        htmltools::tags$div(class = "tk-sidebar-header",
+          sprintf("Segments (%d)", length(segments))
+        ),
+        htmltools::tags$div(class = "tk-sidebar-nav-scroll",
+          htmltools::tags$nav(class = "tk-sidebar-nav",
+            htmltools::HTML(paste(items, collapse = "\n"))
+          )
+        )
+      )
     )
   )
 }
-
-#' Build Tracker Sidebar (legacy, for backward compat in tests)
-#' @keywords internal
-build_tracker_sidebar <- function(html_data, config) {
-  build_overview_sidebar(html_data, config)
-}
-
 
 # ==============================================================================
 # SEGMENT SELECTOR (dropdown for Segment Overview tab)
@@ -1108,28 +1256,20 @@ build_controls <- function(html_data, config) {
 #' @keywords internal
 build_chart_containers <- function(html_data, charts, config) {
 
+  # Chart panel header with selection count and action buttons
   containers <- c()
-  for (i in seq_along(charts)) {
-    if (is.null(charts[[i]])) next
+  containers <- c(containers, '<div class="tk-chart-header">')
+  containers <- c(containers, '<span class="tk-chart-count" id="tk-chart-count">Charts (0 selected)</span>')
+  containers <- c(containers, '<div class="tk-chart-header-actions">')
+  containers <- c(containers, '<button class="export-btn" onclick="exportChartPNG(\'combined\')">&#x1F4F8; Export PNG</button>')
+  containers <- c(containers, '<button class="export-btn" onclick="pinSelectedCharts()">&#x1F4CC; Pin Charts</button>')
+  containers <- c(containers, '</div>')
+  containers <- c(containers, '</div>')
 
-    mr <- html_data$metric_rows[[i]]
-    section <- if (is.na(mr$section) || mr$section == "") "(Ungrouped)" else mr$section
-
-    containers <- c(containers, sprintf(
-      '<div class="tk-chart-container" data-metric-id="%s" data-section="%s">',
-      mr$metric_id, htmltools::htmlEscape(section)
-    ))
-    containers <- c(containers, sprintf(
-      '<h3 class="tk-chart-title">%s</h3>',
-      htmltools::htmlEscape(mr$metric_label)
-    ))
-    containers <- c(containers, as.character(charts[[i]]))
-    containers <- c(containers, sprintf(
-      '<div class="tk-chart-actions"><button class="tk-btn tk-btn-sm" onclick="exportChartPNG(\'%s\')">Export PNG</button></div>',
-      mr$metric_id
-    ))
-    containers <- c(containers, '</div>')
-  }
+  # Single combined chart container (JS will render a multi-line SVG here)
+  containers <- c(containers, '<div id="tk-combined-chart" class="tk-chart-container" style="padding:20px;background:var(--card);border-radius:8px;border:1px solid var(--border);">')
+  containers <- c(containers, '<p style="color:#888;text-align:center;padding:40px;">Select metrics from the table to add them to the chart.</p>')
+  containers <- c(containers, '</div>')
 
   htmltools::HTML(paste(containers, collapse = "\n"))
 }
@@ -1209,18 +1349,27 @@ build_help_overlay <- function() {
 build_tracker_css <- function(brand_colour, accent_colour) {
 
   css <- '
-/* === TURAS TRACKER HTML REPORT v2.0 === */
+/* === TURAS TRACKER HTML REPORT v2.1 === */
 :root {
   --brand: BRAND_COLOUR;
   --accent: ACCENT_COLOUR;
+  /* Shared Turas design tokens (aligned with Turas Tabs --ct-* prefix) */
+  --ct-brand: BRAND_COLOUR;
+  --ct-accent: ACCENT_COLOUR;
+  --ct-text-primary: #1e293b;
+  --ct-text-secondary: #64748b;
+  --ct-bg-surface: #ffffff;
+  --ct-bg-muted: #f8f9fa;
+  --ct-border: #e2e8f0;
+  /* Module variables */
   --bg: #f8f7f5;
   --card: #ffffff;
-  --text: #2c2c2c;
-  --text-muted: #888;
-  --border: #e2e2e2;
+  --text: #1e293b;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
   --section-bg: #f0f4e8;
   --change-bg: #fafafa;
-  --sidebar-w: 260px;
+  --sidebar-w: 280px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
@@ -1245,11 +1394,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .tk-badge-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.20); flex-shrink: 0; }
 
 /* ---- REPORT TABS ---- */
-.report-tabs { display: flex; gap: 0; background: var(--card); border-bottom: 2px solid var(--border); padding: 0 24px; }
+.report-tabs { display: flex; align-items: center; gap: 0; background: var(--card); border-bottom: 2px solid var(--border); padding: 0 24px; }
 .report-tab { padding: 12px 24px; border: none; background: transparent; color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; border-bottom: 3px solid transparent; transition: all 0.15s; }
 .report-tab:hover:not(.active) { background: #f8f8f8; color: var(--brand); }
 .report-tab.active { color: var(--brand); border-bottom-color: var(--brand); }
 .pin-count-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 10px; background: var(--brand); color: #fff; font-size: 11px; font-weight: 700; }
+.tk-tab-actions { display: flex; gap: 8px; align-items: center; padding: 6px 0; }
 
 /* ---- TAB PANELS ---- */
 .tk-tab-panels { min-height: calc(100vh - 180px); }
@@ -1269,13 +1419,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 
 /* ---- METRICS BY SEGMENT TAB ---- */
 .metrics-tab-layout { display: flex; min-height: calc(100vh - 180px); }
-.mv-sidebar { width: var(--sidebar-w); background: var(--card); border-right: 1px solid var(--border); overflow-y: auto; flex-shrink: 0; }
-.mv-sidebar-search { padding: 12px; border-bottom: 1px solid var(--border); }
-.mv-sidebar-nav { padding: 8px 0; }
-.mv-nav-section { padding: 10px 16px 4px; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-.tk-metric-nav-item { display: block; padding: 7px 16px; font-size: 13px; color: var(--text); text-decoration: none; cursor: pointer; border-left: 3px solid transparent; transition: all 0.15s; }
-.tk-metric-nav-item:hover { background: #f5f5f5; }
-.tk-metric-nav-item.active { border-left-color: var(--brand); background: #f0f0ff; font-weight: 600; }
+.mv-sidebar { width: var(--sidebar-w); flex-shrink: 0; padding: 16px 0 0 0; }
+.mv-sidebar-inner { position: sticky; top: 20px; }
+.mv-sidebar-search { padding: 0 14px 12px; }
+.tk-search-input { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--card); outline: none; transition: border-color 0.15s; font-family: inherit; }
+.tk-search-input:focus { border-color: var(--brand); }
+.mv-sidebar-nav-wrap { background: var(--card); border-radius: 8px; border: 1px solid var(--border); overflow: hidden; }
+.mv-sidebar-nav-header { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+.mv-sidebar-nav-scroll { max-height: 500px; overflow-y: auto; }
+.mv-sidebar-nav { padding: 0; }
+.mv-nav-section { padding: 10px 14px 4px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+.tk-metric-nav-item { display: block; padding: 10px 14px; font-size: 12px; color: var(--text); text-decoration: none; cursor: pointer; border-left: 3px solid transparent; border-bottom: 1px solid var(--border); transition: all 0.12s ease; line-height: 1.35; }
+.tk-metric-nav-item:last-child { border-bottom: none; }
+.tk-metric-nav-item:hover { background: #f8fafc; }
+.tk-metric-nav-item.active { border-left-color: var(--brand); background: #e6f5f5; font-weight: 600; color: #1a2744; }
 /* Metric type filter */
 .mv-type-filter { display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .mv-type-chip { padding: 3px 10px; border: 1.5px solid var(--border); background: var(--card); border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; color: var(--text-muted); font-family: inherit; }
@@ -1287,8 +1444,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 /* Metric panel */
 .tk-metric-panel { display: none; }
 .tk-metric-panel.active { display: block; }
-.mv-metric-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
-.mv-metric-subtitle { font-size: 14px; font-weight: 400; color: var(--text-muted); }
+.mv-metric-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.mv-metric-subtitle { font-size: 13px; font-weight: 400; color: var(--text-muted); }
 
 /* Segment chips */
 .mv-segment-chips { display: flex; gap: 8px; margin: 16px 0 8px; flex-wrap: wrap; }
@@ -1316,7 +1473,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .tk-wave-chip:hover { border-color: #4682B4; }
 
 /* Metric controls */
-.mv-controls { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; padding: 10px 16px; background: var(--card); border-radius: 8px; border: 1px solid var(--border); }
+.mv-controls { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
 .mv-control-group { display: flex; align-items: center; gap: 8px; }
 .mv-pin-btn { margin-left: auto; }
 .mv-pin-btn.pinned { background: var(--brand); color: #fff; border-color: var(--brand); }
@@ -1327,19 +1484,21 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 
 /* ---- SEGMENT OVERVIEW TAB ---- */
 .tk-layout { display: flex; min-height: calc(100vh - 180px); }
-.tk-sidebar { width: var(--sidebar-w); background: var(--card); border-right: 1px solid var(--border); overflow-y: auto; flex-shrink: 0; }
-.tk-sidebar-search { padding: 12px; border-bottom: 1px solid var(--border); }
-.tk-sidebar-nav { padding: 8px 0; }
-.tk-sidebar-section { padding: 10px 16px 4px; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-.tk-sidebar-item { display: block; padding: 6px 16px; font-size: 13px; color: var(--text); text-decoration: none; cursor: pointer; border-left: 3px solid transparent; transition: all 0.15s; }
-.tk-sidebar-item:hover { background: #f5f5f5; }
-.tk-sidebar-item.active { border-left-color: var(--brand); background: #f0f0ff; font-weight: 600; }
+.tk-sidebar { width: var(--sidebar-w); flex-shrink: 0; padding: 16px 0 0 14px; }
+.tk-sidebar-inner { position: sticky; top: 20px; }
+.tk-sidebar-nav-card { background: var(--card); border-radius: 8px; border: 1px solid var(--border); overflow: hidden; }
+.tk-sidebar-nav-scroll { max-height: 500px; overflow-y: auto; }
+.tk-sidebar-nav { padding: 0; }
+.tk-sidebar-section { padding: 10px 14px 4px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+.tk-sidebar-item { display: block; padding: 10px 14px; font-size: 12px; color: var(--text); text-decoration: none; cursor: pointer; border-left: 3px solid transparent; border-bottom: 1px solid var(--border); transition: all 0.12s ease; }
+.tk-sidebar-item:last-child { border-bottom: none; }
+.tk-sidebar-item:hover { background: #f8fafc; }
+.tk-sidebar-item.active { border-left-color: var(--brand); background: #e6f5f5; font-weight: 600; color: #1a2744; }
 .tk-sidebar-item.hidden { display: none; }
 .tk-content { flex: 1; padding: 20px 24px; overflow-x: auto; }
 
-/* Segment selector dropdown (replaces old tab bar) */
-.tk-segment-selector { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-.tk-segment-select { padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-weight: 600; background: var(--card); cursor: pointer; min-width: 180px; }
+/* Segment selector dropdown (retained for possible future use) */
+.tk-segment-selector { display: none; }
 
 /* Segment header row removed from HTML (single-row header used instead) */
 
@@ -1347,18 +1506,23 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .tk-seg-sidebar-item { display: flex; align-items: center; gap: 8px; }
 /* Overview actions bar (pin + export + insight) */
 .overview-actions-bar { display: flex; gap: 8px; margin-top: 16px; padding: 10px 0; }
-.tk-sidebar-header { padding: 14px 16px 8px; font-size: 12px; font-weight: 700; color: var(--brand); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+.tk-sidebar-header { padding: 10px 14px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
 
 /* Summary metrics table */
 .summary-metrics-table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 20px; overflow-x: auto; }
 .summary-metrics-table { font-size: 13px; }
 .summary-metrics-table .tk-section-cell { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; padding: 12px 16px 4px; border: none; background: none; }
+.summary-type-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.summary-type-chip { padding: 5px 14px; border-radius: 16px; border: 1px solid var(--border); background: var(--card); font-size: 12px; cursor: pointer; color: var(--text-muted); transition: all 0.15s; }
+.summary-type-chip:hover { border-color: var(--brand); color: var(--brand); }
+.summary-type-chip.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+.summary-actions { display: flex; gap: 8px; margin-bottom: 12px; }
 
 /* Controls */
 .tk-controls { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; padding: 10px 16px; background: var(--card); border-radius: 8px; border: 1px solid var(--border); }
 .tk-control-group { display: flex; align-items: center; gap: 8px; }
 .tk-control-label { font-size: 12px; color: var(--text-muted); font-weight: 600; }
-.tk-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; }
+.tk-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: var(--text-muted); }
 .tk-toggle input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--brand); }
 .tk-toggle-label { user-select: none; }
 .tk-btn { padding: 6px 14px; border: 1px solid var(--border); background: var(--card); border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.15s; font-family: inherit; }
@@ -1372,12 +1536,33 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .tk-select { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; background: var(--card); }
 .tk-export-group { margin-left: auto; }
 
+/* Export button (shared Turas design — matches Turas Tabs .export-btn) */
+.export-btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 4px; background: #ffffff; color: var(--text-muted); font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.12s; white-space: nowrap; }
+.export-btn:hover { background: #f8fafc; color: var(--text); }
+
+/* Header action buttons (dark background variant) */
+.tk-header-actions { display: flex; align-items: center; gap: 8px; }
+.tk-header .export-btn { border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.08); }
+.tk-header .export-btn:hover { border-color: rgba(255,255,255,0.6); color: #fff; background: rgba(255,255,255,0.15); }
+
+/* Low base warning */
+.tk-low-base { color: #dc2626; font-weight: 700; }
+.tk-low-base-dim { opacity: 0.45; }
+
+/* Segment showing label */
+.tk-segment-showing { font-size: 14px; color: var(--text); margin-bottom: 8px; padding: 4px 0; }
+.tk-segment-showing strong { color: var(--brand); }
+
+/* Segment indicator row */
+.tk-segment-indicator-row { }
+.tk-segment-indicator { height: 4px; padding: 0; border: none; }
+
 /* ---- TABLE STYLES ---- */
 .tk-table-wrapper { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); background: var(--card); }
-.tk-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.tk-th { padding: 10px 14px; text-align: center; font-weight: 600; border-bottom: 2px solid var(--border); white-space: nowrap; }
-.tk-td { padding: 8px 14px; text-align: center; border-bottom: 1px solid #f0f0f0; }
-.tk-label-col { text-align: left; min-width: 220px; max-width: 300px; }
+.tk-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.tk-th { padding: 8px 10px; text-align: center; font-size: 11px; font-weight: 600; border-bottom: 2px solid var(--border); white-space: nowrap; background: var(--ct-bg-muted); }
+.tk-td { padding: 6px 10px; text-align: center; border-bottom: 1px solid #f0f0f0; }
+.tk-label-col { text-align: left; min-width: 180px; max-width: 320px; }
 .tk-sticky-col { position: sticky; left: 0; z-index: 2; background: var(--card); }
 .tk-segment-header { font-size: 12px; letter-spacing: 0.3px; }
 .tk-wave-header { font-size: 12px; background: #f8f8fc; }
@@ -1441,13 +1626,21 @@ body.hide-significance .sig-arrow { display: none; }
 .tk-sparkline { vertical-align: middle; }
 body.hide-sparklines .tk-sparkline-wrap { display: none; }
 
-/* Charts */
+/* Charts — additive selection */
 .tk-chart-panel { padding: 16px 0; }
+.tk-chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding: 8px 0; }
+.tk-chart-count { font-size: 14px; font-weight: 600; color: var(--text); }
+.tk-chart-header-actions { display: flex; gap: 8px; }
 .tk-chart-container { margin-bottom: 32px; padding: 20px; background: var(--card); border-radius: 8px; border: 1px solid var(--border); }
-.tk-chart-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; color: var(--text); }
+.tk-chart-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.tk-chart-remove-btn { background: none; border: 1px solid var(--border); border-radius: 50%; width: 22px; height: 22px; font-size: 14px; cursor: pointer; color: var(--text-muted); line-height: 1; }
+.tk-chart-remove-btn:hover { background: #fee; color: #dc2626; border-color: #dc2626; }
 .tk-chart-actions { margin-top: 12px; text-align: right; }
 .tk-line-chart { max-width: 100%; height: auto; }
 .tk-chart-point { cursor: pointer; }
+.tk-add-chart-btn { background: none; border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-size: 11px; cursor: pointer; color: var(--text-muted); margin-left: 6px; transition: all 0.15s; }
+.tk-add-chart-btn:hover { border-color: var(--brand); color: var(--brand); }
+.tk-add-chart-btn.in-chart { background: var(--brand); color: #fff; border-color: var(--brand); }
 
 /* Row filtered (type/text filter) */
 .row-filtered { display: none !important; }
@@ -1502,7 +1695,13 @@ body.hide-sparklines .tk-sparkline-wrap { display: none; }
 .pinned-card-chart { padding: 16px 20px; border-bottom: 1px solid var(--border); text-align: center; }
 .pinned-card-chart svg { max-width: 100%; height: auto; }
 .pinned-card-body { padding: 16px 20px; overflow-x: auto; }
+.pinned-card-png { max-width: 100%; height: auto; border-radius: 4px; }
 .pinned-card-insight { padding: 12px 20px; border-bottom: 1px solid var(--border); background: #f8fafa; border-left: 3px solid var(--brand); font-size: 13px; color: var(--text); }
+.pinned-card-insight-area { padding: 8px 20px; border-bottom: 1px solid var(--border); }
+.pinned-card-insight-editor { border-left: 3px solid var(--brand); background: #fefefe; padding: 8px 12px; font-size: 13px; line-height: 1.6; border-radius: 0 6px 6px 0; min-height: 36px; outline: none; color: var(--text); }
+.pinned-card-insight-editor:empty::before { content: attr(data-placeholder); color: #aab; font-style: italic; }
+.pinned-insight-toggle { padding: 4px 10px; border: 1px dashed #cbd5e1; border-radius: 4px; background: transparent; color: #94a3b8; font-size: 11px; cursor: pointer; width: 100%; text-align: left; font-family: inherit; }
+.pinned-insight-toggle:hover { border-color: var(--brand); color: var(--brand); }
 .pinned-card-meta { padding: 8px 20px; font-size: 11px; color: var(--text-muted); border-top: 1px solid #f0f0f0; }
 
 /* ---- HELP OVERLAY ---- */
@@ -1523,7 +1722,8 @@ body.hide-sparklines .tk-sparkline-wrap { display: none; }
   .tk-sidebar, .mv-sidebar, .tk-controls, .mv-controls, .tk-segment-tabs,
   .tk-chart-actions, .tk-help-overlay, .report-tabs, .mv-segment-chips,
   .insight-toggle, .insight-dismiss, .mv-pin-btn, .pinned-card-actions,
-  .pinned-toolbar, .tk-segment-selector, .tk-row-hide-btn { display: none !important; }
+  .pinned-toolbar, .tk-segment-selector, .tk-row-hide-btn,
+  .tk-tab-actions, .export-btn { display: none !important; }
   .tk-layout, .metrics-tab-layout { display: block; }
   .tk-content, .mv-content { padding: 0; }
   .tk-table-wrapper { border: none; overflow: visible; }

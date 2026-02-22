@@ -80,9 +80,9 @@ function applyChipState(panel) {
         el.style.display = isActive ? "" : "none";
       });
 
-      // Chart LABELS — visible only when segment is ACTIVE AND SELECTED
+      // Chart LABELS — visible when segment is ACTIVE (all active segments show labels)
       panel.querySelectorAll(".mv-chart-area .tk-chart-label[data-segment=\"" + seg + "\"]").forEach(function(el) {
-        el.style.display = (isActive && isSelected) ? "" : "none";
+        el.style.display = isActive ? "" : "none";
       });
     }
   });
