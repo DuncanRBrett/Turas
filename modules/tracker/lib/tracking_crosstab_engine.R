@@ -574,8 +574,10 @@ sort_metric_rows <- function(metric_rows) {
   orders <- vapply(metric_rows, function(r) r$sort_order, numeric(1))
 
   # Sort by section (alphabetical, but "(Ungrouped)" last), then by sort_order
-  section_rank <- ifelse(sections == "(Ungrouped)", "~zzz", sections)
-  sort_idx <- order(section_rank, orders)
+  # Use numeric rank to avoid locale-dependent collation of "~zzz"
+  # (in en_US.UTF-8 locale, "~" sorts before letters, not after)
+  ungrouped_flag <- ifelse(sections == "(Ungrouped)", 1L, 0L)
+  sort_idx <- order(ungrouped_flag, sections, orders)
 
   metric_rows[sort_idx]
 }

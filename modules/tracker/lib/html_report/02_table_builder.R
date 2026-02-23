@@ -88,16 +88,33 @@ build_tracking_table <- function(html_data, config) {
   total_cols <- 1 + length(segments) * n_waves
 
   # Base (n) row at the TOP of the table
+  # Use the maximum n across ALL metrics for each segment/wave so that the
+
+  # base always reflects the total sample for that segment regardless of
+  # which questions were asked in each wave.
   if (length(html_data$metric_rows) > 0) {
+    # Pre-compute max n per segment per wave across all metrics
+    base_n <- list()
+    for (seg_name in segments) {
+      base_n[[seg_name]] <- list()
+      for (wid in waves) {
+        max_n <- NA_integer_
+        for (mr in html_data$metric_rows) {
+          cell <- mr$segment_cells[[seg_name]][[wid]]
+          if (!is.null(cell) && !is.na(cell$n)) {
+            if (is.na(max_n) || cell$n > max_n) max_n <- cell$n
+          }
+        }
+        base_n[[seg_name]][[wid]] <- max_n
+      }
+    }
+
     parts <- c(parts, '<tr class="tk-base-row">')
     parts <- c(parts, '<td class="tk-td tk-label-col tk-sticky-col tk-base-label">Base (n=)</td>')
-    first_metric <- html_data$metric_rows[[1]]
     for (seg_idx in seq_along(segments)) {
       seg_name <- segments[seg_idx]
-      cells <- first_metric$segment_cells[[seg_name]]
       for (wid in waves) {
-        cell <- cells[[wid]]
-        n_val <- if (!is.null(cell) && !is.na(cell$n)) cell$n else NA
+        n_val <- base_n[[seg_name]][[wid]]
         if (!is.na(n_val) && n_val < min_base) {
           n_display <- sprintf('<span class="tk-low-base">%s &#x26A0;</span>', n_val)
         } else {
@@ -136,10 +153,11 @@ build_tracking_table <- function(html_data, config) {
     # ---- Metric value row ----
     m_type <- classify_metric_type(mr$metric_name)
     parts <- c(parts, sprintf(
-      '<tr class="tk-metric-row" data-metric-id="%s" data-q-code="%s" data-metric-type="%s" data-chart=\'%s\'>',
+      '<tr class="tk-metric-row" data-metric-id="%s" data-q-code="%s" data-metric-type="%s" data-section="%s" data-chart=\'%s\'>',
       mr$metric_id,
       htmltools::htmlEscape(mr$question_code),
       m_type,
+      htmltools::htmlEscape(section),
       chart_json
     ))
 

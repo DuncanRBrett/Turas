@@ -16,6 +16,9 @@
   var originalRowOrder = [];  // Captured on DOMContentLoaded for "Original Order" sort
   var hiddenMetrics = {};     // { metricId: true } — user-hidden rows
 
+  // Expose currentSegment for chart_controls.js
+  window.getCurrentSegment = function() { return currentSegment; };
+
   // ---- Metric Navigation ----
   window.selectMetric = function(metricId) {
     // Highlight in sidebar
@@ -65,9 +68,11 @@
     });
 
     // Show only matching segment columns in the overview table
+    // Skip sidebar items — they must always remain visible
     SEGMENTS.forEach(function(seg) {
       var cells = document.querySelectorAll('[data-segment="' + seg + '"]');
       cells.forEach(function(cell) {
+        if (cell.classList.contains("tk-seg-sidebar-item")) return;
         // Only toggle cells inside the overview table, not the metrics panels
         if (cell.closest("#tab-overview") || cell.closest(".tk-table-panel")) {
           cell.classList.toggle("segment-hidden", seg !== segmentName);
@@ -170,8 +175,7 @@
         return sA.localeCompare(sB);
       });
       rebuildTableWithSections(tbody, metricGroups, function(row) {
-        var container = document.querySelector('.tk-chart-container[data-metric-id="' + row.getAttribute("data-metric-id") + '"]');
-        return container ? container.getAttribute("data-section") : "(Ungrouped)";
+        return row.getAttribute("data-section") || "(Ungrouped)";
       });
     } else if (mode === "metric_type") {
       rebuildTableWithSections(tbody, metricGroups, function(row) {
@@ -209,7 +213,12 @@
       groups[section].push(g);
     });
 
-    var sectionKeys = Object.keys(groups).sort();
+    var sectionKeys = Object.keys(groups).sort(function(a, b) {
+      // Always push "(Ungrouped)" to the bottom
+      if (a === "(Ungrouped)") return 1;
+      if (b === "(Ungrouped)") return -1;
+      return a.localeCompare(b);
+    });
     var totalCols = 1 + SEGMENTS.length * N_WAVES;
 
     sectionKeys.forEach(function(sec) {
@@ -719,6 +728,9 @@
     if (SEGMENTS.length > 0) {
       window.switchSegment(SEGMENTS[0]);
     }
+
+    // Note: R generates sections in correct order (Ungrouped last).
+    // switchGroupBy is only called when the user changes the dropdown.
   });
 
 })();

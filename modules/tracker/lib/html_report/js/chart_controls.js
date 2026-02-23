@@ -76,8 +76,8 @@
       return;
     }
 
-    // Get current segment
-    var segmentName = (typeof currentSegment !== "undefined") ? currentSegment : "Total";
+    // Get current segment via exposed getter (falls back to "Total")
+    var segmentName = (typeof getCurrentSegment === "function") ? getCurrentSegment() : "Total";
 
     // Collect data from data-chart attributes on metric rows
     var seriesData = [];
@@ -105,13 +105,8 @@
       }
 
       // Find the series for the current segment
-      var segSeries = null;
-      for (var si = 0; si < chartData.series.length; si++) {
-        if (chartData.series[si].name === segmentName) {
-          segSeries = chartData.series[si];
-          break;
-        }
-      }
+      // series is an object keyed by segment name, not an array
+      var segSeries = chartData.series[segmentName] || null;
       if (!segSeries) continue;
 
       // Get metric label from the table row
@@ -368,8 +363,8 @@
     var pinObj = {
       id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
       metricId: "overview-charts-" + selected.join("-"),
-      metricTitle: "Overview: " + selected.length + " metrics (" + ((typeof currentSegment !== "undefined") ? currentSegment : "Total") + ")",
-      visibleSegments: [(typeof currentSegment !== "undefined") ? currentSegment : "Total"],
+      metricTitle: "Overview: " + selected.length + " metrics (" + ((typeof getCurrentSegment === "function") ? getCurrentSegment() : "Total") + ")",
+      visibleSegments: [(typeof getCurrentSegment === "function") ? getCurrentSegment() : "Total"],
       tableHtml: "",
       chartSvg: chartSvg,
       chartVisible: true,

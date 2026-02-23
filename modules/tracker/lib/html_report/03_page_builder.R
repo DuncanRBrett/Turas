@@ -330,19 +330,23 @@ build_summary_metrics_table <- function(html_data, min_base = 30L) {
   parts <- c(parts, '<tbody>')
   total_cols <- 1 + length(waves)
 
-  # Base (n=) row at TOP
+  # Base (n=) row at TOP — use max n across ALL metrics per wave
+  # so base always reflects the total sample for that segment
   if (length(html_data$metric_rows) > 0) {
-    first_metric <- html_data$metric_rows[[1]]
-    base_cells <- first_metric$segment_cells[[seg_name]]
     parts <- c(parts, '<tr class="tk-base-row">')
     parts <- c(parts, '<td class="tk-td tk-label-col tk-base-label">Base (n=)</td>')
     for (wid in waves) {
-      cell <- base_cells[[wid]]
-      n_val <- if (!is.null(cell) && !is.na(cell$n)) cell$n else NA
-      if (!is.na(n_val) && n_val < min_base) {
-        n_display <- sprintf('<span class="tk-low-base">%s &#x26A0;</span>', n_val)
+      max_n <- NA_integer_
+      for (mr in html_data$metric_rows) {
+        cell <- mr$segment_cells[[seg_name]][[wid]]
+        if (!is.null(cell) && !is.na(cell$n)) {
+          if (is.na(max_n) || cell$n > max_n) max_n <- cell$n
+        }
+      }
+      if (!is.na(max_n) && max_n < min_base) {
+        n_display <- sprintf('<span class="tk-low-base">%s &#x26A0;</span>', max_n)
       } else {
-        n_display <- if (!is.na(n_val)) as.character(n_val) else ""
+        n_display <- if (!is.na(max_n)) as.character(max_n) else ""
       }
       parts <- c(parts, sprintf('<td class="tk-td tk-base-cell">%s</td>', n_display))
     }
