@@ -9,8 +9,9 @@
 # EXTRACTED FROM: trend_calculator.R
 # ==============================================================================
 
-# Default significance level
-DEFAULT_ALPHA <- 0.05
+# Default significance level - defined in constants.R (single source of truth)
+# Do NOT redefine DEFAULT_ALPHA here; use the value from constants.R
+if (!exists("DEFAULT_ALPHA")) DEFAULT_ALPHA <- 0.05
 
 #' Check if Significance Test Result is Significant
 #'
@@ -140,10 +141,22 @@ t_test_for_means <- function(mean1, sd1, n1, mean2, sd2, n2, alpha = DEFAULT_ALP
 #' @return List with z_stat, p_value, significant, alpha
 #' @keywords internal
 z_test_for_proportions <- function(p1, n1, p2, n2, alpha = DEFAULT_ALPHA) {
+  # Guard against zero or negative sample sizes (prevents division by zero)
+  if (n1 <= 0 || n2 <= 0) {
+    return(list(
+      z_stat = NA_real_,
+      p_value = NA_real_,
+      significant = FALSE,
+      alpha = alpha,
+      error = "Sample sizes must be positive"
+    ))
+  }
+
   p_pooled <- (p1 * n1 + p2 * n2) / (n1 + n2)
   se <- sqrt(p_pooled * (1 - p_pooled) * (1/n1 + 1/n2))
 
-  if (se == 0) {
+  # Guard against NaN (e.g. p_pooled outside 0-1) or zero standard error
+  if (is.na(se) || is.nan(se) || se == 0) {
     return(list(z_stat = 0, p_value = 1, significant = FALSE, alpha = alpha))
   }
 

@@ -199,7 +199,8 @@ load_all_waves <- function(config, data_dir = NULL, question_mapping = NULL, par
 
   if (use_parallel) {
     # Set up parallel plan if not already configured
-    if (!future::plan() %in% c("multisession", "multicore", "cluster")) {
+    current_plan_class <- class(future::plan())[1]
+    if (!current_plan_class %in% c("multisession", "multicore", "cluster")) {
       # Use multisession for cross-platform compatibility
       old_plan <- future::plan(future::multisession, workers = min(n_waves, parallel::detectCores() - 1))
       on.exit(future::plan(old_plan), add = TRUE)

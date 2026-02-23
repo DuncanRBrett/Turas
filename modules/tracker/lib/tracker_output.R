@@ -2036,7 +2036,7 @@ write_wave_history_sheet <- function(wb, sheet_name, trend_results, wave_ids, co
 
         if (!is.null(wave_result) && wave_result$available) {
           # Extract value based on metric type
-          value <- extract_metric_value(wave_result, metric_info$metric_key, q_result$metric_type)
+          value <- extract_metric_value_by_key(wave_result, metric_info$metric_key, q_result$metric_type)
           # Ensure value is scalar before checking is.na
           wave_values[i] <- if (length(value) == 1 && !is.na(value)) round(value, decimal_places) else NA_real_
         } else {
@@ -2159,12 +2159,14 @@ extract_wave_history_metrics <- function(q_result) {
 }
 
 
-#' Extract Metric Value from Wave Result
+#' Extract Metric Value from Wave Result by Key
 #'
 #' Extracts the appropriate metric value from a wave result based on metric key.
+#' NOTE: Renamed from extract_metric_value() to avoid collision with
+#' tracking_crosstab_engine.R::extract_metric_value() which has a different signature.
 #'
 #' @keywords internal
-extract_metric_value <- function(wave_result, metric_key, question_metric_type) {
+extract_metric_value_by_key <- function(wave_result, metric_key, question_metric_type) {
 
   # Handle enhanced metrics (stored in metrics list)
   if (question_metric_type == METRIC_TYPES$RATING_ENHANCED || question_metric_type == METRIC_TYPES$COMPOSITE_ENHANCED) {

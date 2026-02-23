@@ -197,12 +197,14 @@ extract_primary_metric <- function(wave_result, metric_type) {
   validate_metric_type(metric_type, context = "extract_primary_metric")
 
   # Extract based on metric type using constants
+  # NOTE: All proportion values are already stored on 0-100 scale by calculate_proportions().
+  # Do NOT multiply by 100 again.
   if (metric_type == METRIC_TYPES$PROPORTIONS) {
-    # For proportions, get first proportion
+    # For proportions, get first proportion (already 0-100 scale)
     if (!is.null(wave_result$proportions) && length(wave_result$proportions) > 0) {
-      return(wave_result$proportions[1] * 100)
+      return(wave_result$proportions[1])
     } else if (!is.null(wave_result$proportion)) {
-      return(wave_result$proportion * 100)
+      return(wave_result$proportion)
     }
     return(NA)
   } else if (metric_type == METRIC_TYPES$MEAN) {
@@ -216,15 +218,15 @@ extract_primary_metric <- function(wave_result, metric_type) {
   } else if (metric_type == METRIC_TYPES$COMPOSITE_ENHANCED) {
     return(wave_result$mean)
   } else if (metric_type == METRIC_TYPES$MULTI_MENTION) {
-    # For multi-mention, extract first item proportion
+    # For multi-mention, extract first item proportion (already 0-100 scale)
     if (!is.null(wave_result$item_proportions) && length(wave_result$item_proportions) > 0) {
-      return(wave_result$item_proportions[1] * 100)
+      return(wave_result$item_proportions[1])
     }
     return(NA)
   } else if (metric_type == METRIC_TYPES$CATEGORY_MENTIONS) {
-    # For category mentions, extract first category proportion
+    # For category mentions, extract first category proportion (already 0-100 scale)
     if (!is.null(wave_result$category_proportions) && length(wave_result$category_proportions) > 0) {
-      return(wave_result$category_proportions[1] * 100)
+      return(wave_result$category_proportions[1])
     }
     return(NA)
   }
@@ -269,7 +271,9 @@ calculate_pairwise_significance <- function(from_result, to_result, metric_type,
     # Use helper functions to determine metric type category
     if (is_proportion_metric(metric_type)) {
       # Two-proportion z-test
-      p1 <- if (!is.null(from_result$proportion)) {
+      # NOTE: Proportions are stored on 0-100 scale by calculate_proportions().
+      # The z-test formula requires 0-1 scale, so we convert below.
+      p1_raw <- if (!is.null(from_result$proportion)) {
         from_result$proportion
       } else if (!is.null(from_result$proportions) && length(from_result$proportions) > 0) {
         from_result$proportions[1]
@@ -279,7 +283,7 @@ calculate_pairwise_significance <- function(from_result, to_result, metric_type,
         return(default_return)
       }
 
-      p2 <- if (!is.null(to_result$proportion)) {
+      p2_raw <- if (!is.null(to_result$proportion)) {
         to_result$proportion
       } else if (!is.null(to_result$proportions) && length(to_result$proportions) > 0) {
         to_result$proportions[1]
@@ -289,18 +293,22 @@ calculate_pairwise_significance <- function(from_result, to_result, metric_type,
         return(default_return)
       }
 
+      # Convert from 0-100 scale to 0-1 scale for z-test
+      p1 <- p1_raw / 100
+      p2 <- p2_raw / 100
+
       n1 <- from_result$n_weighted
       n2 <- to_result$n_weighted
 
       if (is.na(n1) || is.na(n2) || n1 <= 0 || n2 <= 0) return(default_return)
 
-      # Pooled proportion
+      # Pooled proportion (now on 0-1 scale)
       p_pooled <- (p1 * n1 + p2 * n2) / (n1 + n2)
 
       # Standard error
       se <- sqrt(p_pooled * (1 - p_pooled) * (1/n1 + 1/n2))
 
-      if (se == 0 || is.na(se)) return(default_return)
+      if (se == 0 || is.na(se) || is.nan(se)) return(default_return)
 
       # Z-score
       z <- (p2 - p1) / se

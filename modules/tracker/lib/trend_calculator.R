@@ -142,7 +142,8 @@ calculate_all_trends <- function(config, question_map, wave_data, parallel = FAL
     # PARALLEL TREND CALCULATION
     # ---------------------------------------------------------------------------
     # Set up parallel plan if not already configured
-    if (!future::plan() %in% c("multisession", "multicore", "cluster")) {
+    current_plan_class <- class(future::plan())[1]
+    if (!current_plan_class %in% c("multisession", "multicore", "cluster")) {
       old_plan <- future::plan(future::multisession,
                                workers = min(n_questions, parallel::detectCores() - 1))
       on.exit(future::plan(old_plan), add = TRUE)
@@ -954,7 +955,7 @@ calculate_weighted_mean <- function(values, weights) {
     # Show sample of non-numeric values for debugging
     sample_values <- head(unique(values[!is.na(values)]), 5)
     # TRS Refusal: DATA_NON_NUMERIC_VALUES
-    tracker_refuse(
+    return(tracker_refuse(
       code = "DATA_NON_NUMERIC_VALUES",
       title = "Non-Numeric Data Detected",
       problem = "Expected numeric responses but found text values.",
@@ -964,7 +965,7 @@ calculate_weighted_mean <- function(values, weights) {
         "Verify question type is configured correctly"
       ),
       details = paste0("Sample values found: ", paste(sample_values, collapse = ", "))
-    )
+    ))
   }
 
   # Remove NA values
@@ -1616,13 +1617,13 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
 
   if (is.null(source_questions) || length(source_questions) == 0) {
     # TRS Refusal: CFG_NO_COMPOSITE_SOURCES
-    tracker_refuse(
+    return(tracker_refuse(
       code = "CFG_NO_COMPOSITE_SOURCES",
       title = "No Source Questions for Composite",
       problem = paste0("Composite question '", q_code, "' has no source questions defined."),
       why_it_matters = "Composites require source questions to calculate.",
       how_to_fix = "Define source questions in the SourceQuestions column of the question mapping."
-    )
+    ))
   }
 
   # Get TrackingSpecs

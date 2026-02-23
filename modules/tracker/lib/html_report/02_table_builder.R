@@ -158,7 +158,7 @@ build_tracking_table <- function(html_data, config) {
       htmltools::htmlEscape(mr$question_code),
       m_type,
       htmltools::htmlEscape(section),
-      chart_json
+      htmltools::htmlEscape(as.character(chart_json))
     ))
 
     # Label cell with sparkline
