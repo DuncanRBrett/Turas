@@ -55,34 +55,65 @@ is_valid_metric_type <- function(metric_type) {
 }
 
 
-#' Validate metric type and stop if invalid
+#' Validate metric type and refuse if invalid
 #'
 #' @param metric_type Character string to validate
 #' @param context Character string describing where validation occurred (for error messages)
-#' @return NULL (stops execution if invalid)
+#' @return NULL invisibly (throws turas_refusal condition if invalid)
 #' @export
 validate_metric_type <- function(metric_type, context = "unknown") {
   if (is.null(metric_type)) {
-    stop("metric_type is NULL in context: ", context, call. = FALSE)
+    tracker_refuse(
+      code = "DATA_METRIC_TYPE_NULL",
+      title = "Metric Type Is NULL",
+      problem = paste0("metric_type is NULL in context: ", context),
+      why_it_matters = "Every metric requires a valid type to determine how calculations and formatting are applied.",
+      how_to_fix = "Ensure the metric_type parameter is set to one of the valid types before calling this function."
+    )
   }
 
   if (length(metric_type) == 0) {
-    stop("metric_type has length zero in context: ", context, call. = FALSE)
+    tracker_refuse(
+      code = "DATA_METRIC_TYPE_EMPTY",
+      title = "Metric Type Has Zero Length",
+      problem = paste0("metric_type has length zero in context: ", context),
+      why_it_matters = "A zero-length metric_type cannot be matched to any calculation or formatting logic.",
+      how_to_fix = "Provide a single character string as metric_type. Valid types are: mean, nps, proportions, rating_enhanced, composite, composite_enhanced, multi_mention, category_mentions."
+    )
   }
 
   if (!is.character(metric_type)) {
-    stop("metric_type must be a character string, got ", class(metric_type)[1],
-         " in context: ", context, call. = FALSE)
+    tracker_refuse(
+      code = "DATA_METRIC_TYPE_WRONG_CLASS",
+      title = "Metric Type Is Not a Character String",
+      problem = paste0("metric_type must be a character string, got ", class(metric_type)[1],
+                       " in context: ", context),
+      why_it_matters = "Metric type lookups require a character string. A non-character value will cause downstream failures.",
+      how_to_fix = paste0("Convert metric_type to character or ensure the correct value is passed. Got class: ",
+                          class(metric_type)[1])
+    )
   }
 
   if (nchar(metric_type) == 0) {
-    stop("metric_type is empty string in context: ", context, call. = FALSE)
+    tracker_refuse(
+      code = "DATA_METRIC_TYPE_EMPTY_STRING",
+      title = "Metric Type Is Empty String",
+      problem = paste0("metric_type is an empty string in context: ", context),
+      why_it_matters = "An empty string cannot match any valid metric type and will cause silent misrouting of calculations.",
+      how_to_fix = "Provide a non-empty metric_type. Valid types are: mean, nps, proportions, rating_enhanced, composite, composite_enhanced, multi_mention, category_mentions."
+    )
   }
 
   if (!is_valid_metric_type(metric_type)) {
-    stop("Invalid metric_type: '", metric_type, "' in context: ", context,
-         "\nValid types are: ", paste(VALID_METRIC_TYPES, collapse = ", "),
-         call. = FALSE)
+    tracker_refuse(
+      code = "DATA_METRIC_TYPE_INVALID",
+      title = "Invalid Metric Type",
+      problem = paste0("Invalid metric_type: '", metric_type, "' in context: ", context),
+      why_it_matters = "An unrecognised metric type will cause calculation failures or incorrect output formatting.",
+      how_to_fix = paste0("Use one of the valid metric types: ",
+                          paste(VALID_METRIC_TYPES, collapse = ", "),
+                          ". Got: '", metric_type, "'")
+    )
   }
 
   invisible(NULL)
@@ -93,17 +124,29 @@ validate_metric_type <- function(metric_type, context = "unknown") {
 #'
 #' @param result List object that should contain a metric_type field
 #' @param context Character string describing where validation occurred
-#' @return NULL (stops execution if invalid)
+#' @return NULL invisibly (throws turas_refusal condition if invalid)
 #' @export
 validate_result_metric_type <- function(result, context = "unknown") {
   if (!is.list(result)) {
-    stop("Result is not a list in context: ", context, call. = FALSE)
+    tracker_refuse(
+      code = "DATA_RESULT_NOT_LIST",
+      title = "Result Object Is Not a List",
+      problem = paste0("Result is not a list in context: ", context,
+                       ". Got class: ", class(result)[1]),
+      why_it_matters = "Result objects must be lists with a metric_type field to route calculations correctly.",
+      how_to_fix = "Ensure the function producing this result returns a list with at least a 'metric_type' field."
+    )
   }
 
   if (!"metric_type" %in% names(result)) {
-    stop("Result does not contain 'metric_type' field in context: ", context,
-         "\nAvailable fields: ", paste(names(result), collapse = ", "),
-         call. = FALSE)
+    tracker_refuse(
+      code = "DATA_RESULT_MISSING_METRIC_TYPE",
+      title = "Result Missing metric_type Field",
+      problem = paste0("Result does not contain 'metric_type' field in context: ", context),
+      why_it_matters = "Without a metric_type field, the system cannot determine how to process or format results.",
+      how_to_fix = paste0("Add a 'metric_type' field to the result list. Available fields: ",
+                          paste(names(result), collapse = ", "))
+    )
   }
 
   validate_metric_type(result$metric_type, context = paste0(context, " (result$metric_type)"))
@@ -239,7 +282,13 @@ get_metric_type_short_name <- function(metric_type) {
 #' @export
 normalize_metric_type <- function(metric_type) {
   if (is.null(metric_type) || length(metric_type) == 0) {
-    stop("Cannot normalize NULL or empty metric_type", call. = FALSE)
+    tracker_refuse(
+      code = "DATA_METRIC_TYPE_NULL",
+      title = "Cannot Normalize NULL/Empty Metric Type",
+      problem = "metric_type is NULL or has zero length - cannot normalize.",
+      why_it_matters = "Normalization requires a non-empty metric_type string to map legacy names to current standards.",
+      how_to_fix = "Provide a non-NULL, non-empty character string as metric_type."
+    )
   }
 
   # Handle legacy or typo variants
@@ -261,9 +310,16 @@ normalize_metric_type <- function(metric_type) {
     return(metric_type)
   }
 
-  # Otherwise, error
-  stop("Unknown metric_type: '", metric_type, "' - cannot normalize",
-       call. = FALSE)
+  # Otherwise, refuse with actionable message
+  tracker_refuse(
+    code = "DATA_METRIC_TYPE_INVALID",
+    title = "Unknown Metric Type - Cannot Normalize",
+    problem = paste0("Unknown metric_type: '", metric_type, "' - cannot normalize."),
+    why_it_matters = "An unrecognised metric type cannot be mapped to any valid type and will cause downstream failures.",
+    how_to_fix = paste0("Use one of the valid metric types: ",
+                        paste(VALID_METRIC_TYPES, collapse = ", "),
+                        ". If this is a legacy name, add it to the legacy_mapping in normalize_metric_type().")
+  )
 }
 
 

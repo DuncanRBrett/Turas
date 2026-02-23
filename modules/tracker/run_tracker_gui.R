@@ -15,7 +15,9 @@ run_tracker_gui <- function() {
   trs_refusal_path <- file.path(TURAS_HOME, "modules", "shared", "lib", "trs_refusal.R")
 
   # Define local refusal function (used if shared infrastructure unavailable)
-  # This ensures TRS-compliant error messages even before full infrastructure loads
+  # This ensures TRS-compliant error messages even before full infrastructure loads.
+  # Uses stop() as the ultimate mechanism since this is the pre-TRS fallback.
+  # Throws a turas_refusal condition so handlers can catch it consistently.
   gui_refuse <- function(code, title, problem, why_it_matters, how_to_fix, details = NULL) {
     # Ensure code has valid TRS prefix
     if (!grepl("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|PKG_|FEATURE_|BUG_)", code)) {
@@ -34,7 +36,14 @@ run_tracker_gui <- function() {
       msg <- paste0(msg, "\nDetails:\n  ", details, "\n")
     }
     msg <- paste0(msg, "\n", strrep("=", 80), "\n")
-    stop(msg, call. = FALSE)
+
+    # Throw as a turas_refusal condition so handlers can catch it consistently
+    cond <- structure(
+      class = c("turas_refusal", "error", "condition"),
+      list(message = msg, code = code, title = title, problem = problem,
+           why_it_matters = why_it_matters, how_to_fix = how_to_fix)
+    )
+    stop(cond)
   }
 
   # Try to load TRS infrastructure for turas_refuse

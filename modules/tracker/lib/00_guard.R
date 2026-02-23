@@ -74,8 +74,25 @@ if (!exists("turas_refuse", mode = "function")) {
 
   if (!trs_loaded) {
     warning("TRS infrastructure not found. Using fallback error handling.")
+    # Fallback turas_refuse: throws a turas_refusal condition to match TRS behaviour.
+    # Uses stop() as the ultimate mechanism since the real TRS infrastructure is unavailable.
     turas_refuse <- function(code, title, problem, why_it_matters, how_to_fix, ...) {
-      stop(paste0("[", code, "] ", title, ": ", problem))
+      msg <- paste0(
+        "\n", strrep("=", 70), "\n",
+        "  [REFUSE] ", code, ": ", title, "\n",
+        strrep("=", 70), "\n",
+        "  Problem:    ", problem, "\n",
+        "  Why:        ", why_it_matters, "\n",
+        "  How to fix: ", how_to_fix, "\n",
+        strrep("=", 70), "\n"
+      )
+      # Throw as a turas_refusal condition so handlers can catch it consistently
+      cond <- structure(
+        class = c("turas_refusal", "error", "condition"),
+        list(message = msg, code = code, title = title, problem = problem,
+             why_it_matters = why_it_matters, how_to_fix = how_to_fix)
+      )
+      stop(cond)
     }
     with_refusal_handler <- function(expr, module = "UNKNOWN") {
       tryCatch(expr, error = function(e) stop(e))
