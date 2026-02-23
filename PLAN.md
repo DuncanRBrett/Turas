@@ -6,6 +6,22 @@ A new module that combines multiple Turas HTML reports (currently Tracker and Ta
 
 **Guiding principle:** Lightweight, bulletproof, works on all modern browsers. Zero external dependencies — everything vanilla JS/CSS embedded in a single self-contained HTML file.
 
+**Invocation:** Button in `launch_turas.R` Shiny GUI. Config-driven via Excel file.
+
+---
+
+## Confirmed Design Decisions
+
+These were discussed and confirmed with Duncan:
+
+1. **Invocation:** Always from a Shiny GUI button in `launch_turas.R` — not a standalone script.
+2. **Report order:** User-defined `order` parameter per report in the config Excel. Not hardcoded.
+3. **Header/logo:** Defined in the combined report config (not inherited from source reports). The config Excel has fields for project title, subtitle, company name, client name, and logo path.
+4. **Save button:** One Save at hub level. Individual report Save buttons are removed during merge.
+5. **Help overlay:** Kept per-panel (each report retains its own `?` help, scoped to its content).
+6. **Cross-reference mapping:** Defined in a sheet within the config Excel file (e.g., "CrossRef" sheet with tracker_code and tabs_code columns).
+7. **Visual consistency:** All charts/tables across the hub must share the same design language. Chart refinements applied here first, then backported to tracker and tabs.
+
 ---
 
 ## Architecture: DOM Merge with JS Namespacing
@@ -92,6 +108,85 @@ Level 1 switches which report is visible. Level 2 switches within that report (r
 
 ---
 
+## Config Excel Specification
+
+The combined report is driven by a config Excel file with the following sheets:
+
+### Sheet: "Settings"
+| Field | Description | Required |
+|-------|-------------|----------|
+| project_title | Combined report title | Yes |
+| subtitle | Subtitle text | No |
+| company_name | Preparing company | Yes |
+| client_name | Client organisation | No |
+| brand_colour | Hex colour for branding | No (default from source) |
+| accent_colour | Hex colour for accents | No |
+| logo_path | Path to logo image file | No |
+
+### Sheet: "Reports"
+| Field | Description | Required |
+|-------|-------------|----------|
+| report_path | Path to source HTML file | Yes |
+| report_label | Display label (e.g., "Tracker", "Crosstabs 2025") | Yes |
+| report_key | Unique key (e.g., "tracker", "tabs") | Yes |
+| order | Display order (1, 2, 3...) | Yes |
+| report_type | "tracker" or "tabs" (auto-detected if blank) | No |
+
+### Sheet: "CrossRef" (optional)
+| Field | Description |
+|-------|-------------|
+| tracker_code | Tracker metric question code (e.g., "Q_SAT") |
+| tabs_code | Crosstab question code (e.g., "Q12") |
+
+---
+
+## Visual Design Language
+
+All charts and tables in the combined report follow a unified design language. These refinements are applied in the hub first, then backported to tracker and tabs modules.
+
+### Chart Styling
+
+**Geometry:**
+- Rounded corners on bars: `rx="4" ry="4"`
+- Smooth spline interpolation on line charts (already done in tracker)
+- No outer box/border on charts
+- Faint horizontal grid lines only (`#e2e8f0`, 0.5px). No vertical grid lines.
+
+**Colour:**
+- Muted, corporate palette — no bright primaries
+- Soft charcoal for axis labels and tick marks: `#64748b`
+- Data series colours derived from brand palette with muted tones
+
+**Typography:**
+- Font-weight 500 for data values (medium — makes numbers pop)
+- Font-weight 400 for axis labels, legends, annotations (regular)
+- System font stack: `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`
+- Consistent sizing: 11px for data, 12px for axis labels, 14px for chart titles
+
+**Line Charts (tracker):**
+- Line stroke-width: 2.5px (slightly thicker than default for premium feel)
+- Data point circles: r="4" with white fill and coloured stroke
+- Data labels: font-weight 500, positioned to **never collide** — implement collision detection that offsets overlapping labels vertically
+- Smooth Catmull-Rom curves (already implemented)
+
+**Spacing & Alignment:**
+- Consistent padding: 16px inside chart area
+- Labels pixel-aligned to grid (no sub-pixel positioning)
+- Balanced whitespace between chart elements
+
+**Transitions:**
+- Subtle opacity fade (200ms ease) on visibility toggles (segments, waves, columns)
+- No hover lift animations, no drop shadows, no gradients on data elements
+
+### Table Styling
+
+- Consistent with existing Turas table design
+- Soft charcoal text for secondary data (`#64748b`)
+- Clean header row with brand colour accent
+- Consistent cell padding and alignment across tracker and tabs tables
+
+---
+
 ## File Structure
 
 ```
@@ -152,6 +247,8 @@ modules/report_hub/
 - Remap inline `onclick="switchReportTab(...)"` to use namespaced function
 - Route pin-related functions to `ReportHub.addPin()` instead of internal pin stores
 - Prefix CSS selectors that target IDs (`#pinned-cards-container` etc.)
+- **Remove individual Save/Print buttons** from each report's content (these become hub-level only)
+- Keep individual Help (`?`) buttons — they remain scoped to their report panel
 
 ### 1.4 — `04_navigation_builder.R` — Build navigation HTML
 - Level 1 nav bar: report tabs + Pinned tab (with badge)
@@ -328,52 +425,54 @@ cross_refs = list(
 ## API Design
 
 ```r
+#' Combine Multiple Turas HTML Reports
+#'
+#' @param config_file Path to the Report Hub config Excel file
+#'   containing Settings, Reports, and optionally CrossRef sheets.
+#' @param output_file Path for the combined HTML output.
+#'   If NULL, auto-generated from project title + date.
+#' @param auto_cross_ref Logical. Attempt fuzzy matching of questions
+#'   in addition to any explicit CrossRef mappings? Default FALSE.
+#'
+#' @return TRS-compliant list with status, output_path, diagnostics
 combine_reports <- function(
-  reports,
-  output_file,
-  title = NULL,
-  subtitle = NULL,
-  cross_refs = NULL,
-  auto_cross_ref = FALSE,
-  overview_text = NULL
+  config_file,
+  output_file = NULL,
+  auto_cross_ref = FALSE
 )
 ```
-
-**`reports`** — list of report specs:
-```r
-list(
-  list(path = "path/to/tracker.html"),
-  list(path = "path/to/crosstabs.html", label = "Crosstabs 2025")
-)
-```
-Label and key auto-detected from `<meta>` tags if not provided.
 
 **Example usage:**
 ```r
 combine_reports(
-  reports = list(
-    list(path = "tracker_report.html"),
-    list(path = "crosstabs_report.html")
-  ),
-  output_file = "SACAP_Combined_Report.html",
-  title = "SACAP Annual Climate Survey",
-  cross_refs = list(
-    list(tracker_code = "Q_SAT", tabs_code = "Q12"),
-    list(tracker_code = "Q_NPS", tabs_code = "Q15")
-  )
+  config_file = "path/to/SACAP_Combined_Config.xlsx",
+  output_file = "SACAP_Combined_Report.html"
 )
 ```
+
+### Shiny Integration
+
+A "Combine Reports" button in `launch_turas.R` that:
+1. Opens a file picker for the config Excel
+2. Validates the config (shows errors in UI if invalid)
+3. Calls `combine_reports()`
+4. Opens the generated HTML in the default browser
+
+This follows the same pattern as the existing module launch buttons.
 
 ---
 
 ## Key Design Decisions
 
 1. **No external dependencies** — All CSS/JS inline. Vanilla JS only. No CDN, no frameworks.
-2. **Report type auto-detection** — `<meta name="turas-report-type">` for tracker. For tabs, detect by `tab-crosstabs` panel. Will add `turas-report-type` meta to tabs module too.
-3. **CSS scoping** — Both reports share the same design tokens (font stack, colour variables). Common CSS extracted once; report-specific CSS scoped by parent panel class.
-4. **Save Report** — Serializes everything: all content, unified pins, sections, cross-refs, editable text. Reopening restores full state.
-5. **Print** — Two modes: print current report (Level 2 context) or print Pinned Views (curated presentation).
-6. **Single report fallback** — If only one report provided, the hub still works with simplified nav (no Level 1 tabs).
+2. **Config-driven** — All settings from Excel config file. Report order, header, logo, cross-refs all in config.
+3. **Report type auto-detection** — `<meta name="turas-report-type">` for tracker. For tabs, detect by `tab-crosstabs` panel. Will add `turas-report-type` meta to tabs module too.
+4. **CSS scoping** — Both reports share the same design tokens (font stack, colour variables). Common CSS extracted once; report-specific CSS scoped by parent panel class.
+5. **Single Save button** — Hub-level Save only. Individual report Save/Print buttons removed during merge. The hub Save serializes everything: all content, unified pins, sections, cross-refs, editable text.
+6. **Per-panel Help** — Each report keeps its own `?` help overlay, scoped to its content panel.
+7. **Print** — Two modes: print current report (Level 2 context) or print Pinned Views (curated presentation).
+8. **Single report fallback** — If only one report provided, the hub still works with simplified nav (no Level 1 tabs).
+9. **Visual consistency** — Unified design language applied to all charts/tables. Refinements here first, backported to source modules later.
 
 ---
 
