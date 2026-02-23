@@ -1,418 +1,406 @@
-# HTML Report Enhancement Plan — Round 2
+# Plan: Report Hub Module (`modules/report_hub/`)
 
 ## Overview
 
-15 improvements organised into 4 implementation phases. Each phase is self-contained
-and testable before moving to the next, so we never break working functionality.
+A new module that combines multiple Turas HTML reports (currently Tracker and Tabs/Crosstabs) into a single unified interactive report using DOM merge. The combined report preserves the full interactivity of each source report while adding a front page, cross-referencing, and a unified pinned views system with section dividers.
+
+**Guiding principle:** Lightweight, bulletproof, works on all modern browsers. Zero external dependencies — everything vanilla JS/CSS embedded in a single self-contained HTML file.
 
 ---
 
-## Phase 1: Bug Fixes & Regressions (Items 1, 3, 4, 5, 7)
-
-These are functional issues that need fixing regardless of any visual polish.
-
-### 1.1 — Chart-table sort sync regression (Item #1)
-
-**Root cause found:** The R-side chart builder (`07_chart_builder.R` line 311-315) wraps
-each horizontal bar in `<g class="chart-bar-group" data-bar-label="..." data-bar-index="...">`.
-However, `rebuildChartSVG()` is called on `DOMContentLoaded` by `initChartColumnPickers()`,
-which replaces the R-generated SVG with JS-generated SVG from `buildMultiHorizontalSVG()`.
-The JS version renders flat elements — no `<g>` wrapper, no `data-bar-label`, no `data-bar-index`.
-So `sortChartBars()` finds zero `g.chart-bar-group` elements and silently returns.
-
-**Fix:** Add `<g class="chart-bar-group" data-bar-label="..." data-bar-index="...">` wrappers
-to **both** `buildMultiHorizontalSVG()` and `buildMultiStackedSVG()` in the JS chart picker code.
-Each category group of bars gets wrapped so `sortChartBars()` can find and reorder them.
-
-**Files:** `03_page_builder.R` (JS functions around lines 1654-1764)
-
-**Risk:** Low — additive change, wrapping existing elements in `<g>` tags.
-
----
-
-### 1.2 — Chart label truncation on right side (Item #3)
-
-**Analysis:** The JS `buildMultiHorizontalSVG()` calculates `chartW = 680` and dynamically
-widens it if `barAreaW < 200`. However, the **value label** (`pctText`) and **column name**
-(for multi-column mode) are positioned at `labelW + barW + 8`, which can exceed the SVG
-viewBox width when bars are near 100%. The SVG has `overflow: hidden` by default.
-
-Similarly, in multi-column mode, the column name text after the percentage can run off the
-right edge: `afterPct = labelW + barW + 8 + pctText.length * 7 + 6`.
-
-**Fix:**
-- Increase right-side padding in the viewBox calculation (add ~60px margin)
-- Clip value text positioning to stay within viewBox bounds
-- Same adjustment needed in R-side `build_horizontal_bars_svg()` for consistency
-
-**Files:** `03_page_builder.R` (JS), `07_chart_builder.R` (R)
-
-**Risk:** Low — adjusting spacing calculations.
-
----
-
-### 1.3 — Key metric title centred above metric box (Item #4)
-
-**Analysis:** In the stacked bar chart, the priority metric header label is positioned at
-`text-anchor="end"` aligned to the right edge. The user wants it centred directly above
-the metric value pill/box.
-
-**Fix:** Calculate the metric box centre X position and use `text-anchor="middle"` with
-that X coordinate for the header label.
-
-**Files:** `03_page_builder.R` (`buildMultiStackedSVG` around line 1529-1531), and the
-R-side equivalent in `07_chart_builder.R`.
-
-**Risk:** Low — positioning adjustment.
-
----
-
-### 1.4 — Slide export text truncation + colour key (Item #5)
-
-**Analysis:** The slide export renders title text as a single SVG `<text>` element. SVG
-text doesn't wrap — if the question title is longer than the slide width (960px), it gets
-clipped. Same issue for insight text and metrics.
-
-Additionally, the stacked bar chart has no colour key on the slide (the legend is part of
-the chart SVG but may not be visible depending on chart type).
-
-**Fix:**
-- **Text wrapping:** Implement SVG `<tspan>` line-wrapping for title and insight text.
-  Estimate character width (~7px at font-size 16) and split at word boundaries when
-  text would exceed `W - 2*pad` pixels. Adjust subsequent Y positions accordingly.
-- **Colour key:** Ensure the legend from the chart SVG clone is preserved when embedding
-  in the slide. The chart clone already includes it, so this should work — verify and fix
-  if the legend is being cut off by the viewBox.
-
-**Files:** `03_page_builder.R` (`exportSlidePNG` function, lines 1885-2048)
-
-**Risk:** Medium — SVG text wrapping requires careful height recalculation.
-
----
-
-### 1.5 — Don't duplicate mean on slide if shown in chart (Item #7)
-
-**Analysis:** The slide shows:
-1. The chart SVG (which already includes priority metric pills for mean/index)
-2. A separate "metrics strip" below the chart (extracted from table `ct-row-mean` rows)
-
-When mean is the priority metric, it appears twice — once in the chart pill and once in
-the metrics strip below.
-
-**Fix:** In `exportSlidePNG()`, detect if the chart already displays a priority metric
-(check `data-chart-data` JSON for `priority_metric.label`). If so, filter that metric
-from the `metrics[]` array before rendering the strip. Only show metrics in the strip
-that are NOT already visible in the chart.
-
-**Files:** `03_page_builder.R` (`exportSlidePNG`, around lines 1912-1922)
-
-**Risk:** Low — filtering logic before rendering.
-
----
-
-## Phase 2: Branding & Visual Polish (Items 8, 9, 11, 12, 13)
-
-Professional appearance improvements using the TRL brand palette.
-
-### 2.1 — TRL brand colour scheme (Item #8)
-
-**Extracted from TRL Logo Colours_RGB.pptx:**
-
-| Role           | Hex       | RGB             |
-|----------------|-----------|-----------------|
-| Near-Black     | `#030303` | 3, 3, 3         |
-| Dark Navy      | `#323367` | 50, 51, 103     |
-| Gold           | `#CC9900` | 204, 153, 0     |
-| Burnt Orange   | `#E56B33` | 229, 107, 51    |
-
-**Proposed usage:**
-- **Primary brand:** Dark Navy `#323367` — header background, active states, brand accents
-- **Accent/highlight:** Gold `#CC9900` — active tab indicators, selected states, badges
-- **Secondary accent:** Burnt Orange `#E56B33` — hover states, secondary highlights
-- **Text:** Near-Black `#030303` — headings and primary body text
-
-**Important:** The current system uses `brand_colour` from config (default `#0d8a8a` teal).
-We should NOT hardcode TRL colours — instead, update the **default** brand_colour and add
-a configurable **accent_colour** option. The TRL colours become the new defaults but any
-client can override them in their Settings sheet.
-
-**Implementation:**
-- Add `accent_colour` config field (default: Gold `#CC9900`)
-- Update CSS colour variables to use brand + accent
-- Update chart colour palette generation to start from brand_colour
-- Keep everything configurable
-
-**Files:** `config_loader.R`, `03_page_builder.R` (CSS), `06_dashboard_builder.R` (CSS)
-
-**Risk:** Medium — touching CSS across multiple files. Test thoroughly.
-
----
-
-### 2.2 — Professional colour/font consistency (Item #9)
-
-**Current state:** Mix of hardcoded colours throughout CSS (`#1a2744`, `#374151`, `#64748b`,
-`#f8f9fa`, etc.). Font stack is consistent (`-apple-system, BlinkMacSystemFont, Segoe UI,
-Roboto, sans-serif`).
-
-**Fix:**
-- Define a semantic colour palette at the top of `build_css()` using CSS custom properties:
-  ```css
-  :root {
-    --ct-brand: #323367;
-    --ct-accent: #CC9900;
-    --ct-text-primary: #1e293b;
-    --ct-text-secondary: #64748b;
-    --ct-bg-surface: #ffffff;
-    --ct-bg-muted: #f8f9fa;
-    --ct-border: #e2e8f0;
-  }
-  ```
-- Replace hardcoded colour values with CSS variables throughout
-- Ensure consistent font sizing: 11px data, 13px labels, 16px headings
-
-**Files:** `03_page_builder.R` (CSS section)
-
-**Risk:** Medium — many replacements, but purely visual. Side-by-side testing needed.
-
----
-
-### 2.3 — Logo in report banner (Item #11)
-
-**Analysis:** `TRL Logo.png` is 1340x944px, 395KB (527KB base64). This is far too large
-to embed in every HTML report.
-
-**Solution:**
-1. Create a small optimised version (~32px height, ~45px width) as base64 PNG
-   OR use an SVG version if available
-2. Embed in the header-left div, before the brand text
-3. Use a config option `logo_base64` that can be overridden
-
-**Note:** We need to create a resized version. Options:
-- Ask Duncan to provide a small version (~4-8KB)
-- Generate one programmatically using R's `magick` package (if available)
-- Use a simple SVG placeholder that can be swapped
-
-**Recommendation:** Add a `logo_path` config option. At report generation time, read the
-image, resize to max 40px height, convert to base64, and embed. If `magick` isn't available,
-fall back to a simple text logo. If no logo_path specified, show no logo.
-
-**Files:** `config_loader.R`, `03_page_builder.R` (`build_header`), `99_html_report_main.R`
-
-**Risk:** Low-Medium — need to handle image processing gracefully. The `magick` package
-may not be installed (use `requireNamespace` check).
-
----
-
-### 2.4 — Config whitelabel logo option (Item #12)
-
-This is effectively the same as 2.3 — the `logo_path` config field handles both:
-- Default: TRL logo (or no logo)
-- Whitelabel: client's own logo file path in Settings sheet
-
-**Config fields to add:**
-- `logo_path` — file path to logo image (default: NULL = no logo)
-- `company_name` — already exists (default: "The Research Lamppost")
-
-**Files:** `config_loader.R` (add `logo_path` field)
-
----
-
-### 2.5 — Optional client label (Item #13)
-
-**Current header structure:**
-```
-[Brand label: "Company · Turas Analytics"]
-[Project Title]
-[Meta: "Interactive Crosstab Explorer · n=X · Y Questions"]
+## Architecture: DOM Merge with JS Namespacing
+
+### How It Works
+
+1. R parses each source HTML file
+2. Extracts content panels, CSS, and JS
+3. Wraps each report's JS in an IIFE namespace (`TrackerReport`, `TabsReport`)
+4. Prefixes DOM IDs per report (e.g., `tracker--tab-summary`, `tabs--tab-crosstabs`)
+5. Builds a unified shell with two-tier navigation
+6. Creates a shared `ReportHub` manager that both report namespaces feed into (pinned views, cross-refs)
+7. Generates the Overview front page from extracted metadata
+8. Writes out a single self-contained HTML file
+
+### JS Namespace Strategy
+
+Each source report's JS gets wrapped in an IIFE module:
+
+```javascript
+var TrackerReport = (function() {
+  // All tracker globals become private
+  var pinnedViews = [];
+  var activeSegments = {};
+  // Functions reference namespaced DOM IDs
+  return {
+    togglePin: function(metricId) { ... },
+    switchTab: function(tabName) { ... },
+    init: function() { ... }
+  };
+})();
 ```
 
-**Enhancement:** Add optional `client_name` field. When set, display as:
+Shared code lives in a `ReportHub` namespace:
+
+```javascript
+var ReportHub = {
+  pinnedViews: [],       // Unified pin store
+  sections: [],          // Section dividers
+  crossRefs: {},         // Tracker <-> Crosstab mapping
+  switchReport: function(reportKey) { ... },
+  addPin: function(source, pinObj) { ... },
+  renderPinnedCards: function() { ... }
+};
 ```
-[Brand label: "Company · Turas Analytics"]
-[Project Title]
-[Client: "Prepared for ClientName"]     <-- NEW (subtle, right-aligned or below title)
-[Meta: ...]
+
+### Identified Conflicts (from analysis)
+
+**Critical name collisions requiring namespacing:**
+- `pinnedViews` (global array — both modules)
+- `togglePin()` (different signatures)
+- `renderPinnedCards()` (different card structures)
+- `downloadBlob()` (different signatures: 2 vs 3 params)
+- `saveReportHTML()`, `printReport()`, `toggleHelpOverlay()` (different implementations)
+- `escapeHtml()`, `exportSlidePNG()`, `exportChartPNG()` (both define these)
+
+**DOM ID collisions:**
+- `pinned-cards-container`, `pinned-empty-state`, `pinned-views-data`, `pin-count-badge`, `header-date-badge`
+
+All resolved by IIFE wrapping + ID prefixing.
+
+---
+
+## Navigation Structure
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  [Logo]  Project Title — Combined Report                         │
+│          Prepared by Company Name                                │
+├──────────────────────────────────────────────────────────────────┤
+│  Overview │ Tracker │ Crosstabs │ 📌 Pinned (3)                  │  Level 1
+├──────────────────────────────────────────────────────────────────┤
+│  (Tracker selected → Level 2 appears:)                           │
+│  Summary │ Metrics by Segment │ Segment Overview                 │
+│                                                                  │
+│  (Crosstabs selected → Level 2 appears:)                         │
+│  Summary │ Crosstabs                                             │
+├──────────────────────────────────────────────────────────────────┤
+│  [Content area — full width, scrollable]                         │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-**Config fields to add:**
-- `client_name` — client/organisation name (default: NULL = hidden)
-
-**Files:** `config_loader.R`, `03_page_builder.R` (`build_header`)
-
-**Risk:** Low — additive change to header.
+Level 1 switches which report is visible. Level 2 switches within that report (reusing existing tab logic). The Pinned tab and Overview are always at Level 1.
 
 ---
 
-## Phase 3: Chart Intelligence (Items 2, 10)
+## File Structure
 
-Smarter chart behaviour.
-
-### 3.1 — Row greying / exclude from chart (Item #2)
-
-**Concept:** Allow users to click a row in the table to toggle it grey, which excludes that
-category from the chart. Similar to dashboard metric exclusion.
-
-**Implementation:**
-- Add a toggle icon or click handler on `ct-label-col` cells for category rows
-- Toggled rows get `ct-row-excluded` class (greyed out visually)
-- When chart is rebuilt, filter out excluded labels
-- Store exclusion state in a JS object keyed by table ID + label
-- Exclusions reset when switching banner groups (consistent with sort reset)
-
-**UI approach:** Small "eye" icon appears on hover in the label column. Click
-toggles exclusion. Greyed row has `opacity: 0.35` and strikethrough text.
-
-**Files:** `03_page_builder.R` (CSS + JS), `02_table_builder.R` (add icon element)
-
-**Risk:** Medium — new interactive feature. Needs thorough testing with sort + column toggle.
-
----
-
-### 3.2 — Semantic chart colours (Item #10)
-
-**Concept:** For satisfaction-type scales, use colour semantics:
-- Red/negative end: "Very Dissatisfied", "Poor", "Strongly Disagree"
-- Green/positive end: "Very Satisfied", "Excellent", "Strongly Agree"
-- Neutral/grey: middle categories
-
-**Implementation approach:**
-- This is already partially implemented in `07_chart_builder.R` via `get_semantic_colour()`
-- The R-side builder assigns colours based on category position in the scale
-- The JS chart picker also needs this logic for rebuilt charts
-- Need to verify the colour mapping is working correctly and extend if needed
-
-**Colour palette for semantic scales:**
-- Strong negative: `#dc2626` (red-600)
-- Moderate negative: `#f97316` (orange-500)
-- Neutral: `#94a3b8` (slate-400)
-- Moderate positive: `#22c55e` (green-500)
-- Strong positive: `#16a34a` (green-600)
-
-**Config option:** `semantic_colours: TRUE/FALSE` (default TRUE for Likert/ordinal questions)
-The system should auto-detect ordinal scales vs nominal categories and only apply semantic
-colours to ordinal scales.
-
-**Files:** `07_chart_builder.R`, `03_page_builder.R` (JS colour logic)
-
-**Risk:** Medium — auto-detection of scale type needs to be reliable. False positives
-(applying semantic colours to nominal categories) would look wrong.
+```
+modules/report_hub/
+├── 00_guard.R                    # Input validation
+├── 00_main.R                     # Main orchestration: combine_reports()
+├── 01_html_parser.R              # Parse source HTML files, extract components
+├── 02_namespace_rewriter.R       # Prefix DOM IDs, wrap JS in IIFEs
+├── 03_front_page_builder.R       # Build Overview/front page
+├── 04_navigation_builder.R       # Build two-tier navigation shell
+├── 05_pinned_merger.R            # Unified pinned views system
+├── 06_cross_reference.R          # Cross-reference links between reports
+├── 07_page_assembler.R           # Assemble final HTML
+├── 08_html_writer.R              # Write output file
+├── js/
+│   ├── hub_navigation.js         # Level 1 tab switching, Level 2 delegation
+│   ├── hub_pinned.js             # Unified PinnedViewManager with sections
+│   └── hub_cross_ref.js          # Cross-reference link navigation
+├── assets/
+│   └── hub_styles.css            # Shell styles (nav, front page, unified pinned)
+├── tests/
+│   └── testthat/
+│       ├── test_html_parser.R
+│       ├── test_namespace_rewriter.R
+│       ├── test_cross_reference.R
+│       └── test_integration.R
+└── README.md
+```
 
 ---
 
-## Phase 4: Advanced Features (Items 6, 14, 15)
+## Phase 1: Core Shell (Foundation)
 
-### 4.1 — Save insights to HTML file (Item #6)
+**Goal:** Two reports loading side-by-side in a unified shell with working navigation. No JS errors.
 
-**Concept:** Export a standalone HTML file containing all insights, organised by question.
-Must work cross-browser and cross-OS — open in any browser, print nicely.
+### 1.1 — `00_guard.R` — Input validation
+- Each report path exists and is readable
+- Files contain valid HTML (`<html>` tag present)
+- Detect report type from `<meta name="turas-report-type">` (tracker) or presence of `tab-crosstabs` panel (tabs)
+- No duplicate report keys
+- TRS refusals for all failures
 
-**Implementation options:**
+### 1.2 — `01_html_parser.R` — Parse source HTML
+- Extract all `<style>` blocks (CSS)
+- Extract all `<script>` blocks (JS), separating:
+  - Executable JS (functions/logic)
+  - Data blocks (`pinned-views-data` JSON, `BANNER_GROUPS_JSON`, etc.)
+- Extract header HTML (logo, title, metadata badges)
+- Extract content panels (the `tab-panel` divs)
+- Extract footer HTML
+- Return structured list: `list(css, js, data_scripts, content_panels, header, footer, metadata)`
 
-**Option A — Minimal HTML string download (Recommended):**
-- JavaScript collects all insight editors' text content
-- Builds a simple, self-contained HTML string with inline CSS
-- Downloads via `Blob` + `downloadBlob()` (same pattern as CSV/Excel export)
-- Clean formatting: question code, question text, insight text, separator
-- Includes project title, date, base info in header
+### 1.3 — `02_namespace_rewriter.R` — Rewrite to avoid conflicts
+- Prefix all `id="X"` attributes in content HTML with report key (e.g., `tracker--`)
+- Rewrite JS string literals: `getElementById('X')` → `getElementById('tracker--X')`
+- Rewrite JS string literals: `querySelector('#X')` → `querySelector('#tracker--X')`
+- Wrap each report's full JS in an IIFE: `var TrackerReport = (function() { ... return { publicAPI }; })();`
+- Remap inline `onclick="switchReportTab(...)"` to use namespaced function
+- Route pin-related functions to `ReportHub.addPin()` instead of internal pin stores
+- Prefix CSS selectors that target IDs (`#pinned-cards-container` etc.)
 
-**Option B — JSON export:**
-- Export as JSON file that can be re-imported
-- More machine-readable but less user-friendly
+### 1.4 — `04_navigation_builder.R` — Build navigation HTML
+- Level 1 nav bar: report tabs + Pinned tab (with badge)
+- Level 2 nav bars: one per report (hidden until that report is active)
+- Same visual style as existing `.report-tabs` CSS
+- Overview tab is first, always visible
 
-**Recommendation:** Option A. It's consistent with existing export patterns, works offline,
-opens in any browser, and prints cleanly. JSON could be added later as a secondary format.
+### 1.5 — `07_page_assembler.R` — Assemble final HTML
+- Single `<!DOCTYPE html>` document
+- `<meta name="turas-report-type" content="hub"/>`
+- Merged `<style>` blocks (shared first, then per-report scoped)
+- Unified header (from config or extracted from first report)
+- Level 1 navigation
+- Report panels: each wrapped in `<div id="{key}--report-panel" class="hub-panel">`
+- Unified pinned panel
+- All `<script>` blocks: hub JS first, then namespaced report JS
+- Initialization: `DOMContentLoaded` calls each report's `init()`, then `ReportHub.init()`
 
-**Files:** `03_page_builder.R` (new JS function + button in controls area)
+### 1.6 — `08_html_writer.R` — Write output file
+- Standard write with encoding handling
+- Return TRS-compliant result
 
-**Risk:** Low — follows existing export patterns.
+### 1.7 — `js/hub_navigation.js` — Navigation controller
+- `ReportHub.switchReport(key)` — show/hide report panels, show/hide Level 2 nav, update active states
+- URL hash support: `#tracker`, `#crosstabs`, `#pinned` for deep linking
+- Keyboard: left/right arrows to cycle Level 1 tabs (when focus is on nav)
+- Handle edge case: if only 1 report, skip Level 1 nav entirely
+
+### 1.8 — `assets/hub_styles.css` — Shell styles
+- Two-tier navigation styling
+- `.hub-panel { display: none; }` / `.hub-panel.active { display: block; }`
+- Front page card layout
+- Print: current panel only, or pinned views only
+- Responsive: stack nav on small screens
+
+**Phase 1 tests:**
+- HTML parser extracts correct components from real tracker + tabs HTML
+- Namespace rewriter prefixes IDs without corrupting HTML structure
+- Navigation switching shows/hides correct panels
+- No JS console errors when both reports are loaded
 
 ---
 
-### 4.2 — Alternative chart types (Item #14)
+## Phase 2: Unified Pinned Views with Sections
 
-**User note:** "probably for a future phase"
+**Goal:** Single pinned tab collecting pins from both reports. Section dividers for narrative structure.
 
-**Agreed — defer to future phase.** Current stacked bar + horizontal bar cover the core
-use cases well. When ready, candidates include:
-- Donut/pie charts (for single-response with few categories)
-- Line charts (for tracking data when tracker module integrates)
-- Grouped bar charts (already partially there with multi-column horizontal bars)
+### 2.1 — `05_pinned_merger.R` — Server-side pin preparation
+- Parse `pinned-views-data` JSON from each source report
+- Tag each pin with `source: "tracker"` or `source: "tabs"`
+- Merge into single array (ordered by timestamp)
+- Generate unified `<script id="hub-pinned-data" type="application/json">` block
 
-**No action this round.**
+### 2.2 — `js/hub_pinned.js` — Unified PinnedViewManager
+
+**Data structure:**
+```javascript
+ReportHub.pinnedItems = [
+  { type: "section", title: "Brand Health", id: "sec-1234" },
+  { type: "pin", source: "tracker", id: "pin-5678", ...pinData },
+  { type: "pin", source: "tabs", id: "pin-9012", ...pinData },
+  { type: "section", title: "Purchase Intent", id: "sec-3456" },
+  { type: "pin", source: "tracker", id: "pin-7890", ...pinData },
+];
+```
+
+**Features:**
+- Pin cards show source badge: "📈 Tracker" or "📋 Crosstabs"
+- Section dividers render as full-width banners with editable title
+- "Add Section" button in toolbar
+- Reorder pins AND sections freely — sections don't constrain pins
+- Pins from both reports can live under any section
+- Each pin has independent editable insight area
+- Remove pin updates source report's pin button state
+- Export: all pins + section dividers as sequenced PNGs
+- Print: one page per pin, section dividers as page headers
+- Save: serializes unified pin data + sections to JSON store
+
+### 2.3 — Namespace rewriter pin intercept
+- Tracker's `togglePin()` / `pinMetricView()` → rewrite to call `ReportHub.addPin("tracker", ...)`
+- Tabs' `togglePin()` / `captureCurrentView()` → rewrite to call `ReportHub.addPin("tabs", ...)`
+- Both modules' `updatePinBadge()` → `ReportHub.updatePinBadge()`
+- `savePinnedData()` → `ReportHub.savePinnedData()`
+- `hydratePinnedViews()` → `ReportHub.hydratePinnedViews()`
+
+**Phase 2 tests:**
+- Pins from tracker appear with correct badge
+- Pins from tabs appear with correct badge
+- Section dividers render and are editable
+- Reordering works across sources
+- Pin count badge reflects total from both sources
+- Save/hydrate preserves all pins, sections, and their order
 
 ---
 
-### 4.3 — Tooltips / help system (Item #15)
+## Phase 3: Front Page (Overview)
 
-**User context:** Shared Perplexity analysis. Wants to discuss options — concerned that
-too much help could confuse rather than clarify.
+**Goal:** Auto-generated overview with report index and combined summary. Editable where needed.
 
-**Recommendation: "First-time help overlay" approach:**
-- A single "?" button in the header/controls area
-- Clicking it shows a semi-transparent overlay highlighting key interactive elements
-  with short labels: "Click to sort", "Toggle columns", "Add insight", etc.
-- Dismisses on click/ESC
-- Remembers dismissal in `localStorage` (shows automatically on first visit, optional after)
-- Lightweight: ~50 lines of JS, ~30 lines of CSS
+### 3.1 — `03_front_page_builder.R`
 
-**Why this approach:**
-- **Non-intrusive:** Doesn't add persistent tooltips that clutter the UI
-- **Discoverable:** Users who need help can find the "?" button
-- **One-time:** After first view, stays out of the way
-- **Simple:** No tooltip library, no complex positioning logic
-- **Cross-browser:** Pure CSS overlay + JS toggle
+**Metadata extraction** — Pull from source reports:
+- Project title, company name, logo (from header HTML)
+- Tracker: n metrics, n waves, n segments, wave labels
+- Tabs: n questions, total n, fieldwork dates
 
-**Alternative considered:** Per-element tooltips on hover. Rejected because:
-- Adds visual noise
-- Positioning is fragile across screen sizes
-- Many elements to annotate
-- Can interfere with click targets
+**Report index cards:**
+- One card per included report
+- Icon + label + key stats
+- "View Report →" button (navigates to that Level 1 tab)
+- Brand colour accent on card border
 
-**Files:** `03_page_builder.R` (CSS + JS + button in header)
+**Combined summary area:**
+- Pull existing editable text from each report's Summary tab
+- Display as labelled sections: "Tracker Summary", "Crosstabs Summary"
+- Both editable (contenteditable divs)
+- Persisted on save
 
-**Risk:** Low — completely additive, toggle-based.
+**Project metadata strip:**
+- Auto-populated row of badges: client, fieldwork, waves, total n
+- Extracted from source reports
+
+**Phase 3 tests:**
+- Front page renders correct metadata from both reports
+- Report index cards navigate to correct tabs
+- Editable text persists across save/reload
+
+---
+
+## Phase 4: Cross-Referencing
+
+**Goal:** Navigate seamlessly from tracker metric to corresponding crosstab question and back.
+
+### 4.1 — `06_cross_reference.R` — Build cross-reference map
+
+**Primary: user-provided mapping** (most reliable):
+```r
+cross_refs = list(
+  list(tracker_code = "Q_SAT", tabs_code = "Q12"),
+  list(tracker_code = "Q_NPS", tabs_code = "Q15")
+)
+```
+
+**Fallback: auto-match** (when `auto_cross_ref = TRUE`):
+- Extract question text from both reports' HTML (from data attributes or visible text)
+- Fuzzy string matching on question text (base R `agrepl()` or Levenshtein distance)
+- Only accept matches above a high similarity threshold (>0.85)
+- Log matches to console so user can verify
+
+**Output:** JSON lookup embedded in page:
+```json
+{ "tracker::Q_SAT": "tabs::Q12", "tabs::Q12": "tracker::Q_SAT" }
+```
+
+### 4.2 — Inject cross-reference links
+- In tracker metric panels: subtle "See in Crosstabs →" link button near title (only if mapping exists)
+- In crosstab question containers: subtle "See Trend →" link button near title (only if mapping exists)
+- Data attribute: `data-xref-target="tabs::Q12"`
+
+### 4.3 — `js/hub_cross_ref.js` — Navigation handler
+- `ReportHub.navigateTo(target)` — parse target string, switch Level 1 tab, then navigate within report
+- For tracker targets: call `TrackerReport.selectMetric(metricId)` + switch to Metrics by Segment
+- For tabs targets: call `TabsReport.selectQuestion(index)` + switch to Crosstabs tab
+- Brief highlight animation (yellow flash → fade) on target element
+
+**Phase 4 tests:**
+- Cross-ref links appear only where mapping exists
+- Clicking link navigates to correct report + question/metric
+- No errors when target doesn't exist
+- Auto-match produces reasonable results on SACAP data
+
+---
+
+## API Design
+
+```r
+combine_reports <- function(
+  reports,
+  output_file,
+  title = NULL,
+  subtitle = NULL,
+  cross_refs = NULL,
+  auto_cross_ref = FALSE,
+  overview_text = NULL
+)
+```
+
+**`reports`** — list of report specs:
+```r
+list(
+  list(path = "path/to/tracker.html"),
+  list(path = "path/to/crosstabs.html", label = "Crosstabs 2025")
+)
+```
+Label and key auto-detected from `<meta>` tags if not provided.
+
+**Example usage:**
+```r
+combine_reports(
+  reports = list(
+    list(path = "tracker_report.html"),
+    list(path = "crosstabs_report.html")
+  ),
+  output_file = "SACAP_Combined_Report.html",
+  title = "SACAP Annual Climate Survey",
+  cross_refs = list(
+    list(tracker_code = "Q_SAT", tabs_code = "Q12"),
+    list(tracker_code = "Q_NPS", tabs_code = "Q15")
+  )
+)
+```
+
+---
+
+## Key Design Decisions
+
+1. **No external dependencies** — All CSS/JS inline. Vanilla JS only. No CDN, no frameworks.
+2. **Report type auto-detection** — `<meta name="turas-report-type">` for tracker. For tabs, detect by `tab-crosstabs` panel. Will add `turas-report-type` meta to tabs module too.
+3. **CSS scoping** — Both reports share the same design tokens (font stack, colour variables). Common CSS extracted once; report-specific CSS scoped by parent panel class.
+4. **Save Report** — Serializes everything: all content, unified pins, sections, cross-refs, editable text. Reopening restores full state.
+5. **Print** — Two modes: print current report (Level 2 context) or print Pinned Views (curated presentation).
+6. **Single report fallback** — If only one report provided, the hub still works with simplified nav (no Level 1 tabs).
+
+---
+
+## Risks & Mitigations
+
+| Risk | Mitigation |
+|------|-----------|
+| JS namespace conflicts missed during rewriting | Comprehensive collision list already built. Test with real SACAP reports. |
+| Regex-based ID rewriting is fragile | Target known patterns only. Validate with `node --check` on extracted JS. |
+| Large combined file size | CSS deduplication. Accept ~30-50% larger than sum of parts due to shell overhead. |
+| Performance with two reports in DOM | Only active panel is `display: block`. Inactive panels don't repaint. |
+| Cross-ref mapping breaks on code changes | User-provided mapping is authoritative. Auto-match warns, never silent. |
+| Browser compat | Vanilla JS only. Same browser targets as existing reports (Chrome, FF, Safari, Edge). |
 
 ---
 
 ## Implementation Order
 
 ```
-Phase 1 (Bug Fixes)        <-- Do first, highest value
-  1.1 Sort sync regression
-  1.2 Label truncation
-  1.3 Metric title centering
-  1.4 Slide text wrapping + colour key
-  1.5 Slide mean deduplication
-
-Phase 2 (Branding)         <-- Do second, visual polish
-  2.1 Brand colour scheme
-  2.2 CSS custom properties + consistency
-  2.3 Logo in banner
-  2.4 Whitelabel config (part of 2.3)
-  2.5 Client label
-
-Phase 3 (Chart Intelligence) <-- Do third, new features
-  3.1 Row exclusion from charts
-  3.2 Semantic chart colours
-
-Phase 4 (Advanced)          <-- Do last
-  4.1 Insight export to HTML
-  4.3 Help overlay
-  4.2 Alternative charts --> DEFERRED
+Phase 1: Core Shell           ~1,500 lines (8 R files + 1 JS + 1 CSS)
+Phase 2: Unified Pinned Views ~500 lines  (1 R file + 1 JS)
+Phase 3: Front Page           ~300 lines  (1 R file)
+Phase 4: Cross-Referencing    ~300 lines  (1 R file + 1 JS)
+                              ─────────
+Total estimated:              ~2,600 lines + tests
 ```
 
-## Questions for Duncan
-
-1. **Brand colours (Item #8):** Should Dark Navy `#323367` replace the current teal
-   `#0d8a8a` as the default brand_colour? Or should we keep teal as default and only
-   switch to navy when TRL logo is used?
-
-2. **Logo (Item #11):** Can you provide a small version of the logo (~40px height)?
-   Or should I attempt to resize programmatically using the `magick` R package?
-
-3. **Semantic colours (Item #10):** Should semantic colours be opt-in (config flag) or
-   auto-detected based on question type? Auto-detection risks false positives on scales
-   where red/green semantics don't apply (e.g., frequency scales: "Daily, Weekly, Monthly").
 
 4. **Help overlay (Item #15):** The "?" button overlay approach — does this feel right?
-   Or would you prefer a different approach (e.g., a separate "Guide" page/tab)?
+Each phase is independently testable against the real SACAP HTML files.
