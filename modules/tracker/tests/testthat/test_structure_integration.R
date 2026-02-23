@@ -166,20 +166,20 @@ test_that("resolve_question_values returns NA for unknown question", {
   values <- c("Yes", "No")
   structure <- create_mock_structure()
   # Q99 not in structure — tries numeric conversion
-  expect_warning(
-    result <- resolve_question_values(values, structure, "Q99"),
-    "no structure mapping"
-  )
+  output <- capture.output({
+    result <- resolve_question_values(values, structure, "Q99")
+  }, type = "output")
+  expect_true(any(grepl("no structure mapping", output)))
   expect_true(all(is.na(result)))
 })
 
 test_that("resolve_question_values handles empty structure for question", {
   values <- c("Option A", "Option B")
   structure <- create_mock_structure()
-  expect_warning(
-    result <- resolve_question_values(values, structure, "Q99"),
-    "no structure mapping"
-  )
+  output <- capture.output({
+    result <- resolve_question_values(values, structure, "Q99")
+  }, type = "output")
+  expect_true(any(grepl("no structure mapping", output)))
 })
 
 
@@ -213,19 +213,19 @@ test_that("get_box_options is case insensitive", {
 
 test_that("get_box_options warns for unknown category", {
   structure <- create_mock_structure()
-  expect_warning(
-    result <- get_box_options(structure, "Q1", "Unknown"),
-    "not found"
-  )
+  output <- capture.output({
+    result <- get_box_options(structure, "Q1", "Unknown")
+  }, type = "output")
+  expect_true(any(grepl("not found", output)))
   expect_null(result)
 })
 
 test_that("get_box_options warns for question with no BoxCategory", {
   structure <- create_mock_structure()
-  expect_warning(
-    result <- get_box_options(structure, "Q2", "Agree"),
-    "empty"
-  )
+  output <- capture.output({
+    result <- get_box_options(structure, "Q2", "Agree")
+  }, type = "output")
+  expect_true(any(grepl("empty", output)))
   expect_null(result)
 })
 

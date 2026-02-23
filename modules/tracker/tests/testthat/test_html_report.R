@@ -597,13 +597,6 @@ test_that("table displays percentage values correctly (no double multiply)", {
   expect_false(grepl("5200", table_str))
 })
 
-test_that("make_css_safe converts names correctly", {
-  expect_equal(make_css_safe("Total"), "Total")
-  expect_equal(make_css_safe("Cape Town"), "Cape-Town")
-  expect_equal(make_css_safe("Group (A)"), "Group--A-")
-})
-
-
 # ==============================================================================
 # TESTS: HTML Writer
 # ==============================================================================
@@ -797,7 +790,6 @@ test_that("Tab switching JS is embedded", {
 
   # Tab navigation JS
   expect_true(grepl("switchReportTab", content))
-  expect_true(grepl("tab_navigation.js", content))
 
   unlink(output_path)
 })
@@ -964,7 +956,7 @@ test_that("metrics_view.js is embedded", {
   result <- generate_tracker_html_report(crosstab_data, config, output_path)
   content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
 
-  expect_true(grepl("metrics_view.js", content))
+  expect_true(grepl("selectMetric", content))
 
   unlink(output_path)
 })
@@ -1002,7 +994,6 @@ test_that("Pinned views JS is embedded", {
   result <- generate_tracker_html_report(crosstab_data, config, output_path)
   content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
 
-  expect_true(grepl("pinned_views.js", content))
   expect_true(grepl("pinnedViews", content))
   expect_true(grepl("togglePin", content))
   expect_true(grepl("renderPinnedCards", content))
@@ -1555,17 +1546,17 @@ test_that("CSS contains aligned Turas design tokens (--ct-* prefix)", {
   # Shared Turas tokens (matching Turas Tabs)
   expect_true(grepl("--ct-brand:", css_output, fixed = TRUE))
   expect_true(grepl("--ct-accent:", css_output, fixed = TRUE))
-  expect_true(grepl("--ct-text-primary: #1e293b", css_output, fixed = TRUE))
-  expect_true(grepl("--ct-text-secondary: #64748b", css_output, fixed = TRUE))
-  expect_true(grepl("--ct-bg-surface: #ffffff", css_output, fixed = TRUE))
-  expect_true(grepl("--ct-bg-muted: #f8f9fa", css_output, fixed = TRUE))
-  expect_true(grepl("--ct-border: #e2e8f0", css_output, fixed = TRUE))
+  expect_true(grepl("--ct-text-primary:#1e293b", css_output, fixed = TRUE))
+  expect_true(grepl("--ct-text-secondary:#64748b", css_output, fixed = TRUE))
+  expect_true(grepl("--ct-bg-surface:#ffffff", css_output, fixed = TRUE))
+  expect_true(grepl("--ct-bg-muted:#f8f9fa", css_output, fixed = TRUE))
+  expect_true(grepl("--ct-border:#e2e8f0", css_output, fixed = TRUE))
 
   # Module variables updated to match Tabs
-  expect_true(grepl("--text: #1e293b", css_output, fixed = TRUE))
-  expect_true(grepl("--text-muted: #64748b", css_output, fixed = TRUE))
-  expect_true(grepl("--border: #e2e8f0", css_output, fixed = TRUE))
-  expect_true(grepl("--sidebar-w: 280px", css_output, fixed = TRUE))
+  expect_true(grepl("--text:#1e293b", css_output, fixed = TRUE))
+  expect_true(grepl("--text-muted:#64748b", css_output, fixed = TRUE))
+  expect_true(grepl("--border:#e2e8f0", css_output, fixed = TRUE))
+  expect_true(grepl("--sidebar-w:280px", css_output, fixed = TRUE))
 })
 
 test_that("CSS contains export-btn class matching Turas Tabs style", {
@@ -1581,7 +1572,7 @@ test_that("CSS contains low-base warning classes", {
   expect_true(grepl(".tk-low-base", css_output, fixed = TRUE))
   expect_true(grepl("#dc2626", css_output, fixed = TRUE))  # Red colour
   expect_true(grepl(".tk-low-base-dim", css_output, fixed = TRUE))
-  expect_true(grepl("opacity: 0.45", css_output, fixed = TRUE))
+  expect_true(grepl("opacity:0.45", css_output, fixed = TRUE))
 })
 
 test_that("CSS contains header action button dark variant", {
@@ -2045,7 +2036,7 @@ test_that("Pinned card renders PNG image when pngDataUrl exists", {
 test_that("CSS has pinned-card-png style for PNG images", {
   css_output <- build_tracker_css("#323367", "#CC9900")
   expect_true(grepl("pinned-card-png", css_output, fixed = TRUE))
-  expect_true(grepl("max-width: 100%", css_output, fixed = TRUE))
+  expect_true(grepl("max-width:100%", css_output, fixed = TRUE))
 })
 
 

@@ -152,7 +152,7 @@ build_question_map_index <- function(question_mapping, config) {
   # ---------------------------------------------------------------------------
   # STEP 1: Process each question row to build bidirectional mappings
   # ---------------------------------------------------------------------------
-  for (i in 1:nrow(question_mapping)) {
+  for (i in seq_len(nrow(question_mapping))) {
     # Extract and clean the standardized question code
     standard_code <- trimws(as.character(question_mapping$QuestionCode[i]))
 

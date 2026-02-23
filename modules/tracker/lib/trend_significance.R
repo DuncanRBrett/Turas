@@ -48,8 +48,8 @@ perform_significance_tests_means <- function(wave_results, wave_ids, config) {
     wave_id <- wave_ids[i]
     prev_wave_id <- wave_ids[i - 1]
 
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
+    current <- safe_wave_result(wave_results, wave_id)
+    previous <- safe_wave_result(wave_results, prev_wave_id)
 
     # Get effective N (or fall back to n_unweighted if eff_n not available)
     current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else current$n_unweighted
@@ -63,7 +63,7 @@ perform_significance_tests_means <- function(wave_results, wave_ids, config) {
     previous_sd <- if (!is.null(previous$sd)) previous$sd else previous$metrics$sd
 
     # Check if both available and have sufficient base (using effective N)
-    if (current$available && previous$available &&
+    if (isTRUE(current$available) && isTRUE(previous$available) &&
         current_eff_n >= min_base && previous_eff_n >= min_base) {
 
       # Two-sample t-test for means (using effective N)
@@ -117,14 +117,14 @@ perform_significance_tests_proportions <- function(wave_results, wave_ids, confi
     wave_id <- wave_ids[i]
     prev_wave_id <- wave_ids[i - 1]
 
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
+    current <- safe_wave_result(wave_results, wave_id)
+    previous <- safe_wave_result(wave_results, prev_wave_id)
 
     # Get effective N (or fall back to n_unweighted if eff_n not available)
     current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else current$n_unweighted
     previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else previous$n_unweighted
 
-    if (current$available && previous$available &&
+    if (isTRUE(current$available) && isTRUE(previous$available) &&
         current_eff_n >= min_base && previous_eff_n >= min_base) {
 
       # Get proportions for this response code
@@ -195,14 +195,14 @@ perform_significance_tests_nps <- function(wave_results, wave_ids, config) {
     wave_id <- wave_ids[i]
     prev_wave_id <- wave_ids[i - 1]
 
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
+    current <- safe_wave_result(wave_results, wave_id)
+    previous <- safe_wave_result(wave_results, prev_wave_id)
 
     # Get effective N (or fall back to n_unweighted if eff_n not available)
     current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else current$n_unweighted
     previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else previous$n_unweighted
 
-    if (current$available && previous$available &&
+    if (isTRUE(current$available) && isTRUE(previous$available) &&
         current_eff_n >= min_base && previous_eff_n >= min_base) {
 
       # Calculate z-test for NPS difference
@@ -261,11 +261,11 @@ perform_significance_tests_for_metric <- function(wave_results, wave_ids, metric
     wave_id <- wave_ids[i]
     prev_wave_id <- wave_ids[i - 1]
 
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
+    current <- safe_wave_result(wave_results, wave_id)
+    previous <- safe_wave_result(wave_results, prev_wave_id)
 
     # Check availability
-    if (!current$available || !previous$available) {
+    if (!isTRUE(current$available) || !isTRUE(previous$available)) {
       sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
       next
     }
@@ -322,10 +322,10 @@ perform_significance_tests_multi_mention <- function(wave_results, wave_ids, col
     wave_id <- wave_ids[i]
     prev_wave_id <- wave_ids[i - 1]
 
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
+    current <- safe_wave_result(wave_results, wave_id)
+    previous <- safe_wave_result(wave_results, prev_wave_id)
 
-    if (!current$available || !previous$available) {
+    if (!isTRUE(current$available) || !isTRUE(previous$available)) {
       sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
       next
     }
@@ -374,10 +374,10 @@ perform_significance_tests_multi_mention_metric <- function(wave_results, wave_i
     wave_id <- wave_ids[i]
     prev_wave_id <- wave_ids[i - 1]
 
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
+    current <- safe_wave_result(wave_results, wave_id)
+    previous <- safe_wave_result(wave_results, prev_wave_id)
 
-    if (!current$available || !previous$available) {
+    if (!isTRUE(current$available) || !isTRUE(previous$available)) {
       sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
       next
     }

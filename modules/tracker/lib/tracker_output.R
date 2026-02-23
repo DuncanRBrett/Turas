@@ -85,6 +85,26 @@ if (!exists("find_turas_root", mode = "function")) {
 #' @export
 write_tracker_output <- function(trend_results, config, wave_data, output_path = NULL, banner_segments = NULL, run_result = NULL) {
 
+  # --- Input validation ---
+  if (!is.list(trend_results) || length(trend_results) == 0) {
+    tracker_refuse(
+      code = "DATA_TREND_RESULTS_INVALID",
+      title = "Invalid Trend Results for Excel Output",
+      problem = "trend_results must be a non-empty list of trend results.",
+      why_it_matters = "Without valid trend results, there is no data to write to the Excel report.",
+      how_to_fix = "Ensure calculate_all_trends() or calculate_trends_with_banners() completed successfully before calling write_tracker_output()."
+    )
+  }
+  if (!is.list(config) || is.null(config$waves)) {
+    tracker_refuse(
+      code = "CFG_CONFIG_INVALID",
+      title = "Invalid Config for Excel Output",
+      problem = "config must be a list containing a $waves data frame.",
+      why_it_matters = "The config object drives wave ordering, labels, and output path resolution.",
+      how_to_fix = "Pass the config object returned by load_tracking_config() to write_tracker_output()."
+    )
+  }
+
   cat("\n================================================================================\n")
   cat("WRITING EXCEL OUTPUT\n")
   cat("================================================================================\n\n")
@@ -111,7 +131,7 @@ write_tracker_output <- function(trend_results, config, wave_data, output_path =
       tryCatch({
         dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
       }, error = function(e) {
-        warning(paste0("Could not create output directory: ", output_dir, ". Using config directory."))
+        cat("[WARNING]", paste0("Could not create output directory: ", output_dir, ". Using config directory."), "\n")
         output_dir <<- dirname(config$config_path)
       })
     }
@@ -220,11 +240,11 @@ write_summary_sheet <- function(wb, config, wave_data, trend_results, styles, ba
   openxlsx::writeData(wb, "Summary", t(wave_headers),
                       startRow = current_row, startCol = 1, colNames = FALSE)
   openxlsx::addStyle(wb, "Summary", styles$wave_header,
-                    rows = current_row, cols = 1:length(wave_headers), gridExpand = TRUE)
+                    rows = current_row, cols = seq_along(wave_headers), gridExpand = TRUE)
   current_row <- current_row + 1
 
   # Wave data rows
-  for (i in 1:nrow(config$waves)) {
+  for (i in seq_len(nrow(config$waves))) {
     wave_id <- config$waves$WaveID[i]
     wave_df <- wave_data[[wave_id]]
 
@@ -329,7 +349,7 @@ write_mean_trend_table <- function(wb, sheet_name, result, wave_ids, config, sty
   openxlsx::writeData(wb, sheet_name, t(headers),
                       startRow = current_row, startCol = 1, colNames = FALSE)
   openxlsx::addStyle(wb, sheet_name, styles$header,
-                    rows = current_row, cols = 1:length(headers), gridExpand = TRUE)
+                    rows = current_row, cols = seq_along(headers), gridExpand = TRUE)
   current_row <- current_row + 1
 
   # Get decimal separator and decimal places from config
@@ -350,8 +370,8 @@ write_mean_trend_table <- function(wb, sheet_name, result, wave_ids, config, sty
   # Then write numeric values (rounded to specified decimal places)
   mean_values <- numeric(length(wave_ids))
   for (i in seq_along(wave_ids)) {
-    wave_result <- result$wave_results[[wave_ids[i]]]
-    if (wave_result$available) {
+    wave_result <- safe_wave_result(result$wave_results, wave_ids[i])
+    if (isTRUE(wave_result$available)) {
       mean_values[i] <- round(wave_result$mean, decimal_places)
     } else {
       mean_values[i] <- NA
@@ -375,8 +395,8 @@ write_mean_trend_table <- function(wb, sheet_name, result, wave_ids, config, sty
   # Write numeric values
   n_values <- numeric(length(wave_ids))
   for (i in seq_along(wave_ids)) {
-    wave_result <- result$wave_results[[wave_ids[i]]]
-    if (wave_result$available) {
+    wave_result <- safe_wave_result(result$wave_results, wave_ids[i])
+    if (isTRUE(wave_result$available)) {
       n_values[i] <- wave_result$n_unweighted
     } else {
       n_values[i] <- NA
@@ -404,7 +424,7 @@ write_mean_trend_table <- function(wb, sheet_name, result, wave_ids, config, sty
     openxlsx::writeData(wb, sheet_name, t(change_headers),
                         startRow = current_row, startCol = 1, colNames = FALSE)
     openxlsx::addStyle(wb, sheet_name, styles$wave_header,
-                      rows = current_row, cols = 1:length(change_headers), gridExpand = TRUE)
+                      rows = current_row, cols = seq_along(change_headers), gridExpand = TRUE)
     current_row <- current_row + 1
 
     for (change_name in names(result$changes)) {
@@ -479,7 +499,7 @@ write_nps_trend_table <- function(wb, sheet_name, result, wave_ids, config, styl
   openxlsx::writeData(wb, sheet_name, t(headers),
                       startRow = current_row, startCol = 1, colNames = FALSE)
   openxlsx::addStyle(wb, sheet_name, styles$header,
-                    rows = current_row, cols = 1:length(headers), gridExpand = TRUE)
+                    rows = current_row, cols = seq_along(headers), gridExpand = TRUE)
   current_row <- current_row + 1
 
   # NPS row
@@ -494,9 +514,9 @@ write_nps_trend_table <- function(wb, sheet_name, result, wave_ids, config, styl
     # Collect numeric values
     metric_values <- numeric(length(wave_ids))
     for (i in seq_along(wave_ids)) {
-      wave_result <- result$wave_results[[wave_ids[i]]]
+      wave_result <- safe_wave_result(result$wave_results, wave_ids[i])
 
-      if (wave_result$available) {
+      if (isTRUE(wave_result$available)) {
         val <- if (metric == "NPS Score") {
           wave_result$nps
         } else if (metric == "% Promoters (9-10)") {
@@ -559,7 +579,7 @@ write_proportions_trend_table <- function(wb, sheet_name, result, wave_ids, conf
   openxlsx::writeData(wb, sheet_name, t(headers),
                       startRow = current_row, startCol = 1, colNames = FALSE)
   openxlsx::addStyle(wb, sheet_name, styles$header,
-                    rows = current_row, cols = 1:length(headers), gridExpand = TRUE)
+                    rows = current_row, cols = seq_along(headers), gridExpand = TRUE)
   current_row <- current_row + 1
 
   # Row for each response code
@@ -572,9 +592,9 @@ write_proportions_trend_table <- function(wb, sheet_name, result, wave_ids, conf
     # Collect numeric values (rounded)
     code_values <- numeric(length(wave_ids))
     for (i in seq_along(wave_ids)) {
-      wave_result <- result$wave_results[[wave_ids[i]]]
+      wave_result <- safe_wave_result(result$wave_results, wave_ids[i])
 
-      if (wave_result$available) {
+      if (isTRUE(wave_result$available)) {
         pct <- wave_result$proportions[[as.character(code)]]
         code_values[i] <- round(pct, decimal_places)
       } else {
@@ -603,8 +623,8 @@ write_proportions_trend_table <- function(wb, sheet_name, result, wave_ids, conf
   # Write numeric values
   n_values <- numeric(length(wave_ids))
   for (i in seq_along(wave_ids)) {
-    wave_result <- result$wave_results[[wave_ids[i]]]
-    if (wave_result$available) {
+    wave_result <- safe_wave_result(result$wave_results, wave_ids[i])
+    if (isTRUE(wave_result$available)) {
       n_values[i] <- wave_result$n_unweighted
     } else {
       n_values[i] <- NA
@@ -664,7 +684,7 @@ write_metadata_sheet <- function(wb, config, wave_data, styles) {
   openxlsx::addStyle(wb, "Metadata", styles$header, rows = current_row, cols = 1)
   current_row <- current_row + 1
 
-  for (i in 1:nrow(config$waves)) {
+  for (i in seq_len(nrow(config$waves))) {
     wave_id <- config$waves$WaveID[i]
     data_file <- config$waves$DataFile[i]
     openxlsx::writeData(wb, "Metadata", wave_id, startRow = current_row, startCol = 1, colNames = FALSE)
@@ -806,8 +826,8 @@ write_banner_metric_rows <- function(wb, sheet_name, first_seg, question_segment
     for (seg_name in segment_names) {
       seg_result <- question_segments[[seg_name]]
       for (wave_id in wave_ids) {
-        wave_result <- seg_result$wave_results[[wave_id]]
-        if (wave_result$available) {
+        wave_result <- safe_wave_result(seg_result$wave_results, wave_id)
+        if (isTRUE(wave_result$available)) {
           mean_values[idx] <- round(wave_result$mean, decimal_places)
         } else {
           mean_values[idx] <- NA_real_
@@ -867,8 +887,8 @@ write_banner_metric_rows <- function(wb, sheet_name, first_seg, question_segment
       for (seg_name in segment_names) {
         seg_result <- question_segments[[seg_name]]
         for (wave_id in wave_ids) {
-          wave_result <- seg_result$wave_results[[wave_id]]
-          if (wave_result$available && !is.null(wave_result$metrics)) {
+          wave_result <- safe_wave_result(seg_result$wave_results, wave_id)
+          if (isTRUE(wave_result$available) && !is.null(wave_result$metrics)) {
             metric_val <- wave_result$metrics[[metric_lower]]
             if (!is.null(metric_val) && is.numeric(metric_val)) {
               metric_values[idx] <- round(metric_val, decimal_places)
@@ -908,9 +928,9 @@ write_banner_metric_rows <- function(wb, sheet_name, first_seg, question_segment
       for (seg_name in segment_names) {
         seg_result <- question_segments[[seg_name]]
         for (wave_id in wave_ids) {
-          wave_result <- seg_result$wave_results[[wave_id]]
+          wave_result <- safe_wave_result(seg_result$wave_results, wave_id)
 
-          if (wave_result$available && !is.null(wave_result$proportions)) {
+          if (isTRUE(wave_result$available) && !is.null(wave_result$proportions)) {
             pct <- wave_result$proportions[[as.character(code)]]
             code_values[idx] <- if (!is.null(pct) && !is.na(pct)) round(pct, decimal_places) else NA_real_
           } else {
@@ -948,9 +968,9 @@ write_banner_metric_rows <- function(wb, sheet_name, first_seg, question_segment
       for (seg_name in segment_names) {
         seg_result <- question_segments[[seg_name]]
         for (wave_id in wave_ids) {
-          wave_result <- seg_result$wave_results[[wave_id]]
+          wave_result <- safe_wave_result(seg_result$wave_results, wave_id)
 
-          if (wave_result$available) {
+          if (isTRUE(wave_result$available)) {
             val <- if (metric == "NPS Score") {
               wave_result$nps
             } else if (metric == "% Promoters") {
@@ -1046,7 +1066,7 @@ write_banner_changes_section <- function(wb, sheet_name, total_result, wave_ids,
   openxlsx::writeData(wb, sheet_name, t(change_headers),
                       startRow = current_row, startCol = 1, colNames = FALSE)
   openxlsx::addStyle(wb, sheet_name, styles$wave_header,
-                    rows = current_row, cols = 1:length(change_headers), gridExpand = TRUE)
+                    rows = current_row, cols = seq_along(change_headers), gridExpand = TRUE)
   current_row <- current_row + 1
 
   # Get significance tests for the metric
@@ -1208,7 +1228,7 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
   openxlsx::writeData(wb, sheet_name, t(headers),
                       startRow = current_row, startCol = 1, colNames = FALSE)
   openxlsx::addStyle(wb, sheet_name, styles$header,
-                    rows = current_row, cols = 1:length(headers), gridExpand = TRUE)
+                    rows = current_row, cols = seq_along(headers), gridExpand = TRUE)
   current_row <- current_row + 1
 
   # Validate metric type
@@ -1231,8 +1251,8 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
   for (seg_name in segment_names) {
     seg_result <- question_segments[[seg_name]]
     for (wave_id in wave_ids) {
-      wave_result <- seg_result$wave_results[[wave_id]]
-      if (wave_result$available) {
+      wave_result <- safe_wave_result(seg_result$wave_results, wave_id)
+      if (isTRUE(wave_result$available)) {
         n_values[idx] <- wave_result$n_unweighted
       } else {
         n_values[idx] <- NA_real_
@@ -1257,7 +1277,7 @@ write_banner_trend_table <- function(wb, sheet_name, question_segments, wave_ids
   }
 
   # Set column widths
-  openxlsx::setColWidths(wb, sheet_name, cols = 1:length(headers), widths = "auto")
+  openxlsx::setColWidths(wb, sheet_name, cols = seq_along(headers), widths = "auto")
 
   return(current_row + 1)
 }
@@ -1300,7 +1320,7 @@ write_change_summary_sheet <- function(wb, banner_results, config, styles) {
   openxlsx::writeData(wb, "Change_Summary", t(headers),
                       startRow = current_row, startCol = 1, colNames = FALSE)
   openxlsx::addStyle(wb, "Change_Summary", styles$header,
-                    rows = current_row, cols = 1:length(headers), gridExpand = TRUE)
+                    rows = current_row, cols = seq_along(headers), gridExpand = TRUE)
   current_row <- current_row + 1
 
   # Write rows for each question (Total segment only for summary)
@@ -1326,11 +1346,13 @@ write_change_summary_sheet <- function(wb, banner_results, config, styles) {
           latest_val <- NA
 
           # Get baseline and latest values from metrics list
-          if (total_result$wave_results[[baseline_wave]]$available) {
-            baseline_val <- total_result$wave_results[[baseline_wave]]$metrics[[metric_lower]]
+          baseline_wr <- safe_wave_result(total_result$wave_results, baseline_wave)
+          if (isTRUE(baseline_wr$available)) {
+            baseline_val <- baseline_wr$metrics[[metric_lower]]
           }
-          if (total_result$wave_results[[latest_wave]]$available) {
-            latest_val <- total_result$wave_results[[latest_wave]]$metrics[[metric_lower]]
+          latest_wr <- safe_wave_result(total_result$wave_results, latest_wave)
+          if (isTRUE(latest_wr$available)) {
+            latest_val <- latest_wr$metrics[[metric_lower]]
           }
 
           # Calculate change
@@ -1399,19 +1421,21 @@ write_change_summary_sheet <- function(wb, banner_results, config, styles) {
         latest_val <- NA
 
         # Get baseline and latest values
+        baseline_wr <- safe_wave_result(total_result$wave_results, baseline_wave)
+        latest_wr <- safe_wave_result(total_result$wave_results, latest_wave)
         if (total_result$metric_type == METRIC_TYPES$MEAN || total_result$metric_type == METRIC_TYPES$COMPOSITE) {
-          if (total_result$wave_results[[baseline_wave]]$available) {
-            baseline_val <- total_result$wave_results[[baseline_wave]]$mean
+          if (isTRUE(baseline_wr$available)) {
+            baseline_val <- baseline_wr$mean
           }
-          if (total_result$wave_results[[latest_wave]]$available) {
-            latest_val <- total_result$wave_results[[latest_wave]]$mean
+          if (isTRUE(latest_wr$available)) {
+            latest_val <- latest_wr$mean
           }
         } else if (total_result$metric_type == METRIC_TYPES$NPS) {
-          if (total_result$wave_results[[baseline_wave]]$available) {
-            baseline_val <- total_result$wave_results[[baseline_wave]]$nps
+          if (isTRUE(baseline_wr$available)) {
+            baseline_val <- baseline_wr$nps
           }
-          if (total_result$wave_results[[latest_wave]]$available) {
-            latest_val <- total_result$wave_results[[latest_wave]]$nps
+          if (isTRUE(latest_wr$available)) {
+            latest_val <- latest_wr$nps
           }
         }
 
@@ -1491,8 +1515,8 @@ write_distribution_table <- function(wb, sheet_name, result, wave_ids, config, s
   # First, find all unique values across all waves
   all_values <- c()
   for (wave_id in wave_ids) {
-    wave_result <- result$wave_results[[wave_id]]
-    if (wave_result$available && !is.null(wave_result$values)) {
+    wave_result <- safe_wave_result(result$wave_results, wave_id)
+    if (isTRUE(wave_result$available) && !is.null(wave_result$values)) {
       all_values <- c(all_values, wave_result$values)
     }
   }
@@ -1519,7 +1543,7 @@ write_distribution_table <- function(wb, sheet_name, result, wave_ids, config, s
   openxlsx::writeData(wb, sheet_name, t(headers),
                       startRow = current_row, startCol = 1, colNames = FALSE)
   openxlsx::addStyle(wb, sheet_name, styles$wave_header,
-                    rows = current_row, cols = 1:length(headers), gridExpand = TRUE)
+                    rows = current_row, cols = seq_along(headers), gridExpand = TRUE)
   current_row <- current_row + 1
 
   # Write row for each rating value
@@ -1532,9 +1556,9 @@ write_distribution_table <- function(wb, sheet_name, result, wave_ids, config, s
     # Collect numeric values
     dist_values <- numeric(length(wave_ids))
     for (i in seq_along(wave_ids)) {
-      wave_result <- result$wave_results[[wave_ids[i]]]
+      wave_result <- safe_wave_result(result$wave_results, wave_ids[i])
 
-      if (wave_result$available && !is.null(wave_result$values)) {
+      if (isTRUE(wave_result$available) && !is.null(wave_result$values)) {
         # Calculate percentage for this value
         values <- wave_result$values
         weights <- if (!is.null(wave_result$weights)) wave_result$weights else rep(1, length(values))
@@ -1593,7 +1617,7 @@ write_enhanced_rating_trend_table <- function(wb, sheet_name, result, wave_ids, 
   openxlsx::writeData(wb, sheet_name, t(headers),
                       startRow = current_row, startCol = 1, colNames = FALSE)
   openxlsx::addStyle(wb, sheet_name, styles$header,
-                    rows = current_row, cols = 1:length(headers), gridExpand = TRUE)
+                    rows = current_row, cols = seq_along(headers), gridExpand = TRUE)
   current_row <- current_row + 1
 
   # Write row for each metric in tracking_specs
@@ -1632,8 +1656,8 @@ write_enhanced_rating_trend_table <- function(wb, sheet_name, result, wave_ids, 
     # Collect numeric values
     metric_values <- numeric(length(wave_ids))
     for (i in seq_along(wave_ids)) {
-      wave_result <- result$wave_results[[wave_ids[i]]]
-      if (wave_result$available && !is.null(wave_result$metrics)) {
+      wave_result <- safe_wave_result(result$wave_results, wave_ids[i])
+      if (isTRUE(wave_result$available) && !is.null(wave_result$metrics)) {
         metric_val <- wave_result$metrics[[metric_lower]]
         if (!is.null(metric_val)) {
           metric_values[i] <- round(metric_val, decimal_places)
@@ -1664,8 +1688,8 @@ write_enhanced_rating_trend_table <- function(wb, sheet_name, result, wave_ids, 
 
   n_values <- numeric(length(wave_ids))
   for (i in seq_along(wave_ids)) {
-    wave_result <- result$wave_results[[wave_ids[i]]]
-    if (wave_result$available) {
+    wave_result <- safe_wave_result(result$wave_results, wave_ids[i])
+    if (isTRUE(wave_result$available)) {
       n_values[i] <- wave_result$n_unweighted
     } else {
       n_values[i] <- NA
@@ -1711,7 +1735,7 @@ write_multi_mention_trend_table <- function(wb, sheet_name, result, wave_ids, co
   openxlsx::writeData(wb, sheet_name, t(headers),
                       startRow = current_row, startCol = 1, colNames = FALSE)
   openxlsx::addStyle(wb, sheet_name, styles$header,
-                    rows = current_row, cols = 1:length(headers), gridExpand = TRUE)
+                    rows = current_row, cols = seq_along(headers), gridExpand = TRUE)
   current_row <- current_row + 1
 
   # Write row for each tracked column
@@ -1724,8 +1748,8 @@ write_multi_mention_trend_table <- function(wb, sheet_name, result, wave_ids, co
     # Collect numeric values (% mentioning)
     mention_values <- numeric(length(wave_ids))
     for (i in seq_along(wave_ids)) {
-      wave_result <- result$wave_results[[wave_ids[i]]]
-      if (wave_result$available && !is.null(wave_result$mention_proportions)) {
+      wave_result <- safe_wave_result(result$wave_results, wave_ids[i])
+      if (isTRUE(wave_result$available) && !is.null(wave_result$mention_proportions)) {
         mention_pct <- wave_result$mention_proportions[[col_name]]
         if (!is.null(mention_pct) && !is.na(mention_pct)) {
           mention_values[i] <- round(mention_pct, decimal_places)
@@ -1751,8 +1775,8 @@ write_multi_mention_trend_table <- function(wb, sheet_name, result, wave_ids, co
 
   # Add additional metrics if present
   # Check first wave for additional metrics
-  first_wave_result <- result$wave_results[[wave_ids[1]]]
-  if (first_wave_result$available && !is.null(first_wave_result$additional_metrics)) {
+  first_wave_result <- safe_wave_result(result$wave_results, wave_ids[1])
+  if (isTRUE(first_wave_result$available) && !is.null(first_wave_result$additional_metrics)) {
     additional_metrics <- first_wave_result$additional_metrics
 
     if (!is.null(additional_metrics$any_mention_pct)) {
@@ -1765,8 +1789,8 @@ write_multi_mention_trend_table <- function(wb, sheet_name, result, wave_ids, co
 
       any_values <- numeric(length(wave_ids))
       for (i in seq_along(wave_ids)) {
-        wave_result <- result$wave_results[[wave_ids[i]]]
-        if (wave_result$available && !is.null(wave_result$additional_metrics$any_mention_pct)) {
+        wave_result <- safe_wave_result(result$wave_results, wave_ids[i])
+        if (isTRUE(wave_result$available) && !is.null(wave_result$additional_metrics$any_mention_pct)) {
           any_values[i] <- round(wave_result$additional_metrics$any_mention_pct, decimal_places)
         } else {
           any_values[i] <- NA
@@ -1791,8 +1815,8 @@ write_multi_mention_trend_table <- function(wb, sheet_name, result, wave_ids, co
 
       count_values <- numeric(length(wave_ids))
       for (i in seq_along(wave_ids)) {
-        wave_result <- result$wave_results[[wave_ids[i]]]
-        if (wave_result$available && !is.null(wave_result$additional_metrics$count_mean)) {
+        wave_result <- safe_wave_result(result$wave_results, wave_ids[i])
+        if (isTRUE(wave_result$available) && !is.null(wave_result$additional_metrics$count_mean)) {
           count_values[i] <- round(wave_result$additional_metrics$count_mean, decimal_places)
         } else {
           count_values[i] <- NA
@@ -1818,8 +1842,8 @@ write_multi_mention_trend_table <- function(wb, sheet_name, result, wave_ids, co
 
   n_values <- numeric(length(wave_ids))
   for (i in seq_along(wave_ids)) {
-    wave_result <- result$wave_results[[wave_ids[i]]]
-    if (wave_result$available) {
+    wave_result <- safe_wave_result(result$wave_results, wave_ids[i])
+    if (isTRUE(wave_result$available)) {
       n_values[i] <- wave_result$n_unweighted
     } else {
       n_values[i] <- NA
@@ -1882,7 +1906,7 @@ write_wave_history_output <- function(trend_results, config, wave_data, output_p
       tryCatch({
         dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
       }, error = function(e) {
-        warning(paste0("Could not create output directory: ", output_dir, ". Using config directory."))
+        cat("[WARNING]", paste0("Could not create output directory: ", output_dir, ". Using config directory."), "\n")
         output_dir <<- dirname(config$config_path)
       })
     }
@@ -1993,7 +2017,7 @@ write_wave_history_sheet <- function(wb, sheet_name, trend_results, wave_ids, co
   openxlsx::writeData(wb, sheet_name, t(headers),
                       startRow = current_row, startCol = 1, colNames = FALSE)
   openxlsx::addStyle(wb, sheet_name, styles$header,
-                    rows = current_row, cols = 1:length(headers), gridExpand = TRUE)
+                    rows = current_row, cols = seq_along(headers), gridExpand = TRUE)
   current_row <- current_row + 1
 
   # Base row: Show sample size (n) for each wave
@@ -2026,12 +2050,9 @@ write_wave_history_sheet <- function(wb, sheet_name, trend_results, wave_ids, co
 
       # Check if we got valid result and extract n_unweighted
       if (!is.null(q_result) &&
-          !is.null(q_result$wave_results) &&
-          wave_id %in% names(q_result$wave_results)) {
-        wave_result <- q_result$wave_results[[wave_id]]
-        if (!is.null(wave_result) &&
-            !is.null(wave_result$available) &&
-            wave_result$available &&
+          !is.null(q_result$wave_results)) {
+        wave_result <- safe_wave_result(q_result$wave_results, wave_id)
+        if (isTRUE(wave_result$available) &&
             !is.null(wave_result$n_unweighted)) {
           n_value <- as.numeric(wave_result$n_unweighted)
           break  # Found a valid sample size, use it
@@ -2094,9 +2115,9 @@ write_wave_history_sheet <- function(wb, sheet_name, trend_results, wave_ids, co
       wave_values <- numeric(length(wave_ids))
       for (i in seq_along(wave_ids)) {
         wave_id <- wave_ids[i]
-        wave_result <- q_result$wave_results[[wave_id]]
+        wave_result <- safe_wave_result(q_result$wave_results, wave_id)
 
-        if (!is.null(wave_result) && wave_result$available) {
+        if (isTRUE(wave_result$available)) {
           # Extract value based on metric type
           value <- extract_metric_value_by_key(wave_result, metric_info$metric_key, q_result$metric_type)
           # Ensure value is scalar before checking is.na

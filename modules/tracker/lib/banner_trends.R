@@ -111,7 +111,7 @@ get_banner_segments <- function(config, wave_data) {
   banner <- config$banner
   wave_ids <- config$waves$WaveID
 
-  for (i in 1:nrow(banner)) {
+  for (i in seq_len(nrow(banner))) {
     break_var <- banner$BreakVariable[i]
     break_label <- banner$BreakLabel[i]
 
@@ -300,17 +300,17 @@ calculate_trend_for_segment <- function(q_code, question_map, wave_data, config,
     } else if (q_type == "composite") {
       calculate_composite_trend_enhanced(q_code, question_map, wave_data, config, wave_structures)
     } else if (q_type == "open_end") {
-      warning(paste0("  Open-end questions cannot be tracked - skipping"))
+      cat("[WARNING]", paste0("  Open-end questions cannot be tracked - skipping"), "\n")
       NULL
     } else if (q_type == "ranking") {
-      warning(paste0("  Ranking questions not yet supported in tracker - skipping"))
+      cat("[WARNING]", paste0("  Ranking questions not yet supported in tracker - skipping"), "\n")
       NULL
     } else {
-      warning(paste0("  Question type '", q_type_raw, "' not supported - skipping"))
+      cat("[WARNING]", paste0("  Question type '", q_type_raw, "' not supported - skipping"), "\n")
       NULL
     }
   }, error = function(e) {
-    warning(paste0("  Error calculating trend for ", q_code, " in segment ", segment_name, ": ", e$message))
+    cat("[WARNING]", paste0("  Error calculating trend for ", q_code, " in segment ", segment_name, ": ", e$message), "\n")
     NULL
   })
 
@@ -386,7 +386,7 @@ validate_banner_structure <- function(config, wave_data, min_base = 30) {
   banner <- config$banner
   wave_ids <- config$waves$WaveID
 
-  for (i in 1:nrow(banner)) {
+  for (i in seq_len(nrow(banner))) {
     break_var <- banner$BreakVariable[i]
     break_label <- banner$BreakLabel[i]
 

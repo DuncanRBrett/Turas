@@ -37,6 +37,35 @@
 build_tracking_crosstab <- function(trend_results, config, question_map,
                                      banner_segments = NULL) {
 
+  # --- Input validation ---
+  if (is.null(trend_results) || !is.list(trend_results)) {
+    tracker_refuse(
+      code = "DATA_TREND_RESULTS_INVALID",
+      title = "Invalid Trend Results for Crosstab",
+      problem = "trend_results must be a list of trend results (may be empty if no questions are tracked).",
+      why_it_matters = "The crosstab engine reshapes existing trend results into a cross-tabulated structure. A NULL or non-list value cannot be processed.",
+      how_to_fix = "Ensure calculate_all_trends() or calculate_trends_with_banners() completed successfully before calling build_tracking_crosstab()."
+    )
+  }
+  if (!is.list(config) || is.null(config$waves)) {
+    tracker_refuse(
+      code = "CFG_CONFIG_INVALID",
+      title = "Invalid Config for Crosstab",
+      problem = "config must be a list containing a $waves data frame.",
+      why_it_matters = "The config object drives wave ordering, baseline identification, and tracked question definitions.",
+      how_to_fix = "Pass the config object returned by load_tracking_config() to build_tracking_crosstab()."
+    )
+  }
+  if (!is.list(question_map)) {
+    tracker_refuse(
+      code = "DATA_QUESTION_MAP_INVALID",
+      title = "Invalid Question Map for Crosstab",
+      problem = "question_map must be a list (question map index).",
+      why_it_matters = "The question map provides metadata (labels, types) needed to build metric rows.",
+      how_to_fix = "Pass the question_map object returned by build_question_map_index() to build_tracking_crosstab()."
+    )
+  }
+
   wave_ids <- config$waves$WaveID
   wave_labels <- config$waves$WaveName
   baseline_wave <- get_baseline_wave(config)
@@ -237,9 +266,9 @@ extract_segment_metric <- function(seg_trend, metric_type, spec, wave_ids,
 
   # Extract per-wave values based on metric_type
   for (wave_id in wave_ids) {
-    wr <- seg_trend$wave_results[[wave_id]]
+    wr <- safe_wave_result(seg_trend$wave_results, wave_id)
 
-    if (is.null(wr) || isFALSE(wr$available)) {
+    if (!isTRUE(wr$available)) {
       values[[wave_id]] <- NA_real_
       n_values[[wave_id]] <- NA_integer_
       next

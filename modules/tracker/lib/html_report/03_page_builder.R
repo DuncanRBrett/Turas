@@ -1356,6 +1356,58 @@ build_help_overlay <- function() {
 
 #' Build Tracker CSS
 #' @keywords internal
+#' Minify JavaScript (R-based, no external dependencies)
+#'
+#' Strips block comments, line comments, and collapses whitespace.
+#' Preserves string literals and regex patterns.
+#'
+#' @param js Character. JavaScript source code
+#' @return Character. Minified JavaScript
+#' @keywords internal
+minify_js <- function(js) {
+  # Strip block comments (/* ... */) — non-greedy
+  js <- gsub("/\\*[\\s\\S]*?\\*/", "", js, perl = TRUE)
+  # Strip line comments (// ...) but NOT inside strings
+  # Only strip // at start of line or after whitespace (safe heuristic)
+  js <- gsub("(^|[[:space:]])//[^\n]*", "\\1", js, perl = TRUE)
+  # Collapse multiple blank lines to single newline
+  js <- gsub("\n{3,}", "\n\n", js, perl = TRUE)
+  # Remove leading/trailing whitespace per line (preserve indentation minimally)
+  lines <- strsplit(js, "\n", fixed = TRUE)[[1]]
+  lines <- trimws(lines, which = "right")
+  # Remove blank lines entirely
+  lines <- lines[nzchar(trimws(lines))]
+  paste(lines, collapse = "\n")
+}
+
+
+#' Minify CSS (R-based, no external dependencies)
+#'
+#' Strips comments, collapses whitespace, and removes unnecessary newlines.
+#'
+#' @param css Character. CSS source code
+#' @return Character. Minified CSS
+#' @keywords internal
+minify_css <- function(css) {
+  # Strip block comments
+  css <- gsub("/\\*[\\s\\S]*?\\*/", "", css, perl = TRUE)
+  # Collapse whitespace around { } ; : ,
+  css <- gsub("\\s*\\{\\s*", "{", css, perl = TRUE)
+  css <- gsub("\\s*\\}\\s*", "}", css, perl = TRUE)
+  css <- gsub("\\s*;\\s*", ";", css, perl = TRUE)
+  css <- gsub("\\s*:\\s*", ":", css, perl = TRUE)
+  css <- gsub("\\s*,\\s*", ",", css, perl = TRUE)
+  # Collapse multiple whitespace to single space
+  css <- gsub("\\s+", " ", css, perl = TRUE)
+  # Remove space after { and before }
+  css <- gsub("\\{ ", "{", css, fixed = TRUE)
+  css <- gsub(" \\}", "}", css, fixed = TRUE)
+  # Remove trailing semicolons before }
+  css <- gsub(";}", "}", css, fixed = TRUE)
+  trimws(css)
+}
+
+
 build_tracker_css <- function(brand_colour, accent_colour) {
   # CSS lives in assets/tracker_styles.css (extracted for maintainability)
   css_dir <- file.path(.tracker_js_dir, "..", "assets")
@@ -1369,7 +1421,7 @@ build_tracker_css <- function(brand_colour, accent_colour) {
   css <- paste(readLines(css_path, warn = FALSE), collapse = "\n")
   css <- gsub("BRAND_COLOUR", brand_colour, css, fixed = TRUE)
   css <- gsub("ACCENT_COLOUR", accent_colour, css, fixed = TRUE)
-  css
+  minify_css(css)
 }
 
 
@@ -1425,50 +1477,9 @@ build_tracker_javascript <- function(html_data) {
   segment_groups_json <- jsonlite::toJSON(segment_groups, auto_unbox = TRUE)
   js_parts <- c(js_parts, sprintf("var SEGMENT_GROUPS = %s;", segment_groups_json))
 
-  # Metric nav filter functions (inline, needed before JS files load)
-  js_parts <- c(js_parts, '
-var activeMetricTypeFilter = "all";
-
-function filterMetricType(typeKey) {
-  activeMetricTypeFilter = typeKey;
-  document.querySelectorAll(".mv-type-chip").forEach(function(chip) {
-    chip.classList.toggle("active", chip.getAttribute("data-type-filter") === typeKey);
-  });
-  applyMetricNavFilter();
-}
-
-function filterMetricNav(query) {
-  window._metricSearchQuery = (query || "").toLowerCase();
-  applyMetricNavFilter();
-}
-
-function applyMetricNavFilter() {
-  var q = (window._metricSearchQuery || "").toLowerCase();
-  var typeFilter = activeMetricTypeFilter || "all";
-
-  document.querySelectorAll(".tk-metric-nav-item").forEach(function(item) {
-    var textMatch = q === "" || item.textContent.toLowerCase().indexOf(q) >= 0;
-    var typeMatch = typeFilter === "all" || item.getAttribute("data-metric-type") === typeFilter;
-    item.style.display = (textMatch && typeMatch) ? "" : "none";
-  });
-
-  // Hide section headers with no visible items after them
-  document.querySelectorAll(".mv-nav-section").forEach(function(section) {
-    var next = section.nextElementSibling;
-    var hasVisible = false;
-    while (next && !next.classList.contains("mv-nav-section")) {
-      if (next.classList.contains("tk-metric-nav-item") && next.style.display !== "none") {
-        hasVisible = true;
-        break;
-      }
-      next = next.nextElementSibling;
-    }
-    section.style.display = hasVisible ? "" : "none";
-  });
-}
-')
-
-  js_files <- c("tab_navigation.js", "metrics_view.js", "pinned_views.js",
+  # Metric nav filter functions loaded from external JS file (first in list)
+  js_files <- c("metric_nav_filter.js",
+                 "tab_navigation.js", "metrics_view.js", "pinned_views.js",
                  "core_navigation.js", "chart_controls.js",
                  "table_export.js", "slide_export.js")
 
@@ -1481,5 +1492,6 @@ function applyMetricNavFilter() {
     }
   }
 
-  paste(js_parts, collapse = "\n")
+  js_combined <- paste(js_parts, collapse = "\n")
+  minify_js(js_combined)
 }

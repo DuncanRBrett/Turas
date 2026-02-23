@@ -70,6 +70,32 @@ VALID_REPORT_TYPES <- c("detailed", "wave_history", "dashboard", "sig_matrix", "
 
 
 # ==============================================================================
+# Safe Accessor Helpers
+# ==============================================================================
+
+#' Safe Wave Result Access
+#'
+#' Safely access a wave result from a wave_results list. Returns a
+#' default unavailable structure if the wave_id is NULL, missing, or
+#' the result itself is NULL.
+#'
+#' @param wave_results List of wave results indexed by wave ID
+#' @param wave_id Character. The wave ID to look up
+#' @return The wave result list, or a default list with available = FALSE
+#' @keywords internal
+safe_wave_result <- function(wave_results, wave_id) {
+  if (is.null(wave_results) || is.null(wave_id) || !wave_id %in% names(wave_results)) {
+    return(list(available = FALSE, n_unweighted = 0, n_weighted = 0, eff_n = 0))
+  }
+  result <- wave_results[[wave_id]]
+  if (is.null(result)) {
+    return(list(available = FALSE, n_unweighted = 0, n_weighted = 0, eff_n = 0))
+  }
+  result
+}
+
+
+# ==============================================================================
 # Export Constants
 # ==============================================================================
 

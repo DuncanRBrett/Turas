@@ -114,6 +114,7 @@ dispatch_single_trend <- function(q_code, question_map, wave_data, config, wave_
       ))
     }
   }, error = function(e) {
+    cat("[WARNING] Error calculating trend for ", q_code, ": ", e$message, "\n")
     return(list(
       q_code = q_code, result = NULL,
       skipped = list(question_code = q_code, reason = paste0("Error calculating trend: ", e$message), stage = "calculation")
@@ -371,7 +372,7 @@ parse_single_choice_specs <- function(tracking_specs, all_codes) {
       }
 
     } else {
-      warning(paste0("Unknown Single_Choice spec: ", core_spec))
+      cat("[WARNING]", paste0("Unknown Single_Choice spec: ", core_spec), "\n")
     }
   }
 
@@ -768,8 +769,8 @@ calculate_composite_values_per_respondent <- function(wave_df, wave_id, source_q
   }
 
   if (length(source_values) == 0) {
-    warning(paste0("No valid source questions found for composite in ", wave_id,
-                   ". Missing: ", paste(missing_sources, collapse = ", ")))
+    cat("[WARNING]", paste0("No valid source questions found for composite in ", wave_id,
+                   ". Missing: ", paste(missing_sources, collapse = ", ")), "\n")
     return(rep(NA, nrow(wave_df)))
   }
 
@@ -937,7 +938,7 @@ detect_multi_mention_columns <- function(wave_df, base_code) {
   matched_cols <- grep(pattern, names(wave_df), value = TRUE)
 
   if (length(matched_cols) == 0) {
-    warning(paste0("No multi-mention columns found for base code: ", base_code))
+    cat("[WARNING]", paste0("No multi-mention columns found for base code: ", base_code), "\n")
     return(NULL)
   }
 
@@ -1019,7 +1020,7 @@ parse_multi_mention_specs <- function(tracking_specs, base_code, wave_df) {
       result$additional_metrics <- c(result$additional_metrics, core_lower)
 
     } else {
-      warning(paste0("Unknown Multi_Mention spec: ", core_spec))
+      cat("[WARNING]", paste0("Unknown Multi_Mention spec: ", core_spec), "\n")
     }
   }
 
@@ -1033,8 +1034,8 @@ parse_multi_mention_specs <- function(tracking_specs, base_code, wave_df) {
   if (result$mode != "category" && length(result$columns) > 0 && !is.null(base_code) && base_code != "") {
     missing <- setdiff(result$columns, names(wave_df))
     if (length(missing) > 0) {
-      warning(paste0("Multi-mention columns not found in data: ",
-                     paste(missing, collapse = ", ")))
+      cat("[WARNING]", paste0("Multi-mention columns not found in data: ",
+                     paste(missing, collapse = ", ")), "\n")
       result$columns <- intersect(result$columns, names(wave_df))
     }
   }
@@ -1092,7 +1093,7 @@ calculate_multi_mention_trend_categories <- function(q_code, question_map, wave_
   }
 
   if (length(categories_to_track) == 0) {
-    warning(paste0("No categories found for question: ", q_code))
+    cat("[WARNING]", paste0("No categories found for question: ", q_code), "\n")
     return(NULL)
   }
 
@@ -1361,7 +1362,7 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
 
   # If question not found in any wave, return NULL
   if (is.na(first_wave_code) || is.null(first_wave_df)) {
-    warning(paste0("Question ", q_code, " not found in any wave"))
+    cat("[WARNING]", paste0("Question ", q_code, " not found in any wave"), "\n")
     return(NULL)
   }
 
@@ -1395,7 +1396,7 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
   }
 
   if (length(all_columns) == 0) {
-    warning(paste0("No multi-mention columns found for question: ", q_code))
+    cat("[WARNING]", paste0("No multi-mention columns found for question: ", q_code), "\n")
     return(NULL)
   }
 

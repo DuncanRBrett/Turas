@@ -435,11 +435,11 @@ validate_tracking_config <- function(config, question_mapping) {
   }
 
   # Validate data files exist (if absolute paths provided)
-  for (i in 1:nrow(config$waves)) {
+  for (i in seq_len(nrow(config$waves))) {
     data_file <- config$waves$DataFile[i]
     # Only validate if absolute path provided (relative paths resolved later)
     if (file.exists(dirname(data_file)) && !file.exists(data_file)) {
-      warning(paste0("Data file not found for Wave ", config$waves$WaveID[i], ": ", data_file))
+      cat("[WARNING]", paste0("Data file not found for Wave ", config$waves$WaveID[i], ": ", data_file), "\n")
     }
   }
 
@@ -465,10 +465,10 @@ validate_tracking_config <- function(config, question_mapping) {
       question_mapping$QuestionCode
     )
     if (length(unmapped_questions) > 0) {
-      warning(paste0(
+      cat("[WARNING]", paste0(
         "Tracked questions not found in question mapping: ",
         paste(unmapped_questions, collapse = ", ")
-      ))
+      ), "\n")
     }
   }
 
@@ -476,10 +476,10 @@ validate_tracking_config <- function(config, question_mapping) {
   required_settings <- c("project_name", "decimal_places_ratings", "show_significance")
   missing_settings <- setdiff(required_settings, names(config$settings))
   if (length(missing_settings) > 0) {
-    warning(paste0(
+    cat("[WARNING]", paste0(
       "Missing recommended settings (defaults will be used): ",
       paste(missing_settings, collapse = ", ")
-    ))
+    ), "\n")
   }
 
   # Validate banner structure
@@ -497,7 +497,7 @@ validate_tracking_config <- function(config, question_mapping) {
   # Check for "Total" in banner
   if (!"Total" %in% config$banner$BreakVariable &&
       !any(grepl("(?i)total", config$banner$BreakLabel))) {
-    warning("No 'Total' found in banner structure")
+    cat("[WARNING] No 'Total' found in banner structure\n")
   }
 
   message("  Configuration validation passed")

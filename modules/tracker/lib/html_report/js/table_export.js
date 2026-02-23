@@ -148,58 +148,6 @@
     downloadBlob(xml, "tracking_crosstab.xls", "application/vnd.ms-excel");
   };
 
-  // ---- Column Sorting ----
-  window.sortTableByColumn = function(colIndex) {
-    var table = document.getElementById("tk-crosstab-table");
-    if (!table) return;
-
-    var tbody = table.querySelector("tbody");
-    var rows = Array.from(tbody.querySelectorAll("tr"));
-
-    // Separate metric groups (metric + its change rows)
-    var groups = [];
-    var others = [];
-    var i = 0;
-    while (i < rows.length) {
-      var row = rows[i];
-      if (row.classList.contains("tk-metric-row")) {
-        var group = { metric: row, changes: [], sortVal: 0 };
-        var cells = row.querySelectorAll("td");
-        if (colIndex < cells.length) {
-          group.sortVal = parseFloat(cells[colIndex].getAttribute("data-sort-val")) || 0;
-        }
-        i++;
-        while (i < rows.length && rows[i].classList.contains("tk-change-row")) {
-          group.changes.push(rows[i]);
-          i++;
-        }
-        groups.push(group);
-      } else {
-        others.push({ row: row, index: i });
-        i++;
-      }
-    }
-
-    // Sort groups descending
-    groups.sort(function(a, b) { return b.sortVal - a.sortVal; });
-
-    // Rebuild tbody
-    while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
-
-    // Re-insert section rows and sorted groups
-    groups.forEach(function(g) {
-      tbody.appendChild(g.metric);
-      g.changes.forEach(function(cr) { tbody.appendChild(cr); });
-    });
-
-    // Re-insert base row
-    others.forEach(function(o) {
-      if (o.row.classList.contains("tk-base-row")) {
-        tbody.appendChild(o.row);
-      }
-    });
-  };
-
   // ---- Helpers (exposed globally for reuse by metrics_view.js) ----
   function csvEscape(text) {
     if (!text) return "";

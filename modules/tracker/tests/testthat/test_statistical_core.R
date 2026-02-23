@@ -800,18 +800,18 @@ test_that("calculate_custom_range handles empty data", {
 })
 
 test_that("calculate_custom_range handles invalid range spec", {
-  expect_warning(
-    result <- calculate_custom_range(c(1, 2, 3), rep(1, 3), "abc"),
-    "Invalid range"
-  )
+  output <- capture.output({
+    result <- calculate_custom_range(c(1, 2, 3), rep(1, 3), "abc")
+  }, type = "output")
+  expect_true(any(grepl("Invalid range", output)))
   expect_true(is.na(result$proportion))
 })
 
 test_that("calculate_custom_range handles malformed range spec (no dash)", {
-  expect_warning(
-    result <- calculate_custom_range(c(1, 2, 3), rep(1, 3), "123"),
-    "Invalid range"
-  )
+  output <- capture.output({
+    result <- calculate_custom_range(c(1, 2, 3), rep(1, 3), "123")
+  }, type = "output")
+  expect_true(any(grepl("Invalid range", output)))
   expect_true(is.na(result$proportion))
 })
 
@@ -821,10 +821,10 @@ test_that("calculate_custom_range handles range: prefix", {
 })
 
 test_that("calculate_custom_range handles min > max", {
-  expect_warning(
-    result <- calculate_custom_range(c(1, 2, 3), rep(1, 3), "5-1"),
-    "Invalid range"
-  )
+  output <- capture.output({
+    result <- calculate_custom_range(c(1, 2, 3), rep(1, 3), "5-1")
+  }, type = "output")
+  expect_true(any(grepl("Invalid range", output)))
   expect_true(is.na(result$proportion))
 })
 

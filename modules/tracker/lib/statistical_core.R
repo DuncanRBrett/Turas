@@ -511,7 +511,7 @@ calculate_custom_range <- function(values, weights, range_spec) {
   # Parse range specification
   range_parts <- strsplit(range_str, "-")[[1]]
   if (length(range_parts) != 2) {
-    warning(paste("Invalid range specification:", range_spec))
+    cat("[WARNING]", paste("Invalid range specification:", range_spec), "\n")
     return(list(proportion = NA, range_spec = range_spec, range_values = NA,
                 n_unweighted = 0, n_weighted = 0))
   }
@@ -520,7 +520,7 @@ calculate_custom_range <- function(values, weights, range_spec) {
   range_max <- as.numeric(range_parts[2])
 
   if (is.na(range_min) || is.na(range_max) || range_min > range_max) {
-    warning(paste("Invalid range specification:", range_spec))
+    cat("[WARNING]", paste("Invalid range specification:", range_spec), "\n")
     return(list(proportion = NA, range_spec = range_spec, range_values = NA,
                 n_unweighted = 0, n_weighted = 0))
   }

@@ -300,8 +300,7 @@ normalize_metric_type <- function(metric_type) {
 
   if (metric_type %in% names(legacy_mapping)) {
     normalized <- legacy_mapping[[metric_type]]
-    warning("Converted legacy metric_type '", metric_type, "' to '", normalized, "'",
-            call. = FALSE)
+    cat("[WARNING] Converted legacy metric_type '", metric_type, "' to '", normalized, "'\n", sep = "")
     return(normalized)
   }
 

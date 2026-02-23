@@ -78,7 +78,7 @@ extract_categorical_question_codes <- function(config = NULL, question_mapping =
 
   # SECOND: Add categorical tracked questions from question mapping
   if (!is.null(question_mapping) && "QuestionType" %in% names(question_mapping)) {
-    for (i in 1:nrow(question_mapping)) {
+    for (i in seq_len(nrow(question_mapping))) {
       q_code <- question_mapping$QuestionCode[i]
       q_type <- question_mapping$QuestionType[i]
 
@@ -664,7 +664,7 @@ apply_wave_weights <- function(wave_df, weight_var, wave_id) {
 
   # Check if weight variable exists
   if (!weight_var %in% names(wave_df)) {
-    warning(paste0("Weight variable '", weight_var, "' not found in Wave ", wave_id, " data. Using unweighted data (all weights = 1)."))
+    cat("[WARNING]", paste0("Weight variable '", weight_var, "' not found in Wave ", wave_id, " data. Using unweighted data (all weights = 1)."), "\n")
     wave_df$weight_var <- 1
     return(wave_df)
   }
@@ -675,12 +675,12 @@ apply_wave_weights <- function(wave_df, weight_var, wave_id) {
   # Validate weights
   if (any(is.na(weights))) {
     n_missing <- sum(is.na(weights))
-    warning(paste0("Wave ", wave_id, ": ", n_missing, " records have missing weights (will be excluded)"))
+    cat("[WARNING]", paste0("Wave ", wave_id, ": ", n_missing, " records have missing weights (will be excluded)"), "\n")
   }
 
   if (any(weights[!is.na(weights)] <= 0)) {
     n_invalid <- sum(weights[!is.na(weights)] <= 0)
-    warning(paste0("Wave ", wave_id, ": ", n_invalid, " records have zero or negative weights (will be excluded)"))
+    cat("[WARNING]", paste0("Wave ", wave_id, ": ", n_invalid, " records have zero or negative weights (will be excluded)"), "\n")
     # Actually exclude invalid weights by setting to NA (use which() to avoid NA issues)
     invalid_idx <- which(!is.na(weights) & weights <= 0)
     if (length(invalid_idx) > 0) {
@@ -818,12 +818,12 @@ validate_wave_data <- function(wave_data, config, question_mapping) {
       }
 
       if (length(missing_questions) > 0) {
-        warning(paste0(
+        cat("[WARNING]", paste0(
           "Wave ", wave_id, ": ",
           length(missing_questions), " mapped questions not found in data: ",
           paste(head(missing_questions, 5), collapse = ", "),
           if (length(missing_questions) > 5) "..." else ""
-        ))
+        ), "\n")
       }
     }
   }
@@ -1051,8 +1051,8 @@ resolve_question_values <- function(raw_values, wave_structure, q_code) {
     # No structure entry for this question — try numeric conversion
     result <- suppressWarnings(as.numeric(raw_values))
     if (all(is.na(result[!is.na(raw_values)]))) {
-      warning(paste0("Question ", q_code, ": Text values found but no structure mapping available. ",
-                     "All values will be NA."))
+      cat("[WARNING]", paste0("Question ", q_code, ": Text values found but no structure mapping available. ",
+                     "All values will be NA."), "\n")
     }
     return(result)
   }
@@ -1076,9 +1076,9 @@ resolve_question_values <- function(raw_values, wave_structure, q_code) {
     if (!all(is.na(numeric_attempt))) {
       result[unmapped] <- numeric_attempt
     } else {
-      warning(paste0("Question ", q_code, ": ", n_unmapped, " values could not be mapped: ",
+      cat("[WARNING]", paste0("Question ", q_code, ": ", n_unmapped, " values could not be mapped: ",
                      paste(head(unique_unmapped, 5), collapse = ", "),
-                     if (length(unique_unmapped) > 5) "..." else ""))
+                     if (length(unique_unmapped) > 5) "..." else ""), "\n")
     }
   }
 
@@ -1117,13 +1117,13 @@ get_box_options <- function(wave_structure, q_code, box_name) {
   q_options <- wave_structure[wave_structure$QuestionCode == q_code, , drop = FALSE]
 
   if (nrow(q_options) == 0) {
-    warning(paste0("Question ", q_code, ": No options found in survey structure"))
+    cat("[WARNING]", paste0("Question ", q_code, ": No options found in survey structure"), "\n")
     return(NULL)
   }
 
   # Check BoxCategory column has values
   if (all(is.na(q_options$BoxCategory))) {
-    warning(paste0("Question ", q_code, ": BoxCategory column is empty in survey structure"))
+    cat("[WARNING]", paste0("Question ", q_code, ": BoxCategory column is empty in survey structure"), "\n")
     return(NULL)
   }
 
@@ -1133,8 +1133,8 @@ get_box_options <- function(wave_structure, q_code, box_name) {
 
   if (nrow(matching) == 0) {
     available_cats <- unique(q_options$BoxCategory[!is.na(q_options$BoxCategory)])
-    warning(paste0("Question ", q_code, ": BoxCategory '", box_name,
-                   "' not found. Available: ", paste(available_cats, collapse = ", ")))
+    cat("[WARNING]", paste0("Question ", q_code, ": BoxCategory '", box_name,
+                   "' not found. Available: ", paste(available_cats, collapse = ", ")), "\n")
     return(NULL)
   }
 
@@ -1143,8 +1143,8 @@ get_box_options <- function(wave_structure, q_code, box_name) {
   values <- values[!is.na(values)]
 
   if (length(values) == 0) {
-    warning(paste0("Question ", q_code, ": BoxCategory '", box_name,
-                   "' has no Index_Weight values"))
+    cat("[WARNING]", paste0("Question ", q_code, ": BoxCategory '", box_name,
+                   "' has no Index_Weight values"), "\n")
     return(NULL)
   }
 

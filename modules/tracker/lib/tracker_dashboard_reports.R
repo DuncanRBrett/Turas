@@ -372,6 +372,7 @@ calculate_pairwise_significance <- function(from_result, to_result, metric_type,
     return(list(sig_code = sig_code, p_value = p_value))
 
   }, error = function(e) {
+    cat("[WARNING] Significance test failed: ", e$message, "\n")
     return(default_return)
   })
 }
@@ -529,7 +530,7 @@ write_dashboard_data_row <- function(wb, sheet_name, q_result, wave_ids, n_waves
 
   # Extract wave values
   wave_values <- sapply(wave_ids, function(wid) {
-    wr <- q_result$wave_results[[wid]]
+    wr <- safe_wave_result(q_result$wave_results, wid)
     extract_primary_metric(wr, q_result$metric_type)
   })
 
@@ -548,16 +549,16 @@ write_dashboard_data_row <- function(wb, sheet_name, q_result, wave_ids, n_waves
   # Calculate significance
   prev_sig <- if (prev_idx >= 1) {
     calculate_change_significance(
-      q_result$wave_results[[wave_ids[prev_idx]]],
-      q_result$wave_results[[wave_ids[latest_idx]]],
+      safe_wave_result(q_result$wave_results, wave_ids[prev_idx]),
+      safe_wave_result(q_result$wave_results, wave_ids[latest_idx]),
       q_result$metric_type,
       config
     )
   } else NA
 
   base_sig <- calculate_change_significance(
-    q_result$wave_results[[wave_ids[base_idx]]],
-    q_result$wave_results[[wave_ids[latest_idx]]],
+    safe_wave_result(q_result$wave_results, wave_ids[base_idx]),
+    safe_wave_result(q_result$wave_results, wave_ids[latest_idx]),
     q_result$metric_type,
     config
   )
@@ -722,7 +723,7 @@ write_trend_dashboard <- function(wb, trend_results, config, sheet_name = "Trend
   openxlsx::writeData(wb, sheet_name, t(headers),
                       startRow = header_row, startCol = 1, colNames = FALSE)
   openxlsx::addStyle(wb, sheet_name, styles$header,
-                     rows = header_row, cols = 1:length(headers), gridExpand = TRUE)
+                     rows = header_row, cols = seq_along(headers), gridExpand = TRUE)
 
   # ===========================================================================
   # DATA ROWS
@@ -852,11 +853,10 @@ write_matrix_data_cells <- function(wb, sheet_name, wave_ids, wave_values,
         from_wave <- wave_ids[i]
         to_wave <- wave_ids[j]
 
-        from_result <- q_result$wave_results[[from_wave]]
-        to_result <- q_result$wave_results[[to_wave]]
+        from_result <- safe_wave_result(q_result$wave_results, from_wave)
+        to_result <- safe_wave_result(q_result$wave_results, to_wave)
 
-        if (is.null(from_result) || !isTRUE(from_result$available) ||
-            is.null(to_result) || !isTRUE(to_result$available)) {
+        if (!isTRUE(from_result$available) || !isTRUE(to_result$available)) {
           openxlsx::writeData(wb, sheet_name, "N/A",
                               startRow = current_row, startCol = col_idx)
           openxlsx::addStyle(wb, sheet_name, styles$na_cell,
@@ -955,13 +955,13 @@ write_significance_matrix <- function(wb, q_result, config, wave_ids) {
   # ===========================================================================
 
   wave_values <- sapply(wave_ids, function(wid) {
-    wr <- q_result$wave_results[[wid]]
+    wr <- safe_wave_result(q_result$wave_results, wid)
     extract_primary_metric(wr, q_result$metric_type)
   })
 
   wave_n <- sapply(wave_ids, function(wid) {
-    wr <- q_result$wave_results[[wid]]
-    if (!is.null(wr) && wr$available) {
+    wr <- safe_wave_result(q_result$wave_results, wid)
+    if (isTRUE(wr$available)) {
       wr$n_unweighted
     } else {
       NA
@@ -1133,6 +1133,26 @@ write_all_significance_matrices <- function(wb, trend_results, config) {
 write_dashboard_output <- function(trend_results, config, wave_data,
                                    output_path = NULL, include_sig_matrices = TRUE, run_result = NULL) {
 
+  # --- Input validation ---
+  if (!is.list(trend_results) || length(trend_results) == 0) {
+    tracker_refuse(
+      code = "DATA_TREND_RESULTS_INVALID",
+      title = "Invalid Trend Results for Dashboard Output",
+      problem = "trend_results must be a non-empty list of trend results.",
+      why_it_matters = "Without valid trend results, there is no data to write to the dashboard report.",
+      how_to_fix = "Ensure calculate_all_trends() completed successfully before calling write_dashboard_output()."
+    )
+  }
+  if (!is.list(config) || is.null(config$waves)) {
+    tracker_refuse(
+      code = "CFG_CONFIG_INVALID",
+      title = "Invalid Config for Dashboard Output",
+      problem = "config must be a list containing a $waves data frame.",
+      why_it_matters = "The config object drives wave ordering, labels, and output path resolution.",
+      how_to_fix = "Pass the config object returned by load_tracking_config() to write_dashboard_output()."
+    )
+  }
+
   cat("\n================================================================================\n")
   cat("WRITING DASHBOARD EXCEL OUTPUT\n")
   cat("================================================================================\n\n")
@@ -1150,7 +1170,7 @@ write_dashboard_output <- function(trend_results, config, wave_data,
       tryCatch({
         dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
       }, error = function(e) {
-        warning(paste0("Could not create output directory: ", output_dir, ". Using config directory."))
+        cat("[WARNING]", paste0("Could not create output directory: ", output_dir, ". Using config directory."), "\n")
         output_dir <<- dirname(config$config_path)
       })
     }
@@ -1245,7 +1265,7 @@ write_sig_matrix_output <- function(trend_results, config, wave_data, output_pat
       tryCatch({
         dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
       }, error = function(e) {
-        warning(paste0("Could not create output directory: ", output_dir, ". Using config directory."))
+        cat("[WARNING]", paste0("Could not create output directory: ", output_dir, ". Using config directory."), "\n")
         output_dir <<- dirname(config$config_path)
       })
     }

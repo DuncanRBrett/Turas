@@ -53,8 +53,7 @@ build_table_base_row_html <- function(metric_rows, segments, waves, min_base) {
         n_display <- if (!is.na(n_val)) as.character(n_val) else ""
       }
       parts <- c(parts, sprintf(
-        '<td class="tk-td tk-base-cell bg-%s" data-segment="%s" data-n="%s">%s</td>',
-        make_css_safe(seg_name),
+        '<td class="tk-td tk-base-cell" data-segment="%s" data-n="%s">%s</td>',
         htmltools::htmlEscape(seg_name),
         if (!is.na(n_val)) n_val else "",
         n_display
@@ -139,8 +138,8 @@ build_table_metric_row_html <- function(mr, m_idx, chart_json, sparkline_data,
       cell <- cells[[wid]]
       if (is.null(cell)) {
         parts <- c(parts, sprintf(
-          '<td class="tk-td tk-value-cell bg-%s" data-segment="%s">&mdash;</td>',
-          make_css_safe(seg_name), htmltools::htmlEscape(seg_name)
+          '<td class="tk-td tk-value-cell" data-segment="%s">&mdash;</td>',
+          htmltools::htmlEscape(seg_name)
         ))
         next
       }
@@ -153,10 +152,9 @@ build_table_metric_row_html <- function(mr, m_idx, chart_json, sparkline_data,
       low_base_class <- if (!is.na(cell$n) && cell$n < min_base) " tk-low-base-dim" else ""
 
       parts <- c(parts, sprintf(
-        '<td class="tk-td tk-value-cell%s%s bg-%s" data-segment="%s" data-wave="%s" data-sort-val="%s" data-n="%s">%s</td>',
+        '<td class="tk-td tk-value-cell%s%s" data-segment="%s" data-wave="%s" data-sort-val="%s" data-n="%s">%s</td>',
         latest_class,
         low_base_class,
-        make_css_safe(seg_name),
         htmltools::htmlEscape(seg_name),
         htmltools::htmlEscape(wid),
         sort_val,
@@ -184,12 +182,18 @@ build_table_metric_row_html <- function(mr, m_idx, chart_json, sparkline_data,
       if (!is.null(cell) && !cell$is_first_wave && nzchar(cell$display_vs_prev)) {
         content <- cell$display_vs_prev
       }
-      parts <- c(parts, sprintf(
-        '<td class="tk-td tk-change-cell bg-%s" data-segment="%s">%s</td>',
-        make_css_safe(seg_name),
-        htmltools::htmlEscape(seg_name),
-        content
-      ))
+      if (nzchar(content)) {
+        parts <- c(parts, sprintf(
+          '<td class="tk-td tk-change-cell" data-segment="%s">%s</td>',
+          htmltools::htmlEscape(seg_name),
+          content
+        ))
+      } else {
+        parts <- c(parts, sprintf(
+          '<td data-segment="%s"></td>',
+          htmltools::htmlEscape(seg_name)
+        ))
+      }
     }
   }
   parts <- c(parts, '</tr>')
@@ -211,12 +215,18 @@ build_table_metric_row_html <- function(mr, m_idx, chart_json, sparkline_data,
       if (!is.null(cell) && !cell$is_baseline && nzchar(cell$display_vs_base)) {
         content <- cell$display_vs_base
       }
-      parts <- c(parts, sprintf(
-        '<td class="tk-td tk-change-cell bg-%s" data-segment="%s">%s</td>',
-        make_css_safe(seg_name),
-        htmltools::htmlEscape(seg_name),
-        content
-      ))
+      if (nzchar(content)) {
+        parts <- c(parts, sprintf(
+          '<td class="tk-td tk-change-cell" data-segment="%s">%s</td>',
+          htmltools::htmlEscape(seg_name),
+          content
+        ))
+      } else {
+        parts <- c(parts, sprintf(
+          '<td data-segment="%s"></td>',
+          htmltools::htmlEscape(seg_name)
+        ))
+      }
     }
   }
   parts <- c(parts, '</tr>')
@@ -271,8 +281,7 @@ build_tracking_table <- function(html_data, config) {
     seg_colour <- segment_colours[seg_idx]
     for (w_idx in seq_along(waves)) {
       parts <- c(parts, sprintf(
-        '<th class="tk-segment-indicator bg-%s" data-segment="%s" style="background-color:%s"></th>',
-        make_css_safe(seg_name),
+        '<th class="tk-segment-indicator" data-segment="%s" style="background-color:%s"></th>',
         htmltools::htmlEscape(seg_name),
         seg_colour
       ))
@@ -288,8 +297,7 @@ build_tracking_table <- function(html_data, config) {
     seg_name <- segments[seg_idx]
     for (w_idx in seq_along(waves)) {
       parts <- c(parts, sprintf(
-        '<th class="tk-th tk-wave-header tk-sortable bg-%s" data-segment="%s" data-wave="%s" data-col-index="%d" onclick="sortOverviewColumn(this)" title="Click to sort">%s</th>',
-        make_css_safe(seg_name),
+        '<th class="tk-th tk-wave-header tk-sortable" data-segment="%s" data-wave="%s" data-col-index="%d" onclick="sortOverviewColumn(this)" title="Click to sort">%s</th>',
         htmltools::htmlEscape(seg_name),
         htmltools::htmlEscape(waves[w_idx]),
         col_idx,
@@ -333,12 +341,3 @@ build_tracking_table <- function(html_data, config) {
   htmltools::HTML(paste(parts, collapse = "\n"))
 }
 
-
-#' Make a CSS-safe Class Name
-#'
-#' Converts a segment name to a CSS-safe class string.
-#'
-#' @keywords internal
-make_css_safe <- function(name) {
-  gsub("[^a-zA-Z0-9_-]", "-", name)
-}

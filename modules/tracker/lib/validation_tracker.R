@@ -170,7 +170,7 @@ validate_wave_definitions <- function(config) {
   }
 
   # Validate dates
-  for (i in 1:nrow(waves)) {
+  for (i in seq_len(nrow(waves))) {
     start_date <- waves$FieldworkStart[i]
     end_date <- waves$FieldworkEnd[i]
 
@@ -416,7 +416,7 @@ validate_banner_structure <- function(config, wave_data) {
   # Banner sheet may have wave-specific column names (e.g., W2023=Q24, W2024=Q02)
   wave_ids <- names(wave_data)
   if (length(wave_ids) > 0) {
-    for (i in 1:nrow(banner)) {
+    for (i in seq_len(nrow(banner))) {
       break_var <- banner$BreakVariable[i]
 
       # Skip "Total"

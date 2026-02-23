@@ -28,6 +28,35 @@
 write_tracking_crosstab_output <- function(crosstab_data, config, output_path,
                                             run_result = NULL) {
 
+  # --- Input validation ---
+  if (!is.list(crosstab_data) || length(crosstab_data) == 0) {
+    tracker_refuse(
+      code = "DATA_CROSSTAB_DATA_INVALID",
+      title = "Invalid Crosstab Data for Excel Output",
+      problem = "crosstab_data must be a non-empty list from build_tracking_crosstab().",
+      why_it_matters = "Without valid crosstab data, there is no content to write to the Excel report.",
+      how_to_fix = "Ensure build_tracking_crosstab() completed successfully before calling write_tracking_crosstab_output()."
+    )
+  }
+  if (!is.list(config) || is.null(config$waves)) {
+    tracker_refuse(
+      code = "CFG_CONFIG_INVALID",
+      title = "Invalid Config for Crosstab Output",
+      problem = "config must be a list containing a $waves data frame.",
+      why_it_matters = "The config object drives wave ordering, labels, and formatting settings.",
+      how_to_fix = "Pass the config object returned by load_tracking_config() to write_tracking_crosstab_output()."
+    )
+  }
+  if (is.null(output_path) || !is.character(output_path) || nchar(output_path) == 0) {
+    tracker_refuse(
+      code = "IO_OUTPUT_PATH_INVALID",
+      title = "Invalid Output Path for Crosstab",
+      problem = "output_path must be a non-empty character string.",
+      why_it_matters = "The Excel workbook cannot be saved without a valid file path.",
+      how_to_fix = "Provide a valid file path (e.g., 'output/tracking_crosstab.xlsx') to write_tracking_crosstab_output()."
+    )
+  }
+
   cat("\n  Generating Tracking Crosstab Excel report...\n")
 
   wb <- openxlsx::createWorkbook()

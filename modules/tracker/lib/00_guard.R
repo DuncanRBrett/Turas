@@ -73,7 +73,7 @@ if (!exists("turas_refuse", mode = "function")) {
   }
 
   if (!trs_loaded) {
-    warning("TRS infrastructure not found. Using fallback error handling.")
+    cat("[WARNING] TRS infrastructure not found. Using fallback error handling.\n")
     # Fallback turas_refuse: throws a turas_refusal condition to match TRS behaviour.
     # Uses stop() as the ultimate mechanism since the real TRS infrastructure is unavailable.
     turas_refuse <- function(code, title, problem, why_it_matters, how_to_fix, ...) {

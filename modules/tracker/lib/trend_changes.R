@@ -30,8 +30,8 @@ calculate_changes <- function(wave_results, wave_ids, metric_name, sub_metric = 
     wave_id <- wave_ids[i]
     prev_wave_id <- wave_ids[i - 1]
 
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
+    current <- safe_wave_result(wave_results, wave_id)
+    previous <- safe_wave_result(wave_results, prev_wave_id)
 
     # Get metric values
     if (!is.null(sub_metric)) {
@@ -106,17 +106,17 @@ calculate_changes_for_metric <- function(wave_results, wave_ids, metric_name) {
     wave_id <- wave_ids[i]
     prev_wave_id <- wave_ids[i - 1]
 
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
+    current <- safe_wave_result(wave_results, wave_id)
+    previous <- safe_wave_result(wave_results, prev_wave_id)
 
     # Get metric values
-    current_val <- if (current$available && !is.null(current$metrics[[metric_name]])) {
+    current_val <- if (isTRUE(current$available) && !is.null(current$metrics[[metric_name]])) {
       current$metrics[[metric_name]]
     } else {
       NA
     }
 
-    previous_val <- if (previous$available && !is.null(previous$metrics[[metric_name]])) {
+    previous_val <- if (isTRUE(previous$available) && !is.null(previous$metrics[[metric_name]])) {
       previous$metrics[[metric_name]]
     } else {
       NA
@@ -175,17 +175,17 @@ calculate_changes_for_multi_mention_option <- function(wave_results, wave_ids, c
     wave_id <- wave_ids[i]
     prev_wave_id <- wave_ids[i - 1]
 
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
+    current <- safe_wave_result(wave_results, wave_id)
+    previous <- safe_wave_result(wave_results, prev_wave_id)
 
     # Get mention proportions
-    current_val <- if (current$available && !is.null(current$mention_proportions[[column_name]])) {
+    current_val <- if (isTRUE(current$available) && !is.null(current$mention_proportions[[column_name]])) {
       current$mention_proportions[[column_name]]
     } else {
       NA
     }
 
-    previous_val <- if (previous$available && !is.null(previous$mention_proportions[[column_name]])) {
+    previous_val <- if (isTRUE(previous$available) && !is.null(previous$mention_proportions[[column_name]])) {
       previous$mention_proportions[[column_name]]
     } else {
       NA
@@ -244,16 +244,16 @@ calculate_changes_for_multi_mention_metric <- function(wave_results, wave_ids, m
     wave_id <- wave_ids[i]
     prev_wave_id <- wave_ids[i - 1]
 
-    current <- wave_results[[wave_id]]
-    previous <- wave_results[[prev_wave_id]]
+    current <- safe_wave_result(wave_results, wave_id)
+    previous <- safe_wave_result(wave_results, prev_wave_id)
 
-    current_val <- if (current$available && !is.null(current$additional_metrics[[metric_name]])) {
+    current_val <- if (isTRUE(current$available) && !is.null(current$additional_metrics[[metric_name]])) {
       current$additional_metrics[[metric_name]]
     } else {
       NA
     }
 
-    previous_val <- if (previous$available && !is.null(previous$additional_metrics[[metric_name]])) {
+    previous_val <- if (isTRUE(previous$available) && !is.null(previous$additional_metrics[[metric_name]])) {
       previous$additional_metrics[[metric_name]]
     } else {
       NA
