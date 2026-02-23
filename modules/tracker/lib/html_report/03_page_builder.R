@@ -191,6 +191,8 @@ build_summary_tab <- function(html_data, config) {
   n_waves <- length(html_data$waves)
   n_segments <- length(html_data$segments)
   baseline_label <- html_data$wave_lookup[html_data$baseline_wave]
+  latest_wave_id <- html_data$waves[n_waves]
+  latest_wave_label <- html_data$wave_lookup[latest_wave_id]
 
   htmltools::tags$div(class = "summary-tab-content",
     htmltools::tags$div(class = "summary-stats-row",
@@ -209,6 +211,10 @@ build_summary_tab <- function(html_data, config) {
       htmltools::tags$div(class = "summary-stat-card",
         htmltools::tags$div(class = "stat-number", paste0(baseline_label)),
         htmltools::tags$div(class = "stat-label", "Baseline")
+      ),
+      htmltools::tags$div(class = "summary-stat-card",
+        htmltools::tags$div(class = "stat-number", paste0(latest_wave_label)),
+        htmltools::tags$div(class = "stat-label", "Latest Wave")
       )
     ),
 

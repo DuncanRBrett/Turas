@@ -641,7 +641,7 @@ function saveReportHTML() {
   a.href = URL.createObjectURL(blob);
   var projectTitle = document.querySelector(".tk-header-project");
   var filename = projectTitle ? projectTitle.textContent.trim().replace(/[^a-zA-Z0-9_-]/g, "_") : "tracking_report";
-  a.download = filename + "_with_pins.html";
+  a.download = filename + "_updated.html";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
