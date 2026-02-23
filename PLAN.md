@@ -401,6 +401,4 @@ Phase 4: Cross-Referencing    ~300 lines  (1 R file + 1 JS)
 Total estimated:              ~2,600 lines + tests
 ```
 
-
-4. **Help overlay (Item #15):** The "?" button overlay approach — does this feel right?
 Each phase is independently testable against the real SACAP HTML files.
