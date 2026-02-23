@@ -161,6 +161,22 @@ test_that("normalize_question_type handles already-lowercase types", {
   expect_equal(normalize_question_type("rating"), "rating")
 })
 
+test_that("normalize_question_type returns NA for NULL input", {
+  expect_true(is.na(normalize_question_type(NULL)))
+})
+
+test_that("normalize_question_type returns NA for NA input", {
+  expect_true(is.na(normalize_question_type(NA)))
+})
+
+test_that("normalize_question_type returns NA for empty string", {
+  expect_true(is.na(normalize_question_type("")))
+})
+
+test_that("normalize_question_type returns NA for whitespace-only string", {
+  expect_true(is.na(normalize_question_type("   ")))
+})
+
 
 # ==============================================================================
 # t_test_for_means() - CORE STATISTICAL FUNCTION
@@ -400,7 +416,7 @@ test_that("z_test_for_proportions handles very small samples", {
 test_that("calculate_weighted_mean returns correct structure", {
   result <- calculate_weighted_mean(c(1, 2, 3, 4, 5), rep(1, 5))
   expect_true(is.list(result))
-  expect_true(all(c("mean", "sd", "n_unweighted", "n_weighted", "ci_lower", "ci_upper") %in% names(result)))
+  expect_true(all(c("mean", "sd", "n_unweighted", "n_weighted", "ci_lower", "ci_upper", "eff_n") %in% names(result)))
 })
 
 test_that("calculate_weighted_mean with equal weights gives arithmetic mean", {
@@ -459,6 +475,36 @@ test_that("calculate_weighted_mean with all zero weights returns NA", {
   result <- calculate_weighted_mean(c(1, 2, 3), c(0, 0, 0))
   expect_true(is.na(result$mean))
   expect_equal(result$n_unweighted, 0)
+})
+
+test_that("calculate_weighted_mean eff_n equals n for equal weights", {
+  result <- calculate_weighted_mean(c(1, 2, 3, 4, 5), rep(1, 5))
+  expect_equal(result$eff_n, 5)
+})
+
+test_that("calculate_weighted_mean eff_n < n for unequal weights", {
+  result <- calculate_weighted_mean(c(1, 2, 3, 4, 5), c(1, 1, 1, 1, 10))
+  # Unequal weights reduce effective sample size
+  expect_true(result$eff_n < result$n_unweighted)
+  expect_true(result$eff_n > 0)
+})
+
+test_that("calculate_weighted_mean eff_n = 0 for empty data", {
+  result <- calculate_weighted_mean(c(NA, NA), c(1, 1))
+  expect_equal(result$eff_n, 0)
+})
+
+test_that("calculate_weighted_mean eff_n = 1 for single observation", {
+  result <- calculate_weighted_mean(c(5), c(1))
+  expect_equal(result$eff_n, 1)
+})
+
+test_that("calculate_weighted_mean refuses non-numeric values", {
+  # Non-numeric data should trigger TRS refusal
+  expect_error(
+    calculate_weighted_mean(c("a", "b", "c"), rep(1, 3)),
+    class = "turas_refusal"
+  )
 })
 
 
@@ -533,63 +579,79 @@ test_that("calculate_nps_score: value 8 is passive", {
   expect_equal(result$nps, -0)
 })
 
+test_that("calculate_nps_score includes eff_n field", {
+  result <- calculate_nps_score(c(5, 7, 9, 10), rep(1, 4))
+  expect_true("eff_n" %in% names(result))
+  expect_equal(result$eff_n, 4)  # Equal weights -> eff_n = n
+})
+
+test_that("calculate_nps_score eff_n = 0 for empty data", {
+  result <- calculate_nps_score(c(NA, NA), c(1, 1))
+  expect_equal(result$eff_n, 0)
+})
+
 
 # ==============================================================================
 # calculate_proportions()
 # ==============================================================================
 
-test_that("calculate_proportions returns correct structure", {
+test_that("calculate_proportions returns correct structure (list with named vector)", {
   result <- calculate_proportions(c("A", "B", "A"), rep(1, 3))
-  expect_true(is.data.frame(result))
-  expect_true(all(c("code", "proportion", "n_unweighted", "n_weighted") %in% names(result)))
+  expect_true(is.list(result))
+  expect_true(all(c("proportions", "n_unweighted", "n_weighted", "eff_n") %in% names(result)))
+  expect_true(is.numeric(result$proportions))
 })
 
 test_that("calculate_proportions: equal split gives 50/50", {
   result <- calculate_proportions(c("A", "B"), rep(1, 2))
-  a_row <- result[result$code == "A", ]
-  b_row <- result[result$code == "B", ]
-  expect_equal(a_row$proportion, 50)
-  expect_equal(b_row$proportion, 50)
+  expect_equal(result$proportions[["A"]], 50)
+  expect_equal(result$proportions[["B"]], 50)
 })
 
 test_that("calculate_proportions: proportions sum to 100 (on 0-100 scale)", {
   result <- calculate_proportions(c("A", "B", "C", "A", "B"), rep(1, 5))
-  expect_equal(sum(result$proportion), 100)
+  expect_equal(sum(result$proportions), 100)
 })
 
 test_that("calculate_proportions handles weighted data", {
   # A has weight 3, B has weight 1. Total = 4. A = 75%, B = 25%
   result <- calculate_proportions(c("A", "B"), c(3, 1))
-  a_row <- result[result$code == "A", ]
-  b_row <- result[result$code == "B", ]
-  expect_equal(a_row$proportion, 75)
-  expect_equal(b_row$proportion, 25)
+  expect_equal(result$proportions[["A"]], 75)
+  expect_equal(result$proportions[["B"]], 25)
 })
 
 test_that("calculate_proportions with specific codes", {
   result <- calculate_proportions(c("A", "B", "C", "A"), rep(1, 4), codes = c("A", "B"))
-  expect_equal(nrow(result), 2)
-  expect_equal(result[result$code == "A", "proportion"], 50)
-  expect_equal(result[result$code == "B", "proportion"], 25)
+  expect_equal(length(result$proportions), 2)
+  expect_equal(result$proportions[["A"]], 50)
+  expect_equal(result$proportions[["B"]], 25)
 })
 
 test_that("calculate_proportions with code not in data gives 0", {
   result <- calculate_proportions(c("A", "A"), rep(1, 2), codes = c("A", "Z"))
-  z_row <- result[result$code == "Z", ]
-  expect_equal(z_row$proportion, 0)
-  expect_equal(z_row$n_unweighted, 0)
+  expect_equal(result$proportions[["Z"]], 0)
 })
 
 test_that("calculate_proportions handles NAs in values", {
   result <- calculate_proportions(c("A", NA, "B"), c(1, 1, 1))
   # NA values should be excluded from total
-  expect_equal(sum(result$proportion), 100)
+  expect_equal(sum(result$proportions), 100)
 })
 
 test_that("calculate_proportions tracks n_unweighted correctly", {
   result <- calculate_proportions(c("A", "A", "B"), rep(1, 3))
-  a_row <- result[result$code == "A", ]
-  expect_equal(a_row$n_unweighted, 2)
+  expect_equal(result$n_unweighted, 3)
+})
+
+test_that("calculate_proportions includes eff_n", {
+  result <- calculate_proportions(c("A", "B", "A"), rep(1, 3))
+  expect_equal(result$eff_n, 3)  # Equal weights -> eff_n = n
+})
+
+test_that("calculate_proportions eff_n = 0 for empty data", {
+  result <- calculate_proportions(c(NA, NA), c(1, 1), codes = c("A"))
+  expect_equal(result$eff_n, 0)
+  expect_true(is.na(result$proportions[["A"]]))
 })
 
 
@@ -597,33 +659,42 @@ test_that("calculate_proportions tracks n_unweighted correctly", {
 # calculate_distribution()
 # ==============================================================================
 
-test_that("calculate_distribution returns correct structure", {
+test_that("calculate_distribution returns correct structure (list with named list)", {
   result <- calculate_distribution(c(1, 2, 3), rep(1, 3))
-  expect_true(is.data.frame(result))
-  expect_true(all(c("value", "count", "proportion") %in% names(result)))
+  expect_true(is.list(result))
+  expect_true(all(c("distribution", "n_unweighted", "n_weighted") %in% names(result)))
+  expect_true(is.list(result$distribution))
 })
 
 test_that("calculate_distribution proportions sum to 100", {
   result <- calculate_distribution(c(1, 2, 3, 1, 2), rep(1, 5))
-  expect_equal(sum(result$proportion), 100)
+  total <- sum(unlist(result$distribution))
+  expect_equal(total, 100)
 })
 
-test_that("calculate_distribution values are sorted", {
+test_that("calculate_distribution keys are sorted", {
   result <- calculate_distribution(c(3, 1, 2), rep(1, 3))
-  expect_equal(result$value, c(1, 2, 3))
+  expect_equal(names(result$distribution), c("1", "2", "3"))
 })
 
 test_that("calculate_distribution with weights", {
   result <- calculate_distribution(c(1, 2), c(3, 1))
   # Total weight = 4. Value 1 = 3/4*100 = 75%, Value 2 = 1/4*100 = 25%
-  expect_equal(result$proportion[result$value == 1], 75)
-  expect_equal(result$proportion[result$value == 2], 25)
+  expect_equal(result$distribution[["1"]], 75)
+  expect_equal(result$distribution[["2"]], 25)
 })
 
 test_that("calculate_distribution handles NAs", {
   result <- calculate_distribution(c(1, NA, 2), c(1, 1, 1))
-  expect_equal(nrow(result), 2)
-  expect_equal(sum(result$proportion), 100)
+  expect_equal(length(result$distribution), 2)
+  total <- sum(unlist(result$distribution))
+  expect_equal(total, 100)
+})
+
+test_that("calculate_distribution empty data returns empty list", {
+  result <- calculate_distribution(c(NA, NA), c(1, 1))
+  expect_equal(length(result$distribution), 0)
+  expect_equal(result$n_unweighted, 0)
 })
 
 
@@ -739,6 +810,19 @@ test_that("calculate_custom_range handles invalid range spec", {
 test_that("calculate_custom_range handles malformed range spec (no dash)", {
   expect_warning(
     result <- calculate_custom_range(c(1, 2, 3), rep(1, 3), "123"),
+    "Invalid range"
+  )
+  expect_true(is.na(result$proportion))
+})
+
+test_that("calculate_custom_range handles range: prefix", {
+  result <- calculate_custom_range(c(1, 2, 3, 4, 5), rep(1, 5), "range:4-5")
+  expect_equal(result$proportion, 40)
+})
+
+test_that("calculate_custom_range handles min > max", {
+  expect_warning(
+    result <- calculate_custom_range(c(1, 2, 3), rep(1, 3), "5-1"),
     "Invalid range"
   )
   expect_true(is.na(result$proportion))

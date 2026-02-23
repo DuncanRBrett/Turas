@@ -1,12 +1,25 @@
 # ==============================================================================
-# TurasTracker - Statistical Core Functions
+# TurasTracker - Statistical Core Functions (SINGLE SOURCE OF TRUTH)
 # ==============================================================================
 #
-# Core statistical calculations used by trend calculator.
-# Extracted for clarity and potential reuse.
+# Canonical definitions for all core statistical calculations used by the
+# tracker module. All calculation functions are defined here and nowhere else.
 #
-# VERSION: 1.0.0
-# EXTRACTED FROM: trend_calculator.R
+# Functions:
+#   - is_significant()          Safe significance check
+#   - normalize_question_type() Type mapping (TurasTabs/legacy -> internal)
+#   - t_test_for_means()        Pooled two-sample t-test from summary stats
+#   - z_test_for_proportions()  Two-sample z-test for proportions
+#   - calculate_weighted_mean() Weighted mean with SD, CI, and eff_n
+#   - calculate_nps_score()     Net Promoter Score with eff_n
+#   - calculate_proportions()   Weighted proportions (named vector + eff_n)
+#   - calculate_distribution()  Full distribution (named list of percentages)
+#   - calculate_top_box()       Top-N box percentage
+#   - calculate_bottom_box()    Bottom-N box percentage
+#   - calculate_custom_range()  Custom value range percentage
+#
+# SOURCED BY: run_tracker.R (line 76, before trend_calculator.R)
+# VERSION: 2.0.0
 # ==============================================================================
 
 # Default significance level - defined in constants.R (single source of truth)
@@ -36,6 +49,11 @@ is_significant <- function(sig_test) {
 #' @return Character, normalized type
 #' @keywords internal
 normalize_question_type <- function(q_type) {
+  # Guard against NULL/NA/empty input
+  if (is.null(q_type) || is.na(q_type) || trimws(as.character(q_type)) == "") {
+    return(NA_character_)
+  }
+
   type_map <- c(
     "Single_Response" = "single_choice",
     "SingleChoice" = "single_choice",
@@ -181,7 +199,25 @@ z_test_for_proportions <- function(p1, n1, p2, n2, alpha = DEFAULT_ALPHA) {
 #' @return List with mean, sd, n_unweighted, n_weighted, ci_lower, ci_upper
 #' @keywords internal
 calculate_weighted_mean <- function(values, weights) {
-  valid_idx <- !is.na(values) & !is.na(weights) & weights > 0
+  # Guard: non-numeric values cannot be averaged
+  # Note: c(NA, NA) is logical in R, so only refuse if non-NA values exist and aren't numeric
+  non_na_values <- values[!is.na(values)]
+  if (length(non_na_values) > 0 && !is.numeric(non_na_values)) {
+    sample_values <- head(unique(non_na_values), 5)
+    return(tracker_refuse(
+      code = "DATA_NON_NUMERIC_VALUES",
+      title = "Non-Numeric Data Detected",
+      problem = "Expected numeric responses but found text values.",
+      why_it_matters = "Weighted mean calculation requires numeric data.",
+      how_to_fix = c(
+        "Check that the data file has numeric values for this question",
+        "Verify question type is configured correctly"
+      ),
+      details = paste0("Sample values found: ", paste(sample_values, collapse = ", "))
+    ))
+  }
+
+  valid_idx <- which(!is.na(values) & !is.na(weights) & weights > 0)
   values_valid <- values[valid_idx]
   weights_valid <- weights[valid_idx]
 
@@ -195,7 +231,8 @@ calculate_weighted_mean <- function(values, weights) {
       n_unweighted = n_unweighted,
       n_weighted = n_weighted,
       ci_lower = NA,
-      ci_upper = NA
+      ci_upper = NA,
+      eff_n = if (n_unweighted == 1) 1 else 0
     ))
   }
 
@@ -206,13 +243,22 @@ calculate_weighted_mean <- function(values, weights) {
   ci_lower <- w_mean - 1.96 * se
   ci_upper <- w_mean + 1.96 * se
 
+  # Effective N (design-effect adjusted sample size)
+  sum_weights_squared <- sum(weights_valid^2)
+  eff_n <- if (sum_weights_squared > 0) {
+    (n_weighted^2) / sum_weights_squared
+  } else {
+    0
+  }
+
   list(
     mean = w_mean,
     sd = w_sd,
     n_unweighted = n_unweighted,
     n_weighted = n_weighted,
     ci_lower = ci_lower,
-    ci_upper = ci_upper
+    ci_upper = ci_upper,
+    eff_n = eff_n
   )
 }
 
@@ -225,7 +271,7 @@ calculate_weighted_mean <- function(values, weights) {
 #' @return List with nps, promoters_pct, passives_pct, detractors_pct, n_*
 #' @keywords internal
 calculate_nps_score <- function(values, weights) {
-  valid_idx <- !is.na(values) & !is.na(weights) & weights > 0
+  valid_idx <- which(!is.na(values) & !is.na(weights) & weights > 0)
   values_valid <- values[valid_idx]
   weights_valid <- weights[valid_idx]
 
@@ -236,7 +282,8 @@ calculate_nps_score <- function(values, weights) {
     return(list(
       nps = NA, promoters_pct = NA, passives_pct = NA, detractors_pct = NA,
       n_unweighted = 0, n_weighted = 0,
-      n_promoters = 0, n_passives = 0, n_detractors = 0
+      n_promoters = 0, n_passives = 0, n_detractors = 0,
+      eff_n = 0
     ))
   }
 
@@ -250,6 +297,14 @@ calculate_nps_score <- function(values, weights) {
   detractors_pct <- sum(detractors) / n_weighted * 100
   nps <- promoters_pct - detractors_pct
 
+  # Effective N (design-effect adjusted sample size)
+  sum_weights_squared <- sum(weights_valid^2)
+  eff_n <- if (sum_weights_squared > 0) {
+    (n_weighted^2) / sum_weights_squared
+  } else {
+    0
+  }
+
   list(
     nps = nps,
     promoters_pct = promoters_pct,
@@ -259,7 +314,8 @@ calculate_nps_score <- function(values, weights) {
     n_weighted = n_weighted,
     n_promoters = length(promoters),
     n_passives = length(passives),
-    n_detractors = length(detractors)
+    n_detractors = length(detractors),
+    eff_n = eff_n
   )
 }
 
@@ -273,41 +329,50 @@ calculate_nps_score <- function(values, weights) {
 #' @return Data frame with code, proportion, n_unweighted, n_weighted
 #' @keywords internal
 calculate_proportions <- function(values, weights, codes = NULL) {
-  valid_idx <- !is.na(values) & !is.na(weights) & weights > 0
+  valid_idx <- which(!is.na(values) & !is.na(weights) & weights > 0)
   values_valid <- values[valid_idx]
   weights_valid <- weights[valid_idx]
-
-  total_weight <- sum(weights_valid)
 
   if (is.null(codes)) {
     codes <- unique(values_valid)
   }
 
-  results <- data.frame(
-    code = character(),
-    proportion = numeric(),
-    n_unweighted = integer(),
-    n_weighted = numeric(),
-    stringsAsFactors = FALSE
-  )
+  n_unweighted <- length(values_valid)
+  n_weighted <- sum(weights_valid)
 
-  for (code in codes) {
-    mask <- values_valid == code
-    code_weights <- weights_valid[mask]
-    n_unwt <- sum(mask)
-    n_wt <- sum(code_weights)
-    prop <- if (total_weight > 0) (n_wt / total_weight) * 100 else 0
-
-    results <- rbind(results, data.frame(
-      code = as.character(code),
-      proportion = prop,
-      n_unweighted = n_unwt,
-      n_weighted = n_wt,
-      stringsAsFactors = FALSE
+  if (n_unweighted == 0) {
+    return(list(
+      proportions = setNames(rep(NA_real_, length(codes)), as.character(codes)),
+      n_unweighted = 0,
+      n_weighted = 0,
+      eff_n = 0
     ))
   }
 
-  results
+  total_weight <- sum(weights_valid)
+
+  # Calculate proportion for each code (as named numeric vector, 0-100 scale)
+  proportions <- sapply(codes, function(code) {
+    matched_idx <- which(values_valid == code)
+    code_weight <- sum(weights_valid[matched_idx], na.rm = TRUE)
+    (code_weight / total_weight) * 100
+  })
+  names(proportions) <- as.character(codes)
+
+  # Effective N (design-effect adjusted sample size)
+  sum_weights_squared <- sum(weights_valid^2)
+  eff_n <- if (sum_weights_squared > 0) {
+    (n_weighted^2) / sum_weights_squared
+  } else {
+    0
+  }
+
+  list(
+    proportions = proportions,
+    n_unweighted = n_unweighted,
+    n_weighted = n_weighted,
+    eff_n = eff_n
+  )
 }
 
 #' Calculate Distribution
@@ -319,21 +384,37 @@ calculate_proportions <- function(values, weights, codes = NULL) {
 #' @return Data frame with value, count, proportion
 #' @keywords internal
 calculate_distribution <- function(values, weights) {
-  valid_idx <- !is.na(values) & !is.na(weights) & weights > 0
+  valid_idx <- which(!is.na(values) & !is.na(weights) & weights > 0)
   values_valid <- values[valid_idx]
   weights_valid <- weights[valid_idx]
 
-  total_weight <- sum(weights_valid)
+  n_unweighted <- length(values_valid)
+  n_weighted <- sum(weights_valid)
+
+  if (n_unweighted == 0) {
+    return(list(
+      distribution = list(),
+      n_unweighted = 0,
+      n_weighted = 0
+    ))
+  }
+
+  # Build named list: value -> percentage (0-100 scale)
   unique_vals <- sort(unique(values_valid))
+  total_weight <- sum(weights_valid)
 
-  results <- data.frame(
-    value = unique_vals,
-    count = sapply(unique_vals, function(v) sum(weights_valid[values_valid == v])),
-    stringsAsFactors = FALSE
+  distribution <- list()
+  for (val in unique_vals) {
+    matched_idx <- which(values_valid == val)
+    val_weight <- sum(weights_valid[matched_idx])
+    distribution[[as.character(val)]] <- (val_weight / total_weight) * 100
+  }
+
+  list(
+    distribution = distribution,
+    n_unweighted = n_unweighted,
+    n_weighted = n_weighted
   )
-
-  results$proportion <- if (total_weight > 0) results$count / total_weight * 100 else 0
-  results
 }
 
 #' Calculate Top Box
@@ -346,7 +427,7 @@ calculate_distribution <- function(values, weights) {
 #' @return List with proportion, scale_detected, top_values, n_*
 #' @keywords internal
 calculate_top_box <- function(values, weights, n_boxes = 1) {
-  valid_idx <- !is.na(values) & !is.na(weights) & weights > 0
+  valid_idx <- which(!is.na(values) & !is.na(weights) & weights > 0)
   values_valid <- values[valid_idx]
   weights_valid <- weights[valid_idx]
 
@@ -356,20 +437,22 @@ calculate_top_box <- function(values, weights, n_boxes = 1) {
   }
 
   unique_values <- sort(unique(values_valid))
+  scale_min <- min(unique_values)
   scale_max <- max(unique_values)
+  n_boxes <- min(n_boxes, length(unique_values))
   top_values <- tail(unique_values, n_boxes)
 
-  top_mask <- values_valid %in% top_values
-  top_weights <- weights_valid[top_mask]
+  in_top_box <- values_valid %in% top_values
+  top_weight <- sum(weights_valid[which(in_top_box)])
   total_weight <- sum(weights_valid)
-  proportion <- sum(top_weights) / total_weight * 100
+  proportion <- (top_weight / total_weight) * 100
 
   list(
     proportion = proportion,
-    scale_detected = paste0("1-", scale_max),
+    scale_detected = paste0(scale_min, "-", scale_max),
     top_values = top_values,
-    n_unweighted = sum(top_mask),
-    n_weighted = sum(top_weights)
+    n_unweighted = length(values_valid),
+    n_weighted = total_weight
   )
 }
 
@@ -383,7 +466,7 @@ calculate_top_box <- function(values, weights, n_boxes = 1) {
 #' @return List with proportion, scale_detected, bottom_values, n_*
 #' @keywords internal
 calculate_bottom_box <- function(values, weights, n_boxes = 1) {
-  valid_idx <- !is.na(values) & !is.na(weights) & weights > 0
+  valid_idx <- which(!is.na(values) & !is.na(weights) & weights > 0)
   values_valid <- values[valid_idx]
   weights_valid <- weights[valid_idx]
 
@@ -393,20 +476,22 @@ calculate_bottom_box <- function(values, weights, n_boxes = 1) {
   }
 
   unique_values <- sort(unique(values_valid))
+  scale_min <- min(unique_values)
   scale_max <- max(unique_values)
+  n_boxes <- min(n_boxes, length(unique_values))
   bottom_values <- head(unique_values, n_boxes)
 
-  bottom_mask <- values_valid %in% bottom_values
-  bottom_weights <- weights_valid[bottom_mask]
+  in_bottom_box <- values_valid %in% bottom_values
+  bottom_weight <- sum(weights_valid[which(in_bottom_box)])
   total_weight <- sum(weights_valid)
-  proportion <- sum(bottom_weights) / total_weight * 100
+  proportion <- (bottom_weight / total_weight) * 100
 
   list(
     proportion = proportion,
-    scale_detected = paste0("1-", scale_max),
+    scale_detected = paste0(scale_min, "-", scale_max),
     bottom_values = bottom_values,
-    n_unweighted = sum(bottom_mask),
-    n_weighted = sum(bottom_weights)
+    n_unweighted = length(values_valid),
+    n_weighted = total_weight
   )
 }
 
@@ -420,17 +505,11 @@ calculate_bottom_box <- function(values, weights, n_boxes = 1) {
 #' @return List with proportion, range_values, n_*
 #' @keywords internal
 calculate_custom_range <- function(values, weights, range_spec) {
-  valid_idx <- !is.na(values) & !is.na(weights) & weights > 0
-  values_valid <- values[valid_idx]
-  weights_valid <- weights[valid_idx]
-
-  if (length(values_valid) == 0) {
-    return(list(proportion = NA, range_spec = range_spec, range_values = NA,
-                n_unweighted = 0, n_weighted = 0))
-  }
+  # Strip optional "range:" prefix (supports both "4-5" and "range:4-5")
+  range_str <- sub("^range:", "", tolower(range_spec))
 
   # Parse range specification
-  range_parts <- strsplit(range_spec, "-")[[1]]
+  range_parts <- strsplit(range_str, "-")[[1]]
   if (length(range_parts) != 2) {
     warning(paste("Invalid range specification:", range_spec))
     return(list(proportion = NA, range_spec = range_spec, range_values = NA,
@@ -440,23 +519,33 @@ calculate_custom_range <- function(values, weights, range_spec) {
   range_min <- as.numeric(range_parts[1])
   range_max <- as.numeric(range_parts[2])
 
-  if (is.na(range_min) || is.na(range_max)) {
+  if (is.na(range_min) || is.na(range_max) || range_min > range_max) {
     warning(paste("Invalid range specification:", range_spec))
     return(list(proportion = NA, range_spec = range_spec, range_values = NA,
                 n_unweighted = 0, n_weighted = 0))
   }
 
   range_values <- seq(range_min, range_max)
-  range_mask <- values_valid >= range_min & values_valid <= range_max
-  range_weights <- weights_valid[range_mask]
+
+  valid_idx <- which(!is.na(values) & !is.na(weights) & weights > 0)
+  values_valid <- values[valid_idx]
+  weights_valid <- weights[valid_idx]
+
+  if (length(values_valid) == 0) {
+    return(list(proportion = NA, range_spec = range_spec, range_values = range_values,
+                n_unweighted = 0, n_weighted = 0))
+  }
+
+  in_range <- values_valid %in% range_values
+  range_weight <- sum(weights_valid[which(in_range)])
   total_weight <- sum(weights_valid)
-  proportion <- sum(range_weights) / total_weight * 100
+  proportion <- (range_weight / total_weight) * 100
 
   list(
     proportion = proportion,
     range_spec = range_spec,
     range_values = range_values,
-    n_unweighted = sum(range_mask),
-    n_weighted = sum(range_weights)
+    n_unweighted = length(values_valid),
+    n_weighted = total_weight
   )
 }

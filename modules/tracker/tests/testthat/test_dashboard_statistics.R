@@ -505,7 +505,7 @@ test_that("full pipeline: calculate_proportions -> extract -> pairwise all use 0
   # 2. extract_primary_metric() reads without re-scaling
   # 3. calculate_pairwise_significance() converts to 0-1 for z-test
 
-  # Step 1: calculate_proportions produces 0-100 values
+  # Step 1: calculate_proportions produces 0-100 values (returns named list)
   set.seed(123)
   wave1_vals <- sample(c("A", "B"), 200, replace = TRUE, prob = c(0.40, 0.60))
   wave2_vals <- sample(c("A", "B"), 200, replace = TRUE, prob = c(0.65, 0.35))
@@ -513,28 +513,28 @@ test_that("full pipeline: calculate_proportions -> extract -> pairwise all use 0
   wave2_data <- calculate_proportions(wave2_vals, rep(1, 200), codes = c("A", "B"))
 
   # Verify proportions are on 0-100 scale (sum to 100)
-  expect_equal(sum(wave1_data$proportion), 100)
-  expect_equal(sum(wave2_data$proportion), 100)
+  expect_equal(sum(wave1_data$proportions), 100)
+  expect_equal(sum(wave2_data$proportions), 100)
 
   # Step 2: Build wave results as the tracker would
   # Use explicit field names to avoid R's partial matching:
   #   - $proportion (singular) for the first/primary proportion value
-  #   - $proportions (plural) for the full vector
+  #   - $proportions (plural) for the full named vector
   # In real tracker data, the singular form is used for pairwise significance.
-  wave1_prop_A <- wave1_data$proportion[wave1_data$code == "A"]
-  wave2_prop_A <- wave2_data$proportion[wave2_data$code == "A"]
+  wave1_prop_A <- wave1_data$proportions[["A"]]
+  wave2_prop_A <- wave2_data$proportions[["A"]]
 
   wave1_result <- list(
     available = TRUE,
     proportion = wave1_prop_A,
-    proportions = wave1_data$proportion,
+    proportions = wave1_data$proportions,
     n_weighted = 200,
     n_unweighted = 200
   )
   wave2_result <- list(
     available = TRUE,
     proportion = wave2_prop_A,
-    proportions = wave2_data$proportion,
+    proportions = wave2_data$proportions,
     n_weighted = 200,
     n_unweighted = 200
   )
