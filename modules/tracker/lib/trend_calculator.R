@@ -54,6 +54,82 @@
 
 # [REMOVED] normalize_question_type() - Now defined in statistical_core.R (single source of truth).
 
+
+#' Dispatch Single Trend Calculation
+#'
+#' Routes a single question to the appropriate trend calculator based on type.
+#' Returns a standardized result with q_code, result, and skipped fields.
+#' Used by both parallel and sequential branches of calculate_all_trends.
+#'
+#' @param q_code Character. Question code
+#' @param question_map List. Question mapping
+#' @param wave_data List. All wave data
+#' @param config List. Tracker config
+#' @param wave_structures List or NULL. Survey structures
+#' @return List with $q_code, $result (or NULL), $skipped (or NULL)
+#' @keywords internal
+dispatch_single_trend <- function(q_code, question_map, wave_data, config, wave_structures) {
+  metadata <- get_question_metadata(question_map, q_code)
+
+  if (is.null(metadata)) {
+    return(list(
+      q_code = q_code,
+      result = NULL,
+      skipped = list(
+        question_code = q_code,
+        reason = "Question not found in mapping",
+        stage = "get_question_metadata"
+      )
+    ))
+  }
+
+  q_type_raw <- metadata$QuestionType
+  q_type <- normalize_question_type(q_type_raw)
+
+  trend_result <- tryCatch({
+    if (q_type == "rating") {
+      calculate_rating_trend_enhanced(q_code, question_map, wave_data, config, wave_structures)
+    } else if (q_type == "nps") {
+      calculate_nps_trend(q_code, question_map, wave_data, config, wave_structures)
+    } else if (q_type == "single_choice") {
+      calculate_single_choice_trend_enhanced(q_code, question_map, wave_data, config, wave_structures)
+    } else if (q_type == "multi_choice" || q_type_raw == "Multi_Mention") {
+      calculate_multi_mention_trend(q_code, question_map, wave_data, config, wave_structures)
+    } else if (q_type == "composite") {
+      calculate_composite_trend_enhanced(q_code, question_map, wave_data, config, wave_structures)
+    } else if (q_type == "open_end") {
+      return(list(
+        q_code = q_code, result = NULL,
+        skipped = list(question_code = q_code, reason = "Open-end questions cannot be tracked", stage = "type_check")
+      ))
+    } else if (q_type == "ranking") {
+      return(list(
+        q_code = q_code, result = NULL,
+        skipped = list(question_code = q_code, reason = "Ranking questions not yet supported in tracker", stage = "type_check")
+      ))
+    } else {
+      return(list(
+        q_code = q_code, result = NULL,
+        skipped = list(question_code = q_code, reason = paste0("Question type '", q_type_raw, "' not supported"), stage = "type_check")
+      ))
+    }
+  }, error = function(e) {
+    return(list(
+      q_code = q_code, result = NULL,
+      skipped = list(question_code = q_code, reason = paste0("Error calculating trend: ", e$message), stage = "calculation")
+    ))
+  })
+
+  # If we got a trend result (not an early return), wrap it
+  if (!is.null(trend_result) &&
+      (!is.list(trend_result) || is.null(trend_result$skipped))) {
+    return(list(q_code = q_code, result = trend_result, skipped = NULL))
+  }
+
+  return(trend_result)
+}
+
+
 calculate_all_trends <- function(config, question_map, wave_data, parallel = FALSE,
                                  wave_structures = NULL) {
 
@@ -98,100 +174,14 @@ calculate_all_trends <- function(config, question_map, wave_data, parallel = FAL
 
     cat("Calculating trends in parallel...\n")
 
-    # Define the calculation function for a single question
-    calculate_single_trend <- function(q_code) {
-      # Get question metadata
-      metadata <- get_question_metadata(question_map, q_code)
-
-      if (is.null(metadata)) {
-        return(list(
-          q_code = q_code,
-          result = NULL,
-          skipped = list(
-            question_code = q_code,
-            reason = "Question not found in mapping",
-            stage = "get_question_metadata"
-          )
-        ))
-      }
-
-      # Normalize question type
-      q_type_raw <- metadata$QuestionType
-      q_type <- normalize_question_type(q_type_raw)
-
-      trend_result <- tryCatch({
-        if (q_type == "rating") {
-          calculate_rating_trend_enhanced(q_code, question_map, wave_data, config, wave_structures)
-        } else if (q_type == "nps") {
-          calculate_nps_trend(q_code, question_map, wave_data, config, wave_structures)
-        } else if (q_type == "single_choice") {
-          calculate_single_choice_trend_enhanced(q_code, question_map, wave_data, config, wave_structures)
-        } else if (q_type == "multi_choice" || q_type_raw == "Multi_Mention") {
-          calculate_multi_mention_trend(q_code, question_map, wave_data, config, wave_structures)
-        } else if (q_type == "composite") {
-          calculate_composite_trend_enhanced(q_code, question_map, wave_data, config, wave_structures)
-        } else if (q_type == "open_end") {
-          return(list(
-            q_code = q_code,
-            result = NULL,
-            skipped = list(
-              question_code = q_code,
-              reason = "Open-end questions cannot be tracked",
-              stage = "type_check"
-            )
-          ))
-        } else if (q_type == "ranking") {
-          return(list(
-            q_code = q_code,
-            result = NULL,
-            skipped = list(
-              question_code = q_code,
-              reason = "Ranking questions not yet supported in tracker",
-              stage = "type_check"
-            )
-          ))
-        } else {
-          return(list(
-            q_code = q_code,
-            result = NULL,
-            skipped = list(
-              question_code = q_code,
-              reason = paste0("Question type '", q_type_raw, "' not supported"),
-              stage = "type_check"
-            )
-          ))
-        }
-      }, error = function(e) {
-        return(list(
-          q_code = q_code,
-          result = NULL,
-          skipped = list(
-            question_code = q_code,
-            reason = paste0("Error calculating trend: ", e$message),
-            stage = "calculation"
-          )
-        ))
-      })
-
-      # If we got a trend result (not an early return), wrap it
-      # Fixed operator precedence: use explicit parentheses for clarity
-      # Condition: result is non-null AND (either not a list, OR a list without skipped field)
-      if (!is.null(trend_result) &&
-          (!is.list(trend_result) || is.null(trend_result$skipped))) {
-        return(list(
-          q_code = q_code,
-          result = trend_result,
-          skipped = NULL
-        ))
-      }
-
-      return(trend_result)
-    }
-
-    # Run calculations in parallel
+    # Run calculations in parallel using shared dispatch helper
     parallel_results <- future.apply::future_lapply(
       tracked_questions,
-      calculate_single_trend,
+      dispatch_single_trend,
+      question_map = question_map,
+      wave_data = wave_data,
+      config = config,
+      wave_structures = wave_structures,
       future.seed = TRUE
     )
 
@@ -221,82 +211,16 @@ calculate_all_trends <- function(config, question_map, wave_data, parallel = FAL
       cat(paste0("\n", strrep("=", 80), "\n"))
       cat(paste0("Processing question: ", q_code, "\n"))
 
-      # Get question metadata
-      metadata <- get_question_metadata(question_map, q_code)
+      # Use shared dispatch helper
+      res <- dispatch_single_trend(q_code, question_map, wave_data, config, wave_structures)
 
-      if (is.null(metadata)) {
-        # TRS v1.0: Record skipped question for PARTIAL status
-        skipped_questions[[q_code]] <- list(
-          question_code = q_code,
-          reason = "Question not found in mapping",
-          stage = "get_question_metadata"
-        )
-        message(paste0("[TRS PARTIAL] Question ", q_code, " not found in mapping - skipping"))
-        next
-      }
-
-      # Normalize question type to internal standard
-      q_type_raw <- metadata$QuestionType
-      q_type <- normalize_question_type(q_type_raw)
-      cat(paste0("  Type: ", q_type_raw, " (normalized: ", q_type, ")\n"))
-
-      trend_result <- tryCatch({
-        if (q_type == "rating") {
-          # Use enhanced version (supports TrackingSpecs, backward compatible)
-          calculate_rating_trend_enhanced(q_code, question_map, wave_data, config, wave_structures)
-        } else if (q_type == "nps") {
-          calculate_nps_trend(q_code, question_map, wave_data, config, wave_structures)
-        } else if (q_type == "single_choice") {
-          # Use enhanced version (supports TrackingSpecs, backward compatible)
-          calculate_single_choice_trend_enhanced(q_code, question_map, wave_data, config, wave_structures)
-        } else if (q_type == "multi_choice" || q_type_raw == "Multi_Mention") {
-          # Multi-mention support (Enhancement Phase 2)
-          calculate_multi_mention_trend(q_code, question_map, wave_data, config, wave_structures)
-        } else if (q_type == "composite") {
-          # Use enhanced version (supports TrackingSpecs, backward compatible)
-          calculate_composite_trend_enhanced(q_code, question_map, wave_data, config, wave_structures)
-        } else if (q_type == "open_end") {
-          # TRS v1.0: Record unsupported type for PARTIAL status
-          skipped_questions[[q_code]] <- list(
-            question_code = q_code,
-            reason = "Open-end questions cannot be tracked",
-            stage = "type_check"
-          )
-          message(paste0("[TRS PARTIAL] Open-end question ", q_code, " cannot be tracked - skipping"))
-          NULL
-        } else if (q_type == "ranking") {
-          # TRS v1.0: Record unsupported type for PARTIAL status
-          skipped_questions[[q_code]] <- list(
-            question_code = q_code,
-            reason = "Ranking questions not yet supported in tracker",
-            stage = "type_check"
-          )
-          message(paste0("[TRS PARTIAL] Ranking question ", q_code, " not supported - skipping"))
-          NULL
-        } else {
-          # TRS v1.0: Record unsupported type for PARTIAL status
-          skipped_questions[[q_code]] <- list(
-            question_code = q_code,
-            reason = paste0("Question type '", q_type_raw, "' not supported"),
-            stage = "type_check"
-          )
-          message(paste0("[TRS PARTIAL] Question type '", q_type_raw, "' not supported - skipping"))
-          NULL
-        }
-      }, error = function(e) {
-        # TRS v1.0: Record error for PARTIAL status
-        skipped_questions[[q_code]] <<- list(
-          question_code = q_code,
-          reason = paste0("Error calculating trend: ", e$message),
-          stage = "calculation"
-        )
-        message(paste0("[TRS PARTIAL] Error calculating trend for ", q_code, ": ", e$message))
-        NULL
-      })
-
-      if (!is.null(trend_result)) {
-        trend_results[[q_code]] <- trend_result
+      if (!is.null(res$result)) {
+        trend_results[[q_code]] <- res$result
         cat(paste0("  ✓ Trend calculated\n"))
+      }
+      if (!is.null(res$skipped)) {
+        skipped_questions[[q_code]] <- res$skipped
+        message(paste0("[TRS PARTIAL] ", q_code, " - ", res$skipped$reason))
       }
     }
   }
@@ -586,6 +510,142 @@ calculate_single_choice_trend_enhanced <- function(q_code, question_map, wave_da
 # statistical_core.R is sourced before trend_calculator.R in run_tracker.R.
 
 
+# ------------------------------------------------------------------------------
+# SHARED HELPERS FOR ENHANCED TREND CALCULATORS
+# ------------------------------------------------------------------------------
+
+#' Calculate Metrics from Tracking Specs
+#'
+#' Shared dispatch loop that calculates metrics from a specs_list.
+#' Used by both rating and composite enhanced trend calculators.
+#'
+#' @param values Numeric vector. The data values (question data or composite scores)
+#' @param weights Numeric vector. Weight variable from wave data
+#' @param specs_list Character vector. Parsed tracking specs (e.g. "mean", "top_box")
+#' @param wave_struct List or NULL. Survey structure for this wave (for box: specs)
+#' @param wave_col Character or NULL. Wave-specific question code (for box: specs)
+#' @return Named list of calculated metrics
+#' @keywords internal
+calculate_metrics_from_specs <- function(values, weights, specs_list,
+                                          wave_struct = NULL, wave_col = NULL) {
+  metrics <- list()
+
+  for (spec in specs_list) {
+    spec_lower <- tolower(trimws(spec))
+
+    if (spec_lower == "mean") {
+      result <- calculate_weighted_mean(values, weights)
+      metrics$mean <- result$mean
+      metrics$sd <- result$sd
+
+    } else if (spec_lower == "top_box") {
+      result <- calculate_top_box(values, weights, n_boxes = 1)
+      metrics$top_box <- result$proportion
+
+    } else if (spec_lower == "top2_box") {
+      result <- calculate_top_box(values, weights, n_boxes = 2)
+      metrics$top2_box <- result$proportion
+
+    } else if (spec_lower == "top3_box") {
+      result <- calculate_top_box(values, weights, n_boxes = 3)
+      metrics$top3_box <- result$proportion
+
+    } else if (spec_lower == "bottom_box") {
+      result <- calculate_bottom_box(values, weights, n_boxes = 1)
+      metrics$bottom_box <- result$proportion
+
+    } else if (spec_lower == "bottom2_box") {
+      result <- calculate_bottom_box(values, weights, n_boxes = 2)
+      metrics$bottom2_box <- result$proportion
+
+    } else if (grepl("^range:", spec_lower)) {
+      # Strip "range:" prefix before passing to calculate_custom_range
+      range_part <- sub("^range:", "", spec_lower)
+      result <- calculate_custom_range(values, weights, range_part)
+      metric_name <- gsub("[^a-z0-9_]", "_", spec_lower)  # Clean for list name
+      metrics[[metric_name]] <- result$proportion
+
+    } else if (grepl("^box:", spec_lower)) {
+      # box:CATEGORY — calculate proportion of values in a BoxCategory group
+      box_name <- sub("^box:", "", spec)  # Preserve original case
+      box_values <- get_box_options(wave_struct, wave_col, box_name)
+      if (!is.null(box_values)) {
+        # Calculate weighted proportion of values matching box category
+        valid_idx <- which(!is.na(values) & !is.na(weights) & weights > 0)
+        if (length(valid_idx) > 0) {
+          in_box <- values[valid_idx] %in% box_values
+          proportion <- sum(weights[valid_idx][in_box]) /
+                       sum(weights[valid_idx]) * 100
+        } else {
+          proportion <- NA
+        }
+      } else {
+        proportion <- NA
+      }
+      metric_name <- paste0("box_", gsub("[^a-z0-9_]", "_", tolower(box_name)))
+      metrics[[metric_name]] <- proportion
+
+    } else if (spec_lower == "distribution") {
+      result <- calculate_distribution(values, weights)
+      metrics$distribution <- result$distribution
+    }
+  }
+
+  return(metrics)
+}
+
+
+#' Calculate Changes and Significance for Enhanced Metrics
+#'
+#' Shared post-processing that calculates wave-over-wave changes and
+#' significance tests for each metric in specs_list. Used by both rating
+#' and composite enhanced trend calculators.
+#'
+#' @param specs_list Character vector. Parsed tracking specs
+#' @param wave_results List. Wave results with metrics
+#' @param wave_ids Character vector. Wave IDs
+#' @param config List. Tracker config
+#' @return List with $changes and $significance named lists
+#' @keywords internal
+calculate_enhanced_changes_and_significance <- function(specs_list, wave_results, wave_ids, config) {
+  changes <- list()
+  significance <- list()
+
+  for (spec in specs_list) {
+    spec_lower <- tolower(trimws(spec))
+    metric_name <- if (grepl("^range:", spec_lower)) {
+      gsub("[^a-z0-9_]", "_", spec_lower)
+    } else if (grepl("^box:", spec_lower)) {
+      box_name <- sub("^box:", "", spec_lower)
+      paste0("box_", gsub("[^a-z0-9_]", "_", box_name))
+    } else {
+      spec_lower
+    }
+
+    # Skip distribution (too complex for wave-over-wave comparison)
+    if (metric_name == "distribution") {
+      next
+    }
+
+    # Calculate changes
+    changes[[metric_name]] <- calculate_changes_for_metric(wave_results, wave_ids, metric_name)
+
+    # Significance testing
+    # For means, use t-test; for proportions (boxes/ranges), use z-test
+    if (metric_name == "mean") {
+      significance[[metric_name]] <- perform_significance_tests_means(wave_results, wave_ids, config)
+    } else {
+      # Box/range metrics are proportions
+      significance[[metric_name]] <- perform_significance_tests_for_metric(
+        wave_results, wave_ids, metric_name, config, test_type = "proportion"
+      )
+    }
+  }
+
+  return(list(changes = changes, significance = significance))
+}
+
+
 #' Calculate Rating Trend - Enhanced Version
 #'
 #' Enhanced version that supports TrackingSpecs for multiple metrics.
@@ -635,69 +695,9 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
     wave_col <- get_wave_question_code(question_map, q_code, wave_id)
     q_data <- resolve_question_values(q_data, wave_struct, wave_col)
 
-    # Calculate each requested metric
-    metrics <- list()
-
-    for (spec in specs_list) {
-      spec_lower <- tolower(trimws(spec))
-
-      if (spec_lower == "mean") {
-        result <- calculate_weighted_mean(q_data, wave_df$weight_var)
-        metrics$mean <- result$mean
-        metrics$sd <- result$sd
-
-      } else if (spec_lower == "top_box") {
-        result <- calculate_top_box(q_data, wave_df$weight_var, n_boxes = 1)
-        metrics$top_box <- result$proportion
-
-      } else if (spec_lower == "top2_box") {
-        result <- calculate_top_box(q_data, wave_df$weight_var, n_boxes = 2)
-        metrics$top2_box <- result$proportion
-
-      } else if (spec_lower == "top3_box") {
-        result <- calculate_top_box(q_data, wave_df$weight_var, n_boxes = 3)
-        metrics$top3_box <- result$proportion
-
-      } else if (spec_lower == "bottom_box") {
-        result <- calculate_bottom_box(q_data, wave_df$weight_var, n_boxes = 1)
-        metrics$bottom_box <- result$proportion
-
-      } else if (spec_lower == "bottom2_box") {
-        result <- calculate_bottom_box(q_data, wave_df$weight_var, n_boxes = 2)
-        metrics$bottom2_box <- result$proportion
-
-      } else if (grepl("^range:", spec_lower)) {
-        # Strip "range:" prefix before passing to calculate_custom_range
-        range_part <- sub("^range:", "", spec_lower)
-        result <- calculate_custom_range(q_data, wave_df$weight_var, range_part)
-        metric_name <- gsub("[^a-z0-9_]", "_", spec_lower)  # Clean for list name
-        metrics[[metric_name]] <- result$proportion
-
-      } else if (grepl("^box:", spec_lower)) {
-        # box:CATEGORY — calculate proportion of values in a BoxCategory group
-        box_name <- sub("^box:", "", spec)  # Preserve original case
-        box_values <- get_box_options(wave_struct, wave_col, box_name)
-        if (!is.null(box_values)) {
-          # Calculate weighted proportion of values matching box category
-          valid_idx <- which(!is.na(q_data) & !is.na(wave_df$weight_var) & wave_df$weight_var > 0)
-          if (length(valid_idx) > 0) {
-            in_box <- q_data[valid_idx] %in% box_values
-            proportion <- sum(wave_df$weight_var[valid_idx][in_box]) /
-                         sum(wave_df$weight_var[valid_idx]) * 100
-          } else {
-            proportion <- NA
-          }
-        } else {
-          proportion <- NA
-        }
-        metric_name <- paste0("box_", gsub("[^a-z0-9_]", "_", tolower(box_name)))
-        metrics[[metric_name]] <- proportion
-
-      } else if (spec_lower == "distribution") {
-        result <- calculate_distribution(q_data, wave_df$weight_var)
-        metrics$distribution <- result$distribution
-      }
-    }
+    # Calculate each requested metric using shared dispatch
+    metrics <- calculate_metrics_from_specs(q_data, wave_df$weight_var, specs_list,
+                                             wave_struct, wave_col)
 
     # Store basic counts (shared across all metrics)
     # Use which() to get numeric indices (avoids NA issues)
@@ -712,40 +712,8 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
     )
   }
 
-  # Calculate changes and significance for each metric
-  changes <- list()
-  significance <- list()
-
-  for (spec in specs_list) {
-    spec_lower <- tolower(trimws(spec))
-    metric_name <- if (grepl("^range:", spec_lower)) {
-      gsub("[^a-z0-9_]", "_", spec_lower)
-    } else if (grepl("^box:", spec_lower)) {
-      box_name <- sub("^box:", "", spec_lower)
-      paste0("box_", gsub("[^a-z0-9_]", "_", box_name))
-    } else {
-      spec_lower
-    }
-
-    # Skip distribution (too complex for wave-over-wave comparison)
-    if (metric_name == "distribution") {
-      next
-    }
-
-    # Calculate changes
-    changes[[metric_name]] <- calculate_changes_for_metric(wave_results, wave_ids, metric_name)
-
-    # Significance testing
-    # For means, use t-test; for proportions (boxes/ranges), use z-test
-    if (metric_name == "mean") {
-      significance[[metric_name]] <- perform_significance_tests_means(wave_results, wave_ids, config)
-    } else {
-      # Box/range metrics are proportions
-      significance[[metric_name]] <- perform_significance_tests_for_metric(
-        wave_results, wave_ids, metric_name, config, test_type = "proportion"
-      )
-    }
-  }
+  # Calculate changes and significance using shared helper
+  cs <- calculate_enhanced_changes_and_significance(specs_list, wave_results, wave_ids, config)
 
   result <- list(
     question_code = q_code,
@@ -755,8 +723,8 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
     tracking_specs = specs_list,
     tracking_specs_original = specs_original,
     wave_results = wave_results,
-    changes = changes,
-    significance = significance
+    changes = cs$changes,
+    significance = cs$significance
   )
 
   validate_result_metric_type(result, context = "calculate_rating_trend_enhanced")
@@ -901,68 +869,14 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
       next
     }
 
-    # Now apply requested metrics to composite values
-    # (same logic as rating questions)
-    metrics <- list()
-
-    for (spec in specs_list) {
-      spec_lower <- tolower(trimws(spec))
-
-      if (spec_lower == "mean") {
-        result <- calculate_weighted_mean(composite_values, wave_df$weight_var)
-        metrics$mean <- result$mean
-        metrics$sd <- result$sd
-
-      } else if (spec_lower == "top_box") {
-        result <- calculate_top_box(composite_values, wave_df$weight_var, n_boxes = 1)
-        metrics$top_box <- result$proportion
-
-      } else if (spec_lower == "top2_box") {
-        result <- calculate_top_box(composite_values, wave_df$weight_var, n_boxes = 2)
-        metrics$top2_box <- result$proportion
-
-      } else if (spec_lower == "top3_box") {
-        result <- calculate_top_box(composite_values, wave_df$weight_var, n_boxes = 3)
-        metrics$top3_box <- result$proportion
-
-      } else if (spec_lower == "bottom_box") {
-        result <- calculate_bottom_box(composite_values, wave_df$weight_var, n_boxes = 1)
-        metrics$bottom_box <- result$proportion
-
-      } else if (spec_lower == "bottom2_box") {
-        result <- calculate_bottom_box(composite_values, wave_df$weight_var, n_boxes = 2)
-        metrics$bottom2_box <- result$proportion
-
-      } else if (grepl("^range:", spec_lower)) {
-        range_part <- sub("^range:", "", spec_lower)
-        result <- calculate_custom_range(composite_values, wave_df$weight_var, range_part)
-        metric_name <- gsub("[^a-z0-9_]", "_", spec_lower)
-        metrics[[metric_name]] <- result$proportion
-
-      } else if (grepl("^box:", spec_lower)) {
-        box_name <- sub("^box:", "", spec)
-        wave_struct <- if (!is.null(wave_structures)) wave_structures[[wave_id]] else NULL
-        # Composite questions don't have a single wave column; use q_code as fallback
-        composite_wave_col <- tryCatch(
-          get_wave_question_code(question_map, q_code, wave_id),
-          error = function(e) q_code
-        )
-        box_values <- get_box_options(wave_struct, composite_wave_col, box_name)
-        if (!is.null(box_values) && length(valid_idx) > 0) {
-          in_box <- composite_values[valid_idx] %in% box_values
-          proportion <- sum(wave_df$weight_var[valid_idx][in_box]) /
-                       sum(wave_df$weight_var[valid_idx]) * 100
-        } else {
-          proportion <- NA
-        }
-        metric_name <- paste0("box_", gsub("[^a-z0-9_]", "_", tolower(box_name)))
-        metrics[[metric_name]] <- proportion
-
-      } else if (spec_lower == "distribution") {
-        result <- calculate_distribution(composite_values, wave_df$weight_var)
-        metrics$distribution <- result$distribution
-      }
-    }
+    # Apply requested metrics to composite values using shared dispatch
+    wave_struct <- if (!is.null(wave_structures)) wave_structures[[wave_id]] else NULL
+    composite_wave_col <- tryCatch(
+      get_wave_question_code(question_map, q_code, wave_id),
+      error = function(e) q_code
+    )
+    metrics <- calculate_metrics_from_specs(composite_values, wave_df$weight_var, specs_list,
+                                             wave_struct, composite_wave_col)
 
     # Store results
     wave_results[[wave_id]] <- list(
@@ -976,39 +890,8 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
     )
   }
 
-  # Calculate changes and significance for each metric
-  changes <- list()
-  significance <- list()
-
-  for (spec in specs_list) {
-    spec_lower <- tolower(trimws(spec))
-    metric_name <- if (grepl("^range:", spec_lower)) {
-      gsub("[^a-z0-9_]", "_", spec_lower)
-    } else if (grepl("^box:", spec_lower)) {
-      box_name <- sub("^box:", "", spec_lower)
-      paste0("box_", gsub("[^a-z0-9_]", "_", box_name))
-    } else {
-      spec_lower
-    }
-
-    # Skip distribution
-    if (metric_name == "distribution") {
-      next
-    }
-
-    # Calculate changes
-    changes[[metric_name]] <- calculate_changes_for_metric(wave_results, wave_ids, metric_name)
-
-    # Significance testing
-    if (metric_name == "mean") {
-      significance[[metric_name]] <- perform_significance_tests_means(wave_results, wave_ids, config)
-    } else {
-      # Box/range metrics are proportions
-      significance[[metric_name]] <- perform_significance_tests_for_metric(
-        wave_results, wave_ids, metric_name, config, test_type = "proportion"
-      )
-    }
-  }
+  # Calculate changes and significance using shared helper
+  cs <- calculate_enhanced_changes_and_significance(specs_list, wave_results, wave_ids, config)
 
   result <- list(
     question_code = q_code,
@@ -1019,8 +902,8 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
     tracking_specs_original = specs_original,
     source_questions = source_questions,
     wave_results = wave_results,
-    changes = changes,
-    significance = significance
+    changes = cs$changes,
+    significance = cs$significance
   )
 
   validate_result_metric_type(result, context = "calculate_composite_trend_enhanced")
@@ -1330,6 +1213,124 @@ calculate_multi_mention_trend_categories <- function(q_code, question_map, wave_
 }
 
 
+# ------------------------------------------------------------------------------
+# MULTI-MENTION TREND HELPERS
+# ------------------------------------------------------------------------------
+
+#' Calculate Mention Proportions for a Single Wave
+#'
+#' Computes weighted mention proportions for each option column in a wave.
+#'
+#' @param option_columns Character vector. Column names to process
+#' @param wave_df Data frame. Wave data with weight_var column
+#' @param valid_rows Integer vector. Row indices with valid weights
+#' @return Named list of proportions (percentage mentioning each option)
+#' @keywords internal
+calculate_mention_proportions_for_wave <- function(option_columns, wave_df, valid_rows) {
+  mention_proportions <- list()
+
+  for (col_name in option_columns) {
+    if (!col_name %in% names(wave_df)) {
+      mention_proportions[[col_name]] <- NA
+      next
+    }
+
+    # Get column data
+    col_data <- wave_df[[col_name]]
+
+    # Check if column data is valid
+    if (is.null(col_data) || all(is.na(col_data))) {
+      mention_proportions[[col_name]] <- NA
+      next
+    }
+
+    # Calculate % mentioning (value == 1)
+    # Use which() on valid_rows subset to avoid NA issues
+    valid_col_data <- col_data[valid_rows]
+    mentioned_idx <- which(!is.na(valid_col_data) & valid_col_data == 1)
+    mentioned_rows <- valid_rows[mentioned_idx]
+
+    mentioned_weight <- sum(wave_df$weight_var[mentioned_rows], na.rm = TRUE)
+    total_weight <- sum(wave_df$weight_var[valid_rows], na.rm = TRUE)
+
+    proportion <- if (total_weight > 0) {
+      (mentioned_weight / total_weight) * 100
+    } else {
+      NA
+    }
+
+    mention_proportions[[col_name]] <- proportion
+  }
+
+  return(mention_proportions)
+}
+
+
+#' Calculate Additional Multi-Mention Metrics for a Single Wave
+#'
+#' Computes additional metrics (any mention, count mean, count distribution)
+#' for a multi-mention question in a single wave.
+#'
+#' @param specs List. Parsed multi-mention specs with $additional_metrics
+#' @param option_columns Character vector. Column names to process
+#' @param wave_df Data frame. Wave data with weight_var column
+#' @param valid_rows Integer vector. Row indices with valid weights
+#' @return Named list of additional metrics
+#' @keywords internal
+calculate_mention_additional_metrics_for_wave <- function(specs, option_columns,
+                                                          wave_df, valid_rows) {
+  additional_metrics <- list()
+
+  if ("any" %in% specs$additional_metrics) {
+    # % mentioning at least one option
+    option_matrix <- as.matrix(wave_df[valid_rows, option_columns, drop = FALSE])
+    mentioned_any <- rowSums(option_matrix == 1, na.rm = TRUE) > 0
+    mentioned_any_idx <- which(mentioned_any)
+    any_weight <- sum(wave_df$weight_var[valid_rows][mentioned_any_idx], na.rm = TRUE)
+    total_weight <- sum(wave_df$weight_var[valid_rows], na.rm = TRUE)
+    additional_metrics$any_mention_pct <- if (total_weight > 0) {
+      (any_weight / total_weight) * 100
+    } else {
+      NA
+    }
+  }
+
+  if ("count_mean" %in% specs$additional_metrics) {
+    # Mean number of mentions
+    option_matrix <- as.matrix(wave_df[valid_rows, option_columns, drop = FALSE])
+    mention_counts <- rowSums(option_matrix == 1, na.rm = TRUE)
+    weights_valid <- wave_df$weight_var[valid_rows]
+    additional_metrics$count_mean <- if (sum(weights_valid, na.rm = TRUE) > 0) {
+      sum(mention_counts * weights_valid, na.rm = TRUE) / sum(weights_valid, na.rm = TRUE)
+    } else {
+      NA
+    }
+  }
+
+  if ("count_distribution" %in% specs$additional_metrics) {
+    # Distribution of mention counts
+    option_matrix <- as.matrix(wave_df[valid_rows, option_columns, drop = FALSE])
+    mention_counts <- rowSums(option_matrix == 1, na.rm = TRUE)
+    weights_valid <- wave_df$weight_var[valid_rows]
+    total_weight <- sum(weights_valid, na.rm = TRUE)
+
+    count_dist <- list()
+    for (count_val in 0:length(option_columns)) {
+      matched_idx <- which(mention_counts == count_val)
+      count_weight <- sum(weights_valid[matched_idx], na.rm = TRUE)
+      count_dist[[as.character(count_val)]] <- if (total_weight > 0) {
+        (count_weight / total_weight) * 100
+      } else {
+        NA
+      }
+    }
+    additional_metrics$count_distribution <- count_dist
+  }
+
+  return(additional_metrics)
+}
+
+
 #' Calculate Multi-Mention Trend
 #'
 #' Calculates percentage mentioning each option across waves for multi-mention questions.
@@ -1429,95 +1430,18 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
       next
     }
 
-    # Calculate mention proportions for each option
-    mention_proportions <- list()
-
     # Create valid row indices (use which() to ensure numeric indices)
     valid_rows <- which(!is.na(wave_df$weight_var) & wave_df$weight_var > 0)
 
-    for (col_name in option_columns) {
-      if (!col_name %in% names(wave_df)) {
-        mention_proportions[[col_name]] <- NA
-        next
-      }
-
-      # Get column data
-      col_data <- wave_df[[col_name]]
-
-      # Check if column data is valid
-      if (is.null(col_data) || all(is.na(col_data))) {
-        mention_proportions[[col_name]] <- NA
-        next
-      }
-
-      # Calculate % mentioning (value == 1)
-      # Use which() on valid_rows subset to avoid NA issues
-      valid_col_data <- col_data[valid_rows]
-      mentioned_idx <- which(!is.na(valid_col_data) & valid_col_data == 1)
-      mentioned_rows <- valid_rows[mentioned_idx]
-
-      mentioned_weight <- sum(wave_df$weight_var[mentioned_rows], na.rm = TRUE)
-      total_weight <- sum(wave_df$weight_var[valid_rows], na.rm = TRUE)
-
-      proportion <- if (total_weight > 0) {
-        (mentioned_weight / total_weight) * 100
-      } else {
-        NA
-      }
-
-      mention_proportions[[col_name]] <- proportion
-    }
+    # Calculate mention proportions for each option
+    mention_proportions <- calculate_mention_proportions_for_wave(
+      option_columns, wave_df, valid_rows
+    )
 
     # Calculate additional metrics if requested
-    additional_metrics <- list()
-
-    # Note: valid_rows already defined above
-
-    if ("any" %in% specs$additional_metrics) {
-      # % mentioning at least one option
-      option_matrix <- as.matrix(wave_df[valid_rows, option_columns, drop = FALSE])
-      mentioned_any <- rowSums(option_matrix == 1, na.rm = TRUE) > 0
-      mentioned_any_idx <- which(mentioned_any)
-      any_weight <- sum(wave_df$weight_var[valid_rows][mentioned_any_idx], na.rm = TRUE)
-      total_weight <- sum(wave_df$weight_var[valid_rows], na.rm = TRUE)
-      additional_metrics$any_mention_pct <- if (total_weight > 0) {
-        (any_weight / total_weight) * 100
-      } else {
-        NA
-      }
-    }
-
-    if ("count_mean" %in% specs$additional_metrics) {
-      # Mean number of mentions
-      option_matrix <- as.matrix(wave_df[valid_rows, option_columns, drop = FALSE])
-      mention_counts <- rowSums(option_matrix == 1, na.rm = TRUE)
-      weights_valid <- wave_df$weight_var[valid_rows]
-      additional_metrics$count_mean <- if (sum(weights_valid, na.rm = TRUE) > 0) {
-        sum(mention_counts * weights_valid, na.rm = TRUE) / sum(weights_valid, na.rm = TRUE)
-      } else {
-        NA
-      }
-    }
-
-    if ("count_distribution" %in% specs$additional_metrics) {
-      # Distribution of mention counts
-      option_matrix <- as.matrix(wave_df[valid_rows, option_columns, drop = FALSE])
-      mention_counts <- rowSums(option_matrix == 1, na.rm = TRUE)
-      weights_valid <- wave_df$weight_var[valid_rows]
-      total_weight <- sum(weights_valid, na.rm = TRUE)
-
-      count_dist <- list()
-      for (count_val in 0:length(option_columns)) {
-        matched_idx <- which(mention_counts == count_val)
-        count_weight <- sum(weights_valid[matched_idx], na.rm = TRUE)
-        count_dist[[as.character(count_val)]] <- if (total_weight > 0) {
-          (count_weight / total_weight) * 100
-        } else {
-          NA
-        }
-      }
-      additional_metrics$count_distribution <- count_dist
-    }
+    additional_metrics <- calculate_mention_additional_metrics_for_wave(
+      specs, option_columns, wave_df, valid_rows
+    )
 
     # Store results
     wave_results[[wave_id]] <- list(

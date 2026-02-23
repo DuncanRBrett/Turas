@@ -717,6 +717,13 @@ test_that("JS files pass syntax validation", {
   # slide_export, tab_navigation, metrics_view, pinned_views
   expect_true(length(js_files) >= 7)
 
+  # Skip if node is not installed (syntax validation is a bonus check)
+  node_available <- tryCatch({
+    system2("node", args = "--version", stdout = TRUE, stderr = TRUE)
+    TRUE
+  }, error = function(e) FALSE)
+  skip_if_not(node_available, "node is not installed — skipping JS syntax check")
+
   for (js_file in js_files) {
     result <- system2("node", args = c("--check", js_file),
                        stdout = TRUE, stderr = TRUE)
@@ -1650,8 +1657,11 @@ test_that("Per-metric table has base row as first row in tbody", {
 
 test_that("Low base warning shows when n < 30 in segment overview", {
   crosstab_data <- create_test_crosstab_data()
-  # Set n to low value (25) for W2
-  crosstab_data$metrics[[1]]$segments$Total$n$W2 <- 25L
+  # Set n to low value (25) for W2 across ALL metrics —
+  # the base row uses max(n) across metrics, so all must be low
+  for (i in seq_along(crosstab_data$metrics)) {
+    crosstab_data$metrics[[i]]$segments$Total$n$W2 <- 25L
+  }
 
   config <- create_test_config()
   html_data <- transform_tracker_for_html(crosstab_data, config)
@@ -1684,7 +1694,11 @@ test_that("Low base dims data cells when n < 30", {
 
 test_that("Low base warning shows in summary metrics table when n < 30", {
   crosstab_data <- create_test_crosstab_data()
-  crosstab_data$metrics[[1]]$segments$Total$n$W2 <- 25L
+  # Set n to low value for W2 across ALL metrics —
+  # the base row uses max(n) across metrics, so all must be low
+  for (i in seq_along(crosstab_data$metrics)) {
+    crosstab_data$metrics[[i]]$segments$Total$n$W2 <- 25L
+  }
 
   config <- create_test_config()
   html_data <- transform_tracker_for_html(crosstab_data, config)

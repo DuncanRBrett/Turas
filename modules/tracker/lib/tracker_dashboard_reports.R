@@ -505,6 +505,161 @@ create_dashboard_styles <- function() {
 
 
 # ==============================================================================
+# TREND DASHBOARD HELPERS
+# ==============================================================================
+
+#' Write a Single Data Row to the Trend Dashboard
+#'
+#' Writes one question's data row including code, question text, type, latest value,
+#' vs-previous change, vs-baseline change, wave values, and status indicator.
+#'
+#' @param wb openxlsx workbook object
+#' @param sheet_name Character. Sheet name
+#' @param q_result List. Trend result for one question
+#' @param wave_ids Character vector. Wave IDs
+#' @param n_waves Integer. Number of waves
+#' @param styles List. Dashboard styles
+#' @param decimal_places Numeric. Decimal places for formatting
+#' @param current_row Integer. Row to write to
+#' @param config List. Configuration object
+#' @return Integer. Next row number after writing
+#' @keywords internal
+write_dashboard_data_row <- function(wb, sheet_name, q_result, wave_ids, n_waves,
+                                     styles, decimal_places, current_row, config) {
+
+  # Extract wave values
+  wave_values <- sapply(wave_ids, function(wid) {
+    wr <- q_result$wave_results[[wid]]
+    extract_primary_metric(wr, q_result$metric_type)
+  })
+
+  # Calculate indices for comparisons
+  latest_idx <- n_waves
+  prev_idx <- n_waves - 1
+  base_idx <- 1
+
+  latest_val <- wave_values[latest_idx]
+  prev_val <- if (prev_idx >= 1) wave_values[prev_idx] else NA
+  base_val <- wave_values[base_idx]
+
+  prev_change <- if (!is.na(latest_val) && !is.na(prev_val)) latest_val - prev_val else NA
+  base_change <- if (!is.na(latest_val) && !is.na(base_val)) latest_val - base_val else NA
+
+  # Calculate significance
+  prev_sig <- if (prev_idx >= 1) {
+    calculate_change_significance(
+      q_result$wave_results[[wave_ids[prev_idx]]],
+      q_result$wave_results[[wave_ids[latest_idx]]],
+      q_result$metric_type,
+      config
+    )
+  } else NA
+
+  base_sig <- calculate_change_significance(
+    q_result$wave_results[[wave_ids[base_idx]]],
+    q_result$wave_results[[wave_ids[latest_idx]]],
+    q_result$metric_type,
+    config
+  )
+
+  # Determine status
+  status <- determine_trend_status(prev_sig, base_sig, styles)
+
+  # Format values for display
+  metric_type_display <- format_metric_type_display(q_result$metric_type)
+  latest_display <- format_metric_value_display(latest_val, q_result$metric_type, decimal_places)
+  prev_display <- format_change_value_display(prev_change, q_result$metric_type, decimal_places)
+  base_display <- format_change_value_display(base_change, q_result$metric_type, decimal_places)
+  prev_sig_char <- sig_to_arrow(prev_sig)
+  base_sig_char <- sig_to_arrow(base_sig)
+
+  # Truncate question text if too long
+  question_text <- q_result$question_text
+  if (nchar(question_text) > 60) {
+    question_text <- paste0(substr(question_text, 1, 57), "...")
+  }
+
+  # Write row data
+  col <- 1
+
+  # Code
+  openxlsx::writeData(wb, sheet_name, q_result$question_code,
+                      startRow = current_row, startCol = col)
+  openxlsx::addStyle(wb, sheet_name, styles$data_text,
+                     rows = current_row, cols = col)
+  col <- col + 1
+
+  # Question
+  openxlsx::writeData(wb, sheet_name, question_text,
+                      startRow = current_row, startCol = col)
+  openxlsx::addStyle(wb, sheet_name, styles$data_text,
+                     rows = current_row, cols = col)
+  col <- col + 1
+
+  # Type
+  openxlsx::writeData(wb, sheet_name, metric_type_display,
+                      startRow = current_row, startCol = col)
+  openxlsx::addStyle(wb, sheet_name, styles$data_num,
+                     rows = current_row, cols = col)
+  col <- col + 1
+
+  # Latest value
+  openxlsx::writeData(wb, sheet_name, latest_display,
+                      startRow = current_row, startCol = col)
+  openxlsx::addStyle(wb, sheet_name, styles$data_num,
+                     rows = current_row, cols = col)
+  col <- col + 1
+
+  # vs Prev change
+  openxlsx::writeData(wb, sheet_name, prev_display,
+                      startRow = current_row, startCol = col)
+  openxlsx::addStyle(wb, sheet_name, get_sig_style(prev_sig, styles),
+                     rows = current_row, cols = col)
+  col <- col + 1
+
+  # Prev sig indicator
+  openxlsx::writeData(wb, sheet_name, prev_sig_char,
+                      startRow = current_row, startCol = col)
+  openxlsx::addStyle(wb, sheet_name, get_sig_style(prev_sig, styles),
+                     rows = current_row, cols = col)
+  col <- col + 1
+
+  # vs Base change
+  openxlsx::writeData(wb, sheet_name, base_display,
+                      startRow = current_row, startCol = col)
+  openxlsx::addStyle(wb, sheet_name, get_sig_style(base_sig, styles),
+                     rows = current_row, cols = col)
+  col <- col + 1
+
+  # Base sig indicator
+  openxlsx::writeData(wb, sheet_name, base_sig_char,
+                      startRow = current_row, startCol = col)
+  openxlsx::addStyle(wb, sheet_name, get_sig_style(base_sig, styles),
+                     rows = current_row, cols = col)
+  col <- col + 1
+
+  # Wave values
+  for (i in seq_along(wave_ids)) {
+    wave_val <- wave_values[i]
+    wave_display <- if (!is.na(wave_val)) round(wave_val, decimal_places) else "\u2014"
+    openxlsx::writeData(wb, sheet_name, wave_display,
+                        startRow = current_row, startCol = col)
+    openxlsx::addStyle(wb, sheet_name, styles$wave_col,
+                       rows = current_row, cols = col)
+    col <- col + 1
+  }
+
+  # Status
+  openxlsx::writeData(wb, sheet_name, status$label,
+                      startRow = current_row, startCol = col)
+  openxlsx::addStyle(wb, sheet_name, status$style,
+                     rows = current_row, cols = col)
+
+  return(current_row + 1)
+}
+
+
+# ==============================================================================
 # TREND DASHBOARD
 # ==============================================================================
 
@@ -592,135 +747,10 @@ write_trend_dashboard <- function(wb, trend_results, config, sheet_name = "Trend
       next
     }
 
-    # Extract wave values
-    wave_values <- sapply(wave_ids, function(wid) {
-      wr <- q_result$wave_results[[wid]]
-      extract_primary_metric(wr, q_result$metric_type)
-    })
-
-    # Calculate indices for comparisons
-    latest_idx <- n_waves
-    prev_idx <- n_waves - 1
-    base_idx <- 1
-
-    latest_val <- wave_values[latest_idx]
-    prev_val <- if (prev_idx >= 1) wave_values[prev_idx] else NA
-    base_val <- wave_values[base_idx]
-
-    prev_change <- if (!is.na(latest_val) && !is.na(prev_val)) latest_val - prev_val else NA
-    base_change <- if (!is.na(latest_val) && !is.na(base_val)) latest_val - base_val else NA
-
-    # Calculate significance
-    prev_sig <- if (prev_idx >= 1) {
-      calculate_change_significance(
-        q_result$wave_results[[wave_ids[prev_idx]]],
-        q_result$wave_results[[wave_ids[latest_idx]]],
-        q_result$metric_type,
-        config
-      )
-    } else NA
-
-    base_sig <- calculate_change_significance(
-      q_result$wave_results[[wave_ids[base_idx]]],
-      q_result$wave_results[[wave_ids[latest_idx]]],
-      q_result$metric_type,
-      config
+    current_row <- write_dashboard_data_row(
+      wb, sheet_name, q_result, wave_ids, n_waves,
+      styles, decimal_places, current_row, config
     )
-
-    # Determine status
-    status <- determine_trend_status(prev_sig, base_sig, styles)
-
-    # Format values for display
-    metric_type_display <- format_metric_type_display(q_result$metric_type)
-    latest_display <- format_metric_value_display(latest_val, q_result$metric_type, decimal_places)
-    prev_display <- format_change_value_display(prev_change, q_result$metric_type, decimal_places)
-    base_display <- format_change_value_display(base_change, q_result$metric_type, decimal_places)
-    prev_sig_char <- sig_to_arrow(prev_sig)
-    base_sig_char <- sig_to_arrow(base_sig)
-
-    # Truncate question text if too long
-    question_text <- q_result$question_text
-    if (nchar(question_text) > 60) {
-      question_text <- paste0(substr(question_text, 1, 57), "...")
-    }
-
-    # Write row data
-    col <- 1
-
-    # Code
-    openxlsx::writeData(wb, sheet_name, q_result$question_code,
-                        startRow = current_row, startCol = col)
-    openxlsx::addStyle(wb, sheet_name, styles$data_text,
-                       rows = current_row, cols = col)
-    col <- col + 1
-
-    # Question
-    openxlsx::writeData(wb, sheet_name, question_text,
-                        startRow = current_row, startCol = col)
-    openxlsx::addStyle(wb, sheet_name, styles$data_text,
-                       rows = current_row, cols = col)
-    col <- col + 1
-
-    # Type
-    openxlsx::writeData(wb, sheet_name, metric_type_display,
-                        startRow = current_row, startCol = col)
-    openxlsx::addStyle(wb, sheet_name, styles$data_num,
-                       rows = current_row, cols = col)
-    col <- col + 1
-
-    # Latest value
-    openxlsx::writeData(wb, sheet_name, latest_display,
-                        startRow = current_row, startCol = col)
-    openxlsx::addStyle(wb, sheet_name, styles$data_num,
-                       rows = current_row, cols = col)
-    col <- col + 1
-
-    # vs Prev change
-    openxlsx::writeData(wb, sheet_name, prev_display,
-                        startRow = current_row, startCol = col)
-    openxlsx::addStyle(wb, sheet_name, get_sig_style(prev_sig, styles),
-                       rows = current_row, cols = col)
-    col <- col + 1
-
-    # Prev sig indicator
-    openxlsx::writeData(wb, sheet_name, prev_sig_char,
-                        startRow = current_row, startCol = col)
-    openxlsx::addStyle(wb, sheet_name, get_sig_style(prev_sig, styles),
-                       rows = current_row, cols = col)
-    col <- col + 1
-
-    # vs Base change
-    openxlsx::writeData(wb, sheet_name, base_display,
-                        startRow = current_row, startCol = col)
-    openxlsx::addStyle(wb, sheet_name, get_sig_style(base_sig, styles),
-                       rows = current_row, cols = col)
-    col <- col + 1
-
-    # Base sig indicator
-    openxlsx::writeData(wb, sheet_name, base_sig_char,
-                        startRow = current_row, startCol = col)
-    openxlsx::addStyle(wb, sheet_name, get_sig_style(base_sig, styles),
-                       rows = current_row, cols = col)
-    col <- col + 1
-
-    # Wave values
-    for (i in seq_along(wave_ids)) {
-      wave_val <- wave_values[i]
-      wave_display <- if (!is.na(wave_val)) round(wave_val, decimal_places) else "\u2014"
-      openxlsx::writeData(wb, sheet_name, wave_display,
-                          startRow = current_row, startCol = col)
-      openxlsx::addStyle(wb, sheet_name, styles$wave_col,
-                         rows = current_row, cols = col)
-      col <- col + 1
-    }
-
-    # Status
-    openxlsx::writeData(wb, sheet_name, status$label,
-                        startRow = current_row, startCol = col)
-    openxlsx::addStyle(wb, sheet_name, status$style,
-                       rows = current_row, cols = col)
-
-    current_row <- current_row + 1
     rows_written <- rows_written + 1
   }
 
@@ -769,6 +799,107 @@ write_trend_dashboard <- function(wb, trend_results, config, sheet_name = "Trend
                        firstActiveRow = header_row + 1, firstActiveCol = 3)
 
   invisible(wb)
+}
+
+
+# ==============================================================================
+# SIGNIFICANCE MATRIX HELPERS
+# ==============================================================================
+
+#' Write Matrix Data Cells for Significance Matrix
+#'
+#' Writes the i×j cell grid for the significance matrix, including diagonal,
+#' upper triangle (comparisons), and lower triangle (empty).
+#'
+#' @param wb openxlsx workbook object
+#' @param sheet_name Character. Sheet name
+#' @param wave_ids Character vector. Wave IDs
+#' @param wave_values Numeric vector. Primary metric values per wave
+#' @param q_result List. Trend result for the question
+#' @param alpha Numeric. Significance level
+#' @param decimal_places Numeric. Decimal places for formatting
+#' @param styles List. Dashboard styles
+#' @param start_row Integer. First row of the matrix data
+#' @return Integer. Next row number after writing
+#' @keywords internal
+write_matrix_data_cells <- function(wb, sheet_name, wave_ids, wave_values,
+                                    q_result, alpha, decimal_places, styles,
+                                    start_row) {
+  current_row <- start_row
+
+  for (i in seq_along(wave_ids)) {
+    # Row header
+    row_label <- paste0(wave_ids[i], " (",
+                        format_metric_value_display(wave_values[i], q_result$metric_type, decimal_places), ")")
+    openxlsx::writeData(wb, sheet_name, row_label,
+                        startRow = current_row, startCol = 1)
+    openxlsx::addStyle(wb, sheet_name, styles$row_header,
+                       rows = current_row, cols = 1)
+
+    # Matrix cells
+    for (j in seq_along(wave_ids)) {
+      col_idx <- j + 1
+
+      if (i == j) {
+        # Diagonal - same wave
+        openxlsx::writeData(wb, sheet_name, "\u2014",
+                            startRow = current_row, startCol = col_idx)
+        openxlsx::addStyle(wb, sheet_name, styles$diagonal,
+                           rows = current_row, cols = col_idx)
+
+      } else if (j > i) {
+        # Upper triangle - show comparison (from row wave TO column wave)
+        from_wave <- wave_ids[i]
+        to_wave <- wave_ids[j]
+
+        from_result <- q_result$wave_results[[from_wave]]
+        to_result <- q_result$wave_results[[to_wave]]
+
+        if (is.null(from_result) || !isTRUE(from_result$available) ||
+            is.null(to_result) || !isTRUE(to_result$available)) {
+          openxlsx::writeData(wb, sheet_name, "N/A",
+                              startRow = current_row, startCol = col_idx)
+          openxlsx::addStyle(wb, sheet_name, styles$na_cell,
+                             rows = current_row, cols = col_idx)
+        } else {
+          # Calculate change and significance
+          change <- wave_values[j] - wave_values[i]
+          sig_result <- calculate_pairwise_significance(
+            from_result, to_result, q_result$metric_type, alpha
+          )
+
+          # Format cell content
+          change_text <- format_change_value_display(change, q_result$metric_type, decimal_places)
+          sig_arrow <- sig_to_arrow(sig_result$sig_code)
+          cell_text <- paste0(change_text, sig_arrow)
+
+          openxlsx::writeData(wb, sheet_name, cell_text,
+                              startRow = current_row, startCol = col_idx)
+
+          # Apply significance-based styling
+          cell_style <- switch(
+            as.character(sig_result$sig_code),
+            "1" = styles$matrix_sig_up,
+            "-1" = styles$matrix_sig_down,
+            styles$matrix_not_sig
+          )
+          openxlsx::addStyle(wb, sheet_name, cell_style,
+                             rows = current_row, cols = col_idx)
+        }
+
+      } else {
+        # Lower triangle - leave empty/grey
+        openxlsx::writeData(wb, sheet_name, "",
+                            startRow = current_row, startCol = col_idx)
+        openxlsx::addStyle(wb, sheet_name, styles$na_cell,
+                           rows = current_row, cols = col_idx)
+      }
+    }
+
+    current_row <- current_row + 1
+  }
+
+  return(current_row)
 }
 
 
@@ -891,77 +1022,10 @@ write_significance_matrix <- function(wb, q_result, config, wave_ids) {
   # MATRIX DATA ROWS
   # ===========================================================================
 
-  for (i in seq_along(wave_ids)) {
-    # Row header
-    row_label <- paste0(wave_ids[i], " (",
-                        format_metric_value_display(wave_values[i], q_result$metric_type, decimal_places), ")")
-    openxlsx::writeData(wb, sheet_name, row_label,
-                        startRow = current_row, startCol = 1)
-    openxlsx::addStyle(wb, sheet_name, styles$row_header,
-                       rows = current_row, cols = 1)
-
-    # Matrix cells
-    for (j in seq_along(wave_ids)) {
-      col_idx <- j + 1
-
-      if (i == j) {
-        # Diagonal - same wave
-        openxlsx::writeData(wb, sheet_name, "\u2014",
-                            startRow = current_row, startCol = col_idx)
-        openxlsx::addStyle(wb, sheet_name, styles$diagonal,
-                           rows = current_row, cols = col_idx)
-
-      } else if (j > i) {
-        # Upper triangle - show comparison (from row wave TO column wave)
-        from_wave <- wave_ids[i]
-        to_wave <- wave_ids[j]
-
-        from_result <- q_result$wave_results[[from_wave]]
-        to_result <- q_result$wave_results[[to_wave]]
-
-        if (is.null(from_result) || !isTRUE(from_result$available) ||
-            is.null(to_result) || !isTRUE(to_result$available)) {
-          openxlsx::writeData(wb, sheet_name, "N/A",
-                              startRow = current_row, startCol = col_idx)
-          openxlsx::addStyle(wb, sheet_name, styles$na_cell,
-                             rows = current_row, cols = col_idx)
-        } else {
-          # Calculate change and significance
-          change <- wave_values[j] - wave_values[i]
-          sig_result <- calculate_pairwise_significance(
-            from_result, to_result, q_result$metric_type, alpha
-          )
-
-          # Format cell content
-          change_text <- format_change_value_display(change, q_result$metric_type, decimal_places)
-          sig_arrow <- sig_to_arrow(sig_result$sig_code)
-          cell_text <- paste0(change_text, sig_arrow)
-
-          openxlsx::writeData(wb, sheet_name, cell_text,
-                              startRow = current_row, startCol = col_idx)
-
-          # Apply significance-based styling
-          cell_style <- switch(
-            as.character(sig_result$sig_code),
-            "1" = styles$matrix_sig_up,
-            "-1" = styles$matrix_sig_down,
-            styles$matrix_not_sig
-          )
-          openxlsx::addStyle(wb, sheet_name, cell_style,
-                             rows = current_row, cols = col_idx)
-        }
-
-      } else {
-        # Lower triangle - leave empty/grey
-        openxlsx::writeData(wb, sheet_name, "",
-                            startRow = current_row, startCol = col_idx)
-        openxlsx::addStyle(wb, sheet_name, styles$na_cell,
-                           rows = current_row, cols = col_idx)
-      }
-    }
-
-    current_row <- current_row + 1
-  }
+  current_row <- write_matrix_data_cells(
+    wb, sheet_name, wave_ids, wave_values,
+    q_result, alpha, decimal_places, styles, current_row
+  )
 
   # ===========================================================================
   # LEGEND

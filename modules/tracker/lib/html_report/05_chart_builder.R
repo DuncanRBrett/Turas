@@ -19,6 +19,202 @@
 # ==============================================================================
 
 
+# ------------------------------------------------------------------------------
+# LINE CHART HELPERS
+# ------------------------------------------------------------------------------
+
+#' Build SVG Axes Elements (Gridlines + Y Labels + X Labels + Ticks)
+#'
+#' @param n_waves Integer. Number of waves
+#' @param wave_labels Character vector. Labels for x-axis
+#' @param wave_ids Character vector. IDs for data attributes
+#' @param y_axis_min Numeric. Y-axis minimum
+#' @param y_axis_max Numeric. Y-axis maximum
+#' @param plot_w Numeric. Plot width in pixels
+#' @param plot_h Numeric. Plot height in pixels
+#' @param scale_fn Function. Maps value to pixel offset from bottom
+#' @param format_fn Function. Formats value for display
+#' @return Character vector of SVG elements
+#' @keywords internal
+build_chart_axes_svg <- function(n_waves, wave_labels, wave_ids,
+                                  y_axis_min, y_axis_max,
+                                  plot_w, plot_h, scale_fn, format_fn) {
+  parts <- c()
+
+  # Dashed gridlines and Y-axis labels
+  n_gridlines <- 5
+  grid_vals <- seq(y_axis_min, y_axis_max, length.out = n_gridlines)
+  for (gv in grid_vals) {
+    gy <- plot_h - scale_fn(gv)
+    parts <- c(parts, sprintf(
+      '<line x1="0" y1="%.1f" x2="%d" y2="%.1f" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="4,4"/>',
+      gy, plot_w, gy
+    ))
+    parts <- c(parts, sprintf(
+      '<text x="-10" y="%.1f" text-anchor="end" fill="#666" font-size="12" font-weight="500" dy="0.35em">%s</text>',
+      gy, htmltools::htmlEscape(format_fn(gv))
+    ))
+  }
+
+  # X-axis labels — data-wave for JS filtering
+  for (i in seq_len(n_waves)) {
+    x_pos <- (i - 1) / (n_waves - 1) * plot_w
+    parts <- c(parts, sprintf(
+      '<text x="%.1f" y="%d" text-anchor="middle" fill="#666" font-size="13" font-weight="600" class="tk-chart-xaxis" data-wave="%s">%s</text>',
+      x_pos, plot_h + 24, htmltools::htmlEscape(wave_ids[i]),
+      htmltools::htmlEscape(wave_labels[i])
+    ))
+    # Tick mark
+    parts <- c(parts, sprintf(
+      '<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="#ccc" stroke-width="1" class="tk-chart-tick" data-wave="%s"/>',
+      x_pos, plot_h, x_pos, plot_h + 5,
+      htmltools::htmlEscape(wave_ids[i])
+    ))
+  }
+
+  return(parts)
+}
+
+
+#' Build SVG Series (Lines + Points) and Collect Label Data
+#'
+#' @param chart_data List. Chart data with series
+#' @param segment_colours Character vector. Colours per series
+#' @param n_waves Integer
+#' @param plot_w Numeric. Plot width
+#' @param plot_h Numeric. Plot height
+#' @param scale_fn Function. Y-value to pixel converter
+#' @param format_fn Function. Value formatter
+#' @param active_segment Character or NULL
+#' @return List with $svg_parts and $all_label_data
+#' @keywords internal
+build_chart_series_svg <- function(chart_data, segment_colours, n_waves,
+                                    plot_w, plot_h, scale_fn, format_fn,
+                                    active_segment) {
+  svg_parts <- c()
+  all_label_data <- vector("list", n_waves)
+  for (i in seq_len(n_waves)) all_label_data[[i]] <- list()
+
+  for (s_idx in seq_along(chart_data$series)) {
+    series <- chart_data$series[[s_idx]]
+    colour <- segment_colours[s_idx]
+    seg_name <- series$name
+
+    xy_points <- list()
+    point_circles <- c()
+
+    for (i in seq_len(n_waves)) {
+      val <- series$values[i]
+      if (is.na(val)) next
+
+      x_pos <- (i - 1) / (n_waves - 1) * plot_w
+      y_pos <- plot_h - scale_fn(val)
+
+      xy_points[[length(xy_points) + 1]] <- c(x_pos, y_pos)
+
+      # Data point circle
+      point_circles <- c(point_circles, sprintf(
+        '<circle cx="%.1f" cy="%.1f" r="5" fill="%s" stroke="#fff" stroke-width="2.5" class="tk-chart-point" data-segment="%s" data-wave="%s" data-value="%s"/>',
+        x_pos, y_pos, colour,
+        htmltools::htmlEscape(seg_name),
+        htmltools::htmlEscape(chart_data$wave_ids[i]),
+        htmltools::htmlEscape(format_fn(val))
+      ))
+
+      # Store label data for collision avoidance
+      all_label_data[[i]][[length(all_label_data[[i]]) + 1]] <- list(
+        x = x_pos, y = y_pos - 14, text = format_fn(val),
+        colour = colour, seg_name = seg_name,
+        wave_id = chart_data$wave_ids[i]
+      )
+    }
+
+    # Draw smooth path
+    if (length(xy_points) >= 2) {
+      line_opacity <- if (!is.null(active_segment) && seg_name != active_segment) "0.3" else "1"
+      path_d <- build_smooth_path(xy_points)
+
+      svg_parts <- c(svg_parts, sprintf(
+        '<path d="%s" fill="none" stroke="%s" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" opacity="%s" class="tk-chart-line" data-segment="%s"/>',
+        path_d, colour, line_opacity,
+        htmltools::htmlEscape(seg_name)
+      ))
+    }
+
+    # Draw points on top of lines
+    svg_parts <- c(svg_parts, paste(point_circles, collapse = "\n"))
+  }
+
+  return(list(svg_parts = svg_parts, all_label_data = all_label_data))
+}
+
+
+#' Resolve Label Collisions and Emit SVG Text Elements
+#'
+#' Takes label data collected per wave, resolves vertical overlaps,
+#' and emits positioned SVG text elements.
+#'
+#' @param all_label_data List. Per-wave label data lists
+#' @param plot_h Numeric. Plot area height
+#' @return Character vector of SVG text elements
+#' @keywords internal
+resolve_and_emit_labels_svg <- function(all_label_data, plot_h) {
+  svg_parts <- c()
+  min_label_gap <- 14  # minimum vertical gap between labels in pixels
+
+  for (wave_labels_at_x in all_label_data) {
+    if (length(wave_labels_at_x) == 0) next
+
+    # Sort by y position (ascending = top of SVG first)
+    y_vals <- vapply(wave_labels_at_x, function(lb) lb$y, numeric(1))
+    sorted_idx <- order(y_vals)
+    sorted_labels <- wave_labels_at_x[sorted_idx]
+
+    # Push overlapping labels apart
+    for (j in seq_along(sorted_labels)) {
+      if (j > 1) {
+        prev_y <- sorted_labels[[j - 1]]$y
+        if (sorted_labels[[j]]$y - prev_y < min_label_gap) {
+          sorted_labels[[j]]$y <- prev_y + min_label_gap
+        }
+      }
+    }
+
+    # Clamp labels within plot area bounds
+    n_labels <- length(sorted_labels)
+    if (n_labels > 0) {
+      last_y <- sorted_labels[[n_labels]]$y
+      if (last_y > plot_h - 4) {
+        # Labels exceed bottom — redistribute evenly within available range
+        total_needed <- (n_labels - 1) * min_label_gap
+        first_y <- sorted_labels[[1]]$y
+        start_y <- max(4, min(first_y, plot_h - 4 - total_needed))
+        for (j in seq_along(sorted_labels)) {
+          sorted_labels[[j]]$y <- start_y + (j - 1) * min_label_gap
+        }
+      }
+      # Final clamp for each label
+      for (j in seq_along(sorted_labels)) {
+        sorted_labels[[j]]$y <- max(4, min(sorted_labels[[j]]$y, plot_h - 4))
+      }
+    }
+
+    # Emit labels
+    for (lb in sorted_labels) {
+      svg_parts <- c(svg_parts, sprintf(
+        '<text x="%.1f" y="%.1f" text-anchor="middle" fill="%s" font-size="12" font-weight="700" class="tk-chart-label" data-segment="%s" data-wave="%s">%s</text>',
+        lb$x, lb$y, lb$colour,
+        htmltools::htmlEscape(lb$seg_name),
+        htmltools::htmlEscape(lb$wave_id),
+        htmltools::htmlEscape(lb$text)
+      ))
+    }
+  }
+
+  return(svg_parts)
+}
+
+
 #' Build Line Chart SVG for a Metric
 #'
 #' Creates an SVG line chart showing metric values across waves.
@@ -117,143 +313,21 @@ build_line_chart <- function(chart_data, config, active_segment = NULL,
     margin$left, margin$top
   ))
 
-  # Dashed gridlines and Y-axis labels
-  n_gridlines <- 5
-  grid_vals <- seq(y_axis_min, y_axis_max, length.out = n_gridlines)
-  for (gv in grid_vals) {
-    gy <- plot_h - scale_fn(gv)
-    svg_parts <- c(svg_parts, sprintf(
-      '<line x1="0" y1="%.1f" x2="%d" y2="%.1f" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="4,4"/>',
-      gy, plot_w, gy
-    ))
-    svg_parts <- c(svg_parts, sprintf(
-      '<text x="-10" y="%.1f" text-anchor="end" fill="#666" font-size="12" font-weight="500" dy="0.35em">%s</text>',
-      gy, htmltools::htmlEscape(format_fn(gv))
-    ))
-  }
+  # Axes: gridlines, Y labels, X labels, ticks
+  svg_parts <- c(svg_parts, build_chart_axes_svg(
+    n_waves, wave_labels, chart_data$wave_ids,
+    y_axis_min, y_axis_max, plot_w, plot_h, scale_fn, format_fn
+  ))
 
-  # X-axis labels — data-wave for JS filtering
-  for (i in seq_len(n_waves)) {
-    x_pos <- (i - 1) / (n_waves - 1) * plot_w
-    svg_parts <- c(svg_parts, sprintf(
-      '<text x="%.1f" y="%d" text-anchor="middle" fill="#666" font-size="13" font-weight="600" class="tk-chart-xaxis" data-wave="%s">%s</text>',
-      x_pos, plot_h + 24, htmltools::htmlEscape(chart_data$wave_ids[i]),
-      htmltools::htmlEscape(wave_labels[i])
-    ))
-    # Tick mark
-    svg_parts <- c(svg_parts, sprintf(
-      '<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="#ccc" stroke-width="1" class="tk-chart-tick" data-wave="%s"/>',
-      x_pos, plot_h, x_pos, plot_h + 5,
-      htmltools::htmlEscape(chart_data$wave_ids[i])
-    ))
-  }
+  # Data series: lines, points, and label data collection
+  series_result <- build_chart_series_svg(
+    chart_data, segment_colours, n_waves,
+    plot_w, plot_h, scale_fn, format_fn, active_segment
+  )
+  svg_parts <- c(svg_parts, series_result$svg_parts)
 
-  # ---- Collect all value labels for collision avoidance ----
-  # Structure: list of lists grouped by wave index, each containing (x, y, text, colour, seg_name, wave_id)
-  all_label_data <- vector("list", n_waves)
-  for (i in seq_len(n_waves)) all_label_data[[i]] <- list()
-
-  # Plot lines and points for each series
-  for (s_idx in seq_along(chart_data$series)) {
-    series <- chart_data$series[[s_idx]]
-    colour <- segment_colours[s_idx]
-    seg_name <- series$name
-
-    xy_points <- list()
-    point_circles <- c()
-
-    for (i in seq_len(n_waves)) {
-      val <- series$values[i]
-      if (is.na(val)) next
-
-      x_pos <- (i - 1) / (n_waves - 1) * plot_w
-      y_pos <- plot_h - scale_fn(val)
-
-      xy_points[[length(xy_points) + 1]] <- c(x_pos, y_pos)
-
-      # Data point circle
-      point_circles <- c(point_circles, sprintf(
-        '<circle cx="%.1f" cy="%.1f" r="5" fill="%s" stroke="#fff" stroke-width="2.5" class="tk-chart-point" data-segment="%s" data-wave="%s" data-value="%s"/>',
-        x_pos, y_pos, colour,
-        htmltools::htmlEscape(seg_name),
-        htmltools::htmlEscape(chart_data$wave_ids[i]),
-        htmltools::htmlEscape(format_fn(val))
-      ))
-
-      # Store label data for collision avoidance
-      all_label_data[[i]][[length(all_label_data[[i]]) + 1]] <- list(
-        x = x_pos, y = y_pos - 14, text = format_fn(val),
-        colour = colour, seg_name = seg_name,
-        wave_id = chart_data$wave_ids[i]
-      )
-    }
-
-    # Draw smooth path
-    if (length(xy_points) >= 2) {
-      line_opacity <- if (!is.null(active_segment) && seg_name != active_segment) "0.3" else "1"
-      path_d <- build_smooth_path(xy_points)
-
-      svg_parts <- c(svg_parts, sprintf(
-        '<path d="%s" fill="none" stroke="%s" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" opacity="%s" class="tk-chart-line" data-segment="%s"/>',
-        path_d, colour, line_opacity,
-        htmltools::htmlEscape(seg_name)
-      ))
-    }
-
-    # Draw points on top of lines
-    svg_parts <- c(svg_parts, paste(point_circles, collapse = "\n"))
-  }
-
-  # ---- Resolve label collisions and draw value labels ----
-  min_label_gap <- 14  # minimum vertical gap between labels in pixels
-  for (wave_labels_at_x in all_label_data) {
-    if (length(wave_labels_at_x) == 0) next
-
-    # Sort by y position (ascending = top of SVG first)
-    y_vals <- vapply(wave_labels_at_x, function(lb) lb$y, numeric(1))
-    sorted_idx <- order(y_vals)
-    sorted_labels <- wave_labels_at_x[sorted_idx]
-
-    # Push overlapping labels apart
-    for (j in seq_along(sorted_labels)) {
-      if (j > 1) {
-        prev_y <- sorted_labels[[j - 1]]$y
-        if (sorted_labels[[j]]$y - prev_y < min_label_gap) {
-          sorted_labels[[j]]$y <- prev_y + min_label_gap
-        }
-      }
-    }
-
-    # Clamp labels within plot area bounds
-    n_labels <- length(sorted_labels)
-    if (n_labels > 0) {
-      last_y <- sorted_labels[[n_labels]]$y
-      if (last_y > plot_h - 4) {
-        # Labels exceed bottom — redistribute evenly within available range
-        total_needed <- (n_labels - 1) * min_label_gap
-        first_y <- sorted_labels[[1]]$y
-        start_y <- max(4, min(first_y, plot_h - 4 - total_needed))
-        for (j in seq_along(sorted_labels)) {
-          sorted_labels[[j]]$y <- start_y + (j - 1) * min_label_gap
-        }
-      }
-      # Final clamp for each label
-      for (j in seq_along(sorted_labels)) {
-        sorted_labels[[j]]$y <- max(4, min(sorted_labels[[j]]$y, plot_h - 4))
-      }
-    }
-
-    # Emit labels
-    for (lb in sorted_labels) {
-      svg_parts <- c(svg_parts, sprintf(
-        '<text x="%.1f" y="%.1f" text-anchor="middle" fill="%s" font-size="12" font-weight="700" class="tk-chart-label" data-segment="%s" data-wave="%s">%s</text>',
-        lb$x, lb$y, lb$colour,
-        htmltools::htmlEscape(lb$seg_name),
-        htmltools::htmlEscape(lb$wave_id),
-        htmltools::htmlEscape(lb$text)
-      ))
-    }
-  }
+  # Resolve label collisions and emit value labels
+  svg_parts <- c(svg_parts, resolve_and_emit_labels_svg(series_result$all_label_data, plot_h))
 
   svg_parts <- c(svg_parts, '</g>')  # Close plot area group
 
