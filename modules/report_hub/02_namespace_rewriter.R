@@ -253,6 +253,8 @@ rewrite_html_onclick_conflicts <- function(html, report_key) {
     "renderPinnedCards",
     "removePinned",
     "movePinned",
+    "addSection",
+    "updateSectionTitle",
     "exportSlidePNG",
     "printReport",
     "toggleHelpOverlay",
@@ -349,6 +351,8 @@ wrap_js_in_iife <- function(js_blocks, report_key, report_type) {
     "movePinned",
     "removePinned",
     "hydratePinnedViews",
+    "addSection",
+    "updateSectionTitle",
     "exportSlidePNG",
     "printReport",
     "toggleHelpOverlay",
@@ -357,7 +361,11 @@ wrap_js_in_iife <- function(js_blocks, report_key, report_type) {
     "exportChartPNG",
     "exportCSV",
     "exportExcel",
-    "pinnedViews"
+    "pinnedViews",
+    "switchReportTab",
+    "printAllPins",
+    "exportAllPinsPNG",
+    "saveReportHTML"
   )
 
   prefix <- paste0(report_key, "_")
@@ -375,11 +383,14 @@ wrap_js_in_iife <- function(js_blocks, report_key, report_type) {
       sprintf("\\1 %s%s", prefix, fn),
       all_js
     )
-    # Prefix window.fnName assignments: window.fnName -> prefix_fnName
+    # Prefix window.fnName assignments: window.fnName -> window.prefix_fnName
     # (tracker defines many functions as window.fnName = function(...))
+    # CRITICAL: Must keep "window." prefix! Without it, strict-mode IIFEs
+    # throw ReferenceError on bare assignments (e.g., tracker_fn = function(){})
+    # and non-strict IIFEs lose global exposure (variable stays IIFE-local).
     all_js <- gsub(
       sprintf("window\\.%s\\b", fn),
-      sprintf("%s%s", prefix, fn),
+      sprintf("window.%s%s", prefix, fn),
       all_js
     )
     # Prefix standalone calls: fnName( -> prefix_fnName(
@@ -398,6 +409,12 @@ wrap_js_in_iife <- function(js_blocks, report_key, report_type) {
   id_prefix <- paste0(report_key, "--")
   helper_id <- paste0("_", report_key, "_id")
   helper_qs <- paste0("_", report_key, "_qs")
+  helper_qsa <- paste0("_", report_key, "_qsa")
+
+  # IMPORTANT: Replace querySelectorAll BEFORE querySelector to avoid substring collision
+  # "document.querySelectorAll(" contains "document.querySelector(" as a prefix,
+  # but the trailing "All(" vs "(" disambiguates them with fixed matching.
+  all_js <- gsub("document.querySelectorAll(", paste0(helper_qsa, "("), all_js, fixed = TRUE)
   all_js <- gsub("document.getElementById(", paste0(helper_id, "("), all_js, fixed = TRUE)
   all_js <- gsub("document.querySelector(", paste0(helper_qs, "("), all_js, fixed = TRUE)
 
@@ -405,8 +422,9 @@ wrap_js_in_iife <- function(js_blocks, report_key, report_type) {
   helpers_js <- sprintf(
     'var %s = function(id) { return document.getElementById(id) || document.getElementById("%s" + id); };
 var %s = function(sel) { var el = document.querySelector(sel); if (el) return el; if (sel.indexOf("#") === -1) return null; return document.querySelector(sel.replace(/#([a-zA-Z][\\w-]*)/g, "#%s$1")); };
+var %s = function(sel) { var els = document.querySelectorAll(sel); if (els.length > 0 || sel.indexOf("#") === -1) return els; return document.querySelectorAll(sel.replace(/#([a-zA-Z][\\w-]*)/g, "#%s$1")); };
 ',
-    helper_id, id_prefix, helper_qs, id_prefix
+    helper_id, id_prefix, helper_qs, id_prefix, helper_qsa, id_prefix
   )
   all_js <- paste0(helpers_js, "\n", all_js)
 
@@ -493,7 +511,19 @@ pinOverviewView = function() {
   var cleanHtml = "";
   if (tablePanel && tablePanel.style.display !== "none") {
     var clone = tablePanel.cloneNode(true);
-    clone.querySelectorAll(".segment-hidden, .row-hidden-user, .row-filtered").forEach(function(el) { el.parentNode.removeChild(el); });
+    clone.querySelectorAll(".segment-hidden").forEach(function(el) { el.parentNode.removeChild(el); });
+    clone.querySelectorAll(".row-hidden-user").forEach(function(el) { el.parentNode.removeChild(el); });
+    clone.querySelectorAll(".row-filtered").forEach(function(el) { el.parentNode.removeChild(el); });
+    clone.querySelectorAll(".section-hidden").forEach(function(el) { el.parentNode.removeChild(el); });
+    clone.querySelectorAll(".tk-change-row").forEach(function(el) {
+      if (!el.classList.contains("visible")) el.parentNode.removeChild(el);
+    });
+    clone.querySelectorAll(".tk-section-row.section-collapsed").forEach(function(el) {
+      el.parentNode.removeChild(el);
+    });
+    clone.querySelectorAll(".tk-row-hide-btn, .tk-add-chart-btn, .tk-sortable").forEach(function(el) {
+      el.removeAttribute("onclick");
+    });
     cleanHtml = clone.innerHTML;
   }
   var chartSvg = "";
@@ -502,15 +532,20 @@ pinOverviewView = function() {
     chartVisible = true;
     chartSvg = chartPanel.innerHTML;
   }
+  var seg = typeof getCurrentSegment === "function" ? getCurrentSegment() : "Total";
   var pinObj = {
     id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2,5),
-    metricId: "overview-" + (typeof getCurrentSegment === "function" ? getCurrentSegment() : "Total"),
-    title: "Segment Overview: " + (typeof getCurrentSegment === "function" ? getCurrentSegment() : "Total"),
+    metricId: "overview-" + seg,
+    metricTitle: "Segment Overview: " + seg,
+    title: "Segment Overview: " + seg,
     tableHtml: cleanHtml, chartSvg: chartSvg, chartVisible: chartVisible,
     insight: insightEditor ? insightEditor.innerHTML : "",
     timestamp: Date.now()
   };
   ReportHub.addPin("tracker", pinObj);
+  if (typeof window.captureOverviewPng === "function") {
+    window.captureOverviewPng(pinObj);
+  }
 };
 pinSelectedCharts = function() {
   var selected = typeof getChartSelection === "function" ? getChartSelection() : [];

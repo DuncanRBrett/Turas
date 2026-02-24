@@ -273,19 +273,23 @@ build_tracking_table <- function(html_data, config) {
   # ---- THEAD: Segment indicator row + wave header row ----
   parts <- c(parts, '<thead>')
 
-  # Segment colour indicator row
+  # Segment colour indicator row (with segment name labels)
   parts <- c(parts, '<tr class="tk-segment-indicator-row">')
   parts <- c(parts, '<th class="tk-segment-indicator tk-sticky-col"></th>')  # Empty label cell
   for (seg_idx in seq_along(segments)) {
     seg_name <- segments[seg_idx]
     seg_colour <- segment_colours[seg_idx]
-    for (w_idx in seq_along(waves)) {
-      parts <- c(parts, sprintf(
-        '<th class="tk-segment-indicator" data-segment="%s" style="background-color:%s"></th>',
-        htmltools::htmlEscape(seg_name),
-        seg_colour
-      ))
-    }
+    # Use text colour that contrasts with the background (luminance via weighted RGB sum)
+    seg_rgb <- as.numeric(grDevices::col2rgb(seg_colour))
+    seg_lum <- seg_rgb[1] * 0.299 + seg_rgb[2] * 0.587 + seg_rgb[3] * 0.114
+    text_colour <- if (seg_lum > 150) "#1e293b" else "#ffffff"
+    parts <- c(parts, sprintf(
+      '<th class="tk-segment-indicator" data-segment="%s" colspan="%d" style="background-color:%s;color:%s;font-size:11px;font-weight:600;text-align:center;letter-spacing:0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">%s</th>',
+      htmltools::htmlEscape(seg_name),
+      n_waves,
+      seg_colour, text_colour,
+      htmltools::htmlEscape(seg_name)
+    ))
   }
   parts <- c(parts, '</tr>')
 

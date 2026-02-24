@@ -158,7 +158,7 @@ transform_metric_for_html <- function(metric, waves, wave_lookup, segments,
     section = metric$section,
     sort_order = metric$sort_order,
     question_type = metric$question_type,
-    question_text = metric$question_text %||% "",
+    question_text = if (is.null(metric$question_text) || is.na(metric$question_text)) "" else metric$question_text,
     segment_cells = segment_cells
   )
 }

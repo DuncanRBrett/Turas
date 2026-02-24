@@ -130,7 +130,62 @@ function renderPinnedCards() {
   if (!container) return;
   container.innerHTML = "";
 
-  pinnedViews.forEach(function(pin, idx) {
+  // Count actual pins (not sections) for empty state
+  var pinCount = 0;
+  for (var c = 0; c < pinnedViews.length; c++) {
+    if (pinnedViews[c].type !== "section") pinCount++;
+  }
+  var empty = document.getElementById("pinned-empty-state");
+  if (empty) empty.style.display = pinCount === 0 ? "block" : "none";
+
+  var total = pinnedViews.length;
+
+  pinnedViews.forEach(function(item, idx) {
+
+    // Section divider
+    if (item.type === "section") {
+      var divider = document.createElement("div");
+      divider.className = "section-divider";
+      divider.setAttribute("data-idx", idx);
+
+      var titleEl = document.createElement("div");
+      titleEl.className = "section-divider-title";
+      titleEl.contentEditable = "true";
+      titleEl.textContent = item.title;
+      titleEl.onblur = function() { updateSectionTitle(idx, this.textContent); };
+      divider.appendChild(titleEl);
+
+      var sActions = document.createElement("div");
+      sActions.className = "section-divider-actions";
+      if (idx > 0) {
+        var sUp = document.createElement("button");
+        sUp.className = "export-btn";
+        sUp.style.cssText = "padding:3px 8px;font-size:11px;";
+        sUp.textContent = "\u25B2"; sUp.title = "Move up";
+        sUp.onclick = function() { movePinned(idx, idx - 1); };
+        sActions.appendChild(sUp);
+      }
+      if (idx < total - 1) {
+        var sDown = document.createElement("button");
+        sDown.className = "export-btn";
+        sDown.style.cssText = "padding:3px 8px;font-size:11px;";
+        sDown.textContent = "\u25BC"; sDown.title = "Move down";
+        sDown.onclick = function() { movePinned(idx, idx + 1); };
+        sActions.appendChild(sDown);
+      }
+      var sDel = document.createElement("button");
+      sDel.className = "export-btn";
+      sDel.style.cssText = "padding:3px 8px;font-size:11px;color:#e8614d;";
+      sDel.textContent = "\u2715"; sDel.title = "Remove section";
+      sDel.onclick = function() { removePinned(item.id, null); };
+      sActions.appendChild(sDel);
+      divider.appendChild(sActions);
+      container.appendChild(divider);
+      return;
+    }
+
+    // Pin card
+    var pin = item;
     var card = document.createElement("div");
     card.className = "pinned-card";
     card.setAttribute("data-pin-id", pin.id);
@@ -219,6 +274,34 @@ function renderPinnedCards() {
   });
 }
 
+/**
+ * Add a section divider to the pinned views
+ * @param {string} title - Section title (editable in the UI)
+ */
+function addSection(title) {
+  title = title || "New Section";
+  pinnedViews.push({
+    type: "section",
+    title: title,
+    id: "sec-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5)
+  });
+  savePinnedData();
+  renderPinnedCards();
+  updatePinBadge();
+}
+
+/**
+ * Update a section divider's title after inline editing
+ * @param {number} idx - Index in pinnedViews array
+ * @param {string} newTitle - New title text
+ */
+function updateSectionTitle(idx, newTitle) {
+  if (idx >= 0 && idx < pinnedViews.length && pinnedViews[idx].type === "section") {
+    pinnedViews[idx].title = newTitle.trim() || "Untitled Section";
+    savePinnedData();
+  }
+}
+
 function movePinned(fromIdx, toIdx) {
   if (toIdx < 0 || toIdx >= pinnedViews.length) return;
   var item = pinnedViews.splice(fromIdx, 1)[0];
@@ -229,7 +312,7 @@ function movePinned(fromIdx, toIdx) {
 
 function removePinned(pinId, qCode) {
   pinnedViews = pinnedViews.filter(function(p) { return p.id !== pinId; });
-  updatePinButton(qCode, pinnedViews.some(function(p) { return p.qCode === qCode; }));
+  if (qCode) updatePinButton(qCode, pinnedViews.some(function(p) { return p.qCode === qCode; }));
   savePinnedData();
   renderPinnedCards();
   updatePinBadge();
@@ -266,6 +349,8 @@ function exportAllPinnedSlides() {
   // Step 1: Build all SVG blobs upfront (synchronous)
   var slides = [];
   pinnedViews.forEach(function(pin, idx) {
+    // Skip section dividers
+    if (pin.type === "section") return;
     var usableW = W - pad * 2;
     var titleFullText = (pin.pinType === "text_box" || pin.pinType === "heatmap")
       ? pin.qTitle
@@ -440,7 +525,12 @@ function exportAllPinnedSlides() {
 // Builds a temporary print layout with one pinned view per page,
 // triggers window.print() (user can save to PDF), then restores DOM.
 function printPinnedViews() {
-  if (pinnedViews.length === 0) {
+  // Count actual pins (not sections)
+  var pinCount = 0;
+  for (var pc = 0; pc < pinnedViews.length; pc++) {
+    if (pinnedViews[pc].type !== "section") pinCount++;
+  }
+  if (pinCount === 0) {
     alert("No pinned views to print. Pin questions from the Crosstabs tab first.");
     return;
   }
@@ -524,8 +614,19 @@ function printPinnedViews() {
     (statsLine ? "<div style=\"font-size:10px;color:#64748b;margin-top:2px;\">" + escapeHtml(statsLine) + "</div>" : "");
   overlay.appendChild(projStrip);
 
-  // Build one page per pinned view
+  // Build one page per pinned view (sections become dividers)
+  var printPinIdx = 0;
   pinnedViews.forEach(function(pin, idx) {
+    // Render section dividers as heading strips (not full pages)
+    if (pin.type === "section") {
+      var sectionEl = document.createElement("div");
+      sectionEl.style.cssText = "padding:16px 0 8px;margin:8px 0;border-bottom:2px solid #323367;font-size:16px;font-weight:600;color:#323367;";
+      sectionEl.textContent = pin.title || "Untitled Section";
+      overlay.appendChild(sectionEl);
+      return;
+    }
+    printPinIdx++;
+
     var page = document.createElement("div");
     page.className = "pinned-print-page";
 
@@ -571,10 +672,10 @@ function printPinnedViews() {
       page.appendChild(tableDiv);
     }
 
-    // Page number
+    // Page number (count only pins, not section dividers)
     var pgNum = document.createElement("div");
     pgNum.className = "pinned-print-page-num";
-    pgNum.textContent = (idx + 1) + " of " + pinnedViews.length;
+    pgNum.textContent = printPinIdx + " of " + pinCount;
     page.appendChild(pgNum);
 
     overlay.appendChild(page);

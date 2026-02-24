@@ -248,9 +248,9 @@
       html += '<div class="hub-pin-chart">' + pin.chartSvg + '</div>';
     }
 
-    // PNG snapshot (if captured)
+    // PNG snapshot (hidden – used only for export, not displayed on screen)
     if (pin.pngDataUrl) {
-      html += '<div class="hub-pin-snapshot"><img src="' + pin.pngDataUrl + '" alt="Pinned view"></div>';
+      html += '<div class="hub-pin-snapshot" style="display:none"><img src="' + pin.pngDataUrl + '" alt="Pinned view"></div>';
     }
 
     // Table (if captured)
@@ -315,23 +315,40 @@
     var card = document.querySelector('.hub-pin-card[data-pin-id="' + pinId + '"]');
     if (!card) return;
 
+    // Shortcut: if card has a pre-captured PNG snapshot, download it directly
+    var snapshotImg = card.querySelector(".hub-pin-snapshot img");
+    if (snapshotImg && snapshotImg.src && snapshotImg.src.indexOf("data:") === 0) {
+      downloadDataUrlAsPng(snapshotImg.src, "pinned_" + pinId + ".png");
+      return;
+    }
+
     var clone = card.cloneNode(true);
     // Remove action buttons from clone
     var actions = clone.querySelector(".hub-pin-actions");
     if (actions) actions.parentNode.removeChild(actions);
 
-    // Inline computed styles for accurate rendering
+    // Inline computed styles FIRST (while clone tree still matches source tree)
     inlineStylesRecursive(clone, card);
+
+    // Strip contenteditable and event handler attributes
+    cleanCloneForExport(clone);
+
+    // Convert embedded SVGs to data URL images — foreignObject cannot
+    // reliably render nested SVGs due to XML namespace conflicts
+    convertSvgsToImages(clone);
 
     var w = card.offsetWidth || 800;
     var h = card.offsetHeight || 600;
     var scale = 3;
 
+    // Sanitize for XHTML compliance (SVG foreignObject requirement)
+    var htmlContent = sanitizeForSvg(clone.outerHTML);
+
     var svgNS = "http://www.w3.org/2000/svg";
     var svgStr = '<svg xmlns="' + svgNS + '" width="' + (w * scale) + '" height="' + (h * scale) + '">';
     svgStr += '<foreignObject width="' + w + '" height="' + h + '" transform="scale(' + scale + ')">';
     svgStr += '<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:14px;color:#2c2c2c;background:#fff;padding:20px;">';
-    svgStr += clone.outerHTML;
+    svgStr += htmlContent;
     svgStr += '</div></foreignObject></svg>';
 
     var svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
@@ -344,7 +361,11 @@
     img.onload = function() {
       ctx.drawImage(img, 0, 0);
       canvas.toBlob(function(blob) {
-        if (!blob) return;
+        if (!blob) {
+          URL.revokeObjectURL(svgUrl);
+          exportPinCardFallback(card, pinId);
+          return;
+        }
         var a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
         a.download = "pinned_" + pinId + ".png";
@@ -357,6 +378,7 @@
     };
     img.onerror = function() {
       URL.revokeObjectURL(svgUrl);
+      exportPinCardFallback(card, pinId);
     };
     img.src = svgUrl;
   };
@@ -384,6 +406,272 @@
   };
 
   /**
+   * Strip contenteditable and event handler attributes from a cloned element.
+   * These are irrelevant in a static PNG and can cause XHTML issues.
+   */
+  function cleanCloneForExport(clone) {
+    clone.querySelectorAll("[contenteditable]").forEach(function(el) {
+      el.removeAttribute("contenteditable");
+    });
+    clone.querySelectorAll("[oninput],[onblur],[onclick]").forEach(function(el) {
+      el.removeAttribute("oninput");
+      el.removeAttribute("onblur");
+      el.removeAttribute("onclick");
+    });
+  }
+
+  /**
+   * Convert embedded SVGs in a clone to data URL <img> tags.
+   * foreignObject cannot reliably render nested SVGs — namespace
+   * conflicts cause XML parsing failures that silently break the export.
+   */
+  function convertSvgsToImages(clone) {
+    clone.querySelectorAll("svg").forEach(function(svg) {
+      try {
+        var svgStr = new XMLSerializer().serializeToString(svg);
+        var encoded = "data:image/svg+xml;base64," +
+          btoa(unescape(encodeURIComponent(svgStr)));
+        var imgEl = document.createElement("img");
+        imgEl.src = encoded;
+        imgEl.style.cssText = "width:100%;height:auto;display:block;";
+        svg.parentNode.replaceChild(imgEl, svg);
+      } catch (e) {
+        if (svg.parentNode) svg.parentNode.removeChild(svg);
+      }
+    });
+  }
+
+  /**
+   * Sanitize HTML for XHTML compliance (required by SVG foreignObject).
+   * Converts self-closing HTML5 tags to XHTML form and fixes bare ampersands.
+   */
+  function sanitizeForSvg(html) {
+    // Fix bare ampersands (not already part of any entity: named, decimal, or hex)
+    html = html.replace(/&(?![a-zA-Z]+;|#\d+;|#x[0-9a-fA-F]+;)/g, "&amp;");
+    // Self-closing void elements
+    html = html.replace(/<br\s*>/gi, "<br/>");
+    html = html.replace(/<hr\s*>/gi, "<hr/>");
+    html = html.replace(/<img([^>]*?)(?<!\/)>/gi, "<img$1/>");
+    html = html.replace(/<input([^>]*?)(?<!\/)>/gi, "<input$1/>");
+    html = html.replace(/<col([^>]*?)(?<!\/)>/gi, "<col$1/>");
+    html = html.replace(/<wbr\s*>/gi, "<wbr/>");
+    html = html.replace(/<source([^>]*?)(?<!\/)>/gi, "<source$1/>");
+    html = html.replace(/<meta([^>]*?)(?<!\/)>/gi, "<meta$1/>");
+    html = html.replace(/<link([^>]*?)(?<!\/)>/gi, "<link$1/>");
+    return html;
+  }
+
+  /**
+   * Download a data URL as a PNG file via Blob (reliable for large images).
+   */
+  function downloadDataUrlAsPng(dataUrl, filename) {
+    try {
+      var parts = dataUrl.split(",");
+      var mime = parts[0].match(/:(.*?);/)[1];
+      var bstr = atob(parts[1]);
+      var n = bstr.length;
+      var u8 = new Uint8Array(n);
+      for (var i = 0; i < n; i++) u8[i] = bstr.charCodeAt(i);
+      var blob = new Blob([u8], { type: mime });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      // Fallback: direct data URL download
+      var a2 = document.createElement("a");
+      a2.href = dataUrl;
+      a2.download = filename;
+      document.body.appendChild(a2);
+      a2.click();
+      document.body.removeChild(a2);
+    }
+  }
+
+  /**
+   * Fallback PNG export — renders card content on a canvas.
+   * Extracts real data (title, insight, table rows) for a useful export.
+   * Used when foreignObject rendering fails (complex embedded content).
+   */
+  function exportPinCardFallback(card, pinId) {
+    var titleEl = card.querySelector(".hub-pin-title");
+    var titleText = titleEl ? titleEl.textContent : "Pinned View";
+    var subtitleEl = card.querySelector(".hub-pin-subtitle");
+    var subtitleText = subtitleEl ? subtitleEl.textContent.trim() : "";
+    var insightEl = card.querySelector(".hub-insight-editor");
+    var insightText = insightEl ? insightEl.textContent.trim() : "";
+
+    // Extract table data from the card
+    var tableRows = extractTableFromCard(card);
+
+    var scale = 3;
+    var w = 800;
+    var headerH = 56;
+    var subtitleH = subtitleText ? 24 : 0;
+    var insightH = insightText ? Math.ceil(insightText.length / 90) * 18 + 28 : 0;
+    var tableH = tableRows ? (tableRows.length * 22 + 12) : 0;
+    var h = Math.max(headerH + subtitleH + insightH + tableH + 40, 200);
+
+    var canvas = document.createElement("canvas");
+    canvas.width = w * scale;
+    canvas.height = h * scale;
+    var ctx = canvas.getContext("2d");
+    ctx.scale(scale, scale);
+
+    // Background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, w, h);
+
+    // Header bar
+    ctx.fillStyle = "#1a2744";
+    ctx.fillRect(0, 0, w, 50);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 18px -apple-system, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(titleText, 16, 34);
+
+    var y = headerH;
+
+    // Subtitle
+    if (subtitleText) {
+      ctx.fillStyle = "#64748b";
+      ctx.font = "12px -apple-system, sans-serif";
+      ctx.fillText(subtitleText, 16, y + 14);
+      y += subtitleH;
+    }
+
+    // Insight
+    if (insightText) {
+      ctx.fillStyle = "#f0f4ff";
+      ctx.fillRect(16, y, w - 32, insightH - 4);
+      ctx.fillStyle = "#323367";
+      ctx.fillRect(16, y, 4, insightH - 4);
+      ctx.fillStyle = "#1a2744";
+      ctx.font = "13px -apple-system, sans-serif";
+      y = wrapCanvasText(ctx, insightText, 28, y + 16, w - 60, 18);
+      y += 12;
+    }
+
+    // Table data
+    if (tableRows && tableRows.length > 0) {
+      y = renderCanvasTable(ctx, tableRows, 16, y, w - 32);
+    }
+
+    canvas.toBlob(function(blob) {
+      if (!blob) return;
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "pinned_" + pinId + ".png";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    }, "image/png");
+  }
+
+  /**
+   * Extract table rows from a card DOM element for canvas rendering.
+   * Returns array of arrays (rows × cells of text content).
+   */
+  function extractTableFromCard(card) {
+    var table = card.querySelector("table");
+    if (!table) return null;
+    var rows = [];
+    table.querySelectorAll("tr").forEach(function(tr) {
+      if (tr.style.display === "none") return;
+      if (tr.classList.contains("segment-hidden")) return;
+      var cells = [];
+      tr.querySelectorAll("th, td").forEach(function(cell) {
+        if (cell.style.display === "none") return;
+        if (cell.classList.contains("segment-hidden")) return;
+        cells.push(cell.textContent.trim());
+      });
+      if (cells.length > 0) rows.push(cells);
+    });
+    return rows.length > 0 ? rows : null;
+  }
+
+  /**
+   * Wrap text on a canvas, returning the final Y position.
+   */
+  function wrapCanvasText(ctx, text, x, y, maxW, lineH) {
+    var words = text.split(" ");
+    var line = "";
+    var curY = y;
+    for (var i = 0; i < words.length; i++) {
+      var test = line + words[i] + " ";
+      if (ctx.measureText(test).width > maxW && line !== "") {
+        ctx.fillText(line.trim(), x, curY);
+        line = words[i] + " ";
+        curY += lineH;
+      } else {
+        line = test;
+      }
+    }
+    if (line.trim()) {
+      ctx.fillText(line.trim(), x, curY);
+      curY += lineH;
+    }
+    return curY;
+  }
+
+  /**
+   * Render table rows on a canvas at the given position.
+   * Returns the final Y position after rendering.
+   */
+  function renderCanvasTable(ctx, rows, x, y, maxW) {
+    if (!rows || rows.length === 0) return y;
+    var colCount = Math.max.apply(null, rows.map(function(r) { return r.length; }));
+    var colW = maxW / colCount;
+    var rowH = 22;
+
+    for (var r = 0; r < rows.length; r++) {
+      var rowY = y + r * rowH;
+      // Header row style
+      if (r === 0) {
+        ctx.fillStyle = "#f1f5f9";
+        ctx.fillRect(x, rowY, maxW, rowH);
+        ctx.fillStyle = "#1e293b";
+        ctx.font = "bold 11px -apple-system, sans-serif";
+      } else {
+        if (r % 2 === 0) {
+          ctx.fillStyle = "#f8fafc";
+          ctx.fillRect(x, rowY, maxW, rowH);
+        }
+        ctx.fillStyle = "#1e293b";
+        ctx.font = "12px -apple-system, sans-serif";
+      }
+
+      for (var c = 0; c < rows[r].length; c++) {
+        var cellX = x + c * colW;
+        var text = rows[r][c];
+        if (text.length > 25) text = text.substring(0, 23) + "\u2026";
+        if (c === 0) {
+          ctx.textAlign = "left";
+          ctx.fillText(text, cellX + 4, rowY + 15);
+        } else {
+          ctx.textAlign = "center";
+          ctx.fillText(text, cellX + colW / 2, rowY + 15);
+        }
+      }
+
+      // Row bottom border
+      ctx.strokeStyle = "#e2e8f0";
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(x, rowY + rowH);
+      ctx.lineTo(x + maxW, rowY + rowH);
+      ctx.stroke();
+    }
+    ctx.textAlign = "left";
+    return y + rows.length * rowH;
+  }
+
+  /**
    * Recursively inline computed styles from a source element onto a clone
    * (needed for SVG foreignObject rendering)
    */
@@ -391,9 +679,13 @@
     if (!source || !clone) return;
     try {
       var computed = window.getComputedStyle(source);
-      var important = ["font-family", "font-size", "font-weight", "color",
-        "background-color", "border", "padding", "margin", "display",
-        "text-align", "line-height", "width", "max-width"];
+      var important = [
+        "font-family", "font-size", "font-weight", "color",
+        "background-color", "background", "border", "border-radius",
+        "padding", "margin", "display", "text-align", "line-height",
+        "white-space", "width", "max-width",
+        "border-bottom", "border-top", "border-left", "overflow"
+      ];
       for (var p = 0; p < important.length; p++) {
         var val = computed.getPropertyValue(important[p]);
         if (val) clone.style.setProperty(important[p], val);

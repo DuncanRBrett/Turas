@@ -319,17 +319,34 @@ extract_footer <- function(html, report_type) {
 
 #' Extract Metadata from HTML
 #'
+#' Extracts both legacy HTML-based metadata and new \code{<meta>} tag metadata
+#' embedded by Turas report generators for clean hub extraction.
+#'
 #' @param html Full HTML string
 #' @param report_type "tracker" or "tabs"
 #' @return Named list of metadata
 extract_metadata <- function(html, report_type) {
   meta <- list(report_type = report_type)
 
+  # --- Helper: extract content from <meta name="X" content="Y"> ---
+  extract_meta_tag <- function(name) {
+    pat <- sprintf('<meta\\s+name="%s"\\s+content="([^"]*)"', name)
+    m <- regexpr(pat, html, perl = TRUE)
+    if (m > 0) {
+      val <- sub(pat, '\\1', regmatches(html, m))
+      if (nzchar(val)) return(val)
+    }
+    return(NULL)
+  }
+
   # Project title from <title> tag
   title_m <- regexpr('<title>([^<]*)</title>', html)
   if (title_m > 0) {
     meta$title <- sub('<title>([^<]*)</title>', '\\1', regmatches(html, title_m))
   }
+
+  # Generation timestamp from meta tag
+  meta$generated <- extract_meta_tag("turas-generated")
 
   if (report_type == "tracker") {
     # Extract from header elements
@@ -339,12 +356,10 @@ extract_metadata <- function(html, report_type) {
                                 regmatches(html, proj_m))
     }
 
-    # Badge bar stats
+    # Badge bar stats (legacy extraction)
     badge_m <- regexpr('class="tk-badge-bar">[\\s\\S]*?</div>', html, perl = TRUE)
     if (badge_m > 0) {
       badge_html <- regmatches(html, badge_m)
-      # Extract numbers from <strong>N</strong> Type patterns
-      num_matches <- gregexpr('<strong>(\\d+)</strong>\\s*([^<]*)<', badge_html)
       meta$badge_bar <- badge_html
     }
 
@@ -355,8 +370,24 @@ extract_metadata <- function(html, report_type) {
                              regmatches(html, brand_m))
     }
 
+    # --- New meta-tag extraction (preferred, falls back to badge_bar regex) ---
+    meta$n_metrics <- extract_meta_tag("turas-metrics")
+    meta$n_waves <- extract_meta_tag("turas-waves")
+    meta$n_segments <- extract_meta_tag("turas-segments")
+    meta$baseline_label <- extract_meta_tag("turas-baseline-label")
+    meta$latest_label <- extract_meta_tag("turas-latest-label")
+
+    # Fallback: parse badge bar if meta tags not present (older reports)
+    if (is.null(meta$n_metrics) && !is.null(meta$badge_bar)) {
+      nums <- regmatches(meta$badge_bar,
+                         gregexpr("<strong>(\\d+)</strong>", meta$badge_bar))[[1]]
+      if (length(nums) >= 1) meta$n_metrics <- gsub("<[^>]+>", "", nums[1])
+      if (length(nums) >= 2) meta$n_waves <- gsub("<[^>]+>", "", nums[2])
+      if (length(nums) >= 3) meta$n_segments <- gsub("<[^>]+>", "", nums[3])
+    }
+
   } else {
-    # Tabs: extract from tab-summary data attributes
+    # Tabs: extract from tab-summary data attributes (legacy)
     summary_m <- regexpr('id="tab-summary"[^>]*>', html)
     if (summary_m > 0) {
       summary_tag <- regmatches(html, summary_m)
@@ -376,6 +407,18 @@ extract_metadata <- function(html, report_type) {
       # data-brand-colour
       bc <- regmatches(summary_tag, regexpr('data-brand-colour="[^"]*"', summary_tag))
       if (length(bc) > 0) meta$brand_colour <- gsub('data-brand-colour="|"', '', bc)
+    }
+
+    # --- New meta-tag extraction (preferred) ---
+    meta$total_n <- extract_meta_tag("turas-total-n")
+    meta$n_questions <- extract_meta_tag("turas-questions")
+    meta$n_banner_groups <- extract_meta_tag("turas-banner-groups")
+    meta$weighted <- extract_meta_tag("turas-weighted")
+    meta$fieldwork <- meta$fieldwork %||% extract_meta_tag("turas-fieldwork")
+
+    # Use title for project_title fallback
+    if (is.null(meta$project_title) && !is.null(meta$title)) {
+      meta$project_title <- meta$title
     }
   }
 

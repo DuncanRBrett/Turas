@@ -577,7 +577,7 @@ build_gauge_section <- function(metrics, brand_colour, section_label, thresholds
         class = "dash-export-btn dash-slide-export-btn",
         style = "margin-left:12px;",
         onclick = sprintf("exportDashboardSlide('%s')", section_id),
-        htmltools::HTML("&#128196; Export Slide")
+        htmltools::HTML("&#x1F4F7; Export Slide")
       ),
       htmltools::tags$button(
         class = "dash-export-btn dash-sort-btn",

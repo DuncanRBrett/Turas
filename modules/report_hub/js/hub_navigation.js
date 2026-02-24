@@ -145,12 +145,13 @@ var ReportHub = ReportHub || {};
     // Sync any editable content
     ReportHub.savePinnedData();
 
-    // Stamp the date
-    var dateBadge = document.getElementById("hub-date-badge");
-    if (dateBadge) {
+    // Stamp the date in header
+    var dateEl = document.getElementById("hub-header-date");
+    if (dateEl) {
       var now = new Date();
       var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-      dateBadge.textContent = "Saved " + months[now.getMonth()] + " " + now.getFullYear();
+      var day = now.getDate();
+      dateEl.textContent = "Last saved " + day + " " + months[now.getMonth()] + " " + now.getFullYear();
     }
 
     // Serialize the full page

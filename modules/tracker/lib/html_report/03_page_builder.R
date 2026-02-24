@@ -31,6 +31,14 @@ build_tracker_page <- function(html_data, table_html, charts, config) {
       htmltools::tags$title(paste0(project_name, " - Tracking Report")),
       htmltools::tags$meta(name = "turas-report-type", content = "tracker"),
       htmltools::tags$meta(name = "turas-generated", content = format(Sys.time(), "%Y-%m-%dT%H:%M:%S")),
+      # Hub-extraction metadata
+      htmltools::tags$meta(name = "turas-metrics", content = as.character(html_data$n_metrics)),
+      htmltools::tags$meta(name = "turas-waves", content = as.character(length(html_data$waves))),
+      htmltools::tags$meta(name = "turas-segments", content = as.character(length(html_data$segments))),
+      htmltools::tags$meta(name = "turas-baseline-label",
+                           content = html_data$wave_lookup[html_data$baseline_wave] %||% ""),
+      htmltools::tags$meta(name = "turas-latest-label",
+                           content = html_data$wave_lookup[html_data$waves[length(html_data$waves)]] %||% ""),
       htmltools::tags$style(htmltools::HTML(build_tracker_css(brand_colour, accent_colour)))
     ),
 
@@ -59,15 +67,7 @@ build_tracker_page <- function(html_data, table_html, charts, config) {
           build_overview_sidebar(html_data, config),
           htmltools::tags$main(class = "tk-content",
             build_controls(html_data, config),
-            htmltools::tags$div(class = "tk-main-area",
-              htmltools::tags$div(class = "tk-table-panel", table_html),
-              htmltools::tags$div(class = "tk-chart-panel",
-                id = "tk-chart-panel",
-                style = "display:none",
-                build_chart_containers(html_data, charts, config)
-              )
-            ),
-            # Overview actions: Pin + Export + Insight
+            # Overview actions: Pin + Export (above table, like Metrics by Segment)
             htmltools::tags$div(class = "overview-actions-bar",
               htmltools::tags$button(class = "tk-btn",
                 onclick = "pinOverviewView()",
@@ -75,6 +75,14 @@ build_tracker_page <- function(html_data, table_html, charts, config) {
               htmltools::tags$button(class = "tk-btn",
                 onclick = "exportOverviewSlide()",
                 htmltools::HTML("&#x1F4F8; Export Slide"))
+            ),
+            htmltools::tags$div(class = "tk-main-area",
+              htmltools::tags$div(class = "tk-table-panel", table_html),
+              htmltools::tags$div(class = "tk-chart-panel",
+                id = "tk-chart-panel",
+                style = "display:none",
+                build_chart_containers(html_data, charts, config)
+              )
             ),
             htmltools::tags$div(class = "insight-area",
               htmltools::tags$button(class = "insight-toggle",
@@ -221,12 +229,12 @@ build_summary_tab <- function(html_data, config) {
     # Background & Method insight box (above metrics table)
     htmltools::tags$div(class = "summary-insight-box", id = "summary-section-background",
       htmltools::tags$div(class = "summary-section-controls",
-        htmltools::tags$button(class = "tk-btn tk-btn-sm",
+        htmltools::tags$button(class = "turas-action-btn",
           onclick = "pinSummarySection('background')",
-          htmltools::HTML("&#x1F4CC; Pin")),
-        htmltools::tags$button(class = "tk-btn tk-btn-sm",
+          htmltools::HTML("&#x1F4CC; Pin to Views")),
+        htmltools::tags$button(class = "turas-action-btn",
           onclick = "exportSummarySlide('background')",
-          htmltools::HTML("&#x1F4F8; Export Slide"))
+          htmltools::HTML("&#x1F4F7; Export Slide"))
       ),
       htmltools::tags$h3(class = "summary-insight-title", "Background & Method"),
       htmltools::tags$div(
@@ -240,12 +248,12 @@ build_summary_tab <- function(html_data, config) {
     # Summary insight box (above metrics table)
     htmltools::tags$div(class = "summary-insight-box", id = "summary-section-findings",
       htmltools::tags$div(class = "summary-section-controls",
-        htmltools::tags$button(class = "tk-btn tk-btn-sm",
+        htmltools::tags$button(class = "turas-action-btn",
           onclick = "pinSummarySection('findings')",
-          htmltools::HTML("&#x1F4CC; Pin")),
-        htmltools::tags$button(class = "tk-btn tk-btn-sm",
+          htmltools::HTML("&#x1F4CC; Pin to Views")),
+        htmltools::tags$button(class = "turas-action-btn",
           onclick = "exportSummarySlide('findings')",
-          htmltools::HTML("&#x1F4F8; Export Slide"))
+          htmltools::HTML("&#x1F4F7; Export Slide"))
       ),
       htmltools::tags$h3(class = "summary-insight-title", "Summary"),
       htmltools::tags$div(
@@ -261,15 +269,15 @@ build_summary_tab <- function(html_data, config) {
 
     # Action buttons bar
     htmltools::tags$div(class = "summary-actions",
-      htmltools::tags$button(class = "export-btn",
+      htmltools::tags$button(class = "turas-action-btn",
         onclick = "exportSummaryExcel()",
         htmltools::HTML("&#x1F4CA; Export Excel")),
-      htmltools::tags$button(class = "export-btn",
+      htmltools::tags$button(class = "turas-action-btn",
         onclick = "pinSummaryTable()",
-        htmltools::HTML("&#x1F4CC; Pin Table")),
-      htmltools::tags$button(class = "export-btn",
+        htmltools::HTML("&#x1F4CC; Pin to Views")),
+      htmltools::tags$button(class = "turas-action-btn",
         onclick = "exportSummaryTableSlide()",
-        htmltools::HTML("&#x1F4F8; Export Slide"))
+        htmltools::HTML("&#x1F4F7; Export Slide"))
     ),
 
     # Metrics Overview table (Total segment by wave) — at bottom
@@ -617,8 +625,15 @@ build_metric_panels <- function(html_data, charts, config, segments, segment_col
       active_class, mr$metric_id
     ))
 
-    # Title
-    q_text <- if (nzchar(mr$question_text)) paste0(" &mdash; ", htmltools::htmlEscape(mr$question_text)) else ""
+    # Title — handle NA/missing question_text; show "Composite Metric" for composites
+    q_raw <- mr$question_text
+    q_display <- ""
+    if (!is.null(q_raw) && !is.na(q_raw) && nzchar(q_raw) && q_raw != "NA") {
+      q_display <- q_raw
+    } else if (!is.null(mr$question_type) && tolower(mr$question_type) == "composite") {
+      q_display <- "Composite Metric"
+    }
+    q_text <- if (nzchar(q_display)) paste0(" &mdash; ", htmltools::htmlEscape(q_display)) else ""
     panel_parts <- c(panel_parts, sprintf(
       '<h2 class="mv-metric-title">%s<span class="mv-metric-subtitle">%s</span></h2>',
       htmltools::htmlEscape(mr$metric_label), q_text
@@ -943,6 +958,8 @@ build_pinned_tab <- function() {
     # Export toolbar (hidden when no pins)
     htmltools::tags$div(class = "pinned-toolbar", id = "pinned-toolbar",
                          style = "display:none",
+      htmltools::tags$button(class = "tk-btn", onclick = "addSection()",
+                              htmltools::HTML("&#x2795; Add Section")),
       htmltools::tags$button(class = "tk-btn", onclick = "exportAllPinsPNG()",
                               htmltools::HTML("&#x1F4F8; Export All as PNGs")),
       htmltools::tags$button(class = "tk-btn", onclick = "printAllPins()",
@@ -1072,12 +1089,18 @@ build_overview_sidebar <- function(html_data, config) {
     ))
   }
 
-  # Grouped segments
+  # Grouped segments — group header is clickable to show all segments in the group
   for (group_name in names(segment_group_info$groups)) {
     group_segs <- segment_group_info$groups[[group_name]]
 
+    # Comma-separated list of segment names for JS
+    group_segs_escaped <- paste(vapply(group_segs, js_escape_seg, character(1)), collapse = ",")
+
     items <- c(items, sprintf(
-      '<div class="tk-sidebar-section">%s</div>',
+      '<div class="tk-sidebar-section" data-group-segments="%s" onclick="showBannerGroup(\'%s\',this);return false;" title="Show all %s segments">%s</div>',
+      htmltools::htmlEscape(paste(group_segs, collapse = ",")),
+      htmltools::htmlEscape(group_name),
+      htmltools::htmlEscape(group_name),
       htmltools::htmlEscape(group_name)
     ))
 
@@ -1086,8 +1109,9 @@ build_overview_sidebar <- function(html_data, config) {
       seg_colour <- segment_colours[s_idx]
       display_label <- sub(paste0("^", group_name, "_"), "", seg_name)
       items <- c(items, sprintf(
-        '<a class="tk-sidebar-item tk-seg-sidebar-item" data-segment="%s" href="#" onclick="switchSegment(\'%s\');return false;"><span class="tk-seg-dot" style="background:%s"></span>%s</a>',
+        '<a class="tk-sidebar-item tk-seg-sidebar-item" data-segment="%s" data-group="%s" href="#" onclick="switchSegment(\'%s\');return false;"><span class="tk-seg-dot" style="background:%s"></span>%s</a>',
         htmltools::htmlEscape(seg_name),
+        htmltools::htmlEscape(group_name),
         js_escape_seg(seg_name), seg_colour,
         htmltools::htmlEscape(display_label)
       ))

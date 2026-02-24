@@ -86,10 +86,21 @@
 
   /**
    * Render a metric's data table on the canvas.
-   * Reads chart data from the metric row's data-chart JSON attribute.
+   * Reads from the visible DOM table in the metric panel (#mv-{metricId}),
+   * respecting all current visibility filters (segment-hidden, change rows, etc.).
+   * Falls back to JSON data-chart attribute if no DOM table is found.
    */
   function drawTableOnCanvas(ctx, metricId, metricRow, x, y, w, h) {
-    // Get chart data from the metric row
+    // Try to read from the visible DOM table first
+    var panel = document.getElementById("mv-" + metricId);
+    var domTable = panel ? panel.querySelector(".mv-metric-table") : null;
+
+    if (domTable) {
+      drawTableFromDOM(ctx, domTable, metricId, x, y, w, h);
+      return;
+    }
+
+    // Fallback: read from JSON data-chart attribute (less accurate — shows all segments)
     var chartAttr = metricRow ? metricRow.getAttribute("data-chart") : null;
     if (!chartAttr) {
       drawPlaceholder(ctx, x, y, w, h, "No data available for this metric");
@@ -107,11 +118,222 @@
       return;
     }
 
+    drawTableFromJSON(ctx, chartData, x, y, w, h);
+  }
+
+  /**
+   * Read visible rows/columns from the DOM table and render on canvas.
+   * Only includes rows and columns that are currently visible in the UI.
+   */
+  function drawTableFromDOM(ctx, domTable, metricId, x, y, w, h) {
+    // Extract visible wave headers
+    var waveLabels = [];
+    var headerRow = domTable.querySelector("thead tr.tk-wave-header-row");
+    if (headerRow) {
+      headerRow.querySelectorAll("th").forEach(function(th) {
+        if (th.classList.contains("segment-hidden")) return;
+        if (th.classList.contains("wave-hidden")) return;
+        if (th.style.display === "none") return;
+        waveLabels.push(th.textContent.trim());
+      });
+    }
+    // First header is "Segment" label column — separate it
+    var labelHeader = waveLabels.length > 0 ? waveLabels.shift() : "Segment";
+    var nWaves = waveLabels.length;
+
+    if (nWaves === 0) {
+      drawPlaceholder(ctx, x, y, w, h, "No visible wave columns");
+      return;
+    }
+
+    // Extract visible data rows
+    var visibleRows = [];
+    domTable.querySelectorAll("tbody tr").forEach(function(tr) {
+      // Skip hidden rows of all types
+      if (tr.classList.contains("segment-hidden")) return;
+      if (tr.style.display === "none") return;
+      // Skip change rows unless they are toggled visible
+      if (tr.classList.contains("tk-change-row") && !tr.classList.contains("visible")) return;
+
+      var rowInfo = { label: "", values: [], colour: null, isBase: false, isChange: false, isTotal: false };
+
+      if (tr.classList.contains("tk-base-row")) {
+        rowInfo.isBase = true;
+        var baseLabelEl = tr.querySelector(".tk-base-label");
+        rowInfo.label = baseLabelEl ? baseLabelEl.textContent.trim() : "Base (n=)";
+        tr.querySelectorAll("td.tk-base-cell").forEach(function(td) {
+          if (td.classList.contains("segment-hidden")) return;
+          if (td.classList.contains("wave-hidden")) return;
+          if (td.style.display === "none") return;
+          rowInfo.values.push(td.textContent.trim());
+        });
+        visibleRows.push(rowInfo);
+        return;
+      }
+
+      if (tr.classList.contains("tk-change-row")) {
+        rowInfo.isChange = true;
+        var changeLabelEl = tr.querySelector(".tk-change-label");
+        rowInfo.label = changeLabelEl ? changeLabelEl.textContent.trim() : "Change";
+        tr.querySelectorAll("td.tk-change-cell").forEach(function(td) {
+          if (td.classList.contains("segment-hidden")) return;
+          if (td.classList.contains("wave-hidden")) return;
+          if (td.style.display === "none") return;
+          rowInfo.values.push(td.textContent.trim());
+        });
+        visibleRows.push(rowInfo);
+        return;
+      }
+
+      if (tr.classList.contains("tk-metric-row")) {
+        var segName = tr.getAttribute("data-segment") || "";
+        var labelEl = tr.querySelector(".tk-metric-label");
+        rowInfo.label = labelEl ? labelEl.textContent.trim() : segName;
+        rowInfo.isTotal = segName === "Total";
+
+        // Get segment colour from dot element
+        var dot = tr.querySelector(".tk-seg-dot");
+        if (dot) {
+          rowInfo.colour = dot.style.background || dot.style.backgroundColor || null;
+        }
+
+        tr.querySelectorAll("td.tk-value-cell").forEach(function(td) {
+          if (td.classList.contains("segment-hidden")) return;
+          if (td.classList.contains("wave-hidden")) return;
+          if (td.style.display === "none") return;
+          var valSpan = td.querySelector(".tk-val");
+          rowInfo.values.push(valSpan ? valSpan.textContent.trim() : td.textContent.trim());
+        });
+        visibleRows.push(rowInfo);
+      }
+    });
+
+    if (visibleRows.length === 0) {
+      drawPlaceholder(ctx, x, y, w, h, "No visible data rows");
+      return;
+    }
+
+    // Default colour palette (fallback if no dot colours found)
+    var COLOURS = [
+      "#323367", "#CC9900", "#2E8B57", "#CD5C5C", "#4682B4",
+      "#9370DB", "#D2691E", "#20B2AA", "#8B4513", "#6A5ACD"
+    ];
+
+    // Layout calculations
+    var rowH = 26;
+    var headerH = 32;
+    var labelColW = Math.min(260, w * 0.28);
+    var dataColW = (w - labelColW) / nWaves;
+    var maxRows = Math.floor((h - headerH) / rowH);
+    var displayRows = visibleRows.slice(0, maxRows);
+
+    // Background
+    ctx.fillStyle = "#fafafa";
+    ctx.fillRect(x, y, w, h);
+
+    // Header row background
+    ctx.fillStyle = "#f0f0f5";
+    ctx.fillRect(x, y, w, headerH);
+
+    // Header text
+    ctx.fillStyle = "#555";
+    ctx.font = "bold 12px -apple-system, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(labelHeader, x + 10, y + 20);
+    ctx.textAlign = "center";
+    for (var wi = 0; wi < nWaves; wi++) {
+      var colX = x + labelColW + wi * dataColW + dataColW / 2;
+      ctx.fillText(waveLabels[wi], colX, y + 20);
+    }
+
+    // Header bottom border
+    ctx.strokeStyle = "#ccc";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, y + headerH);
+    ctx.lineTo(x + w, y + headerH);
+    ctx.stroke();
+
+    // Data rows
+    var colourIdx = 0;
+    for (var ri = 0; ri < displayRows.length; ri++) {
+      var row = displayRows[ri];
+      var rowY = y + headerH + ri * rowH;
+
+      // Row background
+      if (row.isBase) {
+        ctx.fillStyle = "#f8f9fa";
+      } else if (row.isChange) {
+        ctx.fillStyle = "#fafafa";
+      } else if (ri % 2 === 0) {
+        ctx.fillStyle = "#ffffff";
+      } else {
+        ctx.fillStyle = "#f8f9fa";
+      }
+      ctx.fillRect(x, rowY, w, rowH);
+
+      // Row border
+      ctx.strokeStyle = "#eee";
+      ctx.beginPath();
+      ctx.moveTo(x, rowY + rowH);
+      ctx.lineTo(x + w, rowY + rowH);
+      ctx.stroke();
+
+      // Label with colour dot (for metric rows only, not base/change)
+      if (!row.isBase && !row.isChange) {
+        var dotColour = row.colour || COLOURS[colourIdx % COLOURS.length];
+        ctx.fillStyle = dotColour;
+        ctx.beginPath();
+        ctx.arc(x + 14, rowY + rowH / 2, 4, 0, Math.PI * 2);
+        ctx.fill();
+        colourIdx++;
+
+        ctx.fillStyle = "#333";
+        ctx.font = row.isTotal ? "bold 12px -apple-system, sans-serif" : "12px -apple-system, sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(row.label, x + 24, rowY + rowH / 2 + 4);
+      } else {
+        // Base / change row label (no dot, dimmer text)
+        ctx.fillStyle = row.isBase ? "#666" : "#888";
+        ctx.font = row.isBase ? "bold 11px -apple-system, sans-serif" : "11px -apple-system, sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(row.label, x + 10, rowY + rowH / 2 + 4);
+      }
+
+      // Values
+      ctx.font = row.isChange ? "11px -apple-system, sans-serif" : "12px -apple-system, sans-serif";
+      ctx.textAlign = "center";
+      for (var vi = 0; vi < row.values.length && vi < nWaves; vi++) {
+        var colCx = x + labelColW + vi * dataColW + dataColW / 2;
+        var cellText = row.values[vi] || "\u2014";
+        ctx.fillStyle = row.isChange ? "#888" : (row.isBase ? "#666" : "#222");
+        ctx.fillText(cellText, colCx, rowY + rowH / 2 + 4);
+      }
+    }
+
+    // Outer border
+    ctx.strokeStyle = "#ddd";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, w, headerH + displayRows.length * rowH);
+
+    // Reset text alignment
+    ctx.textAlign = "left";
+  }
+
+  /**
+   * Fallback: render table from JSON data-chart attribute.
+   * Used when the DOM table is not available.
+   */
+  function drawTableFromJSON(ctx, chartData, x, y, w, h) {
     var waveLabels = chartData.wave_labels;
     var nWaves = waveLabels.length;
     var segmentNames = Object.keys(chartData.series);
-    var nSegments = segmentNames.length;
     var isPct = chartData.is_percentage;
+
+    var COLOURS = [
+      "#323367", "#CC9900", "#2E8B57", "#CD5C5C", "#4682B4",
+      "#9370DB", "#D2691E", "#20B2AA", "#8B4513", "#6A5ACD"
+    ];
 
     // Layout calculations
     var rowH = 26;
@@ -148,12 +370,6 @@
     ctx.lineTo(x + w, y + headerH);
     ctx.stroke();
 
-    // Segment colour palette (matching chart_controls.js)
-    var COLOURS = [
-      "#323367", "#CC9900", "#2E8B57", "#CD5C5C", "#4682B4",
-      "#9370DB", "#D2691E", "#20B2AA", "#8B4513", "#6A5ACD"
-    ];
-
     // Data rows
     ctx.textAlign = "left";
     for (var si = 0; si < visibleSegments.length; si++) {
@@ -163,7 +379,6 @@
 
       var rowY = y + headerH + si * rowH;
 
-      // Alternating row background
       if (si % 2 === 0) {
         ctx.fillStyle = "#ffffff";
       } else {
@@ -171,21 +386,18 @@
       }
       ctx.fillRect(x, rowY, w, rowH);
 
-      // Row border
       ctx.strokeStyle = "#eee";
       ctx.beginPath();
       ctx.moveTo(x, rowY + rowH);
       ctx.lineTo(x + w, rowY + rowH);
       ctx.stroke();
 
-      // Colour dot
       var dotColour = COLOURS[si % COLOURS.length];
       ctx.fillStyle = dotColour;
       ctx.beginPath();
       ctx.arc(x + 14, rowY + rowH / 2, 4, 0, Math.PI * 2);
       ctx.fill();
 
-      // Segment name (strip group prefix for display)
       var displayName = segName;
       var underscoreIdx = segName.indexOf("_");
       if (underscoreIdx > 0 && segName !== "Total") {
@@ -196,7 +408,6 @@
       ctx.textAlign = "left";
       ctx.fillText(displayName, x + 24, rowY + rowH / 2 + 4);
 
-      // Values
       ctx.font = "12px -apple-system, sans-serif";
       ctx.textAlign = "center";
       for (var vi = 0; vi < nWaves; vi++) {
@@ -220,7 +431,6 @@
         }
       }
 
-      // Base sizes (small text below values)
       if (series.n) {
         ctx.font = "9px -apple-system, sans-serif";
         ctx.fillStyle = "#999";
@@ -239,7 +449,6 @@
     ctx.lineWidth = 1;
     ctx.strokeRect(x, y, w, headerH + visibleSegments.length * rowH);
 
-    // Reset text alignment
     ctx.textAlign = "left";
   }
 

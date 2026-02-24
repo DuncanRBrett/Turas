@@ -16,7 +16,7 @@
   --text: #1e293b;
   --text-muted: #64748b;
   --border: #e2e8f0;
-  --section-bg: #f0f4e8;
+  --section-bg: #f8f9fa;
   --change-bg: #fafafa;
   --sidebar-w: 280px;
 }
@@ -58,13 +58,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 /* ---- SUMMARY TAB ---- */
 .summary-tab-content { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
 .summary-stats-row { display: flex; gap: 16px; margin-bottom: 32px; flex-wrap: wrap; }
-.summary-stat-card { flex: 1; min-width: 140px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px 16px; text-align: center; }
+.summary-stat-card { flex: 1; min-width: 140px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px 16px; text-align: center; }
 .stat-number { font-size: 28px; font-weight: 700; color: var(--brand); }
 .stat-label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
-.summary-insight-box { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 20px; position: relative; }
+.summary-insight-box { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin-bottom: 20px; position: relative; }
 .summary-insight-title { font-size: 16px; font-weight: 700; color: var(--brand); margin-bottom: 12px; }
 .summary-editor { min-height: 80px; }
-.summary-section-controls { float: right; display: flex; gap: 4px; }
+.summary-section-controls { float: right; display: flex; gap: 6px; }
+
+/* Teal action buttons (Pin to Views, Export Slide) — consistent with Turas Tabs dashboard */
+.turas-action-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 12px; font-weight: 600; color: var(--brand); background: rgba(13,138,138,0.06); border: 1px solid rgba(13,138,138,0.2); border-radius: 6px; cursor: pointer; transition: all 0.15s; font-family: inherit; white-space: nowrap; }
+.turas-action-btn:hover { background: rgba(13,138,138,0.12); border-color: var(--brand); }
 
 /* ---- METRICS BY SEGMENT TAB ---- */
 .metrics-tab-layout { display: flex; min-height: calc(100vh - 180px); }
@@ -78,7 +82,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .mv-sidebar-nav-scroll { max-height: 500px; overflow-y: auto; }
 .mv-sidebar-nav { padding: 0; }
 .mv-nav-section { padding: 10px 14px 4px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
-.tk-metric-nav-item { display: block; padding: 10px 14px; font-size: 12px; color: var(--text); text-decoration: none; cursor: pointer; border-left: 3px solid transparent; border-bottom: 1px solid var(--border); transition: all 0.12s ease; line-height: 1.35; }
+.tk-metric-nav-item { display: block; padding: 10px 14px; font-size: 12px; color: var(--text); text-decoration: none; cursor: pointer; border-left: 3px solid transparent; border-bottom: 1px solid var(--border); transition: all 0.15s ease; line-height: 1.35; }
 .tk-metric-nav-item:last-child { border-bottom: none; }
 .tk-metric-nav-item:hover { background: #f8fafc; }
 .tk-metric-nav-item.active { border-left-color: var(--brand); background: #e6f5f5; font-weight: 600; color: #1a2744; }
@@ -86,7 +90,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .mv-type-filter { display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .mv-type-chip { padding: 3px 10px; border: 1.5px solid var(--border); background: var(--card); border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; color: var(--text-muted); font-family: inherit; }
 .mv-type-chip:hover { border-color: var(--brand); }
-.mv-type-chip.active { border-color: var(--brand); color: var(--brand); background: #f0f0ff; }
+.mv-type-chip.active { border-color: var(--brand); color: var(--brand); background: #e6f5f5; }
 .mv-global-controls { padding: 10px 16px; border-bottom: 1px solid var(--border); }
 .mv-content { flex: 1; padding: 24px; overflow-x: auto; }
 
@@ -99,16 +103,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 /* Segment chips */
 .mv-segment-chips { display: flex; gap: 8px; margin: 16px 0 8px; flex-wrap: wrap; }
 .tk-segment-chip { padding: 6px 16px; border: 2px solid var(--border); background: var(--card); border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; color: var(--text-muted); font-family: inherit; }
-.tk-segment-chip.active { border-color: var(--chip-color, var(--brand)); color: var(--chip-color, var(--brand)); background: #f8f8ff; }
+.tk-segment-chip.active { border-color: var(--chip-color, var(--brand)); color: var(--chip-color, var(--brand)); background: #f0fafa; }
 .tk-segment-chip:hover { border-color: var(--chip-color, var(--brand)); }
 
 /* Hierarchical segment groups */
 .mv-segment-grouped { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
 .mv-segment-group { display: flex; flex-direction: column; gap: 4px; }
-.mv-segment-group-header { padding: 5px 14px; border: 2px solid var(--border); background: #f0f0f5; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); cursor: pointer; transition: all 0.15s; font-family: inherit; }
+.mv-segment-group-header { padding: 5px 14px; border: 2px solid var(--border); background: var(--ct-bg-muted); border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); cursor: pointer; transition: all 0.15s; font-family: inherit; }
 .mv-segment-group-header:hover { border-color: var(--brand); color: var(--brand); }
-.mv-segment-group-header.active { background: #e8e8ff; border-color: var(--brand); color: var(--brand); }
-.mv-segment-group-header .chevron { display: inline-block; font-size: 9px; margin-left: 4px; transition: transform 0.2s; }
+.mv-segment-group-header.active { background: #e6f5f5; border-color: var(--brand); color: var(--brand); }
+.mv-segment-group-header .chevron { display: inline-block; font-size: 9px; margin-left: 4px; transition: transform 0.15s; }
 .mv-segment-group.expanded .mv-segment-group-header .chevron { transform: rotate(90deg); }
 .mv-segment-group-chips { display: none; gap: 6px; flex-wrap: wrap; padding-left: 4px; }
 .mv-segment-group.expanded .mv-segment-group-chips { display: flex; }
@@ -138,8 +142,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .tk-sidebar-nav-card { background: var(--card); border-radius: 8px; border: 1px solid var(--border); overflow: hidden; }
 .tk-sidebar-nav-scroll { max-height: 500px; overflow-y: auto; }
 .tk-sidebar-nav { padding: 0; }
-.tk-sidebar-section { padding: 10px 14px 4px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
-.tk-sidebar-item { display: block; padding: 10px 14px; font-size: 12px; color: var(--text); text-decoration: none; cursor: pointer; border-left: 3px solid transparent; border-bottom: 1px solid var(--border); transition: all 0.12s ease; }
+.tk-sidebar-section { padding: 10px 14px 4px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: color 0.15s ease; }
+.tk-sidebar-section:hover { color: var(--brand); }
+.tk-sidebar-section.active { color: var(--brand); }
+.tk-sidebar-item { display: block; padding: 10px 14px; font-size: 12px; color: var(--text); text-decoration: none; cursor: pointer; border-left: 3px solid transparent; border-bottom: 1px solid var(--border); transition: all 0.15s ease; }
 .tk-sidebar-item:last-child { border-bottom: none; }
 .tk-sidebar-item:hover { background: #f8fafc; }
 .tk-sidebar-item.active { border-left-color: var(--brand); background: #e6f5f5; font-weight: 600; color: #1a2744; }
@@ -154,12 +160,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 /* Segment sidebar items */
 .tk-seg-sidebar-item { display: flex; align-items: center; gap: 8px; }
 /* Overview actions bar (pin + export + insight) */
-.overview-actions-bar { display: flex; gap: 8px; margin-top: 16px; padding: 10px 0; }
+.overview-actions-bar { display: flex; gap: 8px; margin-bottom: 12px; padding: 10px 0; }
 .tk-sidebar-header { padding: 10px 14px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
 
 /* Summary metrics table */
-.summary-metrics-table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 20px; overflow-x: auto; }
-.summary-metrics-table { font-size: 13px; }
+.summary-metrics-table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin-bottom: 20px; overflow-x: auto; }
+.summary-metrics-table { font-size: 13px; color: #1e293b; }
 .summary-metrics-table .tk-section-cell { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; padding: 12px 16px 4px; border: none; background: none; }
 .summary-type-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
 .summary-type-chip { padding: 5px 14px; border-radius: 16px; border: 1px solid var(--border); background: var(--card); font-size: 12px; cursor: pointer; color: var(--text-muted); transition: all 0.15s; }
@@ -186,7 +192,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .tk-export-group { margin-left: auto; }
 
 /* Export button (shared Turas design — matches Turas Tabs .export-btn) */
-.export-btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 4px; background: #ffffff; color: var(--text-muted); font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.12s; white-space: nowrap; }
+.export-btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 4px; background: #ffffff; color: var(--text-muted); font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s; white-space: nowrap; }
 .export-btn:hover { background: #f8fafc; color: var(--text); }
 
 /* Header action buttons (dark background variant) */
@@ -202,32 +208,34 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .tk-segment-showing { font-size: 14px; color: var(--text); margin-bottom: 8px; padding: 4px 0; }
 .tk-segment-showing strong { color: var(--brand); }
 
-/* Segment indicator row */
+/* Segment indicator row (coloured bar with segment name label) */
 .tk-segment-indicator-row { }
-.tk-segment-indicator { height: 4px; padding: 0; border: none; }
+.tk-segment-indicator { padding: 4px 8px; border: none; }
 
 /* ---- TABLE STYLES ---- */
 .tk-table-wrapper { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); background: var(--card); }
-.tk-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.tk-th { padding: 8px 10px; text-align: center; font-size: 11px; font-weight: 600; border-bottom: 2px solid var(--border); white-space: nowrap; background: var(--ct-bg-muted); }
-.tk-td { padding: 6px 10px; text-align: center; border-bottom: 1px solid #f0f0f0; }
+.tk-table { width: 100%; border-collapse: collapse; color: #1e293b; font-size: 13px; }
+.tk-table td, .tk-table th { color: #1e293b; }
+.tk-th { padding: 8px 10px; text-align: center; font-size: 11px; font-weight: 600; color: #64748b; border-bottom: 2px solid var(--border); white-space: nowrap; background: var(--ct-bg-muted); }
+.tk-td { padding: 6px 10px; text-align: center; border-bottom: 1px solid #f0f0f0; font-size: 13px; color: #1e293b; }
 .tk-label-col { text-align: left; min-width: 180px; max-width: 320px; }
 .tk-sticky-col { position: sticky; left: 0; z-index: 2; background: var(--card); }
 .tk-segment-header { font-size: 12px; letter-spacing: 0.3px; }
-.tk-wave-header { font-size: 12px; background: #f8f8fc; }
-.tk-value-cell { font-variant-numeric: tabular-nums; }
+.tk-wave-header { font-size: 12px; color: #64748b; background: var(--ct-bg-muted); }
+.tk-value-cell { font-variant-numeric: tabular-nums; color: #1e293b; font-size: 13px; }
+.tk-val { font-variant-numeric: tabular-nums; color: #1e293b; font-size: 13px; }
 
 /* Section rows (collapsible) */
 .tk-section-row { background: none; }
-.tk-section-cell { padding: 14px 16px 8px; font-size: 12px; font-weight: 700; color: var(--brand); text-transform: uppercase; letter-spacing: 0.5px; background: var(--section-bg); border-bottom: 2px solid var(--border); cursor: pointer; user-select: none; }
-.tk-section-cell:hover { background: #e5ebd8; }
-.section-chevron { display: inline-block; font-size: 10px; transition: transform 0.2s; margin-right: 4px; }
+.tk-section-cell { padding: 14px 16px 8px; font-size: 13px; font-weight: 700; color: var(--brand); text-transform: uppercase; letter-spacing: 0.5px; background: var(--section-bg); border-bottom: 2px solid var(--border); cursor: pointer; user-select: none; }
+.tk-section-cell:hover { background: #eef0f2; }
+.section-chevron { display: inline-block; font-size: 10px; transition: transform 0.15s; margin-right: 4px; }
 .section-collapsed .section-chevron { transform: rotate(-90deg); }
 tr.section-hidden { display: none !important; }
 
 /* Metric rows */
-.tk-metric-row { transition: background 0.1s; }
-.tk-metric-row:hover { background: #fafafe; }
+.tk-metric-row { transition: background 0.15s; }
+.tk-metric-row:hover { background: #f8fafa; }
 .tk-metric-label { font-weight: 600; margin-right: 8px; }
 .tk-sparkline-wrap { display: inline-block; vertical-align: middle; margin-left: 4px; }
 
@@ -264,7 +272,7 @@ body.hide-significance .sig-arrow { display: none; }
 
 /* Sortable column headers */
 .tk-sortable { cursor: pointer; user-select: none; }
-.tk-sortable:hover { background: #eef; }
+.tk-sortable:hover { background: #f0fafa; }
 .tk-sortable.sort-asc::after { content: " \25B2"; font-size: 9px; color: var(--brand); }
 .tk-sortable.sort-desc::after { content: " \25BC"; font-size: 9px; color: var(--brand); }
 
@@ -295,7 +303,7 @@ body.hide-sparklines .tk-sparkline-wrap { display: none; }
 .row-filtered { display: none !important; }
 
 /* Latest wave highlight */
-.tk-latest-wave { background: rgba(50,51,103,0.04); }
+.tk-latest-wave { background: rgba(30,41,59,0.03); }
 
 /* Sticky table headers */
 .tk-table thead { position: sticky; top: 0; z-index: 10; }
@@ -334,16 +342,23 @@ body.hide-sparklines .tk-sparkline-wrap { display: none; }
 .insight-dismiss { position: absolute; top: 8px; right: 8px; background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); line-height: 1; }
 .insight-dismiss:hover { color: #c0392b; }
 
+/* ---- SECTION DIVIDERS (Pinned Views) ---- */
+.section-divider { display: flex; align-items: center; gap: 12px; padding: 12px 0; margin: 8px 0; border-bottom: 2px solid var(--brand); }
+.section-divider-title { font-size: 16px; font-weight: 600; color: var(--brand); flex: 1; outline: none; min-width: 100px; }
+.section-divider-title:focus { border-bottom: 1px dashed var(--border); }
+.section-divider-actions { display: flex; gap: 4px; }
+
 /* ---- PINNED VIEWS ---- */
 .pinned-tab-content { padding: 24px; max-width: 1000px; margin: 0 auto; }
 .pinned-empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 15px; }
-.pinned-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 20px; overflow: hidden; }
-.pinned-card-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--border); background: #f8f8fc; }
+.pinned-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
+.pinned-card-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--ct-bg-muted); }
 .pinned-card-title { font-size: 15px; font-weight: 700; color: var(--text); margin: 0; }
 .pinned-card-actions { display: flex; gap: 6px; }
 .pinned-card-chart { padding: 16px 20px; border-bottom: 1px solid var(--border); text-align: center; }
 .pinned-card-chart svg { max-width: 100%; height: auto; }
-.pinned-card-body { padding: 16px 20px; overflow-x: auto; }
+.pinned-card-body { padding: 24px 28px; overflow-x: auto; }
+.pinned-card-body .tk-table-wrapper { border: none; margin: 8px 0; }
 .pinned-card-png { max-width: 100%; height: auto; border-radius: 4px; }
 .pinned-card-insight { padding: 12px 20px; border-bottom: 1px solid var(--border); background: #f8fafa; border-left: 3px solid var(--brand); font-size: 13px; color: var(--text); }
 .pinned-card-insight-area { padding: 8px 20px; border-bottom: 1px solid var(--border); }
@@ -372,7 +387,7 @@ body.hide-sparklines .tk-sparkline-wrap { display: none; }
   .tk-chart-actions, .tk-help-overlay, .report-tabs, .mv-segment-chips,
   .insight-toggle, .insight-dismiss, .mv-pin-btn, .pinned-card-actions,
   .pinned-toolbar, .tk-segment-selector, .tk-row-hide-btn,
-  .tk-tab-actions, .export-btn { display: none !important; }
+  .tk-tab-actions, .export-btn, .turas-action-btn { display: none !important; }
   .tk-layout, .metrics-tab-layout { display: block; }
   .tk-content, .mv-content { padding: 0; }
   .tk-table-wrapper { border: none; overflow: visible; }

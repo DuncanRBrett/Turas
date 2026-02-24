@@ -145,6 +145,12 @@ build_hub_css <- function(config) {
 
 #' Build Hub Header HTML
 #'
+#' Header layout:
+#' - Title (project_title)
+#' - Subtitle line 1: "Prepared by {company_name} for {client_name}"
+#' - Subtitle line 2: "Powered by Turas Analytics"
+#' - Date line: "Created {date}" (updates to "Last saved {date}" on save)
+#'
 #' @param config Validated config
 #' @return HTML string
 build_hub_header <- function(config) {
@@ -166,19 +172,23 @@ build_hub_header <- function(config) {
     )
   }
 
-  subtitle_html <- ""
-  if (!is.null(config$settings$subtitle) && nzchar(config$settings$subtitle)) {
-    subtitle_html <- sprintf('<div class="hub-header-subtitle">%s</div>',
-                             htmltools::htmlEscape(config$settings$subtitle))
+  # Build "Prepared by X for Y" line
+  prepared_parts <- character(0)
+  company <- config$settings$company_name
+  client <- config$settings$client_name
+  if (!is.null(company) && nzchar(company)) {
+    prepared_parts <- c(prepared_parts, sprintf("Prepared by <strong>%s</strong>",
+                                                 htmltools::htmlEscape(company)))
   }
+  if (!is.null(client) && nzchar(client)) {
+    prepared_parts <- c(prepared_parts, sprintf("for <strong>%s</strong>",
+                                                 htmltools::htmlEscape(client)))
+  }
+  prepared_line <- paste(prepared_parts, collapse = " ")
 
-  client_html <- ""
-  if (!is.null(config$settings$client_name) && nzchar(config$settings$client_name)) {
-    client_html <- sprintf(
-      ' &middot; Prepared for <strong>%s</strong>',
-      htmltools::htmlEscape(config$settings$client_name)
-    )
-  }
+  # Date line: "Created {date}" — JS will update to "Last saved ..." on save
+
+  created_date <- format(Sys.Date(), "%d %b %Y")
 
   sprintf(
     '<div class="hub-header">
@@ -186,18 +196,22 @@ build_hub_header <- function(config) {
     %s
     <div class="hub-header-text">
       <div class="hub-header-title">%s</div>
-      <div class="hub-header-subtitle">%s%s</div>
+      <div class="hub-header-subtitle">%s</div>
+      <div class="hub-header-subtitle hub-header-powered">Powered by Turas Analytics</div>
     </div>
-    <div class="hub-header-actions">
-      <button class="hub-save-btn" onclick="ReportHub.saveReportHTML()">Save Report</button>
-      <button class="hub-print-btn" onclick="ReportHub.printReport()">Print</button>
+    <div class="hub-header-right">
+      <div class="hub-header-date" id="hub-header-date">Created %s</div>
+      <div class="hub-header-actions">
+        <button class="hub-save-btn" onclick="ReportHub.saveReportHTML()">Save Report</button>
+        <button class="hub-print-btn" onclick="ReportHub.printReport()">Print</button>
+      </div>
     </div>
   </div>
 </div>',
     logo_html,
     htmltools::htmlEscape(config$settings$project_title),
-    htmltools::htmlEscape(config$settings$company_name),
-    client_html
+    prepared_line,
+    htmltools::htmlEscape(created_date)
   )
 }
 

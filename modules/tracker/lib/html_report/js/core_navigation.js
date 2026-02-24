@@ -62,9 +62,12 @@
       dropdown.value = segmentName;
     }
 
-    // Update sidebar active state
+    // Update sidebar active state — deactivate group headers and individual items
     document.querySelectorAll(".tk-seg-sidebar-item").forEach(function(item) {
       item.classList.toggle("active", item.getAttribute("data-segment") === segmentName);
+    });
+    document.querySelectorAll(".tk-sidebar-section").forEach(function(el) {
+      el.classList.remove("active");
     });
 
     // Show only matching segment columns in the overview table
@@ -92,6 +95,51 @@
     // Rebuild combined overview chart for new segment
     if (typeof onOverviewSegmentChanged === "function") {
       onOverviewSegmentChanged();
+    }
+  };
+
+  /**
+   * Show all segments from a banner group (e.g., all Campus or all Tenure segments).
+   * Reads the group's segment list from the data-group-segments attribute on the header.
+   * @param {string} groupName - The banner group name (e.g., "Campus")
+   * @param {HTMLElement} headerEl - The clicked group header element
+   */
+  window.showBannerGroup = function(groupName, headerEl) {
+    // Read segment names from the header's data attribute
+    var segAttr = headerEl ? headerEl.getAttribute("data-group-segments") : "";
+    if (!segAttr) return;
+    var groupSegs = segAttr.split(",");
+
+    currentSegment = groupName;
+
+    // Deactivate all individual segment items, activate items in this group
+    document.querySelectorAll(".tk-seg-sidebar-item").forEach(function(item) {
+      var seg = item.getAttribute("data-segment");
+      item.classList.toggle("active", groupSegs.indexOf(seg) !== -1);
+    });
+
+    // Highlight this group header, deactivate others
+    document.querySelectorAll(".tk-sidebar-section").forEach(function(el) {
+      el.classList.remove("active");
+    });
+    if (headerEl) headerEl.classList.add("active");
+
+    // Show only this group's segment columns, hide all others
+    SEGMENTS.forEach(function(seg) {
+      var show = groupSegs.indexOf(seg) !== -1;
+      var cells = document.querySelectorAll('[data-segment="' + seg + '"]');
+      cells.forEach(function(cell) {
+        if (cell.classList.contains("tk-seg-sidebar-item")) return;
+        if (cell.closest("#tab-overview") || cell.closest(".tk-table-panel")) {
+          cell.classList.toggle("segment-hidden", !show);
+        }
+      });
+    });
+
+    // Update "Showing" label
+    var showingEl = document.getElementById("tk-segment-showing");
+    if (showingEl) {
+      showingEl.innerHTML = "Showing: <strong>" + groupName + "</strong> (" + groupSegs.length + " segments)";
     }
   };
 
@@ -583,13 +631,26 @@
     var chartPanel = document.getElementById("tk-chart-panel");
     var insightEditor = document.getElementById("overview-insight-editor");
 
-    // Clone table, remove hidden/filtered elements
+    // Clone table, remove hidden/filtered/collapsed elements — capture only the current view
     var cleanHtml = "";
     if (tablePanel && tablePanel.style.display !== "none") {
       var clone = tablePanel.cloneNode(true);
       clone.querySelectorAll(".segment-hidden").forEach(function(el) { el.parentNode.removeChild(el); });
       clone.querySelectorAll(".row-hidden-user").forEach(function(el) { el.parentNode.removeChild(el); });
       clone.querySelectorAll(".row-filtered").forEach(function(el) { el.parentNode.removeChild(el); });
+      clone.querySelectorAll(".section-hidden").forEach(function(el) { el.parentNode.removeChild(el); });
+      // Remove hidden change rows (only keep ones with class "visible")
+      clone.querySelectorAll(".tk-change-row").forEach(function(el) {
+        if (!el.classList.contains("visible")) el.parentNode.removeChild(el);
+      });
+      // Remove collapsed section headers and their hidden rows
+      clone.querySelectorAll(".tk-section-row.section-collapsed").forEach(function(el) {
+        el.parentNode.removeChild(el);
+      });
+      // Remove interactive elements that shouldn't appear in pin
+      clone.querySelectorAll(".tk-row-hide-btn, .tk-add-chart-btn, .tk-sortable").forEach(function(el) {
+        el.removeAttribute("onclick");
+      });
       cleanHtml = clone.innerHTML;
     }
 
@@ -618,41 +679,339 @@
     if (typeof renderPinnedCards === "function") renderPinnedCards();
     if (typeof updatePinBadge === "function") updatePinBadge();
     if (typeof savePinnedData === "function") savePinnedData();
+
+    // Capture a branded PNG snapshot asynchronously for reliable export
+    captureOverviewPng(pinObj);
   };
 
-  // ---- Overview Slide Export ----
-  window.exportOverviewSlide = function() {
-    var content = document.querySelector("#tab-overview .tk-content");
-    if (!content) return;
+  /**
+   * Generate a branded PNG of the currently visible overview table and store
+   * it in pinObj.pngDataUrl. Uses the same DOM-reading approach as
+   * exportOverviewSlide() so the image reflects exactly what is visible.
+   */
+  window.captureOverviewPng = function(pinObj) {
+    var table = document.getElementById("tk-crosstab-table");
+    if (!table) return;
 
-    // Use slide export for overview table
-    if (typeof exportSlidePNG === "function") {
-      var firstMetric = document.querySelector("#tk-crosstab-table .tk-metric-row");
-      if (firstMetric) {
-        exportSlidePNG(firstMetric.getAttribute("data-metric-id"), "table");
-        return;
-      }
+    var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367";
+
+    // Extract visible data from the DOM table (same logic as exportOverviewSlide)
+    var headers = [];
+    var headerRow = table.querySelector("thead tr.tk-wave-header-row");
+    if (headerRow) {
+      headerRow.querySelectorAll("th").forEach(function(th) {
+        if (th.classList.contains("segment-hidden")) return;
+        headers.push(th.textContent.trim());
+      });
     }
 
-    // Fallback: export the overview content area as PNG
-    var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367";
+    var dataRows = [];
+    table.querySelectorAll("tbody tr").forEach(function(tr) {
+      if (tr.classList.contains("section-hidden")) return;
+      if (tr.classList.contains("row-hidden-user")) return;
+      if (tr.classList.contains("row-filtered")) return;
+      if (tr.style.display === "none") return;
+      if (tr.classList.contains("tk-change-row") && !tr.classList.contains("visible")) return;
+
+      var cells = [];
+      var rowType = "data";
+      if (tr.classList.contains("tk-section-row")) rowType = "section";
+      else if (tr.classList.contains("tk-base-row")) rowType = "base";
+      else if (tr.classList.contains("tk-change-row")) rowType = "change";
+
+      tr.querySelectorAll("td, th").forEach(function(cell) {
+        if (cell.classList.contains("segment-hidden")) return;
+        var label = cell.querySelector(".tk-metric-label");
+        cells.push(label ? label.textContent.trim() : cell.textContent.trim());
+      });
+
+      if (cells.length > 0) {
+        dataRows.push({ cells: cells, type: rowType });
+      }
+    });
+
+    if (dataRows.length === 0) return;
+
+    // Canvas setup
+    var nCols = headers.length || 4;
+    var slideW = Math.max(1280, nCols * 120 + 300);
+    var rowH = 24;
+    var headerH = 36;
+    var titleBarH = 60;
+    var pad = 30;
+    var slideH = Math.max(720, titleBarH + pad + headerH + dataRows.length * rowH + pad * 2);
+    var scale = 3;
+
     var canvas = document.createElement("canvas");
-    var w = 1280, h = 720, scale = 3;
-    canvas.width = w * scale;
-    canvas.height = h * scale;
+    canvas.width = slideW * scale;
+    canvas.height = slideH * scale;
     var ctx = canvas.getContext("2d");
     ctx.scale(scale, scale);
 
+    // White background
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(0, 0, slideW, slideH);
+
+    // Header bar
     ctx.fillStyle = brandColour;
-    ctx.fillRect(0, 0, w, 60);
-    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, slideW, titleBarH);
+    ctx.fillStyle = "#ffffff";
     ctx.font = "bold 22px -apple-system, sans-serif";
-    ctx.fillText("Segment Overview: " + currentSegment, 30, 40);
-    ctx.fillStyle = "#666";
-    ctx.font = "13px -apple-system, sans-serif";
-    ctx.fillText("See HTML report for full interactive table", 30, 90);
+    ctx.fillText(pinObj.metricTitle, pad, 40);
+    ctx.font = "14px -apple-system, sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.fillText("Tracking Report", slideW - 200, 40);
+
+    // Table layout
+    var tableX = pad;
+    var tableY = titleBarH + pad;
+    var labelColW = Math.min(400, slideW * 0.35);
+    var dataColW = (slideW - pad * 2 - labelColW) / Math.max(1, nCols - 1);
+
+    // Column headers
+    ctx.fillStyle = "#f0f0f5";
+    ctx.fillRect(tableX, tableY, slideW - pad * 2, headerH);
+    ctx.fillStyle = "#555";
+    ctx.font = "bold 12px -apple-system, sans-serif";
+    ctx.textAlign = "left";
+    if (headers.length > 0) ctx.fillText(headers[0], tableX + 10, tableY + 22);
+    ctx.textAlign = "center";
+    for (var hi = 1; hi < headers.length; hi++) {
+      var hx = tableX + labelColW + (hi - 1) * dataColW + dataColW / 2;
+      ctx.fillText(headers[hi], hx, tableY + 22);
+    }
+
+    // Data rows
+    var curY = tableY + headerH;
+    for (var ri = 0; ri < dataRows.length; ri++) {
+      var row = dataRows[ri];
+
+      if (row.type === "section") {
+        ctx.fillStyle = "#f4f5f7";
+        ctx.fillRect(tableX, curY, slideW - pad * 2, rowH);
+        ctx.fillStyle = brandColour;
+        ctx.font = "bold 11px -apple-system, sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(row.cells[0] || "", tableX + 10, curY + 16);
+        curY += rowH;
+        continue;
+      }
+
+      if (row.type === "base") {
+        ctx.fillStyle = "#fafbfc";
+        ctx.fillRect(tableX, curY, slideW - pad * 2, rowH);
+        ctx.fillStyle = "#888";
+        ctx.font = "11px -apple-system, sans-serif";
+      } else if (row.type === "change") {
+        ctx.fillStyle = "#fafafa";
+        ctx.fillRect(tableX, curY, slideW - pad * 2, rowH);
+        ctx.fillStyle = "#888";
+        ctx.font = "11px -apple-system, sans-serif";
+      } else {
+        ctx.fillStyle = ri % 2 === 0 ? "#ffffff" : "#fafbfc";
+        ctx.fillRect(tableX, curY, slideW - pad * 2, rowH);
+        ctx.fillStyle = "#1e293b";
+        ctx.font = "12px -apple-system, sans-serif";
+      }
+
+      // Row border
+      ctx.strokeStyle = "#eee";
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(tableX, curY + rowH);
+      ctx.lineTo(tableX + slideW - pad * 2, curY + rowH);
+      ctx.stroke();
+
+      // Label cell
+      ctx.textAlign = "left";
+      if (row.cells.length > 0) {
+        var labelText = row.cells[0];
+        if (labelText.length > 50) labelText = labelText.substring(0, 48) + "...";
+        ctx.fillText(labelText, tableX + 10, curY + 16);
+      }
+
+      // Value cells
+      ctx.textAlign = "center";
+      for (var ci = 1; ci < row.cells.length; ci++) {
+        var cx = tableX + labelColW + (ci - 1) * dataColW + dataColW / 2;
+        ctx.fillText(row.cells[ci] || "", cx, curY + 16);
+      }
+
+      curY += rowH;
+    }
+
+    // Outer border
+    ctx.strokeStyle = "#ddd";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(tableX, tableY, slideW - pad * 2, curY - tableY);
+
+    // Store as data URL
+    try {
+      pinObj.pngDataUrl = canvas.toDataURL("image/png");
+      if (typeof renderPinnedCards === "function") renderPinnedCards();
+      if (typeof savePinnedData === "function") savePinnedData();
+    } catch (e) {
+      // Canvas tainted or too large — fallback to HTML rendering
+    }
+  }
+
+  // ---- Overview Slide Export ----
+  // Renders only the currently visible table rows/columns as a branded PNG slide.
+  window.exportOverviewSlide = function() {
+    var table = document.getElementById("tk-crosstab-table");
+    if (!table) return;
+
+    var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367";
+
+    // Extract visible data from the DOM table
+    var headers = [];
+    var headerRow = table.querySelector("thead tr.tk-wave-header-row");
+    if (headerRow) {
+      headerRow.querySelectorAll("th").forEach(function(th) {
+        if (th.classList.contains("segment-hidden")) return;
+        headers.push(th.textContent.trim());
+      });
+    }
+
+    var dataRows = [];
+    table.querySelectorAll("tbody tr").forEach(function(tr) {
+      // Skip hidden rows of all types
+      if (tr.classList.contains("section-hidden")) return;
+      if (tr.classList.contains("row-hidden-user")) return;
+      if (tr.classList.contains("row-filtered")) return;
+      if (tr.style.display === "none") return;
+      if (tr.classList.contains("tk-change-row") && !tr.classList.contains("visible")) return;
+
+      var cells = [];
+      var rowType = "data";
+      if (tr.classList.contains("tk-section-row")) rowType = "section";
+      else if (tr.classList.contains("tk-base-row")) rowType = "base";
+      else if (tr.classList.contains("tk-change-row")) rowType = "change";
+
+      tr.querySelectorAll("td, th").forEach(function(cell) {
+        if (cell.classList.contains("segment-hidden")) return;
+        var label = cell.querySelector(".tk-metric-label");
+        cells.push(label ? label.textContent.trim() : cell.textContent.trim());
+      });
+
+      if (cells.length > 0) {
+        dataRows.push({ cells: cells, type: rowType });
+      }
+    });
+
+    // Canvas setup
+    var nCols = headers.length || 4;
+    var slideW = Math.max(1280, nCols * 120 + 300);
+    var rowH = 24;
+    var headerH = 36;
+    var titleBarH = 60;
+    var pad = 30;
+    var slideH = Math.max(720, titleBarH + pad + headerH + dataRows.length * rowH + pad * 2);
+    var scale = 3;
+
+    var canvas = document.createElement("canvas");
+    canvas.width = slideW * scale;
+    canvas.height = slideH * scale;
+    var ctx = canvas.getContext("2d");
+    ctx.scale(scale, scale);
+
+    // White background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, slideW, slideH);
+
+    // Header bar
+    ctx.fillStyle = brandColour;
+    ctx.fillRect(0, 0, slideW, titleBarH);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 22px -apple-system, sans-serif";
+    ctx.fillText("Segment Overview: " + currentSegment, pad, 40);
+    ctx.font = "14px -apple-system, sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.fillText("Tracking Report", slideW - 200, 40);
+
+    // Table layout
+    var tableX = pad;
+    var tableY = titleBarH + pad;
+    var labelColW = Math.min(400, slideW * 0.35);
+    var dataColW = (slideW - pad * 2 - labelColW) / Math.max(1, nCols - 1);
+
+    // Column headers
+    ctx.fillStyle = "#f0f0f5";
+    ctx.fillRect(tableX, tableY, slideW - pad * 2, headerH);
+    ctx.fillStyle = "#555";
+    ctx.font = "bold 12px -apple-system, sans-serif";
+    ctx.textAlign = "left";
+    if (headers.length > 0) ctx.fillText(headers[0], tableX + 10, tableY + 22);
+    ctx.textAlign = "center";
+    for (var hi = 1; hi < headers.length; hi++) {
+      var hx = tableX + labelColW + (hi - 1) * dataColW + dataColW / 2;
+      ctx.fillText(headers[hi], hx, tableY + 22);
+    }
+
+    // Data rows
+    var curY = tableY + headerH;
+    for (var ri = 0; ri < dataRows.length; ri++) {
+      var row = dataRows[ri];
+
+      // Row background
+      if (row.type === "section") {
+        ctx.fillStyle = "#f4f5f7";
+        ctx.fillRect(tableX, curY, slideW - pad * 2, rowH);
+        ctx.fillStyle = brandColour;
+        ctx.font = "bold 11px -apple-system, sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(row.cells[0] || "", tableX + 10, curY + 16);
+        curY += rowH;
+        continue;
+      }
+
+      if (row.type === "base") {
+        ctx.fillStyle = "#fafbfc";
+        ctx.fillRect(tableX, curY, slideW - pad * 2, rowH);
+        ctx.fillStyle = "#888";
+        ctx.font = "11px -apple-system, sans-serif";
+      } else if (row.type === "change") {
+        ctx.fillStyle = "#fafafa";
+        ctx.fillRect(tableX, curY, slideW - pad * 2, rowH);
+        ctx.fillStyle = "#888";
+        ctx.font = "11px -apple-system, sans-serif";
+      } else {
+        ctx.fillStyle = ri % 2 === 0 ? "#ffffff" : "#fafbfc";
+        ctx.fillRect(tableX, curY, slideW - pad * 2, rowH);
+        ctx.fillStyle = "#1e293b";
+        ctx.font = "12px -apple-system, sans-serif";
+      }
+
+      // Row border
+      ctx.strokeStyle = "#eee";
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(tableX, curY + rowH);
+      ctx.lineTo(tableX + slideW - pad * 2, curY + rowH);
+      ctx.stroke();
+
+      // Label cell
+      ctx.textAlign = "left";
+      if (row.cells.length > 0) {
+        var labelText = row.cells[0];
+        if (labelText.length > 50) labelText = labelText.substring(0, 48) + "...";
+        ctx.fillText(labelText, tableX + 10, curY + 16);
+      }
+
+      // Value cells
+      ctx.textAlign = "center";
+      for (var ci = 1; ci < row.cells.length; ci++) {
+        var cx = tableX + labelColW + (ci - 1) * dataColW + dataColW / 2;
+        ctx.fillText(row.cells[ci] || "", cx, curY + 16);
+      }
+
+      curY += rowH;
+    }
+
+    // Outer border
+    ctx.strokeStyle = "#ddd";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(tableX, tableY, slideW - pad * 2, curY - tableY);
 
     canvas.toBlob(function(blob) {
       if (!blob) return;

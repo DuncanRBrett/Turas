@@ -63,6 +63,25 @@ body {
   margin-top: 2px;
 }
 
+.hub-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.hub-header-date {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+}
+
+.hub-header-powered {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  font-style: italic;
+}
+
 .hub-header-actions {
   display: flex;
   gap: 8px;
@@ -78,7 +97,7 @@ body {
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: background 0.15s ease;
 }
 
 .hub-save-btn:hover,
@@ -107,7 +126,7 @@ body {
   font-weight: 500;
   color: var(--hub-text-muted);
   cursor: pointer;
-  transition: color 0.2s ease, border-color 0.2s ease;
+  transition: color 0.15s ease, border-color 0.15s ease;
   white-space: nowrap;
 }
 
@@ -153,7 +172,7 @@ body {
   font-weight: 400;
   color: var(--hub-text-muted);
   cursor: pointer;
-  transition: color 0.2s ease, border-color 0.2s ease;
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
 
 .hub-subtab:hover {
@@ -182,25 +201,33 @@ body {
   padding: 0 32px;
 }
 
-.hub-meta-strip {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 32px;
+/* --- Report Card Type Badges --- */
+.hub-card-type-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 10px;
 }
 
-.hub-meta-badge {
-  background: var(--hub-card);
-  border: 1px solid var(--hub-border);
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 13px;
+.hub-card-type-tracker {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.hub-card-type-crosstabs {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.hub-report-card-wave-range {
+  font-size: 12px;
   color: var(--hub-text-muted);
-}
-
-.hub-meta-badge strong {
-  color: var(--hub-text);
-  font-weight: 600;
+  margin-top: 6px;
+  font-style: italic;
 }
 
 .hub-report-cards {
@@ -217,7 +244,7 @@ body {
   border-radius: 8px;
   padding: 24px;
   cursor: pointer;
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 .hub-report-card:hover {
@@ -275,21 +302,24 @@ body {
 }
 
 .hub-pin-summary-btn {
-  background: none;
-  border: 1px solid var(--hub-border);
-  border-radius: 4px;
-  padding: 3px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(13, 138, 138, 0.06);
+  border: 1px solid rgba(13, 138, 138, 0.2);
+  border-radius: 6px;
+  padding: 6px 14px;
   font-family: var(--hub-font);
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--hub-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hub-brand);
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: all 0.15s ease;
 }
 
 .hub-pin-summary-btn:hover {
-  background: #f1f5f9;
-  color: var(--hub-text);
+  background: rgba(13, 138, 138, 0.12);
+  border-color: var(--hub-brand);
 }
 
 .hub-summary-editor {
@@ -301,7 +331,7 @@ body {
   border: 1px dashed transparent;
   padding: 4px;
   border-radius: 4px;
-  transition: border-color 0.2s ease;
+  transition: border-color 0.15s ease;
 }
 
 .hub-summary-editor:focus {
@@ -338,7 +368,7 @@ body {
   font-weight: 500;
   color: var(--hub-text);
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: background 0.15s ease;
 }
 
 .hub-toolbar-btn:hover {
@@ -359,7 +389,7 @@ body {
   border-radius: 8px;
   padding: 20px;
   margin-bottom: 16px;
-  transition: box-shadow 0.2s ease;
+  transition: box-shadow 0.15s ease;
 }
 
 .hub-pin-header {
@@ -479,7 +509,7 @@ body {
   padding: 6px 8px;
   border: 1px dashed transparent;
   border-radius: 4px;
-  transition: border-color 0.2s ease;
+  transition: border-color 0.15s ease;
 }
 
 .hub-insight-editor:focus {
@@ -515,12 +545,18 @@ body {
 }
 
 .hub-pin-table table {
-  font-size: 12px;
+  font-size: 13px;
+  color: #1e293b;
+}
+
+.hub-pin-table td,
+.hub-pin-table th {
+  color: #1e293b;
 }
 
 /* --- Transitions for visibility toggles --- */
 .tab-panel {
-  transition: opacity 0.2s ease;
+  transition: opacity 0.15s ease;
 }
 
 /* --- Print Styles --- */
@@ -576,6 +612,18 @@ body {
 
   .hub-header {
     padding: 16px;
+  }
+
+  .hub-header-inner {
+    flex-wrap: wrap;
+  }
+
+  .hub-header-right {
+    align-items: flex-start;
+    width: 100%;
+    margin-top: 8px;
+    flex-direction: row;
+    justify-content: space-between;
   }
 
   .hub-overview,

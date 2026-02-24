@@ -30,13 +30,20 @@
       rows.push(cells.join(","));
     });
 
-    // Data rows (only visible ones)
+    // Data rows (only visible ones — respects all view filters)
     var bodyRows = table.querySelectorAll("tbody tr");
     bodyRows.forEach(function(tr) {
       // Skip hidden change rows
       if (tr.classList.contains("tk-change-row") && !tr.classList.contains("visible")) return;
-      // Skip section rows
+      // Skip user-hidden, filtered, and collapsed-section rows
+      if (tr.classList.contains("row-hidden-user")) return;
+      if (tr.classList.contains("row-filtered")) return;
+      if (tr.classList.contains("section-hidden")) return;
+      if (tr.style.display === "none") return;
+      // Skip section rows but include their label
       if (tr.classList.contains("tk-section-row")) {
+        // Skip collapsed section headers entirely
+        if (tr.classList.contains("section-collapsed")) return;
         var secText = tr.querySelector("td").textContent.trim();
         rows.push(csvEscape(secText));
         return;
@@ -98,10 +105,16 @@
       xml += '</Row>\n';
     });
 
-    // Body
+    // Body (only visible rows — respects all view filters)
     var bodyRows = table.querySelectorAll("tbody tr");
     bodyRows.forEach(function(tr) {
       if (tr.classList.contains("tk-change-row") && !tr.classList.contains("visible")) return;
+      if (tr.classList.contains("row-hidden-user")) return;
+      if (tr.classList.contains("row-filtered")) return;
+      if (tr.classList.contains("section-hidden")) return;
+      if (tr.style.display === "none") return;
+      // Skip collapsed section headers
+      if (tr.classList.contains("tk-section-row") && tr.classList.contains("section-collapsed")) return;
 
       xml += '<Row>\n';
 

@@ -78,6 +78,11 @@ build_html_page <- function(html_data, tables, config_obj,
             style = "display:flex;gap:8px;",
             htmltools::tags$button(
               class = "export-btn",
+              onclick = "addSection()",
+              "\u2795 Add Section"
+            ),
+            htmltools::tags$button(
+              class = "export-btn",
               onclick = "exportAllPinnedSlides()",
               "\U0001F4E4 Export All Slides"
             ),
@@ -111,11 +116,26 @@ build_html_page <- function(html_data, tables, config_obj,
       htmltools::tags$meta(name = "turas-source-filename", content = source_filename)
     }
 
+    # Hub-extraction metadata
+    hub_meta <- htmltools::tagList(
+      htmltools::tags$meta(name = "turas-report-type", content = "tabs"),
+      htmltools::tags$meta(name = "turas-total-n",
+                           content = if (!is.na(html_data$total_n)) as.character(round(html_data$total_n)) else ""),
+      htmltools::tags$meta(name = "turas-questions", content = as.character(html_data$n_questions)),
+      htmltools::tags$meta(name = "turas-banner-groups",
+                           content = as.character(length(html_data$banner_groups))),
+      htmltools::tags$meta(name = "turas-weighted",
+                           content = if (isTRUE(config_obj$apply_weighting)) "true" else "false"),
+      htmltools::tags$meta(name = "turas-fieldwork",
+                           content = config_obj$fieldwork_dates %||% "")
+    )
+
     page <- htmltools::tagList(
       htmltools::tags$head(
         htmltools::tags$meta(charset = "UTF-8"),
         htmltools::tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
         source_meta,
+        hub_meta,
         htmltools::tags$title(project_title),
         build_css(brand_colour, accent_colour),
         build_dashboard_css(brand_colour),
@@ -136,11 +156,27 @@ build_html_page <- function(html_data, tables, config_obj,
     )
   } else {
     # No dashboard: original layout unchanged
+
+    # Hub-extraction metadata
+    hub_meta <- htmltools::tagList(
+      htmltools::tags$meta(name = "turas-report-type", content = "tabs"),
+      htmltools::tags$meta(name = "turas-total-n",
+                           content = if (!is.na(html_data$total_n)) as.character(round(html_data$total_n)) else ""),
+      htmltools::tags$meta(name = "turas-questions", content = as.character(html_data$n_questions)),
+      htmltools::tags$meta(name = "turas-banner-groups",
+                           content = as.character(length(html_data$banner_groups))),
+      htmltools::tags$meta(name = "turas-weighted",
+                           content = if (isTRUE(config_obj$apply_weighting)) "true" else "false"),
+      htmltools::tags$meta(name = "turas-fieldwork",
+                           content = config_obj$fieldwork_dates %||% "")
+    )
+
     page <- htmltools::tagList(
       htmltools::tags$head(
         htmltools::tags$meta(charset = "UTF-8"),
         htmltools::tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
         source_meta,
+        hub_meta,
         htmltools::tags$title(project_title),
         build_css(brand_colour, accent_colour),
         build_print_css()
@@ -248,7 +284,7 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       cursor: pointer;
       border-bottom: 1px solid #e2e8f0;
       border-left: 3px solid transparent;
-      transition: all 0.12s ease;
+      transition: all 0.15s ease;
     }
     .question-item:hover { background: #f8fafc; }
     .question-item.active {
@@ -296,7 +332,7 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       cursor: pointer;
       font-family: inherit;
       border-right: 1px solid #e2e8f0;
-      transition: all 0.12s ease;
+      transition: all 0.15s ease;
     }
     .banner-tab:last-child { border-right: none; }
     .banner-tab.active { background: #1a2744; color: #ffffff; }
@@ -367,10 +403,15 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;
-      transition: all 0.12s;
+      transition: all 0.15s;
     }
     .export-btn:hover { background: #f8fafc; color: #1e293b; }
     .slide-menu-item:hover { background: #f1f5f9; }
+    /* Section dividers (pinned views) */
+    .section-divider { display: flex; align-items: center; gap: 12px; padding: 12px 0; margin: 8px 0; border-bottom: 2px solid BRAND; }
+    .section-divider-title { font-size: 16px; font-weight: 600; color: BRAND; flex: 1; outline: none; min-width: 100px; }
+    .section-divider-title:focus { border-bottom: 1px dashed #e2e8f0; }
+    .section-divider-actions { display: flex; gap: 4px; }
     .footer {
       margin-top: 16px;
       padding: 12px 16px;
@@ -417,7 +458,8 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     .ct-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 12px;
+      font-size: 13px;
+      color: #1e293b;
       table-layout: auto;
     }
     .ct-th {
@@ -448,6 +490,8 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       text-align: center;
       border-bottom: 1px solid #f0f0f0;
       white-space: nowrap;
+      color: #1e293b;
+      font-size: 13px;
       transition: background-color 0.15s;
     }
     .ct-td.ct-label-col {
@@ -496,8 +540,8 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     tr.ct-row-category:hover .ct-label-col .row-exclude-btn,
     tr.ct-row-net:hover .ct-label-col .row-exclude-btn { display: inline; }
     tr.ct-row-excluded .ct-label-col .row-exclude-btn { display: inline; color: #dc2626; }
-    .ct-val { font-variant-numeric: tabular-nums; }
-    .ct-val-net { font-weight: 700; }
+    .ct-val { font-variant-numeric: tabular-nums; color: #1e293b; }
+    .ct-val-net { font-weight: 700; color: #1e293b; }
     .ct-na { color: #cbd5e1; }
     .ct-base-n { font-variant-numeric: tabular-nums; }
     .ct-low-base { color: #e8614d; font-weight: 700; }
@@ -549,7 +593,7 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;
-      transition: all 0.12s;
+      transition: all 0.15s;
     }
     .print-btn:hover { background: #f8fafc; color: #1e293b; }
 
@@ -588,7 +632,7 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     .col-chip {
       padding: 4px 10px; border: 1px solid #e2e8f0; border-radius: 16px;
       background: #f0fafa; color: #1e293b; font-size: 11px; font-weight: 500;
-      cursor: pointer; font-family: inherit; transition: all 0.12s;
+      cursor: pointer; font-family: inherit; transition: all 0.15s;
     }
     .col-chip:hover { border-color: BRAND; }
     .col-chip-off {
