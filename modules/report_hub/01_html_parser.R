@@ -178,11 +178,11 @@ extract_blocks <- function(html, open_pattern, close_tag) {
 extract_header <- function(html, report_type) {
   if (report_type == "tracker") {
     # Tracker: <header class="tk-header">...</header>
-    m <- regexpr('<header class="tk-header">[\\s\\S]*?</header>', html)
+    m <- regexpr('<header class="tk-header">[\\s\\S]*?</header>', html, perl = TRUE)
     if (m > 0) return(regmatches(html, m))
   } else {
     # Tabs: <div class="header">...</div> (up to report-tabs)
-    m <- regexpr('<div class="header">[\\s\\S]*?</div>\\s*</div>\\s*</div>', html)
+    m <- regexpr('<div class="header">[\\s\\S]*?</div>\\s*</div>\\s*</div>', html, perl = TRUE)
     if (m > 0) return(regmatches(html, m))
   }
   return("")
@@ -195,7 +195,7 @@ extract_header <- function(html, report_type) {
 #' @return List with tab_html and tab_names
 extract_report_tabs <- function(html) {
   # Both reports use <div class="report-tabs">...</div>
-  m <- regexpr('<div class="report-tabs">[\\s\\S]*?</div>', html)
+  m <- regexpr('<div class="report-tabs">[\\s\\S]*?</div>', html, perl = TRUE)
   tab_html <- ""
   if (m > 0) tab_html <- regmatches(html, m)
 
@@ -268,15 +268,12 @@ extract_content_panels <- function(html, report_type) {
                       substr(html, search_from, nchar(html)), fixed = TRUE)
     if (pv_pos > 0) end_markers <- c(end_markers, search_from + pv_pos - 2)
 
-    # Footer
+    # Footer — tracker only (tabs footer is inside content panels, not a boundary)
     if (report_type == "tracker") {
       ft_pos <- regexpr('<footer class="tk-footer"',
                         substr(html, search_from, nchar(html)), fixed = TRUE)
-    } else {
-      ft_pos <- regexpr('<div class="footer"',
-                        substr(html, search_from, nchar(html)), fixed = TRUE)
+      if (ft_pos > 0) end_markers <- c(end_markers, search_from + ft_pos - 2)
     }
-    if (ft_pos > 0) end_markers <- c(end_markers, search_from + ft_pos - 2)
 
     # Script blocks after content
     sc_pos <- regexpr('\n<script>',
@@ -312,13 +309,10 @@ extract_content_panels <- function(html, report_type) {
 #' @return Footer HTML string
 extract_footer <- function(html, report_type) {
   if (report_type == "tracker") {
-    m <- regexpr('<footer class="tk-footer">[\\s\\S]*?</footer>', html)
-    if (m > 0) return(regmatches(html, m))
-  } else {
-    # Tabs footer is inside the crosstabs panel, class="footer"
-    m <- regexpr('<div class="footer">[\\s\\S]*?</div>', html)
+    m <- regexpr('<footer class="tk-footer">[\\s\\S]*?</footer>', html, perl = TRUE)
     if (m > 0) return(regmatches(html, m))
   }
+  # Tabs footer is inside content panels — already captured, no separate extraction
   return("")
 }
 
@@ -346,7 +340,7 @@ extract_metadata <- function(html, report_type) {
     }
 
     # Badge bar stats
-    badge_m <- regexpr('class="tk-badge-bar">[\\s\\S]*?</div>', html)
+    badge_m <- regexpr('class="tk-badge-bar">[\\s\\S]*?</div>', html, perl = TRUE)
     if (badge_m > 0) {
       badge_html <- regmatches(html, badge_m)
       # Extract numbers from <strong>N</strong> Type patterns

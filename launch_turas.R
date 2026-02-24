@@ -170,6 +170,13 @@ launch_turas <- function() {
         .btn-weighting:hover {
           background-color: #0284c7;
         }
+        .btn-report_hub {
+          background-color: #3b82f6;
+          color: white;
+        }
+        .btn-report_hub:hover {
+          background-color: #2563eb;
+        }
         .status-message {
           margin-top: 20px;
           padding: 15px;
@@ -317,6 +324,16 @@ launch_turas <- function() {
           ),
           actionButton("launch_weighting", "Launch Weighting",
                       class = "launch-btn btn-weighting")
+        ),
+
+        # Report Hub
+        div(class = "module-card",
+          div(class = "module-title", "\U0001F4CA Report Hub"),
+          div(class = "module-description",
+            "Combine multiple Turas HTML reports into a unified portal with integrated navigation, cross-referencing, and pinned views."
+          ),
+          actionButton("launch_report_hub", "Launch Report Hub",
+                      class = "launch-btn btn-report_hub")
         )
       ),
 
@@ -640,6 +657,27 @@ if ("%s" != "alchemerparser") {
 
       }, error = function(e) {
         status(paste("Error launching Weighting:", e$message))
+      })
+    })
+
+    # Launch Report Hub
+    observeEvent(input$launch_report_hub, {
+      status("Launching Report Hub in new tab...")
+
+      tryCatch({
+        launch_module("report_hub",
+                     file.path(turas_root, "modules/report_hub/run_report_hub_gui.R"))
+
+        later::later(function() {
+          status("Report Hub launched successfully!")
+        }, delay = 1)
+
+        later::later(function() {
+          status("")
+        }, delay = 4)
+
+      }, error = function(e) {
+        status(paste("Error launching Report Hub:", e$message))
       })
     })
   }

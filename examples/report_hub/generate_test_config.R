@@ -18,14 +18,20 @@ settings <- data.frame(
     "company_name",
     "client_name",
     "brand_colour",
-    "accent_colour"
+    "accent_colour",
+    "logo_path",
+    "output_dir",
+    "output_file"
   ),
   Value = c(
     "SACAP Annual Climate Survey",
     "The Research LampPost",
     "SACAP",
     "#323367",
-    "#CC9900"
+    "#CC9900",
+    "sacap_logo.png",
+    "/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Projects/SACAP/SACS/04_CrossWave",
+    "SACAP_Combined_Report.html"
   ),
   stringsAsFactors = FALSE
 )

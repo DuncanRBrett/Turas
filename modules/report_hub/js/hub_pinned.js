@@ -47,10 +47,11 @@
     ReportHub.pinnedItems.splice(idx, 1);
 
     // Update source report's pin button state if applicable
-    if (item.type === "pin" && item.source && item.metricId) {
+    if (item.type === "pin" && item.source) {
       var ns = item.source === "tracker" ? "TrackerReport" : "TabsReport";
-      if (window[ns] && typeof window[ns].updatePinButton === "function") {
-        window[ns].updatePinButton(item.metricId || item.qCode, false);
+      var key = item.metricId || item.qCode;
+      if (key && window[ns] && typeof window[ns].updatePinButton === "function") {
+        window[ns].updatePinButton(key, false);
       }
     }
 
@@ -125,6 +126,18 @@
         ReportHub.pinnedItems = data;
         ReportHub.renderPinnedCards();
         ReportHub.updatePinBadge();
+
+        // Restore per-report pin button states
+        for (var i = 0; i < data.length; i++) {
+          var item = data[i];
+          if (item.type === "pin" && item.source) {
+            var ns = item.source === "tracker" ? "TrackerReport" : "TabsReport";
+            var key = item.metricId || item.qCode;
+            if (key && window[ns] && typeof window[ns].updatePinButton === "function") {
+              window[ns].updatePinButton(key, true);
+            }
+          }
+        }
       }
     } catch (e) {
       // Silently ignore parse errors
@@ -192,9 +205,14 @@
    */
   function buildPinCardHTML(pin, idx) {
     var total = ReportHub.pinnedItems.length;
-    var sourceBadge = pin.source === "tracker"
-      ? '<span class="hub-source-badge hub-badge-tracker">Tracker</span>'
-      : '<span class="hub-source-badge hub-badge-tabs">Crosstabs</span>';
+    var sourceBadge;
+    if (pin.source === "tracker") {
+      sourceBadge = '<span class="hub-source-badge hub-badge-tracker">Tracker</span>';
+    } else if (pin.source === "overview") {
+      sourceBadge = '<span class="hub-source-badge hub-badge-overview">Overview</span>';
+    } else {
+      sourceBadge = '<span class="hub-source-badge hub-badge-tabs">Crosstabs</span>';
+    }
 
     var title = pin.title || pin.metricLabel || pin.qCode || "Pinned View";
     var subtitle = pin.subtitle || pin.questionText || "";
@@ -204,6 +222,7 @@
         sourceBadge +
         '<span class="hub-pin-title">' + escapeHtml(title) + '</span>' +
         '<div class="hub-pin-actions">' +
+          '<button class="hub-action-btn" onclick="ReportHub.exportPinCard(\'' + pin.id + '\')" title="Export as PNG">\uD83D\uDCF8</button>' +
           (idx > 0 ? '<button class="hub-action-btn" onclick="ReportHub.moveItem(' + idx + ',' + (idx - 1) + ')" title="Move up">\u25B2</button>' : '') +
           (idx < total - 1 ? '<button class="hub-action-btn" onclick="ReportHub.moveItem(' + idx + ',' + (idx + 1) + ')" title="Move down">\u25BC</button>' : '') +
           '<button class="hub-action-btn hub-remove-btn" onclick="ReportHub.removePin(\'' + pin.id + '\')" title="Remove">\u00D7</button>' +
@@ -224,8 +243,8 @@
       '</div>' +
     '</div>';
 
-    // Chart (if captured)
-    if (pin.chartSvg) {
+    // Chart (if captured and was visible when pinned)
+    if (pin.chartSvg && pin.chartVisible !== false) {
       html += '<div class="hub-pin-chart">' + pin.chartSvg + '</div>';
     }
 
@@ -266,6 +285,126 @@
       }
     }
   };
+
+  /**
+   * Pin an overview summary editor's content
+   * @param {string} source - Data source key (e.g., "tracker", "tabs")
+   */
+  ReportHub.pinOverviewSummary = function(source) {
+    var editors = document.querySelectorAll('.hub-summary-editor[data-source="' + source + '"]');
+    if (!editors.length) return;
+    var editor = editors[0];
+    var text = editor.innerText.trim();
+    if (!text) { alert("Add summary text before pinning."); return; }
+    var section = editor.closest(".hub-summary-section");
+    var title = section ? section.querySelector(".hub-summary-label").textContent : "Overview Summary";
+    var pinObj = {
+      id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+      title: title,
+      insight: text,
+      timestamp: Date.now()
+    };
+    ReportHub.addPin("overview", pinObj);
+  };
+
+  /**
+   * Export a single pin card as PNG
+   * @param {string} pinId - Pin ID
+   */
+  ReportHub.exportPinCard = function(pinId) {
+    var card = document.querySelector('.hub-pin-card[data-pin-id="' + pinId + '"]');
+    if (!card) return;
+
+    var clone = card.cloneNode(true);
+    // Remove action buttons from clone
+    var actions = clone.querySelector(".hub-pin-actions");
+    if (actions) actions.parentNode.removeChild(actions);
+
+    // Inline computed styles for accurate rendering
+    inlineStylesRecursive(clone, card);
+
+    var w = card.offsetWidth || 800;
+    var h = card.offsetHeight || 600;
+    var scale = 3;
+
+    var svgNS = "http://www.w3.org/2000/svg";
+    var svgStr = '<svg xmlns="' + svgNS + '" width="' + (w * scale) + '" height="' + (h * scale) + '">';
+    svgStr += '<foreignObject width="' + w + '" height="' + h + '" transform="scale(' + scale + ')">';
+    svgStr += '<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:14px;color:#2c2c2c;background:#fff;padding:20px;">';
+    svgStr += clone.outerHTML;
+    svgStr += '</div></foreignObject></svg>';
+
+    var svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+    var svgUrl = URL.createObjectURL(svgBlob);
+    var canvas = document.createElement("canvas");
+    canvas.width = w * scale;
+    canvas.height = h * scale;
+    var ctx = canvas.getContext("2d");
+    var img = new Image();
+    img.onload = function() {
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob(function(blob) {
+        if (!blob) return;
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "pinned_" + pinId + ".png";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+      }, "image/png");
+      URL.revokeObjectURL(svgUrl);
+    };
+    img.onerror = function() {
+      URL.revokeObjectURL(svgUrl);
+    };
+    img.src = svgUrl;
+  };
+
+  /**
+   * Export all pinned cards as PNGs (sequential download)
+   */
+  ReportHub.exportAllPins = function() {
+    var pins = [];
+    for (var i = 0; i < ReportHub.pinnedItems.length; i++) {
+      if (ReportHub.pinnedItems[i].type === "pin") {
+        pins.push(ReportHub.pinnedItems[i].id);
+      }
+    }
+    if (pins.length === 0) return;
+
+    var idx = 0;
+    function exportNext() {
+      if (idx >= pins.length) return;
+      ReportHub.exportPinCard(pins[idx]);
+      idx++;
+      setTimeout(exportNext, 400);
+    }
+    exportNext();
+  };
+
+  /**
+   * Recursively inline computed styles from a source element onto a clone
+   * (needed for SVG foreignObject rendering)
+   */
+  function inlineStylesRecursive(clone, source) {
+    if (!source || !clone) return;
+    try {
+      var computed = window.getComputedStyle(source);
+      var important = ["font-family", "font-size", "font-weight", "color",
+        "background-color", "border", "padding", "margin", "display",
+        "text-align", "line-height", "width", "max-width"];
+      for (var p = 0; p < important.length; p++) {
+        var val = computed.getPropertyValue(important[p]);
+        if (val) clone.style.setProperty(important[p], val);
+      }
+    } catch (e) { /* ignore */ }
+    var sourceChildren = source.children;
+    var cloneChildren = clone.children;
+    for (var c = 0; c < Math.min(sourceChildren.length, cloneChildren.length); c++) {
+      inlineStylesRecursive(cloneChildren[c], sourceChildren[c]);
+    }
+  }
 
   /**
    * Escape HTML entities

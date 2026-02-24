@@ -96,7 +96,6 @@ assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_
   parts <- c(parts, sprintf('<script>\n%s\n</script>', hub_js))
 
   # Per-report namespaced JS
-
   for (parsed in parsed_reports) {
     parts <- c(parts, sprintf('<script>/* %s JS */\n%s\n</script>',
                                parsed$report_key, parsed$wrapped_js))
@@ -262,7 +261,7 @@ build_hub_js <- function() {
     js_dir <- file.path("modules", "report_hub", "js")
   }
 
-  js_files <- c("hub_navigation.js", "hub_pinned.js")
+  js_files <- c("hub_id_resolver.js", "hub_navigation.js", "hub_pinned.js")
   js_parts <- character(0)
 
   for (f in js_files) {

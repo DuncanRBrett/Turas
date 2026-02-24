@@ -49,6 +49,15 @@ rewrite_for_hub <- function(parsed) {
     )
   }
 
+  # --- Collect data script ID mappings (before modifying HTML) ---
+  data_id_map <- list()
+  for (i in seq_along(parsed$data_scripts)) {
+    if (!is.null(parsed$data_scripts[[i]]$id)) {
+      old_id <- parsed$data_scripts[[i]]$id
+      data_id_map[[old_id]] <- paste0(prefix, old_id)
+    }
+  }
+
   # --- Rewrite JS blocks ---
   for (i in seq_along(parsed$js_blocks)) {
     parsed$js_blocks[[i]]$content <- rewrite_js_ids(
@@ -60,12 +69,24 @@ rewrite_for_hub <- function(parsed) {
     parsed$js_blocks[[i]]$content <- redirect_save_functions(
       parsed$js_blocks[[i]]$content
     )
+    # Rewrite data script ID string literals so each report finds its own data
+    for (old_id in names(data_id_map)) {
+      new_id <- data_id_map[[old_id]]
+      parsed$js_blocks[[i]]$content <- gsub(
+        sprintf('"%s"', old_id), sprintf('"%s"', new_id),
+        parsed$js_blocks[[i]]$content, fixed = TRUE
+      )
+      parsed$js_blocks[[i]]$content <- gsub(
+        sprintf("'%s'", old_id), sprintf("'%s'", new_id),
+        parsed$js_blocks[[i]]$content, fixed = TRUE
+      )
+    }
   }
 
   # --- Wrap all JS in an IIFE namespace ---
   parsed$wrapped_js <- wrap_js_in_iife(parsed$js_blocks, key, parsed$report_type)
 
-  # --- Rewrite data scripts ---
+  # --- Rewrite data scripts (HTML elements) ---
   for (i in seq_along(parsed$data_scripts)) {
     if (!is.null(parsed$data_scripts[[i]]$id)) {
       old_id <- parsed$data_scripts[[i]]$id
@@ -89,25 +110,25 @@ rewrite_for_hub <- function(parsed) {
 #' @param prefix Prefix to add (e.g., "tracker--")
 #' @return Modified HTML
 rewrite_html_ids <- function(html, prefix) {
-  # Known IDs that need prefixing (from conflict analysis)
-  # We prefix ALL ids to be safe, not just the conflicting ones
+  # Prefix standalone id= attributes (not data-*-id= etc.)
+  # Require whitespace before "id=" to avoid matching substrings like data-metric-id=
   html <- gsub(
-    'id="([^"]+)"',
-    sprintf('id="%s\\1"', prefix),
+    '(\\s)id="([^"]+)"',
+    sprintf('\\1id="%s\\2"', prefix),
     html
   )
 
   # Also rewrite href="#id" links
   html <- gsub(
-    'href="#([^"]+)"',
-    sprintf('href="#%s\\1"', prefix),
+    '(\\s)href="#([^"]+)"',
+    sprintf('\\1href="#%s\\2"', prefix),
     html
   )
 
-  # Rewrite for="id" on labels
+  # Rewrite for="id" on labels (avoid matching data-*-for= etc.)
   html <- gsub(
-    'for="([^"]+)"',
-    sprintf('for="%s\\1"', prefix),
+    '(\\s)for="([^"]+)"',
+    sprintf('\\1for="%s\\2"', prefix),
     html
   )
 
@@ -122,64 +143,29 @@ rewrite_html_ids <- function(html, prefix) {
 #' @return Modified CSS
 rewrite_css_ids <- function(css, prefix) {
   # Rewrite #id selectors — match #word-chars but not hex colours
-  # CSS ID selectors: #name { ... } or #name.class or #name:pseudo
-  # Hex colours: #fff, #abcdef — always 3, 4, 6, or 8 hex digits
-  # Strategy: replace #id patterns that are followed by a selector character
-
-  # Split CSS into lines for safer processing
-  lines <- strsplit(css, "\n")[[1]]
-  result <- character(length(lines))
-
-  for (i in seq_along(lines)) {
-    line <- lines[i]
-
-    # Skip lines that are inside property values (contain : before #)
-    # These are likely colour values
-    if (grepl(":\\s*#", line) && !grepl("^\\s*#", line)) {
-      result[i] <- line
-      next
-    }
-
-    # Replace #id patterns in selector context
-    # Match #identifier where identifier starts with a letter or hyphen
-    result[i] <- gsub(
-      "#([a-zA-Z][a-zA-Z0-9_-]*)",
-      paste0("#", prefix, "\\1"),
-      line
-    )
-  }
-
-  return(paste(result, collapse = "\n"))
+  # Strategy: only match identifiers containing at least one hyphen or underscore.
+  # All Turas IDs have hyphens/underscores (tab-summary, mv-metric_1, etc.)
+  # while hex colours (#e2e8f0, #ccc, #fff) never do.
+  gsub(
+    "#([a-zA-Z][a-zA-Z0-9_-]*[-_][a-zA-Z0-9_-]*)",
+    paste0("#", prefix, "\\1"),
+    css
+  )
 }
 
 
-#' Rewrite JS String References to DOM IDs
+#' Rewrite JS References for Hub Integration
+#'
+#' Redirects tab-switching calls to the hub's navigation controller.
+#' DOM ID resolution is handled at runtime by hub_id_resolver.js,
+#' so we do NOT rewrite getElementById/querySelector patterns here.
 #'
 #' @param js JavaScript string
-#' @param prefix Prefix to add
+#' @param prefix Prefix string (e.g., "tracker--")
+#' @param report_key Report key (e.g., "tracker")
 #' @return Modified JavaScript
 rewrite_js_ids <- function(js, prefix, report_key = NULL) {
   if (is.null(report_key)) report_key <- sub("--$", "", prefix)
-  # getElementById('id') and getElementById("id")
-  js <- gsub(
-    "getElementById\\(['\"]([^'\"]+)['\"]\\)",
-    sprintf("getElementById('%s\\1')", prefix),
-    js
-  )
-
-  # querySelector('#id') and querySelector("#id")
-  js <- gsub(
-    "querySelector\\(['\"]#([^'\"]+)['\"]\\)",
-    sprintf("querySelector('#%s\\1')", prefix),
-    js
-  )
-
-  # querySelectorAll with ID selectors (less common but possible)
-  js <- gsub(
-    "querySelectorAll\\(['\"]#([^'\"]+)['\"]\\)",
-    sprintf("querySelectorAll('#%s\\1')", prefix),
-    js
-  )
 
   # Rewrite switchReportTab CALLS within JS (not the function definition)
   # Match calls: switchReportTab( but NOT: function switchReportTab(
@@ -203,8 +189,9 @@ redirect_pin_functions <- function(js, report_key) {
   # These functions should call through to ReportHub instead of operating locally
 
   # updatePinBadge() -> ReportHub.updatePinBadge()
+  # Skip function declarations (function updatePinBadge) and method calls (.updatePinBadge)
   js <- gsub(
-    "(?<![.a-zA-Z])updatePinBadge\\(",
+    "(?<!function )(?<![.a-zA-Z])updatePinBadge\\(",
     "ReportHub.updatePinBadge(",
     js,
     perl = TRUE
@@ -212,10 +199,18 @@ redirect_pin_functions <- function(js, report_key) {
 
   # savePinnedData() -> ReportHub.savePinnedData()
   js <- gsub(
-    "(?<![.a-zA-Z])savePinnedData\\(",
+    "(?<!function )(?<![.a-zA-Z])savePinnedData\\(",
     "ReportHub.savePinnedData(",
     js,
     perl = TRUE
+  )
+
+  # Fix tabs captureCurrentView: only capture chart SVG if chart-wrapper is visible
+  # (toggleChart sets display:none on .chart-wrapper when charts are hidden)
+  js <- gsub(
+    'var chartSvg = wrapper ? wrapper.querySelector("svg") : null;',
+    'var chartSvg = (wrapper && wrapper.style.display !== "none") ? wrapper.querySelector("svg") : null;',
+    js, fixed = TRUE
   )
 
   return(js)
@@ -228,8 +223,9 @@ redirect_pin_functions <- function(js, report_key) {
 #' @return Modified JavaScript
 redirect_save_functions <- function(js) {
   # saveReportHTML() -> ReportHub.saveReportHTML()
+  # Skip function declarations (function saveReportHTML) and method calls
   js <- gsub(
-    "(?<![.a-zA-Z])saveReportHTML\\(",
+    "(?<!function )(?<![.a-zA-Z])saveReportHTML\\(",
     "ReportHub.saveReportHTML(",
     js,
     perl = TRUE
@@ -379,6 +375,13 @@ wrap_js_in_iife <- function(js_blocks, report_key, report_type) {
       sprintf("\\1 %s%s", prefix, fn),
       all_js
     )
+    # Prefix window.fnName assignments: window.fnName -> prefix_fnName
+    # (tracker defines many functions as window.fnName = function(...))
+    all_js <- gsub(
+      sprintf("window\\.%s\\b", fn),
+      sprintf("%s%s", prefix, fn),
+      all_js
+    )
     # Prefix standalone calls: fnName( -> prefix_fnName(
     # But NOT when preceded by . (method call) or another letter (substring)
     all_js <- gsub(
@@ -389,12 +392,188 @@ wrap_js_in_iife <- function(js_blocks, report_key, report_type) {
     )
   }
 
+  # --- Rewrite DOM queries to use report-specific scoped helpers ---
+  # Each report gets uniquely-named helpers to prevent global variable collision
+  # (both scripts share global scope, so _$id would be overwritten by the second report)
+  id_prefix <- paste0(report_key, "--")
+  helper_id <- paste0("_", report_key, "_id")
+  helper_qs <- paste0("_", report_key, "_qs")
+  all_js <- gsub("document.getElementById(", paste0(helper_id, "("), all_js, fixed = TRUE)
+  all_js <- gsub("document.querySelector(", paste0(helper_qs, "("), all_js, fixed = TRUE)
+
+  # Prepend scoped helper functions
+  helpers_js <- sprintf(
+    'var %s = function(id) { return document.getElementById(id) || document.getElementById("%s" + id); };
+var %s = function(sel) { var el = document.querySelector(sel); if (el) return el; if (sel.indexOf("#") === -1) return null; return document.querySelector(sel.replace(/#([a-zA-Z][\\w-]*)/g, "#%s$1")); };
+',
+    helper_id, id_prefix, helper_qs, id_prefix
+  )
+  all_js <- paste0(helpers_js, "\n", all_js)
+
   # Also create a namespace object for the public API
   namespace_name <- if (report_type == "tracker") "TrackerReport" else "TabsReport"
 
   api_js <- build_namespace_api(namespace_name, report_key, report_type)
 
-  return(paste0(all_js, "\n\n", api_js))
+  bridge_js <- build_pin_bridge(report_key, report_type)
+
+  return(paste0(all_js, "\n\n", api_js, "\n\n", bridge_js))
+}
+
+
+#' Build Pin Bridge for Hub Integration
+#'
+#' Generates JavaScript that overrides per-report pin functions to route
+#' pins through the hub's unified store (ReportHub.pinnedItems) instead
+#' of the local per-report arrays. Appended at the end of each report's
+#' JS block so it overwrites the original function definitions.
+#'
+#' @param report_key "tracker" or "tabs"
+#' @param report_type "tracker" or "tabs"
+#' @return JavaScript string with bridge functions
+build_pin_bridge <- function(report_key, report_type) {
+  prefix <- paste0(report_key, "_")
+  id_helper <- paste0("_", report_key, "_id")
+  qs_helper <- paste0("_", report_key, "_qs")
+
+  if (report_type == "tracker") {
+    sprintf('
+// ===== Hub Pin Bridge \u2014 Tracker =====
+// Override per-report pin functions to route through hub store
+pinMetricView = function(metricId) {
+  var existing = null;
+  for (var i = 0; i < ReportHub.pinnedItems.length; i++) {
+    if (ReportHub.pinnedItems[i].source === "tracker" && ReportHub.pinnedItems[i].metricId === metricId) {
+      existing = ReportHub.pinnedItems[i]; break;
+    }
+  }
+  if (existing) {
+    ReportHub.removePin(existing.id);
+    %1$supdatePinButton(metricId, false);
+  } else {
+    var pinObj = captureMetricView(metricId);
+    if (!pinObj) return;
+    pinObj.title = pinObj.metricTitle || metricId;
+    pinObj.insight = pinObj.insightText || "";
+    ReportHub.addPin("tracker", pinObj);
+    %1$supdatePinButton(metricId, true);
+  }
+};
+pinSummarySection = function(sectionType) {
+  var editorId = sectionType === "background" ? "summary-background-editor" : "summary-findings-editor";
+  var editor = %2$s(editorId);
+  if (!editor || !editor.innerHTML.trim()) { alert("Add content before pinning."); return; }
+  var title = sectionType === "background" ? "Background & Method" : "Summary";
+  var pinObj = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2,5),
+    metricId: "summary-" + sectionType,
+    title: title, insight: editor.innerHTML,
+    tableHtml: "", chartSvg: "", timestamp: Date.now()
+  };
+  ReportHub.addPin("tracker", pinObj);
+};
+pinSummaryTable = function() {
+  var table = %2$s("summary-metrics-table");
+  if (!table) return;
+  var clone = table.cloneNode(true);
+  clone.querySelectorAll("tr").forEach(function(tr) { if (tr.style.display === "none") tr.parentNode.removeChild(tr); });
+  var pinObj = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2,5),
+    metricId: "summary-metrics-table",
+    title: "Summary Metrics Overview", insight: "",
+    tableHtml: \'<div class="tk-table-wrapper">\' + clone.outerHTML + \'</div>\',
+    chartSvg: "", timestamp: Date.now()
+  };
+  ReportHub.addPin("tracker", pinObj);
+};
+pinOverviewView = function() {
+  var tablePanel = %3$s("#tab-overview .tk-table-panel");
+  var chartPanel = %2$s("tk-chart-panel");
+  var insightEditor = %2$s("overview-insight-editor");
+  var cleanHtml = "";
+  if (tablePanel && tablePanel.style.display !== "none") {
+    var clone = tablePanel.cloneNode(true);
+    clone.querySelectorAll(".segment-hidden, .row-hidden-user, .row-filtered").forEach(function(el) { el.parentNode.removeChild(el); });
+    cleanHtml = clone.innerHTML;
+  }
+  var chartSvg = "";
+  var chartVisible = false;
+  if (chartPanel && chartPanel.style.display !== "none") {
+    chartVisible = true;
+    chartSvg = chartPanel.innerHTML;
+  }
+  var pinObj = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2,5),
+    metricId: "overview-" + (typeof getCurrentSegment === "function" ? getCurrentSegment() : "Total"),
+    title: "Segment Overview: " + (typeof getCurrentSegment === "function" ? getCurrentSegment() : "Total"),
+    tableHtml: cleanHtml, chartSvg: chartSvg, chartVisible: chartVisible,
+    insight: insightEditor ? insightEditor.innerHTML : "",
+    timestamp: Date.now()
+  };
+  ReportHub.addPin("tracker", pinObj);
+};
+pinSelectedCharts = function() {
+  var selected = typeof getChartSelection === "function" ? getChartSelection() : [];
+  if (selected.length === 0) return;
+  var chartContainer = %2$s("tk-combined-chart");
+  var chartSvg = chartContainer ? chartContainer.innerHTML : "";
+  var insightEditor = %2$s("overview-insight-editor");
+  var pinObj = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2,5),
+    metricId: "overview-charts-" + selected.join("-"),
+    title: "Overview: " + selected.length + " metrics (" + (typeof getCurrentSegment === "function" ? getCurrentSegment() : "Total") + ")",
+    tableHtml: "", chartSvg: chartSvg, chartVisible: true,
+    insight: insightEditor ? insightEditor.innerHTML : "",
+    timestamp: Date.now()
+  };
+  ReportHub.addPin("tracker", pinObj);
+};
+%1$shydratePinnedViews = function() {};
+%1$srenderPinnedCards = function() { ReportHub.renderPinnedCards(); };
+// ===== End Hub Pin Bridge =====
+', prefix, id_helper, qs_helper)
+  } else {
+    sprintf('
+// ===== Hub Pin Bridge \u2014 Tabs =====
+// Override per-report pin functions to route through hub store
+%stogglePin = function(qCode) {
+  var existing = null;
+  for (var i = 0; i < ReportHub.pinnedItems.length; i++) {
+    var p = ReportHub.pinnedItems[i];
+    if (p.source === "tabs" && p.qCode === qCode && p.bannerGroup === currentGroup) {
+      existing = p; break;
+    }
+  }
+  if (existing) {
+    ReportHub.removePin(existing.id);
+    %supdatePinButton(qCode, false);
+  } else {
+    var pinObj = captureCurrentView(qCode);
+    if (!pinObj) return;
+    pinObj.title = pinObj.qCode || "";
+    pinObj.subtitle = pinObj.qTitle || "";
+    pinObj.insight = pinObj.insightText || "";
+    ReportHub.addPin("tabs", pinObj);
+    %supdatePinButton(qCode, true);
+  }
+};
+pinDashboardText = function(boxId) {
+  var editor = %s("dash-text-" + boxId);
+  var text = editor ? editor.innerText.trim() : "";
+  if (!text) { alert("Please enter text before pinning."); return; }
+  var title = boxId === "background" ? "Background & Method" : "Executive Summary";
+  var pinObj = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2,5),
+    pinType: "text_box", qCode: null, title: title,
+    insight: text, tableHtml: null, chartSvg: null, timestamp: Date.now()
+  };
+  ReportHub.addPin("tabs", pinObj);
+};
+%shydratePinnedViews = function() {};
+%srenderPinnedCards = function() { ReportHub.renderPinnedCards(); };
+// ===== End Hub Pin Bridge =====
+', prefix, prefix, prefix, id_helper, prefix, prefix)
+  }
 }
 
 
@@ -415,16 +594,18 @@ build_namespace_api <- function(namespace_name, report_key, report_type) {
 var %s = {
   selectMetric: typeof selectTrackerMetric === "function" ? selectTrackerMetric : function() {},
   togglePin: typeof %stogglePin === "function" ? %stogglePin : function() {},
+  updatePinButton: typeof %supdatePinButton === "function" ? %supdatePinButton : function() {},
   toggleHelpOverlay: typeof %stoggleHelpOverlay === "function" ? %stoggleHelpOverlay : function() {}
 };
-', namespace_name, prefix, prefix, prefix, prefix)
+', namespace_name, prefix, prefix, prefix, prefix, prefix, prefix)
   } else {
     sprintf('
 var %s = {
   selectQuestion: typeof selectQuestion === "function" ? selectQuestion : function() {},
   togglePin: typeof %stogglePin === "function" ? %stogglePin : function() {},
+  updatePinButton: typeof %supdatePinButton === "function" ? %supdatePinButton : function() {},
   toggleHelpOverlay: typeof %stoggleHelpOverlay === "function" ? %stoggleHelpOverlay : function() {}
 };
-', namespace_name, prefix, prefix, prefix, prefix)
+', namespace_name, prefix, prefix, prefix, prefix, prefix, prefix)
   }
 }

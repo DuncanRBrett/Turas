@@ -259,13 +259,37 @@ body {
   margin-bottom: 16px;
 }
 
+.hub-summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
 .hub-summary-label {
   font-size: 12px;
   font-weight: 600;
   color: var(--hub-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-bottom: 8px;
+}
+
+.hub-pin-summary-btn {
+  background: none;
+  border: 1px solid var(--hub-border);
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-family: var(--hub-font);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--hub-text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.hub-pin-summary-btn:hover {
+  background: #f1f5f9;
+  color: var(--hub-text);
 }
 
 .hub-summary-editor {
@@ -363,6 +387,11 @@ body {
 .hub-badge-tabs {
   background: #fef3c7;
   color: #92400e;
+}
+
+.hub-badge-overview {
+  background: #e0e7ff;
+  color: #3730a3;
 }
 
 .hub-pin-title {

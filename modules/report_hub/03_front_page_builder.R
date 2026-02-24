@@ -161,10 +161,14 @@ build_summary_area <- function(parsed_reports) {
 
     parts <- paste0(parts, sprintf(
       '<div class="hub-summary-section">
-  <div class="hub-summary-label">%s</div>
+  <div class="hub-summary-header">
+    <div class="hub-summary-label">%s</div>
+    <button class="hub-pin-summary-btn" onclick="ReportHub.pinOverviewSummary(\'%s\')" title="Pin this summary">\U0001F4CC Pin</button>
+  </div>
   <div class="hub-summary-editor" contenteditable="true" data-placeholder="Add summary for %s..." data-source="%s">%s</div>
 </div>',
       htmltools::htmlEscape(label),
+      key,
       htmltools::htmlEscape(label),
       key,
       summary_text

@@ -227,6 +227,48 @@ guard_validate_hub_config <- function(config_file) {
     }
   }
 
+  # --- Validate output settings if provided ---
+  # output_dir: directory for the combined report (absolute or relative to config)
+  # output_file: filename for the combined report (just the name, no directory)
+  if (!is.null(settings$output_dir) && nzchar(trimws(settings$output_dir))) {
+    out_dir <- trimws(settings$output_dir)
+    # Resolve relative to config file directory
+    if (!dir.exists(out_dir)) {
+      config_dir <- dirname(config_file)
+      out_dir_resolved <- file.path(config_dir, out_dir)
+      if (dir.exists(out_dir_resolved)) {
+        out_dir <- normalizePath(out_dir_resolved)
+      } else {
+        # Try to create the directory
+        dir_created <- tryCatch({
+          dir.create(out_dir_resolved, recursive = TRUE, showWarnings = FALSE)
+          dir.exists(out_dir_resolved)
+        }, error = function(e) FALSE)
+        if (dir_created) {
+          out_dir <- normalizePath(out_dir_resolved)
+        } else {
+          warnings <- c(warnings, sprintf(
+            "Output directory not found and could not be created: %s. Using config file directory instead.",
+            settings$output_dir
+          ))
+          out_dir <- dirname(config_file)
+        }
+      }
+    } else {
+      out_dir <- normalizePath(out_dir)
+    }
+    settings$output_dir <- out_dir
+  }
+
+  if (!is.null(settings$output_file) && nzchar(trimws(settings$output_file))) {
+    out_file <- trimws(settings$output_file)
+    # Ensure it ends in .html
+    if (!grepl("\\.html?$", out_file, ignore.case = TRUE)) {
+      out_file <- paste0(out_file, ".html")
+    }
+    settings$output_file <- out_file
+  }
+
   # --- Validate logo path if provided ---
   if (!is.null(settings$logo_path) && nzchar(trimws(settings$logo_path))) {
     logo_path <- settings$logo_path
@@ -254,7 +296,11 @@ guard_validate_hub_config <- function(config_file) {
       client_name = if (!is.null(settings$client_name)) trimws(settings$client_name) else NULL,
       brand_colour = if (!is.null(settings$brand_colour)) trimws(settings$brand_colour) else NULL,
       accent_colour = if (!is.null(settings$accent_colour)) trimws(settings$accent_colour) else NULL,
-      logo_path = settings$logo_path
+      logo_path = settings$logo_path,
+      output_dir = if (!is.null(settings$output_dir) && nzchar(trimws(settings$output_dir)))
+                     settings$output_dir else NULL,
+      output_file = if (!is.null(settings$output_file) && nzchar(trimws(settings$output_file)))
+                      settings$output_file else NULL
     ),
     reports = lapply(seq_len(nrow(reports_df)), function(i) {
       row <- reports_df[i, ]

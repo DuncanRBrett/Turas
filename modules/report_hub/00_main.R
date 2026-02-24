@@ -69,9 +69,19 @@ combine_reports <- function(config_file, output_file = NULL, auto_cross_ref = FA
 
   # --- Step 2: Generate output file path if not provided ---
   if (is.null(output_file)) {
-    safe_title <- gsub("[^a-zA-Z0-9_-]", "_", config$settings$project_title)
-    output_file <- sprintf("%s_Combined_%s.html",
-                           safe_title, format(Sys.Date(), "%Y%m%d"))
+    # Use config settings if available, otherwise auto-generate
+    if (!is.null(config$settings$output_file)) {
+      output_file <- config$settings$output_file
+    } else {
+      safe_title <- gsub("[^a-zA-Z0-9_-]", "_", config$settings$project_title)
+      output_file <- sprintf("%s_Combined_%s.html",
+                             safe_title, format(Sys.Date(), "%Y%m%d"))
+    }
+
+    # Prepend output_dir if configured and output_file is just a filename
+    if (!is.null(config$settings$output_dir) && !grepl(.Platform$file.sep, output_file, fixed = TRUE)) {
+      output_file <- file.path(config$settings$output_dir, output_file)
+    }
   }
 
   # --- Step 3: Parse each report ---
