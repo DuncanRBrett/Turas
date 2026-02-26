@@ -913,10 +913,10 @@ function pinDashboardText(boxId) {
  */
 function pinGaugeSection(sectionId) {
   var section = document.getElementById("dash-sec-" + sectionId);
-  if (!section) { alert("Section not found."); return; }
+  if (!section) return;
 
   var gauges = section.querySelectorAll(".dash-gauge-card:not(.dash-gauge-excluded)");
-  if (gauges.length === 0) { alert("No gauges to pin (all excluded)."); return; }
+  if (gauges.length === 0) return;
 
   // Get the section title
   var titleEl = section.querySelector(".dash-section-title");
@@ -960,10 +960,10 @@ function pinGaugeSection(sectionId) {
  */
 function pinSigFindings() {
   var section = document.getElementById("dash-sec-sig-findings");
-  if (!section) { alert("No significant findings section found."); return; }
+  if (!section) return;
 
   var cards = section.querySelectorAll(".dash-sig-card");
-  if (cards.length === 0) { alert("There are no significant findings to pin."); return; }
+  if (cards.length === 0) return;
 
   // Clone the section content
   var clone = section.cloneNode(true);

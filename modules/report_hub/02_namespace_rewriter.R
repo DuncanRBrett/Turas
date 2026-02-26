@@ -553,6 +553,26 @@ pinSelectedCharts = function() {
   };
   ReportHub.addPin("tracker", pinObj);
 };
+pinSigChanges = function() {
+  var section = %2$s("summary-section-sig-changes");
+  if (!section) return;
+  var cards = section.querySelectorAll(".dash-sig-card");
+  if (cards.length === 0) return;
+  var clone = section.cloneNode(true);
+  var controls = clone.querySelector(".summary-section-controls");
+  if (controls) controls.parentNode.removeChild(controls);
+  var pinObj = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2,5),
+    metricId: "summary-sig-changes",
+    metricTitle: "Significant Changes",
+    title: "Significant Changes",
+    visibleSegments: [],
+    tableHtml: clone.innerHTML, chartSvg: "", chartVisible: false,
+    insightText: "", insight: "",
+    timestamp: Date.now()
+  };
+  ReportHub.addPin("tracker", pinObj);
+};
 %1$shydratePinnedViews = function() {};
 %1$srenderPinnedCards = function() { ReportHub.renderPinnedCards(); };
 // ===== End Hub Pin Bridge =====
@@ -561,7 +581,7 @@ pinSelectedCharts = function() {
     sprintf('
 // ===== Hub Pin Bridge \u2014 Tabs =====
 // Override per-report pin functions to route through hub store
-%stogglePin = function(qCode) {
+%1$stogglePin = function(qCode) {
   // Always add a new pin (multi-pin support).
   // Each pin captures the current view state (banner, chart, table).
   var pinObj = captureCurrentView(qCode);
@@ -570,10 +590,10 @@ pinSelectedCharts = function() {
   pinObj.subtitle = pinObj.qTitle || "";
   pinObj.insight = pinObj.insightText || "";
   ReportHub.addPin("tabs", pinObj);
-  %supdatePinButton(qCode, true);
+  %1$supdatePinButton(qCode, true);
 };
 pinDashboardText = function(boxId) {
-  var editor = %s("dash-text-" + boxId);
+  var editor = %2$s("dash-text-" + boxId);
   var text = editor ? editor.innerText.trim() : "";
   if (!text) { alert("Please enter text before pinning."); return; }
   var title = boxId === "background" ? "Background & Method" : "Executive Summary";
@@ -584,10 +604,44 @@ pinDashboardText = function(boxId) {
   };
   ReportHub.addPin("tabs", pinObj);
 };
-%shydratePinnedViews = function() {};
-%srenderPinnedCards = function() { ReportHub.renderPinnedCards(); };
+pinGaugeSection = function(sectionId) {
+  var section = %2$s("dash-sec-" + sectionId);
+  if (!section) return;
+  var gauges = section.querySelectorAll(".dash-gauge-card:not(.dash-gauge-excluded)");
+  if (gauges.length === 0) return;
+  var titleEl = section.querySelector(".dash-section-title");
+  var sectionTitle = titleEl ? titleEl.childNodes[0].textContent.trim() : sectionId;
+  var clone = section.cloneNode(true);
+  clone.querySelectorAll(".dash-export-btn, .dash-sort-btn, .dash-slide-export-btn").forEach(function(btn) { btn.remove(); });
+  clone.querySelectorAll(".dash-tier-pill").forEach(function(pill) { pill.remove(); });
+  clone.querySelectorAll(".dash-gauge-excluded").forEach(function(g) { g.remove(); });
+  var pinObj = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2,5),
+    pinType: "dashboard_section", qCode: null, title: sectionTitle, subtitle: "",
+    insight: null, tableHtml: clone.innerHTML, chartSvg: null,
+    baseText: null, timestamp: Date.now()
+  };
+  ReportHub.addPin("tabs", pinObj);
+};
+pinSigFindings = function() {
+  var section = %2$s("dash-sec-sig-findings");
+  if (!section) return;
+  var cards = section.querySelectorAll(".dash-sig-card");
+  if (cards.length === 0) return;
+  var clone = section.cloneNode(true);
+  clone.querySelectorAll(".dash-export-btn, .dash-slide-export-btn").forEach(function(btn) { btn.remove(); });
+  var pinObj = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2,5),
+    pinType: "dashboard_section", qCode: null, title: "Significant Findings", subtitle: "",
+    insight: null, tableHtml: clone.innerHTML, chartSvg: null,
+    baseText: null, timestamp: Date.now()
+  };
+  ReportHub.addPin("tabs", pinObj);
+};
+%1$shydratePinnedViews = function() {};
+%1$srenderPinnedCards = function() { ReportHub.renderPinnedCards(); };
 // ===== End Hub Pin Bridge =====
-', prefix, prefix, prefix, id_helper, prefix, prefix)
+', prefix, id_helper)
   }
 }
 

@@ -1058,16 +1058,11 @@ function pinSummarySection(sectionType) {
  */
 function pinSigChanges() {
   var section = document.getElementById("summary-section-sig-changes");
-  if (!section) {
-    alert("No significant changes section found.");
-    return;
-  }
+  if (!section) return;
+
   // Check for empty state (no actual cards)
   var cards = section.querySelectorAll(".dash-sig-card");
-  if (cards.length === 0) {
-    alert("There are no significant changes to pin.");
-    return;
-  }
+  if (cards.length === 0) return;
 
   // Clone the section and strip interactive controls
   var clone = section.cloneNode(true);
