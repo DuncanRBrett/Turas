@@ -558,6 +558,9 @@ process_composite_question <- function(composite_def, data, questions_df,
     stringsAsFactors = FALSE
   )
 
+  # Tag as composite for downstream classification
+  result_table$RowSource <- "composite"
+
   # Add banner columns
   # Get decimal places safely for ratings
   decimal_places_ratings <- if (!is.null(config$decimal_places_ratings) &&
@@ -658,6 +661,9 @@ test_composite_significance <- function(data, composite_code, source_questions,
     RowType = "Sig.",
     stringsAsFactors = FALSE
   )
+
+  # Tag as composite for downstream classification
+  sig_row$RowSource <- "composite"
 
   internal_keys <- banner_info$internal_keys
   sig_letters <- setNames(rep("", length(internal_keys)), internal_keys)

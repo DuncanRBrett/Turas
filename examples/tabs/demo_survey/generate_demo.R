@@ -651,7 +651,9 @@ settings_df <- data.frame(
     # Index descriptor
     "index_descriptor",
     # Charts
-    "show_charts"
+    "show_charts",
+    # Priority metric on charts
+    "priority_metric"
   ),
   Value = c(
     # File paths
@@ -682,7 +684,9 @@ settings_df <- data.frame(
     # Index descriptor
     "Strongly disagree(1) = 1 to Strongly agree(5) = 5",
     # Charts
-    "TRUE"
+    "TRUE",
+    # Priority metric on charts
+    "Mean, NPS Score"
   ),
   stringsAsFactors = FALSE
 )

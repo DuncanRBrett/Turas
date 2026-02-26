@@ -89,6 +89,9 @@ transform_for_dashboard <- function(all_results, banner_info, config_obj) {
   if (isTRUE(config_obj$enable_significance_testing)) {
     sig_findings <- extract_sig_findings(all_metrics, banner_info)
   }
+  cat(sprintf("    [Dashboard] Sig testing enabled: %s -> %d findings extracted\n",
+              as.character(config_obj$enable_significance_testing %||% "NULL"),
+              length(sig_findings)))
 
   list(
     status = "PASS",
@@ -337,6 +340,12 @@ build_metric_object <- function(q_result, metric_row, metric_type, table,
 #' structured finding objects for the dashboard. Resolves sig letter codes
 #' (e.g., "B", "BCD") to actual column display names and their values.
 #'
+#' IMPORTANT: Significance tests run WITHIN each banner group, and each group
+#' assigns letters starting from "A". The global banner_info$letters array
+#' therefore contains duplicate letters across groups. We must resolve sig
+#' letters using the per-group letter mappings from banner_info$banner_info,
+#' not the global array.
+#'
 #' @param headline_metrics List of metric objects
 #' @param banner_info Banner structure
 #' @return List of finding objects with resolved_comparisons
@@ -351,14 +360,14 @@ extract_sig_findings <- function(headline_metrics, banner_info) {
     stats::setNames(banner_info$internal_keys, banner_info$internal_keys)
   }
 
+  # Map each internal key to its banner group display label
   key_to_group <- character(0)
-
   banner_code_to_label <- build_banner_code_to_label(banner_info)
 
   if (!is.null(banner_info$banner_info)) {
     for (grp_name in names(banner_info$banner_info)) {
       grp <- banner_info$banner_info[[grp_name]]
-      # Use display label (e.g. "Campus") instead of code (e.g. "Q002")
+      # Use display label (e.g. "Region") instead of code (e.g. "Q01")
       display_label <- if (grp_name %in% names(banner_code_to_label)) {
         banner_code_to_label[grp_name]
       } else {
@@ -372,33 +381,45 @@ extract_sig_findings <- function(headline_metrics, banner_info) {
     }
   }
 
-  # Build letter-to-key, letter-to-display, and letter-to-group mappings
-  # banner_info$letters is parallel with banner_info$internal_keys
-  letter_to_key <- list()
-  letter_to_display <- list()
-  letter_to_group <- list()
-  if (!is.null(banner_info$letters) && !is.null(banner_info$internal_keys)) {
-    for (i in seq_along(banner_info$letters)) {
-      ltr <- banner_info$letters[i]
-      if (!is.null(ltr) && !is.na(ltr) && ltr != "-" && nchar(ltr) > 0) {
-        k <- banner_info$internal_keys[i]
-        letter_to_key[[ltr]] <- k
-        letter_to_display[[ltr]] <- if (k %in% names(key_to_display)) {
-          key_to_display[[k]]
-        } else {
-          sub("^[^:]+::", "", k)
+  # Build PER-GROUP letter-to-key and letter-to-display mappings.
+  # Each banner group assigns letters independently (A, B, C, ...),
+  # so we must resolve sig letters within the context of the column's
+  # own banner group — NOT from the global letters array which has
+  # duplicate letters that overwrite each other.
+  group_letter_maps <- list()
+  if (!is.null(banner_info$banner_info)) {
+    for (grp_name in names(banner_info$banner_info)) {
+      grp <- banner_info$banner_info[[grp_name]]
+      if (!is.null(grp$letters) && !is.null(grp$internal_keys)) {
+        ltr_to_key <- list()
+        ltr_to_display <- list()
+        for (i in seq_along(grp$letters)) {
+          ltr <- grp$letters[i]
+          if (!is.null(ltr) && !is.na(ltr) && ltr != "-" && nchar(ltr) > 0) {
+            k <- grp$internal_keys[i]
+            ltr_to_key[[ltr]] <- k
+            ltr_to_display[[ltr]] <- if (k %in% names(key_to_display)) {
+              key_to_display[[k]]
+            } else {
+              sub("^[^:]+::", "", k)
+            }
+          }
         }
-        # Track which banner group this letter belongs to
-        letter_to_group[[ltr]] <- if (k %in% names(key_to_group)) {
-          key_to_group[[k]]
+        display_label <- if (grp_name %in% names(banner_code_to_label)) {
+          banner_code_to_label[grp_name]
         } else {
-          "Unknown"
+          grp_name
         }
+        group_letter_maps[[display_label]] <- list(
+          letter_to_key = ltr_to_key,
+          letter_to_display = ltr_to_display
+        )
       }
     }
   }
 
   for (metric in headline_metrics) {
+
     for (key in names(metric$sig_flags)) {
       sig_val <- metric$sig_flags[[key]]
 
@@ -424,20 +445,24 @@ extract_sig_findings <- function(headline_metrics, banner_info) {
       total_val <- metric$values[["TOTAL::Total"]]
       if (is.null(total_val)) total_val <- NA_real_
 
+      # Use the PER-GROUP letter mapping for this column's banner group.
+      # Sig tests run within each group, so all letters in sig_val
+      # refer to columns in the same group.
+      grp_map <- group_letter_maps[[grp_name]]
+      if (is.null(grp_map)) next  # No letter mapping for this group
+
       # Resolve sig letter codes to column names and values
       # sig_val might be "B" or "BCD" or "B C D" — split into individual letters
       sig_letters_clean <- gsub("[^A-Za-z]", "", sig_val)
       individual_letters <- strsplit(sig_letters_clean, "")[[1]]
 
-      # Only show comparisons from the SAME banner group as this column.
-      # Sig tests run across ALL columns, but comparing Campus vs Age
-      # is misleading in the dashboard context.
+      # All sig letters are from the same group (sig tests run within groups),
+      # so all resolved comparisons are same-group by definition.
       resolved_comparisons <- list()
-      cross_group_comparisons <- list()
       for (ltr in individual_letters) {
         ltr_upper <- toupper(ltr)
-        comp_name <- letter_to_display[[ltr_upper]] %||% ltr_upper
-        comp_key <- letter_to_key[[ltr_upper]]
+        comp_name <- grp_map$letter_to_display[[ltr_upper]] %||% ltr_upper
+        comp_key <- grp_map$letter_to_key[[ltr_upper]]
         comp_val <- if (!is.null(comp_key)) {
           metric$values[[comp_key]]
         } else {
@@ -445,24 +470,14 @@ extract_sig_findings <- function(headline_metrics, banner_info) {
         }
         if (is.null(comp_val)) comp_val <- NA_real_
 
-        comp_group <- letter_to_group[[ltr_upper]] %||% "Unknown"
-        comp_entry <- list(
+        resolved_comparisons[[length(resolved_comparisons) + 1]] <- list(
           letter = ltr_upper,
           name = comp_name,
           value = comp_val,
-          group = comp_group
+          group = grp_name
         )
-
-        if (comp_group == grp_name) {
-          # Same banner group — include in main comparisons
-          resolved_comparisons[[length(resolved_comparisons) + 1]] <- comp_entry
-        } else {
-          # Different banner group — track separately
-          cross_group_comparisons[[length(cross_group_comparisons) + 1]] <- comp_entry
-        }
       }
 
-      # Skip findings that have no same-group comparisons (all cross-group)
       if (length(resolved_comparisons) == 0) next
 
       findings[[length(findings) + 1]] <- list(
@@ -477,7 +492,7 @@ extract_sig_findings <- function(headline_metrics, banner_info) {
         banner_group = grp_name,
         metric_type = metric$metric_type,
         resolved_comparisons = resolved_comparisons,
-        cross_group_comparisons = cross_group_comparisons
+        cross_group_comparisons = list()
       )
     }
   }

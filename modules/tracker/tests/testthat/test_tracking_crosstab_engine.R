@@ -252,7 +252,7 @@ test_that("extract_metric_value handles NPS correctly", {
              n_unweighted = 480, available = TRUE)
 
   expect_equal(extract_metric_value(wr, "nps", "nps"), 38)
-  expect_equal(extract_metric_value(wr, "nps", "nps_score"), NA_real_)  # stored as "nps" not "nps_score"
+  expect_equal(extract_metric_value(wr, "nps", "nps_score"), 38)  # nps_field_map maps "nps_score" → "nps"
   expect_equal(extract_metric_value(wr, "nps", "promoters_pct"), 48)
 })
 
@@ -261,6 +261,35 @@ test_that("extract_metric_value handles unavailable wave", {
   # Won't reach extraction since extract_segment_metric checks available first
   # But if called directly:
   expect_true(is.na(extract_metric_value(wr, "rating_enhanced", "mean")))
+})
+
+test_that("extract_metric_value handles proportions metric_type", {
+  # calculate_single_choice_trend_enhanced returns metric_type = "proportions"
+  # with proportions as a named numeric vector
+  wr <- list(
+    available = TRUE,
+    proportions = c("Yes" = 45.2, "No" = 54.8),
+    n_unweighted = 100
+  )
+
+  # Category spec: "category:Yes" → metric_name = "category_yes"
+  expect_equal(extract_metric_value(wr, "proportions", "category_yes"), 45.2)
+  expect_equal(extract_metric_value(wr, "proportions", "category_no"), 54.8)
+
+  # Missing category returns NA
+  expect_true(is.na(extract_metric_value(wr, "proportions", "category_maybe")))
+})
+
+test_that("extract_metric_value handles category names with spaces (normalized matching)", {
+  # Codes like "Brand A" get normalized to "brand_a" by normalize_metric_name
+  wr <- list(
+    available = TRUE,
+    proportions = c("Brand A" = 32.1, "Brand B" = 67.9),
+    n_unweighted = 100
+  )
+
+  expect_equal(extract_metric_value(wr, "proportions", "category_brand_a"), 32.1)
+  expect_equal(extract_metric_value(wr, "proportions", "category_brand_b"), 67.9)
 })
 
 

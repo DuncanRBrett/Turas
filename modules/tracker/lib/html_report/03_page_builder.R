@@ -264,6 +264,9 @@ build_summary_tab <- function(html_data, config) {
       )
     ),
 
+    # Significant Changes section (matching crosstabs sig findings pattern)
+    build_sig_changes_section(html_data),
+
     # Metric type filter chips (only if more than one type present)
     htmltools::HTML(build_summary_type_filter(html_data)),
 
@@ -271,7 +274,7 @@ build_summary_tab <- function(html_data, config) {
     htmltools::tags$div(class = "summary-actions",
       htmltools::tags$button(class = "turas-action-btn",
         onclick = "exportSummaryExcel()",
-        htmltools::HTML("&#x1F4CA; Export Excel")),
+        htmltools::HTML("&#x2B73; Export Excel")),
       htmltools::tags$button(class = "turas-action-btn",
         onclick = "pinSummaryTable()",
         htmltools::HTML("&#x1F4CC; Pin to Views")),
@@ -420,6 +423,131 @@ build_summary_metrics_table <- function(html_data, min_base = 30L) {
 
 
 # ==============================================================================
+# SIGNIFICANT CHANGES SECTION (for Summary tab)
+# ==============================================================================
+
+#' Build Significant Changes Section
+#'
+#' Scans all metrics × segments for the latest wave and shows cards
+#' for any statistically significant wave-on-wave changes.
+#' Matches crosstabs "Significant Findings" pattern.
+#'
+#' @param html_data List. Output from transform_tracker_for_html()
+#' @return htmltools tag or NULL if no significant changes
+#' @keywords internal
+build_sig_changes_section <- function(html_data) {
+
+  latest_wave <- html_data$waves[length(html_data$waves)]
+  prev_wave <- if (length(html_data$waves) >= 2) html_data$waves[length(html_data$waves) - 1] else NULL
+  latest_label <- html_data$wave_lookup[latest_wave]
+  prev_label <- if (!is.null(prev_wave)) html_data$wave_lookup[prev_wave] else ""
+
+  findings <- list()
+
+  for (mr in html_data$metric_rows) {
+    for (seg_name in names(mr$segment_cells)) {
+      cells <- mr$segment_cells[[seg_name]]
+      cell <- cells[[latest_wave]]
+      if (is.null(cell)) next
+      if (is.null(cell$sig_vs_prev) || is.na(cell$sig_vs_prev) || !isTRUE(cell$sig_vs_prev)) next
+      if (is.null(cell$change_vs_prev) || is.na(cell$change_vs_prev)) next
+
+      direction <- if (cell$change_vs_prev > 0) "up" else "down"
+      direction_label <- if (direction == "up") "increase" else "decrease"
+      direction_symbol <- if (direction == "up") "\u25B2" else "\u25BC"
+
+      # Get previous wave value for context
+      prev_cell <- cells[[prev_wave]]
+      prev_display <- if (!is.null(prev_cell)) prev_cell$display_value else ""
+
+      # Format the raw numeric change as plain text (not HTML)
+      change_num <- cell$change_vs_prev
+      is_pct <- grepl("(pct|box|range|proportion|category|any)", mr$metric_name)
+      change_text <- if (is_pct) {
+        sprintf("%+.1f pp", change_num)
+      } else {
+        sprintf("%+.2f", change_num)
+      }
+
+      findings[[length(findings) + 1]] <- list(
+        metric_label = mr$metric_label,
+        section = if (!is.na(mr$section) && nzchar(mr$section)) mr$section else "",
+        segment = seg_name,
+        direction = direction,
+        direction_label = direction_label,
+        direction_symbol = direction_symbol,
+        current_value = cell$display_value,
+        prev_value = prev_display,
+        change = change_text
+      )
+    }
+  }
+
+  # Empty state: show message instead of hiding section entirely
+  if (length(findings) == 0) {
+    return(htmltools::tags$div(class = "dash-section", id = "summary-section-sig-changes",
+      htmltools::tags$div(class = "dash-section-title", "Significant Changes"),
+      htmltools::tags$div(class = "dash-section-sub",
+        "Wave-on-wave changes that are statistically significant"
+      ),
+      htmltools::tags$div(class = "dash-sig-empty",
+        "There are no significant findings"
+      )
+    ))
+  }
+
+  # Sort: increases first, then decreases
+  findings <- findings[order(
+    sapply(findings, function(f) if (f$direction == "up") 0 else 1),
+    sapply(findings, function(f) f$metric_label)
+  )]
+
+  cards <- lapply(findings, function(f) {
+    border_colour <- if (f$direction == "up") "#059669" else "#c0392b"
+    sig_class <- paste0("tk-sig tk-sig-", f$direction)
+
+    htmltools::tags$div(
+      class = "dash-sig-card",
+      style = sprintf("border-left-color: %s", border_colour),
+      htmltools::tags$div(
+        class = "dash-sig-badges",
+        htmltools::tags$span(class = "dash-sig-metric-badge", f$metric_label),
+        if (nzchar(f$section)) htmltools::tags$span(class = "dash-sig-group-badge", f$section),
+        htmltools::tags$span(class = "dash-sig-segment-badge", f$segment)
+      ),
+      htmltools::tags$div(class = "dash-sig-text",
+        htmltools::tags$span(class = sig_class, f$direction_symbol),
+        sprintf(" Significant %s: %s \u2192 %s (%s)",
+          f$direction_label, f$prev_value, f$current_value, f$change
+        )
+      )
+    )
+  })
+
+  htmltools::tags$div(class = "dash-section", id = "summary-section-sig-changes",
+    htmltools::tags$div(class = "summary-section-controls",
+      htmltools::tags$button(
+        class = "turas-action-btn",
+        onclick = "pinSigChanges()",
+        htmltools::HTML("&#x1F4CC; Pin to Views")
+      ),
+      htmltools::tags$button(
+        class = "turas-action-btn",
+        onclick = "exportSummarySlide('sig-changes')",
+        htmltools::HTML("&#x1F4F7; Export Slide")
+      )
+    ),
+    htmltools::tags$div(class = "dash-section-title", "Significant Changes"),
+    htmltools::tags$div(class = "dash-section-sub",
+      sprintf("Wave-on-wave changes that are statistically significant (%s vs %s)",
+        latest_label, prev_label)
+    ),
+    htmltools::tags$div(class = "dash-sig-grid", cards)
+  )
+}
+
+
+# ==============================================================================
 # METRICS BY SEGMENT TAB
 # ==============================================================================
 
@@ -493,6 +621,26 @@ build_metrics_tab <- function(html_data, charts, config) {
             htmltools::tags$nav(class = "mv-sidebar-nav",
               htmltools::HTML(metric_nav)
             )
+          )
+        ),
+        # Legend box (matching crosstabs pattern)
+        htmltools::tags$div(class = "legend-box",
+          htmltools::tags$div(class = "legend-title", "Legend"),
+          htmltools::tags$div(class = "legend-item",
+            htmltools::tags$span(class = "tk-sig tk-sig-up", "\u25B2"),
+            htmltools::tags$span("Significantly higher than previous wave")
+          ),
+          htmltools::tags$div(class = "legend-item",
+            htmltools::tags$span(class = "tk-sig tk-sig-down", "\u25BC"),
+            htmltools::tags$span("Significantly lower than previous wave")
+          ),
+          htmltools::tags$div(class = "legend-item",
+            htmltools::tags$span(style = "color:#94a3b8;font-size:12px", "3.80"),
+            htmltools::tags$span("Low base \u2014 values in grey (n<30)")
+          ),
+          htmltools::tags$div(class = "legend-item",
+            htmltools::tags$span(style = "color:#e8614d;font-weight:700;font-size:11px", "\u26A0 28"),
+            htmltools::tags$span("Low base warning in base row (n<30)")
           )
         )
       )
@@ -607,7 +755,7 @@ build_metric_nav_list <- function(html_data) {
 build_metric_panels <- function(html_data, charts, config, segments, segment_colours) {
 
   brand_colour <- get_setting(config, "brand_colour", default = "#323367") %||% "#323367"
-  min_base <- as.integer(get_setting(config, "significance_min_base", default = 30) %||% 30)
+  min_base <- 30L
   segment_group_info <- derive_segment_groups(segments)
   panels <- c()
 
@@ -639,8 +787,9 @@ build_metric_panels <- function(html_data, charts, config, segments, segment_col
       htmltools::htmlEscape(mr$metric_label), q_text
     ))
 
-    # Segment chips — grouped by category
+    # Segment chips — grouped by category (matching crosstab col-chip-bar)
     panel_parts <- c(panel_parts, '<div class="mv-segment-chips mv-segment-grouped">')
+    panel_parts <- c(panel_parts, '<span class="mv-segment-chips-label">Segments:</span>')
 
     # Standalone segments first (Total)
     for (seg_name in segment_group_info$standalone) {
@@ -653,6 +802,13 @@ build_metric_panels <- function(html_data, charts, config, segments, segment_col
         mr$metric_id, htmltools::htmlEscape(seg_name),
         htmltools::htmlEscape(seg_name)
       ))
+    }
+
+    # "+ Segments" toggle (only if there are grouped segments)
+    if (length(segment_group_info$groups) > 0) {
+      panel_parts <- c(panel_parts,
+        '<button class="mv-groups-toggle" onclick="toggleSegmentGroups(this)">+ Segments</button>'
+      )
     }
 
     # Grouped segments
@@ -708,6 +864,22 @@ build_metric_panels <- function(html_data, charts, config, segments, segment_col
     }
     panel_parts <- c(panel_parts, '</div>')
 
+    # Chart segment chips (independent chart-only toggle, hidden until chart shown)
+    panel_parts <- c(panel_parts, '<div class="mv-chart-segment-chips" style="display:none">')
+    panel_parts <- c(panel_parts, '<span class="mv-wave-chips-label">Chart:</span>')
+    for (s_idx in seq_along(segments)) {
+      seg_name <- segments[s_idx]
+      seg_colour <- segment_colours[s_idx]
+      panel_parts <- c(panel_parts, sprintf(
+        '<button class="tk-segment-chip active" data-segment="%s" style="--chip-color:%s" onclick="toggleChartSegment(\'%s\',\'%s\',this)">%s</button>',
+        htmltools::htmlEscape(seg_name),
+        seg_colour,
+        mr$metric_id, htmltools::htmlEscape(seg_name),
+        htmltools::htmlEscape(seg_name)
+      ))
+    }
+    panel_parts <- c(panel_parts, '</div>')
+
     # Controls row: Show count + vs Prev/Base toggles + Show chart checkbox + Pin
     panel_parts <- c(panel_parts, sprintf('<div class="mv-controls">'))
 
@@ -736,7 +908,7 @@ build_metric_panels <- function(html_data, charts, config, segments, segment_col
 
     # Export + Pin + Slide buttons
     panel_parts <- c(panel_parts, sprintf(
-      '<button class="export-btn" onclick="exportMetricExcel(\'%s\')" title="Export to Excel">&#x1F4CA; Export</button>',
+      '<button class="export-btn" onclick="exportMetricExcel(\'%s\')" title="Export to Excel">&#x2B73; Export Excel</button>',
       mr$metric_id
     ))
     panel_parts <- c(panel_parts, sprintf(
@@ -894,7 +1066,7 @@ build_metric_table <- function(mr, html_data, sparkline_data, segments, segment_
         htmltools::htmlEscape(wid),
         htmltools::htmlEscape(seg_name),
         sort_val,
-        cell$display_value, n_display
+        paste0(cell$display_value, cell$sig_badge), n_display
       ))
     }
     parts <- c(parts, '</tr>')
@@ -1129,6 +1301,26 @@ build_overview_sidebar <- function(html_data, config) {
             htmltools::HTML(paste(items, collapse = "\n"))
           )
         )
+      ),
+      # Legend box (matching crosstabs pattern — same as Metrics by Segment sidebar)
+      htmltools::tags$div(class = "legend-box",
+        htmltools::tags$div(class = "legend-title", "Legend"),
+        htmltools::tags$div(class = "legend-item",
+          htmltools::tags$span(class = "tk-sig tk-sig-up", "\u25B2"),
+          htmltools::tags$span("Significantly higher than previous wave")
+        ),
+        htmltools::tags$div(class = "legend-item",
+          htmltools::tags$span(class = "tk-sig tk-sig-down", "\u25BC"),
+          htmltools::tags$span("Significantly lower than previous wave")
+        ),
+        htmltools::tags$div(class = "legend-item",
+          htmltools::tags$span(style = "color:#94a3b8;font-size:12px", "3.80"),
+          htmltools::tags$span("Low base \u2014 values in grey (n<30)")
+        ),
+        htmltools::tags$div(class = "legend-item",
+          htmltools::tags$span(style = "color:#e8614d;font-weight:700;font-size:11px", "\u26A0 28"),
+          htmltools::tags$span("Low base warning in base row (n<30)")
+        )
       )
     )
   )
@@ -1318,8 +1510,21 @@ build_tracker_footer <- function(html_data, config) {
 
   company_name <- get_setting(config, "company_name", default = "") %||% ""
   baseline_label <- html_data$wave_lookup[html_data$baseline_wave]
+  min_base <- 30L
+  alpha <- html_data$metadata$confidence_level
+  p_val <- if (!is.null(alpha)) sprintf("p<%.2f", 1 - alpha) else "p<0.05"
+
+  # Significance test method line (matching crosstabs footer pattern)
+  sig_info_parts <- c(
+    "Significance testing: Wave-on-wave z-test / t-test",
+    p_val,
+    sprintf("Minimum base n=%d", min_base)
+  )
+  sig_line <- paste(sig_info_parts, collapse = " \u00B7 ")
 
   htmltools::tags$footer(class = "tk-footer",
+    # Significance test info line
+    htmltools::tags$div(class = "tk-footer-sig-info", sig_line),
     htmltools::tags$div(class = "tk-footer-info",
       htmltools::tags$span(sprintf("Baseline: %s (%s)", html_data$baseline_wave, baseline_label)),
       htmltools::tags$span(class = "tk-footer-sep", "|"),

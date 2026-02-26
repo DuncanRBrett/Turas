@@ -102,24 +102,41 @@ detect_available_stats <- function(question_table) {
 #' Determines whether each unique RowLabel is a regular category,
 #' a NET/box-category summary, or a mean/summary statistic.
 #'
+#' Uses the RowSource column (if available) as the primary classifier,
+#' falling back to regex pattern matching for backward compatibility.
+#'
 #' @param question_table Data.frame from question result
 #' @param question_type Character, question type (e.g., "Single_Choice")
 #' @return Named character vector: RowLabel -> "category"|"net"|"mean"
 #' @export
 classify_row_labels <- function(question_table, question_type = "Single_Choice") {
 
-  # Get all unique labels and their associated row types
+  # Get all unique labels and their associated row types and sources
   labels <- unique(question_table$RowLabel)
   # Remove NA labels
   labels <- labels[!is.na(labels) & labels != ""]
+
+  has_row_source <- "RowSource" %in% names(question_table)
+
   label_types <- sapply(labels, function(lbl) {
     unique(question_table$RowType[!is.na(question_table$RowLabel) & question_table$RowLabel == lbl])
   }, simplify = FALSE)
 
+  # Build RowSource lookup per label (first non-NA source wins)
+  label_sources <- if (has_row_source) {
+    sapply(labels, function(lbl) {
+      sources <- question_table$RowSource[!is.na(question_table$RowLabel) & question_table$RowLabel == lbl]
+      sources <- sources[!is.na(sources) & sources != ""]
+      if (length(sources) > 0) sources[1] else NA_character_
+    }, USE.NAMES = TRUE)
+  } else {
+    NULL
+  }
+
   classification <- character(length(labels))
   names(classification) <- labels
 
-  # Common NET/box-category patterns (case-insensitive)
+  # Common NET/box-category patterns (case-insensitive) - fallback for data without RowSource
   net_patterns <- c(
     "^NET\\b", "^NET ", "\\bNET\\b",
     "^TOP BOX", "^BOTTOM BOX", "^TOP 2", "^BOTTOM 2",
@@ -145,6 +162,23 @@ classify_row_labels <- function(question_table, question_type = "Single_Choice")
 
   for (lbl in labels) {
     types <- label_types[[lbl]]
+
+    # ── Primary: Use RowSource if available ──
+    if (!is.null(label_sources) && !is.na(label_sources[lbl])) {
+      src <- label_sources[lbl]
+      if (src %in% c("individual", "ranking")) {
+        classification[lbl] <- "category"
+        next
+      } else if (src %in% c("boxcategory", "net_positive")) {
+        classification[lbl] <- "net"
+        next
+      } else if (src %in% c("summary", "chi_square", "composite")) {
+        classification[lbl] <- "mean"
+        next
+      }
+    }
+
+    # ── Fallback: regex-based classification (backward compatibility) ──
 
     # Mean/summary statistics - always classified as "mean"
     if (any(types %in% c("Average", "Index", "Score", "Std Dev", "StdDev", "ChiSquare"))) {
@@ -208,6 +242,20 @@ transform_single_question <- function(q_result, banner_info, config_obj) {
       last_label <- table$RowLabel[i]
     } else {
       table$RowLabel[i] <- last_label
+    }
+  }
+
+  # Forward-fill RowSource: same logic as RowLabel — sub-rows (Column %, Sig.)
+
+  # inherit the source type from their parent frequency row.
+  if ("RowSource" %in% names(table)) {
+    last_source <- ""
+    for (i in seq_len(nrow(table))) {
+      if (!is.na(table$RowSource[i]) && nzchar(table$RowSource[i])) {
+        last_source <- table$RowSource[i]
+      } else {
+        table$RowSource[i] <- last_source
+      }
     }
   }
 
@@ -467,7 +515,7 @@ transform_for_html <- function(all_results, banner_info, config_obj) {
     first_q <- questions[[1]]
     base_row <- first_q$table_data[first_q$table_data$.row_type == "base", , drop = FALSE]
     if (nrow(base_row) > 0 && "TOTAL::Total" %in% names(base_row)) {
-      total_n <- base_row[1, "TOTAL::Total"]
+      total_n <- suppressWarnings(as.numeric(base_row[1, "TOTAL::Total"]))
     }
   }
 

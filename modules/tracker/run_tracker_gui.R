@@ -274,9 +274,7 @@ run_tracker_gui <- function() {
     # Reactive values
     files <- reactiveValues(
       tracking_config = NULL,
-      question_mapping = NULL,
-      data_dir = NULL,
-      output_path = NULL
+      question_mapping = NULL
     )
 
     console_output <- reactiveVal("")
@@ -286,9 +284,6 @@ run_tracker_gui <- function() {
     volumes <- c(Home = "~", Documents = "~/Documents", Desktop = "~/Desktop")
 
     shinyFileChoose(input, "tracking_config_btn", roots = volumes, session = session,
-                   filetypes = c("", "xlsx"))
-    shinyDirChoose(input, "data_dir_btn", roots = volumes, session = session)
-    shinyFileChoose(input, "output_path_btn", roots = volumes, session = session,
                    filetypes = c("", "xlsx"))
 
     # Handle tracking config selection
@@ -343,38 +338,6 @@ run_tracker_gui <- function() {
       })
     })
 
-    # Handle data dir selection
-    observeEvent(input$data_dir_btn, {
-      tryCatch({
-        if (!is.integer(input$data_dir_btn)) {
-          dir_path <- parseDirPath(volumes, input$data_dir_btn)
-          # Expand tilde and normalize path (fixes OneDrive/home directory paths)
-          dir_path <- normalizePath(path.expand(dir_path), winslash = "/", mustWork = FALSE)
-          if (length(dir_path) > 0 && nchar(dir_path[1]) > 0) {
-            files$data_dir <- as.character(dir_path[1])
-          }
-        }
-      }, error = function(e) {
-        showNotification(paste("Error selecting directory:", e$message), type = "error")
-      })
-    })
-
-    # Handle output path selection
-    observeEvent(input$output_path_btn, {
-      tryCatch({
-        if (!is.integer(input$output_path_btn)) {
-          file_path <- parseFilePaths(volumes, input$output_path_btn)
-          if (nrow(file_path) > 0) {
-            # Expand tilde and normalize path (fixes OneDrive/home directory paths)
-            files$output_path <- normalizePath(path.expand(as.character(file_path$datapath[1])),
-                                              winslash = "/", mustWork = FALSE)
-          }
-        }
-      }, error = function(e) {
-        showNotification(paste("Error selecting file:", e$message), type = "error")
-      })
-    })
-
     # Handle recent project selection
     observeEvent(input$select_recent, {
       req(input$select_recent)
@@ -386,14 +349,6 @@ run_tracker_gui <- function() {
                                               winslash = "/", mustWork = FALSE)
         files$question_mapping <- normalizePath(path.expand(proj$question_mapping),
                                                winslash = "/", mustWork = FALSE)
-        if (!is.null(proj$data_dir)) {
-          files$data_dir <- normalizePath(path.expand(proj$data_dir),
-                                         winslash = "/", mustWork = FALSE)
-        }
-        if (!is.null(proj$output_path)) {
-          files$output_path <- normalizePath(path.expand(proj$output_path),
-                                            winslash = "/", mustWork = FALSE)
-        }
         if (!is.null(proj$use_banners)) {
           updateCheckboxInput(session, "use_banners", value = proj$use_banners)
         }
@@ -480,49 +435,6 @@ run_tracker_gui <- function() {
       div(class = "card",
         h3("2. Additional Options (Optional)"),
 
-        div(class = "file-label", "Data Directory (optional):"),
-        p(style = "font-size: 13px; color: #666;",
-          "Default: Same directory as config files. Only change if wave data files are elsewhere."),
-        div(style = "display: inline-block; margin-right: 10px;",
-          shinyDirButton("data_dir_btn",
-                        "Browse for Data Directory",
-                        "Select data directory",
-                        class = "btn btn-primary",
-                        icon = icon("folder"))
-        ),
-        if (!is.null(files$data_dir)) {
-          div(class = "file-display",
-            tags$strong("Data Directory:"),
-            tags$br(),
-            tags$small(files$data_dir),
-            actionLink("clear_data_dir", "Clear", style = "float: right; color: #e53e3e;")
-          )
-        },
-
-        tags$hr(),
-
-        div(class = "file-label", "Output Path (optional):"),
-        p(style = "font-size: 13px; color: #666;",
-          "Default: Auto-generated in same directory as config (e.g., 'CCS_tracking_output.xlsx')"),
-        div(style = "display: inline-block; margin-right: 10px;",
-          shinyFilesButton("output_path_btn",
-                        "Browse for Output Path",
-                        "Select output file location",
-                        class = "btn btn-primary",
-                        icon = icon("file-excel"),
-                        multiple = FALSE)
-        ),
-        if (!is.null(files$output_path)) {
-          div(class = "file-display",
-            tags$strong("Output Path:"),
-            tags$br(),
-            tags$small(files$output_path),
-            actionLink("clear_output", "Clear", style = "float: right; color: #e53e3e;")
-          )
-        },
-
-        tags$hr(),
-
         checkboxInput("use_banners",
                      "Calculate trends with banner breakouts (Phase 3)",
                      value = TRUE),
@@ -537,15 +449,6 @@ run_tracker_gui <- function() {
         p(style = "font-size: 13px; color: #666;",
           "Creates a self-contained HTML report with charts, filtering, and export features alongside the Excel output")
       )
-    })
-
-    # Clear handlers
-    observeEvent(input$clear_data_dir, {
-      files$data_dir <- NULL
-    })
-
-    observeEvent(input$clear_output, {
-      files$output_path <- NULL
     })
 
     # Run button UI
@@ -669,23 +572,10 @@ run_tracker_gui <- function() {
           )
         }
 
-        # Auto-set data_dir to same directory as config files if not specified
+        # Let run_tracker() resolve output path from config settings
+        # Priority in run_tracker(): 1) output_dir/output_file from config, 2) config directory
         config_dir <- dirname(tracking_config)
-        data_dir <- if (!is.null(files$data_dir)) {
-          normalizePath(files$data_dir, mustWork = FALSE)
-        } else {
-          config_dir  # Use same directory as config
-        }
-
-        # Auto-generate output path in same directory as config
-        output_path <- if (!is.null(files$output_path)) {
-          normalizePath(files$output_path, mustWork = FALSE)
-        } else {
-          # Generate filename based on tracking config name
-          config_basename <- gsub("_tracking_config\\.xlsx$|_config\\.xlsx$", "", basename(tracking_config))
-          output_filename <- paste0(config_basename, "_tracking_output.xlsx")
-          file.path(config_dir, output_filename)
-        }
+        data_dir <- config_dir
 
         # Build paths
         tracker_dir <- file.path(TURAS_HOME, "modules", "tracker")
@@ -719,7 +609,7 @@ run_tracker_gui <- function() {
             tracking_config_path = tracking_config,
             question_mapping_path = question_mapping,
             data_dir = data_dir,
-            output_path = output_path,
+            output_path = NULL,
             use_banners = input$use_banners,
             enable_html = input$enable_html
           )
@@ -754,8 +644,6 @@ run_tracker_gui <- function() {
           add_recent_project(list(
             tracking_config = tracking_config,
             question_mapping = question_mapping,
-            data_dir = data_dir,
-            output_path = output_path,
             use_banners = input$use_banners,
             enable_html = input$enable_html
           ))

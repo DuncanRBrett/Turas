@@ -132,10 +132,22 @@ transform_metric_for_html <- function(metric, waves, wave_lookup, segments,
         }
       }
 
+      # Significance badge for value cell (vs previous wave)
+      sig_badge <- ""
+      if (!is.null(prev_sig) && !is.na(prev_sig) && isTRUE(prev_sig) &&
+          !is.null(prev_change) && !is.na(prev_change)) {
+        if (prev_change > 0) {
+          sig_badge <- '<span class="tk-sig tk-sig-up">&#x25B2;</span>'
+        } else if (prev_change < 0) {
+          sig_badge <- '<span class="tk-sig tk-sig-down">&#x25BC;</span>'
+        }
+      }
+
       cells[[wid]] <- list(
         wave_id = wid,
         value = val,
         display_value = display_val,
+        sig_badge = sig_badge,
         n = n_val,
         change_vs_prev = prev_change,
         sig_vs_prev = prev_sig,

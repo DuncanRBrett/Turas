@@ -443,19 +443,27 @@ process_single_question <- function(question_code, prepared_data,
       return(NULL)
     })
 
-    # Combine all results
+    # Combine all results (column-safe rbind handles RowSource mismatches)
+    safe_rbind <- function(df1, df2) {
+      if (nrow(df1) == 0) return(df2)
+      if (nrow(df2) == 0) return(df1)
+      all_cols <- union(names(df1), names(df2))
+      for (col in setdiff(all_cols, names(df1))) df1[[col]] <- NA
+      for (col in setdiff(all_cols, names(df2))) df2[[col]] <- NA
+      rbind(df1[, all_cols, drop = FALSE], df2[, all_cols, drop = FALSE])
+    }
     question_table <- data.frame(stringsAsFactors = FALSE)
     if (!is.null(individual_results) && nrow(individual_results) > 0) {
-      question_table <- rbind(question_table, individual_results)
+      question_table <- safe_rbind(question_table, individual_results)
     }
     if (!is.null(boxcategory_results) && nrow(boxcategory_results) > 0) {
-      question_table <- rbind(question_table, boxcategory_results)
+      question_table <- safe_rbind(question_table, boxcategory_results)
     }
     if (!is.null(chi_square_row) && nrow(chi_square_row) > 0) {
-      question_table <- rbind(question_table, chi_square_row)
+      question_table <- safe_rbind(question_table, chi_square_row)
     }
     if (!is.null(summary_results) && nrow(summary_results) > 0) {
-      question_table <- rbind(question_table, summary_results)
+      question_table <- safe_rbind(question_table, summary_results)
     }
   }
 

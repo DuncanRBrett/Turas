@@ -224,9 +224,13 @@ process_standard_question <- function(data, question_info, question_options,
   
   # Combine all rows
   if (length(results_list) > 0) {
+    # Tag all rows as individual response rows for downstream classification
+    for (i in seq_along(results_list)) {
+      results_list[[i]]$RowSource <- "individual"
+    }
     return(batch_rbind(results_list))
   }
-  
+
   return(NULL)
 }
 
@@ -388,6 +392,10 @@ add_boxcategory_summaries <- function(data, question_info, question_options,
 
   # Combine all rows
   if (length(results_list) > 0) {
+    # Tag all rows as boxcategory summary rows for downstream classification
+    for (i in seq_along(results_list)) {
+      results_list[[i]]$RowSource <- "boxcategory"
+    }
     return(batch_rbind(results_list))
   }
 
@@ -579,7 +587,10 @@ add_summary_statistic <- function(data, question_info, question_options,
     "N"
   }
 
-  if (create_index != "Y") return(NULL)
+  # NPS questions always generate their Score row (native NPS scoring).
+
+  # CreateIndex only gates Mean/Index for Rating/Likert questions.
+  if (create_index != "Y" && question_info$Variable_Type != "NPS") return(NULL)
   if (!question_info$Variable_Type %in% c("Rating", "Likert", "NPS")) return(NULL)
 
   internal_keys <- banner_info$internal_keys
@@ -628,6 +639,10 @@ add_summary_statistic <- function(data, question_info, question_options,
 
   # Combine all rows
   if (length(results_list) > 0) {
+    # Tag all rows as summary statistic rows for downstream classification
+    for (i in seq_along(results_list)) {
+      results_list[[i]]$RowSource <- "summary"
+    }
     return(batch_rbind(results_list))
   }
 
@@ -720,6 +735,9 @@ insert_net_sig_row <- function(existing_table, net_name, net_results, internal_k
   for (key in internal_keys) {
     net_sig_row[[key]] <- net_results[[key]]
   }
+
+  # Tag as boxcategory for downstream classification (inherits from parent net)
+  net_sig_row$RowSource <- "boxcategory"
 
   # Insert after net percentage row
   if (net_pct_row[1] < nrow(existing_table)) {
@@ -914,6 +932,9 @@ create_net_positive_row <- function(top_category, bottom_category, row_counts_to
     )
   }
 
+  # Tag as net_positive for downstream classification
+  net_positive_row$RowSource <- "net_positive"
+
   return(net_positive_row)
 }
 
@@ -963,6 +984,8 @@ add_net_positive_significance <- function(row_counts_top, row_counts_bottom,
     for (key in internal_keys) {
       sig_row[[key]] <- net_sig_results$net1[[key]]
     }
+    # Tag as net_positive for downstream classification
+    sig_row$RowSource <- "net_positive"
     return(sig_row)
   }
 
@@ -1237,6 +1260,9 @@ calculate_chi_square_row <- function(boxcategory_results, banner_info, config,
               for (key in banner_info$internal_keys) {
                 chi_row[[key]] <- NA_real_
               }
+
+              # Tag as chi_square for downstream classification
+              chi_row$RowSource <- "chi_square"
 
               chi_row
             } else {

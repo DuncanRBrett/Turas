@@ -371,11 +371,14 @@ add_chi_square_test <- function(boxcategory_results, banner_info, config) {
     RowType = "ChiSquare",
     stringsAsFactors = FALSE
   )
-  
+
   for (key in banner_info$internal_keys) {
     chi_row[[key]] <- NA_real_
   }
-  
+
+  # Tag as chi_square for downstream classification
+  chi_row$RowSource <- "chi_square"
+
   return(chi_row)
 }
 

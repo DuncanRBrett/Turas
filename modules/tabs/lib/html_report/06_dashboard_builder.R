@@ -155,10 +155,20 @@ build_dashboard_panel <- function(dashboard_data, config_obj) {
   }
 
   # Significant findings (across all metrics)
-  sig_section <- NULL
   if (length(dashboard_data$sig_findings) > 0) {
     sig_section <- build_sig_findings_section(
       dashboard_data$sig_findings, brand_colour
+    )
+  } else {
+    sig_section <- htmltools::tags$div(class = "dash-section",
+      id = "dash-sec-sig-findings",
+      htmltools::tags$div(class = "dash-section-title", "Significant Findings"),
+      htmltools::tags$div(class = "dash-section-sub",
+        "Columns significantly higher than others on headline metrics"
+      ),
+      htmltools::tags$div(class = "dash-sig-empty",
+        "There are no significant findings"
+      )
     )
   }
 
@@ -433,7 +443,9 @@ build_gauge_section <- function(metrics, brand_colour, section_label, thresholds
 
   total_vals <- sapply(metrics, function(m) {
     v <- m$values[["TOTAL::Total"]]
-    if (is.null(v) || is.na(v)) -Inf else v
+    if (is.null(v)) return(-Inf)
+    v <- suppressWarnings(as.numeric(as.character(v)))
+    if (is.na(v)) -Inf else v
   })
   # Track original indices for JS re-sort to "original" order
   original_indices <- seq_along(metrics)
@@ -574,8 +586,14 @@ build_gauge_section <- function(metrics, brand_colour, section_label, thresholds
       htmltools::HTML(htmltools::htmlEscape(section_label)),
       tier_badges,
       htmltools::tags$button(
-        class = "dash-export-btn dash-slide-export-btn",
+        class = "dash-export-btn",
         style = "margin-left:12px;",
+        onclick = sprintf("pinGaugeSection('%s')", section_id),
+        htmltools::HTML("&#x1F4CC; Pin to Views")
+      ),
+      htmltools::tags$button(
+        class = "dash-export-btn dash-slide-export-btn",
+        style = "margin-left:6px;",
         onclick = sprintf("exportDashboardSlide('%s')", section_id),
         htmltools::HTML("&#x1F4F7; Export Slide")
       ),
@@ -605,7 +623,7 @@ build_gauge_section <- function(metrics, brand_colour, section_label, thresholds
 #' @return Character display string
 #' @keywords internal
 format_gauge_value <- function(value, metric_type) {
-  if (is.null(value) || is.na(value)) return("N/A")
+  if (is.null(value) || !is.numeric(value) || is.na(value)) return("N/A")
   if (metric_type %in% c("net_positive", "nps_score")) {
     paste0(ifelse(value >= 0, "+", ""), round(value))
   } else if (metric_type == "custom") {
@@ -636,6 +654,8 @@ build_svg_gauge <- function(value, metric_type, brand_colour, thresholds,
     svg_w <- 130; svg_h <- 78; font_size <- 28
   }
 
+  # Coerce to numeric to prevent character values reaching math operations
+  if (!is.numeric(value)) value <- suppressWarnings(as.numeric(as.character(value)))
   if (is.na(value)) {
     # Return a simple N/A gauge
     return(paste0(
@@ -1421,7 +1441,22 @@ build_sig_findings_section <- function(sig_findings, brand_colour) {
 
   htmltools::tags$div(
     class = "dash-section",
-    htmltools::tags$div(class = "dash-section-title", "Significant Findings"),
+    id = "dash-sec-sig-findings",
+    htmltools::tags$div(class = "dash-section-title",
+      "Significant Findings",
+      htmltools::tags$button(
+        class = "dash-export-btn",
+        style = "margin-left:12px;",
+        onclick = "pinSigFindings()",
+        htmltools::HTML("&#x1F4CC; Pin to Views")
+      ),
+      htmltools::tags$button(
+        class = "dash-export-btn dash-slide-export-btn",
+        style = "margin-left:6px;",
+        onclick = "exportSigFindingsSlide()",
+        htmltools::HTML("&#x1F4F7; Export Slide")
+      )
+    ),
     htmltools::tags$div(class = "dash-section-sub",
       "Columns significantly higher than others on headline metrics"
     ),
@@ -1724,6 +1759,11 @@ build_dashboard_css <- function(brand_colour) {
       white-space: normal; word-wrap: break-word; overflow-wrap: break-word;
     }
     .dash-sig-text { font-size: 12px; color: #1e293b; line-height: 1.4; }
+    .dash-sig-empty {
+      padding: 16px 20px; font-size: 13px; color: #94a3b8;
+      font-style: italic; text-align: center;
+      background: #f8fafc; border-radius: 8px; border: 1px dashed #e2e8f0;
+    }
 
     /* === RESPONSIVE === */
     @media (max-width: 768px) {

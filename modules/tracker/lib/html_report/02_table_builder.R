@@ -159,7 +159,7 @@ build_table_metric_row_html <- function(mr, m_idx, chart_json, sparkline_data,
         htmltools::htmlEscape(wid),
         sort_val,
         if (!is.na(cell$n)) cell$n else "",
-        cell$display_value
+        paste0(cell$display_value, cell$sig_badge)
       ))
     }
   }
@@ -252,7 +252,7 @@ build_tracking_table <- function(html_data, config) {
   wave_labels <- html_data$wave_labels
   segments <- html_data$segments
   n_waves <- length(waves)
-  min_base <- as.integer(get_setting(config, "significance_min_base", default = 30) %||% 30)
+  min_base <- 30L
 
   brand_colour <- get_setting(config, "brand_colour", default = "#323367") %||% "#323367"
   segment_colours <- get_segment_colours(segments, brand_colour)

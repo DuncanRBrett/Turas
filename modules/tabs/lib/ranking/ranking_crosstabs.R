@@ -297,6 +297,11 @@ create_ranking_rows_for_item <- function(ranking_matrix, item_name, banner_data_
     })
   }
 
+  # Tag all rows as ranking for downstream classification
+  pct_first_row$RowSource <- "ranking"
+  mean_rank_row$RowSource <- "ranking"
+  if (show_top_n) top_n_row$RowSource <- "ranking"
+
   results[[1]] <- pct_first_row
   results[[2]] <- mean_rank_row
   if (show_top_n) {

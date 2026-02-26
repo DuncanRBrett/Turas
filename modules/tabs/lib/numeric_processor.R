@@ -326,9 +326,13 @@ process_numeric_question <- function(data, question_info, question_options,
   # ===========================================================================
   
   if (length(results_list) > 0) {
+    # Tag all rows as summary for downstream classification
+    for (i in seq_along(results_list)) {
+      results_list[[i]]$RowSource <- "summary"
+    }
     return(batch_rbind(results_list))
   }
-  
+
   return(NULL)
 }
 

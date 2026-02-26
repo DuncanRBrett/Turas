@@ -12,7 +12,14 @@
     // mode: "chart", "table", or "chart_table"
     mode = mode || "chart";
 
+    // Find chart container: check Segment Overview first, then Metrics by Segment panel
     var container = document.querySelector('.tk-chart-container[data-metric-id="' + metricId + '"]');
+    if (!container) {
+      var mvPanel = document.getElementById("mv-" + metricId);
+      if (mvPanel) {
+        container = mvPanel.querySelector(".mv-chart-area");
+      }
+    }
     if (!container && mode !== "table") return;
 
     // Find the metric row — check overview table first, then metric panels
@@ -20,7 +27,19 @@
     if (!metricRow) {
       metricRow = document.querySelector('.tk-metric-row[data-metric-id="' + metricId + '"]');
     }
-    var title = metricRow ? metricRow.querySelector(".tk-metric-label").textContent : "Metric";
+    // Extract title — try overview label first, then Metrics by Segment title
+    var title = "Metric";
+    if (metricRow) {
+      var labelEl = metricRow.querySelector(".tk-metric-label");
+      if (labelEl) title = labelEl.textContent;
+    }
+    if (title === "Metric") {
+      var mvPanel = document.getElementById("mv-" + metricId);
+      if (mvPanel) {
+        var mvTitle = mvPanel.querySelector(".mv-metric-title");
+        if (mvTitle) title = mvTitle.textContent.trim();
+      }
+    }
 
     // Build slide
     var slideW = 1280;

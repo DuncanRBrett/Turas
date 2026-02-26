@@ -12,25 +12,12 @@ var pinnedViews = [];
  * @param {string} metricId - The metric ID
  */
 function togglePin(metricId) {
-  var existingIdx = -1;
-  for (var i = 0; i < pinnedViews.length; i++) {
-    if (pinnedViews[i].metricId === metricId) {
-      existingIdx = i;
-      break;
-    }
-  }
-
-  if (existingIdx >= 0) {
-    // Unpin
-    pinnedViews.splice(existingIdx, 1);
-    updatePinButton(metricId, false);
-  } else {
-    // Pin — capture current view
-    var pinObj = captureMetricView(metricId);
-    if (pinObj) {
-      pinnedViews.push(pinObj);
-      updatePinButton(metricId, true);
-    }
+  // Always add a new pin (multi-pin support).
+  // Each pin captures the current view state (visible segments, chart, table).
+  // Unpinning is done via the ✕ button on each pinned card.
+  var pinObj = captureMetricView(metricId);
+  if (pinObj) {
+    pinnedViews.push(pinObj);
   }
 
   renderPinnedCards();
@@ -150,95 +137,14 @@ function captureMetricView(metricId) {
     chartSvg: chartSvg,
     chartVisible: chartVisible,
     insightText: insightEditor ? insightEditor.innerHTML : "",
-    pngDataUrl: null,
     timestamp: Date.now(),
     order: pinnedViews.length
   };
-
-  // Attempt PNG capture via foreignObject SVG → canvas
-  capturePinAsPng(panel, pinObj);
 
   return pinObj;
 }
 
 
-/**
- * Capture a DOM element as a PNG data URL using foreignObject SVG → canvas.
- * Stores the result in pinObj.pngDataUrl asynchronously. The pinned card
- * will re-render once the PNG is available.
- * @param {HTMLElement} sourceEl - The DOM element to capture
- * @param {Object} pinObj - The pin object to update with pngDataUrl
- */
-function capturePinAsPng(sourceEl, pinObj) {
-  if (!sourceEl) return;
-
-  var w = sourceEl.offsetWidth || 800;
-  var h = sourceEl.offsetHeight || 400;
-  var scale = 2;
-
-  // Clone and inline styles
-  var clone = sourceEl.cloneNode(true);
-
-  // Remove controls, buttons, etc from the clone
-  clone.querySelectorAll(".mv-controls, .mv-segment-chips, .mv-wave-chips, .insight-area, .mv-segment-grouped").forEach(function(el) {
-    el.parentNode.removeChild(el);
-  });
-  clone.querySelectorAll("button").forEach(function(el) {
-    el.parentNode.removeChild(el);
-  });
-
-  inlineStyles(clone);
-
-  var svgNs = "http://www.w3.org/2000/svg";
-  var svg = document.createElementNS(svgNs, "svg");
-  svg.setAttribute("width", w);
-  svg.setAttribute("height", h);
-  svg.setAttribute("xmlns", svgNs);
-
-  var foreignObject = document.createElementNS(svgNs, "foreignObject");
-  foreignObject.setAttribute("width", "100%");
-  foreignObject.setAttribute("height", "100%");
-
-  var body = document.createElement("div");
-  body.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
-  body.style.width = w + "px";
-  body.style.fontFamily = "-apple-system, BlinkMacSystemFont, sans-serif";
-  body.style.fontSize = "13px";
-  body.style.background = "#ffffff";
-  body.appendChild(clone);
-  foreignObject.appendChild(body);
-  svg.appendChild(foreignObject);
-
-  var svgData = new XMLSerializer().serializeToString(svg);
-  var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-  var svgUrl = URL.createObjectURL(svgBlob);
-
-  var img = new Image();
-  img.onload = function() {
-    var canvas = document.createElement("canvas");
-    canvas.width = w * scale;
-    canvas.height = h * scale;
-    var ctx = canvas.getContext("2d");
-    ctx.scale(scale, scale);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, w, h);
-    ctx.drawImage(img, 0, 0, w, h);
-
-    try {
-      pinObj.pngDataUrl = canvas.toDataURL("image/png");
-      // Re-render pinned cards to show PNG
-      renderPinnedCards();
-    } catch (e) {
-      // Security/tainted canvas — fallback to HTML rendering
-    }
-
-    URL.revokeObjectURL(svgUrl);
-  };
-  img.onerror = function() {
-    URL.revokeObjectURL(svgUrl);
-  };
-  img.src = svgUrl;
-}
 
 /**
  * Update pin button visual state
@@ -246,14 +152,8 @@ function capturePinAsPng(sourceEl, pinObj) {
  * @param {boolean} isPinned - Whether it's pinned
  */
 function updatePinButton(metricId, isPinned) {
-  var panel = document.getElementById("mv-" + metricId);
-  if (!panel) return;
-
-  var btn = panel.querySelector(".mv-pin-btn");
-  if (btn) {
-    btn.classList.toggle("pinned", isPinned);
-    btn.title = isPinned ? "Unpin this view" : "Pin this view";
-  }
+  // No-op: multi-pin support means the pin button always shows "Pin this view".
+  // Unpinning is done via the ✕ button on each pinned card.
 }
 
 /**
@@ -329,11 +229,6 @@ function renderPinnedCards() {
     }
     html += "</div>";
 
-    // PNG snapshot (hidden – kept for export only, not displayed on screen)
-    if (pin.pngDataUrl) {
-      html += "<div class=\"pinned-card-png-store\" style=\"display:none\"><img class=\"pinned-card-png\" src=\"" + pin.pngDataUrl + "\" alt=\"" + escapeHtml(pin.metricTitle) + "\"></div>";
-    }
-
     // Chart (if captured and was visible)
     if (pin.chartSvg && pin.chartVisible !== false) {
       html += "<div class=\"pinned-card-chart\">" + pin.chartSvg + "</div>";
@@ -399,7 +294,6 @@ function movePinned(fromIdx, toIdx) {
  */
 function removePinned(pinId, metricId) {
   pinnedViews = pinnedViews.filter(function(p) { return p.id !== pinId; });
-  updatePinButton(metricId, false);
   renderPinnedCards();
   updatePinBadge();
   savePinnedData();
@@ -461,10 +355,6 @@ function hydratePinnedViews() {
       pinnedViews = JSON.parse(store.textContent || "[]");
       renderPinnedCards();
       updatePinBadge();
-      // Update pin buttons
-      for (var i = 0; i < pinnedViews.length; i++) {
-        updatePinButton(pinnedViews[i].metricId, true);
-      }
     } catch (e) {
       pinnedViews = [];
     }
@@ -483,101 +373,457 @@ function escapeHtml(str) {
 }
 
 // ==============================================================================
-// Export Functions
+// Export Functions — SVG-Native Approach
+// ==============================================================================
+// Builds pure SVG (no foreignObject), clones chart SVG into <g>, renders
+// tables as SVG rect+text elements. Single reliable code path.
+// Matches the approach used in the Turas Tabs slide_export.js.
 // ==============================================================================
 
-/**
- * Export a single pinned card as PNG using SVG foreignObject approach.
- * @param {string} pinId - The pin ID
- */
-function exportPinnedCardPNG(pinId) {
-  // Shortcut: if the pin has a pre-captured PNG data URL, download it directly
-  for (var p = 0; p < pinnedViews.length; p++) {
-    if (pinnedViews[p].id === pinId && pinnedViews[p].pngDataUrl) {
-      downloadDataUrlAsPng(pinnedViews[p].pngDataUrl, "pinned_" + pinId + ".png");
-      return;
+// ---- SVG Helper: Wrap text into lines ----
+function pinWrapTextLines(text, maxWidth, charWidth) {
+  if (!text) return [];
+  var maxChars = Math.floor(maxWidth / charWidth);
+  if (text.length <= maxChars) return [text];
+  var words = text.split(" ");
+  var lines = [], current = "";
+  for (var i = 0; i < words.length; i++) {
+    var test = current ? current + " " + words[i] : words[i];
+    if (test.length > maxChars && current) {
+      lines.push(current);
+      current = words[i];
+    } else {
+      current = test;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+// ---- SVG Helper: Create <text> with <tspan> lines ----
+function pinCreateWrappedText(ns, lines, x, startY, lineHeight, attrs) {
+  var el = document.createElementNS(ns, "text");
+  el.setAttribute("x", x);
+  for (var key in attrs) { el.setAttribute(key, attrs[key]); }
+  for (var i = 0; i < lines.length; i++) {
+    var tspan = document.createElementNS(ns, "tspan");
+    tspan.setAttribute("x", x);
+    tspan.setAttribute("y", startY + i * lineHeight);
+    tspan.textContent = lines[i];
+    el.appendChild(tspan);
+  }
+  return { element: el, height: lines.length * lineHeight };
+}
+
+// ---- SVG Helper: Extract table data from stored pin HTML ----
+function extractPinTableData(tableHtml) {
+  if (!tableHtml) return null;
+  var tempDiv = document.createElement("div");
+  tempDiv.innerHTML = tableHtml;
+  var table = tempDiv.querySelector("table");
+  if (!table) return null;
+
+  var rows = [];
+
+  // Header row
+  var headerCells = [];
+  var headerRow = table.querySelector("thead tr");
+  if (headerRow) {
+    headerRow.querySelectorAll("th").forEach(function(th) {
+      if (th.style.display === "none") return;
+      headerCells.push(th.textContent.trim());
+    });
+    if (headerCells.length > 0) {
+      rows.push({ cells: headerCells, type: "header" });
     }
   }
 
-  var card = document.querySelector('.pinned-card[data-pin-id="' + pinId + '"]');
-  if (!card) return;
+  // Body rows
+  table.querySelectorAll("tbody tr").forEach(function(tr) {
+    if (tr.style.display === "none") return;
 
-  // Also check for a PNG image in the card itself
-  var pngImg = card.querySelector(".pinned-card-png");
-  if (pngImg && pngImg.src && pngImg.src.indexOf("data:") === 0) {
-    downloadDataUrlAsPng(pngImg.src, "pinned_" + pinId + ".png");
-    return;
-  }
+    var rowInfo = { cells: [], type: "data" };
 
-  var clone = card.cloneNode(true);
+    if (tr.classList.contains("tk-base-row")) {
+      rowInfo.type = "base";
+      var baseLabel = tr.querySelector(".tk-base-label");
+      rowInfo.cells.push(baseLabel ? baseLabel.textContent.trim() : "Base");
+      tr.querySelectorAll("td.tk-base-cell").forEach(function(td) {
+        if (td.style.display === "none") return;
+        rowInfo.cells.push(td.textContent.trim());
+      });
+    } else if (tr.classList.contains("tk-change-row")) {
+      rowInfo.type = "change";
+      var changeLabel = tr.querySelector(".tk-change-label");
+      rowInfo.cells.push(changeLabel ? changeLabel.textContent.trim() : "Change");
+      tr.querySelectorAll("td.tk-change-cell").forEach(function(td) {
+        if (td.style.display === "none") return;
+        rowInfo.cells.push(td.textContent.trim());
+      });
+    } else if (tr.classList.contains("tk-metric-row")) {
+      var segName = tr.getAttribute("data-segment") || "";
+      rowInfo.type = segName === "Total" ? "total" : "data";
+      var labelEl = tr.querySelector(".tk-metric-label");
+      rowInfo.cells.push(labelEl ? labelEl.textContent.trim() : segName);
+      tr.querySelectorAll("td.tk-value-cell").forEach(function(td) {
+        if (td.style.display === "none") return;
+        var valSpan = td.querySelector(".tk-val");
+        rowInfo.cells.push(valSpan ? valSpan.textContent.trim() : td.textContent.trim());
+      });
+      // Capture segment colour from dot
+      var dot = tr.querySelector(".tk-seg-dot");
+      if (dot) {
+        rowInfo.colour = dot.style.background || dot.style.backgroundColor || null;
+      }
+    } else {
+      // Generic row
+      tr.querySelectorAll("th, td").forEach(function(cell) {
+        if (cell.style.display === "none") return;
+        rowInfo.cells.push(cell.textContent.trim());
+      });
+    }
 
-  // Remove action buttons from clone
-  var actions = clone.querySelector(".pinned-card-actions");
-  if (actions) actions.parentNode.removeChild(actions);
-
-  // Strip contenteditable attrs and clean for SVG export
-  cleanCloneForExport(clone);
-
-  // Convert embedded SVGs to data URL images — foreignObject cannot
-  // reliably render nested SVGs due to XML namespace conflicts
-  clone.querySelectorAll("svg").forEach(function(svg) {
-    try {
-      var svgStr = new XMLSerializer().serializeToString(svg);
-      var encoded = "data:image/svg+xml;base64," +
-        btoa(unescape(encodeURIComponent(svgStr)));
-      var imgEl = document.createElement("img");
-      imgEl.src = encoded;
-      imgEl.style.cssText = "width:100%;height:auto;display:block;";
-      svg.parentNode.replaceChild(imgEl, svg);
-    } catch (e) {
-      if (svg.parentNode) svg.parentNode.removeChild(svg);
+    if (rowInfo.cells.length > 0) {
+      rows.push(rowInfo);
     }
   });
 
-  // Inline critical styles
-  inlineStyles(clone);
+  return rows.length > 0 ? rows : null;
+}
 
-  var cardWidth = card.offsetWidth || 800;
-  var cardHeight = card.offsetHeight || 600;
-  var scale = 3;
+// ---- SVG Helper: Render table as SVG rect+text elements ----
+function renderPinTableSVG(ns, svgParent, tableData, x, y, maxWidth) {
+  if (!tableData || tableData.length === 0) return 0;
+  var nCols = tableData[0].cells.length;
+  if (nCols === 0) return 0;
 
-  // Build SVG with foreignObject (sanitize HTML for XHTML compliance)
-  var svgNS = "http://www.w3.org/2000/svg";
-  var htmlContent = sanitizeForSvg(clone.outerHTML);
-  var svgStr = '<svg xmlns="' + svgNS + '" width="' + (cardWidth * scale) + '" height="' + (cardHeight * scale) + '">';
-  svgStr += '<foreignObject width="' + cardWidth + '" height="' + cardHeight + '" transform="scale(' + scale + ')">';
-  svgStr += '<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:14px;color:#2c2c2c;background:#fff;">';
-  svgStr += htmlContent;
-  svgStr += '</div></foreignObject></svg>';
+  var COLOURS = [
+    "#323367", "#CC9900", "#2E8B57", "#CD5C5C", "#4682B4",
+    "#9370DB", "#D2691E", "#20B2AA", "#8B4513", "#6A5ACD"
+  ];
 
-  var svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
-  var svgUrl = URL.createObjectURL(svgBlob);
+  var baseRowH = 22, headerH = 26, fontSize = 10, padX = 6;
+  var firstColW = Math.min(Math.max(maxWidth * 0.25, 140), 260);
+  var dataColW = nCols > 1 ? (maxWidth - firstColW) / (nCols - 1) : maxWidth;
 
-  var canvas = document.createElement("canvas");
-  canvas.width = cardWidth * scale;
-  canvas.height = cardHeight * scale;
-  var ctx = canvas.getContext("2d");
+  var curY = y;
+  var colourIdx = 0;
+
+  tableData.forEach(function(row, ri) {
+    var isHeader = row.type === "header";
+    var rH = isHeader ? headerH : baseRowH;
+
+    // Row background
+    var bgRect = document.createElementNS(ns, "rect");
+    bgRect.setAttribute("x", x); bgRect.setAttribute("y", curY);
+    bgRect.setAttribute("width", maxWidth); bgRect.setAttribute("height", rH);
+
+    if (isHeader) {
+      bgRect.setAttribute("fill", "#1a2744");
+    } else if (row.type === "base") {
+      bgRect.setAttribute("fill", "#f8f9fa");
+    } else if (row.type === "change") {
+      bgRect.setAttribute("fill", "#fafbfc");
+    } else if (row.type === "total") {
+      bgRect.setAttribute("fill", "#f0f0f5");
+    } else if (ri % 2 === 0) {
+      bgRect.setAttribute("fill", "#ffffff");
+    } else {
+      bgRect.setAttribute("fill", "#f9fafb");
+    }
+    svgParent.appendChild(bgRect);
+
+    // Segment colour dot for data/total rows
+    if (row.type === "data" || row.type === "total") {
+      var dotColour = row.colour || COLOURS[colourIdx % COLOURS.length];
+      var dot = document.createElementNS(ns, "circle");
+      dot.setAttribute("cx", x + 12);
+      dot.setAttribute("cy", curY + rH / 2);
+      dot.setAttribute("r", "3.5");
+      dot.setAttribute("fill", dotColour);
+      svgParent.appendChild(dot);
+      colourIdx++;
+    }
+
+    // Cell text
+    row.cells.forEach(function(cellText, ci) {
+      var cellW = ci === 0 ? firstColW : dataColW;
+      var cellX;
+      if (ci === 0) {
+        cellX = (row.type === "data" || row.type === "total") ? x + 22 : x + padX;
+      } else {
+        cellX = x + firstColW + (ci - 1) * dataColW;
+      }
+
+      var textEl = document.createElementNS(ns, "text");
+      textEl.setAttribute("y", curY + rH / 2 + 1);
+      textEl.setAttribute("dominant-baseline", "central");
+      textEl.setAttribute("font-size", fontSize);
+
+      if (ci === 0) {
+        textEl.setAttribute("x", cellX);
+        textEl.setAttribute("text-anchor", "start");
+      } else {
+        textEl.setAttribute("x", cellX + cellW / 2);
+        textEl.setAttribute("text-anchor", "middle");
+      }
+
+      if (isHeader) {
+        textEl.setAttribute("fill", "#ffffff");
+        textEl.setAttribute("font-weight", "600");
+      } else if (row.type === "total") {
+        textEl.setAttribute("fill", ci === 0 ? "#1a2744" : "#1e293b");
+        textEl.setAttribute("font-weight", "600");
+      } else if (row.type === "base") {
+        textEl.setAttribute("fill", "#666666");
+        textEl.setAttribute("font-weight", "600");
+        textEl.setAttribute("font-size", fontSize - 1);
+      } else if (row.type === "change") {
+        textEl.setAttribute("fill", "#888888");
+        textEl.setAttribute("font-size", fontSize - 1);
+      } else {
+        textEl.setAttribute("fill", ci === 0 ? "#374151" : "#1e293b");
+      }
+
+      // Truncate long label text
+      var maxChars = Math.floor((cellW - padX * 2) / (fontSize * 0.55));
+      if (maxChars > 0 && cellText.length > maxChars) {
+        cellText = cellText.substring(0, Math.max(maxChars - 1, 5)) + "\u2026";
+      }
+
+      textEl.textContent = cellText;
+      svgParent.appendChild(textEl);
+    });
+
+    // Row border
+    var borderLine = document.createElementNS(ns, "line");
+    borderLine.setAttribute("x1", x); borderLine.setAttribute("x2", x + maxWidth);
+    borderLine.setAttribute("y1", curY + rH); borderLine.setAttribute("y2", curY + rH);
+    borderLine.setAttribute("stroke", "#e2e8f0"); borderLine.setAttribute("stroke-width", "0.5");
+    svgParent.appendChild(borderLine);
+
+    curY += rH;
+  });
+
+  return curY - y;
+}
+
+/**
+ * Export a single pinned card as PNG using SVG-native approach.
+ * Builds pure SVG: title, insight, chart (cloned <g>), table (rect+text).
+ * No foreignObject — single reliable code path.
+ * @param {string} pinId - The pin ID
+ */
+function exportPinnedCardPNG(pinId) {
+  // Find pin data
+  var pin = null;
+  for (var i = 0; i < pinnedViews.length; i++) {
+    if (pinnedViews[i].id === pinId) { pin = pinnedViews[i]; break; }
+  }
+  if (!pin) return;
+
+  var ns = "http://www.w3.org/2000/svg";
+  var W = 1280;
+  var fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
+  var pad = 28;
+  var usableW = W - pad * 2;
+  var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367";
+
+  // ---- 1. Title ----
+  var titleText = pin.metricTitle || "Pinned View";
+  var titleLines = pinWrapTextLines(titleText, usableW, 9.5);
+  var titleLineH = 20;
+  var titleStartY = pad + 16;
+  var titleBlockH = titleLines.length * titleLineH;
+
+  // ---- 2. Meta line ----
+  var metaText = new Date(pin.timestamp).toLocaleDateString();
+  if (pin.visibleSegments && pin.visibleSegments.length > 0) {
+    metaText += "  \u00B7  Segments: " + pin.visibleSegments.join(", ");
+  }
+  var metaY = titleStartY + titleBlockH + 4;
+  var contentTop = metaY + 18;
+
+  // ---- 3. Insight ----
+  var insightPlain = "";
+  if (pin.insightText) {
+    var tmpDiv = document.createElement("div");
+    tmpDiv.innerHTML = pin.insightText;
+    insightPlain = tmpDiv.textContent.trim();
+  }
+  var insightLines = pinWrapTextLines(insightPlain, usableW - 16, 7.5);
+  var insightLineH = 17;
+  var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 24 : 0;
+  var insightY = contentTop;
+
+  // ---- 4. Chart dimensions ----
+  var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 12 : 0);
+  var chartDisplayH = 0;
+  var chartClone = null;
+  var chartScale = 1;
+
+  if (pin.chartSvg && pin.chartVisible !== false) {
+    var chartTempDiv = document.createElement("div");
+    chartTempDiv.innerHTML = pin.chartSvg;
+    var svgEl = chartTempDiv.querySelector("svg");
+    if (svgEl) {
+      chartClone = svgEl.cloneNode(true);
+      // Resolve any CSS variable references in the chart SVG
+      chartClone.querySelectorAll("*").forEach(function(el) {
+        ["fill", "stroke"].forEach(function(attr) {
+          var val = el.getAttribute(attr);
+          if (val && val.indexOf("var(") !== -1) {
+            // Parse var(--name, fallback)
+            var match = val.match(/var\(--[^,)]+,\s*([^)]+)\)/);
+            if (match) el.setAttribute(attr, match[1].trim());
+          }
+        });
+      });
+      var vb = chartClone.getAttribute("viewBox");
+      if (vb) {
+        var chartVB = vb.split(" ").map(Number);
+        var chartOrigW = chartVB[2];
+        var chartOrigH = chartVB[3];
+        chartScale = usableW / chartOrigW;
+        chartDisplayH = chartOrigH * chartScale;
+      }
+    }
+  }
+
+  // ---- 5. Table dimensions ----
+  var tableTopY = chartTopY + chartDisplayH + (chartDisplayH > 0 ? 14 : 0);
+  var tableData = null;
+  var estimatedTableH = 0;
+
+  if (pin.tableHtml) {
+    tableData = extractPinTableData(pin.tableHtml);
+    if (tableData && tableData.length > 0) {
+      // Estimate: header 26px + data rows 22px each
+      estimatedTableH = 26 + (tableData.length - 1) * 22 + 8;
+    }
+  }
+
+  // ---- 6. Calculate total height ----
+  var totalH = tableTopY + estimatedTableH + pad + 20;
+  if (totalH < 300) totalH = 300;
+
+  // ---- Build slide SVG ----
+  var svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("xmlns", ns);
+  svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
+  svg.setAttribute("style", "font-family:" + fontFamily + ";");
+
+  // White background
+  var bg = document.createElementNS(ns, "rect");
+  bg.setAttribute("width", W); bg.setAttribute("height", totalH);
+  bg.setAttribute("fill", "#ffffff");
+  svg.appendChild(bg);
+
+  // Brand accent bar at top
+  var accentBar = document.createElementNS(ns, "rect");
+  accentBar.setAttribute("x", "0"); accentBar.setAttribute("y", "0");
+  accentBar.setAttribute("width", W); accentBar.setAttribute("height", "4");
+  accentBar.setAttribute("fill", brandColour);
+  svg.appendChild(accentBar);
+
+  // Title
+  var titleResult = pinCreateWrappedText(ns, titleLines, pad, titleStartY, titleLineH,
+    { fill: "#1a2744", "font-size": "16", "font-weight": "700" });
+  svg.appendChild(titleResult.element);
+
+  // Meta line
+  var metaEl = document.createElementNS(ns, "text");
+  metaEl.setAttribute("x", pad); metaEl.setAttribute("y", metaY);
+  metaEl.setAttribute("fill", "#94a3b8"); metaEl.setAttribute("font-size", "11");
+  metaEl.textContent = metaText;
+  svg.appendChild(metaEl);
+
+  // Insight block
+  if (insightLines.length > 0) {
+    var accentH = Math.max(28, insightLines.length * insightLineH + 12);
+    var insBg = document.createElementNS(ns, "rect");
+    insBg.setAttribute("x", pad); insBg.setAttribute("y", insightY + 2);
+    insBg.setAttribute("width", usableW); insBg.setAttribute("height", accentH);
+    insBg.setAttribute("rx", "4"); insBg.setAttribute("fill", "#f0f4ff");
+    svg.appendChild(insBg);
+    var iBar = document.createElementNS(ns, "rect");
+    iBar.setAttribute("x", pad); iBar.setAttribute("y", insightY + 2);
+    iBar.setAttribute("width", "4"); iBar.setAttribute("height", accentH);
+    iBar.setAttribute("fill", brandColour); iBar.setAttribute("rx", "2");
+    svg.appendChild(iBar);
+    var insResult = pinCreateWrappedText(ns, insightLines, pad + 14, insightY + 18, insightLineH,
+      { fill: "#1a2744", "font-size": "13", "font-weight": "500" });
+    svg.appendChild(insResult.element);
+  }
+
+  // Chart — clone SVG content into <g> element (no foreignObject!)
+  if (chartClone && chartDisplayH > 0) {
+    var chartG = document.createElementNS(ns, "g");
+    chartG.setAttribute("transform", "translate(" + pad + "," + chartTopY + ") scale(" + chartScale + ")");
+    while (chartClone.firstChild) chartG.appendChild(chartClone.firstChild);
+    svg.appendChild(chartG);
+  }
+
+  // Table — rendered as SVG rect+text elements
+  if (tableData && tableData.length > 0) {
+    var actualTableH = renderPinTableSVG(ns, svg, tableData, pad, tableTopY, usableW);
+    var newTotalH = tableTopY + actualTableH + pad + 20;
+    if (newTotalH > totalH) {
+      totalH = newTotalH;
+      bg.setAttribute("height", totalH);
+      svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
+    }
+  }
+
+  // Subtle footer line
+  var footerY = totalH - pad;
+  var footerLine = document.createElementNS(ns, "line");
+  footerLine.setAttribute("x1", pad); footerLine.setAttribute("x2", W - pad);
+  footerLine.setAttribute("y1", footerY); footerLine.setAttribute("y2", footerY);
+  footerLine.setAttribute("stroke", "#e2e8f0"); footerLine.setAttribute("stroke-width", "0.5");
+  svg.appendChild(footerLine);
+
+  var footerText = document.createElementNS(ns, "text");
+  footerText.setAttribute("x", W - pad); footerText.setAttribute("y", footerY + 14);
+  footerText.setAttribute("text-anchor", "end");
+  footerText.setAttribute("fill", "#cbd5e1"); footerText.setAttribute("font-size", "9");
+  footerText.textContent = "Tracking Report";
+  svg.appendChild(footerText);
+
+  // ---- Render SVG to PNG at 3x resolution ----
+  var renderScale = 3;
+  var svgData = new XMLSerializer().serializeToString(svg);
+  var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+  var url = URL.createObjectURL(svgBlob);
 
   var img = new Image();
+  img.onerror = function() {
+    URL.revokeObjectURL(url);
+    console.error("[Pin PNG] SVG render failed for pin: " + pinId);
+    alert("PNG export failed. Please try using Chrome or Edge browser.");
+  };
   img.onload = function() {
-    ctx.drawImage(img, 0, 0);
+    var canvas = document.createElement("canvas");
+    canvas.width = W * renderScale;
+    canvas.height = totalH * renderScale;
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
     canvas.toBlob(function(blob) {
       if (!blob) return;
+      var filename = "pinned_" + pin.metricTitle.replace(/[^a-zA-Z0-9]/g, "_") + ".png";
       var a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = "pinned_" + pinId + ".png";
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(a.href);
     }, "image/png");
-    URL.revokeObjectURL(svgUrl);
   };
-  img.onerror = function() {
-    URL.revokeObjectURL(svgUrl);
-    exportPinnedCardFallback(card, pinId);
-  };
-  img.src = svgUrl;
+  img.src = url;
 }
 
 /**
@@ -611,172 +857,6 @@ function downloadDataUrlAsPng(dataUrl, filename) {
   }
 }
 
-/**
- * Fallback PNG export — renders card content on a canvas.
- * Extracts real data (title, insight, table rows) for a useful export.
- */
-function exportPinnedCardFallback(card, pinId) {
-  var titleEl = card.querySelector(".pinned-card-title");
-  var titleText = titleEl ? titleEl.textContent : "Pinned View";
-  var insightEl = card.querySelector(".pinned-card-insight-editor, .insight-editor");
-  var insightText = insightEl ? insightEl.textContent.trim() : "";
-
-  // Extract table data from the card
-  var tableRows = extractTableFromCard(card);
-
-  var scale = 3;
-  var w = 800;
-  var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367";
-  var headerH = 56;
-  var insightH = insightText ? Math.ceil(insightText.length / 90) * 18 + 28 : 0;
-  var tableH = tableRows ? (tableRows.length * 22 + 12) : 0;
-  var h = Math.max(headerH + insightH + tableH + 40, 200);
-
-  var canvas = document.createElement("canvas");
-  canvas.width = w * scale;
-  canvas.height = h * scale;
-  var ctx = canvas.getContext("2d");
-  ctx.scale(scale, scale);
-
-  // Background
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, w, h);
-
-  // Header bar
-  ctx.fillStyle = brandColour;
-  ctx.fillRect(0, 0, w, 50);
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 18px -apple-system, sans-serif";
-  ctx.textAlign = "left";
-  ctx.fillText(titleText, 16, 34);
-
-  var y = headerH;
-
-  // Insight
-  if (insightText) {
-    ctx.fillStyle = "#f0f4ff";
-    ctx.fillRect(16, y, w - 32, insightH - 4);
-    ctx.fillStyle = brandColour;
-    ctx.fillRect(16, y, 4, insightH - 4);
-    ctx.fillStyle = "#1a2744";
-    ctx.font = "13px -apple-system, sans-serif";
-    y = wrapCanvasTextTracker(ctx, insightText, 28, y + 16, w - 60, 18);
-    y += 12;
-  }
-
-  // Table data
-  if (tableRows && tableRows.length > 0) {
-    y = renderCanvasTableTracker(ctx, tableRows, 16, y, w - 32);
-  }
-
-  canvas.toBlob(function(blob) {
-    if (!blob) return;
-    var a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "pinned_" + pinId + ".png";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(a.href);
-  }, "image/png");
-}
-
-/**
- * Extract table rows from a card DOM element for canvas rendering.
- */
-function extractTableFromCard(card) {
-  var table = card.querySelector("table");
-  if (!table) return null;
-  var rows = [];
-  table.querySelectorAll("tr").forEach(function(tr) {
-    if (tr.style.display === "none") return;
-    if (tr.classList.contains("segment-hidden")) return;
-    var cells = [];
-    tr.querySelectorAll("th, td").forEach(function(cell) {
-      if (cell.style.display === "none") return;
-      if (cell.classList.contains("segment-hidden")) return;
-      cells.push(cell.textContent.trim());
-    });
-    if (cells.length > 0) rows.push(cells);
-  });
-  return rows.length > 0 ? rows : null;
-}
-
-/**
- * Wrap text on a canvas, returning the final Y position.
- */
-function wrapCanvasTextTracker(ctx, text, x, y, maxW, lineH) {
-  var words = text.split(" ");
-  var line = "";
-  var curY = y;
-  for (var i = 0; i < words.length; i++) {
-    var test = line + words[i] + " ";
-    if (ctx.measureText(test).width > maxW && line !== "") {
-      ctx.fillText(line.trim(), x, curY);
-      line = words[i] + " ";
-      curY += lineH;
-    } else {
-      line = test;
-    }
-  }
-  if (line.trim()) {
-    ctx.fillText(line.trim(), x, curY);
-    curY += lineH;
-  }
-  return curY;
-}
-
-/**
- * Render table rows on a canvas at the given position.
- */
-function renderCanvasTableTracker(ctx, rows, x, y, maxW) {
-  if (!rows || rows.length === 0) return y;
-  var colCount = 1;
-  for (var i = 0; i < rows.length; i++) {
-    if (rows[i].length > colCount) colCount = rows[i].length;
-  }
-  var colW = maxW / colCount;
-  var rowH = 22;
-
-  for (var r = 0; r < rows.length; r++) {
-    var rowY = y + r * rowH;
-    if (r === 0) {
-      ctx.fillStyle = "#f1f5f9";
-      ctx.fillRect(x, rowY, maxW, rowH);
-      ctx.fillStyle = "#1e293b";
-      ctx.font = "bold 11px -apple-system, sans-serif";
-    } else {
-      if (r % 2 === 0) {
-        ctx.fillStyle = "#f8fafc";
-        ctx.fillRect(x, rowY, maxW, rowH);
-      }
-      ctx.fillStyle = "#1e293b";
-      ctx.font = "12px -apple-system, sans-serif";
-    }
-
-    for (var c = 0; c < rows[r].length; c++) {
-      var cellX = x + c * colW;
-      var text = rows[r][c];
-      if (text.length > 25) text = text.substring(0, 23) + "\u2026";
-      if (c === 0) {
-        ctx.textAlign = "left";
-        ctx.fillText(text, cellX + 4, rowY + 15);
-      } else {
-        ctx.textAlign = "center";
-        ctx.fillText(text, cellX + colW / 2, rowY + 15);
-      }
-    }
-
-    ctx.strokeStyle = "#e2e8f0";
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    ctx.moveTo(x, rowY + rowH);
-    ctx.lineTo(x + maxW, rowY + rowH);
-    ctx.stroke();
-  }
-  ctx.textAlign = "left";
-  return y + rows.length * rowH;
-}
 
 /**
  * Clean a cloned DOM element for SVG foreignObject export.
@@ -973,13 +1053,59 @@ function pinSummarySection(sectionType) {
 }
 
 /**
+ * Pin the Significant Changes section to Pinned Views.
+ * Captures the entire sig changes grid as a single pinned card.
+ */
+function pinSigChanges() {
+  var section = document.getElementById("summary-section-sig-changes");
+  if (!section) {
+    alert("No significant changes section found.");
+    return;
+  }
+  // Check for empty state (no actual cards)
+  var cards = section.querySelectorAll(".dash-sig-card");
+  if (cards.length === 0) {
+    alert("There are no significant changes to pin.");
+    return;
+  }
+
+  // Clone the section and strip interactive controls
+  var clone = section.cloneNode(true);
+  var controls = clone.querySelector(".summary-section-controls");
+  if (controls) controls.parentNode.removeChild(controls);
+
+  var pinObj = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+    metricId: "summary-sig-changes",
+    metricTitle: "Significant Changes",
+    visibleSegments: [],
+    tableHtml: clone.innerHTML,
+    chartSvg: "",
+    chartVisible: false,
+    insightText: "",
+    timestamp: Date.now(),
+    order: pinnedViews.length
+  };
+
+  pinnedViews.push(pinObj);
+  renderPinnedCards();
+  updatePinBadge();
+  savePinnedData();
+}
+
+/**
  * Export a summary section as a slide PNG.
- * @param {string} sectionType - "background" or "findings"
+ * @param {string} sectionType - "background", "findings", or "sig-changes"
  */
 function exportSummarySlide(sectionType) {
-  var sectionId = sectionType === "background"
-    ? "summary-section-background"
-    : "summary-section-findings";
+  var sectionId;
+  if (sectionType === "background") {
+    sectionId = "summary-section-background";
+  } else if (sectionType === "sig-changes") {
+    sectionId = "summary-section-sig-changes";
+  } else {
+    sectionId = "summary-section-findings";
+  }
   var section = document.getElementById(sectionId);
   if (!section) return;
 

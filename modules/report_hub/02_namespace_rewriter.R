@@ -459,23 +459,13 @@ build_pin_bridge <- function(report_key, report_type) {
 // ===== Hub Pin Bridge \u2014 Tracker =====
 // Override per-report pin functions to route through hub store
 pinMetricView = function(metricId) {
-  var existing = null;
-  for (var i = 0; i < ReportHub.pinnedItems.length; i++) {
-    if (ReportHub.pinnedItems[i].source === "tracker" && ReportHub.pinnedItems[i].metricId === metricId) {
-      existing = ReportHub.pinnedItems[i]; break;
-    }
-  }
-  if (existing) {
-    ReportHub.removePin(existing.id);
-    %1$supdatePinButton(metricId, false);
-  } else {
-    var pinObj = captureMetricView(metricId);
-    if (!pinObj) return;
-    pinObj.title = pinObj.metricTitle || metricId;
-    pinObj.insight = pinObj.insightText || "";
-    ReportHub.addPin("tracker", pinObj);
-    %1$supdatePinButton(metricId, true);
-  }
+  // Always add a new pin (multi-pin support).
+  // Each pin captures the current view state (visible segments, chart, table).
+  var pinObj = captureMetricView(metricId);
+  if (!pinObj) return;
+  pinObj.title = pinObj.metricTitle || metricId;
+  pinObj.insight = pinObj.insightText || "";
+  ReportHub.addPin("tracker", pinObj);
 };
 pinSummarySection = function(sectionType) {
   var editorId = sectionType === "background" ? "summary-background-editor" : "summary-findings-editor";
@@ -572,25 +562,15 @@ pinSelectedCharts = function() {
 // ===== Hub Pin Bridge \u2014 Tabs =====
 // Override per-report pin functions to route through hub store
 %stogglePin = function(qCode) {
-  var existing = null;
-  for (var i = 0; i < ReportHub.pinnedItems.length; i++) {
-    var p = ReportHub.pinnedItems[i];
-    if (p.source === "tabs" && p.qCode === qCode && p.bannerGroup === currentGroup) {
-      existing = p; break;
-    }
-  }
-  if (existing) {
-    ReportHub.removePin(existing.id);
-    %supdatePinButton(qCode, false);
-  } else {
-    var pinObj = captureCurrentView(qCode);
-    if (!pinObj) return;
-    pinObj.title = pinObj.qCode || "";
-    pinObj.subtitle = pinObj.qTitle || "";
-    pinObj.insight = pinObj.insightText || "";
-    ReportHub.addPin("tabs", pinObj);
-    %supdatePinButton(qCode, true);
-  }
+  // Always add a new pin (multi-pin support).
+  // Each pin captures the current view state (banner, chart, table).
+  var pinObj = captureCurrentView(qCode);
+  if (!pinObj) return;
+  pinObj.title = pinObj.qCode || "";
+  pinObj.subtitle = pinObj.qTitle || "";
+  pinObj.insight = pinObj.insightText || "";
+  ReportHub.addPin("tabs", pinObj);
+  %supdatePinButton(qCode, true);
 };
 pinDashboardText = function(boxId) {
   var editor = %s("dash-text-" + boxId);

@@ -181,13 +181,26 @@ safe_execute <- function(expr, default = NA, error_msg = "Operation failed",
 }
 
 
-#' Batch rbind (efficient)
+#' Batch rbind (column-safe)
+#'
+#' Combines a list of data frames by rows.
+#' Handles column mismatches by adding missing columns with NA values
+#' before binding, preventing "numbers of columns do not match" errors.
 #'
 #' @param row_list List of data frames
 #' @return Single data frame
 #' @export
 batch_rbind <- function(row_list) {
   if (length(row_list) == 0) return(data.frame())
+  # Normalize columns across all data frames to prevent mismatch errors
+  all_cols <- unique(unlist(lapply(row_list, names)))
+  row_list <- lapply(row_list, function(df) {
+    missing_cols <- setdiff(all_cols, names(df))
+    for (col in missing_cols) {
+      df[[col]] <- NA
+    }
+    df[, all_cols, drop = FALSE]
+  })
   do.call(rbind, row_list)
 }
 

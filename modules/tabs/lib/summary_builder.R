@@ -53,9 +53,13 @@ build_index_summary_table <- function(results_list, composite_results,
     config
   )
 
-  # Combine
+  # Combine (column-safe: metric_rows and composite_rows may have different columns)
   if (nrow(metric_rows) > 0 && nrow(composite_rows) > 0) {
-    all_metrics <- rbind(metric_rows, composite_rows)
+    all_cols <- union(names(metric_rows), names(composite_rows))
+    for (col in setdiff(all_cols, names(metric_rows))) metric_rows[[col]] <- NA
+    for (col in setdiff(all_cols, names(composite_rows))) composite_rows[[col]] <- NA
+    all_metrics <- rbind(metric_rows[, all_cols, drop = FALSE],
+                         composite_rows[, all_cols, drop = FALSE])
   } else if (nrow(metric_rows) > 0) {
     all_metrics <- metric_rows
   } else if (nrow(composite_rows) > 0) {
@@ -202,6 +206,16 @@ extract_metric_rows <- function(results_list, banner_info, config) {
     return(empty_df)
   }
 
+  # Normalize columns across all metric rows before combining
+  # (different question types may have different columns, e.g. RowSource)
+  all_cols <- unique(unlist(lapply(metric_list, names)))
+  metric_list <- lapply(metric_list, function(df) {
+    for (col in setdiff(all_cols, names(df))) {
+      df[[col]] <- NA
+    }
+    df[, all_cols, drop = FALSE]
+  })
+
   result <- do.call(rbind, metric_list)
   rownames(result) <- NULL
 
@@ -325,6 +339,12 @@ extract_composite_rows <- function(composite_results, banner_info,
     return(empty_df)
   }
 
+  # Normalize columns before combining (defensive against column mismatches)
+  all_cols <- unique(unlist(lapply(composite_list, names)))
+  composite_list <- lapply(composite_list, function(df) {
+    for (col in setdiff(all_cols, names(df))) df[[col]] <- NA
+    df[, all_cols, drop = FALSE]
+  })
   result <- do.call(rbind, composite_list)
   rownames(result) <- NULL
 
@@ -487,6 +507,12 @@ organize_by_composite_groups <- function(metrics_df, composite_defs, config) {
     return(metrics_df)
   }
 
+  # Normalize columns before combining (defensive against column mismatches)
+  all_cols <- unique(unlist(lapply(organized_rows, names)))
+  organized_rows <- lapply(organized_rows, function(df) {
+    for (col in setdiff(all_cols, names(df))) df[[col]] <- NA
+    df[, all_cols, drop = FALSE]
+  })
   result <- do.call(rbind, organized_rows)
   rownames(result) <- NULL
 
@@ -562,6 +588,12 @@ insert_section_headers <- function(metrics_df, banner_info) {
     result_rows[[length(result_rows) + 1]] <- row
   }
 
+  # Normalize columns before combining (defensive against column mismatches)
+  all_cols <- unique(unlist(lapply(result_rows, names)))
+  result_rows <- lapply(result_rows, function(df) {
+    for (col in setdiff(all_cols, names(df))) df[[col]] <- NA
+    df[, all_cols, drop = FALSE]
+  })
   result <- do.call(rbind, result_rows)
   rownames(result) <- NULL
 

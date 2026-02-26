@@ -12,6 +12,8 @@
 // ---- Global chip state (persists across metric panels) ----
 var activeSegments = {};   // { segmentName: true/false }
 var activeWaves = {};      // { waveId: true/false }
+var chartSegments = {};    // { segmentName: true/false } — independent chart-only segment toggle
+var chartSegmentInitialised = false;
 var chipStateInitialised = false;
 var selectedSegment = null; // Segment whose chart labels are shown (only one at a time)
 
@@ -22,10 +24,11 @@ var selectedSegment = null; // Segment whose chart labels are shown (only one at
 function initChipState() {
   if (chipStateInitialised) return;
 
-  // Read initial segment state from first panel's chips
+  // Read initial segment state from first panel's TABLE segment chips only
+  // (NOT chart segment chips which live in .mv-chart-segment-chips)
   var firstPanel = document.querySelector(".tk-metric-panel");
   if (firstPanel) {
-    firstPanel.querySelectorAll(".tk-segment-chip").forEach(function(chip) {
+    firstPanel.querySelectorAll(".mv-segment-chips .tk-segment-chip").forEach(function(chip) {
       var seg = chip.getAttribute("data-segment");
       if (seg) {
         var isActive = chip.classList.contains("active");
@@ -36,7 +39,7 @@ function initChipState() {
         }
       }
     });
-    firstPanel.querySelectorAll(".tk-wave-chip").forEach(function(chip) {
+    firstPanel.querySelectorAll(".mv-wave-chips .tk-wave-chip").forEach(function(chip) {
       var wid = chip.getAttribute("data-wave");
       if (wid) activeWaves[wid] = chip.classList.contains("active");
     });
@@ -52,8 +55,8 @@ function initChipState() {
 function applyChipState(panel) {
   if (!panel) return;
 
-  // ---- Apply segment state ----
-  panel.querySelectorAll(".tk-segment-chip").forEach(function(chip) {
+  // ---- Apply segment state (TABLE segment chips only) ----
+  panel.querySelectorAll(".mv-segment-chips .tk-segment-chip").forEach(function(chip) {
     var seg = chip.getAttribute("data-segment");
     if (seg && seg in activeSegments) {
       var isActive = activeSegments[seg];
@@ -68,24 +71,9 @@ function applyChipState(panel) {
       panel.querySelectorAll("td[data-segment=\"" + seg + "\"], th[data-segment=\"" + seg + "\"]").forEach(function(el) {
         el.classList.toggle("segment-hidden", !isActive);
       });
-
-      // Chart elements: lines, points, legend — visible when segment is ACTIVE
-      panel.querySelectorAll(".mv-chart-area path[data-segment=\"" + seg + "\"]").forEach(function(el) {
-        el.style.display = isActive ? "" : "none";
-      });
-      panel.querySelectorAll(".mv-chart-area circle[data-segment=\"" + seg + "\"]").forEach(function(el) {
-        el.style.display = isActive ? "" : "none";
-      });
-      panel.querySelectorAll(".mv-chart-area .tk-chart-legend-item[data-segment=\"" + seg + "\"]").forEach(function(el) {
-        el.style.display = isActive ? "" : "none";
-      });
-
-      // Chart LABELS — visible when segment is ACTIVE (all active segments show labels)
-      panel.querySelectorAll(".mv-chart-area .tk-chart-label[data-segment=\"" + seg + "\"]").forEach(function(el) {
-        el.style.display = isActive ? "" : "none";
-      });
     }
   });
+  // (Chart element visibility is handled entirely by applyChartSegmentState)
 
   // ---- Update group header states ----
   if (typeof SEGMENT_GROUPS !== "undefined" && SEGMENT_GROUPS.groups) {
@@ -101,8 +89,8 @@ function applyChipState(panel) {
     }
   }
 
-  // ---- Apply wave state ----
-  panel.querySelectorAll(".tk-wave-chip").forEach(function(chip) {
+  // ---- Apply wave state (table + chart) ----
+  panel.querySelectorAll(".mv-wave-chips .tk-wave-chip").forEach(function(chip) {
     var wid = chip.getAttribute("data-wave");
     if (wid && wid in activeWaves) {
       var isActive = activeWaves[wid];
@@ -115,7 +103,6 @@ function applyChipState(panel) {
 
       // Chart elements (points and labels for this wave)
       panel.querySelectorAll(".mv-chart-area circle[data-wave=\"" + wid + "\"]").forEach(function(el) {
-        // Only hide if wave is hidden; segment visibility is handled above
         if (!isActive) el.style.display = "none";
       });
       panel.querySelectorAll(".mv-chart-area .tk-chart-label[data-wave=\"" + wid + "\"]").forEach(function(el) {
@@ -124,8 +111,15 @@ function applyChipState(panel) {
     }
   });
 
-  // Rebuild chart paths based on current visibility
-  rebuildChartLines(panel);
+  // ---- Apply chart segment state (chart-only, independent from table segment chips) ----
+  initChartSegmentState();
+  panel.querySelectorAll(".mv-chart-segment-chips .tk-segment-chip").forEach(function(chip) {
+    var seg = chip.getAttribute("data-segment");
+    if (seg && seg in chartSegments) {
+      chip.classList.toggle("active", chartSegments[seg]);
+    }
+  });
+  applyChartSegmentState(panel);
 }
 
 /**
@@ -208,6 +202,14 @@ function toggleSegmentGroupExpand(metricId, groupName, headerBtn) {
     selectedSegment = groupSegs[0];
   }
 
+  // Sync chart: deactivated table segments get removed from chart; newly activated stay off
+  for (var si = 0; si < groupSegs.length; si++) {
+    if (!activeSegments[groupSegs[si]]) {
+      chartSegments[groupSegs[si]] = false;
+    }
+  }
+  syncChartSegmentChips();
+
   // Apply to all panels so state persists across metric switches
   applyChipStateAllPanels();
 }
@@ -259,6 +261,12 @@ function toggleSegmentChip(metricId, segmentName, chip) {
   // Store in global state
   activeSegments[segmentName] = isActive;
 
+  // Sync chart segment state: deactivated → remove from chart; activated → keep current chart state
+  if (!isActive) {
+    chartSegments[segmentName] = false;
+  }
+  // (newly activated segments stay off in chart — user adds via chart chips)
+
   // If activating a segment, make it the selected segment (for chart labels)
   if (isActive) {
     selectedSegment = segmentName;
@@ -269,6 +277,9 @@ function toggleSegmentChip(metricId, segmentName, chip) {
       if (activeSegments[key]) { selectedSegment = key; break; }
     }
   }
+
+  // Sync chart chips to reflect new active segments
+  syncChartSegmentChips();
 
   // Apply state to ALL panels (so chip visual state persists across metric switches)
   applyChipStateAllPanels();
@@ -306,6 +317,132 @@ function toggleWaveChip(metricId, waveId, chip) {
 
   // Rebuild chart lines: the smooth path needs to be recalculated
   // since hidden wave points should not be connected
+  rebuildChartLines(panel);
+}
+
+/**
+ * Initialise chart segment state: only Total starts visible.
+ * All other segments start hidden in the chart.
+ */
+function initChartSegmentState() {
+  if (chartSegmentInitialised) return;
+  initChipState();
+  for (var seg in activeSegments) {
+    // Only "Total" (first standalone segment) starts active in chart
+    chartSegments[seg] = (seg === "Total");
+  }
+  chartSegmentInitialised = true;
+}
+
+/**
+ * Sync chart segment chips: only show chips for segments active in the table.
+ * Charts start with Total only; user can add from the active banner group.
+ */
+function syncChartSegmentChips() {
+  document.querySelectorAll(".mv-chart-segment-chips .tk-segment-chip").forEach(function(chip) {
+    var seg = chip.getAttribute("data-segment");
+    if (!seg) return;
+    var tableActive = activeSegments[seg] === true;
+    // Hide chip entirely if segment not visible in table
+    chip.style.display = tableActive ? "" : "none";
+    // If segment is no longer active in table, turn off in chart
+    if (!tableActive) {
+      chartSegments[seg] = false;
+      chip.classList.remove("active");
+    } else {
+      // New segments added to table default OFF in chart (user adds via chip)
+      if (!(seg in chartSegments)) chartSegments[seg] = false;
+      chip.classList.toggle("active", chartSegments[seg]);
+    }
+  });
+}
+
+/**
+ * Toggle visibility of segment group headers/chips.
+ * @param {HTMLElement} btn - The "+ Segments" toggle button
+ */
+function toggleSegmentGroups(btn) {
+  var chipBar = btn.closest(".mv-segment-chips");
+  if (!chipBar) return;
+  var isOpen = chipBar.classList.contains("groups-visible");
+  // Toggle on THIS panel
+  chipBar.classList.toggle("groups-visible", !isOpen);
+  btn.classList.toggle("open", !isOpen);
+  btn.textContent = isOpen ? "+ Segments" : "\u2212 Segments";
+  // Sync to all other panels
+  document.querySelectorAll(".mv-segment-chips").forEach(function(bar) {
+    if (bar === chipBar) return;
+    bar.classList.toggle("groups-visible", !isOpen);
+    var otherBtn = bar.querySelector(".mv-groups-toggle");
+    if (otherBtn) {
+      otherBtn.classList.toggle("open", !isOpen);
+      otherBtn.textContent = isOpen ? "+ Segments" : "\u2212 Segments";
+    }
+  });
+}
+
+/**
+ * Toggle a segment's visibility in the CHART ONLY (not the table).
+ * Independent from the table segment chips.
+ * @param {string} metricId - The metric ID
+ * @param {string} segName  - The segment name to toggle
+ * @param {HTMLElement} chip - The chart segment chip button element
+ */
+function toggleChartSegment(metricId, segName, chip) {
+  initChartSegmentState();
+
+  // Prevent deselecting all segments
+  var activeCount = 0;
+  for (var k in chartSegments) { if (chartSegments[k]) activeCount++; }
+  if (activeCount <= 1 && chartSegments[segName]) return;
+
+  chip.classList.toggle("active");
+  var isActive = chip.classList.contains("active");
+  chartSegments[segName] = isActive;
+
+  // Sync chart segment chip state across all panels
+  document.querySelectorAll(".mv-chart-segment-chips .tk-segment-chip[data-segment=\"" + segName + "\"]").forEach(function(c) {
+    c.classList.toggle("active", isActive);
+  });
+
+  // Apply to all panels
+  applyChartSegmentStateAllPanels();
+}
+
+/**
+ * Apply chart segment state to all metric panels.
+ */
+function applyChartSegmentStateAllPanels() {
+  document.querySelectorAll(".tk-metric-panel").forEach(function(panel) {
+    applyChartSegmentState(panel);
+  });
+}
+
+/**
+ * Apply chart segment visibility to a single panel's chart.
+ * Hides/shows chart paths, circles, labels, legend items for each segment.
+ * @param {HTMLElement} panel - The metric panel element
+ */
+function applyChartSegmentState(panel) {
+  var chartArea = panel.querySelector(".mv-chart-area");
+  if (!chartArea) return;
+
+  for (var seg in chartSegments) {
+    var isVisible = chartSegments[seg] && (activeSegments[seg] !== false);
+    chartArea.querySelectorAll("path[data-segment=\"" + seg + "\"]").forEach(function(el) {
+      el.style.display = isVisible ? "" : "none";
+    });
+    chartArea.querySelectorAll("circle[data-segment=\"" + seg + "\"]").forEach(function(el) {
+      el.style.display = isVisible ? "" : "none";
+    });
+    chartArea.querySelectorAll(".tk-chart-label[data-segment=\"" + seg + "\"]").forEach(function(el) {
+      el.style.display = isVisible ? "" : "none";
+    });
+    chartArea.querySelectorAll(".tk-chart-legend-item[data-segment=\"" + seg + "\"]").forEach(function(el) {
+      el.style.display = isVisible ? "" : "none";
+    });
+  }
+
   rebuildChartLines(panel);
 }
 
@@ -435,6 +572,19 @@ function toggleShowChart(metricId, show) {
   if (chartArea) {
     chartArea.style.display = show ? "block" : "none";
   }
+
+  // Show/hide the chart segment chips bar
+  var chartSegBar = panel.querySelector(".mv-chart-segment-chips");
+  if (chartSegBar) {
+    chartSegBar.style.display = show ? "flex" : "none";
+  }
+
+  // When showing chart, sync chart segment chips to only show active table segments
+  if (show) {
+    initChartSegmentState();
+    syncChartSegmentChips();
+    applyChartSegmentState(panel);
+  }
 }
 
 /**
@@ -525,11 +675,12 @@ function pinMetricView(metricId) {
 // ==============================================================================
 
 // Track current sort state per metric table
-var metricSortState = {};  // { metricId: { col: colIndex, dir: "asc"|"desc" } }
+var metricSortState = {};      // { metricId: { col: colIndex, dir: "asc"|"desc" } }
+var metricOriginalOrder = {};  // { metricId: [row, row, ...] } — captured on first sort
 
 /**
  * Sort the per-metric table by a wave column.
- * Toggles ascending/descending on repeated clicks.
+ * Cycle: unsorted → desc → asc → unsorted (original order) → desc → ...
  * @param {string} metricId - The metric ID
  * @param {number} colIndex - Column index (1-based, matching data-col-index)
  * @param {HTMLElement} headerEl - The clicked header element
@@ -543,11 +694,24 @@ function sortMetricTable(metricId, colIndex, headerEl) {
   var tbody = table.querySelector("tbody");
   if (!tbody) return;
 
-  // Determine sort direction
+  // Capture original row order on first sort of this metric
+  if (!metricOriginalOrder[metricId]) {
+    metricOriginalOrder[metricId] = Array.from(tbody.querySelectorAll("tr"));
+  }
+
+  // Determine sort direction: desc → asc → original → desc → ...
   var state = metricSortState[metricId] || {};
-  var dir = "desc";
-  if (state.col === colIndex && state.dir === "desc") {
-    dir = "asc";
+  var dir;
+  if (state.col === colIndex) {
+    if (state.dir === "desc") {
+      dir = "asc";
+    } else if (state.dir === "asc") {
+      dir = "original";
+    } else {
+      dir = "desc";
+    }
+  } else {
+    dir = "desc";
   }
   metricSortState[metricId] = { col: colIndex, dir: dir };
 
@@ -555,6 +719,17 @@ function sortMetricTable(metricId, colIndex, headerEl) {
   table.querySelectorAll(".tk-sortable").forEach(function(th) {
     th.classList.remove("sort-asc", "sort-desc");
   });
+
+  // If restoring original order, rebuild from saved rows and clear state
+  if (dir === "original") {
+    metricSortState[metricId] = {};
+    while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+    metricOriginalOrder[metricId].forEach(function(row) {
+      tbody.appendChild(row);
+    });
+    return;
+  }
+
   headerEl.classList.add(dir === "asc" ? "sort-asc" : "sort-desc");
 
   // Group rows: each segment row + its change rows

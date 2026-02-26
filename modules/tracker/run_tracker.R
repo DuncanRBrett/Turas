@@ -323,6 +323,15 @@ run_tracker <- function(tracking_config_path,
   cat("\n[7/8] CALCULATING TRENDS\n")
   cat("================================================================================\n")
 
+  # Defensive check: warn if banners defined in config but use_banners=FALSE
+  if (!use_banners && !is.null(config$banner) && nrow(config$banner) > 0) {
+    non_total <- config$banner[tolower(config$banner$BreakVariable) != "total", ]
+    if (nrow(non_total) > 0) {
+      cat("\n  [NOTE] Config defines ", nrow(non_total), " banner breakout(s) but use_banners=FALSE.\n")
+      cat("         Set use_banners=TRUE for segment breakouts (Region, Age, etc.).\n\n")
+    }
+  }
+
   if (use_banners) {
     # Phase 3: Calculate trends with banner breakouts
     banner_segments <- get_banner_segments(config, wave_data)
@@ -438,11 +447,16 @@ run_tracker <- function(tracking_config_path,
     detailed_path <- if (!is.null(output_path)) {
       # Explicit output_path parameter takes priority
       output_path
-    } else if (length(report_types) == 1 && !is.null(output_file_setting) && nzchar(trimws(output_file_setting))) {
-      # Single report type with output_file setting - use it directly
-      file.path(base_output_dir, trimws(output_file_setting))
+    } else if (!is.null(output_file_setting) && nzchar(trimws(output_file_setting))) {
+      # Derive from output_file config setting
+      stem <- tools::file_path_sans_ext(trimws(output_file_setting))
+      if (length(report_types) == 1) {
+        file.path(base_output_dir, trimws(output_file_setting))
+      } else {
+        file.path(base_output_dir, paste0(stem, "_Tracker.xlsx"))
+      }
     } else {
-      # Auto-generate filename
+      # Auto-generate filename from project_name
       project_name <- get_setting(config, "project_name", default = "Tracking")
       project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
       file.path(base_output_dir, paste0(project_name, "_Tracker_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
@@ -460,11 +474,16 @@ run_tracker <- function(tracking_config_path,
 
   if ("wave_history" %in% report_types) {
     # Generate wave history report
-    wave_history_path <- if (length(report_types) == 1 && !is.null(output_file_setting) && nzchar(trimws(output_file_setting))) {
-      # Single report type with output_file setting - use it directly
-      file.path(base_output_dir, trimws(output_file_setting))
+    wave_history_path <- if (!is.null(output_file_setting) && nzchar(trimws(output_file_setting))) {
+      # Derive from output_file config setting
+      stem <- tools::file_path_sans_ext(trimws(output_file_setting))
+      if (length(report_types) == 1) {
+        file.path(base_output_dir, trimws(output_file_setting))
+      } else {
+        file.path(base_output_dir, paste0(stem, "_WaveHistory.xlsx"))
+      }
     } else {
-      # Auto-generate filename
+      # Auto-generate filename from project_name
       project_name <- get_setting(config, "project_name", default = "Tracking")
       project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
       file.path(base_output_dir, paste0(project_name, "_WaveHistory_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
@@ -482,11 +501,16 @@ run_tracker <- function(tracking_config_path,
 
   if ("dashboard" %in% report_types) {
     # Generate executive dashboard report
-    dashboard_path <- if (length(report_types) == 1 && !is.null(output_file_setting) && nzchar(trimws(output_file_setting))) {
-      # Single report type with output_file setting - use it directly
-      file.path(base_output_dir, trimws(output_file_setting))
+    dashboard_path <- if (!is.null(output_file_setting) && nzchar(trimws(output_file_setting))) {
+      # Derive from output_file config setting
+      stem <- tools::file_path_sans_ext(trimws(output_file_setting))
+      if (length(report_types) == 1) {
+        file.path(base_output_dir, trimws(output_file_setting))
+      } else {
+        file.path(base_output_dir, paste0(stem, "_Dashboard.xlsx"))
+      }
     } else {
-      # Auto-generate filename
+      # Auto-generate filename from project_name
       project_name <- get_setting(config, "project_name", default = "Tracking")
       project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
       file.path(base_output_dir, paste0(project_name, "_Dashboard_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
@@ -504,11 +528,16 @@ run_tracker <- function(tracking_config_path,
 
   if ("sig_matrix" %in% report_types) {
     # Generate significance matrix report (standalone, without dashboard)
-    sig_matrix_path <- if (length(report_types) == 1 && !is.null(output_file_setting) && nzchar(trimws(output_file_setting))) {
-      # Single report type with output_file setting - use it directly
-      file.path(base_output_dir, trimws(output_file_setting))
+    sig_matrix_path <- if (!is.null(output_file_setting) && nzchar(trimws(output_file_setting))) {
+      # Derive from output_file config setting
+      stem <- tools::file_path_sans_ext(trimws(output_file_setting))
+      if (length(report_types) == 1) {
+        file.path(base_output_dir, trimws(output_file_setting))
+      } else {
+        file.path(base_output_dir, paste0(stem, "_SigMatrix.xlsx"))
+      }
     } else {
-      # Auto-generate filename
+      # Auto-generate filename from project_name
       project_name <- get_setting(config, "project_name", default = "Tracking")
       project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
       file.path(base_output_dir, paste0(project_name, "_SigMatrix_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
@@ -548,9 +577,11 @@ run_tracker <- function(tracking_config_path,
 
   if ("tracking_crosstab" %in% report_types && !is.null(crosstab_data)) {
     # Excel output
-    crosstab_path <- if (length(report_types) == 1 && !is.null(output_file_setting) && nzchar(trimws(output_file_setting))) {
+    crosstab_path <- if (!is.null(output_file_setting) && nzchar(trimws(output_file_setting))) {
+      # Use output_file as-is (tracking_crosstab is the primary report type)
       file.path(base_output_dir, trimws(output_file_setting))
     } else {
+      # Auto-generate filename from project_name
       project_name <- get_setting(config, "project_name", default = "Tracking")
       project_name <- gsub("[^A-Za-z0-9_-]", "_", project_name)
       file.path(base_output_dir, paste0(project_name, "_TrackingCrosstab_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))

@@ -363,21 +363,47 @@ extract_metric_value <- function(wave_result, metric_type, metric_name) {
 
   } else if (metric_type == "nps") {
     # NPS: values at top level
-    if (!is.null(wave_result[[metric_name]])) {
-      return(wave_result[[metric_name]])
+    # Map spec names to actual field names from calculate_nps_score()
+    nps_field_map <- c(
+      "nps_score" = "nps",
+      "promoters_pct" = "promoters_pct",
+      "passives_pct" = "passives_pct",
+      "detractors_pct" = "detractors_pct"
+    )
+    field_name <- if (metric_name %in% names(nps_field_map)) {
+      nps_field_map[[metric_name]]
+    } else {
+      metric_name
+    }
+    if (!is.null(wave_result[[field_name]])) {
+      return(wave_result[[field_name]])
     }
     return(NA_real_)
 
-  } else if (metric_type %in% c("single_choice", "single_choice_enhanced")) {
-    # Single choice: proportions sub-list
-    if (!is.null(wave_result$proportions) && !is.null(wave_result$proportions[[metric_name]])) {
+  } else if (metric_type %in% c("single_choice", "single_choice_enhanced", "proportions")) {
+    # Single choice / proportions: proportions sub-list (or named vector)
+    # Note: calculate_single_choice_trend_enhanced() returns metric_type = "proportions"
+    # Proportions may be a named vector (from calculate_proportions) — use %in% names() for safety
+    if (!is.null(wave_result$proportions) && metric_name %in% names(wave_result$proportions)) {
       return(wave_result$proportions[[metric_name]])
     }
-    # Category spec: check for the category name
+    # Category spec: check for the category name (normalized matching)
     if (grepl("^category_", metric_name)) {
       cat_name <- sub("^category_", "", metric_name)
-      if (!is.null(wave_result$proportions) && cat_name %in% names(wave_result$proportions)) {
-        return(wave_result$proportions[[cat_name]])
+      if (!is.null(wave_result$proportions)) {
+        # Exact match first
+        if (cat_name %in% names(wave_result$proportions)) {
+          return(wave_result$proportions[[cat_name]])
+        }
+        # Normalized match: lowercase + replace non-alphanumeric with underscore
+        # Needed because normalize_metric_name() converts "Brand A" → "brand_a"
+        # but the data keys preserve the original "Brand A"
+        norm_key <- function(x) gsub("[^a-z0-9]", "_", tolower(x))
+        prop_names <- names(wave_result$proportions)
+        norm_match <- which(norm_key(prop_names) == norm_key(cat_name))
+        if (length(norm_match) > 0) {
+          return(wave_result$proportions[[prop_names[norm_match[1]]]])
+        }
       }
     }
     return(NA_real_)
@@ -502,7 +528,7 @@ get_default_specs_list <- function(metric_type) {
   switch(metric_type,
     "rating" = , "rating_enhanced" = c("mean"),
     "nps" = c("nps_score"),
-    "single_choice" = , "single_choice_enhanced" = c("all"),
+    "single_choice" = , "single_choice_enhanced" = , "proportions" = c("all"),
     "multi_mention" = , "multi_choice" = , "category_mentions" = c("auto"),
     "composite" = , "composite_enhanced" = c("mean"),
     c("mean")  # fallback

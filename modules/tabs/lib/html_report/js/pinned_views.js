@@ -19,16 +19,13 @@ function savePinnedData() {
 }
 
 function togglePin(qCode) {
-  var idx = pinnedViews.findIndex(function(p) { return p.qCode === qCode && p.bannerGroup === currentGroup; });
-  if (idx >= 0) {
-    pinnedViews.splice(idx, 1);
-    updatePinButton(qCode, false);
-  } else {
-    var pin = captureCurrentView(qCode);
-    if (pin) {
-      pinnedViews.push(pin);
-      updatePinButton(qCode, true);
-    }
+  // Always add a new pin (multi-pin support).
+  // Each pin captures the current view state (banner, chart, table).
+  // Unpinning is done via the ✕ button on each pinned card.
+  var pin = captureCurrentView(qCode);
+  if (pin) {
+    pinnedViews.push(pin);
+    updatePinButton(qCode, true);
   }
   savePinnedData();
   renderPinnedCards();
@@ -195,7 +192,7 @@ function renderPinnedCards() {
     var header = document.createElement("div");
     header.style.cssText = "display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;";
     var titleDiv = document.createElement("div");
-    if (pin.pinType === "text_box" || pin.pinType === "heatmap") {
+    if (pin.pinType === "text_box" || pin.pinType === "heatmap" || pin.pinType === "dashboard_section") {
       // Simplified header for dashboard pins (no qCode/banner)
       titleDiv.innerHTML = "<div style=\"font-size:14px;font-weight:600;color:#1e293b;\">" + escapeHtml(pin.qTitle || "") + "</div>";
     } else {
@@ -227,6 +224,13 @@ function renderPinnedCards() {
       downBtn.onclick = function() { movePinned(idx, idx + 1); };
       controls.appendChild(downBtn);
     }
+    var exportBtn = document.createElement("button");
+    exportBtn.className = "export-btn";
+    exportBtn.style.cssText = "padding:3px 8px;font-size:11px;";
+    exportBtn.innerHTML = "&#128247;";
+    exportBtn.title = "Export as PNG";
+    exportBtn.onclick = (function(id) { return function() { exportPinnedCardPNG(id); }; })(pin.id);
+    controls.appendChild(exportBtn);
     var removeBtn = document.createElement("button");
     removeBtn.className = "export-btn";
     removeBtn.style.cssText = "padding:3px 8px;font-size:11px;color:#e8614d;";
@@ -245,8 +249,8 @@ function renderPinnedCards() {
         // Text box pins: plain body text, no accent bar
         insightDiv.style.cssText = "margin-bottom:12px;padding:16px 20px;background:#f8fafc;border-radius:8px;font-size:14px;line-height:1.7;color:#1e293b;font-weight:400;white-space:pre-wrap;";
       } else {
-        // Standard crosstab insight: accent bar callout
-        insightDiv.style.cssText = "margin-bottom:12px;padding:14px 18px;border-left:4px solid #323367;background:linear-gradient(135deg,#f0f4ff 0%,#f8f9fb 100%);border-radius:0 8px 8px 0;font-size:13px;line-height:1.6;color:#1a2744;font-weight:500;box-shadow:0 1px 3px rgba(50,51,103,0.08);";
+        // Standard crosstab insight: prominent callout
+        insightDiv.style.cssText = "margin-bottom:12px;padding:16px 24px;border-left:4px solid #323367;background:linear-gradient(135deg,#f0f5f5 0%,#f8fafa 100%);border-radius:0 8px 8px 0;font-size:15px;line-height:1.5;color:#1a2744;font-weight:600;";
       }
       insightDiv.textContent = pin.insightText;
       card.appendChild(insightDiv);
@@ -327,12 +331,168 @@ function hydratePinnedViews() {
       pinnedViews = data;
       renderPinnedCards();
       updatePinBadge();
-      // Update pin buttons
-      pinnedViews.forEach(function(pin) {
-        updatePinButton(pin.qCode, true);
-      });
     }
   } catch(e) {}
+}
+
+/**
+ * Export a single pinned card as a PowerPoint-quality PNG slide.
+ * Uses the same SVG-native approach as exportAllPinnedSlides.
+ * @param {string} pinId - The pin ID
+ */
+function exportPinnedCardPNG(pinId) {
+  var pin = null;
+  for (var i = 0; i < pinnedViews.length; i++) {
+    if (pinnedViews[i].id === pinId) { pin = pinnedViews[i]; break; }
+  }
+  if (!pin || pin.type === "section") return;
+
+  var ns = "http://www.w3.org/2000/svg";
+  var W = 1280, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
+  var pad = 28;
+  var scale = 3;
+  var usableW = W - pad * 2;
+
+  var titleFullText = (pin.pinType === "text_box" || pin.pinType === "heatmap")
+    ? pin.qTitle
+    : pin.qCode + " - " + pin.qTitle;
+  var titleLines = wrapTextLines(titleFullText, usableW, 9.5);
+  var titleLineH = 20;
+  var titleStartY = pad + 16;
+  var titleBlockH = titleLines.length * titleLineH;
+  var metaText = (pin.pinType === "text_box" || pin.pinType === "heatmap")
+    ? ""
+    : "Base: " + (pin.baseText || "\u2014") + " \u00B7 Banner: " + (pin.bannerLabel || "");
+  var metaY = titleStartY + titleBlockH + 4;
+  var contentTop = metaY + 18;
+
+  // 1. Insight dimensions
+  var insightLines = wrapTextLines(pin.insightText, usableW - 16, 7);
+  var insightLineH = 17;
+  var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 24 : 0;
+  var insightY = contentTop;
+
+  // 2. Chart dimensions (full width)
+  var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 12 : 0);
+  var chartH = 0, hasChart = false;
+  var chartTemp = null;
+  if (pin.chartSvg) {
+    var tempDiv = document.createElement("div");
+    tempDiv.innerHTML = pin.chartSvg;
+    chartTemp = tempDiv.querySelector("svg");
+    if (chartTemp) {
+      hasChart = true;
+      var vb = chartTemp.getAttribute("viewBox");
+      if (vb) {
+        var parts = vb.split(" ").map(Number);
+        var cScale = usableW / parts[2];
+        chartH = parts[3] * cScale;
+      }
+    }
+  }
+
+  // 3. Table dimensions (full width)
+  var tableTopY = chartTopY + chartH + (chartH > 0 ? 12 : 0);
+  var tableH = 0;
+  if (pin.tableHtml) {
+    var countRows = (pin.tableHtml.match(/<tr/g) || []).length;
+    tableH = countRows * 18 + 4;
+  }
+
+  var totalH = tableTopY + tableH + pad + 20;
+
+  var svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("xmlns", ns);
+  svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
+  svg.setAttribute("style", "font-family:" + fontFamily + ";");
+
+  var bg = document.createElementNS(ns, "rect");
+  bg.setAttribute("width", W); bg.setAttribute("height", totalH);
+  bg.setAttribute("fill", "#ffffff");
+  svg.appendChild(bg);
+
+  var titleResult = createWrappedText(ns, titleLines, pad, titleStartY, titleLineH,
+    { fill: "#1a2744", "font-size": "16", "font-weight": "700" });
+  svg.appendChild(titleResult.element);
+
+  var metaEl = document.createElementNS(ns, "text");
+  metaEl.setAttribute("x", pad); metaEl.setAttribute("y", metaY);
+  metaEl.setAttribute("fill", "#94a3b8"); metaEl.setAttribute("font-size", "11");
+  metaEl.textContent = metaText;
+  svg.appendChild(metaEl);
+
+  var isTextBox = pin.pinType === "text_box";
+
+  // 1. Insight
+  if (insightLines.length > 0) {
+    var aH = Math.max(28, insightLines.length * insightLineH + 12);
+    var insBg = document.createElementNS(ns, "rect");
+    insBg.setAttribute("x", pad); insBg.setAttribute("y", insightY + 2);
+    insBg.setAttribute("width", usableW); insBg.setAttribute("height", aH);
+    insBg.setAttribute("rx", "4");
+    insBg.setAttribute("fill", isTextBox ? "#f8fafc" : "#f0f4ff");
+    svg.appendChild(insBg);
+    if (!isTextBox) {
+      var iB = document.createElementNS(ns, "rect");
+      iB.setAttribute("x", pad); iB.setAttribute("y", insightY + 2);
+      iB.setAttribute("width", "4"); iB.setAttribute("height", aH);
+      iB.setAttribute("fill", "#323367"); iB.setAttribute("rx", "2");
+      svg.appendChild(iB);
+    }
+    var insFontSize = isTextBox ? "14" : "13";
+    var insXOffset = isTextBox ? 12 : 14;
+    var insRes = createWrappedText(ns, insightLines, pad + insXOffset, insightY + 18, insightLineH,
+      { fill: "#1a2744", "font-size": insFontSize, "font-weight": isTextBox ? "400" : "500" });
+    svg.appendChild(insRes.element);
+  }
+
+  // 2. Chart
+  if (hasChart && chartTemp) {
+    var chartClone = chartTemp.cloneNode(true);
+    var cvb = chartClone.getAttribute("viewBox").split(" ").map(Number);
+    var cScale2 = usableW / cvb[2];
+    var cG = document.createElementNS(ns, "g");
+    cG.setAttribute("transform", "translate(" + pad + "," + chartTopY + ") scale(" + cScale2 + ")");
+    while (chartClone.firstChild) cG.appendChild(chartClone.firstChild);
+    svg.appendChild(cG);
+  }
+
+  // 3. Table
+  if (pin.tableHtml) {
+    var tDiv = document.createElement("div");
+    tDiv.innerHTML = pin.tableHtml;
+    var tRows = extractSlideTableData({
+      querySelector: function(sel) { return tDiv.querySelector(sel); },
+      querySelectorAll: function(sel) { return tDiv.querySelectorAll(sel); }
+    });
+    if (tRows) {
+      renderTableSVG(ns, svg, tRows, pad, tableTopY, usableW);
+    }
+  }
+
+  // Render SVG to PNG at 3x
+  var svgData = new XMLSerializer().serializeToString(svg);
+  var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+  var url = URL.createObjectURL(svgBlob);
+  var sImg = new Image();
+  sImg.onerror = function() {
+    URL.revokeObjectURL(url);
+    alert("PNG export failed. Try Chrome or Edge.");
+  };
+  sImg.onload = function() {
+    var canvas = document.createElement("canvas");
+    canvas.width = W * scale; canvas.height = totalH * scale;
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(sImg, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+    canvas.toBlob(function(blob) {
+      var slug = (pin.qCode || "pin").replace(/[^a-zA-Z0-9]/g, "_");
+      downloadBlob(blob, "pin_" + slug + "_slide.png");
+    }, "image/png");
+  };
+  sImg.src = url;
 }
 
 function exportAllPinnedSlides() {
@@ -553,8 +713,8 @@ function printPinnedViews() {
     ".pinned-print-qcode { font-size: 13px; font-weight: 700; color: #323367; } " +
     ".pinned-print-title { font-size: 16px; font-weight: 600; color: #1e293b; margin: 2px 0; } " +
     ".pinned-print-meta { font-size: 11px; color: #64748b; } " +
-    ".pinned-print-insight { margin-bottom: 12px; padding: 12px 16px; border-left: 4px solid #323367; " +
-    "  background: #f0f4ff; border-radius: 0 6px 6px 0; font-size: 14px; font-weight: 500; " +
+    ".pinned-print-insight { margin-bottom: 12px; padding: 16px 24px; border-left: 4px solid #323367; " +
+    "  background: #f0f5f5; border-radius: 0 6px 6px 0; font-size: 15px; font-weight: 600; " +
     "  color: #1a2744; line-height: 1.5; " +
     "  -webkit-print-color-adjust: exact; print-color-adjust: exact; } " +
     ".pinned-print-chart { margin-bottom: 12px; } " +
@@ -743,5 +903,231 @@ function pinDashboardText(boxId) {
   savePinnedData();
   renderPinnedCards();
   updatePinBadge();
+}
+
+/**
+ * Pin a gauge section (Index, NPS Score, etc.) to Pinned Views.
+ * Clones the gauge cards and heatmap grid from the section, strips controls,
+ * and stores as a dashboard_section pin.
+ * @param {string} sectionId - The section id suffix (e.g., "index", "nps-score")
+ */
+function pinGaugeSection(sectionId) {
+  var section = document.getElementById("dash-sec-" + sectionId);
+  if (!section) { alert("Section not found."); return; }
+
+  var gauges = section.querySelectorAll(".dash-gauge-card:not(.dash-gauge-excluded)");
+  if (gauges.length === 0) { alert("No gauges to pin (all excluded)."); return; }
+
+  // Get the section title
+  var titleEl = section.querySelector(".dash-section-title");
+  var sectionTitle = titleEl ? titleEl.childNodes[0].textContent.trim() : sectionId;
+
+  // Clone the section content (gauges + heatmap)
+  var clone = section.cloneNode(true);
+  // Remove action buttons (pin, export, sort) from the clone
+  clone.querySelectorAll(".dash-export-btn, .dash-sort-btn, .dash-slide-export-btn").forEach(function(btn) { btn.remove(); });
+  // Remove tier badges from clone (already visible in the gauges)
+  clone.querySelectorAll(".dash-tier-pill").forEach(function(pill) { pill.remove(); });
+  // Remove excluded gauges
+  clone.querySelectorAll(".dash-gauge-excluded").forEach(function(g) { g.remove(); });
+
+  var pin = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+    pinType: "dashboard_section",
+    qCode: null,
+    qTitle: sectionTitle,
+    bannerGroup: null,
+    bannerLabel: null,
+    selectedColumns: null,
+    excludedRows: null,
+    insightText: null,
+    sortState: null,
+    tableHtml: clone.innerHTML,
+    chartSvg: null,
+    baseText: null,
+    timestamp: Date.now(),
+    order: pinnedViews.length
+  };
+  pinnedViews.push(pin);
+  savePinnedData();
+  renderPinnedCards();
+  updatePinBadge();
+}
+
+/**
+ * Pin the Significant Findings section to Pinned Views.
+ * Clones the sig finding cards and stores as a dashboard_section pin.
+ */
+function pinSigFindings() {
+  var section = document.getElementById("dash-sec-sig-findings");
+  if (!section) { alert("No significant findings section found."); return; }
+
+  var cards = section.querySelectorAll(".dash-sig-card");
+  if (cards.length === 0) { alert("There are no significant findings to pin."); return; }
+
+  // Clone the section content
+  var clone = section.cloneNode(true);
+  // Remove action buttons from the clone
+  clone.querySelectorAll(".dash-export-btn, .dash-slide-export-btn").forEach(function(btn) { btn.remove(); });
+
+  var pin = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+    pinType: "dashboard_section",
+    qCode: null,
+    qTitle: "Significant Findings",
+    bannerGroup: null,
+    bannerLabel: null,
+    selectedColumns: null,
+    excludedRows: null,
+    insightText: null,
+    sortState: null,
+    tableHtml: clone.innerHTML,
+    chartSvg: null,
+    baseText: null,
+    timestamp: Date.now(),
+    order: pinnedViews.length
+  };
+  pinnedViews.push(pin);
+  savePinnedData();
+  renderPinnedCards();
+  updatePinBadge();
+}
+
+/**
+ * Export the Significant Findings section as a PNG slide.
+ * Reuses the exportDashboardSlide infrastructure but adapted for sig cards.
+ */
+function exportSigFindingsSlide() {
+  var section = document.getElementById("dash-sec-sig-findings");
+  if (!section) return;
+  var cards = section.querySelectorAll(".dash-sig-card");
+  if (cards.length === 0) { alert("No significant findings to export."); return; }
+
+  // Read metadata
+  var summaryPanel = document.getElementById("tab-summary");
+  var projectTitle = summaryPanel ? (summaryPanel.getAttribute("data-project-title") || "") : "";
+  var fieldwork = summaryPanel ? (summaryPanel.getAttribute("data-fieldwork") || "") : "";
+  var companyName = summaryPanel ? (summaryPanel.getAttribute("data-company") || "") : "";
+  var brandColour = summaryPanel ? (summaryPanel.getAttribute("data-brand-colour") || "#323367") : "#323367";
+
+  var ns = "http://www.w3.org/2000/svg";
+  var font = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
+  var W = 1000, pad = 30;
+  var headerH = 48, titleH = 30, footerH = 30;
+  var cardH = 64, cardGap = 6;
+  var maxPerSlide = 12;
+  var totalCards = cards.length;
+  var slideCount = Math.ceil(totalCards / maxPerSlide);
+
+  for (var si = 0; si < slideCount; si++) {
+    var startIdx = si * maxPerSlide;
+    var endIdx = Math.min(startIdx + maxPerSlide, totalCards);
+    var slideCards = Array.from(cards).slice(startIdx, endIdx);
+    var gridH = slideCards.length * (cardH + cardGap);
+    var totalH = headerH + pad + titleH + gridH + pad + footerH;
+
+    var svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("xmlns", ns);
+    svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
+    svg.setAttribute("style", "font-family:" + font + ";");
+
+    // White background
+    var bg = document.createElementNS(ns, "rect");
+    bg.setAttribute("width", W); bg.setAttribute("height", totalH);
+    bg.setAttribute("fill", "#ffffff"); svg.appendChild(bg);
+
+    // Brand header
+    var hBar = document.createElementNS(ns, "rect");
+    hBar.setAttribute("x", "0"); hBar.setAttribute("y", "0");
+    hBar.setAttribute("width", W); hBar.setAttribute("height", headerH);
+    hBar.setAttribute("fill", brandColour); svg.appendChild(hBar);
+
+    if (projectTitle) {
+      var ptEl = document.createElementNS(ns, "text");
+      ptEl.setAttribute("x", pad); ptEl.setAttribute("y", headerH / 2 + 6);
+      ptEl.setAttribute("fill", "#ffffff"); ptEl.setAttribute("font-size", "16");
+      ptEl.setAttribute("font-weight", "700"); ptEl.textContent = projectTitle;
+      svg.appendChild(ptEl);
+    }
+    var rightText = [fieldwork, companyName].filter(function(s) { return s; }).join("  \u00B7  ");
+    if (rightText) {
+      var rtEl = document.createElementNS(ns, "text");
+      rtEl.setAttribute("x", W - pad); rtEl.setAttribute("y", headerH / 2 + 5);
+      rtEl.setAttribute("text-anchor", "end"); rtEl.setAttribute("fill", "rgba(255,255,255,0.85)");
+      rtEl.setAttribute("font-size", "11"); rtEl.setAttribute("font-weight", "500");
+      rtEl.textContent = rightText; svg.appendChild(rtEl);
+    }
+
+    // Section title
+    var secY = headerH + pad;
+    var secTitle = document.createElementNS(ns, "text");
+    secTitle.setAttribute("x", pad); secTitle.setAttribute("y", secY + 16);
+    secTitle.setAttribute("fill", "#1a2744"); secTitle.setAttribute("font-size", "15");
+    secTitle.setAttribute("font-weight", "700");
+    secTitle.textContent = "Significant Findings" + (slideCount > 1 ? " (" + (si + 1) + "/" + slideCount + ")" : "");
+    svg.appendChild(secTitle);
+
+    // Finding cards
+    var cardY = secY + titleH;
+    slideCards.forEach(function(card) {
+      var sigText = card.querySelector(".dash-sig-text");
+      var badges = card.querySelectorAll(".dash-sig-metric-badge, .dash-sig-group-badge, .dash-sig-type-badge");
+      var text = sigText ? sigText.textContent.trim() : "";
+
+      // Card background
+      var cardBg = document.createElementNS(ns, "rect");
+      cardBg.setAttribute("x", pad); cardBg.setAttribute("y", cardY);
+      cardBg.setAttribute("width", W - 2 * pad); cardBg.setAttribute("height", cardH);
+      cardBg.setAttribute("rx", "6"); cardBg.setAttribute("fill", "#f0fdf4");
+      cardBg.setAttribute("stroke", "#bbf7d0"); cardBg.setAttribute("stroke-width", "1");
+      svg.appendChild(cardBg);
+
+      // Badges
+      var bx = pad + 10;
+      badges.forEach(function(badge) {
+        var bText = badge.textContent.trim();
+        var bEl = document.createElementNS(ns, "text");
+        bEl.setAttribute("x", bx); bEl.setAttribute("y", cardY + 18);
+        bEl.setAttribute("fill", "#059669"); bEl.setAttribute("font-size", "9");
+        bEl.setAttribute("font-weight", "700"); bEl.textContent = bText;
+        svg.appendChild(bEl);
+        bx += bText.length * 6 + 14;
+      });
+
+      // Finding text (truncate if too long)
+      var dispText = text.length > 130 ? text.substring(0, 127) + "..." : text;
+      var ftEl = document.createElementNS(ns, "text");
+      ftEl.setAttribute("x", pad + 10); ftEl.setAttribute("y", cardY + 42);
+      ftEl.setAttribute("fill", "#1e293b"); ftEl.setAttribute("font-size", "11");
+      ftEl.textContent = dispText;
+      svg.appendChild(ftEl);
+
+      cardY += cardH + cardGap;
+    });
+
+    // Footer
+    var footerY = totalH - footerH + 18;
+    var footerEl = document.createElementNS(ns, "text");
+    footerEl.setAttribute("x", W / 2); footerEl.setAttribute("y", footerY);
+    footerEl.setAttribute("text-anchor", "middle"); footerEl.setAttribute("fill", "#94a3b8");
+    footerEl.setAttribute("font-size", "9");
+    footerEl.textContent = "Generated by Turas \u00B7 " + new Date().toLocaleDateString();
+    svg.appendChild(footerEl);
+
+    // Download
+    var svgData = new XMLSerializer().serializeToString(svg);
+    var canvas = document.createElement("canvas");
+    canvas.width = W * 2; canvas.height = totalH * 2;
+    var ctx = canvas.getContext("2d");
+    var img = new Image();
+    img.onload = function() {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      var a = document.createElement("a");
+      a.download = "sig_findings" + (slideCount > 1 ? "_" + (si + 1) : "") + ".png";
+      a.href = canvas.toDataURL("image/png");
+      a.click();
+    };
+    img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+  }
 }
 
