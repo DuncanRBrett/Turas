@@ -91,16 +91,17 @@ run_multinomial_logistic_robust <- function(formula, data, weights = NULL, confi
   # FIT MODEL
   # ===========================================================================
 
+  fit_data <- data  # Local copy to avoid polluting caller's data with .wt column
   model <- tryCatch({
     if (!is.null(weights) && length(weights) == nrow(data)) {
       if (!(length(unique(weights)) == 1 && unique(weights)[1] == 1)) {
-        data$.wt <- weights
-        nnet::multinom(formula, data = data, weights = .wt, trace = FALSE, maxit = 500)
+        fit_data$.wt <- weights
+        nnet::multinom(formula, data = fit_data, weights = .wt, trace = FALSE, maxit = 500)
       } else {
-        nnet::multinom(formula, data = data, trace = FALSE, maxit = 500)
+        nnet::multinom(formula, data = fit_data, trace = FALSE, maxit = 500)
       }
     } else {
-      nnet::multinom(formula, data = data, trace = FALSE, maxit = 500)
+      nnet::multinom(formula, data = fit_data, trace = FALSE, maxit = 500)
     }
   }, error = function(e) {
     list(error = TRUE, message = e$message)

@@ -271,12 +271,14 @@ validate_catdriver_data <- function(data, config) {
   # This prevents rejecting valid runs where drivers use missing_as_level.
 
   # Start with rows that have non-missing outcome (these are always required)
-  outcome_valid_mask <- !is.na(data[[config$outcome_var]])
+  # Use is_missing_value() to also catch empty strings from Excel/CSV imports
+  outcome_valid_mask <- !is_missing_value(data[[config$outcome_var]])
   effective_n <- sum(outcome_valid_mask)
 
   # For each driver, only subtract if strategy is "drop_row"
+  # Default must match 10_missing.R::handle_missing_data() which defaults to "missing_as_level"
   for (driver_var in config$driver_vars) {
-    strategy <- get_driver_setting(config, driver_var, "missing_strategy", "drop_row")
+    strategy <- get_driver_setting(config, driver_var, "missing_strategy", "missing_as_level")
 
     if (strategy == "drop_row") {
       # These rows will be dropped - but only if outcome is also valid
@@ -388,10 +390,11 @@ validate_catdriver_data <- function(data, config) {
 
   # Build strategy-aware mask: include rows that will be analyzed
   # (outcome non-missing, and drivers either non-missing or use missing_as_level)
+  # Default must match 10_missing.R::handle_missing_data() which defaults to "missing_as_level"
   analyzable_mask <- !is.na(data[[config$outcome_var]])
 
   for (driver_var in config$driver_vars) {
-    strategy <- get_driver_setting(config, driver_var, "missing_strategy", "drop_row")
+    strategy <- get_driver_setting(config, driver_var, "missing_strategy", "missing_as_level")
     if (strategy == "drop_row") {
       # These rows will be dropped, so exclude from analysis
       analyzable_mask <- analyzable_mask & !is.na(data[[driver_var]])
@@ -516,7 +519,8 @@ prepare_analysis_data <- function(data, config, diagnostics) {
 
   for (driver_var in config$driver_vars) {
     # Get per-variable strategy from Driver_Settings
-    strategy <- get_driver_setting(config, driver_var, "missing_strategy", "drop_row")
+    # Default must match 10_missing.R::handle_missing_data() which defaults to "missing_as_level"
+    strategy <- get_driver_setting(config, driver_var, "missing_strategy", "missing_as_level")
 
     driver_missing <- is.na(data[[driver_var]])
     n_missing <- sum(driver_missing)

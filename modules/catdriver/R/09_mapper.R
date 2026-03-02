@@ -486,6 +486,11 @@ aggregate_importance_mapped <- function(term_importance, mapping) {
 #' @param mapping Term-level mapping from map_terms_to_levels() or map_multinomial_terms()
 #' @param model_coefs Model coefficient names (from names(coef(model)) or similar)
 #' @return TRUE if valid, refuses with catdriver_refuse() otherwise
+#'
+#' @note Threshold parameters are identified by the "|" separator (e.g. "Low|Medium").
+#'   This is standard in ordinal::clm and MASS::polr. If adding support for new ordinal
+#'   engines, verify their threshold naming convention matches this pattern.
+#'
 #' @export
 validate_mapping <- function(mapping, model_coefs) {
   # Filter out terms that should not be mapped:

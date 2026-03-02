@@ -160,10 +160,11 @@ run_categorical_keydriver_impl <- function(config_file,
   # TRS RUN STATE INITIALIZATION (TRS v1.0)
   # ==========================================================================
 
-  # Helper function for progress updates (11 steps total)
+  # Helper function for progress updates
+  TOTAL_STEPS <- 11L
   update_progress <- function(step, message) {
     if (!is.null(progress_callback) && is.function(progress_callback)) {
-      progress_callback(step / 11, message)
+      progress_callback(step / TOTAL_STEPS, message)
     }
   }
 
@@ -521,16 +522,16 @@ run_categorical_keydriver_impl <- function(config_file,
   }, error = function(e) {
     # HARD STOP - no legacy fallback allowed
     catdriver_refuse(
-      reason = "term_mapping_failed",
-      message = paste0(
-        "Cannot create canonical term-to-level mapping.\n\n",
-        "Error: ", e$message, "\n\n",
-        "This mapping is required for correct odds ratio interpretation.\n",
-        "Possible causes:\n",
-        "  - Model did not converge properly\n",
-        "  - Unexpected coefficient naming from model\n",
-        "  - Data structure incompatible with expected design matrix\n\n",
-        "Please check your data and configuration, or contact support."
+      reason = "MAPPER_TERM_MAPPING_FAILED",
+      title = "TERM MAPPING FAILED",
+      problem = paste0("Cannot create canonical term-to-level mapping.\nError: ", e$message),
+      why_it_matters = "This mapping is required for correct odds ratio interpretation. Without it, CatDriver cannot guarantee which factor level each coefficient belongs to.",
+      fix = paste0(
+        "Possible causes and solutions:\n",
+        "  1. Model did not converge - check for sparse cells or separation\n",
+        "  2. Unexpected coefficient naming - check for special characters in level names\n",
+        "  3. Data structure issue - verify config matches data\n",
+        "  4. Contact support with your config file"
       )
     )
   })
@@ -567,8 +568,22 @@ run_categorical_keydriver_impl <- function(config_file,
 
   # Bootstrap confidence intervals (optional)
   bootstrap_results <- NULL
-  do_bootstrap <- as.logical(config$bootstrap_ci) %in% TRUE
+  do_bootstrap <- isTRUE(as.logical(config$bootstrap_ci))
   if (do_bootstrap && prep_data$outcome_info$type != "multinomial") {
+
+    # Validate bootstrap parameters (safe defaults for missing/invalid)
+    if (is.null(config$bootstrap_reps) || is.na(config$bootstrap_reps) ||
+        !is.numeric(config$bootstrap_reps) || config$bootstrap_reps < 10) {
+      config$bootstrap_reps <- 200L
+      cat("   [INFO] Bootstrap reps not configured or too low - using default 200\n")
+    }
+    if (is.null(config$confidence_level) || is.na(config$confidence_level) ||
+        !is.numeric(config$confidence_level) ||
+        config$confidence_level <= 0 || config$confidence_level >= 1) {
+      config$confidence_level <- 0.95
+      cat("   [INFO] Confidence level not configured or invalid - using default 0.95\n")
+    }
+
     log_message(paste0("Running bootstrap (", config$bootstrap_reps, " resamples)..."), "info")
     cat("   [INFO] Bootstrap may take 1-3 minutes\n")
 
@@ -588,7 +603,7 @@ run_categorical_keydriver_impl <- function(config_file,
       progress_callback = NULL  # Could add GUI callback here
     )
 
-    if (!is.null(bootstrap_results)) {
+    if (!is.null(bootstrap_results) && isTRUE(bootstrap_results$n_successful > 0)) {
       log_message(paste0("Bootstrap complete (", bootstrap_results$n_successful, "/",
                          bootstrap_results$n_boot, " successful)"), "success")
 
@@ -610,6 +625,12 @@ run_categorical_keydriver_impl <- function(config_file,
         }
         # If idx is empty or multiple matches, leave as NA (already initialized)
       }
+    } else if (!is.null(bootstrap_results)) {
+      # Bootstrap ran but all iterations failed
+      cat("   [PARTIAL] All bootstrap iterations failed - bootstrap results dropped\n")
+      bootstrap_results <- NULL
+      degraded_reasons <- c(degraded_reasons, "All bootstrap iterations failed")
+      affected_outputs <- c(affected_outputs, "bootstrap_ci")
     }
   }
 
@@ -743,6 +764,7 @@ calculate_probability_lift <- function(model_result, prep_data, config) {
   pred_probs <- model_result$predicted_probs
 
   if (is.null(pred_probs)) {
+    log_message("Probability lift skipped - no predicted probabilities available", "info")
     return(NULL)
   }
 

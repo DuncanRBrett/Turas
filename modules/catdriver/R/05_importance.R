@@ -383,8 +383,8 @@ aggregate_dummy_importance <- function(importance_df, config, mapping = NULL) {
 
     if (!matched) {
       # Final fallback: keep term as-is (it's likely already the variable name)
-      # Log a warning since we couldn't map it properly
       term_to_var[i] <- term
+      log_message(sprintf("Could not map term '%s' to a driver variable - using term as-is", term), "warn")
     }
   }
 

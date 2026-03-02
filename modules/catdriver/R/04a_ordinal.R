@@ -31,18 +31,19 @@ run_ordinal_logistic_robust <- function(formula, data, weights = NULL, config, g
 
   model <- NULL
   primary_success <- FALSE
+  fit_data <- data  # Local copy to avoid polluting caller's data with .wt column
 
   if (requireNamespace("ordinal", quietly = TRUE)) {
     model <- tryCatch({
       if (!is.null(weights) && length(weights) == nrow(data)) {
         if (!(length(unique(weights)) == 1 && unique(weights)[1] == 1)) {
-          data$.wt <- weights
-          ordinal::clm(formula, data = data, weights = .wt, link = "logit")
+          fit_data$.wt <- weights
+          ordinal::clm(formula, data = fit_data, weights = .wt, link = "logit")
         } else {
-          ordinal::clm(formula, data = data, link = "logit")
+          ordinal::clm(formula, data = fit_data, link = "logit")
         }
       } else {
-        ordinal::clm(formula, data = data, link = "logit")
+        ordinal::clm(formula, data = fit_data, link = "logit")
       }
     }, error = function(e) {
       list(error = TRUE, message = e$message)
@@ -50,7 +51,7 @@ run_ordinal_logistic_robust <- function(formula, data, weights = NULL, config, g
 
     if (!is.list(model) || !isTRUE(model$error)) {
       # Check convergence
-      if (!is.null(model$convergence) && model$convergence$code == 0) {
+      if (!is.null(model$convergence) && isTRUE(model$convergence$code == 0)) {
         primary_success <- TRUE
       } else if (is.null(model$convergence)) {
         primary_success <- TRUE  # Assume success if no convergence info
@@ -87,13 +88,13 @@ run_ordinal_logistic_robust <- function(formula, data, weights = NULL, config, g
     model <- tryCatch({
       if (!is.null(weights) && length(weights) == nrow(data)) {
         if (!(length(unique(weights)) == 1 && unique(weights)[1] == 1)) {
-          data$.wt <- weights
-          MASS::polr(formula, data = data, weights = .wt, Hess = TRUE, method = "logistic")
+          fit_data$.wt <- weights
+          MASS::polr(formula, data = fit_data, weights = .wt, Hess = TRUE, method = "logistic")
         } else {
-          MASS::polr(formula, data = data, Hess = TRUE, method = "logistic")
+          MASS::polr(formula, data = fit_data, Hess = TRUE, method = "logistic")
         }
       } else {
-        MASS::polr(formula, data = data, Hess = TRUE, method = "logistic")
+        MASS::polr(formula, data = fit_data, Hess = TRUE, method = "logistic")
       }
     }, error = function(e) {
       list(error = TRUE, message = e$message)
