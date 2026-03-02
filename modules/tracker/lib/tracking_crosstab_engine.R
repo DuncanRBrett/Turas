@@ -188,6 +188,45 @@ build_metric_rows_for_question <- function(q_code, q_trend, metric_type,
     specs_list <- trimws(strsplit(tracking_specs_str, ",")[[1]])
   }
 
+  # ---------------------------------------------------------------------------
+  # Expand shorthand specs into component metrics
+  # ---------------------------------------------------------------------------
+
+  # NPS "full" → nps_score, promoters_pct, passives_pct, detractors_pct
+  if (metric_type == "nps") {
+    expanded <- character(0)
+    for (s in specs_list) {
+      core <- tolower(trimws(parse_spec_label(s)$core))
+      if (core == "full") {
+        expanded <- c(expanded, "nps_score", "promoters_pct", "passives_pct", "detractors_pct")
+      } else {
+        expanded <- c(expanded, s)
+      }
+    }
+    specs_list <- expanded
+  }
+
+  # Single choice "all" / "top3" → expand to actual response codes from trend result
+  if (metric_type %in% c("proportions", "single_choice", "single_choice_enhanced")) {
+    expanded <- character(0)
+    for (s in specs_list) {
+      core <- tolower(trimws(parse_spec_label(s)$core))
+      if (core %in% c("all", "top3")) {
+        # Get response codes from trend result
+        if (has_banners) {
+          ref_trend <- q_trend[[segment_names[1]]]
+        } else {
+          ref_trend <- q_trend
+        }
+        codes <- if (!is.null(ref_trend$response_codes)) ref_trend$response_codes else character(0)
+        expanded <- c(expanded, codes)
+      } else {
+        expanded <- c(expanded, s)
+      }
+    }
+    specs_list <- expanded
+  }
+
   # For each spec, build a metric_row
   for (spec_idx in seq_along(specs_list)) {
     spec_original <- specs_list[spec_idx]
@@ -387,6 +426,15 @@ extract_metric_value <- function(wave_result, metric_type, metric_name) {
     if (!is.null(wave_result$proportions) && metric_name %in% names(wave_result$proportions)) {
       return(wave_result$proportions[[metric_name]])
     }
+    # Case-insensitive fallback for expanded "all" specs (response codes lowered
+    # by extract_segment_metric but stored with original case in proportions)
+    if (!is.null(wave_result$proportions)) {
+      prop_names <- names(wave_result$proportions)
+      ci_match <- which(tolower(prop_names) == metric_name)
+      if (length(ci_match) > 0) {
+        return(wave_result$proportions[[prop_names[ci_match[1]]]])
+      }
+    }
     # Category spec: check for the category name (normalized matching)
     if (grepl("^category_", metric_name)) {
       cat_name <- sub("^category_", "", metric_name)
@@ -453,6 +501,21 @@ extract_significance <- function(seg_trend, metric_name, sig_key) {
         return(sig_result$significant)
       }
       return(sig_result)
+    }
+
+    # Case-insensitive fallback for proportions (response codes lowered by
+    # extract_segment_metric but stored with original case in significance)
+    sig_names <- names(sig)
+    ci_match <- which(tolower(sig_names) == metric_name)
+    if (length(ci_match) > 0) {
+      matched_key <- sig_names[ci_match[1]]
+      if (!is.null(sig[[matched_key]][[sig_key]])) {
+        sig_result <- sig[[matched_key]][[sig_key]]
+        if (is.list(sig_result) && !is.null(sig_result$significant)) {
+          return(sig_result$significant)
+        }
+        return(sig_result)
+      }
     }
 
     # Legacy NPS/basic: sig directly at $significance$sig_key

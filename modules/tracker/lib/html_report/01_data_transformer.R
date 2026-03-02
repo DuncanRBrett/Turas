@@ -283,8 +283,8 @@ build_chart_data <- function(metric, waves, wave_labels, segments) {
 
     n_values <- vapply(waves, function(wid) {
       n <- seg_data$n[[wid]]
-      if (is.null(n) || is.na(n)) NA_integer_ else n
-    }, integer(1))
+      if (is.null(n) || is.na(n)) NA_real_ else as.numeric(n)
+    }, numeric(1))
 
     series[[seg_name]] <- list(
       name = seg_name,

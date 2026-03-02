@@ -1,2 +1,18 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Binary files - never perform line-ending conversion
+*.xlsx binary
+*.xls binary
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.rds binary
+*.RData binary
+*.rda binary
+*.zip binary
+*.gz binary
+*.tar binary

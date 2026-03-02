@@ -144,9 +144,21 @@ extract_clm_results <- function(model, config, guard) {
   threshold_names <- names(model$alpha)
   coef_names <- names(model$beta)
 
-  # Predictor coefficients
+  # Predictor coefficients — use named indexing to ensure length alignment
+  # (if a coefficient is aliased/dropped from vcov, %in% filtering can cause
+  # a length mismatch between pred_coef and pred_se)
   pred_coef <- model$beta
-  pred_se <- se_vals[names(se_vals) %in% coef_names]
+  pred_se <- se_vals[names(pred_coef)]
+
+  # Remove any coefficients without valid SEs (aliased due to collinearity)
+  valid_mask <- !is.na(pred_se) & !is.na(pred_coef)
+  if (sum(!valid_mask) > 0) {
+    dropped <- names(pred_coef)[!valid_mask]
+    cat("   [WARN] Dropped", length(dropped), "aliased coefficient(s):",
+        paste(dropped, collapse = ", "), "\n")
+    pred_coef <- pred_coef[valid_mask]
+    pred_se <- pred_se[valid_mask]
+  }
 
   z_vals <- pred_coef / pred_se
   p_vals <- 2 * pnorm(-abs(z_vals))
@@ -267,7 +279,19 @@ extract_polr_results <- function(model, config, guard) {
   n_thresh <- length(model$zeta)
 
   pred_coef <- coef_vals
-  pred_se <- se_vals[1:n_coef]
+  # Use named indexing for robustness (positional indexing can break if
+  # polr reorders parameters or drops aliased coefficients)
+  pred_se <- se_vals[names(pred_coef)]
+
+  # Remove any coefficients without valid SEs (aliased due to collinearity)
+  valid_mask <- !is.na(pred_se) & !is.na(pred_coef)
+  if (sum(!valid_mask) > 0) {
+    dropped <- names(pred_coef)[!valid_mask]
+    cat("   [WARN] Dropped", length(dropped), "aliased coefficient(s):",
+        paste(dropped, collapse = ", "), "\n")
+    pred_coef <- pred_coef[valid_mask]
+    pred_se <- pred_se[valid_mask]
+  }
 
   z_vals <- pred_coef / pred_se
   p_vals <- 2 * pnorm(-abs(z_vals))
