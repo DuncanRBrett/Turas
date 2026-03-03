@@ -12,7 +12,7 @@
 #' @param importance List of importance entries from transformer
 #' @return htmltools tag object
 #' @keywords internal
-build_cd_importance_table <- function(importance) {
+build_cd_importance_table <- function(importance, id_prefix = "") {
 
   header <- htmltools::tags$tr(
     htmltools::tags$th("Rank", class = "cd-th cd-th-rank"),
@@ -61,7 +61,7 @@ build_cd_importance_table <- function(importance) {
 
   htmltools::tags$table(
     class = "cd-table cd-importance-table",
-    id = "cd-importance-table",
+    id = paste0(id_prefix, "cd-importance-table"),
     htmltools::tags$thead(header),
     htmltools::tags$tbody(rows)
   )
@@ -74,7 +74,7 @@ build_cd_importance_table <- function(importance) {
 #' @param var_name Variable name (used for ID)
 #' @return htmltools tag object
 #' @keywords internal
-build_cd_pattern_table <- function(pattern_data, var_name) {
+build_cd_pattern_table <- function(pattern_data, var_name, id_prefix = "") {
 
   # Build outcome headers
   outcome_ths <- lapply(pattern_data$outcome_categories, function(cat_name) {
@@ -130,7 +130,7 @@ build_cd_pattern_table <- function(pattern_data, var_name) {
 
   htmltools::tags$table(
     class = "cd-table cd-pattern-table",
-    id = paste0("cd-pattern-", safe_id),
+    id = paste0(id_prefix, "cd-pattern-", safe_id),
     htmltools::tags$thead(header),
     htmltools::tags$tbody(rows)
   )
@@ -143,7 +143,7 @@ build_cd_pattern_table <- function(pattern_data, var_name) {
 #' @param has_bootstrap Whether bootstrap columns are available
 #' @return htmltools tag object
 #' @keywords internal
-build_cd_odds_ratio_table <- function(odds_ratios, has_bootstrap = FALSE) {
+build_cd_odds_ratio_table <- function(odds_ratios, has_bootstrap = FALSE, id_prefix = "") {
 
   base_ths <- list(
     htmltools::tags$th("Factor", class = "cd-th cd-th-label"),
@@ -240,12 +240,12 @@ build_cd_odds_ratio_table <- function(odds_ratios, has_bootstrap = FALSE) {
       )
     }
 
-    htmltools::tags$tr(class = "cd-tr", base_tds)
+    htmltools::tags$tr(class = "cd-tr", `data-cd-factor` = r$factor_label, base_tds)
   })
 
   htmltools::tags$table(
     class = "cd-table cd-or-table",
-    id = "cd-odds-ratios-table",
+    id = paste0(id_prefix, "cd-odds-ratios-table"),
     htmltools::tags$thead(header),
     htmltools::tags$tbody(rows)
   )
@@ -259,7 +259,7 @@ build_cd_odds_ratio_table <- function(odds_ratios, has_bootstrap = FALSE) {
 #' @param config Configuration list
 #' @return htmltools tag object
 #' @keywords internal
-build_cd_diagnostics_table <- function(diagnostics, model_info, config) {
+build_cd_diagnostics_table <- function(diagnostics, model_info, config, id_prefix = "") {
 
   min_sample <- config$min_sample_size %||% 30
 
@@ -318,7 +318,7 @@ build_cd_diagnostics_table <- function(diagnostics, model_info, config) {
 
   htmltools::tags$table(
     class = "cd-table cd-diagnostics-table",
-    id = "cd-diagnostics-table",
+    id = paste0(id_prefix, "cd-diagnostics-table"),
     htmltools::tags$thead(header),
     htmltools::tags$tbody(rows)
   )

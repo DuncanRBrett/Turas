@@ -57,90 +57,11 @@ generate_catdriver_comparison_report <- function(analyses,
                 message = "htmltools package required", how_to_fix = "install.packages('htmltools')"))
   }
 
-  # --- Extract summaries from each analysis ---
+  # --- Extract summaries and driver comparison ---
   cat(sprintf("  Processing %d analyses...\n", length(analyses)))
-  summaries <- list()
-
-  for (name in names(analyses)) {
-    entry <- analyses[[name]]
-    results <- entry$results
-    config <- entry$config
-    label <- entry$label %||% config$analysis_name %||% name
-
-    # Basic model info
-    fit <- results$model_result$fit_statistics
-    r2 <- if (!is.null(fit) && !is.na(fit$mcfadden_r2)) fit$mcfadden_r2 else NA
-
-    # Importance ranking
-    imp_df <- results$importance
-    top_drivers <- list()
-    if (!is.null(imp_df) && nrow(imp_df) > 0) {
-      top_n <- min(5, nrow(imp_df))
-      for (i in 1:top_n) {
-        top_drivers <- c(top_drivers, list(list(
-          rank = i,
-          label = imp_df$label[i],
-          variable = imp_df$variable[i],
-          importance_pct = if (is.na(imp_df$importance_pct[i])) 0 else imp_df$importance_pct[i],
-          significance = if (is.null(imp_df$significance[i]) || is.na(imp_df$significance[i])) "" else imp_df$significance[i]
-        )))
-      }
-    }
-
-    # Outcome info
-    outcome_type <- results$model_result$outcome_type %||%
-                    results$prep_data$outcome_info$type %||% "unknown"
-    n_cats <- results$prep_data$outcome_info$n_categories %||% NA
-
-    summaries[[name]] <- list(
-      name = name,
-      label = label,
-      outcome_type = outcome_type,
-      outcome_label = config$outcome_label %||% label,
-      n_categories = n_cats,
-      r2 = r2,
-      r2_label = classify_r2(r2),
-      sample_n = results$diagnostics$complete_n %||% NA,
-      n_drivers = length(config$driver_vars),
-      run_status = results$run_status %||% "PASS",
-      top_drivers = top_drivers,
-      aic = if (!is.null(fit) && !is.na(fit$aic)) fit$aic else NA
-    )
-  }
-
-  # --- Cross-outcome driver comparison ---
-  # Find which drivers appear across outcomes and how their ranks compare
-  all_driver_vars <- unique(unlist(lapply(summaries, function(s) {
-    vapply(s$top_drivers, function(d) d$variable, character(1))
-  })))
-
-  driver_comparison <- lapply(all_driver_vars, function(var) {
-    ranks <- list()
-    pcts <- list()
-    for (s in summaries) {
-      for (d in s$top_drivers) {
-        if (d$variable == var) {
-          ranks[[s$name]] <- d$rank
-          pcts[[s$name]] <- d$importance_pct
-          label <- d$label
-        }
-      }
-    }
-    list(
-      variable = var,
-      label = if (exists("label", inherits = FALSE)) label else var,
-      ranks = ranks,
-      pcts = pcts,
-      n_appearances = length(ranks),
-      mean_pct = if (length(pcts) > 0) mean(unlist(pcts)) else 0
-    )
-  })
-
-  # Sort by number of appearances (desc) then mean importance (desc)
-  driver_comparison <- driver_comparison[order(
-    -vapply(driver_comparison, function(d) d$n_appearances, integer(1)),
-    -vapply(driver_comparison, function(d) d$mean_pct, numeric(1))
-  )]
+  comp_data <- extract_comparison_data(analyses)
+  summaries <- comp_data$summaries
+  driver_comparison <- comp_data$driver_comparison
 
   # --- Build HTML ---
   cat("  Building comparison HTML...\n")
@@ -190,6 +111,121 @@ generate_catdriver_comparison_report <- function(analyses,
     n_outcomes = length(analyses),
     elapsed_seconds = elapsed
   )
+}
+
+
+# --- Extract comparison data from analyses ---
+#' Extract Comparison Data from Multiple Analyses
+#'
+#' Pulls summary information and builds a driver comparison matrix
+#' from a named list of catdriver analysis results. Used by both
+#' the standalone comparison report and the unified tabbed report.
+#'
+#' @param analyses Named list where each entry has `results`, `config`,
+#'   and optionally `label`
+#' @return List with `summaries` (named list) and `driver_comparison` (list)
+#' @keywords internal
+extract_comparison_data <- function(analyses) {
+
+  analysis_names <- names(analyses)
+  if (is.null(analysis_names)) {
+    analysis_names <- paste0("Analysis_", seq_along(analyses))
+  }
+
+  summaries <- list()
+  all_drivers <- list()
+
+  for (i in seq_along(analyses)) {
+    entry <- analyses[[i]]
+    name <- analysis_names[i]
+    res <- entry$results
+    cfg <- entry$config
+    label <- entry$label %||% name
+
+    # Outcome info
+    outcome_label <- cfg$outcome_label %||% cfg$outcome_variable %||% name
+    outcome_type <- res$model_result$outcome_type %||%
+                    res$prep_data$outcome_info$type %||% "binary"
+
+    # Model fit (McFadden R2)
+    r2 <- NA_real_
+    if (!is.null(res$model_result$fit_statistics)) {
+      r2 <- res$model_result$fit_statistics$mcfadden_r2 %||% NA_real_
+    }
+
+    # Sample size
+    sample_n <- res$diagnostics$complete_n %||% 0
+
+    # Top drivers from importance ranking
+    imp_df <- res$importance
+    top_drivers <- list()
+    if (is.data.frame(imp_df) && nrow(imp_df) > 0) {
+      for (j in seq_len(min(nrow(imp_df), 10))) {
+        drv <- list(
+          rank = j,
+          var_name = imp_df$variable[j],
+          label = imp_df$label[j] %||% imp_df$variable[j],
+          importance_pct = if (is.na(imp_df$importance_pct[j])) 0
+                           else as.numeric(imp_df$importance_pct[j])
+        )
+        top_drivers[[j]] <- drv
+
+        # Accumulate for cross-outcome comparison
+        all_drivers[[length(all_drivers) + 1]] <- list(
+          var_name = imp_df$variable[j],
+          label = imp_df$label[j] %||% imp_df$variable[j],
+          rank = j,
+          importance_pct = drv$importance_pct,
+          outcome = name
+        )
+      }
+    }
+
+    summaries[[name]] <- list(
+      name = name,
+      label = label,
+      outcome_label = outcome_label,
+      outcome_type = outcome_type,
+      r2 = r2,
+      r2_label = classify_r2(r2),
+      sample_n = sample_n,
+      top_drivers = top_drivers
+    )
+  }
+
+  # --- Build driver comparison matrix ---
+  unique_vars <- unique(vapply(all_drivers, function(d) d$var_name, character(1)))
+
+  driver_comparison <- lapply(unique_vars, function(var) {
+    matches <- all_drivers[vapply(all_drivers,
+                                   function(d) d$var_name == var, logical(1))]
+    label <- matches[[1]]$label
+
+    ranks <- list()
+    pcts <- list()
+    for (m in matches) {
+      ranks[[m$outcome]] <- m$rank
+      pcts[[m$outcome]] <- m$importance_pct
+    }
+
+    list(
+      var_name = var,
+      label = label,
+      ranks = ranks,
+      pcts = pcts,
+      n_appearances = length(matches)
+    )
+  })
+
+  # Sort by appearances desc, then average rank asc
+  if (length(driver_comparison) > 0) {
+    driver_comparison <- driver_comparison[order(
+      -vapply(driver_comparison, function(d) d$n_appearances, numeric(1)),
+      vapply(driver_comparison, function(d) mean(unlist(d$ranks)), numeric(1))
+    )]
+  }
+
+  list(summaries = summaries, driver_comparison = driver_comparison)
 }
 
 
@@ -421,7 +457,10 @@ build_comparison_header <- function(report_title, summaries, brand_colour, logo_
 
 
 # --- Overview cards ---
-build_comparison_overview <- function(summaries, brand_colour, accent_colour) {
+# tab_targets: optional named list mapping analysis names to tab IDs.
+# When provided (unified mode), cards become clickable to switch tabs.
+build_comparison_overview <- function(summaries, brand_colour, accent_colour,
+                                      tab_targets = NULL) {
 
   cards <- lapply(summaries, function(s) {
     r2_pct <- if (!is.na(s$r2)) round(s$r2 * 100, 1) else 0
@@ -453,8 +492,17 @@ build_comparison_overview <- function(summaries, brand_colour, accent_colour) {
       )
     })
 
+    # If tab_targets provided, make card clickable
+    card_class <- "cd-comp-card"
+    card_onclick <- NULL
+    if (!is.null(tab_targets) && !is.null(tab_targets[[s$name]])) {
+      card_class <- "cd-comp-card cd-comp-card-clickable"
+      card_onclick <- sprintf("cdSwitchAnalysisTab('%s')", tab_targets[[s$name]])
+    }
+
     htmltools::tags$div(
-      class = "cd-comp-card",
+      class = card_class,
+      onclick = card_onclick,
       htmltools::tags$div(class = "cd-comp-card-title", s$label),
       htmltools::tags$div(class = "cd-comp-card-sub", s$outcome_label),
       htmltools::tags$div(class = "cd-comp-card-stat",

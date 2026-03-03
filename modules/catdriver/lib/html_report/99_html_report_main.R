@@ -25,7 +25,7 @@
 .cd_required_files <- c("00_html_guard.R", "01_data_transformer.R",
                          "02_table_builder.R", "03_page_builder.R",
                          "04_html_writer.R", "05_chart_builder.R",
-                         "06_comparison_report.R")
+                         "06_comparison_report.R", "07_unified_report.R")
 
 .cd_missing <- character(0)
 for (.cd_file in .cd_required_files) {
@@ -35,9 +35,13 @@ for (.cd_file in .cd_required_files) {
   }
 }
 
-# Check JS file
-if (!file.exists(file.path(.cd_html_report_dir, "js", "cd_navigation.js"))) {
-  .cd_missing <- c(.cd_missing, "js/cd_navigation.js")
+# Check JS files
+.cd_required_js <- c("cd_navigation.js", "cd_unified_tabs.js", "cd_utils.js",
+                      "cd_insights.js", "cd_pinned_views.js", "cd_slide_export.js")
+for (.cd_js in .cd_required_js) {
+  if (!file.exists(file.path(.cd_html_report_dir, "js", .cd_js))) {
+    .cd_missing <- c(.cd_missing, paste0("js/", .cd_js))
+  }
 }
 
 if (length(.cd_missing) > 0) {
