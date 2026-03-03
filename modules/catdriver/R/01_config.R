@@ -401,6 +401,14 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
     bootstrap_ci = as_logical_setting(get_setting(settings, "bootstrap_ci", FALSE), FALSE),
     bootstrap_reps = as_numeric_setting(get_setting(settings, "bootstrap_reps", 200), 200),
 
+    # HTML report settings (optional - on by default)
+    html_report = as_logical_setting(get_setting(settings, "html_report", TRUE), TRUE),
+    brand_colour = get_setting(settings, "brand_colour", "#2563EB"),
+    accent_colour = get_setting(settings, "accent_colour", "#10B981"),
+    report_title = get_setting(settings, "report_title", NULL),
+    researcher_logo_path = get_setting(settings, "researcher_logo_path", NULL),
+    client_logo_path = get_setting(settings, "client_logo_path", NULL),
+
     # Raw settings for reference
     settings = settings
   )

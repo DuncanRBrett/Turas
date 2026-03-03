@@ -698,7 +698,52 @@ run_categorical_keydriver_impl <- function(config_file,
   # Write Excel output
   write_catdriver_output(results, config, config$output_file)
 
-  log_message(paste("Output saved to:", basename(config$output_file)), "success")
+  log_message(paste("Excel output saved to:", basename(config$output_file)), "success")
+
+  # ==========================================================================
+  # HTML REPORT (if enabled)
+  # ==========================================================================
+  if (isTRUE(config$html_report)) {
+    html_path <- sub("\\.xlsx$", ".html", config$output_file)
+
+    # Source HTML report module if not already loaded
+    if (!exists("generate_catdriver_html_report", mode = "function")) {
+      html_main <- file.path(dirname(dirname(config$output_file %||% ".")),
+                              "modules", "catdriver", "lib", "html_report",
+                              "99_html_report_main.R")
+      # Try standard module locations
+      candidates <- c(
+        html_main,
+        file.path(.get_script_dir_for_guard(), "..", "lib", "html_report", "99_html_report_main.R"),
+        file.path(getwd(), "modules", "catdriver", "lib", "html_report", "99_html_report_main.R")
+      )
+      for (cand in candidates) {
+        if (file.exists(cand)) {
+          tryCatch(source(cand), error = function(e) {
+            log_message(sprintf("Could not source HTML report module: %s", e$message), "warning")
+          })
+          break
+        }
+      }
+    }
+
+    if (exists("generate_catdriver_html_report", mode = "function")) {
+      html_result <- tryCatch({
+        generate_catdriver_html_report(results, config, html_path)
+      }, error = function(e) {
+        log_message(sprintf("HTML report generation failed: %s", e$message), "warning")
+        list(status = "REFUSED", message = e$message)
+      })
+
+      if (html_result$status != "REFUSED") {
+        log_message(paste("HTML report saved to:", basename(html_result$output_file)), "success")
+      } else {
+        log_message(paste("HTML report skipped:", html_result$message), "warning")
+      }
+    } else {
+      log_message("HTML report module not available - skipping HTML output", "info")
+    }
+  }
 
   # ==========================================================================
   # COMPLETION
@@ -740,10 +785,8 @@ run_categorical_keydriver_impl <- function(config_file,
     trs_banner_end("CATEGORICAL KEY DRIVER ANALYSIS", status, elapsed)
   }
 
-  cat(sprintf("   Output: %s\n", config$output_file))
-
-  # Print console summary
-  print_console_summary(results, config)
+  # Print console summary (includes output file path)
+  print_console_summary(results, config, output_file = config$output_file)
 
   invisible(results)
 }
