@@ -16,7 +16,7 @@
 #' @param brand_colour Brand colour hex string
 #' @return htmltools::HTML string containing SVG
 #' @keywords internal
-build_cd_importance_chart <- function(importance, brand_colour = "#2563EB") {
+build_cd_importance_chart <- function(importance, brand_colour = "#323367") {
 
   n <- length(importance)
   if (n == 0) return(NULL)
@@ -90,8 +90,8 @@ build_cd_importance_chart <- function(importance, brand_colour = "#2563EB") {
 #' @param accent_colour Accent colour hex string
 #' @return htmltools::HTML string containing SVG
 #' @keywords internal
-build_cd_forest_plot <- function(odds_ratios, brand_colour = "#2563EB",
-                                  accent_colour = "#10B981") {
+build_cd_forest_plot <- function(odds_ratios, brand_colour = "#323367",
+                                  accent_colour = "#CC9900") {
 
   n <- length(odds_ratios)
   if (n == 0) return(NULL)
@@ -226,7 +226,7 @@ build_cd_forest_plot <- function(odds_ratios, brand_colour = "#2563EB",
 #' @param accent_colour Accent colour hex string
 #' @return htmltools::HTML string containing SVG or NULL
 #' @keywords internal
-build_cd_outcome_chart <- function(model_info, accent_colour = "#10B981") {
+build_cd_outcome_chart <- function(model_info, accent_colour = "#CC9900") {
 
   categories <- model_info$outcome_categories
   n_cats <- length(categories)

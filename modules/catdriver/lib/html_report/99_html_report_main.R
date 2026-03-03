@@ -24,7 +24,8 @@
 # Source submodules
 .cd_required_files <- c("00_html_guard.R", "01_data_transformer.R",
                          "02_table_builder.R", "03_page_builder.R",
-                         "04_html_writer.R", "05_chart_builder.R")
+                         "04_html_writer.R", "05_chart_builder.R",
+                         "06_comparison_report.R")
 
 .cd_missing <- character(0)
 for (.cd_file in .cd_required_files) {
@@ -191,8 +192,8 @@ generate_catdriver_html_report <- function(results, config, output_path) {
   # ============================================================================
   cat("  Step 4: Building SVG charts...\n")
 
-  brand_colour <- config$brand_colour %||% "#2563EB"
-  accent_colour <- config$accent_colour %||% "#10B981"
+  brand_colour <- config$brand_colour %||% "#323367"
+  accent_colour <- config$accent_colour %||% "#CC9900"
 
   charts <- list()
 

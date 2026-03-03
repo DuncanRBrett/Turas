@@ -131,6 +131,9 @@ transform_catdriver_for_html <- function(results, config) {
     weight_diagnostics = results$weight_diagnostics
   )
 
+  # Generate narrative insights
+  narrative <- generate_narrative_insights(importance, patterns, model_info, diagnostics)
+
   list(
     summary_lines = summary_lines,
     importance = importance,
@@ -138,10 +141,156 @@ transform_catdriver_for_html <- function(results, config) {
     odds_ratios = odds_ratios,
     diagnostics = diagnostics,
     model_info = model_info,
+    narrative = narrative,
     has_bootstrap = has_bootstrap,
     analysis_name = config$analysis_name %||% "Categorical Key Driver Analysis",
     run_status = results$run_status %||% "PASS",
     degraded = isTRUE(results$degraded),
     degraded_reasons = results$degraded_reasons %||% character(0)
+  )
+}
+
+
+#' Generate Narrative Insights
+#'
+#' Detects patterns in the analysis results and produces plain-English
+#' insight statements suitable for the executive summary.
+#'
+#' Patterns detected:
+#' - Dominant driver (one driver has >40% importance)
+#' - Clear top tier (top 2-3 drivers account for >70% of total)
+#' - Dose-response patterns (monotonic OR progression within a driver)
+#' - Extreme odds ratios (very large effects suggesting strong differentiation)
+#'
+#' @param importance List of importance entries
+#' @param patterns List of factor pattern entries
+#' @param model_info Model information list
+#' @param diagnostics Diagnostics list
+#' @return List with: insights (character vector), dominant_driver (name or NULL),
+#'   dose_response_drivers (names), key_findings (list of finding structures)
+#' @keywords internal
+generate_narrative_insights <- function(importance, patterns, model_info, diagnostics) {
+
+  insights <- character(0)
+  key_findings <- list()
+  dose_response_drivers <- character(0)
+  dominant_driver <- NULL
+
+  n_drivers <- length(importance)
+  if (n_drivers == 0) return(list(
+    insights = "No driver importance data available.",
+    dominant_driver = NULL,
+    dose_response_drivers = character(0),
+    key_findings = list()
+  ))
+
+  # --- Dominant driver detection ---
+  top_pct <- importance[[1]]$importance_pct
+  top_label <- importance[[1]]$label
+
+  if (top_pct >= 40) {
+    dominant_driver <- top_label
+    insights <- c(insights, sprintf(
+      "%s is the dominant driver, accounting for %.0f%% of explained variation \u2014 substantially more than any other factor.",
+      top_label, top_pct
+    ))
+  } else if (n_drivers >= 2) {
+    top2_pct <- importance[[1]]$importance_pct + importance[[2]]$importance_pct
+    if (top2_pct >= 70) {
+      insights <- c(insights, sprintf(
+        "%s (%.0f%%) and %s (%.0f%%) together account for %.0f%% of explained variation, forming a clear top tier.",
+        importance[[1]]$label, importance[[1]]$importance_pct,
+        importance[[2]]$label, importance[[2]]$importance_pct,
+        top2_pct
+      ))
+    }
+  }
+
+  # --- Dose-response detection ---
+  for (var_name in names(patterns)) {
+    pat <- patterns[[var_name]]
+    cats <- pat$categories
+    if (length(cats) < 3) next
+
+    # Get non-reference categories with valid ORs
+    non_ref <- cats[!vapply(cats, function(c) isTRUE(c$is_reference), logical(1))]
+    ors <- vapply(non_ref, function(c) {
+      val <- suppressWarnings(as.numeric(c$odds_ratio))
+      if (is.na(val)) NA_real_ else val
+    }, numeric(1))
+
+    valid_ors <- ors[!is.na(ors)]
+    if (length(valid_ors) < 3) next
+
+    # Check monotonic (all increasing or all decreasing)
+    diffs <- diff(valid_ors)
+    if (all(diffs > 0) || all(diffs < 0)) {
+      dose_response_drivers <- c(dose_response_drivers, var_name)
+      direction <- if (all(diffs > 0)) "increasing" else "decreasing"
+      range_text <- sprintf("%.1fx to %.1fx", min(valid_ors), max(valid_ors))
+      insights <- c(insights, sprintf(
+        "%s shows a dose-response pattern with %s odds ratios across categories (%s), suggesting a graded relationship.",
+        pat$label, direction, range_text
+      ))
+    }
+  }
+
+  # --- Key findings: extreme ORs ---
+  for (var_name in names(patterns)) {
+    pat <- patterns[[var_name]]
+    for (cat in pat$categories) {
+      if (isTRUE(cat$is_reference)) next
+      or_val <- suppressWarnings(as.numeric(cat$odds_ratio))
+      if (is.na(or_val)) next
+
+      if (or_val >= 5.0) {
+        key_findings <- c(key_findings, list(list(
+          driver = pat$label,
+          category = cat$category,
+          or_value = or_val,
+          direction = "positive",
+          text = sprintf("%s \u2014 %s is %.1fx more likely than the reference group.",
+                         pat$label, cat$category, or_val)
+        )))
+      } else if (or_val <= 0.2 && or_val > 0) {
+        key_findings <- c(key_findings, list(list(
+          driver = pat$label,
+          category = cat$category,
+          or_value = or_val,
+          direction = "negative",
+          text = sprintf("%s \u2014 %s is %.0f%% less likely than the reference group.",
+                         pat$label, cat$category, (1 - or_val) * 100)
+        )))
+      }
+    }
+  }
+
+  # Sort key findings by OR magnitude (largest effects first)
+  if (length(key_findings) > 0) {
+    magnitudes <- vapply(key_findings, function(f) {
+      if (f$direction == "positive") f$or_value else 1 / f$or_value
+    }, numeric(1))
+    key_findings <- key_findings[order(magnitudes, decreasing = TRUE)]
+
+    # Limit to top 5
+    if (length(key_findings) > 5) key_findings <- key_findings[1:5]
+  }
+
+  # --- Model quality note ---
+  fit <- model_info$fit_statistics
+  if (!is.null(fit) && !is.na(fit$mcfadden_r2)) {
+    r2 <- fit$mcfadden_r2
+    if (r2 < 0.1) {
+      insights <- c(insights,
+        "The measured factors explain only a small portion of the variation, suggesting important unmeasured drivers exist. Results should be interpreted as directional signals rather than definitive explanations."
+      )
+    }
+  }
+
+  list(
+    insights = insights,
+    dominant_driver = dominant_driver,
+    dose_response_drivers = dose_response_drivers,
+    key_findings = key_findings
   )
 }
