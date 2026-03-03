@@ -32,9 +32,9 @@ build_cd_importance_table <- function(importance) {
                   else if (d$importance_pct >= 5) "#93C5FD"
                   else "#DBEAFE"
 
-    sig_class <- if (grepl("\\*\\*\\*", d$significance)) "cd-sig-strong"
-                 else if (grepl("\\*\\*", d$significance)) "cd-sig-strong"
-                 else if (grepl("\\*", d$significance)) "cd-sig-moderate"
+    sig_text <- if (is.null(d$significance) || is.na(d$significance)) "" else d$significance
+    sig_class <- if (grepl("\\*\\*", sig_text)) "cd-sig-strong"
+                 else if (grepl("\\*", sig_text)) "cd-sig-moderate"
                  else "cd-sig-none"
 
     htmltools::tags$tr(
@@ -54,8 +54,8 @@ build_cd_importance_table <- function(importance) {
       htmltools::tags$td(sprintf("%.1f%%", d$importance_pct), class = "cd-td cd-td-num"),
       htmltools::tags$td(sprintf("%.2f", d$chi_square), class = "cd-td cd-td-num"),
       htmltools::tags$td(d$p_formatted, class = "cd-td cd-td-num"),
-      htmltools::tags$td(d$significance, class = paste("cd-td cd-td-sig", sig_class)),
-      htmltools::tags$td(d$effect_size, class = "cd-td cd-td-effect")
+      htmltools::tags$td(sig_text, class = paste("cd-td cd-td-sig", sig_class)),
+      htmltools::tags$td(d$effect_size %||% "", class = "cd-td cd-td-effect")
     )
   })
 
@@ -188,14 +188,16 @@ build_cd_odds_ratio_table <- function(odds_ratios, has_bootstrap = FALSE) {
               else if (or_val >= 0.5) "Moderately less likely"
               else "Much less likely"
 
-    sig_class <- if (grepl("\\*\\*", r$significance)) "cd-sig-strong"
-                 else if (grepl("\\*", r$significance)) "cd-sig-moderate"
+    sig_text <- if (is.null(r$significance) || is.na(r$significance)) "" else r$significance
+    sig_class <- if (grepl("\\*\\*", sig_text)) "cd-sig-strong"
+                 else if (grepl("\\*", sig_text)) "cd-sig-moderate"
                  else "cd-sig-none"
 
     # Effect colour class
-    effect_class <- if (grepl("large|very large", tolower(r$effect))) {
+    effect_text <- if (is.null(r$effect) || is.na(r$effect)) "" else r$effect
+    effect_class <- if (grepl("large|very large", tolower(effect_text))) {
       if (!is.na(or_val) && or_val >= 1.0) "cd-effect-pos" else "cd-effect-neg"
-    } else if (grepl("medium", tolower(r$effect))) {
+    } else if (grepl("medium", tolower(effect_text))) {
       "cd-effect-mod"
     } else {
       "cd-effect-none"
@@ -208,8 +210,8 @@ build_cd_odds_ratio_table <- function(odds_ratios, has_bootstrap = FALSE) {
       htmltools::tags$td(r$or_formatted, class = "cd-td cd-td-num"),
       htmltools::tags$td(r$ci_formatted, class = "cd-td cd-td-num"),
       htmltools::tags$td(r$p_formatted, class = "cd-td cd-td-num"),
-      htmltools::tags$td(r$significance, class = paste("cd-td cd-td-sig", sig_class)),
-      htmltools::tags$td(r$effect, class = paste("cd-td cd-td-effect", effect_class)),
+      htmltools::tags$td(sig_text, class = paste("cd-td cd-td-sig", sig_class)),
+      htmltools::tags$td(effect_text, class = paste("cd-td cd-td-effect", effect_class)),
       htmltools::tags$td(interp, class = "cd-td cd-td-interp")
     )
 

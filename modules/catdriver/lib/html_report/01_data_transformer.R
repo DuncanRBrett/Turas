@@ -27,12 +27,12 @@ transform_catdriver_for_html <- function(results, config) {
       rank = row$rank,
       variable = row$variable,
       label = row$label,
-      importance_pct = as.numeric(row$importance_pct),
-      chi_square = round(row$chi_square, 2),
+      importance_pct = if (is.na(row$importance_pct)) 0 else as.numeric(row$importance_pct),
+      chi_square = if (is.na(row$chi_square)) 0 else round(row$chi_square, 2),
       p_value = row$p_value,
-      p_formatted = format_pvalue(row$p_value),
-      significance = row$significance %||% "",
-      effect_size = row$effect_size %||% ""
+      p_formatted = if (is.na(row$p_value)) "n/a" else format_pvalue(row$p_value),
+      significance = if (is.null(row$significance) || is.na(row$significance)) "" else row$significance,
+      effect_size = if (is.null(row$effect_size) || is.na(row$effect_size)) "" else row$effect_size
     )
   })
 
