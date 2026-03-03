@@ -372,7 +372,8 @@ build_cd_probability_lift_chart <- function(probability_lifts,
     pl <- probability_lifts[[var_name]]
     non_ref <- Filter(function(c) !isTRUE(c$is_reference), pl$categories)
     if (length(non_ref) > 0) {
-      rows <- c(rows, list(list(type = "header", label = pl$label)))
+      ref_label <- if (!is.null(pl$reference) && nzchar(pl$reference)) pl$reference else NULL
+      rows <- c(rows, list(list(type = "header", label = pl$label, reference = ref_label)))
       for (cat in non_ref) {
         rows <- c(rows, list(list(
           type = "bar",
@@ -464,10 +465,18 @@ build_cd_probability_lift_chart <- function(probability_lifts,
   y_pos <- 30
   for (r in rows) {
     if (r$type == "header") {
-      # Driver group header
+      # Driver group header with reference category annotation
+      header_label <- htmltools::htmlEscape(r$label)
+      if (!is.null(r$reference)) {
+        ref_text <- htmltools::htmlEscape(r$reference)
+        header_label <- sprintf(
+          '%s <tspan font-size="9" fill="#94a3b8" font-weight="400">(ref: %s)</tspan>',
+          header_label, ref_text
+        )
+      }
       elements <- paste0(elements, sprintf(
         '<text x="%d" y="%.1f" font-size="11" fill="%s" font-weight="600">%s</text>\n',
-        8, y_pos + header_height / 2 + 2, brand_colour, htmltools::htmlEscape(r$label)
+        8, y_pos + header_height / 2 + 2, brand_colour, header_label
       ))
       # Subtle separator line
       elements <- paste0(elements, sprintf(

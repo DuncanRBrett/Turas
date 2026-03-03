@@ -1,7 +1,7 @@
 # Turas Categorical Key Driver Module - Template Reference
 
-**Version:** 10.0
-**Last Updated:** 22 December 2025
+**Version:** 12.0
+**Last Updated:** 3 March 2026
 **Target Audience:** Analysts, Project Managers, Template Configurers
 
 This document provides complete field-by-field reference for the CatDriver configuration template.
@@ -71,18 +71,13 @@ This document provides complete field-by-field reference for the CatDriver confi
 
 #### outcome_type
 
-- **Purpose:** Override automatic outcome type detection
-- **Required:** No
-- **Default:** `auto`
+- **Purpose:** Declare the outcome variable type
+- **Required:** **Yes** (analysis will refuse without it)
 - **Valid Values:**
-  - `auto` - Detect from data
-  - `binary` - Force binary logistic
-  - `ordinal` - Force ordinal logistic
-  - `nominal` - Force multinomial logistic
-- **When to Override:**
-  - Auto-detection makes wrong choice
-  - Testing different model specifications
-  - Ordinal treatment of numeric categories
+  - `binary` - Binary logistic regression (exactly 2 outcome categories)
+  - `ordinal` - Ordinal logistic regression (3+ ordered categories)
+  - `multinomial` - Multinomial logistic regression (3+ unordered categories)
+- **Note:** `auto` is no longer accepted. You must explicitly declare the correct model type.
 
 #### reference_category
 
@@ -236,7 +231,7 @@ Setting              | Value
 analysis_name        | Customer Churn Drivers
 data_file            | data/customers.csv
 output_file          | output/churn_analysis.xlsx
-outcome_type         | auto
+outcome_type         | binary
 reference_category   | Retained
 min_sample_size      | 50
 confidence_level     | 0.95
@@ -327,7 +322,7 @@ recommendation       | Driver  | Recommendation     |
 |---------|------|
 | data_file | File must exist |
 | output_file | Directory must exist |
-| outcome_type | Must be: auto, binary, ordinal, nominal |
+| outcome_type | Must be: binary, ordinal, multinomial (required) |
 | reference_category | Must exist in outcome variable |
 | min_sample_size | Integer ≥ 1 |
 | confidence_level | 0 < value < 1 |

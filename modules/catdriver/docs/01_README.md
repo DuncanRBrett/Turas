@@ -1,7 +1,7 @@
 # Turas Categorical Key Driver Module
 
-**Version:** 10.0
-**Last Updated:** 22 December 2025
+**Version:** 12.0
+**Last Updated:** 3 March 2026
 
 Key driver analysis for categorical outcomes using logistic regression methods.
 
@@ -15,10 +15,14 @@ The Categorical Key Driver module identifies which factors most strongly influen
 - Binary logistic regression for 2-category outcomes
 - Ordinal logistic regression for ordered 3+ categories
 - Multinomial logistic regression for unordered 3+ categories
-- Automatic outcome type detection
 - Chi-square based variable importance
 - Odds ratios with confidence intervals
+- Probability lifts with intuitive percentage-point metrics
+- Bootstrap confidence intervals (optional)
 - Plain-English executive summaries
+- Interactive HTML reports with SVG charts
+- **Multi-config GUI** — run multiple outcome analyses and generate a
+  unified tabbed report from a single panel
 
 ---
 
@@ -57,7 +61,7 @@ results <- run_categorical_keydriver("path/to/config.xlsx")
 
 ## Configuration
 
-Create an Excel file with two required sheets:
+Create an Excel file with three sheets (Settings, Variables, Driver_Settings):
 
 ### Settings Sheet
 
@@ -65,7 +69,9 @@ Create an Excel file with two required sheets:
 |---------|-------|
 | data_file | survey_data.csv |
 | output_file | results.xlsx |
-| outcome_type | auto |
+| outcome_type | ordinal |
+
+**Note:** `outcome_type` is required. Must be `binary`, `ordinal`, or `multinomial`.
 
 ### Variables Sheet
 
@@ -109,15 +115,16 @@ modules/catdriver/
 │   ├── 05_importance.R     # Importance calculations
 │   ├── 06_output.R         # Excel generation
 │   └── 07_utilities.R      # Helper functions
+├── lib/html_report/        # HTML report pipeline
 ├── run_catdriver_gui.R     # Shiny GUI
 └── docs/                   # Documentation
     ├── 01_README.md        # This file
-    ├── 02_CATDRIVER_OVERVIEW.md
     ├── 03_REFERENCE_GUIDE.md
     ├── 04_USER_MANUAL.md
     ├── 05_TECHNICAL_DOCS.md
     ├── 06_TEMPLATE_REFERENCE.md
     ├── 07_EXAMPLE_WORKFLOWS.md
+    ├── 08_BOOTSTRAP_GUIDE.md
     └── templates/
 ```
 
@@ -169,12 +176,12 @@ install.packages("haven")
 
 | Document | Purpose |
 |----------|---------|
-| [02_CATDRIVER_OVERVIEW.md](docs/02_CATDRIVER_OVERVIEW.md) | Capabilities and use cases |
 | [03_REFERENCE_GUIDE.md](docs/03_REFERENCE_GUIDE.md) | Statistical methods reference |
 | [04_USER_MANUAL.md](docs/04_USER_MANUAL.md) | Complete user guide |
 | [05_TECHNICAL_DOCS.md](docs/05_TECHNICAL_DOCS.md) | Developer documentation |
 | [06_TEMPLATE_REFERENCE.md](docs/06_TEMPLATE_REFERENCE.md) | Template field reference |
 | [07_EXAMPLE_WORKFLOWS.md](docs/07_EXAMPLE_WORKFLOWS.md) | Practical examples |
+| [08_BOOTSTRAP_GUIDE.md](docs/08_BOOTSTRAP_GUIDE.md) | Bootstrap confidence intervals |
 
 ---
 

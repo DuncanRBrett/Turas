@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Categorical Key Driver Module - Technical Documentation
 
-**Version:** 10.0 **Last Updated:** 22 December 2025 **Target
+**Version:** 12.0 **Last Updated:** 3 March 2026 **Target
 Audience:** Developers, Technical Maintainers, Data Scientists
 
 ------------------------------------------------------------------------
@@ -57,7 +57,7 @@ changes from shared library updates
 
 ### Directory Layout
 
-```         
+```
 modules/catdriver/
 ├── R/
 │   ├── 00_main.R              # Entry point, orchestration
@@ -77,17 +77,35 @@ modules/catdriver/
 │   ├── 08b_guards_soft.R      # Soft warning guards
 │   ├── 09_mapper.R            # Term-to-level mapping
 │   └── 10_missing.R           # Missing data handling
-├── run_catdriver_gui.R        # Shiny GUI launcher
+├── lib/
+│   └── html_report/           # HTML report generation pipeline
+│       ├── 00_html_guard.R          # Input validation for HTML report
+│       ├── 01_data_transformer.R    # Results → HTML-ready data structures
+│       ├── 02_table_builder.R       # HTML table generators
+│       ├── 03_page_builder.R        # Page layout, sections, CSS
+│       ├── 04_html_writer.R         # File writer (self-contained HTML)
+│       ├── 05_chart_builder.R       # SVG chart generators (forest, bar)
+│       ├── 06_comparison_report.R   # Multi-outcome comparison report
+│       ├── 07_unified_report.R      # Unified tabbed multi-analysis report
+│       ├── 99_html_report_main.R    # Entry point for HTML report generation
+│       └── js/                      # Client-side JavaScript
+│           ├── cd_insights.js       # Insight/annotation pinning
+│           ├── cd_navigation.js     # Section nav, scroll, tab switching
+│           ├── cd_pinned_views.js   # Pinned section management
+│           ├── cd_slide_export.js   # PNG slide export from pinned views
+│           ├── cd_unified_tabs.js   # Unified report tab controller
+│           └── cd_utils.js          # Shared JS utilities
+├── run_catdriver_gui.R        # Shiny GUI (single + multi-config)
 ├── examples/basic/            # Example files
 ├── tests/test_data/           # Test datasets
 └── docs/                      # Documentation
     ├── 01_README.md
-    ├── 02_CATDRIVER_OVERVIEW.md
     ├── 03_REFERENCE_GUIDE.md
     ├── 04_USER_MANUAL.md
     ├── 05_TECHNICAL_DOCS.md   # This file
     ├── 06_TEMPLATE_REFERENCE.md
     ├── 07_EXAMPLE_WORKFLOWS.md
+    ├── 08_BOOTSTRAP_GUIDE.md
     └── templates/
 ```
 
@@ -128,6 +146,7 @@ source("modules/catdriver/R/00_main.R")          # Uses: all above
 | haven      | Optional    | SPSS/Stata file support              |
 | shiny      | GUI only    | Web application framework            |
 | shinyFiles | GUI only    | File browser widgets                 |
+| htmltools  | HTML report | HTML tag generation for reports       |
 
 ------------------------------------------------------------------------
 
@@ -191,26 +210,38 @@ source("modules/catdriver/R/00_main.R")          # Uses: all above
          │
          ▼
 ┌─────────────────┐
-│ 10. Write Output│  write_catdriver_output()
+│ 10. Prob Lifts  │  calculate_probability_lift()
+│   (00_main)     │  → Returns: probability lift df
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ 11. Write Output│  write_catdriver_output()
 │    (06_output)  │  → Creates: Excel workbook
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ 12. HTML Report │  generate_catdriver_html_report()
+│ (99_html_report)│  → Creates: self-contained HTML
 └─────────────────┘
 ```
 
 ### Model Selection Logic
 
-```         
-detect_outcome_type()
-         │
-         ├─── n_unique == 2 ──────────────► Binary Logistic (glm)
-         │
-         ├─── order_spec provided ────────► Ordinal Logistic (polr/clm)
-         │
-         ├─── is.ordered(outcome) ────────► Ordinal Logistic (polr/clm)
-         │
-         ├─── is.numeric(outcome) ────────► Ordinal Logistic + warning
-         │
-         └─── else (3+ unordered) ────────► Multinomial Logistic (multinom)
+The model is determined by the **mandatory** `outcome_type` config setting:
+
 ```
+config$outcome_type
+         │
+         ├─── "binary"       ──────────► Binary Logistic (glm)
+         │
+         ├─── "ordinal"      ──────────► Ordinal Logistic (clm/polr)
+         │
+         └─── "multinomial"  ──────────► Multinomial Logistic (multinom)
+```
+
+**Note:** `auto` detection is no longer supported. The analyst must explicitly declare the outcome type in the config file.
 
 ------------------------------------------------------------------------
 
@@ -286,6 +317,42 @@ write_catdriver_output <- function(results, config, output_file)
 
 **Creates:** 6-sheet Excel workbook (or 4 if detailed_output=FALSE).
 
+### HTML Report Pipeline (lib/html_report/)
+
+``` r
+generate_catdriver_html_report <- function(results, config, output_file)
+```
+
+**Entry point:** `99_html_report_main.R`
+
+The HTML report pipeline transforms analysis results into a self-contained,
+interactive HTML report. It supports single-outcome reports, multi-outcome
+comparison reports, and unified tabbed reports.
+
+**Pipeline stages:**
+
+| Stage | File | Purpose |
+|-------|------|---------|
+| Guard | `00_html_guard.R` | Validates results structure before rendering |
+| Transform | `01_data_transformer.R` | Converts R results to HTML-ready data structures |
+| Tables | `02_table_builder.R` | Generates HTML tables (importance, OR, patterns, lifts) |
+| Charts | `05_chart_builder.R` | Generates inline SVG charts (forest plots, bar charts) |
+| Layout | `03_page_builder.R` | Assembles sections, navigation, CSS, diagnostics cards |
+| Write | `04_html_writer.R` | Writes self-contained HTML with embedded JS/CSS |
+| Comparison | `06_comparison_report.R` | Multi-outcome side-by-side comparison |
+| Unified | `07_unified_report.R` | Tabbed report combining multiple analyses |
+
+**Client-side JS** (embedded in output):
+
+| File | Purpose |
+|------|---------|
+| `cd_navigation.js` | Section nav, scroll tracking, tab switching |
+| `cd_insights.js` | Insight/annotation pinning per section |
+| `cd_pinned_views.js` | Pinned section management (user-curated views) |
+| `cd_slide_export.js` | PNG slide export from pinned views |
+| `cd_unified_tabs.js` | Analysis-level tab controller for unified reports |
+| `cd_utils.js` | Shared JS utilities |
+
 ------------------------------------------------------------------------
 
 ## Error Handling Strategy {#error-handling-strategy}
@@ -341,7 +408,7 @@ The term-to-level mapper (09_mapper.R) uses **positional mapping**:
 | analysis_name | string | "Key Driver Analysis" | Non-empty |
 | data_file | path | \- | Must exist |
 | output_file | path | \- | Directory must exist |
-| outcome_type | enum | "auto" | auto/binary/ordinal/nominal |
+| outcome_type | enum | *(required)* | binary/ordinal/multinomial |
 | reference_category | string | First alpha | Must exist in outcome |
 | min_sample_size | integer | 30 | ≥ 1 |
 | confidence_level | numeric | 0.95 | 0 \< x \< 1 |
@@ -483,10 +550,12 @@ standard errors - No interaction terms - No multiple imputation
 
 ## Additional Resources
 
+-   [01_README.md](01_README.md) - Quick start and overview
 -   [03_REFERENCE_GUIDE.md](03_REFERENCE_GUIDE.md) - Statistical methods
 -   [04_USER_MANUAL.md](04_USER_MANUAL.md) - User guide
 -   [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) - Configuration
 -   [07_EXAMPLE_WORKFLOWS.md](07_EXAMPLE_WORKFLOWS.md) - Examples
+-   [08_BOOTSTRAP_GUIDE.md](08_BOOTSTRAP_GUIDE.md) - Bootstrap confidence intervals
 
 ------------------------------------------------------------------------
 

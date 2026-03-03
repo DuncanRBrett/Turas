@@ -1,10 +1,14 @@
 # ==============================================================================
 # TURAS CATEGORICAL KEY DRIVER MODULE - GUI LAUNCHER
 # ==============================================================================
+# Supports single-config and multi-config (unified report) workflows.
+# Multi-config: select 2+ config files → run sequentially → unified report.
+# ==============================================================================
 
 #' Run Categorical Key Driver Analysis GUI
 #'
 #' Launches a Shiny GUI for running categorical key driver analysis.
+#' Supports selecting multiple config files for unified report generation.
 #'
 #' @return A shinyApp object
 #' @export
@@ -87,6 +91,11 @@ run_catdriver_gui <- function() {
       if (length(matches) > 0) detected <- c(detected, matches)
     }
     unique(detected)
+  }
+
+  # Hex colour validator
+  is_valid_hex <- function(x) {
+    !is.null(x) && nzchar(x) && grepl("^#[0-9A-Fa-f]{6}$", x)
   }
 
   ui <- fluidPage(
@@ -175,7 +184,7 @@ run_catdriver_gui <- function() {
           font-family: 'Consolas', 'Monaco', monospace;
           padding: 15px;
           border-radius: 5px;
-          max-height: 400px;
+          max-height: 500px;
           overflow-y: auto;
           white-space: pre-wrap;
           font-size: 13px;
@@ -189,6 +198,38 @@ run_catdriver_gui <- function() {
           margin-top: 10px;
           font-size: 13px;
         }
+        .toggle-link {
+          font-size: 13px;
+          color: #6366f1;
+          cursor: pointer;
+          margin-bottom: 8px;
+          display: inline-block;
+        }
+        .toggle-link:hover {
+          text-decoration: underline;
+        }
+        .config-list-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-bottom: 4px;
+          font-size: 13px;
+        }
+        .colour-swatch {
+          display: inline-block;
+          width: 24px;
+          height: 24px;
+          border-radius: 4px;
+          border: 1px solid #ccc;
+          vertical-align: middle;
+        }
+        .report-settings-card {
+          background-color: #fefce8;
+          border: 1px solid #fef08a;
+          border-radius: 8px;
+          padding: 20px;
+          margin-bottom: 20px;
+        }
       "))
     ),
 
@@ -197,7 +238,7 @@ run_catdriver_gui <- function() {
       # Header
       div(class = "header",
         h1("TURAS Categorical Key Driver"),
-        p("Key driver analysis for categorical outcomes (binary, ordinal, nominal)")
+        p("Key driver analysis for categorical outcomes (binary, ordinal, multinomial)")
       ),
 
       # Step 1: Project Directory
@@ -220,29 +261,76 @@ run_catdriver_gui <- function() {
         uiOutput("project_display")
       ),
 
-      # Step 2: Config File
+      # Step 2: Config Files (multi-select)
       conditionalPanel(
         condition = "output.project_selected",
         div(class = "step-card",
-          div(class = "step-title", "Step 2: Select Configuration File"),
+          div(class = "step-title", "Step 2: Select Configuration Files"),
           uiOutput("config_selector"),
           uiOutput("config_display"),
           div(class = "info-box",
-            tags$strong("Note: "), "The config file should have ",
-            tags$code("Settings"), " and ", tags$code("Variables"), " sheets. ",
-            "The Settings sheet must specify ", tags$code("data_file"), " and ",
-            tags$code("output_file"), " paths."
+            tags$strong("Note: "), "Each config file needs ",
+            tags$code("Settings"), ", ", tags$code("Variables"), ", and ",
+            tags$code("Driver_Settings"), " sheets. ",
+            "Select multiple configs to generate a unified report."
           )
         )
       ),
 
-      # Run Button
+      # Step 3: Report Settings (only for multi-config)
+      conditionalPanel(
+        condition = "output.show_report_settings",
+        div(class = "report-settings-card",
+          div(class = "step-title", "Step 3: Unified Report Settings"),
+
+          fluidRow(
+            column(6,
+              textInput("report_title", "Report Title",
+                        value = "Categorical Key Driver Analysis",
+                        placeholder = "e.g., Q4 2024 Brand Health Drivers")
+            ),
+            column(6,
+              textInput("client_name", "Client Name (optional)",
+                        value = "",
+                        placeholder = "e.g., Acme Corp")
+            )
+          ),
+
+          fluidRow(
+            column(3,
+              textInput("brand_colour", "Brand Colour",
+                        value = "#323367",
+                        placeholder = "#323367")
+            ),
+            column(3,
+              textInput("accent_colour", "Accent Colour",
+                        value = "#CC9900",
+                        placeholder = "#CC9900")
+            ),
+            column(3,
+              fileInput("researcher_logo", "Researcher Logo",
+                        accept = c("image/png", "image/jpeg", "image/svg+xml"))
+            ),
+            column(3,
+              fileInput("client_logo", "Client Logo",
+                        accept = c("image/png", "image/jpeg", "image/svg+xml"))
+            )
+          ),
+
+          uiOutput("colour_preview"),
+
+          div(class = "info-box",
+            tags$strong("Note: "), "These settings apply to the unified report. ",
+            "They override brand/colour settings in individual config files."
+          )
+        )
+      ),
+
+      # Run Button (dynamic label)
       conditionalPanel(
         condition = "output.ready_to_run",
         div(class = "step-card",
-          actionButton("run_analysis", "Run Categorical Key Driver Analysis",
-                      class = "btn btn-catdriver run-btn",
-                      icon = icon("play"))
+          uiOutput("run_button_ui")
         )
       ),
 
@@ -264,7 +352,7 @@ run_catdriver_gui <- function() {
     # Reactive values
     files <- reactiveValues(
       project_dir = NULL,
-      config_file = NULL
+      config_files = character(0)  # Vector of full paths
     )
 
     console_text <- reactiveVal("")
@@ -285,7 +373,7 @@ run_catdriver_gui <- function() {
         dir_path <- normalizePath(path.expand(dir_path), winslash = "/", mustWork = FALSE)
         if (length(dir_path) > 0 && dir.exists(dir_path)) {
           files$project_dir <- dir_path
-          files$config_file <- NULL
+          files$config_files <- character(0)
         }
       }
     })
@@ -309,7 +397,7 @@ run_catdriver_gui <- function() {
       if (!is.null(input$recent_project) && input$recent_project != "") {
         if (dir.exists(input$recent_project)) {
           files$project_dir <- input$recent_project
-          files$config_file <- NULL
+          files$config_files <- character(0)
         }
       }
     })
@@ -325,17 +413,24 @@ run_catdriver_gui <- function() {
       }
     })
 
-    # Config file selector
+    # =========================================================================
+    # CONFIG FILE SELECTOR (checkboxes + select all toggle)
+    # =========================================================================
+
     output$config_selector <- renderUI({
       req(files$project_dir)
       configs <- detect_config_files(files$project_dir)
 
       if (length(configs) > 0) {
-        radioButtons("config_select", "Detected config files:",
-                    choices = configs,
-                    selected = configs[1])
+        tagList(
+          actionLink("toggle_all_configs", "Select All / Deselect All",
+                     class = "toggle-link"),
+          checkboxGroupInput("config_select", "Detected config files:",
+                            choices = configs,
+                            selected = configs[1])
+        )
       } else {
-        # Manual file selection
+        # Manual file selection fallback
         shinyFilesButton("config_btn", "Browse for Config File",
                         "Select configuration file",
                         class = "btn btn-catdriver",
@@ -343,39 +438,110 @@ run_catdriver_gui <- function() {
       }
     })
 
-    # Handle config selection
-    observeEvent(input$config_select, {
-      if (!is.null(input$config_select) && !is.null(files$project_dir)) {
-        files$config_file <- file.path(files$project_dir, input$config_select)
+    # Select All / Deselect All toggle
+    observeEvent(input$toggle_all_configs, {
+      configs <- detect_config_files(files$project_dir)
+      current <- input$config_select
+      if (length(current) == length(configs)) {
+        updateCheckboxGroupInput(session, "config_select", selected = character(0))
+      } else {
+        updateCheckboxGroupInput(session, "config_select", selected = configs)
       }
     })
 
-    # Config display
+    # Handle config selection → build full path vector
+    observeEvent(input$config_select, {
+      if (!is.null(input$config_select) && length(input$config_select) > 0 &&
+          !is.null(files$project_dir)) {
+        files$config_files <- file.path(files$project_dir, input$config_select)
+      } else {
+        files$config_files <- character(0)
+      }
+    }, ignoreNULL = FALSE)
+
+    # Config display — bullet list of selected files
     output$config_display <- renderUI({
-      if (!is.null(files$config_file)) {
+      if (length(files$config_files) > 0) {
+        file_items <- lapply(files$config_files, function(f) {
+          exists <- file.exists(f)
+          div(class = "config-list-item",
+            tags$span(
+              class = if (exists) "status-success" else "status-error",
+              if (exists) "\u2713" else "\u2717"
+            ),
+            tags$span(basename(f))
+          )
+        })
         div(class = "file-display",
-          div(class = "filename", basename(files$config_file)),
-          div(class = "filepath", files$config_file),
-          if (file.exists(files$config_file)) {
-            div(class = "status-success", "\u2713 Config file found")
-          } else {
-            div(class = "status-error", "\u2717 File not found")
-          }
+          div(class = "filename",
+            sprintf("%d config%s selected",
+                    length(files$config_files),
+                    if (length(files$config_files) != 1) "s" else "")),
+          file_items
         )
       }
     })
 
-    # Conditional panel outputs
+    # =========================================================================
+    # COLOUR PREVIEW
+    # =========================================================================
+
+    output$colour_preview <- renderUI({
+      brand <- input$brand_colour
+      accent <- input$accent_colour
+      items <- list()
+      if (is_valid_hex(brand)) {
+        items <- c(items, list(
+          tags$span(class = "colour-swatch", style = sprintf("background:%s;", brand)),
+          tags$span(style = "font-size:12px;color:#6c757d;margin-right:16px;", "Brand")
+        ))
+      }
+      if (is_valid_hex(accent)) {
+        items <- c(items, list(
+          tags$span(class = "colour-swatch", style = sprintf("background:%s;", accent)),
+          tags$span(style = "font-size:12px;color:#6c757d;", "Accent")
+        ))
+      }
+      if (length(items) > 0) {
+        div(style = "display:flex;align-items:center;gap:8px;margin-top:8px;", items)
+      }
+    })
+
+    # =========================================================================
+    # DYNAMIC RUN BUTTON
+    # =========================================================================
+
+    output$run_button_ui <- renderUI({
+      n <- length(files$config_files)
+      label <- if (n <= 1) {
+        "Run Categorical Key Driver Analysis"
+      } else {
+        sprintf("Run %d Analyses + Generate Unified Report", n)
+      }
+      actionButton("run_analysis", label,
+                    class = "btn btn-catdriver run-btn",
+                    icon = icon("play"))
+    })
+
+    # =========================================================================
+    # CONDITIONAL PANEL FLAGS
+    # =========================================================================
+
     output$project_selected <- reactive({ !is.null(files$project_dir) })
     outputOptions(output, "project_selected", suspendWhenHidden = FALSE)
 
     output$ready_to_run <- reactive({
       !is.null(files$project_dir) &&
-      !is.null(files$config_file) &&
-      file.exists(files$config_file) &&
+      length(files$config_files) > 0 &&
+      all(file.exists(files$config_files)) &&
       !is_running()
     })
     outputOptions(output, "ready_to_run", suspendWhenHidden = FALSE)
+
+    output$show_report_settings <- reactive({
+      length(files$config_files) >= 2
+    })
+    outputOptions(output, "show_report_settings", suspendWhenHidden = FALSE)
 
     output$show_console <- reactive({ nchar(console_text()) > 0 })
     outputOptions(output, "show_console", suspendWhenHidden = FALSE)
@@ -393,10 +559,13 @@ run_catdriver_gui <- function() {
       }
     })
 
-    # Run analysis
+    # =========================================================================
+    # RUN ANALYSIS — Multi-config orchestration
+    # =========================================================================
+
     observeEvent(input$run_analysis, {
 
-      req(files$project_dir, files$config_file)
+      req(files$project_dir, length(files$config_files) > 0)
 
       is_running(TRUE)
       console_text("")
@@ -406,6 +575,8 @@ run_catdriver_gui <- function() {
 
       # Capture output
       output_text <- ""
+      n_configs <- length(files$config_files)
+      is_multi <- n_configs >= 2
 
       # Use withProgress for visual progress bar
       withProgress(message = "Running Key Driver Analysis", value = 0, {
@@ -417,10 +588,12 @@ run_catdriver_gui <- function() {
             turas_root <- dirname(turas_root)
           }
 
-          # Source module files in correct order
+          # =================================================================
+          # PHASE 1: Source module files
+          # =================================================================
           output_text <- paste0(output_text, "Loading Categorical Key Driver module...\n\n")
           console_text(output_text)
-          setProgress(value = 0.05, detail = "Loading modules...")
+          setProgress(value = 0.02, detail = "Loading modules...")
 
           # 1. Source shared TRS infrastructure first (required by guard files)
           source(file.path(turas_root, "modules/shared/lib/import_all.R"))
@@ -444,33 +617,195 @@ run_catdriver_gui <- function() {
           source(file.path(turas_root, "modules/catdriver/R/06_output.R"))
           source(file.path(turas_root, "modules/catdriver/R/00_main.R"))
 
-          setProgress(value = 0.1, detail = "Starting analysis...")
-
-          # Create progress callback for run_categorical_keydriver
-          progress_callback <- function(value, message) {
-            # Scale progress: 0.1-0.95 for analysis steps (leaving room for loading/finishing)
-            scaled_value <- 0.1 + (value * 0.85)
-            setProgress(value = scaled_value, detail = message)
+          # 3. Source HTML report pipeline (needed for unified report generation)
+          if (is_multi) {
+            assign(".catdriver_lib_dir",
+                   file.path(turas_root, "modules", "catdriver", "lib"),
+                   envir = globalenv())
+            source(file.path(turas_root, "modules/catdriver/lib/html_report/99_html_report_main.R"))
           }
 
-          # Capture ALL analysis output (stdout, warnings, messages) - TRS v1.0 compliance
-          captured <- capture_console_all({
-            results <- run_categorical_keydriver(
-              config_file = files$config_file,
-              progress_callback = progress_callback
-            )
-          })
+          setProgress(value = 0.05, detail = "Modules loaded")
 
+          # =================================================================
+          # PHASE 2: Run each config sequentially
+          # =================================================================
+          analyses <- list()        # Named list for unified report
+          failed_configs <- list()  # Track failures
+
+          for (i in seq_along(files$config_files)) {
+            config_path <- files$config_files[i]
+            config_name <- tools::file_path_sans_ext(basename(config_path))
+
+            # Progress: each config gets a proportional slice within 5%-85%
+            base_progress <- 0.05 + (i - 1) * (0.80 / n_configs)
+            slice_size <- 0.80 / n_configs
+
+            output_text <- paste0(output_text,
+              sprintf("\n%s\n", paste(rep("=", 50), collapse = "")),
+              sprintf("  Config %d/%d: %s\n", i, n_configs, basename(config_path)),
+              sprintf("%s\n", paste(rep("=", 50), collapse = "")))
+            console_text(output_text)
+
+            setProgress(
+              value = base_progress,
+              detail = sprintf("Config %d/%d: %s", i, n_configs, config_name)
+            )
+
+            # Scoped progress callback for this config
+            config_progress <- function(value, message) {
+              scaled <- base_progress + (value * slice_size)
+              setProgress(value = scaled,
+                          detail = sprintf("[%d/%d] %s", i, n_configs, message))
+            }
+
+            # Run with full output capture
+            captured <- capture_console_all({
+              run_categorical_keydriver(
+                config_file = config_path,
+                progress_callback = config_progress
+              )
+            })
+
+            output_text <- paste0(output_text,
+                                   paste(captured$combined_output, collapse = "\n"))
+
+            if (captured$has_error) {
+              output_text <- paste0(output_text,
+                sprintf("\n\u2717 Config '%s' FAILED\n", config_name))
+              failed_configs[[config_name]] <- "error"
+
+            } else {
+              result <- captured$result
+
+              # Check for TRS refusal
+              is_refused <- isTRUE(result$status == "REFUSED") ||
+                            isTRUE(result$run_status == "REFUSED")
+
+              if (is_refused) {
+                output_text <- paste0(output_text,
+                  sprintf("\n\u2717 Config '%s' REFUSED: %s\n", config_name,
+                          result$message %||% result$code %||% "Unknown"))
+                failed_configs[[config_name]] <- result
+
+              } else {
+                output_text <- paste0(output_text,
+                  sprintf("\n\u2713 Config '%s' complete (status: %s)\n",
+                          config_name, result$run_status %||% "PASS"))
+
+                analyses[[config_name]] <- list(
+                  results = result,
+                  config = result$config,
+                  label = result$config$outcome_label %||%
+                          result$config$analysis_name %||% config_name
+                )
+              }
+            }
+
+            console_text(output_text)
+          }  # end config loop
+
+          # =================================================================
+          # PHASE 3: Generate unified report (if multi-config, 2+ succeeded)
+          # =================================================================
+          n_success <- length(analyses)
+          n_failed <- length(failed_configs)
+
+          if (is_multi && n_success >= 2) {
+            setProgress(value = 0.88, detail = "Generating unified report...")
+
+            output_text <- paste0(output_text,
+              sprintf("\n%s\n", paste(rep("=", 50), collapse = "")),
+              "  GENERATING UNIFIED REPORT\n",
+              sprintf("  %d successful analyses, %d failed\n", n_success, n_failed),
+              sprintf("%s\n", paste(rep("=", 50), collapse = "")))
+            console_text(output_text)
+
+            # Output path: same directory as first config
+            first_dir <- dirname(files$config_files[1])
+            unified_filename <- sprintf("CatDriver_Unified_%s.html",
+                                         format(Sys.Date(), "%Y%m%d"))
+            unified_path <- file.path(first_dir, unified_filename)
+
+            # Get GUI branding settings (with safe defaults)
+            gui_brand <- if (is_valid_hex(input$brand_colour)) {
+              input$brand_colour
+            } else "#323367"
+            gui_accent <- if (is_valid_hex(input$accent_colour)) {
+              input$accent_colour
+            } else "#CC9900"
+            gui_title <- if (!is.null(input$report_title) && nzchar(input$report_title)) {
+              input$report_title
+            } else "Categorical Key Driver Analysis"
+            gui_client <- if (!is.null(input$client_name) && nzchar(input$client_name)) {
+              input$client_name
+            } else NULL
+
+            # Resolve logo file paths from fileInput uploads
+            researcher_logo <- NULL
+            if (!is.null(input$researcher_logo)) {
+              researcher_logo <- input$researcher_logo$datapath
+            }
+            client_logo <- NULL
+            if (!is.null(input$client_logo)) {
+              client_logo <- input$client_logo$datapath
+            }
+
+            # Generate unified report
+            unified_captured <- capture_console_all({
+              generate_catdriver_unified_report(
+                analyses = analyses,
+                output_path = unified_path,
+                report_title = gui_title,
+                brand_colour = gui_brand,
+                accent_colour = gui_accent,
+                researcher_logo_path = researcher_logo,
+                client_logo_path = client_logo,
+                client_name = gui_client,
+                company_name = "The Research Lamppost"
+              )
+            })
+
+            output_text <- paste0(output_text,
+                                   paste(unified_captured$combined_output, collapse = "\n"))
+
+            if (!unified_captured$has_error) {
+              output_text <- paste0(output_text,
+                sprintf("\n\n\u2713 Unified report saved: %s\n", unified_filename))
+            } else {
+              output_text <- paste0(output_text,
+                "\n\n\u2717 Unified report generation failed\n")
+            }
+
+          } else if (is_multi && n_success < 2) {
+            output_text <- paste0(output_text,
+              "\n\u26a0 Fewer than 2 analyses succeeded \u2014 unified report skipped\n")
+          }
+
+          # =================================================================
+          # PHASE 4: Summary
+          # =================================================================
           setProgress(value = 0.98, detail = "Finalizing...")
 
-          output_text <- paste0(output_text, paste(captured$combined_output, collapse = "\n"))
-
-          if (captured$has_error) {
-            output_text <- paste0(output_text, "\n\n\u2717 Analysis failed - see error above")
-          } else if (captured$has_warnings) {
-            output_text <- paste0(output_text, "\n\n\u26a0 Analysis complete with warnings - review above")
+          if (n_failed > 0) {
+            output_text <- paste0(output_text, sprintf(
+              "\n\n\u26a0 %d/%d config%s completed, %d failed",
+              n_success, n_configs,
+              if (n_configs != 1) "s" else "", n_failed))
+          } else if (n_configs == 1) {
+            if (captured$has_error) {
+              output_text <- paste0(output_text,
+                "\n\n\u2717 Analysis failed - see error above")
+            } else if (captured$has_warnings) {
+              output_text <- paste0(output_text,
+                "\n\n\u26a0 Analysis complete with warnings - review above")
+            } else {
+              output_text <- paste0(output_text,
+                "\n\n\u2713 Analysis complete!")
+            }
           } else {
-            output_text <- paste0(output_text, "\n\n\u2713 Analysis complete!")
+            output_text <- paste0(output_text, sprintf(
+              "\n\n\u2713 All %d configs completed successfully!", n_configs))
           }
 
           setProgress(value = 1, detail = "Done!")

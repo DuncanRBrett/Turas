@@ -1,7 +1,9 @@
 # Turas Categorical Key Driver Module - Example Workflows
 
-**Version:** 10.0
-**Last Updated:** 22 December 2025
+**Version:** 12.0
+**Last Updated:** 3 March 2026
+
+> **Important:** As of v11.0, `outcome_type` must be explicitly set to `binary`, `ordinal`, or `multinomial`. The `auto` setting is no longer accepted. A Driver_Settings sheet is required for all analyses. See [04_USER_MANUAL.md](04_USER_MANUAL.md) for the complete guide including variable selection, collapsing decisions, and probability lifts.
 
 This document provides practical step-by-step workflows for common categorical key driver scenarios.
 
@@ -15,7 +17,8 @@ This document provides practical step-by-step workflows for common categorical k
 4. [Handling Missing Data](#workflow-4-handling-missing-data)
 5. [Working with Weighted Data](#workflow-5-weighted-analysis)
 6. [Interpreting Results](#workflow-6-interpreting-results)
-7. [Troubleshooting Guide](#troubleshooting-guide)
+7. [Multi-Outcome Unified Report](#workflow-7-multi-outcome-unified-report)
+8. [Troubleshooting Guide](#troubleshooting-guide)
 
 ---
 
@@ -345,6 +348,73 @@ LR Test: χ² = 115.8, df = 6, p < 0.001
 - Model explains a good amount of variation (R² = 0.28)
 - Model significantly better than null (p < 0.001)
 - 3% of cases dropped due to missing data
+
+---
+
+## Workflow 7: Multi-Outcome Unified Report
+
+**Scenario:** You have one dataset with several outcome variables.
+You want to compare which drivers matter for each outcome in a single
+report.
+
+### Step 1: Create Config Files
+
+Create one config file per outcome in the same project folder:
+
+```
+project/
+├── survey_data.csv
+├── satisfaction_config.xlsx    (outcome_type = ordinal)
+├── recommend_config.xlsx       (outcome_type = binary)
+└── return_intent_config.xlsx   (outcome_type = binary)
+```
+
+Each config should:
+-   Point to the **same** `data_file` (`survey_data.csv`)
+-   Use a different `outcome` variable
+-   Set `outcome_type` explicitly for each outcome
+-   Share the same set of driver variables (or vary them if needed)
+
+### Step 2: Run from the GUI
+
+1.  Launch Turas and open Categorical Key Driver
+2.  Browse to the project folder
+3.  Tick the checkboxes for all 3 configs (or use **Select All**)
+4.  The **Report Settings** panel appears (only shown for 2+ configs)
+5.  Fill in:
+    -   Report Title: "Customer Experience Drivers"
+    -   Client Name: "Acme Corp"
+    -   Brand Colour: `#2C5F8A`
+    -   Accent Colour: `#D4A827`
+    -   Upload logos if desired
+6.  Click **"Run 3 Analyses + Generate Unified Report"**
+
+### Step 3: Review Output
+
+**Individual outputs** (one per config):
+-   `satisfaction_results.xlsx` + `.html`
+-   `recommend_results.xlsx` + `.html`
+-   `return_intent_results.xlsx` + `.html`
+
+**Unified report**:
+-   `CatDriver_Unified_20260303.html`
+
+The unified report shows:
+-   **Overview tab**: Side-by-side comparison of all outcomes, driver
+    importance matrix, cross-outcome insights
+-   **Individual tabs**: Full detail for each outcome
+-   **Pinned Views tab**: Pin any section for export/presentation
+
+### Tips
+
+-   If one config fails (e.g., bad variable name), the other two still
+    run. The unified report is generated from whatever succeeds.
+-   You need at least 2 successful analyses for a unified report.
+-   Report Settings override `brand_colour` and `accent_colour` in
+    individual configs — but only for the unified report. Individual
+    HTML reports use their own config values.
+-   You don't have to select all detected configs. Pick the subset that
+    makes sense for the comparison you want.
 
 ---
 

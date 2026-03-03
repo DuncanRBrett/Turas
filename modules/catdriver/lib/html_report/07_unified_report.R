@@ -23,7 +23,10 @@
 #' @param report_title Optional title (default: "Categorical Key Driver Analysis")
 #' @param brand_colour Brand colour hex string
 #' @param accent_colour Accent colour hex string
-#' @param researcher_logo_path Optional logo file path
+#' @param researcher_logo_path Optional researcher logo file path
+#' @param client_logo_path Optional client logo file path
+#' @param client_name Optional client name (appears in header as "for X")
+#' @param company_name Researcher/company name (default: "The Research Lamppost")
 #' @return List with status, output_file, file_size_mb
 #' @export
 generate_catdriver_unified_report <- function(analyses,
@@ -31,7 +34,10 @@ generate_catdriver_unified_report <- function(analyses,
                                               report_title = "Categorical Key Driver Analysis",
                                               brand_colour = "#323367",
                                               accent_colour = "#CC9900",
-                                              researcher_logo_path = NULL) {
+                                              researcher_logo_path = NULL,
+                                              client_logo_path = NULL,
+                                              client_name = NULL,
+                                              company_name = "The Research Lamppost") {
 
   start_time <- Sys.time()
 
@@ -64,10 +70,13 @@ generate_catdriver_unified_report <- function(analyses,
   if (length(analyses) == 1) {
     cat("  Single analysis detected — generating standard report.\n")
     entry <- analyses[[1]]
-    # Thread brand/accent from unified call into config
+    # Thread brand/accent/client from unified call into config
     entry$config$brand_colour <- brand_colour
     entry$config$accent_colour <- accent_colour
     entry$config$researcher_logo_path <- researcher_logo_path
+    if (!is.null(client_logo_path)) entry$config$client_logo_path <- client_logo_path
+    if (!is.null(client_name)) entry$config$client_name <- client_name
+    if (!is.null(company_name)) entry$config$company_name <- company_name
     if (!is.null(report_title)) entry$config$report_title <- report_title
     return(generate_catdriver_html_report(entry$results, entry$config, output_path))
   }
@@ -208,14 +217,18 @@ generate_catdriver_unified_report <- function(analyses,
   # --- Build CSS ---
   css <- build_cd_unified_css(brand_colour, accent_colour)
 
-  # --- Build logo URI ---
+  # --- Build logo URIs ---
   logo_uri <- resolve_logo_uri(researcher_logo_path)
+  client_logo_uri <- resolve_logo_uri(client_logo_path)
 
   # --- Build page ---
   cat("  Assembling unified page...\n")
 
   # Unified header
-  header <- build_unified_header(report_title, summaries, brand_colour, logo_uri)
+  header <- build_unified_header(report_title, summaries, brand_colour,
+                                  logo_uri, client_logo_uri = client_logo_uri,
+                                  client_name = client_name,
+                                  company_name = company_name)
 
   # Tab bar: Overview + one per analysis + Pinned
   tab_buttons <- list(
@@ -369,7 +382,8 @@ generate_catdriver_unified_report <- function(analyses,
     "[]"
   )
 
-  footer <- build_comparison_footer()
+  footer <- build_comparison_footer(company_name = company_name,
+                                     client_name = client_name)
 
   # Read JS files — all 6
   js_files <- c("cd_utils.js", "cd_navigation.js", "cd_unified_tabs.js",
@@ -460,13 +474,48 @@ read_js_file <- function(filename) {
 # ==============================================================================
 # HELPER: Build unified header
 # ==============================================================================
-build_unified_header <- function(report_title, summaries, brand_colour, logo_uri) {
+build_unified_header <- function(report_title, summaries, brand_colour,
+                                  logo_uri, client_logo_uri = NULL,
+                                  client_name = NULL, company_name = NULL) {
 
-  logo_el <- NULL
+  # Build logo elements — researcher left, client right
+  logo_els <- htmltools::tagList()
   if (!is.null(logo_uri) && nzchar(logo_uri)) {
-    logo_el <- htmltools::tags$div(
-      class = "cd-comp-logo-container",
-      htmltools::tags$img(src = logo_uri, alt = "Logo")
+    logo_els <- htmltools::tagAppendChild(logo_els,
+      htmltools::tags$div(
+        class = "cd-comp-logo-container",
+        htmltools::tags$img(src = logo_uri, alt = "Researcher Logo")
+      )
+    )
+  }
+  if (!is.null(client_logo_uri) && nzchar(client_logo_uri)) {
+    logo_els <- htmltools::tagAppendChild(logo_els,
+      htmltools::tags$div(
+        class = "cd-comp-logo-container",
+        htmltools::tags$img(src = client_logo_uri, alt = "Client Logo")
+      )
+    )
+  }
+
+  # "Prepared by X for Y" row
+  prepared_row <- NULL
+  prepared_parts <- c()
+  if (!is.null(company_name) && nzchar(company_name)) {
+    prepared_parts <- c(prepared_parts, sprintf(
+      'Prepared by <span style="font-weight:600;">%s</span>',
+      htmltools::htmlEscape(company_name)
+    ))
+  }
+  if (!is.null(client_name) && nzchar(client_name)) {
+    prepared_parts <- c(prepared_parts, sprintf(
+      'for <span style="font-weight:600;">%s</span>',
+      htmltools::htmlEscape(client_name)
+    ))
+  }
+  if (length(prepared_parts) > 0) {
+    prepared_row <- htmltools::tags$div(
+      class = "cd-comp-header-prepared",
+      htmltools::HTML(paste(prepared_parts, collapse = " "))
     )
   }
 
@@ -498,7 +547,7 @@ build_unified_header <- function(report_title, summaries, brand_colour, logo_uri
       class = "cd-comp-header-inner",
       htmltools::tags$div(
         class = "cd-comp-header-top",
-        logo_el,
+        logo_els,
         htmltools::tags$div(
           htmltools::tags$div(class = "cd-comp-module-name", "Turas Catdriver"),
           htmltools::tags$div(class = "cd-comp-module-sub",
@@ -506,6 +555,7 @@ build_unified_header <- function(report_title, summaries, brand_colour, logo_uri
         )
       ),
       htmltools::tags$div(class = "cd-comp-title", report_title),
+      prepared_row,
       htmltools::tags$div(class = "cd-comp-badges", badge_items)
     )
   )
@@ -779,6 +829,23 @@ build_cd_unified_css <- function(brand_colour, accent_colour) {
 @media (max-width: 768px) {
   .cd-analysis-tabs { padding: 0 12px; }
   .cd-analysis-tab { padding: 10px 14px; font-size: 12px; }
+}
+
+/* ================================================================ */
+/* UNIFIED HEADER: prepared-by row & dual logos                      */
+/* ================================================================ */
+
+.cd-comp-header-prepared {
+  color: rgba(255,255,255,0.70);
+  font-size: 13px;
+  margin-top: 4px;
+  letter-spacing: 0.2px;
+}
+
+.cd-comp-header-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 '
   # Combine all CSS. The unified_css overrides come last.

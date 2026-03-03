@@ -1,7 +1,7 @@
 # Turas Categorical Key Driver Module - Reference Guide
 
-**Version:** 10.0
-**Last Updated:** 22 December 2025
+**Version:** 12.0
+**Last Updated:** 3 March 2026
 **Target Audience:** Statisticians, Senior Analysts, Methodologists
 
 This document provides comprehensive technical reference for the statistical methods used in the Categorical Key Driver module.
@@ -25,7 +25,7 @@ This document provides comprehensive technical reference for the statistical met
 
 ### When Used
 
-Automatically selected when the outcome variable has exactly 2 categories.
+Used when `outcome_type = binary` (outcome has exactly 2 categories).
 
 ### Model Specification
 
@@ -91,10 +91,7 @@ Where `z` is the critical value (1.96 for 95% CI).
 
 ### When Used
 
-Automatically selected when:
-- Outcome has 3+ categories AND
-- Order is specified in config OR
-- Outcome is already an ordered factor
+Used when `outcome_type = ordinal` (outcome has 3+ ordered categories with order specified in config).
 
 ### Model Specification (Proportional Odds)
 
@@ -146,10 +143,7 @@ The `αⱼ` parameters represent the log-odds of being in category j or lower wh
 
 ### When Used
 
-Automatically selected when:
-- Outcome has 3+ categories AND
-- No order is specified AND
-- Outcome is not an ordered factor
+Used when `outcome_type = multinomial` (outcome has 3+ unordered categories).
 
 ### Model Specification
 
@@ -392,32 +386,24 @@ GVIF^(1/(2×df))
 
 ## Method Selection Guide
 
-### Automatic Selection Logic
+### Selection Logic
 
-```
-Is outcome binary (2 categories)?
-├── Yes → Binary Logistic Regression (glm)
-└── No
-    └── Is order specified or is.ordered(outcome)?
-        ├── Yes → Ordinal Logistic Regression (polr/clm)
-        └── No → Multinomial Logistic Regression (multinom)
-```
+The model type is determined by the **mandatory** `outcome_type` setting in your config:
 
-### Manual Override
+| `outcome_type` | Model | R Function |
+|----------------|-------|------------|
+| `binary` | Binary Logistic Regression | `stats::glm()` |
+| `ordinal` | Proportional Odds | `ordinal::clm()` / `MASS::polr()` |
+| `multinomial` | Multinomial Logistic | `nnet::multinom()` |
 
-Set `outcome_type` in config to force a specific method:
+**Note:** `auto` detection is no longer supported. The analyst must explicitly declare the outcome type.
 
-- `auto` - Use automatic detection (default)
-- `binary` - Force binary logistic
-- `ordinal` - Force ordinal logistic
-- `nominal` - Force multinomial logistic
+### When to Consider Alternatives
 
-### When to Override
-
-| Situation | Override To |
-|-----------|-------------|
-| Ordinal outcome but want category-specific effects | `nominal` |
-| Nominal outcome but want parsimonious model | Not recommended |
+| Situation | Consider |
+|-----------|----------|
+| Ordinal outcome but want category-specific effects | `multinomial` instead of `ordinal` |
+| Proportional odds assumption violated | `multinomial` instead of `ordinal` |
 | Binary outcome treated as ordinal (Never/Sometimes/Always but only 2 observed) | `binary` |
 
 ---
