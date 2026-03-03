@@ -137,6 +137,83 @@ build_cd_pattern_table <- function(pattern_data, var_name, id_prefix = "") {
 }
 
 
+#' Build Probability Lift Table HTML
+#'
+#' Shows how predicted probability changes for each driver level compared
+#' to the reference category. Displayed per-driver, similar to pattern tables.
+#'
+#' @param lift_data List with label, variable, reference, categories
+#' @param var_name Variable name (for table ID)
+#' @param id_prefix ID prefix for unified report scoping
+#' @return htmltools tag object
+#' @keywords internal
+build_cd_probability_lift_table <- function(lift_data, var_name, id_prefix = "") {
+
+  header <- htmltools::tags$tr(
+    htmltools::tags$th("Category", class = "cd-th cd-th-label"),
+    htmltools::tags$th("Pred. Prob", class = "cd-th cd-th-num"),
+    htmltools::tags$th("Ref. Prob", class = "cd-th cd-th-num"),
+    htmltools::tags$th("Lift (pp)", class = "cd-th cd-th-num"),
+    htmltools::tags$th("Direction", class = "cd-th cd-th-effect")
+  )
+
+  rows <- lapply(lift_data$categories, function(cat) {
+    row_class <- if (cat$is_reference) "cd-tr cd-tr-reference" else "cd-tr"
+
+    if (cat$is_reference) {
+      htmltools::tags$tr(
+        class = row_class,
+        htmltools::tags$td(paste0(cat$level, " (ref)"), class = "cd-td cd-td-label"),
+        htmltools::tags$td(sprintf("%.1f%%", cat$mean_prob * 100), class = "cd-td cd-td-num"),
+        htmltools::tags$td("\u2014", class = "cd-td cd-td-num"),
+        htmltools::tags$td("\u2014", class = "cd-td cd-td-num"),
+        htmltools::tags$td("Baseline", class = "cd-td cd-td-effect")
+      )
+    } else {
+      lift_val <- cat$lift_pct
+      lift_colour <- if (lift_val > 0) "#059669" else if (lift_val < 0) "#DC2626" else "#64748b"
+      arrow <- if (lift_val > 2) "\u25B2"
+               else if (lift_val > 0) "\u25B3"
+               else if (lift_val < -2) "\u25BC"
+               else if (lift_val < 0) "\u25BD"
+               else "\u2014"
+      lift_label <- if (abs(lift_val) >= 10) "Strong"
+                    else if (abs(lift_val) >= 5) "Moderate"
+                    else if (abs(lift_val) >= 1) "Modest"
+                    else "Minimal"
+
+      htmltools::tags$tr(
+        class = row_class,
+        htmltools::tags$td(cat$level, class = "cd-td cd-td-label"),
+        htmltools::tags$td(sprintf("%.1f%%", cat$mean_prob * 100), class = "cd-td cd-td-num"),
+        htmltools::tags$td(sprintf("%.1f%%", cat$ref_prob * 100), class = "cd-td cd-td-num"),
+        htmltools::tags$td(
+          class = "cd-td cd-td-num",
+          htmltools::tags$span(
+            style = sprintf("color:%s;font-weight:600;", lift_colour),
+            sprintf("%+.1f pp", lift_val)
+          )
+        ),
+        htmltools::tags$td(
+          class = "cd-td cd-td-effect",
+          htmltools::tags$span(style = sprintf("color:%s;", lift_colour), arrow),
+          htmltools::tags$span(style = "margin-left:4px;", lift_label)
+        )
+      )
+    }
+  })
+
+  safe_id <- gsub("[^a-zA-Z0-9_]", "-", var_name)
+
+  htmltools::tags$table(
+    class = "cd-table cd-lift-table",
+    id = paste0(id_prefix, "cd-lift-", safe_id),
+    htmltools::tags$thead(header),
+    htmltools::tags$tbody(rows)
+  )
+}
+
+
 #' Build Odds Ratio Table HTML
 #'
 #' @param odds_ratios List of OR entries from transformer

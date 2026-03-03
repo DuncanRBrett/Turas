@@ -166,6 +166,20 @@ generate_catdriver_html_report <- function(results, config, output_path) {
     }
   )
 
+  # Probability lift tables (one per driver, conditional)
+  tables$probability_lifts <- list()
+  if (!is.null(html_data$probability_lifts)) {
+    for (var_name in names(html_data$probability_lifts)) {
+      tables$probability_lifts[[var_name]] <- tryCatch(
+        build_cd_probability_lift_table(html_data$probability_lifts[[var_name]], var_name),
+        error = function(e) {
+          warnings <<- c(warnings, sprintf("Probability lift table for %s failed: %s", var_name, e$message))
+          NULL
+        }
+      )
+    }
+  }
+
   # Diagnostics table
   tables$diagnostics <- tryCatch(
     build_cd_diagnostics_table(html_data$diagnostics, html_data$model_info, config),
@@ -213,6 +227,14 @@ generate_catdriver_html_report <- function(results, config, output_path) {
     build_cd_forest_plot(html_data$odds_ratios, brand_colour, accent_colour),
     error = function(e) {
       cat(sprintf("    [WARNING] Forest plot failed: %s\n", e$message))
+      NULL
+    }
+  )
+
+  charts$probability_lift <- tryCatch(
+    build_cd_probability_lift_chart(html_data$probability_lifts, brand_colour, accent_colour),
+    error = function(e) {
+      cat(sprintf("    [WARNING] Probability lift chart failed: %s\n", e$message))
       NULL
     }
   )

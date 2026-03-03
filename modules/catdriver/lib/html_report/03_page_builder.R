@@ -28,8 +28,10 @@ build_cd_html_page <- function(html_data, tables, charts, config) {
   # Build sections
   header_section <- build_cd_header(html_data, config, brand_colour, report_title)
   exec_summary_section <- build_cd_exec_summary(html_data, brand_colour)
-  importance_section <- build_cd_importance_section(tables, charts, brand_colour)
+  importance_section <- build_cd_importance_section(tables, charts, brand_colour,
+                                                     n_drivers = length(html_data$importance))
   patterns_section <- build_cd_patterns_section(html_data, tables)
+  prob_lifts_section <- build_cd_probability_lifts_section(html_data, tables, charts)
   or_section <- build_cd_or_section(tables, charts, html_data$has_bootstrap,
                                      odds_ratios = html_data$odds_ratios)
   diagnostics_section <- build_cd_diagnostics_section(tables, html_data)
@@ -80,8 +82,54 @@ build_cd_html_page <- function(html_data, tables, charts, config) {
     htmltools::tags$meta(name = "turas-source-filename", content = source_filename)
   )
 
+  # Pinned Views section (single-report mode — shown inline below content)
+  pinned_section <- htmltools::tags$div(
+    class = "cd-section",
+    id = "cd-pinned-section",
+    style = "margin-top:24px;",
+    htmltools::tags$div(
+      class = "cd-pinned-panel-header",
+      htmltools::tags$div(class = "cd-pinned-panel-title",
+                          "\U0001F4CC Pinned Views"),
+      htmltools::tags$div(
+        class = "cd-pinned-panel-actions",
+        htmltools::tags$button(
+          class = "cd-pinned-panel-btn",
+          onclick = "cdAddSection()",
+          "\u2795 Add Section"
+        ),
+        htmltools::tags$button(
+          class = "cd-pinned-panel-btn",
+          onclick = "cdExportAllPinnedPNG()",
+          "\U0001F4E5 Export All as PNG"
+        ),
+        htmltools::tags$button(
+          class = "cd-pinned-panel-btn",
+          onclick = "cdPrintPinnedViews()",
+          "\U0001F5B6 Print / PDF"
+        ),
+        htmltools::tags$button(
+          class = "cd-pinned-panel-btn",
+          onclick = "cdClearAllPinned()",
+          "\U0001F5D1 Clear All"
+        )
+      )
+    ),
+    htmltools::tags$div(
+      id = "cd-pinned-empty",
+      class = "cd-pinned-empty",
+      htmltools::tags$div(class = "cd-pinned-empty-icon", "\U0001F4CC"),
+      htmltools::tags$div("No pinned views yet."),
+      htmltools::tags$div(
+        style = "font-size:12px;margin-top:4px;",
+        "Click the pin icon on any section to save it here for export."
+      )
+    ),
+    htmltools::tags$div(id = "cd-pinned-cards-container")
+  )
+
   # Assemble page — linear layout (no sidebar)
-  # Header → action bar → sticky nav bar → content → footer
+  # Header → action bar → sticky nav bar → content → pinned → footer
   page <- htmltools::tagList(
     htmltools::tags$head(
       htmltools::tags$meta(charset = "utf-8"),
@@ -102,9 +150,11 @@ build_cd_html_page <- function(html_data, tables, charts, config) {
           exec_summary_section,
           importance_section,
           patterns_section,
+          prob_lifts_section,
           or_section,
           diagnostics_section,
           interpretation_section,
+          pinned_section,
           footer_section,
           insight_store,
           pinned_store
@@ -362,6 +412,75 @@ build_cd_css <- function(brand_colour, accent_colour) {
 }
 
 /* ================================================================ */
+/* MODEL FIT STATISTIC CARDS                                        */
+/* ================================================================ */
+
+.cd-fit-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.cd-fit-card {
+  background: #f8f9fa;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 12px 16px;
+  border-left: 3px solid var(--cd-brand);
+}
+
+.cd-fit-card-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+  font-variant-numeric: tabular-nums;
+}
+
+.cd-fit-card-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-top: 2px;
+}
+
+.cd-fit-card-quality {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cd-brand);
+  margin-top: 4px;
+}
+
+.cd-fit-card-verdict {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 4px;
+  margin-top: 6px;
+  letter-spacing: 0.3px;
+}
+.cd-fit-card-verdict.cd-verdict-yes {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+.cd-fit-card-verdict.cd-verdict-no {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.cd-fit-card-note {
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.4;
+  margin-top: 6px;
+}
+
+/* ================================================================ */
 /* STATUS BADGES                                                    */
 /* ================================================================ */
 
@@ -411,6 +530,7 @@ build_cd_css <- function(brand_colour, accent_colour) {
   border-bottom: 1px solid #f0f0f0;
   vertical-align: middle;
   color: var(--cd-text);
+  font-variant-numeric: tabular-nums;
   transition: background-color 0.15s;
 }
 
@@ -421,6 +541,7 @@ build_cd_css <- function(brand_colour, accent_colour) {
 .cd-td-status { text-align: center; }
 .cd-td-interp { font-size: 12px; color: var(--cd-text-muted); }
 
+.cd-tr:nth-child(even) { background: #f9fafb; }
 .cd-tr:hover { background: #f8fafc; }
 .cd-tr-reference { background: #f0fdf4; }
 .cd-tr-reference:hover { background: #ecfdf5; }
@@ -539,7 +660,7 @@ build_cd_css <- function(brand_colour, accent_colour) {
 /* CHARTS                                                           */
 /* ================================================================ */
 
-.cd-chart { width: 100%; max-width: 700px; height: auto; margin: 16px 0; }
+.cd-chart, .cd-forest-plot { width: 100%; max-width: 700px; height: auto; margin: 16px 0; display: block; }
 
 /* ================================================================ */
 /* FACTOR PICKER — pill tabs                                        */
@@ -791,6 +912,52 @@ build_cd_css <- function(brand_colour, accent_colour) {
 }
 
 /* ================================================================ */
+/* CHART/TABLE WRAPPERS — containers with component pin buttons      */
+/* ================================================================ */
+
+.cd-chart-wrapper,
+.cd-table-wrapper {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.cd-component-pin {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 10;
+  background: rgba(255,255,255,0.85);
+  border: 1px solid var(--cd-border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--cd-text-faint);
+  cursor: pointer;
+  font-family: inherit;
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.cd-chart-wrapper:hover .cd-component-pin,
+.cd-table-wrapper:hover .cd-component-pin {
+  opacity: 1;
+}
+
+.cd-component-pin:hover {
+  border-color: var(--cd-brand);
+  color: var(--cd-brand);
+  background: rgba(255,255,255,0.95);
+}
+
+.cd-component-pin.cd-pin-btn-active {
+  background: var(--cd-brand);
+  color: white;
+  border-color: var(--cd-brand);
+  opacity: 1;
+}
+
+/* ================================================================ */
 /* OR FACTOR CHIP BAR — filter pills above odds ratio table          */
 /* ================================================================ */
 
@@ -963,14 +1130,63 @@ build_cd_css <- function(brand_colour, accent_colour) {
 }
 
 .cd-pinned-card-chart {
-  margin-top: 8px;
-  max-height: 300px;
-  overflow: hidden;
+  margin-top: 10px;
+  overflow: visible;
 }
 
 .cd-pinned-card-chart svg {
-  max-width: 100%;
+  width: 100%;
   height: auto;
+  display: block;
+}
+
+.cd-pinned-card-table {
+  margin-top: 10px;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.cd-pinned-card-table table {
+  width: 100%;
+  font-size: 12px;
+  table-layout: fixed;
+}
+
+.cd-pinned-card-table th,
+.cd-pinned-card-table td {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* ================================================================ */
+/* SECTION DIVIDERS — editable headers between pinned cards          */
+/* ================================================================ */
+
+.cd-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  margin: 8px 0;
+  border-bottom: 2px solid var(--cd-brand);
+}
+
+.cd-section-divider-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--cd-brand);
+  flex: 1;
+  outline: none;
+  min-width: 100px;
+}
+
+.cd-section-divider-title:focus {
+  border-bottom: 1px dashed var(--cd-border);
+}
+
+.cd-section-divider-actions {
+  display: flex;
+  gap: 4px;
 }
 
 /* ================================================================ */
@@ -1030,10 +1246,11 @@ build_cd_css <- function(brand_colour, accent_colour) {
   .cd-header-logo-container img { width: 28px !important; height: 28px !important; }
   .cd-factor-tabs { display: none !important; }
   .cd-factor-panel { display: block !important; margin-bottom: 16px; }
-  .cd-chart { max-width: 500px; }
+  .cd-chart, .cd-forest-plot { max-width: 500px; }
   /* Hide interactive elements in print */
   .cd-insight-area { display: none !important; }
   .cd-pin-btn { display: none !important; }
+  .cd-component-pin { display: none !important; }
   .cd-or-chip-bar { display: none !important; }
   .cd-action-bar { display: none !important; }
   .cd-pinned-card-actions { display: none !important; }
@@ -1071,6 +1288,7 @@ build_cd_section_nav <- function(brand_colour = "#323367", id_prefix = "") {
     htmltools::tags$a(href = paste0("#", id_prefix, "cd-exec-summary"), "Summary", class = "active"),
     htmltools::tags$a(href = paste0("#", id_prefix, "cd-importance"), "Importance"),
     htmltools::tags$a(href = paste0("#", id_prefix, "cd-patterns"), "Patterns"),
+    htmltools::tags$a(href = paste0("#", id_prefix, "cd-probability-lifts"), "Prob. Lifts"),
     htmltools::tags$a(href = paste0("#", id_prefix, "cd-odds-ratios"), "Odds Ratios"),
     htmltools::tags$a(href = paste0("#", id_prefix, "cd-diagnostics"), "Diagnostics"),
     htmltools::tags$a(href = paste0("#", id_prefix, "cd-interpretation"), "Guide")
@@ -1392,10 +1610,35 @@ build_cd_exec_summary <- function(html_data, brand_colour, id_prefix = "") {
 
 #' Build Importance Section
 #' @keywords internal
-build_cd_importance_section <- function(tables, charts, brand_colour, id_prefix = "") {
+build_cd_importance_section <- function(tables, charts, brand_colour,
+                                        id_prefix = "", n_drivers = 0) {
   title_row <- build_cd_section_title_row("Driver Importance", "importance",
                                            id_prefix = id_prefix)
   insight_area <- build_cd_insight_area("importance", id_prefix = id_prefix)
+
+  # Importance filter bar — show threshold options if many drivers
+  filter_bar <- NULL
+  if (n_drivers > 5) {
+    filter_bar <- build_cd_importance_filter_bar(id_prefix, n_drivers)
+  }
+
+  # Wrap chart and table in containers with component pin buttons
+  chart_wrapper <- if (!is.null(charts$importance)) {
+    htmltools::tags$div(
+      class = "cd-chart-wrapper",
+      build_cd_component_pin_btn("importance", "chart", id_prefix),
+      charts$importance
+    )
+  }
+
+  table_wrapper <- if (!is.null(tables$importance)) {
+    htmltools::tags$div(
+      class = "cd-table-wrapper",
+      build_cd_component_pin_btn("importance", "table", id_prefix),
+      filter_bar,
+      tables$importance
+    )
+  }
 
   htmltools::tags$div(
     class = "cd-section",
@@ -1407,8 +1650,49 @@ build_cd_importance_section <- function(tables, charts, brand_colour, id_prefix 
       class = "cd-section-intro",
       "Relative importance of each driver in explaining the outcome, based on chi-square contribution. Higher percentage means stronger statistical relationship."
     ),
-    if (!is.null(charts$importance)) charts$importance,
-    tables$importance
+    chart_wrapper,
+    table_wrapper
+  )
+}
+
+
+#' Build Importance Filter Bar
+#'
+#' Threshold options: All | Top 3 | Top 5 | Significant
+#' @keywords internal
+build_cd_importance_filter_bar <- function(id_prefix = "", n_drivers = 0) {
+  prefix_js <- if (nchar(id_prefix) > 0) paste0("'", id_prefix, "'") else "''"
+
+  # Determine sensible "top N" options based on total count
+  options <- list(
+    list(label = "All", mode = "all"),
+    list(label = "Top 3", mode = "top-3"),
+    list(label = "Top 5", mode = "top-5")
+  )
+  if (n_drivers > 8) {
+    options <- c(options, list(list(label = "Top 8", mode = "top-8")))
+  }
+  options <- c(options, list(list(label = "Significant", mode = "significant")))
+
+  chips <- lapply(options, function(opt) {
+    active_class <- if (opt$mode == "all") " active" else ""
+    htmltools::tags$button(
+      class = paste0("cd-or-chip", active_class),
+      `data-cd-imp-mode` = opt$mode,
+      onclick = sprintf("cdFilterImportanceBars('%s',%s)", opt$mode, prefix_js),
+      opt$label
+    )
+  })
+
+  htmltools::tags$div(
+    class = "cd-or-chip-bar",
+    id = paste0(id_prefix, "cd-importance-filter"),
+    style = "margin-top: 6px; margin-bottom: 2px;",
+    htmltools::tags$span(
+      style = "font-size: 12px; color: #64748b; font-weight: 500; margin-right: 8px;",
+      "Show:"
+    ),
+    chips
   )
 }
 
@@ -1474,6 +1758,103 @@ build_cd_patterns_section <- function(html_data, tables, id_prefix = "") {
 }
 
 
+#' Build Probability Lifts Section
+#'
+#' Tabbed per-driver view showing how predicted probability changes for
+#' each category compared to the reference. Includes a diverging bar chart
+#' and per-driver tables. Follows the patterns section layout.
+#'
+#' @param html_data Transformed HTML data (must include probability_lifts)
+#' @param tables List of table objects (must include probability_lifts list)
+#' @param charts List of chart objects (includes probability_lift chart)
+#' @param id_prefix ID prefix for unified report scoping
+#' @return htmltools tag, or NULL if no probability lift data
+#' @keywords internal
+build_cd_probability_lifts_section <- function(html_data, tables, charts,
+                                                id_prefix = "") {
+
+  pl <- html_data$probability_lifts
+  if (is.null(pl) || length(pl) == 0) return(NULL)
+
+  lift_names <- names(pl)
+
+  # Tabbed interface — use "lift-" prefix to avoid ID collision with Patterns section
+  tabs <- lapply(seq_along(lift_names), function(i) {
+    var_name <- lift_names[i]
+    label <- pl[[var_name]]$label
+    active_class <- if (i == 1) " active" else ""
+    safe_id <- paste0("lift-", gsub("[^a-zA-Z0-9_]", "-", var_name))
+
+    htmltools::tags$button(
+      class = paste0("cd-factor-tab", active_class),
+      onclick = sprintf("cdShowFactor('%s','%s')", safe_id, id_prefix),
+      `data-factor` = paste0(id_prefix, safe_id),
+      label
+    )
+  })
+
+  # Panels — one per driver (with "lift-" prefix)
+  panels <- lapply(seq_along(lift_names), function(i) {
+    var_name <- lift_names[i]
+    safe_id <- paste0("lift-", gsub("[^a-zA-Z0-9_]", "-", var_name))
+    active_class <- if (i == 1) " active" else ""
+    label <- pl[[var_name]]$label
+    ref <- pl[[var_name]]$reference
+
+    htmltools::tags$div(
+      class = paste0("cd-factor-panel", active_class),
+      id = paste0(id_prefix, "cd-panel-", safe_id),
+      htmltools::tags$h3(
+        class = "cd-panel-heading-label",
+        sprintf("%s (reference: %s)", label, ref)
+      ),
+      tables$probability_lifts[[var_name]]
+    )
+  })
+
+  title_row <- build_cd_section_title_row("Probability Lifts", "probability-lifts",
+                                           id_prefix = id_prefix)
+  insight_area <- build_cd_insight_area("probability-lifts", id_prefix = id_prefix)
+
+  # Chart wrapper (combined chart showing all drivers)
+  chart_el <- NULL
+  if (!is.null(charts$probability_lift)) {
+    chart_el <- htmltools::tags$div(
+      class = "cd-chart-wrapper",
+      build_cd_component_pin_btn("probability-lifts", "chart", id_prefix),
+      charts$probability_lift
+    )
+  }
+
+  # Table wrapper (holds the tabbed panels)
+  table_el <- htmltools::tags$div(
+    class = "cd-table-wrapper",
+    build_cd_component_pin_btn("probability-lifts", "table", id_prefix),
+    htmltools::tags$div(class = "cd-factor-tabs", tabs),
+    panels
+  )
+
+  htmltools::tags$div(
+    class = "cd-section",
+    id = paste0(id_prefix, "cd-probability-lifts"),
+    `data-cd-section` = "probability-lifts",
+    title_row,
+    insight_area,
+    htmltools::tags$p(
+      class = "cd-section-intro",
+      "How each driver level changes the predicted probability of the outcome compared to the reference category. Values represent percentage-point changes."
+    ),
+    chart_el,
+    table_el,
+    htmltools::tags$p(
+      class = "cd-section-intro",
+      style = "margin-top:12px;font-size:11px;font-style:italic;",
+      "Probability lifts are mean predicted probabilities for observations in each category, holding other factors at their observed values. They are sample-specific marginal effects."
+    )
+  )
+}
+
+
 #' Build Odds Ratios Section
 #' @keywords internal
 build_cd_or_section <- function(tables, charts, has_bootstrap,
@@ -1492,6 +1873,25 @@ build_cd_or_section <- function(tables, charts, has_bootstrap,
   # OR chip bar for factor filtering
   chip_bar <- build_cd_or_chip_bar(odds_ratios, id_prefix = id_prefix)
 
+  # Wrap chart and table in containers with component pin buttons
+  chart_wrapper <- if (!is.null(charts$forest)) {
+    htmltools::tags$div(
+      class = "cd-chart-wrapper",
+      build_cd_component_pin_btn("odds-ratios", "chart", id_prefix),
+      charts$forest
+    )
+  }
+
+  table_wrapper <- if (!is.null(tables$odds_ratios)) {
+    htmltools::tags$div(
+      class = "cd-table-wrapper",
+      build_cd_component_pin_btn("odds-ratios", "table", id_prefix),
+      chip_bar,
+      tables$odds_ratios,
+      bootstrap_note
+    )
+  }
+
   htmltools::tags$div(
     class = "cd-section",
     id = paste0(id_prefix, "cd-odds-ratios"),
@@ -1502,10 +1902,8 @@ build_cd_or_section <- function(tables, charts, has_bootstrap,
       class = "cd-section-intro",
       "Detailed coefficient table showing the odds ratio for each factor level compared to its reference category. OR > 1 means higher likelihood; OR < 1 means lower likelihood."
     ),
-    if (!is.null(charts$forest)) charts$forest,
-    chip_bar,
-    tables$odds_ratios,
-    bootstrap_note
+    chart_wrapper,
+    table_wrapper
   )
 }
 
@@ -1527,34 +1925,69 @@ build_cd_diagnostics_section <- function(tables, html_data, id_prefix = "") {
     )
   }
 
-  # Model fit stats
+  # Model fit stats — each as a labeled card with brief explanation
   fit <- html_data$model_info$fit_statistics
-  fit_items <- list()
+  fit_cards <- list()
   if (!is.null(fit)) {
     if (!is.na(fit$mcfadden_r2)) {
-      fit_items <- c(fit_items, list(sprintf("McFadden R\u00B2: %.3f", fit$mcfadden_r2)))
+      r2_label <- if (fit$mcfadden_r2 >= 0.4) "Excellent"
+                  else if (fit$mcfadden_r2 >= 0.2) "Good"
+                  else if (fit$mcfadden_r2 >= 0.1) "Moderate"
+                  else "Limited"
+      fit_cards <- c(fit_cards, list(htmltools::tags$div(
+        class = "cd-fit-card",
+        htmltools::tags$div(class = "cd-fit-card-value",
+          sprintf("%.3f", fit$mcfadden_r2)),
+        htmltools::tags$div(class = "cd-fit-card-label",
+          htmltools::HTML("McFadden R\u00B2")),
+        htmltools::tags$div(class = "cd-fit-card-quality", r2_label),
+        htmltools::tags$div(class = "cd-fit-card-note",
+          "Proportion of explained variation. Values 0.2\u20130.4 indicate good fit for logistic models.")
+      )))
     }
     if (!is.na(fit$aic)) {
-      fit_items <- c(fit_items, list(sprintf("AIC: %.1f", fit$aic)))
+      fit_cards <- c(fit_cards, list(htmltools::tags$div(
+        class = "cd-fit-card",
+        htmltools::tags$div(class = "cd-fit-card-value",
+          sprintf("%.1f", fit$aic)),
+        htmltools::tags$div(class = "cd-fit-card-label", "AIC"),
+        htmltools::tags$div(class = "cd-fit-card-quality",
+          style = "color:#64748b;",
+          "Comparison metric only"),
+        htmltools::tags$div(class = "cd-fit-card-note",
+          "This number has no absolute good/bad threshold \u2014 it is only useful when comparing alternative models on the same data. A lower AIC indicates a better-fitting model.")
+      )))
     }
     if (!is.na(fit$lr_statistic)) {
-      fit_items <- c(fit_items, list(
-        sprintf("LR test: \u03C7\u00B2(%d) = %.1f, p %s",
-                fit$lr_df, fit$lr_statistic, format_pvalue(fit$lr_pvalue))
-      ))
+      lr_is_sig <- !is.na(fit$lr_pvalue) && fit$lr_pvalue < 0.05
+      lr_verdict_text <- if (lr_is_sig) {
+        "\u2713 Yes \u2014 the model is statistically significant"
+      } else {
+        "\u2717 No \u2014 the model is not statistically significant"
+      }
+      lr_verdict_class <- paste0("cd-fit-card-verdict ",
+        if (lr_is_sig) "cd-verdict-yes" else "cd-verdict-no")
+
+      fit_cards <- c(fit_cards, list(htmltools::tags$div(
+        class = "cd-fit-card",
+        htmltools::tags$div(class = lr_verdict_class, lr_verdict_text),
+        htmltools::tags$div(class = "cd-fit-card-value",
+          style = "margin-top:8px;",
+          sprintf("\u03C7\u00B2(%d) = %.1f", fit$lr_df, fit$lr_statistic)),
+        htmltools::tags$div(class = "cd-fit-card-label",
+          htmltools::HTML(sprintf("Likelihood Ratio Test &nbsp;(p %s)",
+                                   format_pvalue(fit$lr_pvalue)))),
+        htmltools::tags$div(class = "cd-fit-card-note",
+          "Tests whether the drivers collectively predict the outcome better than chance alone. A significant result (p < 0.05) means the drivers matter.")
+      )))
     }
   }
 
-  fit_html <- if (length(fit_items) > 0) {
+  fit_html <- if (length(fit_cards) > 0) {
     htmltools::tags$div(
       style = "margin-top:16px;",
       htmltools::tags$h3(class = "cd-panel-heading-label", "Model Fit Statistics"),
-      htmltools::tags$div(
-        style = "display:flex;gap:24px;flex-wrap:wrap;",
-        lapply(fit_items, function(item) {
-          htmltools::tags$span(style = "font-size:13px;color:var(--cd-text-muted);", item)
-        })
-      )
+      htmltools::tags$div(class = "cd-fit-cards-grid", fit_cards)
     )
   }
 
@@ -1714,6 +2147,33 @@ build_cd_section_title_row <- function(title_text, section_key, id_prefix = "",
     class = "cd-section-title-row",
     htmltools::tags$h2(class = "cd-section-title", title_text),
     pin_btn
+  )
+}
+
+
+# ==============================================================================
+# COMPONENT PIN BUTTON — small pin icon on chart/table wrappers
+# ==============================================================================
+
+#' Build Component Pin Button
+#'
+#' Small ghost-style pin button for individual chart/table pinning.
+#'
+#' @param section_key Section key (e.g., "importance", "odds-ratios")
+#' @param component Component type: "chart" or "table"
+#' @param id_prefix ID prefix for the panel
+#' @return htmltools tag
+#' @keywords internal
+build_cd_component_pin_btn <- function(section_key, component, id_prefix = "") {
+  label <- if (component == "chart") "\U0001F4CC Chart" else "\U0001F4CC Table"
+  htmltools::tags$button(
+    class = "cd-component-pin",
+    `data-cd-pin-section` = section_key,
+    `data-cd-pin-prefix` = id_prefix,
+    `data-cd-pin-component` = component,
+    onclick = sprintf("cdPinComponent('%s','%s','%s')", section_key, component, id_prefix),
+    title = sprintf("Pin %s only", component),
+    label
   )
 }
 

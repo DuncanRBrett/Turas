@@ -634,8 +634,10 @@ run_categorical_keydriver_impl <- function(config_file,
     }
   }
 
-  # Calculate probability lift (new in v2.0)
-  prob_lift <- calculate_probability_lift(model_result, prep_data, config)
+  # Calculate probability lift (configurable — default TRUE)
+  prob_lift <- if (isTRUE(config$probability_lifts %||% TRUE)) {
+    calculate_probability_lift(model_result, prep_data, config)
+  } else NULL
 
   # Factor patterns
   factor_patterns <- calculate_factor_patterns(prep_data, config, odds_ratios)

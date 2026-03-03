@@ -131,6 +131,37 @@ transform_catdriver_for_html <- function(results, config) {
     weight_diagnostics = results$weight_diagnostics
   )
 
+  # Transform probability lifts (per-driver structure, mirrors patterns)
+  probability_lifts <- NULL
+  pl_df <- results$probability_lift
+  if (is.data.frame(pl_df) && nrow(pl_df) > 0) {
+    probability_lifts <- list()
+    for (var_name in unique(pl_df$driver)) {
+      var_df <- pl_df[pl_df$driver == var_name, , drop = FALSE]
+      ref_row <- var_df[var_df$is_reference == TRUE, , drop = FALSE]
+      ref_level <- if (nrow(ref_row) > 0) ref_row$level[1] else var_df$level[1]
+
+      categories <- lapply(seq_len(nrow(var_df)), function(i) {
+        r <- var_df[i, ]
+        list(
+          level = r$level,
+          is_reference = isTRUE(r$is_reference),
+          mean_prob = r$mean_predicted_prob,
+          ref_prob = r$reference_prob,
+          lift = r$prob_lift,
+          lift_pct = r$prob_lift_pct
+        )
+      })
+
+      probability_lifts[[var_name]] <- list(
+        label = var_df$driver_label[1],
+        variable = var_name,
+        reference = ref_level,
+        categories = categories
+      )
+    }
+  }
+
   # Generate narrative insights
   narrative <- generate_narrative_insights(importance, patterns, model_info, diagnostics)
 
@@ -139,6 +170,7 @@ transform_catdriver_for_html <- function(results, config) {
     importance = importance,
     patterns = patterns,
     odds_ratios = odds_ratios,
+    probability_lifts = probability_lifts,
     diagnostics = diagnostics,
     model_info = model_info,
     narrative = narrative,

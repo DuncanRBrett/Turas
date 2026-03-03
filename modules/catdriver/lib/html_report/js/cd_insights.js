@@ -47,7 +47,7 @@
     var isHidden = container.style.display === 'none' || !container.style.display;
     container.style.display = isHidden ? 'block' : 'none';
     if (toggle) {
-      toggle.textContent = isHidden ? '− Hide Insight' : '+ Add Insight';
+      toggle.textContent = isHidden ? '- Hide Insight' : '+ Add Insight';
     }
 
     // Focus editor when opening
@@ -136,7 +136,7 @@
         var editor = container.querySelector('.cd-insight-editor');
         if (editor) editor.textContent = text;
         container.style.display = 'block';
-        if (toggle) toggle.textContent = '− Hide Insight';
+        if (toggle) toggle.textContent = '- Hide Insight';
       });
     });
   };

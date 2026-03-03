@@ -97,6 +97,19 @@ generate_catdriver_unified_report <- function(analyses,
 
   for (name in analysis_names) {
     entry <- analyses[[name]]
+
+    # Skip REFUSED analyses (e.g. outcome variable not found in data)
+    # TRS refusals may use status="REFUSED", run_status="REFUSED", or refused=TRUE
+    is_refused <- isTRUE(entry$results$refused) ||
+                  identical(entry$results$status, "REFUSED") ||
+                  identical(entry$results$run_status, "REFUSED")
+    if (is_refused) {
+      refuse_reason <- entry$results$reason %||% entry$results$message %||% "unknown reason"
+      cat(sprintf("  Skipping %s: REFUSED - %s\n", name, refuse_reason))
+      warnings <- c(warnings, sprintf("%s was excluded (REFUSED: %s)", name, refuse_reason))
+      next
+    }
+
     cat(sprintf("  Transforming: %s...\n", name))
 
     html_data <- tryCatch({
@@ -134,6 +147,17 @@ generate_catdriver_unified_report <- function(analyses,
                                   entry$config, id_prefix = prefix),
       error = function(e) { NULL }
     )
+    # Probability lift tables (one per driver, conditional)
+    tables$probability_lifts <- list()
+    if (!is.null(html_data$probability_lifts)) {
+      for (var_name in names(html_data$probability_lifts)) {
+        tables$probability_lifts[[var_name]] <- tryCatch(
+          build_cd_probability_lift_table(html_data$probability_lifts[[var_name]],
+                                          var_name, id_prefix = prefix),
+          error = function(e) { NULL }
+        )
+      }
+    }
 
     # Build charts
     charts <- list()
@@ -143,6 +167,10 @@ generate_catdriver_unified_report <- function(analyses,
     )
     charts$forest <- tryCatch(
       build_cd_forest_plot(html_data$odds_ratios, brand_colour, accent_colour),
+      error = function(e) { NULL }
+    )
+    charts$probability_lift <- tryCatch(
+      build_cd_probability_lift_chart(html_data$probability_lifts, brand_colour, accent_colour),
       error = function(e) { NULL }
     )
 
@@ -164,8 +192,10 @@ generate_catdriver_unified_report <- function(analyses,
   }
 
   # --- Extract comparison data for overview ---
+  # Only include analyses that produced valid panel_data (excludes REFUSED / failed)
+  valid_analyses <- analyses[names(panel_data)]
   cat("  Building overview comparison data...\n")
-  comp_data <- extract_comparison_data(analyses)
+  comp_data <- extract_comparison_data(valid_analyses)
   summaries <- comp_data$summaries
   driver_comparison <- comp_data$driver_comparison
 
@@ -229,15 +259,18 @@ generate_catdriver_unified_report <- function(analyses,
   )
 
   # Overview panel
+  overview_prefix <- "overview-"
   overview_panel <- htmltools::tags$div(
     class = "cd-analysis-panel active",
     id = "cd-tab-overview",
     htmltools::tags$div(
       class = "cd-comp-content",
       build_comparison_overview(summaries, brand_colour, accent_colour,
-                                tab_targets = tab_targets),
-      build_comparison_driver_matrix(summaries, driver_comparison, brand_colour),
-      build_comparison_insights(summaries, driver_comparison, brand_colour)
+                                tab_targets = tab_targets, id_prefix = overview_prefix),
+      build_comparison_driver_matrix(summaries, driver_comparison, brand_colour,
+                                      id_prefix = overview_prefix),
+      build_comparison_insights(summaries, driver_comparison, brand_colour,
+                                 id_prefix = overview_prefix)
     )
   )
 
@@ -273,8 +306,18 @@ generate_catdriver_unified_report <- function(analyses,
           class = "cd-pinned-panel-actions",
           htmltools::tags$button(
             class = "cd-pinned-panel-btn",
+            onclick = "cdAddSection()",
+            "\u2795 Add Section"
+          ),
+          htmltools::tags$button(
+            class = "cd-pinned-panel-btn",
             onclick = "cdExportAllPinnedPNG()",
             "\U0001F4E5 Export All as PNG"
+          ),
+          htmltools::tags$button(
+            class = "cd-pinned-panel-btn",
+            onclick = "cdPrintPinnedViews()",
+            "\U0001F5B6 Print / PDF"
           ),
           htmltools::tags$button(
             class = "cd-pinned-panel-btn",
@@ -297,7 +340,7 @@ generate_catdriver_unified_report <- function(analyses,
     )
   )
 
-  # Hidden insight stores — one per analysis panel
+  # Hidden insight stores — one per analysis panel + one for overview
   insight_stores <- lapply(names(panel_data), function(name) {
     prefix <- id_prefixes[[name]]
     htmltools::tags$textarea(
@@ -308,6 +351,16 @@ generate_catdriver_unified_report <- function(analyses,
       "{}"
     )
   })
+  # Overview panel insight store
+  insight_stores <- c(insight_stores, list(
+    htmltools::tags$textarea(
+      class = "cd-insight-store",
+      id = paste0(overview_prefix, "cd-insight-store"),
+      `data-cd-prefix` = overview_prefix,
+      style = "display:none;",
+      "{}"
+    )
+  ))
 
   # Hidden pinned views data store
   pinned_store <- htmltools::tags$script(
@@ -522,9 +575,12 @@ build_cd_analysis_panel <- function(tab_id, panel_title, html_data, tables,
   exec_summary <- build_cd_exec_summary(html_data, brand_colour,
                                          id_prefix = id_prefix)
   importance <- build_cd_importance_section(tables, charts, brand_colour,
-                                             id_prefix = id_prefix)
+                                             id_prefix = id_prefix,
+                                             n_drivers = length(html_data$importance))
   patterns <- build_cd_patterns_section(html_data, tables,
                                          id_prefix = id_prefix)
+  prob_lifts <- build_cd_probability_lifts_section(html_data, tables, charts,
+                                                     id_prefix = id_prefix)
   odds_ratios <- build_cd_or_section(tables, charts, html_data$has_bootstrap,
                                       id_prefix = id_prefix,
                                       odds_ratios = html_data$odds_ratios)
@@ -541,6 +597,7 @@ build_cd_analysis_panel <- function(tab_id, panel_title, html_data, tables,
     exec_summary,
     importance,
     patterns,
+    prob_lifts,
     odds_ratios,
     diagnostics,
     interpretation

@@ -403,6 +403,7 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
 
     # HTML report settings (optional - on by default)
     html_report = as_logical_setting(get_setting(settings, "html_report", TRUE), TRUE),
+    probability_lifts = as_logical_setting(get_setting(settings, "probability_lifts", TRUE), TRUE),
     brand_colour = get_setting(settings, "brand_colour", "#323367"),
     accent_colour = get_setting(settings, "accent_colour", "#CC9900"),
     report_title = get_setting(settings, "report_title", NULL),

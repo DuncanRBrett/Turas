@@ -116,16 +116,16 @@
       var insightHeight = Math.max(40, insightLines.length * 18 + 16);
 
       insightBorder.setAttribute('height', insightHeight);
-      insightBorder.setAttribute('fill', accentColour);
+      insightBorder.setAttribute('fill', brandColour);
       svgEl.appendChild(insightBorder);
 
-      // Insight background
+      // Insight background — light blue matching tabs export
       var insightBg = document.createElementNS(NS, 'rect');
       insightBg.setAttribute('x', 51);
       insightBg.setAttribute('y', yPos);
       insightBg.setAttribute('width', SLIDE_W - 99);
       insightBg.setAttribute('height', insightHeight);
-      insightBg.setAttribute('fill', '#faf9f7');
+      insightBg.setAttribute('fill', '#f0f4ff');
       insightBg.setAttribute('rx', '4');
       svgEl.appendChild(insightBg);
 
@@ -151,21 +151,18 @@
       yPos += insightHeight + 16;
     }
 
-    // Chart (if present)
+    // Chart (if present) — embed as nested <svg> (not foreignObject)
     var chartArea = SLIDE_H - yPos - 60; // Reserve 60px for footer
     if (pin.chartSvg && chartArea > 80) {
-      var chartGroup = document.createElementNS(NS, 'g');
-
-      // Parse the captured SVG to extract its content
       var tempDiv = document.createElement('div');
       tempDiv.innerHTML = pin.chartSvg;
       var sourceSvg = tempDiv.querySelector('svg');
 
       if (sourceSvg) {
-        var svgW = parseFloat(sourceSvg.getAttribute('width')) || 700;
-        var svgH = parseFloat(sourceSvg.getAttribute('height')) || 350;
+        var svgW = 700;
+        var svgH = 350;
 
-        // If viewBox exists, use those dimensions
+        // Use viewBox dimensions for accurate scaling
         var vb = sourceSvg.getAttribute('viewBox');
         if (vb) {
           var parts = vb.split(/[\s,]+/);
@@ -176,7 +173,7 @@
         }
 
         var maxChartW = SLIDE_W - 96;
-        var maxChartH = Math.min(chartArea - 8, 360);
+        var maxChartH = Math.min(chartArea - 8, 400);
         var scaleX = maxChartW / svgW;
         var scaleY = maxChartH / svgH;
         var chartScale = Math.min(scaleX, scaleY, 1.0);
@@ -184,33 +181,46 @@
         var scaledH = svgH * chartScale;
         var chartX = 48 + (maxChartW - scaledW) / 2;
 
-        // Use foreignObject to embed the chart SVG
-        var fo = document.createElementNS(NS, 'foreignObject');
-        fo.setAttribute('x', chartX);
-        fo.setAttribute('y', yPos);
-        fo.setAttribute('width', scaledW);
-        fo.setAttribute('height', scaledH);
+        // Nested <svg> — works natively in Canvas rendering (no foreignObject)
+        var nestedSvg = document.createElementNS(NS, 'svg');
+        nestedSvg.setAttribute('x', chartX);
+        nestedSvg.setAttribute('y', yPos);
+        nestedSvg.setAttribute('width', scaledW);
+        nestedSvg.setAttribute('height', scaledH);
+        nestedSvg.setAttribute('viewBox', '0 0 ' + svgW + ' ' + svgH);
+        nestedSvg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
-        var innerDiv = document.createElement('div');
-        innerDiv.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
-        innerDiv.style.cssText = 'width:100%;height:100%;overflow:hidden;';
-        innerDiv.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="' + scaledW +
-          '" height="' + scaledH + '" viewBox="0 0 ' + svgW + ' ' + svgH + '">' +
-          sourceSvg.innerHTML + '</svg>';
-
-        fo.appendChild(innerDiv);
-        chartGroup.appendChild(fo);
-        svgEl.appendChild(chartGroup);
+        // Copy all child elements from source SVG
+        while (sourceSvg.firstChild) {
+          nestedSvg.appendChild(sourceSvg.firstChild);
+        }
+        svgEl.appendChild(nestedSvg);
 
         yPos += scaledH + 12;
       }
     }
 
-    // Table (if present and enough space)
-    if (pin.tableHtml && !pin.chartSvg && (SLIDE_H - yPos - 60) > 80) {
-      var tableData = cdExtractSlideTableData(pin.tableHtml);
-      if (tableData && tableData.headers.length > 0) {
-        cdRenderTableSVG(svgEl, tableData, 48, yPos, SLIDE_W - 96, SLIDE_H - yPos - 60);
+    // Table or callout content (if present and enough space remaining)
+    if (pin.tableHtml) {
+      var contentRendered = false;
+      var remainingSpace = SLIDE_H - yPos - 60;
+
+      // First try: render as table (importance, OR, diagnostics)
+      if (remainingSpace > 60) {
+        var tableData = cdExtractSlideTableData(pin.tableHtml);
+        if (tableData && tableData.headers.length > 0) {
+          var tableUsed = cdRenderTableSVG(svgEl, tableData, 48, yPos, SLIDE_W - 96, remainingSpace);
+          yPos += tableUsed + 8;
+          contentRendered = true;
+        }
+      }
+
+      // Fallback: render as callout cards (exec summary)
+      if (!contentRendered && remainingSpace > 60) {
+        var calloutData = cdExtractCalloutData(pin.tableHtml);
+        if (calloutData && calloutData.length > 0) {
+          yPos = cdRenderCalloutsSVG(svgEl, calloutData, 48, yPos, SLIDE_W - 96, remainingSpace);
+        }
       }
     }
 
@@ -244,9 +254,9 @@
     var footerText = document.createElementNS(NS, 'text');
     footerText.setAttribute('x', 48);
     footerText.setAttribute('y', footerY + 23);
-    footerText.setAttribute('fill', '#94a3b8');
+    footerText.setAttribute('fill', '#5c4a2a');
     footerText.setAttribute('font-size', '11');
-    footerText.setAttribute('font-weight', '400');
+    footerText.setAttribute('font-weight', '600');
     footerText.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
     footerText.textContent = footerParts.join('  \u2022  ');
     svgEl.appendChild(footerText);
@@ -344,34 +354,34 @@
    * @param {number} maxW - Maximum width
    * @param {number} maxH - Maximum height
    */
+  /**
+   * @returns {number} Total height used
+   */
   function cdRenderTableSVG(parent, tableData, x, y, maxW, maxH) {
     var nCols = tableData.headers.length;
-    if (nCols === 0) return;
+    if (nCols === 0) return 0;
 
     var colW = Math.floor(maxW / nCols);
     var rowH = 22;
     var headerH = 26;
     var fontSize = 10;
 
-    var brandColour = getComputedStyle(document.documentElement)
-      .getPropertyValue('--cd-brand').trim() || '#323367';
-
-    // Header background
+    // Header background — dark, matching tabs export style
     var headerBg = document.createElementNS(NS, 'rect');
     headerBg.setAttribute('x', x);
     headerBg.setAttribute('y', y);
     headerBg.setAttribute('width', maxW);
     headerBg.setAttribute('height', headerH);
-    headerBg.setAttribute('fill', '#f8f9fa');
+    headerBg.setAttribute('fill', '#1a2744');
     headerBg.setAttribute('rx', '3');
     parent.appendChild(headerBg);
 
-    // Header text
+    // Header text — white on dark
     for (var h = 0; h < nCols; h++) {
       var hText = document.createElementNS(NS, 'text');
       hText.setAttribute('x', x + h * colW + 6);
       hText.setAttribute('y', y + 17);
-      hText.setAttribute('fill', '#64748b');
+      hText.setAttribute('fill', '#ffffff');
       hText.setAttribute('font-size', String(fontSize - 1));
       hText.setAttribute('font-weight', '600');
       hText.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
@@ -418,6 +428,137 @@
     bottomLine.setAttribute('stroke', '#e2e8f0');
     bottomLine.setAttribute('stroke-width', '1');
     parent.appendChild(bottomLine);
+
+    return rowY - y;
+  }
+
+  /**
+   * Extract callout card data from exec summary HTML.
+   * @param {string} html
+   * @returns {Array|null} Array of { title, items[] }
+   */
+  function cdExtractCalloutData(html) {
+    if (!html) return null;
+    var tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+
+    var data = [];
+
+    // Model confidence callout
+    var confidence = tempDiv.querySelector('.cd-model-confidence');
+    if (confidence) {
+      data.push({ title: 'Model Confidence', items: [confidence.textContent.trim()] });
+    }
+
+    // Top driver callout cards
+    var callouts = tempDiv.querySelectorAll('.cd-callout');
+    callouts.forEach(function(c) {
+      var titleEl = c.querySelector('.cd-callout-title');
+      var textEl = c.querySelector('.cd-callout-text');
+      var title = titleEl ? titleEl.textContent.trim() : '';
+      var items = [];
+      if (textEl) items.push(textEl.textContent.trim());
+      if (title || items.length > 0) data.push({ title: title, items: items });
+    });
+
+    // Key insights list
+    var insightItems = tempDiv.querySelectorAll('.cd-key-insight-item');
+    if (insightItems.length > 0) {
+      var items = [];
+      insightItems.forEach(function(li) { items.push(li.textContent.trim()); });
+      data.push({ title: 'Key Insights', items: items });
+    }
+
+    // Standout findings
+    var findingItems = tempDiv.querySelectorAll('.cd-finding-item');
+    if (findingItems.length > 0) {
+      var items = [];
+      findingItems.forEach(function(f) { items.push(f.textContent.trim()); });
+      data.push({ title: 'Standout Findings', items: items });
+    }
+
+    // Overview comparison insights
+    var compInsights = tempDiv.querySelectorAll('.cd-comp-insight');
+    if (compInsights.length > 0) {
+      var items = [];
+      compInsights.forEach(function(ci) { items.push(ci.textContent.trim()); });
+      data.push({ title: 'Cross-Outcome Insights', items: items });
+    }
+
+    // Overview card grid — extract summary info
+    var compCards = tempDiv.querySelectorAll('.cd-comp-card');
+    if (compCards.length > 0) {
+      compCards.forEach(function(card) {
+        var cardTitle = card.querySelector('.cd-comp-card-title');
+        var title = cardTitle ? cardTitle.textContent.trim() : 'Outcome';
+        var statEls = card.querySelectorAll('.cd-comp-card-stat');
+        var items = [];
+        statEls.forEach(function(s) { items.push(s.textContent.trim()); });
+        data.push({ title: title, items: items });
+      });
+    }
+
+    return data.length > 0 ? data : null;
+  }
+
+  /**
+   * Render exec summary callouts as SVG elements.
+   * @param {SVGElement} parent
+   * @param {Array} calloutData
+   * @param {number} x
+   * @param {number} y
+   * @param {number} maxW
+   * @param {number} maxH
+   * @returns {number} Y position after rendering
+   */
+  function cdRenderCalloutsSVG(parent, calloutData, x, y, maxW, maxH) {
+    var brandColour = getComputedStyle(document.documentElement)
+      .getPropertyValue('--cd-brand').trim() || '#323367';
+    var currentY = y;
+    var cardGap = 12;
+    var lineHeight = 16;
+    var maxY = y + maxH;
+
+    calloutData.forEach(function(card) {
+      if (currentY >= maxY - 30) return;
+
+      // Card title
+      if (card.title) {
+        var titleText = document.createElementNS(NS, 'text');
+        titleText.setAttribute('x', x + 8);
+        titleText.setAttribute('y', currentY + 16);
+        titleText.setAttribute('fill', brandColour);
+        titleText.setAttribute('font-size', '13');
+        titleText.setAttribute('font-weight', '700');
+        titleText.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
+        titleText.textContent = card.title;
+        parent.appendChild(titleText);
+        currentY += 24;
+      }
+
+      // Card items
+      card.items.forEach(function(item) {
+        if (currentY >= maxY - 16) return;
+        var wrapped = cdWrapTextLines(item, maxW - 24, 7);
+        wrapped.forEach(function(line, li) {
+          if (currentY >= maxY - 16) return;
+          var lineText = document.createElementNS(NS, 'text');
+          lineText.setAttribute('x', x + 16);
+          lineText.setAttribute('y', currentY + 12);
+          lineText.setAttribute('fill', '#334155');
+          lineText.setAttribute('font-size', '11');
+          lineText.setAttribute('font-weight', '400');
+          lineText.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
+          lineText.textContent = (li === 0 ? '\u2022 ' : '  ') + line;
+          parent.appendChild(lineText);
+          currentY += lineHeight;
+        });
+        currentY += 4;
+      });
+      currentY += cardGap;
+    });
+
+    return currentY;
   }
 
   /**

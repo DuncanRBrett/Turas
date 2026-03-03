@@ -97,24 +97,28 @@
   window.cdShowFactor = function(factorId, prefix) {
     prefix = prefix || '';
 
-    // Find the container section (the patterns section for this prefix)
-    var containerId = prefix + 'cd-patterns';
-    var container = document.getElementById(containerId) || document;
+    // Find the target panel first, then scope to its parent section
+    var targetPanel = document.getElementById(prefix + 'cd-panel-' + factorId);
+    // Walk up from the panel to find the nearest cd-section container
+    var container = targetPanel ? targetPanel.closest('.cd-section') : null;
+    if (!container) {
+      // Fallback: try patterns section ID (legacy)
+      container = document.getElementById(prefix + 'cd-patterns') || document;
+    }
 
-    // Deactivate all tabs and panels within this container
+    // Deactivate all tabs and panels within this container only
     container.querySelectorAll('.cd-factor-tab').forEach(function(tab) {
       tab.classList.remove('active');
     });
-    container.querySelectorAll('.cd-factor-panel').forEach(function(panel) {
-      panel.classList.remove('active');
+    container.querySelectorAll('.cd-factor-panel').forEach(function(fp) {
+      fp.classList.remove('active');
     });
 
     // Activate selected — data-factor includes prefix
     var tab = container.querySelector('.cd-factor-tab[data-factor="' + prefix + factorId + '"]');
-    var panel = document.getElementById(prefix + 'cd-panel-' + factorId);
 
     if (tab) tab.classList.add('active');
-    if (panel) panel.classList.add('active');
+    if (targetPanel) targetPanel.classList.add('active');
   };
 
   // --------------------------------------------------------------------------
@@ -137,16 +141,196 @@
     chip.classList.toggle('active');
     var isActive = chip.classList.contains('active');
 
-    // Show/hide rows matching this factor
+    // Show/hide table rows matching this factor
     var table = section.querySelector('.cd-or-table');
-    if (!table) return;
+    if (table) {
+      table.querySelectorAll('tbody tr[data-cd-factor]').forEach(function(row) {
+        if (row.getAttribute('data-cd-factor') === factorLabel) {
+          row.style.display = isActive ? '' : 'none';
+        }
+      });
+    }
 
-    table.querySelectorAll('tbody tr[data-cd-factor]').forEach(function(row) {
-      if (row.getAttribute('data-cd-factor') === factorLabel) {
-        row.style.display = isActive ? '' : 'none';
+    // Show/hide forest plot SVG rows matching this factor
+    var chart = section.querySelector('.cd-forest-plot');
+    if (chart) {
+      chart.querySelectorAll('g.cd-forest-row[data-cd-factor]').forEach(function(g) {
+        if (g.getAttribute('data-cd-factor') === factorLabel) {
+          g.style.display = isActive ? '' : 'none';
+        }
+      });
+      // Compact visible rows and resize the SVG
+      cdResizeForestPlot(chart);
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // Forest plot dynamic resize — compact visible rows after chip filtering
+  // Repositions visible <g> rows, adjusts viewBox, ref line, zone labels.
+  // --------------------------------------------------------------------------
+  function cdResizeForestPlot(svg) {
+    var rowHeight = 26;
+    var gap = 6;
+    var rowStep = rowHeight + gap;   // 32
+    var topPad = 30;
+    var bottomPad = 50;
+
+    var allRows = svg.querySelectorAll('g.cd-forest-row');
+    var visibleIdx = 0;
+
+    allRows.forEach(function(g, i) {
+      if (g.style.display === 'none') {
+        return;
+      }
+      // Original y for row i: topPad + i * rowStep
+      var originalY = topPad + i * rowStep;
+      var targetY = topPad + visibleIdx * rowStep;
+      var deltaY = targetY - originalY;
+
+      if (deltaY !== 0) {
+        g.setAttribute('transform', 'translate(0,' + deltaY + ')');
+      } else {
+        g.removeAttribute('transform');
+      }
+      visibleIdx++;
+    });
+
+    if (visibleIdx === 0) return;
+
+    // New total height
+    var newHeight = topPad + visibleIdx * rowStep + bottomPad - gap;
+
+    // Update viewBox height
+    var vb = svg.getAttribute('viewBox');
+    if (vb) {
+      var parts = vb.split(/\s+/);
+      if (parts.length >= 4) {
+        svg.setAttribute('viewBox', parts[0] + ' ' + parts[1] + ' ' + parts[2] + ' ' + newHeight);
+      }
+    }
+
+    // Update reference line y2 (dashed line)
+    var refLine = svg.querySelector('line[stroke-dasharray]');
+    if (refLine) refLine.setAttribute('y2', newHeight - 10);
+
+    // Update zone labels (italic text elements at the bottom)
+    svg.querySelectorAll('text[font-style="italic"]').forEach(function(t) {
+      t.setAttribute('y', newHeight - 2);
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // Importance bar filtering — show/hide bars by threshold
+  // Modes: 'all', 'top-3', 'top-5', 'top-8', 'significant'
+  // --------------------------------------------------------------------------
+  window.cdFilterImportanceBars = function(mode, prefix) {
+    prefix = prefix || '';
+
+    var sectionId = prefix + 'cd-importance';
+    var section = document.getElementById(sectionId);
+    if (!section) return;
+
+    // Update chip active state
+    var filterBar = section.querySelector('#' + CSS.escape(prefix + 'cd-importance-filter'));
+    if (filterBar) {
+      filterBar.querySelectorAll('.cd-or-chip').forEach(function(chip) {
+        chip.classList.toggle('active', chip.getAttribute('data-cd-imp-mode') === mode);
+      });
+    }
+
+    // Filter chart rows
+    var chart = section.querySelector('svg.cd-importance-chart');
+    if (chart) {
+      var rows = chart.querySelectorAll('g.cd-importance-row');
+      rows.forEach(function(g) {
+        var rank = parseInt(g.getAttribute('data-cd-rank'), 10);
+        var sig = g.getAttribute('data-cd-sig') === 'yes';
+        var show = true;
+
+        if (mode === 'top-3') show = rank <= 3;
+        else if (mode === 'top-5') show = rank <= 5;
+        else if (mode === 'top-8') show = rank <= 8;
+        else if (mode === 'significant') show = sig;
+        // 'all' shows everything
+
+        g.style.display = show ? '' : 'none';
+      });
+
+      cdResizeImportanceChart(chart);
+    }
+
+    // Also filter table rows to match
+    var table = section.querySelector('.cd-importance-table');
+    if (table) {
+      var trs = table.querySelectorAll('tbody tr');
+      trs.forEach(function(tr, idx) {
+        var rank = idx + 1;
+        var show = true;
+
+        if (mode === 'top-3') show = rank <= 3;
+        else if (mode === 'top-5') show = rank <= 5;
+        else if (mode === 'top-8') show = rank <= 8;
+        else if (mode === 'significant') {
+          // Check the sig column — cd-sig-none means not significant
+          var sigCell = tr.querySelector('.cd-td-sig');
+          show = sigCell ? !sigCell.classList.contains('cd-sig-none') : true;
+        }
+
+        tr.style.display = show ? '' : 'none';
+      });
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // Importance chart dynamic resize — same approach as forest plot
+  // --------------------------------------------------------------------------
+  function cdResizeImportanceChart(svg) {
+    var barHeight = 28;
+    var gap = 8;
+    var rowStep = barHeight + gap;  // 36
+    var topPad = 25;
+    var bottomPad = 15;
+
+    var allRows = svg.querySelectorAll('g.cd-importance-row');
+    var visibleIdx = 0;
+
+    allRows.forEach(function(g, i) {
+      if (g.style.display === 'none') {
+        return;
+      }
+      var originalY = topPad + i * rowStep;
+      var targetY = topPad + visibleIdx * rowStep;
+      var deltaY = targetY - originalY;
+
+      if (deltaY !== 0) {
+        g.setAttribute('transform', 'translate(0,' + deltaY + ')');
+      } else {
+        g.removeAttribute('transform');
+      }
+      visibleIdx++;
+    });
+
+    if (visibleIdx === 0) return;
+
+    var newHeight = topPad + visibleIdx * rowStep + bottomPad;
+
+    // Update viewBox height
+    var vb = svg.getAttribute('viewBox');
+    if (vb) {
+      var parts = vb.split(/\s+/);
+      if (parts.length >= 4) {
+        svg.setAttribute('viewBox', parts[0] + ' ' + parts[1] + ' ' + parts[2] + ' ' + newHeight);
+      }
+    }
+
+    // Update gridlines — shorten their y2 to new height
+    svg.querySelectorAll('line[stroke="#e2e8f0"]').forEach(function(line) {
+      var y2 = parseFloat(line.getAttribute('y2'));
+      if (y2 > newHeight) {
+        line.setAttribute('y2', newHeight - 5);
       }
     });
-  };
+  }
 
   // --------------------------------------------------------------------------
   // Save Report — download HTML with current state preserved
@@ -205,6 +389,45 @@
   window.cdHydratePage = function() {
     if (typeof cdHydrateInsights === 'function') cdHydrateInsights();
     if (typeof cdHydratePinnedViews === 'function') cdHydratePinnedViews();
+  };
+
+  // --------------------------------------------------------------------------
+  // Driver comparison matrix — top N filter
+  // --------------------------------------------------------------------------
+
+  /**
+   * Filter driver comparison matrix rows by best rank.
+   * @param {string} tableId - ID of the <table> element
+   * @param {string} mode - 'all', '3', or '5'
+   */
+  window.cdFilterMatrixRows = function(tableId, mode) {
+    var table = document.getElementById(tableId);
+    if (!table) return;
+
+    // Update chip active state — find the chip bar within the same section
+    var section = table.closest('.cd-section');
+    if (section) {
+      var chips = section.querySelectorAll('.cd-or-chip-bar .cd-or-chip');
+      chips.forEach(function(chip) {
+        var isActive = false;
+        var text = chip.textContent.trim().toLowerCase();
+        if (mode === 'all' && text === 'all') isActive = true;
+        else if (mode === '3' && text === 'top 3') isActive = true;
+        else if (mode === '5' && text === 'top 5') isActive = true;
+        chip.classList.toggle('active', isActive);
+      });
+    }
+
+    // Filter table rows
+    var rows = table.querySelectorAll('tbody tr');
+    rows.forEach(function(row) {
+      var bestRank = parseInt(row.getAttribute('data-cd-best-rank'), 10);
+      var show = true;
+      if (mode === '3') show = bestRank <= 3;
+      else if (mode === '5') show = bestRank <= 5;
+      // 'all' shows everything
+      row.style.display = show ? '' : 'none';
+    });
   };
 
   // --------------------------------------------------------------------------

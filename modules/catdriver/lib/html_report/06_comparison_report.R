@@ -337,6 +337,13 @@ build_comparison_css <- function(brand_colour, accent_colour) {
 .cd-comp-card {
   background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
   padding: 16px 20px; border-top: 3px solid var(--cd-brand);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  transition: all 0.15s ease;
+}
+
+.cd-comp-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transform: translateY(-1px);
 }
 
 .cd-comp-card-title {
@@ -460,7 +467,7 @@ build_comparison_header <- function(report_title, summaries, brand_colour, logo_
 # tab_targets: optional named list mapping analysis names to tab IDs.
 # When provided (unified mode), cards become clickable to switch tabs.
 build_comparison_overview <- function(summaries, brand_colour, accent_colour,
-                                      tab_targets = NULL) {
+                                      tab_targets = NULL, id_prefix = "overview-") {
 
   cards <- lapply(summaries, function(s) {
     r2_pct <- if (!is.na(s$r2)) round(s$r2 * 100, 1) else 0
@@ -538,16 +545,24 @@ build_comparison_overview <- function(summaries, brand_colour, accent_colour,
     )
   })
 
+  title_row <- build_cd_section_title_row("Outcome Overview", "summary-cards",
+                                           id_prefix = id_prefix)
+  insight_area <- build_cd_insight_area("summary-cards", id_prefix = id_prefix)
+
   htmltools::tags$div(
-    class = "cd-comp-section",
-    htmltools::tags$h2(class = "cd-comp-section-title", "Outcome Overview"),
+    class = "cd-comp-section cd-section",
+    id = paste0(id_prefix, "cd-summary-cards"),
+    `data-cd-section` = "summary-cards",
+    title_row,
+    insight_area,
     htmltools::tags$div(class = "cd-comp-cards", cards)
   )
 }
 
 
 # --- Driver comparison matrix ---
-build_comparison_driver_matrix <- function(summaries, driver_comparison, brand_colour) {
+build_comparison_driver_matrix <- function(summaries, driver_comparison, brand_colour,
+                                           id_prefix = "overview-") {
 
   outcome_names <- vapply(summaries, function(s) s$label, character(1))
 
@@ -558,8 +573,9 @@ build_comparison_driver_matrix <- function(summaries, driver_comparison, brand_c
   }
   header_row <- htmltools::tags$tr(header_cells)
 
-  # Data rows
+  # Data rows — each row gets a data attribute for the best rank across outcomes
   data_rows <- lapply(driver_comparison, function(d) {
+    best_rank <- min(unlist(d$ranks), na.rm = TRUE)
     cells <- list(htmltools::tags$td(class = "cd-comp-td", d$label))
     for (s in summaries) {
       rank <- d$ranks[[s$name]]
@@ -585,27 +601,67 @@ build_comparison_driver_matrix <- function(summaries, driver_comparison, brand_c
         )))
       }
     }
-    htmltools::tags$tr(cells)
+    htmltools::tags$tr(`data-cd-best-rank` = best_rank, cells)
   })
 
+  title_row <- build_cd_section_title_row("Driver Comparison Matrix", "driver-matrix",
+                                           id_prefix = id_prefix)
+  insight_area <- build_cd_insight_area("driver-matrix", id_prefix = id_prefix)
+
+  # Chip filter bar for top N filtering
+  n_drivers <- length(driver_comparison)
+  matrix_table_id <- paste0(id_prefix, "cd-driver-matrix-table")
+  chip_bar <- htmltools::tags$div(
+    class = "cd-or-chip-bar",
+    style = "margin-top:6px;margin-bottom:2px;",
+    htmltools::tags$span(
+      style = "font-size:12px;color:#64748b;font-weight:500;margin-right:8px;",
+      "Show:"
+    ),
+    htmltools::tags$button(
+      class = "cd-or-chip active",
+      onclick = sprintf("cdFilterMatrixRows('%s','all')", matrix_table_id),
+      "All"
+    ),
+    htmltools::tags$button(
+      class = "cd-or-chip",
+      onclick = sprintf("cdFilterMatrixRows('%s','3')", matrix_table_id),
+      "Top 3"
+    ),
+    htmltools::tags$button(
+      class = "cd-or-chip",
+      onclick = sprintf("cdFilterMatrixRows('%s','5')", matrix_table_id),
+      "Top 5"
+    )
+  )
+
   htmltools::tags$div(
-    class = "cd-comp-section",
-    htmltools::tags$h2(class = "cd-comp-section-title", "Driver Comparison Matrix"),
+    class = "cd-comp-section cd-section",
+    id = paste0(id_prefix, "cd-driver-matrix"),
+    `data-cd-section` = "driver-matrix",
+    title_row,
+    insight_area,
     htmltools::tags$p(
-      style = "color:#64748b;font-size:13px;margin-bottom:14px;",
+      class = "cd-section-intro",
       "How each driver ranks across different outcomes. Rank #1 indicates the strongest driver for that outcome."
     ),
-    htmltools::tags$table(
-      class = "cd-comp-table",
-      htmltools::tags$thead(header_row),
-      htmltools::tags$tbody(data_rows)
+    chip_bar,
+    htmltools::tags$div(
+      class = "cd-table-wrapper",
+      htmltools::tags$table(
+        class = "cd-comp-table cd-table",
+        id = matrix_table_id,
+        htmltools::tags$thead(header_row),
+        htmltools::tags$tbody(data_rows)
+      )
     )
   )
 }
 
 
 # --- Cross-outcome insights ---
-build_comparison_insights <- function(summaries, driver_comparison, brand_colour) {
+build_comparison_insights <- function(summaries, driver_comparison, brand_colour,
+                                      id_prefix = "overview-") {
 
   insights <- character(0)
 
@@ -663,11 +719,18 @@ build_comparison_insights <- function(summaries, driver_comparison, brand_colour
     )
   })
 
+  title_row <- build_cd_section_title_row("Cross-Outcome Insights", "key-insights",
+                                           id_prefix = id_prefix)
+  insight_area <- build_cd_insight_area("key-insights", id_prefix = id_prefix)
+
   htmltools::tags$div(
-    class = "cd-comp-section",
-    htmltools::tags$h2(class = "cd-comp-section-title", "Cross-Outcome Insights"),
+    class = "cd-comp-section cd-section",
+    id = paste0(id_prefix, "cd-key-insights"),
+    `data-cd-section` = "key-insights",
+    title_row,
+    insight_area,
     htmltools::tags$p(
-      style = "color:#64748b;font-size:13px;margin-bottom:14px;",
+      class = "cd-section-intro",
       "Patterns detected by comparing driver importance across outcomes."
     ),
     insight_els
