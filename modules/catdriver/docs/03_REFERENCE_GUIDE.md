@@ -436,6 +436,42 @@ The model type is determined by the **mandatory** `outcome_type` setting in your
 
 ---
 
+## Subgroup Comparison Analysis
+
+### Method
+
+When `subgroup_var` is set, the module runs **separate models** for each subgroup rather than a single pooled model with interaction terms. This stratified approach was chosen because:
+
+1. **Interpretability**: Separate models produce per-group importance rankings and odds ratios that are directly comparable and easily explained to non-technical stakeholders
+2. **Flexibility**: Each subgroup model can converge independently — a failed subgroup doesn't prevent analysis of other groups
+3. **Robustness**: Avoids the combinatorial explosion of interaction terms when drivers have many levels
+
+### Driver Classification
+
+After running per-subgroup models, drivers are classified based on their importance rank patterns across groups:
+
+| Classification | Rule | Interpretation |
+|---------------|------|----------------|
+| **Universal** | Rank ≤ 3 in ALL groups AND max rank difference ≤ 2 | Driver is consistently important across all segments |
+| **Segment-Specific** | Rank ≤ 3 in exactly 1 group AND rank > 5 in all others | Driver matters for one segment but not others |
+| **Mixed** | Everything else | Driver importance varies moderately across segments |
+
+### Comparison Metrics
+
+Three comparison dimensions are reported:
+
+1. **Importance Matrix**: Side-by-side importance percentages and ranks for every driver across all subgroups, with classification labels
+2. **Odds Ratio Comparison**: Per-driver, per-level OR values across groups. Differences are flagged as "notable" when the ratio between the largest and smallest group OR exceeds 2.0
+3. **Model Fit Summary**: Per-group sample size (n), McFadden R², AIC, and convergence status
+
+### Limitations
+
+- The stratified approach does not formally test whether differences between groups are statistically significant. It identifies *patterns* in rank and effect size differences, which should be interpreted as exploratory rather than confirmatory
+- Small subgroups (below `subgroup_min_n`) may produce unstable estimates. These groups receive a warning but are still analysed
+- If a subgroup model fails to converge, it is excluded from comparison but the remaining groups still produce results (graceful degradation via PARTIAL status)
+
+---
+
 ## References
 
 1. Agresti, A. (2010). Analysis of Ordinal Categorical Data. Wiley.

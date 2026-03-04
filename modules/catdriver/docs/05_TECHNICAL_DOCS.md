@@ -71,12 +71,14 @@ modules/catdriver/
 │   ├── 06_output.R            # Excel workbook generation
 │   ├── 06a_sheets_summary.R   # Summary sheet formatting
 │   ├── 06b_sheets_detail.R    # Detail sheet formatting
+│   ├── 06c_sheets_subgroup.R   # Subgroup Excel sheets
 │   ├── 07_utilities.R         # Helper functions
 │   ├── 08_guard.R             # Refusal mechanism
 │   ├── 08a_guards_hard.R      # Hard validation guards
 │   ├── 08b_guards_soft.R      # Soft warning guards
 │   ├── 09_mapper.R            # Term-to-level mapping
-│   └── 10_missing.R           # Missing data handling
+│   ├── 10_missing.R           # Missing data handling
+│   └── 11_subgroup_comparison.R # Subgroup comparison logic
 ├── lib/
 │   └── html_report/           # HTML report generation pipeline
 │       ├── 00_html_guard.R          # Input validation for HTML report
@@ -87,6 +89,7 @@ modules/catdriver/
 │       ├── 05_chart_builder.R       # SVG chart generators (forest, bar)
 │       ├── 06_comparison_report.R   # Multi-outcome comparison report
 │       ├── 07_unified_report.R      # Unified tabbed multi-analysis report
+│       ├── 08_subgroup_report.R    # Subgroup HTML section
 │       ├── 99_html_report_main.R    # Entry point for HTML report generation
 │       └── js/                      # Client-side JavaScript
 │           ├── cd_insights.js       # Insight/annotation pinning
@@ -227,6 +230,17 @@ source("modules/catdriver/R/00_main.R")          # Uses: all above
 └─────────────────┘
 ```
 
+### Subgroup Pipeline Branch (Optional)
+
+When `subgroup_var` is set, the pipeline branches after Step 3:
+
+1. **Subgroup detection** — identifies distinct groups from the subgroup variable
+2. **Per-group loop** — Steps 4-10 run independently for each subgroup (plus Total) inside `run_catdriver_steps_4_to_10()`
+3. **Comparison** — `build_subgroup_comparison()` produces importance matrix, driver classification, OR comparison, model fit summary, and insights
+4. **Output integration** — Subgroup sheets added to Excel; subgroup section added to HTML report
+
+Failed subgroups receive PARTIAL status but do not prevent other groups from completing.
+
 ### Model Selection Logic
 
 The model is determined by the **mandatory** `outcome_type` config setting:
@@ -353,6 +367,28 @@ comparison reports, and unified tabbed reports.
 | `cd_unified_tabs.js` | Analysis-level tab controller for unified reports |
 | `cd_utils.js` | Shared JS utilities |
 
+### Subgroup Comparison (`11_subgroup_comparison.R`)
+
+| Function | Purpose |
+|----------|---------|
+| `build_subgroup_comparison()` | Master comparison function — takes per-group results, returns structured comparison |
+| `build_importance_matrix()` | Creates driver-by-group rank/percentage matrix |
+| `classify_drivers()` | Assigns Universal / Segment-Specific / Mixed classification |
+| `build_or_comparison()` | Compares OR values across groups, flags notable differences |
+| `build_model_fit_summary()` | One row per group with n, R², AIC, convergence |
+| `generate_subgroup_insights()` | Auto-generates management-ready insight bullets |
+
+### Subgroup Guards (`08a_guards_hard.R`, `08b_guards_soft.R`)
+
+| Guard | Type | Condition |
+|-------|------|-----------|
+| `guard_subgroup_not_outcome()` | Hard | REFUSE if subgroup_var == outcome_var |
+| `guard_subgroup_not_driver()` | Hard | REFUSE if subgroup_var is in driver_vars |
+| `guard_subgroup_exists_in_data()` | Hard | REFUSE if subgroup_var column not in data |
+| `guard_subgroup_minimum_levels()` | Hard | REFUSE if < 2 distinct non-NA levels |
+| `guard_check_subgroup_sample_size()` | Soft | WARN if group n < subgroup_min_n |
+| `guard_check_subgroup_model_failed()` | Soft | Record failure for PARTIAL status |
+
 ------------------------------------------------------------------------
 
 ## Error Handling Strategy {#error-handling-strategy}
@@ -435,6 +471,14 @@ Weight
 | type             | Yes      | categorical/ordinal/binary                 |
 | reference_level  | No       | Must exist in data                         |
 | missing_strategy | No       | drop_row/missing_as_level/error_if_missing |
+
+### Subgroup Settings (Optional)
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `subgroup_var` | character | NULL | Column name for subgroup splitting |
+| `subgroup_min_n` | integer | 30 | Minimum observations per subgroup |
+| `subgroup_include_total` | logical | TRUE | Include full-dataset Total analysis |
 
 ------------------------------------------------------------------------
 

@@ -1,7 +1,7 @@
 # Turas Categorical Key Driver Module
 
-**Version:** 12.0
-**Last Updated:** 3 March 2026
+**Version:** 13.0
+**Last Updated:** 4 March 2026
 
 Key driver analysis for categorical outcomes using logistic regression methods.
 
@@ -21,6 +21,8 @@ The Categorical Key Driver module identifies which factors most strongly influen
 - Bootstrap confidence intervals (optional)
 - Plain-English executive summaries
 - Interactive HTML reports with SVG charts
+- **Subgroup comparison** — split analysis by a grouping variable
+  (e.g., age, region) and compare driver importance across groups
 - **Multi-config GUI** — run multiple outcome analyses and generate a
   unified tabbed report from a single panel
 
@@ -35,6 +37,7 @@ The Categorical Key Driver module identifies which factors most strongly influen
 | Brand preference | Nominal | Brand A/B/C/D |
 | Survey completion | Ordinal | Complete/Partial/Abandoned |
 | Employee engagement | Ordinal | Disengaged/Neutral/Engaged |
+| Churn by segment | Binary + Subgroup | Churned vs Retained, split by age group |
 
 ---
 
@@ -73,6 +76,16 @@ Create an Excel file with three sheets (Settings, Variables, Driver_Settings):
 
 **Note:** `outcome_type` is required. Must be `binary`, `ordinal`, or `multinomial`.
 
+**Optional subgroup settings:**
+
+| Setting | Value |
+|---------|-------|
+| subgroup_var | age_group |
+| subgroup_min_n | 30 |
+| subgroup_include_total | TRUE |
+
+Set `subgroup_var` to split the analysis by a grouping variable. The variable must not be the outcome or a driver.
+
 ### Variables Sheet
 
 | VariableName | Type | Label | Order |
@@ -97,6 +110,9 @@ The module generates an Excel workbook with:
 | Model Summary | Fit statistics (pseudo-R², AIC) |
 | Odds Ratios | Detailed comparisons (if detailed_output=TRUE) |
 | Diagnostics | Data quality checks (if detailed_output=TRUE) |
+| Subgroup Summary | Driver importance across subgroups (if subgroup_var set) |
+| Subgroup OR Compare | Odds ratio comparison across subgroups (if subgroup_var set) |
+| Subgroup Model Fit | Per-subgroup model fit statistics (if subgroup_var set) |
 
 ---
 
@@ -114,7 +130,14 @@ modules/catdriver/
 │   ├── 04b_multinomial.R   # Multinomial logistic
 │   ├── 05_importance.R     # Importance calculations
 │   ├── 06_output.R         # Excel generation
-│   └── 07_utilities.R      # Helper functions
+│   ├── 06c_sheets_subgroup.R # Subgroup Excel sheets
+│   ├── 07_utilities.R      # Helper functions
+│   ├── 08_guard.R          # Guard framework
+│   ├── 08a_guards_hard.R   # Hard guards (REFUSE)
+│   ├── 08b_guards_soft.R   # Soft guards (WARN)
+│   ├── 09_mapper.R         # Term-level mapping
+│   ├── 10_missing.R        # Missing data handling
+│   └── 11_subgroup_comparison.R  # Subgroup comparison logic
 ├── lib/html_report/        # HTML report pipeline
 ├── run_catdriver_gui.R     # Shiny GUI
 └── docs/                   # Documentation

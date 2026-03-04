@@ -18,7 +18,8 @@ This document provides practical step-by-step workflows for common categorical k
 5. [Working with Weighted Data](#workflow-5-weighted-analysis)
 6. [Interpreting Results](#workflow-6-interpreting-results)
 7. [Multi-Outcome Unified Report](#workflow-7-multi-outcome-unified-report)
-8. [Troubleshooting Guide](#troubleshooting-guide)
+8. [Subgroup Comparison: Churn Drivers by Age Group](#workflow-8-subgroup-comparison--churn-drivers-by-age-group)
+9. [Troubleshooting Guide](#troubleshooting-guide)
 
 ---
 
@@ -415,6 +416,62 @@ The unified report shows:
     HTML reports use their own config values.
 -   You don't have to select all detected configs. Pick the subset that
     makes sense for the comparison you want.
+
+---
+
+## Workflow 8: Subgroup Comparison — Churn Drivers by Age Group
+
+### Scenario
+
+A telecoms company wants to know whether the factors driving customer churn differ across age groups. Management suspects that younger customers churn for different reasons than older customers.
+
+### Step 1: Choose the Subgroup Variable
+
+Select a variable that:
+- Defines meaningful segments (e.g., age_group, region, customer_tier)
+- Has at least 2 groups with sufficient sample sizes (30+ per group recommended)
+- Is NOT already used as a driver or as the outcome variable
+
+**Important:** If your subgroup variable is currently a driver, remove it from the Variables sheet driver list. A variable cannot be both a predictor and a splitter.
+
+### Step 2: Configure Settings
+
+In your config file's **Settings** sheet, add:
+
+| Setting | Value |
+|---------|-------|
+| data_file | customer_survey.csv |
+| output_file | churn_by_age.xlsx |
+| outcome_type | binary |
+| reference_category | Retained |
+| subgroup_var | age_group |
+| subgroup_min_n | 30 |
+| subgroup_include_total | TRUE |
+
+### Step 3: Run the Analysis
+
+```r
+results <- run_categorical_keydriver("churn_by_age_config.xlsx")
+```
+
+Or use the GUI: select your config file, expand **Advanced Options**, and enter the subgroup variable name.
+
+### Step 4: Interpret the Subgroup Comparison
+
+The output includes three additional Excel sheets and an HTML report section:
+
+**Driver Classification:**
+- **Universal**: Ranks in the top 3 across ALL groups with minimal rank variation — these are drivers that matter everywhere
+- **Segment-Specific**: Ranks in the top 3 in exactly one group but is unimportant (rank > 5) in others — these are group-specific drivers
+- **Mixed**: Everything else — drivers with moderate variation across groups
+
+**Example interpretation:**
+> "Service quality is a Universal driver — it's the #1 predictor of churn in all age groups. However, price perception is Segment-Specific to 18-30 year olds, where it ranks #2, but only #5 in the 46-60 group. This suggests price-focused retention campaigns should target younger customers."
+
+**Auto-generated insights** appear in both the Excel and HTML outputs with findings like:
+- "Driver X is #1 in Group A but #4 in Group B"
+- "All groups agree that Y is the most important driver"
+- "Group C has the highest R² (0.32), suggesting the model explains churn best for this segment"
 
 ---
 

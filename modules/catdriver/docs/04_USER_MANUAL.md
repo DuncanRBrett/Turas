@@ -26,12 +26,14 @@ Market Researchers, Data Analysts, Survey Managers
     Turas](#6-running-the-analysis-from-turas)
 7.  [Running Multiple Outcomes (Unified
     Report)](#7-running-multiple-outcomes-unified-report)
-8.  [Understanding Your Output](#8-understanding-your-output)
-9.  [Interpreting the HTML Report](#9-interpreting-the-html-report)
-10. [Troubleshooting](#10-troubleshooting)
-11. [Decision Flowcharts](#11-decision-flowcharts)
-12. [Complete Worked Example](#12-complete-worked-example)
-13. [Quick Reference Tables](#13-quick-reference-tables)
+8.  [Running Subgroup
+    Comparisons](#8-running-subgroup-comparisons)
+9.  [Understanding Your Output](#9-understanding-your-output)
+10. [Interpreting the HTML Report](#10-interpreting-the-html-report)
+11. [Troubleshooting](#11-troubleshooting)
+12. [Decision Flowcharts](#12-decision-flowcharts)
+13. [Complete Worked Example](#13-complete-worked-example)
+14. [Quick Reference Tables](#14-quick-reference-tables)
 
 ------------------------------------------------------------------------
 
@@ -432,7 +434,7 @@ the correct model type. See Section 2 for guidance.
 | `html_report` | TRUE | Generate interactive HTML report |
 | `bootstrap_ci` | FALSE | Calculate bootstrap confidence intervals (slower but more robust) |
 | `bootstrap_reps` | 200 | Number of bootstrap resamples |
-| `probability_lifts` | TRUE | Calculate probability lifts (see Section 8) |
+| `probability_lifts` | TRUE | Calculate probability lifts (see Section 9) |
 | `brand_colour` | "#323367" | Primary colour for HTML report charts |
 | `accent_colour` | "#CC9900" | Accent colour for HTML report |
 
@@ -638,7 +640,7 @@ will see a clear error:
 ```
 
 Every error includes a code, a plain-English message, and a specific fix
-instruction. See Section 10 for common errors and their solutions.
+instruction. See Section 11 for common errors and their solutions.
 
 ------------------------------------------------------------------------
 
@@ -815,7 +817,81 @@ unified <- generate_catdriver_unified_report(
 
 ------------------------------------------------------------------------
 
-## 8. Understanding Your Output
+## 8. Running Subgroup Comparisons
+
+### When to Use Subgroup Analysis
+
+Use subgroup comparison when you suspect that **different segments of your audience are driven by different factors**. Common scenarios:
+
+- "Do younger and older customers churn for different reasons?"
+- "Are the drivers of satisfaction different across regions?"
+- "Does brand preference work differently for high-value vs low-value customers?"
+
+### Setting Up a Subgroup Analysis
+
+**Step 1:** Choose your subgroup variable — a column in your data that defines the groups (e.g., `age_group`, `region`, `customer_tier`).
+
+**Important constraints:**
+- The subgroup variable must **not** be the outcome variable
+- The subgroup variable must **not** be listed as a driver in the Variables sheet
+- The variable must have at least 2 distinct non-missing values
+- Each group should ideally have 30+ observations (configurable via `subgroup_min_n`)
+
+If your desired subgroup variable is currently a driver, remove it from the Variables sheet first. A variable cannot be both a predictor and a grouping variable — it would have no variation within each group.
+
+**Step 2:** Add subgroup settings to your config file's **Settings** sheet:
+
+| Setting | Value | Notes |
+|---------|-------|-------|
+| subgroup_var | age_group | Column name in your data |
+| subgroup_min_n | 30 | Minimum observations per group (default) |
+| subgroup_include_total | TRUE | Include full-dataset analysis as baseline |
+
+**Step 3:** Run the analysis as normal:
+
+```r
+results <- run_categorical_keydriver("my_config.xlsx")
+```
+
+Or via the GUI: select your config, expand **Advanced Options**, and type the subgroup variable name.
+
+### What Happens Behind the Scenes
+
+1. The full dataset is analysed first (the "Total" result) — this is identical to a standard non-subgroup analysis and ensures backward compatibility
+2. The data is split by the subgroup variable into separate datasets
+3. The same analysis pipeline (Steps 4-10) runs independently on each subgroup
+4. Results are compared using importance rankings, odds ratios, and model fit statistics
+5. Drivers are classified as Universal, Segment-Specific, or Mixed
+
+If a subgroup model fails (e.g., too few observations, convergence issues), that group is marked as PARTIAL but does not prevent other groups from being analysed.
+
+### Understanding Subgroup Output
+
+**Excel Output** — Three additional sheets:
+
+| Sheet | Content |
+|-------|---------|
+| Subgroup Summary | Side-by-side importance ranks with classification (Universal / Segment-Specific / Mixed) |
+| Subgroup OR Compare | Odds ratios per group, notable differences highlighted in red |
+| Subgroup Model Fit | Per-group n, R², AIC, convergence status |
+
+**HTML Report** — A dedicated "Subgroups" section containing:
+- Overview cards showing each group's sample size, R², and top driver
+- Grouped horizontal bar chart comparing importance percentages across groups
+- Classification table showing which drivers are universal vs segment-specific
+- Auto-generated management insights
+
+### Tips for Subgroup Analysis
+
+1. **Start with the Total**: Always check the overall (Total) analysis first to understand the baseline
+2. **Watch for small groups**: Groups with fewer than 30-50 observations may produce unreliable results. Check the Model Fit sheet for warnings
+3. **Don't over-interpret Mixed drivers**: A driver classified as "Mixed" simply means it doesn't clearly fit Universal or Segment-Specific patterns. It may still be important
+4. **Use with bootstrap**: If your data has unequal group sizes, consider enabling `bootstrap_ci = TRUE` for more robust uncertainty estimates per subgroup
+5. **Report Universal drivers first**: When presenting to management, lead with Universal drivers (important everywhere), then highlight Segment-Specific findings as actionable targeting opportunities
+
+------------------------------------------------------------------------
+
+## 9. Understanding Your Output
 
 ### Excel Workbook Sheets
 
@@ -893,7 +969,7 @@ Filter chips let you show/hide individual drivers.
 
 ------------------------------------------------------------------------
 
-## 9. Interpreting the HTML Report
+## 10. Interpreting the HTML Report
 
 ### How to Read the Model Fit Cards
 
@@ -964,7 +1040,7 @@ reference, how much does their probability of the outcome change?"
 
 ------------------------------------------------------------------------
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 ### Error: "outcome_type setting is required"
 
@@ -1058,7 +1134,7 @@ Results marked PARTIAL should be interpreted with extra caution.
 
 ------------------------------------------------------------------------
 
-## 11. Decision Flowcharts
+## 12. Decision Flowcharts
 
 ### Choosing Your Outcome Type
 
@@ -1149,7 +1225,7 @@ Potential driver variable:
 
 ------------------------------------------------------------------------
 
-## 12. Complete Worked Example
+## 13. Complete Worked Example
 
 This walks through a real analysis using the included example data.
 
@@ -1250,7 +1326,7 @@ fit, sample information, warnings
 
 ------------------------------------------------------------------------
 
-## 13. Quick Reference Tables
+## 14. Quick Reference Tables
 
 ### Settings Quick Reference
 

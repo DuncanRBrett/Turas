@@ -133,6 +133,31 @@ This document provides complete field-by-field reference for the CatDriver confi
 
 ---
 
+### Subgroup Comparison Settings (Optional)
+
+| Setting | Required | Default | Description |
+|---------|----------|---------|-------------|
+| subgroup_var | No | (disabled) | Column name from data file to split analysis by subgroup (e.g., `age_group`, `region`). Must NOT be the outcome or a driver variable. Leave blank for standard analysis. |
+| subgroup_min_n | No | 30 | Minimum observations per subgroup to run analysis. Groups below this threshold produce a warning but analysis still proceeds. |
+| subgroup_include_total | No | TRUE | Include a full-dataset "Total" analysis alongside per-subgroup results. Provides a comparison baseline. |
+
+**Rules:**
+- `subgroup_var` must exist as a column in the data file
+- `subgroup_var` must NOT be the outcome variable
+- `subgroup_var` must NOT be listed as a driver in the Variables sheet
+- Must have at least 2 distinct non-NA values in the subgroup column
+
+**Additional Output (when subgroup_var is set):**
+
+Three extra Excel sheets are generated:
+- **Subgroup Summary** — side-by-side importance rankings with driver classification (Universal / Segment-Specific / Mixed)
+- **Subgroup OR Compare** — odds ratio values per group, flagging notable differences (ratio > 2.0x)
+- **Subgroup Model Fit** — per-group sample size, R², AIC, and convergence status
+
+The HTML report also includes a dedicated Subgroups section with grouped bar charts, classification tables, and auto-generated management insights.
+
+---
+
 ## Variables Sheet
 
 ### Column Definitions

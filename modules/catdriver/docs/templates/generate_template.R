@@ -92,7 +92,11 @@ settings_df <- data.frame(
     "accent_colour",
     "report_title",
     "researcher_logo_path",
-    "client_logo_path"
+    "client_logo_path",
+    # Subgroup comparison (optional)
+    "subgroup_var",
+    "subgroup_min_n",
+    "subgroup_include_total"
   ),
   Value = c(
     "data.csv",
@@ -115,7 +119,11 @@ settings_df <- data.frame(
     "#CC9900",
     "",
     "",
-    ""
+    "",
+    # Subgroup comparison
+    "",
+    "30",
+    "TRUE"
   ),
   Required = c(
     "YES", "YES",
@@ -124,7 +132,8 @@ settings_df <- data.frame(
     "No",
     "No", "No", "No",
     "No", "No",
-    "No", "No", "No", "No", "No", "No", "No"
+    "No", "No", "No", "No", "No", "No", "No",
+    "No", "No", "No"
   ),
   Default = c(
     "-", "-",
@@ -133,7 +142,8 @@ settings_df <- data.frame(
     "TRUE",
     "warn_only", "10", "5",
     "FALSE", "200",
-    "TRUE", "TRUE", "#323367", "#CC9900", "(analysis_name)", "-", "-"
+    "TRUE", "TRUE", "#323367", "#CC9900", "(analysis_name)", "-", "-",
+    "(disabled)", "30", "TRUE"
   ),
   Description = c(
     "Path to data file. Relative paths resolve from this config file's directory.",
@@ -156,7 +166,10 @@ settings_df <- data.frame(
     "Accent colour for report highlights (hex code).",
     "Custom title for the HTML report. Leave blank to use analysis_name.",
     "Path to researcher/analyst logo image for report header. Leave blank to omit.",
-    "Path to client logo image for report header. Leave blank to omit."
+    "Path to client logo image for report header. Leave blank to omit.",
+    "Column name for subgroup splitting (e.g. age_group, region). Must NOT be outcome or driver. Leave blank for standard analysis.",
+    "Minimum observations per subgroup. Groups below this threshold produce a warning.",
+    "Include full-dataset 'Total' analysis alongside per-subgroup results."
   ),
   Valid.Values = c(
     ".csv, .xlsx, .xls, .sav, .dta",
@@ -179,7 +192,10 @@ settings_df <- data.frame(
     "Hex colour (e.g. #CC9900)",
     "Any text",
     "Image file path (.png, .jpg)",
-    "Image file path (.png, .jpg)"
+    "Image file path (.png, .jpg)",
+    "Column name from data file",
+    "Positive integer (recommend 30+)",
+    "TRUE | FALSE"
   ),
   stringsAsFactors = FALSE
 )
@@ -341,13 +357,34 @@ instructions <- c(
   "Numeric codes:        1;2;3;4;5",
   "",
   "=== OPTIONAL FEATURES ===",
-  "Bootstrap CIs:    Set bootstrap_ci=TRUE for more robust confidence intervals.",
-  "                  Recommended for non-probability samples. Adds 1-3 minutes runtime.",
-  "HTML Report:      Set html_report=TRUE (default) for an interactive HTML report.",
-  "Probability Lifts: Set probability_lifts=TRUE (default) to show how each driver level",
-  "                   changes the predicted probability vs the reference.",
-  "Brand Colours:    Set brand_colour and accent_colour (hex codes) to customise report styling.",
-  "Logos:            Set researcher_logo_path and client_logo_path for branded report headers.",
+  "Bootstrap CIs:      Set bootstrap_ci=TRUE for more robust confidence intervals.",
+  "                    Recommended for non-probability samples. Adds 1-3 minutes runtime.",
+  "HTML Report:        Set html_report=TRUE (default) for an interactive HTML report.",
+  "Probability Lifts:  Set probability_lifts=TRUE (default) to show how each driver level",
+  "                    changes the predicted probability vs the reference.",
+  "Brand Colours:      Set brand_colour and accent_colour (hex codes) to customise report styling.",
+  "Logos:              Set researcher_logo_path and client_logo_path for branded report headers.",
+  "",
+  "=== SUBGROUP COMPARISON (OPTIONAL) ===",
+  "Set subgroup_var to a column name from your data to split the analysis by group.",
+  "The module runs a separate model for each subgroup, then compares results across groups.",
+  "",
+  "SETTINGS:",
+  "  subgroup_var          - Column name (e.g. 'age_group', 'region'). Leave blank to disable.",
+  "  subgroup_min_n        - Minimum observations per subgroup (default: 30).",
+  "  subgroup_include_total - Include full-dataset analysis alongside subgroups (default: TRUE).",
+  "",
+  "RULES:",
+  "  - subgroup_var must NOT be the outcome variable",
+  "  - subgroup_var must NOT be listed as a driver variable",
+  "  - Must have at least 2 distinct non-NA levels",
+  "",
+  "OUTPUT:",
+  "  - Per-subgroup importance rankings with driver classification:",
+  "    Universal (important across all groups), Segment-Specific (only important in one group), Mixed",
+  "  - Odds ratio comparison table flagging notable differences (ratio > 2x)",
+  "  - Per-subgroup model fit summary (n, R-squared, AIC, convergence)",
+  "  - Auto-generated management insights (e.g. 'Driver X is #1 in Group A but #5 in Group B')",
   "",
   "=== TIPS ===",
   "- Use relative paths so projects work when moved or synced via OneDrive",
