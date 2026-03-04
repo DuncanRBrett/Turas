@@ -85,16 +85,17 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
   # ATTEMPT PRIMARY FIT (standard glm)
   # ==========================================================================
 
+  fit_data <- data  # Local copy to avoid polluting caller's data with .wt column
   model <- tryCatch({
     if (!is.null(weights) && length(weights) == nrow(data)) {
       if (length(unique(weights)) == 1 && unique(weights)[1] == 1) {
-        glm(formula, data = data, family = binomial(link = "logit"))
+        glm(formula, data = fit_data, family = binomial(link = "logit"))
       } else {
-        data$.wt <- weights
-        glm(formula, data = data, family = binomial(link = "logit"), weights = .wt)
+        fit_data$.wt <- weights
+        glm(formula, data = fit_data, family = binomial(link = "logit"), weights = .wt)
       }
     } else {
-      glm(formula, data = data, family = binomial(link = "logit"))
+      glm(formula, data = fit_data, family = binomial(link = "logit"))
     }
   }, error = function(e) {
     list(error = TRUE, message = e$message)
@@ -134,11 +135,11 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
 
         if (!is.null(weights) && length(weights) == nrow(data) &&
             !(length(unique(weights)) == 1 && unique(weights)[1] == 1)) {
-          data$.wt <- weights
-          glm(formula, data = data, family = binomial(link = "logit"),
+          fit_data$.wt <- weights
+          glm(formula, data = fit_data, family = binomial(link = "logit"),
               weights = .wt, method = brglm2::brglm_fit)
         } else {
-          glm(formula, data = data, family = binomial(link = "logit"),
+          glm(formula, data = fit_data, family = binomial(link = "logit"),
               method = brglm2::brglm_fit)
         }
       }, error = function(e) {
@@ -303,6 +304,14 @@ check_multicollinearity <- function(model) {
     return(list(
       checked = FALSE,
       message = "Package 'car' required for multicollinearity check"
+    ))
+  }
+
+  # car::vif() does not support multinomial (nnet) models
+  if (inherits(model, "multinom")) {
+    return(list(
+      checked = FALSE,
+      message = "VIF not available for multinomial models (limitation of car::vif)"
     ))
   }
 

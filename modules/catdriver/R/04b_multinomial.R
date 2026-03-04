@@ -91,16 +91,21 @@ run_multinomial_logistic_robust <- function(formula, data, weights = NULL, confi
   # FIT MODEL
   # ===========================================================================
 
+  fit_data <- data  # Local copy to avoid polluting caller's data with .wt column
+  # Hess = TRUE stores the Hessian so vcov()/confint() work outside fit scope
   model <- tryCatch({
     if (!is.null(weights) && length(weights) == nrow(data)) {
       if (!(length(unique(weights)) == 1 && unique(weights)[1] == 1)) {
-        data$.wt <- weights
-        nnet::multinom(formula, data = data, weights = .wt, trace = FALSE, maxit = 500)
+        fit_data$.wt <- weights
+        nnet::multinom(formula, data = fit_data, weights = .wt,
+                       trace = FALSE, maxit = 500, Hess = TRUE)
       } else {
-        nnet::multinom(formula, data = data, trace = FALSE, maxit = 500)
+        nnet::multinom(formula, data = fit_data,
+                       trace = FALSE, maxit = 500, Hess = TRUE)
       }
     } else {
-      nnet::multinom(formula, data = data, trace = FALSE, maxit = 500)
+      nnet::multinom(formula, data = fit_data,
+                     trace = FALSE, maxit = 500, Hess = TRUE)
     }
   }, error = function(e) {
     list(error = TRUE, message = e$message)
@@ -126,9 +131,20 @@ run_multinomial_logistic_robust <- function(formula, data, weights = NULL, confi
                          dimnames = list(names(model$lev)[-1], names(coef_matrix)))
   }
 
+  # vcov() for nnet::multinom internally calls model.frame() which tries to
+
+  # evaluate the `data` argument from model$call. If model$call stores the
+  # symbol `fit_data`, it fails when `fit_data` is not in the calling scope.
+  # Fix: temporarily ensure fit_data is visible, or use the Hessian directly.
   se_matrix <- tryCatch({
-    vcov_mat <- vcov(model)
-    se_vec <- sqrt(diag(vcov_mat))
+    # nnet stores the Hessian — use it directly for robust SE extraction
+    if (!is.null(model$Hessian)) {
+      vcov_mat <- solve(model$Hessian)
+      se_vec <- sqrt(pmax(diag(vcov_mat), 0))  # pmax guards against tiny negatives
+    } else {
+      vcov_mat <- vcov(model)
+      se_vec <- sqrt(diag(vcov_mat))
+    }
     matrix(se_vec, nrow = nrow(coef_matrix), byrow = TRUE,
            dimnames = dimnames(coef_matrix))
   }, error = function(e) {
@@ -202,6 +218,7 @@ run_multinomial_logistic_robust <- function(formula, data, weights = NULL, confi
 
   list(
     model = model,
+    analysis_data = data,
     model_type = "multinomial_logistic",
     engine_used = engine_used,
     fallback_used = fallback_used,

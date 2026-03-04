@@ -1,7 +1,7 @@
 # Turas Categorical Key Driver Module - Template Reference
 
-**Version:** 10.0
-**Last Updated:** 22 December 2025
+**Version:** 12.0
+**Last Updated:** 3 March 2026
 **Target Audience:** Analysts, Project Managers, Template Configurers
 
 This document provides complete field-by-field reference for the CatDriver configuration template.
@@ -71,18 +71,13 @@ This document provides complete field-by-field reference for the CatDriver confi
 
 #### outcome_type
 
-- **Purpose:** Override automatic outcome type detection
-- **Required:** No
-- **Default:** `auto`
+- **Purpose:** Declare the outcome variable type
+- **Required:** **Yes** (analysis will refuse without it)
 - **Valid Values:**
-  - `auto` - Detect from data
-  - `binary` - Force binary logistic
-  - `ordinal` - Force ordinal logistic
-  - `nominal` - Force multinomial logistic
-- **When to Override:**
-  - Auto-detection makes wrong choice
-  - Testing different model specifications
-  - Ordinal treatment of numeric categories
+  - `binary` - Binary logistic regression (exactly 2 outcome categories)
+  - `ordinal` - Ordinal logistic regression (3+ ordered categories)
+  - `multinomial` - Multinomial logistic regression (3+ unordered categories)
+- **Note:** `auto` is no longer accepted. You must explicitly declare the correct model type.
 
 #### reference_category
 
@@ -135,6 +130,31 @@ This document provides complete field-by-field reference for the CatDriver confi
 - **Default:** `TRUE`
 - **When FALSE:** Omits Odds Ratios and Diagnostics sheets
 - **When TRUE:** Full 6-sheet output
+
+---
+
+### Subgroup Comparison Settings (Optional)
+
+| Setting | Required | Default | Description |
+|---------|----------|---------|-------------|
+| subgroup_var | No | (disabled) | Column name from data file to split analysis by subgroup (e.g., `age_group`, `region`). Must NOT be the outcome or a driver variable. Leave blank for standard analysis. |
+| subgroup_min_n | No | 30 | Minimum observations per subgroup to run analysis. Groups below this threshold produce a warning but analysis still proceeds. |
+| subgroup_include_total | No | TRUE | Include a full-dataset "Total" analysis alongside per-subgroup results. Provides a comparison baseline. |
+
+**Rules:**
+- `subgroup_var` must exist as a column in the data file
+- `subgroup_var` must NOT be the outcome variable
+- `subgroup_var` must NOT be listed as a driver in the Variables sheet
+- Must have at least 2 distinct non-NA values in the subgroup column
+
+**Additional Output (when subgroup_var is set):**
+
+Three extra Excel sheets are generated:
+- **Subgroup Summary** — side-by-side importance rankings with driver classification (Universal / Segment-Specific / Mixed)
+- **Subgroup OR Compare** — odds ratio values per group, flagging notable differences (ratio > 2.0x)
+- **Subgroup Model Fit** — per-group sample size, R², AIC, and convergence status
+
+The HTML report also includes a dedicated Subgroups section with grouped bar charts, classification tables, and auto-generated management insights.
 
 ---
 
@@ -236,7 +256,7 @@ Setting              | Value
 analysis_name        | Customer Churn Drivers
 data_file            | data/customers.csv
 output_file          | output/churn_analysis.xlsx
-outcome_type         | auto
+outcome_type         | binary
 reference_category   | Retained
 min_sample_size      | 50
 confidence_level     | 0.95
@@ -327,7 +347,7 @@ recommendation       | Driver  | Recommendation     |
 |---------|------|
 | data_file | File must exist |
 | output_file | Directory must exist |
-| outcome_type | Must be: auto, binary, ordinal, nominal |
+| outcome_type | Must be: binary, ordinal, multinomial (required) |
 | reference_category | Must exist in outcome variable |
 | min_sample_size | Integer ≥ 1 |
 | confidence_level | 0 < value < 1 |

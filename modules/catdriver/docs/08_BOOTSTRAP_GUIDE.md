@@ -90,6 +90,7 @@ The **percentage of bootstrap resamples** where the odds ratio stayed on the sam
 | Self-selection sample | Recommended |
 | Small sample (n < 200) | Highly recommended |
 | Weighted data with extreme weights | Highly recommended |
+| Subgroup comparison (unequal group sizes) | Recommended |
 | Academic/regulatory reporting | Required for credibility |
 | Quick exploratory analysis | Optional (adds time) |
 
@@ -146,6 +147,8 @@ For each coefficient:
 3. **Failed resamples**: Some bootstrap samples may fail to converge (sparse data). Results use successful resamples only.
 
 4. **Not a fix for bias**: Bootstrap addresses variance/precision, not systematic bias from non-random sampling
+
+5. **Subgroup analysis**: When `subgroup_var` is set, bootstrap is applied independently to each subgroup model. This multiplies runtime by the number of subgroups (e.g., 4 subgroups × 200 reps = 800 model fits).
 
 ## Example Interpretation
 

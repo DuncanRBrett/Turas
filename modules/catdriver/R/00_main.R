@@ -132,7 +132,8 @@ run_categorical_keydriver <- function(config_file,
                                       data_file = NULL,
                                       output_file = NULL,
                                       outcome_type = NULL,
-                                      progress_callback = NULL) {
+                                      progress_callback = NULL,
+                                      config_overrides = NULL) {
 
   # ==========================================================================
   # TOP-LEVEL REFUSAL HANDLER (TRS v1.0)
@@ -142,7 +143,8 @@ run_categorical_keydriver <- function(config_file,
   # consistent handling per TRS v1.0 requirements.
 
   with_refusal_handler(
-    run_categorical_keydriver_impl(config_file, data_file, output_file, outcome_type, progress_callback)
+    run_categorical_keydriver_impl(config_file, data_file, output_file, outcome_type,
+                                   progress_callback, config_overrides)
   )
 }
 
@@ -154,16 +156,18 @@ run_categorical_keydriver_impl <- function(config_file,
                                            data_file = NULL,
                                            output_file = NULL,
                                            outcome_type = NULL,
-                                           progress_callback = NULL) {
+                                           progress_callback = NULL,
+                                           config_overrides = NULL) {
 
   # ==========================================================================
   # TRS RUN STATE INITIALIZATION (TRS v1.0)
   # ==========================================================================
 
-  # Helper function for progress updates (11 steps total)
+  # Helper function for progress updates
+  TOTAL_STEPS <- 11L
   update_progress <- function(step, message) {
     if (!is.null(progress_callback) && is.function(progress_callback)) {
-      progress_callback(step / 11, message)
+      progress_callback(step / TOTAL_STEPS, message)
     }
   }
 
@@ -208,6 +212,13 @@ run_categorical_keydriver_impl <- function(config_file,
   }
   if (!is.null(outcome_type)) {
     config$outcome_type <- outcome_type
+  }
+
+  # Apply arbitrary config overrides (e.g., from GUI)
+  if (!is.null(config_overrides) && is.list(config_overrides)) {
+    for (key in names(config_overrides)) {
+      config[[key]] <- config_overrides[[key]]
+    }
   }
 
   log_message(paste("Analysis:", config$analysis_name), "success")
@@ -293,6 +304,150 @@ run_categorical_keydriver_impl <- function(config_file,
   }
 
   log_message(paste("Original sample:", diagnostics$original_n, "respondents"), "info")
+
+  # ==========================================================================
+  # SUBGROUP DETECTION & BRANCHING
+  # ==========================================================================
+
+  subgroup_active <- !is.null(config$subgroup_var) && nzchar(config$subgroup_var)
+  subgroup_comparison <- NULL
+
+  if (subgroup_active) {
+    # Build the list of subgroups to analyse
+    subgroup_col <- data[[config$subgroup_var]]
+    subgroup_levels <- sort(unique(as.character(na.omit(subgroup_col))))
+
+    run_list <- list()
+    if (isTRUE(config$subgroup_include_total)) {
+      run_list[["Total"]] <- data
+    }
+    for (lvl in subgroup_levels) {
+      run_list[[lvl]] <- data[!is.na(subgroup_col) & as.character(subgroup_col) == lvl, , drop = FALSE]
+    }
+
+    cat("\n")
+    log_message(sprintf(
+      "Subgroup analysis activated: splitting by '%s' (%d groups: %s)",
+      config$subgroup_var, length(run_list), paste(names(run_list), collapse = ", ")
+    ), "info")
+
+    subgroup_results <- list()
+
+    for (group_name in names(run_list)) {
+      group_data <- run_list[[group_name]]
+      group_n <- nrow(group_data)
+
+      cat("\n")
+      cat(paste(rep("=", 60), collapse = ""), "\n")
+      cat(sprintf("  SUBGROUP: %s (n=%d)\n", group_name, group_n))
+      cat(paste(rep("=", 60), collapse = ""), "\n")
+
+      # Soft guard: check minimum sample size
+      guard <- guard_check_subgroup_sample_size(
+        guard, group_name, group_n, config$subgroup_min_n
+      )
+
+      # Run Steps 4-10 in tryCatch for graceful per-group failure
+      group_result <- tryCatch({
+        run_catdriver_steps_4_to_10(
+          group_data, config, guard,
+          degraded_reasons, affected_outputs,
+          update_progress, group_label = group_name
+        )
+      }, turas_refusal = function(e) {
+        cat(sprintf("   [PARTIAL] Subgroup '%s' REFUSED: %s\n",
+                    group_name, conditionMessage(e)))
+        guard <<- guard_check_subgroup_model_failed(guard, group_name, conditionMessage(e))
+        degraded_reasons <<- c(degraded_reasons,
+          sprintf("Subgroup '%s' failed: %s", group_name, e$code %||% "UNKNOWN"))
+        list(status = "REFUSED", group_name = group_name,
+             code = e$code %||% "UNKNOWN", message = conditionMessage(e))
+      }, catdriver_refusal = function(e) {
+        cat(sprintf("   [PARTIAL] Subgroup '%s' REFUSED: %s\n",
+                    group_name, conditionMessage(e)))
+        guard <<- guard_check_subgroup_model_failed(guard, group_name, conditionMessage(e))
+        degraded_reasons <<- c(degraded_reasons,
+          sprintf("Subgroup '%s' failed: %s", group_name, e$code %||% "UNKNOWN"))
+        list(status = "REFUSED", group_name = group_name,
+             code = e$code %||% "UNKNOWN", message = conditionMessage(e))
+      }, error = function(e) {
+        cat(sprintf("   [PARTIAL] Subgroup '%s' ERROR: %s\n",
+                    group_name, e$message))
+        guard <<- guard_check_subgroup_model_failed(guard, group_name, e$message)
+        degraded_reasons <<- c(degraded_reasons,
+          sprintf("Subgroup '%s' error: %s", group_name, e$message))
+        list(status = "ERROR", group_name = group_name, message = e$message)
+      })
+
+      group_result$group_name <- group_name
+      group_result$group_n <- group_n
+      subgroup_results[[group_name]] <- group_result
+
+      # Collect degraded reasons from per-group analysis
+      if (!is.null(group_result$degraded_reasons)) {
+        for (dr in group_result$degraded_reasons) {
+          degraded_reasons <- c(degraded_reasons, sprintf("[%s] %s", group_name, dr))
+        }
+      }
+      if (!is.null(group_result$affected_outputs)) {
+        affected_outputs <- c(affected_outputs, group_result$affected_outputs)
+      }
+    }
+
+    # Build comparison
+    if (exists("build_subgroup_comparison", mode = "function")) {
+      subgroup_comparison <- tryCatch(
+        build_subgroup_comparison(subgroup_results, config),
+        error = function(e) {
+          cat(sprintf("   [WARNING] Subgroup comparison generation failed: %s\n", e$message))
+          NULL
+        }
+      )
+    }
+
+    # Use "Total" as the primary result (backward compat for existing output)
+    # If no Total, use first successful subgroup
+    primary_name <- if ("Total" %in% names(subgroup_results) &&
+                        subgroup_results[["Total"]]$status %in% c("PASS", "PARTIAL")) {
+      "Total"
+    } else {
+      successful_names <- names(Filter(
+        function(r) r$status %in% c("PASS", "PARTIAL"), subgroup_results))
+      if (length(successful_names) > 0) successful_names[1] else NULL
+    }
+
+    if (is.null(primary_name)) {
+      catdriver_refuse(
+        reason = "SUBGROUP_ALL_FAILED",
+        title = "ALL SUBGROUP ANALYSES FAILED",
+        problem = "No subgroup produced a successful model fit.",
+        why_it_matters = "Cannot generate any output without at least one successful subgroup.",
+        fix = "Check the data quality and sample sizes for each subgroup."
+      )
+    }
+
+    # Extract primary result fields for backward-compatible Step 11
+    primary <- subgroup_results[[primary_name]]
+    model_result <- primary$model_result
+    importance <- primary$importance
+    odds_ratios <- primary$odds_ratios
+    prob_lift <- primary$probability_lift
+    factor_patterns <- primary$factor_patterns
+    prep_data <- primary$prep_data
+    term_mapping <- primary$term_mapping
+    missing_result <- list(missing_report = primary$missing_report)
+    rare_result <- list(collapse_report = primary$collapse_report)
+    vif_check <- primary$multicollinearity %||% list(checked = FALSE)
+    weight_diagnostics <- primary$weight_diagnostics
+    bootstrap_results <- primary$bootstrap_results
+    guard_status <- if (!is.null(primary$guard)) guard_summary(primary$guard) else guard_summary(guard)
+
+    log_message(sprintf("Subgroup analysis complete. Primary result: %s", primary_name), "success")
+
+  } else {
+    # ========================================================================
+    # NON-SUBGROUP PATH (original Steps 4-10, unchanged)
+    # ========================================================================
 
   # ==========================================================================
   # STEP 4: HANDLE MISSING DATA
@@ -521,16 +676,16 @@ run_categorical_keydriver_impl <- function(config_file,
   }, error = function(e) {
     # HARD STOP - no legacy fallback allowed
     catdriver_refuse(
-      reason = "term_mapping_failed",
-      message = paste0(
-        "Cannot create canonical term-to-level mapping.\n\n",
-        "Error: ", e$message, "\n\n",
-        "This mapping is required for correct odds ratio interpretation.\n",
-        "Possible causes:\n",
-        "  - Model did not converge properly\n",
-        "  - Unexpected coefficient naming from model\n",
-        "  - Data structure incompatible with expected design matrix\n\n",
-        "Please check your data and configuration, or contact support."
+      reason = "MAPPER_TERM_MAPPING_FAILED",
+      title = "TERM MAPPING FAILED",
+      problem = paste0("Cannot create canonical term-to-level mapping.\nError: ", e$message),
+      why_it_matters = "This mapping is required for correct odds ratio interpretation. Without it, CatDriver cannot guarantee which factor level each coefficient belongs to.",
+      fix = paste0(
+        "Possible causes and solutions:\n",
+        "  1. Model did not converge - check for sparse cells or separation\n",
+        "  2. Unexpected coefficient naming - check for special characters in level names\n",
+        "  3. Data structure issue - verify config matches data\n",
+        "  4. Contact support with your config file"
       )
     )
   })
@@ -567,8 +722,22 @@ run_categorical_keydriver_impl <- function(config_file,
 
   # Bootstrap confidence intervals (optional)
   bootstrap_results <- NULL
-  do_bootstrap <- as.logical(config$bootstrap_ci) %in% TRUE
+  do_bootstrap <- isTRUE(as.logical(config$bootstrap_ci))
   if (do_bootstrap && prep_data$outcome_info$type != "multinomial") {
+
+    # Validate bootstrap parameters (safe defaults for missing/invalid)
+    if (is.null(config$bootstrap_reps) || is.na(config$bootstrap_reps) ||
+        !is.numeric(config$bootstrap_reps) || config$bootstrap_reps < 10) {
+      config$bootstrap_reps <- 200L
+      cat("   [INFO] Bootstrap reps not configured or too low - using default 200\n")
+    }
+    if (is.null(config$confidence_level) || is.na(config$confidence_level) ||
+        !is.numeric(config$confidence_level) ||
+        config$confidence_level <= 0 || config$confidence_level >= 1) {
+      config$confidence_level <- 0.95
+      cat("   [INFO] Confidence level not configured or invalid - using default 0.95\n")
+    }
+
     log_message(paste0("Running bootstrap (", config$bootstrap_reps, " resamples)..."), "info")
     cat("   [INFO] Bootstrap may take 1-3 minutes\n")
 
@@ -588,7 +757,7 @@ run_categorical_keydriver_impl <- function(config_file,
       progress_callback = NULL  # Could add GUI callback here
     )
 
-    if (!is.null(bootstrap_results)) {
+    if (!is.null(bootstrap_results) && isTRUE(bootstrap_results$n_successful > 0)) {
       log_message(paste0("Bootstrap complete (", bootstrap_results$n_successful, "/",
                          bootstrap_results$n_boot, " successful)"), "success")
 
@@ -610,15 +779,25 @@ run_categorical_keydriver_impl <- function(config_file,
         }
         # If idx is empty or multiple matches, leave as NA (already initialized)
       }
+    } else if (!is.null(bootstrap_results)) {
+      # Bootstrap ran but all iterations failed
+      cat("   [PARTIAL] All bootstrap iterations failed - bootstrap results dropped\n")
+      bootstrap_results <- NULL
+      degraded_reasons <- c(degraded_reasons, "All bootstrap iterations failed")
+      affected_outputs <- c(affected_outputs, "bootstrap_ci")
     }
   }
 
-  # Calculate probability lift (new in v2.0)
-  prob_lift <- calculate_probability_lift(model_result, prep_data, config)
+  # Calculate probability lift (configurable — default TRUE)
+  prob_lift <- if (isTRUE(config$probability_lifts %||% TRUE)) {
+    calculate_probability_lift(model_result, prep_data, config)
+  } else NULL
 
   # Factor patterns
   factor_patterns <- calculate_factor_patterns(prep_data, config, odds_ratios)
   log_message(paste("Generated patterns for", length(factor_patterns), "factors"), "info")
+
+  }  # end non-subgroup path (else branch)
 
   # ==========================================================================
   # STEP 11: GENERATE OUTPUT
@@ -666,6 +845,10 @@ run_categorical_keydriver_impl <- function(config_file,
     weight_diagnostics = weight_diagnostics,
     bootstrap_results = bootstrap_results,
     config = config,
+    # Subgroup comparison (NULL when subgroup_var not set)
+    subgroup_comparison = subgroup_comparison,
+    subgroup_results = if (subgroup_active) subgroup_results else NULL,
+    subgroup_active = subgroup_active,
     # TRS v1.0: Include status fields for Run_Status sheet
     run_status = run_status,
     status = status,
@@ -677,7 +860,52 @@ run_categorical_keydriver_impl <- function(config_file,
   # Write Excel output
   write_catdriver_output(results, config, config$output_file)
 
-  log_message(paste("Output saved to:", basename(config$output_file)), "success")
+  log_message(paste("Excel output saved to:", basename(config$output_file)), "success")
+
+  # ==========================================================================
+  # HTML REPORT (if enabled)
+  # ==========================================================================
+  if (isTRUE(config$html_report)) {
+    html_path <- sub("\\.xlsx$", ".html", config$output_file)
+
+    # Source HTML report module if not already loaded
+    if (!exists("generate_catdriver_html_report", mode = "function")) {
+      html_main <- file.path(dirname(dirname(config$output_file %||% ".")),
+                              "modules", "catdriver", "lib", "html_report",
+                              "99_html_report_main.R")
+      # Try standard module locations
+      candidates <- c(
+        html_main,
+        file.path(.get_script_dir_for_guard(), "..", "lib", "html_report", "99_html_report_main.R"),
+        file.path(getwd(), "modules", "catdriver", "lib", "html_report", "99_html_report_main.R")
+      )
+      for (cand in candidates) {
+        if (file.exists(cand)) {
+          tryCatch(source(cand), error = function(e) {
+            log_message(sprintf("Could not source HTML report module: %s", e$message), "warning")
+          })
+          break
+        }
+      }
+    }
+
+    if (exists("generate_catdriver_html_report", mode = "function")) {
+      html_result <- tryCatch({
+        generate_catdriver_html_report(results, config, html_path)
+      }, error = function(e) {
+        log_message(sprintf("HTML report generation failed: %s", e$message), "warning")
+        list(status = "REFUSED", message = e$message)
+      })
+
+      if (html_result$status != "REFUSED") {
+        log_message(paste("HTML report saved to:", basename(html_result$output_file)), "success")
+      } else {
+        log_message(paste("HTML report skipped:", html_result$message), "warning")
+      }
+    } else {
+      log_message("HTML report module not available - skipping HTML output", "info")
+    }
+  }
 
   # ==========================================================================
   # COMPLETION
@@ -719,12 +947,180 @@ run_categorical_keydriver_impl <- function(config_file,
     trs_banner_end("CATEGORICAL KEY DRIVER ANALYSIS", status, elapsed)
   }
 
-  cat(sprintf("   Output: %s\n", config$output_file))
-
-  # Print console summary
-  print_console_summary(results, config)
+  # Print console summary (includes output file path)
+  print_console_summary(results, config, output_file = config$output_file)
 
   invisible(results)
+}
+
+
+# ==============================================================================
+# SUBGROUP HELPER: Run Steps 4-10 on a single data subset
+# ==============================================================================
+
+#' Run Analysis Steps 4-10 on a Data Subset
+#'
+#' Executes the core analysis pipeline (missing data handling through
+#' result extraction) on a single dataset. Used by the subgroup loop
+#' to analyse each subgroup independently.
+#'
+#' @param group_data Data frame (already filtered to subgroup)
+#' @param config Configuration list
+#' @param guard Guard state object
+#' @param degraded_reasons Character vector of degraded reasons (for tracking)
+#' @param affected_outputs Character vector of affected outputs (for tracking)
+#' @param update_progress Progress callback function
+#' @param group_label Label for console output
+#' @return List with all analysis results for this group
+#' @keywords internal
+run_catdriver_steps_4_to_10 <- function(group_data, config, guard,
+                                         degraded_reasons, affected_outputs,
+                                         update_progress, group_label = "") {
+
+  local_degraded <- character(0)
+  local_affected <- character(0)
+
+  # Step 4: Missing data
+  cat(sprintf("   [%s] Step 4: Missing data handling...\n", group_label))
+  missing_result <- handle_missing_data(group_data, config)
+  data_g <- missing_result$data
+
+  # Step 5: Rare level policy
+  cat(sprintf("   [%s] Step 5: Rare level policy...\n", group_label))
+  rare_result <- apply_rare_level_policy(data_g, config)
+  data_g <- rare_result$data
+
+  n_collapsed <- sum(sapply(rare_result$collapse_report, function(x) {
+    if (x$action == "collapsed") length(x$rare_levels) else 0
+  }))
+  if (n_collapsed > 0) {
+    local_degraded <- c(local_degraded,
+      paste0("Rare level collapsing applied: ", n_collapsed, " levels collapsed"))
+    local_affected <- c(local_affected, "Odds ratios", "Factor patterns")
+  }
+
+  # Step 6: Preprocess
+  cat(sprintf("   [%s] Step 6: Preprocessing...\n", group_label))
+
+  weights_g <- NULL
+  weight_diagnostics_g <- NULL
+  if (!is.null(config$weight_var) && config$weight_var %in% names(data_g)) {
+    weights_g <- data_g[[config$weight_var]]
+    weights_g[is.na(weights_g)] <- 1
+    weights_g[weights_g < 0] <- 0
+    weight_diagnostics_g <- calculate_weight_diagnostics(weights_g)
+  }
+
+  prep_data_g <- preprocess_catdriver_data(data_g, config)
+
+  # Step 7: Model fitting
+  cat(sprintf("   [%s] Step 7: Fitting model...\n", group_label))
+  guard_g <- guard_init()
+  model_result_g <- run_catdriver_model(
+    prep_data_g, config, weights = weights_g, guard = guard_g
+  )
+  if (!is.null(model_result_g$guard)) {
+    guard_g <- model_result_g$guard
+  }
+
+  if (!model_result_g$convergence) {
+    local_degraded <- c(local_degraded, "Model convergence warning")
+  }
+  if (isTRUE(model_result_g$fallback_used)) {
+    local_degraded <- c(local_degraded,
+      paste0("Fallback estimator used: ", model_result_g$engine_used))
+  }
+
+  # Step 8: Post-model guards
+  cat(sprintf("   [%s] Step 8: Post-model checks...\n", group_label))
+  guard_g <- guard_post_model(guard_g, prep_data_g, model_result_g, config)
+
+  vif_check_g <- check_multicollinearity(model_result_g$model)
+  if (vif_check_g$checked && vif_check_g$status == "WARNING") {
+    guard_g <- guard_check_multicollinearity(guard_g, vif_check_g)
+    local_degraded <- c(local_degraded, vif_check_g$interpretation)
+  }
+
+  # Step 9: Importance
+  cat(sprintf("   [%s] Step 9: Calculating importance...\n", group_label))
+  importance_g <- calculate_importance(model_result_g, config)
+
+  cat(sprintf("   [%s] Top 3:", group_label))
+  for (i in 1:min(3, nrow(importance_g))) {
+    cat(sprintf(" %d.%s(%s%%)", i, importance_g$label[i], importance_g$importance_pct[i]))
+  }
+  cat("\n")
+
+  # Step 10: Extract results
+  cat(sprintf("   [%s] Step 10: Extracting results...\n", group_label))
+
+  term_mapping_g <- if (prep_data_g$outcome_info$type %in% c("multinomial", "nominal")) {
+    map_multinomial_terms(model_result_g$model, prep_data_g$data,
+                          prep_data_g$model_formula, config$outcome_var)
+  } else {
+    map_terms_to_levels(model_result_g$model, prep_data_g$data,
+                        prep_data_g$model_formula)
+  }
+
+  odds_ratios_g <- extract_odds_ratios_mapped(model_result_g, term_mapping_g, config)
+
+  bootstrap_results_g <- NULL
+  if (isTRUE(config$bootstrap_ci)) {
+    bootstrap_results_g <- tryCatch({
+      run_bootstrap_ci(model_result_g, prep_data_g, config,
+                       weights = weights_g,
+                       n_boot = config$bootstrap_reps,
+                       conf_level = config$confidence_level)
+    }, error = function(e) {
+      local_degraded <<- c(local_degraded, "Bootstrap CI failed")
+      NULL
+    })
+
+    if (!is.null(bootstrap_results_g) && isTRUE(bootstrap_results_g$n_successful > 0)) {
+      odds_ratios_g$boot_median_or <- NA_real_
+      odds_ratios_g$boot_ci_lower <- NA_real_
+      odds_ratios_g$boot_ci_upper <- NA_real_
+      odds_ratios_g$sign_stability <- NA_real_
+      for (i in seq_len(nrow(odds_ratios_g))) {
+        term <- odds_ratios_g$term[i]
+        idx <- which(bootstrap_results_g$term == term)
+        if (length(idx) == 1) {
+          odds_ratios_g$boot_median_or[i] <- bootstrap_results_g$median_or[idx]
+          odds_ratios_g$boot_ci_lower[i] <- bootstrap_results_g$ci_lower[idx]
+          odds_ratios_g$boot_ci_upper[i] <- bootstrap_results_g$ci_upper[idx]
+          odds_ratios_g$sign_stability[i] <- bootstrap_results_g$sign_consistency[idx]
+        }
+      }
+    }
+  }
+
+  prob_lift_g <- if (isTRUE(config$probability_lifts %||% TRUE)) {
+    calculate_probability_lift(model_result_g, prep_data_g, config)
+  } else NULL
+
+  factor_patterns_g <- calculate_factor_patterns(prep_data_g, config, odds_ratios_g)
+
+  cat(sprintf("   [%s] COMPLETE (status: %s)\n", group_label,
+              if (length(local_degraded) > 0) "PARTIAL" else "PASS"))
+
+  list(
+    status = if (length(local_degraded) > 0) "PARTIAL" else "PASS",
+    model_result = model_result_g,
+    importance = importance_g,
+    odds_ratios = odds_ratios_g,
+    probability_lift = prob_lift_g,
+    factor_patterns = factor_patterns_g,
+    prep_data = prep_data_g,
+    term_mapping = term_mapping_g,
+    missing_report = missing_result$missing_report,
+    collapse_report = rare_result$collapse_report,
+    multicollinearity = vif_check_g,
+    weight_diagnostics = weight_diagnostics_g,
+    bootstrap_results = bootstrap_results_g,
+    guard = guard_g,
+    degraded_reasons = local_degraded,
+    affected_outputs = local_affected
+  )
 }
 
 
@@ -743,6 +1139,7 @@ calculate_probability_lift <- function(model_result, prep_data, config) {
   pred_probs <- model_result$predicted_probs
 
   if (is.null(pred_probs)) {
+    log_message("Probability lift skipped - no predicted probabilities available", "info")
     return(NULL)
   }
 

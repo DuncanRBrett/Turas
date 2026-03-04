@@ -114,7 +114,7 @@ process_anova_results <- function(anova_result, config) {
   importance_df$importance_pct <- if (total_chisq > 0) {
     round(100 * importance_df$chi_square / total_chisq, 1)
   } else {
-    0
+    rep(0, nrow(importance_df))
   }
 
   # Add labels
@@ -159,7 +159,34 @@ process_anova_results <- function(anova_result, config) {
 calculate_multinomial_importance <- function(model_result, config) {
 
   model <- model_result$model
-  data <- model$model
+
+  # Extract data safely - model$model may be NULL for multinom
+  # Priority: analysis_data (explicit from 04b) > model.frame > model$model
+  data <- model_result$analysis_data
+  if (is.null(data)) data <- tryCatch(model.frame(model), error = function(e) NULL)
+  if (is.null(data)) data <- model$model
+
+  if (is.null(data)) {
+    cat("   [WARN] Cannot extract data for multinomial importance — returning equal importance\n")
+    importance_df <- data.frame(
+      variable = config$driver_vars,
+      chi_square = rep(0, length(config$driver_vars)),
+      df = rep(NA, length(config$driver_vars)),
+      p_value = rep(NA, length(config$driver_vars)),
+      importance_pct = rep(round(100 / length(config$driver_vars), 1), length(config$driver_vars)),
+      label = sapply(config$driver_vars, function(v) get_var_label(config, v)),
+      significance = rep("", length(config$driver_vars)),
+      effect_size = rep("Unknown", length(config$driver_vars)),
+      rank = seq_along(config$driver_vars),
+      stringsAsFactors = FALSE
+    )
+    return(importance_df)
+  }
+
+  # Strip internal weight column if present (prevents refit issues)
+  if (".wt" %in% names(data)) {
+    data[[".wt"]] <- NULL
+  }
 
   # Get full model log-likelihood
   ll_full <- logLik(model)
@@ -217,7 +244,7 @@ calculate_multinomial_importance <- function(model_result, config) {
   importance_df$importance_pct <- if (total_chisq > 0) {
     round(100 * importance_df$chi_square / total_chisq, 1)
   } else {
-    0
+    rep(0, nrow(importance_df))
   }
 
   # Add labels and formatting
@@ -297,7 +324,7 @@ calculate_fallback_importance <- function(model_result, config) {
   importance_df$importance_pct <- if (total_chisq > 0) {
     round(100 * importance_df$chi_square / total_chisq, 1)
   } else {
-    0
+    rep(0, nrow(importance_df))
   }
 
   # Add labels
@@ -383,8 +410,8 @@ aggregate_dummy_importance <- function(importance_df, config, mapping = NULL) {
 
     if (!matched) {
       # Final fallback: keep term as-is (it's likely already the variable name)
-      # Log a warning since we couldn't map it properly
       term_to_var[i] <- term
+      log_message(sprintf("Could not map term '%s' to a driver variable - using term as-is", term), "warn")
     }
   }
 

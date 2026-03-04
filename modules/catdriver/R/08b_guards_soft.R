@@ -237,6 +237,55 @@ guard_direction_sanity <- function(guard, prep_data, model_result, config) {
 }
 
 
+# ==============================================================================
+# SUBGROUP COMPARISON GUARDS (SOFT)
+# ==============================================================================
+
+#' Guard: Check Subgroup Sample Size
+#'
+#' SOFT FAILURE if a subgroup has fewer observations than subgroup_min_n.
+#'
+#' @param guard Guard state object
+#' @param group_name Name of the subgroup
+#' @param group_n Number of observations in the subgroup
+#' @param min_n Minimum sample size threshold
+#' @return Updated guard state
+#' @keywords internal
+guard_check_subgroup_sample_size <- function(guard, group_name, group_n, min_n) {
+  if (group_n < min_n) {
+    msg <- sprintf(
+      "Subgroup '%s' has %d observations (below minimum %d). Results may be unreliable.",
+      group_name, group_n, min_n
+    )
+    guard <- guard_warn(guard, msg, "subgroup_analysis")
+    guard <- guard_flag_stability(guard,
+      sprintf("Subgroup '%s' below minimum sample size", group_name)
+    )
+  }
+  guard
+}
+
+
+#' Guard: Record Subgroup Model Failure
+#'
+#' SOFT FAILURE when a subgroup's model fitting fails.
+#' Tracks the failure so the overall analysis can degrade to PARTIAL.
+#'
+#' @param guard Guard state object
+#' @param group_name Name of the failed subgroup
+#' @param reason Character string describing the failure
+#' @return Updated guard state
+#' @keywords internal
+guard_check_subgroup_model_failed <- function(guard, group_name, reason) {
+  msg <- sprintf("Subgroup '%s' analysis failed: %s", group_name, reason)
+  guard <- guard_warn(guard, msg, "subgroup_analysis")
+  guard <- guard_flag_stability(guard,
+    sprintf("Subgroup '%s' analysis failed", group_name)
+  )
+  guard
+}
+
+
 #' Run All Pre-Analysis Guards
 #'
 #' Validates config and data before analysis begins.
@@ -256,6 +305,12 @@ guard_pre_analysis <- function(config, data) {
 
   guard_require_driver_settings(config)   # Validates Driver_Settings exists and is complete
   guard_ordinal_levels_order(config)      # Ordinal drivers must have levels_order
+
+  # Subgroup comparison guards (only fire when subgroup_var is set)
+  guard_subgroup_not_outcome(config)
+  guard_subgroup_not_driver(config)
+  guard_subgroup_exists_in_data(config, data)
+  guard_subgroup_minimum_levels(config, data)
 
   guard
 }

@@ -72,29 +72,60 @@ write_catdriver_output <- function(results, config, output_file) {
   add_run_status_sheet(wb, results, styles)
 
   # Sheet 2: Executive Summary
-  add_executive_summary_sheet(wb, results, config, styles)
+  tryCatch(
+    add_executive_summary_sheet(wb, results, config, styles),
+    error = function(e) cat("   [ERROR] Executive Summary sheet failed:", conditionMessage(e), "\n")
+  )
 
   # Sheet 3: Importance Summary
-  add_importance_sheet(wb, results, config, styles)
+  tryCatch(
+    add_importance_sheet(wb, results, config, styles),
+    error = function(e) cat("   [ERROR] Importance sheet failed:", conditionMessage(e), "\n")
+  )
 
   # Sheet 4: Factor Patterns
-  add_patterns_sheet(wb, results, config, styles)
+  tryCatch(
+    add_patterns_sheet(wb, results, config, styles),
+    error = function(e) cat("   [ERROR] Patterns sheet failed:", conditionMessage(e), "\n")
+  )
 
   # Sheet 5: Model Summary
-  add_model_summary_sheet(wb, results, config, styles)
+  tryCatch(
+    add_model_summary_sheet(wb, results, config, styles),
+    error = function(e) cat("   [ERROR] Model Summary sheet failed:", conditionMessage(e), "\n")
+  )
 
   # Sheet 6: Odds Ratios (if detailed output)
   if (config$detailed_output) {
-    add_odds_ratios_sheet(wb, results, config, styles)
+    tryCatch(
+      add_odds_ratios_sheet(wb, results, config, styles),
+      error = function(e) cat("   [ERROR] Odds Ratios sheet failed:", conditionMessage(e), "\n")
+    )
   }
 
   # Sheet 7: Diagnostics (if detailed output)
   if (config$detailed_output) {
-    add_diagnostics_sheet(wb, results, config, styles)
+    tryCatch(
+      add_diagnostics_sheet(wb, results, config, styles),
+      error = function(e) cat("   [ERROR] Diagnostics sheet failed:", conditionMessage(e), "\n")
+    )
   }
 
   # Sheet 8: Interpretation & Limits (always included for transparency)
-  add_interpretation_sheet(wb, results, config, styles)
+  tryCatch(
+    add_interpretation_sheet(wb, results, config, styles),
+    error = function(e) cat("   [ERROR] Interpretation sheet failed:", conditionMessage(e), "\n")
+  )
+
+  # Sheets 9-11: Subgroup Comparison (only when subgroup analysis is active)
+  if (isTRUE(results$subgroup_active) && !is.null(results$subgroup_comparison)) {
+    if (exists("add_subgroup_sheets", mode = "function")) {
+      tryCatch(
+        add_subgroup_sheets(wb, results$subgroup_comparison, results, config, styles),
+        error = function(e) cat("   [ERROR] Subgroup sheets failed:", conditionMessage(e), "\n")
+      )
+    }
+  }
 
   # Save workbook (TRS v1.0: Use atomic save if available)
   if (exists("turas_save_workbook_atomic", mode = "function")) {
@@ -293,19 +324,115 @@ create_output_styles <- function(wb) {
 
 #' Print Console Summary
 #'
-#' Prints a summary of results to console.
+#' Prints a structured summary of results to console.
+#' Uses boxed format for visibility in Shiny console output.
 #'
 #' @param results Analysis results
 #' @param config Configuration
+#' @param output_file Path to generated output file (optional)
 #' @export
-print_console_summary <- function(results, config) {
+print_console_summary <- function(results, config, output_file = NULL) {
 
-  summary_lines <- generate_executive_summary(results, config)
+  width <- 62
+  border <- paste(rep("\u2500", width), collapse = "")
 
   cat("\n")
-  for (line in summary_lines) {
-    cat(line, "\n")
+  cat("\u250C", border, "\u2510\n", sep = "")
+  cat("\u2502 ", format("CATEGORICAL KEY DRIVER ANALYSIS", width = width - 2), " \u2502\n", sep = "")
+  cat("\u251C", border, "\u2524\n", sep = "")
+
+  # Outcome and model
+  outcome_info <- results$prep_data$outcome_info
+  model_label <- switch(outcome_info$type,
+    binary = "Binary Logistic",
+    ordinal = "Ordinal Logistic (Proportional Odds)",
+    nominal = "Multinomial Logistic",
+    outcome_info$type
+  )
+
+  pad_line <- function(text) {
+    # Truncate if too long
+    if (nchar(text) > width - 2) text <- paste0(substr(text, 1, width - 5), "...")
+    cat("\u2502 ", format(text, width = width - 2), " \u2502\n", sep = "")
   }
+
+  pad_line(sprintf("Outcome: %s (%s)", config$outcome_label, model_label))
+  pad_line(sprintf("Sample: n=%d of %d (%s%% complete)",
+                   results$diagnostics$complete_n,
+                   results$diagnostics$original_n,
+                   results$diagnostics$pct_complete))
+
+  # Weight status
+  if (!is.null(results$weight_diagnostics)) {
+    wd <- results$weight_diagnostics
+    pad_line(sprintf("Weights: %s (effective n=%d)",
+                     config$weight_var, round(wd$effective_n)))
+  } else {
+    pad_line("Weights: None (unweighted)")
+  }
+
+  # Model fit
+  fit <- results$model_result$fit_statistics
+  if (!is.na(fit$mcfadden_r2)) {
+    r2_pct <- round(fit$mcfadden_r2 * 100, 1)
+    fit_label <- if (fit$mcfadden_r2 >= 0.4) "Excellent"
+                 else if (fit$mcfadden_r2 >= 0.2) "Good"
+                 else if (fit$mcfadden_r2 >= 0.1) "Moderate"
+                 else "Limited"
+    pad_line(sprintf("Model fit: R2=%.3f (%s%% variation, %s)",
+                     fit$mcfadden_r2, r2_pct, fit_label))
+  }
+
+  cat("\u251C", border, "\u2524\n", sep = "")
+  pad_line("TOP DRIVERS:")
+
+  # Top 3 drivers with direction
+  importance_df <- results$importance
+  n_show <- min(3, nrow(importance_df))
+
+  for (i in 1:n_show) {
+    row <- importance_df[i, ]
+    var_name <- row$variable
+    patterns <- results$factor_patterns[[var_name]]
+
+    direction <- ""
+    if (!is.null(patterns)) {
+      non_ref <- patterns$patterns[!patterns$patterns$is_reference, ]
+      if (nrow(non_ref) > 0) {
+        max_or <- max(non_ref$odds_ratio, na.rm = TRUE)
+        min_or <- min(non_ref$odds_ratio, na.rm = TRUE)
+        if (!is.na(max_or) && max_or > 1.5) {
+          max_cat <- non_ref$category[which.max(non_ref$odds_ratio)]
+          direction <- sprintf(" [%s: %.1fx higher]", max_cat, max_or)
+        } else if (!is.na(min_or) && min_or < 0.67) {
+          min_cat <- non_ref$category[which.min(non_ref$odds_ratio)]
+          direction <- sprintf(" [%s: %.1fx lower]", min_cat, min_or)
+        }
+      }
+    }
+
+    pad_line(sprintf("  %d. %s (%s%%)%s",
+                     i, row$label, row$importance_pct, direction))
+  }
+
+  # Status and cautions
+  if (length(results$diagnostics$warnings) > 0) {
+    cat("\u251C", border, "\u2524\n", sep = "")
+    n_warn <- min(3, length(results$diagnostics$warnings))
+    for (w in results$diagnostics$warnings[1:n_warn]) {
+      # Truncate long warnings
+      if (nchar(w) > width - 4) w <- paste0(substr(w, 1, width - 7), "...")
+      pad_line(paste0("! ", w))
+    }
+  }
+
+  # Output file
+  if (!is.null(output_file)) {
+    cat("\u251C", border, "\u2524\n", sep = "")
+    pad_line(sprintf("Output: %s", basename(output_file)))
+  }
+
+  cat("\u2514", border, "\u2518\n", sep = "")
   cat("\n")
 }
 

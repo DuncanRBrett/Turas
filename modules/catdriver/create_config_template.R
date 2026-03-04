@@ -80,7 +80,12 @@ create_catdriver_config_template <- function(output_file = "catdriver_config_tem
       "missing_threshold",
 
       # OUTPUT OPTIONS
-      "detailed_output"
+      "detailed_output",
+
+      # SUBGROUP COMPARISON (Optional)
+      "subgroup_var",
+      "subgroup_min_n",
+      "subgroup_include_total"
     ),
     Value = c(
       # FILE PATHS
@@ -112,7 +117,12 @@ create_catdriver_config_template <- function(output_file = "catdriver_config_tem
       "50",
 
       # OUTPUT OPTIONS
-      "TRUE"
+      "TRUE",
+
+      # SUBGROUP COMPARISON
+      "",   # Column name for subgroup splitting (leave blank to disable)
+      "30", # Minimum observations per subgroup
+      "TRUE" # Include total (full-dataset) analysis alongside subgroups
     ),
     Required = c(
       "Yes", "Yes",
@@ -123,7 +133,8 @@ create_catdriver_config_template <- function(output_file = "catdriver_config_tem
       "No", "No",
       "No", "No", "No",
       "No", "No", "No",
-      "No"
+      "No",
+      "No", "No", "No"
     ),
     Description = c(
       # FILE PATHS
@@ -155,7 +166,12 @@ create_catdriver_config_template <- function(output_file = "catdriver_config_tem
       "Maximum % missing data allowed per variable (0-100).",
 
       # OUTPUT OPTIONS
-      "Include detailed tabs in output (TRUE/FALSE)."
+      "Include detailed tabs in output (TRUE/FALSE).",
+
+      # SUBGROUP COMPARISON
+      "Column name to split analysis by subgroup (e.g., age_group, region). Must NOT be the outcome or a driver variable. Leave blank for standard (non-subgroup) analysis.",
+      "Minimum observations per subgroup to run analysis. Groups below this threshold produce a warning but still attempt analysis.",
+      "Include a 'Total' analysis on the full dataset alongside per-subgroup results. Recommended for comparison baseline."
     ),
     stringsAsFactors = FALSE
   )

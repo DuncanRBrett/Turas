@@ -401,6 +401,23 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
     bootstrap_ci = as_logical_setting(get_setting(settings, "bootstrap_ci", FALSE), FALSE),
     bootstrap_reps = as_numeric_setting(get_setting(settings, "bootstrap_reps", 200), 200),
 
+    # HTML report settings (optional - on by default)
+    html_report = as_logical_setting(get_setting(settings, "html_report", TRUE), TRUE),
+    probability_lifts = as_logical_setting(get_setting(settings, "probability_lifts", TRUE), TRUE),
+    brand_colour = get_setting(settings, "brand_colour", "#323367"),
+    accent_colour = get_setting(settings, "accent_colour", "#CC9900"),
+    report_title = get_setting(settings, "report_title", NULL),
+    researcher_logo_path = get_setting(settings, "researcher_logo_path", NULL),
+    client_logo_path = get_setting(settings, "client_logo_path", NULL),
+    researcher_name = get_setting(settings, "researcher_name", NULL),
+
+    # Subgroup comparison settings (optional - off by default)
+    subgroup_var = get_setting(settings, "subgroup_var", NULL),
+    subgroup_min_n = as_numeric_setting(get_setting(settings, "subgroup_min_n", 30), 30),
+    subgroup_include_total = as_logical_setting(
+      get_setting(settings, "subgroup_include_total", TRUE), TRUE
+    ),
+
     # Raw settings for reference
     settings = settings
   )

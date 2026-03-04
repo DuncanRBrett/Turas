@@ -1,7 +1,7 @@
 # Turas Categorical Key Driver Module
 
-**Version:** 10.0
-**Last Updated:** 22 December 2025
+**Version:** 13.0
+**Last Updated:** 4 March 2026
 
 Key driver analysis for categorical outcomes using logistic regression methods.
 
@@ -15,10 +15,16 @@ The Categorical Key Driver module identifies which factors most strongly influen
 - Binary logistic regression for 2-category outcomes
 - Ordinal logistic regression for ordered 3+ categories
 - Multinomial logistic regression for unordered 3+ categories
-- Automatic outcome type detection
 - Chi-square based variable importance
 - Odds ratios with confidence intervals
+- Probability lifts with intuitive percentage-point metrics
+- Bootstrap confidence intervals (optional)
 - Plain-English executive summaries
+- Interactive HTML reports with SVG charts
+- **Subgroup comparison** — split analysis by a grouping variable
+  (e.g., age, region) and compare driver importance across groups
+- **Multi-config GUI** — run multiple outcome analyses and generate a
+  unified tabbed report from a single panel
 
 ---
 
@@ -31,6 +37,7 @@ The Categorical Key Driver module identifies which factors most strongly influen
 | Brand preference | Nominal | Brand A/B/C/D |
 | Survey completion | Ordinal | Complete/Partial/Abandoned |
 | Employee engagement | Ordinal | Disengaged/Neutral/Engaged |
+| Churn by segment | Binary + Subgroup | Churned vs Retained, split by age group |
 
 ---
 
@@ -57,7 +64,7 @@ results <- run_categorical_keydriver("path/to/config.xlsx")
 
 ## Configuration
 
-Create an Excel file with two required sheets:
+Create an Excel file with three sheets (Settings, Variables, Driver_Settings):
 
 ### Settings Sheet
 
@@ -65,7 +72,19 @@ Create an Excel file with two required sheets:
 |---------|-------|
 | data_file | survey_data.csv |
 | output_file | results.xlsx |
-| outcome_type | auto |
+| outcome_type | ordinal |
+
+**Note:** `outcome_type` is required. Must be `binary`, `ordinal`, or `multinomial`.
+
+**Optional subgroup settings:**
+
+| Setting | Value |
+|---------|-------|
+| subgroup_var | age_group |
+| subgroup_min_n | 30 |
+| subgroup_include_total | TRUE |
+
+Set `subgroup_var` to split the analysis by a grouping variable. The variable must not be the outcome or a driver.
 
 ### Variables Sheet
 
@@ -91,6 +110,9 @@ The module generates an Excel workbook with:
 | Model Summary | Fit statistics (pseudo-R², AIC) |
 | Odds Ratios | Detailed comparisons (if detailed_output=TRUE) |
 | Diagnostics | Data quality checks (if detailed_output=TRUE) |
+| Subgroup Summary | Driver importance across subgroups (if subgroup_var set) |
+| Subgroup OR Compare | Odds ratio comparison across subgroups (if subgroup_var set) |
+| Subgroup Model Fit | Per-subgroup model fit statistics (if subgroup_var set) |
 
 ---
 
@@ -108,16 +130,24 @@ modules/catdriver/
 │   ├── 04b_multinomial.R   # Multinomial logistic
 │   ├── 05_importance.R     # Importance calculations
 │   ├── 06_output.R         # Excel generation
-│   └── 07_utilities.R      # Helper functions
+│   ├── 06c_sheets_subgroup.R # Subgroup Excel sheets
+│   ├── 07_utilities.R      # Helper functions
+│   ├── 08_guard.R          # Guard framework
+│   ├── 08a_guards_hard.R   # Hard guards (REFUSE)
+│   ├── 08b_guards_soft.R   # Soft guards (WARN)
+│   ├── 09_mapper.R         # Term-level mapping
+│   ├── 10_missing.R        # Missing data handling
+│   └── 11_subgroup_comparison.R  # Subgroup comparison logic
+├── lib/html_report/        # HTML report pipeline
 ├── run_catdriver_gui.R     # Shiny GUI
 └── docs/                   # Documentation
     ├── 01_README.md        # This file
-    ├── 02_CATDRIVER_OVERVIEW.md
     ├── 03_REFERENCE_GUIDE.md
     ├── 04_USER_MANUAL.md
     ├── 05_TECHNICAL_DOCS.md
     ├── 06_TEMPLATE_REFERENCE.md
     ├── 07_EXAMPLE_WORKFLOWS.md
+    ├── 08_BOOTSTRAP_GUIDE.md
     └── templates/
 ```
 
@@ -169,12 +199,12 @@ install.packages("haven")
 
 | Document | Purpose |
 |----------|---------|
-| [02_CATDRIVER_OVERVIEW.md](docs/02_CATDRIVER_OVERVIEW.md) | Capabilities and use cases |
 | [03_REFERENCE_GUIDE.md](docs/03_REFERENCE_GUIDE.md) | Statistical methods reference |
 | [04_USER_MANUAL.md](docs/04_USER_MANUAL.md) | Complete user guide |
 | [05_TECHNICAL_DOCS.md](docs/05_TECHNICAL_DOCS.md) | Developer documentation |
 | [06_TEMPLATE_REFERENCE.md](docs/06_TEMPLATE_REFERENCE.md) | Template field reference |
 | [07_EXAMPLE_WORKFLOWS.md](docs/07_EXAMPLE_WORKFLOWS.md) | Practical examples |
+| [08_BOOTSTRAP_GUIDE.md](docs/08_BOOTSTRAP_GUIDE.md) | Bootstrap confidence intervals |
 
 ---
 

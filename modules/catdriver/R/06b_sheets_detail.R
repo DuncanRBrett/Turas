@@ -30,11 +30,18 @@ add_model_summary_sheet <- function(wb, results, config, styles) {
     stringsAsFactors = FALSE
   )
 
-  # Model type
-  model_type_label <- switch(model_result$outcome_type,
+  # Model type - handle various field names and values
+  ot <- model_result$outcome_type
+  if (is.null(ot)) ot <- model_result$model_type
+  model_type_label <- switch(as.character(ot),
     binary = "Binary Logistic Regression",
+    binary_logistic = "Binary Logistic Regression",
     ordinal = "Ordinal Logistic Regression (Proportional Odds)",
-    nominal = "Multinomial Logistic Regression"
+    ordinal_logistic = "Ordinal Logistic Regression (Proportional Odds)",
+    nominal = "Multinomial Logistic Regression",
+    multinomial = "Multinomial Logistic Regression",
+    multinomial_logistic = "Multinomial Logistic Regression",
+    paste("Logistic Regression (", ot, ")")
   )
 
   summary_data <- rbind(summary_data, data.frame(
@@ -174,10 +181,51 @@ add_odds_ratios_sheet <- function(wb, results, config, styles) {
   }
   names(out_df) <- col_names
 
+  # Add plain-English interpretation column
+  or_numeric <- or_df$or_formatted
+  # Parse OR values for interpretation
+  or_vals <- suppressWarnings(as.numeric(gsub("[^0-9.]", "", or_df$or_formatted)))
+  interpretations <- vapply(or_vals, function(or_val) {
+    if (is.na(or_val)) return("")
+    if (or_val > 3.0) "Much more likely"
+    else if (or_val > 2.0) "Substantially more likely"
+    else if (or_val > 1.5) "Moderately more likely"
+    else if (or_val > 1.1) "Slightly more likely"
+    else if (or_val >= 0.9) "No meaningful difference"
+    else if (or_val >= 0.67) "Slightly less likely"
+    else if (or_val >= 0.5) "Moderately less likely"
+    else "Much less likely"
+  }, character(1))
+
+  out_df$`What This Means` <- interpretations
+  col_names <- c(col_names, "What This Means")
+  names(out_df) <- col_names
+
   # Write data
   openxlsx::writeData(wb, "Odds Ratios", out_df,
                       startRow = 1, startCol = 1,
                       headerStyle = styles$header)
+
+  # Apply effect-based colour coding to the Effect column
+  effect_col_idx <- which(col_names == "Effect")
+  or_strong_pos <- openxlsx::createStyle(fgFill = "#C6EFCE", fontColour = "#006100")
+  or_strong_neg <- openxlsx::createStyle(fgFill = "#FCE4EC", fontColour = "#9C2724")
+  or_moderate <- openxlsx::createStyle(fgFill = "#FFF2CC", fontColour = "#7F6003")
+
+  for (i in seq_len(nrow(out_df))) {
+    effect_val <- tolower(trimws(out_df$Effect[i]))
+    row_num <- i + 1  # +1 for header row
+    if (grepl("large|very large", effect_val)) {
+      or_val <- or_vals[i]
+      if (!is.na(or_val) && or_val >= 1.0) {
+        openxlsx::addStyle(wb, "Odds Ratios", or_strong_pos, rows = row_num, cols = effect_col_idx)
+      } else {
+        openxlsx::addStyle(wb, "Odds Ratios", or_strong_neg, rows = row_num, cols = effect_col_idx)
+      }
+    } else if (grepl("medium", effect_val)) {
+      openxlsx::addStyle(wb, "Odds Ratios", or_moderate, rows = row_num, cols = effect_col_idx)
+    }
+  }
 
   openxlsx::setColWidths(wb, "Odds Ratios", cols = 1:ncol(out_df), widths = "auto")
 
