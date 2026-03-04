@@ -32,7 +32,8 @@ generate_catdriver_comparison_report <- function(analyses,
                                                   researcher_logo_path = NULL,
                                                   client_logo_path = NULL,
                                                   client_name = NULL,
-                                                  company_name = "The Research Lamppost") {
+                                                  company_name = "The Research Lamppost",
+                                                  researcher_name = NULL) {
 
   start_time <- Sys.time()
 
@@ -83,7 +84,10 @@ generate_catdriver_comparison_report <- function(analyses,
     ),
     htmltools::tags$body(
       class = "cd-body",
-      build_comparison_header(report_title, summaries, brand_colour, logo_uri),
+      build_comparison_header(report_title, summaries, brand_colour, logo_uri,
+                              company_name = company_name,
+                              client_name = client_name,
+                              researcher_name = researcher_name),
       htmltools::tags$div(
         class = "cd-comp-content",
         build_comparison_overview(summaries, brand_colour, accent_colour),
@@ -428,13 +432,45 @@ build_comparison_css <- function(brand_colour, accent_colour) {
 
 
 # --- Comparison header ---
-build_comparison_header <- function(report_title, summaries, brand_colour, logo_uri) {
+build_comparison_header <- function(report_title, summaries, brand_colour, logo_uri,
+                                     company_name = NULL, client_name = NULL,
+                                     researcher_name = NULL) {
 
   logo_el <- NULL
   if (!is.null(logo_uri) && nzchar(logo_uri)) {
     logo_el <- htmltools::tags$div(
       class = "cd-comp-logo-container",
       htmltools::tags$img(src = logo_uri, alt = "Logo")
+    )
+  }
+
+  # "Prepared by X for Y" row
+  prepared_row <- NULL
+  prepared_parts <- c()
+  if (!is.null(company_name) && nzchar(company_name)) {
+    if (!is.null(researcher_name) && nzchar(researcher_name)) {
+      prepared_parts <- c(prepared_parts, sprintf(
+        'Prepared by <span style="font-weight:600;">%s</span> (%s)',
+        htmltools::htmlEscape(researcher_name),
+        htmltools::htmlEscape(company_name)
+      ))
+    } else {
+      prepared_parts <- c(prepared_parts, sprintf(
+        'Prepared by <span style="font-weight:600;">%s</span>',
+        htmltools::htmlEscape(company_name)
+      ))
+    }
+  }
+  if (!is.null(client_name) && nzchar(client_name)) {
+    prepared_parts <- c(prepared_parts, sprintf(
+      'for <span style="font-weight:600;">%s</span>',
+      htmltools::htmlEscape(client_name)
+    ))
+  }
+  if (length(prepared_parts) > 0) {
+    prepared_row <- htmltools::tags$div(
+      class = "cd-comp-header-prepared",
+      htmltools::HTML(paste(prepared_parts, collapse = " "))
     )
   }
 
@@ -461,6 +497,7 @@ build_comparison_header <- function(report_title, summaries, brand_colour, logo_
         )
       ),
       htmltools::tags$div(class = "cd-comp-title", report_title),
+      prepared_row,
       htmltools::tags$div(class = "cd-comp-badges", badge_items)
     )
   )

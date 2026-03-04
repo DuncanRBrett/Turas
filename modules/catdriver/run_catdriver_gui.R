@@ -301,11 +301,11 @@ run_catdriver_gui <- function() {
         )
       ),
 
-      # Step 3: Report Settings (only for multi-config)
+      # Step 3: Report Settings (always visible when configs selected)
       conditionalPanel(
-        condition = "output.show_report_settings",
+        condition = "output.ready_to_run",
         div(class = "report-settings-card",
-          div(class = "step-title", "Step 3: Unified Report Settings"),
+          div(class = "step-title", "Step 3: Report Settings"),
 
           fluidRow(
             column(6,
@@ -317,6 +317,19 @@ run_catdriver_gui <- function() {
               textInput("client_name", "Client Name (optional)",
                         value = "",
                         placeholder = "e.g., Acme Corp")
+            )
+          ),
+
+          fluidRow(
+            column(6,
+              textInput("researcher_name", "Researcher Name (optional)",
+                        value = "",
+                        placeholder = "e.g., Jane Smith")
+            ),
+            column(6,
+              div(style = "margin-top: 30px; font-size: 12px; color: #6c757d;",
+                "Appears in the report header alongside company name."
+              )
             )
           ),
 
@@ -344,8 +357,8 @@ run_catdriver_gui <- function() {
           uiOutput("colour_preview"),
 
           div(class = "info-box",
-            tags$strong("Note: "), "These settings apply to the unified report. ",
-            "They override brand/colour settings in individual config files."
+            tags$strong("Note: "), "These settings are applied to the generated HTML report. ",
+            "They override any brand/colour settings in individual config files."
           )
         )
       ),
@@ -562,11 +575,6 @@ run_catdriver_gui <- function() {
     })
     outputOptions(output, "ready_to_run", suspendWhenHidden = FALSE)
 
-    output$show_report_settings <- reactive({
-      length(files$config_files) >= 2
-    })
-    outputOptions(output, "show_report_settings", suspendWhenHidden = FALSE)
-
     output$show_console <- reactive({ nchar(console_text()) > 0 })
     outputOptions(output, "show_console", suspendWhenHidden = FALSE)
 
@@ -685,11 +693,44 @@ run_catdriver_gui <- function() {
                           detail = sprintf("[%d/%d] %s", i, n_configs, message))
             }
 
-            # Build config overrides from GUI (e.g., subgroup_var)
-            gui_overrides <- NULL
+            # Build config overrides from all GUI inputs
+            gui_overrides <- list()
+
+            # Subgroup variable
             subgroup_input <- input$subgroup_var
             if (!is.null(subgroup_input) && nzchar(trimws(subgroup_input))) {
-              gui_overrides <- list(subgroup_var = trimws(subgroup_input))
+              gui_overrides$subgroup_var <- trimws(subgroup_input)
+            }
+
+            # Report branding settings
+            if (is_valid_hex(input$brand_colour)) {
+              gui_overrides$brand_colour <- input$brand_colour
+            }
+            if (is_valid_hex(input$accent_colour)) {
+              gui_overrides$accent_colour <- input$accent_colour
+            }
+            if (!is.null(input$report_title) && nzchar(input$report_title)) {
+              gui_overrides$report_title <- input$report_title
+            }
+            if (!is.null(input$client_name) && nzchar(input$client_name)) {
+              gui_overrides$client_name <- input$client_name
+            }
+            if (!is.null(input$researcher_name) && nzchar(input$researcher_name)) {
+              gui_overrides$researcher_name <- input$researcher_name
+            }
+            gui_overrides$company_name <- "The Research Lamppost"
+
+            # Logo file paths from fileInput uploads
+            if (!is.null(input$researcher_logo)) {
+              gui_overrides$researcher_logo_path <- input$researcher_logo$datapath
+            }
+            if (!is.null(input$client_logo)) {
+              gui_overrides$client_logo_path <- input$client_logo$datapath
+            }
+
+            # If no overrides were added beyond company_name, keep minimal
+            if (length(gui_overrides) == 1 && "company_name" %in% names(gui_overrides)) {
+              gui_overrides <- NULL
             }
 
             # Run with full output capture
@@ -774,6 +815,9 @@ run_catdriver_gui <- function() {
             gui_client <- if (!is.null(input$client_name) && nzchar(input$client_name)) {
               input$client_name
             } else NULL
+            gui_researcher <- if (!is.null(input$researcher_name) && nzchar(input$researcher_name)) {
+              input$researcher_name
+            } else NULL
 
             # Resolve logo file paths from fileInput uploads
             researcher_logo <- NULL
@@ -796,7 +840,8 @@ run_catdriver_gui <- function() {
                 researcher_logo_path = researcher_logo,
                 client_logo_path = client_logo,
                 client_name = gui_client,
-                company_name = "The Research Lamppost"
+                company_name = "The Research Lamppost",
+                researcher_name = gui_researcher
               )
             })
 

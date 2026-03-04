@@ -37,7 +37,8 @@ generate_catdriver_unified_report <- function(analyses,
                                               researcher_logo_path = NULL,
                                               client_logo_path = NULL,
                                               client_name = NULL,
-                                              company_name = "The Research Lamppost") {
+                                              company_name = "The Research Lamppost",
+                                              researcher_name = NULL) {
 
   start_time <- Sys.time()
 
@@ -77,6 +78,7 @@ generate_catdriver_unified_report <- function(analyses,
     if (!is.null(client_logo_path)) entry$config$client_logo_path <- client_logo_path
     if (!is.null(client_name)) entry$config$client_name <- client_name
     if (!is.null(company_name)) entry$config$company_name <- company_name
+    if (!is.null(researcher_name)) entry$config$researcher_name <- researcher_name
     if (!is.null(report_title)) entry$config$report_title <- report_title
     return(generate_catdriver_html_report(entry$results, entry$config, output_path))
   }
@@ -228,7 +230,8 @@ generate_catdriver_unified_report <- function(analyses,
   header <- build_unified_header(report_title, summaries, brand_colour,
                                   logo_uri, client_logo_uri = client_logo_uri,
                                   client_name = client_name,
-                                  company_name = company_name)
+                                  company_name = company_name,
+                                  researcher_name = researcher_name)
 
   # Tab bar: Overview + one per analysis + Pinned
   tab_buttons <- list(
@@ -476,7 +479,8 @@ read_js_file <- function(filename) {
 # ==============================================================================
 build_unified_header <- function(report_title, summaries, brand_colour,
                                   logo_uri, client_logo_uri = NULL,
-                                  client_name = NULL, company_name = NULL) {
+                                  client_name = NULL, company_name = NULL,
+                                  researcher_name = NULL) {
 
   # Build logo elements — researcher left, client right
   logo_els <- htmltools::tagList()
@@ -501,10 +505,19 @@ build_unified_header <- function(report_title, summaries, brand_colour,
   prepared_row <- NULL
   prepared_parts <- c()
   if (!is.null(company_name) && nzchar(company_name)) {
-    prepared_parts <- c(prepared_parts, sprintf(
-      'Prepared by <span style="font-weight:600;">%s</span>',
-      htmltools::htmlEscape(company_name)
-    ))
+    if (!is.null(researcher_name) && nzchar(researcher_name)) {
+      # "Prepared by Researcher Name (Company)"
+      prepared_parts <- c(prepared_parts, sprintf(
+        'Prepared by <span style="font-weight:600;">%s</span> (%s)',
+        htmltools::htmlEscape(researcher_name),
+        htmltools::htmlEscape(company_name)
+      ))
+    } else {
+      prepared_parts <- c(prepared_parts, sprintf(
+        'Prepared by <span style="font-weight:600;">%s</span>',
+        htmltools::htmlEscape(company_name)
+      ))
+    }
   }
   if (!is.null(client_name) && nzchar(client_name)) {
     prepared_parts <- c(prepared_parts, sprintf(
