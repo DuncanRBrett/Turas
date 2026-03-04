@@ -16,7 +16,8 @@
 #' @param config Configuration list
 #' @return htmltools::browsable tagList
 #' @keywords internal
-build_cd_html_page <- function(html_data, tables, charts, config) {
+build_cd_html_page <- function(html_data, tables, charts, config,
+                                subgroup_comparison = NULL) {
 
   brand_colour <- config$brand_colour %||% "#323367"
   accent_colour <- config$accent_colour %||% "#CC9900"
@@ -35,11 +36,25 @@ build_cd_html_page <- function(html_data, tables, charts, config) {
   or_section <- build_cd_or_section(tables, charts, html_data$has_bootstrap,
                                      odds_ratios = html_data$odds_ratios)
   diagnostics_section <- build_cd_diagnostics_section(tables, html_data)
+
+  # Subgroup comparison section (only when subgroup analysis is active)
+  subgroup_section <- if (!is.null(subgroup_comparison) &&
+                          exists("build_cd_subgroup_section", mode = "function")) {
+    tryCatch(
+      build_cd_subgroup_section(subgroup_comparison, brand_colour, accent_colour),
+      error = function(e) {
+        cat(sprintf("    [WARNING] Subgroup section failed: %s\n", e$message))
+        NULL
+      }
+    )
+  } else NULL
+
   interpretation_section <- build_cd_interpretation_section(brand_colour)
   footer_section <- build_cd_footer()
 
   # Horizontal section nav bar
-  nav <- build_cd_section_nav(brand_colour)
+  nav <- build_cd_section_nav(brand_colour,
+                               has_subgroup = !is.null(subgroup_section))
 
   # Action bar (save button)
   action_bar <- build_cd_action_bar(report_title)
@@ -153,6 +168,7 @@ build_cd_html_page <- function(html_data, tables, charts, config) {
           prob_lifts_section,
           or_section,
           diagnostics_section,
+          subgroup_section,
           interpretation_section,
           pinned_section,
           footer_section,
@@ -1281,18 +1297,33 @@ build_cd_css <- function(brand_colour, accent_colour) {
 #' @param brand_colour Brand colour hex string
 #' @return htmltools tag
 #' @keywords internal
-build_cd_section_nav <- function(brand_colour = "#323367", id_prefix = "") {
-  htmltools::tags$nav(
-    class = "cd-section-nav",
-    id = paste0(id_prefix, "cd-section-nav"),
+build_cd_section_nav <- function(brand_colour = "#323367", id_prefix = "",
+                                  has_subgroup = FALSE) {
+
+  links <- list(
     htmltools::tags$a(href = paste0("#", id_prefix, "cd-exec-summary"), "Summary", class = "active"),
     htmltools::tags$a(href = paste0("#", id_prefix, "cd-importance"), "Importance"),
     htmltools::tags$a(href = paste0("#", id_prefix, "cd-patterns"), "Patterns"),
     htmltools::tags$a(href = paste0("#", id_prefix, "cd-probability-lifts"), "Prob. Lifts"),
     htmltools::tags$a(href = paste0("#", id_prefix, "cd-odds-ratios"), "Odds Ratios"),
-    htmltools::tags$a(href = paste0("#", id_prefix, "cd-diagnostics"), "Diagnostics"),
+    htmltools::tags$a(href = paste0("#", id_prefix, "cd-diagnostics"), "Diagnostics")
+  )
+
+  if (isTRUE(has_subgroup)) {
+    links <- c(links, list(
+      htmltools::tags$a(href = paste0("#", id_prefix, "cd-subgroup-comparison"), "Subgroups")
+    ))
+  }
+
+  links <- c(links, list(
     htmltools::tags$a(href = paste0("#", id_prefix, "cd-interpretation"), "Guide"),
     htmltools::tags$a(href = paste0("#", id_prefix, "cd-pinned-section"), "Pinned Views")
+  ))
+
+  htmltools::tags$nav(
+    class = "cd-section-nav",
+    id = paste0(id_prefix, "cd-section-nav"),
+    links
   )
 }
 

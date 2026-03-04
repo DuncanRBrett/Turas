@@ -25,7 +25,8 @@
 .cd_required_files <- c("00_html_guard.R", "01_data_transformer.R",
                          "02_table_builder.R", "03_page_builder.R",
                          "04_html_writer.R", "05_chart_builder.R",
-                         "06_comparison_report.R", "07_unified_report.R")
+                         "06_comparison_report.R", "07_unified_report.R",
+                         "08_subgroup_report.R")
 
 .cd_missing <- character(0)
 for (.cd_file in .cd_required_files) {
@@ -248,7 +249,8 @@ generate_catdriver_html_report <- function(results, config, output_path) {
   cat("  Step 5: Assembling HTML page...\n")
 
   page <- tryCatch({
-    build_cd_html_page(html_data, tables, charts, config)
+    build_cd_html_page(html_data, tables, charts, config,
+                       subgroup_comparison = results$subgroup_comparison)
   }, error = function(e) {
     cat("\n=== TURAS ERROR ===\n")
     cat("Code: CALC_PAGE_BUILD_FAILED\n")

@@ -273,6 +273,30 @@ run_catdriver_gui <- function() {
             tags$code("Settings"), ", ", tags$code("Variables"), ", and ",
             tags$code("Driver_Settings"), " sheets. ",
             "Select multiple configs to generate a unified report."
+          ),
+
+          # Subgroup comparison option (collapsible advanced)
+          tags$hr(style = "margin: 15px 0 10px 0; border-color: #dee2e6;"),
+          actionLink("toggle_advanced", "Advanced Options",
+                     class = "toggle-link", icon = icon("cog")),
+          conditionalPanel(
+            condition = "input.toggle_advanced % 2 == 1",
+            div(style = "margin-top: 10px;",
+              fluidRow(
+                column(6,
+                  textInput("subgroup_var", "Subgroup Variable (optional)",
+                            value = "",
+                            placeholder = "e.g., age_group, region, segment")
+                ),
+                column(6,
+                  div(style = "margin-top: 30px; font-size: 12px; color: #6c757d;",
+                    "Enter a column name from your data to split the analysis ",
+                    "by subgroup. Leave blank for standard analysis. ",
+                    "The variable must NOT be the outcome or a driver."
+                  )
+                )
+              )
+            )
           )
         )
       ),
@@ -615,13 +639,15 @@ run_catdriver_gui <- function() {
           source(file.path(turas_root, "modules/catdriver/R/06a_sheets_summary.R"))
           source(file.path(turas_root, "modules/catdriver/R/06b_sheets_detail.R"))
           source(file.path(turas_root, "modules/catdriver/R/06_output.R"))
+          source(file.path(turas_root, "modules/catdriver/R/06c_sheets_subgroup.R"))
+          source(file.path(turas_root, "modules/catdriver/R/11_subgroup_comparison.R"))
           source(file.path(turas_root, "modules/catdriver/R/00_main.R"))
 
-          # 3. Source HTML report pipeline (needed for unified report generation)
+          # 3. Set lib dir for HTML report auto-discovery + source pipeline if multi-config
+          assign(".catdriver_lib_dir",
+                 file.path(turas_root, "modules", "catdriver", "lib"),
+                 envir = globalenv())
           if (is_multi) {
-            assign(".catdriver_lib_dir",
-                   file.path(turas_root, "modules", "catdriver", "lib"),
-                   envir = globalenv())
             source(file.path(turas_root, "modules/catdriver/lib/html_report/99_html_report_main.R"))
           }
 
@@ -659,11 +685,19 @@ run_catdriver_gui <- function() {
                           detail = sprintf("[%d/%d] %s", i, n_configs, message))
             }
 
+            # Build config overrides from GUI (e.g., subgroup_var)
+            gui_overrides <- NULL
+            subgroup_input <- input$subgroup_var
+            if (!is.null(subgroup_input) && nzchar(trimws(subgroup_input))) {
+              gui_overrides <- list(subgroup_var = trimws(subgroup_input))
+            }
+
             # Run with full output capture
             captured <- capture_console_all({
               run_categorical_keydriver(
                 config_file = config_path,
-                progress_callback = config_progress
+                progress_callback = config_progress,
+                config_overrides = gui_overrides
               )
             })
 

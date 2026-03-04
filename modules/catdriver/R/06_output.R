@@ -117,6 +117,16 @@ write_catdriver_output <- function(results, config, output_file) {
     error = function(e) cat("   [ERROR] Interpretation sheet failed:", conditionMessage(e), "\n")
   )
 
+  # Sheets 9-11: Subgroup Comparison (only when subgroup analysis is active)
+  if (isTRUE(results$subgroup_active) && !is.null(results$subgroup_comparison)) {
+    if (exists("add_subgroup_sheets", mode = "function")) {
+      tryCatch(
+        add_subgroup_sheets(wb, results$subgroup_comparison, results, config, styles),
+        error = function(e) cat("   [ERROR] Subgroup sheets failed:", conditionMessage(e), "\n")
+      )
+    }
+  }
+
   # Save workbook (TRS v1.0: Use atomic save if available)
   if (exists("turas_save_workbook_atomic", mode = "function")) {
     save_result <- turas_save_workbook_atomic(wb, output_file, module = "CATD")

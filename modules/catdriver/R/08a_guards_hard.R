@@ -266,6 +266,139 @@ guard_require_driver_settings <- function(config) {
 }
 
 
+# ==============================================================================
+# SUBGROUP COMPARISON GUARDS (HARD)
+# ==============================================================================
+
+#' Guard: Validate Subgroup Variable Is Not Outcome
+#'
+#' REFUSES if subgroup_var is the same as outcome_var.
+#'
+#' @param config Configuration list
+#' @keywords internal
+guard_subgroup_not_outcome <- function(config) {
+  if (is.null(config$subgroup_var) || !nzchar(config$subgroup_var)) {
+    return(invisible(TRUE))
+  }
+
+  if (config$subgroup_var == config$outcome_var) {
+    catdriver_refuse(
+      reason = "CFG_SUBGROUP_IS_OUTCOME",
+      title = "SUBGROUP VARIABLE CANNOT BE OUTCOME",
+      problem = sprintf(
+        "subgroup_var '%s' is the same as outcome_var '%s'.",
+        config$subgroup_var, config$outcome_var
+      ),
+      why_it_matters = "Splitting by the outcome variable would create meaningless subgroup models where the outcome has no variation within each group.",
+      fix = "Use a different variable for subgroup comparison (e.g., a demographic or segment variable)."
+    )
+  }
+
+  invisible(TRUE)
+}
+
+
+#' Guard: Validate Subgroup Variable Is Not a Driver
+#'
+#' REFUSES if subgroup_var is also listed as a driver variable.
+#'
+#' @param config Configuration list
+#' @keywords internal
+guard_subgroup_not_driver <- function(config) {
+  if (is.null(config$subgroup_var) || !nzchar(config$subgroup_var)) {
+    return(invisible(TRUE))
+  }
+
+  if (config$subgroup_var %in% config$driver_vars) {
+    catdriver_refuse(
+      reason = "CFG_SUBGROUP_IS_DRIVER",
+      title = "SUBGROUP VARIABLE CANNOT BE A DRIVER",
+      problem = sprintf(
+        "subgroup_var '%s' is also listed as a driver variable.",
+        config$subgroup_var
+      ),
+      why_it_matters = "Using the same variable as both the splitting variable and a predictor creates circular analysis. The subgroup variable would have no variation within each subgroup.",
+      fix = sprintf(
+        "Either:\n  1. Remove '%s' from the Variables sheet driver list, OR\n  2. Use a different variable for subgroup_var.",
+        config$subgroup_var
+      )
+    )
+  }
+
+  invisible(TRUE)
+}
+
+
+#' Guard: Validate Subgroup Variable Exists in Data
+#'
+#' REFUSES if subgroup_var column not found in data.
+#'
+#' @param config Configuration list
+#' @param data Data frame
+#' @keywords internal
+guard_subgroup_exists_in_data <- function(config, data) {
+  if (is.null(config$subgroup_var) || !nzchar(config$subgroup_var)) {
+    return(invisible(TRUE))
+  }
+
+  if (!config$subgroup_var %in% names(data)) {
+    catdriver_refuse(
+      reason = "CFG_SUBGROUP_VAR_NOT_IN_DATA",
+      title = "SUBGROUP VARIABLE NOT FOUND",
+      problem = sprintf(
+        "subgroup_var '%s' not found in data columns.",
+        config$subgroup_var
+      ),
+      why_it_matters = "Cannot split data by a variable that does not exist in the dataset.",
+      fix = sprintf(
+        "Check the 'subgroup_var' setting matches a column in your data file.\nAvailable columns: %s",
+        paste(head(names(data), 15), collapse = ", ")
+      )
+    )
+  }
+
+  invisible(TRUE)
+}
+
+
+#' Guard: Validate Subgroup Variable Has Sufficient Levels
+#'
+#' REFUSES if subgroup_var has fewer than 2 distinct non-NA levels.
+#'
+#' @param config Configuration list
+#' @param data Data frame
+#' @keywords internal
+guard_subgroup_minimum_levels <- function(config, data) {
+  if (is.null(config$subgroup_var) || !nzchar(config$subgroup_var)) {
+    return(invisible(TRUE))
+  }
+
+  # Only check if variable exists (existence guard runs first)
+  if (!config$subgroup_var %in% names(data)) {
+    return(invisible(TRUE))
+  }
+
+  subgroup_levels <- unique(as.character(na.omit(data[[config$subgroup_var]])))
+
+  if (length(subgroup_levels) < 2) {
+    catdriver_refuse(
+      reason = "CFG_SUBGROUP_INSUFFICIENT_LEVELS",
+      title = "SUBGROUP VARIABLE HAS FEWER THAN 2 LEVELS",
+      problem = sprintf(
+        "subgroup_var '%s' has %d distinct non-NA level(s): %s",
+        config$subgroup_var,
+        length(subgroup_levels),
+        paste(subgroup_levels, collapse = ", ")
+      ),
+      why_it_matters = "Need at least 2 subgroups to make a comparison.",
+      fix = "Choose a variable with 2 or more distinct values for subgroup comparison."
+    )
+  }
+
+  invisible(TRUE)
+}
+
+
 #' Guard: Validate Reference Category Not Missing
 #'
 #' REFUSES if reference category is "Missing" without explicit permission.

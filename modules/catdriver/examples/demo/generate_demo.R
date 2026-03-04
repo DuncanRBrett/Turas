@@ -26,6 +26,7 @@
 #   - demo_config_binary.xlsx           (churn analysis config)
 #   - demo_config_ordinal.xlsx          (satisfaction analysis config)
 #   - demo_config_multinomial.xlsx      (plan preference analysis config)
+#   - demo_config_binary_subgroup.xlsx  (churn by age_group subgroup config)
 #
 # ==============================================================================
 
@@ -183,7 +184,9 @@ cat("Written:", data_file, "(", n, "rows )\n")
 create_config <- function(filename, outcome_var, outcome_label, outcome_type,
                           outcome_order = NULL, reference_category = NULL,
                           multinomial_mode = NULL, target_outcome_level = NULL,
-                          use_weights = TRUE) {
+                          use_weights = TRUE,
+                          subgroup_var = NULL,
+                          exclude_drivers = NULL) {
 
   wb <- createWorkbook()
 
@@ -228,18 +231,43 @@ create_config <- function(filename, outcome_var, outcome_label, outcome_type,
   add_setting("researcher_logo_path", file.path(demo_output_dir, "trlwhite.png"))
   add_setting("report_title",       paste0("Customer ", outcome_label, " — Key Drivers"))
 
+  # Subgroup settings (optional)
+  if (!is.null(subgroup_var)) {
+    add_setting("subgroup_var", subgroup_var)
+    add_setting("subgroup_min_n", "30")
+    add_setting("subgroup_include_total", "TRUE")
+  }
+
   addWorksheet(wb, "Settings")
   writeData(wb, "Settings", settings)
 
   # --- Variables sheet ---
-  var_names  <- c(outcome_var, "service_quality", "price_perception",
-                  "support_experience", "contract_type", "age_group")
-  var_types  <- c("Outcome", "Driver", "Driver", "Driver", "Driver", "Driver")
-  var_labels <- c(outcome_label, "Service Quality", "Price Perception",
-                  "Support Experience", "Contract Type", "Age Group")
+  all_driver_names  <- c("service_quality", "price_perception",
+                         "support_experience", "contract_type", "age_group")
+  all_driver_labels <- c("Service Quality", "Price Perception",
+                         "Support Experience", "Contract Type", "Age Group")
+
+  # Remove excluded drivers (e.g., when a driver becomes the subgroup_var)
+  if (!is.null(exclude_drivers)) {
+    keep <- !all_driver_names %in% exclude_drivers
+    all_driver_names  <- all_driver_names[keep]
+    all_driver_labels <- all_driver_labels[keep]
+  }
+
+  # Lookup table: driver name → display order (used to build var_order dynamically)
+  driver_order_lookup <- c(
+    service_quality    = "Poor;Fair;Good;Excellent",
+    price_perception   = "Too Expensive;Fair;Good Value",
+    support_experience = "Negative;Neutral;Positive",
+    contract_type      = "",
+    age_group          = ""
+  )
+
+  var_names  <- c(outcome_var, all_driver_names)
+  var_types  <- c("Outcome", rep("Driver", length(all_driver_names)))
+  var_labels <- c(outcome_label, all_driver_labels)
   var_order  <- c(ifelse(is.null(outcome_order), "", outcome_order),
-                  "Poor;Fair;Good;Excellent", "Too Expensive;Fair;Good Value",
-                  "Negative;Neutral;Positive", "", "")
+                  unname(driver_order_lookup[all_driver_names]))
 
   if (use_weights) {
     var_names  <- c(var_names,  "survey_weight")
@@ -260,7 +288,8 @@ create_config <- function(filename, outcome_var, outcome_label, outcome_type,
   writeData(wb, "Variables", variables)
 
   # --- Driver_Settings sheet ---
-  driver_settings <- data.frame(
+  # Build full driver settings, then filter to match the (possibly reduced) driver list
+  all_ds <- data.frame(
     driver           = c("service_quality", "price_perception",
                          "support_experience", "contract_type", "age_group"),
     type             = c("ordinal", "ordinal", "ordinal", "categorical", "ordinal"),
@@ -276,6 +305,7 @@ create_config <- function(filename, outcome_var, outcome_label, outcome_type,
     rare_level_policy = c("", "", "", "", ""),
     stringsAsFactors = FALSE
   )
+  driver_settings <- all_ds[all_ds$driver %in% all_driver_names, , drop = FALSE]
 
   addWorksheet(wb, "Driver_Settings")
   writeData(wb, "Driver_Settings", driver_settings)
@@ -335,6 +365,19 @@ create_config(
   reference_category = "Basic",
   multinomial_mode   = "baseline_category",
   use_weights        = FALSE
+)
+
+# Binary + Subgroup: Churn split by Age Group
+# Note: age_group is excluded from drivers (can't be both splitter and predictor)
+create_config(
+  filename           = "demo_config_binary_subgroup.xlsx",
+  outcome_var        = "churn",
+  outcome_label      = "Customer Churn",
+  outcome_type       = "binary",
+  outcome_order      = "Retained;Churned",
+  reference_category = "Retained",
+  subgroup_var       = "age_group",
+  exclude_drivers    = "age_group"
 )
 
 cat("\n=== DEMO GENERATION COMPLETE ===\n")

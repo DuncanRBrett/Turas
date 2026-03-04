@@ -410,6 +410,13 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
     researcher_logo_path = get_setting(settings, "researcher_logo_path", NULL),
     client_logo_path = get_setting(settings, "client_logo_path", NULL),
 
+    # Subgroup comparison settings (optional - off by default)
+    subgroup_var = get_setting(settings, "subgroup_var", NULL),
+    subgroup_min_n = as_numeric_setting(get_setting(settings, "subgroup_min_n", 30), 30),
+    subgroup_include_total = as_logical_setting(
+      get_setting(settings, "subgroup_include_total", TRUE), TRUE
+    ),
+
     # Raw settings for reference
     settings = settings
   )

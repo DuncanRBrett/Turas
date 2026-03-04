@@ -69,7 +69,7 @@ cat("CatDriver module loaded.\n\n")
 
 #' Run a single demo analysis
 #'
-#' @param outcome_type One of "binary", "ordinal", "multinomial"
+#' @param outcome_type One of "binary", "ordinal", "multinomial", "binary_subgroup"
 #' @param open_html If TRUE, opens the HTML report in the default browser
 #' @return The analysis result list
 run_demo <- function(outcome_type = "binary", open_html = FALSE) {
@@ -109,6 +109,21 @@ run_demo <- function(outcome_type = "binary", open_html = FALSE) {
         cat(sprintf("  %d. %s (%.1f%%)\n",
                     i, top$label[i], top$importance_pct[i]))
       }
+    }
+  }
+
+  # Subgroup summary (if active)
+  if (isTRUE(result$subgroup_active) && !is.null(result$subgroup_comparison)) {
+    cat("\nSubgroup Comparison:\n")
+    comp <- result$subgroup_comparison
+    if (!is.null(comp$insights) && length(comp$insights) > 0) {
+      for (ins in comp$insights) {
+        cat("  •", ins, "\n")
+      }
+    }
+    if (!is.null(comp$importance_matrix)) {
+      cat(sprintf("  Groups analysed: %s\n",
+                  paste(comp$group_names, collapse = ", ")))
     }
   }
 
@@ -207,6 +222,7 @@ if (!interactive() || identical(Sys.getenv("RUN_DEMO_ALL"), "TRUE")) {
   cat("  result <- run_demo(\"binary\")\n")
   cat("  result <- run_demo(\"ordinal\")\n")
   cat("  result <- run_demo(\"multinomial\")\n")
+  cat("  result <- run_demo(\"binary_subgroup\")    # churn split by age_group\n")
   cat("\nOr generate a unified (combined) HTML report:\n")
   cat("  run_demo_unified()                                    # all three\n")
   cat("  run_demo_unified(c(\"binary\", \"ordinal\"))              # pick two\n")
