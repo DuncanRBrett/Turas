@@ -30,11 +30,18 @@ add_model_summary_sheet <- function(wb, results, config, styles) {
     stringsAsFactors = FALSE
   )
 
-  # Model type
-  model_type_label <- switch(model_result$outcome_type,
+  # Model type - handle various field names and values
+  ot <- model_result$outcome_type
+  if (is.null(ot)) ot <- model_result$model_type
+  model_type_label <- switch(as.character(ot),
     binary = "Binary Logistic Regression",
+    binary_logistic = "Binary Logistic Regression",
     ordinal = "Ordinal Logistic Regression (Proportional Odds)",
-    nominal = "Multinomial Logistic Regression"
+    ordinal_logistic = "Ordinal Logistic Regression (Proportional Odds)",
+    nominal = "Multinomial Logistic Regression",
+    multinomial = "Multinomial Logistic Regression",
+    multinomial_logistic = "Multinomial Logistic Regression",
+    paste("Logistic Regression (", ot, ")")
   )
 
   summary_data <- rbind(summary_data, data.frame(

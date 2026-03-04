@@ -220,6 +220,93 @@
   }
 
   // --------------------------------------------------------------------------
+  // Probability lift chip filtering
+  // Toggle chip on/off, show/hide lift chart rows by data-cd-factor attribute.
+  // --------------------------------------------------------------------------
+  window.cdToggleLiftFactor = function(factorLabel, prefix) {
+    prefix = prefix || '';
+
+    var sectionId = prefix + 'cd-probability-lifts';
+    var section = document.getElementById(sectionId);
+    if (!section) return;
+
+    // Toggle chip active state
+    var chip = section.querySelector('.cd-or-chip[data-cd-lift-factor="' + factorLabel + '"]');
+    if (!chip) return;
+
+    chip.classList.toggle('active');
+    var isActive = chip.classList.contains('active');
+
+    // Show/hide lift chart SVG rows matching this driver
+    var chart = section.querySelector('.cd-lift-chart');
+    if (chart) {
+      chart.querySelectorAll('g.cd-lift-row[data-cd-factor]').forEach(function(g) {
+        if (g.getAttribute('data-cd-factor') === factorLabel) {
+          g.style.display = isActive ? '' : 'none';
+        }
+      });
+      cdResizeLiftChart(chart);
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // Lift chart dynamic resize — compact visible rows after chip filtering
+  // --------------------------------------------------------------------------
+  function cdResizeLiftChart(svg) {
+    var barHeight = 24;
+    var headerHeight = 28;
+    var gap = 6;
+    var topPad = 30;
+    var bottomPad = 20;
+
+    var allRows = svg.querySelectorAll('g.cd-lift-row');
+    var visibleIdx = 0;
+    var currentY = topPad;
+
+    allRows.forEach(function(g, i) {
+      if (g.style.display === 'none') return;
+
+      // Calculate original y position by counting all rows before this one
+      var origY = topPad;
+      for (var j = 0; j < i; j++) {
+        var prev = allRows[j];
+        origY += (prev.classList.contains('cd-lift-header') ? headerHeight : barHeight) + gap;
+      }
+
+      var deltaY = currentY - origY;
+      if (deltaY !== 0) {
+        g.setAttribute('transform', 'translate(0,' + deltaY + ')');
+      } else {
+        g.removeAttribute('transform');
+      }
+
+      currentY += (g.classList.contains('cd-lift-header') ? headerHeight : barHeight) + gap;
+      visibleIdx++;
+    });
+
+    if (visibleIdx === 0) return;
+
+    var newHeight = currentY + bottomPad;
+
+    // Update viewBox height
+    var vb = svg.getAttribute('viewBox');
+    if (vb) {
+      var parts = vb.split(/\s+/);
+      if (parts.length >= 4) {
+        svg.setAttribute('viewBox', parts[0] + ' ' + parts[1] + ' ' + parts[2] + ' ' + newHeight);
+      }
+    }
+
+    // Update zero line and gridlines y2
+    svg.querySelectorAll('line[stroke-dasharray]').forEach(function(line) {
+      line.setAttribute('y2', newHeight - 15);
+    });
+    svg.querySelectorAll('line[stroke="#f0f0f0"]').forEach(function(line) {
+      line.setAttribute('y2', newHeight - 15);
+    });
+  }
+
+  // --------------------------------------------------------------------------
   // Importance bar filtering — show/hide bars by threshold
   // Modes: 'all', 'top-3', 'top-5', 'top-8', 'significant'
   // --------------------------------------------------------------------------

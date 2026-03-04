@@ -373,13 +373,16 @@ build_cd_probability_lift_chart <- function(probability_lifts,
     non_ref <- Filter(function(c) !isTRUE(c$is_reference), pl$categories)
     if (length(non_ref) > 0) {
       ref_label <- if (!is.null(pl$reference) && nzchar(pl$reference)) pl$reference else NULL
-      rows <- c(rows, list(list(type = "header", label = pl$label, reference = ref_label)))
+      driver_label <- pl$label
+      rows <- c(rows, list(list(type = "header", label = driver_label,
+                                reference = ref_label, driver = driver_label)))
       for (cat in non_ref) {
         rows <- c(rows, list(list(
           type = "bar",
           label = cat$level,
           lift_pct = cat$lift_pct,
-          prob = cat$mean_prob
+          prob = cat$mean_prob,
+          driver = driver_label
         )))
       }
     }
@@ -387,13 +390,13 @@ build_cd_probability_lift_chart <- function(probability_lifts,
 
   if (length(rows) == 0) return(NULL)
 
-  # Layout
+  # Layout — wider chart for better axis readability
   bar_height <- 24
   header_height <- 28
   gap <- 6
   label_width <- 200
-  chart_width <- 700
-  bar_area_width <- chart_width - label_width - 40
+  chart_width <- 900
+  bar_area_width <- chart_width - label_width - 60
   half_bar <- bar_area_width / 2
   zero_x <- label_width + half_bar
 
@@ -461,10 +464,15 @@ build_cd_probability_lift_chart <- function(probability_lifts,
     }
   }
 
-  # Draw rows
+  # Draw rows — each wrapped in <g data-cd-factor="..."> for chip filtering
   y_pos <- 30
   for (r in rows) {
+    driver_attr <- htmltools::htmlEscape(r$driver %||% "")
+
     if (r$type == "header") {
+      elements <- paste0(elements, sprintf(
+        '<g class="cd-lift-row cd-lift-header" data-cd-factor="%s">\n', driver_attr))
+
       # Driver group header with reference category annotation
       header_label <- htmltools::htmlEscape(r$label)
       if (!is.null(r$reference)) {
@@ -483,8 +491,12 @@ build_cd_probability_lift_chart <- function(probability_lifts,
         '<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" stroke="#e2e8f0" stroke-width="1"/>\n',
         label_width, y_pos + header_height, chart_width - 20, y_pos + header_height
       ))
+      elements <- paste0(elements, '</g>\n')
       y_pos <- y_pos + header_height + gap
     } else {
+      elements <- paste0(elements, sprintf(
+        '<g class="cd-lift-row cd-lift-bar" data-cd-factor="%s">\n', driver_attr))
+
       # Bar row
       lift <- r$lift_pct
       bar_w <- to_width(lift)
@@ -522,6 +534,7 @@ build_cd_probability_lift_chart <- function(probability_lifts,
         ))
       }
 
+      elements <- paste0(elements, '</g>\n')
       y_pos <- y_pos + bar_height + gap
     }
   }

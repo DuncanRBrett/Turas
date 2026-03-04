@@ -307,6 +307,14 @@ check_multicollinearity <- function(model) {
     ))
   }
 
+  # car::vif() does not support multinomial (nnet) models
+  if (inherits(model, "multinom")) {
+    return(list(
+      checked = FALSE,
+      message = "VIF not available for multinomial models (limitation of car::vif)"
+    ))
+  }
+
   vif_result <- tryCatch({
     vif_vals <- car::vif(model)
 

@@ -72,29 +72,50 @@ write_catdriver_output <- function(results, config, output_file) {
   add_run_status_sheet(wb, results, styles)
 
   # Sheet 2: Executive Summary
-  add_executive_summary_sheet(wb, results, config, styles)
+  tryCatch(
+    add_executive_summary_sheet(wb, results, config, styles),
+    error = function(e) cat("   [ERROR] Executive Summary sheet failed:", conditionMessage(e), "\n")
+  )
 
   # Sheet 3: Importance Summary
-  add_importance_sheet(wb, results, config, styles)
+  tryCatch(
+    add_importance_sheet(wb, results, config, styles),
+    error = function(e) cat("   [ERROR] Importance sheet failed:", conditionMessage(e), "\n")
+  )
 
   # Sheet 4: Factor Patterns
-  add_patterns_sheet(wb, results, config, styles)
+  tryCatch(
+    add_patterns_sheet(wb, results, config, styles),
+    error = function(e) cat("   [ERROR] Patterns sheet failed:", conditionMessage(e), "\n")
+  )
 
   # Sheet 5: Model Summary
-  add_model_summary_sheet(wb, results, config, styles)
+  tryCatch(
+    add_model_summary_sheet(wb, results, config, styles),
+    error = function(e) cat("   [ERROR] Model Summary sheet failed:", conditionMessage(e), "\n")
+  )
 
   # Sheet 6: Odds Ratios (if detailed output)
   if (config$detailed_output) {
-    add_odds_ratios_sheet(wb, results, config, styles)
+    tryCatch(
+      add_odds_ratios_sheet(wb, results, config, styles),
+      error = function(e) cat("   [ERROR] Odds Ratios sheet failed:", conditionMessage(e), "\n")
+    )
   }
 
   # Sheet 7: Diagnostics (if detailed output)
   if (config$detailed_output) {
-    add_diagnostics_sheet(wb, results, config, styles)
+    tryCatch(
+      add_diagnostics_sheet(wb, results, config, styles),
+      error = function(e) cat("   [ERROR] Diagnostics sheet failed:", conditionMessage(e), "\n")
+    )
   }
 
   # Sheet 8: Interpretation & Limits (always included for transparency)
-  add_interpretation_sheet(wb, results, config, styles)
+  tryCatch(
+    add_interpretation_sheet(wb, results, config, styles),
+    error = function(e) cat("   [ERROR] Interpretation sheet failed:", conditionMessage(e), "\n")
+  )
 
   # Save workbook (TRS v1.0: Use atomic save if available)
   if (exists("turas_save_workbook_atomic", mode = "function")) {

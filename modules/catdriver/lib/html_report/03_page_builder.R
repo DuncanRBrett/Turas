@@ -82,11 +82,11 @@ build_cd_html_page <- function(html_data, tables, charts, config) {
     htmltools::tags$meta(name = "turas-source-filename", content = source_filename)
   )
 
-  # Pinned Views section (single-report mode — shown inline below content)
+  # Pinned Views section — its own navigable page/section
   pinned_section <- htmltools::tags$div(
     class = "cd-section",
     id = "cd-pinned-section",
-    style = "margin-top:24px;",
+    `data-cd-section` = "pinned-views",
     htmltools::tags$div(
       class = "cd-pinned-panel-header",
       htmltools::tags$div(class = "cd-pinned-panel-title",
@@ -1291,7 +1291,8 @@ build_cd_section_nav <- function(brand_colour = "#323367", id_prefix = "") {
     htmltools::tags$a(href = paste0("#", id_prefix, "cd-probability-lifts"), "Prob. Lifts"),
     htmltools::tags$a(href = paste0("#", id_prefix, "cd-odds-ratios"), "Odds Ratios"),
     htmltools::tags$a(href = paste0("#", id_prefix, "cd-diagnostics"), "Diagnostics"),
-    htmltools::tags$a(href = paste0("#", id_prefix, "cd-interpretation"), "Guide")
+    htmltools::tags$a(href = paste0("#", id_prefix, "cd-interpretation"), "Guide"),
+    htmltools::tags$a(href = paste0("#", id_prefix, "cd-pinned-section"), "Pinned Views")
   )
 }
 
@@ -1816,12 +1817,16 @@ build_cd_probability_lifts_section <- function(html_data, tables, charts,
                                            id_prefix = id_prefix)
   insight_area <- build_cd_insight_area("probability-lifts", id_prefix = id_prefix)
 
+  # Chip bar for driver show/hide on the combined chart
+  lift_chip_bar <- build_cd_lift_chip_bar(html_data$probability_lifts, id_prefix = id_prefix)
+
   # Chart wrapper (combined chart showing all drivers)
   chart_el <- NULL
   if (!is.null(charts$probability_lift)) {
     chart_el <- htmltools::tags$div(
       class = "cd-chart-wrapper",
       build_cd_component_pin_btn("probability-lifts", "chart", id_prefix),
+      lift_chip_bar,
       charts$probability_lift
     )
   }
@@ -2208,6 +2213,38 @@ build_cd_or_chip_bar <- function(odds_ratios, id_prefix = "") {
       onclick = sprintf("cdToggleOrFactor('%s','%s')",
                         gsub("'", "\\\\'", fl), id_prefix),
       fl
+    )
+  })
+
+  htmltools::tags$div(class = "cd-or-chip-bar", chips)
+}
+
+
+#' Build Probability Lift Chip Bar
+#'
+#' Creates a chip bar for showing/hiding drivers in the probability lift chart.
+#' Mirrors the OR chip bar pattern.
+#'
+#' @param probability_lifts Named list of probability lift data
+#' @param id_prefix Optional prefix for multi-report mode
+#' @return htmltools tag or NULL
+#' @keywords internal
+build_cd_lift_chip_bar <- function(probability_lifts, id_prefix = "") {
+  if (is.null(probability_lifts) || length(probability_lifts) == 0) return(NULL)
+
+  # Extract driver labels
+  driver_labels <- vapply(probability_lifts, function(pl) pl$label %||% "", character(1))
+  driver_labels <- driver_labels[nzchar(driver_labels)]
+
+  if (length(driver_labels) < 2) return(NULL)
+
+  chips <- lapply(driver_labels, function(dl) {
+    htmltools::tags$button(
+      class = "cd-or-chip active",
+      `data-cd-lift-factor` = dl,
+      onclick = sprintf("cdToggleLiftFactor('%s','%s')",
+                        gsub("'", "\\\\'", dl), id_prefix),
+      dl
     )
   })
 
