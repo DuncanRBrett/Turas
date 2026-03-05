@@ -1,0 +1,621 @@
+# ==============================================================================
+# SEGMENT MODULE - MAIN ORCHESTRATOR
+# ==============================================================================
+# Step-function orchestrator for the Turas Segmentation module.
+# Follows the catdriver/keydriver pattern: steps are sequential,
+# guard state is threaded through, PARTIAL status tracks degradation.
+#
+# Entry point: turas_segment_from_config(config_file)
+#
+# Pipeline:
+#   STEP 1: Load & validate configuration
+#   STEP 2: Load & prepare data
+#   STEP 3: Run hard guards
+#   STEP 4: Clustering (kmeans / hclust / gmm)
+#   STEP 5: Validation metrics
+#   STEP 6: Profiling & enhanced features
+#   STEP 7: Output (Excel + segment assignments + HTML report)
+#
+# Version: 11.0
+# ==============================================================================
+
+
+# ==============================================================================
+# LOAD DEPENDENCIES
+# ==============================================================================
+
+# Get Turas root
+turas_root <- Sys.getenv("TURAS_ROOT", getwd())
+
+# Null coalescing operator (if not already defined)
+if (!exists("%||%", mode = "function")) {
+  `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
+}
+
+# TRS Infrastructure (shared)
+tryCatch({
+  source(file.path(turas_root, "modules/shared/lib/trs_run_state.R"))
+  source(file.path(turas_root, "modules/shared/lib/trs_banner.R"))
+  source(file.path(turas_root, "modules/shared/lib/trs_run_status_writer.R"))
+  source(file.path(turas_root, "modules/shared/lib/turas_log.R"))
+  source(file.path(turas_root, "modules/shared/lib/turas_save_workbook_atomic.R"))
+  source(file.path(turas_root, "modules/shared/lib/turas_excel_escape.R"))
+}, error = function(e) {
+  message(sprintf("[TRS INFO] SEG_TRS_LOAD: Could not load TRS infrastructure: %s", e$message))
+})
+
+# Shared utilities
+source(file.path(turas_root, "modules/shared/lib/validation_utils.R"))
+source(file.path(turas_root, "modules/shared/lib/config_utils.R"))
+source(file.path(turas_root, "modules/shared/lib/data_utils.R"))
+source(file.path(turas_root, "modules/shared/lib/logging_utils.R"))
+source(file.path(turas_root, "modules/shared/lib/formatting_utils.R"))
+
+# Segment module files (R/ directory)
+.seg_r_dir <- file.path(turas_root, "modules/segment/R")
+
+source(file.path(.seg_r_dir, "00_guard.R"))
+source(file.path(.seg_r_dir, "00a_guards_hard.R"))
+source(file.path(.seg_r_dir, "00b_guards_soft.R"))
+source(file.path(.seg_r_dir, "01_config.R"))
+source(file.path(.seg_r_dir, "02_data_prep.R"))
+source(file.path(.seg_r_dir, "02a_variable_selection.R"))
+source(file.path(.seg_r_dir, "02b_outliers.R"))
+source(file.path(.seg_r_dir, "03_clustering.R"))
+source(file.path(.seg_r_dir, "03a_kmeans.R"))
+source(file.path(.seg_r_dir, "03b_hclust.R"))
+source(file.path(.seg_r_dir, "03c_gmm.R"))
+source(file.path(.seg_r_dir, "04_validation.R"))
+source(file.path(.seg_r_dir, "05_profiling.R"))
+source(file.path(.seg_r_dir, "05a_profiling_stats.R"))
+source(file.path(.seg_r_dir, "06_rules.R"))
+source(file.path(.seg_r_dir, "07_cards.R"))
+source(file.path(.seg_r_dir, "08_scoring.R"))
+source(file.path(.seg_r_dir, "09_output.R"))
+source(file.path(.seg_r_dir, "10_utilities.R"))
+source(file.path(.seg_r_dir, "11_lca.R"))
+source(file.path(.seg_r_dir, "12_executive_summary.R"))
+
+# HTML report pipeline (optional - check if files exist)
+.seg_html_dir <- file.path(turas_root, "modules/segment/lib/html_report")
+.seg_html_available <- file.exists(file.path(.seg_html_dir, "99_html_report_main.R"))
+
+if (.seg_html_available) {
+  tryCatch({
+    source(file.path(.seg_html_dir, "99_html_report_main.R"))
+    cat("[SEGMENT] HTML report pipeline loaded\n")
+  }, error = function(e) {
+    .seg_html_available <<- FALSE
+    cat(sprintf("[SEGMENT] HTML report pipeline not available: %s\n", e$message))
+  })
+}
+
+
+# ==============================================================================
+# MAIN ENTRY POINT
+# ==============================================================================
+
+#' Run Segmentation Analysis from Configuration File
+#'
+#' Main entry point for the Turas segmentation module.
+#' Supports K-means, hierarchical clustering, and GMM methods.
+#' Automatically detects exploration vs final mode from config.
+#'
+#' @param config_file Character, path to segmentation config Excel file
+#' @param verbose Logical, print progress messages (default: TRUE)
+#' @return List with segmentation results
+#' @export
+turas_segment_from_config <- function(config_file, verbose = TRUE) {
+  segment_with_refusal_handler({
+    turas_segment_impl(config_file, verbose)
+  })
+}
+
+
+#' Internal Segmentation Implementation
+#'
+#' Called by turas_segment_from_config() inside refusal handler.
+#'
+#' @param config_file Path to config file
+#' @param verbose Print progress
+#' @return Results list
+#' @keywords internal
+turas_segment_impl <- function(config_file, verbose = TRUE) {
+
+  # ==========================================================================
+  # TRS RUN STATE INITIALIZATION
+  # ==========================================================================
+
+  trs_state <- if (exists("turas_run_state_new", mode = "function")) {
+    turas_run_state_new("SEGMENT")
+  } else {
+    NULL
+  }
+
+  if (exists("turas_print_start_banner", mode = "function")) {
+    turas_print_start_banner("SEGMENT", SEGMENT_VERSION)
+  }
+
+  start_time <- Sys.time()
+  guard <- segment_guard_init()
+
+  cat(sprintf("Configuration file: %s\n", basename(config_file)))
+  cat(sprintf("Start time: %s\n", format(start_time, "%Y-%m-%d %H:%M:%S")))
+  cat(sprintf("Module version: %s\n\n", SEGMENT_VERSION))
+
+  # ==========================================================================
+  # STEP 1: CONFIGURATION
+  # ==========================================================================
+
+  if (exists("turas_step", mode = "function")) {
+    turas_step(1, "Loading & validating configuration")
+  } else {
+    cat("STEP 1: CONFIGURATION\n")
+  }
+
+  config_raw <- read_segment_config(config_file)
+  config <- validate_segment_config(config_raw)
+
+  # Set seed for reproducibility
+  seed_used <- set_segmentation_seed(config)
+
+  # ==========================================================================
+  # STEP 2: DATA PREPARATION
+  # ==========================================================================
+
+  if (exists("turas_step", mode = "function")) {
+    turas_step(2, "Loading & preparing data")
+  } else {
+    cat("\nSTEP 2: DATA PREPARATION\n")
+  }
+
+  data_list <- prepare_segment_data(config)
+
+  # Soft guards on data quality
+  guard <- guard_check_missing_data(data_list$data, config$clustering_vars, guard,
+                                     threshold = config$missing_threshold)
+  guard <- guard_check_low_variance(data_list$scaled_data, guard)
+  guard <- guard_check_high_correlation(data_list$scaled_data, guard)
+
+  if (!is.null(data_list$outlier_count) && data_list$outlier_count > 0) {
+    guard <- guard_check_outlier_proportion(data_list$outlier_count,
+                                            nrow(data_list$data), guard)
+    guard <- guard_record_outliers_removed(guard, data_list$outlier_count)
+  }
+
+  # ==========================================================================
+  # STEP 3: HARD GUARDS
+  # ==========================================================================
+
+  if (exists("turas_step", mode = "function")) {
+    turas_step(3, "Running validation checks")
+  } else {
+    cat("\nSTEP 3: VALIDATION\n")
+  }
+
+  guard_require_clustering_vars(config, data_list$data)
+  guard_require_id_variable(config, data_list$data)
+
+  # Sample size check (use k_max for exploration, k_fixed for final)
+  k_check <- if (config$mode == "exploration") config$k_max else config$k_fixed
+  guard_require_sample_size(nrow(data_list$scaled_data), k_check, ncol(data_list$scaled_data))
+
+  cat("  All validation checks passed\n")
+
+  # ==========================================================================
+  # STEP 4: CLUSTERING
+  # ==========================================================================
+
+  if (exists("turas_step", mode = "function")) {
+    turas_step(4, sprintf("Running %s clustering", toupper(config$method)))
+  } else {
+    cat(sprintf("\nSTEP 4: CLUSTERING (%s)\n", toupper(config$method)))
+  }
+
+  if (config$mode == "exploration") {
+    return(run_exploration_pipeline(data_list, config, guard, trs_state, start_time, config_file))
+  }
+
+  # Final mode
+  cluster_result <- run_clustering(data_list, config, guard)
+
+  # Record method in guard
+  guard$clustering_method <- config$method
+
+  # Soft guard on cluster sizes
+  guard <- guard_check_small_clusters(cluster_result$clusters, guard,
+                                       min_pct = config$min_segment_size_pct)
+
+  # ==========================================================================
+  # STEP 5: VALIDATION METRICS
+  # ==========================================================================
+
+  if (exists("turas_step", mode = "function")) {
+    turas_step(5, "Calculating validation metrics")
+  } else {
+    cat("\nSTEP 5: VALIDATION METRICS\n")
+  }
+
+  validation_metrics <- calculate_validation_metrics(
+    data = data_list$scaled_data,
+    model = cluster_result$model,
+    k = cluster_result$k,
+    clusters = cluster_result$clusters,
+    calculate_gap = FALSE
+  )
+
+  guard <- guard_check_silhouette_quality(validation_metrics$avg_silhouette, guard)
+  guard <- guard_record_cluster_stability(guard, cluster_result$k,
+    validation_metrics$avg_silhouette, validation_metrics$tot_withinss)
+
+  cat(sprintf("  Average silhouette: %.3f\n", validation_metrics$avg_silhouette))
+  cat(sprintf("  Between/Total SS: %.3f\n", validation_metrics$betweenss_totss))
+
+  # ==========================================================================
+  # STEP 6: PROFILING & ENHANCED FEATURES
+  # ==========================================================================
+
+  if (exists("turas_step", mode = "function")) {
+    turas_step(6, "Building segment profiles")
+  } else {
+    cat("\nSTEP 6: PROFILING\n")
+  }
+
+  # Segment names
+  if (identical(config$segment_names, "auto")) {
+    segment_names <- generate_segment_names(cluster_result$k,
+      method = config$auto_name_style %||% "simple")
+  } else {
+    segment_names <- config$segment_names
+  }
+
+  # Core profiles
+  profile_result <- create_full_segment_profile(
+    data = data_list$data,
+    clusters = cluster_result$clusters,
+    clustering_vars = data_list$config$clustering_vars,
+    profile_vars = data_list$config$profile_vars
+  )
+
+  # Enhanced features (optional, with tryCatch)
+  enhanced <- list()
+
+  # Classification rules
+  if (config$generate_rules) {
+    enhanced$rules <- tryCatch({
+      cat("  Generating classification rules...\n")
+      generate_classification_rules(
+        data = data_list$scaled_data,
+        clusters = cluster_result$clusters,
+        max_depth = config$rules_max_depth
+      )
+    }, error = function(e) {
+      guard <<- guard_warn(guard, paste("Rules generation failed:", e$message), "rules")
+      NULL
+    })
+  }
+
+  # Segment cards
+  if (config$generate_action_cards) {
+    enhanced$cards <- tryCatch({
+      cat("  Generating segment action cards...\n")
+      generate_segment_cards(
+        profiles = profile_result,
+        segment_names = segment_names,
+        scale_max = config$scale_max
+      )
+    }, error = function(e) {
+      guard <<- guard_warn(guard, paste("Card generation failed:", e$message), "cards")
+      NULL
+    })
+  }
+
+  # Stability check
+  if (config$run_stability_check) {
+    enhanced$stability <- tryCatch({
+      cat("  Running stability assessment...\n")
+      run_stability_check(
+        data = data_list$scaled_data,
+        k = cluster_result$k,
+        method = config$method,
+        n_runs = config$stability_n_runs,
+        config = config
+      )
+    }, error = function(e) {
+      guard <<- guard_warn(guard, paste("Stability check failed:", e$message), "stability")
+      NULL
+    })
+  }
+
+  # GMM membership probabilities
+  gmm_membership <- NULL
+  if (config$method == "gmm" && !is.null(cluster_result$method_info$probabilities)) {
+    gmm_membership <- summarize_gmm_membership(
+      probabilities = cluster_result$method_info$probabilities,
+      uncertainty = cluster_result$method_info$uncertainty,
+      segment_names = segment_names
+    )
+  }
+
+  # Executive summary
+  exec_summary <- tryCatch({
+    generate_segment_executive_summary(
+      cluster_result = cluster_result,
+      validation_metrics = validation_metrics,
+      profile_result = profile_result,
+      segment_names = segment_names,
+      config = config,
+      enhanced = enhanced
+    )
+  }, error = function(e) {
+    guard <<- guard_warn(guard, paste("Executive summary failed:", e$message), "exec_summary")
+    NULL
+  })
+
+  # ==========================================================================
+  # STEP 7: OUTPUT
+  # ==========================================================================
+
+  if (exists("turas_step", mode = "function")) {
+    turas_step(7, "Generating outputs")
+  } else {
+    cat("\nSTEP 7: OUTPUT\n")
+  }
+
+  # Determine run status
+  run_status <- segment_determine_status(guard,
+    clusters_created = cluster_result$k,
+    cases_assigned = length(cluster_result$clusters),
+    silhouette_score = validation_metrics$avg_silhouette)
+
+  # TRS run state
+  run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+    if (run_status$status == "PARTIAL" && exists("turas_run_state_partial", mode = "function")) {
+      for (reason in run_status$degraded_reasons %||% character(0)) {
+        trs_state <- turas_run_state_partial(trs_state, reason)
+      }
+    }
+    turas_run_state_result(trs_state)
+  } else {
+    NULL
+  }
+
+  # Create output folder
+  output_folder <- create_output_folder(config$output_folder, config$create_dated_folder)
+
+  # Export segment assignments (Excel with ID + segment columns)
+  assignments_filename <- paste0(config$output_prefix, "segment_assignments.xlsx")
+  assignments_path <- file.path(output_folder, assignments_filename)
+
+  export_segment_assignments(
+    data = data_list$data,
+    clusters = cluster_result$clusters,
+    segment_names = segment_names,
+    id_var = config$id_variable,
+    output_path = assignments_path,
+    outlier_flags = data_list$outlier_flags,
+    probabilities = cluster_result$method_info$probabilities
+  )
+
+  # Export full report (Excel)
+  report_filename <- paste0(config$output_prefix, "segmentation_report.xlsx")
+  report_path <- file.path(output_folder, report_filename)
+
+  export_final_report(
+    final_result = cluster_result,
+    profile_result = profile_result,
+    validation_metrics = validation_metrics,
+    output_path = report_path,
+    run_result = run_result,
+    enhanced = enhanced,
+    segment_names = segment_names,
+    exec_summary = exec_summary,
+    gmm_membership = gmm_membership
+  )
+
+  # Save model object
+  model_path <- NULL
+  if (config$save_model) {
+    model_filename <- paste0(config$output_prefix, "model.rds")
+    model_path <- file.path(output_folder, model_filename)
+
+    model_object <- list(
+      model = cluster_result$model,
+      k = cluster_result$k,
+      clusters = cluster_result$clusters,
+      centers = cluster_result$centers,
+      method = cluster_result$method,
+      segment_names = segment_names,
+      clustering_vars = data_list$config$clustering_vars,
+      id_variable = config$id_variable,
+      scale_params = data_list$scale_params,
+      imputation_params = data_list$imputation_params,
+      original_distribution = table(cluster_result$clusters),
+      seed = seed_used,
+      config = data_list$config,
+      timestamp = Sys.time(),
+      turas_version = SEGMENT_VERSION
+    )
+
+    saveRDS(model_object, model_path)
+    cat(sprintf("  Model saved: %s\n", basename(model_path)))
+  }
+
+  # HTML report (optional)
+  html_path <- NULL
+  if (config$html_report && .seg_html_available) {
+    html_filename <- paste0(config$output_prefix, "segmentation_report.html")
+    html_path <- file.path(output_folder, html_filename)
+
+    cat("  Generating HTML report...\n")
+    html_result <- tryCatch({
+      generate_segment_html_report(
+        results = list(
+          mode = "final",
+          cluster_result = cluster_result,
+          validation_metrics = validation_metrics,
+          profile_result = profile_result,
+          segment_names = segment_names,
+          enhanced = enhanced,
+          exec_summary = exec_summary,
+          gmm_membership = gmm_membership,
+          data_list = data_list
+        ),
+        config = config,
+        output_path = html_path
+      )
+    }, error = function(e) {
+      cat(sprintf("  [WARNING] HTML report generation failed: %s\n", e$message))
+      guard <<- guard_warn(guard, paste("HTML report failed:", e$message), "html")
+      NULL
+    })
+
+    if (!is.null(html_result)) {
+      cat(sprintf("  HTML report: %s (%.1f MB)\n", basename(html_path),
+                  html_result$file_size_mb %||% 0))
+    }
+  } else if (config$html_report && !.seg_html_available) {
+    cat("  [WARNING] HTML report requested but pipeline not available\n")
+  }
+
+  # ==========================================================================
+  # COMPLETION
+  # ==========================================================================
+
+  elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+
+  cat(sprintf("\n  Analysis complete in %s\n", format_seconds(elapsed)))
+  cat("\n  Outputs:\n")
+  cat(sprintf("    Segment assignments: %s\n", basename(assignments_path)))
+  cat(sprintf("    Full report: %s\n", basename(report_path)))
+  if (!is.null(model_path)) cat(sprintf("    Model object: %s\n", basename(model_path)))
+  if (!is.null(html_path)) cat(sprintf("    HTML report: %s\n", basename(html_path)))
+
+  cat(sprintf("\n  Summary: %d segments | %d respondents | silhouette %.3f | method %s\n",
+              cluster_result$k, length(cluster_result$clusters),
+              validation_metrics$avg_silhouette, toupper(config$method)))
+
+  # TRS final banner
+  if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
+    turas_print_final_banner(run_result)
+  }
+
+  # Return results
+  invisible(list(
+    mode = "final",
+    status = run_status$status,
+    k = cluster_result$k,
+    method = config$method,
+    model = cluster_result$model,
+    clusters = cluster_result$clusters,
+    centers = cluster_result$centers,
+    segment_names = segment_names,
+    validation = validation_metrics,
+    profiles = profile_result,
+    enhanced = enhanced,
+    exec_summary = exec_summary,
+    gmm_membership = gmm_membership,
+    output_files = list(
+      assignments = assignments_path,
+      report = report_path,
+      model = model_path,
+      html = html_path
+    ),
+    config = config,
+    run_result = run_result,
+    guard_summary = segment_guard_summary(guard)
+  ))
+}
+
+
+# ==============================================================================
+# EXPLORATION PIPELINE
+# ==============================================================================
+
+#' Run Exploration Mode Pipeline
+#'
+#' Tests multiple k values and generates comparison report.
+#'
+#' @keywords internal
+run_exploration_pipeline <- function(data_list, config, guard, trs_state, start_time, config_file) {
+
+  cat(sprintf("\n  Mode: EXPLORATION (k = %d to %d, method = %s)\n",
+              config$k_min, config$k_max, toupper(config$method)))
+
+  # Run clustering for multiple k values
+  exploration_result <- run_clustering_exploration(data_list, config, guard)
+
+  # Calculate metrics for each k
+  metrics_result <- calculate_exploration_metrics(exploration_result)
+
+  # Recommend optimal k
+  recommendation <- recommend_k(metrics_result$metrics_df, config$min_segment_size_pct)
+
+  # TRS run state
+  run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+    turas_run_state_result(trs_state)
+  } else {
+    NULL
+  }
+
+  # Create output
+  output_folder <- create_output_folder(config$output_folder, config$create_dated_folder)
+  report_filename <- paste0(config$output_prefix, "k_selection_report.xlsx")
+  report_path <- file.path(output_folder, report_filename)
+
+  export_exploration_report(
+    exploration_result = exploration_result,
+    metrics_result = metrics_result,
+    recommendation = recommendation,
+    output_path = report_path,
+    run_result = run_result
+  )
+
+  # HTML exploration report (optional)
+  html_path <- NULL
+  if (config$html_report && .seg_html_available) {
+    html_filename <- paste0(config$output_prefix, "k_selection_report.html")
+    html_path <- file.path(output_folder, html_filename)
+
+    html_result <- tryCatch({
+      generate_segment_html_report(
+        results = list(
+          mode = "exploration",
+          exploration_result = exploration_result,
+          metrics_result = metrics_result,
+          recommendation = recommendation,
+          data_list = data_list
+        ),
+        config = config,
+        output_path = html_path
+      )
+    }, error = function(e) {
+      cat(sprintf("  [WARNING] HTML exploration report failed: %s\n", e$message))
+      NULL
+    })
+  }
+
+  elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+
+  cat(sprintf("\n  Analysis complete in %s\n", format_seconds(elapsed)))
+  cat(sprintf("\n  Recommended k: %d\n", recommendation$recommended_k))
+  cat(sprintf("  Next: set k_fixed = %d in your config and re-run\n", recommendation$recommended_k))
+
+  if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
+    turas_print_final_banner(run_result)
+  }
+
+  invisible(list(
+    mode = "exploration",
+    method = config$method,
+    recommendation = recommendation,
+    metrics = metrics_result,
+    models = exploration_result$results,
+    output_files = list(
+      report = report_path,
+      html = html_path
+    ),
+    config = config,
+    run_result = run_result
+  ))
+}
