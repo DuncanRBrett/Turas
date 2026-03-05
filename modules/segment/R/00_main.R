@@ -75,6 +75,7 @@ source(file.path(.seg_r_dir, "09_output.R"))
 source(file.path(.seg_r_dir, "10_utilities.R"))
 source(file.path(.seg_r_dir, "11_lca.R"))
 source(file.path(.seg_r_dir, "12_executive_summary.R"))
+source(file.path(.seg_r_dir, "13_vulnerability.R"))
 
 # HTML report pipeline (optional - check if files exist)
 .seg_html_dir <- file.path(turas_root, "modules/segment/lib/html_report")
@@ -216,6 +217,11 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
     return(run_exploration_pipeline(data_list, config, guard, trs_state, start_time, config_file))
   }
 
+  # Multi-method mode: run each method and produce combined report
+  if (isTRUE(config$is_multi_method) && config$mode == "final") {
+    return(run_multi_method_pipeline(data_list, config, guard, trs_state, start_time, config_file))
+  }
+
   # Final mode
   cluster_result <- run_clustering(data_list, config, guard)
 
@@ -342,6 +348,23 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
       segment_names = segment_names
     )
   }
+
+  # Vulnerability / switching analysis
+  vulnerability <- tryCatch({
+    cat("  Running vulnerability analysis...\n")
+    vuln <- calculate_vulnerability(
+      data = data_list$scaled_data,
+      clusters = cluster_result$clusters,
+      centers = cluster_result$centers,
+      method = config$method,
+      probabilities = cluster_result$method_info$probabilities
+    )
+    format_vulnerability_summary(vuln, segment_names)
+    vuln
+  }, error = function(e) {
+    guard <<- guard_warn(guard, paste("Vulnerability analysis failed:", e$message), "vulnerability")
+    NULL
+  })
 
   # Executive summary
   exec_summary <- tryCatch({
@@ -474,6 +497,7 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
           enhanced = enhanced,
           exec_summary = exec_summary,
           gmm_membership = gmm_membership,
+          vulnerability = vulnerability,
           data_list = data_list
         ),
         config = config,
@@ -530,6 +554,7 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
     enhanced = enhanced,
     exec_summary = exec_summary,
     gmm_membership = gmm_membership,
+    vulnerability = vulnerability,
     output_files = list(
       assignments = assignments_path,
       report = report_path,
@@ -632,5 +657,307 @@ run_exploration_pipeline <- function(data_list, config, guard, trs_state, start_
     ),
     config = config,
     run_result = run_result
+  ))
+}
+
+
+# ==============================================================================
+# MULTI-METHOD PIPELINE
+# ==============================================================================
+
+#' Run Multi-Method Pipeline
+#'
+#' Runs multiple clustering algorithms on the same data and produces
+#' a combined comparison report with tabs.
+#'
+#' @keywords internal
+run_multi_method_pipeline <- function(data_list, config, guard, trs_state, start_time, config_file) {
+
+  methods <- config$methods
+  cat(sprintf("\n  Multi-method mode: running %s\n", paste(toupper(methods), collapse = ", ")))
+
+  method_results <- list()
+
+  for (m in methods) {
+    cat(sprintf("\n  ── Method: %s ──\n", toupper(m)))
+
+    # Create method-specific config
+    method_config <- config
+    method_config$method <- m
+    method_config$is_multi_method <- FALSE  # prevent recursion
+
+    # Run clustering
+    cluster_result <- tryCatch({
+      run_clustering(data_list, method_config, guard)
+    }, error = function(e) {
+      cat(sprintf("    FAILED: %s\n", e$message))
+      NULL
+    })
+
+    if (is.null(cluster_result)) {
+      cat(sprintf("    Skipping %s (clustering failed)\n", toupper(m)))
+      next
+    }
+
+    # Validation metrics
+    validation_metrics <- tryCatch({
+      calculate_validation_metrics(
+        data = data_list$scaled_data,
+        model = cluster_result$model,
+        k = cluster_result$k,
+        clusters = cluster_result$clusters,
+        calculate_gap = FALSE
+      )
+    }, error = function(e) {
+      cat(sprintf("    Warning: validation failed for %s: %s\n", m, e$message))
+      list(avg_silhouette = NA, betweenss_totss = NA, tot_withinss = NA)
+    })
+
+    # Segment names
+    segment_names <- generate_segment_names(cluster_result$k,
+      method = config$auto_name_style %||% "simple")
+
+    # Profiles
+    profile_result <- tryCatch({
+      create_full_segment_profile(
+        data = data_list$data,
+        clusters = cluster_result$clusters,
+        clustering_vars = data_list$config$clustering_vars,
+        profile_vars = data_list$config$profile_vars
+      )
+    }, error = function(e) {
+      cat(sprintf("    Warning: profiling failed for %s: %s\n", m, e$message))
+      NULL
+    })
+
+    # Vulnerability analysis
+    vulnerability <- tryCatch({
+      if (exists("calculate_vulnerability", mode = "function")) {
+        calculate_vulnerability(
+          data = data_list$scaled_data,
+          clusters = cluster_result$clusters,
+          centers = cluster_result$centers,
+          method = m,
+          probabilities = cluster_result$method_info$probabilities
+        )
+      } else {
+        NULL
+      }
+    }, error = function(e) {
+      cat(sprintf("    Warning: vulnerability analysis failed for %s: %s\n", m, e$message))
+      NULL
+    })
+
+    # Enhanced features
+    enhanced <- list()
+
+    if (config$generate_rules) {
+      enhanced$rules <- tryCatch({
+        generate_segment_rules(
+          data = data_list$data,
+          clusters = cluster_result$clusters,
+          clustering_vars = data_list$config$clustering_vars,
+          question_labels = config$question_labels,
+          max_depth = config$rules_max_depth,
+          segment_names = segment_names
+        )
+      }, error = function(e) NULL)
+    }
+
+    if (config$generate_action_cards) {
+      enhanced$cards <- tryCatch({
+        generate_segment_cards(
+          data = data_list$data,
+          clusters = cluster_result$clusters,
+          clustering_vars = data_list$config$clustering_vars,
+          segment_names = segment_names,
+          question_labels = config$question_labels,
+          scale_max = config$scale_max
+        )
+      }, error = function(e) NULL)
+    }
+
+    # GMM membership
+    gmm_membership <- NULL
+    if (m == "gmm" && !is.null(cluster_result$method_info$probabilities)) {
+      gmm_membership <- tryCatch({
+        summarize_gmm_membership(
+          probabilities = cluster_result$method_info$probabilities,
+          uncertainty = cluster_result$method_info$uncertainty,
+          segment_names = segment_names
+        )
+      }, error = function(e) NULL)
+    }
+
+    # Executive summary
+    exec_summary <- tryCatch({
+      generate_segment_executive_summary(
+        cluster_result = cluster_result,
+        validation_metrics = validation_metrics,
+        profile_result = profile_result,
+        segment_names = segment_names,
+        config = method_config,
+        enhanced = enhanced
+      )
+    }, error = function(e) NULL)
+
+    cat(sprintf("    Silhouette: %.3f | BSS/TSS: %.3f\n",
+                validation_metrics$avg_silhouette %||% 0,
+                validation_metrics$betweenss_totss %||% 0))
+
+    method_results[[m]] <- list(
+      method = m,
+      cluster_result = cluster_result,
+      validation_metrics = validation_metrics,
+      profile_result = profile_result,
+      segment_names = segment_names,
+      enhanced = enhanced,
+      exec_summary = exec_summary,
+      gmm_membership = gmm_membership,
+      vulnerability = vulnerability
+    )
+  }
+
+  if (length(method_results) == 0) {
+    segment_refuse(
+      code = "MODEL_ALL_METHODS_FAILED",
+      title = "All Clustering Methods Failed",
+      problem = "No clustering method produced valid results.",
+      why_it_matters = "Cannot generate a comparison report without at least one successful method.",
+      how_to_fix = "Check your data quality and try individual methods to diagnose the issue."
+    )
+  }
+
+  # ==========================================================================
+  # OUTPUT
+  # ==========================================================================
+
+  if (exists("turas_step", mode = "function")) {
+    turas_step(7, "Generating multi-method outputs")
+  } else {
+    cat("\nSTEP 7: MULTI-METHOD OUTPUT\n")
+  }
+
+  # Determine run status using first successful method
+  first_result <- method_results[[1]]
+  run_status <- segment_determine_status(guard,
+    clusters_created = first_result$cluster_result$k,
+    cases_assigned = length(first_result$cluster_result$clusters),
+    silhouette_score = first_result$validation_metrics$avg_silhouette)
+
+  run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+    turas_run_state_result(trs_state)
+  } else {
+    NULL
+  }
+
+  output_folder <- create_output_folder(config$output_folder, config$create_dated_folder)
+
+  # Export per-method assignments and reports
+  for (m_name in names(method_results)) {
+    mr <- method_results[[m_name]]
+
+    # Segment assignments
+    assignments_path <- file.path(output_folder,
+      paste0(config$output_prefix, m_name, "_assignments.xlsx"))
+    tryCatch({
+      export_segment_assignments(
+        data = data_list$data,
+        clusters = mr$cluster_result$clusters,
+        segment_names = mr$segment_names,
+        id_var = config$id_variable,
+        output_path = assignments_path,
+        outlier_flags = data_list$outlier_flags,
+        probabilities = mr$cluster_result$method_info$probabilities
+      )
+    }, error = function(e) {
+      cat(sprintf("    Warning: assignments export failed for %s: %s\n", m_name, e$message))
+    })
+
+    # Save model
+    if (config$save_model) {
+      model_path <- file.path(output_folder,
+        paste0(config$output_prefix, m_name, "_model.rds"))
+      model_object <- list(
+        model = mr$cluster_result$model,
+        k = mr$cluster_result$k,
+        clusters = mr$cluster_result$clusters,
+        centers = mr$cluster_result$centers,
+        method = mr$cluster_result$method,
+        segment_names = mr$segment_names,
+        clustering_vars = data_list$config$clustering_vars,
+        id_variable = config$id_variable,
+        scale_params = data_list$scale_params,
+        timestamp = Sys.time(),
+        turas_version = SEGMENT_VERSION
+      )
+      saveRDS(model_object, model_path)
+      cat(sprintf("    Model saved: %s\n", basename(model_path)))
+    }
+  }
+
+  # Combined HTML report
+  html_path <- NULL
+  if (config$html_report && .seg_html_available) {
+    html_filename <- paste0(config$output_prefix, "combined_report.html")
+    html_path <- file.path(output_folder, html_filename)
+
+    cat("  Generating combined multi-method HTML report...\n")
+    html_result <- tryCatch({
+      generate_segment_html_report(
+        results = list(
+          mode = "combined",
+          method_results = method_results,
+          methods = names(method_results),
+          data_list = data_list
+        ),
+        config = config,
+        output_path = html_path
+      )
+    }, error = function(e) {
+      cat(sprintf("  [WARNING] Combined HTML report failed: %s\n", e$message))
+      NULL
+    })
+
+    if (!is.null(html_result)) {
+      cat(sprintf("  Combined HTML report: %s (%.1f MB)\n", basename(html_path),
+                  html_result$file_size_mb %||% 0))
+    }
+  }
+
+  # Completion
+  elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+
+  cat(sprintf("\n  Multi-method analysis complete in %s\n", format_seconds(elapsed)))
+  cat(sprintf("  Methods: %s\n", paste(toupper(names(method_results)), collapse = ", ")))
+
+  # Comparison summary
+  cat("\n  Method Comparison:\n")
+  cat(sprintf("  %-12s  %10s  %10s\n", "Method", "Silhouette", "BSS/TSS"))
+  cat(sprintf("  %-12s  %10s  %10s\n", "------", "----------", "-------"))
+  for (m_name in names(method_results)) {
+    mr <- method_results[[m_name]]
+    cat(sprintf("  %-12s  %10.3f  %10.3f\n",
+                toupper(m_name),
+                mr$validation_metrics$avg_silhouette %||% 0,
+                mr$validation_metrics$betweenss_totss %||% 0))
+  }
+
+  if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
+    turas_print_final_banner(run_result)
+  }
+
+  invisible(list(
+    mode = "combined",
+    status = run_status$run_status %||% "PASS",
+    methods = names(method_results),
+    method_results = method_results,
+    output_files = list(
+      html = html_path,
+      folder = output_folder
+    ),
+    config = config,
+    run_result = run_result,
+    guard_summary = segment_guard_summary(guard)
   ))
 }

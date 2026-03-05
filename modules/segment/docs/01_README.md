@@ -22,6 +22,8 @@ The Turas Segmentation Module provides a standardized, repeatable approach to cl
 - Outlier detection and handling (Z-score or Mahalanobis)
 - Variable selection for high-dimensional data
 - Validation metrics (Silhouette, Elbow, Gap statistic, Calinski-Harabasz)
+- Multi-method comparison with combined tabbed HTML report
+- Segment vulnerability/switching analysis with assignment confidence scores
 - Segment profiling, classification rules, and action cards
 - Stability assessment for solution robustness
 - Segment assignment output (Excel with ID, segment_id, segment_name, and GMM probabilities)
@@ -162,7 +164,7 @@ modules/segment/
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `method` | kmeans | Clustering algorithm: `kmeans`, `hclust`, or `gmm` |
+| `method` | kmeans | Clustering algorithm: `kmeans`, `hclust`, `gmm`, or comma-separated for multi-method comparison (e.g., `kmeans,hclust,gmm` or `all`) |
 | `k_fixed` | (blank) | Fixed k for final run; blank = exploration |
 | `k_min` | 3 | Minimum k to test in exploration |
 | `k_max` | 6 | Maximum k to test |

@@ -57,6 +57,7 @@ Customer segmentation divides your respondents into distinct groups (segments) b
 | **Exploration Mode** | Compare 2-10 segment solutions before committing |
 | **Final Mode** | Detailed profiling of chosen solution |
 | **Model Persistence** | Save models to score new data consistently |
+| **Multi-Method Comparison** | Run kmeans, hclust, and GMM simultaneously with tabbed HTML report |
 
 ### Data Quality
 
@@ -80,6 +81,7 @@ Customer segmentation divides your respondents into distinct groups (segments) b
 | **BIC Model Selection** | Principled model comparison (GMM only) |
 | **Stability Assessment** | Multi-run consistency check |
 | **Enhanced Profiling** | ANOVA tests and effect sizes |
+| **Vulnerability Analysis** | Assignment confidence scores and segment switching identification |
 
 ### Scoring & Application
 

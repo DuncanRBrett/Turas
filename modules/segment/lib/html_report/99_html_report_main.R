@@ -76,6 +76,12 @@ if (file.exists(.seg_html_exploration_path)) {
   source(.seg_html_exploration_path)
 }
 
+# Optional: combined multi-method report builder
+.seg_html_combined_path <- file.path(.seg_html_report_dir, "07_combined_report.R")
+if (file.exists(.seg_html_combined_path)) {
+  source(.seg_html_combined_path)
+}
+
 
 # ==============================================================================
 # MAIN ENTRY POINT
@@ -83,8 +89,8 @@ if (file.exists(.seg_html_exploration_path)) {
 
 #' Generate Segment HTML Report
 #'
-#' Main entry point for HTML report generation. Routes to final or
-#' exploration report based on results$mode.
+#' Main entry point for HTML report generation. Routes to final,
+#' exploration, or combined report based on results$mode.
 #'
 #' @param results List with segmentation results (mode, cluster_result, etc.)
 #' @param config Configuration list
@@ -97,6 +103,11 @@ generate_segment_html_report <- function(results, config, output_path) {
   mode <- results$mode %||% "final"
   if (mode == "exploration" && exists("generate_segment_exploration_html_report", mode = "function")) {
     return(generate_segment_exploration_html_report(results, config, output_path))
+  }
+
+  # Route combined mode to multi-method comparison builder
+  if (mode == "combined" && exists("generate_segment_combined_html_report", mode = "function")) {
+    return(generate_segment_combined_html_report(results, config, output_path))
   }
 
   start_time <- Sys.time()

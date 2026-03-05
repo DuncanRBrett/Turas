@@ -40,6 +40,7 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
     !is.null(html_data$variable_importance)
   show_profiles <- isTRUE(config$html_show_profiles %||% TRUE) &&
     !is.null(html_data$profile_data)
+  show_vulnerability <- !is.null(html_data$vulnerability)
   show_guide <- isTRUE(config$html_show_guide %||% TRUE)
 
   # Build sections config for nav
@@ -51,6 +52,7 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
     profiles       = list(label = "Profiles", show = show_profiles),
     rules          = list(label = "Rules", show = show_rules),
     cards          = list(label = "Segment Cards", show = show_cards),
+    vulnerability  = list(label = "Vulnerability", show = show_vulnerability),
     gmm            = list(label = "GMM Membership", show = show_gmm),
     guide          = list(label = "Guide", show = show_guide),
     `pinned-views` = list(label = "Pinned Views", show = TRUE)
@@ -81,6 +83,9 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
   }
   cards_section <- if (show_cards) {
     build_seg_cards_section(html_data)
+  }
+  vulnerability_section <- if (show_vulnerability) {
+    build_seg_vulnerability_section(html_data)
   }
   gmm_section <- if (show_gmm) {
     build_seg_gmm_section(tables, html_data)
@@ -200,6 +205,7 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
           profiles_section,
           rules_section,
           cards_section,
+          vulnerability_section,
           gmm_section,
           guide_section,
           pinned_section,
@@ -2240,6 +2246,170 @@ build_seg_cards_section <- function(html_data) {
       "Executive-ready summaries for each segment highlighting defining characteristics, strengths, pain points, and recommended actions."
     ),
     htmltools::tags$div(class = "seg-cards-grid", card_els)
+  )
+}
+
+
+# ==============================================================================
+# VULNERABILITY / SWITCHING SECTION
+# ==============================================================================
+
+#' Build Vulnerability Analysis Section
+#'
+#' Displays segment switching vulnerability analysis including per-segment
+#' confidence scores, vulnerability rates, and switching matrix.
+#'
+#' @param html_data Transformed HTML data (must contain $vulnerability)
+#' @return htmltools tag
+#' @keywords internal
+build_seg_vulnerability_section <- function(html_data) {
+
+  title_row <- build_seg_section_title_row("Segment Vulnerability", "vulnerability")
+  insight_area <- build_seg_insight_area("vulnerability")
+
+  vuln <- html_data$vulnerability
+  if (is.null(vuln)) {
+    return(htmltools::tags$div(
+      class = "seg-section",
+      id = "seg-vulnerability",
+      `data-seg-section` = "vulnerability",
+      title_row,
+      insight_area,
+      htmltools::tags$p(class = "seg-section-intro",
+                        "Vulnerability analysis not available.")
+    ))
+  }
+
+  # Overall summary metrics
+  overall_pct <- round(vuln$overall_pct_vulnerable, 1)
+  overall_conf <- round(vuln$overall_avg_confidence, 2)
+  threshold <- vuln$threshold %||% 0.3
+
+  status_colour <- if (overall_pct > 30) "#ef4444" else if (overall_pct > 15) "#f59e0b" else "#22c55e"
+  status_label <- if (overall_pct > 30) "High" else if (overall_pct > 15) "Moderate" else "Low"
+
+  summary_box <- htmltools::tags$div(
+    class = "seg-finding-box",
+    htmltools::tags$div(
+      class = "seg-finding-item",
+      htmltools::tags$span(class = "seg-finding-icon",
+                          style = sprintf("color:%s;", status_colour), "\u25CF"),
+      htmltools::tags$span(class = "seg-finding-text",
+                          sprintf("%s vulnerability: %.1f%% of respondents are borderline (confidence < %.1f)",
+                                  status_label, overall_pct, threshold))
+    ),
+    htmltools::tags$div(
+      class = "seg-finding-item",
+      htmltools::tags$span(class = "seg-finding-icon",
+                          style = "color:var(--seg-brand);", "\u25B6"),
+      htmltools::tags$span(class = "seg-finding-text",
+                          sprintf("Average assignment confidence: %.2f (1.0 = perfectly assigned)", overall_conf))
+    )
+  )
+
+  # Per-segment vulnerability table
+  seg_summary <- vuln$segment_summary
+  seg_table <- NULL
+  if (!is.null(seg_summary) && nrow(seg_summary) > 0) {
+    header <- htmltools::tags$tr(
+      htmltools::tags$th("Segment", class = "seg-th"),
+      htmltools::tags$th("n", class = "seg-th seg-th-num"),
+      htmltools::tags$th("Vulnerable", class = "seg-th seg-th-num"),
+      htmltools::tags$th("% Vulnerable", class = "seg-th seg-th-num"),
+      htmltools::tags$th("Avg Confidence", class = "seg-th seg-th-num")
+    )
+
+    rows <- lapply(seq_len(nrow(seg_summary)), function(i) {
+      row <- seg_summary[i, ]
+      pct_vuln <- round(row$pct_vulnerable, 1)
+      bar_colour <- if (pct_vuln > 30) "#ef4444" else if (pct_vuln > 15) "#f59e0b" else "#22c55e"
+
+      htmltools::tags$tr(
+        htmltools::tags$td(row$segment, class = "seg-td"),
+        htmltools::tags$td(format(row$n, big.mark = ","), class = "seg-td seg-td-num"),
+        htmltools::tags$td(format(row$n_vulnerable, big.mark = ","), class = "seg-td seg-td-num"),
+        htmltools::tags$td(
+          class = "seg-td seg-td-num",
+          htmltools::tags$span(
+            style = sprintf("color:%s; font-weight:500;", bar_colour),
+            sprintf("%.1f%%", pct_vuln)
+          )
+        ),
+        htmltools::tags$td(sprintf("%.2f", row$avg_confidence), class = "seg-td seg-td-num")
+      )
+    })
+
+    seg_table <- htmltools::tags$div(
+      class = "seg-table-wrapper",
+      build_seg_component_pin_btn("vulnerability", "table"),
+      htmltools::tags$table(
+        class = "seg-table",
+        htmltools::tags$thead(header),
+        htmltools::tags$tbody(rows)
+      )
+    )
+  }
+
+  # Switching matrix
+  sw_matrix <- vuln$switching_matrix
+  matrix_el <- NULL
+  if (!is.null(sw_matrix) && nrow(sw_matrix) > 0) {
+    k <- nrow(sw_matrix)
+    seg_names <- rownames(sw_matrix) %||% paste0("Seg ", 1:k)
+
+    m_header <- htmltools::tags$tr(
+      htmltools::tags$th("From \\ To", class = "seg-th"),
+      lapply(seg_names, function(s) htmltools::tags$th(s, class = "seg-th seg-th-num"))
+    )
+
+    m_rows <- lapply(seq_len(k), function(i) {
+      cells <- lapply(seq_len(k), function(j) {
+        val <- sw_matrix[i, j]
+        bg <- if (i == j) "#f8fafc" else if (val > 0) {
+          intensity <- min(val / max(sw_matrix[sw_matrix > 0], na.rm = TRUE), 1)
+          sprintf("rgba(239, 68, 68, %.2f)", intensity * 0.3)
+        } else {
+          "transparent"
+        }
+        htmltools::tags$td(
+          class = "seg-td seg-td-num",
+          style = sprintf("background:%s;", bg),
+          if (i == j) "-" else as.character(val)
+        )
+      })
+      htmltools::tags$tr(
+        htmltools::tags$td(seg_names[i], class = "seg-td", style = "font-weight:500;"),
+        cells
+      )
+    })
+
+    matrix_el <- htmltools::tags$div(
+      class = "seg-table-wrapper",
+      htmltools::tags$h4(class = "seg-subsection-title", "Switching Matrix"),
+      htmltools::tags$p(class = "seg-section-intro", style = "font-size:12px;",
+                        "Number of borderline respondents in each segment (rows) who would switch to another segment (columns)."),
+      build_seg_component_pin_btn("vulnerability", "matrix"),
+      htmltools::tags$table(
+        class = "seg-table",
+        htmltools::tags$thead(m_header),
+        htmltools::tags$tbody(m_rows)
+      )
+    )
+  }
+
+  htmltools::tags$div(
+    class = "seg-section",
+    id = "seg-vulnerability",
+    `data-seg-section` = "vulnerability",
+    title_row,
+    insight_area,
+    htmltools::tags$p(
+      class = "seg-section-intro",
+      "Identifies respondents whose segment assignments are borderline - they sit near the boundary between segments and could potentially switch with small changes in their responses."
+    ),
+    summary_box,
+    seg_table,
+    matrix_el
   )
 }
 

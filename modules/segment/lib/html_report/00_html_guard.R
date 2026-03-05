@@ -39,12 +39,12 @@ validate_segment_html_inputs <- function(results, config, output_path) {
 
   # Check mode
   mode <- results$mode %||% "final"
-  if (!(mode %in% c("final", "exploration"))) {
+  if (!(mode %in% c("final", "exploration", "combined"))) {
     return(list(
       status = "REFUSED",
       code = "CFG_INVALID_MODE",
-      message = sprintf("Invalid report mode: '%s'. Expected 'final' or 'exploration'.", mode),
-      how_to_fix = "Set results$mode to 'final' or 'exploration'."
+      message = sprintf("Invalid report mode: '%s'. Expected 'final', 'exploration', or 'combined'.", mode),
+      how_to_fix = "Set results$mode to 'final', 'exploration', or 'combined'."
     ))
   }
 
@@ -61,7 +61,7 @@ validate_segment_html_inputs <- function(results, config, output_path) {
         ))
       }
     }
-  } else {
+  } else if (mode == "exploration") {
     required_fields <- c("exploration_result", "metrics_result", "recommendation")
     for (field in required_fields) {
       if (is.null(results[[field]])) {
@@ -72,6 +72,24 @@ validate_segment_html_inputs <- function(results, config, output_path) {
           how_to_fix = sprintf("Ensure results$%s is populated before generating HTML report.", field)
         ))
       }
+    }
+  } else if (mode == "combined") {
+    # Combined mode requires methods list and method_results
+    if (is.null(results$methods) || length(results$methods) < 2) {
+      return(list(
+        status = "REFUSED",
+        code = "CFG_COMBINED_MIN_METHODS",
+        message = "Combined mode requires at least 2 methods in results$methods.",
+        how_to_fix = "Provide results$methods with at least 2 method names."
+      ))
+    }
+    if (is.null(results$method_results) || !is.list(results$method_results)) {
+      return(list(
+        status = "REFUSED",
+        code = "DATA_MISSING_FIELD",
+        message = "Required field 'method_results' is missing or not a list.",
+        how_to_fix = "Provide a named list of per-method results in results$method_results."
+      ))
     }
   }
 

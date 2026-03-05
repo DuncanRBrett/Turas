@@ -34,12 +34,17 @@ run_gmm_clustering <- function(data_list, config, guard) {
   if (!requireNamespace("mclust", quietly = TRUE)) {
     segment_refuse(
       code = "PKG_MCLUST_MISSING",
-      title = "Package 'mclust' Required",
-      problem = "GMM clustering requires the 'mclust' package.",
-      why_it_matters = "Cannot fit Gaussian mixture models without mclust.",
-      how_to_fix = "Install: install.packages('mclust')"
+      title = "Package 'mclust' Not Installed",
+      problem = "GMM clustering requires the 'mclust' package, which is not installed.",
+      why_it_matters = "Gaussian Mixture Models cannot be fitted without mclust.",
+      how_to_fix = "Install mclust: install.packages('mclust')"
     )
   }
+
+  # mclust::Mclust() internally calls mclustBIC() without namespace prefix,
+
+  # so the package must be fully loaded (not just requireNamespace).
+  suppressPackageStartupMessages(library(mclust))
 
   scaled_data <- data_list$scaled_data
   k <- config$k_fixed
@@ -170,12 +175,15 @@ run_gmm_exploration <- function(data_list, config) {
   if (!requireNamespace("mclust", quietly = TRUE)) {
     segment_refuse(
       code = "PKG_MCLUST_MISSING",
-      title = "Package 'mclust' Required",
-      problem = "GMM exploration requires the 'mclust' package.",
+      title = "Package 'mclust' Not Installed",
+      problem = "GMM exploration requires the 'mclust' package, which is not installed.",
       why_it_matters = "Cannot perform BIC-based model selection without mclust.",
-      how_to_fix = "Install: install.packages('mclust')"
+      how_to_fix = "Install mclust: install.packages('mclust')"
     )
   }
+
+  # mclust internal functions require the package to be fully loaded
+  suppressPackageStartupMessages(library(mclust))
 
   scaled_data <- data_list$scaled_data
   k_range <- seq(config$k_min, config$k_max)

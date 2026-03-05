@@ -88,6 +88,9 @@ transform_final_for_html <- function(results, config) {
   # GMM membership
   gmm_membership <- results$gmm_membership %||% NULL
 
+  # Vulnerability analysis
+  vulnerability <- results$vulnerability %||% NULL
+
   # Question labels
   question_labels <- config$question_labels %||% NULL
 
@@ -108,6 +111,7 @@ transform_final_for_html <- function(results, config) {
     exec_summary = exec_summary,
     enhanced = enhanced,
     gmm_membership = gmm_membership,
+    vulnerability = vulnerability,
     question_labels = question_labels,
     config = config,
     run_status = "PASS"

@@ -1,0 +1,1774 @@
+# ==============================================================================
+# SEGMENT HTML REPORT - COMBINED MULTI-METHOD REPORT
+# ==============================================================================
+# Builds a tabbed HTML report comparing multiple clustering methods
+# (K-Means, Hierarchical, GMM, etc.) in a single HTML file.
+# Each method gets its own tab panel with the standard section content,
+# plus a Comparison tab summarising metrics side-by-side.
+#
+# Entry point: generate_segment_combined_html_report()
+# Called from 99_html_report_main.R when results$mode == "combined".
+#
+# Reuses existing builders:
+#   - transform_segment_for_html()   from 01_data_transformer.R
+#   - build_seg_overview_table()     from 02_table_builder.R
+#   - build_seg_profile_table()      from 02_table_builder.R
+#   - build_seg_validation_table()   from 02_table_builder.R
+#   - build_seg_sizes_chart()        from 05_chart_builder.R
+#   - build_seg_silhouette_chart()   from 05_chart_builder.R
+#   - build_seg_heatmap_chart()      from 05_chart_builder.R
+#   - build_seg_importance_chart()   from 05_chart_builder.R
+#   - build_seg_css()                from 03_page_builder.R
+#   - build_seg_footer()             from 03_page_builder.R
+#   - write_seg_html_report()        from 04_html_writer.R
+#
+# Version: 11.0
+# ==============================================================================
+
+
+# ==============================================================================
+# MAIN ENTRY POINT
+# ==============================================================================
+
+
+#' Generate Combined Multi-Method Segment HTML Report
+#'
+#' Main entry point for the combined (multi-method comparison) HTML report.
+#' Builds a tabbed interface where each clustering method has its own panel
+#' showing the standard report sections, plus a Comparison tab with
+#' side-by-side metrics and agreement analysis.
+#'
+#' @param results List with combined segmentation results. Expected structure:
+#'   \describe{
+#'     \item{mode}{Character, must be "combined"}
+#'     \item{method_results}{Named list of per-method results, each structured
+#'       like a "final" mode result (with cluster_result, validation_metrics,
+#'       profile_result, segment_names)}
+#'     \item{methods}{Character vector of method names (e.g., c("kmeans", "hclust", "gmm"))}
+#'     \item{data_list}{Shared data list (original data used for clustering)}
+#'   }
+#' @param config Configuration list (brand_colour, accent_colour, report_title, etc.)
+#' @param output_path Character, output file path (.html)
+#' @return List with status, output_file, file_size_mb, elapsed_seconds, warnings
+#' @export
+generate_segment_combined_html_report <- function(results, config, output_path) {
+
+  start_time <- Sys.time()
+
+  cat(paste(rep("-", 60), collapse = ""), "\n")
+  cat("  SEGMENT COMBINED HTML REPORT GENERATION\n")
+  cat(paste(rep("-", 60), collapse = ""), "\n")
+
+  # ==========================================================================
+  # STEP 1: VALIDATE INPUTS
+  # ==========================================================================
+
+  cat("  Step 1: Validating inputs...\n")
+
+  if (!requireNamespace("htmltools", quietly = TRUE)) {
+    cat("\n=== TURAS ERROR ===\n")
+    cat("Code: PKG_HTMLTOOLS_MISSING\n")
+    cat("Message: Package 'htmltools' is required for HTML report generation.\n")
+    cat("Fix: install.packages('htmltools')\n")
+    cat("===================\n\n")
+    return(list(
+      status = "REFUSED",
+      code = "PKG_HTMLTOOLS_MISSING",
+      message = "Package 'htmltools' is required for HTML report generation but is not installed.",
+      how_to_fix = "Install htmltools: install.packages('htmltools')"
+    ))
+  }
+
+  if (is.null(results) || !is.list(results)) {
+    cat("\n=== TURAS ERROR ===\n")
+    cat("Code: DATA_INVALID_RESULTS\n")
+    cat("Message: Results object is NULL or not a list.\n")
+    cat("===================\n\n")
+    return(list(
+      status = "REFUSED",
+      code = "DATA_INVALID_RESULTS",
+      message = "Results object is NULL or not a list.",
+      how_to_fix = "Ensure combined segmentation analysis completed successfully."
+    ))
+  }
+
+  methods <- results$methods
+  method_results <- results$method_results
+
+  if (is.null(methods) || length(methods) < 2) {
+    cat("\n=== TURAS ERROR ===\n")
+    cat("Code: CFG_COMBINED_MIN_METHODS\n")
+    cat("Message: At least 2 methods required for combined report.\n")
+    cat("===================\n\n")
+    return(list(
+      status = "REFUSED",
+      code = "CFG_COMBINED_MIN_METHODS",
+      message = "At least 2 methods required for combined report.",
+      how_to_fix = "Provide results$methods with at least 2 method names and corresponding results$method_results."
+    ))
+  }
+
+  if (is.null(method_results) || !is.list(method_results)) {
+    cat("\n=== TURAS ERROR ===\n")
+    cat("Code: DATA_MISSING_METHOD_RESULTS\n")
+    cat("Message: results$method_results is NULL or not a list.\n")
+    cat("===================\n\n")
+    return(list(
+      status = "REFUSED",
+      code = "DATA_MISSING_METHOD_RESULTS",
+      message = "results$method_results is NULL or not a list.",
+      how_to_fix = "Provide a named list of per-method results in results$method_results."
+    ))
+  }
+
+  if (is.null(output_path) || !nzchar(output_path)) {
+    return(list(
+      status = "REFUSED",
+      code = "IO_INVALID_OUTPUT_PATH",
+      message = "Output path is empty or NULL.",
+      how_to_fix = "Provide a valid output file path ending in .html."
+    ))
+  }
+
+  # ==========================================================================
+  # STEP 2: TRANSFORM DATA FOR EACH METHOD
+  # ==========================================================================
+
+  cat("  Step 2: Transforming per-method data...\n")
+  warnings <- character(0)
+  brand_colour <- config$brand_colour %||% "#323367"
+  accent_colour <- config$accent_colour %||% "#CC9900"
+
+  method_html_data <- list()
+  for (m in methods) {
+    mr <- method_results[[m]]
+    if (is.null(mr)) {
+      warnings <- c(warnings, sprintf("Method '%s': no results found, skipping.", m))
+      next
+    }
+
+    # Build a per-method results object that looks like final mode
+    per_method_results <- mr
+    per_method_results$mode <- "final"
+
+    # Build a per-method config with method set
+    per_method_config <- config
+    per_method_config$method <- m
+
+    html_data <- tryCatch(
+      transform_segment_for_html(per_method_results, per_method_config),
+      error = function(e) {
+        warnings <<- c(warnings, sprintf("Method '%s': data transform failed: %s", m, e$message))
+        NULL
+      }
+    )
+
+    if (!is.null(html_data)) {
+      method_html_data[[m]] <- html_data
+    }
+  }
+
+  if (length(method_html_data) == 0) {
+    cat("\n=== TURAS ERROR ===\n")
+    cat("Code: CALC_NO_METHODS_TRANSFORMED\n")
+    cat("Message: No methods could be transformed for HTML report.\n")
+    cat("===================\n\n")
+    return(list(
+      status = "REFUSED",
+      code = "CALC_NO_METHODS_TRANSFORMED",
+      message = "No methods could be transformed for HTML report.",
+      how_to_fix = "Check that method_results contains valid final-mode results for at least one method."
+    ))
+  }
+
+  active_methods <- names(method_html_data)
+  cat(sprintf("    Transformed %d of %d methods\n", length(active_methods), length(methods)))
+
+  # ==========================================================================
+  # STEP 3: BUILD PER-METHOD TABLES AND CHARTS
+  # ==========================================================================
+
+  cat("  Step 3: Building per-method tables & charts...\n")
+
+  method_tables <- list()
+  method_charts <- list()
+
+  for (m in active_methods) {
+    hd <- method_html_data[[m]]
+
+    # Tables
+    tbls <- list()
+    tbls$overview <- tryCatch(build_seg_overview_table(hd), error = function(e) {
+      warnings <<- c(warnings, sprintf("Method '%s' overview table: %s", m, e$message))
+      NULL
+    })
+    tbls$validation <- tryCatch(build_seg_validation_table(hd), error = function(e) {
+      warnings <<- c(warnings, sprintf("Method '%s' validation table: %s", m, e$message))
+      NULL
+    })
+    tbls$profiles <- tryCatch(build_seg_profile_table(hd), error = function(e) {
+      warnings <<- c(warnings, sprintf("Method '%s' profile table: %s", m, e$message))
+      NULL
+    })
+    method_tables[[m]] <- tbls
+
+    # Charts
+    chts <- list()
+    chts$sizes <- tryCatch(
+      build_seg_sizes_chart(hd, brand_colour),
+      error = function(e) {
+        warnings <<- c(warnings, sprintf("Method '%s' sizes chart: %s", m, e$message))
+        NULL
+      }
+    )
+    chts$silhouette <- tryCatch(
+      build_seg_silhouette_chart(hd, brand_colour),
+      error = function(e) {
+        warnings <<- c(warnings, sprintf("Method '%s' silhouette chart: %s", m, e$message))
+        NULL
+      }
+    )
+    chts$heatmap <- tryCatch(
+      build_seg_heatmap_chart(hd, brand_colour, accent_colour),
+      error = function(e) {
+        warnings <<- c(warnings, sprintf("Method '%s' heatmap chart: %s", m, e$message))
+        NULL
+      }
+    )
+    chts$importance <- tryCatch(
+      build_seg_importance_chart(hd, brand_colour),
+      error = function(e) {
+        warnings <<- c(warnings, sprintf("Method '%s' importance chart: %s", m, e$message))
+        NULL
+      }
+    )
+    method_charts[[m]] <- chts
+  }
+
+  cat(sprintf("    Built tables & charts for %d methods\n", length(active_methods)))
+
+  # ==========================================================================
+  # STEP 4: BUILD COMPARISON CONTENT
+  # ==========================================================================
+
+  cat("  Step 4: Building comparison content...\n")
+
+  comparison_table <- tryCatch(
+    build_seg_method_comparison_table(method_html_data),
+    error = function(e) {
+      warnings <- c(warnings, sprintf("Comparison table: %s", e$message))
+      NULL
+    }
+  )
+
+  comparison_chart <- tryCatch(
+    build_seg_method_comparison_chart(method_html_data, brand_colour),
+    error = function(e) {
+      warnings <- c(warnings, sprintf("Comparison chart: %s", e$message))
+      NULL
+    }
+  )
+
+  agreement_matrix <- tryCatch(
+    build_seg_agreement_matrix(method_results, active_methods),
+    error = function(e) {
+      warnings <- c(warnings, sprintf("Agreement matrix: %s", e$message))
+      NULL
+    }
+  )
+
+  comparison_content <- list(
+    table = comparison_table,
+    chart = comparison_chart,
+    agreement = agreement_matrix
+  )
+
+  # ==========================================================================
+  # STEP 5: ASSEMBLE COMBINED HTML PAGE
+  # ==========================================================================
+
+  cat("  Step 5: Assembling combined HTML page...\n")
+
+  page <- tryCatch(
+    build_seg_combined_page(
+      method_html_data = method_html_data,
+      method_tables = method_tables,
+      method_charts = method_charts,
+      comparison_content = comparison_content,
+      config = config
+    ),
+    error = function(e) {
+      cat(sprintf("    ERROR: Combined page assembly failed: %s\n", e$message))
+      NULL
+    }
+  )
+
+  if (is.null(page)) {
+    return(list(
+      status = "REFUSED",
+      code = "CALC_PAGE_BUILD_FAILED",
+      message = "Failed to assemble combined HTML page."
+    ))
+  }
+
+  # ==========================================================================
+  # STEP 6: WRITE HTML FILE
+  # ==========================================================================
+
+  cat("  Step 6: Writing HTML file...\n")
+  write_result <- write_seg_html_report(page, output_path)
+
+  if (write_result$status == "REFUSED") {
+    return(write_result)
+  }
+
+  # ==========================================================================
+  # DONE
+  # ==========================================================================
+
+  elapsed <- round(as.numeric(difftime(Sys.time(), start_time, units = "secs")), 1)
+  final_status <- if (length(warnings) > 0) "PARTIAL" else "PASS"
+
+  cat(paste(rep("-", 60), collapse = ""), "\n")
+  cat(sprintf("  Combined report complete (%s, %.1fs)\n", final_status, elapsed))
+  if (length(warnings) > 0) {
+    cat(sprintf("  %d warning(s):\n", length(warnings)))
+    for (w in warnings) cat(sprintf("    - %s\n", w))
+  }
+  cat(paste(rep("-", 60), collapse = ""), "\n")
+
+  list(
+    status = final_status,
+    output_file = write_result$output_file,
+    file_size_mb = write_result$file_size_mb,
+    elapsed_seconds = elapsed,
+    warnings = if (length(warnings) > 0) warnings else NULL
+  )
+}
+
+
+# ==============================================================================
+# PAGE ASSEMBLY
+# ==============================================================================
+
+
+#' Build Combined Multi-Method HTML Page
+#'
+#' Assembles the full tabbed HTML page from per-method content and
+#' comparison content. Returns an htmltools browsable page.
+#'
+#' @param method_html_data Named list of transformed html_data per method
+#' @param method_tables Named list of table lists per method
+#' @param method_charts Named list of chart lists per method
+#' @param comparison_content List with table, chart, agreement elements
+#' @param config Configuration list
+#' @return htmltools::browsable tagList
+#' @keywords internal
+build_seg_combined_page <- function(method_html_data,
+                                     method_tables,
+                                     method_charts,
+                                     comparison_content,
+                                     config) {
+
+  brand_colour <- config$brand_colour %||% "#323367"
+  accent_colour <- config$accent_colour %||% "#CC9900"
+  report_title <- config$report_title %||% "Segmentation Analysis - Method Comparison"
+
+  active_methods <- names(method_html_data)
+
+  # --- Base CSS + combined-specific CSS ---
+  base_css <- build_seg_css(brand_colour, accent_colour)
+  combined_css <- .build_seg_combined_css(brand_colour, accent_colour)
+
+  # --- Header ---
+  header <- .build_seg_combined_header(method_html_data, config, brand_colour, report_title)
+
+  # --- Tab bar ---
+  tab_bar <- .build_seg_method_tab_bar(active_methods, brand_colour)
+
+  # --- Per-method panels ---
+  method_panels <- lapply(active_methods, function(m) {
+    .build_seg_method_panel(
+      method = m,
+      html_data = method_html_data[[m]],
+      tables = method_tables[[m]],
+      charts = method_charts[[m]],
+      is_first = (m == active_methods[1])
+    )
+  })
+
+  # --- Comparison panel ---
+  comparison_panel <- .build_seg_comparison_panel(
+    comparison_content = comparison_content,
+    method_html_data = method_html_data,
+    brand_colour = brand_colour,
+    accent_colour = accent_colour
+  )
+
+  # --- Footer ---
+  footer <- build_seg_footer(config)
+
+  # --- JavaScript ---
+  tab_js <- .build_seg_combined_js()
+
+  # Load existing JS files
+  js_dir <- tryCatch({
+    if (exists(".seg_html_report_dir")) {
+      file.path(.seg_html_report_dir, "js")
+    } else {
+      turas_root <- Sys.getenv("TURAS_ROOT", getwd())
+      file.path(turas_root, "modules/segment/lib/html_report/js")
+    }
+  }, error = function(e) {
+    turas_root <- Sys.getenv("TURAS_ROOT", getwd())
+    file.path(turas_root, "modules/segment/lib/html_report/js")
+  })
+
+  js_files <- c("seg_utils.js", "seg_navigation.js",
+                "seg_pinned_views.js", "seg_slide_export.js")
+  js_tags <- lapply(js_files, function(fname) {
+    js_path <- file.path(js_dir, fname)
+    js_content <- if (file.exists(js_path)) {
+      paste(readLines(js_path, warn = FALSE), collapse = "\n")
+    } else {
+      sprintf("/* %s not found */", fname)
+    }
+    htmltools::tags$script(htmltools::HTML(js_content))
+  })
+
+  # --- Report Hub metadata ---
+  source_filename <- basename(config$output_file %||%
+                               config$report_title %||% "Segment_Combined_Report")
+  hub_meta <- htmltools::tagList(
+    htmltools::tags$meta(name = "turas-report-type", content = "segment-combined"),
+    htmltools::tags$meta(name = "turas-module-version", content = "11.0"),
+    htmltools::tags$meta(name = "turas-source-filename", content = source_filename)
+  )
+
+  # --- Assemble page ---
+  page <- htmltools::tagList(
+    htmltools::tags$head(
+      htmltools::tags$meta(charset = "utf-8"),
+      htmltools::tags$meta(name = "viewport",
+                           content = "width=device-width, initial-scale=1"),
+      htmltools::tags$title(report_title),
+      hub_meta,
+      htmltools::tags$style(htmltools::HTML(base_css)),
+      htmltools::tags$style(htmltools::HTML(combined_css))
+    ),
+    htmltools::tags$body(
+      class = "seg-body",
+      header,
+      htmltools::tags$main(
+        class = "seg-main",
+        htmltools::tags$div(
+          class = "seg-content",
+          tab_bar,
+          htmltools::tags$div(
+            class = "seg-method-panels-container",
+            method_panels,
+            comparison_panel
+          ),
+          footer
+        )
+      ),
+      js_tags,
+      htmltools::tags$script(htmltools::HTML(tab_js))
+    )
+  )
+
+  htmltools::browsable(page)
+}
+
+
+# ==============================================================================
+# COMBINED-SPECIFIC CSS
+# ==============================================================================
+
+
+#' Build Combined Report CSS
+#'
+#' Additional CSS for the tabbed method interface, comparison tables,
+#' and agreement matrix. Layered on top of build_seg_css().
+#'
+#' @param brand_colour Brand colour hex string
+#' @param accent_colour Accent colour hex string
+#' @return Character string of CSS
+#' @keywords internal
+.build_seg_combined_css <- function(brand_colour = "#323367",
+                                     accent_colour = "#CC9900") {
+
+  css <- '
+/* ==== COMBINED REPORT - METHOD TABS ==== */
+
+.seg-method-tabs {
+  display: flex;
+  border-bottom: 2px solid #e2e8f0;
+  margin: 0 0 24px 0;
+  padding: 0;
+  gap: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.seg-method-tab {
+  padding: 12px 24px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #64748b;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s ease;
+  user-select: none;
+  white-space: nowrap;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.seg-method-tab:hover {
+  color: #334155;
+  background: #f8fafc;
+}
+
+.seg-method-tab-active {
+  color: BRAND_COLOUR;
+  border-bottom-color: BRAND_COLOUR;
+  font-weight: 600;
+}
+
+.seg-method-panel {
+  display: none;
+}
+
+.seg-method-panel-visible {
+  display: block;
+}
+
+.seg-method-panels-container {
+  min-height: 400px;
+}
+
+/* ==== COMBINED REPORT - METHOD PANEL SECTIONS ==== */
+
+.seg-combined-section {
+  margin-bottom: 28px;
+}
+
+.seg-combined-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.seg-combined-section-desc {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0 0 16px 0;
+  line-height: 1.6;
+}
+
+/* ==== COMPARISON TAB ==== */
+
+.seg-comparison-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+@media (max-width: 900px) {
+  .seg-comparison-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.seg-comparison-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 20px;
+}
+
+.seg-comparison-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 12px 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Comparison table */
+.seg-comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.seg-comparison-table th {
+  background: #f8fafc;
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: #334155;
+  border-bottom: 2px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.seg-comparison-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+}
+
+.seg-comparison-table tr:last-child td {
+  border-bottom: none;
+}
+
+.seg-comparison-best {
+  color: ACCENT_COLOUR;
+  font-weight: 600;
+}
+
+/* Agreement matrix */
+.seg-agreement-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.seg-agreement-table th {
+  background: #f8fafc;
+  padding: 10px 14px;
+  text-align: center;
+  font-weight: 600;
+  color: #334155;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.seg-agreement-table td {
+  padding: 10px 14px;
+  text-align: center;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+}
+
+.seg-agreement-cell-high {
+  background: #ecfdf5;
+  color: #059669;
+  font-weight: 600;
+}
+
+.seg-agreement-cell-medium {
+  background: #FFFBEB;
+  color: #B45309;
+  font-weight: 500;
+}
+
+.seg-agreement-cell-low {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.seg-agreement-cell-self {
+  background: #f1f5f9;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* Executive summary card for method panels */
+.seg-combined-exec-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+
+.seg-combined-exec-stat {
+  display: inline-block;
+  margin-right: 24px;
+  margin-bottom: 4px;
+}
+
+.seg-combined-exec-stat-label {
+  font-size: 11px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.seg-combined-exec-stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: BRAND_COLOUR;
+  font-family: monospace;
+}
+'
+
+  css <- gsub("BRAND_COLOUR", brand_colour, css, fixed = TRUE)
+  css <- gsub("ACCENT_COLOUR", accent_colour, css, fixed = TRUE)
+
+  css
+}
+
+
+# ==============================================================================
+# COMBINED HEADER
+# ==============================================================================
+
+
+#' Build Combined Report Header
+#'
+#' Gradient banner showing report title, methods tested, k value,
+#' respondent count, and generation date.
+#'
+#' @param method_html_data Named list of transformed html_data per method
+#' @param config Configuration list
+#' @param brand_colour Brand colour hex string
+#' @param report_title Report title text
+#' @return htmltools tag
+#' @keywords internal
+.build_seg_combined_header <- function(method_html_data, config, brand_colour, report_title) {
+
+  active_methods <- names(method_html_data)
+
+  # Get method labels
+  method_labels <- vapply(active_methods, function(m) {
+    switch(tolower(m),
+      kmeans  = "K-Means",
+      pam     = "PAM",
+      hclust  = "Hierarchical",
+      gmm     = "GMM",
+      mclust  = "GMM",
+      lca     = "Latent Class",
+      toupper(m)
+    )
+  }, character(1))
+
+  # Extract k and n from first available method
+  first_hd <- method_html_data[[active_methods[1]]]
+  k_value <- first_hd$k %||% 0
+  n_obs <- first_hd$n_observations %||% 0
+
+  # Researcher and client logos
+  logo_el <- NULL
+  if (exists("resolve_logo_uri", mode = "function")) {
+    logo_uri <- resolve_logo_uri(config$researcher_logo_path)
+    if (!is.null(logo_uri) && nzchar(logo_uri)) {
+      logo_el <- htmltools::tags$div(
+        class = "seg-header-logo-container",
+        htmltools::tags$img(
+          src = logo_uri,
+          alt = "Logo",
+          style = "height:56px;width:56px;object-fit:contain;"
+        )
+      )
+    }
+  }
+
+  client_logo_el <- NULL
+  if (exists("resolve_logo_uri", mode = "function")) {
+    client_logo_uri <- resolve_logo_uri(config$client_logo_path)
+    if (!is.null(client_logo_uri) && nzchar(client_logo_uri)) {
+      client_logo_el <- htmltools::tags$div(
+        class = "seg-header-logo-container",
+        style = "margin-left:auto;",
+        htmltools::tags$img(
+          src = client_logo_uri,
+          alt = "Client Logo",
+          style = "height:56px;width:56px;object-fit:contain;"
+        )
+      )
+    }
+  }
+
+  branding_left <- htmltools::tags$div(
+    class = "seg-header-branding",
+    logo_el,
+    htmltools::tags$div(
+      htmltools::tags$div(class = "seg-header-module-name", "TURAS Segmentation"),
+      htmltools::tags$div(class = "seg-header-module-sub", "Method Comparison Report")
+    ),
+    client_logo_el
+  )
+
+  top_row <- htmltools::tags$div(class = "seg-header-top", branding_left)
+
+  title_el <- htmltools::tags$h1(
+    class = "seg-header-title",
+    report_title
+  )
+
+  subtitle_el <- htmltools::tags$p(
+    class = "seg-header-subtitle",
+    sprintf("Comparing %d clustering methods on %s observations",
+            length(active_methods),
+            format(n_obs, big.mark = ","))
+  )
+
+  badge_bar <- htmltools::tags$div(
+    class = "seg-header-badges",
+    htmltools::tags$span(
+      class = "seg-badge-item",
+      htmltools::tags$span(class = "seg-badge-label", "Methods"),
+      htmltools::tags$span(class = "seg-badge-value",
+                           paste(method_labels, collapse = ", "))
+    ),
+    htmltools::tags$span(
+      class = "seg-badge-item",
+      htmltools::tags$span(class = "seg-badge-label", "k"),
+      htmltools::tags$span(class = "seg-badge-value", as.character(k_value))
+    ),
+    htmltools::tags$span(
+      class = "seg-badge-item",
+      htmltools::tags$span(class = "seg-badge-label", "n"),
+      htmltools::tags$span(class = "seg-badge-value",
+                           format(n_obs, big.mark = ","))
+    ),
+    htmltools::tags$span(
+      class = "seg-badge-item",
+      htmltools::tags$span(class = "seg-badge-label", "Generated"),
+      htmltools::tags$span(class = "seg-badge-value",
+                           format(Sys.time(), "%d %B %Y, %H:%M"))
+    )
+  )
+
+  htmltools::tags$header(
+    class = "seg-header",
+    style = sprintf("border-top: 4px solid %s;", brand_colour),
+    htmltools::tags$div(
+      class = "seg-header-inner",
+      top_row,
+      title_el,
+      subtitle_el,
+      badge_bar
+    )
+  )
+}
+
+
+# ==============================================================================
+# TAB BAR
+# ==============================================================================
+
+
+#' Build Method Tab Bar
+#'
+#' Horizontal tab strip with one tab per method plus a Comparison tab.
+#'
+#' @param active_methods Character vector of method names
+#' @param brand_colour Brand colour hex string
+#' @return htmltools tag
+#' @keywords internal
+.build_seg_method_tab_bar <- function(active_methods, brand_colour) {
+
+  method_labels <- vapply(active_methods, function(m) {
+    switch(tolower(m),
+      kmeans  = "K-Means",
+      pam     = "PAM",
+      hclust  = "Hierarchical",
+      gmm     = "GMM",
+      mclust  = "GMM",
+      lca     = "Latent Class",
+      toupper(m)
+    )
+  }, character(1))
+
+  tabs <- lapply(seq_along(active_methods), function(i) {
+    m <- active_methods[i]
+    is_first <- (i == 1)
+
+    htmltools::tags$div(
+      class = paste("seg-method-tab",
+                     if (is_first) "seg-method-tab-active" else ""),
+      `data-method` = m,
+      method_labels[i]
+    )
+  })
+
+  # Add Comparison tab
+  comparison_tab <- htmltools::tags$div(
+    class = "seg-method-tab",
+    `data-method` = "comparison",
+    "Comparison"
+  )
+
+  htmltools::tags$div(
+    class = "seg-method-tabs",
+    id = "seg-method-tabs",
+    tabs,
+    comparison_tab
+  )
+}
+
+
+# ==============================================================================
+# PER-METHOD PANEL
+# ==============================================================================
+
+
+#' Build Method Panel Content
+#'
+#' Builds the content panel for a single clustering method, showing
+#' executive summary, segment overview, validation, profiles, and
+#' segment cards (where available).
+#'
+#' @param method Character, method name
+#' @param html_data Transformed html_data for this method
+#' @param tables Named list of table objects for this method
+#' @param charts Named list of chart objects for this method
+#' @param is_first Logical, whether this is the first (default visible) tab
+#' @return htmltools tag
+#' @keywords internal
+.build_seg_method_panel <- function(method, html_data, tables, charts, is_first = FALSE) {
+
+  method_label <- switch(tolower(method),
+    kmeans  = "K-Means",
+    pam     = "PAM",
+    hclust  = "Hierarchical",
+    gmm     = "GMM",
+    mclust  = "GMM",
+    lca     = "Latent Class",
+    toupper(method)
+  )
+
+  sections <- list()
+
+  # --- Executive summary card ---
+  diag <- html_data$diagnostics
+  exec_stats <- list()
+
+  if (!is.null(diag$avg_silhouette) && !is.na(diag$avg_silhouette)) {
+    sil_val <- diag$avg_silhouette
+    sil_label <- if (sil_val >= 0.50) "Strong"
+                 else if (sil_val >= 0.35) "Good"
+                 else if (sil_val >= 0.25) "Moderate"
+                 else "Weak"
+    exec_stats <- c(exec_stats, list(
+      htmltools::tags$div(
+        class = "seg-combined-exec-stat",
+        htmltools::tags$div(class = "seg-combined-exec-stat-label", "Silhouette"),
+        htmltools::tags$div(class = "seg-combined-exec-stat-value",
+                            sprintf("%.3f", sil_val)),
+        htmltools::tags$div(
+          style = "font-size:11px; color:#64748b;", sil_label
+        )
+      )
+    ))
+  }
+
+  if (!is.null(diag$betweenss_totss) && !is.na(diag$betweenss_totss)) {
+    exec_stats <- c(exec_stats, list(
+      htmltools::tags$div(
+        class = "seg-combined-exec-stat",
+        htmltools::tags$div(class = "seg-combined-exec-stat-label", "BSS/TSS"),
+        htmltools::tags$div(class = "seg-combined-exec-stat-value",
+                            sprintf("%.1f%%", diag$betweenss_totss * 100))
+      )
+    ))
+  }
+
+  if (!is.null(html_data$k) && !is.na(html_data$k)) {
+    exec_stats <- c(exec_stats, list(
+      htmltools::tags$div(
+        class = "seg-combined-exec-stat",
+        htmltools::tags$div(class = "seg-combined-exec-stat-label", "Segments"),
+        htmltools::tags$div(class = "seg-combined-exec-stat-value",
+                            as.character(html_data$k))
+      )
+    ))
+  }
+
+  if (!is.null(html_data$n_observations) && !is.na(html_data$n_observations)) {
+    exec_stats <- c(exec_stats, list(
+      htmltools::tags$div(
+        class = "seg-combined-exec-stat",
+        htmltools::tags$div(class = "seg-combined-exec-stat-label", "Respondents"),
+        htmltools::tags$div(class = "seg-combined-exec-stat-value",
+                            format(html_data$n_observations, big.mark = ","))
+      )
+    ))
+  }
+
+  if (length(exec_stats) > 0) {
+    sections$exec <- htmltools::tags$div(
+      class = "seg-combined-exec-card",
+      exec_stats
+    )
+  }
+
+  # --- Segment Overview ---
+  overview_els <- list()
+  if (!is.null(charts$sizes)) {
+    overview_els <- c(overview_els, list(charts$sizes))
+  }
+  if (!is.null(tables$overview)) {
+    overview_els <- c(overview_els, list(tables$overview))
+  }
+
+  if (length(overview_els) > 0) {
+    sections$overview <- htmltools::tags$div(
+      class = "seg-combined-section",
+      htmltools::tags$h4(class = "seg-combined-section-title", "Segment Overview"),
+      htmltools::tags$p(
+        class = "seg-combined-section-desc",
+        sprintf("Segment sizes for the %s solution with k = %d.",
+                method_label, html_data$k %||% 0)
+      ),
+      overview_els
+    )
+  }
+
+  # --- Validation ---
+  validation_els <- list()
+  if (!is.null(charts$silhouette)) {
+    validation_els <- c(validation_els, list(charts$silhouette))
+  }
+  if (!is.null(tables$validation)) {
+    validation_els <- c(validation_els, list(
+      htmltools::tags$div(style = "margin-top:16px;", tables$validation)
+    ))
+  }
+
+  if (length(validation_els) > 0) {
+    sections$validation <- htmltools::tags$div(
+      class = "seg-combined-section",
+      htmltools::tags$h4(class = "seg-combined-section-title", "Validation Metrics"),
+      htmltools::tags$p(
+        class = "seg-combined-section-desc",
+        "Silhouette scores and cluster validation statistics for this method."
+      ),
+      validation_els
+    )
+  }
+
+  # --- Profiles (heatmap) ---
+  profiles_els <- list()
+  if (!is.null(charts$heatmap)) {
+    profiles_els <- c(profiles_els, list(charts$heatmap))
+  }
+  if (!is.null(tables$profiles)) {
+    profiles_els <- c(profiles_els, list(
+      htmltools::tags$div(style = "margin-top:16px;", tables$profiles)
+    ))
+  }
+
+  if (length(profiles_els) > 0) {
+    sections$profiles <- htmltools::tags$div(
+      class = "seg-combined-section",
+      htmltools::tags$h4(class = "seg-combined-section-title", "Segment Profiles"),
+      htmltools::tags$p(
+        class = "seg-combined-section-desc",
+        "Heatmap showing variable means per segment. Darker cells indicate higher values relative to the overall mean."
+      ),
+      profiles_els
+    )
+  }
+
+  # --- Variable Importance ---
+  if (!is.null(charts$importance)) {
+    sections$importance <- htmltools::tags$div(
+      class = "seg-combined-section",
+      htmltools::tags$h4(class = "seg-combined-section-title", "Variable Importance"),
+      htmltools::tags$p(
+        class = "seg-combined-section-desc",
+        "Variables ranked by their discriminating power across segments (eta-squared from ANOVA)."
+      ),
+      charts$importance
+    )
+  }
+
+  # --- Segment Cards (if available) ---
+  if (!is.null(html_data$enhanced$segment_cards)) {
+    cards_content <- .build_seg_combined_cards(html_data)
+    if (!is.null(cards_content)) {
+      sections$cards <- htmltools::tags$div(
+        class = "seg-combined-section",
+        htmltools::tags$h4(class = "seg-combined-section-title", "Segment Cards"),
+        cards_content
+      )
+    }
+  }
+
+  # --- Wrap in panel div ---
+  panel_class <- if (is_first) {
+    "seg-method-panel seg-method-panel-visible"
+  } else {
+    "seg-method-panel"
+  }
+
+  htmltools::tags$div(
+    class = panel_class,
+    `data-method` = method,
+    htmltools::tags$h3(
+      style = "font-size:18px; font-weight:600; color:#1e293b; margin:0 0 16px 0;",
+      sprintf("%s Clustering Results", method_label)
+    ),
+    sections
+  )
+}
+
+
+#' Build Simplified Segment Cards for Combined Report
+#'
+#' Renders segment cards in a compact format suitable for the combined report.
+#'
+#' @param html_data Transformed html_data containing enhanced$segment_cards
+#' @return htmltools tag or NULL
+#' @keywords internal
+.build_seg_combined_cards <- function(html_data) {
+
+  cards_data <- html_data$enhanced$segment_cards
+  if (is.null(cards_data) || length(cards_data) == 0) return(NULL)
+
+  segment_names <- html_data$segment_names %||% list()
+
+  card_els <- lapply(seq_along(cards_data), function(i) {
+    card <- cards_data[[i]]
+    seg_id <- card$segment_id %||% i
+    seg_name <- segment_names[[seg_id]] %||% card$name %||% paste0("Segment ", seg_id)
+
+    # Description
+    desc_el <- if (!is.null(card$description) && nzchar(card$description)) {
+      htmltools::tags$p(
+        style = "font-size:13px; color:#64748b; margin:8px 0 0 0; line-height:1.5;",
+        card$description
+      )
+    }
+
+    # Key characteristics list
+    chars_el <- NULL
+    if (!is.null(card$key_characteristics) && length(card$key_characteristics) > 0) {
+      chars_el <- htmltools::tags$ul(
+        style = "margin:8px 0 0 0; padding-left:18px; font-size:12px; color:#475569;",
+        lapply(card$key_characteristics, function(ch) {
+          htmltools::tags$li(style = "margin-bottom:3px;", ch)
+        })
+      )
+    }
+
+    htmltools::tags$div(
+      style = "border:1px solid #e2e8f0; border-radius:6px; padding:14px 18px; margin-bottom:10px; background:white;",
+      htmltools::tags$div(
+        style = "font-size:14px; font-weight:600; color:#1e293b;",
+        sprintf("%s (Segment %d)", seg_name, seg_id)
+      ),
+      desc_el,
+      chars_el
+    )
+  })
+
+  htmltools::tagList(card_els)
+}
+
+
+# ==============================================================================
+# COMPARISON PANEL
+# ==============================================================================
+
+
+#' Build Comparison Panel
+#'
+#' The Comparison tab content showing side-by-side metrics, bar chart,
+#' and inter-method agreement matrix.
+#'
+#' @param comparison_content List with table, chart, agreement
+#' @param method_html_data Named list of transformed html_data per method
+#' @param brand_colour Brand colour hex string
+#' @param accent_colour Accent colour hex string
+#' @return htmltools tag
+#' @keywords internal
+.build_seg_comparison_panel <- function(comparison_content,
+                                         method_html_data,
+                                         brand_colour,
+                                         accent_colour) {
+
+  sections <- list()
+
+  # Intro text
+  active_methods <- names(method_html_data)
+  method_labels <- vapply(active_methods, function(m) {
+    switch(tolower(m),
+      kmeans = "K-Means", pam = "PAM", hclust = "Hierarchical",
+      gmm = "GMM", mclust = "GMM", lca = "Latent Class", toupper(m)
+    )
+  }, character(1))
+
+  sections$intro <- htmltools::tags$p(
+    class = "seg-combined-section-desc",
+    sprintf("Side-by-side comparison of %s across %d clustering methods.",
+            paste(method_labels, collapse = ", "),
+            length(active_methods))
+  )
+
+  # --- Metrics comparison table ---
+  if (!is.null(comparison_content$table)) {
+    sections$metrics <- htmltools::tags$div(
+      class = "seg-combined-section",
+      htmltools::tags$h4(class = "seg-combined-section-title", "Metrics Comparison"),
+      htmltools::tags$p(
+        class = "seg-combined-section-desc",
+        "Best value per metric is highlighted. Higher silhouette, CH index, and BSS/TSS indicate better separation. Larger minimum segment size indicates more balanced solutions."
+      ),
+      comparison_content$table
+    )
+  }
+
+  # --- Silhouette comparison chart ---
+  if (!is.null(comparison_content$chart)) {
+    sections$chart <- htmltools::tags$div(
+      class = "seg-combined-section",
+      htmltools::tags$h4(class = "seg-combined-section-title", "Silhouette Score Comparison"),
+      htmltools::tags$p(
+        class = "seg-combined-section-desc",
+        "Visual comparison of average silhouette width across methods. Higher is better."
+      ),
+      comparison_content$chart
+    )
+  }
+
+  # --- Agreement matrix ---
+  if (!is.null(comparison_content$agreement)) {
+    sections$agreement <- htmltools::tags$div(
+      class = "seg-combined-section",
+      htmltools::tags$h4(class = "seg-combined-section-title", "Method Agreement"),
+      htmltools::tags$p(
+        class = "seg-combined-section-desc",
+        "Adjusted Rand Index measuring how similarly each pair of methods assigns respondents to segments. Values range from 0 (random) to 1 (identical). Higher agreement suggests robustness of the segmentation structure."
+      ),
+      comparison_content$agreement
+    )
+  }
+
+  # --- Method recommendation ---
+  rec_section <- .build_seg_combined_recommendation(method_html_data, accent_colour)
+  if (!is.null(rec_section)) {
+    sections$recommendation <- rec_section
+  }
+
+  htmltools::tags$div(
+    class = "seg-method-panel",
+    `data-method` = "comparison",
+    htmltools::tags$h3(
+      style = "font-size:18px; font-weight:600; color:#1e293b; margin:0 0 16px 0;",
+      "Method Comparison"
+    ),
+    sections
+  )
+}
+
+
+#' Build Combined Report Recommendation
+#'
+#' Determines and displays which method performs best across metrics.
+#'
+#' @param method_html_data Named list of transformed html_data per method
+#' @param accent_colour Accent colour hex string
+#' @return htmltools tag or NULL
+#' @keywords internal
+.build_seg_combined_recommendation <- function(method_html_data, accent_colour) {
+
+  active_methods <- names(method_html_data)
+  if (length(active_methods) < 2) return(NULL)
+
+  # Score each method: +1 for each metric where it is best
+  scores <- setNames(rep(0L, length(active_methods)), active_methods)
+  reasons <- list()
+
+  # Silhouette - higher is better
+  sil_vals <- vapply(active_methods, function(m) {
+    method_html_data[[m]]$diagnostics$avg_silhouette %||% NA_real_
+  }, numeric(1))
+
+  if (any(!is.na(sil_vals))) {
+    best_m <- active_methods[which.max(sil_vals)]
+    scores[best_m] <- scores[best_m] + 1L
+    reasons <- c(reasons, list(sprintf(
+      "Highest silhouette score (%.3f)", max(sil_vals, na.rm = TRUE)
+    )))
+  }
+
+  # BSS/TSS - higher is better
+  bss_vals <- vapply(active_methods, function(m) {
+    method_html_data[[m]]$diagnostics$betweenss_totss %||% NA_real_
+  }, numeric(1))
+
+  if (any(!is.na(bss_vals))) {
+    best_m <- active_methods[which.max(bss_vals)]
+    scores[best_m] <- scores[best_m] + 1L
+  }
+
+  # Min segment size - larger is better (more balanced)
+  min_sizes <- vapply(active_methods, function(m) {
+    sizes <- method_html_data[[m]]$segment_sizes
+    if (!is.null(sizes) && nrow(sizes) > 0) min(sizes$n) else NA_real_
+  }, numeric(1))
+
+  if (any(!is.na(min_sizes))) {
+    best_m <- active_methods[which.max(min_sizes)]
+    scores[best_m] <- scores[best_m] + 1L
+  }
+
+  # Find winner
+  best_method <- active_methods[which.max(scores)]
+  best_label <- switch(tolower(best_method),
+    kmeans = "K-Means", pam = "PAM", hclust = "Hierarchical",
+    gmm = "GMM", mclust = "GMM", lca = "Latent Class", toupper(best_method)
+  )
+
+  # Build recommendation card
+  htmltools::tags$div(
+    class = "seg-combined-section",
+    htmltools::tags$div(
+      style = sprintf(
+        "background:#FFFBEB; border:2px solid %s; border-radius:8px; padding:24px; margin-top:8px;",
+        accent_colour
+      ),
+      htmltools::tags$h4(
+        style = sprintf("font-size:16px; font-weight:600; color:%s; margin:0 0 8px 0;", accent_colour),
+        sprintf("Recommended: %s", best_label)
+      ),
+      htmltools::tags$p(
+        style = "font-size:14px; color:#1e293b; line-height:1.6; margin:0;",
+        sprintf(
+          "%s achieved the best results across %d of %d comparison metrics. Review the per-method tabs for detailed validation before making a final selection.",
+          best_label, max(scores), length(active_methods)
+        )
+      )
+    )
+  )
+}
+
+
+# ==============================================================================
+# COMPARISON BUILDERS
+# ==============================================================================
+
+
+#' Build Method Comparison Table
+#'
+#' Creates a table comparing key metrics across all methods. The best
+#' value for each metric is highlighted with the accent colour.
+#'
+#' @param method_html_data Named list of transformed html_data per method
+#' @return htmltools tag or NULL
+#' @keywords internal
+build_seg_method_comparison_table <- function(method_html_data) {
+
+  active_methods <- names(method_html_data)
+  if (length(active_methods) < 2) return(NULL)
+
+  method_labels <- vapply(active_methods, function(m) {
+    switch(tolower(m),
+      kmeans = "K-Means", pam = "PAM", hclust = "Hierarchical",
+      gmm = "GMM", mclust = "GMM", lca = "Latent Class", toupper(m)
+    )
+  }, character(1))
+
+  # Extract metrics for each method
+  metrics <- lapply(active_methods, function(m) {
+    hd <- method_html_data[[m]]
+    diag <- hd$diagnostics
+    sizes <- hd$segment_sizes
+
+    list(
+      method = method_labels[m],
+      avg_silhouette = diag$avg_silhouette %||% NA_real_,
+      betweenss_totss = diag$betweenss_totss %||% NA_real_,
+      ch_index = diag$ch_index %||% NA_real_,
+      min_segment_n = if (!is.null(sizes) && nrow(sizes) > 0) min(sizes$n) else NA_real_,
+      min_segment_pct = if (!is.null(sizes) && nrow(sizes) > 0) min(sizes$pct) else NA_real_
+    )
+  })
+
+  # Find best values (higher is better for all except min segment which is also higher = better)
+  best_sil <- .find_best_index(metrics, "avg_silhouette", higher = TRUE)
+  best_bss <- .find_best_index(metrics, "betweenss_totss", higher = TRUE)
+  best_ch <- .find_best_index(metrics, "ch_index", higher = TRUE)
+  best_min <- .find_best_index(metrics, "min_segment_n", higher = TRUE)
+
+  # Header row
+  header <- htmltools::tags$tr(
+    htmltools::tags$th("Method"),
+    htmltools::tags$th("Avg Silhouette"),
+    htmltools::tags$th("BSS/TSS"),
+    htmltools::tags$th("CH Index"),
+    htmltools::tags$th("Min Segment"),
+    htmltools::tags$th("Min %")
+  )
+
+  # Data rows
+  rows <- lapply(seq_along(metrics), function(i) {
+    met <- metrics[[i]]
+
+    sil_class <- if (i == best_sil) "seg-comparison-best" else ""
+    bss_class <- if (i == best_bss) "seg-comparison-best" else ""
+    ch_class <- if (i == best_ch) "seg-comparison-best" else ""
+    min_class <- if (i == best_min) "seg-comparison-best" else ""
+
+    htmltools::tags$tr(
+      htmltools::tags$td(
+        style = "font-weight:600;",
+        met$method
+      ),
+      htmltools::tags$td(
+        class = sil_class,
+        style = "font-family:monospace;",
+        if (!is.na(met$avg_silhouette)) sprintf("%.3f", met$avg_silhouette) else "-"
+      ),
+      htmltools::tags$td(
+        class = bss_class,
+        style = "font-family:monospace;",
+        if (!is.na(met$betweenss_totss)) sprintf("%.1f%%", met$betweenss_totss * 100) else "-"
+      ),
+      htmltools::tags$td(
+        class = ch_class,
+        style = "font-family:monospace;",
+        if (!is.na(met$ch_index)) sprintf("%.1f", met$ch_index) else "-"
+      ),
+      htmltools::tags$td(
+        class = min_class,
+        style = "font-family:monospace;",
+        if (!is.na(met$min_segment_n)) format(as.integer(met$min_segment_n), big.mark = ",") else "-"
+      ),
+      htmltools::tags$td(
+        style = "font-family:monospace;",
+        if (!is.na(met$min_segment_pct)) sprintf("%.1f%%", met$min_segment_pct) else "-"
+      )
+    )
+  })
+
+  htmltools::tags$table(
+    class = "seg-comparison-table",
+    htmltools::tags$thead(header),
+    htmltools::tags$tbody(rows)
+  )
+}
+
+
+#' Find Best Index for a Metric
+#'
+#' Returns the 1-based index of the method with the best value for a metric.
+#'
+#' @param metrics List of metric lists
+#' @param field Character, the metric field name
+#' @param higher Logical, TRUE if higher values are better
+#' @return Integer index, or NA if all values are NA
+#' @keywords internal
+.find_best_index <- function(metrics, field, higher = TRUE) {
+  vals <- vapply(metrics, function(m) {
+    v <- m[[field]]
+    if (is.null(v) || is.na(v)) NA_real_ else as.numeric(v)
+  }, numeric(1))
+
+  if (all(is.na(vals))) return(NA_integer_)
+
+  if (higher) which.max(vals) else which.min(vals)
+}
+
+
+#' Build Method Comparison Chart
+#'
+#' SVG horizontal bar chart comparing average silhouette scores across methods.
+#'
+#' @param method_html_data Named list of transformed html_data per method
+#' @param brand_colour Brand colour hex string
+#' @return htmltools::HTML string containing SVG, or NULL
+#' @keywords internal
+build_seg_method_comparison_chart <- function(method_html_data,
+                                               brand_colour = "#323367") {
+
+  active_methods <- names(method_html_data)
+  if (length(active_methods) < 2) return(NULL)
+
+  method_labels <- vapply(active_methods, function(m) {
+    switch(tolower(m),
+      kmeans = "K-Means", pam = "PAM", hclust = "Hierarchical",
+      gmm = "GMM", mclust = "GMM", lca = "Latent Class", toupper(m)
+    )
+  }, character(1))
+
+  sil_vals <- vapply(active_methods, function(m) {
+    method_html_data[[m]]$diagnostics$avg_silhouette %||% NA_real_
+  }, numeric(1))
+
+  # Filter out NA values
+  valid_idx <- which(!is.na(sil_vals))
+  if (length(valid_idx) == 0) return(NULL)
+
+  labels <- method_labels[valid_idx]
+  values <- sil_vals[valid_idx]
+
+  n <- length(labels)
+  bar_height <- 36
+  gap <- 12
+  label_width <- 140
+  chart_width <- 550
+  bar_area_width <- chart_width - label_width - 100
+  total_height <- n * (bar_height + gap) + 30
+
+  max_val <- max(values, 0.5, na.rm = TRUE)
+
+  # Reference lines at 0.25 and 0.50
+  ref_lines <- ""
+  for (ref in c(0.25, 0.50)) {
+    if (ref <= max_val * 1.15) {
+      x_pos <- label_width + (ref / max(max_val * 1.15, 0.01)) * bar_area_width
+      ref_lines <- paste0(ref_lines, sprintf(
+        '<line x1="%.1f" y1="15" x2="%.1f" y2="%.0f" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,3"/>\n',
+        x_pos, x_pos, total_height - 5
+      ))
+      ref_lines <- paste0(ref_lines, sprintf(
+        '<text x="%.1f" y="12" text-anchor="middle" font-size="10" font-family="\'Segoe UI\', Arial, sans-serif" fill="#94a3b8" font-weight="400">%.2f</text>\n',
+        x_pos, ref
+      ))
+    }
+  }
+
+  # Bars
+  bars <- ""
+  best_idx <- which.max(values)
+
+  for (i in seq_len(n)) {
+    y <- 20 + (i - 1) * (bar_height + gap)
+    bar_w <- max(2, (values[i] / max(max_val * 1.15, 0.01)) * bar_area_width)
+
+    # Colour: brand for best, lighter for others
+    bar_colour <- if (i == best_idx) brand_colour else "#94a3b8"
+    opacity <- if (i == best_idx) 1.0 else 0.65
+
+    # Label
+    bars <- paste0(bars, sprintf(
+      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="13" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="%s" dominant-baseline="central">%s</text>\n',
+      label_width - 10, y + bar_height / 2,
+      if (i == best_idx) "600" else "400",
+      htmltools::htmlEscape(labels[i])
+    ))
+
+    # Bar
+    bars <- paste0(bars, sprintf(
+      '<rect x="%.0f" y="%.1f" width="%.1f" height="%d" rx="4" fill="%s" opacity="%.2f"/>\n',
+      label_width, y, bar_w, bar_height, bar_colour, opacity
+    ))
+
+    # Value label
+    bars <- paste0(bars, sprintf(
+      '<text x="%.1f" y="%.1f" font-size="12" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="500" dominant-baseline="central">%.3f</text>\n',
+      label_width + bar_w + 8, y + bar_height / 2, values[i]
+    ))
+  }
+
+  svg <- sprintf(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %.0f" class="seg-chart seg-comparison-silhouette-chart" role="img" aria-label="Method comparison silhouette chart">\n%s\n%s\n</svg>',
+    chart_width, total_height, ref_lines, bars
+  )
+
+  htmltools::HTML(svg)
+}
+
+
+#' Build Agreement Matrix
+#'
+#' Calculates the Adjusted Rand Index (ARI) between every pair of methods
+#' and displays the result as a matrix table. Falls back to simple
+#' percentage agreement if ARI computation is not available.
+#'
+#' @param method_results Named list of per-method results (from results$method_results)
+#' @param active_methods Character vector of method names to include
+#' @return htmltools tag or NULL
+#' @keywords internal
+build_seg_agreement_matrix <- function(method_results, active_methods) {
+
+  if (length(active_methods) < 2) return(NULL)
+
+  method_labels <- vapply(active_methods, function(m) {
+    switch(tolower(m),
+      kmeans = "K-Means", pam = "PAM", hclust = "Hierarchical",
+      gmm = "GMM", mclust = "GMM", lca = "Latent Class", toupper(m)
+    )
+  }, character(1))
+
+  # Extract cluster assignments
+  assignments <- list()
+  for (m in active_methods) {
+    mr <- method_results[[m]]
+    clusters <- mr$cluster_result$clusters %||% NULL
+    if (is.null(clusters)) {
+      clusters <- mr$clusters %||% NULL
+    }
+    if (!is.null(clusters)) {
+      assignments[[m]] <- as.integer(clusters)
+    }
+  }
+
+  valid_methods <- intersect(active_methods, names(assignments))
+  if (length(valid_methods) < 2) return(NULL)
+
+  # Ensure all assignment vectors have the same length
+  n_obs <- unique(vapply(assignments[valid_methods], length, integer(1)))
+  if (length(n_obs) != 1) {
+    # Different lengths - cannot compare
+    return(htmltools::tags$div(
+      class = "seg-combined-section-desc",
+      style = "color:#dc2626;",
+      "Cannot compute agreement: methods have different numbers of observations."
+    ))
+  }
+
+  # Compute pairwise ARI
+  n_methods <- length(valid_methods)
+  ari_matrix <- matrix(NA_real_, nrow = n_methods, ncol = n_methods,
+                        dimnames = list(valid_methods, valid_methods))
+
+  for (i in seq_len(n_methods)) {
+    ari_matrix[i, i] <- 1.0
+    if (i < n_methods) {
+      for (j in (i + 1):n_methods) {
+        ari_val <- .compute_adjusted_rand_index(
+          assignments[[valid_methods[i]]],
+          assignments[[valid_methods[j]]]
+        )
+        ari_matrix[i, j] <- ari_val
+        ari_matrix[j, i] <- ari_val
+      }
+    }
+  }
+
+  # Build HTML table
+  valid_labels <- method_labels[match(valid_methods, active_methods)]
+
+  # Header row
+  header_cells <- list(htmltools::tags$th(""))
+  for (lbl in valid_labels) {
+    header_cells <- c(header_cells, list(htmltools::tags$th(lbl)))
+  }
+  header_row <- htmltools::tags$tr(header_cells)
+
+  # Data rows
+  rows <- lapply(seq_len(n_methods), function(i) {
+    cells <- list(htmltools::tags$td(
+      style = "font-weight:600; text-align:left;",
+      valid_labels[i]
+    ))
+
+    for (j in seq_len(n_methods)) {
+      val <- ari_matrix[i, j]
+
+      if (i == j) {
+        cell_class <- "seg-agreement-cell-self"
+        cell_text <- "-"
+      } else if (is.na(val)) {
+        cell_class <- ""
+        cell_text <- "N/A"
+      } else {
+        cell_class <- if (val >= 0.65) "seg-agreement-cell-high"
+                      else if (val >= 0.35) "seg-agreement-cell-medium"
+                      else "seg-agreement-cell-low"
+        cell_text <- sprintf("%.3f", val)
+      }
+
+      cells <- c(cells, list(htmltools::tags$td(class = cell_class, cell_text)))
+    }
+
+    htmltools::tags$tr(cells)
+  })
+
+  htmltools::tags$table(
+    class = "seg-agreement-table",
+    htmltools::tags$thead(header_row),
+    htmltools::tags$tbody(rows)
+  )
+}
+
+
+#' Compute Adjusted Rand Index
+#'
+#' Calculates the Adjusted Rand Index (ARI) between two integer cluster
+#' assignment vectors. Uses the formula based on the contingency table
+#' of the two partitions. ARI ranges from -0.5 to 1.0, where 1.0 means
+#' identical partitions and 0.0 means agreement no better than random.
+#'
+#' @param labels1 Integer vector of cluster assignments from method 1
+#' @param labels2 Integer vector of cluster assignments from method 2
+#' @return Numeric ARI value, or NA if computation fails
+#' @keywords internal
+.compute_adjusted_rand_index <- function(labels1, labels2) {
+
+  if (length(labels1) != length(labels2)) return(NA_real_)
+  n <- length(labels1)
+  if (n < 2) return(NA_real_)
+
+  # Build contingency table
+  tab <- table(labels1, labels2)
+
+  # Sum of combinations
+  sum_nij_c2 <- sum(choose(tab, 2))
+
+  # Row and column sums
+  a_i <- rowSums(tab)
+  b_j <- colSums(tab)
+
+  sum_ai_c2 <- sum(choose(a_i, 2))
+  sum_bj_c2 <- sum(choose(b_j, 2))
+
+  n_c2 <- choose(n, 2)
+
+  if (n_c2 == 0) return(NA_real_)
+
+  expected <- (sum_ai_c2 * sum_bj_c2) / n_c2
+  max_index <- (sum_ai_c2 + sum_bj_c2) / 2
+
+  if (max_index == expected) return(1.0)
+
+  ari <- (sum_nij_c2 - expected) / (max_index - expected)
+
+  ari
+}
+
+
+# ==============================================================================
+# TAB SWITCHING JAVASCRIPT
+# ==============================================================================
+
+
+#' Build Combined Report JavaScript
+#'
+#' Returns inline JavaScript for tab switching.
+#'
+#' @return Character string of JavaScript code
+#' @keywords internal
+.build_seg_combined_js <- function() {
+  '
+/* ==== Segment Combined Report - Tab Switching ==== */
+document.addEventListener("DOMContentLoaded", function() {
+  var tabs = document.querySelectorAll(".seg-method-tab");
+  var panels = document.querySelectorAll(".seg-method-panel");
+
+  tabs.forEach(function(tab) {
+    tab.addEventListener("click", function() {
+      var method = this.getAttribute("data-method");
+
+      // Update active tab
+      tabs.forEach(function(t) {
+        t.classList.remove("seg-method-tab-active");
+      });
+      this.classList.add("seg-method-tab-active");
+
+      // Show/hide panels
+      panels.forEach(function(p) {
+        if (p.getAttribute("data-method") === method) {
+          p.classList.add("seg-method-panel-visible");
+        } else {
+          p.classList.remove("seg-method-panel-visible");
+        }
+      });
+    });
+  });
+});
+'
+}

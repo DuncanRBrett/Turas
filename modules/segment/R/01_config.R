@@ -159,16 +159,30 @@ validate_segment_config <- function(config) {
   # ===========================================================================
 
   method <- tolower(get_char_config(config, "method", default_value = "kmeans"))
-  # Validate allowed values
-  if (!(method %in% c("kmeans", "hclust", "gmm"))) {
+
+  # Parse multiple methods (comma-separated or "all")
+  methods <- trimws(unlist(strsplit(method, ",")))
+  if (length(methods) == 1 && methods[1] == "all") {
+    methods <- c("kmeans", "hclust", "gmm")
+  }
+
+  # Validate each method
+  valid_methods <- c("kmeans", "hclust", "gmm")
+  invalid <- setdiff(methods, valid_methods)
+  if (length(invalid) > 0) {
     segment_refuse(
       code = "CFG_INVALID_METHOD",
       title = "Invalid Clustering Method",
-      problem = sprintf("Method '%s' is not supported.", method),
+      problem = sprintf("Method(s) '%s' not supported.", paste(invalid, collapse = ", ")),
       why_it_matters = "Only supported methods produce valid results.",
-      how_to_fix = "Set method to one of: kmeans, hclust, gmm"
+      how_to_fix = sprintf("Set method to one or more of: %s (comma-separated)", paste(valid_methods, collapse = ", "))
     )
   }
+
+  # Determine if multi-method mode
+  is_multi_method <- length(methods) > 1
+  # For backward compat, use first method as primary
+  method <- methods[1]
 
   # Method-specific parameters
   linkage_method <- get_char_config(config, "linkage_method", default_value = "ward.D2")
@@ -365,7 +379,8 @@ validate_segment_config <- function(config) {
     # Variables
     clustering_vars = clustering_vars, profile_vars = profile_vars,
     # Method
-    method = method, linkage_method = linkage_method, gmm_model_type = gmm_model_type,
+    method = method, methods = methods, is_multi_method = is_multi_method,
+    linkage_method = linkage_method, gmm_model_type = gmm_model_type,
     # K parameters
     k_fixed = k_fixed, k_min = k_min, k_max = k_max, nstart = nstart, seed = seed,
     # Data handling
@@ -413,7 +428,11 @@ validate_segment_config <- function(config) {
 
   cat(sprintf("  Configuration validated\n"))
   cat(sprintf("  Mode: %s\n", validated_config$mode))
-  cat(sprintf("  Method: %s\n", toupper(method)))
+  if (is_multi_method) {
+    cat(sprintf("  Methods: %s (multi-method comparison)\n", paste(toupper(methods), collapse = ", ")))
+  } else {
+    cat(sprintf("  Method: %s\n", toupper(method)))
+  }
   cat(sprintf("  Clustering variables: %d\n", length(clustering_vars)))
 
   if (validated_config$mode == "exploration") {

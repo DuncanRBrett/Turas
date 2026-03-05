@@ -100,11 +100,12 @@ Both templates use a consistent structure:
 - **Purpose:** Clustering algorithm
 - **Required:** No
 - **Default:** `kmeans`
-- **Valid Values:** `kmeans`, `hclust`, `gmm`
+- **Valid Values:** `kmeans`, `hclust`, `gmm`, comma-separated list (e.g., `kmeans,hclust,gmm`), or `all`
 - **Notes:**
   - `kmeans` - K-means clustering (default, fast, scalable)
   - `hclust` - Hierarchical agglomerative clustering (dendrogram, limited to ~15k rows)
   - `gmm` - Gaussian Mixture Models via mclust (soft assignments, requires `mclust` package)
+  - Comma-separated values (e.g., `kmeans,hclust,gmm`) or `all` - Run multiple methods and produce a combined tabbed HTML report with per-method results and a comparison tab
 
 #### k_fixed
 
@@ -799,7 +800,7 @@ html_show_guide          | FALSE
 | k_fixed | Integer 2-10 or blank |
 | k_min | Integer 2-10, less than k_max |
 | k_max | Integer 2-10, greater than k_min |
-| method | One of: kmeans, hclust, gmm |
+| method | One of: kmeans, hclust, gmm, comma-separated list, or all |
 | nstart | Integer 1-200 |
 | linkage_method | One of: ward.D, ward.D2, single, complete, average, mcquitty, median, centroid |
 | gmm_model_type | Valid mclust model name or blank |
