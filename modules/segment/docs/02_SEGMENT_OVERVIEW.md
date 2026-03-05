@@ -1,9 +1,9 @@
 # Turas Segmentation Module - Overview
 
-**Version:** 10.0
-**Last Updated:** 22 December 2025
+**Version:** 11.0
+**Last Updated:** 5 March 2026
 
-Transform your survey data into actionable customer segments with proven statistical methods and intuitive workflows.
+Transform your survey data into actionable customer segments with multiple clustering algorithms, interactive HTML reports, and executive-ready deliverables.
 
 ---
 
@@ -21,7 +21,7 @@ Transform your survey data into actionable customer segments with proven statist
 
 ## What is Customer Segmentation?
 
-Customer segmentation divides your respondents into distinct groups (segments) based on similarities in their attitudes, behaviors, or satisfaction levels. The Turas Segmentation Module uses **k-means clustering**, a proven statistical method for creating data-driven segments.
+Customer segmentation divides your respondents into distinct groups (segments) based on similarities in their attitudes, behaviors, or satisfaction levels. The Turas Segmentation Module offers three proven statistical methods: **K-means clustering**, **Hierarchical clustering**, and **Gaussian Mixture Models (GMM)**, allowing analysts to choose the best approach for their data.
 
 ### Why Segment Your Customers?
 
@@ -51,6 +51,8 @@ Customer segmentation divides your respondents into distinct groups (segments) b
 | Feature | Description |
 |---------|-------------|
 | **K-Means Clustering** | Industry-standard algorithm for continuous data |
+| **Hierarchical Clustering** | Agglomerative method with dendrogram and multiple linkage options |
+| **Gaussian Mixture Models** | Soft-assignment clustering with membership probabilities |
 | **Automatic K Selection** | Tests multiple k values with statistical recommendations |
 | **Exploration Mode** | Compare 2-10 segment solutions before committing |
 | **Final Mode** | Detailed profiling of chosen solution |
@@ -74,7 +76,9 @@ Customer segmentation divides your respondents into distinct groups (segments) b
 | **Elbow Method** | Visual identification of optimal k |
 | **Gap Statistic** | Compare to random data (optional) |
 | **Calinski-Harabasz Index** | Cluster separation metric |
-| **Bootstrap Stability** | Assess segment consistency |
+| **Cophenetic Correlation** | Dendrogram fit quality (hierarchical only) |
+| **BIC Model Selection** | Principled model comparison (GMM only) |
+| **Stability Assessment** | Multi-run consistency check |
 | **Enhanced Profiling** | ANOVA tests and effect sizes |
 
 ### Scoring & Application
@@ -83,21 +87,36 @@ Customer segmentation divides your respondents into distinct groups (segments) b
 |---------|-------------|
 | **Model Scoring** | Classify new respondents to existing segments |
 | **Confidence Scores** | Distance-based assignment confidence |
+| **GMM Probabilities** | Soft membership probabilities per segment |
 | **Segment Drift Monitoring** | Track distribution changes over time |
 | **Respondent Typing** | Single or batch classification |
 
-### Enhanced Features (v10.1)
+### Interactive HTML Reports (v11.0)
 
 | Feature | Description |
 |---------|-------------|
-| **Quick Run Function** | Programmatic segmentation without Excel config |
-| **Golden Questions** | Identify minimum questions to predict segments |
+| **Self-Contained HTML** | Single-file report with no external dependencies |
+| **SVG Charts** | Scalable vector charts for sizes, silhouette, heatmap, importance |
+| **Sticky Navigation** | Section-aware nav bar for quick access |
+| **Pinned Views** | Collect charts and tables into a curated workspace |
+| **Slide Export** | Export individual sections as PNG for presentations |
+| **Brand Customisation** | Configure colours and titles from the config Excel file |
+| **Section Visibility** | Toggle report sections on/off via config flags |
+| **Exploration Report** | K-selection variant with elbow plot and solution previews |
+
+### Enhanced Features (v11.0)
+
+| Feature | Description |
+|---------|-------------|
+| **Executive Summary** | Auto-generated narrative overview with quality assessment |
+| **Classification Rules** | Plain-English decision rules from decision trees |
+| **Segment Action Cards** | Executive-ready cards with strengths, pain points, and actions |
 | **Auto Segment Naming** | Generate meaningful names automatically |
-| **Action Cards** | Executive-ready segment summaries |
-| **Classification Rules** | Plain-English decision rules |
-| **Variable Importance** | Rank variables by discriminating power |
+| **Golden Questions** | Identify minimum questions to predict segments |
+| **Variable Importance** | Rank variables by discriminating power (eta-squared) |
 | **Demographic Profiling** | Chi-square analysis of segment composition |
-| **Simple Stability Check** | Fast consistency verification |
+| **Stability Check** | Fast multi-run consistency verification |
+| **Segment Assignments** | Excel output with ID, segment_id, segment_name (+ GMM probabilities) |
 | **Latent Class Analysis** | Alternative method for categorical data |
 
 ---
@@ -166,28 +185,30 @@ Customer segmentation divides your respondents into distinct groups (segments) b
 
 ```
 Phase 1: EXPLORATION                 Phase 2: FINAL
-┌───────────────────┐               ┌───────────────────┐
-│ Test k = 3 to 6   │               │ Run with k = 4    │
-│ Compare metrics   │ ─── Choose k ─▶│ Full profiling    │
-│ Review profiles   │               │ Save model        │
-└───────────────────┘               └───────────────────┘
-         │                                    │
-         ▼                                    ▼
++-----------------------+           +-----------------------+
+| Test k = 3 to 6       |           | Run with k = 4        |
+| Compare methods        | -- Choose --> | Full profiling         |
+| Review HTML report     |           | HTML report + cards   |
++-----------------------+           +-----------------------+
+         |                                    |
+         v                                    v
     Exploration                         Final Report
-    Report                              Assignments
-    (which k is best?)                  Model (.rds)
+    Report (Excel + HTML)               Assignments (Excel)
+    (which k is best?)                  HTML Report
+                                        Model (.rds)
 ```
 
 ### Step-by-Step Process
 
-1. **Configure** - Create Excel config with data path and variables
+1. **Configure** - Create Excel config with data path, variables, and method
 2. **Validate** - Run validation checks on data quality
 3. **Explore** - Test multiple k values (3-6 typical)
-4. **Review** - Compare silhouette scores and profiles
+4. **Review** - Compare silhouette scores and profiles in HTML report
 5. **Decide** - Choose optimal k based on metrics and interpretability
 6. **Finalize** - Run final segmentation with chosen k
 7. **Profile** - Interpret segments and assign names
-8. **Apply** - Score new data with saved model
+8. **Deliver** - Share HTML report with stakeholders
+9. **Apply** - Score new data with saved model
 
 ### GUI vs. Command Line
 
@@ -207,7 +228,27 @@ Phase 1: EXPLORATION                 Phase 2: FINAL
 | Method | Data Type | Sample Size | Complexity | When to Use |
 |--------|-----------|-------------|------------|-------------|
 | **K-Means** | Continuous | 100+ | Low | Default choice for scales |
+| **Hierarchical** | Continuous | 100-15,000 | Medium | Need dendrogram, nested structures |
+| **GMM** | Continuous | 200+ | Medium | Need soft assignments, elliptical clusters |
 | **LCA** | Categorical | 200+ | Medium | Binary/ordinal data |
+
+### Linkage Methods (Hierarchical Clustering)
+
+| Method | Approach | Best For |
+|--------|----------|----------|
+| **ward.D2** | Minimize within-cluster variance | Default, balanced clusters |
+| **complete** | Maximum inter-cluster distance | Well-separated clusters |
+| **average** | Mean inter-cluster distance | Balanced approach |
+| **single** | Minimum inter-cluster distance | Chained/elongated clusters |
+
+### GMM Covariance Structures
+
+| Model Type | Description | When to Use |
+|------------|-------------|-------------|
+| **(auto)** | mclust selects best by BIC | Default, recommended |
+| **VVV** | Variable volume, shape, orientation | Most flexible |
+| **EEE** | Equal volume, shape, orientation | When clusters are similar |
+| **VVI** | Variable volume, axis-aligned | Moderate flexibility |
 
 ### Outlier Detection Methods
 
@@ -233,6 +274,8 @@ Phase 1: EXPLORATION                 Phase 2: FINAL
 | **Gap Statistic** | Comparison to random | Optimal k where gap peaks |
 | **Calinski-Harabasz** | Between/within variance | Higher is better |
 | **Davies-Bouldin** | Average similarity ratio | Lower is better |
+| **Cophenetic Corr.** | Dendrogram faithfulness | > 0.7 good (hclust only) |
+| **BIC** | Model fit quality | Lower is better (GMM only) |
 
 ---
 
@@ -246,12 +289,18 @@ Phase 1: EXPLORATION                 Phase 2: FINAL
 ### Required Packages
 
 ```r
-install.packages(c("readxl", "writexl", "cluster"))
+install.packages(c("readxl", "writexl", "cluster", "openxlsx", "htmltools"))
 ```
 
 ### Optional Packages
 
 ```r
+# Gaussian Mixture Models
+install.packages("mclust")
+
+# Faster hierarchical clustering
+install.packages("fastcluster")
+
 # SPSS file support
 install.packages("haven")
 
@@ -263,6 +312,9 @@ install.packages(c("ggplot2", "fmsb"))
 
 # Latent Class Analysis
 install.packages("poLCA")
+
+# Classification rules
+install.packages("rpart")
 ```
 
 ### Sample Size Guidelines
@@ -275,6 +327,11 @@ install.packages("poLCA")
 | 1000+ | Up to 8 | More granular segments |
 
 **Rule of thumb:** At least 30-50 respondents per segment.
+
+**Method-specific limits:**
+- K-means: Up to 50,000 respondents
+- Hierarchical: Up to ~15,000 respondents (distance matrix constraint)
+- GMM: Up to ~20,000 respondents (computational constraint)
 
 ---
 
@@ -297,7 +354,7 @@ result <- turas_segment_from_config("my_config.xlsx")
 ### Option 3: Quick Run (No Config File)
 
 ```r
-source("modules/segment/lib/segment_utils.R")
+source("modules/segment/R/10_utilities.R")
 result <- run_segment_quick(
   data = survey_data,
   id_var = "respondent_id",
@@ -317,6 +374,7 @@ result <- run_segment_quick(
 | [05_TECHNICAL_DOCS.md](05_TECHNICAL_DOCS.md) | Developer documentation |
 | [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) | Configuration field reference |
 | [07_EXAMPLE_WORKFLOWS.md](07_EXAMPLE_WORKFLOWS.md) | Step-by-step examples |
+| [08_HTML_REPORT_GUIDE.md](08_HTML_REPORT_GUIDE.md) | HTML report configuration and usage |
 
 ---
 

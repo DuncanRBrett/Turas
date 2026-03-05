@@ -21,11 +21,28 @@
 # ==============================================================================
 
 # Determine report directory
+# Strategy: walk the source stack to find this file's own directory,
+# fall back to .seg_html_dir (set by 00_main.R) or TURAS_ROOT.
 .seg_html_report_dir <- tryCatch({
-  # When sourced, use the file's own directory
-  normalizePath(dirname(sys.frame(1)$ofile), mustWork = FALSE)
+  # Walk frames from innermost to outermost to find this file's ofile
+  found_dir <- NULL
+  for (i in rev(seq_len(sys.nframe()))) {
+    ofile <- tryCatch(sys.frame(i)$ofile, error = function(e) NULL)
+    if (!is.null(ofile) && grepl("99_html_report_main\\.R$", ofile)) {
+      found_dir <- normalizePath(dirname(ofile), mustWork = FALSE)
+      break
+    }
+  }
+  if (!is.null(found_dir)) {
+    found_dir
+  } else if (exists(".seg_html_dir", envir = .GlobalEnv)) {
+    # Use the variable set by 00_main.R
+    get(".seg_html_dir", envir = .GlobalEnv)
+  } else {
+    stop("Could not determine HTML report directory")
+  }
 }, error = function(e) {
-  # Fallback: construct from TURAS_ROOT
+  # Final fallback: construct from TURAS_ROOT
   turas_root <- Sys.getenv("TURAS_ROOT", getwd())
   file.path(turas_root, "modules/segment/lib/html_report")
 })

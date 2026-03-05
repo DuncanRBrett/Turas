@@ -1,7 +1,7 @@
 # Turas Segmentation Module - Example Workflows
 
-**Version:** 10.0
-**Last Updated:** 22 December 2025
+**Version:** 11.0
+**Last Updated:** 5 March 2026
 
 This document provides practical step-by-step workflows for common segmentation scenarios.
 
@@ -9,20 +9,24 @@ This document provides practical step-by-step workflows for common segmentation 
 
 ## Table of Contents
 
-1. [GUI Workflow: Complete Exploration to Final](#workflow-1-gui-complete-exploration-to-final)
-2. [Command Line: Basic Segmentation](#workflow-2-command-line-basic-segmentation)
-3. [Variable Selection with Many Variables](#workflow-3-variable-selection)
-4. [Scoring New Survey Responses](#workflow-4-scoring-new-data)
-5. [Outlier Handling](#workflow-5-outlier-handling)
-6. [Validation and Quality Checks](#workflow-6-validation)
-7. [Segment Interpretation and Naming](#workflow-7-interpretation)
-8. [Troubleshooting Guide](#troubleshooting-guide)
+1. [K-Means: GUI Exploration to Final](#workflow-1-k-means-gui-exploration-to-final)
+2. [K-Means: Command Line Basic](#workflow-2-k-means-command-line-basic)
+3. [Hierarchical Clustering Workflow](#workflow-3-hierarchical-clustering)
+4. [Gaussian Mixture Model Workflow](#workflow-4-gaussian-mixture-model)
+5. [HTML Report Generation](#workflow-5-html-report-generation)
+6. [Variable Selection with Many Variables](#workflow-6-variable-selection)
+7. [Scoring New Survey Responses](#workflow-7-scoring-new-data)
+8. [Outlier Handling](#workflow-8-outlier-handling)
+9. [Validation and Quality Checks](#workflow-9-validation)
+10. [Segment Interpretation and Naming](#workflow-10-interpretation)
+11. [Demo Showcase](#workflow-11-demo-showcase)
+12. [Troubleshooting Guide](#troubleshooting-guide)
 
 ---
 
-## Workflow 1: GUI Complete Exploration to Final
+## Workflow 1: K-Means GUI Exploration to Final
 
-**Scenario:** Run complete segmentation analysis using the GUI interface.
+**Scenario:** Run complete K-means segmentation analysis using the GUI interface.
 
 ### Step 1: Launch GUI
 
@@ -40,10 +44,12 @@ Setting                | Value
 data_file              | data/customer_survey.csv
 id_variable            | respondent_id
 clustering_vars        | q1_product,q2_service,q3_value,q4_support,q5_recommend
+method                 | kmeans
 k_fixed                | [BLANK]
 k_min                  | 3
 k_max                  | 6
 standardize            | TRUE
+html_report            | TRUE
 output_folder          | output/
 output_prefix          | seg_
 project_name           | Customer Segmentation
@@ -51,8 +57,8 @@ project_name           | Customer Segmentation
 
 ### Step 3: Run Exploration
 
-1. Click **"Browse..."** → Select exploration_config.xlsx
-2. Click **"Validate Configuration"** → Wait for ✓
+1. Click **"Browse..."** -> Select exploration_config.xlsx
+2. Click **"Validate Configuration"** -> Wait for checkmark
 3. Click **"Run Segmentation Analysis"**
 4. Monitor console output:
 
@@ -61,32 +67,42 @@ project_name           | Customer Segmentation
 TURAS SEGMENTATION ANALYSIS
 ========================================
 Mode: Exploration (testing k = 3 to 6)
+Method: KMEANS
 
-[1/6] Loading configuration...
-✓ Configuration loaded
+[1/7] Loading configuration...
+  Configuration loaded
 
-[2/6] Loading and preparing data...
-✓ Data loaded: 500 rows, 10 columns
+[2/7] Loading and preparing data...
+  Data loaded: 500 rows, 10 columns
 
-[3/6] Running k-means clustering...
-Testing k=3... Silhouette: 0.38
-Testing k=4... Silhouette: 0.52  ← Highest
-Testing k=5... Silhouette: 0.48
-Testing k=6... Silhouette: 0.41
+[4/7] Running clustering...
+  Clustering method: KMEANS
+  Testing k=3... Silhouette: 0.38
+  Testing k=4... Silhouette: 0.52  <- Highest
+  Testing k=5... Silhouette: 0.48
+  Testing k=6... Silhouette: 0.41
 
-✓ Analysis complete!
-Recommended k: 4 (Silhouette: 0.52)
+  Analysis complete!
+  Recommended k: 4 (Silhouette: 0.52)
+
+[7/7] Generating output...
+  HTML report: output/seg_exploration_report.html
 ```
 
 ### Step 4: Review Exploration Report
 
-Open `seg_exploration_report.xlsx`:
+Open `seg_exploration_report.html` in your browser to interactively review:
+- Elbow plot and silhouette chart side by side
+- Metrics comparison table
+- Solution preview cards for each k value
+
+Or open `seg_exploration_report.xlsx` for the raw data:
 
 **Metrics_Comparison sheet:**
 | k | silhouette | tot.withinss | recommendation |
 |---|------------|--------------|----------------|
 | 3 | 0.38 | 1520 | |
-| 4 | 0.52 | 1120 | ← Best |
+| 4 | 0.52 | 1120 | <- Best |
 | 5 | 0.48 | 980 | |
 | 6 | 0.41 | 890 | |
 
@@ -94,44 +110,50 @@ Open `seg_exploration_report.xlsx`:
 
 ### Step 5: Create Final Configuration
 
-Copy exploration_config.xlsx → final_config.xlsx
+Copy exploration_config.xlsx -> final_config.xlsx
 
 Change:
 ```
 k_fixed                | 4
 segment_names          | Advocates,Satisfied,At-Risk,Detractors
+generate_action_cards  | TRUE
+generate_rules         | TRUE
+html_show_rules        | TRUE
 ```
 
 ### Step 6: Run Final Segmentation
 
-1. Click **"Browse..."** → Select final_config.xlsx
+1. Click **"Browse..."** -> Select final_config.xlsx
 2. Click **"Validate Configuration"**
 3. Click **"Run Segmentation Analysis"**
 
 ### Step 7: Review Final Results
 
-**Results display shows:**
+**Console output:**
 ```
-✓ Analysis Complete!
+  Analysis Complete!
 
-Number of Segments: 4
-Silhouette Score: 0.52
+  Number of Segments: 4
+  Silhouette Score: 0.52
 
-Segment Sizes:
-- Advocates: 100 (20%)
-- Satisfied: 250 (50%)
-- At-Risk: 100 (20%)
-- Detractors: 50 (10%)
+  Segment Sizes:
+  - Advocates: 100 (20%)
+  - Satisfied: 250 (50%)
+  - At-Risk: 100 (20%)
+  - Detractors: 50 (10%)
 
-Output Files:
-📊 Final Report: output/seg_final_report.xlsx
-📋 Assignments: output/seg_assignments.xlsx
-💾 Model: output/seg_model.rds
+  Output Files:
+  Final Report: output/seg_final_report.xlsx
+  HTML Report:  output/seg_final_report.html
+  Assignments:  output/seg_assignments.xlsx
+  Model:        output/seg_model.rds
 ```
+
+Open `seg_final_report.html` for the interactive report with executive summary, profile heatmap, action cards, and classification rules.
 
 ---
 
-## Workflow 2: Command Line Basic Segmentation
+## Workflow 2: K-Means Command Line Basic
 
 **Scenario:** Run segmentation from R command line.
 
@@ -145,9 +167,11 @@ Setting                | Value
 data_file              | data/survey.csv
 id_variable            | resp_id
 clustering_vars        | satisfaction,loyalty,recommend,quality
+method                 | kmeans
 k_min                  | 3
 k_max                  | 5
 standardize            | TRUE
+html_report            | TRUE
 ```
 
 ### Step 2: Run Exploration
@@ -162,25 +186,11 @@ result_exp <- turas_segment_from_config("config/segmentation.xlsx")
 print(result_exp$recommendation)
 ```
 
-**Output:**
-```
-K-Means Exploration Results
-===========================
-Tested k: 3, 4, 5
-Best k: 4 (Silhouette: 0.51)
-
-k | Silhouette | WCSS   | Sizes
---|------------|--------|------------------
-3 | 0.42       | 1250   | 180, 220, 100
-4 | 0.51       | 980    | 120, 200, 130, 50
-5 | 0.47       | 850    | 100, 150, 120, 80, 50
-```
-
 ### Step 3: Choose K and Run Final
 
 ```r
-# Update config to set k_fixed = 4
-# Or use Quick Run
+# Use Quick Run for the final mode
+source("modules/segment/R/10_utilities.R")
 
 result_final <- run_segment_quick(
   data = survey_data,
@@ -200,13 +210,223 @@ print(result_final$profiles)
 assignments <- result_final$assignments
 head(assignments)
 
-# Save to Excel
-writexl::write_xlsx(assignments, "output/segment_assignments.xlsx")
+# Already exported to output/ directory
 ```
 
 ---
 
-## Workflow 3: Variable Selection
+## Workflow 3: Hierarchical Clustering
+
+**Scenario:** Use hierarchical clustering to explore nested cluster structure.
+
+### Step 1: Configure for Hierarchical Clustering
+
+**Config Excel (hclust_config.xlsx):**
+```
+Setting                | Value
+-----------------------|--------------------------------
+data_file              | data/customer_survey.csv
+id_variable            | respondent_id
+clustering_vars        | q1_product,q2_service,q3_value,q4_support,q5_recommend
+method                 | hclust
+linkage_method         | ward.D2
+k_fixed                | [BLANK]
+k_min                  | 3
+k_max                  | 6
+standardize            | TRUE
+html_report            | TRUE
+output_folder          | output/hclust/
+report_title           | Hierarchical Segmentation Analysis
+project_name           | Hierarchical Clustering
+```
+
+### Step 2: Run Exploration
+
+```r
+source("modules/segment/run_segment.R")
+result <- turas_segment_from_config("hclust_config.xlsx")
+```
+
+**Console output:**
+```
+  Clustering method: HCLUST
+    Linkage method: ward.D2
+    Computing distance matrix (500 x 500)...
+    Fitting hierarchical model...
+    Cophenetic correlation: 0.78 (Good)
+    Cutting tree at k=3... Silhouette: 0.41
+    Cutting tree at k=4... Silhouette: 0.49
+    Cutting tree at k=5... Silhouette: 0.45
+    Cutting tree at k=6... Silhouette: 0.39
+```
+
+### Step 3: Compare Linkage Methods
+
+Try different linkage methods to find the best fit:
+
+```
+linkage_method | ward.D2     -> run -> cophenetic: 0.78, sil(k=4): 0.49
+linkage_method | complete    -> run -> cophenetic: 0.72, sil(k=4): 0.46
+linkage_method | average     -> run -> cophenetic: 0.81, sil(k=4): 0.47
+```
+
+Choose the linkage with the best balance of cophenetic correlation and silhouette.
+
+### Step 4: Run Final
+
+Update config:
+```
+k_fixed                | 4
+linkage_method         | ward.D2
+segment_names          | Advocates,Satisfied,At-Risk,Detractors
+```
+
+Re-run analysis.
+
+### Step 5: Review Hierarchical-Specific Output
+
+The HTML report includes additional metrics:
+- **Cophenetic Correlation:** How well the dendrogram preserves distances
+- **Linkage Method:** Which linkage was used
+
+---
+
+## Workflow 4: Gaussian Mixture Model
+
+**Scenario:** Use GMM for soft-assignment clustering with membership probabilities.
+
+### Step 1: Install mclust
+
+```r
+install.packages("mclust")
+```
+
+### Step 2: Configure for GMM
+
+**Config Excel (gmm_config.xlsx):**
+```
+Setting                | Value
+-----------------------|--------------------------------
+data_file              | data/customer_survey.csv
+id_variable            | respondent_id
+clustering_vars        | q1_product,q2_service,q3_value,q4_support,q5_recommend
+method                 | gmm
+gmm_model_type         | [BLANK]
+k_fixed                | 4
+standardize            | TRUE
+html_report            | TRUE
+output_folder          | output/gmm/
+brand_colour           | #8E44AD
+report_title           | GMM Segmentation Analysis
+project_name           | Gaussian Mixture Model
+```
+
+### Step 3: Run Analysis
+
+```r
+source("modules/segment/run_segment.R")
+result <- turas_segment_from_config("gmm_config.xlsx")
+```
+
+**Console output:**
+```
+  Clustering method: GMM
+    Fitting GMM with k = 4...
+    Best model type: VVV (selected by BIC)
+    BIC: -4521.3
+    Average max probability: 0.87
+    Borderline assignments (< 0.60): 23 (4.6%)
+
+  Analysis complete!
+```
+
+### Step 4: Review GMM-Specific Output
+
+**Assignments file** (`seg_assignments.xlsx`) includes:
+
+| respondent_id | segment_id | segment_name | prob_segment_1 | prob_segment_2 | prob_segment_3 | prob_segment_4 | max_probability | uncertainty |
+|---------------|------------|--------------|----------------|----------------|----------------|----------------|-----------------|-------------|
+| 1001 | 1 | Advocates | 0.92 | 0.05 | 0.02 | 0.01 | 0.92 | 0.08 |
+| 1002 | 3 | At-Risk | 0.08 | 0.12 | 0.73 | 0.07 | 0.73 | 0.27 |
+| 1003 | 2 | Satisfied | 0.03 | 0.55 | 0.35 | 0.07 | 0.55 | 0.45 |
+
+**HTML report** includes a GMM Membership section showing:
+- Mean probability per segment
+- Maximum uncertainty
+- Number of borderline assignments
+
+### Step 5: Investigate Borderline Cases
+
+Respondents with low max probability (< 0.60) are "borderline" and may not belong clearly to any segment. Consider:
+- Reviewing their profiles manually
+- Assigning them to the most similar segment with a flag
+- Treating them as a separate "transitional" group
+
+---
+
+## Workflow 5: HTML Report Generation
+
+**Scenario:** Generate a branded, interactive HTML report for stakeholder delivery.
+
+### Step 1: Configure Report Settings
+
+```
+Setting                  | Value
+-------------------------|--------------------------------
+html_report              | TRUE
+brand_colour             | #D35400
+accent_colour            | #27AE60
+report_title             | Q1 2026 Customer Segmentation
+html_show_exec_summary   | TRUE
+html_show_overview       | TRUE
+html_show_validation     | TRUE
+html_show_importance     | TRUE
+html_show_profiles       | TRUE
+html_show_rules          | TRUE
+html_show_cards          | TRUE
+html_show_guide          | TRUE
+generate_rules           | TRUE
+generate_action_cards    | TRUE
+```
+
+### Step 2: Run Analysis
+
+```r
+source("modules/segment/run_segment.R")
+result <- turas_segment_from_config("config.xlsx")
+```
+
+### Step 3: Open the HTML Report
+
+The report is a single self-contained `.html` file. Open it in any modern browser (Chrome, Firefox, Edge, Safari).
+
+### Step 4: Navigate the Report
+
+- **Sticky nav bar:** Jump between sections
+- **Executive Summary:** High-level quality assessment and key findings
+- **Segment Overview:** Sizes chart and composition table
+- **Cluster Validation:** Silhouette chart and metrics
+- **Variable Importance:** Which variables differentiate segments most
+- **Segment Profiles:** Heatmap and detailed profile table
+- **Classification Rules:** Plain-English IF-THEN rules
+- **Action Cards:** Executive-ready cards with recommendations
+- **Interpretation Guide:** How to read the report
+
+### Step 5: Curate Findings with Pinned Views
+
+1. Hover over any chart or table to reveal the pin button
+2. Click the pin button to add the view to the Pinned Views workspace
+3. Scroll to the bottom to see all pinned views collected together
+4. Click "Export All as PNG" to save for presentations
+5. Click "Print / PDF" for a formatted print layout
+
+### Step 6: Share the Report
+
+The HTML file has no external dependencies. Share it via email, file share, or upload to the Turas Report Hub.
+
+---
+
+## Workflow 6: Variable Selection
 
 **Scenario:** You have 30 survey questions and need to select the best subset.
 
@@ -224,8 +444,10 @@ variable_selection_method | variance_correlation
 max_clustering_vars       | 10
 varsel_min_variance       | 0.1
 varsel_max_correlation    | 0.8
+method                    | kmeans
 k_min                     | 3
 k_max                     | 5
+html_report               | TRUE
 ```
 
 ### Step 2: Run Analysis
@@ -249,10 +471,10 @@ Step 2: Analyzing correlations (threshold: 0.80)
   Removed 8 correlated variables: Q02, Q07, Q09, Q14, Q19, Q22, Q27, Q28
   Remaining: 19
 
-Step 3: Ranking variables (19 → 10)
+Step 3: Ranking variables (19 -> 10)
   Selected top 10 by variance
 
-✓ Variable selection complete: 30 → 10 variables
+  Variable selection complete: 30 -> 10 variables
 
 SELECTED VARIABLES:
   Q01, Q03, Q05, Q08, Q11, Q15, Q17, Q21, Q24, Q30
@@ -260,22 +482,11 @@ SELECTED VARIABLES:
 
 ### Step 3: Review Selection Report
 
-**seg_final_report.xlsx - VarSel_Statistics sheet:**
-
-| Variable | Variance | Correlation | Selected | Reason |
-|----------|----------|-------------|----------|--------|
-| Q01 | 2.45 | - | YES | High variance |
-| Q02 | 2.28 | 0.92 (Q01) | NO | Correlated with Q01 |
-| Q03 | 2.31 | - | YES | High variance |
-| Q12 | 0.05 | - | NO | Low variance |
-
-### Step 4: Run Final with Selected Variables
-
-The analysis automatically uses selected variables. Review profiles to confirm meaningful segments.
+The analysis automatically uses selected variables. The report includes a variable selection summary sheet in the Excel output.
 
 ---
 
-## Workflow 4: Scoring New Data
+## Workflow 7: Scoring New Data
 
 **Scenario:** Monthly survey with ongoing responses to classify.
 
@@ -286,13 +497,13 @@ Ensure model is saved:
 save_model | TRUE
 ```
 
-Run initial segmentation → Creates `seg_model.rds`
+Run initial segmentation -> Creates `seg_model.rds`
 
 ### Step 2: Load New Survey Data
 
 ```r
 # New month's responses
-new_responses <- read.csv("data/march_2025_responses.csv")
+new_responses <- read.csv("data/march_2026_responses.csv")
 
 # Check structure matches original
 head(new_responses)
@@ -301,13 +512,13 @@ head(new_responses)
 ### Step 3: Score New Respondents
 
 ```r
-source("modules/segment/lib/segment_scoring.R")
+source("modules/segment/R/08_scoring.R")
 
 scores <- score_new_data(
   model_file = "output/seg_model.rds",
   new_data = new_responses,
   id_variable = "respondent_id",
-  output_file = "output/march_2025_scores.xlsx"
+  output_file = "output/march_2026_scores.xlsx"
 )
 
 # View results
@@ -340,7 +551,7 @@ Segment Distribution Comparison
 ==============================
 Segment     | Original | New    | Change
 ------------|----------|--------|--------
-Advocates   | 20%      | 15%    | -5%  ⚠
+Advocates   | 20%      | 15%    | -5%
 Satisfied   | 50%      | 55%    | +5%
 At-Risk     | 20%      | 22%    | +2%
 Detractors  | 10%      | 8%     | -2%
@@ -351,7 +562,7 @@ Recommendation: Consider refreshing segmentation
 
 ---
 
-## Workflow 5: Outlier Handling
+## Workflow 8: Outlier Handling
 
 **Scenario:** Data may contain extreme respondents or errors.
 
@@ -387,7 +598,7 @@ Analyzing 5 clustering variables...
   Variable q4: 0 potential outliers
   Variable q5: 2 potential outliers
 
-✓ Identified 6 outlier respondents (extreme on 2+ variables)
+  Identified 6 outlier respondents (extreme on 2+ variables)
   Handling: FLAG (included in clustering, marked in output)
 ```
 
@@ -404,9 +615,9 @@ Analyzing 5 clustering variables...
 ### Step 4: Decision on Outliers
 
 **Review each outlier:**
-- ID 42: All negative → Consistently dissatisfied (keep)
-- ID 157: All positive → Super satisfied (keep)
-- ID 289: Extreme on all → Data entry error? (investigate)
+- ID 42: All negative -> Consistently dissatisfied (keep)
+- ID 157: All positive -> Super satisfied (keep)
+- ID 289: Extreme on all -> Data entry error? (investigate)
 
 **If removing outliers:**
 ```
@@ -417,87 +628,58 @@ Re-run analysis.
 
 ---
 
-## Workflow 6: Validation
+## Workflow 9: Validation
 
 **Scenario:** Ensure segment quality before presenting to stakeholders.
 
-### Step 1: Run Comprehensive Validation
+### Step 1: Run with Stability Check
+
+```
+run_stability_check | TRUE
+stability_n_runs    | 10
+```
+
+### Step 2: Review Validation in HTML Report
+
+The HTML report's Cluster Validation section shows:
+- Per-cluster silhouette scores (colour-coded by quality)
+- Validation metrics table with interpretations
+- Method-specific metrics (cophenetic for hclust, BIC for GMM)
+
+### Step 3: Review Executive Summary
+
+The Executive Summary section provides:
+- Quality assessment (Excellent/Good/Moderate/Limited) based on silhouette
+- Key findings summary
+- Contextual insights from profile data
+
+### Step 4: Quick Stability Check
 
 ```r
-source("modules/segment/lib/segment_validation.R")
+# Run stability assessment separately
+source("modules/segment/R/04_validation.R")
 
-validation <- validate_segmentation(
-  data = survey_data,
-  clusters = result$clusters,
-  clustering_vars = c("q1", "q2", "q3", "q4", "q5"),
-  k = 4,
-  n_bootstrap = 100
-)
-```
-
-### Step 2: Review Metrics
-
-**Output:**
-```
-================================================================================
-SEGMENT VALIDATION RESULTS
-================================================================================
-
-SEPARATION METRICS
-------------------
-Silhouette Score: 0.52 (Good)
-Calinski-Harabasz Index: 342.15 (Higher is better)
-Davies-Bouldin Index: 0.68 (Lower is better, < 1.0 good)
-
-STABILITY ANALYSIS (100 bootstrap samples)
------------------------------------------
-Average Jaccard Similarity: 0.78
-Interpretation: GOOD - Segments reasonably stable
-
-Per-segment stability:
-  Segment 1: 0.82 (Excellent)
-  Segment 2: 0.79 (Good)
-  Segment 3: 0.75 (Good)
-  Segment 4: 0.71 (Acceptable)
-
-DISCRIMINANT ANALYSIS
---------------------
-LDA Classification Accuracy: 89.2%
-Interpretation: EXCELLENT - Segments well separated
-
-OVERALL QUALITY: GOOD
-Quality Score: 2.3 / 3.0
-```
-
-### Step 3: Quick Stability Check
-
-```r
 stability <- check_stability_simple(
   data = survey_data,
   clustering_vars = c("q1", "q2", "q3", "q4", "q5"),
   k = 4,
-  n_runs = 5
+  n_runs = 10
 )
 ```
 
 **Output:**
 ```
-Running 5 k-means iterations with different seeds...
+Running 10 k-means iterations with different seeds...
 
 STABILITY RESULTS
 -----------------
 Stability Score: 92%
 Interpretation: EXCELLENT - Very stable segmentation
-
-Run consistency:
-  Average agreement: 92.3%
-  Min: 89.5%
-  Max: 95.1%
 ```
 
 ---
 
-## Workflow 7: Interpretation
+## Workflow 10: Interpretation
 
 **Scenario:** Interpret segments and create meaningful names.
 
@@ -513,52 +695,16 @@ Run consistency:
 | Support | 8.9 | 7.4 | 4.9 | 2.5 | 6.7 |
 | Recommend | 9.5 | 7.8 | 4.5 | 2.2 | 7.0 |
 | **Size** | **100** | **250** | **100** | **50** | **500** |
-| **Percent** | **20%** | **50%** | **20%** | **10%** | **100%** |
 
-### Step 2: Calculate Index Scores
+### Step 2: Use HTML Report Heatmap
 
-Index = (Segment Mean / Overall Mean) × 100
+The HTML report's profile heatmap provides a visual representation with colour coding:
+- Blue = below average, White = average, Red = above average
 
-| Variable | Seg 1 | Seg 2 | Seg 3 | Seg 4 |
-|----------|-------|-------|-------|-------|
-| Product | 130 | 106 | 72 | 39 |
-| Service | 130 | 106 | 70 | 46 |
-| Value | 129 | 103 | 81 | 51 |
-| Support | 133 | 110 | 73 | 37 |
-| Recommend | 136 | 111 | 64 | 31 |
+### Step 3: Review Action Cards
 
-### Step 3: Identify Defining Characteristics
+If `generate_action_cards = TRUE`, the HTML report shows action cards:
 
-**Segment 1:** All indices > 125 → High on everything
-**Segment 2:** All indices 100-115 → Slightly above average
-**Segment 3:** All indices 65-80 → Below average
-**Segment 4:** All indices < 50 → Very low on everything
-
-### Step 4: Assign Names
-
-| Segment | Name | Size | Key Characteristic |
-|---------|------|------|-------------------|
-| 1 | **Advocates** | 20% | High across all dimensions, likely to recommend |
-| 2 | **Satisfied** | 50% | Above average, stable majority |
-| 3 | **At-Risk** | 20% | Below average, intervention needed |
-| 4 | **Detractors** | 10% | Low satisfaction, churn risk |
-
-### Step 5: Create Action Recommendations
-
-```r
-source("modules/segment/lib/segment_cards.R")
-
-cards <- generate_segment_cards(
-  data = survey_data,
-  clusters = result$clusters,
-  clustering_vars = c("q1", "q2", "q3", "q4", "q5"),
-  segment_names = c("Advocates", "Satisfied", "At-Risk", "Detractors")
-)
-
-print_segment_cards(cards)
-```
-
-**Output:**
 ```
 ============================================================
 SEGMENT: Advocates (20%)
@@ -577,6 +723,68 @@ RECOMMENDED ACTIONS:
   > Maintain current service levels
 ============================================================
 ```
+
+### Step 4: Review Classification Rules
+
+If `generate_rules = TRUE`, the HTML report shows rules like:
+
+```
+IF Q05_recommend > 7.5 AND Q01_product > 7.0 THEN Advocates    (accuracy: 94%)
+IF Q05_recommend <= 7.5 AND Q01_product > 5.5 THEN Satisfied   (accuracy: 87%)
+IF Q01_product <= 5.5 AND Q03_value > 4.0     THEN At-Risk     (accuracy: 82%)
+IF Q01_product <= 5.5 AND Q03_value <= 4.0    THEN Detractors  (accuracy: 91%)
+```
+
+### Step 5: Pin Key Findings
+
+Use the HTML report's pinned views to collect the most important charts, tables, and cards, then export as PNGs for your presentation.
+
+---
+
+## Workflow 11: Demo Showcase
+
+**Scenario:** Run the built-in demo to see all three methods with HTML reports.
+
+### Step 1: Navigate to Demo
+
+```r
+setwd("examples/segment/demo_showcase")
+```
+
+### Step 2: Generate Demo Data
+
+```r
+source("generate_demo_data.R")
+```
+
+This creates synthetic survey data suitable for demonstrating all three clustering methods.
+
+### Step 3: Create Demo Configs
+
+```r
+source("create_demo_configs.R")
+```
+
+This generates configuration files for K-means, hierarchical, and GMM analyses.
+
+### Step 4: Run the Demo
+
+```r
+source("run_demo.R")
+```
+
+This runs all three methods sequentially and generates:
+- K-means final report (Excel + HTML)
+- Hierarchical final report (Excel + HTML)
+- GMM final report (Excel + HTML)
+
+### Step 5: Compare Results
+
+Open the three HTML reports side by side to compare:
+- How each method handles the same data
+- Differences in segment assignments
+- GMM-specific membership probabilities
+- Method-specific validation metrics
 
 ---
 
@@ -636,10 +844,11 @@ colSums(is.na(data[, clustering_vars]))
 **Cause:** Multiple local optima, not enough random starts.
 
 **Solutions:**
-1. Increase nstart: `nstart = 50`
+1. Increase nstart: `nstart = 50` (K-means only)
 2. Set consistent seed: `seed = 123`
 3. Try different k value
 4. Check for outliers pulling centroids
+5. Try hierarchical clustering (deterministic)
 
 ---
 
@@ -657,8 +866,43 @@ colSums(is.na(data[, clustering_vars]))
 **Solutions:**
 1. Try different k values
 2. Review variable selection
-3. Enable SHAP for non-linear patterns
+3. Try a different method (GMM may find elliptical clusters)
 4. Accept that some data doesn't segment cleanly
+
+---
+
+### Issue: "PKG_MCLUST_MISSING"
+
+**Error:** GMM method requires mclust package.
+
+**Solution:**
+```r
+install.packages("mclust")
+```
+
+---
+
+### Issue: "PKG_HTMLTOOLS_MISSING"
+
+**Error:** HTML report requires htmltools package.
+
+**Solution:**
+```r
+install.packages("htmltools")
+```
+
+Or set `html_report = FALSE` to skip HTML output.
+
+---
+
+### Issue: "Hierarchical clustering too slow"
+
+**Cause:** Dataset exceeds ~15,000 rows (distance matrix is O(n^2) memory).
+
+**Solutions:**
+1. Switch to K-means for large datasets
+2. Subsample the data
+3. Install `fastcluster` for speed improvement: `install.packages("fastcluster")`
 
 ---
 
@@ -698,9 +942,19 @@ colSums(is.na(data[, clustering_vars]))
 
 ### Common Configuration Patterns
 
-**Basic Exploration:**
+**Basic K-Means Exploration:**
 ```
-k_min = 3, k_max = 6, standardize = TRUE
+method = kmeans, k_min = 3, k_max = 6, standardize = TRUE, html_report = TRUE
+```
+
+**Hierarchical with Ward Linkage:**
+```
+method = hclust, linkage_method = ward.D2, k_fixed = 4, html_report = TRUE
+```
+
+**GMM with Auto Model Selection:**
+```
+method = gmm, gmm_model_type = [BLANK], k_fixed = 4, html_report = TRUE
 ```
 
 **With Outlier Detection:**
@@ -713,9 +967,17 @@ outlier_detection = TRUE, outlier_method = zscore, outlier_handling = flag
 variable_selection = TRUE, max_clustering_vars = 10
 ```
 
-**Final Run:**
+**Full Final Run with Enhanced Features:**
 ```
 k_fixed = 4, segment_names = Name1,Name2,Name3,Name4, save_model = TRUE
+generate_rules = TRUE, generate_action_cards = TRUE, run_stability_check = TRUE
+html_report = TRUE, html_show_rules = TRUE
+```
+
+**Branded HTML Report:**
+```
+html_report = TRUE, brand_colour = #D35400, accent_colour = #27AE60
+report_title = Customer Segmentation Q1 2026
 ```
 
 ---
@@ -725,6 +987,7 @@ k_fixed = 4, segment_names = Name1,Name2,Name3,Name4, save_model = TRUE
 - [03_REFERENCE_GUIDE.md](03_REFERENCE_GUIDE.md) - Statistical methods
 - [04_USER_MANUAL.md](04_USER_MANUAL.md) - Complete user guide
 - [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) - Configuration fields
+- [08_HTML_REPORT_GUIDE.md](08_HTML_REPORT_GUIDE.md) - HTML report reference
 
 ---
 

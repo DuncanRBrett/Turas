@@ -1,7 +1,7 @@
 # Turas Segmentation Module - User Manual
 
-**Version:** 10.0
-**Last Updated:** 22 December 2025
+**Version:** 11.0
+**Last Updated:** 5 March 2026
 **Target Audience:** Market Researchers, Data Analysts, Survey Managers
 
 ---
@@ -11,12 +11,14 @@
 1. [Prerequisites](#prerequisites)
 2. [Data Preparation](#data-preparation)
 3. [Configuration Guide](#configuration-guide)
-4. [Running the Analysis](#running-the-analysis)
-5. [Understanding Output](#understanding-output)
-6. [Advanced Features](#advanced-features)
-7. [Scoring New Data](#scoring-new-data)
-8. [Best Practices](#best-practices)
-9. [Troubleshooting](#troubleshooting)
+4. [Method Selection Guidance](#method-selection-guidance)
+5. [Running the Analysis](#running-the-analysis)
+6. [Understanding Output](#understanding-output)
+7. [HTML Report](#html-report)
+8. [Advanced Features](#advanced-features)
+9. [Scoring New Data](#scoring-new-data)
+10. [Best Practices](#best-practices)
+11. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -25,12 +27,18 @@
 ### Required R Packages
 
 ```r
-install.packages(c("readxl", "writexl", "cluster"))
+install.packages(c("readxl", "writexl", "cluster", "openxlsx", "htmltools"))
 ```
 
 ### Optional Packages
 
 ```r
+# For Gaussian Mixture Models
+install.packages("mclust")
+
+# For faster hierarchical clustering
+install.packages("fastcluster")
+
 # For SPSS file support
 install.packages("haven")
 
@@ -42,6 +50,9 @@ install.packages(c("ggplot2", "fmsb"))
 
 # For Latent Class Analysis
 install.packages("poLCA")
+
+# For classification rules
+install.packages("rpart")
 
 # For GUI
 install.packages(c("shiny", "shinyFiles"))
@@ -128,11 +139,11 @@ The config file has 1-2 sheets:
 
 **Option 1: Use Template**
 
-Copy from `docs/templates/segment_config_template.xlsx`
+Copy from `docs/templates/Segment_Config_Template.xlsx`
 
 **Option 2: Generate Programmatically**
 ```r
-source("modules/segment/lib/segment_utils.R")
+source("modules/segment/R/10_utilities.R")
 generate_config_template(
   data_file = "data/survey.csv",
   output_file = "config/my_segmentation.xlsx",
@@ -154,12 +165,14 @@ generate_config_template(
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `method` | kmeans | Clustering algorithm |
+| `method` | kmeans | Clustering algorithm: `kmeans`, `hclust`, or `gmm` |
 | `k_fixed` | (blank) | Fixed k for final run |
 | `k_min` | 3 | Min k for exploration |
 | `k_max` | 6 | Max k for exploration |
-| `nstart` | 25 | Algorithm restarts |
+| `nstart` | 25 | Algorithm restarts (K-means only) |
 | `seed` | 123 | Random seed |
+| `linkage_method` | ward.D2 | Linkage for hierarchical clustering |
+| `gmm_model_type` | (auto) | GMM covariance structure |
 
 #### Data Handling
 
@@ -178,8 +191,54 @@ generate_config_template(
 | `output_prefix` | seg_ | Filename prefix |
 | `segment_names` | auto | Custom names or auto |
 | `save_model` | TRUE | Save for scoring |
+| `html_report` | TRUE | Generate HTML report |
+| `brand_colour` | #323367 | HTML report primary colour |
+| `accent_colour` | #CC9900 | HTML report accent colour |
+| `report_title` | (auto) | HTML report title |
+
+#### Enhanced Features
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `generate_rules` | FALSE | Generate classification rules |
+| `generate_action_cards` | TRUE | Generate segment action cards |
+| `run_stability_check` | FALSE | Run stability assessment |
+| `auto_name_style` | descriptive | Segment naming style |
 
 See [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) for complete list.
+
+---
+
+## Method Selection Guidance
+
+### When to Use K-Means
+
+- **Default choice** for most survey segmentation
+- Data is continuous numeric (ratings, scales)
+- Sample size from 100 to 50,000+
+- You expect roughly spherical, equal-sized clusters
+- Speed is important
+
+### When to Use Hierarchical Clustering
+
+- You want to **explore nested structure** before choosing k
+- Sample size is under ~15,000 (distance matrix constraint)
+- You need a **deterministic** result (no random initialization)
+- Dendrogram visualization is important for stakeholders
+- You want to experiment with different **linkage methods**
+
+**Choosing a linkage method:**
+- `ward.D2` (default): Best for balanced, compact clusters
+- `complete`: When you need well-separated clusters
+- `average`: When cluster sizes vary substantially
+
+### When to Use GMM
+
+- You expect **overlapping segments** (respondents between groups)
+- You need **probability-based** assignments (soft clustering)
+- Clusters may be **elliptical** rather than spherical
+- You want **uncertainty quantification** per respondent
+- BIC-based model selection is preferred over heuristics
 
 ---
 
@@ -201,7 +260,7 @@ run_segment_gui()
 
 **Step 2: Validate Configuration**
 - Click "Validate Configuration"
-- Green checkmark (✓) if valid
+- Green checkmark if valid
 - Red error messages if issues found
 
 **Step 3: Run Analysis**
@@ -210,11 +269,12 @@ run_segment_gui()
 
 **Step 4: Monitor Console**
 - Real-time progress in console output box
-- Shows stage completion and metrics
+- Shows stage completion, method, and metrics
 
 **Step 5: View Results**
 - Summary displays after completion
 - Click file links to open outputs
+- Open the HTML report in your browser for interactive exploration
 
 ### Using Command Line
 
@@ -234,7 +294,7 @@ result <- turas_segment_from_config(
 ### Quick Run (No Config File)
 
 ```r
-source("modules/segment/lib/segment_utils.R")
+source("modules/segment/R/10_utilities.R")
 
 # Exploration mode
 result <- run_segment_quick(
@@ -263,6 +323,7 @@ result <- run_segment_quick(
 | File | Content |
 |------|---------|
 | `seg_exploration_report.xlsx` | K-selection metrics |
+| `seg_exploration_report.html` | Interactive HTML exploration report |
 | `seg_segment_profiles_k3.xlsx` | Profiles for k=3 |
 | `seg_segment_profiles_k4.xlsx` | Profiles for k=4 |
 | `seg_k_selection.png` | Elbow and silhouette plots |
@@ -273,10 +334,31 @@ result <- run_segment_quick(
 | File | Content |
 |------|---------|
 | `seg_final_report.xlsx` | Complete segmentation report |
+| `seg_final_report.html` | Interactive HTML report with all sections |
 | `seg_assignments.xlsx` | Respondent-to-segment mapping |
 | `seg_segment_sizes.png` | Size distribution chart |
 | `seg_profiles_heatmap.png` | Visual profile comparison |
 | `seg_model.rds` | Saved model |
+
+### Segment Assignments File
+
+The `seg_assignments.xlsx` file contains:
+
+| Column | Description |
+|--------|-------------|
+| (ID column) | Respondent identifier |
+| segment_id | Numeric segment assignment (1, 2, 3, ...) |
+| segment_name | Segment label |
+
+**Additional columns for GMM (method = gmm):**
+
+| Column | Description |
+|--------|-------------|
+| prob_segment_1 | Probability of belonging to segment 1 |
+| prob_segment_2 | Probability of belonging to segment 2 |
+| ... | ... |
+| max_probability | Highest probability across segments |
+| uncertainty | 1 - max_probability |
 
 ### Reading the Exploration Report
 
@@ -320,6 +402,45 @@ result <- run_segment_quick(
 
 ---
 
+## HTML Report
+
+### Overview
+
+v11.0 generates interactive, self-contained HTML reports alongside the standard Excel outputs. Reports include SVG charts, sticky navigation, pinned views, and slide export capabilities.
+
+### Enabling the Report
+
+Set `html_report = TRUE` in your config (this is the default).
+
+### Customising the Report
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `brand_colour` | #323367 | Primary colour for headers, nav, charts |
+| `accent_colour` | #CC9900 | Highlight colour for markers, badges |
+| `report_title` | (auto) | Title in report header |
+| `html_show_exec_summary` | TRUE | Executive summary section |
+| `html_show_overview` | TRUE | Segment sizes chart and table |
+| `html_show_validation` | TRUE | Silhouette chart and metrics |
+| `html_show_importance` | TRUE | Variable importance bar chart |
+| `html_show_profiles` | TRUE | Profile heatmap and table |
+| `html_show_rules` | FALSE | Classification rules table |
+| `html_show_cards` | TRUE | Segment action cards |
+| `html_show_guide` | TRUE | Interpretation guide |
+
+### Using the Report
+
+1. Open the `.html` file in any modern browser
+2. Use the sticky nav bar to jump between sections
+3. Hover over charts and tables to reveal the pin button
+4. Pin important views to the Pinned Views workspace at the bottom
+5. Use "Export All as PNG" to save pinned views for presentations
+6. Use "Print / PDF" for a formatted print layout
+
+See [08_HTML_REPORT_GUIDE.md](08_HTML_REPORT_GUIDE.md) for complete reference.
+
+---
+
 ## Advanced Features
 
 ### Outlier Detection
@@ -354,63 +475,75 @@ max_clustering_vars = 10
 2. Remove highly correlated pairs
 3. Select top N by variance
 
+### Classification Rules
+
+Generate plain-English decision rules:
+```
+generate_rules = TRUE
+rules_max_depth = 3
+```
+
+Rules appear in the HTML report (when `html_show_rules = TRUE`) and in the Excel output. They provide stakeholders with simple "IF-THEN" logic for segment assignment.
+
+### Segment Action Cards
+
+Generate executive-ready action cards:
+```
+generate_action_cards = TRUE
+```
+
+Cards include:
+- Segment name and size
+- Defining characteristics
+- Strengths (highest-scoring variables)
+- Pain points (lowest-scoring variables)
+- Recommended actions
+
+### Stability Assessment
+
+Test solution robustness:
+```
+run_stability_check = TRUE
+stability_n_runs = 10
+```
+
+Runs the clustering algorithm multiple times with different random seeds and reports consistency metrics. Higher stability (> 90%) indicates a robust solution.
+
+### Executive Summary
+
+Auto-generated narrative overview of the segmentation solution, including:
+- Quality assessment (Excellent/Good/Moderate/Limited)
+- Key findings (dominant segment, smallest segment, top differentiators)
+- Contextual insights derived from profile data
+
+The executive summary appears in the HTML report and is generated by `generate_segment_executive_summary()` in `R/12_executive_summary.R`.
+
 ### Enhanced Profiling
 
 Get statistical significance:
 ```r
-source("modules/segment/lib/segment_profiling_enhanced.R")
-
-enhanced <- create_enhanced_profile_report(
-  data = your_data,
-  clusters = result$clusters,
-  clustering_vars = config$clustering_vars,
-  output_path = "output/enhanced_profile.xlsx"
-)
+# This is run automatically during the main pipeline
+# To run standalone:
+source("modules/segment/R/05a_profiling_stats.R")
 ```
 
 **Output includes:**
 - ANOVA p-values
 - Effect sizes (eta-squared)
 - Index scores (segment vs. overall)
+- Variable importance rankings
 
 ### Segment Validation
 
 Test quality and stability:
 ```r
-source("modules/segment/lib/segment_validation.R")
-
-validation <- validate_segmentation(
-  data = your_data,
-  clusters = result$clusters,
-  clustering_vars = config$clustering_vars,
-  k = 4,
-  n_bootstrap = 100
-)
+source("modules/segment/R/04_validation.R")
 ```
 
 **Metrics:**
 - Stability (bootstrap): > 0.8 excellent
 - Separation (Calinski-Harabasz): Higher is better
 - Discrimination (LDA accuracy): > 90% excellent
-
-### Visualizations
-
-Create all standard plots:
-```r
-source("modules/segment/lib/segment_visualization.R")
-
-create_all_visualizations(
-  result = result,
-  output_folder = "output/charts/",
-  prefix = "seg_"
-)
-```
-
-**Creates:**
-- Segment sizes bar chart
-- K-selection plots
-- Profile heatmap
-- Spider/radar chart
 
 ---
 
@@ -431,7 +564,7 @@ save_model = TRUE  # in original config
 
 **Step 2: Score new data**
 ```r
-source("modules/segment/lib/segment_scoring.R")
+source("modules/segment/R/08_scoring.R")
 
 scores <- score_new_data(
   model_file = "output/seg_model.rds",
@@ -522,13 +655,14 @@ Before running:
 ### Reporting Results
 
 **For executives:**
+- Share the HTML report with executive summary
 - Segment names and sizes
 - Key differentiating characteristics
-- Recommended actions per segment
+- Action cards with recommended actions per segment
 
 **For technical audience:**
 - All validation metrics
-- Method details
+- Method details (algorithm, linkage, covariance structure)
 - Limitations and assumptions
 
 ---
@@ -554,6 +688,14 @@ Before running:
 - Everyone answered the same
 - Remove constant variable from clustering_vars
 
+**"PKG_MCLUST_MISSING"**
+- GMM method requires mclust package
+- Install: `install.packages("mclust")`
+
+**"PKG_HTMLTOOLS_MISSING"**
+- HTML report requires htmltools package
+- Install: `install.packages("htmltools")`
+
 ### GUI-Specific Issues
 
 **Grey screen when launching**
@@ -571,9 +713,10 @@ Before running:
 ### Performance Issues
 
 **Segmentation takes too long:**
-- Reduce `nstart` from 25 to 10
+- Reduce `nstart` from 25 to 10 (K-means)
 - Reduce k_max range
 - Disable gap statistic
+- For hierarchical: reduce dataset or switch to K-means (hclust is O(n^2))
 
 **Large output files:**
 - Set `create_dated_folder = FALSE`
@@ -586,7 +729,7 @@ Before running:
 **Resolution:**
 1. Prioritize silhouette score
 2. Consider practical interpretability
-3. Test sensitivity by running final with k and k±1
+3. Test sensitivity by running final with k and k+/-1
 
 ---
 
@@ -596,6 +739,7 @@ Before running:
 - [05_TECHNICAL_DOCS.md](05_TECHNICAL_DOCS.md) - Developer documentation
 - [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) - Template field reference
 - [07_EXAMPLE_WORKFLOWS.md](07_EXAMPLE_WORKFLOWS.md) - Practical examples
+- [08_HTML_REPORT_GUIDE.md](08_HTML_REPORT_GUIDE.md) - HTML report reference
 
 ---
 

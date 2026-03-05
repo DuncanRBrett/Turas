@@ -1,7 +1,7 @@
 # Turas Segmentation Module - Technical Documentation
 
-**Version:** 10.1
-**Last Updated:** 29 December 2024
+**Version:** 11.0
+**Last Updated:** 5 March 2026
 **Target Audience:** Developers, Technical Maintainers, Data Scientists
 
 ---
@@ -12,12 +12,15 @@
 2. [Architecture](#architecture)
 3. [File Structure](#file-structure)
 4. [Core Components](#core-components)
-5. [Data Processing Pipeline](#data-processing-pipeline)
-6. [API Reference](#api-reference)
-7. [Extension Points](#extension-points)
-8. [GUI Implementation](#gui-implementation)
-9. [Testing](#testing)
-10. [Maintenance Guide](#maintenance-guide)
+5. [Method Dispatcher](#method-dispatcher)
+6. [Guard System](#guard-system)
+7. [Data Processing Pipeline](#data-processing-pipeline)
+8. [HTML Report Pipeline](#html-report-pipeline)
+9. [API Reference](#api-reference)
+10. [Extension Points](#extension-points)
+11. [GUI Implementation](#gui-implementation)
+12. [Testing](#testing)
+13. [Maintenance Guide](#maintenance-guide)
 
 ---
 
@@ -25,47 +28,59 @@
 
 ### Purpose
 
-The Segment module provides K-means clustering for market segmentation analysis. It identifies natural groups within survey respondents based on their attitudes, behaviors, or characteristics.
+The Segment module provides multi-algorithm clustering for market segmentation analysis. It identifies natural groups within survey respondents based on their attitudes, behaviors, or characteristics using K-means, hierarchical clustering, or Gaussian Mixture Models.
 
 ### Key Features
 
 **Clustering:**
-- K-means with configurable k range
+- K-means with configurable k range and multiple random starts
+- Hierarchical clustering with multiple linkage methods
+- Gaussian Mixture Models with soft assignments and BIC model selection
+- Method dispatcher for unified API across algorithms
 - Automatic optimal k selection
-- Multiple initialization (nstart)
-- Reproducible results (seed)
+- Reproducible results (seed control)
 
 **Data Preparation:**
 - Automatic scaling and normalization
 - Outlier detection (Z-score, Mahalanobis)
-- Missing data handling
-- Variable selection
+- Missing data handling (listwise deletion, mean/median imputation)
+- Variable selection (variance-correlation, factor analysis)
 
 **Validation:**
 - Silhouette coefficient
 - Elbow method (WCSS)
 - Gap statistic
 - Calinski-Harabasz index
-- Bootstrap stability
+- Cophenetic correlation (hierarchical)
+- BIC (GMM)
+- Stability assessment
 
-**Profiling:**
+**Profiling & Enhanced Features:**
 - Basic means/frequencies
-- Enhanced profiling with ANOVA
-- Variable importance (eta-squared)
-- Cross-tabulation
+- Enhanced profiling with ANOVA and eta-squared
+- Variable importance ranking
+- Classification rules (decision trees)
+- Segment action cards
+- Executive summary generation
+
+**Output:**
+- Excel reports and assignments
+- Interactive HTML reports with SVG charts
+- Model persistence (.rds)
 
 ### Performance
 
-| Dataset Size | Variables | Time |
-|--------------|-----------|------|
-| 500 respondents | 10 | 5-10 sec |
-| 2,000 respondents | 20 | 15-30 sec |
-| 10,000 respondents | 30 | 60-120 sec |
+| Dataset Size | Variables | Time (K-means) | Time (Hclust) | Time (GMM) |
+|--------------|-----------|-----------------|----------------|-------------|
+| 500 respondents | 10 | 5-10 sec | 5-15 sec | 10-20 sec |
+| 2,000 respondents | 20 | 15-30 sec | 30-60 sec | 45-90 sec |
+| 10,000 respondents | 30 | 60-120 sec | 3-5 min | 3-5 min |
 
 **Scalability:**
-- Up to 50,000 respondents
-- Up to 50 clustering variables
-- k range: 2-20 clusters
+- K-means: Up to 50,000 respondents
+- Hierarchical: Up to ~15,000 respondents (distance matrix limit)
+- GMM: Up to ~20,000 respondents
+- All methods: Up to 50 clustering variables, k range 2-20
 
 ---
 
@@ -73,98 +88,118 @@ The Segment module provides K-means clustering for market segmentation analysis.
 
 ### Design Pattern
 
-Modular Pipeline Architecture:
+Modular Step-Function Pipeline Architecture following the catdriver/keydriver pattern:
 
 ```
-Config → Data Prep → Outlier Removal → Clustering → Validation → Profiling → Output
+Guard Init -> Config -> Data Prep -> Hard Guards -> Clustering -> Validation -> Profiling -> Output
+                                                        |
+                                                   Method Dispatcher
+                                                   /      |       \
+                                              K-means  Hclust    GMM
 ```
 
 ### Design Principles
 
-1. **Separation of Concerns** - Each file handles one aspect
-2. **Two-Mode Operation** - Exploration (find k) vs Final (use k)
-3. **Reproducibility** - Seed control for consistent results
-4. **Statistical Rigor** - Multiple validation metrics
-5. **Extensibility** - Easy to add new methods
+1. **Separation of Concerns** - Each numbered file handles one aspect
+2. **Method Dispatch** - Unified interface across clustering algorithms
+3. **Two-Mode Operation** - Exploration (find k) vs Final (use k)
+4. **TRS Compliance** - Structured refusal system, no stop() calls
+5. **Guard Layer** - Hard guards (REFUSE) and soft guards (PARTIAL)
+6. **Reproducibility** - Seed control for consistent results
+7. **Statistical Rigor** - Multiple validation metrics
+8. **Extensibility** - Easy to add new methods or features
 
 ### Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                   SEGMENT MODULE                             │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │ INPUT LAYER                                           │   │
-│  │  ├─ Survey Data (CSV/Excel/SPSS)                     │   │
-│  │  └─ Configuration (Excel)                            │   │
-│  └─────────────────┬────────────────────────────────────┘   │
-│                    │                                         │
-│  ┌─────────────────▼────────────────────────────────────┐   │
-│  │ CONFIGURATION & DATA LOADING                          │   │
-│  │  ├─ segment_config.R → Load & validate config        │   │
-│  │  └─ segment_data_prep.R → Load & prepare data        │   │
-│  └─────────────────┬────────────────────────────────────┘   │
-│                    │                                         │
-│  ┌─────────────────▼────────────────────────────────────┐   │
-│  │ DATA PREPROCESSING                                    │   │
-│  │  ├─ Variable selection (segment_variable_selection.R)│   │
-│  │  ├─ Missing data handling                            │   │
-│  │  ├─ Scaling/normalization                            │   │
-│  │  └─ Outlier detection (segment_outliers.R)           │   │
-│  └─────────────────┬────────────────────────────────────┘   │
-│                    │                                         │
-│  ┌─────────────────▼────────────────────────────────────┐   │
-│  │ CLUSTERING ENGINE                                     │   │
-│  │  ├─ segment_kmeans.R → K-means implementation        │   │
-│  │  ├─ Run for k_min to k_max (exploration)             │   │
-│  │  └─ Or run for k_fixed (final)                       │   │
-│  └─────────────────┬────────────────────────────────────┘   │
-│                    │                                         │
-│  ┌─────────────────▼────────────────────────────────────┐   │
-│  │ VALIDATION                                            │   │
-│  │  ├─ segment_validation.R → Quality metrics           │   │
-│  │  ├─ Silhouette, WCSS, Gap, Calinski-Harabasz        │   │
-│  │  └─ Bootstrap stability                              │   │
-│  └─────────────────┬────────────────────────────────────┘   │
-│                    │                                         │
-│  ┌─────────────────▼────────────────────────────────────┐   │
-│  │ PROFILING                                             │   │
-│  │  ├─ segment_profile.R → Basic profiling              │   │
-│  │  ├─ segment_profiling_enhanced.R → Statistical tests │   │
-│  │  └─ Variable importance (eta-squared)                │   │
-│  └─────────────────┬────────────────────────────────────┘   │
-│                    │                                         │
-│  ┌─────────────────▼────────────────────────────────────┐   │
-│  │ OUTPUT                                                │   │
-│  │  ├─ segment_export.R → Excel output                  │   │
-│  │  ├─ segment_visualization.R → Charts                 │   │
-│  │  └─ Model object (.rds)                              │   │
-│  └─────────────────┬────────────────────────────────────┘   │
-│                    │                                         │
-│  ┌─────────────────▼────────────────────────────────────┐   │
-│  │ SCORING                                               │   │
-│  │  └─ segment_scoring.R → Classify new data            │   │
-│  └──────────────────────────────────────────────────────┘   │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
++---------------------------------------------------------------+
+|                   SEGMENT MODULE v11.0                          |
++---------------------------------------------------------------+
+|                                                                 |
+|  +----------------------------------------------------------+  |
+|  | INPUT LAYER                                                |  |
+|  |  +-- Survey Data (CSV/Excel/SPSS)                         |  |
+|  |  +-- Configuration (Excel)                                |  |
+|  +------------------------+-----------------------------------+  |
+|                           |                                      |
+|  +------------------------v-----------------------------------+  |
+|  | GUARD LAYER                                                 |  |
+|  |  +-- 00_guard.R      -> TRS framework, segment_refuse()   |  |
+|  |  +-- 00a_guards_hard.R -> REFUSE guards (fatal)           |  |
+|  |  +-- 00b_guards_soft.R -> PARTIAL guards (degradation)    |  |
+|  +------------------------+-----------------------------------+  |
+|                           |                                      |
+|  +------------------------v-----------------------------------+  |
+|  | CONFIGURATION & DATA LOADING                                |  |
+|  |  +-- 01_config.R     -> Load & validate config             |  |
+|  |  +-- 02_data_prep.R  -> Load & prepare data                |  |
+|  |  +-- 02a_variable_selection.R -> Variable selection         |  |
+|  |  +-- 02b_outliers.R  -> Outlier detection & handling        |  |
+|  +------------------------+-----------------------------------+  |
+|                           |                                      |
+|  +------------------------v-----------------------------------+  |
+|  | CLUSTERING ENGINE (Method Dispatcher)                       |  |
+|  |  +-- 03_clustering.R -> Dispatch to method                  |  |
+|  |  +-- 03a_kmeans.R    -> K-means implementation              |  |
+|  |  +-- 03b_hclust.R    -> Hierarchical clustering             |  |
+|  |  +-- 03c_gmm.R       -> Gaussian Mixture Models             |  |
+|  +------------------------+-----------------------------------+  |
+|                           |                                      |
+|  +------------------------v-----------------------------------+  |
+|  | VALIDATION                                                  |  |
+|  |  +-- 04_validation.R -> Quality metrics                     |  |
+|  |  +-- Silhouette, WCSS, Gap, CH, Cophenetic, BIC            |  |
+|  +------------------------+-----------------------------------+  |
+|                           |                                      |
+|  +------------------------v-----------------------------------+  |
+|  | PROFILING & ENHANCED FEATURES                               |  |
+|  |  +-- 05_profiling.R    -> Basic profiling                   |  |
+|  |  +-- 05a_profiling_stats.R -> ANOVA, effect sizes           |  |
+|  |  +-- 06_rules.R       -> Classification rules              |  |
+|  |  +-- 07_cards.R       -> Segment action cards               |  |
+|  |  +-- 12_executive_summary.R -> Narrative insights           |  |
+|  +------------------------+-----------------------------------+  |
+|                           |                                      |
+|  +------------------------v-----------------------------------+  |
+|  | OUTPUT                                                      |  |
+|  |  +-- 09_output.R      -> Excel output                      |  |
+|  |  +-- HTML Report Pipeline (lib/html_report/)               |  |
+|  |  +-- Model object (.rds)                                    |  |
+|  +------------------------+-----------------------------------+  |
+|                           |                                      |
+|  +------------------------v-----------------------------------+  |
+|  | SCORING                                                     |  |
+|  |  +-- 08_scoring.R     -> Classify new data                  |  |
+|  +----------------------------------------------------------+  |
+|                                                                 |
++---------------------------------------------------------------+
 ```
 
 ### Dependencies
 
 **R Packages:**
 ```r
-# Core
-library(stats)          # kmeans()
+# Core (required)
+library(stats)          # kmeans(), hclust(), dist()
 library(cluster)        # silhouette(), clusGap()
+library(openxlsx)       # Formatted Excel output
+library(htmltools)      # HTML report generation
 
 # Data I/O
 library(readxl)         # Excel reading
 library(writexl)        # Excel writing
 library(haven)          # SPSS support (optional)
 
-# Visualization
-library(ggplot2)        # Charts (optional)
+# Clustering methods (optional)
+library(mclust)         # GMM clustering (required for method = gmm)
+library(fastcluster)    # Faster hclust (optional speedup)
+
+# Enhanced features (optional)
+library(rpart)          # Classification rules
+library(MASS)           # Discriminant analysis
+
+# Visualization (optional)
+library(ggplot2)        # Charts
 ```
 
 ---
@@ -175,381 +210,209 @@ library(ggplot2)        # Charts (optional)
 
 ```
 modules/segment/
-├── lib/                                # Core library
-│   ├── segment_config.R               # Configuration loading
-│   ├── segment_data_prep.R            # Data preparation
-│   ├── segment_kmeans.R               # K-means clustering
-│   ├── segment_outliers.R             # Outlier detection
-│   ├── segment_validation.R           # Validation metrics
-│   ├── segment_profile.R              # Basic profiling
-│   ├── segment_profiling_enhanced.R   # Enhanced profiling
-│   ├── segment_variable_selection.R   # Variable selection
-│   ├── segment_scoring.R              # New data scoring
-│   ├── segment_export.R               # Excel output
-│   ├── segment_visualization.R        # Charts
-│   └── segment_utils.R                # Utilities
-├── run_segment.R                       # Main entry point (CLI)
-├── run_segment_gui.R                   # Shiny GUI
-├── test_data/                          # Test datasets
-└── docs/                               # Documentation
-    ├── 01_README.md
-    ├── 02_SEGMENT_OVERVIEW.md
-    ├── 03_REFERENCE_GUIDE.md
-    ├── 04_USER_MANUAL.md
-    ├── 05_TECHNICAL_DOCS.md            # This file
-    ├── 06_TEMPLATE_REFERENCE.md
-    ├── 07_EXAMPLE_WORKFLOWS.md
-    └── templates/
+├── R/                                  # Core analysis code (v11.0)
+│   ├── 00_main.R                      # Main orchestrator
+│   ├── 00_guard.R                     # TRS guard framework
+│   ├── 00a_guards_hard.R             # Hard guards (REFUSE)
+│   ├── 00b_guards_soft.R             # Soft guards (PARTIAL)
+│   ├── 01_config.R                    # Configuration loading
+│   ├── 02_data_prep.R                # Data preparation
+│   ├── 02a_variable_selection.R      # Variable selection
+│   ├── 02b_outliers.R                # Outlier detection
+│   ├── 03_clustering.R               # Method dispatcher
+│   ├── 03a_kmeans.R                  # K-means clustering
+│   ├── 03b_hclust.R                  # Hierarchical clustering
+│   ├── 03c_gmm.R                     # Gaussian Mixture Models
+│   ├── 04_validation.R               # Validation metrics
+│   ├── 05_profiling.R                # Basic profiling
+│   ├── 05a_profiling_stats.R         # Enhanced profiling (ANOVA)
+│   ├── 06_rules.R                    # Classification rules
+│   ├── 07_cards.R                    # Segment action cards
+│   ├── 08_scoring.R                  # New data scoring
+│   ├── 09_output.R                   # Excel export
+│   ├── 10_utilities.R                # Utilities & quick run
+│   ├── 11_lca.R                      # Latent Class Analysis
+│   └── 12_executive_summary.R        # Executive summary generator
+├── lib/                               # Supporting libraries
+│   ├── html_report/                   # HTML report pipeline
+│   │   ├── 00_html_guard.R           # Validate HTML inputs
+│   │   ├── 01_data_transformer.R     # Results -> HTML data structure
+│   │   ├── 02_table_builder.R        # Build HTML tables
+│   │   ├── 03_page_builder.R         # Assemble full HTML page
+│   │   ├── 04_html_writer.R          # Atomic file writer
+│   │   ├── 05_chart_builder.R        # SVG chart generation
+│   │   ├── 06_exploration_report.R   # Exploration mode report
+│   │   ├── 99_html_report_main.R     # HTML report entry point
+│   │   └── js/                        # JavaScript modules
+│   │       ├── seg_utils.js           # Shared utilities
+│   │       ├── seg_navigation.js      # Sticky nav & section tracking
+│   │       ├── seg_pinned_views.js    # Pin, collect, manage views
+│   │       └── seg_slide_export.js    # PNG export
+│   └── (legacy lib files)            # Pre-v11 library files
+├── run_segment.R                      # Entry point (sources R/00_main.R)
+├── run_segment_gui.R                  # Shiny GUI
+├── tests/                             # Module tests
+├── test_data/                         # Test datasets
+└── docs/                              # Documentation
 ```
 
 ### File Responsibilities
 
 | File | Purpose | Key Functions |
 |------|---------|---------------|
-| segment_config.R | Load/validate config | `read_segment_config()` |
-| segment_data_prep.R | Data preprocessing | `prepare_segment_data()` |
-| segment_kmeans.R | Clustering engine | `run_kmeans_single()`, `run_kmeans_multiple()` |
-| segment_outliers.R | Outlier detection | `detect_outliers_zscore()`, `detect_outliers_mahal()` |
-| segment_validation.R | Validation metrics | `calculate_silhouette()`, `calculate_gap_stat()` |
-| segment_profile.R | Basic profiling | `profile_clusters()`, `cluster_means()` |
-| segment_profiling_enhanced.R | Statistical tests | `enhanced_profile()`, `test_anova()` |
-| segment_scoring.R | Score new data | `score_new_data()`, `type_respondent()` |
-| segment_export.R | Excel output | `write_segment_results()` |
-| segment_visualization.R | Charts | `plot_elbow()`, `plot_silhouette()` |
-| segment_utils.R | Utilities & Quick Run | See [segment_utils.R Structure](#segment_utilsr-structure) |
-
-### segment_utils.R Structure
-
-**Refactored December 2024** for improved maintainability and testability.
-
-The file is organized into 9 sections:
-
-| Section | Functions | Purpose |
-|---------|-----------|---------|
-| 1. Shared Infrastructure | `.source_shared_utils()` | Dynamic loading of shared validation utilities |
-| 2. Package Dependencies | `check_segment_dependencies()`, `get_minimum_install_cmd()`, `get_full_install_cmd()` | Dependency checking and install commands |
-| 3. Config Template | `generate_config_template()` | Create starter Excel config files |
-| 4. Input Validation | `validate_input_data()` | Comprehensive data quality checks |
-| 5. Project Init | `initialize_segmentation_project()` | Set up project folder structure |
-| 6. Seed Management | `set_segmentation_seed()` | Centralized seed handling |
-| 7. Quick Run Helpers | `.validate_quick_inputs()`, `.build_quick_config()`, `.prepare_quick_data()`, `.run_quick_exploration()`, `.run_quick_final()` | Internal helper functions (see below) |
-| 8. Quick Run Main | `run_segment_quick()` | Public API orchestrator |
-| 9. RNG Utilities | `get_rng_state()`, `restore_rng_state()`, `validate_seed_reproducibility()` | RNG state management |
-
-**Quick Run Helper Functions (Internal):**
-
-The `run_segment_quick()` function delegates to specialized helpers:
-
-```
-run_segment_quick()
-    │
-    ├── .validate_quick_inputs()    # Validate data, variables, k parameter
-    │
-    ├── .build_quick_config()       # Build config list from parameters
-    │
-    ├── .prepare_quick_data()       # Handle missing data, standardize
-    │
-    └── .run_quick_exploration()    # If k=NULL: test multiple k values
-        OR
-        .run_quick_final()          # If k=integer: run with fixed k
-```
-
-This decomposition improves:
-- **Testability**: Each helper can be unit tested independently
-- **Maintainability**: Single-responsibility functions are easier to modify
-- **Readability**: Main function is ~60 lines (was 423 lines)
+| 00_main.R | Pipeline orchestrator | `turas_segment_from_config()` |
+| 00_guard.R | TRS guard framework | `segment_refuse()`, `segment_guard_init()` |
+| 00a_guards_hard.R | Fatal guards | `guard_require_valid_method()`, `guard_require_hclust_size()` |
+| 00b_guards_soft.R | Degradation guards | Soft validation with PARTIAL status |
+| 01_config.R | Config loading | `load_segment_config()`, `format_variable_label()` |
+| 02_data_prep.R | Data preprocessing | `prepare_segment_data()` |
+| 02a_variable_selection.R | Variable selection | `run_variable_selection()` |
+| 02b_outliers.R | Outlier detection | `detect_outliers_zscore()`, `detect_outliers_mahal()` |
+| 03_clustering.R | Method dispatcher | `run_clustering()`, `run_exploration_clustering()` |
+| 03a_kmeans.R | K-means engine | `run_kmeans_clustering()`, `run_kmeans_dispatch()` |
+| 03b_hclust.R | Hierarchical engine | `run_hclust_clustering()`, `run_hclust_dispatch()` |
+| 03c_gmm.R | GMM engine | `run_gmm_clustering()`, `run_gmm_dispatch()` |
+| 04_validation.R | Validation metrics | `calculate_silhouette()`, `calculate_gap_stat()` |
+| 05_profiling.R | Basic profiling | `create_full_segment_profile()` |
+| 05a_profiling_stats.R | Statistical tests | `enhanced_profile()`, `test_anova()` |
+| 06_rules.R | Classification rules | `generate_segment_rules()` |
+| 07_cards.R | Action cards | `generate_segment_cards()` |
+| 08_scoring.R | Score new data | `score_new_data()`, `type_respondent()` |
+| 09_output.R | Excel output | `write_segment_results()` |
+| 10_utilities.R | Utilities & Quick Run | `run_segment_quick()`, `generate_config_template()` |
+| 11_lca.R | Latent Class Analysis | `run_lca_analysis()` |
+| 12_executive_summary.R | Narrative insights | `generate_segment_executive_summary()` |
 
 ---
 
 ## Core Components
 
-### Configuration Loader
+### Main Orchestrator (00_main.R)
 
-**File:** `segment_config.R`
+The main orchestrator follows the catdriver/keydriver step-function pattern. Guard state is threaded through all steps, and PARTIAL status tracks degradation.
 
-**Main Function:** `read_segment_config(config_file)`
+**Pipeline Steps:**
 
-```r
-read_segment_config <- function(config_file) {
-  # 1. Read Excel config
-  config_raw <- readxl::read_excel(config_file, sheet = "Config")
-
-  # 2. Convert to named list
-  config <- setNames(as.list(config_raw$Value), config_raw$Setting)
-
-  # 3. Validate and set defaults
-  config <- validate_segment_config(config)
-
-  return(config)
-}
-
-validate_segment_config <- function(config) {
-  # Required fields
-  required <- c("data_file", "id_variable", "clustering_vars")
-  missing <- setdiff(required, names(config))
-  if (length(missing) > 0) {
-    stop("Missing required config fields: ", paste(missing, collapse = ", "))
-  }
-
-  # Determine mode
-  if (!is.null(config$k_fixed) && !is.na(config$k_fixed) &&
-      nchar(trimws(config$k_fixed)) > 0) {
-    config$mode <- "final"
-    config$k_fixed <- as.integer(config$k_fixed)
-  } else {
-    config$mode <- "exploration"
-  }
-
-  # Parse clustering variables
-  config$clustering_vars <- strsplit(config$clustering_vars, ",")[[1]]
-  config$clustering_vars <- trimws(config$clustering_vars)
-
-  # Set defaults
-  config$nstart <- as.integer(config$nstart %||% 25)
-  config$seed <- as.integer(config$seed %||% 123)
-  config$standardize <- as.logical(config$standardize %||% TRUE)
-  config$k_min <- as.integer(config$k_min %||% 3)
-  config$k_max <- as.integer(config$k_max %||% 6)
-
-  return(config)
-}
+```
+STEP 1: Load & validate configuration  (01_config.R)
+STEP 2: Load & prepare data            (02_data_prep.R)
+STEP 3: Run hard guards                (00a_guards_hard.R)
+STEP 4: Clustering                     (03_clustering.R -> 03a/03b/03c)
+STEP 5: Validation metrics             (04_validation.R)
+STEP 6: Profiling & enhanced features  (05_profiling.R, 06_rules.R, 07_cards.R, 12_executive_summary.R)
+STEP 7: Output                         (09_output.R + lib/html_report/)
 ```
 
-### Data Preparation
+**Dependency Loading:**
 
-**File:** `segment_data_prep.R`
-
-**Main Function:** `prepare_segment_data(config)`
+The orchestrator sources all R/ files and shared infrastructure:
 
 ```r
-prepare_segment_data <- function(config) {
-  # 1. Load data
-  data <- load_survey_data(config$data_file, config$data_sheet)
+# Shared TRS infrastructure
+source("modules/shared/lib/trs_run_state.R")
+source("modules/shared/lib/trs_banner.R")
+source("modules/shared/lib/trs_run_status_writer.R")
+source("modules/shared/lib/turas_log.R")
 
-  # 2. Validate columns exist
-  required_cols <- c(config$id_variable, config$clustering_vars)
-  missing_cols <- setdiff(required_cols, names(data))
-  if (length(missing_cols) > 0) {
-    stop("Missing columns: ", paste(missing_cols, collapse = ", "))
-  }
+# Shared utilities
+source("modules/shared/lib/validation_utils.R")
+source("modules/shared/lib/config_utils.R")
+source("modules/shared/lib/data_utils.R")
+source("modules/shared/lib/logging_utils.R")
 
-  # 3. Extract clustering data
-  cluster_data <- data[, config$clustering_vars, drop = FALSE]
-
-  # 4. Handle missing data
-  if (config$missing_data == "listwise_deletion") {
-    complete_rows <- complete.cases(cluster_data)
-    data <- data[complete_rows, ]
-    cluster_data <- cluster_data[complete_rows, ]
-  } else if (config$missing_data == "mean_imputation") {
-    cluster_data <- impute_means(cluster_data)
-  }
-
-  # 5. Scale data
-  if (config$standardize) {
-    cluster_data_scaled <- scale(cluster_data)
-  } else {
-    cluster_data_scaled <- as.matrix(cluster_data)
-  }
-
-  return(list(
-    full_data = data,
-    cluster_data = cluster_data,
-    cluster_data_scaled = cluster_data_scaled,
-    n_rows = nrow(data),
-    n_vars = ncol(cluster_data)
-  ))
-}
+# All segment R/ files (00 through 12)
 ```
 
-### K-Means Clustering
+---
 
-**File:** `segment_kmeans.R`
+## Method Dispatcher
 
-**Exploration Mode:**
+### Architecture (03_clustering.R)
+
+The method dispatcher routes to the appropriate clustering algorithm based on `config$method`. All algorithms return a standard result structure for downstream processing.
+
+**Standard Result Structure:**
 ```r
-run_kmeans_multiple <- function(data_scaled, k_min, k_max, config) {
-  results <- list()
-
-  for (k in k_min:k_max) {
-    cat(sprintf("Testing k = %d...\n", k))
-
-    km <- stats::kmeans(
-      x = data_scaled,
-      centers = k,
-      nstart = config$nstart,
-      iter.max = 100,
-      algorithm = "Hartigan-Wong"
-    )
-
-    results[[paste0("k", k)]] <- list(
-      k = k,
-      model = km,
-      cluster = km$cluster,
-      centers = km$centers,
-      size = km$size,
-      tot.withinss = km$tot.withinss,
-      betweenss = km$betweenss
-    )
-  }
-
-  return(results)
-}
+list(
+  clusters      = integer_vector,      # Cluster assignments (1..k)
+  k             = integer,             # Number of clusters
+  centers       = matrix,              # Cluster centers (k x p)
+  method        = "kmeans"|"hclust"|"gmm",
+  method_info   = list(...),           # Method-specific diagnostics
+  model         = fitted_model_object
+)
 ```
 
-**Final Mode:**
-```r
-run_kmeans_single <- function(data_scaled, k, config) {
-  km <- stats::kmeans(
-    x = data_scaled,
-    centers = k,
-    nstart = config$nstart,
-    iter.max = 100,
-    algorithm = "Hartigan-Wong"
-  )
+**Method-Specific Extras:**
 
-  return(list(
-    k = k,
-    model = km,
-    cluster = km$cluster,
-    centers = km$centers,
-    size = km$size,
-    tot.withinss = km$tot.withinss,
-    betweenss = km$betweenss
-  ))
-}
+| Method | Extra Fields |
+|--------|-------------|
+| K-means | `tot.withinss`, `betweenss`, `size` |
+| Hierarchical | `cophenetic_correlation`, `linkage_method`, `dendrogram` |
+| GMM | `probabilities` (n x k matrix), `bic`, `model_type`, `uncertainty` |
+
+**Dispatch Flow:**
+
+```
+run_clustering(data_list, config, guard)
+    |
+    +-- guard_require_valid_method(method)
+    +-- guard_require_method_packages(method)
+    |
+    +-- switch(method)
+        +-- "kmeans" -> run_kmeans_dispatch()
+        +-- "hclust" -> run_hclust_dispatch()
+        +-- "gmm"    -> run_gmm_dispatch()
+    |
+    +-- validate_clustering_result(result, method)
 ```
 
-### Validation Metrics
+---
 
-**File:** `segment_validation.R`
+## Guard System
+
+### TRS v1.1 Integration
+
+The segment module uses a three-file guard architecture:
+
+| File | Purpose | Severity |
+|------|---------|----------|
+| `00_guard.R` | TRS framework, `segment_refuse()` wrapper | Infrastructure |
+| `00a_guards_hard.R` | Fatal guards that REFUSE execution | REFUSE |
+| `00b_guards_soft.R` | Non-fatal guards that degrade to PARTIAL | PARTIAL |
+
+### Hard Guards (REFUSE)
+
+Hard guards prevent execution when critical requirements are not met:
+
+- `guard_require_valid_method()` - Method must be kmeans, hclust, or gmm
+- `guard_require_method_packages()` - Required packages must be installed (e.g., mclust for GMM)
+- `guard_require_hclust_size()` - Dataset must be under ~15,000 rows for hierarchical clustering
+- `guard_require_minimum_cases()` - Sufficient complete cases for analysis
+- `guard_require_numeric_vars()` - All clustering variables must be numeric
+
+### Soft Guards (PARTIAL)
+
+Soft guards allow execution to continue with warnings:
+
+- Small segment size warnings
+- High missing data percentage warnings
+- Variable selection reducing to fewer than expected variables
+- Stability below acceptable thresholds
+
+### segment_refuse() Pattern
 
 ```r
-calculate_silhouette <- function(data_scaled, clusters) {
-  sil <- cluster::silhouette(clusters, dist(data_scaled))
-  avg_sil <- mean(sil[, "sil_width"])
-  return(avg_sil)
-}
-
-calculate_gap_statistic <- function(data_scaled, k_range, B = 50) {
-  gap_stat <- cluster::clusGap(
-    data_scaled,
-    FUNcluster = kmeans,
-    nstart = 25,
-    K.max = max(k_range),
-    B = B
-  )
-  return(gap_stat)
-}
-
-calculate_calinski_harabasz <- function(data_scaled, clusters, k) {
-  n <- nrow(data_scaled)
-
-  # Between-cluster SS
-  overall_mean <- colMeans(data_scaled)
-  bss <- 0
-  for (i in 1:k) {
-    cluster_data <- data_scaled[clusters == i, , drop = FALSE]
-    n_k <- nrow(cluster_data)
-    cluster_mean <- colMeans(cluster_data)
-    bss <- bss + n_k * sum((cluster_mean - overall_mean)^2)
-  }
-
-  # Within-cluster SS
-  wss <- 0
-  for (i in 1:k) {
-    cluster_data <- data_scaled[clusters == i, , drop = FALSE]
-    cluster_mean <- colMeans(cluster_data)
-    wss <- wss + sum((cluster_data - cluster_mean)^2)
-  }
-
-  ch <- (bss / (k - 1)) / (wss / (n - k))
-  return(ch)
-}
+segment_refuse(
+  code = "CFG_INVALID_METHOD",
+  title = "Unsupported Clustering Method",
+  problem = sprintf("Method '%s' is not implemented.", method),
+  why_it_matters = "Only supported methods can produce valid results.",
+  how_to_fix = "Use one of: kmeans, hclust, gmm"
+)
 ```
 
-### Outlier Detection
-
-**File:** `segment_outliers.R`
-
-```r
-detect_outliers_zscore <- function(data, threshold = 3.0, min_vars = 1) {
-  z_scores <- scale(data)
-  extreme_count <- rowSums(abs(z_scores) > threshold)
-  outliers <- extreme_count >= min_vars
-
-  return(list(
-    is_outlier = outliers,
-    z_scores = z_scores,
-    extreme_count = extreme_count
-  ))
-}
-
-detect_outliers_mahalanobis <- function(data, alpha = 0.001) {
-  center <- colMeans(data)
-  cov_matrix <- cov(data)
-
-  mahal_dist <- mahalanobis(data, center, cov_matrix)
-  threshold <- qchisq(1 - alpha, df = ncol(data))
-  outliers <- mahal_dist > threshold
-
-  return(list(
-    is_outlier = outliers,
-    distances = mahal_dist,
-    threshold = threshold
-  ))
-}
-```
-
-### Profiling
-
-**File:** `segment_profile.R`
-
-```r
-profile_clusters <- function(data, clusters, clustering_vars) {
-  k <- length(unique(clusters))
-
-  # Calculate means by cluster
-  profiles <- lapply(1:k, function(i) {
-    cluster_data <- data[clusters == i, clustering_vars, drop = FALSE]
-    colMeans(cluster_data, na.rm = TRUE)
-  })
-
-  profile_df <- do.call(rbind, profiles)
-  rownames(profile_df) <- paste0("Segment_", 1:k)
-
-  # Add overall means
-  overall <- colMeans(data[, clustering_vars], na.rm = TRUE)
-  profile_df <- rbind(profile_df, Overall = overall)
-
-  return(as.data.frame(profile_df))
-}
-```
-
-**File:** `segment_profiling_enhanced.R`
-
-```r
-test_anova <- function(data, clusters, variable) {
-  model <- aov(data[[variable]] ~ factor(clusters))
-  summary_table <- summary(model)
-
-  # Extract statistics
-  f_value <- summary_table[[1]][["F value"]][1]
-  p_value <- summary_table[[1]][["Pr(>F)"]][1]
-
-  # Calculate eta-squared
-  ss_between <- summary_table[[1]][["Sum Sq"]][1]
-  ss_total <- sum(summary_table[[1]][["Sum Sq"]])
-  eta_squared <- ss_between / ss_total
-
-  return(list(
-    f_value = f_value,
-    p_value = p_value,
-    eta_squared = eta_squared,
-    significant = p_value < 0.05
-  ))
-}
-```
+All refusals are logged to console with structured formatting and returned as TRS-compliant list structures.
 
 ---
 
@@ -559,43 +422,123 @@ test_anova <- function(data, clusters, variable) {
 
 ```
 1. LOAD CONFIG
-   └─ Read Excel, parse settings, set defaults
+   +-- Read Excel, parse settings, set defaults
+   +-- Validate method, linkage, GMM model type
 
 2. LOAD DATA
-   └─ Read survey file, validate columns
+   +-- Read survey file, validate columns
 
 3. HANDLE MISSING
-   ├─ Listwise deletion (default)
-   └─ Mean/median imputation
+   +-- Listwise deletion (default)
+   +-- Mean/median imputation
 
 4. SCALE DATA
-   └─ Z-score standardization
+   +-- Z-score standardization
 
-5. DETECT OUTLIERS
-   ├─ Z-score method
-   └─ Mahalanobis method
+5. DETECT OUTLIERS (optional)
+   +-- Z-score method
+   +-- Mahalanobis method
 
-6. RUN CLUSTERING
-   ├─ Exploration: k_min to k_max
-   └─ Final: k_fixed
+6. VARIABLE SELECTION (optional)
+   +-- Variance-correlation filtering
+   +-- Factor analysis
 
-7. CALCULATE METRICS
-   ├─ Silhouette
-   ├─ WCSS (elbow)
-   ├─ Gap statistic
-   └─ Calinski-Harabasz
+7. RUN HARD GUARDS
+   +-- Validate method packages, sample size, data types
 
-8. PROFILE SEGMENTS
-   ├─ Means
-   ├─ ANOVA tests
-   └─ Effect sizes
+8. RUN CLUSTERING (via dispatcher)
+   +-- K-means: Hartigan-Wong algorithm with nstart restarts
+   +-- Hierarchical: Distance matrix + linkage + cut tree
+   +-- GMM: EM algorithm via mclust
 
-9. EXPORT RESULTS
-   ├─ Assignments Excel
-   ├─ Report Excel
-   ├─ Charts
-   └─ Model RDS
+9. CALCULATE METRICS
+   +-- Silhouette
+   +-- WCSS (elbow)
+   +-- Gap statistic (optional)
+   +-- Calinski-Harabasz
+   +-- Method-specific metrics (cophenetic, BIC)
+
+10. PROFILE SEGMENTS
+    +-- Means and index scores
+    +-- ANOVA tests and effect sizes
+    +-- Variable importance
+
+11. ENHANCED FEATURES (optional)
+    +-- Classification rules
+    +-- Segment action cards
+    +-- Stability assessment
+    +-- Executive summary
+
+12. EXPORT RESULTS
+    +-- Assignments Excel (ID + segment_id + segment_name + GMM probs)
+    +-- Report Excel (multi-tab)
+    +-- HTML Report (interactive)
+    +-- Model RDS
 ```
+
+---
+
+## HTML Report Pipeline
+
+### Pipeline Architecture (6-Step Process)
+
+```
+99_html_report_main.R        Entry point / orchestrator
+  |
+  +-- 00_html_guard.R        Step 1: Validate inputs
+  |                            - htmltools package installed?
+  |                            - results object valid?
+  |                            - output path writable?
+  |
+  +-- 01_data_transformer.R  Step 2: Transform results
+  |                            - Flatten nested results into html_data structure
+  |                            - Extract segment sizes, profiles, validation metrics
+  |                            - Prepare data for chart and table builders
+  |
+  +-- 02_table_builder.R     Step 3: Build HTML tables
+  |                            - Overview table (segment sizes)
+  |                            - Profile table (means with index colouring)
+  |                            - Validation metrics table
+  |                            - Rules table
+  |                            - GMM membership table
+  |
+  +-- 05_chart_builder.R     Step 4: Build SVG charts
+  |                            - Segment sizes bar chart
+  |                            - Silhouette per-cluster bar chart
+  |                            - Variable importance bar chart
+  |                            - Profile heatmap
+  |
+  +-- 03_page_builder.R      Step 5: Assemble full page
+  |                            - Generate CSS (with brand colour injection)
+  |                            - Build header, nav, sections, footer
+  |                            - Inline all JavaScript
+  |                            - Honour section visibility flags
+  |
+  +-- 04_html_writer.R       Step 6: Write to disk
+  |                            - Atomic write (.tmp -> rename)
+  |                            - Create output directory if needed
+  |
+  +-- 06_exploration_report.R  Alternative path
+                                - Exploration mode HTML report
+                                - Elbow plot, silhouette chart, metrics table
+                                - Solution preview cards
+```
+
+### Design System
+
+- **CSS namespace:** All classes prefixed with `seg-` to prevent collisions
+- **CSS variables:** `--seg-brand`, `--seg-accent` injected from config
+- **Self-contained:** All CSS, JS, and SVG inlined in the output HTML file
+- **Responsive:** Grid layouts collapse on narrow viewports
+
+### JavaScript Modules
+
+| File | Purpose |
+|------|---------|
+| `seg_utils.js` | Shared utility functions |
+| `seg_navigation.js` | Sticky nav bar with IntersectionObserver |
+| `seg_pinned_views.js` | Pin charts/tables to workspace |
+| `seg_slide_export.js` | PNG export via canvas rendering |
 
 ---
 
@@ -612,7 +555,7 @@ turas_segment_from_config(config_file, data_file = NULL, output_folder = NULL)
 - `data_file`: Override data file path (optional)
 - `output_folder`: Override output folder (optional)
 
-**Returns:** List with segmentation results
+**Returns:** List with segmentation results (TRS-compliant)
 
 ### Quick Run Function
 
@@ -635,22 +578,6 @@ run_segment_quick(
 )
 ```
 
-**Arguments:**
-- `data`: Data frame with survey data (already loaded in memory)
-- `id_var`: Name of ID column
-- `clustering_vars`: Character vector of clustering variable names
-- `k`: Fixed k value (integer) or NULL for exploration mode
-- `k_range`: Integer vector for exploration (default: 3:6)
-- `profile_vars`: Character vector or NULL (auto-detect if NULL)
-- `output_folder`: Output folder path (default: "output/")
-- `seed`: Random seed for reproducibility (default: 123)
-- `question_labels`: Named vector of question labels or NULL
-- `standardize`: Whether to standardize data (default: TRUE)
-- `nstart`: Number of random starts for k-means (default: 50)
-- `outlier_detection`: Enable outlier detection (default: FALSE)
-- `missing_data`: Handling method: "listwise_deletion", "mean_imputation", "median_imputation"
-- `segment_names`: Segment naming: "auto" or character vector
-
 **Returns:**
 
 *Exploration Mode (k = NULL):*
@@ -670,7 +597,7 @@ list(
 list(
   mode = "final",
   k = integer,
-  model = kmeans_object,
+  model = model_object,
   clusters = integer_vector,
   segment_names = character_vector,
   validation = list(avg_silhouette, ...),
@@ -680,28 +607,13 @@ list(
 )
 ```
 
-**Internal Architecture:**
-
-The function delegates to 5 internal helper functions:
-1. `.validate_quick_inputs()` - Validates all input parameters
-2. `.build_quick_config()` - Creates config list from parameters
-3. `.prepare_quick_data()` - Handles missing data and standardization
-4. `.run_quick_exploration()` - Runs exploration mode (multiple k)
-5. `.run_quick_final()` - Runs final mode (fixed k)
-
 ### Scoring Function
 
 ```r
 score_new_data(model_file, new_data, id_variable, output_file = NULL)
 ```
 
-**Arguments:**
-- `model_file`: Path to saved .rds model
-- `new_data`: Data frame with new respondents
-- `id_variable`: Name of ID column
-- `output_file`: Path for output (optional)
-
-**Returns:** Data frame with segment assignments
+**Returns:** Data frame with segment assignments and confidence
 
 ### Single Respondent Typing
 
@@ -709,11 +621,15 @@ score_new_data(model_file, new_data, id_variable, output_file = NULL)
 type_respondent(answers, model_file)
 ```
 
-**Arguments:**
-- `answers`: Named vector of answers (e.g., `c(q1=8, q2=7, q3=9)`)
-- `model_file`: Path to saved model
-
 **Returns:** List with segment, name, confidence
+
+### HTML Report Generation
+
+```r
+generate_segment_html_report(results, config, output_path)
+```
+
+**Called automatically from the main pipeline when `html_report = TRUE`.**
 
 ---
 
@@ -721,22 +637,32 @@ type_respondent(answers, model_file)
 
 ### Adding New Clustering Methods
 
-1. Create `segment_[method].R` in lib/
-2. Implement `run_[method]_single()` and `run_[method]_multiple()`
-3. Add method to config validation
-4. Update run_segment.R to dispatch
+1. Create `R/03d_[method].R` following the pattern in 03a/03b/03c
+2. Implement `run_[method]_clustering()` and `run_[method]_dispatch()`
+3. Return the standard clustering result structure
+4. Add method to the switch statement in `R/03_clustering.R`
+5. Add package guard in `R/00a_guards_hard.R` if new dependency needed
+6. Update `R/01_config.R` to recognize the new method name
 
 ### Adding New Validation Metrics
 
-1. Add function to `segment_validation.R`
-2. Update `calculate_all_metrics()`
-3. Add to exploration report output
+1. Add function to `R/04_validation.R`
+2. Update the metrics collection in the main pipeline
+3. Add to HTML report table builder if needed
+4. Add to exploration report metrics comparison
 
 ### Adding New Profiling Statistics
 
-1. Add function to `segment_profiling_enhanced.R`
-2. Update `create_enhanced_profile_report()`
-3. Add sheet to Excel output
+1. Add function to `R/05a_profiling_stats.R`
+2. Update the enhanced profile report builder
+3. Add sheet to Excel output in `R/09_output.R`
+
+### Adding New HTML Report Sections
+
+1. Add data extraction in `lib/html_report/01_data_transformer.R`
+2. Add table/chart builder functions
+3. Add section assembly in `lib/html_report/03_page_builder.R`
+4. Add config flag (`html_show_[section]`) in `R/01_config.R`
 
 ---
 
@@ -751,7 +677,7 @@ The GUI uses Shiny with a 5-step workflow:
 ui <- fluidPage(
   # Step 1: File selection
   # Step 2: Validation
-  # Step 3: Run button
+  # Step 3: Run button (with method/HTML report options)
   # Step 4: Console output (static)
   # Step 5: Results display
 )
@@ -768,23 +694,19 @@ server <- function(input, output, session) {
 **R 4.2+ Compatibility:**
 
 ```r
-# Use Progress$new(session) pattern for Shiny progress
 # Console output captured with sink() to temporary file
 # Display in verbatimTextOutput (static, not reactive)
 
 observe_analysis <- function() {
-  # Create temp file for output capture
   temp_output <- tempfile()
   sink(temp_output, split = TRUE)
 
   tryCatch({
-    # Run analysis
     result <- turas_segment_from_config(config_file)
   }, finally = {
-    sink()  # Restore output
+    sink()
   })
 
-  # Read captured output
   console_text <- readLines(temp_output)
   return(console_text)
 }
@@ -811,17 +733,32 @@ Located in `test_data/`:
 
 | Scenario | Config | Expected |
 |----------|--------|----------|
-| Basic exploration | k_min=3, k_max=5 | 3 solutions compared |
-| Final run | k_fixed=4 | Single solution with profiles |
+| K-means exploration | method=kmeans, k_min=3, k_max=5 | 3 solutions compared |
+| Hierarchical final | method=hclust, k_fixed=4, linkage=ward.D2 | Single solution with profiles |
+| GMM final | method=gmm, k_fixed=4 | Solution with probabilities |
 | Variable selection | 20 vars, selection=TRUE | Reduced to 10 vars |
 | Outlier detection | outlier=TRUE | Outliers flagged/removed |
+| HTML report | html_report=TRUE | Self-contained HTML file |
 
 ### Running Tests
 
 ```r
-source("modules/segment/test_data/run_tests.R")
-run_all_segment_tests()
+# Run all segment tests
+testthat::test_dir("modules/segment/tests")
+
+# Run specific test file
+testthat::test_file("modules/segment/tests/testthat/test_clustering.R")
 ```
+
+### Demo Showcase
+
+A comprehensive demo project is available in `examples/segment/demo_showcase/`:
+
+```r
+source("examples/segment/demo_showcase/run_demo.R")
+```
+
+This generates synthetic data and runs all three clustering methods with HTML reports.
 
 ---
 
@@ -830,12 +767,13 @@ run_all_segment_tests()
 ### Common Maintenance Tasks
 
 **Adding New Config Parameter:**
-1. Add to `validate_segment_config()` with default
-2. Document in 06_TEMPLATE_REFERENCE.md
-3. Update template Excel files
+1. Add parsing and default in `R/01_config.R`
+2. Document in `docs/06_TEMPLATE_REFERENCE.md`
+3. Update template Excel files in `docs/templates/`
+4. Add guard if validation needed
 
 **Updating Validation Thresholds:**
-1. Locate in `segment_validation.R`
+1. Locate in `R/04_validation.R`
 2. Update threshold values
 3. Update documentation
 
@@ -848,54 +786,55 @@ run_all_segment_tests()
 
 **Large Datasets:**
 - Use `data.table` for data operations
-- Reduce nstart if acceptable
+- Reduce nstart if acceptable (K-means)
+- Use `fastcluster` for hierarchical clustering
 - Limit k_max range
 - Sample for gap statistic calculation
 
 **Memory Management:**
 - Remove intermediate objects with `rm()`
 - Use `gc()` after large operations
-- Process in chunks if needed
-
-### Troubleshooting
-
-**"Cannot allocate vector":**
-- Reduce dataset size or sample
-- Increase R memory limit
-- Reduce k_max range
-
-**"Singular covariance matrix":**
-- Variables are perfectly correlated
-- Remove one of correlated pair
-- Use Z-score instead of Mahalanobis
-
-**GUI Grey Screen:**
-- Check for errors in R console
-- Update to latest code version
-- Verify R 4.2+ compatibility patterns
+- Hierarchical clustering: distance matrix is O(n^2) memory
 
 ### Version History
 
-**v10.1 (December 2024) - segment_utils.R Refactoring**
+**v11.0 (March 2026) - Multi-Algorithm + HTML Reports**
 
-Major refactoring of `segment_utils.R` for improved maintainability:
+Major upgrade adding multi-algorithm support and interactive HTML reporting:
 
-*Changes:*
-- Extracted `run_segment_quick()` from 423 lines to ~60 lines orchestrator
-- Created 5 internal helper functions (`.validate_quick_inputs()`, `.build_quick_config()`, `.prepare_quick_data()`, `.run_quick_exploration()`, `.run_quick_final()`)
-- Added shared infrastructure integration for validation utilities
-- Organized file into 9 clearly-labeled sections
-- Added comprehensive roxygen documentation
+*New Capabilities:*
+- Hierarchical clustering with multiple linkage methods (03b_hclust.R)
+- Gaussian Mixture Models with soft assignments (03c_gmm.R)
+- Method dispatcher for unified API (03_clustering.R)
+- Interactive HTML reports with SVG charts (lib/html_report/)
+- Executive summary generator (12_executive_summary.R)
+- Classification rules (06_rules.R)
+- Segment action cards (07_cards.R)
+- Stability assessment
 
-*Benefits:*
-- Each helper function can be unit tested independently
-- Single-responsibility functions are easier to modify
-- Clear separation between validation, configuration, and execution
-- Fallback stubs ensure file works standalone if shared utils unavailable
+*Architecture Changes:*
+- Code moved from `lib/` to `R/` directory with numbered files
+- Step-function pipeline following catdriver/keydriver pattern
+- Three-file guard system (00_guard.R, 00a_guards_hard.R, 00b_guards_soft.R)
+- TRS v1.1 compliance throughout
+
+*New Config Parameters:*
+- `method` (kmeans/hclust/gmm)
+- `linkage_method`, `gmm_model_type`
+- `html_report`, `brand_colour`, `accent_colour`, `report_title`
+- `html_show_*` visibility flags
+- `generate_rules`, `generate_action_cards`, `run_stability_check`
+- `auto_name_style`, `scale_max`, `rules_max_depth`, `stability_n_runs`
 
 *Backward Compatibility:*
-- Public API unchanged - `run_segment_quick()` signature identical
-- All existing scripts will continue to work without modification
+- `run_segment.R` entry point unchanged
+- Quick run API (`run_segment_quick()`) unchanged
+- Default method is kmeans, preserving existing behavior
+- Legacy lib/ files retained alongside new R/ directory
+
+**v10.1 (December 2024) - segment_utils.R Refactoring**
+
+Refactoring of `segment_utils.R` for improved maintainability. Extracted `run_segment_quick()` from 423 lines to ~60 lines orchestrator with 5 internal helper functions.
 
 ---
 
@@ -905,6 +844,7 @@ Major refactoring of `segment_utils.R` for improved maintainability:
 - [04_USER_MANUAL.md](04_USER_MANUAL.md) - User guide
 - [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) - Configuration
 - [07_EXAMPLE_WORKFLOWS.md](07_EXAMPLE_WORKFLOWS.md) - Examples
+- [08_HTML_REPORT_GUIDE.md](08_HTML_REPORT_GUIDE.md) - HTML report reference
 
 ---
 
