@@ -302,37 +302,70 @@ calculate_exploration_metrics <- function(exploration_result) {
     )
   }
 
-  models <- exploration_result$models
+  # Support both legacy field names ($models) and current ($results)
+  cluster_results <- exploration_result$results %||% exploration_result$models
   data <- exploration_result$data_list$scaled_data
-  
+
   metrics_list <- list()
-  
-  for (k_str in names(models)) {
+
+  for (k_str in names(cluster_results)) {
     k <- as.numeric(k_str)
-    model <- models[[k_str]]
-    
+    result_k <- cluster_results[[k_str]]
+
+    # Extract cluster assignments - from result structure or model
+    cluster_assignments <- result_k$clusters %||% result_k$model$cluster
+    if (is.null(cluster_assignments)) next
+
     # Calculate silhouette
-    sil <- cluster::silhouette(model$cluster, dist(data))
+    sil <- cluster::silhouette(cluster_assignments, dist(data))
     avg_sil <- mean(sil[, 3])
-    
+
     # Get segment sizes
-    sizes <- table(model$cluster)
+    sizes <- table(cluster_assignments)
     min_size_pct <- min(prop.table(sizes)) * 100
-    
+
+    # Extract SS metrics from model or method_info
+    model <- result_k$model
+    method_info <- result_k$method_info
+
+    totss <- model$totss %||% method_info$totss
+    tot_withinss <- model$tot.withinss %||% method_info$tot_withinss
+    betweenss <- model$betweenss %||% method_info$betweenss
+
+    # Calculate from data if not available
+    if (is.null(totss)) {
+      grand_mean <- colMeans(data)
+      totss <- sum(sweep(data, 2, grand_mean)^2)
+    }
+    if (is.null(tot_withinss)) {
+      tot_withinss <- 0
+      for (i in seq_len(k)) {
+        mask <- cluster_assignments == i
+        if (sum(mask) > 0) {
+          cluster_data <- data[mask, , drop = FALSE]
+          cluster_center <- colMeans(cluster_data)
+          tot_withinss <- tot_withinss + sum(sweep(cluster_data, 2, cluster_center)^2)
+        }
+      }
+    }
+    if (is.null(betweenss)) betweenss <- totss - tot_withinss
+
+    betweenss_totss <- if (totss > 0) betweenss / totss else 0
+
     metrics_list[[k_str]] <- data.frame(
       k = k,
-      tot.withinss = model$tot.withinss,
-      betweenss = model$betweenss,
-      totss = model$totss,
-      betweenss_totss = model$betweenss / model$totss,
+      tot.withinss = tot_withinss,
+      betweenss = betweenss,
+      totss = totss,
+      betweenss_totss = betweenss_totss,
       avg_silhouette_width = avg_sil,
       min_segment_pct = min_size_pct
     )
   }
-  
+
   metrics_df <- do.call(rbind, metrics_list)
   rownames(metrics_df) <- NULL
-  
+
   return(list(
     metrics_df = metrics_df,
     exploration_result = exploration_result
@@ -370,13 +403,18 @@ recommend_k <- function(metrics_df, min_segment_size_pct) {
 #'
 #' Calculate validation metrics for a single k value in final mode
 #'
+#' Supports kmeans, hclust, and gmm models by extracting cluster assignments
+#' and SS metrics from the appropriate source.
+#'
 #' @param data Scaled data matrix
-#' @param model K-means model object
+#' @param model Fitted model object (kmeans, hclust, or Mclust)
 #' @param k Number of clusters
+#' @param clusters Integer vector of cluster assignments (required for hclust/gmm)
 #' @param calculate_gap Logical, whether to calculate gap statistic
 #' @return List with validation metrics
 #' @export
-calculate_validation_metrics <- function(data, model, k, calculate_gap = FALSE) {
+calculate_validation_metrics <- function(data, model, k, clusters = NULL,
+                                         calculate_gap = FALSE) {
   if (!requireNamespace("cluster", quietly = TRUE)) {
     segment_refuse(
       code = "PKG_CLUSTER_MISSING",
@@ -387,21 +425,58 @@ calculate_validation_metrics <- function(data, model, k, calculate_gap = FALSE) 
     )
   }
 
+  # Extract cluster assignments from model or parameter
+  cluster_assignments <- if (!is.null(clusters)) {
+    clusters
+  } else if (!is.null(model$cluster)) {
+    model$cluster
+  } else {
+    segment_refuse(
+      code = "CALC_NO_CLUSTERS",
+      title = "No Cluster Assignments Available",
+      problem = "Could not extract cluster assignments from model or clusters parameter.",
+      why_it_matters = "Validation metrics require cluster assignments.",
+      how_to_fix = "Pass cluster assignments via the 'clusters' parameter."
+    )
+  }
+
   # Calculate silhouette
-  sil <- cluster::silhouette(model$cluster, dist(data))
+  sil <- cluster::silhouette(cluster_assignments, dist(data))
   avg_sil <- mean(sil[, 3])
-  
-  # Get quality metrics from model
-  betweenss_totss <- model$betweenss / model$totss
-  
+
+  # Extract SS metrics - handle kmeans (native) vs hclust/gmm (computed)
+  if (!is.null(model$totss)) {
+    # kmeans model has these directly
+    totss <- model$totss
+    tot_withinss <- model$tot.withinss
+    betweenss <- model$betweenss
+  } else {
+    # Calculate from data and cluster assignments
+    grand_mean <- colMeans(data)
+    totss <- sum(sweep(data, 2, grand_mean)^2)
+
+    tot_withinss <- 0
+    for (i in seq_len(k)) {
+      mask <- cluster_assignments == i
+      if (sum(mask) > 0) {
+        cluster_data <- data[mask, , drop = FALSE]
+        cluster_center <- colMeans(cluster_data)
+        tot_withinss <- tot_withinss + sum(sweep(cluster_data, 2, cluster_center)^2)
+      }
+    }
+    betweenss <- totss - tot_withinss
+  }
+
+  betweenss_totss <- if (totss > 0) betweenss / totss else 0
+
   metrics <- list(
     avg_silhouette = avg_sil,
     betweenss_totss = betweenss_totss,
-    tot_withinss = model$tot.withinss,
-    betweenss = model$betweenss,
-    totss = model$totss
+    tot_withinss = tot_withinss,
+    betweenss = betweenss,
+    totss = totss
   )
-  
+
   # Optionally calculate gap statistic (computationally expensive)
   if (calculate_gap) {
     # Gap statistic calculation would go here

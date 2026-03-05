@@ -163,7 +163,12 @@ guard_check_missing_data <- function(data, vars, guard, threshold = 15) {
 #' @return Updated guard state
 #' @keywords internal
 guard_check_high_correlation <- function(data, guard, threshold = 0.85) {
-  numeric_data <- data[, sapply(data, is.numeric), drop = FALSE]
+  # Handle both matrix and data.frame inputs
+  if (is.matrix(data)) {
+    numeric_data <- data
+  } else {
+    numeric_data <- data[, sapply(data, is.numeric), drop = FALSE]
+  }
   if (ncol(numeric_data) < 2) return(guard)
 
   cor_matrix <- tryCatch(

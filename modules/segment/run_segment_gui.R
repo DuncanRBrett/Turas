@@ -207,7 +207,7 @@ run_segment_gui <- function() {
 
     div(class = "main-container",
       div(class = "module-title", "Segmentation Analysis"),
-      div(class = "module-subtitle", "K-means clustering with variable selection and outlier detection"),
+      div(class = "module-subtitle", "Multi-algorithm clustering with variable selection and outlier detection"),
 
       hr(),
 
@@ -351,12 +351,17 @@ run_segment_gui <- function() {
           div(class = "step-title", "Step 2: Configuration Summary"),
 
           div(class = "status-box",
-            strong("✓ Configuration Loaded Successfully"), br(),
+            strong("Configuration Loaded Successfully"), br(),
             hr(style = "margin: 10px 0;"),
 
             strong("Mode: "), config$mode, br(),
+            strong("Method: "), switch(config$method,
+              kmeans = "K-Means",
+              hclust = paste0("Hierarchical (", config$linkage_method %||% "ward.D2", ")"),
+              gmm = paste0("Gaussian Mixture Model (", config$gmm_model_type %||% "VVV", ")"),
+              toupper(config$method)
+            ), br(),
             strong("Clustering Variables: "), length(config$clustering_vars), br(),
-            strong("Method: "), config$method, br(),
 
             if (config$mode == "exploration") {
               tagList(
@@ -379,6 +384,12 @@ run_segment_gui <- function() {
               tagList(
                 strong("Outlier Detection: "), "Enabled (", config$outlier_method,
                 ", handling: ", config$outlier_handling, ")", br()
+              )
+            },
+
+            if (isTRUE(config$html_report)) {
+              tagList(
+                strong("HTML Report: "), "Enabled", br()
               )
             },
 
@@ -567,8 +578,11 @@ run_segment_gui <- function() {
                 }, br(),
                 br(),
                 strong("Output Files:"), br(),
-                "• K Selection Report: ",
+                "- K Selection Report: ",
                 basename(result$output_files$report), br(),
+                if (!is.null(result$output_files$html)) {
+                  tagList("- HTML Report: ", basename(result$output_files$html), br())
+                },
                 br(),
                 strong("Next Steps:"), br(),
                 "1. Review the k selection report", br(),
@@ -579,17 +593,24 @@ run_segment_gui <- function() {
             } else {
               tagList(
                 strong("Number of Segments: "), result$k, br(),
+                strong("Method: "), toupper(result$method %||% "kmeans"), br(),
                 strong("Silhouette Score: "),
-                round(result$validation$avg_silhouette, 3), br(),
-                strong("Observations: "), nrow(result$profiles$segment_sizes), br(),
+                if (!is.null(result$validation$avg_silhouette) && is.numeric(result$validation$avg_silhouette)) {
+                  round(result$validation$avg_silhouette, 3)
+                } else {
+                  "N/A"
+                }, br(),
                 br(),
                 strong("Output Files:"), br(),
-                "• Segment Assignments: ",
+                "- Segment Assignments: ",
                 basename(result$output_files$assignments), br(),
-                "• Full Report: ",
+                "- Full Report: ",
                 basename(result$output_files$report), br(),
                 if (!is.null(result$output_files$model)) {
-                  tagList("• Model Object: ", basename(result$output_files$model), br())
+                  tagList("- Model Object: ", basename(result$output_files$model), br())
+                },
+                if (!is.null(result$output_files$html)) {
+                  tagList("- HTML Report: ", basename(result$output_files$html), br())
                 }
               )
             }

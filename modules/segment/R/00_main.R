@@ -284,10 +284,13 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
   if (config$generate_rules) {
     enhanced$rules <- tryCatch({
       cat("  Generating classification rules...\n")
-      generate_classification_rules(
-        data = data_list$scaled_data,
+      generate_segment_rules(
+        data = data_list$data,
         clusters = cluster_result$clusters,
-        max_depth = config$rules_max_depth
+        clustering_vars = data_list$config$clustering_vars,
+        question_labels = config$question_labels,
+        max_depth = config$rules_max_depth,
+        segment_names = segment_names
       )
     }, error = function(e) {
       guard <<- guard_warn(guard, paste("Rules generation failed:", e$message), "rules")
@@ -300,8 +303,11 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
     enhanced$cards <- tryCatch({
       cat("  Generating segment action cards...\n")
       generate_segment_cards(
-        profiles = profile_result,
+        data = data_list$data,
+        clusters = cluster_result$clusters,
+        clustering_vars = data_list$config$clustering_vars,
         segment_names = segment_names,
+        question_labels = config$question_labels,
         scale_max = config$scale_max
       )
     }, error = function(e) {
@@ -370,9 +376,14 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
 
   # TRS run state
   run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
-    if (run_status$status == "PARTIAL" && exists("turas_run_state_partial", mode = "function")) {
+    if (identical(run_status$run_status, "PARTIAL") && exists("turas_run_state_partial", mode = "function")) {
       for (reason in run_status$degraded_reasons %||% character(0)) {
-        trs_state <- turas_run_state_partial(trs_state, reason)
+        turas_run_state_partial(
+          trs_state,
+          code = "QUALITY_DEGRADED",
+          title = "Quality Degradation",
+          problem = reason
+        )
       }
     }
     turas_run_state_result(trs_state)
@@ -401,8 +412,12 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
   report_filename <- paste0(config$output_prefix, "segmentation_report.xlsx")
   report_path <- file.path(output_folder, report_filename)
 
+  # Augment cluster result with data_list for report export
+  final_result_for_export <- cluster_result
+  final_result_for_export$data_list <- data_list
+
   export_final_report(
-    final_result = cluster_result,
+    final_result = final_result_for_export,
     profile_result = profile_result,
     validation_metrics = validation_metrics,
     output_path = report_path,
@@ -503,7 +518,7 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
   # Return results
   invisible(list(
     mode = "final",
-    status = run_status$status,
+    status = run_status$run_status %||% "PASS",
     k = cluster_result$k,
     method = config$method,
     model = cluster_result$model,

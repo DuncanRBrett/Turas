@@ -171,8 +171,9 @@ export_exploration_report <- function(exploration_result, metrics_result,
   for (k in k_range) {
     cat(sprintf("  Creating profile for k=%d...\n", k))
 
-    model <- exploration_result$models[[as.character(k)]]
-    clusters <- model$cluster
+    result_k <- exploration_result$results[[as.character(k)]]
+    if (is.null(result_k)) next
+    clusters <- result_k$clusters
 
     # Create profile
     profile <- create_full_segment_profile(

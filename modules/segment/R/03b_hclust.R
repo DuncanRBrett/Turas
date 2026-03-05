@@ -46,6 +46,10 @@ run_hclust_clustering <- function(data_list, config, guard) {
     )
   }
 
+  # Restore proper casing for hclust (R's hclust requires "ward.D" / "ward.D2")
+  linkage <- sub("^ward\\.d$", "ward.D", linkage)
+  linkage <- sub("^ward\\.d2$", "ward.D2", linkage)
+
   cat(sprintf("    Linkage method: %s\n", linkage))
   cat(sprintf("    Computing distance matrix (%d x %d)...\n", nrow(scaled_data), nrow(scaled_data)))
 

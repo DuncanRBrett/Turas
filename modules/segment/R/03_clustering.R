@@ -133,7 +133,8 @@ run_clustering_exploration <- function(data_list, config, guard) {
     method = method,
     k_range = k_range,
     results = results,
-    n_successful = length(results)
+    n_successful = length(results),
+    data_list = data_list
   )
 }
 
