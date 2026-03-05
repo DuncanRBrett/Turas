@@ -177,7 +177,7 @@ export_quadrant_plots <- function(plots, output_dir, prefix = "quadrant",
                                   dpi = 300) {
 
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    warning("Package 'ggplot2' required for plot export.")
+    cat("   [WARN] Package 'ggplot2' required for plot export - skipping\n")
     return(invisible(NULL))
   }
 
@@ -216,7 +216,7 @@ export_quadrant_plots <- function(plots, output_dir, prefix = "quadrant",
         )
         saved_files <- c(saved_files, filepath)
       }, error = function(e) {
-        warning(sprintf("Could not save %s: %s", filepath, e$message))
+        cat(sprintf("   [WARN] Could not save %s: %s\n", filepath, e$message))
       })
     }
   }
@@ -237,7 +237,7 @@ export_quadrant_plots <- function(plots, output_dir, prefix = "quadrant",
 insert_quadrant_charts_to_excel <- function(wb, plots, sheet_name = "Quadrant_Charts") {
 
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    warning("ggplot2 required for chart insertion.")
+    cat("   [WARN] ggplot2 required for chart insertion - skipping\n")
     return(wb)
   }
 
@@ -285,7 +285,7 @@ insert_quadrant_charts_to_excel <- function(wb, plots, sheet_name = "Quadrant_Ch
       row_pos <- row_pos + 28  # Space for next chart
 
     }, error = function(e) {
-      warning(sprintf("Could not insert chart %s: %s", plot_name, e$message))
+      cat(sprintf("   [WARN] Could not insert chart %s: %s\n", plot_name, e$message))
     })
   }
 

@@ -98,7 +98,7 @@ create_quadrant_analysis <- function(
   }
 
   if (!requireNamespace("ggrepel", quietly = TRUE)) {
-    warning("Package 'ggrepel' not available. Labels may overlap.")
+    cat("   [WARN] Package 'ggrepel' not available - labels may overlap\n")
   }
 
   # Set defaults for config

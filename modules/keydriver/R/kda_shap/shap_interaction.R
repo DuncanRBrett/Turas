@@ -26,7 +26,7 @@ analyze_shap_interactions <- function(shp, config) {
   )
 
   if (is.null(interactions)) {
-    message("SHAP interactions not calculated. Set include_interactions = TRUE in config.")
+    cat("   [INFO] SHAP interactions not calculated. Set include_interactions = TRUE in config.\n")
     return(NULL)
   }
 
@@ -58,9 +58,8 @@ analyze_shap_interactions <- function(shp, config) {
         ) +
         turas_theme()
     }, error = function(e) {
-      msg <- sprintf("SHAP interaction plot skipped for '%s': %s", v, conditionMessage(e))
-      cat(sprintf("   [WARN] %s\n", msg))
-      warning(msg, call. = FALSE)
+      cat(sprintf("   [WARN] SHAP interaction plot skipped for '%s': %s\n",
+                  v, conditionMessage(e)))
     })
   }
 

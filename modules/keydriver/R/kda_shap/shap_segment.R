@@ -49,8 +49,8 @@ run_segment_shap <- function(shp, data, segments) {
 
     # Check if segment variable exists
     if (!seg_var %in% names(data)) {
-      warning(sprintf("Segment variable '%s' not found in data. Skipping segment '%s'.",
-                      seg_var, seg_name))
+      cat(sprintf("   [WARN] Segment variable '%s' not found in data - skipping segment '%s'\n",
+                  seg_var, seg_name))
       next
     }
 
@@ -58,12 +58,12 @@ run_segment_shap <- function(shp, data, segments) {
     seg_idx <- data[[seg_var]] %in% seg_vals
 
     if (sum(seg_idx) < 30) {
-      warning(sprintf("Segment '%s' has only %d observations. Minimum 30 recommended.",
-                      seg_name, sum(seg_idx)))
+      cat(sprintf("   [WARN] Segment '%s' has only %d observations (minimum 30 recommended)\n",
+                  seg_name, sum(seg_idx)))
     }
 
     if (sum(seg_idx) == 0) {
-      warning(sprintf("Segment '%s' has no observations. Skipping.", seg_name))
+      cat(sprintf("   [WARN] Segment '%s' has no observations - skipping\n", seg_name))
       next
     }
 

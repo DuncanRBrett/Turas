@@ -182,7 +182,7 @@ calculate_shap_values <- function(model, prep, config) {
     idx <- sample(n, max_n)
     X_explain <- prep$X[idx, , drop = FALSE]
     X_display <- prep$X_display[idx, , drop = FALSE]
-    message(sprintf("Sampled %d of %d observations for SHAP calculation", max_n, n))
+    cat(sprintf("   [INFO] Sampled %d of %d observations for SHAP calculation\n", max_n, n))
   } else {
     idx <- seq_len(n)
     X_explain <- prep$X

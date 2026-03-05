@@ -31,7 +31,7 @@ parse_html_report <- function(report_path, report_key) {
       status = "REFUSED",
       code = "DATA_INVALID",
       message = sprintf("Cannot detect report type for: %s", basename(report_path)),
-      how_to_fix = "The file must be a Turas-generated HTML report (tracker or tabs/crosstabs)."
+      how_to_fix = "The file must be a Turas-generated HTML report (tracker, tabs, catdriver, or keydriver)."
     ))
   }
 
@@ -114,6 +114,12 @@ detect_report_type <- function(html) {
   if (grepl('<meta\\s+name="turas-report-type"\\s+content="tabs"', html)) {
     return("tabs")
   }
+  if (grepl('<meta\\s+name="turas-report-type"\\s+content="catdriver"', html)) {
+    return("catdriver")
+  }
+  if (grepl('<meta\\s+name="turas-report-type"\\s+content="keydriver"', html)) {
+    return("keydriver")
+  }
   # Fallback: detect by structural markers
   if (grepl('id="tab-crosstabs"', html, fixed = TRUE)) {
     return("tabs")
@@ -180,6 +186,14 @@ extract_header <- function(html, report_type) {
     # Tracker: <header class="tk-header">...</header>
     m <- regexpr('<header class="tk-header">[\\s\\S]*?</header>', html, perl = TRUE)
     if (m > 0) return(regmatches(html, m))
+  } else if (report_type == "catdriver") {
+    # Catdriver: <div class="cd-header">...</div>
+    m <- regexpr('<div class="cd-header">[\\s\\S]*?</div>\\s*</div>', html, perl = TRUE)
+    if (m > 0) return(regmatches(html, m))
+  } else if (report_type == "keydriver") {
+    # Keydriver: <div class="kd-header">...</div>
+    m <- regexpr('<div class="kd-header">[\\s\\S]*?</div>\\s*</div>', html, perl = TRUE)
+    if (m > 0) return(regmatches(html, m))
   } else {
     # Tabs: <div class="header">...</div> (up to report-tabs)
     m <- regexpr('<div class="header">[\\s\\S]*?</div>\\s*</div>\\s*</div>', html, perl = TRUE)
@@ -194,19 +208,36 @@ extract_header <- function(html, report_type) {
 #' @param html Full HTML string
 #' @return List with tab_html and tab_names
 extract_report_tabs <- function(html) {
-  # Both reports use <div class="report-tabs">...</div>
-  m <- regexpr('<div class="report-tabs">[\\s\\S]*?</div>', html, perl = TRUE)
   tab_html <- ""
-  if (m > 0) tab_html <- regmatches(html, m)
 
-  # Extract tab names from data-tab attributes
-  tab_matches <- gregexpr('data-tab="([^"]*)"', tab_html)[[1]]
+  # Try module-specific section navs first (catdriver/keydriver)
+  for (prefix in c("kd", "cd")) {
+    pattern <- sprintf('<div[^>]*class="[^"]*%s-section-nav[^"]*"[^>]*>[\\s\\S]*?</div>', prefix)
+    m <- regexpr(pattern, html, perl = TRUE)
+    if (m > 0) {
+      tab_html <- regmatches(html, m)
+      break
+    }
+  }
+
+  # Fallback: tracker/tabs use <div class="report-tabs">...</div>
+  if (!nzchar(tab_html)) {
+    m <- regexpr('<div class="report-tabs">[\\s\\S]*?</div>', html, perl = TRUE)
+    if (m > 0) tab_html <- regmatches(html, m)
+  }
+
+  # Extract tab names from data-tab or data-kd-section or data-cd-section attributes
   tab_names <- character(0)
-  if (tab_matches[1] != -1) {
-    for (i in seq_along(tab_matches)) {
-      len <- attr(tab_matches, "match.length")[i]
-      attr_str <- substr(tab_html, tab_matches[i], tab_matches[i] + len - 1)
-      tab_names <- c(tab_names, gsub('data-tab="|"', '', attr_str))
+  for (attr_name in c("data-tab", "data-kd-section", "data-cd-section")) {
+    pattern <- sprintf('%s="([^"]*)"', attr_name)
+    tab_matches <- gregexpr(pattern, tab_html)[[1]]
+    if (tab_matches[1] != -1) {
+      for (i in seq_along(tab_matches)) {
+        len <- attr(tab_matches, "match.length")[i]
+        attr_str <- substr(tab_html, tab_matches[i], tab_matches[i] + len - 1)
+        tab_names <- c(tab_names, gsub(sprintf('%s="|"', attr_name), '', attr_str))
+      }
+      break  # found tabs, stop trying other attribute names
     }
   }
 
@@ -223,12 +254,71 @@ extract_report_tabs <- function(html) {
 #' Extract Content Panels (tab-panel divs)
 #'
 #' @param html Full HTML string
-#' @param report_type "tracker" or "tabs"
+#' @param report_type "tracker", "tabs", "catdriver", or "keydriver"
 #' @return Named list of panel HTML strings (keyed by tab name)
 extract_content_panels <- function(html, report_type) {
   panels <- list()
 
-  # Find all tab-panel divs by their id pattern: id="tab-{name}"
+  # Catdriver/Keydriver: sections use class="cd-section"/"kd-section" with id="kd-section-*"
+  if (report_type %in% c("catdriver", "keydriver")) {
+    prefix <- if (report_type == "catdriver") "cd" else "kd"
+    section_pattern <- sprintf('id="%s-section-([^"]*)"', prefix)
+    id_matches <- gregexpr(section_pattern, html, perl = TRUE)[[1]]
+    if (id_matches[1] == -1) return(panels)
+
+    section_ids <- character(0)
+    for (i in seq_along(id_matches)) {
+      len <- attr(id_matches, "match.length")[i]
+      attr_str <- substr(html, id_matches[i], id_matches[i] + len - 1)
+      section_id <- sub(sprintf('id="%s-section-([^"]*)"', prefix), '\\1', attr_str, perl = TRUE)
+      section_ids <- c(section_ids, section_id)
+    }
+
+    for (idx in seq_along(section_ids)) {
+      sid <- section_ids[idx]
+      full_id <- sprintf("%s-section-%s", prefix, sid)
+      pattern <- sprintf('<div[^>]*id="%s"', full_id)
+      start <- regexpr(pattern, html, perl = TRUE)
+      if (start == -1) next
+
+      search_from <- start + 10
+      end_markers <- c()
+
+      # Next section
+      if (idx < length(section_ids)) {
+        next_id <- sprintf('%s-section-%s', prefix, section_ids[idx + 1])
+        next_pos <- regexpr(sprintf('<div[^>]*id="%s"', next_id),
+                            substr(html, search_from, nchar(html)), perl = TRUE)
+        if (next_pos > 0) end_markers <- c(end_markers, search_from + next_pos - 2)
+      }
+
+      # Pinned panel or footer
+      footer_pattern <- sprintf('%s-footer', prefix)
+      ft_pos <- regexpr(footer_pattern, substr(html, search_from, nchar(html)), fixed = TRUE)
+      if (ft_pos > 0) end_markers <- c(end_markers, search_from + ft_pos - 2)
+
+      sc_pos <- regexpr('\n<script>', substr(html, search_from, nchar(html)), fixed = TRUE)
+      if (sc_pos > 0) end_markers <- c(end_markers, search_from + sc_pos - 2)
+
+      if (length(end_markers) > 0) {
+        end_pos <- min(end_markers)
+      } else {
+        body_end <- regexpr('</body>', substr(html, search_from, nchar(html)), fixed = TRUE)
+        end_pos <- if (body_end > 0) search_from + body_end - 2 else nchar(html)
+      }
+
+      panel_html <- substr(html, start, end_pos)
+      panel_html <- sub("\\s+$", "", panel_html)
+
+      # Skip pinned panel — hub manages its own
+      if (sid != "pinned") {
+        panels[[sid]] <- panel_html
+      }
+    }
+    return(panels)
+  }
+
+  # Tracker/Tabs: Find all tab-panel divs by their id pattern: id="tab-{name}"
   # We need to extract each complete panel including all nested content
   panel_ids <- c()
   id_matches <- gregexpr('id="tab-([^"]*)"\\s+class="tab-panel', html)[[1]]
@@ -310,6 +400,14 @@ extract_content_panels <- function(html, report_type) {
 extract_footer <- function(html, report_type) {
   if (report_type == "tracker") {
     m <- regexpr('<footer class="tk-footer">[\\s\\S]*?</footer>', html, perl = TRUE)
+    if (m > 0) return(regmatches(html, m))
+  }
+  if (report_type == "catdriver") {
+    m <- regexpr('<div class="cd-footer">[\\s\\S]*?</div>', html, perl = TRUE)
+    if (m > 0) return(regmatches(html, m))
+  }
+  if (report_type == "keydriver") {
+    m <- regexpr('<div class="kd-footer">[\\s\\S]*?</div>', html, perl = TRUE)
     if (m > 0) return(regmatches(html, m))
   }
   # Tabs footer is inside content panels — already captured, no separate extraction

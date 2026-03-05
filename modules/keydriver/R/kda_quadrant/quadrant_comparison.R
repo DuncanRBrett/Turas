@@ -22,8 +22,7 @@
 create_segment_quadrants <- function(kda_results, data, performance_data, segments, config) {
 
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    # TRS INFO: Optional package not available for quadrant plots
-    message("[TRS INFO] ggplot2 not available - segment comparison quadrant skipped")
+    cat("   [WARN] ggplot2 not available - segment comparison quadrant skipped\n")
     return(NULL)
   }
 
@@ -39,8 +38,7 @@ create_segment_quadrants <- function(kda_results, data, performance_data, segmen
   }
 
   if (is.null(drivers)) {
-    # TRS INFO: Cannot determine drivers for this optional feature
-    message("[TRS INFO] Cannot determine drivers for segment comparison - skipping")
+    cat("   [WARN] Cannot determine drivers for segment comparison - skipping\n")
     return(NULL)
   }
 
@@ -59,9 +57,8 @@ create_segment_quadrants <- function(kda_results, data, performance_data, segmen
 
     # Check segment variable exists
     if (!seg_var %in% names(data)) {
-      # TRS INFO: Segment variable not found
-      message(sprintf("[TRS INFO] Segment variable '%s' not found - skipping segment '%s'",
-                      seg_var, seg_name))
+      cat(sprintf("   [WARN] Segment variable '%s' not found - skipping segment '%s'\n",
+                  seg_var, seg_name))
       next
     }
 
@@ -69,14 +66,12 @@ create_segment_quadrants <- function(kda_results, data, performance_data, segmen
     seg_data <- data[data[[seg_var]] %in% seg_vals, , drop = FALSE]
 
     if (nrow(seg_data) < 30) {
-      # TRS INFO: Small sample size warning
-      message(sprintf("[TRS INFO] Segment '%s' has only %d observations (minimum 30 recommended)",
-                      seg_name, nrow(seg_data)))
+      cat(sprintf("   [WARN] Segment '%s' has only %d observations (minimum 30 recommended)\n",
+                  seg_name, nrow(seg_data)))
     }
 
     if (nrow(seg_data) == 0) {
-      # TRS INFO: Empty segment
-      message(sprintf("[TRS INFO] Segment '%s' has no observations - skipping", seg_name))
+      cat(sprintf("   [WARN] Segment '%s' has no observations - skipping\n", seg_name))
       next
     }
 
@@ -92,9 +87,8 @@ create_segment_quadrants <- function(kda_results, data, performance_data, segmen
     seg_quad <- tryCatch({
       prepare_quadrant_data(seg_importance, seg_perf, config)
     }, error = function(e) {
-      # TRS INFO: Error in segment quadrant preparation
-      message(sprintf("[TRS INFO] Could not prepare quadrant data for segment '%s': %s - skipping",
-                      seg_name, e$message))
+      cat(sprintf("   [WARN] Could not prepare quadrant data for segment '%s': %s - skipping\n",
+                  seg_name, e$message))
       return(NULL)
     })
 
@@ -105,8 +99,7 @@ create_segment_quadrants <- function(kda_results, data, performance_data, segmen
   }
 
   if (length(segment_results) == 0) {
-    # TRS INFO: No valid segments
-    message("[TRS INFO] No valid segments for comparison - quadrant comparison unavailable")
+    cat("   [WARN] No valid segments for comparison - quadrant comparison unavailable\n")
     return(NULL)
   }
 
@@ -175,7 +168,7 @@ create_faceted_quadrant_plot <- function(all_segments, config) {
   }
 
   p <- p +
-    ggplot2::facet_wrap(~ segment, ncol = 2) +
+    ggplot2::facet_wrap(~ segment, ncol = config$facet_ncol %||% 2) +
     ggplot2::scale_color_manual(
       values = quad_colors,
       guide = "none"

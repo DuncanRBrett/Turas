@@ -208,10 +208,8 @@ check_shap_packages <- function() {
   missing_optional <- optional[!sapply(optional, requireNamespace, quietly = TRUE)]
 
   if (length(missing_optional) > 0) {
-    message(sprintf(
-      "Optional packages not available: %s. Some visualizations may be limited.",
-      paste(missing_optional, collapse = ", ")
-    ))
+    cat(sprintf("   [WARN] Optional packages not available: %s. Some visualizations may be limited.\n",
+                paste(missing_optional, collapse = ", ")))
   }
 
   invisible(TRUE)
@@ -294,10 +292,8 @@ validate_shap_inputs <- function(data, outcome, drivers, weights) {
 
   # Check minimum sample size
   if (nrow(data) < 100) {
-    warning(sprintf(
-      "Small sample size for SHAP analysis: %d observations. Recommended: >= 200.",
-      nrow(data)
-    ))
+    cat(sprintf("   [WARN] Small sample size for SHAP analysis: %d observations. Recommended: >= 200.\n",
+                nrow(data)))
   }
 
   # Check outcome variance
@@ -330,10 +326,8 @@ validate_shap_inputs <- function(data, outcome, drivers, weights) {
         pairs <- unique(apply(high_cor, 1, function(x) {
           paste(sort(c(drivers[x[1]], drivers[x[2]])), collapse = " - ")
         }))
-        warning(sprintf(
-          "Highly correlated drivers detected (r > 0.9): %s\nSHAP will still work but importance may be split between correlated drivers.",
-          paste(pairs, collapse = "; ")
-        ))
+        cat(sprintf("   [WARN] Highly correlated drivers detected (r > 0.9): %s\n   SHAP will still work but importance may be split between correlated drivers.\n",
+                    paste(pairs, collapse = "; ")))
       }
     }
   }

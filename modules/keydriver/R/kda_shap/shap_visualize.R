@@ -165,7 +165,7 @@ create_importance_combined <- function(shp, config) {
 create_dependence_plots <- function(shp, config) {
 
   if (!requireNamespace("patchwork", quietly = TRUE)) {
-    warning("Package 'patchwork' not available. Returning individual plots only.")
+    cat("   [WARN] Package 'patchwork' not available - returning individual plots only\n")
     return(list(individual = list(), combined = NULL))
   }
 
@@ -195,7 +195,7 @@ create_dependence_plots <- function(shp, config) {
 
       plots[[driver]] <- p
     }, error = function(e) {
-      warning(sprintf("Could not create dependence plot for %s: %s", driver, e$message))
+      cat(sprintf("   [WARN] Could not create dependence plot for %s: %s\n", driver, e$message))
     })
   }
 
@@ -205,7 +205,7 @@ create_dependence_plots <- function(shp, config) {
     tryCatch({
       combined <- patchwork::wrap_plots(plots, ncol = 2)
     }, error = function(e) {
-      warning(sprintf("Could not combine dependence plots: %s", e$message))
+      cat(sprintf("   [WARN] Could not combine dependence plots: %s\n", e$message))
     })
   }
 
@@ -265,7 +265,7 @@ create_waterfall_plots <- function(shp, config) {
 
       plots[[paste0("respondent_", i)]] <- p
     }, error = function(e) {
-      warning(sprintf("Could not create waterfall plot for row %d: %s", i, e$message))
+      cat(sprintf("   [WARN] Could not create waterfall plot for row %d: %s\n", i, e$message))
     })
   }
 
@@ -299,7 +299,7 @@ create_force_plots <- function(shp, config) {
 
       plots[[paste0("respondent_", i)]] <- p
     }, error = function(e) {
-      warning(sprintf("Could not create force plot for row %d: %s", i, e$message))
+      cat(sprintf("   [WARN] Could not create force plot for row %d: %s\n", i, e$message))
     })
   }
 
@@ -339,9 +339,8 @@ create_interaction_plot <- function(shp, config) {
 
       plots[[v]] <- p
     }, error = function(e) {
-      msg <- sprintf("SHAP interaction dependence plot skipped for '%s': %s", v, conditionMessage(e))
-      cat(sprintf("   [WARN] %s\n", msg))
-      warning(msg, call. = FALSE)
+      cat(sprintf("   [WARN] SHAP interaction dependence plot skipped for '%s': %s\n",
+                  v, conditionMessage(e)))
     })
   }
 

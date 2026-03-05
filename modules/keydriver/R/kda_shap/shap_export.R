@@ -160,7 +160,7 @@ export_shap_plots <- function(plots, output_dir, prefix = "shap",
                               dpi = 300) {
 
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    warning("Package 'ggplot2' required for plot export.")
+    cat("   [WARN] Package 'ggplot2' required for plot export - skipping\n")
     return(invisible(NULL))
   }
 
@@ -233,7 +233,7 @@ save_plot <- function(p, path_without_ext, formats = c("png"),
       )
       saved <- c(saved, filepath)
     }, error = function(e) {
-      warning(sprintf("Could not save %s: %s", filepath, e$message))
+      cat(sprintf("   [WARN] Could not save %s: %s\n", filepath, e$message))
     })
   }
 
@@ -248,7 +248,7 @@ save_plot <- function(p, path_without_ext, formats = c("png"),
       )
       saved <- c(saved, filepath)
     }, error = function(e) {
-      warning(sprintf("Could not save %s: %s", filepath, e$message))
+      cat(sprintf("   [WARN] Could not save %s: %s\n", filepath, e$message))
     })
   }
 
@@ -315,7 +315,7 @@ insert_shap_charts_to_excel <- function(wb, plots, sheet_name = "SHAP_Charts") {
       row_pos <- row_pos + 25  # Space for next chart
 
     }, error = function(e) {
-      warning(sprintf("Could not insert chart %s: %s", name, e$message))
+      cat(sprintf("   [WARN] Could not insert chart %s: %s\n", name, e$message))
     })
   }
 

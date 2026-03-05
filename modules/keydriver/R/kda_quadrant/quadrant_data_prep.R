@@ -130,7 +130,7 @@ select_best_importance <- function(importance_df) {
   driver_col <- if ("Driver" %in% names(importance_df)) "Driver" else "driver"
 
   if ("Shapley_Value" %in% names(importance_df)) {
-    message("Using Shapley importance (auto-selected)")
+    cat("   [INFO] Using Shapley importance (auto-selected)\n")
     return(data.frame(
       driver = importance_df[[driver_col]],
       importance = importance_df$Shapley_Value,
@@ -139,7 +139,7 @@ select_best_importance <- function(importance_df) {
   }
 
   if ("Relative_Weight" %in% names(importance_df)) {
-    message("Using relative weights importance (auto-selected)")
+    cat("   [INFO] Using relative weights importance (auto-selected)\n")
     return(data.frame(
       driver = importance_df[[driver_col]],
       importance = importance_df$Relative_Weight,
@@ -148,7 +148,7 @@ select_best_importance <- function(importance_df) {
   }
 
   if ("Beta_Weight" %in% names(importance_df)) {
-    message("Using regression importance (auto-selected)")
+    cat("   [INFO] Using regression importance (auto-selected)\n")
     return(data.frame(
       driver = importance_df[[driver_col]],
       importance = importance_df$Beta_Weight,
@@ -157,7 +157,7 @@ select_best_importance <- function(importance_df) {
   }
 
   if ("Correlation" %in% names(importance_df)) {
-    message("Using correlation importance (auto-selected)")
+    cat("   [INFO] Using correlation importance (auto-selected)\n")
     return(data.frame(
       driver = importance_df[[driver_col]],
       importance = abs(importance_df$Correlation) * 100,
@@ -188,6 +188,40 @@ select_best_importance <- function(importance_df) {
 }
 
 
+#' Normalize Values to 0-100 Scale
+#'
+#' Generic normalizer used for both importance and performance scores.
+#'
+#' @param df Data frame containing values to normalize
+#' @param value_col Name of the column to normalize
+#' @param output_col Name of the normalized output column
+#' @param config Configuration parameters
+#' @param scale_min Optional fixed minimum for scale
+#' @param scale_max Optional fixed maximum for scale
+#' @return Data frame with normalized column added
+#' @keywords internal
+normalize_to_range <- function(df, value_col, output_col, config,
+                               scale_min = NULL, scale_max = NULL) {
+
+  if (!isTRUE(config$normalize_axes)) {
+    df[[output_col]] <- df[[value_col]]
+    return(df)
+  }
+
+  vals <- df[[value_col]]
+  min_val <- if (!is.null(scale_min)) scale_min else min(vals, na.rm = TRUE)
+  max_val <- if (!is.null(scale_max)) scale_max else max(vals, na.rm = TRUE)
+
+  if (max_val == min_val) {
+    df[[output_col]] <- 50
+  } else {
+    df[[output_col]] <- (vals - min_val) / (max_val - min_val) * 100
+  }
+
+  df
+}
+
+
 #' Normalize Importance to 0-100 Scale
 #'
 #' @param imp Importance data frame
@@ -195,23 +229,7 @@ select_best_importance <- function(importance_df) {
 #' @return Importance data frame with normalized column
 #' @keywords internal
 normalize_importance <- function(imp, config) {
-
-  if (!isTRUE(config$normalize_axes)) {
-    imp$importance_normalized <- imp$importance
-    return(imp)
-  }
-
-  min_val <- min(imp$importance, na.rm = TRUE)
-  max_val <- max(imp$importance, na.rm = TRUE)
-
-  if (max_val == min_val) {
-    imp$importance_normalized <- 50
-  } else {
-    imp$importance_normalized <-
-      (imp$importance - min_val) / (max_val - min_val) * 100
-  }
-
-  imp
+  normalize_to_range(imp, "importance", "importance_normalized", config)
 }
 
 
@@ -345,31 +363,11 @@ calculate_weighted_means <- function(data, drivers, weights = NULL) {
 #' @return Performance data frame with normalized column
 #' @keywords internal
 normalize_performance <- function(perf, config) {
-
-  if (!isTRUE(config$normalize_axes)) {
-    perf$performance_normalized <- perf$performance
-    return(perf)
-  }
-
-  # If scale range is specified, use it
-  scale_min <- config$performance_scale_min
-  scale_max <- config$performance_scale_max
-
-  if (is.null(scale_min)) {
-    scale_min <- min(perf$performance, na.rm = TRUE)
-  }
-  if (is.null(scale_max)) {
-    scale_max <- max(perf$performance, na.rm = TRUE)
-  }
-
-  if (scale_max == scale_min) {
-    perf$performance_normalized <- 50
-  } else {
-    perf$performance_normalized <-
-      (perf$performance - scale_min) / (scale_max - scale_min) * 100
-  }
-
-  perf
+  normalize_to_range(
+    perf, "performance", "performance_normalized", config,
+    scale_min = config$performance_scale_min,
+    scale_max = config$performance_scale_max
+  )
 }
 
 
@@ -386,19 +384,17 @@ validate_quadrant_inputs <- function(importance, performance) {
 
   missing_perf <- setdiff(imp_drivers, perf_drivers)
   if (length(missing_perf) > 0) {
-    warning(sprintf(
-      "Drivers missing from performance data: %s. These will be excluded.",
-      paste(missing_perf, collapse = ", ")
-    ))
+    cat(sprintf("   [WARN] Drivers missing from performance data: %s (excluded)\n",
+                paste(missing_perf, collapse = ", ")))
   }
 
   # Check for valid values
   if (any(is.na(importance$importance))) {
-    warning("NA values in importance scores - these drivers will be excluded")
+    cat("   [WARN] NA values in importance scores - these drivers will be excluded\n")
   }
 
   if (any(is.na(performance$performance))) {
-    warning("NA values in performance scores - these drivers will be excluded")
+    cat("   [WARN] NA values in performance scores - these drivers will be excluded\n")
   }
 
   # Check minimum drivers

@@ -64,8 +64,8 @@ fit_shap_model <- function(prep, config) {
     params = params,
     data = dtrain,
     nrounds = max_rounds,
-    nfold = 5,
-    early_stopping_rounds = 20,
+    nfold = config$cv_nfold %||% 5,
+    early_stopping_rounds = config$early_stopping_rounds %||% 20,
     verbose = FALSE,
     print_every_n = 50
   )

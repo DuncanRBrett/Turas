@@ -10,6 +10,27 @@
 #
 # ==============================================================================
 
+#' Safely Coerce Variable to Numeric
+#'
+#' Returns NA values with a warning instead of silently failing.
+#' Non-numeric values that cannot be converted are set to NA and
+#' a console warning is emitted with the count of failed conversions.
+#'
+#' @param x Vector to coerce
+#' @param var_name Variable name (for error messages)
+#' @return Numeric vector
+#' @keywords internal
+coerce_numeric_safe <- function(x, var_name) {
+  if (is.numeric(x)) return(x)
+  result <- suppressWarnings(as.numeric(as.character(x)))
+  n_failed <- sum(is.na(result) & !is.na(x))
+  if (n_failed > 0) {
+    cat(sprintf("   [WARN] %d value(s) in '%s' could not be converted to numeric and were set to NA\n",
+                n_failed, var_name))
+  }
+  result
+}
+
 #' Load Key Driver Data
 #'
 #' Loads and validates data for key driver analysis.
@@ -130,14 +151,14 @@ load_keydriver_data <- function(data_file, config) {
   # Convert outcome and drivers to numeric if needed
   for (var in base_vars) {
     if (!is.numeric(data[[var]])) {
-      data[[var]] <- as.numeric(as.character(data[[var]]))
+      data[[var]] <- coerce_numeric_safe(data[[var]], var)
     }
   }
 
   # Convert weight to numeric if specified
   if (!is.null(weight_var)) {
     if (!is.numeric(data[[weight_var]])) {
-      data[[weight_var]] <- as.numeric(as.character(data[[weight_var]]))
+      data[[weight_var]] <- coerce_numeric_safe(data[[weight_var]], weight_var)
     }
   }
 
@@ -149,6 +170,15 @@ load_keydriver_data <- function(data_file, config) {
   if (!is.null(weight_var)) {
     w <- data[[weight_var]]
     valid_w <- !is.na(w) & w > 0
+
+    # Check for invalid weights (NaN, Inf)
+    n_nan <- sum(is.nan(w))
+    n_inf <- sum(is.infinite(w))
+    if (n_nan > 0 || n_inf > 0) {
+      cat(sprintf("   [WARN] Weight variable has %d NaN and %d Inf values (excluded)\n", n_nan, n_inf))
+      valid_w <- valid_w & !is.nan(w) & !is.infinite(w)
+    }
+
     complete_cases <- complete_cases & valid_w
   }
 

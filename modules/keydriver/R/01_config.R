@@ -187,7 +187,7 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
     NULL
   } else {
     if (length(weight_vars) > 1) {
-      warning("Multiple weight variables found. Using first: ", weight_vars[1])
+      cat(sprintf("   [WARN] Multiple weight variables found. Using first: %s\n", weight_vars[1]))
     }
     weight_vars[1]
   }
@@ -334,7 +334,7 @@ validate_stated_importance_sheet <- function(si_df) {
   if (!"stated_importance" %in% names(si_df)) {
     # Use first numeric column
     num_col <- names(si_df)[numeric_cols][1]
-    message(sprintf("Using '%s' as stated importance column", num_col))
+    cat(sprintf("   [INFO] Using '%s' as stated importance column\n", num_col))
     names(si_df)[names(si_df) == num_col] <- "stated_importance"
   }
 

@@ -1,7 +1,7 @@
 # Turas Key Driver Analysis - Template Reference
 
-**Version:** 10.0
-**Last Updated:** 22 December 2025
+**Version:** 10.3
+**Last Updated:** 4 March 2026
 **Target Audience:** Analysts, Project Managers, Template Configurers
 
 This document provides complete field-by-field reference for the KeyDriver Config Template.
@@ -172,6 +172,92 @@ Configure analysis parameters and file paths.
 
 ---
 
+### Bootstrap Analysis Settings
+
+#### enable_bootstrap
+
+- **Purpose:** Enable bootstrap confidence intervals for importance scores
+- **Required:** No
+- **Default:** FALSE
+- **Valid Values:** TRUE, FALSE
+- **NEW in v10.3**
+
+#### bootstrap_iterations
+
+- **Purpose:** Number of bootstrap resamples
+- **Required:** No
+- **Default:** 1000
+- **Valid Range:** 100-10000
+- **Recommendation:** 1000 for final analysis; 200 for exploratory work
+- **Impact:** Higher = more stable CIs, but slower runtime
+
+#### bootstrap_ci_level
+
+- **Purpose:** Confidence level for the bootstrap interval
+- **Required:** No
+- **Default:** 0.95
+- **Valid Range:** 0.80-0.99
+- **Common Values:** 0.90 (90% CI), 0.95 (95% CI), 0.99 (99% CI)
+
+---
+
+### HTML Report Settings
+
+#### enable_html_report
+
+- **Purpose:** Generate an interactive HTML report alongside Excel output
+- **Required:** No
+- **Default:** FALSE
+- **Valid Values:** TRUE, FALSE
+- **Dependencies:** Requires htmltools package
+- **NEW in v10.3**
+
+#### brand_colour
+
+- **Purpose:** Primary brand colour for HTML report styling
+- **Required:** No
+- **Default:** #ec4899 (pink)
+- **Data Type:** Hex colour code (e.g., `#3b82f6`)
+
+#### accent_colour
+
+- **Purpose:** Secondary accent colour for HTML report charts
+- **Required:** No
+- **Default:** #f59e0b (amber)
+- **Data Type:** Hex colour code
+
+---
+
+### Effect Size Settings
+
+#### effect_size_method
+
+- **Purpose:** Method for calculating effect size benchmarks
+- **Required:** No
+- **Default:** cohen_f2
+- **Valid Values:** cohen_f2, standardized_beta, correlation
+- **NEW in v10.3**
+
+---
+
+### XGBoost Tuning (Advanced)
+
+#### cv_nfold
+
+- **Purpose:** Number of cross-validation folds for XGBoost tuning
+- **Required:** No
+- **Default:** 5
+- **Valid Range:** 3-10
+
+#### early_stopping_rounds
+
+- **Purpose:** Early stopping rounds for XGBoost training
+- **Required:** No
+- **Default:** 20
+- **Valid Range:** 5-50
+
+---
+
 ## Variables Sheet
 
 Define the outcome variable, driver variables, and optional weight variable.
@@ -309,8 +395,24 @@ Compares:
 | Method Rankings | Rank comparison across methods |
 | Model Summary | R², VIF diagnostics, coefficients |
 | Correlations | Full correlation matrix |
+| Effect Sizes | Effect size classification and interpretation (NEW v10.3) |
+| Executive Summary | Plain-English findings and recommendations (NEW v10.3) |
 | Charts | Bar chart of importance |
+| Run Status | TRS run status details |
 | README | Methodology documentation |
+
+### Bootstrap Output (when enable_bootstrap = TRUE, NEW v10.3)
+
+| Sheet | Content |
+|-------|---------|
+| Bootstrap_CIs | Confidence intervals per driver per method |
+| Bootstrap_Summary | Point estimates, SE, CI bounds |
+
+### HTML Report Output (when enable_html_report = TRUE, NEW v10.3)
+
+| File | Content |
+|------|---------|
+| keydriver_report.html | Self-contained interactive HTML report |
 
 ### SHAP Output (when enable_shap = TRUE)
 
@@ -339,16 +441,22 @@ Compares:
 ### Settings Sheet
 
 ```
-Setting              | Value
-analysis_name        | Customer Satisfaction Drivers Q4 2024
-data_file            | data/survey_q4.csv
-output_file          | results/satisfaction_drivers.xlsx
-enable_shap          | TRUE
-enable_quadrant      | TRUE
-n_trees              | 100
-max_depth            | 6
-threshold_method     | mean
-normalize_axes       | TRUE
+Setting                | Value
+analysis_name          | Customer Satisfaction Drivers Q4 2024
+data_file              | data/survey_q4.csv
+output_file            | results/satisfaction_drivers.xlsx
+enable_shap            | TRUE
+enable_quadrant        | TRUE
+enable_bootstrap       | TRUE
+enable_html_report     | TRUE
+n_trees                | 100
+max_depth              | 6
+threshold_method       | mean
+normalize_axes         | TRUE
+bootstrap_iterations   | 1000
+bootstrap_ci_level     | 0.95
+brand_colour           | #3b82f6
+accent_colour          | #f59e0b
 ```
 
 ### Variables Sheet
@@ -396,11 +504,20 @@ website_ease     | 45
 | output_file | Valid path, .xlsx extension |
 | enable_shap | TRUE or FALSE |
 | enable_quadrant | TRUE or FALSE |
+| enable_bootstrap | TRUE or FALSE |
+| enable_html_report | TRUE or FALSE |
 | n_trees | Integer 50-1000 |
 | max_depth | Integer 3-10 |
 | learning_rate | Numeric 0.01-0.3 |
 | shap_sample_size | Integer 500-5000 |
 | threshold_method | One of: mean, median, midpoint, custom |
+| bootstrap_iterations | Integer 100-10000 |
+| bootstrap_ci_level | Numeric 0.80-0.99 |
+| brand_colour | Valid hex colour code |
+| accent_colour | Valid hex colour code |
+| effect_size_method | One of: cohen_f2, standardized_beta, correlation |
+| cv_nfold | Integer 3-10 |
+| early_stopping_rounds | Integer 5-50 |
 
 ### Variables Validation
 

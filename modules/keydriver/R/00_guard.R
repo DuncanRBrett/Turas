@@ -2,7 +2,7 @@
 # KEY DRIVER - TRS GUARD LAYER
 # ==============================================================================
 #
-# TRS v1.0 integration for the Key Driver module.
+# TRS v1.1 integration for the Key Driver module.
 # Implements refusal, guard state, and validation gates per TRS standard.
 #
 # This module provides:
@@ -13,7 +13,7 @@
 # Related:
 #   - modules/shared/lib/trs_refusal.R - shared TRS infrastructure
 #
-# Version: 1.0 (TRS Integration)
+# Version: 1.1 (TRS Integration)
 # Date: December 2024
 #
 # ==============================================================================
@@ -107,6 +107,8 @@ keydriver_guard_init <- function() {
   guard$collinearity_warnings <- list()
   guard$shap_status <- "not_run"
   guard$quadrant_status <- "not_run"
+  guard$assumption_violations <- list()
+  guard$encoding_issues <- list()
 
   guard
 }
@@ -165,11 +167,15 @@ keydriver_guard_summary <- function(guard) {
   summary$collinearity_warnings <- guard$collinearity_warnings
   summary$shap_status <- guard$shap_status
   summary$quadrant_status <- guard$quadrant_status
+  summary$assumption_violations <- guard$assumption_violations
+  summary$encoding_issues <- guard$encoding_issues
 
   # Update has_issues
   summary$has_issues <- summary$has_issues ||
                         length(guard$excluded_drivers) > 0 ||
-                        length(guard$collinearity_warnings) > 0
+                        length(guard$collinearity_warnings) > 0 ||
+                        length(guard$assumption_violations) > 0 ||
+                        length(guard$encoding_issues) > 0
 
   summary
 }
@@ -393,6 +399,125 @@ validate_keydriver_mapping <- function(model, driver_vars, guard) {
       unmapped = if (length(unmapped) > 0) unmapped else NULL
     )
   }
+
+  guard
+}
+
+
+# ==============================================================================
+# KEYDRIVER ASSUMPTION & ENCODING TRACKING (TRS v1.1)
+# ==============================================================================
+
+#' Record Model Assumption Violation
+#'
+#' Records when a model assumption is violated (e.g., high VIF,
+#' non-normal residuals). Tracked in guard state for reporting.
+#'
+#' @param guard Guard state object
+#' @param assumption Name of the assumption violated
+#' @param details Description of the violation
+#' @return Updated guard state
+#' @keywords internal
+guard_record_assumption_violation <- function(guard, assumption, details) {
+  if (is.null(guard$assumption_violations)) guard$assumption_violations <- list()
+  guard$assumption_violations[[length(guard$assumption_violations) + 1]] <- list(
+    assumption = assumption,
+    details = details
+  )
+  guard <- guard_warn(guard, paste0("Assumption violation: ", assumption, " - ", details), "assumptions")
+  guard
+}
+
+#' Record Encoding Issue
+#'
+#' Records when a driver variable has encoding issues during
+#' data preparation (e.g., factor-to-numeric conversion problems).
+#'
+#' @param guard Guard state object
+#' @param driver Driver variable name
+#' @param issue Description of the encoding issue
+#' @return Updated guard state
+#' @keywords internal
+guard_record_encoding_issue <- function(guard, driver, issue) {
+  if (is.null(guard$encoding_issues)) guard$encoding_issues <- list()
+  guard$encoding_issues[[length(guard$encoding_issues) + 1]] <- list(
+    driver = driver,
+    issue = issue
+  )
+  guard <- guard_warn(guard, paste0("Encoding issue: ", driver, " - ", issue), "encoding")
+  guard
+}
+
+#' Check Feature Package Availability
+#'
+#' Validates that required packages for optional features are available.
+#' Should be called during guard phase, not at runtime.
+#'
+#' @param enable_shap Logical, is SHAP enabled
+#' @param enable_quadrant Logical, is Quadrant enabled
+#' @param guard Guard state object
+#' @return Updated guard state with package status
+#' @keywords internal
+guard_check_feature_packages <- function(enable_shap, enable_quadrant, guard) {
+  if (enable_shap) {
+    for (pkg in c("xgboost", "shapviz")) {
+      if (!requireNamespace(pkg, quietly = TRUE)) {
+        guard <- guard_warn(guard,
+          paste0("SHAP requires package '", pkg, "' which is not installed"), "packages")
+      }
+    }
+  }
+  if (enable_quadrant) {
+    if (!requireNamespace("ggplot2", quietly = TRUE)) {
+      guard <- guard_warn(guard,
+        "Quadrant analysis requires 'ggplot2' which is not installed", "packages")
+    }
+  }
+  guard
+}
+
+#' Validate Model Assumptions Post-Fit
+#'
+#' Checks residuals and VIF after model fitting. Records any
+#' violations in guard state rather than refusing outright.
+#'
+#' @param model Fitted lm model
+#' @param data Data frame used for fitting
+#' @param config Configuration list
+#' @param guard Guard state object
+#' @return Updated guard state
+#' @keywords internal
+guard_validate_model_assumptions <- function(model, data, config, guard) {
+  # Check for high VIF
+  tryCatch({
+    X <- stats::model.matrix(model)[, -1, drop = FALSE]
+    if (ncol(X) >= 2) {
+      for (i in seq_len(ncol(X))) {
+        r_sq <- summary(stats::lm(X[, i] ~ X[, -i]))$r.squared
+        vif_val <- 1 / (1 - r_sq)
+        if (vif_val > 10) {
+          guard <- guard_record_assumption_violation(guard,
+            "high_vif",
+            sprintf("Variable '%s' has VIF=%.1f (>10 indicates severe multicollinearity)",
+                    colnames(X)[i], vif_val))
+        }
+      }
+    }
+  }, error = function(e) NULL)
+
+  # Check residual normality (Shapiro-Wilk on subsample)
+  tryCatch({
+    resids <- stats::residuals(model)
+    n <- min(length(resids), 5000)
+    if (n >= 30) {
+      sw_test <- stats::shapiro.test(resids[sample(length(resids), n)])
+      if (sw_test$p.value < 0.01) {
+        guard <- guard_record_assumption_violation(guard,
+          "non_normal_residuals",
+          sprintf("Residuals may not be normally distributed (Shapiro-Wilk p=%.4f)", sw_test$p.value))
+      }
+    }
+  }, error = function(e) NULL)
 
   guard
 }

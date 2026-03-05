@@ -155,10 +155,8 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
                       rows = nrow(model_summary) + 4,
                       cols = 1:3, gridExpand = TRUE)
   }, error = function(e) {
-    # VIF calculation failed - log explicitly (no silent fails per TRS)
-    msg <- sprintf("VIF diagnostics failed and were skipped: %s", conditionMessage(e))
-    cat(sprintf("   [WARN] %s\n", msg))
-    warning(msg, call. = FALSE)
+    # VIF calculation failed - log to console (no silent fails per TRS)
+    cat(sprintf("   [WARN] VIF diagnostics failed and were skipped: %s\n", conditionMessage(e)))
     NULL
   })
 

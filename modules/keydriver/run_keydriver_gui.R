@@ -97,7 +97,8 @@ run_keydriver_gui <- function() {
   detect_config_files <- function(dir) {
     if (!dir.exists(dir)) return(character(0))
     files <- list.files(dir, pattern = "\\.xlsx$", full.names = FALSE, ignore.case = TRUE)
-    config_patterns <- c("keydriver.*config", "key.*driver.*config", "kda.*config", "driver.*config", "config")
+    config_patterns <- c("keydriver.*config", "key.*driver.*config", "kda.*config",
+                         "driver.*config", "config")
     detected <- character(0)
     for (pattern in config_patterns) {
       matches <- grep(pattern, files, value = TRUE, ignore.case = TRUE)
@@ -106,114 +107,98 @@ run_keydriver_gui <- function() {
     unique(detected)
   }
 
+  # --- CSS ---
+  gui_css <- "
+    body {
+      background-color: #f5f5f5;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .main-container {
+      max-width: 900px;
+      margin: 30px auto;
+      padding: 30px;
+      background-color: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 3px solid #ec4899;
+    }
+    .header h1 { color: #ec4899; margin-bottom: 5px; }
+    .header p { color: #6c757d; }
+    .step-card {
+      background-color: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .step-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #2c3e50;
+      margin-bottom: 15px;
+    }
+    .file-display {
+      background-color: #e9ecef;
+      padding: 10px 15px;
+      border-radius: 5px;
+      margin-top: 10px;
+      word-break: break-all;
+    }
+    .file-display .filename { font-weight: bold; color: #2c3e50; }
+    .file-display .filepath { font-size: 12px; color: #6c757d; }
+    .status-success { color: #28a745; font-weight: bold; }
+    .status-error { color: #dc3545; font-weight: bold; }
+    .btn-keydriver { background-color: #ec4899; color: white; border: none; }
+    .btn-keydriver:hover { background-color: #db2777; color: white; }
+    .run-btn { width: 100%; padding: 15px; font-size: 18px; font-weight: bold; }
+    .console-output {
+      background-color: #1e1e1e;
+      color: #d4d4d4;
+      font-family: 'Consolas', 'Monaco', monospace;
+      padding: 15px;
+      border-radius: 5px;
+      max-height: 400px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      font-size: 13px;
+    }
+    .info-box {
+      background-color: #d1ecf1;
+      border: 1px solid #bee5eb;
+      color: #0c5460;
+      padding: 10px 15px;
+      border-radius: 5px;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+  "
+
+  # --- Source files (ordered by dependency) ---
+  kd_source_files <- c(
+    "modules/shared/lib/import_all.R",
+    "modules/keydriver/R/00_guard.R",
+    "modules/keydriver/R/01_config.R",
+    "modules/keydriver/R/02_term_mapping.R",
+    "modules/keydriver/R/02_validation.R",
+    "modules/keydriver/R/03_analysis.R",
+    "modules/keydriver/R/04_output.R",
+    "modules/keydriver/R/00_main.R"
+  )
+
   ui <- fluidPage(
 
-    tags$head(
-      tags$style(HTML("
-        body {
-          background-color: #f5f5f5;
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .main-container {
-          max-width: 900px;
-          margin: 30px auto;
-          padding: 30px;
-          background-color: white;
-          border-radius: 10px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .header {
-          text-align: center;
-          margin-bottom: 30px;
-          padding-bottom: 20px;
-          border-bottom: 3px solid #ec4899;
-        }
-        .header h1 {
-          color: #ec4899;
-          margin-bottom: 5px;
-        }
-        .header p {
-          color: #6c757d;
-        }
-        .step-card {
-          background-color: #f8f9fa;
-          border: 1px solid #dee2e6;
-          border-radius: 8px;
-          padding: 20px;
-          margin-bottom: 20px;
-        }
-        .step-title {
-          font-size: 18px;
-          font-weight: bold;
-          color: #2c3e50;
-          margin-bottom: 15px;
-        }
-        .file-display {
-          background-color: #e9ecef;
-          padding: 10px 15px;
-          border-radius: 5px;
-          margin-top: 10px;
-          word-break: break-all;
-        }
-        .file-display .filename {
-          font-weight: bold;
-          color: #2c3e50;
-        }
-        .file-display .filepath {
-          font-size: 12px;
-          color: #6c757d;
-        }
-        .status-success {
-          color: #28a745;
-          font-weight: bold;
-        }
-        .status-error {
-          color: #dc3545;
-          font-weight: bold;
-        }
-        .btn-keydriver {
-          background-color: #ec4899;
-          color: white;
-          border: none;
-        }
-        .btn-keydriver:hover {
-          background-color: #db2777;
-          color: white;
-        }
-        .run-btn {
-          width: 100%;
-          padding: 15px;
-          font-size: 18px;
-          font-weight: bold;
-        }
-        .console-output {
-          background-color: #1e1e1e;
-          color: #d4d4d4;
-          font-family: 'Consolas', 'Monaco', monospace;
-          padding: 15px;
-          border-radius: 5px;
-          max-height: 400px;
-          overflow-y: auto;
-          white-space: pre-wrap;
-          font-size: 13px;
-        }
-        .info-box {
-          background-color: #d1ecf1;
-          border: 1px solid #bee5eb;
-          color: #0c5460;
-          padding: 10px 15px;
-          border-radius: 5px;
-          margin-top: 10px;
-          font-size: 13px;
-        }
-      "))
-    ),
+    tags$head(tags$style(HTML(gui_css))),
 
     div(class = "main-container",
 
       # Header
       div(class = "header",
-        h1("🔑 TURAS Key Driver Analysis"),
+        h1("TURAS Key Driver Analysis"),
         p("Identify key drivers of your target outcome")
       ),
 
@@ -247,6 +232,20 @@ run_keydriver_gui <- function() {
           div(class = "info-box",
             tags$strong("Note: "), "The config file's Settings sheet should specify ",
             tags$code("data_file"), " and ", tags$code("output_file"), " paths."
+          )
+        )
+      ),
+
+      # Step 3: Output Options
+      conditionalPanel(
+        condition = "output.project_selected",
+        div(class = "step-card",
+          div(class = "step-title", "Step 3: Output Options"),
+          checkboxInput("enable_html_report", "Generate HTML Report", value = FALSE),
+          div(class = "info-box",
+            tags$strong("HTML Report: "),
+            "Creates an interactive browser-based report with charts, ",
+            "tables, and pinned slide export."
           )
         )
       ),
@@ -296,7 +295,6 @@ run_keydriver_gui <- function() {
     observeEvent(input$project_dir_btn, {
       if (!is.integer(input$project_dir_btn)) {
         dir_path <- parseDirPath(volumes, input$project_dir_btn)
-        # Expand tilde and normalize path (fixes OneDrive/home directory paths)
         dir_path <- normalizePath(path.expand(dir_path), winslash = "/", mustWork = FALSE)
         if (length(dir_path) > 0 && dir.exists(dir_path)) {
           files$project_dir <- dir_path
@@ -335,7 +333,7 @@ run_keydriver_gui <- function() {
         div(class = "file-display",
           div(class = "filename", basename(files$project_dir)),
           div(class = "filepath", files$project_dir),
-          div(class = "status-success", "✓ Directory selected")
+          div(class = "status-success", "Directory selected")
         )
       }
     })
@@ -350,7 +348,6 @@ run_keydriver_gui <- function() {
                     choices = configs,
                     selected = configs[1])
       } else {
-        # Manual file selection
         shinyFilesButton("config_btn", "Browse for Config File",
                         "Select configuration file",
                         class = "btn btn-keydriver",
@@ -372,9 +369,9 @@ run_keydriver_gui <- function() {
           div(class = "filename", basename(files$config_file)),
           div(class = "filepath", files$config_file),
           if (file.exists(files$config_file)) {
-            div(class = "status-success", "✓ Config file found")
+            div(class = "status-success", "Config file found")
           } else {
-            div(class = "status-error", "✗ File not found")
+            div(class = "status-error", "File not found")
           }
         )
       }
@@ -398,12 +395,9 @@ run_keydriver_gui <- function() {
     # Console output - R 4.2+ compatibility (ensure single string)
     output$console_output <- renderText({
       current_output <- console_text()
-
-      # Ensure single string for R 4.2+ compatibility
       if (is.null(current_output) || length(current_output) == 0 || nchar(current_output[1]) == 0) {
         "Console output will appear here when you run the analysis..."
       } else {
-        # Ensure it's a single string
         paste(current_output, collapse = "\n")
       }
     })
@@ -419,7 +413,6 @@ run_keydriver_gui <- function() {
       # Save to recent projects
       add_recent_project(list(project_dir = files$project_dir))
 
-      # Capture output
       output_text <- ""
 
       tryCatch({
@@ -429,46 +422,42 @@ run_keydriver_gui <- function() {
           turas_root <- dirname(turas_root)
         }
 
-        # Source module files
+        # Source module files with error handling
         output_text <- paste0(output_text, "Loading Key Driver module...\n\n")
         console_text(output_text)
 
-        # 1. Source shared TRS infrastructure first (required by all modules)
-        source(file.path(turas_root, "modules/shared/lib/import_all.R"))
+        for (src_file in kd_source_files) {
+          src_path <- file.path(turas_root, src_file)
+          tryCatch({
+            source(src_path)
+          }, error = function(e) {
+            cat(sprintf("   [WARN] Failed to source %s: %s\n", basename(src_path), e$message))
+          })
+        }
 
-        # 2. Source guard file (defines keydriver_with_refusal_handler) BEFORE main
-        source(file.path(turas_root, "modules/keydriver/R/00_guard.R"))
-
-        # 3. Source remaining module files in order
-        source(file.path(turas_root, "modules/keydriver/R/01_config.R"))
-        source(file.path(turas_root, "modules/keydriver/R/02_term_mapping.R"))
-        source(file.path(turas_root, "modules/keydriver/R/02_validation.R"))
-        source(file.path(turas_root, "modules/keydriver/R/03_analysis.R"))
-        source(file.path(turas_root, "modules/keydriver/R/04_output.R"))
-
-        # 4. Source main entry point last (uses all the above)
-        source(file.path(turas_root, "modules/keydriver/R/00_main.R"))
+        # Build HTML report flag
+        html_report <- isTRUE(input$enable_html_report)
 
         # Capture ALL analysis output (stdout, warnings, messages) - TRS v1.0 compliance
-        # Paths are read from config file Settings sheet
         captured <- capture_console_all({
           results <- run_keydriver_analysis(
-            config_file = files$config_file
+            config_file = files$config_file,
+            html_report = html_report
           )
         })
 
         output_text <- paste0(output_text, paste(captured$combined_output, collapse = "\n"))
 
         if (captured$has_error) {
-          output_text <- paste0(output_text, "\n\n✗ Analysis failed - see error above")
+          output_text <- paste0(output_text, "\n\nAnalysis failed - see error above")
         } else if (captured$has_warnings) {
-          output_text <- paste0(output_text, "\n\n⚠ Analysis complete with warnings - review above")
+          output_text <- paste0(output_text, "\n\nAnalysis complete with warnings - review above")
         } else {
-          output_text <- paste0(output_text, "\n\n✓ Analysis complete!")
+          output_text <- paste0(output_text, "\n\nAnalysis complete!")
         }
 
       }, error = function(e) {
-        output_text <<- paste0(output_text, "\n\n✗ Error: ", e$message)
+        output_text <<- paste0(output_text, "\n\nError: ", e$message)
       })
 
       console_text(output_text)
