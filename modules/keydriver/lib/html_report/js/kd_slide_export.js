@@ -20,7 +20,8 @@
    * @param {string} pinId - The pin ID to export
    */
   window.kdExportPinnedCardPNG = function(pinId) {
-    var pins = kdGetPinnedViews();
+    var pins = (typeof kdGetPinnedViews === 'function') ? kdGetPinnedViews() : [];
+    if (!pins || !pins.length) return;
     var pin = null;
     for (var i = 0; i < pins.length; i++) {
       if (pins[i].id === pinId) { pin = pins[i]; break; }
@@ -112,8 +113,8 @@
       insightBorder.setAttribute('y', yPos);
       insightBorder.setAttribute('width', 3);
 
-      var insightLines = kdWrapTextLines(pin.insightText, SLIDE_W - 140, 7.5);
-      var insightHeight = Math.max(40, insightLines.length * 18 + 16);
+      var insightLines = kdWrapTextLines(pin.insightText, SLIDE_W - 140, 9);
+      var insightHeight = Math.max(48, insightLines.length * 20 + 24);
 
       insightBorder.setAttribute('height', insightHeight);
       insightBorder.setAttribute('fill', brandColour);
@@ -134,16 +135,16 @@
       insightLabel.setAttribute('x', 64);
       insightLabel.setAttribute('y', yPos + 16);
       insightLabel.setAttribute('fill', accentColour);
-      insightLabel.setAttribute('font-size', '10');
+      insightLabel.setAttribute('font-size', '12');
       insightLabel.setAttribute('font-weight', '700');
       insightLabel.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
       insightLabel.textContent = 'ANALYST INSIGHT';
       svgEl.appendChild(insightLabel);
 
-      // Insight text
-      var insightTextEl = kdCreateWrappedText(NS, insightLines, 64, yPos + 32, 18, {
+      // Insight text (16px = readable in PowerPoint landscape at 3x scale)
+      var insightTextEl = kdCreateWrappedText(NS, insightLines, 64, yPos + 34, 20, {
         fill: '#475569',
-        fontSize: '13',
+        fontSize: '16',
         fontWeight: '400'
       });
       svgEl.appendChild(insightTextEl);
@@ -151,18 +152,25 @@
       yPos += insightHeight + 16;
     }
 
-    // Chart (if present) — embed as nested <svg> (not foreignObject)
-    var chartArea = SLIDE_H - yPos - 60; // Reserve 60px for footer
-    if (pin.chartSvg && chartArea > 80) {
+    // Determine layout: side-by-side for quadrant (chart + table), stacked for others
+    var isSideBySide = (pin.sectionKey === 'quadrant') && pin.chartSvg && pin.tableHtml;
+
+    if (isSideBySide) {
+      // Side-by-side layout: chart on left, table on right
+      var contentArea = SLIDE_H - yPos - 60;
+      var leftW = Math.floor((SLIDE_W - 96) * 0.55);  // 55% for chart
+      var rightW = (SLIDE_W - 96) - leftW - 16;        // 45% for table minus gap
+      var rightX = 48 + leftW + 16;
+
+      // Left: Chart
       var tempDiv = document.createElement('div');
       tempDiv.innerHTML = pin.chartSvg;
       var sourceSvg = tempDiv.querySelector('svg');
+      var chartEndY = yPos;
 
       if (sourceSvg) {
         var svgW = 700;
         var svgH = 350;
-
-        // Use viewBox dimensions for accurate scaling
         var vb = sourceSvg.getAttribute('viewBox');
         if (vb) {
           var parts = vb.split(/[\s,]+/);
@@ -172,48 +180,155 @@
           }
         }
 
-        var maxChartW = SLIDE_W - 96;
-        var maxChartH = Math.min(chartArea - 8, 400);
-        var scaleX = maxChartW / svgW;
+        var maxChartH = Math.min(contentArea - 8, 440);
+        var scaleX = leftW / svgW;
         var scaleY = maxChartH / svgH;
         var chartScale = Math.min(scaleX, scaleY, 1.0);
         var scaledW = svgW * chartScale;
         var scaledH = svgH * chartScale;
-        var chartX = 48 + (maxChartW - scaledW) / 2;
 
-        // Nested <svg> — works natively in Canvas rendering (no foreignObject)
         var nestedSvg = document.createElementNS(NS, 'svg');
-        nestedSvg.setAttribute('x', chartX);
+        nestedSvg.setAttribute('x', 48);
         nestedSvg.setAttribute('y', yPos);
         nestedSvg.setAttribute('width', scaledW);
         nestedSvg.setAttribute('height', scaledH);
         nestedSvg.setAttribute('viewBox', '0 0 ' + svgW + ' ' + svgH);
         nestedSvg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
-        // Copy all child elements from source SVG
         while (sourceSvg.firstChild) {
           nestedSvg.appendChild(sourceSvg.firstChild);
         }
         svgEl.appendChild(nestedSvg);
-
-        yPos += scaledH + 12;
+        chartEndY = yPos + scaledH;
       }
-    }
 
-    // Table content (if present and enough space remaining)
-    if (pin.tableHtml) {
-      var remainingSpace = SLIDE_H - yPos - 60;
+      // Right: Table
+      var tableData = kdExtractSlideTableData(pin.tableHtml);
+      var tableEndY = yPos;
+      if (tableData && tableData.headers.length > 0) {
+        var tableUsed = kdRenderTableSVG(svgEl, tableData, rightX, yPos, rightW, contentArea);
+        tableEndY = yPos + tableUsed;
+      }
 
-      if (remainingSpace > 60) {
-        var tableData = kdExtractSlideTableData(pin.tableHtml);
-        if (tableData && tableData.headers.length > 0) {
-          var tableUsed = kdRenderTableSVG(svgEl, tableData, 48, yPos, SLIDE_W - 96, remainingSpace);
-          yPos += tableUsed + 8;
-        } else {
-          // Fallback: extract text content from non-table HTML (exec summary, insights)
-          var textData = kdExtractContentText(pin.tableHtml);
-          if (textData && textData.length > 0) {
-            yPos = kdRenderContentTextSVG(svgEl, textData, 48, yPos, SLIDE_W - 96, remainingSpace, brandColour);
+      yPos = Math.max(chartEndY, tableEndY) + 12;
+
+      // Action guide legend strip (below chart+table, fits in remaining space)
+      var legendSpace = SLIDE_H - yPos - 60;
+      if (legendSpace >= 36) {
+        var actionItems = [
+          { label: 'IMPROVE',  bg: '#fee2e2', color: '#991b1b', desc: 'High importance, low performance' },
+          { label: 'MAINTAIN', bg: '#dcfce7', color: '#166534', desc: 'High importance, high performance' },
+          { label: 'MONITOR',  bg: '#f1f5f9', color: '#64748b', desc: 'Low importance, low performance' },
+          { label: 'ASSESS',   bg: '#dbeafe', color: '#1e40af', desc: 'Low importance, high performance' }
+        ];
+        var legendW = SLIDE_W - 96;
+        var boxW = Math.floor(legendW / 4) - 6;
+        var boxH = Math.min(36, legendSpace - 4);
+
+        for (var li = 0; li < actionItems.length; li++) {
+          var ax = 48 + li * (boxW + 8);
+          var item = actionItems[li];
+
+          // Background box
+          var boxRect = document.createElementNS(NS, 'rect');
+          boxRect.setAttribute('x', ax);
+          boxRect.setAttribute('y', yPos);
+          boxRect.setAttribute('width', boxW);
+          boxRect.setAttribute('height', boxH);
+          boxRect.setAttribute('fill', item.bg);
+          boxRect.setAttribute('rx', '4');
+          svgEl.appendChild(boxRect);
+
+          // Action label (bold)
+          var labelText = document.createElementNS(NS, 'text');
+          labelText.setAttribute('x', ax + boxW / 2);
+          labelText.setAttribute('y', yPos + 13);
+          labelText.setAttribute('text-anchor', 'middle');
+          labelText.setAttribute('fill', item.color);
+          labelText.setAttribute('font-size', '9');
+          labelText.setAttribute('font-weight', '700');
+          labelText.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
+          labelText.textContent = item.label;
+          svgEl.appendChild(labelText);
+
+          // Description text
+          if (boxH >= 30) {
+            var descText = document.createElementNS(NS, 'text');
+            descText.setAttribute('x', ax + boxW / 2);
+            descText.setAttribute('y', yPos + 26);
+            descText.setAttribute('text-anchor', 'middle');
+            descText.setAttribute('fill', item.color);
+            descText.setAttribute('font-size', '7');
+            descText.setAttribute('font-weight', '400');
+            descText.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
+            descText.textContent = item.desc;
+            svgEl.appendChild(descText);
+          }
+        }
+        yPos += boxH + 8;
+      }
+
+    } else {
+      // Standard stacked layout: chart above table
+      var chartArea = SLIDE_H - yPos - 60; // Reserve 60px for footer
+      if (pin.chartSvg && chartArea > 80) {
+        var tempDiv = document.createElement('div');
+        tempDiv.innerHTML = pin.chartSvg;
+        var sourceSvg = tempDiv.querySelector('svg');
+
+        if (sourceSvg) {
+          var svgW = 700;
+          var svgH = 350;
+
+          var vb = sourceSvg.getAttribute('viewBox');
+          if (vb) {
+            var parts = vb.split(/[\s,]+/);
+            if (parts.length >= 4) {
+              svgW = parseFloat(parts[2]);
+              svgH = parseFloat(parts[3]);
+            }
+          }
+
+          var maxChartW = SLIDE_W - 96;
+          var maxChartH = Math.min(chartArea - 8, 400);
+          var scaleX = maxChartW / svgW;
+          var scaleY = maxChartH / svgH;
+          var chartScale = Math.min(scaleX, scaleY, 1.0);
+          var scaledW = svgW * chartScale;
+          var scaledH = svgH * chartScale;
+          var chartX = 48 + (maxChartW - scaledW) / 2;
+
+          var nestedSvg = document.createElementNS(NS, 'svg');
+          nestedSvg.setAttribute('x', chartX);
+          nestedSvg.setAttribute('y', yPos);
+          nestedSvg.setAttribute('width', scaledW);
+          nestedSvg.setAttribute('height', scaledH);
+          nestedSvg.setAttribute('viewBox', '0 0 ' + svgW + ' ' + svgH);
+          nestedSvg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+          while (sourceSvg.firstChild) {
+            nestedSvg.appendChild(sourceSvg.firstChild);
+          }
+          svgEl.appendChild(nestedSvg);
+
+          yPos += scaledH + 12;
+        }
+      }
+
+      // Table content (if present and enough space remaining)
+      if (pin.tableHtml) {
+        var remainingSpace = SLIDE_H - yPos - 60;
+
+        if (remainingSpace > 60) {
+          var tableData = kdExtractSlideTableData(pin.tableHtml);
+          if (tableData && tableData.headers.length > 0) {
+            var tableUsed = kdRenderTableSVG(svgEl, tableData, 48, yPos, SLIDE_W - 96, remainingSpace);
+            yPos += tableUsed + 8;
+          } else {
+            var textData = kdExtractContentText(pin.tableHtml);
+            if (textData && textData.length > 0) {
+              yPos = kdRenderContentTextSVG(svgEl, textData, 48, yPos, SLIDE_W - 96, remainingSpace, brandColour);
+            }
           }
         }
       }

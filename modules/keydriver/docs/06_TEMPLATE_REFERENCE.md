@@ -210,21 +210,114 @@ Configure analysis parameters and file paths.
 - **Default:** FALSE
 - **Valid Values:** TRUE, FALSE
 - **Dependencies:** Requires htmltools package
+- **Note:** Can also be enabled via the Shiny GUI "Generate HTML Report" checkbox, which overrides this config setting
 - **NEW in v10.3**
 
 #### brand_colour
 
-- **Purpose:** Primary brand colour for HTML report styling
+- **Purpose:** Primary brand colour for HTML report styling (header bar, chart bars, accents)
 - **Required:** No
-- **Default:** #ec4899 (pink)
+- **Default:** #323367 (dark navy)
 - **Data Type:** Hex colour code (e.g., `#3b82f6`)
 
 #### accent_colour
 
-- **Purpose:** Secondary accent colour for HTML report charts
+- **Purpose:** Secondary accent colour for HTML report charts and highlights
 - **Required:** No
 - **Default:** #f59e0b (amber)
 - **Data Type:** Hex colour code
+
+#### report_title
+
+- **Purpose:** Custom title displayed in the HTML report header
+- **Required:** No
+- **Default:** Analysis name derived from config file
+- **Data Type:** Text string
+
+---
+
+### HTML Report Section Visibility
+
+These settings control which sections appear in the HTML report. All default to TRUE. Set to FALSE to hide a section. Sections with no data are automatically hidden regardless of these settings.
+
+#### html_show_exec_summary
+
+- **Purpose:** Show the Executive Summary section
+- **Default:** TRUE
+
+#### html_show_importance
+
+- **Purpose:** Show the Driver Importance section (bar chart and table)
+- **Default:** TRUE
+
+#### html_show_methods
+
+- **Purpose:** Show the Method Comparison section
+- **Default:** TRUE
+
+#### html_show_effect_sizes
+
+- **Purpose:** Show the Effect Sizes section
+- **Default:** TRUE
+
+#### html_show_correlations
+
+- **Purpose:** Show the Correlation Matrix section
+- **Default:** TRUE
+
+#### html_show_quadrant
+
+- **Purpose:** Show the Quadrant Analysis (IPA) section
+- **Default:** TRUE
+- **Note:** Also requires `enable_quadrant = TRUE` for quadrant data to be computed
+
+#### html_show_shap
+
+- **Purpose:** Show the SHAP Analysis section
+- **Default:** TRUE
+- **Note:** Also requires `enable_shap = TRUE` for SHAP data to be computed
+
+#### html_show_diagnostics
+
+- **Purpose:** Show the Model Diagnostics section (VIF, R², residuals)
+- **Default:** TRUE
+
+#### html_show_bootstrap
+
+- **Purpose:** Show the Bootstrap Confidence Intervals section
+- **Default:** TRUE
+- **Note:** Also requires `enable_bootstrap = TRUE` for bootstrap data to be computed
+
+#### html_show_segments
+
+- **Purpose:** Show the Segment Comparison section
+- **Default:** TRUE
+- **Note:** Also requires segments to be defined in the Segments config sheet
+
+#### html_show_guide
+
+- **Purpose:** Show the built-in Interpretation Guide section
+- **Default:** TRUE
+
+---
+
+### HTML Report Display Options
+
+#### correlation_display
+
+- **Purpose:** Control how the correlation matrix is displayed
+- **Required:** No
+- **Default:** heatmap
+- **Valid Values:** heatmap, table, both
+- **Note:** "heatmap" shows the colour-coded matrix only; "table" shows the numeric table only; "both" shows both
+
+#### bootstrap_display
+
+- **Purpose:** Control how bootstrap confidence intervals are displayed
+- **Required:** No
+- **Default:** summary
+- **Valid Values:** summary, full, table
+- **Note:** "summary" shows the forest plot chart only; "table" shows the CI table only; "full" shows both chart and table
 
 ---
 
@@ -455,7 +548,7 @@ threshold_method       | mean
 normalize_axes         | TRUE
 bootstrap_iterations   | 1000
 bootstrap_ci_level     | 0.95
-brand_colour           | #3b82f6
+brand_colour           | #323367
 accent_colour          | #f59e0b
 ```
 

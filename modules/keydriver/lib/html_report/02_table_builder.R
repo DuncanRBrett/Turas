@@ -42,15 +42,13 @@ build_kd_importance_table <- function(importance) {
     htmltools::tags$th("Rank",       class = "kd-th kd-th-rank"),
     htmltools::tags$th("Driver",     class = "kd-th kd-th-label"),
     htmltools::tags$th("Importance", class = "kd-th kd-th-bar"),
-    htmltools::tags$th("%",          class = "kd-th kd-th-num"),
-    htmltools::tags$th("Top Method", class = "kd-th kd-th-label")
+    htmltools::tags$th("%",          class = "kd-th kd-th-num")
   )
 
   rows <- lapply(rows_data, function(d) {
     rank_val <- d$rank %||% NA
     label    <- d$label %||% d$driver %||% d$Driver %||% ""
     pct      <- as.numeric(d$importance_pct %||% d$Importance_Pct %||% 0)
-    method   <- d$top_method %||% d$Top_Method %||% ""
 
     bar_width  <- min(100, max(0, pct))
     bar_colour <- if (pct >= 20) "#2563EB"
@@ -79,8 +77,7 @@ build_kd_importance_table <- function(importance) {
           )
         )
       ),
-      htmltools::tags$td(sprintf("%.1f%%", pct), class = "kd-td kd-td-num"),
-      htmltools::tags$td(method, class = "kd-td kd-td-label")
+      htmltools::tags$td(sprintf("%.0f%%", pct), class = "kd-td kd-td-num")
     )
   })
 
@@ -515,10 +512,33 @@ build_kd_quadrant_action_table <- function(quadrant_data) {
     quadrant    <- as.character(row$quadrant %||% row$Quadrant %||% "")
     importance  <- as.numeric(row$importance  %||% row$Importance  %||% NA)
     performance <- as.numeric(row$performance %||% row$Performance %||% NA)
-    action      <- as.character(row$action %||% row$Action %||% "")
+    action_full <- as.character(row$action %||% row$Action %||% "")
+
+    # Extract short action keyword (e.g. "IMPROVE" from "IMPROVE: High importance...")
+    action_short <- sub(":.*$", "", action_full)
+    action_short <- trimws(action_short)
+    if (nchar(action_short) == 0) action_short <- quadrant
+
+    # Action badge colour based on keyword
+    action_bg    <- switch(toupper(action_short),
+      "IMPROVE"  = "#fee2e2", "MAINTAIN" = "#dcfce7",
+      "MONITOR"  = "#f1f5f9", "REASSESS" = "#dbeafe",
+      "ASSESS"   = "#dbeafe", "#f1f5f9")
+    action_color <- switch(toupper(action_short),
+      "IMPROVE"  = "#991b1b", "MAINTAIN" = "#166534",
+      "MONITOR"  = "#64748b", "REASSESS" = "#1e40af",
+      "ASSESS"   = "#1e40af", "#64748b")
 
     # Quadrant colour class
     quad_class <- .kd_quadrant_class(quadrant)
+
+    action_badge <- htmltools::tags$span(
+      style = sprintf(
+        "background:%s;color:%s;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600;text-transform:uppercase;",
+        action_bg, action_color
+      ),
+      action_short
+    )
 
     htmltools::tags$tr(
       class = paste("kd-tr", quad_class),
@@ -529,14 +549,14 @@ build_kd_quadrant_action_table <- function(quadrant_data) {
         htmltools::tags$span(class = paste("kd-badge", quad_class), quadrant)
       ),
       htmltools::tags$td(
-        if (is.na(importance)) "-" else sprintf("%.1f%%", importance),
+        if (is.na(importance)) "-" else sprintf("%.0f%%", importance),
         class = "kd-td kd-td-num"
       ),
       htmltools::tags$td(
         if (is.na(performance)) "-" else sprintf("%.2f", performance),
         class = "kd-td kd-td-num"
       ),
-      htmltools::tags$td(action, class = "kd-td kd-td-label")
+      htmltools::tags$td(action_badge, class = "kd-td", style = "text-align:center;")
     )
   })
 
@@ -650,25 +670,31 @@ build_kd_segment_comparison_table <- function(segment_comparison) {
   if (!is.data.frame(df) || nrow(df) == 0) return(NULL)
 
   # Identify segment columns: *_Pct and *_Rank pairs
+  # Exclude Mean_Pct which is an aggregate, not a segment
   pct_cols  <- grep("_Pct$",  names(df), value = TRUE)
   rank_cols <- grep("_Rank$", names(df), value = TRUE)
-  segment_names <- sub("_Pct$", "", pct_cols)
+  all_seg_names <- sub("_Pct$", "", pct_cols)
+  # Only keep segments that have both _Pct and _Rank columns
+  segment_names <- all_seg_names[paste0(all_seg_names, "_Rank") %in% rank_cols]
 
-  # Build header: Driver | (Seg_Pct | Seg_Rank) per segment | Mean_Pct [| Delta]
+  # Build header: Driver | (Seg_Pct | Seg_Rank) per segment | Total % [| Delta]
   header_cells <- list(htmltools::tags$th("Driver", class = "kd-th kd-th-label"))
 
   for (seg in segment_names) {
     header_cells <- c(header_cells, list(
-      htmltools::tags$th(paste0(seg, " %"),    class = "kd-th kd-th-num"),
-      htmltools::tags$th(paste0(seg, " Rank"), class = "kd-th kd-th-num")
+      htmltools::tags$th(paste0(seg, " %"),    class = "kd-th kd-th-num",
+                         `data-kd-seg-col` = seg),
+      htmltools::tags$th(paste0(seg, " Rank"), class = "kd-th kd-th-num",
+                         `data-kd-seg-col` = seg)
     ))
   }
 
-  # Mean column
+  # Total column (average across segments)
   has_mean <- "Mean_Pct" %in% names(df)
   if (has_mean) {
     header_cells <- c(header_cells, list(
-      htmltools::tags$th("Mean %", class = "kd-th kd-th-num")
+      htmltools::tags$th("Total %", class = "kd-th kd-th-num",
+                         `data-kd-seg-col` = "total")
     ))
   }
 
@@ -696,23 +722,28 @@ build_kd_segment_comparison_table <- function(segment_comparison) {
 
       cells <- c(cells, list(
         htmltools::tags$td(
-          if (is.na(pct_val)) "-" else sprintf("%.1f%%", pct_val),
-          class = "kd-td kd-td-num"
+          if (is.na(pct_val)) "-" else sprintf("%.0f%%", pct_val),
+          class = "kd-td kd-td-num",
+          `data-kd-seg-col` = seg,
+          `data-kd-sort-val` = if (is.na(pct_val)) "0" else sprintf("%.4f", pct_val)
         ),
         htmltools::tags$td(
           if (is.na(rank_val)) "-" else as.character(rank_val),
-          class = "kd-td kd-td-num"
+          class = "kd-td kd-td-num",
+          `data-kd-seg-col` = seg
         )
       ))
     }
 
-    # Mean column
+    # Total column (average across segments)
     if (has_mean) {
       mean_val <- as.numeric(row$Mean_Pct)
       cells <- c(cells, list(
         htmltools::tags$td(
-          if (is.na(mean_val)) "-" else sprintf("%.1f%%", mean_val),
-          class = "kd-td kd-td-num"
+          if (is.na(mean_val)) "-" else sprintf("%.0f%%", mean_val),
+          class = "kd-td kd-td-num",
+          `data-kd-seg-col` = "total",
+          `data-kd-sort-val` = if (is.na(mean_val)) "0" else sprintf("%.4f", mean_val)
         )
       ))
     }
@@ -735,7 +766,7 @@ build_kd_segment_comparison_table <- function(segment_comparison) {
             class = "kd-td kd-td-num",
             htmltools::tags$span(
               style = sprintf("color:%s;font-weight:600;", delta_colour),
-              sprintf("%+.1f pp", delta)
+              sprintf("%+.0f pp", delta)
             )
           )
         ))

@@ -78,6 +78,22 @@ transform_keydriver_for_html <- function(results, config) {
   has_quadrant  <- !is.null(results$quadrant_results) || !is.null(results$quadrant)
   has_bootstrap <- !is.null(results$bootstrap_ci)
 
+  # Extract SHAP importance data for dedicated SHAP section
+  shap_importance <- NULL
+  if (has_shap) {
+    shap_source <- results$shap_results %||% results$shap
+    if (!is.null(shap_source) && !is.null(shap_source$importance)) {
+      shap_importance <- shap_source$importance
+    } else if ("SHAP_Importance" %in% names(imp_df)) {
+      shap_importance <- data.frame(
+        driver = imp_df$Driver,
+        importance_pct = imp_df$SHAP_Importance,
+        stringsAsFactors = FALSE
+      )
+      shap_importance <- shap_importance[order(-shap_importance$importance_pct), ]
+    }
+  }
+
   # --------------------------------------------------------------------------
   # 1. Importance list -- one entry per driver
   # --------------------------------------------------------------------------
@@ -105,13 +121,18 @@ transform_keydriver_for_html <- function(results, config) {
       shap        = .kd_safe_numeric(row, "SHAP_Importance")
     )
 
+    # Determine top method for this driver
+    top_method <- .kd_top_method_for_driver(method_scores)
+
     list(
-      rank          = i,
-      driver        = as.character(row$Driver),
-      label         = label,
-      pct           = pct,
-      method_scores = method_scores,
-      top3          = (i <= 3)
+      rank           = i,
+      driver         = as.character(row$Driver),
+      label          = label,
+      importance_pct = pct,
+      pct            = pct,           # backward compat alias
+      top_method     = top_method,
+      method_scores  = method_scores,
+      top3           = (i <= 3)
     )
   })
 
@@ -119,6 +140,19 @@ transform_keydriver_for_html <- function(results, config) {
   # 2. Method comparison
   # --------------------------------------------------------------------------
   method_comparison <- .kd_build_method_comparison(imp_df_sorted, has_shap)
+
+  # Enrich importance entries with consensus (agreement) from method comparison
+  if (!is.null(method_comparison) && "Agreement" %in% names(method_comparison)) {
+    for (idx in seq_along(importance)) {
+      drv_name <- importance[[idx]]$driver
+      mc_row <- which(method_comparison$Driver == drv_name)
+      if (length(mc_row) == 1) {
+        importance[[idx]]$agreement <- method_comparison$Agreement[mc_row]
+      } else {
+        importance[[idx]]$agreement <- "N/A"
+      }
+    }
+  }
 
   # --------------------------------------------------------------------------
   # 3. Correlations
@@ -136,9 +170,20 @@ transform_keydriver_for_html <- function(results, config) {
   vif_values <- .kd_transform_vif(results)
 
   # --------------------------------------------------------------------------
-  # 6. Effect sizes (optional)
+  # 6. Effect sizes (optional) — normalize column names for HTML consumption
   # --------------------------------------------------------------------------
-  effect_sizes <- results$effect_sizes  # pass through if available
+  effect_sizes <- NULL
+  if (!is.null(results$effect_sizes) && is.data.frame(results$effect_sizes)) {
+    effect_sizes <- results$effect_sizes
+    col_map <- c(Effect_Value = "effect_value", Effect_Size = "effect_size",
+                 Driver = "driver", Interpretation = "interpretation")
+    for (src in names(col_map)) {
+      tgt <- col_map[[src]]
+      if (src %in% names(effect_sizes) && !tgt %in% names(effect_sizes)) {
+        effect_sizes[[tgt]] <- effect_sizes[[src]]
+      }
+    }
+  }
 
   # --------------------------------------------------------------------------
   # 7. Quadrant data (optional)
@@ -194,6 +239,7 @@ transform_keydriver_for_html <- function(results, config) {
     narrative          = narrative,
     methods_available  = methods_available,
     n_drivers          = n_drivers,
+    shap_importance    = shap_importance,
     has_shap           = has_shap,
     has_quadrant       = has_quadrant,
     has_bootstrap      = has_bootstrap,
@@ -403,6 +449,36 @@ generate_kd_narrative <- function(importance,
 # INTERNAL HELPERS
 # ==============================================================================
 
+#' Determine Top Method for a Driver
+#'
+#' Returns the name of the method that contributed the highest score for a
+#' given driver.  Used for the "Top Method" column in the importance table.
+#'
+#' @param method_scores Named list of per-method numeric values.
+#' @return Character string method name.
+#' @keywords internal
+.kd_top_method_for_driver <- function(method_scores) {
+  method_labels <- c(
+    shapley    = "Shapley",
+    shap       = "SHAP",
+    rel_weight = "Relative Weight",
+    beta       = "Beta Weight",
+    std_beta   = "Std. Beta",
+    correlation = "Correlation"
+  )
+
+  vals <- vapply(method_scores, function(v) {
+    v <- as.numeric(v)
+    if (length(v) == 0 || is.na(v)) 0 else abs(v)
+  }, numeric(1))
+
+  if (all(vals == 0)) return("")
+
+  best <- names(which.max(vals))
+  method_labels[best] %||% best
+}
+
+
 #' Pick Primary Importance Column
 #'
 #' Selects the best available importance column from the data frame for sorting
@@ -413,7 +489,7 @@ generate_kd_narrative <- function(importance,
 #' @keywords internal
 .kd_pick_primary_importance <- function(imp_df) {
   preference <- c("Shapley_Value", "SHAP_Importance", "Relative_Weight",
-                   "Beta_Weight", "Importance")
+                   "Beta_Weight", "Importance", "Correlation")
   for (col in preference) {
     if (col %in% names(imp_df)) return(col)
   }
@@ -482,7 +558,7 @@ generate_kd_narrative <- function(importance,
 #' @param imp_df Importance data frame (already sorted).
 #' @param has_shap Logical, whether SHAP ranks are available.
 #' @return Data frame with columns: Driver, Rank_Correlation, Rank_Beta,
-#'   Rank_RelWeight, Rank_StdBeta, optionally Rank_SHAP, Mean_Rank, Agreement.
+#'   Rank_RelWeight, Rank_Shapley, optionally Rank_SHAP, Mean_Rank, Agreement.
 #' @keywords internal
 .kd_build_method_comparison <- function(imp_df, has_shap) {
 
@@ -493,7 +569,7 @@ generate_kd_narrative <- function(importance,
     Rank_Correlation = c("Corr_Rank"),
     Rank_Beta        = c("Beta_Rank"),
     Rank_RelWeight   = c("RelWeight_Rank"),
-    Rank_StdBeta     = c("Shapley_Rank")
+    Rank_Shapley     = c("Shapley_Rank")
   )
 
   for (out_col in names(rank_map)) {

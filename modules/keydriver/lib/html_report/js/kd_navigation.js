@@ -37,11 +37,13 @@
           e.preventDefault();
           var target = document.getElementById(href.slice(1));
           if (target) {
-            // Total sticky offset: tab bar (if present) + this nav bar
+            // Total sticky offset: report tabs + analysis tabs (if present) + this nav bar
+            var reportTabs = document.querySelector('.kd-report-tabs');
+            var reportTabsHeight = reportTabs ? reportTabs.offsetHeight : 0;
             var tabBar = document.querySelector('.kd-analysis-tabs');
             var tabBarHeight = tabBar ? tabBar.offsetHeight : 0;
             var navHeight = navBar.offsetHeight;
-            var totalOffset = tabBarHeight + navHeight + 8;
+            var totalOffset = reportTabsHeight + tabBarHeight + navHeight + 8;
             var targetY = target.getBoundingClientRect().top + window.scrollY - totalOffset;
             window.scrollTo({ top: targetY, behavior: 'smooth' });
           }
@@ -60,10 +62,12 @@
       var panel = group.navBar.closest('.kd-analysis-panel');
       if (panel && !panel.classList.contains('active')) return;
 
+      var reportTabs = document.querySelector('.kd-report-tabs');
+      var reportTabsHeight = reportTabs ? reportTabs.offsetHeight : 0;
       var tabBar = document.querySelector('.kd-analysis-tabs');
       var tabBarHeight = tabBar ? tabBar.offsetHeight : 0;
       var navHeight = group.navBar.offsetHeight;
-      var scrollY = window.scrollY + tabBarHeight + navHeight + 40;
+      var scrollY = window.scrollY + reportTabsHeight + tabBarHeight + navHeight + 40;
       var active = null;
 
       for (var i = group.sections.length - 1; i >= 0; i--) {
@@ -91,7 +95,7 @@
 
   // --------------------------------------------------------------------------
   // Importance bar filtering — show/hide bars by threshold
-  // Modes: 'all', 'top-3', 'top-5', 'top-8', 'significant'
+  // Modes: 'all', 'top-3', 'top-5', 'top-8'
   // --------------------------------------------------------------------------
   window.kdFilterImportanceBars = function(mode, prefix) {
     prefix = prefix || '';
@@ -201,6 +205,159 @@
       }
     });
   }
+
+  // --------------------------------------------------------------------------
+  // Segment comparison — show/hide segments and sort by segment
+  // --------------------------------------------------------------------------
+
+  /**
+   * Toggle a single segment on/off in the chart and table.
+   * @param {string} segName - Segment name (e.g., 'Premium', 'Total')
+   */
+  window.kdToggleSegment = function(segName) {
+    var section = document.getElementById('kd-segment-comparison');
+    if (!section) return;
+
+    // Toggle chip active state
+    var chip = section.querySelector('[data-kd-seg-chip="' + segName + '"]');
+    if (chip) chip.classList.toggle('active');
+
+    // Update "All" chip
+    var allChips = section.querySelectorAll('[data-kd-seg-chip]:not([data-kd-seg-chip="all"])');
+    var allActive = true;
+    allChips.forEach(function(c) {
+      if (!c.classList.contains('active')) allActive = false;
+    });
+    var allChip = section.querySelector('[data-kd-seg-chip="all"]');
+    if (allChip) allChip.classList.toggle('active', allActive);
+
+    kdApplySegmentFilter(section);
+  };
+
+  /**
+   * Toggle all segments on or off.
+   * @param {boolean} show
+   */
+  window.kdToggleAllSegments = function(show) {
+    var section = document.getElementById('kd-segment-comparison');
+    if (!section) return;
+
+    section.querySelectorAll('[data-kd-seg-chip]').forEach(function(chip) {
+      if (show) chip.classList.add('active');
+      else if (chip.getAttribute('data-kd-seg-chip') !== 'all') chip.classList.remove('active');
+    });
+
+    kdApplySegmentFilter(section);
+  };
+
+  /**
+   * Apply segment filter based on active chips.
+   * Hides/shows columns in the table and bars in the chart.
+   */
+  function kdApplySegmentFilter(section) {
+    // Determine which segments are active
+    var activeSegs = {};
+    section.querySelectorAll('[data-kd-seg-chip].active').forEach(function(chip) {
+      var seg = chip.getAttribute('data-kd-seg-chip');
+      if (seg !== 'all') activeSegs[seg] = true;
+    });
+
+    // Filter table columns
+    var table = section.querySelector('.kd-segment-comparison-table');
+    if (table) {
+      // Header cells and body cells with data-kd-seg-col
+      table.querySelectorAll('[data-kd-seg-col]').forEach(function(cell) {
+        var seg = cell.getAttribute('data-kd-seg-col');
+        cell.style.display = activeSegs[seg] ? '' : 'none';
+      });
+    }
+
+    // Filter chart bars
+    var chart = section.querySelector('.kd-segment-chart');
+    if (chart) {
+      chart.querySelectorAll('.kd-seg-bar').forEach(function(g) {
+        var seg = g.getAttribute('data-kd-segment');
+        g.style.display = activeSegs[seg] ? '' : 'none';
+      });
+      // Also toggle legend items
+      chart.querySelectorAll('[data-kd-seg-legend]').forEach(function(rect) {
+        var seg = rect.getAttribute('data-kd-seg-legend');
+        var show = activeSegs[seg];
+        rect.style.display = show ? '' : 'none';
+        // Hide corresponding text label (next sibling)
+        var next = rect.nextElementSibling;
+        if (next && next.tagName === 'text') {
+          next.style.display = show ? '' : 'none';
+        }
+      });
+    }
+  }
+
+  /**
+   * Sort the segment comparison table by a segment's percentage.
+   * @param {string} segName - Segment name to sort by, or 'default' for original order
+   */
+  window.kdSortSegmentTable = function(segName) {
+    var section = document.getElementById('kd-segment-comparison');
+    if (!section) return;
+    var table = section.querySelector('.kd-segment-comparison-table');
+    if (!table) return;
+    var tbody = table.querySelector('tbody');
+    if (!tbody) return;
+
+    var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+    if (rows.length === 0) return;
+
+    if (segName === 'default') {
+      // Restore original order (by data-kd-sort-val of total, or original DOM order)
+      // Store original indices if not already stored
+      rows.forEach(function(row, idx) {
+        if (!row.hasAttribute('data-kd-orig-idx')) {
+          row.setAttribute('data-kd-orig-idx', idx);
+        }
+      });
+      rows.sort(function(a, b) {
+        return parseInt(a.getAttribute('data-kd-orig-idx')) -
+               parseInt(b.getAttribute('data-kd-orig-idx'));
+      });
+    } else {
+      // Store original indices on first sort
+      rows.forEach(function(row, idx) {
+        if (!row.hasAttribute('data-kd-orig-idx')) {
+          row.setAttribute('data-kd-orig-idx', idx);
+        }
+      });
+      // Sort by the segment's percentage (descending)
+      var colName = segName === 'Total' ? 'total' : segName;
+      rows.sort(function(a, b) {
+        var aCell = a.querySelector('[data-kd-seg-col="' + colName + '"][data-kd-sort-val]');
+        var bCell = b.querySelector('[data-kd-seg-col="' + colName + '"][data-kd-sort-val]');
+        var aVal = aCell ? parseFloat(aCell.getAttribute('data-kd-sort-val')) : 0;
+        var bVal = bCell ? parseFloat(bCell.getAttribute('data-kd-sort-val')) : 0;
+        return bVal - aVal;
+      });
+    }
+
+    // Re-append rows in sorted order
+    rows.forEach(function(row) { tbody.appendChild(row); });
+  };
+
+  // --------------------------------------------------------------------------
+  // Report-level tab switching (Analysis | Pinned Views)
+  // --------------------------------------------------------------------------
+  window.kdSwitchReportTab = function(tabName) {
+    document.querySelectorAll('.kd-report-tab').forEach(function(btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-kd-tab') === tabName);
+    });
+    document.querySelectorAll('.kd-tab-panel').forEach(function(panel) {
+      panel.classList.remove('active');
+    });
+    var target = document.getElementById('kd-tab-' + tabName);
+    if (target) target.classList.add('active');
+
+    // Scroll to top when switching tabs
+    window.scrollTo({ top: 0 });
+  };
 
   // --------------------------------------------------------------------------
   // Save Report — download HTML with current state preserved

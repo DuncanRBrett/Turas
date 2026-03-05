@@ -247,7 +247,7 @@ generate_keydriver_html_report <- function(results, config, output_path) {
   # ==========================================================================
   cat("  Step 4: Building SVG charts...\n")
 
-  brand_colour <- config$brand_colour %||% "#ec4899"
+  brand_colour <- config$brand_colour %||% "#323367"
   accent_colour <- config$accent_colour %||% "#f59e0b"
 
   charts <- list()
@@ -301,6 +301,29 @@ generate_keydriver_html_report <- function(results, config, output_path) {
       build_kd_quadrant_chart(html_data$quadrant_data, config),
       error = function(e) {
         cat(sprintf("    [WARN] Quadrant chart failed: %s\n", e$message))
+        NULL
+      }
+    )
+  }
+
+  # SHAP importance chart
+  if (!is.null(html_data$shap_importance)) {
+    charts$shap_importance <- tryCatch(
+      build_kd_shap_importance_chart(html_data$shap_importance, brand_colour),
+      error = function(e) {
+        cat(sprintf("    [WARN] SHAP importance chart failed: %s\n", e$message))
+        NULL
+      }
+    )
+  }
+
+  # Segment comparison chart
+  if (!is.null(html_data$segment_comparison)) {
+    charts$segment_comparison <- tryCatch(
+      build_kd_segment_comparison_chart(html_data$segment_comparison,
+                                         brand_colour, accent_colour),
+      error = function(e) {
+        cat(sprintf("    [WARN] Segment comparison chart failed: %s\n", e$message))
         NULL
       }
     )

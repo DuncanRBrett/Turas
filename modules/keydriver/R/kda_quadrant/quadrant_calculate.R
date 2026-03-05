@@ -220,7 +220,7 @@ create_action_table <- function(quad_data, config) {
       "1" = "IMPROVE: High importance, low performance. Priority investment needed.",
       "2" = "MAINTAIN: High importance, high performance. Protect current investment.",
       "3" = "MONITOR: Low importance, low performance. Low priority unless trending.",
-      "4" = "REASSESS: Low importance, high performance. Consider reallocating resources.",
+      "4" = "ASSESS: Low importance, high performance. Consider reallocating resources.",
       "Review required"
     )
   })

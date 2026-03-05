@@ -14,79 +14,172 @@ The HTML report is designed for three audiences:
 
 ## How to Enable
 
+### From the Shiny GUI
+
+When running keydriver through the Shiny GUI (`launch_turas.R`), check the **"Generate HTML Report"** checkbox in the settings panel. This overrides the config file setting.
+
+### From the Config File
+
 Add this setting to the **Settings** sheet of your config Excel file:
 
 | Setting | Value |
 |---------|-------|
 | enable_html_report | TRUE |
 
-Optional styling settings:
+### Optional Styling Settings
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| brand_colour | #ec4899 | Primary brand colour (hex) |
+| brand_colour | #323367 | Primary brand colour (hex) |
 | accent_colour | #f59e0b | Secondary accent colour (hex) |
 | report_title | (analysis name) | Title displayed in report header |
 
 The HTML report requires the `htmltools` R package. If it is not installed, the module will return a TRS refusal with code `PKG_HTMLTOOLS_MISSING`.
 
-When running keydriver through the Shiny GUI, check the "Generate HTML Report" checkbox in the settings panel.
+## Section Visibility Configuration
+
+All sections can be independently shown or hidden via config settings. Add these to the **Settings** sheet. All default to TRUE.
+
+| Setting | Section | Default |
+|---------|---------|---------|
+| html_show_exec_summary | Executive Summary | TRUE |
+| html_show_importance | Driver Importance | TRUE |
+| html_show_methods | Method Comparison | TRUE |
+| html_show_effect_sizes | Effect Sizes | TRUE |
+| html_show_correlations | Correlation Matrix | TRUE |
+| html_show_quadrant | Quadrant Analysis | TRUE |
+| html_show_shap | SHAP Analysis | TRUE |
+| html_show_diagnostics | Model Diagnostics | TRUE |
+| html_show_bootstrap | Bootstrap CIs | TRUE |
+| html_show_segments | Segment Comparison | TRUE |
+| html_show_guide | Interpretation Guide | TRUE |
+
+Additionally, two display mode settings control how certain sections render:
+
+| Setting | Default | Options | Description |
+|---------|---------|---------|-------------|
+| correlation_display | heatmap | heatmap, table, both | How the correlation matrix is displayed |
+| bootstrap_display | summary | summary, full, table | How bootstrap CIs are displayed |
 
 ## Report Sections
 
-The report contains up to eleven sections. Sections with no data are automatically omitted.
+The report contains up to eleven sections. Sections with no data are automatically omitted, regardless of visibility settings.
 
 ### Executive Summary
 
-High-level overview with key insights about the most important drivers, standout findings, and sample size badges. Always present.
+High-level overview with key insights about the most important drivers, standout findings, and sample size badges. Importance percentages are shown as whole numbers (e.g., 31% not 31.1%). Always present unless hidden via config.
 
 ### Driver Importance
 
-The primary results section with a horizontal bar chart ranked from highest to lowest importance, an importance table with significance indicators, and filter chips to show all drivers, top 3, top 5, top 8, or only statistically significant drivers. The chart and table are synchronized -- filtering updates both.
+The primary results section with a horizontal bar chart ranked from highest to lowest importance and a four-column importance table (Rank, Driver, Importance bar, %). Filter chips (All, Top 3, Top 5, Top 8) let you focus on the most relevant drivers. The chart and table are synchronized -- filtering updates both.
+
+A methodology callout explains that the final importance percentages use Shapley value decomposition to fairly apportion the model's explanatory power across all drivers, and directs analysts to the Method Comparison section for cross-method agreement details.
 
 ### Method Comparison
 
-Compares importance rankings across Correlation, Beta Weight, and Relative Weight. Includes an agreement chart showing rank positions across methods and a side-by-side comparison table.
+Compares importance rankings across Correlation, Beta Weight, Relative Weight, and Shapley Value (plus SHAP if enabled). Includes:
+
+- An agreement chart showing rank positions across methods
+- A side-by-side comparison table
+- An **Agreement** column (High/Medium/Low) based on rank consistency across methods -- High agreement means the driver's relative rank is consistent regardless of method
+
+A callout explains each analytical method and how to interpret agreement between them.
 
 ### Effect Sizes
 
-Standardized effect sizes (Cohen's f-squared or configured method) with benchmark bands for small, medium, and large effects. Appears when effect size data is available.
+Standardised effect sizes (Cohen's f-squared or configured method) with benchmark bands. A callout explains the Cohen's f² benchmarks:
+
+- **Large** (f² ≥ 0.35) -- substantial practical impact
+- **Medium** (f² ≥ 0.15) -- moderate practical impact
+- **Small** (f² ≥ 0.02) -- detectable but limited practical impact
+- **Negligible** (f² < 0.02) -- trivial practical effect
+
+Appears when effect size data is available in results.
 
 ### Correlation Matrix
 
-Inter-driver correlation heatmap and numeric table. High correlations (above 0.7) indicate multicollinearity that can inflate beta weight uncertainty.
+Inter-driver correlation heatmap showing the strength of relationships between drivers. A callout explains that high correlations (above 0.7) indicate multicollinearity that can inflate beta weight uncertainty, and that this is why the report uses Shapley value decomposition as the primary importance method.
+
+Display mode is controlled by the `correlation_display` config setting:
+
+- **heatmap** (default): Colour-coded matrix only
+- **table**: Numeric correlation table only
+- **both**: Both heatmap and table
 
 ### Quadrant Analysis
 
-Importance-Performance Analysis mapping drivers onto a four-quadrant grid. Includes a scatter chart and action table with prioritized recommendations. The quadrants are: Concentrate Here (high importance, low performance), Keep Up the Good Work (high importance, high performance), Low Priority (low importance, low performance), and Possible Overkill (low importance, high performance). Appears when `enable_quadrant = TRUE`.
+Importance-Performance Analysis (IPA) mapping drivers onto a four-quadrant grid. Includes:
+
+- A scatter chart with colour-shaded quadrants and label collision avoidance
+- An action table with colour-coded action badges (IMPROVE, MAINTAIN, MONITOR, ASSESS)
+- A priority callout explaining how priorities are determined
+- An Action Guide callout explaining each action:
+  - **IMPROVE** -- High importance, low performance. Priority investment area
+  - **MAINTAIN** -- High importance, high performance. Protect current standards
+  - **MONITOR** -- Low importance, low performance. Watch for changes
+  - **ASSESS** -- Low importance, high performance. Evaluate resource allocation
+
+Appears when `enable_quadrant = TRUE`.
 
 ### SHAP Analysis
 
-Machine learning-based importance using XGBoost and TreeSHAP, providing a complementary non-linear perspective. Appears when `enable_shap = TRUE`.
+Machine learning-based importance using XGBoost and TreeSHAP, providing a complementary non-linear perspective. Includes:
+
+- A horizontal bar chart showing SHAP-derived importance percentages
+- A callout explaining why SHAP values may differ from the primary driver importance analysis (SHAP captures non-linear relationships and interactions, while driver importance uses linear decomposition)
+
+Appears when `enable_shap = TRUE`.
 
 ### Diagnostics
 
-Statistical health checks: VIF for multicollinearity, model R-squared, residual diagnostics, and pass/flag/fail indicators. VIF values above 5 warrant attention; above 10 indicate serious multicollinearity.
+Statistical health checks with a prominent verdict banner at the top:
+
+- **Reliable** (R² ≥ 0.50 + significant F-test)
+- **Directionally reliable** (R² ≥ 0.25 + significant)
+- **Interpret with caution** (R² ≥ 0.10 + significant)
+- **Exploratory only** (low R² or not significant)
+
+Also includes VIF for multicollinearity (values above 5 warrant attention; above 10 indicate serious multicollinearity), model R-squared, and pass/flag/fail indicators.
 
 ### Bootstrap Confidence Intervals
 
-Forest-style CI chart with point estimates and error bars, plus a detailed table. Appears when `enable_bootstrap = TRUE`. See `08_BOOTSTRAP_GUIDE.md` for interpretation guidance.
+Forest-style CI chart with point estimates and error bars, plus a detailed table. Display mode is controlled by the `bootstrap_display` config setting:
+
+- **summary** (default): Forest plot chart only
+- **table**: CI table only
+- **full**: Both chart and table
+
+Appears when `enable_bootstrap = TRUE`. See `08_BOOTSTRAP_GUIDE.md` for interpretation guidance.
 
 ### Segment Comparison
 
-Side-by-side importance scores across defined customer segments, with highlights for drivers whose importance varies substantially between segments. Appears when segments are defined in config.
+Side-by-side importance scores across defined customer segments, with:
+
+- A grouped horizontal bar chart showing per-segment importance percentages with a curated colour palette
+- A comparison table with segment toggle chips (click to show/hide specific segments)
+- Sort functionality (click column headers to sort by a segment's values)
+- Highlights for drivers whose importance varies substantially between segments
+
+Appears when segments are defined in config.
 
 ### Interpretation Guide
 
-Built-in reference explaining the statistical methods, how to read charts and tables, and common caveats. Always present.
+Built-in reference explaining the statistical methods, how to read charts and tables, and common caveats. Always present unless hidden via config.
 
 ## Navigation
 
-A horizontal tab bar is pinned below the report header, containing a tab for each visible section. Clicking a tab smoothly scrolls to that section. As you scroll, the active tab updates automatically to reflect the currently visible section. The nav bar remains sticky so you can jump to any section at any time.
+The report uses a two-level tab structure:
+
+1. **Report tabs** -- A top-level tab bar with "Analysis" and "Pinned Views" tabs
+2. **Section nav bar** -- Within the Analysis tab, a horizontal nav bar pinned below the report header containing a link for each visible section
+
+Clicking a section link smoothly scrolls to that section. As you scroll, the active link updates automatically to reflect the currently visible section. The nav bar remains sticky so you can jump to any section at any time.
+
+In unified mode (Report Hub), each analysis panel has its own independently operating section nav bar.
 
 ## Pinned Views
 
-Pinned views let you collect specific sections, charts, or tables into a curated panel for presentation or export.
+Pinned views let you collect specific sections, charts, or tables into a curated panel for presentation or export. Access pinned views by clicking the "Pinned Views" tab at the top of the report.
 
 ### How to Pin
 
@@ -94,7 +187,7 @@ Each section header has a pin button on the right side. Click it to pin the enti
 
 ### The Pinned Views Panel
 
-Located at the bottom of the report. Contains a card for each pinned view with the section title, chart, table, and analyst insight. A badge in the nav bar shows the pin count. Each card has controls to move up, move down, export as PNG, or remove.
+Located in the Pinned Views tab. Contains a card for each pinned view with the section title, chart, table, and analyst insight. A badge in the report tab bar shows the pin count. Each card has controls to move up, move down, export as PNG, or remove.
 
 ### Reordering
 
@@ -115,6 +208,10 @@ Pinned views can be exported as presentation-quality PNG images at 1280x720 reso
 ### Exporting a Single Slide
 
 Click the export button on any pinned card. The PNG downloads with a filename derived from the panel label and section title. Each slide includes a brand bar, title, analyst insight callout (if present), chart, table (limited to 12 rows and 8 columns for readability), and a footer with method, sample size, date, and Turas branding.
+
+### Quadrant Slide Layout
+
+When a quadrant analysis pin is exported, the slide uses a side-by-side layout: chart on the left (55% width) and action table on the right (45% width). Below both, an action guide legend strip shows the four action types (IMPROVE, MAINTAIN, MONITOR, ASSESS) with colour-coded badges and descriptions.
 
 ### Exporting All Slides
 
@@ -180,22 +277,26 @@ Pinned views are only preserved if you use the Save button. Reloading the origin
 
 Slide export uses the browser's Canvas API. Check the developer console (F12) for errors. The report uses system fonts to avoid Canvas font resolution issues.
 
+### GUI Checkbox Has No Effect
+
+If checking "Generate HTML Report" in the Shiny GUI does not produce an HTML file, ensure that the keydriver module has been properly sourced. The GUI checkbox overrides the config file setting, but the HTML report library files must be present in `modules/keydriver/lib/html_report/`.
+
 ### Sections Are Missing
 
-Sections are conditionally included:
+Sections are conditionally included based on both data availability and visibility settings:
 
 | Section | Requires |
 |---------|----------|
-| Executive Summary | Always present |
-| Driver Importance | Always present |
-| Method Comparison | Always present |
-| Effect Sizes | Effect size data in results |
-| Correlation Matrix | Correlation data in results |
-| Quadrant Analysis | enable_quadrant = TRUE |
-| SHAP Analysis | enable_shap = TRUE |
-| Diagnostics | Model diagnostics in results |
-| Bootstrap CIs | enable_bootstrap = TRUE |
-| Segment Comparison | Segments defined in config |
-| Interpretation Guide | Always present |
+| Executive Summary | Always present (unless html_show_exec_summary = FALSE) |
+| Driver Importance | Always present (unless html_show_importance = FALSE) |
+| Method Comparison | Always present (unless html_show_methods = FALSE) |
+| Effect Sizes | Effect size data in results + html_show_effect_sizes = TRUE |
+| Correlation Matrix | Correlation data in results + html_show_correlations = TRUE |
+| Quadrant Analysis | enable_quadrant = TRUE + html_show_quadrant = TRUE |
+| SHAP Analysis | enable_shap = TRUE + html_show_shap = TRUE |
+| Diagnostics | Model diagnostics in results + html_show_diagnostics = TRUE |
+| Bootstrap CIs | enable_bootstrap = TRUE + html_show_bootstrap = TRUE |
+| Segment Comparison | Segments defined in config + html_show_segments = TRUE |
+| Interpretation Guide | Always present (unless html_show_guide = FALSE) |
 
 If an expected section is missing, verify the corresponding feature is enabled and check the console for TRS refusal messages.

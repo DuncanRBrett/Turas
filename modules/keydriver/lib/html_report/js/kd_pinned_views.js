@@ -192,9 +192,9 @@
       }
     }
 
-    // Chart SVG — look for any SVG with kd-chart or kd-importance-chart class
+    // Chart SVG — look inside chart wrapper/container, fall back to any SVG
     var chartSvg = '';
-    var svgEl = section.querySelector('svg.kd-chart, svg.kd-importance-chart');
+    var svgEl = section.querySelector('.kd-chart-wrapper svg, .kd-chart-container svg, svg.kd-importance-chart, svg.kd-chart');
     if (svgEl) {
       // Clone to avoid modifying the original
       var svgClone = svgEl.cloneNode(true);
@@ -203,7 +203,7 @@
 
     // Table HTML — capture first visible table
     var tableHtml = '';
-    var tableEl = section.querySelector('table.kd-table, table.kd-comp-table');
+    var tableEl = section.querySelector('table.kd-table, table.kd-comp-table, table.kd-quadrant-action-table');
     if (tableEl) {
       // Clone visible rows only (respect chip filtering)
       var tableClone = tableEl.cloneNode(true);
@@ -331,7 +331,7 @@
           var sDown = document.createElement('button');
           sDown.className = 'kd-pinned-action-btn';
           sDown.textContent = '\u25BC'; sDown.title = 'Move down';
-          sDown.onclick = function() { kdMovePinned(item.id, -1); };
+          sDown.onclick = function() { kdMovePinned(item.id, 1); };
           sActions.appendChild(sDown);
         }
         var sDel = document.createElement('button');

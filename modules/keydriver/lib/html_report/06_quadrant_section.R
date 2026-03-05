@@ -90,7 +90,7 @@ build_kd_quadrant_chart <- function(quadrant_data, config) {
   y_min <- 0; y_max <- 100
 
   # --- Brand colour ---
-  brand_colour <- config$brand_colour %||% "#ec4899"
+  brand_colour <- config$brand_colour %||% "#323367"
 
   # --- Helper: scale data value to pixel coordinate ---
   scale_x <- function(v) margin_left + (v - x_min) / (x_max - x_min) * plot_w
@@ -473,19 +473,32 @@ build_kd_quadrant_action_table <- function(quadrant_data) {
       ""
     }
 
-    action_text <- if ("Action" %in% names(row)) {
-      htmltools::htmlEscape(as.character(row$Action))
+    action_full <- if ("Action" %in% names(row)) {
+      as.character(row$Action)
     } else if ("Recommended Action" %in% names(row)) {
-      htmltools::htmlEscape(as.character(row[["Recommended Action"]]))
+      as.character(row[["Recommended Action"]])
     } else {
       ""
     }
+    # Extract short action keyword (e.g. "IMPROVE" from "IMPROVE: High importance...")
+    action_short <- htmltools::htmlEscape(sub(":.*$", "", trimws(action_full)))
+    if (nchar(action_short) == 0) action_short <- htmltools::htmlEscape(quad_name)
+
+    # Action badge styling
+    action_bg <- switch(toupper(action_short),
+      "IMPROVE"  = "#fee2e2", "MAINTAIN" = "#dcfce7",
+      "MONITOR"  = "#f1f5f9", "REASSESS" = "#dbeafe",
+      "ASSESS"   = "#dbeafe", "#f1f5f9")
+    action_clr <- switch(toupper(action_short),
+      "IMPROVE"  = "#991b1b", "MAINTAIN" = "#166534",
+      "MONITOR"  = "#64748b", "REASSESS" = "#1e40af",
+      "ASSESS"   = "#1e40af", "#64748b")
 
     row_html <- sprintf(
-      '<tr class="kd-quadrant-action-row"><td class="kd-quadrant-action-cell" style="font-weight:500;">%s</td><td class="kd-quadrant-action-cell"><span class="kd-quadrant-badge" style="background-color:%s;color:#fff;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;">%s</span></td><td class="kd-quadrant-action-cell" style="text-align:center;">%s</td><td class="kd-quadrant-action-cell" style="font-size:12px;color:#475569;">%s</td></tr>',
+      '<tr class="kd-quadrant-action-row"><td class="kd-quadrant-action-cell" style="font-weight:500;">%s</td><td class="kd-quadrant-action-cell"><span class="kd-quadrant-badge" style="background-color:%s;color:#fff;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;">%s</span></td><td class="kd-quadrant-action-cell" style="text-align:center;">%s</td><td class="kd-quadrant-action-cell" style="text-align:center;"><span style="background:%s;color:%s;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;">%s</span></td></tr>',
       driver_text, badge_col,
       htmltools::htmlEscape(quad_name),
-      priority_text, action_text
+      priority_text, action_bg, action_clr, action_short
     )
 
     rows_html <- c(rows_html, row_html)

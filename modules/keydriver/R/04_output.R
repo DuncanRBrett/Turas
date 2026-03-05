@@ -164,14 +164,20 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
   # Sheet 4: Correlation Matrix
   # ----------------------------------------------------------------------
   openxlsx::addWorksheet(wb, "Correlations")
-  cor_df <- as.data.frame(correlations)
-  cor_df <- cbind(Variable = rownames(cor_df), cor_df)
-  rownames(cor_df) <- NULL
+  if (!is.null(correlations)) {
+    cor_df <- as.data.frame(correlations)
+    cor_df <- cbind(Variable = rownames(cor_df), cor_df)
+    rownames(cor_df) <- NULL
 
-  openxlsx::writeData(wb, "Correlations", cor_df, startRow = 1)
-  openxlsx::addStyle(wb, "Correlations", header_style, rows = 1,
-                     cols = 1:ncol(cor_df), gridExpand = TRUE)
-  openxlsx::setColWidths(wb, "Correlations", cols = 1:ncol(cor_df), widths = "auto")
+    openxlsx::writeData(wb, "Correlations", cor_df, startRow = 1)
+    openxlsx::addStyle(wb, "Correlations", header_style, rows = 1,
+                       cols = 1:ncol(cor_df), gridExpand = TRUE)
+    openxlsx::setColWidths(wb, "Correlations", cols = 1:ncol(cor_df), widths = "auto")
+  } else {
+    openxlsx::writeData(wb, "Correlations",
+                       "Correlation matrix not available (insufficient numeric drivers).",
+                       startRow = 1, startCol = 1)
+  }
 
   # ----------------------------------------------------------------------
   # Sheet 5: Charts (Shapley impact bar chart)

@@ -60,6 +60,12 @@ extract_importance_scores <- function(kda_results, config) {
             importance = importance_df$Shapley_Value,
             stringsAsFactors = FALSE
           )
+        } else if ("SHAP_Importance" %in% names(importance_df)) {
+          data.frame(
+            driver = importance_df$Driver,
+            importance = importance_df$SHAP_Importance,
+            stringsAsFactors = FALSE
+          )
         } else {
           select_best_importance(importance_df)
         }
@@ -134,6 +140,15 @@ select_best_importance <- function(importance_df) {
     return(data.frame(
       driver = importance_df[[driver_col]],
       importance = importance_df$Shapley_Value,
+      stringsAsFactors = FALSE
+    ))
+  }
+
+  if ("SHAP_Importance" %in% names(importance_df)) {
+    cat("   [INFO] Using SHAP importance (auto-selected)\n")
+    return(data.frame(
+      driver = importance_df[[driver_col]],
+      importance = importance_df$SHAP_Importance,
       stringsAsFactors = FALSE
     ))
   }

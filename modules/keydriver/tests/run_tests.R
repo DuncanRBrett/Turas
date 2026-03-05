@@ -25,8 +25,24 @@ project_root <- file.path(module_dir, "..", "..")
 # Source test data generators
 source(file.path(test_dir, "fixtures", "generate_test_data.R"))
 
+# Source shared TRS infrastructure (must be loaded before module files)
+shared_lib <- file.path(project_root, "modules", "shared", "lib")
+source(file.path(shared_lib, "trs_refusal.R"))
+source(file.path(shared_lib, "trs_run_state.R"))
+source(file.path(shared_lib, "trs_banner.R"))
+source(file.path(shared_lib, "trs_run_status_writer.R"))
+
 # Source module files
 source(file.path(module_dir, "R", "00_guard.R"))
+source(file.path(module_dir, "R", "01_config.R"))
+source(file.path(module_dir, "R", "02_term_mapping.R"))
+source(file.path(module_dir, "R", "02_validation.R"))
+source(file.path(module_dir, "R", "03_analysis.R"))
+source(file.path(module_dir, "R", "04_output.R"))
+source(file.path(module_dir, "R", "05_bootstrap.R"))
+source(file.path(module_dir, "R", "06_effect_size.R"))
+source(file.path(module_dir, "R", "07_segment_comparison.R"))
+source(file.path(module_dir, "R", "08_executive_summary.R"))
 
 # Run tests
 if (requireNamespace("testthat", quietly = TRUE)) {

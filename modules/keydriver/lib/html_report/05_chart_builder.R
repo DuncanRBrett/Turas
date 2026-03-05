@@ -112,7 +112,7 @@ if (!exists("%||%", mode = "function")) {
 #' @param brand_colour Brand colour hex string
 #' @return htmltools::tags$div wrapping SVG, or NULL
 #' @keywords internal
-build_kd_importance_chart <- function(importance, brand_colour = "#ec4899") {
+build_kd_importance_chart <- function(importance, brand_colour = "#323367") {
 
   if (is.null(importance) || length(importance) == 0) return(NULL)
 
@@ -153,7 +153,7 @@ build_kd_importance_chart <- function(importance, brand_colour = "#ec4899") {
     s <- paste0(s, "\n", .kd_svg_text(lbl_w - 8, y + bar_h/2, as.character(d$label %||% ""),
                                        size = 12, fill = .kd_value_colour, anchor = "end", baseline = "central"))
     s <- paste0(s, "\n", .kd_svg_bar(lbl_w, y, bw, bar_h, fill, op))
-    s <- paste0(s, "\n", .kd_svg_text(lbl_w + bw + 6, y + bar_h/2, sprintf("%.1f%%", pv),
+    s <- paste0(s, "\n", .kd_svg_text(lbl_w + bw + 6, y + bar_h/2, sprintf("%.0f%%", pv),
                                        size = 11, fill = .kd_value_colour, weight = "500",
                                        anchor = "start", baseline = "central"))
     s <- paste0(s, "\n</g>")
@@ -178,7 +178,7 @@ build_kd_importance_chart <- function(importance, brand_colour = "#ec4899") {
 #' @return htmltools::tags$div wrapping SVG, or NULL
 #' @keywords internal
 build_kd_method_agreement_chart <- function(method_comparison,
-                                            brand_colour = "#ec4899",
+                                            brand_colour = "#323367",
                                             accent_colour = "#f59e0b") {
 
   if (is.null(method_comparison)) return(NULL)
@@ -273,7 +273,7 @@ build_kd_method_agreement_chart <- function(method_comparison,
 #' @param brand_colour Brand colour hex (unused; diverging scale is fixed)
 #' @return htmltools::tags$div wrapping SVG, or NULL
 #' @keywords internal
-build_kd_correlation_heatmap <- function(correlations, brand_colour = "#ec4899") {
+build_kd_correlation_heatmap <- function(correlations, brand_colour = "#323367") {
 
   if (is.null(correlations)) return(NULL)
 
@@ -372,7 +372,7 @@ build_kd_correlation_heatmap <- function(correlations, brand_colour = "#ec4899")
 #' @return htmltools::tags$div wrapping SVG, or NULL
 #' @keywords internal
 build_kd_effect_size_chart <- function(effect_sizes,
-                                       brand_colour = "#ec4899",
+                                       brand_colour = "#323367",
                                        accent_colour = "#f59e0b") {
 
   if (is.null(effect_sizes)) return(NULL)
@@ -383,15 +383,15 @@ build_kd_effect_size_chart <- function(effect_sizes,
     entries <- lapply(seq_len(nrow(effect_sizes)), function(i) {
       r <- effect_sizes[i, , drop = FALSE]
       list(label = as.character(r$driver %||% r$Driver %||% r$label %||% ""),
-           effect_value = as.numeric(r$effect_value %||% 0),
-           category = as.character(r$effect_size %||% r$category %||% ""))
+           effect_value = as.numeric(r$effect_value %||% r$Effect_Value %||% 0),
+           category = as.character(r$effect_size %||% r$Effect_Size %||% r$category %||% ""))
     })
   } else if (is.list(effect_sizes)) {
     if (length(effect_sizes) == 0) return(NULL)
     entries <- lapply(effect_sizes, function(d) {
-      list(label = as.character(d$label %||% d$driver %||% ""),
-           effect_value = as.numeric(d$effect_value %||% 0),
-           category = as.character(d$effect_size %||% d$category %||% ""))
+      list(label = as.character(d$label %||% d$driver %||% d$Driver %||% ""),
+           effect_value = as.numeric(d$effect_value %||% d$Effect_Value %||% 0),
+           category = as.character(d$effect_size %||% d$Effect_Size %||% d$category %||% ""))
     })
   } else { return(NULL) }
 
@@ -464,7 +464,7 @@ build_kd_effect_size_chart <- function(effect_sizes,
 #' @return htmltools::tags$div wrapping SVG, or NULL
 #' @keywords internal
 build_kd_bootstrap_ci_chart <- function(bootstrap_ci,
-                                        brand_colour = "#ec4899",
+                                        brand_colour = "#323367",
                                         accent_colour = "#f59e0b") {
 
   if (is.null(bootstrap_ci)) return(NULL)
@@ -474,20 +474,30 @@ build_kd_bootstrap_ci_chart <- function(bootstrap_ci,
     if (nrow(bootstrap_ci) == 0) return(NULL)
     entries <- lapply(seq_len(nrow(bootstrap_ci)), function(i) {
       r <- bootstrap_ci[i, , drop = FALSE]
-      list(label = as.character(r$driver %||% r$Driver %||% r$label %||% ""),
-           pe = as.numeric(r$point_estimate %||% r$estimate %||% 0),
-           lo = as.numeric(r$ci_lower %||% r$lower %||% 0),
-           hi = as.numeric(r$ci_upper %||% r$upper %||% 0))
+      list(label  = as.character(r$driver %||% r$Driver %||% r$label %||% ""),
+           method = as.character(r$method %||% r$Method %||% ""),
+           pe = as.numeric(r$point_estimate %||% r$Point_Estimate %||% r$estimate %||% r$PE %||% 0),
+           lo = as.numeric(r$ci_lower %||% r$CI_Lower %||% r$lower %||% r$LCI %||% 0),
+           hi = as.numeric(r$ci_upper %||% r$CI_Upper %||% r$upper %||% r$UCI %||% 0))
     })
   } else if (is.list(bootstrap_ci)) {
     if (length(bootstrap_ci) == 0) return(NULL)
     entries <- lapply(bootstrap_ci, function(d) {
-      list(label = as.character(d$label %||% d$driver %||% ""),
-           pe = as.numeric(d$point_estimate %||% d$estimate %||% 0),
-           lo = as.numeric(d$ci_lower %||% d$lower %||% 0),
-           hi = as.numeric(d$ci_upper %||% d$upper %||% 0))
+      list(label  = as.character(d$label %||% d$driver %||% d$Driver %||% ""),
+           method = as.character(d$method %||% d$Method %||% ""),
+           pe = as.numeric(d$point_estimate %||% d$Point_Estimate %||% d$estimate %||% 0),
+           lo = as.numeric(d$ci_lower %||% d$CI_Lower %||% d$lower %||% 0),
+           hi = as.numeric(d$ci_upper %||% d$CI_Upper %||% d$upper %||% 0))
     })
   } else { return(NULL) }
+
+  # If multiple methods, keep only the first method (most common)
+  methods <- vapply(entries, function(d) d$method, character(1))
+  unique_methods <- unique(methods[methods != ""])
+  if (length(unique_methods) > 1) {
+    keep_method <- unique_methods[1]
+    entries <- entries[methods == keep_method]
+  }
 
   # Sort descending by point estimate
   entries <- entries[order(-vapply(entries, function(d) d$pe, numeric(1)))]
@@ -548,133 +558,198 @@ build_kd_bootstrap_ci_chart <- function(bootstrap_ci,
 }
 
 
+# NOTE: build_kd_quadrant_chart() is defined in 06_quadrant_section.R
+# (with label collision avoidance and proper IPA axis orientation).
+# Do NOT define it here to avoid duplicate function definitions.
+
+
 # ==============================================================================
-# 6. QUADRANT CHART (IPA - Importance-Performance Analysis)
+# SHAP IMPORTANCE CHART
 # ==============================================================================
 
-#' Build Key Driver IPA Quadrant Chart (SVG)
+#' Build SHAP Importance Horizontal Bar Chart
 #'
-#' Scatter plot with four coloured quadrant regions:
-#'   Top-right (Maintain): #f0fdf4, Top-left (Improve): #fef2f2,
-#'   Bottom-right (Monitor): #eff6ff, Bottom-left (Low Priority): #f8fafc.
-#' Crosshair lines at threshold (default: mean). Axis: Importance (x), Performance (y).
-#'
-#' @param quadrant_data List with $data (data.frame: driver, importance, performance, quadrant)
-#' @param config Config list (brand_colour, accent_colour, importance_threshold, performance_threshold)
-#' @return htmltools::tags$div wrapping SVG, or NULL
+#' @param shap_importance Data frame with driver and importance_pct columns
+#' @param brand_colour Brand colour for bars
+#' @return htmltools tag or NULL
 #' @keywords internal
-build_kd_quadrant_chart <- function(quadrant_data, config = list()) {
+build_kd_shap_importance_chart <- function(shap_importance, brand_colour = "#323367") {
 
-  if (is.null(quadrant_data)) return(NULL)
+  if (is.null(shap_importance) || !is.data.frame(shap_importance)) return(NULL)
+  if (nrow(shap_importance) == 0) return(NULL)
 
-  brand <- config$brand_colour %||% "#ec4899"
+  # Standardise column names
+  if (!"driver" %in% names(shap_importance) && "Driver" %in% names(shap_importance)) {
+    shap_importance$driver <- shap_importance$Driver
+  }
+  pct_col <- intersect(c("importance_pct", "SHAP_Importance", "pct", "Importance"),
+                        names(shap_importance))[1]
+  if (is.na(pct_col)) return(NULL)
+  shap_importance$pct_val <- as.numeric(shap_importance[[pct_col]])
 
-  # Extract data.frame
-  if (is.data.frame(quadrant_data)) {
-    qd <- quadrant_data
-  } else if (is.list(quadrant_data) && !is.null(quadrant_data$data) && is.data.frame(quadrant_data$data)) {
-    qd <- quadrant_data$data
+  # Sort descending
+  shap_importance <- shap_importance[order(-shap_importance$pct_val), ]
+
+  n  <- nrow(shap_importance)
+  bh <- 26; gap <- 8; rs <- bh + gap
+  ml <- 160; mr <- 60; mt <- 20; mb <- 10
+  cw <- 440
+  tw <- ml + cw + mr
+  th <- mt + n * rs + mb
+
+  max_val <- max(shap_importance$pct_val, na.rm = TRUE)
+  if (max_val <= 0) max_val <- 1
+
+  s <- sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" width="100%%" style="max-width:%dpx;display:block;">', tw, th, tw)
+
+  for (i in seq_len(n)) {
+    row <- shap_importance[i, ]
+    label <- as.character(row$driver)
+    val   <- row$pct_val
+    bw    <- max(2, (val / max_val) * cw)
+    by    <- mt + (i - 1) * rs
+    alpha <- 0.5 + 0.5 * (val / max_val)
+
+    s <- paste0(s, "\n", .kd_svg_text(ml - 8, by + bh / 2 + 4, label,
+                                       size = 11, fill = .kd_label_colour,
+                                       weight = "500", anchor = "end"))
+    s <- paste0(s, "\n", .kd_svg_bar(ml, by, bw, bh, brand_colour, alpha))
+    s <- paste0(s, "\n", .kd_svg_text(ml + bw + 6, by + bh / 2 + 4,
+                                       sprintf("%.0f%%", val),
+                                       size = 11, fill = .kd_value_colour,
+                                       weight = "600"))
+  }
+
+  s <- paste0(s, "\n</svg>")
+  htmltools::tags$div(class = "kd-chart-container", htmltools::HTML(s))
+}
+
+
+# ==============================================================================
+# SEGMENT COMPARISON CHART
+# ==============================================================================
+
+#' Build Segment Comparison Grouped Bar Chart
+#'
+#' @param segment_comparison Data frame with Driver and per-segment _Pct columns
+#' @param brand_colour Brand colour
+#' @param accent_colour Accent colour
+#' @return htmltools tag or NULL
+#' @keywords internal
+build_kd_segment_comparison_chart <- function(segment_comparison,
+                                              brand_colour = "#323367",
+                                              accent_colour = "#CC9900") {
+
+  if (is.null(segment_comparison) || length(segment_comparison) == 0) return(NULL)
+
+  # Accept either a data.frame or a list with $comparison_matrix
+  if (!is.data.frame(segment_comparison)) {
+    if (is.list(segment_comparison) && !is.null(segment_comparison$comparison_matrix)) {
+      segment_comparison <- segment_comparison$comparison_matrix
+    } else {
+      return(NULL)
+    }
+  }
+  if (nrow(segment_comparison) == 0) return(NULL)
+
+  # Extract segment names from _Pct columns
+  pct_cols  <- grep("_Pct$", names(segment_comparison), value = TRUE)
+  rank_cols <- grep("_Rank$", names(segment_comparison), value = TRUE)
+  all_seg   <- sub("_Pct$", "", pct_cols)
+  seg_names <- all_seg[paste0(all_seg, "_Rank") %in% rank_cols]
+  if (length(seg_names) == 0) return(NULL)
+
+  # Include Total (Mean_Pct) as a pseudo-segment
+  has_total <- "Mean_Pct" %in% names(segment_comparison)
+  all_names <- if (has_total) c("Total", seg_names) else seg_names
+  nt <- length(all_names)
+  drivers <- as.character(segment_comparison$Driver)
+  nd <- length(drivers)
+
+  # Colour palette for segments — Total gets a neutral charcoal
+  seg_palette <- c("#4f86c6", "#e07b39", "#6ba368", "#c75b7a",
+                    "#8e7cc3", "#d4a843", "#5ca4a9", "#d4587a")
+  total_col <- "#64748b"
+  seg_cols <- if (has_total) {
+    c(total_col, rep_len(seg_palette, length(seg_names)))
   } else {
-    return(NULL)
-  }
-  if (nrow(qd) == 0) return(NULL)
-
-  # Resolve column names
-  ic <- if ("importance" %in% names(qd)) "importance"
-        else if ("importance_normalized" %in% names(qd)) "importance_normalized" else NULL
-  pc <- if ("performance" %in% names(qd)) "performance"
-        else if ("performance_normalized" %in% names(qd)) "performance_normalized" else NULL
-  dc <- if ("driver" %in% names(qd)) "driver" else if ("Driver" %in% names(qd)) "Driver" else NULL
-
-  if (is.null(ic) || is.null(pc) || is.null(dc)) {
-    cat("[WARN] build_kd_quadrant_chart: missing columns (driver, importance, performance)\n")
-    return(NULL)
+    rep_len(seg_palette, length(seg_names))
   }
 
-  iv <- as.numeric(qd[[ic]]); pv <- as.numeric(qd[[pc]]); lb <- as.character(qd[[dc]])
-  ok <- !is.na(iv) & !is.na(pv); if (sum(ok) == 0) return(NULL)
-  iv <- iv[ok]; pv <- pv[ok]; lb <- lb[ok]; np <- length(iv)
+  sb <- 18; sg <- 2
+  group_h <- nt * sb + (nt - 1) * sg
+  group_gap <- 14
+  ml <- 160; mr <- 60; mt <- 30; mb <- 10
+  cw <- 400
+  tw <- ml + cw + mr
+  th <- mt + nd * (group_h + group_gap) + mb
 
-  # Thresholds
-  it <- as.numeric(config$importance_threshold  %||% mean(iv))
-  pt <- as.numeric(config$performance_threshold %||% mean(pv))
-
-  # Axis ranges
-  ir <- range(iv); pr <- range(pv)
-  ip <- max(diff(ir) * 0.15, 0.5); pp <- max(diff(pr) * 0.15, 0.5)
-  xmin <- ir[1] - ip; xmax <- ir[2] + ip
-  ymin <- pr[1] - pp; ymax <- pr[2] + pp
-
-  # Layout
-  ml <- 70; mb <- 50; mt <- 30; mr <- 30
-  cw <- 600; ch <- 480; pw <- cw - ml - mr; ph <- ch - mt - mb
-
-  sx <- function(v) ml + ((v - xmin) / (xmax - xmin)) * pw
-  sy <- function(v) mt + ph - ((v - ymin) / (ymax - ymin)) * ph
-
-  tpx <- sx(it); tpy <- sy(pt)
-
-  s <- sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" class="kd-chart kd-quadrant-chart" role="img" aria-label="Importance-Performance quadrant chart" style="font-family:%s;">',
-               cw, ch, .kd_font_family)
-
-  # Quadrant fills
-  s <- paste0(s, sprintf('\n<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="#f0fdf4" opacity="0.7"/>',
-                         tpx, mt, ml + pw - tpx, tpy - mt))  # top-right: Maintain
-  s <- paste0(s, sprintf('\n<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="#fef2f2" opacity="0.7"/>',
-                         ml, mt, tpx - ml, tpy - mt))  # top-left: Improve
-  s <- paste0(s, sprintf('\n<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="#eff6ff" opacity="0.7"/>',
-                         tpx, tpy, ml + pw - tpx, mt + ph - tpy))  # bottom-right: Monitor
-  s <- paste0(s, sprintf('\n<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="#f8fafc" opacity="0.7"/>',
-                         ml, tpy, tpx - ml, mt + ph - tpy))  # bottom-left: Low Priority
-
-  # Gridlines
-  xst <- .kd_nice_step(xmax - xmin)
-  for (gv in seq(ceiling(xmin/xst)*xst, floor(xmax/xst)*xst, by = xst)) {
-    gx <- sx(gv)
-    if (gx > ml && gx < ml + pw)
-      s <- paste0(s, "\n", .kd_svg_line(gx, mt, gx, mt + ph, width = 0.5))
-    s <- paste0(s, "\n", .kd_svg_text(gx, ch - mb + 18, format(round(gv, 2), nsmall = 1),
-                                       size = 9, fill = .kd_muted_colour, anchor = "middle"))
+  # Find max value for scaling
+  max_val <- 0
+  for (seg in seg_names) {
+    col_name <- paste0(seg, "_Pct")
+    if (col_name %in% names(segment_comparison)) {
+      v <- as.numeric(segment_comparison[[col_name]])
+      max_val <- max(max_val, v, na.rm = TRUE)
+    }
   }
-  yst <- .kd_nice_step(ymax - ymin)
-  for (gv in seq(ceiling(ymin/yst)*yst, floor(ymax/yst)*yst, by = yst)) {
-    gy <- sy(gv)
-    if (gy > mt && gy < mt + ph)
-      s <- paste0(s, "\n", .kd_svg_line(ml, gy, ml + pw, gy, width = 0.5))
-    s <- paste0(s, "\n", .kd_svg_text(ml - 8, gy, format(round(gv, 2), nsmall = 1),
-                                       size = 9, fill = .kd_muted_colour, anchor = "end", baseline = "central"))
+  if (has_total) {
+    v <- as.numeric(segment_comparison$Mean_Pct)
+    max_val <- max(max_val, v, na.rm = TRUE)
+  }
+  if (max_val <= 0) max_val <- 1
+
+  s <- sprintf(
+    '<svg xmlns="http://www.w3.org/2000/svg" class="kd-segment-chart" viewBox="0 0 %d %d" width="100%%" style="max-width:%dpx;display:block;">',
+    tw, th, tw)
+
+  # Legend row
+  lx <- ml
+  for (si in seq_len(nt)) {
+    s <- paste0(s, sprintf('\n<rect x="%.0f" y="6" width="12" height="12" rx="2" fill="%s" data-kd-seg-legend="%s"/>',
+                           lx, seg_cols[si], all_names[si]))
+    s <- paste0(s, "\n", .kd_svg_text(lx + 16, 16, all_names[si],
+                                       size = 10, fill = .kd_label_colour,
+                                       weight = "500"))
+    lx <- lx + nchar(all_names[si]) * 7 + 32
   }
 
-  # Crosshair lines
-  s <- paste0(s, "\n", .kd_svg_line(tpx, mt, tpx, mt + ph, stroke = .kd_muted_colour, width = 1.5, dash = "6,4"))
-  s <- paste0(s, "\n", .kd_svg_line(ml, tpy, ml + pw, tpy, stroke = .kd_muted_colour, width = 1.5, dash = "6,4"))
+  for (di in seq_len(nd)) {
+    gy <- mt + (di - 1) * (group_h + group_gap)
+    # Driver group
+    s <- paste0(s, sprintf('\n<g class="kd-seg-driver-group" data-kd-driver="%s">',
+                           htmltools::htmlEscape(drivers[di])))
+    # Driver label
+    s <- paste0(s, "\n", .kd_svg_text(ml - 8, gy + group_h / 2 + 4,
+                                       drivers[di], size = 11,
+                                       fill = .kd_label_colour,
+                                       weight = "500", anchor = "end"))
+    # Separator line
+    if (di > 1) {
+      sep_y <- gy - group_gap / 2
+      s <- paste0(s, sprintf('\n<line x1="%.0f" y1="%.0f" x2="%.0f" y2="%.0f" stroke="%s" stroke-width="0.5"/>',
+                             ml, sep_y, ml + cw, sep_y, .kd_grid_colour))
+    }
 
-  # Quadrant labels (muted, small)
-  s <- paste0(s, "\n", .kd_svg_text(ml + 6, mt + 16, "Improve", size = 10, fill = .kd_muted_colour))
-  s <- paste0(s, "\n", .kd_svg_text(ml + pw - 6, mt + 16, "Maintain", size = 10, fill = .kd_muted_colour, anchor = "end"))
-  s <- paste0(s, "\n", .kd_svg_text(ml + 6, mt + ph - 6, "Low Priority", size = 10, fill = .kd_muted_colour))
-  s <- paste0(s, "\n", .kd_svg_text(ml + pw - 6, mt + ph - 6, "Monitor", size = 10, fill = .kd_muted_colour, anchor = "end"))
+    for (si in seq_len(nt)) {
+      seg_name <- all_names[si]
+      col_name <- if (seg_name == "Total") "Mean_Pct" else paste0(seg_name, "_Pct")
+      val <- if (col_name %in% names(segment_comparison)) {
+        as.numeric(segment_comparison[[col_name]][di])
+      } else 0
+      if (is.na(val)) val <- 0
 
-  # Axis labels
-  s <- paste0(s, "\n", .kd_svg_text(ml + pw/2, ch - 8, "Importance", size = 11,
-                                     fill = .kd_label_colour, weight = "500", anchor = "middle"))
-  s <- paste0(s, sprintf('\n<text x="15" y="%.0f" text-anchor="middle" font-size="11" fill="%s" font-weight="500" transform="rotate(-90,15,%.0f)">Performance</text>',
-                         mt + ph/2, .kd_label_colour, mt + ph/2))
+      by <- gy + (si - 1) * (sb + sg)
+      bw <- max(2, (val / max_val) * cw)
 
-  # Plot border
-  s <- paste0(s, sprintf('\n<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="none" stroke="%s" stroke-width="1"/>',
-                         ml, mt, pw, ph, .kd_grid_colour))
-
-  # Driver points
-  for (i in seq_len(np)) {
-    px <- sx(iv[i]); py <- sy(pv[i])
-    hi <- iv[i] >= it; hp <- pv[i] >= pt
-    pc_col <- if (hi && hp) "#22c55e" else if (hi && !hp) "#ef4444"
-              else if (!hi && hp) "#3b82f6" else .kd_muted_colour
-
-    s <- paste0(s, sprintf('\n<g class="kd-quadrant-point" data-kd-driver="%s">', .kd_html_escape(lb[i])))
-    s <- paste0(s, "\n", .kd_svg_circle(px, py, 6, pc_col))
-    s <- paste0(s, "\n", .kd_svg_text(px + 9, py - 4, lb[i], size = 9, fill = .kd_value_colour))
+      s <- paste0(s, sprintf('\n<g class="kd-seg-bar" data-kd-segment="%s">', seg_name))
+      s <- paste0(s, "\n", .kd_svg_bar(ml, by, bw, sb, seg_cols[si], 0.85))
+      s <- paste0(s, "\n", .kd_svg_text(ml + bw + 5, by + sb / 2 + 4,
+                                         sprintf("%.0f%%", val),
+                                         size = 9, fill = .kd_value_colour,
+                                         weight = "500"))
+      s <- paste0(s, "\n</g>")
+    }
     s <- paste0(s, "\n</g>")
   }
 

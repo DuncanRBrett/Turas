@@ -101,4 +101,86 @@
     return textEl;
   };
 
+  // --------------------------------------------------------------------------
+  // Insight editor functions
+  // --------------------------------------------------------------------------
+
+  /**
+   * Toggle the insight editor for a section.
+   * @param {string} sectionKey - Section key (e.g., 'importance')
+   * @param {string} prefix - ID prefix (e.g., 'nps-')
+   */
+  window.kdToggleInsight = function(sectionKey, prefix) {
+    prefix = prefix || '';
+    var container = document.getElementById(prefix + 'kd-insight-container-' + sectionKey);
+    var toggle = document.getElementById(prefix + 'kd-insight-toggle-' + sectionKey);
+    if (!container) return;
+
+    var isHidden = container.style.display === 'none' || container.style.display === '';
+    container.style.display = isHidden ? 'block' : 'none';
+    if (toggle) toggle.style.display = isHidden ? 'none' : '';
+
+    // Focus the editor when opening
+    if (isHidden) {
+      var editor = container.querySelector('.kd-insight-editor');
+      if (editor) editor.focus();
+    }
+  };
+
+  /**
+   * Sync insight text to a hidden data store (called on editor input).
+   * @param {string} sectionKey
+   * @param {string} prefix
+   */
+  window.kdSyncInsight = function(sectionKey, prefix) {
+    // No-op during editing — text is already in the contentEditable div.
+    // Actual persistence happens via kdSyncAllInsights() before save.
+  };
+
+  /**
+   * Dismiss (hide and clear) the insight editor for a section.
+   * @param {string} sectionKey
+   * @param {string} prefix
+   */
+  window.kdDismissInsight = function(sectionKey, prefix) {
+    prefix = prefix || '';
+    var container = document.getElementById(prefix + 'kd-insight-container-' + sectionKey);
+    var toggle = document.getElementById(prefix + 'kd-insight-toggle-' + sectionKey);
+    if (container) {
+      var editor = container.querySelector('.kd-insight-editor');
+      if (editor) editor.textContent = '';
+      container.style.display = 'none';
+    }
+    if (toggle) toggle.style.display = '';
+  };
+
+  /**
+   * Sync all insight editors to hidden data stores (called before save).
+   * Since insights are stored directly in contentEditable divs, the DOM
+   * already holds the text. This function is a hook for any pre-save work.
+   */
+  window.kdSyncAllInsights = function() {
+    // Insights live in contentEditable divs — they're serialized with the page.
+    // Nothing extra needed.
+  };
+
+  /**
+   * Hydrate insight editors from saved state on page load.
+   * If an editor already has text (from a saved HTML file), show its container.
+   */
+  window.kdHydrateInsights = function() {
+    document.querySelectorAll('.kd-insight-container').forEach(function(container) {
+      var editor = container.querySelector('.kd-insight-editor');
+      if (editor && editor.textContent.trim()) {
+        container.style.display = 'block';
+        // Hide the toggle button since the editor is visible
+        var area = container.closest('.kd-insight-area');
+        if (area) {
+          var toggle = area.querySelector('.kd-insight-toggle');
+          if (toggle) toggle.style.display = 'none';
+        }
+      }
+    });
+  };
+
 })();

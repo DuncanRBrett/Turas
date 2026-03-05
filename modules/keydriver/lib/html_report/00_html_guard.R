@@ -43,8 +43,12 @@ validate_keydriver_html_inputs <- function(results, config, output_path) {
   }
 
   # Check required result components
-  required_fields <- c("importance", "model_summary", "correlations")
+  # Accept either 'model' (lm object) or 'model_summary' (pre-computed)
+  required_fields <- c("importance", "correlations")
   missing_fields <- setdiff(required_fields, names(results))
+  if (is.null(results$model) && is.null(results$model_summary)) {
+    missing_fields <- c(missing_fields, "model or model_summary")
+  }
 
   if (length(missing_fields) > 0) {
     return(list(

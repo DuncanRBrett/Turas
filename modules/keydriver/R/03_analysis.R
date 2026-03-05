@@ -448,9 +448,12 @@ calculate_shapley_values <- function(model, data, config) {
 #' @param data Data frame
 #' @param config Configuration list
 #' @param term_mapping Result from build_term_mapping()
+#' @param correlations Pre-computed correlation matrix (optional). If NULL,
+#'   correlations are calculated internally.
 #' @return Data frame with driver-level importance
 #' @export
-calculate_importance_mixed <- function(model, data, config, term_mapping) {
+calculate_importance_mixed <- function(model, data, config, term_mapping,
+                                      correlations = NULL) {
 
   driver_vars <- config$driver_vars
 
@@ -484,7 +487,9 @@ calculate_importance_mixed <- function(model, data, config, term_mapping) {
 
   # METHOD 4: Correlations - only for numeric drivers
   numeric_drivers <- get_numeric_drivers(data, driver_vars)
-  correlations <- calculate_correlations(data, config)
+  if (is.null(correlations)) {
+    correlations <- calculate_correlations(data, config)
+  }
 
   importance$Correlation <- vapply(driver_vars, function(drv) {
     if (drv %in% numeric_drivers) {

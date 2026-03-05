@@ -23,7 +23,9 @@
 #' @param b Fallback value
 #' @return \code{a} if not NULL, otherwise \code{b}
 #' @keywords internal
-`%||%` <- function(a, b) if (is.null(a)) b else a
+if (!exists("%||%", mode = "function")) {
+  `%||%` <- function(a, b) if (is.null(a)) b else a
+}
 
 #' Get Valid Driver Types
 #' @return Character vector of valid driver type strings

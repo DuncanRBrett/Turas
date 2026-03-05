@@ -108,6 +108,9 @@ tryCatch({
 #'   If NULL, reads from config Settings sheet.
 #' @param output_file Path for results Excel file.
 #'   If NULL, reads from config Settings sheet.
+#' @param html_report Logical; if TRUE, generate an HTML report alongside Excel.
+#'   If NULL (default), reads from config Settings sheet enable_html_report.
+#'   When provided, overrides the config file setting.
 #'
 #' @return List with importance, model, correlations, shap, quadrant, config.
 #'
@@ -118,9 +121,11 @@ tryCatch({
 #' }
 #'
 #' @export
-run_keydriver_analysis <- function(config_file, data_file = NULL, output_file = NULL) {
+run_keydriver_analysis <- function(config_file, data_file = NULL, output_file = NULL,
+                                   html_report = NULL) {
   keydriver_with_refusal_handler(
-    run_keydriver_analysis_impl(config_file, data_file, output_file)
+    run_keydriver_analysis_impl(config_file, data_file, output_file,
+                                 html_report = html_report)
   )
 }
 
@@ -284,7 +289,8 @@ step_fit_model <- function(data, config, guard, has_mixed) {
 step_calculate_importance <- function(model, data, config, correlations,
                                       term_mapping, has_mixed) {
   if (has_mixed && !is.null(term_mapping)) {
-    calculate_importance_mixed(model, data$data, config, term_mapping)
+    calculate_importance_mixed(model, data$data, config, term_mapping,
+                              correlations = correlations)
   } else {
     calculate_importance_scores(model, data$data, correlations, config)
   }
@@ -371,7 +377,8 @@ determine_run_status <- function(degraded_reasons, affected_outputs, guard) {
 #' Internal implementation: orchestrates the key driver pipeline.
 #' All console output lives here; step functions are silent.
 #' @keywords internal
-run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_file = NULL) {
+run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_file = NULL,
+                                        html_report = NULL) {
 
   # --- TRS Run State Init ---
   trs_state <- if (exists("turas_run_state_new", mode = "function")) {
@@ -549,19 +556,184 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
     }
   }
 
+  # --- Step 8: Bootstrap Confidence Intervals (if enabled) ---
+  enable_bootstrap <- isTRUE(as.logical(config$settings$enable_bootstrap))
+  if (enable_bootstrap) {
+    step_num <- 6 + (if (enable_shap) 1 else 0) + (if (enable_quadrant) 1 else 0) + 1
+    cat(sprintf("\n%d. Bootstrap confidence intervals...\n", step_num))
+
+    turas_root <- find_turas_root()
+    source(file.path(turas_root, "modules/keydriver/R/05_bootstrap.R"), local = FALSE)
+
+    bootstrap_result <- tryCatch({
+      bootstrap_importance_ci(
+        data = data$data,
+        outcome = config$outcome_var,
+        drivers = config$driver_vars,
+        weights = config$weight_var,
+        n_bootstrap = as.numeric(config$settings$bootstrap_iterations %||% 500),
+        ci_level = as.numeric(config$settings$bootstrap_ci_level %||% 0.95)
+      )
+    }, error = function(e) {
+      cat(sprintf("   [WARN] Bootstrap failed: %s\n", e$message))
+      degraded_reasons <<- c(degraded_reasons, paste0("Bootstrap CI failed: ", e$message))
+      affected_outputs <<- c(affected_outputs, "Bootstrap confidence intervals")
+      NULL
+    })
+
+    if (!is.null(bootstrap_result)) {
+      results$bootstrap_ci <- bootstrap_result
+      cat(sprintf("   [OK] Bootstrap CIs computed (%s iterations)\n",
+                  config$settings$bootstrap_iterations %||% "500"))
+    }
+  }
+
+  # --- Step 9: Effect Size Interpretation ---
+  step_num_effect <- 6 + (if (enable_shap) 1 else 0) + (if (enable_quadrant) 1 else 0) +
+                     (if (enable_bootstrap) 1 else 0) + 1
+  cat(sprintf("\n%d. Effect size interpretation...\n", step_num_effect))
+
+  turas_root <- find_turas_root()
+  source(file.path(turas_root, "modules/keydriver/R/06_effect_size.R"), local = FALSE)
+
+  effect_result <- tryCatch({
+    r2_full <- summary(model)$r.squared
+    driver_vars <- config$driver_vars
+
+    r2_reduced <- vapply(driver_vars, function(drv) {
+      other_drivers <- setdiff(driver_vars, drv)
+      formula_str <- paste(config$outcome_var, "~", paste(other_drivers, collapse = " + "))
+      reduced_model <- stats::lm(stats::as.formula(formula_str), data = data$data,
+                                  weights = if (!is.null(config$weight_var)) data$data[[config$weight_var]] else NULL)
+      summary(reduced_model)$r.squared
+    }, numeric(1))
+    names(r2_reduced) <- driver_vars
+
+    model_info <- list(r_squared_full = r2_full, r_squared_reduced = r2_reduced)
+    generate_effect_interpretation(results$importance, model_summary = model_info)
+  }, error = function(e) {
+    cat(sprintf("   [WARN] Effect size interpretation failed: %s\n", e$message))
+    NULL
+  })
+
+  if (!is.null(effect_result)) {
+    results$effect_sizes <- effect_result
+    cat("   [OK] Effect sizes classified\n")
+  }
+
+  # --- Step 10: Segment Comparison (if segments configured) ---
+  if (!is.null(config$segments) && nrow(config$segments) > 0) {
+    step_num_seg <- step_num_effect + 1
+    cat(sprintf("\n%d. Segment comparison analysis...\n", step_num_seg))
+
+    source(file.path(turas_root, "modules/keydriver/R/07_segment_comparison.R"), local = FALSE)
+
+    segment_result <- tryCatch({
+      seg_var <- config$segments$segment_variable[1]
+      # Use raw_data (pre-filtering) since segment variable may not be in analysis variables
+      seg_data <- if (!is.null(config$raw_data)) config$raw_data else data$data
+      run_segment_importance_comparison(
+        data = seg_data,
+        outcome = config$outcome_var,
+        drivers = config$driver_vars,
+        segment_var = seg_var,
+        config = list(top_n = 3, rank_diff_threshold = 3, min_segment_n = 30)
+      )
+    }, error = function(e) {
+      cat(sprintf("   [WARN] Segment comparison failed: %s\n", e$message))
+      NULL
+    })
+
+    if (!is.null(segment_result)) {
+      results$segment_comparison <- segment_result
+      cat(sprintf("   [OK] Segment comparison complete (%d segments)\n",
+                  nrow(config$segments)))
+    }
+  }
+
+  # --- Step 11: Executive Summary ---
+  step_num_exec <- step_num_effect + (if (!is.null(config$segments) && nrow(config$segments) > 0) 1 else 0) + 1
+  cat(sprintf("\n%d. Generating executive summary...\n", step_num_exec))
+
+  source(file.path(turas_root, "modules/keydriver/R/08_executive_summary.R"), local = FALSE)
+
+  exec_summary <- tryCatch({
+    generate_executive_summary(results)
+  }, error = function(e) {
+    cat(sprintf("   [WARN] Executive summary failed: %s\n", e$message))
+    NULL
+  })
+
+  if (!is.null(exec_summary)) {
+    results$executive_summary <- exec_summary
+    cat("   [OK] Executive summary generated\n")
+  }
+
   # --- Determine Final Status ---
   status_out <- determine_run_status(degraded_reasons, affected_outputs, guard)
   results$run_status <- status_out$run_status
   results$status <- status_out$status
   results$guard_summary <- status_out$guard_summary
 
-  # --- Generate Output ---
-  step_num <- 6 + (if (enable_shap) 1 else 0) + (if (enable_quadrant) 1 else 0)
-  cat(sprintf("\n%d. Generating output file...\n", step_num))
+  # --- Generate Excel Output ---
+  step_num_output <- step_num_exec + 1
+  cat(sprintf("\n%d. Generating output file...\n", step_num_output))
   write_keydriver_output_enhanced(
     results = results, output_file = output_file,
     run_status = results$run_status, status_details = status_out$status_details)
   cat(sprintf("   [OK] Results written to: %s\n", output_file))
+
+  # --- Generate HTML Report (if enabled) ---
+  # GUI parameter overrides config file setting
+  enable_html <- if (!is.null(html_report)) {
+    isTRUE(html_report)
+  } else {
+    isTRUE(as.logical(config$settings$enable_html_report))
+  }
+  if (enable_html) {
+    step_num_html <- step_num_output + 1
+    cat(sprintf("\n%d. Generating HTML report...\n", step_num_html))
+
+    html_lib_dir <- file.path(turas_root, "modules", "keydriver", "lib", "html_report")
+    html_main <- file.path(html_lib_dir, "99_html_report_main.R")
+
+    if (file.exists(html_main)) {
+      # Set lib dir for submodule sourcing
+      assign(".keydriver_lib_dir", file.path(turas_root, "modules", "keydriver", "lib"),
+             envir = globalenv())
+      source(html_main, local = FALSE)
+
+      html_output_path <- sub("\\.xlsx$", ".html", output_file)
+
+      html_config <- list(
+        brand_colour  = config$settings$brand_colour  %||% "#323367",
+        accent_colour = config$settings$accent_colour %||% "#f59e0b",
+        report_title  = config$settings$report_title  %||% NULL,
+        output_file   = output_file,
+        settings      = config$settings
+      )
+
+      html_result <- tryCatch({
+        generate_keydriver_html_report(
+          results = results,
+          config = html_config,
+          output_path = html_output_path
+        )
+      }, error = function(e) {
+        cat(sprintf("   [WARN] HTML report generation failed: %s\n", e$message))
+        degraded_reasons <<- c(degraded_reasons, paste0("HTML report failed: ", e$message))
+        affected_outputs <<- c(affected_outputs, "HTML interactive report")
+        NULL
+      })
+
+      if (!is.null(html_result) && !is.null(html_result$status) && html_result$status != "REFUSED") {
+        results$html_report <- html_result
+        cat(sprintf("   [OK] HTML report: %s\n", html_output_path))
+      }
+    } else {
+      cat("   [SKIP] HTML report library not found\n")
+    }
+  }
 
   # --- Completion ---
   end_time <- Sys.time()
@@ -595,19 +767,22 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
     }
   } else {
     cat("(by Shapley value)\n")
-    top_drivers <- head(importance[order(-importance$Shapley_Value), ], 5)
+    top_drivers <- head(results$importance[order(-results$importance$Shapley_Value), ], 5)
     for (i in seq_len(nrow(top_drivers))) {
       cat(sprintf("  %d. %s (%.1f%%)\n", i, top_drivers$Driver[i], top_drivers$Shapley_Value[i]))
     }
   }
 
-  if (!is.null(results$quadrant)) {
+  if (!is.null(results$quadrant) && !is.null(results$quadrant$data)) {
     cat("\nQUADRANT SUMMARY:\n")
-    q_counts <- table(results$quadrant$data$quadrant)
-    cat(sprintf("  Q1 (Concentrate Here): %d drivers\n", q_counts["1"] %||% 0))
-    cat(sprintf("  Q2 (Keep Up Good Work): %d drivers\n", q_counts["2"] %||% 0))
-    cat(sprintf("  Q3 (Low Priority): %d drivers\n", q_counts["3"] %||% 0))
-    cat(sprintf("  Q4 (Possible Overkill): %d drivers\n", q_counts["4"] %||% 0))
+    q_vals <- as.character(results$quadrant$data$quadrant)
+    q_counts <- table(q_vals)
+    q_labels <- c("1" = "Concentrate Here", "2" = "Keep Up Good Work",
+                  "3" = "Low Priority", "4" = "Possible Overkill")
+    for (q in c("1", "2", "3", "4")) {
+      n <- if (q %in% names(q_counts)) as.integer(q_counts[[q]]) else 0L
+      cat(sprintf("  Q%s (%s): %d drivers\n", q, q_labels[[q]], n))
+    }
   }
 
   if (status_out$guard_summary$has_issues) {
@@ -685,10 +860,14 @@ run_quadrant_analysis_internal <- function(results, data, config) {
     show_diagonal = isTRUE(as.logical(config$settings$show_diagonal %||% FALSE))
   )
 
-  kda_input <- if (!is.null(results$shap)) results$shap else results
+  # Always pass full results (has $config$driver_vars and $importance$Driver).
+ # If SHAP is available and importance_source is "auto", prefer SHAP-based importance.
+  if (!is.null(results$shap) && tolower(quad_config$importance_source) == "auto") {
+    quad_config$importance_source <- "shap"
+  }
 
   create_quadrant_analysis(
-    kda_results = kda_input, data = data, config = quad_config,
+    kda_results = results, data = data, config = quad_config,
     stated_importance = config$stated_importance, segments = config$segments)
 }
 

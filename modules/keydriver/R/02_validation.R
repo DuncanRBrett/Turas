@@ -106,9 +106,16 @@ load_keydriver_data <- function(data_file, config) {
   # Get weight variable if specified
   weight_var <- config$weight_var
 
-  # Build variable list: outcome + drivers + weight (if present)
+  # Build variable list: outcome + drivers + weight + segment vars (if present)
   base_vars <- c(config$outcome_var, config$driver_vars)
-  all_vars <- unique(c(base_vars, weight_var))
+  segment_vars <- if (!is.null(config$segments) && nrow(config$segments) > 0) {
+    unique(config$segments$segment_variable)
+  } else {
+    character(0)
+  }
+  # Only include segment vars that exist in data (don't refuse if missing — optional)
+  segment_vars <- intersect(segment_vars, names(data))
+  all_vars <- unique(c(base_vars, weight_var, segment_vars))
 
   # Validate required variables exist
   missing_vars <- setdiff(base_vars, names(data))
@@ -148,9 +155,17 @@ load_keydriver_data <- function(data_file, config) {
   # Select only relevant variables
   data <- data[, all_vars, drop = FALSE]
 
-  # Convert outcome and drivers to numeric if needed
-  for (var in base_vars) {
-    if (!is.numeric(data[[var]])) {
+  # Convert outcome to numeric (always required)
+  if (!is.numeric(data[[config$outcome_var]])) {
+    data[[config$outcome_var]] <- coerce_numeric_safe(data[[config$outcome_var]], config$outcome_var)
+  }
+
+  # Convert driver variables to numeric ONLY if they are not categorical/factor
+  # Categorical drivers (factor, character, logical) must be preserved for
+  # mixed-predictor encoding in 02_term_mapping.R
+  for (var in config$driver_vars) {
+    if (!is.numeric(data[[var]]) && !is.factor(data[[var]]) &&
+        !is.character(data[[var]]) && !is.logical(data[[var]])) {
       data[[var]] <- coerce_numeric_safe(data[[var]], var)
     }
   }
@@ -213,24 +228,28 @@ load_keydriver_data <- function(data_file, config) {
   # Filter to complete cases
   data <- data[complete_cases, , drop = FALSE]
 
-  # Zero-variance checks after filtering
-  sds <- vapply(base_vars, function(v) stats::sd(data[[v]], na.rm = TRUE), numeric(1))
-  zero_var <- sds == 0
+  # Zero-variance checks after filtering (numeric variables only)
+  # Categorical/factor variables are checked for sufficient levels elsewhere
+  numeric_base_vars <- base_vars[vapply(base_vars, function(v) is.numeric(data[[v]]), logical(1))]
+  if (length(numeric_base_vars) > 0) {
+    sds <- vapply(numeric_base_vars, function(v) stats::sd(data[[v]], na.rm = TRUE), numeric(1))
+    zero_var <- sds == 0
 
-  if (any(zero_var)) {
-    offending <- base_vars[zero_var]
-    keydriver_refuse(
-      code = "DATA_ZERO_VARIANCE",
-      title = "Variables Have Zero Variance",
-      problem = paste0(length(offending), " variable(s) have zero variance (all values identical)."),
-      why_it_matters = "Variables with no variance cannot predict anything and will cause model failures.",
-      how_to_fix = c(
-        "Remove these variables from your analysis",
-        "Or check your data for issues",
-        "These variables have identical values for all respondents"
-      ),
-      missing = offending
-    )
+    if (any(zero_var)) {
+      offending <- numeric_base_vars[zero_var]
+      keydriver_refuse(
+        code = "DATA_ZERO_VARIANCE",
+        title = "Variables Have Zero Variance",
+        problem = paste0(length(offending), " variable(s) have zero variance (all values identical)."),
+        why_it_matters = "Variables with no variance cannot predict anything and will cause model failures.",
+        how_to_fix = c(
+          "Remove these variables from your analysis",
+          "Or check your data for issues",
+          "These variables have identical values for all respondents"
+        ),
+        missing = offending
+      )
+    }
   }
 
   list(

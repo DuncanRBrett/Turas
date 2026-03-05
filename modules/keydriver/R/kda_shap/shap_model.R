@@ -196,6 +196,8 @@ model_diagnostics <- function(model, prep) {
 }
 
 
-#' Null-coalescing operator
+#' Null-coalescing operator (if not already defined)
 #' @keywords internal
-`%||%` <- function(a, b) if (is.null(a)) b else a
+if (!exists("%||%", mode = "function")) {
+  `%||%` <- function(a, b) if (is.null(a)) b else a
+}

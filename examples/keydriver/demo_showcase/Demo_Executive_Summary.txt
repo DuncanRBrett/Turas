@@ -1,0 +1,26 @@
+EXECUTIVE SUMMARY
+============================================================
+
+Network Reliability is the leading driver of the outcome, explaining 39% of the model's variance (R<U+00B2>=52%, n=776).
+
+KEY FINDINGS:
+----------------------------------------
+  * The top 3 drivers are: Network Reliability (39%), Customer Service (22%), Data Speed (14%).
+  * The model explains 52% of variance in the outcome, which is considered good for survey data (n=776, 8 drivers).
+  * Moderate agreement across 5 methods (avg rank correlation = 0.81): methods mostly agree but differ on some mid-ranking drivers. All methods agree that Network Reliability is the #1 driver.
+
+METHOD AGREEMENT:
+----------------------------------------
+  Moderate agreement across 5 methods (avg rank correlation = 0.81): methods mostly agree but differ on some mid-ranking drivers. All methods agree that Network Reliability is the #1 driver.
+
+MODEL QUALITY:
+----------------------------------------
+  The model explains 52% of variance in the outcome, which is considered good for survey data (n=776, 8 drivers).
+
+RECOMMENDATIONS:
+----------------------------------------
+  1. Prioritise Network Reliability as the primary lever for improvement - it accounts for 39% of driver importance.
+  2. Also focus on Customer Service (22%) as a secondary improvement area.
+  3. The model has good explanatory power (R²=52%). Results are reliable for strategic decision-making.
+
+============================================================
