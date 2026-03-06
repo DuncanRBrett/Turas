@@ -356,7 +356,8 @@ generate_html_report <- function(all_results, banner_info, config_obj, output_pa
   page <- tryCatch({
     build_html_page(html_data, tables, config_obj,
                     dashboard_html = dashboard_html, charts = charts,
-                    source_filename = source_filename)
+                    source_filename = source_filename,
+                    qualitative_slides = config_obj$qualitative_slides)
   }, error = function(e) {
     cat("\n=== TURAS ERROR ===\n")
     cat("Code: CALC_PAGE_BUILD_FAILED\n")

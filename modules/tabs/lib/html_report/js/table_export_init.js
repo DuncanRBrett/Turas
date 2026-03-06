@@ -390,6 +390,14 @@ document.addEventListener("DOMContentLoaded", function() {
   hydrateInsights();
   // Hydrate pinned views from hidden JSON store
   hydratePinnedViews();
+  // Hydrate sig card toggle states
+  hydrateSigCardStates();
+  // Hydrate closing notes from hidden store
+  var closingStore = document.querySelector(".closing-notes-store");
+  var closingEditor = document.querySelector(".closing-notes-editor");
+  if (closingStore && closingStore.value && closingEditor) {
+    closingEditor.innerHTML = closingStore.value;
+  }
   // Auto-show insights that have content (from config or save-as)
   document.querySelectorAll(".insight-editor").forEach(function(editor) {
     if (editor.textContent.trim()) {
@@ -402,6 +410,30 @@ document.addEventListener("DOMContentLoaded", function() {
       }
     }
   });
+  // Hydrate qualitative slides from hidden stores
+  renderAllQualSlides();
+
+  // Qualitative: double-click to edit, blur to render
+  document.addEventListener("dblclick", function(e) {
+    var card = e.target.closest(".qual-slide-card");
+    if (!card || card.classList.contains("editing")) return;
+    if (e.target.closest(".qual-slide-actions")) return;
+    toggleQualEdit(card);
+  });
+  document.addEventListener("focusout", function(e) {
+    if (e.target.classList && e.target.classList.contains("qual-md-editor")) {
+      var card = e.target.closest(".qual-slide-card");
+      if (card && card.classList.contains("editing")) {
+        setTimeout(function() {
+          // Only exit edit mode if focus didn't move to another element in the card
+          if (!card.contains(document.activeElement)) {
+            toggleQualEdit(card);
+          }
+        }, 200);
+      }
+    }
+  });
+
   // Show help overlay on first visit
   try {
     if (!localStorage.getItem("turas-help-seen")) {

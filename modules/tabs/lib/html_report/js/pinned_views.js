@@ -958,32 +958,44 @@ function pinGaugeSection(sectionId) {
  * Pin the Significant Findings section to Pinned Views.
  * Clones the sig finding cards and stores as a dashboard_section pin.
  */
-function pinSigFindings() {
-  var section = document.getElementById("dash-sec-sig-findings");
-  if (!section) return;
+function pinSigFindings() { pinVisibleSigFindings(); }
 
-  var cards = section.querySelectorAll(".dash-sig-card");
-  if (cards.length === 0) return;
+/**
+ * Toggle visibility of an individual sig finding card.
+ */
+function toggleSigCard(sigId) {
+  var card = document.querySelector('.dash-sig-card[data-sig-id="' + sigId + '"]');
+  if (!card) return;
+  card.classList.toggle("sig-hidden");
+  saveSigCardStates();
+}
 
-  // Clone the section content
-  var clone = section.cloneNode(true);
-  // Remove action buttons from the clone
-  clone.querySelectorAll(".dash-export-btn, .dash-slide-export-btn").forEach(function(btn) { btn.remove(); });
+/**
+ * Pin an individual sig finding card to Pinned Views.
+ */
+function pinSigCard(sigId) {
+  var card = document.querySelector('.dash-sig-card[data-sig-id="' + sigId + '"]');
+  if (!card || card.classList.contains("sig-hidden")) return;
+  var clone = card.cloneNode(true);
+  // Remove action buttons from clone
+  var actions = clone.querySelector(".sig-card-actions");
+  if (actions) actions.remove();
+  clone.classList.remove("sig-hidden");
+
+  // Extract finding text for title
+  var textEl = clone.querySelector(".dash-sig-text");
+  var title = textEl ? textEl.textContent.substring(0, 80) : "Sig Finding";
 
   var pin = {
     id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
     pinType: "dashboard_section",
     qCode: null,
-    qTitle: "Significant Findings",
-    bannerGroup: null,
-    bannerLabel: null,
-    selectedColumns: null,
-    excludedRows: null,
-    insightText: null,
-    sortState: null,
-    tableHtml: clone.innerHTML,
-    chartSvg: null,
-    baseText: null,
+    qTitle: "Sig Finding: " + title,
+    bannerGroup: null, bannerLabel: null,
+    selectedColumns: null, excludedRows: null,
+    insightText: null, sortState: null,
+    tableHtml: clone.outerHTML,
+    chartSvg: null, baseText: null,
     timestamp: Date.now(),
     order: pinnedViews.length
   };
@@ -991,6 +1003,75 @@ function pinSigFindings() {
   savePinnedData();
   renderPinnedCards();
   updatePinBadge();
+}
+
+/**
+ * Pin only the visible (non-hidden) sig finding cards.
+ */
+function pinVisibleSigFindings() {
+  var section = document.getElementById("dash-sec-sig-findings");
+  if (!section) return;
+  var visible = section.querySelectorAll(".dash-sig-card:not(.sig-hidden)");
+  if (visible.length === 0) return;
+
+  var wrapper = document.createElement("div");
+  wrapper.className = "dash-sig-grid";
+  visible.forEach(function(card) {
+    var clone = card.cloneNode(true);
+    var actions = clone.querySelector(".sig-card-actions");
+    if (actions) actions.remove();
+    wrapper.appendChild(clone);
+  });
+
+  var pin = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+    pinType: "dashboard_section",
+    qCode: null,
+    qTitle: "Significant Findings",
+    bannerGroup: null, bannerLabel: null,
+    selectedColumns: null, excludedRows: null,
+    insightText: null, sortState: null,
+    tableHtml: wrapper.outerHTML,
+    chartSvg: null, baseText: null,
+    timestamp: Date.now(),
+    order: pinnedViews.length
+  };
+  pinnedViews.push(pin);
+  savePinnedData();
+  renderPinnedCards();
+  updatePinBadge();
+}
+
+/**
+ * Persist sig card toggle states to hidden JSON store.
+ */
+function saveSigCardStates() {
+  var store = document.getElementById("sig-card-states");
+  if (!store) return;
+  var states = {};
+  document.querySelectorAll(".dash-sig-card[data-sig-id]").forEach(function(card) {
+    if (card.classList.contains("sig-hidden")) {
+      states[card.getAttribute("data-sig-id")] = true;
+    }
+  });
+  store.textContent = JSON.stringify(states);
+}
+
+/**
+ * Restore sig card toggle states from hidden JSON store.
+ */
+function hydrateSigCardStates() {
+  var store = document.getElementById("sig-card-states");
+  if (!store || !store.textContent || store.textContent === "{}") return;
+  try {
+    var states = JSON.parse(store.textContent);
+    for (var sigId in states) {
+      if (states[sigId]) {
+        var card = document.querySelector('.dash-sig-card[data-sig-id="' + sigId + '"]');
+        if (card) card.classList.add("sig-hidden");
+      }
+    }
+  } catch(e) {}
 }
 
 /**
@@ -1129,5 +1210,154 @@ function exportSigFindingsSlide() {
     };
     img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
   }
+}
+
+
+// ==============================================================================
+// QUALITATIVE SLIDES (V10.7.0)
+// ==============================================================================
+
+/**
+ * Lightweight markdown renderer.
+ * Handles: **bold**, *italic*, ## headings, > blockquotes, - bullets, paragraphs.
+ */
+function renderMarkdown(md) {
+  if (!md) return "";
+  var html = md
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/^&gt; (.+)$/gm, "<blockquote>$1</blockquote>")
+    .replace(/^- (.+)$/gm, "<li>$1</li>");
+  // Wrap consecutive <li> in <ul>
+  html = html.replace(/((?:<li>.*<\/li>\s*)+)/g, function(match) {
+    return "<ul>" + match + "</ul>";
+  });
+  // Merge consecutive blockquotes
+  html = html.replace(/<\/blockquote>\s*<blockquote>/g, "<br>");
+  // Paragraphs: lines not already wrapped in block elements
+  html = html.split("\n").map(function(line) {
+    var trimmed = line.trim();
+    if (!trimmed) return "";
+    if (/^<(h2|ul|li|blockquote)/.test(trimmed)) return trimmed;
+    return "<p>" + trimmed + "</p>";
+  }).join("\n");
+  return html;
+}
+
+/** Render markdown for all qualitative slide cards. */
+function renderAllQualSlides() {
+  document.querySelectorAll(".qual-slide-card").forEach(function(card) {
+    var store = card.querySelector(".qual-md-store");
+    var editor = card.querySelector(".qual-md-editor");
+    var rendered = card.querySelector(".qual-md-rendered");
+    if (store && store.value && editor) {
+      editor.value = store.value;
+    }
+    if (rendered && editor) {
+      rendered.innerHTML = renderMarkdown(editor.value);
+    }
+  });
+  updateQualEmptyState();
+}
+
+/** Toggle edit mode on a qualitative slide card. */
+function toggleQualEdit(card) {
+  card.classList.toggle("editing");
+  if (!card.classList.contains("editing")) {
+    var editor = card.querySelector(".qual-md-editor");
+    var rendered = card.querySelector(".qual-md-rendered");
+    var store = card.querySelector(".qual-md-store");
+    if (rendered && editor) rendered.innerHTML = renderMarkdown(editor.value);
+    if (store && editor) store.value = editor.value;
+  } else {
+    var ed = card.querySelector(".qual-md-editor");
+    if (ed) ed.focus();
+  }
+}
+
+/** Add a new empty qualitative slide. */
+function addQualSlide() {
+  var container = document.getElementById("qual-slides-container");
+  if (!container) return;
+  var id = "qual-slide-" + Date.now();
+  var card = document.createElement("div");
+  card.className = "qual-slide-card editing";
+  card.setAttribute("data-slide-id", id);
+  card.innerHTML =
+    '<div class="qual-slide-header">' +
+      '<div class="qual-slide-title" contenteditable="true">New Slide</div>' +
+      '<div class="qual-slide-actions">' +
+        '<button class="export-btn" title="Pin this slide" onclick="pinQualSlide(\'' + id + '\')">&#x1F4CC;</button>' +
+        '<button class="export-btn" title="Move up" onclick="moveQualSlide(\'' + id + '\',\'up\')">&#x25B2;</button>' +
+        '<button class="export-btn" title="Move down" onclick="moveQualSlide(\'' + id + '\',\'down\')">&#x25BC;</button>' +
+        '<button class="export-btn" title="Remove slide" style="color:#e8614d;" onclick="removeQualSlide(\'' + id + '\')">&#x2715;</button>' +
+      '</div>' +
+    '</div>' +
+    '<textarea class="qual-md-editor" rows="6" placeholder="Enter markdown content... (**bold**, *italic*, > quote, - bullet, ## heading)"></textarea>' +
+    '<div class="qual-md-rendered"></div>' +
+    '<textarea class="qual-md-store" style="display:none;"></textarea>';
+  container.appendChild(card);
+  card.querySelector(".qual-md-editor").focus();
+  updateQualEmptyState();
+}
+
+/** Remove a qualitative slide. */
+function removeQualSlide(slideId) {
+  var card = document.querySelector('.qual-slide-card[data-slide-id="' + slideId + '"]');
+  if (card && confirm("Remove this slide?")) {
+    card.remove();
+    updateQualEmptyState();
+  }
+}
+
+/** Move a qualitative slide up or down. */
+function moveQualSlide(slideId, direction) {
+  var card = document.querySelector('.qual-slide-card[data-slide-id="' + slideId + '"]');
+  if (!card) return;
+  if (direction === "up" && card.previousElementSibling) {
+    card.parentNode.insertBefore(card, card.previousElementSibling);
+  } else if (direction === "down" && card.nextElementSibling) {
+    card.parentNode.insertBefore(card.nextElementSibling, card);
+  }
+}
+
+/** Pin a qualitative slide to Pinned Views. */
+function pinQualSlide(slideId) {
+  var card = document.querySelector('.qual-slide-card[data-slide-id="' + slideId + '"]');
+  if (!card) return;
+  var titleEl = card.querySelector(".qual-slide-title");
+  var rendered = card.querySelector(".qual-md-rendered");
+  // Ensure rendered is up to date
+  var editor = card.querySelector(".qual-md-editor");
+  if (rendered && editor) rendered.innerHTML = renderMarkdown(editor.value);
+
+  var pin = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+    pinType: "text_box",
+    qCode: null,
+    qTitle: titleEl ? titleEl.textContent.trim() : "Qualitative Slide",
+    bannerGroup: null, bannerLabel: null,
+    selectedColumns: null, excludedRows: null,
+    insightText: rendered ? rendered.innerHTML : "",
+    sortState: null,
+    tableHtml: null, chartSvg: null, baseText: null,
+    timestamp: Date.now(),
+    order: pinnedViews.length
+  };
+  pinnedViews.push(pin);
+  savePinnedData();
+  renderPinnedCards();
+  updatePinBadge();
+}
+
+/** Show/hide qualitative empty state. */
+function updateQualEmptyState() {
+  var container = document.getElementById("qual-slides-container");
+  var emptyState = document.getElementById("qual-empty-state");
+  if (!container || !emptyState) return;
+  var hasCards = container.querySelectorAll(".qual-slide-card").length > 0;
+  emptyState.style.display = hasCards ? "none" : "";
 }
 

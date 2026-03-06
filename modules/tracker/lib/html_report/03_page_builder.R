@@ -24,6 +24,10 @@ build_tracker_page <- function(html_data, table_html, charts, config) {
   accent_colour <- get_setting(config, "accent_colour", default = "#CC9900") %||% "#CC9900"
   project_name <- get_setting(config, "project_name", default = "Tracking Report") %||% "Tracking Report"
 
+  # Build About panel (analyst details, verbatim ref, closing notes)
+  about_panel <- build_tracker_about_panel(config)
+  has_about <- !is.null(about_panel)
+
   page <- htmltools::tagList(
     htmltools::tags$head(
       htmltools::tags$meta(charset = "UTF-8"),
@@ -46,7 +50,7 @@ build_tracker_page <- function(html_data, table_html, charts, config) {
     build_tracker_header(html_data, config, brand_colour),
 
     # Tab navigation
-    build_report_tab_nav(brand_colour),
+    build_report_tab_nav(brand_colour, has_about = has_about),
 
     # ---- TAB PANELS ----
     htmltools::tags$div(class = "tk-tab-panels", `data-report-module` = "tracker",
@@ -103,7 +107,10 @@ build_tracker_page <- function(html_data, table_html, charts, config) {
         )
       ),
 
-      # Tab 4: Pinned Views
+      # Tab 4: About (analyst details, verbatim, notes)
+      about_panel,
+
+      # Tab 5: Pinned Views
       htmltools::tags$div(id = "tab-pinned", class = "tab-panel",
         build_pinned_tab()
       )
@@ -132,7 +139,16 @@ build_tracker_page <- function(html_data, table_html, charts, config) {
 
 #' Build Report Tab Navigation
 #' @keywords internal
-build_report_tab_nav <- function(brand_colour) {
+build_report_tab_nav <- function(brand_colour, has_about = FALSE) {
+
+  about_tab <- if (has_about) {
+    htmltools::tags$button(
+      class = "report-tab",
+      onclick = "switchReportTab('about')",
+      `data-tab` = "about",
+      "\u2139\uFE0F About"
+    )
+  }
 
   htmltools::tags$div(class = "report-tabs",
     htmltools::tags$button(
@@ -153,6 +169,7 @@ build_report_tab_nav <- function(brand_colour) {
       `data-tab` = "overview",
       "Segment Overview"
     ),
+    about_tab,
     htmltools::tags$button(
       class = "report-tab",
       onclick = "switchReportTab('pinned')",
@@ -502,23 +519,48 @@ build_sig_changes_section <- function(html_data) {
     sapply(findings, function(f) f$metric_label)
   )]
 
-  cards <- lapply(findings, function(f) {
+  cards <- lapply(seq_along(findings), function(i) {
+    f <- findings[[i]]
     border_colour <- if (f$direction == "up") "#059669" else "#c0392b"
     sig_class <- paste0("tk-sig tk-sig-", f$direction)
 
+    sig_id <- sprintf("sig-%s-%s-%d",
+      gsub("[^a-zA-Z0-9]", "", f$metric_label %||% ""),
+      gsub("[^a-zA-Z0-9]", "", f$segment %||% ""), i)
+
     htmltools::tags$div(
       class = "dash-sig-card",
+      `data-sig-id` = sig_id,
       style = sprintf("border-left-color: %s", border_colour),
+      # Action bar: toggle + pin
       htmltools::tags$div(
-        class = "dash-sig-badges",
-        htmltools::tags$span(class = "dash-sig-metric-badge", f$metric_label),
-        if (nzchar(f$section)) htmltools::tags$span(class = "dash-sig-group-badge", f$section),
-        htmltools::tags$span(class = "dash-sig-segment-badge", f$segment)
+        class = "sig-card-actions",
+        htmltools::tags$button(
+          class = "sig-card-toggle-btn",
+          title = "Toggle visibility",
+          onclick = sprintf("toggleSigCard('%s')", sig_id),
+          htmltools::HTML("&#x1F441;")
+        ),
+        htmltools::tags$button(
+          class = "sig-card-pin-btn",
+          title = "Pin this finding",
+          onclick = sprintf("pinSigCard('%s')", sig_id),
+          htmltools::HTML("&#x1F4CC;")
+        )
       ),
-      htmltools::tags$div(class = "dash-sig-text",
-        htmltools::tags$span(class = sig_class, f$direction_symbol),
-        sprintf(" Significant %s: %s \u2192 %s (%s)",
-          f$direction_label, f$prev_value, f$current_value, f$change
+      htmltools::tags$div(
+        class = "sig-card-content",
+        htmltools::tags$div(
+          class = "dash-sig-badges",
+          htmltools::tags$span(class = "dash-sig-metric-badge", f$metric_label),
+          if (nzchar(f$section)) htmltools::tags$span(class = "dash-sig-group-badge", f$section),
+          htmltools::tags$span(class = "dash-sig-segment-badge", f$segment)
+        ),
+        htmltools::tags$div(class = "dash-sig-text",
+          htmltools::tags$span(class = sig_class, f$direction_symbol),
+          sprintf(" Significant %s: %s \u2192 %s (%s)",
+            f$direction_label, f$prev_value, f$current_value, f$change
+          )
         )
       )
     )
@@ -528,8 +570,8 @@ build_sig_changes_section <- function(html_data) {
     htmltools::tags$div(class = "summary-section-controls",
       htmltools::tags$button(
         class = "turas-action-btn",
-        onclick = "pinSigChanges()",
-        htmltools::HTML("&#x1F4CC; Pin to Views")
+        onclick = "pinVisibleSigFindings()",
+        htmltools::HTML("&#x1F4CC; Pin All Visible")
       ),
       htmltools::tags$button(
         class = "turas-action-btn",
@@ -539,10 +581,11 @@ build_sig_changes_section <- function(html_data) {
     ),
     htmltools::tags$div(class = "dash-section-title", "Significant Changes"),
     htmltools::tags$div(class = "dash-section-sub",
-      sprintf("Wave-on-wave changes that are statistically significant (%s vs %s)",
+      sprintf("Wave-on-wave changes that are statistically significant (%s vs %s). Click the eye to hide, pin to save individual findings.",
         latest_label, prev_label)
     ),
-    htmltools::tags$div(class = "dash-sig-grid", cards)
+    htmltools::tags$div(class = "dash-sig-grid", cards),
+    htmltools::tags$script(type = "application/json", id = "sig-card-states", "{}")
   )
 }
 
@@ -1498,6 +1541,102 @@ build_chart_containers <- function(html_data, charts, config) {
   containers <- c(containers, '</div>')
 
   htmltools::HTML(paste(containers, collapse = "\n"))
+}
+
+
+# ==============================================================================
+# ABOUT TAB (analyst details, verbatim ref, closing notes)
+# ==============================================================================
+
+#' Build About Tab Panel for Tracker
+#'
+#' Renders analyst contact details, verbatim file reference, and editable
+#' closing notes inside a tab-panel div. Returns NULL if no fields are present.
+#'
+#' @param config Tracker configuration list
+#' @return htmltools tag or NULL
+#' @keywords internal
+build_tracker_about_panel <- function(config) {
+  analyst_name  <- get_setting(config, "analyst_name",     default = NULL)
+  analyst_email <- get_setting(config, "analyst_email",    default = NULL)
+  analyst_phone <- get_setting(config, "analyst_phone",    default = NULL)
+  verbatim_file <- get_setting(config, "verbatim_filename", default = NULL)
+  closing_notes <- get_setting(config, "closing_notes",    default = NULL)
+
+  has_content <- any(sapply(
+    list(analyst_name, analyst_email, analyst_phone, verbatim_file, closing_notes),
+    function(x) !is.null(x) && nzchar(trimws(x))
+  ))
+  if (!has_content) return(NULL)
+
+  # Contact items
+  contact_items <- list()
+  if (!is.null(analyst_name) && nzchar(analyst_name)) {
+    contact_items <- c(contact_items, list(
+      htmltools::tags$div(class = "closing-contact-item",
+        htmltools::tags$span(class = "closing-label", "Analyst"),
+        htmltools::tags$span(class = "closing-value", analyst_name)
+      )
+    ))
+  }
+  if (!is.null(analyst_email) && nzchar(analyst_email)) {
+    contact_items <- c(contact_items, list(
+      htmltools::tags$div(class = "closing-contact-item",
+        htmltools::tags$span(class = "closing-label", "Email"),
+        htmltools::tags$a(class = "closing-value closing-link",
+                          href = paste0("mailto:", analyst_email), analyst_email)
+      )
+    ))
+  }
+  if (!is.null(analyst_phone) && nzchar(analyst_phone)) {
+    contact_items <- c(contact_items, list(
+      htmltools::tags$div(class = "closing-contact-item",
+        htmltools::tags$span(class = "closing-label", "Phone"),
+        htmltools::tags$span(class = "closing-value", analyst_phone)
+      )
+    ))
+  }
+
+  # Verbatim reference
+  verbatim_el <- NULL
+  if (!is.null(verbatim_file) && nzchar(verbatim_file)) {
+    verbatim_el <- htmltools::tags$div(class = "closing-verbatim",
+      htmltools::tags$span(class = "closing-label", "Verbatim Data"),
+      htmltools::tags$span(class = "closing-value", verbatim_file)
+    )
+  }
+
+  # Closing notes (editable)
+  notes_content <- if (!is.null(closing_notes) && nzchar(closing_notes)) closing_notes else ""
+  notes_el <- htmltools::tags$div(class = "closing-notes-section",
+    htmltools::tags$div(class = "closing-label", "Notes"),
+    htmltools::tags$div(
+      class = "closing-notes-editor",
+      contenteditable = "true",
+      `data-placeholder` = "Add closing notes...",
+      htmltools::HTML(notes_content)
+    ),
+    htmltools::tags$textarea(
+      class = "closing-notes-store",
+      style = "display:none;",
+      notes_content
+    )
+  )
+
+  htmltools::tags$div(id = "tab-about", class = "tab-panel",
+    htmltools::tags$div(
+      class = "closing-section",
+      id = "report-closing-section",
+      htmltools::tags$div(class = "closing-divider"),
+      htmltools::tags$div(class = "closing-content",
+        if (length(contact_items) > 0) {
+          htmltools::tags$div(class = "closing-contact-grid", contact_items)
+        },
+        verbatim_el,
+        notes_el
+      )
+    )
+  )
 }
 
 

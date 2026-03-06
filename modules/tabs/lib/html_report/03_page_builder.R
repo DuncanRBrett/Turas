@@ -18,7 +18,8 @@
 #' @export
 build_html_page <- function(html_data, tables, config_obj,
                             dashboard_html = NULL, charts = list(),
-                            source_filename = NULL) {
+                            source_filename = NULL,
+                            qualitative_slides = NULL) {
 
   if (!requireNamespace("jsonlite", quietly = TRUE)) {
     return(list(
@@ -146,9 +147,15 @@ build_html_page <- function(html_data, tables, config_obj,
                          client_name = config_obj$client_name,
                          researcher_logo_uri = config_obj$researcher_logo_uri,
                          apply_weighting = isTRUE(config_obj$apply_weighting)),
-      build_report_tab_nav(brand_colour),
+      build_report_tab_nav(brand_colour, has_qualitative = TRUE,
+                           has_about = any(nzchar(c(
+                             config_obj$analyst_name, config_obj$analyst_email,
+                             config_obj$analyst_phone, config_obj$verbatim_filename,
+                             config_obj$closing_notes)))),
       dashboard_html,
       crosstab_panel,
+      build_qualitative_panel(qualitative_slides, brand_colour),
+      build_about_panel(config_obj),
       pinned_panel,
       build_help_overlay(),
       build_javascript(html_data),
@@ -187,6 +194,7 @@ build_html_page <- function(html_data, tables, config_obj,
                          researcher_logo_uri = config_obj$researcher_logo_uri,
                          apply_weighting = isTRUE(config_obj$apply_weighting)),
       crosstab_content,
+      build_closing_section(config_obj),
       build_help_overlay(),
       build_javascript(html_data)
     )
@@ -705,8 +713,90 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     }
   '
 
+  css_closing <- '
+    /* === CLOSING SECTION (V10.7.0) === */
+    .closing-section {
+      max-width: 1400px; margin: 32px auto 0; padding: 0 32px 32px;
+    }
+    .closing-divider {
+      height: 1px; background: #e2e8f0; margin-bottom: 24px;
+    }
+    .closing-content {
+      background: #f8fafc; border-radius: 8px; padding: 24px;
+      border: 1px solid #e2e8f0;
+    }
+    .closing-contact-grid {
+      display: flex; gap: 32px; flex-wrap: wrap; margin-bottom: 16px;
+    }
+    .closing-contact-item { display: flex; flex-direction: column; }
+    .closing-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 2px;
+    }
+    .closing-value { font-size: 14px; color: #1e293b; font-weight: 500; }
+    .closing-link { color: BRAND; text-decoration: none; }
+    .closing-link:hover { text-decoration: underline; }
+    .closing-verbatim {
+      display: flex; flex-direction: column; margin-bottom: 16px;
+      padding: 12px 16px; background: #fff; border-radius: 6px;
+      border: 1px dashed #e2e8f0;
+    }
+    .closing-notes-section { margin-top: 12px; }
+    .closing-notes-editor {
+      font-size: 14px; line-height: 1.7; color: #1e293b; padding: 12px;
+      background: #fff; border-radius: 6px; border: 1px solid #e2e8f0;
+      min-height: 40px; outline: none;
+    }
+    .closing-notes-editor:empty::before {
+      content: attr(data-placeholder); color: #94a3b8;
+    }
+  '
+
+  css_qualitative <- '
+    /* === QUALITATIVE SLIDES (V10.7.0) === */
+    .qual-slide-card {
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+      padding: 20px; margin-bottom: 16px;
+    }
+    .qual-slide-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .qual-slide-title {
+      font-size: 16px; font-weight: 600; color: #1e293b;
+      outline: none; min-width: 200px; border-bottom: 1px dashed transparent;
+    }
+    .qual-slide-title:focus { border-bottom-color: #e2e8f0; }
+    .qual-slide-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .qual-md-editor {
+      width: 100%; min-height: 100px; padding: 12px; font-size: 13px;
+      border: 1px solid #e2e8f0; border-radius: 6px; font-family: monospace;
+      resize: vertical; display: none; box-sizing: border-box;
+    }
+    .qual-slide-card.editing .qual-md-editor { display: block; }
+    .qual-slide-card.editing .qual-md-rendered { display: none; }
+    .qual-slide-card:not(.editing) .qual-md-editor { display: none; }
+    .qual-md-rendered {
+      font-size: 14px; line-height: 1.7; color: #1e293b; padding: 4px 0;
+      min-height: 24px; cursor: pointer;
+    }
+    .qual-md-rendered:empty::after {
+      content: "Double-click to add content..."; color: #94a3b8; font-style: italic;
+    }
+    .qual-md-rendered h2 { font-size: 16px; font-weight: 600; margin: 12px 0 6px; color: #1e293b; }
+    .qual-md-rendered p { margin: 6px 0; }
+    .qual-md-rendered blockquote {
+      border-left: 3px solid BRAND; padding: 8px 16px; margin: 8px 0;
+      background: #f8fafc; font-style: italic; color: #475569;
+    }
+    .qual-md-rendered ul { padding-left: 20px; margin: 6px 0; }
+    .qual-md-rendered li { margin-bottom: 4px; }
+    .qual-md-rendered strong { font-weight: 700; }
+    .qual-md-rendered em { font-style: italic; }
+  '
+
   # Replace BRAND and ACCENT placeholders with actual colours
-  css_text <- paste0(css_layout, css_tables)
+  css_text <- paste0(css_layout, css_tables, css_closing, css_qualitative)
   css_text <- gsub("ACCENT", ac, css_text, fixed = TRUE)
   css_text <- gsub("BRAND", bc, css_text, fixed = TRUE)
 
@@ -915,6 +1005,8 @@ build_print_css <- function() {
         border-top: 1px solid #ccc;
         margin-top: 8px;
       }
+
+      /* === CLOSING SECTION (inside About tab panel) === */
     }
   '))
 }
@@ -925,7 +1017,25 @@ build_print_css <- function() {
 #' @param brand_colour Character hex colour
 #' @return htmltools::tags$div
 #' @keywords internal
-build_report_tab_nav <- function(brand_colour) {
+build_report_tab_nav <- function(brand_colour, has_qualitative = FALSE, has_about = FALSE) {
+  qual_tab <- if (has_qualitative) {
+    htmltools::tags$button(
+      class = "report-tab",
+      onclick = "switchReportTab('qualitative')",
+      `data-tab` = "qualitative",
+      "\U0001F4DD Added Slides"
+    )
+  }
+
+  about_tab <- if (has_about) {
+    htmltools::tags$button(
+      class = "report-tab",
+      onclick = "switchReportTab('about')",
+      `data-tab` = "about",
+      "\u2139\uFE0F About"
+    )
+  }
+
   htmltools::tags$div(
     class = "report-tabs",
     htmltools::tags$button(
@@ -940,6 +1050,8 @@ build_report_tab_nav <- function(brand_colour) {
       `data-tab` = "crosstabs",
       "\U0001F4CB Crosstabs"
     ),
+    qual_tab,
+    about_tab,
     htmltools::tags$button(
       class = "report-tab",
       onclick = "switchReportTab('pinned')",
@@ -1603,6 +1715,129 @@ build_question_containers <- function(questions, tables, banner_groups,
 }
 
 
+# ==============================================================================
+# COMPONENT: QUALITATIVE SLIDES (V10.7.0)
+# ==============================================================================
+
+#' Build Qualitative Panel
+#'
+#' Creates a tab panel for qualitative/open-ended content slides.
+#' Slides can be seeded from the config Excel and also added/edited in the browser.
+#'
+#' @param slides List of slide objects from load_qualitative_sheet(), or NULL
+#' @param brand_colour Character hex colour
+#' @return htmltools::tags$div
+#' @keywords internal
+build_qualitative_panel <- function(slides = NULL, brand_colour = "#323367") {
+  # Render initial slides from config (if any)
+  slide_cards <- if (!is.null(slides) && length(slides) > 0) {
+    lapply(slides, function(s) {
+      build_qual_slide_card(s$id, s$title, s$content)
+    })
+  }
+
+  htmltools::tags$div(
+    id = "tab-qualitative",
+    class = "tab-panel",
+    htmltools::tags$div(
+      class = "qual-container",
+      style = "max-width:1400px;margin:0 auto;padding:20px 32px;",
+      htmltools::tags$div(
+        class = "qual-header",
+        style = "display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;",
+        htmltools::tags$div(
+          htmltools::tags$h2(style = "font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;",
+                             "Added Slides"),
+          htmltools::tags$p(style = "font-size:12px;color:#64748b;",
+                            "Open-ended findings, quotes, and narrative content. Double-click to edit, use markdown for formatting.")
+        ),
+        htmltools::tags$div(
+          style = "display:flex;gap:8px;",
+          htmltools::tags$button(class = "export-btn", onclick = "addQualSlide()",
+                                 "\u2795 Add Slide"),
+          htmltools::tags$button(class = "export-btn", onclick = "saveReportHTML()",
+                                 "\U0001F4BE Save Report")
+        )
+      ),
+      htmltools::tags$div(
+        class = "qual-md-help",
+        style = "background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px 16px;margin-bottom:16px;font-size:11px;color:#64748b;line-height:1.6;",
+        htmltools::tags$span(style = "font-weight:600;color:#475569;", "Formatting: "),
+        htmltools::HTML(paste0(
+          "<code>**bold**</code> &middot; ",
+          "<code>*italic*</code> &middot; ",
+          "<code>## Heading</code> &middot; ",
+          "<code>- bullet</code> &middot; ",
+          "<code>&gt; quote</code>"
+        ))
+      ),
+      htmltools::tags$div(id = "qual-slides-container", slide_cards),
+      htmltools::tags$div(
+        id = "qual-empty-state",
+        style = paste0(
+          if (!is.null(slides) && length(slides) > 0) "display:none;" else "",
+          "text-align:center;padding:60px 20px;color:#94a3b8;"
+        ),
+        htmltools::tags$div(style = "font-size:36px;margin-bottom:12px;", "\U0001F4DD"),
+        htmltools::tags$div(style = "font-size:14px;font-weight:600;", "No slides yet"),
+        htmltools::tags$div(style = "font-size:12px;margin-top:4px;",
+          "Click 'Add Slide' to create narrative content, or add a 'Qualitative' sheet to your config Excel.")
+      )
+    )
+  )
+}
+
+
+#' Build Single Qualitative Slide Card
+#'
+#' @param slide_id Character unique ID
+#' @param title Character slide title
+#' @param content_md Character markdown content
+#' @return htmltools::tags$div
+#' @keywords internal
+build_qual_slide_card <- function(slide_id, title, content_md) {
+  htmltools::tags$div(
+    class = "qual-slide-card",
+    `data-slide-id` = slide_id,
+    htmltools::tags$div(
+      class = "qual-slide-header",
+      htmltools::tags$div(
+        class = "qual-slide-title",
+        contenteditable = "true",
+        title
+      ),
+      htmltools::tags$div(
+        class = "qual-slide-actions",
+        htmltools::tags$button(class = "export-btn", title = "Pin this slide",
+                               onclick = sprintf("pinQualSlide('%s')", slide_id),
+                               htmltools::HTML("&#x1F4CC;")),
+        htmltools::tags$button(class = "export-btn", title = "Move up",
+                               onclick = sprintf("moveQualSlide('%s','up')", slide_id),
+                               htmltools::HTML("&#x25B2;")),
+        htmltools::tags$button(class = "export-btn", title = "Move down",
+                               onclick = sprintf("moveQualSlide('%s','down')", slide_id),
+                               htmltools::HTML("&#x25BC;")),
+        htmltools::tags$button(class = "export-btn", title = "Remove slide",
+                               style = "color:#e8614d;",
+                               onclick = sprintf("removeQualSlide('%s')", slide_id),
+                               htmltools::HTML("&#x2715;"))
+      )
+    ),
+    # Markdown editor (shown when editing)
+    htmltools::tags$textarea(
+      class = "qual-md-editor",
+      rows = "6",
+      placeholder = "Enter markdown content... (**bold**, *italic*, > quote, - bullet, ## heading)",
+      content_md
+    ),
+    # Rendered output (shown when not editing)
+    htmltools::tags$div(class = "qual-md-rendered"),
+    # Hidden store for save persistence
+    htmltools::tags$textarea(class = "qual-md-store", style = "display:none;", content_md)
+  )
+}
+
+
 #' Build Footer
 #'
 #' @param config_obj Configuration
@@ -1622,6 +1857,113 @@ build_footer <- function(config_obj, min_base = 30) {
   parts <- c(parts, "Generated by Turas Analytics")
 
   htmltools::tags$div(class = "footer", paste(parts, collapse = " \u00B7 "))
+}
+
+
+# ==============================================================================
+# COMPONENT: CLOSING SECTION (V10.7.0)
+# ==============================================================================
+
+#' Build Closing Section
+#'
+#' Professional footer section with analyst contact details, verbatim file
+#' reference, and editable closing notes. Only renders if at least one field
+#' has content.
+#'
+#' @param config_obj Configuration object
+#' @return htmltools::tags$div or NULL
+#' @keywords internal
+build_closing_section <- function(config_obj) {
+  analyst_name     <- config_obj$analyst_name
+  analyst_email    <- config_obj$analyst_email
+  analyst_phone    <- config_obj$analyst_phone
+  verbatim_file    <- config_obj$verbatim_filename
+  closing_notes    <- config_obj$closing_notes
+
+  has_content <- any(sapply(
+    list(analyst_name, analyst_email, analyst_phone, verbatim_file, closing_notes),
+    function(x) !is.null(x) && nzchar(trimws(x))
+  ))
+  if (!has_content) return(NULL)
+
+  # Contact items
+  contact_items <- list()
+  if (!is.null(analyst_name) && nzchar(analyst_name)) {
+    contact_items <- c(contact_items, list(
+      htmltools::tags$div(class = "closing-contact-item",
+        htmltools::tags$span(class = "closing-label", "Analyst"),
+        htmltools::tags$span(class = "closing-value", analyst_name)
+      )
+    ))
+  }
+  if (!is.null(analyst_email) && nzchar(analyst_email)) {
+    contact_items <- c(contact_items, list(
+      htmltools::tags$div(class = "closing-contact-item",
+        htmltools::tags$span(class = "closing-label", "Email"),
+        htmltools::tags$a(class = "closing-value closing-link",
+                          href = paste0("mailto:", analyst_email), analyst_email)
+      )
+    ))
+  }
+  if (!is.null(analyst_phone) && nzchar(analyst_phone)) {
+    contact_items <- c(contact_items, list(
+      htmltools::tags$div(class = "closing-contact-item",
+        htmltools::tags$span(class = "closing-label", "Phone"),
+        htmltools::tags$span(class = "closing-value", analyst_phone)
+      )
+    ))
+  }
+
+  # Verbatim reference
+  verbatim_el <- NULL
+  if (!is.null(verbatim_file) && nzchar(verbatim_file)) {
+    verbatim_el <- htmltools::tags$div(class = "closing-verbatim",
+      htmltools::tags$span(class = "closing-label", "Verbatim Data"),
+      htmltools::tags$span(class = "closing-value", verbatim_file)
+    )
+  }
+
+  # Closing notes (editable in HTML)
+  notes_content <- if (!is.null(closing_notes) && nzchar(closing_notes)) closing_notes else ""
+  notes_el <- htmltools::tags$div(class = "closing-notes-section",
+    htmltools::tags$div(class = "closing-label", "Notes"),
+    htmltools::tags$div(
+      class = "closing-notes-editor",
+      contenteditable = "true",
+      `data-placeholder` = "Add closing notes...",
+      htmltools::HTML(notes_content)
+    ),
+    htmltools::tags$textarea(
+      class = "closing-notes-store",
+      style = "display:none;",
+      notes_content
+    )
+  )
+
+  htmltools::tags$div(
+    class = "closing-section",
+    id = "report-closing-section",
+    htmltools::tags$div(class = "closing-divider"),
+    htmltools::tags$div(class = "closing-content",
+      if (length(contact_items) > 0) {
+        htmltools::tags$div(class = "closing-contact-grid", contact_items)
+      },
+      verbatim_el,
+      notes_el
+    )
+  )
+}
+
+
+#' Wrap Closing Section as an About Tab Panel
+#'
+#' @param config_obj Configuration object
+#' @return htmltools::tags$div (tab-panel) or NULL
+#' @keywords internal
+build_about_panel <- function(config_obj) {
+  content <- build_closing_section(config_obj)
+  if (is.null(content)) return(NULL)
+  htmltools::tags$div(id = "tab-about", class = "tab-panel", content)
 }
 
 

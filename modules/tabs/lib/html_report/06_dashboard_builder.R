@@ -1396,7 +1396,8 @@ build_sig_findings_section <- function(sig_findings, brand_colour) {
 
   if (length(sig_findings) == 0) return(NULL)
 
-  cards <- lapply(sig_findings, function(f) {
+  cards <- lapply(seq_along(sig_findings), function(i) {
+    f <- sig_findings[[i]]
     col_val_display <- format_gauge_value(f$value, f$metric_type)
     total_val_display <- format_gauge_value(f$total_value, f$metric_type)
 
@@ -1422,20 +1423,46 @@ build_sig_findings_section <- function(sig_findings, brand_colour) {
     # Full question text (no truncation — CSS handles wrapping)
     q_text <- f$question_text %||% ""
 
+    # Unique ID for toggle/pin targeting
+    sig_id <- sprintf("sig-%s-%s-%d",
+      gsub("[^a-zA-Z0-9]", "", f$q_code %||% ""),
+      gsub("[^a-zA-Z0-9]", "", f$banner_group %||% ""), i)
+
     htmltools::tags$div(
       class = "dash-sig-card",
+      `data-sig-id` = sig_id,
+      # Action bar: toggle visibility + pin individual finding
       htmltools::tags$div(
-        class = "dash-sig-badges",
-        htmltools::tags$span(class = "dash-sig-metric-badge", f$q_code),
-        htmltools::tags$span(class = "dash-sig-group-badge", f$banner_group),
-        if (nchar(metric_desc) > 0) {
-          htmltools::tags$span(class = "dash-sig-type-badge", metric_desc)
-        }
+        class = "sig-card-actions",
+        htmltools::tags$button(
+          class = "sig-card-toggle-btn",
+          title = "Toggle visibility",
+          onclick = sprintf("toggleSigCard('%s')", sig_id),
+          htmltools::HTML("&#x1F441;")
+        ),
+        htmltools::tags$button(
+          class = "sig-card-pin-btn",
+          title = "Pin this finding",
+          onclick = sprintf("pinSigCard('%s')", sig_id),
+          htmltools::HTML("&#x1F4CC;")
+        )
       ),
-      if (nchar(q_text) > 0) {
-        htmltools::tags$div(class = "dash-sig-question", q_text)
-      },
-      htmltools::tags$div(class = "dash-sig-text", finding_text)
+      # Card content (hidden when toggled off)
+      htmltools::tags$div(
+        class = "sig-card-content",
+        htmltools::tags$div(
+          class = "dash-sig-badges",
+          htmltools::tags$span(class = "dash-sig-metric-badge", f$q_code),
+          htmltools::tags$span(class = "dash-sig-group-badge", f$banner_group),
+          if (nchar(metric_desc) > 0) {
+            htmltools::tags$span(class = "dash-sig-type-badge", metric_desc)
+          }
+        ),
+        if (nchar(q_text) > 0) {
+          htmltools::tags$div(class = "dash-sig-question", q_text)
+        },
+        htmltools::tags$div(class = "dash-sig-text", finding_text)
+      )
     )
   })
 
@@ -1447,8 +1474,8 @@ build_sig_findings_section <- function(sig_findings, brand_colour) {
       htmltools::tags$button(
         class = "dash-export-btn",
         style = "margin-left:12px;",
-        onclick = "pinSigFindings()",
-        htmltools::HTML("&#x1F4CC; Pin to Views")
+        onclick = "pinVisibleSigFindings()",
+        htmltools::HTML("&#x1F4CC; Pin All Visible")
       ),
       htmltools::tags$button(
         class = "dash-export-btn dash-slide-export-btn",
@@ -1458,9 +1485,11 @@ build_sig_findings_section <- function(sig_findings, brand_colour) {
       )
     ),
     htmltools::tags$div(class = "dash-section-sub",
-      "Columns significantly higher than others on headline metrics"
+      "Columns significantly higher than others on headline metrics. Click the eye to hide, pin to save individual findings."
     ),
-    htmltools::tags$div(class = "dash-sig-grid", cards)
+    htmltools::tags$div(class = "dash-sig-grid", cards),
+    # State store for toggle visibility persistence
+    htmltools::tags$script(type = "application/json", id = "sig-card-states", "{}")
   )
 }
 
@@ -1740,7 +1769,20 @@ build_dashboard_css <- function(brand_colour) {
     .dash-sig-card {
       background: #fff; border-radius: 8px; border: 1px solid #e2e8f0;
       padding: 12px 16px; border-left: 3px solid #059669;
+      position: relative; transition: opacity 0.2s;
     }
+    .dash-sig-card.sig-hidden .sig-card-content { display: none; }
+    .dash-sig-card.sig-hidden {
+      opacity: 0.4; border-left-color: #cbd5e1; min-height: 32px;
+    }
+    .sig-card-actions {
+      position: absolute; top: 8px; right: 8px; display: flex; gap: 4px;
+    }
+    .sig-card-actions button {
+      background: none; border: 1px solid #e2e8f0; border-radius: 4px;
+      padding: 2px 6px; font-size: 11px; cursor: pointer; color: #64748b;
+    }
+    .sig-card-actions button:hover { border-color: #94a3b8; color: #1e293b; }
     .dash-sig-badges { display: flex; gap: 6px; margin-bottom: 4px; }
     .dash-sig-metric-badge {
       font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 3px;

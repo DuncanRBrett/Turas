@@ -264,7 +264,20 @@ rewrite_html_onclick_conflicts <- function(html, report_key) {
     "exportAllPinsPNG",
     "printAllPins",
     "saveReportHTML",
-    "hydratePinnedViews"
+    "hydratePinnedViews",
+    # V10.7.0 sig findings toggle/pin + qualitative slides
+    "toggleSigCard",
+    "pinSigCard",
+    "pinVisibleSigFindings",
+    "saveSigCardStates",
+    "hydrateSigCardStates",
+    "renderMarkdown",
+    "addQualSlide",
+    "removeQualSlide",
+    "moveQualSlide",
+    "pinQualSlide",
+    "toggleQualEdit",
+    "renderAllQualSlides"
   )
 
   for (fn in conflict_fns) {
@@ -365,7 +378,20 @@ wrap_js_in_iife <- function(js_blocks, report_key, report_type) {
     "switchReportTab",
     "printAllPins",
     "exportAllPinsPNG",
-    "saveReportHTML"
+    "saveReportHTML",
+    # V10.7.0 sig findings toggle/pin + qualitative slides
+    "toggleSigCard",
+    "pinSigCard",
+    "pinVisibleSigFindings",
+    "saveSigCardStates",
+    "hydrateSigCardStates",
+    "renderMarkdown",
+    "addQualSlide",
+    "removeQualSlide",
+    "moveQualSlide",
+    "pinQualSlide",
+    "toggleQualEdit",
+    "renderAllQualSlides"
   )
 
   prefix <- paste0(report_key, "_")
@@ -553,21 +579,47 @@ pinSelectedCharts = function() {
   };
   ReportHub.addPin("tracker", pinObj);
 };
-pinSigChanges = function() {
+pinSigChanges = function() { %1$spinVisibleSigFindings(); };
+%1$spinSigCard = function(sigId) {
+  var card = %3$s(\'.dash-sig-card[data-sig-id="\' + sigId + \'"]\');
+  if (!card || card.classList.contains("sig-hidden")) return;
+  var clone = card.cloneNode(true);
+  var actions = clone.querySelector(".sig-card-actions");
+  if (actions) actions.remove();
+  var textEl = clone.querySelector(".dash-sig-text");
+  var title = textEl ? textEl.textContent.substring(0, 80) : "Sig Change";
+  var pinObj = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2,5),
+    metricId: "summary-sig-change-" + sigId,
+    metricTitle: "Sig Change: " + title,
+    title: "Sig Change: " + title,
+    visibleSegments: [],
+    tableHtml: clone.outerHTML, chartSvg: "", chartVisible: false,
+    insightText: "", insight: "",
+    timestamp: Date.now()
+  };
+  ReportHub.addPin("tracker", pinObj);
+};
+%1$spinVisibleSigFindings = function() {
   var section = %2$s("summary-section-sig-changes");
   if (!section) return;
-  var cards = section.querySelectorAll(".dash-sig-card");
-  if (cards.length === 0) return;
-  var clone = section.cloneNode(true);
-  var controls = clone.querySelector(".summary-section-controls");
-  if (controls) controls.parentNode.removeChild(controls);
+  var visible = section.querySelectorAll(".dash-sig-card:not(.sig-hidden)");
+  if (visible.length === 0) return;
+  var wrapper = document.createElement("div");
+  wrapper.className = "dash-sig-grid";
+  visible.forEach(function(card) {
+    var clone = card.cloneNode(true);
+    var actions = clone.querySelector(".sig-card-actions");
+    if (actions) actions.remove();
+    wrapper.appendChild(clone);
+  });
   var pinObj = {
     id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2,5),
     metricId: "summary-sig-changes",
     metricTitle: "Significant Changes",
     title: "Significant Changes",
     visibleSegments: [],
-    tableHtml: clone.innerHTML, chartSvg: "", chartVisible: false,
+    tableHtml: wrapper.outerHTML, chartSvg: "", chartVisible: false,
     insightText: "", insight: "",
     timestamp: Date.now()
   };
@@ -623,17 +675,60 @@ pinGaugeSection = function(sectionId) {
   };
   ReportHub.addPin("tabs", pinObj);
 };
-pinSigFindings = function() {
-  var section = %2$s("dash-sec-sig-findings");
-  if (!section) return;
-  var cards = section.querySelectorAll(".dash-sig-card");
-  if (cards.length === 0) return;
-  var clone = section.cloneNode(true);
-  clone.querySelectorAll(".dash-export-btn, .dash-slide-export-btn").forEach(function(btn) { btn.remove(); });
+pinSigFindings = function() { %1$spinVisibleSigFindings(); };
+%1$spinSigCard = function(sigId) {
+  var card = %3$s(\'.dash-sig-card[data-sig-id="\' + sigId + \'"]\');
+  if (!card || card.classList.contains("sig-hidden")) return;
+  var clone = card.cloneNode(true);
+  var actions = clone.querySelector(".sig-card-actions");
+  if (actions) actions.remove();
+  var textEl = clone.querySelector(".dash-sig-text");
+  var title = textEl ? textEl.textContent.substring(0, 80) : "Sig Finding";
   var pinObj = {
     id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2,5),
-    pinType: "dashboard_section", qCode: null, title: "Significant Findings", subtitle: "",
-    insight: null, tableHtml: clone.innerHTML, chartSvg: null,
+    pinType: "dashboard_section", qCode: null,
+    title: "Sig Finding: " + title, subtitle: "",
+    insight: null, tableHtml: clone.outerHTML, chartSvg: null,
+    baseText: null, timestamp: Date.now()
+  };
+  ReportHub.addPin("tabs", pinObj);
+};
+%1$spinVisibleSigFindings = function() {
+  var section = %2$s("dash-sec-sig-findings");
+  if (!section) return;
+  var visible = section.querySelectorAll(".dash-sig-card:not(.sig-hidden)");
+  if (visible.length === 0) return;
+  var wrapper = document.createElement("div");
+  wrapper.className = "dash-sig-grid";
+  visible.forEach(function(card) {
+    var clone = card.cloneNode(true);
+    var actions = clone.querySelector(".sig-card-actions");
+    if (actions) actions.remove();
+    wrapper.appendChild(clone);
+  });
+  var pinObj = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2,5),
+    pinType: "dashboard_section", qCode: null,
+    title: "Significant Findings", subtitle: "",
+    insight: null, tableHtml: wrapper.outerHTML, chartSvg: null,
+    baseText: null, timestamp: Date.now()
+  };
+  ReportHub.addPin("tabs", pinObj);
+};
+%1$spinQualSlide = function(slideId) {
+  var card = %3$s(\'.qual-slide-card[data-slide-id="\' + slideId + \'"]\');
+  if (!card) return;
+  var titleEl = card.querySelector(".qual-slide-title");
+  var rendered = card.querySelector(".qual-md-rendered");
+  var editor = card.querySelector(".qual-md-editor");
+  if (rendered && editor) rendered.innerHTML = %1$srenderMarkdown(editor.value);
+  var pinObj = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2,5),
+    pinType: "text_box", qCode: null,
+    title: titleEl ? titleEl.textContent.trim() : "Qualitative Slide",
+    subtitle: "",
+    insight: rendered ? rendered.innerHTML : "",
+    tableHtml: null, chartSvg: null,
     baseText: null, timestamp: Date.now()
   };
   ReportHub.addPin("tabs", pinObj);
@@ -641,7 +736,7 @@ pinSigFindings = function() {
 %1$shydratePinnedViews = function() {};
 %1$srenderPinnedCards = function() { ReportHub.renderPinnedCards(); };
 // ===== End Hub Pin Bridge =====
-', prefix, id_helper)
+', prefix, id_helper, qs_helper)
   }
 }
 

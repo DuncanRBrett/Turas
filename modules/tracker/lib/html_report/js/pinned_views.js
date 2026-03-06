@@ -992,6 +992,13 @@ function saveReportHTML() {
     }
   });
 
+  // Sync closing notes editor to hidden store
+  var closingEditor = document.querySelector(".closing-notes-editor");
+  var closingStore = document.querySelector(".closing-notes-store");
+  if (closingEditor && closingStore) {
+    closingStore.textContent = closingEditor.innerHTML;
+  }
+
   // Save summary editor contents
   document.querySelectorAll(".summary-editor").forEach(function(editor) {
     editor.setAttribute("data-saved-content", editor.innerHTML);
@@ -1056,36 +1063,114 @@ function pinSummarySection(sectionType) {
  * Pin the Significant Changes section to Pinned Views.
  * Captures the entire sig changes grid as a single pinned card.
  */
-function pinSigChanges() {
+function pinSigChanges() { pinVisibleSigFindings(); }
+
+/**
+ * Toggle visibility of an individual sig finding/change card.
+ */
+function toggleSigCard(sigId) {
+  var card = document.querySelector('.dash-sig-card[data-sig-id="' + sigId + '"]');
+  if (!card) return;
+  card.classList.toggle("sig-hidden");
+  saveSigCardStates();
+}
+
+/**
+ * Pin an individual sig finding/change card to Pinned Views.
+ */
+function pinSigCard(sigId) {
+  var card = document.querySelector('.dash-sig-card[data-sig-id="' + sigId + '"]');
+  if (!card || card.classList.contains("sig-hidden")) return;
+  var clone = card.cloneNode(true);
+  var actions = clone.querySelector(".sig-card-actions");
+  if (actions) actions.remove();
+  clone.classList.remove("sig-hidden");
+
+  var textEl = clone.querySelector(".dash-sig-text");
+  var title = textEl ? textEl.textContent.substring(0, 80) : "Sig Change";
+
+  var pinObj = {
+    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+    metricId: "summary-sig-change-" + sigId,
+    metricTitle: "Sig Change: " + title,
+    visibleSegments: [],
+    tableHtml: clone.outerHTML,
+    chartSvg: "", chartVisible: false,
+    insightText: "",
+    timestamp: Date.now(),
+    order: pinnedViews.length
+  };
+  pinnedViews.push(pinObj);
+  renderPinnedCards();
+  updatePinBadge();
+  savePinnedData();
+}
+
+/**
+ * Pin only the visible (non-hidden) sig change cards.
+ */
+function pinVisibleSigFindings() {
   var section = document.getElementById("summary-section-sig-changes");
   if (!section) return;
+  var visible = section.querySelectorAll(".dash-sig-card:not(.sig-hidden)");
+  if (visible.length === 0) return;
 
-  // Check for empty state (no actual cards)
-  var cards = section.querySelectorAll(".dash-sig-card");
-  if (cards.length === 0) return;
-
-  // Clone the section and strip interactive controls
-  var clone = section.cloneNode(true);
-  var controls = clone.querySelector(".summary-section-controls");
-  if (controls) controls.parentNode.removeChild(controls);
+  var wrapper = document.createElement("div");
+  wrapper.className = "dash-sig-grid";
+  visible.forEach(function(card) {
+    var clone = card.cloneNode(true);
+    var actions = clone.querySelector(".sig-card-actions");
+    if (actions) actions.remove();
+    wrapper.appendChild(clone);
+  });
 
   var pinObj = {
     id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
     metricId: "summary-sig-changes",
     metricTitle: "Significant Changes",
     visibleSegments: [],
-    tableHtml: clone.innerHTML,
-    chartSvg: "",
-    chartVisible: false,
+    tableHtml: wrapper.outerHTML,
+    chartSvg: "", chartVisible: false,
     insightText: "",
     timestamp: Date.now(),
     order: pinnedViews.length
   };
-
   pinnedViews.push(pinObj);
   renderPinnedCards();
   updatePinBadge();
   savePinnedData();
+}
+
+/**
+ * Persist sig card toggle states to hidden JSON store.
+ */
+function saveSigCardStates() {
+  var store = document.getElementById("sig-card-states");
+  if (!store) return;
+  var states = {};
+  document.querySelectorAll(".dash-sig-card[data-sig-id]").forEach(function(card) {
+    if (card.classList.contains("sig-hidden")) {
+      states[card.getAttribute("data-sig-id")] = true;
+    }
+  });
+  store.textContent = JSON.stringify(states);
+}
+
+/**
+ * Restore sig card toggle states from hidden JSON store.
+ */
+function hydrateSigCardStates() {
+  var store = document.getElementById("sig-card-states");
+  if (!store || !store.textContent || store.textContent === "{}") return;
+  try {
+    var states = JSON.parse(store.textContent);
+    for (var sigId in states) {
+      if (states[sigId]) {
+        var card = document.querySelector('.dash-sig-card[data-sig-id="' + sigId + '"]');
+        if (card) card.classList.add("sig-hidden");
+      }
+    }
+  } catch(e) {}
 }
 
 /**
@@ -1293,4 +1378,11 @@ function exportSummaryTableSlide() {
 
 document.addEventListener("DOMContentLoaded", function() {
   hydratePinnedViews();
+  hydrateSigCardStates();
+  // Hydrate closing notes from hidden store
+  var closingStore = document.querySelector(".closing-notes-store");
+  var closingEditor = document.querySelector(".closing-notes-editor");
+  if (closingStore && closingStore.value && closingEditor) {
+    closingEditor.innerHTML = closingStore.value;
+  }
 });

@@ -51,12 +51,14 @@ build_level2_nav <- function(report_key, tab_names, tab_labels = NULL, report_ty
       tab_labels <- c(
         summary = "Summary",
         metrics = "Metrics by Segment",
-        overview = "Segment Overview"
+        overview = "Segment Overview",
+        about = "About"
       )
     } else {
       tab_labels <- c(
         summary = "Summary",
-        crosstabs = "Crosstabs"
+        crosstabs = "Crosstabs",
+        about = "About"
       )
     }
   }

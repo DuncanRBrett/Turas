@@ -71,7 +71,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .dash-section-title { font-size: 16px; font-weight: 700; color: var(--brand); margin-bottom: 4px; }
 .dash-section-sub { font-size: 12px; color: #64748b; margin-bottom: 12px; }
 .dash-sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.dash-sig-card { background: #fff; border-radius: 8px; border: 1px solid #e2e8f0; padding: 12px 16px; border-left: 3px solid #059669; }
+.dash-sig-card { background: #fff; border-radius: 8px; border: 1px solid #e2e8f0; padding: 12px 16px; border-left: 3px solid #059669; position: relative; transition: opacity 0.2s; }
+.dash-sig-card.sig-hidden .sig-card-content { display: none; }
+.dash-sig-card.sig-hidden { opacity: 0.4; border-left-color: #cbd5e1; min-height: 32px; }
+.sig-card-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; }
+.sig-card-actions button { background: none; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 6px; font-size: 11px; cursor: pointer; color: #64748b; }
+.sig-card-actions button:hover { border-color: #94a3b8; color: #1e293b; }
 .dash-sig-badges { display: flex; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
 .dash-sig-metric-badge { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 3px; background: rgba(26,39,68,0.06); color: #1a2744; letter-spacing: 0.5px; }
 .dash-sig-group-badge { font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 3px; background: rgba(13,138,138,0.08); color: var(--brand); }
@@ -432,6 +437,43 @@ body.hide-sparklines .tk-sparkline-wrap { display: none; }
 .tk-help-body h3 { margin: 16px 0 6px; font-size: 14px; color: var(--brand); }
 .tk-help-body p { color: var(--text-muted); font-size: 13px; }
 .tk-help-body ul { margin-left: 20px; color: var(--text-muted); font-size: 13px; }
+
+/* ---- CLOSING / ABOUT SECTION ---- */
+.closing-section {
+  max-width: 1400px; margin: 32px auto 0; padding: 0 32px 32px;
+}
+.closing-divider {
+  height: 1px; background: #e2e8f0; margin-bottom: 24px;
+}
+.closing-content {
+  background: #f8fafc; border-radius: 8px; padding: 24px;
+  border: 1px solid #e2e8f0;
+}
+.closing-contact-grid {
+  display: flex; gap: 32px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.closing-contact-item { display: flex; flex-direction: column; }
+.closing-label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 2px;
+}
+.closing-value { font-size: 14px; color: #1e293b; font-weight: 500; }
+.closing-link { color: var(--brand); text-decoration: none; }
+.closing-link:hover { text-decoration: underline; }
+.closing-verbatim {
+  display: flex; flex-direction: column; margin-bottom: 16px;
+  padding: 12px 16px; background: #fff; border-radius: 6px;
+  border: 1px dashed #e2e8f0;
+}
+.closing-notes-section { margin-top: 12px; }
+.closing-notes-editor {
+  font-size: 14px; line-height: 1.7; color: #1e293b; padding: 12px;
+  background: #fff; border-radius: 6px; border: 1px solid #e2e8f0;
+  min-height: 40px; outline: none;
+}
+.closing-notes-editor:empty::before {
+  content: attr(data-placeholder); color: #94a3b8;
+}
 
 /* Footer */
 .tk-footer { padding: 16px 24px; border-top: 1px solid var(--border); background: var(--card); display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }

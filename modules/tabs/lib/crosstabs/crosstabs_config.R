@@ -222,7 +222,14 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     show_charts = safe_logical(get_config_value(config, "show_charts", FALSE)),
 
     # V10.6.0 Report enhancements
-    priority_metric = get_config_value(config, "priority_metric", NULL)
+    priority_metric = get_config_value(config, "priority_metric", NULL),
+
+    # V10.7.0 Closing section & qualitative content
+    analyst_name = get_config_value(config, "analyst_name", NULL),
+    analyst_email = get_config_value(config, "analyst_email", NULL),
+    analyst_phone = get_config_value(config, "analyst_phone", NULL),
+    verbatim_filename = get_config_value(config, "verbatim_filename", NULL),
+    closing_notes = get_config_value(config, "closing_notes", NULL)
   )
 }
 
@@ -305,6 +312,60 @@ load_comments_sheet <- function(config_file) {
 
 
 # ==============================================================================
+# QUALITATIVE SHEET LOADER (V10.7.0)
+# ==============================================================================
+
+#' Load Optional Qualitative Sheet from Config Excel
+#'
+#' Reads a "Qualitative" sheet from the config workbook if it exists.
+#' Expected columns: slide_title, content (markdown), display_order (optional).
+#' Returns a list of slide objects or NULL if sheet is absent.
+#'
+#' @param config_file Character, path to config Excel file
+#' @return List of slide objects, or NULL
+#' @keywords internal
+load_qualitative_sheet <- function(config_file) {
+  tryCatch({
+    sheets <- openxlsx::getSheetNames(config_file)
+    if (!"Qualitative" %in% sheets) return(NULL)
+
+    df <- openxlsx::read.xlsx(config_file, sheet = "Qualitative")
+    if (is.null(df) || nrow(df) == 0) return(NULL)
+
+    if (!"slide_title" %in% names(df) || !"content" %in% names(df)) {
+      cat("  [INFO] Qualitative sheet found but missing slide_title/content columns - skipped\n")
+      return(NULL)
+    }
+
+    # Filter valid rows
+    df <- df[!is.na(df$slide_title) & nzchar(trimws(df$slide_title)), , drop = FALSE]
+    if (nrow(df) == 0) return(NULL)
+
+    # Add display_order if not present
+    if (!"display_order" %in% names(df)) {
+      df$display_order <- seq_len(nrow(df))
+    }
+    df <- df[order(df$display_order), , drop = FALSE]
+
+    slides <- lapply(seq_len(nrow(df)), function(i) {
+      list(
+        id = sprintf("qual-slide-%d", i),
+        title = trimws(df$slide_title[i]),
+        content = trimws(df$content[i] %||% ""),
+        order = i
+      )
+    })
+
+    cat(sprintf("  [INFO] Loaded %d qualitative slides from config\n", length(slides)))
+    slides
+  }, error = function(e) {
+    cat(sprintf("  [WARNING] Could not read Qualitative sheet: %s\n", e$message))
+    NULL
+  })
+}
+
+
+# ==============================================================================
 # FULL CONFIGURATION LOADER
 # ==============================================================================
 
@@ -330,6 +391,9 @@ load_crosstabs_config <- function(config_file) {
 
   # Load optional Comments sheet (V10.6.0)
   config_obj$comments <- load_comments_sheet(config_file)
+
+  # Load optional Qualitative sheet (V10.7.0)
+  config_obj$qualitative_slides <- load_qualitative_sheet(config_file)
 
   # Resolve logo paths against project root so HTML report gets absolute paths
   # Helper: resolve a single logo path, trying multiple candidate locations

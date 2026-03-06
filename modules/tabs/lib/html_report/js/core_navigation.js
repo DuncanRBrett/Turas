@@ -424,6 +424,24 @@ function saveReportHTML() {
     }
   });
 
+  // Sync closing notes editor to hidden store
+  var closingEditor = document.querySelector(".closing-notes-editor");
+  var closingStore = document.querySelector(".closing-notes-store");
+  if (closingEditor && closingStore) {
+    closingStore.textContent = closingEditor.innerHTML;
+  }
+
+  // Sync qualitative slide editors to their stores
+  document.querySelectorAll(".qual-slide-card").forEach(function(card) {
+    var editor = card.querySelector(".qual-md-editor");
+    var store = card.querySelector(".qual-md-store");
+    if (editor && store) store.value = editor.value;
+    // Exit edit mode before save
+    card.classList.remove("editing");
+    var rendered = card.querySelector(".qual-md-rendered");
+    if (rendered && editor) rendered.innerHTML = renderMarkdown(editor.value);
+  });
+
   // Before serializing, clear editor contenteditable (data lives in textarea store)
   // The hydrate function will restore editors from stores on re-open
   document.querySelectorAll(".insight-area").forEach(function(area) {
