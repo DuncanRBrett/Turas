@@ -247,7 +247,7 @@ run_tabs_gui <- function() {
           project_data(list(
             path = dir_path,
             configs = configs,
-            selected_config = if(length(configs) > 0) configs[1] else NULL
+            selected_configs = if(length(configs) > 0) configs else character(0)
           ))
           add_recent_project(dir_path)
         }
@@ -264,19 +264,32 @@ run_tabs_gui <- function() {
         project_data(list(
           path = dir_path,
           configs = configs,
-          selected_config = if(length(configs) > 0) configs[1] else NULL
+          selected_configs = if(length(configs) > 0) configs else character(0)
         ))
         add_recent_project(dir_path)
       }
     })
     
-    # Handle config selection
+    # Handle config selection (multi-select)
     observeEvent(input$config_select, {
       data <- project_data()
       if (!is.null(data)) {
-        data$selected_config <- input$config_select
+        data$selected_configs <- input$config_select
         project_data(data)
       }
+    }, ignoreNULL = FALSE)
+
+    # Select All configs
+    observeEvent(input$select_all_configs, {
+      data <- project_data()
+      if (!is.null(data) && length(data$configs) > 0) {
+        updateCheckboxGroupInput(session, "config_select", selected = data$configs)
+      }
+    })
+
+    # Deselect All configs
+    observeEvent(input$deselect_all_configs, {
+      updateCheckboxGroupInput(session, "config_select", selected = character(0))
     })
     
     # Project display
@@ -319,30 +332,45 @@ run_tabs_gui <- function() {
       )
     })
     
-    # Config selection UI
+    # Config selection UI (multi-select)
     output$config_ui <- renderUI({
       data <- project_data()
       if (is.null(data) || length(data$configs) == 0) return(NULL)
-      
+
       div(class = "card",
-        h3("2. Select Configuration File"),
-        radioButtons("config_select",
+        h3("2. Select Configuration Files"),
+        p(style = "color: #666; margin-bottom: 10px;",
+          "Select one or more config files to run. Each will produce a separate report."),
+        div(style = "margin-bottom: 10px;",
+          actionLink("select_all_configs", "Select All",
+                     style = "margin-right: 15px; font-weight: 600;"),
+          actionLink("deselect_all_configs", "Deselect All",
+                     style = "font-weight: 600;")
+        ),
+        checkboxGroupInput("config_select",
                     NULL,
-                    choices = setNames(data$configs, paste("📄", data$configs)),
-                    selected = data$selected_config)
+                    choices = setNames(data$configs, paste("\U0001F4C4", data$configs)),
+                    selected = data$selected_configs)
       )
     })
     
     # Run button UI
     output$run_ui <- renderUI({
       data <- project_data()
-      if (is.null(data) || is.null(data$selected_config)) return(NULL)
-      
+      if (is.null(data) || length(data$selected_configs) == 0) return(NULL)
+
+      n_selected <- length(data$selected_configs)
+      btn_label <- if (n_selected == 1) {
+        "RUN ANALYSIS"
+      } else {
+        sprintf("RUN %d ANALYSES", n_selected)
+      }
+
       div(class = "card",
         h3("3. Run Analysis"),
         div(style = "text-align: center; margin: 20px 0;",
-          actionButton("run_btn", 
-                      "RUN ANALYSIS", 
+          actionButton("run_btn",
+                      btn_label,
                       class = "btn-run",
                       icon = icon("play-circle"),
                       disabled = is_running())
@@ -366,13 +394,18 @@ run_tabs_gui <- function() {
       console_output()
     })
     
-    # Run analysis
+    # Run analysis (supports multiple configs sequentially)
     observeEvent(input$run_btn, {
       data <- project_data()
-      req(data, data$selected_config)
+      req(data, length(data$selected_configs) > 0)
 
       is_running(TRUE)
-      console_output("Starting analysis...\n\n")
+
+      selected_configs <- data$selected_configs
+      n_configs <- length(selected_configs)
+
+      console_output(sprintf("Starting analysis for %d configuration file%s...\n\n",
+                             n_configs, if (n_configs > 1) "s" else ""))
 
       # Save current working directory
       old_wd <- getwd()
@@ -387,133 +420,226 @@ run_tabs_gui <- function() {
         return()
       }
 
-      # Update console
-      console_output(paste0(
-        console_output(),
-        sprintf("Project: %s\n", data$path),
-        sprintf("Config: %s\n", data$selected_config),
-        sprintf("\n%s\n\n", strrep("=", 80))
-      ))
+      # Track overall results
+      results_summary <- list()
+      overall_start <- Sys.time()
 
-      # Change to modules/tabs/lib directory where all the analysis scripts are
-      setwd(tabs_lib_dir)
+      # --- Loop over each selected config ---
+      for (config_idx in seq_along(selected_configs)) {
+        current_config <- selected_configs[config_idx]
 
-      # Set config_file as global variable (script expects this)
-      assign("config_file", file.path(data$path, data$selected_config), envir = .GlobalEnv)
-
-      # Create Shiny progress bar updater (replaces log_progress)
-      # This function will be called by process_all_questions()
-      shiny_progress_callback <- function(current, total, item, start_time) {
-        # Calculate progress percentage
-        progress_value <- current / total
-
-        # Build detail message
-        elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
-        rate <- elapsed / current
-        remaining <- (total - current) * rate
-
-        eta_str <- if (remaining < 60) {
-          sprintf("%.0fs", remaining)
-        } else if (remaining < 3600) {
-          sprintf("%.1fm", remaining / 60)
+        # Header for this config run
+        config_header <- if (n_configs > 1) {
+          sprintf("\n%s\n  CONFIG %d of %d: %s\n%s\n",
+                  strrep("=", 80), config_idx, n_configs, current_config, strrep("=", 80))
         } else {
-          sprintf("%.1fh", remaining / 3600)
+          sprintf("\n%s\n", strrep("=", 80))
         }
 
-        detail_msg <- sprintf("Processing %s... (%d/%d) | ETA: %s",
-                             item, current, total, eta_str)
+        console_output(paste0(
+          console_output(),
+          config_header,
+          sprintf("Project: %s\n", data$path),
+          sprintf("Config:  %s\n\n", current_config)
+        ))
 
-        # Update Shiny progress bar
-        setProgress(progress_value, detail = detail_msg)
-      }
+        # Change to modules/tabs/lib directory where all the analysis scripts are
+        setwd(tabs_lib_dir)
 
-      # Set the custom progress callback as a global variable
-      # (run_crosstabs.R will use this if it exists)
-      assign("gui_progress_callback", shiny_progress_callback, envir = .GlobalEnv)
+        # Set config_file as global variable (script expects this)
+        assign("config_file", file.path(data$path, current_config), envir = .GlobalEnv)
 
-      # Run analysis with progress bar
-      withProgress(message = 'Running Analysis', value = 0, {
+        # Create Shiny progress bar updater (replaces log_progress)
+        # This function will be called by process_all_questions()
+        shiny_progress_callback <- function(current, total, item, start_time) {
+          # Calculate progress percentage
+          progress_value <- current / total
 
-        # Run analysis and capture ALL console output (including validation errors)
-        # Use sink() to capture output even when errors occur
-        output_file <- tempfile()
-        sink(output_file, type = "output")
+          # Build detail message
+          elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+          rate <- elapsed / current
+          remaining <- (total - current) * rate
 
-        analysis_result <- tryCatch({
-          source("run_crosstabs.R", local = FALSE)  # local = FALSE so it uses global config_file
-          list(success = TRUE, error = NULL)
+          eta_str <- if (remaining < 60) {
+            sprintf("%.0fs", remaining)
+          } else if (remaining < 3600) {
+            sprintf("%.1fm", remaining / 60)
+          } else {
+            sprintf("%.1fh", remaining / 3600)
+          }
 
-        }, error = function(e) {
-          list(success = FALSE, error = e)
+          # Include config context in progress message for multi-config runs
+          config_prefix <- if (n_configs > 1) {
+            sprintf("[%d/%d] ", config_idx, n_configs)
+          } else {
+            ""
+          }
 
-        }, finally = {
-          # Always restore console output
-          sink(type = "output")
+          detail_msg <- sprintf("%sProcessing %s... (%d/%d) | ETA: %s",
+                               config_prefix, item, current, total, eta_str)
+
+          # Update Shiny progress bar
+          setProgress(progress_value, detail = detail_msg)
+        }
+
+        # Set the custom progress callback as a global variable
+        assign("gui_progress_callback", shiny_progress_callback, envir = .GlobalEnv)
+
+        # Run analysis with progress bar
+        progress_msg <- if (n_configs > 1) {
+          sprintf("Running Analysis [%d/%d]: %s", config_idx, n_configs, current_config)
+        } else {
+          "Running Analysis"
+        }
+
+        withProgress(message = progress_msg, value = 0, {
+
+          # Run analysis and capture ALL console output (including validation errors)
+          output_file <- tempfile()
+          sink(output_file, type = "output")
+
+          analysis_result <- tryCatch({
+            source("run_crosstabs.R", local = FALSE)
+            list(success = TRUE, error = NULL)
+
+          }, error = function(e) {
+            list(success = FALSE, error = e)
+
+          }, finally = {
+            sink(type = "output")
+          })
         })
-      })
 
-      # Read captured output (available even if error occurred)
-      captured_output <- readLines(output_file, warn = FALSE)
-      unlink(output_file)
+        # Read captured output
+        captured_output <- readLines(output_file, warn = FALSE)
+        unlink(output_file)
 
-      # Append captured output to console (works for both success and error cases)
-      if (length(captured_output) > 0) {
-        console_output(paste0(
-          console_output(),
-          paste(captured_output, collapse = "\n"),
-          "\n"
-        ))
-      }
-
-      # Handle success or error
-      if (analysis_result$success) {
-        # Get actual output path from config
-        config_settings <- tryCatch({
-          load_config_settings(file.path(data$path, data$selected_config))
-        }, error = function(e) list())
-        output_subfolder <- get_config_value(config_settings, "output_subfolder", "Crosstabs")
-
-        # Update console with completion message
-        console_output(paste0(
-          console_output(),
-          sprintf("\n%s\n✓ ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80)),
-          sprintf("\nOutput files saved to:\n%s\n", file.path(data$path, output_subfolder))
-        ))
-
-        showNotification("Analysis completed successfully!", type = "message", duration = 5)
-
-      } else {
-        # Display error with full details
-        error_msg <- analysis_result$error$message
-        error_call <- if (!is.null(analysis_result$error$call)) {
-          paste0("\nCall: ", deparse(analysis_result$error$call))
-        } else {
-          ""
+        if (length(captured_output) > 0) {
+          console_output(paste0(
+            console_output(),
+            paste(captured_output, collapse = "\n"),
+            "\n"
+          ))
         }
 
-        error_output <- paste0(
-          console_output(),
-          "\n\n",
-          strrep("=", 80), "\n",
-          "ERROR\n",
-          strrep("=", 80), "\n",
-          error_msg, "\n",
-          error_call, "\n",
-          "\nConfig file: ", file.path(data$path, data$selected_config), "\n",
-          "File exists: ", file.exists(file.path(data$path, data$selected_config)), "\n"
-        )
-        console_output(error_output)
-        showNotification(paste("Error:", error_msg), type = "error", duration = 10)
+        # Handle result for this config
+        if (analysis_result$success) {
+          config_settings <- tryCatch({
+            load_config_settings(file.path(data$path, current_config))
+          }, error = function(e) list())
+          output_subfolder <- get_config_value(config_settings, "output_subfolder", "Crosstabs")
+
+          console_output(paste0(
+            console_output(),
+            sprintf("\n%s %s\n", "\U2713", current_config),
+            sprintf("  Output: %s\n", file.path(data$path, output_subfolder))
+          ))
+
+          results_summary[[current_config]] <- list(
+            success = TRUE,
+            output_dir = file.path(data$path, output_subfolder)
+          )
+
+        } else {
+          error_msg <- analysis_result$error$message
+          error_call <- if (!is.null(analysis_result$error$call)) {
+            paste0("\n  Call: ", deparse(analysis_result$error$call))
+          } else {
+            ""
+          }
+
+          console_output(paste0(
+            console_output(),
+            sprintf("\n%s %s\n", "\U2717", current_config),
+            sprintf("  Error: %s%s\n", error_msg, error_call)
+          ))
+
+          results_summary[[current_config]] <- list(
+            success = FALSE,
+            error = error_msg
+          )
+        }
+
+        # Clean up global config_file between runs
+        if (exists("config_file", envir = .GlobalEnv)) {
+          rm("config_file", envir = .GlobalEnv)
+        }
+
+        # Restore working directory between runs
+        setwd(old_wd)
       }
 
-      # Clean up global variables
-      if (exists("config_file", envir = .GlobalEnv)) {
-        rm("config_file", envir = .GlobalEnv)
+      # --- Overall summary ---
+      n_success <- sum(sapply(results_summary, function(x) x$success))
+      n_failed <- n_configs - n_success
+      elapsed_total <- as.numeric(difftime(Sys.time(), overall_start, units = "secs"))
+
+      elapsed_str <- if (elapsed_total < 60) {
+        sprintf("%.0f seconds", elapsed_total)
+      } else {
+        sprintf("%.1f minutes", elapsed_total / 60)
       }
+
+      summary_text <- paste0(
+        "\n", strrep("=", 80), "\n",
+        if (n_configs > 1) {
+          sprintf("  BATCH COMPLETE: %d of %d succeeded in %s\n", n_success, n_configs, elapsed_str)
+        } else if (n_success == 1) {
+          sprintf("  \U2713 ANALYSIS COMPLETE (%s)\n", elapsed_str)
+        } else {
+          sprintf("  \U2717 ANALYSIS FAILED\n")
+        },
+        strrep("=", 80), "\n"
+      )
+
+      # List output locations for successful runs
+      if (n_success > 0) {
+        summary_text <- paste0(summary_text, "\nOutput files:\n")
+        for (cfg_name in names(results_summary)) {
+          r <- results_summary[[cfg_name]]
+          if (r$success) {
+            summary_text <- paste0(summary_text, sprintf("  \U2713 %s\n    %s\n", cfg_name, r$output_dir))
+          }
+        }
+      }
+
+      # List failures
+      if (n_failed > 0) {
+        summary_text <- paste0(summary_text, "\nFailed:\n")
+        for (cfg_name in names(results_summary)) {
+          r <- results_summary[[cfg_name]]
+          if (!r$success) {
+            summary_text <- paste0(summary_text, sprintf("  \U2717 %s: %s\n", cfg_name, r$error))
+          }
+        }
+      }
+
+      console_output(paste0(console_output(), summary_text))
+
+      # Notifications
+      if (n_failed == 0) {
+        msg <- if (n_configs > 1) {
+          sprintf("All %d analyses completed successfully!", n_configs)
+        } else {
+          "Analysis completed successfully!"
+        }
+        showNotification(msg, type = "message", duration = 5)
+      } else if (n_success > 0) {
+        showNotification(
+          sprintf("%d of %d analyses completed. %d failed.", n_success, n_configs, n_failed),
+          type = "warning", duration = 10
+        )
+      } else {
+        showNotification(
+          sprintf("All %d analyses failed. Check console for details.", n_configs),
+          type = "error", duration = 10
+        )
+      }
+
+      # Final cleanup
       if (exists("gui_progress_callback", envir = .GlobalEnv)) {
         rm("gui_progress_callback", envir = .GlobalEnv)
       }
-      # Restore original working directory
       setwd(old_wd)
       is_running(FALSE)
     })
