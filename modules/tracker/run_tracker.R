@@ -244,7 +244,7 @@ run_tracker <- function(tracking_config_path,
   # ============================================================================
   # STEP 1: Load Configuration
   # ============================================================================
-  cat("\n[1/6] LOADING CONFIGURATION\n")
+  cat("\n[1/8] LOADING CONFIGURATION\n")
   cat("================================================================================\n")
 
   config <- load_tracking_config(tracking_config_path)
@@ -258,7 +258,7 @@ run_tracker <- function(tracking_config_path,
   # ============================================================================
   # STEP 2: Load Question Mapping
   # ============================================================================
-  cat("\n[2/6] LOADING QUESTION MAPPING\n")
+  cat("\n[2/8] LOADING QUESTION MAPPING\n")
   cat("================================================================================\n")
 
   question_mapping <- load_question_mapping(question_mapping_path)
@@ -270,7 +270,7 @@ run_tracker <- function(tracking_config_path,
   # ============================================================================
   # STEP 3: Validate Configuration
   # ============================================================================
-  cat("\n[3/6] VALIDATING CONFIGURATION\n")
+  cat("\n[3/8] VALIDATING CONFIGURATION\n")
   cat("================================================================================\n")
 
   validate_tracking_config(config, question_mapping)
@@ -279,7 +279,7 @@ run_tracker <- function(tracking_config_path,
   # ============================================================================
   # STEP 4: Load Wave Data
   # ============================================================================
-  cat("\n[4/6] LOADING WAVE DATA\n")
+  cat("\n[4/8] LOADING WAVE DATA\n")
   cat("================================================================================\n")
 
   wave_load_result <- load_all_waves(config, data_dir, question_mapping)
@@ -294,7 +294,7 @@ run_tracker <- function(tracking_config_path,
   # ============================================================================
   # STEP 5: Validate Wave Data
   # ============================================================================
-  cat("\n[5/6] VALIDATING WAVE DATA\n")
+  cat("\n[5/8] VALIDATING WAVE DATA\n")
   cat("================================================================================\n")
 
   validate_wave_data(wave_data, config, question_mapping)
@@ -303,7 +303,7 @@ run_tracker <- function(tracking_config_path,
   # ============================================================================
   # STEP 6: Comprehensive Validation
   # ============================================================================
-  cat("\n[6/6] RUNNING COMPREHENSIVE VALIDATION\n")
+  cat("\n[6/8] RUNNING COMPREHENSIVE VALIDATION\n")
   cat("================================================================================\n")
 
   validation_results <- validate_tracker_setup(
@@ -404,9 +404,11 @@ run_tracker <- function(tracking_config_path,
     tryCatch({
       dir.create(base_output_dir, recursive = TRUE, showWarnings = FALSE)
     }, error = function(e) {
-      warning(paste0("Could not create output directory: ", base_output_dir, ". Using config directory."))
-      base_output_dir <<- dirname(config$config_path)
+      cat(paste0("  [WARNING] Could not create output directory: ", base_output_dir, ". Using config directory.\n"))
     })
+    if (!dir.exists(base_output_dir)) {
+      base_output_dir <- dirname(config$config_path)
+    }
   }
 
   # Check for output_file setting (used when single report type)
@@ -427,7 +429,7 @@ run_tracker <- function(tracking_config_path,
   valid_types <- c("detailed", "wave_history", "dashboard", "sig_matrix", "tracking_crosstab")
   invalid_types <- setdiff(report_types, valid_types)
   if (length(invalid_types) > 0) {
-    warning(paste0("Invalid report types ignored: ", paste(invalid_types, collapse = ", ")))
+    cat(paste0("  [WARNING] Invalid report types ignored: ", paste(invalid_types, collapse = ", "), "\n"))
     report_types <- intersect(report_types, valid_types)
   }
 

@@ -349,22 +349,23 @@ function exportPinnedCardPNG(pinId) {
 
   var ns = "http://www.w3.org/2000/svg";
   var W = 1280, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
-  var pad = 28;
+  var pad = 20;
   var scale = 3;
   var usableW = W - pad * 2;
+  var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand-colour").trim() || "#323367";
 
   var titleFullText = (pin.pinType === "text_box" || pin.pinType === "heatmap")
     ? pin.qTitle
     : pin.qCode + " - " + pin.qTitle;
   var titleLines = wrapTextLines(titleFullText, usableW, 9.5);
   var titleLineH = 20;
-  var titleStartY = pad + 16;
+  var titleStartY = pad + 12;
   var titleBlockH = titleLines.length * titleLineH;
   var metaText = (pin.pinType === "text_box" || pin.pinType === "heatmap")
     ? ""
     : "Base: " + (pin.baseText || "\u2014") + " \u00B7 Banner: " + (pin.bannerLabel || "");
   var metaY = titleStartY + titleBlockH + 4;
-  var contentTop = metaY + 18;
+  var contentTop = metaY + 12;
 
   // 1. Insight dimensions
   var insightLines = wrapTextLines(pin.insightText, usableW - 16, 7);
@@ -373,7 +374,7 @@ function exportPinnedCardPNG(pinId) {
   var insightY = contentTop;
 
   // 2. Chart dimensions (full width)
-  var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 12 : 0);
+  var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 8 : 0);
   var chartH = 0, hasChart = false;
   var chartTemp = null;
   if (pin.chartSvg) {
@@ -392,14 +393,15 @@ function exportPinnedCardPNG(pinId) {
   }
 
   // 3. Table dimensions (full width)
-  var tableTopY = chartTopY + chartH + (chartH > 0 ? 12 : 0);
+  var tableTopY = chartTopY + chartH + (chartH > 0 ? 8 : 0);
   var tableH = 0;
   if (pin.tableHtml) {
     var countRows = (pin.tableHtml.match(/<tr/g) || []).length;
     tableH = countRows * 18 + 4;
   }
 
-  var totalH = tableTopY + tableH + pad + 20;
+  var totalH = tableTopY + tableH + pad + 8;
+  if (totalH < 200) totalH = 200;
 
   var svg = document.createElementNS(ns, "svg");
   svg.setAttribute("xmlns", ns);
@@ -411,13 +413,20 @@ function exportPinnedCardPNG(pinId) {
   bg.setAttribute("fill", "#ffffff");
   svg.appendChild(bg);
 
+  // Brand accent bar at top
+  var accentBar = document.createElementNS(ns, "rect");
+  accentBar.setAttribute("x", "0"); accentBar.setAttribute("y", "0");
+  accentBar.setAttribute("width", W); accentBar.setAttribute("height", "4");
+  accentBar.setAttribute("fill", brandColour);
+  svg.appendChild(accentBar);
+
   var titleResult = createWrappedText(ns, titleLines, pad, titleStartY, titleLineH,
-    { fill: "#1a2744", "font-size": "16", "font-weight": "700" });
+    { fill: "#1a2744", "font-size": "18", "font-weight": "700" });
   svg.appendChild(titleResult.element);
 
   var metaEl = document.createElementNS(ns, "text");
   metaEl.setAttribute("x", pad); metaEl.setAttribute("y", metaY);
-  metaEl.setAttribute("fill", "#94a3b8"); metaEl.setAttribute("font-size", "11");
+  metaEl.setAttribute("fill", "#94a3b8"); metaEl.setAttribute("font-size", "12");
   metaEl.textContent = metaText;
   svg.appendChild(metaEl);
 
@@ -502,9 +511,10 @@ function exportAllPinnedSlides() {
   }
   var ns = "http://www.w3.org/2000/svg";
   var W = 1280, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
-  var pad = 28;
+  var pad = 20;
   var scale = 3;
   var DOWNLOAD_DELAY_MS = 600;
+  var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand-colour").trim() || "#323367";
 
   // Step 1: Build all SVG blobs upfront (synchronous)
   var slides = [];
@@ -517,13 +527,13 @@ function exportAllPinnedSlides() {
       : pin.qCode + " - " + pin.qTitle;
     var titleLines = wrapTextLines(titleFullText, usableW, 9.5);
     var titleLineH = 20;
-    var titleStartY = pad + 16;
+    var titleStartY = pad + 12;
     var titleBlockH = titleLines.length * titleLineH;
     var metaText = (pin.pinType === "text_box" || pin.pinType === "heatmap")
       ? ""
       : "Base: " + (pin.baseText || "\u2014") + " \u00B7 Banner: " + (pin.bannerLabel || "");
     var metaY = titleStartY + titleBlockH + 4;
-    var contentTop = metaY + 18;
+    var contentTop = metaY + 12;
 
     // Stacked layout: insight → chart → table
     // 1. Insight dimensions
@@ -533,7 +543,7 @@ function exportAllPinnedSlides() {
     var insightY = contentTop;
 
     // 2. Chart dimensions (full width)
-    var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 12 : 0);
+    var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 8 : 0);
     var chartH = 0, hasChart = false;
     var chartTemp = null;
     if (pin.chartSvg) {
@@ -552,14 +562,15 @@ function exportAllPinnedSlides() {
     }
 
     // 3. Table dimensions (full width)
-    var tableTopY = chartTopY + chartH + (chartH > 0 ? 12 : 0);
+    var tableTopY = chartTopY + chartH + (chartH > 0 ? 8 : 0);
     var tableH = 0;
     if (pin.tableHtml) {
       var countRows = (pin.tableHtml.match(/<tr/g) || []).length;
       tableH = countRows * 18 + 4;
     }
 
-    var totalH = tableTopY + tableH + pad + 20;
+    var totalH = tableTopY + tableH + pad + 8;
+    if (totalH < 200) totalH = 200;
 
     var svg = document.createElementNS(ns, "svg");
     svg.setAttribute("xmlns", ns);
@@ -571,13 +582,20 @@ function exportAllPinnedSlides() {
     bg.setAttribute("fill", "#ffffff");
     svg.appendChild(bg);
 
+    // Brand accent bar at top
+    var accentBar = document.createElementNS(ns, "rect");
+    accentBar.setAttribute("x", "0"); accentBar.setAttribute("y", "0");
+    accentBar.setAttribute("width", W); accentBar.setAttribute("height", "4");
+    accentBar.setAttribute("fill", brandColour);
+    svg.appendChild(accentBar);
+
     var titleResult = createWrappedText(ns, titleLines, pad, titleStartY, titleLineH,
-      { fill: "#1a2744", "font-size": "16", "font-weight": "700" });
+      { fill: "#1a2744", "font-size": "18", "font-weight": "700" });
     svg.appendChild(titleResult.element);
 
     var metaEl = document.createElementNS(ns, "text");
     metaEl.setAttribute("x", pad); metaEl.setAttribute("y", metaY);
-    metaEl.setAttribute("fill", "#94a3b8"); metaEl.setAttribute("font-size", "11");
+    metaEl.setAttribute("fill", "#94a3b8"); metaEl.setAttribute("font-size", "12");
     metaEl.textContent = metaText;
     svg.appendChild(metaEl);
 

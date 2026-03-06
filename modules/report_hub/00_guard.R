@@ -183,6 +183,17 @@ guard_validate_hub_config <- function(config_file) {
       ))
     }
 
+    # Validate report_key format (must be safe for use in JS, HTML, and CSS identifiers)
+    key_val <- trimws(row$report_key)
+    if (!grepl("^[a-zA-Z][a-zA-Z0-9_-]*$", key_val)) {
+      return(list(
+        status = "REFUSED",
+        code = "CFG_INVALID_VALUE",
+        message = sprintf("Reports row %d: report_key '%s' contains invalid characters", i, key_val),
+        how_to_fix = "report_key must start with a letter and contain only letters, numbers, hyphens, or underscores (e.g., 'tracker', 'brand-health', 'tabs_v2')."
+      ))
+    }
+
     if (is.na(row$order) || !is.numeric(row$order)) {
       return(list(
         status = "REFUSED",

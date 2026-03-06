@@ -206,8 +206,9 @@ function exportSlidePNG(qCode, mode) {
 
   var ns = "http://www.w3.org/2000/svg";
   var W = 1280, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
-  var pad = 28;
+  var pad = 20;
   var usableW = W - pad * 2;
+  var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand-colour").trim() || "#323367";
 
   var qTitle = wrapper ? wrapper.getAttribute("data-q-title") || "" : "";
   var qCodeLabel = wrapper ? wrapper.getAttribute("data-q-code") || qCode : qCode;
@@ -256,12 +257,12 @@ function exportSlidePNG(qCode, mode) {
   var titleFullText = qCodeLabel + " - " + qTitle;
   var titleLines = wrapTextLines(titleFullText, usableW, 9.5);
   var titleLineH = 20;
-  var titleStartY = pad + 16;
+  var titleStartY = pad + 12;
   var titleBlockH = titleLines.length * titleLineH;
 
   var metaText = [baseText, bannerLabel ? "Banner: " + bannerLabel : ""].filter(function(s) { return s; }).join(" \u00B7 ");
   var metaY = titleStartY + titleBlockH + 4;
-  var contentTop = metaY + 18;
+  var contentTop = metaY + 12;
 
   // Determine content area dimensions based on mode
   var showChart = mode === "chart" || mode === "chart_table";
@@ -280,7 +281,7 @@ function exportSlidePNG(qCode, mode) {
   var insightY = contentTop;
 
   // 2. Chart dimensions (full width)
-  var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 12 : 0);
+  var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 8 : 0);
   chartDisplayH = 0;
   if (showChart && chartSvg) {
     chartClone = chartSvg.cloneNode(true);
@@ -291,17 +292,18 @@ function exportSlidePNG(qCode, mode) {
   }
 
   // 3. Table dimensions (full width)
-  var tableTopY = chartTopY + chartDisplayH + (chartDisplayH > 0 ? 12 : 0);
+  var tableTopY = chartTopY + chartDisplayH + (chartDisplayH > 0 ? 8 : 0);
   var tableH = 0;
   if (showTable && tableData) {
     tableH = tableData.length * 18 + 4;
   }
 
   // Metrics strip after table
-  var metricsY = tableTopY + tableH + 12;
+  var metricsY = tableTopY + tableH + 8;
   var metricsH = metrics.length > 0 ? 28 : 0;
 
-  var totalH = metricsY + metricsH + pad + 20;
+  var totalH = metricsY + metricsH + pad + 8;
+  if (totalH < 200) totalH = 200;
 
   if (!showChart && !showTable) return;
 
@@ -316,15 +318,22 @@ function exportSlidePNG(qCode, mode) {
   bg.setAttribute("fill", "#ffffff");
   svg.appendChild(bg);
 
+  // Brand accent bar at top
+  var accentBar = document.createElementNS(ns, "rect");
+  accentBar.setAttribute("x", "0"); accentBar.setAttribute("y", "0");
+  accentBar.setAttribute("width", W); accentBar.setAttribute("height", "4");
+  accentBar.setAttribute("fill", brandColour);
+  svg.appendChild(accentBar);
+
   // Title
   var titleResult = createWrappedText(ns, titleLines, pad, titleStartY, titleLineH,
-    { fill: "#1a2744", "font-size": "16", "font-weight": "700" });
+    { fill: "#1a2744", "font-size": "18", "font-weight": "700" });
   svg.appendChild(titleResult.element);
 
   // Meta (base + banner)
   var metaEl = document.createElementNS(ns, "text");
   metaEl.setAttribute("x", pad); metaEl.setAttribute("y", metaY);
-  metaEl.setAttribute("fill", "#94a3b8"); metaEl.setAttribute("font-size", "11");
+  metaEl.setAttribute("fill", "#94a3b8"); metaEl.setAttribute("font-size", "12");
   metaEl.textContent = metaText;
   svg.appendChild(metaEl);
 
@@ -372,7 +381,7 @@ function exportSlidePNG(qCode, mode) {
     svg.appendChild(mLine);
     var mText = document.createElementNS(ns, "text");
     mText.setAttribute("x", pad); mText.setAttribute("y", metricsY + 16);
-    mText.setAttribute("fill", "#5c4a2a"); mText.setAttribute("font-size", "11");
+    mText.setAttribute("fill", "#5c4a2a"); mText.setAttribute("font-size", "12");
     mText.setAttribute("font-weight", "600");
     mText.textContent = metrics.join("  |  ");
     svg.appendChild(mText);

@@ -463,7 +463,15 @@ if (exists("turas_print_start_banner", mode = "function")) {
 }
 
 # Validate config file exists
-validate_config_file(config_file)
+validation_check <- validate_config_file(config_file)
+if (is.list(validation_check) && identical(validation_check$status, "REFUSED")) {
+  cat("\n=== TURAS ERROR ===\n")
+  cat("Code:", validation_check$code, "\n")
+  cat("Message:", validation_check$message, "\n")
+  cat("Fix:", validation_check$how_to_fix, "\n")
+  cat("==================\n\n")
+  return(validation_check)
+}
 
 # Record start time
 start_time <- Sys.time()
@@ -473,12 +481,28 @@ start_time <- Sys.time()
 # ==============================================================================
 
 config_result <- load_crosstabs_config(config_file)
+if (is.list(config_result) && identical(config_result$status, "REFUSED")) {
+  cat("\n=== TURAS ERROR ===\n")
+  cat("Code:", config_result$code, "\n")
+  cat("Message:", config_result$message, "\n")
+  cat("Fix:", config_result$how_to_fix, "\n")
+  cat("==================\n\n")
+  return(config_result)
+}
 
 # ==============================================================================
 # STEP 2: LOAD DATA
 # ==============================================================================
 
 data_result <- load_crosstabs_data(config_result)
+if (is.list(data_result) && identical(data_result$status, "REFUSED")) {
+  cat("\n=== TURAS ERROR ===\n")
+  cat("Code:", data_result$code, "\n")
+  cat("Message:", data_result$message, "\n")
+  cat("Fix:", data_result$how_to_fix, "\n")
+  cat("==================\n\n")
+  return(data_result)
+}
 
 # ==============================================================================
 # STEP 3: RUN ANALYSIS

@@ -239,9 +239,6 @@ calculate_weighted_mean <- function(values, weights) {
   w_mean <- sum(values_valid * weights_valid) / n_weighted
   w_var <- sum(weights_valid * (values_valid - w_mean)^2) / n_weighted
   w_sd <- sqrt(w_var)
-  se <- w_sd / sqrt(n_unweighted)
-  ci_lower <- w_mean - 1.96 * se
-  ci_upper <- w_mean + 1.96 * se
 
   # Effective N (design-effect adjusted sample size)
   sum_weights_squared <- sum(weights_valid^2)
@@ -250,6 +247,11 @@ calculate_weighted_mean <- function(values, weights) {
   } else {
     0
   }
+
+  # Use effective sample size for SE to correctly account for weighting design effect
+  se <- if (eff_n > 0) w_sd / sqrt(eff_n) else NA
+  ci_lower <- w_mean - 1.96 * se
+  ci_upper <- w_mean + 1.96 * se
 
   list(
     mean = w_mean,

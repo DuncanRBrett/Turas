@@ -127,6 +127,25 @@ tabs_refuse <- function(code,
     code <- paste0("CFG_", code)
   }
 
+  # Console output for Shiny debugging - ensures errors are always visible
+  cat("\n\u250C\u2500\u2500\u2500 TURAS TABS ERROR \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n")
+  cat("\u2502 Code:    ", code, "\n")
+  cat("\u2502 Title:   ", title, "\n")
+  cat("\u2502 Problem: ", problem, "\n")
+  if (!is.null(how_to_fix)) {
+    fix_text <- if (is.character(how_to_fix) && length(how_to_fix) > 1) {
+      paste(how_to_fix, collapse = "; ")
+    } else {
+      as.character(how_to_fix)
+    }
+    cat("\u2502 Fix:     ", fix_text, "\n")
+  }
+  if (!is.null(details)) cat("\u2502 Details: ", details, "\n")
+  if (!is.null(expected)) cat("\u2502 Expected:", paste(expected, collapse = ", "), "\n")
+  if (!is.null(observed)) cat("\u2502 Observed:", paste(observed, collapse = ", "), "\n")
+  if (!is.null(missing)) cat("\u2502 Missing: ", paste(missing, collapse = ", "), "\n")
+  cat("\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\n")
+
   turas_refuse(
     code = code,
     title = title,
@@ -155,6 +174,10 @@ tabs_with_refusal_handler <- function(expr) {
   # Add Tabs-specific class for compatibility
   if (inherits(result, "turas_refusal_result")) {
     class(result) <- c("tabs_refusal_result", class(result))
+    # Console output for caught refusals (Shiny debugging)
+    if (!is.null(result$code)) {
+      cat("\n[TABS REFUSAL CAUGHT] ", result$code, ": ", result$problem %||% result$message %||% "", "\n")
+    }
   }
 
   result
@@ -741,7 +764,7 @@ tabs_determine_status <- function(guard,
   }
 
   # Check guard stability flag
-  if (!summary$is_stable) {
+  if (isTRUE(summary$use_with_caution)) {
     degraded_reasons <- c(degraded_reasons, "Analysis flagged as unstable")
     affected_outputs <- c(affected_outputs, "stability")
   }

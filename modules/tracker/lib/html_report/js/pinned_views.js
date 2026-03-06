@@ -625,7 +625,7 @@ function exportPinnedCardPNG(pinId) {
   var ns = "http://www.w3.org/2000/svg";
   var W = 1280;
   var fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
-  var pad = 28;
+  var pad = 20;
   var usableW = W - pad * 2;
   var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367";
 
@@ -633,7 +633,7 @@ function exportPinnedCardPNG(pinId) {
   var titleText = pin.metricTitle || "Pinned View";
   var titleLines = pinWrapTextLines(titleText, usableW, 9.5);
   var titleLineH = 20;
-  var titleStartY = pad + 16;
+  var titleStartY = pad + 12;
   var titleBlockH = titleLines.length * titleLineH;
 
   // ---- 2. Meta line ----
@@ -642,7 +642,7 @@ function exportPinnedCardPNG(pinId) {
     metaText += "  \u00B7  Segments: " + pin.visibleSegments.join(", ");
   }
   var metaY = titleStartY + titleBlockH + 4;
-  var contentTop = metaY + 18;
+  var contentTop = metaY + 12;
 
   // ---- 3. Insight ----
   var insightPlain = "";
@@ -657,7 +657,7 @@ function exportPinnedCardPNG(pinId) {
   var insightY = contentTop;
 
   // ---- 4. Chart dimensions ----
-  var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 12 : 0);
+  var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 8 : 0);
   var chartDisplayH = 0;
   var chartClone = null;
   var chartScale = 1;
@@ -691,7 +691,7 @@ function exportPinnedCardPNG(pinId) {
   }
 
   // ---- 5. Table dimensions ----
-  var tableTopY = chartTopY + chartDisplayH + (chartDisplayH > 0 ? 14 : 0);
+  var tableTopY = chartTopY + chartDisplayH + (chartDisplayH > 0 ? 8 : 0);
   var tableData = null;
   var estimatedTableH = 0;
 
@@ -704,8 +704,8 @@ function exportPinnedCardPNG(pinId) {
   }
 
   // ---- 6. Calculate total height ----
-  var totalH = tableTopY + estimatedTableH + pad + 20;
-  if (totalH < 300) totalH = 300;
+  var totalH = tableTopY + estimatedTableH + pad + 8;
+  if (totalH < 200) totalH = 200;
 
   // ---- Build slide SVG ----
   var svg = document.createElementNS(ns, "svg");
@@ -728,13 +728,13 @@ function exportPinnedCardPNG(pinId) {
 
   // Title
   var titleResult = pinCreateWrappedText(ns, titleLines, pad, titleStartY, titleLineH,
-    { fill: "#1a2744", "font-size": "16", "font-weight": "700" });
+    { fill: "#1a2744", "font-size": "18", "font-weight": "700" });
   svg.appendChild(titleResult.element);
 
   // Meta line
   var metaEl = document.createElementNS(ns, "text");
   metaEl.setAttribute("x", pad); metaEl.setAttribute("y", metaY);
-  metaEl.setAttribute("fill", "#94a3b8"); metaEl.setAttribute("font-size", "11");
+  metaEl.setAttribute("fill", "#94a3b8"); metaEl.setAttribute("font-size", "12");
   metaEl.textContent = metaText;
   svg.appendChild(metaEl);
 
@@ -774,21 +774,6 @@ function exportPinnedCardPNG(pinId) {
       svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
     }
   }
-
-  // Subtle footer line
-  var footerY = totalH - pad;
-  var footerLine = document.createElementNS(ns, "line");
-  footerLine.setAttribute("x1", pad); footerLine.setAttribute("x2", W - pad);
-  footerLine.setAttribute("y1", footerY); footerLine.setAttribute("y2", footerY);
-  footerLine.setAttribute("stroke", "#e2e8f0"); footerLine.setAttribute("stroke-width", "0.5");
-  svg.appendChild(footerLine);
-
-  var footerText = document.createElementNS(ns, "text");
-  footerText.setAttribute("x", W - pad); footerText.setAttribute("y", footerY + 14);
-  footerText.setAttribute("text-anchor", "end");
-  footerText.setAttribute("fill", "#cbd5e1"); footerText.setAttribute("font-size", "9");
-  footerText.textContent = "Tracking Report";
-  svg.appendChild(footerText);
 
   // ---- Render SVG to PNG at 3x resolution ----
   var renderScale = 3;
