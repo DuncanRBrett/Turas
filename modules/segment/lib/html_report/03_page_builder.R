@@ -113,35 +113,36 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
     htmltools::tags$div(
       class = "seg-pinned-panel-header",
       htmltools::tags$div(class = "seg-pinned-panel-title",
-                          "\U0001F4CC Pinned Views"),
+                          "Pinned Views"),
       htmltools::tags$div(
         class = "seg-pinned-panel-actions",
         htmltools::tags$button(
           class = "seg-pinned-panel-btn",
           onclick = "segAddSection()",
-          "\u2795 Add Section"
+          "+ Add Section"
         ),
         htmltools::tags$button(
           class = "seg-pinned-panel-btn",
           onclick = "segExportAllPinnedPNG()",
-          "\U0001F4E5 Export All as PNG"
+          "Export All as PNG"
         ),
         htmltools::tags$button(
           class = "seg-pinned-panel-btn",
           onclick = "segPrintPinnedViews()",
-          "\U0001F5B6 Print / PDF"
+          "Print / PDF"
         ),
         htmltools::tags$button(
           class = "seg-pinned-panel-btn",
           onclick = "segClearAllPinned()",
-          "\U0001F5D1 Clear All"
+          "Clear All"
         )
       )
     ),
     htmltools::tags$div(
       id = "seg-pinned-empty",
       class = "seg-pinned-empty",
-      htmltools::tags$div(class = "seg-pinned-empty-icon", "\U0001F4CC"),
+      htmltools::tags$div(class = "seg-pinned-empty-icon", style = "font-size:32px; color:#94a3b8;",
+                          "\U0001F4CC"),
       htmltools::tags$div("No pinned views yet."),
       htmltools::tags$div(
         style = "font-size:12px;margin-top:4px;",
@@ -599,10 +600,10 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 .seg-tr:nth-child(even) { background: #f9fafb; }
 .seg-tr:hover { background: #f8fafc; }
 
-/* Heatmap cell tinting */
-.seg-td-high { background: #dbeafe; }
-.seg-td-mod-high { background: #eff6ff; }
-.seg-td-mod-low { background: #fef3c7; }
+/* Heatmap cell tinting - green=above average, red=below average */
+.seg-td-high { background: #dcfce7; }
+.seg-td-mod-high { background: #f0fdf4; }
+.seg-td-mod-low { background: #fef2f2; }
 .seg-td-low { background: #fee2e2; }
 
 /* ================================================================ */
@@ -759,14 +760,13 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
   right: 4px;
   z-index: 10;
   background: rgba(255,255,255,0.85);
-  border: 1px solid var(--seg-border);
+  border: 1px solid #e2e8f0;
   border-radius: 4px;
   padding: 2px 8px;
   font-size: 11px;
   font-weight: 500;
-  color: var(--seg-text-faint);
+  color: #94a3b8;
   cursor: pointer;
-  font-family: inherit;
   opacity: 0;
   transition: all 0.15s;
 }
@@ -779,7 +779,8 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 .seg-component-pin:hover {
   border-color: var(--seg-brand);
   color: var(--seg-brand);
-  background: rgba(255,255,255,0.95);
+  background: rgba(255,255,255,0.97);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 
 .seg-component-pin.seg-pin-btn-active {
@@ -787,6 +788,7 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
   color: white;
   border-color: var(--seg-brand);
   opacity: 1;
+  box-shadow: 0 1px 3px rgba(50,51,103,0.2);
 }
 
 /* ================================================================ */
@@ -981,26 +983,29 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 
 .seg-pin-btn {
   background: none;
-  border: 1px solid var(--seg-border);
-  border-radius: 6px;
-  padding: 4px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 3px 8px;
   font-size: 14px;
   cursor: pointer;
-  color: var(--seg-text-faint);
+  color: #94a3b8;
   transition: all 0.15s;
   flex-shrink: 0;
+  margin-left: 8px;
 }
 
 .seg-pin-btn:hover {
   border-color: var(--seg-brand);
   color: var(--seg-brand);
-  background: rgba(50,51,103,0.03);
+  background: rgba(50,51,103,0.04);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 
 .seg-pin-btn.seg-pin-btn-active {
   background: var(--seg-brand);
   color: white;
   border-color: var(--seg-brand);
+  box-shadow: 0 1px 3px rgba(50,51,103,0.2);
 }
 
 /* ================================================================ */
@@ -1442,13 +1447,15 @@ build_seg_header <- function(html_data, config, brand_colour, report_title) {
     }
   }
 
-  # --- Top row: [logo] TURAS SEGMENTATION / subtitle [client logo] ---
+  # --- Top row: [logo] TURAS SEGMENTATION / method subtitle [client logo] ---
+  method_subtitle <- sprintf("%s Cluster Analysis", method_label)
+
   branding_left <- htmltools::tags$div(
     class = "seg-header-branding",
     logo_el,
     htmltools::tags$div(
       htmltools::tags$div(class = "seg-header-module-name", "TURAS Segmentation"),
-      htmltools::tags$div(class = "seg-header-module-sub", "Survey Analytics Platform")
+      htmltools::tags$div(class = "seg-header-module-sub", method_subtitle)
     ),
     client_logo_el
   )
@@ -1586,7 +1593,7 @@ build_seg_section_title_row <- function(title_text, section_key,
       `data-seg-pin-section` = section_key,
       onclick = sprintf("segPinSection('%s')", section_key),
       title = "Pin this section",
-      "\U0001F4CC"
+      "\U0001F4CC Pin"
     )
   }
 
@@ -1651,14 +1658,14 @@ build_seg_insight_area <- function(section_key) {
 #' @return htmltools tag
 #' @keywords internal
 build_seg_component_pin_btn <- function(section_key, component) {
-  label <- if (component == "chart") "\U0001F4CC Chart" else "\U0001F4CC Table"
+  comp_label <- if (component == "chart") "\u2295 Chart" else "\u2295 Table"
   htmltools::tags$button(
     class = "seg-component-pin",
     `data-seg-pin-section` = section_key,
     `data-seg-pin-component` = component,
     onclick = sprintf("segPinComponent('%s','%s')", section_key, component),
     title = sprintf("Pin %s only", component),
-    label
+    comp_label
   )
 }
 
@@ -2090,6 +2097,100 @@ build_seg_importance_section <- function(tables, charts, html_data) {
     )
   }
 
+  # Interpretation callout — adapts to the metric available
+  vi <- html_data$variable_importance
+  metric_type <- if (!is.null(vi) && "importance_metric" %in% names(vi)) {
+    vi$importance_metric[1]
+  } else if (!is.null(vi) && "eta_squared" %in% names(vi)) {
+    "eta_squared"
+  } else {
+    "f_statistic"
+  }
+
+  if (metric_type == "eta_squared") {
+    callout_title <- "Understanding Eta-squared (&eta;&sup2;)"
+    callout_body <- paste0(
+      "Eta-squared measures the proportion of total variance in each variable explained by segment membership. Values range from 0 to 1:<br>",
+      "<span style='display:inline-block;width:10px;height:10px;background:#dcfce7;border:1px solid #86efac;border-radius:2px;margin-right:4px;'></span> ",
+      "<strong>&gt; 0.14</strong> = Large effect &mdash; strong differentiator<br>",
+      "<span style='display:inline-block;width:10px;height:10px;background:#fef9c3;border:1px solid #fde047;border-radius:2px;margin-right:4px;'></span> ",
+      "<strong>0.06 &ndash; 0.14</strong> = Medium effect &mdash; moderate differentiator<br>",
+      "<span style='display:inline-block;width:10px;height:10px;background:#fee2e2;border:1px solid #fca5a5;border-radius:2px;margin-right:4px;'></span> ",
+      "<strong>&lt; 0.06</strong> = Small effect &mdash; weak differentiator"
+    )
+  } else {
+    callout_title <- "Understanding Variable Importance"
+    callout_body <- paste0(
+      "The chart shows each variable's share of total segment discrimination (as a percentage of total F-statistic). ",
+      "The F-statistic from one-way ANOVA tests whether segment means differ significantly &mdash; higher F = greater difference between segments.<br><br>",
+      "The percentage shows each variable's <strong>relative contribution</strong> to distinguishing the segments. ",
+      "Variables at the top contribute most; those at the bottom contribute least and are candidates for removal."
+    )
+  }
+
+  eta_callout <- htmltools::tags$div(
+    class = "seg-callout-box",
+    style = "background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:13px; color:#475569;",
+    htmltools::tags$div(
+      style = "margin-bottom:8px;",
+      htmltools::tags$strong(htmltools::HTML(callout_title))
+    ),
+    htmltools::tags$div(
+      style = "line-height:1.6;",
+      htmltools::HTML(callout_body)
+    )
+  )
+
+  # Question reduction analysis
+  reduction_el <- NULL
+  vi <- html_data$variable_importance
+  if (!is.null(vi) && "cumulative_pct" %in% names(vi) && nrow(vi) > 1) {
+    total_vars <- nrow(vi)
+    thresholds <- c(80, 90, 95)
+    reduction_items <- list()
+
+    for (thresh in thresholds) {
+      n_needed <- which(vi$cumulative_pct >= thresh)[1]
+      if (!is.na(n_needed)) {
+        actual_pct <- vi$cumulative_pct[n_needed]
+        reduction_items <- c(reduction_items, list(
+          htmltools::tags$div(
+            style = "margin-bottom:4px;",
+            htmltools::HTML(sprintf(
+              "&bull; Top <strong>%d</strong> variable%s capture <strong>%.0f%%</strong> of segment discrimination",
+              n_needed, if (n_needed > 1) "s" else "", actual_pct
+            ))
+          )
+        ))
+      }
+    }
+
+    if (length(reduction_items) > 0) {
+      # Find the sweet spot: fewest questions for >= 90%
+      n_for_90 <- which(vi$cumulative_pct >= 90)[1]
+      recommendation <- if (!is.na(n_for_90) && n_for_90 < total_vars) {
+        htmltools::tags$div(
+          style = "margin-top:8px; padding-top:8px; border-top:1px solid #e2e8f0; font-weight:500; color:#334155;",
+          htmltools::HTML(sprintf(
+            "&rarr; You could reduce the questionnaire to <strong>%d item%s</strong> (from %d) and retain %.0f%% accuracy in segment assignment.",
+            n_for_90, if (n_for_90 > 1) "s" else "", total_vars, vi$cumulative_pct[n_for_90]
+          ))
+        )
+      }
+
+      reduction_el <- htmltools::tags$div(
+        class = "seg-callout-box",
+        style = "background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:13px; color:#475569;",
+        htmltools::tags$div(
+          style = "margin-bottom:8px;",
+          htmltools::tags$strong("Question Reduction Analysis")
+        ),
+        htmltools::tags$div(style = "line-height:1.8;", reduction_items),
+        recommendation
+      )
+    }
+  }
+
   htmltools::tags$div(
     class = "seg-section",
     id = "seg-importance",
@@ -2098,13 +2199,11 @@ build_seg_importance_section <- function(tables, charts, html_data) {
     insight_area,
     htmltools::tags$p(
       class = "seg-section-intro",
-      htmltools::HTML(paste0(
-        "Variables ranked by their ability to differentiate segments, measured using ",
-        "eta-squared (&eta;&sup2;) from one-way ANOVA. Higher values indicate the variable ",
-        "explains more of the between-segment variation."
-      ))
+      "Variables ranked by their ability to differentiate segments, based on one-way ANOVA. Higher values indicate the variable contributes more to distinguishing the segments."
     ),
+    eta_callout,
     chart_el,
+    reduction_el,
     table_el
   )
 }
@@ -2149,6 +2248,21 @@ build_seg_profiles_section <- function(tables, charts, html_data) {
     )
   }
 
+  # F-statistic and color footnote
+  footnote_el <- htmltools::tags$div(
+    class = "seg-callout-box",
+    style = "background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px 16px; margin-top:12px; font-size:12px; color:#64748b; line-height:1.6;",
+    htmltools::HTML(paste0(
+      "<strong>Table guide:</strong> ",
+      "Cells are colour-coded relative to the overall mean: ",
+      "<span style='display:inline-block;width:10px;height:10px;background:#dcfce7;border:1px solid #86efac;border-radius:2px;margin:0 2px;'></span> green = above average, ",
+      "<span style='display:inline-block;width:10px;height:10px;background:#fee2e2;border:1px solid #fca5a5;border-radius:2px;margin:0 2px;'></span> red = below average. ",
+      "<strong>F-statistic</strong>: from one-way ANOVA testing whether segment means differ significantly. ",
+      "Higher F = greater difference between segments. Values &gt; 4 typically indicate statistically significant differences (p &lt; 0.05). ",
+      "<strong>&eta;&sup2;</strong>: proportion of variance explained by segment membership (see Variable Importance for interpretation)."
+    ))
+  )
+
   htmltools::tags$div(
     class = "seg-section",
     id = "seg-profiles",
@@ -2157,10 +2271,11 @@ build_seg_profiles_section <- function(tables, charts, html_data) {
     insight_area,
     htmltools::tags$p(
       class = "seg-section-intro",
-      "Mean scores for each variable by segment. Cells are colour-coded: blue indicates above-average scores, amber/red indicates below-average scores relative to the overall sample mean."
+      "Mean scores for each variable by segment. Cells are colour-coded: green indicates above-average scores, red indicates below-average scores relative to the overall sample mean."
     ),
     chart_el,
-    table_el
+    table_el,
+    footnote_el
   )
 }
 
@@ -2381,7 +2496,15 @@ build_seg_overlap_section <- function(charts, html_data) {
     insight_area,
     htmltools::tags$p(
       class = "seg-section-intro",
-      "Pairwise distances between segment centroids. Red cells indicate segments that are similar (potentially overlapping); green cells indicate well-separated segments."
+      "Similarity between segment centroids. Higher percentages indicate segments that are more alike (potentially overlapping); lower percentages indicate well-separated, distinct segments."
+    ),
+    htmltools::tags$div(
+      class = "seg-callout-box",
+      style = "background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:13px; color:#475569;",
+      htmltools::tags$strong("How to read: "),
+      "Each cell shows how similar two segments are (0% = completely different, 100% = identical). ",
+      "Red/orange cells suggest those segments may not be well-differentiated and could potentially be merged. ",
+      "Green cells confirm the segments are distinct from each other."
     ),
     chart_el
   )
@@ -2581,13 +2704,22 @@ build_seg_vulnerability_section <- function(html_data) {
       htmltools::tags$th("n", class = "seg-th seg-th-num"),
       htmltools::tags$th("Vulnerable", class = "seg-th seg-th-num"),
       htmltools::tags$th("% Vulnerable", class = "seg-th seg-th-num"),
-      htmltools::tags$th("Avg Confidence", class = "seg-th seg-th-num")
+      htmltools::tags$th("Avg Confidence", class = "seg-th seg-th-num"),
+      htmltools::tags$th("Borderline Confidence", class = "seg-th seg-th-num")
     )
 
     rows <- lapply(seq_len(nrow(seg_summary)), function(i) {
       row <- seg_summary[i, ]
       pct_vuln <- round(row$pct_vulnerable, 1)
       bar_colour <- if (pct_vuln > 30) "#ef4444" else if (pct_vuln > 15) "#f59e0b" else "#22c55e"
+
+      # Borderline confidence: lower = more likely to switch
+      avg_vuln_conf <- if ("avg_vuln_confidence" %in% names(row)) row$avg_vuln_confidence else NA_real_
+      vuln_display <- if (is.na(avg_vuln_conf)) "-" else sprintf("%.2f", avg_vuln_conf)
+      vuln_colour <- if (is.na(avg_vuln_conf)) "#64748b"
+                     else if (avg_vuln_conf < 0.10) "#ef4444"
+                     else if (avg_vuln_conf < 0.20) "#f59e0b"
+                     else "#64748b"
 
       htmltools::tags$tr(
         htmltools::tags$td(row$segment, class = "seg-td"),
@@ -2600,7 +2732,14 @@ build_seg_vulnerability_section <- function(html_data) {
             sprintf("%.1f%%", pct_vuln)
           )
         ),
-        htmltools::tags$td(sprintf("%.2f", row$avg_confidence), class = "seg-td seg-td-num")
+        htmltools::tags$td(sprintf("%.2f", row$avg_confidence), class = "seg-td seg-td-num"),
+        htmltools::tags$td(
+          class = "seg-td seg-td-num",
+          htmltools::tags$span(
+            style = sprintf("color:%s; font-weight:500;", vuln_colour),
+            vuln_display
+          )
+        )
       )
     })
 
@@ -2652,7 +2791,7 @@ build_seg_vulnerability_section <- function(html_data) {
       class = "seg-table-wrapper",
       htmltools::tags$h4(class = "seg-subsection-title", "Switching Matrix"),
       htmltools::tags$p(class = "seg-section-intro", style = "font-size:12px;",
-                        "Number of borderline respondents in each segment (rows) who would switch to another segment (columns)."),
+                        "Number of vulnerable respondents in each segment (rows) who would switch to another segment (columns). Only includes respondents below the confidence threshold."),
       build_seg_component_pin_btn("vulnerability", "matrix"),
       htmltools::tags$table(
         class = "seg-table",

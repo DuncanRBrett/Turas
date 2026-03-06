@@ -206,13 +206,10 @@ generate_segment_combined_html_report <- function(results, config, output_path) 
       warnings <<- c(warnings, sprintf("Method '%s' validation table: %s", m, e$message))
       NULL
     })
-    tbls$profiles <- tryCatch(build_seg_profile_table(hd), error = function(e) {
-      warnings <<- c(warnings, sprintf("Method '%s' profile table: %s", m, e$message))
-      NULL
-    })
+    # Per-method tabs only show overview and validation (not full profiles)
     method_tables[[m]] <- tbls
 
-    # Charts
+    # Charts (only sizes and silhouette for per-method tabs)
     chts <- list()
     chts$sizes <- tryCatch(
       build_seg_sizes_chart(hd, brand_colour),
@@ -225,20 +222,6 @@ generate_segment_combined_html_report <- function(results, config, output_path) 
       build_seg_silhouette_chart(hd, brand_colour),
       error = function(e) {
         warnings <<- c(warnings, sprintf("Method '%s' silhouette chart: %s", m, e$message))
-        NULL
-      }
-    )
-    chts$heatmap <- tryCatch(
-      build_seg_heatmap_chart(hd, brand_colour, accent_colour),
-      error = function(e) {
-        warnings <<- c(warnings, sprintf("Method '%s' heatmap chart: %s", m, e$message))
-        NULL
-      }
-    )
-    chts$importance <- tryCatch(
-      build_seg_importance_chart(hd, brand_colour),
-      error = function(e) {
-        warnings <<- c(warnings, sprintf("Method '%s' importance chart: %s", m, e$message))
         NULL
       }
     )
@@ -473,35 +456,36 @@ build_seg_combined_page <- function(method_html_data,
     htmltools::tags$div(
       class = "seg-pinned-panel-header",
       htmltools::tags$div(class = "seg-pinned-panel-title",
-                          "\U0001F4CC Pinned Views"),
+                          "Pinned Views"),
       htmltools::tags$div(
         class = "seg-pinned-panel-actions",
         htmltools::tags$button(
           class = "seg-pinned-panel-btn",
           onclick = "segAddSection()",
-          "\u2795 Add Section"
+          "+ Add Section"
         ),
         htmltools::tags$button(
           class = "seg-pinned-panel-btn",
           onclick = "segExportAllPinnedPNG()",
-          "\U0001F4E5 Export All as PNG"
+          "Export All as PNG"
         ),
         htmltools::tags$button(
           class = "seg-pinned-panel-btn",
           onclick = "segPrintPinnedViews()",
-          "\U0001F5B6 Print / PDF"
+          "Print / PDF"
         ),
         htmltools::tags$button(
           class = "seg-pinned-panel-btn",
           onclick = "segClearAllPinned()",
-          "\U0001F5D1 Clear All"
+          "Clear All"
         )
       )
     ),
     htmltools::tags$div(
       id = "seg-pinned-empty",
       class = "seg-pinned-empty",
-      htmltools::tags$div(class = "seg-pinned-empty-icon", "\U0001F4CC"),
+      htmltools::tags$div(class = "seg-pinned-empty-icon", style = "font-size:32px; color:#94a3b8;",
+                          "\U0001F4CC"),
       htmltools::tags$div("No pinned views yet."),
       htmltools::tags$div(
         style = "font-size:12px;margin-top:4px;",
@@ -1141,53 +1125,10 @@ build_seg_combined_page <- function(method_html_data,
     )
   }
 
-  # --- Profiles (heatmap) ---
-  profiles_els <- list()
-  if (!is.null(charts$heatmap)) {
-    profiles_els <- c(profiles_els, list(charts$heatmap))
-  }
-  if (!is.null(tables$profiles)) {
-    profiles_els <- c(profiles_els, list(
-      htmltools::tags$div(style = "margin-top:16px;", tables$profiles)
-    ))
-  }
-
-  if (length(profiles_els) > 0) {
-    sections$profiles <- htmltools::tags$div(
-      class = "seg-combined-section",
-      htmltools::tags$h4(class = "seg-combined-section-title", "Segment Profiles"),
-      htmltools::tags$p(
-        class = "seg-combined-section-desc",
-        "Heatmap showing variable means per segment. Darker cells indicate higher values relative to the overall mean."
-      ),
-      profiles_els
-    )
-  }
-
-  # --- Variable Importance ---
-  if (!is.null(charts$importance)) {
-    sections$importance <- htmltools::tags$div(
-      class = "seg-combined-section",
-      htmltools::tags$h4(class = "seg-combined-section-title", "Variable Importance"),
-      htmltools::tags$p(
-        class = "seg-combined-section-desc",
-        "Variables ranked by their discriminating power across segments (eta-squared from ANOVA)."
-      ),
-      charts$importance
-    )
-  }
-
-  # --- Segment Cards (if available) ---
-  if (!is.null(html_data$enhanced$segment_cards)) {
-    cards_content <- .build_seg_combined_cards(html_data)
-    if (!is.null(cards_content)) {
-      sections$cards <- htmltools::tags$div(
-        class = "seg-combined-section",
-        htmltools::tags$h4(class = "seg-combined-section-title", "Segment Cards"),
-        cards_content
-      )
-    }
-  }
+  # NOTE: Per-method tabs in the comparison report are kept lean.
+  # Full profiles, variable importance, and segment cards are only shown
+  # in the single-method report for the chosen best-fit method.
+  # This avoids confusion from showing duplicate detail across methods.
 
   # --- Wrap in panel div ---
   panel_class <- if (is_first) {
@@ -1304,11 +1245,19 @@ build_seg_combined_page <- function(method_html_data,
     )
   }, character(1))
 
-  sections$intro <- htmltools::tags$p(
-    class = "seg-combined-section-desc",
-    sprintf("Side-by-side comparison of %s across %d clustering methods.",
-            paste(method_labels, collapse = ", "),
-            length(active_methods))
+  sections$intro <- htmltools::tags$div(
+    htmltools::tags$p(
+      class = "seg-combined-section-desc",
+      sprintf("Side-by-side comparison of %s across %d clustering methods.",
+              paste(method_labels, collapse = ", "),
+              length(active_methods))
+    ),
+    htmltools::tags$div(
+      style = "background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:13px; color:#1e40af;",
+      htmltools::tags$strong("Purpose: "),
+      "This report compares methods to help select the best segmentation approach. ",
+      "Use the single-method report for the chosen method as your client deliverable."
+    )
   )
 
   # --- Metrics comparison table ---

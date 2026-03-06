@@ -206,12 +206,18 @@ transform_exploration_for_html <- function(results, config) {
   # Add rank
   result$rank <- seq_len(nrow(result))
 
-  # Calculate importance percentage (normalized eta-squared)
-  if (!is.null(eta_col)) {
+  # Calculate importance percentage and cumulative
+  # Prefer eta-squared; fall back to F-statistic for proportional importance
+  if (!is.null(eta_col) && sum(result$eta_squared, na.rm = TRUE) > 0) {
     total_eta <- sum(result$eta_squared, na.rm = TRUE)
-    if (total_eta > 0) {
-      result$importance_pct <- round(result$eta_squared / total_eta * 100, 1)
-    }
+    result$importance_pct <- round(result$eta_squared / total_eta * 100, 1)
+    result$cumulative_pct <- round(cumsum(result$importance_pct), 1)
+    result$importance_metric <- "eta_squared"
+  } else if (!is.null(f_col) && sum(result$f_statistic, na.rm = TRUE) > 0) {
+    total_f <- sum(result$f_statistic, na.rm = TRUE)
+    result$importance_pct <- round(result$f_statistic / total_f * 100, 1)
+    result$cumulative_pct <- round(cumsum(result$importance_pct), 1)
+    result$importance_metric <- "f_statistic"
   }
 
   result
