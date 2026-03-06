@@ -86,6 +86,8 @@ if (dir.exists(html_report_dir)) {
       message("Note: Could not source 99_html_report_main.R: ", conditionMessage(e))
     })
   }
+  # Mark submodules as loaded (setup.R sourced them individually above)
+  assign(".whr_submodules_loaded", TRUE, envir = .GlobalEnv)
 }
 
 # Set launcher flag in global env so CLI code in run_weighting.R doesn't trigger quit()

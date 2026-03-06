@@ -20,44 +20,65 @@
 }
 assign(".weighting_html_report_dir", .weighting_html_report_dir, envir = globalenv())
 
-# Source all submodules
-.whr_required_files <- c("00_html_guard.R", "01_data_transformer.R",
-                           "02_table_builder.R", "03_page_builder.R",
-                           "04_html_writer.R", "05_chart_builder.R")
+# Submodule sourcing is deferred to generate_weighting_html_report() below.
+# This avoids stop() at source time, which would crash Shiny even when HTML
+# reports are not requested.
+assign(".whr_submodules_loaded", FALSE, envir = globalenv())
 
-.whr_missing <- character(0)
-for (.whr_file in .whr_required_files) {
-  .whr_path <- file.path(.weighting_html_report_dir, .whr_file)
-  if (!file.exists(.whr_path)) {
-    .whr_missing <- c(.whr_missing, .whr_file)
+#' Load HTML Report Submodules (Lazy)
+#'
+#' Sources all required submodule files on first call.
+#' Returns a TRS-compliant refusal if any files are missing.
+#'
+#' @return NULL on success, or a TRS refusal list if files are missing
+#' @keywords internal
+.whr_load_submodules <- function() {
+  if (isTRUE(get0(".whr_submodules_loaded", envir = globalenv()))) return(NULL)
+
+  required_files <- c("00_html_guard.R", "01_data_transformer.R",
+                       "02_table_builder.R", "03_page_builder.R",
+                       "04_html_writer.R", "05_chart_builder.R")
+
+  report_dir <- get(".weighting_html_report_dir", envir = globalenv())
+
+  missing <- character(0)
+  for (f in required_files) {
+    if (!file.exists(file.path(report_dir, f))) {
+      missing <- c(missing, f)
+    }
   }
-}
 
-# Check for JS files
-.whr_js_path <- file.path(.weighting_html_report_dir, "js", "weighting_navigation.js")
-if (!file.exists(.whr_js_path)) {
-  .whr_missing <- c(.whr_missing, "js/weighting_navigation.js")
-}
-
-if (length(.whr_missing) > 0) {
-  cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
-  cat("│ Code: IO_HTML_SUBMODULE_MISSING\n")
-  cat("│ Missing files:\n")
-  for (.whr_f in .whr_missing) {
-    cat("│   -", .whr_f, "\n")
+  js_path <- file.path(report_dir, "js", "weighting_navigation.js")
+  if (!file.exists(js_path)) {
+    missing <- c(missing, "js/weighting_navigation.js")
   }
-  cat("│ Expected in:", .weighting_html_report_dir, "\n")
-  cat("│ Fix: Restore missing files or check html_report/ directory\n")
-  cat("└───────────────────────────────────────────────────────┘\n\n")
-  stop(sprintf("Weighting HTML report submodule(s) missing: %s",
-               paste(.whr_missing, collapse = ", ")), call. = FALSE)
-}
 
-for (.whr_file in .whr_required_files) {
-  .whr_path <- file.path(.weighting_html_report_dir, .whr_file)
-  source(.whr_path)
+  if (length(missing) > 0) {
+    cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
+    cat("│ Code: IO_HTML_SUBMODULE_MISSING\n")
+    cat("│ Missing files:\n")
+    for (f in missing) {
+      cat("│   -", f, "\n")
+    }
+    cat("│ Expected in:", report_dir, "\n")
+    cat("│ Fix: Restore missing files or check html_report/ directory\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+    return(list(
+      status = "REFUSED",
+      code = "IO_HTML_SUBMODULE_MISSING",
+      message = sprintf("Weighting HTML report submodule(s) missing: %s",
+                         paste(missing, collapse = ", ")),
+      how_to_fix = sprintf("Restore missing files in %s", report_dir)
+    ))
+  }
+
+  for (f in required_files) {
+    source(file.path(report_dir, f))
+  }
+
+  assign(".whr_submodules_loaded", TRUE, envir = globalenv())
+  NULL
 }
-rm(.whr_file, .whr_path, .whr_required_files, .whr_missing, .whr_js_path)
 
 
 #' Generate Weighting HTML Report
@@ -76,6 +97,10 @@ rm(.whr_file, .whr_path, .whr_required_files, .whr_missing, .whr_js_path)
 #' @export
 generate_weighting_html_report <- function(weighting_results, output_path,
                                             config = list()) {
+  # Load submodules on first call (lazy, avoids stop() at source time)
+  load_err <- .whr_load_submodules()
+  if (!is.null(load_err)) return(load_err)
+
   start_time <- Sys.time()
 
   cat("\n")

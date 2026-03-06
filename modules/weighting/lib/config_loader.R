@@ -149,8 +149,26 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
   if (!is.null(general$logo_file) && !is.na(general$logo_file) &&
       nzchar(trimws(general$logo_file))) {
     general$logo_file_resolved <- resolve_config_path(trimws(general$logo_file), project_root)
+    if (!file.exists(general$logo_file_resolved)) {
+      warning(sprintf("Logo file not found: %s (will use default logo)", general$logo_file_resolved))
+      general$logo_file_resolved <- NULL
+    }
   } else {
     general$logo_file_resolved <- NULL
+  }
+
+  # Brand / accent colour settings (optional, used by HTML report)
+  if (is.null(general$brand_colour) || is.na(general$brand_colour) ||
+      !nzchar(trimws(general$brand_colour))) {
+    general$brand_colour <- NULL
+  } else {
+    general$brand_colour <- trimws(general$brand_colour)
+  }
+  if (is.null(general$accent_colour) || is.na(general$accent_colour) ||
+      !nzchar(trimws(general$accent_colour))) {
+    general$accent_colour <- NULL
+  } else {
+    general$accent_colour <- trimws(general$accent_colour)
   }
 
   # HTML report settings
