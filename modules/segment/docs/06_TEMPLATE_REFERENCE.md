@@ -36,6 +36,8 @@ This document provides complete field-by-field reference for the Segmentation co
 | Segment_Config_Template.xlsx | Main segmentation configuration | docs/templates/ |
 | VarSel_Config_Template.xlsx | Variable selection configuration | docs/templates/ |
 
+**Note:** There is no separate VarSel_Config sheet within the main config file. All variable selection parameters (`variable_selection`, `variable_selection_method`, `max_clustering_vars`, `varsel_min_variance`, `varsel_max_correlation`) are controlled via the main Config sheet's Settings tab. The VarSel_Config_Template.xlsx is a standalone template for running variable selection independently.
+
 ### Template Structure
 
 Both templates use a consistent structure:
@@ -100,12 +102,13 @@ Both templates use a consistent structure:
 - **Purpose:** Clustering algorithm
 - **Required:** No
 - **Default:** `kmeans`
-- **Valid Values:** `kmeans`, `hclust`, `gmm`, comma-separated list (e.g., `kmeans,hclust,gmm`), or `all`
+- **Valid Values:** `kmeans`, `hclust`, `gmm`, `lca`, comma-separated list (e.g., `kmeans,hclust,gmm,lca`), or `all`
 - **Notes:**
   - `kmeans` - K-means clustering (default, fast, scalable)
   - `hclust` - Hierarchical agglomerative clustering (dendrogram, limited to ~15k rows)
   - `gmm` - Gaussian Mixture Models via mclust (soft assignments, requires `mclust` package)
-  - Comma-separated values (e.g., `kmeans,hclust,gmm`) or `all` - Run multiple methods and produce a combined tabbed HTML report with per-method results and a comparison tab
+  - `lca` - Latent Class Analysis via poLCA (categorical/ordinal data, probabilistic, requires `poLCA` package)
+  - Comma-separated values (e.g., `kmeans,hclust,gmm,lca`) or `all` - Run multiple methods and produce a combined tabbed HTML report with per-method results and a comparison tab
 
 #### k_fixed
 
@@ -175,6 +178,39 @@ Both templates use a consistent structure:
   - `VVV` is the most flexible (variable volume, shape, and orientation)
   - `EEE` constrains all components to have the same covariance
   - Ignored when method is not gmm
+
+#### lca_n_classes
+
+- **Purpose:** Number of latent classes for LCA
+- **Required:** No (only used when method = lca)
+- **Data Type:** Integer or blank
+- **Default:** Uses `k_fixed` (final mode) or `k_min:k_max` range (exploration mode)
+- **Notes:**
+  - If set, overrides k_fixed/k_min/k_max for LCA specifically
+  - Ignored when method is not lca
+
+#### lca_max_iter
+
+- **Purpose:** Maximum EM iterations for LCA estimation
+- **Required:** No (only used when method = lca)
+- **Data Type:** Integer
+- **Valid Values:** 100-10000
+- **Default:** `1000`
+- **Notes:**
+  - Increase if model fails to converge
+  - Ignored when method is not lca
+
+#### lca_n_rep
+
+- **Purpose:** Number of random starting values for LCA
+- **Required:** No (only used when method = lca)
+- **Data Type:** Integer
+- **Valid Values:** 1-100
+- **Default:** `10`
+- **Notes:**
+  - Higher values reduce risk of local optima but increase runtime
+  - Analogous to `nstart` for K-means
+  - Ignored when method is not lca
 
 ---
 
@@ -579,7 +615,7 @@ Both templates use a consistent structure:
 |------|---------|
 | seg_final_report.xlsx | Summary, Profiles, Statistics, Validation |
 | seg_final_report.html | Interactive HTML with all configured sections |
-| seg_assignments.xlsx | ID + segment_id + segment_name (+ GMM probabilities) |
+| seg_assignments.xlsx | ID + segment_id + segment_name (+ probabilities if GMM or LCA) |
 | seg_profiles_heatmap.png | Visual profile comparison |
 | seg_segment_sizes.png | Size distribution |
 | seg_model.rds | Saved model object |
@@ -594,7 +630,7 @@ Both templates use a consistent structure:
 | segment_id | Integer | Numeric segment assignment (1, 2, 3, ...) |
 | segment_name | Text | Segment label |
 
-**Additional columns (GMM only):**
+**Additional columns (GMM and LCA):**
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -746,6 +782,34 @@ generate_action_cards  | TRUE
 project_name           | Gaussian Mixture Model Analysis
 ```
 
+### LCA Configuration
+
+```
+Setting                | Value
+-----------------------|--------------------------------
+data_file              | data/satisfaction_survey.csv
+id_variable            | ResponseID
+clustering_vars        | Q02,Q03,Q04,Q05,Q06,Q07,Q08
+k_fixed                | 4
+method                 | lca
+lca_max_iter           | 1000
+lca_n_rep              | 10
+seed                   | 123
+missing_data           | listwise_deletion
+standardize            | FALSE
+segment_names          | auto
+save_model             | TRUE
+output_folder          | output/lca/
+output_prefix          | seg_
+html_report            | TRUE
+brand_colour           | #16A085
+report_title           | LCA Segmentation
+generate_action_cards  | TRUE
+project_name           | Latent Class Analysis
+```
+
+**Notes:** LCA works best with categorical or ordinal variables (e.g., Likert scales). Set `standardize = FALSE` since LCA operates on raw categorical values, not z-scores.
+
 ### Variable Selection Configuration
 
 ```
@@ -800,7 +864,7 @@ html_show_guide          | FALSE
 | k_fixed | Integer 2-10 or blank |
 | k_min | Integer 2-10, less than k_max |
 | k_max | Integer 2-10, greater than k_min |
-| method | One of: kmeans, hclust, gmm, comma-separated list, or all |
+| method | One of: kmeans, hclust, gmm, lca, comma-separated list, or all |
 | nstart | Integer 1-200 |
 | linkage_method | One of: ward.D, ward.D2, single, complete, average, mcquitty, median, centroid |
 | gmm_model_type | Valid mclust model name or blank |
@@ -818,6 +882,7 @@ html_show_guide          | FALSE
 |--------|-----------|-------|
 | hclust | Dataset must be under ~15,000 rows | `guard_require_hclust_size()` |
 | gmm | Package `mclust` must be installed | `guard_require_method_packages()` |
+| lca | Package `poLCA` must be installed; variables should be categorical/ordinal | `guard_require_method_packages()` |
 | kmeans | No specific constraints | - |
 
 ### Sample Size Validation

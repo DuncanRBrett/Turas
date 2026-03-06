@@ -295,7 +295,8 @@ generate_segment_combined_html_report <- function(results, config, output_path) 
       method_tables = method_tables,
       method_charts = method_charts,
       comparison_content = comparison_content,
-      config = config
+      config = config,
+      recommendation = results$recommendation
     ),
     error = function(e) {
       cat(sprintf("    ERROR: Combined page assembly failed: %s\n", e$message))
@@ -355,20 +356,23 @@ generate_segment_combined_html_report <- function(results, config, output_path) 
 #' Build Combined Multi-Method HTML Page
 #'
 #' Assembles the full tabbed HTML page from per-method content and
-#' comparison content. Returns an htmltools browsable page.
+#' comparison content. Includes report-level tabs (Analysis | Pinned Views)
+#' matching the single-method report pattern. Returns an htmltools browsable page.
 #'
 #' @param method_html_data Named list of transformed html_data per method
 #' @param method_tables Named list of table lists per method
 #' @param method_charts Named list of chart lists per method
 #' @param comparison_content List with table, chart, agreement elements
 #' @param config Configuration list
+#' @param recommendation Optional recommendation list (from results$recommendation)
 #' @return htmltools::browsable tagList
 #' @keywords internal
 build_seg_combined_page <- function(method_html_data,
                                      method_tables,
                                      method_charts,
                                      comparison_content,
-                                     config) {
+                                     config,
+                                     recommendation = NULL) {
 
   brand_colour <- config$brand_colour %||% "#323367"
   accent_colour <- config$accent_colour %||% "#CC9900"
@@ -402,7 +406,8 @@ build_seg_combined_page <- function(method_html_data,
     comparison_content = comparison_content,
     method_html_data = method_html_data,
     brand_colour = brand_colour,
-    accent_colour = accent_colour
+    accent_colour = accent_colour,
+    recommendation = recommendation
   )
 
   # --- Footer ---
@@ -445,6 +450,82 @@ build_seg_combined_page <- function(method_html_data,
     htmltools::tags$meta(name = "turas-source-filename", content = source_filename)
   )
 
+  # --- Report-level tab bar (Analysis | Pinned Views) ---
+  report_tab_bar <- htmltools::tags$div(
+    class = "seg-report-tabs",
+    htmltools::tags$button(
+      class = "seg-report-tab-btn active",
+      `data-tab` = "analysis",
+      "Analysis"
+    ),
+    htmltools::tags$button(
+      class = "seg-report-tab-btn",
+      `data-tab` = "pinned",
+      "Pinned Views"
+    )
+  )
+
+  # --- Pinned Views section ---
+  pinned_section <- htmltools::tags$div(
+    class = "seg-section",
+    id = "seg-pinned-section",
+    `data-seg-section` = "pinned-views",
+    htmltools::tags$div(
+      class = "seg-pinned-panel-header",
+      htmltools::tags$div(class = "seg-pinned-panel-title",
+                          "\U0001F4CC Pinned Views"),
+      htmltools::tags$div(
+        class = "seg-pinned-panel-actions",
+        htmltools::tags$button(
+          class = "seg-pinned-panel-btn",
+          onclick = "segAddSection()",
+          "\u2795 Add Section"
+        ),
+        htmltools::tags$button(
+          class = "seg-pinned-panel-btn",
+          onclick = "segExportAllPinnedPNG()",
+          "\U0001F4E5 Export All as PNG"
+        ),
+        htmltools::tags$button(
+          class = "seg-pinned-panel-btn",
+          onclick = "segPrintPinnedViews()",
+          "\U0001F5B6 Print / PDF"
+        ),
+        htmltools::tags$button(
+          class = "seg-pinned-panel-btn",
+          onclick = "segClearAllPinned()",
+          "\U0001F5D1 Clear All"
+        )
+      )
+    ),
+    htmltools::tags$div(
+      id = "seg-pinned-empty",
+      class = "seg-pinned-empty",
+      htmltools::tags$div(class = "seg-pinned-empty-icon", "\U0001F4CC"),
+      htmltools::tags$div("No pinned views yet."),
+      htmltools::tags$div(
+        style = "font-size:12px;margin-top:4px;",
+        "Click the pin icon on any section to save it here for export."
+      )
+    ),
+    htmltools::tags$div(id = "seg-pinned-cards-container")
+  )
+
+  # --- Hidden data stores ---
+  insight_store <- htmltools::tags$textarea(
+    class = "seg-insight-store",
+    id = "seg-insight-store",
+    `data-seg-prefix` = "",
+    style = "display:none;",
+    "{}"
+  )
+
+  pinned_store <- htmltools::tags$script(
+    id = "seg-pinned-views-data",
+    type = "application/json",
+    "[]"
+  )
+
   # --- Assemble page ---
   page <- htmltools::tagList(
     htmltools::tags$head(
@@ -459,9 +540,12 @@ build_seg_combined_page <- function(method_html_data,
     htmltools::tags$body(
       class = "seg-body",
       header,
+      report_tab_bar,
       htmltools::tags$main(
         class = "seg-main",
+        # Analysis tab content
         htmltools::tags$div(
+          id = "seg-analysis-tab",
           class = "seg-content",
           tab_bar,
           htmltools::tags$div(
@@ -470,7 +554,17 @@ build_seg_combined_page <- function(method_html_data,
             comparison_panel
           ),
           footer
-        )
+        ),
+        # Pinned Views tab content (hidden by default)
+        htmltools::tags$div(
+          id = "seg-pinned-tab",
+          class = "seg-content",
+          style = "display:none;",
+          pinned_section,
+          footer
+        ),
+        insight_store,
+        pinned_store
       ),
       js_tags,
       htmltools::tags$script(htmltools::HTML(tab_js))
@@ -1175,20 +1269,31 @@ build_seg_combined_page <- function(method_html_data,
 #' Build Comparison Panel
 #'
 #' The Comparison tab content showing side-by-side metrics, bar chart,
-#' and inter-method agreement matrix.
+#' and inter-method agreement matrix. The Best Fit recommendation banner
+#' appears at the very top for immediate visibility.
 #'
 #' @param comparison_content List with table, chart, agreement
 #' @param method_html_data Named list of transformed html_data per method
 #' @param brand_colour Brand colour hex string
 #' @param accent_colour Accent colour hex string
+#' @param recommendation Optional recommendation list (from results$recommendation)
 #' @return htmltools tag
 #' @keywords internal
 .build_seg_comparison_panel <- function(comparison_content,
                                          method_html_data,
                                          brand_colour,
-                                         accent_colour) {
+                                         accent_colour,
+                                         recommendation = NULL) {
 
   sections <- list()
+
+  # --- Best Fit recommendation banner (TOP of comparison tab) ---
+  rec_section <- .build_seg_combined_recommendation(
+    method_html_data, accent_colour, recommendation
+  )
+  if (!is.null(rec_section)) {
+    sections$recommendation <- rec_section
+  }
 
   # Intro text
   active_methods <- names(method_html_data)
@@ -1245,12 +1350,6 @@ build_seg_combined_page <- function(method_html_data,
     )
   }
 
-  # --- Method recommendation ---
-  rec_section <- .build_seg_combined_recommendation(method_html_data, accent_colour)
-  if (!is.null(rec_section)) {
-    sections$recommendation <- rec_section
-  }
-
   htmltools::tags$div(
     class = "seg-method-panel",
     `data-method` = "comparison",
@@ -1266,81 +1365,157 @@ build_seg_combined_page <- function(method_html_data,
 #' Build Combined Report Recommendation
 #'
 #' Determines and displays which method performs best across metrics.
+#' If \code{recommendation} is provided (from \code{results$recommendation}),
+#' uses its \code{recommended_method}, \code{reason}, and \code{scores} fields.
+#' Otherwise falls back to computing scores from method_html_data.
+#'
+#' Returns a prominent banner suitable for display at the top of the
+#' Comparison tab, using the \code{seg-quality-banner} CSS classes.
 #'
 #' @param method_html_data Named list of transformed html_data per method
 #' @param accent_colour Accent colour hex string
+#' @param recommendation Optional recommendation list with recommended_method,
+#'   reason, and scores fields (from results$recommendation)
 #' @return htmltools tag or NULL
 #' @keywords internal
-.build_seg_combined_recommendation <- function(method_html_data, accent_colour) {
+.build_seg_combined_recommendation <- function(method_html_data,
+                                                 accent_colour,
+                                                 recommendation = NULL) {
 
   active_methods <- names(method_html_data)
   if (length(active_methods) < 2) return(NULL)
 
-  # Score each method: +1 for each metric where it is best
-  scores <- setNames(rep(0L, length(active_methods)), active_methods)
-  reasons <- list()
-
-  # Silhouette - higher is better
-  sil_vals <- vapply(active_methods, function(m) {
-    method_html_data[[m]]$diagnostics$avg_silhouette %||% NA_real_
-  }, numeric(1))
-
-  if (any(!is.na(sil_vals))) {
-    best_m <- active_methods[which.max(sil_vals)]
-    scores[best_m] <- scores[best_m] + 1L
-    reasons <- c(reasons, list(sprintf(
-      "Highest silhouette score (%.3f)", max(sil_vals, na.rm = TRUE)
-    )))
+  # --- Resolve best method and reason ---
+  if (!is.null(recommendation) &&
+      !is.null(recommendation$recommended_method) &&
+      nzchar(recommendation$recommended_method)) {
+    # Use pre-computed recommendation
+    best_method <- recommendation$recommended_method
+    reason_text <- recommendation$reason %||% NULL
+    ext_scores  <- recommendation$scores
+  } else {
+    best_method <- NULL
+    reason_text <- NULL
+    ext_scores  <- NULL
   }
 
-  # BSS/TSS - higher is better
-  bss_vals <- vapply(active_methods, function(m) {
-    method_html_data[[m]]$diagnostics$betweenss_totss %||% NA_real_
-  }, numeric(1))
+  # Fall back to scoring if no external recommendation
+  if (is.null(best_method) || !best_method %in% active_methods) {
+    # Score each method: +1 for each metric where it is best
+    scores <- setNames(rep(0L, length(active_methods)), active_methods)
+    metric_wins <- list()
 
-  if (any(!is.na(bss_vals))) {
-    best_m <- active_methods[which.max(bss_vals)]
-    scores[best_m] <- scores[best_m] + 1L
+    # Silhouette - higher is better
+    sil_vals <- vapply(active_methods, function(m) {
+      method_html_data[[m]]$diagnostics$avg_silhouette %||% NA_real_
+    }, numeric(1))
+
+    if (any(!is.na(sil_vals))) {
+      best_m <- active_methods[which.max(sil_vals)]
+      scores[best_m] <- scores[best_m] + 1L
+      metric_wins <- c(metric_wins, list(sprintf(
+        "Highest silhouette score (%.3f)", max(sil_vals, na.rm = TRUE)
+      )))
+    }
+
+    # BSS/TSS - higher is better
+    bss_vals <- vapply(active_methods, function(m) {
+      method_html_data[[m]]$diagnostics$betweenss_totss %||% NA_real_
+    }, numeric(1))
+
+    if (any(!is.na(bss_vals))) {
+      best_m <- active_methods[which.max(bss_vals)]
+      scores[best_m] <- scores[best_m] + 1L
+    }
+
+    # Min segment size - larger is better (more balanced)
+    min_sizes <- vapply(active_methods, function(m) {
+      sizes <- method_html_data[[m]]$segment_sizes
+      if (!is.null(sizes) && nrow(sizes) > 0) min(sizes$n) else NA_real_
+    }, numeric(1))
+
+    if (any(!is.na(min_sizes))) {
+      best_m <- active_methods[which.max(min_sizes)]
+      scores[best_m] <- scores[best_m] + 1L
+    }
+
+    best_method <- active_methods[which.max(scores)]
+    if (is.null(reason_text)) {
+      reason_text <- sprintf(
+        "Best results across %d of %d comparison metrics. Review the per-method tabs for detailed validation before making a final selection.",
+        max(scores), length(active_methods)
+      )
+    }
+    ext_scores <- as.list(scores)
   }
 
-  # Min segment size - larger is better (more balanced)
-  min_sizes <- vapply(active_methods, function(m) {
-    sizes <- method_html_data[[m]]$segment_sizes
-    if (!is.null(sizes) && nrow(sizes) > 0) min(sizes$n) else NA_real_
-  }, numeric(1))
-
-  if (any(!is.na(min_sizes))) {
-    best_m <- active_methods[which.max(min_sizes)]
-    scores[best_m] <- scores[best_m] + 1L
-  }
-
-  # Find winner
-  best_method <- active_methods[which.max(scores)]
+  # --- Build the best-method label ---
   best_label <- switch(tolower(best_method),
     kmeans = "K-Means", pam = "PAM", hclust = "Hierarchical",
     gmm = "GMM", mclust = "GMM", lca = "Latent Class", toupper(best_method)
   )
 
-  # Build recommendation card
-  htmltools::tags$div(
-    class = "seg-combined-section",
-    htmltools::tags$div(
-      style = sprintf(
-        "background:#FFFBEB; border:2px solid %s; border-radius:8px; padding:24px; margin-top:8px;",
-        accent_colour
-      ),
-      htmltools::tags$h4(
-        style = sprintf("font-size:16px; font-weight:600; color:%s; margin:0 0 8px 0;", accent_colour),
-        sprintf("Recommended: %s", best_label)
-      ),
-      htmltools::tags$p(
-        style = "font-size:14px; color:#1e293b; line-height:1.6; margin:0;",
-        sprintf(
-          "%s achieved the best results across %d of %d comparison metrics. Review the per-method tabs for detailed validation before making a final selection.",
-          best_label, max(scores), length(active_methods)
-        )
-      )
+  # --- Determine quality tier from silhouette of best method ---
+  best_sil <- method_html_data[[best_method]]$diagnostics$avg_silhouette %||% NA_real_
+  if (!is.na(best_sil)) {
+    if (best_sil >= 0.50) {
+      quality_class <- "seg-quality-excellent"
+    } else if (best_sil >= 0.35) {
+      quality_class <- "seg-quality-good"
+    } else if (best_sil >= 0.25) {
+      quality_class <- "seg-quality-moderate"
+    } else {
+      quality_class <- "seg-quality-limited"
+    }
+  } else {
+    quality_class <- "seg-quality-good"
+  }
+
+  # --- Build prominent Best Fit banner ---
+  # Title line
+  banner_title <- htmltools::tags$div(
+    style = "font-size: 22px; font-weight: 700; margin-bottom: 6px; color: #1e293b;",
+    sprintf("Best Fit: %s", best_label)
+  )
+
+  # Reason / explanation
+  banner_reason <- NULL
+  if (!is.null(reason_text) && nzchar(reason_text)) {
+    banner_reason <- htmltools::tags$div(
+      style = "font-size: 14px; color: #334155; line-height: 1.6; margin-bottom: 0;",
+      reason_text
     )
+  }
+
+  # Score breakdown (if scores available)
+  score_chips <- NULL
+  if (!is.null(ext_scores) && length(ext_scores) > 0) {
+    chip_els <- lapply(names(ext_scores), function(m) {
+      m_label <- switch(tolower(m),
+        kmeans = "K-Means", pam = "PAM", hclust = "Hierarchical",
+        gmm = "GMM", mclust = "GMM", lca = "Latent Class", toupper(m)
+      )
+      sc <- ext_scores[[m]]
+      is_best <- (tolower(m) == tolower(best_method))
+      chip_style <- if (is_best) {
+        sprintf("display:inline-block; padding:4px 12px; border-radius:12px; font-size:12px; font-weight:600; margin-right:8px; margin-top:8px; background:%s; color:white;", accent_colour)
+      } else {
+        "display:inline-block; padding:4px 12px; border-radius:12px; font-size:12px; font-weight:500; margin-right:8px; margin-top:8px; background:#f1f5f9; color:#64748b;"
+      }
+      htmltools::tags$span(
+        style = chip_style,
+        sprintf("%s: %s", m_label, as.character(sc))
+      )
+    })
+    score_chips <- htmltools::tags$div(style = "margin-top: 4px;", chip_els)
+  }
+
+  htmltools::tags$div(
+    class = paste("seg-quality-banner", quality_class),
+    style = "padding: 20px 24px; margin-bottom: 24px;",
+    banner_title,
+    banner_reason,
+    score_chips
   )
 }
 

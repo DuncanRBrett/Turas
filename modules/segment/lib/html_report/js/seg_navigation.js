@@ -1,13 +1,18 @@
 /**
- * seg_navigation.js - Section navigation with smooth scroll and active tracking
+ * seg_navigation.js - Section navigation with smooth scroll and active tracking,
+ * plus report-level tab switching between Analysis and Pinned Views,
  * for Turas Segment HTML reports.
  * Handles nav bar initialization, scroll-based active section highlighting,
- * page hydration, save, and print.
+ * report tab switching, page hydration, save, and print.
  */
 (function() {
   'use strict';
 
   var navGroups = [];
+
+  // =========================================================================
+  // Section navigation
+  // =========================================================================
 
   /**
    * Initialize all section navigation bars.
@@ -73,6 +78,71 @@
     }
   }
 
+  // =========================================================================
+  // Report-level tab switching (Analysis / Pinned Views)
+  // =========================================================================
+
+  /**
+   * Initialize report-level tab buttons.
+   * Finds .seg-report-tab-btn elements and attaches click handlers that
+   * switch between the Analysis and Pinned Views panes.
+   */
+  function initReportTabs() {
+    var tabBtns = document.querySelectorAll('.seg-report-tab-btn');
+    if (!tabBtns.length) return;
+
+    for (var i = 0; i < tabBtns.length; i++) {
+      (function(btn) {
+        btn.addEventListener('click', function() {
+          var target = btn.getAttribute('data-tab');
+          switchReportTab(target, tabBtns);
+        });
+      })(tabBtns[i]);
+    }
+  }
+
+  /**
+   * Switch the visible report tab and update button active states.
+   * @param {string} tabName - 'analysis' or 'pinned'
+   * @param {NodeList|Array} tabBtns - the set of tab button elements
+   */
+  function switchReportTab(tabName, tabBtns) {
+    var analysisTab = document.getElementById('seg-analysis-tab');
+    var pinnedTab   = document.getElementById('seg-pinned-tab');
+    var sectionNav  = document.getElementById('seg-section-nav');
+
+    // Toggle active class on tab buttons
+    for (var i = 0; i < tabBtns.length; i++) {
+      tabBtns[i].classList.toggle(
+        'active',
+        tabBtns[i].getAttribute('data-tab') === tabName
+      );
+    }
+
+    if (tabName === 'pinned') {
+      if (analysisTab) analysisTab.style.display = 'none';
+      if (pinnedTab)   pinnedTab.style.display   = 'block';
+      if (sectionNav)  sectionNav.style.display   = 'none';
+    } else {
+      if (analysisTab) analysisTab.style.display = 'block';
+      if (pinnedTab)   pinnedTab.style.display   = 'none';
+      if (sectionNav)  sectionNav.style.display   = '';
+    }
+  }
+
+  /**
+   * Public helper for programmatic tab switching (e.g. from a pin button click).
+   * @param {string} tabName - 'analysis' or 'pinned'
+   */
+  window.segSwitchToTab = function(tabName) {
+    var tabBtns = document.querySelectorAll('.seg-report-tab-btn');
+    switchReportTab(tabName, tabBtns);
+  };
+
+  // =========================================================================
+  // Page utilities (hydrate, save, print)
+  // =========================================================================
+
   /**
    * Hydrate the page: run insight hydration and pinned views restoration.
    */
@@ -112,10 +182,15 @@
     window.print();
   };
 
+  // =========================================================================
+  // Initialization
+  // =========================================================================
+
   // Initialize on DOM ready
   document.addEventListener('DOMContentLoaded', function() {
     initNavBars();
     updateActiveNav();
+    initReportTabs();
     window.segHydratePage();
   });
 

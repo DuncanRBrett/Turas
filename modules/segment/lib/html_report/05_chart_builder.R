@@ -842,3 +842,270 @@ build_seg_metrics_chart <- function(html_data, brand_colour = "#323367",
 
   htmltools::HTML(svg)
 }
+
+
+#' Build Segment Overlap Heatmap (SVG)
+#'
+#' K x K heatmap showing pairwise segment similarity based on centroid
+#' distances. Cells coloured from green (distinct, large distance) to red
+#' (overlapping, small distance). Diagonal cells are shaded dark as
+#' self-comparisons.
+#'
+#' @param html_data List from data transformer (must contain centers and segment_names)
+#' @param brand_colour Brand colour hex string
+#' @return htmltools::HTML string containing SVG, or empty string if no data
+#' @keywords internal
+build_seg_overlap_heatmap <- function(html_data, brand_colour = "#323367") {
+
+  centers <- html_data$centers
+  if (is.null(centers)) return(htmltools::HTML(""))
+
+  if (!is.matrix(centers)) {
+    centers <- tryCatch(as.matrix(centers), error = function(e) NULL)
+    if (is.null(centers)) return(htmltools::HTML(""))
+  }
+
+  k <- nrow(centers)
+  if (k < 2) return(htmltools::HTML(""))
+
+  seg_names <- html_data$segment_names %||% paste0("Seg ", seq_len(k))
+
+  # Compute pairwise Euclidean distances between centroids
+  dist_matrix <- as.matrix(stats::dist(centers, method = "euclidean"))
+
+  # Normalise distances to 0-1 for colour mapping (0 = overlap, 1 = distinct)
+  max_dist <- max(dist_matrix, na.rm = TRUE)
+  if (max_dist == 0) max_dist <- 1
+  norm_matrix <- dist_matrix / max_dist
+
+  cell_size <- 70
+  label_width <- 120
+  header_height <- 60
+  chart_width <- label_width + k * cell_size + 10
+  total_height <- header_height + k * cell_size + 10
+
+  # Colour interpolation: red (overlap/close) -> yellow -> green (distinct/far)
+  overlap_colour <- function(norm_val) {
+    if (is.na(norm_val)) return("#f1f5f9")
+    v <- max(0, min(1, norm_val))
+    if (v < 0.5) {
+      t <- v / 0.5
+      r <- 255
+      g <- round(180 * t)
+      b <- round(60 * (1 - t))
+    } else {
+      t <- (v - 0.5) / 0.5
+      r <- round(255 * (1 - t * 0.6))
+      g <- round(180 + 50 * t)
+      b <- round(60 * t)
+    }
+    sprintf("#%02x%02x%02x", r, g, b)
+  }
+
+  # Header row (segment names rotated)
+  header <- ""
+  for (j in seq_len(k)) {
+    x <- label_width + (j - 1) * cell_size + cell_size / 2
+    seg_label <- htmltools::htmlEscape(seg_names[j])
+    if (nchar(seg_label) > 10) seg_label <- paste0(substr(seg_label, 1, 9), "\u2026")
+    header <- paste0(header, sprintf(
+      '<text x="%.1f" y="%.0f" text-anchor="end" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="%s" font-weight="500" transform="rotate(-45, %.1f, %.0f)">%s</text>\n',
+      x, header_height - 8, brand_colour, x, header_height - 8, seg_label
+    ))
+  }
+
+  # Data cells
+  cells <- ""
+  for (i in seq_len(k)) {
+    y <- header_height + (i - 1) * cell_size
+
+    # Row label
+    row_label <- htmltools::htmlEscape(seg_names[i])
+    if (nchar(row_label) > 14) row_label <- paste0(substr(row_label, 1, 13), "\u2026")
+    cells <- paste0(cells, sprintf(
+      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="400" dominant-baseline="central">%s</text>\n',
+      label_width - 8, y + cell_size / 2, row_label
+    ))
+
+    for (j in seq_len(k)) {
+      x <- label_width + (j - 1) * cell_size
+
+      if (i == j) {
+        bg_colour <- "#e2e8f0"
+        value_text <- "\u2014"
+        txt_colour <- "#94a3b8"
+      } else {
+        raw_dist <- dist_matrix[i, j]
+        norm_val <- norm_matrix[i, j]
+        bg_colour <- overlap_colour(norm_val)
+        value_text <- sprintf("%.2f", raw_dist)
+        txt_colour <- if (norm_val < 0.3) "#ffffff" else "#1e293b"
+      }
+
+      cells <- paste0(cells, sprintf(
+        '<rect x="%.0f" y="%.0f" width="%d" height="%d" rx="4" fill="%s" stroke="#ffffff" stroke-width="2"/>\n',
+        x, y, cell_size, cell_size, bg_colour
+      ))
+
+      cells <- paste0(cells, sprintf(
+        '<text x="%.1f" y="%.1f" text-anchor="middle" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="%s" font-weight="500" dominant-baseline="central">%s</text>\n',
+        x + cell_size / 2, y + cell_size / 2, txt_colour, value_text
+      ))
+    }
+  }
+
+  # Legend
+  legend_y <- header_height + k * cell_size + 2
+  legend_width <- k * cell_size
+  legend_x <- label_width
+  n_steps <- 20
+  step_w <- legend_width / n_steps
+
+  legend <- ""
+  for (s in seq_len(n_steps)) {
+    v <- (s - 1) / (n_steps - 1)
+    lx <- legend_x + (s - 1) * step_w
+    legend <- paste0(legend, sprintf(
+      '<rect x="%.1f" y="%.0f" width="%.1f" height="8" fill="%s"/>\n',
+      lx, legend_y, step_w + 0.5, overlap_colour(v)
+    ))
+  }
+  legend <- paste0(legend, sprintf(
+    '<text x="%.0f" y="%.0f" font-size="9" font-family="\'Segoe UI\', Arial, sans-serif" fill="#94a3b8">Overlapping</text>\n',
+    legend_x, legend_y + 20
+  ))
+  legend <- paste0(legend, sprintf(
+    '<text x="%.0f" y="%.0f" text-anchor="end" font-size="9" font-family="\'Segoe UI\', Arial, sans-serif" fill="#94a3b8">Distinct</text>\n',
+    legend_x + legend_width, legend_y + 20
+  ))
+
+  total_height <- total_height + 25
+
+  svg <- sprintf(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %.0f %.0f" class="seg-chart seg-overlap-heatmap" role="img" aria-label="Segment overlap heatmap showing pairwise distances between %d segments">\n%s\n%s\n%s\n</svg>',
+    chart_width, total_height, k, header, cells, legend
+  )
+
+  htmltools::HTML(svg)
+}
+
+
+#' Build Golden Questions Importance Chart (SVG)
+#'
+#' Horizontal bar chart showing Random Forest variable importance for
+#' predicting segment membership. Bars show MeanDecreaseAccuracy with
+#' accuracy badge in header.
+#'
+#' @param html_data List from data transformer (must contain golden_questions)
+#' @param brand_colour Brand colour hex string
+#' @return htmltools::HTML string containing SVG, or empty string if no data
+#' @keywords internal
+build_seg_golden_questions_chart <- function(html_data, brand_colour = "#323367") {
+
+  gq <- html_data$golden_questions
+  if (is.null(gq) || is.null(gq$top_questions)) return(htmltools::HTML(""))
+
+  tq <- gq$top_questions
+  if (nrow(tq) == 0) return(htmltools::HTML(""))
+
+  n <- nrow(tq)
+  accuracy <- gq$accuracy %||% NA_real_
+
+  bar_height <- 32
+  gap <- 10
+  label_width <- 220
+  chart_width <- 700
+  bar_area_width <- chart_width - label_width - 80
+  header_space <- 35
+  total_height <- header_space + n * (bar_height + gap) + 20
+
+  # Use importance_pct if available, else raw importance
+  if ("importance_pct" %in% names(tq)) {
+    vals <- tq$importance_pct
+    fmt <- function(v) sprintf("%.1f%%", v)
+  } else if ("importance" %in% names(tq)) {
+    vals <- tq$importance
+    fmt <- function(v) sprintf("%.2f", v)
+  } else {
+    return(htmltools::HTML(""))
+  }
+
+  max_val <- max(vals, na.rm = TRUE)
+  if (max_val == 0) max_val <- 1
+
+  # Resolve labels
+  labels <- tq$variable
+  ql <- html_data$question_labels
+  if (!is.null(ql) && is.list(ql)) {
+    labels <- vapply(labels, function(v) {
+      lbl <- ql[[v]]
+      if (!is.null(lbl) && nzchar(lbl)) lbl else v
+    }, character(1), USE.NAMES = FALSE)
+  }
+
+  # Header: accuracy badge
+  acc_text <- if (!is.na(accuracy)) sprintf("OOB Accuracy: %.1f%%", accuracy * 100) else ""
+  header <- sprintf(
+    '<text x="%.0f" y="18" font-size="12" font-family="\'Segoe UI\', Arial, sans-serif" fill="%s" font-weight="600">%s</text>\n',
+    label_width, brand_colour, acc_text
+  )
+
+  # Gridlines
+  grid_lines <- ""
+  grid_step <- if (max_val > 40) 20 else if (max_val > 20) 10 else 5
+  for (g in seq(0, 100, by = grid_step)) {
+    if (g > max_val * 1.15) break
+    x_pos <- label_width + (g / max(max_val * 1.15, 1)) * bar_area_width
+    grid_lines <- paste0(grid_lines, sprintf(
+      '<line x1="%.1f" y1="%.0f" x2="%.1f" y2="%.0f" stroke="#e2e8f0" stroke-width="1"/>\n',
+      x_pos, header_space, x_pos, total_height - 5
+    ))
+  }
+
+  # Bars
+  bars <- ""
+  accent <- "#CC9900"
+
+  for (i in seq_len(n)) {
+    val <- vals[i]
+    if (is.na(val)) val <- 0
+    y <- header_space + (i - 1) * (bar_height + gap)
+    bar_w <- max(2, (val / max(max_val * 1.15, 1)) * bar_area_width)
+
+    bar_colour <- if (i == 1) accent else brand_colour
+    opacity <- max(0.4, 1.0 - (i - 1) * 0.12)
+
+    # Rank badge
+    bars <- paste0(bars, sprintf(
+      '<text x="8" y="%.1f" font-size="10" font-family="\'Segoe UI\', Arial, sans-serif" fill="#94a3b8" font-weight="500" dominant-baseline="central">#%d</text>\n',
+      y + bar_height / 2, i
+    ))
+
+    # Label
+    lbl <- labels[i]
+    if (nchar(lbl) > 35) lbl <- paste0(substr(lbl, 1, 33), "\u2026")
+    bars <- paste0(bars, sprintf(
+      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="400" dominant-baseline="central">%s</text>\n',
+      label_width - 8, y + bar_height / 2, htmltools::htmlEscape(lbl)
+    ))
+
+    # Bar
+    bars <- paste0(bars, sprintf(
+      '<rect x="%.0f" y="%.1f" width="%.1f" height="%d" rx="4" fill="%s" opacity="%.2f"/>\n',
+      label_width, y, bar_w, bar_height, bar_colour, opacity
+    ))
+
+    # Value
+    bars <- paste0(bars, sprintf(
+      '<text x="%.1f" y="%.1f" font-size="10" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="500" dominant-baseline="central">%s</text>\n',
+      label_width + bar_w + 6, y + bar_height / 2, fmt(val)
+    ))
+  }
+
+  svg <- sprintf(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %.0f" class="seg-chart seg-golden-questions-chart" role="img" aria-label="Golden questions importance chart showing top %d predictive variables">\n%s\n%s\n%s\n</svg>',
+    chart_width, total_height, n, header, grid_lines, bars
+  )
+
+  htmltools::HTML(svg)
+}

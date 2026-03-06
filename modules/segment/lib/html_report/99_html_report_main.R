@@ -232,6 +232,22 @@ generate_segment_html_report <- function(results, config, output_path) {
     }
   )
 
+  charts$overlap <- tryCatch(
+    build_seg_overlap_heatmap(html_data, brand_colour),
+    error = function(e) {
+      warnings <<- c(warnings, paste("Overlap heatmap:", e$message))
+      NULL
+    }
+  )
+
+  charts$golden_questions <- tryCatch(
+    build_seg_golden_questions_chart(html_data, brand_colour),
+    error = function(e) {
+      warnings <<- c(warnings, paste("Golden questions chart:", e$message))
+      NULL
+    }
+  )
+
   cat(sprintf("    Built %d charts\n", sum(!sapply(charts, is.null))))
 
   # ==========================================================================

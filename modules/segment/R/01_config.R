@@ -369,6 +369,9 @@ validate_segment_config <- function(config) {
     question_labels <- load_question_labels(question_labels_file)
   }
 
+  # Segment names file (for reading edited names back from Excel)
+  segment_names_file <- get_config_value(config, "segment_names_file", default_value = NULL)
+
   # ===========================================================================
   # CONSTRUCT VALIDATED CONFIG
   # ===========================================================================
@@ -418,6 +421,7 @@ validate_segment_config <- function(config) {
     # Metadata
     project_name = project_name, analyst_name = analyst_name, description = description,
     question_labels_file = question_labels_file, question_labels = question_labels,
+    segment_names_file = segment_names_file,
     # Mode detection
     mode = if (is.null(k_fixed)) "exploration" else "final"
   )

@@ -12,7 +12,7 @@ Multi-algorithm clustering segmentation for survey data with exploration and fin
 The Turas Segmentation Module provides a standardized, repeatable approach to clustering survey respondents into meaningful segments based on behavioral, attitudinal, or satisfaction data.
 
 **Core Capabilities:**
-- Multi-algorithm clustering: **K-means**, **Hierarchical (hclust)**, and **Gaussian Mixture Models (GMM)**
+- Multi-algorithm clustering: **K-means**, **Hierarchical (hclust)**, **Gaussian Mixture Models (GMM)**, and **Latent Class Analysis (LCA)**
 - Excel-based configuration
 - Interactive GUI interface with real-time console output
 - Exploration mode (compare multiple k values across all methods)
@@ -26,8 +26,10 @@ The Turas Segmentation Module provides a standardized, repeatable approach to cl
 - Segment vulnerability/switching analysis with assignment confidence scores
 - Segment profiling, classification rules, and action cards
 - Stability assessment for solution robustness
-- Segment assignment output (Excel with ID, segment_id, segment_name, and GMM probabilities)
+- Segment assignment output (Excel with ID, segment_id, segment_name, and GMM/LCA probabilities)
 - Model scoring for new data
+- Golden question identification for simplified segment typing
+- `merge_segment_to_data()` utility to merge segment assignments back to original data
 
 ---
 
@@ -86,7 +88,7 @@ Open the exploration report (Excel and/or HTML) and review:
 Update config: `k_fixed = 4` then re-run.
 
 **Outputs:**
-- `seg_assignments.xlsx` - Respondent ID + segment_id + segment_name (+ GMM probabilities if method = gmm)
+- `seg_assignments.xlsx` - Respondent ID + segment_id + segment_name (+ probabilities if method = gmm or lca)
 - `seg_final_report.xlsx` - Comprehensive multi-tab report
 - `seg_final_report.html` - Interactive HTML report with SVG charts and navigation
 - `seg_model.rds` - Saved model for scoring new data
@@ -164,12 +166,15 @@ modules/segment/
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `method` | kmeans | Clustering algorithm: `kmeans`, `hclust`, `gmm`, or comma-separated for multi-method comparison (e.g., `kmeans,hclust,gmm` or `all`) |
+| `method` | kmeans | Clustering algorithm: `kmeans`, `hclust`, `gmm`, `lca`, or comma-separated for multi-method comparison (e.g., `kmeans,hclust,gmm,lca` or `all`) |
 | `k_fixed` | (blank) | Fixed k for final run; blank = exploration |
 | `k_min` | 3 | Minimum k to test in exploration |
 | `k_max` | 6 | Maximum k to test |
 | `linkage_method` | ward.D2 | Linkage for hclust: ward.D2, complete, average, etc. |
 | `gmm_model_type` | (auto) | GMM covariance structure: VVV, EEE, etc. (NULL = auto) |
+| `lca_n_classes` | (from k) | Number of latent classes (defaults to k_fixed or k_min:k_max range) |
+| `lca_max_iter` | 1000 | Maximum EM iterations for LCA |
+| `lca_n_rep` | 10 | Number of random starts for LCA |
 | `missing_data` | listwise_deletion | How to handle missing data |
 | `standardize` | TRUE | Standardize variables before clustering |
 | `outlier_detection` | FALSE | Enable outlier detection |
@@ -195,6 +200,7 @@ See [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) for complete parameter 
 | **K-means** | Default choice, continuous scales | Fast, scalable, well-understood | Assumes spherical clusters |
 | **Hierarchical** | Exploring nested structures | Dendrogram, no k needed upfront | O(n^2) memory, max ~15k rows |
 | **GMM** | Overlapping segments, soft assignment | Probability-based, handles elliptical clusters | Requires `mclust` package, heavier |
+| **LCA** | Categorical/ordinal data (e.g., Likert scales) | Probabilistic, fit indices (AIC/BIC), no normality assumption | Requires `poLCA` package, categorical inputs |
 
 ---
 
@@ -230,7 +236,9 @@ See [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) for complete parameter 
 | Between/Total | 0 to 1 | > 0.6 | Separation quality |
 | Calinski-Harabasz | 0+ | Higher is better | Cluster separation |
 | Cophenetic Corr. | 0 to 1 | > 0.7 | Dendrogram fit (hclust only) |
-| BIC | varies | Lower is better | Model fit (GMM only) |
+| BIC | varies | Lower is better | Model fit (GMM and LCA) |
+| AIC | varies | Lower is better | Model fit (LCA) |
+| Entropy R-sq | 0 to 1 | > 0.80 | Classification certainty (LCA) |
 
 ---
 
@@ -252,7 +260,7 @@ See [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) for complete parameter 
 - `fmsb` - Spider plots
 - `ggplot2` - Enhanced visualizations
 - `rpart` - Classification rules (decision trees)
-- `poLCA` - Latent Class Analysis
+- `poLCA` - Latent Class Analysis (required for method = lca; handled gracefully if missing)
 
 ---
 

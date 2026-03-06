@@ -434,3 +434,344 @@ export_rules_text <- function(rules_result, output_path) {
   writeLines(lines, output_path)
   cat(sprintf("✓ Rules exported to: %s\n", output_path))
 }
+
+
+# ==============================================================================
+# GOLDEN QUESTIONS - RANDOM FOREST VARIABLE IMPORTANCE
+# ==============================================================================
+
+#' Identify Golden Questions for Segment Prediction
+#'
+#' Uses Random Forest to identify the top N survey questions that most
+#' accurately predict segment membership. These "golden questions" can be
+#' used in short-form surveys or at point-of-sale to classify new
+#' respondents into segments without a full survey.
+#'
+#' @param data Data frame of original (unscaled) survey variables used in clustering
+#' @param clusters Integer vector of segment assignments
+#' @param segment_names Named character vector of segment labels
+#' @param n_top Integer, number of top questions to return (default 5)
+#' @param n_trees Integer, number of trees in Random Forest (default 500)
+#' @return List with:
+#'   \item{status}{"PASS", "PARTIAL", or "SKIPPED"}
+#'   \item{top_questions}{Data frame with variable, importance, rank}
+#'   \item{accuracy}{Overall OOB classification accuracy}
+#'   \item{confusion_matrix}{Confusion matrix from OOB predictions}
+#'   \item{per_segment_accuracy}{Per-segment classification accuracy}
+#'   \item{n_trees}{Number of trees used}
+#' @keywords internal
+identify_golden_questions <- function(data,
+                                      clusters,
+                                      segment_names = NULL,
+                                      n_top = 5,
+                                      n_trees = 500) {
+
+  # ===========================================================================
+  # CHECK RANDOMFOREST PACKAGE
+  # ===========================================================================
+
+  if (!requireNamespace("randomForest", quietly = TRUE)) {
+    cat("\n")
+    cat("  [SKIPPED] Golden Questions: Package 'randomForest' not installed.\n")
+    cat("  Install with: install.packages('randomForest')\n\n")
+    return(list(
+      status = "SKIPPED",
+      message = "Package 'randomForest' not installed. Install with: install.packages('randomForest')"
+    ))
+  }
+
+  cat("\n")
+  cat("  Golden Questions (Random Forest Variable Importance)\n")
+  cat("  ", rep("\u2500", 53), "\n", sep = "")
+
+  # ===========================================================================
+  # VALIDATE INPUTS
+  # ===========================================================================
+
+  if (!is.data.frame(data) && !is.matrix(data)) {
+    segment_refuse(
+      code = "DATA_GOLDEN_INVALID_DATA",
+      title = "Invalid data for Golden Questions",
+      problem = "Parameter 'data' must be a data frame or matrix.",
+      why_it_matters = "Random Forest requires a rectangular data structure of predictor variables.",
+      how_to_fix = "Pass the original (unscaled) data frame used for clustering."
+    )
+  }
+
+  if (is.null(clusters) || length(clusters) != nrow(data)) {
+    segment_refuse(
+      code = "DATA_GOLDEN_CLUSTER_MISMATCH",
+      title = "Cluster vector length mismatch",
+      problem = sprintf(
+        "Length of 'clusters' (%s) does not match nrow(data) (%d).",
+        if (is.null(clusters)) "NULL" else as.character(length(clusters)),
+        nrow(data)
+      ),
+      why_it_matters = "Each row in the data must have a corresponding segment assignment.",
+      how_to_fix = "Ensure 'clusters' is an integer vector with one entry per row of 'data'."
+    )
+  }
+
+  if (length(unique(clusters)) < 2) {
+    segment_refuse(
+      code = "DATA_GOLDEN_TOO_FEW_SEGMENTS",
+      title = "Too few segments for Golden Questions",
+      problem = sprintf("Only %d unique segment(s) found. Need at least 2.", length(unique(clusters))),
+      why_it_matters = "Classification requires at least two distinct classes to discriminate.",
+      how_to_fix = "Provide a cluster solution with 2 or more segments."
+    )
+  }
+
+  # ===========================================================================
+  # PREPARE DATA
+  # ===========================================================================
+
+  # Coerce to data frame if matrix
+  if (is.matrix(data)) {
+    data <- as.data.frame(data)
+  }
+
+  # Convert clusters to factor for classification
+  cluster_factor <- as.factor(clusters)
+
+  # Remove rows with NA in data or clusters
+
+  complete_mask <- complete.cases(data) & !is.na(clusters)
+  n_removed <- sum(!complete_mask)
+  n_total <- length(clusters)
+  pct_removed <- 100 * n_removed / n_total
+
+  if (n_removed > 0) {
+    cat(sprintf("  Removed %d rows with NA values (%.1f%% of data)\n", n_removed, pct_removed))
+  }
+
+  if (pct_removed > 10) {
+    cat("  WARNING: >10% of rows removed due to missing values.\n")
+    cat("  Consider imputing missing data before running Golden Questions.\n")
+  }
+
+  clean_data <- data[complete_mask, , drop = FALSE]
+  clean_clusters <- cluster_factor[complete_mask]
+
+  # Drop any factor levels that no longer exist after NA removal
+  clean_clusters <- droplevels(clean_clusters)
+
+  if (nrow(clean_data) < 10) {
+    segment_refuse(
+      code = "DATA_GOLDEN_TOO_FEW_ROWS",
+      title = "Too few complete rows for Random Forest",
+      problem = sprintf("Only %d complete rows remain after removing NAs.", nrow(clean_data)),
+      why_it_matters = "Random Forest needs sufficient data to estimate variable importance reliably.",
+      how_to_fix = "Provide a dataset with at least 10 complete rows, or impute missing values."
+    )
+  }
+
+  # Cap n_top at number of variables
+  n_vars <- ncol(clean_data)
+  n_top <- min(n_top, n_vars)
+
+  cat(sprintf("  Respondents: %d\n", nrow(clean_data)))
+  cat(sprintf("  Variables: %d\n", n_vars))
+  cat(sprintf("  Segments: %d\n", length(levels(clean_clusters))))
+  cat(sprintf("  Trees: %d\n", n_trees))
+  cat(sprintf("  Top questions requested: %d\n\n", n_top))
+
+  # ===========================================================================
+  # TRAIN RANDOM FOREST
+  # ===========================================================================
+
+  rf_result <- tryCatch({
+
+    model <- randomForest::randomForest(
+      x = clean_data,
+      y = clean_clusters,
+      ntree = n_trees,
+      importance = TRUE
+    )
+
+    # =========================================================================
+    # EXTRACT IMPORTANCE
+    # =========================================================================
+
+    imp_matrix <- randomForest::importance(model)
+    mean_decrease_accuracy <- imp_matrix[, "MeanDecreaseAccuracy"]
+
+    # Sort descending
+    sorted_idx <- order(mean_decrease_accuracy, decreasing = TRUE)
+    top_idx <- sorted_idx[seq_len(n_top)]
+
+    # Total importance for normalization
+    total_importance <- sum(mean_decrease_accuracy)
+
+    top_questions <- data.frame(
+      variable = names(mean_decrease_accuracy)[top_idx],
+      importance = round(mean_decrease_accuracy[top_idx], 4),
+      pct_of_total = if (total_importance > 0) {
+        round(100 * mean_decrease_accuracy[top_idx] / total_importance, 1)
+      } else {
+        rep(0, n_top)
+      },
+      rank = seq_len(n_top),
+      stringsAsFactors = FALSE
+    )
+
+    # =========================================================================
+    # CALCULATE OOB ACCURACY
+    # =========================================================================
+
+    # model$confusion has rows = actual, cols = predicted, plus a class.error column
+    confusion_full <- model$confusion
+    # Separate class.error column from the confusion counts
+    class_error_col <- confusion_full[, "class.error"]
+    confusion_counts <- confusion_full[, -ncol(confusion_full), drop = FALSE]
+
+    # Overall OOB accuracy
+    correct <- sum(diag(confusion_counts))
+    total <- sum(confusion_counts)
+    oob_accuracy <- correct / total
+
+    # Per-segment accuracy (1 - class.error)
+    per_segment_accuracy <- 1 - class_error_col
+
+    # Apply segment names if provided
+    if (!is.null(segment_names)) {
+      seg_levels <- levels(clean_clusters)
+      name_map <- character(length(seg_levels))
+      for (i in seq_along(seg_levels)) {
+        lvl <- seg_levels[i]
+        if (lvl %in% names(segment_names)) {
+          name_map[i] <- segment_names[lvl]
+        } else if (i <= length(segment_names)) {
+          name_map[i] <- segment_names[i]
+        } else {
+          name_map[i] <- paste0("Segment ", lvl)
+        }
+      }
+      names(per_segment_accuracy) <- name_map
+    }
+
+    # =========================================================================
+    # BUILD RESULT
+    # =========================================================================
+
+    list(
+      status = "PASS",
+      top_questions = top_questions,
+      accuracy = round(oob_accuracy, 4),
+      confusion_matrix = confusion_counts,
+      per_segment_accuracy = round(per_segment_accuracy, 4),
+      n_trees = n_trees,
+      n_respondents = nrow(clean_data),
+      n_removed = n_removed,
+      all_importance = sort(mean_decrease_accuracy, decreasing = TRUE)
+    )
+
+  }, error = function(e) {
+
+    cat(sprintf("  WARNING: Random Forest failed: %s\n", conditionMessage(e)))
+    cat("  Returning partial result.\n\n")
+
+    list(
+      status = "PARTIAL",
+      message = sprintf("Random Forest model fitting failed: %s", conditionMessage(e)),
+      top_questions = NULL,
+      accuracy = NULL,
+      confusion_matrix = NULL,
+      per_segment_accuracy = NULL,
+      n_trees = n_trees,
+      n_respondents = nrow(clean_data),
+      n_removed = n_removed
+    )
+
+  })
+
+  # ===========================================================================
+  # CONSOLE SUMMARY
+  # ===========================================================================
+
+  if (rf_result$status == "PASS") {
+    cat(sprintf("  Overall OOB accuracy: %.1f%%\n\n", rf_result$accuracy * 100))
+    format_golden_questions_summary(rf_result, segment_names)
+  }
+
+  return(rf_result)
+}
+
+
+#' Format Golden Questions Summary for Console
+#'
+#' Prints a clean, tabular summary of golden question results to the console.
+#' Designed for use in the Shiny console output where users review analysis
+#' results.
+#'
+#' @param golden_result Result list from \code{identify_golden_questions()}
+#' @param segment_names Named character vector of segment labels (optional)
+#' @return Invisible NULL. Called for side-effect (console output).
+#' @keywords internal
+format_golden_questions_summary <- function(golden_result, segment_names = NULL) {
+
+  if (is.null(golden_result) || golden_result$status == "SKIPPED") {
+    cat("  Golden Questions: skipped (see message above)\n")
+    return(invisible(NULL))
+  }
+
+  if (golden_result$status == "PARTIAL") {
+    cat("  Golden Questions: partial result (Random Forest failed)\n")
+    if (!is.null(golden_result$message)) {
+      cat(sprintf("  Reason: %s\n", golden_result$message))
+    }
+    return(invisible(NULL))
+  }
+
+  # ---------------------------------------------------------------------------
+  # Top questions table
+  # ---------------------------------------------------------------------------
+
+  tq <- golden_result$top_questions
+
+  # Calculate column widths
+  max_var_width <- max(nchar(tq$variable), nchar("Variable"))
+  max_var_width <- min(max_var_width, 35)  # cap at 35 chars
+
+  header <- sprintf("  %-4s  %-*s  %10s   %10s",
+                     "Rank", max_var_width, "Variable", "Importance", "% of Total")
+  separator <- paste0("  ", paste(rep("\u2500", nchar(header) - 2), collapse = ""))
+
+  cat(header, "\n")
+  cat(separator, "\n")
+
+  for (i in seq_len(nrow(tq))) {
+    var_display <- tq$variable[i]
+    if (nchar(var_display) > max_var_width) {
+      var_display <- paste0(substr(var_display, 1, max_var_width - 3), "...")
+    }
+    cat(sprintf("  %4d  %-*s  %10.2f   %9.1f%%\n",
+                tq$rank[i], max_var_width, var_display,
+                tq$importance[i], tq$pct_of_total[i]))
+  }
+
+  cat("\n")
+
+  # ---------------------------------------------------------------------------
+  # Per-segment accuracy
+  # ---------------------------------------------------------------------------
+
+  if (!is.null(golden_result$per_segment_accuracy)) {
+    cat("  Per-Segment OOB Accuracy:\n")
+
+    psa <- golden_result$per_segment_accuracy
+    seg_labels <- names(psa)
+    if (is.null(seg_labels)) {
+      seg_labels <- paste0("Segment ", seq_along(psa))
+    }
+
+    max_label_width <- max(nchar(seg_labels), nchar("Segment"))
+
+    for (i in seq_along(psa)) {
+      cat(sprintf("    %-*s  %.1f%%\n", max_label_width, seg_labels[i], psa[i] * 100))
+    }
+    cat("\n")
+  }
+
+  return(invisible(NULL))
+}

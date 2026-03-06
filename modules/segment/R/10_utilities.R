@@ -1370,3 +1370,217 @@ validate_seed_reproducibility <- function(seed, test_data, k = 3) {
     return(FALSE)
   }
 }
+
+
+# ==============================================================================
+# 10. MERGE SEGMENT ASSIGNMENTS TO DATA
+# ==============================================================================
+
+#' Merge Segment Assignments Back to Original Data
+#'
+#' Reads the segment assignment file (produced by the segmentation pipeline)
+#' and merges it with the original survey data on the ID column. This creates
+#' a new data file with a segment column that can be used as a banner variable
+#' in tabs or as a subgroup variable in keydriver/catdriver.
+#'
+#' @param data_path Character, path to original data file (.csv, .xlsx, or .sav)
+#' @param assignment_path Character, path to segment assignment file (.xlsx)
+#' @param id_column Character, name of the ID column present in both files
+#' @param output_path Character or NULL. If provided, writes the merged data to
+#'   this path (.csv or .xlsx). If NULL, returns the merged data frame.
+#' @param data_sheet Character, sheet name for data file if .xlsx (default "Data")
+#' @param assignment_sheet Character, sheet name in assignment file (default 1)
+#' @return List with status, merged_data (data frame), n_matched, n_unmatched,
+#'   output_path (if written)
+#' @export
+merge_segment_to_data <- function(data_path,
+                                   assignment_path,
+                                   id_column,
+                                   output_path = NULL,
+                                   data_sheet = "Data",
+                                   assignment_sheet = 1) {
+
+  # --- Validate inputs ---
+  if (!file.exists(data_path)) {
+    cat("\n=== TURAS ERROR ===\n")
+    cat("Context: merge_segment_to_data\n")
+    cat(sprintf("Data file not found: %s\n", data_path))
+    cat("==================\n\n")
+    return(list(
+      status = "REFUSED",
+      code = "IO_DATA_FILE_NOT_FOUND",
+      message = sprintf("Data file not found: %s", data_path),
+      how_to_fix = "Check the data_path argument and ensure the file exists."
+    ))
+  }
+
+  if (!file.exists(assignment_path)) {
+    cat("\n=== TURAS ERROR ===\n")
+    cat("Context: merge_segment_to_data\n")
+    cat(sprintf("Assignment file not found: %s\n", assignment_path))
+    cat("==================\n\n")
+    return(list(
+      status = "REFUSED",
+      code = "IO_ASSIGNMENT_FILE_NOT_FOUND",
+      message = sprintf("Segment assignment file not found: %s", assignment_path),
+      how_to_fix = "Run the segmentation pipeline first to generate the assignment file."
+    ))
+  }
+
+  # --- Load data ---
+  data_ext <- tolower(tools::file_ext(data_path))
+  data <- tryCatch({
+    if (data_ext == "csv") {
+      if (requireNamespace("data.table", quietly = TRUE)) {
+        as.data.frame(data.table::fread(data_path))
+      } else {
+        read.csv(data_path, stringsAsFactors = FALSE)
+      }
+    } else if (data_ext %in% c("xlsx", "xls")) {
+      openxlsx::read.xlsx(data_path, sheet = data_sheet)
+    } else if (data_ext == "sav") {
+      if (!requireNamespace("haven", quietly = TRUE)) {
+        return(list(
+          status = "REFUSED",
+          code = "PKG_HAVEN_MISSING",
+          message = "Package 'haven' is required to read .sav files.",
+          how_to_fix = "Install haven: install.packages('haven')"
+        ))
+      }
+      as.data.frame(haven::read_sav(data_path))
+    } else {
+      return(list(
+        status = "REFUSED",
+        code = "IO_UNSUPPORTED_FORMAT",
+        message = sprintf("Unsupported data format: .%s", data_ext),
+        how_to_fix = "Use .csv, .xlsx, or .sav format."
+      ))
+    }
+  }, error = function(e) {
+    cat("\n=== TURAS ERROR ===\n")
+    cat(sprintf("Failed to read data file: %s\n", e$message))
+    cat("==================\n\n")
+    return(NULL)
+  })
+
+  if (is.null(data)) {
+    return(list(
+      status = "REFUSED",
+      code = "IO_DATA_READ_FAILED",
+      message = "Failed to read the data file.",
+      how_to_fix = "Check that the file is not corrupted and the format is correct."
+    ))
+  }
+
+  # --- Load assignments ---
+  assignments <- tryCatch({
+    openxlsx::read.xlsx(assignment_path, sheet = assignment_sheet)
+  }, error = function(e) {
+    cat("\n=== TURAS ERROR ===\n")
+    cat(sprintf("Failed to read assignment file: %s\n", e$message))
+    cat("==================\n\n")
+    return(NULL)
+  })
+
+  if (is.null(assignments)) {
+    return(list(
+      status = "REFUSED",
+      code = "IO_ASSIGNMENT_READ_FAILED",
+      message = "Failed to read the segment assignment file.",
+      how_to_fix = "Check that the assignment file was generated correctly."
+    ))
+  }
+
+  # --- Validate ID column ---
+  if (!id_column %in% names(data)) {
+    cat("\n=== TURAS ERROR ===\n")
+    cat(sprintf("ID column '%s' not found in data file.\n", id_column))
+    cat(sprintf("Available columns: %s\n", paste(head(names(data), 10), collapse = ", ")))
+    cat("==================\n\n")
+    return(list(
+      status = "REFUSED",
+      code = "DATA_ID_COLUMN_MISSING",
+      message = sprintf("ID column '%s' not found in data file.", id_column),
+      how_to_fix = sprintf("Available columns: %s",
+                            paste(head(names(data), 10), collapse = ", "))
+    ))
+  }
+
+  if (!id_column %in% names(assignments)) {
+    cat("\n=== TURAS ERROR ===\n")
+    cat(sprintf("ID column '%s' not found in assignment file.\n", id_column))
+    cat(sprintf("Available columns: %s\n", paste(names(assignments), collapse = ", ")))
+    cat("==================\n\n")
+    return(list(
+      status = "REFUSED",
+      code = "DATA_ID_COLUMN_MISSING_ASSIGNMENT",
+      message = sprintf("ID column '%s' not found in assignment file.", id_column),
+      how_to_fix = sprintf("Assignment file columns: %s",
+                            paste(names(assignments), collapse = ", "))
+    ))
+  }
+
+  # --- Merge ---
+  # Select only segment columns from assignments (ID + segment_id + segment_name + any probabilities)
+  seg_cols <- c(id_column,
+                intersect(names(assignments),
+                          c("segment_id", "segment_name",
+                            grep("^prob_", names(assignments), value = TRUE))))
+  assignments_slim <- assignments[, seg_cols, drop = FALSE]
+
+  merged <- merge(data, assignments_slim, by = id_column, all.x = TRUE)
+
+  n_matched <- sum(!is.na(merged$segment_id))
+  n_unmatched <- sum(is.na(merged$segment_id))
+  n_total <- nrow(data)
+
+  cat(sprintf("  Merge results: %d of %d records matched (%.1f%%)\n",
+              n_matched, n_total, 100 * n_matched / n_total))
+
+  if (n_unmatched > 0) {
+    cat(sprintf("  Warning: %d records have no segment assignment\n", n_unmatched))
+  }
+
+  # --- Write output if requested ---
+  warnings <- character(0)
+  if (n_unmatched > 0) {
+    warnings <- sprintf("%d records unmatched (%.1f%%)", n_unmatched,
+                         100 * n_unmatched / n_total)
+  }
+
+  if (!is.null(output_path)) {
+    out_ext <- tolower(tools::file_ext(output_path))
+    tryCatch({
+      if (out_ext == "csv") {
+        if (requireNamespace("data.table", quietly = TRUE)) {
+          data.table::fwrite(merged, output_path)
+        } else {
+          write.csv(merged, output_path, row.names = FALSE)
+        }
+      } else if (out_ext %in% c("xlsx", "xls")) {
+        wb <- openxlsx::createWorkbook()
+        openxlsx::addWorksheet(wb, "Data")
+        openxlsx::writeData(wb, "Data", merged)
+        openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+      } else {
+        write.csv(merged, output_path, row.names = FALSE)
+      }
+      cat(sprintf("  Written to: %s\n", output_path))
+    }, error = function(e) {
+      cat(sprintf("  Warning: Failed to write output: %s\n", e$message))
+      warnings <<- c(warnings, sprintf("Write failed: %s", e$message))
+    })
+  }
+
+  status <- if (n_unmatched > 0) "PARTIAL" else "PASS"
+
+  list(
+    status = status,
+    merged_data = merged,
+    n_total = n_total,
+    n_matched = n_matched,
+    n_unmatched = n_unmatched,
+    output_path = output_path,
+    warnings = if (length(warnings) > 0) warnings else NULL
+  )
+}

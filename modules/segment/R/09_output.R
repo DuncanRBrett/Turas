@@ -96,10 +96,24 @@ export_segment_assignments <- function(data, clusters, segment_names, id_var, ou
   # Rename first column to match original ID variable name
   names(assignments)[1] <- id_var
 
+  # Build Segment_Names sheet for user editing
+  unique_ids <- sort(unique(clusters))
+  names_df <- data.frame(
+    Segment_ID = unique_ids,
+    Suggested_Name = segment_names[unique_ids],
+    Custom_Name = rep("", length(unique_ids)),
+    stringsAsFactors = FALSE
+  )
+
+  sheets <- list(
+    Segment_Assignments = assignments,
+    Segment_Names = names_df
+  )
+
   # Write to Excel (TRS v1.0: Use atomic save if available)
   if (exists("turas_save_writexl_atomic", mode = "function")) {
     save_result <- turas_save_writexl_atomic(
-      sheets = list(Segment_Assignments = assignments),
+      sheets = sheets,
       file_path = output_path,
       module = "SEGMENT"
     )
@@ -107,12 +121,72 @@ export_segment_assignments <- function(data, clusters, segment_names, id_var, ou
       warning(sprintf("[SEGMENT] Failed to save assignments: %s", save_result$error))
     }
   } else {
-    writexl::write_xlsx(assignments, output_path)
+    writexl::write_xlsx(sheets, output_path)
   }
 
-  cat(sprintf("  Exported %d segment assignments\n", nrow(assignments)))
+  cat(sprintf("  Exported %d segment assignments (with Segment_Names sheet)\n", nrow(assignments)))
 
   return(invisible(output_path))
+}
+
+#' Read edited segment names from an assignments Excel file
+#'
+#' Reads the Segment_Names sheet from a segment assignments Excel file.
+#' Uses Custom_Name if filled in by the user, otherwise falls back to
+#' Suggested_Name, then to generic "Segment {i}" names.
+#'
+#' @param file_path Character, path to the segment assignments Excel file
+#' @param k Integer, expected number of segments (optional, used for validation)
+#' @return Character vector of segment names, or NULL on failure
+#' @export
+read_segment_names_from_file <- function(file_path, k = NULL) {
+  if (is.null(file_path) || !nzchar(file_path)) {
+    return(NULL)
+  }
+
+  if (!file.exists(file_path)) {
+    cat(sprintf("  [WARNING] Segment names file not found: %s\n", file_path))
+    return(NULL)
+  }
+
+  # Read Segment_Names sheet
+  names_df <- tryCatch({
+    openxlsx::read.xlsx(file_path, sheet = "Segment_Names")
+  }, error = function(e) {
+    cat(sprintf("  [WARNING] Could not read Segment_Names sheet: %s\n", e$message))
+    NULL
+  })
+
+  if (is.null(names_df) || nrow(names_df) == 0) {
+    cat("  [WARNING] Segment_Names sheet is empty or missing\n")
+    return(NULL)
+  }
+
+  # Build names: prefer Custom_Name > Suggested_Name > "Segment {i}"
+  n <- nrow(names_df)
+  names_out <- character(n)
+  for (i in seq_len(n)) {
+    custom <- if ("Custom_Name" %in% names(names_df)) names_df$Custom_Name[i] else NA
+    suggested <- if ("Suggested_Name" %in% names(names_df)) names_df$Suggested_Name[i] else NA
+
+    if (!is.na(custom) && nzchar(trimws(custom))) {
+      names_out[i] <- trimws(custom)
+    } else if (!is.na(suggested) && nzchar(trimws(suggested))) {
+      names_out[i] <- trimws(suggested)
+    } else {
+      names_out[i] <- paste0("Segment ", i)
+    }
+  }
+
+  # Validate against expected k if provided
+  if (!is.null(k) && length(names_out) != k) {
+    cat(sprintf("  [WARNING] Segment_Names has %d rows but expected %d segments\n",
+                length(names_out), k))
+    return(NULL)
+  }
+
+  cat(sprintf("  Loaded %d segment names from: %s\n", length(names_out), basename(file_path)))
+  return(names_out)
 }
 
 #' Export exploration mode k selection report
@@ -230,6 +304,43 @@ export_exploration_report <- function(exploration_result, metrics_result,
     # Store with sheet name
     sheet_name <- sprintf("Profile_K%d", k)
     profile_sheets[[sheet_name]] <- profile_export
+  }
+
+  # Add Variable_Contribution sheet for recommended k
+  cat("  Creating variable contribution sheet...\n")
+  rec_k <- recommendation$recommended_k
+  rec_k_result <- exploration_result$results[[as.character(rec_k)]]
+
+  if (!is.null(rec_k_result) && exists("rank_variable_importance", mode = "function")) {
+    var_importance <- tryCatch({
+      suppressMessages(capture.output(
+        result <- rank_variable_importance(
+          data = data_list$data,
+          clusters = rec_k_result$clusters,
+          clustering_vars = config$clustering_vars,
+          question_labels = config$question_labels
+        ),
+        type = "output"
+      ))
+      result
+    }, error = function(e) {
+      cat(sprintf("  [WARNING] Variable contribution analysis failed: %s\n", e$message))
+      NULL
+    })
+
+    if (!is.null(var_importance) && !is.null(var_importance$ranking)) {
+      contrib_df <- var_importance$ranking
+      contrib_df$Annotation <- ifelse(
+        contrib_df$Category == "MINIMAL IMPACT",
+        "<- Consider removing",
+        ""
+      )
+      profile_sheets[["Variable_Contribution"]] <- contrib_df
+      cat(sprintf("  Variable contribution: %d ESSENTIAL, %d USEFUL, %d MINIMAL IMPACT\n",
+                  length(var_importance$essential_vars),
+                  length(var_importance$useful_vars),
+                  length(var_importance$drop_candidates)))
+    }
   }
 
   # Add outlier analysis sheet if outliers were detected

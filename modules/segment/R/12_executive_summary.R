@@ -409,6 +409,15 @@ generate_segment_executive_summary <- function(cluster_result,
   k <- cluster_result$k
   descriptions <- character(k)
 
+  # Compute segment sizes and percentages from cluster assignments
+  seg_table <- table(cluster_result$clusters)
+  seg_sizes <- as.integer(seg_table)
+  n_total <- length(cluster_result$clusters)
+  seg_pcts <- round(seg_sizes / n_total * 100, 1)
+
+  # Extract question labels from config (optional human-readable names)
+  q_labels <- config$question_labels
+
   profile_df <- profile_result$clustering_profile
   if (is.null(profile_df)) {
     for (i in seq_len(k)) {
@@ -417,7 +426,10 @@ generate_segment_executive_summary <- function(cluster_result,
       } else {
         paste("Segment", i)
       }
-      descriptions[i] <- sprintf("%s: Profile data not available.", name)
+      descriptions[i] <- sprintf(
+        "**%s** (n=%s, %s%%): Profile data not available.",
+        name, format(seg_sizes[i], big.mark = ","), seg_pcts[i]
+      )
     }
     return(descriptions)
   }
@@ -432,10 +444,38 @@ generate_segment_executive_summary <- function(cluster_result,
 
   if (length(available_seg_cols) == 0) {
     for (i in seq_len(k)) {
-      name <- segment_names[i] %||% paste("Segment", i)
-      descriptions[i] <- sprintf("%s: Segment column data not available.", name)
+      name <- if (!is.null(segment_names) && length(segment_names) >= i) {
+        segment_names[i]
+      } else {
+        paste("Segment", i)
+      }
+      descriptions[i] <- sprintf(
+        "**%s** (n=%s, %s%%): Segment column data not available.",
+        name, format(seg_sizes[i], big.mark = ","), seg_pcts[i]
+      )
     }
     return(descriptions)
+  }
+
+  # Helper: resolve a variable name to a human-readable label
+  .resolve_label <- function(var_name, labels) {
+    if (!is.null(labels) && var_name %in% names(labels)) {
+      return(labels[[var_name]])
+    }
+    var_name
+  }
+
+  # Helper: map deviation magnitude to a strength descriptor
+  .strength_descriptor <- function(deviation) {
+    abs_dev <- abs(deviation)
+    direction <- if (deviation > 0) "positive" else "negative"
+    if (abs_dev > 30) {
+      return(if (direction == "positive") "very high" else "very low")
+    } else if (abs_dev > 15) {
+      return(if (direction == "positive") "high" else "low")
+    } else {
+      return(if (direction == "positive") "slightly above average" else "slightly below average")
+    }
   }
 
   for (i in seq_len(k)) {
@@ -446,8 +486,15 @@ generate_segment_executive_summary <- function(cluster_result,
       paste("Segment", i)
     }
 
+    size_label <- sprintf(
+      "(n=%s, %s%%)",
+      format(seg_sizes[i], big.mark = ","), seg_pcts[i]
+    )
+
     if (!(seg_col %in% names(profile_df)) || !has_overall) {
-      descriptions[i] <- sprintf("%s: Detailed profile not available.", name)
+      descriptions[i] <- sprintf(
+        "**%s** %s: Detailed profile not available.", name, size_label
+      )
       next
     }
 
@@ -458,7 +505,9 @@ generate_segment_executive_summary <- function(cluster_result,
 
     valid <- !is.na(seg_vals) & !is.na(overall_vals) & overall_vals != 0
     if (sum(valid) == 0) {
-      descriptions[i] <- sprintf("%s: No valid comparison data.", name)
+      descriptions[i] <- sprintf(
+        "**%s** %s: No valid comparison data.", name, size_label
+      )
       next
     }
 
@@ -467,40 +516,102 @@ generate_segment_executive_summary <- function(cluster_result,
     deviations <- index_scores - 100
     var_names <- vars[valid]
 
-    # Find top positive and negative deviations
+    # Sort by deviation magnitude
     pos_order <- order(-deviations)
     neg_order <- order(deviations)
 
-    traits <- character(0)
-
-    # Top 2 positive (high)
-    n_pos <- min(2, sum(deviations > 5))
+    # Collect top 3 positive deviations (threshold > 5pt)
+    pos_traits <- character(0)
+    pos_labels_for_sketch <- character(0)
+    n_pos <- min(3, sum(deviations > 5))
     if (n_pos > 0) {
       for (j in seq_len(n_pos)) {
         idx <- pos_order[j]
         if (deviations[idx] > 5) {
-          traits <- c(traits, sprintf("high %s", var_names[idx]))
+          label <- .resolve_label(var_names[idx], q_labels)
+          strength <- .strength_descriptor(deviations[idx])
+          pos_traits <- c(pos_traits, sprintf("%s %s", strength, label))
+          pos_labels_for_sketch <- c(pos_labels_for_sketch, label)
         }
       }
     }
 
-    # Top 1 negative (low)
-    n_neg <- min(1, sum(deviations < -5))
+    # Collect top 2 negative deviations (threshold < -5pt)
+    neg_traits <- character(0)
+    neg_labels_for_sketch <- character(0)
+    n_neg <- min(2, sum(deviations < -5))
     if (n_neg > 0) {
-      idx <- neg_order[1]
-      if (deviations[idx] < -5) {
-        traits <- c(traits, sprintf("low %s", var_names[idx]))
+      for (j in seq_len(n_neg)) {
+        idx <- neg_order[j]
+        if (deviations[idx] < -5) {
+          label <- .resolve_label(var_names[idx], q_labels)
+          strength <- .strength_descriptor(deviations[idx])
+          neg_traits <- c(neg_traits, sprintf("%s %s", strength, label))
+          neg_labels_for_sketch <- c(neg_labels_for_sketch, label)
+        }
       }
     }
 
-    if (length(traits) > 0) {
-      descriptions[i] <- sprintf("%s: Characterised by %s.", name, paste(traits, collapse = ", "))
+    all_traits <- c(pos_traits, neg_traits)
+
+    if (length(all_traits) > 0) {
+      # Build a one-sentence pen sketch summary from top distinguishing traits
+      sketch <- .build_pen_sketch(
+        pos_labels_for_sketch, neg_labels_for_sketch, name
+      )
+      trait_list <- paste(all_traits, collapse = ", ")
+      descriptions[i] <- sprintf(
+        "**%s** %s: %s Key traits: %s.",
+        name, size_label, sketch, trait_list
+      )
     } else {
-      descriptions[i] <- sprintf("%s: Close to overall average across all variables.", name)
+      descriptions[i] <- sprintf(
+        "**%s** %s: This segment closely mirrors the overall sample with no strongly distinguishing characteristics.",
+        name, size_label
+      )
     }
   }
 
   descriptions
+}
+
+
+#' Build a One-Sentence Pen Sketch from Top Traits
+#'
+#' Constructs a natural-language summary sentence highlighting the most
+#' distinguishing positive and negative characteristics.
+#'
+#' @param pos_labels Character vector of top positive trait labels.
+#' @param neg_labels Character vector of top negative trait labels.
+#' @param seg_name Name of the segment (for fallback phrasing).
+#' @return A single sentence ending with a period.
+#' @keywords internal
+.build_pen_sketch <- function(pos_labels, neg_labels, seg_name) {
+  has_pos <- length(pos_labels) > 0
+  has_neg <- length(neg_labels) > 0
+
+  if (has_pos && has_neg) {
+    pos_phrase <- paste(pos_labels, collapse = " and ")
+    neg_phrase <- paste(neg_labels, collapse = " and ")
+    sprintf(
+      "A group that stands out for elevated %s, combined with lower %s.",
+      pos_phrase, neg_phrase
+    )
+  } else if (has_pos) {
+    pos_phrase <- paste(pos_labels, collapse = ", ")
+    sprintf(
+      "A group distinguished by notably higher %s relative to the overall sample.",
+      pos_phrase
+    )
+  } else if (has_neg) {
+    neg_phrase <- paste(neg_labels, collapse = " and ")
+    sprintf(
+      "A group characterised by markedly lower %s compared to the overall sample.",
+      neg_phrase
+    )
+  } else {
+    sprintf("A segment with a profile close to the overall average.")
+  }
 }
 
 

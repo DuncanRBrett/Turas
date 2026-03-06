@@ -267,10 +267,34 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
     cat("\nSTEP 6: PROFILING\n")
   }
 
-  # Segment names
-  if (identical(config$segment_names, "auto")) {
-    segment_names <- generate_segment_names(cluster_result$k,
-      method = config$auto_name_style %||% "simple")
+  # Segment names — priority: names file > auto-generate > config
+  if (!is.null(config$segment_names_file)) {
+    # Step 3 workflow: read edited names from Excel
+    file_names <- read_segment_names_from_file(config$segment_names_file, cluster_result$k)
+    if (!is.null(file_names) && length(file_names) == cluster_result$k) {
+      segment_names <- file_names
+    } else {
+      cat("  Falling back to auto-generated names\n")
+      segment_names <- generate_segment_names(
+        k = cluster_result$k,
+        method = config$auto_name_style %||% "simple",
+        data = data_list$data,
+        clusters = cluster_result$clusters,
+        clustering_vars = data_list$config$clustering_vars,
+        question_labels = config$question_labels,
+        scale_max = config$scale_max %||% 10
+      )
+    }
+  } else if (identical(config$segment_names, "auto")) {
+    segment_names <- generate_segment_names(
+      k = cluster_result$k,
+      method = config$auto_name_style %||% "simple",
+      data = data_list$data,
+      clusters = cluster_result$clusters,
+      clustering_vars = data_list$config$clustering_vars,
+      question_labels = config$question_labels,
+      scale_max = config$scale_max %||% 10
+    )
   } else {
     segment_names <- config$segment_names
   }
@@ -363,6 +387,34 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
     vuln
   }, error = function(e) {
     guard <<- guard_warn(guard, paste("Vulnerability analysis failed:", e$message), "vulnerability")
+    NULL
+  })
+
+  # Golden questions (Random Forest variable importance)
+  golden_questions <- tryCatch({
+    if (exists("identify_golden_questions", mode = "function")) {
+      cat("  Identifying golden questions...\n")
+      gq <- identify_golden_questions(
+        data = data_list$clustering_data %||% data_list$data[, config$clustering_vars, drop = FALSE],
+        clusters = cluster_result$clusters,
+        segment_names = segment_names,
+        n_top = config$golden_questions_n %||% 5,
+        n_trees = config$golden_questions_trees %||% 500
+      )
+      if (gq$status == "SKIPPED") {
+        cat(sprintf("    Skipped: %s\n", gq$message))
+        NULL
+      } else if (gq$status == "PARTIAL") {
+        cat(sprintf("    Partial: %s\n", gq$message %||% ""))
+        gq
+      } else {
+        gq
+      }
+    } else {
+      NULL
+    }
+  }, error = function(e) {
+    guard <<- guard_warn(guard, paste("Golden questions failed:", e$message), "golden_questions")
     NULL
   })
 
@@ -498,6 +550,7 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
           exec_summary = exec_summary,
           gmm_membership = gmm_membership,
           vulnerability = vulnerability,
+          golden_questions = golden_questions,
           data_list = data_list
         ),
         config = config,
@@ -555,6 +608,7 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
     exec_summary = exec_summary,
     gmm_membership = gmm_membership,
     vulnerability = vulnerability,
+    golden_questions = golden_questions,
     output_files = list(
       assignments = assignments_path,
       report = report_path,

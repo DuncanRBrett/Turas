@@ -91,6 +91,9 @@ transform_final_for_html <- function(results, config) {
   # Vulnerability analysis
   vulnerability <- results$vulnerability %||% NULL
 
+  # Golden questions
+  golden_questions <- results$golden_questions %||% NULL
+
   # Question labels
   question_labels <- config$question_labels %||% NULL
 
@@ -112,6 +115,7 @@ transform_final_for_html <- function(results, config) {
     enhanced = enhanced,
     gmm_membership = gmm_membership,
     vulnerability = vulnerability,
+    golden_questions = golden_questions,
     question_labels = question_labels,
     config = config,
     run_status = "PASS"

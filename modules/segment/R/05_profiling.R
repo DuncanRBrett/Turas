@@ -156,21 +156,43 @@ calculate_segment_differences <- function(data, clusters, var_names = NULL) {
 
 #' Generate automatic segment names based on characteristics
 #'
-#' DESIGN: Simple descriptive names based on segment number
-#' NOTE: Auto-naming based on profiles is Phase 2 enhancement
+#' When method is "simple", returns generic "Segment 1", "Segment 2", etc.
+#' For other methods ("descriptive", "persona", "emoji"), dispatches to
+#' auto_name_segments() which generates names from segment profiles.
+#' Falls back to simple names if data/clusters not provided.
 #'
 #' @param k Integer, number of segments
-#' @param method Character, naming method ("simple" or "auto")
+#' @param method Character, naming style: "simple", "descriptive", "persona", or "emoji"
+#' @param data Data frame with survey data (required for non-simple methods)
+#' @param clusters Integer vector of cluster assignments (required for non-simple methods)
+#' @param clustering_vars Character vector of clustering variable names
+#' @param question_labels Named character vector mapping variable names to labels
+#' @param scale_max Numeric, maximum scale value for trait detection (default 10)
 #' @return Character vector of segment names
 #' @export
-generate_segment_names <- function(k, method = "simple") {
-  if (method == "simple" || method == "auto") {
-    # Simple numeric names for Phase 1
+generate_segment_names <- function(k, method = "simple",
+                                   data = NULL, clusters = NULL,
+                                   clustering_vars = NULL,
+                                   question_labels = NULL,
+                                   scale_max = 10) {
+  if (method == "simple" || is.null(data) || is.null(clusters)) {
     return(paste0("Segment ", 1:k))
   }
 
-  # Future: sophisticated auto-naming based on distinguishing characteristics
-  return(paste0("Segment ", 1:k))
+  # Dispatch to auto_name_segments for descriptive/persona/emoji styles
+  tryCatch({
+    names <- auto_name_segments(data, clusters, clustering_vars,
+                                question_labels, scale_max,
+                                name_style = method)
+    if (is.null(names) || length(names) != k) {
+      cat("  [WARNING] Auto-naming returned unexpected result, using simple names\n")
+      return(paste0("Segment ", 1:k))
+    }
+    names
+  }, error = function(e) {
+    cat(sprintf("  [WARNING] Auto-naming failed: %s. Using simple names.\n", e$message))
+    paste0("Segment ", 1:k)
+  })
 }
 
 #' Create complete segment profile with statistics

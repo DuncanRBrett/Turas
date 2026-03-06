@@ -41,21 +41,25 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
   show_profiles <- isTRUE(config$html_show_profiles %||% TRUE) &&
     !is.null(html_data$profile_data)
   show_vulnerability <- !is.null(html_data$vulnerability)
+  show_overlap <- !is.null(html_data$centers) && html_data$k > 1
+  show_golden_questions <- !is.null(html_data$golden_questions) &&
+    !is.null(html_data$golden_questions$top_questions)
   show_guide <- isTRUE(config$html_show_guide %||% TRUE)
 
-  # Build sections config for nav
+  # Build sections config for nav (analysis sections only; pinned views is a report-level tab)
   sections_config <- list(
     `exec-summary` = list(label = "Summary", show = show_exec),
     overview       = list(label = "Overview", show = show_overview),
     validation     = list(label = "Validation", show = show_validation),
+    overlap        = list(label = "Overlap", show = show_overlap),
     importance     = list(label = "Importance", show = show_importance),
+    `golden-questions` = list(label = "Golden Questions", show = show_golden_questions),
     profiles       = list(label = "Profiles", show = show_profiles),
     rules          = list(label = "Rules", show = show_rules),
     cards          = list(label = "Segment Cards", show = show_cards),
     vulnerability  = list(label = "Vulnerability", show = show_vulnerability),
     gmm            = list(label = "GMM Membership", show = show_gmm),
-    guide          = list(label = "Guide", show = show_guide),
-    `pinned-views` = list(label = "Pinned Views", show = TRUE)
+    guide          = list(label = "Guide", show = show_guide)
   )
 
   # Build sections
@@ -83,6 +87,12 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
   }
   cards_section <- if (show_cards) {
     build_seg_cards_section(html_data)
+  }
+  overlap_section <- if (show_overlap) {
+    build_seg_overlap_section(charts, html_data)
+  }
+  golden_questions_section <- if (show_golden_questions) {
+    build_seg_golden_questions_section(charts, html_data)
   }
   vulnerability_section <- if (show_vulnerability) {
     build_seg_vulnerability_section(html_data)
@@ -179,6 +189,21 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
     htmltools::tags$meta(name = "turas-source-filename", content = source_filename)
   )
 
+  # Report-level tab bar (Analysis | Pinned Views)
+  report_tab_bar <- htmltools::tags$div(
+    class = "seg-report-tabs",
+    htmltools::tags$button(
+      class = "seg-report-tab-btn active",
+      `data-tab` = "analysis",
+      "Analysis"
+    ),
+    htmltools::tags$button(
+      class = "seg-report-tab-btn",
+      `data-tab` = "pinned",
+      "Pinned Views"
+    )
+  )
+
   # Assemble page
   page <- htmltools::tagList(
     htmltools::tags$head(
@@ -193,26 +218,38 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
       class = "seg-body",
       header_section,
       action_bar,
+      report_tab_bar,
       nav,
       htmltools::tags$main(
         class = "seg-main",
+        # Analysis tab content
         htmltools::tags$div(
+          id = "seg-analysis-tab",
           class = "seg-content",
           exec_summary_section,
           overview_section,
           validation_section,
+          overlap_section,
           importance_section,
+          golden_questions_section,
           profiles_section,
           rules_section,
           cards_section,
           vulnerability_section,
           gmm_section,
           guide_section,
+          footer_section
+        ),
+        # Pinned Views tab content (hidden by default)
+        htmltools::tags$div(
+          id = "seg-pinned-tab",
+          class = "seg-content",
+          style = "display:none;",
           pinned_section,
-          footer_section,
-          insight_store,
-          pinned_store
-        )
+          footer_section
+        ),
+        insight_store,
+        pinned_store
       ),
       js_tags
     )
@@ -310,6 +347,44 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 .seg-section-nav a.active {
   color: var(--seg-brand);
   border-bottom-color: var(--seg-brand);
+}
+
+/* ================================================================ */
+/* REPORT-LEVEL TABS (Analysis | Pinned Views)                       */
+/* ================================================================ */
+
+.seg-report-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 24px;
+  background: var(--seg-card);
+  border-bottom: 1px solid var(--seg-border);
+}
+
+.seg-report-tab-btn {
+  padding: 10px 24px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--seg-text-muted);
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.seg-report-tab-btn:hover {
+  color: var(--seg-brand);
+  background: #f8fafc;
+}
+
+.seg-report-tab-btn.active {
+  color: var(--seg-brand);
+  border-bottom-color: var(--seg-accent);
 }
 
 /* ================================================================ */
@@ -1206,6 +1281,7 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 /* ================================================================ */
 
 @media print {
+  .seg-report-tabs { display: none !important; }
   .seg-section-nav { display: none !important; }
   .seg-action-bar { display: none !important; }
   .seg-pin-btn { display: none !important; }
@@ -2246,6 +2322,173 @@ build_seg_cards_section <- function(html_data) {
       "Executive-ready summaries for each segment highlighting defining characteristics, strengths, pain points, and recommended actions."
     ),
     htmltools::tags$div(class = "seg-cards-grid", card_els)
+  )
+}
+
+
+# ==============================================================================
+# SEGMENT OVERLAP SECTION
+# ==============================================================================
+
+#' Build Segment Overlap Section
+#'
+#' Displays centroid distance heatmap showing pairwise segment similarity.
+#'
+#' @param charts Named list of chart objects
+#' @param html_data Transformed HTML data
+#' @return htmltools tag
+#' @keywords internal
+build_seg_overlap_section <- function(charts, html_data) {
+
+  title_row <- build_seg_section_title_row("Segment Overlap", "overlap")
+  insight_area <- build_seg_insight_area("overlap")
+
+  chart_el <- if (!is.null(charts$overlap)) {
+    htmltools::tags$div(
+      class = "seg-chart-wrapper",
+      build_seg_component_pin_btn("overlap", "chart"),
+      htmltools::tags$div(class = "seg-chart", charts$overlap)
+    )
+  }
+
+  htmltools::tags$div(
+    class = "seg-section",
+    id = "seg-overlap",
+    `data-seg-section` = "overlap",
+    title_row,
+    insight_area,
+    htmltools::tags$p(
+      class = "seg-section-intro",
+      "Pairwise distances between segment centroids. Red cells indicate segments that are similar (potentially overlapping); green cells indicate well-separated segments."
+    ),
+    chart_el
+  )
+}
+
+
+# ==============================================================================
+# GOLDEN QUESTIONS SECTION
+# ==============================================================================
+
+#' Build Golden Questions Section
+#'
+#' Displays the top discriminating variables identified by Random Forest,
+#' with importance bar chart and summary metrics.
+#'
+#' @param charts Named list of chart objects
+#' @param html_data Transformed HTML data
+#' @return htmltools tag
+#' @keywords internal
+build_seg_golden_questions_section <- function(charts, html_data) {
+
+  title_row <- build_seg_section_title_row("Golden Questions", "golden-questions")
+  insight_area <- build_seg_insight_area("golden-questions")
+
+  gq <- html_data$golden_questions
+
+  # Summary metrics
+  accuracy <- round(gq$accuracy * 100, 1)
+  n_top <- nrow(gq$top_questions)
+  accuracy_colour <- if (accuracy >= 80) "#22c55e" else if (accuracy >= 60) "#f59e0b" else "#ef4444"
+
+  summary_box <- htmltools::tags$div(
+    class = "seg-finding-box",
+    htmltools::tags$div(
+      class = "seg-finding-item",
+      htmltools::tags$span(class = "seg-finding-icon",
+                          style = sprintf("color:%s;", accuracy_colour), "\u25CF"),
+      htmltools::tags$span(class = "seg-finding-text",
+                          sprintf("Random Forest classification accuracy: %.1f%% (OOB error rate: %.1f%%)",
+                                  accuracy, 100 - accuracy))
+    ),
+    htmltools::tags$div(
+      class = "seg-finding-item",
+      htmltools::tags$span(class = "seg-finding-icon",
+                          style = "color:var(--seg-accent);", "\u2605"),
+      htmltools::tags$span(class = "seg-finding-text",
+                          sprintf("Top %d variables that best predict segment membership shown below",
+                                  n_top))
+    )
+  )
+
+  chart_el <- if (!is.null(charts$golden_questions)) {
+    htmltools::tags$div(
+      class = "seg-chart-wrapper",
+      build_seg_component_pin_btn("golden-questions", "chart"),
+      htmltools::tags$div(class = "seg-chart", charts$golden_questions)
+    )
+  }
+
+  # Questions table
+  tq <- gq$top_questions
+  question_labels <- html_data$question_labels
+
+  header <- htmltools::tags$tr(
+    htmltools::tags$th("Rank", class = "seg-th seg-th-rank"),
+    htmltools::tags$th("Variable", class = "seg-th"),
+    htmltools::tags$th("Importance", class = "seg-th seg-th-num")
+  )
+
+  rows <- lapply(seq_len(nrow(tq)), function(i) {
+    var_name <- tq$variable[i]
+    label <- if (!is.null(question_labels) && var_name %in% names(question_labels)) {
+      question_labels[[var_name]]
+    } else {
+      var_name
+    }
+
+    htmltools::tags$tr(
+      class = "seg-tr",
+      htmltools::tags$td(
+        class = "seg-td seg-td-rank",
+        htmltools::tags$span(
+          style = if (i == 1) "color:var(--seg-accent);font-weight:700;" else "",
+          as.character(i)
+        )
+      ),
+      htmltools::tags$td(
+        class = "seg-td",
+        htmltools::tags$div(
+          style = "font-weight:500;",
+          label
+        ),
+        if (label != var_name) {
+          htmltools::tags$div(
+            style = "font-size:11px;color:var(--seg-text-faint);",
+            var_name
+          )
+        }
+      ),
+      htmltools::tags$td(
+        class = "seg-td seg-td-num",
+        sprintf("%.1f", tq$importance[i])
+      )
+    )
+  })
+
+  questions_table <- htmltools::tags$div(
+    class = "seg-table-wrapper",
+    build_seg_component_pin_btn("golden-questions", "table"),
+    htmltools::tags$table(
+      class = "seg-table",
+      htmltools::tags$thead(header),
+      htmltools::tags$tbody(rows)
+    )
+  )
+
+  htmltools::tags$div(
+    class = "seg-section",
+    id = "seg-golden-questions",
+    `data-seg-section` = "golden-questions",
+    title_row,
+    insight_area,
+    htmltools::tags$p(
+      class = "seg-section-intro",
+      "Golden questions are the survey items that best predict segment membership. These are identified using Random Forest variable importance (MeanDecreaseAccuracy). Use these questions for quick segment assignment in future research."
+    ),
+    summary_box,
+    chart_el,
+    questions_table
   )
 }
 
