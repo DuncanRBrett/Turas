@@ -2,7 +2,7 @@
 # WEIGHTING MODULE - CONFIGURATION LOADER
 # ==============================================================================
 # Load and validate Weight_Config.xlsx configuration file
-# Part of TURAS Weighting Module v1.0
+# Part of TURAS Weighting Module v3.0
 # ==============================================================================
 
 #' Load Weighting Configuration
@@ -130,6 +130,31 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
 
   general$save_diagnostics <- save_diag
   general$project_root <- project_root
+
+  # HTML report settings
+  general$html_report <- !is.null(general$html_report) &&
+                          !is.na(general$html_report) &&
+                          toupper(general$html_report) == "Y"
+
+  if (general$html_report) {
+    if (is.null(general$html_report_file) || is.na(general$html_report_file) ||
+        general$html_report_file == "") {
+      # Default: same location as diagnostics or output, with .html extension
+      if (!is.null(general$diagnostics_file_resolved)) {
+        general$html_report_file_resolved <- sub("\\.[^.]+$", ".html",
+                                                   general$diagnostics_file_resolved)
+      } else if (!is.null(general$output_file_resolved)) {
+        general$html_report_file_resolved <- sub("\\.[^.]+$", "_report.html",
+                                                   general$output_file_resolved)
+      } else {
+        general$html_report_file_resolved <- file.path(project_root, "Weighting_Report.html")
+      }
+    } else {
+      general$html_report_file_resolved <- resolve_config_path(general$html_report_file, project_root)
+    }
+  } else {
+    general$html_report_file_resolved <- NULL
+  }
 
   if (verbose) {
     message("  Project: ", general$project_name)
@@ -326,6 +351,60 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
   }
 
   # ============================================================================
+  # Load Cell Targets (if any cell weights specified)
+  # ============================================================================
+  has_cell <- any(tolower(weight_specs_df$method) == "cell")
+  cell_targets <- NULL
+
+  if (has_cell) {
+    if (!"Cell_Targets" %in% available_sheets) {
+      cell_weights <- weight_specs_df$weight_name[tolower(weight_specs_df$method) == "cell"]
+      weighting_refuse(
+        code = "CFG_MISSING_SHEET",
+        title = "Cell_Targets sheet required",
+        problem = sprintf("Cell_Targets sheet is missing but required for cell weight(s): %s", paste(cell_weights, collapse = ", ")),
+        why_it_matters = "Cell weights require joint distribution targets defined in the Cell_Targets sheet",
+        how_to_fix = "Add a Cell_Targets sheet with columns: weight_name, variable columns (e.g., Gender, Age), and target_percent"
+      )
+    }
+
+    if (verbose) message("\nLoading Cell Targets...")
+
+    cell_targets <- tryCatch({
+      readxl::read_excel(config_file, sheet = "Cell_Targets")
+    }, error = function(e) {
+      weighting_refuse(
+        code = "IO_SHEET_READ_ERROR",
+        title = "Failed to read Cell_Targets sheet",
+        problem = sprintf("Could not read 'Cell_Targets' sheet from config file: %s", conditionMessage(e)),
+        why_it_matters = "The Cell_Targets sheet contains joint distribution targets needed for cell weights",
+        how_to_fix = "Check that the Cell_Targets sheet is not corrupted and is properly formatted"
+      )
+    })
+
+    # Validate required columns
+    if (!"weight_name" %in% names(cell_targets) || !"target_percent" %in% names(cell_targets)) {
+      weighting_refuse(
+        code = "CFG_MISSING_COLUMNS",
+        title = "Cell_Targets missing required columns",
+        problem = "Cell_Targets must have 'weight_name' and 'target_percent' columns",
+        why_it_matters = "These columns are essential for defining cell weight targets",
+        how_to_fix = sprintf("Add 'weight_name' and 'target_percent' columns. Found: %s",
+                            paste(names(cell_targets), collapse = ", "))
+      )
+    }
+
+    # Ensure target_percent is numeric
+    cell_targets$target_percent <- suppressWarnings(as.numeric(cell_targets$target_percent))
+
+    if (verbose) {
+      message("  Loaded ", nrow(cell_targets), " cell target rows")
+      cell_vars <- setdiff(names(cell_targets), c("weight_name", "target_percent"))
+      message("  Cell variables: ", paste(cell_vars, collapse = " x "))
+    }
+  }
+
+  # ============================================================================
   # Load Advanced Settings (optional)
   # ============================================================================
   advanced_settings <- NULL
@@ -351,6 +430,46 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
   }
 
   # ============================================================================
+  # Load Notes/Assumptions (optional)
+  # ============================================================================
+  notes <- NULL
+
+  if ("Notes" %in% available_sheets) {
+    if (verbose) message("\nLoading Notes/Assumptions...")
+
+    notes <- tryCatch({
+      readxl::read_excel(config_file, sheet = "Notes")
+    }, error = function(e) {
+      warning(sprintf("Failed to read 'Notes' sheet: %s", conditionMessage(e)), call. = FALSE)
+      NULL
+    })
+
+    if (!is.null(notes) && nrow(notes) > 0) {
+      # Expected columns: Section, Note
+      if (!all(c("Section", "Note") %in% names(notes))) {
+        # Try case-insensitive match
+        names(notes) <- tolower(names(notes))
+        if (!all(c("section", "note") %in% names(notes))) {
+          warning("Notes sheet should have 'Section' and 'Note' columns. Ignoring.", call. = FALSE)
+          notes <- NULL
+        } else {
+          names(notes)[names(notes) == "section"] <- "Section"
+          names(notes)[names(notes) == "note"] <- "Note"
+        }
+      }
+
+      if (!is.null(notes)) {
+        # Remove empty rows
+        notes <- notes[!is.na(notes$Note) & notes$Note != "", , drop = FALSE]
+        if (verbose && nrow(notes) > 0) {
+          sections <- unique(notes$Section)
+          message("  Loaded ", nrow(notes), " note(s) in sections: ", paste(sections, collapse = ", "))
+        }
+      }
+    }
+  }
+
+  # ============================================================================
   # Build Configuration Object
   # ============================================================================
   config <- list(
@@ -358,7 +477,9 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
     weight_specifications = weight_specs_df,
     design_targets = design_targets,
     rim_targets = rim_targets,
+    cell_targets = cell_targets,
     advanced_settings = advanced_settings,
+    notes = notes,
     config_file = normalizePath(config_file, mustWork = TRUE)
   )
 
@@ -539,5 +660,26 @@ get_rim_targets <- function(config, weight_name) {
   }
 
   targets <- config$rim_targets[config$rim_targets$weight_name == weight_name, , drop = FALSE]
+  return(targets)
+}
+
+#' Get Cell Targets for Weight
+#'
+#' Retrieves cell/interlocked targets for a specific weight.
+#'
+#' @param config List, full configuration object
+#' @param weight_name Character, name of weight
+#' @return Data frame of cell targets (without weight_name column)
+#' @export
+get_cell_targets <- function(config, weight_name) {
+  if (is.null(config$cell_targets)) {
+    return(NULL)
+  }
+
+  targets <- config$cell_targets[config$cell_targets$weight_name == weight_name, , drop = FALSE]
+
+  # Remove weight_name column (not needed downstream)
+  targets$weight_name <- NULL
+
   return(targets)
 }

@@ -3,50 +3,11 @@
 # ==============================================================================
 # Implements TURAS Reliability Standard (TRS) v1.0 for weighting module
 # All validation happens upfront before any calculations
-# Part of TURAS Weighting Module v2.0 (survey package migration 2025-12-25)
+# Part of TURAS Weighting Module v3.0
+#
+# REQUIRES: Shared TRS infrastructure must be loaded before this file is sourced.
+#           See run_weighting.R::load_shared_infrastructure()
 # ==============================================================================
-
-# Try to load shared TRS infrastructure if available
-.load_trs_infrastructure <- function() {
-  turas_root <- tryCatch({
-    # Try environment variable first
-    root <- Sys.getenv("TURAS_ROOT", "")
-    if (nzchar(root) && dir.exists(file.path(root, "modules"))) {
-      return(root)
-    }
-
-    # Try to find from current location
-    wd <- getwd()
-    for (i in 0:5) {
-      check <- if (i == 0) wd else dirname(wd)
-      if (dir.exists(file.path(check, "modules", "shared"))) {
-        return(check)
-      }
-      wd <- dirname(wd)
-    }
-    return(NULL)
-  }, error = function(e) NULL)
-
-  if (!is.null(turas_root)) {
-    trs_file <- file.path(turas_root, "modules", "shared", "lib", "trs_refusal.R")
-    log_file <- file.path(turas_root, "modules", "shared", "lib", "turas_log.R")
-    atomic_file <- file.path(turas_root, "modules", "shared", "lib", "turas_save_workbook_atomic.R")
-
-    if (file.exists(trs_file) && !exists("turas_refuse", mode = "function")) {
-      source(trs_file, local = FALSE)
-    }
-    if (file.exists(log_file) && !exists("turas_log", mode = "function")) {
-      source(log_file, local = FALSE)
-    }
-    # TRS v1.0: Load atomic workbook save to prevent file corruption on network/OneDrive folders
-    if (file.exists(atomic_file) && !exists("turas_save_workbook_atomic", mode = "function")) {
-      source(atomic_file, local = FALSE)
-    }
-  }
-}
-
-# Load TRS on source
-.load_trs_infrastructure()
 
 # ==============================================================================
 # WEIGHTING-SPECIFIC REFUSE FUNCTION
@@ -55,7 +16,7 @@
 #' Refuse with Weighting Module Context
 #'
 #' Wrapper for turas_refuse that adds weighting module context.
-#' Falls back to standard stop() if TRS infrastructure not available.
+#' Shared TRS infrastructure MUST be loaded before calling this function.
 #'
 #' @param code TRS refusal code (must start with valid prefix)
 #' @param title Short title
@@ -65,34 +26,15 @@
 #' @param ... Additional arguments passed to turas_refuse
 #' @export
 weighting_refuse <- function(code, title, problem, why_it_matters, how_to_fix, ...) {
-  if (exists("turas_refuse", mode = "function")) {
-    turas_refuse(
-      code = code,
-      title = title,
-      problem = problem,
-      why_it_matters = why_it_matters,
-      how_to_fix = how_to_fix,
-      module = "WEIGHTING",
-      ...
-    )
-  } else {
-    # Fallback: standard stop with formatted message
-    msg <- paste0(
-      "\n", strrep("=", 70), "\n",
-      "  [REFUSE] ", code, ": ", title, "\n",
-      strrep("=", 70), "\n\n",
-      "Problem:\n  ", problem, "\n\n",
-      "Why it matters:\n  ", why_it_matters, "\n\n",
-      "How to fix:\n  ",
-      if (length(how_to_fix) > 1) {
-        paste(paste0("  ", seq_along(how_to_fix), ". ", how_to_fix), collapse = "\n")
-      } else {
-        how_to_fix
-      },
-      "\n\n", strrep("=", 70), "\n"
-    )
-    stop(msg, call. = FALSE)
-  }
+  turas_refuse(
+    code = code,
+    title = title,
+    problem = problem,
+    why_it_matters = why_it_matters,
+    how_to_fix = how_to_fix,
+    module = "WEIGHTING",
+    ...
+  )
 }
 
 # ==============================================================================
@@ -211,34 +153,14 @@ guard_variable_exists <- function(data, variable, context) {
   invisible(TRUE)
 }
 
-#' Guard: Validate No Missing Values
-#' @keywords internal
-guard_no_missing_values <- function(data, variable, context) {
-  n_missing <- sum(is.na(data[[variable]]))
-  if (n_missing > 0) {
-    pct <- round(100 * n_missing / nrow(data), 1)
-    weighting_refuse(
-      code = "DATA_MISSING_VALUES",
-      title = "Missing Values Not Allowed",
-      problem = sprintf("Variable '%s' has %d missing values (%.1f%%).",
-                       variable, n_missing, pct),
-      why_it_matters = sprintf("%s requires complete data for weighting variables.", context),
-      how_to_fix = c(
-        "Remove rows with missing values before weighting",
-        "Impute missing values before weighting",
-        "Create a 'Missing' category if appropriate"
-      ),
-      details = sprintf("Missing count: %d of %d rows", n_missing, nrow(data))
-    )
-  }
-  invisible(TRUE)
-}
+# Tolerance constant for rim target sums (percentage points)
+RIM_TARGET_SUM_TOLERANCE <- 0.5
 
 #' Guard: Validate Rim Targets Sum to 100
 #' @keywords internal
 guard_rim_targets_sum <- function(variable, categories, percentages) {
   total <- sum(percentages, na.rm = TRUE)
-  if (abs(total - 100) > 0.1) {
+  if (abs(total - 100) > RIM_TARGET_SUM_TOLERANCE) {
     weighting_refuse(
       code = "CFG_INVALID_RIM_TARGETS",
       title = "Rim Targets Do Not Sum to 100",
@@ -270,27 +192,6 @@ guard_survey_available <- function() {
       how_to_fix = c(
         "Install the package: install.packages('survey')",
         "Then re-run your weighting analysis"
-      )
-    )
-  }
-  invisible(TRUE)
-}
-
-#' Guard: Validate Rim Weighting Convergence
-#' @keywords internal
-guard_rim_convergence <- function(converged, iterations, max_iterations, force_convergence) {
-  if (!converged && !force_convergence) {
-    weighting_refuse(
-      code = "MODEL_RIM_NO_CONVERGENCE",
-      title = "Rim Weighting Did Not Converge",
-      problem = sprintf("Rim weighting did not converge after %d iterations.", iterations),
-      why_it_matters = "Target margins will not be exactly achieved. Results may be biased.",
-      how_to_fix = c(
-        sprintf("Increase max_iterations (currently %d) in Advanced_Settings", max_iterations),
-        "Relax convergence_tolerance (try 0.02 or higher)",
-        "Reduce the number of rim variables (maximum 5 recommended)",
-        "Set force_convergence=Y to accept approximate weights (use with caution)",
-        "Check for impossible target combinations"
       )
     )
   }
@@ -357,56 +258,4 @@ guard_categories_match <- function(config_categories, data_categories, variable,
   }
 
   invisible(TRUE)
-}
-
-# ==============================================================================
-# WEIGHTING MODULE LOG FUNCTION
-# ==============================================================================
-
-#' Log Message with Weighting Context
-#'
-#' @param level Log level: INFO, PARTIAL, REFUSE, DEBUG
-#' @param message Log message
-#' @param code Optional TRS code
-#' @param verbose Print if TRUE
-#' @export
-weighting_log <- function(level, message, code = NULL, verbose = TRUE) {
-  if (exists("turas_log", mode = "function")) {
-    turas_log(level, "WEIGHTING", message, code = code, verbose = verbose)
-  } else if (verbose) {
-    prefix <- sprintf("[%s] WEIGHTING: ", level)
-    if (!is.null(code)) prefix <- sprintf("[%s] %s: ", level, code)
-    cat(prefix, message, "\n", sep = "")
-  }
-  invisible(NULL)
-}
-
-# ==============================================================================
-# GUARD STATE FOR COLLECTING WARNINGS
-# ==============================================================================
-
-#' Initialize Weighting Guard State
-#' @export
-weighting_guard_init <- function() {
-  if (exists("guard_init", mode = "function")) {
-    guard_init("WEIGHTING")
-  } else {
-    list(
-      module = "WEIGHTING",
-      warnings = character(0),
-      issues = character(0),
-      timestamp = Sys.time()
-    )
-  }
-}
-
-#' Add Warning to Guard State
-#' @export
-weighting_guard_warn <- function(guard, message) {
-  if (exists("guard_warn", mode = "function")) {
-    guard_warn(guard, message)
-  } else {
-    guard$warnings <- c(guard$warnings, message)
-  }
-  invisible(guard)
 }

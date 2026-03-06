@@ -106,13 +106,12 @@ example_name/
 ### Example:
 ```r
 # Before (local)
-setwd("/Users/duncan/Documents/Turas/modules/weighting/examples/example1_design_weights")
+setwd("path/to/Turas/modules/weighting/examples/example1_design_weights")
 
 # After (OneDrive)
-setwd("/Users/duncan/Library/CloudStorage/OneDrive-Personal/Turas_Examples/example1_design_weights")
+setwd("path/to/OneDrive/Turas_Examples/example1_design_weights")
 
-# The rest stays the same
-source("../../run_weighting.R")
+# The rest stays the same — all data/output paths are relative to the config file
 result <- run_weighting("Weight_Config.xlsx")
 ```
 

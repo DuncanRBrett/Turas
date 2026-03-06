@@ -200,8 +200,8 @@ assess_weight_quality <- function(diagnostics) {
     ))
   }
 
-  # Check CV
-  if (diagnostics$distribution$cv > 1.0) {
+  # Check CV (guard against NA for single-weight or zero-sd cases)
+  if (!is.na(diagnostics$distribution$cv) && diagnostics$distribution$cv > 1.0) {
     if (status == "GOOD") status <- "ACCEPTABLE"
     issues <- c(issues, sprintf(
       "High weight variability (CV = %.2f). Consider trimming.",

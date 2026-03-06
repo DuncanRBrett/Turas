@@ -31,7 +31,7 @@ parse_html_report <- function(report_path, report_key) {
       status = "REFUSED",
       code = "DATA_INVALID",
       message = sprintf("Cannot detect report type for: %s", basename(report_path)),
-      how_to_fix = "The file must be a Turas-generated HTML report (tracker, tabs, catdriver, or keydriver)."
+      how_to_fix = "The file must be a Turas-generated HTML report (tracker, tabs, catdriver, keydriver, or weighting)."
     ))
   }
 
@@ -105,7 +105,7 @@ parse_html_report <- function(report_path, report_key) {
 #' Detect Report Type from HTML Content
 #'
 #' @param html Full HTML string
-#' @return "tracker", "tabs", or NULL
+#' @return "tracker", "tabs", "catdriver", "keydriver", "weighting", or NULL
 detect_report_type <- function(html) {
   # Check for explicit meta tag (tracker has this)
   if (grepl('<meta\\s+name="turas-report-type"\\s+content="tracker"', html)) {
@@ -120,6 +120,9 @@ detect_report_type <- function(html) {
   if (grepl('<meta\\s+name="turas-report-type"\\s+content="keydriver"', html)) {
     return("keydriver")
   }
+  if (grepl('<meta\\s+name="turas-report-type"\\s+content="weighting"', html)) {
+    return("weighting")
+  }
   # Fallback: detect by structural markers
   if (grepl('id="tab-crosstabs"', html, fixed = TRUE)) {
     return("tabs")
@@ -130,6 +133,9 @@ detect_report_type <- function(html) {
   }
   if (grepl('class="tk-header"', html, fixed = TRUE)) {
     return("tracker")
+  }
+  if (grepl('class="wt-header"', html, fixed = TRUE)) {
+    return("weighting")
   }
   return(NULL)
 }
@@ -193,6 +199,10 @@ extract_header <- function(html, report_type) {
   } else if (report_type == "keydriver") {
     # Keydriver: <div class="kd-header">...</div>
     m <- regexpr('<div class="kd-header">[\\s\\S]*?</div>\\s*</div>', html, perl = TRUE)
+    if (m > 0) return(regmatches(html, m))
+  } else if (report_type == "weighting") {
+    # Weighting: <div class="wt-header">...</div>
+    m <- regexpr('<div class="wt-header">[\\s\\S]*?</div>\\s*</div>\\s*</div>', html, perl = TRUE)
     if (m > 0) return(regmatches(html, m))
   } else {
     # Tabs: <div class="header">...</div> (up to report-tabs)
@@ -410,6 +420,10 @@ extract_footer <- function(html, report_type) {
     m <- regexpr('<div class="kd-footer">[\\s\\S]*?</div>', html, perl = TRUE)
     if (m > 0) return(regmatches(html, m))
   }
+  if (report_type == "weighting") {
+    m <- regexpr('<div class="wt-footer">[\\s\\S]*?</div>', html, perl = TRUE)
+    if (m > 0) return(regmatches(html, m))
+  }
   # Tabs footer is inside content panels — already captured, no separate extraction
   return("")
 }
@@ -517,6 +531,25 @@ extract_metadata <- function(html, report_type) {
     # Use title for project_title fallback
     if (is.null(meta$project_title) && !is.null(meta$title)) {
       meta$project_title <- meta$title
+    }
+  }
+
+  # --- Weighting report metadata ---
+  if (report_type == "weighting") {
+    # Project title from header
+    proj_m <- regexpr('class="wt-header-project">([^<]*)<', html)
+    if (proj_m > 0) {
+      meta$project_title <- sub('class="wt-header-project">([^<]*)<', '\\1',
+                                regmatches(html, proj_m))
+    }
+
+    # Meta tag extraction
+    meta$total_n <- extract_meta_tag("turas-total-n")
+    meta$n_weights <- extract_meta_tag("turas-weights")
+
+    # Use title for fallback
+    if (is.null(meta$project_title) && !is.null(meta$title)) {
+      meta$project_title <- sub("^Turas Weighting Report - ", "", meta$title)
     }
   }
 

@@ -2,13 +2,14 @@
 # TURAS WEIGHTING MODULE - MAIN ENTRY POINT
 # ==============================================================================
 #
-# Version: 2.0
-# Date: 2025-12-25
+# Version: 3.0
+# Date: 2026-03-06
 #
 # DESCRIPTION:
 # Calculates survey weights using industry-standard methods:
 #   - Design weights for stratified samples
 #   - Rim weights (raking) using survey::calibrate()
+#   - Cell weights for interlocked distributions
 #
 # USAGE:
 #   result <- run_weighting("path/to/Weight_Config.xlsx")
@@ -18,41 +19,12 @@
 #   Rscript run_weighting.R path/to/Weight_Config.xlsx
 #
 # DEPENDENCIES:
-#   Required: readxl, dplyr, openxlsx, survey
+#   Required: readxl, survey, openxlsx
 #   Optional: haven (for SPSS files)
 #
 # ==============================================================================
 
-SCRIPT_VERSION <- "2.0"
-
-# ==============================================================================
-# TRS v1.0: Early refusal function (used before guard layer loads)
-# ==============================================================================
-
-#' Early Refusal Function
-#'
-#' Used for TRS-compliant errors before the guard layer is loaded.
-#' @keywords internal
-weighting_early_refuse <- function(code, title, problem, why_it_matters, how_to_fix, details = NULL) {
-  # Ensure code has valid TRS prefix
-  if (!grepl("^(CFG_|DATA_|IO_|MODEL_|MAPPER_|PKG_|FEATURE_|BUG_)", code)) {
-    code <- paste0("CFG_", code)
-  }
-
-  msg <- paste0(
-    "\n", strrep("=", 80), "\n",
-    "  [REFUSE] ", code, ": ", title, "\n",
-    strrep("=", 80), "\n\n",
-    "Problem:\n  ", problem, "\n\n",
-    "Why it matters:\n  ", why_it_matters, "\n\n",
-    "How to fix:\n  ", how_to_fix, "\n"
-  )
-  if (!is.null(details)) {
-    msg <- paste0(msg, "\nDetails:\n  ", details, "\n")
-  }
-  msg <- paste0(msg, "\n", strrep("=", 80), "\n")
-  stop(msg, call. = FALSE)
-}
+SCRIPT_VERSION <- "3.0"
 
 # ==============================================================================
 # MODULE INITIALIZATION
@@ -63,6 +35,11 @@ weighting_early_refuse <- function(code, title, problem, why_it_matters, how_to_
 #' Returns the directory containing this script.
 #' @keywords internal
 get_module_dir <- function() {
+  # Check for explicit override (set by test setup or external caller)
+  if (exists("WEIGHTING_MODULE_DIR", envir = .GlobalEnv)) {
+    return(get("WEIGHTING_MODULE_DIR", envir = .GlobalEnv))
+  }
+
   # Try multiple methods to find module directory
   if (sys.nframe() > 0 && !is.null(sys.frame(1)$ofile)) {
     return(dirname(sys.frame(1)$ofile))
@@ -81,13 +58,8 @@ get_module_dir <- function() {
     }
   }
 
-  weighting_early_refuse(
-    code = "IO_MODULE_NOT_FOUND",
-    title = "Weighting Module Directory Not Found",
-    problem = "Cannot locate the weighting module directory.",
-    why_it_matters = "The weighting module needs to find its library files to run.",
-    how_to_fix = "Ensure you are running from the Turas root directory or the weighting module directory."
-  )
+  stop("Cannot locate weighting module directory. Run from the Turas root or weighting module directory.",
+       call. = FALSE)
 }
 
 #' Source Module Libraries
@@ -98,13 +70,9 @@ source_module_libs <- function(module_dir) {
   lib_dir <- file.path(module_dir, "lib")
 
   if (!dir.exists(lib_dir)) {
-    weighting_early_refuse(
-      code = "IO_LIB_DIR_NOT_FOUND",
-      title = "Module Library Directory Not Found",
-      problem = paste0("Module library directory not found: ", lib_dir),
-      why_it_matters = "The weighting module cannot load its required library files.",
-      how_to_fix = "Ensure the Turas installation is complete and the lib/ directory exists."
-    )
+    stop(paste0("Module library directory not found: ", lib_dir,
+                "\nEnsure the Turas installation is complete and the lib/ directory exists."),
+         call. = FALSE)
   }
 
   # Source in dependency order
@@ -114,6 +82,7 @@ source_module_libs <- function(module_dir) {
     "config_loader.R",
     "design_weights.R",
     "rim_weights.R",
+    "cell_weights.R",
     "trimming.R",
     "diagnostics.R",
     "output.R"
@@ -123,10 +92,41 @@ source_module_libs <- function(module_dir) {
     lib_path <- file.path(lib_dir, lib_file)
     if (file.exists(lib_path)) {
       source(lib_path, local = FALSE)
-    } else {
-      warning(sprintf("Library file not found: %s", lib_file), call. = FALSE)
     }
   }
+}
+
+#' Load Shared Infrastructure
+#'
+#' Loads the shared Turas infrastructure (TRS, logging, utilities).
+#' This is mandatory - the module cannot run without shared infrastructure.
+#' @keywords internal
+load_shared_infrastructure <- function(module_dir) {
+  # Find TURAS root by walking up from module directory
+  turas_root <- NULL
+  check_path <- module_dir
+  for (i in 1:5) {
+    if (dir.exists(file.path(check_path, "modules", "shared"))) {
+      turas_root <- check_path
+      break
+    }
+    check_path <- dirname(check_path)
+  }
+
+  if (is.null(turas_root)) {
+    stop("Cannot find Turas shared infrastructure (modules/shared/).\n",
+         "Run from the Turas root directory or set TURAS_HOME environment variable.",
+         call. = FALSE)
+  }
+
+  shared_import <- file.path(turas_root, "modules", "shared", "lib", "import_all.R")
+  if (!file.exists(shared_import)) {
+    stop(paste0("Shared infrastructure file not found: ", shared_import),
+         call. = FALSE)
+  }
+
+  source(shared_import, local = FALSE)
+  return(turas_root)
 }
 
 #' Check Required Packages
@@ -134,12 +134,12 @@ source_module_libs <- function(module_dir) {
 #' Verifies required packages are installed.
 #' @keywords internal
 check_required_packages <- function() {
-  required <- c("readxl", "dplyr", "survey", "openxlsx")
+  required <- c("readxl", "survey", "openxlsx")
 
   missing <- required[!sapply(required, requireNamespace, quietly = TRUE)]
 
   if (length(missing) > 0) {
-    weighting_early_refuse(
+    weighting_refuse(
       code = "PKG_MISSING_DEPENDENCY",
       title = "Missing Required Packages",
       problem = paste0("Required packages not installed: ", paste(missing, collapse = ", ")),
@@ -166,25 +166,28 @@ check_required_packages <- function() {
 #' @param progress_callback Function, optional callback for progress updates (for GUI).
 #'   Called with (value, message) where value is 0-1 and message is status text.
 #' @return List with elements:
+#'   \item{status}{"PASS", "PARTIAL", or "REFUSE" (via with_refusal_handler)}
 #'   \item{data}{Data frame with weight columns added}
-#'   \item{diagnostics}{List of diagnostic results per weight}
-#'   \item{config}{Parsed configuration}
 #'   \item{weight_names}{Character vector of weight column names created}
+#'   \item{weight_results}{List of per-weight results with diagnostics}
+#'   \item{config}{Parsed configuration}
+#'   \item{output_file}{Path to output data file (if written)}
+#'   \item{diagnostics_file}{Path to diagnostics file (if written)}
+#'   \item{run_state}{TRS run state result with timing and events}
 #' @export
 #'
 #' @examples
+#' \dontrun{
 #' result <- run_weighting("project/Weight_Config.xlsx")
-#' weighted_data <- result$data
-#'
-#' # Access diagnostics
-#' result$diagnostics[["population_weight"]]
+#' if (result$status == "PASS") {
+#'   weighted_data <- result$data
+#' }
+#' }
 run_weighting <- function(config_file,
                           data_file = NULL,
                           return_data = TRUE,
                           verbose = TRUE,
                           progress_callback = NULL) {
-
-  start_time <- Sys.time()
 
   # Helper to update progress
   update_progress <- function(value, message) {
@@ -194,49 +197,33 @@ run_weighting <- function(config_file,
   }
 
   # ============================================================================
-  # Initialization
+  # Initialization: Load shared infrastructure FIRST
   # ============================================================================
-  update_progress(0.05, "Initializing weighting module...")
+  update_progress(0.02, "Loading shared infrastructure...")
 
-  if (verbose) {
-    cat("\n")
-    cat(strrep("=", 80), "\n")
-    cat("TURAS WEIGHTING MODULE v", SCRIPT_VERSION, "\n", sep = "")
-    cat(strrep("=", 80), "\n")
-    cat("Started: ", format(start_time, "%Y-%m-%d %H:%M:%S"), "\n")
+  module_dir <- get_module_dir()
+
+  # Only load shared infra if not already available (e.g., in test context)
+  if (!exists("turas_refuse", mode = "function")) {
+    load_shared_infrastructure(module_dir)
   }
 
-  # Check packages
-  check_required_packages()
-
-  # Source module libraries if not already loaded
+  # Now that shared infra is loaded, source module libs
   if (!exists("load_weighting_config", mode = "function")) {
-    module_dir <- get_module_dir()
     source_module_libs(module_dir)
   }
 
-  # Load shared utilities if available
-  tryCatch({
-    # Find TURAS root by looking for modules/shared directory
-    turas_root <- NULL
-    check_path <- module_dir
-    for (i in 1:5) {
-      if (dir.exists(file.path(check_path, "modules", "shared"))) {
-        turas_root <- check_path
-        break
-      }
-      check_path <- dirname(check_path)
-    }
+  # Create run state for TRS tracking
+  run_state <- turas_run_state_new("WEIGHTING")
 
-    if (!is.null(turas_root)) {
-      shared_import <- file.path(turas_root, "modules", "shared", "lib", "import_all.R")
-      if (file.exists(shared_import)) {
-        source(shared_import)
-      }
-    }
-  }, error = function(e) {
-    # Shared utilities not available - continue without them
-  })
+  # Print start banner
+  if (verbose) {
+    turas_print_start_banner("WEIGHTING", SCRIPT_VERSION)
+  }
+
+  # Check packages
+  update_progress(0.05, "Checking dependencies...")
+  check_required_packages()
 
   # ============================================================================
   # Load Configuration
@@ -350,72 +337,129 @@ run_weighting <- function(config_file,
       message(strrep("-", 70))
     }
 
-    result <- list()
+    result <- tryCatch({
+      res <- list()
 
-    # Calculate based on method
-    if (method == "design") {
-      result$design_result <- calculate_design_weights_from_config(
-        data = data,
-        config = config,
-        weight_name = weight_name,
-        verbose = verbose
-      )
-      weights <- result$design_result$weights
+      # Calculate based on method
+      if (method == "design") {
+        res$design_result <- calculate_design_weights_from_config(
+          data = data,
+          config = config,
+          weight_name = weight_name,
+          verbose = verbose
+        )
+        weights <- res$design_result$weights
 
-      if (verbose) {
-        print_design_summary(result$design_result, weight_name)
+        if (verbose) {
+          print_design_summary(res$design_result, weight_name)
+        }
+
+      } else if (method %in% c("rim", "rake")) {
+        res$rim_result <- calculate_rim_weights_from_config(
+          data = data,
+          config = config,
+          weight_name = weight_name,
+          verbose = verbose
+        )
+        weights <- res$rim_result$weights
+
+        if (verbose) {
+          print_rim_summary(res$rim_result, weight_name)
+        }
+
+      } else if (method == "cell") {
+        if (!exists("calculate_cell_weights_from_config", mode = "function")) {
+          weighting_refuse(
+            code = "FEATURE_CELL_NOT_LOADED",
+            title = "Cell Weighting Not Available",
+            problem = "Cell weighting library (cell_weights.R) is not loaded.",
+            why_it_matters = "Cannot calculate cell weights without the cell weighting library.",
+            how_to_fix = "Ensure modules/weighting/lib/cell_weights.R exists."
+          )
+        }
+        res$cell_result <- calculate_cell_weights_from_config(
+          data = data,
+          config = config,
+          weight_name = weight_name,
+          verbose = verbose
+        )
+        weights <- res$cell_result$weights
+
+        if (verbose && exists("print_cell_summary", mode = "function")) {
+          print_cell_summary(res$cell_result, weight_name)
+        }
+
+      } else {
+        weighting_refuse(
+          code = "CFG_UNKNOWN_METHOD",
+          title = "Unknown Weighting Method",
+          problem = paste0("Unknown weighting method: ", method),
+          why_it_matters = "Cannot calculate weights with an unrecognized method.",
+          how_to_fix = "Use one of: 'design', 'rim', 'rake', or 'cell' as the weighting method."
+        )
       }
 
-    } else if (method == "rim") {
-      result$rim_result <- calculate_rim_weights_from_config(
-        data = data,
-        config = config,
-        weight_name = weight_name,
+      # Apply trimming if configured
+      trimming_result <- apply_trimming_from_config(
+        weights = weights,
+        spec = spec,
         verbose = verbose
       )
-      weights <- result$rim_result$weights
 
-      if (verbose) {
-        print_rim_summary(result$rim_result, weight_name)
+      if (trimming_result$trimming_applied) {
+        weights <- trimming_result$weights
+        res$trimming_result <- trimming_result
       }
 
-    } else {
-      weighting_refuse(
-        code = "CFG_UNKNOWN_METHOD",
-        title = "Unknown Weighting Method",
-        problem = paste0("Unknown weighting method: ", method),
-        why_it_matters = "Cannot calculate weights with an unrecognized method.",
-        how_to_fix = "Use one of: 'design', 'rim', or 'rake' as the weighting method."
+      # Generate diagnostics
+      res$diagnostics <- diagnose_weights(
+        weights = weights,
+        label = weight_name,
+        rim_result = res$rim_result,
+        trimming_result = trimming_result,
+        verbose = verbose
       )
+
+      # Store final weights
+      res$weights <- weights
+      res
+
+    }, error = function(e) {
+      # If this is a turas_refusal, re-throw it
+      if (inherits(e, "turas_refusal")) {
+        stop(e)
+      }
+
+      # Non-refusal error: log as PARTIAL if other weights remain
+      if (n_weights > 1) {
+        turas_run_state_partial(
+          run_state,
+          code = "MODEL_WEIGHT_FAILED",
+          title = paste0("Weight '", weight_name, "' calculation failed"),
+          problem = conditionMessage(e),
+          fix = "Check configuration and data for this weight specification.",
+          stage = "weight_calculation"
+        )
+        return(NULL)
+      } else {
+        # Single weight - re-throw as this is fatal
+        stop(e)
+      }
+    })
+
+    if (is.null(result)) {
+      # Weight failed but other weights may succeed (PARTIAL mode)
+      weight_results[[weight_name]] <- list(
+        weights = rep(NA_real_, nrow(data)),
+        diagnostics = NULL,
+        error = TRUE
+      )
+      data[[weight_name]] <- NA_real_
+      next
     }
-
-    # Apply trimming if configured
-    trimming_result <- apply_trimming_from_config(
-      weights = weights,
-      spec = spec,
-      verbose = verbose
-    )
-
-    if (trimming_result$trimming_applied) {
-      weights <- trimming_result$weights
-      result$trimming_result <- trimming_result
-    }
-
-    # Generate diagnostics
-    result$diagnostics <- diagnose_weights(
-      weights = weights,
-      label = weight_name,
-      rim_result = result$rim_result,
-      trimming_result = trimming_result,
-      verbose = verbose
-    )
-
-    # Store final weights
-    result$weights <- weights
 
     # Add to data
-    data[[weight_name]] <- weights
-
+    data[[weight_name]] <- result$weights
     weight_results[[weight_name]] <- result
   }
 
@@ -447,7 +491,78 @@ run_weighting <- function(config_file,
       weight_results = weight_results
     )
 
-    generate_weighting_report(full_results, diagnostics_file, verbose = verbose)
+    generate_weighting_report(full_results, diagnostics_file,
+                              run_state = run_state, verbose = verbose)
+  }
+
+  # ============================================================================
+  # Generate HTML Report (if configured)
+  # ============================================================================
+  html_report_file <- NULL
+
+  if (isTRUE(config$general$html_report) && !is.null(config$general$html_report_file_resolved)) {
+    update_progress(0.92, "Generating HTML report...")
+
+    # Source HTML report orchestrator
+    html_report_main <- file.path(module_dir, "lib", "html_report", "99_html_report_main.R")
+    if (file.exists(html_report_main)) {
+      # Set lib dir for JS file resolution
+      assign(".weighting_lib_dir", file.path(module_dir, "lib"), envir = globalenv())
+
+      tryCatch({
+        source(html_report_main, local = FALSE)
+
+        full_results <- list(
+          data = data,
+          config = config,
+          weight_names = weight_names,
+          weight_results = weight_results
+        )
+
+        html_config <- list(
+          brand_colour = config$general$brand_colour %||% "#1e3a5f",
+          accent_colour = config$general$accent_colour %||% "#2aa198"
+        )
+
+        html_result <- generate_weighting_html_report(
+          weighting_results = full_results,
+          output_path = config$general$html_report_file_resolved,
+          config = html_config
+        )
+
+        if (html_result$status == "PASS") {
+          html_report_file <- html_result$output_file
+        } else {
+          if (verbose) {
+            cat("\n  [WARNING] HTML report generation failed:", html_result$message, "\n")
+          }
+          turas_run_state_partial(
+            run_state,
+            code = "IO_HTML_REPORT_FAILED",
+            title = "HTML report generation failed",
+            problem = html_result$message %||% "Unknown error",
+            fix = "Check HTML report configuration and htmltools package",
+            stage = "html_report"
+          )
+        }
+      }, error = function(e) {
+        if (verbose) {
+          cat("\n  [WARNING] HTML report generation error:", conditionMessage(e), "\n")
+        }
+        turas_run_state_partial(
+          run_state,
+          code = "IO_HTML_REPORT_ERROR",
+          title = "HTML report generation error",
+          problem = conditionMessage(e),
+          fix = "Check that htmltools is installed and html_report/ directory is complete",
+          stage = "html_report"
+        )
+      })
+    } else {
+      if (verbose) {
+        cat("\n  [WARNING] HTML report files not found at:", html_report_main, "\n")
+      }
+    }
   }
 
   # ============================================================================
@@ -455,26 +570,36 @@ run_weighting <- function(config_file,
   # ============================================================================
   update_progress(0.95, "Finalizing results...")
 
-  result <- list(
+  # Get run state result
+  run_result <- turas_run_state_result(run_state)
+
+  # Print summary
+  if (verbose) {
+    full_result <- list(
+      data = data,
+      weight_names = weight_names,
+      weight_results = weight_results,
+      config = config,
+      output_file = output_file,
+      diagnostics_file = diagnostics_file
+    )
+    print_run_summary(full_result)
+    turas_print_final_banner(run_result)
+  }
+
+  update_progress(1.0, "Complete!")
+
+  return(list(
+    status = run_result$status,
     data = if (return_data) data else NULL,
     weight_names = weight_names,
     weight_results = weight_results,
     config = config,
     output_file = output_file,
-    diagnostics_file = diagnostics_file
-  )
-
-  # Print summary
-  if (verbose) {
-    print_run_summary(result)
-
-    elapsed <- difftime(Sys.time(), start_time, units = "secs")
-    cat("Completed in ", round(elapsed, 1), " seconds\n\n", sep = "")
-  }
-
-  update_progress(1.0, "Complete!")
-
-  return(result)
+    diagnostics_file = diagnostics_file,
+    html_report_file = html_report_file,
+    run_state = run_result
+  ))
 }
 
 # ==============================================================================
@@ -504,19 +629,18 @@ run_cli <- function() {
   config_file <- args[1]
   verbose <- !("--quiet" %in% args)
 
-  tryCatch({
-    result <- run_weighting(
+  result <- with_refusal_handler({
+    run_weighting(
       config_file = config_file,
       verbose = verbose
     )
+  }, module = "WEIGHTING")
 
-    # Exit successfully
-    quit(status = 0)
-
-  }, error = function(e) {
-    message("\nERROR: ", conditionMessage(e))
+  # Exit with appropriate code
+  if (is_refusal(result) || is_error(result)) {
     quit(status = 1)
-  })
+  }
+  quit(status = 0)
 }
 
 # Run CLI if executed directly (but not if being sourced by GUI launcher)
@@ -542,8 +666,10 @@ if (!interactive() && identical(environment(), globalenv()) &&
 #' @export
 #'
 #' @examples
+#' \dontrun{
 #' pop <- c("Small" = 5000, "Medium" = 2000, "Large" = 500)
 #' weighted_data <- quick_design_weight(survey, "size", pop)
+#' }
 quick_design_weight <- function(data,
                                 stratum_variable,
                                 population_sizes,
@@ -553,6 +679,7 @@ quick_design_weight <- function(data,
   # Source libs if needed
   if (!exists("calculate_design_weights", mode = "function")) {
     module_dir <- get_module_dir()
+    load_shared_infrastructure(module_dir)
     source_module_libs(module_dir)
   }
 
@@ -583,11 +710,13 @@ quick_design_weight <- function(data,
 #' @export
 #'
 #' @examples
+#' \dontrun{
 #' targets <- list(
 #'   Gender = c("Male" = 0.48, "Female" = 0.52),
 #'   Age = c("18-34" = 0.30, "35-54" = 0.40, "55+" = 0.30)
 #' )
 #' weighted_data <- quick_rim_weight(survey, targets)
+#' }
 quick_rim_weight <- function(data,
                              targets,
                              weight_name = "weight",
@@ -596,6 +725,7 @@ quick_rim_weight <- function(data,
   # Source libs if needed
   if (!exists("calculate_rim_weights", mode = "function")) {
     module_dir <- get_module_dir()
+    load_shared_infrastructure(module_dir)
     source_module_libs(module_dir)
   }
 

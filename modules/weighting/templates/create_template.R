@@ -2,6 +2,7 @@
 # CREATE WEIGHT_CONFIG_TEMPLATE.XLSX
 # ==============================================================================
 # Run this script to generate the Weight_Config_Template.xlsx file
+# Part of TURAS Weighting Module v3.0
 # ==============================================================================
 
 library(openxlsx)
@@ -14,6 +15,14 @@ create_weight_config_template <- function(output_path = NULL) {
 
   wb <- createWorkbook()
 
+  # Add header style
+  headerStyle <- createStyle(
+    fontColour = "#FFFFFF",
+    fgFill = "#4472C4",
+    halign = "center",
+    textDecoration = "bold"
+  )
+
   # ============================================================================
   # Sheet 1: General
   # ============================================================================
@@ -25,35 +34,39 @@ create_weight_config_template <- function(output_path = NULL) {
       "data_file",
       "output_file",
       "save_diagnostics",
-      "diagnostics_file"
+      "diagnostics_file",
+      "html_report",
+      "html_report_file",
+      "brand_colour",
+      "accent_colour"
     ),
     Value = c(
       "My_Project",
       "data/survey_responses.csv",
       "data/survey_weighted.csv",
       "Y",
-      "output/weight_diagnostics.txt"
+      "output/weight_diagnostics.xlsx",
+      "Y",
+      "output/weighting_report.html",
+      "#1e3a5f",
+      "#2aa198"
     ),
     Description = c(
       "Project identifier for reporting",
       "Path to survey data file (relative to config or absolute)",
       "Path for weighted data output (optional)",
-      "Save diagnostics to file? (Y/N)",
-      "Path for diagnostics report (required if save_diagnostics=Y)"
+      "Save Excel diagnostics report? (Y/N)",
+      "Path for diagnostics workbook (required if save_diagnostics=Y)",
+      "Generate self-contained HTML report? (Y/N)",
+      "Path for HTML report (auto-generated if blank)",
+      "Brand hex colour for HTML report (optional)",
+      "Accent hex colour for HTML report (optional)"
     ),
     stringsAsFactors = FALSE
   )
 
   writeData(wb, "General", general_data)
   setColWidths(wb, "General", cols = 1:3, widths = c(20, 35, 50))
-
-  # Add header style
-  headerStyle <- createStyle(
-    fontColour = "#FFFFFF",
-    fgFill = "#4472C4",
-    halign = "center",
-    textDecoration = "bold"
-  )
   addStyle(wb, "General", headerStyle, rows = 1, cols = 1:3, gridExpand = TRUE)
 
   # ============================================================================
@@ -62,22 +75,22 @@ create_weight_config_template <- function(output_path = NULL) {
   addWorksheet(wb, "Weight_Specifications")
 
   weight_specs <- data.frame(
-    weight_name = c("design_weight", "population_weight"),
-    method = c("design", "rim"),
+    weight_name = c("design_weight", "population_weight", "cell_weight"),
+    method = c("design", "rim", "cell"),
     description = c(
       "Design weights by customer segment",
-      "Rim weights to match population demographics"
+      "Rim weights to match population demographics",
+      "Cell weights for interlocked Age x Gender"
     ),
-    apply_trimming = c("Y", "Y"),
-    trim_method = c("cap", "percentile"),
-    trim_value = c(5, 0.95),
-    population_total = c(10000, 50000),
+    apply_trimming = c("N", "Y", "N"),
+    trim_method = c(NA, "cap", NA),
+    trim_value = c(NA, 5, NA),
     stringsAsFactors = FALSE
   )
 
   writeData(wb, "Weight_Specifications", weight_specs)
-  setColWidths(wb, "Weight_Specifications", cols = 1:7, widths = c(20, 10, 40, 15, 15, 12, 15))
-  addStyle(wb, "Weight_Specifications", headerStyle, rows = 1, cols = 1:7, gridExpand = TRUE)
+  setColWidths(wb, "Weight_Specifications", cols = 1:6, widths = c(20, 10, 40, 15, 15, 12))
+  addStyle(wb, "Weight_Specifications", headerStyle, rows = 1, cols = 1:6, gridExpand = TRUE)
 
   # ============================================================================
   # Sheet 3: Design_Targets
@@ -102,11 +115,7 @@ create_weight_config_template <- function(output_path = NULL) {
   addWorksheet(wb, "Rim_Targets")
 
   rim_targets <- data.frame(
-    weight_name = c(
-      "population_weight", "population_weight", "population_weight",
-      "population_weight", "population_weight",
-      "population_weight", "population_weight", "population_weight", "population_weight"
-    ),
+    weight_name = rep("population_weight", 9),
     variable = c(
       "Age", "Age", "Age",
       "Gender", "Gender",
@@ -130,30 +139,67 @@ create_weight_config_template <- function(output_path = NULL) {
   addStyle(wb, "Rim_Targets", headerStyle, rows = 1, cols = 1:4, gridExpand = TRUE)
 
   # ============================================================================
-  # Sheet 5: Advanced_Settings
+  # Sheet 5: Cell_Targets
+  # ============================================================================
+  addWorksheet(wb, "Cell_Targets")
+
+  cell_targets <- data.frame(
+    weight_name = rep("cell_weight", 6),
+    Gender = rep(c("Male", "Female"), each = 3),
+    Age = rep(c("18-34", "35-54", "55+"), 2),
+    target_percent = c(14.5, 19.4, 14.6, 15.5, 20.6, 15.4),
+    stringsAsFactors = FALSE
+  )
+
+  writeData(wb, "Cell_Targets", cell_targets)
+  setColWidths(wb, "Cell_Targets", cols = 1:4, widths = c(20, 15, 15, 15))
+  addStyle(wb, "Cell_Targets", headerStyle, rows = 1, cols = 1:4, gridExpand = TRUE)
+
+  # ============================================================================
+  # Sheet 6: Advanced_Settings
   # ============================================================================
   addWorksheet(wb, "Advanced_Settings")
 
   advanced <- data.frame(
     weight_name = c("population_weight"),
     max_iterations = c(50),
-    convergence_tolerance = c(1e-7),
-    calibration_method = c("raking"),
-    weight_bounds = c("0.3,3.0"),
+    convergence_tolerance = c(0.001),
+    force_convergence = c("N"),
     stringsAsFactors = FALSE
   )
 
   writeData(wb, "Advanced_Settings", advanced)
-  setColWidths(wb, "Advanced_Settings", cols = 1:5, widths = c(20, 15, 22, 18, 15))
-  addStyle(wb, "Advanced_Settings", headerStyle, rows = 1, cols = 1:5, gridExpand = TRUE)
+  setColWidths(wb, "Advanced_Settings", cols = 1:4, widths = c(20, 15, 22, 18))
+  addStyle(wb, "Advanced_Settings", headerStyle, rows = 1, cols = 1:4, gridExpand = TRUE)
 
   # ============================================================================
-  # Sheet 6: Instructions
+  # Sheet 7: Notes
+  # ============================================================================
+  addWorksheet(wb, "Notes")
+
+  notes <- data.frame(
+    Section = c("Assumptions", "Assumptions", "Methodology", "Data Quality", "Caveats"),
+    Note = c(
+      "Population data sourced from Census 2021",
+      "Age categories collapsed from 5-year bands",
+      "Rim weighting chosen over cell due to sparse cells",
+      "3 records excluded due to missing age data",
+      "Rural areas may be under-represented"
+    ),
+    stringsAsFactors = FALSE
+  )
+
+  writeData(wb, "Notes", notes)
+  setColWidths(wb, "Notes", cols = 1:2, widths = c(20, 60))
+  addStyle(wb, "Notes", headerStyle, rows = 1, cols = 1:2, gridExpand = TRUE)
+
+  # ============================================================================
+  # Sheet 8: Instructions
   # ============================================================================
   addWorksheet(wb, "Instructions")
 
   instructions <- c(
-    "TURAS WEIGHTING MODULE - CONFIGURATION TEMPLATE v2.0",
+    "TURAS WEIGHTING MODULE - CONFIGURATION TEMPLATE v3.0",
     "",
     "This template helps you configure survey weighting calculations.",
     "",
@@ -163,17 +209,20 @@ create_weight_config_template <- function(output_path = NULL) {
     "   - project_name: Identifier for your project",
     "   - data_file: Path to your survey data (CSV, Excel, or SPSS)",
     "   - output_file: Where to save weighted data (optional)",
-    "   - save_diagnostics: Y/N to save diagnostic report",
+    "   - save_diagnostics: Y/N to save Excel diagnostics report",
     "   - diagnostics_file: Path for diagnostics (if save_diagnostics=Y)",
+    "   - html_report: Y/N to generate self-contained HTML report",
+    "   - html_report_file: Path for HTML report (auto-generated if blank)",
+    "   - brand_colour: Hex colour for report branding (optional)",
+    "   - accent_colour: Hex accent colour for report (optional)",
     "",
     "2. Weight_Specifications - Define each weight to calculate",
     "   - weight_name: Unique name for the weight column",
-    "   - method: 'design' for stratified samples, 'rim' for demographic adjustment",
+    "   - method: 'design', 'rim' (or 'rake'), or 'cell'",
     "   - description: Optional description",
     "   - apply_trimming: Y/N to cap extreme weights",
     "   - trim_method: 'cap' (hard max) or 'percentile' (e.g., 95th percentile)",
-    "   - trim_value: Max weight (if cap) or percentile (0-1 if percentile)",
-    "   - population_total: Total population size (for grossing up)",
+    "   - trim_value: Max weight (if cap) or upper percentile (if percentile)",
     "",
     "3. Design_Targets - For design weights only",
     "   - weight_name: Links to Weight_Specifications",
@@ -187,30 +236,40 @@ create_weight_config_template <- function(output_path = NULL) {
     "   - category: Value in the variable column",
     "   - target_percent: Target percentage (must sum to 100 per variable)",
     "",
-    "5. Advanced_Settings (Optional) - Rim weighting parameters (v2.0)",
+    "5. Cell_Targets - For cell/interlocked weights only",
+    "   - weight_name: Links to Weight_Specifications",
+    "   - One column per cell variable (e.g., Gender, Age)",
+    "   - target_percent: Joint distribution target (all rows must sum to 100)",
+    "",
+    "6. Advanced_Settings (Optional) - Rim weighting parameters",
     "   - max_iterations: Maximum iterations for convergence (default: 50)",
-    "   - convergence_tolerance: Precision threshold (default: 1e-7)",
-    "   - calibration_method: 'raking' (default), 'linear', or 'logit'",
-    "   - weight_bounds: Weight limits during calibration (e.g., '0.3,3.0')",
+    "   - convergence_tolerance: Precision threshold (default: 0.001)",
+    "   - force_convergence: Y/N to accept non-converged weights",
+    "",
+    "7. Notes (Optional) - Document assumptions and methodology",
+    "   - Section: Category (e.g., Assumptions, Methodology, Data Quality, Caveats)",
+    "   - Note: Description text",
+    "   - Notes appear in HTML report and Excel diagnostics",
     "",
     "USAGE:",
     "",
     "1. Copy this template and rename for your project",
     "2. Update the General settings",
     "3. Define your weights in Weight_Specifications",
-    "4. Add targets to Design_Targets and/or Rim_Targets as needed",
+    "4. Add targets to Design_Targets, Rim_Targets, and/or Cell_Targets as needed",
     "5. Run: result <- run_weighting('your_config.xlsx')",
     "",
     "TIPS:",
     "",
     "- Rim targets for each variable must sum to 100%",
+    "- Cell targets must sum to 100% across all rows",
     "- Design weights: Ensure all stratum categories exist in your data",
     "- For rim weighting, max 5 variables recommended",
-    "- Start with apply_trimming=N, then add if needed",
-    "- v2.0: Use calibration_method='logit' for better bounded convergence",
-    "- v2.0: Weight bounds applied DURING calibration (superior to trimming)",
+    "- For cell weighting, ensure every cell combination has at least 1 respondent",
+    "- Start with apply_trimming=N, then add if design effect > 2.0",
+    "- All paths are relative to the config file location",
     "",
-    "For more information, see the module README and USER_GUIDE.md."
+    "For more information, see the module README.md."
   )
 
   writeData(wb, "Instructions", data.frame(Instructions = instructions))

@@ -2,8 +2,8 @@
 # TURAS WEIGHTING MODULE - SHINY GUI
 # ==============================================================================
 #
-# Version: 1.0
-# Date: 2025-12-24
+# Version: 3.0
+# Date: 2026-03-06
 #
 # DESCRIPTION:
 # Graphical user interface for the weighting module.
@@ -15,8 +15,21 @@
 #
 # ==============================================================================
 
-library(shiny)
-library(shinyFiles)
+# Check required GUI packages
+if (!requireNamespace("shiny", quietly = TRUE)) {
+  stop(paste0(
+    "[REFUSE] PKG_SHINY_MISSING: Shiny Package Required\n\n",
+    "Problem: Package 'shiny' is not installed.\n",
+    "How to fix: Install with: install.packages('shiny')"
+  ), call. = FALSE)
+}
+if (!requireNamespace("shinyFiles", quietly = TRUE)) {
+  stop(paste0(
+    "[REFUSE] PKG_SHINYFILES_MISSING: shinyFiles Package Required\n\n",
+    "Problem: Package 'shinyFiles' is not installed.\n",
+    "How to fix: Install with: install.packages('shinyFiles')"
+  ), call. = FALSE)
+}
 
 #' Run Weighting Module GUI
 #'
@@ -25,6 +38,10 @@ library(shinyFiles)
 #' @param launch_browser Logical, open in browser (default: TRUE)
 #' @export
 run_weighting_gui <- function(launch_browser = TRUE) {
+
+  # Load Shiny packages into function scope (requireNamespace check already done above)
+  library(shiny)
+  library(shinyFiles)
 
   # Get module directory
   module_dir <- tryCatch({
@@ -93,8 +110,8 @@ run_weighting_gui <- function(launch_browser = TRUE) {
   lib_dir <- file.path(module_dir, "lib")
   if (dir.exists(lib_dir)) {
     lib_files <- c("00_guard.R", "validation.R", "config_loader.R",
-                   "design_weights.R", "rim_weights.R", "trimming.R",
-                   "diagnostics.R", "output.R")
+                   "design_weights.R", "rim_weights.R", "cell_weights.R",
+                   "trimming.R", "diagnostics.R", "output.R")
     for (f in lib_files) {
       lib_path <- file.path(lib_dir, f)
       if (file.exists(lib_path)) {
@@ -260,7 +277,7 @@ run_weighting_gui <- function(launch_browser = TRUE) {
       # Header
       div(class = "header",
         h1("TURAS Weighting Module"),
-        p("Calculate survey weights using design or rim weighting methods")
+        p("Calculate survey weights using design, rim, or cell weighting methods")
       ),
 
       # Folder Selection
@@ -280,7 +297,7 @@ run_weighting_gui <- function(launch_browser = TRUE) {
       fluidRow(
         column(9,
           textInput("project_folder", "Project Folder Path",
-                    placeholder = "e.g., /Users/duncan/Documents/Turas/modules/weighting/examples/example2_rim_weights",
+                    placeholder = "e.g., path/to/your/weighting/project/folder",
                     width = "100%")
         ),
         column(3,
@@ -308,11 +325,14 @@ run_weighting_gui <- function(launch_browser = TRUE) {
       div(class = "section-title", "2. Options"),
 
       fluidRow(
-        column(6,
-          checkboxInput("save_output", "Save weighted data to file", value = TRUE)
+        column(4,
+          shiny::checkboxInput("save_output", "Save weighted data to file", value = TRUE)
         ),
-        column(6,
-          checkboxInput("save_diagnostics", "Save diagnostic report", value = TRUE)
+        column(4,
+          shiny::checkboxInput("save_diagnostics", "Save diagnostic report", value = TRUE)
+        ),
+        column(4,
+          shiny::checkboxInput("generate_html", "Generate HTML report", value = FALSE)
         )
       ),
 
@@ -584,12 +604,23 @@ run_weighting_gui <- function(launch_browser = TRUE) {
           # Use capture.output for TRS compliance - all console output visible in GUI
           output_capture <- capture.output({
             result <- withCallingHandlers({
-              run_weighting(
-                config_file = config_path,
-                data_file = data_path,
-                verbose = TRUE,
-                progress_callback = progress_callback
-              )
+              if (exists("with_refusal_handler", mode = "function")) {
+                with_refusal_handler({
+                  run_weighting(
+                    config_file = config_path,
+                    data_file = data_path,
+                    verbose = TRUE,
+                    progress_callback = progress_callback
+                  )
+                }, module = "WEIGHTING")
+              } else {
+                run_weighting(
+                  config_file = config_path,
+                  data_file = data_path,
+                  verbose = TRUE,
+                  progress_callback = progress_callback
+                )
+              }
             }, message = function(m) {
               cat(conditionMessage(m), "\n")
               invokeRestart("muffleMessage")
@@ -677,7 +708,13 @@ run_weighting_gui <- function(launch_browser = TRUE) {
 
       if (!is.null(rv$result$diagnostics_file)) {
         files <- c(files, list(
-          p(icon("file-alt"), " Diagnostics: ", code(basename(rv$result$diagnostics_file)))
+          shiny::p(shiny::icon("file-alt"), " Diagnostics: ", shiny::code(basename(rv$result$diagnostics_file)))
+        ))
+      }
+
+      if (!is.null(rv$result$html_report_file)) {
+        files <- c(files, list(
+          shiny::p(shiny::icon("globe"), " HTML Report: ", shiny::code(basename(rv$result$html_report_file)))
         ))
       }
 

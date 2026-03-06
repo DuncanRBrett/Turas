@@ -2,7 +2,7 @@
 # WEIGHTING MODULE - VALIDATION FUNCTIONS
 # ==============================================================================
 # Input validation for weighting configuration and data
-# Part of TURAS Weighting Module v1.0
+# Part of TURAS Weighting Module v3.0
 # ==============================================================================
 
 #' Validate Design Weight Configuration
@@ -194,12 +194,13 @@ validate_rim_config <- function(data, rim_targets, weight_name) {
       ))
     }
 
-    # Check targets sum to 100 (with 1% tolerance for rounding)
+    # Check targets sum to 100 (tolerance matches guard layer)
     target_sum <- sum(var_targets$target_percent, na.rm = TRUE)
-    if (abs(target_sum - 100) > 1.0) {
+    tolerance <- if (exists("RIM_TARGET_SUM_TOLERANCE")) RIM_TARGET_SUM_TOLERANCE else 0.5
+    if (abs(target_sum - 100) > tolerance) {
       errors <- c(errors, sprintf(
-        "Targets for variable '%s' sum to %.2f%%, must sum to 100%% (±1%%)",
-        var, target_sum
+        "Targets for variable '%s' sum to %.2f%%, must sum to 100%% (tolerance: %.1f%%)",
+        var, target_sum, tolerance
       ))
     }
 
@@ -357,9 +358,9 @@ validate_weight_spec <- function(spec) {
 
   if (is.null(spec$method) || is.na(spec$method)) {
     errors <- c(errors, "method is required")
-  } else if (!tolower(spec$method) %in% c("design", "rim")) {
+  } else if (!tolower(spec$method) %in% c("design", "rim", "rake", "cell")) {
     errors <- c(errors, sprintf(
-      "method must be 'design' or 'rim', got: '%s'",
+      "method must be 'design', 'rim', 'rake', or 'cell', got: '%s'",
       spec$method
     ))
   }
