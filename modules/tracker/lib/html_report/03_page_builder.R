@@ -1601,7 +1601,7 @@ build_tracker_about_panel <- function(config) {
   verbatim_el <- NULL
   if (!is.null(verbatim_file) && nzchar(verbatim_file)) {
     verbatim_el <- htmltools::tags$div(class = "closing-verbatim",
-      htmltools::tags$span(class = "closing-label", "Verbatim Data"),
+      htmltools::tags$span(class = "closing-label", "Appendices"),
       htmltools::tags$span(class = "closing-value", verbatim_file)
     )
   }

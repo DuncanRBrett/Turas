@@ -1918,7 +1918,7 @@ build_closing_section <- function(config_obj) {
   verbatim_el <- NULL
   if (!is.null(verbatim_file) && nzchar(verbatim_file)) {
     verbatim_el <- htmltools::tags$div(class = "closing-verbatim",
-      htmltools::tags$span(class = "closing-label", "Verbatim Data"),
+      htmltools::tags$span(class = "closing-label", "Appendices"),
       htmltools::tags$span(class = "closing-value", verbatim_file)
     )
   }
