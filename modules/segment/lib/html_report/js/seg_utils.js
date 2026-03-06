@@ -42,60 +42,147 @@
   };
 
   /**
-   * Wrap text into lines at word boundaries.
-   * @param {string} text - Text to wrap
-   * @param {number} maxChars - Maximum characters per line
-   * @returns {string[]} Array of line strings
+   * Word-wrap text into lines that fit a given pixel width.
+   * @param {string} text - Input text
+   * @param {number} maxWidth - Maximum width in pixels
+   * @param {number} charWidth - Approximate character width in pixels (default 7)
+   * @returns {string[]} Array of lines
    */
-  window.segWrapTextLines = function(text, maxChars) {
-    if (!text) return [''];
-    maxChars = maxChars || 40;
+  window.segWrapTextLines = function(text, maxWidth, charWidth) {
+    if (!text) return [];
+    charWidth = charWidth || 7;
+    var maxChars = Math.floor(maxWidth / charWidth);
+    if (maxChars < 10) maxChars = 10;
+
     var words = String(text).split(/\s+/);
     var lines = [];
-    var current = '';
+    var currentLine = '';
+
     for (var i = 0; i < words.length; i++) {
-      var test = current ? current + ' ' + words[i] : words[i];
-      if (test.length > maxChars && current) {
-        lines.push(current);
-        current = words[i];
+      var word = words[i];
+      if (currentLine.length === 0) {
+        currentLine = word;
+      } else if ((currentLine + ' ' + word).length <= maxChars) {
+        currentLine += ' ' + word;
       } else {
-        current = test;
+        lines.push(currentLine);
+        currentLine = word;
       }
     }
-    if (current) lines.push(current);
-    return lines.length ? lines : [''];
+    if (currentLine.length > 0) lines.push(currentLine);
+    return lines;
   };
 
   /**
-   * Create wrapped SVG text with tspan elements.
-   * @param {SVGElement} parent - SVG parent to append to
-   * @param {string} text - Text content
-   * @param {number} x - X position
-   * @param {number} y - Starting Y position
-   * @param {number} maxChars - Max chars per line
-   * @param {Object} attrs - SVG attributes for each tspan
-   * @returns {number} Total height used
+   * Create SVG <text> element with multiple <tspan> lines.
+   * @param {string} ns - SVG namespace URI
+   * @param {string[]} lines - Array of text lines
+   * @param {number} x - X coordinate
+   * @param {number} startY - Starting Y coordinate
+   * @param {number} lineHeight - Line height in pixels
+   * @param {Object} attrs - Additional attributes { fill, fontSize, fontWeight, fontFamily }
+   * @returns {SVGTextElement}
    */
-  window.segCreateWrappedText = function(parent, text, x, y, maxChars, attrs) {
-    var NS = 'http://www.w3.org/2000/svg';
-    var lines = window.segWrapTextLines(text, maxChars);
-    var lineHeight = parseInt((attrs && attrs['font-size']) || '14', 10) * 1.3;
-    var textEl = document.createElementNS(NS, 'text');
-    if (attrs) {
-      for (var key in attrs) {
-        if (attrs.hasOwnProperty(key)) {
-          textEl.setAttribute(key, attrs[key]);
-        }
-      }
-    }
+  window.segCreateWrappedText = function(ns, lines, x, startY, lineHeight, attrs) {
+    attrs = attrs || {};
+    var textEl = document.createElementNS(ns, 'text');
+    textEl.setAttribute('x', x);
+    textEl.setAttribute('y', startY);
+    textEl.setAttribute('fill', attrs.fill || '#1e293b');
+    textEl.setAttribute('font-size', attrs.fontSize || '14');
+    textEl.setAttribute('font-weight', attrs.fontWeight || '400');
+    textEl.setAttribute('font-family', attrs.fontFamily || '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
+
     for (var i = 0; i < lines.length; i++) {
-      var tspan = document.createElementNS(NS, 'tspan');
+      var tspan = document.createElementNS(ns, 'tspan');
       tspan.setAttribute('x', x);
-      tspan.setAttribute('y', y + i * lineHeight);
+      if (i > 0) tspan.setAttribute('dy', lineHeight);
       tspan.textContent = lines[i];
       textEl.appendChild(tspan);
     }
-    parent.appendChild(textEl);
-    return lines.length * lineHeight;
+    return textEl;
+  };
+
+  // ==========================================================================
+  // Insight editor functions
+  // ==========================================================================
+
+  /**
+   * Toggle the insight editor for a section.
+   * @param {string} sectionKey - Section key (e.g., 'importance')
+   * @param {string} prefix - ID prefix (optional)
+   */
+  window.segToggleInsight = function(sectionKey, prefix) {
+    prefix = prefix || '';
+    var container = document.getElementById(prefix + 'seg-insight-container-' + sectionKey);
+    var toggle = document.getElementById(prefix + 'seg-insight-toggle-' + sectionKey);
+    if (!container) return;
+
+    var isHidden = container.style.display === 'none' || container.style.display === '';
+    container.style.display = isHidden ? 'block' : 'none';
+    if (toggle) toggle.style.display = isHidden ? 'none' : '';
+
+    // Focus the editor when opening
+    if (isHidden) {
+      var editor = container.querySelector('.seg-insight-editor');
+      if (editor) editor.focus();
+    }
+  };
+
+  /**
+   * Sync insight text (called on editor input).
+   * No-op during editing — text lives in the contentEditable div.
+   * Actual persistence happens when the page is saved.
+   * @param {string} sectionKey
+   * @param {string} prefix
+   */
+  window.segSyncInsight = function(sectionKey, prefix) {
+    // No-op — text is already in the contentEditable div.
+  };
+
+  /**
+   * Dismiss (hide and clear) the insight editor for a section.
+   * @param {string} sectionKey
+   * @param {string} prefix
+   */
+  window.segDismissInsight = function(sectionKey, prefix) {
+    prefix = prefix || '';
+    var container = document.getElementById(prefix + 'seg-insight-container-' + sectionKey);
+    var toggle = document.getElementById(prefix + 'seg-insight-toggle-' + sectionKey);
+    if (container) {
+      var editor = container.querySelector('.seg-insight-editor');
+      if (editor) editor.textContent = '';
+      container.style.display = 'none';
+    }
+    if (toggle) toggle.style.display = '';
+  };
+
+  /**
+   * Sync all insight editors before save.
+   * Insights live in contentEditable divs — they're serialized with the page.
+   */
+  window.segSyncAllInsights = function() {
+    // Insights live in contentEditable divs — serialized with the page.
+  };
+
+  /**
+   * Hydrate insight editors from saved state on page load.
+   * If an editor already has text (from a saved HTML file), show its container.
+   */
+  window.segHydrateInsights = function() {
+    var containers = document.querySelectorAll('.seg-insight-container');
+    for (var i = 0; i < containers.length; i++) {
+      var container = containers[i];
+      var editor = container.querySelector('.seg-insight-editor');
+      if (editor && editor.textContent.trim()) {
+        container.style.display = 'block';
+        // Hide the toggle button since the editor is visible
+        var area = container.closest('.seg-insight-area');
+        if (area) {
+          var toggle = area.querySelector('.seg-insight-toggle');
+          if (toggle) toggle.style.display = 'none';
+        }
+      }
+    }
   };
 })();

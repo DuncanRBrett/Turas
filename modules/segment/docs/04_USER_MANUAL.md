@@ -416,7 +416,7 @@ result <- turas_segment_from_config("config/my_segmentation.xlsx")
 
 5. **If you need to refine:** Update your config -- remove weak variables from `clustering_vars`, adjust `k_min`/`k_max`, try a different method -- and re-run Step 1. Repeat until you are satisfied.
 
-> **Tip:** Exploration mode works with all methods (K-Means, Hierarchical, GMM, LCA). You can also test multiple methods at once by setting `method = kmeans,hclust,gmm`.
+> **Tip:** Exploration mode works with all methods (K-Means, Hierarchical, GMM, LCA). You can also test multiple methods at once by setting `method = kmeans,hclust,gmm`. Note that LCA is not a `method` value -- to include LCA, set `use_lca = TRUE` separately.
 
 ---
 
@@ -430,7 +430,7 @@ result <- turas_segment_from_config("config/my_segmentation.xlsx")
 Setting          | Value                | Notes
 -----------------|----------------------|------------------------------
 k_fixed          | 4                    | Your chosen number of segments
-auto_name_style  | descriptive          | Auto-generate meaningful names (or "persona", "emoji", "simple")
+auto_name_style  | descriptive          | Auto-generate meaningful names (or "persona", "simple")
 html_report      | TRUE                 | Generate HTML report (optional -- see shortcut below)
 ```
 

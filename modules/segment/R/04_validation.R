@@ -312,8 +312,11 @@ calculate_exploration_metrics <- function(exploration_result) {
     k <- as.numeric(k_str)
     result_k <- cluster_results[[k_str]]
 
-    # Extract cluster assignments - from result structure or model
-    cluster_assignments <- result_k$clusters %||% result_k$model$cluster
+    # Extract cluster assignments - from result structure, model, or raw kmeans
+    # result_k$clusters: wrapped result structure
+    # result_k$model$cluster: wrapped result with nested model
+    # result_k$cluster: raw kmeans object passed directly
+    cluster_assignments <- result_k$clusters %||% result_k$model$cluster %||% result_k$cluster
     if (is.null(cluster_assignments)) next
 
     # Calculate silhouette
@@ -325,7 +328,8 @@ calculate_exploration_metrics <- function(exploration_result) {
     min_size_pct <- min(prop.table(sizes)) * 100
 
     # Extract SS metrics from model or method_info
-    model <- result_k$model
+    # When result_k is a raw kmeans object, it IS the model
+    model <- if (!is.null(result_k$model)) result_k$model else result_k
     method_info <- result_k$method_info
 
     totss <- model$totss %||% method_info$totss

@@ -120,8 +120,8 @@ test_that("method_info contains linkage, engine, dendrogram, cophenetic_correlat
   expect_true(!is.null(mi$dendrogram))
   expect_true(!is.null(mi$cophenetic_correlation))
 
-  # Linkage should match what we requested
-  expect_equal(mi$linkage, "ward.d2")
+  # Linkage should match what we requested (proper casing restored by source)
+  expect_equal(mi$linkage, "ward.D2")
 
   # Engine should be a string
 

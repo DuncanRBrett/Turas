@@ -86,7 +86,7 @@ test_that("guard handles empty warnings list", {
 test_that("large k relative to n is handled by sample size guard", {
   # k=10 with n=25 should be refused
   expect_error(
-    guard_require_sample_size(n = 25, k = 10, p = 5),
+    guard_require_sample_size(n_cases = 25, k = 10, n_vars = 5),
     class = "turas_refusal"
   )
 })

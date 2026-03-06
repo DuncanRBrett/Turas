@@ -40,18 +40,36 @@ generate_segment_test_data <- function(n = 300, k_true = 3, n_vars = 10,
     shift <- (i - 1) * 2
     centers[i, ] <- rep(5, n_vars)  # Base value at 5 (scale 1-10)
 
-    # Create distinct signatures
+    # Create distinct signatures (guard indices against n_vars)
     if (i == 1) {
-      centers[i, 1:4] <- c(8, 7, 8, 7)   # High on vars 1-4
-      centers[i, 5:7] <- c(3, 3, 4)       # Low on vars 5-7
+      idx_1_4 <- 1:min(4, n_vars)
+      centers[i, idx_1_4] <- c(8, 7, 8, 7)[seq_along(idx_1_4)]
+      if (n_vars >= 5) {
+        idx_5_7 <- 5:min(7, n_vars)
+        centers[i, idx_5_7] <- c(3, 3, 4)[seq_along(idx_5_7)]
+      }
     } else if (i == 2) {
-      centers[i, 1:4] <- c(3, 4, 3, 4)   # Low on vars 1-4
-      centers[i, 5:7] <- c(8, 7, 8)       # High on vars 5-7
-      centers[i, 8:10] <- c(7, 6, 7)      # Moderate-high on vars 8-10
+      idx_1_4 <- 1:min(4, n_vars)
+      centers[i, idx_1_4] <- c(3, 4, 3, 4)[seq_along(idx_1_4)]
+      if (n_vars >= 5) {
+        idx_5_7 <- 5:min(7, n_vars)
+        centers[i, idx_5_7] <- c(8, 7, 8)[seq_along(idx_5_7)]
+      }
+      if (n_vars >= 8) {
+        idx_8_10 <- 8:min(10, n_vars)
+        centers[i, idx_8_10] <- c(7, 6, 7)[seq_along(idx_8_10)]
+      }
     } else if (i == 3) {
-      centers[i, 1:4] <- c(5, 5, 5, 5)   # Average on vars 1-4
-      centers[i, 5:7] <- c(5, 5, 5)       # Average on vars 5-7
-      centers[i, 8:10] <- c(2, 3, 2)      # Low on vars 8-10
+      idx_1_4 <- 1:min(4, n_vars)
+      centers[i, idx_1_4] <- c(5, 5, 5, 5)[seq_along(idx_1_4)]
+      if (n_vars >= 5) {
+        idx_5_7 <- 5:min(7, n_vars)
+        centers[i, idx_5_7] <- c(5, 5, 5)[seq_along(idx_5_7)]
+      }
+      if (n_vars >= 8) {
+        idx_8_10 <- 8:min(10, n_vars)
+        centers[i, idx_8_10] <- c(2, 3, 2)[seq_along(idx_8_10)]
+      }
     }
   }
 
@@ -67,8 +85,8 @@ generate_segment_test_data <- function(n = 300, k_true = 3, n_vars = 10,
       cluster_data[, j] <- rnorm(ni, mean = centers[i, j], sd = 1.0)
     }
 
-    # Clamp to 1-10 scale
-    cluster_data <- pmax(1, pmin(10, cluster_data))
+    # Clamp to 1-10 scale (preserve matrix dimensions lost by pmax/pmin)
+    cluster_data[] <- pmax(1, pmin(10, cluster_data))
 
     data_list[[i]] <- cluster_data
     true_clusters <- c(true_clusters, rep(i, ni))
@@ -83,10 +101,17 @@ generate_segment_test_data <- function(n = 300, k_true = 3, n_vars = 10,
     for (j in seq_len(n_vars)) {
       outlier_data[, j] <- runif(n_outliers, min = 0, max = 10)
     }
-    # Make outliers extreme on some variables
-    outlier_data[1, 1:3] <- c(10, 10, 10)
-    outlier_data[2, 5:7] <- c(1, 1, 1)
-    if (n_outliers >= 3) outlier_data[3, 8:10] <- c(10, 10, 10)
+    # Make outliers extreme on some variables (guard indices against n_vars)
+    idx_1_3 <- 1:min(3, n_vars)
+    outlier_data[1, idx_1_3] <- 10
+    if (n_vars >= 5) {
+      idx_5_7 <- 5:min(7, n_vars)
+      outlier_data[2, idx_5_7] <- 1
+    }
+    if (n_outliers >= 3 && n_vars >= 8) {
+      idx_8_10 <- 8:min(10, n_vars)
+      outlier_data[3, idx_8_10] <- 10
+    }
 
     numeric_data <- rbind(numeric_data, outlier_data)
     true_clusters <- c(true_clusters, rep(NA_integer_, n_outliers))

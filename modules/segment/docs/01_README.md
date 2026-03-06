@@ -89,8 +89,8 @@ Update config: `k_fixed = 4` then re-run.
 
 **Outputs:**
 - `seg_assignments.xlsx` - Respondent ID + segment_id + segment_name (+ probabilities if method = gmm or lca)
-- `seg_final_report.xlsx` - Comprehensive multi-tab report
-- `seg_final_report.html` - Interactive HTML report with SVG charts and navigation
+- `seg_segmentation_report.xlsx` - Comprehensive multi-tab report
+- `seg_segmentation_report.html` - Interactive HTML report with SVG charts and navigation
 - `seg_model.rds` - Saved model for scoring new data
 
 ---
@@ -121,7 +121,8 @@ modules/segment/
 │   ├── 09_output.R                   # Excel export functions
 │   ├── 10_utilities.R                # Utilities & quick run
 │   ├── 11_lca.R                      # Latent Class Analysis
-│   └── 12_executive_summary.R        # Auto-generated narrative summary
+│   ├── 12_executive_summary.R        # Auto-generated narrative summary
+│   └── 13_vulnerability.R           # Segment vulnerability/switching analysis
 ├── lib/                               # Supporting libraries
 │   ├── html_report/                   # HTML report pipeline
 │   │   ├── 00_html_guard.R           # HTML input validation
@@ -166,25 +167,25 @@ modules/segment/
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `method` | kmeans | Clustering algorithm: `kmeans`, `hclust`, `gmm`, `lca`, or comma-separated for multi-method comparison (e.g., `kmeans,hclust,gmm,lca` or `all`) |
+| `method` | kmeans | Clustering algorithm: `kmeans`, `hclust`, `gmm`, or comma-separated for multi-method comparison (e.g., `kmeans,hclust,gmm` or `all` which expands to `kmeans,hclust,gmm`). LCA is not a `method` value -- use `use_lca = TRUE` separately. |
 | `k_fixed` | (blank) | Fixed k for final run; blank = exploration |
 | `k_min` | 3 | Minimum k to test in exploration |
 | `k_max` | 6 | Maximum k to test |
 | `linkage_method` | ward.D2 | Linkage for hclust: ward.D2, complete, average, etc. |
 | `gmm_model_type` | (auto) | GMM covariance structure: VVV, EEE, etc. (NULL = auto) |
-| `lca_n_classes` | (from k) | Number of latent classes (defaults to k_fixed or k_min:k_max range) |
-| `lca_max_iter` | 1000 | Maximum EM iterations for LCA |
-| `lca_n_rep` | 10 | Number of random starts for LCA |
+| `lca_n_classes` | (from k) | Number of latent classes (requires `use_lca = TRUE`; defaults to k_fixed or k_min:k_max range) |
+| `lca_max_iter` | 1000 | Maximum EM iterations for LCA (requires `use_lca = TRUE`) |
+| `lca_n_rep` | 10 | Number of random starts for LCA (requires `use_lca = TRUE`) |
 | `missing_data` | listwise_deletion | How to handle missing data |
 | `standardize` | TRUE | Standardize variables before clustering |
 | `outlier_detection` | FALSE | Enable outlier detection |
 | `variable_selection` | FALSE | Enable automatic variable selection |
-| `html_report` | TRUE | Generate interactive HTML report |
+| `html_report` | FALSE | Generate interactive HTML report |
 | `brand_colour` | #323367 | Primary brand colour for HTML report |
 | `accent_colour` | #CC9900 | Accent colour for HTML report |
 | `report_title` | (auto) | Title for HTML report header |
 | `generate_rules` | FALSE | Generate classification rules |
-| `generate_action_cards` | TRUE | Generate segment action cards |
+| `generate_action_cards` | FALSE | Generate segment action cards |
 | `run_stability_check` | FALSE | Run stability assessment |
 
 See [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) for complete parameter list.

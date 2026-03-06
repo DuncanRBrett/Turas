@@ -200,7 +200,12 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
     htmltools::tags$button(
       class = "seg-report-tab-btn",
       `data-tab` = "pinned",
-      "Pinned Views"
+      "Pinned Views",
+      htmltools::tags$span(
+        id = "seg-pin-count-badge",
+        class = "seg-pin-count-badge",
+        style = "display:none;"
+      )
     )
   )
 
@@ -1229,9 +1234,26 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 
 .seg-saved-badge {
   display: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
   font-size: 11px;
   color: var(--seg-text-faint);
   font-weight: 400;
+}
+
+.seg-pin-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--seg-accent);
+  color: white;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 6px;
 }
 
 /* ================================================================ */

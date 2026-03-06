@@ -64,7 +64,7 @@ Both templates use a consistent structure:
 - **Purpose:** Sheet name in Excel file
 - **Required:** No (only for Excel files)
 - **Data Type:** Text
-- **Default:** First sheet
+- **Default:** Data
 - **Example:** `Data`
 
 #### id_variable
@@ -102,20 +102,21 @@ Both templates use a consistent structure:
 - **Purpose:** Clustering algorithm
 - **Required:** No
 - **Default:** `kmeans`
-- **Valid Values:** `kmeans`, `hclust`, `gmm`, `lca`, comma-separated list (e.g., `kmeans,hclust,gmm,lca`), or `all`
+- **Valid Values:** `kmeans`, `hclust`, `gmm`, comma-separated list (e.g., `kmeans,hclust,gmm`), or `all`
 - **Notes:**
   - `kmeans` - K-means clustering (default, fast, scalable)
   - `hclust` - Hierarchical agglomerative clustering (dendrogram, limited to ~15k rows)
   - `gmm` - Gaussian Mixture Models via mclust (soft assignments, requires `mclust` package)
-  - `lca` - Latent Class Analysis via poLCA (categorical/ordinal data, probabilistic, requires `poLCA` package)
-  - Comma-separated values (e.g., `kmeans,hclust,gmm,lca`) or `all` - Run multiple methods and produce a combined tabbed HTML report with per-method results and a comparison tab
+  - `all` expands to `kmeans,hclust,gmm`
+  - Comma-separated values (e.g., `kmeans,hclust,gmm`) or `all` - Run multiple methods and produce a combined tabbed HTML report with per-method results and a comparison tab
+  - **LCA** is not a `method` value. To include LCA, set `use_lca = TRUE` separately.
 
 #### k_fixed
 
 - **Purpose:** Fixed number of segments
 - **Required:** No (blank = exploration mode)
 - **Data Type:** Integer or blank
-- **Valid Values:** 2-10 or blank
+- **Valid Values:** 2 or greater, or blank
 - **Logic:**
   - **Blank** = Exploration mode (tests k_min to k_max)
   - **Number** = Final mode (uses this k)
@@ -134,7 +135,7 @@ Both templates use a consistent structure:
 - **Purpose:** Maximum k to test (exploration mode)
 - **Required:** Only for exploration mode
 - **Data Type:** Integer
-- **Valid Values:** 2-10
+- **Valid Values:** 2-15
 - **Default:** `6`
 
 #### nstart
@@ -143,7 +144,7 @@ Both templates use a consistent structure:
 - **Required:** No
 - **Data Type:** Integer
 - **Valid Values:** 1-200
-- **Default:** `25`
+- **Default:** `50`
 - **Notes:** Higher = more stable but slower. Only applies to K-means.
 
 #### seed
@@ -338,7 +339,7 @@ Both templates use a consistent structure:
 - **Purpose:** Target number of variables to keep
 - **Required:** Only if variable_selection = TRUE
 - **Data Type:** Integer
-- **Valid Values:** 5-20
+- **Valid Values:** 2-20
 - **Default:** `10`
 
 #### varsel_min_variance
@@ -431,8 +432,8 @@ Both templates use a consistent structure:
 - **Purpose:** Enable or disable HTML report generation
 - **Required:** No
 - **Data Type:** TRUE/FALSE
-- **Default:** `TRUE`
-- **Notes:** Set to FALSE to skip HTML output entirely and only produce Excel files
+- **Default:** `FALSE`
+- **Notes:** Set to TRUE to generate an interactive HTML report in addition to Excel files
 
 #### brand_colour
 
@@ -499,7 +500,7 @@ Both templates use a consistent structure:
 - **Purpose:** Show Classification Rules section
 - **Required:** No
 - **Data Type:** TRUE/FALSE
-- **Default:** `FALSE`
+- **Default:** `TRUE`
 - **Notes:** Requires `generate_rules = TRUE` for rules data to be available
 
 #### html_show_cards
@@ -541,7 +542,7 @@ Both templates use a consistent structure:
 - **Purpose:** Generate executive-ready segment action cards
 - **Required:** No
 - **Data Type:** TRUE/FALSE
-- **Default:** `TRUE`
+- **Default:** `FALSE`
 - **Notes:** Cards include strengths, pain points, and recommended actions.
 
 #### run_stability_check
@@ -557,8 +558,8 @@ Both templates use a consistent structure:
 - **Purpose:** Number of runs for stability assessment
 - **Required:** No (only used if run_stability_check = TRUE)
 - **Data Type:** Integer
-- **Valid Values:** 5-50
-- **Default:** `10`
+- **Valid Values:** 3-20
+- **Default:** `5`
 
 #### auto_name_style
 
@@ -566,11 +567,11 @@ Both templates use a consistent structure:
 - **Required:** No
 - **Data Type:** Text
 - **Default:** `descriptive`
-- **Valid Values:** `descriptive`, `numeric`, `letter`
+- **Valid Values:** `descriptive`, `persona`, `simple`
 - **Notes:**
   - `descriptive` - Generate names based on segment characteristics (e.g., "High Satisfaction Advocates")
-  - `numeric` - Simple numbering (Segment 1, Segment 2, ...)
-  - `letter` - Letter labels (Segment A, Segment B, ...)
+  - `persona` - Generate persona-style names
+  - `simple` - Simple labels
 
 ---
 
@@ -602,11 +603,10 @@ Both templates use a consistent structure:
 
 | File | Content |
 |------|---------|
-| seg_exploration_report.xlsx | Metrics_Comparison, Recommendation, Profile_k3, Profile_k4, ... |
+| seg_k_selection_report.xlsx | Metrics_Comparison, Recommendation, Profile_k3, Profile_k4, ... |
 | seg_exploration_report.html | Interactive HTML with elbow plot, silhouette chart, solution previews |
 | seg_segment_profiles_k3.xlsx | Profiles, Statistics |
 | seg_segment_profiles_k4.xlsx | Profiles, Statistics |
-| seg_k_selection.png | Elbow and silhouette plots |
 | seg_model.rds | Saved model object |
 
 ### Final Mode Output
@@ -616,8 +616,6 @@ Both templates use a consistent structure:
 | seg_final_report.xlsx | Summary, Profiles, Statistics, Validation |
 | seg_final_report.html | Interactive HTML with all configured sections |
 | seg_assignments.xlsx | ID + segment_id + segment_name (+ probabilities if GMM or LCA) |
-| seg_profiles_heatmap.png | Visual profile comparison |
-| seg_segment_sizes.png | Size distribution |
 | seg_model.rds | Saved model object |
 
 ### Assignments File Detail
@@ -861,10 +859,10 @@ html_show_guide          | FALSE
 | data_file | File must exist, valid format |
 | id_variable | Column must exist in data |
 | clustering_vars | All columns must exist, must be numeric |
-| k_fixed | Integer 2-10 or blank |
+| k_fixed | Integer 2 or greater, or blank |
 | k_min | Integer 2-10, less than k_max |
 | k_max | Integer 2-10, greater than k_min |
-| method | One of: kmeans, hclust, gmm, lca, comma-separated list, or all |
+| method | One of: kmeans, hclust, gmm, comma-separated list, or all |
 | nstart | Integer 1-200 |
 | linkage_method | One of: ward.D, ward.D2, single, complete, average, mcquitty, median, centroid |
 | gmm_model_type | Valid mclust model name or blank |
@@ -888,18 +886,18 @@ html_show_guide          | FALSE
 ### Sample Size Validation
 
 ```
-Minimum n = max(50, 30 * k_max)
+Minimum n = max(100, k * 30, n_vars * 10)
 
 Examples:
-- k_max = 4 -> need >= 120 complete cases
-- k_max = 6 -> need >= 180 complete cases
+- k = 4, n_vars = 7  -> need >= max(100, 120, 70) = 120 complete cases
+- k = 6, n_vars = 12 -> need >= max(100, 180, 120) = 180 complete cases
 ```
 
 ### Variable Requirements
 
 | Rule | Message |
 |------|---------|
-| At least 3 clustering vars | "Need at least 3 clustering variables" |
+| At least 2 clustering vars | "Need at least 2 clustering variables" |
 | Maximum 50 clustering vars | "Maximum 50 clustering variables" |
 | All vars numeric | "Variable 'X' must be numeric" |
 | No zero variance | "Variable 'X' has zero variance" |
