@@ -38,7 +38,10 @@ create_weight_config_template <- function(output_path = NULL) {
       "html_report",
       "html_report_file",
       "brand_colour",
-      "accent_colour"
+      "accent_colour",
+      "researcher_name",
+      "client_name",
+      "logo_file"
     ),
     Value = c(
       "My_Project",
@@ -49,7 +52,10 @@ create_weight_config_template <- function(output_path = NULL) {
       "Y",
       "output/weighting_report.html",
       "#1e3a5f",
-      "#2aa198"
+      "#2aa198",
+      "",
+      "",
+      ""
     ),
     Description = c(
       "Project identifier for reporting",
@@ -60,7 +66,10 @@ create_weight_config_template <- function(output_path = NULL) {
       "Generate self-contained HTML report? (Y/N)",
       "Path for HTML report (auto-generated if blank)",
       "Brand hex colour for HTML report (optional)",
-      "Accent hex colour for HTML report (optional)"
+      "Accent hex colour for HTML report (optional)",
+      "Researcher/analyst name shown in report header (optional)",
+      "Client name shown in report header (optional)",
+      "Path to logo image for report header (PNG/JPG/SVG, optional)"
     ),
     stringsAsFactors = FALSE
   )
@@ -215,6 +224,9 @@ create_weight_config_template <- function(output_path = NULL) {
     "   - html_report_file: Path for HTML report (auto-generated if blank)",
     "   - brand_colour: Hex colour for report branding (optional)",
     "   - accent_colour: Hex accent colour for report (optional)",
+    "   - researcher_name: Researcher/analyst name for report header (optional)",
+    "   - client_name: Client name for report header (optional)",
+    "   - logo_file: Path to logo image for report header (optional)",
     "",
     "2. Weight_Specifications - Define each weight to calculate",
     "   - weight_name: Unique name for the weight column",

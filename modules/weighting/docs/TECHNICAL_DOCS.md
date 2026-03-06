@@ -32,20 +32,21 @@ The TURAS Weighting Module follows these design principles:
 ```
 Config File → Config Loader → Validator → Weight Calculator → Trimmer → Diagnostics → Output
      ↓              ↓            ↓              ↓              ↓            ↓           ↓
-   Excel       Structured     Validated    Raw Weights   Trimmed Wts   Quality    Data + Report
-                 Config         Data                                   Metrics
+   Excel       Structured     Validated    Raw Weights   Trimmed Wts   Quality    Data + Reports
+                 Config         Data                                   Metrics    (Excel + HTML)
 ```
 
 ### 1.3 Dependencies
 
 **Required:**
 - readxl: Excel file reading
-- dplyr: Data manipulation
 - openxlsx: Excel writing
 - survey: Rim weighting/calibration (required if method=rim)
 
 **Optional:**
 - haven: SPSS file reading
+- htmltools: HTML report generation
+- base64enc: Logo embedding in HTML report
 
 ---
 
@@ -63,16 +64,37 @@ modules/weighting/
 │   ├── validation.R             # Input validation
 │   ├── design_weights.R         # Design weight calculation
 │   ├── rim_weights.R            # Rim weighting (survey::calibrate)
+│   ├── cell_weights.R           # Cell/interlocked weights
 │   ├── trimming.R               # Weight capping/trimming
 │   ├── diagnostics.R            # Quality diagnostics
-│   └── output.R                 # Report generation
+│   ├── output.R                 # Excel report generation
+│   └── html_report/             # HTML report pipeline
+│       ├── 00_html_guard.R      # Input validation
+│       ├── 01_data_transformer.R # Transform results for HTML
+│       ├── 02_table_builder.R   # Plain HTML tables
+│       ├── 03_page_builder.R    # Full page assembly (CSS, header, tabs, JS)
+│       ├── 04_html_writer.R     # Self-contained HTML writer
+│       ├── 05_chart_builder.R   # Inline SVG charts
+│       ├── 99_html_report_main.R # Orchestrator
+│       └── js/
+│           └── weighting_navigation.js  # Tab switching + save
 ├── docs/
-│   ├── USER_GUIDE.md            # End-user documentation
+│   ├── TECHNICAL_DOCS.md        # This file (developer reference)
 │   ├── TEMPLATE_REFERENCE.md    # Config file specification
-│   └── TECHNICAL_DOCS.md        # This file
+│   └── CONFIG_EXAMPLE.md        # Configuration guide with examples
 ├── templates/
-│   └── create_template.R        # Template generator
-└── README.txt                   # Quick reference
+│   ├── create_template.R        # Template generator
+│   └── Weight_Config_Template.xlsx  # Generated template
+├── examples/
+│   ├── example1_design_weights/ # Design weight walkthrough
+│   ├── example2_rim_weights/    # Rim weight walkthrough
+│   ├── example3_combined_weights/ # Design + Rim combined
+│   └── example4_cell_weights/   # Cell/interlocked weights
+├── tests/
+│   ├── testthat.R               # Test runner
+│   ├── testthat/                # 306 tests
+│   └── fixtures/                # Synthetic test data
+└── README.md                    # Primary user documentation
 ```
 
 ### 2.2 Function Naming Conventions
@@ -85,7 +107,8 @@ modules/weighting/
 | `calculate_*` | Core calculations | `calculate_design_weights()` |
 | `apply_*` | Transformations | `apply_trimming_from_config()` |
 | `get_*` | Accessors | `get_weight_spec()` |
-| `print_*` | Output formatting | `print_rim_summary()` |
+| `build_*` | HTML builders | `build_summary_table()` |
+| `generate_*` | Report generators | `generate_weighting_html_report()` |
 
 ### 2.3 Source Order
 
@@ -96,9 +119,11 @@ Files must be sourced in dependency order:
 3. config_loader.R (uses validation.R)
 4. design_weights.R (uses validation.R, config_loader.R)
 5. rim_weights.R (uses validation.R, config_loader.R)
-6. trimming.R (standalone)
-7. diagnostics.R (standalone)
-8. output.R (uses diagnostics.R)
+6. cell_weights.R (uses validation.R, config_loader.R)
+7. trimming.R (standalone)
+8. diagnostics.R (standalone)
+9. output.R (uses diagnostics.R)
+10. html_report/99_html_report_main.R (sources its own submodules)
 
 ---
 
@@ -116,7 +141,10 @@ Files must be sourced in dependency order:
 5. Parse Weight_Specifications with validation
 6. Load Design_Targets if any design weights
 7. Load Rim_Targets if any rim weights
-8. Load Advanced_Settings if present
+8. Load Cell_Targets if any cell weights
+9. Load Advanced_Settings if present
+10. Load Notes if present
+11. Parse HTML report settings
 
 **Return Value:**
 ```r
@@ -124,16 +152,25 @@ list(
   general = list(
     project_name = "...",
     data_file = "...",
-    data_file_resolved = "...",  # Absolute path
+    data_file_resolved = "...",       # Absolute path
     output_file_resolved = "...",
     save_diagnostics = TRUE/FALSE,
+    html_report = TRUE/FALSE,
+    html_report_file_resolved = "...",
+    brand_colour = "#1e3a5f",
+    accent_colour = "#2aa198",
+    researcher_name = "...",          # or NULL
+    client_name = "...",              # or NULL
+    logo_file_resolved = "...",       # or NULL
     project_root = "..."
   ),
   weight_specifications = data.frame(...),
-  design_targets = data.frame(...),  # or NULL
-  rim_targets = data.frame(...),     # or NULL
+  design_targets = data.frame(...),     # or NULL
+  rim_targets = data.frame(...),        # or NULL
+  cell_targets = data.frame(...),       # or NULL
   advanced_settings = data.frame(...),  # or NULL
-  config_file = "..."  # Absolute path
+  notes = data.frame(...),             # or NULL
+  config_file = "..."                  # Absolute path
 )
 ```
 
@@ -146,22 +183,8 @@ list(
 | `validate_weight_spec()` | Validate single weight specification |
 | `validate_design_config()` | Validate design targets against data |
 | `validate_rim_config()` | Validate rim targets against data |
+| `validate_cell_config()` | Validate cell targets against data |
 | `validate_calculated_weights()` | Post-calculation quality check |
-
-**Validation Pattern:**
-```r
-validation <- validate_design_config(data, targets, weight_name)
-if (!validation$valid) {
-  # Use TRS refusal
-  turas_refuse(
-    code = "CFG_INVALID_DESIGN_TARGETS",
-    title = "Invalid Design Weight Configuration",
-    problem = validation$errors[1],
-    why_it_matters = "Cannot calculate weights without valid targets",
-    how_to_fix = "Review and correct the Design_Targets sheet"
-  )
-}
-```
 
 ### 3.3 Design Weights (design_weights.R)
 
@@ -171,146 +194,77 @@ if (!validation$valid) {
 ```
 For each stratum s:
   weight[s] = population_size[s] / sample_size[s]
-
-Where:
-  sample_size[s] = count of rows where stratum_variable == s
-```
-
-**Return Value:**
-```r
-list(
-  weights = numeric_vector,  # Length = nrow(data)
-  validation = list(...),
-  stratum_summary = data.frame(
-    stratum, population_size, sample_size, weight
-  ),
-  stratum_variable = "..."
-)
 ```
 
 ### 3.4 Rim Weights (rim_weights.R)
 
-**Primary Function:** `calculate_rim_weights(data, target_list, base_weights = NULL, max_iterations = 50, convergence_tolerance = 1e-7, cap_weights = c(0.3, 3.0), calibration_method = "raking", verbose = FALSE)`
+**Primary Function:** `calculate_rim_weights(data, target_list, ...)`
 
-**Algorithm:** Uses survey package's calibrate() function for modern calibration.
-
-**v2.0 Implementation (survey::calibrate):**
-```r
-# Set up starting weights (base weights or unit weights)
-if (is.null(base_weights)) {
-  starting_weights <- rep(1, nrow(data))
-} else {
-  starting_weights <- base_weights  # For rim-on-design weighting
-}
-
-# Create survey design with starting weights
-svy_design <- survey::svydesign(
-  ids = ~1,
-  data = data,
-  weights = starting_weights
-)
-
-# Build calibration formula and population margins
-formula <- as.formula(paste("~", paste(names(target_list), collapse = " + ")))
-base_n <- sum(starting_weights)  # CRITICAL: Uses actual sample, not hard-coded 1000
-population <- c("(Intercept)" = base_n, ...)  # Target totals
-
-# Calibrate with bounds DURING fitting
-calibrated <- survey::calibrate(
-  design = svy_design,
-  formula = formula,
-  population = population,
-  calfun = calibration_method,  # "raking", "linear", or "logit"
-  bounds = cap_weights,         # Applied DURING calibration!
-  maxit = max_iterations,
-  epsilon = convergence_tolerance
-)
-
-weights <- weights(calibrated)
-```
-
-**Key v2.0 Improvements:**
-- Weight bounds applied **DURING** calibration (not after)
-- Multiple calibration methods: raking, linear, logit
-- **Base weights support**: Rim-on-design weighting (calibrate on top of existing weights)
-- Returns full survey design object for variance estimation
-- Better convergence with logit method for bounded weights
-- Uses actual sample size for base_n (not hard-coded 1000)
-
-**Base Weights (Rim-on-Design):**
-When `base_weights` is provided, calibration adjusts those weights rather than starting from 1:
-- Use case: Apply rim weighting on top of existing design weights
-- Final weights = base_weights × g-weights (calibration factors)
-- Returns both final weights and g-weights in result
+Uses `survey::calibrate()` for modern calibration with weight bounds applied during fitting.
 
 **Return Value:**
 ```r
 list(
-  weights = numeric_vector,       # Final weights (full length, NA for excluded)
-  g_weights = numeric_vector,     # Calibration factors (final/base)
-  converged = logical,            # TRUE if we got here (survey errors otherwise)
-  iterations = NA_integer_,       # survey doesn't expose iteration count
-  margins = data.frame(
-    variable, category, target_pct, achieved_pct, diff_pct
-  ),
-  design = survey.design,         # Full design object for variance estimation
-  diagnostics = list(...)         # n_total, n_used, n_excluded, sum_weights, etc.
+  weights = numeric_vector,
+  g_weights = numeric_vector,     # Calibration factors
+  converged = logical,
+  margins = data.frame(variable, category, target_pct, achieved_pct, diff_pct),
+  design = survey.design,         # Full design object
+  diagnostics = list(...)
 )
 ```
 
-### 3.5 Trimming (trimming.R)
+### 3.5 Cell Weights (cell_weights.R)
 
-**Primary Function:** `trim_weights(weights, method, value, verbose)`
+**Primary Function:** `calculate_cell_weights(data, cell_targets, cell_variables, verbose)`
 
-**Methods:**
-
-| Method | Formula | Example |
-|--------|---------|---------|
-| cap | `weights[weights > value] <- value` | Cap at 5 |
-| percentile | `threshold <- quantile(weights, value)` | Cap at 95th %ile |
+**Algorithm:**
+```
+For each cell c (combination of variable levels):
+  weight[c] = (target_proportion * N) / cell_count
+```
 
 **Return Value:**
 ```r
 list(
-  weights = trimmed_vector,
-  n_trimmed = integer,
-  original_max = numeric,
-  new_max = numeric,
-  threshold = numeric,
-  method = "cap" or "percentile",
-  pct_trimmed = numeric
+  weights = numeric_vector,
+  cell_summary = data.frame(cell, target_pct, sample_count, sample_pct, weight),
+  cell_variables = character_vector,
+  method = "cell",
+  n_cells_defined = integer,
+  n_cells_empty = integer,
+  n_unmatched = integer
 )
 ```
 
-### 3.6 Diagnostics (diagnostics.R)
+### 3.6 HTML Report Pipeline (lib/html_report/)
 
-**Primary Function:** `diagnose_weights(weights, label, rim_result, trimming_result, save_to_file, verbose)`
+**Entry Point:** `generate_weighting_html_report(weighting_results, output_path, config)`
 
-**Metrics Calculated:**
+**Pipeline:**
+1. **Guard** (00_html_guard.R) - Validate inputs and htmltools availability
+2. **Transform** (01_data_transformer.R) - Convert run_weighting() output to HTML-ready structures
+3. **Tables** (02_table_builder.R) - Build summary, diagnostics, margins, strata, cell tables
+4. **Charts** (05_chart_builder.R) - Build inline SVG histograms and quality gauges
+5. **Page** (03_page_builder.R) - Assemble CSS, header, 3-tab layout, footer, JS
+6. **Writer** (04_html_writer.R) - Render to self-contained HTML via htmltools
 
-| Metric | Formula | Interpretation |
-|--------|---------|----------------|
-| Effective N | (Σw)² / Σw² | Usable sample size |
-| Design Effect | n / n_eff | Variance inflation factor |
-| Efficiency | n_eff / n × 100 | Percent of sample retained |
-| CV | SD(w) / mean(w) | Weight variability |
+**Report Tabs:**
+- **Summary** - All weights overview, quality gauges, key metrics
+- **Weight Details** - Per-weight histograms (with explanatory callout), diagnostics (with metric definitions), margins/strata/cells
+- **Method Notes** - Auto-generated method documentation + analyst notes from config + editable comments box
+- **Save Report** - Tab-bar button to download the HTML report (preserves editable comments)
 
-**Quality Assessment:**
-```r
-status <- "GOOD"
+**Header Features:**
+- Custom logo (base64-embedded from `logo_file` config setting)
+- "Prepared by [researcher] for [client]" line (from `researcher_name` / `client_name` settings)
+- Project name, record count, weight count, generation date badges
 
-if (design_effect > 3) {
-  status <- "POOR"
-  issues <- c(issues, "High design effect (>3)")
-} else if (design_effect > 2) {
-  status <- "ACCEPTABLE"
-  issues <- c(issues, "Moderate design effect")
-}
-
-if (cv > 1.0) {
-  if (status == "GOOD") status <- "ACCEPTABLE"
-  issues <- c(issues, "High weight variability")
-}
+**Hub Integration Meta Tags:**
+```html
+<meta name="turas-report-type" content="weighting">
+<meta name="turas-generated" content="ISO-timestamp">
+<meta name="turas-weights" content="N">
 ```
 
 ---
@@ -318,8 +272,6 @@ if (cv > 1.0) {
 ## 4. Mathematical Methods
 
 ### 4.1 Design Weight Calculation
-
-**Purpose:** Adjust for unequal selection probabilities in stratified samples.
 
 **Formula:**
 ```
@@ -331,80 +283,56 @@ Where:
   n_s = sample size of stratum s
 ```
 
-**Properties:**
-- Weights sum to total population
-- Unbiased for population parameters
-- Higher weights = underrepresented groups
-
 ### 4.2 Rim Weighting (Raking)
 
-**Purpose:** Adjust sample to match multiple marginal distributions simultaneously.
-
 **Algorithm (Iterative Proportional Fitting):**
-
 ```
 Initialize: w_i = 1 for all i
 
 Repeat until convergence:
   For each target variable v:
     For each category c in v:
-      # Current weighted proportion
       p_c = Σ w_i[i in c] / Σ w_i
-
-      # Adjustment factor
       a_c = target_c / p_c
-
-      # Apply adjustment
       w_i[i in c] *= a_c
 
   Check: max(|achieved - target|) < tolerance
 ```
 
-**Convergence:**
-- Algorithm converges when all margins within tolerance
-- May not converge if targets are inconsistent
-- More variables = harder to converge
+### 4.3 Cell Weighting
 
-### 4.3 Effective Sample Size
+**Formula:**
+```
+w_c = (target_pct_c / 100) * N / n_c
 
-**Purpose:** Measure precision loss from weighting.
+Where:
+  w_c = weight for cell c
+  target_pct_c = target percentage for cell c
+  N = total sample size
+  n_c = number of respondents in cell c
+```
 
-**Kish Formula:**
+### 4.4 Effective Sample Size (Kish Formula)
+
 ```
 n_eff = (Σ w_i)² / Σ w_i²
 ```
 
-**Intuition:**
-- Equal weights: n_eff = n
-- Variable weights: n_eff < n
-- Extreme weights: n_eff << n
+### 4.5 Design Effect
 
-### 4.4 Design Effect
-
-**Formula:**
 ```
-DEFF = n / n_eff = Σ w_i² / (Σ w_i)² × n
+DEFF = n / n_eff
 ```
 
-**Interpretation:**
-- DEFF = 1: No effect
-- DEFF = 2: Variance doubled, SE × 1.41
-- DEFF = 3: Variance tripled, SE × 1.73
+- DEFF = 1: No effect (equal weights)
+- DEFF = 2: Variance doubled, SE x 1.41
+- DEFF = 3: Variance tripled, SE x 1.73
 
 ---
 
 ## 5. TRS Compliance
 
-### 5.1 TRS Principles
-
-The module implements TURAS Reliability Standard (TRS) v1.0:
-
-1. **No Silent Failures**: All errors produce actionable messages
-2. **Execution States**: PASS, PARTIAL, REFUSE, ERROR
-3. **Refusal Codes**: Standardized error codes with prefixes
-4. **Guard State**: Track warnings during execution
-
-### 5.2 Refusal Code Prefixes
+### 5.1 Refusal Code Prefixes
 
 | Prefix | Category | Example |
 |--------|----------|---------|
@@ -413,71 +341,18 @@ The module implements TURAS Reliability Standard (TRS) v1.0:
 | IO_ | File/path errors | IO_FILE_NOT_FOUND |
 | MODEL_ | Model fitting errors | MODEL_NO_CONVERGENCE |
 | PKG_ | Missing dependencies | PKG_SURVEY_MISSING |
+| CALC_ | Calculation errors | CALC_PAGE_BUILD_FAILED |
 
-### 5.3 TRS Integration Points
+### 5.2 Shared Infrastructure Used
 
-**Configuration Loading:**
-```r
-if (!file.exists(config_file)) {
-  turas_refuse(
-    code = "IO_CONFIG_NOT_FOUND",
-    title = "Configuration File Not Found",
-    problem = sprintf("Config file not found: %s", config_file),
-    why_it_matters = "Cannot proceed without configuration",
-    how_to_fix = c(
-      "Check the file path is correct",
-      "Ensure the file exists"
-    )
-  )
-}
-```
-
-**Rim Convergence:**
-```r
-# v2.0: survey::calibrate() errors on non-convergence
-tryCatch({
-  calibrated <- survey::calibrate(...)
-}, error = function(e) {
-  turas_refuse(
-    code = "MODEL_RIM_NO_CONVERGENCE",
-    title = "Rim Weighting Did Not Converge",
-    problem = sprintf("Calibration failed: %s", e$message),
-    why_it_matters = "Target margins cannot be achieved with current settings",
-    how_to_fix = c(
-      "Increase max_iterations in Advanced_Settings (try 100)",
-      "Try calibration_method='logit' (better for bounded weights)",
-      "Adjust weight_bounds if needed",
-      "Reduce number of rim variables"
-    )
-  )
-})
-```
-
-### 5.4 Guard State Usage
-
-```r
-guard <- guard_init("WEIGHTING")
-
-# During execution
-if (n_missing > 0) {
-  guard_warn(guard, sprintf("%d missing values in stratum variable", n_missing))
-}
-
-if (design_effect > 2) {
-  guard_flag_stability(guard, "High design effect")
-}
-
-# At end
-summary <- guard_summary(guard)
-if (summary$has_issues) {
-  # Return PARTIAL status
-  return(trs_status_partial(
-    module = "WEIGHTING",
-    degraded_reasons = guard$warnings,
-    affected_outputs = c("weight_column")
-  ))
-}
-```
+| Function | Source | Purpose |
+|----------|--------|---------|
+| `turas_refuse()` | shared/lib/trs_refusal.R | Structured refusals |
+| `with_refusal_handler()` | shared/lib/trs_refusal.R | Wrap entry points |
+| `turas_run_state_new()` | shared/lib/trs_run_state.R | Run tracking |
+| `turas_print_start_banner()` | shared/lib/trs_banner.R | Console output |
+| `turas_save_workbook_atomic()` | shared/lib/turas_save_workbook_atomic.R | Safe Excel write |
+| `turas_excel_escape()` | shared/lib/turas_excel_escape.R | Formula injection prevention |
 
 ---
 
@@ -489,69 +364,48 @@ if (summary$has_issues) {
 run_weighting(config_file)
     │
     ├── load_weighting_config(config_file)
-    │       ├── Validate file exists
-    │       ├── Parse General sheet
-    │       ├── Parse Weight_Specifications
-    │       ├── Parse Design_Targets (if needed)
-    │       ├── Parse Rim_Targets (if needed)
+    │       ├── Parse General, Weight_Specifications
+    │       ├── Parse Design/Rim/Cell_Targets (as needed)
+    │       ├── Parse Advanced_Settings, Notes (if present)
     │       └── Return config object
     │
-    ├── Load survey data
-    │       ├── Detect file format
-    │       ├── Read data
-    │       └── Convert to data.frame
+    ├── Load survey data (CSV/XLSX/SAV)
     │
     ├── For each weight in Weight_Specifications:
-    │       │
-    │       ├── If method == "design":
-    │       │   ├── validate_design_config()
-    │       │   ├── calculate_design_weights_from_config()
-    │       │   └── Store result
-    │       │
-    │       ├── If method == "rim":
-    │       │   ├── validate_rim_config()
-    │       │   ├── calculate_rim_weights_from_config()
-    │       │   └── Store result
-    │       │
-    │       ├── apply_trimming_from_config()
-    │       │
+    │       ├── If method == "design": calculate_design_weights_from_config()
+    │       ├── If method == "rim":    calculate_rim_weights_from_config()
+    │       ├── If method == "cell":   calculate_cell_weights_from_config()
+    │       ├── apply_trimming_from_config() (if configured)
     │       ├── diagnose_weights()
-    │       │
     │       └── Add weight column to data
     │
-    ├── write_weighted_data() (if output_file specified)
-    │
-    ├── generate_weighting_report() (if save_diagnostics)
+    ├── write_weighted_data() (if output_file configured)
+    ├── generate_weighting_report() (if save_diagnostics = Y)
+    ├── generate_weighting_html_report() (if html_report = Y)
     │
     └── Return result object
 ```
 
-### 6.2 Data Structures
+### 6.2 Result Object
 
-**Survey Data:**
-```r
-data.frame with:
-  - Original survey columns
-  - Added weight columns (one per weight in config)
-```
-
-**Result Object:**
 ```r
 list(
-  data = data.frame,           # Weighted data
-  weight_names = c("w1", "w2"), # Weight column names
-  weight_results = list(       # Per-weight details
+  status = "PASS" | "PARTIAL",
+  data = data.frame,               # With weight columns added
+  weight_names = c("w1", "w2"),
+  weight_results = list(
     w1 = list(
       weights = numeric,
       diagnostics = list(...),
-      design_result = list(...),  # or rim_result
+      design_result = list(...),   # or rim_result / cell_result
       trimming_result = list(...)
-    ),
-    w2 = ...
+    )
   ),
-  config = list(...),          # Parsed config
-  output_file = "...",         # Path if written
-  diagnostics_file = "..."     # Path if written
+  config = list(...),
+  output_file = "...",
+  diagnostics_file = "...",
+  html_report_file = "...",
+  run_state = list(...)
 )
 ```
 
@@ -559,20 +413,7 @@ list(
 
 ## 7. Error Handling
 
-### 7.1 Error Categories
-
-| Category | TRS Code | Example |
-|----------|----------|---------|
-| Config missing | IO_CONFIG_NOT_FOUND | Config file doesn't exist |
-| Sheet missing | CFG_MISSING_SHEET | Required sheet not in config |
-| Column missing | DATA_COLUMN_NOT_FOUND | Stratum variable not in data |
-| Value missing | DATA_MISSING_VALUES | NAs in rim variables |
-| Convergence | MODEL_RIM_NO_CONVERGENCE | Rim weighting failed |
-| Package | PKG_ANESRAKE_MISSING | anesrake not installed |
-
-### 7.2 Error Message Format
-
-All errors follow TRS format:
+All errors follow TRS format with console visibility for Shiny debugging:
 
 ```
 ================================================================================
@@ -580,36 +421,16 @@ All errors follow TRS format:
 ================================================================================
 
 Problem:
-  The 'Design_Targets' sheet is required but not found in config file.
+  The 'Cell_Targets' sheet is required but not found in config file.
 
 Why it matters:
-  Design weights cannot be calculated without population sizes.
+  Cell weights cannot be calculated without target percentages.
 
 How to fix:
-  1. Add a 'Design_Targets' sheet to your config file
-  2. Include columns: weight_name, stratum_variable, stratum_category, population_size
-  3. Add one row per stratum with population size
-
-Diagnostics:
-  Expected:  Design_Targets
-  Observed:  General, Weight_Specifications
+  1. Add a 'Cell_Targets' sheet to your config file
+  2. Include columns for cell variables and target_percent
 
 ================================================================================
-```
-
-### 7.3 Warning Handling
-
-Warnings are collected but don't stop execution:
-
-```r
-# Collected during execution
-guard_warn(guard, "3 respondents have zero weights")
-
-# Included in diagnostics
-if (length(warnings) > 0) {
-  cat("Warnings:\n")
-  for (w in warnings) cat("  - ", w, "\n")
-}
 ```
 
 ---
@@ -618,74 +439,18 @@ if (length(warnings) > 0) {
 
 ### 8.1 Adding New Weighting Methods
 
-1. Create new file `lib/new_method.R`
-2. Implement core function:
-   ```r
-   calculate_new_method_weights <- function(data, targets, ...) {
-     # Implementation
-     return(list(weights = w, ...))
-   }
-   ```
-3. Add wrapper for config:
-   ```r
-   calculate_new_method_from_config <- function(data, config, weight_name, verbose) {
-     # Get targets from config
-     # Validate
-     # Call core function
-   }
-   ```
-4. Add dispatch in `run_weighting.R`:
-   ```r
-   } else if (method == "new_method") {
-     result$new_result <- calculate_new_method_from_config(...)
-     weights <- result$new_result$weights
-   }
-   ```
-5. Add to config loading if new sheet needed
-6. Add validation function
-
-### 8.2 Adding Custom Diagnostics
-
-```r
-# In diagnostics.R, add to diagnose_weights():
-
-# Custom metric
-results$custom_metric <- list(
-  value = calculate_custom_metric(valid_weights),
-  threshold = 0.5,
-  status = if (value > 0.5) "WARN" else "OK"
-)
-
-# Add to quality assessment
-if (results$custom_metric$status == "WARN") {
-  issues <- c(issues, "Custom metric exceeds threshold")
-}
-```
-
-### 8.3 Adding Output Formats
-
-```r
-# In output.R:
-
-write_weighted_data_json <- function(data, output_file) {
-  jsonlite::write_json(data, output_file, pretty = TRUE)
-}
-```
+1. Create `lib/new_method.R` with `calculate_new_method_weights()`
+2. Add wrapper `calculate_new_method_from_config()`
+3. Add validation function
+4. Add dispatch case in `run_weighting.R`
+5. Update `config_loader.R` if new sheet needed
+6. Add tests in `tests/testthat/test_new_method.R`
+7. Update HTML report transformer/table builder for new method
+8. Update template and documentation
 
 ---
 
 ## 9. Performance Considerations
-
-### 9.1 Memory Usage
-
-| Component | Memory Pattern |
-|-----------|----------------|
-| Data loading | O(rows × cols) |
-| Design weights | O(rows) |
-| Rim weights | O(rows × iterations) |
-| Diagnostics | O(rows) |
-
-### 9.2 Computation Time
 
 Typical execution times (n=1000 respondents):
 
@@ -695,99 +460,50 @@ Typical execution times (n=1000 respondents):
 | Data loading | 1-5s |
 | Design weights | < 1s |
 | Rim weights (3 vars) | 2-5s |
-| Rim weights (5 vars) | 5-15s |
+| Cell weights | < 1s |
 | Diagnostics | < 1s |
 | Excel output | 1-3s |
-
-### 9.3 Optimization Tips
-
-1. **Large datasets:**
-   - Consider sampling for exploratory runs
-   - Use CSV instead of Excel for faster loading
-
-2. **Rim convergence:**
-   - Start with fewer variables
-   - Use relaxed tolerance for exploration
-
-3. **Repeated runs:**
-   - Cache loaded config
-   - Use `quick_*` functions for simple cases
+| HTML report | 1-2s |
 
 ---
 
 ## 10. Testing
 
-### 10.1 Test Categories
+### 10.1 Test Suite: 306 tests
 
-| Category | Purpose |
-|----------|---------|
-| Unit tests | Individual function behavior |
-| Integration tests | End-to-end workflows |
-| Validation tests | Known answer tests |
-| Edge case tests | Boundary conditions |
+| File | Tests | Coverage |
+|------|-------|----------|
+| test_guard.R | ~25 | Guard validation |
+| test_config_loader.R | ~22 | Config parsing (all sheet types) |
+| test_validation.R | ~30 | Data/config validation |
+| test_design_weights.R | ~15 | Design weight calculation |
+| test_rim_weights.R | ~21 | Rim weight calculation |
+| test_cell_weights.R | ~15 | Cell weight calculation |
+| test_trimming.R | ~19 | Weight trimming |
+| test_diagnostics.R | ~12 | Quality diagnostics |
+| test_output.R | ~15 | Excel output |
+| test_integration.R | ~12 | End-to-end workflows |
+| test_edge_cases.R | ~12 | Boundary conditions |
+| test_html_report.R | ~18 | HTML report pipeline |
 
-### 10.2 Key Test Cases
-
-**Configuration:**
-- Valid config loads successfully
-- Missing required sheets produce REFUSE
-- Invalid method produces REFUSE
-- Path resolution works correctly
-
-**Design Weights:**
-- Equal strata produce equal weights
-- Known population/sample produces correct weights
-- Missing stratum values produce NA weights
-- Empty stratum produces error
-
-**Rim Weights:**
-- Converges with valid targets
-- Non-convergence handled correctly
-- Achieved margins match targets
-- Missing values produce error
-
-**Trimming:**
-- Cap method caps correctly
-- Percentile method caps correctly
-- Untrimmed weights unchanged
-
-**Diagnostics:**
-- Equal weights produce DEFF=1
-- Known weights produce expected n_eff
-- Quality thresholds work correctly
-
-### 10.3 Running Tests
+### 10.2 Running Tests
 
 ```r
-# Run all tests
-testthat::test_dir("modules/weighting/tests")
+# All tests
+testthat::test_dir("modules/weighting/tests/testthat")
 
-# Run specific test file
-testthat::test_file("modules/weighting/tests/test-design_weights.R")
-
-# Run with coverage
-covr::package_coverage("modules/weighting")
+# Specific file
+testthat::test_file("modules/weighting/tests/testthat/test_cell_weights.R")
 ```
 
 ---
 
 ## References
 
-### Statistical Methods
-
 - Kish, L. (1965). *Survey Sampling*. John Wiley & Sons.
-- Deming, W.E. & Stephan, F.F. (1940). On a least squares adjustment of a sampled frequency table when the expected marginal totals are known. *Annals of Mathematical Statistics*, 11(4), 427-444.
-- Deville, J.C. & Särndal, C.E. (1992). Calibration estimators in survey sampling. *Journal of the American Statistical Association*, 87(418), 376-382.
-
-### survey Package
-
-- Lumley, T. (2023). *survey: Analysis of complex survey samples*. R package version 4.2+. https://CRAN.R-project.org/package=survey
-- Lumley, T. (2010). *Complex Surveys: A Guide to Analysis Using R*. John Wiley & Sons.
-
-### TRS Specification
-
-- TURAS_Mapping_Refusal_Standard_TRS_v1.0.md
+- Deville, J.C. & Sarndal, C.E. (1992). Calibration estimators in survey sampling. *JASA*, 87(418), 376-382.
+- Lumley, T. (2010). *Complex Surveys: A Guide to Analysis Using R*. Wiley.
 
 ---
 
-*TURAS Weighting Module - Technical Documentation v2.0*
+*TURAS Weighting Module - Technical Documentation v3.0*

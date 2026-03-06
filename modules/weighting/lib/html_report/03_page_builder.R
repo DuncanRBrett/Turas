@@ -34,7 +34,7 @@ build_weighting_page <- function(html_data, tables, charts, config,
   meta_tags <- build_meta_tags(html_data, source_filename)
 
   # Build header
-  header_html <- build_weighting_header(html_data$summary, brand)
+  header_html <- build_weighting_header(html_data$summary, brand, config)
 
   # Build tab navigation
   tab_nav <- build_report_tab_nav(brand)
@@ -162,12 +162,17 @@ body {
   font-size: 12px;
   font-weight: 400;
   letter-spacing: 0.5px;
-  text-transform: uppercase;
 }
 .wt-header-project {
   color: #fff;
   font-size: 20px;
   font-weight: 700;
+  margin-bottom: 4px;
+}
+.wt-header-prepared {
+  color: rgba(255,255,255,0.65);
+  font-size: 13px;
+  font-weight: 400;
   margin-bottom: 12px;
 }
 .wt-header-badges {
@@ -428,6 +433,42 @@ body {
   border-bottom: none;
 }
 
+/* Explanatory callouts */
+.wt-callout {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-left: 3px solid BRAND;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #334155;
+}
+.wt-callout strong {
+  color: #1e293b;
+}
+
+/* Editable comments */
+.wt-comments-box {
+  width: 100%;
+  min-height: 120px;
+  padding: 12px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #1e293b;
+  background: #fff;
+  resize: vertical;
+}
+.wt-comments-box:focus {
+  outline: none;
+  border-color: BRAND;
+  box-shadow: 0 0 0 2px rgba(30,58,95,0.10);
+}
+
 /* Method auto-doc */
 .wt-method-doc {
   background: #f8f9fa;
@@ -468,27 +509,19 @@ body {
   border-top: 1px solid #e2e8f0;
 }
 
-/* Save button */
-.wt-save-btn {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  padding: 10px 20px;
-  background: BRAND;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  transition: opacity 0.2s;
-  font-family: inherit;
+/* Save button (in tab bar) */
+.wt-save-tab {
+  margin-left: auto;
+  color: BRAND;
+  border-bottom-color: transparent !important;
 }
-.wt-save-btn:hover { opacity: 0.9; }
+.wt-save-tab:hover {
+  background: #f0f9ff;
+  color: BRAND;
+}
 
 @media print {
-  .report-tabs, .wt-nav, .wt-save-btn { display: none !important; }
+  .report-tabs, .wt-nav, .wt-save-tab { display: none !important; }
   .tab-panel, .wt-detail-panel { display: block !important; }
   .wt-header { break-after: avoid; }
   .wt-card { break-inside: avoid; page-break-inside: avoid; }
@@ -509,9 +542,58 @@ body {
 # ==============================================================================
 
 #' @keywords internal
-build_weighting_header <- function(summary, brand_colour) {
-  # Scale icon (weighing scales)
-  scale_icon <- '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M5 7l7-4 7 4"/><path d="M5 7l-2 8h4l-2-8z"/><path d="M19 7l-2 8h4l-2-8z"/></svg>'
+build_weighting_header <- function(summary, brand_colour, config = list()) {
+  # Logo: use custom logo if provided, otherwise default scale icon
+  logo_html <- ""
+  if (!is.null(config$logo_file) && file.exists(config$logo_file)) {
+    # Embed logo as base64 data URI
+    logo_ext <- tolower(tools::file_ext(config$logo_file))
+    mime_type <- switch(logo_ext,
+      "png" = "image/png",
+      "jpg" = , "jpeg" = "image/jpeg",
+      "svg" = "image/svg+xml",
+      "gif" = "image/gif",
+      "image/png"
+    )
+    logo_b64 <- tryCatch({
+      if (requireNamespace("base64enc", quietly = TRUE)) {
+        base64enc::base64encode(config$logo_file)
+      } else {
+        NULL
+      }
+    }, error = function(e) NULL)
+
+    if (!is.null(logo_b64)) {
+      logo_html <- sprintf(
+        '<div class="wt-header-logo"><img src="data:%s;base64,%s" alt="Logo" style="max-width:40px; max-height:40px; object-fit:contain;"/></div>',
+        mime_type, logo_b64
+      )
+    }
+  }
+
+  if (!nzchar(logo_html)) {
+    scale_icon <- '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M5 7l7-4 7 4"/><path d="M5 7l-2 8h4l-2-8z"/><path d="M19 7l-2 8h4l-2-8z"/></svg>'
+    logo_html <- sprintf('<div class="wt-header-logo">%s</div>', scale_icon)
+  }
+
+  # "Prepared by X for Y" line
+  prepared_html <- ""
+  has_researcher <- !is.null(config$researcher_name) && nzchar(config$researcher_name)
+  has_client <- !is.null(config$client_name) && nzchar(config$client_name)
+  if (has_researcher || has_client) {
+    parts <- ""
+    if (has_researcher) parts <- paste0("Prepared by ", htmlEscape(config$researcher_name))
+    if (has_client) {
+      if (nzchar(parts)) {
+        parts <- paste0(parts, " for ", htmlEscape(config$client_name))
+      } else {
+        parts <- paste0("Prepared for ", htmlEscape(config$client_name))
+      }
+    }
+    prepared_html <- sprintf(
+      '<div class="wt-header-prepared">%s</div>', parts
+    )
+  }
 
   badges <- sprintf(
     '<div class="wt-header-badges">
@@ -531,18 +613,20 @@ build_weighting_header <- function(summary, brand_colour) {
     '<div class="wt-header">
       <div class="wt-header-inner">
         <div class="wt-header-top">
-          <div class="wt-header-logo">%s</div>
+          %s
           <div>
             <div class="wt-header-title">Turas Weighting</div>
-            <div class="wt-header-subtitle">Sample Weighting Report</div>
+            <div class="wt-header-subtitle">Sample weighting report</div>
           </div>
         </div>
         <div class="wt-header-project">%s</div>
         %s
+        %s
       </div>
     </div>',
-    scale_icon,
+    logo_html,
     htmlEscape(summary$project_name),
+    prepared_html,
     badges
   )
 }
@@ -558,6 +642,7 @@ build_report_tab_nav <- function(brand_colour) {
     <button class="report-tab active" data-tab="summary" onclick="switchReportTab(\'summary\')">Summary</button>
     <button class="report-tab" data-tab="details" onclick="switchReportTab(\'details\')">Weight Details</button>
     <button class="report-tab" data-tab="notes" onclick="switchReportTab(\'notes\')">Method Notes</button>
+    <button class="report-tab wt-save-tab" onclick="saveReportHTML()">Save Report</button>
   </div>'
 }
 
@@ -650,7 +735,12 @@ build_details_panel <- function(html_data, tables, charts) {
     chart_key <- detail$weight_name
     if (!is.null(charts[[chart_key]]) && nzchar(charts[[chart_key]])) {
       panel_content <- paste0(panel_content, sprintf(
-        '<div class="wt-card"><h3>Distribution</h3>%s</div>',
+        '<div class="wt-card"><h3>Distribution</h3>
+          <div class="wt-callout">This histogram shows how weights are distributed across respondents.
+          A tight cluster around 1.0 means the sample closely matches targets with minimal adjustment.
+          A wide spread or long tail indicates some respondents need large corrections, which reduces effective sample size.
+          Ideally, most weights should fall between 0.5 and 2.0.</div>
+          %s</div>',
         charts[[chart_key]]
       ))
     }
@@ -765,7 +855,14 @@ build_notes_panel <- function(html_data) {
     content <- '<div class="wt-card"><h3>Method Notes</h3><p style="color:#64748b;">No method notes or analyst assumptions have been provided.</p></div>'
   }
 
-  sprintf('<div id="tab-notes" class="tab-panel">%s</div>', content)
+  # Add editable comments box
+  comments_box <- '<div class="wt-card">
+    <h3>Comments</h3>
+    <p style="font-size:12px; color:#64748b; margin-bottom:12px;">Add your comments below. These will be saved when you use the Save Report button.</p>
+    <textarea class="wt-comments-box" id="analyst-comments" placeholder="Add your comments, observations, or notes here..."></textarea>
+  </div>'
+
+  sprintf('<div id="tab-notes" class="tab-panel">%s%s</div>', content, comments_box)
 }
 
 
@@ -858,8 +955,7 @@ build_weighting_footer <- function(summary) {
   sprintf(
     '<div class="wt-footer">
       Generated by Turas Weighting &middot; %s &middot; The Research Lamppost (Pty) Ltd
-    </div>
-    <button class="wt-save-btn" onclick="saveReportHTML()">Save Report</button>',
+    </div>',
     htmlEscape(summary$generated)
   )
 }

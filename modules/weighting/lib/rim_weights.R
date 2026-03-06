@@ -2,7 +2,7 @@
 # WEIGHTING MODULE - RIM WEIGHT CALCULATION
 # ==============================================================================
 # Calculate rim weights using iterative proportional fitting (raking/calibration)
-# Part of TURAS Weighting Module v2.0
+# Part of TURAS Weighting Module v3.0
 #
 # METHODOLOGY:
 # Rim weighting (also called raking or iterative proportional fitting)

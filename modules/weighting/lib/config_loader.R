@@ -131,6 +131,28 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
   general$save_diagnostics <- save_diag
   general$project_root <- project_root
 
+  # Researcher / branding settings (optional)
+  if (!is.null(general$researcher_name) && !is.na(general$researcher_name) &&
+      nzchar(trimws(general$researcher_name))) {
+    general$researcher_name <- trimws(general$researcher_name)
+  } else {
+    general$researcher_name <- NULL
+  }
+
+  if (!is.null(general$client_name) && !is.na(general$client_name) &&
+      nzchar(trimws(general$client_name))) {
+    general$client_name <- trimws(general$client_name)
+  } else {
+    general$client_name <- NULL
+  }
+
+  if (!is.null(general$logo_file) && !is.na(general$logo_file) &&
+      nzchar(trimws(general$logo_file))) {
+    general$logo_file_resolved <- resolve_config_path(trimws(general$logo_file), project_root)
+  } else {
+    general$logo_file_resolved <- NULL
+  }
+
   # HTML report settings
   general$html_report <- !is.null(general$html_report) &&
                           !is.na(general$html_report) &&

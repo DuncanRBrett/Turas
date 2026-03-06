@@ -2,7 +2,7 @@
 # WEIGHTING MODULE - WEIGHT TRIMMING
 # ==============================================================================
 # Functions for capping and trimming extreme weights
-# Part of TURAS Weighting Module v1.0
+# Part of TURAS Weighting Module v3.0
 #
 # PURPOSE:
 # Extreme weights can destabilize estimates by giving too much influence

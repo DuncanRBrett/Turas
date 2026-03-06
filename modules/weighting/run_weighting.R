@@ -187,7 +187,8 @@ run_weighting <- function(config_file,
                           data_file = NULL,
                           return_data = TRUE,
                           verbose = TRUE,
-                          progress_callback = NULL) {
+                          progress_callback = NULL,
+                          html_report = NULL) {
 
   # Helper to update progress
   update_progress <- function(value, message) {
@@ -230,6 +231,18 @@ run_weighting <- function(config_file,
   # ============================================================================
   update_progress(0.10, "Loading configuration...")
   config <- load_weighting_config(config_file, verbose = verbose)
+
+  # Apply GUI overrides (html_report parameter takes precedence over config file)
+  if (!is.null(html_report)) {
+    config$general$html_report <- isTRUE(html_report)
+    if (isTRUE(html_report) && is.null(config$general$html_report_file_resolved)) {
+      # Auto-generate HTML report path from output_file or config_file
+      base_path <- config$general$output_file_resolved %||% config_file
+      config$general$html_report_file_resolved <- sub(
+        "\\.[^.]+$", "_weighting_report.html", base_path
+      )
+    }
+  }
 
   # ============================================================================
   # Load Survey Data
@@ -521,7 +534,10 @@ run_weighting <- function(config_file,
 
         html_config <- list(
           brand_colour = config$general$brand_colour %||% "#1e3a5f",
-          accent_colour = config$general$accent_colour %||% "#2aa198"
+          accent_colour = config$general$accent_colour %||% "#2aa198",
+          researcher_name = config$general$researcher_name,
+          client_name = config$general$client_name,
+          logo_file = config$general$logo_file_resolved
         )
 
         html_result <- generate_weighting_html_report(

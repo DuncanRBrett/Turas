@@ -46,6 +46,9 @@ Weight_Config.xlsx
 | html_report_file | Path | (auto) | Path for HTML report (auto-generated from output_file if blank) |
 | brand_colour | Hex | #1e3a5f | Brand hex colour for HTML report |
 | accent_colour | Hex | #2aa198 | Accent hex colour for HTML report |
+| researcher_name | Text | (none) | Researcher/analyst name shown in report header |
+| client_name | Text | (none) | Client name shown in report header |
+| logo_file | Path | (none) | Path to logo image (PNG/JPG/SVG) embedded in report header |
 
 ### Path Resolution
 
@@ -75,6 +78,9 @@ Paths are resolved in this order:
 | html_report       | Y                                   |
 | html_report_file  | output/weighting_report.html        |
 | brand_colour      | #1e3a5f                             |
+| researcher_name   | Jane Smith                          |
+| client_name       | Acme Corp                           |
+| logo_file         | assets/acme_logo.png                |
 ```
 
 ---

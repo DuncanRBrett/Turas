@@ -2,7 +2,7 @@
 # WEIGHTING MODULE - DIAGNOSTICS
 # ==============================================================================
 # Comprehensive weight quality diagnostics and reporting
-# Part of TURAS Weighting Module v1.0
+# Part of TURAS Weighting Module v3.0
 #
 # METRICS:
 # - Basic statistics (min, max, mean, median, SD, CV)

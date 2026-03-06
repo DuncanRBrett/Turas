@@ -44,6 +44,9 @@ If creating manually, your Excel file can have up to 7 sheets:
 | html_report_file | output/weighting_report.html |
 | brand_colour | #1e3a5f |
 | accent_colour | #2aa198 |
+| researcher_name | Jane Smith |
+| client_name | Acme Corp |
+| logo_file | assets/acme_logo.png |
 
 **Notes:**
 - `data_file` path is relative to the Weight_Config.xlsx location
@@ -51,6 +54,8 @@ If creating manually, your Excel file can have up to 7 sheets:
 - Supported data formats: .csv, .xlsx, .xls, .sav
 - `html_report_file` is auto-generated if left blank
 - `brand_colour`/`accent_colour` are optional (defaults used if blank)
+- `researcher_name`/`client_name` appear in the HTML report header as "Prepared by X for Y"
+- `logo_file` is embedded as a base64 image in the report header (PNG, JPG, SVG supported)
 
 ---
 

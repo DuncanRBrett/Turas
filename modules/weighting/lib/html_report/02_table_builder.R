@@ -54,14 +54,14 @@ build_summary_table <- function(weight_details) {
         <tr>
           <th class="wt-label-col">Weight</th>
           <th>Method</th>
-          <th>N</th>
-          <th>Eff. N</th>
-          <th>Min</th>
-          <th>Max</th>
-          <th>Mean</th>
-          <th>DEFF</th>
-          <th>Efficiency</th>
-          <th>Quality</th>
+          <th class="wt-num">N</th>
+          <th class="wt-num">Eff. N</th>
+          <th class="wt-num">Min</th>
+          <th class="wt-num">Max</th>
+          <th class="wt-num">Mean</th>
+          <th class="wt-num">DEFF</th>
+          <th class="wt-num">Efficiency</th>
+          <th style="text-align:center;">Quality</th>
         </tr>
       </thead>
       <tbody>%s</tbody>
@@ -78,7 +78,7 @@ build_diagnostics_table <- function(diagnostics) {
   diag <- diagnostics
   if (is.null(diag)) return("")
 
-  sprintf(
+  grid_html <- sprintf(
     '<div class="wt-diag-grid">
       <div class="wt-diag-card">
         <h4>Sample Size</h4>
@@ -119,6 +119,18 @@ build_diagnostics_table <- function(diagnostics) {
     diag$effective_sample$effective_n, diag$effective_sample$design_effect,
     diag$effective_sample$efficiency
   )
+
+  callout <- '<div class="wt-callout" style="margin-top:16px;">
+    <strong>Reading these metrics:</strong>
+    <strong>Min/Max</strong> show the weight range. Values far from 1.0 indicate large adjustments for some respondents.
+    <strong>Q1/Q3</strong> (quartiles) show where the middle 50%% of weights fall &mdash; a narrow range means most respondents have similar weights.
+    <strong>SD</strong> (standard deviation) measures spread; lower is better.
+    <strong>CV</strong> (coefficient of variation = SD/Mean) summarises variability as a ratio; values below 0.3 are typical.
+    <strong>Design Effect (DEFF)</strong> measures variance inflation from weighting. DEFF = 1.0 means no effect (equal weights); DEFF = 2.0 means the effective sample is halved.
+    <strong>Efficiency</strong> = 100%% / DEFF &mdash; the percentage of sample size retained after weighting. Higher is better; below 50%% suggests weights may be too variable.
+  </div>'
+
+  paste0(grid_html, callout)
 }
 
 #' Build Rim Margins Table HTML

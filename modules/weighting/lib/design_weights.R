@@ -2,7 +2,7 @@
 # WEIGHTING MODULE - DESIGN WEIGHT CALCULATION
 # ==============================================================================
 # Calculate design weights for stratified samples
-# Part of TURAS Weighting Module v1.0
+# Part of TURAS Weighting Module v3.0
 #
 # METHODOLOGY:
 # Design weights adjust for unequal selection probabilities in stratified samples.

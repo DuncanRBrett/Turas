@@ -6,7 +6,7 @@ This example demonstrates **rim weighting (raking)** using `survey::calibrate()`
 
 ## What This Example Shows
 
-- Rim weighting with `survey::calibrate()` (v2.0)
+- Rim weighting with `survey::calibrate()` (v3.0)
 - Proper Weight_Config.xlsx structure for rim weights
 - Multiple demographic variables (age, gender, region)
 - Weight bounds applied **during** calibration (not after)
@@ -88,9 +88,9 @@ As configured in Rim_Targets sheet:
 | Suburban | 45%      |
 | Rural    | 20%      |
 
-## Advanced Settings (v2.0)
+## Advanced Settings (v3.0)
 
-The config uses these v2.0 parameters:
+The config uses these v3.0 parameters:
 
 ```
 calibration_method: "raking"         # Can also be "linear" or "logit"
@@ -162,16 +162,16 @@ population_weight | region   | Rural     | 20
 
 **Critical:** Each variable's target_percent must sum to 100!
 
-### 5. Advanced_Settings Sheet (v2.0)
+### 5. Advanced_Settings Sheet (v3.0)
 ```
 weight_name       | max_iterations | convergence_tolerance | calibration_method | weight_bounds
 ------------------|----------------|----------------------|-------------------|---------------
 population_weight | 100            | 1e-7                 | raking            | 0.1,10.0
 ```
 
-## What Makes This v2.0?
+## What Makes This v3.0?
 
-Key v2.0 features demonstrated:
+Key v3.0 features demonstrated:
 
 1. **survey::calibrate()** instead of anesrake
    - Modern, actively maintained package
@@ -289,4 +289,4 @@ Or if using .xlsx formats:
 
 ---
 
-*TURAS Weighting Module v2.0 - Example 2*
+*TURAS Weighting Module v3.0 - Example 2*

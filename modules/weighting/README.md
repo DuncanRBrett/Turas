@@ -70,6 +70,9 @@ Key-value format (Setting | Value columns):
 | `html_report_file` | output/report.html | No | Path for HTML report (auto-generated if blank) |
 | `brand_colour` | #1e3a5f | No | Brand hex colour for HTML report |
 | `accent_colour` | #2aa198 | No | Accent hex colour for HTML report |
+| `researcher_name` | Jane Smith | No | Researcher name shown in report header |
+| `client_name` | Acme Corp | No | Client name shown in report header ("Prepared by X for Y") |
+| `logo_file` | assets/logo.png | No | Logo image embedded in report header (PNG/JPG/SVG) |
 
 #### Sheet 2: Weight_Specifications
 

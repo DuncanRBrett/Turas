@@ -610,7 +610,8 @@ run_weighting_gui <- function(launch_browser = TRUE) {
                     config_file = config_path,
                     data_file = data_path,
                     verbose = TRUE,
-                    progress_callback = progress_callback
+                    progress_callback = progress_callback,
+                    html_report = input$generate_html
                   )
                 }, module = "WEIGHTING")
               } else {
@@ -618,7 +619,8 @@ run_weighting_gui <- function(launch_browser = TRUE) {
                   config_file = config_path,
                   data_file = data_path,
                   verbose = TRUE,
-                  progress_callback = progress_callback
+                  progress_callback = progress_callback,
+                  html_report = input$generate_html
                 )
               }
             }, message = function(m) {
