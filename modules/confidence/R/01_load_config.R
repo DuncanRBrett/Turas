@@ -151,7 +151,7 @@ load_confidence_config <- function(config_path) {
 
   # Convert file_paths and study_settings to named lists for easier access
   file_paths_list <- if (!is.null(file_paths)) {
-    as.list(setNames(as.character(file_paths$Value), file_paths$Parameter))
+    as.list(setNames(as.character(file_paths$Value), file_paths$Setting))
   } else {
     list()  # Empty list if no File_Paths sheet
   }
@@ -168,6 +168,65 @@ load_confidence_config <- function(config_path) {
   )
 
   return(config)
+}
+
+
+# ==============================================================================
+# HEADER ROW AUTO-DETECTION
+# ==============================================================================
+
+#' Auto-detect header row in Excel sheet
+#'
+#' Scans first 10 rows for a row containing all required columns.
+#' Supports config templates with title/subtitle rows above the header.
+#'
+#' @param file_path Character. Path to Excel file
+#' @param sheet_name Character. Sheet name
+#' @param required_cols Character vector. Column names to search for
+#' @return Data frame re-read with correct header row, or original df if headers in row 1
+#' @keywords internal
+auto_detect_header_read <- function(file_path, sheet_name, required_cols) {
+  # First try standard read (headers in row 1)
+  df <- readxl::read_excel(file_path, sheet = sheet_name, col_types = "text")
+
+  if (all(required_cols %in% names(df))) {
+    return(df)
+  }
+
+  # Auto-detect: scan first 10 rows for the header
+  raw <- suppressMessages(readxl::read_excel(file_path, sheet = sheet_name,
+                                              col_names = FALSE, n_max = 10,
+                                              col_types = "text"))
+  header_row <- NULL
+  for (r in seq_len(nrow(raw))) {
+    row_vals <- as.character(unlist(raw[r, ]))
+    if (all(required_cols %in% row_vals)) {
+      header_row <- r
+      break
+    }
+  }
+
+  if (!is.null(header_row)) {
+    df <- readxl::read_excel(file_path, sheet = sheet_name,
+                              skip = header_row - 1, col_types = "text")
+
+    # Filter out help/description rows that start with "[REQUIRED]" or "[Optional]"
+    if (nrow(df) > 0 && ncol(df) > 0) {
+      first_col_vals <- as.character(df[[1]])
+      help_rows <- grepl("^\\[REQUIRED\\]|^\\[Optional\\]", first_col_vals, ignore.case = TRUE)
+      if (any(help_rows)) {
+        df <- df[!help_rows, , drop = FALSE]
+      }
+    }
+
+    # Remove completely empty rows
+    if (nrow(df) > 0) {
+      all_na <- apply(df, 1, function(row) all(is.na(row) | trimws(row) == ""))
+      df <- df[!all_na, , drop = FALSE]
+    }
+  }
+
+  return(df)
 }
 
 
@@ -190,9 +249,10 @@ load_file_paths_sheet <- function(config_path) {
     return(NULL)
   }
 
-  # Read sheet
+  # Read sheet with auto-detection of header row
+  required_cols <- c("Setting", "Value")
   df <- tryCatch(
-    readxl::read_excel(config_path, sheet = sheet_name),
+    auto_detect_header_read(config_path, sheet_name, required_cols),
     error = function(e) {
       confidence_refuse(
         code = "IO_CONFIG_SHEET_READ_FAILED",
@@ -209,7 +269,6 @@ load_file_paths_sheet <- function(config_path) {
   )
 
   # Validate structure
-  required_cols <- c("Parameter", "Value")
   if (!all(required_cols %in% names(df))) {
     confidence_refuse(
       code = "CFG_MISSING_COLUMNS",
@@ -230,7 +289,7 @@ load_file_paths_sheet <- function(config_path) {
   )
 
   # Check all required parameters present
-  missing_params <- setdiff(required_params, df$Parameter)
+  missing_params <- setdiff(required_params, df$Setting)
   if (length(missing_params) > 0) {
     confidence_refuse(
       code = "CFG_MISSING_PARAMETERS",
@@ -239,7 +298,7 @@ load_file_paths_sheet <- function(config_path) {
       why_it_matters = "Required parameters ensure complete configuration specification.",
       how_to_fix = sprintf("Add the required parameters to the '%s' sheet", sheet_name),
       expected = required_params,
-      observed = df$Parameter,
+      observed = df$Setting,
       missing = missing_params
     )
   }
@@ -256,9 +315,10 @@ load_file_paths_sheet <- function(config_path) {
 load_study_settings_sheet <- function(config_path) {
   sheet_name <- "Study_Settings"
 
-  # Read sheet
+  # Read sheet with auto-detection of header row
+  required_cols <- c("Setting", "Value")
   df <- tryCatch(
-    readxl::read_excel(config_path, sheet = sheet_name),
+    auto_detect_header_read(config_path, sheet_name, required_cols),
     error = function(e) {
       confidence_refuse(
         code = "IO_CONFIG_SHEET_READ_FAILED",
@@ -275,7 +335,6 @@ load_study_settings_sheet <- function(config_path) {
   )
 
   # Validate structure
-  required_cols <- c("Setting", "Value")
   if (!all(required_cols %in% names(df))) {
     confidence_refuse(
       code = "CFG_MISSING_COLUMNS",
@@ -344,9 +403,17 @@ load_question_analysis_sheet <- function(config_path, max_questions = NULL) {
     max_questions <- MAX_QUESTION_LIMIT
   }
 
-  # Read sheet
+  # Read sheet with auto-detection of header row
+  required_cols <- c(
+    "Question_ID",
+    "Statistic_Type",
+    "Run_MOE",
+    "Run_Bootstrap",
+    "Run_Credible"
+  )
+
   df <- tryCatch(
-    readxl::read_excel(config_path, sheet = sheet_name),
+    auto_detect_header_read(config_path, sheet_name, required_cols),
     error = function(e) {
       confidence_refuse(
         code = "IO_CONFIG_SHEET_READ_FAILED",
@@ -363,14 +430,6 @@ load_question_analysis_sheet <- function(config_path, max_questions = NULL) {
   )
 
   # Validate structure - required columns
-  required_cols <- c(
-    "Question_ID",
-    "Statistic_Type",
-    "Run_MOE",
-    "Run_Bootstrap",
-    "Run_Credible"
-  )
-
   missing_cols <- setdiff(required_cols, names(df))
   if (length(missing_cols) > 0) {
     confidence_refuse(
@@ -495,7 +554,7 @@ validate_file_paths <- function(file_paths_df) {
   }
 
   # Convert to named list for easier access
-  paths <- setNames(file_paths_df$Value, file_paths_df$Parameter)
+  paths <- setNames(file_paths_df$Value, file_paths_df$Setting)
 
   # Check input data file exists
   data_file <- paths[["Data_File"]]
@@ -755,9 +814,10 @@ load_population_margins_sheet <- function(config_path) {
     return(NULL)  # Sheet not present, return NULL silently
   }
 
-  # Read sheet
+  # Read sheet with auto-detection of header row
+  required_cols <- c("Variable", "Category_Label", "Target_Prop")
   df <- tryCatch(
-    readxl::read_excel(config_path, sheet = sheet_name),
+    auto_detect_header_read(config_path, sheet_name, required_cols),
     error = function(e) {
       # TRS INFO: Optional sheet unreadable
       message(sprintf(
@@ -774,7 +834,6 @@ load_population_margins_sheet <- function(config_path) {
   }
 
   # Validate required columns
-  required_cols <- c("Variable", "Category_Label", "Target_Prop")
   missing_cols <- setdiff(required_cols, names(df))
 
   if (length(missing_cols) > 0) {
@@ -909,7 +968,7 @@ get_setting_value <- function(study_settings_df, setting_name, default = NULL) {
 #'
 #' @keywords internal
 get_file_path <- function(file_paths_df, param_name) {
-  idx <- which(file_paths_df$Parameter == param_name)
+  idx <- which(file_paths_df$Setting == param_name)
 
   if (length(idx) == 0) {
     confidence_refuse(

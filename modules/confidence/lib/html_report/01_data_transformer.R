@@ -29,7 +29,7 @@ transform_confidence_for_html <- function(confidence_results, config = list()) {
     sampling_method <- "Not_Specified"
   }
 
-  is_weighted <- !is.null(weight_var) && nzchar(weight_var %||% "")
+  is_weighted <- !is.null(weight_var) && !is.na(weight_var) && nzchar(trimws(weight_var))
 
   # Study-level stats
   study_stats <- cr$study_stats

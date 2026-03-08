@@ -175,6 +175,13 @@ detect_metric_by_type <- function(q_result, req_type, banner_info) {
   table <- q_result$table
   if (is.null(table) || nrow(table) == 0) return(NULL)
 
+  # Skip ranking questions — Mean Rank is a position, not a metric
+  if (!is.null(q_result$question_type) &&
+      length(q_result$question_type) > 0 &&
+      q_result$question_type == "Ranking") {
+    return(NULL)
+  }
+
   table$RowLabel <- trimws(as.character(table$RowLabel))
   table$RowType <- trimws(as.character(table$RowType))
 

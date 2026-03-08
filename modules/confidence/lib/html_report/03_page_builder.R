@@ -285,6 +285,9 @@ body {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+.ci-table thead th.ci-num {
+  text-align: right;
+}
 .ci-label-col { font-weight: 600; color: var(--ci-text-primary); }
 .ci-table-compact { font-size: 12px; }
 .ci-table-compact td { padding: 6px 10px; }

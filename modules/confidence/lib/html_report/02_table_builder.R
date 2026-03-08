@@ -62,10 +62,10 @@ build_ci_summary_table <- function(questions) {
         <tr>
           <th class="ci-th ci-label-col">Question</th>
           <th class="ci-th">Type</th>
-          <th class="ci-th">Estimate</th>
-          <th class="ci-th">CI Lower</th>
-          <th class="ci-th">CI Upper</th>
-          <th class="ci-th">CI Width</th>
+          <th class="ci-th ci-num">Estimate</th>
+          <th class="ci-th ci-num">CI Lower</th>
+          <th class="ci-th ci-num">CI Upper</th>
+          <th class="ci-th ci-num">CI Width</th>
           <th class="ci-th">Quality</th>
         </tr>
       </thead>
@@ -121,11 +121,11 @@ build_study_level_table <- function(study_level) {
       <thead>
         <tr>
           <th class="ci-th ci-label-col">Group</th>
-          <th class="ci-th">Sample N</th>
-          <th class="ci-th">Mean Weight</th>
-          <th class="ci-th">DEFF</th>
-          <th class="ci-th">Effective N</th>
-          <th class="ci-th">Efficiency</th>
+          <th class="ci-th ci-num">Sample N</th>
+          <th class="ci-th ci-num">Mean Weight</th>
+          <th class="ci-th ci-num">DEFF</th>
+          <th class="ci-th ci-num">Effective N</th>
+          <th class="ci-th ci-num">Efficiency</th>
           <th class="ci-th">Warnings</th>
         </tr>
       </thead>
@@ -191,9 +191,9 @@ build_proportion_detail_table <- function(result, conf_level) {
       <thead>
         <tr>
           <th class="ci-th ci-label-col">Method</th>
-          <th class="ci-th">%d%% Lower</th>
-          <th class="ci-th">%d%% Upper</th>
-          <th class="ci-th">MOE</th>
+          <th class="ci-th ci-num">%d%% Lower</th>
+          <th class="ci-th ci-num">%d%% Upper</th>
+          <th class="ci-th ci-num">MOE</th>
           <th class="ci-th">Notes</th>
         </tr>
       </thead>
@@ -254,9 +254,9 @@ build_mean_detail_table <- function(result, conf_level) {
       <thead>
         <tr>
           <th class="ci-th ci-label-col">Method</th>
-          <th class="ci-th">%d%% Lower</th>
-          <th class="ci-th">%d%% Upper</th>
-          <th class="ci-th">Half-Width</th>
+          <th class="ci-th ci-num">%d%% Lower</th>
+          <th class="ci-th ci-num">%d%% Upper</th>
+          <th class="ci-th ci-num">Half-Width</th>
           <th class="ci-th">Notes</th>
         </tr>
       </thead>
@@ -341,9 +341,9 @@ build_nps_detail_table <- function(result, conf_level) {
       <thead>
         <tr>
           <th class="ci-th ci-label-col">Metric</th>
-          <th class="ci-th">%d%% Lower</th>
-          <th class="ci-th">%d%% Upper</th>
-          <th class="ci-th">MOE</th>
+          <th class="ci-th ci-num">%d%% Lower</th>
+          <th class="ci-th ci-num">%d%% Upper</th>
+          <th class="ci-th ci-num">MOE</th>
           <th class="ci-th">Notes</th>
         </tr>
       </thead>
@@ -403,9 +403,9 @@ build_representativeness_table <- function(margin_comparison) {
         <tr>
           <th class="ci-th ci-label-col">Variable</th>
           <th class="ci-th">Category</th>
-          <th class="ci-th">Target</th>
-          <th class="ci-th">Achieved</th>
-          <th class="ci-th">Difference</th>
+          <th class="ci-th ci-num">Target</th>
+          <th class="ci-th ci-num">Achieved</th>
+          <th class="ci-th ci-num">Difference</th>
           <th class="ci-th">Status</th>
         </tr>
       </thead>
