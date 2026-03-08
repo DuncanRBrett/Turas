@@ -31,7 +31,7 @@ parse_html_report <- function(report_path, report_key) {
       status = "REFUSED",
       code = "DATA_INVALID",
       message = sprintf("Cannot detect report type for: %s", basename(report_path)),
-      how_to_fix = "The file must be a Turas-generated HTML report (tracker, tabs, catdriver, keydriver, or weighting)."
+      how_to_fix = "The file must be a Turas-generated HTML report (tracker, tabs, catdriver, keydriver, weighting, or confidence)."
     ))
   }
 
@@ -105,25 +105,14 @@ parse_html_report <- function(report_path, report_key) {
 #' Detect Report Type from HTML Content
 #'
 #' @param html Full HTML string
-#' @return "tracker", "tabs", "catdriver", "keydriver", "weighting", or NULL
+#' @return "tracker", "tabs", "catdriver", "keydriver", "weighting", "confidence", or NULL
 detect_report_type <- function(html) {
-  # Check for explicit meta tag (tracker has this)
-  if (grepl('<meta\\s+name="turas-report-type"\\s+content="tracker"', html)) {
-    return("tracker")
+  # Check for explicit meta tag first (all modern Turas reports include this)
+  for (type in c("tracker", "tabs", "catdriver", "keydriver", "weighting", "confidence")) {
+    pattern <- sprintf('<meta\\s+name="turas-report-type"\\s+content="%s"', type)
+    if (grepl(pattern, html)) return(type)
   }
-  if (grepl('<meta\\s+name="turas-report-type"\\s+content="tabs"', html)) {
-    return("tabs")
-  }
-  if (grepl('<meta\\s+name="turas-report-type"\\s+content="catdriver"', html)) {
-    return("catdriver")
-  }
-  if (grepl('<meta\\s+name="turas-report-type"\\s+content="keydriver"', html)) {
-    return("keydriver")
-  }
-  if (grepl('<meta\\s+name="turas-report-type"\\s+content="weighting"', html)) {
-    return("weighting")
-  }
-  # Fallback: detect by structural markers
+  # Fallback: detect by structural markers (older reports without meta tag)
   if (grepl('id="tab-crosstabs"', html, fixed = TRUE)) {
     return("tabs")
   }
@@ -133,6 +122,9 @@ detect_report_type <- function(html) {
   }
   if (grepl('class="tk-header"', html, fixed = TRUE)) {
     return("tracker")
+  }
+  if (grepl('class="ci-header"', html, fixed = TRUE)) {
+    return("confidence")
   }
   if (grepl('class="wt-header"', html, fixed = TRUE)) {
     return("weighting")
@@ -199,6 +191,10 @@ extract_header <- function(html, report_type) {
   } else if (report_type == "keydriver") {
     # Keydriver: <div class="kd-header">...</div>
     m <- regexpr('<div class="kd-header">[\\s\\S]*?</div>\\s*</div>', html, perl = TRUE)
+    if (m > 0) return(regmatches(html, m))
+  } else if (report_type == "confidence") {
+    # Confidence: <div class="ci-header">...</div>
+    m <- regexpr('<div class="ci-header">[\\s\\S]*?</div>\\s*</div>\\s*</div>', html, perl = TRUE)
     if (m > 0) return(regmatches(html, m))
   } else if (report_type == "weighting") {
     # Weighting: <div class="wt-header">...</div>
@@ -368,9 +364,14 @@ extract_content_panels <- function(html, report_type) {
                       substr(html, search_from, nchar(html)), fixed = TRUE)
     if (pv_pos > 0) end_markers <- c(end_markers, search_from + pv_pos - 2)
 
-    # Footer — tracker only (tabs footer is inside content panels, not a boundary)
+    # Footer — tracker and confidence have footers after content panels
     if (report_type == "tracker") {
       ft_pos <- regexpr('<footer class="tk-footer"',
+                        substr(html, search_from, nchar(html)), fixed = TRUE)
+      if (ft_pos > 0) end_markers <- c(end_markers, search_from + ft_pos - 2)
+    }
+    if (report_type == "confidence") {
+      ft_pos <- regexpr('<div class="ci-footer"',
                         substr(html, search_from, nchar(html)), fixed = TRUE)
       if (ft_pos > 0) end_markers <- c(end_markers, search_from + ft_pos - 2)
     }
@@ -418,6 +419,10 @@ extract_footer <- function(html, report_type) {
   }
   if (report_type == "keydriver") {
     m <- regexpr('<div class="kd-footer">[\\s\\S]*?</div>', html, perl = TRUE)
+    if (m > 0) return(regmatches(html, m))
+  }
+  if (report_type == "confidence") {
+    m <- regexpr('<div class="ci-footer">[\\s\\S]*?</div>', html, perl = TRUE)
     if (m > 0) return(regmatches(html, m))
   }
   if (report_type == "weighting") {
@@ -531,6 +536,25 @@ extract_metadata <- function(html, report_type) {
     # Use title for project_title fallback
     if (is.null(meta$project_title) && !is.null(meta$title)) {
       meta$project_title <- meta$title
+    }
+  }
+
+  # --- Confidence report metadata ---
+  if (report_type == "confidence") {
+    # Project title from header
+    proj_m <- regexpr('class="ci-header-project">([^<]*)<', html)
+    if (proj_m > 0) {
+      meta$project_title <- sub('class="ci-header-project">([^<]*)<', '\\1',
+                                regmatches(html, proj_m))
+    }
+
+    # Meta tag extraction
+    meta$total_n <- extract_meta_tag("turas-total-n")
+    meta$n_questions <- extract_meta_tag("turas-questions")
+
+    # Use title for fallback
+    if (is.null(meta$project_title) && !is.null(meta$title)) {
+      meta$project_title <- sub("^Turas Confidence Analysis - ", "", meta$title)
     }
   }
 

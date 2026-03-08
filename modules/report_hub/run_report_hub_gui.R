@@ -60,6 +60,28 @@ run_report_hub_gui <- function() {
 
   TURAS_HOME <- getwd()
 
+  # Recent configs file (last 5 configs, same approach as tabs module)
+  RECENT_CONFIGS_FILE <- file.path(TURAS_HOME, ".recent_hub_configs.rds")
+
+  load_recent_configs <- function() {
+    if (file.exists(RECENT_CONFIGS_FILE)) {
+      tryCatch(readRDS(RECENT_CONFIGS_FILE), error = function(e) character(0))
+    } else {
+      character(0)
+    }
+  }
+
+  save_recent_configs <- function(configs) {
+    tryCatch(saveRDS(configs, RECENT_CONFIGS_FILE), error = function(e) NULL)
+  }
+
+  add_recent_config <- function(config_path) {
+    recent <- load_recent_configs()
+    recent <- unique(c(config_path, recent))
+    recent <- recent[1:min(5, length(recent))]
+    save_recent_configs(recent)
+  }
+
   # ==============================================================================
   # SHINY UI
   # ==============================================================================
@@ -178,6 +200,18 @@ run_report_hub_gui <- function() {
           background: #1d4ed8;
           color: white;
         }
+        .recent-config-item {
+          padding: 10px;
+          margin: 5px 0;
+          background: #f7fafc;
+          border-radius: 5px;
+          cursor: pointer;
+          border: 1px solid #e2e8f0;
+        }
+        .recent-config-item:hover {
+          background: #edf2f7;
+          border-color: #3b82f6;
+        }
       "))
     ),
 
@@ -204,7 +238,8 @@ run_report_hub_gui <- function() {
                           "Select config file",
                           class = "btn btn-primary btn-lg",
                           multiple = FALSE),
-          uiOutput("config_display")
+          uiOutput("config_display"),
+          uiOutput("recent_configs_ui")
         ),
 
         # Step 2: Config preview (conditional)
@@ -245,12 +280,27 @@ run_report_hub_gui <- function() {
           path <- normalizePath(path.expand(as.character(fp$datapath[1])),
                                winslash = "/", mustWork = FALSE)
           config_path(path)
+          add_recent_config(path)
           # Quick-read config for preview
           config_info(read_config_preview(path))
           # Reset previous run state
           console_text("")
           result_info(NULL)
         }
+      }
+    })
+
+    # Handle recent config selection
+    observeEvent(input$select_recent_config, {
+      req(input$select_recent_config)
+      path <- normalizePath(path.expand(input$select_recent_config),
+                           winslash = "/", mustWork = FALSE)
+      if (file.exists(path)) {
+        config_path(path)
+        add_recent_config(path)
+        config_info(read_config_preview(path))
+        console_text("")
+        result_info(NULL)
       }
     })
 
@@ -268,6 +318,31 @@ run_report_hub_gui <- function() {
           tags$small(style = "color: #666;", dirname(path))
         )
       }
+    })
+
+    # Recent configs list
+    output$recent_configs_ui <- renderUI({
+      recent <- load_recent_configs()
+      if (length(recent) == 0) return(NULL)
+
+      # Only show configs that still exist
+      recent <- recent[file.exists(recent)]
+      if (length(recent) == 0) return(NULL)
+
+      div(
+        tags$hr(),
+        h4("Recent Configs"),
+        lapply(seq_along(recent), function(i) {
+          tags$div(
+            class = "recent-config-item",
+            onclick = sprintf("Shiny.setInputValue('select_recent_config', '%s', {priority: 'event'})",
+                             gsub("'", "\\\\'", recent[i])),
+            tags$strong(basename(recent[i])),
+            tags$br(),
+            tags$small(style = "color: #666;", dirname(recent[i]))
+          )
+        })
+      )
     })
 
     # Config preview
@@ -483,10 +558,113 @@ run_report_hub_gui <- function() {
 }
 
 
+# ==============================================================================
+# HELPERS: Auto-detect header row (same approach as tabs module)
+# ==============================================================================
+
+#' Read a table-format Excel sheet with auto-detection of header row
+#' @keywords internal
+.read_table_preview <- function(file_path, sheet_name, required_cols) {
+  df <- openxlsx::read.xlsx(file_path, sheet = sheet_name)
+
+  if (all(required_cols %in% names(df))) {
+    # Filter out help/description rows
+    if (nrow(df) > 0 && any(grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
+                                   as.character(df[[1]]), ignore.case = TRUE))) {
+      df <- df[!grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
+                       as.character(df[[1]]), ignore.case = TRUE), , drop = FALSE]
+    }
+    if (nrow(df) > 0) {
+      all_na <- apply(df, 1, function(row) all(is.na(row) | trimws(as.character(row)) == ""))
+      df <- df[!all_na, , drop = FALSE]
+    }
+    return(df)
+  }
+
+  # Auto-detect: scan first 10 rows for the header
+  raw <- openxlsx::read.xlsx(file_path, sheet = sheet_name,
+                              colNames = FALSE, rows = 1:10)
+  header_row <- NULL
+  for (r in seq_len(nrow(raw))) {
+    row_vals <- as.character(unlist(raw[r, ]))
+    if (all(required_cols %in% row_vals)) {
+      header_row <- r
+      break
+    }
+  }
+
+  if (!is.null(header_row)) {
+    df <- openxlsx::read.xlsx(file_path, sheet = sheet_name, startRow = header_row)
+    if (nrow(df) > 0 && any(grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
+                                   as.character(df[[1]]), ignore.case = TRUE))) {
+      df <- df[!grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
+                       as.character(df[[1]]), ignore.case = TRUE), , drop = FALSE]
+    }
+    if (nrow(df) > 0) {
+      all_na <- apply(df, 1, function(row) all(is.na(row) | trimws(as.character(row)) == ""))
+      df <- df[!all_na, , drop = FALSE]
+    }
+    return(df)
+  }
+
+  return(df)
+}
+
+
+#' Read a Settings-format Excel sheet with auto-detection of header row
+#' @keywords internal
+.read_settings_preview <- function(file_path, sheet_name) {
+  df <- openxlsx::read.xlsx(file_path, sheet = sheet_name)
+  col_lower <- tolower(names(df))
+
+  has_kv <- ("setting" %in% col_lower && "value" %in% col_lower) ||
+            ("field" %in% col_lower && "value" %in% col_lower)
+
+  if (has_kv) {
+    key_col <- if ("setting" %in% col_lower) which(col_lower == "setting")[1]
+               else which(col_lower == "field")[1]
+    value_col <- which(col_lower == "value")[1]
+    keys <- as.character(df[[key_col]])
+    values <- as.character(df[[value_col]])
+    valid <- !is.na(keys) & nzchar(trimws(keys)) &
+             !grepl("^\\[", keys) &
+             !grepl("^(PROJECT|BRANDING|OUTPUT|SECTION)$", keys, ignore.case = TRUE)
+    return(as.list(setNames(values[valid], tolower(trimws(keys[valid])))))
+  }
+
+  # Auto-detect: scan first 10 rows for Setting/Value or Field/Value header
+  raw <- openxlsx::read.xlsx(file_path, sheet = sheet_name,
+                              colNames = FALSE, rows = 1:10)
+  for (r in seq_len(nrow(raw))) {
+    row_vals <- tolower(as.character(unlist(raw[r, ])))
+    if (("setting" %in% row_vals && "value" %in% row_vals) ||
+        ("field" %in% row_vals && "value" %in% row_vals)) {
+      df <- openxlsx::read.xlsx(file_path, sheet = sheet_name, startRow = r)
+      col_lower <- tolower(names(df))
+      key_col <- if ("setting" %in% col_lower) which(col_lower == "setting")[1]
+                 else which(col_lower == "field")[1]
+      value_col <- which(col_lower == "value")[1]
+      keys <- as.character(df[[key_col]])
+      values <- as.character(df[[value_col]])
+      valid <- !is.na(keys) & nzchar(trimws(keys)) &
+               !grepl("^\\[", keys) &
+               !grepl("^(PROJECT|BRANDING|OUTPUT|SECTION)$", keys, ignore.case = TRUE)
+      return(as.list(setNames(values[valid], tolower(trimws(keys[valid])))))
+    }
+  }
+
+  # Fallback: single-row format
+  settings <- as.list(df[1, ])
+  names(settings) <- tolower(trimws(names(settings)))
+  return(settings)
+}
+
+
 #' Quick-Read Config for Preview
 #'
 #' Reads the config file just enough to display a preview
-#' without running full validation.
+#' without running full validation. Auto-detects header rows to support
+#' both legacy and template formats.
 #'
 #' @param config_path Path to the config Excel file
 #' @return List with title, n_reports, reports, and optional error
@@ -503,27 +681,14 @@ read_config_preview <- function(config_path) {
       ))
     }
 
-    # Read Settings
-    settings_raw <- openxlsx::read.xlsx(config_path, sheet = "Settings")
-
-    # Parse settings (handle key-value or single-row format)
-    col_lower <- tolower(names(settings_raw))
-    if ("field" %in% col_lower && "value" %in% col_lower) {
-      field_col <- which(col_lower == "field")[1]
-      value_col <- which(col_lower == "value")[1]
-      settings <- setNames(
-        as.character(settings_raw[[value_col]]),
-        tolower(trimws(as.character(settings_raw[[field_col]])))
-      )
-      title <- settings[["project_title"]]
-    } else {
-      title <- settings_raw$project_title[1]
-    }
-
+    # Read Settings (auto-detect header row)
+    settings <- .read_settings_preview(config_path, "Settings")
+    title <- settings[["project_title"]]
     if (is.null(title) || is.na(title)) title <- "(No title found)"
 
-    # Read Reports
-    reports_df <- openxlsx::read.xlsx(config_path, sheet = "Reports")
+    # Read Reports (auto-detect header row)
+    reports_df <- .read_table_preview(config_path, "Reports",
+                                       c("report_path", "report_label"))
 
     if (!"report_path" %in% names(reports_df) ||
         !"report_label" %in% names(reports_df)) {
@@ -549,31 +714,10 @@ read_config_preview <- function(config_path) {
     })
 
     # Extract output settings
-    output_file <- NULL
-    output_dir <- NULL
-    if ("field" %in% col_lower && "value" %in% col_lower) {
-      field_col <- which(col_lower == "field")[1]
-      value_col <- which(col_lower == "value")[1]
-      fields_lower <- tolower(trimws(as.character(settings_raw[[field_col]])))
-      values <- as.character(settings_raw[[value_col]])
-      if ("output_file" %in% fields_lower) {
-        output_file <- values[which(fields_lower == "output_file")[1]]
-        if (is.na(output_file) || !nzchar(trimws(output_file))) output_file <- NULL
-      }
-      if ("output_dir" %in% fields_lower) {
-        output_dir <- values[which(fields_lower == "output_dir")[1]]
-        if (is.na(output_dir) || !nzchar(trimws(output_dir))) output_dir <- NULL
-      }
-    } else {
-      if ("output_file" %in% names(settings_raw)) {
-        output_file <- settings_raw$output_file[1]
-        if (is.na(output_file) || !nzchar(trimws(output_file))) output_file <- NULL
-      }
-      if ("output_dir" %in% names(settings_raw)) {
-        output_dir <- settings_raw$output_dir[1]
-        if (is.na(output_dir) || !nzchar(trimws(output_dir))) output_dir <- NULL
-      }
-    }
+    output_file <- settings[["output_file"]]
+    if (!is.null(output_file) && (is.na(output_file) || !nzchar(trimws(output_file)))) output_file <- NULL
+    output_dir <- settings[["output_dir"]]
+    if (!is.null(output_dir) && (is.na(output_dir) || !nzchar(trimws(output_dir)))) output_dir <- NULL
 
     list(title = title, n_reports = nrow(reports_df), reports = report_list,
          output_file = output_file, output_dir = output_dir)

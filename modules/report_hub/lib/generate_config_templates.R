@@ -192,7 +192,7 @@ generate_report_hub_config_template <- function(output_path) {
       width = 18,
       required = FALSE,
       description = "Report type override (auto-detected if blank)",
-      dropdown = c("tracker", "tabs"),
+      dropdown = c("tracker", "tabs", "confidence", "catdriver", "keydriver", "weighting"),
       numeric_range = NULL,
       integer_range = NULL
     )

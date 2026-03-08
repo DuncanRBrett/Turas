@@ -502,6 +502,66 @@ test_that("guard passes with valid config and returns correct structure", {
   expect_null(result$result$cross_refs)
 })
 
+test_that("guard passes with template-format config (headers not in row 1)", {
+  skip_if_not_installed("openxlsx")
+
+  html_file <- tempfile(fileext = ".html")
+  writeLines("<html><body></body></html>", html_file)
+  on.exit(unlink(html_file), add = TRUE)
+
+  tmp <- tempfile(fileext = ".xlsx")
+  wb <- openxlsx::createWorkbook()
+
+  # Settings sheet: title/subtitle/legend/header rows before data (template format)
+  openxlsx::addWorksheet(wb, "Settings")
+  openxlsx::writeData(wb, "Settings", "Report Hub Configuration", startRow = 1, startCol = 1)
+  openxlsx::writeData(wb, "Settings", "Settings for combining multiple Turas HTML reports", startRow = 2, startCol = 1)
+  openxlsx::writeData(wb, "Settings", "Legend:", startRow = 3, startCol = 1)
+  # Row 5: header
+  openxlsx::writeData(wb, "Settings",
+    data.frame(t(c("Setting", "Value", "Required?", "Description", "Valid Values / Notes"))),
+    startRow = 5, startCol = 1, colNames = FALSE)
+  # Row 6+: data (with section headers)
+  openxlsx::writeData(wb, "Settings", "PROJECT", startRow = 6, startCol = 1)
+  openxlsx::writeData(wb, "Settings", "project_title", startRow = 7, startCol = 1)
+  openxlsx::writeData(wb, "Settings", "Template Test", startRow = 7, startCol = 2)
+  openxlsx::writeData(wb, "Settings", "company_name", startRow = 8, startCol = 1)
+  openxlsx::writeData(wb, "Settings", "Acme Research", startRow = 8, startCol = 2)
+
+  # Reports sheet: title/subtitle/header/description rows (template format)
+  openxlsx::addWorksheet(wb, "Reports")
+  openxlsx::writeData(wb, "Reports", "Report Files", startRow = 1, startCol = 1)
+  openxlsx::writeData(wb, "Reports", "List all HTML reports to combine", startRow = 2, startCol = 1)
+  # Row 3: column headers
+  openxlsx::writeData(wb, "Reports",
+    data.frame(t(c("report_path", "report_label", "report_key", "order", "report_type"))),
+    startRow = 3, startCol = 1, colNames = FALSE)
+  # Row 4: description row
+  openxlsx::writeData(wb, "Reports", "[REQUIRED] Path to report file", startRow = 4, startCol = 1)
+  openxlsx::writeData(wb, "Reports", "[REQUIRED] Display label", startRow = 4, startCol = 2)
+  openxlsx::writeData(wb, "Reports", "[REQUIRED] Unique key", startRow = 4, startCol = 3)
+  openxlsx::writeData(wb, "Reports", "[REQUIRED] Sort order", startRow = 4, startCol = 4)
+  openxlsx::writeData(wb, "Reports", "[Optional] Report type", startRow = 4, startCol = 5)
+  # Row 5: actual data
+  openxlsx::writeData(wb, "Reports", html_file, startRow = 5, startCol = 1)
+  openxlsx::writeData(wb, "Reports", "Tracker Report", startRow = 5, startCol = 2)
+  openxlsx::writeData(wb, "Reports", "tracker", startRow = 5, startCol = 3)
+  openxlsx::writeData(wb, "Reports", 1, startRow = 5, startCol = 4)
+  openxlsx::writeData(wb, "Reports", "tracker", startRow = 5, startCol = 5)
+
+  openxlsx::saveWorkbook(wb, tmp, overwrite = TRUE)
+  on.exit(unlink(tmp), add = TRUE)
+
+  result <- guard_validate_hub_config(tmp)
+
+  expect_equal(result$status, "PASS")
+  expect_equal(result$result$settings$project_title, "Template Test")
+  expect_equal(result$result$settings$company_name, "Acme Research")
+  expect_length(result$result$reports, 1)
+  expect_equal(result$result$reports[[1]]$key, "tracker")
+  expect_equal(result$result$reports[[1]]$label, "Tracker Report")
+})
+
 test_that("guard sorts reports by order", {
   skip_if_not_installed("openxlsx")
 
