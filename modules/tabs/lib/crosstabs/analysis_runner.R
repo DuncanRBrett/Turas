@@ -41,10 +41,12 @@
 #' @param composite_defs Data frame, composite definitions (can be NULL)
 #' @return Data frame, error log
 #' @export
-run_validation <- function(survey_structure, survey_data, config_obj, composite_defs) {
+run_validation <- function(survey_structure, survey_data, config_obj,
+                           composite_defs, selection_df = NULL) {
   log_message("Running comprehensive validation...", "INFO")
 
-  error_log <- run_all_validations(survey_structure, survey_data, config_obj)
+  error_log <- run_all_validations(survey_structure, survey_data, config_obj,
+                                    selection_df = selection_df)
 
   if (nrow(error_log) > 0) {
     log_message(sprintf("Found %d validation issues", nrow(error_log)), "WARNING")
@@ -468,7 +470,8 @@ run_crosstabs_analysis <- function(config_result, data_result,
     data_result$survey_structure,
     data_result$survey_data,
     config_result$config_obj,
-    data_result$composite_defs
+    data_result$composite_defs,
+    data_result$selection_df
   )
 
   # Create banner structure

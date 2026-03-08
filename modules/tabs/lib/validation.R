@@ -83,6 +83,7 @@ if (exists("tabs_source", mode = "function")) {
   tabs_source("validation", "weight_validators.R")
   tabs_source("validation", "config_validators.R")
   tabs_source("validation", "data_validators.R")
+  tabs_source("validation", "preflight_validators.R")
 } else {
   # Fallback: try to source directly (less reliable but maintains backward compat)
   .validation_dir <- tryCatch(dirname(sys.frame(1)$ofile), error = function(e) getwd())
@@ -101,6 +102,10 @@ if (exists("tabs_source", mode = "function")) {
   .data_validators_path <- file.path(.validation_dir, "validation", "data_validators.R")
   if (file.exists(.data_validators_path)) {
     source(.data_validators_path)
+  }
+  .preflight_validators_path <- file.path(.validation_dir, "validation", "preflight_validators.R")
+  if (file.exists(.preflight_validators_path)) {
+    source(.preflight_validators_path)
   }
 }
 
@@ -1370,7 +1375,8 @@ validate_base_sizes_for_testing <- function(base_sizes,
 #' 
 #' # Quiet mode (for unit tests or batch processing)
 #' error_log <- run_all_validations(survey_structure, survey_data, config, verbose = FALSE)
-run_all_validations <- function(survey_structure, survey_data, config, verbose = TRUE) {
+run_all_validations <- function(survey_structure, survey_data, config,
+                                verbose = TRUE, selection_df = NULL) {
   # Input validation (fail fast)
   if (!is.list(survey_structure)) {
     tabs_refuse(
@@ -1420,6 +1426,8 @@ run_all_validations <- function(survey_structure, survey_data, config, verbose =
     error_log <- validate_data_structure(survey_data, survey_structure, error_log, verbose)
     error_log <- validate_weighting_config(survey_structure, survey_data, config, error_log, verbose)
     error_log <- validate_crosstab_config(config, survey_structure, survey_data, error_log, verbose)
+    error_log <- validate_preflight(survey_structure, survey_data, config,
+                                     selection_df, error_log, verbose)
   }, error = function(e) {
     # Validation function itself failed (shouldn't happen with proper inputs)
     if (verbose) {
