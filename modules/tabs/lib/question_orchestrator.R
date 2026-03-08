@@ -467,9 +467,6 @@ process_single_question <- function(question_code, prepared_data,
     }
     if (!is.null(summary_results) && nrow(summary_results) > 0) {
       question_table <- safe_rbind(question_table, summary_results)
-    } else if (question_info$Variable_Type == "Rating") {
-      cat(sprintf("  [DEBUG] %s: summary_results is %s\n", question_code,
-          if (is.null(summary_results)) "NULL" else paste0("empty (", nrow(summary_results), " rows)")))
     }
   }
 

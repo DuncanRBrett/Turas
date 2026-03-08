@@ -229,21 +229,26 @@ check_preflight_multi_mention <- function(questions_df, survey_data, selection_d
       }
     }
 
-    # Check binary values (0/1/NA) for existing columns
+    # Check data format for existing columns (binary 0/1 or text-in-column)
+    # Both formats are valid:
+    #   - Binary: 0/1 values (standard)
+    #   - Text-in-column: option text if selected, NA/blank if not (Alchemer export format)
+    # The cell calculator handles both via safe_equal() matching.
+    # Only log once per question (not per column) as an informational note.
     existing_cols <- intersect(expected_cols, data_cols)
-    for (col in existing_cols) {
-      vals <- survey_data[[col]]
+    if (length(existing_cols) > 0) {
+      first_col <- existing_cols[1]
+      vals <- survey_data[[first_col]]
       vals <- vals[!is.na(vals)]
       if (length(vals) > 0) {
         non_binary <- vals[!vals %in% c(0, 1, "0", "1")]
         if (length(non_binary) > 0) {
           error_log <- log_issue(
-            error_log, "Preflight", "Non-Binary Multi_Mention Values",
-            sprintf("Question '%s', column '%s': expected 0/1 values but found: %s",
-                    q_code, col,
-                    paste(unique(utils::head(non_binary, 5)), collapse = ", ")),
+            error_log, "Preflight", "Text-Based Multi_Mention Format",
+            sprintf("Question '%s': uses text-in-column format (e.g. '%s'). This is supported.",
+                    q_code, utils::head(unique(non_binary), 1)),
             q_code,
-            "Warning"
+            "Note"
           )
         }
       }
@@ -317,7 +322,8 @@ check_numeric_data_types <- function(questions_df, survey_data, selection_df,
 #' @param error_log Data frame, error log
 #' @return Updated error_log
 #' @keywords internal
-check_create_index_config <- function(selection_df, options_df, error_log) {
+check_create_index_config <- function(selection_df, options_df, error_log,
+                                      questions_df = NULL) {
   index_questions <- selection_df[
     !is.na(selection_df$CreateIndex) &
     toupper(selection_df$CreateIndex) == "Y", ]
@@ -328,6 +334,14 @@ check_create_index_config <- function(selection_df, options_df, error_log) {
 
   for (i in seq_len(nrow(index_questions))) {
     q_code <- index_questions$QuestionCode[i]
+
+    # Skip question types where Index_Weight doesn't apply
+    if (!is.null(questions_df)) {
+      q_row <- questions_df[questions_df$QuestionCode == q_code, ]
+      if (nrow(q_row) > 0 && q_row$Variable_Type[1] %in% c("Ranking", "NPS")) {
+        next
+      }
+    }
 
     if (!has_weight_col) {
       error_log <- log_issue(
@@ -901,7 +915,8 @@ validate_preflight <- function(survey_structure, survey_data, config,
       questions_df, survey_data, selection_df, error_log)
 
     # 5. CreateIndex configuration (Index_Weight lives in Options sheet)
-    error_log <- check_create_index_config(selection_df, options_df, error_log)
+    error_log <- check_create_index_config(selection_df, options_df, error_log,
+                                              questions_df = questions_df)
 
     # 6. Banner variable validation
     error_log <- check_banner_variables(
