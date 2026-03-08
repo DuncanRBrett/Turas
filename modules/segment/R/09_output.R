@@ -7,47 +7,230 @@
 
 # Source config utilities for label formatting
 
-#' Create Run_Status Data Frame for writexl
+#' Create Segment Output Styles
 #'
-#' @param run_result TRS run result object
-#' @return Data frame for Run_Status sheet
+#' Creates a reusable style list for professional Excel output,
+#' matching the catdriver module's formatting standard.
+#'
+#' @param wb openxlsx Workbook object
+#' @return List of style objects
 #' @keywords internal
-create_run_status_df <- function(run_result) {
-  if (is.null(run_result)) return(NULL)
-
-  # Build summary section
-  summary_rows <- data.frame(
-    Field = c("Module", "Status", "Event_Count", "Timestamp"),
-    Value = c(
-      run_result$module %||% "SEGMENT",
-      run_result$status %||% "UNKNOWN",
-      as.character(length(run_result$events)),
-      format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+create_segment_output_styles <- function(wb) {
+  list(
+    header = openxlsx::createStyle(
+      fontColour = "#FFFFFF",
+      fgFill = "#4472C4",
+      halign = "center",
+      valign = "center",
+      textDecoration = "bold",
+      border = "TopBottomLeftRight",
+      borderColour = "#2F5496"
     ),
-    stringsAsFactors = FALSE
+    subheader = openxlsx::createStyle(
+      fgFill = "#D6DCE4",
+      halign = "left",
+      textDecoration = "bold",
+      border = "TopBottomLeftRight"
+    ),
+    title = openxlsx::createStyle(
+      fontSize = 16,
+      textDecoration = "bold",
+      halign = "left"
+    ),
+    section = openxlsx::createStyle(
+      fontSize = 12,
+      textDecoration = "bold",
+      halign = "left",
+      border = "bottom",
+      borderColour = "#4472C4"
+    ),
+    normal = openxlsx::createStyle(
+      halign = "left",
+      valign = "center"
+    ),
+    number = openxlsx::createStyle(
+      halign = "right",
+      numFmt = "0.000"
+    ),
+    success = openxlsx::createStyle(
+      fgFill = "#C6EFCE",
+      halign = "left"
+    ),
+    warning = openxlsx::createStyle(
+      fgFill = "#FFF2CC",
+      halign = "left"
+    ),
+    error = openxlsx::createStyle(
+      fgFill = "#FFC7CE",
+      halign = "left"
+    )
   )
+}
 
-  # Add events if any
-  if (length(run_result$events) > 0) {
-    # Add blank row
-    summary_rows <- rbind(summary_rows, data.frame(Field = "", Value = "", stringsAsFactors = FALSE))
-    summary_rows <- rbind(summary_rows, data.frame(Field = "EVENTS", Value = "", stringsAsFactors = FALSE))
 
-    for (i in seq_along(run_result$events)) {
-      e <- run_result$events[[i]]
-      event_str <- sprintf("[%s] %s: %s",
-                           e$level %||% "INFO",
-                           e$code %||% "",
-                           e$title %||% "")
-      summary_rows <- rbind(summary_rows, data.frame(
-        Field = sprintf("Event_%d", i),
-        Value = event_str,
-        stringsAsFactors = FALSE
-      ))
+#' Add Run_Status Sheet (TRS v1.0)
+#'
+#' Creates the required Run_Status sheet per TRS v1.0 spec with
+#' professional formatting. This sheet is always placed FIRST in the
+#' workbook for governance compliance.
+#'
+#' @param wb openxlsx Workbook object
+#' @param run_status Character, "PASS" | "PARTIAL" | "REFUSED"
+#' @param degraded Logical, whether output is degraded
+#' @param degraded_reasons Character vector, reasons for degradation
+#' @param affected_outputs Character vector, which outputs are affected
+#' @param guard_summary Guard summary list (optional, for additional details)
+#' @param styles Style list from create_segment_output_styles()
+#' @keywords internal
+add_segment_run_status_sheet <- function(wb, run_status = "PASS",
+                                          degraded = FALSE,
+                                          degraded_reasons = character(0),
+                                          affected_outputs = character(0),
+                                          guard_summary = NULL,
+                                          styles = NULL) {
+
+  openxlsx::addWorksheet(wb, "Run_Status")
+
+  if (is.null(styles)) {
+    styles <- create_segment_output_styles(wb)
+  }
+
+  row <- 1
+
+  # Title
+  openxlsx::writeData(wb, "Run_Status", "SEGMENT RUN STATUS", startRow = row, startCol = 1)
+  openxlsx::addStyle(wb, "Run_Status", styles$title, rows = row, cols = 1)
+  row <- row + 2
+
+  # Status row
+  openxlsx::writeData(wb, "Run_Status", "run_status:", startRow = row, startCol = 1)
+  openxlsx::writeData(wb, "Run_Status", run_status, startRow = row, startCol = 2)
+  if (run_status == "PASS") {
+    openxlsx::addStyle(wb, "Run_Status", styles$success, rows = row, cols = 2)
+  } else if (run_status == "PARTIAL") {
+    openxlsx::addStyle(wb, "Run_Status", styles$warning, rows = row, cols = 2)
+  } else if (run_status == "REFUSED") {
+    openxlsx::addStyle(wb, "Run_Status", styles$error, rows = row, cols = 2)
+  }
+  row <- row + 1
+
+  # Degraded flag
+  openxlsx::writeData(wb, "Run_Status", "degraded:", startRow = row, startCol = 1)
+  openxlsx::writeData(wb, "Run_Status", if (degraded) "TRUE" else "FALSE", startRow = row, startCol = 2)
+  row <- row + 1
+
+  # Module
+  openxlsx::writeData(wb, "Run_Status", "module:", startRow = row, startCol = 1)
+  openxlsx::writeData(wb, "Run_Status", paste0("SEGMENT v", SEGMENT_VERSION),
+                       startRow = row, startCol = 2)
+  row <- row + 1
+
+  # Timestamp
+  openxlsx::writeData(wb, "Run_Status", "timestamp:", startRow = row, startCol = 1)
+  openxlsx::writeData(wb, "Run_Status", format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
+                       startRow = row, startCol = 2)
+  row <- row + 2
+
+  # Degraded reasons (if any)
+  if (length(degraded_reasons) > 0) {
+    openxlsx::writeData(wb, "Run_Status", "DEGRADED REASONS:", startRow = row, startCol = 1)
+    openxlsx::addStyle(wb, "Run_Status", styles$section, rows = row, cols = 1)
+    row <- row + 1
+
+    for (reason in degraded_reasons) {
+      openxlsx::writeData(wb, "Run_Status", paste0("- ", reason), startRow = row, startCol = 1)
+      row <- row + 1
+    }
+    row <- row + 1
+  }
+
+  # Affected outputs (if any)
+  if (length(affected_outputs) > 0) {
+    openxlsx::writeData(wb, "Run_Status", "AFFECTED OUTPUTS:", startRow = row, startCol = 1)
+    openxlsx::addStyle(wb, "Run_Status", styles$section, rows = row, cols = 1)
+    row <- row + 1
+
+    for (output in affected_outputs) {
+      openxlsx::writeData(wb, "Run_Status", paste0("- ", output), startRow = row, startCol = 1)
+      row <- row + 1
+    }
+    row <- row + 1
+  }
+
+  # Guard summary details (if available)
+  if (!is.null(guard_summary)) {
+    if (length(guard_summary$warnings) > 0) {
+      openxlsx::writeData(wb, "Run_Status", "WARNINGS:", startRow = row, startCol = 1)
+      openxlsx::addStyle(wb, "Run_Status", styles$section, rows = row, cols = 1)
+      row <- row + 1
+
+      for (w in guard_summary$warnings) {
+        openxlsx::writeData(wb, "Run_Status", paste0("- ", w), startRow = row, startCol = 1)
+        row <- row + 1
+      }
+      row <- row + 1
+    }
+
+    if (length(guard_summary$stability_flags) > 0) {
+      openxlsx::writeData(wb, "Run_Status", "STABILITY FLAGS:", startRow = row, startCol = 1)
+      openxlsx::addStyle(wb, "Run_Status", styles$section, rows = row, cols = 1)
+      row <- row + 1
+
+      for (flag in guard_summary$stability_flags) {
+        openxlsx::writeData(wb, "Run_Status", paste0("- ", flag), startRow = row, startCol = 1)
+        row <- row + 1
+      }
     }
   }
 
-  return(summary_rows)
+  # Set column widths
+  openxlsx::setColWidths(wb, "Run_Status", cols = 1, widths = 25)
+  openxlsx::setColWidths(wb, "Run_Status", cols = 2, widths = 60)
+}
+
+
+#' Write Sheets to openxlsx Workbook
+#'
+#' Helper to write a named list of data frames as sheets in an openxlsx
+#' workbook with header styling.
+#'
+#' @param wb openxlsx Workbook object
+#' @param sheets Named list of data frames
+#' @param styles Style list from create_segment_output_styles()
+#' @keywords internal
+write_sheets_to_workbook <- function(wb, sheets, styles) {
+  for (sheet_name in names(sheets)) {
+    df <- sheets[[sheet_name]]
+    if (is.null(df) || (is.data.frame(df) && nrow(df) == 0)) next
+
+    openxlsx::addWorksheet(wb, sheet_name)
+    openxlsx::writeData(wb, sheet_name, df, headerStyle = styles$header)
+
+    # Set reasonable column widths
+    n_cols <- ncol(df)
+    widths <- pmin(pmax(nchar(names(df)) * 1.2 + 2, 12), 40)
+    openxlsx::setColWidths(wb, sheet_name, cols = seq_len(n_cols), widths = widths)
+  }
+}
+
+
+#' Save Workbook with Atomic Safety
+#'
+#' Saves an openxlsx workbook using the atomic save pattern if available,
+#' falling back to direct save.
+#'
+#' @param wb openxlsx Workbook object
+#' @param output_path Character, output file path
+#' @keywords internal
+save_workbook_safe <- function(wb, output_path) {
+  if (exists("turas_save_workbook_atomic", mode = "function")) {
+    save_result <- turas_save_workbook_atomic(wb, output_path, module = "SEGMENT")
+    if (!save_result$success) {
+      warning(sprintf("[SEGMENT] Failed to save workbook: %s", save_result$error))
+    }
+  } else {
+    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+  }
 }
 
 #' Null coalesce operator
@@ -410,29 +593,25 @@ export_exploration_report <- function(exploration_result, metrics_result,
     }
   }
 
-  # Add Run_Status sheet (TRS v1.0)
-  if (!is.null(run_result)) {
-    run_status_df <- create_run_status_df(run_result)
-    if (!is.null(run_status_df)) {
-      profile_sheets[["Run_Status"]] <- run_status_df
-    }
-  }
+  # Write to Excel using openxlsx for professional formatting
+  wb <- openxlsx::createWorkbook()
+  styles <- create_segment_output_styles(wb)
 
-  # Write all sheets to Excel (TRS v1.0: Use atomic save if available)
-  if (exists("turas_save_writexl_atomic", mode = "function")) {
-    save_result <- turas_save_writexl_atomic(
-      sheets = profile_sheets,
-      file_path = output_path,
-      module = "SEGMENT"
-    )
-    if (!save_result$success) {
-      warning(sprintf("[SEGMENT] Failed to save exploration report: %s", save_result$error))
-    }
-  } else {
-    writexl::write_xlsx(profile_sheets, output_path)
-  }
+  # TRS v1.0: Run_Status sheet FIRST
+  run_status_val <- if (!is.null(run_result)) (run_result$status %||% "PASS") else "PASS"
+  add_segment_run_status_sheet(wb,
+    run_status = run_status_val,
+    degraded = !identical(run_status_val, "PASS"),
+    styles = styles
+  )
 
-  cat(sprintf("✓ Exported exploration report with %d sheets\n", length(profile_sheets)))
+  # Write data sheets
+  write_sheets_to_workbook(wb, profile_sheets, styles)
+
+  # Save
+  save_workbook_safe(wb, output_path)
+
+  cat(sprintf("  Exported exploration report with %d sheets\n", length(profile_sheets) + 1))
 
   return(invisible(output_path))
 }
@@ -452,11 +631,15 @@ export_exploration_report <- function(exploration_result, metrics_result,
 #' @param segment_names Character vector of segment names
 #' @param exec_summary Executive summary list (optional)
 #' @param gmm_membership GMM membership summary (optional)
+#' @param run_status_details List with degraded_reasons and affected_outputs (optional)
+#' @param guard_summary Guard summary list for Run_Status sheet (optional)
 #' @export
 export_final_report <- function(final_result, profile_result, validation_metrics,
                                  output_path, run_result = NULL,
                                  enhanced = list(), segment_names = NULL,
-                                 exec_summary = NULL, gmm_membership = NULL) {
+                                 exec_summary = NULL, gmm_membership = NULL,
+                                 run_status_details = NULL,
+                                 guard_summary = NULL) {
   cat(sprintf("  Exporting segmentation report: %s\n", basename(output_path)))
 
   data_list <- final_result$data_list
@@ -752,29 +935,43 @@ export_final_report <- function(final_result, profile_result, validation_metrics
     }
   }
 
-  # Add Run_Status sheet (TRS v1.0)
-  if (!is.null(run_result)) {
-    run_status_df <- create_run_status_df(run_result)
-    if (!is.null(run_status_df)) {
-      sheets[["Run_Status"]] <- run_status_df
+  # Write to Excel using openxlsx for professional formatting
+  wb <- openxlsx::createWorkbook()
+  styles <- create_segment_output_styles(wb)
+
+  # TRS v1.0: Run_Status sheet FIRST
+  run_status_val <- if (!is.null(run_result)) (run_result$status %||% "PASS") else "PASS"
+  degraded <- !identical(run_status_val, "PASS")
+  deg_reasons <- if (!is.null(run_status_details)) (run_status_details$degraded_reasons %||% character(0)) else character(0)
+  aff_outputs <- if (!is.null(run_status_details)) (run_status_details$affected_outputs %||% character(0)) else character(0)
+
+  # Extract events from run_result as additional degraded reasons
+  if (!is.null(run_result) && length(run_result$events) > 0) {
+    for (e in run_result$events) {
+      if (identical(e$level, "WARNING") || identical(e$level, "ERROR")) {
+        deg_reasons <- c(deg_reasons,
+          sprintf("[%s] %s", e$code %||% "", e$title %||% ""))
+      }
     }
+    deg_reasons <- unique(deg_reasons)
   }
 
-  # Write to Excel (TRS v1.0: Use atomic save if available)
-  if (exists("turas_save_writexl_atomic", mode = "function")) {
-    save_result <- turas_save_writexl_atomic(
-      sheets = sheets,
-      file_path = output_path,
-      module = "SEGMENT"
-    )
-    if (!save_result$success) {
-      warning(sprintf("[SEGMENT] Failed to save final report: %s", save_result$error))
-    }
-  } else {
-    writexl::write_xlsx(sheets, output_path)
-  }
+  add_segment_run_status_sheet(wb,
+    run_status = run_status_val,
+    degraded = degraded,
+    degraded_reasons = deg_reasons,
+    affected_outputs = aff_outputs,
+    guard_summary = guard_summary,
+    styles = styles
+  )
 
-  cat(sprintf("  Exported report with %d sheets\n", length(sheets)))
+  # Write data sheets
+  write_sheets_to_workbook(wb, sheets, styles)
+
+  # Save
+  save_workbook_safe(wb, output_path)
+
+  cat(sprintf("  Exported report with %d sheets\n", length(sheets) + 1))
 
   return(invisible(output_path))
 }

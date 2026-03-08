@@ -1,7 +1,7 @@
 # Turas Segmentation Module - Technical Documentation
 
-**Version:** 11.0
-**Last Updated:** 5 March 2026
+**Version:** 12.0
+**Last Updated:** 8 March 2026
 **Target Audience:** Developers, Technical Maintainers, Data Scientists
 
 ---
@@ -373,32 +373,76 @@ run_clustering(data_list, config, guard)
 
 ### TRS v1.1 Integration
 
-The segment module uses a three-file guard architecture:
+The segment module uses a four-file guard architecture:
 
 | File | Purpose | Severity |
 |------|---------|----------|
-| `00_guard.R` | TRS framework, `segment_refuse()` wrapper | Infrastructure |
+| `00_guard.R` | TRS framework, `segment_refuse()` wrapper, state management | Infrastructure |
 | `00a_guards_hard.R` | Fatal guards that REFUSE execution | REFUSE |
-| `00b_guards_soft.R` | Non-fatal guards that degrade to PARTIAL | PARTIAL |
+| `00b_guards_soft.R` | Non-fatal guards + pre/post orchestrators | PARTIAL |
+| `lib/validation/preflight_validators.R` | 15 cross-referential config/data checks | Error/Warning |
+
+### Guard Orchestrators (v12.0)
+
+Guards are collected into two orchestrator functions that mirror the catdriver pattern:
+
+**`segment_guard_pre_analysis(config, data_list)`** - Runs before clustering:
+- All hard guards (config, data, method validation)
+- Data quality soft guards (missing data, variance, correlation)
+- Outlier tracking
+- Returns initialized guard state
+
+**`segment_guard_post_clustering(guard, cluster_result, validation_metrics, config)`** - Runs after clustering:
+- Cluster size checks
+- Silhouette quality assessment
+- Stability metric recording
+- Returns updated guard state
+
+### Preflight Validation (v12.0)
+
+The preflight system (`lib/validation/preflight_validators.R`) runs 15 cross-referential checks before analysis begins. Unlike guards that throw TRS refusals, preflight validators accumulate issues in an error log and report all problems at once:
+
+1. Data file exists
+2. Clustering variables exist in data
+3. Clustering variables are numeric
+4. Profile variables exist (if specified)
+5. ID variable exists
+6. ID variable has unique values
+7. Sample size adequate for k and p
+8. K range is valid
+9. Required packages available
+10. Per-variable missing data rates
+11. Zero/near-zero variance variables
+12. High correlation pairs (|r| > 0.95)
+13. Outlier configuration consistency
+14. Output directory writable
+15. Segment names file exists (if specified)
 
 ### Hard Guards (REFUSE)
 
 Hard guards prevent execution when critical requirements are not met:
 
+- `guard_require_data_file()` - Data file must exist
+- `guard_require_clustering_vars()` - At least 2 numeric variables
+- `guard_require_id_variable()` - ID variable must exist and be unique
+- `guard_require_sample_size()` - n >= max(100, 30*k, 10*p)
 - `guard_require_valid_method()` - Method must be kmeans, hclust, or gmm
-- `guard_require_method_packages()` - Required packages must be installed (e.g., mclust for GMM)
-- `guard_require_hclust_size()` - Dataset must be under ~15,000 rows for hierarchical clustering
-- `guard_require_minimum_cases()` - Sufficient complete cases for analysis
-- `guard_require_numeric_vars()` - All clustering variables must be numeric
+- `guard_require_method_packages()` - Required packages installed
+- `guard_require_valid_k()` - Valid k range or k_fixed
+- `guard_require_valid_solution()` - No empty clusters, minimum size
+- `guard_require_hclust_size()` - Dataset under ~15,000 for hclust
 
 ### Soft Guards (PARTIAL)
 
 Soft guards allow execution to continue with warnings:
 
-- Small segment size warnings
-- High missing data percentage warnings
-- Variable selection reducing to fewer than expected variables
-- Stability below acceptable thresholds
+- `guard_check_low_variance()` - Near-zero variance variables
+- `guard_check_small_clusters()` - Small or imbalanced clusters
+- `guard_check_silhouette_quality()` - Weak cluster separation
+- `guard_check_outlier_proportion()` - High outlier rate
+- `guard_check_missing_data()` - High missing data per variable
+- `guard_check_high_correlation()` - Multicollinearity
+- `guard_check_variable_selection()` - Significant variable reduction
 
 ### segment_refuse() Pattern
 

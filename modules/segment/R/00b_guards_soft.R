@@ -1,8 +1,11 @@
 # ==============================================================================
-# SEGMENT MODULE - SOFT GUARDS (PARTIAL)
+# SEGMENT MODULE - SOFT GUARDS (PARTIAL) + GUARD ORCHESTRATORS
 # ==============================================================================
 # Data quality checks that produce warnings and PARTIAL status.
 # These do NOT halt execution - they update the guard state and continue.
+#
+# Also provides orchestrator functions that collect guards into
+# pre-analysis and post-clustering phases (mirroring catdriver pattern).
 #
 # Convention: guard_check_*() = soft guard (warn, continue)
 # ==============================================================================
@@ -229,6 +232,96 @@ guard_check_variable_selection <- function(original_count, selected_count, guard
         category = "variable_selection")
     }
   }
+
+  guard
+}
+
+
+# ==============================================================================
+# GUARD ORCHESTRATORS
+# ==============================================================================
+# These functions collect all guards into coordinated pre/post phases,
+# matching the catdriver pattern for maintainability and clarity.
+# ==============================================================================
+
+
+#' Run All Pre-Analysis Guards
+#'
+#' Validates config and data before clustering begins.
+#' Runs all hard-error guards that use segment_refuse().
+#' Also runs data-quality soft guards that set PARTIAL status.
+#'
+#' @param config Configuration list
+#' @param data_list Prepared data list from prepare_segment_data()
+#' @return Guard state object with all pre-analysis checks recorded
+#' @export
+segment_guard_pre_analysis <- function(config, data_list) {
+  guard <- segment_guard_init()
+
+  # --- Hard guards (REFUSE on failure) ---
+
+  # Config completeness
+  guard_require_clustering_vars(config, data_list$data)
+  guard_require_id_variable(config, data_list$data)
+  guard_require_valid_method(config$method)
+  guard_require_method_packages(config$method)
+  guard_require_valid_k(config)
+
+  # Sample size (use k_max for exploration, k_fixed for final)
+  k_check <- if (config$mode == "exploration") config$k_max else config$k_fixed
+  guard_require_sample_size(nrow(data_list$scaled_data), k_check, ncol(data_list$scaled_data))
+
+  # Hclust size limit
+  if (tolower(config$method) == "hclust") {
+    guard_require_hclust_size(nrow(data_list$scaled_data))
+  }
+
+  # --- Soft guards (warn, set PARTIAL) ---
+
+  # Data quality checks
+  guard <- guard_check_missing_data(data_list$data, config$clustering_vars, guard,
+                                     threshold = config$missing_threshold)
+  guard <- guard_check_low_variance(data_list$scaled_data, guard)
+  guard <- guard_check_high_correlation(data_list$scaled_data, guard)
+
+  # Outlier proportion
+  if (!is.null(data_list$outlier_count) && data_list$outlier_count > 0) {
+    guard <- guard_check_outlier_proportion(data_list$outlier_count,
+                                            nrow(data_list$data), guard)
+    guard <- guard_record_outliers_removed(guard, data_list$outlier_count)
+  }
+
+  guard
+}
+
+
+#' Run All Post-Clustering Guards
+#'
+#' Validates clustering results and adds appropriate warnings.
+#' Called after clustering and validation metrics are computed.
+#'
+#' @param guard Guard state object from segment_guard_pre_analysis()
+#' @param cluster_result Clustering result list (clusters, k, centers, method)
+#' @param validation_metrics Validation metrics list (avg_silhouette, etc.)
+#' @param config Configuration list
+#' @return Updated guard state
+#' @export
+segment_guard_post_clustering <- function(guard, cluster_result, validation_metrics, config) {
+
+  # Record clustering method
+
+  guard$clustering_method <- config$method
+
+  # Cluster size checks
+  guard <- guard_check_small_clusters(cluster_result$clusters, guard,
+                                       min_pct = config$min_segment_size_pct)
+
+  # Silhouette quality
+  guard <- guard_check_silhouette_quality(validation_metrics$avg_silhouette, guard)
+
+  # Record stability metrics
+  guard <- guard_record_cluster_stability(guard, cluster_result$k,
+    validation_metrics$avg_silhouette, validation_metrics$tot_withinss)
 
   guard
 }

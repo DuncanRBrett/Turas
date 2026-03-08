@@ -250,3 +250,168 @@ test_that("create_output_folder does not error if directory already exists", {
   expect_true(dir.exists(result2))
   expect_equal(result1, result2)
 })
+
+
+# =============================================================================
+# TEST: Run_Status Sheet (TRS v1.0)
+# =============================================================================
+
+test_that("add_segment_run_status_sheet creates Run_Status sheet in workbook", {
+  wb <- openxlsx::createWorkbook()
+
+  add_segment_run_status_sheet(wb, run_status = "PASS")
+
+  expect_true("Run_Status" %in% names(wb))
+})
+
+test_that("add_segment_run_status_sheet writes PASS status correctly", {
+  wb <- openxlsx::createWorkbook()
+
+  add_segment_run_status_sheet(wb, run_status = "PASS", degraded = FALSE)
+
+  # Save and read back
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp))
+  openxlsx::saveWorkbook(wb, tmp, overwrite = TRUE)
+
+  df <- openxlsx::read.xlsx(tmp, sheet = "Run_Status", colNames = FALSE)
+
+  # Title should be first
+  expect_true(any(grepl("SEGMENT RUN STATUS", df[[1]])))
+  # Status should contain PASS
+  status_row <- which(df[[1]] == "run_status:")
+  expect_true(length(status_row) > 0)
+  expect_equal(df[[2]][status_row], "PASS")
+})
+
+test_that("add_segment_run_status_sheet writes PARTIAL with degraded reasons", {
+  wb <- openxlsx::createWorkbook()
+
+  add_segment_run_status_sheet(wb,
+    run_status = "PARTIAL",
+    degraded = TRUE,
+    degraded_reasons = c("Variables dropped", "Low silhouette"),
+    affected_outputs = c("cluster_centers", "segment_interpretability")
+  )
+
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp))
+  openxlsx::saveWorkbook(wb, tmp, overwrite = TRUE)
+
+  df <- openxlsx::read.xlsx(tmp, sheet = "Run_Status", colNames = FALSE)
+
+  # Should contain PARTIAL status
+  status_row <- which(df[[1]] == "run_status:")
+  expect_equal(df[[2]][status_row], "PARTIAL")
+
+  # Should contain degraded = TRUE
+  degraded_row <- which(df[[1]] == "degraded:")
+  expect_equal(df[[2]][degraded_row], "TRUE")
+
+  # Should contain degraded reasons
+  expect_true(any(grepl("Variables dropped", df[[1]])))
+  expect_true(any(grepl("Low silhouette", df[[1]])))
+
+  # Should contain affected outputs
+  expect_true(any(grepl("cluster_centers", df[[1]])))
+})
+
+test_that("add_segment_run_status_sheet includes guard summary warnings", {
+  wb <- openxlsx::createWorkbook()
+
+  guard_summary <- list(
+    warnings = c("Variable q1 has low variance", "5 outliers removed"),
+    stability_flags = c("Low silhouette score")
+  )
+
+  add_segment_run_status_sheet(wb,
+    run_status = "PARTIAL",
+    degraded = TRUE,
+    degraded_reasons = "Low quality",
+    guard_summary = guard_summary
+  )
+
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp))
+  openxlsx::saveWorkbook(wb, tmp, overwrite = TRUE)
+
+  df <- openxlsx::read.xlsx(tmp, sheet = "Run_Status", colNames = FALSE)
+
+  # Should contain warnings and stability flags
+  expect_true(any(grepl("low variance", df[[1]], ignore.case = TRUE)))
+  expect_true(any(grepl("outliers removed", df[[1]], ignore.case = TRUE)))
+  expect_true(any(grepl("silhouette", df[[1]], ignore.case = TRUE)))
+})
+
+
+# =============================================================================
+# TEST: create_segment_output_styles()
+# =============================================================================
+
+test_that("create_segment_output_styles returns expected style list", {
+  wb <- openxlsx::createWorkbook()
+  styles <- create_segment_output_styles(wb)
+
+  expect_true(is.list(styles))
+  expect_true("header" %in% names(styles))
+  expect_true("title" %in% names(styles))
+  expect_true("section" %in% names(styles))
+  expect_true("normal" %in% names(styles))
+  expect_true("success" %in% names(styles))
+  expect_true("warning" %in% names(styles))
+  expect_true("error" %in% names(styles))
+})
+
+
+# =============================================================================
+# TEST: write_sheets_to_workbook()
+# =============================================================================
+
+test_that("write_sheets_to_workbook writes multiple sheets", {
+  wb <- openxlsx::createWorkbook()
+  styles <- create_segment_output_styles(wb)
+
+  sheets <- list(
+    Sheet1 = data.frame(A = 1:5, B = letters[1:5]),
+    Sheet2 = data.frame(X = rnorm(3), Y = runif(3))
+  )
+
+  write_sheets_to_workbook(wb, sheets, styles)
+
+  expect_true("Sheet1" %in% names(wb))
+  expect_true("Sheet2" %in% names(wb))
+})
+
+test_that("write_sheets_to_workbook skips empty data frames", {
+  wb <- openxlsx::createWorkbook()
+  styles <- create_segment_output_styles(wb)
+
+  sheets <- list(
+    Populated = data.frame(A = 1:3),
+    Empty = data.frame()
+  )
+
+  write_sheets_to_workbook(wb, sheets, styles)
+
+  expect_true("Populated" %in% names(wb))
+  expect_false("Empty" %in% names(wb))
+})
+
+
+# =============================================================================
+# TEST: save_workbook_safe()
+# =============================================================================
+
+test_that("save_workbook_safe creates Excel file", {
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Test")
+  openxlsx::writeData(wb, "Test", data.frame(A = 1:3))
+
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp))
+
+  save_workbook_safe(wb, tmp)
+
+  expect_true(file.exists(tmp))
+  expect_true(file.size(tmp) > 0)
+})

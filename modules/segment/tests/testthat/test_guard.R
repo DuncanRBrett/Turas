@@ -329,3 +329,201 @@ test_that("segment_determine_status() includes silhouette in details", {
   # Assert
   expect_equal(status$details$silhouette_score, 0.72)
 })
+
+
+# ==============================================================================
+# segment_guard_pre_analysis() - Guard Orchestrator
+# ==============================================================================
+
+test_that("segment_guard_pre_analysis() returns initialized guard state", {
+  set.seed(42)
+  n <- 200
+  data <- data.frame(
+    resp_id = paste0("R", sprintf("%04d", 1:n)),
+    q1 = rnorm(n, 5, 1),
+    q2 = rnorm(n, 5, 1.5),
+    q3 = rnorm(n, 5, 1.2),
+    stringsAsFactors = FALSE
+  )
+
+  config <- list(
+    clustering_vars = c("q1", "q2", "q3"),
+    id_variable = "resp_id",
+    method = "kmeans",
+    mode = "final",
+    k_fixed = 3,
+    k_min = 2,
+    k_max = 6,
+    missing_threshold = 15,
+    min_segment_size_pct = 5
+  )
+
+  data_list <- list(
+    data = data,
+    scaled_data = scale(data[, c("q1", "q2", "q3")]),
+    outlier_count = 0
+  )
+
+  guard <- segment_guard_pre_analysis(config, data_list)
+
+  expect_true(is.list(guard))
+  expect_equal(guard$module, "SEGMENT")
+  expect_type(guard$warnings, "character")
+})
+
+test_that("segment_guard_pre_analysis() detects low variance variables", {
+  set.seed(42)
+  n <- 200
+  data <- data.frame(
+    resp_id = paste0("R", sprintf("%04d", 1:n)),
+    q1 = rnorm(n, 5, 1),
+    q2 = rnorm(n, 5, 1.5),
+    q3 = rnorm(n, 5, 0.05),
+    stringsAsFactors = FALSE
+  )
+
+  config <- list(
+    clustering_vars = c("q1", "q2", "q3"),
+    id_variable = "resp_id",
+    method = "kmeans",
+    mode = "final",
+    k_fixed = 3,
+    k_min = 2,
+    k_max = 6,
+    missing_threshold = 15,
+    min_segment_size_pct = 5
+  )
+
+  # Create scaled data as data.frame with q3 having near-zero variance
+  set.seed(99)
+  scaled_df <- data.frame(
+    q1 = scale(data$q1),
+    q2 = scale(data$q2),
+    q3 = rnorm(n, 0, 0.005)
+  )
+
+  data_list <- list(
+    data = data,
+    scaled_data = scaled_df,
+    outlier_count = 0
+  )
+
+  guard <- segment_guard_pre_analysis(config, data_list)
+
+  # q3 should be flagged as low variance (var < 0.01)
+  expect_true(length(guard$low_variance_variables) > 0)
+})
+
+test_that("segment_guard_pre_analysis() records outlier count when present", {
+  set.seed(42)
+  n <- 200
+  data <- data.frame(
+    resp_id = paste0("R", sprintf("%04d", 1:n)),
+    q1 = rnorm(n, 5, 1),
+    q2 = rnorm(n, 5, 1.5),
+    q3 = rnorm(n, 5, 1.2),
+    stringsAsFactors = FALSE
+  )
+
+  config <- list(
+    clustering_vars = c("q1", "q2", "q3"),
+    id_variable = "resp_id",
+    method = "kmeans",
+    mode = "final",
+    k_fixed = 3,
+    k_min = 2,
+    k_max = 6,
+    missing_threshold = 15,
+    min_segment_size_pct = 5
+  )
+
+  data_list <- list(
+    data = data,
+    scaled_data = scale(data[, c("q1", "q2", "q3")]),
+    outlier_count = 5
+  )
+
+  guard <- segment_guard_pre_analysis(config, data_list)
+
+  expect_equal(guard$outliers_removed, 5)
+})
+
+
+# ==============================================================================
+# segment_guard_post_clustering() - Guard Orchestrator
+# ==============================================================================
+
+test_that("segment_guard_post_clustering() records clustering method", {
+  guard <- segment_guard_init()
+
+  cluster_result <- list(
+    clusters = rep(1:3, each = 100),
+    k = 3
+  )
+
+  validation_metrics <- list(
+    avg_silhouette = 0.55,
+    tot_withinss = 500
+  )
+
+  config <- list(
+    method = "kmeans",
+    min_segment_size_pct = 5
+  )
+
+  guard <- segment_guard_post_clustering(guard, cluster_result, validation_metrics, config)
+
+  expect_equal(guard$clustering_method, "kmeans")
+})
+
+test_that("segment_guard_post_clustering() flags low silhouette", {
+  guard <- segment_guard_init()
+
+  cluster_result <- list(
+    clusters = rep(1:3, each = 100),
+    k = 3
+  )
+
+  validation_metrics <- list(
+    avg_silhouette = 0.15,  # below 0.25 threshold
+    tot_withinss = 800
+  )
+
+  config <- list(
+    method = "kmeans",
+    min_segment_size_pct = 5
+  )
+
+  guard <- segment_guard_post_clustering(guard, cluster_result, validation_metrics, config)
+
+  # Should have warnings about weak cluster structure
+  expect_true(length(guard$warnings) > 0)
+})
+
+test_that("segment_guard_post_clustering() warns about small clusters", {
+  guard <- segment_guard_init()
+
+  # Create imbalanced clusters: 280 in cluster 1, 10 each in 2 and 3
+  clusters <- c(rep(1, 280), rep(2, 10), rep(3, 10))
+
+  cluster_result <- list(
+    clusters = clusters,
+    k = 3
+  )
+
+  validation_metrics <- list(
+    avg_silhouette = 0.55,
+    tot_withinss = 500
+  )
+
+  config <- list(
+    method = "kmeans",
+    min_segment_size_pct = 5
+  )
+
+  guard <- segment_guard_post_clustering(guard, cluster_result, validation_metrics, config)
+
+  # Clusters 2 and 3 are <5% - should produce warnings
+  expect_true(length(guard$warnings) > 0)
+  expect_true(any(grepl("Segment", guard$warnings) | grepl("cluster", guard$warnings, ignore.case = TRUE)))
+})

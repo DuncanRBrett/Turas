@@ -427,6 +427,51 @@ validate_segment_config <- function(config) {
   )
 
   # ===========================================================================
+  # PARAMETER INTERACTION VALIDATION
+  # ===========================================================================
+
+  # Variable selection requires at least 3 clustering vars to be meaningful
+  if (variable_selection && length(clustering_vars) < 3) {
+    segment_refuse(
+      code = "CFG_VARSEL_TOO_FEW_VARS",
+      title = "Variable Selection Requires More Variables",
+      problem = sprintf("variable_selection=TRUE but only %d clustering variables specified.", length(clustering_vars)),
+      why_it_matters = "Variable selection reduces the variable set — you need at least 3 to select from.",
+      how_to_fix = "Either add more variables to clustering_vars or set variable_selection=FALSE."
+    )
+  }
+
+  # max_clustering_vars must be less than total variables for selection to make sense
+  if (variable_selection && max_clustering_vars >= length(clustering_vars)) {
+    cat(sprintf("  [INFO] max_clustering_vars (%d) >= total clustering_vars (%d). Variable selection will have no effect.\n",
+                max_clustering_vars, length(clustering_vars)))
+  }
+
+  # Factor analysis variable selection requires psych package
+  if (variable_selection && variable_selection_method %in% c("factor_analysis", "both")) {
+    if (!requireNamespace("psych", quietly = TRUE)) {
+      segment_refuse(
+        code = "PKG_PSYCH_MISSING",
+        title = "Package 'psych' Required for Factor Analysis",
+        problem = "Variable selection method 'factor_analysis' requires the 'psych' package.",
+        why_it_matters = "Cannot perform factor analysis without the psych package.",
+        how_to_fix = "Install psych: install.packages('psych') or set variable_selection_method='variance_correlation'."
+      )
+    }
+  }
+
+  # Stability check with small stability_n_runs is unreliable
+  if (run_stability_check && stability_n_runs < 5) {
+    cat(sprintf("  [INFO] stability_n_runs=%d is low. Consider 10+ for reliable stability assessment.\n",
+                stability_n_runs))
+  }
+
+  # Hclust with large k is unusual
+  if (method == "hclust" && !is.null(k_fixed) && k_fixed > 10) {
+    cat(sprintf("  [INFO] k_fixed=%d with hclust is unusual. Ward's method works best with k <= 8.\n", k_fixed))
+  }
+
+  # ===========================================================================
   # SUMMARY OUTPUT
   # ===========================================================================
 

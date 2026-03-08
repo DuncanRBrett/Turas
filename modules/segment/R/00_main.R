@@ -77,6 +77,12 @@ source(file.path(.seg_r_dir, "11_lca.R"))
 source(file.path(.seg_r_dir, "12_executive_summary.R"))
 source(file.path(.seg_r_dir, "13_vulnerability.R"))
 
+# Preflight validators
+.seg_validation_dir <- file.path(turas_root, "modules/segment/lib/validation")
+if (file.exists(file.path(.seg_validation_dir, "preflight_validators.R"))) {
+  source(file.path(.seg_validation_dir, "preflight_validators.R"))
+}
+
 # HTML report pipeline (optional - check if files exist)
 .seg_html_dir <- file.path(turas_root, "modules/segment/lib/html_report")
 .seg_html_available <- file.exists(file.path(.seg_html_dir, "99_html_report_main.R"))
@@ -138,7 +144,6 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
   }
 
   start_time <- Sys.time()
-  guard <- segment_guard_init()
 
   cat(sprintf("Configuration file: %s\n", basename(config_file)))
   cat(sprintf("Start time: %s\n", format(start_time, "%Y-%m-%d %H:%M:%S")))
@@ -172,20 +177,8 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
 
   data_list <- prepare_segment_data(config)
 
-  # Soft guards on data quality
-  guard <- guard_check_missing_data(data_list$data, config$clustering_vars, guard,
-                                     threshold = config$missing_threshold)
-  guard <- guard_check_low_variance(data_list$scaled_data, guard)
-  guard <- guard_check_high_correlation(data_list$scaled_data, guard)
-
-  if (!is.null(data_list$outlier_count) && data_list$outlier_count > 0) {
-    guard <- guard_check_outlier_proportion(data_list$outlier_count,
-                                            nrow(data_list$data), guard)
-    guard <- guard_record_outliers_removed(guard, data_list$outlier_count)
-  }
-
   # ==========================================================================
-  # STEP 3: HARD GUARDS
+  # STEP 3: PRE-ANALYSIS VALIDATION
   # ==========================================================================
 
   if (exists("turas_step", mode = "function")) {
@@ -194,12 +187,25 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
     cat("\nSTEP 3: VALIDATION\n")
   }
 
-  guard_require_clustering_vars(config, data_list$data)
-  guard_require_id_variable(config, data_list$data)
+  # Preflight cross-referential validation (if available)
+  if (exists("validate_segment_preflight", mode = "function")) {
+    preflight_log <- validate_segment_preflight(config, data_list$data)
+    n_preflight_errors <- sum(preflight_log$Severity == "Error")
+    if (n_preflight_errors > 0) {
+      error_details <- preflight_log[preflight_log$Severity == "Error", ]
+      segment_refuse(
+        code = "CFG_PREFLIGHT_FAILED",
+        title = "Preflight Validation Failed",
+        problem = sprintf("%d configuration error(s) detected before analysis.", n_preflight_errors),
+        why_it_matters = "Analysis cannot proceed with invalid configuration or data.",
+        how_to_fix = paste(error_details$Description, collapse = "\n"),
+        details = error_details
+      )
+    }
+  }
 
-  # Sample size check (use k_max for exploration, k_fixed for final)
-  k_check <- if (config$mode == "exploration") config$k_max else config$k_fixed
-  guard_require_sample_size(nrow(data_list$scaled_data), k_check, ncol(data_list$scaled_data))
+  # Guard orchestrator: hard guards + data quality soft guards
+  guard <- segment_guard_pre_analysis(config, data_list)
 
   cat("  All validation checks passed\n")
 
@@ -225,13 +231,6 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
   # Final mode
   cluster_result <- run_clustering(data_list, config, guard)
 
-  # Record method in guard
-  guard$clustering_method <- config$method
-
-  # Soft guard on cluster sizes
-  guard <- guard_check_small_clusters(cluster_result$clusters, guard,
-                                       min_pct = config$min_segment_size_pct)
-
   # ==========================================================================
   # STEP 5: VALIDATION METRICS
   # ==========================================================================
@@ -250,9 +249,8 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
     calculate_gap = FALSE
   )
 
-  guard <- guard_check_silhouette_quality(validation_metrics$avg_silhouette, guard)
-  guard <- guard_record_cluster_stability(guard, cluster_result$k,
-    validation_metrics$avg_silhouette, validation_metrics$tot_withinss)
+  # Post-clustering guard orchestrator
+  guard <- segment_guard_post_clustering(guard, cluster_result, validation_metrics, config)
 
   cat(sprintf("  Average silhouette: %.3f\n", validation_metrics$avg_silhouette))
   cat(sprintf("  Between/Total SS: %.3f\n", validation_metrics$betweenss_totss))
@@ -500,7 +498,9 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
     enhanced = enhanced,
     segment_names = segment_names,
     exec_summary = exec_summary,
-    gmm_membership = gmm_membership
+    gmm_membership = gmm_membership,
+    run_status_details = run_status,
+    guard_summary = segment_guard_summary(guard)
   )
 
   # Save model object
