@@ -246,7 +246,7 @@ run_confidence_analysis_impl <- function(config_path,
   # ==========================================================================
   # STEP 1: LOAD CONFIGURATION
   # ==========================================================================
-  if (verbose) cat("STEP 1/6: Loading configuration...\n")
+  if (verbose) cat("STEP 1/7: Loading configuration...\n")
 
   config <- load_config_step(config_path)
 
@@ -261,7 +261,7 @@ run_confidence_analysis_impl <- function(config_path,
   # ==========================================================================
   # STEP 2: LOAD SURVEY DATA
   # ==========================================================================
-  if (verbose) cat("\nSTEP 2/6: Loading survey data...\n")
+  if (verbose) cat("\nSTEP 2/7: Loading survey data...\n")
 
   data_result <- load_data_step(config, verbose)
   survey_data <- data_result$survey_data
@@ -279,7 +279,7 @@ run_confidence_analysis_impl <- function(config_path,
   # ==========================================================================
   # STEP 3: STUDY-LEVEL STATISTICS
   # ==========================================================================
-  if (verbose) cat("\nSTEP 3/6: Calculating study-level statistics...\n")
+  if (verbose) cat("\nSTEP 3/7: Calculating study-level statistics...\n")
 
   study_result <- calculate_study_stats_step(survey_data, weight_var, config, verbose)
   study_stats <- study_result$study_stats
@@ -288,7 +288,7 @@ run_confidence_analysis_impl <- function(config_path,
   # ==========================================================================
   # STEP 4: PROCESS QUESTIONS
   # ==========================================================================
-  if (verbose) cat("\nSTEP 4/6: Processing questions...\n")
+  if (verbose) cat("\nSTEP 4/7: Processing questions...\n")
 
   question_result <- process_all_questions(config, survey_data, weight_var, verbose)
   proportion_results <- question_result$proportion_results
@@ -304,14 +304,14 @@ run_confidence_analysis_impl <- function(config_path,
   # ==========================================================================
   # STEP 5: COLLECT WARNINGS
   # ==========================================================================
-  if (verbose) cat("\nSTEP 5/6: Quality checks...\n")
+  if (verbose) cat("\nSTEP 5/7: Quality checks...\n")
 
   handle_warnings_step(warnings_list, verbose, stop_on_warnings)
 
   # ==========================================================================
   # STEP 6: GENERATE OUTPUT
   # ==========================================================================
-  if (verbose) cat("\nSTEP 6/6: Generating Excel output...\n")
+  if (verbose) cat("\nSTEP 6/7: Generating Excel output...\n")
 
   run_result <- log_trs_events(trs_state, warnings_list)
 
@@ -319,6 +319,29 @@ run_confidence_analysis_impl <- function(config_path,
     config, study_stats, proportion_results, mean_results, nps_results,
     warnings_list, run_result
   )
+
+  # ==========================================================================
+  # STEP 7: GENERATE HTML REPORT (Optional)
+  # ==========================================================================
+  html_report_result <- NULL
+  generate_html <- !is.null(config$study_settings$Generate_HTML_Report) &&
+                   toupper(config$study_settings$Generate_HTML_Report) == "Y"
+
+  if (generate_html) {
+    if (verbose) cat("\nSTEP 7/7: Generating HTML report...\n")
+
+    html_report_result <- generate_html_report_step(
+      config = config,
+      study_stats = study_stats,
+      proportion_results = proportion_results,
+      mean_results = mean_results,
+      nps_results = nps_results,
+      warnings_list = warnings_list,
+      verbose = verbose
+    )
+  } else {
+    if (verbose) cat("\nSTEP 7/7: HTML report skipped (not enabled in config)\n")
+  }
 
   # ==========================================================================
   # SUMMARY
@@ -342,7 +365,8 @@ run_confidence_analysis_impl <- function(config_path,
     warnings = warnings_list,
     config = config,
     elapsed_seconds = elapsed,
-    run_result = run_result
+    run_result = run_result,
+    html_report = html_report_result
   ))
 }
 
@@ -607,6 +631,96 @@ generate_output_step <- function(config, study_stats, proportion_results,
         "Verify sufficient disk space is available",
         "Check file permissions"
       )
+    )
+  })
+}
+
+
+#' Generate HTML report step
+#' @keywords internal
+generate_html_report_step <- function(config, study_stats, proportion_results,
+                                       mean_results, nps_results,
+                                       warnings_list, verbose) {
+  # Determine HTML output path
+  html_path <- config$file_paths$HTML_Output_File
+  if (is.null(html_path) || is.na(html_path) || html_path == "") {
+    # Default: same as Excel but with .html extension
+    html_path <- sub("\\.[^.]+$", ".html", config$file_paths$Output_File)
+  }
+
+  # Source the HTML report orchestrator
+  html_report_main <- NULL
+  base_dir <- get_script_dir()
+
+  # Try to find html_report directory
+  possible_dirs <- c(
+    file.path(base_dir, "html_report"),
+    file.path(base_dir, "..", "lib", "html_report"),
+    file.path(base_dir, "lib", "html_report")
+  )
+
+  # Also store the lib dir for the orchestrator to use
+  for (d in possible_dirs) {
+    main_file <- file.path(d, "99_html_report_main.R")
+    if (file.exists(main_file)) {
+      # Set the dir so the orchestrator can find its submodules
+      assign(".confidence_lib_dir", dirname(d), envir = globalenv())
+      assign(".confidence_html_report_dir", d, envir = globalenv())
+      source(main_file)
+      html_report_main <- TRUE
+      break
+    }
+  }
+
+  if (is.null(html_report_main)) {
+    if (verbose) cat("  ! HTML report files not found - skipping\n")
+    return(list(
+      status = "REFUSED",
+      code = "IO_HTML_REPORT_NOT_FOUND",
+      message = "HTML report submodules not found in expected locations"
+    ))
+  }
+
+  # Build the confidence_results structure expected by the HTML report
+  confidence_results <- list(
+    study_stats = study_stats,
+    proportion_results = proportion_results,
+    mean_results = mean_results,
+    nps_results = nps_results,
+    warnings = warnings_list,
+    config = config
+  )
+
+  # Config for HTML report (handle both NULL and NA from Excel config)
+  raw_brand <- config$study_settings$Brand_Colour
+  raw_accent <- config$study_settings$Accent_Colour
+  raw_sampling <- config$study_settings$Sampling_Method
+  html_config <- list(
+    brand_colour = if (is.null(raw_brand) || is.na(raw_brand) || !nzchar(trimws(raw_brand))) "#1e3a5f" else trimws(raw_brand),
+    accent_colour = if (is.null(raw_accent) || is.na(raw_accent) || !nzchar(trimws(raw_accent))) "#2aa198" else trimws(raw_accent),
+    sampling_method = if (is.null(raw_sampling) || is.na(raw_sampling) || !nzchar(trimws(raw_sampling))) "Not_Specified" else trimws(raw_sampling)
+  )
+
+  # Generate the report
+  tryCatch({
+    result <- generate_confidence_html_report(confidence_results, html_path, html_config)
+
+    if (result$status == "PASS" && verbose) {
+      cat(sprintf("  + HTML report written: %s (%.1f KB)\n",
+                  basename(html_path), result$file_size_bytes / 1024))
+    } else if (result$status == "REFUSED" && verbose) {
+      cat(sprintf("  ! HTML report failed: %s\n", result$message))
+    }
+
+    result
+  }, error = function(e) {
+    if (verbose) {
+      cat(sprintf("  ! HTML report generation failed: %s\n", conditionMessage(e)))
+    }
+    list(
+      status = "REFUSED",
+      code = "CALC_HTML_REPORT_FAILED",
+      message = sprintf("HTML report generation failed: %s", conditionMessage(e))
     )
   })
 }
@@ -946,10 +1060,12 @@ print_analysis_summary <- function(results) {
 
 
 # ==============================================================================
-# NULL-COALESCING OPERATOR
+# NULL-COALESCING OPERATOR (canonical definition in utils.R)
 # ==============================================================================
 
-`%||%` <- function(a, b) if (is.null(a)) b else a
+if (!exists("%||%", mode = "function")) {
+  `%||%` <- function(a, b) if (is.null(a)) b else a
+}
 
 
 # ==============================================================================

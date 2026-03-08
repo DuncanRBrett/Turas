@@ -33,13 +33,16 @@ PROPORTIONS_VERSION <- "10.0"
 # DEPENDENCIES
 # ==============================================================================
 
-source_if_exists <- function(file_path) {
-  if (file.exists(file_path)) {
-    source(file_path)
-  } else if (file.exists(file.path("R", file_path))) {
-    source(file.path("R", file_path))
-  } else if (file.exists(file.path("..", "R", file_path))) {
-    source(file.path("..", "R", file_path))
+# Canonical definition in utils.R; fallback if sourced independently
+if (!exists("source_if_exists", mode = "function")) {
+  source_if_exists <- function(file_path) {
+    if (file.exists(file_path)) {
+      source(file_path)
+    } else if (file.exists(file.path("R", file_path))) {
+      source(file.path("R", file_path))
+    } else if (file.exists(file.path("..", "R", file_path))) {
+      source(file.path("..", "R", file_path))
+    }
   }
 }
 

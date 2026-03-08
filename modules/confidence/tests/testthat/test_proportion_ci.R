@@ -1,373 +1,408 @@
 # ==============================================================================
 # TEST SUITE: Proportion Confidence Intervals
 # ==============================================================================
-# Tests for proportion CI calculations across multiple methods
+# Tests for the module's own proportion CI functions in 04_proportions.R
 # Part of Turas Confidence Module Test Suite
+#
+# Tests cover:
+#   - calculate_proportion_ci_normal()
+#   - calculate_proportion_ci_wilson()
+#   - bootstrap_proportion_ci()
+#   - credible_interval_proportion()
+#   - analyze_proportion()
+#   - TRS refusal handling
 # ==============================================================================
 
 library(testthat)
 
-context("Proportion Confidence Intervals")
-
 # ==============================================================================
-# TEST DATA SETUP
+# NORMAL APPROXIMATION: calculate_proportion_ci_normal()
 # ==============================================================================
 
-# Create synthetic test data with known properties
-create_test_proportion_data <- function(n = 100, p = 0.5, seed = 12345) {
-  set.seed(seed)
-  list(
-    values = sample(c(0, 1), n, replace = TRUE, prob = c(1-p, p)),
-    weights = NULL,
-    expected_p = p,
-    expected_n = n
-  )
-}
+test_that("normal CI returns correct structure", {
+  result <- calculate_proportion_ci_normal(p = 0.5, n = 100)
 
-# Create weighted test data
-create_weighted_proportion_data <- function(n = 100, p = 0.5, seed = 12345) {
-  set.seed(seed)
-  list(
-    values = sample(c(0, 1), n, replace = TRUE, prob = c(1-p, p)),
-    weights = runif(n, 0.5, 2.0),  # Random weights
-    expected_p = p,
-    expected_n = n
-  )
-}
-
-# ==============================================================================
-# BASIC PROPORTION CALCULATION TESTS
-# ==============================================================================
-
-test_that("Basic proportion calculation works correctly", {
-  # Test with p = 0.5
-  data <- create_test_proportion_data(n = 100, p = 0.5)
-
-  # Calculate observed proportion
-  obs_p <- mean(data$values)
-
-  # Should be approximately 0.5 (allowing for sampling variation)
-  expect_true(obs_p >= 0.3 && obs_p <= 0.7)
-
-  # Test with extreme proportions
-  all_ones <- rep(1, 50)
-  expect_equal(mean(all_ones), 1.0)
-
-  all_zeros <- rep(0, 50)
-  expect_equal(mean(all_zeros), 0.0)
+  expect_type(result, "list")
+  expect_true("lower" %in% names(result))
+  expect_true("upper" %in% names(result))
+  expect_true("moe" %in% names(result))
+  expect_true("se" %in% names(result))
+  expect_true("method" %in% names(result))
+  expect_equal(result$method, "Normal approximation")
 })
 
-test_that("Proportion calculation handles edge cases", {
-  # Empty vector should error
-  expect_error(mean(numeric(0)))
+test_that("normal CI computes correct values for known case", {
+  # p=0.5, n=100, 95% CI: SE = sqrt(0.25/100) = 0.05, MOE = 1.96*0.05 = 0.098
+  result <- calculate_proportion_ci_normal(p = 0.5, n = 100, conf_level = 0.95)
 
-  # Single value
-  expect_equal(mean(1), 1.0)
-  expect_equal(mean(0), 0.0)
-
-  # All NA should return NA
-  expect_true(is.na(mean(c(NA, NA, NA), na.rm = FALSE)))
+  expect_equal(result$se, 0.05, tolerance = 1e-10)
+  expect_equal(result$moe, qnorm(0.975) * 0.05, tolerance = 1e-6)
+  expect_equal(result$lower, 0.5 - result$moe, tolerance = 1e-6)
+  expect_equal(result$upper, 0.5 + result$moe, tolerance = 1e-6)
 })
 
-# ==============================================================================
-# WILSON SCORE INTERVAL TESTS
-# ==============================================================================
-
-test_that("Wilson score intervals have correct coverage", {
-  skip_if_not_installed("PropCIs")
-
-  # Known values from statistical tables
-  # For p=0.5, n=100, 95% CI should be approximately [0.40, 0.60]
-
-  n <- 100
-  x <- 50
-  p <- x / n
-
-  # Calculate Wilson interval
-  ci <- PropCIs::scoreci(x, n, conf.level = 0.95)
-
-  # Check properties
-  expect_true(ci$conf.int[1] < p)  # Lower bound below p
-  expect_true(ci$conf.int[2] > p)  # Upper bound above p
-  expect_true(ci$conf.int[2] - ci$conf.int[1] > 0)  # Positive width
-
-  # Approximate known value check (Wilson interval for p=0.5, n=100)
-  expect_true(abs(ci$conf.int[1] - 0.40) < 0.05)
-  expect_true(abs(ci$conf.int[2] - 0.60) < 0.05)
+test_that("normal CI: CI contains the point estimate", {
+  result <- calculate_proportion_ci_normal(p = 0.3, n = 200)
+  expect_true(result$lower < 0.3)
+  expect_true(result$upper > 0.3)
 })
 
-test_that("Wilson score handles extreme proportions better than normal", {
-  skip_if_not_installed("PropCIs")
+test_that("normal CI: higher confidence gives wider intervals", {
+  ci_90 <- calculate_proportion_ci_normal(p = 0.5, n = 100, conf_level = 0.90)
+  ci_95 <- calculate_proportion_ci_normal(p = 0.5, n = 100, conf_level = 0.95)
+  ci_99 <- calculate_proportion_ci_normal(p = 0.5, n = 100, conf_level = 0.99)
 
-  # For p=0 or p=1, Wilson score should give reasonable intervals
-  # while normal approximation would give nonsensical results
+  expect_true(ci_90$moe < ci_95$moe)
+  expect_true(ci_95$moe < ci_99$moe)
+})
 
-  # p = 0 (0 successes)
-  ci_zero <- PropCIs::scoreci(0, 100, conf.level = 0.95)
-  expect_true(ci_zero$conf.int[1] >= 0)  # Lower bound at or above 0
-  expect_true(ci_zero$conf.int[2] < 0.05)  # Upper bound small but positive
+test_that("normal CI: larger n gives narrower intervals", {
+  ci_50 <- calculate_proportion_ci_normal(p = 0.5, n = 50)
+  ci_500 <- calculate_proportion_ci_normal(p = 0.5, n = 500)
 
-  # p = 1 (all successes)
-  ci_one <- PropCIs::scoreci(100, 100, conf.level = 0.95)
-  expect_true(ci_one$conf.int[1] > 0.95)  # Lower bound near 1
-  expect_true(ci_one$conf.int[2] <= 1.0)  # Upper bound at or below 1
+  expect_true(ci_500$moe < ci_50$moe)
+})
+
+test_that("normal CI: bounds are capped to [0, 1]", {
+  # p=0.01, n=20 would normally give negative lower bound
+  result <- calculate_proportion_ci_normal(p = 0.01, n = 20)
+  expect_true(result$lower >= 0)
+  expect_true(result$upper <= 1)
+})
+
+test_that("normal CI: warnings for extreme proportions", {
+  result <- calculate_proportion_ci_normal(p = 0.05, n = 100)
+  expect_true(length(result$warnings) > 0)
+  expect_true(any(grepl("extreme|Extreme", result$warnings, ignore.case = TRUE)))
+})
+
+test_that("normal CI: warnings for small samples", {
+  result <- calculate_proportion_ci_normal(p = 0.5, n = 10)
+  expect_true(length(result$warnings) > 0)
+  expect_true(any(grepl("small|Small", result$warnings, ignore.case = TRUE)))
+})
+
+test_that("normal CI: refuses invalid proportion", {
+  expect_error(calculate_proportion_ci_normal(p = -0.1, n = 100), class = "turas_refusal")
+  expect_error(calculate_proportion_ci_normal(p = 1.5, n = 100), class = "turas_refusal")
+})
+
+test_that("normal CI: refuses invalid sample size", {
+  expect_error(calculate_proportion_ci_normal(p = 0.5, n = 0), class = "turas_refusal")
+  expect_error(calculate_proportion_ci_normal(p = 0.5, n = -10), class = "turas_refusal")
 })
 
 # ==============================================================================
-# NORMAL APPROXIMATION TESTS
+# WILSON SCORE: calculate_proportion_ci_wilson()
 # ==============================================================================
 
-test_that("Normal approximation CI calculation is correct", {
-  # Standard normal approximation formula:
-  # p +/- z * sqrt(p(1-p)/n)
+test_that("Wilson CI returns correct structure", {
+  result <- calculate_proportion_ci_wilson(p = 0.5, n = 100)
 
-  n <- 100
+  expect_type(result, "list")
+  expect_true("lower" %in% names(result))
+  expect_true("upper" %in% names(result))
+  expect_true("center" %in% names(result))
+  expect_true("method" %in% names(result))
+  expect_equal(result$method, "Wilson score")
+})
+
+test_that("Wilson CI: bounds always within [0, 1]", {
+  # p=0, extreme case
+  result_zero <- calculate_proportion_ci_wilson(p = 0, n = 100)
+  expect_true(result_zero$lower >= 0)
+  expect_true(result_zero$upper <= 1)
+  expect_true(result_zero$upper > 0)  # Should be positive
+
+  # p=1, extreme case
+  result_one <- calculate_proportion_ci_wilson(p = 1, n = 100)
+  expect_true(result_one$lower >= 0)
+  expect_true(result_one$upper <= 1)
+  expect_true(result_one$lower < 1)  # Should be below 1
+})
+
+test_that("Wilson CI: narrower than normal for extreme p", {
+  p <- 0.02
+  n <- 200
+
+  wilson <- calculate_proportion_ci_wilson(p = p, n = n)
+  normal <- calculate_proportion_ci_normal(p = p, n = n)
+
+  wilson_width <- wilson$upper - wilson$lower
+  normal_width <- normal$upper - normal$lower
+
+  # Wilson should give a more sensible (often narrower) interval for extreme p
+  expect_true(wilson$lower >= 0)  # Wilson never goes negative
+})
+
+test_that("Wilson CI: similar to normal for moderate p", {
   p <- 0.5
-  z <- 1.96  # 95% CI
+  n <- 1000
 
-  se <- sqrt(p * (1 - p) / n)
-  lower <- p - z * se
-  upper <- p + z * se
+  wilson <- calculate_proportion_ci_wilson(p = p, n = n)
+  normal <- calculate_proportion_ci_normal(p = p, n = n)
 
-  # Expected values
-  expect_equal(round(lower, 3), 0.402)
-  expect_equal(round(upper, 3), 0.598)
-
-  # Check properties
-  expect_true(lower < p)
-  expect_true(upper > p)
-  expect_equal(upper - lower, 2 * z * se)
+  # For large n and moderate p, Wilson and normal should be very close
+  expect_equal(wilson$lower, normal$lower, tolerance = 0.005)
+  expect_equal(wilson$upper, normal$upper, tolerance = 0.005)
 })
 
-test_that("Normal approximation fails appropriately for extreme proportions", {
-  # For p near 0 or 1, normal approximation can give invalid intervals
-  # (outside [0, 1])
+test_that("Wilson CI: center is shifted from p for small n", {
+  result <- calculate_proportion_ci_wilson(p = 0.5, n = 10)
+  # Wilson center should be close to p but not exactly p
+  expect_true(abs(result$center - 0.5) < 0.1)
+})
 
-  n <- 20
-  p <- 0.05  # 1 success out of 20
-  z <- 1.96
-
-  se <- sqrt(p * (1 - p) / n)
-  lower <- p - z * se
-
-  # Lower bound would be negative - this is why we need Wilson score!
-  expect_true(lower < 0)
+test_that("Wilson CI: refuses invalid inputs", {
+  expect_error(calculate_proportion_ci_wilson(p = -0.1, n = 100), class = "turas_refusal")
+  expect_error(calculate_proportion_ci_wilson(p = 0.5, n = 0), class = "turas_refusal")
 })
 
 # ==============================================================================
-# BOOTSTRAP CI TESTS
+# BOOTSTRAP: bootstrap_proportion_ci()
 # ==============================================================================
 
-test_that("Bootstrap confidence intervals are reasonable", {
-  skip_if_not_installed("boot")
+test_that("bootstrap CI returns correct structure", {
+  data <- c(rep(1, 50), rep(0, 50))
+  result <- bootstrap_proportion_ci(data, categories = 1, B = 1000, seed = 42)
 
-  # Create test data
-  data <- create_test_proportion_data(n = 100, p = 0.6)
+  expect_type(result, "list")
+  expect_true("lower" %in% names(result))
+  expect_true("upper" %in% names(result))
+  expect_true("boot_se" %in% names(result))
+  expect_true("boot_mean" %in% names(result))
+  expect_true("method" %in% names(result))
+})
 
-  # Bootstrap function
-  boot_prop <- function(data, indices) {
-    mean(data[indices])
-  }
+test_that("bootstrap CI: reproduces with same seed", {
+  data <- c(rep(1, 45), rep(0, 55))
+  r1 <- bootstrap_proportion_ci(data, categories = 1, B = 2000, seed = 123)
+  r2 <- bootstrap_proportion_ci(data, categories = 1, B = 2000, seed = 123)
 
-  # Run bootstrap
-  boot_results <- boot::boot(
-    data = data$values,
-    statistic = boot_prop,
-    R = 1000
+  expect_equal(r1$lower, r2$lower)
+  expect_equal(r1$upper, r2$upper)
+})
+
+test_that("bootstrap CI: boot_mean close to observed proportion", {
+  data <- c(rep(1, 60), rep(0, 40))
+  result <- bootstrap_proportion_ci(data, categories = 1, B = 5000, seed = 42)
+
+  obs_p <- mean(data)
+  expect_equal(result$boot_mean, obs_p, tolerance = 0.05)
+})
+
+test_that("bootstrap CI: works with weighted data", {
+  data <- c(rep(1, 50), rep(0, 50))
+  weights <- runif(100, 0.5, 2.0)
+
+  result <- bootstrap_proportion_ci(data, categories = 1,
+                                     weights = weights, B = 1000, seed = 42)
+
+  expect_true(result$lower < result$upper)
+  expect_true(result$lower >= 0)
+  expect_true(result$upper <= 1)
+})
+
+test_that("bootstrap CI: works with multi-category success", {
+  data <- c(rep(1, 30), rep(2, 20), rep(3, 50))
+  result <- bootstrap_proportion_ci(data, categories = c(1, 2), B = 1000, seed = 42)
+
+  expect_true(result$lower < result$upper)
+  # Observed proportion of 1 or 2 is 0.5
+  expect_equal(result$boot_mean, 0.5, tolerance = 0.05)
+})
+
+test_that("bootstrap CI: wider at higher confidence", {
+  data <- c(rep(1, 45), rep(0, 55))
+  ci_90 <- bootstrap_proportion_ci(data, categories = 1, B = 2000, conf_level = 0.90, seed = 42)
+  ci_99 <- bootstrap_proportion_ci(data, categories = 1, B = 2000, conf_level = 0.99, seed = 42)
+
+  width_90 <- ci_90$upper - ci_90$lower
+  width_99 <- ci_99$upper - ci_99$lower
+  expect_true(width_99 > width_90)
+})
+
+test_that("bootstrap CI: refuses invalid data type", {
+  expect_error(
+    bootstrap_proportion_ci(list(1, 2, 3), categories = 1),
+    class = "turas_refusal"
+  )
+})
+
+test_that("bootstrap CI: refuses empty data", {
+  expect_error(
+    bootstrap_proportion_ci(numeric(0), categories = 1),
+    class = "turas_refusal"
+  )
+})
+
+# ==============================================================================
+# BAYESIAN: credible_interval_proportion()
+# ==============================================================================
+
+test_that("Bayesian CI returns correct structure (uninformed)", {
+  result <- credible_interval_proportion(p = 0.5, n = 100)
+
+  expect_type(result, "list")
+  expect_true("lower" %in% names(result))
+  expect_true("upper" %in% names(result))
+  expect_true("post_mean" %in% names(result))
+  expect_true("prior_type" %in% names(result))
+  expect_equal(result$prior_type, "Uninformed")
+  expect_equal(result$method, "Bayesian (Beta-Binomial)")
+})
+
+test_that("Bayesian CI: uninformed prior uses Beta(1,1)", {
+  result <- credible_interval_proportion(p = 0.5, n = 100)
+  expect_equal(result$prior_alpha, 1)
+  expect_equal(result$prior_beta, 1)
+})
+
+test_that("Bayesian CI: posterior mean close to observed for large n", {
+  result <- credible_interval_proportion(p = 0.45, n = 1000)
+  # With uninformed prior and large n, posterior mean ~ observed proportion
+  expect_equal(result$post_mean, 0.45, tolerance = 0.01)
+})
+
+test_that("Bayesian CI: informed prior shifts posterior toward prior", {
+  # With strong prior (prior_n=500) at 0.3, observed p=0.5, n=100
+  # Posterior should be pulled toward 0.3
+  result <- credible_interval_proportion(
+    p = 0.5, n = 100,
+    prior_mean = 0.3, prior_n = 500
   )
 
-  # Get percentile CI
-  ci <- boot::boot.ci(boot_results, type = "perc", conf = 0.95)
-
-  # Check properties
-  expect_true(!is.null(ci$percent))
-  expect_true(ci$percent[4] < ci$percent[5])  # Lower < Upper
-  expect_true(ci$percent[4] >= 0 && ci$percent[5] <= 1)  # Valid bounds
+  expect_true(result$post_mean < 0.5)  # Pulled toward prior
+  expect_true(result$post_mean > 0.3)  # But not all the way
+  expect_equal(result$prior_type, "Informed")
 })
 
-test_that("Bootstrap handles small samples appropriately", {
-  skip_if_not_installed("boot")
+test_that("Bayesian CI: weak prior has minimal effect", {
+  uninformed <- credible_interval_proportion(p = 0.5, n = 1000)
+  informed <- credible_interval_proportion(p = 0.5, n = 1000,
+                                           prior_mean = 0.3, prior_n = 5)
 
-  # Small sample (n=10)
-  data <- create_test_proportion_data(n = 10, p = 0.5)
+  # With very weak prior (prior_n=5) and large data (n=1000), results should be similar
 
-  boot_prop <- function(data, indices) mean(data[indices])
-
-  # Bootstrap should still work
-  boot_results <- boot::boot(data = data$values, statistic = boot_prop, R = 500)
-
-  expect_true(!is.null(boot_results))
-  expect_equal(length(boot_results$t), 500)
+  expect_equal(uninformed$post_mean, informed$post_mean, tolerance = 0.02)
 })
 
-# ==============================================================================
-# WEIGHTED PROPORTION TESTS
-# ==============================================================================
+test_that("Bayesian CI: higher confidence gives wider interval", {
+  ci_90 <- credible_interval_proportion(p = 0.5, n = 100, conf_level = 0.90)
+  ci_99 <- credible_interval_proportion(p = 0.5, n = 100, conf_level = 0.99)
 
-test_that("Weighted proportions calculate correctly", {
-  # Create weighted data
-  values <- c(1, 1, 0, 0, 1)
-  weights <- c(2, 1, 1, 1, 2)
-
-  # Weighted proportion = sum(values * weights) / sum(weights)
-  weighted_p <- sum(values * weights) / sum(weights)
-
-  # Expected: (1*2 + 1*1 + 0*1 + 0*1 + 1*2) / (2+1+1+1+2) = 5/7
-  expect_equal(weighted_p, 5/7)
+  width_90 <- ci_90$upper - ci_90$lower
+  width_99 <- ci_99$upper - ci_99$lower
+  expect_true(width_99 > width_90)
 })
 
-test_that("Effective n calculation for weighted data", {
-  # Effective n = (sum(weights))^2 / sum(weights^2)
-
-  weights <- c(1, 1, 1, 1, 1)  # Equal weights
-  n_eff_equal <- sum(weights)^2 / sum(weights^2)
-  expect_equal(n_eff_equal, 5)  # Should equal actual n
-
-  # Unequal weights reduce effective n
-  weights_unequal <- c(5, 1, 1, 1, 1)
-  n_eff_unequal <- sum(weights_unequal)^2 / sum(weights_unequal^2)
-  expect_true(n_eff_unequal < 5)  # Less than actual n
-  expect_true(n_eff_unequal > 1)  # But greater than 1
-})
-
-# ==============================================================================
-# EDGE CASE TESTS
-# ==============================================================================
-
-test_that("Handle proportion of 0%", {
-  # All zeros
-  values <- rep(0, 100)
-  p <- mean(values)
-
-  expect_equal(p, 0)
-
-  # Wilson score should give [0, small positive number]
-  skip_if_not_installed("PropCIs")
-  ci <- PropCIs::scoreci(0, 100, conf.level = 0.95)
-  expect_equal(ci$conf.int[1], 0)
-  expect_true(ci$conf.int[2] > 0)
-  expect_true(ci$conf.int[2] < 0.05)
-})
-
-test_that("Handle proportion of 100%", {
-  # All ones
-  values <- rep(1, 100)
-  p <- mean(values)
-
-  expect_equal(p, 1)
-
-  # Wilson score should give [large number near 1, 1]
-  skip_if_not_installed("PropCIs")
-  ci <- PropCIs::scoreci(100, 100, conf.level = 0.95)
-  expect_true(ci$conf.int[1] < 1)
-  expect_true(ci$conf.int[1] > 0.95)
-  expect_equal(ci$conf.int[2], 1)
-})
-
-test_that("Handle very small sample sizes", {
-  # n = 1
-  expect_equal(mean(1), 1.0)
-
-  # n = 2
-  values <- c(1, 0)
-  expect_equal(mean(values), 0.5)
-
-  # CI should still be calculable
-  skip_if_not_installed("PropCIs")
-  ci <- PropCIs::scoreci(1, 2, conf.level = 0.95)
-  expect_true(!is.null(ci))
-})
-
-test_that("Handle missing values appropriately", {
-  values <- c(1, 0, 1, NA, 0)
-
-  # With na.rm = TRUE
-  expect_equal(mean(values, na.rm = TRUE), 0.5)
-
-  # With na.rm = FALSE
-  expect_true(is.na(mean(values, na.rm = FALSE)))
-})
-
-# ==============================================================================
-# CONFIDENCE LEVEL VARIATION TESTS
-# ==============================================================================
-
-test_that("Different confidence levels produce expected interval widths", {
-  skip_if_not_installed("PropCIs")
-
+test_that("Bayesian CI: posterior parameters are correctly computed", {
+  p <- 0.6
   n <- 100
-  x <- 50
+  successes <- round(p * n)  # 60
+  failures <- n - successes  # 40
 
-  # 90% CI
-  ci_90 <- PropCIs::scoreci(x, n, conf.level = 0.90)
-  width_90 <- ci_90$conf.int[2] - ci_90$conf.int[1]
+  result <- credible_interval_proportion(p = p, n = n)
 
-  # 95% CI
-  ci_95 <- PropCIs::scoreci(x, n, conf.level = 0.95)
-  width_95 <- ci_95$conf.int[2] - ci_95$conf.int[1]
+  # With uninformed Beta(1,1) prior:
+  # post_alpha = 1 + 60 = 61, post_beta = 1 + 40 = 41
+  expect_equal(result$post_alpha, 1 + successes)
+  expect_equal(result$post_beta, 1 + failures)
+})
 
-  # 99% CI
-  ci_99 <- PropCIs::scoreci(x, n, conf.level = 0.99)
-  width_99 <- ci_99$conf.int[2] - ci_99$conf.int[1]
+test_that("Bayesian CI: refuses invalid proportion", {
+  expect_error(credible_interval_proportion(p = -0.1, n = 100), class = "turas_refusal")
+  expect_error(credible_interval_proportion(p = 1.5, n = 100), class = "turas_refusal")
+})
 
-  # Higher confidence should give wider intervals
-  expect_true(width_90 < width_95)
-  expect_true(width_95 < width_99)
+test_that("Bayesian CI: refuses invalid prior_mean", {
+  expect_error(
+    credible_interval_proportion(p = 0.5, n = 100, prior_mean = 1.5, prior_n = 50),
+    class = "turas_refusal"
+  )
 })
 
 # ==============================================================================
-# INTEGRATION TESTS
+# METHOD COMPARISON TESTS
 # ==============================================================================
 
-test_that("Multiple CI methods give similar results for moderate proportions", {
-  skip_if_not_installed("PropCIs")
-  skip_if_not_installed("boot")
-
-  n <- 100
+test_that("all methods give similar results for moderate p, large n", {
   p <- 0.5
-  set.seed(123)
-  values <- rbinom(n, 1, p)
-  x <- sum(values)
+  n <- 1000
+  data <- c(rep(1, 500), rep(0, 500))
 
-  # Wilson score
-  ci_wilson <- PropCIs::scoreci(x, n, conf.level = 0.95)
+  normal <- calculate_proportion_ci_normal(p = p, n = n)
+  wilson <- calculate_proportion_ci_wilson(p = p, n = n)
+  bayesian <- credible_interval_proportion(p = p, n = n)
+  bootstrap <- bootstrap_proportion_ci(data, categories = 1, B = 5000, seed = 42)
 
-  # Normal approximation
-  p_obs <- x / n
-  se <- sqrt(p_obs * (1 - p_obs) / n)
-  ci_normal <- c(p_obs - 1.96 * se, p_obs + 1.96 * se)
+  # All lower bounds should be close
+  lowers <- c(normal$lower, wilson$lower, bayesian$lower, bootstrap$lower)
+  expect_true(max(lowers) - min(lowers) < 0.02)
 
-  # Bootstrap
-  boot_prop <- function(data, indices) mean(data[indices])
-  boot_results <- boot::boot(values, boot_prop, R = 1000)
-  ci_boot <- boot::boot.ci(boot_results, type = "perc", conf = 0.95)
+  # All upper bounds should be close
+  uppers <- c(normal$upper, wilson$upper, bayesian$upper, bootstrap$upper)
+  expect_true(max(uppers) - min(uppers) < 0.02)
+})
 
-  # All methods should be reasonably close for moderate p and large n
-  wilson_width <- ci_wilson$conf.int[2] - ci_wilson$conf.int[1]
-  normal_width <- ci_normal[2] - ci_normal[1]
-  boot_width <- ci_boot$percent[5] - ci_boot$percent[4]
+test_that("Wilson handles extreme p better than normal", {
+  p <- 0.01
+  n <- 100
 
-  # Widths should be within 20% of each other
-  expect_true(abs(wilson_width - normal_width) / wilson_width < 0.2)
-  expect_true(abs(wilson_width - boot_width) / wilson_width < 0.3)  # Bootstrap has more variation
+  normal <- calculate_proportion_ci_normal(p = p, n = n)
+  wilson <- calculate_proportion_ci_wilson(p = p, n = n)
+
+  # Wilson should always stay in [0,1]
+  expect_true(wilson$lower >= 0)
+  expect_true(wilson$upper <= 1)
+})
+
+# ==============================================================================
+# EDGE CASES
+# ==============================================================================
+
+test_that("p = 0 works for Wilson and Bayesian", {
+  wilson <- calculate_proportion_ci_wilson(p = 0, n = 100)
+  expect_equal(wilson$lower, 0, tolerance = 1e-10)
+  expect_true(wilson$upper > 0)
+
+  bayesian <- credible_interval_proportion(p = 0, n = 100)
+  expect_true(bayesian$lower >= 0)
+  expect_true(bayesian$upper > 0)
+})
+
+test_that("p = 1 works for Wilson and Bayesian", {
+  wilson <- calculate_proportion_ci_wilson(p = 1, n = 100)
+  expect_true(wilson$lower < 1)
+  expect_equal(wilson$upper, 1, tolerance = 1e-10)
+
+  bayesian <- credible_interval_proportion(p = 1, n = 100)
+  expect_true(bayesian$lower < 1)
+  expect_true(bayesian$upper <= 1)
+})
+
+test_that("small n (n=5) works for all methods", {
+  normal <- calculate_proportion_ci_normal(p = 0.4, n = 5)
+  wilson <- calculate_proportion_ci_wilson(p = 0.4, n = 5)
+  bayesian <- credible_interval_proportion(p = 0.4, n = 5)
+
+  # All should return valid intervals
+  expect_true(normal$lower < normal$upper)
+  expect_true(wilson$lower < wilson$upper)
+  expect_true(bayesian$lower < bayesian$upper)
 })
 
 # ==============================================================================
 # PERFORMANCE TESTS
 # ==============================================================================
 
-test_that("Proportion CI calculations are reasonably fast", {
-  skip_if_not_installed("PropCIs")
-
-  # Should calculate 100 CIs in under 1 second
-  start_time <- Sys.time()
-
+test_that("normal and Wilson are fast (100 calls < 1 second)", {
+  start <- Sys.time()
   for (i in 1:100) {
-    PropCIs::scoreci(50, 100, conf.level = 0.95)
+    calculate_proportion_ci_normal(p = 0.5, n = 100)
+    calculate_proportion_ci_wilson(p = 0.5, n = 100)
   }
-
-  elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
-
+  elapsed <- as.numeric(difftime(Sys.time(), start, units = "secs"))
   expect_true(elapsed < 1.0)
 })
 

@@ -6,8 +6,8 @@ editor_options:
 
 # Turas Confidence Module - User Manual
 
-**Version:** 2.0.0 **Last Updated:** December 2025 **Template:**
-Confidence_Config_Template.xlsx (v10.0)
+**Version:** 2.1.0 **Last Updated:** March 2026 **Template:**
+Confidence_Config_Template.xlsx (v10.2)
 
 ------------------------------------------------------------------------
 
@@ -91,12 +91,13 @@ Copy `Confidence_Config_Template.xlsx` to your project folder.
 
 ### Step 3: Configure Study_Settings Sheet
 
-| Setting               | Value |
-|-----------------------|-------|
-| Calculate_Effective_N | Y     |
-| Bootstrap_Iterations  | 5000  |
-| Confidence_Level      | 0.95  |
-| Decimal_Separator     | .     |
+| Setting               | Value        |
+|-----------------------|--------------|
+| Calculate_Effective_N | Y            |
+| Bootstrap_Iterations  | 5000         |
+| Confidence_Level      | 0.95         |
+| Decimal_Separator     | .            |
+| Sampling_Method       | Online_Panel |
 
 ### Step 4: Configure Question_Analysis Sheet
 
@@ -224,6 +225,72 @@ The configuration file is an Excel workbook with the following sheets:
 -   **Notes:**
     -   `.` for US/UK format (8.2)
     -   `,` for European format (8,2)
+
+#### Generate_HTML_Report
+
+-   **Purpose:** Generate an interactive HTML report alongside the
+    Excel output
+-   **Values:** `Y` or `N`
+-   **Default:** `N` (Excel only)
+-   **Notes:**
+    -   Set to `Y` to produce a self-contained HTML file with
+        interactive navigation, visual charts, method comparisons,
+        and plain-English explanations
+    -   The HTML file is saved alongside the Excel output using the
+        same filename but `.html` extension
+    -   The report includes: summary dashboard, per-question detail
+        panels with method comparison tables and charts, methodology
+        documentation with assumptions and limitations, and an
+        editable comments box for analyst notes
+
+#### Brand_Colour
+
+-   **Purpose:** Primary brand colour for HTML report styling
+-   **Values:** Hex colour code (e.g., `#1e3a5f`)
+-   **Default:** `#1e3a5f` (dark navy)
+-   **Notes:**
+    -   Used for the header gradient, active navigation, and
+        accent borders
+    -   Only applies when `Generate_HTML_Report = Y`
+
+#### Accent_Colour
+
+-   **Purpose:** Secondary accent colour for HTML report
+-   **Values:** Hex colour code (e.g., `#2aa198`)
+-   **Default:** `#2aa198` (teal)
+-   **Notes:**
+    -   Used for focus states and secondary highlights
+    -   Only applies when `Generate_HTML_Report = Y`
+
+#### Sampling_Method
+
+-   **Purpose:** Describe how respondents were recruited, so the
+    HTML report can tailor confidence interval interpretation notes
+-   **Values:** One of the following:
+
+| Value          | Description                                            |
+|----------------|--------------------------------------------------------|
+| `Random`       | Simple random (probability) sample                     |
+| `Stratified`   | Stratified random sample (population divided into strata, random selection within each) |
+| `Cluster`      | Cluster sample (groups selected, then all/some members surveyed) |
+| `Quota`        | Quota sample (structured recruitment to match population targets) |
+| `Online_Panel` | Online research panel (recruited, profiled, quality-managed members) |
+| `Self_Selected`| Self-selected / opt-in sample (respondents chose to participate) |
+| `Census`       | Full population (every member surveyed)                |
+| `Not_Specified`| No sampling method declared (generic guidance shown)   |
+
+-   **Default:** `Not_Specified`
+-   **Required:** No (optional)
+-   **Notes:**
+    -   When set, the HTML report adds a tailored sampling note to
+        every question's callout panel, explaining what the sampling
+        design means for the reliability of the confidence intervals
+    -   The language is statistically accurate but written for
+        non-statisticians — it acknowledges real-world research
+        realities without being dismissive of non-probability designs
+    -   A badge showing the sampling method also appears in the
+        HTML report header
+    -   Has no effect on the Excel output
 
 ------------------------------------------------------------------------
 
@@ -380,29 +447,35 @@ run_confidence_analysis(
 
 ### Expected Output
 
-```         
-STEP 1/6: Loading configuration...
+```
+STEP 1/7: Loading configuration...
   ✓ Configuration loaded
 
-STEP 2/6: Loading survey data...
+STEP 2/7: Loading survey data...
   ✓ Data loaded: 1000 observations
 
-STEP 3/6: Calculating study-level statistics...
+STEP 3/7: Calculating study-level statistics...
   ✓ Actual n: 1000
   ✓ Effective n: 856
   ✓ DEFF: 1.17
 
-STEP 4/6: Processing questions...
+STEP 4/7: Processing questions...
   ✓ Processed: 5 proportions, 3 means, 1 NPS
 
-STEP 5/6: Quality checks...
+STEP 5/7: Quality checks...
   ✓ No warnings detected
 
-STEP 6/6: Generating Excel output...
+STEP 6/7: Generating Excel output...
   ✓ Output written to: /path/to/results.xlsx
+
+STEP 7/7: Generating HTML report...
+  ✓ HTML report written to: /path/to/results.html (42.3 KB)
 
 ANALYSIS COMPLETE
 ```
+
+**Note:** Step 7 only appears when `Generate_HTML_Report = Y` in
+Study_Settings.
 
 ------------------------------------------------------------------------
 
@@ -743,6 +816,9 @@ The module validates:
 
 -   Confidence_Level between 0.80 and 0.99
 -   Bootstrap_Iterations between 1000 and 10000
+-   Sampling_Method must be one of: Random, Stratified, Cluster,
+    Quota, Online_Panel, Self_Selected, Census, Not_Specified
+    (optional — defaults to Not_Specified)
 
 ### Question Analysis
 
@@ -761,6 +837,153 @@ The module validates:
 
 ------------------------------------------------------------------------
 
+## HTML Report {#html-report}
+
+### Enabling the HTML Report
+
+Add `Generate_HTML_Report = Y` to the **Study_Settings** sheet.
+The HTML report is generated after the Excel output (Step 7) and
+saved alongside it with the same filename but `.html` extension.
+
+### What the HTML Report Contains
+
+The report is a single self-contained HTML file (no external
+dependencies) with four tabs:
+
+#### Summary Tab
+
+-   **Study-level statistics card** — Actual sample size, effective
+    sample size (Kish formula), design effect (DEFF), weighting
+    efficiency percentage, and plain-English interpretation
+-   **Results overview table** — All questions at a glance with
+    estimate, confidence interval, CI width, and quality badge
+-   **Forest plot** — Visual comparison of all confidence intervals
+-   **Representativeness table** — If population margins were
+    provided, shows target vs achieved with traffic-light flags
+
+#### Question Details Tab
+
+-   **Per-question navigation** — Click any question to see its
+    detailed results
+-   **Plain-English callout** — Interpretation of the result,
+    assumptions, and caveats written for non-statisticians
+-   **Method comparison table** — Side-by-side comparison of all
+    CI methods (Normal, Wilson, Bootstrap, Bayesian) with lower
+    bound, upper bound, margin of error, and notes
+-   **Method comparison chart** — Visual bar chart comparing CI
+    widths across methods
+
+#### Method Notes Tab
+
+-   **Statistical methodology documentation** — How each method
+    works, when to trust it, and what assumptions it makes
+-   **Understanding limitations** — Critical caveats about what
+    confidence intervals can and cannot tell you
+-   **Editable comments box** — Free-text area for analyst notes
+    (saved when you use Save Report)
+-   **Analysis warnings** — Any issues detected during processing
+
+#### Save Report
+
+-   Serializes the entire report including any edits to the comments
+    box and downloads it as a self-contained HTML file
+
+### Customising Appearance
+
+| Setting       | Default   | Purpose                        |
+|---------------|-----------|--------------------------------|
+| Brand_Colour  | `#1e3a5f` | Header gradient, active states |
+| Accent_Colour | `#2aa198` | Focus borders, highlights      |
+
+### Example Configuration
+
+```
+Setting                  Value
+Generate_HTML_Report     Y
+Brand_Colour             #003f87
+Accent_Colour            #2aa198
+Sampling_Method          Online_Panel
+```
+
+------------------------------------------------------------------------
+
+## Understanding Confidence Intervals {#understanding-cis}
+
+### What a Confidence Interval Tells You
+
+A 95% confidence interval means: if you drew 100 independent
+random samples from the same population and calculated a confidence
+interval from each, approximately 95 of those intervals would
+contain the true population value. It measures **precision** —
+how tightly the data pins down the answer.
+
+### What a Confidence Interval Does NOT Tell You
+
+-   It does not tell you the probability that the true value is in
+    the interval (that is the Bayesian credible interval)
+-   It does not account for non-sampling errors: question wording
+    bias, non-response bias, social desirability effects, or
+    interviewer effects
+-   It does not fix a biased sample — a narrow interval from a
+    biased sample is precise but wrong
+-   It assumes the stated sampling method (typically simple random
+    sampling) was actually used
+
+### The Most Common Mistake
+
+Many researchers report a margin of error from a convenience sample
+or opt-in online panel. This is technically meaningless because the
+margin of error formula assumes random sampling. The true
+uncertainty from a non-random sample is unknown and likely larger
+than the reported margin of error. The Turas HTML report flags this
+assumption prominently on every result.
+
+------------------------------------------------------------------------
+
+## Choosing the Right Method {#choosing-methods}
+
+### For Proportions (Percentages)
+
+| Situation | Recommended Method | Why |
+|---|---|---|
+| Standard survey, n > 100, proportion 10%–90% | Normal Approximation (MOE) | Simple, well-understood, performs well in this range |
+| Proportion near 0% or 100% | Wilson Score | Prevents impossible intervals; better coverage near boundaries |
+| Small sample (n < 50) | Wilson Score + Bootstrap | Wilson handles boundaries; bootstrap adds distribution-free check |
+| Tracking study with prior waves | Bayesian | Incorporates prior knowledge; smooths estimates across waves |
+| Skewed or unusual distribution | Bootstrap | Makes no distributional assumptions |
+| Publication or regulatory reporting | All four methods | Method agreement strengthens credibility |
+
+### For Means (Averages)
+
+| Situation | Recommended Method | Why |
+|---|---|---|
+| Approximately normal data, n > 30 | t-Distribution | Standard, well-understood, mathematically optimal for normal data |
+| Skewed data or small sample | Bootstrap | No normality assumption; reliable for non-symmetric distributions |
+| Tracking study with historical data | Bayesian | Prior centres the estimate; prevents extreme swings between waves |
+| Publication quality | t-Distribution + Bootstrap | Agreement between parametric and non-parametric methods is convincing |
+
+### For NPS (Net Promoter Score)
+
+| Situation | Recommended Method | Why |
+|---|---|---|
+| Standard NPS reporting | Normal Approximation | Uses the delta method for variance of a difference of proportions |
+| Small sample or extreme NPS | Bootstrap | NPS is a difference of proportions — bootstrap handles this naturally |
+| Tracking NPS over time | Bayesian | Smooths wave-to-wave variation with prior from previous waves |
+
+### Method Agreement as a Quality Signal
+
+When multiple methods produce similar intervals, you can be
+confident the result is robust. When they disagree substantially:
+
+-   Check whether the proportion is near 0% or 100% (Wilson will
+    differ from Normal in this case — trust Wilson)
+-   Check for heavy skew in the data (Bootstrap will differ from
+    t-distribution — trust Bootstrap)
+-   Check for strong priors (Bayesian will differ if the prior
+    dominates — consider whether the prior is justified)
+
+------------------------------------------------------------------------
+
 **End of User Manual**
 
-*Turas Confidence Module v2.0.0* *Last Updated: December 2025*
+*Turas Confidence Module v2.1.0* *Last Updated: March 2026*

@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Confidence Analysis Module
 
-**Version:** 10.1 **Last Updated:** December 2025 **Status:**
+**Version:** 10.2 **Last Updated:** March 2026 **Status:**
 Production Ready
 
 ------------------------------------------------------------------------
@@ -53,7 +53,9 @@ run_confidence_analysis(
 | **NPS**                | Full Net Promoter Score analysis with CIs          |
 | **Weighted Data**      | DEFF, effective n, weighted bootstrap              |
 | **Representativeness** | Quota checking with traffic-light flags            |
-| **Output**             | Multi-sheet Excel workbook                         |
+| **HTML Report**        | Interactive report with charts, callouts, method notes |
+| **Sampling Context**   | Tailored CI interpretation by sampling method      |
+| **Output**             | Multi-sheet Excel workbook + optional HTML report  |
 
 ------------------------------------------------------------------------
 
@@ -114,9 +116,29 @@ The module generates an Excel workbook with:
 8.  **Warnings** - Data quality issues
 9.  **Inputs** - Configuration snapshot
 
+**Optional HTML Report:** Set `Generate_HTML_Report = Y` in
+Study_Settings to also produce a self-contained HTML report with
+interactive navigation, SVG charts, method comparison tables,
+plain-English callouts, and sampling methodology notes tailored to
+your declared sampling method.
+
 ------------------------------------------------------------------------
 
 ## Version History
+
+### v10.2 (March 2026)
+
+-   **HTML Report:** Self-contained interactive HTML report with
+    summary dashboard, per-question detail panels, forest plots,
+    method comparison charts, plain-English callouts, and editable
+    comments box
+-   **Sampling Method:** New `Sampling_Method` config option (8 values)
+    generates tailored interpretation notes explaining what the
+    sampling design means for CI reliability
+-   **Wilson Fix:** Fixed `Run_Wilson` column name mismatch that
+    silently prevented Wilson score intervals from being calculated
+-   **Expanded Tests:** New test files for CI dispatcher, mean CI,
+    and study-level calculations; 596 tests passing
 
 ### v10.1 (December 2025)
 
@@ -151,5 +173,5 @@ Contact Turas development team
 
 ------------------------------------------------------------------------
 
-**Module Status:** Production Ready **Maintainer:** Turas Development
-Team
+**Module Status:** Production Ready (v10.2) **Maintainer:** Turas
+Development Team

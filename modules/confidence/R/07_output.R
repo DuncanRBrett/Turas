@@ -52,13 +52,16 @@ if (!require("openxlsx", quietly = TRUE)) {
   )
 }
 
-source_if_exists <- function(file_path) {
-  if (file.exists(file_path)) {
-    source(file_path)
-  } else if (file.exists(file.path("R", file_path))) {
-    source(file.path("R", file_path))
-  } else if (file.exists(file.path("..", "R", file_path))) {
-    source(file.path("..", "R", file_path))
+# Canonical definition in utils.R; fallback if sourced independently
+if (!exists("source_if_exists", mode = "function")) {
+  source_if_exists <- function(file_path) {
+    if (file.exists(file_path)) {
+      source(file_path)
+    } else if (file.exists(file.path("R", file_path))) {
+      source(file.path("R", file_path))
+    } else if (file.exists(file.path("..", "R", file_path))) {
+      source(file.path("..", "R", file_path))
+    }
   }
 }
 
@@ -371,7 +374,7 @@ add_summary_sheet <- function(wb, study_stats, prop_results, mean_results,
 
   # Warnings Summary
   if (length(warnings) > 0) {
-    openxlsx::writeData(wb, "Summary", "⚠ Warnings",
+    openxlsx::writeData(wb, "Summary", "Warnings",
                         startCol = 1, startRow = row)
     openxlsx::addStyle(wb, "Summary",
                        style = openxlsx::createStyle(fontSize = 12, textDecoration = "bold",
@@ -384,13 +387,43 @@ add_summary_sheet <- function(wb, study_stats, prop_results, mean_results,
                                 length(warnings)),
                         startCol = 1, startRow = row)
   } else {
-    openxlsx::writeData(wb, "Summary", "✓ No Warnings",
+    openxlsx::writeData(wb, "Summary", "No Warnings",
                         startCol = 1, startRow = row)
     openxlsx::addStyle(wb, "Summary",
                        style = openxlsx::createStyle(fontSize = 12, textDecoration = "bold",
                                                      fontColour = "#008000"),
                        rows = row, cols = 1)
   }
+  row <- row + 3
+
+  # Plain-English guide
+  write_callout_block(wb, "Summary", row, c(
+    "HOW TO READ THIS REPORT",
+    "",
+    "This report presents the results of your confidence analysis. It tells you how",
+    "precise your survey estimates are and how much they might differ from the true",
+    "population values.",
+    "",
+    "Key concepts:",
+    "  Confidence Interval (CI): A range of values likely to contain the true",
+    "  population value. A 95% CI means that if you repeated this survey 100 times,",
+    "  about 95 of those intervals would contain the true value.",
+    "",
+    "  Margin of Error (MOE): Half the width of the confidence interval. A smaller",
+    "  MOE means a more precise estimate.",
+    "",
+    "  Effective Sample Size: When survey weights are applied, some respondents",
+    "  count more than others. The effective n tells you how many unweighted",
+    "  respondents your weighted sample is equivalent to.",
+    "",
+    "IMPORTANT ASSUMPTIONS:",
+    "  The margin of error assumes a RANDOM (probability) sample. If your sample",
+    "  was collected through convenience, online panels, or other non-random methods,",
+    "  the MOE does not apply in the traditional sense. Non-response bias and",
+    "  coverage error may affect results beyond what the CI captures.",
+    "",
+    "  See the Methodology sheet for details on each statistical method used."
+  ))
 
   # Auto-size columns
   openxlsx::setColWidths(wb, "Summary", cols = 1:2, widths = "auto")
@@ -440,23 +473,33 @@ add_study_level_sheet <- function(wb, study_stats, decimal_sep) {
                      rows = row, cols = 1)
 
   row <- row + 1
-  notes <- c(
-    "DEFF (Design Effect):",
-    "  1.00 = No loss of precision from weighting",
-    "  1.05-1.20 = Modest loss (5-20%)",
-    "  1.20-2.00 = Moderate loss (20-50%)",
-    "  >2.00 = Substantial loss (>50%)",
+
+  write_callout_block(wb, "Study_Level", row, c(
+    "WHAT THIS MEANS",
+    "",
+    "The Design Effect (DEFF) measures how much precision you lose because of",
+    "weighting. A DEFF of 1.00 means no loss at all. A DEFF of 1.20 means you",
+    "lose about 20% of your precision, as if you had surveyed 20% fewer people.",
+    "",
+    "  1.00 = No loss of precision (no weighting or perfectly balanced weights)",
+    "  1.05-1.20 = Modest loss - your weighted results are still very reliable",
+    "  1.20-2.00 = Moderate loss - consider whether weighting is adding value",
+    "  >2.00 = Substantial loss - weighting is significantly reducing precision",
+    "",
+    "The Effective Sample Size is your actual sample after accounting for",
+    "weighting. For example, if you surveyed 1,000 people but DEFF = 1.25,",
+    "your effective n is about 800. This is the number used in CI calculations.",
+    "",
+    "IMPORTANT: These statistics only measure the impact of weighting on",
+    "precision. They do NOT account for non-response bias, coverage errors,",
+    "or measurement errors. A large effective n does not guarantee your",
+    "results are representative of the population.",
     "",
     "Weight CV (Coefficient of Variation):",
-    "  <0.20 = Modest variation",
+    "  <0.20 = Modest variation in weights",
     "  0.20-0.30 = Moderate variation",
-    "  >0.30 = High variation"
-  )
-
-  for (note in notes) {
-    openxlsx::writeData(wb, "Study_Level", note, startCol = 1, startRow = row)
-    row <- row + 1
-  }
+    "  >0.30 = High variation - a few respondents may dominate results"
+  ))
 
   # Auto-size columns
   openxlsx::setColWidths(wb, "Study_Level", cols = 1:ncol(study_stats), widths = "auto")
@@ -696,6 +739,41 @@ add_proportions_detail_sheet <- function(wb, prop_results, decimal_sep) {
   openxlsx::addStyle(wb, "Proportions_Detail", header_style, rows = 3,
                      cols = 1:ncol(prop_df), gridExpand = TRUE)
 
+  # Callout rows below the data
+  callout_row <- 3 + nrow(prop_df) + 2
+  write_callout_block(wb, "Proportions_Detail", callout_row, c(
+    "HOW TO READ THESE RESULTS",
+    "",
+    "Each row shows a survey question analysed as a proportion (percentage).",
+    "The Proportion column is the observed percentage in your sample.",
+    "",
+    "Confidence intervals tell you the range where the TRUE population",
+    "value likely falls. For example, if the proportion is 0.45 and the 95%",
+    "CI is [0.40, 0.50], there is a 95% chance the real value is between",
+    "40% and 50%.",
+    "",
+    "Methods available:",
+    "  MOE (Normal): Standard margin of error. Simple and widely understood,",
+    "  but can give impossible values (below 0% or above 100%) for extreme",
+    "  proportions. Works best when p is between 20% and 80%.",
+    "",
+    "  Wilson Score: Better than MOE for extreme proportions (very high or",
+    "  very low percentages). Always gives valid intervals within [0%, 100%].",
+    "  Recommended for proportions below 10% or above 90%.",
+    "",
+    "  Bootstrap: Makes no assumptions about your data distribution. Works",
+    "  by re-analysing random subsets thousands of times. Especially reliable",
+    "  for unusual distributions or small samples.",
+    "",
+    "  Bayesian: Combines your survey data with prior knowledge (if any).",
+    "  Useful for tracking studies where previous wave data can inform the",
+    "  current estimate.",
+    "",
+    "IMPORTANT: All confidence intervals assume a random (probability) sample.",
+    "If your sample was collected through convenience, online panels, or",
+    "snowball sampling, the intervals may understate the true uncertainty."
+  ))
+
   # Auto-size columns
   openxlsx::setColWidths(wb, "Proportions_Detail", cols = 1:ncol(prop_df), widths = "auto")
 }
@@ -815,6 +893,41 @@ add_means_detail_sheet <- function(wb, mean_results, decimal_sep) {
   openxlsx::addStyle(wb, "Means_Detail", header_style, rows = 3,
                      cols = 1:ncol(mean_df), gridExpand = TRUE)
 
+  # Callout rows below the data
+  callout_row <- 3 + nrow(mean_df) + 2
+  write_callout_block(wb, "Means_Detail", callout_row, c(
+    "HOW TO READ THESE RESULTS",
+    "",
+    "Each row shows a survey question analysed as a mean (average).",
+    "The Mean column is the observed average in your sample, and SD is",
+    "the standard deviation (how spread out the individual responses are).",
+    "",
+    "Confidence intervals tell you the range where the TRUE population",
+    "average likely falls. For example, if the mean is 7.2 and the 95%",
+    "CI is [6.8, 7.6], there is a 95% chance the real average is between",
+    "6.8 and 7.6.",
+    "",
+    "Methods available:",
+    "  t-Distribution: The standard approach for means. Assumes data is",
+    "  roughly bell-shaped (normally distributed). Reliable for most survey",
+    "  rating scales when n > 30.",
+    "",
+    "  Bootstrap: Makes no assumptions about your data distribution. Works",
+    "  by re-analysing random subsets thousands of times. Better for skewed",
+    "  distributions or small samples.",
+    "",
+    "  Bayesian: Combines your survey data with prior knowledge (if any).",
+    "  The posterior mean may differ from the sample mean if a prior was set.",
+    "",
+    "SE (Standard Error) measures how precisely the mean is estimated.",
+    "Smaller SE = more precise estimate. SE depends on both sample size",
+    "and data variability.",
+    "",
+    "IMPORTANT: All confidence intervals assume a random (probability) sample.",
+    "If respondents self-selected into the survey, the CI reflects sampling",
+    "variability only and does not capture selection bias."
+  ))
+
   # Auto-size columns
   openxlsx::setColWidths(wb, "Means_Detail", cols = 1:ncol(mean_df), widths = "auto")
 }
@@ -930,6 +1043,29 @@ add_nps_detail_sheet <- function(wb, nps_results, decimal_sep) {
   openxlsx::addStyle(wb, "NPS_Detail", header_style, rows = 3,
                      cols = 1:ncol(nps_df), gridExpand = TRUE)
 
+  # Callout rows below the data
+  callout_row <- 3 + nrow(nps_df) + 2
+  write_callout_block(wb, "NPS_Detail", callout_row, c(
+    "HOW TO READ THESE RESULTS",
+    "",
+    "NPS (Net Promoter Score) = % Promoters - % Detractors.",
+    "It ranges from -100 (everyone is a detractor) to +100 (everyone is a",
+    "promoter). Scores above 0 are generally positive, above 50 are excellent.",
+    "",
+    "Confidence intervals show the range where the TRUE NPS likely falls.",
+    "NPS can be volatile with small samples because it depends on the",
+    "difference between two proportions.",
+    "",
+    "Rule of thumb for NPS precision:",
+    "  n < 100: NPS can swing by 15-20 points between samples",
+    "  n = 200-500: Typical MOE of 7-10 points",
+    "  n > 1000: MOE under 4 points",
+    "",
+    "IMPORTANT: NPS confidence intervals assume a random sample. If your",
+    "respondents were not randomly selected, the interval does not account",
+    "for the bias introduced by sample selection."
+  ))
+
   # Auto-size columns
   openxlsx::setColWidths(wb, "NPS_Detail", cols = 1:ncol(nps_df), widths = "auto")
 }
@@ -958,11 +1094,12 @@ build_nps_dataframe <- function(nps_results) {
       Effective_n = ifelse(!is.null(q_result$n_eff), q_result$n_eff, NA)
     )
 
-    # Normal approximation CI
-    if (!is.null(q_result$normal_ci)) {
-      base_row$Normal_Lower <- q_result$normal_ci$lower
-      base_row$Normal_Upper <- q_result$normal_ci$upper
-      base_row$SE <- q_result$normal_ci$se
+    # Normal approximation CI (check both field names for compatibility)
+    nps_normal <- q_result$moe_normal %||% q_result$normal_ci
+    if (!is.null(nps_normal)) {
+      base_row$Normal_Lower <- nps_normal$lower
+      base_row$Normal_Upper <- nps_normal$upper
+      base_row$SE <- nps_normal$se
     }
 
     # Bootstrap
@@ -1020,83 +1157,128 @@ add_methodology_sheet <- function(wb) {
 
   row <- 3
 
-  # Methodology content
+  # Methodology content — plain-English first, then technical detail
   methodology_text <- c(
-    "PROPORTIONS:",
+    "ABOUT CONFIDENCE ANALYSIS",
+    "",
+    "Confidence analysis answers the question: 'How much can I trust these",
+    "numbers?' Every survey is based on a sample of people, not the entire",
+    "population. Confidence intervals tell you the range of values where",
+    "the true population answer likely falls.",
+    "",
+    "For example, if 45% of your sample chose Option A, and the 95%",
+    "confidence interval is [40%, 50%], you can say: 'We are 95% confident",
+    "that the true percentage is between 40% and 50%.'",
+    "",
+    "----------------------------------------------------------------------",
+    "",
+    "METHODS FOR PROPORTIONS (Percentages)",
     "",
     "1. Normal Approximation (Margin of Error)",
+    "   What it does: The standard 'plus or minus' margin of error.",
+    "   When to use: Works well for most proportions between 20% and 80%",
+    "   with samples of 100+.",
+    "   Limitation: Can produce impossible results (below 0% or above 100%)",
+    "   for extreme proportions. Not reliable when n*p < 10.",
     "   Formula: MOE = z * sqrt(p*(1-p)/n)",
-    "   Use: Large samples (n*p >= 10 and n*(1-p) >= 10)",
-    "   Confidence Interval: [p - MOE, p + MOE]",
     "",
     "2. Wilson Score Interval",
-    "   Better for extreme proportions (p < 0.1 or p > 0.9)",
-    "   Automatically provides asymmetric intervals",
-    "   Recommended for small samples or extreme proportions",
+    "   What it does: A smarter version of the margin of error that always",
+    "   stays within [0%, 100%].",
+    "   When to use: Always better than Normal for extreme proportions",
+    "   (below 10% or above 90%) and small samples.",
+    "   Limitation: Slightly more complex to calculate, but modern software",
+    "   handles this automatically.",
     "",
     "3. Bootstrap",
-    "   Non-parametric resampling method (5000-10000 iterations)",
-    "   No distributional assumptions required",
-    "   Percentile method for confidence intervals",
+    "   What it does: Re-analyses your data thousands of times by randomly",
+    "   selecting subsets (with replacement). The range of these results",
+    "   becomes the confidence interval.",
+    "   When to use: When you are unsure whether standard assumptions hold,",
+    "   or when dealing with complex survey designs.",
+    "   Limitation: Results vary slightly between runs (controlled by seed).",
+    "   Computationally intensive for very large datasets.",
     "",
     "4. Bayesian (Beta-Binomial)",
-    "   Posterior: Beta(alpha + x, beta + n - x)",
-    "   Uninformed prior: Beta(1,1) = Uniform(0,1)",
-    "   Informed prior: Beta from previous wave data",
+    "   What it does: Combines your survey data with prior knowledge to",
+    "   produce a 'credible interval'. With no prior, it gives results",
+    "   similar to other methods.",
+    "   When to use: Tracking studies where previous wave data provides",
+    "   a useful starting point.",
+    "   Limitation: Results depend on prior specification. A poorly chosen",
+    "   prior can bias the result.",
+    "   Technical: Posterior = Beta(alpha + x, beta + n - x)",
     "",
-    "MEANS:",
+    "----------------------------------------------------------------------",
+    "",
+    "METHODS FOR MEANS (Averages)",
     "",
     "1. t-Distribution",
-    "   Formula: CI = mean ± t(df) * SE",
-    "   SE = sd / sqrt(n_eff)",
-    "   Accounts for design effect in weighted data",
+    "   What it does: The standard approach for average values.",
+    "   When to use: Most survey rating scales (e.g. 1-10 satisfaction)",
+    "   with n > 30. Works well when data is roughly symmetric.",
+    "   Limitation: Less reliable for highly skewed distributions or",
+    "   very small samples.",
+    "   Formula: CI = mean +/- t(df) * SE, where SE = sd / sqrt(n_eff)",
     "",
     "2. Bootstrap",
-    "   Resampling with replacement (5000-10000 iterations)",
-    "   Preserves survey weights if applicable",
-    "   Percentile method for confidence intervals",
+    "   What it does: Same approach as proportion bootstrap - re-analyses",
+    "   data thousands of times.",
+    "   When to use: Skewed distributions, small samples, or when the",
+    "   bell-curve assumption is questionable.",
     "",
-    "3. Bayesian (Normal-Normal Conjugate)",
-    "   Prior: N(mu0, sigma0²/n0)",
-    "   Posterior: Precision-weighted combination of prior and data",
-    "   Uninformed: very weak prior (large prior variance)",
-    "   Informed: from previous wave statistics",
+    "3. Bayesian (Normal-Normal)",
+    "   What it does: Combines data with prior knowledge using precision-",
+    "   weighted averaging.",
+    "   When to use: Tracking studies with informative priors.",
     "",
-    "NET PROMOTER SCORE (NPS):",
+    "----------------------------------------------------------------------",
     "",
-    "Formula: NPS = %Promoters - %Detractors",
-    "  Scale: -100 to +100",
-    "  Promoters: High scores (typically 9-10 on 0-10 scale)",
-    "  Detractors: Low scores (typically 0-6)",
-    "  Passives: Middle scores (7-8, not included in NPS)",
+    "NET PROMOTER SCORE (NPS)",
     "",
-    "1. Normal Approximation",
-    "   Variance of difference formula:",
-    "   Var(NPS) = Var(prom) + Var(detr)",
-    "   SE = sqrt(p_prom*(1-p_prom)/n + p_detr*(1-p_detr)/n) * 100",
-    "   Uses n_eff for weighted data",
+    "Formula: NPS = %Promoters - %Detractors (scale: -100 to +100)",
+    "  Promoters: Scores 9-10 (on 0-10 scale)",
+    "  Detractors: Scores 0-6",
+    "  Passives: Scores 7-8 (excluded from NPS calculation)",
     "",
-    "2. Bootstrap",
-    "   Resampling with replacement (5000-10000 iterations)",
-    "   Preserves survey weights if applicable",
-    "   Percentile method for confidence intervals",
+    "NPS is inherently volatile because it depends on the difference",
+    "between two proportions. Expect wider confidence intervals than",
+    "for simple proportions.",
     "",
-    "3. Bayesian",
-    "   Normal approximation to NPS distribution",
-    "   Prior: N(mu0, sigma0²)",
-    "   Posterior combines prior and data (precision-weighted)",
+    "----------------------------------------------------------------------",
     "",
-    "WEIGHTING:",
+    "WEIGHTING AND EFFECTIVE SAMPLE SIZE",
     "",
-    "Design Effect (DEFF): DEFF = 1 + CV²",
-    "  where CV = coefficient of variation of weights",
+    "When weights are applied, some respondents count more than others.",
+    "This reduces precision compared to an unweighted sample of the same",
+    "size. The Design Effect (DEFF) quantifies this loss.",
     "",
-    "Effective Sample Size: n_eff = (Σw)² / Σw²",
-    "  Kish (1965) approximation",
+    "  DEFF = 1 + CV^2 (where CV = coefficient of variation of weights)",
+    "  Effective n = (Sum of weights)^2 / Sum(weights^2)  [Kish, 1965]",
     "",
-    "Standard errors use effective n for weighted data",
+    "All standard errors in this report use effective n for weighted data.",
     "",
-    "REFERENCES:",
+    "----------------------------------------------------------------------",
+    "",
+    "CRITICAL ASSUMPTIONS AND LIMITATIONS",
+    "",
+    "1. RANDOM SAMPLING: All confidence intervals assume data was collected",
+    "   through a probability (random) sampling method. If your sample is a",
+    "   convenience sample, online panel, or collected through non-random",
+    "   means, the intervals are technically invalid. They still indicate",
+    "   variability, but they do NOT capture selection bias.",
+    "",
+    "2. NON-RESPONSE: If certain groups are less likely to respond, the",
+    "   sample may not represent the population even with random selection.",
+    "   Confidence intervals do not account for non-response bias.",
+    "",
+    "3. MEASUREMENT ERROR: CIs measure sampling variability only. They",
+    "   cannot detect poorly worded questions, social desirability bias,",
+    "   or other systematic measurement errors.",
+    "",
+    "----------------------------------------------------------------------",
+    "",
+    "REFERENCES",
     "",
     "Kish, L. (1965). Survey Sampling. Wiley.",
     "Agresti, A., & Coull, B. A. (1998). Approximate is better than exact.",
@@ -1134,16 +1316,19 @@ add_warnings_sheet <- function(wb, warnings) {
   row <- 3
 
   if (length(warnings) == 0) {
-    openxlsx::writeData(wb, "Warnings", "✓ No warnings detected",
+    openxlsx::writeData(wb, "Warnings", "No warnings detected",
                         startCol = 1, startRow = row)
     openxlsx::addStyle(wb, "Warnings",
                        style = openxlsx::createStyle(fontSize = 12, fontColour = "#008000"),
                        rows = row, cols = 1)
   } else {
-    # Write warnings
+    # Build warnings with guidance
+    guidance <- vapply(warnings, classify_warning_guidance, character(1))
+
     warnings_df <- data.frame(
       Number = seq_along(warnings),
       Warning = warnings,
+      What_To_Do = guidance,
       stringsAsFactors = FALSE
     )
 
@@ -1158,10 +1343,12 @@ add_warnings_sheet <- function(wb, warnings) {
       fontColour = "#FFFFFF"
     )
     openxlsx::addStyle(wb, "Warnings", header_style, rows = row,
-                       cols = 1:2, gridExpand = TRUE)
+                       cols = 1:3, gridExpand = TRUE)
 
     # Auto-size columns
-    openxlsx::setColWidths(wb, "Warnings", cols = 1:2, widths = "auto")
+    openxlsx::setColWidths(wb, "Warnings", cols = 1, widths = 8)
+    openxlsx::setColWidths(wb, "Warnings", cols = 2, widths = 60)
+    openxlsx::setColWidths(wb, "Warnings", cols = 3, widths = 60)
   }
 }
 
@@ -1300,6 +1487,92 @@ apply_numeric_formatting <- function(wb, sheet, start_row, start_col, df, decima
   }
 
   invisible(NULL)
+}
+
+
+#' Classify a warning and return actionable guidance
+#'
+#' Matches warning text to known patterns and returns plain-English guidance
+#' for what the user should do about each warning.
+#'
+#' @param warning_text Character. The warning message
+#' @return Character. Guidance text
+#' @keywords internal
+classify_warning_guidance <- function(warning_text) {
+  w <- tolower(warning_text)
+
+  if (grepl("effective.?n|n_eff|sample.?size.*(small|low|insuff)", w)) {
+    return("Consider increasing your sample size. Results with small effective n are unreliable. Treat estimates as directional only.")
+  }
+  if (grepl("deff|design.?effect.*(high|large)", w)) {
+    return("High DEFF means weighting is reducing precision significantly. Review whether all weighting variables are necessary, or consider collecting more data.")
+  }
+  if (grepl("weight.*(extreme|high|conc|domin)", w)) {
+    return("Some respondents have very large weights, meaning a few people heavily influence results. Consider capping extreme weights or reviewing your weighting scheme.")
+  }
+  if (grepl("zero.?cell|zero.?count|no.?(obs|respon)", w)) {
+    return("Some categories have no respondents. CIs cannot be calculated for empty cells. Consider combining sparse categories or increasing sample coverage.")
+  }
+  if (grepl("ci.?width.*(wide|large)|moe.*(large|wide)", w)) {
+    return("Wide confidence intervals mean low precision. The true value could be anywhere in a large range. More data or a more targeted sample would narrow the interval.")
+  }
+  if (grepl("bootstrap.*(fail|converg|warn)", w)) {
+    return("Bootstrap resampling encountered issues. Results may be less reliable. Check data for extreme outliers or consider using a different CI method.")
+  }
+  if (grepl("prior.*(invalid|conflict|implaus)", w)) {
+    return("The Bayesian prior may not be appropriate for this data. Bayesian results will be unreliable. Consider using an uninformed prior or check prior settings.")
+  }
+  if (grepl("normal.?approx|n\\*p.*(small|less|low)", w)) {
+    return("The normal approximation may not be accurate for this data. Use Wilson Score or Bootstrap intervals instead, which are more reliable for extreme proportions or small samples.")
+  }
+  if (grepl("convergence|iteration|did not converge", w)) {
+    return("The algorithm did not fully converge. Results may be approximate. Consider increasing bootstrap iterations or checking data quality.")
+  }
+
+  # Default guidance
+  "Review this warning in context. If it affects a question important to your analysis, consider alternative methods or collecting additional data."
+}
+
+
+#' Write a callout block to an Excel sheet
+#'
+#' Writes plain-English interpretation text with light blue background styling.
+#' Used across sheets to provide marketer-friendly explanations.
+#'
+#' @param wb Workbook object
+#' @param sheet Sheet name
+#' @param start_row Starting row for the callout
+#' @param lines Character vector, one element per row
+#' @return Next available row after the callout block (invisible)
+#' @keywords internal
+write_callout_block <- function(wb, sheet, start_row, lines) {
+  callout_style <- openxlsx::createStyle(
+    fontSize = 10,
+    fontColour = "#1a3a5c",
+    fgFill = "#f0f9ff",
+    wrapText = TRUE
+  )
+  callout_bold <- openxlsx::createStyle(
+    fontSize = 10,
+    fontColour = "#1a3a5c",
+    fgFill = "#f0f9ff",
+    textDecoration = "bold",
+    wrapText = TRUE
+  )
+
+  row <- start_row
+  for (line in lines) {
+    openxlsx::writeData(wb, sheet, line, startCol = 1, startRow = row)
+    # Bold lines that look like headings (all caps or end with ":")
+    if (nzchar(line) && (grepl("^[A-Z ]+:?$", line) || grepl(":$", trimws(line)))) {
+      openxlsx::addStyle(wb, sheet, callout_bold, rows = row, cols = 1)
+    } else if (nzchar(line)) {
+      openxlsx::addStyle(wb, sheet, callout_style, rows = row, cols = 1)
+    }
+    row <- row + 1
+  }
+
+  invisible(row)
 }
 
 

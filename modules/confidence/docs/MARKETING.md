@@ -137,6 +137,23 @@ The module generates a professional Excel workbook with:
 | **Warnings**           | Data quality flags                       |
 | **Inputs**             | Configuration record for reproducibility |
 
+### Interactive HTML Report (Optional)
+
+Set `Generate_HTML_Report = Y` to also produce a self-contained
+HTML report featuring:
+
+-   **Summary dashboard** with study-level statistics and forest plot
+-   **Per-question detail panels** with method comparison tables and
+    charts
+-   **Plain-English callouts** explaining each result, the methods
+    used, and what the sampling design means for confidence interval
+    reliability
+-   **Sampling method context** — declare your design (random, quota,
+    online panel, etc.) and get tailored interpretation notes
+-   **Methodology notes** with editable comments box for analyst
+    annotations
+-   **Save Report** — downloads the report with any edits preserved
+
 ------------------------------------------------------------------------
 
 ## Typical Use Cases
@@ -223,8 +240,9 @@ The Confidence Module integrates seamlessly with other Turas modules:
 |----------------------|-----------------------------|
 | Steep learning curve | Survey-focused              |
 | Complex scripting    | Excel configuration         |
-| Generic output       | Survey-ready reports        |
+| Generic output       | Survey-ready reports + HTML  |
 | No quota checking    | Representativeness built-in |
+| No interpretation    | Plain-English callouts      |
 
 ------------------------------------------------------------------------
 
@@ -259,7 +277,11 @@ The Turas Confidence Module provides:
 -   **Full NPS support** with intervals
 -   **Weighted data handling** with DEFF
 -   **Quota checking** for sample quality
--   **Professional output** ready for client reports
+-   **Interactive HTML report** with charts, callouts, and
+    sampling methodology notes
+-   **Sampling method context** — tailored CI interpretation for
+    your specific research design
+-   **Professional output** ready for client reports (Excel + HTML)
 
 **Result:** More credible, defensible survey reporting with rigorous
 statistical backing.
@@ -272,4 +294,4 @@ instructions, see:** [USER_MANUAL.md](USER_MANUAL.md)
 
 ------------------------------------------------------------------------
 
-*Turas Confidence Module v2.0.0* *Part of the Turas Analytics Platform*
+*Turas Confidence Module v2.1.0* *Part of the Turas Analytics Platform*

@@ -301,7 +301,14 @@ calculate_mean_stats <- function(values, weights = NULL) {
     }
 
     mean_val <- sum(values * weights) / total_w
-    weighted_var <- sum(weights * (values - mean_val)^2) / total_w
+    # Bessel-corrected weighted variance (reliability weights)
+    sum_w2 <- sum(weights^2)
+    bessel_denom <- total_w - (sum_w2 / total_w)
+    if (bessel_denom > 0) {
+      weighted_var <- sum(weights * (values - mean_val)^2) / bessel_denom
+    } else {
+      weighted_var <- sum(weights * (values - mean_val)^2) / total_w
+    }
     sd_val <- sqrt(weighted_var)
     n_eff <- calculate_effective_n(weights)
     n_raw <- length(values)

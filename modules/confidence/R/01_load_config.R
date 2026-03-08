@@ -42,14 +42,16 @@ if (!require("readxl", quietly = TRUE)) {
   )
 }
 
-# Source utils
-source_if_exists <- function(file_path) {
-  if (file.exists(file_path)) {
-    source(file_path)
-  } else if (file.exists(file.path("R", file_path))) {
-    source(file.path("R", file_path))
-  } else if (file.exists(file.path("..", "R", file_path))) {
-    source(file.path("..", "R", file_path))
+# Source utils (canonical definition in utils.R; fallback if sourced independently)
+if (!exists("source_if_exists", mode = "function")) {
+  source_if_exists <- function(file_path) {
+    if (file.exists(file_path)) {
+      source(file_path)
+    } else if (file.exists(file.path("R", file_path))) {
+      source(file.path("R", file_path))
+    } else if (file.exists(file.path("..", "R", file_path))) {
+      source(file.path("..", "R", file_path))
+    }
   }
 }
 
@@ -584,6 +586,20 @@ validate_study_settings <- function(study_settings_df) {
     }
   }
 
+  # Validate Sampling_Method (optional — defaults to Not_Specified)
+  valid_sampling_methods <- c("Random", "Stratified", "Cluster", "Quota",
+                               "Online_Panel", "Self_Selected", "Census",
+                               "Not_Specified")
+  if ("Sampling_Method" %in% study_settings_df$Setting) {
+    sm <- as.character(settings[["Sampling_Method"]])
+    if (!is.na(sm) && sm != "" && !sm %in% valid_sampling_methods) {
+      errors <- c(errors, sprintf(
+        "Sampling_Method must be one of: %s (got '%s')",
+        paste(valid_sampling_methods, collapse = ", "), sm
+      ))
+    }
+  }
+
   return(list(errors = errors, warnings = warnings))
 }
 
@@ -652,7 +668,7 @@ validate_question_analysis <- function(question_df) {
     }
 
     # Validate Run_* columns
-    for (col in c("Run_MOE", "Run_Bootstrap", "Run_Credible", "Use_Wilson")) {
+    for (col in c("Run_MOE", "Run_Bootstrap", "Run_Credible", "Run_Wilson")) {
       if (col %in% names(row)) {
         val <- toupper(as.character(row[[col]]))
         if (!is.na(val) && val != "" && !val %in% c("Y", "N")) {

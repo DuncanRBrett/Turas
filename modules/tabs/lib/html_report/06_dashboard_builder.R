@@ -188,7 +188,7 @@ build_dashboard_panel <- function(dashboard_data, config_obj) {
       class = "dash-container",
       meta_strip,
       colour_legend,
-      build_dashboard_text_boxes(brand_colour),
+      build_dashboard_text_boxes(brand_colour, config_obj),
       section_blocks,
       sig_section,
       build_heatmap_export_js(),
@@ -375,11 +375,18 @@ build_colour_legend <- function(thresholds, config_obj = NULL) {
 #' @param brand_colour Character hex colour
 #' @return htmltools::tagList
 #' @keywords internal
-build_dashboard_text_boxes <- function(brand_colour) {
+build_dashboard_text_boxes <- function(brand_colour, config_obj = list()) {
 
   bc <- brand_colour %||% "#323367"
 
-  build_one_box <- function(box_id, title, placeholder) {
+  build_one_box <- function(box_id, title, placeholder, prefill = NULL) {
+    # Pre-populated content (from config Settings sheet)
+    content <- if (!is.null(prefill) && nzchar(trimws(prefill))) {
+      htmltools::HTML(htmltools::htmlEscape(trimws(prefill)))
+    } else {
+      NULL
+    }
+
     htmltools::tags$div(
       class = "dash-text-box",
       style = sprintf("border-left: 3px solid %s;", bc),
@@ -396,7 +403,8 @@ build_dashboard_text_boxes <- function(brand_colour) {
         id = paste0("dash-text-", box_id),
         class = "dash-text-editor",
         contenteditable = "true",
-        `data-placeholder` = placeholder
+        `data-placeholder` = placeholder,
+        content
       )
     )
   }
@@ -405,12 +413,14 @@ build_dashboard_text_boxes <- function(brand_colour) {
     build_one_box(
       "background",
       "Background & Method",
-      "Enter background, method, sample details..."
+      "Enter background, method, sample details...",
+      prefill = config_obj$background_text
     ),
     build_one_box(
       "execsummary",
       "Executive Summary",
-      "Enter key findings and recommendations..."
+      "Enter key findings and recommendations...",
+      prefill = config_obj$executive_summary
     )
   )
 }

@@ -31,13 +31,16 @@ MEANS_VERSION <- "10.0"
 # DEPENDENCIES
 # ==============================================================================
 
-source_if_exists <- function(file_path) {
-  if (file.exists(file_path)) {
-    source(file_path)
-  } else if (file.exists(file.path("R", file_path))) {
-    source(file.path("R", file_path))
-  } else if (file.exists(file.path("..", "R", file_path))) {
-    source(file.path("..", "R", file_path))
+# Canonical definition in utils.R; fallback if sourced independently
+if (!exists("source_if_exists", mode = "function")) {
+  source_if_exists <- function(file_path) {
+    if (file.exists(file_path)) {
+      source(file_path)
+    } else if (file.exists(file.path("R", file_path))) {
+      source(file.path("R", file_path))
+    } else if (file.exists(file.path("..", "R", file_path))) {
+      source(file.path("..", "R", file_path))
+    }
   }
 }
 
@@ -148,10 +151,20 @@ calculate_mean_ci <- function(values, weights = NULL, conf_level = 0.95) {
     }
 
     # Weighted mean
-    mean_val <- sum(values * weights) / sum(weights)
+    sum_w <- sum(weights)
+    mean_val <- sum(values * weights) / sum_w
 
-    # Weighted SD (population estimator - consistent with effective n approach)
-    weighted_var <- sum(weights * (values - mean_val)^2) / sum(weights)
+    # Weighted SD with Bessel correction (reliability weights)
+    # Uses V1 = sum(w), V2 = sum(w^2) correction factor for unbiased estimate
+    # Reference: https://en.wikipedia.org/wiki/Weighted_arithmetic_mean#Reliability_weights
+    sum_w2 <- sum(weights^2)
+    bessel_denom <- sum_w - (sum_w2 / sum_w)
+    if (bessel_denom > 0) {
+      weighted_var <- sum(weights * (values - mean_val)^2) / bessel_denom
+    } else {
+      # Fallback to population estimator when correction is not possible
+      weighted_var <- sum(weights * (values - mean_val)^2) / sum_w
+    }
     sd_val <- sqrt(weighted_var)
 
     # Effective sample size for degrees of freedom
@@ -514,8 +527,16 @@ credible_interval_mean <- function(values, weights = NULL, conf_level = 0.95,
   is_weighted <- !is.null(weights) && length(weights) > 0
 
   if (is_weighted) {
-    mean_data <- sum(values * weights) / sum(weights)
-    weighted_var <- sum(weights * (values - mean_data)^2) / sum(weights)
+    sum_w <- sum(weights)
+    mean_data <- sum(values * weights) / sum_w
+    # Bessel-corrected weighted variance (reliability weights)
+    sum_w2 <- sum(weights^2)
+    bessel_denom <- sum_w - (sum_w2 / sum_w)
+    if (bessel_denom > 0) {
+      weighted_var <- sum(weights * (values - mean_data)^2) / bessel_denom
+    } else {
+      weighted_var <- sum(weights * (values - mean_data)^2) / sum_w
+    }
     sd_data <- sqrt(weighted_var)
     n_eff <- calculate_effective_n(weights)
   } else {
@@ -672,8 +693,16 @@ analyze_mean <- function(values, weights = NULL, conf_level = 0.95,
 
   # Calculate basic statistics
   if (is_weighted) {
-    mean_val <- sum(values * weights) / sum(weights)
-    weighted_var <- sum(weights * (values - mean_val)^2) / sum(weights)
+    sum_w <- sum(weights)
+    mean_val <- sum(values * weights) / sum_w
+    # Bessel-corrected weighted variance (reliability weights)
+    sum_w2 <- sum(weights^2)
+    bessel_denom <- sum_w - (sum_w2 / sum_w)
+    if (bessel_denom > 0) {
+      weighted_var <- sum(weights * (values - mean_val)^2) / bessel_denom
+    } else {
+      weighted_var <- sum(weights * (values - mean_val)^2) / sum_w
+    }
     sd_val <- sqrt(weighted_var)
     n_actual <- length(values)
     n_eff <- calculate_effective_n(weights)

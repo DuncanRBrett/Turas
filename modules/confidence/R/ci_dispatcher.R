@@ -71,8 +71,8 @@ dispatch_proportion_ci <- function(p, n_eff, values, categories, weights,
   # -------------------------------------------------------------------------
   # Wilson Score Interval
   # -------------------------------------------------------------------------
-  use_wilson_flag <- if ("Use_Wilson" %in% names(q_row)) q_row$Use_Wilson else NULL
-  if (!is.null(use_wilson_flag) && !is.na(use_wilson_flag) && toupper(use_wilson_flag) == "Y") {
+  run_wilson_flag <- if ("Run_Wilson" %in% names(q_row)) q_row$Run_Wilson else NULL
+  if (!is.null(run_wilson_flag) && !is.na(run_wilson_flag) && toupper(run_wilson_flag) == "Y") {
     if (!is.na(n_eff) && n_eff > 0) {
       result$wilson <- calculate_proportion_ci_wilson(p, n_eff, conf_level)
     } else {
@@ -190,12 +190,17 @@ dispatch_mean_ci <- function(mean_val, sd_val, n_eff, values, weights,
   run_boot_flag <- q_row$Run_Bootstrap
   if (!is.null(run_boot_flag) && !is.na(run_boot_flag) && toupper(run_boot_flag) == "Y") {
     boot_iter <- as.integer(config$study_settings$Bootstrap_Iterations)
-    result$bootstrap <- bootstrap_mean_ci(
-      values     = values,
-      weights    = weights,
-      B          = boot_iter,
-      conf_level = conf_level
-    )
+    tryCatch({
+      result$bootstrap <- bootstrap_mean_ci(
+        values     = values,
+        weights    = weights,
+        B          = boot_iter,
+        conf_level = conf_level
+      )
+    }, error = function(e) {
+      warnings_list <<- c(warnings_list,
+        sprintf("Question %s: Bootstrap mean CI failed - %s", q_id, conditionMessage(e)))
+    })
   }
 
   # -------------------------------------------------------------------------
@@ -207,14 +212,19 @@ dispatch_mean_ci <- function(mean_val, sd_val, n_eff, values, weights,
     prior_sd   <- if (!is.null(q_row$Prior_SD) && !is.na(q_row$Prior_SD)) q_row$Prior_SD else NULL
     prior_n    <- if (!is.null(q_row$Prior_N) && !is.na(q_row$Prior_N)) q_row$Prior_N else NULL
 
-    result$bayesian <- credible_interval_mean(
-      values     = values,
-      weights    = weights,
-      conf_level = conf_level,
-      prior_mean = prior_mean,
-      prior_sd   = prior_sd,
-      prior_n    = prior_n
-    )
+    tryCatch({
+      result$bayesian <- credible_interval_mean(
+        values     = values,
+        weights    = weights,
+        conf_level = conf_level,
+        prior_mean = prior_mean,
+        prior_sd   = prior_sd,
+        prior_n    = prior_n
+      )
+    }, error = function(e) {
+      warnings_list <<- c(warnings_list,
+        sprintf("Question %s: Bayesian mean CI failed - %s", q_id, conditionMessage(e)))
+    })
   }
 
   result$warnings <- warnings_list

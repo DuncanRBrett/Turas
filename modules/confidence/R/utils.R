@@ -539,6 +539,41 @@ get_confidence_module_version <- function() {
 }
 
 
+# ==============================================================================
+# SHARED UTILITY FUNCTIONS
+# ==============================================================================
+# Canonical definitions of utilities used across the module.
+# Other files should guard-check before re-defining these.
+# ==============================================================================
+
+#' Null-coalescing operator
+#'
+#' Returns b if a is NULL, otherwise a.
+#' @param a Value to check
+#' @param b Fallback value
+#' @return a if non-NULL, else b
+#' @keywords internal
+`%||%` <- function(a, b) if (is.null(a)) b else a
+
+
+#' Source a file if it exists
+#'
+#' Safely sources an R file, checking the given path first,
+#' then a fallback in the R/ subdirectory.
+#'
+#' @param file_path Path to the R file
+#' @keywords internal
+source_if_exists <- function(file_path) {
+  if (file.exists(file_path)) {
+    source(file_path)
+  } else if (file.exists(file.path("R", file_path))) {
+    source(file.path("R", file_path))
+  } else if (file.exists(file.path("..", "R", file_path))) {
+    source(file.path("..", "R", file_path))
+  }
+}
+
+
 #' Print module information
 #'
 #' Prints module information to console

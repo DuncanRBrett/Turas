@@ -283,6 +283,24 @@ load_comments_sheet <- function(config_file) {
     # Support optional Banner column for multi-banner comments
     has_banner <- "Banner" %in% names(df)
 
+    # Extract special dashboard text entries (V10.8.0)
+    # Use _BACKGROUND and _EXECUTIVE_SUMMARY as reserved QuestionCode values
+    special_codes <- c("_BACKGROUND", "_EXECUTIVE_SUMMARY")
+    background_text <- NULL
+    executive_summary <- NULL
+
+    for (i in seq_len(nrow(df))) {
+      q_code <- trimws(toupper(df$QuestionCode[i]))
+      if (q_code == "_BACKGROUND") {
+        background_text <- trimws(df$Comment[i])
+      } else if (q_code == "_EXECUTIVE_SUMMARY") {
+        executive_summary <- trimws(df$Comment[i])
+      }
+    }
+
+    # Filter out special rows from question comments
+    df <- df[!trimws(toupper(df$QuestionCode)) %in% special_codes, , drop = FALSE]
+
     # Build structure: comments[[q_code]] = list of list(banner, text)
     comments <- list()
     for (i in seq_len(nrow(df))) {
@@ -300,9 +318,17 @@ load_comments_sheet <- function(config_file) {
       }
     }
 
-    n_total <- sum(sapply(comments, length))
+    n_total <- if (length(comments) > 0) sum(vapply(comments, length, integer(1))) else 0L
     cat(sprintf("  [INFO] Loaded %d comments for %d questions from Comments sheet\n",
                 n_total, length(comments)))
+
+    if (!is.null(background_text)) cat(sprintf("  [INFO] Background text loaded from Comments sheet\n"))
+    if (!is.null(executive_summary)) cat(sprintf("  [INFO] Executive summary loaded from Comments sheet\n"))
+
+    # Attach dashboard text as attributes
+    attr(comments, "background_text") <- background_text
+    attr(comments, "executive_summary") <- executive_summary
+
     comments
   }, error = function(e) {
     cat(sprintf("  [WARNING] Could not read Comments sheet: %s\n", e$message))
@@ -312,12 +338,13 @@ load_comments_sheet <- function(config_file) {
 
 
 # ==============================================================================
-# QUALITATIVE SHEET LOADER (V10.7.0)
+# ADDED SLIDES SHEET LOADER (V10.8.0, renamed from Qualitative)
 # ==============================================================================
 
-#' Load Optional Qualitative Sheet from Config Excel
+#' Load Optional AddedSlides Sheet from Config Excel
 #'
-#' Reads a "Qualitative" sheet from the config workbook if it exists.
+#' Reads an "AddedSlides" sheet from the config workbook if it exists.
+#' Also checks for legacy "Qualitative" sheet name for backward compatibility.
 #' Expected columns: slide_title, content (markdown), display_order (optional).
 #' Returns a list of slide objects or NULL if sheet is absent.
 #'
@@ -327,13 +354,17 @@ load_comments_sheet <- function(config_file) {
 load_qualitative_sheet <- function(config_file) {
   tryCatch({
     sheets <- openxlsx::getSheetNames(config_file)
-    if (!"Qualitative" %in% sheets) return(NULL)
 
-    df <- openxlsx::read.xlsx(config_file, sheet = "Qualitative")
+    # V10.8.0: Check for "AddedSlides" first, fall back to legacy "Qualitative"
+    sheet_name <- if ("AddedSlides" %in% sheets) "AddedSlides"
+                  else if ("Qualitative" %in% sheets) "Qualitative"
+                  else return(NULL)
+
+    df <- openxlsx::read.xlsx(config_file, sheet = sheet_name)
     if (is.null(df) || nrow(df) == 0) return(NULL)
 
     if (!"slide_title" %in% names(df) || !"content" %in% names(df)) {
-      cat("  [INFO] Qualitative sheet found but missing slide_title/content columns - skipped\n")
+      cat(sprintf("  [INFO] %s sheet found but missing slide_title/content columns - skipped\n", sheet_name))
       return(NULL)
     }
 
@@ -356,10 +387,10 @@ load_qualitative_sheet <- function(config_file) {
       )
     })
 
-    cat(sprintf("  [INFO] Loaded %d qualitative slides from config\n", length(slides)))
+    cat(sprintf("  [INFO] Loaded %d added slides from %s sheet\n", length(slides), sheet_name))
     slides
   }, error = function(e) {
-    cat(sprintf("  [WARNING] Could not read Qualitative sheet: %s\n", e$message))
+    cat(sprintf("  [WARNING] Could not read AddedSlides/Qualitative sheet: %s\n", e$message))
     NULL
   })
 }
@@ -392,7 +423,13 @@ load_crosstabs_config <- function(config_file) {
   # Load optional Comments sheet (V10.6.0)
   config_obj$comments <- load_comments_sheet(config_file)
 
-  # Load optional Qualitative sheet (V10.7.0)
+  # Extract dashboard text from Comments sheet (V10.8.0)
+  if (!is.null(config_obj$comments)) {
+    config_obj$background_text <- attr(config_obj$comments, "background_text")
+    config_obj$executive_summary <- attr(config_obj$comments, "executive_summary")
+  }
+
+  # Load optional AddedSlides sheet (V10.8.0, renamed from Qualitative)
   config_obj$qualitative_slides <- load_qualitative_sheet(config_file)
 
   # Resolve logo paths against project root so HTML report gets absolute paths

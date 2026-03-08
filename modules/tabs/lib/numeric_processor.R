@@ -118,6 +118,7 @@ process_numeric_question <- function(data, question_info, question_options,
         freq_row <- data.frame(
           RowLabel = bin_label,
           RowType = FREQUENCY_ROW_TYPE,
+          RowSource = "individual",
           stringsAsFactors = FALSE
         )
         for (key in internal_keys) {
@@ -128,12 +129,13 @@ process_numeric_question <- function(data, question_info, question_options,
         }
         results_list[[length(results_list) + 1]] <- freq_row
       }
-      
+
       # Create percentage row
       if (config$show_percent_column) {
         pct_row <- data.frame(
           RowLabel = bin_label,
           RowType = COLUMN_PCT_ROW_TYPE,
+          RowSource = "individual",
           stringsAsFactors = FALSE
         )
         for (key in internal_keys) {
@@ -326,9 +328,14 @@ process_numeric_question <- function(data, question_info, question_options,
   # ===========================================================================
   
   if (length(results_list) > 0) {
-    # Tag all rows as summary for downstream classification
+    # Tag rows without a RowSource as summary (Mean, Median, StdDev, etc.)
+    # Bin rows already have RowSource = "individual" set above
     for (i in seq_along(results_list)) {
-      results_list[[i]]$RowSource <- "summary"
+      if (!"RowSource" %in% names(results_list[[i]]) ||
+          is.na(results_list[[i]]$RowSource[1]) ||
+          !nzchar(results_list[[i]]$RowSource[1])) {
+        results_list[[i]]$RowSource <- "summary"
+      }
     }
     return(batch_rbind(results_list))
   }

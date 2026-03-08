@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Confidence Module - Technical Documentation
 
-**Version:** 10.1 **Last Updated:** December 2025 **Audience:**
+**Version:** 10.2 **Last Updated:** March 2026 **Audience:**
 Developers, Technical Maintainers
 
 ------------------------------------------------------------------------
@@ -59,14 +59,29 @@ modules/confidence/
 │   ├── 05_means.R              # Mean CI methods
 │   ├── 07_output.R             # Excel output generation
 │   ├── utils.R                 # Utility functions
-│   ├── question_processor.R    # Shared question processing logic (NEW)
-│   ├── ci_dispatcher.R         # CI calculation dispatch (NEW)
-│   └── output_helpers.R        # Output building helpers (NEW)
+│   ├── question_processor.R    # Shared question processing logic
+│   ├── ci_dispatcher.R         # CI calculation dispatch
+│   └── output_helpers.R        # Output building helpers
+├── lib/                        # Supporting libraries
+│   └── html_report/            # HTML report generation (v10.2)
+│       ├── 99_html_report_main.R   # Entry point & orchestrator
+│       ├── 00_html_guard.R         # Input validation
+│       ├── 01_data_transformer.R   # Data transformation & callouts
+│       ├── 02_table_builder.R      # HTML table generation
+│       ├── 03_page_builder.R       # Page assembly & CSS
+│       ├── 04_html_writer.R        # File writer
+│       ├── 05_chart_builder.R      # SVG chart generation
+│       └── js/
+│           └── confidence_navigation.js  # Tab/question navigation
 ├── tests/                      # Test suite
-│   ├── test_representativeness.R
-│   ├── test_nps.R
-│   ├── test_weighted_data.R
-│   └── test_real_config_ccpb.R
+│   └── testthat/               # Unit & integration tests
+│       ├── setup.R
+│       ├── test_proportion_ci.R
+│       ├── test_mean_ci.R
+│       ├── test_ci_dispatcher.R
+│       ├── test_study_level.R
+│       ├── test_html_report.R
+│       └── ...
 ├── docs/                       # Documentation
 ├── run_confidence_gui.R        # Shiny GUI launcher
 └── examples/                   # Example configs and data
@@ -237,7 +252,7 @@ dispatch_mean_ci(mean_val, sd_val, n_eff, values, weights, q_row, config)
 dispatch_nps_ci(nps_stats, values, promoter_codes, detractor_codes, weights, q_row, config)
 
 # Each dispatcher:
-# 1. Checks Run_MOE, Run_Bootstrap, Run_Credible flags
+# 1. Checks Run_MOE, Run_Wilson, Run_Bootstrap, Run_Credible flags
 # 2. Validates prior parameters if Bayesian enabled
 # 3. Calls appropriate CI calculation functions
 # 4. Handles errors gracefully with warnings
@@ -293,7 +308,7 @@ Main orchestration script using the **orchestrator pattern**.
 ``` r
 run_confidence_analysis(config_path, verbose = TRUE) -> list
 
-# Execution flow (6 steps):
+# Execution flow (7 steps):
 # 1. Load and validate configuration
 # 2. Load survey data
 # 3. Calculate study-level statistics
@@ -303,6 +318,7 @@ run_confidence_analysis(config_path, verbose = TRUE) -> list
 #        └── Uses ci_dispatcher.R for CI calculations
 # 5. Collect and handle warnings
 # 6. Generate Excel output via 07_output.R
+# 7. Generate HTML report via lib/html_report/ (if Generate_HTML_Report = Y)
 ```
 
 **Orchestrator Functions:**
@@ -375,6 +391,18 @@ write_confidence_output()        [07_output.R]
     └── build_*_result_row()     [output_helpers.R]
     ↓
 [Excel Workbook]
+    ↓ (if Generate_HTML_Report = Y)
+generate_confidence_html_report()   [lib/html_report/99_html_report_main.R]
+    ├── validate_confidence_html_inputs()   [00_html_guard.R]
+    ├── transform_confidence_for_html()     [01_data_transformer.R]
+    │       └── generate_*_callout()        (plain-English callouts)
+    │       └── build_sampling_note()       (sampling method interpretation)
+    ├── build_*_table()                     [02_table_builder.R]
+    ├── build_*_chart()                     [05_chart_builder.R]
+    ├── build_confidence_page()             [03_page_builder.R]
+    └── write_confidence_html_report()      [04_html_writer.R]
+    ↓
+[Self-Contained HTML File]
 ```
 
 ------------------------------------------------------------------------
@@ -424,12 +452,18 @@ if (!is.numeric(values)) {
 Check for optional columns before accessing:
 
 ``` r
-use_wilson_flag <- if ("Use_Wilson" %in% names(q_row)) {
-  q_row$Use_Wilson
+run_wilson_flag <- if ("Run_Wilson" %in% names(q_row)) {
+  q_row$Run_Wilson
 } else {
   NULL
 }
 ```
+
+**Note:** The config column is `Run_Wilson` (matching the `Run_*`
+naming convention used by `Run_MOE`, `Run_Bootstrap`, and
+`Run_Credible`). This was corrected in v10.2 — earlier versions
+incorrectly checked for `Use_Wilson`, which caused Wilson score
+intervals to be silently skipped.
 
 ------------------------------------------------------------------------
 
@@ -469,6 +503,13 @@ config <- list(
 | Bootstrap_Iterations  | 1000-10000       | 5000    |
 | Decimal_Separator     | "." or ","       | "."     |
 | Calculate_Effective_N | "Y" or "N"       | "Y"     |
+| Generate_HTML_Report  | "Y" or "N"       | "N"     |
+| Brand_Colour          | Hex colour code  | "#1e3a5f" |
+| Accent_Colour         | Hex colour code  | "#2aa198" |
+| Sampling_Method       | See below        | "Not_Specified" |
+
+**Sampling_Method valid values:** `Random`, `Stratified`, `Cluster`,
+`Quota`, `Online_Panel`, `Self_Selected`, `Census`, `Not_Specified`
 
 ------------------------------------------------------------------------
 
@@ -530,12 +571,19 @@ bootstrap_proportion_ci <- function(data, categories, weights, B, conf_level) {
 
 ### Test Suite Structure
 
-```         
+```
 tests/
-├── test_representativeness.R  # Quota checking
-├── test_nps.R                 # NPS calculations
-├── test_weighted_data.R       # Weighted data handling
-└── test_real_config_ccpb.R    # Backward compatibility
+└── testthat/
+    ├── setup.R                    # Shared test helpers & fixtures
+    ├── test_proportion_ci.R       # Proportion CI methods
+    ├── test_mean_ci.R             # Mean CI methods
+    ├── test_ci_dispatcher.R       # CI dispatch routing
+    ├── test_study_level.R         # DEFF, effective n
+    ├── test_html_report.R         # HTML report generation
+    ├── test_nps.R                 # NPS calculations
+    ├── test_representativeness.R  # Quota checking
+    ├── test_weighted_data.R       # Weighted data handling
+    └── ...
 ```
 
 ### Running Tests
@@ -632,10 +680,11 @@ if (some_issue) {
 
 1.  Create function in 04_proportions.R or 05_means.R
 2.  Add config column (e.g., `Run_NewMethod`)
-3.  Add processing logic in 00_main.R
-4.  Update output in 07_output.R
-5.  Add tests
-6.  Update documentation
+3.  Add dispatch logic in ci_dispatcher.R
+4.  Update output in 07_output.R and output_helpers.R
+5.  Add HTML report support in lib/html_report/ (table, chart, callout)
+6.  Add tests
+7.  Update documentation
 
 ### Adding New Question Types
 
@@ -896,6 +945,34 @@ list(
 
 ## Version History
 
+### v10.2 (March 2026) - HTML Report & Sampling Method
+
+**New Features:**
+-   **HTML Report System:** 7 submodule files in `lib/html_report/`
+    producing self-contained HTML with interactive navigation, SVG
+    forest plots, method comparison charts, plain-English callouts,
+    and editable comments box
+-   **Sampling Method:** `Sampling_Method` config option (8 values)
+    generates tailored callout text explaining CI reliability in
+    context of the declared sampling design
+-   **Callout Architecture:** Three-section callout design per question
+    (result interpretation, method explanation, sampling note) with
+    distinct visual styling (blue/grey/amber)
+
+**Bug Fixes:**
+-   **Wilson Column Name:** Fixed `Run_Wilson` → was incorrectly
+    checked as `Use_Wilson` in `ci_dispatcher.R`, causing Wilson
+    score intervals to be silently skipped for all questions
+-   **NA Brand Colour:** Fixed crash when `Brand_Colour` config
+    value is `NA` (now defaults to `#1e3a5f`)
+-   **NPS Callout:** Fixed `methods_used` parameter not being passed
+    to NPS callout generator
+
+**Testing:**
+-   New test files: `test_ci_dispatcher.R`, `test_mean_ci.R`,
+    `test_study_level.R`, `test_html_report.R`
+-   Expanded from ~300 to 596 passing tests
+
 ### v10.1 (December 2025) - Refactoring Release
 
 **Architecture Changes:**
@@ -930,4 +1007,4 @@ list(
 
 **End of Technical Documentation**
 
-*Turas Confidence Module v10.1* *Last Updated: December 2025*
+*Turas Confidence Module v10.2* *Last Updated: March 2026*

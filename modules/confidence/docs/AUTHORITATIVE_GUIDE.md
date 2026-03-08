@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Confidence Module - Authoritative Guide
 
-**Version:** 2.0.0 **Last Updated:** December 2025 **Audience:**
+**Version:** 2.1.0 **Last Updated:** March 2026 **Audience:**
 Statisticians, Senior Analysts, Researchers
 
 ------------------------------------------------------------------------
@@ -49,6 +49,8 @@ social science applications where:
 | NPS CIs              | Production | Normal, Bootstrap, Bayesian         |
 | Weighted Analysis    | Production | Kish effective n, DEFF              |
 | Representativeness   | Production | Simple & nested quotas              |
+| HTML Report          | Production | Interactive report with charts & callouts |
+| Sampling Context     | Production | 8 sampling methods with tailored notes |
 | Multiple Comparisons | Planned    | Bonferroni, Holm, FDR               |
 
 ------------------------------------------------------------------------
@@ -483,6 +485,42 @@ START
 
 ------------------------------------------------------------------------
 
+## Sampling Method and CI Interpretation {#sampling-method}
+
+Confidence intervals are mathematically derived under assumptions
+about the sampling process. The module's `Sampling_Method` setting
+(v10.2) generates tailored interpretation notes that honestly
+describe what the intervals mean for each design.
+
+### How Sampling Method Affects CI Validity
+
+| Sampling Method | CI Validity | Notes |
+|---|---|---|
+| **Random** | Full stated coverage | Intervals have their stated probability (e.g., 95%) |
+| **Stratified** | Conservative (better than stated) | Stratification typically improves precision |
+| **Cluster** | May understate uncertainty | Intra-cluster correlation inflates variance; DEFF partially adjusts |
+| **Quota** | Reliable within controlled dimensions | Unmeasured biases possible but well-designed quotas reduce this |
+| **Online Panel** | Reliable for achieved sample | Quality-managed panels routinely match probability benchmarks |
+| **Self-Selected** | Reflects data variability only | Selection bias means intervals may understate total uncertainty |
+| **Census** | No sampling uncertainty | CIs reflect measurement precision only |
+
+### Design Philosophy
+
+The callout language follows these principles:
+
+1.  **Statistically accurate** — Does not overclaim precision for
+    non-probability designs
+2.  **Not dismissive** — Acknowledges that well-executed
+    non-probability designs (quotas, managed panels) produce
+    actionable, trustworthy results
+3.  **Practically useful** — Helps non-statisticians understand what
+    the intervals mean for their specific study
+4.  **Balanced** — The language recognises that most commercial
+    research uses non-probability designs and that these designs
+    have genuine strengths
+
+------------------------------------------------------------------------
+
 ## Strengths and Limitations {#strengths-and-limitations}
 
 ### Strengths
@@ -490,11 +528,15 @@ START
 1.  **Multiple Methods:** Four proportion methods, three mean methods
 2.  **Weighted Data:** Full DEFF and effective n support
 3.  **Excel Configuration:** No R coding required
-4.  **Professional Output:** Client-ready workbooks
-5.  **Representativeness:** Built-in quota checking
-6.  **NPS Support:** Full Net Promoter Score analysis
-7.  **Bayesian Option:** Prior incorporation for tracking
-8.  **Tested:** Comprehensive test suite
+4.  **Professional Output:** Client-ready Excel workbooks + HTML reports
+5.  **HTML Report:** Interactive dashboard with charts, callouts, and
+    method documentation
+6.  **Sampling Context:** Tailored CI interpretation for 8 sampling
+    methods
+7.  **Representativeness:** Built-in quota checking
+8.  **NPS Support:** Full Net Promoter Score analysis
+9.  **Bayesian Option:** Prior incorporation for tracking
+10. **Tested:** 596-test suite with unit, integration, and HTML tests
 
 ### Limitations
 
@@ -557,19 +599,32 @@ START
 
 ### Architecture
 
-```         
+```
 modules/confidence/
 ├── R/
-│   ├── 00_main.R          # Main orchestration
-│   ├── 01_load_config.R   # Configuration loading
-│   ├── 02_load_data.R     # Data loading
-│   ├── 03_study_level.R   # DEFF, effective n
-│   ├── 04_proportions.R   # Proportion CI methods
-│   ├── 05_means.R         # Mean CI methods
-│   ├── 06_nps.R           # NPS calculations
-│   └── 07_output.R        # Excel generation
-├── tests/                  # Test suite
-└── docs/                   # This documentation
+│   ├── 00_main.R               # Main orchestration (7-step pipeline)
+│   ├── 00_guard.R              # TRS refusal handling
+│   ├── 01_load_config.R        # Configuration loading & validation
+│   ├── 02_load_data.R          # Data loading
+│   ├── 03_study_level.R        # DEFF, effective n
+│   ├── 04_proportions.R        # Proportion CI methods
+│   ├── 05_means.R              # Mean CI methods
+│   ├── 07_output.R             # Excel generation
+│   ├── utils.R                 # Utility functions
+│   ├── question_processor.R    # Shared question processing
+│   ├── ci_dispatcher.R         # CI method dispatch
+│   └── output_helpers.R        # Output formatting
+├── lib/html_report/            # Interactive HTML report
+│   ├── 99_html_report_main.R   # Report orchestrator
+│   ├── 00_html_guard.R         # Input validation
+│   ├── 01_data_transformer.R   # Data transformation & callouts
+│   ├── 02_table_builder.R      # HTML table generation
+│   ├── 03_page_builder.R       # Page assembly & CSS
+│   ├── 04_html_writer.R        # File output
+│   ├── 05_chart_builder.R      # SVG charts
+│   └── js/confidence_navigation.js
+├── tests/testthat/             # Test suite (596 tests)
+└── docs/                       # This documentation
 ```
 
 ### Data Flow
@@ -729,4 +784,4 @@ DEFF = 1 + CV²(w) = n/n_eff
 
 **End of Authoritative Guide**
 
-*Turas Confidence Module v2.0.0* *Last Updated: December 2025*
+*Turas Confidence Module v2.1.0* *Last Updated: March 2026*
