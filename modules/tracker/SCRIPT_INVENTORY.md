@@ -9,7 +9,7 @@ The Tracker module provides longitudinal tracking analysis for multi-wave survey
 ## Script Inventory
 
 | File | Lines | Purpose | Status | Quality |
-|------|-------|---------|--------|---------|
+|----|----|----|----|----|
 | `run_tracker.R` | 790 | Main 8-step pipeline | Active | 4/5 |
 | `run_tracker_gui.R` | 716 | Shiny GUI wrapper | Active | 4/5 |
 | `lib/00_guard.R` | 787 | TRS v1.0 guard layer | Active | 5/5 |

@@ -1,24 +1,26 @@
 # Weighting Module - Script Inventory
+
 Generated: 2026-03-08
 
 ## Summary
-- Total R scripts: 21
-- Total JS files: 1
-- Total lines of code: 9993
-- Production code: 9693 lines
-- Test code: 0 lines (tests reside in `tests/testthat/` and are not counted here)
+
+-   Total R scripts: 21
+-   Total JS files: 1
+-   Total lines of code: 9993
+-   Production code: 9693 lines
+-   Test code: 0 lines (tests reside in `tests/testthat/` and are not counted here)
 
 ## Core Scripts
 
 | File | Lines | Purpose | Key Functions | Quality | Status |
-|------|-------|---------|---------------|---------|--------|
+|----|----|----|----|----|----|
 | `run_weighting.R` | 757 | Main entry point orchestration | `run_weighting()`, pipeline control, shared infrastructure loading | 4/5 | Active |
 | `run_weighting_gui.R` | 750 | Shiny GUI interface | `run_weighting_gui()`, reactive UI, input binding, observer handlers | 4/5 | Active |
 
 ## Library Scripts
 
 | File | Lines | Purpose | Key Functions | Quality | Status |
-|------|-------|---------|---------------|---------|--------|
+|----|----|----|----|----|----|
 | `lib/00_guard.R` | 261 | TRS guard layer - validates all inputs before processing | `weighting_refuse()`, `guard_config_file()`, `guard_data_file()`, `guard_config_object()` | 5/5 | Active |
 | `lib/config_loader.R` | 725 | Excel config parsing and normalisation | `load_weighting_config()`, sheet readers, field mapping, defaults | 4/5 | Active |
 | `lib/validation.R` | 410 | Pre-calculation data validation | `validate_weighting_data()`, type checks, completeness checks | 4/5 | Active |
@@ -34,7 +36,7 @@ Generated: 2026-03-08
 ## HTML Report Scripts
 
 | File | Lines | Purpose | Key Functions | Quality | Status |
-|------|-------|---------|---------------|---------|--------|
+|----|----|----|----|----|----|
 | `lib/html_report/00_html_guard.R` | 37 | HTML report input validation | Guard checks for HTML report parameters | 4/5 | Active |
 | `lib/html_report/01_data_transformer.R` | 95 | Data preparation for HTML report | Transforms weighting results into report-ready structures | 4/5 | Active |
 | `lib/html_report/02_table_builder.R` | 231 | HTML table generation | Builds formatted tables for weight summaries and diagnostics | 4/5 | Active |
@@ -46,13 +48,13 @@ Generated: 2026-03-08
 ## JavaScript Files
 
 | File | Lines | Purpose | Quality | Status |
-|------|-------|---------|---------|--------|
+|----|----|----|----|----|
 | `lib/html_report/js/weighting_navigation.js` | 64 | Client-side navigation for HTML report | 4/5 | Active |
 
 ## Legacy / Superseded Scripts
 
 | File | Lines | Purpose | Key Functions | Quality | Status |
-|------|-------|---------|---------------|---------|--------|
+|----|----|----|----|----|----|
 | `templates/create_template.R` | 300 | Legacy template generator (replaced by `lib/generate_config_templates.R`) | `create_weight_template()` | 3/5 | Superseded |
 
 ## Test Files (not counted in totals above)
@@ -60,7 +62,7 @@ Generated: 2026-03-08
 Tests reside in `tests/testthat/` with fixtures in `tests/fixtures/synthetic_data/`.
 
 | File | Purpose |
-|------|---------|
+|----|----|
 | `tests/testthat/test_cell_weights.R` | Cell weight calculation tests |
 | `tests/testthat/test_config_loader.R` | Config parsing tests |
 | `tests/testthat/test_design_weights.R` | Design weight calculation tests |
@@ -79,9 +81,9 @@ Tests reside in `tests/testthat/` with fixtures in `tests/fixtures/synthetic_dat
 
 ## Architecture Notes
 
-- **Entry point:** `run_weighting.R` orchestrates the full pipeline: guard -> config load -> validate -> calculate -> trim -> diagnose -> output
-- **GUI:** `run_weighting_gui.R` provides the Shiny interface and calls into the same pipeline
-- **Config:** Excel-based configuration with 7 sheets (Settings, Weight_Specifications, Design_Targets, Rim_Targets, Cell_Targets, Advanced_Settings, Notes)
-- **Validation:** Two layers - `lib/validation.R` (data quality) and `lib/validation/preflight_validators.R` (cross-referential config checks)
-- **Template:** `lib/generate_config_templates.R` supersedes `templates/create_template.R` with shared infrastructure support
-- **HTML report:** 7-file pipeline following the standard TURAS report pattern (guard -> transform -> build -> write)
+-   **Entry point:** `run_weighting.R` orchestrates the full pipeline: guard -\> config load -\> validate -\> calculate -\> trim -\> diagnose -\> output
+-   **GUI:** `run_weighting_gui.R` provides the Shiny interface and calls into the same pipeline
+-   **Config:** Excel-based configuration with 7 sheets (Settings, Weight_Specifications, Design_Targets, Rim_Targets, Cell_Targets, Advanced_Settings, Notes)
+-   **Validation:** Two layers - `lib/validation.R` (data quality) and `lib/validation/preflight_validators.R` (cross-referential config checks)
+-   **Template:** `lib/generate_config_templates.R` supersedes `templates/create_template.R` with shared infrastructure support
+-   **HTML report:** 7-file pipeline following the standard TURAS report pattern (guard -\> transform -\> build -\> write)
