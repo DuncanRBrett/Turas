@@ -172,7 +172,7 @@ classify_row_labels <- function(question_table, question_type = "Single_Choice")
       } else if (src %in% c("boxcategory", "net_positive")) {
         classification[lbl] <- "net"
         next
-      } else if (src %in% c("summary", "chi_square", "composite")) {
+      } else if (src %in% c("summary", "chi_square", "composite", "ranking_mean")) {
         classification[lbl] <- "mean"
         next
       }
