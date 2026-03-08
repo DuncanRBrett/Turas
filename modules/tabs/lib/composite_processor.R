@@ -57,30 +57,18 @@ load_composite_definitions <- function(survey_structure_file) {
       return(NULL)
     }
 
-    # Read the sheet
-    composite_defs <- readxl::read_excel(
-      survey_structure_file,
-      sheet = "Composite_Metrics",
-      col_types = "text"  # Read all as text initially
-    )
+    # Read the sheet (auto-detect header row for template format)
+    required_cols <- c("CompositeCode", "CompositeLabel", "CalculationType", "SourceQuestions")
+    composite_defs <- .read_table_sheet(survey_structure_file, "Composite_Metrics",
+                                         required_cols = required_cols)
 
-    # Check if empty
+    # Empty sheet — treat as no composites defined (not an error)
     if (nrow(composite_defs) == 0) {
-      # TRS v1.0: Empty Composite_Metrics sheet is a config error - refuse
-      tabs_refuse(
-        code = "CFG_COMPOSITE_SHEET_EMPTY",
-        title = "Empty Composite_Metrics Sheet",
-        problem = "The Composite_Metrics sheet exists but contains no definitions.",
-        why_it_matters = "If the sheet exists, Turas expects it to contain composite definitions. An empty sheet suggests incomplete configuration.",
-        how_to_fix = c(
-          "Add composite metric definitions to the Composite_Metrics sheet, or",
-          "Delete the Composite_Metrics sheet entirely if you don't need composites"
-        )
-      )
+      cat("  [INFO] Composite_Metrics sheet is empty - no composites to process\n")
+      return(NULL)
     }
 
     # Validate required columns
-    required_cols <- c("CompositeCode", "CompositeLabel", "CalculationType", "SourceQuestions")
     missing_cols <- setdiff(required_cols, names(composite_defs))
 
     if (length(missing_cols) > 0) {
@@ -128,18 +116,10 @@ load_composite_definitions <- function(survey_structure_file) {
       composite_defs <- composite_defs[!blank_codes, ]
     }
 
-    # TRS v1.0: If sheet exists but becomes empty after cleaning, refuse
+    # If sheet becomes empty after cleaning blank rows, treat as no composites
     if (nrow(composite_defs) == 0) {
-      tabs_refuse(
-        code = "CFG_COMPOSITE_SHEET_EMPTY_AFTER_CLEANING",
-        title = "Composite Sheet Empty After Cleaning",
-        problem = "The Composite_Metrics sheet exists but all rows have blank CompositeCode.",
-        why_it_matters = "If the Composite_Metrics sheet is present, Turas expects at least one valid composite definition. An empty sheet after cleaning indicates incomplete configuration.",
-        how_to_fix = c(
-          "Add valid composite definitions with non-blank CompositeCode values, or",
-          "Delete the Composite_Metrics sheet entirely if you don't need composites"
-        )
-      )
+      cat("  [INFO] Composite_Metrics sheet has no valid definitions - no composites to process\n")
+      return(NULL)
     }
 
     return(composite_defs)

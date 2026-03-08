@@ -29,6 +29,73 @@ SUPPORTED_CONFIG_FORMATS <- c("xlsx", "xls")
 
 
 # ==============================================================================
+# HELPER: Auto-detect header row for table sheets
+# ==============================================================================
+
+#' Read an Excel table sheet with auto-detection of header row
+#'
+#' Supports both legacy format (headers in row 1) and new template format
+#' (title/subtitle/help rows above the actual column headers).
+#' Scans first 10 rows for the required column names.
+#'
+#' @param file_path Path to Excel file
+#' @param sheet_name Sheet name to read
+#' @param required_cols Character vector of required column names to detect
+#' @return Data frame with the sheet contents
+#' @keywords internal
+.read_table_sheet <- function(file_path, sheet_name, required_cols) {
+  # First try standard read (headers in row 1)
+  df <- readxl::read_excel(file_path, sheet = sheet_name, col_types = "text")
+
+  if (all(required_cols %in% names(df))) {
+    # Filter out help/description rows that start with "[REQUIRED]" or "[Optional]"
+    if (nrow(df) > 0 && any(grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
+                                   as.character(df[[1]]), ignore.case = TRUE))) {
+      df <- df[!grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
+                       as.character(df[[1]]), ignore.case = TRUE), , drop = FALSE]
+    }
+    return(df)
+  }
+
+  # Auto-detect: scan first 10 rows for the header
+  raw <- suppressMessages(readxl::read_excel(file_path, sheet = sheet_name,
+                                              col_names = FALSE, n_max = 10,
+                                              col_types = "text"))
+  header_row <- NULL
+  for (r in seq_len(nrow(raw))) {
+    row_vals <- as.character(unlist(raw[r, ]))
+    if (all(required_cols %in% row_vals)) {
+      header_row <- r
+      break
+    }
+  }
+
+  if (!is.null(header_row)) {
+    df <- readxl::read_excel(file_path, sheet = sheet_name,
+                              skip = header_row - 1, col_types = "text")
+
+    # Filter out help/description rows
+    if (nrow(df) > 0 && any(grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
+                                   as.character(df[[1]]), ignore.case = TRUE))) {
+      df <- df[!grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
+                       as.character(df[[1]]), ignore.case = TRUE), , drop = FALSE]
+    }
+
+    # Remove completely empty rows
+    if (nrow(df) > 0) {
+      all_na <- apply(df, 1, function(row) all(is.na(row) | trimws(row) == ""))
+      df <- df[!all_na, , drop = FALSE]
+    }
+
+    return(df)
+  }
+
+  # Fall through - return original df, let caller handle validation
+  return(df)
+}
+
+
+# ==============================================================================
 # SURVEY STRUCTURE LOADING
 # ==============================================================================
 
@@ -65,11 +132,15 @@ load_survey_structure <- function(structure_file_path, project_root = NULL) {
     # Load Project sheet
     project_config <- load_config_sheet(structure_file_path, "Project")
 
-    # Load Questions sheet
-    questions_df <- readxl::read_excel(structure_file_path, sheet = "Questions", col_types = "text")
+    # Load Questions sheet (auto-detect header row for template format)
+    questions_df <- .read_table_sheet(structure_file_path, "Questions",
+                                      required_cols = c("QuestionCode", "QuestionText",
+                                                        "Variable_Type", "Columns"))
 
-    # Load Options sheet
-    options_df <- readxl::read_excel(structure_file_path, sheet = "Options", col_types = "text")
+    # Load Options sheet (auto-detect header row for template format)
+    options_df <- .read_table_sheet(structure_file_path, "Options",
+                                    required_cols = c("QuestionCode", "OptionText",
+                                                      "DisplayText"))
 
   }, error = function(e) {
     # Check if already a TRS refusal

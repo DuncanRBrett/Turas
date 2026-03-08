@@ -207,9 +207,10 @@ setup_weights <- function(survey_data, config_obj) {
 load_question_selection <- function(config_file) {
   log_message("Loading question selection...", "INFO")
 
-  # Load selection sheet
+  # Load selection sheet (auto-detect header row for template format)
   selection_df <- tryCatch({
-    readxl::read_excel(config_file, sheet = "Selection", col_types = "text")
+    .read_table_sheet(config_file, "Selection",
+                      required_cols = c("QuestionCode"))
   }, error = function(e) {
     tabs_refuse(
       code = "IO_SELECTION_SHEET_FAILED",

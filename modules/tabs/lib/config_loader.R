@@ -409,10 +409,12 @@ resolve_path <- function(base_path, relative_path) {
 load_question_selection <- function(config_file) {
   
   tryCatch({
-    selection_df <- readxl::read_excel(config_file, sheet = "Selection")
-    
-    # Validate required columns
+    # Auto-detect header row for template format
     required_cols <- c("QuestionCode")
+    selection_df <- .read_table_sheet(config_file, "Selection",
+                                       required_cols = required_cols)
+
+    # Validate required columns
     missing_cols <- setdiff(required_cols, names(selection_df))
     
     if (length(missing_cols) > 0) {

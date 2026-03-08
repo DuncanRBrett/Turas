@@ -29,6 +29,8 @@ renv/.gitignore
 # EXCEPTION: Allow template files
 !templates/**/*.xlsx
 !templates/**/*.xls
+!**/templates/**/*.xlsx
+!**/templates/**/*.xls
 
 # Output files
 Output/
