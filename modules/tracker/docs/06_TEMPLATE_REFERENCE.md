@@ -110,6 +110,12 @@ Configure analysis parameters and output options.
 | project_name | Text | (required)     | Project title for reports |
 | output_file  | Text | auto-generated | Output filename           |
 | output_dir   | Path | same as config | Output directory          |
+| question_mapping_file | Path | auto-detected | Path to question mapping file |
+
+**question_mapping_file:** Links this config to its question mapping file.
+Accepts a filename (e.g., `My_Mapping.xlsx`), relative path, or absolute path.
+Resolved relative to the config file directory. If blank, the GUI auto-detects
+by searching for standard filenames in the same directory.
 
 ### Report Type Settings
 
@@ -120,7 +126,8 @@ Configure analysis parameters and output options.
 **report_types Values:** - `detailed` - Full detailed trend report (one
 sheet per question) - `wave_history` - Compact format (one row per
 metric) - `dashboard` - Executive summary with status indicators -
-`sig_matrix` - Significance matrix for all wave-pairs
+`sig_matrix` - Significance matrix for all wave-pairs -
+`tracking_crosstab` - Crosstab format with optional HTML report
 
 **Examples:**
 
@@ -128,6 +135,7 @@ metric) - `dashboard` - Executive summary with status indicators -
 report_types | detailed
 report_types | detailed,wave_history
 report_types | detailed,wave_history,dashboard,sig_matrix
+report_types | tracking_crosstab
 ```
 
 ### Statistical Settings

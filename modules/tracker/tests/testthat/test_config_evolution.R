@@ -32,6 +32,17 @@ if (file.exists(config_loader_path)) source(config_loader_path)
 question_mapper_path <- file.path(tracker_root, "lib", "question_mapper.R")
 if (file.exists(question_mapper_path)) source(question_mapper_path)
 
+# Source resolve_mapping_file_path directly (run_tracker.R sources too many deps)
+resolve_mapping_file_path <- function(mapping_path, config_dir) {
+  mapping_path <- path.expand(mapping_path)
+  mapping_path <- gsub("^\\./", "", mapping_path)
+  if (grepl("^/|^[A-Za-z]:", mapping_path)) {
+    return(normalizePath(mapping_path, winslash = "/", mustWork = FALSE))
+  }
+  full_path <- file.path(config_dir, mapping_path)
+  return(normalizePath(full_path, winslash = "/", mustWork = FALSE))
+}
+
 # ==============================================================================
 # HELPER: Create mock config objects for testing
 # ==============================================================================
@@ -295,4 +306,68 @@ test_that("validate_tracker_config passes without baseline_wave", {
   config <- create_mock_config(settings = list(project_name = "Test"))
   result <- validate_tracker_config(config)
   expect_true(result)
+})
+
+
+# ==============================================================================
+# TESTS: question_mapping_file setting
+# ==============================================================================
+
+test_that("get_setting retrieves question_mapping_file correctly", {
+  config <- create_mock_config(settings = list(
+    project_name = "Test",
+    question_mapping_file = "My_Question_Mapping.xlsx"
+  ))
+  result <- get_setting(config, "question_mapping_file", default = NULL)
+  expect_equal(result, "My_Question_Mapping.xlsx")
+})
+
+test_that("get_setting returns NULL when question_mapping_file not set", {
+  config <- create_mock_config(settings = list(project_name = "Test"))
+  result <- get_setting(config, "question_mapping_file", default = NULL)
+  expect_null(result)
+})
+
+test_that("get_setting returns NULL when question_mapping_file is empty string", {
+  config <- create_mock_config(settings = list(
+    project_name = "Test",
+    question_mapping_file = ""
+  ))
+  result <- get_setting(config, "question_mapping_file", default = NULL)
+  expect_null(result)
+})
+
+
+# ==============================================================================
+# TESTS: resolve_mapping_file_path()
+# ==============================================================================
+
+test_that("resolve_mapping_file_path handles bare filename", {
+  result <- resolve_mapping_file_path("mapping.xlsx", "/some/project/dir")
+  expect_equal(result, normalizePath("/some/project/dir/mapping.xlsx",
+               winslash = "/", mustWork = FALSE))
+})
+
+test_that("resolve_mapping_file_path handles relative path", {
+  result <- resolve_mapping_file_path("configs/mapping.xlsx", "/some/project/dir")
+  expect_equal(result, normalizePath("/some/project/dir/configs/mapping.xlsx",
+               winslash = "/", mustWork = FALSE))
+})
+
+test_that("resolve_mapping_file_path handles absolute path", {
+  result <- resolve_mapping_file_path("/absolute/path/mapping.xlsx", "/some/project/dir")
+  expect_equal(result, normalizePath("/absolute/path/mapping.xlsx",
+               winslash = "/", mustWork = FALSE))
+})
+
+test_that("resolve_mapping_file_path strips leading ./", {
+  result <- resolve_mapping_file_path("./mapping.xlsx", "/some/project/dir")
+  expect_equal(result, normalizePath("/some/project/dir/mapping.xlsx",
+               winslash = "/", mustWork = FALSE))
+})
+
+test_that("resolve_mapping_file_path expands tilde", {
+  result <- resolve_mapping_file_path("~/Documents/mapping.xlsx", "/some/project/dir")
+  expect_true(grepl("Documents/mapping.xlsx$", result))
+  expect_false(grepl("^~", result))
 })

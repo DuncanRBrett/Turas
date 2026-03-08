@@ -173,6 +173,7 @@ Controls analysis parameters. Two-column format: `Setting` (or
 | Setting | Type | Default | Description |
 |-----------------|-----------------|-----------------|-----------------------|
 | `project_name` | Text | "Tracking Analysis" | Project title displayed in reports and used for output filenames. |
+| `question_mapping_file` | Path | *(auto-detected)* | Path to question mapping file. Filename, relative, or absolute path resolved relative to config directory. If blank, auto-detected from same directory. |
 | `report_types` | CSV list | "detailed" | Which reports to generate. See [Output Reports](#9-output-reports). |
 | `weight_variable` | Text | *(none)* | Global weight variable name. Used for all waves unless overridden by WeightVar in the Waves sheet. |
 | `alpha` | Number | 0.05 | Significance level for statistical testing (0.05 = 95% confidence). |

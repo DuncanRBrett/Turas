@@ -169,6 +169,21 @@ validate_wave_definitions <- function(config) {
     results$warnings <- c(results$warnings, "Duplicate WaveNames found")
   }
 
+  # Coerce dates if they came in as character or numeric
+  for (date_col in c("FieldworkStart", "FieldworkEnd")) {
+    vals <- waves[[date_col]]
+    if (is.numeric(vals)) {
+      waves[[date_col]] <- as.Date(as.character(as.integer(vals)), format = "%Y%m%d")
+    } else if (is.character(vals)) {
+      parsed <- as.Date(vals, format = "%Y-%m-%d")
+      still_na <- is.na(parsed) & !is.na(vals)
+      if (any(still_na)) {
+        parsed[still_na] <- as.Date(vals[still_na], format = "%Y%m%d")
+      }
+      waves[[date_col]] <- parsed
+    }
+  }
+
   # Validate dates
   for (i in seq_len(nrow(waves))) {
     start_date <- waves$FieldworkStart[i]

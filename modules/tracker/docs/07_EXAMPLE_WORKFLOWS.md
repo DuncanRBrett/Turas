@@ -379,17 +379,18 @@ Mean    | 7.8    | 8.0    | 8.2    | ↑
 
 **Settings sheet:**
 
-```         
-SettingName   | SettingValue
-report_types  | detailed,wave_history,dashboard
+```
+SettingName            | SettingValue
+report_types           | detailed,wave_history,dashboard
+question_mapping_file  | question_mapping.xlsx
 ```
 
 ### Step 2: Run Analysis
 
 ``` r
+# question_mapping_path resolved automatically from config setting
 result <- run_tracker(
   tracking_config_path = "config/tracking_config.xlsx",
-  question_mapping_path = "config/question_mapping.xlsx",
   data_dir = "data/"
 )
 

@@ -361,7 +361,8 @@ comparisons - Color-coded significance
 | Setting | Default | Description |
 |---------------------|---------------------|------------------------------|
 | project_name | (required) | Project title |
-| report_types | detailed | Comma-separated: detailed,wave_history,dashboard,sig_matrix |
+| question_mapping_file | (auto-detected) | Path to question mapping file (filename, relative, or absolute) |
+| report_types | detailed | Comma-separated: detailed,wave_history,dashboard,sig_matrix,tracking_crosstab |
 | confidence_level | 0.95 | Statistical confidence |
 | min_base_size | 30 | Minimum n for sig testing |
 | decimal_places_ratings | 1 | Decimal places for means |

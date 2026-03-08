@@ -231,7 +231,7 @@ run_tracker_gui <- function() {
         div(class = "card",
           h3("1. Select Tracking Configuration"),
           p(style = "color: #666; font-size: 14px;",
-            "Question mapping will be auto-detected in the same directory"),
+            "Question mapping from config setting, or auto-detected in same directory"),
 
           div(class = "file-label", "Tracking Configuration:"),
           div(style = "display: inline-block; margin-right: 10px;",
@@ -274,7 +274,8 @@ run_tracker_gui <- function() {
     # Reactive values
     files <- reactiveValues(
       tracking_config = NULL,
-      question_mapping = NULL
+      question_mapping = NULL,
+      mapping_source = NULL     # "config" or "auto-detected"
     )
 
     console_output <- reactiveVal("")
@@ -297,38 +298,79 @@ run_tracker_gui <- function() {
                                           winslash = "/", mustWork = FALSE)
             files$tracking_config <- tracking_path
 
-            # Auto-detect question mapping in same directory
+            # Resolve question mapping: config setting first, then auto-detect
             config_dir <- dirname(tracking_path)
-
-            # Look for question_mapping file
-            possible_names <- c(
-              "question_mapping.xlsx",
-              "Question_Mapping.xlsx",
-              "QuestionMapping.xlsx",
-              paste0(gsub("_tracking_config\\.xlsx$|_config\\.xlsx$", "", basename(tracking_path)), "_question_mapping.xlsx")
-            )
-
             question_map_path <- NULL
-            for (name in possible_names) {
-              test_path <- file.path(config_dir, name)
-              if (file.exists(test_path)) {
-                question_map_path <- test_path
-                break
-              }
-            }
+            mapping_source <- NULL
 
-            # If not found, list all xlsx files in directory
+            # Try reading question_mapping_file from config Settings sheet
+            tryCatch({
+              # Read raw to find header row (styled templates have title rows above)
+              raw_df <- openxlsx::read.xlsx(tracking_path, sheet = "Settings",
+                                            colNames = FALSE, skipEmptyRows = FALSE)
+              header_row <- which(raw_df[[1]] == "Setting" | raw_df[[1]] == "SettingName")[1]
+              if (!is.na(header_row)) {
+                settings_df <- openxlsx::read.xlsx(tracking_path, sheet = "Settings",
+                                                   startRow = header_row)
+              } else {
+                settings_df <- openxlsx::read.xlsx(tracking_path, sheet = "Settings")
+              }
+              setting_col <- if ("Setting" %in% names(settings_df)) "Setting" else "SettingName"
+              if (setting_col %in% names(settings_df) && "Value" %in% names(settings_df)) {
+                idx <- which(settings_df[[setting_col]] == "question_mapping_file")
+                if (length(idx) > 0) {
+                  val <- trimws(settings_df$Value[idx[1]])
+                  if (!is.na(val) && nzchar(val)) {
+                    val <- path.expand(val)
+                    val <- gsub("^\\./", "", val)
+                    if (!grepl("^/|^[A-Za-z]:", val)) {
+                      val <- file.path(config_dir, val)
+                    }
+                    val <- normalizePath(val, winslash = "/", mustWork = FALSE)
+                    if (file.exists(val)) {
+                      question_map_path <- val
+                      mapping_source <- "config"
+                    }
+                  }
+                }
+              }
+            }, error = function(e) {
+              # Silently continue to auto-detection if config read fails
+            })
+
+            # Fall back to auto-detection if not found in config
             if (is.null(question_map_path)) {
-              xlsx_files <- list.files(config_dir, pattern = "mapping.*\\.xlsx$", ignore.case = TRUE, full.names = TRUE)
-              if (length(xlsx_files) > 0) {
-                question_map_path <- xlsx_files[1]
+              possible_names <- c(
+                "question_mapping.xlsx",
+                "Question_Mapping.xlsx",
+                "QuestionMapping.xlsx",
+                paste0(gsub("_tracking_config\\.xlsx$|_config\\.xlsx$", "", basename(tracking_path)), "_question_mapping.xlsx")
+              )
+
+              for (name in possible_names) {
+                test_path <- file.path(config_dir, name)
+                if (file.exists(test_path)) {
+                  question_map_path <- test_path
+                  mapping_source <- "auto-detected"
+                  break
+                }
+              }
+
+              # Last resort: search for any mapping*.xlsx
+              if (is.null(question_map_path)) {
+                xlsx_files <- list.files(config_dir, pattern = "mapping.*\\.xlsx$", ignore.case = TRUE, full.names = TRUE)
+                if (length(xlsx_files) > 0) {
+                  question_map_path <- xlsx_files[1]
+                  mapping_source <- "auto-detected"
+                }
               }
             }
 
             files$question_mapping <- question_map_path
+            files$mapping_source <- mapping_source
 
             if (is.null(question_map_path)) {
-              showNotification("Question mapping file not found in same directory. Please ensure it exists.",
+              showNotification("Question mapping file not found. Set 'question_mapping_file' in config Settings or place it in the same directory.",
                              type = "warning", duration = 5)
             }
           }
@@ -349,6 +391,7 @@ run_tracker_gui <- function() {
                                               winslash = "/", mustWork = FALSE)
         files$question_mapping <- normalizePath(path.expand(proj$question_mapping),
                                                winslash = "/", mustWork = FALSE)
+        files$mapping_source <- proj$mapping_source
         if (!is.null(proj$use_banners)) {
           updateCheckboxInput(session, "use_banners", value = proj$use_banners)
         }
@@ -388,7 +431,10 @@ run_tracker_gui <- function() {
         return(NULL)
       } else {
         div(
-          div(class = "file-label", style = "margin-top: 15px;", "Question Mapping (auto-detected):"),
+          div(class = "file-label", style = "margin-top: 15px;",
+            paste0("Question Mapping (",
+                   if (!is.null(files$mapping_source)) files$mapping_source else "auto-detected",
+                   "):")),
           div(class = "file-display",
             tags$strong(basename(files$question_mapping)),
             tags$br(),
@@ -644,6 +690,7 @@ run_tracker_gui <- function() {
           add_recent_project(list(
             tracking_config = tracking_config,
             question_mapping = question_mapping,
+            mapping_source = files$mapping_source,
             use_banners = input$use_banners,
             enable_html = input$enable_html
           ))

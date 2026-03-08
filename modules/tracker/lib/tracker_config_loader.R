@@ -20,6 +20,45 @@
 # compatibility. New code should use shared/config_utils.R functions.
 # ==============================================================================
 
+#' Read Config Sheet (handles styled templates)
+#'
+#' Reads an Excel sheet, auto-detecting styled template header rows.
+#' Styled templates have title/subtitle/legend rows above the actual
+#' column headers. This function finds the real header row by looking
+#' for a known column name in column 1.
+#'
+#' @param file_path Character. Path to Excel file.
+#' @param sheet_name Character. Sheet name to read.
+#' @param expected_col Character. A column name expected in column 1 of the header row.
+#' @param ... Additional arguments passed to openxlsx::read.xlsx()
+#' @return Data frame with correct column names.
+#'
+#' @keywords internal
+read_config_sheet <- function(file_path, sheet_name, expected_col, ...) {
+  df <- openxlsx::read.xlsx(file_path, sheet = sheet_name, ...)
+  if (!(expected_col %in% names(df))) {
+    # Styled template: scan column 1 for the expected header row
+    # Use skipEmptyRows=FALSE so raw row numbers match Excel row numbers
+    raw_df <- openxlsx::read.xlsx(file_path, sheet = sheet_name,
+                                  colNames = FALSE, skipEmptyRows = FALSE)
+    header_row <- which(raw_df[[1]] == expected_col)[1]
+    if (!is.na(header_row)) {
+      df <- openxlsx::read.xlsx(file_path, sheet = sheet_name,
+                                startRow = header_row, ...)
+      # Strip help/description rows (start with [REQUIRED] or [Optional])
+      if (nrow(df) > 0 && expected_col %in% names(df)) {
+        help_rows <- grepl("^\\[REQUIRED\\]|^\\[Optional\\]", df[[expected_col]])
+        if (any(help_rows)) {
+          df <- df[!help_rows, , drop = FALSE]
+          rownames(df) <- NULL
+        }
+      }
+    }
+  }
+  df
+}
+
+
 #' Load Tracking Configuration
 #'
 #' Loads the main tracking configuration file (tracking_config.xlsx) and
@@ -59,7 +98,7 @@ load_tracking_config <- function(config_path) {
 
   # Load Waves sheet
   waves <- tryCatch({
-    openxlsx::read.xlsx(config_path, sheet = "Waves", detectDates = TRUE)
+    read_config_sheet(config_path, "Waves", "WaveID", detectDates = TRUE)
   }, error = function(e) {
     # TRS Refusal: IO_WAVES_SHEET_FAILED
     tracker_refuse(
@@ -74,6 +113,25 @@ load_tracking_config <- function(config_path) {
       details = e$message
     )
   })
+
+  # Coerce date columns to Date objects (handles multiple input formats)
+  for (date_col in c("FieldworkStart", "FieldworkEnd")) {
+    if (date_col %in% names(waves)) {
+      vals <- waves[[date_col]]
+      if (is.numeric(vals)) {
+        # Numeric YYYYMMDD format (e.g. 20250916)
+        waves[[date_col]] <- as.Date(as.character(as.integer(vals)), format = "%Y%m%d")
+      } else if (is.character(vals)) {
+        # Try YYYY-MM-DD first, then YYYYMMDD
+        parsed <- as.Date(vals, format = "%Y-%m-%d")
+        still_na <- is.na(parsed) & !is.na(vals)
+        if (any(still_na)) {
+          parsed[still_na] <- as.Date(vals[still_na], format = "%Y%m%d")
+        }
+        waves[[date_col]] <- parsed
+      }
+    }
+  }
 
   # Validate required columns in Waves
   required_wave_cols <- c("WaveID", "WaveName", "DataFile", "FieldworkStart", "FieldworkEnd")
@@ -95,9 +153,14 @@ load_tracking_config <- function(config_path) {
     )
   }
 
-  # Load Settings sheet
+  # Load Settings sheet (handles both plain and styled template formats)
   settings_df <- tryCatch({
-    openxlsx::read.xlsx(config_path, sheet = "Settings")
+    df <- read_config_sheet(config_path, "Settings", "Setting")
+    # Also handle legacy "SettingName" column
+    if (!("Setting" %in% names(df)) && !("SettingName" %in% names(df))) {
+      df <- read_config_sheet(config_path, "Settings", "SettingName")
+    }
+    df
   }, error = function(e) {
     # TRS Refusal: IO_SETTINGS_SHEET_FAILED
     tracker_refuse(
@@ -117,11 +180,15 @@ load_tracking_config <- function(config_path) {
   # Future: Extract to shared/config_utils.R::parse_settings()
 
   # Convert settings dataframe to named list
+  # Known settings: project_name, question_mapping_file, output_file, output_dir,
+  # report_types, html_report, decimal_places_*, alpha, confidence_level,
+  # minimum_base, show_significance, baseline_wave, weight_variable,
+  # brand_colour, accent_colour, company_name, researcher_logo_path, etc.
   settings <- parse_settings_to_list(settings_df)
 
   # Load Banner sheet
   banner <- tryCatch({
-    openxlsx::read.xlsx(config_path, sheet = "Banner")
+    read_config_sheet(config_path, "Banner", "BreakVariable")
   }, error = function(e) {
     # TRS Refusal: IO_BANNER_SHEET_FAILED
     tracker_refuse(
@@ -158,7 +225,7 @@ load_tracking_config <- function(config_path) {
 
   # Load TrackedQuestions sheet
   tracked_questions <- tryCatch({
-    openxlsx::read.xlsx(config_path, sheet = "TrackedQuestions")
+    read_config_sheet(config_path, "TrackedQuestions", "QuestionCode")
   }, error = function(e) {
     # TRS Refusal: IO_TRACKED_QUESTIONS_FAILED
     tracker_refuse(
@@ -264,7 +331,7 @@ load_question_mapping <- function(mapping_path) {
 
   # Load QuestionMap sheet
   mapping <- tryCatch({
-    openxlsx::read.xlsx(mapping_path, sheet = "QuestionMap")
+    read_config_sheet(mapping_path, "QuestionMap", "QuestionCode")
   }, error = function(e) {
     # TRS Refusal: IO_QUESTIONMAP_SHEET_FAILED
     tracker_refuse(

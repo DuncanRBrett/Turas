@@ -170,7 +170,9 @@ verify_tracker_environment()
 #' Supports Phase 2 (simple trends) and Phase 3 (banner breakouts & composites).
 #'
 #' @param tracking_config_path Character. Path to tracking_config.xlsx
-#' @param question_mapping_path Character. Path to question_mapping.xlsx
+#' @param question_mapping_path Character or NULL. Path to question_mapping.xlsx.
+#'   If NULL (default), resolved from the 'question_mapping_file' setting in
+#'   the config Settings sheet. If provided, overrides the config setting.
 #' @param data_dir Character. Directory containing wave data files (for relative paths)
 #' @param output_path Character. Path for output file (default: auto-generated)
 #' @param use_banners Logical. If TRUE, calculate trends with banner breakouts (Phase 3). Default FALSE (Phase 2).
@@ -181,7 +183,7 @@ verify_tracker_environment()
 #'
 #' @export
 run_tracker <- function(tracking_config_path,
-                        question_mapping_path,
+                        question_mapping_path = NULL,
                         data_dir = NULL,
                         output_path = NULL,
                         use_banners = FALSE,
@@ -248,6 +250,33 @@ run_tracker <- function(tracking_config_path,
   cat("================================================================================\n")
 
   config <- load_tracking_config(tracking_config_path)
+
+  # Resolve question_mapping_path: parameter > config setting > error
+  if (is.null(question_mapping_path)) {
+    mapping_setting <- get_setting(config, "question_mapping_file", default = NULL)
+    if (!is.null(mapping_setting) && nzchar(trimws(mapping_setting))) {
+      question_mapping_path <- resolve_mapping_file_path(
+        trimws(mapping_setting), dirname(tracking_config_path)
+      )
+      cat(paste0("  Question mapping from config: ", basename(question_mapping_path), "\n"))
+    } else {
+      # No parameter and no config setting
+      cat("\n=== TURAS ERROR ===\n")
+      cat("Code: IO_MAPPING_PATH_MISSING\n")
+      cat("Message: No question mapping file path provided and no 'question_mapping_file' setting in config.\n")
+      cat("Fix: Add 'question_mapping_file' to Settings sheet, or pass question_mapping_path to run_tracker()\n")
+      cat("==================\n\n")
+      return(list(
+        status = "REFUSED",
+        code = "IO_MAPPING_PATH_MISSING",
+        message = "No question mapping file path provided and no 'question_mapping_file' setting found in config.",
+        how_to_fix = c(
+          "Add 'question_mapping_file' setting in the Settings sheet of your config file",
+          "Or pass question_mapping_path to run_tracker()"
+        )
+      ))
+    }
+  }
 
   # Display project info
   project_name <- get_setting(config, "project_name", default = "Tracking Analysis")
@@ -387,10 +416,28 @@ run_tracker <- function(tracking_config_path,
   # Resolve output directory and validate it exists
   # ===========================================================================
   # Priority: 1) output_path parameter, 2) output_dir setting, 3) config file directory
+  output_dir_setting <- get_setting(config, "output_dir", default = NULL)
+  output_file_setting <- get_setting(config, "output_file", default = NULL)
+
+  # Detect and correct swapped output_dir / output_file values
+  # output_dir should be a directory path, output_file should be a filename
+  if (!is.null(output_dir_setting) && nzchar(trimws(output_dir_setting)) &&
+      !is.null(output_file_setting) && nzchar(trimws(output_file_setting))) {
+    dir_val <- trimws(output_dir_setting)
+    file_val <- trimws(output_file_setting)
+    dir_has_ext <- grepl("\\.(xlsx|csv|html)$", dir_val, ignore.case = TRUE)
+    file_is_path <- grepl("^(/|[A-Za-z]:)", file_val) && !grepl("\\.(xlsx|csv|html)$", file_val, ignore.case = TRUE)
+
+    if (dir_has_ext && file_is_path) {
+      cat("  [NOTE] output_dir and output_file appear swapped — auto-correcting\n")
+      output_dir_setting <- file_val
+      output_file_setting <- dir_val
+    }
+  }
+
   base_output_dir <- if (!is.null(output_path)) {
     dirname(output_path)
   } else {
-    output_dir_setting <- get_setting(config, "output_dir", default = NULL)
     if (!is.null(output_dir_setting) && nzchar(trimws(output_dir_setting))) {
       trimws(output_dir_setting)
     } else {
@@ -410,9 +457,6 @@ run_tracker <- function(tracking_config_path,
       base_output_dir <- dirname(config$config_path)
     }
   }
-
-  # Check for output_file setting (used when single report type)
-  output_file_setting <- get_setting(config, "output_file", default = NULL)
 
   cat(paste0("  Output directory: ", base_output_dir, "\n"))
   if (!is.null(output_file_setting) && nzchar(trimws(output_file_setting))) {
@@ -668,6 +712,34 @@ run_tracker <- function(tracking_config_path,
   } else {
     return(output_files)
   }
+}
+
+
+#' Resolve Question Mapping File Path
+#'
+#' Resolves a question mapping file path from the config setting.
+#' Handles filenames, relative paths, and absolute paths.
+#'
+#' @param mapping_path Character. Path value from config setting
+#' @param config_dir Character. Directory containing the config file
+#' @return Character. Resolved absolute path
+#'
+#' @keywords internal
+resolve_mapping_file_path <- function(mapping_path, config_dir) {
+  # Expand home directory (~)
+  mapping_path <- path.expand(mapping_path)
+
+  # Remove leading ./ if present
+  mapping_path <- gsub("^\\./", "", mapping_path)
+
+  # Check if already absolute path
+  if (grepl("^/|^[A-Za-z]:", mapping_path)) {
+    return(normalizePath(mapping_path, winslash = "/", mustWork = FALSE))
+  }
+
+  # Relative path or bare filename -- resolve relative to config directory
+  full_path <- file.path(config_dir, mapping_path)
+  return(normalizePath(full_path, winslash = "/", mustWork = FALSE))
 }
 
 

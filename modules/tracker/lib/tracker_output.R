@@ -43,7 +43,7 @@
 #
 # FEATURES:
 # - Decimal separator properly respected via shared formatting
-# - Report types: "detailed", "dashboard", "sig_matrix"
+# - Report types: "detailed", "dashboard", "sig_matrix", "tracking_crosstab"
 # - See tracker_dashboard_reports.R for dashboard implementations
 # ==============================================================================
 

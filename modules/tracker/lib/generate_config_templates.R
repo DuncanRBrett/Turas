@@ -75,6 +75,13 @@ generate_tracking_config_template <- function(output_path) {
           default = "",
           description = "Output directory (defaults to config file directory)",
           valid_values_text = "Relative or absolute directory path"
+        ),
+        list(
+          name = "question_mapping_file",
+          required = FALSE,
+          default = "",
+          description = "Path to question mapping file (auto-detected if blank)",
+          valid_values_text = "Filename, relative path, or absolute path (e.g., Question_Mapping.xlsx)"
         )
       )
     ),
@@ -88,10 +95,12 @@ generate_tracking_config_template <- function(output_path) {
           required = FALSE,
           default = "detailed",
           description = "Comma-separated list of report types to generate",
-          valid_values_text = "detailed, wave_history, dashboard, sig_matrix",
+          valid_values_text = "detailed, wave_history, dashboard, sig_matrix, tracking_crosstab",
           dropdown = c("detailed", "wave_history", "dashboard", "sig_matrix",
+                       "tracking_crosstab",
                        "detailed,wave_history", "detailed,dashboard",
-                       "detailed,wave_history,dashboard,sig_matrix")
+                       "detailed,wave_history,dashboard,sig_matrix",
+                       "detailed,wave_history,dashboard,sig_matrix,tracking_crosstab")
         ),
         list(
           name = "html_report",
