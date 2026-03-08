@@ -612,6 +612,14 @@ create_crosstabs_workbook <- function(all_results,
   create_summary_sheet_safe(wb, project_info, all_results, config_obj, styles,
                              script_version, total_column, very_small_base)
 
+  # Create Guide sheet (how to read this report)
+  tryCatch(
+    create_guide_sheet(wb, config_obj, banner_info, styles),
+    error = function(e) {
+      log_message(sprintf("Guide sheet skipped: %s", e$message), "WARNING")
+    }
+  )
+
   # Create Index Summary sheet
   create_index_summary_safe(wb, all_results, composite_results, composite_defs,
                              banner_info, config_obj, styles)

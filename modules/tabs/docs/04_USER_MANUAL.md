@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Tabs - User Manual
 
-**Version:** 10.0 **Date:** 22 December 2025
+**Version:** 10.3 **Date:** 8 March 2026
 
 This manual walks you through using Turas Tabs from start to finish. By
 the end, you'll be able to set up and run cross-tabulation analyses on
@@ -46,10 +46,30 @@ The Survey Structure file defines your survey questions and response
 options. This is the master reference that Tabs uses to understand your
 data.
 
+### Generate Professional Templates (Recommended)
+
+Turas can generate professionally formatted, hardened config templates
+with dropdown validation, colour-coded cells, and built-in help text:
+
+``` r
+source("modules/tabs/lib/generate_config_templates.R")
+
+# Generate both templates in your project folder
+generate_survey_structure_template("path/to/your/project/")
+generate_crosstab_config_template("path/to/your/project/")
+```
+
+The generated templates include:
+- **Dropdown menus** for Variable_Type, Include, UseBanner, etc.
+- **Colour-coded cells** (green = editable, blue = reference, grey = auto)
+- **Help text** describing every field and valid values
+- **Data validation** preventing invalid entries
+- **Cover sheet** with instructions
+
 ### Create the Questions Sheet
 
-Open `Survey_Structure_Template.xlsx` from the templates folder. Go to
-the Questions sheet.
+Open `Survey_Structure_Template.xlsx` from the templates folder (or use
+the generated template). Go to the Questions sheet.
 
 For each question in your survey, add a row with:
 
@@ -269,12 +289,42 @@ if (result$validation$has_errors) {
 1.  Tabs loads your configuration and structure files
 2.  It validates everything is properly set up
 3.  It loads your survey data
-4.  For each stub question:
+4.  **Pre-flight validation** cross-references your config, structure,
+    and data to catch mismatches before analysis begins (see below)
+5.  For each stub question:
     -   It calculates frequencies and percentages across banner columns
     -   It runs significance tests
     -   It builds the output table
-5.  It writes the Excel workbook
-6.  It returns the results
+6.  It writes the Excel workbook (including the Guide sheet)
+7.  If HTML report is enabled, it generates the interactive HTML report
+8.  It returns the results
+
+### Pre-Flight Validation
+
+Before processing begins, Tabs automatically runs 16 cross-referential
+checks that catch configuration mistakes early:
+
+-   **Selection vs Structure:** Verifies every selected question exists
+    in the Survey Structure
+-   **Option values vs Data:** Checks that configured options actually
+    appear in your data
+-   **Multi-Mention columns:** Verifies expected columns (e.g., Q02_1,
+    Q02_2) exist in data
+-   **Data types:** Confirms numeric questions contain numeric data
+-   **Banner variables:** Validates banner questions exist in both
+    structure and data
+-   **Base filter variables:** Checks that filter expressions reference
+    valid columns
+-   **Weight variable:** Validates the weight column exists and contains
+    valid values
+-   **Logo files:** When HTML report is enabled, warns if logo files
+    are missing
+-   **Colour codes:** Validates hex colour codes for HTML report branding
+-   **Dashboard scales:** Warns if green/amber thresholds are inverted
+
+Pre-flight issues appear in the console and in the Error Log sheet of
+the Excel output. Warnings don't stop the analysis but help you catch
+problems early.
 
 Processing time depends on your data size. A typical survey (1,000
 respondents, 30 questions, 10 banner columns) takes about 10-15 seconds.
@@ -283,7 +333,26 @@ respondents, 30 questions, 10 banner columns) takes about 10-15 seconds.
 
 ## Step 5: Review the Output
 
-Open the output Excel file. You'll find several sheets.
+Open the output Excel file. You'll find these sheets:
+
+| Sheet | Purpose |
+|-------|---------|
+| Summary | Project info, settings used, question list with base sizes |
+| Guide | How to read this report — explains row types, significance letters, weighting, index scores |
+| Index_Summary | Consolidated mean/index scores across all banner columns |
+| Error Log | Any validation warnings or errors found during processing |
+| Run_Status | TRS pass/partial/refused status with timing |
+| Sample Composition | Banner variable distributions (if enabled) |
+| Crosstabs | The full cross-tabulation results |
+
+### Guide Sheet
+
+The Guide sheet is automatically generated and explains how to
+interpret the output. It adapts to your configuration — for example,
+the significance testing section only appears if significance testing
+is enabled, and the weighting section only appears if weighting is
+applied. This makes the Excel file self-documenting for anyone who
+receives it.
 
 ### Index_Summary Sheet
 
@@ -467,6 +536,39 @@ Run each one separately to get different output files.
     efficiency issues.
 -   **Verify significance makes sense.** If nothing is significant, you
     may have small bases or low variability.
+
+### HTML Report Output
+
+When `html_report=TRUE` is set in your config, Tabs generates an
+interactive HTML report alongside the Excel output. The HTML report
+includes:
+
+-   **Summary dashboard** with gauge charts and heatmap grids
+-   **Interactive crosstab tables** with heatmap colouring and
+    significance badges
+-   **Inline SVG charts** (stacked bars for ordinal, horizontal bars
+    for nominal)
+-   **Pinned views** for saving and annotating key findings
+-   **Column sorting and export** (CSV and Excel)
+-   **Search and navigation** across all questions
+
+The HTML file is completely self-contained (no external dependencies)
+and can be shared with anyone who has a web browser.
+
+See [HTML Report Guide](08_HTML_REPORT_GUIDE.md) for full details.
+
+### Console Output
+
+The console shows a configuration summary before processing begins,
+including:
+
+-   Number of questions, respondents, and banner columns
+-   Weighting and significance settings
+-   HTML report, charts, and dashboard status
+-   Estimated processing time
+
+After completion, a run summary shows the TRS status, question count,
+output path, duration, and number of issues found.
 
 ------------------------------------------------------------------------
 

@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Tabs - Technical Documentation
 
-**Version:** 10.1 **Date:** 29 December 2025 **Audience:** Developers,
+**Version:** 10.3 **Date:** 8 March 2026 **Audience:** Developers,
 Technical Contributors, Module Maintainers
 
 This document covers the internal architecture, code structure, and
@@ -70,56 +70,86 @@ if (exists("tabs_source", mode = "function")) {
 
 ```
 modules/tabs/
-├── run_tabs.R                    # Main entry point
-├── run_tabs_gui.R                # Shiny GUI interface
+├── run_tabs.R                    # Main entry point (~92 lines)
+├── run_tabs_gui.R                # Shiny GUI interface (~651 lines)
 ├── lib/
-│   ├── 00_guard.R                # Path resolution & sourcing utilities (~763 lines)
-│   ├── run_crosstabs.R           # Core orchestration (~1,715 lines)
+│   ├── 00_guard.R                # TRS guard layer & sourcing utilities (~786 lines)
+│   ├── run_crosstabs.R           # Core orchestration (~636 lines)
 │   ├── run_crosstabs_helpers.R   # Helper functions (~291 lines)
-│   ├── config_loader.R           # Configuration management (~729 lines)
-│   ├── config_utils.R            # Configuration utilities (~267 lines)
-│   ├── validation.R              # Input validation core (~1,664 lines)
-│   ├── question_orchestrator.R   # Question preparation (~667 lines)
-│   ├── question_dispatcher.R     # Question type routing (~420 lines)
-│   ├── standard_processor.R      # Single/Multi processing (~1,312 lines)
-│   ├── numeric_processor.R       # Numeric/Rating/NPS processing (~581 lines)
-│   ├── composite_processor.R     # Composite metrics (~839 lines)
+│   ├── config_loader.R           # Configuration management (~684 lines)
+│   ├── config_utils.R            # Configuration utilities (~293 lines)
+│   ├── generate_config_templates.R # Professional config template generator (~1,354 lines)
+│   ├── validation.R              # Input validation core (~1,672 lines)
+│   ├── validation_utils.R        # Validation utility functions (~428 lines)
+│   ├── question_orchestrator.R   # Question preparation (~675 lines)
+│   ├── question_dispatcher.R     # Question type routing (~423 lines)
+│   ├── standard_processor.R      # Single/Multi processing (~1,338 lines)
+│   ├── numeric_processor.R       # Numeric/Rating/NPS processing (~592 lines)
+│   ├── composite_processor.R     # Composite metrics (~825 lines)
 │   ├── ranking.R                 # Ranking question processing (~1,019 lines)
 │   ├── cell_calculator.R         # Cell/row calculations (~756 lines)
 │   ├── banner.R                  # Banner structure (~588 lines)
 │   ├── banner_indices.R          # Banner indexing (~555 lines)
 │   ├── weighting.R               # Weight calculations (~1,590 lines)
-│   ├── shared_functions.R        # Utilities (~2,001 lines)
-│   ├── excel_writer.R            # Excel output (~1,561 lines)
+│   ├── shared_functions.R        # Utilities (~347 lines)
+│   ├── excel_writer.R            # Excel output + Guide sheet (~1,768 lines)
 │   ├── excel_utils.R             # Excel utilities (~151 lines)
-│   ├── summary_builder.R         # Summary statistics (~626 lines)
+│   ├── summary_builder.R         # Summary statistics (~658 lines)
 │   ├── logging_utils.R           # Logging utilities (~189 lines)
 │   ├── type_utils.R              # Type utilities (~166 lines)
+│   ├── path_utils.R              # Path handling utilities (~208 lines)
+│   ├── filter_utils.R            # Base filter utilities (~211 lines)
 │   │
-│   ├── validation/               # Validation submodules (Phase 2)
+│   ├── validation/               # Validation submodules (Phase 2-3)
 │   │   ├── structure_validators.R   # Survey structure validation (~208 lines)
 │   │   ├── weight_validators.R      # Weight validation (~375 lines)
 │   │   ├── config_validators.R      # Configuration validation (~253 lines)
-│   │   └── data_validators.R        # Data type/format validation (~398 lines)
+│   │   ├── data_validators.R        # Data type/format validation (~398 lines)
+│   │   └── preflight_validators.R   # Cross-referential pre-flight checks (~927 lines)
 │   │
-│   └── ranking/                  # Ranking submodules (Phase 2)
-│       ├── ranking_validation.R     # Ranking question validation (~200 lines)
-│       ├── ranking_metrics.R        # Metric calculations (~557 lines)
-│       └── ranking_crosstabs.R      # Crosstab row creation (~307 lines)
+│   ├── ranking/                  # Ranking submodules (Phase 2)
+│   │   ├── ranking_validation.R     # Ranking question validation (~200 lines)
+│   │   ├── ranking_metrics.R        # Metric calculations (~557 lines)
+│   │   └── ranking_crosstabs.R      # Crosstab row creation (~312 lines)
+│   │
+│   ├── crosstabs/                # Crosstabs submodules (Phase 4)
+│   │   ├── crosstabs_config.R       # Config object builder (~486 lines)
+│   │   ├── data_setup.R             # Data loading orchestration (~317 lines)
+│   │   ├── analysis_runner.R        # Analysis processing orchestration (~570 lines)
+│   │   ├── workbook_builder.R       # Excel workbook assembly (~657 lines)
+│   │   └── checkpoint.R             # Checkpoint/resume system (~146 lines)
+│   │
+│   └── html_report/              # HTML report system (V10.3+)
+│       ├── 00_html_guard.R          # HTML report input validation (~181 lines)
+│       ├── 01_data_transformer.R    # Transform results for HTML (~533 lines)
+│       ├── 02_table_builder.R       # Build HTML <table> elements (~327 lines)
+│       ├── 03_page_builder.R        # Assemble complete HTML page (~2,097 lines)
+│       ├── 04_html_writer.R         # Write HTML to file (~111 lines)
+│       ├── 05_dashboard_transformer.R # Extract dashboard metrics (~503 lines)
+│       ├── 06_dashboard_builder.R   # Build dashboard components (~1,951 lines)
+│       ├── 07_chart_builder.R       # Inline SVG chart generation (~608 lines)
+│       ├── 99_html_report_main.R    # HTML report entry point (~434 lines)
+│       └── js/                      # Client-side JavaScript
+│           ├── core_navigation.js      # Navigation, search, help (~572 lines)
+│           ├── chart_picker.js         # Chart column picker, export (~613 lines)
+│           ├── table_export_init.js    # CSV/Excel export, sort (~443 lines)
+│           ├── pinned_views.js         # View pinning, Markdown editor (~1,381 lines)
+│           └── slide_export.js         # Slide PNG export (~479 lines)
 ```
 
-Total lines of code: approximately 20,750 (including submodules).
+Total lines of code: approximately 36,330 (R: 32,840 + JS: 3,490).
 
 ### Dependencies
 
-**Required R Packages:** - openxlsx: Excel file I/O - readxl: Reading
-Excel configuration files
+**Required R Packages:** - openxlsx: Excel file I/O (no Java
+dependency) - htmltools: HTML generation for reports - jsonlite: JSON
+serialization
 
 **Optional R Packages:** - data.table: High-performance data operations
 (faster CSV reading) - haven: SPSS file support
 
-**Internal Dependencies:** Currently standalone. Future versions may
-integrate with shared Turas utilities.
+**Internal Dependencies:** Integrates with `/modules/shared/lib/` for
+common utilities (validation_utils, config_utils, formatting_utils).
 
 ------------------------------------------------------------------------
 
@@ -204,7 +234,8 @@ validation.R                      # Core validation orchestration
 ├── validation/structure_validators.R   # Survey structure validation
 ├── validation/weight_validators.R      # Weight validation
 ├── validation/config_validators.R      # Configuration validation
-└── validation/data_validators.R        # Data type/format validation
+├── validation/data_validators.R        # Data type/format validation
+└── validation/preflight_validators.R   # Cross-referential pre-flight checks
 ```
 
 **Key Functions (Core):**
@@ -272,6 +303,32 @@ Validates data types and formats:
 - `check_bin_overlaps()` - Detects overlapping bins
 - `check_bin_coverage()` - Validates bin coverage
 - `validate_numeric_question()` - Comprehensive numeric validation
+
+**Submodule: preflight_validators.R**
+
+Cross-referential validation that runs after data loading, checking
+consistency between config, structure, and data:
+
+- `check_selection_vs_questions()` - Selection sheet questions exist in structure
+- `check_option_values_vs_data()` - Configured options appear in actual data
+- `check_preflight_multi_mention()` - Multi_Mention binary columns exist
+- `check_numeric_data_types()` - Numeric questions contain numeric data
+- `check_create_index_config()` - CreateIndex + Index_Weight consistency
+- `check_banner_variables()` - Banner questions exist in structure + data
+- `check_conflicting_display()` - All display metrics disabled warning
+- `check_preflight_weight_variable()` - Weight variable existence and validity
+- `check_duplicate_options()` - Duplicate OptionCodes within same question
+- `check_open_end_selection()` - Open_End questions selected for crosstabs
+- `check_base_filter_variables()` - Filter expression variable verification
+- `check_data_column_coverage()` - Data columns exist for selected questions
+- `check_preflight_logo_files()` - Logo files exist when HTML report enabled
+- `check_preflight_colour_codes()` - Valid hex colour codes for HTML report
+- `check_preflight_dashboard_scales()` - Dashboard threshold ordering
+- `check_preflight_bonferroni()` - Bonferroni with few columns advisory
+
+All preflight functions are prefixed with `check_preflight_` or
+`check_` to avoid name collisions with functions in other validator
+submodules that share the same global namespace.
 
 **Error Log Structure:**
 
@@ -556,28 +613,108 @@ format_crosstab_sheet(wb, sheet_name, question_result, config)
 Formats one question sheet with headers, percentage formats,
 significance highlighting, and frozen panes.
 
+### Config Template Generator (generate_config_templates.R)
+
+Generates professionally formatted Excel config templates with
+validation, dropdowns, and help text.
+
+``` r
+generate_survey_structure_template(output_dir)
+generate_crosstab_config_template(output_dir)
+```
+
+Templates include:
+- openxlsx data validation (dropdowns for Variable_Type, Y/N fields)
+- Colour-coded cells (green = editable, blue = reference, grey = auto)
+- Cover sheet with instructions
+- All valid options pre-populated
+
+### Guide Sheet (excel_writer.R::create_guide_sheet)
+
+Auto-generated "Guide" sheet added to every Excel workbook output.
+Content is conditional on the config object:
+
+``` r
+create_guide_sheet(wb, config_obj, banner_info, styles)
+```
+
+Sections included dynamically:
+- **ROW TYPES** - Only shows enabled row types (frequency, column %,
+  row %, SD, net positive, mean, index)
+- **SIGNIFICANCE TESTING** - Only if `enable_significance_testing=TRUE`
+- **WEIGHTED DATA** - Only if `apply_weighting=TRUE`
+- **INDEX SCORES** - Always shown
+- **BASE SIZE WARNINGS** - Always shown
+- **BANNER COLUMN LETTERS** - Lists letter-to-column mappings from
+  `banner_info$column_letters`
+- **FORMATTING** - Decimal separator and places
+
+### HTML Report System (html_report/)
+
+Self-contained interactive HTML report generated alongside Excel output
+when `html_report=TRUE`.
+
+**Architecture:**
+
+```
+99_html_report_main.R    # Entry point: guard → transform → build → write
+├── 00_html_guard.R      # Input validation (TRS pattern)
+├── 01_data_transformer.R # Transform all_results → HTML-ready structures
+├── 02_table_builder.R   # Build <table> elements with data attributes
+├── 03_page_builder.R    # Assemble complete HTML page (CSS + JS + HTML)
+├── 04_html_writer.R     # Write self-contained HTML file
+├── 05_dashboard_transformer.R # Extract headline metrics for dashboard
+├── 06_dashboard_builder.R     # Build gauge charts, heatmap, findings
+└── 07_chart_builder.R   # Pure SVG chart generation (zero dependencies)
+```
+
+**JavaScript modules (js/):**
+
+| File | Responsibility |
+|------|---------------|
+| core_navigation.js | Question navigation, search, banner switching, help overlay |
+| chart_picker.js | Column picker for charts, SVG rebuild, PNG export |
+| table_export_init.js | CSV/Excel export, column toggle, column sort |
+| pinned_views.js | View capture, pin cards, Markdown editor |
+| slide_export.js | Slide PNG export (1280x720 at 3x resolution) |
+
+### Crosstabs Submodules (crosstabs/)
+
+Phase 4 refactoring extracted orchestration into focused submodules:
+
+| File | Responsibility |
+|------|---------------|
+| crosstabs_config.R | `build_config_object()` with 62 config settings |
+| data_setup.R | Survey structure, data, and weight loading |
+| analysis_runner.R | Validation, banner creation, question processing |
+| workbook_builder.R | Excel workbook assembly (Summary, Guide, Index_Summary, etc.) |
+| checkpoint.R | Save/load/cleanup for resumable analysis |
+
 ------------------------------------------------------------------------
 
 ## Data Flow
 
 ### Complete Pipeline
 
-```         
+```
 1. CONFIGURATION LOADING
    - Load Tabs_Config.xlsx (Settings, Selection sheets)
    - Load Survey_Structure.xlsx (Questions, Options, Composite_Metrics)
    - Resolve file paths relative to project root
+   - Build config_obj (62 settings with typed defaults)
 
-2. VALIDATION
-   - Validate survey structure (questions, options)
-   - Validate survey data (columns, types)
-   - Validate weights (if specified)
-   - Validate banner selection
+2. VALIDATION (5 sequential validators)
+   - Structure validators: questions, options, duplicates
+   - Data validators: columns, types, multi-mention
+   - Weight validators: column, values, DEFF
+   - Config validators: alpha, min_base, paths
+   - Pre-flight validators: cross-reference config ↔ structure ↔ data
 
 3. DATA LOADING
    - Load survey data (CSV, XLSX, SAV)
    - Load weights (if specified)
    - Create banner structure
+   - Print config summary (questions, respondents, features)
 
 4. QUESTION LOOP (for each stub question)
    4a. Prepare Question Data
@@ -600,10 +737,23 @@ significance highlighting, and frozen panes.
 
 5. EXCEL OUTPUT
    - Create workbook
-   - Write each question sheet
-   - Apply formatting
-   - Write metadata sheet
+   - Write Summary sheet (project info, question list)
+   - Write Guide sheet (config-aware legend)
+   - Write Index_Summary sheet (consolidated metrics)
+   - Write Error Log sheet
+   - Write Run_Status sheet
+   - Write Sample Composition sheet (if enabled)
+   - Write Crosstabs sheet (all question tables)
    - Save workbook
+
+6. HTML REPORT (if html_report=TRUE)
+   - Guard: validate inputs and packages
+   - Transform: convert all_results to HTML-ready structures
+   - Dashboard: extract headline metrics, sig findings
+   - Tables: build HTML tables with heatmap data attributes
+   - Charts: generate inline SVG charts
+   - Page: assemble complete self-contained HTML
+   - Write: save HTML file
 ```
 
 ### Memory Management

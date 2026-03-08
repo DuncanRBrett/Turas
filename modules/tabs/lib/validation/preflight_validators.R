@@ -675,6 +675,161 @@ check_data_column_coverage <- function(selection_df, questions_df, survey_data,
 
 
 # ==============================================================================
+# CHECK 13: LOGO FILE EXISTENCE (HTML REPORT)
+# ==============================================================================
+
+#' Check Logo Files Exist
+#'
+#' When html_report is enabled, verifies that configured logo files actually exist.
+#' Upgrades the console-only warning from crosstabs_config.R to a logged issue.
+#'
+#' @param config List, configuration object
+#' @param error_log Data frame, error log
+#' @return Updated error_log
+check_preflight_logo_files <- function(config, error_log) {
+  html_report <- !is.null(config$html_report) && isTRUE(config$html_report)
+  if (!html_report) return(error_log)
+
+  logo_fields <- list(
+    researcher_logo_path = "Researcher logo",
+    client_logo_path = "Client logo",
+    logo_path = "Logo"
+  )
+
+  for (field in names(logo_fields)) {
+    path <- config[[field]]
+    if (!is.null(path) && nzchar(path) && !file.exists(path)) {
+      error_log <- log_issue(error_log, "Preflight", "Warning",
+        sprintf("HTML report enabled but %s file not found: '%s'. The report will render without this logo.",
+                logo_fields[[field]], basename(path)),
+        severity = "Warning")
+    }
+  }
+
+  return(error_log)
+}
+
+
+# ==============================================================================
+# CHECK 14: COLOUR CODE VALIDATION (HTML REPORT)
+# ==============================================================================
+
+#' Check Colour Codes Are Valid Hex
+#'
+#' Validates that brand_colour, accent_colour, and chart_bar_colour are
+#' valid hex colour codes when html_report is enabled.
+#'
+#' @param config List, configuration object
+#' @param error_log Data frame, error log
+#' @return Updated error_log
+check_preflight_colour_codes <- function(config, error_log) {
+  html_report <- !is.null(config$html_report) && isTRUE(config$html_report)
+  if (!html_report) return(error_log)
+
+  hex_pattern <- "^#[0-9A-Fa-f]{6}$"
+
+  colour_fields <- list(
+    brand_colour = "Brand colour",
+    accent_colour = "Accent colour",
+    chart_bar_colour = "Chart bar colour"
+  )
+
+  for (field in names(colour_fields)) {
+    val <- config[[field]]
+    if (!is.null(val) && nzchar(val) && !grepl(hex_pattern, val)) {
+      error_log <- log_issue(error_log, "Preflight", "Warning",
+        sprintf("%s '%s' is not a valid hex colour code (expected format: #RRGGBB). The report may not render colours correctly.",
+                colour_fields[[field]], val),
+        severity = "Warning")
+    }
+  }
+
+  return(error_log)
+}
+
+
+# ==============================================================================
+# CHECK 15: DASHBOARD SCALE VALIDATION
+# ==============================================================================
+
+#' Check Dashboard Scale Thresholds
+#'
+#' When include_summary is enabled, validates that dashboard colour break
+#' thresholds are logically ordered (green > amber) and not unreasonable.
+#'
+#' @param config List, configuration object
+#' @param error_log Data frame, error log
+#' @return Updated error_log
+check_preflight_dashboard_scales <- function(config, error_log) {
+  include_summary <- !is.null(config$include_summary) && isTRUE(config$include_summary)
+  if (!include_summary) return(error_log)
+
+  # Check green > amber for each metric type
+  scale_pairs <- list(
+    list(green = "dashboard_green_net", amber = "dashboard_amber_net", label = "Net Positive"),
+    list(green = "dashboard_green_mean", amber = "dashboard_amber_mean", label = "Mean"),
+    list(green = "dashboard_green_index", amber = "dashboard_amber_index", label = "Index"),
+    list(green = "dashboard_green_custom", amber = "dashboard_amber_custom", label = "Custom")
+  )
+
+  for (pair in scale_pairs) {
+    green_val <- config[[pair$green]]
+    amber_val <- config[[pair$amber]]
+
+    if (!is.null(green_val) && !is.null(amber_val)) {
+      if (green_val <= amber_val) {
+        error_log <- log_issue(error_log, "Preflight", "Warning",
+          sprintf("Dashboard %s: green threshold (%.1f) <= amber threshold (%.1f). Green should be higher than amber for correct colour coding.",
+                  pair$label, green_val, amber_val),
+          severity = "Warning")
+      }
+    }
+  }
+
+  return(error_log)
+}
+
+
+# ==============================================================================
+# CHECK 16: BONFERRONI WITH FEW COLUMNS
+# ==============================================================================
+
+#' Check Bonferroni With Few Banner Columns
+#'
+#' When bonferroni_correction is enabled with fewer than 5 banner columns,
+#' warns that the correction may be overly conservative.
+#'
+#' @param config List, configuration object
+#' @param selection_df Data frame, Selection sheet (for counting banner columns)
+#' @param error_log Data frame, error log
+#' @return Updated error_log
+check_preflight_bonferroni <- function(config, selection_df, error_log) {
+  sig_enabled <- !is.null(config$enable_significance_testing) &&
+                 isTRUE(config$enable_significance_testing)
+  bonf <- !is.null(config$bonferroni_correction) &&
+          isTRUE(config$bonferroni_correction)
+
+  if (!sig_enabled || !bonf) return(error_log)
+
+  # Count banner columns from selection_df
+  if (!is.null(selection_df) && "UseBanner" %in% names(selection_df)) {
+    banner_cols <- selection_df[!is.na(selection_df$UseBanner) &
+                                toupper(as.character(selection_df$UseBanner)) == "YES", ]
+    n_banner <- nrow(banner_cols)
+
+    if (n_banner > 0 && n_banner < 5) {
+      error_log <- log_issue(error_log, "Preflight", "Info",
+        sprintf("Bonferroni correction is enabled with only %d banner column(s). With few columns, this correction may be overly conservative and reduce the ability to detect significant differences. Consider disabling bonferroni_correction.",
+                n_banner),
+        severity = "Info")
+    }
+  }
+
+  return(error_log)
+}
+
+
+# ==============================================================================
 # PREFLIGHT ORCHESTRATOR
 # ==============================================================================
 
@@ -746,6 +901,18 @@ validate_preflight <- function(survey_structure, survey_data, config,
 
   # 9. Duplicate options
   error_log <- check_duplicate_options(options_df, error_log)
+
+  # 13. Logo file existence (HTML report)
+  error_log <- check_preflight_logo_files(config, error_log)
+
+  # 14. Colour code validation (HTML report)
+  error_log <- check_preflight_colour_codes(config, error_log)
+
+  # 15. Dashboard scale thresholds
+  error_log <- check_preflight_dashboard_scales(config, error_log)
+
+  # 16. Bonferroni with few columns
+  error_log <- check_preflight_bonferroni(config, selection_df, error_log)
 
   if (verbose) {
     n_preflight <- sum(error_log$Component == "Preflight")

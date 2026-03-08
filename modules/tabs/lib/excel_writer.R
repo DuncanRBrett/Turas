@@ -1551,6 +1551,213 @@ write_index_summary_sheet <- function(wb, summary_table, banner_info,
 }
 
 # ==============================================================================
+# GUIDE / LEGEND SHEET
+# ==============================================================================
+
+#' Create Guide Sheet
+#'
+#' Adds a "Guide" sheet to the workbook explaining how to read the results.
+#' Content is conditional on the config - only relevant sections are shown.
+#'
+#' @param wb Workbook object
+#' @param config_obj List, configuration object
+#' @param banner_info List, banner information (for letter assignments)
+#' @param styles List, style objects from create_excel_styles()
+#' @return Invisible NULL
+#' @export
+create_guide_sheet <- function(wb, config_obj, banner_info, styles) {
+
+  openxlsx::addWorksheet(wb, "Guide")
+
+  # --- Style definitions for this sheet ---
+  title_style <- openxlsx::createStyle(
+    fontSize = 16, fontName = "Aptos", textDecoration = "bold",
+    fontColour = "#1F4E79"
+  )
+  section_style <- openxlsx::createStyle(
+    fontSize = 12, fontName = "Aptos", textDecoration = "bold",
+    fgFill = "#E7E6E6"
+  )
+  label_style <- openxlsx::createStyle(
+    fontSize = 11, fontName = "Aptos", textDecoration = "bold"
+  )
+  desc_style <- openxlsx::createStyle(
+    fontSize = 11, fontName = "Aptos", wrapText = TRUE
+  )
+
+  # Safe config extraction helpers
+  cfg_bool <- function(field, default = FALSE) {
+    val <- config_obj[[field]]
+    !is.null(val) && length(val) > 0 && isTRUE(val)
+  }
+  cfg_val <- function(field, default = NULL) {
+    val <- config_obj[[field]]
+    if (is.null(val) || length(val) == 0) default else val
+  }
+
+  # Collect all rows as list of c(col1, col2)
+  rows <- list()
+  section_rows <- c()   # row indices that get section styling
+  label_rows <- c()     # row indices that get label styling (col A bold)
+
+  add_row <- function(col1, col2 = "") {
+    rows[[length(rows) + 1]] <<- c(col1, col2)
+  }
+  add_section <- function(title) {
+    add_row(title, "")
+    section_rows <<- c(section_rows, length(rows) + 1)  # +1 for header row offset
+  }
+  add_entry <- function(label, description) {
+    add_row(label, description)
+    label_rows <<- c(label_rows, length(rows) + 1)
+  }
+
+  # === TITLE ===
+  add_row("HOW TO READ THIS REPORT", "")
+
+  add_row("", "")
+
+  # === ROW TYPES SECTION ===
+  add_section("ROW TYPES")
+
+  if (cfg_bool("show_frequency")) {
+    add_entry("Frequency (n)", "The raw count of respondents who selected each option.")
+  }
+  if (cfg_bool("show_percent_column")) {
+    add_entry("Column %", "The percentage of respondents within each banner column. Percentages read down each column and sum to 100%.")
+  }
+  if (cfg_bool("show_percent_row")) {
+    add_entry("Row %", "The percentage across banner columns for each option. Percentages read across each row and sum to 100%.")
+  }
+  if (cfg_bool("show_standard_deviation")) {
+    add_entry("SD", "Standard deviation of the responses for that column. Measures spread around the mean.")
+  }
+  if (cfg_bool("show_net_positive")) {
+    add_entry("Net Positive", "Percentage of positive responses minus percentage of negative responses. Range: -100 to +100.")
+  }
+
+  add_entry("Mean", "The average score for rating and numeric questions, calculated within each banner column.")
+  add_entry("Index", "A comparison score where 100 = the Total column average. Values above 100 indicate above-average; below 100 indicates below-average.")
+
+  add_row("", "")
+
+  # === SIGNIFICANCE TESTING SECTION ===
+  if (cfg_bool("enable_significance_testing")) {
+    add_section("SIGNIFICANCE TESTING")
+
+    alpha <- cfg_val("alpha", 0.05)
+    add_entry("What it shows",
+              sprintf("Statistical tests compare each banner column against every other column at the %.1f%% confidence level (alpha = %.3f).",
+                      (1 - alpha) * 100, alpha))
+
+    add_entry("Letter markers",
+              "Each banner column is assigned a letter (A, B, C, ...). If a cell shows 'AB', it means that column's value is significantly higher than columns A and B.")
+
+    add_entry("Sig. row",
+              "The 'Sig.' row below each option shows which columns are significantly different. An empty cell means no significant difference was found.")
+
+    if (cfg_bool("bonferroni_correction")) {
+      add_entry("Bonferroni correction",
+                "Applied to adjust for multiple comparisons. This reduces the chance of false positives but makes it harder to find significant differences.")
+    }
+
+    min_base <- cfg_val("significance_min_base", 30)
+    add_entry("Minimum base",
+              sprintf("Significance tests are only performed when the column base size is at least %d. Columns with smaller bases are excluded from testing.", min_base))
+
+    add_row("", "")
+  }
+
+  # === WEIGHTING SECTION ===
+  if (cfg_bool("apply_weighting")) {
+    add_section("WEIGHTED DATA")
+
+    wt_var <- cfg_val("weight_variable", "")
+    add_entry("Weight variable", sprintf("Data has been weighted using '%s'.", wt_var))
+
+    add_entry("Weighted n", "The base size after applying weights. This is used for all percentage and mean calculations.")
+
+    if (cfg_bool("show_unweighted_n")) {
+      add_entry("Unweighted n", "The actual number of respondents before weighting. Shown for reference and to assess data quality.")
+    }
+    if (cfg_bool("show_effective_n")) {
+      add_entry("Effective n", "The effective sample size after weighting. Accounts for the design effect of the weights. Used for significance testing.")
+    }
+
+    add_row("", "")
+  }
+
+  # === INDEX SCORES SECTION ===
+  add_section("INDEX SCORES")
+  add_entry("How to read", "An index of 100 means the column matches the Total average. An index of 120 means 20% above average; 80 means 20% below.")
+  add_entry("Calculation", "Index = (Column % / Total %) x 100, calculated for each response option.")
+  add_row("", "")
+
+  # === BASE SIZE WARNINGS ===
+  add_section("BASE SIZE WARNINGS")
+  add_entry("Small base (*)", "An asterisk (*) next to a base size indicates a small base. Results should be interpreted with caution.")
+  add_entry("Very small base (**)", "A double asterisk (**) indicates a very small base. Results are indicative only and should not be used for decision-making.")
+  add_row("", "")
+
+  # === BANNER COLUMNS ===
+  if (!is.null(banner_info) && !is.null(banner_info$column_letters)) {
+    add_section("BANNER COLUMN LETTERS")
+    add_entry("Reference", "The following letters are assigned to banner columns for significance testing:")
+    for (i in seq_along(banner_info$column_letters)) {
+      ltr <- banner_info$column_letters[i]
+      col_label <- if (!is.null(banner_info$column_labels) && i <= length(banner_info$column_labels)) {
+        banner_info$column_labels[i]
+      } else {
+        sprintf("Column %d", i)
+      }
+      add_entry(sprintf("  %s", ltr), col_label)
+    }
+    add_row("", "")
+  }
+
+  # === DECIMAL SETTINGS ===
+  add_section("FORMATTING")
+  add_entry("Decimal separator", cfg_val("decimal_separator", "."))
+  add_entry("Decimal places (percentages)", as.character(cfg_val("decimal_places_percent", 0)))
+  add_entry("Decimal places (ratings/means)", as.character(cfg_val("decimal_places_ratings", 1)))
+  add_entry("Decimal places (index)", as.character(cfg_val("decimal_places_index", 1)))
+
+  # --- Write to sheet ---
+  guide_df <- as.data.frame(do.call(rbind, rows), stringsAsFactors = FALSE)
+  names(guide_df) <- c("Topic", "Description")
+
+  openxlsx::writeData(wb, "Guide", guide_df, startRow = 1, colNames = TRUE)
+
+  # Apply header style to row 1
+  openxlsx::addStyle(wb, "Guide", styles$header, rows = 1, cols = 1:2, gridExpand = TRUE)
+
+  # Apply title style to row 2 (the "HOW TO READ" title)
+  openxlsx::addStyle(wb, "Guide", title_style, rows = 2, cols = 1:2, gridExpand = TRUE)
+
+  # Apply section styling
+  for (r in section_rows) {
+    if (r <= nrow(guide_df) + 1) {
+      openxlsx::addStyle(wb, "Guide", section_style, rows = r, cols = 1:2, gridExpand = TRUE)
+    }
+  }
+
+  # Apply label styling (bold col A)
+  for (r in label_rows) {
+    if (r <= nrow(guide_df) + 1) {
+      openxlsx::addStyle(wb, "Guide", label_style, rows = r, cols = 1)
+      openxlsx::addStyle(wb, "Guide", desc_style, rows = r, cols = 2)
+    }
+  }
+
+  # Column widths
+  openxlsx::setColWidths(wb, "Guide", cols = 1, widths = 30)
+  openxlsx::setColWidths(wb, "Guide", cols = 2, widths = 80)
+
+  return(invisible(NULL))
+}
+
+
+# ==============================================================================
 # MODULE LOAD MESSAGE
 # ==============================================================================
 
