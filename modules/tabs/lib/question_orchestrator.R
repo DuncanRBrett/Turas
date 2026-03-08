@@ -241,10 +241,13 @@ process_single_question <- function(question_code, prepared_data,
       ranking_reset_partial_failures()
     }
 
-    ranking_data <- safe_execute(
+    ranking_data <- tryCatch(
       extract_ranking_data(filtered_data, question_info, question_options),
-      default = NULL,
-      error_msg = paste("Ranking failed:", question_code)
+      turas_refusal = function(e) stop(e),
+      error = function(e) {
+        cat(sprintf("\n[ERROR] Ranking extraction failed for %s: %s\n", question_code, conditionMessage(e)))
+        NULL
+      }
     )
 
     if (is.null(ranking_data)) {
@@ -464,6 +467,9 @@ process_single_question <- function(question_code, prepared_data,
     }
     if (!is.null(summary_results) && nrow(summary_results) > 0) {
       question_table <- safe_rbind(question_table, summary_results)
+    } else if (question_info$Variable_Type == "Rating") {
+      cat(sprintf("  [DEBUG] %s: summary_results is %s\n", question_code,
+          if (is.null(summary_results)) "NULL" else paste0("empty (", nrow(summary_results), " rows)")))
     }
   }
 

@@ -308,30 +308,52 @@ check_numeric_data_types <- function(questions_df, survey_data, selection_df,
 
 #' Check CreateIndex without Index_Weight
 #'
-#' Warns if CreateIndex=Y but no Index_Weight is specified.
+#' Warns if CreateIndex=Y but no Index_Weight is specified in the Options sheet
+#' of the Survey Structure. Index_Weight belongs with options because each option
+#' within a question can have a different weight for index calculation.
 #'
-#' @param selection_df Data frame, Selection sheet
+#' @param selection_df Data frame, Selection sheet (has CreateIndex flag)
+#' @param options_df Data frame, Options sheet from Survey Structure (has Index_Weight)
 #' @param error_log Data frame, error log
 #' @return Updated error_log
 #' @keywords internal
-check_create_index_config <- function(selection_df, error_log) {
+check_create_index_config <- function(selection_df, options_df, error_log) {
   index_questions <- selection_df[
     !is.na(selection_df$CreateIndex) &
     toupper(selection_df$CreateIndex) == "Y", ]
 
   if (nrow(index_questions) == 0) return(error_log)
 
-  has_weight_col <- "Index_Weight" %in% names(selection_df)
+  has_weight_col <- "Index_Weight" %in% names(options_df)
 
   for (i in seq_len(nrow(index_questions))) {
     q_code <- index_questions$QuestionCode[i]
 
-    if (!has_weight_col ||
-        is.na(index_questions$Index_Weight[i]) ||
-        trimws(index_questions$Index_Weight[i]) == "") {
+    if (!has_weight_col) {
       error_log <- log_issue(
         error_log, "Preflight", "Missing Index Weight",
-        sprintf("Question '%s' has CreateIndex=Y but no Index_Weight specified. Index will use equal weights.",
+        sprintf("Question '%s' has CreateIndex=Y but Options sheet has no Index_Weight column. Index will use equal weights.",
+                q_code),
+        q_code,
+        "Warning"
+      )
+      next
+    }
+
+    # Check options for this question have Index_Weight values
+    q_options <- options_df[options_df$QuestionCode == q_code, ]
+    if (nrow(q_options) == 0) {
+      # Multi_Mention options use column codes (Q01_1, Q01_2, etc.)
+      pattern <- paste0("^", q_code, "_")
+      q_options <- options_df[grepl(pattern, options_df$QuestionCode), ]
+    }
+
+    if (nrow(q_options) == 0 ||
+        all(is.na(q_options$Index_Weight)) ||
+        all(trimws(as.character(q_options$Index_Weight)) == "")) {
+      error_log <- log_issue(
+        error_log, "Preflight", "Missing Index Weight",
+        sprintf("Question '%s' has CreateIndex=Y but no Index_Weight specified in Options. Index will use equal weights.",
                 q_code),
         q_code,
         "Warning"
@@ -659,6 +681,11 @@ check_data_column_coverage <- function(selection_df, questions_df, survey_data,
       next
     }
 
+    if (var_type == "Ranking") {
+      # Ranking uses multiple columns (Q76_1, Q76_2, etc.), not a single column
+      next
+    }
+
     # Single column questions: data column name = QuestionCode
     if (!q_code %in% data_cols) {
       error_log <- log_issue(
@@ -873,8 +900,8 @@ validate_preflight <- function(survey_structure, survey_data, config,
     error_log <- check_numeric_data_types(
       questions_df, survey_data, selection_df, error_log)
 
-    # 5. CreateIndex configuration
-    error_log <- check_create_index_config(selection_df, error_log)
+    # 5. CreateIndex configuration (Index_Weight lives in Options sheet)
+    error_log <- check_create_index_config(selection_df, options_df, error_log)
 
     # 6. Banner variable validation
     error_log <- check_banner_variables(

@@ -368,7 +368,7 @@ calculate_rating_mean <- function(data, question_col, options_info, weights) {
   if (length(valid_data) == 0) {
     return(NULL)
   }
-  
+
   # Convert to numeric values
   numeric_values <- numeric(0)
   numeric_weights <- numeric(0)
@@ -378,13 +378,15 @@ calculate_rating_mean <- function(data, question_col, options_info, weights) {
                           as.character(valid_options$OptionText[i]))
     
     if (any(matching, na.rm = TRUE)) {
-      # Use OptionValue if available, otherwise OptionText
-      option_value <- if ("OptionValue" %in% names(valid_options)) {
-        suppressWarnings(as.numeric(valid_options$OptionValue[i]))
-      } else {
-        suppressWarnings(as.numeric(valid_options$OptionText[i]))
+      # Use OptionValue if available and non-NA, otherwise fall back to OptionText
+      option_value <- NA
+      if ("OptionValue" %in% names(valid_options) && !is.na(valid_options$OptionValue[i])) {
+        option_value <- suppressWarnings(as.numeric(valid_options$OptionValue[i]))
       }
-      
+      if (is.na(option_value)) {
+        option_value <- suppressWarnings(as.numeric(valid_options$OptionText[i]))
+      }
+
       if (!is.na(option_value)) {
         count <- sum(matching, na.rm = TRUE)
         numeric_values <- c(numeric_values, rep(option_value, count))
@@ -395,7 +397,7 @@ calculate_rating_mean <- function(data, question_col, options_info, weights) {
   
   if (length(numeric_values) > 0 && sum(numeric_weights) > 0) {
     mean_value <- weighted.mean(numeric_values, numeric_weights, na.rm = TRUE)
-    
+
     return(list(
       stat_name = "Mean",
       stat_label = AVERAGE_ROW_TYPE,
@@ -404,7 +406,7 @@ calculate_rating_mean <- function(data, question_col, options_info, weights) {
       weights = numeric_weights
     ))
   }
-  
+
   return(NULL)
 }
 
