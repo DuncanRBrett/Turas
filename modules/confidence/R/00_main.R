@@ -855,7 +855,10 @@ process_proportion_question <- function(q_row, survey_data, weight_var, config) 
     }
 
     # Step 4: Build result with base stats
+    q_label <- q_row$Question_Label
+    if (is.null(q_label) || is.na(q_label)) q_label <- ""
     result <- list(
+      label      = q_label,
       category   = paste(categories, collapse = ","),
       proportion = stats$proportion,
       n          = stats$n_raw,
@@ -914,7 +917,10 @@ process_mean_question <- function(q_row, survey_data, weight_var, config) {
     }
 
     # Step 3: Build result with base stats
+    q_label <- q_row$Question_Label
+    if (is.null(q_label) || is.na(q_label)) q_label <- ""
     result <- list(
+      label = q_label,
       mean  = stats$mean,
       sd    = stats$sd,
       n     = stats$n_raw,
@@ -985,7 +991,10 @@ process_nps_question <- function(q_row, survey_data, weight_var, config) {
     }
 
     # Step 4: Build result with base stats
+    q_label <- q_row$Question_Label
+    if (is.null(q_label) || is.na(q_label)) q_label <- ""
     result <- list(
+      label           = q_label,
       nps_score       = stats$nps_score,
       pct_promoters   = stats$pct_promoters,
       pct_detractors  = stats$pct_detractors,

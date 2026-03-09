@@ -265,6 +265,15 @@ build_question_analysis_columns <- function() {
       numeric_range = NULL
     ),
     list(
+      name = "Question_Label",
+      width = 35,
+      required = FALSE,
+      description = "Human-readable label for this question. Shown alongside Question_ID in output reports. Leave blank to use Question_ID only.",
+      dropdown = NULL,
+      integer_range = NULL,
+      numeric_range = NULL
+    ),
+    list(
       name = "Statistic_Type",
       width = 18,
       required = TRUE,
@@ -377,6 +386,7 @@ build_question_analysis_examples <- function() {
   list(
     list(
       Question_ID = "Q1_Awareness",
+      Question_Label = "Brand Awareness",
       Statistic_Type = "proportion",
       Run_MOE = "Y",
       Run_Wilson = "Y",
@@ -391,6 +401,7 @@ build_question_analysis_examples <- function() {
     ),
     list(
       Question_ID = "Q2_Satisfaction",
+      Question_Label = "Overall Satisfaction",
       Statistic_Type = "mean",
       Run_MOE = "Y",
       Run_Wilson = "N",
@@ -405,6 +416,7 @@ build_question_analysis_examples <- function() {
     ),
     list(
       Question_ID = "Q3_NPS",
+      Question_Label = "Likelihood to Recommend",
       Statistic_Type = "nps",
       Run_MOE = "Y",
       Run_Wilson = "N",

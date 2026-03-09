@@ -1,6 +1,189 @@
 // ---- Pinned Views ----
 var pinnedViews = [];
 
+/** Strip HTML tags and decode entities to plain text. */
+function stripHtmlToText(html) {
+  if (!html) return "";
+  var tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || "";
+}
+
+/**
+ * Render HTML (from renderMarkdown) as native SVG elements with proper
+ * headings, bullet lists, paragraphs, blockquotes, and inline em/strong.
+ * Returns { elements: SVGElement[], height: number }.
+ */
+function renderInsightHtmlToSvg(ns, html, x, y, boxWidth) {
+  if (!html) return { elements: [], height: 0 };
+  var elems = [];
+  var curY = y + 16;               // top padding
+  var padL = x + 20;               // left padding inside box
+  var textW = boxWidth - 40;       // usable text width (20px padding each side)
+
+  var tmp = document.createElement("div");
+  tmp.innerHTML = html;
+
+  for (var i = 0; i < tmp.children.length; i++) {
+    var child = tmp.children[i];
+    var tag = child.tagName ? child.tagName.toLowerCase() : "";
+
+    if (tag === "h2") {
+      if (i > 0) curY += 10;
+      var hLines = wrapTextLines(child.textContent, textW, 10);
+      var hEl = createWrappedText(ns, hLines, padL, curY, 24,
+        { fill: "#1a2744", "font-size": "20", "font-weight": "700" });
+      elems.push(hEl.element);
+      curY += hLines.length * 24 + 10;
+
+    } else if (tag === "p") {
+      curY += 4;
+      var spans = collectInlineRuns(child);
+      var rendered = renderInlineRuns(ns, spans, padL, curY, textW, 20);
+      elems = elems.concat(rendered.elements);
+      curY += rendered.height + 6;
+
+    } else if (tag === "ul") {
+      curY += 4;
+      var lis = child.children;
+      for (var j = 0; j < lis.length; j++) {
+        if (lis[j].tagName.toLowerCase() !== "li") continue;
+        // Bullet
+        var bEl = document.createElementNS(ns, "text");
+        bEl.setAttribute("x", padL + 2); bEl.setAttribute("y", curY);
+        bEl.setAttribute("fill", "#1a2744"); bEl.setAttribute("font-size", "14");
+        bEl.textContent = "\u2022";
+        elems.push(bEl);
+        // Li content with inline formatting
+        var liSpans = collectInlineRuns(lis[j]);
+        var liR = renderInlineRuns(ns, liSpans, padL + 18, curY, textW - 20, 20);
+        elems = elems.concat(liR.elements);
+        curY += liR.height + 5;
+      }
+      curY += 4;
+
+    } else if (tag === "blockquote") {
+      curY += 4;
+      var bqLines = wrapTextLines(child.textContent, textW - 24, 7.5);
+      var bqH = bqLines.length * 20 + 8;
+      var border = document.createElementNS(ns, "rect");
+      border.setAttribute("x", padL + 4); border.setAttribute("y", curY - 8);
+      border.setAttribute("width", "3"); border.setAttribute("height", bqH);
+      border.setAttribute("fill", "#cbd5e1"); border.setAttribute("rx", "1.5");
+      elems.push(border);
+      var bqEl = createWrappedText(ns, bqLines, padL + 16, curY, 20,
+        { fill: "#475569", "font-size": "14", "font-weight": "400", "font-style": "italic" });
+      elems.push(bqEl.element);
+      curY += bqH + 6;
+    }
+  }
+  curY += 12; // bottom padding
+  return { elements: elems, height: curY - y };
+}
+
+/**
+ * Collect inline runs from an element's child nodes.
+ * Returns array of { text, italic, bold }.
+ */
+function collectInlineRuns(el) {
+  var runs = [];
+  function walk(node, italic, bold) {
+    for (var i = 0; i < node.childNodes.length; i++) {
+      var c = node.childNodes[i];
+      if (c.nodeType === 3) {
+        var t = c.textContent;
+        if (t) runs.push({ text: t, italic: italic, bold: bold });
+      } else if (c.tagName) {
+        var tag = c.tagName.toLowerCase();
+        walk(c, italic || tag === "em", bold || tag === "strong");
+      }
+    }
+  }
+  walk(el, false, false);
+  return runs;
+}
+
+/**
+ * Render inline runs as SVG text with word wrapping.
+ * Each formatting change creates a new <tspan>.
+ * Returns { elements: SVGElement[], height: number }.
+ */
+function renderInlineRuns(ns, runs, x, y, maxWidth, lineH) {
+  if (!runs.length) return { elements: [], height: 0 };
+  // Build word list with formatting metadata
+  var words = [];
+  for (var r = 0; r < runs.length; r++) {
+    var parts = runs[r].text.split(/(\s+)/);
+    for (var p = 0; p < parts.length; p++) {
+      if (parts[p] === "") continue;
+      words.push({ word: parts[p], italic: runs[r].italic, bold: runs[r].bold });
+    }
+  }
+  // Word-wrap into lines
+  var charW = 7.5;
+  var maxChars = Math.floor(maxWidth / charW);
+  var lines = []; // each line = array of { word, italic, bold }
+  var curLine = [];
+  var curLen = 0;
+  for (var w = 0; w < words.length; w++) {
+    var wLen = words[w].word.length;
+    if (/^\s+$/.test(words[w].word)) {
+      // Whitespace: add to current length but don't push as separate word
+      curLen += wLen;
+      continue;
+    }
+    var testLen = curLen > 0 ? curLen + 1 + wLen : wLen;
+    if (testLen > maxChars && curLine.length > 0) {
+      lines.push(curLine);
+      curLine = [{ word: words[w].word, italic: words[w].italic, bold: words[w].bold }];
+      curLen = wLen;
+    } else {
+      if (curLine.length > 0) curLen += 1; // space
+      curLine.push({ word: words[w].word, italic: words[w].italic, bold: words[w].bold });
+      curLen += wLen;
+    }
+  }
+  if (curLine.length > 0) lines.push(curLine);
+
+  // Render lines as SVG text with tspans
+  var elems = [];
+  for (var li = 0; li < lines.length; li++) {
+    var textEl = document.createElementNS(ns, "text");
+    textEl.setAttribute("x", x);
+    textEl.setAttribute("y", y + li * lineH);
+    textEl.setAttribute("fill", "#1a2744");
+    textEl.setAttribute("font-size", "14");
+    // Group consecutive words with same formatting
+    var grouped = groupByFormat(lines[li]);
+    for (var g = 0; g < grouped.length; g++) {
+      var tspan = document.createElementNS(ns, "tspan");
+      if (grouped[g].italic) tspan.setAttribute("font-style", "italic");
+      tspan.setAttribute("font-weight", grouped[g].bold ? "600" : "400");
+      tspan.textContent = (g > 0 ? " " : "") + grouped[g].text;
+      textEl.appendChild(tspan);
+    }
+    elems.push(textEl);
+  }
+  return { elements: elems, height: lines.length * lineH };
+}
+
+/** Group consecutive words with the same italic/bold flags. */
+function groupByFormat(lineWords) {
+  if (!lineWords.length) return [];
+  var groups = [];
+  var cur = { text: lineWords[0].word, italic: lineWords[0].italic, bold: lineWords[0].bold };
+  for (var i = 1; i < lineWords.length; i++) {
+    if (lineWords[i].italic === cur.italic && lineWords[i].bold === cur.bold) {
+      cur.text += " " + lineWords[i].word;
+    } else {
+      groups.push(cur);
+      cur = { text: lineWords[i].word, italic: lineWords[i].italic, bold: lineWords[i].bold };
+    }
+  }
+  groups.push(cur);
+  return groups;
+}
+
 function updatePinBadge() {
   var badge = document.getElementById("pin-count-badge");
   if (badge) {
@@ -64,10 +247,10 @@ function captureCurrentView(qCode) {
     excludedRows = Object.keys(window._chartExclusions[qCode]);
   }
 
-  // Capture insight text
+  // Capture insight text (escape for safe innerHTML rendering)
   var insightText = "";
   var editor = qContainer.querySelector(".insight-editor");
-  if (editor) insightText = editor.textContent.trim();
+  if (editor) insightText = escapeHtml(editor.textContent.trim());
 
   // Capture table sort state
   var table = qContainer.querySelector("table.ct-table");
@@ -252,7 +435,7 @@ function renderPinnedCards() {
         // Standard crosstab insight: prominent callout
         insightDiv.style.cssText = "margin-bottom:12px;padding:16px 24px;border-left:4px solid #323367;background:linear-gradient(135deg,#f0f5f5 0%,#f8fafa 100%);border-radius:0 8px 8px 0;font-size:15px;line-height:1.5;color:#1a2744;font-weight:600;";
       }
-      insightDiv.textContent = pin.insightText;
+      insightDiv.innerHTML = pin.insightText;
       card.appendChild(insightDiv);
     }
 
@@ -368,10 +551,21 @@ function exportPinnedCardPNG(pinId) {
   var contentTop = metaY + 12;
 
   // 1. Insight dimensions
-  var insightLines = wrapTextLines(pin.insightText, usableW - 16, 7);
-  var insightLineH = 17;
-  var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 24 : 0;
+  var isTextBox = pin.pinType === "text_box";
+  var hasHtmlInsight = isTextBox && pin.insightText && /<[a-z][\s\S]*>/i.test(pin.insightText);
   var insightY = contentTop;
+  var insightBlockH = 0;
+  var insightLines = [];
+  var insightLineH = 17;
+  var htmlInsightResult = null;
+
+  if (hasHtmlInsight) {
+    htmlInsightResult = renderInsightHtmlToSvg(ns, pin.insightText, pad, insightY, usableW);
+    insightBlockH = htmlInsightResult.height;
+  } else if (pin.insightText) {
+    insightLines = wrapTextLines(stripHtmlToText(pin.insightText), usableW - 16, 7);
+    insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 24 : 0;
+  }
 
   // 2. Chart dimensions (full width)
   var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 8 : 0);
@@ -430,17 +624,26 @@ function exportPinnedCardPNG(pinId) {
   metaEl.textContent = metaText;
   svg.appendChild(metaEl);
 
-  var isTextBox = pin.pinType === "text_box";
-
   // 1. Insight
-  if (insightLines.length > 0) {
-    var aH = Math.max(28, insightLines.length * insightLineH + 12);
+  if (hasHtmlInsight && htmlInsightResult) {
+    // Rich HTML insight (qualitative slides) — rendered with structure
     var insBg = document.createElementNS(ns, "rect");
-    insBg.setAttribute("x", pad); insBg.setAttribute("y", insightY + 2);
-    insBg.setAttribute("width", usableW); insBg.setAttribute("height", aH);
-    insBg.setAttribute("rx", "4");
-    insBg.setAttribute("fill", isTextBox ? "#f8fafc" : "#f0f4ff");
+    insBg.setAttribute("x", pad); insBg.setAttribute("y", insightY);
+    insBg.setAttribute("width", usableW); insBg.setAttribute("height", insightBlockH);
+    insBg.setAttribute("rx", "8"); insBg.setAttribute("fill", "#f8fafc");
     svg.appendChild(insBg);
+    for (var ei = 0; ei < htmlInsightResult.elements.length; ei++) {
+      svg.appendChild(htmlInsightResult.elements[ei]);
+    }
+  } else if (insightLines.length > 0) {
+    // Plain text insight (crosstab pins)
+    var aH = Math.max(28, insightLines.length * insightLineH + 12);
+    var insBg2 = document.createElementNS(ns, "rect");
+    insBg2.setAttribute("x", pad); insBg2.setAttribute("y", insightY + 2);
+    insBg2.setAttribute("width", usableW); insBg2.setAttribute("height", aH);
+    insBg2.setAttribute("rx", "4");
+    insBg2.setAttribute("fill", isTextBox ? "#f8fafc" : "#f0f4ff");
+    svg.appendChild(insBg2);
     if (!isTextBox) {
       var iB = document.createElementNS(ns, "rect");
       iB.setAttribute("x", pad); iB.setAttribute("y", insightY + 2);
@@ -537,10 +740,21 @@ function exportAllPinnedSlides() {
 
     // Stacked layout: insight → chart → table
     // 1. Insight dimensions
-    var insightLines = wrapTextLines(pin.insightText, usableW - 16, 7);
-    var insightLineH = 17;
-    var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 24 : 0;
+    var isTextBox = pin.pinType === "text_box";
+    var hasHtmlInsight = isTextBox && pin.insightText && /<[a-z][\s\S]*>/i.test(pin.insightText);
     var insightY = contentTop;
+    var insightBlockH = 0;
+    var insightLines = [];
+    var insightLineH = 17;
+    var htmlInsightResult = null;
+
+    if (hasHtmlInsight) {
+      htmlInsightResult = renderInsightHtmlToSvg(ns, pin.insightText, pad, insightY, usableW);
+      insightBlockH = htmlInsightResult.height;
+    } else if (pin.insightText) {
+      insightLines = wrapTextLines(stripHtmlToText(pin.insightText), usableW - 16, 7);
+      insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 24 : 0;
+    }
 
     // 2. Chart dimensions (full width)
     var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 8 : 0);
@@ -600,20 +814,25 @@ function exportAllPinnedSlides() {
     svg.appendChild(metaEl);
 
     // Render stacked: insight → chart → table
-    var isTextBox = pin.pinType === "text_box";
-
     // 1. Insight (first — the editorial takeaway)
-    if (insightLines.length > 0) {
-      var aH = Math.max(28, insightLines.length * insightLineH + 12);
-      // Background fill for insight area
+    if (hasHtmlInsight && htmlInsightResult) {
       var insBg = document.createElementNS(ns, "rect");
-      insBg.setAttribute("x", pad); insBg.setAttribute("y", insightY + 2);
-      insBg.setAttribute("width", usableW); insBg.setAttribute("height", aH);
-      insBg.setAttribute("rx", "4");
-      insBg.setAttribute("fill", isTextBox ? "#f8fafc" : "#f0f4ff");
+      insBg.setAttribute("x", pad); insBg.setAttribute("y", insightY);
+      insBg.setAttribute("width", usableW); insBg.setAttribute("height", insightBlockH);
+      insBg.setAttribute("rx", "8"); insBg.setAttribute("fill", "#f8fafc");
       svg.appendChild(insBg);
+      for (var ei = 0; ei < htmlInsightResult.elements.length; ei++) {
+        svg.appendChild(htmlInsightResult.elements[ei]);
+      }
+    } else if (insightLines.length > 0) {
+      var aH = Math.max(28, insightLines.length * insightLineH + 12);
+      var insBg2 = document.createElementNS(ns, "rect");
+      insBg2.setAttribute("x", pad); insBg2.setAttribute("y", insightY + 2);
+      insBg2.setAttribute("width", usableW); insBg2.setAttribute("height", aH);
+      insBg2.setAttribute("rx", "4");
+      insBg2.setAttribute("fill", isTextBox ? "#f8fafc" : "#f0f4ff");
+      svg.appendChild(insBg2);
       if (!isTextBox) {
-        // Accent bar (only for standard crosstab insights)
         var iB = document.createElementNS(ns, "rect");
         iB.setAttribute("x", pad); iB.setAttribute("y", insightY + 2);
         iB.setAttribute("width", "4"); iB.setAttribute("height", aH);
@@ -830,7 +1049,7 @@ function printPinnedViews() {
       if (pin.pinType === "text_box") {
         insDiv.style.cssText = "font-size:13px;line-height:1.7;font-weight:400;font-style:normal;border-left:none;background:#f8fafc;padding:12px 16px;border-radius:6px;white-space:pre-wrap;";
       }
-      insDiv.textContent = pin.insightText;
+      insDiv.innerHTML = pin.insightText;
       page.appendChild(insDiv);
     }
 
@@ -898,6 +1117,8 @@ function pinDashboardText(boxId) {
   var editor = document.getElementById("dash-text-" + boxId);
   var text = editor ? editor.innerText.trim() : "";
   if (!text) { alert("Please enter text before pinning."); return; }
+  // Escape plain text so we can safely use innerHTML for all text_box pins
+  text = escapeHtml(text);
 
   var title = boxId === "background" ? "Background & Method" : "Executive Summary";
   var pin = {

@@ -536,6 +536,19 @@ generate_weight_config_template <- function(output_path) {
       required = FALSE,
       description = "If Y, use the last iteration result even if convergence was not achieved.",
       dropdown = c("Y", "N")
+    ),
+    list(
+      name = "calibration_method",
+      width = 22,
+      required = FALSE,
+      description = "Calibration algorithm for rim/rake weighting. Default: raking.",
+      dropdown = c("raking", "linear", "logit")
+    ),
+    list(
+      name = "weight_bounds",
+      width = 20,
+      required = FALSE,
+      description = "Lower and upper weight bounds as 'lower,upper' (e.g. '0.3,3.0'). A single value sets upper bound only. Default: 0.3,3.0."
     )
   )
 
@@ -544,7 +557,9 @@ generate_weight_config_template <- function(output_path) {
       weight_name = "wgt_demo",
       max_iterations = 50,
       convergence_tolerance = 0.001,
-      force_convergence = "N"
+      force_convergence = "N",
+      calibration_method = "raking",
+      weight_bounds = "0.3,3.0"
     )
   )
 

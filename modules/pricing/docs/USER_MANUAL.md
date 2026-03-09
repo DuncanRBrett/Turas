@@ -1,7 +1,7 @@
 # Turas Pricing Module - User Manual
 
-**Version:** 11.0
-**Last Updated:** December 2025
+**Version:** 12.0
+**Last Updated:** March 2026
 
 ---
 
@@ -11,11 +11,14 @@
 2. [Installation](#2-installation)
 3. [Van Westendorp Analysis](#3-van-westendorp-analysis)
 4. [Gabor-Granger Analysis](#4-gabor-granger-analysis)
-5. [Configuration Reference](#5-configuration-reference)
-6. [Understanding Output](#6-understanding-output)
-7. [Advanced Features](#7-advanced-features)
-8. [Troubleshooting](#8-troubleshooting)
-9. [Best Practices](#9-best-practices)
+5. [Monadic Price Testing](#5-monadic-price-testing)
+6. [Configuration Reference](#6-configuration-reference)
+7. [Understanding Output](#7-understanding-output)
+8. [HTML Report](#8-html-report)
+9. [Interactive Simulator](#9-interactive-simulator)
+10. [Advanced Features](#10-advanced-features)
+11. [Troubleshooting](#11-troubleshooting)
+12. [Best Practices](#12-best-practices)
 
 ---
 
@@ -52,7 +55,7 @@ run_pricing_gui()
 ### 1.4 Create Your Own Config
 
 1. Click "Create Config Template"
-2. Select method: `van_westendorp`, `gabor_granger`, or `both`
+2. Select method: `van_westendorp`, `gabor_granger`, `monadic`, or `both`
 3. Save as `my_config.xlsx`
 4. Edit in Excel:
    - Set `data_file` path
@@ -215,14 +218,86 @@ Profit-Maximizing Price: $40.00 (if unit_cost = $18)
 
 ---
 
-## 5. Configuration Reference
+## 5. Monadic Price Testing
 
-### 5.1 Settings Sheet (Global)
+### 5.1 What is Monadic Price Testing?
+
+Monadic (randomised cell) price testing is the gold standard for unbiased price sensitivity measurement. Each respondent is shown ONE randomly assigned price and asked about their purchase intent. Because respondents see only a single price, there are no anchoring or order effects.
+
+**Statistical Method**: Logistic regression models the relationship between price and purchase probability:
+
+```
+P(buy) = 1 / (1 + exp(-(β₀ + β₁ × price)))
+```
+
+This produces a smooth demand curve that can be used for revenue and profit optimisation.
+
+### 5.2 Data Requirements
+
+Each respondent needs exactly two values:
+- **Price shown**: The single price randomly assigned to the respondent
+- **Purchase intent**: Binary (yes/no) or scale (e.g. 1-5 Likert)
+
+```
+respondent_id | price_shown | purchase_intent
+1001          | 35          | 1
+1002          | 55          | 0
+1003          | 45          | 1
+1004          | 25          | 1
+1005          | 65          | 0
+```
+
+**Sample size**: Minimum 200 respondents recommended. 50+ per price cell for reliable estimates.
+
+### 5.3 Configuration (Monadic Sheet)
+
+| Setting | Required | Description | Example |
+|---------|----------|-------------|---------|
+| price_column | YES | Column with assigned price | `price_shown` |
+| intent_column | YES | Column with purchase intent | `purchase_intent` |
+| intent_type | YES | `binary` or `scale` | `binary` |
+| scale_threshold | NO | Top-box threshold for scale intent | `4` |
+| model_type | NO | `logistic` or `log_logistic` | `logistic` |
+| prediction_points | NO | Points on demand curve | `100` |
+| confidence_intervals | NO | Enable bootstrap CIs | `TRUE` |
+| bootstrap_iterations | NO | Number of bootstrap samples | `1000` |
+| confidence_level | NO | CI confidence level | `0.95` |
+
+### 5.4 Results Interpretation
+
+**Example Output:**
+```
+Model: logistic, pseudo-R²: 0.15, AIC: 250.3
+Revenue-Maximizing Price: $42.00
+- Purchase Intent: 58.2%
+- Revenue Index: $24.44
+
+Profit-Maximizing Price: $48.00 (if unit_cost = $15)
+- Purchase Intent: 49.5%
+- Profit Index: $16.34
+```
+
+**Key Metrics:**
+- **Pseudo-R²**: Model fit (0.05-0.20 typical for pricing data)
+- **Price coefficient p-value**: Statistical significance of the price effect (< 0.05 desired)
+- **AIC**: Model comparison metric (lower = better)
+- **Elasticity**: Arc elasticity at sampled price intervals
+
+**Decision Guide:**
+- Use monadic when you need unbiased estimates (no anchoring effects)
+- Works well for new products where respondents have no price reference
+- Combine with Van Westendorp for both range identification and precise optimisation
+
+---
+
+## 6. Configuration Reference
+
+### 6.1 Settings Sheet (Global)
 
 | Setting | Required | Description | Values | Example |
 |---------|----------|-------------|--------|---------|
 | project_name | YES | Project name | Text | `Q4_Product_Pricing` |
-| analysis_method | YES | Method(s) to run | `van_westendorp`, `gabor_granger`, `both` | `both` |
+| analysis_method | YES | Method(s) to run | `van_westendorp`, `gabor_granger`, `monadic`, `both` | `both` |
 | data_file | YES | Survey data path | File path | `data/survey.csv` |
 | output_file | YES | Results path | File path | `results/pricing_results.xlsx` |
 | currency_symbol | YES | Currency | Symbol | `$` |
@@ -230,8 +305,11 @@ Profit-Maximizing Price: $40.00 (if unit_cost = $18)
 | weight_var | NO | Weight column | Column name or blank | `weight` |
 | dk_codes | NO | "Don't Know" codes | Comma-separated | `98,99` |
 | unit_cost | NO | Cost per unit | Number | `18.50` |
+| brand_colour | NO | Brand colour for HTML report | Hex colour | `#1e3a5f` |
+| generate_html_report | NO | Generate HTML report | `TRUE`/`FALSE` | `TRUE` |
+| generate_simulator | NO | Generate simulator dashboard | `TRUE`/`FALSE` | `TRUE` |
 
-### 5.2 Monotonicity Handling
+### 6.2 Monotonicity Handling
 
 **Van Westendorp** (`vw_monotonicity_behavior`):
 - `flag_only`: Report violations, keep all data (recommended)
@@ -243,7 +321,7 @@ Profit-Maximizing Price: $40.00 (if unit_cost = $18)
 - `diagnostic_only`: Report only, no correction
 - `none`: No checking
 
-### 5.3 Validation Settings
+### 6.3 Validation Settings
 
 Configure data quality checks:
 - `min_completeness`: Minimum % of questions answered (e.g., `0.75`)
@@ -253,9 +331,9 @@ Configure data quality checks:
 
 ---
 
-## 6. Understanding Output
+## 7. Understanding Output
 
-### 6.1 Excel Workbook Structure
+### 7.1 Excel Workbook Structure
 
 The results workbook contains multiple sheets:
 
@@ -275,7 +353,7 @@ The results workbook contains multiple sheets:
 | Validation | Data quality diagnostics |
 | Configuration | Settings used |
 
-### 6.2 Van Westendorp Output
+### 7.2 Van Westendorp Output
 
 **VW_Price_Points Sheet:**
 ```
@@ -288,7 +366,7 @@ PME         | $118.40| Marginal Expensiveness
 
 **Recommendation**: Price in optimal zone ($74.50 - $89.20)
 
-### 6.3 Gabor-Granger Output
+### 7.3 Gabor-Granger Output
 
 **GG_Demand_Curve Sheet:**
 ```
@@ -300,20 +378,102 @@ $40   | 55.3%          | $22.12        | -1.38
 $45   | 43.7%          | $19.67        | -1.52
 ```
 
-### 6.4 Charts
+### 7.4 Monadic Output
+
+**Monadic_Model Sheet:**
+```
+Metric              | Value
+Model Type          | logistic
+Pseudo-R²           | 0.148
+AIC                 | 355.2
+Price Coefficient P | 0.0001
+N Observations      | 300
+```
+
+**Monadic_Demand Sheet:**
+```
+Price  | Predicted_Intent | Revenue_Index | Profit_Index
+$25.00 | 71.3%           | $17.83        | $7.13
+$35.00 | 62.8%           | $21.98        | $12.56
+$45.00 | 53.7%           | $24.17        | $16.11
+$55.00 | 44.2%           | $24.31        | $17.68
+$65.00 | 35.1%           | $22.82        | $17.55
+```
+
+### 7.5 Charts
 
 **Generated PNG Files:**
 - `vw_psm_plot.png` - Van Westendorp curves with intersections
 - `gg_demand_curve.png` - Purchase intent vs price
 - `gg_revenue_curve.png` - Revenue optimization
 - `gg_profit_curve.png` - Profit optimization (if applicable)
+- `monadic_demand_curve.png` - Logistic demand curve with CI band
 - `segment_comparison.png` - Segment-level analysis
 
 ---
 
-## 7. Advanced Features
+## 8. HTML Report
 
-### 7.1 NMS Extension (Newton-Miller-Smith)
+When `generate_html_report = TRUE` in the Settings sheet, the module generates a self-contained HTML report alongside the Excel output.
+
+### 8.1 Report Features
+
+- **Self-contained**: Single HTML file with embedded CSS, SVG charts, and JavaScript
+- **Tabbed navigation**: Summary | Van Westendorp | Gabor-Granger | Monadic | Segments | Recommendation
+- **Brand theming**: Set `brand_colour` in config to customise the colour scheme
+- **SVG charts**: Vector-based charts that scale to any resolution
+- **Report hub integration**: Meta tags enable automatic discovery by the Turas Report Hub
+
+### 8.2 Chart Types
+
+- **VW Cumulative Distribution Curves**: Four lines with intersection points marked
+- **GG Demand Curve with Revenue Overlay**: Dual-axis chart showing intent and revenue
+- **Monadic Logistic Curve with CI Band**: Demand curve with bootstrap confidence band
+- **Segment Comparison**: Forest-plot style comparison across segments
+- **Price Ladder Tiers**: Visual tier breakdown
+
+### 8.3 Sharing
+
+The HTML file can be opened in any modern browser. No Turas installation is required. Attach it to emails or share via file transfer.
+
+---
+
+## 9. Interactive Simulator
+
+When `generate_simulator = TRUE` in the Settings sheet, the module generates an interactive pricing simulator dashboard as a standalone HTML file.
+
+### 9.1 Features
+
+- **Price Sliders**: Drag to adjust price and see demand, revenue, and profit update in real-time
+- **Preset Scenario Cards**: Named configurations (e.g., "Budget Launcher", "Premium Pro") configured via the Simulator sheet in the config
+- **Battle Mode**: Side-by-side comparison of 2-3 scenarios across all metrics
+- **Segment Toggle**: Switch between total sample and segment-specific views
+- **PNG Export**: One-click capture of the current view for presentations
+
+### 9.2 Simulator Configuration (Simulator Sheet)
+
+Define preset scenarios in the config:
+
+| Setting | Description | Example |
+|---------|-------------|---------|
+| scenario_name | Scenario identifier | `Budget Launcher` |
+| scenario_price | Price for this scenario | `29.99` |
+| competitor_prices | Competitor prices (semicolon-separated) | `35;42;50` |
+| cost_assumption | Unit cost for profit calculation | `15` |
+
+### 9.3 Sharing with Clients
+
+The simulator is a single HTML file. Clients can:
+1. Open it in any browser (Chrome, Firefox, Safari, Edge)
+2. Adjust sliders and explore scenarios
+3. Export PNG snapshots for internal presentations
+4. No Turas installation, R, or technical knowledge required
+
+---
+
+## 10. Advanced Features
+
+### 10.1 NMS Extension (Newton-Miller-Smith)
 
 Enhances Van Westendorp with behavioral calibration.
 
@@ -329,7 +489,7 @@ col_pi_expensive = "pi_expensive"
 
 **Output**: Revenue-optimal price based on actual purchase likelihood.
 
-### 7.2 Segment Analysis
+### 10.2 Segment Analysis
 
 Run pricing analysis across customer segments.
 
@@ -344,7 +504,7 @@ min_segment_n = 50
 - Segment-specific offers
 - Price sensitivity comparison
 
-### 7.3 Price Ladder Builder
+### 10.3 Price Ladder Builder
 
 Automatically generates Good/Better/Best pricing tiers.
 
@@ -364,12 +524,12 @@ anchor = "Standard"
 - Purchase intent estimates
 - Revenue projections
 
-### 7.4 Recommendation Synthesis
+### 10.4 Recommendation Synthesis
 
 Combines all analyses into executive summary.
 
 **Factors Considered:**
-1. Method agreement (Van Westendorp, Gabor-Granger, NMS)
+1. Method agreement (Van Westendorp, Gabor-Granger, Monadic, NMS)
 2. Sample size adequacy
 3. Data quality
 4. Zone fit
@@ -383,9 +543,9 @@ Combines all analyses into executive summary.
 
 ---
 
-## 8. Troubleshooting
+## 11. Troubleshooting
 
-### 8.1 Common Errors
+### 11.1 Common Errors
 
 | Error | Cause | Solution |
 |-------|-------|----------|
@@ -395,7 +555,7 @@ Combines all analyses into executive summary.
 | "Package 'pricesensitivitymeter' required" | NMS not installed | `install.packages("pricesensitivitymeter")` |
 | "All 100% or 0%" | Price range too narrow | Expand tested price range |
 
-### 8.2 Data Quality Issues
+### 11.2 Data Quality Issues
 
 | Warning | Meaning | Action |
 |---------|---------|--------|
@@ -404,7 +564,7 @@ Combines all analyses into executive summary.
 | "Segment n < 50" | Small segment | Combine segments or lower threshold |
 | "High exclusion rate" | Many incomplete responses | Review data collection |
 
-### 8.3 Interpretation Issues
+### 11.3 Interpretation Issues
 
 **Issue**: Van Westendorp curves don't intersect clearly
 **Solution**: May indicate poorly defined market; consider price bundling or segmentation
@@ -417,9 +577,9 @@ Combines all analyses into executive summary.
 
 ---
 
-## 9. Best Practices
+## 12. Best Practices
 
-### 9.1 Study Design
+### 12.1 Study Design
 
 **Sample Size:**
 - Minimum 100 respondents for basic analysis
@@ -429,13 +589,14 @@ Combines all analyses into executive summary.
 **Price Range:**
 - Van Westendorp: Let respondents answer freely (don't constrain)
 - Gabor-Granger: Test 5-7 price points spanning 50-200% of expected price
+- Monadic: Use 4-8 price cells with at least 50 respondents per cell
 
 **Question Design:**
 - Van Westendorp: Use exact wording from methodology
 - Gabor-Granger: Clear "Would you buy at $X?" questions
 - Both: Randomize order to reduce bias
 
-### 9.2 Data Collection
+### 12.2 Data Collection
 
 **Survey Flow:**
 1. Van Westendorp questions first (open-ended)
@@ -447,7 +608,7 @@ Combines all analyses into executive summary.
 - Monitor completion time (< 1 min suggests speeding)
 - Soft launch to test (n=50)
 
-### 9.3 Configuration
+### 12.3 Configuration
 
 **General:**
 - Always set `validate_monotonicity = TRUE`
@@ -459,7 +620,7 @@ Combines all analyses into executive summary.
 - Set `unit_cost` if known (enables profit analysis)
 - Test price sequence: lowest to highest
 
-### 9.4 Analysis
+### 12.4 Analysis
 
 **Validation:**
 - Review data quality metrics in Validation sheet
@@ -469,7 +630,8 @@ Combines all analyses into executive summary.
 **Interpretation:**
 - Van Westendorp: Focus on optimal zone (OPP to IDP)
 - Gabor-Granger: Compare revenue-max vs profit-max
-- Both: Ensure Gabor-Granger optimal falls within Van Westendorp range
+- Monadic: Check pseudo-R2 and price coefficient p-value for model quality
+- Combined: Ensure optimal prices from all methods converge within acceptable range
 
 **Reporting:**
 - Use rescaled scores for client presentations

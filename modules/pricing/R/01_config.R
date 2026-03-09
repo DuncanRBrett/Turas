@@ -3,15 +3,121 @@
 # ==============================================================================
 #
 # Purpose: Load and validate Excel configuration for pricing analysis
-# Version: 1.0.0
-# Date: 2025-11-18
+#          Supports autodetect heading row (header not always in row 1)
+# Version: 2.0.0
+# Date: 2026-03-09
 #
 # ==============================================================================
+
+#' Read a Settings-style Sheet with Autodetect Heading
+#'
+#' Reads an Excel sheet that has Setting/Value columns, automatically
+#' detecting the header row if it's not in row 1 (e.g., template files
+#' with title/subtitle rows above the headers).
+#'
+#' @param config_file Path to Excel configuration file
+#' @param sheet_name Name of the sheet to read
+#' @param required_cols Column names that must be present (default: Setting, Value)
+#'
+#' @return Data frame with Setting/Value columns, cleaned of help rows
+#' @keywords internal
+read_settings_sheet <- function(config_file, sheet_name,
+                                required_cols = c("Setting", "Value")) {
+
+  # Attempt 1: Standard read (headers in row 1)
+  df <- tryCatch(
+    readxl::read_excel(config_file, sheet = sheet_name),
+    error = function(e) NULL
+  )
+
+  if (!is.null(df) && all(required_cols %in% names(df))) {
+    # Headers found in row 1 — clean and return
+    return(.clean_settings_df(df))
+  }
+
+  # Attempt 2: Autodetect header row by scanning first 10 rows
+  raw <- suppressMessages(
+    readxl::read_excel(config_file, sheet = sheet_name,
+                       col_names = FALSE, n_max = 10)
+  )
+
+  header_row <- NULL
+  for (r in seq_len(nrow(raw))) {
+    row_vals <- tolower(trimws(as.character(unlist(raw[r, ]))))
+    if (all(tolower(required_cols) %in% row_vals)) {
+      header_row <- r
+      break
+    }
+  }
+
+  if (!is.null(header_row)) {
+    df <- readxl::read_excel(config_file, sheet = sheet_name,
+                             skip = header_row - 1)
+    if (all(required_cols %in% names(df))) {
+      return(.clean_settings_df(df))
+    }
+  }
+
+  # Neither attempt found required columns
+  pricing_refuse(
+    code = sprintf("CFG_INVALID_%s_FORMAT", toupper(gsub("[^A-Za-z]", "_", sheet_name))),
+    title = sprintf("Invalid %s Sheet Format", sheet_name),
+    problem = sprintf("%s sheet must have columns: %s",
+                      sheet_name, paste(required_cols, collapse = ", ")),
+    why_it_matters = "Cannot parse configuration without proper column structure",
+    how_to_fix = c(
+      sprintf("Ensure %s sheet has columns: %s", sheet_name,
+              paste(required_cols, collapse = ", ")),
+      "Use generate_pricing_config_template() to create a properly formatted template"
+    ),
+    observed = if (!is.null(df)) names(df) else "could not read sheet",
+    expected = required_cols
+  )
+}
+
+
+#' Clean a Settings Data Frame
+#'
+#' Removes help/description rows (prefixed with [REQUIRED] or [Optional]),
+#' section header rows (prefixed with #), and completely empty rows.
+#'
+#' @param df Data frame with Setting/Value columns
+#' @return Cleaned data frame
+#' @keywords internal
+.clean_settings_df <- function(df) {
+  if (nrow(df) == 0) return(df)
+
+  first_col <- as.character(df[[1]])
+  second_col <- if (ncol(df) >= 2) as.character(df[[2]]) else rep(NA, nrow(df))
+
+  # Remove help text rows from template
+  help_rows <- grepl("^\\[REQUIRED\\]|^\\[Optional\\]", first_col, ignore.case = TRUE)
+
+  # Remove section header rows (from old-style configs with # prefix)
+  section_rows <- grepl("^#\\s", first_col)
+
+  # Remove template section headers (setting name in col 1, NA in col 2,
+  # typically ALL CAPS — these are merged section dividers from the template)
+  section_dividers <- !is.na(first_col) & is.na(second_col) &
+    grepl("^[A-Z &/()]+$", first_col, perl = TRUE)
+
+  # Remove completely empty rows
+  all_na <- apply(df, 1, function(row) all(is.na(row) | trimws(as.character(row)) == ""))
+
+  keep <- !help_rows & !section_rows & !section_dividers & !all_na
+  df <- df[keep, , drop = FALSE]
+
+  rownames(df) <- NULL
+  df
+}
+
 
 #' Load Pricing Configuration from Excel
 #'
 #' Reads and parses Excel configuration file for pricing analysis.
-#' Supports both Van Westendorp and Gabor-Granger configurations.
+#' Supports Van Westendorp, Gabor-Granger, and Monadic configurations.
+#' Automatically detects header row position (handles template files
+#' where headers are not in row 1).
 #'
 #' @param config_file Path to Excel configuration file
 #'
@@ -30,12 +136,12 @@ load_pricing_config <- function(config_file) {
       how_to_fix = c(
         "Check the file path is correct",
         "Ensure the configuration file exists",
-        "Use create_pricing_config() to generate a template if needed"
+        "Use generate_pricing_config_template() to generate a template if needed"
       )
     )
   }
 
-  # Load Settings sheet
+  # Check for readxl
   if (!requireNamespace("readxl", quietly = TRUE)) {
     pricing_refuse(
       code = "PKG_READXL_MISSING",
@@ -57,37 +163,24 @@ load_pricing_config <- function(config_file) {
       why_it_matters = "The Settings sheet contains core configuration needed for analysis",
       how_to_fix = c(
         "Add a 'Settings' sheet to your configuration file",
-        "Use create_pricing_config() to generate a properly formatted template"
+        "Use generate_pricing_config_template() to generate a properly formatted template"
       ),
       observed = sheets,
       expected = "Settings"
     )
   }
 
-  # Read Settings sheet
-  settings_raw <- readxl::read_excel(config_file, sheet = "Settings")
+  # Read Settings sheet with autodetect heading
+  settings_raw <- read_settings_sheet(config_file, "Settings")
 
-  # Validate Settings sheet structure
-  if (!all(c("Setting", "Value") %in% names(settings_raw))) {
-    pricing_refuse(
-      code = "CFG_INVALID_SETTINGS_FORMAT",
-      title = "Invalid Settings Sheet Format",
-      problem = "Settings sheet must have 'Setting' and 'Value' columns",
-      why_it_matters = "Cannot parse configuration without proper column structure",
-      how_to_fix = c(
-        "Ensure Settings sheet has two columns: 'Setting' and 'Value'",
-        "Use create_pricing_config() to generate a properly formatted template"
-      ),
-      observed = names(settings_raw),
-      expected = c("Setting", "Value")
-    )
-  }
-
-  # Convert to named list
+  # Convert to named list (case-insensitive setting name matching)
   settings <- setNames(
     as.list(settings_raw$Value),
     settings_raw$Setting
   )
+
+  # Normalize setting names: allow both old-style (lowercase) and template-style (Title_Case)
+  settings <- .normalize_setting_names(settings)
 
   # Store project root (directory containing config file)
   config_dir <- dirname(normalizePath(config_file))
@@ -146,6 +239,30 @@ load_pricing_config <- function(config_file) {
     }
   }
 
+  if (analysis_method == "monadic") {
+    if ("Monadic" %in% sheets) {
+      settings$monadic <- load_monadic_config(config_file)
+    } else {
+      pricing_refuse(
+        code = "CFG_MISSING_MONADIC_SHEET",
+        title = "Missing Monadic Sheet",
+        problem = "Analysis method is 'monadic' but no Monadic sheet found in config",
+        why_it_matters = "Monadic analysis requires column mappings and model settings",
+        how_to_fix = c(
+          "Add a 'Monadic' sheet to your configuration file",
+          "Use generate_pricing_config_template() to create a template with all sheets"
+        ),
+        observed = sheets,
+        expected = "Monadic"
+      )
+    }
+  }
+
+  # Load simulator scenarios if present
+  if ("Simulator" %in% sheets) {
+    settings$simulator_scenarios <- load_simulator_config(config_file)
+  }
+
   # Load validation settings if present
   if ("Validation" %in% sheets) {
     settings$validation <- load_validation_config(config_file)
@@ -164,6 +281,57 @@ load_pricing_config <- function(config_file) {
   settings <- apply_pricing_defaults(settings)
 
   return(settings)
+}
+
+
+#' Normalize Setting Names
+#'
+#' Maps template-style Title_Case names to internal lowercase names.
+#' Supports both styles so old and new configs both work.
+#'
+#' @param settings Named list of settings
+#' @return Settings with normalized names
+#' @keywords internal
+.normalize_setting_names <- function(settings) {
+  # Map template names to internal names
+  name_map <- c(
+    "Project_Name" = "project_name",
+    "Analysis_Method" = "analysis_method",
+    "Data_File" = "data_file",
+    "Output_File" = "output_file",
+    "ID_Variable" = "id_var",
+    "Weight_Variable" = "weight_var",
+    "Currency_Symbol" = "currency_symbol",
+    "Unit_Cost" = "unit_cost",
+    "DK_Codes" = "dk_codes",
+    "Generate_HTML_Report" = "generate_html_report",
+    "Generate_Simulator" = "generate_simulator",
+    "Brand_Colour" = "brand_colour",
+    "VW_Monotonicity_Behavior" = "vw_monotonicity_behavior",
+    "GG_Monotonicity_Behavior" = "gg_monotonicity_behavior",
+    "Segment_Column" = "segment_column",
+    "Min_Segment_N" = "min_segment_n",
+    "Include_Total" = "include_total",
+    "N_Tiers" = "n_tiers",
+    "Tier_Names" = "tier_names",
+    "Min_Gap_Pct" = "min_gap_pct",
+    "Max_Gap_Pct" = "max_gap_pct",
+    "Round_To" = "round_to",
+    "Price_Floor" = "price_floor",
+    "Price_Ceiling" = "price_ceiling"
+  )
+
+  nms <- names(settings)
+  for (i in seq_along(nms)) {
+    if (nms[i] %in% names(name_map)) {
+      # Only add the normalized name if the internal name doesn't already exist
+      internal <- name_map[nms[i]]
+      if (!internal %in% nms) {
+        settings[[internal]] <- settings[[nms[i]]]
+      }
+    }
+  }
+  settings
 }
 
 
@@ -194,7 +362,7 @@ validate_required_settings <- function(settings) {
   }
 
   # Validate analysis_method value
-  valid_methods <- c("van_westendorp", "gabor_granger", "both")
+  valid_methods <- c("van_westendorp", "gabor_granger", "monadic", "both")
   if (!tolower(settings$analysis_method) %in% valid_methods) {
     pricing_refuse(
       code = "CFG_INVALID_METHOD",
@@ -202,10 +370,11 @@ validate_required_settings <- function(settings) {
       problem = sprintf("Analysis method '%s' is not recognized", settings$analysis_method),
       why_it_matters = "Cannot run analysis without specifying a valid methodology",
       how_to_fix = c(
-        "Set analysis_method in Settings sheet to one of:",
+        "Set Analysis_Method in Settings sheet to one of:",
         "  - 'van_westendorp' for price sensitivity meter",
         "  - 'gabor_granger' for demand curve analysis",
-        "  - 'both' for combined analysis"
+        "  - 'monadic' for randomized cell monadic testing",
+        "  - 'both' for combined VW + GG analysis"
       ),
       observed = settings$analysis_method,
       expected = valid_methods
@@ -221,23 +390,7 @@ validate_required_settings <- function(settings) {
 #' @keywords internal
 load_van_westendorp_config <- function(config_file) {
 
-  vw_raw <- readxl::read_excel(config_file, sheet = "VanWestendorp")
-
-  if (!all(c("Setting", "Value") %in% names(vw_raw))) {
-    pricing_refuse(
-      code = "CFG_INVALID_VW_FORMAT",
-      title = "Invalid Van Westendorp Sheet Format",
-      problem = "VanWestendorp sheet must have 'Setting' and 'Value' columns",
-      why_it_matters = "Cannot parse Van Westendorp configuration without proper column structure",
-      how_to_fix = c(
-        "Ensure VanWestendorp sheet has two columns: 'Setting' and 'Value'",
-        "Use create_pricing_config() to generate a properly formatted template"
-      ),
-      observed = names(vw_raw),
-      expected = c("Setting", "Value")
-    )
-  }
-
+  vw_raw <- read_settings_sheet(config_file, "VanWestendorp")
   vw <- setNames(as.list(vw_raw$Value), vw_raw$Setting)
 
   # Convert numeric fields
@@ -268,23 +421,7 @@ load_van_westendorp_config <- function(config_file) {
 #' @keywords internal
 load_gabor_granger_config <- function(config_file) {
 
-  gg_raw <- readxl::read_excel(config_file, sheet = "GaborGranger")
-
-  if (!all(c("Setting", "Value") %in% names(gg_raw))) {
-    pricing_refuse(
-      code = "CFG_INVALID_GG_FORMAT",
-      title = "Invalid Gabor-Granger Sheet Format",
-      problem = "GaborGranger sheet must have 'Setting' and 'Value' columns",
-      why_it_matters = "Cannot parse Gabor-Granger configuration without proper column structure",
-      how_to_fix = c(
-        "Ensure GaborGranger sheet has two columns: 'Setting' and 'Value'",
-        "Use create_pricing_config() to generate a properly formatted template"
-      ),
-      observed = names(gg_raw),
-      expected = c("Setting", "Value")
-    )
-  }
-
+  gg_raw <- read_settings_sheet(config_file, "GaborGranger")
   gg <- setNames(as.list(gg_raw$Value), gg_raw$Setting)
 
   # Parse price sequence if present
@@ -398,8 +535,25 @@ extract_gg_settings <- function(settings) {
 #' @return Validation settings
 #' @keywords internal
 load_validation_config <- function(config_file) {
-  val_raw <- readxl::read_excel(config_file, sheet = "Validation")
-  setNames(as.list(val_raw$Value), val_raw$Setting)
+  val_raw <- read_settings_sheet(config_file, "Validation")
+  settings <- setNames(as.list(val_raw$Value), val_raw$Setting)
+  # Normalize template names
+  name_map <- c(
+    "Min_Completeness" = "min_completeness",
+    "Min_Sample" = "min_sample",
+    "Price_Min" = "price_min",
+    "Price_Max" = "price_max",
+    "Flag_Outliers" = "flag_outliers",
+    "Outlier_Method" = "outlier_method",
+    "Outlier_Threshold" = "outlier_threshold"
+  )
+  nms <- names(settings)
+  for (i in seq_along(nms)) {
+    if (nms[i] %in% names(name_map) && !name_map[nms[i]] %in% nms) {
+      settings[[name_map[nms[i]]]] <- settings[[nms[i]]]
+    }
+  }
+  settings
 }
 
 
@@ -409,8 +563,129 @@ load_validation_config <- function(config_file) {
 #' @return Visualization settings
 #' @keywords internal
 load_visualization_config <- function(config_file) {
-  viz_raw <- readxl::read_excel(config_file, sheet = "Visualization")
+  viz_raw <- read_settings_sheet(config_file, "Visualization")
   setNames(as.list(viz_raw$Value), viz_raw$Setting)
+}
+
+
+#' Load Monadic Configuration
+#'
+#' @param config_file Path to config file
+#' @return Monadic settings list
+#' @keywords internal
+load_monadic_config <- function(config_file) {
+  mon_raw <- read_settings_sheet(config_file, "Monadic")
+  mon <- setNames(as.list(mon_raw$Value), mon_raw$Setting)
+
+  # Normalize template names to internal names
+  name_map <- c(
+    "Price_Column" = "price_column",
+    "Intent_Column" = "intent_column",
+    "Intent_Type" = "intent_type",
+    "Scale_Threshold" = "scale_threshold",
+    "Model_Type" = "model_type",
+    "Min_Cell_Size" = "min_cell_size",
+    "Prediction_Points" = "prediction_points",
+    "Confidence_Intervals" = "confidence_intervals",
+    "Bootstrap_Iterations" = "bootstrap_iterations",
+    "Confidence_Level" = "confidence_level"
+  )
+  nms <- names(mon)
+  for (i in seq_along(nms)) {
+    if (nms[i] %in% names(name_map) && !name_map[nms[i]] %in% nms) {
+      mon[[name_map[nms[i]]]] <- mon[[nms[i]]]
+    }
+  }
+
+  # Convert numeric fields
+  numeric_fields <- c("scale_threshold", "min_cell_size", "prediction_points",
+                       "bootstrap_iterations", "confidence_level")
+  for (field in numeric_fields) {
+    if (field %in% names(mon) && !is.na(mon[[field]])) {
+      mon[[field]] <- as.numeric(mon[[field]])
+    }
+  }
+
+  # Convert logical fields
+  logical_fields <- c("confidence_intervals")
+  for (field in logical_fields) {
+    if (field %in% names(mon) && !is.na(mon[[field]])) {
+      mon[[field]] <- as.logical(mon[[field]])
+    }
+  }
+
+  # Apply defaults
+  mon$intent_type <- mon$intent_type %||% "binary"
+  mon$model_type <- mon$model_type %||% "logistic"
+  mon$min_cell_size <- mon$min_cell_size %||% 30
+  mon$prediction_points <- mon$prediction_points %||% 100
+  mon$confidence_intervals <- mon$confidence_intervals %||% TRUE
+  mon$bootstrap_iterations <- mon$bootstrap_iterations %||% 1000
+  mon$confidence_level <- mon$confidence_level %||% 0.95
+
+  mon
+}
+
+
+#' Load Simulator Scenarios Configuration
+#'
+#' Reads the Simulator sheet (table format) containing preset scenarios
+#' for the interactive pricing simulator.
+#'
+#' @param config_file Path to config file
+#' @return List of scenario definitions
+#' @keywords internal
+load_simulator_config <- function(config_file) {
+
+  # Read raw — table format, so headers should be column names
+  raw <- tryCatch(
+    readxl::read_excel(config_file, sheet = "Simulator"),
+    error = function(e) NULL
+  )
+
+  if (is.null(raw)) return(list())
+
+  # Autodetect header row for table sheets
+  required_col <- "Scenario_Name"
+  if (!required_col %in% names(raw)) {
+    # Scan first 10 rows
+    raw_scan <- suppressMessages(
+      readxl::read_excel(config_file, sheet = "Simulator",
+                         col_names = FALSE, n_max = 10)
+    )
+    header_row <- NULL
+    for (r in seq_len(nrow(raw_scan))) {
+      row_vals <- trimws(as.character(unlist(raw_scan[r, ])))
+      if (required_col %in% row_vals) {
+        header_row <- r
+        break
+      }
+    }
+    if (!is.null(header_row)) {
+      raw <- readxl::read_excel(config_file, sheet = "Simulator",
+                                skip = header_row - 1)
+    }
+  }
+
+  if (!required_col %in% names(raw)) return(list())
+
+  # Filter out help rows and empty rows
+  first_col <- as.character(raw[[1]])
+  help_rows <- grepl("^\\[REQUIRED\\]|^\\[Optional\\]", first_col, ignore.case = TRUE)
+  all_na <- apply(raw, 1, function(row) all(is.na(row) | trimws(as.character(row)) == ""))
+  raw <- raw[!help_rows & !all_na, , drop = FALSE]
+
+  if (nrow(raw) == 0) return(list())
+
+  # Convert to list of scenarios
+  scenarios <- lapply(seq_len(nrow(raw)), function(i) {
+    row <- as.list(raw[i, ])
+    # Clean NAs
+    row <- lapply(row, function(x) if (is.na(x)) NULL else x)
+    row
+  })
+
+  scenarios
 }
 
 
@@ -461,6 +736,11 @@ apply_pricing_defaults <- function(settings) {
   settings$project_name <- settings$project_name %||% "Pricing Analysis"
   settings$currency_symbol <- settings$currency_symbol %||% "$"
   settings$verbose <- as.logical(settings$verbose %||% TRUE)
+
+  # Output options
+  settings$generate_html_report <- as.logical(settings$generate_html_report %||% TRUE)
+  settings$generate_simulator <- as.logical(settings$generate_simulator %||% FALSE)
+  settings$brand_colour <- settings$brand_colour %||% "#1e3a5f"
 
   # Weighting and segmentation
   settings$weight_var <- settings$weight_var %||% NA_character_
@@ -576,9 +856,10 @@ apply_pricing_defaults <- function(settings) {
 #' Create Pricing Configuration Template
 #'
 #' Generates an Excel configuration template for pricing analysis.
+#' This is a convenience wrapper around the full template generator.
 #'
 #' @param output_file Path where template should be saved
-#' @param method Type of analysis: "van_westendorp", "gabor_granger", or "both"
+#' @param method Type of analysis: "van_westendorp", "gabor_granger", "monadic", or "both"
 #' @param overwrite Logical. Overwrite existing file?
 #'
 #' @return Invisible path to created file
@@ -598,302 +879,54 @@ create_pricing_config <- function(output_file = "pricing_config.xlsx",
     )
   }
 
-  if (!requireNamespace("openxlsx", quietly = TRUE)) {
-    pricing_refuse(
-      code = "PKG_OPENXLSX_MISSING",
-      title = "Required Package Missing",
-      problem = "Package 'openxlsx' is not installed",
-      why_it_matters = "Cannot create Excel configuration template without openxlsx package",
-      how_to_fix = "Install the package: install.packages('openxlsx')"
-    )
+  # Try to use the polished generator if available
+  generator_path <- file.path(dirname(sys.frame(1)$ofile %||% "."),
+                               "..", "lib", "generate_config_templates.R")
+  if (!file.exists(generator_path)) {
+    generator_path <- file.path(getwd(), "modules", "pricing", "lib",
+                                 "generate_config_templates.R")
   }
 
-  wb <- openxlsx::createWorkbook()
+  if (file.exists(generator_path)) {
+    source(generator_path)
+    generate_pricing_config_template(
+      output_path = output_file,
+      include_monadic = method %in% c("monadic", "both"),
+      include_simulator = TRUE,
+      overwrite = overwrite
+    )
+  } else {
+    # Fallback: basic template if generator not found
+    if (!requireNamespace("openxlsx", quietly = TRUE)) {
+      pricing_refuse(
+        code = "PKG_OPENXLSX_MISSING",
+        title = "Required Package Missing",
+        problem = "Package 'openxlsx' is not installed",
+        why_it_matters = "Cannot create Excel configuration template without openxlsx package",
+        how_to_fix = "Install the package: install.packages('openxlsx')"
+      )
+    }
+    message("[INFO] Full template generator not found. Creating basic template.")
+    message("  For the polished template, source modules/pricing/lib/generate_config_templates.R")
 
-  # Header style
-  header_style <- openxlsx::createStyle(
-    fontColour = "#FFFFFF",
-    fgFill = "#003D5C",
-    halign = "left",
-    textDecoration = "bold"
-  )
+    wb <- openxlsx::createWorkbook()
+    header_style <- openxlsx::createStyle(
+      fontColour = "#FFFFFF", fgFill = "#323367",
+      halign = "left", textDecoration = "bold"
+    )
 
-  # --------------------------------------------------------------------------
-  # Settings Sheet
-  # --------------------------------------------------------------------------
-  openxlsx::addWorksheet(wb, "Settings")
-
-  settings_data <- data.frame(
-    Setting = c(
-      "project_name",
-      "analysis_method",
-      "data_file",
-      "output_file",
-      "id_var",
-      "weight_var",
-      "unit_cost",
-      "currency_symbol",
-      "vw_monotonicity_behavior",
-      "gg_monotonicity_behavior",
-      "dk_codes",
-      "verbose",
-      "",
-      "# SEGMENTATION",
-      "segment_column",
-      "min_segment_n",
-      "include_total",
-      "",
-      "# PRICE LADDER",
-      "n_tiers",
-      "tier_names",
-      "min_gap_pct",
-      "max_gap_pct",
-      "round_to",
-      "anchor",
-      "",
-      "# CONSTRAINTS",
-      "price_floor",
-      "price_ceiling"
-    ),
-    Value = c(
-      "My Pricing Study",
-      method,
-      "data/survey_data.csv",
-      "pricing_results.xlsx",
-      "respondent_id",
-      "",
-      "",
-      "$",
-      "flag_only",
-      "smooth",
-      "",
-      "TRUE",
-      "",
-      "",
-      "",
-      "50",
-      "TRUE",
-      "",
-      "",
-      "3",
-      "Value;Standard;Premium",
-      "15",
-      "50",
-      "0.99",
-      "Standard",
-      "",
-      "",
-      "",
-      ""
-    ),
-    Description = c(
-      "Project name for reports",
-      "van_westendorp, gabor_granger, or both",
-      "Path to data file (relative to config)",
-      "Path for output file",
-      "Respondent ID column name",
-      "Weight column name (optional)",
-      "Unit cost for profit calculations (optional)",
-      "Currency symbol for display",
-      "VW monotonicity: drop, fix, or flag_only",
-      "GG monotonicity: diagnostic_only or smooth",
-      "Don't know codes (comma-separated, e.g., 98,99)",
-      "Show progress messages",
-      "",
-      "Settings for segment-level analysis",
-      "Column containing segment labels (optional)",
-      "Minimum sample size per segment",
-      "Include total sample in comparison",
-      "",
-      "Settings for Good/Better/Best tier generation",
-      "Number of price tiers (2-4)",
-      "Tier names (semicolon-separated)",
-      "Minimum gap between tiers (%)",
-      "Maximum gap between tiers (%)",
-      "Price rounding: 0.99, 0.95, 0.00, none",
-      "Which tier anchors to optimal price",
-      "",
-      "Price constraints for recommendation",
-      "Minimum price constraint (optional)",
-      "Maximum price constraint (optional)"
-    ),
-    stringsAsFactors = FALSE
-  )
-
-  openxlsx::writeData(wb, "Settings", settings_data, headerStyle = header_style)
-  openxlsx::setColWidths(wb, "Settings", cols = 1:3, widths = c(25, 30, 40))
-
-  # --------------------------------------------------------------------------
-  # Van Westendorp Sheet
-  # --------------------------------------------------------------------------
-  if (method %in% c("van_westendorp", "both")) {
-    openxlsx::addWorksheet(wb, "VanWestendorp")
-
-    vw_data <- data.frame(
-      Setting = c(
-        "col_too_cheap",
-        "col_cheap",
-        "col_expensive",
-        "col_too_expensive",
-        "validate_monotonicity",
-        "exclude_violations",
-        "violation_threshold",
-        "interpolation_method",
-        "calculate_confidence",
-        "confidence_level",
-        "bootstrap_iterations",
-        "price_decimals",
-        "",
-        "# NMS EXTENSION (Optional)",
-        "col_pi_cheap",
-        "col_pi_expensive"
-      ),
-      Value = c(
-        "q1_too_cheap",
-        "q2_cheap",
-        "q3_expensive",
-        "q4_too_expensive",
-        "TRUE",
-        "FALSE",
-        "0.1",
-        "linear",
-        "TRUE",
-        "0.95",
-        "1000",
-        "2",
-        "",
-        "",
-        "",
-        ""
-      ),
-      Description = c(
-        "Column: 'At what price too cheap?'",
-        "Column: 'At what price a bargain?'",
-        "Column: 'At what price getting expensive?'",
-        "Column: 'At what price too expensive?'",
-        "Check price sequence logic",
-        "Remove cases with violations",
-        "Max allowed violation rate (0-1)",
-        "linear or spline",
-        "Calculate bootstrap confidence intervals",
-        "Confidence level (0-1)",
-        "Number of bootstrap iterations",
-        "Decimal places for price display",
-        "",
-        "Newton-Miller-Smith purchase intent calibration",
-        "Purchase intent at 'bargain' price (0-100 scale)",
-        "Purchase intent at 'expensive' price (0-100 scale)"
-      ),
+    openxlsx::addWorksheet(wb, "Settings")
+    settings_data <- data.frame(
+      Setting = c("Project_Name", "Analysis_Method", "Data_File", "Output_File",
+                  "Currency_Symbol", "Generate_HTML_Report"),
+      Value = c("My Pricing Study", method, "", "pricing_results.xlsx", "$", "TRUE"),
       stringsAsFactors = FALSE
     )
-
-    openxlsx::writeData(wb, "VanWestendorp", vw_data, headerStyle = header_style)
-    openxlsx::setColWidths(wb, "VanWestendorp", cols = 1:3, widths = c(25, 25, 40))
+    openxlsx::writeData(wb, "Settings", settings_data, headerStyle = header_style)
+    openxlsx::setColWidths(wb, "Settings", cols = 1:2, widths = c(30, 30))
+    openxlsx::saveWorkbook(wb, output_file, overwrite = overwrite)
   }
-
-  # --------------------------------------------------------------------------
-  # Gabor-Granger Sheet
-  # --------------------------------------------------------------------------
-  if (method %in% c("gabor_granger", "both")) {
-    openxlsx::addWorksheet(wb, "GaborGranger")
-
-    gg_data <- data.frame(
-      Setting = c(
-        "data_format",
-        "price_sequence",
-        "response_columns",
-        "price_column",
-        "response_column",
-        "respondent_column",
-        "response_type",
-        "scale_threshold",
-        "check_monotonicity",
-        "calculate_elasticity",
-        "revenue_optimization",
-        "confidence_intervals",
-        "bootstrap_iterations",
-        "confidence_level"
-      ),
-      Value = c(
-        "wide",
-        "4.99;6.99;8.99;10.99;12.99",
-        "buy_499;buy_699;buy_899;buy_1099;buy_1299",
-        "price",
-        "purchase_intent",
-        "respondent_id",
-        "binary",
-        "3",
-        "TRUE",
-        "TRUE",
-        "TRUE",
-        "FALSE",
-        "1000",
-        "0.95"
-      ),
-      Description = c(
-        "Data format: wide or long",
-        "Price points (semicolon-separated) for wide format",
-        "Response column names (semicolon-separated) for wide format",
-        "Price column name for long format",
-        "Response column name for long format",
-        "Respondent ID column for long format",
-        "binary, scale, or auto",
-        "Top-box threshold if scale response",
-        "Check for monotonic demand",
-        "Calculate price elasticity",
-        "Find revenue-maximizing price",
-        "Calculate bootstrap confidence intervals",
-        "Number of bootstrap iterations",
-        "Confidence level (0-1)"
-      ),
-      stringsAsFactors = FALSE
-    )
-
-    openxlsx::writeData(wb, "GaborGranger", gg_data, headerStyle = header_style)
-    openxlsx::setColWidths(wb, "GaborGranger", cols = 1:3, widths = c(25, 35, 40))
-  }
-
-  # --------------------------------------------------------------------------
-  # Validation Sheet
-  # --------------------------------------------------------------------------
-  openxlsx::addWorksheet(wb, "Validation")
-
-  validation_data <- data.frame(
-    Setting = c(
-      "min_completeness",
-      "price_min",
-      "price_max",
-      "flag_outliers",
-      "outlier_method",
-      "outlier_threshold"
-    ),
-    Value = c(
-      "0.8",
-      "0",
-      "10000",
-      "TRUE",
-      "iqr",
-      "3"
-    ),
-    Description = c(
-      "Minimum response completeness (0-1)",
-      "Minimum valid price value",
-      "Maximum valid price value",
-      "Flag statistical outliers",
-      "iqr, zscore, or percentile",
-      "Outlier detection threshold"
-    ),
-    stringsAsFactors = FALSE
-  )
-
-  openxlsx::writeData(wb, "Validation", validation_data, headerStyle = header_style)
-  openxlsx::setColWidths(wb, "Validation", cols = 1:3, widths = c(25, 20, 40))
-
-  # Save workbook
-  openxlsx::saveWorkbook(wb, output_file, overwrite = overwrite)
 
   cat(sprintf("Configuration template created: %s\n", output_file))
-  cat(sprintf("Edit this file to configure your %s analysis.\n", method))
-
   invisible(output_file)
 }

@@ -223,6 +223,26 @@ body {
   color: #92400e;
 }
 
+.hub-card-type-confidence {
+  background: #ddd6fe;
+  color: #5b21b6;
+}
+
+.hub-card-type-catdriver {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.hub-card-type-keydriver {
+  background: #ccfbf1;
+  color: #115e59;
+}
+
+.hub-card-type-weighting {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
 .hub-report-card-wave-range {
   font-size: 12px;
   color: var(--hub-text-muted);

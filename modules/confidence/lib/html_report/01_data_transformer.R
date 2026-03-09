@@ -151,9 +151,14 @@ transform_proportion_question <- function(q_id, result, conf_level, global_n_eff
                                           conf_level, is_weighted, quality,
                                           methods_used, sampling_method)
 
+  q_label <- result$label %||% ""
+  display_label <- if (nzchar(q_label)) paste0(q_id, ": ", q_label) else q_id
+
   list(
     type = "proportion",
     question_id = q_id,
+    question_label = q_label,
+    display_label = display_label,
     estimate = p,
     estimate_pct = if (!is.na(p)) round(p * 100, 1) else NA,
     n = n,
@@ -201,9 +206,14 @@ transform_mean_question <- function(q_id, result, conf_level, global_n_eff,
                                     conf_level, is_weighted, quality,
                                     methods_used, sampling_method)
 
+  q_label <- result$label %||% ""
+  display_label <- if (nzchar(q_label)) paste0(q_id, ": ", q_label) else q_id
+
   list(
     type = "mean",
     question_id = q_id,
+    question_label = q_label,
+    display_label = display_label,
     estimate = mean_val,
     estimate_pct = NA,
     n = n,
@@ -251,9 +261,14 @@ transform_nps_question <- function(q_id, result, conf_level, global_n_eff,
                                    result$pct_promoters, result$pct_detractors,
                                    methods_used, sampling_method)
 
+  q_label <- result$label %||% ""
+  display_label <- if (nzchar(q_label)) paste0(q_id, ": ", q_label) else q_id
+
   list(
     type = "nps",
     question_id = q_id,
+    question_label = q_label,
+    display_label = display_label,
     estimate = nps_score,
     estimate_pct = NA,
     n = n,

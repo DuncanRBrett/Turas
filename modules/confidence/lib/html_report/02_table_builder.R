@@ -51,7 +51,7 @@ build_ci_summary_table <- function(questions) {
         <td class="ci-td ci-num">%s</td>
         <td class="ci-td"><span class="%s">%s</span></td>
       </tr>',
-      htmlEscape(q$question_id), type_label, est, lower_str, upper_str,
+      htmlEscape(q$display_label %||% q$question_id), type_label, est, lower_str, upper_str,
       width_str, badge_class, badge_label
     ))
   }

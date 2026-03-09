@@ -266,13 +266,32 @@ load_comments_sheet <- function(config_file) {
     sheets <- openxlsx::getSheetNames(config_file)
     if (!"Comments" %in% sheets) return(NULL)
 
+    # Try reading with headers in row 1 first (simple format)
     df <- openxlsx::read.xlsx(config_file, sheet = "Comments")
     if (is.null(df) || nrow(df) == 0) return(NULL)
 
-    # Require QuestionCode and Comment columns
-    if (!all(c("QuestionCode", "Comment") %in% names(df))) {
-      cat("  [INFO] Comments sheet found but missing QuestionCode/Comment columns - skipped\n")
-      return(NULL)
+    # Auto-detect: if expected columns not found, scan for the header row
+    # Templates may have instructional/title rows above the real headers.
+    required_cols <- c("QuestionCode", "Comment")
+    if (!all(required_cols %in% names(df))) {
+      # Read raw without headers to scan for the row containing "QuestionCode"
+      raw <- openxlsx::read.xlsx(config_file, sheet = "Comments", colNames = FALSE)
+      header_row <- which(apply(raw, 1, function(r) any(trimws(r) == "QuestionCode", na.rm = TRUE)))
+      if (length(header_row) == 0) {
+        cat("  [INFO] Comments sheet found but missing QuestionCode/Comment columns - skipped\n")
+        return(NULL)
+      }
+      header_row <- header_row[1]
+      df <- openxlsx::read.xlsx(config_file, sheet = "Comments", startRow = header_row)
+      if (is.null(df) || nrow(df) == 0 || !all(required_cols %in% names(df))) {
+        cat("  [INFO] Comments sheet found but missing QuestionCode/Comment columns - skipped\n")
+        return(NULL)
+      }
+
+      # Remove description rows (start with "[REQUIRED]", "[Optional]", etc.)
+      while (nrow(df) > 0 && grepl("^\\[", trimws(df$QuestionCode[1]))) {
+        df <- df[-1, , drop = FALSE]
+      }
     }
 
     # Filter valid rows
@@ -363,9 +382,27 @@ load_qualitative_sheet <- function(config_file) {
     df <- openxlsx::read.xlsx(config_file, sheet = sheet_name)
     if (is.null(df) || nrow(df) == 0) return(NULL)
 
-    if (!"slide_title" %in% names(df) || !"content" %in% names(df)) {
-      cat(sprintf("  [INFO] %s sheet found but missing slide_title/content columns - skipped\n", sheet_name))
-      return(NULL)
+    # Auto-detect: if expected columns not found, scan for the header row
+    # Templates may have instructional/title rows above the real headers.
+    required_cols <- c("slide_title", "content")
+    if (!all(required_cols %in% names(df))) {
+      raw <- openxlsx::read.xlsx(config_file, sheet = sheet_name, colNames = FALSE)
+      header_row <- which(apply(raw, 1, function(r) any(trimws(r) == "slide_title", na.rm = TRUE)))
+      if (length(header_row) == 0) {
+        cat(sprintf("  [INFO] %s sheet found but missing slide_title/content columns - skipped\n", sheet_name))
+        return(NULL)
+      }
+      header_row <- header_row[1]
+      df <- openxlsx::read.xlsx(config_file, sheet = sheet_name, startRow = header_row)
+      if (is.null(df) || nrow(df) == 0 || !all(required_cols %in% names(df))) {
+        cat(sprintf("  [INFO] %s sheet found but missing slide_title/content columns - skipped\n", sheet_name))
+        return(NULL)
+      }
+
+      # Remove description rows (start with "[REQUIRED]", "[Optional]", etc.)
+      while (nrow(df) > 0 && grepl("^\\[", trimws(df$slide_title[1]))) {
+        df <- df[-1, , drop = FALSE]
+      }
     }
 
     # Filter valid rows

@@ -793,8 +793,10 @@ build_proportions_dataframe <- function(prop_results) {
     q_result <- prop_results[[q_id]]
 
     # Base info
+    q_label <- q_result$label %||% ""
     base_row <- list(
       Question_ID = q_id,
+      Question_Label = q_label,
       Category = ifelse(!is.null(q_result$category), q_result$category, "Total"),
       Proportion = ifelse(!is.null(q_result$proportion), q_result$proportion, NA),
       Sample_Size = ifelse(!is.null(q_result$n), q_result$n, NA),
@@ -947,8 +949,10 @@ build_means_dataframe <- function(mean_results) {
     q_result <- mean_results[[q_id]]
 
     # Base info
+    q_label <- q_result$label %||% ""
     base_row <- list(
       Question_ID = q_id,
+      Question_Label = q_label,
       Mean = ifelse(!is.null(q_result$mean), q_result$mean, NA),
       SD = ifelse(!is.null(q_result$sd), q_result$sd, NA),
       Sample_Size = ifelse(!is.null(q_result$n), q_result$n, NA),
@@ -1085,8 +1089,10 @@ build_nps_dataframe <- function(nps_results) {
     q_result <- nps_results[[q_id]]
 
     # Base info
+    q_label <- q_result$label %||% ""
     base_row <- list(
       Question_ID = q_id,
+      Question_Label = q_label,
       NPS_Score = ifelse(!is.null(q_result$nps_score), q_result$nps_score, NA),
       Pct_Promoters = ifelse(!is.null(q_result$pct_promoters), q_result$pct_promoters, NA),
       Pct_Detractors = ifelse(!is.null(q_result$pct_detractors), q_result$pct_detractors, NA),

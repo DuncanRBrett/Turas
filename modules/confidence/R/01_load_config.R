@@ -453,6 +453,14 @@ load_question_analysis_sheet <- function(config_path, max_questions = NULL) {
                     "Question_ID", "Statistic_Type", "Categories")
   df <- df[!df$Question_ID %in% header_names, ]
 
+  # Add Question_Label column if not present (backward compatibility)
+  if (!"Question_Label" %in% names(df)) {
+    df$Question_Label <- ""
+  }
+  # Replace NA labels with empty string
+  df$Question_Label[is.na(df$Question_Label)] <- ""
+  df$Question_Label <- trimws(df$Question_Label)
+
   # Check question limit (configurable, default 200)
   n_questions <- nrow(df)
   if (n_questions > max_questions) {

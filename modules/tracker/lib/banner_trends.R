@@ -153,7 +153,8 @@ get_banner_segments <- function(config, wave_data) {
           wave_code <- wave_specific_mapping[[wave_id]]
 
           if (wave_code %in% names(wave_df)) {
-            vals <- unique(wave_df[[wave_code]][!is.na(wave_df[[wave_code]])])
+            vals <- unique(trimws(as.character(wave_df[[wave_code]][!is.na(wave_df[[wave_code]])])))
+            vals <- vals[vals != ""]
             message(paste0("  ", wave_id, " (", wave_code, "): Found ", length(vals), " unique values"))
             all_unique_vals <- unique(c(all_unique_vals, vals))
           } else {
@@ -181,7 +182,7 @@ get_banner_segments <- function(config, wave_data) {
       first_wave <- wave_data[[wave_ids[1]]]
 
       if (break_var %in% names(first_wave)) {
-        unique_vals <- unique(first_wave[[break_var]][!is.na(first_wave[[break_var]])])
+        unique_vals <- unique(trimws(as.character(first_wave[[break_var]][!is.na(first_wave[[break_var]])])))
 
         for (val in unique_vals) {
           seg_name <- paste0(break_label, "_", val)
@@ -395,23 +396,44 @@ validate_banner_structure <- function(config, wave_data, min_base = 30) {
       next
     }
 
+    # Resolve wave-specific column mappings (same logic as get_banner_segments)
+    wave_specific_mapping <- list()
+    has_wave_mapping <- FALSE
+
+    for (wave_id in wave_ids) {
+      if (wave_id %in% names(banner)) {
+        wave_code <- banner[[wave_id]][i]
+        if (!is.na(wave_code) && trimws(wave_code) != "") {
+          wave_specific_mapping[[wave_id]] <- trimws(wave_code)
+          has_wave_mapping <- TRUE
+        }
+      }
+    }
+
     # Check if variable exists in each wave
     for (wave_id in wave_ids) {
       wave_df <- wave_data[[wave_id]]
 
-      if (!break_var %in% names(wave_df)) {
+      # Resolve the actual column name for this wave
+      actual_col <- if (has_wave_mapping && wave_id %in% names(wave_specific_mapping)) {
+        wave_specific_mapping[[wave_id]]
+      } else {
+        break_var
+      }
+
+      if (!actual_col %in% names(wave_df)) {
         validation$warnings <- c(
           validation$warnings,
-          paste0("Banner variable '", break_var, "' not found in ", wave_id, " data")
+          paste0("Banner variable '", break_var, "' (column '", actual_col, "') not found in ", wave_id, " data")
         )
         next
       }
 
       # Check base sizes for each value
-      unique_vals <- unique(wave_df[[break_var]][!is.na(wave_df[[break_var]])])
+      unique_vals <- unique(wave_df[[actual_col]][!is.na(wave_df[[actual_col]])])
 
       for (val in unique_vals) {
-        n <- sum(wave_df[[break_var]] == val & !is.na(wave_df[[break_var]]) &
+        n <- sum(wave_df[[actual_col]] == val & !is.na(wave_df[[actual_col]]) &
                  wave_df$weight_var > 0, na.rm = TRUE)
 
         if (n < min_base) {

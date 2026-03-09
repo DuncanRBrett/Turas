@@ -50,12 +50,12 @@ build_forest_svg <- function(questions, brand_colour, title, is_proportion) {
   if (n_items == 0) return("")
 
   # Layout
-  margin_left <- 140
+  margin_left <- 200
   margin_right <- 60
   margin_top <- 40
   margin_bottom <- 30
   row_height <- 32
-  chart_width <- 700
+  chart_width <- 760
   chart_height <- margin_top + n_items * row_height + margin_bottom
 
   plot_w <- chart_width - margin_left - margin_right
@@ -118,8 +118,8 @@ build_forest_svg <- function(questions, brand_colour, title, is_proportion) {
     y <- margin_top + (i - 0.5) * row_height
 
     # Label
-    label <- q$question_id
-    if (nchar(label) > 18) label <- paste0(substr(label, 1, 16), "...")
+    label <- q$display_label %||% q$question_id
+    if (nchar(label) > 30) label <- paste0(substr(label, 1, 28), "...")
     elements <- c(elements, sprintf(
       '<text x="%d" y="%.1f" font-size="11" fill="#1e293b" text-anchor="end" dominant-baseline="middle">%s</text>',
       margin_left - 8, y, htmlEscape(label)

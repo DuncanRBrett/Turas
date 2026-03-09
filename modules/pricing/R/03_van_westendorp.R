@@ -61,9 +61,10 @@ validate_vw_data <- function(data, config, verbose = TRUE) {
   # ============================================================================
 
   required_mappings <- c("col_too_cheap", "col_cheap", "col_expensive", "col_too_expensive")
-  missing_mappings <- required_mappings[!required_mappings %in% names(vw) |
-                                         sapply(vw[required_mappings], is.null) |
-                                         sapply(vw[required_mappings], is.na)]
+  missing_mappings <- required_mappings[
+    !required_mappings %in% names(vw) |
+    sapply(required_mappings, function(k) is.null(vw[[k]]) || (length(vw[[k]]) == 1 && is.na(vw[[k]])))
+  ]
 
   checks$config_complete <- length(missing_mappings) == 0
 
@@ -178,13 +179,19 @@ validate_vw_data <- function(data, config, verbose = TRUE) {
   # ============================================================================
 
   # Correct order: too_cheap <= cheap <= expensive <= too_expensive
-  logical_order <- too_cheap[complete_cases] <= cheap[complete_cases] &
-                   cheap[complete_cases] <= expensive[complete_cases] &
-                   expensive[complete_cases] <= too_expensive[complete_cases]
+  if (n_complete > 0) {
+    logical_order <- too_cheap[complete_cases] <= cheap[complete_cases] &
+                     cheap[complete_cases] <= expensive[complete_cases] &
+                     expensive[complete_cases] <= too_expensive[complete_cases]
 
-  n_logical <- sum(logical_order)
-  n_violations <- n_complete - n_logical
-  violation_rate <- n_violations / n_complete
+    n_logical <- sum(logical_order)
+    n_violations <- n_complete - n_logical
+    violation_rate <- n_violations / n_complete
+  } else {
+    n_logical <- 0
+    n_violations <- 0
+    violation_rate <- 0
+  }
 
   checks$logical_order <- violation_rate < 0.10
 

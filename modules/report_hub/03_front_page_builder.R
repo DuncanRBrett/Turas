@@ -44,12 +44,19 @@ build_report_card <- function(parsed) {
   label <- meta$project_title
   if (is.null(label)) label <- key
 
-  # Type badge
-  if (type == "tracker") {
-    type_badge <- '<span class="hub-card-type-badge hub-card-type-tracker">Tracker</span>'
-  } else {
-    type_badge <- '<span class="hub-card-type-badge hub-card-type-crosstabs">Crosstabs</span>'
-  }
+  # Type badge — map each report type to its display label and CSS class
+  type_badge_map <- list(
+    tracker    = list(label = "Tracker",    css = "hub-card-type-tracker"),
+    tabs       = list(label = "Crosstabs",  css = "hub-card-type-crosstabs"),
+    confidence = list(label = "Confidence", css = "hub-card-type-confidence"),
+    catdriver  = list(label = "CatDriver",  css = "hub-card-type-catdriver"),
+    keydriver  = list(label = "KeyDriver",  css = "hub-card-type-keydriver"),
+    weighting  = list(label = "Weighting",  css = "hub-card-type-weighting")
+  )
+  badge_info <- type_badge_map[[type]] %||%
+    list(label = "Crosstabs", css = "hub-card-type-crosstabs")
+  type_badge <- sprintf('<span class="hub-card-type-badge %s">%s</span>',
+                        badge_info$css, badge_info$label)
 
   # Build stats lines
   stats_lines <- character(0)
@@ -147,7 +154,10 @@ build_summary_area <- function(parsed_reports) {
   parts <- '<div class="hub-summary-area">'
 
   for (parsed in parsed_reports) {
-    label <- if (parsed$report_type == "tracker") "Tracker Summary" else "Crosstabs Summary"
+    type_labels <- c(tracker = "Tracker", tabs = "Crosstabs",
+                      confidence = "Confidence", catdriver = "CatDriver",
+                      keydriver = "KeyDriver", weighting = "Weighting")
+    label <- paste0(type_labels[parsed$report_type] %||% "Crosstabs", " Summary")
     key <- parsed$report_key
 
     # Try to extract existing summary text from contenteditable divs

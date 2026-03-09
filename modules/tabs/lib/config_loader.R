@@ -90,7 +90,28 @@ load_config_settings <- function(config_file, sheet_name = "Settings") {
   tryCatch({
     # Load sheet
     config_df <- readxl::read_excel(config_file, sheet = sheet_name)
-    
+
+    # Auto-detect header row for styled templates with title/subtitle rows
+    if (!all(c("Setting", "Value") %in% names(config_df))) {
+      raw <- suppressMessages(readxl::read_excel(config_file, sheet = sheet_name,
+                                                  col_names = FALSE, n_max = 10))
+      header_row <- NULL
+      for (r in seq_len(nrow(raw))) {
+        row_vals <- as.character(unlist(raw[r, ]))
+        if ("Setting" %in% row_vals && "Value" %in% row_vals) {
+          header_row <- r
+          break
+        }
+      }
+      if (!is.null(header_row)) {
+        config_df <- readxl::read_excel(config_file, sheet = sheet_name,
+                                         skip = header_row - 1)
+        if (all(c("Setting", "Value") %in% names(config_df))) {
+          config_df <- config_df[, c("Setting", "Value"), drop = FALSE]
+        }
+      }
+    }
+
     # Validate structure
     if (!all(c("Setting", "Value") %in% names(config_df))) {
       tabs_refuse(

@@ -5,6 +5,48 @@
 # Part of TURAS Weighting Module v3.0
 # ==============================================================================
 
+#' Read Excel sheet with styled template auto-detection
+#'
+#' Handles styled templates that have title/subtitle rows above the actual
+#' data headers. Scans first 10 rows for the expected column names.
+#'
+#' @param file_path Path to Excel file
+#' @param sheet_name Sheet name to read
+#' @param expected_cols Character vector of column names to look for in header
+#' @return Data frame with correct headers
+#' @keywords internal
+.read_styled_sheet <- function(file_path, sheet_name, expected_cols) {
+  df <- suppressMessages(readxl::read_excel(file_path, sheet = sheet_name))
+
+  if (all(expected_cols %in% names(df))) {
+    return(df)
+  }
+
+  # Scan first 10 rows for the header row
+  raw <- suppressMessages(readxl::read_excel(file_path, sheet = sheet_name,
+                                              col_names = FALSE, n_max = 10))
+  for (r in seq_len(nrow(raw))) {
+    row_vals <- as.character(unlist(raw[r, ]))
+    if (all(expected_cols %in% row_vals)) {
+      df <- suppressMessages(readxl::read_excel(file_path, sheet = sheet_name,
+                                                 skip = r - 1))
+      # Strip help text rows (start with [REQUIRED] or [Optional])
+      if (nrow(df) > 0) {
+        help_rows <- grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
+                           as.character(df[[1]]), ignore.case = TRUE)
+        if (any(help_rows)) {
+          df <- df[!help_rows, , drop = FALSE]
+          rownames(df) <- NULL
+        }
+      }
+      return(df)
+    }
+  }
+
+  # Return as-is if header not found (caller will handle validation)
+  df
+}
+
 #' Load Weighting Configuration
 #'
 #' Loads and validates the complete weighting configuration from Excel file.
@@ -39,8 +81,8 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
   project_root <- dirname(normalizePath(config_file, mustWork = TRUE))
 
   # Required sheets
-  required_sheets <- c("General", "Weight_Specifications")
   available_sheets <- readxl::excel_sheets(config_file)
+  required_sheets <- c("Settings", "Weight_Specifications")
 
   # Validate required sheets (use TRS guard if available)
   for (sheet in required_sheets) {
@@ -49,42 +91,47 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
     } else if (!sheet %in% available_sheets) {
       weighting_refuse(
         code = "CFG_MISSING_SHEET",
-        title = "Required configuration sheet missing",
-        problem = sprintf("Missing required sheet '%s' in config file", sheet),
-        why_it_matters = "All required sheets must be present for proper configuration",
-        how_to_fix = sprintf("Add the '%s' sheet to your config file. Found sheets: %s", sheet, paste(available_sheets, collapse = ", "))
+        title = "Required Sheet Missing",
+        problem = sprintf("The '%s' sheet is required but not found in config file.", sheet),
+        why_it_matters = "Configuration is incomplete without this sheet.",
+        how_to_fix = sprintf("Add a '%s' sheet to your config file. Found sheets: %s", sheet, paste(available_sheets, collapse = ", "))
       )
     }
   }
 
   # ============================================================================
-  # Load General Settings
+  # Load Settings
   # ============================================================================
-  if (verbose) message("\nLoading General settings...")
+  if (verbose) message("\nLoading Settings...")
 
   general_df <- tryCatch({
-    readxl::read_excel(config_file, sheet = "General")
+    df <- .read_styled_sheet(config_file, "Settings", c("Setting", "Value"))
+    # Keep only Setting and Value columns (ignore help/description columns)
+    if (all(c("Setting", "Value") %in% names(df))) {
+      df <- df[, c("Setting", "Value"), drop = FALSE]
+    }
+    df
   }, error = function(e) {
     weighting_refuse(
       code = "IO_SHEET_READ_ERROR",
-      title = "Failed to read General sheet",
-      problem = sprintf("Could not read 'General' sheet from config file: %s", conditionMessage(e)),
-      why_it_matters = "The General sheet contains essential configuration settings",
-      how_to_fix = "Check that the General sheet is not corrupted and is properly formatted as an Excel sheet"
+      title = "Failed to read Settings sheet",
+      problem = sprintf("Could not read 'Settings' sheet from config file: %s", conditionMessage(e)),
+      why_it_matters = "The Settings sheet contains essential configuration settings",
+      how_to_fix = "Check that the sheet is not corrupted and is properly formatted as an Excel sheet"
     )
   })
 
-  # Parse General sheet (Setting | Value format)
+  # Parse Settings sheet (Setting | Value format)
   general <- parse_settings_sheet(general_df)
 
-  # Validate required general settings
+  # Validate required settings
   if (is.null(general$project_name) || is.na(general$project_name)) {
     weighting_refuse(
       code = "CFG_MISSING_SETTING",
       title = "Missing required setting: project_name",
-      problem = "The 'project_name' setting is missing or empty in the General sheet",
+      problem = "The 'project_name' setting is missing or empty in the Settings sheet",
       why_it_matters = "Project name is required to identify the weighting project",
-      how_to_fix = "Add a row in the General sheet with Setting = 'project_name' and a valid Value"
+      how_to_fix = "Add a row in the Settings sheet with Setting = 'project_name' and a valid Value"
     )
   }
 
@@ -92,9 +139,9 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
     weighting_refuse(
       code = "CFG_MISSING_SETTING",
       title = "Missing required setting: data_file",
-      problem = "The 'data_file' setting is missing or empty in the General sheet",
+      problem = "The 'data_file' setting is missing or empty in the Settings sheet",
       why_it_matters = "Data file path is required to locate the input data for weighting",
-      how_to_fix = "Add a row in the General sheet with Setting = 'data_file' and a valid file path as Value"
+      how_to_fix = "Add a row in the Settings sheet with Setting = 'data_file' and a valid file path as Value"
     )
   }
 
@@ -120,7 +167,7 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
         title = "Missing required setting: diagnostics_file",
         problem = "The 'diagnostics_file' setting is missing but save_diagnostics = Y",
         why_it_matters = "When diagnostics are enabled, a file path is required to save the output",
-        how_to_fix = "Add a row in the General sheet with Setting = 'diagnostics_file' and a valid file path, or set save_diagnostics = N"
+        how_to_fix = "Add a row in the Settings sheet with Setting = 'diagnostics_file' and a valid file path, or set save_diagnostics = N"
       )
     }
     general$diagnostics_file_resolved <- resolve_config_path(general$diagnostics_file, project_root)
@@ -207,7 +254,7 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
   if (verbose) message("\nLoading Weight Specifications...")
 
   weight_specs_df <- tryCatch({
-    readxl::read_excel(config_file, sheet = "Weight_Specifications")
+    .read_styled_sheet(config_file, "Weight_Specifications", c("weight_name", "method"))
   }, error = function(e) {
     weighting_refuse(
       code = "IO_SHEET_READ_ERROR",
@@ -299,7 +346,8 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
     if (verbose) message("\nLoading Design Targets...")
 
     design_targets <- tryCatch({
-      readxl::read_excel(config_file, sheet = "Design_Targets")
+      .read_styled_sheet(config_file, "Design_Targets",
+                         c("weight_name", "stratum_variable", "stratum_category", "population_size"))
     }, error = function(e) {
       weighting_refuse(
         code = "IO_SHEET_READ_ERROR",
@@ -354,7 +402,8 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
     if (verbose) message("\nLoading Rim Targets...")
 
     rim_targets <- tryCatch({
-      readxl::read_excel(config_file, sheet = "Rim_Targets")
+      .read_styled_sheet(config_file, "Rim_Targets",
+                         c("weight_name", "variable", "category", "target_percent"))
     }, error = function(e) {
       weighting_refuse(
         code = "IO_SHEET_READ_ERROR",
@@ -411,7 +460,8 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
     if (verbose) message("\nLoading Cell Targets...")
 
     cell_targets <- tryCatch({
-      readxl::read_excel(config_file, sheet = "Cell_Targets")
+      .read_styled_sheet(config_file, "Cell_Targets",
+                         c("weight_name", "target_percent"))
     }, error = function(e) {
       weighting_refuse(
         code = "IO_SHEET_READ_ERROR",
@@ -453,7 +503,7 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
     if (verbose) message("\nLoading Advanced Settings...")
 
     advanced_settings <- tryCatch({
-      readxl::read_excel(config_file, sheet = "Advanced_Settings")
+      .read_styled_sheet(config_file, "Advanced_Settings", c("weight_name"))
     }, error = function(e) {
       warning(sprintf(
         "Failed to read 'Advanced_Settings' sheet: %s\nUsing defaults.",
@@ -561,10 +611,10 @@ parse_settings_sheet <- function(df) {
   if (is.null(setting_col) || is.null(value_col)) {
     weighting_refuse(
       code = "CFG_MISSING_COLUMNS",
-      title = "General sheet missing required columns",
-      problem = "General sheet must have 'Setting' and 'Value' columns",
-      why_it_matters = "The General sheet uses a Setting/Value format to define configuration",
-      how_to_fix = sprintf("Add 'Setting' and 'Value' columns to the General sheet. Found columns: %s", paste(names(df), collapse = ", "))
+      title = "Settings sheet missing required columns",
+      problem = "Settings sheet must have 'Setting' and 'Value' columns",
+      why_it_matters = "The Settings sheet uses a Setting/Value format to define configuration",
+      how_to_fix = sprintf("Add 'Setting' and 'Value' columns to the Settings sheet. Found columns: %s", paste(names(df), collapse = ", "))
     )
   }
 

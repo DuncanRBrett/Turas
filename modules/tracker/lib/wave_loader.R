@@ -873,9 +873,27 @@ load_wave_structure <- function(file_path, wave_id) {
     )
   }
 
-  # Read Options sheet
+  # Read Options sheet (with styled template auto-detection)
   options_df <- tryCatch({
-    openxlsx::read.xlsx(file_path, sheet = "Options")
+    df <- openxlsx::read.xlsx(file_path, sheet = "Options")
+    # Auto-detect header row for styled templates
+    if (!("QuestionCode" %in% names(df))) {
+      raw_df <- openxlsx::read.xlsx(file_path, sheet = "Options",
+                                    colNames = FALSE, skipEmptyRows = FALSE)
+      header_row <- which(raw_df[[1]] == "QuestionCode")[1]
+      if (!is.na(header_row)) {
+        df <- openxlsx::read.xlsx(file_path, sheet = "Options", startRow = header_row)
+        # Strip help/description rows
+        if (nrow(df) > 0 && "QuestionCode" %in% names(df)) {
+          help_rows <- grepl("^\\[REQUIRED\\]|^\\[Optional\\]", df[["QuestionCode"]])
+          if (any(help_rows)) {
+            df <- df[!help_rows, , drop = FALSE]
+            rownames(df) <- NULL
+          }
+        }
+      }
+    }
+    df
   }, error = function(e) {
     tracker_refuse(
       code = "IO_STRUCTURE_READ_FAILED",
@@ -900,7 +918,10 @@ load_wave_structure <- function(file_path, wave_id) {
       problem = paste0("Options sheet for Wave ", wave_id, " is missing required columns: ",
                        paste(missing_cols, collapse = ", ")),
       why_it_matters = "QuestionCode and OptionText are required for value mapping.",
-      how_to_fix = "Add the missing columns to the Options sheet in your Survey_Structure.xlsx.",
+      how_to_fix = c(
+        "Add the missing columns to the Options sheet in your Survey_Structure.xlsx.",
+        "If using a styled template, ensure the header row contains 'QuestionCode' in column 1."
+      ),
       observed = names(options_df)
     )
   }
