@@ -67,6 +67,7 @@ if (!exists("source_if_exists", mode = "function")) {
 
 source_if_exists("utils.R")
 source_if_exists("output_helpers.R")
+source_if_exists("sampling_labels.R")
 
 # ==============================================================================
 # MAIN OUTPUT FUNCTION
@@ -181,9 +182,31 @@ write_confidence_output <- function(output_path,
   # Create workbook
   wb <- openxlsx::createWorkbook()
 
+  # Derive sampling-method-aware labels for presentation
+  # Fallback: try sourcing sampling_labels.R if not already loaded
+  if (!exists("get_sampling_labels", mode = "function")) {
+    sl_candidates <- c(
+      file.path(dirname(output_path), "..", "R", "sampling_labels.R"),
+      file.path("R", "sampling_labels.R"),
+      file.path("..", "R", "sampling_labels.R"),
+      "sampling_labels.R"
+    )
+    for (sl_path in sl_candidates) {
+      if (file.exists(sl_path)) {
+        tryCatch(source(sl_path, local = FALSE), error = function(e) NULL)
+        break
+      }
+    }
+  }
+  labels <- if (exists("get_sampling_labels", mode = "function")) {
+    get_sampling_labels(config$sampling_method %||% "Not_Specified")
+  } else {
+    NULL
+  }
+
   # Sheet 1: Summary
   add_summary_sheet(wb, study_level_stats, proportion_results, mean_results,
-                    nps_results, config, warnings, decimal_sep)
+                    nps_results, config, warnings, decimal_sep, labels = labels)
 
   # Sheet 2: Study Level
   if (!is.null(study_level_stats) && nrow(study_level_stats) > 0) {
@@ -197,17 +220,17 @@ write_confidence_output <- function(output_path,
 
   # Sheet 4: Proportions Detail
   if (length(proportion_results) > 0) {
-    add_proportions_detail_sheet(wb, proportion_results, decimal_sep)
+    add_proportions_detail_sheet(wb, proportion_results, decimal_sep, labels = labels)
   }
 
   # Sheet 5: Means Detail
   if (length(mean_results) > 0) {
-    add_means_detail_sheet(wb, mean_results, decimal_sep)
+    add_means_detail_sheet(wb, mean_results, decimal_sep, labels = labels)
   }
 
   # Sheet 6: NPS Detail
   if (length(nps_results) > 0) {
-    add_nps_detail_sheet(wb, nps_results, decimal_sep)
+    add_nps_detail_sheet(wb, nps_results, decimal_sep, labels = labels)
   }
 
   # Sheet 7: Methodology
@@ -292,13 +315,20 @@ write_confidence_output <- function(output_path,
 #' Add summary sheet to workbook (internal)
 #' @keywords internal
 add_summary_sheet <- function(wb, study_stats, prop_results, mean_results,
-                               nps_results, config, warnings, decimal_sep) {
+                               nps_results, config, warnings, decimal_sep,
+                               labels = NULL) {
+  if (is.null(labels)) labels <- get_sampling_labels("Not_Specified")
 
   openxlsx::addWorksheet(wb, "Summary")
 
-  # Title
+  # Title (adapts to sampling method)
   row <- 1
-  openxlsx::writeData(wb, "Summary", "TURAS CONFIDENCE ANALYSIS - SUMMARY",
+  title_text <- if (labels$is_probability) {
+    "TURAS CONFIDENCE ANALYSIS - SUMMARY"
+  } else {
+    "TURAS PRECISION ANALYSIS - SUMMARY"
+  }
+  openxlsx::writeData(wb, "Summary", title_text,
                       startCol = 1, startRow = row)
   openxlsx::addStyle(wb, "Summary",
                      style = openxlsx::createStyle(fontSize = 14, textDecoration = "bold"),
@@ -396,34 +426,75 @@ add_summary_sheet <- function(wb, study_stats, prop_results, mean_results,
   }
   row <- row + 3
 
-  # Plain-English guide
-  write_callout_block(wb, "Summary", row, c(
-    "HOW TO READ THIS REPORT",
-    "",
-    "This report presents the results of your confidence analysis. It tells you how",
-    "precise your survey estimates are and how much they might differ from the true",
-    "population values.",
-    "",
-    "Key concepts:",
-    "  Confidence Interval (CI): A range of values likely to contain the true",
-    "  population value. A 95% CI means that if you repeated this survey 100 times,",
-    "  about 95 of those intervals would contain the true value.",
-    "",
-    "  Margin of Error (MOE): Half the width of the confidence interval. A smaller",
-    "  MOE means a more precise estimate.",
-    "",
-    "  Effective Sample Size: When survey weights are applied, some respondents",
-    "  count more than others. The effective n tells you how many unweighted",
-    "  respondents your weighted sample is equivalent to.",
-    "",
-    "IMPORTANT ASSUMPTIONS:",
-    "  The margin of error assumes a RANDOM (probability) sample. If your sample",
-    "  was collected through convenience, online panels, or other non-random methods,",
-    "  the MOE does not apply in the traditional sense. Non-response bias and",
-    "  coverage error may affect results beyond what the CI captures.",
-    "",
-    "  See the Methodology sheet for details on each statistical method used."
-  ))
+  # Plain-English guide (adapts to probability vs non-probability design)
+  if (labels$is_probability) {
+    callout_lines <- c(
+      "HOW TO READ THIS REPORT",
+      "",
+      "This report presents the results of your confidence analysis. It tells you how",
+      "precise your survey estimates are and how much they might differ from the true",
+      "population values.",
+      "",
+      "Key concepts:",
+      sprintf("  %s (%s): A range of values likely to contain the true",
+              labels$interval_name, labels$interval_abbrev),
+      sprintf("  population value. A 95%% %s means that if you repeated this survey 100 times,",
+              labels$interval_abbrev),
+      "  about 95 of those intervals would contain the true value.",
+      "",
+      sprintf("  %s (%s): Half the width of the %s. A smaller",
+              labels$moe_name, labels$moe_abbrev, tolower(labels$interval_name)),
+      sprintf("  %s means a more precise estimate.", labels$moe_abbrev),
+      "",
+      "  Effective Sample Size: When survey weights are applied, some respondents",
+      "  count more than others. The effective n tells you how many unweighted",
+      "  respondents your weighted sample is equivalent to.",
+      "",
+      "IMPORTANT ASSUMPTIONS:",
+      sprintf("  The %s assumes a RANDOM (probability) sample. If your sample",
+              tolower(labels$moe_name)),
+      "  was collected through convenience, online panels, or other non-random methods,",
+      sprintf("  the %s does not apply in the traditional sense. Non-response bias and",
+              labels$moe_abbrev),
+      sprintf("  coverage error may affect results beyond what the %s captures.",
+              labels$interval_abbrev),
+      "",
+      "  See the Methodology sheet for details on each statistical method used."
+    )
+  } else {
+    callout_lines <- c(
+      "HOW TO READ THIS REPORT",
+      "",
+      "This report presents the results of your precision analysis. It tells you how",
+      "stable your survey estimates are within the achieved sample.",
+      "",
+      "Key concepts:",
+      sprintf("  %s (%s): A range that describes the variability in your",
+              labels$interval_name, labels$interval_abbrev),
+      sprintf("  observed estimates. A 95%% %s shows the range you would expect if",
+              labels$interval_abbrev),
+      "  you repeated this study with a similar group of respondents.",
+      "",
+      sprintf("  %s (%s): Half the width of the %s.",
+              labels$moe_name, labels$moe_abbrev, tolower(labels$interval_name)),
+      sprintf("  A smaller %s means more consistent estimates.", labels$moe_abbrev),
+      "",
+      "  Effective Sample Size: When survey weights are applied, some respondents",
+      "  count more than others. The effective n tells you how many unweighted",
+      "  respondents your weighted sample is equivalent to.",
+      "",
+      "IMPORTANT — INTERPRETING THESE INTERVALS:",
+      "  Because this sample was not drawn using a probability-based method,",
+      sprintf("  the %ss measure precision (how stable the results are)", tolower(labels$interval_name)),
+      "  rather than accuracy (how close they are to the true population value).",
+      "  Non-response bias, selection bias, and coverage error may affect results",
+      sprintf("  beyond what the %s captures. These intervals are reliable for", labels$interval_abbrev),
+      "  comparing subgroups and tracking changes over time.",
+      "",
+      "  See the Methodology sheet for details on each statistical method used."
+    )
+  }
+  write_callout_block(wb, "Summary", row, callout_lines)
 
   # Auto-size columns
   openxlsx::setColWidths(wb, "Summary", cols = 1:2, widths = "auto")
@@ -701,7 +772,8 @@ add_representativeness_sheet <- function(wb, study_stats, decimal_sep) {
 
 #' Add proportions detail sheet (internal)
 #' @keywords internal
-add_proportions_detail_sheet <- function(wb, prop_results, decimal_sep) {
+add_proportions_detail_sheet <- function(wb, prop_results, decimal_sep, labels = NULL) {
+  if (is.null(labels)) labels <- get_sampling_labels("Not_Specified")
 
   openxlsx::addWorksheet(wb, "Proportions_Detail")
 
@@ -741,23 +813,39 @@ add_proportions_detail_sheet <- function(wb, prop_results, decimal_sep) {
 
   # Callout rows below the data
   callout_row <- 3 + nrow(prop_df) + 2
+  # Build assumption note based on sampling method
+  assumption_lines <- if (labels$is_probability) {
+    c(
+      sprintf("IMPORTANT: All %ss assume a random (probability) sample.", tolower(labels$interval_name)),
+      "If your sample was collected through convenience, online panels, or",
+      "snowball sampling, the intervals may understate the true uncertainty."
+    )
+  } else {
+    c(
+      sprintf("IMPORTANT: These %ss measure precision within the achieved sample.", tolower(labels$interval_name)),
+      "Because respondents were not randomly selected from the population,",
+      "the intervals describe how stable the estimates are, not how close",
+      "they are to the true population value."
+    )
+  }
   write_callout_block(wb, "Proportions_Detail", callout_row, c(
     "HOW TO READ THESE RESULTS",
     "",
     "Each row shows a survey question analysed as a proportion (percentage).",
     "The Proportion column is the observed percentage in your sample.",
     "",
-    "Confidence intervals tell you the range where the TRUE population",
-    "value likely falls. For example, if the proportion is 0.45 and the 95%",
-    "CI is [0.40, 0.50], there is a 95% chance the real value is between",
+    sprintf("%ss tell you the range where the TRUE population", labels$interval_name),
+    sprintf("value likely falls. For example, if the proportion is 0.45 and the 95%%"),
+    sprintf("%s is [0.40, 0.50], there is a 95%% chance the real value is between", labels$interval_abbrev),
     "40% and 50%.",
     "",
     "Methods available:",
-    "  MOE (Normal): Standard margin of error. Simple and widely understood,",
+    sprintf("  %s (Normal): Standard %s. Simple and widely understood,",
+            labels$moe_abbrev, tolower(labels$moe_name)),
     "  but can give impossible values (below 0% or above 100%) for extreme",
     "  proportions. Works best when p is between 20% and 80%.",
     "",
-    "  Wilson Score: Better than MOE for extreme proportions (very high or",
+    sprintf("  Wilson Score: Better than %s for extreme proportions (very high or", labels$moe_abbrev),
     "  very low percentages). Always gives valid intervals within [0%, 100%].",
     "  Recommended for proportions below 10% or above 90%.",
     "",
@@ -769,9 +857,7 @@ add_proportions_detail_sheet <- function(wb, prop_results, decimal_sep) {
     "  Useful for tracking studies where previous wave data can inform the",
     "  current estimate.",
     "",
-    "IMPORTANT: All confidence intervals assume a random (probability) sample.",
-    "If your sample was collected through convenience, online panels, or",
-    "snowball sampling, the intervals may understate the true uncertainty."
+    assumption_lines
   ))
 
   # Auto-size columns
@@ -855,7 +941,8 @@ build_proportions_dataframe <- function(prop_results) {
 
 #' Add means detail sheet (internal)
 #' @keywords internal
-add_means_detail_sheet <- function(wb, mean_results, decimal_sep) {
+add_means_detail_sheet <- function(wb, mean_results, decimal_sep, labels = NULL) {
+  if (is.null(labels)) labels <- get_sampling_labels("Not_Specified")
 
   openxlsx::addWorksheet(wb, "Means_Detail")
 
@@ -895,6 +982,21 @@ add_means_detail_sheet <- function(wb, mean_results, decimal_sep) {
 
   # Callout rows below the data
   callout_row <- 3 + nrow(mean_df) + 2
+  # Build assumption note based on sampling method
+  assumption_lines_means <- if (labels$is_probability) {
+    c(
+      sprintf("IMPORTANT: All %ss assume a random (probability) sample.", tolower(labels$interval_name)),
+      sprintf("If respondents self-selected into the survey, the %s reflects sampling", labels$interval_abbrev),
+      "variability only and does not capture selection bias."
+    )
+  } else {
+    c(
+      sprintf("IMPORTANT: These %ss measure precision within the achieved sample.", tolower(labels$interval_name)),
+      "Because respondents were not randomly selected from the population,",
+      "the intervals describe how stable the estimates are, not how close",
+      "they are to the true population value."
+    )
+  }
   write_callout_block(wb, "Means_Detail", callout_row, c(
     "HOW TO READ THESE RESULTS",
     "",
@@ -902,9 +1004,9 @@ add_means_detail_sheet <- function(wb, mean_results, decimal_sep) {
     "The Mean column is the observed average in your sample, and SD is",
     "the standard deviation (how spread out the individual responses are).",
     "",
-    "Confidence intervals tell you the range where the TRUE population",
-    "average likely falls. For example, if the mean is 7.2 and the 95%",
-    "CI is [6.8, 7.6], there is a 95% chance the real average is between",
+    sprintf("%ss tell you the range where the TRUE population", labels$interval_name),
+    sprintf("average likely falls. For example, if the mean is 7.2 and the 95%%"),
+    sprintf("%s is [6.8, 7.6], there is a 95%% chance the real average is between", labels$interval_abbrev),
     "6.8 and 7.6.",
     "",
     "Methods available:",
@@ -923,9 +1025,7 @@ add_means_detail_sheet <- function(wb, mean_results, decimal_sep) {
     "Smaller SE = more precise estimate. SE depends on both sample size",
     "and data variability.",
     "",
-    "IMPORTANT: All confidence intervals assume a random (probability) sample.",
-    "If respondents self-selected into the survey, the CI reflects sampling",
-    "variability only and does not capture selection bias."
+    assumption_lines_means
   ))
 
   # Auto-size columns
@@ -1005,7 +1105,8 @@ build_means_dataframe <- function(mean_results) {
 
 #' Add NPS detail sheet (internal)
 #' @keywords internal
-add_nps_detail_sheet <- function(wb, nps_results, decimal_sep) {
+add_nps_detail_sheet <- function(wb, nps_results, decimal_sep, labels = NULL) {
+  if (is.null(labels)) labels <- get_sampling_labels("Not_Specified")
 
   openxlsx::addWorksheet(wb, "NPS_Detail")
 
@@ -1045,6 +1146,20 @@ add_nps_detail_sheet <- function(wb, nps_results, decimal_sep) {
 
   # Callout rows below the data
   callout_row <- 3 + nrow(nps_df) + 2
+  # Build assumption note based on sampling method
+  assumption_lines_nps <- if (labels$is_probability) {
+    c(
+      sprintf("IMPORTANT: NPS %ss assume a random sample. If your", tolower(labels$interval_name)),
+      "respondents were not randomly selected, the interval does not account",
+      "for the bias introduced by sample selection."
+    )
+  } else {
+    c(
+      sprintf("IMPORTANT: These %ss measure precision within the achieved sample.", tolower(labels$interval_name)),
+      "Because respondents were not randomly selected, the intervals describe",
+      "how stable the NPS is, not how close it is to the true population NPS."
+    )
+  }
   write_callout_block(wb, "NPS_Detail", callout_row, c(
     "HOW TO READ THESE RESULTS",
     "",
@@ -1052,18 +1167,16 @@ add_nps_detail_sheet <- function(wb, nps_results, decimal_sep) {
     "It ranges from -100 (everyone is a detractor) to +100 (everyone is a",
     "promoter). Scores above 0 are generally positive, above 50 are excellent.",
     "",
-    "Confidence intervals show the range where the TRUE NPS likely falls.",
+    sprintf("%ss show the range where the TRUE NPS likely falls.", labels$interval_name),
     "NPS can be volatile with small samples because it depends on the",
     "difference between two proportions.",
     "",
     "Rule of thumb for NPS precision:",
     "  n < 100: NPS can swing by 15-20 points between samples",
-    "  n = 200-500: Typical MOE of 7-10 points",
-    "  n > 1000: MOE under 4 points",
+    sprintf("  n = 200-500: Typical %s of 7-10 points", labels$moe_abbrev),
+    sprintf("  n > 1000: %s under 4 points", labels$moe_abbrev),
     "",
-    "IMPORTANT: NPS confidence intervals assume a random sample. If your",
-    "respondents were not randomly selected, the interval does not account",
-    "for the bias introduced by sample selection."
+    assumption_lines_nps
   ))
 
   # Auto-size columns

@@ -10,7 +10,8 @@
 #' @param questions Named list from transform_confidence_for_html()
 #' @return Character string of HTML
 #' @keywords internal
-build_ci_summary_table <- function(questions) {
+build_ci_summary_table <- function(questions, labels = NULL) {
+  if (is.null(labels)) labels <- get_sampling_labels("Not_Specified")
   if (length(questions) == 0) return("")
 
   rows <- character()
@@ -63,9 +64,9 @@ build_ci_summary_table <- function(questions) {
           <th class="ci-th ci-label-col">Question</th>
           <th class="ci-th">Type</th>
           <th class="ci-th ci-num">Estimate</th>
-          <th class="ci-th ci-num">CI Lower</th>
-          <th class="ci-th ci-num">CI Upper</th>
-          <th class="ci-th ci-num">CI Width</th>
+          <th class="ci-th ci-num">%s Lower</th>
+          <th class="ci-th ci-num">%s Upper</th>
+          <th class="ci-th ci-num">%s Width</th>
           <th class="ci-th">Quality</th>
         </tr>
       </thead>
@@ -73,6 +74,7 @@ build_ci_summary_table <- function(questions) {
         %s
       </tbody>
     </table>',
+    labels$interval_abbrev, labels$interval_abbrev, labels$interval_abbrev,
     paste(rows, collapse = "\n")
   )
 }
@@ -144,7 +146,8 @@ build_study_level_table <- function(study_level) {
 #' @param conf_level Numeric confidence level
 #' @return Character string of HTML
 #' @keywords internal
-build_proportion_detail_table <- function(result, conf_level) {
+build_proportion_detail_table <- function(result, conf_level, labels = NULL) {
+  if (is.null(labels)) labels <- get_sampling_labels("Not_Specified")
   pct <- round(conf_level * 100)
   rows <- character()
 
@@ -193,7 +196,7 @@ build_proportion_detail_table <- function(result, conf_level) {
           <th class="ci-th ci-label-col">Method</th>
           <th class="ci-th ci-num">%d%% Lower</th>
           <th class="ci-th ci-num">%d%% Upper</th>
-          <th class="ci-th ci-num">MOE</th>
+          <th class="ci-th ci-num">%s</th>
           <th class="ci-th">Notes</th>
         </tr>
       </thead>
@@ -201,7 +204,7 @@ build_proportion_detail_table <- function(result, conf_level) {
         %s
       </tbody>
     </table>',
-    pct, pct, paste(rows, collapse = "\n")
+    pct, pct, labels$moe_abbrev, paste(rows, collapse = "\n")
   )
 }
 
@@ -212,7 +215,8 @@ build_proportion_detail_table <- function(result, conf_level) {
 #' @param conf_level Numeric confidence level
 #' @return Character string of HTML
 #' @keywords internal
-build_mean_detail_table <- function(result, conf_level) {
+build_mean_detail_table <- function(result, conf_level, labels = NULL) {
+  if (is.null(labels)) labels <- get_sampling_labels("Not_Specified")
   pct <- round(conf_level * 100)
   rows <- character()
 
@@ -256,7 +260,7 @@ build_mean_detail_table <- function(result, conf_level) {
           <th class="ci-th ci-label-col">Method</th>
           <th class="ci-th ci-num">%d%% Lower</th>
           <th class="ci-th ci-num">%d%% Upper</th>
-          <th class="ci-th ci-num">Half-Width</th>
+          <th class="ci-th ci-num">%s</th>
           <th class="ci-th">Notes</th>
         </tr>
       </thead>
@@ -264,7 +268,7 @@ build_mean_detail_table <- function(result, conf_level) {
         %s
       </tbody>
     </table>',
-    pct, pct, paste(rows, collapse = "\n")
+    pct, pct, labels$halfwidth_name, paste(rows, collapse = "\n")
   )
 }
 
@@ -275,7 +279,8 @@ build_mean_detail_table <- function(result, conf_level) {
 #' @param conf_level Numeric confidence level
 #' @return Character string of HTML
 #' @keywords internal
-build_nps_detail_table <- function(result, conf_level) {
+build_nps_detail_table <- function(result, conf_level, labels = NULL) {
+  if (is.null(labels)) labels <- get_sampling_labels("Not_Specified")
   pct <- round(conf_level * 100)
 
   # NPS breakdown row
@@ -343,7 +348,7 @@ build_nps_detail_table <- function(result, conf_level) {
           <th class="ci-th ci-label-col">Metric</th>
           <th class="ci-th ci-num">%d%% Lower</th>
           <th class="ci-th ci-num">%d%% Upper</th>
-          <th class="ci-th ci-num">MOE</th>
+          <th class="ci-th ci-num">%s</th>
           <th class="ci-th">Notes</th>
         </tr>
       </thead>
@@ -352,7 +357,7 @@ build_nps_detail_table <- function(result, conf_level) {
         %s
       </tbody>
     </table>',
-    pct, pct, breakdown, paste(ci_rows, collapse = "\n")
+    pct, pct, labels$moe_abbrev, breakdown, paste(ci_rows, collapse = "\n")
   )
 }
 

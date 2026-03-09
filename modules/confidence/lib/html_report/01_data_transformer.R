@@ -146,7 +146,8 @@ transform_proportion_question <- function(q_id, result, conf_level, global_n_eff
   ci_upper <- if (!is.null(best_ci)) best_ci$upper else NA
   ci_width <- if (!is.na(ci_lower) && !is.na(ci_upper)) (ci_upper - ci_lower) * 100 else NA
 
-  quality <- assess_quality(n_eff, ci_width, result)
+  sl <- get_sampling_labels(sampling_method)
+  quality <- assess_quality(n_eff, ci_width, result, labels = sl)
   callout <- generate_proportion_callout(q_id, p, ci_lower, ci_upper, n_eff,
                                           conf_level, is_weighted, quality,
                                           methods_used, sampling_method)
@@ -196,7 +197,8 @@ transform_mean_question <- function(q_id, result, conf_level, global_n_eff,
   ci_upper <- if (!is.null(best_ci)) best_ci$upper else NA
   ci_width <- if (!is.na(ci_lower) && !is.na(ci_upper)) ci_upper - ci_lower else NA
 
-  quality <- assess_quality_mean(n_eff, ci_width, sd_val, mean_val, result)
+  sl <- get_sampling_labels(sampling_method)
+  quality <- assess_quality_mean(n_eff, ci_width, sd_val, mean_val, result, labels = sl)
   callout <- generate_mean_callout(q_id, mean_val, ci_lower, ci_upper, n_eff,
                                     conf_level, is_weighted, quality,
                                     methods_used, sampling_method)
@@ -245,7 +247,8 @@ transform_nps_question <- function(q_id, result, conf_level, global_n_eff,
   ci_upper <- if (!is.null(best_ci)) best_ci$upper else NA
   ci_width <- if (!is.na(ci_lower) && !is.na(ci_upper)) ci_upper - ci_lower else NA
 
-  quality <- assess_quality(n_eff, ci_width, result)
+  sl <- get_sampling_labels(sampling_method)
+  quality <- assess_quality(n_eff, ci_width, result, labels = sl)
   callout <- generate_nps_callout(q_id, nps_score, ci_lower, ci_upper, n_eff,
                                    conf_level, is_weighted, quality,
                                    result$pct_promoters, result$pct_detractors,
@@ -274,8 +277,9 @@ transform_nps_question <- function(q_id, result, conf_level, global_n_eff,
 # ==============================================================================
 
 #' @keywords internal
-assess_quality <- function(n_eff, ci_width_pp, result) {
+assess_quality <- function(n_eff, ci_width_pp, result, labels = NULL) {
   # ci_width_pp is in percentage points for proportions, raw for NPS
+  if (is.null(labels)) labels <- get_sampling_labels("Not_Specified")
   badge <- "good"
   reasons <- character()
 
@@ -289,17 +293,18 @@ assess_quality <- function(n_eff, ci_width_pp, result) {
 
   if (!is.na(ci_width_pp) && ci_width_pp > 20) {
     badge <- "poor"
-    reasons <- c(reasons, "Very wide confidence interval (over 20 percentage points)")
+    reasons <- c(reasons, sprintf("Very wide %s (over 20 percentage points)", tolower(labels$interval_name)))
   } else if (!is.na(ci_width_pp) && ci_width_pp > 10) {
     badge <- if (badge != "poor") "warn" else badge
-    reasons <- c(reasons, "Wide confidence interval (over 10 percentage points)")
+    reasons <- c(reasons, sprintf("Wide %s (over 10 percentage points)", tolower(labels$interval_name)))
   }
 
   list(badge = badge, reasons = reasons)
 }
 
 #' @keywords internal
-assess_quality_mean <- function(n_eff, ci_width, sd_val, mean_val, result) {
+assess_quality_mean <- function(n_eff, ci_width, sd_val, mean_val, result, labels = NULL) {
+  if (is.null(labels)) labels <- get_sampling_labels("Not_Specified")
   badge <- "good"
   reasons <- character()
 
@@ -316,10 +321,10 @@ assess_quality_mean <- function(n_eff, ci_width, sd_val, mean_val, result) {
     relative_width <- ci_width / sd_val
     if (relative_width > 1.5) {
       badge <- "poor"
-      reasons <- c(reasons, "CI width exceeds 1.5 standard deviations")
+      reasons <- c(reasons, sprintf("%s width exceeds 1.5 standard deviations", labels$interval_abbrev))
     } else if (relative_width > 0.8) {
       badge <- if (badge != "poor") "warn" else badge
-      reasons <- c(reasons, "CI width is large relative to the standard deviation")
+      reasons <- c(reasons, sprintf("%s width is large relative to the standard deviation", labels$interval_abbrev))
     }
   }
 
@@ -338,6 +343,7 @@ generate_proportion_callout <- function(q_id, p, lower, upper, n_eff,
                                          methods_used,
                                          sampling_method = "Not_Specified") {
   pct <- round(conf_level * 100)
+  labels <- get_sampling_labels(sampling_method)
   sections <- character()
 
   # === SECTION 1: KEY RESULT (blue callout) ===
@@ -345,8 +351,8 @@ generate_proportion_callout <- function(q_id, p, lower, upper, n_eff,
   if (!is.na(p) && !is.na(lower) && !is.na(upper)) {
     moe <- round((upper - lower) / 2 * 100, 1)
     result_parts <- c(result_parts, sprintf(
-      "The observed proportion is <strong>%.1f%%</strong>, with a %d%% confidence interval of <strong>%.1f%% to %.1f%%</strong> (&plusmn;%.1f pp).",
-      p * 100, pct, lower * 100, upper * 100, moe
+      "The observed proportion is <strong>%.1f%%</strong>, with a %d%% %s of <strong>%.1f%% to %.1f%%</strong> (&plusmn;%.1f pp).",
+      p * 100, pct, labels$interval_term, lower * 100, upper * 100, moe
     ))
     if (moe <= 3) {
       result_parts <- c(result_parts, "This is a tight, highly precise estimate.")
@@ -420,6 +426,7 @@ generate_mean_callout <- function(q_id, mean_val, lower, upper, n_eff,
                                    methods_used,
                                    sampling_method = "Not_Specified") {
   pct <- round(conf_level * 100)
+  labels <- get_sampling_labels(sampling_method)
   sections <- character()
 
   # === SECTION 1: KEY RESULT (blue callout) ===
@@ -427,8 +434,8 @@ generate_mean_callout <- function(q_id, mean_val, lower, upper, n_eff,
   if (!is.na(mean_val) && !is.na(lower) && !is.na(upper)) {
     width <- upper - lower
     result_parts <- c(result_parts, sprintf(
-      "The observed mean is <strong>%.2f</strong>, with a %d%% confidence interval of <strong>%.2f to %.2f</strong> (width: %.2f).",
-      mean_val, pct, lower, upper, width
+      "The observed mean is <strong>%.2f</strong>, with a %d%% %s of <strong>%.2f to %.2f</strong> (width: %.2f).",
+      mean_val, pct, labels$interval_term, lower, upper, width
     ))
     denom <- abs(mean_val) + 0.001
     rw <- width / denom
@@ -500,6 +507,7 @@ generate_nps_callout <- function(q_id, nps_score, lower, upper, n_eff,
                                   methods_used = character(),
                                   sampling_method = "Not_Specified") {
   pct <- round(conf_level * 100)
+  labels <- get_sampling_labels(sampling_method)
   sections <- character()
 
   # === SECTION 1: KEY RESULT (blue callout) ===
@@ -517,8 +525,8 @@ generate_nps_callout <- function(q_id, nps_score, lower, upper, n_eff,
     if (!is.na(lower) && !is.na(upper)) {
       moe_nps <- round((upper - lower) / 2, 1)
       result_parts <- c(result_parts, sprintf(
-        "The %d%% confidence interval runs from <strong>%+.0f to %+.0f</strong> (&plusmn;%.1f points).",
-        pct, lower, upper, moe_nps
+        "The %d%% %s runs from <strong>%+.0f to %+.0f</strong> (&plusmn;%.1f points).",
+        pct, labels$interval_term, lower, upper, moe_nps
       ))
       if (nps_score != 0 && lower <= 0 && upper >= 0) {
         result_parts <- c(result_parts,
@@ -589,9 +597,9 @@ generate_nps_callout <- function(q_id, nps_score, lower, upper, n_eff,
 #' Build tailored sampling note based on study sampling method
 #'
 #' Returns an HTML callout explaining what the sampling design means for
-#' interpreting the confidence intervals. Tone is statistically honest but
-#' pragmatic — acknowledging real-world research realities without being
-#' unnecessarily negative.
+#' interpreting the intervals. Honest and defensible: probability designs
+#' get standard CI language, non-probability designs get language that
+#' accurately reflects what the intervals can and cannot tell you.
 #'
 #' @param sampling_method Character. One of: Random, Stratified, Cluster,
 #'   Quota, Online_Panel, Self_Selected, Census, Not_Specified
@@ -600,26 +608,22 @@ generate_nps_callout <- function(q_id, nps_score, lower, upper, n_eff,
 build_sampling_note <- function(sampling_method = "Not_Specified") {
   note <- switch(sampling_method,
 
-    "Random" = '<strong>Sampling design: simple random sample.</strong> These confidence intervals have their stated coverage probability and can be used to generalise to the target population with the precision shown.',
+    "Random" = '<strong>Sampling design: simple random sample.</strong> Every person in the target population had an equal chance of being selected. This is the gold standard for survey sampling, and the confidence intervals can be taken at face value. The remaining uncertainty is practical rather than statistical: people who chose not to respond may hold different views from those who did, and the way questions are worded always influences answers to some degree.',
 
-    "Stratified" = '<strong>Sampling design: stratified random sample.</strong> Stratification typically improves precision beyond what standard formulas assume, so the intervals shown are likely conservative &mdash; actual precision may be somewhat better than reported.',
+    "Stratified" = '<strong>Sampling design: stratified random sample.</strong> The population was divided into groups (e.g. by channel, region, or segment) and people were sampled randomly within each group. This ensures reliable results for each group, even smaller ones, but may mean some groups are deliberately oversampled relative to their true size. Within each group, the confidence intervals are trustworthy. At total level, they are conservative &mdash; if anything, slightly wider than necessary. As with any survey, people who declined to take part may differ from those who did.',
 
-    "Cluster" = '<strong>Sampling design: cluster sample.</strong> Standard confidence intervals may understate uncertainty if responses within clusters are correlated. The design effect (DEFF) partially adjusts for this, but if clustering variables differ from the weighting variables, residual design effects are possible. If in doubt, compare bootstrap intervals (which capture more of this variability) with the standard intervals.',
+    "Cluster" = '<strong>Sampling design: cluster sample.</strong> The population was divided into natural groupings (e.g. branches, stores, or teams) and a selection of these groupings was sampled rather than individuals directly. This is practical and cost-effective but means that people within the same cluster tend to give similar responses, which reduces the effective sample size. The confidence intervals reported here do not adjust for this clustering effect and may therefore be narrower than they should be. Results should be treated as indicative, and differences near the margin of error interpreted with caution.',
 
-    "Quota" = '<strong>Sampling design: quota sample.</strong> Quotas ensure the sample matches the population on key demographics, and the intervals reliably capture variability within those controlled dimensions. Because recruitment is non-random, unmeasured biases are possible &mdash; but well-designed quotas substantially reduce this risk. Results are suitable for business and policy decisions.',
+    "Quota" = '<strong>Sampling design: quota sample.</strong> Respondents were recruited to match the target population on selected characteristics such as age, gender, or region. Within these quotas, selection was not random &mdash; interviewers or recruiters chose who to approach. The stability intervals describe the variability in the achieved sample and are useful for comparing groups and detecting shifts between waves. They should not be read as exact margins of error, because the non-random selection within quotas introduces uncertainty that the intervals cannot measure.',
 
-    "Online_Panel" = '<strong>Sampling design: online research panel.</strong> Panel members are recruited, profiled, and quality-managed, providing a structured and repeatable sampling frame. Confidence intervals accurately reflect variability in the achieved sample. Well-managed panels routinely produce results consistent with probability-based benchmarks, though as with all non-probability designs, coverage of hard-to-reach groups may be limited.',
+    "Online_Panel" = '<strong>Sampling design: online research panel.</strong> Respondents were drawn from a pre-recruited research panel, usually with quotas to match the target population on key characteristics. The stability intervals measure how stable the results are within this sample, but panel members are volunteers who have opted in to research &mdash; they are not a random cross-section of the population. These intervals are reliable for tracking changes over time and comparing subgroups, but should be read as a measure of precision rather than a guaranteed margin of error.',
 
-    "Self_Selected" = '<strong>Sampling design: self-selected (opt-in) sample.</strong> Because participants chose to take part, the intervals reflect the data\'s internal variability but may not fully capture selection bias. Directional findings and relative comparisons between subgroups are informative and useful; treat exact percentage-point margins as indicative rather than definitive.',
+    "Self_Selected" = '<strong>Sampling design: self-selected (opt-in) sample.</strong> Respondents chose to take part &mdash; there was no structured selection from a defined population. The stability intervals describe the range of results you would expect if you repeated the exercise with a similar group of volunteers, but they do not tell you how close the results are to what the broader population thinks. These results are useful for identifying patterns and priorities within the responding group. They are not generalisable without additional evidence that the respondents are representative.',
 
-    "Census" = '<strong>Sampling design: census (full population).</strong> These results represent the complete population, so there is no sampling uncertainty. Any confidence intervals shown reflect measurement precision or model-based uncertainty rather than sampling variability.',
+    "Census" = '<strong>Sampling design: census (full population).</strong> Everyone in the target population was invited to participate. There is no sampling error in the traditional sense &mdash; the uncertainty comes entirely from who chose to respond. If most people responded, the results closely represent the whole population. If response rates are low, the responding group may not be representative, and the confidence intervals understate the true uncertainty. The response rate is the single most important quality indicator for this type of study. If the response rate is below 50%, consider treating the results as you would a convenience sample.',
 
-    # Default: Not_Specified — show the generic multi-method note
-    paste0(
-      '<strong>About your sample:</strong> With a <em>random (probability)</em> sample, these intervals have their stated coverage and are fully trustworthy. ',
-      'With a <em>structured quota</em> or <em>online panel</em>, they reliably capture variability within controlled demographics, though unmeasured biases are possible. ',
-      'With a <em>self-selected or opt-in</em> sample, the intervals reflect the data\'s variability but may understate total uncertainty &mdash; directional findings are informative, but treat exact margins as indicative rather than definitive.'
-    )
+    # Default: Not_Specified — sampling method unknown, use cautious framing
+    '<strong>About your sample:</strong> The sampling method for this study was not recorded. The stability intervals describe the variability in the observed data and provide a useful indication of estimate precision. However, their interpretation depends on how the sample was drawn. If the sample is broadly representative of the target population, the intervals are a reasonable guide to the margin of error. If representativeness is uncertain, treat them as a measure of internal consistency rather than definitive bounds.'
   )
 
   sprintf('<div class="ci-callout ci-callout-sampling">%s</div>', note)

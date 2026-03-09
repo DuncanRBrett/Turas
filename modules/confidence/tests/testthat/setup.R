@@ -50,7 +50,7 @@ for (f in shared_files) {
 # Source confidence module R files in dependency order
 r_dir <- file.path(MODULE_DIR, "R")
 r_files <- c(
-  "utils.R", "00_guard.R", "03_study_level.R",
+  "utils.R", "sampling_labels.R", "00_guard.R", "03_study_level.R",
   "04_proportions.R", "05_means.R",
   "question_processor.R", "ci_dispatcher.R",
   "output_helpers.R", "01_load_config.R",

@@ -76,6 +76,14 @@ assign(".chr_submodules_loaded", FALSE, envir = globalenv())
     source(file.path(report_dir, f))
   }
 
+  # Source sampling_labels.R from the module's R/ directory
+  labels_path <- file.path(dirname(dirname(report_dir)), "R", "sampling_labels.R")
+  if (file.exists(labels_path)) {
+    source(labels_path)
+  } else {
+    cat(sprintf("    [WARNING] sampling_labels.R not found at %s — using defaults\n", labels_path))
+  }
+
   assign(".chr_submodules_loaded", TRUE, envir = globalenv())
   NULL
 }
@@ -155,6 +163,13 @@ generate_confidence_html_report <- function(confidence_results, output_path,
   n_questions <- length(html_data$questions)
   cat(sprintf("    %d question(s) to render\n", n_questions))
 
+  # Generate sampling-method-aware labels for presentation
+  labels <- if (exists("get_sampling_labels", mode = "function")) {
+    get_sampling_labels(html_data$summary$sampling_method %||% "Not_Specified")
+  } else {
+    NULL
+  }
+
   # ==========================================================================
   # STEP 3: BUILD TABLES
   # ==========================================================================
@@ -165,7 +180,7 @@ generate_confidence_html_report <- function(confidence_results, output_path,
 
   # Summary table (all questions overview)
   tables$summary <- tryCatch(
-    build_ci_summary_table(html_data$questions),
+    build_ci_summary_table(html_data$questions, labels = labels),
     error = function(e) {
       cat(sprintf("    [WARNING] Summary table failed: %s\n", e$message))
       ""
@@ -200,11 +215,11 @@ generate_confidence_html_report <- function(confidence_results, output_path,
 
     detail_table <- tryCatch({
       if (q$type == "proportion") {
-        build_proportion_detail_table(q$results, conf_level)
+        build_proportion_detail_table(q$results, conf_level, labels = labels)
       } else if (q$type == "mean") {
-        build_mean_detail_table(q$results, conf_level)
+        build_mean_detail_table(q$results, conf_level, labels = labels)
       } else if (q$type == "nps") {
-        build_nps_detail_table(q$results, conf_level)
+        build_nps_detail_table(q$results, conf_level, labels = labels)
       } else {
         ""
       }
@@ -259,7 +274,8 @@ generate_confidence_html_report <- function(confidence_results, output_path,
 
   page <- tryCatch({
     build_confidence_page(html_data, tables, charts, config,
-                           source_filename = source_filename)
+                           source_filename = source_filename,
+                           labels = labels)
   }, error = function(e) {
     cat("\n=== TURAS ERROR ===\n")
     cat("Code: CALC_PAGE_BUILD_FAILED\n")

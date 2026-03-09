@@ -127,6 +127,7 @@ source_module_files <- function(base_dir = NULL) {
   # List of files to source in order (including new refactored modules)
   module_files <- c(
     "utils.R",
+    "sampling_labels.R",
     "01_load_config.R",
     "02_load_data.R",
     "03_study_level.R",
@@ -613,7 +614,11 @@ generate_output_step <- function(config, study_stats, proportion_results,
         confidence_level = as.numeric(config$study_settings$Confidence_Level),
         bootstrap_iterations = as.integer(config$study_settings$Bootstrap_Iterations),
         multiple_comparison_method = config$study_settings$Multiple_Comparison_Method,
-        calculate_effective_n = config$study_settings$Calculate_Effective_N == "Y"
+        calculate_effective_n = config$study_settings$Calculate_Effective_N == "Y",
+        sampling_method = {
+          sm <- config$study_settings$Sampling_Method
+          if (is.null(sm) || is.na(sm) || !nzchar(trimws(sm))) "Not_Specified" else trimws(sm)
+        }
       ),
       warnings = warnings_list,
       decimal_sep = config$study_settings$Decimal_Separator,

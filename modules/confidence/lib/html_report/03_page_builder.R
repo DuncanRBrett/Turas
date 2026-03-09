@@ -21,7 +21,10 @@ if (!exists("%||%", mode = "function")) {
 #' @return Character string of complete HTML document
 #' @keywords internal
 build_confidence_page <- function(html_data, tables, charts, config,
-                                   source_filename = "Confidence_Report") {
+                                   source_filename = "Confidence_Report",
+                                   labels = NULL) {
+  if (is.null(labels)) labels <- get_sampling_labels("Not_Specified")
+
   # Robust colour extraction: handle NULL, NA, and empty strings
   brand <- config$brand_colour %||% "#1e3a5f"
   if (is.na(brand) || !nzchar(trimws(brand))) brand <- "#1e3a5f"
@@ -30,10 +33,10 @@ build_confidence_page <- function(html_data, tables, charts, config,
 
   meta_tags <- build_ci_meta_tags(html_data$summary, source_filename)
   css <- build_ci_css(brand, accent)
-  header <- build_ci_header(html_data$summary, brand, config)
+  header <- build_ci_header(html_data$summary, brand, config, labels = labels)
   nav <- build_ci_tab_nav()
-  summary_panel <- build_ci_summary_panel(html_data, tables, charts)
-  details_panel <- build_ci_details_panel(html_data, tables, charts, brand)
+  summary_panel <- build_ci_summary_panel(html_data, tables, charts, labels = labels)
+  details_panel <- build_ci_details_panel(html_data, tables, charts, brand, labels = labels)
   notes_panel <- build_ci_notes_panel(html_data, config)
   footer <- build_ci_footer()
   js <- build_ci_js()
@@ -43,7 +46,7 @@ build_confidence_page <- function(html_data, tables, charts, config,
     '<meta charset="UTF-8">\n',
     '<meta name="viewport" content="width=device-width, initial-scale=1">\n',
     meta_tags, '\n',
-    '<title>Turas Confidence Analysis</title>\n',
+    sprintf('<title>%s</title>\n', htmlEscape(labels$report_title)),
     '<style>\n', css, '\n</style>\n',
     '</head>\n<body>\n',
     header, '\n',
@@ -422,7 +425,8 @@ body {
 # HEADER
 # ==============================================================================
 
-build_ci_header <- function(summary, brand, config) {
+build_ci_header <- function(summary, brand, config, labels = NULL) {
+  if (is.null(labels)) labels <- get_sampling_labels("Not_Specified")
   # Logo: custom or fallback SVG checkmark
   logo_html <- '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="40" height="40"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
 
@@ -462,8 +466,9 @@ build_ci_header <- function(summary, brand, config) {
                                  format(summary$n_total, big.mark = ",")))
   }
   badge_items <- c(badge_items, sprintf('<span class="ci-badge">%d Questions</span>', summary$n_questions))
-  badge_items <- c(badge_items, sprintf('<span class="ci-badge">%d%% Confidence</span>',
-                               round(summary$confidence_level * 100)))
+  badge_items <- c(badge_items, sprintf(
+    paste0('<span class="ci-badge">', labels$badge_text_fmt, '</span>'),
+    round(summary$confidence_level * 100)))
   if (summary$is_weighted) {
     badge_items <- c(badge_items, '<span class="ci-badge">Weighted</span>')
   }
@@ -497,8 +502,8 @@ build_ci_header <- function(summary, brand, config) {
       <div class="ci-header-inner">
         <div class="ci-header-logo">%s</div>
         <div class="ci-header-text">
-          <div class="ci-header-title">Turas Confidence Analysis</div>
-          <div class="ci-header-subtitle">Statistical confidence interval report</div>
+          <div class="ci-header-title">%s</div>
+          <div class="ci-header-subtitle">%s</div>
           <div class="ci-header-project">%s</div>
           %s
           <div class="ci-header-badges">%s</div>
@@ -506,6 +511,8 @@ build_ci_header <- function(summary, brand, config) {
       </div>
     </div>',
     logo_html,
+    htmlEscape(labels$report_title),
+    htmlEscape(labels$report_subtitle),
     htmlEscape(summary$project_name),
     prepared,
     badges
@@ -531,7 +538,8 @@ build_ci_tab_nav <- function() {
 # SUMMARY PANEL
 # ==============================================================================
 
-build_ci_summary_panel <- function(html_data, tables, charts) {
+build_ci_summary_panel <- function(html_data, tables, charts, labels = NULL) {
+  if (is.null(labels)) labels <- get_sampling_labels("Not_Specified")
   summary <- html_data$summary
   parts <- character()
 
@@ -595,21 +603,21 @@ build_ci_summary_panel <- function(html_data, tables, charts) {
   if (nzchar(tables$summary %||% "")) {
     parts <- c(parts, sprintf(
       '<div class="ci-card"><h3>Results Overview</h3>
-        <div class="ci-callout">This table shows all questions analysed with their confidence intervals and quality assessments. The Quality column indicates whether the sample is large enough for reliable estimates. Click the <strong>Question Details</strong> tab above for full method comparisons and explanations.</div>
+        <div class="ci-callout">This table shows all questions analysed with their %ss and quality assessments. The Quality column indicates whether the sample is large enough for reliable estimates. Click the <strong>Question Details</strong> tab above for full method comparisons and explanations.</div>
         %s
       </div>',
-      tables$summary
+      labels$interval_term, tables$summary
     ))
   }
 
   # Forest plot
   if (nzchar(charts$forest_plot %||% "")) {
     parts <- c(parts, sprintf(
-      '<div class="ci-card"><h3>Confidence Interval Overview</h3>
-        <div class="ci-callout">Each dot shows the estimated value, and the horizontal bar shows the confidence interval. Shorter bars indicate more precise estimates. If a bar is very wide, the true value is uncertain &mdash; a larger sample would narrow it.</div>
+      '<div class="ci-card"><h3>%s</h3>
+        <div class="ci-callout">Each dot shows the estimated value, and the horizontal bar shows the %s. Shorter bars indicate more precise estimates. If a bar is very wide, the true value is uncertain &mdash; a larger sample would narrow it.</div>
         %s
       </div>',
-      charts$forest_plot
+      labels$overview_title, tolower(labels$interval_name), charts$forest_plot
     ))
   }
 
@@ -633,7 +641,8 @@ build_ci_summary_panel <- function(html_data, tables, charts) {
 # DETAILS PANEL
 # ==============================================================================
 
-build_ci_details_panel <- function(html_data, tables, charts, brand) {
+build_ci_details_panel <- function(html_data, tables, charts, brand, labels = NULL) {
+  if (is.null(labels)) labels <- get_sampling_labels("Not_Specified")
   questions <- html_data$questions
   if (length(questions) == 0) {
     return('<div id="tab-details" class="tab-panel"><div class="ci-card"><p>No question results to display.</p></div></div>')
@@ -664,6 +673,11 @@ build_ci_details_panel <- function(html_data, tables, charts, brand) {
     # Callout (structured HTML from callout generator — already has its own divs)
     panel_parts <- c(panel_parts, q$callout)
 
+    # Cluster warning (only for cluster samples)
+    if (labels$sampling_method_normalised == "cluster") {
+      panel_parts <- c(panel_parts, CLUSTER_WARNING_HTML)
+    }
+
     # Quality badge
     badge_class <- paste0("ci-quality-", q$quality$badge)
     badge_label <- switch(q$quality$badge, good = "Good", warn = "Caution", poor = "Poor")
@@ -681,11 +695,11 @@ build_ci_details_panel <- function(html_data, tables, charts, brand) {
     if (!nzchar(detail_table)) {
       # Fallback: build on demand if not pre-built
       detail_table <- if (q$type == "proportion") {
-        build_proportion_detail_table(q$results, conf_level)
+        build_proportion_detail_table(q$results, conf_level, labels = labels)
       } else if (q$type == "mean") {
-        build_mean_detail_table(q$results, conf_level)
+        build_mean_detail_table(q$results, conf_level, labels = labels)
       } else if (q$type == "nps") {
-        build_nps_detail_table(q$results, conf_level)
+        build_nps_detail_table(q$results, conf_level, labels = labels)
       } else ""
     }
 
