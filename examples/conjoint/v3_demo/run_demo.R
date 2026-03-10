@@ -122,12 +122,13 @@ if (exists("optimize_product_exhaustive", mode = "function") && !is.null(results
     NULL
   })
 
-  if (!is.null(opt_result) && nrow(opt_result) > 0) {
+  if (!is.null(opt_result) && !is.null(opt_result$top_products)) {
     cat("\n  Top 5 product configurations:\n")
-    for (i in seq_len(min(5, nrow(opt_result)))) {
-      row <- opt_result[i, ]
-      score_col <- if ("share" %in% names(row)) "share" else if ("score" %in% names(row)) "score" else names(row)[ncol(row)]
-      cat(sprintf("    #%d: Score=%.4f\n", i, row[[score_col]]))
+    for (i in seq_len(min(5, length(opt_result$top_products)))) {
+      prod <- opt_result$top_products[[i]]
+      config_str <- paste(sapply(names(prod$configuration), function(a)
+        paste0(a, "=", prod$configuration[[a]])), collapse = ", ")
+      cat(sprintf("    #%d: Score=%.4f (%s)\n", i, prod$score, config_str))
     }
   }
 } else {
@@ -145,7 +146,7 @@ if (exists("predict_market_shares", mode = "function") && !is.null(results$utili
   )
 
   shares <- tryCatch({
-    predict_market_shares(products, results$utilities, results$config)
+    predict_market_shares(products, results$utilities, method = "logit")
   }, error = function(e) {
     cat(sprintf("  Simulation error: %s\n", conditionMessage(e)))
     NULL
@@ -154,8 +155,8 @@ if (exists("predict_market_shares", mode = "function") && !is.null(results$utili
   if (!is.null(shares)) {
     cat("  Market shares:\n")
     labels <- c("TechPro ($199)", "ValueMax ($299)", "PremiumX ($399)")
-    for (i in seq_along(shares)) {
-      cat(sprintf("    %s: %.1f%%\n", labels[i], shares[i] * 100))
+    for (i in seq_len(nrow(shares))) {
+      cat(sprintf("    %s: %.1f%%\n", labels[i], shares$Share_Percent[i]))
     }
   }
 } else {
@@ -170,14 +171,10 @@ if (exists("source_of_volume", mode = "function") && !is.null(results$utilities)
     list(Brand = "TechPro",  Price = "$199", Screen = "6.1 inch", Battery = "4500mAh", Storage = "128GB"),
     list(Brand = "ValueMax", Price = "$299", Screen = "6.1 inch", Battery = "4500mAh", Storage = "128GB")
   )
-  test_scenario <- list(
-    list(Brand = "TechPro",  Price = "$199", Screen = "6.1 inch", Battery = "4500mAh", Storage = "128GB"),
-    list(Brand = "ValueMax", Price = "$299", Screen = "6.1 inch", Battery = "4500mAh", Storage = "128GB"),
-    list(Brand = "PremiumX", Price = "$399", Screen = "6.7 inch", Battery = "5000mAh", Storage = "256GB")
-  )
+  new_product <- list(Brand = "PremiumX", Price = "$399", Screen = "6.7 inch", Battery = "5000mAh", Storage = "256GB")
 
   sov <- tryCatch({
-    source_of_volume(baseline, test_scenario, results$utilities, results$config)
+    source_of_volume(baseline, new_product, utilities = results$utilities, method = "logit")
   }, error = function(e) {
     cat(sprintf("  SoV error: %s\n", conditionMessage(e)))
     NULL
@@ -186,7 +183,7 @@ if (exists("source_of_volume", mode = "function") && !is.null(results$utilities)
   if (!is.null(sov)) {
     cat("  Share shifts when PremiumX enters market:\n")
     for (i in seq_len(nrow(sov))) {
-      cat(sprintf("    Product %d: %+.1f%% share shift\n", i, sov$share_shift[i] * 100))
+      cat(sprintf("    %s: %+.1f pp share shift\n", sov$Product[i], sov$Share_Change[i]))
     }
   }
 } else {
@@ -198,16 +195,11 @@ cat("\n[7/8] Generating HTML analysis report...\n")
 if (exists("generate_conjoint_html_report", mode = "function") && !is.null(results)) {
 
   conjoint_results <- list(
-    utilities  = results$utilities,
-    importance = results$importance,
-    model_fit  = list(
-      method = results$model_result$method %||% "mlogit",
-      mcfadden_r2 = if (!is.null(results$diagnostics$mcfadden_r2)) results$diagnostics$mcfadden_r2 else 0.30,
-      aic = results$model_result$aic %||% NA,
-      bic = results$model_result$bic %||% NA,
-      n_obs = results$model_result$n_obs %||% nrow(results$data_info$data),
-      n_respondents = results$model_result$n_respondents %||% 300
-    )
+    utilities    = results$utilities,
+    importance   = results$importance,
+    model_result = results$model_result,
+    diagnostics  = results$diagnostics,
+    config       = results$config
   )
 
   report_config <- list(
@@ -218,7 +210,7 @@ if (exists("generate_conjoint_html_report", mode = "function") && !is.null(resul
 
   html_path <- file.path(output_dir, "demo_results_report.html")
   report_result <- tryCatch({
-    generate_conjoint_html_report(conjoint_results, report_config, html_path)
+    generate_conjoint_html_report(conjoint_results, html_path, report_config)
   }, error = function(e) {
     cat(sprintf("  HTML report error: %s\n", conditionMessage(e)))
     NULL
