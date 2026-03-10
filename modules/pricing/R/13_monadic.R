@@ -360,7 +360,7 @@ monadic_bootstrap_ci <- function(prices, intents, model_type, price_range,
         b_model <- glm(b_intents ~ b_prices, family = binomial(link = "logit"))
       }
 
-      b_pred <- predict(b_model, newdata = data.frame(prices = price_range), type = "response")
+      b_pred <- predict(b_model, newdata = data.frame(b_prices = price_range), type = "response")
 
       # Revenue optimal
       b_revenue <- price_range * b_pred

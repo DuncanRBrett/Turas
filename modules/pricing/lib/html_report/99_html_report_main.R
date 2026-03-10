@@ -104,23 +104,63 @@ generate_pricing_html_report <- function(pricing_results, output_path, config = 
   cat("   HTML Report: Building charts...\n")
   charts <- list()
 
+  # Helper: safely coerce to numeric vector, handling NULL/list/character
+  safe_numeric <- function(x) {
+    if (is.null(x)) return(NULL)
+    if (is.list(x) && !is.data.frame(x)) x <- unlist(x)
+    as.numeric(x)
+  }
+
   if (!is.null(html_data$van_westendorp)) {
-    charts$vw_curves <- build_vw_curves_chart(html_data$van_westendorp, brand)
+    tryCatch({
+      charts$vw_curves <- build_vw_curves_chart(html_data$van_westendorp, brand)
+    }, error = function(e) {
+      cat(sprintf("   ! VW curves chart failed: %s\n", e$message))
+      charts$vw_curves <<- ""
+    })
   }
 
   if (!is.null(html_data$gabor_granger)) {
     gg <- html_data$gabor_granger
-    charts$gg_demand <- build_demand_curve_chart(
-      prices = gg$demand_curve$price,
-      intents = gg$demand_curve$purchase_intent,
-      revenue = gg$revenue_curve$revenue_index %||% (gg$demand_curve$price * gg$demand_curve$purchase_intent),
-      optimal_price = gg$optimal_price$price,
-      brand_colour = brand,
-      title = "Gabor-Granger Demand & Revenue Curves",
-      currency = currency
-    )
+
+    # Safely extract GG demand data with numeric coercion
+    gg_prices <- safe_numeric(gg$demand_curve$price)
+    gg_intents <- safe_numeric(gg$demand_curve$purchase_intent)
+
+    # Revenue: prefer revenue_curve$revenue_index, fall back to price * intent
+    gg_revenue <- safe_numeric(gg$revenue_curve$revenue_index)
+    if (is.null(gg_revenue) || length(gg_revenue) == 0) {
+      if (!is.null(gg_prices) && !is.null(gg_intents)) {
+        gg_revenue <- gg_prices * gg_intents
+      }
+    }
+
+    # Optimal price: extract scalar value safely
+    gg_optimal <- safe_numeric(gg$optimal_price$price)
+    if (!is.null(gg_optimal) && length(gg_optimal) > 1) gg_optimal <- gg_optimal[1]
+
+    tryCatch({
+      charts$gg_demand <- build_demand_curve_chart(
+        prices = gg_prices,
+        intents = gg_intents,
+        revenue = gg_revenue,
+        optimal_price = gg_optimal,
+        brand_colour = brand,
+        title = "Gabor-Granger Demand & Revenue Curves",
+        currency = currency
+      )
+    }, error = function(e) {
+      cat(sprintf("   ! GG demand chart failed: %s\n", e$message))
+      charts$gg_demand <<- ""
+    })
+
     if (!is.null(gg$elasticity)) {
-      charts$gg_elasticity <- build_elasticity_chart(gg$elasticity, brand, currency)
+      tryCatch({
+        charts$gg_elasticity <- build_elasticity_chart(gg$elasticity, brand, currency)
+      }, error = function(e) {
+        cat(sprintf("   ! GG elasticity chart failed: %s\n", e$message))
+        charts$gg_elasticity <<- ""
+      })
     }
   }
 
@@ -128,31 +168,48 @@ generate_pricing_html_report <- function(pricing_results, output_path, config = 
     mon <- html_data$monadic
     ci_lower <- ci_upper <- NULL
     if (!is.null(mon$confidence_intervals$demand_curve_ci)) {
-      ci_lower <- mon$confidence_intervals$demand_curve_ci$ci_lower
-      ci_upper <- mon$confidence_intervals$demand_curve_ci$ci_upper
+      ci_lower <- safe_numeric(mon$confidence_intervals$demand_curve_ci$ci_lower)
+      ci_upper <- safe_numeric(mon$confidence_intervals$demand_curve_ci$ci_upper)
     }
-    charts$monadic_demand <- build_demand_curve_chart(
-      prices = mon$demand_curve$price,
-      intents = mon$demand_curve$predicted_intent,
-      revenue = mon$demand_curve$revenue_index,
-      ci_lower = ci_lower,
-      ci_upper = ci_upper,
-      observed_prices = mon$observed_data$price,
-      observed_intents = mon$observed_data$observed_intent,
-      optimal_price = mon$optimal_price$price,
-      brand_colour = brand,
-      title = "Monadic Demand Curve (Logistic Model)",
-      currency = currency
-    )
+
+    tryCatch({
+      charts$monadic_demand <- build_demand_curve_chart(
+        prices = safe_numeric(mon$demand_curve$price),
+        intents = safe_numeric(mon$demand_curve$predicted_intent),
+        revenue = safe_numeric(mon$demand_curve$revenue_index),
+        ci_lower = ci_lower,
+        ci_upper = ci_upper,
+        observed_prices = safe_numeric(mon$observed_data$price),
+        observed_intents = safe_numeric(mon$observed_data$observed_intent),
+        optimal_price = safe_numeric(mon$optimal_price$price),
+        brand_colour = brand,
+        title = "Monadic Demand Curve (Logistic Model)",
+        currency = currency
+      )
+    }, error = function(e) {
+      cat(sprintf("   ! Monadic demand chart failed: %s\n", e$message))
+      charts$monadic_demand <<- ""
+    })
+
     if (!is.null(mon$elasticity)) {
-      charts$monadic_elasticity <- build_elasticity_chart(mon$elasticity, brand, currency)
+      tryCatch({
+        charts$monadic_elasticity <- build_elasticity_chart(mon$elasticity, brand, currency)
+      }, error = function(e) {
+        cat(sprintf("   ! Monadic elasticity chart failed: %s\n", e$message))
+        charts$monadic_elasticity <<- ""
+      })
     }
   }
 
   if (!is.null(html_data$segments)) {
-    charts$segment_comparison <- build_segment_comparison_chart(
-      html_data$segments, brand, currency
-    )
+    tryCatch({
+      charts$segment_comparison <- build_segment_comparison_chart(
+        html_data$segments, brand, currency
+      )
+    }, error = function(e) {
+      cat(sprintf("   ! Segment comparison chart failed: %s\n", e$message))
+      charts$segment_comparison <<- ""
+    })
   }
 
   # --------------------------------------------------------------------------

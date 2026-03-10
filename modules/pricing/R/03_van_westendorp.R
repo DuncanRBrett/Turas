@@ -525,7 +525,7 @@ run_van_westendorp <- function(data, config, validate = TRUE) {
     tooexpensive = too_expensive,
     validate = TRUE,
     interpolate = TRUE,
-    interpolation_steps = 500
+    interpolation_steps = 0.1
   )
 
   # Add NMS parameters if available
@@ -583,7 +583,7 @@ run_van_westendorp <- function(data, config, validate = TRUE) {
 
   if (has_nms && !is.null(psm_result$pi_scale)) {
     nms_results <- list(
-      trial_optimal = psm_result$price_optimal_trial,
+      trial_optimal = psm_result$price_optimal_reach,
       revenue_optimal = psm_result$price_optimal_revenue,
       data = psm_result$data_nms
     )

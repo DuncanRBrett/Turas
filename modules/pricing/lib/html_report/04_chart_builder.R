@@ -35,9 +35,15 @@ build_vw_curves_chart <- function(vw_data, brand_colour = "#1e3a5f") {
   cw <- width - ml - mr   # chart area width
   ch <- height - mt - mb  # chart area height
 
-  prices <- curves$price
+  prices <- as.numeric(curves$price)
+  valid_idx <- !is.na(prices)
+  if (sum(valid_idx) < 2) return("")
+  # Filter curves to valid price rows only
+  curves <- curves[valid_idx, , drop = FALSE]
+  prices <- prices[valid_idx]
   x_min <- min(prices)
   x_max <- max(prices)
+  if (x_min == x_max) x_max <- x_min + 1  # avoid division by zero
 
   # Scale functions
   scale_x <- function(p) ml + (p - x_min) / (x_max - x_min) * cw
@@ -117,14 +123,24 @@ build_vw_curves_chart <- function(vw_data, brand_colour = "#1e3a5f") {
   # Intersection markers (OPP, IDP, PMC, PME)
   pp <- vw_data$price_points
   markers_svg <- character(0)
+
+  # Safely extract price point values (may be list, scalar, or NULL)
+  safe_pp <- function(x) {
+    v <- x$value
+    if (is.null(v)) return(NA_real_)
+    if (is.list(v)) v <- unlist(v)
+    as.numeric(v[1])
+  }
+
   marker_defs <- list(
-    list(price = pp$pmc$value, label = "PMC", colour = "#64748b"),
-    list(price = pp$opp$value, label = "OPP", colour = brand_colour),
-    list(price = pp$idp$value, label = "IDP", colour = brand_colour),
-    list(price = pp$pme$value, label = "PME", colour = "#64748b")
+    list(price = safe_pp(pp$pmc), label = "PMC", colour = "#64748b"),
+    list(price = safe_pp(pp$opp), label = "OPP", colour = brand_colour),
+    list(price = safe_pp(pp$idp), label = "IDP", colour = brand_colour),
+    list(price = safe_pp(pp$pme), label = "PME", colour = "#64748b")
   )
 
   for (m in marker_defs) {
+    if (is.na(m$price) || !is.numeric(m$price)) next
     mx <- scale_x(m$price)
     markers_svg <- c(markers_svg, sprintf(
       '<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="%s" stroke-width="1.5" stroke-dasharray="4,3"/>',
@@ -202,6 +218,20 @@ build_demand_curve_chart <- function(prices, intents,
                                      title = "Demand Curve",
                                      currency = "$") {
 
+  # Defensive: ensure numeric types for all inputs
+  prices <- as.numeric(prices)
+  intents <- as.numeric(intents)
+  if (!is.null(revenue)) revenue <- as.numeric(revenue)
+  if (!is.null(ci_lower)) ci_lower <- as.numeric(ci_lower)
+  if (!is.null(ci_upper)) ci_upper <- as.numeric(ci_upper)
+  if (!is.null(observed_prices)) observed_prices <- as.numeric(observed_prices)
+  if (!is.null(observed_intents)) observed_intents <- as.numeric(observed_intents)
+  if (!is.null(optimal_price)) {
+    optimal_price <- as.numeric(optimal_price)
+    if (length(optimal_price) > 1) optimal_price <- optimal_price[1]
+    if (length(optimal_price) == 0 || is.na(optimal_price)) optimal_price <- NULL
+  }
+
   if (length(prices) < 2 || length(intents) < 2) return("")
 
   # Chart dimensions
@@ -214,17 +244,20 @@ build_demand_curve_chart <- function(prices, intents,
   cw <- width - ml - mr
   ch <- height - mt - mb
 
-  x_min <- min(prices)
-  x_max <- max(prices)
+  x_min <- min(prices, na.rm = TRUE)
+  x_max <- max(prices, na.rm = TRUE)
+  if (x_min == x_max) x_max <- x_min + 1  # avoid division by zero
 
   # Scale functions
   scale_x <- function(p) ml + (p - x_min) / (x_max - x_min) * cw
   scale_y <- function(v) mt + (1 - v) * ch  # intent: 0-1
 
   # Revenue scaling (separate axis)
-  has_revenue <- !is.null(revenue) && length(revenue) == length(prices)
+  has_revenue <- !is.null(revenue) && length(revenue) == length(prices) &&
+                  any(is.finite(revenue))
   if (has_revenue) {
     rev_max <- max(revenue, na.rm = TRUE) * 1.1
+    if (!is.finite(rev_max) || rev_max == 0) rev_max <- 1  # avoid division by zero / Inf
     scale_y_rev <- function(r) mt + (1 - r / rev_max) * ch
   }
 
@@ -407,6 +440,7 @@ build_segment_comparison_chart <- function(segment_data, brand_colour = "#1e3a5f
 
   p_min <- min(prices) * 0.85
   p_max <- max(prices) * 1.05
+  if (p_min == p_max) p_max <- p_min + 1  # avoid division by zero
   scale_x <- function(p) ml + (p - p_min) / (p_max - p_min) * cw
 
   palette <- generate_palette(n, brand_colour)
@@ -488,13 +522,36 @@ build_elasticity_chart <- function(elasticity_data, brand_colour = "#1e3a5f",
   cw <- width - ml - mr
   ch <- height - mt - mb
 
+  # Resolve column names (support both naming conventions)
   prices <- elasticity_data$price_midpoint %||% elasticity_data$price_low
-  elast <- elasticity_data$elasticity
+  # Compute midpoint from from/to if no dedicated column exists
+  if (is.null(prices) && !is.null(elasticity_data$price_from)) {
+    if (!is.null(elasticity_data$price_to)) {
+      prices <- as.numeric(elasticity_data$price_from) + as.numeric(elasticity_data$price_to)
+      prices <- prices / 2
+    } else {
+      prices <- elasticity_data$price_from
+    }
+  }
+  elast <- elasticity_data$elasticity %||% elasticity_data$arc_elasticity
+
+  # Defensive: ensure numeric
+  prices <- as.numeric(prices)
+  elast <- as.numeric(elast)
+
+  # Remove non-finite values (Inf, NaN from division by zero in elasticity calc)
+  valid <- is.finite(prices) & is.finite(elast)
+  prices <- prices[valid]
+  elast <- elast[valid]
+
+  if (is.null(prices) || is.null(elast) || length(prices) == 0) return("")
 
   x_min <- min(prices)
   x_max <- max(prices)
+  if (x_min == x_max) x_max <- x_min + 1  # avoid division by zero
   y_min <- min(elast, -2)
   y_max <- max(elast, 0.5)
+  if (y_min == y_max) y_max <- y_min + 1  # avoid division by zero
 
   scale_x <- function(p) ml + (p - x_min) / (x_max - x_min) * cw
   scale_y <- function(e) mt + (y_max - e) / (y_max - y_min) * ch
@@ -539,7 +596,7 @@ build_elasticity_chart <- function(elasticity_data, brand_colour = "#1e3a5f",
   for (i in seq_along(prices)) {
     cx <- scale_x(prices[i])
     cy <- scale_y(elast[i])
-    colour <- if (abs(elast[i]) > 1) "#e74c3c" else "#2ecc71"
+    colour <- if (!is.na(elast[i]) && abs(elast[i]) > 1) "#e74c3c" else "#2ecc71"
     parts <- c(parts, sprintf(
       '<circle cx="%.1f" cy="%.1f" r="3.5" fill="%s" stroke="white" stroke-width="1.5"/>',
       cx, cy, colour

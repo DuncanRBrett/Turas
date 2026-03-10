@@ -76,8 +76,10 @@ synthesize_recommendation <- function(vw_results = NULL,
       description = "Center of optimal zone"
     )
 
-    # NMS if available
-    if (!is.null(vw_results$nms_results)) {
+    # NMS if available (guard against NA revenue_optimal)
+    if (!is.null(vw_results$nms_results) &&
+        !is.null(vw_results$nms_results$revenue_optimal) &&
+        !is.na(vw_results$nms_results$revenue_optimal)) {
       method_prices$nms_revenue <- list(
         price = vw_results$nms_results$revenue_optimal,
         label = "NMS Revenue Optimal",
@@ -116,6 +118,7 @@ synthesize_recommendation <- function(vw_results = NULL,
   # ============================================================================
 
   prices <- sapply(method_prices, function(x) x$price)
+  prices <- prices[!is.na(prices) & is.finite(prices)]
 
   # Use NMS or GG or Monadic as primary if available (behaviorally calibrated)
   if (!is.null(method_prices$nms_revenue)) {
@@ -132,15 +135,17 @@ synthesize_recommendation <- function(vw_results = NULL,
     primary_source <- "Van Westendorp optimal zone midpoint"
   }
 
-  # Apply constraints
-  if (!is.null(synth_config$price_floor)) {
+  # Apply constraints (guard against NA primary_price)
+  if (!is.null(synth_config$price_floor) && !is.na(primary_price) &&
+      !is.na(synth_config$price_floor)) {
     if (primary_price < synth_config$price_floor) {
       primary_price <- synth_config$price_floor
       primary_source <- paste(primary_source, "(constrained to floor)")
     }
   }
 
-  if (!is.null(synth_config$price_ceiling)) {
+  if (!is.null(synth_config$price_ceiling) && !is.na(primary_price) &&
+      !is.na(synth_config$price_ceiling)) {
     if (primary_price > synth_config$price_ceiling) {
       primary_price <- synth_config$price_ceiling
       primary_source <- paste(primary_source, "(constrained to ceiling)")
@@ -282,6 +287,11 @@ synthesize_recommendation <- function(vw_results = NULL,
 #' @keywords internal
 round_to_psychological <- function(price) {
 
+  # Guard: if price is NA or non-finite, return as-is
+  if (is.null(price) || length(price) != 1 || is.na(price) || !is.finite(price)) {
+    return(price)
+  }
+
   # Determine magnitude
   if (price < 10) {
     # Under $10: round to X.99
@@ -301,7 +311,7 @@ round_to_psychological <- function(price) {
   }
 
   # Don't round more than 10% from original
-  if (abs(rounded - price) / price > 0.10) {
+  if (price == 0 || abs(rounded - price) / abs(price) > 0.10) {
     rounded <- round(price, 2)
   }
 
@@ -326,7 +336,9 @@ assess_recommendation_confidence <- function(method_prices, recommended_price,
 
   # Factor 1: Method agreement
   prices <- sapply(method_prices, function(x) x$price)
+  prices <- prices[!is.na(prices) & is.finite(prices)]
   cv <- if (length(prices) > 1) sd(prices) / mean(prices) else 0
+  if (is.na(cv) || !is.finite(cv)) cv <- 0
 
   if (cv < 0.08) {
     factors$method_agreement <- "Strong agreement across methods (<8% variation)"
@@ -365,6 +377,7 @@ assess_recommendation_confidence <- function(method_prices, recommended_price,
   # Factor 3: Data quality (VW violations)
   if (!is.null(vw_results)) {
     violation_rate <- vw_results$diagnostics$violation_rate
+    if (is.null(violation_rate) || is.na(violation_rate)) violation_rate <- 0
 
     if (violation_rate < 0.05) {
       factors$data_quality <- "Good data quality (<5% logical violations)"
@@ -383,33 +396,41 @@ assess_recommendation_confidence <- function(method_prices, recommended_price,
     p_val <- monadic_results$model_summary$price_coefficient_p
     pseudo_r2 <- monadic_results$model_summary$pseudo_r2
 
-    if (p_val <= 0.01 && pseudo_r2 >= 0.05) {
-      factors$model_quality <- sprintf("Strong monadic model (p=%.4f, pseudo-R2=%.3f)", p_val, pseudo_r2)
-      scores <- c(scores, 1.0)
-    } else if (p_val <= 0.05) {
-      factors$model_quality <- sprintf("Adequate monadic model (p=%.4f, pseudo-R2=%.3f)", p_val, pseudo_r2)
-      scores <- c(scores, 0.7)
+    if (!is.null(p_val) && !is.na(p_val) && !is.null(pseudo_r2) && !is.na(pseudo_r2)) {
+      if (p_val <= 0.01 && pseudo_r2 >= 0.05) {
+        factors$model_quality <- sprintf("Strong monadic model (p=%.4f, pseudo-R2=%.3f)", p_val, pseudo_r2)
+        scores <- c(scores, 1.0)
+      } else if (p_val <= 0.05) {
+        factors$model_quality <- sprintf("Adequate monadic model (p=%.4f, pseudo-R2=%.3f)", p_val, pseudo_r2)
+        scores <- c(scores, 0.7)
+      } else {
+        factors$model_quality <- sprintf("Weak monadic model (p=%.4f) - price effect not significant", p_val)
+        scores <- c(scores, 0.3)
+      }
     } else {
-      factors$model_quality <- sprintf("Weak monadic model (p=%.4f) - price effect not significant", p_val)
-      scores <- c(scores, 0.3)
+      factors$model_quality <- "Monadic model quality could not be assessed (missing p-value or pseudo-R2)"
+      scores <- c(scores, 0.5)
     }
   }
 
   # Factor 5: Price within optimal zone
-  if (!is.null(vw_results)) {
+  if (!is.null(vw_results) && !is.na(recommended_price)) {
     opp <- vw_results$price_points$OPP
     idp <- vw_results$price_points$IDP
+    pmc <- vw_results$price_points$PMC
+    pme <- vw_results$price_points$PME
 
-    if (recommended_price >= opp && recommended_price <= idp) {
-      factors$zone_fit <- "Recommended price within optimal zone"
-      scores <- c(scores, 1.0)
-    } else if (recommended_price >= vw_results$price_points$PMC &&
-               recommended_price <= vw_results$price_points$PME) {
-      factors$zone_fit <- "Recommended price within acceptable range (outside optimal zone)"
-      scores <- c(scores, 0.6)
-    } else {
-      factors$zone_fit <- "Recommended price outside acceptable range - unusual"
-      scores <- c(scores, 0.3)
+    if (!is.na(opp) && !is.na(idp) && !is.na(pmc) && !is.na(pme)) {
+      if (recommended_price >= opp && recommended_price <= idp) {
+        factors$zone_fit <- "Recommended price within optimal zone"
+        scores <- c(scores, 1.0)
+      } else if (recommended_price >= pmc && recommended_price <= pme) {
+        factors$zone_fit <- "Recommended price within acceptable range (outside optimal zone)"
+        scores <- c(scores, 0.6)
+      } else {
+        factors$zone_fit <- "Recommended price outside acceptable range - unusual"
+        scores <- c(scores, 0.3)
+      }
     }
   }
 
@@ -507,15 +528,17 @@ build_evidence_table <- function(method_prices, vw_results, gg_results,
 
     if (!is.null(gg_results$elasticity)) {
       avg_elast <- mean(gg_results$elasticity$arc_elasticity, na.rm = TRUE)
-      elast_type <- if (avg_elast > -1) "Inelastic" else if (avg_elast < -2) "Highly elastic" else "Moderately elastic"
+      if (!is.na(avg_elast) && is.finite(avg_elast)) {
+        elast_type <- if (avg_elast > -1) "Inelastic" else if (avg_elast < -2) "Highly elastic" else "Moderately elastic"
 
-      rows$gg_elast <- data.frame(
-        method = "Gabor-Granger",
-        metric = "Price Elasticity",
-        value = sprintf("%.2f (avg)", avg_elast),
-        interpretation = elast_type,
-        stringsAsFactors = FALSE
-      )
+        rows$gg_elast <- data.frame(
+          method = "Gabor-Granger",
+          metric = "Price Elasticity",
+          value = sprintf("%.2f (avg)", avg_elast),
+          interpretation = elast_type,
+          stringsAsFactors = FALSE
+        )
+      }
     }
   }
 
@@ -536,7 +559,9 @@ build_evidence_table <- function(method_prices, vw_results, gg_results,
       value = sprintf("pseudo-R2=%.3f, AIC=%.1f",
                       monadic_results$model_summary$pseudo_r2,
                       monadic_results$model_summary$aic),
-      interpretation = if (monadic_results$model_summary$price_coefficient_p <= 0.05) {
+      interpretation = if (!is.null(monadic_results$model_summary$price_coefficient_p) &&
+                           !is.na(monadic_results$model_summary$price_coefficient_p) &&
+                           monadic_results$model_summary$price_coefficient_p <= 0.05) {
         "Price effect statistically significant"
       } else {
         "Price effect NOT significant - interpret with caution"
@@ -577,22 +602,25 @@ identify_pricing_risks <- function(recommended_price, vw_results,
   )
 
   # Upside risks (opportunities)
-  if (!is.null(vw_results)) {
-    headroom <- vw_results$price_points$PME - recommended_price
-    headroom_pct <- headroom / recommended_price * 100
+  if (!is.null(vw_results) && !is.na(recommended_price) && recommended_price != 0) {
+    pme <- vw_results$price_points$PME
+    if (!is.null(pme) && !is.na(pme)) {
+      headroom <- pme - recommended_price
+      headroom_pct <- headroom / recommended_price * 100
 
-    if (headroom_pct > 30) {
-      risks$upside <- c(risks$upside, sprintf(
-        "%.0f%% headroom to PME - potential for premium variant or future increases",
-        headroom_pct
-      ))
+      if (!is.na(headroom_pct) && headroom_pct > 30) {
+        risks$upside <- c(risks$upside, sprintf(
+          "%.0f%% headroom to PME - potential for premium variant or future increases",
+          headroom_pct
+        ))
+      }
     }
   }
 
   if (!is.null(gg_results)) {
     if (!is.null(gg_results$elasticity)) {
       avg_elast <- mean(gg_results$elasticity$arc_elasticity, na.rm = TRUE)
-      if (avg_elast > -1) {
+      if (!is.na(avg_elast) && is.finite(avg_elast) && avg_elast > -1) {
         risks$upside <- c(risks$upside,
           "Inelastic demand suggests price increases may be absorbed"
         )
@@ -601,22 +629,25 @@ identify_pricing_risks <- function(recommended_price, vw_results,
   }
 
   # Downside risks (threats)
-  if (!is.null(vw_results)) {
-    buffer <- recommended_price - vw_results$price_points$PMC
-    buffer_pct <- buffer / recommended_price * 100
+  if (!is.null(vw_results) && !is.na(recommended_price) && recommended_price != 0) {
+    pmc <- vw_results$price_points$PMC
+    if (!is.null(pmc) && !is.na(pmc)) {
+      buffer <- recommended_price - pmc
+      buffer_pct <- buffer / recommended_price * 100
 
-    if (buffer_pct < 20) {
-      risks$downside <- c(risks$downside, sprintf(
-        "Only %.0f%% buffer to PMC - limited room for discounting",
-        buffer_pct
-      ))
+      if (!is.na(buffer_pct) && buffer_pct < 20) {
+        risks$downside <- c(risks$downside, sprintf(
+          "Only %.0f%% buffer to PMC - limited room for discounting",
+          buffer_pct
+        ))
+      }
     }
   }
 
   if (!is.null(gg_results)) {
     if (!is.null(gg_results$elasticity)) {
       avg_elast <- mean(gg_results$elasticity$arc_elasticity, na.rm = TRUE)
-      if (avg_elast < -2) {
+      if (!is.na(avg_elast) && is.finite(avg_elast) && avg_elast < -2) {
         risks$downside <- c(risks$downside,
           "Highly elastic demand - price increases risk significant volume loss"
         )
@@ -637,10 +668,11 @@ identify_pricing_risks <- function(recommended_price, vw_results,
     "Market conditions unchanged since data collection"
   )
 
-  if (!is.null(vw_results) && vw_results$diagnostics$violation_rate > 0.10) {
+  vr <- if (!is.null(vw_results)) vw_results$diagnostics$violation_rate else NULL
+  if (!is.null(vr) && !is.na(vr) && vr > 0.10) {
     risks$assumptions <- c(risks$assumptions,
       sprintf("%.0f%% of respondents gave inconsistent prices - may affect reliability",
-              vw_results$diagnostics$violation_rate * 100)
+              vr * 100)
     )
   }
 

@@ -138,8 +138,9 @@ build_summary_callout <- function(summary, pricing_results, config) {
     ))
   }
 
-  # Method note
-  method_note <- switch(tolower(pricing_results$method),
+  # Method note (use safe method extraction)
+  safe_method <- tolower(pricing_results$method %||% config$analysis_method %||% "unknown")
+  method_note <- switch(safe_method,
     "van_westendorp" = "Van Westendorp PSM identifies the acceptable price range through four price perception questions. The optimal zone represents where pricing resistance is minimised.",
     "gabor_granger" = "Gabor-Granger analysis constructs a demand curve from sequential purchase intent questions, identifying the price that maximises expected revenue.",
     "monadic" = "Monadic price testing uses logistic regression on randomised price cells to model the relationship between price and purchase probability, yielding a statistically rigorous demand curve.",
@@ -275,15 +276,17 @@ transform_gg_section <- function(gg_results, config) {
   # Elasticity summary
   if (!is.null(gg_results$elasticity) && nrow(gg_results$elasticity) > 0) {
     avg_e <- mean(gg_results$elasticity$arc_elasticity, na.rm = TRUE)
-    e_class <- if (abs(avg_e) > 1.5) "highly elastic" else if (abs(avg_e) > 1) "moderately elastic" else "inelastic"
-    callout_parts <- c(callout_parts, sprintf(
-      '<div class="pr-callout-method">
-        Average price elasticity: %.2f (%s). %s
-       </div>',
-      avg_e, e_class,
-      if (abs(avg_e) > 1) "Demand is sensitive to price changes; small increases could reduce volume significantly."
-      else "Demand is relatively insensitive to price; there may be room to increase price without major volume loss."
-    ))
+    if (!is.na(avg_e) && is.finite(avg_e)) {
+      e_class <- if (abs(avg_e) > 1.5) "highly elastic" else if (abs(avg_e) > 1) "moderately elastic" else "inelastic"
+      callout_parts <- c(callout_parts, sprintf(
+        '<div class="pr-callout-method">
+          Average price elasticity: %.2f (%s). %s
+         </div>',
+        avg_e, e_class,
+        if (abs(avg_e) > 1) "Demand is sensitive to price changes; small increases could reduce volume significantly."
+        else "Demand is relatively insensitive to price; there may be room to increase price without major volume loss."
+      ))
+    }
   }
 
   section$callout <- paste(callout_parts, collapse = "\n")
@@ -346,18 +349,22 @@ transform_monadic_section <- function(monadic_results, config) {
     ))
   }
 
-  # Model assessment
-  sig_text <- if (ms$price_coefficient_p <= 0.01) {
+  # Model assessment (guard against NA p-value or pseudo-R2)
+  p_val <- ms$price_coefficient_p
+  sig_text <- if (!is.null(p_val) && !is.na(p_val) && p_val <= 0.01) {
     "Price effect is highly significant (p < 0.01), providing strong evidence of a price-demand relationship."
-  } else if (ms$price_coefficient_p <= 0.05) {
+  } else if (!is.null(p_val) && !is.na(p_val) && p_val <= 0.05) {
     "Price effect is statistically significant (p < 0.05)."
+  } else if (!is.null(p_val) && !is.na(p_val)) {
+    sprintf("Price effect is NOT statistically significant (p = %.3f). Interpret the demand curve and optimal price with caution.", p_val)
   } else {
-    sprintf("Price effect is NOT statistically significant (p = %.3f). Interpret the demand curve and optimal price with caution.", ms$price_coefficient_p)
+    "Price effect significance could not be assessed."
   }
 
-  fit_text <- if (ms$pseudo_r2 >= 0.1) {
+  pr2 <- ms$pseudo_r2
+  fit_text <- if (!is.null(pr2) && !is.na(pr2) && pr2 >= 0.1) {
     "Model fit is reasonable for discrete choice data."
-  } else if (ms$pseudo_r2 >= 0.02) {
+  } else if (!is.null(pr2) && !is.na(pr2) && pr2 >= 0.02) {
     "Model fit is modest but typical for survey-based pricing data."
   } else {
     "Model fit is low, suggesting price alone may not fully explain purchase intent."

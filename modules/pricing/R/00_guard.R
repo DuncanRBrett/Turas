@@ -575,8 +575,9 @@ pricing_console_warning <- function(message, context = "Pricing Module") {
 pricing_print_guard_summary <- function(guard, n_respondents = NULL) {
   summary <- pricing_guard_summary(guard)
 
-  if (summary$warning_count > 0) {
-    cat(sprintf("   Pre-flight: %d warning(s)\n", summary$warning_count))
+  n_warn <- summary$n_warnings %||% summary$warning_count %||% 0
+  if (n_warn > 0) {
+    cat(sprintf("   Pre-flight: %d warning(s)\n", n_warn))
     for (w in guard$warnings) {
       cat(sprintf("     - [%s] %s\n", w$category, w$msg))
     }

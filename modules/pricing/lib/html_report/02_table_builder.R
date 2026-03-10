@@ -128,8 +128,18 @@ build_vw_ci_table <- function(vw_data, currency = "$") {
 #' Build GG Demand Curve Table
 #' @keywords internal
 build_gg_demand_table <- function(gg_data, currency = "$") {
-  dc <- gg_data$demand_curve
+  # Use revenue_curve (which contains demand_curve columns + revenue_index)
+  # Fall back to demand_curve if revenue_curve unavailable
+  dc <- gg_data$revenue_curve
+  if (is.null(dc) || !is.data.frame(dc)) {
+    dc <- gg_data$demand_curve
+  }
   if (is.null(dc) || !is.data.frame(dc)) return("")
+
+  # Compute revenue_index if not present on the data frame
+  if (!"revenue_index" %in% names(dc)) {
+    dc$revenue_index <- dc$price * dc$purchase_intent
+  }
 
   rows <- character(0)
   for (i in seq_len(nrow(dc))) {
@@ -203,16 +213,22 @@ build_gg_elasticity_table <- function(gg_data, currency = "$") {
   el <- gg_data$elasticity
   if (is.null(el) || !is.data.frame(el) || nrow(el) == 0) return("")
 
+  # Resolve column names (support both naming conventions)
+  price_low_col <- if ("price_low" %in% names(el)) "price_low" else "price_from"
+  price_high_col <- if ("price_high" %in% names(el)) "price_high" else "price_to"
+  class_col <- if ("classification" %in% names(el)) "classification" else "elasticity_type"
+
   rows <- character(0)
   for (i in seq_len(nrow(el))) {
-    class_badge <- switch(el$classification[i],
+    class_val <- tolower(as.character(el[[class_col]][i] %||% ""))
+    class_badge <- switch(class_val,
       "elastic" = '<span class="pr-badge-elastic">Elastic</span>',
       "inelastic" = '<span class="pr-badge-inelastic">Inelastic</span>',
       '<span class="pr-badge-unitary">Unitary</span>'
     )
     rows <- c(rows, sprintf(
       '<tr><td class="pr-td pr-num">%s%.2f &ndash; %s%.2f</td><td class="pr-td pr-num">%.2f</td><td class="pr-td">%s</td></tr>',
-      currency, el$price_low[i], currency, el$price_high[i],
+      currency, el[[price_low_col]][i], currency, el[[price_high_col]][i],
       el$arc_elasticity[i], class_badge
     ))
   }
@@ -241,9 +257,10 @@ build_monadic_model_table <- function(monadic_data) {
   ms <- monadic_data$model_summary
   if (is.null(ms)) return("")
 
-  sig_badge <- if (ms$price_coefficient_p <= 0.01) {
+  p_val <- ms$price_coefficient_p
+  sig_badge <- if (!is.null(p_val) && !is.na(p_val) && p_val <= 0.01) {
     '<span class="pr-badge-good">p &lt; 0.01</span>'
-  } else if (ms$price_coefficient_p <= 0.05) {
+  } else if (!is.null(p_val) && !is.na(p_val) && p_val <= 0.05) {
     '<span class="pr-badge-warn">p &lt; 0.05</span>'
   } else {
     '<span class="pr-badge-poor">Not significant</span>'

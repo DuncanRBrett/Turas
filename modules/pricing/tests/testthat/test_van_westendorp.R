@@ -166,11 +166,15 @@ test_that("bootstrap_vw_confidence returns CIs", {
           "pricesensitivitymeter package not available")
 
   data <- generate_vw_data(n = 200)
-  config <- make_vw_config()
-  config$van_westendorp$bootstrap_iterations <- 50
-  config$van_westendorp$confidence_level <- 0.95
 
-  result <- bootstrap_vw_confidence(data, config)
+  result <- bootstrap_vw_confidence(
+    too_cheap = data$too_cheap,
+    cheap = data$cheap,
+    expensive = data$expensive,
+    too_expensive = data$too_expensive,
+    iterations = 50,
+    level = 0.95
+  )
 
   expect_true(is.data.frame(result) || is.list(result))
 })
