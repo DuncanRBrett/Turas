@@ -1,7 +1,7 @@
 # Turas Conjoint Module - Authoritative Guide
 
-**Version:** 2.1.0
-**Last Updated:** December 2025
+**Version:** 3.0.0
+**Last Updated:** March 2026
 **Audience:** Statisticians, Senior Analysts, Market Researchers
 
 ---

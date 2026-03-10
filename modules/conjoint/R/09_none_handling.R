@@ -4,8 +4,8 @@
 #
 # Module: Conjoint Analysis - None Option Detection and Handling
 # Purpose: Auto-detect and handle "none of these" options in CBC data
-# Version: 2.0.0 (Phase 1 Implementation)
-# Date: 2025-11-26
+# Version: 3.0.0
+# Date: 2026-03-10
 #
 # ==============================================================================
 

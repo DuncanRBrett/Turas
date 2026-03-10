@@ -1,8 +1,8 @@
 # Turas Conjoint Module - User Manual
 
-**Version:** 2.1.0
-**Last Updated:** December 2025
-**Template:** Conjoint_Config_Template.xlsx (v10.0)
+**Version:** 3.0.0
+**Last Updated:** March 2026
+**Template:** Conjoint_Config_Template.xlsx (v11.0)
 
 ---
 

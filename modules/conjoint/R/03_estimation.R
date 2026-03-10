@@ -4,8 +4,8 @@
 #
 # Module: Conjoint Analysis - Model Estimation
 # Purpose: Estimate choice models using mlogit (primary) and clogit (fallback)
-# Version: 2.1.0 (Phase 1 - Alchemer Integration)
-# Date: 2025-12-12
+# Version: 3.0.0
+# Date: 2026-03-10
 #
 # ESTIMATION METHODS:
 #   - mlogit: Primary engine, purpose-built for discrete choice analysis
@@ -50,17 +50,34 @@ estimate_choice_model <- function(data_list, config, verbose = TRUE) {
   } else if (method == "clogit") {
     result <- estimate_with_clogit(data, config, verbose)
   } else if (method == "hb") {
-    conjoint_refuse(
-      code = "EST_HB_NOT_IMPLEMENTED",
-      title = "Hierarchical Bayes Not Implemented",
-      problem = "Hierarchical Bayes (HB) estimation is not yet implemented.",
-      why_it_matters = "HB provides individual-level utilities but requires complex MCMC estimation.",
-      how_to_fix = c(
-        "This is a Phase 2 feature",
-        "Use 'auto', 'mlogit', or 'clogit' for now",
-        "OR see modules/conjoint/R/11_hierarchical_bayes.R for framework"
+    result <- estimate_hierarchical_bayes(data_list, config, verbose)
+  } else if (method == "latent_class") {
+    # Latent class estimation (routed to 13_latent_class.R)
+    if (exists("estimate_latent_class", mode = "function")) {
+      result <- estimate_latent_class(data_list, config, verbose)
+    } else {
+      conjoint_refuse(
+        code = "FEATURE_LC_NOT_LOADED",
+        title = "Latent Class Module Not Loaded",
+        problem = "Latent class estimation module (13_latent_class.R) is not loaded.",
+        why_it_matters = "The latent class module must be sourced before use.",
+        how_to_fix = "Ensure 13_latent_class.R is present in the conjoint R directory"
       )
-    )
+    }
+  } else if (method == "best_worst") {
+    # Best-worst scaling (routed to 10_best_worst.R)
+    if (exists("estimate_best_worst_model", mode = "function")) {
+      bw_method <- config$bw_method %||% "sequential"
+      result <- estimate_best_worst_model(data_list, config, method = bw_method, verbose = verbose)
+    } else {
+      conjoint_refuse(
+        code = "FEATURE_BWS_NOT_LOADED",
+        title = "Best-Worst Module Not Loaded",
+        problem = "Best-worst scaling module (10_best_worst.R) is not loaded.",
+        why_it_matters = "The BWS module must be sourced before use.",
+        how_to_fix = "Ensure 10_best_worst.R is present in the conjoint R directory"
+      )
+    }
   } else {
     conjoint_refuse(
       code = "EST_INVALID_METHOD",
@@ -68,7 +85,7 @@ estimate_choice_model <- function(data_list, config, verbose = TRUE) {
       problem = sprintf("Unknown estimation method: %s", method),
       why_it_matters = "Only specific estimation methods are supported for conjoint analysis.",
       how_to_fix = c(
-        "Valid methods: auto, mlogit, clogit, hb",
+        "Valid methods: auto, mlogit, clogit, hb, latent_class, best_worst",
         "Set 'estimation_method' in your configuration",
         sprintf("You specified: %s", method)
       )
@@ -334,6 +351,10 @@ prepare_mlogit_data <- function(data, config) {
 
 #' Build mlogit Formula
 #'
+#' Supports optional interaction terms from config (interaction_terms field).
+#' If interactions are configured, delegates to build_formula_with_interactions()
+#' from 06_interactions.R.
+#'
 #' @keywords internal
 build_mlogit_formula <- function(config) {
 
@@ -363,6 +384,15 @@ build_mlogit_formula <- function(config) {
         "Set 'chosen_column' in the Settings sheet (typically 'chosen' or 'selected')"
       )
     )
+  }
+
+  # Check for config-driven interactions
+  if (!is.null(config$interaction_terms) && nchar(trimws(config$interaction_terms %||% "")) > 0 &&
+      exists("build_formula_with_interactions", mode = "function")) {
+    int_spec <- parse_interactions_from_config(config)
+    if (!is.null(int_spec) && int_spec$n_interactions > 0) {
+      return(build_formula_with_interactions(config, int_spec))
+    }
   }
 
   # Build formula: choice ~ attribute1 + attribute2 + ... | 0

@@ -4,8 +4,8 @@
 #
 # Module: Conjoint Analysis - Utilities
 # Purpose: Shared utility functions for conjoint analysis
-# Version: 2.1.0 - Uses consolidated shared utilities
-# Date: 2025-12-13
+# Version: 3.0.0 - Uses consolidated shared utilities
+# Date: 2026-03-10
 #
 # SHARED UTILITIES: Functions like safe_numeric, safe_logical are available
 # from /modules/shared/lib/data_utils.R. Local versions retained for

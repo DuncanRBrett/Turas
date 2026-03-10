@@ -4,8 +4,8 @@
 #
 # Module: Conjoint Analysis - Part-Worth Utilities
 # Purpose: Calculate utilities, confidence intervals, and attribute importance
-# Version: 2.1.0 (Phase 1 - Alchemer Integration)
-# Date: 2025-12-12
+# Version: 3.0.0
+# Date: 2026-03-10
 #
 # NOTE: Handles attribute names with special characters (e.g., "I+G") by
 #       escaping regex patterns when matching coefficient names.
@@ -26,6 +26,24 @@ calculate_utilities <- function(model_result, config, verbose = TRUE) {
 
   log_verbose("Calculating part-worth utilities...", verbose)
 
+  # HB dispatch: use HB-specific extraction for individual-level utilities
+  if (!is.null(model_result$method) && model_result$method == "hierarchical_bayes") {
+    utilities <- extract_hb_utilities(model_result, config, verbose)
+
+    # Add interpretation
+    utilities$Interpretation <- mapply(
+      interpret_utility,
+      utilities$Utility,
+      utilities$p_value,
+      utilities$is_baseline,
+      SIMPLIFY = TRUE
+    )
+
+    log_verbose(sprintf("  ✓ Calculated %d part-worth utilities (HB)", nrow(utilities)), verbose)
+    return(utilities)
+  }
+
+  # Aggregate method path (mlogit, clogit, OLS)
   # Extract coefficients and standard errors
   coefs <- model_result$coefficients
   std_errors <- model_result$std_errors
