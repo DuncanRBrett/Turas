@@ -52,7 +52,9 @@ build_ci_summary_table <- function(questions, labels = NULL) {
         <td class="ci-td ci-num">%s</td>
         <td class="ci-td"><span class="%s">%s</span></td>
       </tr>',
-      htmlEscape(q$question_id), type_label, est, lower_str, upper_str,
+      htmlEscape(if (!is.null(q$question_label) && q$question_label != q$question_id)
+        paste0(q$question_id, " \u2014 ", q$question_label) else q$question_id),
+      type_label, est, lower_str, upper_str,
       width_str, badge_class, badge_label
     ))
   }

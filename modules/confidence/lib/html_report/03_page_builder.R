@@ -655,9 +655,12 @@ build_ci_details_panel <- function(html_data, tables, charts, brand, labels = NU
   q_ids <- names(questions)
   for (i in seq_along(q_ids)) {
     active <- if (i == 1) " active" else ""
+    q_raw_label <- questions[[q_ids[i]]]$question_label
+    q_label <- if (!is.null(q_raw_label) && q_raw_label != q_ids[i])
+      paste0(q_ids[i], " \u2014 ", q_raw_label) else q_ids[i]
     nav_buttons <- c(nav_buttons, sprintf(
       '<button class="ci-nav-btn%s" data-question="%s" onclick="switchQuestionDetail(\'%s\')">%s</button>',
-      active, q_ids[i], q_ids[i], htmlEscape(q_ids[i])
+      active, q_ids[i], q_ids[i], htmlEscape(q_label)
     ))
   }
   nav_html <- sprintf('<div class="ci-nav">%s</div>', paste(nav_buttons, collapse = "\n"))
@@ -718,9 +721,11 @@ build_ci_details_panel <- function(html_data, tables, charts, brand, labels = NU
       panel_parts <- c(panel_parts, method_chart)
     }
 
+    q_heading <- if (!is.null(q$question_label) && q$question_label != q_ids[i])
+      paste0(q_ids[i], " \u2014 ", q$question_label) else q_ids[i]
     panels <- c(panels, sprintf(
       '<div id="ci-detail-%s" class="ci-detail-panel%s"><div class="ci-card"><h3>%s</h3>%s</div></div>',
-      q_ids[i], active, htmlEscape(q_ids[i]),
+      q_ids[i], active, htmlEscape(q_heading),
       paste(panel_parts, collapse = "\n")
     ))
   }

@@ -223,6 +223,16 @@ body {
   color: #92400e;
 }
 
+.hub-card-type-confidence {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.hub-card-type-analysis {
+  background: #d1fae5;
+  color: #065f46;
+}
+
 .hub-report-card-wave-range {
   font-size: 12px;
   color: var(--hub-text-muted);
@@ -422,6 +432,11 @@ body {
 .hub-badge-overview {
   background: #e0e7ff;
   color: #3730a3;
+}
+
+.hub-badge-confidence {
+  background: #ede9fe;
+  color: #5b21b6;
 }
 
 .hub-pin-title {

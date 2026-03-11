@@ -224,9 +224,13 @@
     // Source badge: use sourceLabel if available, fall back to generic type label
     var badgeLabel = pin.sourceLabel || "";
     var badgeClass = "hub-badge-tabs";
-    if (pin.source === "tracker" || (pin.sourceType || pin.source) === "tracker") {
+    var sourceType = pin.sourceType || pin.source;
+    if (sourceType === "tracker") {
       badgeClass = "hub-badge-tracker";
       if (!badgeLabel) badgeLabel = "Tracker";
+    } else if (sourceType === "confidence") {
+      badgeClass = "hub-badge-confidence";
+      if (!badgeLabel) badgeLabel = "Confidence";
     } else if (pin.source === "overview") {
       badgeClass = "hub-badge-overview";
       if (!badgeLabel) badgeLabel = "Overview";
@@ -1116,6 +1120,7 @@
     if (pin.sourceLabel) metaParts.push(pin.sourceLabel);
     else if (pin.source === "tracker") metaParts.push("Tracker");
     else if (pin.source === "tabs") metaParts.push("Crosstabs");
+    else if (pin.source === "confidence") metaParts.push("Confidence");
     else if (pin.source === "overview") metaParts.push("Overview");
     // Date
     if (pin.timestamp) metaParts.push(new Date(pin.timestamp).toLocaleDateString());

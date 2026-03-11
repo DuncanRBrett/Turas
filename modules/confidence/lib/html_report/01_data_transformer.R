@@ -63,6 +63,25 @@ transform_confidence_for_html <- function(confidence_results, config = list()) {
                                                  sampling_method)
   }
 
+  # Attach question labels from config (if Question_Label column exists)
+  qa <- analysis_config$question_analysis
+  if (!is.null(qa) && "Question_Label" %in% names(qa)) {
+    label_map <- setNames(
+      as.character(qa$Question_Label),
+      as.character(qa$Question_ID)
+    )
+    for (q_id in names(questions)) {
+      lbl <- label_map[[q_id]]
+      questions[[q_id]]$question_label <- if (!is.null(lbl) && !is.na(lbl) &&
+                                               nzchar(trimws(lbl))) trimws(lbl) else q_id
+    }
+  } else {
+    # No label column — default label to question_id
+    for (q_id in names(questions)) {
+      questions[[q_id]]$question_label <- q_id
+    }
+  }
+
   # Determine methods used
   methods_used <- character()
   for (q in questions) {

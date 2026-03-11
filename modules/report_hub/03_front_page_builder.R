@@ -67,11 +67,20 @@ build_report_card <- function(parsed) {
   if (is.null(label)) label <- key
 
   # Type badge
-  if (type == "tracker") {
-    type_badge <- '<span class="hub-card-type-badge hub-card-type-tracker">Tracker</span>'
-  } else {
-    type_badge <- '<span class="hub-card-type-badge hub-card-type-crosstabs">Crosstabs</span>'
-  }
+  badge_map <- list(
+    tracker    = list(css = "hub-card-type-tracker",    label = "Tracker"),
+    tabs       = list(css = "hub-card-type-crosstabs",  label = "Crosstabs"),
+    confidence = list(css = "hub-card-type-confidence",  label = "Confidence"),
+    catdriver  = list(css = "hub-card-type-analysis",    label = "Driver Analysis"),
+    keydriver  = list(css = "hub-card-type-analysis",    label = "Key Drivers"),
+    weighting  = list(css = "hub-card-type-analysis",    label = "Weighting")
+  )
+  badge_info <- badge_map[[type]]
+  if (is.null(badge_info)) badge_info <- badge_map[["tabs"]]  # fallback
+  type_badge <- sprintf(
+    '<span class="hub-card-type-badge %s">%s</span>',
+    badge_info$css, badge_info$label
+  )
 
   # Build stats lines
   stats_lines <- character(0)

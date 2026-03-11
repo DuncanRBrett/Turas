@@ -4,6 +4,38 @@
 #' Checks config file, report paths, and configuration integrity.
 
 # ==============================================================================
+# HELPER: Clean OpenXML escape sequences from Excel text
+# ==============================================================================
+
+#' Clean OpenXML Escape Sequences from Text
+#'
+#' openxlsx may pass through unresolved OpenXML `_xHHHH_` escape sequences
+#' (e.g., `_x000B_` for vertical tab / in-cell line break, `_x000D_` for
+#' carriage return). This helper decodes common control-character escapes
+#' to their natural equivalents so that markdown rendering and display work
+#' correctly.
+#'
+#' @param x Character vector to clean
+#' @return Cleaned character vector (same length as input)
+#' @keywords internal
+.clean_openxml_escapes <- function(x) {
+  if (is.null(x) || !is.character(x)) return(x)
+  # _x000D_ = carriage return → remove (usually paired with \n)
+  x <- gsub("_x000D_", "", x, fixed = TRUE)
+  # _x000B_ = vertical tab (Excel in-cell soft line break) → space.
+  # Real paragraph breaks are already \n in the content; _x000B_ was a visual
+  # break within a cell (Alt+Enter or Word paste). Using space keeps the
+  # paragraph structure intact for the markdown renderer which wraps each
+  # non-blank line in <p> tags.
+  x <- gsub(" ?_x000B_", " ", x, perl = TRUE)
+  # _x000A_ = line feed → newline (shouldn't normally appear, but be safe)
+  x <- gsub("_x000A_", "\n", x, fixed = TRUE)
+  # Catch-all: any remaining _xHHHH_ control chars (U+0000–U+001F) → space
+  x <- gsub("_x00[0-1][0-9a-fA-F]_", " ", x, perl = TRUE)
+  return(x)
+}
+
+# ==============================================================================
 # HELPER: Auto-detect header row (same approach as tabs module)
 # ==============================================================================
 
@@ -102,7 +134,10 @@
     valid <- !is.na(keys) & nzchar(trimws(keys)) &
              !grepl("^\\[", keys) &           # skip [REQUIRED] description rows
              !grepl("^(PROJECT|BRANDING|OUTPUT|SECTION)$", keys, ignore.case = TRUE)  # skip section headers
-    settings <- as.list(setNames(values[valid], tolower(trimws(keys[valid]))))
+    settings <- as.list(setNames(
+      .clean_openxml_escapes(values[valid]),
+      tolower(trimws(keys[valid]))
+    ))
     return(settings)
   }
 
@@ -131,7 +166,10 @@
     valid <- !is.na(keys) & nzchar(trimws(keys)) &
              !grepl("^\\[", keys) &
              !grepl("^(PROJECT|BRANDING|OUTPUT|SECTION)$", keys, ignore.case = TRUE)
-    settings <- as.list(setNames(values[valid], tolower(trimws(keys[valid]))))
+    settings <- as.list(setNames(
+      .clean_openxml_escapes(values[valid]),
+      tolower(trimws(keys[valid]))
+    ))
     return(settings)
   }
 
@@ -405,8 +443,8 @@ guard_validate_hub_config <- function(config_file) {
         slides <- lapply(seq_len(nrow(slides_df)), function(i) {
           list(
             id = sprintf("hub-slide-%d", i),
-            title = trimws(slides_df$slide_title[i]),
-            content = trimws(slides_df$content[i]),
+            title = trimws(.clean_openxml_escapes(slides_df$slide_title[i])),
+            content = trimws(.clean_openxml_escapes(slides_df$content[i])),
             order = slides_df$display_order[i]
           )
         })
