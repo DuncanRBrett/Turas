@@ -33,9 +33,9 @@ function switchBannerGroup(groupCode, btn) {
   // Save all current insight editor text under the OLD banner before switching
   var oldBannerName = getActiveBannerName();
   document.querySelectorAll(".insight-area").forEach(function(area) {
-    var editor = area.querySelector(".insight-editor");
+    var editor = area.querySelector(".insight-md-editor");
     if (!editor) return;
-    var text = editor.textContent.trim();
+    var text = editor.value.trim();
     var storeObj = getInsightStore(area);
     if (text) {
       storeObj[oldBannerName] = text;
@@ -173,8 +173,8 @@ function printReport() {
   // Show insights that have content
   var insightStates = [];
   document.querySelectorAll(".insight-container").forEach(function(container) {
-    var editor = container.querySelector(".insight-editor");
-    var hadContent = editor && editor.textContent.trim() !== "";
+    var editor = container.querySelector(".insight-md-editor");
+    var hadContent = editor && editor.value.trim() !== "";
     insightStates.push({ el: container, was: container.style.display });
     if (hadContent) container.style.display = "block";
   });
@@ -350,7 +350,31 @@ function toggleInsight(qCode) {
     btn.style.display = isHidden ? "none" : "block";
   }
   if (isHidden) {
-    var editor = container.querySelector(".insight-editor");
+    // Enter edit mode and focus the textarea
+    container.classList.add("editing");
+    var editor = container.querySelector(".insight-md-editor");
+    if (editor) editor.focus();
+  }
+}
+
+// Toggle between edit and rendered mode for an insight
+function toggleInsightEdit(qCode) {
+  var area = document.querySelector(".insight-area[data-q-code=\"" + qCode + "\"]");
+  if (!area) return;
+  var container = area.querySelector(".insight-container");
+  if (!container) return;
+  var isEditing = container.classList.contains("editing");
+  if (isEditing) {
+    // Exit edit mode: render markdown and sync
+    var editor = container.querySelector(".insight-md-editor");
+    var rendered = container.querySelector(".insight-md-rendered");
+    if (rendered && editor) rendered.innerHTML = renderMarkdown(editor.value);
+    container.classList.remove("editing");
+    syncInsight(qCode);
+  } else {
+    // Enter edit mode
+    container.classList.add("editing");
+    var editor = container.querySelector(".insight-md-editor");
     if (editor) editor.focus();
   }
 }
@@ -360,10 +384,12 @@ function dismissInsight(qCode) {
   if (!area) return;
   var container = area.querySelector(".insight-container");
   var btn = area.querySelector(".insight-toggle");
-  var editor = area.querySelector(".insight-editor");
+  var editor = container ? container.querySelector(".insight-md-editor") : null;
+  var rendered = container ? container.querySelector(".insight-md-rendered") : null;
   // Clear content for current banner and hide
-  if (editor) editor.innerHTML = "";
-  if (container) container.style.display = "none";
+  if (editor) editor.value = "";
+  if (rendered) rendered.innerHTML = "";
+  if (container) { container.style.display = "none"; container.classList.remove("editing"); }
   if (btn) {
     btn.style.display = "block";
     btn.textContent = "+ Add Insight";
@@ -376,11 +402,11 @@ function dismissInsight(qCode) {
 function syncInsight(qCode) {
   var area = document.querySelector(".insight-area[data-q-code=\"" + qCode + "\"]");
   if (!area) return;
-  var editor = area.querySelector(".insight-editor");
+  var editor = area.querySelector(".insight-md-editor");
   if (!editor) return;
   var bannerName = getActiveBannerName();
   var storeObj = getInsightStore(area);
-  var text = editor.textContent.trim();
+  var text = editor.value.trim();
   if (text) {
     storeObj[bannerName] = text;
   } else {
@@ -392,7 +418,7 @@ function syncInsight(qCode) {
 // Sync ALL insights into their hidden stores (called before save)
 function syncAllInsights() {
   document.querySelectorAll(".insight-area").forEach(function(area) {
-    var editor = area.querySelector(".insight-editor");
+    var editor = area.querySelector(".insight-md-editor");
     if (!editor) return;
     var qCode = area.getAttribute("data-q-code");
     if (qCode) syncInsight(qCode);
@@ -416,12 +442,14 @@ function saveReportHTML() {
     dateBadge.textContent = "Last saved " + d + " " + m + " " + y + " " + hh + ":" + mm;
   }
 
-  // Also sync any dashboard text-box editors into their stores
-  document.querySelectorAll(".dash-text-editor").forEach(function(editor) {
-    var store = editor.nextElementSibling;
-    if (store && store.tagName === "TEXTAREA") {
-      store.textContent = editor.innerHTML;
-    }
+  // Sync dashboard markdown editors into their stores and render
+  document.querySelectorAll(".dash-text-content").forEach(function(content) {
+    var editor = content.querySelector(".dash-md-editor");
+    var store = content.querySelector(".dash-md-store");
+    var rendered = content.querySelector(".dash-md-rendered");
+    if (editor && store) store.value = editor.value;
+    if (rendered && editor) rendered.innerHTML = renderMarkdown(editor.value);
+    content.classList.remove("editing");
   });
 
   // Sync closing notes editor to hidden store
@@ -442,24 +470,28 @@ function saveReportHTML() {
     if (rendered && editor) rendered.innerHTML = renderMarkdown(editor.value);
   });
 
-  // Before serializing, clear editor contenteditable (data lives in textarea store)
+  // Before serializing, render markdown and exit edit mode
   // The hydrate function will restore editors from stores on re-open
   document.querySelectorAll(".insight-area").forEach(function(area) {
     var store = area.querySelector("textarea.insight-store");
-    var editor = area.querySelector(".insight-editor");
+    var editor = area.querySelector(".insight-md-editor");
+    var rendered = area.querySelector(".insight-md-rendered");
     var container = area.querySelector(".insight-container");
     var btn = area.querySelector(".insight-toggle");
+    if (container) container.classList.remove("editing");
     var storeObj = getInsightStore(area);
     var hasAny = Object.keys(storeObj).length > 0;
     // Show the insight container if any banner has content
     if (hasAny) {
       var bannerName = getActiveBannerName();
       var currentText = storeObj[bannerName] || "";
-      if (editor) editor.textContent = currentText;
+      if (editor) editor.value = currentText;
+      if (rendered) rendered.innerHTML = currentText ? renderMarkdown(currentText) : "";
       if (container) container.style.display = currentText ? "block" : "none";
       if (btn) btn.style.display = currentText ? "none" : "block";
     } else {
-      if (editor) editor.innerHTML = "";
+      if (editor) editor.value = "";
+      if (rendered) rendered.innerHTML = "";
       if (container) container.style.display = "none";
       if (btn) { btn.style.display = "block"; btn.textContent = "+ Add Insight"; }
     }
@@ -513,11 +545,13 @@ function hydrateInsights() {
     var storeObj = getInsightStore(area);
     if (Object.keys(storeObj).length === 0) return;
     var text = storeObj[bannerName] || "";
-    var editor = area.querySelector(".insight-editor");
+    var editor = area.querySelector(".insight-md-editor");
+    var rendered = area.querySelector(".insight-md-rendered");
     var container = area.querySelector(".insight-container");
     var btn = area.querySelector(".insight-toggle");
-    if (text && editor) {
-      editor.textContent = text;
+    if (text) {
+      if (editor) editor.value = text;
+      if (rendered) rendered.innerHTML = renderMarkdown(text);
       if (container) container.style.display = "block";
       if (btn) btn.style.display = "none";
     }
@@ -555,18 +589,43 @@ function updateInsightsForBanner(bannerName) {
     }
 
     var text = storeObj[bannerName] || "";
-    var editor = area.querySelector(".insight-editor");
+    var editor = area.querySelector(".insight-md-editor");
+    var rendered = area.querySelector(".insight-md-rendered");
     var container = area.querySelector(".insight-container");
     var btn = area.querySelector(".insight-toggle");
+    if (container) container.classList.remove("editing");
     if (text) {
-      if (editor) editor.textContent = text;
+      if (editor) editor.value = text;
+      if (rendered) rendered.innerHTML = renderMarkdown(text);
       if (container) container.style.display = "block";
       if (btn) btn.style.display = "none";
     } else {
-      if (editor) editor.innerHTML = "";
+      if (editor) editor.value = "";
+      if (rendered) rendered.innerHTML = "";
       if (container) container.style.display = "none";
       if (btn) { btn.style.display = "block"; btn.textContent = "+ Add Insight"; }
     }
   });
+}
+
+// Toggle edit mode for dashboard text boxes
+function toggleDashEdit(boxId) {
+  var content = document.getElementById("dash-text-" + boxId);
+  if (!content) return;
+  var isEditing = content.classList.contains("editing");
+  if (isEditing) {
+    // Exit edit mode: render markdown, sync to store
+    var editor = content.querySelector(".dash-md-editor");
+    var rendered = content.querySelector(".dash-md-rendered");
+    var store = content.querySelector(".dash-md-store");
+    if (rendered && editor) rendered.innerHTML = renderMarkdown(editor.value);
+    if (store && editor) store.value = editor.value;
+    content.classList.remove("editing");
+  } else {
+    // Enter edit mode
+    content.classList.add("editing");
+    var editor = content.querySelector(".dash-md-editor");
+    if (editor) editor.focus();
+  }
 }
 

@@ -668,15 +668,34 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       width: 100%;
     }
     .insight-toggle:hover { border-color: BRAND; color: BRAND; }
-    .insight-editor {
-      border-left: 3px solid BRAND; background: #f8fafa;
-      padding: 12px 16px; font-size: 13px; line-height: 1.6;
-      border-radius: 0 6px 6px 0; min-height: 40px; outline: none;
-      color: #1e293b; position: relative;
+    .insight-md-editor {
+      width: 100%; min-height: 60px; padding: 12px 16px; font-size: 13px;
+      border: 1px solid #e2e8f0; border-radius: 6px; font-family: monospace;
+      resize: vertical; box-sizing: border-box; line-height: 1.6;
+      color: #1e293b; outline: none;
     }
-    .insight-editor:empty::before {
-      content: attr(data-placeholder); color: #b0bec5; font-style: italic;
+    .insight-md-editor:focus { border-color: BRAND; }
+    .insight-md-rendered {
+      font-size: 13px; line-height: 1.6; color: #1e293b; padding: 0;
+      min-height: 24px; cursor: pointer;
     }
+    .insight-md-rendered:empty::after {
+      content: "Click to add insight (supports **bold**, *italic*, - bullets, ## headings)";
+      color: #b0bec5; font-style: italic;
+    }
+    .insight-md-rendered h2 { font-size: 15px; font-weight: 600; margin: 8px 0 4px; color: #1e293b; }
+    .insight-md-rendered p { margin: 4px 0; }
+    .insight-md-rendered blockquote {
+      border-left: 3px solid BRAND; padding: 6px 12px; margin: 6px 0;
+      background: #f0fafa; font-style: italic; color: #475569;
+    }
+    .insight-md-rendered ul { padding-left: 20px; margin: 4px 0; }
+    .insight-md-rendered li { margin-bottom: 2px; }
+    .insight-md-rendered strong { font-weight: 700; }
+    .insight-md-rendered em { font-style: italic; }
+    .insight-container.editing .insight-md-editor { display: block; }
+    .insight-container.editing .insight-md-rendered { display: none; }
+    .insight-container:not(.editing) .insight-md-editor { display: none; }
     .insight-dismiss {
       position: absolute; top: 6px; right: 8px; border: none; background: none;
       color: #cbd5e1; font-size: 14px; cursor: pointer; padding: 2px 6px;
@@ -684,7 +703,8 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     }
     .insight-dismiss:hover { color: #64748b; background: #e2e8f0; }
     .insight-container {
-      border: 1px solid #e2e8f0; border-top: none; background: #f8fafa;
+      border-left: 3px solid BRAND; background: #f8fafa;
+      border-radius: 0 6px 6px 0;
       padding: 10px 16px; position: relative;
     }
     /* Help overlay */
@@ -817,9 +837,11 @@ build_print_css <- function() {
       .export-btn, .export-chart-btn, .export-slide-btn, .slide-export-group,
       .slide-menu, .search-box, .pin-btn,
       .toggle-label, .print-btn, .col-chip-bar, .ct-sort-indicator,
-      .insight-toggle, .insight-dismiss,
+      .insight-toggle, .insight-dismiss, .insight-md-editor,
+      .dash-md-editor,
       .chart-col-picker, .help-overlay, .help-btn,
       .report-tabs, .row-exclude-btn { display: none !important; }
+      .insight-md-rendered, .dash-md-rendered { display: block !important; }
 
       /* === LAYOUT RESET === */
       body {
@@ -1538,17 +1560,22 @@ build_insight_area <- function(q_code, comment_entries = NULL,
       onclick = sprintf("toggleInsight('%s')", q_code),
       if (has_comment) "Edit Insight" else "+ Add Insight"
     ),
-    # Editable callout container
+    # Insight container with markdown editor/renderer (like qual slides)
     htmltools::tags$div(
       class = "insight-container",
       style = if (!has_comment) "display:none;" else NULL,
-      htmltools::tags$div(
-        class = "insight-editor",
-        contenteditable = "true",
-        `data-placeholder` = "Type key insight here\u2026",
+      # Textarea for editing raw markdown (hidden unless .editing)
+      htmltools::tags$textarea(
+        class = "insight-md-editor",
         `data-q-code` = q_code,
-        oninput = sprintf("syncInsight('%s')", q_code),
+        placeholder = "Type key insight here\u2026 (supports **bold**, *italic*, - bullets, ## headings)",
         if (has_comment) initial_text
+      ),
+      # Rendered markdown display (visible unless .editing)
+      htmltools::tags$div(
+        class = "insight-md-rendered",
+        `data-q-code` = q_code,
+        ondblclick = sprintf("toggleInsightEdit('%s')", q_code)
       ),
       htmltools::tags$button(
         class = "insight-dismiss",

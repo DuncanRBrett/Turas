@@ -380,9 +380,9 @@ build_dashboard_text_boxes <- function(brand_colour, config_obj = list()) {
   bc <- brand_colour %||% "#323367"
 
   build_one_box <- function(box_id, title, placeholder, prefill = NULL) {
-    # Pre-populated content (from config Settings sheet)
-    content <- if (!is.null(prefill) && nzchar(trimws(prefill))) {
-      htmltools::HTML(htmltools::htmlEscape(trimws(prefill)))
+    # Pre-populated content (raw markdown from config Comments sheet)
+    raw_md <- if (!is.null(prefill) && nzchar(trimws(prefill))) {
+      trimws(prefill)
     } else {
       NULL
     }
@@ -401,10 +401,24 @@ build_dashboard_text_boxes <- function(brand_colour, config_obj = list()) {
       ),
       htmltools::tags$div(
         id = paste0("dash-text-", box_id),
-        class = "dash-text-editor",
-        contenteditable = "true",
-        `data-placeholder` = placeholder,
-        content
+        class = "dash-text-content",
+        # Textarea for editing raw markdown (hidden unless .editing)
+        htmltools::tags$textarea(
+          class = "dash-md-editor",
+          placeholder = placeholder,
+          if (!is.null(raw_md)) raw_md
+        ),
+        # Rendered markdown display (visible unless .editing)
+        htmltools::tags$div(
+          class = "dash-md-rendered",
+          ondblclick = sprintf("toggleDashEdit('%s')", box_id)
+        ),
+        # Hidden store for persistence on save
+        htmltools::tags$textarea(
+          class = "dash-md-store",
+          style = "display:none;",
+          if (!is.null(raw_md)) raw_md
+        )
       )
     )
   }
@@ -1696,18 +1710,37 @@ build_dashboard_css <- function(brand_colour) {
       font-size: 12px; font-weight: 700; color: #1a2744;
       text-transform: uppercase; letter-spacing: 0.5px;
     }
-    .dash-text-editor {
-      min-height: 60px; padding: 10px 12px; font-size: 13px;
+    .dash-text-content { position: relative; }
+    .dash-md-editor {
+      width: 100%; min-height: 80px; padding: 10px 12px; font-size: 13px;
       line-height: 1.6; color: #1e293b; border: 1px solid #e2e8f0;
-      border-radius: 6px; outline: none; transition: border-color 0.15s;
+      border-radius: 6px; outline: none; font-family: monospace;
+      resize: vertical; box-sizing: border-box;
     }
-    .dash-text-editor:focus {
+    .dash-md-editor:focus {
       border-color: BRAND; box-shadow: 0 0 0 2px rgba(13,138,138,0.08);
     }
-    .dash-text-editor:empty:before {
-      content: attr(data-placeholder);
+    .dash-md-rendered {
+      font-size: 13px; line-height: 1.7; color: #1e293b; padding: 4px 0;
+      min-height: 40px; cursor: pointer;
+    }
+    .dash-md-rendered:empty::after {
+      content: "Double-click to add text (supports **bold**, *italic*, - bullets)";
       color: #94a3b8; font-style: italic;
     }
+    .dash-md-rendered h2 { font-size: 15px; font-weight: 600; margin: 10px 0 5px; color: #1e293b; }
+    .dash-md-rendered p { margin: 5px 0; }
+    .dash-md-rendered blockquote {
+      border-left: 3px solid BRAND; padding: 6px 12px; margin: 6px 0;
+      background: #f8fafc; font-style: italic; color: #475569;
+    }
+    .dash-md-rendered ul { padding-left: 20px; margin: 5px 0; }
+    .dash-md-rendered li { margin-bottom: 3px; }
+    .dash-md-rendered strong { font-weight: 700; }
+    .dash-md-rendered em { font-style: italic; }
+    .dash-text-content.editing .dash-md-editor { display: block; }
+    .dash-text-content.editing .dash-md-rendered { display: none; }
+    .dash-text-content:not(.editing) .dash-md-editor { display: none; }
 
     /* === HEATMAP GRID === */
     .dash-heatmap-header {

@@ -398,10 +398,12 @@ document.addEventListener("DOMContentLoaded", function() {
   if (closingStore && closingStore.value && closingEditor) {
     closingEditor.innerHTML = closingStore.value;
   }
-  // Auto-show insights that have content (from config or save-as)
-  document.querySelectorAll(".insight-editor").forEach(function(editor) {
-    if (editor.textContent.trim()) {
+  // Auto-show insights that have content and render markdown (from config or save-as)
+  document.querySelectorAll(".insight-md-editor").forEach(function(editor) {
+    if (editor.value.trim()) {
       var cont = editor.closest(".insight-container");
+      var rendered = cont ? cont.querySelector(".insight-md-rendered") : null;
+      if (rendered) rendered.innerHTML = renderMarkdown(editor.value);
       if (cont) cont.style.display = "block";
       var area = editor.closest(".insight-area");
       if (area) {
@@ -409,6 +411,15 @@ document.addEventListener("DOMContentLoaded", function() {
         if (btn) btn.style.display = "none";
       }
     }
+  });
+  // Hydrate dashboard text boxes — render markdown from editor/store
+  document.querySelectorAll(".dash-text-content").forEach(function(content) {
+    var editor = content.querySelector(".dash-md-editor");
+    var store = content.querySelector(".dash-md-store");
+    var rendered = content.querySelector(".dash-md-rendered");
+    var md = (store && store.value) ? store.value : (editor ? editor.value : "");
+    if (editor && md) editor.value = md;
+    if (rendered && md) rendered.innerHTML = renderMarkdown(md);
   });
   // Hydrate qualitative slides from hidden stores
   renderAllQualSlides();
@@ -425,9 +436,32 @@ document.addEventListener("DOMContentLoaded", function() {
       var card = e.target.closest(".qual-slide-card");
       if (card && card.classList.contains("editing")) {
         setTimeout(function() {
-          // Only exit edit mode if focus didn't move to another element in the card
           if (!card.contains(document.activeElement)) {
             toggleQualEdit(card);
+          }
+        }, 200);
+      }
+    }
+    // Insight markdown editor: exit edit on blur
+    if (e.target.classList && e.target.classList.contains("insight-md-editor")) {
+      var container = e.target.closest(".insight-container");
+      if (container && container.classList.contains("editing")) {
+        setTimeout(function() {
+          if (!container.contains(document.activeElement)) {
+            var qCode = e.target.getAttribute("data-q-code");
+            if (qCode) toggleInsightEdit(qCode);
+          }
+        }, 200);
+      }
+    }
+    // Dashboard markdown editor: exit edit on blur
+    if (e.target.classList && e.target.classList.contains("dash-md-editor")) {
+      var content = e.target.closest(".dash-text-content");
+      if (content && content.classList.contains("editing")) {
+        setTimeout(function() {
+          if (!content.contains(document.activeElement)) {
+            var boxId = content.id.replace("dash-text-", "");
+            if (boxId) toggleDashEdit(boxId);
           }
         }, 200);
       }

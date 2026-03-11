@@ -64,10 +64,10 @@ function captureCurrentView(qCode) {
     excludedRows = Object.keys(window._chartExclusions[qCode]);
   }
 
-  // Capture insight text
+  // Capture insight text (raw markdown)
   var insightText = "";
-  var editor = qContainer.querySelector(".insight-editor");
-  if (editor) insightText = editor.textContent.trim();
+  var editor = qContainer.querySelector(".insight-md-editor");
+  if (editor) insightText = editor.value.trim();
 
   // Capture table sort state
   var table = qContainer.querySelector("table.ct-table");
@@ -895,8 +895,9 @@ function printPinnedViews() {
 // ---- Dashboard Pin Functions (3B) ----
 
 function pinDashboardText(boxId) {
-  var editor = document.getElementById("dash-text-" + boxId);
-  var text = editor ? editor.innerText.trim() : "";
+  var content = document.getElementById("dash-text-" + boxId);
+  var mdEditor = content ? content.querySelector(".dash-md-editor") : null;
+  var text = mdEditor ? mdEditor.value.trim() : "";
   if (!text) { alert("Please enter text before pinning."); return; }
 
   var title = boxId === "background" ? "Background & Method" : "Executive Summary";

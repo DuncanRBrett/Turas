@@ -250,8 +250,8 @@ function exportSlidePNG(qCode, mode) {
   } catch(e) {}
 
   var insightText = "";
-  var insightEditor = container.querySelector(".insight-editor");
-  if (insightEditor) insightText = insightEditor.textContent.trim();
+  var insightEditor = container.querySelector(".insight-md-editor");
+  if (insightEditor) insightText = insightEditor.value.trim();
 
   // ---- Layout calculations ----
   var titleFullText = qCodeLabel + " - " + qTitle;

@@ -266,11 +266,16 @@ load_comments_sheet <- function(config_file) {
     sheets <- openxlsx::getSheetNames(config_file)
     if (!"Comments" %in% sheets) return(NULL)
 
-    df <- openxlsx::read.xlsx(config_file, sheet = "Comments")
+    # Use .read_table_sheet to auto-detect header row (template format support)
+    required_cols <- c("QuestionCode", "Comment")
+    df <- tryCatch(
+      .read_table_sheet(config_file, "Comments", required_cols),
+      error = function(e) NULL
+    )
     if (is.null(df) || nrow(df) == 0) return(NULL)
 
     # Require QuestionCode and Comment columns
-    if (!all(c("QuestionCode", "Comment") %in% names(df))) {
+    if (!all(required_cols %in% names(df))) {
       cat("  [INFO] Comments sheet found but missing QuestionCode/Comment columns - skipped\n")
       return(NULL)
     }
@@ -360,7 +365,12 @@ load_qualitative_sheet <- function(config_file) {
                   else if ("Qualitative" %in% sheets) "Qualitative"
                   else return(NULL)
 
-    df <- openxlsx::read.xlsx(config_file, sheet = sheet_name)
+    # Use .read_table_sheet to auto-detect header row (template format support)
+    required_cols <- c("slide_title", "content")
+    df <- tryCatch(
+      .read_table_sheet(config_file, sheet_name, required_cols),
+      error = function(e) NULL
+    )
     if (is.null(df) || nrow(df) == 0) return(NULL)
 
     if (!"slide_title" %in% names(df) || !"content" %in% names(df)) {

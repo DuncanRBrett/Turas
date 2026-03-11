@@ -32,6 +32,37 @@ load_config_sheet <- function(file_path, sheet_name = "Settings") {
   tryCatch({
     config_df <- readxl::read_excel(file_path, sheet = sheet_name)
 
+    # Auto-detect header row: if row 1 isn't Setting/Value, scan for it
+    # This supports both legacy (Setting/Value in row 1) and new template
+    # format (title/subtitle rows above the header)
+    if (!all(c("Setting", "Value") %in% names(config_df))) {
+      raw <- suppressMessages(readxl::read_excel(file_path, sheet = sheet_name,
+                                                  col_names = FALSE, n_max = 10))
+      header_row <- NULL
+      for (r in seq_len(nrow(raw))) {
+        row_vals <- as.character(unlist(raw[r, ]))
+        if ("Setting" %in% row_vals && "Value" %in% row_vals) {
+          header_row <- r
+          break
+        }
+      }
+
+      if (!is.null(header_row)) {
+        config_df <- readxl::read_excel(file_path, sheet = sheet_name,
+                                         skip = header_row - 1)
+        # Filter out help/description rows
+        if (nrow(config_df) > 0 && any(grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
+                                              as.character(config_df[[1]]), ignore.case = TRUE))) {
+          config_df <- config_df[!grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
+                                         as.character(config_df[[1]]), ignore.case = TRUE), , drop = FALSE]
+        }
+        # Keep only Setting and Value columns (ignore help columns)
+        if (all(c("Setting", "Value") %in% names(config_df))) {
+          config_df <- config_df[, c("Setting", "Value"), drop = FALSE]
+        }
+      }
+    }
+
     # Validate structure
     if (!all(c("Setting", "Value") %in% names(config_df))) {
       turas_refuse(
