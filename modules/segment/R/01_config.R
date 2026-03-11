@@ -167,7 +167,7 @@ validate_segment_config <- function(config) {
   }
 
   # Validate each method
-  valid_methods <- c("kmeans", "hclust", "gmm")
+  valid_methods <- c("kmeans", "hclust", "gmm", "ensemble")
   invalid <- setdiff(methods, valid_methods)
   if (length(invalid) > 0) {
     segment_refuse(
@@ -369,7 +369,7 @@ validate_segment_config <- function(config) {
   # Metadata
   project_name <- get_char_config(config, "project_name", default_value = "Segmentation Analysis")
   analyst_name <- get_char_config(config, "analyst_name", default_value = "Analyst")
-  description <- get_char_config(config, "description", default_value = "")
+  description <- as.character(get_config_value(config, "description", default_value = ""))
 
   # Question labels
   question_labels_file <- get_config_value(config, "question_labels_file", default_value = NULL)

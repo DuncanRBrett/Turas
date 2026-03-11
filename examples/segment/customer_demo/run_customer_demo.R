@@ -34,6 +34,7 @@ segment_main <- file.path(turas_root, "modules/segment/R/00_main.R")
 if (!file.exists(segment_main)) {
   stop("Segment module not found at: ", segment_main)
 }
+source(segment_main)
 
 
 #' Run Exploration Mode
@@ -42,8 +43,7 @@ if (!file.exists(segment_main)) {
 run_exploration <- function() {
   cat("\n--- MODE: EXPLORATION (k = 2 to 7) ---\n\n")
   config_file <- file.path(demo_dir, "customer_explore_config.xlsx")
-  source(segment_main)
-  result <- run_segmentation(config_file)
+  result <- turas_segment_from_config(config_file)
   cat("\nExploration mode complete. Check output_explore/ for results.\n")
   invisible(result)
 }
@@ -55,8 +55,7 @@ run_exploration <- function() {
 run_final <- function() {
   cat("\n--- MODE: FINAL (k = 4, K-means, all features) ---\n\n")
   config_file <- file.path(demo_dir, "customer_final_config.xlsx")
-  source(segment_main)
-  result <- run_segmentation(config_file)
+  result <- turas_segment_from_config(config_file)
   cat("\nFinal mode complete. Check output_final/ for results.\n")
   invisible(result)
 }
@@ -68,8 +67,7 @@ run_final <- function() {
 run_combined <- function() {
   cat("\n--- MODE: MULTI-METHOD COMPARISON (kmeans, hclust, gmm) ---\n\n")
   config_file <- file.path(demo_dir, "customer_combined_config.xlsx")
-  source(segment_main)
-  result <- run_segmentation(config_file)
+  result <- turas_segment_from_config(config_file)
   cat("\nMulti-method comparison complete. Check output_combined/ for results.\n")
   invisible(result)
 }
@@ -81,8 +79,7 @@ run_combined <- function() {
 run_ensemble <- function() {
   cat("\n--- MODE: ENSEMBLE CLUSTERING ---\n\n")
   config_file <- file.path(demo_dir, "customer_ensemble_config.xlsx")
-  source(segment_main)
-  result <- run_segmentation(config_file)
+  result <- turas_segment_from_config(config_file)
   cat("\nEnsemble clustering complete. Check output_ensemble/ for results.\n")
   invisible(result)
 }
