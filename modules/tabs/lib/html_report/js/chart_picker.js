@@ -326,11 +326,14 @@ function getDistinctPalette(brandHex, count) {
     else h = ((r - g) / d + 4) / 6;
   }
   var palette = [];
-  var offsets = [0, 35, 190, 60, 150];
+  // Wide hue offsets for maximum visual distinction between series
+  var offsets = [0, 145, 50, 210, 100, 280, 170, 320];
+  // Alternate lightness to add contrast even when hues are closer
+  var lightLevels = [0, 0.45, 0.40, 0.48, 0.42, 0.46, 0.44, 0.50];
   for (var i = 0; i < count; i++) {
-    var oh = ((h * 360 + (offsets[i] || i * 72)) % 360) / 360;
-    var os = i === 0 ? s : Math.max(0.35, s * 0.8);
-    var ol = i === 0 ? l : Math.min(0.55, l + 0.05);
+    var oh = ((h * 360 + (offsets[i] || i * 51)) % 360) / 360;
+    var os = i === 0 ? s : Math.max(0.50, s + 0.15);
+    var ol = i === 0 ? l : lightLevels[i] || 0.45;
     palette.push(hslToHex(oh, os, ol));
   }
   return palette;
