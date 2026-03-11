@@ -150,6 +150,8 @@ create_maxdiff_template <- function(output_path = NULL) {
       "Weight_Variable",
       "Filter_Expression",
       "Seed",
+      "Brand_Colour",
+      "Accent_Colour",
       "Module_Version"
     ),
     Value = c(
@@ -163,13 +165,17 @@ create_maxdiff_template <- function(output_path = NULL) {
       "",
       "",
       "12345",
-      "v10.0"
+      "#1e3a5f",
+      "#2aa198",
+      "v11.0"
     ),
     Required = c(
       "YES",
       "YES",
       "ANALYSIS only",
       "ANALYSIS only",
+      "NO",
+      "NO",
       "NO",
       "NO",
       "NO",
@@ -189,6 +195,8 @@ create_maxdiff_template <- function(output_path = NULL) {
       "Column name for weighting variable (leave blank for unweighted)",
       "R expression to filter data, e.g., Q1 == 1 (leave blank for no filter)",
       "Random seed for reproducibility (any integer)",
+      "Primary brand colour for HTML report and simulator (hex format)",
+      "Secondary accent colour for HTML report (hex format)",
       "Module version (for tracking)"
     ),
     Options_Examples = c(
@@ -202,7 +210,9 @@ create_maxdiff_template <- function(output_path = NULL) {
       "Weight, wgt, sample_weight (leave blank if unweighted)",
       "Region == 'North', Age >= 18 & Age <= 65, Complete == 1",
       "12345, 42, 98765",
-      "v10.0"
+      "#1e3a5f, #2c3e50, #003366",
+      "#2aa198, #e67e22, #27ae60",
+      "v11.0"
     ),
     stringsAsFactors = FALSE
   )
@@ -211,7 +221,7 @@ create_maxdiff_template <- function(output_path = NULL) {
   addStyle(wb, "PROJECT_SETTINGS", headerStyle, rows = 1, cols = 1:5, gridExpand = TRUE)
 
   # Color code required vs optional
-  for (i in 2:12) {
+  for (i in 2:(nrow(project_settings) + 1)) {
     if (project_settings$Required[i-1] == "YES") {
       addStyle(wb, "PROJECT_SETTINGS", requiredStyle, rows = i, cols = 1:5, gridExpand = TRUE)
     } else {
@@ -418,7 +428,8 @@ create_maxdiff_template <- function(output_path = NULL) {
       "Worst_Column_Pattern",
       "Task_Number_Pattern",
       "Best_Value_Type",
-      "Worst_Value_Type"
+      "Worst_Value_Type",
+      "Anchor_Variable"
     ),
     Value = c(
       "Version",
@@ -426,7 +437,8 @@ create_maxdiff_template <- function(output_path = NULL) {
       "MaxDiff_T{task}_Worst",
       "{task}",
       "ITEM_POSITION",
-      "ITEM_POSITION"
+      "ITEM_POSITION",
+      ""
     ),
     Required = c(
       "YES",
@@ -434,7 +446,8 @@ create_maxdiff_template <- function(output_path = NULL) {
       "YES",
       "NO",
       "YES",
-      "YES"
+      "YES",
+      "NO"
     ),
     Description = c(
       "Column name containing design version number (1, 2, 3...)",
@@ -442,7 +455,8 @@ create_maxdiff_template <- function(output_path = NULL) {
       "Pattern for Worst choice columns. Use {task} as placeholder for task number",
       "How task number appears in column names (usually just {task})",
       "What value is stored: ITEM_POSITION (1-5) or ITEM_ID (actual ID)",
-      "What value is stored: ITEM_POSITION (1-5) or ITEM_ID (actual ID)"
+      "What value is stored: ITEM_POSITION (1-5) or ITEM_ID (actual ID)",
+      "Column containing anchor/must-have selections (comma-separated Item_IDs or blank)"
     ),
     Examples = c(
       "Version, DesignVersion, Block, MD_Version",
@@ -450,7 +464,8 @@ create_maxdiff_template <- function(output_path = NULL) {
       "MaxDiff_T{task}_Worst, MD{task}W, Worst_{task}, Q5_{task}_Worst",
       "{task}, T{task}, Task{task}",
       "ITEM_POSITION (1,2,3,4,5) or ITEM_ID (ITEM_01, ITEM_02...)",
-      "ITEM_POSITION (1,2,3,4,5) or ITEM_ID (ITEM_01, ITEM_02...)"
+      "ITEM_POSITION (1,2,3,4,5) or ITEM_ID (ITEM_01, ITEM_02...)",
+      "MustHave_Items, Anchor_Q (e.g. 'ITEM_01,ITEM_03,ITEM_05')"
     ),
     stringsAsFactors = FALSE
   )
@@ -458,7 +473,7 @@ create_maxdiff_template <- function(output_path = NULL) {
   writeData(wb, "SURVEY_MAPPING", survey_mapping, startRow = 1, startCol = 1)
   addStyle(wb, "SURVEY_MAPPING", headerStyle, rows = 1, cols = 1:5, gridExpand = TRUE)
 
-  for (i in 2:7) {
+  for (i in 2:(nrow(survey_mapping) + 1)) {
     if (survey_mapping$Required[i-1] == "YES") {
       addStyle(wb, "SURVEY_MAPPING", requiredStyle, rows = i, cols = 1:5, gridExpand = TRUE)
     } else {
@@ -551,6 +566,14 @@ create_maxdiff_template <- function(output_path = NULL) {
       "Generate_HB_Model",
       "Generate_Segment_Tables",
       "Generate_Charts",
+      "Generate_HTML_Report",
+      "Generate_Simulator",
+      "Generate_TURF",
+      "TURF_Max_Items",
+      "TURF_Threshold",
+      "Has_Anchor_Question",
+      "Anchor_Threshold",
+      "Score_Display",
       "Utility_Scale",
       "Include_Raw_Data",
       "Include_Diagnostics",
@@ -565,6 +588,14 @@ create_maxdiff_template <- function(output_path = NULL) {
       "NO",
       "YES",
       "YES",
+      "YES",
+      "YES",
+      "YES",
+      "10",
+      "AUTO",
+      "NO",
+      "0.50",
+      "BOTH",
       "0_100",
       "NO",
       "YES",
@@ -578,7 +609,15 @@ create_maxdiff_template <- function(output_path = NULL) {
       "Fit aggregate multinomial logit model for utilities",
       "Fit Hierarchical Bayes model for individual-level utilities (requires cmdstanr)",
       "Generate separate score tables for each segment",
-      "Generate visualization charts",
+      "Generate PNG/PDF visualization charts",
+      "Generate interactive HTML report with SVG charts and tabbed layout",
+      "Generate interactive HTML simulator (head-to-head, portfolio builder)",
+      "Run TURF (Total Unduplicated Reach & Frequency) portfolio optimization",
+      "Maximum portfolio size for TURF analysis",
+      "Method for classifying items as appealing in TURF",
+      "Whether the survey includes an anchor/must-have question",
+      "Proportion threshold for classifying items as must-have (0.0-1.0)",
+      "How to display preference scores in reports",
       "Scale for utility scores: RAW, 0_100, or PROBABILITY",
       "Include raw response data in output file",
       "Include model diagnostics and fit statistics",
@@ -593,6 +632,14 @@ create_maxdiff_template <- function(output_path = NULL) {
       "YES or NO (requires additional setup)",
       "YES or NO",
       "YES or NO",
+      "YES or NO (produces self-contained .html file)",
+      "YES or NO (requires HB or logit results)",
+      "YES or NO (requires individual-level utilities from HB)",
+      "1 to n_items (default: min(10, n_items))",
+      "AUTO | TOP_3 | ABOVE_MEAN | ABOVE_ZERO",
+      "YES or NO",
+      "0.0-1.0 (items with anchor rate above this = must-have)",
+      "UTILITY | PREFERENCE_SHARE | BOTH",
       "RAW = logit scale | 0_100 = rescaled 0-100 | PROBABILITY = share of preference",
       "YES or NO",
       "YES or NO",
@@ -605,7 +652,7 @@ create_maxdiff_template <- function(output_path = NULL) {
 
   writeData(wb, "OUTPUT_SETTINGS", output_settings, startRow = 1, startCol = 1)
   addStyle(wb, "OUTPUT_SETTINGS", headerStyle, rows = 1, cols = 1:4, gridExpand = TRUE)
-  addStyle(wb, "OUTPUT_SETTINGS", optionalStyle, rows = 2:13, cols = 1:4, gridExpand = TRUE)
+  addStyle(wb, "OUTPUT_SETTINGS", optionalStyle, rows = 2:(nrow(output_settings) + 1), cols = 1:4, gridExpand = TRUE)
 
   setColWidths(wb, "OUTPUT_SETTINGS", cols = 1, widths = 28)
   setColWidths(wb, "OUTPUT_SETTINGS", cols = 2, widths = 12)

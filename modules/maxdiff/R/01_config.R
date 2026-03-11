@@ -725,7 +725,7 @@ parse_survey_mapping <- function(df) {
   df$Field_Type <- toupper(trimws(as.character(df$Field_Type)))
 
   # Valid field types
-  valid_types <- c("VERSION", "BEST_CHOICE", "WORST_CHOICE", "SHOWN_ITEMS")
+  valid_types <- c("VERSION", "BEST_CHOICE", "WORST_CHOICE", "SHOWN_ITEMS", "ANCHOR")
 
   invalid_types <- setdiff(unique(df$Field_Type), valid_types)
   if (length(invalid_types) > 0) {
