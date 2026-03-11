@@ -166,8 +166,12 @@ if (!is.null(results$hb_results$individual_utilities)) {
     cat("--- PREFERENCE SHARES ---\n")
     shares <- compute_preference_shares(individual_utils = results$hb_results$individual_utilities)
     shares_sorted <- sort(shares, decreasing = TRUE)
+    # Map item IDs to labels
+    item_labels <- setNames(results$count_scores$Item_Label, results$count_scores$Item_ID)
     for (i in seq_len(min(5, length(shares_sorted)))) {
-      cat(sprintf("  %s: %.1f%%\n", names(shares_sorted)[i], shares_sorted[i]))
+      id <- names(shares_sorted)[i]
+      lbl <- item_labels[id] %||% id
+      cat(sprintf("  %s: %.1f%%\n", lbl, shares_sorted[i]))
     }
     cat("\n")
   }, error = function(e) {

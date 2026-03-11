@@ -283,10 +283,11 @@ build_segment_table <- function(segment_data) {
     seg <- segment_data[[seg_name]]
     if (is.null(seg) || !is.data.frame(seg) || nrow(seg) == 0) next
 
-    # Determine segment level columns (non-standard columns)
+    # Determine segment level columns (numeric non-standard columns only)
     standard_cols <- c("Item_ID", "Item_Label", "Include")
     level_cols <- setdiff(names(seg), standard_cols)
     level_cols <- level_cols[!grepl("^(Best|Worst|BW|Net|Count)", level_cols)]
+    level_cols <- level_cols[sapply(seg[level_cols], is.numeric)]
 
     if (length(level_cols) == 0) next
 

@@ -200,7 +200,13 @@ run_turf_analysis <- function(individual_utils, items,
     return(list(status = "REFUSED", message = "No individual utilities available"))
   }
 
-  utils_mat <- as.matrix(individual_utils)
+  # Drop non-numeric columns (e.g., resp_id) before matrix conversion
+  if (is.data.frame(individual_utils)) {
+    numeric_cols <- sapply(individual_utils, is.numeric)
+    utils_mat <- as.matrix(individual_utils[, numeric_cols, drop = FALSE])
+  } else {
+    utils_mat <- as.matrix(individual_utils)
+  }
   n_resp <- nrow(utils_mat)
   n_items <- ncol(utils_mat)
   item_names <- colnames(utils_mat)

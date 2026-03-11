@@ -693,7 +693,13 @@ rank_utilities <- function(utilities) {
 compute_preference_shares <- function(individual_utils = NULL, aggregate_utils = NULL) {
 
   if (!is.null(individual_utils) && nrow(individual_utils) > 0) {
-    utils_mat <- as.matrix(individual_utils)
+    # Drop non-numeric columns (e.g., resp_id) before matrix conversion
+    if (is.data.frame(individual_utils)) {
+      numeric_cols <- sapply(individual_utils, is.numeric)
+      utils_mat <- as.matrix(individual_utils[, numeric_cols, drop = FALSE])
+    } else {
+      utils_mat <- as.matrix(individual_utils)
+    }
     n_resp <- nrow(utils_mat)
     n_items <- ncol(utils_mat)
 
@@ -792,7 +798,13 @@ classify_item_discrimination <- function(individual_utils, items = NULL) {
     ))
   }
 
-  utils_mat <- as.matrix(individual_utils)
+  # Drop non-numeric columns (e.g., resp_id) before matrix conversion
+  if (is.data.frame(individual_utils)) {
+    numeric_cols <- sapply(individual_utils, is.numeric)
+    utils_mat <- as.matrix(individual_utils[, numeric_cols, drop = FALSE])
+  } else {
+    utils_mat <- as.matrix(individual_utils)
+  }
   item_ids <- colnames(utils_mat)
 
   # Compute per-item statistics

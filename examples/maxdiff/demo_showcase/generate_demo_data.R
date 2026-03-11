@@ -201,9 +201,9 @@ for (r in 1:n_resp) {
     prob_worst <- exp_u_neg / sum(exp_u_neg)
     worst_pos <- remaining_idx[sample(length(remaining_idx), 1, prob = prob_worst)]
 
-    # Store best/worst as position within task (1-based)
-    row[[sprintf("Best_T%d", t)]] <- best_pos
-    row[[sprintf("Worst_T%d", t)]] <- worst_pos
+    # Store best/worst as item IDs (matching design matrix)
+    row[[sprintf("Best_T%d", t)]] <- shown_item_ids[best_pos]
+    row[[sprintf("Worst_T%d", t)]] <- shown_item_ids[worst_pos]
   }
 
   resp_rows[[r]] <- as.data.frame(row, stringsAsFactors = FALSE)
