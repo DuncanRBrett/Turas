@@ -446,10 +446,21 @@ build_hub_about_panel <- function(config) {
     ))
   }
   if (!is.null(s$analyst_email)) {
-    contact_items <- c(contact_items, sprintf(
-      '<div class="hub-about-contact-item"><span class="hub-about-label">Email</span><a class="hub-about-value hub-about-link" href="mailto:%s">%s</a></div>',
-      htmltools::htmlEscape(s$analyst_email), htmltools::htmlEscape(s$analyst_email)
-    ))
+    # Split on semicolons/commas to make each email a separate mailto link
+    emails_raw <- trimws(unlist(strsplit(s$analyst_email, "[;,]")))
+    emails_raw <- emails_raw[nzchar(emails_raw)]
+    if (length(emails_raw) > 0) {
+      email_links <- vapply(emails_raw, function(e) {
+        e <- trimws(e)
+        sprintf('<a class="hub-about-link" href="mailto:%s">%s</a>',
+                htmltools::htmlEscape(e), htmltools::htmlEscape(e))
+      }, character(1))
+      email_html <- paste(email_links, collapse = '<br>')
+      contact_items <- c(contact_items, sprintf(
+        '<div class="hub-about-contact-item"><span class="hub-about-label">Email</span><span class="hub-about-value">%s</span></div>',
+        email_html
+      ))
+    }
   }
   if (!is.null(s$analyst_phone)) {
     contact_items <- c(contact_items, sprintf(

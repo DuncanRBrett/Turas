@@ -809,8 +809,8 @@ body {
 
 .hub-about-contact-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 24px;
+  grid-template-columns: 1fr 1.5fr 1fr;
+  gap: 24px 32px;
   padding: 24px;
   border: 1.5px dashed var(--hub-border);
   border-radius: 8px;
@@ -820,7 +820,8 @@ body {
 .hub-about-contact-item {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  min-width: 0;
 }
 
 .hub-about-label {
@@ -836,28 +837,32 @@ body {
   font-weight: 500;
   color: var(--hub-text);
   line-height: 1.4;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .hub-about-link {
   color: var(--hub-brand, #323367);
   text-decoration: none;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .hub-about-link:hover {
   text-decoration: underline;
 }
 
 .hub-about-appendices {
-  padding: 16px 24px;
+  padding: 20px 24px;
   border: 1.5px dashed var(--hub-border);
   border-radius: 8px;
   margin-bottom: 20px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .hub-about-notes {
-  padding: 16px 24px;
+  padding: 20px 24px;
   border: 1.5px solid var(--hub-border);
   border-radius: 8px;
   background: #fafaf8;
@@ -888,6 +893,28 @@ body {
   line-height: 1.5;
   resize: vertical;
   box-sizing: border-box;
+}
+
+@media (max-width: 1024px) {
+  .hub-about-contact-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .hub-about-section {
+    margin: 24px 16px;
+    padding: 20px;
+  }
+  .hub-about-contact-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 16px;
+  }
+  .hub-about-appendices,
+  .hub-about-notes {
+    padding: 16px;
+  }
 }
 
 /* --- Print Styles --- */
