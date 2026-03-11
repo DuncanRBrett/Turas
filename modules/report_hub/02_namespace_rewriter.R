@@ -247,8 +247,10 @@ redirect_save_functions <- function(js) {
 rewrite_html_onclick_conflicts <- function(html, report_key) {
   prefix <- paste0(report_key, "_")
 
-  # Functions that conflict and appear in onclick handlers
+  # Functions that appear in inline HTML handlers (onclick, onchange, oninput, ondblclick).
+  # Must be prefixed in both JS definitions AND HTML attributes.
   conflict_fns <- c(
+    # --- Pin/export functions ---
     "togglePin",
     "updatePinButton",
     "renderPinnedCards",
@@ -278,7 +280,27 @@ rewrite_html_onclick_conflicts <- function(html, report_key) {
     "moveQualSlide",
     "pinQualSlide",
     "toggleQualEdit",
-    "renderAllQualSlides"
+    "renderAllQualSlides",
+    # --- Navigation/display (called from onchange/oninput/onclick in HTML) ---
+    "selectQuestion",
+    "switchBannerGroup",
+    "filterQuestions",
+    "toggleChart",
+    "toggleHeatmap",
+    "toggleFrequency",
+    "toggleColumn",
+    "toggleRowExclusion",
+    "toggleGaugeExclude",
+    "toggleDashEdit",
+    "pinDashboardText",
+    "pinGaugeSection",
+    "pinSigFindings",
+    "exportHeatmapExcel",
+    "exportSigFindingsSlide",
+    "exportAllPinnedSlides",
+    "printPinnedViews",
+    "exportPinnedCardPNG",
+    "toggleSlideMenu"
   )
 
   for (fn in conflict_fns) {
@@ -357,9 +379,13 @@ wrap_js_in_iife <- function(js_blocks, report_key, report_type, report_label = N
     collapse = "\n\n"
   )
 
-  # Prefix conflicting global function definitions and their calls
-  # These are functions that exist in BOTH tracker and tabs with different implementations
+  # Prefix conflicting global function definitions and their calls.
+  # CRITICAL: When multiple reports of the same type (e.g., 3 tabs reports) are
+  # combined, ALL global functions that use DOM queries must be prefixed.
+  # Otherwise the last report's version overwrites earlier ones, and its
+  # report-specific DOM helpers (_tabs3_id) can't find elements in earlier panels.
   conflicting_fns <- c(
+    # --- Pin/export functions (shared between tracker and tabs) ---
     "togglePin",
     "updatePinButton",
     "renderPinnedCards",
@@ -393,7 +419,56 @@ wrap_js_in_iife <- function(js_blocks, report_key, report_type, report_label = N
     "moveQualSlide",
     "pinQualSlide",
     "toggleQualEdit",
-    "renderAllQualSlides"
+    "renderAllQualSlides",
+    # --- Core navigation (conflict when multiple tabs reports combined) ---
+    "selectQuestion",
+    "switchBannerGroup",
+    "filterQuestions",
+    "captureCurrentView",
+    # --- Display toggles ---
+    "toggleChart",
+    "toggleHeatmap",
+    "toggleFrequency",
+    "toggleColumn",
+    "toggleRowExclusion",
+    "toggleGaugeExclude",
+    "buildColumnChips",
+    "sortByColumn",
+    "sortChartBars",
+    "initSortHeaders",
+    # --- Dashboard text / insight editing ---
+    "toggleDashEdit",
+    "toggleInsight",
+    "toggleInsightEdit",
+    "dismissInsight",
+    "syncInsight",
+    "syncAllInsights",
+    "hydrateInsights",
+    "updateInsightsForBanner",
+    "pinDashboardText",
+    "pinGaugeSection",
+    "pinSigFindings",
+    # --- Chart picker ---
+    "initChartColumnPickers",
+    "buildChartPickersForGroup",
+    "toggleChartColumn",
+    "rebuildChartSVG",
+    "rebuildChartWithExclusions",
+    # --- Utility functions used by navigation ---
+    "getActiveBannerName",
+    "getLabelText",
+    "getInsightStore",
+    "setInsightStore",
+    "extractTableData",
+    "escapeXml",
+    # --- Additional export functions ---
+    "exportHeatmapExcel",
+    "exportSigFindingsSlide",
+    "exportAllPinnedSlides",
+    "printPinnedViews",
+    "exportPinnedCardPNG",
+    "toggleSlideMenu",
+    "exportInsightsHTML"
   )
 
   prefix <- paste0(report_key, "_")
@@ -650,7 +725,7 @@ var _hubSourceLabel = \'%4$s\';
 %1$stogglePin = function(qCode) {
   // Always add a new pin (multi-pin support).
   // Each pin captures the current view state (banner, chart, table).
-  var pinObj = captureCurrentView(qCode);
+  var pinObj = %1$scaptureCurrentView(qCode);
   if (!pinObj) return;
   pinObj.title = pinObj.qCode || "";
   pinObj.subtitle = pinObj.qTitle || "";
@@ -659,7 +734,7 @@ var _hubSourceLabel = \'%4$s\';
   ReportHub.addPin("%5$s", pinObj);
   %1$supdatePinButton(qCode, true);
 };
-pinDashboardText = function(boxId) {
+%1$spinDashboardText = function(boxId) {
   var editor = %2$s("dash-text-" + boxId);
   var text = editor ? editor.innerText.trim() : "";
   if (!text) { alert("Please enter text before pinning."); return; }
@@ -672,7 +747,7 @@ pinDashboardText = function(boxId) {
   pinObj.sourceLabel = _hubSourceLabel;
   ReportHub.addPin("%5$s", pinObj);
 };
-pinGaugeSection = function(sectionId) {
+%1$spinGaugeSection = function(sectionId) {
   var section = %2$s("dash-sec-" + sectionId);
   if (!section) return;
   var gauges = section.querySelectorAll(".dash-gauge-card:not(.dash-gauge-excluded)");
@@ -692,7 +767,7 @@ pinGaugeSection = function(sectionId) {
   pinObj.sourceLabel = _hubSourceLabel;
   ReportHub.addPin("%5$s", pinObj);
 };
-pinSigFindings = function() { %1$spinVisibleSigFindings(); };
+%1$spinSigFindings = function() { %1$spinVisibleSigFindings(); };
 %1$spinSigCard = function(sigId) {
   var card = %3$s(\'.dash-sig-card[data-sig-id="\' + sigId + \'"]\');
   if (!card || card.classList.contains("sig-hidden")) return;

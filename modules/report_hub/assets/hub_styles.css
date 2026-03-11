@@ -643,6 +643,24 @@ body {
   margin-bottom: 12px;
 }
 
+.hub-add-slide-btn {
+  background: var(--hub-card);
+  border: 1px solid var(--hub-border);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-family: var(--hub-font);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--hub-brand);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.hub-add-slide-btn:hover {
+  background: #f1f5f9;
+  border-color: var(--hub-brand);
+}
+
 .hub-slides-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
@@ -666,6 +684,28 @@ body {
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
+}
+
+.hub-slide-remove-btn {
+  background: none;
+  border: 1px solid var(--hub-border);
+  border-radius: 4px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--hub-text-muted);
+  transition: background 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.hub-slide-remove-btn:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fecaca;
 }
 
 .hub-slide-title {

@@ -41,10 +41,9 @@ build_front_page <- function(config, parsed_reports) {
   # --- Combined summary area (per-report summaries) ---
   parts <- c(parts, build_summary_area(parsed_reports))
 
-  # --- Hub-level qualitative slides (from config, if provided) ---
-  if (!is.null(config$slides) && length(config$slides) > 0) {
-    parts <- c(parts, build_hub_slides_section(config$slides))
-  }
+  # --- Hub-level qualitative slides (always shown — user can add dynamically) ---
+  slides <- if (!is.null(config$slides)) config$slides else list()
+  parts <- c(parts, build_hub_slides_section(slides))
 
   parts <- c(parts, '</div>')
 
@@ -161,8 +160,9 @@ build_report_card <- function(parsed) {
 
 #' Build Combined Summary Area
 #'
-#' Extracts editable summary text from each report's summary panel
-#' and presents them as labelled editable sections.
+#' Extracts labeled text sections (Background & Method, Executive Summary)
+#' from each report's summary panel and presents them as editable
+#' markdown-capable sections on the overview page.
 #'
 #' @param parsed_reports List of parsed report objects
 #' @return HTML string
@@ -170,26 +170,77 @@ build_summary_area <- function(parsed_reports) {
   parts <- '<div class="hub-summary-area">'
 
   for (parsed in parsed_reports) {
-    label <- if (parsed$report_type == "tracker") "Tracker Summary" else "Crosstabs Summary"
     key <- parsed$report_key
+    report_label <- parsed$metadata$project_title
+    if (is.null(report_label)) report_label <- key
 
-    # Try to extract existing summary text from contenteditable divs
-    summary_text <- extract_summary_text(parsed)
+    # Extract distinct sections from the summary panel
+    sections <- extract_summary_sections(parsed)
 
-    parts <- paste0(parts, sprintf(
-      '<div class="hub-summary-section">
+    if (length(sections) > 0) {
+      # Build labeled section for each extracted text box
+      section_meta <- list(
+        background = list(
+          label = sprintf("%s \u2014 Background & Method", report_label),
+          id = sprintf("%s-background", key)
+        ),
+        execsummary = list(
+          label = sprintf("%s \u2014 Executive Summary", report_label),
+          id = sprintf("%s-execsummary", key)
+        ),
+        general = list(
+          label = sprintf("%s Summary",
+                          if (parsed$report_type == "tracker") "Tracker" else "Crosstabs"),
+          id = sprintf("%s-general", key)
+        )
+      )
+
+      for (sec_name in names(sections)) {
+        meta <- section_meta[[sec_name]]
+        content <- sections[[sec_name]]
+        escaped_content <- htmltools::htmlEscape(content)
+
+        # Use dual-mode editor (rendered markdown + hidden textarea) like hub text sections
+        parts <- paste0(parts, sprintf(
+          '<div class="hub-text-section hub-summary-section" id="hub-text-%s">
+  <div class="hub-summary-header">
+    <div class="hub-summary-label">%s</div>
+    <button class="hub-pin-summary-btn" onclick="ReportHub.pinHubText(\'%s\')" title="Pin this section">\U0001F4CC Pin to Views</button>
+  </div>
+  <div class="hub-text-rendered hub-md-content" id="hub-text-rendered-%s"
+       ondblclick="ReportHub.toggleHubTextEdit(\'%s\')"></div>
+  <textarea class="hub-text-editor" id="hub-text-editor-%s"
+            style="display:none"
+            onblur="ReportHub.finishHubTextEdit(\'%s\')">%s</textarea>
+</div>',
+          meta$id,
+          htmltools::htmlEscape(meta$label),
+          meta$id,
+          meta$id,
+          meta$id,
+          meta$id,
+          meta$id,
+          escaped_content
+        ))
+      }
+    } else {
+      # No sections extracted — show empty editable area
+      label <- if (parsed$report_type == "tracker") "Tracker Summary" else "Crosstabs Summary"
+
+      parts <- paste0(parts, sprintf(
+        '<div class="hub-summary-section">
   <div class="hub-summary-header">
     <div class="hub-summary-label">%s</div>
     <button class="hub-pin-summary-btn" onclick="ReportHub.pinOverviewSummary(\'%s\')" title="Pin this summary">\U0001F4CC Pin to Views</button>
   </div>
-  <div class="hub-summary-editor" contenteditable="true" data-placeholder="Add summary for %s..." data-source="%s">%s</div>
+  <div class="hub-summary-editor" contenteditable="true" data-placeholder="Add summary for %s..." data-source="%s"></div>
 </div>',
-      htmltools::htmlEscape(label),
-      key,
-      htmltools::htmlEscape(label),
-      key,
-      summary_text
-    ))
+        htmltools::htmlEscape(label),
+        key,
+        htmltools::htmlEscape(label),
+        key
+      ))
+    }
   }
 
   parts <- paste0(parts, '</div>')
@@ -197,31 +248,90 @@ build_summary_area <- function(parsed_reports) {
 }
 
 
-#' Extract Summary Text from a Parsed Report
+#' Extract Summary Sections from a Parsed Report
 #'
-#' Looks for contenteditable summary areas in the summary panel.
+#' Extracts labeled text sections (Background & Method, Executive Summary)
+#' from the report's summary panel. Tabs reports store content in
+#' <textarea class="dash-md-store"> elements; older formats may use
+#' contenteditable divs.
 #'
 #' @param parsed Parsed report object
-#' @return Text content (HTML-safe)
-extract_summary_text <- function(parsed) {
-  # Look in the summary panel for contenteditable content
+#' @return Named list of section texts (e.g., list(background = "...", execsummary = "..."))
+extract_summary_sections <- function(parsed) {
   summary_panel <- parsed$content_panels[["summary"]]
-  if (is.null(summary_panel)) return("")
+  if (is.null(summary_panel)) return(list())
 
-  # Try to find contenteditable divs with actual content
-  # Match contenteditable="true">...content...</div>
-  m <- gregexpr('contenteditable="true"[^>]*>([^<]+)<', summary_panel)[[1]]
-  if (m[1] == -1) return("")
+  sections <- list()
 
-  # Return the first non-empty content found
-  for (i in seq_along(m)) {
-    len <- attr(m, "match.length")[i]
-    match_str <- substr(summary_panel, m[i], m[i] + len - 1)
-    content <- sub('contenteditable="true"[^>]*>([^<]+)<', '\\1', match_str)
-    content <- trimws(content)
-    if (nzchar(content) && !grepl("^(Add|Click|Type)", content)) {
-      return(htmltools::htmlEscape(content))
+  # --- Tabs reports: textarea-based text boxes ---
+  # Structure: <div id="...dash-text-{id}">
+  #              <textarea class="dash-md-store"...>CONTENT</textarea>
+  bg <- extract_dash_textarea(summary_panel, "background")
+  if (nzchar(bg)) sections$background <- bg
+
+  exec <- extract_dash_textarea(summary_panel, "execsummary")
+  if (nzchar(exec)) sections$execsummary <- exec
+
+  # --- Fallback: contenteditable divs (older report formats) ---
+  if (length(sections) == 0) {
+    m <- gregexpr('contenteditable="true"[^>]*>([^<]+)<', summary_panel)[[1]]
+    if (m[1] != -1) {
+      for (i in seq_along(m)) {
+        len <- attr(m, "match.length")[i]
+        match_str <- substr(summary_panel, m[i], m[i] + len - 1)
+        content <- sub('contenteditable="true"[^>]*>([^<]+)<', '\\1', match_str)
+        content <- trimws(content)
+        if (nzchar(content) && !grepl("^(Add|Click|Type)", content)) {
+          sections$general <- content
+          break
+        }
+      }
     }
+  }
+
+  return(sections)
+}
+
+
+#' Extract Text from a Dash Text Box Textarea
+#'
+#' Finds a dash-text-{box_id} section in the summary panel HTML and
+#' extracts the content from its dash-md-store (or dash-md-editor) textarea.
+#' Handles namespaced IDs (e.g., "report1--dash-text-background").
+#'
+#' @param html Summary panel HTML string
+#' @param box_id Text box identifier ("background" or "execsummary")
+#' @return Extracted text content (trimmed), or "" if not found
+extract_dash_textarea <- function(html, box_id) {
+  # Find the section div (ID may have namespace prefix)
+  id_pattern <- sprintf('id="[^"]*dash-text-%s"', box_id)
+  m <- regexpr(id_pattern, html, perl = TRUE)
+  if (m == -1) return("")
+
+  # Work from the matched position forward
+  remainder <- substring(html, m)
+
+  # Try dash-md-store first (hidden persistence textarea — most reliable)
+  store_pattern <- '<textarea\\s+class="dash-md-store"[\\s\\S]*?>([\\s\\S]*?)</textarea>'
+  store_m <- regexpr(store_pattern, remainder, perl = TRUE)
+
+  if (store_m != -1) {
+    match_str <- regmatches(remainder, store_m)
+    content <- sub(store_pattern, '\\1', match_str, perl = TRUE)
+    content <- trimws(content)
+    if (nzchar(content)) return(content)
+  }
+
+  # Fallback: try dash-md-editor (visible editor textarea)
+  editor_pattern <- '<textarea\\s+class="dash-md-editor"[\\s\\S]*?>([\\s\\S]*?)</textarea>'
+  editor_m <- regexpr(editor_pattern, remainder, perl = TRUE)
+
+  if (editor_m != -1) {
+    match_str <- regmatches(remainder, editor_m)
+    content <- sub(editor_pattern, '\\1', match_str, perl = TRUE)
+    content <- trimws(content)
+    # Ignore placeholder-only content
+    if (nzchar(content) && !grepl("^Enter ", content)) return(content)
   }
 
   return("")
@@ -270,6 +380,7 @@ build_hub_slides_section <- function(slides) {
   parts <- c(parts, '<div class="hub-slides-section">')
   parts <- c(parts, '<div class="hub-slides-header">')
   parts <- c(parts, '  <div class="hub-summary-label">Insights & Analysis</div>')
+  parts <- c(parts, '  <button class="hub-add-slide-btn" onclick="ReportHub.addHubSlide()">+ Add Insight</button>')
   parts <- c(parts, '</div>')
   parts <- c(parts, '<div class="hub-slides-grid" id="hub-slides-grid">')
 
@@ -283,6 +394,7 @@ build_hub_slides_section <- function(slides) {
     <input class="hub-slide-title" value="%s"
            onchange="ReportHub.updateHubSlideTitle(\'%s\', this.value)">
     <button class="hub-pin-summary-btn" onclick="ReportHub.pinHubSlide(\'%s\')" title="Pin this slide">\U0001F4CC Pin</button>
+    <button class="hub-slide-remove-btn" onclick="ReportHub.removeHubSlide(\'%s\')" title="Remove this slide">\u00D7</button>
   </div>
   <div class="hub-slide-rendered hub-md-content" data-slide-id="%s"
        ondblclick="ReportHub.toggleHubSlideEdit(\'%s\')"></div>
@@ -291,7 +403,8 @@ build_hub_slides_section <- function(slides) {
             onblur="ReportHub.finishHubSlideEdit(\'%s\')">%s</textarea>
 </div>',
       slide$id, escaped_title, slide$id,
-      slide$id, slide$id, slide$id, slide$id, slide$id,
+      slide$id, slide$id,
+      slide$id, slide$id, slide$id, slide$id,
       escaped_content
     ))
   }

@@ -398,13 +398,13 @@
     rendered.innerHTML = hubRenderMarkdown(editor.value);
     var text = rendered.innerHTML.trim();
     if (!text) { alert("Add text before pinning."); return; }
-    var titleMap = {
-      "executive-summary": "Executive Summary",
-      "background": "Background & Methodology"
-    };
+    // Derive title from the section header label (works for both hub-level and per-report sections)
+    var section = document.getElementById("hub-text-" + boxId);
+    var labelEl = section ? section.querySelector(".hub-summary-label") : null;
+    var title = labelEl ? labelEl.textContent.trim() : boxId;
     var pinObj = {
       id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
-      title: titleMap[boxId] || boxId,
+      title: title,
       sourceLabel: "Overview",
       insight: text,
       timestamp: Date.now()
@@ -526,6 +526,45 @@
         rendered.innerHTML = hubRenderMarkdown(editor.value);
       }
     });
+  };
+
+  /**
+   * Add a new insight slide to the Insights & Analysis grid
+   */
+  ReportHub.addHubSlide = function() {
+    var grid = document.getElementById("hub-slides-grid");
+    if (!grid) return;
+    var slideId = "hub-slide-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5);
+    var card = document.createElement("div");
+    card.className = "hub-slide-card";
+    card.setAttribute("data-slide-id", slideId);
+    card.innerHTML =
+      '<div class="hub-slide-title-row">' +
+        '<input class="hub-slide-title" value="New Insight" ' +
+          'onchange="ReportHub.updateHubSlideTitle(\'' + slideId + '\', this.value)">' +
+        '<button class="hub-pin-summary-btn" onclick="ReportHub.pinHubSlide(\'' + slideId + '\')" title="Pin this slide">\uD83D\uDCCC Pin</button>' +
+        '<button class="hub-slide-remove-btn" onclick="ReportHub.removeHubSlide(\'' + slideId + '\')" title="Remove this slide">\u00D7</button>' +
+      '</div>' +
+      '<div class="hub-slide-rendered hub-md-content" data-slide-id="' + slideId + '" ' +
+        'ondblclick="ReportHub.toggleHubSlideEdit(\'' + slideId + '\')"></div>' +
+      '<textarea class="hub-slide-editor" data-slide-id="' + slideId + '" ' +
+        'style="display:block" ' +
+        'onblur="ReportHub.finishHubSlideEdit(\'' + slideId + '\')"></textarea>';
+    grid.appendChild(card);
+    // Focus the editor immediately so the user can start typing
+    var editor = card.querySelector(".hub-slide-editor");
+    if (editor) editor.focus();
+  };
+
+  /**
+   * Remove a hub slide card from the DOM
+   * @param {string} slideId - Slide element ID
+   */
+  ReportHub.removeHubSlide = function(slideId) {
+    var card = document.querySelector('.hub-slide-card[data-slide-id="' + slideId + '"]');
+    if (!card) return;
+    if (!confirm("Remove this insight slide?")) return;
+    card.parentNode.removeChild(card);
   };
 
   // ==========================================================================
