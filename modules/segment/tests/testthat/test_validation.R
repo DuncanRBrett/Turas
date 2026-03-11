@@ -231,10 +231,8 @@ test_that("recommend_k still returns a value even if no k meets size threshold",
     min_segment_pct = c(3, 2, 1)  # All below threshold
   )
 
-  # Should still return a recommendation (with warning)
-  expect_warning(
-    recommendation <- recommend_k(metrics_df, min_segment_size_pct = 10)
-  )
+  # Should still return a recommendation (outputs cat message instead of warning)
+  recommendation <- recommend_k(metrics_df, min_segment_size_pct = 10)
 
   expect_true(!is.null(recommendation$recommended_k))
   expect_true(recommendation$recommended_k %in% c(2, 3, 4))

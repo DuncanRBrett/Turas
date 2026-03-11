@@ -7,7 +7,10 @@
 
 #' Assess Segment Stability via Bootstrap
 #'
-#' Tests segment stability by resampling data and measuring consistency
+#' Tests segment stability by resampling data and measuring consistency.
+#' Each bootstrap sample is scaled using the ORIGINAL scaling parameters
+#' (not re-scaled independently), and compared against the original solution
+#' using greedy center-matching for cluster alignment.
 #'
 #' @param data Data frame with clustering variables
 #' @param clustering_vars Character vector of clustering variable names
@@ -15,9 +18,12 @@
 #' @param n_bootstrap Number of bootstrap iterations (default: 100)
 #' @param nstart Number of random starts for k-means (default: 25)
 #' @param seed Random seed for reproducibility
+#' @param original_clusters Optional integer vector of original cluster assignments
 #' @return List with stability metrics
 #' @export
-assess_segment_stability <- function(data, clustering_vars, k, n_bootstrap = 100, nstart = 25, seed = 123) {
+assess_segment_stability <- function(data, clustering_vars, k, n_bootstrap = 100,
+                                     nstart = 25, seed = 123,
+                                     original_clusters = NULL) {
 
   cat("\n")
   cat(rep("=", 80), "\n", sep = "")
@@ -30,61 +36,81 @@ assess_segment_stability <- function(data, clustering_vars, k, n_bootstrap = 100
   clustering_data <- data[, clustering_vars, drop = FALSE]
   n <- nrow(clustering_data)
 
-  cat(sprintf("Running %d bootstrap iterations...\n", n_bootstrap))
+  # Scale once using original data parameters (Bug fix: all bootstrap samples
 
-  # Store bootstrap results
-  bootstrap_assignments <- matrix(NA, nrow = n, ncol = n_bootstrap)
+  # must use the same scaling to ensure comparability)
+  scale_center <- colMeans(clustering_data, na.rm = TRUE)
+  scale_sd <- apply(clustering_data, 2, sd, na.rm = TRUE)
+  scale_sd[scale_sd == 0] <- 1  # guard against constant columns
+  scaled_original <- scale(clustering_data, center = scale_center, scale = scale_sd)
 
-  # Run bootstrap
-  for (i in 1:n_bootstrap) {
-    if (i %% 20 == 0) cat(sprintf("  Iteration %d/%d\n", i, n_bootstrap))
-
-    # Resample with replacement
-    boot_idx <- sample(1:n, n, replace = TRUE)
-    boot_data <- clustering_data[boot_idx, ]
-
-    # Cluster
-    boot_model <- kmeans(scale(boot_data), centers = k, nstart = nstart)
-
-    # Map back to original indices
-    bootstrap_assignments[boot_idx, i] <- boot_model$cluster
+  # Fit original solution if not provided
+  if (is.null(original_clusters)) {
+    original_model <- kmeans(scaled_original, centers = k, nstart = nstart)
+    original_clusters <- original_model$cluster
   }
 
-  cat("\nCalculating stability metrics...\n")
-
-  # Calculate Jaccard similarity between bootstrap iterations
-  jaccard_similarities <- numeric(n_bootstrap - 1)
-
-  for (i in 1:(n_bootstrap - 1)) {
-    # Compare iteration i with i+1
-    valid_rows <- !is.na(bootstrap_assignments[, i]) & !is.na(bootstrap_assignments[, i + 1])
-
-    if (sum(valid_rows) > 0) {
-      # For each pair of respondents, check if they're in same segment in both iterations
-      same_cluster_i <- outer(bootstrap_assignments[valid_rows, i],
-                              bootstrap_assignments[valid_rows, i], "==")
-      same_cluster_j <- outer(bootstrap_assignments[valid_rows, i + 1],
-                              bootstrap_assignments[valid_rows, i + 1], "==")
-
-      # Jaccard = intersection / union
-      intersection <- sum(same_cluster_i & same_cluster_j)
-      union <- sum(same_cluster_i | same_cluster_j)
-
-      jaccard_similarities[i] <- intersection / union
+  # Compute original cluster centers (for greedy matching)
+  original_centers <- matrix(NA, nrow = k, ncol = ncol(scaled_original))
+  for (seg in seq_len(k)) {
+    mask <- original_clusters == seg
+    if (sum(mask) > 0) {
+      original_centers[seg, ] <- colMeans(scaled_original[mask, , drop = FALSE])
     }
   }
 
-  avg_stability <- mean(jaccard_similarities, na.rm = TRUE)
+  cat(sprintf("Running %d bootstrap iterations...\n", n_bootstrap))
+
+  # Store per-bootstrap agreement scores (each compared to original)
+  agreement_scores <- numeric(n_bootstrap)
+
+  for (i in seq_len(n_bootstrap)) {
+    if (i %% 25 == 0) cat(sprintf("  Iteration %d/%d\n", i, n_bootstrap))
+
+    # Resample with replacement
+    boot_idx <- sample(n, n, replace = TRUE)
+    boot_data <- clustering_data[boot_idx, , drop = FALSE]
+
+    # Scale using ORIGINAL parameters (not re-computed from bootstrap sample)
+    boot_scaled <- scale(boot_data, center = scale_center, scale = scale_sd)
+
+    # Cluster bootstrap sample
+    boot_result <- tryCatch({
+      kmeans(boot_scaled, centers = k, nstart = nstart)
+    }, error = function(e) NULL)
+
+    if (is.null(boot_result)) {
+      agreement_scores[i] <- NA
+      next
+    }
+
+    # Map bootstrap clusters back to full sample by assigning each original
+    # observation to the nearest bootstrap center
+    boot_centers <- boot_result$centers
+    boot_full <- assign_to_nearest_centers(scaled_original, boot_centers)
+
+    # Align labels via greedy center-matching against original
+    aligned <- align_cluster_labels(original_clusters, boot_full, k)
+
+    # Calculate agreement (fraction of matching assignments)
+    agreement_scores[i] <- mean(aligned == original_clusters)
+  }
+
+  avg_stability <- mean(agreement_scores, na.rm = TRUE)
+  n_failed <- sum(is.na(agreement_scores))
 
   cat(sprintf("\n✓ Stability analysis complete\n"))
-  cat(sprintf("  Average Jaccard similarity: %.3f\n", avg_stability))
+  cat(sprintf("  Average agreement with original: %.1f%%\n", avg_stability * 100))
+  if (n_failed > 0) {
+    cat(sprintf("  Failed iterations: %d\n", n_failed))
+  }
 
   # Interpret stability
-  if (avg_stability > 0.8) {
+  if (avg_stability > 0.85) {
     interpretation <- "Excellent - segments are very stable"
-  } else if (avg_stability > 0.6) {
+  } else if (avg_stability > 0.75) {
     interpretation <- "Good - segments are reasonably stable"
-  } else if (avg_stability > 0.4) {
+  } else if (avg_stability > 0.60) {
     interpretation <- "Fair - segments show moderate instability"
   } else {
     interpretation <- "Poor - segments are unstable, consider different k"
@@ -94,10 +120,83 @@ assess_segment_stability <- function(data, clustering_vars, k, n_bootstrap = 100
 
   return(list(
     avg_stability = avg_stability,
-    jaccard_similarities = jaccard_similarities,
+    agreement_scores = agreement_scores[!is.na(agreement_scores)],
     interpretation = interpretation,
-    n_bootstrap = n_bootstrap
+    n_bootstrap = n_bootstrap,
+    n_failed = n_failed
   ))
+}
+
+
+#' Assign Observations to Nearest Centers (vectorized)
+#'
+#' @param data Scaled data matrix (n x p)
+#' @param centers Center matrix (k x p)
+#' @return Integer vector of cluster assignments
+#' @keywords internal
+assign_to_nearest_centers <- function(data, centers) {
+  k <- nrow(centers)
+  dist_matrix <- matrix(NA_real_, nrow = nrow(data), ncol = k)
+  for (j in seq_len(k)) {
+    diff <- sweep(data, 2, centers[j, ])
+    dist_matrix[, j] <- rowSums(diff^2)
+  }
+  max.col(-dist_matrix, ties.method = "first")
+}
+
+
+#' Align Cluster Labels via Greedy Center-Matching
+#'
+#' Finds the permutation of labels in clusters_new that best matches
+#' clusters_orig, using a greedy contingency-table approach.
+#'
+#' @param clusters_orig Integer vector of reference assignments
+#' @param clusters_new Integer vector of assignments to align
+#' @param k Number of clusters
+#' @return Integer vector with relabelled clusters_new
+#' @keywords internal
+align_cluster_labels <- function(clusters_orig, clusters_new, k) {
+  cont <- table(factor(clusters_orig, levels = seq_len(k)),
+                factor(clusters_new, levels = seq_len(k)))
+
+  # Greedy matching: for each original cluster, find best unmatched new cluster
+  mapping <- integer(k)
+  used <- logical(k)
+
+  for (pass in seq_len(k)) {
+    best_val <- -1
+    best_i <- 0
+    best_j <- 0
+    for (i in seq_len(k)) {
+      if (mapping[i] > 0) next
+      for (j in seq_len(k)) {
+        if (used[j]) next
+        if (cont[i, j] > best_val) {
+          best_val <- cont[i, j]
+          best_i <- i
+          best_j <- j
+        }
+      }
+    }
+    if (best_i > 0) {
+      mapping[best_i] <- best_j
+      used[best_j] <- TRUE
+    }
+  }
+
+  # Create reverse mapping: new_label -> orig_label
+  reverse_map <- integer(k)
+  for (i in seq_len(k)) {
+    if (mapping[i] > 0) reverse_map[mapping[i]] <- i
+  }
+
+  # Apply mapping
+  aligned <- clusters_new
+  for (j in seq_len(k)) {
+    aligned[clusters_new == j] <- reverse_map[j]
+  }
+
+  aligned
 }
 
 
@@ -240,7 +339,12 @@ calculate_separation_metrics <- function(data, clusters, clustering_vars) {
     )
   }
 
-  ch_index <- (bgss / (k - 1)) / (wgss / (n - k))
+  # CH index undefined for k=1 (division by zero in k-1)
+  if (k == 1) {
+    ch_index <- NA_real_
+  } else {
+    ch_index <- (bgss / (k - 1)) / (wgss / (n - k))
+  }
 
   # 2. Davies-Bouldin Index
   centers <- matrix(NA, nrow = k, ncol = ncol(clustering_data))
@@ -389,7 +493,7 @@ recommend_k <- function(metrics_df, min_segment_size_pct) {
   valid <- metrics_df[metrics_df$min_segment_pct >= min_segment_size_pct, ]
   
   if (nrow(valid) == 0) {
-    warning("No k values meet minimum segment size requirement")
+    cat("  [SEGMENT WARNING] No k values meet minimum segment size requirement\n")
     valid <- metrics_df
   }
   
@@ -481,11 +585,17 @@ calculate_validation_metrics <- function(data, model, k, clusters = NULL,
     totss = totss
   )
 
-  # Optionally calculate gap statistic (computationally expensive)
+  # Optionally calculate gap statistic (Tibshirani et al. 2001)
   if (calculate_gap) {
-    # Gap statistic calculation would go here
-    # Skipped for now as it's not critical
-    metrics$gap_statistic <- NA
+    gap_result <- tryCatch(
+      calculate_gap_statistic(clustering_data, clusters, k),
+      error = function(e) {
+        cat(sprintf("  [SEGMENT] Gap statistic failed: %s\n", e$message))
+        list(gap = NA_real_, se = NA_real_)
+      }
+    )
+    metrics$gap_statistic <- gap_result$gap
+    metrics$gap_se <- gap_result$se
   }
 
   return(metrics)
@@ -740,4 +850,177 @@ Best Run: #%d
   )
 
   return(report)
+}
+
+
+# ==============================================================================
+# GAP STATISTIC (Tibshirani, Walther & Hastie, 2001)
+# ==============================================================================
+
+#' Calculate Gap Statistic for a Given Clustering
+#'
+#' Computes the gap statistic by comparing the observed within-cluster
+#' dispersion to that expected under a uniform reference distribution
+#' on the data bounding box. Uses B reference datasets.
+#'
+#' @param data Numeric matrix/data.frame of clustering variables (already scaled)
+#' @param clusters Integer vector of cluster assignments
+#' @param k Number of clusters
+#' @param B Number of reference datasets (default: 50)
+#' @param nstart Number of random starts for reference k-means (default: 10)
+#' @return List with gap, se, log_wk, E_log_wk_star, sd_log_wk_star
+#' @export
+calculate_gap_statistic <- function(data, clusters, k, B = 50, nstart = 10) {
+
+  data <- as.matrix(data)
+  n <- nrow(data)
+  p <- ncol(data)
+
+  # Observed log(W_k) -- pooled within-cluster sum of squares
+  log_wk <- log(compute_pooled_wss(data, clusters))
+
+  # Generate B uniform reference datasets on bounding box
+  col_mins <- apply(data, 2, min, na.rm = TRUE)
+  col_maxs <- apply(data, 2, max, na.rm = TRUE)
+
+  log_wk_stars <- numeric(B)
+
+  for (b in seq_len(B)) {
+    # Generate uniform data on bounding box
+    ref_data <- matrix(NA_real_, nrow = n, ncol = p)
+    for (j in seq_len(p)) {
+      ref_data[, j] <- runif(n, min = col_mins[j], max = col_maxs[j])
+    }
+
+    # Cluster reference data
+    ref_result <- tryCatch(
+      kmeans(ref_data, centers = k, nstart = nstart),
+      error = function(e) NULL
+    )
+
+    if (!is.null(ref_result)) {
+      log_wk_stars[b] <- log(ref_result$tot.withinss)
+    } else {
+      log_wk_stars[b] <- NA
+    }
+  }
+
+  # Remove any failed reference runs
+  log_wk_stars <- log_wk_stars[!is.na(log_wk_stars)]
+
+  if (length(log_wk_stars) < 5) {
+    return(list(gap = NA_real_, se = NA_real_))
+  }
+
+  # Gap = E*[log(W_k)] - log(W_k)
+  E_log_wk_star <- mean(log_wk_stars)
+  sd_log_wk_star <- sd(log_wk_stars)
+  se <- sd_log_wk_star * sqrt(1 + 1 / length(log_wk_stars))
+
+  gap <- E_log_wk_star - log_wk
+
+  list(
+    gap = gap,
+    se = se,
+    log_wk = log_wk,
+    E_log_wk_star = E_log_wk_star,
+    sd_log_wk_star = sd_log_wk_star
+  )
+}
+
+
+#' Calculate Gap Statistic Across a Range of k Values
+#'
+#' For exploration mode: compute gap(k) for k_min:k_max and identify
+#' optimal k using the Tibshirani et al. (2001) "1-SE" rule:
+#' smallest k such that Gap(k) >= Gap(k+1) - SE(k+1).
+#'
+#' @param data Numeric matrix/data.frame of scaled clustering variables
+#' @param k_range Integer vector of k values to test
+#' @param B Number of reference datasets per k (default: 50)
+#' @param nstart Number of random starts for k-means (default: 10)
+#' @return List with gap_values, se_values, optimal_k, gap_df
+#' @export
+calculate_gap_statistic_range <- function(data, k_range, B = 50, nstart = 10) {
+
+  data <- as.matrix(data)
+  n_k <- length(k_range)
+
+  gap_values <- numeric(n_k)
+  se_values <- numeric(n_k)
+
+  cat(sprintf("    Gap statistic: computing for k = %d to %d (B = %d)...\n",
+              min(k_range), max(k_range), B))
+
+  for (idx in seq_along(k_range)) {
+    k <- k_range[idx]
+
+    # Cluster data
+    km <- tryCatch(
+      kmeans(data, centers = k, nstart = nstart),
+      error = function(e) NULL
+    )
+
+    if (is.null(km)) {
+      gap_values[idx] <- NA
+      se_values[idx] <- NA
+      next
+    }
+
+    gap_result <- calculate_gap_statistic(data, km$cluster, k, B = B, nstart = nstart)
+    gap_values[idx] <- gap_result$gap
+    se_values[idx] <- gap_result$se
+  }
+
+  # Find optimal k: smallest k where Gap(k) >= Gap(k+1) - SE(k+1)
+  optimal_k <- NA
+  for (idx in seq_len(n_k - 1)) {
+    if (!is.na(gap_values[idx]) && !is.na(gap_values[idx + 1]) && !is.na(se_values[idx + 1])) {
+      if (gap_values[idx] >= gap_values[idx + 1] - se_values[idx + 1]) {
+        optimal_k <- k_range[idx]
+        break
+      }
+    }
+  }
+
+  # Fallback: k with max gap
+  if (is.na(optimal_k) && any(!is.na(gap_values))) {
+    optimal_k <- k_range[which.max(gap_values)]
+  }
+
+  gap_df <- data.frame(
+    k = k_range,
+    gap = round(gap_values, 4),
+    se = round(se_values, 4),
+    stringsAsFactors = FALSE
+  )
+
+  cat(sprintf("    Gap statistic optimal k: %s\n",
+              if (is.na(optimal_k)) "indeterminate" else as.character(optimal_k)))
+
+  list(
+    gap_values = gap_values,
+    se_values = se_values,
+    optimal_k = optimal_k,
+    gap_df = gap_df
+  )
+}
+
+
+#' Compute Pooled Within-Cluster Sum of Squares
+#'
+#' @param data Numeric matrix
+#' @param clusters Integer vector of cluster assignments
+#' @return Numeric scalar (total within-SS)
+#' @keywords internal
+compute_pooled_wss <- function(data, clusters) {
+  wss <- 0
+  for (seg in unique(clusters)) {
+    seg_data <- data[clusters == seg, , drop = FALSE]
+    if (nrow(seg_data) > 0) {
+      center <- colMeans(seg_data)
+      wss <- wss + sum(sweep(seg_data, 2, center)^2)
+    }
+  }
+  wss
 }

@@ -60,6 +60,20 @@ analyze_variable_correlations <- function(data, candidate_vars, max_correlation 
 
   # Calculate correlation matrix
   cor_data <- data[, candidate_vars, drop = FALSE]
+
+  # Need at least 2 variables for correlation analysis
+  if (length(candidate_vars) < 2) {
+    cat("  Correlation analysis: skipped (fewer than 2 variables)\n")
+    return(list(
+      removed_vars = character(0),
+      remaining_vars = candidate_vars,
+      high_cor_pairs = data.frame(var1 = character(), var2 = character(),
+                                  correlation = numeric(), stringsAsFactors = FALSE),
+      cor_matrix = matrix(1, nrow = 1, ncol = 1,
+                          dimnames = list(candidate_vars, candidate_vars))
+    ))
+  }
+
   cor_matrix <- cor(cor_data, use = "pairwise.complete.obs")
 
   # Find highly correlated pairs
@@ -325,8 +339,10 @@ select_clustering_variables <- function(data, candidate_vars, target_n,
         selection_log$factor_analysis <- fa_analysis
         cat(sprintf("  Using factor analysis: selected %d variables\n", length(final_vars)))
       } else {
-        # Fall back to variance ranking
-        final_vars <- variance_analysis$variance_df$variable[1:target_n]
+        # Fall back to variance ranking (only from remaining vars after correlation removal)
+        var_ranks <- variance_analysis$variance_df
+        var_ranks <- var_ranks[var_ranks$variable %in% remaining_vars, ]
+        final_vars <- var_ranks$variable[1:min(target_n, nrow(var_ranks))]
         cat(sprintf("  Factor analysis not available, using variance ranking\n"))
       }
     } else {
@@ -501,19 +517,7 @@ export_variable_selection_report <- function(selection_result, output_path) {
     sheets[["Factor_Assignments"]] <- factor_assign
   }
 
-  # Write to Excel (TRS v1.0: Use atomic save if available)
-  if (exists("turas_save_writexl_atomic", mode = "function")) {
-    save_result <- turas_save_writexl_atomic(
-      sheets = sheets,
-      file_path = output_path,
-      module = "SEGMENT"
-    )
-    if (!save_result$success) {
-      warning(sprintf("[SEGMENT] Failed to save variable selection report: %s", save_result$error))
-    }
-  } else {
-    writexl::write_xlsx(sheets, output_path)
-  }
+  segment_write_xlsx(sheets, output_path, "variable selection report")
 
   cat(sprintf("✓ Exported variable selection report with %d sheets\n", length(sheets)))
 

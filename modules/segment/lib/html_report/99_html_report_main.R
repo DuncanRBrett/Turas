@@ -39,7 +39,13 @@
     # Use the variable set by 00_main.R
     get(".seg_html_dir", envir = .GlobalEnv)
   } else {
-    stop("Could not determine HTML report directory")
+    segment_refuse(
+      code = "IO_HTML_DIR_NOT_FOUND",
+      title = "HTML Report Directory Not Found",
+      problem = "Could not determine the HTML report directory.",
+      why_it_matters = "HTML report templates are required to generate the segment report.",
+      how_to_fix = "Ensure the segment module is properly installed with lib/html_report/ directory."
+    )
   }
 }, error = function(e) {
   # Final fallback: construct from TURAS_ROOT
@@ -62,11 +68,13 @@ for (.seg_html_file in .seg_html_required_files) {
   if (file.exists(.seg_html_path)) {
     source(.seg_html_path)
   } else {
-    cat(sprintf("\n=== TURAS ERROR ===\n"))
-    cat(sprintf("Context: Segment HTML Report Loader\n"))
-    cat(sprintf("Missing file: %s\n", .seg_html_path))
-    cat(sprintf("===================\n\n"))
-    stop(sprintf("[SEGMENT] Required HTML report file missing: %s", .seg_html_file))
+    segment_refuse(
+      code = "IO_HTML_FILE_MISSING",
+      title = "Required HTML Report File Missing",
+      problem = sprintf("Required HTML report file missing: %s", .seg_html_file),
+      why_it_matters = "All HTML report sub-modules are required for report generation.",
+      how_to_fix = sprintf("Ensure file exists at: %s", .seg_html_path)
+    )
   }
 }
 

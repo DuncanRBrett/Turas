@@ -99,8 +99,12 @@ run_gmm_clustering <- function(data_list, config, guard) {
   if (!is.null(centers)) {
     if (is.matrix(centers)) {
       centers <- t(centers)  # mclust returns p x k, we want k x p
+    } else if (k == 1 && ncol(scaled_data) > 1) {
+      # k=1, multiple variables: mean is a vector of length p
+      centers <- matrix(centers, nrow = 1, ncol = length(centers))
+      colnames(centers) <- colnames(scaled_data)
     } else {
-      # Single variable case
+      # Single variable, k > 1: vector of length k
       centers <- matrix(centers, nrow = k, ncol = 1)
       colnames(centers) <- colnames(scaled_data)
     }

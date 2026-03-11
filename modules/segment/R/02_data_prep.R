@@ -102,8 +102,7 @@ load_segment_data <- function(config) {
     # Validate specified profile variables exist
     for (var in config$profile_vars) {
       if (!var %in% names(data)) {
-        warning(sprintf("Profile variable '%s' not found in data, skipping", var),
-                call. = FALSE)
+        cat(sprintf("  [SEGMENT] Profile variable '%s' not found in data, skipping\n", var))
       }
     }
     # Keep only variables that exist
@@ -239,7 +238,7 @@ handle_missing_data <- function(data_list) {
         )
       )
     } else {
-      warning(msg, call. = FALSE)
+      cat(sprintf("  [SEGMENT WARNING] %s\n", msg))
     }
   }
 
@@ -395,6 +394,7 @@ detect_and_handle_outliers <- function(data_list) {
     data_list$outlier_flags <- rep(FALSE, nrow(data_list$data))
     data_list$outlier_result <- NULL
     data_list$outlier_handling <- list(handling = "none", n_outliers = 0)
+    data_list$outlier_count <- 0
     return(data_list)
   }
 
@@ -469,6 +469,7 @@ detect_and_handle_outliers <- function(data_list) {
   # Store outlier results for reporting
   data_list$outlier_result <- outlier_result
   data_list$outlier_handling <- outlier_handling
+  data_list$outlier_count <- outlier_handling$n_outliers
 
   return(data_list)
 }

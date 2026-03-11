@@ -226,7 +226,7 @@ save_workbook_safe <- function(wb, output_path) {
   if (exists("turas_save_workbook_atomic", mode = "function")) {
     save_result <- turas_save_workbook_atomic(wb, output_path, module = "SEGMENT")
     if (!save_result$success) {
-      warning(sprintf("[SEGMENT] Failed to save workbook: %s", save_result$error))
+      cat(sprintf("  [SEGMENT] Failed to save workbook: %s\n", save_result$error))
     }
   } else {
     openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
@@ -293,19 +293,7 @@ export_segment_assignments <- function(data, clusters, segment_names, id_var, ou
     Segment_Names = names_df
   )
 
-  # Write to Excel (TRS v1.0: Use atomic save if available)
-  if (exists("turas_save_writexl_atomic", mode = "function")) {
-    save_result <- turas_save_writexl_atomic(
-      sheets = sheets,
-      file_path = output_path,
-      module = "SEGMENT"
-    )
-    if (!save_result$success) {
-      warning(sprintf("[SEGMENT] Failed to save assignments: %s", save_result$error))
-    }
-  } else {
-    writexl::write_xlsx(sheets, output_path)
-  }
+  segment_write_xlsx(sheets, output_path, "segment assignments")
 
   cat(sprintf("  Exported %d segment assignments (with Segment_Names sheet)\n", nrow(assignments)))
 

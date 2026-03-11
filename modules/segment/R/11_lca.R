@@ -46,7 +46,7 @@
 calculate_entropy_rsquared <- function(posterior, class_probs) {
 
   if (is.null(posterior) || !is.matrix(posterior)) {
-    warning("Posterior probabilities required for entropy calculation")
+    cat("  [SEGMENT] Posterior probabilities required for entropy calculation\n")
     return(NA_real_)
   }
 
@@ -68,8 +68,8 @@ calculate_entropy_rsquared <- function(posterior, class_probs) {
   }
   posterior_entropy <- posterior_entropy / n
 
-  # Calculate maximum possible entropy (uniform distribution)
-  max_entropy <- -sum(class_probs * log(class_probs))
+  # Calculate maximum possible entropy (uniform distribution across k classes)
+  max_entropy <- log(length(class_probs))
 
   # If max entropy is 0, return NA (shouldn't happen with k >= 2)
   if (max_entropy == 0) {
@@ -412,37 +412,13 @@ run_lca <- function(data, id_var, clustering_vars, n_classes = NULL,
     )
 
     assignments_path <- file.path(output_folder, "lca_class_assignments.xlsx")
-    # TRS v1.0: Use atomic save if available
-    if (exists("turas_save_writexl_atomic", mode = "function")) {
-      save_result <- turas_save_writexl_atomic(
-        sheets = list(Assignments = assignments),
-        file_path = assignments_path,
-        module = "SEGMENT"
-      )
-      if (!save_result$success) {
-        warning(sprintf("[SEGMENT] Failed to save LCA assignments: %s", save_result$error))
-      }
-    } else {
-      writexl::write_xlsx(assignments, assignments_path)
-    }
+    segment_write_xlsx(list(Assignments = assignments), assignments_path, "LCA assignments")
     cat(sprintf("\n✓ Class assignments saved to: %s\n", basename(assignments_path)))
 
     # Export profiles
     profiles <- create_lca_profiles(model, clustering_vars, question_labels)
     profiles_path <- file.path(output_folder, "lca_class_profiles.xlsx")
-    # TRS v1.0: Use atomic save if available
-    if (exists("turas_save_writexl_atomic", mode = "function")) {
-      save_result <- turas_save_writexl_atomic(
-        sheets = profiles,
-        file_path = profiles_path,
-        module = "SEGMENT"
-      )
-      if (!save_result$success) {
-        warning(sprintf("[SEGMENT] Failed to save LCA profiles: %s", save_result$error))
-      }
-    } else {
-      writexl::write_xlsx(profiles, profiles_path)
-    }
+    segment_write_xlsx(profiles, profiles_path, "LCA profiles")
     cat(sprintf("✓ Class profiles saved to: %s\n", basename(profiles_path)))
 
     # Save model
@@ -589,19 +565,7 @@ export_lca_exploration <- function(fit_stats, models, output_path) {
     }
   }
 
-  # TRS v1.0: Use atomic save if available
-  if (exists("turas_save_writexl_atomic", mode = "function")) {
-    save_result <- turas_save_writexl_atomic(
-      sheets = sheets,
-      file_path = output_path,
-      module = "SEGMENT"
-    )
-    if (!save_result$success) {
-      warning(sprintf("[SEGMENT] Failed to save LCA exploration report: %s", save_result$error))
-    }
-  } else {
-    writexl::write_xlsx(sheets, output_path)
-  }
+  segment_write_xlsx(sheets, output_path, "LCA exploration report")
   cat(sprintf("✓ LCA exploration report saved to: %s\n", basename(output_path)))
 }
 

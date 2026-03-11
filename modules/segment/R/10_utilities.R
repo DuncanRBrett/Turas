@@ -58,7 +58,15 @@
   }
   if (!exists("validate_column_exists", mode = "function")) {
     validate_column_exists <- function(data, col, ...) {
-      if (!col %in% names(data)) stop(sprintf("Column '%s' not found", col))
+      if (!col %in% names(data)) {
+        segment_refuse(
+          code = "DATA_COLUMN_NOT_FOUND",
+          title = "Column Not Found",
+          problem = sprintf("Column '%s' not found in data.", col),
+          why_it_matters = "The required column must exist for processing to continue.",
+          how_to_fix = sprintf("Ensure column '%s' exists in the data frame.", col)
+        )
+      }
     }
   }
   invisible(FALSE)
@@ -66,6 +74,41 @@
 
 # Initialize shared utilities on load
 .source_shared_utils()
+
+
+# ==============================================================================
+# 1b. EXCEL WRITE HELPER
+# ==============================================================================
+
+#' Write Excel File with TRS Atomic Save
+#'
+#' Centralised helper that uses turas_save_writexl_atomic() when available,
+#' falls back to writexl::write_xlsx(). Logs failures via cat() (TRS compliant).
+#'
+#' @param sheets Named list of data frames (sheet name -> data frame)
+#' @param file_path Output .xlsx path
+#' @param context Character label for error messages (e.g. "LCA profiles")
+#' @return Invisible TRUE on success, FALSE on failure
+#' @keywords internal
+segment_write_xlsx <- function(sheets, file_path, context = "Excel output") {
+  if (exists("turas_save_writexl_atomic", mode = "function")) {
+    save_result <- turas_save_writexl_atomic(
+      sheets = sheets,
+      file_path = file_path,
+      module = "SEGMENT"
+    )
+    if (!save_result$success) {
+      cat(sprintf("  [SEGMENT] Failed to save %s: %s\n", context, save_result$error))
+      return(invisible(FALSE))
+    }
+  } else if (requireNamespace("writexl", quietly = TRUE)) {
+    writexl::write_xlsx(sheets, file_path)
+  } else {
+    cat(sprintf("  [SEGMENT] Cannot save %s: no Excel writer available.\n", context))
+    return(invisible(FALSE))
+  }
+  invisible(TRUE)
+}
 
 
 # ==============================================================================
@@ -416,19 +459,7 @@ generate_config_template <- function(data_file, output_file, mode = "exploration
     stringsAsFactors = FALSE
   )
 
-  # Write to Excel (TRS v1.0: Use atomic save if available)
-  if (exists("turas_save_writexl_atomic", mode = "function")) {
-    save_result <- turas_save_writexl_atomic(
-      sheets = list(Config = config_df),
-      file_path = output_file,
-      module = "SEGMENT"
-    )
-    if (!save_result$success) {
-      warning(sprintf("[SEGMENT] Failed to save config template: %s", save_result$error))
-    }
-  } else {
-    writexl::write_xlsx(list(Config = config_df), output_file)
-  }
+  segment_write_xlsx(list(Config = config_df), output_file, "config template")
 
   cat(sprintf("✓ Config template saved to: %s\n", output_file))
   cat("\nIMPORTANT: Edit the following required fields:\n")
@@ -1366,7 +1397,7 @@ validate_seed_reproducibility <- function(seed, test_data, k = 3) {
     cat(sprintf("✓ Seed %d produces reproducible results\n", seed))
     return(TRUE)
   } else {
-    warning(sprintf("Seed %d does NOT produce reproducible results", seed), call. = FALSE)
+    cat(sprintf("  [SEGMENT WARNING] Seed %d does NOT produce reproducible results\n", seed))
     return(FALSE)
   }
 }

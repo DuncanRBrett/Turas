@@ -197,7 +197,7 @@ guard_require_sample_size <- function(n_cases, k, n_vars) {
 #' @param method Method string from config
 #' @keywords internal
 guard_require_valid_method <- function(method) {
-  allowed <- c("kmeans", "hclust", "gmm")
+  allowed <- c("kmeans", "hclust", "gmm", "ensemble")
 
   if (is.null(method) || !(tolower(method) %in% allowed)) {
     segment_refuse(

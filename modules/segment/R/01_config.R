@@ -188,6 +188,15 @@ validate_segment_config <- function(config) {
   linkage_method <- get_char_config(config, "linkage_method", default_value = "ward.D2")
   gmm_model_type <- get_config_value(config, "gmm_model_type", default_value = NULL)
 
+  # Ensemble-specific parameters
+  ensemble_methods_str <- get_config_value(config, "ensemble_methods", default_value = NULL)
+  ensemble_methods <- if (!is.null(ensemble_methods_str) && nzchar(trimws(as.character(ensemble_methods_str)))) {
+    trimws(unlist(strsplit(as.character(ensemble_methods_str), "[,;]")))
+  } else {
+    c("kmeans", "hclust")
+  }
+  ensemble_n_runs <- as.integer(get_config_value(config, "ensemble_n_runs", default_value = 50))
+
   # ===========================================================================
   # OPTIONAL PARAMETERS WITH DEFAULTS
   # ===========================================================================
@@ -217,8 +226,8 @@ validate_segment_config <- function(config) {
   nstart <- get_numeric_config(config, "nstart", default_value = 50, min = 1, max = 200)
   seed <- get_numeric_config(config, "seed", default_value = 123, min = 1)
 
-  # Validate k
-  if (k_min >= k_max) {
+  # Validate k range (only relevant for exploration mode, not final mode)
+  if (is.null(k_fixed) && k_min >= k_max) {
     segment_refuse(
       code = "CFG_INVALID_K_RANGE",
       title = "Invalid K Range",
@@ -384,6 +393,7 @@ validate_segment_config <- function(config) {
     # Method
     method = method, methods = methods, is_multi_method = is_multi_method,
     linkage_method = linkage_method, gmm_model_type = gmm_model_type,
+    ensemble_methods = ensemble_methods, ensemble_n_runs = ensemble_n_runs,
     # K parameters
     k_fixed = k_fixed, k_min = k_min, k_max = k_max, nstart = nstart, seed = seed,
     # Data handling

@@ -317,19 +317,7 @@ score_new_data <- function(model_file, new_data, id_variable, output_file = NULL
 
     # Determine file type
     if (grepl("\\.xlsx$", output_file, ignore.case = TRUE)) {
-      # Excel export (TRS v1.0: Use atomic save if available)
-      if (exists("turas_save_writexl_atomic", mode = "function")) {
-        save_result <- turas_save_writexl_atomic(
-          sheets = list(Assignments = results),
-          file_path = output_file,
-          module = "SEGMENT"
-        )
-        if (!save_result$success) {
-          warning(sprintf("[SEGMENT] Failed to save scoring results: %s", save_result$error))
-        }
-      } else {
-        writexl::write_xlsx(list(Assignments = results), output_file)
-      }
+      segment_write_xlsx(list(Assignments = results), output_file, "scoring results")
     } else if (grepl("\\.csv$", output_file, ignore.case = TRUE)) {
       # CSV export
       write.csv(results, output_file, row.names = FALSE)
@@ -773,10 +761,11 @@ type_respondents_batch <- function(data, model_file, id_var) {
       n_processed <- n_processed + 1
 
     }, error = function(e) {
-      results$segment[row_idx] <- NA
-      results$segment_name[row_idx] <- NA
-      results$confidence[row_idx] <- NA
-      n_errors <- n_errors + 1
+      results$segment[row_idx] <<- NA
+      results$segment_name[row_idx] <<- NA
+      results$confidence[row_idx] <<- NA
+      results$distance_to_center[row_idx] <<- NA
+      n_errors <<- n_errors + 1
     })
   }
 

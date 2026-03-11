@@ -703,7 +703,18 @@ format_segment_executive_summary <- function(summary_list, format = "text") {
     return("Executive summary not available.")
   }
 
-  format <- match.arg(format, choices = c("text", "html"))
+  format <- tryCatch(
+    match.arg(format, choices = c("text", "html")),
+    error = function(e) {
+      segment_refuse(
+        code = "CFG_INVALID_FORMAT",
+        title = "Invalid Summary Format",
+        problem = sprintf("Format '%s' is not valid. Must be 'text' or 'html'.", format),
+        why_it_matters = "Executive summary requires a supported output format.",
+        how_to_fix = "Set format to 'text' or 'html'."
+      )
+    }
+  )
 
   if (format == "text") {
     .format_segment_text(summary_list)

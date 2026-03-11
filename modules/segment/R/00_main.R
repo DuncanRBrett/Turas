@@ -76,6 +76,7 @@ source(file.path(.seg_r_dir, "10_utilities.R"))
 source(file.path(.seg_r_dir, "11_lca.R"))
 source(file.path(.seg_r_dir, "12_executive_summary.R"))
 source(file.path(.seg_r_dir, "13_vulnerability.R"))
+source(file.path(.seg_r_dir, "14_ensemble.R"))
 
 # Preflight validators
 .seg_validation_dir <- file.path(turas_root, "modules/segment/lib/validation")

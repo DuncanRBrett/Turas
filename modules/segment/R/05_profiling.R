@@ -132,7 +132,7 @@ calculate_segment_differences <- function(data, clusters, var_names = NULL) {
   for (i in seq_along(numeric_vars)) {
     var <- numeric_vars[i]
 
-    tryCatch({
+    aov_vals <- tryCatch({
       # Run ANOVA
       aov_result <- aov(data[[var]] ~ factor(clusters))
       aov_summary <- summary(aov_result)
@@ -141,14 +141,12 @@ calculate_segment_differences <- function(data, clusters, var_names = NULL) {
       f_stat <- aov_summary[[1]]["F value"][1, 1]
       p_value <- aov_summary[[1]]["Pr(>F)"][1, 1]
 
-      anova_results$F_statistic[i] <- f_stat
-      anova_results$p_value[i] <- p_value
-
+      list(f = f_stat, p = p_value)
     }, error = function(e) {
-      # If ANOVA fails, store NA
-      anova_results$F_statistic[i] <- NA
-      anova_results$p_value[i] <- NA
+      list(f = NA, p = NA)
     })
+    anova_results$F_statistic[i] <- aov_vals$f
+    anova_results$p_value[i] <- aov_vals$p
   }
 
   return(anova_results)
@@ -553,16 +551,8 @@ profile_demographics <- function(data, clusters, demo_vars,
     categorical_profiles[[var]] <- profile_df
 
     # Chi-squared test
-    tryCatch({
+    chi_sq_tests[[var]] <- tryCatch({
       chi_result <- chisq.test(cross_tab)
-      chi_sq_tests[[var]] <- data.frame(
-        Variable = var,
-        Chi_Sq = round(chi_result$statistic, 2),
-        DF = chi_result$parameter,
-        P_Value = format(chi_result$p.value, scientific = TRUE, digits = 3),
-        Significant = chi_result$p.value < 0.05,
-        stringsAsFactors = FALSE
-      )
 
       if (chi_result$p.value < 0.05) {
         cat(sprintf("  ✓ Significant difference (p < 0.05)\n"))
@@ -570,9 +560,17 @@ profile_demographics <- function(data, clusters, demo_vars,
         cat(sprintf("    Not significant (p = %.3f)\n", chi_result$p.value))
       }
 
+      data.frame(
+        Variable = var,
+        Chi_Sq = round(chi_result$statistic, 2),
+        DF = chi_result$parameter,
+        P_Value = format(chi_result$p.value, scientific = TRUE, digits = 3),
+        Significant = chi_result$p.value < 0.05,
+        stringsAsFactors = FALSE
+      )
     }, error = function(e) {
-      cat(sprintf("  Warning: Chi-squared test failed: %s\n", e$message))
-      chi_sq_tests[[var]] <- data.frame(
+      cat(sprintf("  [SEGMENT] Chi-squared test failed for %s: %s\n", var, e$message))
+      data.frame(
         Variable = var,
         Chi_Sq = NA,
         DF = NA,
@@ -716,18 +714,6 @@ export_demographic_profiles <- function(demo_result, output_path) {
     sheets[[sheet_name]] <- demo_result$numeric_profiles[[var]]
   }
 
-  # TRS v1.0: Use atomic save if available
-  if (exists("turas_save_writexl_atomic", mode = "function")) {
-    save_result <- turas_save_writexl_atomic(
-      sheets = sheets,
-      file_path = output_path,
-      module = "SEGMENT"
-    )
-    if (!save_result$success) {
-      warning(sprintf("[SEGMENT] Failed to save demographic profiles: %s", save_result$error))
-    }
-  } else {
-    writexl::write_xlsx(sheets, output_path)
-  }
+  segment_write_xlsx(sheets, output_path, "demographic profiles")
   cat(sprintf("✓ Demographic profiles exported to: %s\n", basename(output_path)))
 }

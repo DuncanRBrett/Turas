@@ -190,8 +190,14 @@ initialize_centers_plusplus <- function(data, k, seed) {
     }
 
     # Sample with probability proportional to squared distance
-    probs <- min_dists / sum(min_dists)
-    centers[i, ] <- data[sample(n, 1, prob = probs), ]
+    total_dist <- sum(min_dists)
+    if (total_dist == 0) {
+      # All points equidistant from current centers; pick randomly
+      centers[i, ] <- data[sample(n, 1), ]
+    } else {
+      probs <- min_dists / total_dist
+      centers[i, ] <- data[sample(n, 1, prob = probs), ]
+    }
   }
 
   return(centers)
@@ -205,25 +211,17 @@ initialize_centers_plusplus <- function(data, k, seed) {
 #' @return Integer vector of cluster assignments
 #' @keywords internal
 assign_to_nearest <- function(data, centers) {
-  n <- nrow(data)
   k <- nrow(centers)
-  d <- ncol(data)
 
-  # Calculate distances to all centers
-  clusters <- integer(n)
-
-  for (i in 1:n) {
-    min_dist <- Inf
-    for (j in 1:k) {
-      dist <- sum((data[i, ] - centers[j, ])^2)
-      if (dist < min_dist) {
-        min_dist <- dist
-        clusters[i] <- j
-      }
-    }
+  # Vectorized: compute squared Euclidean distance to each center
+  # dist_matrix[i, j] = sum((data[i,] - centers[j,])^2)
+  dist_matrix <- matrix(NA_real_, nrow = nrow(data), ncol = k)
+  for (j in seq_len(k)) {
+    diff <- sweep(data, 2, centers[j, ])
+    dist_matrix[, j] <- rowSums(diff^2)
   }
 
-  return(clusters)
+  return(max.col(-dist_matrix, ties.method = "first"))
 }
 
 
@@ -340,12 +338,12 @@ run_kmeans_single <- function(data,
         algorithm = "Hartigan-Wong"
       )
 
-      # Check convergence
-      if (result$ifault == 4) {
-        warning(sprintf(
-          "K-means did not converge for k=%d. Results may be suboptimal. Consider increasing nstart.",
-          k
-        ), call. = FALSE)
+      # Check convergence (ifault: 0=success, 1=max iterations, 2=empty cluster)
+      if (!is.null(result$ifault) && result$ifault != 0) {
+        cat(sprintf(
+          "[SEGMENT] K-means convergence note for k=%d: ifault=%d. Results may be suboptimal. Consider increasing nstart.\n",
+          k, result$ifault
+        ))
       }
 
       result$method <- "standard"
@@ -476,13 +474,13 @@ run_kmeans_final <- function(data_list) {
   # Check minimum segment size
   min_size_pct <- min(segment_pcts)
   if (min_size_pct < config$min_segment_size_pct) {
-    warning(sprintf(
-      "Smallest segment is %.1f%% (threshold: %.0f%%)\nSegment %d has only %d respondents.\nConsider reducing k or adjusting min_segment_size_pct.",
+    cat(sprintf(
+      "  [SEGMENT WARNING] Smallest segment is %.1f%% (threshold: %.0f%%). Segment %d has only %d respondents. Consider reducing k or adjusting min_segment_size_pct.\n",
       min_size_pct,
       config$min_segment_size_pct,
       which.min(segment_pcts),
       min(segment_sizes)
-    ), call. = FALSE)
+    ))
   } else {
     cat(sprintf("\n✓ All segments meet minimum size threshold (%.0f%%)\n",
                 config$min_segment_size_pct))
@@ -518,10 +516,10 @@ check_segment_sizes <- function(clusters, min_pct) {
   min_size <- min(segment_pcts)
 
   if (min_size < min_pct) {
-    warning(sprintf(
-      "Smallest segment is %.1f%% (threshold: %.0f%%)",
+    cat(sprintf(
+      "  [SEGMENT WARNING] Smallest segment is %.1f%% (threshold: %.0f%%)\n",
       min_size, min_pct
-    ), call. = FALSE)
+    ))
     return(FALSE)
   }
 
