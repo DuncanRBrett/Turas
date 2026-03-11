@@ -910,6 +910,7 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
     mode = "ANALYSIS",
     design = design,
     long_data = long_data,
+    raw_data = raw_data,
     study_summary = study_summary,
     count_scores = count_scores,
     logit_results = logit_results,

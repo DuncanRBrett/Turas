@@ -101,7 +101,8 @@ generate_maxdiff_html_simulator <- function(maxdiff_results, config, output_path
     hb_results = hb_results,
     logit_results = logit_results,
     config = config,
-    segment_results = maxdiff_results$segment_results
+    segment_results = maxdiff_results$segment_results,
+    raw_data = maxdiff_results$raw_data
   )
 
   # Read JS files

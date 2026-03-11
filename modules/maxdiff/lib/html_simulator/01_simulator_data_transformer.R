@@ -14,7 +14,7 @@
 #' @return List ready for JSON serialization
 #' @keywords internal
 build_simulator_data <- function(hb_results, logit_results, config,
-                                  segment_results = NULL) {
+                                  segment_results = NULL, raw_data = NULL) {
 
   items <- config$items[config$items$Include == 1, ]
   brand_colour <- config$project_settings$Brand_Colour %||% "#1e3a5f"
@@ -63,14 +63,52 @@ build_simulator_data <- function(hb_results, logit_results, config,
       seg_data <- config$segment_settings
     }
 
+    # Build respondent ID lookup for segment mapping
+    resp_ids <- NULL
+    if (!is.null(hb_results$respondent_ids)) {
+      resp_ids <- as.character(hb_results$respondent_ids)
+    } else if (is.data.frame(hb_results$individual_utilities) &&
+               "resp_id" %in% names(hb_results$individual_utilities)) {
+      resp_ids <- as.character(hb_results$individual_utilities$resp_id)
+    }
+
+    # Get segment variable names for lookup
+    seg_vars <- NULL
+    if (!is.null(config$segment_settings) && nrow(config$segment_settings) > 0) {
+      seg_vars <- unique(config$segment_settings$Variable_Name)
+    }
+
+    # Build respondent-to-segment lookup from raw_data
+    resp_segments <- NULL
+    id_var <- config$project_settings$Respondent_ID_Variable %||% "Respondent_ID"
+    if (!is.null(raw_data) && !is.null(seg_vars) && !is.null(resp_ids) &&
+        id_var %in% names(raw_data)) {
+      resp_segments <- list()
+      raw_ids <- as.character(raw_data[[id_var]])
+      for (sv in seg_vars) {
+        if (sv %in% names(raw_data)) {
+          resp_segments[[sv]] <- setNames(as.character(raw_data[[sv]]), raw_ids)
+        }
+      }
+    }
+
     for (r in seq_len(nrow(indiv_mat))) {
       entry <- list(
         utilities = round(as.numeric(indiv_mat[r, ]), 4)
       )
 
-      # Add segment info if we have raw_data attached
-      if (!is.null(hb_results$respondent_ids)) {
-        entry$id <- as.character(hb_results$respondent_ids[r])
+      if (!is.null(resp_ids) && r <= length(resp_ids)) {
+        entry$id <- resp_ids[r]
+
+        # Add segment membership
+        if (!is.null(resp_segments)) {
+          segs <- list()
+          for (sv in names(resp_segments)) {
+            val <- resp_segments[[sv]][resp_ids[r]]
+            if (!is.na(val)) segs[[sv]] <- val
+          }
+          if (length(segs) > 0) entry$segments <- segs
+        }
       }
 
       indiv_list[[r]] <- entry
@@ -81,10 +119,19 @@ build_simulator_data <- function(hb_results, logit_results, config,
   seg_defs <- list()
   if (!is.null(config$segment_settings) && nrow(config$segment_settings) > 0) {
     for (i in seq_len(nrow(config$segment_settings))) {
+      seg_var <- config$segment_settings$Variable_Name[i]
+
+      # Extract the actual data value from Segment_Def (e.g., 'Age_Group == "18-34"' -> "18-34")
+      seg_def <- config$segment_settings$Segment_Def[i] %||% ""
+      filter_val <- ""
+      m <- regmatches(seg_def, regexpr('"([^"]+)"', seg_def, perl = TRUE))
+      if (length(m) == 1) filter_val <- gsub('^"|"$', '', m)
+
       seg_defs[[i]] <- list(
         id = config$segment_settings$Segment_ID[i],
         label = config$segment_settings$Segment_Label[i],
-        variable = config$segment_settings$Variable_Name[i]
+        variable = seg_var,
+        value = filter_val
       )
     }
   }

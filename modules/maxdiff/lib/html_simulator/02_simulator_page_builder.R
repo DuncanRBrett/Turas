@@ -47,7 +47,7 @@ build_simulator_page <- function(sim_data, js_engine, js_charts, js_ui) {
   if (length(sim_data$segments) > 0) {
     seg_options <- paste(vapply(sim_data$segments, function(s) {
       sprintf('<option value="%s:%s">%s</option>',
-              htmlEscape(s$variable), htmlEscape(s$id), htmlEscape(s$label))
+              htmlEscape(s$variable), htmlEscape(s$value), htmlEscape(s$label))
     }, character(1)), collapse = "\n")
     seg_filter <- sprintf(
       '<div class="sim-filter"><label>Segment: <select id="seg-filter"><option value="">All respondents</option>%s</select></label></div>',
