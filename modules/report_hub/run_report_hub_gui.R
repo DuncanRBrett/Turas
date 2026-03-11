@@ -267,6 +267,15 @@ run_report_hub_gui <- function() {
     result_info <- reactiveVal(NULL)
     is_running <- reactiveVal(FALSE)
 
+    # Auto-load config from launcher (env var set by launch_turas.R)
+    pre_config <- Sys.getenv("TURAS_HUB_CONFIG", unset = "")
+    if (nzchar(pre_config) && file.exists(pre_config)) {
+      Sys.unsetenv("TURAS_HUB_CONFIG")
+      config_path(normalizePath(pre_config, winslash = "/", mustWork = FALSE))
+      add_recent_config(normalizePath(pre_config, winslash = "/", mustWork = FALSE))
+      config_info(read_config_preview(pre_config))
+    }
+
     # File chooser
     volumes <- c(Home = "~", Documents = "~/Documents", Desktop = "~/Desktop")
     shinyFileChoose(input, "config_btn", roots = volumes, session = session,

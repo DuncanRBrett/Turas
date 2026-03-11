@@ -202,6 +202,27 @@ launch_turas <- function() {
           color: #95a5a6;
           font-size: 12px;
         }
+        .recent-hub-item {
+          padding: 8px 12px;
+          margin: 4px 0;
+          background: #f0f4ff;
+          border-radius: 5px;
+          cursor: pointer;
+          border: 1px solid #e2e8f0;
+          font-size: 13px;
+        }
+        .recent-hub-item:hover {
+          background: #e0e7ff;
+          border-color: #3b82f6;
+        }
+        .recent-hub-item strong {
+          color: #1e293b;
+          font-size: 13px;
+        }
+        .recent-hub-item small {
+          color: #64748b;
+          font-size: 11px;
+        }
       "))
     ),
 
@@ -333,7 +354,8 @@ launch_turas <- function() {
             "Combine multiple Turas HTML reports into a unified portal with integrated navigation, cross-referencing, and pinned views."
           ),
           actionButton("launch_report_hub", "Launch Report Hub",
-                      class = "launch-btn btn-report_hub")
+                      class = "launch-btn btn-report_hub"),
+          uiOutput("recent_hub_ui")
         )
       ),
 
@@ -356,6 +378,67 @@ launch_turas <- function() {
       if (status() != "") {
         div(class = "status-message status-info", status())
       }
+    })
+
+    # --- Recent hub configs (shared with report_hub module) ---
+    recent_hub_file <- file.path(turas_root, ".recent_hub_configs.rds")
+
+    load_recent_hub_configs <- function() {
+      if (file.exists(recent_hub_file)) {
+        tryCatch(readRDS(recent_hub_file), error = function(e) character(0))
+      } else {
+        character(0)
+      }
+    }
+
+    # Recent hub configs UI
+    output$recent_hub_ui <- renderUI({
+      # Re-check on every launch_report_hub click so list stays fresh
+      input$launch_report_hub
+      recent <- load_recent_hub_configs()
+      recent <- recent[file.exists(recent)]
+      if (length(recent) == 0) return(NULL)
+
+      div(style = "margin-top: 12px;",
+        tags$hr(style = "margin: 10px 0;"),
+        tags$div(style = "font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px;",
+          "Recent Projects"
+        ),
+        lapply(seq_along(recent), function(i) {
+          tags$div(
+            class = "recent-hub-item",
+            onclick = sprintf(
+              "Shiny.setInputValue('launch_recent_hub', '%s', {priority: 'event'})",
+              gsub("'", "\\\\'", recent[i])
+            ),
+            tags$strong(basename(recent[i])),
+            tags$br(),
+            tags$small(dirname(recent[i]))
+          )
+        })
+      )
+    })
+
+    # Launch Report Hub with pre-selected config
+    observeEvent(input$launch_recent_hub, {
+      req(input$launch_recent_hub)
+      config <- input$launch_recent_hub
+      if (!file.exists(config)) {
+        status("Config file no longer exists — please browse for a new one.")
+        return()
+      }
+      status("Launching Report Hub with recent config...")
+      tryCatch({
+        # Set env var so Report Hub auto-loads this config
+        Sys.setenv(TURAS_HUB_CONFIG = config)
+        launch_module("report_hub",
+                     file.path(turas_root, "modules/report_hub/run_report_hub_gui.R"))
+        Sys.unsetenv("TURAS_HUB_CONFIG")
+        later::later(function() { status("Report Hub launched!") }, delay = 1)
+        later::later(function() { status("") }, delay = 4)
+      }, error = function(e) {
+        status(paste("Error launching Report Hub:", e$message))
+      })
     })
 
     # Helper function to launch modules in background
