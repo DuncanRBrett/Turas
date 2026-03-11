@@ -47,7 +47,14 @@ build_simulator_data <- function(hb_results, logit_results, config,
   # Build individual utilities array
   indiv_list <- list()
   if (!is.null(hb_results$individual_utilities)) {
-    indiv_mat <- as.matrix(hb_results$individual_utilities)
+    # Drop non-numeric columns (e.g., resp_id) before matrix conversion
+    indiv_df <- hb_results$individual_utilities
+    if (is.data.frame(indiv_df)) {
+      numeric_cols <- sapply(indiv_df, is.numeric)
+      indiv_mat <- as.matrix(indiv_df[, numeric_cols, drop = FALSE])
+    } else {
+      indiv_mat <- as.matrix(indiv_df)
+    }
     item_ids <- colnames(indiv_mat)
 
     # Get segment data if available
