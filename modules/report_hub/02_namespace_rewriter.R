@@ -522,12 +522,16 @@ wrap_js_in_iife <- function(js_blocks, report_key, report_type, report_label = N
   all_js <- gsub("document.querySelector(", paste0(helper_qs, "("), all_js, fixed = TRUE)
 
   # Prepend scoped helper functions
+  # _qs and _qsa search within the report's hub panel FIRST to prevent
+
+  # cross-report collisions (e.g., two reports both having ".question-container .chart-wrapper[data-q-code='Q05']")
   helpers_js <- sprintf(
-    'var %s = function(id) { return document.getElementById(id) || document.getElementById("%s" + id); };
-var %s = function(sel) { var el = document.querySelector(sel); if (el) return el; if (sel.indexOf("#") === -1) return null; return document.querySelector(sel.replace(/#([a-zA-Z][\\w-]*)/g, "#%s$1")); };
-var %s = function(sel) { var els = document.querySelectorAll(sel); if (els.length > 0 || sel.indexOf("#") === -1) return els; return document.querySelectorAll(sel.replace(/#([a-zA-Z][\\w-]*)/g, "#%s$1")); };
+    'var %1$s = function(id) { return document.getElementById(id) || document.getElementById("%2$s" + id); };
+var _%7$s_panel = function() { return document.querySelector(\'[data-hub-panel="%7$s"]\'); };
+var %3$s = function(sel) { var p = _%7$s_panel(); if (p) { var el = p.querySelector(sel); if (el) return el; } var el = document.querySelector(sel); if (el) return el; if (sel.indexOf("#") === -1) return null; var pSel = sel.replace(/#([a-zA-Z][\\w-]*)/g, "#%4$s$1"); if (p) { var el2 = p.querySelector(pSel); if (el2) return el2; } return document.querySelector(pSel); };
+var %5$s = function(sel) { var p = _%7$s_panel(); if (p) { var els = p.querySelectorAll(sel); if (els.length > 0) return els; } var els = document.querySelectorAll(sel); if (els.length > 0 || sel.indexOf("#") === -1) return els; var pSel = sel.replace(/#([a-zA-Z][\\w-]*)/g, "#%6$s$1"); if (p) { var els2 = p.querySelectorAll(pSel); if (els2.length > 0) return els2; } return document.querySelectorAll(pSel); };
 ',
-    helper_id, id_prefix, helper_qs, id_prefix, helper_qsa, id_prefix
+    helper_id, id_prefix, helper_qs, id_prefix, helper_qsa, id_prefix, report_key
   )
   all_js <- paste0(helpers_js, "\n", all_js)
 
@@ -564,7 +568,8 @@ build_pin_bridge <- function(report_key, report_type, report_label = NULL) {
     sprintf('
 // ===== Hub Pin Bridge \u2014 Tracker =====
 // Override per-report pin functions to route through hub store
-var _hubSourceLabel = \'%4$s\';
+// Use report-specific variable name to prevent global collision
+var _hubSrcLbl_%5$s = \'%4$s\';
 pinMetricView = function(metricId) {
   // Always add a new pin (multi-pin support).
   // Each pin captures the current view state (visible segments, chart, table).
@@ -572,7 +577,7 @@ pinMetricView = function(metricId) {
   if (!pinObj) return;
   pinObj.title = pinObj.metricTitle || metricId;
   pinObj.insight = pinObj.insightText || "";
-  pinObj.sourceLabel = _hubSourceLabel;
+  pinObj.sourceLabel = _hubSrcLbl_%5$s;
   ReportHub.addPin("%5$s", pinObj);
 };
 pinSummarySection = function(sectionType) {
@@ -586,7 +591,7 @@ pinSummarySection = function(sectionType) {
     title: title, insight: editor.innerHTML,
     tableHtml: "", chartSvg: "", timestamp: Date.now()
   };
-  pinObj.sourceLabel = _hubSourceLabel;
+  pinObj.sourceLabel = _hubSrcLbl_%5$s;
   ReportHub.addPin("%5$s", pinObj);
 };
 pinSummaryTable = function() {
@@ -601,7 +606,7 @@ pinSummaryTable = function() {
     tableHtml: \'<div class="tk-table-wrapper">\' + clone.outerHTML + \'</div>\',
     chartSvg: "", timestamp: Date.now()
   };
-  pinObj.sourceLabel = _hubSourceLabel;
+  pinObj.sourceLabel = _hubSrcLbl_%5$s;
   ReportHub.addPin("%5$s", pinObj);
 };
 pinOverviewView = function() {
@@ -642,7 +647,7 @@ pinOverviewView = function() {
     insight: insightEditor ? insightEditor.innerHTML : "",
     timestamp: Date.now()
   };
-  pinObj.sourceLabel = _hubSourceLabel;
+  pinObj.sourceLabel = _hubSrcLbl_%5$s;
   ReportHub.addPin("%5$s", pinObj);
   if (typeof window.captureOverviewPng === "function") {
     window.captureOverviewPng(pinObj);
@@ -662,7 +667,7 @@ pinSelectedCharts = function() {
     insight: insightEditor ? insightEditor.innerHTML : "",
     timestamp: Date.now()
   };
-  pinObj.sourceLabel = _hubSourceLabel;
+  pinObj.sourceLabel = _hubSrcLbl_%5$s;
   ReportHub.addPin("%5$s", pinObj);
 };
 pinSigChanges = function() { %1$spinVisibleSigFindings(); };
@@ -684,7 +689,7 @@ pinSigChanges = function() { %1$spinVisibleSigFindings(); };
     insightText: "", insight: "",
     timestamp: Date.now()
   };
-  pinObj.sourceLabel = _hubSourceLabel;
+  pinObj.sourceLabel = _hubSrcLbl_%5$s;
   ReportHub.addPin("%5$s", pinObj);
 };
 %1$spinVisibleSigFindings = function() {
@@ -710,7 +715,7 @@ pinSigChanges = function() { %1$spinVisibleSigFindings(); };
     insightText: "", insight: "",
     timestamp: Date.now()
   };
-  pinObj.sourceLabel = _hubSourceLabel;
+  pinObj.sourceLabel = _hubSrcLbl_%5$s;
   ReportHub.addPin("%5$s", pinObj);
 };
 %1$shydratePinnedViews = function() {};
@@ -721,7 +726,7 @@ pinSigChanges = function() { %1$spinVisibleSigFindings(); };
     sprintf('
 // ===== Hub Pin Bridge \u2014 Tabs =====
 // Override per-report pin functions to route through hub store
-var _hubSourceLabel = \'%4$s\';
+var _hubSrcLbl_%5$s = \'%4$s\';
 %1$stogglePin = function(qCode) {
   // Always add a new pin (multi-pin support).
   // Each pin captures the current view state (banner, chart, table).
@@ -730,7 +735,7 @@ var _hubSourceLabel = \'%4$s\';
   pinObj.title = pinObj.qCode || "";
   pinObj.subtitle = pinObj.qTitle || "";
   pinObj.insight = pinObj.insightText || "";
-  pinObj.sourceLabel = _hubSourceLabel;
+  pinObj.sourceLabel = _hubSrcLbl_%5$s;
   ReportHub.addPin("%5$s", pinObj);
   %1$supdatePinButton(qCode, true);
 };
@@ -744,7 +749,7 @@ var _hubSourceLabel = \'%4$s\';
     pinType: "text_box", qCode: null, title: title,
     insight: text, tableHtml: null, chartSvg: null, timestamp: Date.now()
   };
-  pinObj.sourceLabel = _hubSourceLabel;
+  pinObj.sourceLabel = _hubSrcLbl_%5$s;
   ReportHub.addPin("%5$s", pinObj);
 };
 %1$spinGaugeSection = function(sectionId) {
@@ -764,7 +769,7 @@ var _hubSourceLabel = \'%4$s\';
     insight: null, tableHtml: clone.innerHTML, chartSvg: null,
     baseText: null, timestamp: Date.now()
   };
-  pinObj.sourceLabel = _hubSourceLabel;
+  pinObj.sourceLabel = _hubSrcLbl_%5$s;
   ReportHub.addPin("%5$s", pinObj);
 };
 %1$spinSigFindings = function() { %1$spinVisibleSigFindings(); };
@@ -783,7 +788,7 @@ var _hubSourceLabel = \'%4$s\';
     insight: null, tableHtml: clone.outerHTML, chartSvg: null,
     baseText: null, timestamp: Date.now()
   };
-  pinObj.sourceLabel = _hubSourceLabel;
+  pinObj.sourceLabel = _hubSrcLbl_%5$s;
   ReportHub.addPin("%5$s", pinObj);
 };
 %1$spinVisibleSigFindings = function() {
@@ -806,7 +811,7 @@ var _hubSourceLabel = \'%4$s\';
     insight: null, tableHtml: wrapper.outerHTML, chartSvg: null,
     baseText: null, timestamp: Date.now()
   };
-  pinObj.sourceLabel = _hubSourceLabel;
+  pinObj.sourceLabel = _hubSrcLbl_%5$s;
   ReportHub.addPin("%5$s", pinObj);
 };
 %1$spinQualSlide = function(slideId) {
@@ -825,7 +830,7 @@ var _hubSourceLabel = \'%4$s\';
     tableHtml: null, chartSvg: null,
     baseText: null, timestamp: Date.now()
   };
-  pinObj.sourceLabel = _hubSourceLabel;
+  pinObj.sourceLabel = _hubSrcLbl_%5$s;
   ReportHub.addPin("%5$s", pinObj);
 };
 %1$shydratePinnedViews = function() {};

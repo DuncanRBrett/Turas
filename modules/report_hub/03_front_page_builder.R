@@ -178,12 +178,11 @@ build_summary_area <- function(parsed_reports) {
     sections <- extract_summary_sections(parsed)
 
     if (length(sections) > 0) {
+      # Only show executive summary on overview (not background & method)
+      sections$background <- NULL
+
       # Build labeled section for each extracted text box
       section_meta <- list(
-        background = list(
-          label = sprintf("%s \u2014 Background & Method", report_label),
-          id = sprintf("%s-background", key)
-        ),
         execsummary = list(
           label = sprintf("%s \u2014 Executive Summary", report_label),
           id = sprintf("%s-execsummary", key)
