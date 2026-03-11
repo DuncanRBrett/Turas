@@ -281,6 +281,10 @@ rewrite_html_onclick_conflicts <- function(html, report_key) {
     "pinQualSlide",
     "toggleQualEdit",
     "renderAllQualSlides",
+    # --- Insight editing (onclick/ondblclick in insight-area HTML) ---
+    "toggleInsight",
+    "toggleInsightEdit",
+    "dismissInsight",
     # --- Navigation/display (called from onchange/oninput/onclick in HTML) ---
     "selectQuestion",
     "switchBannerGroup",
@@ -385,6 +389,14 @@ wrap_js_in_iife <- function(js_blocks, report_key, report_type, report_label = N
   # Otherwise the last report's version overwrites earlier ones, and its
   # report-specific DOM helpers (_tabs3_id) can't find elements in earlier panels.
   conflicting_fns <- c(
+    # --- Global state variables (collide when multiple tabs reports combined) ---
+    "bannerGroups",
+    "currentGroup",
+    "heatmapEnabled",
+    "hiddenColumns",
+    "sortState",
+    "originalRowOrder",
+    "excludedRows",
     # --- Pin/export functions (shared between tracker and tabs) ---
     "togglePin",
     "updatePinButton",
@@ -496,10 +508,13 @@ wrap_js_in_iife <- function(js_blocks, report_key, report_type, report_label = N
       sprintf("window.%s%s", prefix, fn),
       all_js
     )
-    # Prefix standalone calls: fnName( -> prefix_fnName(
-    # But NOT when preceded by . (method call) or another letter (substring)
+    # Prefix standalone references: fnName -> prefix_fnName
+    # Match when NOT preceded by . or identifier char (prevents matching
+    # inside obj.fnName or longerFnName) and NOT followed by identifier char
+    # (prevents matching fnNameExtra). Covers function calls, variable access,
+    # assignments, typeof checks, and object property values.
     all_js <- gsub(
-      sprintf("(?<![.a-zA-Z_])%s(?=\\(|\\s*=|\\[|\\.|\\s*;|\\s*\\))", fn),
+      sprintf("(?<![.a-zA-Z_])%s(?![a-zA-Z0-9_])", fn),
       sprintf("%s%s", prefix, fn),
       all_js,
       perl = TRUE
