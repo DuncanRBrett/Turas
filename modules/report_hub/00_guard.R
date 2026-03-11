@@ -491,7 +491,18 @@ guard_validate_hub_config <- function(config_file) {
       executive_summary = if (!is.null(settings$executive_summary) && nzchar(trimws(settings$executive_summary)))
                             trimws(settings$executive_summary) else NULL,
       background_text = if (!is.null(settings$background_text) && nzchar(trimws(settings$background_text)))
-                           trimws(settings$background_text) else NULL
+                           trimws(settings$background_text) else NULL,
+      # About section fields
+      analyst_name = if (!is.null(settings$analyst_name) && nzchar(trimws(settings$analyst_name)))
+                       trimws(settings$analyst_name) else NULL,
+      analyst_email = if (!is.null(settings$analyst_email) && nzchar(trimws(settings$analyst_email)))
+                        trimws(settings$analyst_email) else NULL,
+      analyst_phone = if (!is.null(settings$analyst_phone) && nzchar(trimws(settings$analyst_phone)))
+                        trimws(settings$analyst_phone) else NULL,
+      appendices = if (!is.null(settings$appendices) && nzchar(trimws(settings$appendices)))
+                     trimws(settings$appendices) else NULL,
+      notes = if (!is.null(settings$notes) && nzchar(trimws(settings$notes)))
+                trimws(settings$notes) else NULL
     ),
     reports = lapply(seq_len(nrow(reports_df)), function(i) {
       row <- reports_df[i, ]

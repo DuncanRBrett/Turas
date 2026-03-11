@@ -29,59 +29,60 @@ get_semantic_colour <- function(label, index = 1, n_total = 3, brand_colour = "#
 
   label_lower <- tolower(trimws(label))
 
-  # Sentiment / satisfaction spectrum
-  # Red (negative) -> Amber (moderate negative) -> Grey (neutral) -> Green (positive)
+  # Sentiment / satisfaction spectrum — Red → Amber → Green
+  # Dark red (strongly negative) → pale red → amber (neutral) → pale green → deep green (positive)
+  # DK / NA / Not applicable → grey
   # Muted, professional tones — not garish primaries
   semantic_map <- list(
-    # Strong negative (muted red)
-    "negative"              = "#c0695c",
-    "terrible or not good"  = "#c0695c",
-    "poor (1-3)"            = "#c0695c",
-    "poor"                  = "#c0695c",
-    "below average or poor" = "#c0695c",
-    "dissatisfied (1-5)"    = "#c0695c",
-    "detractor (0-6)"       = "#c0695c",
-    "detractor"             = "#c0695c",
-    "do not trust"          = "#c0695c",
-    "would switch"          = "#c0695c",
-    "strongly disagree"     = "#c0695c",
-    "very dissatisfied"     = "#c0695c",
+    # Strong negative (dark muted red)
+    "negative"              = "#c0392b",
+    "terrible or not good"  = "#c0392b",
+    "poor (1-3)"            = "#c0392b",
+    "poor"                  = "#c0392b",
+    "below average or poor" = "#c0392b",
+    "dissatisfied (1-5)"    = "#c0392b",
+    "detractor (0-6)"       = "#c0392b",
+    "detractor"             = "#c0392b",
+    "do not trust"          = "#c0392b",
+    "would switch"          = "#c0392b",
+    "strongly disagree"     = "#c0392b",
+    "very dissatisfied"     = "#c0392b",
 
-    # Moderate negative (warm amber)
-    "below average"         = "#cf8a7c",
-    "dissatisfied"          = "#cf8a7c",
-    "disagree"              = "#cf8a7c",
+    # Moderate negative (pale muted red)
+    "below average"         = "#e07b6c",
+    "dissatisfied"          = "#e07b6c",
+    "disagree"              = "#e07b6c",
 
-    # Neutral / middle (warm amber/gold — distinct from DK/NA grey)
-    "neutral"               = "#e8c170",
-    "average"               = "#e8c170",
-    "average (4-6)"         = "#e8c170",
-    "undecided"             = "#e8c170",
-    "passive (7-8)"         = "#e8c170",
-    "passive"               = "#e8c170",
-    "some trust"            = "#e8c170",
-    "neither agree nor disagree" = "#e8c170",
-    "average satisfaction"  = "#e8c170",
-    "average satisfaction (6-8)" = "#e8c170",
+    # Neutral / middle (amber — distinct from DK/NA grey)
+    "neutral"               = "#e8a838",
+    "average"               = "#e8a838",
+    "average (4-6)"         = "#e8a838",
+    "undecided"             = "#e8a838",
+    "passive (7-8)"         = "#e8a838",
+    "passive"               = "#e8a838",
+    "some trust"            = "#e8a838",
+    "neither agree nor disagree" = "#e8a838",
+    "average satisfaction"  = "#e8a838",
+    "average satisfaction (6-8)" = "#e8a838",
 
     # Moderate positive (muted green)
-    "satisfied"             = "#68a67d",
-    "above average"         = "#68a67d",
-    "agree"                 = "#68a67d",
-    "good"                  = "#68a67d",
+    "satisfied"             = "#5da87a",
+    "above average"         = "#5da87a",
+    "agree"                 = "#5da87a",
+    "good"                  = "#5da87a",
 
-    # Strong positive (rich green)
-    "positive"              = "#3d8b5e",
-    "good or excellent"     = "#3d8b5e",
-    "good or excellent (7-10)" = "#3d8b5e",
-    "excellent"             = "#3d8b5e",
-    "very satisfied (9-10)" = "#3d8b5e",
-    "very satisfied"        = "#3d8b5e",
-    "promoter (9-10)"       = "#3d8b5e",
-    "promoter"              = "#3d8b5e",
-    "fully trust"           = "#3d8b5e",
-    "would not switch"      = "#3d8b5e",
-    "strongly agree"        = "#3d8b5e",
+    # Strong positive (deep green)
+    "positive"              = "#2e7d52",
+    "good or excellent"     = "#2e7d52",
+    "good or excellent (7-10)" = "#2e7d52",
+    "excellent"             = "#2e7d52",
+    "very satisfied (9-10)" = "#2e7d52",
+    "very satisfied"        = "#2e7d52",
+    "promoter (9-10)"       = "#2e7d52",
+    "promoter"              = "#2e7d52",
+    "fully trust"           = "#2e7d52",
+    "would not switch"      = "#2e7d52",
+    "strongly agree"        = "#2e7d52",
 
     # DK / NA / Not applicable (light silver-grey — clearly distinct from amber neutral)
     "dk"                    = "#d4d4d4",
@@ -99,23 +100,39 @@ get_semantic_colour <- function(label, index = 1, n_total = 3, brand_colour = "#
   colour <- semantic_map[[label_lower]]
   if (!is.null(colour)) return(colour)
 
-  # Fallback: use brand colour with varying lightness
-  # Parse brand colour (with validation)
-  r <- strtoi(substr(brand_colour, 2, 3), 16L)
-  g <- strtoi(substr(brand_colour, 4, 5), 16L)
-  b <- strtoi(substr(brand_colour, 6, 7), 16L)
-  if (is.na(r) || is.na(g) || is.na(b)) {
-    r <- 50L; g <- 51L; b <- 103L  # fallback: #323367
+  # Fallback: divergent red → amber → green gradient for unknown ordinal labels.
+  # Assumes items are ordered negative-to-positive (standard for Likert/Rating scales).
+  # Anchor colours: dark red, pale red, amber, pale green, deep green.
+  if (n_total <= 1) return("#e8a838")  # single item → amber neutral
+
+  frac <- (index - 1) / (n_total - 1)  # 0.0 = first (most negative), 1.0 = last (most positive)
+
+  # 5-stop gradient anchors (R, G, B)
+  anchors <- list(
+    c(192,  57,  43),  # 0.00 — dark red   (#c0392b)
+    c(224, 123, 108),  # 0.25 — pale red   (#e07b6c)
+    c(232, 168,  56),  # 0.50 — amber      (#e8a838)
+    c( 93, 168, 122),  # 0.75 — pale green (#5da87a)
+    c( 46, 125,  82)   # 1.00 — deep green (#2e7d52)
+  )
+  stops <- c(0, 0.25, 0.5, 0.75, 1.0)
+
+  # Find the two anchor stops that bracket this position
+  seg <- 1
+  for (s in seq_along(stops)) {
+    if (frac >= stops[s]) seg <- s
   }
+  if (seg >= length(stops)) seg <- length(stops) - 1
 
-  # Generate shades from light to dark
-  if (n_total <= 1) return(brand_colour)
-  frac <- (index - 1) / (n_total - 1)  # 0 = lightest, 1 = darkest
-  mix <- 0.3 + frac * 0.7  # Range from 30% to 100% of brand colour
+  # Interpolate between the two anchors
+  t <- (frac - stops[seg]) / (stops[seg + 1] - stops[seg])
+  t <- max(0, min(1, t))
+  a1 <- anchors[[seg]]
+  a2 <- anchors[[seg + 1]]
 
-  fr <- round(255 - (255 - r) * mix)
-  fg <- round(255 - (255 - g) * mix)
-  fb <- round(255 - (255 - b) * mix)
+  fr <- round(a1[1] + (a2[1] - a1[1]) * t)
+  fg <- round(a1[2] + (a2[2] - a1[2]) * t)
+  fb <- round(a1[3] + (a2[3] - a1[3]) * t)
 
   sprintf("#%02x%02x%02x", fr, fg, fb)
 }

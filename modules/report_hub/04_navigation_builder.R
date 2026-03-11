@@ -8,12 +8,11 @@
 #'
 #' @param reports List of report configs (each with key, label, type)
 #' @return HTML string for Level 1 navigation
-build_level1_nav <- function(reports) {
+build_level1_nav <- function(reports, has_about = FALSE) {
   # Overview tab is always first
   tabs <- '<button class="hub-tab active" onclick="ReportHub.switchReport(\'overview\')" data-hub-tab="overview">Overview</button>'
 
   # Add one tab per report in config order
-
   for (report in reports) {
     tabs <- paste0(tabs, sprintf(
       '<button class="hub-tab" onclick="ReportHub.switchReport(\'%s\')" data-hub-tab="%s">%s</button>',
@@ -21,11 +20,18 @@ build_level1_nav <- function(reports) {
     ))
   }
 
-  # Pinned tab is always last
+  # Pinned tab
   tabs <- paste0(tabs,
     '<button class="hub-tab" onclick="ReportHub.switchReport(\'pinned\')" data-hub-tab="pinned">',
     'Pinned Views <span class="hub-pin-badge" id="hub-pin-count">0</span></button>'
   )
+
+  # About tab (only if about fields are configured)
+  if (has_about) {
+    tabs <- paste0(tabs,
+      '<button class="hub-tab" onclick="ReportHub.switchReport(\'about\')" data-hub-tab="about">About</button>'
+    )
+  }
 
   html <- sprintf('<div class="hub-nav-level1">\n  %s\n</div>', tabs)
   return(html)
@@ -88,9 +94,9 @@ build_level2_nav <- function(report_key, tab_names, tab_labels = NULL, report_ty
 #' @param parsed_reports List of parsed/rewritten report objects
 #' @param report_configs List of report configs from guard
 #' @return HTML string with full navigation (Level 1 + all Level 2 bars)
-build_navigation <- function(parsed_reports, report_configs) {
+build_navigation <- function(parsed_reports, report_configs, has_about = FALSE) {
   # Level 1
-  nav_html <- build_level1_nav(report_configs)
+  nav_html <- build_level1_nav(report_configs, has_about = has_about)
 
   # Level 2 for each report
   for (parsed in parsed_reports) {

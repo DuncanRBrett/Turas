@@ -413,3 +413,81 @@ build_hub_slides_section <- function(slides) {
 
   return(paste(parts, collapse = "\n"))
 }
+
+
+#' Build Hub-Level About Panel
+#'
+#' Creates the About tab content for the consolidated report, showing
+#' analyst contact info, appendices references, and editable notes.
+#' Mirrors the individual report About tab pattern.
+#'
+#' @param config Validated config from guard
+#' @return HTML string for the about panel (empty string if no about fields set)
+build_hub_about_panel <- function(config) {
+  s <- config$settings
+
+  # Check if any about field is set
+  has_content <- any(!sapply(
+    list(s$analyst_name, s$analyst_email, s$analyst_phone, s$appendices, s$notes),
+    is.null
+  ))
+  if (!has_content) return("")
+
+  parts <- character(0)
+  parts <- c(parts, '<div class="hub-panel" data-hub-panel="about">')
+  parts <- c(parts, '<div class="hub-about-section">')
+
+  # --- Contact grid ---
+  contact_items <- character(0)
+  if (!is.null(s$analyst_name)) {
+    contact_items <- c(contact_items, sprintf(
+      '<div class="hub-about-contact-item"><span class="hub-about-label">Analyst</span><span class="hub-about-value">%s</span></div>',
+      htmltools::htmlEscape(s$analyst_name)
+    ))
+  }
+  if (!is.null(s$analyst_email)) {
+    contact_items <- c(contact_items, sprintf(
+      '<div class="hub-about-contact-item"><span class="hub-about-label">Email</span><a class="hub-about-value hub-about-link" href="mailto:%s">%s</a></div>',
+      htmltools::htmlEscape(s$analyst_email), htmltools::htmlEscape(s$analyst_email)
+    ))
+  }
+  if (!is.null(s$analyst_phone)) {
+    contact_items <- c(contact_items, sprintf(
+      '<div class="hub-about-contact-item"><span class="hub-about-label">Phone</span><span class="hub-about-value">%s</span></div>',
+      htmltools::htmlEscape(s$analyst_phone)
+    ))
+  }
+  if (length(contact_items) > 0) {
+    parts <- c(parts, '<div class="hub-about-contact-grid">')
+    parts <- c(parts, contact_items)
+    parts <- c(parts, '</div>')
+  }
+
+  # --- Appendices ---
+  if (!is.null(s$appendices)) {
+    parts <- c(parts, sprintf(
+      '<div class="hub-about-appendices"><span class="hub-about-label">Appendices</span><span class="hub-about-value">%s</span></div>',
+      htmltools::htmlEscape(s$appendices)
+    ))
+  }
+
+  # --- Notes (editable markdown) ---
+  notes_content <- if (!is.null(s$notes)) s$notes else ""
+  escaped_notes <- htmltools::htmlEscape(notes_content)
+  parts <- c(parts, sprintf(
+    '<div class="hub-about-notes">
+  <span class="hub-about-label">Notes</span>
+  <div class="hub-about-notes-rendered hub-md-content" id="hub-about-notes-rendered"
+       ondblclick="ReportHub.toggleHubAboutNotesEdit()"></div>
+  <textarea class="hub-about-notes-editor" id="hub-about-notes-editor"
+            style="display:none"
+            onblur="ReportHub.finishHubAboutNotesEdit()">%s</textarea>
+</div>',
+    escaped_notes
+  ))
+
+  parts <- c(parts, '</div>')  # close hub-about-section
+  parts <- c(parts, '</div>')  # close hub-panel
+
+  return(paste(parts, collapse = "\n"))
+}

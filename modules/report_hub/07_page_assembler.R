@@ -73,6 +73,12 @@ assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_
   # --- Unified pinned views panel ---
   parts <- c(parts, build_pinned_panel())
 
+  # --- About panel (if any about fields configured) ---
+  about_html <- build_hub_about_panel(config)
+  if (nzchar(about_html)) {
+    parts <- c(parts, about_html)
+  }
+
   # --- Data scripts ---
   # Unified pinned data store (pass report configs for source labels)
   merged_pins <- merge_pinned_data(parsed_reports, config$reports)

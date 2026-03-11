@@ -797,6 +797,99 @@ body {
   transition: opacity 0.15s ease;
 }
 
+/* --- Hub About Section --- */
+.hub-about-section {
+  max-width: 900px;
+  margin: 40px auto;
+  padding: 32px 40px;
+  background: var(--hub-card);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.hub-about-contact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 24px;
+  padding: 24px;
+  border: 1.5px dashed var(--hub-border);
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.hub-about-contact-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hub-about-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--hub-brand, #323367);
+}
+
+.hub-about-value {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--hub-text);
+  line-height: 1.4;
+}
+
+.hub-about-link {
+  color: var(--hub-brand, #323367);
+  text-decoration: none;
+}
+.hub-about-link:hover {
+  text-decoration: underline;
+}
+
+.hub-about-appendices {
+  padding: 16px 24px;
+  border: 1.5px dashed var(--hub-border);
+  border-radius: 8px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hub-about-notes {
+  padding: 16px 24px;
+  border: 1.5px solid var(--hub-border);
+  border-radius: 8px;
+  background: #fafaf8;
+}
+
+.hub-about-notes-rendered {
+  min-height: 40px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--hub-text);
+  cursor: text;
+  padding: 8px 0;
+}
+.hub-about-notes-rendered:empty::before {
+  content: "Double-click to add notes...";
+  color: var(--hub-text-muted);
+  font-style: italic;
+}
+
+.hub-about-notes-editor {
+  width: 100%;
+  min-height: 120px;
+  border: 1px solid var(--hub-border);
+  border-radius: 6px;
+  padding: 12px;
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
 /* --- Print Styles --- */
 @media print {
   .hub-nav-level1,

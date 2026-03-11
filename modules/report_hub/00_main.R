@@ -124,7 +124,13 @@ combine_reports <- function(config_file, output_file = NULL, auto_cross_ref = FA
 
   # --- Step 5: Build navigation ---
   cat("Step 4: Building navigation...\n")
-  navigation_html <- build_navigation(parsed_reports, config$reports)
+  has_about <- any(!sapply(
+    list(config$settings$analyst_name, config$settings$analyst_email,
+         config$settings$analyst_phone, config$settings$appendices,
+         config$settings$notes),
+    is.null
+  ))
+  navigation_html <- build_navigation(parsed_reports, config$reports, has_about = has_about)
 
   # --- Step 6: Build front page ---
   cat("Step 5: Building overview page...\n")

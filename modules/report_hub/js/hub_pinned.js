@@ -449,6 +449,36 @@
         rendered.innerHTML = hubRenderMarkdown(editor.value);
       }
     });
+    // Also render About notes section if present
+    var aboutEditor = document.getElementById("hub-about-notes-editor");
+    var aboutRendered = document.getElementById("hub-about-notes-rendered");
+    if (aboutRendered && aboutEditor) {
+      aboutRendered.innerHTML = hubRenderMarkdown(aboutEditor.value);
+    }
+  };
+
+  /**
+   * Toggle About notes into edit mode (double-click to edit)
+   */
+  ReportHub.toggleHubAboutNotesEdit = function() {
+    var rendered = document.getElementById("hub-about-notes-rendered");
+    var editor = document.getElementById("hub-about-notes-editor");
+    if (!rendered || !editor) return;
+    rendered.style.display = "none";
+    editor.style.display = "";
+    editor.focus();
+  };
+
+  /**
+   * Finish About notes editing: re-render markdown
+   */
+  ReportHub.finishHubAboutNotesEdit = function() {
+    var rendered = document.getElementById("hub-about-notes-rendered");
+    var editor = document.getElementById("hub-about-notes-editor");
+    if (!rendered || !editor) return;
+    rendered.innerHTML = hubRenderMarkdown(editor.value);
+    rendered.style.display = "";
+    editor.style.display = "none";
   };
 
   /**
@@ -607,6 +637,197 @@
       el.appendChild(tspan);
     }
     return { element: el, height: lines.length * lineHeight };
+  }
+
+  /**
+   * Parse insight HTML into structured blocks for formatted SVG rendering.
+   * Each block has a type ("heading", "bullet", "quote", "para") and an
+   * array of text runs with inline formatting ({text, bold, italic}).
+   */
+  function hubParseInsightHTML(html) {
+    if (!html || !html.trim()) return [];
+    var div = document.createElement("div");
+    div.innerHTML = html;
+    var blocks = [];
+
+    function extractRuns(node, baseCtx) {
+      var runs = [];
+      (function walk(n, ctx) {
+        if (n.nodeType === 3) {
+          var t = n.textContent;
+          if (t) runs.push({ text: t, bold: ctx.bold, italic: ctx.italic });
+          return;
+        }
+        if (n.nodeType !== 1) return;
+        var tag = n.tagName.toLowerCase();
+        var nc = { bold: ctx.bold, italic: ctx.italic };
+        if (tag === "strong" || tag === "b") nc.bold = true;
+        if (tag === "em" || tag === "i") nc.italic = true;
+        if (tag === "br") { runs.push({ text: "\n", bold: false, italic: false }); return; }
+        for (var i = 0; i < n.childNodes.length; i++) walk(n.childNodes[i], nc);
+      })(node, baseCtx || { bold: false, italic: false });
+      return runs;
+    }
+
+    for (var i = 0; i < div.childNodes.length; i++) {
+      var el = div.childNodes[i];
+      if (el.nodeType === 3) {
+        var t = el.textContent.trim();
+        if (t) blocks.push({ type: "para", runs: [{ text: t, bold: false, italic: false }] });
+        continue;
+      }
+      if (el.nodeType !== 1) continue;
+      var tag = el.tagName.toLowerCase();
+
+      if (/^h[1-6]$/.test(tag)) {
+        blocks.push({ type: "heading", level: parseInt(tag[1]), runs: extractRuns(el, { bold: true, italic: false }) });
+      } else if (tag === "ul" || tag === "ol") {
+        var items = [];
+        for (var j = 0; j < el.children.length; j++) {
+          if (el.children[j].tagName.toLowerCase() === "li") items.push(el.children[j]);
+        }
+        for (var j = 0; j < items.length; j++) {
+          var prefix = tag === "ol" ? (j + 1) + ". " : "\u2022 ";
+          blocks.push({ type: "bullet", prefix: prefix, runs: extractRuns(items[j], { bold: false, italic: false }) });
+        }
+      } else if (tag === "blockquote") {
+        blocks.push({ type: "quote", runs: extractRuns(el, { bold: false, italic: false }) });
+      } else if (tag === "p") {
+        var runs = extractRuns(el, { bold: false, italic: false });
+        if (runs.length > 0) blocks.push({ type: "para", runs: runs });
+      } else {
+        var runs = extractRuns(el, { bold: false, italic: false });
+        if (runs.length > 0) blocks.push({ type: "para", runs: runs });
+      }
+    }
+    return blocks;
+  }
+
+  /**
+   * Render parsed insight blocks as SVG elements with formatting preserved.
+   * Returns { element: SVG <g>, height: total pixel height }
+   */
+  function hubRenderInsightSVG(ns, blocks, x, startY, maxWidth, charWidth) {
+    var g = document.createElementNS(ns, "g");
+    var y = startY;
+    var lineH = 17;
+
+    for (var b = 0; b < blocks.length; b++) {
+      var block = blocks[b];
+      var indent = 0;
+      var fontSize = 13;
+      var isHeading = block.type === "heading";
+      var isQuote = block.type === "quote";
+
+      if (isHeading) {
+        fontSize = block.level <= 2 ? 15 : 14;
+        if (b > 0) y += 6;
+      }
+      if (block.type === "bullet") indent = 16;
+      if (isQuote) indent = 16;
+
+      // Build annotated character array: each char knows its formatting
+      var annot = [];
+      if (block.prefix) {
+        for (var c = 0; c < block.prefix.length; c++) {
+          annot.push({ ch: block.prefix[c], bold: isHeading, italic: false });
+        }
+      }
+      for (var r = 0; r < block.runs.length; r++) {
+        var run = block.runs[r];
+        for (var c = 0; c < run.text.length; c++) {
+          annot.push({ ch: run.text[c], bold: run.bold || isHeading, italic: run.italic || isQuote });
+        }
+      }
+
+      // Collapse whitespace
+      var collapsed = [];
+      var lastSpace = true;
+      for (var ci = 0; ci < annot.length; ci++) {
+        if (/\s/.test(annot[ci].ch)) {
+          if (!lastSpace) { collapsed.push({ ch: " ", bold: annot[ci].bold, italic: annot[ci].italic }); lastSpace = true; }
+        } else {
+          collapsed.push(annot[ci]); lastSpace = false;
+        }
+      }
+      while (collapsed.length > 0 && collapsed[collapsed.length - 1].ch === " ") collapsed.pop();
+      if (collapsed.length === 0) continue;
+
+      var fullText = "";
+      for (var ci = 0; ci < collapsed.length; ci++) fullText += collapsed[ci].ch;
+
+      // Word wrap
+      var effectiveW = maxWidth - indent;
+      var maxChars = Math.floor(effectiveW / charWidth);
+      var wordBounds = [];
+      var ws = -1;
+      for (var ci = 0; ci <= fullText.length; ci++) {
+        if (ci === fullText.length || fullText[ci] === " ") {
+          if (ws >= 0) wordBounds.push({ s: ws, e: ci });
+          ws = -1;
+        } else { if (ws < 0) ws = ci; }
+      }
+
+      var lineRanges = [];
+      var lStart = 0, lLen = 0;
+      for (var w = 0; w < wordBounds.length; w++) {
+        var wb = wordBounds[w];
+        var wLen = wb.e - wb.s;
+        var needed = lLen === 0 ? wLen : lLen + 1 + wLen;
+        if (needed > maxChars && lLen > 0) {
+          lineRanges.push({ s: lStart, e: wb.s > 0 ? wb.s : wb.s });
+          lStart = wb.s; lLen = wLen;
+        } else { lLen = needed; }
+      }
+      if (lStart < fullText.length) lineRanges.push({ s: lStart, e: fullText.length });
+
+      // Render each line with tspan segments for formatting changes
+      for (var li = 0; li < lineRanges.length; li++) {
+        var lr = lineRanges[li];
+        // Trim leading/trailing spaces from line range
+        var ls = lr.s, le = lr.e;
+        while (ls < le && fullText[ls] === " ") ls++;
+        while (le > ls && fullText[le - 1] === " ") le--;
+        if (ls >= le) continue;
+
+        var textEl = document.createElementNS(ns, "text");
+        textEl.setAttribute("x", x + indent);
+        textEl.setAttribute("y", y);
+        textEl.setAttribute("fill", isQuote ? "#64748b" : "#1a2744");
+        textEl.setAttribute("font-size", fontSize);
+
+        // Split line into tspan segments at formatting boundaries
+        var segStart = ls;
+        for (var ci = ls; ci <= le; ci++) {
+          var atEnd = (ci === le);
+          var fmtChange = !atEnd && ci > ls &&
+            (collapsed[ci].bold !== collapsed[ci - 1].bold ||
+             collapsed[ci].italic !== collapsed[ci - 1].italic);
+
+          if (fmtChange || atEnd) {
+            var segText = fullText.substring(segStart, atEnd ? ci : ci);
+            if (segText) {
+              var tspan = document.createElementNS(ns, "tspan");
+              var fmt = collapsed[segStart];
+              if (fmt.bold) tspan.setAttribute("font-weight", "700");
+              if (fmt.italic) tspan.setAttribute("font-style", "italic");
+              tspan.textContent = segText;
+              textEl.appendChild(tspan);
+            }
+            segStart = ci;
+          }
+        }
+
+        g.appendChild(textEl);
+        y += lineH;
+      }
+
+      // Block spacing
+      if (block.type === "bullet" && b < blocks.length - 1 && blocks[b + 1].type !== "bullet") y += 4;
+      else if (block.type !== "bullet") y += 4;
+    }
+
+    return { element: g, height: y - startY };
   }
 
   /**
@@ -875,12 +1096,13 @@
       subtitle = "";
     }
     var insightRaw = pin.insight || pin.insightText || "";
-    var insightPlain = "";
-    if (insightRaw) {
-      var tmpDiv = document.createElement("div");
-      tmpDiv.innerHTML = insightRaw;
-      insightPlain = tmpDiv.textContent.trim();
+    // Parse insight HTML into structured blocks for formatted SVG rendering
+    var insightHtml = insightRaw;
+    if (insightRaw && !containsHtml(insightRaw)) {
+      // Plain text — render through markdown first
+      insightHtml = hubRenderMarkdown(insightRaw);
     }
+    var insightBlocks = hubParseInsightHTML(insightHtml);
 
     // ---- 1. Title ----
     var titleLines = hubWrapTextLines(titleText, usableW, 9.5);
@@ -910,11 +1132,14 @@
     var metaY = titleStartY + titleBlockH + 4;
     var contentTop = metaY + 12;
 
-    // ---- 3. Insight ----
-    var insightLines = hubWrapTextLines(insightPlain, usableW - 16, 7.5);
-    var insightLineH = 17;
-    var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 24 : 0;
+    // ---- 3. Insight (pre-render to measure height) ----
     var insightY = contentTop;
+    var insightBlockH = 0;
+    var insightRendered = null;
+    if (insightBlocks.length > 0) {
+      insightRendered = hubRenderInsightSVG(ns, insightBlocks, pad + 14, insightY + 18, usableW - 16, 7.5);
+      insightBlockH = insightRendered.height + 24;
+    }
 
     // ---- 4. Chart dimensions ----
     var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 8 : 0);
@@ -994,9 +1219,9 @@
     metaEl.textContent = metaText;
     svg.appendChild(metaEl);
 
-    // Insight block
-    if (insightLines.length > 0) {
-      var accentH = Math.max(28, insightLines.length * insightLineH + 12);
+    // Insight block (with formatting preserved: headings, bullets, bold, italic)
+    if (insightRendered && insightBlockH > 0) {
+      var accentH = Math.max(28, insightRendered.height + 12);
       var insBg = document.createElementNS(ns, "rect");
       insBg.setAttribute("x", pad); insBg.setAttribute("y", insightY + 2);
       insBg.setAttribute("width", usableW); insBg.setAttribute("height", accentH);
@@ -1007,9 +1232,7 @@
       iBar.setAttribute("width", "4"); iBar.setAttribute("height", accentH);
       iBar.setAttribute("fill", brandColour); iBar.setAttribute("rx", "2");
       svg.appendChild(iBar);
-      var insResult = hubCreateWrappedText(ns, insightLines, pad + 14, insightY + 18, insightLineH,
-        { fill: "#1a2744", "font-size": "13", "font-weight": "500" });
-      svg.appendChild(insResult.element);
+      svg.appendChild(insightRendered.element);
     }
 
     // Chart — clone SVG content into <g> element
