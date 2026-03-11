@@ -7,8 +7,9 @@
 #' Rewrite a Parsed Report for Hub Integration
 #'
 #' @param parsed Parsed report from parse_html_report()
+#' @param report_label Human-readable label for source identification in pins
 #' @return Modified parsed report with namespaced IDs and JS
-rewrite_for_hub <- function(parsed) {
+rewrite_for_hub <- function(parsed, report_label = NULL) {
   key <- parsed$report_key
   prefix <- paste0(key, "--")
 
@@ -84,7 +85,7 @@ rewrite_for_hub <- function(parsed) {
   }
 
   # --- Wrap all JS in an IIFE namespace ---
-  parsed$wrapped_js <- wrap_js_in_iife(parsed$js_blocks, key, parsed$report_type)
+  parsed$wrapped_js <- wrap_js_in_iife(parsed$js_blocks, key, parsed$report_type, report_label)
 
   # --- Rewrite data scripts (HTML elements) ---
   for (i in seq_along(parsed$data_scripts)) {
@@ -347,8 +348,9 @@ remove_save_print_buttons <- function(html) {
 #' @param js_blocks List of JS block objects from parser
 #' @param report_key Report key (e.g., "tracker")
 #' @param report_type "tracker" or "tabs"
+#' @param report_label Human-readable label for source identification in pins
 #' @return Single JS string with prefixed conflicts
-wrap_js_in_iife <- function(js_blocks, report_key, report_type) {
+wrap_js_in_iife <- function(js_blocks, report_key, report_type, report_label = NULL) {
   # Combine all JS content
   all_js <- paste(
     sapply(js_blocks, function(b) b$content),
@@ -459,7 +461,7 @@ var %s = function(sel) { var els = document.querySelectorAll(sel); if (els.lengt
 
   api_js <- build_namespace_api(namespace_name, report_key, report_type)
 
-  bridge_js <- build_pin_bridge(report_key, report_type)
+  bridge_js <- build_pin_bridge(report_key, report_type, report_label)
 
   return(paste0(all_js, "\n\n", api_js, "\n\n", bridge_js))
 }
@@ -474,16 +476,20 @@ var %s = function(sel) { var els = document.querySelectorAll(sel); if (els.lengt
 #'
 #' @param report_key "tracker" or "tabs"
 #' @param report_type "tracker" or "tabs"
+#' @param report_label Human-readable label for source identification in pins
 #' @return JavaScript string with bridge functions
-build_pin_bridge <- function(report_key, report_type) {
+build_pin_bridge <- function(report_key, report_type, report_label = NULL) {
   prefix <- paste0(report_key, "_")
   id_helper <- paste0("_", report_key, "_id")
   qs_helper <- paste0("_", report_key, "_qs")
+  # Escape label for safe JS string embedding
+  label_js <- if (!is.null(report_label)) gsub("'", "\\\\'", report_label) else report_key
 
   if (report_type == "tracker") {
     sprintf('
 // ===== Hub Pin Bridge \u2014 Tracker =====
 // Override per-report pin functions to route through hub store
+var _hubSourceLabel = \'%4$s\';
 pinMetricView = function(metricId) {
   // Always add a new pin (multi-pin support).
   // Each pin captures the current view state (visible segments, chart, table).
@@ -491,7 +497,8 @@ pinMetricView = function(metricId) {
   if (!pinObj) return;
   pinObj.title = pinObj.metricTitle || metricId;
   pinObj.insight = pinObj.insightText || "";
-  ReportHub.addPin("tracker", pinObj);
+  pinObj.sourceLabel = _hubSourceLabel;
+  ReportHub.addPin("%5$s", pinObj);
 };
 pinSummarySection = function(sectionType) {
   var editorId = sectionType === "background" ? "summary-background-editor" : "summary-findings-editor";
@@ -504,7 +511,8 @@ pinSummarySection = function(sectionType) {
     title: title, insight: editor.innerHTML,
     tableHtml: "", chartSvg: "", timestamp: Date.now()
   };
-  ReportHub.addPin("tracker", pinObj);
+  pinObj.sourceLabel = _hubSourceLabel;
+  ReportHub.addPin("%5$s", pinObj);
 };
 pinSummaryTable = function() {
   var table = %2$s("summary-metrics-table");
@@ -518,7 +526,8 @@ pinSummaryTable = function() {
     tableHtml: \'<div class="tk-table-wrapper">\' + clone.outerHTML + \'</div>\',
     chartSvg: "", timestamp: Date.now()
   };
-  ReportHub.addPin("tracker", pinObj);
+  pinObj.sourceLabel = _hubSourceLabel;
+  ReportHub.addPin("%5$s", pinObj);
 };
 pinOverviewView = function() {
   var tablePanel = %3$s("#tab-overview .tk-table-panel");
@@ -558,7 +567,8 @@ pinOverviewView = function() {
     insight: insightEditor ? insightEditor.innerHTML : "",
     timestamp: Date.now()
   };
-  ReportHub.addPin("tracker", pinObj);
+  pinObj.sourceLabel = _hubSourceLabel;
+  ReportHub.addPin("%5$s", pinObj);
   if (typeof window.captureOverviewPng === "function") {
     window.captureOverviewPng(pinObj);
   }
@@ -577,7 +587,8 @@ pinSelectedCharts = function() {
     insight: insightEditor ? insightEditor.innerHTML : "",
     timestamp: Date.now()
   };
-  ReportHub.addPin("tracker", pinObj);
+  pinObj.sourceLabel = _hubSourceLabel;
+  ReportHub.addPin("%5$s", pinObj);
 };
 pinSigChanges = function() { %1$spinVisibleSigFindings(); };
 %1$spinSigCard = function(sigId) {
@@ -598,7 +609,8 @@ pinSigChanges = function() { %1$spinVisibleSigFindings(); };
     insightText: "", insight: "",
     timestamp: Date.now()
   };
-  ReportHub.addPin("tracker", pinObj);
+  pinObj.sourceLabel = _hubSourceLabel;
+  ReportHub.addPin("%5$s", pinObj);
 };
 %1$spinVisibleSigFindings = function() {
   var section = %2$s("summary-section-sig-changes");
@@ -623,16 +635,18 @@ pinSigChanges = function() { %1$spinVisibleSigFindings(); };
     insightText: "", insight: "",
     timestamp: Date.now()
   };
-  ReportHub.addPin("tracker", pinObj);
+  pinObj.sourceLabel = _hubSourceLabel;
+  ReportHub.addPin("%5$s", pinObj);
 };
 %1$shydratePinnedViews = function() {};
 %1$srenderPinnedCards = function() { ReportHub.renderPinnedCards(); };
 // ===== End Hub Pin Bridge =====
-', prefix, id_helper, qs_helper)
+', prefix, id_helper, qs_helper, label_js, report_key)
   } else {
     sprintf('
 // ===== Hub Pin Bridge \u2014 Tabs =====
 // Override per-report pin functions to route through hub store
+var _hubSourceLabel = \'%4$s\';
 %1$stogglePin = function(qCode) {
   // Always add a new pin (multi-pin support).
   // Each pin captures the current view state (banner, chart, table).
@@ -641,7 +655,8 @@ pinSigChanges = function() { %1$spinVisibleSigFindings(); };
   pinObj.title = pinObj.qCode || "";
   pinObj.subtitle = pinObj.qTitle || "";
   pinObj.insight = pinObj.insightText || "";
-  ReportHub.addPin("tabs", pinObj);
+  pinObj.sourceLabel = _hubSourceLabel;
+  ReportHub.addPin("%5$s", pinObj);
   %1$supdatePinButton(qCode, true);
 };
 pinDashboardText = function(boxId) {
@@ -654,7 +669,8 @@ pinDashboardText = function(boxId) {
     pinType: "text_box", qCode: null, title: title,
     insight: text, tableHtml: null, chartSvg: null, timestamp: Date.now()
   };
-  ReportHub.addPin("tabs", pinObj);
+  pinObj.sourceLabel = _hubSourceLabel;
+  ReportHub.addPin("%5$s", pinObj);
 };
 pinGaugeSection = function(sectionId) {
   var section = %2$s("dash-sec-" + sectionId);
@@ -673,7 +689,8 @@ pinGaugeSection = function(sectionId) {
     insight: null, tableHtml: clone.innerHTML, chartSvg: null,
     baseText: null, timestamp: Date.now()
   };
-  ReportHub.addPin("tabs", pinObj);
+  pinObj.sourceLabel = _hubSourceLabel;
+  ReportHub.addPin("%5$s", pinObj);
 };
 pinSigFindings = function() { %1$spinVisibleSigFindings(); };
 %1$spinSigCard = function(sigId) {
@@ -691,7 +708,8 @@ pinSigFindings = function() { %1$spinVisibleSigFindings(); };
     insight: null, tableHtml: clone.outerHTML, chartSvg: null,
     baseText: null, timestamp: Date.now()
   };
-  ReportHub.addPin("tabs", pinObj);
+  pinObj.sourceLabel = _hubSourceLabel;
+  ReportHub.addPin("%5$s", pinObj);
 };
 %1$spinVisibleSigFindings = function() {
   var section = %2$s("dash-sec-sig-findings");
@@ -713,7 +731,8 @@ pinSigFindings = function() { %1$spinVisibleSigFindings(); };
     insight: null, tableHtml: wrapper.outerHTML, chartSvg: null,
     baseText: null, timestamp: Date.now()
   };
-  ReportHub.addPin("tabs", pinObj);
+  pinObj.sourceLabel = _hubSourceLabel;
+  ReportHub.addPin("%5$s", pinObj);
 };
 %1$spinQualSlide = function(slideId) {
   var card = %3$s(\'.qual-slide-card[data-slide-id="\' + slideId + \'"]\');
@@ -731,12 +750,13 @@ pinSigFindings = function() { %1$spinVisibleSigFindings(); };
     tableHtml: null, chartSvg: null,
     baseText: null, timestamp: Date.now()
   };
-  ReportHub.addPin("tabs", pinObj);
+  pinObj.sourceLabel = _hubSourceLabel;
+  ReportHub.addPin("%5$s", pinObj);
 };
 %1$shydratePinnedViews = function() {};
 %1$srenderPinnedCards = function() { ReportHub.renderPinnedCards(); };
 // ===== End Hub Pin Bridge =====
-', prefix, id_helper, qs_helper)
+', prefix, id_helper, qs_helper, label_js, report_key)
   }
 }
 

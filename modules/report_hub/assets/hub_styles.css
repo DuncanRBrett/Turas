@@ -495,6 +495,47 @@ body {
   gap: 4px;
 }
 
+/* --- Markdown Rendered Content --- */
+.hub-md-content h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--hub-text);
+  margin: 12px 0 6px;
+}
+
+.hub-md-content p {
+  margin: 4px 0;
+  line-height: 1.6;
+}
+
+.hub-md-content ul {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.hub-md-content li {
+  margin: 2px 0;
+  line-height: 1.5;
+}
+
+.hub-md-content blockquote {
+  margin: 8px 0;
+  padding: 6px 12px;
+  border-left: 3px solid var(--hub-accent, #CC9900);
+  background: #fef9e7;
+  color: #5c4a2a;
+  font-style: italic;
+  border-radius: 0 4px 4px 0;
+}
+
+.hub-md-content strong {
+  font-weight: 600;
+}
+
+.hub-md-content em {
+  font-style: italic;
+}
+
 /* --- Insight Editor (on pins) --- */
 .hub-pin-insight {
   margin: 0;
@@ -504,29 +545,180 @@ body {
   border-radius: 0 8px 8px 0;
 }
 
-.hub-insight-editor {
-  font-size: 15px;
-  font-weight: 600;
+.hub-insight-rendered {
+  font-size: 14px;
+  font-weight: 500;
   line-height: 1.5;
   color: #1a2744;
   min-height: 20px;
-  outline: none;
   padding: 16px 24px;
-  border: 1px dashed transparent;
-  border-radius: 0 8px 8px 0;
-  transition: border-color 0.15s ease;
-  background: transparent;
+  cursor: text;
 }
 
-.hub-insight-editor:focus {
-  border-color: var(--hub-border);
-  background: rgba(255,255,255,0.5);
-}
-
-.hub-insight-editor:empty::before {
+.hub-insight-rendered:empty::before {
   content: attr(data-placeholder);
   color: #94a3b8;
   font-style: italic;
+  font-weight: 400;
+}
+
+.hub-insight-editor {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--hub-font);
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1a2744;
+  min-height: 80px;
+  outline: none;
+  padding: 16px 24px;
+  border: 1px dashed var(--hub-border);
+  border-radius: 0 8px 8px 0;
+  background: rgba(255, 255, 255, 0.5);
+  resize: vertical;
+}
+
+.hub-insight-editor:focus {
+  border-color: var(--hub-brand);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+/* --- Hub Text Sections (Executive Summary, Background) --- */
+.hub-text-section {
+  background: var(--hub-card);
+  border: 1px solid var(--hub-border);
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+
+.hub-text-rendered {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--hub-text);
+  min-height: 40px;
+  padding: 4px;
+  cursor: text;
+}
+
+.hub-text-rendered:empty::before {
+  content: "Double-click to edit...";
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.hub-text-editor {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--hub-font);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--hub-text);
+  min-height: 100px;
+  outline: none;
+  padding: 8px;
+  border: 1px dashed var(--hub-border);
+  border-radius: 4px;
+  background: #fafbfc;
+  resize: vertical;
+}
+
+.hub-text-editor:focus {
+  border-color: var(--hub-brand);
+  background: #fff;
+}
+
+/* --- Hub Qualitative Slides --- */
+.hub-slides-section {
+  margin-top: 32px;
+  margin-bottom: 32px;
+}
+
+.hub-slides-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.hub-slides-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.hub-slide-card {
+  background: var(--hub-card);
+  border: 1px solid var(--hub-border);
+  border-radius: 8px;
+  padding: 20px 24px;
+  transition: box-shadow 0.15s ease;
+}
+
+.hub-slide-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.hub-slide-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.hub-slide-title {
+  flex: 1;
+  font-family: var(--hub-font);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--hub-text);
+  border: none;
+  background: transparent;
+  outline: none;
+  padding: 2px 0;
+  border-bottom: 1px dashed transparent;
+}
+
+.hub-slide-title:focus {
+  border-bottom-color: var(--hub-border);
+}
+
+.hub-slide-rendered {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--hub-text);
+  min-height: 40px;
+  cursor: text;
+}
+
+.hub-slide-rendered:empty::before {
+  content: "Double-click to edit...";
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.hub-slide-editor {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--hub-font);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--hub-text);
+  min-height: 100px;
+  outline: none;
+  padding: 8px;
+  border: 1px dashed var(--hub-border);
+  border-radius: 4px;
+  background: #fafbfc;
+  resize: vertical;
+}
+
+.hub-slide-editor:focus {
+  border-color: var(--hub-brand);
+  background: #fff;
 }
 
 /* --- Pin Content Areas --- */

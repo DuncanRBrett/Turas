@@ -118,7 +118,8 @@ combine_reports <- function(config_file, output_file = NULL, auto_cross_ref = FA
   cat("Step 3: Namespacing for conflict resolution...\n")
   for (i in seq_along(parsed_reports)) {
     cat(sprintf("  Rewriting: %s\n", parsed_reports[[i]]$report_key))
-    parsed_reports[[i]] <- rewrite_for_hub(parsed_reports[[i]])
+    report_label <- if (i <= length(config$reports)) config$reports[[i]]$label else NULL
+    parsed_reports[[i]] <- rewrite_for_hub(parsed_reports[[i]], report_label)
   }
 
   # --- Step 5: Build navigation ---

@@ -20,8 +20,31 @@ build_front_page <- function(config, parsed_reports) {
   }
   parts <- c(parts, '</div>')
 
-  # --- Combined summary area ---
+  # --- Hub-level executive summary (from config, if provided) ---
+  if (!is.null(config$settings$executive_summary)) {
+    parts <- c(parts, build_hub_text_section(
+      id = "executive-summary",
+      label = "Executive Summary",
+      content = config$settings$executive_summary
+    ))
+  }
+
+  # --- Hub-level background text (from config, if provided) ---
+  if (!is.null(config$settings$background_text)) {
+    parts <- c(parts, build_hub_text_section(
+      id = "background",
+      label = "Background & Methodology",
+      content = config$settings$background_text
+    ))
+  }
+
+  # --- Combined summary area (per-report summaries) ---
   parts <- c(parts, build_summary_area(parsed_reports))
+
+  # --- Hub-level qualitative slides (from config, if provided) ---
+  if (!is.null(config$slides) && length(config$slides) > 0) {
+    parts <- c(parts, build_hub_slides_section(config$slides))
+  }
 
   parts <- c(parts, '</div>')
 
@@ -202,4 +225,79 @@ extract_summary_text <- function(parsed) {
   }
 
   return("")
+}
+
+
+#' Build a Hub-Level Text Section (Executive Summary or Background)
+#'
+#' Creates an editable text section with a pin button, pre-populated
+#' with content from the hub config. Supports markdown syntax.
+#'
+#' @param id Section identifier (e.g., "executive-summary", "background")
+#' @param label Display label
+#' @param content Text content (supports markdown syntax)
+#' @return HTML string
+build_hub_text_section <- function(id, label, content) {
+  # Escape content for safe embedding in the textarea (markdown source)
+  escaped_content <- htmltools::htmlEscape(content)
+
+  sprintf(
+    '<div class="hub-text-section" id="hub-text-%s">
+  <div class="hub-summary-header">
+    <div class="hub-summary-label">%s</div>
+    <button class="hub-pin-summary-btn" onclick="ReportHub.pinHubText(\'%s\')" title="Pin this section">\U0001F4CC Pin to Views</button>
+  </div>
+  <div class="hub-text-rendered hub-md-content" id="hub-text-rendered-%s"
+       ondblclick="ReportHub.toggleHubTextEdit(\'%s\')"></div>
+  <textarea class="hub-text-editor" id="hub-text-editor-%s"
+            style="display:none"
+            onblur="ReportHub.finishHubTextEdit(\'%s\')">%s</textarea>
+</div>',
+    id, htmltools::htmlEscape(label), id, id, id, id, id, escaped_content
+  )
+}
+
+
+#' Build Hub-Level Qualitative Slides Section
+#'
+#' Creates slide cards from hub config, each with a title + markdown body,
+#' editable via double-click, and pinnable to the pinned views.
+#'
+#' @param slides List of slide objects from config (id, title, content, order)
+#' @return HTML string
+build_hub_slides_section <- function(slides) {
+  parts <- character(0)
+  parts <- c(parts, '<div class="hub-slides-section">')
+  parts <- c(parts, '<div class="hub-slides-header">')
+  parts <- c(parts, '  <div class="hub-summary-label">Insights & Analysis</div>')
+  parts <- c(parts, '</div>')
+  parts <- c(parts, '<div class="hub-slides-grid" id="hub-slides-grid">')
+
+  for (slide in slides) {
+    escaped_content <- htmltools::htmlEscape(slide$content)
+    escaped_title <- htmltools::htmlEscape(slide$title)
+
+    parts <- c(parts, sprintf(
+      '<div class="hub-slide-card" data-slide-id="%s">
+  <div class="hub-slide-title-row">
+    <input class="hub-slide-title" value="%s"
+           onchange="ReportHub.updateHubSlideTitle(\'%s\', this.value)">
+    <button class="hub-pin-summary-btn" onclick="ReportHub.pinHubSlide(\'%s\')" title="Pin this slide">\U0001F4CC Pin</button>
+  </div>
+  <div class="hub-slide-rendered hub-md-content" data-slide-id="%s"
+       ondblclick="ReportHub.toggleHubSlideEdit(\'%s\')"></div>
+  <textarea class="hub-slide-editor" data-slide-id="%s"
+            style="display:none"
+            onblur="ReportHub.finishHubSlideEdit(\'%s\')">%s</textarea>
+</div>',
+      slide$id, escaped_title, slide$id,
+      slide$id, slide$id, slide$id, slide$id, slide$id,
+      escaped_content
+    ))
+  }
+
+  parts <- c(parts, '</div>')
+  parts <- c(parts, '</div>')
+
+  return(paste(parts, collapse = "\n"))
 }

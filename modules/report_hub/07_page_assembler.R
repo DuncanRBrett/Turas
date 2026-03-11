@@ -74,8 +74,8 @@ assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_
   parts <- c(parts, build_pinned_panel())
 
   # --- Data scripts ---
-  # Unified pinned data store
-  merged_pins <- merge_pinned_data(parsed_reports)
+  # Unified pinned data store (pass report configs for source labels)
+  merged_pins <- merge_pinned_data(parsed_reports, config$reports)
   parts <- c(parts, sprintf(
     '<script type="application/json" id="hub-pinned-data">%s</script>',
     merged_pins
@@ -239,9 +239,18 @@ build_pinned_panel <- function() {
 #' Merge Pinned Data from All Reports
 #'
 #' @param parsed_reports List of parsed report objects
+#' @param report_configs List of report config objects (with $key and $label)
 #' @return JSON string of merged pinned items
-merge_pinned_data <- function(parsed_reports) {
+merge_pinned_data <- function(parsed_reports, report_configs = NULL) {
   all_pins <- list()
+
+  # Build key -> label lookup from config
+  label_map <- list()
+  if (!is.null(report_configs)) {
+    for (rc in report_configs) {
+      label_map[[rc$key]] <- rc$label
+    }
+  }
 
   for (parsed in parsed_reports) {
     pins_json <- parsed$pinned_data
@@ -255,6 +264,10 @@ merge_pinned_data <- function(parsed_reports) {
     for (pin in pins) {
       pin$source <- parsed$report_key
       pin$type <- "pin"
+      # Add human-readable source label from config
+      if (!is.null(label_map[[parsed$report_key]])) {
+        pin$sourceLabel <- label_map[[parsed$report_key]]
+      }
       all_pins <- c(all_pins, list(pin))
     }
   }
@@ -307,6 +320,12 @@ build_init_js <- function(parsed_reports) {
       ns_name, ns_name, ns_name
     ))
   }
+
+  # Render hub-level text sections (executive summary, background)
+  init_calls <- c(init_calls, "if (ReportHub.renderHubTextSections) ReportHub.renderHubTextSections();")
+
+  # Render hub-level qualitative slides
+  init_calls <- c(init_calls, "if (ReportHub.renderHubSlides) ReportHub.renderHubSlides();")
 
   # Hydrate pinned views
   init_calls <- c(init_calls, "ReportHub.hydratePinnedViews();")

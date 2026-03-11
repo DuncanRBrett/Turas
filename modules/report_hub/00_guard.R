@@ -381,6 +381,39 @@ guard_validate_hub_config <- function(config_file) {
     }
   }
 
+  # --- Parse Slides sheet (optional) ---
+  slides <- NULL
+  if ("Slides" %in% sheets) {
+    slides_required <- c("slide_title", "content", "display_order")
+    slides_df <- .read_table_sheet(config_file, "Slides", slides_required)
+    slides_missing <- setdiff(slides_required, names(slides_df))
+    if (length(slides_missing) > 0) {
+      warnings <- c(warnings, sprintf(
+        "Slides sheet missing columns: %s. Slides will be skipped.",
+        paste(slides_missing, collapse = ", ")
+      ))
+    } else if (nrow(slides_df) > 0) {
+      # Coerce display_order to numeric
+      slides_df$display_order <- suppressWarnings(as.numeric(slides_df$display_order))
+      # Remove rows with missing title or content
+      valid_slides <- !is.na(slides_df$slide_title) & nzchar(trimws(slides_df$slide_title)) &
+                      !is.na(slides_df$content) & nzchar(trimws(slides_df$content))
+      slides_df <- slides_df[valid_slides, , drop = FALSE]
+      if (nrow(slides_df) > 0) {
+        # Sort by display_order
+        slides_df <- slides_df[order(slides_df$display_order), ]
+        slides <- lapply(seq_len(nrow(slides_df)), function(i) {
+          list(
+            id = sprintf("hub-slide-%d", i),
+            title = trimws(slides_df$slide_title[i]),
+            content = trimws(slides_df$content[i]),
+            order = slides_df$display_order[i]
+          )
+        })
+      }
+    }
+  }
+
   # --- Validate output settings if provided ---
   # output_dir: directory for the combined report (absolute or relative to config)
   # output_file: filename for the combined report (just the name, no directory)
@@ -454,7 +487,11 @@ guard_validate_hub_config <- function(config_file) {
       output_dir = if (!is.null(settings$output_dir) && nzchar(trimws(settings$output_dir)))
                      settings$output_dir else NULL,
       output_file = if (!is.null(settings$output_file) && nzchar(trimws(settings$output_file)))
-                      settings$output_file else NULL
+                      settings$output_file else NULL,
+      executive_summary = if (!is.null(settings$executive_summary) && nzchar(trimws(settings$executive_summary)))
+                            trimws(settings$executive_summary) else NULL,
+      background_text = if (!is.null(settings$background_text) && nzchar(trimws(settings$background_text)))
+                           trimws(settings$background_text) else NULL
     ),
     reports = lapply(seq_len(nrow(reports_df)), function(i) {
       row <- reports_df[i, ]
@@ -467,7 +504,8 @@ guard_validate_hub_config <- function(config_file) {
                    nzchar(trimws(row$report_type))) trimws(row$report_type) else NULL
       )
     }),
-    cross_refs = cross_refs
+    cross_refs = cross_refs,
+    slides = slides
   )
 
   # --- Return ---

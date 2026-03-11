@@ -182,18 +182,58 @@
   }
 
   /**
+   * Lightweight markdown renderer (matches tabs module renderMarkdown).
+   * Handles: **bold**, *italic*, ## headings, > blockquotes, - bullets, paragraphs.
+   */
+  function hubRenderMarkdown(md) {
+    if (!md) return "";
+    var html = md
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.+?)\*/g, "<em>$1</em>")
+      .replace(/^&gt; (.+)$/gm, "<blockquote>$1</blockquote>")
+      .replace(/^- (.+)$/gm, "<li>$1</li>");
+    html = html.replace(/((?:<li>.*<\/li>\s*)+)/g, function(match) {
+      return "<ul>" + match + "</ul>";
+    });
+    html = html.replace(/<\/blockquote>\s*<blockquote>/g, "<br>");
+    html = html.split("\n").map(function(line) {
+      var trimmed = line.trim();
+      if (!trimmed) return "";
+      if (/^<(h2|ul|li|blockquote)/.test(trimmed)) return trimmed;
+      return "<p>" + trimmed + "</p>";
+    }).join("\n");
+    return html;
+  }
+
+  /** Detect whether a string contains HTML tags */
+  function containsHtml(str) {
+    return /<[a-z][\s\S]*>/i.test(str);
+  }
+
+  /** Expose markdown renderer for hub slides */
+  ReportHub.renderMarkdown = hubRenderMarkdown;
+
+  /**
    * Build HTML for a pin card
    */
   function buildPinCardHTML(pin, idx) {
     var total = ReportHub.pinnedItems.length;
-    var sourceBadge;
-    if (pin.source === "tracker") {
-      sourceBadge = '<span class="hub-source-badge hub-badge-tracker">Tracker</span>';
+
+    // Source badge: use sourceLabel if available, fall back to generic type label
+    var badgeLabel = pin.sourceLabel || "";
+    var badgeClass = "hub-badge-tabs";
+    if (pin.source === "tracker" || (pin.sourceType || pin.source) === "tracker") {
+      badgeClass = "hub-badge-tracker";
+      if (!badgeLabel) badgeLabel = "Tracker";
     } else if (pin.source === "overview") {
-      sourceBadge = '<span class="hub-source-badge hub-badge-overview">Overview</span>';
+      badgeClass = "hub-badge-overview";
+      if (!badgeLabel) badgeLabel = "Overview";
     } else {
-      sourceBadge = '<span class="hub-source-badge hub-badge-tabs">Crosstabs</span>';
+      if (!badgeLabel) badgeLabel = "Crosstabs";
     }
+    var sourceBadge = '<span class="hub-source-badge ' + badgeClass + '">' + escapeHtml(badgeLabel) + '</span>';
 
     var title = pin.title || pin.metricLabel || pin.qCode || "Pinned View";
     var subtitle = pin.subtitle || pin.questionText || "";
@@ -214,14 +254,34 @@
       html += '<div class="hub-pin-subtitle">' + escapeHtml(subtitle) + '</div>';
     }
 
-    // Insight area (editable)
-    var insightText = pin.insight || "";
-    html += '<div class="hub-pin-insight">' +
-      '<div class="hub-insight-editor" contenteditable="true" ' +
-        'data-placeholder="Add insight..." ' +
-        'onblur="ReportHub.syncPinInsight(\'' + pin.id + '\', this.textContent)">' +
-        escapeHtml(insightText) +
+    // Insight area with markdown support (dual-mode: rendered view + editor)
+    var insightRaw = pin.insight || "";
+    // Determine rendered HTML: if insight already contains HTML (from qual slides), use directly;
+    // otherwise treat as markdown and render it
+    var renderedHtml = "";
+    var editorText = "";
+    if (insightRaw) {
+      if (containsHtml(insightRaw)) {
+        renderedHtml = insightRaw;
+        // Extract plain text for the editor (reverse: HTML -> text for re-editing)
+        var tmp = document.createElement("div");
+        tmp.innerHTML = insightRaw;
+        editorText = tmp.textContent.trim();
+      } else {
+        editorText = insightRaw;
+        renderedHtml = hubRenderMarkdown(insightRaw);
+      }
+    }
+    html += '<div class="hub-pin-insight" data-pin-id="' + pin.id + '">' +
+      '<div class="hub-insight-rendered hub-md-content" ' +
+        'ondblclick="ReportHub.toggleInsightEdit(\'' + pin.id + '\')" ' +
+        'data-placeholder="Double-click to add insight...">' +
+        (renderedHtml || '') +
       '</div>' +
+      '<textarea class="hub-insight-editor" style="display:none" ' +
+        'onblur="ReportHub.finishInsightEdit(\'' + pin.id + '\')">' +
+        escapeHtml(editorText) +
+      '</textarea>' +
     '</div>';
 
     // Chart (if captured and was visible when pinned)
@@ -255,7 +315,44 @@
   };
 
   /**
-   * Sync a pin's insight text after editing
+   * Toggle insight into edit mode (double-click on rendered view)
+   */
+  ReportHub.toggleInsightEdit = function(pinId) {
+    var container = document.querySelector('.hub-pin-insight[data-pin-id="' + pinId + '"]');
+    if (!container) return;
+    var rendered = container.querySelector(".hub-insight-rendered");
+    var editor = container.querySelector(".hub-insight-editor");
+    if (!rendered || !editor) return;
+    rendered.style.display = "none";
+    editor.style.display = "";
+    editor.focus();
+  };
+
+  /**
+   * Finish insight editing: re-render markdown and save
+   */
+  ReportHub.finishInsightEdit = function(pinId) {
+    var container = document.querySelector('.hub-pin-insight[data-pin-id="' + pinId + '"]');
+    if (!container) return;
+    var rendered = container.querySelector(".hub-insight-rendered");
+    var editor = container.querySelector(".hub-insight-editor");
+    if (!rendered || !editor) return;
+    var md = editor.value.trim();
+    rendered.innerHTML = md ? hubRenderMarkdown(md) : "";
+    rendered.style.display = "";
+    editor.style.display = "none";
+    // Save the markdown source (not HTML) so it round-trips correctly
+    for (var i = 0; i < ReportHub.pinnedItems.length; i++) {
+      if (ReportHub.pinnedItems[i].id === pinId) {
+        ReportHub.pinnedItems[i].insight = md;
+        break;
+      }
+    }
+    ReportHub.savePinnedData();
+  };
+
+  /**
+   * Sync a pin's insight text after editing (legacy compat)
    */
   ReportHub.syncPinInsight = function(pinId, text) {
     for (var i = 0; i < ReportHub.pinnedItems.length; i++) {
@@ -282,10 +379,153 @@
     var pinObj = {
       id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
       title: title,
+      sourceLabel: "Overview",
       insight: text,
       timestamp: Date.now()
     };
     ReportHub.addPin("overview", pinObj);
+  };
+
+  /**
+   * Pin a hub-level executive summary or background text
+   * @param {string} boxId - "executive-summary" or "background"
+   */
+  ReportHub.pinHubText = function(boxId) {
+    var rendered = document.getElementById("hub-text-rendered-" + boxId);
+    var editor = document.getElementById("hub-text-editor-" + boxId);
+    if (!rendered || !editor) return;
+    // Re-render before pinning to capture latest edits
+    rendered.innerHTML = hubRenderMarkdown(editor.value);
+    var text = rendered.innerHTML.trim();
+    if (!text) { alert("Add text before pinning."); return; }
+    var titleMap = {
+      "executive-summary": "Executive Summary",
+      "background": "Background & Methodology"
+    };
+    var pinObj = {
+      id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+      title: titleMap[boxId] || boxId,
+      sourceLabel: "Overview",
+      insight: text,
+      timestamp: Date.now()
+    };
+    ReportHub.addPin("overview", pinObj);
+  };
+
+  /**
+   * Toggle hub text section into edit mode
+   * @param {string} boxId - Text section ID
+   */
+  ReportHub.toggleHubTextEdit = function(boxId) {
+    var rendered = document.getElementById("hub-text-rendered-" + boxId);
+    var editor = document.getElementById("hub-text-editor-" + boxId);
+    if (!rendered || !editor) return;
+    rendered.style.display = "none";
+    editor.style.display = "";
+    editor.focus();
+  };
+
+  /**
+   * Finish hub text section editing: re-render markdown and persist
+   * @param {string} boxId - Text section ID
+   */
+  ReportHub.finishHubTextEdit = function(boxId) {
+    var rendered = document.getElementById("hub-text-rendered-" + boxId);
+    var editor = document.getElementById("hub-text-editor-" + boxId);
+    if (!rendered || !editor) return;
+    rendered.innerHTML = hubRenderMarkdown(editor.value);
+    rendered.style.display = "";
+    editor.style.display = "none";
+  };
+
+  /**
+   * Render all hub text sections on page load (executive summary, background)
+   */
+  ReportHub.renderHubTextSections = function() {
+    document.querySelectorAll(".hub-text-section").forEach(function(section) {
+      var editor = section.querySelector(".hub-text-editor");
+      var rendered = section.querySelector(".hub-text-rendered");
+      if (rendered && editor) {
+        rendered.innerHTML = hubRenderMarkdown(editor.value);
+      }
+    });
+  };
+
+  /**
+   * Pin a hub-level qualitative slide
+   * @param {string} slideId - Slide element ID
+   */
+  ReportHub.pinHubSlide = function(slideId) {
+    var card = document.querySelector('.hub-slide-card[data-slide-id="' + slideId + '"]');
+    if (!card) return;
+    var titleEl = card.querySelector(".hub-slide-title");
+    var editor = card.querySelector(".hub-slide-editor");
+    var rendered = card.querySelector(".hub-slide-rendered");
+    // Re-render before pinning
+    if (rendered && editor) rendered.innerHTML = hubRenderMarkdown(editor.value);
+    var pinObj = {
+      id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+      title: titleEl ? titleEl.textContent.trim() : "Slide",
+      sourceLabel: "Overview",
+      insight: rendered ? rendered.innerHTML : "",
+      tableHtml: null,
+      chartSvg: null,
+      timestamp: Date.now()
+    };
+    ReportHub.addPin("overview", pinObj);
+  };
+
+  /**
+   * Toggle hub slide edit mode
+   * @param {string} slideId - Slide element ID
+   */
+  ReportHub.toggleHubSlideEdit = function(slideId) {
+    var card = document.querySelector('.hub-slide-card[data-slide-id="' + slideId + '"]');
+    if (!card) return;
+    var editor = card.querySelector(".hub-slide-editor");
+    var rendered = card.querySelector(".hub-slide-rendered");
+    if (!editor || !rendered) return;
+    rendered.style.display = "none";
+    editor.style.display = "";
+    editor.focus();
+  };
+
+  /**
+   * Finish hub slide editing: re-render markdown
+   * @param {string} slideId - Slide element ID
+   */
+  ReportHub.finishHubSlideEdit = function(slideId) {
+    var card = document.querySelector('.hub-slide-card[data-slide-id="' + slideId + '"]');
+    if (!card) return;
+    var editor = card.querySelector(".hub-slide-editor");
+    var rendered = card.querySelector(".hub-slide-rendered");
+    if (!editor || !rendered) return;
+    rendered.innerHTML = hubRenderMarkdown(editor.value);
+    rendered.style.display = "";
+    editor.style.display = "none";
+  };
+
+  /**
+   * Update a hub slide's title
+   * @param {string} slideId - Slide element ID
+   * @param {string} newTitle - New title text
+   */
+  ReportHub.updateHubSlideTitle = function(slideId, newTitle) {
+    // Title is stored in the input itself, no separate data store needed
+    // This handler is available for future persistence if needed
+  };
+
+  /**
+   * Render all hub slides on page load
+   */
+  ReportHub.renderHubSlides = function() {
+    document.querySelectorAll(".hub-slide-card").forEach(function(card) {
+      var editor = card.querySelector(".hub-slide-editor");
+      var rendered = card.querySelector(".hub-slide-rendered");
+      if (rendered && editor) {
+        rendered.innerHTML = hubRenderMarkdown(editor.value);
+      }
+    });
   };
 
   // ==========================================================================
@@ -611,8 +851,9 @@
 
     // ---- 2. Meta line ----
     var metaParts = [];
-    // Source badge
-    if (pin.source === "tracker") metaParts.push("Tracker");
+    // Source badge — use specific label when available
+    if (pin.sourceLabel) metaParts.push(pin.sourceLabel);
+    else if (pin.source === "tracker") metaParts.push("Tracker");
     else if (pin.source === "tabs") metaParts.push("Crosstabs");
     else if (pin.source === "overview") metaParts.push("Overview");
     // Date
