@@ -499,6 +499,12 @@ function saveReportHTML() {
 
   // Clean DOM to prevent bloat on repeated save-open-save cycles
   // Remove elements that get rebuilt on DOMContentLoaded
+  var removedChipBar = null;
+  var chipBar = document.getElementById("col-chip-bar");
+  if (chipBar) {
+    removedChipBar = { parent: chipBar.parentNode, next: chipBar.nextSibling, el: chipBar };
+    chipBar.remove();
+  }
   var removedPickers = [];
   document.querySelectorAll(".chart-col-picker").forEach(function(el) {
     removedPickers.push({ parent: el.parentNode, next: el.nextSibling, el: el });
@@ -526,6 +532,13 @@ function saveReportHTML() {
   downloadBlob(blob, fname + "_Updated.html");
 
   // Restore DOM elements for continued use
+  if (removedChipBar) {
+    if (removedChipBar.next) {
+      removedChipBar.parent.insertBefore(removedChipBar.el, removedChipBar.next);
+    } else {
+      removedChipBar.parent.appendChild(removedChipBar.el);
+    }
+  }
   removedPickers.forEach(function(item) {
     if (item.next) {
       item.parent.insertBefore(item.el, item.next);

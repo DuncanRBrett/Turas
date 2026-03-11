@@ -54,6 +54,11 @@ build_html_page <- function(html_data, tables, config_obj,
     )
   )
 
+  # Build source-filename meta tag (used by saveReportHTML for _Updated.html naming)
+  source_meta <- if (!is.null(source_filename) && nzchar(source_filename)) {
+    htmltools::tags$meta(name = "turas-source-filename", content = source_filename)
+  }
+
   if (!is.null(dashboard_html)) {
     # Dashboard mode: two tabs (Summary + Crosstabs)
     crosstab_panel <- htmltools::tags$div(
@@ -111,11 +116,6 @@ build_html_page <- function(html_data, tables, config_obj,
         htmltools::tags$script(type = "application/json", id = "pinned-views-data", "[]")
       )
     )
-
-    # Build source-filename meta tag (used by saveReportHTML for _Updated.html naming)
-    source_meta <- if (!is.null(source_filename) && nzchar(source_filename)) {
-      htmltools::tags$meta(name = "turas-source-filename", content = source_filename)
-    }
 
     # Hub-extraction metadata
     hub_meta <- htmltools::tagList(
@@ -216,6 +216,7 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
   css_layout <- '
     :root {
       --ct-brand: BRAND;
+      --brand-colour: BRAND;
       --ct-accent: ACCENT;
       --ct-text-primary: #1e293b;
       --ct-text-secondary: #64748b;
@@ -1101,9 +1102,12 @@ build_tab_javascript <- function() {
       var target = document.getElementById("tab-" + tabName);
       if (target) target.classList.add("active");
 
-      // When switching to crosstabs, trigger resize for any sticky columns
+      // When switching to crosstabs, rebuild column chips & chart pickers
+      // (they may have been built while the panel was hidden)
       if (tabName === "crosstabs") {
         window.dispatchEvent(new Event("resize"));
+        if (typeof buildColumnChips === "function") buildColumnChips(currentGroup);
+        if (typeof buildChartPickersForGroup === "function") buildChartPickersForGroup(currentGroup);
       }
     }
   '

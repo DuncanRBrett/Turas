@@ -1044,13 +1044,13 @@ build_dashboard_interaction_js <- function() {
       var current = container.getAttribute("data-sort-mode") || "desc";
 
       // Cycle: desc -> asc -> original -> desc
-      var next = current === "desc" ? "asc" : current === "asc" ? "original" : "desc";
-      container.setAttribute("data-sort-mode", next);
+      var nextMode = current === "desc" ? "asc" : current === "asc" ? "original" : "desc";
+      container.setAttribute("data-sort-mode", nextMode);
 
       var cards = Array.from(container.querySelectorAll(".dash-gauge-card"));
       if (cards.length < 2) return;
 
-      if (next === "original") {
+      if (nextMode === "original") {
         cards.sort(function(a, b) {
           return parseInt(a.getAttribute("data-original-idx") || "0") -
                  parseInt(b.getAttribute("data-original-idx") || "0");
@@ -1059,7 +1059,7 @@ build_dashboard_interaction_js <- function() {
         cards.sort(function(a, b) {
           var va = parseFloat(a.getAttribute("data-value-num")) || -Infinity;
           var vb = parseFloat(b.getAttribute("data-value-num")) || -Infinity;
-          return next === "desc" ? vb - va : va - vb;
+          return nextMode === "desc" ? vb - va : va - vb;
         });
       }
 
@@ -1073,8 +1073,8 @@ build_dashboard_interaction_js <- function() {
       // Update button label
       var btn = section.querySelector(".dash-sort-btn");
       if (btn) {
-        btn.innerHTML = next === "desc" ? "\\u25BC High\\u2192Low"
-                      : next === "asc" ? "\\u25B2 Low\\u2192High"
+        btn.innerHTML = nextMode === "desc" ? "\\u25BC High\\u2192Low"
+                      : nextMode === "asc" ? "\\u25B2 Low\\u2192High"
                       : "\\u25CF Original";
       }
     }

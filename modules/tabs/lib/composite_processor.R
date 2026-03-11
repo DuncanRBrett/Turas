@@ -168,7 +168,7 @@ validate_composite_definitions <- function(composite_defs, questions_df, survey_
   }
 
   # Check each composite
-  for (i in 1:nrow(composite_defs)) {
+  for (i in seq_len(nrow(composite_defs))) {
     comp_def <- composite_defs[i, ]
     comp_code <- comp_def$CompositeCode
 
@@ -367,7 +367,7 @@ calculate_composite_values <- function(data_subset, source_questions,
       )
     }
 
-    for (i in 1:nrow(source_values_matrix)) {
+    for (i in seq_len(nrow(source_values_matrix))) {
       row_values <- source_values_matrix[i, ]
       valid_idx <- !is.na(row_values)
 
@@ -471,7 +471,7 @@ process_composite_question <- function(composite_def, data, questions_df,
     if (is.null(subset_indices) || length(subset_indices) == 0) {
       # For TOTAL column, use all rows
       if (grepl("^TOTAL::", key)) {
-        subset_indices <- 1:nrow(data)
+        subset_indices <- seq_len(nrow(data))
       } else {
         # For other banner columns, need to filter based on banner question
         # Extract banner question and value from key (format: "QuestionCode::Category::Value" or "QuestionCode::BOXCAT::Value")
@@ -492,7 +492,7 @@ process_composite_question <- function(composite_def, data, questions_df,
             subset_indices <- integer(0)
           }
         } else {
-          subset_indices <- 1:nrow(data)  # Default to all if can't parse
+          subset_indices <- seq_len(nrow(data))  # Default to all if can't parse
         }
       }
     }
@@ -648,11 +648,12 @@ test_composite_significance <- function(data, composite_code, source_questions,
   internal_keys <- banner_info$internal_keys
   sig_letters <- setNames(rep("", length(internal_keys)), internal_keys)
 
-  # Test each pair
-  for (i in 1:(length(internal_keys) - 1)) {
+  # Test each pair (skip if fewer than 2 keys)
+  n_keys <- length(internal_keys)
+  for (i in seq_len(max(0L, n_keys - 1L))) {
     key_a <- internal_keys[i]
 
-    for (j in (i + 1):length(internal_keys)) {
+    for (j in (i + 1L):n_keys) {
       key_b <- internal_keys[j]
 
       # Get subsets - handle NULL subsets like main calculation does
@@ -662,7 +663,7 @@ test_composite_significance <- function(data, composite_code, source_questions,
       # Handle NULL subsets (same logic as main composite calculation)
       if (is.null(idx_a) || length(idx_a) == 0) {
         if (grepl("^TOTAL::", key_a)) {
-          idx_a <- 1:nrow(data)
+          idx_a <- seq_len(nrow(data))
         } else {
           key_parts_a <- strsplit(key_a, "::")[[1]]
           if (length(key_parts_a) >= 2) {
@@ -674,14 +675,14 @@ test_composite_significance <- function(data, composite_code, source_questions,
               idx_a <- integer(0)
             }
           } else {
-            idx_a <- 1:nrow(data)
+            idx_a <- seq_len(nrow(data))
           }
         }
       }
 
       if (is.null(idx_b) || length(idx_b) == 0) {
         if (grepl("^TOTAL::", key_b)) {
-          idx_b <- 1:nrow(data)
+          idx_b <- seq_len(nrow(data))
         } else {
           key_parts_b <- strsplit(key_b, "::")[[1]]
           if (length(key_parts_b) >= 2) {
@@ -693,7 +694,7 @@ test_composite_significance <- function(data, composite_code, source_questions,
               idx_b <- integer(0)
             }
           } else {
-            idx_b <- 1:nrow(data)
+            idx_b <- seq_len(nrow(data))
           }
         }
       }
@@ -789,7 +790,7 @@ process_all_composites <- function(composite_defs, data, questions_df,
 
   composite_results <- list()
 
-  for (i in 1:nrow(composite_defs)) {
+  for (i in seq_len(nrow(composite_defs))) {
     composite_def <- composite_defs[i, ]
     comp_code <- if (!is.null(composite_def$CompositeCode)) {
       as.character(composite_def$CompositeCode)

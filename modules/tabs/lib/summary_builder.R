@@ -159,7 +159,7 @@ extract_metric_rows <- function(results_list, banner_info, config) {
       full_label <- paste0(question_code, " - ", question_text)
 
       # ISSUE #2 FIX: Update RowLabel for metric rows to use question text with code
-      for (i in 1:nrow(all_rows)) {
+      for (i in seq_len(nrow(all_rows))) {
         current_label <- all_rows$RowLabel[i]
         # For Top/Bottom Box, prepend question text
         if (grepl("Top.*Box|Bottom.*Box", current_label, ignore.case = TRUE)) {
@@ -390,7 +390,7 @@ organize_by_composite_groups <- function(metrics_df, composite_defs, config) {
 
   # Build map of source questions to composites
   source_map <- list()  # source_question_code -> list of composite codes
-  for (i in 1:nrow(composite_defs)) {
+  for (i in seq_len(nrow(composite_defs))) {
     comp_code <- composite_defs$CompositeCode[i]
     sources <- composite_defs$SourceQuestions[i]
 
@@ -428,7 +428,7 @@ organize_by_composite_groups <- function(metrics_df, composite_defs, config) {
     section_composites <- composite_metrics[!is.na(composite_metrics$Section) &
                                              composite_metrics$Section == section, , drop = FALSE]
 
-    for (i in 1:nrow(section_composites)) {
+    for (i in seq_len(nrow(section_composites))) {
       comp_row <- section_composites[i, , drop = FALSE]
       comp_code <- comp_row$QuestionCode[1]
 
@@ -444,7 +444,7 @@ organize_by_composite_groups <- function(metrics_df, composite_defs, config) {
           src_rows <- standard_metrics[standard_metrics$QuestionCode == src_code, , drop = FALSE]
           if (nrow(src_rows) > 0) {
             # Indent source question labels
-            for (j in 1:nrow(src_rows)) {
+            for (j in seq_len(nrow(src_rows))) {
               src_rows$RowLabel[j] <- paste0("  ", src_rows$RowLabel[j])
             }
             organized_rows[[length(organized_rows) + 1]] <- src_rows
@@ -458,7 +458,7 @@ organize_by_composite_groups <- function(metrics_df, composite_defs, config) {
   no_section_composites <- composite_metrics[is.na(composite_metrics$Section) |
                                               composite_metrics$Section == "", , drop = FALSE]
 
-  for (i in 1:nrow(no_section_composites)) {
+  for (i in seq_len(nrow(no_section_composites))) {
     comp_row <- no_section_composites[i, , drop = FALSE]
     comp_code <- comp_row$QuestionCode[1]
 
@@ -474,7 +474,7 @@ organize_by_composite_groups <- function(metrics_df, composite_defs, config) {
         src_rows <- standard_metrics[standard_metrics$QuestionCode == src_code, , drop = FALSE]
         if (nrow(src_rows) > 0) {
           # Indent source question labels
-          for (j in 1:nrow(src_rows)) {
+          for (j in seq_len(nrow(src_rows))) {
             src_rows$RowLabel[j] <- paste0("  ", src_rows$RowLabel[j])
           }
           organized_rows[[length(organized_rows) + 1]] <- src_rows
@@ -544,7 +544,7 @@ insert_section_headers <- function(metrics_df, banner_info) {
   current_section <- NULL
 
   # Iterate through rows in existing order
-  for (i in 1:nrow(metrics_df)) {
+  for (i in seq_len(nrow(metrics_df))) {
     row <- metrics_df[i, , drop = FALSE]
     row_section <- row$Section[1]
 

@@ -50,8 +50,10 @@ build_banner_groups <- function(banner_info) {
     }
 
     # If the banner_info sub-element has its own label, use that
-    if (!is.null(bq$question) && !is.null(bq$question$question_text)) {
-      group_label <- bq$question$question_text
+    # Note: bq$question is a tibble row from survey_structure$questions
+    # where the column is PascalCase "QuestionText", not snake_case
+    if (!is.null(bq$question) && !is.null(bq$question$QuestionText)) {
+      group_label <- bq$question$QuestionText
     }
 
     # Use the label from banner_headers if available, or derive from the question
