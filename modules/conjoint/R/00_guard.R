@@ -397,6 +397,206 @@ validate_conjoint_data <- function(data, min_choices = 5) {
 
 
 # ==============================================================================
+# PHASE 3 UPGRADE - ADDITIONAL VALIDATION GATES
+# ==============================================================================
+
+#' Validate HB Configuration
+#'
+#' Validates Hierarchical Bayes-specific settings including iterations,
+#' burn-in, thinning, and package availability.
+#'
+#' @param config Configuration list
+#' @keywords internal
+validate_hb_config <- function(config) {
+
+  # Check bayesm package
+  if (!requireNamespace("bayesm", quietly = TRUE)) {
+    conjoint_refuse(
+      code = "PKG_BAYESM_MISSING",
+      title = "Required Package Not Installed",
+      problem = "Package 'bayesm' is required for Hierarchical Bayes estimation but is not installed.",
+      why_it_matters = "HB estimation uses bayesm::rhierMnlRwMixture for individual-level utility calculation.",
+      how_to_fix = c(
+        "Install bayesm: install.packages('bayesm')",
+        "Or change estimation_method to 'auto', 'mlogit', or 'clogit' in your config"
+      )
+    )
+  }
+
+  # Validate iteration settings
+  if (config$hb_iterations < 100) {
+    conjoint_refuse(
+      code = "CFG_HB_ITERATIONS_TOO_LOW",
+      title = "Insufficient HB Iterations",
+      problem = sprintf("hb_iterations = %d is too low for reliable estimation.", config$hb_iterations),
+      why_it_matters = "MCMC estimation requires sufficient iterations for convergence. Minimum is 1000, recommended is 10000+.",
+      how_to_fix = "Set hb_iterations to at least 1000 (recommended: 10000)"
+    )
+  }
+
+  if (config$hb_burnin >= config$hb_iterations) {
+    conjoint_refuse(
+      code = "CFG_HB_BURNIN_EXCEEDS_ITERATIONS",
+      title = "Invalid HB Burn-in",
+      problem = sprintf("hb_burnin (%d) >= hb_iterations (%d).", config$hb_burnin, config$hb_iterations),
+      why_it_matters = "Burn-in must be less than total iterations to retain post-burn-in draws for inference.",
+      how_to_fix = sprintf("Set hb_burnin to less than %d (recommended: %d)",
+                           config$hb_iterations,
+                           as.integer(config$hb_iterations / 2))
+    )
+  }
+
+  if (config$hb_thin < 1) {
+    conjoint_refuse(
+      code = "CFG_HB_THIN_INVALID",
+      title = "Invalid HB Thinning",
+      problem = sprintf("hb_thin = %d is invalid (must be >= 1).", config$hb_thin),
+      why_it_matters = "Thinning controls how many MCMC draws are retained. A value of 1 keeps all draws.",
+      how_to_fix = "Set hb_thin to 1 (keep all) or a small positive integer"
+    )
+  }
+
+  invisible(TRUE)
+}
+
+
+#' Validate Latent Class Configuration
+#'
+#' Validates latent class analysis settings.
+#'
+#' @param config Configuration list
+#' @keywords internal
+validate_latent_class_config <- function(config) {
+
+  # bayesm is also required for LC (multi-component mixture)
+  if (!requireNamespace("bayesm", quietly = TRUE)) {
+    conjoint_refuse(
+      code = "PKG_BAYESM_MISSING",
+      title = "Required Package Not Installed",
+      problem = "Package 'bayesm' is required for latent class analysis but is not installed.",
+      why_it_matters = "Latent class analysis uses bayesm with multiple mixture components.",
+      how_to_fix = c(
+        "Install bayesm: install.packages('bayesm')",
+        "Or change estimation_method to 'auto', 'mlogit', or 'clogit' in your config"
+      )
+    )
+  }
+
+  if (config$latent_class_min < 2) {
+    conjoint_refuse(
+      code = "CFG_LC_MIN_TOO_LOW",
+      title = "Invalid Latent Class Minimum",
+      problem = sprintf("latent_class_min = %d is invalid (must be >= 2).", config$latent_class_min),
+      why_it_matters = "Latent class analysis requires at least 2 classes to be meaningful.",
+      how_to_fix = "Set latent_class_min to 2 or higher"
+    )
+  }
+
+  if (config$latent_class_max < config$latent_class_min) {
+    conjoint_refuse(
+      code = "CFG_LC_MAX_BELOW_MIN",
+      title = "Invalid Latent Class Range",
+      problem = sprintf("latent_class_max (%d) < latent_class_min (%d).",
+                        config$latent_class_max, config$latent_class_min),
+      why_it_matters = "The maximum number of classes must be >= the minimum.",
+      how_to_fix = sprintf("Set latent_class_max to at least %d", config$latent_class_min)
+    )
+  }
+
+  valid_criteria <- c("bic", "aic")
+  if (!config$latent_class_criterion %in% valid_criteria) {
+    conjoint_refuse(
+      code = "CFG_LC_CRITERION_INVALID",
+      title = "Invalid Class Selection Criterion",
+      problem = sprintf("latent_class_criterion = '%s' is not supported.", config$latent_class_criterion),
+      why_it_matters = "The criterion determines how the optimal number of classes is selected.",
+      how_to_fix = sprintf("Use one of: %s", paste(valid_criteria, collapse = ", "))
+    )
+  }
+
+  invisible(TRUE)
+}
+
+
+#' Validate HTML Output Configuration
+#'
+#' Validates settings for HTML report and simulator generation.
+#'
+#' @param config Configuration list
+#' @keywords internal
+validate_html_config <- function(config) {
+
+  # Validate brand colours if specified
+  colour_pattern <- "^#[0-9A-Fa-f]{6}$"
+
+  if (!is.na(config$brand_colour) && !grepl(colour_pattern, config$brand_colour)) {
+    conjoint_refuse(
+      code = "CFG_HTML_INVALID_COLOUR",
+      title = "Invalid Brand Colour",
+      problem = sprintf("brand_colour '%s' is not a valid hex colour.", config$brand_colour),
+      why_it_matters = "The brand colour is used for styling the HTML report and simulator.",
+      how_to_fix = "Use a valid 6-digit hex colour code (e.g., '#323367')"
+    )
+  }
+
+  if (!is.na(config$accent_colour) && !grepl(colour_pattern, config$accent_colour)) {
+    conjoint_refuse(
+      code = "CFG_HTML_INVALID_ACCENT",
+      title = "Invalid Accent Colour",
+      problem = sprintf("accent_colour '%s' is not a valid hex colour.", config$accent_colour),
+      why_it_matters = "The accent colour is used for highlights in the HTML report and simulator.",
+      how_to_fix = "Use a valid 6-digit hex colour code (e.g., '#CC9900')"
+    )
+  }
+
+  invisible(TRUE)
+}
+
+
+#' Validate WTP Configuration
+#'
+#' Validates willingness-to-pay settings.
+#'
+#' @param config Configuration list
+#' @param attributes_df Data frame of attributes
+#' @keywords internal
+validate_wtp_config <- function(config, attributes_df) {
+
+  price_attr <- config$wtp_price_attribute
+
+  # If WTP price attribute is specified, validate it exists
+
+  if (!is.na(price_attr) && nchar(trimws(price_attr)) > 0) {
+    if (!price_attr %in% attributes_df$AttributeName) {
+      conjoint_refuse(
+        code = "CFG_WTP_ATTRIBUTE_NOT_FOUND",
+        title = "WTP Price Attribute Not Found",
+        problem = sprintf("wtp_price_attribute '%s' not found in Attributes sheet.", price_attr),
+        why_it_matters = "WTP calculation requires a valid price attribute to compute willingness to pay.",
+        how_to_fix = c(
+          sprintf("Available attributes: %s", paste(attributes_df$AttributeName, collapse = ", ")),
+          "Set wtp_price_attribute to the attribute representing price, or leave blank to skip WTP"
+        )
+      )
+    }
+
+    valid_wtp_methods <- c("marginal", "simulation", "sos")
+    if (!config$wtp_method %in% valid_wtp_methods) {
+      conjoint_refuse(
+        code = "CFG_WTP_METHOD_INVALID",
+        title = "Invalid WTP Method",
+        problem = sprintf("wtp_method '%s' is not supported.", config$wtp_method),
+        why_it_matters = "The WTP method determines how willingness to pay is calculated.",
+        how_to_fix = sprintf("Use one of: %s", paste(valid_wtp_methods, collapse = ", "))
+      )
+    }
+  }
+
+  invisible(TRUE)
+}
+
+
+# ==============================================================================
 # TRS STATUS HELPERS
 # ==============================================================================
 

@@ -5,8 +5,8 @@
 # This file contains functions for predicting market shares from part-worth
 # utilities using choice models (multinomial logit, first-choice rule).
 #
-# Part of: Turas Enhanced Conjoint Analysis Module
-# Version: 2.0.0
+# Part of: Turas Conjoint Analysis Module
+# Version: 3.0.0
 # ==============================================================================
 
 # ==============================================================================
@@ -478,4 +478,315 @@ format_product <- function(product) {
   }, character(1))
 
   paste(parts, collapse = ", ")
+}
+
+
+# ==============================================================================
+# 5. INDIVIDUAL-LEVEL SIMULATION (HB / LC)
+# ==============================================================================
+
+#' Predict Market Shares Using Individual-Level Utilities
+#'
+#' Uses HB or LC individual-level betas for more accurate simulation.
+#' Supports Randomized First Choice (RFC) via Gumbel error draws.
+#'
+#' @param products List of product configurations
+#' @param model_result HB or LC model result with individual_betas
+#' @param config Configuration object
+#' @param method "logit", "first_choice", or "rfc"
+#' @param n_draws Number of RFC error draws per respondent (default: 1000)
+#' @param segment_filter Optional vector of respondent IDs to include
+#' @return Data frame with Product, Share_Percent, and per-respondent details
+#' @export
+predict_market_shares_individual <- function(products,
+                                              model_result,
+                                              config,
+                                              method = "logit",
+                                              n_draws = 1000,
+                                              segment_filter = NULL) {
+
+  if (is.null(model_result$individual_betas)) {
+    conjoint_refuse(
+      code = "SIM_NO_INDIVIDUAL_BETAS",
+      title = "Individual-Level Utilities Required",
+      problem = "Individual-level simulation requires HB or LC estimation results.",
+      why_it_matters = "Aggregate utilities cannot capture preference heterogeneity.",
+      how_to_fix = "Run with estimation_method = 'hb' or 'latent_class'"
+    )
+  }
+
+  individual_betas <- model_result$individual_betas
+  col_names <- model_result$col_names
+  attribute_map <- model_result$attribute_map
+  respondent_ids <- model_result$respondent_ids
+
+  # Apply segment filter if provided
+  if (!is.null(segment_filter)) {
+    mask <- respondent_ids %in% segment_filter
+    individual_betas <- individual_betas[mask, , drop = FALSE]
+    respondent_ids <- respondent_ids[mask]
+  }
+
+  n_respondents <- nrow(individual_betas)
+  n_products <- length(products)
+
+  # Build design vectors for each product
+  product_designs <- lapply(products, function(prod) {
+    build_product_design_vector(prod, config, col_names, attribute_map)
+  })
+
+  if (method == "rfc") {
+    # Randomized First Choice with Gumbel error
+    shares <- simulate_rfc(product_designs, individual_betas, n_draws)
+  } else if (method == "first_choice") {
+    # Deterministic first choice per respondent
+    shares <- simulate_first_choice_individual(product_designs, individual_betas)
+  } else {
+    # Logit per respondent, then average
+    shares <- simulate_logit_individual(product_designs, individual_betas)
+  }
+
+  data.frame(
+    Product = paste0("Product_", seq_len(n_products)),
+    Share_Percent = shares * 100,
+    n_respondents = n_respondents,
+    method = method,
+    stringsAsFactors = FALSE
+  )
+}
+
+
+#' Build Design Vector for a Product Configuration
+#'
+#' @param product Named list of attribute levels
+#' @param config Configuration
+#' @param col_names Column names from HB design matrix
+#' @param attribute_map Attribute/level mapping
+#' @return Numeric design vector
+#' @keywords internal
+build_product_design_vector <- function(product, config, col_names, attribute_map) {
+
+  design <- numeric(length(col_names))
+  names(design) <- col_names
+
+  for (cn in col_names) {
+    if (!is.null(attribute_map[[cn]])) {
+      attr_name <- attribute_map[[cn]]$attribute
+      level_name <- attribute_map[[cn]]$level
+      if (!is.null(product[[attr_name]]) && product[[attr_name]] == level_name) {
+        design[cn] <- 1
+      }
+    }
+  }
+
+  design
+}
+
+
+#' Simulate RFC (Randomized First Choice)
+#'
+#' Adds Gumbel-distributed error to each respondent's utilities, then
+#' selects the highest-utility product. Repeats n_draws times.
+#'
+#' @param product_designs List of design vectors
+#' @param individual_betas Matrix [respondents x parameters]
+#' @param n_draws Number of error draws
+#' @return Numeric vector of share proportions
+#' @keywords internal
+simulate_rfc <- function(product_designs, individual_betas, n_draws) {
+
+  n_respondents <- nrow(individual_betas)
+  n_products <- length(product_designs)
+
+  # Calculate deterministic utilities per product per respondent
+  V <- matrix(NA, nrow = n_respondents, ncol = n_products)
+  for (j in seq_len(n_products)) {
+    V[, j] <- individual_betas %*% product_designs[[j]]
+  }
+
+  # RFC: add Gumbel error and count first choices
+  choice_counts <- numeric(n_products)
+
+  for (d in seq_len(n_draws)) {
+    # Generate Gumbel errors for all respondents x products
+    gumbel_errors <- matrix(
+      -log(-log(runif(n_respondents * n_products))),
+      nrow = n_respondents, ncol = n_products
+    )
+    U <- V + gumbel_errors
+    choices <- apply(U, 1, which.max)
+    tab <- tabulate(choices, nbins = n_products)
+    choice_counts <- choice_counts + tab
+  }
+
+  # Average across draws and respondents
+  choice_counts / (n_draws * n_respondents)
+}
+
+
+#' Simulate First Choice per Respondent (Deterministic)
+#' @keywords internal
+simulate_first_choice_individual <- function(product_designs, individual_betas) {
+
+  n_respondents <- nrow(individual_betas)
+  n_products <- length(product_designs)
+
+  V <- matrix(NA, nrow = n_respondents, ncol = n_products)
+  for (j in seq_len(n_products)) {
+    V[, j] <- individual_betas %*% product_designs[[j]]
+  }
+
+  choices <- apply(V, 1, which.max)
+  tab <- tabulate(choices, nbins = n_products)
+  tab / n_respondents
+}
+
+
+#' Simulate Logit per Respondent
+#' @keywords internal
+simulate_logit_individual <- function(product_designs, individual_betas) {
+
+  n_respondents <- nrow(individual_betas)
+  n_products <- length(product_designs)
+
+  V <- matrix(NA, nrow = n_respondents, ncol = n_products)
+  for (j in seq_len(n_products)) {
+    V[, j] <- individual_betas %*% product_designs[[j]]
+  }
+
+  # Softmax per respondent
+  shares_per_resp <- matrix(NA, nrow = n_respondents, ncol = n_products)
+  for (i in seq_len(n_respondents)) {
+    v_i <- V[i, ]
+    exp_v <- exp(v_i - max(v_i))
+    shares_per_resp[i, ] <- exp_v / sum(exp_v)
+  }
+
+  # Average across respondents
+  colMeans(shares_per_resp)
+}
+
+
+# ==============================================================================
+# 6. SOURCE OF VOLUME ANALYSIS
+# ==============================================================================
+
+#' Calculate Source of Volume
+#'
+#' Determines where a new product's share comes from (share shift analysis).
+#' Compares a baseline scenario (without new product) against a test scenario
+#' (with new product).
+#'
+#' @param baseline_products List of existing product configurations
+#' @param new_product New product configuration to add
+#' @param utilities Utilities data frame (or model_result for individual-level)
+#' @param model_result Optional HB/LC model for individual-level simulation
+#' @param config Optional configuration (needed for individual-level)
+#' @param method Simulation method
+#' @return Data frame with share shifts
+#' @export
+source_of_volume <- function(baseline_products,
+                              new_product,
+                              utilities = NULL,
+                              model_result = NULL,
+                              config = NULL,
+                              method = "logit") {
+
+  # Calculate baseline shares (without new product)
+  if (!is.null(model_result) && !is.null(model_result$individual_betas) && !is.null(config)) {
+    baseline_shares <- predict_market_shares_individual(
+      baseline_products, model_result, config, method = method
+    )
+    # Add new product and recalculate
+    all_products <- c(baseline_products, list(new_product))
+    test_shares <- predict_market_shares_individual(
+      all_products, model_result, config, method = method
+    )
+  } else if (!is.null(utilities)) {
+    baseline_shares <- predict_market_shares(baseline_products, utilities, method = method)
+    all_products <- c(baseline_products, list(new_product))
+    test_shares <- predict_market_shares(all_products, utilities, method = method)
+  } else {
+    conjoint_refuse(
+      code = "SIM_NO_UTILITIES",
+      title = "No Utilities Provided",
+      problem = "Either utilities data frame or model_result must be provided.",
+      why_it_matters = "Cannot calculate source of volume without utilities.",
+      how_to_fix = "Provide either 'utilities' or 'model_result' parameter"
+    )
+  }
+
+  n_baseline <- length(baseline_products)
+  new_product_share <- test_shares$Share_Percent[n_baseline + 1]
+
+  # Calculate share shifts for baseline products
+  result <- data.frame(
+    Product = c(baseline_shares$Product, "New_Product"),
+    Baseline_Share = c(baseline_shares$Share_Percent, 0),
+    Test_Share = test_shares$Share_Percent,
+    Share_Change = test_shares$Share_Percent - c(baseline_shares$Share_Percent, 0),
+    stringsAsFactors = FALSE
+  )
+
+  # Proportion of new product's volume from each existing product
+  existing_shifts <- result$Share_Change[1:n_baseline]
+  total_lost <- sum(abs(existing_shifts))
+  result$Volume_Contribution_Pct <- c(
+    if (total_lost > 0) abs(existing_shifts) / total_lost * 100 else rep(0, n_baseline),
+    NA_real_
+  )
+
+  result
+}
+
+
+# ==============================================================================
+# 7. DEMAND CURVE GENERATION
+# ==============================================================================
+
+#' Generate Demand Curve for Price Attribute
+#'
+#' Sweeps through all price levels, computing market share at each.
+#'
+#' @param base_product Named list product configuration
+#' @param price_attribute Name of the price attribute
+#' @param price_levels Vector of price levels to test
+#' @param utilities Utilities data frame
+#' @param other_products List of competing products
+#' @param model_result Optional HB/LC model
+#' @param config Optional configuration
+#' @param method Simulation method
+#' @return Data frame with Price, Share_Percent columns
+#' @export
+generate_demand_curve <- function(base_product,
+                                   price_attribute,
+                                   price_levels,
+                                   utilities = NULL,
+                                   other_products = list(),
+                                   model_result = NULL,
+                                   config = NULL,
+                                   method = "logit") {
+
+  results <- lapply(price_levels, function(price) {
+    test_product <- base_product
+    test_product[[price_attribute]] <- price
+
+    all_products <- c(list(test_product), other_products)
+
+    if (!is.null(model_result) && !is.null(model_result$individual_betas) && !is.null(config)) {
+      shares <- predict_market_shares_individual(
+        all_products, model_result, config, method = method
+      )
+    } else {
+      shares <- predict_market_shares(all_products, utilities, method = method)
+    }
+
+    data.frame(
+      Price = price,
+      Share_Percent = shares$Share_Percent[1],
+      stringsAsFactors = FALSE
+    )
+  })
+
+  do.call(rbind, results)
 }

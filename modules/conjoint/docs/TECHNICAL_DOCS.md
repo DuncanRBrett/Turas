@@ -1,7 +1,7 @@
 # Turas Conjoint Module - Technical Documentation
 
-**Version:** 2.1.0
-**Last Updated:** December 2025
+**Version:** 3.0.0
+**Last Updated:** March 2026
 **Audience:** Developers, Technical Maintainers
 
 ---
@@ -38,27 +38,50 @@
 ```
 modules/conjoint/
 ├── R/
-│   ├── 00_main.R              # Main orchestration (~400 lines)
-│   ├── 01_config.R            # Configuration loading (~400 lines)
-│   ├── 02_data.R              # Data loading & validation (~500 lines)
-│   ├── 03_estimation.R        # Model estimation (~800 lines)
-│   ├── 04_utilities.R         # Utility calculations (~600 lines)
-│   ├── 05_alchemer_import.R   # Alchemer CBC import (~500 lines)
-│   ├── 05_simulator.R         # Product simulator (~500 lines)
-│   ├── 06_interactions.R      # Interaction effects (~400 lines)
-│   ├── 07_output.R            # Excel output (~900 lines)
-│   ├── 08_market_simulator.R  # Market simulator (~650 lines)
-│   ├── 09_none_handling.R     # NONE option logic (~350 lines)
-│   ├── 10_best_worst.R        # BWS scaling (~400 lines)
-│   ├── 11_hierarchical_bayes.R# HB estimation (PLACEHOLDER - see HB_IMPLEMENTATION_SPEC.md)
-│   └── 99_helpers.R           # Utilities (~500 lines)
-├── tests/                      # Test suite
-├── examples/                   # Example configs and data
-├── docs/                       # This documentation
+│   ├── 00_main.R              # Main orchestration
+│   ├── 00_guard.R             # TRS guard layer
+│   ├── 01_config.R            # Configuration loading (with autodetect)
+│   ├── 02_data_loader.R       # Data loading & validation
+│   ├── 03_estimation.R        # Multi-method estimation dispatch
+│   ├── 04_utilities.R         # Utility calculations
+│   ├── 05_simulator.R         # Market simulation (logit, first_choice, RFC)
+│   ├── 06_interactions.R      # Config-driven interaction effects
+│   ├── 07_output.R            # Excel output (14 sheets including HB/LC)
+│   ├── 08_market_simulator.R  # Excel simulator builder
+│   ├── 09_diagnostics.R       # Model diagnostics
+│   ├── 10_best_worst.R        # Best-worst scaling (base R)
+│   ├── 11_hierarchical_bayes.R# HB estimation (bayesm)
+│   ├── 12_config_template.R   # Config template generator
+│   ├── 13_latent_class.R      # Latent class analysis
+│   ├── 14_willingness_to_pay.R# WTP estimation
+│   └── 15_product_optimizer.R # Product optimization
+├── lib/
+│   ├── html_report/           # HTML analysis report (4-layer architecture)
+│   │   ├── 00_html_guard.R
+│   │   ├── 01_data_transformer.R
+│   │   ├── 02_table_builder.R
+│   │   ├── 03_page_builder.R
+│   │   ├── 04_html_writer.R
+│   │   ├── 05_chart_builder.R
+│   │   ├── 99_html_report_main.R
+│   │   └── js/conjoint_navigation.js
+│   └── html_simulator/        # Standalone HTML simulator
+│       ├── 00_simulator_guard.R
+│       ├── 01_simulator_data_transformer.R
+│       ├── 02_simulator_page_builder.R
+│       ├── 99_simulator_main.R
+│       └── js/
+│           ├── simulator_engine.js   # MNL share calc, RFC, sensitivity
+│           ├── simulator_charts.js   # SVG chart rendering
+│           └── simulator_ui.js       # Product management, tabs, export
+├── tests/
+│   ├── testthat/              # Unit + integration tests (11 files)
+│   └── fixtures/              # Synthetic test data generators
+├── docs/                      # This documentation
 └── run_conjoint_gui.R         # Shiny GUI launcher
 ```
 
-**Total:** ~6,500 lines
+**Total:** ~12,000+ lines across R + JS
 
 ---
 

@@ -1,17 +1,24 @@
 # ==============================================================================
-# TURAS CONJOINT ANALYSIS MODULE - ENHANCED MAIN ENTRY POINT
+# TURAS CONJOINT ANALYSIS MODULE - MAIN ENTRY POINT
 # ==============================================================================
 #
 # Module: Conjoint Analysis
-# Purpose: Calculate part-worth utilities and attribute importance from
-#          choice-based or rating-based conjoint data
-# Version: Turas v10.1 (Phase 1 - Alchemer Integration)
-# Date: 2025-12-12
+# Purpose: World-class conjoint analysis with HB, LC, WTP, HTML output
+# Version: 3.0.0
+# Date: 2026-03-10
 #
-# NEW IN v10.1:
-#   - Alchemer CBC export direct import (05_alchemer_import.R)
-#   - Enhanced mlogit estimation with better diagnostics
-#   - Improved zero-centering and importance calculations
+# CAPABILITIES (v3.0.0):
+#   - Choice-based conjoint (MNL via mlogit/clogit)
+#   - Hierarchical Bayes individual-level utilities (bayesm)
+#   - Latent Class Analysis for preference segmentation
+#   - Willingness to Pay estimation with CIs
+#   - Product optimization (exhaustive + greedy)
+#   - Source of volume and demand curves
+#   - Interactive HTML analysis report
+#   - Standalone HTML market simulator
+#   - Config-driven interaction effects
+#   - Best-worst scaling (sequential/simultaneous)
+#   - Alchemer CBC direct import
 #
 # ==============================================================================
 
@@ -123,25 +130,37 @@ tryCatch({
 
 # Get the directory where this script is located
 .conjoint_module_dir <- tryCatch({
-  dir <- getSrcDirectory(function() {})
-  if (is.null(dir) || length(dir) == 0 || dir == "") {
-    # Fallback if getSrcDirectory doesn't work
-    dir <- tryCatch(dirname(sys.frame(1)$ofile), error = function(e) "")
+
+  # Strategy: walk the source frame stack to find the frame that sourced THIS file.
+  # This is robust even when called via nested source() (e.g., run_demo.R → 00_main.R).
+  dir <- ""
+  for (i in seq_len(sys.nframe())) {
+    ofile <- tryCatch(sys.frame(i)$ofile, error = function(e) NULL)
+    if (!is.null(ofile) && grepl("00_main\\.R$", ofile)) {
+      dir <- dirname(ofile)
+      break
+    }
   }
+
+  # Fallback 1: getSrcDirectory (works in simple source() contexts)
   if (is.null(dir) || length(dir) == 0 || dir == "") {
-    # Check if we're in Turas directory structure
+    dir <- tryCatch(utils::getSrcDirectory(function() {}), error = function(e) "")
+    # Validate it actually points to conjoint/R
+    if (!is.null(dir) && nzchar(dir) && !file.exists(file.path(dir, "99_helpers.R"))) {
+      dir <- ""  # wrong directory, discard
+    }
+  }
+
+  # Fallback 2: working directory based detection
+  if (is.null(dir) || length(dir) == 0 || dir == "") {
     wd <- getwd()
-    if (file.exists(file.path(wd, "modules/conjoint/R"))) {
-      # We're in Turas root
+    if (file.exists(file.path(wd, "modules/conjoint/R/99_helpers.R"))) {
       dir <- file.path(wd, "modules/conjoint/R")
     } else if (basename(dirname(wd)) == "conjoint" && basename(wd) == "R") {
-      # We're already in modules/conjoint/R
       dir <- wd
     } else if (basename(wd) == "conjoint") {
-      # We're in modules/conjoint
       dir <- file.path(wd, "R")
     } else {
-      # Last resort - assume working directory is Turas root
       dir <- file.path(wd, "modules/conjoint/R")
     }
   }
@@ -186,6 +205,32 @@ if (file.exists(file.path(.conjoint_module_dir, "10_best_worst.R"))) {
 }
 if (file.exists(file.path(.conjoint_module_dir, "11_hierarchical_bayes.R"))) {
   source(file.path(.conjoint_module_dir, "11_hierarchical_bayes.R"))
+}
+if (file.exists(file.path(.conjoint_module_dir, "12_config_template.R"))) {
+  source(file.path(.conjoint_module_dir, "12_config_template.R"))
+}
+if (file.exists(file.path(.conjoint_module_dir, "13_latent_class.R"))) {
+  source(file.path(.conjoint_module_dir, "13_latent_class.R"))
+}
+if (file.exists(file.path(.conjoint_module_dir, "14_willingness_to_pay.R"))) {
+  source(file.path(.conjoint_module_dir, "14_willingness_to_pay.R"))
+}
+if (file.exists(file.path(.conjoint_module_dir, "15_product_optimizer.R"))) {
+  source(file.path(.conjoint_module_dir, "15_product_optimizer.R"))
+}
+
+# HTML report and simulator orchestrators (lazy-loaded)
+.conjoint_lib_dir <- file.path(dirname(.conjoint_module_dir), "lib")
+assign(".conjoint_lib_dir", .conjoint_lib_dir, envir = globalenv())
+
+.html_report_main <- file.path(.conjoint_lib_dir, "html_report", "99_html_report_main.R")
+if (file.exists(.html_report_main)) {
+  source(.html_report_main)
+}
+
+.html_simulator_main <- file.path(.conjoint_lib_dir, "html_simulator", "99_simulator_main.R")
+if (file.exists(.html_simulator_main)) {
+  source(.html_simulator_main)
 }
 
 # Clean up
@@ -287,11 +332,11 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
 
   # Print TRS start banner
   if (exists("turas_print_start_banner", mode = "function")) {
-    turas_print_start_banner("CONJOINT", "2.1")
+    turas_print_start_banner("CONJOINT", "3.0.0")
   } else if (verbose) {
     cat("\n")
     cat(rep("=", 80), "\n", sep = "")
-    cat("TURAS CONJOINT ANALYSIS - Version 2.1 (Alchemer Integration)\n")
+    cat("TURAS CONJOINT ANALYSIS - Version 3.0.0\n")
     cat(rep("=", 80), "\n", sep = "")
     cat("\n")
   }
@@ -457,6 +502,53 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
       cat(sprintf("   ✓ Results written to: %s\n", basename(config$output_file)))
     }
 
+    # STEP 8: Generate Combined HTML Report + Simulator (if configured)
+    if (isTRUE(config$generate_html_report) || isTRUE(config$generate_html_simulator)) {
+      if (verbose) cat("\n8. Generating HTML analysis report (with simulator)...\n")
+
+      if (exists("generate_conjoint_html_report", mode = "function")) {
+        html_output_path <- sub("\\.xlsx$", "_report.html", config$output_file)
+
+        # Build comprehensive results for HTML generation
+        html_results <- list(
+          utilities = utilities,
+          importance = importance,
+          model_result = model_result,
+          diagnostics = diagnostics,
+          config = config,
+          wtp = if (exists("wtp_result") && !is.null(wtp_result)) wtp_result else NULL
+        )
+
+        # Build report config with all display fields
+        html_config <- list(
+          brand_colour = config$brand_colour,
+          accent_colour = config$accent_colour,
+          project_name = config$project_name %||% "Conjoint Analysis",
+          company_name = config$company_name %||% "",
+          client_name = config$client_name %||% "",
+          analyst_name = config$analyst_name %||% "",
+          analyst_email = config$analyst_email %||% "",
+          analyst_phone = config$analyst_phone %||% "",
+          closing_notes = config$closing_notes %||% "",
+          researcher_logo_base64 = config$researcher_logo_base64 %||% "",
+          insight_overview = config$insight_overview %||% "",
+          insight_utilities = config$insight_utilities %||% "",
+          insight_diagnostics = config$insight_diagnostics %||% "",
+          insight_simulator = config$insight_simulator %||% "",
+          insight_wtp = config$insight_wtp %||% ""
+        )
+
+        tryCatch({
+          generate_conjoint_html_report(html_results, html_output_path, html_config)
+          if (verbose) cat(sprintf("   ✓ HTML report: %s\n", basename(html_output_path)))
+        }, error = function(e) {
+          message(sprintf("[TRS INFO] CONJ_HTML_REPORT_FAILED: %s", conditionMessage(e)))
+        })
+      } else {
+        if (verbose) cat("   ⚠ HTML report module not loaded\n")
+      }
+    }
+
     # Calculate elapsed time
     elapsed <- difftime(Sys.time(), start_time, units = "secs")
 
@@ -490,7 +582,7 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
       config = config,
       data_info = data_list,
       elapsed_time = as.numeric(elapsed),
-      version = "2.1.0",
+      version = "3.0.0",
       run_result = run_result
     )
 

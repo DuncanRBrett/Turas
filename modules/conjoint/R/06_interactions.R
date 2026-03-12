@@ -1,18 +1,31 @@
 # ==============================================================================
-# INTERACTION EFFECTS - ADVANCED CONJOINT ANALYSIS
+# INTERACTION EFFECTS - CONJOINT ANALYSIS
 # ==============================================================================
 #
-# This file implements interaction effects for conjoint analysis, allowing
-# testing of whether the effect of one attribute depends on another.
+# Module: Conjoint Analysis - Interaction Effects
+# Purpose: Estimate and interpret interaction effects between attributes
+# Version: 3.0.0
+# Date: 2026-03-10
 #
 # Types of interactions supported:
 # - Two-way interactions (Attribute A × Attribute B)
 # - Higher-order interactions (optional)
-# - Automatic interaction detection
+# - Config-driven interaction specification
+# - Automatic interaction detection via BIC improvement
 #
-# Part of: Turas Enhanced Conjoint Analysis Module
-# Version: 2.0.0
+# CONFIG SUPPORT:
+#   interaction_terms: "Price:Brand,Size:Color" (comma-separated pairs)
+#   interaction_auto_detect: Y/N
+#   interaction_max: 3 (maximum auto-detected interactions)
+#
 # ==============================================================================
+
+CONJOINT_INTERACTIONS_VERSION <- "3.0.0"
+
+# Null coalesce
+if (!exists("%||%", mode = "function")) {
+  `%||%` <- function(x, y) if (is.null(x)) y else x
+}
 
 # ==============================================================================
 # 1. INTERACTION SPECIFICATION
@@ -448,7 +461,152 @@ interpret_interaction <- function(interaction_analysis, threshold = 0.5) {
 
 
 # ==============================================================================
-# 5. UTILITY FUNCTIONS
+# 5. CONFIG-DRIVEN INTERACTION SUPPORT
+# ==============================================================================
+
+#' Parse Interaction Terms from Config
+#'
+#' Reads the interaction_terms config field and builds an interaction spec.
+#' Format: "Price:Brand,Size:Color" (colon-separated pairs, comma-separated list)
+#'
+#' @param config Configuration object
+#' @return conjoint_interactions object or NULL if no interactions configured
+#' @export
+parse_interactions_from_config <- function(config) {
+
+  int_str <- config$interaction_terms
+  if (is.null(int_str) || is.na(int_str) || nchar(trimws(int_str)) == 0) {
+    return(NULL)
+  }
+
+  # Parse "Price:Brand,Size:Color" format
+  pairs <- trimws(strsplit(int_str, ",")[[1]])
+  interactions <- lapply(pairs, function(p) {
+    attrs <- trimws(strsplit(p, ":")[[1]])
+    if (length(attrs) < 2) {
+      conjoint_refuse(
+        code = "CFG_INTERACTION_PARSE_ERROR",
+        title = "Cannot Parse Interaction Term",
+        problem = sprintf("Interaction term '%s' must have at least 2 attributes separated by ':'", p),
+        why_it_matters = "Interaction effects require at least two attributes.",
+        how_to_fix = "Format: 'Attr1:Attr2' (e.g., 'Price:Brand')"
+      )
+    }
+    attrs
+  })
+
+  # Get attribute names
+  attr_names <- config$attributes$AttributeName
+  auto_detect <- isTRUE(config$interaction_auto_detect)
+  max_int <- config$interaction_max %||% 3L
+
+  specify_interactions(
+    attributes = attr_names,
+    interactions = interactions,
+    auto_detect = auto_detect,
+    max_interactions = as.integer(max_int)
+  )
+}
+
+
+#' Build Formula with Main Effects and Interaction Terms
+#'
+#' Creates an mlogit-compatible formula including interaction terms.
+#' Used by both direct interaction estimation and config-driven pipelines.
+#'
+#' @param config Configuration object
+#' @param interaction_spec Optional conjoint_interactions object
+#' @return Formula object
+#' @keywords internal
+build_formula_with_interactions <- function(config, interaction_spec = NULL) {
+
+  # Main effects — escape special characters
+  main_attrs <- config$attributes$AttributeName
+  escaped_main <- sapply(main_attrs, function(a) {
+    if (grepl("[^a-zA-Z0-9_.]", a)) paste0("`", a, "`") else a
+  })
+
+  terms <- escaped_main
+
+  # Interaction terms
+  if (!is.null(interaction_spec) && interaction_spec$n_interactions > 0) {
+    for (int in interaction_spec$interactions) {
+      escaped_int <- sapply(int, function(a) {
+        if (grepl("[^a-zA-Z0-9_.]", a)) paste0("`", a, "`") else a
+      })
+      # mlogit uses : for interaction
+      terms <- c(terms, paste(escaped_int, collapse = ":"))
+    }
+  }
+
+  formula_str <- sprintf("%s ~ %s | 0", config$chosen_column, paste(terms, collapse = " + "))
+  as.formula(formula_str)
+}
+
+
+#' Run Interaction Analysis Pipeline
+#'
+#' Config-driven entry point: parse interactions from config, estimate model,
+#' analyze effects, and return enriched result.
+#'
+#' @param data_list Data list from load_conjoint_data()
+#' @param config Configuration object
+#' @param base_model Optional pre-estimated main-effects model (for LR test)
+#' @param verbose Logical
+#' @return Model result with interaction analysis
+#' @export
+run_interaction_analysis <- function(data_list, config, base_model = NULL, verbose = TRUE) {
+
+  interaction_spec <- parse_interactions_from_config(config)
+
+  if (is.null(interaction_spec) || interaction_spec$n_interactions == 0) {
+    if (verbose) cat("  [INTERACTIONS] No interaction terms configured; skipping.\n")
+    return(NULL)
+  }
+
+  if (verbose) {
+    cat(sprintf("\n  [INTERACTIONS] Estimating %d interaction term(s):\n",
+                interaction_spec$n_interactions))
+    for (int in interaction_spec$interactions) {
+      cat(sprintf("    - %s\n", paste(int, collapse = " × ")))
+    }
+  }
+
+  # Estimate with interactions
+  int_result <- estimate_with_interactions(data_list, config, interaction_spec, verbose)
+
+  # Significance test vs base model
+  if (!is.null(base_model)) {
+    lr_test <- test_interaction_significance(int_result, base_model)
+    int_result$interaction_lr_test <- lr_test
+
+    if (verbose) {
+      sig_str <- if (lr_test$significant) "SIGNIFICANT" else "not significant"
+      cat(sprintf("  [INTERACTIONS] LR test: χ²=%.2f, df=%d, p=%.4f (%s)\n",
+                  lr_test$lr_statistic, lr_test$df, lr_test$p_value, sig_str))
+    }
+  }
+
+  # Analyze each interaction
+  int_analyses <- list()
+  for (int in interaction_spec$interactions) {
+    int_name <- paste(int, collapse = "_x_")
+    analysis <- tryCatch(
+      analyze_interaction(int_result, int, config),
+      error = function(e) NULL
+    )
+    if (!is.null(analysis)) {
+      int_analyses[[int_name]] <- analysis
+    }
+  }
+  int_result$interaction_analyses <- int_analyses
+
+  int_result
+}
+
+
+# ==============================================================================
+# 6. UTILITY FUNCTIONS
 # ==============================================================================
 
 #' Check if model has interaction effects
@@ -483,3 +641,10 @@ get_interaction_terms <- function(model_result) {
 format_interaction <- function(interaction_term) {
   paste(interaction_term, collapse = " × ")
 }
+
+
+# ==============================================================================
+# MODULE INITIALIZATION
+# ==============================================================================
+
+message(sprintf("TURAS>Conjoint Interactions module loaded (v%s)", CONJOINT_INTERACTIONS_VERSION))

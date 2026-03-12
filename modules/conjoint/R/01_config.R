@@ -1,22 +1,108 @@
 # ==============================================================================
-# CONJOINT CONFIG LOADER - ENHANCED WITH ALCHEMER SUPPORT
+# CONJOINT CONFIG LOADER - ENHANCED WITH AUTODETECT & PHASE 3 SUPPORT
 # ==============================================================================
 #
 # Module: Conjoint Analysis - Configuration
 # Purpose: Load and validate conjoint study configuration
-# Version: 2.1.0 (Phase 1 - Alchemer Integration)
-# Date: 2025-12-12
+# Version: 3.0.0 (Conjoint Upgrade - HB, LC, HTML, Simulator)
+# Date: 2026-03-09
 #
 # SUPPORTED DATA SOURCES:
 #   - alchemer: Direct Alchemer CBC export (ResponseID, SetNumber, etc.)
 #   - generic: Standard Turas format (resp_id, choice_set_id, etc.)
 #
+# CONFIG AUTODETECT:
+#   Header row is auto-detected by scanning first 20 rows for
+#   "Setting"/"Value" columns. Supports branded templates with
+#   title/subtitle rows above the header.
+#
 # ==============================================================================
+
+# ==============================================================================
+# CONFIG AUTODETECT HEADING
+# ==============================================================================
+
+#' Find Header Row in Config Sheet
+#'
+#' Scans the first 20 rows of a sheet for the expected column headers.
+#' This supports branded templates where title/subtitle rows appear above
+#' the actual data header row.
+#'
+#' @param config_file Path to Excel file
+#' @param sheet_name Sheet name to scan
+#' @param required_cols Character vector of required column names
+#' @param max_scan Integer, maximum rows to scan (default 20)
+#' @return Integer row number where header was found, or 1 if not found (fallback)
+#' @keywords internal
+find_config_header_row <- function(config_file, sheet_name, required_cols,
+                                   max_scan = 20) {
+  # Read raw data without column names
+  raw <- tryCatch({
+    openxlsx::read.xlsx(config_file, sheet = sheet_name,
+                        colNames = FALSE, rows = 1:max_scan)
+  }, error = function(e) {
+    return(NULL)
+  })
+
+  if (is.null(raw) || nrow(raw) == 0) return(1L)
+
+  # Scan each row for the required column names
+
+  for (r in seq_len(nrow(raw))) {
+    row_vals <- as.character(unlist(raw[r, ]))
+    row_vals <- trimws(row_vals)
+    if (all(required_cols %in% row_vals)) {
+      return(r)
+    }
+  }
+
+  # Fallback: assume row 1 is the header
+  1L
+}
+
+
+#' Clean Settings Data Frame
+#'
+#' Removes help/description rows (marked with [REQUIRED], [Optional]),
+#' section divider rows (ALL CAPS with NA values), and empty rows
+#' from a settings data frame.
+#'
+#' @param df Data frame with Setting and Value columns
+#' @return Cleaned data frame
+#' @keywords internal
+.clean_settings_df <- function(df) {
+  if (is.null(df) || nrow(df) == 0) return(df)
+
+  # Remove help/description rows
+  if (any(grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
+                as.character(df$Setting), ignore.case = TRUE))) {
+    df <- df[!grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
+                     as.character(df$Setting), ignore.case = TRUE), , drop = FALSE]
+  }
+
+  # Remove section divider rows (ALL CAPS names with NA in Value column)
+  if (nrow(df) > 0) {
+    section_dividers <- !is.na(df$Setting) &
+                        grepl("^[A-Z][A-Z &]+$", trimws(as.character(df$Setting))) &
+                        (is.na(df$Value) | trimws(as.character(df$Value)) == "")
+    df <- df[!section_dividers, , drop = FALSE]
+  }
+
+  # Remove completely empty rows
+  if (nrow(df) > 0) {
+    all_na <- apply(df, 1, function(row) all(is.na(row) | trimws(as.character(row)) == ""))
+    df <- df[!all_na, , drop = FALSE]
+  }
+
+  df
+}
+
 
 #' Load Conjoint Configuration
 #'
 #' Loads and validates conjoint study configuration from Excel file.
-#' Supports all Phase 1 features including none option handling.
+#' Supports autodetect heading (header can be in any of the first 20 rows),
+#' all Phase 1-3 features including HB, latent class, WTP, and HTML output.
 #'
 #' REQUIRED SHEETS:
 #'   - Settings: Analysis parameters
@@ -54,15 +140,61 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
 
   log_verbose(sprintf("Loading configuration from: %s", basename(config_file)), verbose)
 
-  # Load settings sheet
-  settings_df <- tryCatch({
-    openxlsx::read.xlsx(config_file, sheet = "Settings")
+  # =========================================================================
+  # LOAD SETTINGS SHEET WITH AUTODETECT HEADING
+  # =========================================================================
+
+  # Check sheet exists
+  sheet_names <- tryCatch({
+    openxlsx::getSheetNames(config_file)
   }, error = function(e) {
+    conjoint_refuse(
+      code = "IO_CONFIG_FILE_INVALID",
+      title = "Invalid Configuration File",
+      problem = sprintf("Cannot read Excel file: %s", e$message),
+      why_it_matters = "The configuration file must be a valid .xlsx Excel file.",
+      how_to_fix = c(
+        "Verify the file is a valid .xlsx file (not .xls or other format)",
+        "Check the file is not corrupted or locked by another application",
+        sprintf("File: %s", config_file)
+      )
+    )
+  })
+
+  if (!"Settings" %in% sheet_names) {
     conjoint_refuse(
       code = "CFG_SETTINGS_SHEET_MISSING",
       title = "Settings Sheet Not Found",
-      problem = "Failed to load Settings sheet from configuration file.",
+      problem = "Configuration file does not contain a 'Settings' sheet.",
       why_it_matters = "The Settings sheet contains essential analysis parameters like data file paths and estimation method.",
+      how_to_fix = c(
+        "Add a sheet named 'Settings' to your configuration file",
+        "Use generate_conjoint_config_template() to create a properly formatted template",
+        sprintf("Available sheets: %s", paste(sheet_names, collapse = ", "))
+      )
+    )
+  }
+
+  # Autodetect header row
+  settings_header_row <- find_config_header_row(
+    config_file, "Settings",
+    required_cols = c("Setting", "Value")
+  )
+
+  if (settings_header_row > 1) {
+    log_verbose(sprintf("  ℹ Settings header detected at row %d", settings_header_row), verbose)
+  }
+
+  # Load Settings sheet starting at detected header row
+  settings_df <- tryCatch({
+    openxlsx::read.xlsx(config_file, sheet = "Settings",
+                        startRow = settings_header_row)
+  }, error = function(e) {
+    conjoint_refuse(
+      code = "CFG_SETTINGS_READ_FAILED",
+      title = "Failed to Read Settings Sheet",
+      problem = sprintf("Error reading Settings sheet: %s", e$message),
+      why_it_matters = "The Settings sheet contains essential analysis parameters.",
       how_to_fix = c(
         "Verify the Excel file has a sheet named 'Settings'",
         "Ensure the sheet has 'Setting' and 'Value' columns",
@@ -81,10 +213,13 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
       how_to_fix = c(
         "Settings sheet must have 'Setting' and 'Value' columns",
         sprintf("Found columns: %s", paste(names(settings_df), collapse = ", ")),
-        "Refer to the configuration template for the correct format"
+        "Use generate_conjoint_config_template() to create a properly formatted template"
       )
     )
   }
+
+  # Clean settings: remove help rows, section dividers, empty rows
+  settings_df <- .clean_settings_df(settings_df)
 
   # Convert to named list
   settings_list <- setNames(as.list(settings_df$Value), settings_df$Setting)
@@ -95,18 +230,45 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
     names(settings_list) != ""
   ]
 
-  # Load attributes sheet
-  attributes_df <- tryCatch({
-    openxlsx::read.xlsx(config_file, sheet = "Attributes")
-  }, error = function(e) {
+  # =========================================================================
+  # LOAD ATTRIBUTES SHEET WITH AUTODETECT HEADING
+  # =========================================================================
+
+  if (!"Attributes" %in% sheet_names) {
     conjoint_refuse(
       code = "CFG_ATTRIBUTES_SHEET_MISSING",
       title = "Attributes Sheet Not Found",
-      problem = "Failed to load Attributes sheet from configuration file.",
+      problem = "Configuration file does not contain an 'Attributes' sheet.",
       why_it_matters = "The Attributes sheet defines the product features and levels that will be tested in the conjoint study.",
       how_to_fix = c(
-        "Verify the Excel file has a sheet named 'Attributes'",
-        "This sheet should contain attribute definitions with columns: AttributeName, NumLevels, LevelNames",
+        "Add a sheet named 'Attributes' to your configuration file",
+        "This sheet should contain columns: AttributeName, NumLevels, LevelNames",
+        "Use generate_conjoint_config_template() to create a properly formatted template"
+      )
+    )
+  }
+
+  # Autodetect header row for Attributes sheet
+  attr_header_row <- find_config_header_row(
+    config_file, "Attributes",
+    required_cols = c("AttributeName", "NumLevels", "LevelNames")
+  )
+
+  if (attr_header_row > 1) {
+    log_verbose(sprintf("  ℹ Attributes header detected at row %d", attr_header_row), verbose)
+  }
+
+  attributes_df <- tryCatch({
+    openxlsx::read.xlsx(config_file, sheet = "Attributes",
+                        startRow = attr_header_row)
+  }, error = function(e) {
+    conjoint_refuse(
+      code = "CFG_ATTRIBUTES_READ_FAILED",
+      title = "Failed to Read Attributes Sheet",
+      problem = sprintf("Error reading Attributes sheet: %s", e$message),
+      why_it_matters = "The Attributes sheet defines the product features and levels for the conjoint study.",
+      how_to_fix = c(
+        "Verify the Attributes sheet has columns: AttributeName, NumLevels, LevelNames",
         sprintf("File: %s", config_file)
       )
     )
@@ -177,7 +339,6 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
 
   # Load design (if exists)
   design <- NULL
-  sheet_names <- openxlsx::getSheetNames(config_file)
   if ("Design" %in% sheet_names) {
     design <- openxlsx::read.xlsx(config_file, sheet = "Design")
     log_verbose("  ✓ Loaded experimental design matrix", verbose)
@@ -271,6 +432,77 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
     # None option handling
     none_as_baseline = safe_logical(settings_list$none_as_baseline, FALSE),
     none_label = settings_list$none_label %||% "None",
+
+    # =========================================================================
+    # HIERARCHICAL BAYES SETTINGS (Phase 3 Upgrade)
+    # =========================================================================
+
+    hb_iterations = safe_numeric(settings_list$hb_iterations, 10000),
+    hb_burnin = safe_numeric(settings_list$hb_burnin, 5000),
+    hb_thin = safe_numeric(settings_list$hb_thin, 1),
+    hb_ncomp = safe_numeric(settings_list$hb_ncomp, 1),
+    hb_prior_variance = safe_numeric(settings_list$hb_prior_variance, 2),
+
+    # =========================================================================
+    # LATENT CLASS SETTINGS (Phase 3 Upgrade)
+    # =========================================================================
+
+    latent_class_min = safe_numeric(settings_list$latent_class_min, 2),
+    latent_class_max = safe_numeric(settings_list$latent_class_max, 5),
+    latent_class_criterion = settings_list$latent_class_criterion %||% "bic",
+
+    # =========================================================================
+    # SIMULATION SETTINGS (Phase 3 Upgrade)
+    # =========================================================================
+
+    simulation_method = settings_list$simulation_method %||% "logit",
+    rfc_draws = safe_numeric(settings_list$rfc_draws, 1000),
+
+    # =========================================================================
+    # WILLINGNESS TO PAY SETTINGS (Phase 3 Upgrade)
+    # =========================================================================
+
+    wtp_price_attribute = settings_list$wtp_price_attribute %||% NA_character_,
+    wtp_method = settings_list$wtp_method %||% "marginal",
+
+    # =========================================================================
+    # HTML OUTPUT SETTINGS (Phase 3 Upgrade)
+    # =========================================================================
+
+    generate_html_report = safe_logical(settings_list$generate_html_report, FALSE),
+    generate_html_simulator = safe_logical(settings_list$generate_html_simulator, FALSE),
+    brand_colour = settings_list$brand_colour %||% "#323367",
+    accent_colour = settings_list$accent_colour %||% "#CC9900",
+
+    # =========================================================================
+    # HTML REPORT SETTINGS
+    # =========================================================================
+
+    project_name = settings_list$project_name %||% "Conjoint Analysis",
+    insight_overview = settings_list$insight_overview %||% "",
+    insight_utilities = settings_list$insight_utilities %||% "",
+    insight_diagnostics = settings_list$insight_diagnostics %||% "",
+    insight_simulator = settings_list$insight_simulator %||% "",
+    insight_wtp = settings_list$insight_wtp %||% "",
+
+    # =========================================================================
+    # ABOUT PAGE SETTINGS
+    # =========================================================================
+
+    analyst_name = settings_list$analyst_name %||% "",
+    analyst_email = settings_list$analyst_email %||% "",
+    analyst_phone = settings_list$analyst_phone %||% "",
+    client_name = settings_list$client_name %||% "",
+    company_name = settings_list$company_name %||% "",
+    closing_notes = settings_list$closing_notes %||% "",
+    researcher_logo_base64 = settings_list$researcher_logo_base64 %||% "",
+
+    # =========================================================================
+    # PRODUCT OPTIMIZER SETTINGS (Phase 3 Upgrade)
+    # =========================================================================
+
+    optimizer_method = settings_list$optimizer_method %||% "exhaustive",
+    optimizer_max_products = safe_numeric(settings_list$optimizer_max_products, 5),
 
     # Validation results
     validation = validation_result
@@ -389,12 +621,69 @@ validate_config <- function(settings_list, attributes_df) {
 
   # Validate estimation_method
   estimation_method <- settings_list$estimation_method %||% "auto"
-  valid_methods <- c("auto", "mlogit", "clogit", "hb")
+  valid_methods <- c("auto", "mlogit", "clogit", "hb", "latent_class")
   if (!estimation_method %in% valid_methods) {
     errors <- c(errors, sprintf(
       "estimation_method must be one of: %s (got: %s)",
       paste(valid_methods, collapse = ", "),
       estimation_method
+    ))
+  }
+
+  # Validate HB settings (if HB selected)
+  if (estimation_method == "hb") {
+    hb_iter <- safe_numeric(settings_list$hb_iterations, 10000)
+    hb_burn <- safe_numeric(settings_list$hb_burnin, 5000)
+    if (hb_burn >= hb_iter) {
+      errors <- c(errors, sprintf(
+        "hb_burnin (%d) must be less than hb_iterations (%d)",
+        hb_burn, hb_iter
+      ))
+    }
+    if (hb_iter < 1000) {
+      warnings <- c(warnings,
+        "hb_iterations < 1000 may produce unreliable estimates. Recommend 10000+"
+      )
+    }
+  }
+
+  # Validate latent class settings (if LC selected)
+  if (estimation_method == "latent_class") {
+    lc_min <- safe_numeric(settings_list$latent_class_min, 2)
+    lc_max <- safe_numeric(settings_list$latent_class_max, 5)
+    if (lc_min < 2) {
+      errors <- c(errors, "latent_class_min must be at least 2")
+    }
+    if (lc_max > 6) {
+      warnings <- c(warnings,
+        "latent_class_max > 6 may be slow and risk over-fitting"
+      )
+    }
+    if (lc_min > lc_max) {
+      errors <- c(errors, sprintf(
+        "latent_class_min (%d) must be <= latent_class_max (%d)",
+        lc_min, lc_max
+      ))
+    }
+  }
+
+  # Validate simulation_method
+  sim_method <- settings_list$simulation_method %||% "logit"
+  valid_sim <- c("logit", "first_choice", "rfc")
+  if (!sim_method %in% valid_sim) {
+    errors <- c(errors, sprintf(
+      "simulation_method must be one of: %s (got: %s)",
+      paste(valid_sim, collapse = ", "),
+      sim_method
+    ))
+  }
+
+  # Validate optimizer_method
+  opt_method <- settings_list$optimizer_method %||% "exhaustive"
+  if (!opt_method %in% c("exhaustive", "genetic")) {
+    errors <- c(errors, sprintf(
+      "optimizer_method must be 'exhaustive' or 'genetic' (got: %s)",
+      opt_method
     ))
   }
 

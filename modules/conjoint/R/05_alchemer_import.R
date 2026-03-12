@@ -4,8 +4,8 @@
 #
 # Module: Conjoint Analysis - Alchemer Data Transformer
 # Purpose: Transform Alchemer CBC export format to Turas internal format
-# Version: 2.1.0 (Phase 1 - Alchemer Integration)
-# Date: 2025-12-12
+# Version: 3.0.0
+# Date: 2026-03-10
 #
 # ALCHEMER FORMAT:
 #   ResponseID, SetNumber, CardNumber, [Attributes...], Score

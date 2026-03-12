@@ -4,8 +4,8 @@
 #
 # Module: Conjoint Analysis - Data Management
 # Purpose: Load, validate, and prepare conjoint data for analysis
-# Version: 2.1.0 (Phase 1 - Alchemer Integration)
-# Date: 2025-12-12
+# Version: 3.0.0
+# Date: 2026-03-10
 #
 # SUPPORTED DATA SOURCES:
 #   - alchemer: Uses import_alchemer_conjoint() for Alchemer CBC exports

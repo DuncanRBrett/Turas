@@ -9,8 +9,8 @@
 # - Sensitivity analysis
 # - Charts and visualizations
 #
-# Part of: Turas Enhanced Conjoint Analysis Module
-# Version: 2.0.0
+# Part of: Turas Conjoint Analysis Module
+# Version: 3.0.0
 # ==============================================================================
 
 # ==============================================================================

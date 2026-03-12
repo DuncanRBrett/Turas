@@ -2,18 +2,30 @@
 # BEST-WORST SCALING - ADVANCED CONJOINT ANALYSIS
 # ==============================================================================
 #
-# This file implements best-worst scaling (BWS) for conjoint analysis.
-# BWS asks respondents to select both the BEST and WORST alternatives in each
-# choice set, providing more information per choice task.
+# Module: Conjoint Analysis - Best-Worst Scaling
+# Purpose: BWS estimation via exploded logit (sequential or simultaneous)
+# Version: 3.0.0
+# Date: 2026-03-10
 #
 # Supported formats:
 # - MaxDiff (best-worst discrete choice)
 # - Best-worst conjoint (product profiles)
 # - Multi-profile best-worst
 #
-# Part of: Turas Enhanced Conjoint Analysis Module
-# Version: 2.0.0
+# METHODOLOGY:
+#   BWS provides 2 choices per set: best (utility max) and worst (utility min).
+#   Sequential method: estimate best & worst models separately, average.
+#   Simultaneous method: joint estimation with choice type indicator.
+#   Both use exploded logit (standard MNL on expanded choice sets).
+#
 # ==============================================================================
+
+CONJOINT_BWS_VERSION <- "3.0.0"
+
+# Null coalesce
+if (!exists("%||%", mode = "function")) {
+  `%||%` <- function(x, y) if (is.null(x)) y else x
+}
 
 # ==============================================================================
 # 1. BEST-WORST DATA VALIDATION
@@ -49,26 +61,36 @@ validate_best_worst_data <- function(data, config) {
   }
 
   # Validate best-worst choices
-  choice_set_col <- config$respondent_id_column %||% "choice_set_id"
+  choice_set_col <- config$choice_set_column %||% "choice_set_id"
 
-  # Check: Exactly one best per choice set
-  best_per_set <- data %>%
-    group_by(!!sym(choice_set_col)) %>%
-    summarise(n_best = sum(best))
+  # Check: Exactly one best per choice set (base R — no dplyr)
+  best_per_set <- aggregate(
+    data[["best"]],
+    by = list(choice_set = data[[choice_set_col]]),
+    FUN = sum
+  )
+  names(best_per_set) <- c("choice_set", "n_best")
 
   if (any(best_per_set$n_best != 1)) {
+    bad_sets <- best_per_set$choice_set[best_per_set$n_best != 1]
     validation$critical <- c(validation$critical,
-                              "Each choice set must have exactly 1 'best' selection")
+                              sprintf("Each choice set must have exactly 1 'best' selection (found %d violations)",
+                                      length(bad_sets)))
   }
 
-  # Check: Exactly one worst per choice set
-  worst_per_set <- data %>%
-    group_by(!!sym(choice_set_col)) %>%
-    summarise(n_worst = sum(worst))
+  # Check: Exactly one worst per choice set (base R)
+  worst_per_set <- aggregate(
+    data[["worst"]],
+    by = list(choice_set = data[[choice_set_col]]),
+    FUN = sum
+  )
+  names(worst_per_set) <- c("choice_set", "n_worst")
 
   if (any(worst_per_set$n_worst != 1)) {
+    bad_sets <- worst_per_set$choice_set[worst_per_set$n_worst != 1]
     validation$critical <- c(validation$critical,
-                              "Each choice set must have exactly 1 'worst' selection")
+                              sprintf("Each choice set must have exactly 1 'worst' selection (found %d violations)",
+                                      length(bad_sets)))
   }
 
   # Check: Best and worst are different
@@ -450,3 +472,10 @@ create_best_worst_template <- function(n_respondents = 50,
 
   data
 }
+
+
+# ==============================================================================
+# MODULE INITIALIZATION
+# ==============================================================================
+
+message(sprintf("TURAS>Conjoint BWS module loaded (v%s)", CONJOINT_BWS_VERSION))
