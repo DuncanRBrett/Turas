@@ -320,11 +320,11 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
 
   # Print TRS start banner
   if (exists("turas_print_start_banner", mode = "function")) {
-    turas_print_start_banner("CONJOINT", "2.1")
+    turas_print_start_banner("CONJOINT", "3.0.0")
   } else if (verbose) {
     cat("\n")
     cat(rep("=", 80), "\n", sep = "")
-    cat("TURAS CONJOINT ANALYSIS - Version 2.1 (Alchemer Integration)\n")
+    cat("TURAS CONJOINT ANALYSIS - Version 3.0.0\n")
     cat(rep("=", 80), "\n", sep = "")
     cat("\n")
   }
@@ -490,24 +490,42 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
       cat(sprintf("   ✓ Results written to: %s\n", basename(config$output_file)))
     }
 
-    # STEP 8: Generate HTML Report (if configured)
-    if (isTRUE(config$generate_html_report)) {
-      if (verbose) cat("\n8. Generating HTML analysis report...\n")
+    # STEP 8: Generate Combined HTML Report + Simulator (if configured)
+    if (isTRUE(config$generate_html_report) || isTRUE(config$generate_html_simulator)) {
+      if (verbose) cat("\n8. Generating HTML analysis report (with simulator)...\n")
 
       if (exists("generate_conjoint_html_report", mode = "function")) {
         html_output_path <- sub("\\.xlsx$", "_report.html", config$output_file)
+
+        # Build comprehensive results for HTML generation
         html_results <- list(
           utilities = utilities,
           importance = importance,
           model_result = model_result,
           diagnostics = diagnostics,
-          config = config
+          config = config,
+          wtp = if (exists("wtp_result") && !is.null(wtp_result)) wtp_result else NULL
         )
+
+        # Build report config with all display fields
         html_config <- list(
           brand_colour = config$brand_colour,
           accent_colour = config$accent_colour,
-          project_name = config$project_name %||% "Conjoint Analysis"
+          project_name = config$project_name %||% "Conjoint Analysis",
+          company_name = config$company_name %||% "",
+          client_name = config$client_name %||% "",
+          analyst_name = config$analyst_name %||% "",
+          analyst_email = config$analyst_email %||% "",
+          analyst_phone = config$analyst_phone %||% "",
+          closing_notes = config$closing_notes %||% "",
+          researcher_logo_base64 = config$researcher_logo_base64 %||% "",
+          insight_overview = config$insight_overview %||% "",
+          insight_utilities = config$insight_utilities %||% "",
+          insight_diagnostics = config$insight_diagnostics %||% "",
+          insight_simulator = config$insight_simulator %||% "",
+          insight_wtp = config$insight_wtp %||% ""
         )
+
         tryCatch({
           generate_conjoint_html_report(html_results, html_output_path, html_config)
           if (verbose) cat(sprintf("   ✓ HTML report: %s\n", basename(html_output_path)))
@@ -516,29 +534,6 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
         })
       } else {
         if (verbose) cat("   ⚠ HTML report module not loaded\n")
-      }
-    }
-
-    # STEP 9: Generate HTML Simulator (if configured)
-    if (isTRUE(config$generate_html_simulator)) {
-      if (verbose) cat("\n9. Generating HTML simulator...\n")
-
-      if (exists("generate_conjoint_html_simulator", mode = "function")) {
-        sim_output_path <- sub("\\.xlsx$", "_simulator.html", config$output_file)
-        tryCatch({
-          generate_conjoint_html_simulator(
-            utilities = utilities,
-            importance = importance,
-            model_result = model_result,
-            config = config,
-            output_path = sim_output_path
-          )
-          if (verbose) cat(sprintf("   ✓ HTML simulator: %s\n", basename(sim_output_path)))
-        }, error = function(e) {
-          message(sprintf("[TRS INFO] CONJ_HTML_SIMULATOR_FAILED: %s", conditionMessage(e)))
-        })
-      } else {
-        if (verbose) cat("   ⚠ HTML simulator module not loaded\n")
       }
     }
 

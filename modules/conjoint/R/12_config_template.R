@@ -181,8 +181,25 @@
   add("OUTPUT", "generate_html_simulator", "FALSE", "Generate standalone HTML market simulator", FALSE, "TRUE,FALSE")
 
   # --- BRANDING ---
-  add("BRANDING", "brand_colour", "#323367", "Primary brand hex colour for HTML output", FALSE)
-  add("BRANDING", "accent_colour", "#CC9900", "Accent hex colour for HTML output", FALSE)
+  add("BRANDING", "project_name", "Conjoint Analysis", "Project name displayed in report header", FALSE)
+  add("BRANDING", "brand_colour", "#323367", "Primary brand hex colour for HTML output (e.g. #1e40af)", FALSE)
+  add("BRANDING", "accent_colour", "#CC9900", "Accent hex colour for HTML output (e.g. #f59e0b)", FALSE)
+
+  # --- HTML REPORT INSIGHTS ---
+  add("HTML REPORT", "insight_overview", "", "Pre-populated insight text for Overview tab", FALSE)
+  add("HTML REPORT", "insight_utilities", "", "Pre-populated insight text for Utilities tab", FALSE)
+  add("HTML REPORT", "insight_diagnostics", "", "Pre-populated insight text for Diagnostics tab", FALSE)
+  add("HTML REPORT", "insight_simulator", "", "Pre-populated insight text for Simulator tab", FALSE)
+  add("HTML REPORT", "insight_wtp", "", "Pre-populated insight text for WTP tab", FALSE)
+
+  # --- ABOUT PAGE ---
+  add("ABOUT PAGE", "analyst_name", "", "Analyst name for About page", FALSE)
+  add("ABOUT PAGE", "analyst_email", "", "Analyst email for About page", FALSE)
+  add("ABOUT PAGE", "analyst_phone", "", "Analyst phone for About page", FALSE)
+  add("ABOUT PAGE", "client_name", "", "Client name displayed in header and About page", FALSE)
+  add("ABOUT PAGE", "company_name", "The Research LampPost", "Company name for header", FALSE)
+  add("ABOUT PAGE", "closing_notes", "", "Closing notes (editable in HTML report)", FALSE)
+  add("ABOUT PAGE", "researcher_logo_base64", "", "Base64-encoded logo for report header", FALSE)
 
   # --- NONE OPTION ---
   add("NONE OPTION", "none_as_baseline", "FALSE", "Use None option as baseline", FALSE, "TRUE,FALSE")
@@ -227,6 +244,7 @@
 #' @export
 generate_conjoint_config_template <- function(output_path = "Conjoint_Config_Template.xlsx",
                                                include_examples = TRUE,
+                                               method_template = NULL,
                                                verbose = TRUE) {
 
   if (!requireNamespace("openxlsx", quietly = TRUE)) {
@@ -274,6 +292,19 @@ generate_conjoint_config_template <- function(output_path = "Conjoint_Config_Tem
 
   # Get settings definition
   settings_def <- .get_conjoint_settings_definition()
+
+  # Apply method template overrides
+  if (!is.null(method_template)) {
+    overrides <- .get_method_template_overrides(method_template)
+    for (setting_name in names(overrides)) {
+      idx <- which(settings_def$setting == setting_name)
+      if (length(idx) == 1) {
+        settings_def$default[idx] <- overrides[[setting_name]]
+      }
+    }
+    if (verbose) cat(sprintf("  Applied method template: %s\n", method_template))
+  }
+
   current_row <- header_row + 1
   current_section <- ""
 
@@ -399,4 +430,66 @@ generate_conjoint_config_template <- function(output_path = "Conjoint_Config_Tem
   }
 
   invisible(output_path)
+}
+
+
+# ==============================================================================
+# METHOD TEMPLATE PRESETS
+# ==============================================================================
+
+#' Get Method Template Overrides
+#'
+#' Returns default values for a pre-configured analysis template.
+#'
+#' @param template Character: "standard_cbc", "cbc_hb", "cbc_latent_class", "best_worst"
+#' @return Named list of setting overrides
+#' @keywords internal
+.get_method_template_overrides <- function(template) {
+
+  templates <- list(
+    standard_cbc = list(
+      analysis_type = "choice",
+      choice_type = "single",
+      estimation_method = "auto",
+      generate_html_report = "TRUE",
+      simulation_method = "logit"
+    ),
+    cbc_hb = list(
+      analysis_type = "choice",
+      choice_type = "single",
+      estimation_method = "hb",
+      hb_iterations = "20000",
+      hb_burnin = "10000",
+      hb_thin = "1",
+      hb_ncomp = "1",
+      generate_html_report = "TRUE",
+      simulation_method = "logit"
+    ),
+    cbc_latent_class = list(
+      analysis_type = "choice",
+      choice_type = "single",
+      estimation_method = "latent_class",
+      latent_class_min = "2",
+      latent_class_max = "6",
+      latent_class_criterion = "bic",
+      generate_html_report = "TRUE",
+      simulation_method = "logit"
+    ),
+    best_worst = list(
+      analysis_type = "choice",
+      choice_type = "best_worst",
+      estimation_method = "auto",
+      generate_html_report = "TRUE",
+      simulation_method = "logit"
+    )
+  )
+
+  template <- tolower(trimws(template))
+  if (!template %in% names(templates)) {
+    cat(sprintf("  [WARNING] Unknown method template '%s'. Available: %s\n",
+                template, paste(names(templates), collapse = ", ")))
+    return(list())
+  }
+
+  templates[[template]]
 }

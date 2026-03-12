@@ -475,6 +475,29 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
     accent_colour = settings_list$accent_colour %||% "#CC9900",
 
     # =========================================================================
+    # HTML REPORT SETTINGS
+    # =========================================================================
+
+    project_name = settings_list$project_name %||% "Conjoint Analysis",
+    insight_overview = settings_list$insight_overview %||% "",
+    insight_utilities = settings_list$insight_utilities %||% "",
+    insight_diagnostics = settings_list$insight_diagnostics %||% "",
+    insight_simulator = settings_list$insight_simulator %||% "",
+    insight_wtp = settings_list$insight_wtp %||% "",
+
+    # =========================================================================
+    # ABOUT PAGE SETTINGS
+    # =========================================================================
+
+    analyst_name = settings_list$analyst_name %||% "",
+    analyst_email = settings_list$analyst_email %||% "",
+    analyst_phone = settings_list$analyst_phone %||% "",
+    client_name = settings_list$client_name %||% "",
+    company_name = settings_list$company_name %||% "",
+    closing_notes = settings_list$closing_notes %||% "",
+    researcher_logo_base64 = settings_list$researcher_logo_base64 %||% "",
+
+    # =========================================================================
     # PRODUCT OPTIMIZER SETTINGS (Phase 3 Upgrade)
     # =========================================================================
 

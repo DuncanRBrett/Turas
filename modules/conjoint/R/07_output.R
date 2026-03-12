@@ -123,6 +123,12 @@ write_conjoint_output <- function(utilities, importance, diagnostics, model_resu
     })
   }
 
+  # Ensure output directory exists
+  output_dir <- dirname(output_file)
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+  }
+
   # Save workbook (TRS v1.0: Use atomic save if available)
   if (exists("turas_save_workbook_atomic", mode = "function")) {
     save_result <- turas_save_workbook_atomic(wb, output_file, run_result = run_result, module = "CONJ")

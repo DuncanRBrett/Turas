@@ -1,60 +1,58 @@
 # ==============================================================================
-# TESTS: HTML SIMULATOR (lib/html_simulator/)
+# TESTS: HTML SIMULATOR (DEPRECATED - now part of combined report)
+# ==============================================================================
+# The standalone simulator has been merged into the combined HTML report.
+# These tests verify backward compatibility of the deprecated wrapper.
 # ==============================================================================
 
-fixture_path <- file.path(
-  dirname(dirname(testthat::test_path())),
-  "fixtures", "synthetic_data", "generate_conjoint_test_data.R"
-)
-if (file.exists(fixture_path)) source(fixture_path, local = TRUE)
-
-
-test_that("simulator guard validates utilities", {
-  if (!exists("validate_simulator_inputs", mode = "function")) skip("validate_simulator_inputs not loaded")
-
-  valid_utils <- generate_utilities_df()
-  config <- list(attribute_levels = list(
-    Brand = c("Alpha", "Beta", "Gamma"),
-    Size  = c("Small", "Medium", "Large"),
-    Price = c("$10", "$20", "$30")
-  ))
-
-  result <- validate_simulator_inputs(valid_utils, config)
-  expect_true(result$valid)
-
-  # Invalid: missing columns
-  bad_utils <- data.frame(x = 1, y = 2)
-  result2 <- validate_simulator_inputs(bad_utils, config)
-  expect_false(result2$valid)
-})
-
-
-test_that("simulator data transformer builds JSON-ready structure", {
-  if (!exists("build_simulator_data", mode = "function")) skip("build_simulator_data not loaded")
-
-  utils <- generate_utilities_df(with_price = TRUE)
-  importance <- generate_importance_df(with_price = TRUE)
-  config <- list(
-    project_name = "Test",
-    attribute_levels = list(
-      Brand = c("Alpha", "Beta", "Gamma"),
-      Size  = c("Small", "Medium", "Large"),
-      Price = c("$10", "$20", "$30")
-    ),
-    simulation_method = "logit"
+# Locate module root
+.find_conjoint_root <- function() {
+  tf <- tryCatch(testthat::test_path(".."), error = function(e) NULL)
+  candidates <- c(
+    if (!is.null(tf)) normalizePath(file.path(tf, ".."), mustWork = FALSE) else NULL,
+    file.path(getwd(), "modules", "conjoint"),
+    normalizePath(file.path(testthat::test_path(), "..", ".."), mustWork = FALSE)
   )
+  for (p in candidates) {
+    if (is.null(p)) next
+    check <- file.path(p, "lib", "html_report", "00_html_guard.R")
+    if (file.exists(check)) return(p)
+  }
+  NULL
+}
 
-  sim_data <- build_simulator_data(utils, importance, model_result = NULL, config)
+conjoint_root <- .find_conjoint_root()
 
-  expect_is(sim_data, "list")
-  expect_true("attributes" %in% names(sim_data))
-  expect_true("utilities" %in% names(sim_data))
-  expect_true(length(sim_data$attributes) > 0)
-})
+if (!is.null(conjoint_root)) {
+  if (!exists("%||%", mode = "function")) {
+    `%||%` <- function(x, y) if (is.null(x)) y else x
+  }
+
+  assign(".conjoint_lib_dir", file.path(conjoint_root, "lib"), envir = globalenv())
+
+  # Load fixtures
+  fixture_path <- file.path(conjoint_root, "tests", "fixtures", "synthetic_data",
+                            "generate_conjoint_test_data.R")
+  if (file.exists(fixture_path)) source(fixture_path, local = FALSE)
+
+  # Load HTML report submodules
+  html_report_dir <- file.path(conjoint_root, "lib", "html_report")
+  for (f in c("00_html_guard.R", "01_data_transformer.R", "02_table_builder.R",
+              "05_chart_builder.R", "03_page_builder.R", "04_html_writer.R",
+              "99_html_report_main.R")) {
+    fpath <- file.path(html_report_dir, f)
+    if (file.exists(fpath)) source(fpath, local = FALSE)
+  }
+
+  # Load deprecated simulator wrapper
+  sim_path <- file.path(conjoint_root, "lib", "html_simulator", "99_simulator_main.R")
+  if (file.exists(sim_path)) source(sim_path, local = FALSE)
+}
 
 
-test_that("simulator generates valid HTML file", {
+test_that("deprecated wrapper emits deprecation message", {
   if (!exists("generate_conjoint_html_simulator", mode = "function")) skip("generate_conjoint_html_simulator not loaded")
+  if (!exists("generate_conjoint_html_report", mode = "function")) skip("generate_conjoint_html_report not loaded")
 
   utils <- generate_utilities_df(with_price = TRUE)
   importance <- generate_importance_df(with_price = TRUE)
@@ -72,37 +70,66 @@ test_that("simulator generates valid HTML file", {
   tmp_path <- tempfile(fileext = ".html")
   on.exit(unlink(tmp_path), add = TRUE)
 
-  result <- generate_conjoint_html_simulator(utils, importance, NULL, config, tmp_path)
+  expect_message(
+    result <- generate_conjoint_html_simulator(utils, importance, NULL, config, tmp_path),
+    "DEPRECATED"
+  )
 
   expect_equal(result$status, "PASS")
   expect_true(file.exists(tmp_path))
+})
 
-  # Check HTML structure
+
+test_that("deprecated wrapper produces combined report HTML", {
+  if (!exists("generate_conjoint_html_simulator", mode = "function")) skip("generate_conjoint_html_simulator not loaded")
+  if (!exists("generate_conjoint_html_report", mode = "function")) skip("generate_conjoint_html_report not loaded")
+
+  utils <- generate_utilities_df(with_price = TRUE)
+  importance <- generate_importance_df(with_price = TRUE)
+  config <- list(
+    project_name = "Test",
+    brand_colour = "#2563eb",
+    attribute_levels = list(
+      Brand = c("Alpha", "Beta", "Gamma"),
+      Size  = c("Small", "Medium", "Large"),
+      Price = c("$10", "$20", "$30")
+    )
+  )
+
+  tmp_path <- tempfile(fileext = ".html")
+  on.exit(unlink(tmp_path), add = TRUE)
+
+  suppressMessages({
+    result <- generate_conjoint_html_simulator(utils, importance, NULL, config, tmp_path)
+  })
+
+  # Should produce combined report, not old standalone simulator
   html <- paste(readLines(tmp_path, warn = FALSE), collapse = "\n")
   expect_true(grepl("<!DOCTYPE html>", html, fixed = TRUE))
-  expect_true(grepl("sim-data", html, fixed = TRUE))  # JSON data container
-  expect_true(grepl("SimEngine", html, fixed = TRUE))  # JS engine
-  expect_true(grepl("</html>", html, fixed = TRUE))
+  expect_true(grepl("panel-overview", html, fixed = TRUE))
+  expect_true(grepl("panel-simulator", html, fixed = TRUE))
+  expect_true(grepl("cj-simulator-data", html, fixed = TRUE))
 })
 
 
 test_that("simulator JS files have valid syntax", {
-  js_dir <- file.path(
-    dirname(dirname(dirname(testthat::test_path()))),
-    "lib", "html_simulator", "js"
-  )
+  js_dir <- if (!is.null(conjoint_root)) file.path(conjoint_root, "lib", "html_report", "js") else NULL
 
-  if (!dir.exists(js_dir)) skip("JS directory not found")
+  if (is.null(js_dir) || !dir.exists(js_dir)) skip("JS directory not found")
 
-  js_files <- list.files(js_dir, pattern = "\\.js$", full.names = TRUE)
-  if (length(js_files) == 0) skip("No JS files found")
+  # Check simulator-specific JS files
+  sim_files <- c("simulator_engine.js", "simulator_ui.js", "simulator_charts.js")
+  for (fname in sim_files) {
+    fpath <- file.path(js_dir, fname)
+    if (!file.exists(fpath)) skip(sprintf("%s not found", fname))
 
-  node_path <- "/usr/local/bin/node"
-  if (!file.exists(node_path)) skip("node not found at /usr/local/bin/node")
+    node_path <- "/usr/local/bin/node"
+    if (!file.exists(node_path)) skip("node not found")
 
-  for (f in js_files) {
-    result <- system2(node_path, args = c("--check", f), stdout = TRUE, stderr = TRUE)
+    result <- system2(node_path, args = c("--check", fpath), stdout = TRUE, stderr = TRUE)
     exit_code <- attr(result, "status") %||% 0L
-    expect_equal(exit_code, 0L, info = sprintf("JS syntax error in %s: %s", basename(f), paste(result, collapse = "\n")))
+    expect_equal(exit_code, 0L,
+      info = sprintf("JS syntax error in %s: %s", fname, paste(result, collapse = "\n"))
+    )
   }
 })

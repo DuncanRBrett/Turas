@@ -1,18 +1,17 @@
 # ==============================================================================
-# CONJOINT v3.0 DEMO - FULL PIPELINE TEST
+# CONJOINT v3.1 DEMO - FULL PIPELINE TEST
 # ==============================================================================
 #
 # This script runs the complete conjoint analysis pipeline on synthetic data
-# to demonstrate all v3.0 capabilities:
+# to demonstrate all v3.1 capabilities:
 #
 #   1. Aggregate MNL estimation (mlogit/clogit)
 #   2. Utilities and importance calculation
 #   3. Market simulation (logit shares)
 #   4. Willingness to Pay (WTP)
 #   5. Product optimization
-#   6. HTML analysis report
-#   7. HTML standalone simulator
-#   8. Excel output with all sheets
+#   6. Combined HTML report + simulator
+#   7. Excel output with all sheets
 #
 # USAGE:
 #   source("examples/conjoint/v3_demo/run_demo.R")
@@ -21,13 +20,12 @@
 # OUTPUT:
 #   examples/conjoint/v3_demo/output/demo_results.xlsx
 #   examples/conjoint/v3_demo/output/demo_results_report.html
-#   examples/conjoint/v3_demo/output/demo_results_simulator.html
 #
 # ==============================================================================
 
 cat("\n")
 cat("================================================================\n")
-cat("  TURAS CONJOINT v3.0 DEMO\n")
+cat("  TURAS CONJOINT v3.1 DEMO\n")
 cat("  Testing full pipeline on synthetic smartphone data\n")
 cat("================================================================\n\n")
 
@@ -50,12 +48,12 @@ if (!file.exists(data_file)) {
 }
 
 # --- Step 1: Source the conjoint module ---
-cat("[1/8] Loading conjoint module...\n")
+cat("[1/7] Loading conjoint module...\n")
 source(file.path(turas_root, "modules", "conjoint", "R", "00_main.R"))
 cat("  Done.\n\n")
 
 # --- Step 2: Run analysis via main entry point ---
-cat("[2/8] Running aggregate analysis (mlogit)...\n")
+cat("[2/7] Running aggregate analysis (mlogit)...\n")
 config_file <- file.path(demo_dir, "demo_config.xlsx")
 
 # Override output to go to output directory
@@ -78,7 +76,7 @@ if (is.null(results)) {
 }
 
 # --- Step 3: WTP calculation ---
-cat("\n[3/8] Calculating Willingness to Pay...\n")
+cat("\n[3/7] Calculating Willingness to Pay...\n")
 if (exists("calculate_wtp", mode = "function") && !is.null(results$utilities)) {
 
   wtp_config <- results$config
@@ -106,7 +104,7 @@ if (exists("calculate_wtp", mode = "function") && !is.null(results$utilities)) {
 }
 
 # --- Step 4: Product optimization ---
-cat("\n[4/8] Running product optimizer...\n")
+cat("\n[4/7] Running product optimizer...\n")
 if (exists("optimize_product_exhaustive", mode = "function") && !is.null(results$utilities)) {
 
   opt_config <- results$config
@@ -136,7 +134,7 @@ if (exists("optimize_product_exhaustive", mode = "function") && !is.null(results
 }
 
 # --- Step 5: Market simulation ---
-cat("\n[5/8] Running market simulation...\n")
+cat("\n[5/7] Running market simulation...\n")
 if (exists("predict_market_shares", mode = "function") && !is.null(results$utilities)) {
 
   products <- list(
@@ -164,7 +162,7 @@ if (exists("predict_market_shares", mode = "function") && !is.null(results$utili
 }
 
 # --- Step 6: Source of volume ---
-cat("\n[6/8] Source of volume analysis...\n")
+cat("\n[6/7] Source of volume analysis...\n")
 if (exists("source_of_volume", mode = "function") && !is.null(results$utilities)) {
 
   baseline <- list(
@@ -190,8 +188,8 @@ if (exists("source_of_volume", mode = "function") && !is.null(results$utilities)
   cat("  Skipped\n")
 }
 
-# --- Step 7: HTML report ---
-cat("\n[7/8] Generating HTML analysis report...\n")
+# --- Step 7: Combined HTML report + simulator ---
+cat("\n[7/7] Generating combined HTML report + simulator...\n")
 if (exists("generate_conjoint_html_report", mode = "function") && !is.null(results)) {
 
   conjoint_results <- list(
@@ -199,13 +197,24 @@ if (exists("generate_conjoint_html_report", mode = "function") && !is.null(resul
     importance   = results$importance,
     model_result = results$model_result,
     diagnostics  = results$diagnostics,
-    config       = results$config
+    config       = results$config,
+    wtp          = if (exists("wtp_result") && !is.null(wtp_result)) wtp_result else NULL
   )
 
   report_config <- list(
-    project_name = "Smartphone Conjoint v3.0 Demo",
-    brand_colour = "#1e40af",
-    accent_colour = "#f59e0b"
+    project_name   = "Smartphone Conjoint v3.1 Demo",
+    brand_colour   = "#1e40af",
+    accent_colour  = "#f59e0b",
+    analyst_name   = "Demo Analyst",
+    analyst_email  = "demo@turas.io",
+    company_name   = "The Research LampPost",
+    client_name    = "Demo Client",
+    closing_notes  = "This report was generated from synthetic smartphone conjoint data for demonstration purposes.",
+    insight_overview    = "Smartphone brand and price are the dominant drivers of consumer preference in this conjoint study.",
+    insight_utilities   = "Explore individual attribute utilities to understand level-by-level consumer preferences.",
+    insight_diagnostics = "Model convergence and fit statistics indicate reliable utility estimates.",
+    insight_simulator   = "Use the simulator to explore how product configurations affect market share.",
+    insight_wtp         = "Willingness to pay estimates show the monetary value consumers place on each attribute level."
   )
 
   html_path <- file.path(output_dir, "demo_results_report.html")
@@ -223,35 +232,6 @@ if (exists("generate_conjoint_html_report", mode = "function") && !is.null(resul
   cat("  Skipped (generate_conjoint_html_report not available)\n")
 }
 
-# --- Step 8: HTML simulator ---
-cat("\n[8/8] Generating HTML standalone simulator...\n")
-if (exists("generate_conjoint_html_simulator", mode = "function") && !is.null(results)) {
-
-  sim_config <- results$config
-  sim_config$project_name <- "Smartphone Conjoint Simulator"
-  sim_config$brand_colour <- "#1e40af"
-
-  sim_path <- file.path(output_dir, "demo_results_simulator.html")
-  sim_result <- tryCatch({
-    generate_conjoint_html_simulator(
-      results$utilities,
-      results$importance,
-      results$model_result,
-      sim_config,
-      sim_path
-    )
-  }, error = function(e) {
-    cat(sprintf("  HTML simulator error: %s\n", conditionMessage(e)))
-    NULL
-  })
-
-  if (!is.null(sim_result) && sim_result$status == "PASS") {
-    cat(sprintf("  Written to: %s\n", sim_path))
-  }
-} else {
-  cat("  Skipped (generate_conjoint_html_simulator not available)\n")
-}
-
 # --- Summary ---
 cat("\n")
 cat("================================================================\n")
@@ -264,6 +244,5 @@ for (f in output_files) {
   cat(sprintf("    %s (%s KB)\n", basename(f), size_kb))
 }
 cat(sprintf("\n  Output directory: %s\n", output_dir))
-cat("\n  To view HTML report:  Open demo_results_report.html in browser\n")
-cat("  To use simulator:     Open demo_results_simulator.html in browser\n")
+cat("\n  To view HTML report + simulator:  Open demo_results_report.html in browser\n")
 cat("\n")
