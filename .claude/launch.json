@@ -6,6 +6,12 @@
       "runtimeExecutable": "/usr/local/bin/npx",
       "runtimeArgs": ["serve", "examples/conjoint/v3_demo/output", "-l", "8765", "--no-clipboard"],
       "port": 8765
+    },
+    {
+      "name": "hub-report",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve examples/report_hub -l 8770 --no-clipboard"],
+      "port": 8770
     }
   ]
 }

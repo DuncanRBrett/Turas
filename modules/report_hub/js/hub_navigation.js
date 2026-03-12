@@ -50,6 +50,29 @@ var ReportHub = ReportHub || {};
 
     // Trigger resize for sticky columns / layout recalculation
     window.dispatchEvent(new Event("resize"));
+
+    // If the active sub-tab is crosstabs, rebuild chips/insights
+    // (they may have been initialized while this panel was hidden)
+    var panel = document.querySelector('.hub-panel[data-hub-panel="' + key + '"]');
+    if (panel) {
+      var activeSubTab = panel.querySelector(".tab-panel.active");
+      if (activeSubTab) {
+        var subTabId = activeSubTab.id || "";
+        // Check if the active sub-tab is "crosstabs" (ID pattern: "{key}--tab-crosstabs")
+        if (subTabId.indexOf("tab-crosstabs") !== -1) {
+          var fnPrefix = key + "_";
+          var buildChips = window[fnPrefix + "buildColumnChips"];
+          var currentGrp = window[fnPrefix + "currentGroup"];
+          if (typeof buildChips === "function" && currentGrp) {
+            buildChips(currentGrp);
+          }
+          var buildPickers = window[fnPrefix + "buildChartPickersForGroup"];
+          if (typeof buildPickers === "function" && currentGrp) {
+            buildPickers(currentGrp);
+          }
+        }
+      }
+    }
   };
 
   /**
@@ -84,6 +107,60 @@ var ReportHub = ReportHub || {};
 
     // Trigger resize for layout recalculation
     window.dispatchEvent(new Event("resize"));
+
+    // When switching to crosstabs, rebuild column chips, chart pickers,
+    // and re-hydrate insights (they may have been built while panel was hidden)
+    if (tabName === "crosstabs") {
+      var fnPrefix = reportKey + "_";
+      var buildChips = window[fnPrefix + "buildColumnChips"];
+      var currentGrp = window[fnPrefix + "currentGroup"];
+      if (typeof buildChips === "function" && currentGrp) {
+        buildChips(currentGrp);
+      }
+      var buildPickers = window[fnPrefix + "buildChartPickersForGroup"];
+      if (typeof buildPickers === "function" && currentGrp) {
+        buildPickers(currentGrp);
+      }
+      // Re-hydrate insights to ensure they render correctly
+      var hydrateIns = window[fnPrefix + "hydrateInsights"];
+      if (typeof hydrateIns === "function") {
+        hydrateIns();
+      }
+      // Auto-show insights that have content (from config or saved state)
+      if (panel) {
+        // Handle new format (textarea.insight-md-editor) and legacy format (div.insight-editor)
+        var renderMd = window[fnPrefix + "renderMarkdown"];
+        var mdEditors = panel.querySelectorAll(".insight-md-editor");
+        for (var k = 0; k < mdEditors.length; k++) {
+          if (mdEditors[k].value && mdEditors[k].value.trim()) {
+            var cont = mdEditors[k].closest(".insight-container");
+            var rendered = cont ? cont.querySelector(".insight-md-rendered") : null;
+            if (rendered && typeof renderMd === "function") {
+              rendered.innerHTML = renderMd(mdEditors[k].value);
+            }
+            if (cont) cont.style.display = "block";
+            var area = mdEditors[k].closest(".insight-area");
+            if (area) {
+              var btn = area.querySelector(".insight-toggle");
+              if (btn) btn.style.display = "none";
+            }
+          }
+        }
+        // Legacy contenteditable insight editors
+        var legacyEditors = panel.querySelectorAll(".insight-editor[contenteditable]");
+        for (var m = 0; m < legacyEditors.length; m++) {
+          if (legacyEditors[m].innerHTML && legacyEditors[m].innerHTML.trim()) {
+            var cont2 = legacyEditors[m].closest(".insight-container");
+            if (cont2) cont2.style.display = "block";
+            var area2 = legacyEditors[m].closest(".insight-area");
+            if (area2) {
+              var btn2 = area2.querySelector(".insight-toggle");
+              if (btn2) btn2.style.display = "none";
+            }
+          }
+        }
+      }
+    }
   };
 
   /**

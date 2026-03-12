@@ -281,10 +281,11 @@ rewrite_html_onclick_conflicts <- function(html, report_key) {
     "pinQualSlide",
     "toggleQualEdit",
     "renderAllQualSlides",
-    # --- Insight editing (onclick/ondblclick in insight-area HTML) ---
+    # --- Insight editing (onclick/ondblclick/oninput in insight-area HTML) ---
     "toggleInsight",
     "toggleInsightEdit",
     "dismissInsight",
+    "syncInsight",
     # --- Navigation/display (called from onchange/oninput/onclick in HTML) ---
     "selectQuestion",
     "switchBannerGroup",
@@ -317,18 +318,21 @@ rewrite_html_onclick_conflicts <- function(html, report_key) {
       perl = TRUE
     )
     # Also handle case where function is at the start of the attribute value
-    html <- gsub(
-      sprintf('onclick="%s\\(', fn),
-      sprintf('onclick="%s%s(', prefix, fn),
-      html,
-      fixed = FALSE
-    )
-    html <- gsub(
-      sprintf("onclick='%s\\(", fn),
-      sprintf("onclick='%s%s(", prefix, fn),
-      html,
-      fixed = FALSE
-    )
+    # Cover all event handler attributes: onclick, oninput, onchange, ondblclick
+    for (attr in c("onclick", "oninput", "onchange", "ondblclick")) {
+      html <- gsub(
+        sprintf('%s="%s\\(', attr, fn),
+        sprintf('%s="%s%s(', attr, prefix, fn),
+        html,
+        fixed = FALSE
+      )
+      html <- gsub(
+        sprintf("%s='%s\\(", attr, fn),
+        sprintf("%s='%s%s(", attr, prefix, fn),
+        html,
+        fixed = FALSE
+      )
+    }
   }
 
   return(html)
