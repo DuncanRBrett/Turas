@@ -1,6 +1,7 @@
 /**
  * Conjoint Report Navigation & Core Interactions
- * Tab switching, attribute sidebar, insight system, save/print, help overlay.
+ * Tab switching, attribute sidebar, insight system, slides system,
+ * save/print, help overlay, simulator mode switching with callout toggle.
  */
 
 (function() {
@@ -96,6 +97,175 @@
   }
 
 
+  // === SLIDES SYSTEM ===
+
+  var slides = [];
+
+  window.addSlide = function() {
+    slides.push({
+      id: "slide-" + Date.now(),
+      title: "",
+      body: "",
+      timestamp: new Date().toISOString()
+    });
+    renderSlides();
+    saveSlides();
+  };
+
+  window.removeSlide = function(idx) {
+    slides.splice(idx, 1);
+    renderSlides();
+    saveSlides();
+  };
+
+  window.moveSlide = function(idx, direction) {
+    var newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= slides.length) return;
+    var temp = slides[idx];
+    slides[idx] = slides[newIdx];
+    slides[newIdx] = temp;
+    renderSlides();
+    saveSlides();
+  };
+
+  window.updateSlideTitle = function(idx, text) {
+    if (slides[idx]) { slides[idx].title = text; saveSlides(); }
+  };
+
+  window.updateSlideBody = function(idx, html) {
+    if (slides[idx]) { slides[idx].body = html; saveSlides(); }
+  };
+
+  function renderSlides() {
+    var container = document.getElementById("cj-slides-cards");
+    var empty = document.getElementById("cj-slides-empty");
+    if (!container) return;
+
+    if (slides.length === 0) {
+      container.innerHTML = "";
+      if (empty) empty.style.display = "";
+      return;
+    }
+    if (empty) empty.style.display = "none";
+
+    var html = "";
+    slides.forEach(function(slide, idx) {
+      html += '<div class="cj-slide-card">';
+      html += '<div class="cj-slide-actions">';
+      if (idx > 0) html += '<button class="cj-export-btn" onclick="moveSlide(' + idx + ',-1)">&uarr;</button>';
+      if (idx < slides.length - 1) html += '<button class="cj-export-btn" onclick="moveSlide(' + idx + ',1)">&darr;</button>';
+      html += '<button class="cj-export-btn" onclick="pinSlide(' + idx + ')">\ud83d\udccc</button>';
+      html += '<button class="cj-export-btn" onclick="removeSlide(' + idx + ')">\u00d7</button>';
+      html += '</div>';
+      html += '<div class="cj-slide-title" contenteditable="true" oninput="updateSlideTitle(' + idx + ', this.textContent)">' + escHtmlNav(slide.title) + '</div>';
+      html += '<div class="cj-slide-body" contenteditable="true" oninput="updateSlideBody(' + idx + ', this.innerHTML)">' + (slide.body || '') + '</div>';
+      html += '</div>';
+    });
+    container.innerHTML = html;
+  }
+
+  function saveSlides() {
+    var store = document.getElementById("slides-data");
+    if (store) store.textContent = JSON.stringify(slides);
+  }
+
+  function hydrateSlides() {
+    var store = document.getElementById("slides-data");
+    if (store) {
+      try {
+        var data = JSON.parse(store.textContent);
+        if (Array.isArray(data) && data.length > 0) {
+          slides = data;
+          renderSlides();
+        }
+      } catch (e) { /* invalid JSON */ }
+    }
+  }
+
+  window.pinSlide = function(idx) {
+    var slide = slides[idx];
+    if (!slide) return;
+    if (typeof window._addPinnedEntry === "function") {
+      window._addPinnedEntry({
+        id: slide.id,
+        title: slide.title || "Slide " + (idx + 1),
+        chart: "",
+        table: '<div style="padding:12px;font-size:13px;">' + (slide.body || '') + '</div>',
+        note: "",
+        timestamp: new Date().toISOString()
+      });
+    }
+  };
+
+  window.exportAllSlidesPNG = function() {
+    slides.forEach(function(slide, idx) {
+      setTimeout(function() { exportSlideCardPNG(slide, idx); }, idx * 300);
+    });
+  };
+
+  function exportSlideCardPNG(slide, idx) {
+    var slideW = 1280, slideH = 720, scale = 3;
+    var canvas = document.createElement("canvas");
+    canvas.width = slideW * scale;
+    canvas.height = slideH * scale;
+    var ctx = canvas.getContext("2d");
+    ctx.scale(scale, scale);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, slideW, slideH);
+
+    var brand = getComputedStyle(document.documentElement).getPropertyValue("--cj-brand").trim() || "#323367";
+    ctx.fillStyle = brand;
+    ctx.fillRect(0, 0, slideW, 50);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 18px system-ui, sans-serif";
+    ctx.fillText(slide.title || "Slide " + (idx + 1), 24, 34);
+
+    // Body text (simple rendering)
+    ctx.fillStyle = "#334155";
+    ctx.font = "14px system-ui, sans-serif";
+    var bodyText = (slide.body || "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").trim();
+    var words = bodyText.split(/\s+/);
+    var line = "", lineY = 90, maxW = slideW - 48;
+    for (var i = 0; i < words.length; i++) {
+      var testLine = line + (line ? " " : "") + words[i];
+      if (ctx.measureText(testLine).width > maxW && line) {
+        ctx.fillText(line, 24, lineY);
+        line = words[i];
+        lineY += 22;
+        if (lineY > slideH - 40) break;
+      } else {
+        line = testLine;
+      }
+    }
+    if (line && lineY <= slideH - 40) ctx.fillText(line, 24, lineY);
+
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "10px system-ui, sans-serif";
+    ctx.fillText("Generated by TURAS Analytics Platform", 24, slideH - 12);
+
+    canvas.toBlob(function(blob) {
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "slide_" + (idx + 1) + ".png";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }, "image/png");
+  }
+
+  window.printSlides = function() {
+    switchReportTab("slides");
+    setTimeout(function() { window.print(); }, 200);
+  };
+
+  function escHtmlNav(s) {
+    var d = document.createElement("div");
+    d.textContent = s || "";
+    return d.innerHTML;
+  }
+
+
   // === SAVE REPORT ===
 
   window.saveReportHTML = function() {
@@ -153,14 +323,23 @@
   };
 
 
-  // === SIMULATOR MODE SWITCH ===
+  // === SIMULATOR MODE SWITCH (with callout toggle) ===
 
   window.switchSimMode = function(mode) {
+    // Toggle mode buttons
     document.querySelectorAll(".cj-sim-mode-btn").forEach(function(btn) {
       btn.classList.remove("active");
     });
     var clicked = document.querySelector('.cj-sim-mode-btn[onclick*="' + mode + '"]');
     if (clicked) clicked.classList.add("active");
+
+    // Toggle callouts
+    document.querySelectorAll(".cj-sim-callout").forEach(function(c) {
+      c.classList.remove("active");
+    });
+    var calloutId = "cj-sim-callout-" + mode;
+    var callout = document.getElementById(calloutId);
+    if (callout) callout.classList.add("active");
 
     if (typeof SimUI !== "undefined") {
       SimUI.switchMode(mode);
@@ -212,6 +391,9 @@
     if (typeof hydratePinnedViews === "function") {
       hydratePinnedViews();
     }
+
+    // Hydrate saved slides
+    hydrateSlides();
 
     // Show help on first visit
     try {

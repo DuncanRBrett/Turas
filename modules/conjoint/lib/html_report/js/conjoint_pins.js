@@ -1,6 +1,7 @@
 /**
  * Conjoint Report Pin System
  * Pin views, render pinned cards, persist to JSON store, batch export.
+ * Supports utility attributes (util-*), panel cards (pin-*), and custom entries.
  */
 
 (function() {
@@ -12,8 +13,9 @@
 
   window.togglePin = function(viewId) {
     var idx = pinnedViews.findIndex(function(v) { return v.id === viewId; });
+    var wasPinned = idx >= 0;
 
-    if (idx >= 0) {
+    if (wasPinned) {
       // Unpin
       pinnedViews.splice(idx, 1);
     } else {
@@ -27,19 +29,70 @@
     updatePinButtons();
     renderPinnedCards();
     savePinnedData();
+
+    // Visual feedback: toast + bounce
+    showPinToast(wasPinned ? "Removed from collection" : "Pinned to collection");
+    bounceButton(viewId);
   };
 
   function captureView(viewId) {
-    // Find the source element
     var source = null;
 
-    // Check active attribute detail
-    var activeDetail = document.querySelector('.cj-attr-detail.active');
-    if (activeDetail) {
-      source = activeDetail;
+    // Utility attribute detail (util-Brand, util-Price, etc.)
+    if (viewId.indexOf("util-") === 0) {
+      source = document.querySelector('.cj-attr-detail.active');
+    }
+    // Panel-level pins (pin-overview, pin-diagnostics-fit, etc.)
+    else if (viewId.indexOf("pin-") === 0) {
+      var panelPart = viewId.replace(/^pin-/, "");
+
+      // Diagnostics sub-cards: pin-diagnostics-fit, pin-diagnostics-convergence, pin-diagnostics-quality
+      if (panelPart.indexOf("diagnostics-") === 0) {
+        var subPart = panelPart.replace("diagnostics-", "");
+        var diagPanel = document.getElementById("panel-diagnostics");
+        if (diagPanel) {
+          var targetH2 = {"fit": "Model Fit", "convergence": "HB Convergence", "quality": "Respondent Quality"};
+          diagPanel.querySelectorAll(".cj-card").forEach(function(card) {
+            var h2 = card.querySelector("h2");
+            if (h2 && h2.textContent === targetH2[subPart]) source = card;
+          });
+        }
+      }
+      // LC sub-cards: pin-lc-bic, pin-lc-sizes, pin-lc-importance
+      else if (panelPart.indexOf("lc-") === 0) {
+        var lcPart = panelPart.replace("lc-", "");
+        var lcPanel = document.getElementById("panel-latentclass");
+        if (lcPanel) {
+          var lcTarget = {"bic": "Model Comparison", "sizes": "Class Sizes", "importance": "Importance by Class"};
+          lcPanel.querySelectorAll(".cj-card").forEach(function(card) {
+            var h2 = card.querySelector("h2");
+            if (h2 && h2.textContent === lcTarget[lcPart]) source = card;
+          });
+        }
+      }
+      // WTP sub-cards: pin-wtp-main, pin-wtp-demand
+      else if (panelPart.indexOf("wtp-") === 0) {
+        var wtpPart = panelPart.replace("wtp-", "");
+        var wtpPanel = document.getElementById("panel-wtp");
+        if (wtpPanel) {
+          var wtpTarget = {"main": "Willingness to Pay", "demand": "Demand Curve"};
+          wtpPanel.querySelectorAll(".cj-card").forEach(function(card) {
+            var h2 = card.querySelector("h2");
+            if (h2 && h2.textContent === wtpTarget[wtpPart]) source = card;
+          });
+        }
+      }
+      // Overview: pin-overview
+      else if (panelPart === "overview") {
+        source = document.querySelector("#panel-overview .cj-card");
+      }
+      // Simulator: pin-simulator -> capture the results div
+      else if (panelPart === "simulator") {
+        source = document.getElementById("cj-sim-results");
+      }
     }
 
-    // Check panel by id prefix
+    // Fallback: try panel-{id}
     if (!source) {
       var panelId = viewId.replace(/^util-/, "").replace(/^panel-/, "");
       source = document.getElementById("panel-" + panelId);
@@ -86,7 +139,7 @@
         var id = match[1];
         var isPinned = pinnedViews.some(function(v) { return v.id === id; });
         btn.classList.toggle("pinned", isPinned);
-        btn.textContent = isPinned ? "Pinned" : "Pin";
+        // Keep emoji content unchanged — just toggle CSS class
       }
     });
   }
@@ -178,6 +231,16 @@
   };
 
 
+  // === ADD PINNED ENTRY (used by Slides panel to push custom entries) ===
+
+  window._addPinnedEntry = function(entry) {
+    pinnedViews.push(entry);
+    updatePinButtons();
+    renderPinnedCards();
+    savePinnedData();
+  };
+
+
   // === PERSISTENCE ===
 
   function savePinnedData() {
@@ -252,6 +315,33 @@
     switchReportTab("pinned");
     setTimeout(function() { window.print(); }, 200);
   };
+
+
+  // === TOAST NOTIFICATION ===
+
+  function showPinToast(message) {
+    var toast = document.createElement("div");
+    toast.className = "cj-toast";
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    // Force reflow before adding visible class
+    toast.offsetHeight;
+    toast.classList.add("visible");
+    setTimeout(function() {
+      toast.classList.remove("visible");
+      setTimeout(function() { toast.remove(); }, 350);
+    }, 2000);
+  }
+
+  function bounceButton(viewId) {
+    document.querySelectorAll(".cj-pin-btn").forEach(function(btn) {
+      var onclick = btn.getAttribute("onclick") || "";
+      if (onclick.indexOf("'" + viewId + "'") >= 0) {
+        btn.classList.add("bounce");
+        setTimeout(function() { btn.classList.remove("bounce"); }, 400);
+      }
+    });
+  }
 
 
   // === UTILITY ===

@@ -38,6 +38,7 @@ build_conjoint_page <- function(html_data, tables, charts, config) {
   simulator    <- build_simulator_panel(html_data, brand)
   about        <- build_about_panel(html_data$about, config)
   pinned       <- build_pinned_panel()
+  slides       <- build_slides_panel()
   help_overlay <- build_help_overlay()
   js           <- build_conjoint_js()
 
@@ -69,6 +70,7 @@ build_conjoint_page <- function(html_data, tables, charts, config) {
 %s
 %s
 %s
+%s
 </div>
 %s
 <footer class="cj-footer">
@@ -76,12 +78,13 @@ build_conjoint_page <- function(html_data, tables, charts, config) {
 </footer>
 <script type="application/json" id="cj-simulator-data">%s</script>
 <script type="application/json" id="pinned-views-data">[]</script>
+<script type="application/json" id="slides-data">[]</script>
 <script>%s</script>
 </body>
 </html>',
     meta_tags, .html_esc(summary$project_name), css, print_css,
     header, nav,
-    overview, utilities, diagnostics, lc_panel, wtp_panel, simulator, about, pinned,
+    overview, utilities, diagnostics, lc_panel, wtp_panel, simulator, about, pinned, slides,
     help_overlay,
     summary$generated, sim_json, js
   )
@@ -236,6 +239,7 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 /* === CHART CONTAINERS === */
 .cj-chart-container { margin:16px 0; }
 .cj-chart-wrap { margin:8px 0; }
+.cj-chart-wrap svg { display:block; }
 
 /* === EXPORT BUTTONS === */
 .cj-export-bar { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
@@ -264,14 +268,71 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
   content:attr(data-placeholder); color:#94a3b8; font-style:italic;
 }
 
-/* === PIN BUTTON === */
+/* === PIN BUTTON (emoji style, matches tabs) === */
 .cj-pin-btn {
-  display:inline-flex; align-items:center; gap:4px; padding:4px 10px;
-  font-size:11px; font-weight:500; border:1px solid #e2e8f0; border-radius:6px;
-  background:white; color:#94a3b8; cursor:pointer; transition:all 200ms;
+  background:none; border:1px solid #e2e8f0; border-radius:4px;
+  cursor:pointer; font-size:14px; padding:3px 8px;
+  color:#94a3b8; transition:all 0.15s;
 }
 .cj-pin-btn:hover { border-color:BRAND; color:BRAND; }
-.cj-pin-btn.pinned { background:BRAND; color:white; border-color:BRAND; }
+.cj-pin-btn.pinned { color:BRAND; border-color:BRAND; }
+
+/* === PIN BOUNCE ANIMATION === */
+@keyframes cj-pin-bounce {
+  0%   { transform:scale(1); }
+  30%  { transform:scale(1.25); }
+  60%  { transform:scale(0.9); }
+  100% { transform:scale(1); }
+}
+.cj-pin-btn.bounce { animation:cj-pin-bounce 400ms ease; }
+
+/* === TOAST NOTIFICATION === */
+.cj-toast {
+  position:fixed; top:20px; right:20px; z-index:2000;
+  background:#1e293b; color:#fff; padding:10px 20px;
+  border-radius:8px; font-size:13px; font-weight:500;
+  box-shadow:0 4px 12px rgba(0,0,0,0.15);
+  transform:translateX(120%); opacity:0;
+  transition:transform 300ms cubic-bezier(0.4,0,0.2,1), opacity 300ms ease;
+  pointer-events:none;
+}
+.cj-toast.visible { transform:translateX(0); opacity:1; }
+
+/* === CALLOUT BOXES === */
+.cj-callout {
+  background:#f8fafc; border-left:3px solid BRAND; border-radius:0 6px 6px 0;
+  padding:14px 18px; margin-bottom:16px; font-size:12px; line-height:1.65; color:#475569;
+}
+.cj-callout-title {
+  font-size:12px; font-weight:600; color:#1e293b; margin-bottom:6px;
+  text-transform:uppercase; letter-spacing:0.03em;
+}
+.cj-callout p { margin-bottom:6px; }
+.cj-callout p:last-child { margin-bottom:0; }
+
+/* === SIMULATOR CALLOUTS (mode-switched) === */
+.cj-sim-callout { display:none; }
+.cj-sim-callout.active { display:block; }
+
+/* === SLIDES PANEL === */
+.cj-slides-container { min-height:200px; }
+.cj-slide-card {
+  background:white; border-radius:8px; padding:24px; margin-bottom:16px;
+  box-shadow:0 1px 3px rgba(0,0,0,0.06); position:relative;
+  border-left:3px solid BRAND;
+}
+.cj-slide-title {
+  font-size:16px; font-weight:600; color:#1e293b; outline:none; margin-bottom:8px;
+}
+.cj-slide-title:empty::before { content:"Slide title..."; color:#94a3b8; font-style:italic; }
+.cj-slide-body {
+  min-height:80px; padding:12px; border:1px solid #e2e8f0; border-radius:6px;
+  font-size:13px; line-height:1.6; color:#334155; outline:none;
+}
+.cj-slide-body:focus { border-color:BRAND; box-shadow:0 0 0 2px rgba(50,51,103,0.1); }
+.cj-slide-body:empty::before { content:"Add content..."; color:#94a3b8; font-style:italic; }
+.cj-slide-actions { position:absolute; top:12px; right:12px; display:flex; gap:6px; }
+.cj-slide-empty { text-align:center; padding:60px 20px; color:#94a3b8; }
 
 /* === PINNED VIEWS === */
 .cj-pinned-container { min-height:200px; }
@@ -390,7 +451,8 @@ build_conjoint_print_css <- function() {
   .cj-report-tabs, .cj-export-bar, .cj-export-btn, .cj-pin-btn,
   .cj-insight-toggle, .cj-help-overlay, .cj-help-btn,
   .cj-util-search, .cj-sim-add-btn, .cj-sim-mode-btns,
-  .cj-pinned-card-actions, #panel-pinned, #panel-simulator { display:none !important; }
+  .cj-pinned-card-actions, .cj-slide-actions,
+  #panel-pinned, #panel-simulator { display:none !important; }
 
   body { background:white !important; font-size:14px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   .cj-panels-wrap { padding:0 !important; max-width:none !important; }
@@ -516,6 +578,7 @@ build_report_tab_nav <- function(html_data, config = list()) {
   }
 
   tabs <- c(tabs, list(list(id = "pinned", label = "Pinned")))
+  tabs <- c(tabs, list(list(id = "slides", label = "Slides")))
 
   buttons <- vapply(tabs, function(t) {
     active <- if (t$id == "overview") " active" else ""
@@ -552,21 +615,30 @@ build_overview_panel <- function(html_data, tables, charts, config = list()) {
     if (!is.na(summary$n_choice_sets)) format(summary$n_choice_sets, big.mark = ",") else "N/A"
   )
 
+  overview_callout <- .build_callout(
+    "Understanding This Overview",
+    "<p>Attribute importance shows which product features most influence customer choices. Higher percentages indicate attributes where level changes have the greatest impact on preferences. The importance values are derived from the range of utility values within each attribute.</p>"
+  )
+
   export_bar <- .build_export_bar("overview")
+  pin_btn <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-overview\')" title="Pin this view">\U0001F4CC</button>'
   insight <- build_insight_area("overview", html_data$insights)
 
   sprintf(
     '<div class="cj-panel active" id="panel-overview">
 %s
-<div class="cj-card">
 %s
-<h2>Attribute Importance</h2>
+<div class="cj-card">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+<h2 style="margin-bottom:0;">Attribute Importance</h2>
+<div style="display:flex;gap:8px;">%s %s</div>
+</div>
 <div class="cj-chart-container">%s</div>
 %s
 %s
 </div>
 </div>',
-    kpis, export_bar,
+    kpis, overview_callout, pin_btn, export_bar,
     charts$importance %||% "",
     tables$importance %||% "",
     insight
@@ -613,7 +685,7 @@ build_utilities_panel <- function(html_data, tables, charts, brand, config = lis
     table_html <- tables$utility_tables[[attr_name]] %||% ""
     export_bar <- .build_export_bar(paste0("util-", gsub("[^a-zA-Z0-9]", "-", attr_name)))
     pin_btn <- sprintf(
-      '<button class="cj-pin-btn" onclick="togglePin(\'util-%s\')">Pin</button>',
+      '<button class="cj-pin-btn" onclick="togglePin(\'util-%s\')" title="Pin this view">\U0001F4CC</button>',
       .html_esc(attr_name)
     )
 
@@ -633,6 +705,11 @@ build_utilities_panel <- function(html_data, tables, charts, brand, config = lis
     )
   }, character(1))
 
+  util_callout <- .build_callout(
+    "Reading Utility Values",
+    "<p>Part-worth utilities represent how much each attribute level contributes to overall product attractiveness. Higher values indicate greater preference. One level per attribute serves as the baseline (utility = 0), and other levels are measured relative to it. Positive values are preferred over the baseline; negative values are less preferred.</p>"
+  )
+
   insight <- build_insight_area("utilities", html_data$insights)
 
   sprintf(
@@ -642,10 +719,11 @@ build_utilities_panel <- function(html_data, tables, charts, brand, config = lis
 <div class="cj-util-content">
 %s
 %s
+%s
 </div>
 </div>
 </div>',
-    sidebar, paste(details, collapse = "\n"), insight
+    sidebar, util_callout, paste(details, collapse = "\n"), insight
   )
 }
 
@@ -658,12 +736,23 @@ build_utilities_panel <- function(html_data, tables, charts, brand, config = lis
 build_diagnostics_panel <- function(html_data, tables, charts, brand) {
 
   sections <- character()
+
+  # Explanatory callouts (model fit quality + estimation method)
+  diag_callouts <- .build_diagnostics_callouts(html_data)
+  sections <- c(sections, diag_callouts)
+
   export_bar <- .build_export_bar("diagnostics")
+  pin_fit <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-fit\')" title="Pin this view">\U0001F4CC</button>'
 
   # Model Fit
   sections <- c(sections, sprintf(
-    '<div class="cj-card">%s<h2>Model Fit</h2>%s</div>',
-    export_bar,
+    '<div class="cj-card">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+<h2 style="margin-bottom:0;">Model Fit</h2>
+<div style="display:flex;gap:8px;">%s %s</div>
+</div>
+%s</div>',
+    pin_fit, export_bar,
     tables$model_fit %||% '<p>No model fit data available.</p>'
   ))
 
@@ -672,14 +761,18 @@ build_diagnostics_panel <- function(html_data, tables, charts, brand) {
     hb <- html_data$hb_data
     status_class <- if (isTRUE(hb$convergence$converged)) "cj-status-pass" else "cj-status-fail"
     status_text <- if (isTRUE(hb$convergence$converged)) "CONVERGED" else "NOT CONVERGED"
+    pin_conv <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-convergence\')" title="Pin this view">\U0001F4CC</button>'
 
     sections <- c(sections, sprintf(
-      '<div class="cj-card"><h2>HB Convergence</h2>
+      '<div class="cj-card">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+<h2 style="margin-bottom:0;">HB Convergence</h2>%s
+</div>
 <p>Status: <span class="%s">%s</span></p>
 <p>Iterations: %s | Burn-in: %s | Draws retained: %s</p>
 %s
 </div>',
-      status_class, status_text,
+      pin_conv, status_class, status_text,
       format(hb$iterations %||% 0, big.mark = ","),
       format(hb$burnin %||% 0, big.mark = ","),
       format(hb$n_draws %||% 0, big.mark = ","),
@@ -688,8 +781,14 @@ build_diagnostics_panel <- function(html_data, tables, charts, brand) {
 
     # Respondent quality
     if (!is.null(hb$quality)) {
+      pin_quality <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-quality\')" title="Pin this view">\U0001F4CC</button>'
       sections <- c(sections, sprintf(
-        '<div class="cj-card"><h2>Respondent Quality</h2>%s</div>',
+        '<div class="cj-card">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+<h2 style="margin-bottom:0;">Respondent Quality</h2>%s
+</div>
+%s</div>',
+        pin_quality,
         tables$respondent_quality %||% sprintf(
           '<p>Mean RLH: <strong>%.3f</strong> | Chance: %.3f | Flagged: %d</p>',
           hb$quality$mean_rlh, hb$quality$chance_rlh, hb$quality$n_flagged
@@ -731,32 +830,46 @@ build_lc_panel <- function(html_data, tables, charts, brand) {
   ))
 
   # BIC chart + comparison table
+  pin_bic <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-bic\')" title="Pin this view">\U0001F4CC</button>'
   sections <- c(sections, sprintf(
-    '<div class="cj-card"><h2>Model Comparison</h2>
+    '<div class="cj-card">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+<h2 style="margin-bottom:0;">Model Comparison</h2>%s
+</div>
 <div class="cj-chart-container">%s</div>
 %s
 </div>',
+    pin_bic,
     charts$bic %||% "",
     tables$lc_comparison %||% ""
   ))
 
   # Class sizes
   if (!is.null(charts$class_sizes)) {
+    pin_sizes <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-sizes\')" title="Pin this view">\U0001F4CC</button>'
     sections <- c(sections, sprintf(
-      '<div class="cj-card"><h2>Class Sizes</h2>
+      '<div class="cj-card">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+<h2 style="margin-bottom:0;">Class Sizes</h2>%s
+</div>
 <div class="cj-chart-container">%s</div>
 </div>',
-      charts$class_sizes
+      pin_sizes, charts$class_sizes
     ))
   }
 
   # Class importance comparison
   if (!is.null(charts$class_importance)) {
+    pin_imp <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-importance\')" title="Pin this view">\U0001F4CC</button>'
     sections <- c(sections, sprintf(
-      '<div class="cj-card"><h2>Importance by Class</h2>
+      '<div class="cj-card">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+<h2 style="margin-bottom:0;">Importance by Class</h2>%s
+</div>
 <div class="cj-chart-container">%s</div>
 %s
 </div>',
+      pin_imp,
       charts$class_importance,
       tables$class_importance %||% ""
     ))
@@ -776,6 +889,14 @@ build_wtp_panel <- function(html_data, tables, charts, brand) {
   if (is.null(html_data$wtp_data)) return('<div class="cj-panel" id="panel-wtp"></div>')
 
   sections <- character()
+
+  # WTP callout
+  wtp_callout <- .build_callout(
+    "Willingness to Pay",
+    "<p>WTP converts utility values into monetary equivalents by dividing each level\u2019s utility by the price coefficient. This tells you how much extra a customer would pay for one level versus the baseline. Positive WTP means customers are willing to pay a premium; negative WTP means they require a discount.</p>"
+  )
+  sections <- c(sections, wtp_callout)
+
   export_bar <- .build_export_bar("wtp")
 
   # Price coefficient info
@@ -787,24 +908,34 @@ build_wtp_panel <- function(html_data, tables, charts, brand) {
   } else ""
 
   # WTP chart + table
+  pin_wtp <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-wtp-main\')" title="Pin this view">\U0001F4CC</button>'
   sections <- c(sections, sprintf(
-    '<div class="cj-card">%s<h2>Willingness to Pay</h2>
+    '<div class="cj-card">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+<h2 style="margin-bottom:0;">Willingness to Pay</h2>
+<div style="display:flex;gap:8px;">%s %s</div>
+</div>
 %s
 <div class="cj-chart-container">%s</div>
 %s
 </div>',
-    export_bar, info_html,
+    pin_wtp, export_bar, info_html,
     charts$wtp %||% "",
     tables$wtp %||% ""
   ))
 
   # Demand curve
   if (!is.null(charts$demand_curve) || !is.null(tables$demand_curve)) {
+    pin_demand <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-wtp-demand\')" title="Pin this view">\U0001F4CC</button>'
     sections <- c(sections, sprintf(
-      '<div class="cj-card"><h2>Demand Curve</h2>
+      '<div class="cj-card">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+<h2 style="margin-bottom:0;">Demand Curve</h2>%s
+</div>
 <div class="cj-chart-container">%s</div>
 %s
 </div>',
+      pin_demand,
       charts$demand_curve %||% "",
       tables$demand_curve %||% ""
     ))
@@ -828,12 +959,41 @@ build_simulator_panel <- function(html_data, brand) {
     return('<div class="cj-panel" id="panel-simulator"><div class="cj-card"><p>No simulator data available.</p></div></div>')
   }
 
+  # Mode-switched callouts
+  sim_callout_shares <- .build_callout("Market Shares",
+    "<p>Market share simulation predicts each product\u2019s share of preference using the configured attribute levels. The Logit model distributes share proportionally to each product\u2019s total utility; First Choice assigns all share to whichever product each respondent would most likely pick. Configure products on the left and see predicted shares update on the right.</p>")
+  sim_callout_sensitivity <- .build_callout("Sensitivity Analysis",
+    "<p>Sensitivity analysis sweeps through each level of a selected attribute for Product 1 while holding all other attributes constant. This reveals how much market share changes as you move between levels \u2014 helping identify which attribute level changes have the greatest competitive impact.</p>")
+  sim_callout_sov <- .build_callout("Source of Volume",
+    "<p>Source of Volume shows where a new product (the last one in the list) draws its market share from. By comparing shares before and after the new product enters, you can see which existing competitors lose the most \u2014 helping you understand the competitive dynamics of a potential new entry.</p>")
+
+  sim_callouts <- sprintf(
+    '<div id="cj-sim-callout-shares" class="cj-sim-callout active">%s</div>
+<div id="cj-sim-callout-sensitivity" class="cj-sim-callout">%s</div>
+<div id="cj-sim-callout-sov" class="cj-sim-callout">%s</div>',
+    sim_callout_shares, sim_callout_sensitivity, sim_callout_sov
+  )
+
+  # Simulator export bar
+  sim_export <- '<div class="cj-export-bar">
+<button class="cj-export-btn" onclick="exportSimulatorCSV()">CSV</button>
+<button class="cj-export-btn" onclick="exportSimulatorExcel()">Excel</button>
+<button class="cj-export-btn" onclick="exportChartPNG(\'simulator\')">Chart PNG</button>
+<button class="cj-export-btn" onclick="exportSlidePNG(\'simulator\')">Slide PNG</button>
+</div>'
+
   insight <- build_insight_area("simulator", html_data$insights)
+
+  pin_sim <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-simulator\')" title="Pin this view">\U0001F4CC</button>'
 
   sprintf(
     '<div class="cj-panel" id="panel-simulator">
 <div class="cj-card">
-<h2>Market Simulator</h2>
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+<h2 style="margin-bottom:0;">Market Simulator</h2>
+<div style="display:flex;gap:8px;">%s %s</div>
+</div>
+%s
 <p style="font-size:12px;color:#64748b;margin-bottom:16px;">Configure product profiles and compare predicted market shares.</p>
 <div class="cj-sim-mode-btns">
 <button class="cj-sim-mode-btn active" onclick="switchSimMode(\'shares\')">Market Shares</button>
@@ -853,7 +1013,7 @@ build_simulator_panel <- function(html_data, brand) {
 </div>
 %s
 </div>',
-    insight
+    pin_sim, sim_export, sim_callouts, insight
   )
 }
 
@@ -951,6 +1111,37 @@ build_pinned_panel <- function() {
 
 
 # ==============================================================================
+# SLIDES PANEL
+# ==============================================================================
+
+#' @keywords internal
+build_slides_panel <- function() {
+  '
+<div class="cj-panel" id="panel-slides">
+<div class="cj-slides-container">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+<div>
+<h2 style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;">Slides</h2>
+<p style="font-size:12px;color:#64748b;">Build narrative slides for your presentation. Each slide can contain a title and rich text content.</p>
+</div>
+<div style="display:flex;gap:8px;">
+<button class="cj-export-btn" onclick="addSlide()">+ Add Slide</button>
+<button class="cj-export-btn" onclick="exportAllSlidesPNG()">Export All Slides</button>
+<button class="cj-export-btn" onclick="printSlides()">Print Slides</button>
+</div>
+</div>
+<div id="cj-slides-cards"></div>
+<div class="cj-slide-empty" id="cj-slides-empty">
+<div style="font-size:36px;margin-bottom:12px;">&#128196;</div>
+<div style="font-size:14px;font-weight:600;">No slides yet</div>
+<div style="font-size:12px;margin-top:4px;">Click + Add Slide to create your first presentation slide.</div>
+</div>
+</div>
+</div>'
+}
+
+
+# ==============================================================================
 # HELP OVERLAY
 # ==============================================================================
 
@@ -999,6 +1190,73 @@ build_insight_area <- function(tab_id, insights = list()) {
     tab_id, tab_id, .html_esc(seed),
     tab_id, .html_esc(seed)
   )
+}
+
+
+# ==============================================================================
+# CALLOUT BOX (reusable)
+# ==============================================================================
+
+#' Build an explanatory callout box
+#' @param title Callout title (plain text)
+#' @param body_html HTML body content (can contain <p> tags)
+#' @keywords internal
+.build_callout <- function(title, body_html) {
+  sprintf(
+    '<div class="cj-callout"><div class="cj-callout-title">%s</div>%s</div>',
+    .html_esc(title), body_html
+  )
+}
+
+
+#' Build diagnostics callouts (model fit quality + estimation method)
+#' @param html_data Transformed data from 01_data_transformer
+#' @return Character string of HTML callout(s)
+#' @keywords internal
+.build_diagnostics_callouts <- function(html_data) {
+  callouts <- character()
+  method <- tolower(html_data$summary$estimation_method %||% "unknown")
+  diag <- html_data$diagnostics
+
+  # --- Model Fit Quality callout ---
+  fit_body <- "<p>Model fit measures how well the estimated utilities explain the observed choices in the data.</p>"
+  if (!is.null(diag$mcfadden_r2) && !is.na(diag$mcfadden_r2)) {
+    r2 <- diag$mcfadden_r2
+    quality <- if (r2 >= 0.4) "excellent"
+               else if (r2 >= 0.3) "very good"
+               else if (r2 >= 0.2) "good"
+               else if (r2 >= 0.1) "acceptable"
+               else "weak"
+    fit_body <- sprintf(
+      "<p>Model fit measures how well the estimated utilities explain the observed choices. The McFadden pseudo-R\u00b2 for this model is <strong>%.3f</strong>, which indicates %s fit. In discrete choice models, values between 0.2 and 0.4 are generally considered to represent good to excellent fit \u2014 these values are not directly comparable to R\u00b2 in linear regression.</p>",
+      r2, quality
+    )
+  }
+  if (!is.null(diag$ll_ratio_p) && !is.na(diag$ll_ratio_p)) {
+    sig_text <- if (diag$ll_ratio_p < 0.001) "highly significant (p < 0.001)"
+                else if (diag$ll_ratio_p < 0.01) sprintf("significant (p = %.3f)", diag$ll_ratio_p)
+                else if (diag$ll_ratio_p < 0.05) sprintf("marginally significant (p = %.3f)", diag$ll_ratio_p)
+                else sprintf("not significant (p = %.3f)", diag$ll_ratio_p)
+    fit_body <- paste0(fit_body, sprintf(
+      "<p>The log-likelihood ratio test is %s, indicating the model %s than a null model with no attribute effects.</p>",
+      sig_text,
+      if (diag$ll_ratio_p < 0.05) "performs significantly better" else "may not perform significantly better"
+    ))
+  }
+  callouts <- c(callouts, .build_callout("Model Fit Quality", fit_body))
+
+  # --- Estimation Method callout ---
+  method_body <- switch(
+    method,
+    "mlogit" =, "mnl" = "<p>Multinomial Logit (MNL) is the foundational model for choice-based conjoint analysis. It assumes each respondent evaluates alternatives by summing up the utility (attractiveness) of each attribute level, then selects the option with the highest total utility \u2014 with some randomness reflecting the unpredictable aspects of human decision-making.</p><p>MNL produces a single set of aggregate utilities representing the average preferences across all respondents. It works well when preferences are relatively homogeneous, and provides reliable, interpretable results with modest sample sizes.</p>",
+    "hb" = "<p>Hierarchical Bayes (HB) estimation produces individual-level utilities for each respondent. It combines information from all respondents (the \u2018population\u2019) with each individual\u2019s choices to produce stable estimates \u2014 even when a single respondent provides limited data.</p><p>The algorithm iterates thousands of times, gradually converging on preference estimates. This means we can see not just what matters on average, but how different people value different things. HB is the gold standard for modern conjoint analysis.</p>",
+    "latent_class" =, "lc" = "<p>Latent Class analysis identifies distinct groups (segments) of respondents who share similar preference patterns. Rather than assuming everyone has the same preferences (aggregate) or estimating individual preferences (HB), it finds the best number of naturally-occurring segments and estimates a separate set of utilities for each segment.</p><p>This approach is useful when you suspect the market contains fundamentally different types of buyers \u2014 for example, price-sensitive versus brand-loyal customers.</p>",
+    "best_worst" =, "bws" = "<p>Best-Worst Scaling asks respondents to identify both the most and least preferred options in each choice set. This extracts more information per task than standard choice-based conjoint, producing more discriminating utility estimates.</p><p>By capturing both the best and worst choices, we can better distinguish between levels that respondents are neutral about versus those they actively avoid.</p>",
+    "<p>The conjoint analysis estimates part-worth utilities for each attribute level, representing how much each level contributes to overall product preference. These utilities can be used to predict market shares, calculate willingness to pay, and understand competitive dynamics.</p>"
+  )
+  callouts <- c(callouts, .build_callout("Estimation Method", method_body))
+
+  paste(callouts, collapse = "\n")
 }
 
 

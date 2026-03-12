@@ -328,7 +328,8 @@ test_scenario("Sensitivity analysis produces consistent results", {
   current_row <- sens[sens$Is_Current, ]
   stopifnot(abs(current_row$Share_Change) < 0.01)
 
-  cat(sprintf("    - Tested %d price levels\n", nrow(sens)))\n  cat(sprintf("    - Current level has 0 share change: %s\n",
+  cat(sprintf("    - Tested %d price levels\n", nrow(sens)))
+  cat(sprintf("    - Current level has 0 share change: %s\n",
               abs(current_row$Share_Change) < 0.01))
 })
 

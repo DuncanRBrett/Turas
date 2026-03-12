@@ -83,22 +83,30 @@
 
     var chartW = Math.max(400, nAttrs * (nClasses * 30 + 40) + 200);
     var chartH = 280;
-    var ml = 50, mr = 100, mt = 20, mb = 70;
+    var ml = 50, mr = 100, mt = 20, mb = 50;
     var pw = chartW - ml - mr, ph = chartH - mt - mb;
     var groupW = pw / nAttrs;
-    var barW = Math.min(26, (groupW * 0.7) / nClasses);
+    var barW = Math.min(28, (groupW * 0.7) / nClasses);
 
     var allVals = [];
     classCols.forEach(function(c) { allVals = allVals.concat(classData[c.key]); });
     var maxVal = Math.max.apply(null, allVals.concat([50])) * 1.1;
 
+    // Nice tick step calculation
+    var rough = maxVal / 4;
+    var mag = Math.pow(10, Math.floor(Math.log10(rough)));
+    var candidates = [1, 2, 5, 10].map(function(c) { return c * mag; });
+    var tickStep = candidates.reduce(function(best, c) {
+      return Math.abs(c - rough) < Math.abs(best - rough) ? c : best;
+    });
+
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + chartW + ' ' + chartH + '" width="100%" style="max-width:' + chartW + 'px;font-family:system-ui,sans-serif;">';
 
-    // Y gridlines
-    for (var g = 0; g <= maxVal; g += 10) {
+    // Y gridlines (nice tick step)
+    for (var g = 0; g <= maxVal; g += tickStep) {
       var gy = mt + (1 - g / maxVal) * ph;
       svg += '<line x1="' + ml + '" y1="' + gy.toFixed(1) + '" x2="' + (chartW - mr) + '" y2="' + gy.toFixed(1) + '" stroke="#e2e8f0" stroke-width="1"/>';
-      svg += '<text x="' + (ml - 6) + '" y="' + gy.toFixed(1) + '" text-anchor="end" fill="#64748b" font-size="10" dominant-baseline="central">' + g + '%</text>';
+      svg += '<text x="' + (ml - 6) + '" y="' + gy.toFixed(1) + '" text-anchor="end" fill="#64748b" font-size="11" dominant-baseline="central">' + Math.round(g) + '%</text>';
     }
 
     // Bars
@@ -113,13 +121,13 @@
         var bh = mt + ph - by;
 
         svg += '<rect x="' + bx.toFixed(1) + '" y="' + by.toFixed(1) + '" width="' + (barW - 2).toFixed(1) + '" height="' + Math.max(bh, 1).toFixed(1) + '" rx="4" fill="' + (palette[j] || palette[0]) + '" opacity="0.8"/>';
-        svg += '<text x="' + (bx + (barW - 2) / 2).toFixed(1) + '" y="' + (by - 4).toFixed(1) + '" text-anchor="middle" fill="#334155" font-size="9" font-weight="500">' + Math.round(val) + '</text>';
+        svg += '<text x="' + (bx + (barW - 2) / 2).toFixed(1) + '" y="' + (by - 4).toFixed(1) + '" text-anchor="middle" fill="#334155" font-size="11" font-weight="600">' + Math.round(val) + '</text>';
       }
 
-      // Attribute label
+      // Attribute label (horizontal, no rotation)
       var lbl = attributes[i];
-      if (lbl.length > 12) lbl = lbl.substring(0, 11) + "\u2026";
-      svg += '<text x="' + gc.toFixed(1) + '" y="' + (chartH - mb + 12) + '" text-anchor="end" fill="#64748b" font-size="10" transform="rotate(-45,' + gc.toFixed(1) + ',' + (chartH - mb + 12) + ')">' + lbl + '</text>';
+      if (lbl.length > 18) lbl = lbl.substring(0, 17) + "\u2026";
+      svg += '<text x="' + gc.toFixed(1) + '" y="' + (chartH - mb + 16) + '" text-anchor="middle" fill="#64748b" font-size="11">' + lbl + '</text>';
     }
 
     // Legend
@@ -127,7 +135,7 @@
     for (var k = 0; k < nClasses; k++) {
       var ly = mt + k * 22;
       svg += '<rect x="' + lx + '" y="' + ly + '" width="14" height="14" rx="3" fill="' + (palette[k] || palette[0]) + '"/>';
-      svg += '<text x="' + (lx + 20) + '" y="' + (ly + 10) + '" fill="#64748b" font-size="10" dominant-baseline="central">' + classCols[k].label + '</text>';
+      svg += '<text x="' + (lx + 20) + '" y="' + (ly + 10) + '" fill="#64748b" font-size="11" dominant-baseline="central">' + classCols[k].label + '</text>';
     }
 
     svg += '</svg>';

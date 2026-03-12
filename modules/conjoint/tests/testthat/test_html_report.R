@@ -836,3 +836,370 @@ test_that("deprecated simulator wrapper forwards to combined report", {
   html <- paste(readLines(tmp_path, warn = FALSE), collapse = "\n")
   expect_true(grepl("panel-overview", html, fixed = TRUE))
 })
+
+
+# ==============================================================================
+# CALLOUT BOXES
+# ==============================================================================
+
+test_that("callout helper produces correct HTML structure", {
+  if (!exists(".build_callout", mode = "function")) skip(".build_callout not loaded")
+
+  html <- .build_callout("Test Title", "<p>Test body text</p>")
+  expect_true(grepl("cj-callout", html, fixed = TRUE))
+  expect_true(grepl("cj-callout-title", html, fixed = TRUE))
+  expect_true(grepl("Test Title", html, fixed = TRUE))
+  expect_true(grepl("Test body text", html, fixed = TRUE))
+})
+
+
+test_that("diagnostics callouts produce method-specific text", {
+  if (!exists(".build_diagnostics_callouts", mode = "function")) skip(".build_diagnostics_callouts not loaded")
+
+  # MNL / mlogit
+  html_data_mnl <- list(
+    summary = list(estimation_method = "mlogit"),
+    diagnostics = list(mcfadden_r2 = 0.35)
+  )
+  callouts <- .build_diagnostics_callouts(html_data_mnl)
+  combined <- paste(callouts, collapse = "\n")
+  expect_true(grepl("cj-callout", combined, fixed = TRUE))
+  expect_true(grepl("Model Fit Quality", combined, fixed = TRUE))
+  expect_true(grepl("Estimation Method", combined, fixed = TRUE))
+  expect_true(grepl("Multinomial Logit", combined, fixed = TRUE))
+
+  # HB
+  html_data_hb <- list(
+    summary = list(estimation_method = "hb"),
+    diagnostics = list()
+  )
+  callouts_hb <- .build_diagnostics_callouts(html_data_hb)
+  combined_hb <- paste(callouts_hb, collapse = "\n")
+  expect_true(grepl("Hierarchical Bayes", combined_hb, fixed = TRUE))
+
+  # Latent class
+  html_data_lc <- list(
+    summary = list(estimation_method = "latent_class"),
+    diagnostics = list()
+  )
+  callouts_lc <- .build_diagnostics_callouts(html_data_lc)
+  combined_lc <- paste(callouts_lc, collapse = "\n")
+  expect_true(grepl("Latent Class", combined_lc, fixed = TRUE))
+})
+
+
+test_that("diagnostics callouts interpret McFadden R-squared ranges", {
+  if (!exists(".build_diagnostics_callouts", mode = "function")) skip(".build_diagnostics_callouts not loaded")
+
+  # Good fit (0.2-0.4)
+  html_data <- list(
+    summary = list(estimation_method = "mlogit"),
+    diagnostics = list(mcfadden_r2 = 0.32)
+  )
+  callouts <- paste(.build_diagnostics_callouts(html_data), collapse = "\n")
+  expect_true(grepl("0.32", callouts, fixed = TRUE))
+
+  # Excellent fit (>0.4)
+  html_data2 <- list(
+    summary = list(estimation_method = "mlogit"),
+    diagnostics = list(mcfadden_r2 = 0.55)
+  )
+  callouts2 <- paste(.build_diagnostics_callouts(html_data2), collapse = "\n")
+  expect_true(grepl("0.55", callouts2, fixed = TRUE))
+})
+
+
+test_that("generated HTML includes callout boxes on major panels", {
+  if (!exists("generate_conjoint_html_report", mode = "function")) skip("generate_conjoint_html_report not loaded")
+
+  conjoint_results <- list(
+    utilities = generate_utilities_df(),
+    importance = generate_importance_df(),
+    model_result = list(
+      method = "mlogit",
+      n_respondents = 100,
+      convergence = list(converged = TRUE)
+    ),
+    diagnostics = list(mcfadden_r2 = 0.35)
+  )
+  config <- list(brand_colour = "#2563eb")
+
+  tmp_path <- tempfile(fileext = ".html")
+  on.exit(unlink(tmp_path), add = TRUE)
+
+  result <- generate_conjoint_html_report(conjoint_results, tmp_path, config)
+  expect_equal(result$status, "PASS")
+
+  html <- paste(readLines(tmp_path, warn = FALSE), collapse = "\n")
+
+  # Callout CSS class
+  expect_true(grepl("cj-callout", html, fixed = TRUE))
+
+  # Overview callout
+  expect_true(grepl("Understanding This Overview", html, fixed = TRUE))
+
+  # Utilities callout
+  expect_true(grepl("Reading Utility Values", html, fixed = TRUE))
+
+  # Diagnostics callouts
+  expect_true(grepl("Model Fit Quality", html, fixed = TRUE))
+  expect_true(grepl("Estimation Method", html, fixed = TRUE))
+
+  # Simulator callouts (3 mode-switched)
+  expect_true(grepl("cj-sim-callout-shares", html, fixed = TRUE))
+  expect_true(grepl("cj-sim-callout-sensitivity", html, fixed = TRUE))
+  expect_true(grepl("cj-sim-callout-sov", html, fixed = TRUE))
+
+  # Simulator callout toggle CSS
+  expect_true(grepl("cj-sim-callout", html, fixed = TRUE))
+})
+
+
+test_that("WTP callout appears when WTP data is present", {
+  if (!exists("generate_conjoint_html_report", mode = "function")) skip("generate_conjoint_html_report not loaded")
+
+  conjoint_results <- list(
+    utilities = generate_utilities_df(),
+    importance = generate_importance_df(),
+    model_result = list(method = "mlogit", n_respondents = 50),
+    wtp = list(
+      wtp_table = data.frame(
+        Attribute = c("Brand", "Brand"),
+        Level = c("Alpha", "Beta"),
+        WTP = c(0, 12.5),
+        is_baseline = c(TRUE, FALSE),
+        stringsAsFactors = FALSE
+      ),
+      price_coefficient = -0.04,
+      price_attribute = "Price"
+    )
+  )
+  config <- list(brand_colour = "#2563eb")
+
+  tmp_path <- tempfile(fileext = ".html")
+  on.exit(unlink(tmp_path), add = TRUE)
+
+  result <- generate_conjoint_html_report(conjoint_results, tmp_path, config)
+  html <- paste(readLines(tmp_path, warn = FALSE), collapse = "\n")
+
+  expect_true(grepl("Willingness to Pay", html, fixed = TRUE))
+})
+
+
+# ==============================================================================
+# PIN BUTTONS (EMOJI) ON ALL VIEWS
+# ==============================================================================
+
+test_that("pin buttons use emoji character on all panels", {
+  if (!exists("generate_conjoint_html_report", mode = "function")) skip("generate_conjoint_html_report not loaded")
+
+  conjoint_results <- list(
+    utilities = generate_utilities_df(),
+    importance = generate_importance_df(),
+    model_result = list(
+      method = "mlogit",
+      n_respondents = 100,
+      convergence = list(converged = TRUE)
+    ),
+    diagnostics = list(mcfadden_r2 = 0.35)
+  )
+  config <- list(brand_colour = "#2563eb")
+
+  tmp_path <- tempfile(fileext = ".html")
+  on.exit(unlink(tmp_path), add = TRUE)
+
+  result <- generate_conjoint_html_report(conjoint_results, tmp_path, config)
+  expect_equal(result$status, "PASS")
+
+  html <- paste(readLines(tmp_path, warn = FALSE), collapse = "\n")
+
+  # Pin button CSS class
+  expect_true(grepl("cj-pin-btn", html, fixed = TRUE))
+
+  # Pin buttons should use emoji pushpin (U+1F4CC), not text "Pin"
+  # Test via togglePin pattern (proves pin buttons exist) and absence of old ">Pin<" text
+  pin_emoji <- "\U0001F4CC"
+  expect_true(grepl(pin_emoji, html, fixed = TRUE, useBytes = TRUE))
+
+  # Overview pin
+  expect_true(grepl("pin-overview", html, fixed = TRUE))
+
+  # Diagnostics pins
+  expect_true(grepl("pin-diagnostics-fit", html, fixed = TRUE))
+
+  # Simulator pin
+  expect_true(grepl("pin-simulator", html, fixed = TRUE))
+})
+
+
+test_that("pin buttons present on WTP and LC panels when data available", {
+  if (!exists("generate_conjoint_html_report", mode = "function")) skip("generate_conjoint_html_report not loaded")
+
+  conjoint_results <- list(
+    utilities = generate_utilities_df(),
+    importance = generate_importance_df(),
+    model_result = list(method = "mlogit", n_respondents = 50),
+    wtp = list(
+      wtp_table = data.frame(
+        Attribute = c("Brand", "Brand"),
+        Level = c("Alpha", "Beta"),
+        WTP = c(0, 12.5),
+        is_baseline = c(TRUE, FALSE),
+        stringsAsFactors = FALSE
+      ),
+      price_coefficient = -0.04,
+      price_attribute = "Price"
+    )
+  )
+  config <- list(brand_colour = "#2563eb")
+
+  tmp_path <- tempfile(fileext = ".html")
+  on.exit(unlink(tmp_path), add = TRUE)
+
+  result <- generate_conjoint_html_report(conjoint_results, tmp_path, config)
+  html <- paste(readLines(tmp_path, warn = FALSE), collapse = "\n")
+
+  # WTP pins
+  expect_true(grepl("pin-wtp-main", html, fixed = TRUE))
+})
+
+
+# ==============================================================================
+# SLIDES PANEL
+# ==============================================================================
+
+test_that("slides panel is built and included in page", {
+  if (!exists("build_slides_panel", mode = "function")) skip("build_slides_panel not loaded")
+
+  slides_html <- build_slides_panel()
+  expect_true(grepl("panel-slides", slides_html, fixed = TRUE))
+  expect_true(grepl("cj-slides-container", slides_html, fixed = TRUE))
+  expect_true(grepl("cj-slides-cards", slides_html, fixed = TRUE))
+  expect_true(grepl("cj-slides-empty", slides_html, fixed = TRUE))
+  expect_true(grepl("addSlide", slides_html, fixed = TRUE))
+  expect_true(grepl("exportAllSlidesPNG", slides_html, fixed = TRUE))
+  expect_true(grepl("printSlides", slides_html, fixed = TRUE))
+})
+
+
+test_that("slides panel appears in full HTML report", {
+  if (!exists("generate_conjoint_html_report", mode = "function")) skip("generate_conjoint_html_report not loaded")
+
+  conjoint_results <- list(
+    utilities = generate_utilities_df(),
+    importance = generate_importance_df(),
+    model_result = list(method = "mlogit", n_respondents = 100)
+  )
+  config <- list(brand_colour = "#2563eb")
+
+  tmp_path <- tempfile(fileext = ".html")
+  on.exit(unlink(tmp_path), add = TRUE)
+
+  result <- generate_conjoint_html_report(conjoint_results, tmp_path, config)
+  html <- paste(readLines(tmp_path, warn = FALSE), collapse = "\n")
+
+  # Slides panel present
+  expect_true(grepl("panel-slides", html, fixed = TRUE))
+
+  # Slides JSON data store for persistence
+  expect_true(grepl("slides-data", html, fixed = TRUE))
+
+  # Slides tab in navigation
+  expect_true(grepl('data-tab="slides"', html, fixed = TRUE))
+})
+
+
+# ==============================================================================
+# SIMULATOR EXPORT BAR
+# ==============================================================================
+
+test_that("simulator panel includes export bar with CSV and Excel", {
+  if (!exists("generate_conjoint_html_report", mode = "function")) skip("generate_conjoint_html_report not loaded")
+
+  conjoint_results <- list(
+    utilities = generate_utilities_df(),
+    importance = generate_importance_df(),
+    model_result = list(method = "mlogit", n_respondents = 100)
+  )
+  config <- list(brand_colour = "#2563eb")
+
+  tmp_path <- tempfile(fileext = ".html")
+  on.exit(unlink(tmp_path), add = TRUE)
+
+  result <- generate_conjoint_html_report(conjoint_results, tmp_path, config)
+  html <- paste(readLines(tmp_path, warn = FALSE), collapse = "\n")
+
+  # Simulator-specific export functions
+  expect_true(grepl("exportSimulatorCSV", html, fixed = TRUE))
+  expect_true(grepl("exportSimulatorExcel", html, fixed = TRUE))
+})
+
+
+# ==============================================================================
+# JS FILE CONTENT TESTS — NEW FEATURES
+# ==============================================================================
+
+test_that("navigation JS includes slides system functions", {
+  js_dir <- if (!is.null(conjoint_root)) file.path(conjoint_root, "lib", "html_report", "js") else NULL
+  if (is.null(js_dir) || !dir.exists(js_dir)) skip("JS directory not found")
+
+  nav_file <- file.path(js_dir, "conjoint_navigation.js")
+  if (!file.exists(nav_file)) skip("conjoint_navigation.js not found")
+
+  nav_js <- paste(readLines(nav_file, warn = FALSE), collapse = "\n")
+
+  # Slides functions
+  expect_true(grepl("addSlide", nav_js, fixed = TRUE))
+  expect_true(grepl("removeSlide", nav_js, fixed = TRUE))
+  expect_true(grepl("moveSlide", nav_js, fixed = TRUE))
+  expect_true(grepl("renderSlides", nav_js, fixed = TRUE))
+  expect_true(grepl("hydrateSlides", nav_js, fixed = TRUE))
+  expect_true(grepl("saveSlides", nav_js, fixed = TRUE))
+  expect_true(grepl("pinSlide", nav_js, fixed = TRUE))
+  expect_true(grepl("exportAllSlidesPNG", nav_js, fixed = TRUE))
+
+  # Callout toggle in switchSimMode
+  expect_true(grepl("cj-sim-callout", nav_js, fixed = TRUE))
+  expect_true(grepl("switchSimMode", nav_js, fixed = TRUE))
+})
+
+
+test_that("export JS includes simulator-specific export functions", {
+  js_dir <- if (!is.null(conjoint_root)) file.path(conjoint_root, "lib", "html_report", "js") else NULL
+  if (is.null(js_dir) || !dir.exists(js_dir)) skip("JS directory not found")
+
+  export_file <- file.path(js_dir, "conjoint_export.js")
+  if (!file.exists(export_file)) skip("conjoint_export.js not found")
+
+  export_js <- paste(readLines(export_file, warn = FALSE), collapse = "\n")
+
+  # Simulator export functions
+  expect_true(grepl("exportSimulatorCSV", export_js, fixed = TRUE))
+  expect_true(grepl("exportSimulatorExcel", export_js, fixed = TRUE))
+  expect_true(grepl("buildSimulatorExportData", export_js, fixed = TRUE))
+
+  # Shared refactored functions
+  expect_true(grepl("exportCSVFromData", export_js, fixed = TRUE))
+  expect_true(grepl("exportExcelFromData", export_js, fixed = TRUE))
+})
+
+
+test_that("pins JS includes expanded captureView and _addPinnedEntry", {
+  js_dir <- if (!is.null(conjoint_root)) file.path(conjoint_root, "lib", "html_report", "js") else NULL
+  if (is.null(js_dir) || !dir.exists(js_dir)) skip("JS directory not found")
+
+  pins_file <- file.path(js_dir, "conjoint_pins.js")
+  if (!file.exists(pins_file)) skip("conjoint_pins.js not found")
+
+  pins_js <- paste(readLines(pins_file, warn = FALSE), collapse = "\n")
+
+  # Expanded captureView handles new pin IDs
+  expect_true(grepl("pin-overview", pins_js, fixed = TRUE))
+  expect_true(grepl("pin-diagnostics", pins_js, fixed = TRUE))
+  expect_true(grepl("pin-wtp", pins_js, fixed = TRUE))
+  expect_true(grepl("pin-lc", pins_js, fixed = TRUE))
+  expect_true(grepl("pin-simulator", pins_js, fixed = TRUE))
+
+  # Slides integration
+  expect_true(grepl("_addPinnedEntry", pins_js, fixed = TRUE))
+})

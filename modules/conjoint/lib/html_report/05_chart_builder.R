@@ -25,16 +25,16 @@
   )
 }
 
-.svg_axis_label <- function(x, y, label, anchor = "middle", size = 11, weight = 400) {
+.svg_axis_label <- function(x, y, label, anchor = "middle", size = 11, weight = 500) {
   sprintf(
     '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#64748b" font-size="%d" font-weight="%d">%s</text>',
     x, y, anchor, size, weight, label
   )
 }
 
-.svg_value_label <- function(x, y, label, anchor = "middle", size = 11) {
+.svg_value_label <- function(x, y, label, anchor = "middle", size = 12) {
   sprintf(
-    '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#334155" font-size="%d" font-weight="500">%s</text>',
+    '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#334155" font-size="%d" font-weight="600">%s</text>',
     x, y, anchor, size, label
   )
 }
@@ -57,10 +57,10 @@ build_importance_chart <- function(importance, brand_colour = "#323367") {
   imp_sorted <- importance[order(importance$Importance), ]
   n <- nrow(imp_sorted)
 
-  chart_width <- 600
+  chart_width <- 800
   chart_height <- max(200, n * 40 + 60)
-  margin_left <- 160
-  margin_right <- 60
+  margin_left <- 180
+  margin_right <- 80
   margin_top <- 30
   margin_bottom <- 30
   plot_w <- chart_width - margin_left - margin_right
@@ -69,30 +69,32 @@ build_importance_chart <- function(importance, brand_colour = "#323367") {
 
   elements <- character()
 
-  # Gridlines
+  # Gridlines (skip tick=0 to remove left-edge clutter)
   max_imp <- max(imp_sorted$Importance, 50)
   grid_ticks <- seq(0, ceiling(max_imp / 10) * 10, by = 10)
   for (tick in grid_ticks) {
+    if (tick == 0) next
     x <- margin_left + (tick / max_imp) * plot_w
     elements <- c(elements, .svg_gridline(x, margin_top, x, chart_height - margin_bottom))
     elements <- c(elements, .svg_axis_label(x, chart_height - margin_bottom + 16, sprintf("%d%%", tick)))
   }
 
-  # Bars
+  # Bars with opacity gradient: least important (0.72) → most important (0.92)
   for (i in seq_len(n)) {
     y <- margin_top + (i - 1) * (bar_height + bar_gap)
     w <- (imp_sorted$Importance[i] / max_imp) * plot_w
+    bar_opacity <- 0.72 + (i - 1) / max(n - 1, 1) * 0.20
 
     # Label
     elements <- c(elements, sprintf(
-      '<text x="%d" y="%.1f" text-anchor="end" fill="#334155" font-size="12" font-weight="400" dominant-baseline="central">%s</text>',
+      '<text x="%d" y="%.1f" text-anchor="end" fill="#334155" font-size="13" font-weight="500" dominant-baseline="central">%s</text>',
       margin_left - 8, y + bar_height / 2, imp_sorted$Attribute[i]
     ))
 
     # Bar with rounded corners
     elements <- c(elements, sprintf(
-      '<rect x="%d" y="%.1f" width="%.1f" height="%d" rx="4" fill="%s" opacity="0.85"/>',
-      margin_left, y, max(w, 2), bar_height, brand_colour
+      '<rect x="%d" y="%.1f" width="%.1f" height="%d" rx="4" fill="%s" opacity="%.2f"/>',
+      margin_left, y, max(w, 2), bar_height, brand_colour, bar_opacity
     ))
 
     # Value label
@@ -122,12 +124,12 @@ build_importance_chart <- function(importance, brand_colour = "#323367") {
 build_utility_chart <- function(attr_utilities, attr_name, brand_colour = "#323367") {
 
   n <- nrow(attr_utilities)
-  chart_width <- max(300, n * 80 + 120)
-  chart_height <- 280
+  chart_width <- max(400, n * 100 + 120)
+  chart_height <- 250
   margin_left <- 50
   margin_right <- 20
-  margin_top <- 40
-  margin_bottom <- 80
+  margin_top <- 20
+  margin_bottom <- 50
   plot_w <- chart_width - margin_left - margin_right
   plot_h <- chart_height - margin_top - margin_bottom
   bar_width <- min(50, (plot_w / n) * 0.6)
@@ -141,17 +143,16 @@ build_utility_chart <- function(attr_utilities, attr_name, brand_colour = "#3233
 
   elements <- character()
 
-  # Title
-  elements <- c(elements, .svg_value_label(chart_width / 2, 16, attr_name, size = 13))
+  # No SVG title — card h2 already shows attribute name
 
-  # Zero line
+  # Zero line (softer)
   elements <- c(elements, sprintf(
-    '<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,4"/>',
+    '<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="6,3"/>',
     margin_left, zero_y, chart_width - margin_right, zero_y
   ))
 
-  # Gridlines
-  grid_step <- if (u_max > 1) round(u_max / 3, 1) else round(u_max / 3, 2)
+  # Gridlines using nice tick step
+  grid_step <- .nice_tick_step(u_max)
   if (grid_step > 0) {
     grid_vals <- seq(-floor(u_max / grid_step) * grid_step,
                      ceiling(u_max / grid_step) * grid_step, by = grid_step)
@@ -161,7 +162,7 @@ build_utility_chart <- function(attr_utilities, attr_name, brand_colour = "#3233
       if (gy >= margin_top && gy <= chart_height - margin_bottom) {
         elements <- c(elements, .svg_gridline(margin_left, gy, chart_width - margin_right, gy))
         elements <- c(elements, .svg_axis_label(
-          margin_left - 6, gy, sprintf("%.2f", gv), anchor = "end", size = 10
+          margin_left - 6, gy, sprintf("%.2f", gv), anchor = "end", size = 11
         ))
       }
     }
@@ -172,7 +173,7 @@ build_utility_chart <- function(attr_utilities, attr_name, brand_colour = "#3233
     x_center <- margin_left + (i - 0.5) * (plot_w / n)
     x <- x_center - bar_width / 2
     u <- u_values[i]
-    bar_colour <- if (u >= 0) brand_colour else "#e74c3c"
+    bar_colour <- if (u >= 0) brand_colour else "#c0695c"
 
     if (u >= 0) {
       bar_y <- scale_y(u)
@@ -189,15 +190,14 @@ build_utility_chart <- function(attr_utilities, attr_name, brand_colour = "#3233
 
     # Value label
     label_y <- if (u >= 0) bar_y - 6 else bar_y + bar_h + 14
-    elements <- c(elements, .svg_value_label(x_center, label_y, sprintf("%.3f", u), size = 10))
+    elements <- c(elements, .svg_value_label(x_center, label_y, sprintf("%.3f", u), size = 12))
 
-    # Level label (rotated)
+    # Level label (horizontal, no rotation)
     label <- attr_utilities$Level[i]
-    if (nchar(label) > 15) label <- paste0(substr(label, 1, 14), "\u2026")
+    if (nchar(label) > 20) label <- paste0(substr(label, 1, 19), "\u2026")
     elements <- c(elements, sprintf(
-      '<text x="%.1f" y="%.1f" text-anchor="end" fill="#64748b" font-size="10" transform="rotate(-45,%.1f,%.1f)">%s</text>',
-      x_center, chart_height - margin_bottom + 12,
-      x_center, chart_height - margin_bottom + 12, label
+      '<text x="%.1f" y="%.1f" text-anchor="middle" fill="#64748b" font-size="11">%s</text>',
+      x_center, chart_height - margin_bottom + 16, label
     ))
   }
 
@@ -221,11 +221,11 @@ build_bic_chart <- function(comparison, optimal_k, brand_colour = "#323367") {
 
   if (is.null(comparison) || nrow(comparison) < 2) return("")
 
-  chart_width <- 400
+  chart_width <- 500
   chart_height <- 250
   margin_left <- 70
   margin_right <- 30
-  margin_top <- 30
+  margin_top <- 20
   margin_bottom <- 50
   plot_w <- chart_width - margin_left - margin_right
   plot_h <- chart_height - margin_top - margin_bottom
@@ -247,33 +247,32 @@ build_bic_chart <- function(comparison, optimal_k, brand_colour = "#323367") {
     gy <- y_scale(bic_val)
     elements <- c(elements, .svg_gridline(margin_left, gy, chart_width - margin_right, gy))
     elements <- c(elements, .svg_axis_label(
-      margin_left - 6, gy, sprintf("%.0f", bic_val), anchor = "end", size = 10
+      margin_left - 6, gy, sprintf("%.0f", bic_val), anchor = "end", size = 11
     ))
   }
 
-  # Line path
+  # Line path (rounded joins/caps)
   points <- vapply(seq_along(ks), function(i) {
     sprintf("%.1f,%.1f", x_scale(ks[i]), y_scale(bics[i]))
   }, character(1))
   elements <- c(elements, sprintf(
-    '<polyline points="%s" fill="none" stroke="%s" stroke-width="2.5"/>',
+    '<polyline points="%s" fill="none" stroke="%s" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>',
     paste(points, collapse = " "), brand_colour
   ))
 
-  # Data points
+  # Data points (white stroke border for premium look)
   for (i in seq_along(ks)) {
     cx <- x_scale(ks[i])
     cy <- y_scale(bics[i])
-    fill <- if (ks[i] == optimal_k) "#e74c3c" else brand_colour
-    r <- if (ks[i] == optimal_k) 6 else 4
+    fill <- if (ks[i] == optimal_k) "#c0695c" else brand_colour
+    r <- if (ks[i] == optimal_k) 6 else 5
     elements <- c(elements, sprintf(
-      '<circle cx="%.1f" cy="%.1f" r="%d" fill="%s"/>', cx, cy, r, fill
+      '<circle cx="%.1f" cy="%.1f" r="%d" fill="%s" stroke="#fff" stroke-width="2.5"/>', cx, cy, r, fill
     ))
-    elements <- c(elements, .svg_axis_label(cx, chart_height - margin_bottom + 20, sprintf("K=%d", ks[i])))
+    elements <- c(elements, .svg_axis_label(cx, chart_height - margin_bottom + 20, sprintf("K=%d", ks[i]), size = 11))
   }
 
-  # Title
-  elements <- c(elements, .svg_value_label(chart_width / 2, 16, "BIC by Number of Classes", size = 12))
+  # No SVG title — card h2 already shows "Model Comparison"
 
   .svg_wrap("bic-comparison", elements, chart_width, chart_height)
 }
@@ -302,11 +301,11 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
   if (nrow(wtp) == 0) return("")
 
   n <- nrow(wtp)
-  chart_width <- 600
-  bar_height <- 22
+  chart_width <- 800
+  bar_height <- 24
   bar_gap <- 6
   group_gap <- 14
-  margin_left <- 180
+  margin_left <- 220
   margin_right <- 80
   margin_top <- 30
   margin_bottom <- 30
@@ -323,9 +322,9 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
 
   elements <- character()
 
-  # Zero line
+  # Zero line (softer)
   elements <- c(elements, sprintf(
-    '<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,4"/>',
+    '<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="6,3"/>',
     zero_x, margin_top, zero_x, chart_height - margin_bottom
   ))
 
@@ -350,18 +349,14 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
     curr_attr <- wtp$Attribute[i]
     if (curr_attr != prev_attr && prev_attr != "") {
       y_pos <- y_pos + group_gap
-      # Attribute separator label
-      elements <- c(elements, sprintf(
-        '<text x="%d" y="%.1f" text-anchor="end" fill="#94a3b8" font-size="10" font-weight="500" dominant-baseline="central">%s</text>',
-        margin_left - 8, y_pos - group_gap / 2, ""
-      ))
+      # No empty separator text element
     }
     prev_attr <- curr_attr
 
     val <- wtp$WTP[i]
-    bar_colour <- if (val >= 0) brand_colour else "#e74c3c"
+    bar_colour <- if (val >= 0) brand_colour else "#c0695c"
     label <- sprintf("%s: %s", curr_attr, wtp$Level[i])
-    if (nchar(label) > 28) label <- paste0(substr(label, 1, 27), "\u2026")
+    if (nchar(label) > 34) label <- paste0(substr(label, 1, 33), "\u2026")
 
     # Label
     elements <- c(elements, sprintf(
@@ -386,7 +381,7 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
     vx <- if (val >= 0) scale_x(val) + 4 else scale_x(val) - 4
     vanch <- if (val >= 0) "start" else "end"
     elements <- c(elements, .svg_value_label(
-      vx, y_pos + bar_height / 2, sprintf("$%.2f", val), anchor = vanch, size = 10
+      vx, y_pos + bar_height / 2, sprintf("$%.2f", val), anchor = vanch, size = 12
     ))
 
     y_pos <- y_pos + bar_height + bar_gap
@@ -424,7 +419,7 @@ build_demand_curve_chart <- function(demand_curve, brand_colour = "#323367") {
   share_col <- if ("Share" %in% names(demand_curve)) "Share" else if ("Demand" %in% names(demand_curve)) "Demand" else NULL
   if (is.null(share_col)) return("")
 
-  chart_width <- 500
+  chart_width <- 700
   chart_height <- 300
   margin_left <- 60
   margin_right <- 30
@@ -454,7 +449,7 @@ build_demand_curve_chart <- function(demand_curve, brand_colour = "#323367") {
     yy <- scale_y(yt)
     if (yy >= margin_top && yy <= chart_height - margin_bottom) {
       elements <- c(elements, .svg_gridline(margin_left, yy, chart_width - margin_right, yy))
-      elements <- c(elements, .svg_axis_label(margin_left - 6, yy, sprintf("%.0f%%", yt), anchor = "end", size = 10))
+      elements <- c(elements, .svg_axis_label(margin_left - 6, yy, sprintf("%.0f%%", yt), anchor = "end", size = 11))
     }
   }
 
@@ -463,32 +458,32 @@ build_demand_curve_chart <- function(demand_curve, brand_colour = "#323367") {
   x_ticks <- seq(ceiling(x_min / x_step) * x_step, floor(x_max / x_step) * x_step, by = x_step)
   for (xt in x_ticks) {
     xx <- scale_x(xt)
-    elements <- c(elements, .svg_axis_label(xx, chart_height - margin_bottom + 16, sprintf("$%.0f", xt)))
+    elements <- c(elements, .svg_axis_label(xx, chart_height - margin_bottom + 16, sprintf("$%.0f", xt), size = 11))
   }
 
-  # Line
+  # Line (rounded joins/caps)
   line_points <- vapply(seq_len(nrow(demand_curve)), function(i) {
     sprintf("%.1f,%.1f", scale_x(prices[i]), scale_y(shares[i]))
   }, character(1))
   elements <- c(elements, sprintf(
-    '<polyline points="%s" fill="none" stroke="%s" stroke-width="2.5"/>',
+    '<polyline points="%s" fill="none" stroke="%s" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>',
     paste(line_points, collapse = " "), brand_colour
   ))
 
-  # Data points
+  # Data points (white stroke border)
   for (i in seq_len(nrow(demand_curve))) {
     cx <- scale_x(prices[i])
     cy <- scale_y(shares[i])
     elements <- c(elements, sprintf(
-      '<circle cx="%.1f" cy="%.1f" r="4" fill="%s"/>', cx, cy, brand_colour
+      '<circle cx="%.1f" cy="%.1f" r="5" fill="%s" stroke="#fff" stroke-width="2.5"/>', cx, cy, brand_colour
     ))
-    elements <- c(elements, .svg_value_label(cx, cy - 10, sprintf("%.1f%%", shares[i]), size = 9))
+    elements <- c(elements, .svg_value_label(cx, cy - 12, sprintf("%.1f%%", shares[i]), size = 11))
   }
 
-  # Axis labels
-  elements <- c(elements, .svg_value_label(chart_width / 2, chart_height - 5, "Price", size = 11))
+  # Axis title labels
+  elements <- c(elements, .svg_value_label(chart_width / 2, chart_height - 5, "Price", size = 12))
   elements <- c(elements, sprintf(
-    '<text x="15" y="%.1f" text-anchor="middle" fill="#334155" font-size="11" font-weight="500" transform="rotate(-90,15,%.1f)">Market Share</text>',
+    '<text x="15" y="%.1f" text-anchor="middle" fill="#334155" font-size="12" font-weight="600" transform="rotate(-90,15,%.1f)">Market Share</text>',
     margin_top + plot_h / 2, margin_top + plot_h / 2
   ))
 
@@ -519,11 +514,11 @@ build_class_importance_chart <- function(class_importance, brand_colour = "#3233
   n_classes <- length(class_cols)
 
   chart_width <- max(400, n_attrs * (n_classes * 30 + 40) + 200)
-  chart_height <- 300
+  chart_height <- 280
   margin_left <- 50
   margin_right <- 100  # legend space
   margin_top <- 30
-  margin_bottom <- 80
+  margin_bottom <- 50
   plot_w <- chart_width - margin_left - margin_right
   plot_h <- chart_height - margin_top - margin_bottom
 
@@ -545,7 +540,7 @@ build_class_importance_chart <- function(class_importance, brand_colour = "#3233
     yy <- scale_y(yt)
     if (yy >= margin_top && yy <= chart_height - margin_bottom) {
       elements <- c(elements, .svg_gridline(margin_left, yy, chart_width - margin_right, yy))
-      elements <- c(elements, .svg_axis_label(margin_left - 6, yy, sprintf("%.0f%%", yt), anchor = "end", size = 10))
+      elements <- c(elements, .svg_axis_label(margin_left - 6, yy, sprintf("%.0f%%", yt), anchor = "end", size = 11))
     }
   }
 
@@ -566,16 +561,15 @@ build_class_importance_chart <- function(class_importance, brand_colour = "#3233
       ))
 
       # Value on top
-      elements <- c(elements, .svg_value_label(bx + (bar_w - 2) / 2, by - 5, sprintf("%.0f", val), size = 9))
+      elements <- c(elements, .svg_value_label(bx + (bar_w - 2) / 2, by - 5, sprintf("%.0f", val), size = 11))
     }
 
-    # Attribute label
+    # Attribute label (horizontal, no rotation)
     label <- class_importance$Attribute[i]
-    if (nchar(label) > 12) label <- paste0(substr(label, 1, 11), "\u2026")
+    if (nchar(label) > 18) label <- paste0(substr(label, 1, 17), "\u2026")
     elements <- c(elements, sprintf(
-      '<text x="%.1f" y="%.1f" text-anchor="end" fill="#64748b" font-size="10" transform="rotate(-45,%.1f,%.1f)">%s</text>',
-      group_center, chart_height - margin_bottom + 12,
-      group_center, chart_height - margin_bottom + 12, label
+      '<text x="%.1f" y="%.1f" text-anchor="middle" fill="#64748b" font-size="11">%s</text>',
+      group_center, chart_height - margin_bottom + 16, label
     ))
   }
 
@@ -588,7 +582,7 @@ build_class_importance_chart <- function(class_importance, brand_colour = "#3233
       legend_x, ly, palette[j]
     ))
     elements <- c(elements, .svg_axis_label(
-      legend_x + 20, ly + 10, gsub("_", " ", class_cols[j]), anchor = "start", size = 10
+      legend_x + 20, ly + 10, gsub("_", " ", class_cols[j]), anchor = "start", size = 11
     ))
   }
 
@@ -632,7 +626,7 @@ build_class_size_chart <- function(class_sizes, brand_colour = "#323367") {
 
   palette <- .generate_class_palette(n, brand_colour)
 
-  chart_width <- 400
+  chart_width <- 500
   bar_height <- 28
   bar_gap <- 12
   margin_left <- 80
@@ -650,7 +644,7 @@ build_class_size_chart <- function(class_sizes, brand_colour = "#323367") {
 
     # Label
     elements <- c(elements, sprintf(
-      '<text x="%d" y="%.1f" text-anchor="end" fill="#334155" font-size="12" font-weight="400" dominant-baseline="central">Class %d</text>',
+      '<text x="%d" y="%.1f" text-anchor="end" fill="#334155" font-size="13" font-weight="500" dominant-baseline="central">Class %d</text>',
       margin_left - 8, y + bar_height / 2, i
     ))
 

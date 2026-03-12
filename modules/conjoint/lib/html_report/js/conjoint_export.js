@@ -1,6 +1,7 @@
 /**
  * Conjoint Report Export Functions
  * CSV, Excel (XML Spreadsheet), Chart PNG (SVG -> Canvas), Slide PNG.
+ * Includes simulator-specific export functions.
  */
 
 (function() {
@@ -43,7 +44,10 @@
   window.exportCSV = function(panelId) {
     var data = extractTableData(panelId);
     if (!data) return;
+    exportCSVFromData(data, "conjoint_" + panelId);
+  };
 
+  function exportCSVFromData(data, filenameBase) {
     var csvRows = [];
     csvRows.push(data.headers.map(csvEscape).join(","));
     data.rows.forEach(function(row) {
@@ -51,9 +55,9 @@
     });
 
     var csv = csvRows.join("\n");
-    var filename = "conjoint_" + panelId + ".csv";
+    var filename = filenameBase + ".csv";
     downloadBlob(csv, filename, "text/csv;charset=utf-8");
-  };
+  }
 
   function csvEscape(val) {
     val = String(val);
@@ -69,7 +73,10 @@
   window.exportExcel = function(panelId) {
     var data = extractTableData(panelId);
     if (!data) return;
+    exportExcelFromData(data, "conjoint_" + panelId);
+  };
 
+  function exportExcelFromData(data, filenameBase) {
     var xml = '<?xml version="1.0"?>\n';
     xml += '<?mso-application progid="Excel.Sheet"?>\n';
     xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\n';
@@ -96,12 +103,83 @@
 
     xml += '</Table></Worksheet></Workbook>';
 
-    var filename = "conjoint_" + panelId + ".xls";
+    var filename = filenameBase + ".xls";
     downloadBlob(xml, filename, "application/vnd.ms-excel");
-  };
+  }
 
   function xmlEscape(val) {
     return String(val).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+
+  // === SIMULATOR CSV EXPORT ===
+
+  window.exportSimulatorCSV = function() {
+    var data = buildSimulatorExportData();
+    if (!data) return;
+    exportCSVFromData(data, "conjoint_simulator");
+  };
+
+
+  // === SIMULATOR EXCEL EXPORT ===
+
+  window.exportSimulatorExcel = function() {
+    var data = buildSimulatorExportData();
+    if (!data) return;
+    exportExcelFromData(data, "conjoint_simulator");
+  };
+
+
+  // === BUILD SIMULATOR EXPORT DATA ===
+
+  function buildSimulatorExportData() {
+    if (typeof SimEngine === "undefined") return null;
+    var simData = SimEngine.getData();
+    if (!simData || !simData.attributes) return null;
+
+    // Build headers: Product Name, Attribute1, Attribute2, ..., Predicted Share (%)
+    var headers = ["Product"];
+    simData.attributes.forEach(function(a) { headers.push(a.name); });
+    headers.push("Predicted Share (%)");
+
+    // Extract product configs from DOM
+    var prodEls = document.querySelectorAll(".cj-sim-product");
+    if (prodEls.length === 0) return null;
+
+    var configs = [];
+    prodEls.forEach(function(el) {
+      var config = {};
+      el.querySelectorAll("select").forEach(function(sel) {
+        var label = sel.previousElementSibling;
+        if (label) {
+          config[label.textContent.trim()] = sel.value;
+        }
+      });
+      configs.push(config);
+    });
+
+    // Calculate shares
+    var shares = [];
+    if (configs.length > 0) {
+      try {
+        shares = SimEngine.predictShares(configs, "logit");
+      } catch (e) {
+        shares = configs.map(function() { return 0; });
+      }
+    }
+
+    // Build rows
+    var rows = [];
+    configs.forEach(function(config, i) {
+      var row = ["Product " + (i + 1)];
+      simData.attributes.forEach(function(a) {
+        row.push(config[a.name] || "");
+      });
+      row.push(shares[i] !== undefined ? shares[i].toFixed(1) : "");
+      rows.push(row);
+    });
+
+    return { headers: headers, rows: rows };
   }
 
 
@@ -112,8 +190,14 @@
     if (!panel) panel = document.querySelector('.cj-attr-detail.active');
     if (!panel) return;
 
+    // For simulator, look in results div
+    if (panelId === "simulator") {
+      panel = document.getElementById("cj-sim-results") || panel;
+    }
+
     var chartWrap = panel.querySelector(".cj-chart-wrap");
     if (!chartWrap) chartWrap = panel.querySelector(".cj-chart-container");
+    if (!chartWrap) chartWrap = panel; // fallback to panel itself for inline SVGs
     if (!chartWrap) return;
 
     var svg = chartWrap.querySelector("svg");
@@ -136,6 +220,12 @@
     var panel = document.getElementById("panel-" + panelId);
     if (!panel) panel = document.querySelector('.cj-attr-detail.active');
     if (!panel) return;
+
+    // For simulator, look in results div
+    var svgSource = panel;
+    if (panelId === "simulator") {
+      svgSource = document.getElementById("cj-sim-results") || panel;
+    }
 
     // Build a slide-sized SVG (1280x720)
     var slideW = 1280, slideH = 720, scale = 3;
@@ -166,7 +256,7 @@
     }
 
     // Embed chart as image
-    var svg = panel.querySelector("svg");
+    var svg = svgSource.querySelector("svg");
     if (svg) {
       var svgData = new XMLSerializer().serializeToString(svg);
       var img = new Image();

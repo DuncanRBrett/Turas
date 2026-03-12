@@ -130,25 +130,37 @@ tryCatch({
 
 # Get the directory where this script is located
 .conjoint_module_dir <- tryCatch({
-  dir <- getSrcDirectory(function() {})
-  if (is.null(dir) || length(dir) == 0 || dir == "") {
-    # Fallback if getSrcDirectory doesn't work
-    dir <- tryCatch(dirname(sys.frame(1)$ofile), error = function(e) "")
+
+  # Strategy: walk the source frame stack to find the frame that sourced THIS file.
+  # This is robust even when called via nested source() (e.g., run_demo.R → 00_main.R).
+  dir <- ""
+  for (i in seq_len(sys.nframe())) {
+    ofile <- tryCatch(sys.frame(i)$ofile, error = function(e) NULL)
+    if (!is.null(ofile) && grepl("00_main\\.R$", ofile)) {
+      dir <- dirname(ofile)
+      break
+    }
   }
+
+  # Fallback 1: getSrcDirectory (works in simple source() contexts)
   if (is.null(dir) || length(dir) == 0 || dir == "") {
-    # Check if we're in Turas directory structure
+    dir <- tryCatch(utils::getSrcDirectory(function() {}), error = function(e) "")
+    # Validate it actually points to conjoint/R
+    if (!is.null(dir) && nzchar(dir) && !file.exists(file.path(dir, "99_helpers.R"))) {
+      dir <- ""  # wrong directory, discard
+    }
+  }
+
+  # Fallback 2: working directory based detection
+  if (is.null(dir) || length(dir) == 0 || dir == "") {
     wd <- getwd()
-    if (file.exists(file.path(wd, "modules/conjoint/R"))) {
-      # We're in Turas root
+    if (file.exists(file.path(wd, "modules/conjoint/R/99_helpers.R"))) {
       dir <- file.path(wd, "modules/conjoint/R")
     } else if (basename(dirname(wd)) == "conjoint" && basename(wd) == "R") {
-      # We're already in modules/conjoint/R
       dir <- wd
     } else if (basename(wd) == "conjoint") {
-      # We're in modules/conjoint
       dir <- file.path(wd, "R")
     } else {
-      # Last resort - assume working directory is Turas root
       dir <- file.path(wd, "modules/conjoint/R")
     }
   }

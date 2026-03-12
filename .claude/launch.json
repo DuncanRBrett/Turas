@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "conjoint-report",
+      "runtimeExecutable": "/usr/local/bin/npx",
+      "runtimeArgs": ["serve", "examples/conjoint/v3_demo/output", "-l", "8765", "--no-clipboard"],
+      "port": 8765
+    }
+  ]
+}
