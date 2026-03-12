@@ -298,6 +298,14 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 }
 .cj-toast.visible { transform:translateX(0); opacity:1; }
 
+/* === TAB BADGE === */
+.cj-tab-badge {
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:18px; height:18px; padding:0 5px; border-radius:9px;
+  background:BRAND; color:#fff; font-size:10px; font-weight:700;
+  margin-left:6px; vertical-align:middle;
+}
+
 /* === CALLOUT BOXES === */
 .cj-callout {
   background:#f8fafc; border-left:3px solid BRAND; border-radius:0 6px 6px 0;
@@ -316,22 +324,57 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 
 /* === SLIDES PANEL === */
 .cj-slides-container { min-height:200px; }
+.cj-slide-tabs {
+  display:flex; gap:0; border-bottom:2px solid #e2e8f0; margin-bottom:16px;
+  overflow-x:auto; -webkit-overflow-scrolling:touch;
+}
+.cj-slide-tab {
+  padding:8px 16px; font-size:12px; font-weight:500; color:#64748b;
+  cursor:pointer; border:none; border-bottom:2px solid transparent;
+  background:none; white-space:nowrap; transition:all 200ms;
+  margin-bottom:-2px;
+}
+.cj-slide-tab:hover { color:BRAND; }
+.cj-slide-tab.active { color:BRAND; border-bottom-color:BRAND; font-weight:600; }
 .cj-slide-card {
-  background:white; border-radius:8px; padding:24px; margin-bottom:16px;
+  background:white; border-radius:8px; padding:20px; margin-bottom:16px;
   box-shadow:0 1px 3px rgba(0,0,0,0.06); position:relative;
-  border-left:3px solid BRAND;
+  border-left:3px solid BRAND; display:none;
 }
-.cj-slide-title {
-  font-size:16px; font-weight:600; color:#1e293b; outline:none; margin-bottom:8px;
+.cj-slide-card.active { display:block; }
+.cj-slide-header {
+  display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;
+  padding-bottom:10px; border-bottom:1px solid #f1f5f9;
 }
-.cj-slide-title:empty::before { content:"Slide title..."; color:#94a3b8; font-style:italic; }
-.cj-slide-body {
-  min-height:80px; padding:12px; border:1px solid #e2e8f0; border-radius:6px;
-  font-size:13px; line-height:1.6; color:#334155; outline:none;
+.cj-slide-title-input {
+  font-size:15px; font-weight:600; color:#1e293b; border:none; border-bottom:1.5px solid transparent;
+  background:transparent; outline:none; padding:2px 0; flex:1; margin-right:12px;
+  transition:border-color 200ms;
 }
-.cj-slide-body:focus { border-color:BRAND; box-shadow:0 0 0 2px rgba(50,51,103,0.1); }
-.cj-slide-body:empty::before { content:"Add content..."; color:#94a3b8; font-style:italic; }
-.cj-slide-actions { position:absolute; top:12px; right:12px; display:flex; gap:6px; }
+.cj-slide-title-input:focus { border-bottom-color:BRAND; }
+.cj-slide-title-input::placeholder { color:#94a3b8; font-style:italic; }
+.cj-slide-editor-layout { display:flex; gap:16px; }
+.cj-slide-editor-layout textarea {
+  flex:1; min-height:200px; padding:12px; border:1px solid #e2e8f0; border-radius:6px;
+  font-size:13px; line-height:1.6; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  color:#334155; outline:none; resize:vertical;
+}
+.cj-slide-editor-layout textarea:focus { border-color:BRAND; box-shadow:0 0 0 2px rgba(50,51,103,0.1); }
+.cj-slide-preview {
+  flex:1; min-height:200px; padding:12px 16px; border:1px solid #e2e8f0;
+  border-radius:6px; background:#fafbfc; font-size:13px; line-height:1.6;
+  color:#334155; overflow-y:auto;
+}
+.cj-slide-preview h1 { font-size:20px; font-weight:700; color:#1e293b; margin:16px 0 8px; }
+.cj-slide-preview h2 { font-size:17px; font-weight:600; color:#1e293b; margin:14px 0 6px; }
+.cj-slide-preview h3 { font-size:14px; font-weight:600; color:#334155; margin:12px 0 4px; }
+.cj-slide-preview p { margin-bottom:8px; }
+.cj-slide-preview ul, .cj-slide-preview ol { margin:8px 0 8px 20px; }
+.cj-slide-preview li { margin-bottom:4px; }
+.cj-slide-preview blockquote { border-left:3px solid #e2e8f0; padding-left:12px; margin:8px 0; color:#64748b; font-style:italic; }
+.cj-slide-preview code { background:#f1f5f9; padding:1px 4px; border-radius:3px; font-size:12px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+.cj-slide-preview hr { border:none; border-top:1px solid #e2e8f0; margin:12px 0; }
+.cj-slide-actions { display:flex; gap:6px; flex-shrink:0; }
 .cj-slide-empty { text-align:center; padding:60px 20px; color:#94a3b8; }
 
 /* === PINNED VIEWS === */
@@ -342,11 +385,16 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 }
 .cj-pinned-empty-icon { font-size:36px; margin-bottom:12px; }
 .cj-pinned-card {
-  background:white; border-radius:8px; padding:20px; margin-bottom:16px;
+  background:white; border-radius:8px; padding:16px; margin-bottom:14px;
   box-shadow:0 1px 3px rgba(0,0,0,0.06); position:relative;
 }
-.cj-pinned-card-title { font-size:14px; font-weight:600; color:#1e293b; margin-bottom:8px; }
-.cj-pinned-card-actions { position:absolute; top:12px; right:12px; display:flex; gap:6px; }
+.cj-pinned-card-title { font-size:14px; font-weight:600; color:#1e293b; padding-bottom:8px; border-bottom:1px solid #f1f5f9; margin-bottom:10px; }
+.cj-pinned-card-actions { position:absolute; top:10px; right:10px; display:flex; gap:6px; }
+.cj-pinned-card .cj-table td { padding:6px 10px; font-size:12px; }
+.cj-pinned-card .cj-table th { padding:6px 10px; font-size:10px; }
+.cj-pinned-card .cj-chart-container { margin:6px 0; }
+.cj-pinned-card .cj-chart-wrap { margin:4px 0; }
+.cj-pinned-card .cj-insight-editor { min-height:40px; padding:8px; font-size:12px; }
 .cj-section-divider {
   border:none; border-top:2px solid #e2e8f0; margin:24px 0;
   position:relative; padding-top:8px;
@@ -365,7 +413,11 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
   background:white; border-radius:8px; padding:16px; margin-bottom:12px;
   box-shadow:0 1px 3px rgba(0,0,0,0.06); border-left:3px solid BRAND;
 }
-.cj-sim-product h4 { font-size:13px; font-weight:600; color:#1e293b; margin-bottom:8px; }
+.cj-sim-product-name {
+  font-size:13px; font-weight:600; color:#1e293b; border:none; border-bottom:1.5px solid transparent;
+  background:transparent; outline:none; padding:2px 0; width:160px; transition:border-color 200ms;
+}
+.cj-sim-product-name:focus { border-bottom-color:BRAND; }
 .cj-sim-select {
   width:100%; padding:6px 10px; border:1px solid #e2e8f0; border-radius:4px;
   font-size:12px; margin-bottom:6px; outline:none;
@@ -577,7 +629,7 @@ build_report_tab_nav <- function(html_data, config = list()) {
     tabs <- c(tabs, list(list(id = "about", label = "About")))
   }
 
-  tabs <- c(tabs, list(list(id = "pinned", label = "Pinned")))
+  tabs <- c(tabs, list(list(id = "pinned", label = "Pinned <span class=\"cj-tab-badge\" id=\"cj-pinned-count\" style=\"display:none;\">0</span>")))
   tabs <- c(tabs, list(list(id = "slides", label = "Slides")))
 
   buttons <- vapply(tabs, function(t) {
@@ -961,9 +1013,9 @@ build_simulator_panel <- function(html_data, brand) {
 
   # Mode-switched callouts
   sim_callout_shares <- .build_callout("Market Shares",
-    "<p>Market share simulation predicts each product\u2019s share of preference using the configured attribute levels. The Logit model distributes share proportionally to each product\u2019s total utility; First Choice assigns all share to whichever product each respondent would most likely pick. Configure products on the left and see predicted shares update on the right.</p>")
+    "<p>Market share simulation predicts each product\u2019s share of preference using the configured attribute levels (up to 8 products). The Logit model distributes share proportionally to each product\u2019s total utility; First Choice assigns all share to whichever product each respondent would most likely pick. Configure products on the left and see predicted shares update on the right. Click on a product name to rename it.</p>")
   sim_callout_sensitivity <- .build_callout("Sensitivity Analysis",
-    "<p>Sensitivity analysis sweeps through each level of a selected attribute for Product 1 while holding all other attributes constant. This reveals how much market share changes as you move between levels \u2014 helping identify which attribute level changes have the greatest competitive impact.</p>")
+    "<p>Sensitivity analysis sweeps through each level of a selected attribute for a chosen product while holding all other attributes constant. This reveals how much market share changes as you move between levels \u2014 helping identify which attribute level changes have the greatest competitive impact.</p>")
   sim_callout_sov <- .build_callout("Source of Volume",
     "<p>Source of Volume shows where a new product (the last one in the list) draws its market share from. By comparing shares before and after the new product enters, you can see which existing competitors lose the most \u2014 helping you understand the competitive dynamics of a potential new entry.</p>")
 
@@ -1119,17 +1171,18 @@ build_slides_panel <- function() {
   '
 <div class="cj-panel" id="panel-slides">
 <div class="cj-slides-container">
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
 <div>
 <h2 style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;">Slides</h2>
-<p style="font-size:12px;color:#64748b;">Build narrative slides for your presentation. Each slide can contain a title and rich text content.</p>
+<p style="font-size:12px;color:#64748b;">Build narrative slides with Markdown. Use **bold**, *italic*, # headings, - bullets, > quotes, and --- rules.</p>
 </div>
 <div style="display:flex;gap:8px;">
 <button class="cj-export-btn" onclick="addSlide()">+ Add Slide</button>
-<button class="cj-export-btn" onclick="exportAllSlidesPNG()">Export All Slides</button>
+<button class="cj-export-btn" onclick="exportAllSlidesPNG()">Export All PNGs</button>
 <button class="cj-export-btn" onclick="printSlides()">Print Slides</button>
 </div>
 </div>
+<div class="cj-slide-tabs" id="cj-slide-tabs"></div>
 <div id="cj-slides-cards"></div>
 <div class="cj-slide-empty" id="cj-slides-empty">
 <div style="font-size:36px;margin-bottom:12px;">&#128196;</div>

@@ -74,7 +74,7 @@ var SimEngine = (function() {
   }
 
   // Source of volume: compare baseline market vs market with new product
-  function sourceOfVolume(baselineProducts, newProduct, method) {
+  function sourceOfVolume(baselineProducts, newProduct, method, baselineNames, newProductName) {
     var baseShares = predictShares(baselineProducts, method);
     var allProducts = baselineProducts.concat([newProduct]);
     var testShares = predictShares(allProducts, method);
@@ -82,14 +82,14 @@ var SimEngine = (function() {
     var result = [];
     for (var i = 0; i < baselineProducts.length; i++) {
       result.push({
-        product: "Product " + (i + 1),
+        product: (baselineNames && baselineNames[i]) ? baselineNames[i] : "Product " + (i + 1),
         baseline: baseShares[i],
         test: testShares[i],
         change: testShares[i] - baseShares[i]
       });
     }
     result.push({
-      product: "New Product",
+      product: newProductName || "New Product",
       baseline: 0,
       test: testShares[testShares.length - 1],
       change: testShares[testShares.length - 1]

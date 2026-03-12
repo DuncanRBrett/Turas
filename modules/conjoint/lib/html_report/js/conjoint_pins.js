@@ -29,6 +29,7 @@
     updatePinButtons();
     renderPinnedCards();
     savePinnedData();
+    updatePinnedBadge();
 
     // Visual feedback: toast + bounce
     showPinToast(wasPinned ? "Removed from collection" : "Pinned to collection");
@@ -145,6 +146,17 @@
   }
 
 
+  // === PIN COUNT BADGE ===
+
+  function updatePinnedBadge() {
+    var badge = document.getElementById("cj-pinned-count");
+    if (!badge) return;
+    var count = pinnedViews.filter(function(v) { return v.type !== "section"; }).length;
+    badge.textContent = count;
+    badge.style.display = count > 0 ? "" : "none";
+  }
+
+
   // === RENDER PINNED CARDS ===
 
   function renderPinnedCards() {
@@ -200,6 +212,7 @@
     updatePinButtons();
     renderPinnedCards();
     savePinnedData();
+    updatePinnedBadge();
   };
 
   window.updatePinnedNote = function(idx, html) {
@@ -238,6 +251,7 @@
     updatePinButtons();
     renderPinnedCards();
     savePinnedData();
+    updatePinnedBadge();
   };
 
 
@@ -259,6 +273,7 @@
           pinnedViews = data;
           updatePinButtons();
           renderPinnedCards();
+          updatePinnedBadge();
         }
       } catch (e) { /* invalid JSON */ }
     }

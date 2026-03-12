@@ -97,9 +97,10 @@
   }
 
 
-  // === SLIDES SYSTEM ===
+  // === SLIDES SYSTEM (tab-based, markdown) ===
 
   var slides = [];
+  var activeSlideIdx = 0;
 
   window.addSlide = function() {
     slides.push({
@@ -108,12 +109,14 @@
       body: "",
       timestamp: new Date().toISOString()
     });
+    activeSlideIdx = slides.length - 1;
     renderSlides();
     saveSlides();
   };
 
   window.removeSlide = function(idx) {
     slides.splice(idx, 1);
+    if (activeSlideIdx >= slides.length) activeSlideIdx = Math.max(0, slides.length - 1);
     renderSlides();
     saveSlides();
   };
@@ -124,41 +127,84 @@
     var temp = slides[idx];
     slides[idx] = slides[newIdx];
     slides[newIdx] = temp;
+    if (activeSlideIdx === idx) activeSlideIdx = newIdx;
+    else if (activeSlideIdx === newIdx) activeSlideIdx = idx;
     renderSlides();
     saveSlides();
   };
 
-  window.updateSlideTitle = function(idx, text) {
-    if (slides[idx]) { slides[idx].title = text; saveSlides(); }
+  window.switchSlide = function(idx) {
+    activeSlideIdx = idx;
+    renderSlides();
   };
 
-  window.updateSlideBody = function(idx, html) {
-    if (slides[idx]) { slides[idx].body = html; saveSlides(); }
+  window.updateSlideTitle = function(idx, text) {
+    if (slides[idx]) {
+      slides[idx].title = text;
+      saveSlides();
+      // Update tab label
+      var tabs = document.querySelectorAll(".cj-slide-tab");
+      if (tabs[idx]) tabs[idx].textContent = text || "Slide " + (idx + 1);
+    }
+  };
+
+  window.updateSlideBody = function(idx, md) {
+    if (slides[idx]) {
+      slides[idx].body = md;
+      saveSlides();
+      // Live preview
+      var preview = document.getElementById("cj-slide-preview-" + idx);
+      if (preview) preview.innerHTML = renderMarkdown(md);
+    }
   };
 
   function renderSlides() {
+    var tabStrip = document.getElementById("cj-slide-tabs");
     var container = document.getElementById("cj-slides-cards");
     var empty = document.getElementById("cj-slides-empty");
     if (!container) return;
 
     if (slides.length === 0) {
+      if (tabStrip) tabStrip.innerHTML = "";
       container.innerHTML = "";
       if (empty) empty.style.display = "";
       return;
     }
     if (empty) empty.style.display = "none";
 
+    // Tab strip
+    if (tabStrip) {
+      var tabHtml = "";
+      slides.forEach(function(slide, idx) {
+        var active = idx === activeSlideIdx ? " active" : "";
+        var label = slide.title || "Slide " + (idx + 1);
+        tabHtml += '<button class="cj-slide-tab' + active + '" onclick="switchSlide(' + idx + ')">' + escHtmlNav(label) + '</button>';
+      });
+      tabStrip.innerHTML = tabHtml;
+    }
+
+    // Slide cards
     var html = "";
     slides.forEach(function(slide, idx) {
-      html += '<div class="cj-slide-card">';
+      var active = idx === activeSlideIdx ? " active" : "";
+      html += '<div class="cj-slide-card' + active + '">';
+
+      // Header bar
+      html += '<div class="cj-slide-header">';
+      html += '<input type="text" class="cj-slide-title-input" placeholder="Slide title..." value="' + escAttrNav(slide.title || "") + '" oninput="updateSlideTitle(' + idx + ',this.value)" />';
       html += '<div class="cj-slide-actions">';
-      if (idx > 0) html += '<button class="cj-export-btn" onclick="moveSlide(' + idx + ',-1)">&uarr;</button>';
-      if (idx < slides.length - 1) html += '<button class="cj-export-btn" onclick="moveSlide(' + idx + ',1)">&darr;</button>';
-      html += '<button class="cj-export-btn" onclick="pinSlide(' + idx + ')">\ud83d\udccc</button>';
-      html += '<button class="cj-export-btn" onclick="removeSlide(' + idx + ')">\u00d7</button>';
+      if (idx > 0) html += '<button class="cj-export-btn" onclick="moveSlide(' + idx + ',-1)" title="Move up">&uarr;</button>';
+      if (idx < slides.length - 1) html += '<button class="cj-export-btn" onclick="moveSlide(' + idx + ',1)" title="Move down">&darr;</button>';
+      html += '<button class="cj-export-btn" onclick="pinSlide(' + idx + ')" title="Pin">\ud83d\udccc</button>';
+      html += '<button class="cj-export-btn" onclick="removeSlide(' + idx + ')" title="Delete">\u00d7</button>';
+      html += '</div></div>';
+
+      // Editor + Preview
+      html += '<div class="cj-slide-editor-layout">';
+      html += '<textarea placeholder="Write in Markdown..." oninput="updateSlideBody(' + idx + ',this.value)">' + escHtmlNav(slide.body || "") + '</textarea>';
+      html += '<div class="cj-slide-preview" id="cj-slide-preview-' + idx + '">' + renderMarkdown(slide.body || "") + '</div>';
       html += '</div>';
-      html += '<div class="cj-slide-title" contenteditable="true" oninput="updateSlideTitle(' + idx + ', this.textContent)">' + escHtmlNav(slide.title) + '</div>';
-      html += '<div class="cj-slide-body" contenteditable="true" oninput="updateSlideBody(' + idx + ', this.innerHTML)">' + (slide.body || '') + '</div>';
+
       html += '</div>';
     });
     container.innerHTML = html;
@@ -176,21 +222,119 @@
         var data = JSON.parse(store.textContent);
         if (Array.isArray(data) && data.length > 0) {
           slides = data;
+          activeSlideIdx = 0;
           renderSlides();
         }
       } catch (e) { /* invalid JSON */ }
     }
   }
 
+
+  // === INLINE MARKDOWN RENDERER ===
+
+  function renderMarkdown(md) {
+    if (!md) return '<p style="color:#94a3b8;font-style:italic;">Preview will appear here...</p>';
+
+    var lines = md.split("\n");
+    var html = "";
+    var inUl = false, inOl = false;
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+
+      // Horizontal rule
+      if (/^---+\s*$/.test(line)) {
+        if (inUl) { html += "</ul>"; inUl = false; }
+        if (inOl) { html += "</ol>"; inOl = false; }
+        html += "<hr>";
+        continue;
+      }
+
+      // Headings
+      if (/^### (.+)/.test(line)) {
+        if (inUl) { html += "</ul>"; inUl = false; }
+        if (inOl) { html += "</ol>"; inOl = false; }
+        html += "<h3>" + inlineMarkdown(RegExp.$1) + "</h3>";
+        continue;
+      }
+      if (/^## (.+)/.test(line)) {
+        if (inUl) { html += "</ul>"; inUl = false; }
+        if (inOl) { html += "</ol>"; inOl = false; }
+        html += "<h2>" + inlineMarkdown(RegExp.$1) + "</h2>";
+        continue;
+      }
+      if (/^# (.+)/.test(line)) {
+        if (inUl) { html += "</ul>"; inUl = false; }
+        if (inOl) { html += "</ol>"; inOl = false; }
+        html += "<h1>" + inlineMarkdown(RegExp.$1) + "</h1>";
+        continue;
+      }
+
+      // Blockquote
+      if (/^>\s?(.*)/.test(line)) {
+        if (inUl) { html += "</ul>"; inUl = false; }
+        if (inOl) { html += "</ol>"; inOl = false; }
+        html += "<blockquote>" + inlineMarkdown(RegExp.$1) + "</blockquote>";
+        continue;
+      }
+
+      // Unordered list
+      if (/^[-*]\s+(.+)/.test(line)) {
+        if (inOl) { html += "</ol>"; inOl = false; }
+        if (!inUl) { html += "<ul>"; inUl = true; }
+        html += "<li>" + inlineMarkdown(RegExp.$1) + "</li>";
+        continue;
+      }
+
+      // Ordered list
+      if (/^\d+\.\s+(.+)/.test(line)) {
+        if (inUl) { html += "</ul>"; inUl = false; }
+        if (!inOl) { html += "<ol>"; inOl = true; }
+        html += "<li>" + inlineMarkdown(RegExp.$1) + "</li>";
+        continue;
+      }
+
+      // Close lists on non-list lines
+      if (inUl) { html += "</ul>"; inUl = false; }
+      if (inOl) { html += "</ol>"; inOl = false; }
+
+      // Blank line
+      if (line.trim() === "") {
+        continue;
+      }
+
+      // Paragraph
+      html += "<p>" + inlineMarkdown(line) + "</p>";
+    }
+
+    if (inUl) html += "</ul>";
+    if (inOl) html += "</ol>";
+    return html;
+  }
+
+  function inlineMarkdown(text) {
+    // Escape HTML first
+    text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    // Bold
+    text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    // Italic
+    text = text.replace(/\*(.+?)\*/g, "<em>$1</em>");
+    // Inline code
+    text = text.replace(/`(.+?)`/g, "<code>$1</code>");
+    return text;
+  }
+
+
   window.pinSlide = function(idx) {
     var slide = slides[idx];
     if (!slide) return;
     if (typeof window._addPinnedEntry === "function") {
+      var renderedBody = renderMarkdown(slide.body || "");
       window._addPinnedEntry({
         id: slide.id,
         title: slide.title || "Slide " + (idx + 1),
         chart: "",
-        table: '<div style="padding:12px;font-size:13px;">' + (slide.body || '') + '</div>',
+        table: '<div style="padding:12px;font-size:13px;">' + renderedBody + '</div>',
         note: "",
         timestamp: new Date().toISOString()
       });
@@ -221,17 +365,17 @@
     ctx.font = "bold 18px system-ui, sans-serif";
     ctx.fillText(slide.title || "Slide " + (idx + 1), 24, 34);
 
-    // Body text (simple rendering)
+    // Body text (strip markdown/html for PNG)
     ctx.fillStyle = "#334155";
     ctx.font = "14px system-ui, sans-serif";
-    var bodyText = (slide.body || "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").trim();
+    var bodyText = (slide.body || "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/[#*>`]/g, "").trim();
     var words = bodyText.split(/\s+/);
     var line = "", lineY = 90, maxW = slideW - 48;
-    for (var i = 0; i < words.length; i++) {
-      var testLine = line + (line ? " " : "") + words[i];
+    for (var j = 0; j < words.length; j++) {
+      var testLine = line + (line ? " " : "") + words[j];
       if (ctx.measureText(testLine).width > maxW && line) {
         ctx.fillText(line, 24, lineY);
-        line = words[i];
+        line = words[j];
         lineY += 22;
         if (lineY > slideH - 40) break;
       } else {
@@ -255,6 +399,8 @@
   }
 
   window.printSlides = function() {
+    // Make all slides visible for printing
+    document.querySelectorAll(".cj-slide-card").forEach(function(c) { c.classList.add("active"); });
     switchReportTab("slides");
     setTimeout(function() { window.print(); }, 200);
   };
@@ -263,6 +409,10 @@
     var d = document.createElement("div");
     d.textContent = s || "";
     return d.innerHTML;
+  }
+
+  function escAttrNav(s) {
+    return String(s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
 

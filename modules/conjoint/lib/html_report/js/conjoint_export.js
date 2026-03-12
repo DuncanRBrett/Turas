@@ -68,7 +68,7 @@
   }
 
 
-  // === EXCEL EXPORT (XML Spreadsheet 2003) ===
+  // === EXCEL EXPORT (HTML Table format — compatible with Excel, LibreOffice, Numbers) ===
 
   window.exportExcel = function(panelId) {
     var data = extractTableData(panelId);
@@ -77,37 +77,39 @@
   };
 
   function exportExcelFromData(data, filenameBase) {
-    var xml = '<?xml version="1.0"?>\n';
-    xml += '<?mso-application progid="Excel.Sheet"?>\n';
-    xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\n';
-    xml += ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n';
-    xml += '<Styles><Style ss:ID="header"><Font ss:Bold="1"/><Interior ss:Color="#f1f5f9" ss:Pattern="Solid"/></Style></Styles>\n';
-    xml += '<Worksheet ss:Name="Data"><Table>\n';
+    var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
+    html += '<head><meta charset="UTF-8">';
+    html += '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>';
+    html += '<x:Name>Data</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>';
+    html += '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->';
+    html += '<style>td,th{mso-number-format:"\\@";font-family:Calibri,sans-serif;font-size:11pt;}';
+    html += 'th{background:#f1f5f9;font-weight:bold;border-bottom:2px solid #ccc;}</style>';
+    html += '</head><body>';
+    html += '<table border="1" cellspacing="0" cellpadding="4">';
 
     // Headers
-    xml += '<Row>';
+    html += '<tr>';
     data.headers.forEach(function(h) {
-      xml += '<Cell ss:StyleID="header"><Data ss:Type="String">' + xmlEscape(h) + '</Data></Cell>';
+      html += '<th>' + htmlEscape(h) + '</th>';
     });
-    xml += '</Row>\n';
+    html += '</tr>';
 
     // Data rows
     data.rows.forEach(function(row) {
-      xml += '<Row>';
+      html += '<tr>';
       row.forEach(function(cell) {
-        var type = isNaN(parseFloat(cell)) ? "String" : "Number";
-        xml += '<Cell><Data ss:Type="' + type + '">' + xmlEscape(cell) + '</Data></Cell>';
+        html += '<td>' + htmlEscape(cell) + '</td>';
       });
-      xml += '</Row>\n';
+      html += '</tr>';
     });
 
-    xml += '</Table></Worksheet></Workbook>';
+    html += '</table></body></html>';
 
     var filename = filenameBase + ".xls";
-    downloadBlob(xml, filename, "application/vnd.ms-excel");
+    downloadBlob(html, filename, "application/vnd.ms-excel");
   }
 
-  function xmlEscape(val) {
+  function htmlEscape(val) {
     return String(val).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
@@ -168,10 +170,14 @@
       }
     }
 
+    // Read product names from DOM
+    var nameEls = document.querySelectorAll(".cj-sim-product-name");
+
     // Build rows
     var rows = [];
     configs.forEach(function(config, i) {
-      var row = ["Product " + (i + 1)];
+      var pName = (nameEls[i] && nameEls[i].value) ? nameEls[i].value : "Product " + (i + 1);
+      var row = [pName];
       simData.attributes.forEach(function(a) {
         row.push(config[a.name] || "");
       });

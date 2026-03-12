@@ -22,7 +22,7 @@ var SimCharts = (function() {
     if (!container) return;
 
     var n = shares.length;
-    var w = 500, barH = 28, gap = 10, ml = 120, mr = 70;
+    var w = 540, barH = 38, gap = 14, ml = 180, mr = 70;
     var h = n * (barH + gap) + 20;
     var pw = w - ml - mr;
     var maxShare = Math.max.apply(null, shares.concat([50]));
@@ -33,21 +33,70 @@ var SimCharts = (function() {
       var y = i * (barH + gap) + 10;
       var bw = Math.max((shares[i] / maxShare) * pw, 2);
       var label = products[i].name || ("Product " + (i + 1));
-      if (label.length > 15) label = label.substring(0, 14) + "\u2026";
+      if (label.length > 20) label = label.substring(0, 19) + "\u2026";
 
-      svg += '<text x="' + (ml - 8) + '" y="' + (y + barH / 2) + '" text-anchor="end" fill="#334155" font-size="12" dominant-baseline="central">' + label + '</text>';
+      // Product name
+      svg += '<text x="' + (ml - 8) + '" y="' + (y + barH / 2 - 6) + '" text-anchor="end" fill="#334155" font-size="12" font-weight="500" dominant-baseline="central">' + escSvg(label) + '</text>';
+
+      // Descriptor subtitle (first 3 attribute values)
+      var desc = getProductDescriptor(products[i].config, 3);
+      if (desc) {
+        svg += '<text x="' + (ml - 8) + '" y="' + (y + barH / 2 + 8) + '" text-anchor="end" fill="#94a3b8" font-size="9" dominant-baseline="central">' + escSvg(desc) + '</text>';
+      }
+
       svg += '<rect x="' + ml + '" y="' + y + '" width="' + bw.toFixed(1) + '" height="' + barH + '" rx="4" fill="' + getColour(i) + '" opacity="0.8"/>';
-      svg += '<text x="' + (ml + bw + 6).toFixed(1) + '" y="' + (y + barH / 2) + '" fill="#334155" font-size="12" font-weight="500" dominant-baseline="central">' + shares[i].toFixed(1) + '%</text>';
+      svg += '<text x="' + (ml + bw + 6).toFixed(1) + '" y="' + (y + barH / 2) + '" fill="#334155" font-size="12" font-weight="600" dominant-baseline="central">' + shares[i].toFixed(1) + '%</text>';
     }
 
     svg += '</svg>';
-    container.innerHTML = svg;
+
+    // Product configuration grid below the chart
+    var gridHtml = buildProductGrid(products, shares);
+    container.innerHTML = svg + gridHtml;
+  }
+
+  function getProductDescriptor(config, maxAttrs) {
+    if (!config) return "";
+    var keys = Object.keys(config);
+    var vals = keys.slice(0, maxAttrs).map(function(k) { return config[k]; });
+    var desc = vals.join(", ");
+    if (desc.length > 40) desc = desc.substring(0, 39) + "\u2026";
+    return desc;
+  }
+
+  function buildProductGrid(products, shares) {
+    if (!products || products.length === 0) return "";
+    var data = (typeof SimEngine !== "undefined") ? SimEngine.getData() : null;
+    if (!data || !data.attributes) return "";
+
+    var html = '<table class="cj-table" style="margin-top:16px;font-size:12px;">';
+    html += '<thead><tr>';
+    html += '<th>Product</th>';
+    data.attributes.forEach(function(a) {
+      html += '<th>' + escSvg(a.name) + '</th>';
+    });
+    html += '<th style="text-align:right;">Share (%)</th>';
+    html += '</tr></thead><tbody>';
+
+    products.forEach(function(prod, i) {
+      html += '<tr>';
+      html += '<td style="font-weight:500;"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:' + getColour(i) + ';margin-right:6px;vertical-align:middle;"></span>' + escSvg(prod.name) + '</td>';
+      data.attributes.forEach(function(a) {
+        html += '<td>' + escSvg(prod.config[a.name] || "") + '</td>';
+      });
+      var sh = shares && shares[i] !== undefined ? shares[i].toFixed(1) : "";
+      html += '<td style="text-align:right;font-weight:600;">' + sh + '</td>';
+      html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    return html;
   }
 
 
   // === SENSITIVITY LINE CHART ===
 
-  function renderSensitivity(containerId, sweepResults, attrName) {
+  function renderSensitivity(containerId, sweepResults, attrName, productName) {
     var container = document.getElementById(containerId);
     if (!container || !sweepResults || sweepResults.length === 0) return;
 
@@ -58,8 +107,9 @@ var SimCharts = (function() {
     var minS = Math.min.apply(null, sweepResults.map(function(r) { return r.share; }).concat([0]));
     if (maxS - minS < 1) maxS = minS + 10;
 
+    var titleLabel = productName || "Product 1";
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w + ' ' + h + '" width="100%" style="max-width:' + w + 'px;font-family:system-ui,sans-serif;">';
-    svg += '<text x="' + (w / 2) + '" y="16" text-anchor="middle" fill="#334155" font-size="13" font-weight="500">' + attrName + ' Sensitivity (Product 1)</text>';
+    svg += '<text x="' + (w / 2) + '" y="16" text-anchor="middle" fill="#334155" font-size="13" font-weight="500">' + escSvg(attrName) + ' Sensitivity (' + escSvg(titleLabel) + ')</text>';
 
     // Gridlines
     var yStep = niceStep(maxS - minS, 4);
@@ -95,12 +145,12 @@ var SimCharts = (function() {
 
   // === SOURCE OF VOLUME ===
 
-  function renderSourceOfVolume(containerId, sovResults) {
+  function renderSourceOfVolume(containerId, sovResults, allProducts) {
     var container = document.getElementById(containerId);
     if (!container || !sovResults || sovResults.length === 0) return;
 
     var n = sovResults.length;
-    var w = 500, barH = 24, gap = 8, ml = 120, mr = 80;
+    var w = 540, barH = 24, gap = 8, ml = 160, mr = 100;
     var h = n * (barH + gap) * 2 + 60;
     var pw = w - ml - mr;
 
@@ -108,15 +158,15 @@ var SimCharts = (function() {
 
     var yPos = 20;
     sovResults.forEach(function(item, i) {
-      // Baseline bar
-      svg += '<text x="' + (ml - 8) + '" y="' + (yPos + barH / 2) + '" text-anchor="end" fill="#334155" font-size="11" dominant-baseline="central">' + item.product + '</text>';
+      var label = escSvg(item.product);
+      if (label.length > 20) label = label.substring(0, 19) + "\u2026";
+      svg += '<text x="' + (ml - 8) + '" y="' + (yPos + barH / 2) + '" text-anchor="end" fill="#334155" font-size="11" font-weight="500" dominant-baseline="central">' + label + '</text>';
 
       var bw1 = Math.max((item.baseline / 100) * pw, 0);
       svg += '<rect x="' + ml + '" y="' + yPos + '" width="' + bw1.toFixed(1) + '" height="' + barH + '" rx="4" fill="#94a3b8" opacity="0.5"/>';
       svg += '<text x="' + (ml + bw1 + 4).toFixed(1) + '" y="' + (yPos + barH / 2) + '" fill="#94a3b8" font-size="10" dominant-baseline="central">' + item.baseline.toFixed(1) + '%</text>';
       yPos += barH + 2;
 
-      // Test bar
       var bw2 = Math.max((item.test / 100) * pw, 0);
       svg += '<rect x="' + ml + '" y="' + yPos + '" width="' + bw2.toFixed(1) + '" height="' + barH + '" rx="4" fill="' + getColour(i) + '" opacity="0.8"/>';
 
@@ -130,7 +180,32 @@ var SimCharts = (function() {
     svg += '<text x="' + ml + '" y="' + (yPos + 5) + '" fill="#94a3b8" font-size="10">Grey = Baseline | Colour = With new product</text>';
 
     svg += '</svg>';
-    container.innerHTML = svg;
+
+    // SOV comparison grid
+    var gridHtml = buildSovGrid(sovResults);
+    container.innerHTML = svg + gridHtml;
+  }
+
+  function buildSovGrid(sovResults) {
+    if (!sovResults || sovResults.length === 0) return "";
+    var html = '<table class="cj-table" style="margin-top:16px;font-size:12px;">';
+    html += '<thead><tr>';
+    html += '<th>Product</th><th style="text-align:right;">Baseline %</th><th style="text-align:right;">With Entrant %</th><th style="text-align:right;">Change (pp)</th>';
+    html += '</tr></thead><tbody>';
+
+    sovResults.forEach(function(item, i) {
+      var changeStr = (item.change >= 0 ? "+" : "") + item.change.toFixed(1);
+      var changeClass = item.change >= 0 ? "cj-positive" : "cj-negative";
+      html += '<tr>';
+      html += '<td style="font-weight:500;"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:' + getColour(i) + ';margin-right:6px;vertical-align:middle;"></span>' + escSvg(item.product) + '</td>';
+      html += '<td style="text-align:right;">' + item.baseline.toFixed(1) + '</td>';
+      html += '<td style="text-align:right;">' + item.test.toFixed(1) + '</td>';
+      html += '<td style="text-align:right;" class="' + changeClass + '">' + changeStr + '</td>';
+      html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    return html;
   }
 
 
@@ -182,6 +257,10 @@ var SimCharts = (function() {
     return best || 1;
   }
 
+
+  function escSvg(s) {
+    return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
 
   return {
     setBrand: setBrand,
