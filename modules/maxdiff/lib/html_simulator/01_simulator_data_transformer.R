@@ -143,6 +143,11 @@ build_simulator_data <- function(hb_results, logit_results, config,
     individual_utils = indiv_list,
     segments = seg_defs,
     n_respondents = length(indiv_list),
-    n_items = length(item_list)
+    n_items = length(item_list),
+    analyst_name = config$project_settings$Analyst_Name %||% "",
+    analyst_email = config$project_settings$Analyst_Email %||% "",
+    analyst_phone = config$project_settings$Analyst_Phone %||% "",
+    appendices = config$project_settings$Appendices %||% "",
+    closing_notes = config$project_settings$Closing_Notes %||% ""
   )
 }

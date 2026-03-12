@@ -2,7 +2,7 @@
 # MAXDIFF SIMULATOR - MAIN ORCHESTRATOR - TURAS V11.0
 # ==============================================================================
 
-MAXDIFF_SIMULATOR_VERSION <- "11.0"
+MAXDIFF_SIMULATOR_VERSION <- "2.0"
 
 .md_sim_loaded <- FALSE
 
@@ -114,12 +114,16 @@ generate_maxdiff_html_simulator <- function(maxdiff_results, config, output_path
     if (file.exists(fpath)) paste(readLines(fpath, warn = FALSE), collapse = "\n") else ""
   }
 
-  js_engine <- read_js("simulator_engine.js")
-  js_charts <- read_js("simulator_charts.js")
-  js_ui <- read_js("simulator_ui.js")
+  js_files <- list(
+    engine = read_js("simulator_engine.js"),
+    charts = read_js("simulator_charts.js"),
+    pins   = read_js("simulator_pins.js"),
+    export = read_js("simulator_export.js"),
+    ui     = read_js("simulator_ui.js")
+  )
 
   # Build page
-  page <- build_simulator_page(sim_data, js_engine, js_charts, js_ui)
+  page <- build_simulator_page(sim_data, js_files)
 
   # Write
   output_dir <- dirname(output_path)
