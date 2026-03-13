@@ -725,7 +725,7 @@ parse_survey_mapping <- function(df) {
   df$Field_Type <- toupper(trimws(as.character(df$Field_Type)))
 
   # Valid field types
-  valid_types <- c("VERSION", "BEST_CHOICE", "WORST_CHOICE", "SHOWN_ITEMS")
+  valid_types <- c("VERSION", "BEST_CHOICE", "WORST_CHOICE", "SHOWN_ITEMS", "ANCHOR")
 
   invalid_types <- setdiff(unique(df$Field_Type), valid_types)
   if (length(invalid_types) > 0) {
@@ -915,13 +915,19 @@ parse_output_settings <- function(df) {
       if (name %in% c("Generate_Design_File", "Generate_Count_Scores",
                       "Generate_Aggregate_Logit", "Generate_HB_Model",
                       "Generate_Segment_Tables", "Generate_Charts",
-                      "Export_Individual_Utils")) {
+                      "Export_Individual_Utils", "Generate_HTML_Report",
+                      "Generate_Simulator", "Generate_TURF",
+                      "Has_Anchor_Question")) {
         result[[name]] <- parse_yes_no(val, result[[name]])
       }
       # Integer settings
       else if (name %in% c("HB_Iterations", "HB_Warmup", "HB_Chains",
-                           "Min_Respondents_Per_Segment")) {
+                           "Min_Respondents_Per_Segment", "TURF_Max_Items")) {
         result[[name]] <- safe_integer(val, result[[name]])
+      }
+      # Numeric settings
+      else if (name %in% c("Anchor_Threshold")) {
+        result[[name]] <- safe_numeric(val, result[[name]])
       }
       # String settings
       else {
@@ -973,7 +979,17 @@ get_default_output_settings <- function() {
     Score_Rescale_Method = "0_100",
     Min_Respondents_Per_Segment = 50,
     Output_Item_Sort_Order = "UTILITY_DESC",
-    Export_Individual_Utils = TRUE
+    Export_Individual_Utils = TRUE,
+    Generate_HTML_Report = FALSE,
+    Generate_Simulator = FALSE,
+    Generate_TURF = FALSE,
+    TURF_Max_Items = 10,
+    TURF_Threshold = "ABOVE_MEAN",
+    Has_Anchor_Question = FALSE,
+    Anchor_Variable = "",
+    Anchor_Threshold = 0.50,
+    Anchor_Format = "COMMA_SEPARATED",
+    Score_Display = "BOTH"
   )
 }
 

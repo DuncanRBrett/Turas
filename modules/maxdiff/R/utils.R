@@ -673,6 +673,287 @@ rank_utilities <- function(utilities) {
 
 
 # ==============================================================================
+# PREFERENCE SHARE CALCULATION
+# ==============================================================================
+
+#' Convert utilities to preference shares (MNL-based)
+#'
+#' Converts individual-level HB utilities to preference shares that sum
+#' to 100%. Uses the multinomial logit (MNL) share formula:
+#'   share_i = exp(U_i) / sum(exp(U_j))
+#' Applied at individual level and then averaged.
+#'
+#' @param individual_utils Matrix or data frame. Rows = respondents, cols = items.
+#' @param aggregate_utils Named numeric vector. Aggregate utilities (used if no
+#'   individual utils available). Falls back to softmax on these.
+#'
+#' @return Named numeric vector of preference shares (sum to 100)
+#'
+#' @export
+compute_preference_shares <- function(individual_utils = NULL, aggregate_utils = NULL) {
+
+  if (!is.null(individual_utils) && nrow(individual_utils) > 0) {
+    # Drop non-numeric columns (e.g., resp_id) before matrix conversion
+    if (is.data.frame(individual_utils)) {
+      numeric_cols <- sapply(individual_utils, is.numeric)
+      utils_mat <- as.matrix(individual_utils[, numeric_cols, drop = FALSE])
+    } else {
+      utils_mat <- as.matrix(individual_utils)
+    }
+    n_resp <- nrow(utils_mat)
+    n_items <- ncol(utils_mat)
+
+    # Compute shares per respondent (softmax), then average
+    shares_mat <- matrix(0, nrow = n_resp, ncol = n_items)
+    for (i in seq_len(n_resp)) {
+      row_utils <- utils_mat[i, ]
+      # Subtract max for numerical stability
+      exp_u <- exp(row_utils - max(row_utils, na.rm = TRUE))
+      shares_mat[i, ] <- exp_u / sum(exp_u, na.rm = TRUE)
+    }
+
+    avg_shares <- colMeans(shares_mat, na.rm = TRUE) * 100
+    names(avg_shares) <- colnames(utils_mat)
+    return(avg_shares)
+  }
+
+  if (!is.null(aggregate_utils) && length(aggregate_utils) > 0) {
+    # Softmax on aggregate utilities
+    exp_u <- exp(aggregate_utils - max(aggregate_utils, na.rm = TRUE))
+    shares <- (exp_u / sum(exp_u, na.rm = TRUE)) * 100
+    names(shares) <- names(aggregate_utils)
+    return(shares)
+  }
+
+  return(numeric(0))
+}
+
+
+#' Compute head-to-head choice probability
+#'
+#' Given two items, computes the probability that a respondent would
+#' choose item A over item B using individual-level MNL shares.
+#'
+#' @param individual_utils Matrix or data frame of individual utilities
+#' @param item_a Character. Item_ID for item A
+#' @param item_b Character. Item_ID for item B
+#'
+#' @return List with prob_a, prob_b (percentages summing to 100)
+#'
+#' @export
+compute_head_to_head <- function(individual_utils, item_a, item_b) {
+
+  if (is.null(individual_utils) || nrow(individual_utils) == 0) {
+    return(list(prob_a = 50, prob_b = 50))
+  }
+
+  utils_mat <- as.matrix(individual_utils)
+  col_names <- colnames(utils_mat)
+
+  idx_a <- match(item_a, col_names)
+  idx_b <- match(item_b, col_names)
+
+  if (is.na(idx_a) || is.na(idx_b)) {
+    return(list(prob_a = 50, prob_b = 50))
+  }
+
+  # For each respondent: P(A) = exp(U_A) / (exp(U_A) + exp(U_B))
+  diff <- utils_mat[, idx_a] - utils_mat[, idx_b]
+  prob_a_per_resp <- 1 / (1 + exp(-diff))  # logistic function
+  avg_prob_a <- mean(prob_a_per_resp, na.rm = TRUE)
+
+  list(
+    prob_a = round(avg_prob_a * 100, 1),
+    prob_b = round((1 - avg_prob_a) * 100, 1)
+  )
+}
+
+
+# ==============================================================================
+# ITEM DISCRIMINATION ANALYSIS
+# ==============================================================================
+
+#' Classify items by discrimination (consensus vs polarizing)
+#'
+#' Analyzes variance of individual-level HB utilities to identify:
+#' - Universal favorites: high mean, low variance (everyone likes it)
+#' - Universal rejects: low mean, low variance (everyone dislikes it)
+#' - Polarizing: high variance (love-it-or-hate-it)
+#' - Moderate: everything else
+#'
+#' @param individual_utils Matrix or data frame. Rows = respondents, cols = items.
+#' @param items Data frame with Item_ID and Item_Label
+#'
+#' @return Data frame with Item_ID, Item_Label, Mean_Utility, SD_Utility,
+#'   CV_Utility, Classification, Classification_Label
+#'
+#' @export
+classify_item_discrimination <- function(individual_utils, items = NULL) {
+
+  if (is.null(individual_utils) || nrow(individual_utils) == 0) {
+    return(data.frame(
+      Item_ID = character(0), Item_Label = character(0),
+      Mean_Utility = numeric(0), SD_Utility = numeric(0),
+      Classification = character(0), stringsAsFactors = FALSE
+    ))
+  }
+
+  # Drop non-numeric columns (e.g., resp_id) before matrix conversion
+  if (is.data.frame(individual_utils)) {
+    numeric_cols <- sapply(individual_utils, is.numeric)
+    utils_mat <- as.matrix(individual_utils[, numeric_cols, drop = FALSE])
+  } else {
+    utils_mat <- as.matrix(individual_utils)
+  }
+  item_ids <- colnames(utils_mat)
+
+  # Compute per-item statistics
+  means <- colMeans(utils_mat, na.rm = TRUE)
+  sds <- apply(utils_mat, 2, sd, na.rm = TRUE)
+
+  # Thresholds: median splits on mean and SD across items
+  median_mean <- median(means, na.rm = TRUE)
+  median_sd <- median(sds, na.rm = TRUE)
+
+  # Classify
+  classification <- character(length(item_ids))
+  label <- character(length(item_ids))
+
+  for (j in seq_along(item_ids)) {
+    high_mean <- means[j] > median_mean
+    high_sd <- sds[j] > median_sd
+
+    if (high_mean && !high_sd) {
+      classification[j] <- "UNIVERSAL_FAVORITE"
+      label[j] <- "Universal Favorite"
+    } else if (!high_mean && !high_sd) {
+      classification[j] <- "UNIVERSAL_REJECT"
+      label[j] <- "Low Priority"
+    } else if (high_sd) {
+      classification[j] <- "POLARIZING"
+      label[j] <- "Polarizing"
+    } else {
+      classification[j] <- "MODERATE"
+      label[j] <- "Moderate"
+    }
+  }
+
+  result <- data.frame(
+    Item_ID = item_ids,
+    Mean_Utility = round(means, 4),
+    SD_Utility = round(sds, 4),
+    Classification = classification,
+    Classification_Label = label,
+    stringsAsFactors = FALSE
+  )
+
+  # Add item labels if available
+  if (!is.null(items) && "Item_ID" %in% names(items) && "Item_Label" %in% names(items)) {
+    result <- merge(
+      result,
+      items[, c("Item_ID", "Item_Label")],
+      by = "Item_ID",
+      all.x = TRUE,
+      sort = FALSE
+    )
+  } else {
+    result$Item_Label <- result$Item_ID
+  }
+
+  # Sort by mean utility descending
+  result <- result[order(-result$Mean_Utility), ]
+  rownames(result) <- NULL
+
+  return(result)
+}
+
+
+# ==============================================================================
+# ANCHORED MAXDIFF SUPPORT
+# ==============================================================================
+
+#' Process anchor data from survey responses
+#'
+#' Calculates anchor rates per item from respondent-level anchor
+#' selections (which items they consider "must-haves").
+#'
+#' @param raw_data Data frame. Full survey data
+#' @param anchor_variable Character. Column name containing anchor selections
+#' @param items Data frame. Item definitions with Item_ID column
+#' @param id_variable Character. Respondent ID column name
+#' @param anchor_format Character. Format of anchor data:
+#'   "BINARY_COLUMNS" - one column per item (1 = must-have)
+#'   "COMMA_SEPARATED" - single column with comma-separated Item_IDs
+#'
+#' @return Data frame with Item_ID, Anchor_Count, Anchor_Rate, Is_Must_Have
+#'
+#' @export
+process_anchor_data <- function(raw_data, anchor_variable, items,
+                                id_variable = NULL,
+                                anchor_format = "COMMA_SEPARATED",
+                                anchor_threshold = 0.50) {
+
+  if (is.null(anchor_variable) || !nzchar(anchor_variable)) {
+    return(NULL)
+  }
+
+  active_items <- items$Item_ID[items$Include == 1]
+  n_resp <- nrow(raw_data)
+
+  if (toupper(anchor_format) == "COMMA_SEPARATED") {
+    if (!anchor_variable %in% names(raw_data)) {
+      message(sprintf("[TRS INFO] MAXD_ANCHOR_COL_MISSING: Anchor variable '%s' not found in data",
+                      anchor_variable))
+      return(NULL)
+    }
+
+    anchor_col <- as.character(raw_data[[anchor_variable]])
+    anchor_counts <- setNames(rep(0L, length(active_items)), active_items)
+
+    for (i in seq_len(n_resp)) {
+      if (is.na(anchor_col[i]) || !nzchar(trimws(anchor_col[i]))) next
+      selected <- trimws(unlist(strsplit(anchor_col[i], ",")))
+      for (item_id in selected) {
+        if (item_id %in% active_items) {
+          anchor_counts[item_id] <- anchor_counts[item_id] + 1L
+        }
+      }
+    }
+
+  } else if (toupper(anchor_format) == "BINARY_COLUMNS") {
+    anchor_counts <- setNames(rep(0L, length(active_items)), active_items)
+    for (item_id in active_items) {
+      col_name <- paste0(anchor_variable, "_", item_id)
+      if (col_name %in% names(raw_data)) {
+        vals <- suppressWarnings(as.integer(raw_data[[col_name]]))
+        anchor_counts[item_id] <- sum(vals == 1, na.rm = TRUE)
+      }
+    }
+  } else {
+    return(NULL)
+  }
+
+  anchor_rates <- anchor_counts / n_resp
+
+  result <- data.frame(
+    Item_ID = active_items,
+    Anchor_Count = as.integer(anchor_counts[active_items]),
+    Anchor_Rate = round(anchor_rates[active_items], 3),
+    Is_Must_Have = anchor_rates[active_items] >= anchor_threshold,
+    stringsAsFactors = FALSE
+  )
+
+  # Add labels
+  if ("Item_Label" %in% names(items)) {
+    result <- merge(result, items[, c("Item_ID", "Item_Label")],
+                    by = "Item_ID", all.x = TRUE, sort = FALSE)
+  }
+
+  return(result)
+}
+
+
+# ==============================================================================
 # MODULE INITIALIZATION
 # ==============================================================================
 

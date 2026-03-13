@@ -17,7 +17,8 @@
 8. [Configuration Template Reference](#8-configuration-template-reference)
 9. [Troubleshooting](#9-troubleshooting)
 10. [Best Practices](#10-best-practices)
-11. [Glossary](#11-glossary)
+11. [MaxDiff Study Design Guide](#11-maxdiff-study-design-guide)
+12. [Glossary](#12-glossary)
 
 ---
 
@@ -728,7 +729,140 @@ install_cmdstan()
 
 ---
 
-## 11. Glossary
+## 11. MaxDiff Study Design Guide
+
+This section provides a comprehensive guide to the strategic considerations involved in designing and implementing a MaxDiff study. It covers when MaxDiff is the right technique, its strengths and limitations, and the practical implications for questionnaire design.
+
+### 11.1 When to Use MaxDiff
+
+MaxDiff is the preferred method when you need to:
+
+- **Prioritise a large list of items** (features, benefits, messages, concepts)
+- **Force trade-offs** rather than accept inflated ratings where "everything is important"
+- **Obtain interval-scale measurements** suitable for simulation and share-of-preference modelling
+- **Generate individual-level preference scores** for segmentation, profiling, or personalisation
+- **Compare preferences across segments** on a common metric
+
+MaxDiff is widely used in product development, brand positioning, message testing, feature prioritisation, needs assessment, and menu/assortment optimisation.
+
+### 11.2 Advantages of MaxDiff
+
+| Advantage | Detail |
+|-----------|--------|
+| **Forces discrimination** | Respondents must choose best and worst, preventing scale-use biases (e.g., everything rated 8 or 9 out of 10) |
+| **Scale-free** | No anchor points or reference frames needed; results are naturally comparable across cultures and languages |
+| **Simple task** | Choosing "most" and "least" from a small set is cognitively easier than rating 30+ items on a Likert scale |
+| **Individual-level utilities** | Hierarchical Bayes estimation produces per-respondent scores, enabling latent-class or needs-based segmentation |
+| **Efficient design** | A well-designed study can reliably estimate preferences for 30+ items in under 20 tasks per respondent |
+| **Robust to acquiescence bias** | The forced-choice format eliminates "yea-saying" and central-tendency bias |
+| **Simulator-ready** | Utilities feed directly into MNL share simulators for scenario modelling |
+
+### 11.3 Limitations and Considerations
+
+| Limitation | Mitigation |
+|------------|------------|
+| **Context-free** | Items are evaluated without price or realistic trade-off context. Combine with conjoint when price matters |
+| **Not a purchase intent measure** | MaxDiff shows relative preference, not absolute demand. A top-ranked item may still have low market appeal |
+| **Item framing matters** | Results are sensitive to how items are worded. Pre-test item wording with qualitative research |
+| **Assumes item independence** | The MNL model assumes items are evaluated independently (IIA property). Highly similar items can distort shares |
+| **Respondent fatigue** | More than 15-20 tasks risks satisficing, where respondents adopt simplifying heuristics rather than genuinely evaluating |
+| **Not ideal for < 5 items** | With very few items, simple ranking or paired comparisons may be more efficient |
+| **Sample size requirements** | Hierarchical Bayes requires at least 100-200 respondents for stable individual estimates |
+| **Category interference** | Mixing fundamentally different item categories (e.g., features vs. price levels) can confuse respondents |
+
+### 11.4 Questionnaire Design Implications
+
+#### 11.4.1 Number of Items
+
+- **Sweet spot: 8-25 items.** Fewer than 8 provides little advantage over simple ranking. More than 30 becomes taxing and requires more tasks/versions.
+- **Group related items** in the ITEMS sheet using Item_Group to enable within-group analysis.
+- **Remove duplicates or near-synonyms** before fielding. They inflate each other's scores and waste tasks.
+
+#### 11.4.2 Item Wording
+
+- **Keep items comparable in length and specificity.** A 3-word item alongside a 15-word description creates anchoring bias.
+- **Use concrete, benefit-oriented language.** "Lasts 48 hours on a single charge" beats "Long battery life."
+- **Avoid double-barrelled items.** "Fast and reliable internet" conflates two separate attributes.
+- **Pre-test with 5-10 respondents.** Check for comprehension, ambiguity, and perceived overlap.
+
+#### 11.4.3 Items Per Task
+
+- **4-5 items per task is optimal** for most studies. Fewer provides less information per task; more increases cognitive load.
+- With 4 items per task: each task yields 2 data points (best + worst) out of 4 items = 50% information density.
+- With 5 items per task: 2 out of 5 = 40% information density, but allows more item pairs per task.
+
+#### 11.4.4 Number of Tasks
+
+The minimum number of tasks depends on the number of items and items per task. The goal is for each item to appear a roughly equal number of times (3-5 times per respondent minimum).
+
+**Rule of thumb:** `Tasks >= 3 x (Number of items) / (Items per task)`
+
+| Items | Items/Task | Min Tasks | Recommended Tasks |
+|-------|------------|-----------|-------------------|
+| 8 | 4 | 6 | 8-10 |
+| 12 | 4 | 9 | 12-14 |
+| 15 | 5 | 9 | 12-15 |
+| 20 | 5 | 12 | 15-18 |
+| 25 | 5 | 15 | 18-20 |
+| 30 | 5 | 18 | 20-24 |
+
+#### 11.4.5 Design Versions
+
+- **Use multiple design versions** when items > 10 to ensure positional balance and pair coverage.
+- Each respondent sees one version. More versions = better statistical balance but requires larger samples.
+- **Minimum 3 versions** for studies with 15+ items.
+
+#### 11.4.6 Survey Placement and Context
+
+- **Place MaxDiff after screening and warm-up questions** but before detailed attitudinal batteries.
+- **Provide clear instructions.** Explain that respondents should choose the MOST and LEAST important/preferred from each set.
+- **Use randomised item order within tasks** to prevent order effects.
+- **Mobile-friendly layout:** Ensure the task displays well on small screens. Vertical stacking works better than horizontal on mobile.
+- **Progress indicator:** Show task number (e.g., "Task 3 of 12") to manage expectations.
+- **Avoid mid-exercise breaks.** Don't place page breaks or other questions between MaxDiff tasks.
+
+#### 11.4.7 Sample Size Considerations
+
+| Analysis Goal | Minimum N | Recommended N |
+|---------------|-----------|---------------|
+| Aggregate scores only | 100 | 200+ |
+| Hierarchical Bayes individual utilities | 150 | 300+ |
+| Segment comparisons (per segment) | 50 | 100+ |
+| Latent class segmentation | 300 | 500+ |
+| Small subgroup analysis | 30 (caution) | 75+ |
+
+### 11.5 Interpreting Results
+
+#### 11.5.1 Utility Scores
+
+- Utilities are **interval-scale** and **relative**. A utility of 2.0 vs 1.0 does NOT mean "twice as preferred."
+- The **difference** between utilities is meaningful: an item 0.5 utility points above another is consistently preferred.
+- **Rescale to 0-100** for client-friendly reporting. The lowest item = 0, highest = 100.
+
+#### 11.5.2 Preference Shares
+
+- Shares are computed using the multinomial logit (softmax) model and represent the probability of each item being chosen from the full set.
+- Shares **sum to 100%** and are a useful metric for relative comparison.
+- Shares are **not market shares.** They represent preference share within the tested set only.
+
+#### 11.5.3 Simulator Use
+
+- The interactive simulator lets you explore "what if" scenarios: hiding items, filtering by segment, building portfolios.
+- **TURF analysis** is ideal for assortment/portfolio decisions: "Which 5 items give maximum reach?"
+- **Head-to-head** comparisons show pairwise win probabilities, useful for direct comparisons.
+
+### 11.6 Common Pitfalls
+
+1. **Too many items:** Testing 40+ items leads to fatigue and noisy data. Consider a two-stage approach: screen with ratings first, then MaxDiff on the top 20-25.
+2. **Mixing categories:** Don't mix product features with brand names or price points in the same MaxDiff. Items should be "apples to apples."
+3. **Ignoring heterogeneity:** Population-level results can mask important segment differences. Always run segment analysis.
+4. **Over-interpreting small differences:** Items within 1-2 percentage points of share are effectively tied. Use confidence intervals.
+5. **Anchoring on "winners":** The most preferred item is only meaningful in context. Focus on the overall preference structure and clusters of items.
+6. **No pilot test:** Always pilot the survey with 10-20 respondents to check task comprehension and completion time.
+
+---
+
+## 12. Glossary
 
 | Term | Definition |
 |------|------------|

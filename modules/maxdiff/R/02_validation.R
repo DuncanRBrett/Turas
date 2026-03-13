@@ -391,17 +391,22 @@ validate_survey_data <- function(data, survey_mapping, design, items, verbose = 
   best_cols <- survey_mapping$Field_Name[survey_mapping$Field_Type == "BEST_CHOICE"]
   worst_cols <- survey_mapping$Field_Name[survey_mapping$Field_Type == "WORST_CHOICE"]
 
-  # Check each choice column
+  # Determine items per task from design to know valid position values
+  items_per_task <- length(grep("^Item\\d+_ID$", names(design)))
+  valid_positions <- as.character(seq_len(max(items_per_task, 1)))
+
+  # Check each choice column - accept either Item_IDs or position numbers
   for (col in c(best_cols, worst_cols)) {
     if (col %in% names(data)) {
       col_values <- data[[col]]
       col_values <- col_values[!is.na(col_values)]
 
-      invalid_values <- setdiff(unique(col_values), valid_item_ids)
+      invalid_values <- setdiff(unique(as.character(col_values)),
+                                c(valid_item_ids, valid_positions))
       if (length(invalid_values) > 0) {
         issues <- c(issues, sprintf(
-          "Column '%s' contains invalid Item_IDs: %s",
-          col, paste(invalid_values, collapse = ", ")
+          "Column '%s' contains invalid values: %s (expected Item_IDs or positions 1-%d)",
+          col, paste(invalid_values, collapse = ", "), items_per_task
         ))
       }
     }
@@ -435,39 +440,38 @@ validate_survey_data <- function(data, survey_mapping, design, items, verbose = 
   # SHOWN ITEMS VALIDATION (if provided)
   # ============================================================================
 
-  shown_cols <- survey_mapping$Field_Name[survey_mapping$Field_Type == "SHOWN_ITEMS"]
+  shown_rows <- which(survey_mapping$Field_Type == "SHOWN_ITEMS")
 
-  if (length(shown_cols) > 0) {
-    for (col in shown_cols) {
-      if (col %in% names(data)) {
-        # Validate choices are in shown items
-        task_num <- survey_mapping$Task_Number[survey_mapping$Field_Name == col]
+  if (length(shown_rows) > 0) {
+    for (si in shown_rows) {
+      col <- survey_mapping$Field_Name[si]
+      task_num <- survey_mapping$Task_Number[si]
 
-        if (!is.na(task_num)) {
-          best_col <- best_cols[task_num]
-          worst_col <- worst_cols[task_num]
+      if (col %in% names(data) && !is.na(task_num) && length(task_num) == 1) {
+        best_col <- best_cols[task_num]
+        worst_col <- worst_cols[task_num]
 
-          if (best_col %in% names(data) && worst_col %in% names(data)) {
-            for (r in seq_len(nrow(data))) {
-              shown_items <- unlist(strsplit(as.character(data[[col]][r]), ","))
-              shown_items <- trimws(shown_items)
+        if (!is.null(best_col) && !is.null(worst_col) &&
+            best_col %in% names(data) && worst_col %in% names(data)) {
+          for (r in seq_len(nrow(data))) {
+            shown_items <- unlist(strsplit(as.character(data[[col]][r]), ","))
+            shown_items <- trimws(shown_items)
 
-              best_item <- data[[best_col]][r]
-              worst_item <- data[[worst_col]][r]
+            best_item <- data[[best_col]][r]
+            worst_item <- data[[worst_col]][r]
 
-              if (!is.na(best_item) && !best_item %in% shown_items) {
-                warnings_list <- c(warnings_list, sprintf(
-                  "Row %d Task %d: Best choice '%s' not in shown items",
-                  r, task_num, best_item
-                ))
-              }
+            if (!is.na(best_item) && !best_item %in% shown_items) {
+              warnings_list <- c(warnings_list, sprintf(
+                "Row %d Task %d: Best choice '%s' not in shown items",
+                r, task_num, best_item
+              ))
+            }
 
-              if (!is.na(worst_item) && !worst_item %in% shown_items) {
-                warnings_list <- c(warnings_list, sprintf(
-                  "Row %d Task %d: Worst choice '%s' not in shown items",
-                  r, task_num, worst_item
-                ))
-              }
+            if (!is.na(worst_item) && !worst_item %in% shown_items) {
+              warnings_list <- c(warnings_list, sprintf(
+                "Row %d Task %d: Worst choice '%s' not in shown items",
+                r, task_num, worst_item
+              ))
             }
           }
         }
