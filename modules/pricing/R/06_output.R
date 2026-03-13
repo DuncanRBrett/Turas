@@ -302,6 +302,147 @@ write_pricing_output <- function(results, plots, validation, config, output_file
   }
 
   # --------------------------------------------------------------------------
+  # Monadic Results
+  # --------------------------------------------------------------------------
+  if (method == "monadic") {
+
+    # Demand Curve
+    openxlsx::addWorksheet(wb, "Mon_Demand_Curve")
+    openxlsx::writeData(wb, "Mon_Demand_Curve",
+                        results$demand_curve, headerStyle = header_style)
+    openxlsx::addStyle(wb, "Mon_Demand_Curve", currency_style,
+                       rows = 2:(nrow(results$demand_curve) + 1),
+                       cols = 1, gridExpand = TRUE)
+    openxlsx::setColWidths(wb, "Mon_Demand_Curve",
+                           cols = 1:ncol(results$demand_curve), widths = "auto")
+
+    # Observed Data
+    openxlsx::addWorksheet(wb, "Mon_Observed_Data")
+    openxlsx::writeData(wb, "Mon_Observed_Data",
+                        results$observed_data, headerStyle = header_style)
+    openxlsx::setColWidths(wb, "Mon_Observed_Data",
+                           cols = 1:ncol(results$observed_data), widths = "auto")
+
+    # Optimal Price
+    openxlsx::addWorksheet(wb, "Mon_Optimal_Price")
+    opt_df <- data.frame(
+      Metric = c("Revenue-Maximizing Price", "Predicted Intent", "Revenue Index"),
+      Value = c(
+        results$optimal_price$price,
+        results$optimal_price$predicted_intent,
+        results$optimal_price$revenue_index
+      ),
+      stringsAsFactors = FALSE
+    )
+    openxlsx::writeData(wb, "Mon_Optimal_Price", opt_df, headerStyle = header_style)
+    openxlsx::addStyle(wb, "Mon_Optimal_Price", currency_style, rows = 2, cols = 2)
+    openxlsx::addStyle(wb, "Mon_Optimal_Price", percent_style, rows = 3, cols = 2)
+    openxlsx::setColWidths(wb, "Mon_Optimal_Price", cols = 1:2, widths = c(25, 20))
+
+    current_row <- nrow(opt_df) + 3
+
+    # Profit optimal (if available)
+    if (!is.null(results$optimal_price_profit)) {
+      openxlsx::writeData(wb, "Mon_Optimal_Price", "PROFIT-MAXIMIZING",
+                          startRow = current_row)
+      openxlsx::addStyle(wb, "Mon_Optimal_Price", subheader_style,
+                         rows = current_row, cols = 1:2)
+      profit_df <- data.frame(
+        Metric = c("Profit-Maximizing Price", "Predicted Intent", "Profit Index"),
+        Value = c(
+          results$optimal_price_profit$price,
+          results$optimal_price_profit$predicted_intent,
+          results$optimal_price_profit$profit_index
+        ),
+        stringsAsFactors = FALSE
+      )
+      openxlsx::writeData(wb, "Mon_Optimal_Price", profit_df,
+                          startRow = current_row + 2, headerStyle = header_style)
+      openxlsx::addStyle(wb, "Mon_Optimal_Price", currency_style,
+                         rows = current_row + 3, cols = 2)
+      openxlsx::addStyle(wb, "Mon_Optimal_Price", percent_style,
+                         rows = current_row + 4, cols = 2)
+      current_row <- current_row + nrow(profit_df) + 4
+    }
+
+    # Model Summary
+    openxlsx::addWorksheet(wb, "Mon_Model_Summary")
+    ms <- results$model_summary
+    model_df <- data.frame(
+      Metric = c("Model Type", "Observations", "AIC",
+                 "Null Deviance", "Residual Deviance", "Pseudo R-squared",
+                 "Price Coefficient p-value"),
+      Value = c(
+        ms$model_type,
+        ms$n_observations,
+        sprintf("%.1f", ms$aic),
+        sprintf("%.2f", ms$null_deviance),
+        sprintf("%.2f", ms$residual_deviance),
+        sprintf("%.4f", ms$pseudo_r2),
+        sprintf("%.6f", ms$price_coefficient_p)
+      ),
+      stringsAsFactors = FALSE
+    )
+    openxlsx::writeData(wb, "Mon_Model_Summary", model_df, headerStyle = header_style)
+    openxlsx::setColWidths(wb, "Mon_Model_Summary", cols = 1:2, widths = c(25, 20))
+
+    # Elasticity
+    if (!is.null(results$elasticity) && nrow(results$elasticity) > 0) {
+      openxlsx::addWorksheet(wb, "Mon_Elasticity")
+      openxlsx::writeData(wb, "Mon_Elasticity",
+                          results$elasticity, headerStyle = header_style)
+      openxlsx::setColWidths(wb, "Mon_Elasticity",
+                             cols = 1:ncol(results$elasticity), widths = "auto")
+    }
+
+    # Confidence Intervals
+    if (!is.null(results$confidence_intervals)) {
+      ci <- results$confidence_intervals
+      openxlsx::addWorksheet(wb, "Mon_Confidence_Intervals")
+
+      ci_rows <- list()
+      if (!is.null(ci$optimal_price_ci)) {
+        ci_rows$rev <- data.frame(
+          Metric = "Revenue-Optimal Price CI",
+          Lower = ci$optimal_price_ci[1],
+          Upper = ci$optimal_price_ci[2],
+          stringsAsFactors = FALSE
+        )
+      }
+      if (!is.null(ci$optimal_profit_price_ci)) {
+        ci_rows$profit <- data.frame(
+          Metric = "Profit-Optimal Price CI",
+          Lower = ci$optimal_profit_price_ci[1],
+          Upper = ci$optimal_profit_price_ci[2],
+          stringsAsFactors = FALSE
+        )
+      }
+
+      if (length(ci_rows) > 0) {
+        ci_df <- do.call(rbind, ci_rows)
+        openxlsx::writeData(wb, "Mon_Confidence_Intervals", ci_df,
+                            headerStyle = header_style)
+        openxlsx::addStyle(wb, "Mon_Confidence_Intervals", currency_style,
+                           rows = 2:(nrow(ci_df) + 1), cols = 2:3,
+                           gridExpand = TRUE)
+        openxlsx::setColWidths(wb, "Mon_Confidence_Intervals",
+                               cols = 1:3, widths = c(25, 15, 15))
+      }
+
+      # Demand curve CI band
+      if (!is.null(ci$demand_curve_ci)) {
+        ci_start <- if (length(ci_rows) > 0) nrow(ci_df) + 4 else 1
+        openxlsx::writeData(wb, "Mon_Confidence_Intervals", "DEMAND CURVE CI BAND",
+                            startRow = ci_start)
+        openxlsx::addStyle(wb, "Mon_Confidence_Intervals", subheader_style,
+                           rows = ci_start, cols = 1:3)
+        openxlsx::writeData(wb, "Mon_Confidence_Intervals", ci$demand_curve_ci,
+                            startRow = ci_start + 2, headerStyle = header_style)
+      }
+    }
+  }
+
+  # --------------------------------------------------------------------------
   # Validation Details
   # --------------------------------------------------------------------------
   if (validation$n_warnings > 0 || validation$n_excluded > 0) {

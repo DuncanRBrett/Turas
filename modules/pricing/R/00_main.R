@@ -165,7 +165,8 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
     cat("\n")
   }
 
-  # Track warnings
+  # Initialize guard state for pre-flight tracking
+  guard <- pricing_guard_init()
   warnings_list <- character()
 
   # --------------------------------------------------------------------------
@@ -173,6 +174,7 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
   # --------------------------------------------------------------------------
   cat("1. Loading configuration...\n")
   config <- load_pricing_config(config_file)
+  guard$analysis_type <- config$analysis_method
   cat(sprintf("   Analysis method: %s\n", config$analysis_method))
   if (!is.null(config$project_name) && !is.na(config$project_name)) {
     cat(sprintf("   Project: %s\n", config$project_name))
@@ -256,6 +258,41 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
                   gg_results$optimal_price$purchase_intent * 100))
     }
 
+  } else if (analysis_method == "monadic") {
+    cat("\n3. Running Monadic Price Testing analysis...\n")
+
+    # Source monadic module
+    monadic_path <- file.path(.get_script_dir_for_guard(), "13_monadic.R")
+    if (!file.exists(monadic_path)) {
+      monadic_path <- file.path(getwd(), "modules", "pricing", "R", "13_monadic.R")
+    }
+    if (file.exists(monadic_path)) {
+      source(monadic_path)
+    } else {
+      pricing_refuse(
+        code = "BUG_MONADIC_NOT_FOUND",
+        title = "Monadic Module Not Found",
+        problem = "Could not locate 13_monadic.R",
+        why_it_matters = "Monadic analysis implementation is required",
+        how_to_fix = "Ensure modules/pricing/R/13_monadic.R exists"
+      )
+    }
+
+    # Pre-flight validation for monadic data
+    guard <- validate_monadic_data(validation$clean_data, config, guard)
+    pricing_print_guard_summary(guard, nrow(validation$clean_data))
+
+    monadic_results <- run_monadic_analysis(validation$clean_data, config)
+    analysis_results <- monadic_results
+    cat(sprintf("   Demand curve modelled across %d price points\n",
+                length(monadic_results$demand_curve$price)))
+    if (!is.null(monadic_results$optimal_price)) {
+      cat(sprintf("   Optimal price (revenue-max): %s%.2f (%.1f%% predicted intent)\n",
+                  config$currency_symbol %||% "$",
+                  monadic_results$optimal_price$price,
+                  monadic_results$optimal_price$predicted_intent * 100))
+    }
+
   } else if (analysis_method == "both") {
     cat("\n3. Running both Van Westendorp and Gabor-Granger analyses...\n")
 
@@ -291,10 +328,11 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
         "Set analysis_method in Settings sheet to one of:",
         "  - 'van_westendorp' for price sensitivity meter",
         "  - 'gabor_granger' for demand curve analysis",
-        "  - 'both' for combined analysis"
+        "  - 'monadic' for randomized cell monadic testing",
+        "  - 'both' for combined VW + GG analysis"
       ),
       observed = config$analysis_method,
-      expected = c("van_westendorp", "gabor_granger", "both")
+      expected = c("van_westendorp", "gabor_granger", "monadic", "both")
     )
   }
 
@@ -360,12 +398,14 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
   # STEP 6: Synthesize Recommendation
   # --------------------------------------------------------------------------
   synthesis <- NULL
+  monadic_results_for_synthesis <- if (exists("monadic_results")) monadic_results else NULL
 
   cat("\n6. Synthesizing recommendation...\n")
   tryCatch({
     synthesis <- synthesize_recommendation(
       vw_results = vw_results,
       gg_results = gg_results,
+      monadic_results = monadic_results_for_synthesis,
       segment_results = segment_results,
       ladder_results = ladder_results,
       config = config
@@ -430,6 +470,60 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
   )
   cat(sprintf("   Results written to: %s\n", output_file))
 
+  # --------------------------------------------------------------------------
+  # STEP 9: Generate HTML Report (consolidated with simulator)
+  # --------------------------------------------------------------------------
+  html_report_path <- NULL
+  if (isTRUE(config$generate_html_report) || isTRUE(config$generate_simulator)) {
+    cat("\n9. Generating HTML report (consolidated)...\n")
+
+    # Locate HTML report orchestrator
+    html_report_main <- NULL
+    possible_paths <- c(
+      file.path(.get_script_dir_for_guard(), "..", "lib", "html_report", "99_html_report_main.R"),
+      file.path(getwd(), "modules", "pricing", "lib", "html_report", "99_html_report_main.R")
+    )
+    for (p in possible_paths) {
+      if (file.exists(p)) { html_report_main <- p; break }
+    }
+
+    if (!is.null(html_report_main)) {
+      tryCatch({
+        source(html_report_main)
+
+        # Build HTML output path alongside Excel
+        html_path <- sub("\\.xlsx$", ".html", output_file, ignore.case = TRUE)
+        if (html_path == output_file) {
+          html_path <- paste0(tools::file_path_sans_ext(output_file), ".html")
+        }
+
+        # Build full results object for the report
+        full_results <- list(
+          method = analysis_method,
+          results = analysis_results,
+          segment_results = segment_results,
+          ladder_results = ladder_results,
+          synthesis = synthesis,
+          diagnostics = validation
+        )
+
+        # Pass resolved report_dir so child doesn't need sys.frame()
+        resolved_report_dir <- dirname(html_report_main)
+        html_result <- generate_pricing_html_report(full_results, html_path, config,
+                                                     report_dir = resolved_report_dir)
+        if (html_result$status == "PASS") {
+          html_report_path <- html_result$output_file
+          cat(sprintf("   HTML report: %s\n", basename(html_report_path)))
+        }
+      }, error = function(e) {
+        message(sprintf("[TRS PARTIAL] PRICE_HTML_FAILED: HTML report generation failed: %s", e$message))
+        cat(sprintf("   ! HTML report failed: %s\n", e$message))
+      })
+    } else {
+      cat("   ! HTML report module not found, skipping\n")
+    }
+  }
+
   # ==========================================================================
   # TRS FINAL BANNER (TRS v1.0)
   # ==========================================================================
@@ -457,7 +551,8 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
     plots = plots,
     diagnostics = validation,
     config = config,
-    run_result = run_result
+    run_result = run_result,
+    html_report_path = html_report_path
   ))
 }
 
@@ -575,6 +670,37 @@ run_pricing_analysis_from_config <- function(config) {
                   gg_results$optimal_price_profit$profit_index))
     }
 
+  } else if (analysis_method == "monadic") {
+    cat("\n3. Running Monadic Price Testing analysis...\n")
+
+    # Source monadic module
+    monadic_path <- file.path(.get_script_dir_for_guard(), "13_monadic.R")
+    if (!file.exists(monadic_path)) {
+      monadic_path <- file.path(getwd(), "modules", "pricing", "R", "13_monadic.R")
+    }
+    if (file.exists(monadic_path)) {
+      source(monadic_path)
+    } else {
+      pricing_refuse(
+        code = "BUG_MONADIC_NOT_FOUND",
+        title = "Monadic Module Not Found",
+        problem = "Could not locate 13_monadic.R",
+        why_it_matters = "Monadic analysis implementation is required",
+        how_to_fix = "Ensure modules/pricing/R/13_monadic.R exists"
+      )
+    }
+
+    monadic_results <- run_monadic_analysis(validation$clean_data, config)
+    analysis_results <- monadic_results
+    cat(sprintf("   Demand curve modelled across %d price points\n",
+                length(monadic_results$demand_curve$price)))
+    if (!is.null(monadic_results$optimal_price)) {
+      cat(sprintf("   Optimal price (revenue-max): %s%.2f (%.1f%% predicted intent)\n",
+                  config$currency_symbol %||% "$",
+                  monadic_results$optimal_price$price,
+                  monadic_results$optimal_price$predicted_intent * 100))
+    }
+
   } else if (analysis_method == "both") {
     cat("\n3. Running both Van Westendorp and Gabor-Granger analyses...\n")
 
@@ -614,10 +740,11 @@ run_pricing_analysis_from_config <- function(config) {
         "Set analysis_method in Settings sheet to one of:",
         "  - 'van_westendorp' for price sensitivity meter",
         "  - 'gabor_granger' for demand curve analysis",
-        "  - 'both' for combined analysis"
+        "  - 'monadic' for randomized cell monadic testing",
+        "  - 'both' for combined VW + GG analysis"
       ),
       observed = config$analysis_method,
-      expected = c("van_westendorp", "gabor_granger", "both")
+      expected = c("van_westendorp", "gabor_granger", "monadic", "both")
     )
   }
 
@@ -683,12 +810,14 @@ run_pricing_analysis_from_config <- function(config) {
   # STEP 6: Synthesize Recommendation
   # --------------------------------------------------------------------------
   synthesis <- NULL
+  monadic_results_for_synthesis <- if (exists("monadic_results")) monadic_results else NULL
 
   cat("\n6. Synthesizing recommendation...\n")
   tryCatch({
     synthesis <- synthesize_recommendation(
       vw_results = vw_results,
       gg_results = gg_results,
+      monadic_results = monadic_results_for_synthesis,
       segment_results = segment_results,
       ladder_results = ladder_results,
       config = config
@@ -727,6 +856,54 @@ run_pricing_analysis_from_config <- function(config) {
   )
   cat(sprintf("   Results written to: %s\n", output_file))
 
+  # --------------------------------------------------------------------------
+  # STEP 9: Generate HTML Report (consolidated with simulator)
+  # --------------------------------------------------------------------------
+  html_report_path <- NULL
+  if (isTRUE(config$generate_html_report) || isTRUE(config$generate_simulator)) {
+    cat("\n9. Generating HTML report (consolidated)...\n")
+
+    html_report_main <- NULL
+    possible_paths <- c(
+      file.path(.get_script_dir_for_guard(), "..", "lib", "html_report", "99_html_report_main.R"),
+      file.path(getwd(), "modules", "pricing", "lib", "html_report", "99_html_report_main.R")
+    )
+    for (p in possible_paths) {
+      if (file.exists(p)) { html_report_main <- p; break }
+    }
+
+    if (!is.null(html_report_main)) {
+      tryCatch({
+        source(html_report_main)
+
+        html_path <- sub("\\.xlsx$", ".html", output_file, ignore.case = TRUE)
+        if (html_path == output_file) {
+          html_path <- paste0(tools::file_path_sans_ext(output_file), ".html")
+        }
+
+        full_results <- list(
+          method = analysis_method,
+          results = analysis_results,
+          segment_results = segment_results,
+          ladder_results = ladder_results,
+          synthesis = synthesis,
+          diagnostics = validation
+        )
+
+        html_result <- generate_pricing_html_report(full_results, html_path, config)
+        if (html_result$status == "PASS") {
+          html_report_path <- html_result$output_file
+          cat(sprintf("   HTML report: %s\n", basename(html_report_path)))
+        }
+      }, error = function(e) {
+        message(sprintf("[TRS PARTIAL] PRICE_HTML_FAILED: HTML report generation failed: %s", e$message))
+        cat(sprintf("   ! HTML report failed: %s\n", e$message))
+      })
+    } else {
+      cat("   ! HTML report module not found, skipping\n")
+    }
+  }
+
   cat("\n")
   cat(rep("=", 80), "\n", sep = "")
   cat("ANALYSIS COMPLETE\n")
@@ -742,7 +919,8 @@ run_pricing_analysis_from_config <- function(config) {
     synthesis = synthesis,
     plots = plots,
     diagnostics = validation,
-    config = config
+    config = config,
+    html_report_path = html_report_path
   ))
 }
 

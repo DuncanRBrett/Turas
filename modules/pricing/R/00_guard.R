@@ -133,11 +133,15 @@ pricing_guard_init <- function() {
   guard <- guard_init(module = "PRICING")
 
   # Add Pricing-specific fields
-  guard$analysis_type <- NULL  # VW, GG, or combined
+  guard$analysis_type <- NULL  # VW, GG, monadic, or combined
   guard$price_point_issues <- list()
   guard$sample_size_by_price <- list()
   guard$curve_interpolation_used <- FALSE
   guard$optimal_price_found <- FALSE
+  guard$skipped_methods <- character(0)
+  guard$data_quality_issues <- character(0)
+  guard$monotonicity_violations <- 0L
+  guard$sample_warnings <- character(0)
 
   guard
 }
@@ -413,6 +417,183 @@ validate_van_westendorp_data <- function(data, vw_columns) {
 
 
 # ==============================================================================
+# MONADIC VALIDATION GATES
+# ==============================================================================
+
+#' Validate Monadic Price Testing Data
+#'
+#' @param data Survey data
+#' @param config Configuration list with monadic settings
+#' @param guard Guard state object
+#' @return Updated guard state
+#' @keywords internal
+validate_monadic_data <- function(data, config, guard) {
+  mon <- config$monadic
+
+  # Hard guard: required columns must exist
+  if (is.null(mon$price_column) || is.na(mon$price_column) || mon$price_column == "") {
+    pricing_refuse(
+      code = "CFG_MONADIC_NO_PRICE_COL",
+      title = "Monadic Price Column Not Specified",
+      problem = "No price column specified in Monadic configuration",
+      why_it_matters = "Monadic analysis requires knowing which price each respondent was shown",
+      how_to_fix = "Set Price_Column in the Monadic sheet of your config file"
+    )
+  }
+
+  if (!mon$price_column %in% names(data)) {
+    pricing_refuse(
+      code = "DATA_MONADIC_PRICE_NOT_FOUND",
+      title = "Monadic Price Column Not Found in Data",
+      problem = sprintf("Column '%s' not found in data", mon$price_column),
+      why_it_matters = "Cannot run monadic analysis without the price assignment column",
+      how_to_fix = "Check the column name matches your data exactly (case-sensitive)",
+      observed = head(names(data), 20),
+      expected = mon$price_column
+    )
+  }
+
+  if (is.null(mon$intent_column) || is.na(mon$intent_column) || mon$intent_column == "") {
+    pricing_refuse(
+      code = "CFG_MONADIC_NO_INTENT_COL",
+      title = "Monadic Intent Column Not Specified",
+      problem = "No intent column specified in Monadic configuration",
+      why_it_matters = "Monadic analysis requires a purchase intent response column",
+      how_to_fix = "Set Intent_Column in the Monadic sheet of your config file"
+    )
+  }
+
+  if (!mon$intent_column %in% names(data)) {
+    pricing_refuse(
+      code = "DATA_MONADIC_INTENT_NOT_FOUND",
+      title = "Monadic Intent Column Not Found in Data",
+      problem = sprintf("Column '%s' not found in data", mon$intent_column),
+      why_it_matters = "Cannot run monadic analysis without purchase intent responses",
+      how_to_fix = "Check the column name matches your data exactly (case-sensitive)",
+      observed = head(names(data), 20),
+      expected = mon$intent_column
+    )
+  }
+
+  # Soft guard: check cell sizes
+  price_vals <- data[[mon$price_column]]
+  price_vals <- price_vals[!is.na(price_vals)]
+  price_counts <- table(price_vals)
+  min_cell <- mon$min_cell_size %||% 30
+
+  small_cells <- names(price_counts)[price_counts < min_cell]
+  if (length(small_cells) > 0) {
+    for (p in small_cells) {
+      guard <- guard_record_price_issue(
+        guard, p,
+        sprintf("Monadic cell n=%d below minimum %d", price_counts[p], min_cell),
+        as.numeric(price_counts[p])
+      )
+    }
+  }
+
+  # Hard refuse if any cell has < 10
+  very_small <- names(price_counts)[price_counts < 10]
+  if (length(very_small) > 0) {
+    pricing_refuse(
+      code = "DATA_MONADIC_CELL_TOO_SMALL",
+      title = "Critically Small Monadic Cell Size",
+      problem = sprintf("%d price cell(s) have fewer than 10 respondents", length(very_small)),
+      why_it_matters = "Logistic regression requires adequate sample per price cell for stable estimates",
+      how_to_fix = c(
+        "Collect more data for under-represented price cells",
+        "Consider removing price cells with very few respondents"
+      ),
+      details = sprintf("Affected prices: %s", paste(very_small, collapse = ", "))
+    )
+  }
+
+  # Soft guard: check for sufficient price variation
+  n_prices <- length(price_counts)
+  if (n_prices < 3) {
+    guard <- guard_warn(guard,
+      sprintf("Only %d distinct prices in monadic data (3+ recommended)", n_prices),
+      "monadic_design")
+    guard <- guard_flag_stability(guard, "Insufficient price variation for reliable demand curve")
+  }
+
+  guard
+}
+
+
+# ==============================================================================
+# STRUCTURED CONSOLE OUTPUT (SHINY VISIBILITY)
+# ==============================================================================
+
+#' Print Pricing Error to Console (Boxed Format)
+#'
+#' Outputs errors in a structured box format that is visible in the
+#' R console when running through Shiny.
+#'
+#' @param code Error code
+#' @param message Error message
+#' @param how_to_fix Fix instructions
+#' @param context Where the error occurred
+#' @keywords internal
+pricing_console_error <- function(code, message, how_to_fix = NULL, context = "Pricing Module") {
+  width <- 60
+  cat("\n")
+  cat(strrep("\u2550", width), "\n")
+  cat(" TURAS PRICING ERROR\n")
+  cat(strrep("\u2500", width), "\n")
+  cat(" Context: ", context, "\n")
+  cat(" Code:    ", code, "\n")
+  cat(" Message: ", message, "\n")
+  if (!is.null(how_to_fix)) {
+    cat(strrep("\u2500", width), "\n")
+    cat(" How to fix:\n")
+    if (is.character(how_to_fix)) {
+      for (fix in how_to_fix) {
+        cat("   - ", fix, "\n")
+      }
+    }
+  }
+  cat(strrep("\u2550", width), "\n\n")
+}
+
+
+#' Print Pricing Warning to Console
+#'
+#' @param message Warning message
+#' @param context Where the warning occurred
+#' @keywords internal
+pricing_console_warning <- function(message, context = "Pricing Module") {
+  cat(sprintf("  [WARNING] %s: %s\n", context, message))
+}
+
+
+#' Print Guard Summary to Console
+#'
+#' @param guard Guard state object
+#' @param n_respondents Number of respondents
+#' @keywords internal
+pricing_print_guard_summary <- function(guard, n_respondents = NULL) {
+  summary <- pricing_guard_summary(guard)
+
+  n_warn <- summary$n_warnings %||% summary$warning_count %||% 0
+  if (n_warn > 0) {
+    cat(sprintf("   Pre-flight: %d warning(s)\n", n_warn))
+    for (w in guard$warnings) {
+      cat(sprintf("     - [%s] %s\n", w$category, w$msg))
+    }
+  }
+
+  if (length(summary$price_point_issues) > 0) {
+    cat(sprintf("   Price point issues: %d\n", length(summary$price_point_issues)))
+  }
+
+  if (!is.null(n_respondents)) {
+    cat(sprintf("   Sample: n=%d\n", n_respondents))
+  }
+}
+
+
+# ==============================================================================
 # TRS STATUS HELPERS
 # ==============================================================================
 
@@ -545,8 +726,8 @@ pricing_determine_status <- function(guard,
     affected_outputs <- c(affected_outputs, "optimal_price", "revenue_optimization")
   }
 
-  # Check stability flag
-  if (!summary$is_stable) {
+  # Check stability flag (use_with_caution from shared guard_summary)
+  if (isTRUE(summary$use_with_caution)) {
     degraded_reasons <- c(degraded_reasons, "Analysis stability compromised")
     affected_outputs <- c(affected_outputs, "all_outputs")
   }

@@ -26,6 +26,7 @@
 #' @export
 synthesize_recommendation <- function(vw_results = NULL,
                                       gg_results = NULL,
+                                      monadic_results = NULL,
                                       segment_results = NULL,
                                       ladder_results = NULL,
                                       config = NULL) {
@@ -34,17 +35,17 @@ synthesize_recommendation <- function(vw_results = NULL,
   # STEP 1: Validate inputs
   # ============================================================================
 
-  if (is.null(vw_results) && is.null(gg_results)) {
+  if (is.null(vw_results) && is.null(gg_results) && is.null(monadic_results)) {
     pricing_refuse(
       code = "DATA_NO_RESULTS",
       title = "No Analysis Results Provided",
-      problem = "At least one of vw_results or gg_results must be provided",
+      problem = "At least one of vw_results, gg_results, or monadic_results must be provided",
       why_it_matters = "Cannot synthesize recommendation without pricing analysis results",
       how_to_fix = c(
-        "Run Van Westendorp or Gabor-Granger analysis first",
+        "Run Van Westendorp, Gabor-Granger, or Monadic analysis first",
         "Pass the results to synthesize_recommendation()"
       ),
-      expected = "vw_results and/or gg_results"
+      expected = "vw_results, gg_results, and/or monadic_results"
     )
   }
 
@@ -75,8 +76,10 @@ synthesize_recommendation <- function(vw_results = NULL,
       description = "Center of optimal zone"
     )
 
-    # NMS if available
-    if (!is.null(vw_results$nms_results)) {
+    # NMS if available (guard against NA revenue_optimal)
+    if (!is.null(vw_results$nms_results) &&
+        !is.null(vw_results$nms_results$revenue_optimal) &&
+        !is.na(vw_results$nms_results$revenue_optimal)) {
       method_prices$nms_revenue <- list(
         price = vw_results$nms_results$revenue_optimal,
         label = "NMS Revenue Optimal",
@@ -94,33 +97,55 @@ synthesize_recommendation <- function(vw_results = NULL,
     )
   }
 
+  if (!is.null(monadic_results)) {
+    method_prices$monadic_optimal <- list(
+      price = monadic_results$optimal_price$price,
+      label = "Monadic Revenue Optimal",
+      description = sprintf("Revenue-maximizing (%.0f%% predicted intent)",
+                            monadic_results$optimal_price$predicted_intent * 100)
+    )
+    if (!is.null(monadic_results$optimal_price_profit)) {
+      method_prices$monadic_profit <- list(
+        price = monadic_results$optimal_price_profit$price,
+        label = "Monadic Profit Optimal",
+        description = "Profit-maximizing price from logistic model"
+      )
+    }
+  }
+
   # ============================================================================
   # STEP 3: Calculate consensus price
   # ============================================================================
 
   prices <- sapply(method_prices, function(x) x$price)
+  prices <- prices[!is.na(prices) & is.finite(prices)]
 
-  # Use NMS or GG as primary if available (behaviorally calibrated)
+  # Use NMS or GG or Monadic as primary if available (behaviorally calibrated)
   if (!is.null(method_prices$nms_revenue)) {
     primary_price <- method_prices$nms_revenue$price
     primary_source <- "NMS revenue optimal"
   } else if (!is.null(method_prices$gg_optimal)) {
     primary_price <- method_prices$gg_optimal$price
     primary_source <- "Gabor-Granger optimal"
+  } else if (!is.null(method_prices$monadic_optimal)) {
+    primary_price <- method_prices$monadic_optimal$price
+    primary_source <- "Monadic revenue optimal"
   } else {
     primary_price <- method_prices$vw_midpoint$price
     primary_source <- "Van Westendorp optimal zone midpoint"
   }
 
-  # Apply constraints
-  if (!is.null(synth_config$price_floor)) {
+  # Apply constraints (guard against NA primary_price)
+  if (!is.null(synth_config$price_floor) && !is.na(primary_price) &&
+      !is.na(synth_config$price_floor)) {
     if (primary_price < synth_config$price_floor) {
       primary_price <- synth_config$price_floor
       primary_source <- paste(primary_source, "(constrained to floor)")
     }
   }
 
-  if (!is.null(synth_config$price_ceiling)) {
+  if (!is.null(synth_config$price_ceiling) && !is.na(primary_price) &&
+      !is.na(synth_config$price_ceiling)) {
     if (primary_price > synth_config$price_ceiling) {
       primary_price <- synth_config$price_ceiling
       primary_source <- paste(primary_source, "(constrained to ceiling)")
@@ -138,7 +163,8 @@ synthesize_recommendation <- function(vw_results = NULL,
     method_prices = method_prices,
     recommended_price = recommended_price,
     vw_results = vw_results,
-    gg_results = gg_results
+    gg_results = gg_results,
+    monadic_results = monadic_results
   )
 
   # ============================================================================
@@ -171,7 +197,8 @@ synthesize_recommendation <- function(vw_results = NULL,
     vw_results = vw_results,
     gg_results = gg_results,
     recommended_price = recommended_price,
-    currency = currency
+    currency = currency,
+    monadic_results = monadic_results
   )
 
   # ============================================================================
@@ -222,6 +249,7 @@ synthesize_recommendation <- function(vw_results = NULL,
     acceptable_range = acceptable_range,
     optimal_zone = optimal_zone,
     gg_results = gg_results,
+    monadic_results = monadic_results,
     segment_notes = segment_notes,
     tier_notes = tier_notes,
     risks = risks,
@@ -259,6 +287,11 @@ synthesize_recommendation <- function(vw_results = NULL,
 #' @keywords internal
 round_to_psychological <- function(price) {
 
+  # Guard: if price is NA or non-finite, return as-is
+  if (is.null(price) || length(price) != 1 || is.na(price) || !is.finite(price)) {
+    return(price)
+  }
+
   # Determine magnitude
   if (price < 10) {
     # Under $10: round to X.99
@@ -278,7 +311,7 @@ round_to_psychological <- function(price) {
   }
 
   # Don't round more than 10% from original
-  if (abs(rounded - price) / price > 0.10) {
+  if (price == 0 || abs(rounded - price) / abs(price) > 0.10) {
     rounded <- round(price, 2)
   }
 
@@ -295,14 +328,17 @@ round_to_psychological <- function(price) {
 #' @return List with score, level, and factors
 #' @keywords internal
 assess_recommendation_confidence <- function(method_prices, recommended_price,
-                                             vw_results, gg_results) {
+                                             vw_results, gg_results,
+                                             monadic_results = NULL) {
 
   factors <- list()
   scores <- numeric(0)
 
   # Factor 1: Method agreement
   prices <- sapply(method_prices, function(x) x$price)
-  cv <- sd(prices) / mean(prices)
+  prices <- prices[!is.na(prices) & is.finite(prices)]
+  cv <- if (length(prices) > 1) sd(prices) / mean(prices) else 0
+  if (is.na(cv) || !is.finite(cv)) cv <- 0
 
   if (cv < 0.08) {
     factors$method_agreement <- "Strong agreement across methods (<8% variation)"
@@ -323,6 +359,9 @@ assess_recommendation_confidence <- function(method_prices, recommended_price,
   if (!is.null(gg_results)) {
     n_total <- max(n_total, gg_results$diagnostics$n_respondents)
   }
+  if (!is.null(monadic_results)) {
+    n_total <- max(n_total, monadic_results$diagnostics$n_valid)
+  }
 
   if (n_total >= 300) {
     factors$sample_size <- sprintf("Adequate sample size (n=%d)", n_total)
@@ -338,6 +377,7 @@ assess_recommendation_confidence <- function(method_prices, recommended_price,
   # Factor 3: Data quality (VW violations)
   if (!is.null(vw_results)) {
     violation_rate <- vw_results$diagnostics$violation_rate
+    if (is.null(violation_rate) || is.na(violation_rate)) violation_rate <- 0
 
     if (violation_rate < 0.05) {
       factors$data_quality <- "Good data quality (<5% logical violations)"
@@ -351,21 +391,46 @@ assess_recommendation_confidence <- function(method_prices, recommended_price,
     }
   }
 
-  # Factor 4: Price within optimal zone
-  if (!is.null(vw_results)) {
+  # Factor 4: Monadic model quality (if applicable)
+  if (!is.null(monadic_results)) {
+    p_val <- monadic_results$model_summary$price_coefficient_p
+    pseudo_r2 <- monadic_results$model_summary$pseudo_r2
+
+    if (!is.null(p_val) && !is.na(p_val) && !is.null(pseudo_r2) && !is.na(pseudo_r2)) {
+      if (p_val <= 0.01 && pseudo_r2 >= 0.05) {
+        factors$model_quality <- sprintf("Strong monadic model (p=%.4f, pseudo-R2=%.3f)", p_val, pseudo_r2)
+        scores <- c(scores, 1.0)
+      } else if (p_val <= 0.05) {
+        factors$model_quality <- sprintf("Adequate monadic model (p=%.4f, pseudo-R2=%.3f)", p_val, pseudo_r2)
+        scores <- c(scores, 0.7)
+      } else {
+        factors$model_quality <- sprintf("Weak monadic model (p=%.4f) - price effect not significant", p_val)
+        scores <- c(scores, 0.3)
+      }
+    } else {
+      factors$model_quality <- "Monadic model quality could not be assessed (missing p-value or pseudo-R2)"
+      scores <- c(scores, 0.5)
+    }
+  }
+
+  # Factor 5: Price within optimal zone
+  if (!is.null(vw_results) && !is.na(recommended_price)) {
     opp <- vw_results$price_points$OPP
     idp <- vw_results$price_points$IDP
+    pmc <- vw_results$price_points$PMC
+    pme <- vw_results$price_points$PME
 
-    if (recommended_price >= opp && recommended_price <= idp) {
-      factors$zone_fit <- "Recommended price within optimal zone"
-      scores <- c(scores, 1.0)
-    } else if (recommended_price >= vw_results$price_points$PMC &&
-               recommended_price <= vw_results$price_points$PME) {
-      factors$zone_fit <- "Recommended price within acceptable range (outside optimal zone)"
-      scores <- c(scores, 0.6)
-    } else {
-      factors$zone_fit <- "Recommended price outside acceptable range - unusual"
-      scores <- c(scores, 0.3)
+    if (!is.na(opp) && !is.na(idp) && !is.na(pmc) && !is.na(pme)) {
+      if (recommended_price >= opp && recommended_price <= idp) {
+        factors$zone_fit <- "Recommended price within optimal zone"
+        scores <- c(scores, 1.0)
+      } else if (recommended_price >= pmc && recommended_price <= pme) {
+        factors$zone_fit <- "Recommended price within acceptable range (outside optimal zone)"
+        scores <- c(scores, 0.6)
+      } else {
+        factors$zone_fit <- "Recommended price outside acceptable range - unusual"
+        scores <- c(scores, 0.3)
+      }
     }
   }
 
@@ -412,7 +477,8 @@ assess_recommendation_confidence <- function(method_prices, recommended_price,
 #' @return Data frame with evidence
 #' @keywords internal
 build_evidence_table <- function(method_prices, vw_results, gg_results,
-                                 recommended_price, currency) {
+                                 recommended_price, currency,
+                                 monadic_results = NULL) {
 
   rows <- list()
 
@@ -462,13 +528,53 @@ build_evidence_table <- function(method_prices, vw_results, gg_results,
 
     if (!is.null(gg_results$elasticity)) {
       avg_elast <- mean(gg_results$elasticity$arc_elasticity, na.rm = TRUE)
-      elast_type <- if (avg_elast > -1) "Inelastic" else if (avg_elast < -2) "Highly elastic" else "Moderately elastic"
+      if (!is.na(avg_elast) && is.finite(avg_elast)) {
+        elast_type <- if (avg_elast > -1) "Inelastic" else if (avg_elast < -2) "Highly elastic" else "Moderately elastic"
 
-      rows$gg_elast <- data.frame(
-        method = "Gabor-Granger",
-        metric = "Price Elasticity",
-        value = sprintf("%.2f (avg)", avg_elast),
-        interpretation = elast_type,
+        rows$gg_elast <- data.frame(
+          method = "Gabor-Granger",
+          metric = "Price Elasticity",
+          value = sprintf("%.2f (avg)", avg_elast),
+          interpretation = elast_type,
+          stringsAsFactors = FALSE
+        )
+      }
+    }
+  }
+
+  # Monadic evidence
+  if (!is.null(monadic_results)) {
+    rows$monadic_optimal <- data.frame(
+      method = "Monadic",
+      metric = "Revenue Optimal",
+      value = sprintf("%s%.2f", currency, monadic_results$optimal_price$price),
+      interpretation = sprintf("%.0f%% predicted intent (logistic model)",
+                               monadic_results$optimal_price$predicted_intent * 100),
+      stringsAsFactors = FALSE
+    )
+
+    rows$monadic_model <- data.frame(
+      method = "Monadic",
+      metric = "Model Fit",
+      value = sprintf("pseudo-R2=%.3f, AIC=%.1f",
+                      monadic_results$model_summary$pseudo_r2,
+                      monadic_results$model_summary$aic),
+      interpretation = if (!is.null(monadic_results$model_summary$price_coefficient_p) &&
+                           !is.na(monadic_results$model_summary$price_coefficient_p) &&
+                           monadic_results$model_summary$price_coefficient_p <= 0.05) {
+        "Price effect statistically significant"
+      } else {
+        "Price effect NOT significant - interpret with caution"
+      },
+      stringsAsFactors = FALSE
+    )
+
+    if (!is.null(monadic_results$optimal_price_profit)) {
+      rows$monadic_profit <- data.frame(
+        method = "Monadic",
+        metric = "Profit Optimal",
+        value = sprintf("%s%.2f", currency, monadic_results$optimal_price_profit$price),
+        interpretation = "Profit-maximizing from logistic demand curve",
         stringsAsFactors = FALSE
       )
     }
@@ -496,22 +602,25 @@ identify_pricing_risks <- function(recommended_price, vw_results,
   )
 
   # Upside risks (opportunities)
-  if (!is.null(vw_results)) {
-    headroom <- vw_results$price_points$PME - recommended_price
-    headroom_pct <- headroom / recommended_price * 100
+  if (!is.null(vw_results) && !is.na(recommended_price) && recommended_price != 0) {
+    pme <- vw_results$price_points$PME
+    if (!is.null(pme) && !is.na(pme)) {
+      headroom <- pme - recommended_price
+      headroom_pct <- headroom / recommended_price * 100
 
-    if (headroom_pct > 30) {
-      risks$upside <- c(risks$upside, sprintf(
-        "%.0f%% headroom to PME - potential for premium variant or future increases",
-        headroom_pct
-      ))
+      if (!is.na(headroom_pct) && headroom_pct > 30) {
+        risks$upside <- c(risks$upside, sprintf(
+          "%.0f%% headroom to PME - potential for premium variant or future increases",
+          headroom_pct
+        ))
+      }
     }
   }
 
   if (!is.null(gg_results)) {
     if (!is.null(gg_results$elasticity)) {
       avg_elast <- mean(gg_results$elasticity$arc_elasticity, na.rm = TRUE)
-      if (avg_elast > -1) {
+      if (!is.na(avg_elast) && is.finite(avg_elast) && avg_elast > -1) {
         risks$upside <- c(risks$upside,
           "Inelastic demand suggests price increases may be absorbed"
         )
@@ -520,22 +629,25 @@ identify_pricing_risks <- function(recommended_price, vw_results,
   }
 
   # Downside risks (threats)
-  if (!is.null(vw_results)) {
-    buffer <- recommended_price - vw_results$price_points$PMC
-    buffer_pct <- buffer / recommended_price * 100
+  if (!is.null(vw_results) && !is.na(recommended_price) && recommended_price != 0) {
+    pmc <- vw_results$price_points$PMC
+    if (!is.null(pmc) && !is.na(pmc)) {
+      buffer <- recommended_price - pmc
+      buffer_pct <- buffer / recommended_price * 100
 
-    if (buffer_pct < 20) {
-      risks$downside <- c(risks$downside, sprintf(
-        "Only %.0f%% buffer to PMC - limited room for discounting",
-        buffer_pct
-      ))
+      if (!is.na(buffer_pct) && buffer_pct < 20) {
+        risks$downside <- c(risks$downside, sprintf(
+          "Only %.0f%% buffer to PMC - limited room for discounting",
+          buffer_pct
+        ))
+      }
     }
   }
 
   if (!is.null(gg_results)) {
     if (!is.null(gg_results$elasticity)) {
       avg_elast <- mean(gg_results$elasticity$arc_elasticity, na.rm = TRUE)
-      if (avg_elast < -2) {
+      if (!is.na(avg_elast) && is.finite(avg_elast) && avg_elast < -2) {
         risks$downside <- c(risks$downside,
           "Highly elastic demand - price increases risk significant volume loss"
         )
@@ -556,10 +668,11 @@ identify_pricing_risks <- function(recommended_price, vw_results,
     "Market conditions unchanged since data collection"
   )
 
-  if (!is.null(vw_results) && vw_results$diagnostics$violation_rate > 0.10) {
+  vr <- if (!is.null(vw_results)) vw_results$diagnostics$violation_rate else NULL
+  if (!is.null(vr) && !is.na(vr) && vr > 0.10) {
     risks$assumptions <- c(risks$assumptions,
       sprintf("%.0f%% of respondents gave inconsistent prices - may affect reliability",
-              vw_results$diagnostics$violation_rate * 100)
+              vr * 100)
     )
   }
 
@@ -584,7 +697,8 @@ identify_pricing_risks <- function(recommended_price, vw_results,
 #' @keywords internal
 generate_executive_summary <- function(recommended_price, primary_source,
                                        confidence, acceptable_range, optimal_zone,
-                                       gg_results, segment_notes, tier_notes,
+                                       gg_results, monadic_results = NULL,
+                                       segment_notes, tier_notes,
                                        risks, currency, project_name) {
 
   # Build summary sections
@@ -640,6 +754,25 @@ generate_executive_summary <- function(recommended_price, primary_source,
     )$y
 
     lines <- c(lines, sprintf("Estimated Purchase Intent: %.0f%%", intent * 100))
+    lines <- c(lines, "")
+  }
+
+  # Monadic model results
+  if (!is.null(monadic_results)) {
+    lines <- c(lines, "MONADIC MODEL RESULTS")
+    lines <- c(lines, paste(rep("-", 30), collapse = ""))
+    lines <- c(lines, sprintf("Revenue-Optimal Price: %s%.2f",
+                              currency, monadic_results$optimal_price$price))
+    lines <- c(lines, sprintf("Predicted Intent at Optimum: %.0f%%",
+                              monadic_results$optimal_price$predicted_intent * 100))
+    lines <- c(lines, sprintf("Model: %s (pseudo-R2=%.3f, AIC=%.1f)",
+                              monadic_results$model_summary$model_type,
+                              monadic_results$model_summary$pseudo_r2,
+                              monadic_results$model_summary$aic))
+    if (!is.null(monadic_results$optimal_price_profit)) {
+      lines <- c(lines, sprintf("Profit-Optimal Price: %s%.2f",
+                                currency, monadic_results$optimal_price_profit$price))
+    }
     lines <- c(lines, "")
   }
 
