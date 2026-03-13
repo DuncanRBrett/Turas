@@ -2,13 +2,15 @@
 # TURAS SUITE LAUNCHER
 # ==============================================================================
 # Unified launcher for all Turas modules
+# Data-driven architecture with categorized grid and two-step launch flow
 # ==============================================================================
 
 library(shiny)
+library(shinyjs)
 
 #' Launch Turas Suite Launcher
 #'
-#' Opens a GUI with options to launch Parser, Tabs, or Tracker modules.
+#' Opens a GUI with categorized module grid and per-module recent projects.
 #'
 #' @export
 launch_turas <- function() {
@@ -16,7 +18,6 @@ launch_turas <- function() {
   # Get Turas root directory
   turas_root <- getwd()
   if (basename(turas_root) != "Turas") {
-    # Try to detect if we're in a subdirectory
     if (file.exists(file.path(dirname(turas_root), "launch_turas.R"))) {
       turas_root <- dirname(turas_root)
     } else {
@@ -24,431 +25,703 @@ launch_turas <- function() {
     }
   }
 
-  ui <- fluidPage(
+  # ============================================================================
+  # MODULE REGISTRY
+  # ============================================================================
 
-    # Custom CSS
-    tags$head(
-      tags$style(HTML("
-        body {
-          background-color: #f5f5f5;
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .main-container {
-          max-width: 800px;
-          margin: 50px auto;
-          padding: 40px;
-          background-color: white;
-          border-radius: 10px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .title-section {
-          text-align: center;
-          margin-bottom: 40px;
-          padding-bottom: 20px;
-          border-bottom: 2px solid #e0e0e0;
-        }
-        .title-section h1 {
-          color: #2c3e50;
-          font-size: 36px;
-          margin-bottom: 10px;
-        }
-        .title-section p {
-          color: #7f8c8d;
-          font-size: 16px;
-        }
-        .module-section {
-          margin: 30px 0;
-        }
-        .module-card {
-          background-color: #f8f9fa;
-          border: 1px solid #dee2e6;
-          border-radius: 8px;
-          padding: 20px;
-          margin-bottom: 20px;
-          transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .module-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-        .module-title {
-          font-size: 22px;
-          font-weight: bold;
-          color: #2c3e50;
-          margin-bottom: 10px;
-        }
-        .module-description {
-          color: #6c757d;
-          font-size: 14px;
-          margin-bottom: 15px;
-          line-height: 1.5;
-        }
-        .launch-btn {
-          width: 100%;
-          padding: 12px;
-          font-size: 16px;
-          font-weight: 600;
-          border: none;
-          border-radius: 6px;
-          cursor: pointer;
-          transition: background-color 0.2s;
-        }
-        .btn-alchemerparser {
-          background-color: #16a085;
-          color: white;
-        }
-        .btn-alchemerparser:hover {
-          background-color: #138d75;
-        }
-        .btn-tabs {
-          background-color: #2ecc71;
-          color: white;
-        }
-        .btn-tabs:hover {
-          background-color: #27ae60;
-        }
-        .btn-tracker {
-          background-color: #e74c3c;
-          color: white;
-        }
-        .btn-tracker:hover {
-          background-color: #c0392b;
-        }
-        .btn-confidence {
-          background-color: #f59e0b;
-          color: white;
-        }
-        .btn-confidence:hover {
-          background-color: #d97706;
-        }
-        .btn-segment {
-          background-color: #9b59b6;
-          color: white;
-        }
-        .btn-segment:hover {
-          background-color: #8e44ad;
-        }
-        .btn-conjoint {
-          background-color: #06b6d4;
-          color: white;
-        }
-        .btn-conjoint:hover {
-          background-color: #0891b2;
-        }
-        .btn-keydriver {
-          background-color: #ec4899;
-          color: white;
-        }
-        .btn-keydriver:hover {
-          background-color: #db2777;
-        }
-        .btn-pricing {
-          background-color: #10b981;
-          color: white;
-        }
-        .btn-pricing:hover {
-          background-color: #059669;
-        }
-        .btn-maxdiff {
-          background-color: #8b5cf6;
-          color: white;
-        }
-        .btn-maxdiff:hover {
-          background-color: #7c3aed;
-        }
-        .btn-catdriver {
-          background-color: #6366f1;
-          color: white;
-        }
-        .btn-catdriver:hover {
-          background-color: #4f46e5;
-        }
-        .btn-weighting {
-          background-color: #0ea5e9;
-          color: white;
-        }
-        .btn-weighting:hover {
-          background-color: #0284c7;
-        }
-        .btn-report_hub {
-          background-color: #3b82f6;
-          color: white;
-        }
-        .btn-report_hub:hover {
-          background-color: #2563eb;
-        }
-        .status-message {
-          margin-top: 20px;
-          padding: 15px;
-          border-radius: 6px;
-          text-align: center;
-          font-weight: 500;
-        }
-        .status-success {
-          background-color: #d4edda;
-          color: #155724;
-          border: 1px solid #c3e6cb;
-        }
-        .status-info {
-          background-color: #d1ecf1;
-          color: #0c5460;
-          border: 1px solid #bee5eb;
-        }
-        .footer {
-          text-align: center;
-          margin-top: 40px;
-          padding-top: 20px;
-          border-top: 1px solid #e0e0e0;
-          color: #95a5a6;
-          font-size: 12px;
-        }
-        .recent-hub-item {
-          padding: 8px 12px;
-          margin: 4px 0;
-          background: #f0f4ff;
-          border-radius: 5px;
-          cursor: pointer;
-          border: 1px solid #e2e8f0;
-          font-size: 13px;
-        }
-        .recent-hub-item:hover {
-          background: #e0e7ff;
-          border-color: #3b82f6;
-        }
-        .recent-hub-item strong {
-          color: #1e293b;
-          font-size: 13px;
-        }
-        .recent-hub-item small {
-          color: #64748b;
-          font-size: 11px;
-        }
-      "))
-    ),
-
-    div(class = "main-container",
-
-      # Title
-      div(class = "title-section",
-        h1("TURAS SUITE"),
-        p("Select a module to launch")
-      ),
-
-      # Module Cards
-      div(class = "module-section",
-
-        # AlchemerParser
-        div(class = "module-card",
-          div(class = "module-title", "🔄 AlchemerParser"),
-          div(class = "module-description",
-            "Parse Alchemer survey files and generate Tabs configuration. Converts questionnaire, data export map, and translation files into ready-to-use Tabs inputs."
-          ),
-          actionButton("launch_alchemerparser", "Launch AlchemerParser",
-                      class = "launch-btn btn-alchemerparser")
-        ),
-
-        # Tabs
-        div(class = "module-card",
-          div(class = "module-title", "📈 Tabs"),
-          div(class = "module-description",
-            "Generate cross-tabulation reports. Create formatted Excel outputs with banner breakouts and statistical tests."
-          ),
-          actionButton("launch_tabs", "Launch Tabs",
-                      class = "launch-btn btn-tabs")
-        ),
-
-        # Tracker
-        div(class = "module-card",
-          div(class = "module-title", "📉 Tracker"),
-          div(class = "module-description",
-            "Track metrics across survey waves. Analyze trends, calculate wave-over-wave changes, and test significance."
-          ),
-          actionButton("launch_tracker", "Launch Tracker",
-                      class = "launch-btn btn-tracker")
-        ),
-
-        # Confidence
-        div(class = "module-card",
-          div(class = "module-title", "📊 Confidence"),
-          div(class = "module-description",
-            "Calculate statistical confidence intervals for means and proportions. Supports Bootstrap, Bayesian, and Wilson methods with design effect adjustments."
-          ),
-          actionButton("launch_confidence", "Launch Confidence",
-                      class = "launch-btn btn-confidence")
-        ),
-
-        # Segment
-        div(class = "module-card",
-          div(class = "module-title", "🎯 Segment"),
-          div(class = "module-description",
-            "K-means clustering segmentation. Automatically select optimal variables, detect outliers, and create meaningful respondent segments."
-          ),
-          actionButton("launch_segment", "Launch Segment",
-                      class = "launch-btn btn-segment")
-        ),
-
-        # Conjoint
-        div(class = "module-card",
-          div(class = "module-title", "🔄 Conjoint"),
-          div(class = "module-description",
-            "Choice-based conjoint analysis. Calculate part-worth utilities and attribute importance from experimental choice data."
-          ),
-          actionButton("launch_conjoint", "Launch Conjoint",
-                      class = "launch-btn btn-conjoint")
-        ),
-
-        # Key Driver
-        div(class = "module-card",
-          div(class = "module-title", "🔑 Key Driver"),
-          div(class = "module-description",
-            "Key driver analysis using multiple regression methods. Identify which factors most influence your target outcome with derived importance scores."
-          ),
-          actionButton("launch_keydriver", "Launch Key Driver",
-                      class = "launch-btn btn-keydriver")
-        ),
-
-        # Pricing
-        div(class = "module-card",
-          div(class = "module-title", "💰 Pricing"),
-          div(class = "module-description",
-            "Pricing research analysis using Van Westendorp PSM and Gabor-Granger methods. Determine optimal price points and acceptable price ranges."
-          ),
-          actionButton("launch_pricing", "Launch Pricing",
-                      class = "launch-btn btn-pricing")
-        ),
-
-        # MaxDiff
-        div(class = "module-card",
-          div(class = "module-title", "⚖️ MaxDiff"),
-          div(class = "module-description",
-            "Best-Worst Scaling (MaxDiff) design and analysis. Generate optimal experimental designs and compute preference utilities using count scores, logit models, and Hierarchical Bayes estimation."
-          ),
-          actionButton("launch_maxdiff", "Launch MaxDiff",
-                      class = "launch-btn btn-maxdiff")
-        ),
-
-        # Categorical Key Driver
-        div(class = "module-card",
-          div(class = "module-title", "📋 Categorical Key Driver"),
-          div(class = "module-description",
-            "Key driver analysis for categorical outcomes. Identify what drives binary, ordinal, or nominal outcomes using logistic regression with variable importance scores and odds ratios."
-          ),
-          actionButton("launch_catdriver", "Launch Categorical Key Driver",
-                      class = "launch-btn btn-catdriver")
-        ),
-
-        # Weighting
-        div(class = "module-card",
-          div(class = "module-title", "⚖️ Weighting"),
-          div(class = "module-description",
-            "Calculate survey weights using design or rim weighting methods. Adjust for stratified samples or match demographic targets with iterative proportional fitting (raking)."
-          ),
-          actionButton("launch_weighting", "Launch Weighting",
-                      class = "launch-btn btn-weighting")
-        ),
-
-        # Report Hub
-        div(class = "module-card",
-          div(class = "module-title", "\U0001F4CA Report Hub"),
-          div(class = "module-description",
-            "Combine multiple Turas HTML reports into a unified portal with integrated navigation, cross-referencing, and pinned views."
-          ),
-          actionButton("launch_report_hub", "Launch Report Hub",
-                      class = "launch-btn btn-report_hub"),
-          uiOutput("recent_hub_ui")
-        )
-      ),
-
-      # Status message
-      uiOutput("status_message"),
-
-      # Footer
-      div(class = "footer",
-        paste0("Turas Suite v10.0 | ", turas_root)
-      )
-    )
+  categories <- list(
+    list(id = "setup",    label = "Setup & Data Prep"),
+    list(id = "tables",   label = "Tables & Tracking"),
+    list(id = "advanced", label = "Advanced Analytics"),
+    list(id = "reporting", label = "Reporting")
   )
 
-  server <- function(input, output, session) {
+  modules <- list(
+    list(id = "alchemerparser", name = "AlchemerParser",
+         description = "Parse Alchemer survey exports and generate Tabs configuration files",
+         category = "setup",
+         script = "modules/AlchemerParser/run_alchemerparser_gui.R",
+         recent_file = "modules/AlchemerParser/.recent_alchemerparser_projects.rds",
+         recent_key = NULL),
 
-    # Status message
-    status <- reactiveVal("")
+    list(id = "weighting", name = "Weighting",
+         description = "Sample and rim weighting with iterative proportional fitting",
+         category = "setup",
+         script = "modules/weighting/run_weighting_gui.R",
+         recent_file = file.path(path.expand("~"), ".turas_weighting_recent_folders.rds"),
+         recent_key = NULL,
+         recent_absolute = TRUE),
 
-    output$status_message <- renderUI({
-      if (status() != "") {
-        div(class = "status-message status-info", status())
+    list(id = "tabs", name = "Tabs",
+         description = "Cross-tabulation reports with banner breakouts and statistical tests",
+         category = "tables",
+         script = "modules/tabs/run_tabs_gui.R",
+         recent_file = ".recent_projects.rds",
+         recent_key = NULL),
+
+    list(id = "tracker", name = "Tracker",
+         description = "Longitudinal tracking, trend analysis, and wave-over-wave significance",
+         category = "tables",
+         script = "modules/tracker/run_tracker_gui.R",
+         recent_file = ".recent_tracker_projects.rds",
+         recent_key = "tracking_config"),
+
+    list(id = "conjoint", name = "Conjoint",
+         description = "Choice-based conjoint analysis with Hierarchical Bayes utilities",
+         category = "advanced",
+         script = "modules/conjoint/run_conjoint_gui.R",
+         recent_file = ".recent_conjoint_projects.rds",
+         recent_key = "config_path"),
+
+    list(id = "maxdiff", name = "MaxDiff",
+         description = "Best-worst scaling design generation and preference analysis",
+         category = "advanced",
+         script = "modules/maxdiff/run_maxdiff_gui.R",
+         recent_file = ".recent_maxdiff.rds",
+         recent_key = "path"),
+
+    list(id = "pricing", name = "Pricing",
+         description = "Price sensitivity using Van Westendorp, Gabor-Granger, and monadic methods",
+         category = "advanced",
+         script = "modules/pricing/run_pricing_gui.R",
+         recent_file = "modules/pricing/.recent_pricing_projects.rds",
+         recent_key = NULL),
+
+    list(id = "segment", name = "Segment",
+         description = "K-means clustering segmentation with automatic variable selection",
+         category = "advanced",
+         script = "modules/segment/run_segment_gui.R",
+         recent_file = ".recent_segment_projects.rds",
+         recent_key = NULL),
+
+    list(id = "keydriver", name = "Key Driver",
+         description = "Key driver correlation analysis with derived importance scores",
+         category = "advanced",
+         script = "modules/keydriver/run_keydriver_gui.R",
+         recent_file = ".recent_keydriver_projects.rds",
+         recent_key = "config_path"),
+
+    list(id = "catdriver", name = "Categorical Driver",
+         description = "Driver analysis for categorical outcomes using logistic regression and SHAP",
+         category = "advanced",
+         script = "modules/catdriver/run_catdriver_gui.R",
+         recent_file = ".recent_catdriver_projects.rds",
+         recent_key = "config_path"),
+
+    list(id = "confidence", name = "Confidence",
+         description = "Confidence intervals for means and proportions with design effect adjustments",
+         category = "advanced",
+         script = "modules/confidence/run_confidence_gui.R",
+         recent_file = ".recent_projects.rds",
+         recent_key = NULL),
+
+    list(id = "report_hub", name = "Report Hub",
+         description = "Combine Turas HTML reports into a unified portal with cross-referencing",
+         category = "reporting",
+         script = "modules/report_hub/run_report_hub_gui.R",
+         recent_file = ".recent_hub_configs.rds",
+         recent_key = NULL)
+  )
+
+  # ============================================================================
+  # SVG ICONS
+  # ============================================================================
+
+  icons <- list(
+    alchemerparser = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><polyline points="12 18 12 12 9 14"/></svg>',
+
+    weighting = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="3" x2="12" y2="6"/><circle cx="12" cy="6" r="1"/><line x1="4" y1="9" x2="20" y2="9"/><path d="M4 9l-1 7h6l-1-7"/><path d="M20 9l-1 7h-6l1-7"/><line x1="2" y1="20" x2="22" y2="20"/></svg>',
+
+    tabs = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>',
+
+    tracker = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+
+    conjoint = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2"/><line x1="12" y1="7" x2="12" y2="11"/><line x1="12" y1="11" x2="7" y2="16"/><line x1="12" y1="11" x2="17" y2="16"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>',
+
+    maxdiff = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/><polyline points="18 20 12 14 6 20"/><line x1="3" y1="4" x2="21" y2="4"/></svg>',
+
+    pricing = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+
+    segment = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="16" r="3"/><circle cx="17" cy="7" r="2"/><circle cx="7" cy="17" r="2"/></svg>',
+
+    keydriver = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
+
+    catdriver = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+
+    confidence = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="20"/><line x1="8" y1="4" x2="16" y2="4"/><line x1="8" y1="20" x2="16" y2="20"/><circle cx="12" cy="12" r="2"/></svg>',
+
+    report_hub = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="8" height="8" rx="1"/><rect x="14" y="3" width="8" height="8" rx="1"/><rect x="2" y="13" width="8" height="8" rx="1"/><rect x="14" y="13" width="8" height="8" rx="1"/><line x1="10" y1="7" x2="14" y2="7"/><line x1="6" y1="11" x2="6" y2="13"/><line x1="18" y1="11" x2="18" y2="13"/></svg>'
+  )
+
+  # ============================================================================
+  # HELPER FUNCTIONS
+  # ============================================================================
+
+  #' Read recent projects for a module, normalizing different storage formats
+  read_module_recents <- function(mod) {
+    tryCatch({
+      rds_path <- if (isTRUE(mod$recent_absolute)) {
+        mod$recent_file
+      } else {
+        file.path(turas_root, mod$recent_file)
       }
-    })
+      if (!file.exists(rds_path)) return(character(0))
 
-    # --- Recent hub configs (shared with report_hub module) ---
-    recent_hub_file <- file.path(turas_root, ".recent_hub_configs.rds")
+      data <- readRDS(rds_path)
+      if (length(data) == 0) return(character(0))
 
-    load_recent_hub_configs <- function() {
-      if (file.exists(recent_hub_file)) {
-        tryCatch(readRDS(recent_hub_file), error = function(e) character(0))
+      # Normalize to character vector of paths
+      paths <- if (is.character(data)) {
+        data
+      } else if (is.list(data) && !is.null(mod$recent_key)) {
+        sapply(data, function(x) {
+          val <- x[[mod$recent_key]]
+          if (is.null(val)) NA_character_ else val
+        })
       } else {
         character(0)
       }
+
+      paths <- paths[!is.na(paths)]
+      paths <- paths[file.exists(paths) | dir.exists(paths)]
+      # Filter out directories that have no xlsx files (stale parent dirs)
+      paths <- paths[sapply(paths, function(p) {
+        if (dir.exists(p)) {
+          length(list.files(p, pattern = "\\.xlsx$", ignore.case = TRUE)) > 0
+        } else {
+          TRUE
+        }
+      })]
+      head(paths, 5)
+    }, error = function(e) character(0))
+  }
+
+  #' Build a module card for the grid
+  build_module_card <- function(mod) {
+    div(
+      class = "module-card",
+      onclick = sprintf(
+        "Shiny.setInputValue('module_card_click', '%s', {priority: 'event'})",
+        mod$id
+      ),
+      div(class = "card-icon", HTML(icons[[mod$id]])),
+      div(class = "card-content",
+        div(class = "card-name", mod$name),
+        div(class = "card-desc", mod$description)
+      )
+    )
+  }
+
+  #' Build a category section with grid of cards
+  build_category_section <- function(cat, all_modules) {
+    cat_modules <- Filter(function(m) m$category == cat$id, all_modules)
+    if (length(cat_modules) == 0) return(NULL)
+
+    div(class = "category-section",
+      div(class = "category-label", cat$label),
+      div(class = "category-grid",
+        lapply(cat_modules, build_module_card)
+      )
+    )
+  }
+
+  # ============================================================================
+  # UI
+  # ============================================================================
+
+  ui <- fluidPage(
+    useShinyjs(),
+
+    tags$head(tags$style(HTML("
+      :root {
+        --tl-text: #1e293b;
+        --tl-text-muted: #64748b;
+        --tl-text-faint: #94a3b8;
+        --tl-bg: #f8f7f5;
+        --tl-surface: #ffffff;
+        --tl-border: #e2e8f0;
+        --tl-border-hover: #94a3b8;
+        --tl-accent: #1a2744;
+        --tl-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+      body {
+        background: var(--tl-bg);
+        font-family: var(--tl-font);
+        margin: 0;
+        padding: 0;
+      }
+      .container-fluid { padding: 0; }
+
+      /* Header */
+      .launcher-header {
+        background: linear-gradient(135deg, #1a2744 0%, #2a3f5f 100%);
+        padding: 16px 32px;
+        color: #fff;
+      }
+      .launcher-header-inner {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .launcher-title {
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+      }
+      .launcher-meta {
+        font-size: 12px;
+        color: rgba(255,255,255,0.55);
+      }
+      .launcher-version { margin-right: 16px; }
+
+      /* Content area */
+      .launcher-content {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 32px 32px 80px 32px;
+      }
+
+      /* Category sections */
+      .category-section { margin-bottom: 28px; }
+      .category-label {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--tl-text-faint);
+        margin-bottom: 10px;
+        padding-left: 2px;
+      }
+      .category-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+      @media (max-width: 900px) {
+        .category-grid { grid-template-columns: repeat(2, 1fr); }
+      }
+      @media (max-width: 600px) {
+        .category-grid { grid-template-columns: 1fr; }
+      }
+
+      /* Module cards */
+      .module-card {
+        background: var(--tl-surface);
+        border: 1px solid var(--tl-border);
+        border-radius: 8px;
+        padding: 18px;
+        cursor: pointer;
+        transition: border-color 0.15s, box-shadow 0.15s;
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+      }
+      .module-card:hover {
+        border-color: var(--tl-border-hover);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      }
+      .module-card:active { background: #f8f9fa; }
+      .card-icon {
+        color: var(--tl-text-muted);
+        flex-shrink: 0;
+        margin-top: 2px;
+      }
+      .card-name {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--tl-text);
+        margin-bottom: 4px;
+      }
+      .card-desc {
+        font-size: 12.5px;
+        color: var(--tl-text-muted);
+        line-height: 1.45;
+      }
+
+      /* Detail panel */
+      .detail-panel {
+        max-width: 600px;
+        margin: 0 auto;
+      }
+      .detail-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--tl-text-muted);
+        cursor: pointer;
+        padding: 6px 0;
+        margin-bottom: 20px;
+        border: none;
+        background: none;
+      }
+      .detail-back:hover { color: var(--tl-text); }
+      .detail-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+      .detail-header .card-icon {
+        color: var(--tl-text-muted);
+        flex-shrink: 0;
+      }
+      .detail-header .card-icon svg {
+        width: 36px;
+        height: 36px;
+      }
+      .detail-name {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--tl-text);
+        margin-bottom: 6px;
+      }
+      .detail-desc {
+        font-size: 14px;
+        color: var(--tl-text-muted);
+        line-height: 1.5;
+      }
+
+      /* Recent projects list */
+      .recent-section-label {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--tl-text-faint);
+        margin-bottom: 8px;
+      }
+      .recent-item {
+        background: var(--tl-surface);
+        border: 1px solid var(--tl-border);
+        border-radius: 6px;
+        padding: 12px 16px;
+        margin-bottom: 6px;
+        cursor: pointer;
+        transition: border-color 0.15s, box-shadow 0.15s;
+      }
+      .recent-item:hover {
+        border-color: var(--tl-border-hover);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      }
+      .recent-item:active { background: #f8f9fa; }
+      .recent-name {
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--tl-text);
+        margin-bottom: 2px;
+      }
+      .recent-path {
+        font-size: 11.5px;
+        color: var(--tl-text-faint);
+      }
+
+      /* Divider */
+      .launch-divider {
+        display: flex;
+        align-items: center;
+        margin: 20px 0;
+        color: var(--tl-text-faint);
+        font-size: 12px;
+      }
+      .launch-divider::before, .launch-divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: var(--tl-border);
+      }
+      .launch-divider::before { margin-right: 12px; }
+      .launch-divider::after { margin-left: 12px; }
+
+      /* Launch button */
+      .launch-new-btn {
+        display: block;
+        width: 100%;
+        padding: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--tl-text-muted);
+        background: var(--tl-surface);
+        border: 1px solid var(--tl-border);
+        border-radius: 6px;
+        cursor: pointer;
+        text-align: center;
+        transition: border-color 0.15s, color 0.15s;
+      }
+      .launch-new-btn:hover {
+        border-color: var(--tl-border-hover);
+        color: var(--tl-text);
+      }
+
+      /* Status bar */
+      .status-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 10px 32px;
+        background: var(--tl-accent);
+        color: #e2e8f0;
+        font-size: 13px;
+        font-weight: 500;
+        text-align: center;
+        transform: translateY(100%);
+        transition: transform 0.2s ease;
+        z-index: 100;
+      }
+      .status-bar.visible { transform: translateY(0); }
+
+      /* Footer */
+      .launcher-footer {
+        text-align: center;
+        padding: 16px 0;
+        color: var(--tl-text-faint);
+        font-size: 11px;
+      }
+
+      /* No recents message */
+      .no-recents {
+        color: var(--tl-text-faint);
+        font-size: 13px;
+        padding: 16px 0;
+      }
+    "))),
+
+    # Header
+    div(class = "launcher-header",
+      div(class = "launcher-header-inner",
+        span(class = "launcher-title", "TURAS SUITE"),
+        div(class = "launcher-meta",
+          span(class = "launcher-version", "v10.0"),
+          span(turas_root)
+        )
+      )
+    ),
+
+    # Content
+    div(class = "launcher-content",
+
+      # Grid view
+      div(id = "grid_view",
+        lapply(categories, build_category_section, all_modules = modules),
+        div(class = "launcher-footer",
+          paste0("Turas Suite v10.0")
+        )
+      ),
+
+      # Detail view (hidden by default)
+      hidden(div(id = "detail_view",
+        uiOutput("module_detail")
+      ))
+    ),
+
+    # Status bar
+    div(id = "status_bar", class = "status-bar",
+      textOutput("status_text", inline = TRUE)
+    )
+  )
+
+  # ============================================================================
+  # SERVER
+  # ============================================================================
+
+  server <- function(input, output, session) {
+
+    rv <- reactiveValues(
+      selected_module = NULL,
+      status = ""
+    )
+
+    # Status bar text
+    output$status_text <- renderText({ rv$status })
+
+    show_status <- function(msg) {
+      rv$status <- msg
+      tryCatch(
+        shinyjs::addClass(id = "status_bar", class = "visible"),
+        error = function(e) NULL
+      )
     }
 
-    # Recent hub configs UI
-    output$recent_hub_ui <- renderUI({
-      # Re-check on every launch_report_hub click so list stays fresh
-      input$launch_report_hub
-      recent <- load_recent_hub_configs()
-      recent <- recent[file.exists(recent)]
-      if (length(recent) == 0) return(NULL)
+    hide_status <- function() {
+      tryCatch(
+        shinyjs::removeClass(id = "status_bar", class = "visible"),
+        error = function(e) NULL
+      )
+      rv$status <- ""
+    }
 
-      div(style = "margin-top: 12px;",
-        tags$hr(style = "margin: 10px 0;"),
-        tags$div(style = "font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px;",
-          "Recent Projects"
-        ),
-        lapply(seq_along(recent), function(i) {
-          tags$div(
-            class = "recent-hub-item",
+    # ------------------------------------------------------------------
+    # Card click -> show detail panel
+    # ------------------------------------------------------------------
+    observeEvent(input$module_card_click, {
+      mod_id <- input$module_card_click
+      mod <- Find(function(m) m$id == mod_id, modules)
+      if (is.null(mod)) return()
+
+      rv$selected_module <- mod
+
+      shinyjs::hide("grid_view")
+      shinyjs::show("detail_view")
+    })
+
+    # ------------------------------------------------------------------
+    # Back button -> return to grid
+    # ------------------------------------------------------------------
+    observeEvent(input$detail_back, {
+      shinyjs::hide("detail_view")
+      shinyjs::show("grid_view")
+      rv$selected_module <- NULL
+    })
+
+    # ------------------------------------------------------------------
+    # Render detail panel
+    # ------------------------------------------------------------------
+    output$module_detail <- renderUI({
+      mod <- rv$selected_module
+      if (is.null(mod)) return(NULL)
+
+      recents <- read_module_recents(mod)
+      icon_svg <- icons[[mod$id]]
+      # Make icon larger for detail view
+      icon_large <- gsub('width="28" height="28"', 'width="36" height="36"', icon_svg)
+
+      tagList(
+        div(class = "detail-panel",
+
+          # Back button
+          tags$button(
+            class = "detail-back",
+            onclick = "Shiny.setInputValue('detail_back', Math.random(), {priority: 'event'})",
+            HTML('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>'),
+            "Back"
+          ),
+
+          # Module header
+          div(class = "detail-header",
+            div(class = "card-icon", HTML(icon_large)),
+            div(
+              div(class = "detail-name", mod$name),
+              div(class = "detail-desc", mod$description)
+            )
+          ),
+
+          # Recent projects
+          if (length(recents) > 0) {
+            tagList(
+              div(class = "recent-section-label", "Recent Projects"),
+              lapply(seq_along(recents), function(i) {
+                config_path <- recents[i]
+                div(
+                  class = "recent-item",
+                  onclick = sprintf(
+                    "Shiny.setInputValue('launch_with_config', {mod_id: '%s', config: '%s'}, {priority: 'event'})",
+                    mod$id,
+                    gsub("'", "\\\\'", config_path)
+                  ),
+                  div(class = "recent-name", basename(config_path)),
+                  div(class = "recent-path", dirname(config_path))
+                )
+              }),
+              div(class = "launch-divider", "or")
+            )
+          } else {
+            div(class = "no-recents", "No recent projects")
+          },
+
+          # Launch fresh button
+          tags$button(
+            class = "launch-new-btn",
             onclick = sprintf(
-              "Shiny.setInputValue('launch_recent_hub', '%s', {priority: 'event'})",
-              gsub("'", "\\\\'", recent[i])
+              "Shiny.setInputValue('launch_fresh', '%s', {priority: 'event'})",
+              mod$id
             ),
-            tags$strong(basename(recent[i])),
-            tags$br(),
-            tags$small(dirname(recent[i]))
+            "Launch New Session"
           )
-        })
+        )
       )
     })
 
-    # Launch Report Hub with pre-selected config
-    observeEvent(input$launch_recent_hub, {
-      req(input$launch_recent_hub)
-      config <- input$launch_recent_hub
-      if (!file.exists(config)) {
-        status("Config file no longer exists — please browse for a new one.")
-        return()
-      }
-      status("Launching Report Hub with recent config...")
+    # ------------------------------------------------------------------
+    # Launch module fresh (no config)
+    # ------------------------------------------------------------------
+    observeEvent(input$launch_fresh, {
+      mod_id <- input$launch_fresh
+      mod <- Find(function(m) m$id == mod_id, modules)
+      if (is.null(mod)) return()
+
+      show_status(paste0("Launching ", mod$name, "..."))
+
       tryCatch({
-        # Set env var so Report Hub auto-loads this config
-        Sys.setenv(TURAS_HUB_CONFIG = config)
-        launch_module("report_hub",
-                     file.path(turas_root, "modules/report_hub/run_report_hub_gui.R"))
-        Sys.unsetenv("TURAS_HUB_CONFIG")
-        later::later(function() { status("Report Hub launched!") }, delay = 1)
-        later::later(function() { status("") }, delay = 4)
+        launch_module(mod$id,
+                     file.path(turas_root, mod$script))
+
+        later::later(function() {
+          tryCatch(show_status(paste0(mod$name, " launched")), error = function(e) NULL)
+        }, delay = 1)
+        later::later(function() {
+          tryCatch(hide_status(), error = function(e) NULL)
+        }, delay = 4)
       }, error = function(e) {
-        status(paste("Error launching Report Hub:", e$message))
+        show_status(paste("Error:", e$message))
       })
     })
 
-    # Helper function to launch modules in background
+    # ------------------------------------------------------------------
+    # Launch module with pre-loaded config
+    # ------------------------------------------------------------------
+    observeEvent(input$launch_with_config, {
+      data <- input$launch_with_config
+      mod_id <- data$mod_id
+      config_path <- data$config
+      mod <- Find(function(m) m$id == mod_id, modules)
+      if (is.null(mod)) return()
+
+      if (!file.exists(config_path)) {
+        show_status("Config file no longer exists")
+        later::later(function() {
+          tryCatch(hide_status(), error = function(e) NULL)
+        }, delay = 4)
+        return()
+      }
+
+      show_status(paste0("Launching ", mod$name, " with ", basename(config_path), "..."))
+
+      tryCatch({
+        # Set env var for module to pick up
+        Sys.setenv(TURAS_MODULE_CONFIG = config_path)
+        # Also set TURAS_HUB_CONFIG for Report Hub backwards compatibility
+        if (mod$id == "report_hub") {
+          Sys.setenv(TURAS_HUB_CONFIG = config_path)
+        }
+
+        launch_module(mod$id,
+                     file.path(turas_root, mod$script))
+
+        Sys.unsetenv("TURAS_MODULE_CONFIG")
+        if (mod$id == "report_hub") Sys.unsetenv("TURAS_HUB_CONFIG")
+
+        later::later(function() {
+          tryCatch(show_status(paste0(mod$name, " launched")), error = function(e) NULL)
+        }, delay = 1)
+        later::later(function() {
+          tryCatch(hide_status(), error = function(e) NULL)
+        }, delay = 4)
+      }, error = function(e) {
+        show_status(paste("Error:", e$message))
+      })
+    })
+
+    # ------------------------------------------------------------------
+    # launch_module() — background Rscript launcher
+    # ------------------------------------------------------------------
     launch_module <- function(module_name, script_path) {
-      # Standard launch for all modules
-      # Set TURAS_LAUNCHER_ACTIVE to prevent auto-run in GUI files
-      # IMPORTANT: TURAS_SKIP_RENV must be set as env var BEFORE Rscript starts,
-      # so .Rprofile sees it and skips renv activation (saves ~9 seconds)
       launch_script <- sprintf('
 Sys.setenv(TURAS_ROOT = "%s")
+Sys.setenv(TURAS_LAUNCHED_FROM_HUB = "1")
 setwd("%s")
 TURAS_LAUNCHER_ACTIVE <- TRUE
 source("%s")
@@ -463,11 +736,9 @@ if ("%s" != "alchemerparser") {
       module_name,
       paste0("run_", module_name, "_gui"))
 
-      # Write temporary launch script with error handling
       temp_script <- tempfile(fileext = ".R")
       log_file <- tempfile(fileext = ".log")
 
-      # Wrap the script with error handling
       launch_script_wrapped <- paste0(
         'tryCatch({\n',
         launch_script,
@@ -478,294 +749,37 @@ if ("%s" != "alchemerparser") {
 
       writeLines(launch_script_wrapped, temp_script)
 
-      # Set TURAS_SKIP_RENV before launching so .Rprofile skips renv activation
-      # This is critical for fast GUI loading (~2s vs ~15s)
       old_env <- Sys.getenv("TURAS_SKIP_RENV")
       Sys.setenv(TURAS_SKIP_RENV = "1")
 
-      # Launch in background process (inherits environment with TURAS_SKIP_RENV=1)
       system2("Rscript",
               args = c(temp_script),
               wait = FALSE,
               stdout = log_file,
               stderr = log_file)
 
-      # Restore original env (though it doesn't matter much for parent process)
       if (old_env == "") {
         Sys.unsetenv("TURAS_SKIP_RENV")
       } else {
         Sys.setenv(TURAS_SKIP_RENV = old_env)
       }
 
-      # Check for errors after a delay
       later::later(function() {
-        if (file.exists(log_file)) {
-          log_content <- readLines(log_file, warn = FALSE)
-          if (length(log_content) > 0 && any(grepl("ERROR|error", log_content, ignore.case = TRUE))) {
-            status(paste("Launch error:", paste(log_content, collapse = " ")))
+        tryCatch({
+          if (file.exists(log_file)) {
+            log_content <- readLines(log_file, warn = FALSE)
+            if (length(log_content) > 0 && any(grepl("ERROR|error", log_content, ignore.case = TRUE))) {
+              show_status(paste("Launch error:", paste(log_content, collapse = " ")))
+            }
+            unlink(log_file)
           }
-          unlink(log_file)
-        }
-        if (file.exists(temp_script)) unlink(temp_script)
+          if (file.exists(temp_script)) unlink(temp_script)
+        }, error = function(e) NULL)
       }, delay = 5)
     }
-
-    # Launch AlchemerParser
-    observeEvent(input$launch_alchemerparser, {
-      status("Launching AlchemerParser in new tab...")
-
-      tryCatch({
-        launch_module("alchemerparser",
-                     file.path(turas_root, "modules/AlchemerParser/run_alchemerparser_gui.R"))
-
-        # Update status after short delay
-        later::later(function() {
-          status("AlchemerParser launched successfully!")
-        }, delay = 1)
-
-        # Clear status after a few seconds
-        later::later(function() {
-          status("")
-        }, delay = 4)
-
-      }, error = function(e) {
-        status(paste("Error launching AlchemerParser:", e$message))
-      })
-    })
-
-    # Launch Tabs
-    observeEvent(input$launch_tabs, {
-      status("Launching Tabs in new tab...")
-
-      tryCatch({
-        launch_module("tabs",
-                     file.path(turas_root, "modules/tabs/run_tabs_gui.R"))
-
-        later::later(function() {
-          status("Tabs launched successfully!")
-        }, delay = 1)
-
-        later::later(function() {
-          status("")
-        }, delay = 4)
-
-      }, error = function(e) {
-        status(paste("Error launching Tabs:", e$message))
-      })
-    })
-
-    # Launch Tracker
-    observeEvent(input$launch_tracker, {
-      status("Launching Tracker in new tab...")
-
-      tryCatch({
-        launch_module("tracker",
-                     file.path(turas_root, "modules/tracker/run_tracker_gui.R"))
-
-        later::later(function() {
-          status("Tracker launched successfully!")
-        }, delay = 1)
-
-        later::later(function() {
-          status("")
-        }, delay = 4)
-
-      }, error = function(e) {
-        status(paste("Error launching Tracker:", e$message))
-      })
-    })
-
-    # Launch Confidence
-    observeEvent(input$launch_confidence, {
-      status("Launching Confidence in new tab...")
-
-      tryCatch({
-        launch_module("confidence",
-                     file.path(turas_root, "modules/confidence/run_confidence_gui.R"))
-
-        later::later(function() {
-          status("Confidence launched successfully!")
-        }, delay = 1)
-
-        later::later(function() {
-          status("")
-        }, delay = 4)
-
-      }, error = function(e) {
-        status(paste("Error launching Confidence:", e$message))
-      })
-    })
-
-    # Launch Segment
-    observeEvent(input$launch_segment, {
-      status("Launching Segment in new tab...")
-
-      tryCatch({
-        launch_module("segment",
-                     file.path(turas_root, "modules/segment/run_segment_gui.R"))
-
-        later::later(function() {
-          status("Segment launched successfully!")
-        }, delay = 1)
-
-        later::later(function() {
-          status("")
-        }, delay = 4)
-
-      }, error = function(e) {
-        status(paste("Error launching Segment:", e$message))
-      })
-    })
-
-    # Launch Conjoint
-    observeEvent(input$launch_conjoint, {
-      status("Launching Conjoint in new tab...")
-
-      tryCatch({
-        launch_module("conjoint",
-                     file.path(turas_root, "modules/conjoint/run_conjoint_gui.R"))
-
-        later::later(function() {
-          status("Conjoint launched successfully!")
-        }, delay = 1)
-
-        later::later(function() {
-          status("")
-        }, delay = 4)
-
-      }, error = function(e) {
-        status(paste("Error launching Conjoint:", e$message))
-      })
-    })
-
-    # Launch Key Driver
-    observeEvent(input$launch_keydriver, {
-      status("Launching Key Driver in new tab...")
-
-      tryCatch({
-        launch_module("keydriver",
-                     file.path(turas_root, "modules/keydriver/run_keydriver_gui.R"))
-
-        later::later(function() {
-          status("Key Driver launched successfully!")
-        }, delay = 1)
-
-        later::later(function() {
-          status("")
-        }, delay = 4)
-
-      }, error = function(e) {
-        status(paste("Error launching Key Driver:", e$message))
-      })
-    })
-
-    # Launch Pricing
-    observeEvent(input$launch_pricing, {
-      status("Launching Pricing in new tab...")
-
-      tryCatch({
-        launch_module("pricing",
-                     file.path(turas_root, "modules/pricing/run_pricing_gui.R"))
-
-        later::later(function() {
-          status("Pricing launched successfully!")
-        }, delay = 1)
-
-        later::later(function() {
-          status("")
-        }, delay = 4)
-
-      }, error = function(e) {
-        status(paste("Error launching Pricing:", e$message))
-      })
-    })
-
-    # Launch MaxDiff
-    observeEvent(input$launch_maxdiff, {
-      status("Launching MaxDiff in new tab...")
-
-      tryCatch({
-        launch_module("maxdiff",
-                     file.path(turas_root, "modules/maxdiff/run_maxdiff_gui.R"))
-
-        later::later(function() {
-          status("MaxDiff launched successfully!")
-        }, delay = 1)
-
-        later::later(function() {
-          status("")
-        }, delay = 4)
-
-      }, error = function(e) {
-        status(paste("Error launching MaxDiff:", e$message))
-      })
-    })
-
-    # Launch Categorical Key Driver
-    observeEvent(input$launch_catdriver, {
-      status("Launching Categorical Key Driver in new tab...")
-
-      tryCatch({
-        launch_module("catdriver",
-                     file.path(turas_root, "modules/catdriver/run_catdriver_gui.R"))
-
-        later::later(function() {
-          status("Categorical Key Driver launched successfully!")
-        }, delay = 1)
-
-        later::later(function() {
-          status("")
-        }, delay = 4)
-
-      }, error = function(e) {
-        status(paste("Error launching Categorical Key Driver:", e$message))
-      })
-    })
-
-    # Launch Weighting
-    observeEvent(input$launch_weighting, {
-      status("Launching Weighting in new tab...")
-
-      tryCatch({
-        launch_module("weighting",
-                     file.path(turas_root, "modules/weighting/run_weighting_gui.R"))
-
-        later::later(function() {
-          status("Weighting launched successfully!")
-        }, delay = 1)
-
-        later::later(function() {
-          status("")
-        }, delay = 4)
-
-      }, error = function(e) {
-        status(paste("Error launching Weighting:", e$message))
-      })
-    })
-
-    # Launch Report Hub
-    observeEvent(input$launch_report_hub, {
-      status("Launching Report Hub in new tab...")
-
-      tryCatch({
-        launch_module("report_hub",
-                     file.path(turas_root, "modules/report_hub/run_report_hub_gui.R"))
-
-        later::later(function() {
-          status("Report Hub launched successfully!")
-        }, delay = 1)
-
-        later::later(function() {
-          status("")
-        }, delay = 4)
-
-      }, error = function(e) {
-        status(paste("Error launching Report Hub:", e$message))
-      })
-    })
   }
 
-  # Run the launcher app (stays open while modules launch in background)
+  # Run the launcher
   runApp(list(ui = ui, server = server),
          launch.browser = TRUE,
          quiet = TRUE)
@@ -775,5 +789,4 @@ if ("%s" != "alchemerparser") {
 # ==============================================================================
 # Auto-run when sourced
 # ==============================================================================
-# Automatically launch the GUI when this file is sourced
 launch_turas()

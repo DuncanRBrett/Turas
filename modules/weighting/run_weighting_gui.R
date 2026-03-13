@@ -75,6 +75,13 @@ run_weighting_gui <- function(launch_browser = TRUE) {
     }
   }, error = function(e) NULL)
 
+  # Load shared GUI theme
+  if (!is.null(turas_root)) {
+    source(file.path(turas_root, "modules", "shared", "lib", "gui_theme.R"))
+    theme <- turas_gui_theme("Weighting", "Sample Weighting & Rim Weighting")
+    hide_recents <- turas_hide_recents()
+  }
+
   # Source shared library for TRS compliance (includes atomic save, console capture, etc.)
   shared_loaded <- FALSE
   if (!is.null(turas_root)) {
@@ -148,150 +155,57 @@ run_weighting_gui <- function(launch_browser = TRUE) {
   # ===========================================================================
   ui <- fluidPage(
 
-    # Custom CSS
-    tags$head(
-      tags$style(HTML("
-        body {
-          background-color: #f8f9fa;
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .main-container {
-          max-width: 900px;
-          margin: 30px auto;
-          padding: 30px;
-          background-color: white;
-          border-radius: 10px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .header {
-          text-align: center;
-          margin-bottom: 30px;
-          padding-bottom: 20px;
-          border-bottom: 2px solid #4a90d9;
-        }
-        .header h1 {
-          color: #2c3e50;
-          margin-bottom: 5px;
-        }
-        .header p {
-          color: #7f8c8d;
-          font-size: 14px;
-        }
-        .section-title {
-          color: #2c3e50;
-          font-size: 18px;
-          font-weight: 600;
-          margin-top: 25px;
-          margin-bottom: 15px;
-          padding-bottom: 8px;
-          border-bottom: 1px solid #e0e0e0;
-        }
-        .btn-primary {
-          background-color: #4a90d9;
-          border-color: #4a90d9;
-          padding: 12px 30px;
-          font-size: 16px;
-          font-weight: 600;
-        }
-        .btn-primary:hover {
-          background-color: #3a7fc8;
-          border-color: #3a7fc8;
-        }
-        .results-box {
-          background-color: #f8f9fa;
-          border: 1px solid #dee2e6;
-          border-radius: 6px;
-          padding: 20px;
-          margin-top: 20px;
-        }
-        .status-success {
-          color: #28a745;
-          font-weight: 600;
-        }
-        .status-error {
-          color: #dc3545;
-          font-weight: 600;
-        }
-        .status-warning {
-          color: #ffc107;
-          font-weight: 600;
-        }
-        .log-output {
-          font-family: 'Consolas', 'Monaco', monospace;
-          font-size: 12px;
-          background-color: #1e1e1e;
-          color: #d4d4d4;
-          padding: 15px;
-          border-radius: 6px;
-          max-height: 400px;
-          overflow-y: auto;
-          white-space: pre-wrap;
-        }
-        .help-text {
-          color: #6c757d;
-          font-size: 12px;
-          margin-top: 5px;
-        }
-        .summary-table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-top: 15px;
-        }
-        .summary-table th, .summary-table td {
-          padding: 10px;
-          text-align: left;
-          border-bottom: 1px solid #dee2e6;
-        }
-        .summary-table th {
-          background-color: #f8f9fa;
-          font-weight: 600;
-        }
-        .metric-good { color: #28a745; }
-        .metric-acceptable { color: #ffc107; }
-        .metric-poor { color: #dc3545; }
-        .shiny-notification {
-          position: fixed;
-          top: calc(50% - 100px);
-          left: calc(50% - 200px);
-          width: 400px;
-        }
-        .progress {
-          height: 25px;
-          border-radius: 6px;
-          margin-bottom: 10px;
-        }
-        .progress-bar {
-          font-size: 14px;
-          line-height: 25px;
-          font-weight: 600;
-        }
-        .shiny-progress .progress-text {
-          font-size: 14px;
-          font-weight: 500;
-        }
-      "))
-    ),
+    theme$head,
 
-    div(class = "main-container",
+    # Module-specific CSS (metric indicators, notification positioning)
+    tags$style(HTML("
+      .metric-good { color: #28a745; }
+      .metric-acceptable { color: #ffc107; }
+      .metric-poor { color: #dc3545; }
+      .shiny-notification {
+        position: fixed;
+        top: calc(50% - 100px);
+        left: calc(50% - 200px);
+        width: 400px;
+      }
+      .progress {
+        height: 25px;
+        border-radius: 6px;
+        margin-bottom: 10px;
+      }
+      .progress-bar {
+        font-size: 14px;
+        line-height: 25px;
+        font-weight: 600;
+      }
+      .shiny-progress .progress-text {
+        font-size: 14px;
+        font-weight: 500;
+      }
+    ")),
 
-      # Header
-      div(class = "header",
-        h1("TURAS Weighting Module"),
-        p("Calculate survey weights using design, rim, or cell weighting methods")
-      ),
+    # Header
+    theme$header,
+
+    div(class = "turas-content",
 
       # Folder Selection
-      div(class = "section-title", "1. Select Project Folder"),
+      div(class = "turas-card",
+        h3(class = "turas-card-title", "1. Select Project Folder"),
 
-      # Recent folders dropdown
-      conditionalPanel(
-        condition = "output.has_recent_folders",
-        selectInput("recent_folder", "Recent Folders",
-                    choices = NULL,
-                    width = "100%"),
-        div(class = "help-text", style = "margin-top: -10px; margin-bottom: 15px;",
-            "Select from recently used folders or browse/enter path below")
-      ),
+        # Recent folders dropdown (hidden when launched from hub)
+        if (!hide_recents) {
+          tagList(
+            conditionalPanel(
+              condition = "output.has_recent_folders",
+              selectInput("recent_folder", "Recent Folders",
+                          choices = NULL,
+                          width = "100%"),
+              div(class = "turas-help-text", style = "margin-top: -10px; margin-bottom: 15px;",
+                  "Select from recently used folders or browse/enter path below")
+            )
+          )
+        },
 
       # Folder path with browse button
       fluidRow(
@@ -308,7 +222,7 @@ run_weighting_gui <- function(launch_browser = TRUE) {
           )
         )
       ),
-      div(class = "help-text",
+      div(class = "turas-help-text",
           "Select or enter the folder path containing your Weight_Config.xlsx and data file"),
 
       # Config file selector (shows when folder is selected)
@@ -316,50 +230,61 @@ run_weighting_gui <- function(launch_browser = TRUE) {
         condition = "output.folder_selected",
         div(style = "margin-top: 20px;",
           uiOutput("config_selector"),
-          div(class = "help-text",
+          div(class = "turas-help-text",
               "Select a config file from the detected files in the folder above, or enter a custom filename")
         )
+      )
       ),
 
       # Options Section
-      div(class = "section-title", "2. Options"),
+      div(class = "turas-card",
+        h3(class = "turas-card-title", "2. Options"),
 
-      fluidRow(
-        column(4,
-          shiny::checkboxInput("save_output", "Save weighted data to file", value = TRUE)
+        fluidRow(
+          column(4,
+            shiny::checkboxInput("save_output", "Save weighted data to file", value = TRUE)
+          ),
+          column(4,
+            shiny::checkboxInput("save_diagnostics", "Save diagnostic report", value = TRUE)
+          ),
+          column(4,
+            shiny::checkboxInput("generate_html", "Generate HTML report", value = FALSE)
+          )
         ),
-        column(4,
-          shiny::checkboxInput("save_diagnostics", "Save diagnostic report", value = TRUE)
-        ),
-        column(4,
-          shiny::checkboxInput("generate_html", "Generate HTML report", value = FALSE)
+
+        # Run Button
+        div(style = "text-align: center; margin-top: 20px;",
+          actionButton("run_weighting", "Calculate Weights",
+                      class = "turas-btn-run",
+                      icon = icon("calculator"))
         )
       ),
 
-      # Run Button
-      div(style = "text-align: center; margin-top: 30px;",
-        actionButton("run_weighting", "Calculate Weights",
-                    class = "btn btn-primary",
-                    icon = icon("calculator"))
-      ),
-
       # Progress Section
-      div(class = "section-title", "3. Progress"),
-      verbatimTextOutput("progress_log"),
+      div(class = "turas-card",
+        h3(class = "turas-card-title", "3. Progress"),
+        div(class = "turas-console",
+          verbatimTextOutput("progress_log")
+        )
+      ),
 
       # Results Section
       conditionalPanel(
         condition = "output.has_results",
-        div(class = "section-title", "4. Results"),
-        div(class = "results-box",
+        div(class = "turas-card",
+          h3(class = "turas-card-title", "4. Results"),
           uiOutput("results_summary")
         ),
 
-        div(class = "section-title", "Weight Diagnostics"),
-        tableOutput("diagnostics_table"),
+        div(class = "turas-card",
+          h3(class = "turas-card-title", "Weight Diagnostics"),
+          tableOutput("diagnostics_table")
+        ),
 
-        div(class = "section-title", "Output Files"),
-        uiOutput("output_files")
+        div(class = "turas-card",
+          h3(class = "turas-card-title", "Output Files"),
+          uiOutput("output_files")
+        )
       )
     )
   )
@@ -377,6 +302,13 @@ run_weighting_gui <- function(launch_browser = TRUE) {
       recent_folders = character(0),
       selected_config = NULL
     )
+
+    # Auto-load config from launcher
+    pre_config <- Sys.getenv("TURAS_MODULE_CONFIG", unset = "")
+    if (nzchar(pre_config) && file.exists(pre_config)) {
+      Sys.unsetenv("TURAS_MODULE_CONFIG")
+      rv$selected_config <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
+    }
 
     # Recent folders file location (persistent across sessions)
     # Use user's home directory to persist between sessions
@@ -668,7 +600,7 @@ run_weighting_gui <- function(launch_browser = TRUE) {
       n_rows <- nrow(result$data)
 
       div(
-        h4(class = "status-success", icon("check-circle"), " Analysis Complete"),
+        h4(style = "color: var(--turas-success); font-weight: 600;", icon("check-circle"), " Analysis Complete"),
         p(sprintf("Project: %s", result$config$general$project_name)),
         p(sprintf("Records processed: %s", format(n_rows, big.mark = ","))),
         p(sprintf("Weight columns created: %d", n_weights)),

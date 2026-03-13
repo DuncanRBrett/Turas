@@ -50,11 +50,11 @@ function captureCurrentView(qCode) {
   var qTitle = wrapper ? wrapper.getAttribute("data-q-title") || "" : "";
   var chartDataStr = wrapper ? wrapper.getAttribute("data-chart-data") : null;
 
-  // Capture selected chart columns
+  // Capture selected chart columns (state is per banner group, not per question)
   var selectedCols = [];
-  if (chartColumnState[qCode]) {
-    selectedCols = Object.keys(chartColumnState[qCode]).filter(function(k) {
-      return chartColumnState[qCode][k];
+  if (chartColumnState[currentGroup]) {
+    selectedCols = Object.keys(chartColumnState[currentGroup]).filter(function(k) {
+      return chartColumnState[currentGroup][k];
     });
   }
 

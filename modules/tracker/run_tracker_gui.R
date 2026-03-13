@@ -97,6 +97,11 @@ run_tracker_gui <- function() {
   # Turas home directory
   TURAS_HOME <- getwd()
 
+  # Load shared GUI theme
+  source(file.path(TURAS_HOME, "modules", "shared", "lib", "gui_theme.R"))
+  theme <- turas_gui_theme("Tracker", "Multi-Wave Trend Calculation & Testing")
+  hide_recents <- turas_hide_recents()
+
   # Recent projects file
   RECENT_PROJECTS_FILE <- file.path(TURAS_HOME, ".recent_tracker_projects.rds")
 
@@ -128,108 +133,17 @@ run_tracker_gui <- function() {
   # ==============================================================================
 
   ui <- fluidPage(
-    tags$head(
-      tags$style(HTML("
-        .main-header {
-          background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-          color: white;
-          padding: 30px;
-          border-radius: 10px;
-          margin-bottom: 20px;
-        }
-        .card {
-          background: white;
-          border-radius: 10px;
-          padding: 20px;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-          margin-bottom: 20px;
-        }
-        .status-success {
-          background-color: #f0fff4;
-          border-left: 4px solid #48bb78;
-          padding: 15px;
-          margin: 10px 0;
-        }
-        .status-info {
-          background-color: #e7f3ff;
-          border-left: 4px solid #3182ce;
-          padding: 15px;
-          margin: 10px 0;
-        }
-        .status-warning {
-          background-color: #fffaf0;
-          border-left: 4px solid #ed8936;
-          padding: 15px;
-          margin: 10px 0;
-        }
-        .btn-primary {
-          background: #f093fb;
-          border: none;
-        }
-        .btn-primary:hover {
-          background: #f5576c;
-        }
-        .btn-run {
-          background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-          border: none;
-          color: white;
-          font-weight: 700;
-          padding: 16px 40px;
-          font-size: 18px;
-          border-radius: 10px;
-        }
-        .file-display {
-          background: #f7fafc;
-          padding: 15px;
-          border-radius: 8px;
-          margin: 15px 0;
-        }
-        .console-output {
-          background: #1a202c;
-          color: #e2e8f0;
-          padding: 20px;
-          border-radius: 8px;
-          font-family: monospace;
-          font-size: 13px;
-          max-height: 500px;
-          overflow-y: auto;
-          white-space: pre-wrap;
-        }
-        .recent-project-item {
-          padding: 10px;
-          margin: 5px 0;
-          background: #f7fafc;
-          border-radius: 5px;
-          cursor: pointer;
-          border: 1px solid #e2e8f0;
-        }
-        .recent-project-item:hover {
-          background: #edf2f7;
-          border-color: #f093fb;
-        }
-        .file-label {
-          font-weight: 600;
-          color: #2d3748;
-          margin-top: 10px;
-        }
-      "))
-    ),
+    theme$head,
 
     # Header
-    div(class = "main-header",
-      h1("📊 TURAS>TRACKER"),
-      p("Survey Tracking Analysis • Multi-Wave Trend Calculation & Testing"),
-      p(style = "font-size: 14px; opacity: 0.9;",
-        "Part of Turas Analytics Toolkit")
-    ),
+    theme$header,
 
     # Main content
-    fluidRow(
-      column(12,
+    div(class = "turas-content",
 
         # Step 1: File Selection
-        div(class = "card",
-          h3("1. Select Tracking Configuration"),
+        div(class = "turas-card",
+          h3(class = "turas-card-title", "1. Select Tracking Configuration"),
           p(style = "color: #666; font-size: 14px;",
             "Question mapping from config setting, or auto-detected in same directory"),
 
@@ -245,7 +159,7 @@ run_tracker_gui <- function() {
           uiOutput("tracking_config_display"),
           uiOutput("question_mapping_display"),
 
-          uiOutput("recent_ui")
+          if (!hide_recents) uiOutput("recent_ui")
         ),
 
         # Step 2: Additional Options
@@ -255,13 +169,12 @@ run_tracker_gui <- function() {
         uiOutput("run_ui"),
 
         # Step 4: Console Output (static UI - always visible)
-        div(class = "card",
-          h3("4. Analysis Output"),
-          div(class = "console-output",
+        div(class = "turas-card",
+          h3(class = "turas-card-title", "4. Analysis Output"),
+          div(class = "turas-console",
             verbatimTextOutput("console_text")
           )
         )
-      )
     )
   )
 
@@ -280,6 +193,75 @@ run_tracker_gui <- function() {
 
     console_output <- reactiveVal("")
     is_running <- reactiveVal(FALSE)
+
+    # Auto-load config from launcher
+    pre_config <- Sys.getenv("TURAS_MODULE_CONFIG", unset = "")
+    if (nzchar(pre_config) && file.exists(pre_config)) {
+      Sys.unsetenv("TURAS_MODULE_CONFIG")
+      tracking_path <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
+      files$tracking_config <- tracking_path
+
+      # Resolve question mapping (same logic as file browse handler)
+      config_dir <- dirname(tracking_path)
+      question_map_path <- NULL
+      mapping_source <- NULL
+
+      # Try reading question_mapping_file from config Settings sheet
+      tryCatch({
+        raw_df <- openxlsx::read.xlsx(tracking_path, sheet = "Settings",
+                                      colNames = FALSE, skipEmptyRows = FALSE)
+        header_row <- which(raw_df[[1]] == "Setting" | raw_df[[1]] == "SettingName")[1]
+        if (!is.na(header_row)) {
+          settings_df <- openxlsx::read.xlsx(tracking_path, sheet = "Settings",
+                                             startRow = header_row)
+        } else {
+          settings_df <- openxlsx::read.xlsx(tracking_path, sheet = "Settings")
+        }
+        setting_col <- if ("Setting" %in% names(settings_df)) "Setting" else "SettingName"
+        if (setting_col %in% names(settings_df) && "Value" %in% names(settings_df)) {
+          idx <- which(settings_df[[setting_col]] == "question_mapping_file")
+          if (length(idx) > 0) {
+            val <- trimws(settings_df$Value[idx[1]])
+            if (!is.na(val) && nzchar(val)) {
+              val <- path.expand(val)
+              val <- gsub("^\\./", "", val)
+              if (!grepl("^/|^[A-Za-z]:", val)) val <- file.path(config_dir, val)
+              val <- normalizePath(val, winslash = "/", mustWork = FALSE)
+              if (file.exists(val)) {
+                question_map_path <- val
+                mapping_source <- "config"
+              }
+            }
+          }
+        }
+      }, error = function(e) NULL)
+
+      # Fall back to auto-detection
+      if (is.null(question_map_path)) {
+        possible_names <- c(
+          "question_mapping.xlsx", "Question_Mapping.xlsx", "QuestionMapping.xlsx",
+          paste0(gsub("_tracking_config\\.xlsx$|_config\\.xlsx$", "", basename(tracking_path)), "_question_mapping.xlsx")
+        )
+        for (name in possible_names) {
+          test_path <- file.path(config_dir, name)
+          if (file.exists(test_path)) {
+            question_map_path <- test_path
+            mapping_source <- "auto-detected"
+            break
+          }
+        }
+        if (is.null(question_map_path)) {
+          xlsx_files <- list.files(config_dir, pattern = "mapping.*\\.xlsx$", ignore.case = TRUE, full.names = TRUE)
+          if (length(xlsx_files) > 0) {
+            question_map_path <- xlsx_files[1]
+            mapping_source <- "auto-detected"
+          }
+        }
+      }
+
+      files$question_mapping <- question_map_path
+      files$mapping_source <- mapping_source
+    }
 
     # File choosers
     volumes <- c(Home = "~", Documents = "~/Documents", Desktop = "~/Desktop")
@@ -404,20 +386,20 @@ run_tracker_gui <- function() {
     # Display tracking config
     output$tracking_config_display <- renderUI({
       if (is.null(files$tracking_config)) {
-        div(class = "status-info",
+        div(class = "turas-status-info",
           icon("info-circle"), " No file selected"
         )
       } else {
-        div(class = "file-display",
+        div(class = "turas-file-display",
           tags$strong(basename(files$tracking_config)),
           tags$br(),
           tags$small(files$tracking_config),
           if (file.exists(files$tracking_config)) {
-            div(class = "status-success", style = "margin-top: 10px;",
+            div(class = "turas-status-success", style = "margin-top: 10px;",
               icon("check-circle"), " File found"
             )
           } else {
-            div(class = "status-warning", style = "margin-top: 10px;",
+            div(class = "turas-status-warning", style = "margin-top: 10px;",
               icon("exclamation-triangle"), " File not found"
             )
           }
@@ -435,16 +417,16 @@ run_tracker_gui <- function() {
             paste0("Question Mapping (",
                    if (!is.null(files$mapping_source)) files$mapping_source else "auto-detected",
                    "):")),
-          div(class = "file-display",
+          div(class = "turas-file-display",
             tags$strong(basename(files$question_mapping)),
             tags$br(),
             tags$small(files$question_mapping),
             if (file.exists(files$question_mapping)) {
-              div(class = "status-success", style = "margin-top: 10px;",
+              div(class = "turas-status-success", style = "margin-top: 10px;",
                 icon("check-circle"), " File found"
               )
             } else {
-              div(class = "status-warning", style = "margin-top: 10px;",
+              div(class = "turas-status-warning", style = "margin-top: 10px;",
                 icon("exclamation-triangle"), " File not found"
               )
             }
@@ -455,16 +437,17 @@ run_tracker_gui <- function() {
 
     # Recent projects
     output$recent_ui <- renderUI({
+      if (hide_recents) return(NULL)
       recent <- load_recent_projects()
       if (length(recent) == 0) return(NULL)
 
-      div(
+      div(class = "turas-recent-section",
         tags$hr(),
         h4("Recent Projects"),
         lapply(seq_along(recent), function(i) {
           proj <- recent[[i]]
           tags$div(
-            class = "recent-project-item",
+            class = "turas-recent-item",
             onclick = sprintf("Shiny.setInputValue('select_recent', %d, {priority: 'event'})", i),
             tags$strong(basename(proj$tracking_config)),
             tags$br(),
@@ -478,8 +461,8 @@ run_tracker_gui <- function() {
     output$options_ui <- renderUI({
       if (is.null(files$tracking_config) || is.null(files$question_mapping)) return(NULL)
 
-      div(class = "card",
-        h3("2. Additional Options (Optional)"),
+      div(class = "turas-card",
+        h3(class = "turas-card-title", "2. Additional Options (Optional)"),
 
         checkboxInput("use_banners",
                      "Calculate trends with banner breakouts (Phase 3)",
@@ -506,17 +489,17 @@ run_tracker_gui <- function() {
                  file.exists(files$tracking_config) &&
                  file.exists(files$question_mapping)
 
-      div(class = "card",
-        h3("3. Run Tracking Analysis"),
+      div(class = "turas-card",
+        h3(class = "turas-card-title", "3. Run Tracking Analysis"),
         if (!can_run) {
-          div(class = "status-warning",
+          div(class = "turas-status-warning",
             icon("exclamation-triangle"), " Please select valid configuration files to continue"
           )
         },
         div(style = "text-align: center; margin: 20px 0;",
           actionButton("run_btn",
                       "RUN TRACKING ANALYSIS",
-                      class = "btn-run",
+                      class = "turas-btn-run",
                       icon = icon("play-circle"),
                       disabled = !can_run || is_running())
         )

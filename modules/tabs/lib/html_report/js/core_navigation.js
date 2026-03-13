@@ -17,6 +17,13 @@ function selectQuestion(index) {
   document.querySelectorAll(".question-item").forEach(function(el) {
     el.classList.toggle("active", parseInt(el.getAttribute("data-index")) === index);
   });
+
+  // Rebuild chart for the newly active question so it reflects
+  // the current chart column selection (shared per banner group)
+  if (container && typeof rebuildChartSVG === "function") {
+    var wrapper = container.querySelector(".chart-wrapper[data-q-code]");
+    if (wrapper) rebuildChartSVG(wrapper.getAttribute("data-q-code"));
+  }
 }
 
 // Search filter

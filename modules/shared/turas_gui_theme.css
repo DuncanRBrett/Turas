@@ -1,0 +1,393 @@
+/* ==========================================================================
+   TURAS GUI Theme — Shared stylesheet for all module GUIs
+   Source of truth for platform-wide visual consistency.
+   ========================================================================== */
+
+/* ---------- Design Tokens ---------- */
+:root {
+  --turas-text:         #1e293b;
+  --turas-text-muted:   #64748b;
+  --turas-text-faint:   #94a3b8;
+  --turas-bg:           #f8f7f5;
+  --turas-surface:      #ffffff;
+  --turas-border:       #e2e8f0;
+  --turas-border-hover: #94a3b8;
+  --turas-accent:       #1a2744;
+  --turas-accent-light: #2a3f5f;
+  --turas-font:         -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  --turas-success:      #16a34a;
+  --turas-success-bg:   #f0fdf4;
+  --turas-warning:      #d97706;
+  --turas-warning-bg:   #fffbeb;
+  --turas-error:        #dc2626;
+  --turas-error-bg:     #fef2f2;
+  --turas-info:         #2563eb;
+  --turas-info-bg:      #eff6ff;
+
+  --turas-run-green:    #16a34a;
+  --turas-run-green-dk: #15803d;
+  --turas-radius:       8px;
+  --turas-radius-sm:    6px;
+}
+
+/* ---------- Base ---------- */
+body {
+  background: var(--turas-bg) !important;
+  font-family: var(--turas-font) !important;
+  color: var(--turas-text);
+  margin: 0;
+}
+
+.container-fluid {
+  padding: 0 !important;
+}
+
+/* ---------- Module Header ---------- */
+.turas-header {
+  background: linear-gradient(135deg, #1a2744 0%, #2a3f5f 100%);
+  color: #fff;
+  padding: 0;
+  margin-bottom: 24px;
+}
+
+.turas-header-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.turas-header-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.turas-header-subtitle {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 2px;
+}
+
+.turas-header-meta {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+}
+
+/* ---------- Content Container ---------- */
+.turas-content {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 4px 32px 60px;
+}
+
+.turas-content-wide {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 4px 32px 60px;
+}
+
+/* ---------- Cards / Step Sections ---------- */
+.turas-card {
+  background: var(--turas-surface);
+  border: 1px solid var(--turas-border);
+  border-radius: var(--turas-radius);
+  padding: 24px;
+  margin-bottom: 16px;
+}
+
+.turas-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--turas-text);
+  margin-bottom: 12px;
+  margin-top: 0;
+}
+
+.turas-card-subtitle {
+  font-size: 13px;
+  color: var(--turas-text-muted);
+  margin-bottom: 16px;
+}
+
+/* ---------- Status Indicators ---------- */
+.turas-status-success {
+  background: var(--turas-success-bg);
+  border-left: 4px solid var(--turas-success);
+  padding: 12px 16px;
+  margin: 10px 0;
+  border-radius: 0 var(--turas-radius-sm) var(--turas-radius-sm) 0;
+  font-size: 13px;
+}
+
+.turas-status-warning {
+  background: var(--turas-warning-bg);
+  border-left: 4px solid var(--turas-warning);
+  padding: 12px 16px;
+  margin: 10px 0;
+  border-radius: 0 var(--turas-radius-sm) var(--turas-radius-sm) 0;
+  font-size: 13px;
+}
+
+.turas-status-error {
+  background: var(--turas-error-bg);
+  border-left: 4px solid var(--turas-error);
+  padding: 12px 16px;
+  margin: 10px 0;
+  border-radius: 0 var(--turas-radius-sm) var(--turas-radius-sm) 0;
+  font-size: 13px;
+}
+
+.turas-status-info {
+  background: var(--turas-info-bg);
+  border-left: 4px solid var(--turas-info);
+  padding: 12px 16px;
+  margin: 10px 0;
+  border-radius: 0 var(--turas-radius-sm) var(--turas-radius-sm) 0;
+  font-size: 13px;
+}
+
+/* ---------- Buttons ---------- */
+
+/* Primary (browse, action) */
+.turas-btn-primary,
+.turas-card .btn-primary {
+  background: var(--turas-accent) !important;
+  border: none !important;
+  color: #fff !important;
+  font-weight: 600;
+  border-radius: var(--turas-radius-sm);
+  transition: background 0.15s;
+}
+
+.turas-btn-primary:hover,
+.turas-card .btn-primary:hover {
+  background: var(--turas-accent-light) !important;
+}
+
+/* Run button */
+.turas-btn-run {
+  background: var(--turas-run-green) !important;
+  border: none !important;
+  color: #fff !important;
+  font-weight: 700;
+  padding: 14px 40px;
+  font-size: 16px;
+  border-radius: var(--turas-radius);
+  cursor: pointer;
+  transition: background 0.15s;
+  display: inline-block;
+}
+
+.turas-btn-run:hover {
+  background: var(--turas-run-green-dk) !important;
+}
+
+/* ---------- Project / File Display ---------- */
+.turas-file-display {
+  background: #f7fafc;
+  padding: 15px;
+  border-radius: var(--turas-radius-sm);
+  margin: 12px 0;
+}
+
+.turas-file-display strong {
+  color: var(--turas-text);
+}
+
+.turas-file-display small {
+  color: var(--turas-text-muted);
+}
+
+/* ---------- Console Output ---------- */
+.turas-console {
+  background: #1a202c;
+  color: #e2e8f0;
+  padding: 20px;
+  border-radius: var(--turas-radius);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 13px;
+  max-height: 500px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+/* ---------- Recent Projects ---------- */
+.turas-recent-section h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--turas-text);
+  margin-bottom: 8px;
+}
+
+.turas-recent-item {
+  padding: 12px 16px;
+  margin: 6px 0;
+  background: var(--turas-surface);
+  border-radius: var(--turas-radius-sm);
+  cursor: pointer;
+  border: 1px solid var(--turas-border);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.turas-recent-item:hover {
+  border-color: var(--turas-border-hover);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.turas-recent-item:active {
+  background: #f8f9fa;
+}
+
+.turas-recent-item strong {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--turas-text);
+  display: block;
+  margin-bottom: 2px;
+}
+
+.turas-recent-item small {
+  font-size: 11.5px;
+  color: var(--turas-text-faint);
+}
+
+/* ---------- Form Overrides ---------- */
+.turas-card label {
+  font-weight: 500;
+  color: var(--turas-text);
+}
+
+.turas-card .form-control {
+  border-color: var(--turas-border);
+  border-radius: var(--turas-radius-sm);
+}
+
+.turas-card .form-control:focus {
+  border-color: var(--turas-border-hover);
+  box-shadow: 0 0 0 2px rgba(26, 39, 68, 0.1);
+}
+
+/* Checkbox / radio alignment */
+.turas-card .checkbox label,
+.turas-card .radio label {
+  font-weight: 400;
+  color: var(--turas-text);
+}
+
+/* Select input styling */
+.turas-card .selectize-control .selectize-input {
+  border-color: var(--turas-border);
+  border-radius: var(--turas-radius-sm);
+}
+
+/* ---------- Action Links ---------- */
+.turas-card .action-link,
+.turas-card a {
+  color: var(--turas-accent);
+  font-weight: 500;
+}
+
+.turas-card .action-link:hover,
+.turas-card a:hover {
+  color: var(--turas-accent-light);
+}
+
+/* ---------- Horizontal Rule ---------- */
+.turas-card hr {
+  border: none;
+  border-top: 1px solid var(--turas-border);
+  margin: 16px 0;
+}
+
+/* ---------- Sidebar Layout Override (Pricing) ---------- */
+.turas-sidebar .well {
+  background: var(--turas-surface);
+  border: 1px solid var(--turas-border);
+  border-radius: var(--turas-radius);
+  box-shadow: none;
+}
+
+.turas-sidebar h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--turas-text);
+}
+
+.turas-sidebar .form-group label {
+  font-weight: 500;
+  color: var(--turas-text);
+  font-size: 13px;
+}
+
+/* ---------- Table Styling ---------- */
+.turas-card table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.turas-card table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--turas-text);
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--turas-border);
+  text-align: left;
+}
+
+.turas-card table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--turas-border);
+  font-size: 13px;
+  color: var(--turas-text);
+}
+
+/* ---------- Helper Text ---------- */
+.turas-help-text {
+  font-size: 12px;
+  color: var(--turas-text-faint);
+  margin-top: 4px;
+}
+
+/* ---------- Tabs (tabsetPanel) ---------- */
+.turas-card .nav-tabs > li > a {
+  color: var(--turas-text-muted);
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.turas-card .nav-tabs > li.active > a {
+  color: var(--turas-text);
+  font-weight: 600;
+  border-bottom-color: var(--turas-accent);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 768px) {
+  .turas-header-inner {
+    padding: 12px 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .turas-content,
+  .turas-content-wide {
+    padding: 4px 16px 40px;
+  }
+
+  .turas-card {
+    padding: 16px;
+  }
+
+  .turas-btn-run {
+    width: 100%;
+    text-align: center;
+  }
+}

@@ -86,6 +86,12 @@ run_pricing_gui <- function() {
   library(shinyFiles)
   library(shinyjs)
 
+  # Load shared GUI theme
+  TURAS_HOME <- getwd()
+  source(file.path(TURAS_HOME, "modules", "shared", "lib", "gui_theme.R"))
+  theme <- turas_gui_theme("Pricing", "Price Sensitivity & Optimization")
+  hide_recents <- turas_hide_recents()
+
   # Recent projects file
   recent_projects_file <- file.path(module_dir, ".recent_pricing_projects.rds")
 
@@ -116,161 +122,170 @@ save_recent_project <- function(path) {
 # ==============================================================================
 ui <- fluidPage(
   useShinyjs(),  # Enable shinyjs
-  titlePanel("Turas Pricing Research Analysis"),
+  theme$head,
 
-  sidebarLayout(
-    sidebarPanel(
-      width = 4,
+  # Header
+  theme$header,
 
-      h4("Configuration"),
+  # Main content in sidebar layout
+  div(class = "turas-sidebar",
+    sidebarLayout(
+      sidebarPanel(
+        width = 4,
 
-      # File browser button
-      shinyFilesButton("config_file_button", "Browse for Config File",
-                      "Select configuration file", multiple = FALSE,
+        h4("Configuration"),
+
+        # File browser button
+        shinyFilesButton("config_file_button", "Browse for Config File",
+                        "Select configuration file", multiple = FALSE,
+                        icon = icon("folder-open")),
+
+        # Display selected path
+        verbatimTextOutput("config_path_display", placeholder = TRUE),
+
+        # Or paste path manually
+        textInput("config_path_text", "Or Paste Full Path",
+                  placeholder = "/full/path/to/config.xlsx"),
+
+        # Or select recent (populated dynamically in server)
+        if (!hide_recents) selectInput("recent_projects", "Or Select Recent",
+                    choices = c(""),
+                    selected = ""),
+
+        hr(),
+
+        h4("Output"),
+
+        # Output file
+        textInput("output_file", "Output File Name",
+                  value = "pricing_results.xlsx"),
+
+        # Data file override
+        fileInput("data_file", "Use Different Data File (optional)",
+                  accept = c(".csv", ".xlsx", ".xls", ".sav", ".dta", ".rds")),
+        actionButton("clear_data_file", "Clear Data File",
+                     class = "btn-sm btn-warning"),
+
+        hr(),
+
+        h4("Run-time Overrides"),
+        tags$p("Leave blank to use config file settings.",
+               class = "turas-help-text"),
+
+        # Weight variable
+        textInput("weight_var", "Weight Variable",
+                  placeholder = "e.g., survey_weight"),
+
+        # DK codes
+        textInput("dk_codes", "Don't Know Codes",
+                  placeholder = "e.g., 98,99"),
+
+        # Segment variables
+        textInput("segment_vars", "Segment Variables",
+                  placeholder = "e.g., age_group,region"),
+
+        # Monotonicity behaviors
+        selectInput("vw_monotonicity", "VW Monotonicity",
+                    choices = c("Flag Only" = "flag_only",
+                               "Drop" = "drop",
+                               "Fix" = "fix"),
+                    selected = "flag_only"),
+
+        selectInput("gg_monotonicity", "GG Monotonicity",
+                    choices = c("Smooth" = "smooth",
+                               "Flag Only" = "flag_only",
+                               "None" = "none"),
+                    selected = "smooth"),
+
+        # Unit cost
+        numericInput("unit_cost", "Unit Cost (for profit)",
+                     value = NA, min = 0, step = 0.01),
+
+        hr(),
+
+        # Run button
+        actionButton("run_analysis", "Run Analysis",
+                     class = "turas-btn-run btn-block"),
+
+        hr(),
+
+        # Create template
+        h4("Create Config Template"),
+        selectInput("template_method", "Analysis Method",
+                    choices = c("van_westendorp", "gabor_granger", "both")),
+        shinyDirButton("template_dir_button", "Choose Save Folder",
+                      "Select folder to save template",
                       icon = icon("folder-open")),
+        verbatimTextOutput("template_dir_display", placeholder = TRUE),
+        textInput("template_name", "Template File Name",
+                  value = "pricing_config.xlsx"),
+        actionButton("create_template", "Create Template",
+                     class = "btn-success btn-block")
+      ),
 
-      # Display selected path
-      verbatimTextOutput("config_path_display", placeholder = TRUE),
+      mainPanel(
+        width = 8,
 
-      # Or paste path manually
-      textInput("config_path_text", "Or Paste Full Path",
-                placeholder = "/full/path/to/config.xlsx"),
+        div(class = "turas-card",
+          tabsetPanel(
+            id = "main_tabs",
 
-      # Or select recent (populated dynamically in server)
-      selectInput("recent_projects", "Or Select Recent",
-                  choices = c(""),
-                  selected = ""),
-
-      hr(),
-
-      h4("Optional Overrides"),
-
-      # Data file override
-      fileInput("data_file", "Override Data File (optional)",
-                accept = c(".csv", ".xlsx", ".xls", ".sav", ".dta", ".rds")),
-      actionButton("clear_data_file", "Clear Data File",
-                   class = "btn-sm btn-warning"),
-      br(),
-
-      # Output file
-      textInput("output_file", "Output File Name",
-                value = "pricing_results.xlsx"),
-
-      hr(),
-
-      h4("Phase 1: Advanced Features"),
-
-      # Weight variable
-      textInput("weight_var", "Weight Variable (optional)",
-                placeholder = "e.g., survey_weight"),
-
-      # DK codes
-      textInput("dk_codes", "Don't Know Codes (optional)",
-                placeholder = "e.g., 98,99"),
-
-      # Monotonicity behaviors
-      selectInput("vw_monotonicity", "VW Monotonicity Behavior",
-                  choices = c("Flag Only" = "flag_only",
-                             "Drop" = "drop",
-                             "Fix" = "fix"),
-                  selected = "flag_only"),
-
-      selectInput("gg_monotonicity", "GG Monotonicity Behavior",
-                  choices = c("Smooth" = "smooth",
-                             "Flag Only" = "flag_only",
-                             "None" = "none"),
-                  selected = "smooth"),
-
-      # Segment variables
-      textInput("segment_vars", "Segment Variables (optional)",
-                placeholder = "e.g., age_group,region"),
-
-      hr(),
-
-      h4("Phase 2: Profit Optimization"),
-
-      # Unit cost
-      numericInput("unit_cost", "Unit Cost (for profit)",
-                   value = NA, min = 0, step = 0.01),
-
-      hr(),
-
-      # Run button
-      actionButton("run_analysis", "Run Analysis",
-                   class = "btn-primary btn-lg btn-block"),
-
-      hr(),
-
-      # Create template
-      h4("Create Config Template"),
-      selectInput("template_method", "Analysis Method",
-                  choices = c("van_westendorp", "gabor_granger", "both")),
-      shinyDirButton("template_dir_button", "Choose Save Folder",
-                    "Select folder to save template",
-                    icon = icon("folder-open")),
-      verbatimTextOutput("template_dir_display", placeholder = TRUE),
-      textInput("template_name", "Template File Name",
-                value = "pricing_config.xlsx"),
-      actionButton("create_template", "Create Template",
-                   class = "btn-success btn-block")
-    ),
-
-    mainPanel(
-      width = 8,
-
-      tabsetPanel(
-        id = "main_tabs",
-
-        tabPanel("Results",
-                 br(),
-                 verbatimTextOutput("console_output"),
-                 hr(),
-                 conditionalPanel(
-                   condition = "output.has_results",
-                   h4("Key Results"),
-                   tableOutput("results_table"),
-                   conditionalPanel(
-                     condition = "output.has_profit_results",
+            tabPanel("Results",
+                     br(),
+                     div(class = "turas-console", verbatimTextOutput("console_output")),
                      hr(),
-                     h4("Profit Optimization"),
-                     tableOutput("profit_table")
-                   )
-                 )
-        ),
+                     conditionalPanel(
+                       condition = "output.has_results",
+                       h4("Key Results"),
+                       tableOutput("results_table"),
+                       conditionalPanel(
+                         condition = "output.has_profit_results",
+                         hr(),
+                         h4("Profit Optimization"),
+                         tableOutput("profit_table")
+                       )
+                     )
+            ),
 
-        tabPanel("Main Plot",
-                 br(),
-                 plotOutput("main_plot", height = "500px")
-        ),
+            tabPanel("Main Plot",
+                     br(),
+                     plotOutput("main_plot", height = "500px")
+            ),
 
-        tabPanel("Additional Plots",
-                 br(),
-                 conditionalPanel(
-                   condition = "output.has_additional_plots",
-                   selectInput("plot_selector", "Select Plot",
-                              choices = c("Revenue Curve", "Profit Curve", "Revenue vs Profit")),
-                   plotOutput("additional_plot", height = "500px")
-                 )
-        ),
+            tabPanel("Additional Plots",
+                     br(),
+                     conditionalPanel(
+                       condition = "output.has_additional_plots",
+                       selectInput("plot_selector", "Select Plot",
+                                  choices = c("Revenue Curve", "Profit Curve", "Revenue vs Profit")),
+                       plotOutput("additional_plot", height = "500px")
+                     )
+            ),
 
-        tabPanel("Diagnostics",
-                 br(),
-                 h4("Validation Summary"),
-                 tableOutput("validation_table"),
-                 conditionalPanel(
-                   condition = "output.has_weight_summary",
-                   hr(),
-                   h4("Weight Statistics"),
-                   tableOutput("weight_table")
-                 ),
-                 hr(),
-                 h4("Warnings"),
-                 verbatimTextOutput("warnings_output")
-        ),
+            tabPanel("Diagnostics",
+                     br(),
+                     h4("Validation Summary"),
+                     tableOutput("validation_table"),
+                     conditionalPanel(
+                       condition = "output.has_weight_summary",
+                       hr(),
+                       h4("Weight Statistics"),
+                       tableOutput("weight_table")
+                     ),
+                     hr(),
+                     h4("Warnings"),
+                     verbatimTextOutput("warnings_output")
+            ),
 
-        tabPanel("Help",
-                 br(),
-                 includeMarkdown(file.path(module_dir, "QUICK_START.md"))
+            tabPanel("Help",
+                     br(),
+                     if (file.exists(file.path(module_dir, "QUICK_START.md"))) {
+                       includeMarkdown(file.path(module_dir, "QUICK_START.md"))
+                     } else {
+                       p("Help documentation coming soon.")
+                     }
+            )
+          )
         )
       )
     )
@@ -289,6 +304,13 @@ server <- function(input, output, session) {
     config_path = NULL,
     template_dir = NULL
   )
+
+  # Auto-load config from launcher
+  pre_config <- Sys.getenv("TURAS_MODULE_CONFIG", unset = "")
+  if (nzchar(pre_config) && file.exists(pre_config)) {
+    Sys.unsetenv("TURAS_MODULE_CONFIG")
+    rv$config_path <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
+  }
 
   # Set up file/folder choosers - allow browsing from root and home
   volumes <- c(Home = path.expand("~"), Root = "/")

@@ -29,6 +29,11 @@ run_segment_gui <- function() {
   turas_root <- Sys.getenv("TURAS_ROOT", getwd())
   segment_dir <- file.path(turas_root, "modules/segment")
 
+  # Load shared GUI theme
+  source(file.path(turas_root, "modules", "shared", "lib", "gui_theme.R"))
+  theme <- turas_gui_theme("Segment", "Clustering & Segmentation Analysis")
+  hide_recents <- turas_hide_recents()
+
   # Source the segmentation module
   source(file.path(segment_dir, "run_segment.R"))
 
@@ -62,161 +67,19 @@ run_segment_gui <- function() {
   # ===========================================================================
 
   ui <- fluidPage(
-    tags$head(
-      tags$style(HTML("
-        body {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          min-height: 100vh;
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
+    theme$head,
 
-        .main-container {
-          max-width: 900px;
-          margin: 40px auto;
-          padding: 30px;
-          background: white;
-          border-radius: 15px;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        }
+    # Header
+    theme$header,
 
-        .module-title {
-          font-size: 32px;
-          font-weight: 700;
-          color: #667eea;
-          margin-bottom: 10px;
-          text-align: center;
-        }
-
-        .module-subtitle {
-          font-size: 16px;
-          color: #666;
-          text-align: center;
-          margin-bottom: 30px;
-        }
-
-        .step-card {
-          background: #f8f9fa;
-          border-left: 4px solid #667eea;
-          border-radius: 8px;
-          padding: 20px;
-          margin-bottom: 20px;
-        }
-
-        .step-title {
-          font-size: 18px;
-          font-weight: 600;
-          color: #333;
-          margin-bottom: 15px;
-        }
-
-        .btn-primary {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          border: none;
-          padding: 12px 30px;
-          font-size: 16px;
-          font-weight: 600;
-          border-radius: 8px;
-          transition: all 0.3s;
-        }
-
-        .btn-primary:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-success {
-          background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-          border: none;
-          padding: 15px 40px;
-          font-size: 18px;
-          font-weight: 700;
-          border-radius: 8px;
-          margin-top: 20px;
-        }
-
-        .btn-success:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 5px 15px rgba(56, 239, 125, 0.4);
-        }
-
-        .file-display {
-          background: white;
-          border: 2px solid #e0e0e0;
-          border-radius: 6px;
-          padding: 12px;
-          margin-top: 10px;
-          font-family: 'Courier New', monospace;
-          color: #333;
-        }
-
-        .status-box {
-          background: #e3f2fd;
-          border-left: 4px solid #2196f3;
-          border-radius: 6px;
-          padding: 15px;
-          margin-top: 20px;
-        }
-
-        .success-box {
-          background: #e8f5e9;
-          border-left: 4px solid #4caf50;
-          border-radius: 6px;
-          padding: 15px;
-          margin-top: 20px;
-        }
-
-        .error-box {
-          background: #ffebee;
-          border-left: 4px solid #f44336;
-          border-radius: 6px;
-          padding: 15px;
-          margin-top: 20px;
-        }
-
-        .recent-project {
-          background: white;
-          border: 1px solid #e0e0e0;
-          border-radius: 6px;
-          padding: 10px 15px;
-          margin-bottom: 8px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .recent-project:hover {
-          background: #f5f5f5;
-          border-color: #667eea;
-        }
-
-        .console-output {
-          background: #1e1e1e;
-          color: #d4d4d4;
-          padding: 20px;
-          border-radius: 8px;
-          font-family: 'Courier New', Consolas, monospace;
-          font-size: 12px;
-          line-height: 1.5;
-          max-height: 500px;
-          overflow-y: auto;
-          margin-top: 15px;
-          white-space: pre-wrap;
-          word-wrap: break-word;
-        }
-      "))
-    ),
-
-    div(class = "main-container",
-      div(class = "module-title", "Segmentation Analysis"),
-      div(class = "module-subtitle", "Multi-algorithm clustering with variable selection and outlier detection"),
-
-      hr(),
+    div(class = "turas-content",
 
       # Step 1: Select Configuration File
-      div(class = "step-card",
-        div(class = "step-title", "Step 1: Select Configuration File"),
+      div(class = "turas-card",
+        h3(class = "turas-card-title", "Step 1: Select Configuration File"),
         p("Choose your segmentation configuration Excel file (must contain a 'Config' sheet)."),
 
-        shinyFilesButton("select_config_btn", "Browse for Config File", 
+        shinyFilesButton("select_config_btn", "Browse for Config File",
                          "Please select a config file",
                          multiple = FALSE,
                          class = "btn btn-primary",
@@ -224,8 +87,8 @@ run_segment_gui <- function() {
 
         uiOutput("config_display"),
 
-        # Recent projects
-        uiOutput("recent_projects_ui")
+        # Recent projects (hidden when launched from hub)
+        if (!hide_recents) uiOutput("recent_projects_ui")
       ),
 
       # Step 2: Configuration Summary
@@ -235,9 +98,9 @@ run_segment_gui <- function() {
       uiOutput("run_button_ui"),
 
       # Step 4: Console Output (static UI - always visible, like tracker)
-      div(class = "step-card",
-        div(class = "step-title", "Step 4: Console Output"),
-        div(class = "console-output",
+      div(class = "turas-card",
+        h3(class = "turas-card-title", "Step 4: Console Output"),
+        div(class = "turas-console",
           verbatimTextOutput("console_text")
         )
       ),
@@ -257,6 +120,13 @@ run_segment_gui <- function() {
     config_file <- reactiveVal(NULL)
     analysis_result <- reactiveVal(NULL)
     console_output <- reactiveVal("")  # Store console output
+
+    # Auto-load config from launcher
+    pre_config <- Sys.getenv("TURAS_MODULE_CONFIG", unset = "")
+    if (nzchar(pre_config) && file.exists(pre_config)) {
+      Sys.unsetenv("TURAS_MODULE_CONFIG")
+      config_file(normalizePath(pre_config, winslash = "/", mustWork = FALSE))
+    }
 
     # Setup file browser
     volumes <- c(Home = normalizePath("~"),
@@ -305,11 +175,10 @@ run_segment_gui <- function() {
       req(config_file())
 
       div(
-        div(class = "file-display",
+        div(class = "turas-file-display",
           strong("Selected: "), basename(config_file()),
           br(),
-          span(style = "color: #888; font-size: 12px;",
-               dirname(config_file()))
+          small(dirname(config_file()))
         )
       )
     })
@@ -327,7 +196,7 @@ run_segment_gui <- function() {
               actionButton(
                 paste0("recent_project"),
                 label = basename(recent_projects[[i]]),
-                class = "recent-project",
+                class = "turas-recent-item",
                 style = "width: 100%; text-align: left;",
                 onclick = paste0("Shiny.setInputValue('recent_project', ", i,
                                ", {priority: 'event'})")
@@ -347,10 +216,10 @@ run_segment_gui <- function() {
         config_raw <- read_segment_config(config_file())
         config <- validate_segment_config(config_raw)
 
-        div(class = "step-card",
-          div(class = "step-title", "Step 2: Configuration Summary"),
+        div(class = "turas-card",
+          h3(class = "turas-card-title", "Step 2: Configuration Summary"),
 
-          div(class = "status-box",
+          div(class = "turas-status-info",
             strong("Configuration Loaded Successfully"), br(),
             hr(style = "margin: 10px 0;"),
 
@@ -398,9 +267,9 @@ run_segment_gui <- function() {
         )
       },
       error = function(e) {
-        div(class = "step-card",
-          div(class = "step-title", "Step 2: Configuration Summary"),
-          div(class = "error-box",
+        div(class = "turas-card",
+          h3(class = "turas-card-title", "Step 2: Configuration Summary"),
+          div(class = "turas-status-error",
             strong("✗ Configuration Error"), br(),
             hr(style = "margin: 10px 0;"),
             as.character(e$message)
@@ -413,12 +282,12 @@ run_segment_gui <- function() {
     output$run_button_ui <- renderUI({
       req(config_file())
 
-      div(class = "step-card",
-        div(class = "step-title", "Step 3: Run Analysis"),
+      div(class = "turas-card",
+        h3(class = "turas-card-title", "Step 3: Run Analysis"),
         p("Click the button below to start the segmentation analysis. This may take a few moments."),
 
         actionButton("run_analysis_btn", "Run Segmentation Analysis",
-                    class = "btn btn-success btn-lg btn-block",
+                    class = "turas-btn-run",
                     icon = icon("play-circle"))
       )
     })
@@ -547,9 +416,9 @@ run_segment_gui <- function() {
 
       if (!is.null(result$error)) {
         # Error occurred
-        div(class = "step-card",
-          div(class = "step-title", "Step 5: Results"),
-          div(class = "error-box",
+        div(class = "turas-card",
+          h3(class = "turas-card-title", "Step 5: Results"),
+          div(class = "turas-status-error",
             strong("✗ Analysis Error"), br(),
             hr(style = "margin: 10px 0;"),
             p(strong("Error Details:")),
@@ -560,10 +429,10 @@ run_segment_gui <- function() {
         )
       } else {
         # Success
-        div(class = "step-card",
-          div(class = "step-title", "Step 5: Results"),
+        div(class = "turas-card",
+          h3(class = "turas-card-title", "Step 5: Results"),
 
-          div(class = "success-box",
+          div(class = "turas-status-success",
             strong("✓ Analysis Complete!"), br(),
             hr(style = "margin: 10px 0;"),
 

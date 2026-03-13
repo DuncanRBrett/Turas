@@ -64,6 +64,11 @@ run_keydriver_gui <- function() {
     }
   }
 
+  # Load shared GUI theme
+  source(file.path(turas_root, "modules", "shared", "lib", "gui_theme.R"))
+  theme <- turas_gui_theme("Key Driver", "Key Driver Correlation Analysis")
+  hide_recents <- turas_hide_recents()
+
   # Recent projects file
   RECENT_PROJECTS_FILE <- file.path(turas_root, ".recent_keydriver_projects.rds")
 
@@ -107,77 +112,6 @@ run_keydriver_gui <- function() {
     unique(detected)
   }
 
-  # --- CSS ---
-  gui_css <- "
-    body {
-      background-color: #f5f5f5;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    .main-container {
-      max-width: 900px;
-      margin: 30px auto;
-      padding: 30px;
-      background-color: white;
-      border-radius: 10px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    .header {
-      text-align: center;
-      margin-bottom: 30px;
-      padding-bottom: 20px;
-      border-bottom: 3px solid #ec4899;
-    }
-    .header h1 { color: #ec4899; margin-bottom: 5px; }
-    .header p { color: #6c757d; }
-    .step-card {
-      background-color: #f8f9fa;
-      border: 1px solid #dee2e6;
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 20px;
-    }
-    .step-title {
-      font-size: 18px;
-      font-weight: bold;
-      color: #2c3e50;
-      margin-bottom: 15px;
-    }
-    .file-display {
-      background-color: #e9ecef;
-      padding: 10px 15px;
-      border-radius: 5px;
-      margin-top: 10px;
-      word-break: break-all;
-    }
-    .file-display .filename { font-weight: bold; color: #2c3e50; }
-    .file-display .filepath { font-size: 12px; color: #6c757d; }
-    .status-success { color: #28a745; font-weight: bold; }
-    .status-error { color: #dc3545; font-weight: bold; }
-    .btn-keydriver { background-color: #ec4899; color: white; border: none; }
-    .btn-keydriver:hover { background-color: #db2777; color: white; }
-    .run-btn { width: 100%; padding: 15px; font-size: 18px; font-weight: bold; }
-    .console-output {
-      background-color: #1e1e1e;
-      color: #d4d4d4;
-      font-family: 'Consolas', 'Monaco', monospace;
-      padding: 15px;
-      border-radius: 5px;
-      max-height: 400px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      font-size: 13px;
-    }
-    .info-box {
-      background-color: #d1ecf1;
-      border: 1px solid #bee5eb;
-      color: #0c5460;
-      padding: 10px 15px;
-      border-radius: 5px;
-      margin-top: 10px;
-      font-size: 13px;
-    }
-  "
-
   # --- Source files (ordered by dependency) ---
   kd_source_files <- c(
     "modules/shared/lib/import_all.R",
@@ -192,31 +126,29 @@ run_keydriver_gui <- function() {
 
   ui <- fluidPage(
 
-    tags$head(tags$style(HTML(gui_css))),
+    theme$head,
 
-    div(class = "main-container",
+    theme$header,
 
-      # Header
-      div(class = "header",
-        h1("TURAS Key Driver Analysis"),
-        p("Identify key drivers of your target outcome")
-      ),
+    div(class = "turas-content",
 
       # Step 1: Project Directory
-      div(class = "step-card",
-        div(class = "step-title", "Step 1: Select Project Directory"),
+      div(class = "turas-card",
+        h4(class = "turas-card-title", "Step 1: Select Project Directory"),
 
         fluidRow(
-          column(8,
+          column(if (!hide_recents) 8 else 12,
             shinyDirButton("project_dir_btn",
                           "Browse for Project Folder",
                           "Select project directory",
-                          class = "btn btn-keydriver",
+                          class = "btn turas-btn-primary",
                           icon = icon("folder-open"))
           ),
-          column(4,
-            uiOutput("recent_projects_ui")
-          )
+          if (!hide_recents) {
+            column(4,
+              uiOutput("recent_projects_ui")
+            )
+          }
         ),
 
         uiOutput("project_display")
@@ -225,11 +157,11 @@ run_keydriver_gui <- function() {
       # Step 2: Config File
       conditionalPanel(
         condition = "output.project_selected",
-        div(class = "step-card",
-          div(class = "step-title", "Step 2: Select Configuration File"),
+        div(class = "turas-card",
+          h4(class = "turas-card-title", "Step 2: Select Configuration File"),
           uiOutput("config_selector"),
           uiOutput("config_display"),
-          div(class = "info-box",
+          div(class = "turas-status-info",
             tags$strong("Note: "), "The config file's Settings sheet should specify ",
             tags$code("data_file"), " and ", tags$code("output_file"), " paths."
           )
@@ -239,10 +171,10 @@ run_keydriver_gui <- function() {
       # Step 3: Output Options
       conditionalPanel(
         condition = "output.project_selected",
-        div(class = "step-card",
-          div(class = "step-title", "Step 3: Output Options"),
+        div(class = "turas-card",
+          h4(class = "turas-card-title", "Step 3: Output Options"),
           checkboxInput("enable_html_report", "Generate HTML Report", value = FALSE),
-          div(class = "info-box",
+          div(class = "turas-status-info",
             tags$strong("HTML Report: "),
             "Creates an interactive browser-based report with charts, ",
             "tables, and pinned slide export."
@@ -253,9 +185,9 @@ run_keydriver_gui <- function() {
       # Run Button
       conditionalPanel(
         condition = "output.ready_to_run",
-        div(class = "step-card",
+        div(class = "turas-card",
           actionButton("run_analysis", "Run Key Driver Analysis",
-                      class = "btn btn-keydriver run-btn",
+                      class = "btn turas-btn-run",
                       icon = icon("play"))
         )
       ),
@@ -263,9 +195,9 @@ run_keydriver_gui <- function() {
       # Console Output
       conditionalPanel(
         condition = "output.show_console",
-        div(class = "step-card",
-          div(class = "step-title", "Analysis Output"),
-          div(class = "console-output",
+        div(class = "turas-card",
+          h4(class = "turas-card-title", "Analysis Output"),
+          div(class = "turas-console",
             verbatimTextOutput("console_output")
           )
         )
@@ -283,6 +215,14 @@ run_keydriver_gui <- function() {
 
     console_text <- reactiveVal("")
     is_running <- reactiveVal(FALSE)
+
+    # Auto-load config from launcher
+    pre_config <- Sys.getenv("TURAS_MODULE_CONFIG", unset = "")
+    if (nzchar(pre_config) && file.exists(pre_config)) {
+      Sys.unsetenv("TURAS_MODULE_CONFIG")
+      files$config_file <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
+      files$project_dir <- dirname(pre_config)
+    }
 
     # Set up directory browser
     volumes <- c(Home = path.expand("~"),
@@ -330,10 +270,11 @@ run_keydriver_gui <- function() {
     # Project display
     output$project_display <- renderUI({
       if (!is.null(files$project_dir)) {
-        div(class = "file-display",
-          div(class = "filename", basename(files$project_dir)),
-          div(class = "filepath", files$project_dir),
-          div(class = "status-success", "Directory selected")
+        div(class = "turas-file-display",
+          tags$strong(basename(files$project_dir)),
+          tags$br(),
+          tags$small(files$project_dir),
+          div(class = "status-success", "\u2713 Directory selected")
         )
       }
     })
@@ -350,7 +291,7 @@ run_keydriver_gui <- function() {
       } else {
         shinyFilesButton("config_btn", "Browse for Config File",
                         "Select configuration file",
-                        class = "btn btn-keydriver",
+                        class = "btn turas-btn-primary",
                         multiple = FALSE)
       }
     })
@@ -365,13 +306,14 @@ run_keydriver_gui <- function() {
     # Config display
     output$config_display <- renderUI({
       if (!is.null(files$config_file)) {
-        div(class = "file-display",
-          div(class = "filename", basename(files$config_file)),
-          div(class = "filepath", files$config_file),
+        div(class = "turas-file-display",
+          tags$strong(basename(files$config_file)),
+          tags$br(),
+          tags$small(files$config_file),
           if (file.exists(files$config_file)) {
-            div(class = "status-success", "Config file found")
+            div(class = "status-success", "\u2713 Config file found")
           } else {
-            div(class = "status-error", "File not found")
+            div(class = "status-error", "\u2717 File not found")
           }
         )
       }

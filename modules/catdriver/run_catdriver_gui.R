@@ -50,6 +50,11 @@ run_catdriver_gui <- function() {
     }
   }
 
+  # Load shared GUI theme
+  source(file.path(turas_root, "modules", "shared", "lib", "gui_theme.R"))
+  theme <- turas_gui_theme("Categorical Driver", "Categorical Key Driver Analysis")
+  hide_recents <- turas_hide_recents()
+
   # Recent projects file
   RECENT_PROJECTS_FILE <- file.path(turas_root, ".recent_catdriver_projects.rds")
 
@@ -100,162 +105,54 @@ run_catdriver_gui <- function() {
 
   ui <- fluidPage(
 
-    tags$head(
-      tags$style(HTML("
-        body {
-          background-color: #f5f5f5;
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .main-container {
-          max-width: 900px;
-          margin: 30px auto;
-          padding: 30px;
-          background-color: white;
-          border-radius: 10px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .header {
-          text-align: center;
-          margin-bottom: 30px;
-          padding-bottom: 20px;
-          border-bottom: 3px solid #6366f1;
-        }
-        .header h1 {
-          color: #6366f1;
-          margin-bottom: 5px;
-        }
-        .header p {
-          color: #6c757d;
-        }
-        .step-card {
-          background-color: #f8f9fa;
-          border: 1px solid #dee2e6;
-          border-radius: 8px;
-          padding: 20px;
-          margin-bottom: 20px;
-        }
-        .step-title {
-          font-size: 18px;
-          font-weight: bold;
-          color: #2c3e50;
-          margin-bottom: 15px;
-        }
-        .file-display {
-          background-color: #e9ecef;
-          padding: 10px 15px;
-          border-radius: 5px;
-          margin-top: 10px;
-          word-break: break-all;
-        }
-        .file-display .filename {
-          font-weight: bold;
-          color: #2c3e50;
-        }
-        .file-display .filepath {
-          font-size: 12px;
-          color: #6c757d;
-        }
-        .status-success {
-          color: #28a745;
-          font-weight: bold;
-        }
-        .status-error {
-          color: #dc3545;
-          font-weight: bold;
-        }
-        .btn-catdriver {
-          background-color: #6366f1;
-          color: white;
-          border: none;
-        }
-        .btn-catdriver:hover {
-          background-color: #4f46e5;
-          color: white;
-        }
-        .run-btn {
-          width: 100%;
-          padding: 15px;
-          font-size: 18px;
-          font-weight: bold;
-        }
-        .console-output {
-          background-color: #1e1e1e;
-          color: #d4d4d4;
-          font-family: 'Consolas', 'Monaco', monospace;
-          padding: 15px;
-          border-radius: 5px;
-          max-height: 500px;
-          overflow-y: auto;
-          white-space: pre-wrap;
-          font-size: 13px;
-        }
-        .info-box {
-          background-color: #e0e7ff;
-          border: 1px solid #c7d2fe;
-          color: #3730a3;
-          padding: 10px 15px;
-          border-radius: 5px;
-          margin-top: 10px;
-          font-size: 13px;
-        }
-        .toggle-link {
-          font-size: 13px;
-          color: #6366f1;
-          cursor: pointer;
-          margin-bottom: 8px;
-          display: inline-block;
-        }
-        .toggle-link:hover {
-          text-decoration: underline;
-        }
-        .config-list-item {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          margin-bottom: 4px;
-          font-size: 13px;
-        }
-        .colour-swatch {
-          display: inline-block;
-          width: 24px;
-          height: 24px;
-          border-radius: 4px;
-          border: 1px solid #ccc;
-          vertical-align: middle;
-        }
-        .report-settings-card {
-          background-color: #fefce8;
-          border: 1px solid #fef08a;
-          border-radius: 8px;
-          padding: 20px;
-          margin-bottom: 20px;
-        }
-      "))
-    ),
+    theme$head,
 
-    div(class = "main-container",
+    # Module-specific CSS for catdriver-unique elements
+    tags$style(HTML("
+      .toggle-link {
+        font-size: 13px;
+        cursor: pointer;
+        margin-bottom: 8px;
+        display: inline-block;
+      }
+      .config-list-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 4px;
+        font-size: 13px;
+      }
+      .colour-swatch {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+        vertical-align: middle;
+      }
+    ")),
 
-      # Header
-      div(class = "header",
-        h1("TURAS Categorical Key Driver"),
-        p("Key driver analysis for categorical outcomes (binary, ordinal, multinomial)")
-      ),
+    theme$header,
+
+    div(class = "turas-content",
 
       # Step 1: Project Directory
-      div(class = "step-card",
-        div(class = "step-title", "Step 1: Select Project Directory"),
+      div(class = "turas-card",
+        h4(class = "turas-card-title", "Step 1: Select Project Directory"),
 
         fluidRow(
-          column(8,
+          column(if (!hide_recents) 8 else 12,
             shinyDirButton("project_dir_btn",
                           "Browse for Project Folder",
                           "Select project directory",
-                          class = "btn btn-catdriver",
+                          class = "btn turas-btn-primary",
                           icon = icon("folder-open"))
           ),
-          column(4,
-            uiOutput("recent_projects_ui")
-          )
+          if (!hide_recents) {
+            column(4,
+              uiOutput("recent_projects_ui")
+            )
+          }
         ),
 
         uiOutput("project_display")
@@ -264,11 +161,11 @@ run_catdriver_gui <- function() {
       # Step 2: Config Files (multi-select)
       conditionalPanel(
         condition = "output.project_selected",
-        div(class = "step-card",
-          div(class = "step-title", "Step 2: Select Configuration Files"),
+        div(class = "turas-card",
+          h4(class = "turas-card-title", "Step 2: Select Configuration Files"),
           uiOutput("config_selector"),
           uiOutput("config_display"),
-          div(class = "info-box",
+          div(class = "turas-status-info",
             tags$strong("Note: "), "Each config file needs ",
             tags$code("Settings"), ", ", tags$code("Variables"), ", and ",
             tags$code("Driver_Settings"), " sheets. ",
@@ -276,7 +173,7 @@ run_catdriver_gui <- function() {
           ),
 
           # Subgroup comparison option (collapsible advanced)
-          tags$hr(style = "margin: 15px 0 10px 0; border-color: #dee2e6;"),
+          tags$hr(),
           actionLink("toggle_advanced", "Advanced Options",
                      class = "toggle-link", icon = icon("cog")),
           conditionalPanel(
@@ -304,8 +201,8 @@ run_catdriver_gui <- function() {
       # Step 3: Report Settings (always visible when configs selected)
       conditionalPanel(
         condition = "output.ready_to_run",
-        div(class = "report-settings-card",
-          div(class = "step-title", "Step 3: Report Settings"),
+        div(class = "turas-card",
+          h4(class = "turas-card-title", "Step 3: Report Settings"),
 
           fluidRow(
             column(6,
@@ -356,7 +253,7 @@ run_catdriver_gui <- function() {
 
           uiOutput("colour_preview"),
 
-          div(class = "info-box",
+          div(class = "turas-status-info",
             tags$strong("Note: "), "These settings are applied to the generated HTML report. ",
             "They override any brand/colour settings in individual config files."
           )
@@ -366,7 +263,7 @@ run_catdriver_gui <- function() {
       # Run Button (dynamic label)
       conditionalPanel(
         condition = "output.ready_to_run",
-        div(class = "step-card",
+        div(class = "turas-card",
           uiOutput("run_button_ui")
         )
       ),
@@ -374,9 +271,9 @@ run_catdriver_gui <- function() {
       # Console Output
       conditionalPanel(
         condition = "output.show_console",
-        div(class = "step-card",
-          div(class = "step-title", "Analysis Output"),
-          div(class = "console-output",
+        div(class = "turas-card",
+          h4(class = "turas-card-title", "Analysis Output"),
+          div(class = "turas-console",
             verbatimTextOutput("console_output")
           )
         )
@@ -394,6 +291,14 @@ run_catdriver_gui <- function() {
 
     console_text <- reactiveVal("")
     is_running <- reactiveVal(FALSE)
+
+    # Auto-load config from launcher
+    pre_config <- Sys.getenv("TURAS_MODULE_CONFIG", unset = "")
+    if (nzchar(pre_config) && file.exists(pre_config)) {
+      Sys.unsetenv("TURAS_MODULE_CONFIG")
+      files$config_files <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
+      files$project_dir <- dirname(pre_config)
+    }
 
     # Set up directory browser
     volumes <- c(Home = path.expand("~"),
@@ -442,9 +347,10 @@ run_catdriver_gui <- function() {
     # Project display
     output$project_display <- renderUI({
       if (!is.null(files$project_dir)) {
-        div(class = "file-display",
-          div(class = "filename", basename(files$project_dir)),
-          div(class = "filepath", files$project_dir),
+        div(class = "turas-file-display",
+          tags$strong(basename(files$project_dir)),
+          tags$br(),
+          tags$small(files$project_dir),
           div(class = "status-success", "\u2713 Directory selected")
         )
       }
@@ -470,7 +376,7 @@ run_catdriver_gui <- function() {
         # Manual file selection fallback
         shinyFilesButton("config_btn", "Browse for Config File",
                         "Select configuration file",
-                        class = "btn btn-catdriver",
+                        class = "btn turas-btn-primary",
                         multiple = FALSE)
       }
     })
@@ -509,8 +415,8 @@ run_catdriver_gui <- function() {
             tags$span(basename(f))
           )
         })
-        div(class = "file-display",
-          div(class = "filename",
+        div(class = "turas-file-display",
+          tags$strong(
             sprintf("%d config%s selected",
                     length(files$config_files),
                     if (length(files$config_files) != 1) "s" else "")),
@@ -556,7 +462,7 @@ run_catdriver_gui <- function() {
         sprintf("Run %d Analyses + Generate Unified Report", n)
       }
       actionButton("run_analysis", label,
-                    class = "btn btn-catdriver run-btn",
+                    class = "btn turas-btn-run",
                     icon = icon("play"))
     })
 

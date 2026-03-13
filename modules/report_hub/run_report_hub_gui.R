@@ -60,6 +60,11 @@ run_report_hub_gui <- function() {
 
   TURAS_HOME <- getwd()
 
+  # Load shared GUI theme
+  source(file.path(TURAS_HOME, "modules", "shared", "lib", "gui_theme.R"))
+  theme <- turas_gui_theme("Report Hub", "Unified Report Portal")
+  hide_recents <- turas_hide_recents()
+
   # Recent configs file (last 5 configs, same approach as tabs module)
   RECENT_CONFIGS_FILE <- file.path(TURAS_HOME, ".recent_hub_configs.rds")
 
@@ -87,150 +92,55 @@ run_report_hub_gui <- function() {
   # ==============================================================================
 
   ui <- fluidPage(
-    tags$head(
-      tags$style(HTML("
-        .main-header {
-          background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-          color: white;
-          padding: 30px;
-          border-radius: 10px;
-          margin-bottom: 20px;
-        }
-        .card {
-          background: white;
-          border-radius: 10px;
-          padding: 20px;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-          margin-bottom: 20px;
-        }
-        .status-success {
-          background-color: #f0fff4;
-          border-left: 4px solid #48bb78;
-          padding: 15px;
-          margin: 10px 0;
-        }
-        .status-info {
-          background-color: #e7f3ff;
-          border-left: 4px solid #3182ce;
-          padding: 15px;
-          margin: 10px 0;
-        }
-        .status-warning {
-          background-color: #fffbeb;
-          border-left: 4px solid #f59e0b;
-          padding: 15px;
-          margin: 10px 0;
-        }
-        .status-error {
-          background-color: #fef2f2;
-          border-left: 4px solid #ef4444;
-          padding: 15px;
-          margin: 10px 0;
-        }
-        .btn-primary {
-          background: #3b82f6;
-          border: none;
-        }
-        .btn-primary:hover {
-          background: #1d4ed8;
-        }
-        .btn-run {
-          background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-          border: none;
-          color: white;
-          font-weight: 700;
-          padding: 16px 40px;
-          font-size: 18px;
-          border-radius: 10px;
-        }
-        .config-display {
-          background: #f7fafc;
-          padding: 15px;
-          border-radius: 8px;
-          margin: 15px 0;
-        }
-        .console-output {
-          background: #1a202c;
-          color: #e2e8f0;
-          padding: 20px;
-          border-radius: 8px;
-          font-family: monospace;
-          font-size: 13px;
-          max-height: 500px;
-          overflow-y: auto;
-          white-space: pre-wrap;
-        }
-        .report-list {
-          list-style: none;
-          padding: 0;
-          margin: 10px 0;
-        }
-        .report-list li {
-          padding: 8px 12px;
-          margin: 4px 0;
-          background: #f7fafc;
-          border-radius: 6px;
-          border: 1px solid #e2e8f0;
-          font-size: 14px;
-        }
-        .report-found {
-          border-left: 3px solid #48bb78;
-        }
-        .report-missing {
-          border-left: 3px solid #ef4444;
-        }
-        .success-info {
-          background: #f0fff4;
-          border: 1px solid #c6f6d5;
-          border-radius: 8px;
-          padding: 15px;
-          margin-top: 15px;
-        }
-        .btn-open {
-          background: #3b82f6;
-          border: none;
-          color: white;
-          font-weight: 600;
-          padding: 10px 24px;
-          font-size: 14px;
-          border-radius: 6px;
-          margin-top: 10px;
-        }
-        .btn-open:hover {
-          background: #1d4ed8;
-          color: white;
-        }
-        .recent-config-item {
-          padding: 10px;
-          margin: 5px 0;
-          background: #f7fafc;
-          border-radius: 5px;
-          cursor: pointer;
-          border: 1px solid #e2e8f0;
-        }
-        .recent-config-item:hover {
-          background: #edf2f7;
-          border-color: #3b82f6;
-        }
-      "))
-    ),
+    theme$head,
+
+    # Module-specific styles (report list indicators)
+    tags$head(tags$style(HTML("
+      .report-list {
+        list-style: none;
+        padding: 0;
+        margin: 10px 0;
+      }
+      .report-list li {
+        padding: 8px 12px;
+        margin: 4px 0;
+        background: #f7fafc;
+        border-radius: 6px;
+        border: 1px solid var(--turas-border, #e2e8f0);
+        font-size: 14px;
+      }
+      .report-found {
+        border-left: 3px solid var(--turas-success, #16a34a);
+      }
+      .report-missing {
+        border-left: 3px solid var(--turas-error, #dc2626);
+      }
+      .btn-open {
+        background: var(--turas-accent, #1a2744);
+        border: none;
+        color: white;
+        font-weight: 600;
+        padding: 10px 24px;
+        font-size: 14px;
+        border-radius: var(--turas-radius-sm, 6px);
+        margin-top: 10px;
+      }
+      .btn-open:hover {
+        background: var(--turas-accent-light, #2a3f5f);
+        color: white;
+      }
+    "))),
 
     # Header
-    div(class = "main-header",
-      h1("\U0001F4CA TURAS>REPORT HUB"),
-      p("Combine multiple Turas HTML reports into a unified portal"),
-      p(style = "font-size: 14px; opacity: 0.9;",
-        "Part of Turas Analytics Toolkit")
-    ),
+    theme$header,
 
     # Main content
-    fluidRow(
-      column(12,
+    div(class = "turas-content",
 
         # Step 1: Config file selection
-        div(class = "card",
-          h3("1. Select Config File"),
-          p(style = "color: #6c757d; margin-bottom: 15px;",
+        div(class = "turas-card",
+          h3(class = "turas-card-title", "1. Select Config File"),
+          p(class = "turas-card-subtitle",
             "Select the Report Hub config Excel file (.xlsx) containing Settings and Reports sheets."
           ),
           shinyFilesButton("config_btn",
@@ -239,7 +149,7 @@ run_report_hub_gui <- function() {
                           class = "btn btn-primary btn-lg",
                           multiple = FALSE),
           uiOutput("config_display"),
-          uiOutput("recent_configs_ui")
+          if (!hide_recents) uiOutput("recent_configs_ui")
         ),
 
         # Step 2: Config preview (conditional)
@@ -250,7 +160,6 @@ run_report_hub_gui <- function() {
 
         # Step 4: Console output (conditional)
         uiOutput("console_ui")
-      )
     )
   )
 
@@ -268,7 +177,9 @@ run_report_hub_gui <- function() {
     is_running <- reactiveVal(FALSE)
 
     # Auto-load config from launcher (env var set by launch_turas.R)
-    pre_config <- Sys.getenv("TURAS_HUB_CONFIG", unset = "")
+    pre_config <- Sys.getenv("TURAS_MODULE_CONFIG", unset = "")
+    if (!nzchar(pre_config)) pre_config <- Sys.getenv("TURAS_HUB_CONFIG", unset = "")
+    Sys.unsetenv("TURAS_MODULE_CONFIG")
     if (nzchar(pre_config) && file.exists(pre_config)) {
       Sys.unsetenv("TURAS_HUB_CONFIG")
       config_path(normalizePath(pre_config, winslash = "/", mustWork = FALSE))
@@ -317,14 +228,14 @@ run_report_hub_gui <- function() {
     output$config_display <- renderUI({
       path <- config_path()
       if (is.null(path)) {
-        div(class = "status-info",
-          "\U0001F4C1 No config file selected. Click Browse to get started."
+        div(class = "turas-status-info",
+          icon("info-circle"), " No config file selected. Click Browse to get started."
         )
       } else {
-        div(class = "config-display",
+        div(class = "turas-file-display",
           tags$strong(basename(path)),
           tags$br(),
-          tags$small(style = "color: #666;", dirname(path))
+          tags$small(dirname(path))
         )
       }
     })
@@ -338,17 +249,17 @@ run_report_hub_gui <- function() {
       recent <- recent[file.exists(recent)]
       if (length(recent) == 0) return(NULL)
 
-      div(
+      div(class = "turas-recent-section",
         tags$hr(),
         h4("Recent Configs"),
         lapply(seq_along(recent), function(i) {
           tags$div(
-            class = "recent-config-item",
+            class = "turas-recent-item",
             onclick = sprintf("Shiny.setInputValue('select_recent_config', '%s', {priority: 'event'})",
                              gsub("'", "\\\\'", recent[i])),
             tags$strong(basename(recent[i])),
             tags$br(),
-            tags$small(style = "color: #666;", dirname(recent[i]))
+            tags$small(dirname(recent[i]))
           )
         })
       )
@@ -361,9 +272,9 @@ run_report_hub_gui <- function() {
 
       # Handle read errors
       if (!is.null(info$error)) {
-        return(div(class = "card",
-          h3("2. Config Preview"),
-          div(class = "status-error",
+        return(div(class = "turas-card",
+          h3(class = "turas-card-title", "2. Config Preview"),
+          div(class = "turas-status-error",
             tags$strong("Error reading config: "), info$error
           )
         ))
@@ -395,18 +306,18 @@ run_report_hub_gui <- function() {
           tags$code(paste(out_parts, collapse = "/")))
       }
 
-      div(class = "card",
-        h3("2. Config Preview"),
+      div(class = "turas-card",
+        h3(class = "turas-card-title", "2. Config Preview"),
         tags$p(tags$strong("Project: "), info$title),
         tags$p(tags$strong("Reports: "), info$n_reports),
         output_display,
         tags$ul(class = "report-list", report_items),
         if (all_found) {
-          div(class = "status-success",
+          div(class = "turas-status-success",
             "\u2705 All report files found. Ready to combine."
           )
         } else {
-          div(class = "status-warning",
+          div(class = "turas-status-warning",
             sprintf("\u26A0\uFE0F %d report file(s) not found. Check paths in your config.",
                     missing_count)
           )
@@ -419,12 +330,12 @@ run_report_hub_gui <- function() {
       info <- config_info()
       if (is.null(info) || !is.null(info$error)) return(NULL)
 
-      div(class = "card",
-        h3("3. Combine Reports"),
+      div(class = "turas-card",
+        h3(class = "turas-card-title", "3. Combine Reports"),
         div(style = "text-align: center; margin: 20px 0;",
           actionButton("run_btn",
                       "COMBINE REPORTS",
-                      class = "btn-run",
+                      class = "turas-btn-run",
                       icon = icon("play-circle"),
                       disabled = is_running()),
           div(style = "margin-top: 12px;",
@@ -527,11 +438,11 @@ run_report_hub_gui <- function() {
 
       result <- result_info()
 
-      div(class = "card",
-        h3("4. Output"),
-        pre(class = "console-output", console_text()),
+      div(class = "turas-card",
+        h3(class = "turas-card-title", "4. Output"),
+        pre(class = "turas-console", console_text()),
         if (!is.null(result) && result$status %in% c("PASS", "PARTIAL")) {
-          div(class = "success-info",
+          div(class = "turas-status-success",
             tags$p(
               tags$strong("\u2705 Success: "),
               result$message
@@ -541,7 +452,7 @@ run_report_hub_gui <- function() {
               tags$code(result$result$output_path)
             ),
             if (result$status == "PARTIAL" && length(result$warnings) > 0) {
-              div(class = "status-warning", style = "margin-top: 10px;",
+              div(class = "turas-status-warning", style = "margin-top: 10px;",
                 tags$strong("Warnings:"),
                 tags$ul(lapply(result$warnings, tags$li))
               )

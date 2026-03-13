@@ -109,86 +109,29 @@ recent_projects_file <- file.path(script_dir, ".recent_alchemerparser_projects.r
 #' @export
 run_alchemerparser_gui <- function() {
 
+  # Derive turas root from script_dir (modules/AlchemerParser -> ../../)
+  turas_root <- Sys.getenv("TURAS_ROOT", "")
+  if (!nzchar(turas_root) || !dir.exists(file.path(turas_root, "modules"))) {
+    turas_root <- dirname(dirname(script_dir))
+  }
+
+  # Load shared GUI theme
+  source(file.path(turas_root, "modules", "shared", "lib", "gui_theme.R"))
+  theme <- turas_gui_theme("AlchemerParser", "Parse Alchemer Surveys & Generate Configs")
+  hide_recents <- turas_hide_recents()
+
   ui <- fluidPage(
-    # Custom CSS
-    tags$head(
-      tags$style(HTML("
-        body {
-          background-color: #f5f5f5;
-        }
-        .main-header {
-          background-color: #3498db;
-          color: white;
-          padding: 20px;
-          margin-bottom: 20px;
-          border-radius: 5px;
-        }
-        .main-header h2 {
-          margin: 0;
-        }
-        .section-box {
-          background-color: white;
-          padding: 20px;
-          margin-bottom: 20px;
-          border-radius: 5px;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .section-title {
-          font-size: 18px;
-          font-weight: bold;
-          color: #2c3e50;
-          margin-bottom: 15px;
-          border-bottom: 2px solid #3498db;
-          padding-bottom: 5px;
-        }
-        .status-box {
-          padding: 15px;
-          border-radius: 5px;
-          margin-top: 10px;
-        }
-        .status-success {
-          background-color: #d4edda;
-          border: 1px solid #c3e6cb;
-          color: #155724;
-        }
-        .status-error {
-          background-color: #f8d7da;
-          border: 1px solid #f5c6cb;
-          color: #721c24;
-        }
-        .status-warning {
-          background-color: #fff3cd;
-          border: 1px solid #ffeaa7;
-          color: #856404;
-        }
-        .status-info {
-          background-color: #d1ecf1;
-          border: 1px solid #bee5eb;
-          color: #0c5460;
-        }
-        .file-info {
-          font-family: monospace;
-          font-size: 12px;
-          background-color: #f8f9fa;
-          padding: 10px;
-          border-radius: 3px;
-          margin-top: 10px;
-        }
-      "))
-    ),
+    theme$head,
 
     # Header
-    div(class = "main-header",
-      h2("AlchemerParser"),
-      p("Parse Alchemer survey files and generate Tabs configuration")
-    ),
+    theme$header,
 
     # Main content
-    div(style = "max-width: 1200px; margin: auto;",
+    div(class = "turas-content-wide",
 
       # Step 1: Select Project Directory
-      div(class = "section-box",
-        div(class = "section-title", "Step 1: Select Project Directory"),
+      div(class = "turas-card",
+        h3(class = "turas-card-title", "Step 1: Select Project Directory"),
 
         fluidRow(
           column(8,
@@ -204,16 +147,18 @@ run_alchemerparser_gui <- function() {
           )
         ),
 
-        # Recent projects
-        selectInput("recent_project", "Or select a recent project:",
-                   choices = c("Select..." = ""), width = "100%"),
+        # Recent projects (hidden when launched from hub)
+        if (!hide_recents) {
+          selectInput("recent_project", "Or select a recent project:",
+                     choices = c("Select..." = ""), width = "100%")
+        },
 
         uiOutput("file_status")
       ),
 
       # Step 2: Review and Parse
-      div(class = "section-box",
-        div(class = "section-title", "Step 2: Parse Files"),
+      div(class = "turas-card",
+        h3(class = "turas-card-title", "Step 2: Parse Files"),
 
         fluidRow(
           column(6,
@@ -229,14 +174,14 @@ run_alchemerparser_gui <- function() {
         ),
 
         actionButton("run_parser", "Parse Files", width = "200px",
-                    class = "btn-primary btn-lg"),
+                    class = "turas-btn-run"),
 
         uiOutput("parse_status")
       ),
 
       # Step 3: Review Results
-      div(class = "section-box",
-        div(class = "section-title", "Step 3: Review Results"),
+      div(class = "turas-card",
+        h3(class = "turas-card-title", "Step 3: Review Results"),
 
         uiOutput("results_summary"),
 
@@ -256,8 +201,8 @@ run_alchemerparser_gui <- function() {
       ),
 
       # Step 4: Download Outputs
-      div(class = "section-box",
-        div(class = "section-title", "Step 4: Download Output Files"),
+      div(class = "turas-card",
+        h3(class = "turas-card-title", "Step 4: Download Output Files"),
 
         p("Output files are saved to the output directory. You can also download them here:"),
 
@@ -365,13 +310,13 @@ run_alchemerparser_gui <- function() {
       req(input$project_dir)
 
       if (!dir.exists(input$project_dir)) {
-        div(class = "status-box status-error",
+        div(class = "turas-status-error",
           strong("Directory not found"),
           br(),
           "Please enter a valid directory path."
         )
       } else if (!rv$files_found) {
-        div(class = "status-box status-warning",
+        div(class = "turas-status-warning",
           strong("Required files not found"),
           br(),
           "Looking for:",
@@ -382,7 +327,7 @@ run_alchemerparser_gui <- function() {
           )
         )
       } else {
-        div(class = "status-box status-success",
+        div(class = "turas-status-success",
           strong("✓ All required files found"),
           br(),
           sprintf("Project: %s", rv$project_name)
@@ -395,7 +340,7 @@ run_alchemerparser_gui <- function() {
       req(rv$files_found)
 
       output$parse_status <- renderUI({
-        div(class = "status-box status-info",
+        div(class = "turas-status-info",
           strong("Parsing in progress..."),
           br(),
           "This may take a few moments."
@@ -440,7 +385,7 @@ run_alchemerparser_gui <- function() {
         )
       }, error = function(e) {
         output$parse_status <- renderUI({
-          div(class = "status-box status-error",
+          div(class = "turas-status-error",
             strong("Error during parsing:"),
             br(),
             as.character(e$message)
@@ -455,7 +400,7 @@ run_alchemerparser_gui <- function() {
         rv$output_files <- results$outputs
 
         output$parse_status <- renderUI({
-          div(class = "status-box status-success",
+          div(class = "turas-status-success",
             strong("✓ Parsing complete!"),
             br(),
             sprintf("Processed %d questions with %d data columns",

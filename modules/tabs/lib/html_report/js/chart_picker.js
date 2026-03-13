@@ -1,7 +1,7 @@
 // ---- Chart Column Picker ----
 // Depends on: getLabelText() from core_navigation.js, sortChartBars() from table_export_init.js,
 //             downloadBlob() from table_export_init.js
-var chartColumnState = {}; // qCode -> { colKey: true/false }
+var chartColumnState = {}; // groupCode -> { colKey: true/false }
 
 // Get column keys that belong to the active banner group (+ Total)
 function getChartKeysForGroup(chartData, groupCode) {
@@ -30,6 +30,21 @@ function buildChartPickersForGroup(groupCode) {
   // Remove existing pickers
   document.querySelectorAll(".chart-col-picker").forEach(function(el) { el.remove(); });
 
+  // Initialise group state only if no state exists yet for this banner group
+  // (preserves user's chart column selection across question navigation)
+  var firstWrapper = document.querySelector(".chart-wrapper[data-chart-data]");
+  if (firstWrapper && !chartColumnState[groupCode]) {
+    var firstData;
+    try { firstData = JSON.parse(firstWrapper.getAttribute("data-chart-data")); } catch(e) { firstData = null; }
+    if (firstData && firstData.columns) {
+      var firstKeys = getChartKeysForGroup(firstData, groupCode);
+      if (firstKeys.length > 0) {
+        chartColumnState[groupCode] = {};
+        chartColumnState[groupCode][firstKeys[0]] = true;
+      }
+    }
+  }
+
   document.querySelectorAll(".chart-wrapper[data-chart-data]").forEach(function(wrapper) {
     var qCode = wrapper.getAttribute("data-q-code");
     var data;
@@ -38,10 +53,6 @@ function buildChartPickersForGroup(groupCode) {
 
     var keys = getChartKeysForGroup(data, groupCode);
     if (keys.length === 0) return;
-
-    // Always init state so JS rebuild renders priority metrics
-    chartColumnState[qCode] = {};
-    chartColumnState[qCode][keys[0]] = true;
 
     // Only show column picker when multiple columns available
     if (keys.length > 1) {
@@ -56,11 +67,12 @@ function buildChartPickersForGroup(groupCode) {
 
       keys.forEach(function(key, idx) {
         var chip = document.createElement("button");
-        chip.className = "col-chip" + (idx === 0 ? "" : " col-chip-off");
+        var isActive = chartColumnState[groupCode] && chartColumnState[groupCode][key];
+        chip.className = "col-chip" + (isActive ? "" : " col-chip-off");
         chip.setAttribute("data-col-key", key);
         chip.textContent = data.columns[key].display;
         chip.onclick = function() {
-          toggleChartColumn(qCode, key, chip);
+          toggleChartColumn(groupCode, key, chip);
         };
         bar.appendChild(chip);
       });
@@ -74,22 +86,38 @@ function buildChartPickersForGroup(groupCode) {
   });
 }
 
-function toggleChartColumn(qCode, colKey, chipEl) {
-  if (!chartColumnState[qCode]) chartColumnState[qCode] = {};
-  var isOn = !!chartColumnState[qCode][colKey];
+function toggleChartColumn(groupCode, colKey, chipEl) {
+  if (!chartColumnState[groupCode]) chartColumnState[groupCode] = {};
+  var isOn = !!chartColumnState[groupCode][colKey];
   if (isOn) {
     // Prevent deselecting the last column
-    var activeCount = Object.keys(chartColumnState[qCode]).filter(function(k) {
-      return chartColumnState[qCode][k];
+    var activeCount = Object.keys(chartColumnState[groupCode]).filter(function(k) {
+      return chartColumnState[groupCode][k];
     }).length;
     if (activeCount <= 1) return;
-    delete chartColumnState[qCode][colKey];
+    delete chartColumnState[groupCode][colKey];
     chipEl.classList.add("col-chip-off");
   } else {
-    chartColumnState[qCode][colKey] = true;
+    chartColumnState[groupCode][colKey] = true;
     chipEl.classList.remove("col-chip-off");
   }
-  rebuildChartSVG(qCode);
+  // Rebuild chart for the active question only
+  var activeWrapper = document.querySelector(".question-container.active .chart-wrapper[data-q-code]");
+  if (activeWrapper) {
+    rebuildChartSVG(activeWrapper.getAttribute("data-q-code"));
+  }
+  // Also sync chip state across all pickers for other questions (same group)
+  document.querySelectorAll(".chart-col-picker").forEach(function(picker) {
+    if (picker.contains(chipEl)) return; // skip the one we just toggled
+    var otherChip = picker.querySelector(".col-chip[data-col-key=\"" + colKey + "\"]");
+    if (otherChip) {
+      if (chartColumnState[groupCode][colKey]) {
+        otherChip.classList.remove("col-chip-off");
+      } else {
+        otherChip.classList.add("col-chip-off");
+      }
+    }
+  });
 }
 
 function rebuildChartSVG(qCode) {
@@ -99,8 +127,8 @@ function rebuildChartSVG(qCode) {
   try { data = JSON.parse(wrapper.getAttribute("data-chart-data")); } catch(e) { return; }
   if (!data) return;
 
-  var selectedKeys = Object.keys(chartColumnState[qCode] || {}).filter(function(k) {
-    return chartColumnState[qCode][k];
+  var selectedKeys = Object.keys(chartColumnState[currentGroup] || {}).filter(function(k) {
+    return chartColumnState[currentGroup][k] && data.columns[k];
   });
   if (selectedKeys.length === 0) return;
 

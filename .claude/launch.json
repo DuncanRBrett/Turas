@@ -12,6 +12,12 @@
       "runtimeExecutable": "/bin/bash",
       "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve examples/report_hub -l 8770 --no-clipboard"],
       "port": 8770
+    },
+    {
+      "name": "tabs-report",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve examples/tabs/demo_survey/Output -l 8775 --no-clipboard"],
+      "port": 8775
     }
   ]
 }

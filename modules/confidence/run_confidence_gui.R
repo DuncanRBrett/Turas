@@ -62,6 +62,11 @@ run_confidence_gui <- function() {
   # Turas home directory
   TURAS_HOME <- getwd()
 
+  # Load shared GUI theme
+  source(file.path(TURAS_HOME, "modules", "shared", "lib", "gui_theme.R"))
+  theme <- turas_gui_theme("Confidence", "Statistical Confidence Intervals")
+  hide_recents <- turas_hide_recents()
+
   # Recent projects file
   RECENT_PROJECTS_FILE <- file.path(TURAS_HOME, ".recent_projects.rds")
 
@@ -104,97 +109,17 @@ run_confidence_gui <- function() {
   # ==============================================================================
 
   ui <- fluidPage(
-    tags$head(
-      tags$style(HTML("
-        .main-header {
-          background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-          color: white;
-          padding: 30px;
-          border-radius: 10px;
-          margin-bottom: 20px;
-        }
-        .card {
-          background: white;
-          border-radius: 10px;
-          padding: 20px;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-          margin-bottom: 20px;
-        }
-        .status-success {
-          background-color: #f0fff4;
-          border-left: 4px solid #48bb78;
-          padding: 15px;
-          margin: 10px 0;
-        }
-        .status-info {
-          background-color: #e7f3ff;
-          border-left: 4px solid #3182ce;
-          padding: 15px;
-          margin: 10px 0;
-        }
-        .btn-primary {
-          background: #f59e0b;
-          border: none;
-        }
-        .btn-primary:hover {
-          background: #d97706;
-        }
-        .btn-run {
-          background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-          border: none;
-          color: white;
-          font-weight: 700;
-          padding: 16px 40px;
-          font-size: 18px;
-          border-radius: 10px;
-        }
-        .project-display {
-          background: #f7fafc;
-          padding: 15px;
-          border-radius: 8px;
-          margin: 15px 0;
-        }
-        .console-output {
-          background: #1a202c;
-          color: #e2e8f0;
-          padding: 20px;
-          border-radius: 8px;
-          font-family: monospace;
-          font-size: 13px;
-          max-height: 500px;
-          overflow-y: auto;
-          white-space: pre-wrap;
-        }
-        .recent-project-item {
-          padding: 10px;
-          margin: 5px 0;
-          background: #f7fafc;
-          border-radius: 5px;
-          cursor: pointer;
-          border: 1px solid #e2e8f0;
-        }
-        .recent-project-item:hover {
-          background: #edf2f7;
-          border-color: #f59e0b;
-        }
-      "))
-    ),
+    theme$head,
 
     # Header
-    div(class = "main-header",
-      h1("📊 TURAS>CONFIDENCE"),
-      p("Statistical Confidence Intervals • Means & Proportions • Bootstrap & Bayesian Methods"),
-      p(style = "font-size: 14px; opacity: 0.9;",
-        "Part of Turas Analytics Toolkit")
-    ),
+    theme$header,
 
     # Main content
-    fluidRow(
-      column(12,
+    div(class = "turas-content",
 
         # Step 1: Project Selection
-        div(class = "card",
-          h3("1. Select Project Directory"),
+        div(class = "turas-card",
+          h3(class = "turas-card-title", "1. Select Project Directory"),
 
           shinyDirButton("project_btn",
                         "Browse for Project Folder",
@@ -203,7 +128,7 @@ run_confidence_gui <- function() {
                         icon = icon("folder-open")),
 
           uiOutput("project_ui"),
-          uiOutput("recent_ui")
+          if (!hide_recents) uiOutput("recent_ui")
         ),
 
         # Step 2: Config Selection
@@ -214,7 +139,6 @@ run_confidence_gui <- function() {
 
         # Step 4: Console Output
         uiOutput("console_ui")
-      )
     )
   )
 
@@ -228,6 +152,35 @@ run_confidence_gui <- function() {
     project_data <- reactiveVal(NULL)
     console_output <- reactiveVal("")
     is_running <- reactiveVal(FALSE)
+
+    # Auto-load config from launcher
+    pre_config <- Sys.getenv("TURAS_MODULE_CONFIG", unset = "")
+    if (nzchar(pre_config)) {
+      Sys.unsetenv("TURAS_MODULE_CONFIG")
+      pre_config <- normalizePath(path.expand(pre_config), winslash = "/", mustWork = FALSE)
+
+      if (dir.exists(pre_config)) {
+        # Recents for Confidence are directory paths
+        configs <- detect_config_files(pre_config)
+        project_data(list(
+          path = pre_config,
+          configs = configs,
+          selected_configs = if (length(configs) > 0) configs else character(0)
+        ))
+        add_recent_project(pre_config)
+      } else if (file.exists(pre_config)) {
+        # Config file path
+        config_dir <- dirname(pre_config)
+        config_name <- basename(pre_config)
+        configs <- detect_config_files(config_dir)
+        project_data(list(
+          path = config_dir,
+          configs = configs,
+          selected_configs = config_name
+        ))
+        add_recent_project(config_dir)
+      }
+    }
 
     # Directory chooser
     volumes <- c(Home = "~", Documents = "~/Documents", Desktop = "~/Desktop")
@@ -280,15 +233,15 @@ run_confidence_gui <- function() {
     output$project_ui <- renderUI({
       data <- project_data()
       if (is.null(data)) {
-        div(class = "status-info",
+        div(class = "turas-status-info",
           icon("info-circle"), " No project selected. Click Browse to get started."
         )
       } else {
-        div(class = "project-display",
+        div(class = "turas-file-display",
           tags$strong(basename(data$path)),
           tags$br(),
           tags$small(data$path),
-          div(class = "status-success", style = "margin-top: 10px;",
+          div(class = "turas-status-success", style = "margin-top: 10px;",
             icon("check-circle"), " ",
             tags$strong(length(data$configs)), " configuration file(s) found"
           )
@@ -298,15 +251,16 @@ run_confidence_gui <- function() {
 
     # Recent projects
     output$recent_ui <- renderUI({
+      if (hide_recents) return(NULL)
       recent <- load_recent_projects()
       if (length(recent) == 0) return(NULL)
 
-      div(
+      div(class = "turas-recent-section",
         tags$hr(),
         h4("Recent Projects"),
         lapply(seq_along(recent), function(i) {
           tags$div(
-            class = "recent-project-item",
+            class = "turas-recent-item",
             onclick = sprintf("Shiny.setInputValue('select_recent', '%s', {priority: 'event'})", recent[i]),
             tags$strong(basename(recent[i])),
             tags$br(),
@@ -321,8 +275,8 @@ run_confidence_gui <- function() {
       data <- project_data()
       if (is.null(data) || length(data$configs) == 0) return(NULL)
 
-      div(class = "card",
-        h3("2. Select Configuration File"),
+      div(class = "turas-card",
+        h3(class = "turas-card-title", "2. Select Configuration File"),
         radioButtons("config_select",
                     NULL,
                     choices = setNames(data$configs, paste("📄", data$configs)),
@@ -335,12 +289,12 @@ run_confidence_gui <- function() {
       data <- project_data()
       if (is.null(data) || is.null(data$selected_config)) return(NULL)
 
-      div(class = "card",
-        h3("3. Run Analysis"),
+      div(class = "turas-card",
+        h3(class = "turas-card-title", "3. Run Analysis"),
         div(style = "text-align: center; margin: 20px 0;",
           actionButton("run_btn",
                       "RUN ANALYSIS",
-                      class = "btn-run",
+                      class = "turas-btn-run",
                       icon = icon("play-circle"),
                       disabled = is_running())
         )
@@ -351,9 +305,9 @@ run_confidence_gui <- function() {
     output$console_ui <- renderUI({
       if (console_output() == "") return(NULL)
 
-      div(class = "card",
-        h3("4. Analysis Output"),
-        div(class = "console-output",
+      div(class = "turas-card",
+        h3(class = "turas-card-title", "4. Analysis Output"),
+        div(class = "turas-console",
           verbatimTextOutput("console_text")
         )
       )
