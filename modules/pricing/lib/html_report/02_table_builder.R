@@ -3,19 +3,13 @@
 # ==============================================================================
 #
 # Purpose: Build HTML tables from transformed pricing data
-# Pattern: Follows confidence module 4-layer architecture
-# Version: 1.0.0
+# Pattern: Follows tabs module visual conventions
+# Version: 2.0.0
 # ==============================================================================
 
 `%||%` <- function(x, y) if (is.null(x) || length(x) == 0 || (length(x) == 1 && is.na(x))) y else x
 
-htmlEscape <- function(x) {
-  x <- gsub("&", "&amp;", x, fixed = TRUE)
-  x <- gsub("<", "&lt;", x, fixed = TRUE)
-  x <- gsub(">", "&gt;", x, fixed = TRUE)
-  x <- gsub('"', "&quot;", x, fixed = TRUE)
-  x
-}
+# htmlEscape is defined in 99_html_report_main.R (sourced before this file)
 
 
 # ==============================================================================
@@ -125,28 +119,38 @@ build_vw_ci_table <- function(vw_data, currency = "$") {
 # GABOR-GRANGER TABLES
 # ==============================================================================
 
-#' Build GG Demand Curve Table
+#' Build GG Demand Curve Table (with heatmap colouring)
 #' @keywords internal
 build_gg_demand_table <- function(gg_data, currency = "$") {
-  # Use revenue_curve (which contains demand_curve columns + revenue_index)
-  # Fall back to demand_curve if revenue_curve unavailable
   dc <- gg_data$revenue_curve
   if (is.null(dc) || !is.data.frame(dc)) {
     dc <- gg_data$demand_curve
   }
   if (is.null(dc) || !is.data.frame(dc)) return("")
 
-  # Compute revenue_index if not present on the data frame
   if (!"revenue_index" %in% names(dc)) {
     dc$revenue_index <- dc$price * dc$purchase_intent
   }
 
+  # Find optimal row (max revenue)
+  opt_idx <- which.max(dc$revenue_index)
+
   rows <- character(0)
   for (i in seq_len(nrow(dc))) {
+    intent_val <- dc$purchase_intent[i]
+    # Heatmap class for purchase intent
+    heat_class <- if (!is.na(intent_val) && intent_val > 0.7) " pr-heat-high"
+                  else if (!is.na(intent_val) && intent_val > 0.4) " pr-heat-med"
+                  else " pr-heat-low"
+
+    # Optimal row highlight
+    row_class <- if (i == opt_idx) ' class="pr-row-optimal"' else ""
+
     rows <- c(rows, sprintf(
-      '<tr><td class="pr-td pr-num">%s%.2f</td><td class="pr-td pr-num">%.1f%%</td><td class="pr-td pr-num">%.2f</td>%s</tr>',
+      '<tr%s><td class="pr-td pr-num">%s%.2f</td><td class="pr-td pr-num%s">%.1f%%</td><td class="pr-td pr-num">%.2f</td>%s</tr>',
+      row_class,
       currency, dc$price[i],
-      dc$purchase_intent[i] * 100,
+      heat_class, intent_val * 100,
       dc$revenue_index[i],
       if ("profit_index" %in% names(dc) && !all(is.na(dc$profit_index))) {
         sprintf('<td class="pr-td pr-num">%.2f</td>', dc$profit_index[i])
@@ -292,7 +296,7 @@ build_monadic_model_table <- function(monadic_data) {
   )
 }
 
-#' Build Monadic Observed Data Table
+#' Build Monadic Observed Data Table (with heatmap)
 #' @keywords internal
 build_monadic_observed_table <- function(monadic_data, currency = "$") {
   obs <- monadic_data$observed_data
@@ -300,9 +304,14 @@ build_monadic_observed_table <- function(monadic_data, currency = "$") {
 
   rows <- character(0)
   for (i in seq_len(nrow(obs))) {
+    intent_val <- obs$observed_intent[i]
+    heat_class <- if (!is.na(intent_val) && intent_val > 0.7) " pr-heat-high"
+                  else if (!is.na(intent_val) && intent_val > 0.4) " pr-heat-med"
+                  else " pr-heat-low"
+
     rows <- c(rows, sprintf(
-      '<tr><td class="pr-td pr-num">%s%.2f</td><td class="pr-td pr-num">%d</td><td class="pr-td pr-num">%.1f%%</td></tr>',
-      currency, obs$price[i], obs$n[i], obs$observed_intent[i] * 100
+      '<tr><td class="pr-td pr-num">%s%.2f</td><td class="pr-td pr-num">%d</td><td class="pr-td pr-num%s">%.1f%%</td></tr>',
+      currency, obs$price[i], obs$n[i], heat_class, intent_val * 100
     ))
   }
 
@@ -406,7 +415,6 @@ build_segment_comparison_table <- function(segment_data) {
   ct <- segment_data$comparison_table
   if (is.null(ct) || !is.data.frame(ct) || nrow(ct) == 0) return("")
 
-  # Build headers from column names
   headers <- paste(sprintf('<th class="pr-th">%s</th>', htmlEscape(names(ct))), collapse = "\n")
 
   rows <- character(0)

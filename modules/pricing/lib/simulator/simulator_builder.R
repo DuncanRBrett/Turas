@@ -27,7 +27,8 @@
 #' @param config Configuration list
 #' @return List with status, output_file, file_size
 #' @export
-build_pricing_simulator <- function(pricing_results, output_path, config = list()) {
+build_pricing_simulator <- function(pricing_results, output_path,
+                                     config = list(), sim_dir = NULL) {
 
   cat("   Simulator: Building interactive dashboard...\n")
 
@@ -58,19 +59,46 @@ build_pricing_simulator <- function(pricing_results, output_path, config = list(
   scenarios <- config$simulator$scenarios %||% list()
 
   # --------------------------------------------------------------------------
-  # Read embedded assets
+  # Read embedded assets (reliable path resolution)
   # --------------------------------------------------------------------------
-  sim_dir <- dirname(sys.frame(1)$ofile %||% file.path(getwd(), "modules", "pricing", "lib", "simulator", "simulator_builder.R"))
+  if (is.null(sim_dir) || !dir.exists(sim_dir)) {
+    possible_dirs <- c(
+      file.path(getwd(), "modules", "pricing", "lib", "simulator"),
+      tryCatch(dirname(sys.frame(1)$ofile), error = function(e) ""),
+      file.path(Sys.getenv("TURAS_ROOT", getwd()), "modules", "pricing", "lib", "simulator")
+    )
+    for (d in possible_dirs) {
+      if (nzchar(d) && dir.exists(d)) { sim_dir <- d; break }
+    }
+  }
+
+  if (is.null(sim_dir) || !dir.exists(sim_dir)) {
+    cat("   ! Simulator: Could not locate simulator directory\n")
+    return(list(status = "REFUSED", message = "Simulator asset directory not found"))
+  }
+
+  css_path <- file.path(sim_dir, "css", "simulator_styles.css")
+  js_path <- file.path(sim_dir, "js", "simulator_core.js")
 
   css_content <- tryCatch(
-    paste(readLines(file.path(sim_dir, "css", "simulator_styles.css")), collapse = "\n"),
-    error = function(e) ""
+    paste(readLines(css_path), collapse = "\n"),
+    error = function(e) {
+      cat(sprintf("   ! Simulator: CSS file not found at %s\n", css_path))
+      ""
+    }
   )
 
   js_content <- tryCatch(
-    paste(readLines(file.path(sim_dir, "js", "simulator_core.js")), collapse = "\n"),
-    error = function(e) ""
+    paste(readLines(js_path), collapse = "\n"),
+    error = function(e) {
+      cat(sprintf("   ! Simulator: JS file not found at %s\n", js_path))
+      ""
+    }
   )
+
+  if (!nzchar(css_content) || !nzchar(js_content)) {
+    cat("   ! Simulator: WARNING - CSS or JS assets are empty. Simulator may not function correctly.\n")
+  }
 
   # --------------------------------------------------------------------------
   # Build data JSON

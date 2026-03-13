@@ -207,9 +207,7 @@ if (!is.null(results_vwgg)) {
   if (!is.null(results_vwgg$html_report_path) && file.exists(results_vwgg$html_report_path)) {
     cat(sprintf("    HTML Report:  %s\n", results_vwgg$html_report_path))
   }
-  if (!is.null(results_vwgg$simulator_path) && file.exists(results_vwgg$simulator_path)) {
-    cat(sprintf("    Simulator:    %s\n", results_vwgg$simulator_path))
-  }
+  # Simulator is now consolidated within the HTML report
   cat("\n")
 }
 
@@ -298,10 +296,8 @@ if (length(output_files) > 0) {
 }
 
 cat("\n")
-cat("  To view the HTML report, open:\n")
-cat(sprintf("    %s\n", file.path(output_dir, "demo_report.html")))
-cat("\n")
-cat("  To view the interactive simulator, open:\n")
-cat(sprintf("    %s\n", file.path(output_dir, "demo_simulator.html")))
+cat("  To view the reports (with embedded simulator), open:\n")
+cat(sprintf("    %s\n", file.path(output_dir, "demo_vwgg_results.html")))
+cat(sprintf("    %s\n", file.path(output_dir, "demo_monadic_results.html")))
 cat("\n")
 cat("###########################################################\n\n")

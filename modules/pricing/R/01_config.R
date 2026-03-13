@@ -280,6 +280,11 @@ load_pricing_config <- function(config_file) {
   # Apply defaults for missing optional settings
   settings <- apply_pricing_defaults(settings)
 
+  # Load insights from config (optional Comments/Insights sheet)
+  settings$insights <- tryCatch({
+    load_insights_config(config_file)
+  }, error = function(e) list())
+
   return(settings)
 }
 
@@ -850,6 +855,52 @@ apply_pricing_defaults <- function(settings) {
   )
 
   return(settings)
+}
+
+
+#' Load Insights from Config Excel
+#'
+#' Reads the "Insights" (or "Comments") sheet from the config file.
+#' Expects columns: Section, Insight_Text
+#'
+#' @param config_file Path to the Excel config file
+#' @return Named list of insight text keyed by section name
+#' @keywords internal
+load_insights_config <- function(config_file) {
+  sheets <- readxl::excel_sheets(config_file)
+
+  sheet_name <- NULL
+  for (s in c("Insights", "Comments", "insights", "comments")) {
+    if (s %in% sheets) { sheet_name <- s; break }
+  }
+  if (is.null(sheet_name)) return(list())
+
+  df <- tryCatch(
+    readxl::read_excel(config_file, sheet = sheet_name),
+    error = function(e) NULL
+  )
+  if (is.null(df) || nrow(df) == 0) return(list())
+
+  # Normalize column names
+  names(df) <- tolower(trimws(names(df)))
+
+  section_col <- NULL
+  text_col <- NULL
+  for (n in names(df)) {
+    if (grepl("section", n)) section_col <- n
+    if (grepl("insight|text|comment", n)) text_col <- n
+  }
+  if (is.null(section_col) || is.null(text_col)) return(list())
+
+  result <- list()
+  for (i in seq_len(nrow(df))) {
+    sec <- tolower(trimws(as.character(df[[section_col]][i])))
+    txt <- trimws(as.character(df[[text_col]][i]))
+    if (nzchar(sec) && nzchar(txt) && !is.na(txt)) {
+      result[[sec]] <- txt
+    }
+  }
+  result
 }
 
 

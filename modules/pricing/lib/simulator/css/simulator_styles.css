@@ -27,9 +27,10 @@ body {
   background: var(--sim-bg);
 }
 
-/* Header */
+/* Header (gradient, matching report) */
 .sim-header {
-  background: var(--sim-brand);
+  background: linear-gradient(135deg, #1a2744 0%, #2a3f5f 100%);
+  border-bottom: 3px solid var(--sim-brand);
   color: white;
   padding: 20px 28px;
   display: flex;
@@ -305,10 +306,30 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* Print */
+@page { size: A4 landscape; margin: 10mm 12mm; }
+
 @media print {
+  body {
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .sim-header {
+    background: none !important;
+    border-bottom: 2px solid #1a2744 !important;
+    padding: 10px 0 !important;
+  }
+  .sim-header h1 { color: #1a2744 !important; }
+  .sim-header .sim-subtitle { color: #64748b !important; opacity: 1 !important; }
+  .sim-header-actions { display: none !important; }
   .sim-controls { break-inside: avoid; }
   .sim-btn, .sim-scenario-card { cursor: default; }
   input[type="range"] { display: none; }
+  .sim-control-value { font-size: 18px !important; }
+  .sim-battle { display: none !important; }
+  .sim-chart-area { break-inside: avoid; }
+  .sim-footer { margin-top: 8px; }
+  svg { max-width: 100% !important; }
 }
 
 /* Responsive */

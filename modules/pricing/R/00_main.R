@@ -471,11 +471,11 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
   cat(sprintf("   Results written to: %s\n", output_file))
 
   # --------------------------------------------------------------------------
-  # STEP 9: Generate HTML Report (if configured)
+  # STEP 9: Generate HTML Report (consolidated with simulator)
   # --------------------------------------------------------------------------
   html_report_path <- NULL
-  if (isTRUE(config$generate_html_report)) {
-    cat("\n9. Generating HTML report...\n")
+  if (isTRUE(config$generate_html_report) || isTRUE(config$generate_simulator)) {
+    cat("\n9. Generating HTML report (consolidated)...\n")
 
     # Locate HTML report orchestrator
     html_report_main <- NULL
@@ -507,7 +507,10 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
           diagnostics = validation
         )
 
-        html_result <- generate_pricing_html_report(full_results, html_path, config)
+        # Pass resolved report_dir so child doesn't need sys.frame()
+        resolved_report_dir <- dirname(html_report_main)
+        html_result <- generate_pricing_html_report(full_results, html_path, config,
+                                                     report_dir = resolved_report_dir)
         if (html_result$status == "PASS") {
           html_report_path <- html_result$output_file
           cat(sprintf("   HTML report: %s\n", basename(html_report_path)))
@@ -518,51 +521,6 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
       })
     } else {
       cat("   ! HTML report module not found, skipping\n")
-    }
-  }
-
-  # --------------------------------------------------------------------------
-  # STEP 10: Generate Simulator (if configured)
-  # --------------------------------------------------------------------------
-  simulator_path <- NULL
-  if (isTRUE(config$generate_simulator)) {
-    cat("\n10. Generating interactive simulator...\n")
-
-    sim_builder <- NULL
-    possible_sim_paths <- c(
-      file.path(.get_script_dir_for_guard(), "..", "lib", "simulator", "simulator_builder.R"),
-      file.path(getwd(), "modules", "pricing", "lib", "simulator", "simulator_builder.R")
-    )
-    for (p in possible_sim_paths) {
-      if (file.exists(p)) { sim_builder <- p; break }
-    }
-
-    if (!is.null(sim_builder)) {
-      tryCatch({
-        source(sim_builder)
-
-        sim_path <- paste0(tools::file_path_sans_ext(output_file), "_simulator.html")
-
-        full_results <- list(
-          method = analysis_method,
-          results = analysis_results,
-          segment_results = segment_results,
-          ladder_results = ladder_results,
-          synthesis = synthesis,
-          diagnostics = validation
-        )
-
-        sim_result <- build_pricing_simulator(full_results, sim_path, config)
-        if (sim_result$status == "PASS") {
-          simulator_path <- sim_result$output_file
-          cat(sprintf("   Simulator: %s\n", basename(simulator_path)))
-        }
-      }, error = function(e) {
-        message(sprintf("[TRS PARTIAL] PRICE_SIMULATOR_FAILED: Simulator generation failed: %s", e$message))
-        cat(sprintf("   ! Simulator failed: %s\n", e$message))
-      })
-    } else {
-      cat("   ! Simulator module not found, skipping\n")
     }
   }
 
@@ -594,8 +552,7 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
     diagnostics = validation,
     config = config,
     run_result = run_result,
-    html_report_path = html_report_path,
-    simulator_path = simulator_path
+    html_report_path = html_report_path
   ))
 }
 
@@ -900,11 +857,11 @@ run_pricing_analysis_from_config <- function(config) {
   cat(sprintf("   Results written to: %s\n", output_file))
 
   # --------------------------------------------------------------------------
-  # STEP 9: Generate HTML Report (if configured)
+  # STEP 9: Generate HTML Report (consolidated with simulator)
   # --------------------------------------------------------------------------
   html_report_path <- NULL
-  if (isTRUE(config$generate_html_report)) {
-    cat("\n9. Generating HTML report...\n")
+  if (isTRUE(config$generate_html_report) || isTRUE(config$generate_simulator)) {
+    cat("\n9. Generating HTML report (consolidated)...\n")
 
     html_report_main <- NULL
     possible_paths <- c(
@@ -947,48 +904,6 @@ run_pricing_analysis_from_config <- function(config) {
     }
   }
 
-  # --------------------------------------------------------------------------
-  # STEP 10: Generate Simulator (if configured)
-  # --------------------------------------------------------------------------
-  simulator_path <- NULL
-  if (isTRUE(config$generate_simulator)) {
-    cat("\n10. Generating interactive simulator...\n")
-
-    sim_builder <- NULL
-    possible_sim_paths <- c(
-      file.path(.get_script_dir_for_guard(), "..", "lib", "simulator", "simulator_builder.R"),
-      file.path(getwd(), "modules", "pricing", "lib", "simulator", "simulator_builder.R")
-    )
-    for (p in possible_sim_paths) {
-      if (file.exists(p)) { sim_builder <- p; break }
-    }
-
-    if (!is.null(sim_builder)) {
-      tryCatch({
-        source(sim_builder)
-        sim_path <- paste0(tools::file_path_sans_ext(output_file), "_simulator.html")
-        full_results <- list(
-          method = analysis_method,
-          results = analysis_results,
-          segment_results = segment_results,
-          ladder_results = ladder_results,
-          synthesis = synthesis,
-          diagnostics = validation
-        )
-        sim_result <- build_pricing_simulator(full_results, sim_path, config)
-        if (sim_result$status == "PASS") {
-          simulator_path <- sim_result$output_file
-          cat(sprintf("   Simulator: %s\n", basename(simulator_path)))
-        }
-      }, error = function(e) {
-        message(sprintf("[TRS PARTIAL] PRICE_SIMULATOR_FAILED: Simulator generation failed: %s", e$message))
-        cat(sprintf("   ! Simulator failed: %s\n", e$message))
-      })
-    } else {
-      cat("   ! Simulator module not found, skipping\n")
-    }
-  }
-
   cat("\n")
   cat(rep("=", 80), "\n", sep = "")
   cat("ANALYSIS COMPLETE\n")
@@ -1005,8 +920,7 @@ run_pricing_analysis_from_config <- function(config) {
     plots = plots,
     diagnostics = validation,
     config = config,
-    html_report_path = html_report_path,
-    simulator_path = simulator_path
+    html_report_path = html_report_path
   ))
 }
 

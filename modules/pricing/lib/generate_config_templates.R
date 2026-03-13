@@ -936,6 +936,29 @@ generate_pricing_config_template <- function(output_path,
   addStyle(wb, "Reference", make_help_style(), rows = 4:21, cols = 1:2, gridExpand = TRUE)
 
   # --------------------------------------------------------------------------
+  # Insights Sheet (optional pre-filled insights for HTML report)
+  # --------------------------------------------------------------------------
+  addWorksheet(wb, "Insights", gridLines = FALSE)
+
+  insights_data <- data.frame(
+    Section = c("summary", "van_westendorp", "gabor_granger", "monadic",
+                "segments", "recommendation", "simulator"),
+    Insight_Text = c(
+      "",  # summary
+      "",  # van_westendorp
+      "",  # gabor_granger
+      "",  # monadic
+      "",  # segments
+      "",  # recommendation
+      ""   # simulator
+    ),
+    stringsAsFactors = FALSE
+  )
+
+  writeData(wb, "Insights", insights_data, startRow = 1, headerStyle = make_header_style())
+  addStyle(wb, "Insights", make_help_style(), rows = 2:8, cols = 1:2, gridExpand = TRUE)
+
+  # --------------------------------------------------------------------------
   # Save
   # --------------------------------------------------------------------------
   saveWorkbook(wb, output_path, overwrite = overwrite)

@@ -722,4 +722,8 @@ For complete template documentation, see the template file itself.
 
 *For detailed methodology, see [Authoritative Guide](AUTHORITATIVE_GUIDE.md).*
 
+*For survey design guidance, see [Questionnaire Design Guide](QUESTIONNAIRE_DESIGN_GUIDE.md).*
+
+*For method selection and comparison, see [Methodology Comparison](METHODOLOGY_COMPARISON.md).*
+
 *For developer documentation, see [Technical Reference](TECHNICAL_REFERENCE.md).*

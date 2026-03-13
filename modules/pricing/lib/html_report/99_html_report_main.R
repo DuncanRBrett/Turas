@@ -4,47 +4,56 @@
 #
 # Purpose: Orchestrate the 4-layer HTML report generation pipeline
 # Pattern: Follows confidence module architecture
-# Version: 1.0.0
+# Version: 2.0.0
 # ==============================================================================
 
 `%||%` <- function(x, y) if (is.null(x) || length(x) == 0 || (length(x) == 1 && is.na(x))) y else x
+
+# Consolidated htmlEscape — defined once here, available to all sourced layers
+htmlEscape <- function(x) {
+  if (is.null(x) || length(x) == 0) return("")
+  x <- as.character(x)
+  x <- gsub("&", "&amp;", x, fixed = TRUE)
+  x <- gsub("<", "&lt;", x, fixed = TRUE)
+  x <- gsub(">", "&gt;", x, fixed = TRUE)
+  x <- gsub('"', "&quot;", x, fixed = TRUE)
+  x
+}
 
 #' Generate Pricing HTML Report
 #'
 #' Main entry point for generating a self-contained HTML report from pricing
 #' analysis results. Orchestrates the 4-layer pipeline:
-#'   Layer 1: Data Transformer  → HTML-optimized structure
-#'   Layer 2: Table Builder     → HTML tables
-#'   Layer 3: Chart Builder     → SVG visualizations
-#'   Layer 4: Page Builder      → Complete HTML document
+#'   Layer 1: Data Transformer  -> HTML-optimized structure
+#'   Layer 2: Table Builder     -> HTML tables
+#'   Layer 3: Chart Builder     -> SVG visualizations
+#'   Layer 4: Page Builder      -> Complete HTML document
 #'
 #' @param pricing_results Full results list from run_pricing_analysis()
 #' @param output_path File path for the HTML output
 #' @param config Configuration list
+#' @param report_dir Optional path to html_report directory (passed from 00_main.R)
 #' @return List with status, output_file, file_size
 #' @export
-generate_pricing_html_report <- function(pricing_results, output_path, config = list()) {
+generate_pricing_html_report <- function(pricing_results, output_path,
+                                          config = list(), report_dir = NULL) {
 
   cat("   HTML Report: Starting generation...\n")
 
   # --------------------------------------------------------------------------
   # Step 0: Locate and source sub-modules
   # --------------------------------------------------------------------------
-  report_dir <- NULL
-  possible_dirs <- c(
-    file.path(dirname(sys.frame(1)$ofile %||% ""), "html_report"),
-    file.path(getwd(), "modules", "pricing", "lib", "html_report"),
-    file.path(dirname(sys.frame(1)$ofile %||% ""), "..", "lib", "html_report")
-  )
+  if (is.null(report_dir) || !dir.exists(report_dir)) {
+    # Reliable fallback: try multiple known locations
+    possible_dirs <- c(
+      file.path(getwd(), "modules", "pricing", "lib", "html_report"),
+      tryCatch(dirname(sys.frame(1)$ofile), error = function(e) ""),
+      file.path(Sys.getenv("TURAS_ROOT", getwd()), "modules", "pricing", "lib", "html_report")
+    )
 
-  for (d in possible_dirs) {
-    if (dir.exists(d)) { report_dir <- d; break }
-  }
-
-  if (is.null(report_dir)) {
-    # Try relative to this file
-    this_dir <- tryCatch(dirname(sys.frame(1)$ofile), error = function(e) NULL)
-    if (!is.null(this_dir)) report_dir <- this_dir
+    for (d in possible_dirs) {
+      if (nzchar(d) && dir.exists(d)) { report_dir <- d; break }
+    }
   }
 
   if (is.null(report_dir) || !dir.exists(report_dir)) {
@@ -52,10 +61,20 @@ generate_pricing_html_report <- function(pricing_results, output_path, config = 
     return(list(status = "REFUSED", message = "html_report directory not found"))
   }
 
-  source(file.path(report_dir, "01_data_transformer.R"))
-  source(file.path(report_dir, "02_table_builder.R"))
-  source(file.path(report_dir, "04_chart_builder.R"))
-  source(file.path(report_dir, "03_page_builder.R"))
+  source(file.path(report_dir, "01_data_transformer.R"), local = FALSE)
+  source(file.path(report_dir, "02_table_builder.R"), local = FALSE)
+  source(file.path(report_dir, "04_chart_builder.R"), local = FALSE)
+  source(file.path(report_dir, "03_page_builder.R"), local = FALSE)
+
+  # Source simulator data extraction helpers
+  sim_builder_path <- file.path(dirname(report_dir), "simulator", "simulator_builder.R")
+  if (file.exists(sim_builder_path)) {
+    source(sim_builder_path, local = FALSE)
+  }
+
+  # Locate JS directory for file-based JS embedding
+  js_dir <- file.path(report_dir, "js")
+  if (!dir.exists(js_dir)) js_dir <- NULL
 
   # --------------------------------------------------------------------------
   # Step 1: Transform data
@@ -123,11 +142,9 @@ generate_pricing_html_report <- function(pricing_results, output_path, config = 
   if (!is.null(html_data$gabor_granger)) {
     gg <- html_data$gabor_granger
 
-    # Safely extract GG demand data with numeric coercion
     gg_prices <- safe_numeric(gg$demand_curve$price)
     gg_intents <- safe_numeric(gg$demand_curve$purchase_intent)
 
-    # Revenue: prefer revenue_curve$revenue_index, fall back to price * intent
     gg_revenue <- safe_numeric(gg$revenue_curve$revenue_index)
     if (is.null(gg_revenue) || length(gg_revenue) == 0) {
       if (!is.null(gg_prices) && !is.null(gg_intents)) {
@@ -135,7 +152,6 @@ generate_pricing_html_report <- function(pricing_results, output_path, config = 
       }
     }
 
-    # Optimal price: extract scalar value safely
     gg_optimal <- safe_numeric(gg$optimal_price$price)
     if (!is.null(gg_optimal) && length(gg_optimal) > 1) gg_optimal <- gg_optimal[1]
 
@@ -213,13 +229,56 @@ generate_pricing_html_report <- function(pricing_results, output_path, config = 
   }
 
   # --------------------------------------------------------------------------
-  # Step 4: Assemble page
+  # Step 4: Extract simulator data (if demand curve available)
   # --------------------------------------------------------------------------
-  cat("   HTML Report: Assembling page...\n")
-  page <- build_pricing_page(html_data, tables, charts, config)
+  simulator_data <- NULL
+  if (exists("extract_demand_data", mode = "function")) {
+    tryCatch({
+      results <- pricing_results$results
+      analysis_method <- tolower(pricing_results$method %||% "unknown")
+      demand_data <- extract_demand_data(results, analysis_method)
+
+      if (!is.null(demand_data)) {
+        cat("   HTML Report: Preparing simulator data...\n")
+        optimal_price <- extract_optimal_price(results, analysis_method)
+        segment_demand <- extract_segment_demand(pricing_results$segment_results, analysis_method)
+
+        currency <- config$currency_symbol %||% "$"
+        brand <- config$brand_colour %||% "#1e3a5f"
+        unit_cost <- as.numeric(config$unit_cost %||% 0)
+        project_name <- config$project_name %||% "Pricing Analysis"
+        scenarios <- config$simulator$scenarios %||% list()
+
+        pricing_json <- build_pricing_json(demand_data, optimal_price, segment_demand)
+        config_json <- sprintf(
+          '{"currency":"%s","brand_colour":"%s","unit_cost":%s,"project_name":"%s","scenarios":%s}',
+          jsonEscape(currency),
+          jsonEscape(brand),
+          if (unit_cost > 0) sprintf("%.2f", unit_cost) else "0",
+          jsonEscape(project_name),
+          build_scenarios_json(scenarios, currency)
+        )
+
+        simulator_data <- list(
+          pricing_json = pricing_json,
+          config_json = config_json,
+          has_segments = length(segment_demand) > 0
+        )
+      }
+    }, error = function(e) {
+      cat(sprintf("   ! HTML Report: Simulator data extraction failed: %s\n", e$message))
+    })
+  }
 
   # --------------------------------------------------------------------------
-  # Step 5: Write to disk
+  # Step 5: Assemble page
+  # --------------------------------------------------------------------------
+  cat("   HTML Report: Assembling page...\n")
+  page <- build_pricing_page(html_data, tables, charts, config,
+                              js_dir = js_dir, simulator_data = simulator_data)
+
+  # --------------------------------------------------------------------------
+  # Step 6: Write to disk
   # --------------------------------------------------------------------------
   cat("   HTML Report: Writing file...\n")
 

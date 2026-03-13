@@ -292,6 +292,8 @@ This module includes comprehensive documentation:
 
 For detailed information:
 - **Users**: See [User Manual](USER_MANUAL.md) for step-by-step instructions
+- **Survey Design**: See [Questionnaire Design Guide](QUESTIONNAIRE_DESIGN_GUIDE.md) for question wording, sample sizes, and common mistakes
+- **Method Selection**: See [Methodology Comparison](METHODOLOGY_COMPARISON.md) for strengths, weaknesses, and when to use each method
 - **Clients**: See [Marketing Guide](MARKETING.md) for capabilities overview
 - **Developers**: See [Technical Reference](TECHNICAL_REFERENCE.md) for API documentation
 - **Examples**: See [Example Workflows](EXAMPLE_WORKFLOWS.md) for practical use cases
@@ -300,7 +302,8 @@ For issues or questions, consult the documentation or contact the development te
 
 ## Version History
 
-- **12.0** (2026-03): Added monadic price testing, interactive HTML reports, simulator dashboard, comprehensive test suite (83 tests)
+- **12.1** (2026-03): Production upgrade — visual overhaul (gradient headers, dashboard gauges, heatmap tables, chart tooltips, keyboard nav, SVG export), simulator CSS/JS fix, comprehensive test suite (463 tests), questionnaire design guide, methodology comparison
+- **12.0** (2026-03): Added monadic price testing, interactive HTML reports, simulator dashboard
 - **11.0** (2025-12): Added NMS extension, segment analysis, price ladder builder, recommendation synthesis
 - **2.0** (2025-11): Major update with profit optimization and GUI improvements
 - **1.0** (2025-11): Initial release with Van Westendorp and Gabor-Granger methods

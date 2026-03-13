@@ -3,11 +3,13 @@
 # ==============================================================================
 #
 # Purpose: Generate pure SVG charts for pricing HTML reports
-# Pattern: Follows confidence module chart builder conventions
-# Version: 1.0.0
+# Pattern: Follows tabs module visual conventions
+# Version: 2.0.0
 # ==============================================================================
 
 `%||%` <- function(x, y) if (is.null(x) || length(x) == 0 || (length(x) == 1 && is.na(x))) y else x
+
+# htmlEscape is defined in 99_html_report_main.R (sourced before this file)
 
 # ==============================================================================
 # VAN WESTENDORP CHART
@@ -16,6 +18,7 @@
 #' Build VW Cumulative Distribution SVG
 #'
 #' Draws the four VW cumulative curves with intersection points marked.
+#' Uses point pruning to reduce SVG bloat while preserving visual fidelity.
 #'
 #' @param vw_data Transformed VW section
 #' @param brand_colour Brand colour hex
@@ -25,36 +28,34 @@ build_vw_curves_chart <- function(vw_data, brand_colour = "#1e3a5f") {
   curves <- vw_data$curves
   if (is.null(curves) || !is.data.frame(curves) || nrow(curves) == 0) return("")
 
-  # Chart dimensions
-  width <- 720
+  # Chart dimensions (wider viewBox for better proportions)
+  width <- 800
   height <- 400
   ml <- 60   # margin left
   mr <- 30   # margin right
   mt <- 40   # margin top
   mb <- 50   # margin bottom
-  cw <- width - ml - mr   # chart area width
-  ch <- height - mt - mb  # chart area height
+  cw <- width - ml - mr
+  ch <- height - mt - mb
 
   prices <- as.numeric(curves$price)
   valid_idx <- !is.na(prices)
   if (sum(valid_idx) < 2) return("")
-  # Filter curves to valid price rows only
   curves <- curves[valid_idx, , drop = FALSE]
   prices <- prices[valid_idx]
   x_min <- min(prices)
   x_max <- max(prices)
-  if (x_min == x_max) x_max <- x_min + 1  # avoid division by zero
+  if (x_min == x_max) x_max <- x_min + 1
 
-  # Scale functions
   scale_x <- function(p) ml + (p - x_min) / (x_max - x_min) * cw
-  scale_y <- function(v) mt + (1 - v) * ch  # 0 at bottom, 1 at top
+  scale_y <- function(v) mt + (1 - v) * ch
 
   # Curve colours
   colours <- list(
-    too_cheap  = "#e74c3c",  # red
-    cheap      = "#f39c12",  # amber
-    expensive  = "#3498db",  # blue
-    too_expensive = "#2ecc71" # green
+    too_cheap  = "#e74c3c",
+    cheap      = "#f39c12",
+    expensive  = "#3498db",
+    too_expensive = "#2ecc71"
   )
 
   # Determine which columns exist
@@ -77,23 +78,38 @@ build_vw_curves_chart <- function(vw_data, brand_colour = "#1e3a5f") {
 
   if (length(col_map) < 4) return("")
 
-  # Build SVG polylines
+  # Build SVG polylines with point pruning
   lines_svg <- character(0)
   curve_labels <- c(too_cheap = "Too Cheap", cheap = "Cheap/Bargain",
                     expensive = "Expensive", too_expensive = "Too Expensive")
 
   for (curve_name in names(col_map)) {
-    vals <- curves[[col_map[[curve_name]]]]
+    vals <- as.numeric(curves[[col_map[[curve_name]]]])
     if (is.null(vals) || all(is.na(vals))) next
 
-    points <- paste(sprintf("%.1f,%.1f", scale_x(prices), scale_y(vals)), collapse = " ")
+    # Point pruning: skip consecutive points where Y change < 0.002
+    keep <- rep(FALSE, length(vals))
+    keep[1] <- TRUE
+    keep[length(vals)] <- TRUE
+    last_kept_y <- vals[1]
+    for (i in 2:(length(vals) - 1)) {
+      if (is.na(vals[i])) next
+      if (abs(vals[i] - last_kept_y) >= 0.002) {
+        keep[i] <- TRUE
+        last_kept_y <- vals[i]
+      }
+    }
+
+    pruned_p <- prices[keep]
+    pruned_v <- vals[keep]
+    points <- paste(sprintf("%.1f,%.1f", scale_x(pruned_p), scale_y(pruned_v)), collapse = " ")
     lines_svg <- c(lines_svg, sprintf(
       '<polyline points="%s" fill="none" stroke="%s" stroke-width="2.5" stroke-linecap="round"/>',
       points, colours[[curve_name]]
     ))
   }
 
-  # Grid lines (5 horizontal)
+  # Grid lines (5 horizontal, faint)
   grid_svg <- character(0)
   for (v in seq(0, 1, by = 0.25)) {
     y <- scale_y(v)
@@ -107,7 +123,7 @@ build_vw_curves_chart <- function(vw_data, brand_colour = "#1e3a5f") {
     ))
   }
 
-  # X-axis labels (5-7 price ticks)
+  # X-axis labels
   n_ticks <- min(7, length(unique(prices)))
   tick_prices <- pretty(c(x_min, x_max), n = n_ticks)
   tick_prices <- tick_prices[tick_prices >= x_min & tick_prices <= x_max]
@@ -120,11 +136,10 @@ build_vw_curves_chart <- function(vw_data, brand_colour = "#1e3a5f") {
     ))
   }
 
-  # Intersection markers (OPP, IDP, PMC, PME)
+  # Intersection markers (OPP, IDP, PMC, PME) with tooltips
   pp <- vw_data$price_points
   markers_svg <- character(0)
 
-  # Safely extract price point values (may be list, scalar, or NULL)
   safe_pp <- function(x) {
     v <- x$value
     if (is.null(v)) return(NA_real_)
@@ -133,18 +148,18 @@ build_vw_curves_chart <- function(vw_data, brand_colour = "#1e3a5f") {
   }
 
   marker_defs <- list(
-    list(price = safe_pp(pp$pmc), label = "PMC", colour = "#64748b"),
-    list(price = safe_pp(pp$opp), label = "OPP", colour = brand_colour),
-    list(price = safe_pp(pp$idp), label = "IDP", colour = brand_colour),
-    list(price = safe_pp(pp$pme), label = "PME", colour = "#64748b")
+    list(price = safe_pp(pp$pmc), label = "PMC", desc = pp$pmc$desc %||% "Point of Marginal Cheapness", colour = "#64748b"),
+    list(price = safe_pp(pp$opp), label = "OPP", desc = pp$opp$desc %||% "Optimal Price Point", colour = brand_colour),
+    list(price = safe_pp(pp$idp), label = "IDP", desc = pp$idp$desc %||% "Indifference Price Point", colour = brand_colour),
+    list(price = safe_pp(pp$pme), label = "PME", desc = pp$pme$desc %||% "Point of Marginal Expensiveness", colour = "#64748b")
   )
 
   for (m in marker_defs) {
     if (is.na(m$price) || !is.numeric(m$price)) next
     mx <- scale_x(m$price)
     markers_svg <- c(markers_svg, sprintf(
-      '<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="%s" stroke-width="1.5" stroke-dasharray="4,3"/>',
-      mx, mt, mx, height - mb, m$colour
+      '<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="%s" stroke-width="1.5" stroke-dasharray="4,3" data-tooltip="%s: $%.2f"/>',
+      mx, mt, mx, height - mb, m$colour, m$desc, m$price
     ))
     markers_svg <- c(markers_svg, sprintf(
       '<text x="%.1f" y="%d" text-anchor="middle" fill="%s" font-size="10" font-weight="600">%s</text>',
@@ -167,7 +182,7 @@ build_vw_curves_chart <- function(vw_data, brand_colour = "#1e3a5f") {
   }
 
   svg <- sprintf(
-    '<svg viewBox="0 0 %d %d" style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;width:100%%;max-width:720px;height:auto;display:block;margin:0 auto;" role="img" aria-label="Van Westendorp Price Sensitivity Curves">
+    '<svg viewBox="0 0 %d %d" style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;width:100%%;height:auto;display:block;margin:0 auto;" role="img" aria-label="Van Westendorp Price Sensitivity Curves">
       %s
       %s
       %s
@@ -192,8 +207,8 @@ build_vw_curves_chart <- function(vw_data, brand_colour = "#1e3a5f") {
 
 #' Build Demand Curve SVG
 #'
-#' Line chart showing purchase intent vs price, with optional revenue overlay
-#' and CI band. Used for both Gabor-Granger and Monadic results.
+#' Line chart showing purchase intent vs price, with optional revenue overlay,
+#' CI band, and interactive tooltips. Used for both GG and Monadic results.
 #'
 #' @param prices Numeric vector of prices
 #' @param intents Numeric vector of purchase intents (0-1)
@@ -218,7 +233,6 @@ build_demand_curve_chart <- function(prices, intents,
                                      title = "Demand Curve",
                                      currency = "$") {
 
-  # Defensive: ensure numeric types for all inputs
   prices <- as.numeric(prices)
   intents <- as.numeric(intents)
   if (!is.null(revenue)) revenue <- as.numeric(revenue)
@@ -234,36 +248,35 @@ build_demand_curve_chart <- function(prices, intents,
 
   if (length(prices) < 2 || length(intents) < 2) return("")
 
-  # Chart dimensions
-  width <- 720
-  height <- 380
-  ml <- 60    # margin left
-  mr <- 80    # margin right (space for revenue axis)
-  mt <- 35    # margin top
-  mb <- 50    # margin bottom
+  # Chart dimensions (wider viewBox)
+  width <- 800
+  height <- 400
+  ml <- 60
+  mr <- 80
+  mt <- 35
+  mb <- 50
   cw <- width - ml - mr
   ch <- height - mt - mb
 
   x_min <- min(prices, na.rm = TRUE)
   x_max <- max(prices, na.rm = TRUE)
-  if (x_min == x_max) x_max <- x_min + 1  # avoid division by zero
+  if (x_min == x_max) x_max <- x_min + 1
 
-  # Scale functions
   scale_x <- function(p) ml + (p - x_min) / (x_max - x_min) * cw
-  scale_y <- function(v) mt + (1 - v) * ch  # intent: 0-1
+  scale_y <- function(v) mt + (1 - v) * ch
 
-  # Revenue scaling (separate axis)
+  # Revenue scaling
   has_revenue <- !is.null(revenue) && length(revenue) == length(prices) &&
                   any(is.finite(revenue))
   if (has_revenue) {
     rev_max <- max(revenue, na.rm = TRUE) * 1.1
-    if (!is.finite(rev_max) || rev_max == 0) rev_max <- 1  # avoid division by zero / Inf
+    if (!is.finite(rev_max) || rev_max == 0) rev_max <- 1
     scale_y_rev <- function(r) mt + (1 - r / rev_max) * ch
   }
 
   parts <- character(0)
 
-  # Grid lines
+  # Grid lines (faint horizontal)
   for (v in seq(0, 1, by = 0.2)) {
     y <- scale_y(v)
     parts <- c(parts, sprintf(
@@ -299,14 +312,13 @@ build_demand_curve_chart <- function(prices, intents,
     ))
   }
 
-  # Revenue curve (if available)
+  # Revenue curve
   if (has_revenue) {
     rev_points <- paste(sprintf("%.1f,%.1f", scale_x(prices), scale_y_rev(revenue)), collapse = " ")
     parts <- c(parts, sprintf(
       '<polyline points="%s" fill="none" stroke="#f39c12" stroke-width="2" stroke-dasharray="6,3" opacity="0.7"/>',
       rev_points
     ))
-    # Revenue axis labels (right side)
     for (rv in pretty(c(0, rev_max), n = 5)) {
       if (rv > rev_max || rv < 0) next
       ry <- scale_y_rev(rv)
@@ -324,14 +336,31 @@ build_demand_curve_chart <- function(prices, intents,
     demand_points, brand_colour
   ))
 
-  # Observed data points
+  # Data point dots with tooltips (sample every few points to avoid clutter)
+  step <- max(1, floor(length(prices) / 20))
+  for (i in seq(1, length(prices), by = step)) {
+    if (is.na(intents[i])) next
+    tooltip_text <- sprintf("Price: %s%.2f, Intent: %.1f%%", currency, prices[i], intents[i] * 100)
+    if (has_revenue && !is.na(revenue[i])) {
+      tooltip_text <- sprintf("%s, Revenue: %.1f", tooltip_text, revenue[i])
+    }
+    parts <- c(parts, sprintf(
+      '<circle cx="%.1f" cy="%.1f" r="3" fill="%s" opacity="0.5" data-tooltip="%s"/>',
+      scale_x(prices[i]), scale_y(intents[i]), brand_colour, tooltip_text
+    ))
+  }
+
+  # Observed data points (larger, prominent)
   if (!is.null(observed_prices) && !is.null(observed_intents)) {
     for (i in seq_along(observed_prices)) {
+      if (is.na(observed_prices[i]) || is.na(observed_intents[i])) next
       ox <- scale_x(observed_prices[i])
       oy <- scale_y(observed_intents[i])
+      tooltip_text <- sprintf("Observed: %s%.2f, Intent: %.1f%%",
+                              currency, observed_prices[i], observed_intents[i] * 100)
       parts <- c(parts, sprintf(
-        '<circle cx="%.1f" cy="%.1f" r="4" fill="white" stroke="%s" stroke-width="2"/>',
-        ox, oy, brand_colour
+        '<circle cx="%.1f" cy="%.1f" r="4.5" fill="white" stroke="%s" stroke-width="2" data-tooltip="%s"/>',
+        ox, oy, brand_colour, tooltip_text
       ))
     }
   }
@@ -339,17 +368,16 @@ build_demand_curve_chart <- function(prices, intents,
   # Optimal price marker
   if (!is.null(optimal_price)) {
     opt_x <- scale_x(optimal_price)
-    # Find corresponding intent
     opt_idx <- which.min(abs(prices - optimal_price))
     opt_y <- scale_y(intents[opt_idx])
 
     parts <- c(parts, sprintf(
-      '<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="%s" stroke-width="1.5" stroke-dasharray="4,3"/>',
-      opt_x, mt, opt_x, height - mb, "#e74c3c"
+      '<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="4,3"/>',
+      opt_x, mt, opt_x, height - mb
     ))
     parts <- c(parts, sprintf(
-      '<circle cx="%.1f" cy="%.1f" r="5" fill="%s" stroke="white" stroke-width="2"/>',
-      opt_x, opt_y, "#e74c3c"
+      '<circle cx="%.1f" cy="%.1f" r="5" fill="#e74c3c" stroke="white" stroke-width="2" data-tooltip="Optimal: %s%.2f (%.1f%% intent)"/>',
+      opt_x, opt_y, currency, optimal_price, intents[opt_idx] * 100
     ))
     parts <- c(parts, sprintf(
       '<text x="%.1f" y="%d" text-anchor="middle" fill="#e74c3c" font-size="10" font-weight="600">Optimal: %s%.2f</text>',
@@ -373,7 +401,7 @@ build_demand_curve_chart <- function(prices, intents,
   }
 
   sprintf(
-    '<svg viewBox="0 0 %d %d" style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;width:100%%;max-width:720px;height:auto;display:block;margin:0 auto;" role="img" aria-label="%s">
+    '<svg viewBox="0 0 %d %d" style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;width:100%%;height:auto;display:block;margin:0 auto;" role="img" aria-label="%s">
       %s
       %s
      </svg>',
@@ -384,14 +412,6 @@ build_demand_curve_chart <- function(prices, intents,
   )
 }
 
-htmlEscape <- function(x) {
-  x <- gsub("&", "&amp;", x, fixed = TRUE)
-  x <- gsub("<", "&lt;", x, fixed = TRUE)
-  x <- gsub(">", "&gt;", x, fixed = TRUE)
-  x <- gsub('"', "&quot;", x, fixed = TRUE)
-  x
-}
-
 
 # ==============================================================================
 # SEGMENT COMPARISON CHART
@@ -399,7 +419,7 @@ htmlEscape <- function(x) {
 
 #' Build Segment Comparison Bar Chart
 #'
-#' Horizontal bar chart comparing a key metric across segments (forest-plot style).
+#' Horizontal bar chart comparing a key metric across segments.
 #'
 #' @param segment_data Transformed segments section
 #' @param brand_colour Brand colour hex
@@ -411,14 +431,12 @@ build_segment_comparison_chart <- function(segment_data, brand_colour = "#1e3a5f
   ct <- segment_data$comparison_table
   if (is.null(ct) || !is.data.frame(ct) || nrow(ct) == 0) return("")
 
-  # Look for a price column to chart
   price_col <- NULL
   for (cn in c("OPP", "Optimal_Price", "optimal_price", "Revenue_Optimal", "price")) {
     if (cn %in% names(ct)) { price_col <- cn; break }
   }
   if (is.null(price_col)) return("")
 
-  # Look for segment label column
   seg_col <- names(ct)[1]
 
   segments <- as.character(ct[[seg_col]])
@@ -429,9 +447,9 @@ build_segment_comparison_chart <- function(segment_data, brand_colour = "#1e3a5f
   if (length(prices) == 0) return("")
 
   n <- length(segments)
-  row_height <- 32
-  width <- 600
-  ml <- 140
+  row_height <- 36
+  width <- 700
+  ml <- 150
   mr <- 80
   mt <- 30
   mb <- 30
@@ -440,7 +458,7 @@ build_segment_comparison_chart <- function(segment_data, brand_colour = "#1e3a5f
 
   p_min <- min(prices) * 0.85
   p_max <- max(prices) * 1.05
-  if (p_min == p_max) p_max <- p_min + 1  # avoid division by zero
+  if (p_min == p_max) p_max <- p_min + 1
   scale_x <- function(p) ml + (p - p_min) / (p_max - p_min) * cw
 
   palette <- generate_palette(n, brand_colour)
@@ -462,23 +480,24 @@ build_segment_comparison_chart <- function(segment_data, brand_colour = "#1e3a5f
     ))
   }
 
-  # Bars
+  # Bars with tooltips
   for (i in seq_along(segments)) {
     y_center <- mt + (i - 0.5) * row_height
     bar_h <- row_height * 0.55
 
     # Label
     parts <- c(parts, sprintf(
-      '<text x="%d" y="%.1f" text-anchor="end" fill="#1e293b" font-size="12" dominant-baseline="middle">%s</text>',
+      '<text x="%d" y="%.1f" text-anchor="end" fill="#1e293b" font-size="12" font-weight="500" dominant-baseline="middle">%s</text>',
       ml - 10, y_center, htmlEscape(segments[i])
     ))
 
-    # Bar
+    # Bar (rounded corners)
     bar_x <- scale_x(p_min)
     bar_w <- scale_x(prices[i]) - bar_x
+    tooltip_text <- sprintf("%s: %s%.2f", segments[i], currency, prices[i])
     parts <- c(parts, sprintf(
-      '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="4" fill="%s" opacity="0.7"/>',
-      bar_x, y_center - bar_h / 2, bar_w, bar_h, palette[i]
+      '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="4" fill="%s" opacity="0.75" data-tooltip="%s"/>',
+      bar_x, y_center - bar_h / 2, bar_w, bar_h, palette[i], tooltip_text
     ))
 
     # Value label
@@ -489,7 +508,7 @@ build_segment_comparison_chart <- function(segment_data, brand_colour = "#1e3a5f
   }
 
   sprintf(
-    '<svg viewBox="0 0 %d %d" style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;width:100%%;max-width:600px;height:auto;display:block;margin:0 auto;" role="img" aria-label="Segment Price Comparison">
+    '<svg viewBox="0 0 %d %d" style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;width:100%%;height:auto;display:block;margin:0 auto;" role="img" aria-label="Segment Price Comparison">
       %s
      </svg>',
     width, height,
@@ -513,7 +532,7 @@ build_elasticity_chart <- function(elasticity_data, brand_colour = "#1e3a5f",
                                     currency = "$") {
   if (is.null(elasticity_data) || !is.data.frame(elasticity_data) || nrow(elasticity_data) == 0) return("")
 
-  width <- 720
+  width <- 800
   height <- 300
   ml <- 60
   mr <- 30
@@ -522,24 +541,20 @@ build_elasticity_chart <- function(elasticity_data, brand_colour = "#1e3a5f",
   cw <- width - ml - mr
   ch <- height - mt - mb
 
-  # Resolve column names (support both naming conventions)
+  # Resolve column names
   prices <- elasticity_data$price_midpoint %||% elasticity_data$price_low
-  # Compute midpoint from from/to if no dedicated column exists
   if (is.null(prices) && !is.null(elasticity_data$price_from)) {
     if (!is.null(elasticity_data$price_to)) {
-      prices <- as.numeric(elasticity_data$price_from) + as.numeric(elasticity_data$price_to)
-      prices <- prices / 2
+      prices <- (as.numeric(elasticity_data$price_from) + as.numeric(elasticity_data$price_to)) / 2
     } else {
       prices <- elasticity_data$price_from
     }
   }
   elast <- elasticity_data$elasticity %||% elasticity_data$arc_elasticity
 
-  # Defensive: ensure numeric
   prices <- as.numeric(prices)
   elast <- as.numeric(elast)
 
-  # Remove non-finite values (Inf, NaN from division by zero in elasticity calc)
   valid <- is.finite(prices) & is.finite(elast)
   prices <- prices[valid]
   elast <- elast[valid]
@@ -548,10 +563,10 @@ build_elasticity_chart <- function(elasticity_data, brand_colour = "#1e3a5f",
 
   x_min <- min(prices)
   x_max <- max(prices)
-  if (x_min == x_max) x_max <- x_min + 1  # avoid division by zero
+  if (x_min == x_max) x_max <- x_min + 1
   y_min <- min(elast, -2)
   y_max <- max(elast, 0.5)
-  if (y_min == y_max) y_max <- y_min + 1  # avoid division by zero
+  if (y_min == y_max) y_max <- y_min + 1
 
   scale_x <- function(p) ml + (p - x_min) / (x_max - x_min) * cw
   scale_y <- function(e) mt + (y_max - e) / (y_max - y_min) * ch
@@ -592,14 +607,16 @@ build_elasticity_chart <- function(elasticity_data, brand_colour = "#1e3a5f",
     points, brand_colour
   ))
 
-  # Points with colour coding
+  # Points with colour coding and tooltips
   for (i in seq_along(prices)) {
     cx <- scale_x(prices[i])
     cy <- scale_y(elast[i])
     colour <- if (!is.na(elast[i]) && abs(elast[i]) > 1) "#e74c3c" else "#2ecc71"
+    class_text <- if (!is.na(elast[i]) && abs(elast[i]) > 1) "Elastic" else "Inelastic"
+    tooltip_text <- sprintf("Price: %s%.0f, Elasticity: %.2f (%s)", currency, prices[i], elast[i], class_text)
     parts <- c(parts, sprintf(
-      '<circle cx="%.1f" cy="%.1f" r="3.5" fill="%s" stroke="white" stroke-width="1.5"/>',
-      cx, cy, colour
+      '<circle cx="%.1f" cy="%.1f" r="4" fill="%s" stroke="white" stroke-width="1.5" data-tooltip="%s"/>',
+      cx, cy, colour, tooltip_text
     ))
   }
 
@@ -613,7 +630,7 @@ build_elasticity_chart <- function(elasticity_data, brand_colour = "#1e3a5f",
   }
 
   sprintf(
-    '<svg viewBox="0 0 %d %d" style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;width:100%%;max-width:720px;height:auto;display:block;margin:0 auto;" role="img" aria-label="Price Elasticity">
+    '<svg viewBox="0 0 %d %d" style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;width:100%%;height:auto;display:block;margin:0 auto;" role="img" aria-label="Price Elasticity">
       %s
      </svg>',
     width, height,
@@ -636,13 +653,13 @@ generate_palette <- function(n, brand_colour = "#1e3a5f") {
 
   base_palette <- c(
     brand_colour,
-    "#2aa198",  # teal
-    "#f39c12",  # amber
-    "#e74c3c",  # red
-    "#9b59b6",  # purple
-    "#3498db",  # blue
-    "#1abc9c",  # turquoise
-    "#e67e22"   # orange
+    "#2aa198",
+    "#f39c12",
+    "#e74c3c",
+    "#9b59b6",
+    "#3498db",
+    "#1abc9c",
+    "#e67e22"
   )
 
   rep_len(base_palette, n)
