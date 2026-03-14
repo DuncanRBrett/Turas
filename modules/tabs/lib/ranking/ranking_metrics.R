@@ -465,7 +465,7 @@ run_mean_rank_test <- function(ranks1, ranks2, weights1, weights2, mean1, mean2,
   } else {
     # Fallback: basic t-test (not weighted)
     test <- tryCatch({
-      t.test(ranks1, ranks2, na.rm = TRUE)
+      t.test(ranks1[!is.na(ranks1)], ranks2[!is.na(ranks2)])
     }, error = function(e) {
       # TRS v1.0: Record partial failure instead of silent NULL
       ranking_record_partial_failure(

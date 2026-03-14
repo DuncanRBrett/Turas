@@ -33,7 +33,7 @@ FREQUENCY_ROW_TYPE <- "Frequency"
 COLUMN_PCT_ROW_TYPE <- "Column %"
 ROW_PCT_ROW_TYPE <- "Row %"
 AVERAGE_ROW_TYPE <- "Average"
-SIGNIFICANCE_ROW_TYPE <- "Significance"
+SIGNIFICANCE_ROW_TYPE <- "Sig."
 TOTAL_COLUMN <- "Total"
 
 # ==============================================================================
