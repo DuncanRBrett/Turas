@@ -1640,7 +1640,7 @@ build_dashboard_css <- function(brand_colour) {
       margin-bottom: 6px;
     }
     .dash-type-net_positive { background: rgba(74,124,111,0.1); color: #4a7c6f; }
-    .dash-type-nps_score { background: rgba(13,138,138,0.1); color: BRAND; }
+    .dash-type-nps_score { background: rgba(__BRAND_R__,__BRAND_G__,__BRAND_B__,0.1); color: BRAND; }
     .dash-type-average { background: rgba(201,169,110,0.1); color: #96783a; }
     .dash-type-index { background: rgba(99,102,241,0.1); color: #4f46e5; }
     .dash-type-custom { background: rgba(100,116,139,0.1); color: #475569; }
@@ -1719,7 +1719,7 @@ build_dashboard_css <- function(brand_colour) {
       resize: vertical; box-sizing: border-box;
     }
     .dash-md-editor:focus {
-      border-color: BRAND; box-shadow: 0 0 0 2px rgba(13,138,138,0.08);
+      border-color: BRAND; box-shadow: 0 0 0 2px rgba(__BRAND_R__,__BRAND_G__,__BRAND_B__,0.08);
     }
     .dash-md-rendered {
       font-size: 14px; line-height: 1.7; color: #1e293b; padding: 4px 0;
@@ -1751,12 +1751,12 @@ build_dashboard_css <- function(brand_colour) {
     .dash-export-btn {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 6px 14px; font-size: 12px; font-weight: 600;
-      color: BRAND; background: rgba(13,138,138,0.06);
-      border: 1px solid rgba(13,138,138,0.2); border-radius: 6px;
+      color: BRAND; background: rgba(__BRAND_R__,__BRAND_G__,__BRAND_B__,0.06);
+      border: 1px solid rgba(__BRAND_R__,__BRAND_G__,__BRAND_B__,0.2); border-radius: 6px;
       cursor: pointer; transition: all 0.15s;
     }
     .dash-export-btn:hover {
-      background: rgba(13,138,138,0.12); border-color: BRAND;
+      background: rgba(__BRAND_R__,__BRAND_G__,__BRAND_B__,0.12); border-color: BRAND;
     }
     .dash-heatmap {
       border-radius: 8px; overflow-x: auto; border: 1px solid #e2e8f0;
@@ -1794,8 +1794,8 @@ build_dashboard_css <- function(brand_colour) {
     .dash-hm-td.dash-hm-total {
       background: rgba(26,39,68,0.04); font-weight: 700; color: #1a2744;
     }
-    .dash-hm-row:hover .dash-hm-td { background: rgba(13,138,138,0.03); }
-    .dash-hm-row:hover .dash-hm-td.dash-hm-label { background: rgba(13,138,138,0.03); }
+    .dash-hm-row:hover .dash-hm-td { background: rgba(__BRAND_R__,__BRAND_G__,__BRAND_B__,0.03); }
+    .dash-hm-row:hover .dash-hm-td.dash-hm-label { background: rgba(__BRAND_R__,__BRAND_G__,__BRAND_B__,0.03); }
     .dash-hm-row:hover .dash-hm-td.dash-hm-total { background: rgba(26,39,68,0.06); }
     .dash-hm-qcode {
       font-size: 10px; color: BRAND; font-weight: 700; margin-right: 4px;
@@ -1834,7 +1834,7 @@ build_dashboard_css <- function(brand_colour) {
     }
     .dash-sig-group-badge {
       font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 3px;
-      background: rgba(13,138,138,0.08); color: BRAND;
+      background: rgba(__BRAND_R__,__BRAND_G__,__BRAND_B__,0.08); color: BRAND;
     }
     .dash-sig-type-badge {
       font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 3px;
@@ -1881,6 +1881,12 @@ build_dashboard_css <- function(brand_colour) {
   '
 
   css_text <- gsub("BRAND", bc, css_text, fixed = TRUE)
+
+  # Derive RGB components from brand colour for rgba() values
+  brand_rgb <- tryCatch(col2rgb(bc)[, 1], error = function(e) c(50, 51, 103))
+  css_text <- gsub("__BRAND_R__", brand_rgb[1], css_text, fixed = TRUE)
+  css_text <- gsub("__BRAND_G__", brand_rgb[2], css_text, fixed = TRUE)
+  css_text <- gsub("__BRAND_B__", brand_rgb[3], css_text, fixed = TRUE)
 
   htmltools::tags$style(htmltools::HTML(css_text))
 }
