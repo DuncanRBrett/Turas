@@ -17,10 +17,10 @@
   # in the calling environment before sourcing to avoid this path.
   .ofile <- tryCatch(sys.frame(1)$ofile, error = function(e) NULL)
   if (is.null(.ofile) || !nzchar(.ofile %||% "")) {
-    warning(paste(
-      "Cannot determine html_report directory: .tabs_lib_dir is not set",
+    cat(paste(
+      "  [WARNING] Cannot determine html_report directory: .tabs_lib_dir is not set",
       "and sys.frame()$ofile is unavailable. JS files may not load.",
-      "Set .tabs_lib_dir before sourcing run_crosstabs.R."
+      "Set .tabs_lib_dir before sourcing run_crosstabs.R.\n"
     ))
     "."
   } else {
@@ -74,7 +74,8 @@ if (length(.hr_missing) > 0) {
                      sprintf("Expected in: %s", .html_report_dir))
     )
   } else {
-    stop(sprintf("HTML report submodule(s) missing: %s", paste(.hr_missing, collapse = ", ")),
+    # Console output already printed above. Signal condition to halt sourcing.
+    stop(sprintf("[IO_HTML_SUBMODULE_MISSING] HTML report submodule(s) missing: %s\nSee console output above for details.", paste(.hr_missing, collapse = ", ")),
          call. = FALSE)
   }
 }

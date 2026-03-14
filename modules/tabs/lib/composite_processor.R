@@ -816,7 +816,7 @@ process_all_composites <- function(composite_defs, data, questions_df,
       error_detail <- sprintf("Error processing composite '%s': %s\n  Traceback: %s",
                              comp_code, e$message,
                              paste(as.character(sys.calls()), collapse = "\n  "))
-      warning(error_detail, call. = FALSE)
+      cat(sprintf("  [WARNING] %s\n", error_detail))
     })
   }
 

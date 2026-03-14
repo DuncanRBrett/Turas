@@ -394,8 +394,8 @@ process_single_question <- function(question_code, prepared_data,
           config, is_weighted = is_weighted
         )
       }, error = function(e) {
-        warning(sprintf("Net difference testing failed for %s: %s",
-                       question_code, conditionMessage(e)), call. = FALSE)
+        cat(sprintf("  [WARNING] Net difference testing failed for %s: %s\n",
+                       question_code, conditionMessage(e)))
         boxcategory_results
       })
     }
@@ -422,8 +422,8 @@ process_single_question <- function(question_code, prepared_data,
           config, is_weighted = is_weighted
         )
       }, error = function(e) {
-        warning(sprintf("Net positive calculation failed for %s: %s",
-                       question_code, conditionMessage(e)), call. = FALSE)
+        cat(sprintf("  [WARNING] Net positive calculation failed for %s: %s\n",
+                       question_code, conditionMessage(e)))
         boxcategory_results
       })
     }

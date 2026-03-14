@@ -44,7 +44,7 @@ if (!exists("source_if_exists")) {
         source(file_path, local = envir)
         invisible(NULL)
       }, error = function(e) {
-        warning(sprintf("Failed to source %s: %s", file_path, conditionMessage(e)))
+        cat(sprintf("  [WARNING] Failed to source %s: %s\n", file_path, conditionMessage(e)))
         invisible(NULL)
       })
     }
@@ -116,23 +116,23 @@ apply_exclude_repair_policy <- function(weights, weight_variable) {
 
   # NA weights - exclude (set to 0)
   if (n_na > 0) {
-    warning(sprintf(
-      "Weight column '%s' contains %d NA values (%.1f%%). These will be EXCLUDED (weight=0) from analysis.",
+    cat(sprintf(
+      "  [WARNING] Weight column '%s' contains %d NA values (%.1f%%). These will be EXCLUDED (weight=0) from analysis.\n",
       weight_variable,
       n_na,
       100 * n_na / n_total
-    ), call. = FALSE)
+    ))
     weights[is.na(weights)] <- 0
   }
 
   # Infinite weights - exclude (set to 0)
   if (n_infinite > 0) {
-    warning(sprintf(
-      "Weight column '%s' contains %d infinite values (%.1f%%). These will be EXCLUDED (weight=0) from analysis.",
+    cat(sprintf(
+      "  [WARNING] Weight column '%s' contains %d infinite values (%.1f%%). These will be EXCLUDED (weight=0) from analysis.\n",
       weight_variable,
       n_infinite,
       100 * n_infinite / n_total
-    ), call. = FALSE)
+    ))
     weights[is.infinite(weights)] <- 0
   }
 
@@ -140,12 +140,12 @@ apply_exclude_repair_policy <- function(weights, weight_variable) {
   if (n_zero > 0) {
     pct_zero <- 100 * n_zero / n_total
     if (pct_zero > 5) {
-      warning(sprintf(
-        "Weight column '%s' contains %d zero values (%.1f%%). These cases are EXCLUDED from weighted analysis.\nHigh proportion may indicate data quality issues.",
+      cat(sprintf(
+        "  [WARNING] Weight column '%s' contains %d zero values (%.1f%%). These cases are EXCLUDED from weighted analysis.\n  High proportion may indicate data quality issues.\n",
         weight_variable,
         n_zero,
         pct_zero
-      ), call. = FALSE)
+      ))
     }
   }
 
@@ -161,40 +161,31 @@ apply_coerce_repair_policy <- function(weights, weight_variable) {
   n_infinite <- sum(!is.na(weights) & is.infinite(weights))
 
   # Warn about legacy mode
-  warning(sprintf(
-    "Using legacy repair='coerce_to_one' mode. This is NOT RECOMMENDED as it biases estimates.\nConsider using repair='exclude' (default) instead."
-  ), call. = FALSE)
+  cat("  [WARNING] Using legacy repair='coerce_to_one' mode. This is NOT RECOMMENDED as it biases estimates.\n")
+  cat("  Consider using repair='exclude' (default) instead.\n")
 
   # Warn about each type of problem
   if (n_na > 0) {
-    warning(sprintf(
-      "Weight column '%s': Replacing %d NA values with 1 (unweighted). This may bias results.",
-      weight_variable, n_na
-    ), call. = FALSE)
+    cat(sprintf("  [WARNING] Weight column '%s': Replacing %d NA values with 1 (unweighted). This may bias results.\n",
+      weight_variable, n_na))
     weights[is.na(weights)] <- 1
   }
 
   if (n_negative > 0) {
-    warning(sprintf(
-      "Weight column '%s': Replacing %d negative values with 1. This may bias results.",
-      weight_variable, n_negative
-    ), call. = FALSE)
+    cat(sprintf("  [WARNING] Weight column '%s': Replacing %d negative values with 1. This may bias results.\n",
+      weight_variable, n_negative))
     weights[weights < 0] <- 1
   }
 
   if (n_zero > 0) {
-    warning(sprintf(
-      "Weight column '%s': Replacing %d zero values with 1. This may bias results.",
-      weight_variable, n_zero
-    ), call. = FALSE)
+    cat(sprintf("  [WARNING] Weight column '%s': Replacing %d zero values with 1. This may bias results.\n",
+      weight_variable, n_zero))
     weights[weights == 0] <- 1
   }
 
   if (n_infinite > 0) {
-    warning(sprintf(
-      "Weight column '%s': Replacing %d infinite values with 1. This may bias results.",
-      weight_variable, n_infinite
-    ), call. = FALSE)
+    cat(sprintf("  [WARNING] Weight column '%s': Replacing %d infinite values with 1. This may bias results.\n",
+      weight_variable, n_infinite))
     weights[is.infinite(weights)] <- 1
   }
 
@@ -210,11 +201,11 @@ check_weight_variability <- function(weights, weight_variable) {
     weight_cv <- sd(valid_weights) / mean(valid_weights)  # Coefficient of variation
 
     if (weight_cv > 1.0) {
-      warning(sprintf(
-        "Weight column '%s' has high variability (CV = %.2f). This may indicate:\n  1. Intentional design (e.g., raking weights)\n  2. Data quality issues\n  3. Very unequal sampling probabilities\nEffective sample size will be substantially reduced.",
+      cat(sprintf(
+        "  [WARNING] Weight column '%s' has high variability (CV = %.2f). This may indicate:\n  1. Intentional design (e.g., raking weights)\n  2. Data quality issues\n  3. Very unequal sampling probabilities\n  Effective sample size will be substantially reduced.\n",
         weight_variable,
         weight_cv
-      ), call. = FALSE)
+      ))
     }
   }
 
@@ -268,11 +259,11 @@ get_weight_vector <- function(data, weight_variable, repair = c("exclude", "coer
   
   # Check column exists
   if (!weight_variable %in% names(data)) {
-    warning(sprintf(
-      "Weight column '%s' not found in data. Using unweighted analysis.\nAvailable columns: %s",
+    cat(sprintf(
+      "  [WARNING] Weight column '%s' not found in data. Using unweighted analysis.\n  Available columns: %s\n",
       weight_variable,
       paste(head(names(data), 10), collapse = ", ")
-    ), call. = FALSE)
+    ))
     return(rep(1, nrow(data)))
   }
   
@@ -842,24 +833,21 @@ weighted_z_test_proportions <- function(count1, base1, count2, base2,
   
   # V9.9.3: Sanity check count/base relationship
   if (count1 < 0 || count2 < 0 || base1 < 0 || base2 < 0) {
-    warning("Negative count or base values detected; skipping z-test.", call. = FALSE)
+    cat("  [WARNING] Negative count or base values detected; skipping z-test.\n")
     return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
   }
   
   if (count1 > base1 || count2 > base2) {
-    warning(sprintf(
-      "Count exceeds base (count1=%.1f, base1=%.1f, count2=%.1f, base2=%.1f); skipping z-test.\nThis may indicate duplicated rows or upstream data errors.",
+    cat(sprintf(
+      "  [WARNING] Count exceeds base (count1=%.1f, base1=%.1f, count2=%.1f, base2=%.1f); skipping z-test.\n  This may indicate duplicated rows or upstream data errors.\n",
       count1, base1, count2, base2
-    ), call. = FALSE)
+    ))
     return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
   }
   
   # Explicit is_weighted flag (V9.9.1: no heuristics)
   if (is_weighted && (is.null(eff_n1) || is.null(eff_n2))) {
-    warning(
-      "Weighted data requires effective-n for valid significance testing. Test skipped.",
-      call. = FALSE
-    )
+    cat("  [WARNING] Weighted data requires effective-n for valid significance testing. Test skipped.\n")
     return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
   }
   
@@ -1088,7 +1076,7 @@ weighted_t_test_means <- function(values1, values2,
     ))
 
   }, error = function(e) {
-    warning(sprintf("T-test failed: %s", conditionMessage(e)), call. = FALSE)
+    cat(sprintf("  [WARNING] T-test failed: %s\n", conditionMessage(e)))
     return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
   })
 }

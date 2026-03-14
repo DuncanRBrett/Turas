@@ -310,11 +310,11 @@ validate_file_path <- function(file_path, param_name = "file_path",
   if (must_exist) {
     file_size <- file.info(file_path)$size
     if (file_size > MAX_FILE_SIZE_BYTES) {
-      warning(sprintf(
-        "%s: Large file detected (%.1f MB). Loading may be slow or cause memory issues.\n  Tip: For faster loading, consider converting to CSV format.",
+      cat(sprintf(
+        "  [WARNING] %s: Large file detected (%.1f MB). Loading may be slow or cause memory issues.\n  Tip: For faster loading, consider converting to CSV format.\n",
         param_name,
         file_size / (1024 * 1024)
-      ), call. = FALSE)
+      ))
     }
   }
 
@@ -426,7 +426,7 @@ validate_weights <- function(weights, data_rows, allow_zero = TRUE) {
 
   n_na <- sum(is.na(weights))
   if (n_na > 0) {
-    warning(sprintf("Weight vector contains %d NA values (%.1f%%)",
+    cat(sprintf("  [WARNING] Weight vector contains %d NA values (%.1f%%)\n",
                    n_na, 100 * n_na / length(weights)))
   }
 

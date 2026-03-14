@@ -2246,10 +2246,10 @@ build_javascript <- function(html_data, brand_colour = "#323367") {
     # in the calling environment before sourcing to avoid this path.
     .ofile <- tryCatch(sys.frame(1)$ofile, error = function(e) NULL)
     if (is.null(.ofile) || !nzchar(.ofile %||% "")) {
-      warning(paste(
-        "Cannot determine JS directory: .tabs_lib_dir is not set",
+      cat(paste(
+        "  [WARNING] Cannot determine JS directory: .tabs_lib_dir is not set",
         "and sys.frame()$ofile is unavailable. JS files may not load.",
-        "Set .tabs_lib_dir before sourcing run_crosstabs.R."
+        "Set .tabs_lib_dir before sourcing run_crosstabs.R.\n"
       ))
       file.path(".", "js")
     } else {

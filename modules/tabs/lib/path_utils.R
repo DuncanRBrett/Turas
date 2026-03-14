@@ -211,7 +211,7 @@ source_if_exists <- function(file_path, envir = parent.frame()) {
       source(file_path, local = envir)
       invisible(NULL)
     }, error = function(e) {
-      warning(sprintf("Failed to source %s: %s", file_path, conditionMessage(e)))
+      cat(sprintf("  [WARNING] Failed to source %s: %s\n", file_path, conditionMessage(e)))
       invisible(NULL)
     })
   }

@@ -386,13 +386,11 @@ test_that("zero base returns non-significant", {
   expect_false(result$significant)
 })
 
-test_that("count exceeding base returns non-significant with warning", {
-  expect_warning(
-    result <- weighted_z_test_proportions(
-      count1 = 110, base1 = 100,
-      count2 = 50, base2 = 100
-    ),
-    "Count exceeds base"
+test_that("count exceeding base returns non-significant with console warning", {
+  # warning() converted to cat() for Shiny console visibility
+  result <- weighted_z_test_proportions(
+    count1 = 110, base1 = 100,
+    count2 = 50, base2 = 100
   )
 
   expect_false(result$significant)

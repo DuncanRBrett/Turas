@@ -221,10 +221,10 @@ create_ranking_rows_for_item <- function(ranking_matrix, item_name, banner_data_
 
   # V9.9.2: Guard top_n vs num_positions
   if (!is.null(num_positions) && top_n > num_positions) {
-    warning(sprintf(
-      "top_n (%d) exceeds available positions (%d), clamping to %d",
+    cat(sprintf(
+      "  [WARNING] top_n (%d) exceeds available positions (%d), clamping to %d\n",
       top_n, num_positions, num_positions
-    ), call. = FALSE, immediate. = TRUE)
+    ))
     top_n <- num_positions
   }
 
@@ -266,7 +266,7 @@ create_ranking_rows_for_item <- function(ranking_matrix, item_name, banner_data_
     if (!subset_result$valid) {
       # Handle invalid subset
       if (subset_result$reason == "invalid_indices") {
-        warning(sprintf("Invalid row indices for banner %s, skipping", key), call. = FALSE)
+        cat(sprintf("  [WARNING] Invalid row indices for banner %s, skipping\n", key))
       }
       pct_first_row[[key]] <- NA
       mean_rank_row[[key]] <- NA
@@ -286,11 +286,11 @@ create_ranking_rows_for_item <- function(ranking_matrix, item_name, banner_data_
       mean_rank_row[[key]] <- metrics$mean_rank
       if (show_top_n) top_n_row[[key]] <- metrics$pct_top_n
     }, error = function(e) {
-      warning(sprintf(
-        "Error calculating ranking metrics for banner %s: %s",
+      cat(sprintf(
+        "  [WARNING] Error calculating ranking metrics for banner %s: %s\n",
         key,
         conditionMessage(e)
-      ), call. = FALSE)
+      ))
       pct_first_row[[key]] <- NA
       mean_rank_row[[key]] <- NA
       if (show_top_n) top_n_row[[key]] <- NA

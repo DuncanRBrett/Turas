@@ -101,7 +101,7 @@ load_config_sheet <- function(file_path, sheet_name = "Settings") {
 
     # Check for data
     if (nrow(config_df) == 0) {
-      warning(sprintf("Config sheet '%s' is empty", sheet_name))
+      cat(sprintf("  [WARNING] Config sheet '%s' is empty\n", sheet_name))
       return(list())
     }
 
@@ -131,7 +131,7 @@ load_config_sheet <- function(file_path, sheet_name = "Settings") {
     ]
 
     if (length(config_list) == 0) {
-      warning(sprintf("No valid settings found in '%s' sheet", sheet_name))
+      cat(sprintf("  [WARNING] No valid settings found in '%s' sheet\n", sheet_name))
     }
 
     return(config_list)

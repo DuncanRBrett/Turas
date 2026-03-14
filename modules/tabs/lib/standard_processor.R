@@ -1286,7 +1286,7 @@ calculate_chi_square_row <- function(boxcategory_results, banner_info, config,
     } else {
       sprintf("Chi-square test failed: %s", conditionMessage(e))
     }
-    warning(error_msg, call. = FALSE)
+    cat(sprintf("  [WARNING] %s\n", error_msg))
     NULL
   })
 

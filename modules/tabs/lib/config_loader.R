@@ -12,16 +12,15 @@
 # This module will be incrementally refactored to use shared utilities.
 # ==============================================================================
 
-#' Load Complete Crosstab Configuration
-#' 
-#' Main entry point for loading all configuration elements needed for crosstabs
-#' 
+#' Load Complete Crosstab Configuration (LEGACY - NOT CALLED BY PIPELINE)
+#'
+#' Superseded by crosstabs/crosstabs_config.R + crosstabs/data_setup.R.
+#' Retained for standalone sourcing compatibility only.
+#'
 #' @param config_file Path to Crosstab_Config.xlsx file
 #' @param project_root Optional project root directory
 #' @return List with config, paths, and validation results
-#' @export
-#' @examples
-#' config <- load_crosstab_configuration("Config.xlsx")
+#' @keywords internal
 load_crosstab_configuration <- function(config_file, project_root = NULL) {
   
   # Validate config file exists
@@ -107,7 +106,7 @@ load_config_settings <- function(config_file, sheet_name = "Settings") {
     
     # Check for data
     if (nrow(config_df) == 0) {
-      warning(sprintf("Config sheet '%s' is empty", sheet_name))
+      cat(sprintf("  [WARNING] Config sheet '%s' is empty\n", sheet_name))
       return(list())
     }
     

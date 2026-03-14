@@ -1213,7 +1213,7 @@ create_sample_composition_sheet <- function(wb, data, banner_info, master_weight
                           widths = c(25, 25, rep(15, ncol(composition_df) - 2)))
 
   }, error = function(e) {
-    warning(sprintf("Sample composition sheet creation failed: %s", conditionMessage(e)))
+    cat(sprintf("  [WARNING] Sample composition sheet creation failed: %s\n", conditionMessage(e)))
   })
 
   invisible(NULL)

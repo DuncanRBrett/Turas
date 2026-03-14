@@ -79,7 +79,7 @@ run_validation <- function(survey_structure, survey_data, config_obj,
 
     if (length(validation_result$warnings) > 0) {
       for (warn in validation_result$warnings) {
-        warning(warn, call. = FALSE)
+        cat(sprintf("  [WARNING] %s\n", warn))
       }
     }
 

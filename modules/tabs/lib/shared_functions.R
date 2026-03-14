@@ -173,7 +173,7 @@ safe_execute <- function(expr, default = NA, error_msg = "Operation failed",
     expr,
     error = function(e) {
       if (!silent) {
-        warning(sprintf("%s: %s", error_msg, conditionMessage(e)), call. = FALSE)
+        cat(sprintf("  [WARNING] %s: %s\n", error_msg, conditionMessage(e)))
       }
       return(default)
     }

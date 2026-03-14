@@ -127,7 +127,7 @@ format_output_value <- function(value, type = "frequency",
 
   # Single value extraction for safety
   if (length(value) > 1) {
-    warning("format_output_value received vector, using first element only")
+    cat("  [WARNING] format_output_value received vector, using first element only\n")
     value <- value[1]
   }
 

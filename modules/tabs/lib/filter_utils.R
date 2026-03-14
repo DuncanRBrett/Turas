@@ -111,10 +111,10 @@ validate_filter_result <- function(filter_result, data, filter_expression) {
   # Check if any rows retained
   n_retained <- sum(filter_result)
   if (n_retained == 0) {
-    warning(sprintf(
-      "Filter retains 0 rows (filters out all data): '%s'",
+    cat(sprintf(
+      "  [WARNING] Filter retains 0 rows (filters out all data): '%s'\n",
       filter_expression
-    ), call. = FALSE)
+    ))
   }
 
   return(filter_result)

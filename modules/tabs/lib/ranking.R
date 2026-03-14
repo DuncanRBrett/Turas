@@ -63,11 +63,11 @@ if (!exists("source_if_exists")) {
         sys.source(file_path, envir = envir)
         invisible(NULL)
       }, error = function(e) {
-        warning(sprintf(
-          "Failed to source %s: %s\nSome functions may not be available.",
+        cat(sprintf(
+          "  [WARNING] Failed to source %s: %s\n  Some functions may not be available.\n",
           file_path,
           conditionMessage(e)
-        ), call. = FALSE)
+        ))
         invisible(NULL)
       })
     }
@@ -724,11 +724,11 @@ extract_ranking_data <- function(data, question_info, option_info, config = NULL
   )
   
   if (validation$has_issues) {
-    warning(sprintf(
-      "Question %s: %s",
+    cat(sprintf(
+      "  [WARNING] Question %s: %s\n",
       question_code,
       validation$summary
-    ), call. = FALSE)
+    ))
   }
   
   result$validation <- validation

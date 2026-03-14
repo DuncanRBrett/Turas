@@ -93,11 +93,11 @@ test_that("converts FALSE string variants", {
 test_that("returns default for NULL, NA, and unrecognised input", {
   expect_false(safe_logical(NULL))
   expect_false(safe_logical(NA))
-  expect_warning(expect_false(safe_logical("maybe")), "Could not convert")
-  expect_warning(expect_false(safe_logical("")), "Could not convert")
+  expect_false(safe_logical("maybe"))
+  expect_false(safe_logical(""))
   expect_true(safe_logical(NULL, default = TRUE))
   expect_true(safe_logical(NA, default = TRUE))
-  expect_warning(expect_true(safe_logical("garbage", default = TRUE)), "Could not convert")
+  expect_true(safe_logical("garbage", default = TRUE))
 })
 
 test_that("handles whitespace in input", {

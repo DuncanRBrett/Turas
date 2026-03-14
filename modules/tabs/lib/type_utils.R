@@ -138,10 +138,10 @@ safe_logical <- function(x, default = FALSE) {
   }
 
   # Couldn't convert
-  warning(sprintf(
-    "Could not convert '%s' to logical, using default: %s",
+  cat(sprintf(
+    "  [WARNING] Could not convert '%s' to logical, using default: %s\n",
     x, default
-  ), call. = FALSE)
+  ))
   return(default)
 }
 

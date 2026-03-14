@@ -181,10 +181,10 @@ calculate_percent_top_n <- function(ranking_matrix, item_name, top_n = 3,
   # V9.9.2: Guard top_n vs available positions
   if (!is.null(num_positions)) {
     if (top_n > num_positions) {
-      warning(sprintf(
-        "top_n (%d) exceeds available positions (%d), clamping to %d",
+      cat(sprintf(
+        "  [WARNING] top_n (%d) exceeds available positions (%d), clamping to %d\n",
         top_n, num_positions, num_positions
-      ), call. = FALSE)
+      ))
       top_n <- num_positions
     }
   }
