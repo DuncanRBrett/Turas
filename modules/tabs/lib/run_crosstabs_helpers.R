@@ -1,13 +1,23 @@
 # ==============================================================================
-# RUN_CROSSTABS HELPERS - TURAS V10.0
+# RUN_CROSSTABS HELPERS - DEPRECATED
 # ==============================================================================
-# Helper functions for run_crosstabs.R
-# Extracted from run_crosstabs.R for better modularity and maintainability
+# STATUS: This file is NOT sourced by the tabs pipeline and contains NO active
+# code. All functions here have been superseded by the Phase 4 modules:
+#   - print_analysis_summary()  -> crosstabs/analysis_runner.R
+#   - estimate_runtime()        -> crosstabs/analysis_runner.R
+#   - print_partial_results_warning() -> crosstabs/workbook_builder.R
+#   - print_success_message()   -> run_crosstabs.R (inline)
+#   - has_validation_issues()   -> validation.R
+#   - print_validation_summary() -> validation.R
+#   - get_selected_questions()  -> crosstabs/data_setup.R
+#   - get_question_codes()      -> crosstabs/data_setup.R
+#
+# This file is retained to avoid breaking any external scripts that may
+# source it directly, but it can be safely deleted.
 #
 # VERSION HISTORY:
+# V10.2 - DEPRECATED: All functions superseded by Phase 4 modules (2026-03)
 # V10.0 - Extracted from run_crosstabs.R (2025)
-#        - Refactored procedural code into reusable functions
-#        - Improved testability and maintainability
 # ==============================================================================
 
 # ==============================================================================

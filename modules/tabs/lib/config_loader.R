@@ -156,87 +156,15 @@ load_config_settings <- function(config_file, sheet_name = "Settings") {
   })
 }
 
-#' Get Configuration Value
-#' 
-#' Safely retrieve a configuration value with default fallback
-#' 
-#' @param config_list Named list of config values
-#' @param setting_name Name of setting to retrieve
-#' @param default_value Default value if not found
-#' @param required Stop if setting not found and no default
-#' @return Configuration value or default
-#' @export
-get_config_value <- function(config_list, setting_name, default_value = NULL, 
-                              required = FALSE) {
-  
-  value <- config_list[[setting_name]]
-  
-  # Handle missing value
-  if (is.null(value) || (length(value) == 1 && is.na(value))) {
-    if (required && is.null(default_value)) {
-      tabs_refuse(
-        code = "CFG_MISSING_SETTING",
-        title = "Required Setting Not Found",
-        problem = sprintf("Required setting '%s' not found in configuration.", setting_name),
-        why_it_matters = "This setting is required for the analysis to run properly.",
-        how_to_fix = c(
-          sprintf("Add '%s' to the Settings sheet", setting_name),
-          "Check available settings listed in the error message"
-        ),
-        missing = setting_name
-      )
-    }
-    return(default_value)
-  }
-  
-  return(value)
-}
-
-#' Safe Logical Conversion
-#' 
-#' Convert various formats to logical (TRUE/FALSE)
-#' Handles: Y/N, YES/NO, T/F, 1/0, TRUE/FALSE
-#' 
-#' @param value Value to convert
-#' @param default Default value if conversion fails
-#' @return Logical value
-#' @export
-safe_logical <- function(value, default = FALSE) {
-  if (is.null(value) || is.na(value)) return(default)
-  
-  if (is.logical(value)) return(value)
-  
-  # Convert to character and check
-  char_value <- toupper(trimws(as.character(value)))
-  
-  if (char_value %in% c("Y", "YES", "T", "TRUE", "1")) {
-    return(TRUE)
-  } else if (char_value %in% c("N", "NO", "F", "FALSE", "0")) {
-    return(FALSE)
-  } else {
-    return(default)
-  }
-}
-
-#' Safe Numeric Conversion
-#' 
-#' Convert to numeric with default fallback
-#' 
-#' @param value Value to convert
-#' @param default Default value if conversion fails
-#' @return Numeric value
-#' @export
-safe_numeric <- function(value, default = NA_real_) {
-  if (is.null(value) || is.na(value)) return(default)
-  
-  numeric_value <- suppressWarnings(as.numeric(value))
-  
-  if (is.na(numeric_value)) {
-    return(default)
-  } else {
-    return(numeric_value)
-  }
-}
+# ==============================================================================
+# REMOVED: get_config_value, safe_logical, safe_numeric
+# These functions are defined in the shared utility modules:
+#   - get_config_value() -> config_utils.R (sourced via shared_functions.R)
+#   - safe_logical()     -> type_utils.R   (sourced via shared_functions.R)
+#   - safe_numeric()     -> type_utils.R   (sourced via shared_functions.R)
+# Previously duplicated here, causing function shadowing. Removed to ensure
+# the shared versions (which include extra validation) are used consistently.
+# ==============================================================================
 
 # ==============================================================================
 # CONFIG OBJECT BUILDING
@@ -349,51 +277,7 @@ resolve_config_paths <- function(settings, project_root) {
   ))
 }
 
-#' Resolve Relative Path
-#' 
-#' Convert relative path to absolute path from base
-#' 
-#' @param base_path Base directory
-#' @param relative_path Path relative to base
-#' @return Absolute normalized path
-#' @export
-resolve_path <- function(base_path, relative_path) {
-  
-  if (is.null(base_path) || is.na(base_path) || base_path == "") {
-    tabs_refuse(
-      code = "ARG_INVALID_VALUE",
-      title = "Invalid Base Path",
-      problem = "base_path cannot be empty.",
-      why_it_matters = "A valid base path is required to resolve relative file paths.",
-      how_to_fix = "This is an internal error - check path resolution logic"
-    )
-  }
-
-  if (is.null(relative_path) || is.na(relative_path) || relative_path == "") {
-    tabs_refuse(
-      code = "ARG_INVALID_VALUE",
-      title = "Invalid Relative Path",
-      problem = "relative_path cannot be empty.",
-      why_it_matters = "A valid relative path is required to resolve to an absolute path.",
-      how_to_fix = "This is an internal error - check path resolution logic"
-    )
-  }
-  
-  # Handle absolute paths
-  if (substring(relative_path, 1, 1) == "/" || 
-      (nchar(relative_path) >= 2 && substring(relative_path, 2, 2) == ":")) {
-    return(normalizePath(relative_path, mustWork = FALSE))
-  }
-  
-  # Remove ./ prefix if present
-  if (substring(relative_path, 1, 2) == "./") {
-    relative_path <- substring(relative_path, 3)
-  }
-  
-  # Combine and normalize
-  full_path <- file.path(base_path, relative_path)
-  return(normalizePath(full_path, mustWork = FALSE))
-}
+# REMOVED: resolve_path() — now defined in path_utils.R (sourced via shared_functions.R)
 
 # ==============================================================================
 # QUESTION SELECTION LOADING

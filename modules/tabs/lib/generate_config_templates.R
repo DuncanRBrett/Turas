@@ -18,6 +18,22 @@
 #
 # ==============================================================================
 
+if (!requireNamespace("openxlsx", quietly = TRUE)) {
+  if (exists("tabs_refuse", mode = "function")) {
+    tabs_refuse(
+      code = "PKG_MISSING_DEPENDENCY",
+      title = "Missing Required Package: openxlsx",
+      problem = "The 'openxlsx' package is required for template generation.",
+      why_it_matters = "Cannot create Excel config templates without openxlsx.",
+      how_to_fix = "Install the package: install.packages('openxlsx')"
+    )
+  } else {
+    stop("Package 'openxlsx' required for template generation. Install with: install.packages('openxlsx')",
+         call. = FALSE)
+  }
+}
+# Attach openxlsx — template functions use createWorkbook(), addWorksheet(), etc.
+# without namespace prefix for readability
 library(openxlsx)
 
 # ==============================================================================
