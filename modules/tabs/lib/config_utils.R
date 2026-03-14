@@ -4,6 +4,11 @@
 # Configuration loading and typed getter functions
 # Extracted from shared_functions.R for better modularity
 #
+# TODO: TECH DEBT - Functions here (load_config_sheet, get_config_value,
+# get_numeric_config, etc.) duplicate modules/shared/lib/config_utils.R.
+# Consolidation planned post-launch. Do not modify without checking the
+# shared version for consistency.
+#
 # VERSION HISTORY:
 # V10.0 - Extracted from shared_functions.R (2025)
 #        - Modular design for better maintainability
