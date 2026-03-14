@@ -413,8 +413,13 @@ load_survey_data_smart <- function(data_file_path, project_root = NULL,
       if (!cache_valid) {
         cat(sprintf("Large Excel file (%.1f MB) detected. Creating CSV cache...\n", file_size_mb))
         data <- readxl::read_excel(data_file_path)
-        data.table::fwrite(data, csv_cache_path)
-        cat("  CSV cache created:", basename(csv_cache_path), "\n")
+        tryCatch({
+          data.table::fwrite(data, csv_cache_path)
+          cat("  CSV cache created:", basename(csv_cache_path), "\n")
+        }, error = function(e) {
+          cat("  [WARNING] Could not create CSV cache:", e$message, "\n")
+          cat("  Continuing without cache.\n")
+        })
         return(as.data.frame(data))
       } else {
         cat("Loading from CSV cache (faster)...\n")

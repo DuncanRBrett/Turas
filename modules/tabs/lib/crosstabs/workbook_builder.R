@@ -327,7 +327,7 @@ create_run_status_sheet <- function(wb, trs_state, run_status,
       log_message(sprintf("Run_Status sheet created (status: %s)", run_status), "INFO")
     }
   }, error = function(e) {
-    warning(sprintf("Failed to create Run_Status sheet: %s", conditionMessage(e)), call. = FALSE)
+    cat(sprintf("  [WARNING] Failed to create Run_Status sheet: %s\n", conditionMessage(e)))
   })
 
   # Return run_result for use in saving

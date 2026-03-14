@@ -400,12 +400,12 @@ add_composites_to_results <- function(all_results, composite_results, banner_inf
 
     # Safety check
     if (is.null(comp_result) || is.null(comp_result$question_table)) {
-      warning(sprintf("Composite '%s' has no results table, skipping", comp_code))
+      cat(sprintf("  [WARNING] Composite '%s' has no results table, skipping\n", comp_code))
       next
     }
 
     if (nrow(comp_result$question_table) == 0) {
-      warning(sprintf("Composite '%s' has empty results table, skipping", comp_code))
+      cat(sprintf("  [WARNING] Composite '%s' has empty results table, skipping\n", comp_code))
       next
     }
 
