@@ -504,7 +504,7 @@ detected.
 
 ## Version Compatibility
 
-### Current Version: 10.0
+### Current Version: 10.8
 
 This version uses the current template and configuration formats.
 
