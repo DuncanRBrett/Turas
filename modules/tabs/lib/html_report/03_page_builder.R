@@ -6,6 +6,9 @@
 # Uses plain HTML tables — no reactable, no htmlwidgets.
 # ==============================================================================
 
+# File-level helper: escape strings for safe insertion into JS single-quoted literals
+js_esc <- function(s) gsub("'", "\\\\'", gsub("\\\\", "\\\\\\\\", as.character(s)))
+
 
 #' Build Complete HTML Page
 #'
@@ -1786,9 +1789,6 @@ build_question_containers <- function(questions, tables, banner_groups,
   first_group_name <- if (length(banner_groups) > 0) names(banner_groups)[1] else ""
 
   comments <- config_obj$comments  # Named list or NULL
-
-  # Helper: escape strings for safe insertion into JS single-quoted literals
-  js_esc <- function(s) gsub("'", "\\\\'", gsub("\\\\", "\\\\\\\\", as.character(s)))
 
   containers <- lapply(seq_along(questions), function(i) {
     q <- questions[[i]]
