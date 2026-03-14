@@ -415,8 +415,25 @@ column.
 
 ## Working with the HTML Report
 
-When `html_report` is set to `Y` in your Settings sheet, Tabs generates
+When `html_report` is set to `TRUE` in your Settings sheet, Tabs generates
 an interactive HTML report alongside the Excel output.
+
+### Key HTML Report Settings
+
+These settings in your config's Settings sheet control how the HTML report looks:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `html_report` | FALSE | Set to TRUE to generate the HTML report |
+| `brand_colour` | #323367 | Primary brand colour (hex) — used for headers, gauges, and accents |
+| `accent_colour` | #CC9900 | Secondary accent colour (hex) |
+| `chart_palette_preset` | warm | Colour palette for ordinal/scale charts: `warm` (earth tones), `cool` (blue-anchored), or `research` (purple-green diverging) |
+| `chart_bar_colour` | (brand) | Colour for simple bar charts (hex) |
+| `include_summary` | TRUE | Include the summary dashboard tab with gauges |
+| `show_charts` | FALSE | Include inline SVG charts alongside tables |
+| `embed_frequencies` | TRUE | Show frequency counts in HTML tables |
+
+See the [Template Reference](06_TEMPLATE_REFERENCE.md) for the full list of settings including dashboard thresholds, analyst details, and closing section options.
 
 ### Opening the Report
 
@@ -427,37 +444,35 @@ required.
 
 ### Report Navigation
 
-The report has four tabs across the top: 1. **Summary** — Dashboard with
-headline gauges and significant findings 2. **Crosstabs** — Interactive
-tables with search and banner switching 3. **Added Slides** — Editorial
-content and insights 4. **Pinned Views** — Your curated presentation
-collection
+The report has four tabs across the top:
+
+1. **Summary** — Dashboard with headline gauges and significant findings
+2. **Crosstabs** — Interactive tables with search and banner switching
+3. **Added Slides** — Editorial content and insights
+4. **Pinned Views** — Your curated presentation collection
 
 ### Using Charts and Tables
 
--   **Heatmap toggle** — Click the heatmap icon to colour-code cells by
-    value
--   **Banner switching** — Use the dropdown to switch between banner
-    groups
--   **Search** — Type in the search box to filter questions
--   **Copy to clipboard** — Click the clipboard icon on any table to
-    copy it
--   **Export as PNG** — Click the camera icon to download a table as an
-    image
+- **Heatmap toggle** — Click the heatmap icon to colour-code cells by value
+- **Banner switching** — Use the dropdown to switch between banner groups
+- **Search** — Type in the search box to filter questions
+- **Copy to clipboard** — Click the clipboard icon on any table to copy it
+- **Export as PNG** — Click the camera icon to download a table as an image
+- **Chart palette** — Set `chart_palette_preset` in your config to change the ordinal chart colours across the entire report
 
 ### Adding Slides
 
 You can create narrative slides directly in the browser using the "Add
 Slide" button on the Added Slides tab. Slides support rich text
-formatting. You can also pre-seed slides from the **AddedSlides** sheet
-in your config file (see [Template
-Reference](06_TEMPLATE_REFERENCE.md)).
+formatting (bold, italic, headings, bullets, blockquotes). You can also
+pre-seed slides from the **AddedSlides** sheet in your config file,
+including embedded images (see [Template Reference](06_TEMPLATE_REFERENCE.md)).
 
 ### Pinning Views
 
 Pin any chart or table by clicking the pin icon. Pinned items appear in
 the Pinned Views tab, where you can reorder them and export the entire
-collection as PNG images.
+collection as PNG images for use in presentations.
 
 ------------------------------------------------------------------------
 
