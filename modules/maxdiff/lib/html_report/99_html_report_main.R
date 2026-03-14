@@ -132,7 +132,7 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config) {
     return(list(status = "REFUSED", message = "Data transformation failed"))
   }
 
-  brand <- html_data$meta$brand_colour %||% "#1e3a5f"
+  brand <- html_data$meta$brand_colour %||% "#323367"
 
   # --- Layer 2: Tables ---
   tables <- list()

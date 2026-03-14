@@ -108,7 +108,7 @@ parse_html_report <- function(report_path, report_key) {
 #' @return "tracker", "tabs", "catdriver", "keydriver", "weighting", "confidence", or NULL
 detect_report_type <- function(html) {
   # Check for explicit meta tag first (all modern Turas reports include this)
-  for (type in c("tracker", "tabs", "catdriver", "keydriver", "weighting", "confidence")) {
+  for (type in c("tracker", "tabs", "catdriver", "keydriver", "weighting", "confidence", "maxdiff", "conjoint", "segment", "pricing")) {
     pattern <- sprintf('<meta\\s+name="turas-report-type"\\s+content="%s"', type)
     if (grepl(pattern, html)) return(type)
   }
@@ -128,6 +128,16 @@ detect_report_type <- function(html) {
   }
   if (grepl('class="wt-header"', html, fixed = TRUE)) {
     return("weighting")
+  }
+  if (grepl('class="md-header"', html, fixed = TRUE) &&
+      grepl('Turas MaxDiff', html, fixed = TRUE)) {
+    return("maxdiff")
+  }
+  if (grepl('class="cj-header"', html, fixed = TRUE)) {
+    return("conjoint")
+  }
+  if (grepl('class="seg-header"', html, fixed = TRUE)) {
+    return("segment")
   }
   return(NULL)
 }
@@ -199,6 +209,18 @@ extract_header <- function(html, report_type) {
   } else if (report_type == "weighting") {
     # Weighting: <div class="wt-header">...</div>
     m <- regexpr('<div class="wt-header">[\\s\\S]*?</div>\\s*</div>\\s*</div>', html, perl = TRUE)
+    if (m > 0) return(regmatches(html, m))
+  } else if (report_type == "maxdiff") {
+    # MaxDiff: <header class="md-header">...</header>
+    m <- regexpr('<header class="md-header">[\\s\\S]*?</header>', html, perl = TRUE)
+    if (m > 0) return(regmatches(html, m))
+  } else if (report_type == "conjoint") {
+    # Conjoint: <header class="cj-header">...</header>
+    m <- regexpr('<header class="cj-header">[\\s\\S]*?</header>', html, perl = TRUE)
+    if (m > 0) return(regmatches(html, m))
+  } else if (report_type == "segment") {
+    # Segment: <div class="seg-header">...</div>
+    m <- regexpr('<div class="seg-header">[\\s\\S]*?</div>\\s*</div>', html, perl = TRUE)
     if (m > 0) return(regmatches(html, m))
   } else {
     # Tabs: <div class="header">...</div> (up to report-tabs)

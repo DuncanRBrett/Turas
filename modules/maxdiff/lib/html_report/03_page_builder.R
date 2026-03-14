@@ -1,8 +1,10 @@
 # ==============================================================================
-# MAXDIFF HTML REPORT - PAGE BUILDER - TURAS V11.0
+# MAXDIFF HTML REPORT - PAGE BUILDER - TURAS V11.1
 # ==============================================================================
-# Assembles the full HTML document from tables, charts, and data
-# Layer 4 of the 4-layer HTML report pipeline
+# Assembles the full HTML document from tables, charts, and data.
+# Matches Turas platform standard: dark gradient header, logo, branding,
+# badge bar, tab navigation, about panel, help overlay.
+# All output is a self-contained HTML string — no htmltools dependency.
 # ==============================================================================
 
 htmlEscape <- function(x) {
@@ -15,6 +17,37 @@ htmlEscape <- function(x) {
 }
 
 `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
+
+
+# ==============================================================================
+# LOGO RESOLUTION
+# ==============================================================================
+
+#' Resolve a file path to a base64 data URI
+#'
+#' @param logo_path File path to an image
+#' @return Base64 data URI string, or NULL if unavailable
+#' @keywords internal
+md_resolve_logo_uri <- function(logo_path) {
+  if (is.null(logo_path) || !nzchar(logo_path)) return(NULL)
+  if (!file.exists(logo_path)) return(NULL)
+  tryCatch({
+    ext <- tolower(tools::file_ext(logo_path))
+    mime <- switch(ext,
+      png = "image/png",
+      jpg = , jpeg = "image/jpeg",
+      svg = "image/svg+xml",
+      gif = "image/gif",
+      "image/png"
+    )
+    if (requireNamespace("base64enc", quietly = TRUE)) {
+      base64enc::dataURI(file = logo_path, mime = mime)
+    } else {
+      raw_data <- readBin(logo_path, "raw", file.info(logo_path)$size)
+      paste0("data:", mime, ";base64,", base64enc::base64encode(raw_data))
+    }
+  }, error = function(e) NULL)
+}
 
 
 # ==============================================================================
@@ -32,19 +65,20 @@ htmlEscape <- function(x) {
 #' @keywords internal
 build_maxdiff_page <- function(html_data, tables, charts, config) {
 
-  brand <- html_data$meta$brand_colour %||% "#1e3a5f"
-  accent <- html_data$meta$accent_colour %||% "#2aa198"
+  brand <- html_data$meta$brand_colour %||% "#323367"
+  accent <- html_data$meta$accent_colour %||% "#CC9900"
   project_name <- htmlEscape(html_data$meta$project_name %||% "MaxDiff Analysis")
 
   css <- build_md_css(brand, accent)
+  print_css <- build_md_print_css()
   meta_tags <- build_md_meta(html_data)
+  header <- build_md_header(html_data, config)
 
   # Determine which tabs to show
   has_preferences <- !is.null(html_data$preferences$scores)
   has_items <- !is.null(html_data$items$count_data)
   has_segments <- !is.null(html_data$segments)
   has_turf <- !is.null(html_data$turf)
-  has_diagnostics <- TRUE  # Always show
 
   # Build panels
   summary_panel <- build_summary_panel(html_data, tables, charts)
@@ -53,6 +87,8 @@ build_maxdiff_page <- function(html_data, tables, charts, config) {
   segments_panel <- if (has_segments) build_segments_panel(html_data, tables, charts) else ""
   turf_panel <- if (has_turf) build_turf_panel(html_data, tables, charts) else ""
   diag_panel <- build_diagnostics_panel(html_data, tables, charts)
+  about_panel <- build_md_about_panel(html_data$meta, config)
+  help_overlay <- build_md_help_overlay()
 
   # Build tab navigation
   tab_buttons <- '<button class="md-tab-btn active" data-tab="summary">Summary</button>'
@@ -61,6 +97,7 @@ build_maxdiff_page <- function(html_data, tables, charts, config) {
   if (has_turf) tab_buttons <- paste0(tab_buttons, '\n<button class="md-tab-btn" data-tab="turf">Portfolio (TURF)</button>')
   if (has_segments) tab_buttons <- paste0(tab_buttons, '\n<button class="md-tab-btn" data-tab="segments">Segments</button>')
   tab_buttons <- paste0(tab_buttons, '\n<button class="md-tab-btn" data-tab="diagnostics">Diagnostics</button>')
+  tab_buttons <- paste0(tab_buttons, '\n<button class="md-tab-btn" data-tab="about">About</button>')
 
   js <- build_md_js()
 
@@ -68,44 +105,35 @@ build_maxdiff_page <- function(html_data, tables, charts, config) {
   sprintf('<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  %s
-  <title>%s - MaxDiff Report</title>
-  <style>%s</style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+%s
+<title>%s - MaxDiff Report</title>
+<style>%s</style>
+<style>%s</style>
 </head>
 <body>
-  <div class="md-header">
-    <h1>%s</h1>
-    <div class="md-meta">
-      <span>MaxDiff Analysis</span>
-      <span>%s</span>
-      <span>n = %s</span>
-      <span>Generated: %s</span>
-    </div>
-  </div>
-  <div class="md-container">
-    <div class="md-tab-nav">%s</div>
-    <div class="md-content">
-      %s
-      %s
-      %s
-      %s
-      %s
-      %s
-    </div>
-  </div>
-  <div class="md-footer">Generated by TURAS Analytics Platform &middot; MaxDiff Module v11.0 &middot; %s</div>
-  <script>%s</script>
+%s
+<div class="md-tab-nav">%s</div>
+<div class="md-container">
+%s
+%s
+%s
+%s
+%s
+%s
+%s
+</div>
+%s
+<footer class="md-footer">Generated by TURAS Analytics Platform &middot; MaxDiff Module v11.1 &middot; %s</footer>
+<script>%s</script>
 </body>
 </html>',
     meta_tags,
     project_name,
     css,
-    project_name,
-    html_data$meta$method %||% "Analysis",
-    html_data$meta$n_total %||% "0",
-    html_data$meta$generated %||% "",
+    print_css,
+    header,
     tab_buttons,
     summary_panel,
     pref_panel,
@@ -113,9 +141,208 @@ build_maxdiff_page <- function(html_data, tables, charts, config) {
     turf_panel,
     segments_panel,
     diag_panel,
+    about_panel,
+    help_overlay,
     format(Sys.Date(), "%B %Y"),
     js
   )
+}
+
+
+# ==============================================================================
+# HEADER BUILDER
+# ==============================================================================
+
+#' Build the Turas-standard gradient header for MaxDiff reports
+#'
+#' @param html_data Structured data from transform_maxdiff_for_html()
+#' @param config Module configuration
+#' @return Character string of header HTML
+#' @keywords internal
+build_md_header <- function(html_data, config) {
+
+  meta <- html_data$meta
+  summary <- html_data$summary
+
+  # --- Logo ---
+  logo_html <- ""
+  logo_uri <- md_resolve_logo_uri(meta$researcher_logo_path)
+  if (!is.null(logo_uri) && nzchar(logo_uri)) {
+    logo_html <- sprintf(
+      '<div style="width:72px;height:72px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><img src="%s" alt="Logo" class="md-header-logo"/></div>',
+      logo_uri
+    )
+  }
+
+  # --- Help button ---
+  help_btn <- '<button class="md-help-btn" onclick="toggleHelpOverlay()" title="Show help guide">?</button>'
+
+  # --- Prepared by line ---
+  prepared_parts <- character()
+  company <- meta$company_name %||% ""
+  researcher <- meta$researcher_name %||% ""
+  client <- meta$client_name %||% ""
+
+  if (nzchar(company)) {
+    if (nzchar(researcher)) {
+      prepared_parts <- c(prepared_parts, sprintf(
+        'Prepared by <strong>%s</strong> (%s)',
+        htmlEscape(researcher), htmlEscape(company)
+      ))
+    } else {
+      prepared_parts <- c(prepared_parts, sprintf(
+        'Prepared by <strong>%s</strong>', htmlEscape(company)
+      ))
+    }
+  }
+  if (nzchar(client)) {
+    prepared_parts <- c(prepared_parts, sprintf(
+      'for <strong>%s</strong>', htmlEscape(client)
+    ))
+  }
+  prepared_html <- if (length(prepared_parts) > 0) {
+    sprintf('<div class="md-header-prepared">%s</div>', paste(prepared_parts, collapse = " "))
+  } else ""
+
+  # --- Badge bar ---
+  badges <- character()
+  badges <- c(badges, sprintf(
+    '<span class="md-badge-item">%s</span>',
+    toupper(meta$method %||% "Analysis")
+  ))
+  if (!is.null(meta$n_total) && meta$n_total > 0) {
+    badges <- c(badges, sprintf(
+      '<span class="md-badge-item">n&nbsp;=&nbsp;<strong>%s</strong></span>',
+      format(meta$n_total, big.mark = ",")
+    ))
+  }
+  badges <- c(badges, sprintf(
+    '<span class="md-badge-item"><strong>%s</strong>&nbsp;Items</span>',
+    meta$n_items %||% "0"
+  ))
+  if (!is.null(summary$top_item) && nzchar(summary$top_item) && summary$top_item != "N/A") {
+    badges <- c(badges, sprintf(
+      '<span class="md-badge-item">Top:&nbsp;<strong>%s</strong></span>',
+      htmlEscape(summary$top_item)
+    ))
+  }
+  badges <- c(badges, sprintf(
+    '<span class="md-badge-item" id="md-header-date">Created %s</span>',
+    format(Sys.Date(), "%b %Y")
+  ))
+  badge_html <- paste(badges, collapse = '<span class="md-badge-sep"></span>')
+
+  sprintf(
+    '<header class="md-header">
+<div class="md-header-inner">
+<div class="md-header-top">
+<div class="md-header-branding">%s
+<div class="md-header-titles">
+<h1>Turas MaxDiff</h1>
+<div class="md-header-subtitle">MaxDiff Analysis Report</div>
+</div>
+</div>
+%s
+</div>
+<div class="md-header-title">%s</div>
+%s
+<div class="md-badge-bar">%s</div>
+</div>
+</header>',
+    logo_html, help_btn,
+    htmlEscape(meta$project_name %||% "MaxDiff Analysis"),
+    prepared_html, badge_html
+  )
+}
+
+
+# ==============================================================================
+# ABOUT PANEL
+# ==============================================================================
+
+#' Build About panel with analyst contact details
+#'
+#' @param meta Meta list from html_data
+#' @param config Module configuration
+#' @return Character string of About panel HTML
+#' @keywords internal
+build_md_about_panel <- function(meta, config) {
+
+  # Contact grid
+  contact_rows <- character()
+  fields <- list(
+    list(val = meta$researcher_name %||% "", label = "Analyst"),
+    list(val = config$project_settings$Analyst_Email %||% "", label = "Email"),
+    list(val = config$project_settings$Analyst_Phone %||% "", label = "Phone"),
+    list(val = meta$client_name %||% "", label = "Client"),
+    list(val = meta$company_name %||% "", label = "Company")
+  )
+  for (f in fields) {
+    if (nzchar(f$val)) {
+      val_html <- if (f$label == "Email") {
+        sprintf('<a href="mailto:%s">%s</a>', htmlEscape(f$val), htmlEscape(f$val))
+      } else htmlEscape(f$val)
+      contact_rows <- c(contact_rows, sprintf(
+        '<div class="md-about-label">%s</div><div class="md-about-value">%s</div>',
+        f$label, val_html
+      ))
+    }
+  }
+  contact_html <- if (length(contact_rows) > 0) {
+    sprintf('<div class="md-about-grid">%s</div>', paste(contact_rows, collapse = "\n"))
+  } else ""
+
+  # Generation info
+  gen_info <- sprintf(
+    '<div class="md-about-grid">
+<div class="md-about-label">Generated</div><div class="md-about-value">%s</div>
+<div class="md-about-label">Module</div><div class="md-about-value">MaxDiff v11.1</div>
+<div class="md-about-label">Method</div><div class="md-about-value">%s</div>
+</div>',
+    meta$generated %||% format(Sys.Date(), "%Y-%m-%d"),
+    meta$method %||% "N/A"
+  )
+
+  sprintf(
+    '<div class="md-panel" id="panel-about">
+<div class="md-card">
+<h2>About This Report</h2>
+<div class="md-about-section">
+%s
+<div style="margin-top:16px;">%s</div>
+</div>
+</div>
+</div>',
+    contact_html, gen_info
+  )
+}
+
+
+# ==============================================================================
+# HELP OVERLAY
+# ==============================================================================
+
+#' Build help overlay for MaxDiff report
+#' @return Character string of help overlay HTML
+#' @keywords internal
+build_md_help_overlay <- function() {
+  '
+<div class="md-help-overlay" id="md-help-overlay" onclick="toggleHelpOverlay()">
+<div class="md-help-card" onclick="event.stopPropagation()">
+<h2>Quick Guide</h2>
+<ul>
+<li><span class="md-help-key">Tab navigation</span>Switch between report sections</li>
+<li><span class="md-help-key">Summary</span>Overview metrics and key finding</li>
+<li><span class="md-help-key">Preference Scores</span>Utility values and preference shares</li>
+<li><span class="md-help-key">Item Analysis</span>Best/worst selection frequencies</li>
+<li><span class="md-help-key">Portfolio (TURF)</span>Optimal item set for maximum reach</li>
+<li><span class="md-help-key">Segments</span>Preference differences across groups</li>
+<li><span class="md-help-key">Diagnostics</span>Model fit and convergence checks</li>
+<li><span class="md-help-key">About</span>Report metadata and analyst details</li>
+</ul>
+<div class="md-help-dismiss">Click anywhere to close</div>
+</div>
+</div>'
 }
 
 
@@ -327,35 +554,87 @@ build_md_css <- function(brand, accent) {
   --md-border: #e2e8f0;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f1f5f9; color: var(--md-text-primary); line-height: 1.5; font-size: 14px; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8f7f5; color: var(--md-text-primary); line-height: 1.6; font-size: 14px; -webkit-font-smoothing: antialiased; }
 
-.md-header { background: var(--md-brand); color: white; padding: 20px 28px; }
-.md-header h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
-.md-meta { display: flex; gap: 16px; font-size: 12px; opacity: 0.85; flex-wrap: wrap; }
+/* === HEADER === */
+.md-header {
+  background: linear-gradient(135deg, #1a2744 0%, #2a3f5f 100%);
+  color: white;
+  padding: 24px 40px 20px;
+  border-bottom: 3px solid BRAND_TOKEN;
+}
+.md-header-inner { display: flex; flex-direction: column; max-width: 1400px; margin: 0 auto; }
+.md-header-top { display: flex; align-items: center; justify-content: space-between; }
+.md-header-branding { display: flex; align-items: center; gap: 16px; }
+.md-header-logo { height: 56px; width: 56px; object-fit: contain; border-radius: 8px; }
+.md-header-titles h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.3px; line-height: 1.2; }
+.md-header-subtitle { color: rgba(255,255,255,0.5); font-size: 12px; margin-top: 2px; }
+.md-header-title { color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: -0.3px; margin-top: 14px; }
+.md-header-prepared { color: rgba(255,255,255,0.65); font-size: 13px; margin-top: 4px; }
+.md-header-prepared strong { font-weight: 600; }
 
-.md-container { max-width: 900px; margin: 0 auto; padding: 0 16px; }
-.md-tab-nav { display: flex; gap: 0; background: var(--md-bg-surface); border-bottom: 1px solid var(--md-border); border-radius: 8px 8px 0 0; overflow-x: auto; margin-top: 20px; }
-.md-tab-btn { background: transparent; border: none; padding: 10px 16px; font-size: 13px; font-weight: 500; color: var(--md-text-secondary); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; transition: color 0.15s; }
-.md-tab-btn:hover { color: var(--md-text-primary); }
+/* Badge bar */
+.md-badge-bar {
+  display: inline-flex; align-items: center; margin-top: 12px;
+  border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;
+  background: rgba(255,255,255,0.05);
+}
+.md-badge-item { display: inline-flex; align-items: center; padding: 4px 12px; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.85); }
+.md-badge-item strong { color: #fff; font-weight: 700; }
+.md-badge-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.20); flex-shrink: 0; }
+
+/* Help button */
+.md-help-btn {
+  width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.5);
+  background: transparent; color: rgba(255,255,255,0.8); font-size: 14px; font-weight: 700;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.md-help-btn:hover { background: rgba(255,255,255,0.1); }
+
+/* === TAB NAVIGATION === */
+.md-tab-nav {
+  display: flex; gap: 0; background: white; border-bottom: 2px solid var(--md-border);
+  padding: 0 40px; position: sticky; top: 0; z-index: 100; overflow-x: auto;
+}
+.md-tab-btn {
+  background: transparent; border: none; padding: 12px 20px; font-size: 13px; font-weight: 500;
+  color: var(--md-text-secondary); cursor: pointer; border-bottom: 3px solid transparent;
+  white-space: nowrap; transition: all 200ms;
+}
+.md-tab-btn:hover { color: var(--md-brand); }
 .md-tab-btn.active { color: var(--md-brand); border-bottom-color: var(--md-brand); }
 
-.md-content { background: var(--md-bg-surface); border-radius: 0 0 8px 8px; padding: 24px 28px; min-height: 300px; }
+/* === MAIN CONTENT === */
+.md-container { max-width: 1400px; margin: 0 auto; padding: 24px 40px 60px; }
 .md-panel { display: none; }
 .md-panel.active { display: block; }
 
+/* === CARDS === */
+.md-card {
+  background: white; border-radius: 8px; padding: 24px; margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.md-card h2 { font-size: 16px; font-weight: 600; color: var(--md-text-primary); margin-bottom: 16px; }
+
+/* === SECTIONS === */
 .md-section { margin-bottom: 28px; }
 .md-section h2 { font-size: 17px; font-weight: 600; color: var(--md-brand); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--md-border); }
 .md-section h3 { font-size: 14px; font-weight: 600; color: var(--md-text-primary); margin: 16px 0 8px; }
 
-.md-metrics { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-.md-metric-card { flex: 1; min-width: 120px; background: var(--md-bg-muted); border-radius: 8px; padding: 14px 12px; text-align: center; }
-.md-metric-value { font-size: 20px; font-weight: 700; color: var(--md-brand); }
-.md-metric-label { font-size: 11px; color: var(--md-text-secondary); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.3px; }
+/* === KPI CARDS === */
+.md-metrics { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+.md-metric-card {
+  flex: 1; min-width: 140px; background: white; border-radius: 8px; padding: 16px 20px;
+  text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.md-metric-value { font-size: 24px; font-weight: 700; color: var(--md-brand); }
+.md-metric-label { font-size: 11px; color: var(--md-text-secondary); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
 
+/* === CHARTS === */
 .md-chart-container { background: var(--md-bg-muted); border-radius: 8px; padding: 12px; margin: 12px 0; }
 .md-chart-title { font-size: 13px; font-weight: 600; color: var(--md-text-secondary); text-align: center; margin-bottom: 8px; }
 
-/* Tables */
+/* === TABLES === */
 .md-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; }
 .md-table-compact { font-size: 12px; }
 .md-th { background: var(--md-bg-muted); padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--md-text-secondary); border-bottom: 2px solid var(--md-border); }
@@ -371,12 +650,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .md-bar-bg { position: absolute; left: 0; top: 0; height: 100%; background: var(--md-brand); opacity: 0.10; border-radius: 3px; }
 .md-bar-label { position: relative; z-index: 1; padding-left: 4px; }
 
-/* Badges */
+/* === STATUS BADGES === */
 .md-badge-good { display: inline-block; background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
 .md-badge-warn { display: inline-block; background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
 .md-badge-poor { display: inline-block; background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
 
-/* Callouts */
+/* === CALLOUTS === */
 .md-callout { padding: 12px 16px; border-radius: 6px; margin: 12px 0; font-size: 13px; line-height: 1.5; }
 .md-callout-result { background: #eff6ff; border-left: 4px solid #3b82f6; }
 .md-callout-method { background: #f8fafc; border-left: 4px solid #94a3b8; }
@@ -386,19 +665,36 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .md-negative { color: #dc2626; }
 .md-empty { color: var(--md-text-secondary); font-style: italic; padding: 12px 0; }
 
-.md-footer { text-align: center; padding: 20px; font-size: 11px; color: var(--md-text-secondary); }
+/* === ABOUT PAGE === */
+.md-about-section { max-width: 700px; }
+.md-about-grid { display: grid; grid-template-columns: 120px 1fr; gap: 8px 16px; margin-bottom: 16px; }
+.md-about-label { font-size: 12px; font-weight: 500; color: var(--md-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+.md-about-value { font-size: 13px; color: #334155; }
+.md-about-value a { color: var(--md-brand); text-decoration: none; }
+.md-about-value a:hover { text-decoration: underline; }
 
-/* Print */
-@media print {
-  .md-tab-nav { display: none; }
-  .md-panel { display: block !important; page-break-inside: avoid; }
-  .md-header { background: white !important; color: var(--md-brand) !important; border-bottom: 2px solid var(--md-brand); }
-  body { background: white; }
+/* === HELP OVERLAY === */
+.md-help-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  z-index: 1000; align-items: center; justify-content: center;
 }
+.md-help-overlay.open { display: flex; }
+.md-help-card {
+  background: white; border-radius: 12px; padding: 32px; max-width: 500px; width: 90%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+.md-help-card h2 { font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 16px; }
+.md-help-card ul { list-style: none; padding: 0; }
+.md-help-card li { padding: 6px 0; font-size: 13px; color: #334155; display: flex; gap: 8px; }
+.md-help-key { font-weight: 600; color: var(--md-brand); min-width: 140px; flex-shrink: 0; }
+.md-help-dismiss { text-align: center; margin-top: 20px; font-size: 12px; color: #94a3b8; }
 
-/* Responsive */
-@media (max-width: 600px) {
-  .md-content { padding: 16px; }
+/* === FOOTER === */
+.md-footer { text-align: center; padding: 20px 40px; color: #94a3b8; font-size: 11px; border-top: 1px solid var(--md-border); }
+
+/* === RESPONSIVE === */
+@media (max-width: 768px) {
+  .md-header, .md-tab-nav, .md-container, .md-footer { padding-left: 16px; padding-right: 16px; }
   .md-metrics { flex-direction: column; }
   .md-tab-btn { padding: 8px 10px; font-size: 12px; }
 }'
@@ -410,11 +706,34 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 
 
 # ==============================================================================
+# PRINT CSS
+# ==============================================================================
+
+build_md_print_css <- function() {
+  '@media print {
+  .md-tab-nav { display: none !important; }
+  .md-help-overlay { display: none !important; }
+  .md-help-btn { display: none !important; }
+  .md-panel { display: block !important; page-break-inside: avoid; margin-bottom: 20px; }
+  .md-header { background: white !important; color: var(--md-brand) !important; border-bottom: 2px solid var(--md-brand); }
+  .md-header-title, .md-header-titles h1 { color: var(--md-brand) !important; }
+  .md-header-prepared, .md-header-subtitle { color: #64748b !important; }
+  .md-badge-bar { border-color: #e2e8f0 !important; }
+  .md-badge-item { color: #334155 !important; }
+  .md-badge-sep { background: #e2e8f0 !important; }
+  body { background: white; }
+  .md-container { max-width: 100%; padding: 0 20px; }
+}'
+}
+
+
+# ==============================================================================
 # JAVASCRIPT
 # ==============================================================================
 
 build_md_js <- function() {
   '(function() {
+  /* --- Tab navigation --- */
   var tabs = document.querySelectorAll(".md-tab-btn");
   var panels = document.querySelectorAll(".md-panel");
   tabs.forEach(function(tab) {
@@ -427,5 +746,11 @@ build_md_js <- function() {
       if (panel) panel.classList.add("active");
     });
   });
-})();'
+})();
+
+/* --- Help overlay --- */
+function toggleHelpOverlay() {
+  var overlay = document.getElementById("md-help-overlay");
+  if (overlay) overlay.classList.toggle("open");
+}'
 }

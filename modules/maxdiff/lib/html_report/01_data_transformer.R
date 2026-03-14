@@ -38,8 +38,8 @@ htmlEscape <- function(x) {
 transform_maxdiff_for_html <- function(maxdiff_results, config) {
 
   project_name <- config$project_settings$Project_Name %||% "MaxDiff Analysis"
-  brand_colour <- config$project_settings$Brand_Colour %||% "#1e3a5f"
-  accent_colour <- config$project_settings$Accent_Colour %||% "#2aa198"
+  brand_colour <- config$project_settings$Brand_Colour %||% "#323367"
+  accent_colour <- config$project_settings$Accent_Colour %||% "#CC9900"
 
   # Determine estimation method used
   has_hb <- !is.null(maxdiff_results$hb_results)
@@ -59,7 +59,12 @@ transform_maxdiff_for_html <- function(maxdiff_results, config) {
     method = method_label,
     generated = format(Sys.time(), "%Y-%m-%d %H:%M"),
     n_total = n_total,
-    n_items = n_items
+    n_items = n_items,
+    company_name = config$project_settings$Company_Name %||% "",
+    client_name = config$project_settings$Client_Name %||% "",
+    researcher_name = config$project_settings$Researcher_Name %||% "",
+    researcher_logo_path = config$project_settings$Researcher_Logo_Path %||% NULL,
+    client_logo_path = config$project_settings$Client_Logo_Path %||% NULL
   )
 
   # --- Build summary ---
