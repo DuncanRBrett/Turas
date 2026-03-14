@@ -240,7 +240,13 @@ function toggleChart(enabled) {
     div.style.display = enabled ? "block" : "none";
   });
   document.querySelectorAll(".export-chart-btn").forEach(function(btn) {
-    btn.style.display = enabled ? "inline-block" : "none";
+    // Skip clipboard buttons — they are controlled by clipboard API detection
+    if (btn.classList.contains("clipboard-btn")) {
+      if (enabled && window._clipboardAvailable) btn.style.display = "inline-block";
+      else btn.style.display = "none";
+    } else {
+      btn.style.display = enabled ? "inline-block" : "none";
+    }
   });
   document.querySelectorAll(".slide-export-group").forEach(function(grp) {
     grp.style.display = enabled ? "inline-block" : "none";

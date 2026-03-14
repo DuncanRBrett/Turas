@@ -111,9 +111,12 @@ Includes a `::before` pseudo-element with "KEY INSIGHT" small-caps label (9px, `
 
 ## Chart Conventions
 
-- **Stacked bars:** Labels inside segment only when segment > 20% of bar. Percentage only for 8-20%. Nothing for < 8%.
+- **Stacked bars:** Percentage-only labels inside segments (category names in legend, not in bars)
+  - Segments ≥ 8%: show percentage inside bar
+  - Segments 3–8%: visible coloured rect, no label
+  - Segments < 3%: not rendered (avoids distracting slivers); data shown in legend
 - **Label font:** 12px, weight 500, `font-variant-numeric: tabular-nums`
-- **Legend:** Includes percentage values alongside colour swatches
+- **Legend:** Includes percentage values alongside colour swatches — e.g. "Very Satisfied (9-10) (68%)"
 - **Bar corners:** `rx="3"` or `rx="4"` for rounded appearance
 - **Horizontal bars:** Single brand colour, `opacity: 0.85`
 
@@ -141,6 +144,21 @@ Includes a `::before` pseudo-element with "KEY INSIGHT" small-caps label (9px, `
 - `-webkit-print-color-adjust: exact; print-color-adjust: exact` for chart and heatmap colours
 - Hide all interactive controls (sidebar, toggles, buttons, editors)
 - Header converts to compact black text on white
+
+---
+
+## Pin Export & Clipboard
+
+Pinned views are designed as **tight widgets** for pasting into client PPT templates.
+
+| Button | Action | Details |
+|--------|--------|---------|
+| 📋 Copy | Copy to clipboard as PNG | Uses `navigator.clipboard.write()` with `ClipboardItem`. Falls back to PNG download if clipboard API unavailable. User can Ctrl+V directly into PowerPoint. |
+| 📷 Export | Download as PNG file | SVG-native rendering at 3× scale (3840px wide). White background. |
+
+**Rendering approach:** Both paths build a clean SVG (title, insight, chart, table) then rasterise to canvas at 3× resolution. No html2canvas dependency — pure SVG-to-canvas pipeline.
+
+**Visual feedback:** Clipboard button shows ✔ for 1.5s after successful copy.
 
 ---
 

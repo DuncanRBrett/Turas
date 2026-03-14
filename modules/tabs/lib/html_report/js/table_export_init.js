@@ -474,4 +474,14 @@ document.addEventListener("DOMContentLoaded", function() {
       toggleHelpOverlay();
     }
   } catch(e) {}
+
+  // Show clipboard buttons only when the Clipboard API is available
+  // (requires HTTPS or localhost — won't work on file:// URLs)
+  if (navigator.clipboard && typeof ClipboardItem !== "undefined") {
+    document.querySelectorAll(".clipboard-btn").forEach(function(btn) {
+      btn.style.display = "";
+    });
+    // Flag for dynamically created buttons (e.g. pinned cards re-rendered later)
+    window._clipboardAvailable = true;
+  }
 });

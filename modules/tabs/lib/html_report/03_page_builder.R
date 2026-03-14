@@ -760,23 +760,34 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     }
     .help-overlay.active { display: flex; align-items: center; justify-content: center; }
     .help-card {
-      background: #fff; border-radius: 12px; padding: 32px; max-width: 480px; width: 90%;
+      background: #fff; border-radius: 12px; padding: 28px 32px; max-width: 640px; width: 92%;
+      max-height: 85vh; overflow-y: auto;
       box-shadow: 0 20px 60px rgba(0,0,0,0.3); cursor: default;
     }
-    .help-card h2 { font-size: 18px; margin-bottom: 16px; color: BRAND; }
-    .help-card ul { list-style: none; padding: 0; }
-    .help-card li {
-      padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: #374151;
+    .help-card h2 { font-size: 20px; margin-bottom: 4px; color: BRAND; }
+    .help-card .help-subtitle { font-size: 12px; color: #94a3b8; margin-bottom: 20px; }
+    .help-card h3 {
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+      color: #94a3b8; margin: 18px 0 8px; padding-top: 14px; border-top: 1px solid #f1f5f9;
     }
-    .help-card li:last-child { border-bottom: none; }
+    .help-card h3:first-of-type { border-top: none; padding-top: 0; margin-top: 8px; }
+    .help-card ul { list-style: none; padding: 0; margin: 0; }
+    .help-card li {
+      padding: 5px 0; font-size: 13px; color: #374151; line-height: 1.4;
+    }
     .help-card .help-key {
       display: inline-block; background: #f1f5f9; border-radius: 4px;
       padding: 2px 8px; font-weight: 600; color: BRAND; margin-right: 8px;
-      font-size: 12px; min-width: 90px; text-align: center;
+      font-size: 11px; min-width: 100px; text-align: center;
     }
     .help-card .help-dismiss {
-      margin-top: 16px; text-align: center; color: #94a3b8; font-size: 12px;
+      margin-top: 18px; text-align: center; color: #94a3b8; font-size: 12px;
     }
+    .help-card .help-tip {
+      font-size: 12px; color: #64748b; background: #f8fafc; border-radius: 6px;
+      padding: 10px 14px; margin-top: 14px; line-height: 1.5;
+    }
+    .help-card .help-tip strong { color: BRAND; }
   '
 
   css_closing <- '
@@ -834,6 +845,21 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     }
     .qual-slide-title:focus { border-bottom-color: #e2e8f0; }
     .qual-slide-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .qual-img-preview {
+      position: relative; display: inline-block; margin-bottom: 12px;
+      border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;
+      max-width: 100%;
+    }
+    .qual-img-thumb {
+      display: block; max-width: 100%; max-height: 300px; object-fit: contain;
+    }
+    .qual-img-remove {
+      position: absolute; top: 6px; right: 6px; width: 24px; height: 24px;
+      border-radius: 50%; border: none; background: rgba(0,0,0,0.5); color: #fff;
+      font-size: 16px; line-height: 22px; text-align: center; cursor: pointer;
+      opacity: 0; transition: opacity 0.2s;
+    }
+    .qual-img-preview:hover .qual-img-remove { opacity: 1; }
     .qual-md-editor {
       width: 100%; min-height: 100px; padding: 12px; font-size: 13px;
       border: 1px solid #e2e8f0; border-radius: 6px; font-family: monospace;
@@ -1375,17 +1401,103 @@ build_help_overlay <- function() {
       class = "help-card",
       onclick = "event.stopPropagation()",
       htmltools::tags$h2("Quick Guide"),
+      htmltools::tags$div(class = "help-subtitle", "Everything you need to know to use this report"),
+
+      # --- Navigating ---
+      htmltools::tags$h3("Navigating the Report"),
       htmltools::tags$ul(
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Column headers"), "Click to sort rows by that column"),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Banner tabs"), "Switch between cross-tabulation groups"),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Column chips"), "Show/hide individual columns in the table"),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Chart toggle"), "Show or hide chart visualisations"),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Chart chips"), "Compare columns side-by-side in charts"),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "\u2715 on rows"), "Hover any data row to exclude it from the chart"),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "+ Add Insight"), "Add a text note to any question"),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Save Report"), "Download HTML with your insights embedded"),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Export buttons"), "Download chart PNG, slide PNG, CSV, or Excel")
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Sidebar"),
+          "Browse all questions. Type in the search box to filter."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Banner tabs"),
+          "Switch between cross-tabulation groups (e.g. Total, Age, Region)."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Summary"),
+          "Dashboard with key metrics, gauges, and significant findings."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Crosstabs"),
+          "Full data tables with charts for every question.")
       ),
+
+      # --- Tables ---
+      htmltools::tags$h3("Working with Tables"),
+      htmltools::tags$ul(
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Column headers"),
+          "Click any header to sort the table by that column."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Column chips"),
+          "Toggle individual columns on or off to focus the view."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Heatmap"),
+          "Tick the Heatmap checkbox to colour-code cells by value."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Show count"),
+          "Tick to display raw frequencies alongside percentages.")
+      ),
+
+      # --- Charts ---
+      htmltools::tags$h3("Charts"),
+      htmltools::tags$ul(
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Chart toggle"),
+          "Tick the Chart checkbox to show or hide the chart."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Chart chips"),
+          "Select which columns appear in the chart to compare groups."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "\u2715 on rows"),
+          "Hover a data row and click \u2715 to exclude it from the chart.")
+      ),
+
+      # --- Insights & Notes ---
+      htmltools::tags$h3("Adding Insights"),
+      htmltools::tags$ul(
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "+ Add Insight"),
+          "Click below any question to add your analysis or commentary."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Summary text"),
+          "The Summary tab has editable text areas for Background and Executive Summary.")
+      ),
+
+      # --- Pinning ---
+      htmltools::tags$h3("Pinning Key Findings"),
+      htmltools::tags$ul(
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "\U0001F4CC Pin"),
+          "Click the pin icon on any question to save it to your Pinned Views deck."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Pinned Views"),
+          "A curated set of your key findings. Reorder with \u25B2\u25BC, remove with \u2715."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Section dividers"),
+          "Use 'Add Section' in Pinned Views to organise pins into groups."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Summary pins"),
+          "Pin gauge sections or sig findings from the Summary tab too.")
+      ),
+
+      # --- Added Slides ---
+      htmltools::tags$h3("Added Slides"),
+      htmltools::tags$ul(
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Add Slide"),
+          "Create narrative slides with formatted text (supports **bold**, *italic*, bullets, headings)."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "\U0001F5BC Add image"),
+          "Upload a chart, screenshot, or diagram to any slide. Images are resized automatically."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "\U0001F4CC Pin slide"),
+          "Pin an Added Slide to include it alongside your data findings in Pinned Views.")
+      ),
+
+      # --- Exporting ---
+      htmltools::tags$h3("Exporting & Sharing"),
+      htmltools::tags$ul(
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Save Report"),
+          "Downloads the HTML file with all your insights, pins, and edits preserved."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "\U0001F4F7 Export PNG"),
+          "Download any chart or pinned card as a high-resolution PNG image."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "\U0001F4CB Copy"),
+          "Copy a chart or pin to your clipboard, then paste straight into PowerPoint."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Print / PDF"),
+          "Print your Pinned Views as a paginated document (one finding per page)."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "CSV / Excel"),
+          "Export table data for any question in spreadsheet format.")
+      ),
+
+      # --- Tip ---
+      htmltools::tags$div(class = "help-tip",
+        htmltools::HTML(paste0(
+          "<strong>Tip:</strong> This report is a live working document. ",
+          "Add insights, pin key findings, create narrative slides, then <strong>Save</strong> ",
+          "to keep everything. Re-open the saved file any time to continue where you left off. ",
+          "Press <strong>?</strong> to show this guide again."
+        ))
+      ),
+
       htmltools::tags$div(class = "help-dismiss", "Click anywhere to close")
     )
   )
@@ -1764,6 +1876,15 @@ build_question_containers <- function(questions, tables, banner_groups,
           )
         },
         if (has_chart) {
+          htmltools::tags$button(
+            class = "export-btn export-chart-btn clipboard-btn",
+            style = "margin-left:4px;display:none",
+            title = "Copy chart to clipboard",
+            onclick = sprintf("copyChartToClipboard('%s')", q_code),
+            "\U0001F4CB Copy Chart"
+          )
+        },
+        if (has_chart) {
           htmltools::tags$div(
             class = "slide-export-group",
             style = "display:none;position:relative;margin-left:8px;",
@@ -1898,6 +2019,9 @@ build_qual_slide_card <- function(slide_id, title, content_md) {
       ),
       htmltools::tags$div(
         class = "qual-slide-actions",
+        htmltools::tags$button(class = "export-btn", title = "Add image",
+                               onclick = sprintf("triggerQualImage('%s')", slide_id),
+                               htmltools::HTML("&#x1F5BC;")),
         htmltools::tags$button(class = "export-btn", title = "Pin this slide",
                                onclick = sprintf("pinQualSlide('%s')", slide_id),
                                htmltools::HTML("&#x1F4CC;")),
@@ -1913,6 +2037,18 @@ build_qual_slide_card <- function(slide_id, title, content_md) {
                                htmltools::HTML("&#x2715;"))
       )
     ),
+    # Image preview (hidden until image uploaded)
+    htmltools::tags$div(class = "qual-img-preview", style = "display:none;",
+      htmltools::tags$img(class = "qual-img-thumb"),
+      htmltools::tags$button(class = "qual-img-remove",
+                             onclick = sprintf("removeQualImage('%s')", slide_id),
+                             title = "Remove image",
+                             htmltools::HTML("&times;"))
+    ),
+    # Hidden file input for image upload
+    htmltools::tags$input(type = "file", class = "qual-img-input",
+                          accept = "image/*", style = "display:none;",
+                          onchange = sprintf("handleQualImage('%s', this)", slide_id)),
     # Markdown editor (shown when editing)
     htmltools::tags$textarea(
       class = "qual-md-editor",
@@ -1922,8 +2058,9 @@ build_qual_slide_card <- function(slide_id, title, content_md) {
     ),
     # Rendered output (shown when not editing)
     htmltools::tags$div(class = "qual-md-rendered"),
-    # Hidden store for save persistence
-    htmltools::tags$textarea(class = "qual-md-store", style = "display:none;", content_md)
+    # Hidden stores for save persistence
+    htmltools::tags$textarea(class = "qual-md-store", style = "display:none;", content_md),
+    htmltools::tags$textarea(class = "qual-img-store", style = "display:none;")
   )
 }
 

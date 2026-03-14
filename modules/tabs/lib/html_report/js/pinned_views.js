@@ -224,6 +224,15 @@ function renderPinnedCards() {
       downBtn.onclick = function() { movePinned(idx, idx + 1); };
       controls.appendChild(downBtn);
     }
+    if (window._clipboardAvailable) {
+      var clipBtn = document.createElement("button");
+      clipBtn.className = "export-btn clipboard-btn";
+      clipBtn.style.cssText = "padding:3px 8px;font-size:11px;";
+      clipBtn.innerHTML = "&#x1F4CB;";
+      clipBtn.title = "Copy to clipboard (paste into PowerPoint)";
+      clipBtn.onclick = (function(id) { return function() { copyPinnedCardToClipboard(id); }; })(pin.id);
+      controls.appendChild(clipBtn);
+    }
     var exportBtn = document.createElement("button");
     exportBtn.className = "export-btn";
     exportBtn.style.cssText = "padding:3px 8px;font-size:11px;";
@@ -258,6 +267,17 @@ function renderPinnedCards() {
         insightDiv.textContent = pin.insightText;
       }
       card.appendChild(insightDiv);
+    }
+
+    // Image (custom slide image)
+    if (pin.imageData) {
+      var imgDiv = document.createElement("div");
+      imgDiv.style.cssText = "margin-bottom:12px;text-align:center;";
+      var imgEl = document.createElement("img");
+      imgEl.src = pin.imageData;
+      imgEl.style.cssText = "max-width:100%;max-height:500px;border-radius:6px;border:1px solid #e2e8f0;";
+      imgDiv.appendChild(imgEl);
+      card.appendChild(imgDiv);
     }
 
     // Chart (visual pattern)
@@ -377,8 +397,16 @@ function exportPinnedCardPNG(pinId) {
   var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 24 : 0;
   var insightY = contentTop;
 
-  // 2. Chart dimensions (full width)
-  var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 8 : 0);
+  // 2. Image dimensions (custom slide images — between insight and chart)
+  var imageTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 8 : 0);
+  var imageH = 0;
+  if (pin.imageData && pin.imageWidth && pin.imageHeight) {
+    var imgScale = usableW / pin.imageWidth;
+    imageH = Math.round(pin.imageHeight * imgScale);
+  }
+
+  // 3. Chart dimensions (full width)
+  var chartTopY = imageTopY + imageH + (imageH > 0 ? 8 : 0);
   var chartH = 0, hasChart = false;
   var chartTemp = null;
   if (pin.chartSvg) {
@@ -396,7 +424,7 @@ function exportPinnedCardPNG(pinId) {
     }
   }
 
-  // 3. Table dimensions (full width)
+  // 4. Table dimensions (full width)
   var tableTopY = chartTopY + chartH + (chartH > 0 ? 8 : 0);
   var tableH = 0;
   if (pin.tableHtml) {
@@ -409,6 +437,7 @@ function exportPinnedCardPNG(pinId) {
 
   var svg = document.createElementNS(ns, "svg");
   svg.setAttribute("xmlns", ns);
+  svg.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
   svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
   svg.setAttribute("style", "font-family:" + fontFamily + ";");
 
@@ -459,7 +488,22 @@ function exportPinnedCardPNG(pinId) {
     svg.appendChild(insRes.element);
   }
 
-  // 2. Chart
+  // 2. Image (custom slide image)
+  if (pin.imageData && imageH > 0) {
+    var imgScale2 = usableW / pin.imageWidth;
+    var imgW = Math.round(pin.imageWidth * imgScale2);
+    var imgX = pad + Math.round((usableW - imgW) / 2); // centre horizontally
+    var svgImg = document.createElementNS(ns, "image");
+    svgImg.setAttribute("x", imgX);
+    svgImg.setAttribute("y", imageTopY);
+    svgImg.setAttribute("width", imgW);
+    svgImg.setAttribute("height", imageH);
+    svgImg.setAttributeNS("http://www.w3.org/1999/xlink", "href", pin.imageData);
+    svgImg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    svg.appendChild(svgImg);
+  }
+
+  // 3. Chart
   if (hasChart && chartTemp) {
     var chartClone = chartTemp.cloneNode(true);
     var cvb = chartClone.getAttribute("viewBox").split(" ").map(Number);
@@ -470,7 +514,7 @@ function exportPinnedCardPNG(pinId) {
     svg.appendChild(cG);
   }
 
-  // 3. Table
+  // 4. Table
   if (pin.tableHtml) {
     var tDiv = document.createElement("div");
     tDiv.innerHTML = pin.tableHtml;
@@ -503,6 +547,221 @@ function exportPinnedCardPNG(pinId) {
     canvas.toBlob(function(blob) {
       var slug = (pin.qCode || "pin").replace(/[^a-zA-Z0-9]/g, "_");
       downloadBlob(blob, "pin_" + slug + "_slide.png");
+    }, "image/png");
+  };
+  sImg.src = url;
+}
+
+/**
+ * Copy a pinned card to clipboard as PNG (for pasting into PowerPoint).
+ * Re-uses the same SVG-native rendering as exportPinnedCardPNG but writes
+ * to clipboard instead of downloading a file.
+ * @param {string} pinId - The pin ID
+ */
+function copyPinnedCardToClipboard(pinId) {
+  var pin = null;
+  for (var i = 0; i < pinnedViews.length; i++) {
+    if (pinnedViews[i].id === pinId) { pin = pinnedViews[i]; break; }
+  }
+  if (!pin || pin.type === "section") return;
+
+  // Build the same SVG as exportPinnedCardPNG
+  var ns = "http://www.w3.org/2000/svg";
+  var W = 1280, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
+  var pad = 20;
+  var scale = 3;
+  var usableW = W - pad * 2;
+  var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand-colour").trim() || BRAND_COLOUR;
+
+  var titleFullText = (pin.pinType === "text_box" || pin.pinType === "heatmap")
+    ? pin.qTitle
+    : pin.qCode + " - " + pin.qTitle;
+  var titleLines = wrapTextLines(titleFullText, usableW, 9.5);
+  var titleLineH = 20;
+  var titleStartY = pad + 12;
+  var titleBlockH = titleLines.length * titleLineH;
+  var metaText = (pin.pinType === "text_box" || pin.pinType === "heatmap")
+    ? ""
+    : "Base: " + (pin.baseText || "\u2014") + " \u00B7 Banner: " + (pin.bannerLabel || "");
+  var metaY = titleStartY + titleBlockH + 4;
+  var contentTop = metaY + 12;
+
+  var insightLines = wrapTextLines(pin.insightText, usableW - 16, 7);
+  var insightLineH = 17;
+  var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 24 : 0;
+  var insightY = contentTop;
+
+  // Image dimensions (custom slide images)
+  var imageTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 8 : 0);
+  var imageH = 0;
+  if (pin.imageData && pin.imageWidth && pin.imageHeight) {
+    var imgScale = usableW / pin.imageWidth;
+    imageH = Math.round(pin.imageHeight * imgScale);
+  }
+
+  var chartTopY = imageTopY + imageH + (imageH > 0 ? 8 : 0);
+  var chartH = 0, hasChart = false;
+  var chartTemp = null;
+  if (pin.chartSvg) {
+    var tempDiv = document.createElement("div");
+    tempDiv.innerHTML = pin.chartSvg;
+    chartTemp = tempDiv.querySelector("svg");
+    if (chartTemp) {
+      hasChart = true;
+      var vb = chartTemp.getAttribute("viewBox");
+      if (vb) {
+        var parts = vb.split(" ").map(Number);
+        var cScale = usableW / parts[2];
+        chartH = parts[3] * cScale;
+      }
+    }
+  }
+
+  var tableTopY = chartTopY + chartH + (chartH > 0 ? 8 : 0);
+  var tableH = 0;
+  if (pin.tableHtml) {
+    var countRows = (pin.tableHtml.match(/<tr/g) || []).length;
+    tableH = countRows * 18 + 4;
+  }
+
+  var totalH = tableTopY + tableH + pad + 8;
+  if (totalH < 200) totalH = 200;
+
+  var svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("xmlns", ns);
+  svg.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+  svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
+  svg.setAttribute("style", "font-family:" + fontFamily + ";");
+
+  // White background (PPT paste needs opaque background)
+  var bg = document.createElementNS(ns, "rect");
+  bg.setAttribute("width", W); bg.setAttribute("height", totalH);
+  bg.setAttribute("fill", "#ffffff");
+  svg.appendChild(bg);
+
+  // Brand accent bar
+  var accentBar = document.createElementNS(ns, "rect");
+  accentBar.setAttribute("x", "0"); accentBar.setAttribute("y", "0");
+  accentBar.setAttribute("width", W); accentBar.setAttribute("height", "4");
+  accentBar.setAttribute("fill", brandColour);
+  svg.appendChild(accentBar);
+
+  var titleResult = createWrappedText(ns, titleLines, pad, titleStartY, titleLineH,
+    { fill: "#1a2744", "font-size": "18", "font-weight": "700" });
+  svg.appendChild(titleResult.element);
+
+  var metaEl = document.createElementNS(ns, "text");
+  metaEl.setAttribute("x", pad); metaEl.setAttribute("y", metaY);
+  metaEl.setAttribute("fill", "#94a3b8"); metaEl.setAttribute("font-size", "12");
+  metaEl.textContent = metaText;
+  svg.appendChild(metaEl);
+
+  var isTextBox = pin.pinType === "text_box";
+
+  if (insightLines.length > 0) {
+    var aH = Math.max(28, insightLines.length * insightLineH + 12);
+    var insBg = document.createElementNS(ns, "rect");
+    insBg.setAttribute("x", pad); insBg.setAttribute("y", insightY + 2);
+    insBg.setAttribute("width", usableW); insBg.setAttribute("height", aH);
+    insBg.setAttribute("rx", "4");
+    insBg.setAttribute("fill", isTextBox ? "#f8fafc" : "#f0f4ff");
+    svg.appendChild(insBg);
+    if (!isTextBox) {
+      var iB = document.createElementNS(ns, "rect");
+      iB.setAttribute("x", pad); iB.setAttribute("y", insightY + 2);
+      iB.setAttribute("width", "4"); iB.setAttribute("height", aH);
+      iB.setAttribute("fill", BRAND_COLOUR); iB.setAttribute("rx", "2");
+      svg.appendChild(iB);
+    }
+    var insFontSize = isTextBox ? "14" : "13";
+    var insXOffset = isTextBox ? 12 : 14;
+    var insRes = createWrappedText(ns, insightLines, pad + insXOffset, insightY + 18, insightLineH,
+      { fill: "#1a2744", "font-size": insFontSize, "font-weight": isTextBox ? "400" : "500" });
+    svg.appendChild(insRes.element);
+  }
+
+  // Image (custom slide image)
+  if (pin.imageData && imageH > 0) {
+    var imgScale2 = usableW / pin.imageWidth;
+    var imgW = Math.round(pin.imageWidth * imgScale2);
+    var imgX = pad + Math.round((usableW - imgW) / 2);
+    var svgImg = document.createElementNS(ns, "image");
+    svgImg.setAttribute("x", imgX);
+    svgImg.setAttribute("y", imageTopY);
+    svgImg.setAttribute("width", imgW);
+    svgImg.setAttribute("height", imageH);
+    svgImg.setAttributeNS("http://www.w3.org/1999/xlink", "href", pin.imageData);
+    svgImg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    svg.appendChild(svgImg);
+  }
+
+  if (hasChart && chartTemp) {
+    var chartClone = chartTemp.cloneNode(true);
+    var cvb = chartClone.getAttribute("viewBox").split(" ").map(Number);
+    var cScale2 = usableW / cvb[2];
+    var cG = document.createElementNS(ns, "g");
+    cG.setAttribute("transform", "translate(" + pad + "," + chartTopY + ") scale(" + cScale2 + ")");
+    while (chartClone.firstChild) cG.appendChild(chartClone.firstChild);
+    svg.appendChild(cG);
+  }
+
+  if (pin.tableHtml) {
+    var tDiv = document.createElement("div");
+    tDiv.innerHTML = pin.tableHtml;
+    var tRows = extractSlideTableData({
+      querySelector: function(sel) { return tDiv.querySelector(sel); },
+      querySelectorAll: function(sel) { return tDiv.querySelectorAll(sel); }
+    });
+    if (tRows) {
+      renderTableSVG(ns, svg, tRows, pad, tableTopY, usableW);
+    }
+  }
+
+  // Render to canvas and copy to clipboard
+  var svgData = new XMLSerializer().serializeToString(svg);
+  var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+  var url = URL.createObjectURL(svgBlob);
+  var sImg = new Image();
+
+  // Find the button that triggered this to show feedback
+  var cardEl = document.querySelector('.pinned-card[data-pin-id="' + pinId + '"]');
+  var clipBtnEl = cardEl ? cardEl.querySelector('button[title*="clipboard"]') : null;
+
+  sImg.onerror = function() {
+    URL.revokeObjectURL(url);
+    alert("Clipboard copy failed. Try the PNG download button instead.");
+  };
+  sImg.onload = function() {
+    var canvas = document.createElement("canvas");
+    canvas.width = W * scale; canvas.height = totalH * scale;
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(sImg, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+
+    canvas.toBlob(function(blob) {
+      if (navigator.clipboard && navigator.clipboard.write) {
+        navigator.clipboard.write([
+          new ClipboardItem({ "image/png": blob })
+        ]).then(function() {
+          // Brief visual feedback on the button
+          if (clipBtnEl) {
+            var orig = clipBtnEl.innerHTML;
+            clipBtnEl.innerHTML = "&#x2714;";
+            clipBtnEl.style.color = "#4a7c6f";
+            setTimeout(function() { clipBtnEl.innerHTML = orig; clipBtnEl.style.color = ""; }, 1500);
+          }
+        }).catch(function() {
+          // Fallback: download as PNG if clipboard fails
+          var slug = (pin.qCode || "pin").replace(/[^a-zA-Z0-9]/g, "_");
+          downloadBlob(blob, "pin_" + slug + "_slide.png");
+        });
+      } else {
+        // Browser doesn't support clipboard API — fall back to download
+        var slug = (pin.qCode || "pin").replace(/[^a-zA-Z0-9]/g, "_");
+        downloadBlob(blob, "pin_" + slug + "_slide.png");
+      }
     }, "image/png");
   };
   sImg.src = url;
@@ -546,8 +805,16 @@ function exportAllPinnedSlides() {
     var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 24 : 0;
     var insightY = contentTop;
 
-    // 2. Chart dimensions (full width)
-    var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 8 : 0);
+    // 2. Image dimensions (custom slide images)
+    var imageTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 8 : 0);
+    var imageH = 0;
+    if (pin.imageData && pin.imageWidth && pin.imageHeight) {
+      var imgScale = usableW / pin.imageWidth;
+      imageH = Math.round(pin.imageHeight * imgScale);
+    }
+
+    // 3. Chart dimensions (full width)
+    var chartTopY = imageTopY + imageH + (imageH > 0 ? 8 : 0);
     var chartH = 0, hasChart = false;
     var chartTemp = null;
     if (pin.chartSvg) {
@@ -565,7 +832,7 @@ function exportAllPinnedSlides() {
       }
     }
 
-    // 3. Table dimensions (full width)
+    // 4. Table dimensions (full width)
     var tableTopY = chartTopY + chartH + (chartH > 0 ? 8 : 0);
     var tableH = 0;
     if (pin.tableHtml) {
@@ -578,6 +845,7 @@ function exportAllPinnedSlides() {
 
     var svg = document.createElementNS(ns, "svg");
     svg.setAttribute("xmlns", ns);
+    svg.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
     svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
     svg.setAttribute("style", "font-family:" + fontFamily + ";");
 
@@ -603,7 +871,7 @@ function exportAllPinnedSlides() {
     metaEl.textContent = metaText;
     svg.appendChild(metaEl);
 
-    // Render stacked: insight → chart → table
+    // Render stacked: insight → image → chart → table
     var isTextBox = pin.pinType === "text_box";
 
     // 1. Insight (first — the editorial takeaway)
@@ -631,7 +899,22 @@ function exportAllPinnedSlides() {
       svg.appendChild(insRes.element);
     }
 
-    // 2. Chart (full width — visual pattern)
+    // 2. Image (custom slide image)
+    if (pin.imageData && imageH > 0) {
+      var imgScale2 = usableW / pin.imageWidth;
+      var imgW = Math.round(pin.imageWidth * imgScale2);
+      var imgX = pad + Math.round((usableW - imgW) / 2);
+      var svgImg = document.createElementNS(ns, "image");
+      svgImg.setAttribute("x", imgX);
+      svgImg.setAttribute("y", imageTopY);
+      svgImg.setAttribute("width", imgW);
+      svgImg.setAttribute("height", imageH);
+      svgImg.setAttributeNS("http://www.w3.org/1999/xlink", "href", pin.imageData);
+      svgImg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+      svg.appendChild(svgImg);
+    }
+
+    // 3. Chart (full width — visual pattern)
     if (hasChart && chartTemp) {
       var chartClone = chartTemp.cloneNode(true);
       var cvb = chartClone.getAttribute("viewBox").split(" ").map(Number);
@@ -642,7 +925,7 @@ function exportAllPinnedSlides() {
       svg.appendChild(cG);
     }
 
-    // 3. Table (full width — detailed reference)
+    // 4. Table (full width — detailed reference)
     if (pin.tableHtml) {
       var tDiv = document.createElement("div");
       tDiv.innerHTML = pin.tableHtml;
@@ -840,6 +1123,17 @@ function printPinnedViews() {
         insDiv.textContent = pin.insightText;
       }
       page.appendChild(insDiv);
+    }
+
+    // Image (custom slide)
+    if (pin.imageData) {
+      var imgDiv = document.createElement("div");
+      imgDiv.style.cssText = "margin-bottom:12px;text-align:center;";
+      var imgEl = document.createElement("img");
+      imgEl.src = pin.imageData;
+      imgEl.style.cssText = "max-width:100%;max-height:400px;border-radius:6px;";
+      imgDiv.appendChild(imgEl);
+      page.appendChild(imgDiv);
     }
 
     // Chart (visual pattern)
@@ -1285,6 +1579,14 @@ function renderAllQualSlides() {
     if (rendered && editor) {
       rendered.innerHTML = renderMarkdown(editor.value);
     }
+    // Hydrate image from stored base64 (restores after save/reopen)
+    var imgStore = card.querySelector(".qual-img-store");
+    if (imgStore && imgStore.value) {
+      var preview = card.querySelector(".qual-img-preview");
+      var thumb = card.querySelector(".qual-img-thumb");
+      if (thumb) thumb.src = imgStore.value;
+      if (preview) preview.style.display = "";
+    }
   });
   updateQualEmptyState();
 }
@@ -1316,18 +1618,100 @@ function addQualSlide() {
     '<div class="qual-slide-header">' +
       '<div class="qual-slide-title" contenteditable="true">New Slide</div>' +
       '<div class="qual-slide-actions">' +
+        '<button class="export-btn" title="Add image" onclick="triggerQualImage(\'' + id + '\')">&#x1F5BC;</button>' +
         '<button class="export-btn" title="Pin this slide" onclick="pinQualSlide(\'' + id + '\')">&#x1F4CC;</button>' +
         '<button class="export-btn" title="Move up" onclick="moveQualSlide(\'' + id + '\',\'up\')">&#x25B2;</button>' +
         '<button class="export-btn" title="Move down" onclick="moveQualSlide(\'' + id + '\',\'down\')">&#x25BC;</button>' +
         '<button class="export-btn" title="Remove slide" style="color:#e8614d;" onclick="removeQualSlide(\'' + id + '\')">&#x2715;</button>' +
       '</div>' +
     '</div>' +
+    '<div class="qual-img-preview" style="display:none;">' +
+      '<img class="qual-img-thumb"/>' +
+      '<button class="qual-img-remove" onclick="removeQualImage(\'' + id + '\')" title="Remove image">&times;</button>' +
+    '</div>' +
+    '<input type="file" class="qual-img-input" accept="image/*" style="display:none;" onchange="handleQualImage(\'' + id + '\', this)">' +
     '<textarea class="qual-md-editor" rows="6" placeholder="Enter markdown content... (**bold**, *italic*, > quote, - bullet, ## heading)"></textarea>' +
     '<div class="qual-md-rendered"></div>' +
-    '<textarea class="qual-md-store" style="display:none;"></textarea>';
+    '<textarea class="qual-md-store" style="display:none;"></textarea>' +
+    '<textarea class="qual-img-store" style="display:none;"></textarea>';
   container.appendChild(card);
   card.querySelector(".qual-md-editor").focus();
   updateQualEmptyState();
+}
+
+/** Trigger the hidden file input for image upload. */
+function triggerQualImage(slideId) {
+  var card = document.querySelector('.qual-slide-card[data-slide-id="' + slideId + '"]');
+  if (!card) return;
+  var input = card.querySelector(".qual-img-input");
+  if (input) input.click();
+}
+
+/** Handle image file selection — resize and store as base64. */
+function handleQualImage(slideId, input) {
+  if (!input.files || !input.files[0]) return;
+  var file = input.files[0];
+
+  // File size guard (5MB raw)
+  if (file.size > 5 * 1024 * 1024) {
+    alert("Image too large (" + (file.size / 1024 / 1024).toFixed(1) + "MB). Maximum is 5MB.");
+    input.value = "";
+    return;
+  }
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      // Resize to max 800px on longest side (balances quality vs file size)
+      var maxDim = 800;
+      var w = img.width, h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+        else { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
+      var canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+      var dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+
+      // Warn if large after resize
+      var sizeKB = Math.round(dataUrl.length * 0.75 / 1024);
+      if (sizeKB > 500) {
+        console.warn("TURAS: Image is " + sizeKB + "KB after resize. Consider a smaller image.");
+      }
+
+      // Store and display (also save dimensions for SVG export)
+      var card = document.querySelector('.qual-slide-card[data-slide-id="' + slideId + '"]');
+      if (!card) return;
+      var store = card.querySelector(".qual-img-store");
+      if (store) {
+        store.value = dataUrl;
+        store.setAttribute("data-img-w", w);
+        store.setAttribute("data-img-h", h);
+      }
+      var preview = card.querySelector(".qual-img-preview");
+      var thumb = card.querySelector(".qual-img-thumb");
+      if (thumb) thumb.src = dataUrl;
+      if (preview) preview.style.display = "";
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  input.value = ""; // reset so same file can be re-selected
+}
+
+/** Remove image from a qualitative slide. */
+function removeQualImage(slideId) {
+  var card = document.querySelector('.qual-slide-card[data-slide-id="' + slideId + '"]');
+  if (!card) return;
+  var store = card.querySelector(".qual-img-store");
+  if (store) store.value = "";
+  var preview = card.querySelector(".qual-img-preview");
+  if (preview) preview.style.display = "none";
+  var thumb = card.querySelector(".qual-img-thumb");
+  if (thumb) thumb.src = "";
 }
 
 /** Remove a qualitative slide. */
@@ -1360,6 +1744,26 @@ function pinQualSlide(slideId) {
   var editor = card.querySelector(".qual-md-editor");
   if (rendered && editor) rendered.innerHTML = renderMarkdown(editor.value);
 
+  // Check for image (include dimensions for SVG export layout)
+  // Primary source: hidden store textarea (set by handleQualImage)
+  // Fallback: read directly from the visible thumbnail <img> element
+  var imgStore = card.querySelector(".qual-img-store");
+  var imageData = (imgStore && imgStore.value) ? imgStore.value : null;
+  var imageWidth = imgStore ? parseInt(imgStore.getAttribute("data-img-w")) || 0 : 0;
+  var imageHeight = imgStore ? parseInt(imgStore.getAttribute("data-img-h")) || 0 : 0;
+  if (!imageData) {
+    var thumb = card.querySelector(".qual-img-thumb");
+    if (thumb && thumb.src && thumb.src.indexOf("data:") === 0) {
+      imageData = thumb.src;
+      imageWidth = thumb.naturalWidth || 0;
+      imageHeight = thumb.naturalHeight || 0;
+      console.log("TURAS: Image read from thumbnail fallback (" + imageWidth + "x" + imageHeight + ")");
+    }
+  }
+  if (imageData) {
+    console.log("TURAS: Pinning slide with image (" + Math.round(imageData.length / 1024) + "KB)");
+  }
+
   var pin = {
     id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
     pinType: "text_box",
@@ -1368,6 +1772,9 @@ function pinQualSlide(slideId) {
     bannerGroup: null, bannerLabel: null,
     selectedColumns: null, excludedRows: null,
     insightText: rendered ? rendered.innerHTML : "",
+    imageData: imageData,
+    imageWidth: imageWidth,
+    imageHeight: imageHeight,
     sortState: null,
     tableHtml: null, chartSvg: null, baseText: null,
     timestamp: Date.now(),
