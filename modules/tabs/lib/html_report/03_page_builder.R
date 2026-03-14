@@ -1732,7 +1732,7 @@ build_insight_area <- function(q_code, comment_entries = NULL,
     htmltools::tags$button(
       class = "insight-toggle",
       style = if (has_comment) "display:none;" else NULL,
-      onclick = sprintf("toggleInsight('%s')", q_code),
+      onclick = sprintf("toggleInsight('%s')", js_esc(q_code)),
       if (has_comment) "Edit Insight" else "+ Add Insight"
     ),
     # Insight container with markdown editor/renderer (like qual slides)
@@ -1750,12 +1750,12 @@ build_insight_area <- function(q_code, comment_entries = NULL,
       htmltools::tags$div(
         class = "insight-md-rendered",
         `data-q-code` = q_code,
-        ondblclick = sprintf("toggleInsightEdit('%s')", q_code)
+        ondblclick = sprintf("toggleInsightEdit('%s')", js_esc(q_code))
       ),
       htmltools::tags$button(
         class = "insight-dismiss",
         title = "Delete insight",
-        onclick = sprintf("dismissInsight('%s')", q_code),
+        onclick = sprintf("dismissInsight('%s')", js_esc(q_code)),
         "\u00D7"
       )
     ),
@@ -1785,6 +1785,9 @@ build_question_containers <- function(questions, tables, banner_groups,
   first_group_name <- if (length(banner_groups) > 0) names(banner_groups)[1] else ""
 
   comments <- config_obj$comments  # Named list or NULL
+
+  # Helper: escape strings for safe insertion into JS single-quoted literals
+  js_esc <- function(s) gsub("'", "\\\\'", gsub("\\\\", "\\\\\\\\", as.character(s)))
 
   containers <- lapply(seq_along(questions), function(i) {
     q <- questions[[i]]
@@ -1830,7 +1833,7 @@ build_question_containers <- function(questions, tables, banner_groups,
           htmltools::tags$button(
             class = "pin-btn",
             `data-q-code` = q_code,
-            onclick = sprintf("togglePin('%s')", q_code),
+            onclick = sprintf("togglePin('%s')", js_esc(q_code)),
             title = "Pin this view",
             style = paste0(
               "background:none;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;",
@@ -1841,7 +1844,7 @@ build_question_containers <- function(questions, tables, banner_groups,
         ),
         htmltools::tags$div(class = "question-meta",
           htmltools::HTML(sprintf("Banner: <strong class=\"banner-name-label\">%s</strong> &middot; Showing %s",
-                                  first_group_name, stat_label))
+                                  htmltools::htmlEscape(first_group_name), htmltools::htmlEscape(stat_label %||% "")))
         ),
         if (!is.na(q$base_filter) && nchar(q$base_filter %||% "") > 0) {
           htmltools::tags$div(
@@ -1858,20 +1861,20 @@ build_question_containers <- function(questions, tables, banner_groups,
       htmltools::tags$div(class = "table-actions",
         htmltools::tags$button(
           class = "export-btn",
-          onclick = sprintf("exportExcel('%s')", q_code),
+          onclick = sprintf("exportExcel('%s')", js_esc(q_code)),
           "\u2B73 Export Excel"
         ),
         htmltools::tags$button(
           class = "export-btn",
           style = "margin-left:8px",
-          onclick = sprintf("exportCSV('%s')", q_code),
+          onclick = sprintf("exportCSV('%s')", js_esc(q_code)),
           "\u2B73 Export CSV"
         ),
         if (has_chart) {
           htmltools::tags$button(
             class = "export-btn export-chart-btn",
             style = "margin-left:8px;display:none",
-            onclick = sprintf("exportChartPNG('%s')", q_code),
+            onclick = sprintf("exportChartPNG('%s')", js_esc(q_code)),
             "\U0001F4CA Export Chart"
           )
         },
@@ -1880,7 +1883,7 @@ build_question_containers <- function(questions, tables, banner_groups,
             class = "export-btn export-chart-btn clipboard-btn",
             style = "margin-left:4px;display:none",
             title = "Copy chart to clipboard",
-            onclick = sprintf("copyChartToClipboard('%s')", q_code),
+            onclick = sprintf("copyChartToClipboard('%s')", js_esc(q_code)),
             "\U0001F4CB Copy Chart"
           )
         },
@@ -1890,7 +1893,7 @@ build_question_containers <- function(questions, tables, banner_groups,
             style = "display:none;position:relative;margin-left:8px;",
             htmltools::tags$button(
               class = "export-btn export-slide-btn",
-              onclick = sprintf("toggleSlideMenu('%s')", q_code),
+              onclick = sprintf("toggleSlideMenu('%s')", js_esc(q_code)),
               "\U0001F4C4 Export Slide \u25BE"
             ),
             htmltools::tags$div(
@@ -1900,19 +1903,19 @@ build_question_containers <- function(questions, tables, banner_groups,
               htmltools::tags$button(
                 class = "slide-menu-item",
                 style = "display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;font-family:inherit;",
-                onclick = sprintf("exportSlidePNG('%s','chart_table')", q_code),
+                onclick = sprintf("exportSlidePNG('%s','chart_table')", js_esc(q_code)),
                 "Chart + Table"
               ),
               htmltools::tags$button(
                 class = "slide-menu-item",
                 style = "display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;font-family:inherit;",
-                onclick = sprintf("exportSlidePNG('%s','chart')", q_code),
+                onclick = sprintf("exportSlidePNG('%s','chart')", js_esc(q_code)),
                 "Chart Only"
               ),
               htmltools::tags$button(
                 class = "slide-menu-item",
                 style = "display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;font-family:inherit;",
-                onclick = sprintf("exportSlidePNG('%s','table')", q_code),
+                onclick = sprintf("exportSlidePNG('%s','table')", js_esc(q_code)),
                 "Table Only"
               )
             )
