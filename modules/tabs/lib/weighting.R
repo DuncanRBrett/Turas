@@ -836,14 +836,23 @@ weighted_z_test_proportions <- function(count1, base1, count2, base2,
     cat("  [WARNING] Negative count or base values detected; skipping z-test.\n")
     return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
   }
-  
-  if (count1 > base1 || count2 > base2) {
+
+  # V10.8: Floating-point tolerance for weighted count/base comparison.
+  # Weighted sums computed via different code paths can differ by ~1e-12.
+  # A tolerance of 0.01 catches only genuine data errors (count truly > base)
+  # while allowing legitimate 100% cells (count ≈ base) through.
+  # When count exceeds base by ≤ tolerance, clamp to base so p = count/base ≤ 1.
+  fp_tol <- 0.01
+  if (count1 > base1 + fp_tol || count2 > base2 + fp_tol) {
     cat(sprintf(
       "  [WARNING] Count exceeds base (count1=%.1f, base1=%.1f, count2=%.1f, base2=%.1f); skipping z-test.\n  This may indicate duplicated rows or upstream data errors.\n",
       count1, base1, count2, base2
     ))
     return(list(significant = FALSE, p_value = NA_real_, higher = FALSE))
   }
+  # Clamp floating-point overshoot so proportion never exceeds 1.0
+  count1 <- min(count1, base1)
+  count2 <- min(count2, base2)
   
   # Explicit is_weighted flag (V9.9.1: no heuristics)
   if (is_weighted && (is.null(eff_n1) || is.null(eff_n2))) {

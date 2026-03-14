@@ -49,15 +49,18 @@ build_banner_groups <- function(banner_info) {
       }
     }
 
-    # If the banner_info sub-element has its own label, use that
-    # Note: bq$question is a tibble row from survey_structure$questions
-    # where the column is PascalCase "QuestionText", not snake_case
-    if (!is.null(bq$question) && !is.null(bq$question$QuestionText)) {
-      group_label <- bq$question$QuestionText
+    # V10.8: Only fall back to QuestionText if no BannerLabel was found.
+    # Previously this block unconditionally overwrote the BannerLabel.
+    if (group_label == bq_code) {
+      # No BannerLabel found from banner_headers — try QuestionText
+      if (!is.null(bq$question) && !is.null(bq$question$QuestionText)) {
+        qt <- as.character(bq$question$QuestionText)
+        if (length(qt) > 0 && !is.na(qt[1]) && nzchar(qt[1])) {
+          group_label <- qt[1]
+        }
+      }
     }
 
-    # Use the label from banner_headers if available, or derive from the question
-    # For cleaner display, strip "Q###" prefix patterns
     display_label <- group_label
 
     groups[[display_label]] <- list(
