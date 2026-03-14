@@ -162,7 +162,9 @@ check_numeric_settings <- function(config, error_log) {
               outlier_method, paste(valid_outlier_methods, collapse = ", ")),
       "", "Warning"
     )
-    config$outlier_method <- "IQR"
+    # Note: config mutation removed — the local copy is discarded since this
+    # function only returns error_log. build_config_object() in crosstabs_config.R
+    # handles defaults independently via get_config_value(..., "IQR").
   }
 
   return(error_log)
@@ -181,10 +183,11 @@ check_output_format <- function(config, error_log, verbose) {
               output_format, paste(valid_formats, collapse = ", ")),
       "", "Warning"
     )
-    config$output_format <- "xlsx"
+    # Note: config mutation removed — the local copy is discarded since this
+    # function only returns error_log. build_config_object() handles the
+    # "excel" → "xlsx" normalization independently.
   } else if (output_format == "excel") {
-    config$output_format <- "xlsx"
-    if (verbose) cat("  Note: output_format 'excel' normalized to 'xlsx'\n")
+    if (verbose) cat("  Note: output_format 'excel' will be treated as 'xlsx'\n")
   }
 
   return(error_log)

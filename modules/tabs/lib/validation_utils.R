@@ -118,6 +118,17 @@ validate_data_frame <- function(data, required_cols = NULL, min_rows = 1,
 #' validate_numeric_param(sig_level, "significance_level", min = 0.5, max = 0.9999)
 validate_numeric_param <- function(value, param_name, min = -Inf, max = Inf,
                                   allow_na = FALSE) {
+  # NULL check
+  if (is.null(value) || length(value) == 0) {
+    tabs_refuse(
+      code = "ARG_NULL_NOT_ALLOWED",
+      title = "NULL Value Not Allowed",
+      problem = sprintf("%s cannot be NULL or zero-length", param_name),
+      why_it_matters = "This parameter requires a valid numeric value to proceed with calculations.",
+      how_to_fix = sprintf("Provide a valid numeric value for %s.", param_name)
+    )
+  }
+
   # NA check
   if (is.na(value)) {
     if (!allow_na) {

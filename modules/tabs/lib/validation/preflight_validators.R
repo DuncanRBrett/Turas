@@ -855,7 +855,7 @@ check_preflight_bonferroni <- function(config, selection_df, error_log) {
   # Count banner columns from selection_df
   if (!is.null(selection_df) && "UseBanner" %in% names(selection_df)) {
     banner_cols <- selection_df[!is.na(selection_df$UseBanner) &
-                                toupper(as.character(selection_df$UseBanner)) == "YES", ]
+                                toupper(as.character(selection_df$UseBanner)) == "Y", ]
     n_banner <- nrow(banner_cols)
 
     if (n_banner > 0 && n_banner < 5) {

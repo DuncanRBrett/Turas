@@ -173,7 +173,9 @@ log_issue <- add_log_entry
 check_memory <- function(force_gc = TRUE, warning_threshold = 6, critical_threshold = 8) {
   if (!requireNamespace("lobstr", quietly = TRUE)) return(invisible(NULL))
 
-  mem_used_bytes <- lobstr::obj_size(environment())
+  # Use lobstr::mem_used() for total R session memory, not obj_size(environment())
+  # which only measures the local function environment (always tiny)
+  mem_used_bytes <- lobstr::mem_used()
   mem_used_gib <- as.numeric(mem_used_bytes) / (1024^3)
 
   if (mem_used_gib > critical_threshold) {
