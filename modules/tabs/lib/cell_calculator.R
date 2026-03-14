@@ -355,45 +355,39 @@ calculate_rating_mean <- function(data, question_col, options_info, weights) {
   }
   
   all_responses <- data[[question_col]]
-  
-  # Find matching responses
-  matching_responses <- sapply(all_responses, function(resp) {
-    if (is.na(resp) || resp == "") return(FALSE)
-    any(safe_equal(as.character(resp), as.character(valid_options$OptionText)))
-  })
-  
+
+  # Find matching responses — vectorised with %in% instead of sapply
+  resp_char <- trimws(as.character(all_responses))
+  option_texts <- trimws(as.character(valid_options$OptionText))
+  matching_responses <- !is.na(all_responses) & resp_char != "" & resp_char %in% option_texts
+
   valid_data <- all_responses[matching_responses]
   valid_weights <- weights[matching_responses]
-  
+
   if (length(valid_data) == 0) {
     return(NULL)
   }
 
-  # Convert to numeric values
-  numeric_values <- numeric(0)
-  numeric_weights <- numeric(0)
-  
+  # Build option text → numeric value lookup (vectorised)
+  option_values <- rep(NA_real_, nrow(valid_options))
   for (i in seq_len(nrow(valid_options))) {
-    matching <- safe_equal(as.character(valid_data), 
-                          as.character(valid_options$OptionText[i]))
-    
-    if (any(matching, na.rm = TRUE)) {
-      # Use OptionValue if available and non-NA, otherwise fall back to OptionText
-      option_value <- NA
-      if ("OptionValue" %in% names(valid_options) && !is.na(valid_options$OptionValue[i])) {
-        option_value <- suppressWarnings(as.numeric(valid_options$OptionValue[i]))
-      }
-      if (is.na(option_value)) {
-        option_value <- suppressWarnings(as.numeric(valid_options$OptionText[i]))
-      }
-
-      if (!is.na(option_value)) {
-        count <- sum(matching, na.rm = TRUE)
-        numeric_values <- c(numeric_values, rep(option_value, count))
-        numeric_weights <- c(numeric_weights, valid_weights[matching])
-      }
+    if ("OptionValue" %in% names(valid_options) && !is.na(valid_options$OptionValue[i])) {
+      option_values[i] <- suppressWarnings(as.numeric(valid_options$OptionValue[i]))
+    }
+    if (is.na(option_values[i])) {
+      option_values[i] <- suppressWarnings(as.numeric(valid_options$OptionText[i]))
     }
   }
+  names(option_values) <- option_texts
+
+  # Map responses to numeric values via lookup — no repeated c() concatenation
+  valid_char <- trimws(as.character(valid_data))
+  mapped_values <- option_values[valid_char]
+
+  # Filter out options with no numeric value
+  has_value <- !is.na(mapped_values)
+  numeric_values <- unname(mapped_values[has_value])
+  numeric_weights <- valid_weights[has_value]
   
   if (length(numeric_values) > 0 && sum(numeric_weights) > 0) {
     mean_value <- weighted.mean(numeric_values, numeric_weights, na.rm = TRUE)
