@@ -523,7 +523,7 @@ function buildMultiHorizontalSVG(data, selectedKeys) {
 
 function escapeHtml(s) {
   if (s == null) return "";
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function getLuminance(hex) {
@@ -531,16 +531,6 @@ function getLuminance(hex) {
   var g = parseInt(hex.substr(3, 2), 16);
   var b = parseInt(hex.substr(5, 2), 16);
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-}
-
-function blendColour(hex, mix) {
-  var r = parseInt(hex.substr(1, 2), 16);
-  var g = parseInt(hex.substr(3, 2), 16);
-  var b = parseInt(hex.substr(5, 2), 16);
-  var fr = Math.round(255 - (255 - r) * mix);
-  var fg = Math.round(255 - (255 - g) * mix);
-  var fb = Math.round(255 - (255 - b) * mix);
-  return "#" + ((1 << 24) + (fr << 16) + (fg << 8) + fb).toString(16).slice(1);
 }
 
 // Chart PNG export - injects question title, renders via canvas, downloads PNG

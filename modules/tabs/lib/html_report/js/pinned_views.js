@@ -1541,6 +1541,7 @@ function exportSigFindingsSlide() {
         a.click();
         URL.revokeObjectURL(url);
       };
+      img.onerror = function() { URL.revokeObjectURL(url); };
       img.src = url;
     })(si, svg, totalH);
   }
@@ -1675,6 +1676,7 @@ function handleQualImage(slideId, input) {
   var reader = new FileReader();
   reader.onload = function(e) {
     var img = new Image();
+    img.onerror = function() { /* invalid image data — silently skip */ };
     img.onload = function() {
       // Resize to max 800px on longest side (balances quality vs file size)
       var maxDim = 800;

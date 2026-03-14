@@ -469,7 +469,7 @@ function saveReportHTML() {
   var closingEditor = document.querySelector(".closing-notes-editor");
   var closingStore = document.querySelector(".closing-notes-store");
   if (closingEditor && closingStore) {
-    closingStore.textContent = closingEditor.innerHTML;
+    closingStore.value = closingEditor.innerHTML;
   }
 
   // Sync qualitative slide editors to their stores
