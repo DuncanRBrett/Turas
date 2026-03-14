@@ -467,6 +467,43 @@ load_crosstabs_config <- function(config_file) {
   # Build config object
   config_obj <- build_config_object(settings$config)
 
+  # Check for unrecognised settings — typos are silently ignored otherwise
+  .KNOWN_SETTINGS <- c(
+    "apply_weighting", "weight_variable", "show_unweighted_n", "show_effective_n", "weight_label",
+    "decimal_separator", "show_frequency", "show_percent_column", "show_percent_row",
+    "boxcategory_frequency", "boxcategory_percent_column", "boxcategory_percent_row",
+    "decimal_places_percent", "decimal_places_ratings", "decimal_places_index", "decimal_places_numeric",
+    "enable_significance_testing", "alpha", "significance_min_base", "bonferroni_correction",
+    "enable_checkpointing", "zero_division_as_blank",
+    "show_standard_deviation", "test_net_differences", "create_sample_composition",
+    "enable_chi_square", "show_net_positive",
+    "show_numeric_median", "show_numeric_mode", "show_numeric_outliers",
+    "exclude_outliers_from_stats", "outlier_method",
+    "html_report", "brand_colour", "accent_colour", "project_title", "company_name", "client_name",
+    "researcher_logo_path", "client_logo_path", "logo_path",
+    "chart_bar_colour", "chart_palette_preset", "embed_frequencies",
+    "include_summary", "fieldwork_dates", "dashboard_metrics",
+    "dashboard_scale_mean", "dashboard_scale_index",
+    "dashboard_green_net", "dashboard_amber_net",
+    "dashboard_green_mean", "dashboard_amber_mean",
+    "dashboard_green_index", "dashboard_amber_index",
+    "dashboard_green_custom", "dashboard_amber_custom", "dashboard_sort_gauges",
+    "index_descriptor", "mean_descriptor", "nps_descriptor",
+    "show_charts", "priority_metric",
+    "analyst_name", "analyst_email", "analyst_phone", "verbatim_filename", "closing_notes",
+    # File path settings (loaded separately but may appear in Settings sheet)
+    "data_file", "structure_file", "output_file", "output_folder", "output_subfolder"
+  )
+  user_settings <- names(settings$config)
+  unknown_settings <- setdiff(tolower(trimws(user_settings)), .KNOWN_SETTINGS)
+  if (length(unknown_settings) > 0) {
+    cat("\n  WARNING: Unrecognised settings in config (may be typos):\n")
+    for (us in unknown_settings) {
+      cat("    -", us, "\n")
+    }
+    cat("  These settings will be ignored. Check spelling against the template.\n\n")
+  }
+
   # Load optional Comments sheet (V10.6.0)
   config_obj$comments <- load_comments_sheet(config_file)
 
