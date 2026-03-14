@@ -469,30 +469,50 @@ load_crosstabs_config <- function(config_file) {
 
   # Check for unrecognised settings — typos are silently ignored otherwise
   .KNOWN_SETTINGS <- c(
+    # Weighting
     "apply_weighting", "weight_variable", "show_unweighted_n", "show_effective_n", "weight_label",
+    "default_weight", "weight_column_exists",
+    "weight_na_threshold", "weight_zero_threshold", "weight_deff_warning",
+    # Display — frequencies and percentages
     "decimal_separator", "show_frequency", "show_percent_column", "show_percent_row",
     "boxcategory_frequency", "boxcategory_percent_column", "boxcategory_percent_row",
-    "decimal_places_percent", "decimal_places_ratings", "decimal_places_index", "decimal_places_numeric",
-    "enable_significance_testing", "alpha", "significance_min_base", "bonferroni_correction",
-    "enable_checkpointing", "zero_division_as_blank",
-    "show_standard_deviation", "test_net_differences", "create_sample_composition",
-    "enable_chi_square", "show_net_positive",
-    "show_numeric_median", "show_numeric_mode", "show_numeric_outliers",
-    "exclude_outliers_from_stats", "outlier_method",
-    "html_report", "brand_colour", "accent_colour", "project_title", "company_name", "client_name",
+    "decimal_places", "decimal_places_percent", "decimal_places_ratings",
+    "decimal_places_index", "decimal_places_numeric",
+    # Statistics
+    "show_standard_deviation", "show_net_positive", "show_numeric_median",
+    "show_numeric_mode", "show_numeric_outliers", "exclude_outliers_from_stats", "outlier_method",
+    "test_net_differences", "zero_division_as_blank",
+    # Significance testing
+    "enable_significance_testing", "alpha", "significance_level",
+    "significance_min_base", "bonferroni_correction", "enable_chi_square",
+    # Checkpointing
+    "enable_checkpointing",
+    # Sample composition & index summary
+    "create_sample_composition", "create_index_summary",
+    "index_summary_show_sections", "index_summary_show_base_sizes",
+    "index_summary_show_composites", "index_summary_decimal_places",
+    # HTML report
+    "html_report", "brand_colour", "accent_colour", "project_title", "project_name",
+    "company_name", "client_name",
     "researcher_logo_path", "client_logo_path", "logo_path",
     "chart_bar_colour", "chart_palette_preset", "embed_frequencies",
-    "include_summary", "fieldwork_dates", "dashboard_metrics",
-    "dashboard_scale_mean", "dashboard_scale_index",
+    "include_summary", "fieldwork_dates", "show_charts",
+    # Dashboard
+    "dashboard_metrics", "dashboard_scale_mean", "dashboard_scale_index",
     "dashboard_green_net", "dashboard_amber_net",
     "dashboard_green_mean", "dashboard_amber_mean",
     "dashboard_green_index", "dashboard_amber_index",
     "dashboard_green_custom", "dashboard_amber_custom", "dashboard_sort_gauges",
+    "priority_metric",
+    # Descriptors
     "index_descriptor", "mean_descriptor", "nps_descriptor",
-    "show_charts", "priority_metric",
+    # Analyst / report metadata
     "analyst_name", "analyst_email", "analyst_phone", "verbatim_filename", "closing_notes",
+    # Ranking
+    "ranking_completeness_threshold_pct", "ranking_gap_threshold_pct", "ranking_tie_threshold_pct",
     # File path settings (loaded separately but may appear in Settings sheet)
-    "data_file", "structure_file", "output_file", "output_folder", "output_subfolder"
+    "data_file", "structure_file", "output_file", "output_filename",
+    "output_format", "output_folder", "output_subfolder"
   )
   user_settings <- names(settings$config)
   unknown_settings <- setdiff(tolower(trimws(user_settings)), .KNOWN_SETTINGS)
