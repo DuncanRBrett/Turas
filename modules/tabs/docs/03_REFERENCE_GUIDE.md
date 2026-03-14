@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Tabs - Reference Guide
 
-**Version:** 10.0 **Date:** 22 December 2025
+**Version:** 10.8 **Date:** 14 March 2026
 
 This guide provides a complete reference for all Tabs features and
 concepts. For step-by-step instructions, see the [User
@@ -520,6 +520,43 @@ updates:
 
 Check the template files in this documentation for the current expected
 format.
+
+------------------------------------------------------------------------
+
+## HTML Report
+
+The HTML report is a self-contained interactive output generated
+alongside the Excel crosstabs. For the complete guide, see
+[HTML Report Guide](08_HTML_REPORT_GUIDE.md).
+
+### Key Features
+
+-   **Dashboard gauges** with configurable RAG thresholds for Net
+    Positive, Rating Mean, and Index metrics
+-   **Semantic chart palettes** — choose from `warm`, `cool`, or
+    `research` presets via `chart_palette_preset`
+-   **Significance findings** — auto-generated summary of statistically
+    significant differences
+-   **Pinned views** — pin any table or chart to a curated presentation
+    view; export as PNG
+-   **Added Slides** — create editorial content with Markdown text and
+    embedded images
+-   **Clipboard copy** — one-click copy of any table to clipboard for
+    pasting into Excel/PowerPoint
+
+### Configuration
+
+| Setting | Purpose | Default |
+|---------|---------|---------|
+| `html_report` | Generate HTML report (Y/N) | Y |
+| `brand_colour` | Primary brand hex colour | #323367 |
+| `accent_colour` | Secondary accent hex colour | #0d8a8a |
+| `chart_palette_preset` | Chart colour scheme (warm/cool/research) | warm |
+| `logo_path` | Path to logo image for report header | (none) |
+| `show_charts` | Include charts in HTML report | Y |
+
+See [Template Reference](06_TEMPLATE_REFERENCE.md) for the full
+settings list.
 
 ------------------------------------------------------------------------
 

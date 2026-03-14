@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Tabs - Template Reference
 
-**Version:** 10.0 **Date:** 22 December 2025
+**Version:** 10.8 **Date:** 14 March 2026
 
 This document explains every field in both configuration templates. When
 you're filling in a template and wondering "what does this field do?",
@@ -784,6 +784,37 @@ Likert questions.
 **Default:** `TRUE`
 
 Net positive = percentage positive minus percentage negative.
+
+### HTML Report Settings
+
+These settings control the interactive HTML report generated alongside the Excel output.
+
+| Setting | Description | Values | Default |
+|---------|-------------|--------|---------|
+| `html_report` | Generate an HTML report | Y / N | Y |
+| `brand_colour` | Primary brand colour (hex) | Any hex colour | #323367 |
+| `accent_colour` | Secondary accent colour (hex) | Any hex colour | #0d8a8a |
+| `chart_palette_preset` | Chart colour scheme | warm / cool / research | warm |
+| `logo_path` | Path to logo image for report header | File path (relative or absolute) | (none) |
+| `show_charts` | Include charts in HTML report | Y / N | Y |
+| `project_title` | Report title displayed in header | Text | (from config) |
+| `company_name` | Researcher/company name | Text | (none) |
+| `client_name` | Client name for report branding | Text | (none) |
+| `fieldwork_dates` | Fieldwork period description | Text | (none) |
+| `analyst_name` | Analyst contact name | Text | (none) |
+
+### Dashboard Settings
+
+| Setting | Description | Values | Default |
+|---------|-------------|--------|---------|
+| `dashboard_green_net` | Green threshold for Net Positive gauges | Number (0-100) | 50 |
+| `dashboard_amber_net` | Amber threshold for Net Positive gauges | Number (0-100) | 30 |
+| `dashboard_green_mean` | Green threshold for Rating Mean gauges | Number | 4.0 |
+| `dashboard_amber_mean` | Amber threshold for Rating Mean gauges | Number | 3.0 |
+| `dashboard_green_index` | Green threshold for Index gauges | Number | 110 |
+| `dashboard_amber_index` | Amber threshold for Index gauges | Number | 90 |
+| `dashboard_sort_gauges` | Sort dashboard gauges by value | Y / N | N |
+| `priority_metric` | Default metric for dashboard display | net / mean / index | net |
 
 ------------------------------------------------------------------------
 
@@ -1614,3 +1645,35 @@ Questions sheet with exactly matching codes.
 
 **Fix:** Ensure your Min and Max values create non-overlapping ranges.
 If one bin ends at 34, the next should start at 35.
+
+------------------------------------------------------------------------
+
+## AddedSlides Sheet
+
+The AddedSlides sheet allows you to pre-seed editorial slides that appear in the Added Slides tab of the HTML report.
+
+| Column | Description | Required |
+|--------|-------------|----------|
+| `slide_id` | Unique identifier for the slide | Yes |
+| `title` | Slide heading displayed in the report | Yes |
+| `content` | Slide body text (supports Markdown formatting) | Yes |
+| `image_path` | Path to an image file to embed in the slide | No |
+
+**Notes:**
+- Image paths can be relative (to the config file location) or absolute
+- Supported image formats: PNG, JPG, GIF, SVG
+- Large images are automatically scaled to fit the slide area
+- Slides appear in the order listed in the sheet
+
+------------------------------------------------------------------------
+
+## Comments Sheet
+
+The Comments sheet allows you to attach analyst commentary to specific questions in the HTML report.
+
+| Column | Description | Required |
+|--------|-------------|----------|
+| `QuestionCode` | The question code to attach the comment to | Yes |
+| `Comment` | The commentary text (supports basic formatting) | Yes |
+
+Comments appear as highlighted notes below the question table in the HTML report.

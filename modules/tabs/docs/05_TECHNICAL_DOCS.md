@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Tabs - Technical Documentation
 
-**Version:** 10.3 **Date:** 8 March 2026 **Audience:** Developers,
+**Version:** 10.8 **Date:** 14 March 2026 **Audience:** Developers,
 Technical Contributors, Module Maintainers
 
 This document covers the internal architecture, code structure, and
@@ -150,6 +150,44 @@ serialization
 
 **Internal Dependencies:** Integrates with `/modules/shared/lib/` for
 common utilities (validation_utils, config_utils, formatting_utils).
+
+### HTML Report Subsystem
+
+The HTML report is generated as a post-processing step after Excel output. The pipeline is:
+
+```
+Config → Data Transform → Page Build → Dashboard Build → JS Injection → Single-File Output
+```
+
+**R files (in `lib/html_report/`):**
+| File | Purpose |
+|------|---------|
+| `99_html_report_main.R` | Orchestrator — coordinates all HTML report generation |
+| `01_data_transformer.R` | Transforms crosstab results into HTML-ready data structures |
+| `02_chart_builder.R` | Generates SVG charts (bar, stacked bar, line) |
+| `03_page_builder.R` | Assembles HTML pages with CSS, tables, and navigation |
+| `04_added_slides_builder.R` | Builds the Added Slides tab from config and in-browser content |
+| `05_significance_builder.R` | Generates significance findings summary |
+| `06_dashboard_builder.R` | Builds the Summary Dashboard with gauges and heatmaps |
+| `07_comments_builder.R` | Injects analyst comments into question pages |
+| `08_pin_builder.R` | Builds the Pinned Views infrastructure |
+
+**JS files (in `lib/html_report/js/`):**
+| File | Purpose |
+|------|---------|
+| `core_navigation.js` | Tab switching, search, sidebar, keyboard navigation |
+| `table_interactions.js` | Heatmap toggle, sort, banner switching, clipboard copy |
+| `chart_manager.js` | Chart rendering, resize handling, visibility toggling |
+| `pinned_views.js` | Pin/unpin, reorder, SVG-to-PNG export, state persistence |
+| `table_export_init.js` | Initialization, PNG export, DOMContentLoaded setup |
+
+**Key design decisions:**
+- Single self-contained HTML file — all CSS, JS, and data inline (no external dependencies)
+- SVG-native charts — no canvas; enables clean PNG export via SVG serialization
+- `BRAND_COLOUR` global JS variable — set once at page load, consumed by all chart/style functions
+- Clipboard API detection with `execCommand` fallback for older browsers
+
+Cross-reference: [HTML Report Technical Manual](TABS_HTML_REPORT_TECHNICAL_MANUAL.md) for full implementation details.
 
 ------------------------------------------------------------------------
 

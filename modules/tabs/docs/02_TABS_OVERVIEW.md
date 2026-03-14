@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Tabs - Overview
 
-**Version:** 10.0 **Date:** 22 December 2025
+**Version:** 10.8 **Date:** 14 March 2026
 
 ## What is Turas Tabs?
 
@@ -29,6 +29,8 @@ Tabs is built for research analysts who need to:
 -   Test whether differences between groups are statistically
     significant
 -   Deliver polished Excel workbooks to clients
+-   Generate interactive HTML reports with dashboards, charts, and
+    pinned views
 
 You don't need to be a programmer to use Tabs. If you can fill in an
 Excel template and run a few lines of R code, you can use this module.
@@ -76,6 +78,9 @@ A" means this value is significantly higher than column A).
 
 ### Produce Professional Output
 
+Tabs produces two outputs: a professionally formatted Excel workbook
+and an interactive HTML report.
+
 The Excel output is formatted and ready for delivery:
 
 -   One sheet per question
@@ -84,6 +89,26 @@ The Excel output is formatted and ready for delivery:
 -   Significance letters integrated into cells
 -   Index summary sheet collecting all mean scores
 -   Sample composition tables
+
+### Interactive HTML Report
+
+Alongside the standard Excel output, Tabs generates a self-contained
+HTML report with:
+
+-   **Summary Dashboard** — Headline metrics displayed as gauges with
+    RAG (red/amber/green) thresholds, heatmap grids, and significant
+    findings
+-   **Crosstabs Explorer** — Full interactive tables with search,
+    banner switching, heatmap colouring, and export to clipboard/PNG
+-   **Added Slides** — Narrative content created in-browser or
+    pre-seeded from the AddedSlides config sheet, with support for
+    embedded images
+-   **Pinned Views** — Curated collection of pinned charts, tables, and
+    slides for presentation export
+
+The HTML file works offline, opens in any modern browser, and can be
+shared as a single file. See [HTML Report Guide](08_HTML_REPORT_GUIDE.md)
+for details.
 
 ## How Does It Work?
 

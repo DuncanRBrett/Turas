@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Tabs - User Manual
 
-**Version:** 10.3 **Date:** 8 March 2026
+**Version:** 10.8 **Date:** 14 March 2026
 
 This manual walks you through using Turas Tabs from start to finish. By
 the end, you'll be able to set up and run cross-tabulation analyses on
@@ -270,8 +270,8 @@ For scripted or batch processing:
 ``` r
 # Load Turas and the Tabs module
 setwd("path/to/Turas")
-source("turas.R")
-turas_load("tabs")
+source("launch_turas.R")
+launch_turas()
 
 # Run analysis
 result <- run_tabs_analysis("path/to/your/project")
@@ -332,6 +332,8 @@ respondents, 30 questions, 10 banner columns) takes about 10-15 seconds.
 ------------------------------------------------------------------------
 
 ## Step 5: Review the Output
+
+### Excel Output
 
 Open the output Excel file. You'll find these sheets:
 
@@ -408,6 +410,40 @@ significantly higher than the value in column C (Female).
 
 If a cell has no letter, it's not significantly different from any other
 column.
+
+------------------------------------------------------------------------
+
+## Working with the HTML Report
+
+When `html_report` is set to `Y` in your Settings sheet, Tabs generates an interactive HTML report alongside the Excel output.
+
+### Opening the Report
+
+The HTML file is saved in your output folder with the same base name as your Excel file (e.g., `My_Analysis.html`). Open it in any modern browser — Chrome, Firefox, Edge, or Safari. No internet connection is required.
+
+### Report Navigation
+
+The report has four tabs across the top:
+1. **Summary** — Dashboard with headline gauges and significant findings
+2. **Crosstabs** — Interactive tables with search and banner switching
+3. **Added Slides** — Editorial content and insights
+4. **Pinned Views** — Your curated presentation collection
+
+### Using Charts and Tables
+
+- **Heatmap toggle** — Click the heatmap icon to colour-code cells by value
+- **Banner switching** — Use the dropdown to switch between banner groups
+- **Search** — Type in the search box to filter questions
+- **Copy to clipboard** — Click the clipboard icon on any table to copy it
+- **Export as PNG** — Click the camera icon to download a table as an image
+
+### Adding Slides
+
+You can create narrative slides directly in the browser using the "Add Slide" button on the Added Slides tab. Slides support rich text formatting. You can also pre-seed slides from the **AddedSlides** sheet in your config file (see [Template Reference](06_TEMPLATE_REFERENCE.md)).
+
+### Pinning Views
+
+Pin any chart or table by clicking the pin icon. Pinned items appear in the Pinned Views tab, where you can reorder them and export the entire collection as PNG images.
 
 ------------------------------------------------------------------------
 

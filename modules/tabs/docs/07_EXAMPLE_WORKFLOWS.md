@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Tabs - Example Workflows
 
-**Version:** 10.0 **Date:** 22 December 2025
+**Version:** 10.8 **Date:** 14 March 2026
 
 This document walks through complete examples of common analysis
 scenarios. Each workflow shows the configuration files, data setup, and
@@ -714,3 +714,68 @@ Split into multiple output files
 
 **Solutions:** - Convert Excel data to CSV - Reduce banner columns -
 Process in batches - Disable unused features
+
+------------------------------------------------------------------------
+
+## Workflow: Generating an HTML Report
+
+### The Scenario
+
+You want to generate an interactive HTML report alongside your Excel crosstabs, with custom branding and a cool colour palette.
+
+### Settings Sheet Configuration
+
+Add these settings to your Settings sheet:
+
+| Setting | Value |
+|---------|-------|
+| `html_report` | Y |
+| `brand_colour` | #1a5276 |
+| `accent_colour` | #2ecc71 |
+| `chart_palette_preset` | cool |
+| `project_title` | Q1 2026 Brand Tracker |
+| `company_name` | The Research LampPost |
+| `client_name` | Acme Corp |
+| `fieldwork_dates` | January - March 2026 |
+
+### Running the Analysis
+
+Run Tabs as normal — the HTML report is generated automatically alongside the Excel file.
+
+### Viewing the Report
+
+Open the `.html` file in your browser. You'll see:
+1. A **Summary Dashboard** with gauges for each rating and net-positive question
+2. The **Crosstabs Explorer** with all your tables and charts in the branded colour scheme
+3. The **Added Slides** tab (empty by default — add content in-browser or via the AddedSlides sheet)
+4. The **Pinned Views** tab (pin any chart or table to build a presentation)
+
+------------------------------------------------------------------------
+
+## Workflow: Adding Custom Slides
+
+### The Scenario
+
+You want to add executive summary slides and commentary to your HTML report before sharing with the client.
+
+### Option 1: Pre-seed from Config
+
+Add an **AddedSlides** sheet to your config file:
+
+| slide_id | title | content | image_path |
+|-----------|-------|---------|------------|
+| exec_summary | Executive Summary | Key findings from Q1 2026... | images/summary_chart.png |
+| methodology | Methodology | Online survey of n=1,000 adults... | |
+| recommendations | Recommendations | Based on the findings, we recommend... | |
+
+### Option 2: Create In-Browser
+
+1. Open the HTML report
+2. Navigate to the **Added Slides** tab
+3. Click **Add Slide**
+4. Enter a title and content using Markdown formatting
+5. Save — the slide is stored in the HTML file itself
+
+### Combining Both Approaches
+
+Pre-seeded slides from config appear first, followed by any slides created in-browser. You can pin slides from either source to the Pinned Views tab for export.

@@ -1,6 +1,6 @@
 # Turas Tabs Module - Code Inventory
 
-**Generated:** 8 March 2026 **Total Files:** 52 R + 5 JS = 57 files **Total Lines:** 32,843 R + 3,488 JS = 36,331 lines
+**Generated:** 14 March 2026 **Total Files:** 52 R + 5 JS = 57 files **Total Lines:** 33,394 R + 4,163 JS = 37,557 lines
 
 ------------------------------------------------------------------------
 
@@ -18,11 +18,17 @@
 | Weighting & Statistics     | 1     | 1,590 | 4.4%        |
 | Excel Output               | 4     | 3,234 | 8.9%        |
 | HTML Report (R)            | 9     | 6,745 | 18.6%       |
-| HTML Report (JS)           | 5     | 3,488 | 9.6%        |
+| HTML Report (JS)           | 5     | 4,168 | 11.1%       |
 | Utilities                  | 6     | 1,342 | 3.7%        |
 | Config Templates           | 1     | 1,354 | 3.7%        |
 | Shiny GUI                  | 1     | 651   | 1.8%        |
-| Tests                      | 1     | 1,313 | 3.6%        |
+| Tests                      | 11    | 3,702 | 9.9%        |
+
+**Note:** Tests exist in two locations:
+- `tests/testthat/` (project root) — 10 files, 2,389 lines covering shared infrastructure (TRS compliance, shared utilities, code quality scans)
+- `modules/tabs/tests/testthat/` — 1 file, 1,313 lines of tabs-specific business logic tests (calculations, config, HTML report)
+
+See `tests/testthat/README.md` and `modules/tabs/tests/README.md` for details on what belongs where.
 
 ------------------------------------------------------------------------
 
@@ -52,7 +58,7 @@
 
 | File | Lines | Purpose | Quality |
 |----|---:|----|----|
-| `lib/crosstabs/crosstabs_config.R` | 486 | Build config_obj with 62 typed settings | V10.2; overwrites config_loader at source time |
+| `lib/crosstabs/crosstabs_config.R` | 571 | Build config_obj with 62 typed settings | V10.2; overwrites config_loader at source time |
 | `lib/crosstabs/data_setup.R` | 317 | Orchestrate structure/data/weight loading | V10.2; extracted from run_crosstabs |
 | `lib/crosstabs/analysis_runner.R` | 570 | Validation, banner creation, question processing | V10.2; print_config_summary, progress callbacks |
 | `lib/crosstabs/workbook_builder.R` | 657 | Excel workbook assembly (all sheets) | V10.2; builds Summary, Guide, Index, Error Log, Crosstabs |
@@ -138,7 +144,7 @@
 | `lib/html_report/00_html_guard.R` | 181 | Input validation for HTML report | V10.3.2; TRS refusals; package checks |
 | `lib/html_report/01_data_transformer.R` | 533 | Transform results → HTML structures | V10.3; banner groups, metric sections |
 | `lib/html_report/02_table_builder.R` | 327 | Build HTML `<table>` elements | V10.3.3; data attributes for heatmap; CSS classes |
-| `lib/html_report/03_page_builder.R` | 2,097 | Assemble complete HTML page | V10.3.2; header, sidebar, controls, CSS, JS |
+| `lib/html_report/03_page_builder.R` | 2,337 | Assemble complete HTML page | V10.3.2; header, sidebar, controls, CSS, JS |
 | `lib/html_report/04_html_writer.R` | 111 | Write self-contained HTML file | V10.3.2; validates output paths |
 | `lib/html_report/05_dashboard_transformer.R` | 503 | Extract headline metrics for dashboard | V10.4.2; config-driven; gauges, heatmap grids |
 | `lib/html_report/06_dashboard_builder.R` | 1,951 | Dashboard components (gauges, heatmap, findings) | V10.4.3; configurable colour breaks; Excel export |
@@ -150,12 +156,12 @@
 
 | File | Lines | Purpose | Quality |
 |----|---:|----|----|
-| `lib/html_report/js/core_navigation.js` | 572 | Question navigation, search, help overlay | Banner switching, insight management per banner |
-| `lib/html_report/js/chart_picker.js` | 613 | Chart column picker, SVG rebuild, PNG export | Multi-column SVG; luminance-aware text contrast |
-| `lib/html_report/js/table_export_init.js` | 443 | CSV/Excel export, column toggle, sort | Excel XML export; stable sort; chart bar sync |
-| `lib/html_report/js/pinned_views.js` | 1,381 | Multi-pin, view capture, Markdown editor | Persistent storage; Markdown rendering; sign cards |
-| `lib/html_report/js/slide_export.js` | 479 | Slide PNG export (chart/table/both) | 1280x720 at 3x; stacked layout; multi-mode |
-|  | **3,488** |  |  |
+| `lib/html_report/js/core_navigation.js` | 658 | Question navigation, search, help overlay | Banner switching, insight management per banner |
+| `lib/html_report/js/chart_picker.js` | 731 | Chart column picker, SVG rebuild, PNG export | Multi-column SVG; luminance-aware text contrast |
+| `lib/html_report/js/table_export_init.js` | 495 | CSV/Excel export, column toggle, sort | Excel XML export; stable sort; chart bar sync |
+| `lib/html_report/js/pinned_views.js` | 1,804 | Multi-pin, view capture, Markdown editor | Persistent storage; Markdown rendering; sign cards |
+| `lib/html_report/js/slide_export.js` | 480 | Slide PNG export (chart/table/both) | 1280x720 at 3x; stacked layout; multi-mode |
+|  | **4,168** |  |  |
 
 ### Utility Modules
 
@@ -173,7 +179,8 @@
 | File | Lines | Purpose | Quality |
 |----|---:|----|----|
 | `tests/testthat/test_tabs_core.R` | 1,313 | Core unit tests (243 assertions) | Guard state, status determination, type conversion, config retrieval, validation gates; found/fixed bug in tabs_determine_status() |
-|  | **1,313** |  |  |
+| *Project root `tests/testthat/`* | 2,389 | Shared infrastructure tests (10 files) | TRS compliance, shared utilities, code quality scans |
+|  | **3,702** |  |  |
 
 ------------------------------------------------------------------------
 
@@ -196,7 +203,7 @@
 | Dimension | Score | Notes |
 |----|---:|----|
 | Functionality | 95/100 | Comprehensive crosstab engine, HTML reports, Excel output, weighting, ranking. All features working. |
-| Code Quality | 91/100 | Well-refactored (4 phases), clean module separation. Some large files remain (page_builder 2K, dashboard_builder 2K). Performance anti-patterns in cell_calculator.R (vector growing in loops). |
+| Code Quality | 91/100 | Well-refactored (4 phases), clean module separation. Some large files remain (page_builder 2.3K, dashboard_builder 2K). Performance anti-patterns in cell_calculator.R (vector growing in loops). |
 | TRS Compliance | 88/100 | \~8 stop() calls remain, mostly in fallback paths. Guard layer lacks console output. Orchestrator now checks return values. |
 | Documentation | 94/100 | 12 markdown guides + 2 HTML report guides. Template reference is thorough. Could improve: function-level roxygen coverage in some processors. |
 | Maintainability | 92/100 | Clear directory structure, numbered files, phase-documented refactoring. |
@@ -214,11 +221,13 @@
 | Banner/Cell Calc | 87 | Memory-optimised; index-based subsetting | \- |
 | Weighting | 90 | Correct Kish formula; comprehensive weight policy | \- |
 | Excel Output | 85 | Config-aware Guide sheet; comprehensive formatting | excel_writer.R at 1,768 lines could split further |
-| HTML Report (R) | 88 | Self-contained; zero dependencies; dashboard system | page_builder at 2,097 lines is large |
+| HTML Report (R) | 88 | Self-contained; zero dependencies; dashboard system | page_builder at 2,337 lines is large |
 | HTML Report (JS) | 85 | Feature-rich; persistent state; export capabilities | No minification; interdependent modules |
 | Utilities | 82 | Clean extraction from shared_functions | \- |
 | Tests | 88 | 243 assertions, all passing; guard state, config, status determination, type conversion, validation gates | Could expand to cover processors, weighting, HTML report |
 | **Overall** | **96** | Production-ready with strong architecture and comprehensive test suite | Processor and HTML report test coverage could expand |
+
+Test coverage is focused on critical-path calculations (rating mean, cell data, significance testing) with shared infrastructure tests covering TRS compliance and cross-module utilities.
 
 ### Key Strengths
 
