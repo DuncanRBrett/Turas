@@ -64,8 +64,19 @@ if (length(.hr_missing) > 0) {
   cat("│ Expected in:", .html_report_dir, "\n")
   cat("│ Fix: Restore missing files or check html_report/ directory\n")
   cat("└───────────────────────────────────────────────────────┘\n\n")
-  stop(sprintf("HTML report submodule(s) missing: %s", paste(.hr_missing, collapse = ", ")),
-       call. = FALSE)
+  if (exists("tabs_refuse", mode = "function")) {
+    tabs_refuse(
+      code = "IO_HTML_SUBMODULE_MISSING",
+      title = "HTML Report Submodule Missing",
+      problem = sprintf("Cannot find required HTML report files: %s", paste(.hr_missing, collapse = ", ")),
+      why_it_matters = "The HTML report cannot be generated without these files.",
+      how_to_fix = c("Restore missing files to the html_report/ directory.",
+                     sprintf("Expected in: %s", .html_report_dir))
+    )
+  } else {
+    stop(sprintf("HTML report submodule(s) missing: %s", paste(.hr_missing, collapse = ", ")),
+         call. = FALSE)
+  }
 }
 
 for (.hr_file in .hr_required_files) {

@@ -61,7 +61,12 @@ tabs_lib_path <- function(..., must_exist = FALSE) {
         )
       )
     } else {
-      stop(sprintf("Module file not found: %s", path), call. = FALSE)
+      cat("\n=== TURAS ERROR ===\n")
+      cat("Code: IO_FILE_NOT_FOUND\n")
+      cat("File:", path, "\n")
+      cat("Fix: Verify the file exists in the expected location.\n")
+      cat("===================\n\n")
+      return(invisible(NULL))
     }
   }
 
@@ -119,7 +124,12 @@ resolve_path <- function(base_path, relative_path) {
         how_to_fix = "Provide a valid directory path as the base_path parameter."
       )
     } else {
-      stop("base_path cannot be empty", call. = FALSE)
+      cat("\n=== TURAS ERROR ===\n")
+      cat("Code: ARG_EMPTY_PATH\n")
+      cat("Message: base_path cannot be empty\n")
+      cat("Fix: Provide a valid directory path as the base_path parameter.\n")
+      cat("===================\n\n")
+      return(invisible(NULL))
     }
   }
 
@@ -157,7 +167,12 @@ get_project_root <- function(config_file_path) {
   if (exists("validate_char_param", mode = "function")) {
     validate_char_param(config_file_path, "config_file_path", allow_empty = FALSE)
   } else if (is.null(config_file_path) || !nzchar(config_file_path)) {
-    stop("config_file_path cannot be empty", call. = FALSE)
+    cat("\n=== TURAS ERROR ===\n")
+    cat("Code: ARG_EMPTY_PATH\n")
+    cat("Message: config_file_path cannot be empty\n")
+    cat("Fix: Provide a valid config file path.\n")
+    cat("===================\n\n")
+    return(invisible(NULL))
   }
 
   project_root <- dirname(config_file_path)
