@@ -11,109 +11,212 @@
 
 
 # ==============================================================================
+# COLOUR PALETTE PRESETS
+# ==============================================================================
+# Three configurable presets for semantic (sentiment) chart colours.
+# Each preset defines 5 sentiment stops + DK/NA + Other.
+# Presets are designed for board-ready presentations: desaturated,
+# sophisticated tones that communicate sentiment without looking like
+# traffic lights.
+#
+# Presets: "warm" (default), "cool", "research"
+# Config field: chart_palette_preset
+# Individual overrides: chart_negative_colour, chart_neutral_colour, etc.
+# ==============================================================================
+
+
+#' Get palette colours for a preset
+#'
+#' Returns a named list of 7 semantic colours for the given preset.
+#' Supports individual overrides from config.
+#'
+#' @param preset Character: "warm", "cool", or "research"
+#' @param overrides Named list of individual colour overrides (optional)
+#' @return Named list with: negative, mod_negative, neutral, mod_positive,
+#'         positive, dk_na, other
+#' @keywords internal
+get_palette_colours <- function(preset = "warm", overrides = NULL) {
+
+  palettes <- list(
+    # Warm earth tones — dusty rose through sage/teal
+    warm = list(
+      negative     = "#b85450",
+      mod_negative = "#d4918e",
+      neutral      = "#c9a96e",
+      mod_positive = "#7daa8c",
+      positive     = "#4a7c6f",
+      dk_na        = "#d1cdc7",
+      other        = "#c5c0b8"
+    ),
+    # Cool professional — muted burgundy through deep teal
+    cool = list(
+      negative     = "#a65461",
+      mod_negative = "#c78f93",
+      neutral      = "#94a3b8",
+      mod_positive = "#6f9fa8",
+      positive     = "#3d7a8a",
+      dk_na        = "#d1cdc7",
+      other        = "#c5c0b8"
+    ),
+    # Purple-green diverging — research/academic standard (colorblind-safe)
+    research = list(
+      negative     = "#8e4585",
+      mod_negative = "#b891b5",
+      neutral      = "#b8b8b8",
+      mod_positive = "#7daa8c",
+      positive     = "#3d7a5f",
+      dk_na        = "#d1cdc7",
+      other        = "#c5c0b8"
+    )
+  )
+
+  # Select preset (fall back to warm if unrecognised)
+  pal <- palettes[[tolower(preset)]]
+  if (is.null(pal)) pal <- palettes[["warm"]]
+
+  # Apply individual overrides from config
+  if (!is.null(overrides)) {
+    override_map <- list(
+      chart_negative_colour     = "negative",
+      chart_mod_negative_colour = "mod_negative",
+      chart_neutral_colour      = "neutral",
+      chart_mod_positive_colour = "mod_positive",
+      chart_positive_colour     = "positive",
+      chart_dk_colour           = "dk_na"
+    )
+    for (cfg_key in names(override_map)) {
+      if (!is.null(overrides[[cfg_key]]) && nzchar(overrides[[cfg_key]])) {
+        pal[[ override_map[[cfg_key]] ]] <- overrides[[cfg_key]]
+      }
+    }
+  }
+
+  pal
+}
+
+
+#' Parse hex colour to RGB vector
+#'
+#' @param hex Character, hex colour string (e.g., "#b85450")
+#' @return Integer vector of length 3 (R, G, B)
+#' @keywords internal
+hex_to_rgb <- function(hex) {
+  c(
+    strtoi(substr(hex, 2, 3), 16L),
+    strtoi(substr(hex, 4, 5), 16L),
+    strtoi(substr(hex, 6, 7), 16L)
+  )
+}
+
+
+# ==============================================================================
 # SEMANTIC COLOUR PALETTE
 # ==============================================================================
 
 #' Get semantic colour for a box category label
 #'
-#' Returns a colour appropriate for common category names.
-#' Falls back to brand colour variations for unknown labels.
+#' Returns a colour appropriate for common category names using the
+#' selected palette preset. Falls back to gradient interpolation for
+#' unknown labels.
 #'
 #' @param label Character, the category label
 #' @param index Integer, position in category list (for fallback)
 #' @param n_total Integer, total number of categories
-#' @param brand_colour Character, hex brand colour
+#' @param brand_colour Character, hex brand colour (unused, kept for API compat)
+#' @param palette Named list from get_palette_colours()
 #' @return Character, hex colour
 #' @keywords internal
-get_semantic_colour <- function(label, index = 1, n_total = 3, brand_colour = "#323367") {
+get_semantic_colour <- function(label, index = 1, n_total = 3,
+                                brand_colour = "#323367", palette = NULL) {
+
+  # Default to warm palette if none provided
+  if (is.null(palette)) palette <- get_palette_colours("warm")
 
   label_lower <- tolower(trimws(label))
 
-  # Sentiment / satisfaction spectrum — Red → Amber → Green
-  # Dark red (strongly negative) → pale red → amber (neutral) → pale green → deep green (positive)
-  # DK / NA / Not applicable → grey
-  # Muted, professional tones — not garish primaries
+  # Sentiment / satisfaction spectrum
+  # Desaturated, sophisticated tones — boardroom-ready, not traffic-light
   semantic_map <- list(
-    # Strong negative (dark muted red)
-    "negative"              = "#c0392b",
-    "terrible or not good"  = "#c0392b",
-    "poor (1-3)"            = "#c0392b",
-    "poor"                  = "#c0392b",
-    "below average or poor" = "#c0392b",
-    "dissatisfied (1-5)"    = "#c0392b",
-    "detractor (0-6)"       = "#c0392b",
-    "detractor"             = "#c0392b",
-    "do not trust"          = "#c0392b",
-    "would switch"          = "#c0392b",
-    "strongly disagree"     = "#c0392b",
-    "very dissatisfied"     = "#c0392b",
+    # Strong negative
+    "negative"              = palette$negative,
+    "terrible or not good"  = palette$negative,
+    "poor (1-3)"            = palette$negative,
+    "poor"                  = palette$negative,
+    "below average or poor" = palette$negative,
+    "dissatisfied (1-5)"    = palette$negative,
+    "detractor (0-6)"       = palette$negative,
+    "detractor"             = palette$negative,
+    "do not trust"          = palette$negative,
+    "would switch"          = palette$negative,
+    "strongly disagree"     = palette$negative,
+    "very dissatisfied"     = palette$negative,
 
-    # Moderate negative (pale muted red)
-    "below average"         = "#e07b6c",
-    "dissatisfied"          = "#e07b6c",
-    "disagree"              = "#e07b6c",
+    # Moderate negative
+    "below average"         = palette$mod_negative,
+    "dissatisfied"          = palette$mod_negative,
+    "disagree"              = palette$mod_negative,
 
-    # Neutral / middle (amber — distinct from DK/NA grey)
-    "neutral"               = "#e8a838",
-    "average"               = "#e8a838",
-    "average (4-6)"         = "#e8a838",
-    "undecided"             = "#e8a838",
-    "passive (7-8)"         = "#e8a838",
-    "passive"               = "#e8a838",
-    "some trust"            = "#e8a838",
-    "neither agree nor disagree" = "#e8a838",
-    "average satisfaction"  = "#e8a838",
-    "average satisfaction (6-8)" = "#e8a838",
+    # Neutral / middle
+    "neutral"               = palette$neutral,
+    "average"               = palette$neutral,
+    "average (4-6)"         = palette$neutral,
+    "undecided"             = palette$neutral,
+    "passive (7-8)"         = palette$neutral,
+    "passive"               = palette$neutral,
+    "some trust"            = palette$neutral,
+    "neither agree nor disagree" = palette$neutral,
+    "average satisfaction"  = palette$neutral,
+    "average satisfaction (6-8)" = palette$neutral,
 
-    # Moderate positive (muted green)
-    "satisfied"             = "#5da87a",
-    "above average"         = "#5da87a",
-    "agree"                 = "#5da87a",
-    "good"                  = "#5da87a",
+    # Moderate positive
+    "satisfied"             = palette$mod_positive,
+    "above average"         = palette$mod_positive,
+    "agree"                 = palette$mod_positive,
+    "good"                  = palette$mod_positive,
 
-    # Strong positive (deep green)
-    "positive"              = "#2e7d52",
-    "good or excellent"     = "#2e7d52",
-    "good or excellent (7-10)" = "#2e7d52",
-    "excellent"             = "#2e7d52",
-    "very satisfied (9-10)" = "#2e7d52",
-    "very satisfied"        = "#2e7d52",
-    "promoter (9-10)"       = "#2e7d52",
-    "promoter"              = "#2e7d52",
-    "fully trust"           = "#2e7d52",
-    "would not switch"      = "#2e7d52",
-    "strongly agree"        = "#2e7d52",
+    # Strong positive
+    "positive"              = palette$positive,
+    "good or excellent"     = palette$positive,
+    "good or excellent (7-10)" = palette$positive,
+    "excellent"             = palette$positive,
+    "very satisfied (9-10)" = palette$positive,
+    "very satisfied"        = palette$positive,
+    "promoter (9-10)"       = palette$positive,
+    "promoter"              = palette$positive,
+    "fully trust"           = palette$positive,
+    "would not switch"      = palette$positive,
+    "strongly agree"        = palette$positive,
 
-    # DK / NA / Not applicable (light silver-grey — clearly distinct from amber neutral)
-    "dk"                    = "#d4d4d4",
-    "na"                    = "#d4d4d4",
-    "dk/na"                 = "#d4d4d4",
-    "dk / na"               = "#d4d4d4",
-    "don't know"            = "#d4d4d4",
-    "not applicable"        = "#d4d4d4",
-    "n/a"                   = "#d4d4d4",
-    "refused"               = "#d4d4d4",
-    "prefer not to say"     = "#d4d4d4",
-    "other"                 = "#c5c0b8"
+    # DK / NA / Not applicable
+    "dk"                    = palette$dk_na,
+    "na"                    = palette$dk_na,
+    "dk/na"                 = palette$dk_na,
+    "dk / na"               = palette$dk_na,
+    "don't know"            = palette$dk_na,
+    "not applicable"        = palette$dk_na,
+    "n/a"                   = palette$dk_na,
+    "refused"               = palette$dk_na,
+    "prefer not to say"     = palette$dk_na,
+    "other"                 = palette$other
   )
 
   colour <- semantic_map[[label_lower]]
   if (!is.null(colour)) return(colour)
 
-  # Fallback: divergent red → amber → green gradient for unknown ordinal labels.
-  # Assumes items are ordered negative-to-positive (standard for Likert/Rating scales).
-  # Anchor colours: dark red, pale red, amber, pale green, deep green.
-  if (n_total <= 1) return("#e8a838")  # single item → amber neutral
+  # Fallback: divergent gradient for unknown ordinal labels.
+  # Assumes items are ordered negative-to-positive (standard for Likert/Rating).
+  # Uses the 5 palette stops as gradient anchors.
+  if (n_total <= 1) return(palette$neutral)
 
-  frac <- (index - 1) / (n_total - 1)  # 0.0 = first (most negative), 1.0 = last (most positive)
+  frac <- (index - 1) / (n_total - 1)  # 0.0 = most negative, 1.0 = most positive
 
-  # 5-stop gradient anchors (R, G, B)
+  # 5-stop gradient anchors derived from active palette
   anchors <- list(
-    c(192,  57,  43),  # 0.00 — dark red   (#c0392b)
-    c(224, 123, 108),  # 0.25 — pale red   (#e07b6c)
-    c(232, 168,  56),  # 0.50 — amber      (#e8a838)
-    c( 93, 168, 122),  # 0.75 — pale green (#5da87a)
-    c( 46, 125,  82)   # 1.00 — deep green (#2e7d52)
+    hex_to_rgb(palette$negative),      # 0.00
+    hex_to_rgb(palette$mod_negative),   # 0.25
+    hex_to_rgb(palette$neutral),        # 0.50
+    hex_to_rgb(palette$mod_positive),   # 0.75
+    hex_to_rgb(palette$positive)        # 1.00
   )
   stops <- c(0, 0.25, 0.5, 0.75, 1.0)
 
@@ -135,6 +238,35 @@ get_semantic_colour <- function(label, index = 1, n_total = 3, brand_colour = "#
   fb <- round(a1[3] + (a2[3] - a1[3]) * t)
 
   sprintf("#%02x%02x%02x", fr, fg, fb)
+}
+
+
+#' Get Categorical Colour for Non-Ordinal Questions
+#'
+#' Returns a colour from a muted qualitative palette for nominal data
+#' (e.g. regions, brands) where order has no meaning. Uses a Tableau-inspired
+#' set of distinguishable, desaturated tones.
+#'
+#' @param index Integer, 1-based position in the category list
+#' @param n_total Integer, total number of categories (unused, reserved)
+#' @return Character, hex colour string
+#' @keywords internal
+get_categorical_colour <- function(index, n_total = 10) {
+  # Muted qualitative palette — 10 distinguishable tones
+
+  cat_palette <- c(
+    "#5b7e9a",  # steel blue
+    "#c47f5a",  # warm terracotta
+    "#6a9a7b",  # sage green
+    "#9b6b8a",  # dusty plum
+    "#b8a04c",  # muted gold
+    "#7a8e9e",  # grey-blue
+    "#c27878",  # dusty rose
+    "#5a8a8a",  # teal
+    "#a89060",  # warm khaki
+    "#8a7aaa"   # muted lavender
+  )
+  cat_palette[((index - 1) %% length(cat_palette)) + 1]
 }
 
 
@@ -170,13 +302,16 @@ build_stacked_bar_svg <- function(items, bar_width = 680, chart_id = NULL) {
   usable_width <- bar_width - (label_margin * 2)
 
   # Pre-calculate legend layout to determine total height (may wrap to multiple rows)
+  # Legend includes percentage values for clarity
   legend_row_gap <- 18
   legend_positions <- list()
   leg_x <- label_margin
   leg_row <- 0
+  total_for_pct <- sum(items$value, na.rm = TRUE)
   for (i in seq_len(nrow(items))) {
-    legend_text <- items$label[i]
-    item_width <- nchar(legend_text) * 6 + 30
+    pct_val <- if (total_for_pct > 0) round(items$value[i]) else 0
+    legend_text <- sprintf("%s (%g%%)", items$label[i], pct_val)
+    item_width <- nchar(legend_text) * 5.8 + 30  # ~5.8px per char at 10.5px font
     # Wrap to next row if this item would overflow
     if (leg_x + item_width > bar_width - label_margin && i > 1) {
       leg_row <- leg_row + 1
@@ -218,6 +353,15 @@ build_stacked_bar_svg <- function(items, bar_width = 680, chart_id = NULL) {
 
     if (seg_width < 1) next
 
+    # Skip tiny segments (< 3% of total) — they render as visual noise.
+    # Data is still shown in the legend with percentages.
+    pct_of_total <- (pct / total) * 100
+    if (pct_of_total < 3) {
+      x_offset <- x_offset + seg_width
+      if (i < nrow(items)) seg_edges <- c(seg_edges, x_offset)
+      next
+    }
+
     # Bar segment rect (clipped by rounded bar shape)
     svg_parts <- c(svg_parts, sprintf(
       '<rect x="%g" y="%d" width="%g" height="%d" fill="%s" clip-path="url(#%s)"/>',
@@ -231,27 +375,19 @@ build_stacked_bar_svg <- function(items, bar_width = 680, chart_id = NULL) {
     luminance <- (0.299 * cr + 0.587 * cg + 0.114 * cb) / 255
     text_fill <- if (luminance > 0.65) "#5c4a3a" else "#ffffff"
 
-    # Label + percentage inside the segment (only if wide enough)
-    label_text <- sprintf("%s %s", label, pct_text)
-    text_width_approx <- nchar(label_text) * 6.5  # rough estimate
+    # Percentage label inside the segment (category names are in the legend)
+    # pct_of_total already computed above (for the < 3% skip check)
+    text_x <- x_offset + seg_width / 2
+    text_y <- bar_y + bar_height / 2
 
-    if (seg_width > text_width_approx + 12) {
-      # Fits inside
-      text_x <- x_offset + seg_width / 2
-      text_y <- bar_y + bar_height / 2
+    if (pct_of_total >= 8) {
+      # Show percentage inside segment (legend identifies the category)
       svg_parts <- c(svg_parts, sprintf(
-        '<text x="%g" y="%g" text-anchor="middle" dominant-baseline="central" fill="%s" font-size="11" font-weight="600">%s</text>',
-        text_x, text_y, text_fill, htmltools::htmlEscape(label_text)
-      ))
-    } else if (seg_width > 28) {
-      # Only percentage fits
-      text_x <- x_offset + seg_width / 2
-      text_y <- bar_y + bar_height / 2
-      svg_parts <- c(svg_parts, sprintf(
-        '<text x="%g" y="%g" text-anchor="middle" dominant-baseline="central" fill="%s" font-size="11" font-weight="600">%s</text>',
+        '<text x="%g" y="%g" text-anchor="middle" dominant-baseline="central" fill="%s" font-size="12" font-weight="500" style="font-variant-numeric:tabular-nums">%s</text>',
         text_x, text_y, text_fill, htmltools::htmlEscape(pct_text)
       ))
     }
+    # Segments 3-8%: visible rect but no label (rely on legend)
 
     x_offset <- x_offset + seg_width
     if (i < nrow(items)) seg_edges <- c(seg_edges, x_offset)
@@ -468,7 +604,11 @@ build_question_chart <- function(question_data, options_df, config_obj) {
   q_type <- question_data$question_type %||% "Unknown"
   table_data <- question_data$table_data
   brand_colour <- config_obj$brand_colour %||% "#323367"
-  chart_bar_colour <- config_obj$chart_bar_colour %||% "#323367"
+  chart_bar_colour <- config_obj$chart_bar_colour %||% brand_colour
+
+  # Build palette from preset + any individual overrides
+  palette_preset <- config_obj$chart_palette_preset %||% "warm"
+  chart_palette <- get_palette_colours(palette_preset, overrides = config_obj)
 
   # Skip composite metrics (they only have a summary row)
   if (q_type == "Composite") return(NULL)
@@ -547,7 +687,8 @@ build_question_chart <- function(question_data, options_df, config_obj) {
     chart_items$colour <- sapply(seq_len(nrow(chart_items)), function(i) {
       get_semantic_colour(
         chart_items$label[i], index = i,
-        n_total = nrow(chart_items), brand_colour = brand_colour
+        n_total = nrow(chart_items), brand_colour = brand_colour,
+        palette = chart_palette
       )
     })
     svg_markup <- build_stacked_bar_svg(
@@ -568,12 +709,13 @@ build_question_chart <- function(question_data, options_df, config_obj) {
     columns = all_col_data$columns
   )
 
-  # Add semantic colours for stacked charts
+  # Add semantic colours for stacked charts (using active palette)
   if (chart_data$chart_type == "stacked") {
     chart_data$colours <- sapply(seq_along(all_col_data$labels), function(i) {
       get_semantic_colour(
         all_col_data$labels[i], index = i,
-        n_total = length(all_col_data$labels), brand_colour = brand_colour
+        n_total = length(all_col_data$labels), brand_colour = brand_colour,
+        palette = chart_palette
       )
     })
   }

@@ -192,7 +192,8 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     researcher_logo_path = get_config_value(config, "researcher_logo_path", NULL),
     client_logo_path = get_config_value(config, "client_logo_path", NULL),
     logo_path = get_config_value(config, "logo_path", NULL),
-    chart_bar_colour = get_config_value(config, "chart_bar_colour", "#323367"),
+    chart_bar_colour = get_config_value(config, "chart_bar_colour", NULL),
+    chart_palette_preset = get_config_value(config, "chart_palette_preset", "warm"),
     embed_frequencies = safe_logical(get_config_value(config, "embed_frequencies", TRUE)),
 
     # V10.4 Summary Dashboard settings

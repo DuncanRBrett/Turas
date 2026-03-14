@@ -158,7 +158,7 @@ build_html_page <- function(html_data, tables, config_obj,
       build_about_panel(config_obj),
       pinned_panel,
       build_help_overlay(),
-      build_javascript(html_data),
+      build_javascript(html_data, brand_colour),
       build_tab_javascript()
     )
   } else {
@@ -196,7 +196,7 @@ build_html_page <- function(html_data, tables, config_obj,
       crosstab_content,
       build_closing_section(config_obj),
       build_help_overlay(),
-      build_javascript(html_data)
+      build_javascript(html_data, brand_colour)
     )
   }
 
@@ -285,8 +285,15 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       text-transform: uppercase;
     }
     .question-list-scroll {
-      max-height: 500px;
+      max-height: calc(100vh - 220px);
       overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e1 transparent;
+    }
+    .question-list-scroll::-webkit-scrollbar { width: 6px; }
+    .question-list-scroll::-webkit-scrollbar-track { background: transparent; }
+    .question-list-scroll::-webkit-scrollbar-thumb {
+      background: #cbd5e1; border-radius: 3px;
     }
     .question-item {
       padding: 10px 14px;
@@ -297,7 +304,7 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     }
     .question-item:hover { background: #f8fafc; }
     .question-item.active {
-      background: #e6f5f5;
+      background: #f0f4f8;
       border-left-color: BRAND;
     }
     .question-item-code {
@@ -347,13 +354,22 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     .banner-tab.active { background: #1a2744; color: #ffffff; }
     .banner-tab:hover:not(.active) { background: #f8fafc; }
     .toggle-label {
-      display: flex;
+      display: inline-flex;
       align-items: center;
       gap: 6px;
       font-size: 12px;
       color: #64748b;
       cursor: pointer;
       user-select: none;
+      padding: 5px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      background: #fff;
+      transition: all 0.15s;
+    }
+    .toggle-label:hover { border-color: #94a3b8; }
+    .toggle-label:has(input:checked) {
+      background: #f0f4f8; border-color: BRAND; color: #1e293b;
     }
     .toggle-label input { accent-color: BRAND; }
     .question-container { display: none; }
@@ -371,11 +387,11 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       gap: 10px;
     }
     .question-code {
-      font-size: 13px;
-      font-weight: 700;
-      color: BRAND;
-      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
-      letter-spacing: 0.5px;
+      font-size: 11px;
+      font-weight: 500;
+      color: #94a3b8;
+      font-family: inherit;
+      letter-spacing: 0.3px;
     }
     .question-text {
       font-size: 16px;
@@ -421,6 +437,24 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     .section-divider-title { font-size: 16px; font-weight: 600; color: BRAND; flex: 1; outline: none; min-width: 100px; }
     .section-divider-title:focus { border-bottom: 1px dashed #e2e8f0; }
     .section-divider-actions { display: flex; gap: 4px; }
+    /* Pinned view cards */
+    .pinned-card {
+      background: #ffffff; border: 1px solid #e8e5e0; border-radius: 8px;
+      padding: 20px 24px; margin-bottom: 16px;
+      page-break-inside: avoid;
+    }
+    .pinned-card-title { font-size: 18px; font-weight: 600; color: #1e293b; margin-bottom: 2px; }
+    .pinned-card-subtitle { font-size: 13px; font-weight: 400; color: #94a3b8; }
+    .pinned-card-code { font-size: 11px; font-weight: 500; color: #94a3b8; margin-bottom: 4px; }
+    .pinned-card-insight {
+      margin-bottom: 12px; padding: 14px 20px;
+      border-left: 3px solid BRAND; background: #f8fafa;
+      border-radius: 0 6px 6px 0;
+      font-size: 14px; line-height: 1.6; color: #1e293b;
+    }
+    .pinned-card-chart { margin-bottom: 12px; }
+    .pinned-card-chart svg { width: 100%; height: auto; }
+    .pinned-card-table { overflow-x: auto; }
     .footer {
       margin-top: 16px;
       padding: 12px 16px;
@@ -472,10 +506,10 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       table-layout: auto;
     }
     .ct-th {
-      padding: 8px 10px;
+      padding: 8px 12px;
       text-align: center;
       font-weight: 600;
-      font-size: 11px;
+      font-size: 12px;
       border-bottom: 2px solid #e2e8f0;
       background: #f8f9fa;
       white-space: normal;
@@ -495,7 +529,7 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       z-index: 2;
     }
     .ct-td {
-      padding: 6px 10px;
+      padding: 8px 12px;
       text-align: center;
       border-bottom: 1px solid #f0f0f0;
       white-space: nowrap;
@@ -528,16 +562,19 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     }
     .ct-row-base { background: #fafbfc; }
     .ct-row-base .ct-td { font-weight: 600; color: #64748b; border-bottom: 2px solid #e2e8f0; }
-    .ct-row-net { background: #f5f0e8; }
-    .ct-row-net .ct-label-col { font-weight: 700; color: #5c4a2a; background: #f5f0e8; }
-    .ct-row-mean .ct-label-col { background: #fef9e7; }
+    .ct-row-net { background: #f5f3ef; }
+    .ct-row-net .ct-label-col { font-weight: 700; color: #1e293b; background: #f5f3ef; }
+    .ct-row-mean .ct-label-col { background: #faf8f4; }
     /* Separator line between individual items and NET/summary rows */
     .ct-row-category + .ct-row-net > .ct-td { border-top: 2px solid #cbd5e1; }
     /* Separator line between NET rows and mean/index rows */
     .ct-row-net + .ct-row-mean > .ct-td { border-top: 2px solid #cbd5e1; }
     .ct-row-category + .ct-row-mean > .ct-td { border-top: 2px solid #cbd5e1; }
-    .ct-row-mean { background: #fef9e7; }
-    .ct-row-mean .ct-td { font-style: italic; color: #6b5c1e; }
+    .ct-row-mean { background: #faf8f4; }
+    .ct-row-mean .ct-td { font-style: italic; color: #475569; }
+    /* Row hover */
+    tr.ct-row-category:hover td { background: #f8f9fb; }
+    tr.ct-row-category:hover td.ct-label-col { background: #f8f9fb; }
     /* Row exclusion from chart */
     .ct-row-excluded { opacity: 0.35; }
     .ct-row-excluded .ct-label-col { text-decoration: line-through; }
@@ -611,7 +648,8 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       padding: 20px 20px 12px;
       background: #ffffff;
       border: 1px solid #e2e8f0;
-      border-top: none;
+      border-radius: 8px;
+      margin-top: 8px;
     }
     .chart-wrapper svg {
       width: 100%;
@@ -639,16 +677,17 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       font-size: 11px; font-weight: 600; color: #64748b; margin-right: 4px;
     }
     .col-chip {
-      padding: 4px 10px; border: 1px solid #e2e8f0; border-radius: 16px;
+      padding: 6px 14px; border: 1px solid #e2e8f0; border-radius: 16px;
       background: #f0fafa; color: #1e293b; font-size: 11px; font-weight: 500;
       cursor: pointer; font-family: inherit; transition: all 0.15s;
     }
     .col-chip:hover { border-color: BRAND; }
+    .col-chip.active { background: BRAND; color: #ffffff; border-color: BRAND; }
     .col-chip-off {
-      background: #f1f5f9; color: #94a3b8;
-      text-decoration: line-through; opacity: 0.6;
+      background: #f8f9fa; color: #94a3b8;
+      text-decoration: line-through; opacity: 0.5;
     }
-    .col-chip-off:hover { opacity: 0.8; }
+    .col-chip-off:hover { opacity: 0.7; }
 
     /* Column sort indicators */
     .ct-sort-indicator {
@@ -663,21 +702,21 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     /* Key insight callout */
     .insight-area { margin-top: 0; }
     .insight-toggle {
-      padding: 5px 12px; border: 1px dashed #cbd5e1; border-radius: 4px;
-      background: transparent; color: #94a3b8; font-size: 11px; font-weight: 500;
+      padding: 6px 14px; border: 1px dashed #cbd5e1; border-radius: 6px;
+      background: transparent; color: #94a3b8; font-size: 12px; font-weight: 500;
       cursor: pointer; font-family: inherit; transition: all 0.15s;
       width: 100%;
     }
     .insight-toggle:hover { border-color: BRAND; color: BRAND; }
     .insight-md-editor {
-      width: 100%; min-height: 60px; padding: 12px 16px; font-size: 13px;
-      border: 1px solid #e2e8f0; border-radius: 6px; font-family: monospace;
+      width: 100%; min-height: 60px; padding: 12px 16px; font-size: 14px;
+      border: 1px solid #e2e8f0; border-radius: 6px; font-family: inherit;
       resize: vertical; box-sizing: border-box; line-height: 1.6;
       color: #1e293b; outline: none;
     }
     .insight-md-editor:focus { border-color: BRAND; }
     .insight-md-rendered {
-      font-size: 13px; line-height: 1.6; color: #1e293b; padding: 0;
+      font-size: 14px; line-height: 1.7; color: #1e293b; padding: 0;
       min-height: 24px; cursor: pointer;
     }
     .insight-md-rendered:empty::after {
@@ -706,7 +745,13 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     .insight-container {
       border-left: 3px solid BRAND; background: #f8fafa;
       border-radius: 0 6px 6px 0;
-      padding: 10px 16px; position: relative;
+      padding: 14px 20px; position: relative;
+    }
+    .insight-container::before {
+      content: "KEY INSIGHT"; display: block;
+      font-size: 9px; font-weight: 700; letter-spacing: 1.5px;
+      color: #94a3b8; margin-bottom: 6px;
+      font-variant: small-caps;
     }
     /* Help overlay */
     .help-overlay {
@@ -873,11 +918,11 @@ build_print_css <- function() {
         max-width: none !important;
       }
       .header-inner * { color: #1a2744 !important; }
-      .header-inner div[style*="font-size:28px"] {
-        font-size: 16px !important; font-weight: 700 !important;
+      .header-inner div[style*="font-size:13px"][style*="uppercase"] {
+        font-size: 11px !important; font-weight: 700 !important;
       }
-      .header-inner div[style*="font-size:22px"] {
-        font-size: 14px !important; margin-top: 4px !important;
+      .header-title {
+        font-size: 16px !important; margin-top: 4px !important;
       }
       .header-inner div[style*="font-size:12px"],
       .header-inner div[style*="font-size:13px"] {
@@ -1029,6 +1074,18 @@ build_print_css <- function() {
         margin-top: 8px;
       }
 
+      /* === PINNED CARDS === */
+      .pinned-card {
+        page-break-after: always;
+        page-break-inside: avoid;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 16px 0 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .pinned-card:last-child { page-break-after: auto; }
+
       /* === CLOSING SECTION (inside About tab panel) === */
     }
   '))
@@ -1080,7 +1137,7 @@ build_report_tab_nav <- function(brand_colour, has_qualitative = FALSE, has_abou
       onclick = "switchReportTab('pinned')",
       `data-tab` = "pinned",
       "\U0001F4CC Pinned Views",
-      htmltools::tags$span(class = "pin-count-badge", id = "pin-count-badge", style = "display:none;margin-left:4px;background:#323367;color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;", "0")
+      htmltools::tags$span(class = "pin-count-badge", id = "pin-count-badge", style = paste0("display:none;margin-left:4px;background:", brand_colour, ";color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;"), "0")
     )
   )
 }
@@ -1167,11 +1224,11 @@ build_header <- function(project_title, brand_colour, total_n, n_questions,
     researcher_logo_el,
     htmltools::tags$div(
       htmltools::tags$div(
-        style = "color:#ffffff;font-size:28px;font-weight:700;line-height:1.2;letter-spacing:-0.3px;",
+        style = "color:rgba(255,255,255,0.7);font-size:13px;font-weight:600;line-height:1.2;letter-spacing:0.5px;text-transform:uppercase;",
         "Turas Tabs"
       ),
       htmltools::tags$div(
-        style = "color:rgba(255,255,255,0.50);font-size:12px;font-weight:400;margin-top:2px;",
+        style = "color:rgba(255,255,255,0.40);font-size:11px;font-weight:400;margin-top:2px;",
         "Interactive Crosstab Explorer"
       )
     )
@@ -1197,7 +1254,8 @@ build_header <- function(project_title, brand_colour, total_n, n_questions,
 
   # --- Study name ---
   study_row <- htmltools::tags$div(
-    style = "color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.3px;margin-top:16px;line-height:1.2;",
+    class = "header-title",
+    style = "color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.3px;margin-top:14px;line-height:1.2;",
     project_title
   )
 
@@ -1226,8 +1284,9 @@ build_header <- function(project_title, brand_colour, total_n, n_questions,
 
   # --- Stats badge bar ---
   badge_style <- paste0(
-    "display:inline-flex;align-items:center;padding:4px 12px;",
-    "font-size:12px;font-weight:600;color:rgba(255,255,255,0.85);"
+    "display:inline-flex;align-items:center;padding:5px 14px;",
+    "font-size:12px;font-weight:600;color:rgba(255,255,255,0.85);",
+    "font-variant-numeric:tabular-nums;"
   )
   separator_style <- paste0(
     "width:1px;height:16px;background:rgba(255,255,255,0.20);flex-shrink:0;"
@@ -2005,10 +2064,14 @@ build_about_panel <- function(config_obj) {
 #'
 #' @param html_data The transformed data
 #' @return htmltools::tags$script
-build_javascript <- function(html_data) {
+build_javascript <- function(html_data, brand_colour = "#323367") {
   group_codes <- sapply(html_data$banner_groups, function(g) g$banner_code)
 
+  # Global brand colour variable — all JS files reference this instead of hardcoded hex
+  brand_colour_js <- sprintf('var BRAND_COLOUR = "%s";\n', brand_colour)
+
   js_full <- paste0(
+    brand_colour_js,
     build_js_core_navigation(),
     build_js_chart_picker(),
     build_js_slide_export(),

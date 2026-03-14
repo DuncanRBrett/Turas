@@ -493,9 +493,9 @@ build_gauge_section <- function(metrics, brand_colour, section_label, thresholds
   }
 
   # 1E: Count tiers
-  n_green <- sum(gauge_colours == "#059669")
-  n_amber <- sum(gauge_colours == "#d97706")
-  n_red <- sum(gauge_colours == "#dc2626")
+  n_green <- sum(gauge_colours == "#4a7c6f")
+  n_amber <- sum(gauge_colours == "#c9a96e")
+  n_red <- sum(gauge_colours == "#b85450")
 
   # 1C: Find best/worst indices (only when 3+ metrics with valid values)
   finite_mask <- is.finite(total_vals)
@@ -950,12 +950,12 @@ build_heatmap_export_js <- function() {
       xml.push("<Interior ss:Color=\\"#F8F9FA\\" ss:Pattern=\\"Solid\\"/></Style>");
       xml.push("<Style ss:ID=\\"title\\"><Font ss:Bold=\\"1\\" ss:Size=\\"12\\"/></Style>");
       xml.push("<Style ss:ID=\\"normal\\"><Font ss:Size=\\"11\\"/></Style>");
-      xml.push("<Style ss:ID=\\"green\\"><Font ss:Size=\\"11\\" ss:Color=\\"#059669\\"/>");
-      xml.push("<Interior ss:Color=\\"#D1FAE5\\" ss:Pattern=\\"Solid\\"/></Style>");
-      xml.push("<Style ss:ID=\\"amber\\"><Font ss:Size=\\"11\\" ss:Color=\\"#B45309\\"/>");
-      xml.push("<Interior ss:Color=\\"#FEF3C7\\" ss:Pattern=\\"Solid\\"/></Style>");
-      xml.push("<Style ss:ID=\\"red\\"><Font ss:Size=\\"11\\" ss:Color=\\"#DC2626\\"/>");
-      xml.push("<Interior ss:Color=\\"#FEE2E2\\" ss:Pattern=\\"Solid\\"/></Style>");
+      xml.push("<Style ss:ID=\\"green\\"><Font ss:Size=\\"11\\" ss:Color=\\"#4a7c6f\\"/>");
+      xml.push("<Interior ss:Color=\\"#e0ede8\\" ss:Pattern=\\"Solid\\"/></Style>");
+      xml.push("<Style ss:ID=\\"amber\\"><Font ss:Size=\\"11\\" ss:Color=\\"#96783a\\"/>");
+      xml.push("<Interior ss:Color=\\"#f5efe0\\" ss:Pattern=\\"Solid\\"/></Style>");
+      xml.push("<Style ss:ID=\\"red\\"><Font ss:Size=\\"11\\" ss:Color=\\"#b85450\\"/>");
+      xml.push("<Interior ss:Color=\\"#f5e3e2\\" ss:Pattern=\\"Solid\\"/></Style>");
       xml.push("</Styles>");
 
       var safeName = sheetName.replace(/[\\[\\]\\\\\\/?*]/g, "").substring(0, 31);
@@ -1090,7 +1090,7 @@ build_dashboard_interaction_js <- function() {
       var projectTitle = summaryPanel ? (summaryPanel.getAttribute("data-project-title") || "") : "";
       var fieldwork = summaryPanel ? (summaryPanel.getAttribute("data-fieldwork") || "") : "";
       var companyName = summaryPanel ? (summaryPanel.getAttribute("data-company") || "") : "";
-      var brandColour = summaryPanel ? (summaryPanel.getAttribute("data-brand-colour") || "#323367") : "#323367";
+      var brandColour = summaryPanel ? (summaryPanel.getAttribute("data-brand-colour") || BRAND_COLOUR) : BRAND_COLOUR;
 
       var ns = "http://www.w3.org/2000/svg";
       var font = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
@@ -1108,9 +1108,9 @@ build_dashboard_interaction_js <- function() {
           var ps = g.querySelectorAll("path");
           if (ps.length >= 2) {
             var sc = ps[1].getAttribute("stroke") || "";
-            if (sc === "#059669") nGreen++;
-            else if (sc === "#d97706") nAmber++;
-            else if (sc === "#dc2626") nRed++;
+            if (sc === "#4a7c6f") nGreen++;
+            else if (sc === "#c9a96e") nAmber++;
+            else if (sc === "#b85450") nRed++;
           }
         }
       });
@@ -1232,7 +1232,7 @@ build_dashboard_interaction_js <- function() {
           var midX = cx + cardW / 2;
 
           // Extract gauge colour and fill from the existing card SVG
-          var gaugeColour = "#059669";
+          var gaugeColour = "#4a7c6f";
           var fillFrac = 0.5;
           var gaugeEl = card.querySelector("svg");
           if (gaugeEl) {
@@ -1558,7 +1558,8 @@ build_dashboard_css <- function(brand_colour) {
     .dash-section { margin-bottom: 24px; }
     .dash-section-title {
       font-size: 14px; font-weight: 700; color: #1a2744;
-      margin-bottom: 4px;
+      margin-bottom: 4px; padding-bottom: 6px;
+      border-bottom: 2px solid #e2e8f0;
     }
     .dash-section-sub {
       font-size: 12px; color: #94a3b8; margin-bottom: 16px;
@@ -1606,9 +1607,9 @@ build_dashboard_css <- function(brand_colour) {
     .dash-legend-dot {
       width: 10px; height: 10px; border-radius: 50%; display: inline-block;
     }
-    .dash-legend-green { background: #059669; }
-    .dash-legend-amber { background: #d97706; }
-    .dash-legend-red { background: #dc2626; }
+    .dash-legend-green { background: #4a7c6f; }
+    .dash-legend-amber { background: #c9a96e; }
+    .dash-legend-red { background: #b85450; }
 
     /* === GAUGES === */
     .dash-gauges {
@@ -1616,7 +1617,7 @@ build_dashboard_css <- function(brand_colour) {
     }
     .dash-gauge-card {
       background: #fff; border-radius: 8px; border: 1px solid #e2e8f0;
-      padding: 10px 12px; min-width: 170px; flex: 1; max-width: 240px;
+      padding: 14px 16px; min-width: 170px; flex: 1; max-width: 240px;
       text-align: center; cursor: pointer; transition: all 0.2s;
       position: relative;
     }
@@ -1638,9 +1639,9 @@ build_dashboard_css <- function(brand_colour) {
       padding: 2px 8px; border-radius: 3px; letter-spacing: 0.5px;
       margin-bottom: 6px;
     }
-    .dash-type-net_positive { background: rgba(5,150,105,0.1); color: #059669; }
+    .dash-type-net_positive { background: rgba(74,124,111,0.1); color: #4a7c6f; }
     .dash-type-nps_score { background: rgba(13,138,138,0.1); color: BRAND; }
-    .dash-type-average { background: rgba(217,119,6,0.1); color: #b45309; }
+    .dash-type-average { background: rgba(201,169,110,0.1); color: #96783a; }
     .dash-type-index { background: rgba(99,102,241,0.1); color: #4f46e5; }
     .dash-type-custom { background: rgba(100,116,139,0.1); color: #475569; }
 
@@ -1651,12 +1652,12 @@ build_dashboard_css <- function(brand_colour) {
       border-radius: 10px; letter-spacing: 0.3px;
     }
     .dash-callout-best {
-      background: rgba(5,150,105,0.12); color: #059669;
-      border: 1px solid rgba(5,150,105,0.25);
+      background: rgba(74,124,111,0.12); color: #4a7c6f;
+      border: 1px solid rgba(74,124,111,0.25);
     }
     .dash-callout-worst {
-      background: rgba(220,38,38,0.10); color: #dc2626;
-      border: 1px solid rgba(220,38,38,0.25);
+      background: rgba(184,84,80,0.10); color: #b85450;
+      border: 1px solid rgba(184,84,80,0.25);
     }
 
     /* === HERO CARD (single-metric section) === */
@@ -1678,13 +1679,13 @@ build_dashboard_css <- function(brand_colour) {
       vertical-align: middle;
     }
     .dash-tier-green {
-      background: rgba(5,150,105,0.10); color: #059669;
+      background: rgba(74,124,111,0.10); color: #4a7c6f;
     }
     .dash-tier-amber {
-      background: rgba(217,119,6,0.10); color: #b45309;
+      background: rgba(201,169,110,0.10); color: #96783a;
     }
     .dash-tier-red {
-      background: rgba(220,38,38,0.10); color: #dc2626;
+      background: rgba(184,84,80,0.10); color: #b85450;
     }
 
     /* === RANK INDICATOR === */
@@ -1712,16 +1713,16 @@ build_dashboard_css <- function(brand_colour) {
     }
     .dash-text-content { position: relative; }
     .dash-md-editor {
-      width: 100%; min-height: 80px; padding: 10px 12px; font-size: 13px;
+      width: 100%; min-height: 80px; padding: 10px 12px; font-size: 14px;
       line-height: 1.6; color: #1e293b; border: 1px solid #e2e8f0;
-      border-radius: 6px; outline: none; font-family: monospace;
+      border-radius: 6px; outline: none; font-family: inherit;
       resize: vertical; box-sizing: border-box;
     }
     .dash-md-editor:focus {
       border-color: BRAND; box-shadow: 0 0 0 2px rgba(13,138,138,0.08);
     }
     .dash-md-rendered {
-      font-size: 13px; line-height: 1.7; color: #1e293b; padding: 4px 0;
+      font-size: 14px; line-height: 1.7; color: #1e293b; padding: 4px 0;
       min-height: 40px; cursor: pointer;
     }
     .dash-md-rendered:empty::after {
@@ -1811,7 +1812,7 @@ build_dashboard_css <- function(brand_colour) {
     }
     .dash-sig-card {
       background: #fff; border-radius: 8px; border: 1px solid #e2e8f0;
-      padding: 12px 16px; border-left: 3px solid #059669;
+      padding: 12px 16px; border-left: 3px solid #4a7c6f;
       position: relative; transition: opacity 0.2s;
     }
     .dash-sig-card.sig-hidden .sig-card-content { display: none; }
@@ -1837,7 +1838,7 @@ build_dashboard_css <- function(brand_colour) {
     }
     .dash-sig-type-badge {
       font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 3px;
-      background: rgba(217,119,6,0.10); color: #b45309;
+      background: rgba(201,169,110,0.10); color: #96783a;
     }
     .dash-sig-question {
       font-size: 11px; color: #64748b; line-height: 1.3; margin-bottom: 4px;
@@ -1912,9 +1913,9 @@ get_gauge_colour <- function(value, metric_type, thresholds) {
 
   t <- get_thresholds_for_type(metric_type, thresholds)
 
-  if (value >= t$green) return("#059669")  # Green
-  if (value >= t$amber) return("#d97706")  # Amber
-  return("#dc2626")                         # Red
+  if (value >= t$green) return("#4a7c6f")  # Green (muted teal)
+  if (value >= t$amber) return("#c9a96e")  # Amber (warm sand)
+  return("#b85450")                         # Red (dusty rose)
 }
 
 
@@ -1951,15 +1952,15 @@ get_heatmap_bg_style <- function(value, metric_type, thresholds) {
   }
 
   if (value >= strong_green) {
-    return("background-color: rgba(5,150,105,0.18); color: #059669; font-weight: 700;")
+    return("background-color: rgba(74,124,111,0.18); color: #4a7c6f; font-weight: 700;")
   }
   if (value >= t$green) {
-    return("background-color: rgba(5,150,105,0.10); color: #059669;")
+    return("background-color: rgba(74,124,111,0.10); color: #4a7c6f;")
   }
   if (value >= t$amber) {
-    return("background-color: rgba(217,119,6,0.10); color: #b45309;")
+    return("background-color: rgba(201,169,110,0.15); color: #96783a;")
   }
-  return("background-color: rgba(220,38,38,0.12); color: #dc2626;")
+  return("background-color: rgba(184,84,80,0.12); color: #b85450;")
 }
 
 

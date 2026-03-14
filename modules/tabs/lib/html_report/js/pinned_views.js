@@ -34,8 +34,8 @@ function togglePin(qCode) {
 
 function updatePinButton(qCode, isPinned) {
   document.querySelectorAll(".pin-btn[data-q-code=\"" + qCode + "\"]").forEach(function(btn) {
-    btn.style.color = isPinned ? "#323367" : "#94a3b8";
-    btn.style.borderColor = isPinned ? "#323367" : "#e2e8f0";
+    btn.style.color = isPinned ? BRAND_COLOUR : "#94a3b8";
+    btn.style.borderColor = isPinned ? BRAND_COLOUR : "#e2e8f0";
     btn.title = isPinned ? "Unpin this view" : "Pin this view";
   });
 }
@@ -197,7 +197,7 @@ function renderPinnedCards() {
       titleDiv.innerHTML = "<div style=\"font-size:14px;font-weight:600;color:#1e293b;\">" + escapeHtml(pin.qTitle || "") + "</div>";
     } else {
       // Standard crosstab header
-      titleDiv.innerHTML = "<div style=\"font-size:11px;color:#323367;font-weight:700;\">" + escapeHtml(pin.qCode || "") + "</div>" +
+      titleDiv.innerHTML = "<div style=\"font-size:11px;color:" + BRAND_COLOUR + ";font-weight:700;\">" + escapeHtml(pin.qCode || "") + "</div>" +
         "<div style=\"font-size:14px;font-weight:600;color:#1e293b;\">" + escapeHtml(pin.qTitle || "") + "</div>" +
         "<div style=\"font-size:11px;color:#94a3b8;margin-top:2px;\">Banner: " + escapeHtml(pin.bannerLabel || "") +
         (pin.baseText ? " \u00B7 Base: " + escapeHtml(pin.baseText) : "") + "</div>";
@@ -250,9 +250,13 @@ function renderPinnedCards() {
         insightDiv.style.cssText = "margin-bottom:12px;padding:16px 20px;background:#f8fafc;border-radius:8px;font-size:14px;line-height:1.7;color:#1e293b;font-weight:400;white-space:pre-wrap;";
       } else {
         // Standard crosstab insight: prominent callout
-        insightDiv.style.cssText = "margin-bottom:12px;padding:16px 24px;border-left:4px solid #323367;background:linear-gradient(135deg,#f0f5f5 0%,#f8fafa 100%);border-radius:0 8px 8px 0;font-size:15px;line-height:1.5;color:#1a2744;font-weight:600;";
+        insightDiv.style.cssText = "margin-bottom:12px;padding:16px 24px;border-left:4px solid " + BRAND_COLOUR + ";background:linear-gradient(135deg,#f0f5f5 0%,#f8fafa 100%);border-radius:0 8px 8px 0;font-size:15px;line-height:1.5;color:#1a2744;font-weight:600;";
       }
-      insightDiv.textContent = pin.insightText;
+      if (pin.pinType === "text_box") {
+        insightDiv.innerHTML = pin.insightText;
+      } else {
+        insightDiv.textContent = pin.insightText;
+      }
       card.appendChild(insightDiv);
     }
 
@@ -352,7 +356,7 @@ function exportPinnedCardPNG(pinId) {
   var pad = 20;
   var scale = 3;
   var usableW = W - pad * 2;
-  var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand-colour").trim() || "#323367";
+  var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand-colour").trim() || BRAND_COLOUR;
 
   var titleFullText = (pin.pinType === "text_box" || pin.pinType === "heatmap")
     ? pin.qTitle
@@ -445,7 +449,7 @@ function exportPinnedCardPNG(pinId) {
       var iB = document.createElementNS(ns, "rect");
       iB.setAttribute("x", pad); iB.setAttribute("y", insightY + 2);
       iB.setAttribute("width", "4"); iB.setAttribute("height", aH);
-      iB.setAttribute("fill", "#323367"); iB.setAttribute("rx", "2");
+      iB.setAttribute("fill", BRAND_COLOUR); iB.setAttribute("rx", "2");
       svg.appendChild(iB);
     }
     var insFontSize = isTextBox ? "14" : "13";
@@ -514,7 +518,7 @@ function exportAllPinnedSlides() {
   var pad = 20;
   var scale = 3;
   var DOWNLOAD_DELAY_MS = 600;
-  var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand-colour").trim() || "#323367";
+  var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand-colour").trim() || BRAND_COLOUR;
 
   // Step 1: Build all SVG blobs upfront (synchronous)
   var slides = [];
@@ -617,7 +621,7 @@ function exportAllPinnedSlides() {
         var iB = document.createElementNS(ns, "rect");
         iB.setAttribute("x", pad); iB.setAttribute("y", insightY + 2);
         iB.setAttribute("width", "4"); iB.setAttribute("height", aH);
-        iB.setAttribute("fill", "#323367"); iB.setAttribute("rx", "2");
+        iB.setAttribute("fill", BRAND_COLOUR); iB.setAttribute("rx", "2");
         svg.appendChild(iB);
       }
       var insFontSize = isTextBox ? "14" : "13";
@@ -728,10 +732,10 @@ function printPinnedViews() {
     ".pinned-print-page { page-break-after: always; padding: 12px 0; box-sizing: border-box; } " +
     ".pinned-print-page:last-child { page-break-after: auto; } " +
     ".pinned-print-header { margin-bottom: 10px; } " +
-    ".pinned-print-qcode { font-size: 13px; font-weight: 700; color: #323367; } " +
+    ".pinned-print-qcode { font-size: 13px; font-weight: 700; color: " + BRAND_COLOUR + "; } " +
     ".pinned-print-title { font-size: 16px; font-weight: 600; color: #1e293b; margin: 2px 0; } " +
     ".pinned-print-meta { font-size: 11px; color: #64748b; } " +
-    ".pinned-print-insight { margin-bottom: 12px; padding: 16px 24px; border-left: 4px solid #323367; " +
+    ".pinned-print-insight { margin-bottom: 12px; padding: 16px 24px; border-left: 4px solid " + BRAND_COLOUR + "; " +
     "  background: #f0f5f5; border-radius: 0 6px 6px 0; font-size: 15px; font-weight: 600; " +
     "  color: #1a2744; line-height: 1.5; " +
     "  -webkit-print-color-adjust: exact; print-color-adjust: exact; } " +
@@ -743,7 +747,7 @@ function printPinnedViews() {
     ".pinned-print-table th { background: #f1f5f9; font-weight: 600; font-size: 12px; " +
     "  -webkit-print-color-adjust: exact; print-color-adjust: exact; } " +
     ".pinned-print-page-num { text-align: right; font-size: 9px; color: #94a3b8; margin-top: 4px; } " +
-    ".pinned-print-project-strip { padding: 0 0 8px 0; margin-bottom: 12px; border-bottom: 2px solid #323367; " +
+    ".pinned-print-project-strip { padding: 0 0 8px 0; margin-bottom: 12px; border-bottom: 2px solid " + BRAND_COLOUR + "; " +
     "  page-break-after: avoid; page-break-inside: avoid; " +
     "  -webkit-print-color-adjust: exact; print-color-adjust: exact; } " +
     "} " +
@@ -752,7 +756,7 @@ function printPinnedViews() {
     "  max-width: 900px; margin: 20px auto; padding: 32px; " +
     "  border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; " +
     "  box-shadow: 0 1px 3px rgba(0,0,0,0.1); } " +
-    ".pinned-print-insight { margin-bottom: 12px; padding: 10px 14px; border-left: 3px solid #323367; " +
+    ".pinned-print-insight { margin-bottom: 12px; padding: 10px 14px; border-left: 3px solid " + BRAND_COLOUR + "; " +
     "  background: #f8f9fb; font-size: 12px; color: #374151; } " +
     ".pinned-print-chart { margin-bottom: 12px; } " +
     ".pinned-print-chart svg { width: 100%; height: auto; } " +
@@ -760,7 +764,7 @@ function printPinnedViews() {
     ".pinned-print-table table { font-size: 10px; width: 100%; border-collapse: collapse; } " +
     ".pinned-print-table th, .pinned-print-table td { padding: 3px 6px; border: 1px solid #ddd; } " +
     ".pinned-print-table th { background: #f1f5f9; font-weight: 600; font-size: 9px; } " +
-    ".pinned-print-project-strip { padding: 12px 32px 8px 32px; margin-bottom: 12px; border-bottom: 2px solid #323367; } " +
+    ".pinned-print-project-strip { padding: 12px 32px 8px 32px; margin-bottom: 12px; border-bottom: 2px solid " + BRAND_COLOUR + "; } " +
     "}";
   document.head.appendChild(printStyle);
 
@@ -788,7 +792,7 @@ function printPinnedViews() {
   // Project info strip — appears ONCE at the top (matches Summary print header)
   var projStrip = document.createElement("div");
   projStrip.className = "pinned-print-project-strip";
-  projStrip.innerHTML = "<div style=\"font-size:14px;font-weight:700;color:#323367;\">" + escapeHtml(pTitle) + "</div>" +
+  projStrip.innerHTML = "<div style=\"font-size:14px;font-weight:700;color:" + BRAND_COLOUR + ";\">" + escapeHtml(pTitle) + "</div>" +
     (statsLine ? "<div style=\"font-size:10px;color:#64748b;margin-top:2px;\">" + escapeHtml(statsLine) + "</div>" : "");
   overlay.appendChild(projStrip);
 
@@ -798,7 +802,7 @@ function printPinnedViews() {
     // Render section dividers as heading strips (not full pages)
     if (pin.type === "section") {
       var sectionEl = document.createElement("div");
-      sectionEl.style.cssText = "padding:16px 0 8px;margin:8px 0;border-bottom:2px solid #323367;font-size:16px;font-weight:600;color:#323367;";
+      sectionEl.style.cssText = "padding:16px 0 8px;margin:8px 0;border-bottom:2px solid " + BRAND_COLOUR + ";font-size:16px;font-weight:600;color:" + BRAND_COLOUR + ";";
       sectionEl.textContent = pin.title || "Untitled Section";
       overlay.appendChild(sectionEl);
       return;
@@ -830,7 +834,11 @@ function printPinnedViews() {
       if (pin.pinType === "text_box") {
         insDiv.style.cssText = "font-size:13px;line-height:1.7;font-weight:400;font-style:normal;border-left:none;background:#f8fafc;padding:12px 16px;border-radius:6px;white-space:pre-wrap;";
       }
-      insDiv.textContent = pin.insightText;
+      if (pin.pinType === "text_box") {
+        insDiv.innerHTML = pin.insightText;
+      } else {
+        insDiv.textContent = pin.insightText;
+      }
       page.appendChild(insDiv);
     }
 
@@ -1108,7 +1116,7 @@ function exportSigFindingsSlide() {
   var projectTitle = summaryPanel ? (summaryPanel.getAttribute("data-project-title") || "") : "";
   var fieldwork = summaryPanel ? (summaryPanel.getAttribute("data-fieldwork") || "") : "";
   var companyName = summaryPanel ? (summaryPanel.getAttribute("data-company") || "") : "";
-  var brandColour = summaryPanel ? (summaryPanel.getAttribute("data-brand-colour") || "#323367") : "#323367";
+  var brandColour = summaryPanel ? (summaryPanel.getAttribute("data-brand-colour") || BRAND_COLOUR) : BRAND_COLOUR;
 
   var ns = "http://www.w3.org/2000/svg";
   var font = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";

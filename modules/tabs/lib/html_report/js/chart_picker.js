@@ -224,10 +224,14 @@ function buildMultiStackedSVG(data, selectedKeys, qCode) {
   var labels = data.labels || [];
   var colours = data.colours || [];
 
-  // Pre-calculate legend layout (show category names only — per-column % is on the bars)
+  // Pre-calculate legend layout — include percentages from first selected column
+  var firstVals = data.columns[selectedKeys[0]] ? data.columns[selectedKeys[0]].values : [];
+  var firstTotal = 0;
+  firstVals.forEach(function(v) { firstTotal += v; });
   var legPositions = [], legX = labelMargin, legRow = 0;
   for (var li = 0; li < labels.length; li++) {
-    var legText = labels[li];
+    var legPct = firstTotal > 0 ? Math.round((firstVals[li] || 0) / firstTotal * 100) : 0;
+    var legText = labels[li] + " (" + legPct + "%)";
     var itemW = legText.length * 6 + 30;
     if (legX + itemW > barW - labelMargin && li > 0) { legRow++; legX = labelMargin; }
     legPositions.push({ x: legX, row: legRow, text: legText });
@@ -261,39 +265,27 @@ function buildMultiStackedSVG(data, selectedKeys, qCode) {
       p.push("<text x=\"" + (colLabelW - 8) + "\" y=\"" + (y + barH / 2) + "\" text-anchor=\"end\" dominant-baseline=\"central\" fill=\"#374151\" font-size=\"11\" font-weight=\"600\">" + escapeHtml(data.columns[key].display) + "</text>");
     }
 
-    // Segments — enforce minimum visible width so small % still appear
-    var minSegW = 4;
+    // Segments — skip tiny ones (< 3% of total) as visual noise; data shown in legend
     var xOff = barStartX;
-    var deferredPills = [];  // small-segment pills drawn after all rects (layered on top)
     for (var si = 0; si < vals.length; si++) {
       var segW = (vals[si] / total) * barUsable;
       if (vals[si] <= 0) continue;
-      // Ensure tiny segments are still visible as a sliver
-      if (segW < minSegW) segW = minSegW;
+      var segPct = (vals[si] / total) * 100;
+
+      // Skip segments < 3% — they render as distracting slivers.
+      // Legend includes percentages so no data is lost.
+      if (segPct < 3) { xOff += segW; continue; }
+
       p.push("<rect x=\"" + xOff + "\" y=\"" + y + "\" width=\"" + segW + "\" height=\"" + barH + "\" fill=\"" + (colours[si] || "#999") + "\" clip-path=\"url(#" + cid + ")\"/>");
 
-      // Label: inside bar if wide enough; otherwise queue a coloured pill overlay
+      // Percentage label inside bar (category names are in the legend)
       var pctText = Math.round(vals[si]) + "%";
-      if (segW > 35) {
+      if (segPct >= 8) {
         var tFill = getLuminance(colours[si] || "#999") > 0.65 ? "#5c4a3a" : "#ffffff";
-        p.push("<text x=\"" + (xOff + segW / 2) + "\" y=\"" + (y + barH / 2) + "\" text-anchor=\"middle\" dominant-baseline=\"central\" fill=\"" + tFill + "\" font-size=\"11\" font-weight=\"600\">" + pctText + "</text>");
-      } else if (vals[si] >= 1) {
-        // Deferred: coloured pill matching segment colour, drawn on top of all rects
-        var pillW = pctText.length * 7 + 10;
-        var pillX = xOff;
-        var pillRight = barStartX + barUsable;
-        if (pillX + pillW > pillRight) pillW = pillRight - pillX;
-        var pillCol = colours[si] || "#999";
-        var pillText = getLuminance(pillCol) > 0.65 ? "#5c4a3a" : "#ffffff";
-        deferredPills.push({ x: pillX, y: y, w: pillW, h: barH, rx: 3, fill: pillCol, textFill: pillText, label: pctText });
+        p.push("<text x=\"" + (xOff + segW / 2) + "\" y=\"" + (y + barH / 2) + "\" text-anchor=\"middle\" dominant-baseline=\"central\" fill=\"" + tFill + "\" font-size=\"12\" font-weight=\"500\" style=\"font-variant-numeric:tabular-nums\">" + pctText + "</text>");
       }
+      // Segments 3-8%: visible rect but no label (rely on legend)
       xOff += segW;
-    }
-    // Draw small-segment pills on top of all segment rects
-    for (var pi = 0; pi < deferredPills.length; pi++) {
-      var dp = deferredPills[pi];
-      p.push("<rect x=\"" + dp.x + "\" y=\"" + dp.y + "\" width=\"" + dp.w + "\" height=\"" + dp.h + "\" rx=\"" + dp.rx + "\" fill=\"" + dp.fill + "\"/>");
-      p.push("<text x=\"" + (dp.x + dp.w / 2) + "\" y=\"" + (dp.y + dp.h / 2) + "\" text-anchor=\"middle\" dominant-baseline=\"central\" fill=\"" + dp.textFill + "\" font-size=\"10\" font-weight=\"600\">" + dp.label + "</text>");
     }
 
     // Priority metric value -- styled pill to the right of bar
@@ -458,7 +450,7 @@ function buildMultiHorizontalSVG(data, selectedKeys) {
   var totalH = barsH + metricStripH + bottomPad;
 
   // Distinct colour palette for columns — use chart_bar_colour for horizontal bars
-  var bc = data.chart_bar_colour || data.brand_colour || "#323367";
+  var bc = data.chart_bar_colour || data.brand_colour || BRAND_COLOUR;
   var colColours = nCols > 1 ? getDistinctPalette(bc, nCols) : [bc];
 
   var p = [];

@@ -208,7 +208,7 @@ function exportSlidePNG(qCode, mode) {
   var W = 1280, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
   var pad = 20;
   var usableW = W - pad * 2;
-  var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand-colour").trim() || "#323367";
+  var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand-colour").trim() || BRAND_COLOUR;
 
   var qTitle = wrapper ? wrapper.getAttribute("data-q-title") || "" : "";
   var qCodeLabel = wrapper ? wrapper.getAttribute("data-q-code") || qCode : qCode;
@@ -352,7 +352,7 @@ function exportSlidePNG(qCode, mode) {
     var iBar = document.createElementNS(ns, "rect");
     iBar.setAttribute("x", pad); iBar.setAttribute("y", insightY + 2);
     iBar.setAttribute("width", "4"); iBar.setAttribute("height", accentH);
-    iBar.setAttribute("fill", "#323367"); iBar.setAttribute("rx", "2");
+    iBar.setAttribute("fill", BRAND_COLOUR); iBar.setAttribute("rx", "2");
     svg.appendChild(iBar);
     var insResult = createWrappedText(ns, insightLines, pad + 14, insightY + 18, insightLineH,
       { fill: "#1a2744", "font-size": "13", "font-weight": "500" });
@@ -452,8 +452,8 @@ function exportInsightsHTML() {
   html += "body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#1e293b;line-height:1.6;}";
   html += "h1{font-size:20px;margin-bottom:4px;}";
   html += ".meta{color:#64748b;font-size:12px;margin-bottom:32px;}";
-  html += ".insight{margin-bottom:24px;padding:16px;border-left:3px solid #323367;background:#f8f9fb;border-radius:0 6px 6px 0;}";
-  html += ".q-code{font-weight:700;color:#323367;font-size:13px;}";
+  html += ".insight{margin-bottom:24px;padding:16px;border-left:3px solid " + BRAND_COLOUR + ";background:#f8f9fb;border-radius:0 6px 6px 0;}";
+  html += ".q-code{font-weight:700;color:" + BRAND_COLOUR + ";font-size:13px;}";
   html += ".q-title{font-size:13px;color:#64748b;margin-bottom:8px;}";
   html += ".banner-label{font-size:11px;color:#94a3b8;font-style:italic;margin-bottom:6px;}";
   html += ".q-text{font-size:14px;}";
