@@ -368,7 +368,8 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       transition: all 0.15s;
     }
     .toggle-label:hover { border-color: #94a3b8; }
-    .toggle-label:has(input:checked) {
+    .toggle-label:has(input:checked),
+    .toggle-label.checked {
       background: #f0f4f8; border-color: BRAND; color: #1e293b;
     }
     .toggle-label input { accent-color: BRAND; }

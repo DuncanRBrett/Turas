@@ -475,6 +475,13 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   } catch(e) {}
 
+  // Toggle label :has() fallback for browsers without CSS :has() support (Firefox < 121)
+  document.querySelectorAll('.toggle-label input[type="checkbox"]').forEach(function(cb) {
+    var sync = function() { cb.closest(".toggle-label").classList.toggle("checked", cb.checked); };
+    cb.addEventListener("change", sync);
+    sync();
+  });
+
   // Show clipboard buttons only when the Clipboard API is available
   // (requires HTTPS or localhost — won't work on file:// URLs)
   if (navigator.clipboard && typeof ClipboardItem !== "undefined") {
