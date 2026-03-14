@@ -1943,7 +1943,7 @@ build_qualitative_panel <- function(slides = NULL, brand_colour = "#323367") {
   # Render initial slides from config (if any)
   slide_cards <- if (!is.null(slides) && length(slides) > 0) {
     lapply(slides, function(s) {
-      build_qual_slide_card(s$id, s$title, s$content)
+      build_qual_slide_card(s$id, s$title, s$content, s$image_data)
     })
   }
 
@@ -2004,9 +2004,10 @@ build_qualitative_panel <- function(slides = NULL, brand_colour = "#323367") {
 #' @param slide_id Character unique ID
 #' @param title Character slide title
 #' @param content_md Character markdown content
+#' @param image_data Character base64 data URL for embedded image, or NULL
 #' @return htmltools::tags$div
 #' @keywords internal
-build_qual_slide_card <- function(slide_id, title, content_md) {
+build_qual_slide_card <- function(slide_id, title, content_md, image_data = NULL) {
   htmltools::tags$div(
     class = "qual-slide-card",
     `data-slide-id` = slide_id,
@@ -2037,9 +2038,11 @@ build_qual_slide_card <- function(slide_id, title, content_md) {
                                htmltools::HTML("&#x2715;"))
       )
     ),
-    # Image preview (hidden until image uploaded)
-    htmltools::tags$div(class = "qual-img-preview", style = "display:none;",
-      htmltools::tags$img(class = "qual-img-thumb"),
+    # Image preview (shown if image_data provided, hidden otherwise)
+    htmltools::tags$div(class = "qual-img-preview",
+      style = if (is.null(image_data) || !nzchar(image_data %||% "")) "display:none;" else "",
+      htmltools::tags$img(class = "qual-img-thumb",
+        src = if (!is.null(image_data) && nzchar(image_data %||% "")) image_data else ""),
       htmltools::tags$button(class = "qual-img-remove",
                              onclick = sprintf("removeQualImage('%s')", slide_id),
                              title = "Remove image",
@@ -2060,7 +2063,8 @@ build_qual_slide_card <- function(slide_id, title, content_md) {
     htmltools::tags$div(class = "qual-md-rendered"),
     # Hidden stores for save persistence
     htmltools::tags$textarea(class = "qual-md-store", style = "display:none;", content_md),
-    htmltools::tags$textarea(class = "qual-img-store", style = "display:none;")
+    htmltools::tags$textarea(class = "qual-img-store", style = "display:none;",
+      if (!is.null(image_data) && nzchar(image_data %||% "")) image_data else "")
   )
 }
 

@@ -9,12 +9,16 @@ editor_options:
 ## What It Does
 
 The HTML Report generates a **self-contained, interactive HTML file**
-alongside your standard Excel crosstabs. It has two tabs:
+alongside your standard Excel crosstabs. It has four tabs:
 
 1.  **Summary Dashboard** — Headline metrics at a glance: gauges,
     heatmap grids, and significant findings
 2.  **Crosstabs Explorer** — Full interactive crosstab tables with
     search, banner switching, heatmap colouring, and export
+3.  **Added Slides** — Narrative and editorial content created in
+    browser or pre-seeded from config
+4.  **Pinned Views** — Curated collection of pinned charts, tables,
+    and slides for presentation export
 
 The HTML file works offline (no internet required), opens in any modern
 browser, and can be shared as a single file.
@@ -52,6 +56,7 @@ All settings go in the **Settings sheet** of your config workbook
 | `include_summary` | `TRUE` | Show the Summary Dashboard tab. Set `FALSE` for crosstabs-only |
 | `fieldwork_dates` | *(none)* | Text shown in the metadata strip (e.g., "Sep - Nov 2025") |
 | `show_charts` | `FALSE` | Set to `TRUE` to enable inline SVG charts below crosstab tables |
+| `chart_palette_preset` | `warm` | Colour palette for ordinal charts: `warm` (earth tones), `cool` (blue-anchored), `research` (purple-green diverging) |
 | `index_descriptor` | *(none)* | Descriptive text shown below the Index row label explaining the scale (e.g., "Strongly disagree(1) = 1 to Strongly agree(5) = 5") |
 
 ### Dashboard Metrics
@@ -361,18 +366,21 @@ question (e.g., Negative / Neutral / Positive), the chart shows
 those summary categories rather than individual scale points. If
 no box categories exist, individual response items are charted.
 
-#### Semantic Colours
+#### Colour Palettes
 
-Known category labels are assigned meaningful colours automatically:
+Ordinal charts use one of three configurable presets, set via
+`chart_palette_preset` in Settings. Each preset uses muted,
+desaturated tones suited to professional reports:
 
-| Label | Colour |
-|-------|--------|
-| Negative, Poor, Dissatisfied, Detractor | Warm red |
-| Neutral, Average, Passive, Undecided | Warm grey |
-| Positive, Good or excellent, Satisfied, Promoter | Green |
+| Preset | Style |
+|------------|-----------------------------------------------|
+| `warm` | Earth tones (default) |
+| `cool` | Blue-anchored palette |
+| `research` | Purple-green diverging palette |
 
-Unknown labels fall back to a gradient of the configured
-`brand_colour`.
+Known semantic labels (e.g., Negative, Neutral, Positive) are
+mapped to appropriate colours within the active preset.
+Non-ordinal charts use a separate categorical palette.
 
 #### Chart Labels
 
@@ -388,11 +396,16 @@ Each question table has export buttons:
 -   **Export Chart** — Downloads the chart as a high-resolution PNG
     (3x scale, presentation-ready). Only visible when charts are
     toggled on.
+-   **Copy to Clipboard** — Copies the chart as PNG for pasting into
+    PowerPoint (requires HTTPS or localhost)
 
 The exported PNG includes the question code and text as a title at
 the top, making it self-contained for pasting into PowerPoint or
 other presentations. The on-screen chart does not show this title
 (since the question card above already displays it).
+
+Pinned cards in the Pinned Views tab also have clipboard copy
+buttons.
 
 Exports respect the current state: if "Show count" is on, counts are
 included in the table exports.
@@ -414,6 +427,51 @@ clean, paginated print layout:
 
 To print a different banner, switch to it first (e.g., click "Age")
 then click Print Report again.
+
+------------------------------------------------------------------------
+
+## Added Slides
+
+The **Added Slides** tab lets you create narrative and editorial
+content alongside your data — ideal for commentary, methodology
+notes, or key takeaways.
+
+### Creating Slides
+
+Click **Add Slide** in the Added Slides tab to create a new slide.
+Each slide has a title and a content area that supports markdown
+formatting:
+
+-   **Bold** (`**text**`), *italic* (`*text*`), headings (`# H1`,
+    `## H2`), bullet lists, and blockquotes (`> text`)
+-   Upload images with the image button — images are automatically
+    resized (800px max) and compressed (JPEG 70%)
+-   Slides can be pinned to include them in the Pinned Views tab
+
+### Pre-Seeding from Config
+
+To pre-populate slides, add an **AddedSlides** sheet (or legacy
+**Qualitative** sheet) to your config workbook with these columns:
+
+| Column | Required | Description |
+|----------------|----------|----------------------------------------|
+| `slide_title` | Yes | Title displayed at the top of the slide |
+| `content` | Yes | Markdown-formatted body text |
+| `display_order` | No | Numeric sort order (default: row order) |
+| `image_path` | No | File path to an image to embed |
+
+------------------------------------------------------------------------
+
+## Clipboard Copy
+
+Charts and pinned cards can be copied to the clipboard as PNG images
+for pasting directly into PowerPoint or other applications.
+
+-   Click the clipboard button on any chart or pinned card
+-   Paste with **Ctrl+V** (Windows) or **Cmd+V** (Mac)
+-   Requires **HTTPS or localhost** — on `file://` URLs, clipboard
+    buttons are hidden automatically
+-   PNG export buttons are always available as a fallback
 
 ------------------------------------------------------------------------
 
@@ -535,6 +593,7 @@ categories, and banner complexity.
 
 | Version | Changes |
 |------------------------------------|------------------------------------|
+| **V10.8.0** | Three configurable colour palette presets (warm/cool/research); categorical palette for non-ordinal charts; clipboard copy for charts and pins (paste into PowerPoint); Added Slides with image upload; enhanced quick guide; all JS hardcoded colours replaced with BRAND_COLOUR variable; segment rendering improvements (< 3% suppression, legend percentages); higher compression for uploaded images (800px max, JPEG 70%) |
 | **V10.5.1** | Print Report button (all questions, active banner, one per page); compact print styling |
 | **V10.5.0** | Inline SVG charts (stacked bar for ordinal, horizontal bar for nominal); automatic box category detection from Survey Structure; semantic colour palette; PNG chart export with question title injection (3x resolution, PowerPoint-ready); configurable `index_descriptor` annotation for Index rows; dynamic chart label sizing; legend row wrapping |
 | **V10.4.3** | Resolved sig letter codes to column names + values; banner group labels instead of Q codes; full question text with wrapping; metric type badge on sig findings; NPS Score config matching; Safari table clipping fix |

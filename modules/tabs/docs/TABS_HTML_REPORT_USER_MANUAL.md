@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Tabs HTML Report - User Manual
 
-**Version:** 10.6.0 **Product:** Turas Analytics Platform - Crosstabs
+**Version:** 10.8.0 **Product:** Turas Analytics Platform - Crosstabs
 Module **Publisher:** The Research LampPost (Pty) Ltd
 
 ------------------------------------------------------------------------
@@ -20,6 +20,7 @@ Module **Publisher:** The Research LampPost (Pty) Ltd
     -   [Selection Sheet](#32-selection-sheet)
     -   [Comments Sheet](#33-comments-sheet)
     -   [Instructions Sheet](#34-instructions-sheet)
+    -   [Colour Palette Presets](#colour-palette-presets)
 4.  [Using the HTML Report](#4-using-the-html-report)
     -   [Report Layout](#41-report-layout)
     -   [Navigating Questions](#42-navigating-questions)
@@ -31,6 +32,8 @@ Module **Publisher:** The Research LampPost (Pty) Ltd
     -   [Pinned Views](#48-pinned-views)
     -   [Exporting Data](#49-exporting-data)
     -   [Printing](#410-printing)
+    -   [Added Slides](#411-added-slides)
+    -   [Clipboard Copy](#clipboard-copy)
 5.  [Browser Compatibility & Known
     Issues](#5-browser-compatibility--known-issues)
 
@@ -185,6 +188,7 @@ Male vs Female) are statistically meaningful or could be due to chance.
 | `embed_frequencies` | No | `TRUE` | Embed frequency data in the HTML report so users can toggle between percentages and counts. Set to `FALSE` for smaller file sizes. |
 | `fieldwork_dates` | No | *(none)* | Text description of the fieldwork period (e.g., "Jan - Feb 2025"). Displayed in the dashboard summary. |
 | `show_charts` | No | `FALSE` | Set to `TRUE` to generate inline SVG charts for each question. Charts are interactive and can be exported as PNG slides. |
+| `chart_palette_preset` | No | `warm` | Colour palette for ordinal charts. Options: `warm` (earth tones), `cool` (blue-anchored), `research` (purple-green diverging). See Colour Palette Presets section. |
 
 #### Dashboard Configuration
 
@@ -308,7 +312,7 @@ When you open the report, you see:
 |  [Logo]   PROJECT TITLE                          [Client Logo]   |
 |           Company Name                                           |
 +------------------------------------------------------------------+
-|  Summary  |  Crosstabs  |  Pinned Views (0)                     |
+|  Summary  |  Crosstabs  |  Added Slides  |  Pinned Views (0)    |
 +------------------------------------------------------------------+
 |           |                                                      |
 |  Question | [ Banner Group Tabs: Region | Gender | Age | ... ]   |
@@ -326,9 +330,10 @@ When you open the report, you see:
 +------------------------------------------------------------------+
 ```
 
-**Three main tabs** appear at the top (when dashboard is enabled): -
+**Four main tabs** appear at the top (when dashboard is enabled): -
 **Summary** - Dashboard with headline metrics and colour-coded gauges -
-**Crosstabs** - The main analysis tables, one per question - **Pinned
+**Crosstabs** - The main analysis tables, one per question - **Added
+Slides** - Narrative or editorial slides alongside data - **Pinned
 Views** - Your curated collection of pinned questions
 
 ### 4.2 Navigating Questions
@@ -433,7 +438,7 @@ visualisation above or beside its table.
 
 | Question Type | Chart Style | Description |
 |------------------------|------------------------|------------------------|
-| Likert, Rating, NPS | Stacked horizontal bar | Colour-coded segments showing the proportion in each response category. Sentiment colours (red for negative, amber for neutral, green for positive) are applied automatically. |
+| Likert, Rating, NPS | Stacked horizontal bar | Colour-coded segments showing the proportion in each response category. Colours are determined by the active palette preset (see below). |
 | Single response | Horizontal bar chart | Individual bars for each response option showing their percentages. |
 
 **Interacting with charts:**
@@ -446,6 +451,22 @@ visualisation above or beside its table.
     redraws without it. Click again to restore it.
 -   **Priority metrics:** When configured, a styled metric badge appears
     beside each chart bar showing the Mean, NPS, or Index value.
+
+**Semantic colours (palette presets):** Ordinal charts (Likert, Rating,
+NPS) use one of three palette presets, configured via
+`chart_palette_preset`:
+
+-   **warm** (default): dusty rose-red, blush, warm sand, sage, deep
+    teal-green
+-   **cool**: muted burgundy, dusty pink, steel grey, muted teal, deep
+    teal
+-   **research**: muted purple, lavender, neutral grey, sage, forest
+
+DK/NA/Refused categories always use warm grey (`#d1cdc7`) regardless of
+the active palette. Segments representing less than 3% of the bar are
+not rendered to avoid distracting slivers; their data is still shown in
+the legend. The legend includes percentage values alongside colour
+swatches.
 
 **Chart and table synchronisation:** - Sorting the table automatically
 reorders the chart bars to match - Hiding columns from the table also
@@ -503,6 +524,18 @@ card to change the order - **Remove:** Click the remove button to unpin
 a question - **The pin icon** in the main view reflects the current pin
 state
 
+**Clipboard copy:** - Each pinned card has a clipboard copy button
+(the clipboard icon) that copies the card as a PNG image directly to
+your clipboard - You can then paste straight into PowerPoint, Google
+Slides, or any other application that accepts image paste - **Note:**
+Clipboard copy requires serving the report via HTTPS or localhost. When
+opening a saved HTML file directly (`file://` protocol), clipboard
+buttons are hidden automatically, and the Export PNG buttons remain
+available as a fallback.
+
+**Added Slides with images** that have been pinned export correctly to
+PNG, including any uploaded images embedded in the slide.
+
 **Exporting pinned views:** - **Export All Slides:** Downloads one
 high-resolution PNG image per pinned question (1280x720 at 3x
 resolution). These are ready to paste into PowerPoint. - **Print / Save
@@ -518,9 +551,10 @@ The report offers several export options:
 | **CSV** | `.csv` | Current question's table data (visible columns only) | "Export CSV" button on each question |
 | **Excel** | `.xls` | Current question's table with formatting | "Export Excel" button on each question |
 | **Chart PNG** | `.png` | Current chart as a high-resolution image | Chart export dropdown |
-| **Slide PNG** | `.png` | Presentation slide with title, table, chart, and insight | Slide export dropdown (3 modes: Chart+Table, Chart Only, Table Only) |
+| **Slide PNG** | `.png` | Presentation slide with title, table, chart, and insight at 3x resolution (3840px wide) | Slide export dropdown (3 modes: Chart+Table, Chart Only, Table Only) |
 | **All Pinned Slides** | `.png` (multiple) | One PNG per pinned view | Button in Pinned Views tab |
 | **Insights HTML** | `.html` | All insights across all questions and banners | "Export Insights" in controls |
+| **Clipboard Copy** | clipboard | Chart or pinned card as PNG image | Clipboard copy button (requires HTTPS or localhost) |
 | **Full Report HTML** | `.html` | Complete report with embedded insights | "Save Report" button |
 
 **Dashboard exports:** - Each metric section in the dashboard has an
@@ -543,6 +577,52 @@ print dialog to print or save as PDF
 print - Interactive controls (buttons, search, toggles) are hidden in
 print - For best results, use Chrome or Edge and select "Background
 graphics" in print settings
+
+### 4.11 Added Slides
+
+Added Slides let you create narrative or editorial content alongside
+your data. Use them for executive summaries, methodology notes, key
+takeaways, or any commentary that belongs in the report but is not tied
+to a single crosstab question.
+
+**Creating a slide:** 1. Switch to the "Added Slides" tab 2. Click the
+"Add Slide" button 3. A new slide card appears with an editable title
+and content area 4. Double-click the content area to edit; click away
+to save
+
+**Markdown support:** Slide content supports Markdown formatting:
+
+-   `**bold**` for **bold** text
+-   `*italic*` for *italic* text
+-   `> quote` for block quotes
+-   `- item` for bullet lists
+-   `## Heading` for section headings within a slide
+
+**Image upload:** - Click the image button (the picture icon) on any
+slide card - Select an image file (JPEG, PNG, or other common formats) -
+The image is automatically resized to a maximum width of 800px and
+stored as a compressed JPEG to keep file sizes manageable - The image
+appears as a thumbnail within the slide card - Hover over the image to
+reveal a remove button
+
+**Ordering and pinning:** - Use the up/down arrow buttons on each card
+to reorder slides - Click the pin icon to include a slide in the Pinned
+Views deck - Pinned slides with images export correctly to PNG
+
+**Pre-seeding from config:** You can pre-populate Added Slides by
+including an `AddedSlides` sheet in your configuration workbook. The
+sheet should have these columns:
+
+| Column | Description |
+|-----------------|------------------------------------------------------|
+| `slide_title` | Title displayed at the top of the slide card |
+| `content` | Slide body text (Markdown supported) |
+| `display_order` | Numeric value controlling the order (lower = first) |
+
+**Persistence:** - Images uploaded in the browser are included when you
+save the report as HTML - They are also included in PNG exports from
+Pinned Views - Saved HTML files retain all slides, content, and images
+when reopened
 
 ------------------------------------------------------------------------
 
@@ -615,6 +695,12 @@ email or file transfer
 block `.html` attachments - **Workaround:** Zip the HTML file before
 sending, or share via a file-sharing service
 
+**Clipboard API (copy-to-clipboard)** - The copy-to-clipboard feature
+requires serving the report via HTTPS or localhost. When opening a saved
+HTML file directly (`file://` protocol), clipboard buttons are hidden
+automatically and the Export PNG buttons remain available as a fallback.
+This is a browser security restriction and cannot be overridden.
+
 **Screen readers and accessibility** - Charts include `aria-label`
 attributes for basic screen reader support - Tables use semantic HTML
 for accessibility - Full keyboard navigation is not yet implemented;
@@ -633,5 +719,5 @@ mouse interaction is required for most features
 
 ------------------------------------------------------------------------
 
-*This manual was generated for Turas Analytics Platform v10.6.0. For
+*This manual was generated for Turas Analytics Platform v10.8.0. For
 technical documentation, see the separate Technical Developer Manual.*

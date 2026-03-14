@@ -72,21 +72,44 @@ These control *when* the traffic light colours change, not the colours themselve
 
 These are hardcoded by design because they carry universal meaning.
 
-### 2.1 Semantic Chart Palette
+### 2.1 Semantic Chart Palette (Configurable Presets)
 
-Used in stacked bar charts for ordinal/scale questions. Colours map to survey response sentiment via `get_semantic_colour()` in `07_chart_builder.R`.
+Used in stacked bar charts for ordinal/scale questions. Colours map to survey response sentiment via `get_semantic_colour()` in `07_chart_builder.R`. Three presets are available, selected via the `chart_palette_preset` config field.
 
-| Sentiment Tier | Colour | Hex | Labels Matched |
-|---------------|--------|-----|----------------|
-| Strong negative | Coral red | `#c0695c` | Negative, Poor, Detractor, Do not trust, Would switch, Strongly disagree, Very dissatisfied |
-| Mild negative | Light coral | `#cf8a7c` | Below average, Dissatisfied, Disagree |
-| Neutral | Amber gold | `#e8c170` | Neutral, Average, Passive, Undecided, Some trust, Neither agree nor disagree |
-| Mild positive | Sage green | `#68a67d` | Satisfied, Above average, Agree, Good |
-| Strong positive | Deep green | `#3d8b5e` | Positive, Excellent, Promoter, Fully trust, Would not switch, Strongly agree |
-| DK / NA / Refused | Silver grey | `#d4d4d4` | DK, NA, DK/NA, Don't know, Not applicable, N/A, Refused, Prefer not to say |
-| Other | Warm grey | `#c5c0b8` | Other |
+#### Warm Preset (default)
 
-**Why hardcoded:** Red-to-green sentiment mapping is a universal survey convention. Allowing per-project overrides would risk creating misleading visualisations (e.g., making "Detractor" green).
+| Sentiment | Hex | Description |
+|-----------|-----|-------------|
+| Negative | `#b85450` | Dusty rose-red |
+| Mod negative | `#d4918e` | Blush |
+| Neutral | `#c9a96e` | Warm sand |
+| Mod positive | `#7daa8c` | Sage |
+| Positive | `#4a7c6f` | Deep teal-green |
+| DK/NA | `#d1cdc7` | Warm grey |
+
+#### Cool Preset
+
+| Sentiment | Hex | Description |
+|-----------|-----|-------------|
+| Negative | `#a65461` | Muted burgundy |
+| Mod negative | `#c78f93` | Dusty pink |
+| Neutral | `#94a3b8` | Steel grey |
+| Mod positive | `#6f9fa8` | Muted teal |
+| Positive | `#3d7a8a` | Deep teal |
+| DK/NA | `#d1cdc7` | Warm grey |
+
+#### Research Preset
+
+| Sentiment | Hex | Description |
+|-----------|-----|-------------|
+| Negative | `#8e4585` | Muted purple |
+| Mod negative | `#b891b5` | Lavender |
+| Neutral | `#b8b8b8` | True neutral grey |
+| Mod positive | `#7daa8c` | Sage |
+| Positive | `#3d7a5f` | Forest |
+| DK/NA | `#d1cdc7` | Warm grey |
+
+**Configuration:** Set via `chart_palette_preset` in the Settings sheet. The semantic label-matching logic is unchanged -- only the hex values differ between presets.
 
 **Fallback behaviour:** When a row label does not match any semantic keyword, the chart uses brand-colour-derived shades. The brand colour is parsed to RGB and shades are generated from 30% to 100% intensity, lightest to darkest.
 
@@ -111,6 +134,23 @@ Used for gauge arcs, heatmap cell tints, and significance cards.
 | Red | `rgba(220,38,38,0.12)` | `#dc2626` | Normal |
 
 **Why hardcoded:** Traffic light colours (green/amber/red) have universal meaning in business dashboards. The *threshold values* where colours change are fully configurable (see Section 1.3).
+
+### 2.3 Categorical Palette (Non-Ordinal)
+
+10-colour qualitative palette for nominal data (regions, brands, etc.):
+
+| Colour | Hex | Name |
+|--------|-----|------|
+| 1 | `#5b7e9a` | Steel blue |
+| 2 | `#c47f5a` | Warm terracotta |
+| 3 | `#6a9a7b` | Sage green |
+| 4 | `#9b6b8a` | Dusty plum |
+| 5 | `#b8a04c` | Muted gold |
+| 6 | `#7a8e9e` | Grey-blue |
+| 7 | `#c27878` | Dusty rose |
+| 8 | `#5a8a8a` | Teal |
+| 9 | `#a89060` | Warm khaki |
+| 10 | `#8a7aaa` | Muted lavender |
 
 ---
 
@@ -169,15 +209,17 @@ Used when rendering SVG slides for PNG export.
 
 ### 3.5 Pinned Views Colours
 
+Colours now use the global `BRAND_COLOUR` variable instead of hardcoded `#323367`.
+
 | Element | Colour | Source |
 |---------|--------|--------|
-| Pin button (active) | `#323367` text + border | Hardcoded (default brand) |
+| Pin button (active) | `BRAND_COLOUR` text + border | Dynamic via JS variable |
 | Pin button (inactive) | `#94a3b8` text, `#e2e8f0` border | Hardcoded |
 | Pinned card border | `#e2e8f0` | Hardcoded |
-| Pinned card code | `#323367` | Hardcoded (default brand) |
+| Pinned card code | `BRAND_COLOUR` | Dynamic via JS variable |
 | Pinned card title | `#1e293b` | Hardcoded |
 | Pinned card meta | `#94a3b8` | Hardcoded |
-| Insight accent border | `#323367` | Hardcoded (default brand) |
+| Insight accent border | `BRAND_COLOUR` | Dynamic via JS variable |
 | Remove button text | `#e8614d` | Hardcoded |
 
 ### 3.6 Insights HTML Export Colours
@@ -195,24 +237,9 @@ Used when rendering SVG slides for PNG export.
 
 ## 4. Known Colour Gap
 
-### JS Files Do Not Receive Configured Brand Colour
+### JS Brand Colour - RESOLVED
 
-The R-side CSS correctly substitutes the configured `brand_colour` via `gsub("BRAND", bc, ...)`. However, the 5 JavaScript files and their inline styles contain `#323367` (the *default* brand colour) hardcoded in approximately 15 locations.
-
-**Impact:** If a client sets a brand colour other than `#323367`, the following elements will show the default navy instead of the client's colour:
-
-| File | Element | Line(s) |
-|------|---------|---------|
-| `pinned_views.js` | Pin button active state | 40-41 |
-| `pinned_views.js` | Insight accent border in pinned cards | 204 |
-| `pinned_views.js` | Slide export insight accent bar | 359 |
-| `pinned_views.js` | Print layout accent borders | 440, 450, 466 |
-| `slide_export.js` | Slide insight accent bar | 343 |
-| `slide_export.js` | Insights HTML export borders and code colour | 415-416 |
-
-**Why it exists:** The JS files are loaded as standalone `.js` files and concatenated at build time. The `BANNER_GROUPS_JSON` placeholder substitution exists for banner data, but no equivalent `BRAND_COLOUR` substitution was implemented for colour.
-
-**Workaround:** The main report display (sidebar, headers, tables, controls) correctly uses the configured brand colour. The mismatch only appears in exported slides, pinned view cards, and the insights HTML export.
+**RESOLVED in v10.8.0**: All JS files now use the global `BRAND_COLOUR` variable injected from R via `<script>var BRAND_COLOUR = "...";</script>`. The hardcoded `#323367` references in `pinned_views.js`, `slide_export.js`, `chart_picker.js`, and `core_navigation.js` have been replaced.
 
 ---
 
@@ -223,6 +250,7 @@ Minimum configuration for colour customisation:
 ```r
 config_obj$brand_colour <- "#1B4F72"   # Your brand colour
 config_obj$accent_colour <- "#D4AC0D"  # Your accent colour
+config_obj$chart_palette_preset <- "warm"  # Options: "warm", "cool", "research"
 ```
 
 Full dashboard threshold customisation:

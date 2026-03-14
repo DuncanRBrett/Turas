@@ -1,6 +1,6 @@
 # Turas Tabs HTML Report - Technical Developer Manual
 
-**Version:** 10.6.0
+**Version:** 10.8.0
 **Module:** `modules/tabs/lib/html_report/`
 **Audience:** Developers maintaining or extending the HTML report system
 
@@ -329,6 +329,42 @@ var bannerGroups = ["Q002","Q003","Q004"]; // BANNER_GROUPS_JSON replaced
 </div>
 ```
 
+**Qualitative slide image UI (`build_qual_slide_card()`):**
+
+The `build_qual_slide_card()` function now includes image upload elements for custom qualitative slides:
+
+```html
+<button class="qual-img-btn" title="Add image">&#128444;</button>
+<div class="qual-img-preview" style="display:none">
+  <img class="qual-img-thumb" />
+  <button class="qual-img-remove">&times;</button>
+</div>
+<input type="file" class="qual-img-input" accept="image/*" style="display:none" />
+<textarea class="qual-img-store" style="display:none"></textarea>
+```
+
+**New CSS classes:**
+
+| Class | Purpose |
+|-------|---------|
+| `.qual-img-preview` | Container for image thumbnail and remove button |
+| `.qual-img-thumb` | Thumbnail image element (max-width: 200px, border-radius: 6px) |
+| `.qual-img-remove` | Remove button overlaid on image thumbnail |
+
+**Clipboard button support:**
+
+Clipboard copy buttons use the class `.clipboard-btn` and are conditionally shown via JavaScript when the Clipboard API is available (see `window._clipboardAvailable` in Section 6). Buttons are hidden by default with `display:none` and revealed at page load.
+
+**Help overlay:**
+
+The help overlay has been updated to include 6 sections covering all report features:
+1. Navigation and sidebar usage
+2. Table controls (sorting, column toggling, heatmap, frequencies)
+3. Chart controls (column picker, chart export, clipboard copy)
+4. Insight and comment system
+5. Pinned views and qualitative slides (including image upload)
+6. Export options (CSV, Excel, PNG slides, print, save)
+
 ### 4.5 04_html_writer.R
 
 **Purpose:** Write the assembled HTML string to disk.
@@ -452,6 +488,29 @@ if (has_box_categories OR is_likert OR is_rating OR is_nps) {
 }
 ```
 
+**Palette preset system (`chart_palette_preset`):**
+
+The `config_obj$chart_palette_preset` field selects one of three ordinal colour palettes. Default is `"warm"`.
+
+| Preset | Negative | Mod. Negative | Neutral | Mod. Positive | Positive | DK/NA |
+|--------|----------|---------------|---------|---------------|----------|-------|
+| `warm` | `#b85450` | `#d4918e` | `#c9a96e` | `#7daa8c` | `#4a7c6f` | `#d1cdc7` |
+| `cool` | `#a65461` | `#c78f93` | `#94a3b8` | `#6f9fa8` | `#3d7a8a` | `#d1cdc7` |
+| `research` | `#8e4585` | `#b891b5` | `#b8b8b8` | `#7daa8c` | `#3d7a5f` | `#d1cdc7` |
+
+For non-ordinal (categorical) questions, a 10-colour qualitative palette is used instead of the ordinal preset. This palette is designed for maximum visual distinction across categories.
+
+**Segment rendering thresholds:**
+
+Stacked bar segments follow size-based rendering rules:
+- **< 3%** segments are not rendered (omitted from SVG)
+- **3-8%** segments render the coloured `<rect>` only (no label)
+- **> 8%** segments render both the coloured `<rect>` and a percentage label
+
+**Legend:**
+
+The chart legend includes percentage values alongside each category label, formatted as `"Label (xx%)"`.
+
 **Semantic colour mapping** (`get_semantic_colour()`):
 - 18 predefined label-to-colour mappings
 - Pattern matching (case-insensitive, substring match)
@@ -569,9 +628,25 @@ var chartColumnState = {};  // {qCode: {colKey: true/false}}
 | `buildStackedBarSVG(data, keys, ...)` | Generate stacked bar SVG string |
 | `buildHorizontalBarSVG(data, keys, ...)` | Generate horizontal bar SVG string |
 | `exportChartPNG(svgElement, filename)` | Convert SVG to Canvas to PNG download |
+| `copyChartToClipboard(qCode)` | SVG-native clipboard copy of the current chart |
 | `escapeHtml(str)` | HTML entity escaping utility |
 | `hslToHex(h, s, l)` | HSL to hex colour conversion |
 | `generateDistinctColours(n)` | Generate n visually distinct colours for multi-column charts |
+
+**`copyChartToClipboard(qCode)`:**
+
+Uses the Clipboard API to copy the current chart SVG as a PNG image to the system clipboard. The function serialises the SVG element, renders it to a temporary canvas, converts to a PNG blob, and writes via `navigator.clipboard.write()`. Only available when `window._clipboardAvailable` is `true` (see Section 6).
+
+**Segment rendering (JS-side):**
+
+The client-side chart rebuild functions (`buildStackedBarSVG`, `buildHorizontalBarSVG`) apply the same segment rendering thresholds as the R-side builder:
+- Segments below 3% are omitted
+- Segments between 3-8% render the coloured rect only
+- Segments above 8% include the percentage label
+
+**Legend percentage display:**
+
+Chart legends generated client-side include percentage values alongside each category label, matching the R-side format `"Label (xx%)"`.
 
 **Chart rebuild flow:**
 ```
@@ -605,6 +680,19 @@ toggleChartColumn(qCode, colKey)
 | `exportExcel(tableId)` | Export table as Excel XML Spreadsheet |
 | `downloadBlob(blob, filename)` | Create download link and trigger browser download |
 | `getLabelText(el)` | Extract clean text from label cell (excluding badges) |
+
+**Clipboard API detection:**
+
+At the end of the `DOMContentLoaded` initialisation block, `table_export_init.js` checks for Clipboard API support:
+
+```javascript
+if (navigator.clipboard && typeof ClipboardItem !== "undefined") {
+  window._clipboardAvailable = true;
+  // Show all .clipboard-btn elements
+}
+```
+
+This sets the global `window._clipboardAvailable` flag and reveals any `.clipboard-btn` elements that were hidden by default. Other modules (chart_picker.js, pinned_views.js) read this flag before offering clipboard operations.
 
 **Sort algorithm:**
 ```javascript
@@ -707,6 +795,9 @@ var pinnedViews = [];  // Array of pinned snapshot objects
   insightText: "Key finding...",
   sortState: {colKey: "Total", direction: "desc"},
   excludedRows: {"DK": true},
+  imageData: "data:image/jpeg;base64,/9j/4AAQ...",  // or null
+  imageWidth: 800,   // pixel width of stored image (for SVG export layout)
+  imageHeight: 450,  // pixel height of stored image
   timestamp: 1708234567890
 }
 ```
@@ -718,12 +809,50 @@ var pinnedViews = [];  // Array of pinned snapshot objects
 | `togglePin(qCode)` | Pin or unpin a question |
 | `captureCurrentView(qCode)` | Snapshot current table, chart, insight state |
 | `renderPinnedViews()` | Rebuild pinned views container from pinnedViews array |
+| `renderPinnedCards()` | Render individual pin cards including image support |
 | `movePinUp(index)` / `movePinDown(index)` | Reorder pins |
 | `removePin(index)` | Remove a pin and update UI |
+| `copyPinnedCardToClipboard(pinId)` | Clipboard copy of a pinned card as PNG |
 | `exportAllSlides()` | Download PNG for each pinned view (sequential with 600ms delay) |
 | `printPinnedViews()` | Create print layout and trigger browser print |
 | `hydratePinnedViews()` | Restore pins from embedded JSON on page load |
 | `serializePinnedViews()` | Save pins to hidden data attribute for HTML save |
+| `triggerQualImage(slideId)` | Opens the hidden file input picker for image upload on a qualitative slide |
+| `handleQualImage(slideId, input)` | Reads selected file via FileReader, resizes on canvas to max 800px width, compresses as JPEG at 70% quality, stores base64 data URL in `.qual-img-store` textarea |
+| `removeQualImage(slideId)` | Clears image data from the slide and hides the preview |
+| `addQualSlide()` | Creates a new qualitative slide with image UI elements |
+| `pinQualSlide()` | Captures qualitative slide including `imageData`, `imageWidth`, `imageHeight` |
+| `renderAllQualSlides()` | Hydrates images from `.qual-img-store` textareas on page load |
+
+**Image handling pipeline (`handleQualImage`):**
+```
+User clicks image button (triggerQualImage)
+  → Hidden <input type="file"> triggered
+  → handleQualImage(slideId, input)
+    ├─ FileReader.readAsDataURL(file)
+    ├─ new Image() from data URL
+    ├─ Canvas resize: max 800px width, proportional height
+    ├─ canvas.toDataURL("image/jpeg", 0.7)  → 70% JPEG quality
+    ├─ Store base64 in .qual-img-store textarea
+    ├─ Show thumbnail in .qual-img-preview
+    └─ Record imageWidth, imageHeight for SVG export layout
+```
+
+**`renderPinnedCards()`:**
+
+When rendering pinned cards, if `pin.imageData` is present, an `<img>` element is inserted between the insight text and the chart SVG within the card layout.
+
+**`renderAllQualSlides()`:**
+
+On page load, iterates all `.qual-img-store` textareas and hydrates the corresponding image previews from stored base64 data.
+
+**SVG export with embedded images:**
+
+The SVG export functions embed uploaded images using an SVG `<image>` element with `xlink:href` pointing to the base64 data URL. The `imageWidth` and `imageHeight` fields from the pin object are used to calculate correct positioning and scaling within the SVG layout.
+
+**Clipboard detection:**
+
+The `copyPinnedCardToClipboard(pinId)` function checks `window._clipboardAvailable` before attempting clipboard operations. This flag is set by `table_export_init.js` at page load (see Section 5.3).
 
 **Pin lifecycle:**
 ```
@@ -778,9 +907,19 @@ core_navigation.js
 chart_picker.js
   └─ chartColumnState     (read/written by chart column picker)
 
+table_export_init.js
+  └─ window._clipboardAvailable  (set once at DOMContentLoaded, read by chart_picker.js and pinned_views.js)
+
 pinned_views.js
   └─ pinnedViews          (read/written by pin operations)
+
+R-injected globals (via <script> block in 03_page_builder.R)
+  └─ BRAND_COLOUR         (String, e.g. "#323367", read by chart_picker.js and slide_export.js)
 ```
+
+**`window._clipboardAvailable`** - Boolean. Set once at page load by `table_export_init.js`. Controls visibility of `.clipboard-btn` elements and guards clipboard operations in `copyChartToClipboard()` and `copyPinnedCardToClipboard()`.
+
+**`BRAND_COLOUR`** - Global JS variable injected from R via `<script>var BRAND_COLOUR = "...";</script>` in the page header. Provides the configured brand colour to JavaScript modules for consistent theming in client-side chart rendering and slide export.
 
 ### Cross-module function calls
 
@@ -879,6 +1018,7 @@ Fields accessed from `config_obj` across all R modules:
 | `brand_colour` | 02, 03, 06, 07 | `"#323367"` |
 | `accent_colour` | 03 | `"#CC9900"` |
 | `chart_bar_colour` | 07 | `brand_colour` |
+| `chart_palette_preset` | 07 | `"warm"` |
 | `project_title` | 03 | `"Crosstab Report"` |
 | `company_name` | 03 | `"The Research Lamppost"` |
 | `client_name` | 03 | `NULL` |
@@ -1263,6 +1403,7 @@ JSON.parse(wrapper.getAttribute('data-chart-data'));
 | 10.4.3 | Sig findings with resolved letter codes, full question text, descriptors |
 | 10.5.0 | Advanced chart rendering with multi-column support, chart column picker |
 | 10.6.0 | Pinned views, slide export, insight system, comments sheet, save/hydrate |
+| 10.8.0 | Chart palette presets (warm/cool/research), segment rendering thresholds, clipboard copy for charts and pinned cards, qualitative slide image upload with canvas resize, legend percentages, BRAND_COLOUR global injection |
 
 ---
 

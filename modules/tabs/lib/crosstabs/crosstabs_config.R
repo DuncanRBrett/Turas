@@ -389,13 +389,49 @@ load_qualitative_sheet <- function(config_file) {
     }
     df <- df[order(df$display_order), , drop = FALSE]
 
+    # V10.8.0: Resolve image_path relative to config file directory
+    config_dir <- dirname(normalizePath(config_file, mustWork = FALSE))
+    has_image_col <- "image_path" %in% names(df)
+
     slides <- lapply(seq_len(nrow(df)), function(i) {
-      list(
+      slide <- list(
         id = sprintf("qual-slide-%d", i),
         title = trimws(df$slide_title[i]),
         content = trimws(df$content[i] %||% ""),
-        order = i
+        order = i,
+        image_data = NULL
       )
+
+      # Embed image as base64 if image_path is provided
+      if (has_image_col && !is.na(df$image_path[i]) && nzchar(trimws(df$image_path[i]))) {
+        img_path <- trimws(df$image_path[i])
+        # Resolve relative paths against config directory
+        if (!file.exists(img_path)) {
+          img_path <- file.path(config_dir, img_path)
+        }
+        if (file.exists(img_path) && requireNamespace("base64enc", quietly = TRUE)) {
+          tryCatch({
+            raw <- readBin(img_path, "raw", file.info(img_path)$size)
+            ext <- tolower(tools::file_ext(img_path))
+            mime <- switch(ext,
+              png = "image/png", jpg = "image/jpeg", jpeg = "image/jpeg",
+              gif = "image/gif", webp = "image/webp", svg = "image/svg+xml",
+              "image/png"  # fallback
+            )
+            slide$image_data <- sprintf("data:%s;base64,%s",
+              mime, base64enc::base64encode(raw))
+            cat(sprintf("  [INFO] Embedded image for slide '%s' (%s, %dKB)\n",
+              slide$title, basename(img_path), round(length(raw) / 1024)))
+          }, error = function(e) {
+            cat(sprintf("  [WARNING] Could not embed image '%s': %s\n", img_path, e$message))
+          })
+        } else {
+          cat(sprintf("  [WARNING] Image file not found for slide '%s': %s\n",
+            slide$title, img_path))
+        }
+      }
+
+      slide
     })
 
     cat(sprintf("  [INFO] Loaded %d added slides from %s sheet\n", length(slides), sheet_name))
