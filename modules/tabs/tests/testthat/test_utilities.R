@@ -213,11 +213,11 @@ test_that("resolves relative paths", {
   expect_true(grepl("base/dir/sub/file.txt", result, fixed = TRUE))
 })
 
-test_that("joins absolute second path onto base (no special absolute handling)", {
-  # resolve_path always combines base + relative via file.path then normalizes
+test_that("returns absolute second path directly without joining base", {
+  # resolve_path detects absolute paths and returns them without prepending base
   result <- resolve_path("/base/dir", "/absolute/path.txt")
   expect_true(grepl("absolute/path.txt", result, fixed = TRUE))
-  expect_true(grepl("base/dir", result, fixed = TRUE))
+  expect_false(grepl("base/dir", result, fixed = TRUE))
 })
 
 test_that("strips ./ prefix from relative paths", {

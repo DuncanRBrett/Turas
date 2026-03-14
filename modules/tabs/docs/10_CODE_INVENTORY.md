@@ -80,12 +80,12 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 
 | File | Lines | Purpose |
 |---|---:|---|
-| `lib/crosstabs/crosstabs_config.R` | 590 | Build config_obj with 71 typed settings (canonical) |
+| `lib/crosstabs/crosstabs_config.R` | 591 | Build config_obj with 71 typed settings + unrecognised-setting detection (canonical) |
 | `lib/crosstabs/data_setup.R` | 317 | Orchestrate structure/data/weight loading |
 | `lib/crosstabs/analysis_runner.R` | 570 | Validation, banner creation, question processing loop |
 | `lib/crosstabs/workbook_builder.R` | 657 | Excel workbook assembly (all sheets) |
 | `lib/crosstabs/checkpoint.R` | 146 | Save/load/cleanup for resumable analysis |
-| | **2,280** | |
+| | **2,281** | |
 
 ### Validation System
 
@@ -192,9 +192,9 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | `lib/shared_functions.R` | 347 | Module orchestrator; sources utility modules in order |
 | `lib/logging_utils.R` | 191 | Logging, progress, memory monitoring |
 | `lib/type_utils.R` | 170 | Safe type conversion (safe_logical, safe_numeric, safe_equal) |
-| `lib/path_utils.R` | 223 | Path handling (resolve_path, tabs_lib_path, tabs_source) |
+| `lib/path_utils.R` | 231 | Path handling (resolve_path with absolute path detection, tabs_lib_path, tabs_source) |
 | `lib/filter_utils.R` | 211 | Base filter application and security validation |
-| | **1,142** | |
+| | **1,150** | |
 
 ### Tests
 

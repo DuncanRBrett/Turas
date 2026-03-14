@@ -140,8 +140,16 @@ resolve_path <- function(base_path, relative_path) {
   # Remove leading ./
   relative_path <- gsub("^\\./", "", relative_path)
 
-  # Combine paths (handles both / and \)
-  full_path <- file.path(base_path, relative_path)
+  # If relative_path is already absolute, use it directly
+
+  # (macOS/Linux: starts with /  |  Windows: starts with drive letter like C:/)
+  is_absolute <- grepl("^(/|[A-Za-z]:[\\\\/])", relative_path)
+  if (is_absolute) {
+    full_path <- relative_path
+  } else {
+    # Combine paths (handles both / and \)
+    full_path <- file.path(base_path, relative_path)
+  }
 
   # Normalize (resolves .., ., converts to OS-specific separators)
   full_path <- normalizePath(full_path, winslash = "/", mustWork = FALSE)

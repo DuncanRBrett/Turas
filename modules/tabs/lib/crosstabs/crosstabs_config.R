@@ -510,6 +510,7 @@ load_crosstabs_config <- function(config_file) {
     "analyst_name", "analyst_email", "analyst_phone", "verbatim_filename", "closing_notes",
     # Ranking
     "ranking_completeness_threshold_pct", "ranking_gap_threshold_pct", "ranking_tie_threshold_pct",
+    "ranking_min_base",
     # File path settings (loaded separately but may appear in Settings sheet)
     "data_file", "structure_file", "output_file", "output_filename",
     "output_format", "output_folder", "output_subfolder"
