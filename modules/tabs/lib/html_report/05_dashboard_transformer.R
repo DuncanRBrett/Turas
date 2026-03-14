@@ -244,7 +244,7 @@ detect_metric_by_type <- function(q_result, req_type, banner_info) {
   # e.g., "Good or excellent", "Very Satisfied (9-10)", "Fully trust"
   # Match against Column % rows first, then Frequency
   rows <- table[
-    grepl(req_type, table$RowLabel, ignore.case = TRUE) &
+    grepl(tolower(req_type), tolower(table$RowLabel), fixed = TRUE) &
     table$RowType == "Column %",
     , drop = FALSE
   ]
@@ -252,7 +252,7 @@ detect_metric_by_type <- function(q_result, req_type, banner_info) {
   if (nrow(rows) == 0) {
     # Try Frequency
     rows <- table[
-      grepl(req_type, table$RowLabel, ignore.case = TRUE) &
+      grepl(tolower(req_type), tolower(table$RowLabel), fixed = TRUE) &
       table$RowType == "Frequency",
       , drop = FALSE
     ]

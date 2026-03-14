@@ -823,7 +823,7 @@ build_heatmap_grid <- function(metrics, banner_info, config_obj, thresholds,
   )
   html <- paste0(html, sprintf(
     '<button class="dash-export-btn" onclick="exportHeatmapExcel(\'%s\', \'%s\')">',
-    safe_id, htmltools::htmlEscape(section_label)
+    js_esc(safe_id), js_esc(section_label)
   ))
   html <- paste0(html, '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">')
   html <- paste0(html, '<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/>')
@@ -1880,13 +1880,15 @@ build_dashboard_css <- function(brand_colour) {
     }
   '
 
-  css_text <- gsub("BRAND", bc, css_text, fixed = TRUE)
-
   # Derive RGB components from brand colour for rgba() values
+  # MUST replace __BRAND_R/G/B__ BEFORE bare "BRAND" — otherwise gsub("BRAND",...)
+  # corrupts "__BRAND_R__" into "__#323367_R__"
   brand_rgb <- tryCatch(col2rgb(bc)[, 1], error = function(e) c(50, 51, 103))
   css_text <- gsub("__BRAND_R__", brand_rgb[1], css_text, fixed = TRUE)
   css_text <- gsub("__BRAND_G__", brand_rgb[2], css_text, fixed = TRUE)
   css_text <- gsub("__BRAND_B__", brand_rgb[3], css_text, fixed = TRUE)
+
+  css_text <- gsub("BRAND", bc, css_text, fixed = TRUE)
 
   htmltools::tags$style(htmltools::HTML(css_text))
 }

@@ -83,7 +83,9 @@ for (.hr_file in .hr_required_files) {
   .hr_path <- file.path(.html_report_dir, .hr_file)
   source(.hr_path)
 }
-rm(.hr_file, .hr_path, .hr_required_files, .hr_missing)
+rm(.hr_file, .hr_path, .hr_required_files, .hr_missing, .hr_required_js, .hr_js,
+   .html_report_dir)
+if (exists(".ofile")) rm(.ofile)
 
 
 #' Generate HTML Crosstab Report

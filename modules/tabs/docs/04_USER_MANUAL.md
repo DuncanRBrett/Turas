@@ -317,9 +317,10 @@ checks that catch configuration mistakes early:
     valid columns
 -   **Weight variable:** Validates the weight column exists and contains
     valid values
--   **Logo files:** When HTML report is enabled, warns if logo files
-    are missing
--   **Colour codes:** Validates hex colour codes for HTML report branding
+-   **Logo files:** When HTML report is enabled, warns if logo files are
+    missing
+-   **Colour codes:** Validates hex colour codes for HTML report
+    branding
 -   **Dashboard scales:** Warns if green/amber thresholds are inverted
 
 Pre-flight issues appear in the console and in the Error Log sheet of
@@ -338,7 +339,7 @@ respondents, 30 questions, 10 banner columns) takes about 10-15 seconds.
 Open the output Excel file. You'll find these sheets:
 
 | Sheet | Purpose |
-|-------|---------|
+|----|----|
 | Summary | Project info, settings used, question list with base sizes |
 | Guide | How to read this report — explains row types, significance letters, weighting, index scores |
 | Index_Summary | Consolidated mean/index scores across all banner columns |
@@ -349,12 +350,11 @@ Open the output Excel file. You'll find these sheets:
 
 ### Guide Sheet
 
-The Guide sheet is automatically generated and explains how to
-interpret the output. It adapts to your configuration — for example,
-the significance testing section only appears if significance testing
-is enabled, and the weighting section only appears if weighting is
-applied. This makes the Excel file self-documenting for anyone who
-receives it.
+The Guide sheet is automatically generated and explains how to interpret
+the output. It adapts to your configuration — for example, the
+significance testing section only appears if significance testing is
+enabled, and the weighting section only appears if weighting is applied.
+This makes the Excel file self-documenting for anyone who receives it.
 
 ### Index_Summary Sheet
 
@@ -415,35 +415,49 @@ column.
 
 ## Working with the HTML Report
 
-When `html_report` is set to `Y` in your Settings sheet, Tabs generates an interactive HTML report alongside the Excel output.
+When `html_report` is set to `Y` in your Settings sheet, Tabs generates
+an interactive HTML report alongside the Excel output.
 
 ### Opening the Report
 
-The HTML file is saved in your output folder with the same base name as your Excel file (e.g., `My_Analysis.html`). Open it in any modern browser — Chrome, Firefox, Edge, or Safari. No internet connection is required.
+The HTML file is saved in your output folder with the same base name as
+your Excel file (e.g., `My_Analysis.html`). Open it in any modern
+browser — Chrome, Firefox, Edge, or Safari. No internet connection is
+required.
 
 ### Report Navigation
 
-The report has four tabs across the top:
-1. **Summary** — Dashboard with headline gauges and significant findings
-2. **Crosstabs** — Interactive tables with search and banner switching
-3. **Added Slides** — Editorial content and insights
-4. **Pinned Views** — Your curated presentation collection
+The report has four tabs across the top: 1. **Summary** — Dashboard with
+headline gauges and significant findings 2. **Crosstabs** — Interactive
+tables with search and banner switching 3. **Added Slides** — Editorial
+content and insights 4. **Pinned Views** — Your curated presentation
+collection
 
 ### Using Charts and Tables
 
-- **Heatmap toggle** — Click the heatmap icon to colour-code cells by value
-- **Banner switching** — Use the dropdown to switch between banner groups
-- **Search** — Type in the search box to filter questions
-- **Copy to clipboard** — Click the clipboard icon on any table to copy it
-- **Export as PNG** — Click the camera icon to download a table as an image
+-   **Heatmap toggle** — Click the heatmap icon to colour-code cells by
+    value
+-   **Banner switching** — Use the dropdown to switch between banner
+    groups
+-   **Search** — Type in the search box to filter questions
+-   **Copy to clipboard** — Click the clipboard icon on any table to
+    copy it
+-   **Export as PNG** — Click the camera icon to download a table as an
+    image
 
 ### Adding Slides
 
-You can create narrative slides directly in the browser using the "Add Slide" button on the Added Slides tab. Slides support rich text formatting. You can also pre-seed slides from the **AddedSlides** sheet in your config file (see [Template Reference](06_TEMPLATE_REFERENCE.md)).
+You can create narrative slides directly in the browser using the "Add
+Slide" button on the Added Slides tab. Slides support rich text
+formatting. You can also pre-seed slides from the **AddedSlides** sheet
+in your config file (see [Template
+Reference](06_TEMPLATE_REFERENCE.md)).
 
 ### Pinning Views
 
-Pin any chart or table by clicking the pin icon. Pinned items appear in the Pinned Views tab, where you can reorder them and export the entire collection as PNG images.
+Pin any chart or table by clicking the pin icon. Pinned items appear in
+the Pinned Views tab, where you can reorder them and export the entire
+collection as PNG images.
 
 ------------------------------------------------------------------------
 
@@ -582,8 +596,8 @@ includes:
 -   **Summary dashboard** with gauge charts and heatmap grids
 -   **Interactive crosstab tables** with heatmap colouring and
     significance badges
--   **Inline SVG charts** (stacked bars for ordinal, horizontal bars
-    for nominal)
+-   **Inline SVG charts** (stacked bars for ordinal, horizontal bars for
+    nominal)
 -   **Pinned views** for saving and annotating key findings
 -   **Column sorting and export** (CSV and Excel)
 -   **Search and navigation** across all questions

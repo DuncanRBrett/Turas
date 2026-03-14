@@ -1584,7 +1584,7 @@ build_banner_tabs <- function(banner_groups, brand_colour = "#323367") {
       class = if (i == 1) "banner-tab active" else "banner-tab",
       `data-group` = grp$banner_code,
       `data-banner-name` = grp_name,
-      onclick = sprintf("switchBannerGroup('%s', this)", grp$banner_code),
+      onclick = sprintf("switchBannerGroup('%s', this)", js_esc(grp$banner_code)),
       grp_name
     )
   })
