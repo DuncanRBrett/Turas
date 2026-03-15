@@ -31,15 +31,16 @@ build_dashboard_css <- function(brand_colour) {
     .report-tabs {
       display: flex; gap: 0; max-width: 1400px; margin: 0 auto;
       padding: 0 32px; background: #fff;
-      border-bottom: 2px solid #e2e8f0;
+      border-bottom: 1px solid #e2e8f0;
     }
     .report-tab {
-      padding: 12px 28px; font-size: 14px; font-weight: 600;
+      padding: 12px 20px 10px; font-size: 14px; font-weight: 500;
       color: #64748b; background: none; border: none;
       cursor: pointer; border-bottom: 3px solid transparent;
-      margin-bottom: -2px; transition: all 0.15s;
+      transition: color 0.15s ease, border-color 0.15s ease;
+      white-space: nowrap;
     }
-    .report-tab:hover { color: #1a2744; }
+    .report-tab:hover { color: #1e293b; }
     .report-tab.active {
       color: BRAND; border-bottom-color: BRAND;
     }

@@ -36,7 +36,7 @@ build_report_tab_nav <- function(brand_colour, has_qualitative = FALSE, has_abou
       class = "report-tab",
       onclick = "switchReportTab('qualitative')",
       `data-tab` = "qualitative",
-      "\U0001F4DD Added Slides"
+      "Added Slides"
     )
   }
 
@@ -45,7 +45,7 @@ build_report_tab_nav <- function(brand_colour, has_qualitative = FALSE, has_abou
       class = "report-tab",
       onclick = "switchReportTab('about')",
       `data-tab` = "about",
-      "\u2139\uFE0F About"
+      "About"
     )
   }
 
@@ -55,13 +55,13 @@ build_report_tab_nav <- function(brand_colour, has_qualitative = FALSE, has_abou
       class = "report-tab active",
       onclick = "switchReportTab('summary')",
       `data-tab` = "summary",
-      "\U0001F4CA Summary"
+      "Summary"
     ),
     htmltools::tags$button(
       class = "report-tab",
       onclick = "switchReportTab('crosstabs')",
       `data-tab` = "crosstabs",
-      "\U0001F4CB Crosstabs"
+      "Crosstabs"
     ),
     qual_tab,
     about_tab,
@@ -69,7 +69,7 @@ build_report_tab_nav <- function(brand_colour, has_qualitative = FALSE, has_abou
       class = "report-tab",
       onclick = "switchReportTab('pinned')",
       `data-tab` = "pinned",
-      "\U0001F4CC Pinned Views",
+      "Pinned Views",
       htmltools::tags$span(class = "pin-count-badge", id = "pin-count-badge", style = paste0("display:none;margin-left:4px;background:", brand_colour, ";color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;"), "0")
     )
   )

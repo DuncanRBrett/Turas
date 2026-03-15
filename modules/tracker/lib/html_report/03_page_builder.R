@@ -146,7 +146,7 @@ build_report_tab_nav <- function(brand_colour, has_about = FALSE) {
       class = "report-tab",
       onclick = "switchReportTab('about')",
       `data-tab` = "about",
-      "\u2139\uFE0F About"
+      "About"
     )
   }
 
