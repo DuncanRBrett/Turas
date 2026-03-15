@@ -42,13 +42,17 @@ build_level1_nav <- function(reports, has_about = FALSE) {
 #'
 #' Rebuilds the report's internal tab bar with namespaced IDs
 #' and removes the pinned tab (managed at Level 1).
+#' For report types with help overlays (tabs, tracker), appends a
+#' help button that triggers the namespaced toggleHelpOverlay function.
 #'
 #' @param report_key Report key
 #' @param tab_names Character vector of tab names (excluding "pinned")
 #' @param tab_labels Named vector mapping tab names to display labels (optional)
 #' @param report_type "tracker" or "tabs"
+#' @param has_help_overlay Logical; whether this report has a help overlay
 #' @return HTML string for Level 2 navigation
-build_level2_nav <- function(report_key, tab_names, tab_labels = NULL, report_type = NULL) {
+build_level2_nav <- function(report_key, tab_names, tab_labels = NULL,
+                             report_type = NULL, has_help_overlay = FALSE) {
   if (length(tab_names) == 0) return("")
 
   # Default labels based on report type
@@ -81,6 +85,14 @@ build_level2_nav <- function(report_key, tab_names, tab_labels = NULL, report_ty
     ))
   }
 
+  # Add help button for reports with help overlays
+  if (has_help_overlay) {
+    tabs <- paste0(tabs, sprintf(
+      '<button class="hub-help-btn" onclick="%s_toggleHelpOverlay()" title="Help guide">?</button>',
+      report_key
+    ))
+  }
+
   html <- sprintf(
     '<div class="hub-nav-level2" id="hub-l2-%s" style="display:none;">\n  %s\n</div>',
     report_key, tabs
@@ -100,10 +112,12 @@ build_navigation <- function(parsed_reports, report_configs, has_about = FALSE) 
 
   # Level 2 for each report
   for (parsed in parsed_reports) {
+    has_help <- !is.null(parsed$help_overlay) && nzchar(parsed$help_overlay)
     l2 <- build_level2_nav(
       report_key = parsed$report_key,
       tab_names = parsed$report_tabs$tab_names,
-      report_type = parsed$report_type
+      report_type = parsed$report_type,
+      has_help_overlay = has_help
     )
     nav_html <- paste0(nav_html, "\n", l2)
   }

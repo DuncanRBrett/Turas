@@ -67,6 +67,11 @@ assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_
       parts <- c(parts, parsed$footer)
     }
 
+    # Include help overlay if present (extracted separately from content panels)
+    if (!is.null(parsed$help_overlay) && nzchar(parsed$help_overlay)) {
+      parts <- c(parts, parsed$help_overlay)
+    }
+
     parts <- c(parts, '</div>')
   }
 

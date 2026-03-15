@@ -43,6 +43,12 @@ rewrite_for_hub <- function(parsed, report_label = NULL) {
     parsed$footer <- rewrite_html_ids(parsed$footer, prefix)
   }
 
+  # --- Rewrite help overlay ---
+  if (!is.null(parsed$help_overlay) && nzchar(parsed$help_overlay)) {
+    parsed$help_overlay <- rewrite_html_ids(parsed$help_overlay, prefix)
+    parsed$help_overlay <- rewrite_html_onclick_conflicts(parsed$help_overlay, key)
+  }
+
   # --- Rewrite CSS ---
   for (i in seq_along(parsed$css_blocks)) {
     parsed$css_blocks[[i]]$content <- rewrite_css_ids(

@@ -185,6 +185,31 @@ body {
   font-weight: 500;
 }
 
+/* --- Help Button (Level 2 nav) --- */
+.hub-help-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid var(--hub-text-muted);
+  background: transparent;
+  color: var(--hub-text-muted);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  align-self: center;
+  flex-shrink: 0;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.hub-help-btn:hover {
+  color: var(--hub-brand);
+  border-color: var(--hub-brand);
+}
+
 /* --- Report Panels --- */
 .hub-panel {
   display: none;
@@ -941,7 +966,8 @@ body {
   .hub-action-btn,
   .hub-remove-btn,
   .hub-save-btn,
-  .hub-print-btn {
+  .hub-print-btn,
+  .hub-help-btn {
     display: none !important;
   }
 

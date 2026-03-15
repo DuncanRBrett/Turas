@@ -67,6 +67,9 @@ parse_html_report <- function(report_path, report_key) {
   # --- Extract footer ---
   footer <- extract_footer(html, report_type)
 
+  # --- Extract help overlay ---
+  help_overlay <- extract_help_overlay(html, report_type)
+
   # --- Extract metadata ---
   metadata <- extract_metadata(html, report_type)
 
@@ -91,6 +94,7 @@ parse_html_report <- function(report_path, report_key) {
       report_tabs = report_tabs,
       content_panels = content_panels,
       footer = footer,
+      help_overlay = help_overlay,
       metadata = metadata,
       pinned_data = pinned_data,
       raw_html = html
@@ -453,6 +457,86 @@ extract_footer <- function(html, report_type) {
   }
   # Tabs footer is inside content panels — already captured, no separate extraction
   return("")
+}
+
+
+#' Extract Help Overlay HTML
+#'
+#' Extracts the help overlay modal from report HTML. Tabs reports use
+#' \code{<div class="help-overlay" id="help-overlay">}, tracker reports use
+#' \code{<div id="tk-help-overlay" class="tk-help-overlay">}. Other report
+#' types do not have help overlays.
+#'
+#' The help overlay sits outside the tab-panel divs in source HTML, so it
+#' must be extracted separately from content panels.
+#'
+#' @param html Full HTML string
+#' @param report_type Report type string
+#' @return Help overlay HTML string, or empty string if not found
+#' @keywords internal
+extract_help_overlay <- function(html, report_type) {
+  # Determine the opening tag pattern based on report type
+  open_pattern <- NULL
+  if (report_type == "tabs") {
+    open_pattern <- '<div\\s+class="help-overlay"\\s+id="help-overlay"[^>]*>'
+  } else if (report_type == "tracker") {
+    open_pattern <- '<div\\s+id="tk-help-overlay"[^>]*>'
+  }
+
+  if (is.null(open_pattern)) return("")
+
+  # Find the opening tag
+  m <- regexpr(open_pattern, html, perl = TRUE)
+  if (m == -1) return("")
+
+  # Use div-counting to find the balanced closing tag
+  extract_balanced_div(html, m)
+}
+
+
+#' Extract a Balanced Div Block from HTML
+#'
+#' Starting from a known opening \code{<div} position, counts nested div
+#' opens and closes to find the matching closing \code{</div>} tag.
+#'
+#' @param html Full HTML string
+#' @param start_pos Position of the opening \code{<div} tag
+#' @return The complete balanced HTML string from opening to closing div
+#' @keywords internal
+extract_balanced_div <- function(html, start_pos) {
+  depth <- 0
+  pos <- start_pos
+  n <- nchar(html)
+
+  while (pos <= n) {
+    # Find next <div or </div> from current position
+    rest <- substr(html, pos, n)
+    open_m <- regexpr("<div[\\s>]", rest, perl = TRUE)
+    close_m <- regexpr("</div>", rest, fixed = TRUE)
+
+    open_abs <- if (open_m > 0) pos + open_m - 1 else n + 1
+    close_abs <- if (close_m > 0) pos + close_m - 1 else n + 1
+
+    if (open_abs <= n && open_abs < close_abs) {
+      # Found an opening div first
+      depth <- depth + 1
+      pos <- open_abs + 4  # skip past "<div"
+    } else if (close_abs <= n) {
+      # Found a closing div
+      depth <- depth - 1
+      if (depth == 0) {
+        # This is the matching close for our opening div
+        return(substr(html, start_pos, close_abs + 5))  # +5 for "</div>"
+      }
+      pos <- close_abs + 6  # skip past "</div>"
+    } else {
+      # No more divs found
+      break
+    }
+  }
+
+  # Fallback: return from start to end (shouldn't happen with valid HTML)
+  return(substr(html, start_pos, n))
 }
 
 

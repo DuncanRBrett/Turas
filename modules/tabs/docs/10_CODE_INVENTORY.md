@@ -1,6 +1,6 @@
 # Turas Tabs Module - Code Inventory
 
-**Generated:** 15 March 2026 | **Version:** 10.8.2 | **R Files:** 52 lib + 15 tests + 2 entry = 69 | **JS Files:** 5 | **Total Lines:** 34,749 (lib R+JS) + 9,072 (tests) + 696 (entry) = 44,517
+**Generated:** 15 March 2026 | **Version:** 10.8.2 | **R Files:** 52 lib + 15 tests + 2 entry = 69 | **JS Files:** 5 | **Total Lines:** 30,730 (lib R) + 4,158 (JS) + 9,072 (tests) + 696 (entry) = 44,656
 
 ------------------------------------------------------------------------
 
@@ -30,23 +30,23 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 
 | Category | Files | Lines | % of Total |
 |---|---|---|---|
-| Core Orchestration | 3 | 1,332 | 3.8% |
-| Configuration & Loading | 4 | 2,222 | 6.4% |
-| Crosstabs Submodules | 5 | 2,280 | 6.5% |
-| Validation System | 7 | 4,347 | 12.4% |
-| Guard Layer | 1 | 786 | 2.2% |
-| Question Processing | 4 | 3,035 | 8.6% |
-| Composite Metrics | 1 | 826 | 2.3% |
-| Ranking System | 4 | 2,088 | 5.9% |
-| Banner & Cell Calculations | 3 | 1,895 | 5.4% |
-| Weighting & Statistics | 1 | 1,578 | 4.5% |
-| Excel Output | 3 | 2,577 | 7.3% |
-| HTML Report (R) | 13 | 7,280 | 18.8% |
-| HTML Report (JS) | 5 | 4,155 | 10.7% |
-| Utilities | 5 | 1,142 | 3.2% |
-| Config Templates | 1 | 1,373 | 3.9% |
-| Tests | 15 | 9,072 | 19.5% |
-| Entry Points & GUI | 2 | 696 | 2.0% |
+| Core Orchestration | 3 | 1,332 | 3.0% |
+| Configuration & Loading | 4 | 2,122 | 4.8% |
+| Crosstabs Submodules | 5 | 2,281 | 5.1% |
+| Validation System | 7 | 4,317 | 9.7% |
+| Guard Layer | 1 | 786 | 1.8% |
+| Question Processing | 4 | 3,031 | 6.8% |
+| Composite Metrics | 1 | 830 | 1.9% |
+| Ranking System | 4 | 2,088 | 4.7% |
+| Banner & Cell Calculations | 3 | 1,895 | 4.2% |
+| Weighting & Statistics | 1 | 1,587 | 3.6% |
+| Excel Output | 3 | 2,577 | 5.8% |
+| HTML Report (R) | 13 | 7,415 | 16.6% |
+| HTML Report (JS) | 5 | 4,158 | 9.3% |
+| Utilities | 5 | 1,153 | 2.6% |
+| Config Templates | 1 | 1,373 | 3.1% |
+| Tests | 15 | 9,072 | 20.3% |
+| Entry Points & GUI | 2 | 696 | 1.6% |
 
 **Note on test locations:**
 - `modules/tabs/tests/testthat/` — 15 files, 9,072 lines: tabs-specific business logic (1,008 assertions total, 0 failures, 0 skips)
@@ -166,28 +166,28 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | `lib/html_report/00_html_guard.R` | 181 | Input validation; package checks (htmltools, jsonlite) |
 | `lib/html_report/01_data_transformer.R` | 541 | Transform results to HTML structures |
 | `lib/html_report/02_table_builder.R` | 327 | Build HTML table elements with data attributes |
-| `lib/html_report/03_page_builder.R` | 342 | Page assembler + JS module loader (V10.8 split) |
-| `lib/html_report/03a_page_styling.R` | 926 | CSS stylesheet + print CSS (extracted from 03) |
-| `lib/html_report/03b_page_components.R` | 1,105 | Layout components, question containers, qualitative (extracted from 03) |
+| `lib/html_report/03_page_builder.R` | 340 | Page assembler + JS module loader (V10.8 split) |
+| `lib/html_report/03a_page_styling.R` | 925 | CSS stylesheet + print CSS (extracted from 03) |
+| `lib/html_report/03b_page_components.R` | 1,136 | Layout components, question containers, qualitative, export actions (extracted from 03) |
 | `lib/html_report/04_html_writer.R` | 111 | Write self-contained HTML file |
 | `lib/html_report/05_dashboard_transformer.R` | 510 | Extract headline metrics for dashboard |
-| `lib/html_report/06_dashboard_builder.R` | 1,037 | Dashboard orchestrator + component builders (V10.8 split) |
+| `lib/html_report/06_dashboard_builder.R` | 1,029 | Dashboard orchestrator + component builders (V10.8 split) |
 | `lib/html_report/06a_dashboard_js.R` | 492 | Dashboard JavaScript (heatmap export, gauge interactions, extracted from 06) |
 | `lib/html_report/06b_dashboard_styling.R` | 488 | Dashboard CSS + colour system (extracted from 06) |
-| `lib/html_report/07_chart_builder.R` | 767 | Inline SVG chart generation (semantic palettes) |
+| `lib/html_report/07_chart_builder.R` | 883 | Inline SVG chart generation (semantic palettes) |
 | `lib/html_report/99_html_report_main.R` | 452 | HTML report entry point (guard, transform, build, write) |
-| | **7,279** | |
+| | **7,415** | |
 
 ### HTML Report (JavaScript)
 
 | File | Lines | Purpose |
 |---|---:|---|
-| `lib/html_report/js/core_navigation.js` | 658 | Question navigation, search, help overlay |
-| `lib/html_report/js/chart_picker.js` | 731 | Chart column picker, SVG rebuild, PNG export |
-| `lib/html_report/js/table_export_init.js` | 495 | CSV/Excel export, column toggle, sort |
-| `lib/html_report/js/pinned_views.js` | 1,804 | Multi-pin, view capture, Markdown editor |
-| `lib/html_report/js/slide_export.js` | 467 | Slide PNG export (1280x720 at 3x) |
-| | **4,155** | |
+| `lib/html_report/js/core_navigation.js` | 660 | Question navigation, search, help overlay, print report |
+| `lib/html_report/js/chart_picker.js` | 720 | Chart column picker, SVG rebuild, PNG export |
+| `lib/html_report/js/table_export_init.js` | 494 | CSV/Excel export, column toggle, sort |
+| `lib/html_report/js/pinned_views.js` | 1,805 | Multi-pin, view capture, Markdown editor |
+| `lib/html_report/js/slide_export.js` | 479 | Slide PNG export (1280x720 at 3x) |
+| | **4,158** | |
 
 ### Utility Modules
 
@@ -198,7 +198,7 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | `lib/type_utils.R` | 170 | Safe type conversion (safe_logical, safe_numeric, safe_equal) |
 | `lib/path_utils.R` | 234 | Path handling (resolve_path with absolute path detection + trimws, tabs_lib_path, tabs_source) |
 | `lib/filter_utils.R` | 211 | Base filter application and security validation |
-| | **1,150** | |
+| | **1,153** | |
 
 ### Tests
 
@@ -218,7 +218,7 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | `tests/testthat/test_composite_processor.R` | 562 | Composite validation, Mean/Sum/WeightedMean calculation, NA handling, multi-composite processing, accuracy verification |
 | `tests/testthat/test_ranking_processor.R` | 683 | Ranking validation, percent_ranked_first, percent_top_n, mean_rank, normalize_rank_direction, rank_variance, edge cases |
 | `tests/testthat/test_workbook_builder.R` | 495 | Style config, project info, save_workbook_safe, create_crosstabs_workbook (Summary/Run_Status sheets, E2E file write) |
-| `tests/testthat/test_e2e_integration.R` | 503 | Full pipeline: config load → data load → analysis → Excel output → HTML output using demo survey data |
+| `tests/testthat/test_e2e_integration.R` | 503 | Full pipeline: config load -> data load -> analysis -> Excel output -> HTML output using demo survey data |
 | | **9,072** | **1,008 assertions, 0 failures, 0 skips** |
 
 ------------------------------------------------------------------------
@@ -278,7 +278,7 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | Composite processor (virtual metrics) | Yes (42 assertions) | Mean/Sum/WeightedMean, NA handling, accuracy verification |
 | Ranking processor (V10.1) | Yes (90 assertions) | Ranking validation, percent_ranked_first, percent_top_n, mean_rank, normalize_rank_direction, rank_variance, edge cases |
 | Workbook builder | Yes (39 assertions) | Style config, project info, save_workbook_safe, create_crosstabs_workbook |
-| End-to-end integration | Yes (40 assertions) | Full pipeline: config → data → analysis → Excel → HTML using demo survey data |
+| End-to-end integration | Yes (40 assertions) | Full pipeline: config -> data -> analysis -> Excel -> HTML using demo survey data |
 
 **Honest assessment:** 1,008 assertions across 15 test files cover every major subsystem: core calculations, guard logic, utilities, validation (all 5 sub-modules), V10.8 regression bugs, banner creation, data loading, numeric processing, Excel output, HTML report generation, the standard processor analysis engine (including rating mean, Likert index, NPS score, chi-square), composite metrics, ranking processor, workbook builder, and full end-to-end integration — all passing with 0 failures and 0 skips. All 7 bugs found during systematic code review have regression tests.
 
@@ -291,7 +291,7 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 5. **Memory-efficient** - Index-based banner subsetting; vectorised rating mean
 6. **Self-contained HTML** - Zero external dependencies; pure SVG charts
 7. **Config safety** - Unrecognised settings trigger console warning (typo detection)
-8. **Modular HTML report** - Largest files split into focused submodules (V10.8.1: no file > 1,105 lines)
+8. **Modular HTML report** - Largest files split into focused submodules (V10.8.1: no file > 1,136 lines)
 9. **Bessel-corrected statistics** - Weighted SD uses sample variance (V10.8)
 10. **Floating-point safe** - Weighted z-test tolerates FP noise in 100% cells (V10.8)
 
