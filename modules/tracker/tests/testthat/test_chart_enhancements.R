@@ -214,9 +214,10 @@ test_that("build_line_chart NPS chart has y-axis -100 to +100", {
   )
   config <- make_mock_config()
   result <- as.character(build_line_chart(chart_data, config))
-  # Should contain negative values in axis labels
-  expect_true(grepl("-100", result, fixed = TRUE))
-  expect_true(grepl("\\+100", result))
+  # Y-axis should be data-driven (zoomed to data range with padding)
+  # NPS values -10 to 10 → axis should zoom to ~-20 to +20 range
+  expect_true(grepl("-20\\.00|-10\\.00", result))  # Y-axis label near data min
+  expect_true(grepl("\\+10\\.00|\\+20\\.00", result))  # Y-axis label near data max
 })
 
 test_that("build_line_chart contains tk-chart-point data attributes", {

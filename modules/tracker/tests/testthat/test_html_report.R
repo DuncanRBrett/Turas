@@ -442,9 +442,10 @@ test_that("build_line_chart has proper Y-axis range for percentages", {
   chart <- build_line_chart(chart_data, create_test_config())
   chart_str <- as.character(chart)
 
-  # Y-axis should show 0% and 100% (full percentage range)
-  expect_true(grepl("0%", chart_str))
-  expect_true(grepl("100%", chart_str))
+  # Y-axis should be data-driven (zoomed to data range with padding)
+  # Values 52-58% → axis should zoom to ~45%-65% range, not fixed 0-100%
+  expect_true(grepl("45%|50%", chart_str))  # Y-axis label near data min
+  expect_true(grepl("60%|65%", chart_str))  # Y-axis label near data max
   # Should NOT show 5200% (the old bug)
   expect_false(grepl("5200", chart_str))
 })
@@ -461,9 +462,10 @@ test_that("build_line_chart has proper Y-axis range for ratings (0-5 scale)", {
   chart <- build_line_chart(chart_data, create_test_config())
   chart_str <- as.character(chart)
 
-  # Y-axis should range from 0 to 5 (auto-detected for values <= 5.5)
-  expect_true(grepl("0\\.00", chart_str))  # Y-axis label: 0.00
-  expect_true(grepl("5\\.00", chart_str))  # Y-axis label: 5.00
+  # Y-axis should be data-driven (zoomed to data range with padding)
+  # Values 3.2-3.8 → axis should include labels near data, not fixed 0-5
+  expect_true(grepl("3\\.00|2\\.75|3\\.25", chart_str))  # Y-axis label near data min
+  expect_true(grepl("4\\.00|4\\.25|3\\.75", chart_str))  # Y-axis label near data max
 })
 
 test_that("build_line_chart has proper Y-axis range for ratings (0-10 scale)", {
@@ -478,9 +480,10 @@ test_that("build_line_chart has proper Y-axis range for ratings (0-10 scale)", {
   chart <- build_line_chart(chart_data, create_test_config())
   chart_str <- as.character(chart)
 
-  # Y-axis should range from 0 to 10 (auto-detected for values > 5.5 and <= 10.5)
-  expect_true(grepl(">0\\.00<", chart_str))   # Y-axis label: 0.00
-  expect_true(grepl(">10\\.00<", chart_str))  # Y-axis label: 10.00
+  # Y-axis should be data-driven (zoomed to data range with padding)
+  # Values 7.2-8.0 → axis should include labels near data, not fixed 0-10
+  expect_true(grepl("7\\.00|6\\.50|7\\.50", chart_str))  # Y-axis label near data min
+  expect_true(grepl("8\\.00|8\\.50", chart_str))          # Y-axis label near data max
 })
 
 test_that("build_line_chart has proper Y-axis range for NPS", {
@@ -495,9 +498,10 @@ test_that("build_line_chart has proper Y-axis range for NPS", {
   chart <- build_line_chart(chart_data, create_test_config())
   chart_str <- as.character(chart)
 
-  # Y-axis should range from -100 to +100
-  expect_true(grepl("-100", chart_str))
-  expect_true(grepl("\\+100", chart_str))
+  # Y-axis should be data-driven (zoomed to data range with padding)
+  # NPS values 32-41 → axis should zoom to ~20-60 range, not fixed -100 to +100
+  expect_true(grepl("\\+20\\.00|\\+30\\.00", chart_str))  # Y-axis label near data min
+  expect_true(grepl("\\+50\\.00|\\+60\\.00", chart_str))  # Y-axis label near data max
 })
 
 test_that("build_smooth_path produces SVG path with cubic bezier for 3+ points", {

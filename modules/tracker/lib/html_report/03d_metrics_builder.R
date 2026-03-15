@@ -158,6 +158,13 @@ build_metrics_tab <- function(html_data, charts, config) {
       )
     ),
     htmltools::tags$main(class = "mv-content",
+      # Sticky breadcrumb showing current metric context
+      htmltools::tags$div(class = "mv-breadcrumb", id = "mv-breadcrumb",
+        htmltools::tags$span("Metric:"),
+        htmltools::tags$span(class = "mv-breadcrumb-metric", id = "mv-breadcrumb-metric", ""),
+        htmltools::tags$span(class = "mv-breadcrumb-sep", "|"),
+        htmltools::tags$span(id = "mv-breadcrumb-segments", "")
+      ),
       # Comparison chart container (hidden until compare mode activated)
       htmltools::tags$div(id = "mv-comparison-chart", style = "display:none"),
       htmltools::HTML(metric_panels)
@@ -252,7 +259,8 @@ build_metric_panels <- function(html_data, charts, config, segments, segment_col
       active_class, mr$metric_id, htmltools::htmlEscape(mr$metric_id)
     ))
 
-    # Title — handle NA/missing question_text; show "Composite Metric" for composites
+    # Title — question text as prominent heading, metric label as subtitle context
+    # Inspired by best-practice chart labelling: question as bold title, metric type below
     q_raw <- mr$question_text
     q_display <- ""
     if (!is.null(q_raw) && !is.na(q_raw) && nzchar(q_raw) && q_raw != "NA") {
@@ -260,14 +268,25 @@ build_metric_panels <- function(html_data, charts, config, segments, segment_col
     } else if (!is.null(mr$question_type) && tolower(mr$question_type) == "composite") {
       q_display <- "Composite Metric"
     }
-    q_text <- if (nzchar(q_display)) paste0(" &mdash; ", htmltools::htmlEscape(q_display)) else ""
-    panel_parts <- c(panel_parts, sprintf(
-      '<h2 class="mv-metric-title">%s<span class="mv-metric-subtitle">%s</span></h2>',
-      htmltools::htmlEscape(mr$metric_label), q_text
-    ))
+
+    if (nzchar(q_display) && q_display != mr$metric_label) {
+      # Question text as bold title, metric_label as subtitle context
+      panel_parts <- c(panel_parts, sprintf(
+        '<h2 class="mv-metric-title">%s</h2><p class="mv-metric-subtitle">%s</p>',
+        htmltools::htmlEscape(q_display),
+        htmltools::htmlEscape(mr$metric_label)
+      ))
+    } else {
+      # Just the metric label as title (no redundant subtitle)
+      panel_parts <- c(panel_parts, sprintf(
+        '<h2 class="mv-metric-title">%s</h2>',
+        htmltools::htmlEscape(mr$metric_label)
+      ))
+    }
 
     # Segment chips — grouped by category (matching crosstab col-chip-bar)
-    panel_parts <- c(panel_parts, '<div class="mv-segment-chips mv-segment-grouped">')
+    scroll_class <- if (length(segments) > 8) " mv-segment-chips-scrollable" else ""
+    panel_parts <- c(panel_parts, sprintf('<div class="mv-segment-chips mv-segment-grouped%s">', scroll_class))
     panel_parts <- c(panel_parts, '<span class="mv-segment-chips-label">Segments:</span>')
 
     # Standalone segments first (Total)

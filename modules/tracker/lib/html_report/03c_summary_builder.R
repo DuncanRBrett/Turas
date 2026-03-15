@@ -50,17 +50,11 @@ build_summary_tab <- function(html_data, config) {
 
   htmltools::tags$div(class = "summary-tab-content",
 
-    # ---- Metadata Strip (4 cards matching tabs dash-meta-strip) ----
+    # ---- 1. Metadata Strip (4 cards matching tabs dash-meta-strip) ----
     build_metadata_strip(n_metrics, n_waves, latest_n, fieldwork_text,
                           baseline_label, latest_wave_label),
 
-    # ---- KPI Hero Cards ----
-    build_kpi_hero_cards(html_data, config),
-
-    # ---- Wave-over-Wave Pulse Bar ----
-    build_wave_pulse_bar(html_data),
-
-    # Background & Method insight box
+    # ---- 2. Background & Method insight box ----
     htmltools::tags$div(class = "summary-insight-box", id = "summary-section-background",
       htmltools::tags$div(class = "summary-section-controls",
         htmltools::tags$button(class = "turas-action-btn",
@@ -79,7 +73,7 @@ build_summary_tab <- function(html_data, config) {
       )
     ),
 
-    # Summary insight box
+    # ---- 3. Summary insight box ----
     htmltools::tags$div(class = "summary-insight-box", id = "summary-section-findings",
       htmltools::tags$div(class = "summary-section-controls",
         htmltools::tags$button(class = "turas-action-btn",
@@ -98,13 +92,28 @@ build_summary_tab <- function(html_data, config) {
       )
     ),
 
-    # ---- Significant Changes Section ----
+    # ---- 4. KPI Hero Cards with section header ----
+    htmltools::tags$div(class = "summary-section-header",
+      htmltools::tags$h3(class = "summary-section-title", "Key Metrics at a Glance"),
+      htmltools::tags$p(class = "dash-section-sub",
+        htmltools::HTML(sprintf(
+          "Latest wave values (%s) with change vs previous wave. Border colour: <span style='color:#4a7c6f;font-weight:600'>green</span> = significant increase, <span style='color:#c9a96e;font-weight:600'>amber</span> = stable, <span style='color:#b85450;font-weight:600'>red</span> = significant decrease.",
+          htmltools::htmlEscape(latest_wave_label)
+        ))
+      )
+    ),
+    build_kpi_hero_cards(html_data, config),
+
+    # ---- 5. Wave-over-Wave Pulse Bar ----
+    build_wave_pulse_bar(html_data),
+
+    # ---- 6. Significant Changes Section (collapsible, first 6 visible) ----
     build_sig_changes_section(html_data),
 
-    # ---- Significance Heatmap Matrix ----
+    # ---- 7. Significance Heatmap Matrix (collapsed by default) ----
     build_sig_heatmap(html_data, config),
 
-    # Metric type filter chips (only if more than one type present)
+    # ---- 8. Metric type filter chips ----
     htmltools::HTML(build_summary_type_filter(html_data)),
 
     # Action buttons bar
@@ -120,7 +129,7 @@ build_summary_tab <- function(html_data, config) {
         htmltools::HTML("&#x1F4F7; Export Slide"))
     ),
 
-    # Metrics Overview table (Total segment by wave) — at bottom
+    # ---- 9. Metrics Overview table (Total segment by wave) ----
     build_summary_metrics_table(html_data)
   )
 }
@@ -196,9 +205,9 @@ build_kpi_hero_cards <- function(html_data, config) {
   prev_wave <- if (n_waves >= 2) waves[n_waves - 1] else NULL
   brand_colour <- get_setting(config, "brand_colour", default = "#323367") %||% "#323367"
 
-  # Configurable thresholds for traffic light borders
-  green_threshold <- as.numeric(get_setting(config, "dashboard_green_threshold", default = "70")) %||% 70
-  amber_threshold <- as.numeric(get_setting(config, "dashboard_amber_threshold", default = "50")) %||% 50
+  # Traffic light borders use TREND direction (not absolute values)
+  # Green = significant increase, Amber = stable/no sig change, Red = significant decrease
+  # This works consistently across all metric types (%, means, NPS)
 
   # Filter to hero metrics if configured
   hero_filter <- get_setting(config, "dashboard_hero_metrics", default = NULL)
@@ -262,15 +271,19 @@ build_kpi_hero_cards <- function(html_data, config) {
       sparkline_svg <- build_sparkline_svg(sparkline_vals, width = 80, height = 24, colour = brand_colour)
     }
 
-    # Traffic light border colour
-    border_colour <- "#e2e8f0"  # default: neutral grey
-    if (!is.na(raw_val)) {
-      if (raw_val >= green_threshold) {
-        border_colour <- "#4a7c6f"  # sage green
-      } else if (raw_val >= amber_threshold) {
-        border_colour <- "#c9a96e"  # muted gold
-      } else {
-        border_colour <- "#b85450"  # dusty rose
+    # Traffic light border colour — based on TREND direction
+    # Green = sig increase, Amber = stable, Red = sig decrease
+    border_colour <- "#c9a96e"  # default: amber/stable
+    if (!is.null(prev_wave)) {
+      prev_cell <- cells[[prev_wave]]
+      if (!is.null(prev_cell) && !is.na(latest_cell$change_vs_prev)) {
+        is_sig <- isTRUE(latest_cell$sig_vs_prev)
+        if (is_sig && latest_cell$change_vs_prev > 0) {
+          border_colour <- "#4a7c6f"  # sage green — significant improvement
+        } else if (is_sig && latest_cell$change_vs_prev < 0) {
+          border_colour <- "#b85450"  # dusty rose — significant decline
+        }
+        # Non-significant changes stay amber
       }
     }
 
@@ -386,8 +399,12 @@ build_sig_heatmap <- function(html_data, config) {
   # Build matrix: rows = metrics, cols = segments
   parts <- c()
   parts <- c(parts, '<div class="tk-heatmap-section">')
-  parts <- c(parts, '<h3 class="summary-insight-title">Significance Matrix</h3>')
-  parts <- c(parts, '<p class="dash-section-sub">Latest wave change direction by metric and segment. Green = significant increase, Red = significant decrease, Grey = no significant change.</p>')
+  parts <- c(parts, '<div class="summary-collapse-header collapsed" onclick="toggleSummarySection(\'heatmap\')">')
+  parts <- c(parts, '<span class="section-chevron">&#x25B6;</span>')
+  parts <- c(parts, '<h3 class="summary-insight-title" style="margin:0;display:inline">Significance Matrix</h3>')
+  parts <- c(parts, '</div>')
+  parts <- c(parts, '<div class="summary-collapse-body collapsed" id="summary-section-heatmap">')
+  parts <- c(parts, '<p class="dash-section-sub" style="margin-top:8px">Latest wave change direction by metric and segment. Green = significant increase, Red = significant decrease, Grey = no significant change.</p>')
   parts <- c(parts, '<div class="tk-heatmap-wrap">')
   parts <- c(parts, '<table class="tk-table tk-heatmap-table">')
 
@@ -411,6 +428,8 @@ build_sig_heatmap <- function(html_data, config) {
       htmltools::htmlEscape(mr$metric_label)
     ))
 
+    is_pct <- grepl("(pct|box|range|proportion|category|any)", mr$metric_name)
+
     for (seg in segments) {
       cells <- mr$segment_cells[[seg]]
       cell <- if (!is.null(cells)) cells[[latest_wave]] else NULL
@@ -418,32 +437,47 @@ build_sig_heatmap <- function(html_data, config) {
       if (is.null(cell) || is.na(cell$change_vs_prev)) {
         # No data
         parts <- c(parts, '<td class="tk-td tk-heatmap-cell tk-heatmap-na">&mdash;</td>')
-      } else if (isTRUE(cell$sig_vs_prev)) {
-        if (cell$change_vs_prev > 0) {
+      } else {
+        # Format the change value (not the raw value)
+        change_val <- cell$change_vs_prev
+        if (is_pct) {
+          change_display <- sprintf("%+.1f pp", change_val)
+        } else {
+          change_display <- sprintf("%+.2f", change_val)
+        }
+
+        if (isTRUE(cell$sig_vs_prev) && change_val > 0) {
           # Significant increase
           parts <- c(parts, sprintf(
-            '<td class="tk-td tk-heatmap-cell tk-heatmap-up" title="Significant increase">%s</td>',
-            htmltools::htmlEscape(cell$display_value)
+            '<td class="tk-td tk-heatmap-cell tk-heatmap-up" title="%s &rarr; %s (significant increase)">%s</td>',
+            htmltools::htmlEscape(cell$display_value),
+            htmltools::htmlEscape(change_display),
+            htmltools::htmlEscape(change_display)
           ))
-        } else {
+        } else if (isTRUE(cell$sig_vs_prev) && change_val < 0) {
           # Significant decrease
           parts <- c(parts, sprintf(
-            '<td class="tk-td tk-heatmap-cell tk-heatmap-down" title="Significant decrease">%s</td>',
-            htmltools::htmlEscape(cell$display_value)
+            '<td class="tk-td tk-heatmap-cell tk-heatmap-down" title="%s &rarr; %s (significant decrease)">%s</td>',
+            htmltools::htmlEscape(cell$display_value),
+            htmltools::htmlEscape(change_display),
+            htmltools::htmlEscape(change_display)
+          ))
+        } else {
+          # No significant change
+          parts <- c(parts, sprintf(
+            '<td class="tk-td tk-heatmap-cell tk-heatmap-stable" title="%s (no significant change)">%s</td>',
+            htmltools::htmlEscape(cell$display_value),
+            htmltools::htmlEscape(change_display)
           ))
         }
-      } else {
-        # No significant change
-        parts <- c(parts, sprintf(
-          '<td class="tk-td tk-heatmap-cell tk-heatmap-stable" title="No significant change">%s</td>',
-          htmltools::htmlEscape(cell$display_value)
-        ))
       }
     }
     parts <- c(parts, '</tr>')
   }
 
-  parts <- c(parts, '</tbody></table></div></div>')
+  parts <- c(parts, '</tbody></table></div>')
+  parts <- c(parts, '</div>')  # close summary-collapse-body
+  parts <- c(parts, '</div>')  # close tk-heatmap-section
   htmltools::HTML(paste(parts, collapse = "\n"))
 }
 
@@ -593,7 +627,18 @@ build_sig_changes_section <- function(html_data) {
       sprintf("Wave-on-wave changes that are statistically significant (%s vs %s). Click the eye to hide, pin to save individual findings.",
         latest_label, prev_label)
     ),
-    htmltools::tags$div(class = "dash-sig-grid", cards),
+    if (length(findings) > 6) {
+      htmltools::tags$div(class = "dash-sig-grid sig-cards-collapsed", id = "sig-cards-grid", cards)
+    } else {
+      htmltools::tags$div(class = "dash-sig-grid", id = "sig-cards-grid", cards)
+    },
+    if (length(findings) > 6) {
+      htmltools::tags$button(
+        class = "sig-show-more", id = "sig-show-more-btn",
+        onclick = "toggleSigCards()",
+        sprintf("Show all %d findings", length(findings))
+      )
+    },
     htmltools::tags$script(type = "application/json", id = "sig-card-states", "{}")
   )
 }

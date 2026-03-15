@@ -1093,3 +1093,32 @@
   });
 
 })();
+
+// ==============================================================================
+// SUMMARY TAB COLLAPSIBLE SECTIONS
+// ==============================================================================
+
+// Toggle sig cards show all / collapse to 6
+window.toggleSigCards = function() {
+  var grid = document.getElementById("sig-cards-grid");
+  var btn = document.getElementById("sig-show-more-btn");
+  if (!grid || !btn) return;
+  if (grid.classList.contains("sig-cards-collapsed")) {
+    grid.classList.remove("sig-cards-collapsed");
+    btn.textContent = "Show fewer";
+  } else {
+    grid.classList.add("sig-cards-collapsed");
+    var total = grid.querySelectorAll(".dash-sig-card").length;
+    btn.textContent = "Show all " + total + " findings";
+  }
+};
+
+// Toggle collapsible summary sections (heatmap, etc.)
+window.toggleSummarySection = function(sectionId) {
+  var body = document.getElementById("summary-section-" + sectionId);
+  if (!body) return;
+  var header = body.previousElementSibling;
+  if (!header) return;
+  body.classList.toggle("collapsed");
+  header.classList.toggle("collapsed");
+};

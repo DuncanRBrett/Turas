@@ -113,11 +113,11 @@ build_chart_series_svg <- function(chart_data, segment_colours, n_waves,
 
       xy_points[[length(xy_points) + 1]] <- c(x_pos, y_pos)
 
-      # Data point circle with tooltip data attributes
+      # Data point circle — larger for better clickability
       prev_val <- if (i > 1 && !is.na(series$values[i - 1])) format_fn(series$values[i - 1]) else ""
       change_val <- if (i > 1 && !is.na(series$values[i - 1])) format_fn(val - series$values[i - 1]) else ""
       point_circles <- c(point_circles, sprintf(
-        '<circle cx="%.1f" cy="%.1f" r="5" fill="%s" stroke="#fff" stroke-width="2.5" class="tk-chart-point" data-segment="%s" data-wave="%s" data-value="%s" data-wave-label="%s" data-prev-value="%s" data-change="%s"/>',
+        '<circle cx="%.1f" cy="%.1f" r="7" fill="%s" stroke="#fff" stroke-width="2.5" class="tk-chart-point" data-segment="%s" data-wave="%s" data-value="%s" data-wave-label="%s" data-prev-value="%s" data-change="%s"/>',
         x_pos, y_pos, colour,
         htmltools::htmlEscape(seg_name),
         htmltools::htmlEscape(chart_data$wave_ids[i]),
@@ -128,8 +128,10 @@ build_chart_series_svg <- function(chart_data, segment_colours, n_waves,
       ))
 
       # Store label data for collision avoidance
+      # y_origin = actual data point y, y = initial label position (above point)
       all_label_data[[i]][[length(all_label_data[[i]]) + 1]] <- list(
-        x = x_pos, y = y_pos - 14, text = format_fn(val),
+        x = x_pos, y = y_pos - 18, y_origin = y_pos,
+        text = format_fn(val),
         colour = colour, seg_name = seg_name,
         wave_id = chart_data$wave_ids[i]
       )
@@ -179,7 +181,7 @@ build_chart_series_svg <- function(chart_data, segment_colours, n_waves,
       }
 
       svg_parts <- c(svg_parts, sprintf(
-        '<path d="%s" fill="none" stroke="%s" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" opacity="%s" class="tk-chart-line" data-segment="%s"/>',
+        '<path d="%s" fill="none" stroke="%s" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round" opacity="%s" class="tk-chart-line" data-segment="%s"/>',
         path_d, colour, line_opacity,
         htmltools::htmlEscape(seg_name)
       ))
@@ -204,7 +206,7 @@ build_chart_series_svg <- function(chart_data, segment_colours, n_waves,
 #' @keywords internal
 resolve_and_emit_labels_svg <- function(all_label_data, plot_h) {
   svg_parts <- c()
-  min_label_gap <- 14  # minimum vertical gap between labels in pixels
+  min_label_gap <- 20  # minimum vertical gap between labels in pixels
 
   for (wave_labels_at_x in all_label_data) {
     if (length(wave_labels_at_x) == 0) next
@@ -228,25 +230,47 @@ resolve_and_emit_labels_svg <- function(all_label_data, plot_h) {
     n_labels <- length(sorted_labels)
     if (n_labels > 0) {
       last_y <- sorted_labels[[n_labels]]$y
-      if (last_y > plot_h - 4) {
+      if (last_y > plot_h - 8) {
         # Labels exceed bottom — redistribute evenly within available range
         total_needed <- (n_labels - 1) * min_label_gap
         first_y <- sorted_labels[[1]]$y
-        start_y <- max(4, min(first_y, plot_h - 4 - total_needed))
+        start_y <- max(8, min(first_y, plot_h - 8 - total_needed))
         for (j in seq_along(sorted_labels)) {
           sorted_labels[[j]]$y <- start_y + (j - 1) * min_label_gap
         }
       }
       # Final clamp for each label
       for (j in seq_along(sorted_labels)) {
-        sorted_labels[[j]]$y <- max(4, min(sorted_labels[[j]]$y, plot_h - 4))
+        sorted_labels[[j]]$y <- max(8, min(sorted_labels[[j]]$y, plot_h - 8))
       }
     }
 
-    # Emit labels
+    # Emit connector lines and labels
     for (lb in sorted_labels) {
+      # If label was pushed away from data point, draw a subtle connector line
+      y_origin <- lb$y_origin %||% (lb$y + 18)
+      offset <- abs(lb$y - (y_origin - 10))
+      if (offset > 8) {
+        svg_parts <- c(svg_parts, sprintf(
+          '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="0.75" stroke-dasharray="2,2" opacity="0.4" class="tk-chart-label-connector" data-segment="%s" data-wave="%s"/>',
+          lb$x, y_origin - 8, lb$x, lb$y + 4, lb$colour,
+          htmltools::htmlEscape(lb$seg_name),
+          htmltools::htmlEscape(lb$wave_id)
+        ))
+      }
+
+      # Background pill for readability
+      text_w <- nchar(lb$text) * 7.5 + 8
       svg_parts <- c(svg_parts, sprintf(
-        '<text x="%.1f" y="%.1f" text-anchor="middle" fill="%s" font-size="12" font-weight="700" class="tk-chart-label" data-segment="%s" data-wave="%s">%s</text>',
+        '<rect x="%.1f" y="%.1f" width="%.1f" height="16" rx="3" fill="#ffffff" opacity="0.85" class="tk-chart-label-bg" data-segment="%s" data-wave="%s"/>',
+        lb$x - text_w / 2, lb$y - 11, text_w,
+        htmltools::htmlEscape(lb$seg_name),
+        htmltools::htmlEscape(lb$wave_id)
+      ))
+
+      # Label text — larger and bolder for readability
+      svg_parts <- c(svg_parts, sprintf(
+        '<text x="%.1f" y="%.1f" text-anchor="middle" fill="%s" font-size="13" font-weight="700" class="tk-chart-label" data-segment="%s" data-wave="%s">%s</text>',
         lb$x, lb$y, lb$colour,
         htmltools::htmlEscape(lb$seg_name),
         htmltools::htmlEscape(lb$wave_id),
@@ -302,7 +326,9 @@ build_line_chart <- function(chart_data, config, active_segment = NULL,
   plot_w <- width - margin$left - margin$right
   plot_h <- height - margin$top - margin$bottom - legend_row_h
 
-  # ---- Y-axis range: metric-appropriate fixed ranges ----
+  # ---- Y-axis range: data-driven with smart padding ----
+  # Instead of fixed ranges (0-5, 0-100) which flatten small variations,
+  # use data-driven ranges that make the trend visible while keeping context.
   y_min_data <- min(all_vals, na.rm = TRUE)
   y_max_data <- max(all_vals, na.rm = TRUE)
 
@@ -311,26 +337,52 @@ build_line_chart <- function(chart_data, config, active_segment = NULL,
   dp_nps <- decimal_config$dp_nps %||% 2
 
   if (chart_data$is_percentage) {
-    y_axis_min <- 0
-    y_axis_max <- 100
+    # Percentage: zoom to data range with padding, anchored to nice round numbers
+    y_range_data <- y_max_data - y_min_data
+    if (y_range_data == 0) y_range_data <- 10
+    y_pad <- max(5, y_range_data * 0.25)  # at least 5pp padding
+    y_axis_min <- max(0, floor((y_min_data - y_pad) / 5) * 5)   # round down to nearest 5
+    y_axis_max <- min(100, ceiling((y_max_data + y_pad) / 5) * 5) # round up to nearest 5
+    # If data clustered near top or bottom, ensure minimum visible range
+    if (y_axis_max - y_axis_min < 20) {
+      mid <- (y_min_data + y_max_data) / 2
+      y_axis_min <- max(0, floor((mid - 10) / 5) * 5)
+      y_axis_max <- min(100, ceiling((mid + 10) / 5) * 5)
+    }
     format_fn <- function(v) paste0(format(round(v, dp_pct), nsmall = dp_pct), "%")
   } else if (chart_data$is_nps) {
-    y_axis_min <- -100
-    y_axis_max <- 100
+    # NPS: zoom to data range
+    y_range_data <- y_max_data - y_min_data
+    if (y_range_data == 0) y_range_data <- 20
+    y_pad <- max(10, y_range_data * 0.25)
+    y_axis_min <- max(-100, floor((y_min_data - y_pad) / 10) * 10)
+    y_axis_max <- min(100, ceiling((y_max_data + y_pad) / 10) * 10)
+    if (y_axis_max - y_axis_min < 40) {
+      mid <- (y_min_data + y_max_data) / 2
+      y_axis_min <- max(-100, floor((mid - 20) / 10) * 10)
+      y_axis_max <- min(100, ceiling((mid + 20) / 10) * 10)
+    }
     format_fn <- function(v) sprintf("%+.*f", dp_nps, v)
   } else {
+    # Rating scales: zoom to data range, not fixed 0-5 or 0-10
+    y_range_data <- y_max_data - y_min_data
+    if (y_range_data == 0) y_range_data <- 0.5
+    y_pad <- max(0.25, y_range_data * 0.3)
+    # Round to nice intervals
     if (y_max_data <= 5.5) {
-      y_axis_min <- 0
-      y_axis_max <- 5
+      step <- 0.25
     } else if (y_max_data <= 10.5) {
-      y_axis_min <- 0
-      y_axis_max <- 10
+      step <- 0.5
     } else {
-      y_range <- y_max_data - y_min_data
-      if (y_range == 0) y_range <- 1
-      y_pad <- y_range * 0.15
-      y_axis_min <- max(0, y_min_data - y_pad)
-      y_axis_max <- y_max_data + y_pad
+      step <- max(1, round(y_range_data / 5))
+    }
+    y_axis_min <- max(0, floor((y_min_data - y_pad) / step) * step)
+    y_axis_max <- ceiling((y_max_data + y_pad) / step) * step
+    # Ensure minimum visible range
+    if (y_axis_max - y_axis_min < step * 3) {
+      mid <- (y_min_data + y_max_data) / 2
+      y_axis_min <- max(0, floor((mid - step * 2) / step) * step)
+      y_axis_max <- ceiling((mid + step * 2) / step) * step
     }
     format_fn <- function(v) format(round(v, dp_ratings), nsmall = dp_ratings)
   }

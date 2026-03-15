@@ -9,6 +9,21 @@
 // stored in global activeSegments / activeWaves objects.
 // ==============================================================================
 
+// ---- Breadcrumb updater ----
+function updateBreadcrumbSegments() {
+  var breadcrumb = document.getElementById("mv-breadcrumb");
+  if (!breadcrumb) return;
+  var activePanel = document.querySelector(".tk-metric-panel.active");
+  if (!activePanel) return;
+  var chipBar = activePanel.querySelector(".mv-segment-chips");
+  if (!chipBar) return;
+  var activeChips = chipBar.querySelectorAll(".tk-segment-chip.active");
+  var segNames = [];
+  activeChips.forEach(function(chip) { segNames.push(chip.textContent.trim()); });
+  var el = document.getElementById("mv-breadcrumb-segments");
+  if (el) el.textContent = segNames.length > 0 ? "Segments: " + segNames.join(", ") : "";
+}
+
 // ---- Global chip state (persists across metric panels) ----
 var activeSegments = {};   // { segmentName: true/false }
 var activeWaves = {};      // { waveId: true/false }
@@ -149,6 +164,22 @@ function selectTrackerMetric(metricId) {
   document.querySelectorAll(".tk-metric-nav-item").forEach(function(item) {
     item.classList.toggle("active", item.getAttribute("data-metric-id") === metricId);
   });
+
+  // Update breadcrumb
+  var breadcrumb = document.getElementById("mv-breadcrumb");
+  if (breadcrumb && target) {
+    var titleEl = target.querySelector(".mv-metric-title");
+    var metricName = titleEl ? titleEl.childNodes[0].textContent.trim() : metricId;
+    document.getElementById("mv-breadcrumb-metric").textContent = metricName;
+    // Gather active segment names (only from table chips, not chart chips)
+    var chipBar = target.querySelector(".mv-segment-chips");
+    var activeChips = chipBar ? chipBar.querySelectorAll(".tk-segment-chip.active") : [];
+    var segNames = [];
+    activeChips.forEach(function(chip) { segNames.push(chip.textContent.trim()); });
+    document.getElementById("mv-breadcrumb-segments").textContent =
+      segNames.length > 0 ? "Segments: " + segNames.join(", ") : "";
+    breadcrumb.classList.add("visible");
+  }
 }
 
 /**
@@ -212,6 +243,7 @@ function toggleSegmentGroupExpand(metricId, groupName, headerBtn) {
 
   // Apply to all panels so state persists across metric switches
   applyChipStateAllPanels();
+  updateBreadcrumbSegments();
 }
 
 /**
@@ -283,6 +315,7 @@ function toggleSegmentChip(metricId, segmentName, chip) {
 
   // Apply state to ALL panels (so chip visual state persists across metric switches)
   applyChipStateAllPanels();
+  updateBreadcrumbSegments();
 }
 
 /**
