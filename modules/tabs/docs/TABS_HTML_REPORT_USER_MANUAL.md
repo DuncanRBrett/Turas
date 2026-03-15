@@ -188,7 +188,7 @@ Male vs Female) are statistically meaningful or could be due to chance.
 | `embed_frequencies` | No | `TRUE` | Embed frequency data in the HTML report so users can toggle between percentages and counts. Set to `FALSE` for smaller file sizes. |
 | `fieldwork_dates` | No | *(none)* | Text description of the fieldwork period (e.g., "Jan - Feb 2025"). Displayed in the dashboard summary. |
 | `show_charts` | No | `FALSE` | Set to `TRUE` to generate inline SVG charts for each question. Charts are interactive and can be exported as PNG slides. |
-| `chart_palette_preset` | No | `warm` | Colour palette for ordinal charts. Options: `warm` (earth tones), `cool` (blue-anchored), `research` (purple-green diverging), `teal` (monochromatic teal), `brand` (monochromatic gradient from brand_colour). See Colour Palette Presets section. |
+| `chart_palette_preset` | No | `warm` | Colour palette for ordinal charts. Options: `warm` (earth tones), `cool` (blue-anchored), `research` (purple-green diverging), `teal` (monochromatic teal), `red` (Coca-Cola-inspired muted red), `brand` (monochromatic gradient from brand_colour). See Colour Palette Presets section. |
 
 #### Dashboard Configuration
 
@@ -462,6 +462,7 @@ NPS) use one of five palette presets, configured via
     teal
 -   **research**: muted purple, lavender, neutral grey, sage, forest
 -   **teal**: monochromatic teal gradient, light to dark
+-   **red**: Coca-Cola-inspired muted red gradient, pale blush to deep burgundy
 -   **brand**: monochromatic gradient generated from your `brand_colour`
 
 DK/NA/Refused categories always use warm grey (`#d1cdc7`) regardless of

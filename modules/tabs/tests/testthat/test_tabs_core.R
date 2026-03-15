@@ -63,8 +63,8 @@ source(file.path(turas_root, "modules/tabs/lib/validation_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/path_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/type_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/config_utils.R"))
-# Source config_loader (for load_config_settings, build_config_object fallback)
-source(file.path(turas_root, "modules/tabs/lib/config_loader.R"))
+# config_loader.R is now a stub — all functions moved to config_utils.R,
+# crosstabs_config.R, and data_setup.R
 
 
 # ==============================================================================

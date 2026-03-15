@@ -469,7 +469,7 @@ write_question_table <- function(wb, sheet, result, banner_info, styles,
   # Write base sizes if present
   if (!is.null(result$bases)) {
     current_row <- write_base_rows(
-      wb, sheet, banner_info, result$bases, styles, current_row
+      wb, sheet, banner_info, result$bases, styles, current_row, config
     )
   }
   

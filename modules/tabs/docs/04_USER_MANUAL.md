@@ -427,7 +427,7 @@ These settings in your config's Settings sheet control how the HTML report looks
 | `html_report` | FALSE | Set to TRUE to generate the HTML report |
 | `brand_colour` | #323367 | Primary brand colour (hex) — used for headers, gauges, and accents |
 | `accent_colour` | #CC9900 | Secondary accent colour (hex) |
-| `chart_palette_preset` | warm | Colour palette for ordinal/scale charts: `warm` (earth tones), `cool` (blue-anchored), `research` (purple-green diverging), `teal` (monochromatic teal), or `brand` (monochromatic gradient from brand_colour) |
+| `chart_palette_preset` | warm | Colour palette for ordinal/scale charts: `warm` (earth tones), `cool` (blue-anchored), `research` (purple-green diverging), `teal` (monochromatic teal), `red` (Coca-Cola-inspired muted red), or `brand` (monochromatic gradient from brand_colour) |
 | `chart_bar_colour` | (brand) | Colour for simple bar charts (hex) |
 | `include_summary` | TRUE | Include the summary dashboard tab with gauges |
 | `show_charts` | FALSE | Include inline SVG charts alongside tables |

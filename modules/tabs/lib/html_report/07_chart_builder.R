@@ -19,11 +19,12 @@
 # sophisticated tones that communicate sentiment without looking like
 # traffic lights.
 #
-# Presets: "warm" (default), "cool", "research", "teal", "brand"
+# Presets: "warm" (default), "cool", "research", "teal", "red", "brand"
 #   warm     — earth tones: dusty rose through sage/teal
 #   cool     — muted burgundy through deep teal
 #   research — purple-green diverging (colorblind-safe)
 #   teal     — monochromatic teal gradient, light to dark
+#   red      — monochromatic red gradient, Coca-Cola-inspired muted red
 #   brand    — monochromatic gradient generated from brand_colour
 # Config field: chart_palette_preset
 # Individual overrides: chart_negative_colour, chart_neutral_colour, etc.
@@ -35,7 +36,7 @@
 #' Returns a named list of 7 semantic colours for the given preset.
 #' Supports individual overrides from config.
 #'
-#' @param preset Character: "warm", "cool", "research", "teal", or "brand"
+#' @param preset Character: "warm", "cool", "research", "teal", "red", or "brand"
 #' @param overrides Named list of individual colour overrides (optional).
 #'   For "brand" preset, must include \code{brand_colour} hex value.
 #' @return Named list with: negative, mod_negative, neutral, mod_positive,
@@ -81,6 +82,16 @@ get_palette_colours <- function(preset = "warm", overrides = NULL) {
       neutral      = "#6dbfb8",
       mod_positive = "#4a9e95",
       positive     = "#2d7a72",
+      dk_na        = "#d1cdc7",
+      other        = "#c5c0b8"
+    ),
+    # Monochromatic red — Coca-Cola-inspired, muted (hue ~4°, sat 45%)
+    red = list(
+      negative     = "#e8cbcb",
+      mod_negative = "#cfa0a0",
+      neutral      = "#b07272",
+      mod_positive = "#8f4d4d",
+      positive     = "#6e2b2b",
       dk_na        = "#d1cdc7",
       other        = "#c5c0b8"
     )

@@ -1,6 +1,6 @@
 # Turas Tabs Module - Code Inventory
 
-**Generated:** 15 March 2026 | **Version:** 10.8.1 | **R Files:** 52 lib + 4 tests + 2 entry = 58 | **JS Files:** 5 | **Total Lines:** 35,302 (lib R+JS) + 2,828 (tests) + 696 (entry) = 38,826
+**Generated:** 15 March 2026 | **Version:** 10.8.2 | **R Files:** 52 lib + 9 tests + 2 entry = 63 | **JS Files:** 5 | **Total Lines:** 34,749 (lib R+JS) + 4,915 (tests) + 696 (entry) = 40,360
 
 ------------------------------------------------------------------------
 
@@ -31,7 +31,7 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | Category | Files | Lines | % of Total |
 |---|---|---|---|
 | Core Orchestration | 3 | 1,332 | 3.8% |
-| Configuration & Loading | 4 | 2,775 | 7.9% |
+| Configuration & Loading | 4 | 2,222 | 6.4% |
 | Crosstabs Submodules | 5 | 2,280 | 6.5% |
 | Validation System | 7 | 4,347 | 12.4% |
 | Guard Layer | 1 | 786 | 2.2% |
@@ -45,11 +45,11 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | HTML Report (JS) | 5 | 4,155 | 10.7% |
 | Utilities | 5 | 1,142 | 3.2% |
 | Config Templates | 1 | 1,373 | 3.9% |
-| Tests | 4 | 2,828 | 7.3% |
+| Tests | 9 | 4,915 | 12.2% |
 | Entry Points & GUI | 2 | 696 | 2.0% |
 
 **Note on test locations:**
-- `modules/tabs/tests/testthat/` — 4 files, 2,828 lines: tabs-specific business logic (core guard/config 243 assertions, calculations 56 assertions, utilities 96 assertions, V10.8 bug fix regressions 56 assertions)
+- `modules/tabs/tests/testthat/` — 9 files, 4,915 lines: tabs-specific business logic (core guard/config 243, calculations 56, utilities 96, V10.8 regressions 56, banner 46, data loading 35, numeric processor 32, Excel output 63, HTML report 45 = 560 assertions total)
 - `tests/testthat/` (project root) — 10 files, ~2,389 lines: shared infrastructure (TRS compliance, shared utilities, code quality scans)
 - See `tests/testthat/README.md` and `modules/tabs/tests/README.md` for rationale.
 
@@ -70,11 +70,11 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 
 | File | Lines | Purpose |
 |---|---:|---|
-| `lib/config_loader.R` | 567 | Load and parse Excel config files (legacy functions retained for compatibility) |
+| `lib/config_loader.R` | 14 | Stub — retained as source target in run_crosstabs.R (all functions moved to crosstabs_config.R, config_utils.R, data_setup.R) |
 | `lib/config_utils.R` | 297 | Typed getter functions for config values (canonical versions) |
 | `lib/data_loader.R` | 438 | Survey structure and data loading (.xlsx, .csv, .sav) with CSV caching |
 | `lib/generate_config_templates.R` | 1,373 | Generate professional hardened Excel config templates |
-| | **2,675** | |
+| | **2,122** | |
 
 ### Crosstabs Submodules (Phase 4 Refactoring)
 
@@ -196,7 +196,7 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | `lib/shared_functions.R` | 347 | Module orchestrator; sources utility modules in order |
 | `lib/logging_utils.R` | 191 | Logging, progress, memory monitoring |
 | `lib/type_utils.R` | 170 | Safe type conversion (safe_logical, safe_numeric, safe_equal) |
-| `lib/path_utils.R` | 231 | Path handling (resolve_path with absolute path detection, tabs_lib_path, tabs_source) |
+| `lib/path_utils.R` | 234 | Path handling (resolve_path with absolute path detection + trimws, tabs_lib_path, tabs_source) |
 | `lib/filter_utils.R` | 211 | Base filter application and security validation |
 | | **1,150** | |
 
@@ -208,7 +208,12 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | `tests/testthat/test_calculations.R` | 508 | 56 | Rating mean, cell data, significance testing (weighted/unweighted) |
 | `tests/testthat/test_utilities.R` | 428 | 96 | safe_logical, safe_numeric, safe_equal, config, path, filter, format, excel_col, validate |
 | `tests/testthat/test_bugfixes_v10_8.R` | 575 | 56 | V10.8 regression tests: FP tolerance, Bessel SD, closure scoping, sig letters, tie-breaking, banner labels |
-| | **2,828** | **451** | |
+| `tests/testthat/test_banner.R` | 464 | 46 | Banner structure, excel letters, banner labels, row indices, bases, Kish formula |
+| `tests/testthat/test_data_loading.R` | 301 | 35 | resolve_path (absolute/relative/whitespace), config header auto-detect, survey structure, table sheets |
+| `tests/testthat/test_numeric_processor.R` | 287 | 32 | IQR outliers, numeric bins, statistics (mean/SD/median/mode, weighted/unweighted) |
+| `tests/testthat/test_excel_output.R` | 581 | 63 | Excel styles, row style mapping, banner headers, base rows, question tables, summary/guide/error sheets, E2E file write |
+| `tests/testthat/test_html_report.R` | 454 | 45 | Guard validation, banner groups, data transformation, E2E HTML generation with content verification |
+| | **4,915** | **560** | |
 
 ------------------------------------------------------------------------
 
@@ -257,20 +262,20 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | Ranking crosstab row creation | Yes (8 V10.8 assertions) | |
 | Composite sig_letters lookup | Yes (3 V10.8 assertions) | |
 | Banner label priority (HTML report) | Yes (5 V10.8 assertions) | |
-| Banner creation | | Not tested |
-| Data loading | | Not tested |
-| Excel output | | Not tested |
-| HTML report generation (end-to-end) | | Not tested |
-| Numeric processor (end-to-end) | | Not tested |
+| Banner creation & indices | Yes (46 assertions) | |
+| Data loading & path resolution | Yes (35 assertions) | |
+| Numeric processor (outliers, bins, stats) | Yes (32 assertions) | |
+| Excel output (styles, headers, tables, E2E) | Yes (63 assertions) | |
+| HTML report generation (guard, transform, E2E) | Yes (45 assertions) | |
 
-**Honest assessment:** 451 assertions cover core calculations, guard logic, utilities, validation, and V10.8 bug fix regressions. All 7 bugs found during systematic code review now have regression tests. Integration-level tests (end-to-end report generation) are not automated. Priority expansion areas: banner creation, data loading, Excel output.
+**Honest assessment:** 560 assertions across 9 test files cover core calculations, guard logic, utilities, validation, V10.8 bug fix regressions, banner creation, data loading, numeric processing, Excel output, and HTML report generation end-to-end. All 7 bugs found during systematic code review have regression tests. The Excel output tests also uncovered and fixed a missing `config` argument bug in `write_question_table` → `write_base_rows`.
 
 ### Key Strengths
 
 1. **Zero silent failures** - All errors visible in Shiny console via cat() or TRS refusals
 2. **Comprehensive validation** - 7 validator modules with 16 pre-flight cross-checks
 3. **No function shadowing** - Duplicate definitions removed from config_loader.R
-4. **No dead code** - Deprecated run_crosstabs_helpers.R deleted; legacy functions marked @keywords internal
+4. **No dead code** - Deprecated run_crosstabs_helpers.R deleted; config_loader.R reduced to stub (all functions moved to canonical modules)
 5. **Memory-efficient** - Index-based banner subsetting; vectorised rating mean
 6. **Self-contained HTML** - Zero external dependencies; pure SVG charts
 7. **Config safety** - Unrecognised settings trigger console warning (typo detection)
@@ -280,9 +285,7 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 
 ### Known Limitations
 
-1. `config_loader.R` retains legacy functions not called by pipeline (marked @keywords internal)
-2. Test coverage does not include banner, data loading, or output generation (ranking now partially covered)
-3. `run_crosstabs.R` uses `return()` at top-level scope (works in Shiny but not from bare R console)
+1. `run_crosstabs.R` uses `return()` at top-level scope (works in Shiny but not from bare R console)
 
 ------------------------------------------------------------------------
 

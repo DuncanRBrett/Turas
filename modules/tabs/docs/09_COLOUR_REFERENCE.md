@@ -265,7 +265,7 @@ Minimum configuration for colour customisation:
 ```r
 config_obj$brand_colour <- "#1B4F72"   # Your brand colour
 config_obj$accent_colour <- "#D4AC0D"  # Your accent colour
-config_obj$chart_palette_preset <- "warm"  # Options: "warm", "cool", "research", "teal", "brand"
+config_obj$chart_palette_preset <- "warm"  # Options: "warm", "cool", "research", "teal", "red", "brand"
 ```
 
 Full dashboard threshold customisation:

@@ -478,7 +478,7 @@ run_tabs_gui <- function() {
         # Handle result for this config
         if (analysis_result$success) {
           config_settings <- tryCatch({
-            load_config_settings(file.path(data$path, current_config))
+            load_config_sheet(file.path(data$path, current_config))
           }, error = function(e) list())
           output_subfolder <- get_config_value(config_settings, "output_subfolder", "Crosstabs")
 

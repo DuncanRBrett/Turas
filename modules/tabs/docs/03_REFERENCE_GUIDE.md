@@ -551,7 +551,7 @@ alongside the Excel crosstabs. For the complete guide, see
 | `html_report` | Generate HTML report (Y/N) | Y |
 | `brand_colour` | Primary brand hex colour | #323367 |
 | `accent_colour` | Secondary accent hex colour | #0d8a8a |
-| `chart_palette_preset` | Chart colour scheme (warm/cool/research/teal/brand) | warm |
+| `chart_palette_preset` | Chart colour scheme (warm/cool/research/teal/red/brand) | warm |
 | `logo_path` | Path to logo image for report header | (none) |
 | `show_charts` | Include charts in HTML report | Y |
 
