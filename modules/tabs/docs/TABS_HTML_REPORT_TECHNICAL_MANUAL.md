@@ -490,13 +490,15 @@ if (has_box_categories OR is_likert OR is_rating OR is_nps) {
 
 **Palette preset system (`chart_palette_preset`):**
 
-The `config_obj$chart_palette_preset` field selects one of three ordinal colour palettes. Default is `"warm"`.
+The `config_obj$chart_palette_preset` field selects one of five ordinal colour palettes. Default is `"warm"`.
 
 | Preset | Negative | Mod. Negative | Neutral | Mod. Positive | Positive | DK/NA |
 |--------|----------|---------------|---------|---------------|----------|-------|
 | `warm` | `#b85450` | `#d4918e` | `#c9a96e` | `#7daa8c` | `#4a7c6f` | `#d1cdc7` |
 | `cool` | `#a65461` | `#c78f93` | `#94a3b8` | `#6f9fa8` | `#3d7a8a` | `#d1cdc7` |
 | `research` | `#8e4585` | `#b891b5` | `#b8b8b8` | `#7daa8c` | `#3d7a5f` | `#d1cdc7` |
+| `teal` | `#d4edea` | `#a3d5cf` | `#6dbfb8` | `#4a9e95` | `#2d7a72` | `#d1cdc7` |
+| `brand` | *(generated from `brand_colour` — 5-stop monochromatic gradient, max 45% saturation)* |
 
 For non-ordinal (categorical) questions, a 10-colour qualitative palette is used instead of the ordinal preset. This palette is designed for maximum visual distinction across categories.
 

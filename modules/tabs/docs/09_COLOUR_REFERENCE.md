@@ -74,7 +74,7 @@ These are hardcoded by design because they carry universal meaning.
 
 ### 2.1 Semantic Chart Palette (Configurable Presets)
 
-Used in stacked bar charts for ordinal/scale questions. Colours map to survey response sentiment via `get_semantic_colour()` in `07_chart_builder.R`. Three presets are available, selected via the `chart_palette_preset` config field.
+Used in stacked bar charts for ordinal/scale questions. Colours map to survey response sentiment via `get_semantic_colour()` in `07_chart_builder.R`. Five presets are available, selected via the `chart_palette_preset` config field.
 
 #### Warm Preset (default)
 
@@ -108,6 +108,21 @@ Used in stacked bar charts for ordinal/scale questions. Colours map to survey re
 | Mod positive | `#7daa8c` | Sage |
 | Positive | `#3d7a5f` | Forest |
 | DK/NA | `#d1cdc7` | Warm grey |
+
+#### Teal Preset
+
+| Sentiment | Hex | Description |
+|-----------|-----|-------------|
+| Negative | `#d4edea` | Pale teal |
+| Mod negative | `#a3d5cf` | Light teal |
+| Neutral | `#6dbfb8` | Medium teal |
+| Mod positive | `#4a9e95` | Deep teal |
+| Positive | `#2d7a72` | Dark teal |
+| DK/NA | `#d1cdc7` | Warm grey |
+
+#### Brand Preset
+
+Dynamically generated from the `brand_colour` config setting. The brand colour's hue is extracted and used to produce a 5-stop monochromatic gradient from 88% lightness (lightest) to 30% lightness (darkest), desaturated to a maximum of 45% for a muted, professional look. DK/NA and Other remain warm grey.
 
 **Configuration:** Set via `chart_palette_preset` in the Settings sheet. The semantic label-matching logic is unchanged -- only the hex values differ between presets.
 
@@ -250,7 +265,7 @@ Minimum configuration for colour customisation:
 ```r
 config_obj$brand_colour <- "#1B4F72"   # Your brand colour
 config_obj$accent_colour <- "#D4AC0D"  # Your accent colour
-config_obj$chart_palette_preset <- "warm"  # Options: "warm", "cool", "research"
+config_obj$chart_palette_preset <- "warm"  # Options: "warm", "cool", "research", "teal", "brand"
 ```
 
 Full dashboard threshold customisation:

@@ -56,7 +56,7 @@ All settings go in the **Settings sheet** of your config workbook
 | `include_summary` | `TRUE` | Show the Summary Dashboard tab. Set `FALSE` for crosstabs-only |
 | `fieldwork_dates` | *(none)* | Text shown in the metadata strip (e.g., "Sep - Nov 2025") |
 | `show_charts` | `FALSE` | Set to `TRUE` to enable inline SVG charts below crosstab tables |
-| `chart_palette_preset` | `warm` | Colour palette for ordinal charts: `warm` (earth tones), `cool` (blue-anchored), `research` (purple-green diverging) |
+| `chart_palette_preset` | `warm` | Colour palette for ordinal charts: `warm` (earth tones), `cool` (blue-anchored), `research` (purple-green diverging), `teal` (monochromatic teal), `brand` (monochromatic gradient from brand_colour) |
 | `index_descriptor` | *(none)* | Descriptive text shown below the Index row label explaining the scale (e.g., "Strongly disagree(1) = 1 to Strongly agree(5) = 5") |
 
 ### Dashboard Metrics
@@ -368,7 +368,7 @@ no box categories exist, individual response items are charted.
 
 #### Colour Palettes
 
-Ordinal charts use one of three configurable presets, set via
+Ordinal charts use one of five configurable presets, set via
 `chart_palette_preset` in Settings. Each preset uses muted,
 desaturated tones suited to professional reports:
 
@@ -377,6 +377,8 @@ desaturated tones suited to professional reports:
 | `warm` | Earth tones (default) |
 | `cool` | Blue-anchored palette |
 | `research` | Purple-green diverging palette |
+| `teal` | Monochromatic teal gradient |
+| `brand` | Monochromatic gradient from `brand_colour` |
 
 Known semantic labels (e.g., Negative, Neutral, Positive) are
 mapped to appropriate colours within the active preset.

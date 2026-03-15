@@ -13,13 +13,18 @@
 # ==============================================================================
 # COLOUR PALETTE PRESETS
 # ==============================================================================
-# Three configurable presets for semantic (sentiment) chart colours.
+# Five configurable presets for semantic (sentiment) chart colours.
 # Each preset defines 5 sentiment stops + DK/NA + Other.
 # Presets are designed for board-ready presentations: desaturated,
 # sophisticated tones that communicate sentiment without looking like
 # traffic lights.
 #
-# Presets: "warm" (default), "cool", "research"
+# Presets: "warm" (default), "cool", "research", "teal", "brand"
+#   warm     — earth tones: dusty rose through sage/teal
+#   cool     — muted burgundy through deep teal
+#   research — purple-green diverging (colorblind-safe)
+#   teal     — monochromatic teal gradient, light to dark
+#   brand    — monochromatic gradient generated from brand_colour
 # Config field: chart_palette_preset
 # Individual overrides: chart_negative_colour, chart_neutral_colour, etc.
 # ==============================================================================
@@ -30,8 +35,9 @@
 #' Returns a named list of 7 semantic colours for the given preset.
 #' Supports individual overrides from config.
 #'
-#' @param preset Character: "warm", "cool", or "research"
-#' @param overrides Named list of individual colour overrides (optional)
+#' @param preset Character: "warm", "cool", "research", "teal", or "brand"
+#' @param overrides Named list of individual colour overrides (optional).
+#'   For "brand" preset, must include \code{brand_colour} hex value.
 #' @return Named list with: negative, mod_negative, neutral, mod_positive,
 #'         positive, dk_na, other
 #' @keywords internal
@@ -67,12 +73,35 @@ get_palette_colours <- function(preset = "warm", overrides = NULL) {
       positive     = "#3d7a5f",
       dk_na        = "#d1cdc7",
       other        = "#c5c0b8"
+    ),
+    # Monochromatic teal — light-to-dark single-hue gradient, muted
+    teal = list(
+      negative     = "#d4edea",
+      mod_negative = "#a3d5cf",
+      neutral      = "#6dbfb8",
+      mod_positive = "#4a9e95",
+      positive     = "#2d7a72",
+      dk_na        = "#d1cdc7",
+      other        = "#c5c0b8"
     )
   )
 
-  # Select preset (fall back to warm if unrecognised)
-  pal <- palettes[[tolower(preset)]]
-  if (is.null(pal)) pal <- palettes[["warm"]]
+  preset_lower <- tolower(preset)
+
+  # "brand" preset: generate monochromatic gradient from brand_colour
+
+  if (preset_lower == "brand") {
+    brand_hex <- if (!is.null(overrides$brand_colour) && nzchar(overrides$brand_colour)) {
+      overrides$brand_colour
+    } else {
+      "#323367"  # fallback
+    }
+    pal <- .generate_mono_palette(brand_hex)
+  } else {
+    # Select preset (fall back to warm if unrecognised)
+    pal <- palettes[[preset_lower]]
+    if (is.null(pal)) pal <- palettes[["warm"]]
+  }
 
   # Apply individual overrides from config
   if (!is.null(overrides)) {
@@ -92,6 +121,82 @@ get_palette_colours <- function(preset = "warm", overrides = NULL) {
   }
 
   pal
+}
+
+
+#' Generate monochromatic palette from a single hex colour
+#'
+#' Produces 5 gradient stops from light (90% lightness) to dark (30% lightness)
+#' at the same hue/saturation, desaturated slightly for a muted look.
+#'
+#' @param hex Character, hex colour (e.g. "#323367")
+#' @return Named list with negative, mod_negative, neutral, mod_positive,
+#'         positive, dk_na, other
+#' @keywords internal
+.generate_mono_palette <- function(hex) {
+  # Parse hex to RGB (0-255)
+  hex_clean <- sub("^#", "", hex)
+  r <- strtoi(substr(hex_clean, 1, 2), 16L) / 255
+  g <- strtoi(substr(hex_clean, 3, 4), 16L) / 255
+  b <- strtoi(substr(hex_clean, 5, 6), 16L) / 255
+
+  # RGB -> HSL
+  cmax <- max(r, g, b)
+  cmin <- min(r, g, b)
+  delta <- cmax - cmin
+
+  # Lightness
+  l <- (cmax + cmin) / 2
+
+  # Saturation
+  if (delta == 0) {
+    s <- 0
+    h <- 0
+  } else {
+    s <- if (l < 0.5) delta / (cmax + cmin) else delta / (2 - cmax - cmin)
+    h <- if (cmax == r) {
+      60 * (((g - b) / delta) %% 6)
+    } else if (cmax == g) {
+      60 * ((b - r) / delta + 2)
+    } else {
+      60 * ((r - g) / delta + 4)
+    }
+    if (h < 0) h <- h + 360
+  }
+
+  # Desaturate slightly for muted look (cap at 45%)
+  s_muted <- min(s, 0.45)
+
+  # Generate 5 lightness stops: light → dark
+  lightness_stops <- c(0.88, 0.74, 0.58, 0.44, 0.30)
+
+  hsl_to_hex <- function(h, s, l) {
+    c_val <- (1 - abs(2 * l - 1)) * s
+    x <- c_val * (1 - abs((h / 60) %% 2 - 1))
+    m <- l - c_val / 2
+    if (h < 60)       { r1 <- c_val; g1 <- x;     b1 <- 0 }
+    else if (h < 120) { r1 <- x;     g1 <- c_val; b1 <- 0 }
+    else if (h < 180) { r1 <- 0;     g1 <- c_val; b1 <- x }
+    else if (h < 240) { r1 <- 0;     g1 <- x;     b1 <- c_val }
+    else if (h < 300) { r1 <- x;     g1 <- 0;     b1 <- c_val }
+    else              { r1 <- c_val; g1 <- 0;     b1 <- x }
+    ri <- round((r1 + m) * 255)
+    gi <- round((g1 + m) * 255)
+    bi <- round((b1 + m) * 255)
+    sprintf("#%02x%02x%02x", ri, gi, bi)
+  }
+
+  colours <- vapply(lightness_stops, function(lv) hsl_to_hex(h, s_muted, lv), character(1))
+
+  list(
+    negative     = colours[1],
+    mod_negative = colours[2],
+    neutral      = colours[3],
+    mod_positive = colours[4],
+    positive     = colours[5],
+    dk_na        = "#d1cdc7",
+    other        = "#c5c0b8"
+  )
 }
 
 

@@ -794,7 +794,7 @@ These settings control the interactive HTML report generated alongside the Excel
 | `html_report` | Generate an HTML report | Y / N | Y |
 | `brand_colour` | Primary brand colour (hex) | Any hex colour | #323367 |
 | `accent_colour` | Secondary accent colour (hex) | Any hex colour | #0d8a8a |
-| `chart_palette_preset` | Chart colour scheme | warm / cool / research | warm |
+| `chart_palette_preset` | Chart colour scheme | warm / cool / research / teal / brand | warm |
 | `logo_path` | Path to logo image for report header | File path (relative or absolute) | (none) |
 | `show_charts` | Include charts in HTML report | Y / N | Y |
 | `project_title` | Report title displayed in header | Text | (from config) |
