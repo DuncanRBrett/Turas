@@ -570,11 +570,23 @@ guard_validate_hub_config <- function(config_file) {
 }
 
 
-#' Parse Settings Sheet
+#' Parse Settings Sheet into a Named List
 #'
-#' Handles both key-value format (Field/Value columns) and single-row format.
-#' @param df Data frame from Settings sheet
-#' @return Named list of settings
+#' Converts a Settings sheet data frame into a named list of configuration
+#' values. Supports two formats: key-value format (with "Field" and "Value"
+#' columns where each row is one setting) and single-row format (where
+#' column names are field names and the first row contains values).
+#' Field names are normalised to lowercase with whitespace trimmed.
+#'
+#' @param df Data frame read from the Settings sheet of a Report Hub
+#'   config Excel file. Must have at least one row. If in key-value
+#'   format, must contain columns named "Field" and "Value"
+#'   (case-insensitive).
+#'
+#' @return A named list where names are lowercase field identifiers
+#'   (e.g., \code{"project_title"}, \code{"brand_colour"}) and values
+#'   are the corresponding character strings. Returns an empty list
+#'   if \code{df} has zero rows.
 parse_settings_sheet <- function(df) {
   if (nrow(df) == 0) return(list())
 

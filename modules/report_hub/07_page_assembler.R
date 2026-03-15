@@ -124,10 +124,19 @@ assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_
 }
 
 
-#' Build Hub CSS (read from file and substitute colours)
+#' Build Hub CSS from Template File
 #'
-#' @param config Validated config
-#' @return CSS string
+#' Reads the hub stylesheet from the assets/hub_styles.css file and
+#' substitutes colour tokens (BRAND_COLOUR, ACCENT_COLOUR) with the
+#' values specified in the hub config. Falls back to a minimal inline
+#' CSS string if the file cannot be found.
+#'
+#' @param config Validated config list from \code{guard_validate_hub_config()}.
+#'   Must contain \code{config$settings$brand_colour} and
+#'   \code{config$settings$accent_colour} (both optional, with defaults).
+#'
+#' @return A single CSS string with colour tokens replaced, ready for
+#'   embedding in a \code{<style>} tag.
 build_hub_css <- function(config) {
   css_path <- file.path(dirname(sys.frame(1)$ofile %||% "."), "assets", "hub_styles.css")
 
@@ -156,14 +165,25 @@ build_hub_css <- function(config) {
 
 #' Build Hub Header HTML
 #'
-#' Header layout:
-#' - Title (project_title)
-#' - Subtitle line 1: "Prepared by {company_name} for {client_name}"
-#' - Subtitle line 2: "Powered by Turas Analytics"
-#' - Date line: "Created {date}" (updates to "Last saved {date}" on save)
+#' Generates the top-level header bar for the combined report hub.
+#' The header includes the project title, a "Prepared by / for" subtitle,
+#' a "Powered by Turas Analytics" line, a creation date (which the client-side
+#' JS updates to "Last saved {date}" on save), Save and Print action buttons,
+#' and an optional base64-encoded logo image.
 #'
-#' @param config Validated config
-#' @return HTML string
+#' Header layout:
+#' \itemize{
+#'   \item Title (project_title)
+#'   \item Subtitle line 1: "Prepared by \{company_name\} for \{client_name\}"
+#'   \item Subtitle line 2: "Powered by Turas Analytics"
+#'   \item Date line: "Created \{date\}" (updates to "Last saved \{date\}" on save)
+#' }
+#'
+#' @param config Validated config list from \code{guard_validate_hub_config()}.
+#'   Uses \code{config$settings$project_title}, \code{config$settings$company_name},
+#'   \code{config$settings$client_name}, and \code{config$settings$logo_path}.
+#'
+#' @return A single HTML string containing the complete hub header \code{<div>}.
 build_hub_header <- function(config) {
   logo_html <- ""
   if (!is.null(config$settings$logo_path) && file.exists(config$settings$logo_path)) {
@@ -269,7 +289,11 @@ merge_pinned_data <- function(parsed_reports, report_configs = NULL) {
 
     pins <- tryCatch(
       jsonlite::fromJSON(pins_json, simplifyVector = FALSE),
-      error = function(e) list()
+      error = function(e) {
+        message(sprintf("Report hub: failed to parse pinned data for '%s': %s",
+                        parsed$report_key, e$message))
+        list()
+      }
     )
 
     for (pin in pins) {
@@ -288,9 +312,15 @@ merge_pinned_data <- function(parsed_reports, report_configs = NULL) {
 }
 
 
-#' Build Hub JS (combine JS files)
+#' Build Hub JavaScript from Source Files
 #'
-#' @return JavaScript string
+#' Reads and concatenates the hub-level JavaScript source files from the
+#' \code{js/} directory within the report_hub module. The files loaded are:
+#' \code{hub_id_resolver.js}, \code{hub_navigation.js}, and \code{hub_pinned.js}.
+#' Falls back to a relative path if the script-relative path cannot be resolved.
+#'
+#' @return A single JavaScript string containing all hub JS code, ready for
+#'   embedding in a \code{<script>} tag.
 build_hub_js <- function() {
   js_dir <- file.path(dirname(sys.frame(1)$ofile %||% "."), "js")
 
@@ -315,8 +345,18 @@ build_hub_js <- function() {
 
 #' Build Initialization JavaScript
 #'
-#' @param parsed_reports List of parsed report objects
-#' @return JavaScript string
+#' Generates a \code{DOMContentLoaded} event handler that initialises all
+#' hub components in the correct order: hub navigation, per-report init
+#' calls (TrackerReport or TabsReport), hub-level text sections and
+#' qualitative slides rendering, and pinned views hydration.
+#'
+#' @param parsed_reports List of parsed and namespace-rewritten report objects.
+#'   Each element must have a \code{report_type} field (either \code{"tracker"}
+#'   or \code{"tabs"}) to determine which namespace init function to call.
+#'
+#' @return A JavaScript string containing a \code{DOMContentLoaded} event
+#'   listener with all initialisation calls, ready for embedding in a
+#'   \code{<script>} tag.
 build_init_js <- function(parsed_reports) {
   init_calls <- character(0)
 

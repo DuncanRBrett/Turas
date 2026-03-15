@@ -801,6 +801,105 @@ body {
   background: #fff;
 }
 
+/* --- Hub Slide Image Support --- */
+.hub-slide-img-btn {
+  background: none;
+  border: 1px solid var(--hub-border);
+  border-radius: 4px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--hub-text-muted);
+  transition: background 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.hub-slide-img-btn:hover {
+  background: #f1f5f9;
+  color: var(--hub-brand);
+  border-color: var(--hub-brand);
+}
+
+.hub-slide-img-preview {
+  position: relative;
+  margin-bottom: 10px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--hub-border);
+}
+
+.hub-slide-img-thumb {
+  display: block;
+  max-width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  background: #f8f9fa;
+}
+
+.hub-slide-img-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: background 0.15s ease;
+}
+
+.hub-slide-img-remove:hover {
+  background: #dc2626;
+}
+
+/* --- Hub About Export Section --- */
+.hub-about-export {
+  margin-top: 24px;
+}
+
+.hub-about-export .closing-divider {
+  height: 1px;
+  background: var(--hub-border);
+  margin-bottom: 20px;
+}
+
+.hub-about-export .closing-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hub-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.hub-about-export .export-btn {
+  background: var(--hub-card);
+  border: 1px solid var(--hub-border);
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-family: var(--hub-font);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--hub-text);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.hub-about-export .export-btn:hover {
+  background: #f1f5f9;
+  border-color: var(--hub-brand);
+}
+
 /* --- Pin Content Areas --- */
 .hub-pin-chart {
   margin: 12px 0;
@@ -967,7 +1066,11 @@ body {
   .hub-remove-btn,
   .hub-save-btn,
   .hub-print-btn,
-  .hub-help-btn {
+  .hub-help-btn,
+  .hub-slide-img-btn,
+  .hub-slide-img-remove,
+  .hub-slide-img-input,
+  .hub-about-export {
     display: none !important;
   }
 

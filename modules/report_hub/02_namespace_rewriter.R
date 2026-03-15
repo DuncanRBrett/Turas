@@ -287,6 +287,9 @@ rewrite_html_onclick_conflicts <- function(html, report_key) {
     "pinQualSlide",
     "toggleQualEdit",
     "renderAllQualSlides",
+    "triggerQualImage",
+    "handleQualImage",
+    "removeQualImage",
     # --- Insight editing (onclick/ondblclick/oninput in insight-area HTML) ---
     "toggleInsight",
     "toggleInsightEdit",
@@ -442,6 +445,9 @@ wrap_js_in_iife <- function(js_blocks, report_key, report_type, report_label = N
     "pinQualSlide",
     "toggleQualEdit",
     "renderAllQualSlides",
+    "triggerQualImage",
+    "handleQualImage",
+    "removeQualImage",
     # --- Core navigation (conflict when multiple tabs reports combined) ---
     "selectQuestion",
     "switchBannerGroup",

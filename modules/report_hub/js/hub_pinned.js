@@ -121,7 +121,7 @@
         // Multi-pin: no need to restore per-report pin button states
       }
     } catch (e) {
-      // Silently ignore parse errors
+      console.warn("[Turas Report Hub] Failed to parse pinned data:", e.message);
     }
   };
 
@@ -576,14 +576,22 @@
       '<div class="hub-slide-title-row">' +
         '<input class="hub-slide-title" value="New Insight" ' +
           'onchange="ReportHub.updateHubSlideTitle(\'' + slideId + '\', this.value)">' +
+        '<button class="hub-slide-img-btn" onclick="ReportHub.triggerHubSlideImage(\'' + slideId + '\')" title="Add image">&#x1F5BC;</button>' +
         '<button class="hub-pin-summary-btn" onclick="ReportHub.pinHubSlide(\'' + slideId + '\')" title="Pin this slide">\uD83D\uDCCC Pin</button>' +
         '<button class="hub-slide-remove-btn" onclick="ReportHub.removeHubSlide(\'' + slideId + '\')" title="Remove this slide">\u00D7</button>' +
       '</div>' +
+      '<div class="hub-slide-img-preview" style="display:none;">' +
+        '<img class="hub-slide-img-thumb" src="">' +
+        '<button class="hub-slide-img-remove" onclick="ReportHub.removeHubSlideImage(\'' + slideId + '\')" title="Remove image">&times;</button>' +
+      '</div>' +
+      '<input type="file" class="hub-slide-img-input" accept="image/*" style="display:none;" ' +
+        'onchange="ReportHub.handleHubSlideImage(\'' + slideId + '\', this)">' +
       '<div class="hub-slide-rendered hub-md-content" data-slide-id="' + slideId + '" ' +
         'ondblclick="ReportHub.toggleHubSlideEdit(\'' + slideId + '\')"></div>' +
       '<textarea class="hub-slide-editor" data-slide-id="' + slideId + '" ' +
         'style="display:block" ' +
-        'onblur="ReportHub.finishHubSlideEdit(\'' + slideId + '\')"></textarea>';
+        'onblur="ReportHub.finishHubSlideEdit(\'' + slideId + '\')"></textarea>' +
+      '<textarea class="hub-slide-img-store" style="display:none;"></textarea>';
     grid.appendChild(card);
     // Focus the editor immediately so the user can start typing
     var editor = card.querySelector(".hub-slide-editor");
@@ -599,6 +607,58 @@
     if (!card) return;
     if (!confirm("Remove this insight slide?")) return;
     card.parentNode.removeChild(card);
+  };
+
+  /**
+   * Trigger file input for adding an image to a hub slide
+   * @param {string} slideId - Slide element ID
+   */
+  ReportHub.triggerHubSlideImage = function(slideId) {
+    var card = document.querySelector('.hub-slide-card[data-slide-id="' + slideId + '"]');
+    if (!card) return;
+    var input = card.querySelector(".hub-slide-img-input");
+    if (input) input.click();
+  };
+
+  /**
+   * Handle image file selection for a hub slide
+   * Reads the file as base64 data URL, stores it, and shows preview.
+   * @param {string} slideId - Slide element ID
+   * @param {HTMLInputElement} inputEl - The file input element
+   */
+  ReportHub.handleHubSlideImage = function(slideId, inputEl) {
+    var file = inputEl.files && inputEl.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var dataUrl = e.target.result;
+      var card = document.querySelector('.hub-slide-card[data-slide-id="' + slideId + '"]');
+      if (!card) return;
+      var preview = card.querySelector(".hub-slide-img-preview");
+      var thumb = card.querySelector(".hub-slide-img-thumb");
+      var store = card.querySelector(".hub-slide-img-store");
+      if (thumb) thumb.src = dataUrl;
+      if (preview) preview.style.display = "";
+      if (store) store.value = dataUrl;
+    };
+    reader.readAsDataURL(file);
+    // Reset file input so the same file can be re-selected
+    inputEl.value = "";
+  };
+
+  /**
+   * Remove the image from a hub slide
+   * @param {string} slideId - Slide element ID
+   */
+  ReportHub.removeHubSlideImage = function(slideId) {
+    var card = document.querySelector('.hub-slide-card[data-slide-id="' + slideId + '"]');
+    if (!card) return;
+    var preview = card.querySelector(".hub-slide-img-preview");
+    var thumb = card.querySelector(".hub-slide-img-thumb");
+    var store = card.querySelector(".hub-slide-img-store");
+    if (thumb) thumb.src = "";
+    if (preview) preview.style.display = "none";
+    if (store) store.value = "";
   };
 
   // ==========================================================================

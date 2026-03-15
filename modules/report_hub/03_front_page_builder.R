@@ -396,24 +396,41 @@ build_hub_slides_section <- function(slides) {
     escaped_content <- htmltools::htmlEscape(slide$content)
     escaped_title <- htmltools::htmlEscape(slide$title)
 
+    # Image data (if provided via config)
+    image_data <- if (!is.null(slide$image_data) && nzchar(slide$image_data %||% "")) slide$image_data else ""
+    img_preview_style <- if (nzchar(image_data)) "" else "display:none;"
+    img_src <- if (nzchar(image_data)) image_data else ""
+
     parts <- c(parts, sprintf(
       '<div class="hub-slide-card" data-slide-id="%s">
   <div class="hub-slide-title-row">
     <input class="hub-slide-title" value="%s"
            onchange="ReportHub.updateHubSlideTitle(\'%s\', this.value)">
+    <button class="hub-slide-img-btn" onclick="ReportHub.triggerHubSlideImage(\'%s\')" title="Add image">&#x1F5BC;</button>
     <button class="hub-pin-summary-btn" onclick="ReportHub.pinHubSlide(\'%s\')" title="Pin this slide">\U0001F4CC Pin</button>
     <button class="hub-slide-remove-btn" onclick="ReportHub.removeHubSlide(\'%s\')" title="Remove this slide">\u00D7</button>
   </div>
+  <div class="hub-slide-img-preview" style="%s">
+    <img class="hub-slide-img-thumb" src="%s">
+    <button class="hub-slide-img-remove" onclick="ReportHub.removeHubSlideImage(\'%s\')" title="Remove image">&times;</button>
+  </div>
+  <input type="file" class="hub-slide-img-input" accept="image/*" style="display:none;"
+         onchange="ReportHub.handleHubSlideImage(\'%s\', this)">
   <div class="hub-slide-rendered hub-md-content" data-slide-id="%s"
        ondblclick="ReportHub.toggleHubSlideEdit(\'%s\')"></div>
   <textarea class="hub-slide-editor" data-slide-id="%s"
             style="display:none"
             onblur="ReportHub.finishHubSlideEdit(\'%s\')">%s</textarea>
+  <textarea class="hub-slide-img-store" style="display:none;">%s</textarea>
 </div>',
       slide$id, escaped_title, slide$id,
+      slide$id,
       slide$id, slide$id,
+      img_preview_style, img_src, slide$id,
+      slide$id,
       slide$id, slide$id, slide$id, slide$id,
-      escaped_content
+      escaped_content,
+      htmltools::htmlEscape(image_data)
     ))
   }
 
@@ -505,6 +522,21 @@ build_hub_about_panel <- function(config) {
 </div>',
     escaped_notes
   ))
+
+  # --- Export section (Save/Print with helper text) ---
+  parts <- c(parts, '<div class="hub-about-export">')
+  parts <- c(parts, '<div class="closing-divider"></div>')
+  parts <- c(parts, '<div class="closing-content">')
+  parts <- c(parts, '<div class="closing-label" style="margin-bottom:12px;">Export</div>')
+  parts <- c(parts, '<div style="display:flex;gap:10px;flex-wrap:wrap;">')
+  parts <- c(parts, '<button class="export-btn" onclick="ReportHub.saveReportHTML()" style="font-size:13px;padding:8px 18px;">\U0001F4BE Save Report</button>')
+  parts <- c(parts, '<button class="export-btn" onclick="ReportHub.printReport()" style="font-size:13px;padding:8px 18px;">\U0001F5A8 Print Report</button>')
+  parts <- c(parts, '</div>')
+  parts <- c(parts, '<p style="font-size:11px;color:#94a3b8;margin-top:8px;line-height:1.5;">')
+  parts <- c(parts, 'Save embeds all edits (insights, notes, slides) into the HTML file. ')
+  parts <- c(parts, 'Print outputs the visible panels to PDF.</p>')
+  parts <- c(parts, '</div>')
+  parts <- c(parts, '</div>')
 
   parts <- c(parts, '</div>')  # close hub-about-section
   parts <- c(parts, '</div>')  # close hub-panel

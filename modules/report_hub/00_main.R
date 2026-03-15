@@ -24,8 +24,8 @@ source(file.path(hub_dir, "08_html_writer.R"))
 #'   containing Settings, Reports, and optionally CrossRef sheets.
 #' @param output_file Path for the combined HTML output.
 #'   If NULL, auto-generated from project title + date.
-#' @param auto_cross_ref Logical. Attempt fuzzy matching of questions
-#'   in addition to any explicit CrossRef mappings? Default FALSE.
+#' @param auto_cross_ref Logical. Reserved for future use — will enable
+#'   fuzzy question matching across reports. Currently ignored. Default FALSE.
 #'
 #' @return TRS-compliant list with:
 #'   \item{status}{"PASS", "PARTIAL", or "REFUSED"}

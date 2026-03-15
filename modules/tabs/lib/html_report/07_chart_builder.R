@@ -720,11 +720,20 @@ build_question_chart <- function(question_data, options_df, config_obj) {
   q_type <- question_data$question_type %||% "Unknown"
   table_data <- question_data$table_data
   brand_colour <- config_obj$brand_colour %||% "#323367"
-  chart_bar_colour <- config_obj$chart_bar_colour %||% brand_colour
 
   # Build palette from preset + any individual overrides
   palette_preset <- config_obj$chart_palette_preset %||% "warm"
   chart_palette <- get_palette_colours(palette_preset, overrides = config_obj)
+
+  # Single-bar colour: use explicit override if set, otherwise derive from
+
+  # the palette's darkest shade so that teal/red/brand presets are honoured.
+  chart_bar_colour <- if (!is.null(config_obj$chart_bar_colour) &&
+                          nzchar(config_obj$chart_bar_colour)) {
+    config_obj$chart_bar_colour
+  } else {
+    chart_palette$positive %||% brand_colour
+  }
 
   # Skip composite metrics (they only have a summary row)
   if (q_type == "Composite") return(NULL)

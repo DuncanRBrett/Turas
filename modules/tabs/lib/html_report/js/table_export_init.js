@@ -134,11 +134,25 @@ function buildColumnChips(groupCode) {
   var existing = document.getElementById("col-chip-bar");
   if (existing) existing.remove();
 
-  var headers = document.querySelectorAll(
-    "th.ct-data-col.bg-" + groupCode + "[data-col-key]"
+  // Start with Total column (class bg-total, not bg-{groupCode})
+  var totalHeaders = document.querySelectorAll(
+    "th.ct-data-col.bg-total[data-col-key]"
   );
   var seen = {};
   var columns = [];
+  totalHeaders.forEach(function(th) {
+    var key = th.getAttribute("data-col-key");
+    if (!seen[key]) {
+      seen[key] = true;
+      var label = th.querySelector(".ct-header-text");
+      columns.push({ key: key, label: label ? label.textContent.trim() : key });
+    }
+  });
+
+  // Then add banner group columns
+  var headers = document.querySelectorAll(
+    "th.ct-data-col.bg-" + groupCode + "[data-col-key]"
+  );
   headers.forEach(function(th) {
     var key = th.getAttribute("data-col-key");
     if (!seen[key]) {
