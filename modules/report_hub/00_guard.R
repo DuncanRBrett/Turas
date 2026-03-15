@@ -180,13 +180,15 @@
 }
 
 
-#' Validate Report Hub Configuration
+#' Validate Config File Path and Format
 #'
-#' @param config_file Path to the Report Hub config Excel file
-#' @return TRS-compliant list with status and validated config
-guard_validate_hub_config <- function(config_file) {
-
-  # --- Check config file exists ---
+#' Checks that the config file path is provided, exists, and is .xlsx format.
+#' Returns NULL on success, or a TRS refusal list on failure.
+#'
+#' @param config_file Path to the config file
+#' @return NULL on success, TRS refusal list on failure
+#' @keywords internal
+.validate_config_file <- function(config_file) {
   if (is.null(config_file) || !nzchar(config_file)) {
     return(list(
       status = "REFUSED",
@@ -215,7 +217,20 @@ guard_validate_hub_config <- function(config_file) {
     ))
   }
 
-  # --- Read and validate Settings sheet ---
+  NULL
+}
+
+
+#' Validate Required Sheets Exist in Config File
+#'
+#' Reads sheet names from the Excel file and verifies that the required
+#' Settings and Reports sheets are present.
+#'
+#' @param config_file Path to the config file
+#' @return List with \code{sheets} (character vector) on success,
+#'   or a TRS refusal list on failure
+#' @keywords internal
+.validate_required_sheets <- function(config_file) {
   sheets <- tryCatch(
     openxlsx::getSheetNames(config_file),
     error = function(e) NULL
@@ -248,7 +263,20 @@ guard_validate_hub_config <- function(config_file) {
     ))
   }
 
-  # --- Parse Settings sheet (auto-detect header row) ---
+  list(sheets = sheets)
+}
+
+
+#' Validate and Parse Settings Sheet
+#'
+#' Reads the Settings sheet and validates that required fields
+#' (project_title, company_name) are present.
+#'
+#' @param config_file Path to the config file
+#' @return List with \code{settings} (named list) on success,
+#'   or a TRS refusal list on failure
+#' @keywords internal
+.validate_settings <- function(config_file) {
   settings <- .read_settings_sheet(config_file, "Settings")
 
   if (is.null(settings$project_title) || !nzchar(trimws(settings$project_title))) {
@@ -269,7 +297,20 @@ guard_validate_hub_config <- function(config_file) {
     ))
   }
 
-  # --- Parse Reports sheet (auto-detect header row) ---
+  list(settings = settings)
+}
+
+
+#' Validate and Parse Reports Sheet
+#'
+#' Reads the Reports sheet, validates structure and each row entry,
+#' resolves file paths, and checks for duplicates.
+#'
+#' @param config_file Path to the config file
+#' @return List with \code{reports_df} (data frame) on success,
+#'   or a TRS refusal list on failure
+#' @keywords internal
+.validate_reports <- function(config_file) {
   reports_df <- .read_table_sheet(config_file, "Reports",
                                    c("report_path", "report_label", "report_key", "order"))
 
@@ -300,9 +341,7 @@ guard_validate_hub_config <- function(config_file) {
     reports_df$order <- suppressWarnings(as.numeric(reports_df$order))
   }
 
-  # --- Validate each report entry ---
-  warnings <- character(0)
-
+  # Validate each report entry
   for (i in seq_len(nrow(reports_df))) {
     row <- reports_df[i, ]
 
@@ -400,8 +439,25 @@ guard_validate_hub_config <- function(config_file) {
   # Sort by order
   reports_df <- reports_df[order(reports_df$order), ]
 
-  # --- Parse CrossRef sheet (optional) ---
+  list(reports_df = reports_df)
+}
+
+
+#' Parse Optional Config Sheets (CrossRef, Slides)
+#'
+#' Reads the optional CrossRef and Slides sheets from the config file.
+#' Returns parsed data and any warnings for missing columns.
+#'
+#' @param config_file Path to the config file
+#' @param sheets Character vector of available sheet names
+#' @return List with \code{cross_refs}, \code{slides}, and \code{warnings}
+#' @keywords internal
+.parse_optional_sheets <- function(config_file, sheets) {
+  warnings <- character(0)
   cross_refs <- NULL
+  slides <- NULL
+
+  # --- CrossRef sheet ---
   if ("CrossRef" %in% sheets) {
     xref_required <- c("tracker_code", "tabs_code")
     xref_df <- .read_table_sheet(config_file, "CrossRef", xref_required)
@@ -419,8 +475,7 @@ guard_validate_hub_config <- function(config_file) {
     }
   }
 
-  # --- Parse Slides sheet (optional) ---
-  slides <- NULL
+  # --- Slides sheet ---
   if ("Slides" %in% sheets) {
     slides_required <- c("slide_title", "content", "display_order")
     slides_df <- .read_table_sheet(config_file, "Slides", slides_required)
@@ -452,19 +507,31 @@ guard_validate_hub_config <- function(config_file) {
     }
   }
 
-  # --- Validate output settings if provided ---
-  # output_dir: directory for the combined report (absolute or relative to config)
-  # output_file: filename for the combined report (just the name, no directory)
+  list(cross_refs = cross_refs, slides = slides, warnings = warnings)
+}
+
+
+#' Validate and Resolve Output Settings and Logo Path
+#'
+#' Resolves output_dir (relative to config dir), ensures output_file
+#' ends in .html, and resolves the logo path. Appends warnings for
+#' non-fatal issues (missing logo, unresolvable output directory).
+#'
+#' @param settings Named list of settings from the Settings sheet
+#' @param config_file Path to the config file (used for relative path resolution)
+#' @param warnings Character vector of existing warnings to append to
+#' @return List with \code{settings} (modified) and \code{warnings}
+#' @keywords internal
+.validate_output_settings <- function(settings, config_file, warnings) {
+  # --- output_dir ---
   if (!is.null(settings$output_dir) && nzchar(trimws(settings$output_dir))) {
     out_dir <- trimws(settings$output_dir)
-    # Resolve relative to config file directory
     if (!dir.exists(out_dir)) {
       config_dir <- dirname(config_file)
       out_dir_resolved <- file.path(config_dir, out_dir)
       if (dir.exists(out_dir_resolved)) {
         out_dir <- normalizePath(out_dir_resolved)
       } else {
-        # Try to create the directory
         dir_created <- tryCatch({
           dir.create(out_dir_resolved, recursive = TRUE, showWarnings = FALSE)
           dir.exists(out_dir_resolved)
@@ -485,16 +552,16 @@ guard_validate_hub_config <- function(config_file) {
     settings$output_dir <- out_dir
   }
 
+  # --- output_file ---
   if (!is.null(settings$output_file) && nzchar(trimws(settings$output_file))) {
     out_file <- trimws(settings$output_file)
-    # Ensure it ends in .html
     if (!grepl("\\.html?$", out_file, ignore.case = TRUE)) {
       out_file <- paste0(out_file, ".html")
     }
     settings$output_file <- out_file
   }
 
-  # --- Validate logo path if provided ---
+  # --- logo_path ---
   if (!is.null(settings$logo_path) && nzchar(trimws(settings$logo_path))) {
     logo_path <- settings$logo_path
     if (!file.exists(logo_path)) {
@@ -512,35 +579,45 @@ guard_validate_hub_config <- function(config_file) {
     }
   }
 
-  # --- Build validated config object ---
-  config <- list(
+  list(settings = settings, warnings = warnings)
+}
+
+
+#' Build Validated Config Object from Parsed Components
+#'
+#' Assembles the final config list from validated settings, reports,
+#' cross-references, and slides. Trims and normalises all string fields.
+#'
+#' @param settings Named list of validated settings
+#' @param reports_df Data frame of validated report entries
+#' @param cross_refs Data frame of cross-references (or NULL)
+#' @param slides List of slide objects (or NULL)
+#' @return The assembled config list
+#' @keywords internal
+.build_validated_config <- function(settings, reports_df, cross_refs, slides) {
+  # Helper: return trimmed value if non-null and non-empty, else NULL
+  .trim_or_null <- function(x) {
+    if (!is.null(x) && nzchar(trimws(x))) trimws(x) else NULL
+  }
+
+  list(
     settings = list(
       project_title = trimws(settings$project_title),
-      subtitle = if (!is.null(settings$subtitle)) trimws(settings$subtitle) else NULL,
+      subtitle = .trim_or_null(settings$subtitle),
       company_name = trimws(settings$company_name),
-      client_name = if (!is.null(settings$client_name)) trimws(settings$client_name) else NULL,
-      brand_colour = if (!is.null(settings$brand_colour)) trimws(settings$brand_colour) else NULL,
-      accent_colour = if (!is.null(settings$accent_colour)) trimws(settings$accent_colour) else NULL,
+      client_name = .trim_or_null(settings$client_name),
+      brand_colour = .trim_or_null(settings$brand_colour),
+      accent_colour = .trim_or_null(settings$accent_colour),
       logo_path = settings$logo_path,
-      output_dir = if (!is.null(settings$output_dir) && nzchar(trimws(settings$output_dir)))
-                     settings$output_dir else NULL,
-      output_file = if (!is.null(settings$output_file) && nzchar(trimws(settings$output_file)))
-                      settings$output_file else NULL,
-      executive_summary = if (!is.null(settings$executive_summary) && nzchar(trimws(settings$executive_summary)))
-                            trimws(settings$executive_summary) else NULL,
-      background_text = if (!is.null(settings$background_text) && nzchar(trimws(settings$background_text)))
-                           trimws(settings$background_text) else NULL,
-      # About section fields
-      analyst_name = if (!is.null(settings$analyst_name) && nzchar(trimws(settings$analyst_name)))
-                       trimws(settings$analyst_name) else NULL,
-      analyst_email = if (!is.null(settings$analyst_email) && nzchar(trimws(settings$analyst_email)))
-                        trimws(settings$analyst_email) else NULL,
-      analyst_phone = if (!is.null(settings$analyst_phone) && nzchar(trimws(settings$analyst_phone)))
-                        trimws(settings$analyst_phone) else NULL,
-      appendices = if (!is.null(settings$appendices) && nzchar(trimws(settings$appendices)))
-                     trimws(settings$appendices) else NULL,
-      notes = if (!is.null(settings$notes) && nzchar(trimws(settings$notes)))
-                trimws(settings$notes) else NULL
+      output_dir = .trim_or_null(settings$output_dir),
+      output_file = .trim_or_null(settings$output_file),
+      executive_summary = .trim_or_null(settings$executive_summary),
+      background_text = .trim_or_null(settings$background_text),
+      analyst_name = .trim_or_null(settings$analyst_name),
+      analyst_email = .trim_or_null(settings$analyst_email),
+      analyst_phone = .trim_or_null(settings$analyst_phone),
+      appendices = .trim_or_null(settings$appendices),
+      notes = .trim_or_null(settings$notes)
     ),
     reports = lapply(seq_len(nrow(reports_df)), function(i) {
       row <- reports_df[i, ]
@@ -556,6 +633,52 @@ guard_validate_hub_config <- function(config_file) {
     cross_refs = cross_refs,
     slides = slides
   )
+}
+
+
+#' Validate Report Hub Configuration
+#'
+#' Validates the Report Hub config Excel file: checks file existence,
+#' reads and validates Settings and Reports sheets, parses optional
+#' CrossRef and Slides sheets, resolves output paths, and assembles
+#' the validated config object.
+#'
+#' @param config_file Path to the Report Hub config Excel file
+#' @return TRS-compliant list with status and validated config
+guard_validate_hub_config <- function(config_file) {
+
+  # --- Step 1: Validate config file path and format ---
+  file_check <- .validate_config_file(config_file)
+  if (!is.null(file_check)) return(file_check)
+
+  # --- Step 2: Validate required sheets exist ---
+  sheets_check <- .validate_required_sheets(config_file)
+  if (!is.null(sheets_check$status)) return(sheets_check)
+  sheets <- sheets_check$sheets
+
+  # --- Step 3: Parse and validate Settings sheet ---
+  settings_check <- .validate_settings(config_file)
+  if (!is.null(settings_check$status)) return(settings_check)
+  settings <- settings_check$settings
+
+  # --- Step 4: Parse and validate Reports sheet ---
+  reports_check <- .validate_reports(config_file)
+  if (!is.null(reports_check$status)) return(reports_check)
+  reports_df <- reports_check$reports_df
+
+  # --- Step 5: Parse optional sheets (CrossRef, Slides) ---
+  optional <- .parse_optional_sheets(config_file, sheets)
+  warnings <- optional$warnings
+
+  # --- Step 6: Validate output settings and logo path ---
+  output_check <- .validate_output_settings(settings, config_file, warnings)
+  settings <- output_check$settings
+  warnings <- output_check$warnings
+
+  # --- Step 7: Build validated config object ---
+  config <- .build_validated_config(
+    settings, reports_df, optional$cross_refs, optional$slides
+  )
 
   # --- Return ---
   status <- if (length(warnings) > 0) "PARTIAL" else "PASS"
@@ -565,7 +688,7 @@ guard_validate_hub_config <- function(config_file) {
     warnings = warnings,
     message = sprintf("Config validated: %d reports, %s cross-references",
                       length(config$reports),
-                      if (is.null(cross_refs)) "no" else nrow(cross_refs))
+                      if (is.null(optional$cross_refs)) "no" else nrow(optional$cross_refs))
   ))
 }
 

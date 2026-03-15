@@ -378,30 +378,16 @@ remove_save_print_buttons <- function(html) {
 }
 
 
-#' Prefix Conflicting JS Functions and Variables
+#' Get List of Conflicting JS Function/Variable Names
 #'
-#' Instead of IIFE wrapping (which breaks inline onclick handlers),
-#' we prefix only the functions/variables that actually collide between
-#' tracker and tabs. Non-conflicting functions remain global.
+#' Returns the canonical list of JS function and variable names that must
+#' be prefixed when combining multiple reports. These are global names that
+#' would collide when two reports of the same or different types share a page.
 #'
-#' @param js_blocks List of JS block objects from parser
-#' @param report_key Report key (e.g., "tracker")
-#' @param report_type "tracker" or "tabs"
-#' @param report_label Human-readable label for source identification in pins
-#' @return Single JS string with prefixed conflicts
-wrap_js_in_iife <- function(js_blocks, report_key, report_type, report_label = NULL) {
-  # Combine all JS content
-  all_js <- paste(
-    sapply(js_blocks, function(b) b$content),
-    collapse = "\n\n"
-  )
-
-  # Prefix conflicting global function definitions and their calls.
-  # CRITICAL: When multiple reports of the same type (e.g., 3 tabs reports) are
-  # combined, ALL global functions that use DOM queries must be prefixed.
-  # Otherwise the last report's version overwrites earlier ones, and its
-  # report-specific DOM helpers (_tabs3_id) can't find elements in earlier panels.
-  conflicting_fns <- c(
+#' @return Character vector of function/variable names
+#' @keywords internal
+.get_conflicting_js_names <- function() {
+  c(
     # --- Global state variables (collide when multiple tabs reports combined) ---
     "bannerGroups",
     "currentGroup",
@@ -498,64 +484,83 @@ wrap_js_in_iife <- function(js_blocks, report_key, report_type, report_label = N
     "toggleSlideMenu",
     "exportInsightsHTML"
   )
+}
 
-  prefix <- paste0(report_key, "_")
 
-  for (fn in conflicting_fns) {
+#' Prefix JS Function Definitions, Declarations, and References
+#'
+#' Applies report-key prefixing to all conflicting function/variable names
+#' in a combined JS string. Handles function definitions, var/let/const
+#' declarations, window.* assignments, and standalone references.
+#'
+#' @param js Combined JS string
+#' @param prefix Prefix to apply (e.g., "tracker_")
+#' @param fn_names Character vector of function/variable names to prefix
+#' @return Modified JS string
+#' @keywords internal
+.prefix_js_functions <- function(js, prefix, fn_names) {
+  for (fn in fn_names) {
     # Prefix function definitions: function fnName( -> function prefix_fnName(
-    all_js <- gsub(
+    js <- gsub(
       sprintf("function %s\\(", fn),
       sprintf("function %s%s(", prefix, fn),
-      all_js
+      js
     )
     # Prefix var/let/const declarations: var fnName = -> var prefix_fnName =
-    all_js <- gsub(
+    js <- gsub(
       sprintf("(var|let|const)\\s+%s\\b", fn),
       sprintf("\\1 %s%s", prefix, fn),
-      all_js
+      js
     )
     # Prefix window.fnName assignments: window.fnName -> window.prefix_fnName
-    # (tracker defines many functions as window.fnName = function(...))
     # CRITICAL: Must keep "window." prefix! Without it, strict-mode IIFEs
     # throw ReferenceError on bare assignments (e.g., tracker_fn = function(){})
     # and non-strict IIFEs lose global exposure (variable stays IIFE-local).
-    all_js <- gsub(
+    js <- gsub(
       sprintf("window\\.%s\\b", fn),
       sprintf("window.%s%s", prefix, fn),
-      all_js
+      js
     )
     # Prefix standalone references: fnName -> prefix_fnName
     # Match when NOT preceded by . or identifier char (prevents matching
     # inside obj.fnName or longerFnName) and NOT followed by identifier char
-    # (prevents matching fnNameExtra). Covers function calls, variable access,
-    # assignments, typeof checks, and object property values.
-    all_js <- gsub(
+    # (prevents matching fnNameExtra).
+    js <- gsub(
       sprintf("(?<![.a-zA-Z_])%s(?![a-zA-Z0-9_])", fn),
       sprintf("%s%s", prefix, fn),
-      all_js,
+      js,
       perl = TRUE
     )
   }
+  js
+}
 
-  # --- Rewrite DOM queries to use report-specific scoped helpers ---
-  # Each report gets uniquely-named helpers to prevent global variable collision
-  # (both scripts share global scope, so _$id would be overwritten by the second report)
+
+#' Build Scoped DOM Helper Functions for a Report
+#'
+#' Generates JavaScript helper functions that scope DOM queries
+#' (getElementById, querySelector, querySelectorAll) to a specific
+#' report panel within the hub. Also rewrites bare document.* calls
+#' in the JS string to use these helpers.
+#'
+#' @param js Combined JS string (already function-prefixed)
+#' @param report_key Report key (e.g., "tracker")
+#' @return Modified JS string with helpers prepended and DOM calls rewritten
+#' @keywords internal
+.build_dom_helpers <- function(js, report_key) {
   id_prefix <- paste0(report_key, "--")
   helper_id <- paste0("_", report_key, "_id")
   helper_qs <- paste0("_", report_key, "_qs")
   helper_qsa <- paste0("_", report_key, "_qsa")
 
   # IMPORTANT: Replace querySelectorAll BEFORE querySelector to avoid substring collision
-  # "document.querySelectorAll(" contains "document.querySelector(" as a prefix,
-  # but the trailing "All(" vs "(" disambiguates them with fixed matching.
-  all_js <- gsub("document.querySelectorAll(", paste0(helper_qsa, "("), all_js, fixed = TRUE)
-  all_js <- gsub("document.getElementById(", paste0(helper_id, "("), all_js, fixed = TRUE)
-  all_js <- gsub("document.querySelector(", paste0(helper_qs, "("), all_js, fixed = TRUE)
+  js <- gsub("document.querySelectorAll(", paste0(helper_qsa, "("), js, fixed = TRUE)
+  js <- gsub("document.getElementById(", paste0(helper_id, "("), js, fixed = TRUE)
+  js <- gsub("document.querySelector(", paste0(helper_qs, "("), js, fixed = TRUE)
 
   # Prepend scoped helper functions
   # _qs and _qsa search within the report's hub panel FIRST to prevent
-
-  # cross-report collisions (e.g., two reports both having ".question-container .chart-wrapper[data-q-code='Q05']")
+  # cross-report collisions
   helpers_js <- sprintf(
     'var %1$s = function(id) { return document.getElementById(id) || document.getElementById("%2$s" + id); };
 var _%7$s_panel = function() { return document.querySelector(\'[data-hub-panel="%7$s"]\'); };
@@ -564,13 +569,41 @@ var %5$s = function(sel) { var p = _%7$s_panel(); if (p) { var els = p.querySele
 ',
     helper_id, id_prefix, helper_qs, id_prefix, helper_qsa, id_prefix, report_key
   )
-  all_js <- paste0(helpers_js, "\n", all_js)
 
-  # Also create a namespace object for the public API
+  paste0(helpers_js, "\n", js)
+}
+
+
+#' Prefix Conflicting JS Functions and Variables
+#'
+#' Instead of IIFE wrapping (which breaks inline onclick handlers),
+#' we prefix only the functions/variables that actually collide between
+#' tracker and tabs. Non-conflicting functions remain global.
+#'
+#' @param js_blocks List of JS block objects from parser
+#' @param report_key Report key (e.g., "tracker")
+#' @param report_type "tracker" or "tabs"
+#' @param report_label Human-readable label for source identification in pins
+#' @return Single JS string with prefixed conflicts
+wrap_js_in_iife <- function(js_blocks, report_key, report_type, report_label = NULL) {
+  # Combine all JS content
+  all_js <- paste(
+    sapply(js_blocks, function(b) b$content),
+    collapse = "\n\n"
+  )
+
+  # Step 1: Prefix conflicting function/variable names
+  prefix <- paste0(report_key, "_")
+  all_js <- .prefix_js_functions(all_js, prefix, .get_conflicting_js_names())
+
+  # Step 2: Rewrite DOM queries and prepend scoped helpers
+  all_js <- .build_dom_helpers(all_js, report_key)
+
+  # Step 3: Build namespace API object
   namespace_name <- if (report_type == "tracker") "TrackerReport" else "TabsReport"
-
   api_js <- build_namespace_api(namespace_name, report_key, report_type)
 
+  # Step 4: Build pin bridge
   bridge_js <- build_pin_bridge(report_key, report_type, report_label)
 
   return(paste0(all_js, "\n\n", api_js, "\n\n", bridge_js))
@@ -581,8 +614,7 @@ var %5$s = function(sel) { var p = _%7$s_panel(); if (p) { var els = p.querySele
 #'
 #' Generates JavaScript that overrides per-report pin functions to route
 #' pins through the hub's unified store (ReportHub.pinnedItems) instead
-#' of the local per-report arrays. Appended at the end of each report's
-#' JS block so it overwrites the original function definitions.
+#' of the local per-report arrays. Dispatches to type-specific builders.
 #'
 #' @param report_key "tracker" or "tabs"
 #' @param report_type "tracker" or "tabs"
@@ -596,7 +628,28 @@ build_pin_bridge <- function(report_key, report_type, report_label = NULL) {
   label_js <- if (!is.null(report_label)) gsub("'", "\\\\'", report_label) else report_key
 
   if (report_type == "tracker") {
-    sprintf('
+    .build_tracker_pin_bridge(prefix, id_helper, qs_helper, label_js, report_key)
+  } else {
+    .build_tabs_pin_bridge(prefix, id_helper, qs_helper, label_js, report_key)
+  }
+}
+
+
+#' Build Tracker Pin Bridge JavaScript
+#'
+#' Generates tracker-specific pin bridge functions that override per-report
+#' pin functions (pinMetricView, pinSummarySection, pinOverviewView, etc.)
+#' to route through the hub's unified store.
+#'
+#' @param prefix Report prefix (e.g., "tracker_")
+#' @param id_helper Name of the getElementById helper (e.g., "_tracker_id")
+#' @param qs_helper Name of the querySelector helper (e.g., "_tracker_qs")
+#' @param label_js Escaped report label for JS embedding
+#' @param report_key Report key (e.g., "tracker")
+#' @return JavaScript string
+#' @keywords internal
+.build_tracker_pin_bridge <- function(prefix, id_helper, qs_helper, label_js, report_key) {
+  sprintf('
 // ===== Hub Pin Bridge \u2014 Tracker =====
 // Override per-report pin functions to route through hub store
 // Use report-specific variable name to prevent global collision
@@ -753,8 +806,24 @@ pinSigChanges = function() { %1$spinVisibleSigFindings(); };
 %1$srenderPinnedCards = function() { ReportHub.renderPinnedCards(); };
 // ===== End Hub Pin Bridge =====
 ', prefix, id_helper, qs_helper, label_js, report_key)
-  } else {
-    sprintf('
+}
+
+
+#' Build Tabs Pin Bridge JavaScript
+#'
+#' Generates tabs-specific pin bridge functions that override per-report
+#' pin functions (togglePin, pinDashboardText, pinGaugeSection, etc.)
+#' to route through the hub's unified store.
+#'
+#' @param prefix Report prefix (e.g., "tabs_")
+#' @param id_helper Name of the getElementById helper (e.g., "_tabs_id")
+#' @param qs_helper Name of the querySelector helper (e.g., "_tabs_qs")
+#' @param label_js Escaped report label for JS embedding
+#' @param report_key Report key (e.g., "tabs")
+#' @return JavaScript string
+#' @keywords internal
+.build_tabs_pin_bridge <- function(prefix, id_helper, qs_helper, label_js, report_key) {
+  sprintf('
 // ===== Hub Pin Bridge \u2014 Tabs =====
 // Override per-report pin functions to route through hub store
 var _hubSrcLbl_%5$s = \'%4$s\';
@@ -868,7 +937,6 @@ var _hubSrcLbl_%5$s = \'%4$s\';
 %1$srenderPinnedCards = function() { ReportHub.renderPinnedCards(); };
 // ===== End Hub Pin Bridge =====
 ', prefix, id_helper, qs_helper, label_js, report_key)
-  }
 }
 
 
