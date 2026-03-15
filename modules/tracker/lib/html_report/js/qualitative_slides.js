@@ -55,7 +55,7 @@ function addQualSlide() {
           '<button class="qual-upload-btn" onclick="removeQualImage(\'' + id + '\')">&times; Remove</button>' +
         '</div>' +
       '</div>' +
-      '<input type="file" class="qual-img-input" accept="image/*" style="display:none;" onchange="handleQualImage(\'' + id + '\', this)">' +
+      '<input type="file" class="qual-img-input" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none;" onchange="handleQualImage(\'' + id + '\', this)">' +
       '<div class="qual-slide-editor" contenteditable="true" data-placeholder="Enter slide content... (**bold**, *italic*, - bullets, ## headings)" oninput="syncQualStore(\'' + id + '\')"></div>' +
       '<textarea class="qual-md-store" style="display:none;"></textarea>' +
       '<textarea class="qual-img-store" style="display:none;"></textarea>' +

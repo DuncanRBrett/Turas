@@ -31,8 +31,10 @@
 #' @return Character. Minified JavaScript
 #' @keywords internal
 minify_js <- function(js) {
-  # Strip block comments (/* ... */) — non-greedy
-  js <- gsub("/\\*[\\s\\S]*?\\*/", "", js, perl = TRUE)
+  # Strip block comments (/* ... */) — only at line start (after optional whitespace)
+
+  # This avoids breaking strings that contain /* like accept="image/*"
+  js <- gsub("(?m)^\\s*/\\*[\\s\\S]*?\\*/", "", js, perl = TRUE)
   # Strip line comments (// ...) but NOT inside strings
   # Only strip // at start of line or after whitespace (safe heuristic)
   js <- gsub("(^|[[:space:]])//[^\n]*", "\\1", js, perl = TRUE)
@@ -127,15 +129,21 @@ build_tracker_javascript <- function(html_data) {
 
   js_parts <- c()
 
-  # Embed segment data as JSON
-  segments_json <- jsonlite::toJSON(html_data$segments, auto_unbox = TRUE)
+  # Embed segment data as JSON — SEGMENTS must always be an array, even with 1 element
+  segments_json <- jsonlite::toJSON(as.list(html_data$segments), auto_unbox = TRUE)
   js_parts <- c(js_parts, sprintf("var SEGMENTS = %s;", segments_json))
   js_parts <- c(js_parts, sprintf("var BASELINE_WAVE = %s;",
                                     jsonlite::toJSON(html_data$baseline_wave, auto_unbox = TRUE)))
   js_parts <- c(js_parts, sprintf("var N_WAVES = %d;", length(html_data$waves)))
 
   # Embed segment group structure for hierarchical chip selector
+  # Ensure standalone is always a JSON array (not scalar when length 1)
   segment_groups <- derive_segment_groups(html_data$segments)
+  segment_groups$standalone <- as.list(segment_groups$standalone)
+  # Ensure each group's members is also an array
+  for (gn in names(segment_groups$groups)) {
+    segment_groups$groups[[gn]] <- as.list(segment_groups$groups[[gn]])
+  }
   segment_groups_json <- jsonlite::toJSON(segment_groups, auto_unbox = TRUE)
   js_parts <- c(js_parts, sprintf("var SEGMENT_GROUPS = %s;", segment_groups_json))
 

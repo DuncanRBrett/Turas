@@ -34,10 +34,10 @@ source(file.path(tracker_root, "lib", "html_report", "03a_page_styling.R"))
 # minify_js
 # ==============================================================================
 
-test_that("minify_js strips block comments", {
-  js <- "var x = 1; /* this is a comment */ var y = 2;"
+test_that("minify_js strips block comments at line start", {
+  # Minifier only strips block comments at line start (safe: avoids breaking strings like accept="image/*")
+  js <- "var x = 1;\n/* this is a comment */\nvar y = 2;"
   result <- minify_js(js)
-  expect_false(grepl("/\\*", result))
   expect_false(grepl("this is a comment", result))
   expect_true(grepl("var x = 1;", result))
   expect_true(grepl("var y = 2;", result))
