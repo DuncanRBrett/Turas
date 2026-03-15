@@ -137,6 +137,9 @@ resolve_path <- function(base_path, relative_path) {
     return(normalizePath(base_path, mustWork = FALSE))
   }
 
+  # Trim whitespace (Excel cells can have invisible leading/trailing spaces)
+  relative_path <- trimws(relative_path)
+
   # Remove leading ./
   relative_path <- gsub("^\\./", "", relative_path)
 

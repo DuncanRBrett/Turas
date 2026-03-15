@@ -624,10 +624,7 @@ if (nrow(analysis_result$error_log) > 0) {
 }
 
 cat("\n")
-cat("TURAS V10.2 - PHASE 4 REFACTORING COMPLETE\n")
-cat("  Orchestrator pattern implemented\n")
-cat("  80% code reduction achieved\n")
-cat("  All functionality preserved\n")
+cat("TURAS Tabs V10.8.1\n")
 cat("\n")
 cat(paste(rep("=", 80), collapse=""), "\n")
 
