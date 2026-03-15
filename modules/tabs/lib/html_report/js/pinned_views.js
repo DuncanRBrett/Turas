@@ -345,7 +345,7 @@ function renderPinnedCards() {
       if (pin.pinType === "text_box") {
         insightDiv.innerHTML = pin.insightText;
       } else {
-        insightDiv.textContent = pin.insightText;
+        insightDiv.innerHTML = renderMarkdown(pin.insightText);
       }
       card.appendChild(insightDiv);
     }
@@ -479,7 +479,7 @@ function exportPinnedCardPNG(pinId) {
   var contentTop = metaY + 12;
 
   // 1. Insight dimensions
-  var insightLines = wrapTextLines(pin.insightText, usableW - 16, 7);
+  var insightLines = wrapTextLines(stripMarkdown(pin.insightText), usableW - 16, 7);
   var insightLineH = 17;
   var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 24 : 0;
   var insightY = contentTop;
@@ -673,7 +673,7 @@ function copyPinnedCardToClipboard(pinId) {
   var metaY = titleStartY + titleBlockH + 4;
   var contentTop = metaY + 12;
 
-  var insightLines = wrapTextLines(pin.insightText, usableW - 16, 7);
+  var insightLines = wrapTextLines(stripMarkdown(pin.insightText), usableW - 16, 7);
   var insightLineH = 17;
   var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 24 : 0;
   var insightY = contentTop;
@@ -887,7 +887,7 @@ function exportAllPinnedSlides() {
 
     // Stacked layout: insight → chart → table
     // 1. Insight dimensions
-    var insightLines = wrapTextLines(pin.insightText, usableW - 16, 7);
+    var insightLines = wrapTextLines(stripMarkdown(pin.insightText), usableW - 16, 7);
     var insightLineH = 17;
     var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 24 : 0;
     var insightY = contentTop;
@@ -1207,7 +1207,7 @@ function printPinnedViews() {
       if (pin.pinType === "text_box") {
         insDiv.innerHTML = pin.insightText;
       } else {
-        insDiv.textContent = pin.insightText;
+        insDiv.innerHTML = renderMarkdown(pin.insightText);
       }
       page.appendChild(insDiv);
     }
@@ -1660,6 +1660,20 @@ function renderMarkdown(md) {
     return "<p>" + trimmed + "</p>";
   }).join("\n");
   return html;
+}
+
+/**
+ * Strip markdown syntax for plain-text contexts (SVG export).
+ * Removes **, *, ##, >, - list markers.
+ */
+function stripMarkdown(md) {
+  if (!md) return "";
+  return md
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/\*(.+?)\*/g, "$1")
+    .replace(/^## /gm, "")
+    .replace(/^> /gm, "")
+    .replace(/^- /gm, "\u2022 ");
 }
 
 /** Render markdown for all qualitative slide cards. */
