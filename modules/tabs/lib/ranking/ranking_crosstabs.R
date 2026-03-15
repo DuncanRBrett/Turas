@@ -275,26 +275,32 @@ create_ranking_rows_for_item <- function(ranking_matrix, item_name, banner_data_
     }
 
     # Calculate metrics with error handling (delegated to helper)
-    tryCatch({
-      metrics <- calculate_banner_ranking_metrics(
+    # V10.8: Use tryCatch with return value — assignments inside error closures
+    # create local bindings and are silently discarded (R scoping rules).
+    metrics <- tryCatch({
+      calculate_banner_ranking_metrics(
         subset_result$subset_matrix, item_name, subset_result$subset_weights,
         show_top_n, top_n, num_positions,
         decimal_places_percent, decimal_places_index
       )
-
-      pct_first_row[[key]] <- metrics$pct_first
-      mean_rank_row[[key]] <- metrics$mean_rank
-      if (show_top_n) top_n_row[[key]] <- metrics$pct_top_n
     }, error = function(e) {
       cat(sprintf(
         "  [WARNING] Error calculating ranking metrics for banner %s: %s\n",
         key,
         conditionMessage(e)
       ))
+      NULL
+    })
+
+    if (!is.null(metrics)) {
+      pct_first_row[[key]] <- metrics$pct_first
+      mean_rank_row[[key]] <- metrics$mean_rank
+      if (show_top_n) top_n_row[[key]] <- metrics$pct_top_n
+    } else {
       pct_first_row[[key]] <- NA
       mean_rank_row[[key]] <- NA
       if (show_top_n) top_n_row[[key]] <- NA
-    })
+    }
   }
 
   # Tag all rows as ranking for downstream classification

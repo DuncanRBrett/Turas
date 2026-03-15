@@ -506,7 +506,9 @@ create_standard_deviation_row <- function(stat_value_sets, stat_weight_sets,
           sd_values[key] <- sd(v)
         } else {
           mean_val <- sum(v * w) / sum(w)
-          var_val <- sum(w * (v - mean_val)^2) / sum(w)
+          # V10.8: Bessel-corrected weighted variance (sample, not population)
+          denom <- sum(w) - 1
+          var_val <- if (denom > 0) sum(w * (v - mean_val)^2) / denom else 0
           sd_values[key] <- sqrt(var_val)
         }
       }

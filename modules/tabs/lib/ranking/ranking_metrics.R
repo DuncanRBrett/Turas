@@ -460,7 +460,7 @@ run_mean_rank_test <- function(ranks1, ranks2, weights1, weights2, mean1, mean2,
       p_value = test_result$p_value,
       mean1 = mean1,
       mean2 = mean2,
-      better_group = if (mean1 < mean2) 1 else 2  # Lower mean = better rank
+      better_group = if (mean1 < mean2) 1L else if (mean1 > mean2) 2L else NA_integer_
     ))
   } else {
     # Fallback: basic t-test (not weighted)
@@ -483,7 +483,7 @@ run_mean_rank_test <- function(ranks1, ranks2, weights1, weights2, mean1, mean2,
         p_value = NA_real_,
         mean1 = mean1,
         mean2 = mean2,
-        better_group = if (mean1 < mean2) 1 else 2
+        better_group = if (mean1 < mean2) 1L else if (mean1 > mean2) 2L else NA_integer_
       ))
     }
 
@@ -492,7 +492,7 @@ run_mean_rank_test <- function(ranks1, ranks2, weights1, weights2, mean1, mean2,
       p_value = test$p.value,
       mean1 = mean1,
       mean2 = mean2,
-      better_group = if (mean1 < mean2) 1 else 2
+      better_group = if (mean1 < mean2) 1L else if (mean1 > mean2) 2L else NA_integer_
     ))
   }
 }

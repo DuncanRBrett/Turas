@@ -31,6 +31,7 @@ build_banner_groups <- function(banner_info) {
 
     # Get the display label for this group from banner_headers
     group_label <- bq_code  # fallback
+    found_banner_label <- FALSE
     if (!is.null(banner_info$banner_headers)) {
       # Find matching header by position
       for (i in seq_len(nrow(banner_info$banner_headers))) {
@@ -43,6 +44,7 @@ build_banner_groups <- function(banner_info) {
           in_range <- bq_positions >= hdr$start_col & bq_positions <= hdr$end_col
           if (any(in_range, na.rm = TRUE)) {
             group_label <- hdr$label
+            found_banner_label <- TRUE
             break
           }
         }
@@ -51,7 +53,8 @@ build_banner_groups <- function(banner_info) {
 
     # V10.8: Only fall back to QuestionText if no BannerLabel was found.
     # Previously this block unconditionally overwrote the BannerLabel.
-    if (group_label == bq_code) {
+    # Use a flag (not string comparison) because BannerLabel may equal the code.
+    if (!found_banner_label) {
       # No BannerLabel found from banner_headers — try QuestionText
       if (!is.null(bq$question) && !is.null(bq$question$QuestionText)) {
         qt <- as.character(bq$question$QuestionText)

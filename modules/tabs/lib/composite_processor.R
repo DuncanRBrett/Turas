@@ -648,6 +648,10 @@ test_composite_significance <- function(data, composite_code, source_questions,
   internal_keys <- banner_info$internal_keys
   sig_letters <- setNames(rep("", length(internal_keys)), internal_keys)
 
+  # V10.8: Build key → letter lookup from parallel vectors.
+  # banner_info$sig_letters does not exist; use banner_info$letters.
+  key_to_letter <- setNames(banner_info$letters, internal_keys)
+
   # Test each pair (skip if fewer than 2 keys)
   n_keys <- length(internal_keys)
   for (i in seq_len(max(0L, n_keys - 1L))) {
@@ -749,11 +753,11 @@ test_composite_significance <- function(data, composite_code, source_questions,
         if (sig_result$higher) {
           # A > B: Add B's letter to A's significance
           sig_letters[key_a] <- paste0(sig_letters[key_a],
-                                       banner_info$sig_letters[key_b])
+                                       key_to_letter[key_b])
         } else {
           # B > A: Add A's letter to B's significance
           sig_letters[key_b] <- paste0(sig_letters[key_b],
-                                       banner_info$sig_letters[key_a])
+                                       key_to_letter[key_a])
         }
       }
     }

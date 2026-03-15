@@ -449,7 +449,14 @@ calculate_numeric_statistics <- function(data, question_info, weights,
       total_weight <- sum(calc_weights)
       if (total_weight > 0) {
         mean_val <- result$mean
-        variance <- sum(calc_weights * (calc_values - mean_val)^2) / total_weight
+        # V10.8: Use Bessel-corrected (reliability) weighted variance.
+        # Population formula divides by sum(w); sample formula divides by sum(w) - 1.
+        denom <- total_weight - 1
+        if (denom > 0) {
+          variance <- sum(calc_weights * (calc_values - mean_val)^2) / denom
+        } else {
+          variance <- 0
+        }
         result$sd <- sqrt(variance)
       }
     }
