@@ -55,6 +55,7 @@ source(file.path(turas_root, "modules/tabs/lib/filter_utils.R"))
 source(file.path(turas_root, "modules/tabs/lib/data_loader.R"))
 source(file.path(turas_root, "modules/tabs/lib/banner.R"))
 source(file.path(turas_root, "modules/tabs/lib/banner_indices.R"))
+source(file.path(turas_root, "modules/tabs/lib/crosstabs/crosstabs_config.R"))
 
 # Source HTML report submodules
 .tabs_lib_dir <- file.path(turas_root, "modules/tabs/lib")
@@ -451,4 +452,134 @@ test_that("handles multiple questions end-to-end", {
 
   html_text <- paste(readLines(tmp_html, warn = FALSE), collapse = "\n")
   expect_true(grepl("Would you recommend?", html_text, fixed = TRUE))
+})
+
+
+# ==============================================================================
+# INSIGHT AREA: GLOBAL COMMENTS ACROSS ALL BANNERS
+# ==============================================================================
+
+test_that("build_insight_area stores global comment under all banners", {
+  # Simulate a global comment (banner = NA_character_, as serialized by load_comments_sheet)
+  comment_entries <- list(
+    list(banner = NA_character_, text = "This is a global insight.")
+  )
+  all_banners <- c("Cohort", "1 Year", "5 Year")
+
+  insight_html <- as.character(build_insight_area(
+    q_code = "Q24",
+    comment_entries = comment_entries,
+    first_banner = "Cohort",
+    all_banners = all_banners
+  ))
+
+  # Extract the insight-store textarea content (the per-banner JSON)
+  store_match <- regmatches(insight_html,
+    regexpr('class="insight-store"[^>]*>([^<]*)<', insight_html, perl = TRUE))
+  expect_true(nzchar(store_match), info = "insight-store textarea should have content")
+
+  # Parse the JSON from the textarea
+  json_content <- sub('.*class="insight-store"[^>]*>', '', store_match)
+  json_content <- sub('<$', '', json_content)
+  store_obj <- jsonlite::fromJSON(json_content)
+
+  # Global comment should appear under ALL banner names
+
+  expect_equal(store_obj[["Cohort"]], "This is a global insight.")
+  expect_equal(store_obj[["1 Year"]], "This is a global insight.")
+  expect_equal(store_obj[["5 Year"]], "This is a global insight.")
+})
+
+
+test_that("build_insight_area respects banner-specific over global comment", {
+  # Banner-specific comment overrides global for that banner
+  comment_entries <- list(
+    list(banner = NA_character_, text = "Global insight for all."),
+    list(banner = "1 Year", text = "Specific insight for 1 Year.")
+  )
+  all_banners <- c("Cohort", "1 Year", "5 Year")
+
+  insight_html <- as.character(build_insight_area(
+    q_code = "Q24",
+    comment_entries = comment_entries,
+    first_banner = "Cohort",
+    all_banners = all_banners
+  ))
+
+  # Extract the insight-store JSON
+  store_match <- regmatches(insight_html,
+    regexpr('class="insight-store"[^>]*>([^<]*)<', insight_html, perl = TRUE))
+  json_content <- sub('.*class="insight-store"[^>]*>', '', store_match)
+  json_content <- sub('<$', '', json_content)
+  store_obj <- jsonlite::fromJSON(json_content)
+
+  # Cohort and 5 Year should have the global text
+  expect_equal(store_obj[["Cohort"]], "Global insight for all.")
+  expect_equal(store_obj[["5 Year"]], "Global insight for all.")
+  # 1 Year should have the banner-specific text (overrides global)
+  expect_equal(store_obj[["1 Year"]], "Specific insight for 1 Year.")
+})
+
+
+test_that("build_insight_area with no comments returns empty store", {
+  insight_html <- as.character(build_insight_area(
+    q_code = "Q10",
+    comment_entries = NULL,
+    first_banner = "Cohort",
+    all_banners = c("Cohort", "1 Year")
+  ))
+
+  # Should have an insight-store textarea (empty)
+  expect_true(grepl('class="insight-store"', insight_html, fixed = TRUE))
+  # Should show "+ Add Insight" button
+  expect_true(grepl("Add Insight", insight_html, fixed = TRUE))
+})
+
+
+test_that("load_comments_sheet uses NA for blank banner (not NULL)", {
+  # Create a temporary config with Comments sheet
+  tmp_config <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp_config), add = TRUE)
+
+  wb <- openxlsx::createWorkbook()
+
+  # Settings sheet (required)
+  openxlsx::addWorksheet(wb, "Settings")
+  openxlsx::writeData(wb, "Settings", data.frame(
+    Field = c("project_title"),
+    Value = c("Test")
+  ))
+
+  # Selection sheet (required)
+  openxlsx::addWorksheet(wb, "Selection")
+  openxlsx::writeData(wb, "Selection", data.frame(
+    QuestionCode = "Q1",
+    Include = "Y"
+  ))
+
+  # Comments sheet with blank Banner column
+  openxlsx::addWorksheet(wb, "Comments")
+  openxlsx::writeData(wb, "Comments", data.frame(
+    QuestionCode = c("Q1", "Q1"),
+    Banner = c(NA, "Cohort"),
+    Comment = c("Global comment text", "Cohort-specific comment")
+  ))
+
+  openxlsx::saveWorkbook(wb, tmp_config, overwrite = TRUE)
+
+  comments <- load_comments_sheet(tmp_config)
+  expect_false(is.null(comments))
+  expect_true("Q1" %in% names(comments))
+
+  # First entry should have banner = NA (not NULL) for JSON serialization
+  first_entry <- comments[["Q1"]][[1]]
+  expect_true(is.na(first_entry$banner),
+    info = "Blank banner should be NA (serializes as JSON null), not NULL (serializes as {})")
+
+  # Verify it serializes correctly to JSON
+  json_str <- as.character(jsonlite::toJSON(comments[["Q1"]], auto_unbox = TRUE))
+  expect_true(grepl('"banner":null', json_str, fixed = TRUE),
+    info = "NA banner should serialize as JSON null")
+  expect_false(grepl('"banner":{}', json_str, fixed = TRUE),
+    info = "Should NOT serialize as empty object {}")
 })

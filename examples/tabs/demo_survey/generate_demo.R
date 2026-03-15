@@ -724,6 +724,16 @@ selection_df <- data.frame(
     rep("N", 8)   # Single choice - no index
   ),
   BaseFilter = rep("", 29),
+  Category = c(
+    "Demographics", "Demographics", "Demographics", "Demographics",
+    "Awareness", "Awareness", "Awareness",
+    "Usage", "Usage", "Usage",
+    "Satisfaction", "Satisfaction", "Satisfaction", "Satisfaction", "Satisfaction",
+    "Brand Perception", "Brand Perception", "Brand Perception", "Brand Perception",
+    "Purchase Intent", "Purchase Intent", "Purchase Intent",
+    "Channel", "Channel",
+    "Loyalty", "Loyalty", "Loyalty", "Loyalty", "Loyalty"
+  ),
   stringsAsFactors = FALSE
 )
 

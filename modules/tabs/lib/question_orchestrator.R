@@ -474,6 +474,24 @@ process_single_question <- function(question_code, prepared_data,
   # RETURN STRUCTURED RESULT
   # ===========================================================================
 
+  # Extract category from selection row (optional field, may be NA)
+  q_category <- if (!is.null(question_row$Category) &&
+                    !is.na(question_row$Category) &&
+                    nzchar(trimws(question_row$Category))) {
+    trimws(question_row$Category)
+  } else {
+    NA_character_
+  }
+
+  # Extract category display order (optional, controls sidebar group sorting)
+  q_category_order <- if (!is.null(question_row$CategoryOrder) &&
+                          !is.na(question_row$CategoryOrder) &&
+                          nzchar(trimws(as.character(question_row$CategoryOrder)))) {
+    trimws(as.character(question_row$CategoryOrder))
+  } else {
+    NA_character_
+  }
+
   return(list(
     question_code = question_code,
     question_text = question_info$QuestionText,
@@ -481,6 +499,8 @@ process_single_question <- function(question_code, prepared_data,
     base_filter = base_filter,
     bases = banner_bases,
     table = question_table,
+    category = q_category,
+    category_order = q_category_order,
     partial_sections = partial_sections  # TRS v1.0: Track section-level failures
   ))
 }

@@ -299,6 +299,7 @@ rewrite_html_onclick_conflicts <- function(html, report_key) {
     "selectQuestion",
     "switchBannerGroup",
     "filterQuestions",
+    "toggleCategoryGroup",
     "toggleChart",
     "toggleHeatmap",
     "toggleFrequency",
@@ -438,6 +439,7 @@ remove_save_print_buttons <- function(html) {
     "selectQuestion",
     "switchBannerGroup",
     "filterQuestions",
+    "toggleCategoryGroup",
     "captureCurrentView",
     # --- Display toggles ---
     "toggleChart",
@@ -828,16 +830,50 @@ pinSigChanges = function() { %1$spinVisibleSigFindings(); };
 // Override per-report pin functions to route through hub store
 var _hubSrcLbl_%5$s = \'%4$s\';
 %1$stogglePin = function(qCode) {
-  // Always add a new pin (multi-pin support).
-  // Each pin captures the current view state (banner, chart, table).
-  var pinObj = %1$scaptureCurrentView(qCode);
-  if (!pinObj) return;
-  pinObj.title = pinObj.qCode || "";
-  pinObj.subtitle = pinObj.qTitle || "";
-  pinObj.insight = pinObj.insightText || "";
-  pinObj.sourceLabel = _hubSrcLbl_%5$s;
-  ReportHub.addPin("%5$s", pinObj);
-  %1$supdatePinButton(qCode, true);
+  // Show pin-mode popover (same UX as standalone tabs)
+  var existing = document.querySelector(".pin-mode-popover");
+  if (existing) existing.remove();
+  var btn = %3$s(".pin-btn[data-q-code=\\"" + qCode + "\\"]");
+  if (!btn) return;
+  var popover = document.createElement("div");
+  popover.className = "pin-mode-popover";
+  var options = [
+    { label: "Table + Chart + Insight", mode: "all" },
+    { label: "Chart + Insight", mode: "chart_insight" },
+    { label: "Table + Insight", mode: "table_insight" }
+  ];
+  options.forEach(function(opt) {
+    var row = document.createElement("button");
+    row.className = "pin-mode-option";
+    row.textContent = opt.label;
+    row.onclick = function(e) {
+      e.stopPropagation();
+      popover.remove();
+      var pinObj = %1$scaptureCurrentView(qCode);
+      if (!pinObj) return;
+      pinObj.title = pinObj.qCode || "";
+      pinObj.subtitle = pinObj.qTitle || "";
+      pinObj.insight = pinObj.insightText || "";
+      pinObj.pinMode = opt.mode;
+      pinObj.sourceLabel = _hubSrcLbl_%5$s;
+      ReportHub.addPin("%5$s", pinObj);
+      %1$supdatePinButton(qCode, true);
+    };
+    popover.appendChild(row);
+  });
+  btn.style.position = "relative";
+  popover.style.position = "absolute";
+  popover.style.top = "100%%";
+  popover.style.right = "0";
+  popover.style.zIndex = "1000";
+  btn.appendChild(popover);
+  function closePopover(e) {
+    if (!popover.contains(e.target) && e.target !== btn) {
+      popover.remove();
+      document.removeEventListener("click", closePopover, true);
+    }
+  }
+  setTimeout(function() { document.addEventListener("click", closePopover, true); }, 0);
 };
 %1$spinDashboardText = function(boxId) {
   var editor = %2$s("dash-text-" + boxId);

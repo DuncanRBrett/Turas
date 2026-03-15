@@ -128,6 +128,52 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       line-height: 1.35;
     }
     .question-item.active .question-item-text { font-weight: 600; color: #1a2744; }
+
+    /* === SIDEBAR CATEGORY GROUPS === */
+    .sidebar-category-group { border-bottom: 1px solid #f1f5f9; }
+    .sidebar-category-group:last-child { border-bottom: none; }
+    .sidebar-category-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      cursor: pointer;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .sidebar-category-header:hover { background: #f0f4f8; }
+    .sidebar-category-chevron {
+      font-size: 8px;
+      color: #94a3b8;
+      transition: transform 0.2s ease;
+      display: inline-block;
+    }
+    .sidebar-category-group.collapsed .sidebar-category-chevron {
+      transform: rotate(-90deg);
+    }
+    .sidebar-category-name {
+      font-size: 11px;
+      font-weight: 700;
+      color: BRAND;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+    }
+    .sidebar-category-count {
+      font-size: 10px;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+    .sidebar-category-items {
+      transition: max-height 0.3s ease;
+      overflow: hidden;
+    }
+    .sidebar-category-group.collapsed .sidebar-category-items {
+      max-height: 0 !important;
+      overflow: hidden;
+    }
+
     .content-area { flex: 1; min-width: 0; }
     .controls-bar {
       display: flex;
@@ -635,6 +681,38 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     .closing-notes-editor:empty::before {
       content: attr(data-placeholder); color: #94a3b8;
     }
+
+    /* === PIN MODE POPOVER === */
+    .pin-mode-popover {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      padding: 4px 0;
+      min-width: 180px;
+      display: flex;
+      flex-direction: column;
+    }
+    .pin-mode-option {
+      display: block;
+      width: 100%;
+      padding: 8px 14px;
+      border: none;
+      background: none;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 500;
+      color: #1e293b;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.1s;
+    }
+    .pin-mode-option:hover {
+      background: #f0f4f8;
+      color: BRAND;
+    }
+    .pin-mode-option:first-child { border-radius: 8px 8px 0 0; }
+    .pin-mode-option:last-child { border-radius: 0 0 8px 8px; }
   '
 
   css_qualitative <- '

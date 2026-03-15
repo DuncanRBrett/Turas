@@ -314,7 +314,7 @@ load_comments_sheet <- function(config_file) {
       banner <- if (has_banner && !is.na(df$Banner[i]) && nzchar(trimws(df$Banner[i]))) {
         trimws(df$Banner[i])
       } else {
-        NULL
+        NA_character_  # Serializes as JSON null (not {} like R NULL)
       }
       entry <- list(banner = banner, text = trimws(df$Comment[i]))
       if (is.null(comments[[q_code]])) {

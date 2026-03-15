@@ -413,26 +413,93 @@ build_help_overlay <- function() {
 
 #' Build Sidebar with Question Navigator
 #'
+#' Generates the sidebar with question navigation. If questions have a
+#' \code{category} field, groups them under collapsible category headings.
+#' Falls back to a flat list when no categories are set.
+#'
 #' @param questions List of transformed question data
 #' @param has_sig Logical
 #' @param brand_colour Character
 #' @return htmltools::div
 build_sidebar <- function(questions, has_sig = FALSE, brand_colour = "#323367") {
-  q_items <- lapply(seq_along(questions), function(i) {
+
+  # Check if any questions have categories set
+  categories <- vapply(questions, function(q) {
+    cat_val <- q$category
+    if (is.null(cat_val) || is.na(cat_val) || !nzchar(trimws(cat_val))) "" else trimws(cat_val)
+  }, character(1))
+  has_categories <- any(nzchar(categories))
+
+  # Build individual question items
+  build_q_item <- function(i) {
     q <- questions[[i]]
     q_code <- q$q_code
     q_text <- q$question_text
     if (nchar(q_text) > 80) q_text <- paste0(substr(q_text, 1, 80), "...")
-
     htmltools::tags$div(
       class = if (i == 1) "question-item active" else "question-item",
       `data-index` = i - 1,
       `data-search` = tolower(paste(q_code, q_text)),
+      `data-category` = if (has_categories) categories[i] else NULL,
       onclick = sprintf("selectQuestion(%d)", i - 1),
       htmltools::tags$div(class = "question-item-code", q_code),
       htmltools::tags$div(class = "question-item-text", q_text)
     )
-  })
+  }
+
+  if (has_categories) {
+    # Extract category orders (if provided)
+    cat_orders <- vapply(questions, function(q) {
+      ord <- q$category_order
+      if (is.null(ord) || is.na(ord)) NA_real_ else suppressWarnings(as.numeric(ord))
+    }, numeric(1))
+
+    # Group questions by category, using CategoryOrder for sort when available
+    seen_cats <- character(0)
+    cat_order <- character(0)
+    cat_sort_key <- numeric(0)
+    for (i in seq_along(questions)) {
+      cat <- if (nzchar(categories[i])) categories[i] else "Other"
+      if (!cat %in% seen_cats) {
+        seen_cats <- c(seen_cats, cat)
+        cat_order <- c(cat_order, cat)
+        # Use the first CategoryOrder value found for this group
+        cat_sort_key <- c(cat_sort_key, if (!is.na(cat_orders[i])) cat_orders[i] else Inf)
+      }
+    }
+    # Sort groups by CategoryOrder (groups without order go to end, preserving original order)
+    sort_idx <- order(cat_sort_key, seq_along(cat_order))
+    cat_order <- cat_order[sort_idx]
+
+    # Build collapsible groups
+    group_elements <- lapply(cat_order, function(cat_name) {
+      indices <- which(vapply(seq_along(questions), function(i) {
+        this_cat <- if (nzchar(categories[i])) categories[i] else "Other"
+        this_cat == cat_name
+      }, logical(1)))
+
+      items <- lapply(indices, build_q_item)
+
+      htmltools::tags$div(
+        class = "sidebar-category-group",
+        `data-category` = cat_name,
+        htmltools::tags$div(
+          class = "sidebar-category-header",
+          onclick = "toggleCategoryGroup(this)",
+          htmltools::tags$span(class = "sidebar-category-chevron", "\u25BC"),
+          htmltools::tags$span(class = "sidebar-category-name", cat_name),
+          htmltools::tags$span(class = "sidebar-category-count",
+                               sprintf("(%d)", length(indices)))
+        ),
+        htmltools::tags$div(class = "sidebar-category-items", items)
+      )
+    })
+
+    scroll_content <- group_elements
+  } else {
+    # Flat list (original behaviour — no categories)
+    scroll_content <- lapply(seq_along(questions), build_q_item)
+  }
 
   sidebar_content <- list(
     htmltools::tags$input(
@@ -445,7 +512,7 @@ build_sidebar <- function(questions, has_sig = FALSE, brand_colour = "#323367") 
       class = "question-list",
       htmltools::tags$div(class = "question-list-header",
         sprintf("Questions (%d)", length(questions))),
-      htmltools::tags$div(class = "question-list-scroll", q_items)
+      htmltools::tags$div(class = "question-list-scroll", scroll_content)
     )
   )
 
@@ -556,20 +623,23 @@ build_controls <- function(has_any_freq, has_any_pct, has_any_sig,
 #' @return htmltools::tags$div
 #' @keywords internal
 build_insight_area <- function(q_code, comment_entries = NULL,
-                               first_banner = "") {
+                               first_banner = "", all_banners = NULL) {
   # Determine initial comment to show for the first (active) banner
+  # Helper: check if banner field is "global" (NULL or NA = applies to all banners)
+  is_global_banner <- function(b) is.null(b) || (length(b) == 1 && is.na(b))
+
   initial_text <- NULL
   if (!is.null(comment_entries) && length(comment_entries) > 0) {
     # Try banner-specific first, then global
     for (entry in comment_entries) {
-      if (!is.null(entry$banner) && entry$banner == first_banner) {
+      if (!is_global_banner(entry$banner) && identical(entry$banner, first_banner)) {
         initial_text <- entry$text
         break
       }
     }
     if (is.null(initial_text)) {
       for (entry in comment_entries) {
-        if (is.null(entry$banner)) {
+        if (is_global_banner(entry$banner)) {
           initial_text <- entry$text
           break
         }
@@ -587,16 +657,31 @@ build_insight_area <- function(q_code, comment_entries = NULL,
 
   # Build the per-banner JSON store from config comment entries
   # Format: { "Banner Name": "text", ... }
+  # Global comments (banner = NULL/NA) are stored under ALL banner names
+  # so that switching banners always shows the global insight.
   store_obj <- list()
   if (!is.null(comment_entries) && length(comment_entries) > 0) {
     for (entry in comment_entries) {
-      banner_key <- if (!is.null(entry$banner) && nzchar(entry$banner)) {
-        entry$banner
-      } else {
-        first_banner  # Global comments go under the first banner
-      }
-      if (nzchar(banner_key) && !is.null(entry$text) && nzchar(trimws(entry$text))) {
-        store_obj[[banner_key]] <- entry$text
+      if (!is.null(entry$text) && nzchar(trimws(entry$text))) {
+        if (is_global_banner(entry$banner)) {
+          # Global comment → populate for every banner (first-write-wins to
+          # let banner-specific entries take precedence if defined later)
+          banner_keys <- if (!is.null(all_banners) && length(all_banners) > 0) {
+            all_banners
+          } else {
+            first_banner
+          }
+          for (bk in banner_keys) {
+            if (nzchar(bk) && is.null(store_obj[[bk]])) {
+              store_obj[[bk]] <- entry$text
+            }
+          }
+        } else {
+          # Banner-specific comment → always overwrites (takes precedence)
+          if (nzchar(entry$banner)) {
+            store_obj[[entry$banner]] <- entry$text
+          }
+        }
       }
     }
   }
@@ -704,7 +789,8 @@ build_question_containers <- function(questions, tables, banner_groups,
     # Build insight area (pre-filled from config if available)
     comment_entries <- if (!is.null(comments)) comments[[q_code]] else NULL
     insight_div <- build_insight_area(q_code, comment_entries,
-                                      first_banner = first_group_name)
+                                      first_banner = first_group_name,
+                                      all_banners = names(banner_groups))
 
     htmltools::tags$div(
       class = if (i == 1) "question-container active" else "question-container",

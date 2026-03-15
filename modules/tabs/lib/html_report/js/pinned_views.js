@@ -19,11 +19,86 @@ function savePinnedData() {
 }
 
 function togglePin(qCode) {
-  // Always add a new pin (multi-pin support).
-  // Each pin captures the current view state (banner, chart, table).
-  // Unpinning is done via the ✕ button on each pinned card.
+  // Show a popover letting user choose which components to pin
+  // Close any existing popover first
+  var existing = document.querySelector(".pin-mode-popover");
+  if (existing) existing.remove();
+
+  var btn = document.querySelector(".pin-btn[data-q-code=\"" + qCode + "\"]");
+  if (!btn) return;
+
+  var popover = document.createElement("div");
+  popover.className = "pin-mode-popover";
+
+  // Check what's available for this question
+  var qContainer = document.querySelector("#q-container-" + getQuestionIndexByCode(qCode));
+  if (!qContainer) qContainer = btn.closest(".question-container");
+  var hasChart = qContainer && qContainer.querySelector(".chart-wrapper svg");
+  var hasTable = qContainer && qContainer.querySelector("table.ct-table");
+  var hasInsight = false;
+  if (qContainer) {
+    var editor = qContainer.querySelector(".insight-md-editor");
+    hasInsight = editor && editor.value && editor.value.trim();
+  }
+
+  var options = [
+    { id: "pin-opt-all", label: "Table + Chart + Insight", mode: "all" },
+    { id: "pin-opt-chart", label: "Chart + Insight", mode: "chart_insight" },
+    { id: "pin-opt-table", label: "Table + Insight", mode: "table_insight" }
+  ];
+
+  options.forEach(function(opt) {
+    var row = document.createElement("button");
+    row.className = "pin-mode-option";
+    row.textContent = opt.label;
+    row.onclick = function(e) {
+      e.stopPropagation();
+      popover.remove();
+      executePinWithMode(qCode, opt.mode);
+    };
+    popover.appendChild(row);
+  });
+
+  // Position popover near pin button
+  btn.style.position = "relative";
+  popover.style.position = "absolute";
+  popover.style.top = "100%";
+  popover.style.right = "0";
+  popover.style.zIndex = "1000";
+  btn.appendChild(popover);
+
+  // Close on click outside
+  function closePopover(e) {
+    if (!popover.contains(e.target) && e.target !== btn) {
+      popover.remove();
+      document.removeEventListener("click", closePopover, true);
+    }
+  }
+  setTimeout(function() {
+    document.addEventListener("click", closePopover, true);
+  }, 0);
+}
+
+// Look up question index from qCode
+function getQuestionIndexByCode(qCode) {
+  var items = document.querySelectorAll(".question-item");
+  for (var i = 0; i < items.length; i++) {
+    var search = items[i].getAttribute("data-search") || "";
+    if (search.indexOf(qCode.toLowerCase()) === 0) return i;
+  }
+  // Fallback: scan containers directly
+  var containers = document.querySelectorAll(".question-container");
+  for (var j = 0; j < containers.length; j++) {
+    var wrapper = containers[j].querySelector(".chart-wrapper[data-q-code=\"" + qCode + "\"]");
+    if (wrapper) return j;
+  }
+  return -1;
+}
+
+function executePinWithMode(qCode, mode) {
   var pin = captureCurrentView(qCode);
   if (pin) {
+    pin.pinMode = mode;
     pinnedViews.push(pin);
     updatePinButton(qCode, true);
   }
@@ -251,6 +326,12 @@ function renderPinnedCards() {
     card.appendChild(header);
 
     // Content: stacked layout — insight, chart, table
+    // Respect pinMode: "all" (default), "chart_insight", "table_insight"
+    var mode = pin.pinMode || "all";
+    var showTable = (mode === "all" || mode === "table_insight");
+    var showChart = (mode === "all" || mode === "chart_insight");
+    // Insight is always shown (included in all modes)
+
     // Insight first (the "so what")
     if (pin.insightText) {
       var insightDiv = document.createElement("div");
@@ -269,7 +350,7 @@ function renderPinnedCards() {
       card.appendChild(insightDiv);
     }
 
-    // Image (custom slide image)
+    // Image (custom slide image — always shown)
     if (pin.imageData) {
       var imgDiv = document.createElement("div");
       imgDiv.style.cssText = "margin-bottom:12px;text-align:center;";
@@ -280,16 +361,16 @@ function renderPinnedCards() {
       card.appendChild(imgDiv);
     }
 
-    // Chart (visual pattern)
-    if (pin.chartSvg) {
+    // Chart (visual pattern) — respect pin mode
+    if (pin.chartSvg && showChart) {
       var chartDiv = document.createElement("div");
       chartDiv.style.cssText = "margin-bottom:12px;";
       chartDiv.innerHTML = pin.chartSvg;
       card.appendChild(chartDiv);
     }
 
-    // Table (detailed reference)
-    if (pin.tableHtml) {
+    // Table (detailed reference) — respect pin mode
+    if (pin.tableHtml && showTable) {
       var tableDiv = document.createElement("div");
       tableDiv.style.cssText = "overflow-x:auto;font-size:11px;";
       tableDiv.innerHTML = pin.tableHtml;

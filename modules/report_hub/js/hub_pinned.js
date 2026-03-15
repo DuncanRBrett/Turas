@@ -288,8 +288,13 @@
       '</textarea>' +
     '</div>';
 
-    // Chart (if captured and was visible when pinned)
-    if (pin.chartSvg && pin.chartVisible !== false) {
+    // Respect pinMode: "all" (default), "chart_insight", "table_insight"
+    var mode = pin.pinMode || "all";
+    var showChart = (mode === "all" || mode === "chart_insight");
+    var showTable = (mode === "all" || mode === "table_insight");
+
+    // Chart (if captured and mode allows)
+    if (pin.chartSvg && pin.chartVisible !== false && showChart) {
       html += '<div class="hub-pin-chart">' + pin.chartSvg + '</div>';
     }
 
@@ -298,8 +303,8 @@
       html += '<div class="hub-pin-snapshot" style="display:none"><img src="' + pin.pngDataUrl + '" alt="Pinned view"></div>';
     }
 
-    // Table (if captured)
-    if (pin.tableHtml) {
+    // Table (if captured and mode allows)
+    if (pin.tableHtml && showTable) {
       html += '<div class="hub-pin-table">' + pin.tableHtml + '</div>';
     }
 
@@ -1207,12 +1212,17 @@
     }
 
     // ---- 4. Chart dimensions ----
+    // Respect pinMode: "all" (default), "chart_insight", "table_insight"
+    var exportMode = pin.pinMode || "all";
+    var exportShowChart = (exportMode === "all" || exportMode === "chart_insight");
+    var exportShowTable = (exportMode === "all" || exportMode === "table_insight");
+
     var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 8 : 0);
     var chartDisplayH = 0;
     var chartClone = null;
     var chartScale = 1;
 
-    if (pin.chartSvg && pin.chartVisible !== false) {
+    if (pin.chartSvg && pin.chartVisible !== false && exportShowChart) {
       var chartTempDiv = document.createElement("div");
       chartTempDiv.innerHTML = pin.chartSvg;
       var svgEl = chartTempDiv.querySelector("svg");
@@ -1242,7 +1252,7 @@
     var tableData = null;
     var estimatedTableH = 0;
 
-    if (pin.tableHtml) {
+    if (pin.tableHtml && exportShowTable) {
       tableData = hubExtractPinTableData(pin.tableHtml);
       if (tableData && tableData.length > 0) {
         estimatedTableH = 26 + (tableData.length - 1) * 22 + 8;

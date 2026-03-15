@@ -456,11 +456,76 @@ write_crosstabs_sheet <- function(wb, all_results, banner_info, config_obj, styl
   # Freeze panes
   openxlsx::freezePane(wb, "Crosstabs", firstActiveRow = current_row, firstActiveCol = 3)
 
-  # Write all questions
-  for (q_code in names(all_results)) {
-    question_results <- all_results[[q_code]]
-    current_row <- write_single_question(wb, "Crosstabs", question_results, q_code,
-                                          banner_info, config_obj, styles, current_row)
+  # Write all questions, grouped by category if available
+  # Build category order from question results
+  q_codes <- names(all_results)
+  q_categories <- vapply(q_codes, function(qc) {
+    cat_val <- all_results[[qc]]$category
+    if (is.null(cat_val) || is.na(cat_val) || !nzchar(trimws(cat_val))) "" else trimws(cat_val)
+  }, character(1))
+  has_categories <- any(nzchar(q_categories))
+
+  # Category header style
+  category_style <- openxlsx::createStyle(
+    fontSize = 13, fontName = "Aptos", textDecoration = "bold",
+    fontColour = "#1F4E79", fgFill = "#D6E4F0",
+    halign = "left", valign = "center",
+    border = "Bottom", borderColour = "#1F4E79"
+  )
+
+  if (has_categories) {
+    # Determine category order — use CategoryOrder when available, else first-occurrence order
+    seen_cats <- character(0)
+    cat_order <- character(0)
+    cat_sort_key <- numeric(0)
+    for (i in seq_along(q_codes)) {
+      cat <- if (nzchar(q_categories[i])) q_categories[i] else "Other"
+      if (!cat %in% seen_cats) {
+        seen_cats <- c(seen_cats, cat)
+        cat_order <- c(cat_order, cat)
+        # Use CategoryOrder from the result if available
+        ord_val <- all_results[[q_codes[i]]]$category_order
+        ord_num <- if (!is.null(ord_val) && length(ord_val) == 1) {
+          suppressWarnings(as.numeric(ord_val))
+        } else {
+          NA_real_
+        }
+        cat_sort_key <- c(cat_sort_key, if (!is.na(ord_num)) ord_num else Inf)
+      }
+    }
+    sort_idx <- order(cat_sort_key, seq_along(cat_order))
+    cat_order <- cat_order[sort_idx]
+
+    for (cat_name in cat_order) {
+      # Write category header row
+      current_row <- current_row + 1
+      n_cols <- 2 + length(banner_info$columns)
+      openxlsx::writeData(wb, "Crosstabs", cat_name,
+                          startRow = current_row, startCol = 1, colNames = FALSE)
+      openxlsx::addStyle(wb, "Crosstabs", category_style,
+                         rows = current_row, cols = 1:n_cols, gridExpand = TRUE)
+      openxlsx::mergeCells(wb, "Crosstabs", cols = 1:n_cols, rows = current_row)
+      current_row <- current_row + 1
+
+      # Write questions in this category
+      cat_codes <- q_codes[vapply(seq_along(q_codes), function(j) {
+        this_cat <- if (nzchar(q_categories[j])) q_categories[j] else "Other"
+        this_cat == cat_name
+      }, logical(1))]
+
+      for (q_code in cat_codes) {
+        question_results <- all_results[[q_code]]
+        current_row <- write_single_question(wb, "Crosstabs", question_results, q_code,
+                                              banner_info, config_obj, styles, current_row)
+      }
+    }
+  } else {
+    # No categories — write flat (original behaviour)
+    for (q_code in q_codes) {
+      question_results <- all_results[[q_code]]
+      current_row <- write_single_question(wb, "Crosstabs", question_results, q_code,
+                                            banner_info, config_obj, styles, current_row)
+    }
   }
 
   # Set column widths

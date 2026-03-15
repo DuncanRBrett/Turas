@@ -205,7 +205,9 @@ function buildMultiStackedSVG(data, selectedKeys, qCode) {
   var pmDecimals = (hasPM && data.priority_metric.decimals != null) ? data.priority_metric.decimals : 1;
   var metricW = hasPM ? 90 : 0;
   var barW = 680;
-  var headerH = hasPM ? 20 : 4;
+  // Extra top padding for tiny-segment callout labels above first bar
+  var tinyLabelPad = 12;
+  var headerH = (hasPM ? 20 : 4) + tinyLabelPad;
   // Calculate label column width for column names (skip in single-bar mode)
   var colLabelW = 0;
   if (!singleBarMode) {
@@ -224,14 +226,21 @@ function buildMultiStackedSVG(data, selectedKeys, qCode) {
   var labels = data.labels || [];
   var colours = data.colours || [];
 
-  // Pre-calculate legend layout — include percentages from first selected column
+  // Pre-calculate legend layout
+  // Only include percentages in single-bar mode (multi-bar has labels on each bar)
+  var showLegendPct = singleBarMode;
   var firstVals = data.columns[selectedKeys[0]] ? data.columns[selectedKeys[0]].values : [];
   var firstTotal = 0;
   firstVals.forEach(function(v) { firstTotal += v; });
   var legPositions = [], legX = labelMargin, legRow = 0;
   for (var li = 0; li < labels.length; li++) {
-    var legPct = firstTotal > 0 ? Math.round((firstVals[li] || 0) / firstTotal * 100) : 0;
-    var legText = labels[li] + " (" + legPct + "%)";
+    var legText;
+    if (showLegendPct) {
+      var legPct = firstTotal > 0 ? Math.round((firstVals[li] || 0) / firstTotal * 100) : 0;
+      legText = labels[li] + " (" + legPct + "%)";
+    } else {
+      legText = labels[li];
+    }
     var itemW = legText.length * 6 + 30;
     if (legX + itemW > barW - labelMargin && li > 0) { legRow++; legX = labelMargin; }
     legPositions.push({ x: legX, row: legRow, text: legText });
@@ -265,27 +274,43 @@ function buildMultiStackedSVG(data, selectedKeys, qCode) {
       p.push("<text x=\"" + (colLabelW - 8) + "\" y=\"" + (y + barH / 2) + "\" text-anchor=\"end\" dominant-baseline=\"central\" fill=\"#374151\" font-size=\"11\" font-weight=\"600\">" + escapeHtml(data.columns[key].display) + "</text>");
     }
 
-    // Segments — skip tiny ones (< 3% of total) as visual noise; data shown in legend
+    // Segments — always draw rects; label placement adapts to segment width
     var xOff = barStartX;
+    var deferredLabels = []; // labels for narrow segments placed above/below bar
     for (var si = 0; si < vals.length; si++) {
       var segW = (vals[si] / total) * barUsable;
       if (vals[si] <= 0) continue;
       var segPct = (vals[si] / total) * 100;
 
-      // Skip segments < 3% — they render as distracting slivers.
-      // Legend includes percentages so no data is lost.
-      if (segPct < 3) { xOff += segW; continue; }
+      // Always draw the rect (even tiny slivers get at least 2px)
+      var drawW = Math.max(segW, 2);
+      p.push("<rect x=\"" + xOff + "\" y=\"" + y + "\" width=\"" + drawW + "\" height=\"" + barH + "\" fill=\"" + (colours[si] || "#999") + "\" clip-path=\"url(#" + cid + ")\"/>");
 
-      p.push("<rect x=\"" + xOff + "\" y=\"" + y + "\" width=\"" + segW + "\" height=\"" + barH + "\" fill=\"" + (colours[si] || "#999") + "\" clip-path=\"url(#" + cid + ")\"/>");
-
-      // Percentage label inside bar (category names are in the legend)
       var pctText = Math.round(vals[si]) + "%";
       if (segPct >= 8) {
+        // Wide segments: label centred inside the bar
         var tFill = getLuminance(colours[si] || "#999") > 0.65 ? "#5c4a3a" : "#ffffff";
         p.push("<text x=\"" + (xOff + segW / 2) + "\" y=\"" + (y + barH / 2) + "\" text-anchor=\"middle\" dominant-baseline=\"central\" fill=\"" + tFill + "\" font-size=\"12\" font-weight=\"500\" style=\"font-variant-numeric:tabular-nums\">" + pctText + "</text>");
+      } else if (segPct >= 3) {
+        // Mid-width segments (3-8%): small label centred inside bar
+        var tFill2 = getLuminance(colours[si] || "#999") > 0.65 ? "#5c4a3a" : "#ffffff";
+        p.push("<text x=\"" + (xOff + segW / 2) + "\" y=\"" + (y + barH / 2) + "\" text-anchor=\"middle\" dominant-baseline=\"central\" fill=\"" + tFill2 + "\" font-size=\"9\" font-weight=\"500\" style=\"font-variant-numeric:tabular-nums\">" + pctText + "</text>");
+      } else {
+        // Tiny segments (< 3%): defer label to render above/below bar
+        deferredLabels.push({
+          x: xOff + segW / 2,
+          pctText: pctText,
+          colour: colours[si] || "#999"
+        });
       }
-      // Segments 3-8%: visible rect but no label (rely on legend)
       xOff += segW;
+    }
+
+    // Render deferred labels (tiny segments) as callouts above the bar
+    for (var di = 0; di < deferredLabels.length; di++) {
+      var dl = deferredLabels[di];
+      var labelY = y - 3;
+      p.push("<text x=\"" + dl.x + "\" y=\"" + labelY + "\" text-anchor=\"middle\" fill=\"" + dl.colour + "\" font-size=\"8\" font-weight=\"500\" style=\"font-variant-numeric:tabular-nums\">" + dl.pctText + "</text>");
     }
 
     // Priority metric value -- styled pill to the right of bar
@@ -304,7 +329,7 @@ function buildMultiStackedSVG(data, selectedKeys, qCode) {
     }
   });
 
-  // Legend (category names only — percentages are shown on the bars themselves)
+  // Legend (category names; percentages included only in single-bar mode)
   for (var li = 0; li < labels.length; li++) {
     var pos = legPositions[li];
     var legY = legendY + pos.row * 18;

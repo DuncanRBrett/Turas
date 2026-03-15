@@ -18,6 +18,17 @@ function selectQuestion(index) {
     el.classList.toggle("active", parseInt(el.getAttribute("data-index")) === index);
   });
 
+  // Auto-expand the category group containing this question
+  var activeItem = document.querySelector(".question-item[data-index=\"" + index + "\"]");
+  if (activeItem) {
+    var group = activeItem.closest(".sidebar-category-group");
+    if (group && group.classList.contains("collapsed")) {
+      group.classList.remove("collapsed");
+    }
+    // Scroll the item into view within the sidebar
+    activeItem.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
   // Rebuild chart for the newly active question so it reflects
   // the current chart column selection (shared per banner group)
   if (container && typeof rebuildChartSVG === "function") {
@@ -26,13 +37,37 @@ function selectQuestion(index) {
   }
 }
 
-// Search filter
+// Search filter (handles both flat list and category groups)
 function filterQuestions(term) {
   var lower = term.toLowerCase();
+  var hasGroups = document.querySelector(".sidebar-category-group") !== null;
+
   document.querySelectorAll(".question-item").forEach(function(el) {
     var searchText = el.getAttribute("data-search") || "";
     el.style.display = searchText.indexOf(lower) >= 0 ? "" : "none";
   });
+
+  // If using category groups, show/hide group headers based on child visibility
+  if (hasGroups) {
+    document.querySelectorAll(".sidebar-category-group").forEach(function(group) {
+      var items = group.querySelectorAll(".question-item");
+      var anyVisible = false;
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].style.display !== "none") { anyVisible = true; break; }
+      }
+      group.style.display = anyVisible ? "" : "none";
+      // Auto-expand groups with matches during search, restore on clear
+      if (lower && anyVisible) {
+        group.classList.remove("collapsed");
+      }
+    });
+  }
+}
+
+// Toggle collapse/expand on a sidebar category group
+function toggleCategoryGroup(headerEl) {
+  var group = headerEl.closest(".sidebar-category-group");
+  if (group) group.classList.toggle("collapsed");
 }
 
 // Banner group switching
@@ -581,6 +616,15 @@ function hydrateInsights() {
   });
 }
 
+// Helper: check if a banner field represents a global (all-banners) comment.
+// Handles: null, undefined, empty string, and {} (jsonlite serializes R NULL as {}).
+function isGlobalBanner(b) {
+  if (b == null) return true;  // null or undefined
+  if (typeof b === "string" && !b.trim()) return true;  // empty string
+  if (typeof b === "object" && Object.keys(b).length === 0) return true;  // {} from jsonlite
+  return false;
+}
+
 // Update insight editors when banner group changes
 // Note: saving under the old banner is done in switchBannerGroup BEFORE
 // the active tab changes, so here we only need to load the new banner text.
@@ -593,16 +637,18 @@ function updateInsightsForBanner(bannerName) {
       try {
         var comments = JSON.parse(scriptEl.textContent);
         if (comments && comments.length) {
+          // Try banner-specific match first
           for (var i = 0; i < comments.length; i++) {
-            if (comments[i].banner && comments[i].banner === bannerName) {
+            if (!isGlobalBanner(comments[i].banner) && comments[i].banner === bannerName) {
               storeObj[bannerName] = comments[i].text;
               break;
             }
           }
+          // Fall back to global comment (banner is null/undefined/{}/empty)
           if (!storeObj[bannerName]) {
-            for (var i = 0; i < comments.length; i++) {
-              if (!comments[i].banner) {
-                storeObj[bannerName] = comments[i].text;
+            for (var j = 0; j < comments.length; j++) {
+              if (isGlobalBanner(comments[j].banner)) {
+                storeObj[bannerName] = comments[j].text;
                 break;
               }
             }

@@ -467,6 +467,8 @@ transform_single_question <- function(q_result, banner_info, config_obj) {
     question_text = q_result$question_text %||% "",
     question_type = q_type,
     base_filter = q_result$base_filter,
+    category = q_result$category %||% NA_character_,
+    category_order = q_result$category_order %||% NA_character_,
     stats = stats,
     primary_stat = primary_stat_label,
     table_data = table_data,

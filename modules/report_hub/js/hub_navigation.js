@@ -70,6 +70,42 @@ var ReportHub = ReportHub || {};
           if (typeof buildPickers === "function" && currentGrp) {
             buildPickers(currentGrp);
           }
+          // Re-hydrate insights (same logic as switchSubTab crosstabs path)
+          var hydrateIns = window[fnPrefix + "hydrateInsights"];
+          if (typeof hydrateIns === "function") {
+            hydrateIns();
+          }
+          // Auto-show insights that have content (from config or saved state)
+          var renderMd = window[fnPrefix + "renderMarkdown"];
+          var mdEditors = panel.querySelectorAll(".insight-md-editor");
+          for (var ei = 0; ei < mdEditors.length; ei++) {
+            if (mdEditors[ei].value && mdEditors[ei].value.trim()) {
+              var cont = mdEditors[ei].closest(".insight-container");
+              var rendered = cont ? cont.querySelector(".insight-md-rendered") : null;
+              if (rendered && typeof renderMd === "function") {
+                rendered.innerHTML = renderMd(mdEditors[ei].value);
+              }
+              if (cont) cont.style.display = "block";
+              var area = mdEditors[ei].closest(".insight-area");
+              if (area) {
+                var btn = area.querySelector(".insight-toggle");
+                if (btn) btn.style.display = "none";
+              }
+            }
+          }
+          // Legacy contenteditable insight editors
+          var legacyEds = panel.querySelectorAll(".insight-editor[contenteditable]");
+          for (var li = 0; li < legacyEds.length; li++) {
+            if (legacyEds[li].innerHTML && legacyEds[li].innerHTML.trim()) {
+              var cont2 = legacyEds[li].closest(".insight-container");
+              if (cont2) cont2.style.display = "block";
+              var area2 = legacyEds[li].closest(".insight-area");
+              if (area2) {
+                var btn2 = area2.querySelector(".insight-toggle");
+                if (btn2) btn2.style.display = "none";
+              }
+            }
+          }
         }
       }
     }
@@ -219,6 +255,14 @@ var ReportHub = ReportHub || {};
    * Serializes the entire combined report state
    */
   ReportHub.saveReportHTML = function() {
+    // Sync per-report insights before serializing
+    var panels = document.querySelectorAll(".hub-panel[data-hub-panel]");
+    for (var si = 0; si < panels.length; si++) {
+      var rKey = panels[si].getAttribute("data-hub-panel");
+      var syncFn = window[rKey + "_syncAllInsights"];
+      if (typeof syncFn === "function") syncFn();
+    }
+
     // Sync any editable content
     ReportHub.savePinnedData();
 

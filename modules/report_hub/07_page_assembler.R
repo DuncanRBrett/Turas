@@ -378,6 +378,89 @@ build_init_js <- function(parsed_reports) {
   # Render hub-level qualitative slides
   init_calls <- c(init_calls, "if (ReportHub.renderHubSlides) ReportHub.renderHubSlides();")
 
+  # Hydrate per-report insights (config-provided insights need rendering on load)
+  # Uses a robust fallback chain:
+  # 1. Call the report's own hydrateInsights() (reads from insight-store textarea)
+  # 2. If editors are still empty, fall back to insight-comments-data JSON
+  # 3. Auto-show any insight containers that have content
+  for (parsed in parsed_reports) {
+    key <- parsed$report_key
+    init_calls <- c(init_calls, sprintf(
+      'if (typeof %s_hydrateInsights === "function") { %s_hydrateInsights(); }',
+      key, key
+    ))
+    # Robust fallback: populate editors from insight-store or insight-comments-data
+    init_calls <- c(init_calls, sprintf(
+      paste0(
+        '(function() {',
+        '  var panel = document.querySelector(\'.hub-panel[data-hub-panel="%s"]\');',
+        '  if (!panel) return;',
+        '  var renderMd = window["%s_renderMarkdown"];',
+        '  var getBanner = window["%s_getActiveBannerName"];',
+        '  var bannerName = (typeof getBanner === "function") ? getBanner() : "_default";',
+        '  var areas = panel.querySelectorAll(".insight-area");',
+        '  for (var ai = 0; ai < areas.length; ai++) {',
+        '    var area = areas[ai];',
+        '    var editor = area.querySelector(".insight-md-editor");',
+        '    if (!editor) continue;',
+        '    var text = editor.value ? editor.value.trim() : "";',
+        # If editor empty, try reading insight-store textarea directly
+        '    if (!text) {',
+        '      var store = area.querySelector("textarea.insight-store");',
+        '      if (store && store.value && store.value.trim()) {',
+        '        try {',
+        '          var storeObj = JSON.parse(store.value);',
+        '          if (typeof storeObj === "string") { text = storeObj; }',
+        '          else if (storeObj[bannerName]) { text = storeObj[bannerName]; }',
+        '          else {',
+        '            var keys = Object.keys(storeObj);',
+        '            if (keys.length > 0) text = storeObj[keys[0]];',
+        '          }',
+        '        } catch(e) { text = store.value.trim(); }',
+        '      }',
+        '    }',
+        # If still empty, try insight-comments-data JSON
+        '    if (!text) {',
+        '      var scriptEl = area.querySelector("script.insight-comments-data");',
+        '      if (scriptEl) {',
+        '        try {',
+        '          var comments = JSON.parse(scriptEl.textContent);',
+        '          if (comments && comments.length) {',
+        '            for (var ci = 0; ci < comments.length; ci++) {',
+        '              if (comments[ci].banner && comments[ci].banner === bannerName) {',
+        '                text = comments[ci].text; break;',
+        '              }',
+        '            }',
+        '            if (!text) {',
+        '              for (var ci2 = 0; ci2 < comments.length; ci2++) {',
+        '                if (!comments[ci2].banner || !comments[ci2].banner.trim()) {',
+        '                  text = comments[ci2].text; break;',
+        '                }',
+        '              }',
+        '            }',
+        '            if (!text && comments[0] && comments[0].text) text = comments[0].text;',
+        '          }',
+        '        } catch(e) { /* ignore parse errors */ }',
+        '      }',
+        '    }',
+        # Populate editor and render
+        '    if (text) {',
+        '      editor.value = text;',
+        '      var cont = editor.closest(".insight-container");',
+        '      var rendered = cont ? cont.querySelector(".insight-md-rendered") : null;',
+        '      if (rendered && typeof renderMd === "function") {',
+        '        rendered.innerHTML = renderMd(text);',
+        '      }',
+        '      if (cont) cont.style.display = "block";',
+        '      var btn = area.querySelector(".insight-toggle");',
+        '      if (btn) btn.style.display = "none";',
+        '    }',
+        '  }',
+        '})();'
+      ), key, key, key
+    ))
+  }
+
   # Hydrate pinned views
   init_calls <- c(init_calls, "ReportHub.hydratePinnedViews();")
 
