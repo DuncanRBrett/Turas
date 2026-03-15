@@ -764,15 +764,6 @@ build_question_containers <- function(questions, tables, banner_groups,
           )
         },
         if (has_chart) {
-          htmltools::tags$button(
-            class = "export-btn export-chart-btn clipboard-btn",
-            style = "margin-left:4px;display:none",
-            title = "Copy chart to clipboard",
-            onclick = sprintf("copyChartToClipboard('%s')", js_esc(q_code)),
-            "\U0001F4CB Copy Chart"
-          )
-        },
-        if (has_chart) {
           htmltools::tags$div(
             class = "slide-export-group",
             style = "display:none;position:relative;margin-left:8px;",
