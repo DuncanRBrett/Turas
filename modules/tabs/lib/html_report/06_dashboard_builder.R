@@ -194,14 +194,6 @@ build_dashboard_panel <- function(dashboard_data, config_obj) {
       build_heatmap_export_js(),
       build_dashboard_interaction_js(),
       htmltools::tags$div(
-        style = "text-align:right;padding:8px 0 0 0;",
-        htmltools::tags$button(
-          class = "export-btn",
-          onclick = "saveReportHTML()",
-          "\U0001F4BE Save Report"
-        )
-      ),
-      htmltools::tags$div(
         class = "dash-footer-note",
         htmltools::HTML(paste0(
           "&darr; Switch to <strong>Crosstabs</strong> tab for detailed question-by-question analysis &darr;"

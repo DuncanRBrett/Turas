@@ -534,25 +534,6 @@ build_controls <- function(has_any_freq, has_any_pct, has_any_sig,
     ))
   }
 
-  # Save Report button (saves HTML with insights embedded)
-  controls <- c(controls, list(
-    htmltools::tags$button(
-      class = "print-btn",
-      onclick = "saveReportHTML()",
-      style = "margin-right:6px;",
-      "\U0001F4BE Save Report"
-    )
-  ))
-
-  # Print button always available
-  controls <- c(controls, list(
-    htmltools::tags$button(
-      class = "print-btn",
-      onclick = "printReport()",
-      "\U0001F5A8 Print Report"
-    )
-  ))
-
   htmltools::tags$div(
     class = "controls-bar",
     htmltools::tags$div(style = "flex:1"),
@@ -872,9 +853,7 @@ build_qualitative_panel <- function(slides = NULL, brand_colour = "#323367") {
         htmltools::tags$div(
           style = "display:flex;gap:8px;",
           htmltools::tags$button(class = "export-btn", onclick = "addQualSlide()",
-                                 "\u2795 Add Slide"),
-          htmltools::tags$button(class = "export-btn", onclick = "saveReportHTML()",
-                                 "\U0001F4BE Save Report")
+                                 "\u2795 Add Slide")
         )
       ),
       htmltools::tags$div(
@@ -1093,13 +1072,65 @@ build_closing_section <- function(config_obj) {
 }
 
 
+#' Build Export Actions Section
+#'
+#' Creates Save Report and Print Report buttons for the About tab.
+#' Print includes Summary dashboard, all Crosstabs questions, and Added Slides.
+#'
+#' @return htmltools::tags$div
+#' @keywords internal
+build_export_actions <- function() {
+  htmltools::tags$div(
+    class = "closing-section",
+    style = "margin-bottom:24px;",
+    htmltools::tags$div(class = "closing-divider"),
+    htmltools::tags$div(
+      class = "closing-content",
+      htmltools::tags$div(
+        class = "closing-label",
+        style = "margin-bottom:12px;",
+        "Export"
+      ),
+      htmltools::tags$div(
+        style = "display:flex;gap:10px;flex-wrap:wrap;",
+        htmltools::tags$button(
+          class = "export-btn",
+          onclick = "saveReportHTML()",
+          style = "font-size:13px;padding:8px 18px;",
+          "\U0001F4BE Save Report"
+        ),
+        htmltools::tags$button(
+          class = "export-btn",
+          onclick = "printReport()",
+          style = "font-size:13px;padding:8px 18px;",
+          "\U0001F5A8 Print Report"
+        )
+      ),
+      htmltools::tags$p(
+        style = "font-size:11px;color:#94a3b8;margin-top:8px;line-height:1.5;",
+        "Save embeds all edits (insights, notes, slides) into the HTML file. ",
+        "Print outputs Summary, Crosstabs, and Added Slides to PDF."
+      )
+    )
+  )
+}
+
+
 #' Wrap Closing Section as an About Tab Panel
 #'
+#' Always renders — contains export actions (Save/Print) even when no
+#' analyst contact info is configured.
+#'
 #' @param config_obj Configuration object
-#' @return htmltools::tags$div (tab-panel) or NULL
+#' @return htmltools::tags$div (tab-panel)
 #' @keywords internal
 build_about_panel <- function(config_obj) {
-  content <- build_closing_section(config_obj)
-  if (is.null(content)) return(NULL)
-  htmltools::tags$div(id = "tab-about", class = "tab-panel", content)
+  closing <- build_closing_section(config_obj)
+  export  <- build_export_actions()
+  htmltools::tags$div(
+    id = "tab-about",
+    class = "tab-panel",
+    closing,
+    export
+  )
 }

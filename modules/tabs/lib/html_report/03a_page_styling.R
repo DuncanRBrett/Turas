@@ -895,10 +895,9 @@ build_print_css <- function() {
         margin-top: 8px;
       }
 
-      /* === TABS === */
-      .tab-panel { display: block !important; }
-      #tab-summary { display: none !important; }
-      #tab-pinned { display: none !important; }
+      /* === TABS — JS sets inline display before window.print() === */
+      #tab-summary, #tab-crosstabs, #tab-qualitative { display: block !important; }
+      #tab-about, #tab-pinned { display: none !important; }
 
       /* === FOOTER === */
       .footer {

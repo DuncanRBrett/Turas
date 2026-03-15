@@ -155,7 +155,10 @@ function toggleHelpOverlay() {
 }
 
 // ---- PRINT REPORT ----
-// Shows all questions for the active banner and triggers browser print
+// Prints Summary dashboard + all Crosstabs questions + Added Slides.
+// Print CSS (@media print) controls which tab panels are visible:
+//   shown: #tab-summary, #tab-crosstabs, #tab-qualitative
+//   hidden: #tab-about, #tab-pinned
 function printReport() {
   // Remember which question was active
   var activeContainer = document.querySelector(".question-container.active");
@@ -210,7 +213,7 @@ function printReport() {
   // Trigger print
   window.print();
 
-  // Restore original state after print dialog closes
+  // Restore original question container state
   allContainers.forEach(function(el) {
     el.classList.remove("active");
     el.style.display = "";
