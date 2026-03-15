@@ -875,3 +875,178 @@ function exportMetricExcel(metricId) {
   var filename = "metric_" + metricId.replace(/[^a-zA-Z0-9_-]/g, "_") + ".xls";
   downloadBlob(xml, filename, "application/vnd.ms-excel");
 }
+
+
+// ==============================================================================
+// METRIC COMPARISON MODE
+// ==============================================================================
+// Allow selecting 2-3 metrics to overlay on a single chart for correlation
+// analysis. Toggle via "Compare" button in the metrics sidebar.
+
+var compareMode = false;
+var compareMetrics = [];  // Array of metric IDs selected for comparison
+var MAX_COMPARE = 3;
+
+/**
+ * Toggle comparison mode on/off.
+ */
+function toggleCompareMode() {
+  compareMode = !compareMode;
+  var btn = document.getElementById("mv-compare-toggle");
+  if (btn) {
+    btn.classList.toggle("active", compareMode);
+    btn.textContent = compareMode ? "Exit Compare" : "Compare";
+  }
+
+  if (!compareMode) {
+    compareMetrics = [];
+    // Remove comparison chart
+    var compChart = document.getElementById("mv-comparison-chart");
+    if (compChart) compChart.style.display = "none";
+    // Restore normal single-metric view
+    document.querySelectorAll(".tk-metric-nav-item").forEach(function(item) {
+      item.classList.remove("compare-selected");
+    });
+    // Show the currently active single metric panel
+    var activeNav = document.querySelector(".tk-metric-nav-item.active");
+    if (activeNav) selectMetric(activeNav.getAttribute("data-metric-id"));
+  } else {
+    // Start with currently selected metric
+    var activeNav = document.querySelector(".tk-metric-nav-item.active");
+    if (activeNav) {
+      var metricId = activeNav.getAttribute("data-metric-id");
+      compareMetrics = [metricId];
+      activeNav.classList.add("compare-selected");
+    }
+    showCompareBadge();
+  }
+}
+
+/**
+ * In compare mode, clicking a sidebar metric adds/removes it from comparison.
+ */
+function toggleCompareMetric(metricId) {
+  if (!compareMode) return false;  // Not in compare mode
+
+  var idx = compareMetrics.indexOf(metricId);
+  if (idx >= 0) {
+    // Remove from comparison
+    compareMetrics.splice(idx, 1);
+  } else if (compareMetrics.length < MAX_COMPARE) {
+    // Add to comparison
+    compareMetrics.push(metricId);
+  } else {
+    // Already at max — remove first, add new
+    compareMetrics.shift();
+    compareMetrics.push(metricId);
+  }
+
+  // Update nav item styles
+  document.querySelectorAll(".tk-metric-nav-item").forEach(function(item) {
+    var mid = item.getAttribute("data-metric-id");
+    item.classList.toggle("compare-selected", compareMetrics.indexOf(mid) >= 0);
+  });
+
+  showCompareBadge();
+  renderComparisonChart();
+  return true;  // Signal that compare mode handled the click
+}
+
+/** Update the compare badge count. */
+function showCompareBadge() {
+  var badge = document.getElementById("mv-compare-badge");
+  if (badge) {
+    badge.textContent = compareMetrics.length + "/" + MAX_COMPARE;
+    badge.style.display = compareMode ? "" : "none";
+  }
+}
+
+/**
+ * Render a comparison chart overlaying selected metrics.
+ * Uses different line styles (solid, dashed, dotted) for each metric.
+ */
+function renderComparisonChart() {
+  var container = document.getElementById("mv-comparison-chart");
+  if (!container) return;
+
+  if (compareMetrics.length === 0) {
+    container.style.display = "none";
+    return;
+  }
+
+  container.style.display = "block";
+
+  // Hide individual metric panels
+  document.querySelectorAll(".tk-metric-panel").forEach(function(p) {
+    p.classList.remove("active");
+  });
+
+  // Collect SVG charts from each selected metric and overlay them
+  var lineStyles = ["", "8,4", "3,3"];  // solid, dashed, dotted
+  var colours = [];
+  var labels = [];
+  var svgParts = [];
+
+  // Read the first metric's chart to get dimensions and axes
+  var firstPanel = document.getElementById("mv-" + compareMetrics[0]);
+  var firstSvg = firstPanel ? firstPanel.querySelector(".tk-line-chart") : null;
+  if (!firstSvg) {
+    container.innerHTML = '<p style="color:#888;text-align:center;padding:40px;">No chart data available for selected metrics.</p>';
+    return;
+  }
+
+  // Clone the first SVG as base (axes, gridlines)
+  var baseSvg = firstSvg.cloneNode(true);
+
+  // Remove all series-specific elements (lines, points, labels, legend, area fills)
+  baseSvg.querySelectorAll(".tk-chart-line, .tk-chart-point, .tk-chart-label, .tk-chart-legend-item, .tk-area-fill").forEach(function(el) {
+    el.remove();
+  });
+
+  compareMetrics.forEach(function(metricId, idx) {
+    var panel = document.getElementById("mv-" + metricId);
+    if (!panel) return;
+    var svg = panel.querySelector(".tk-line-chart");
+    if (!svg) return;
+
+    var titleEl = panel.querySelector(".mv-metric-title");
+    labels.push(titleEl ? titleEl.textContent.trim() : metricId);
+
+    // Extract lines and restyle with dash patterns
+    svg.querySelectorAll(".tk-chart-line").forEach(function(line) {
+      var clone = line.cloneNode(true);
+      if (lineStyles[idx]) {
+        clone.setAttribute("stroke-dasharray", lineStyles[idx]);
+      }
+      clone.setAttribute("data-compare-metric", metricId);
+      baseSvg.querySelector("g[transform]").appendChild(clone);
+
+      // Capture colour for legend
+      if (colours.length <= idx) {
+        colours.push(clone.getAttribute("stroke") || "#323367");
+      }
+    });
+
+    // Extract points
+    svg.querySelectorAll(".tk-chart-point").forEach(function(pt) {
+      var clone = pt.cloneNode(true);
+      clone.setAttribute("data-compare-metric", metricId);
+      baseSvg.querySelector("g[transform]").appendChild(clone);
+    });
+  });
+
+  // Build comparison legend
+  var legendHtml = '<div class="tk-comparison-legend">';
+  compareMetrics.forEach(function(metricId, idx) {
+    var dashStyle = idx === 0 ? "border-top:2px solid" : (idx === 1 ? "border-top:2px dashed" : "border-top:2px dotted");
+    legendHtml += '<div class="tk-comparison-legend-item">' +
+      '<span class="tk-comparison-legend-line" style="' + dashStyle + ' ' + (colours[idx] || '#323367') + '"></span>' +
+      '<span>' + (labels[idx] || metricId) + '</span></div>';
+  });
+  legendHtml += '</div>';
+
+  container.innerHTML = '<div class="tk-comparison-chart">' +
+    baseSvg.outerHTML +
+    legendHtml +
+    '</div>';
+}

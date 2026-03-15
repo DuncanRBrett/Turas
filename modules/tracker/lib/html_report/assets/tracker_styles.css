@@ -1,4 +1,4 @@
-/* === TURAS TRACKER HTML REPORT v2.1 === */
+/* === TURAS TRACKER HTML REPORT v3.0 === */
 :root {
   --brand: BRAND_COLOUR;
   --accent: ACCENT_COLOUR;
@@ -475,6 +475,116 @@ body.hide-sparklines .tk-sparkline-wrap { display: none; }
   content: attr(data-placeholder); color: #94a3b8;
 }
 
+/* ---- METADATA STRIP (Summary tab, matching tabs dash-meta-strip) ---- */
+.tk-meta-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
+.tk-meta-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; border-left: 4px solid var(--brand); }
+.tk-meta-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 4px; }
+.tk-meta-value { font-size: 24px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.2; }
+.tk-meta-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+/* ---- KPI HERO CARDS ---- */
+.tk-hero-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-bottom: 28px; }
+.tk-hero-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; border-left: 4px solid #94a3b8; transition: box-shadow 0.15s; }
+.tk-hero-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.tk-hero-card.hero-green { border-left-color: #4a7c6f; }
+.tk-hero-card.hero-amber { border-left-color: #c9a96e; }
+.tk-hero-card.hero-red { border-left-color: #b85450; }
+.tk-hero-label { font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; line-height: 1.3; }
+.tk-hero-value-row { display: flex; align-items: baseline; gap: 12px; }
+.tk-hero-value { font-size: 28px; font-weight: 700; color: var(--brand); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.tk-hero-trend { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; }
+.tk-hero-trend.trend-up { color: #059669; }
+.tk-hero-trend.trend-down { color: #c0392b; }
+.tk-hero-trend.trend-flat { color: #94a3b8; }
+.tk-hero-sparkline { margin-top: 8px; }
+.tk-hero-sparkline svg { display: block; }
+
+/* ---- WAVE PULSE BAR ---- */
+.tk-pulse-bar { display: flex; align-items: center; gap: 12px; padding: 14px 20px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 28px; flex-wrap: wrap; }
+.tk-pulse-label { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; }
+.tk-pulse-counts { display: flex; gap: 16px; align-items: center; }
+.tk-pulse-count { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; }
+.tk-pulse-count.pulse-up { color: #059669; }
+.tk-pulse-count.pulse-down { color: #c0392b; }
+.tk-pulse-count.pulse-stable { color: #94a3b8; }
+.tk-pulse-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.pulse-up .tk-pulse-dot { background: #059669; }
+.pulse-down .tk-pulse-dot { background: #c0392b; }
+.pulse-stable .tk-pulse-dot { background: #94a3b8; }
+
+/* ---- SIGNIFICANCE HEATMAP ---- */
+.tk-heatmap-section { margin-bottom: 28px; }
+.tk-heatmap-title { font-size: 16px; font-weight: 700; color: var(--brand); margin-bottom: 4px; }
+.tk-heatmap-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
+.tk-heatmap-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); background: var(--card); }
+.tk-heatmap-grid { border-collapse: collapse; font-size: 12px; width: 100%; }
+.tk-heatmap-grid th { padding: 8px 10px; text-align: center; font-size: 10px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid var(--border); background: var(--ct-bg-muted); white-space: nowrap; }
+.tk-heatmap-grid th:first-child { text-align: left; min-width: 180px; }
+.tk-heatmap-grid td { padding: 6px 10px; text-align: center; border-bottom: 1px solid #f0f0f0; font-size: 11px; font-weight: 600; }
+.tk-heatmap-grid td:first-child { text-align: left; font-weight: 500; font-size: 12px; color: var(--text); }
+.tk-heatmap-cell { border-radius: 3px; min-width: 40px; }
+.hm-sig-up { background: rgba(5,150,105,0.12); color: #059669; }
+.hm-sig-down { background: rgba(192,57,43,0.12); color: #c0392b; }
+.hm-stable { background: rgba(148,163,184,0.08); color: #94a3b8; }
+.hm-na { color: #cbd5e1; }
+
+/* ---- QUALITATIVE SLIDES (Added Slides tab) ---- */
+.qual-tab-content { max-width: 900px; margin: 0 auto; padding: 24px; }
+.qual-toolbar { display: flex; gap: 8px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.qual-slide-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; overflow: hidden; transition: box-shadow 0.15s; }
+.qual-slide-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.qual-slide-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: var(--ct-bg-muted); border-bottom: 1px solid var(--border); }
+.qual-slide-number { font-size: 12px; font-weight: 700; color: var(--brand); }
+.qual-slide-actions { display: flex; gap: 4px; }
+.qual-slide-actions button { background: none; border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; color: var(--text-muted); font-family: inherit; transition: all 0.15s; }
+.qual-slide-actions button:hover { border-color: #94a3b8; color: var(--text); }
+.qual-slide-body { padding: 20px; }
+.qual-slide-editor { min-height: 80px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; line-height: 1.7; color: var(--text); outline: none; background: #fff; }
+.qual-slide-editor:empty::before { content: attr(data-placeholder); color: #94a3b8; font-style: italic; }
+.qual-slide-image-area { margin-top: 12px; text-align: center; }
+.qual-slide-image { max-width: 100%; max-height: 400px; border-radius: 6px; border: 1px solid var(--border); }
+.qual-slide-image-actions { margin-top: 8px; display: flex; gap: 6px; justify-content: center; }
+.qual-upload-btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; border: 1px dashed #cbd5e1; border-radius: 6px; background: transparent; color: #94a3b8; font-size: 12px; cursor: pointer; transition: all 0.15s; font-family: inherit; }
+.qual-upload-btn:hover { border-color: var(--brand); color: var(--brand); }
+
+/* ---- SLIDE EXPORT DROPDOWN ---- */
+.tk-slide-menu-wrap { position: relative; display: inline-block; }
+.tk-slide-menu { display: none; position: absolute; top: 100%; right: 0; min-width: 180px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 50; padding: 4px 0; margin-top: 4px; }
+.tk-slide-menu.open { display: block; }
+.tk-slide-menu-item { display: block; width: 100%; padding: 8px 16px; border: none; background: transparent; text-align: left; font-size: 12px; color: var(--text); cursor: pointer; font-family: inherit; transition: background 0.1s; }
+.tk-slide-menu-item:hover { background: #f8fafc; }
+
+/* ---- CHART TOOLTIP ---- */
+.tk-chart-tooltip { position: absolute; background: #1a2744; color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 12px; pointer-events: none; z-index: 100; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.2); line-height: 1.4; }
+.tk-chart-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: #1a2744; }
+.tk-tooltip-label { font-weight: 600; margin-bottom: 2px; }
+.tk-tooltip-value { font-size: 14px; font-weight: 700; }
+.tk-tooltip-change { font-size: 11px; opacity: 0.8; }
+
+/* ---- TREND ANNOTATIONS ---- */
+.tk-annotation-line { stroke: #64748b; stroke-width: 1; stroke-dasharray: 4,3; }
+.tk-annotation-label { font-size: 10px; fill: #64748b; font-weight: 500; }
+.tk-annotation-dot { fill: #64748b; cursor: pointer; }
+.tk-annotation-dot:hover { fill: var(--brand); }
+.tk-annotation-popover { position: absolute; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 60; min-width: 200px; }
+.tk-annotation-input { width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px; font-family: inherit; }
+.tk-annotation-actions { display: flex; gap: 6px; margin-top: 8px; justify-content: flex-end; }
+
+/* ---- METRIC COMPARISON MODE ---- */
+.tk-compare-toggle { display: inline-flex; align-items: center; gap: 6px; }
+.tk-compare-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; background: var(--brand); color: #fff; font-size: 10px; font-weight: 700; }
+.tk-comparison-chart { padding: 20px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px; }
+.tk-comparison-legend { display: flex; gap: 16px; padding: 8px 0; flex-wrap: wrap; }
+.tk-comparison-legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text); }
+.tk-comparison-legend-line { width: 24px; height: 2px; border-radius: 1px; }
+
+/* ---- CONFIDENCE BANDS ---- */
+.tk-ci-band { fill-opacity: 0.10; }
+.tk-ci-toggle { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---- AREA FILL (single-series enhancement) ---- */
+.tk-area-fill { fill-opacity: 0.06; }
+
 /* Footer */
 .tk-footer { padding: 16px 24px; border-top: 1px solid var(--border); background: var(--card); display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
 .tk-footer-sig-info { font-size: 10px; color: #94a3b8; text-align: center; }
@@ -488,7 +598,15 @@ body.hide-sparklines .tk-sparkline-wrap { display: none; }
   .tk-chart-actions, .tk-help-overlay, .report-tabs, .mv-segment-chips,
   .insight-toggle, .insight-dismiss, .mv-pin-btn, .pinned-card-actions,
   .pinned-toolbar, .tk-segment-selector, .tk-row-hide-btn,
-  .tk-tab-actions, .export-btn, .turas-action-btn { display: none !important; }
+  .tk-tab-actions, .export-btn, .turas-action-btn,
+  .qual-toolbar, .qual-slide-actions, .qual-upload-btn,
+  .tk-slide-menu-wrap, .tk-annotation-popover,
+  .tk-chart-tooltip { display: none !important; }
+  .tk-hero-strip, .tk-meta-strip { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .tk-hero-card, .tk-meta-card { break-inside: avoid; }
+  .tk-heatmap-grid { font-size: 10px; }
+  .tk-heatmap-grid td, .tk-heatmap-grid th { padding: 4px 6px; }
+  .hm-sig-up, .hm-sig-down, .hm-stable { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .tk-layout, .metrics-tab-layout { display: block; }
   .tk-content, .mv-content { padding: 0; }
   .tk-table-wrapper { border: none; overflow: visible; }

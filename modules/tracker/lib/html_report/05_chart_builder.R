@@ -3,7 +3,7 @@
 # ==============================================================================
 # Generates inline SVG line charts and sparklines for tracking metrics.
 # All charts are self-contained SVG — no external dependencies.
-# VERSION: 2.0.0
+# VERSION: 3.0.0
 # ==============================================================================
 # CHANGES in v3.0.0:
 #   - Professional chart redesign: wider (960px), taller (380px)
@@ -47,11 +47,11 @@ build_chart_axes_svg <- function(n_waves, wave_labels, wave_ids,
   for (gv in grid_vals) {
     gy <- plot_h - scale_fn(gv)
     parts <- c(parts, sprintf(
-      '<line x1="0" y1="%.1f" x2="%d" y2="%.1f" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="4,4"/>',
+      '<line x1="0" y1="%.1f" x2="%d" y2="%.1f" stroke="#edf2f7" stroke-width="0.75" stroke-dasharray="6,4"/>',
       gy, plot_w, gy
     ))
     parts <- c(parts, sprintf(
-      '<text x="-10" y="%.1f" text-anchor="end" fill="#666" font-size="12" font-weight="500" dy="0.35em">%s</text>',
+      '<text x="-10" y="%.1f" text-anchor="end" fill="#64748b" font-size="11" font-weight="500" dy="0.35em">%s</text>',
       gy, htmltools::htmlEscape(format_fn(gv))
     ))
   }
@@ -60,7 +60,7 @@ build_chart_axes_svg <- function(n_waves, wave_labels, wave_ids,
   for (i in seq_len(n_waves)) {
     x_pos <- (i - 1) / (n_waves - 1) * plot_w
     parts <- c(parts, sprintf(
-      '<text x="%.1f" y="%d" text-anchor="middle" fill="#666" font-size="13" font-weight="600" class="tk-chart-xaxis" data-wave="%s">%s</text>',
+      '<text x="%.1f" y="%d" text-anchor="middle" fill="#64748b" font-size="12" font-weight="600" class="tk-chart-xaxis" data-wave="%s">%s</text>',
       x_pos, plot_h + 24, htmltools::htmlEscape(wave_ids[i]),
       htmltools::htmlEscape(wave_labels[i])
     ))
@@ -94,6 +94,7 @@ build_chart_series_svg <- function(chart_data, segment_colours, n_waves,
   svg_parts <- c()
   all_label_data <- vector("list", n_waves)
   for (i in seq_len(n_waves)) all_label_data[[i]] <- list()
+  n_series <- length(chart_data$series)
 
   for (s_idx in seq_along(chart_data$series)) {
     series <- chart_data$series[[s_idx]]
@@ -112,13 +113,18 @@ build_chart_series_svg <- function(chart_data, segment_colours, n_waves,
 
       xy_points[[length(xy_points) + 1]] <- c(x_pos, y_pos)
 
-      # Data point circle
+      # Data point circle with tooltip data attributes
+      prev_val <- if (i > 1 && !is.na(series$values[i - 1])) format_fn(series$values[i - 1]) else ""
+      change_val <- if (i > 1 && !is.na(series$values[i - 1])) format_fn(val - series$values[i - 1]) else ""
       point_circles <- c(point_circles, sprintf(
-        '<circle cx="%.1f" cy="%.1f" r="5" fill="%s" stroke="#fff" stroke-width="2.5" class="tk-chart-point" data-segment="%s" data-wave="%s" data-value="%s"/>',
+        '<circle cx="%.1f" cy="%.1f" r="5" fill="%s" stroke="#fff" stroke-width="2.5" class="tk-chart-point" data-segment="%s" data-wave="%s" data-value="%s" data-wave-label="%s" data-prev-value="%s" data-change="%s"/>',
         x_pos, y_pos, colour,
         htmltools::htmlEscape(seg_name),
         htmltools::htmlEscape(chart_data$wave_ids[i]),
-        htmltools::htmlEscape(format_fn(val))
+        htmltools::htmlEscape(format_fn(val)),
+        htmltools::htmlEscape(chart_data$wave_labels[i]),
+        htmltools::htmlEscape(prev_val),
+        htmltools::htmlEscape(change_val)
       ))
 
       # Store label data for collision avoidance
@@ -133,6 +139,44 @@ build_chart_series_svg <- function(chart_data, segment_colours, n_waves,
     if (length(xy_points) >= 2) {
       line_opacity <- if (!is.null(active_segment) && seg_name != active_segment) "0.3" else "1"
       path_d <- build_smooth_path(xy_points)
+
+      # Confidence band (if CI data available on this series)
+      if (!is.null(series$ci_lower) && !is.null(series$ci_upper)) {
+        upper_pts <- list()
+        lower_pts <- list()
+        for (ci_i in seq_len(n_waves)) {
+          ci_lo <- series$ci_lower[ci_i]
+          ci_hi <- series$ci_upper[ci_i]
+          if (!is.na(ci_lo) && !is.na(ci_hi)) {
+            ci_x <- (ci_i - 1) / (n_waves - 1) * plot_w
+            upper_pts[[length(upper_pts) + 1]] <- c(ci_x, plot_h - scale_fn(ci_hi))
+            lower_pts[[length(lower_pts) + 1]] <- c(ci_x, plot_h - scale_fn(ci_lo))
+          }
+        }
+        if (length(upper_pts) >= 2) {
+          upper_d <- build_smooth_path(upper_pts)
+          lower_rev <- rev(lower_pts)
+          lower_d_parts <- sprintf("L%.1f,%.1f", vapply(lower_rev, `[`, numeric(1), 1),
+                                    vapply(lower_rev, `[`, numeric(1), 2))
+          ci_d <- paste0(upper_d, " ", paste(lower_d_parts, collapse = " "), " Z")
+          svg_parts <- c(svg_parts, sprintf(
+            '<path d="%s" fill="%s" class="tk-ci-band" data-segment="%s"/>',
+            ci_d, colour, htmltools::htmlEscape(seg_name)
+          ))
+        }
+      }
+
+      # Area fill for single-series charts (subtle brand-coloured area)
+      if (n_series == 1 && length(xy_points) >= 2) {
+        area_d <- paste0(path_d,
+          sprintf(" L%.1f,%.1f L%.1f,%.1f Z",
+            xy_points[[length(xy_points)]][1], plot_h,
+            xy_points[[1]][1], plot_h))
+        svg_parts <- c(svg_parts, sprintf(
+          '<path d="%s" fill="%s" class="tk-area-fill" data-segment="%s"/>',
+          area_d, colour, htmltools::htmlEscape(seg_name)
+        ))
+      }
 
       svg_parts <- c(svg_parts, sprintf(
         '<path d="%s" fill="none" stroke="%s" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" opacity="%s" class="tk-chart-line" data-segment="%s"/>',
@@ -244,14 +288,19 @@ build_line_chart <- function(chart_data, config, active_segment = NULL,
   }
   if (length(all_vals) == 0) return(NULL)
 
-  # ---- Chart dimensions: wide, with bottom legend ----
-  width <- 960
-  # Legend row height depends on number of series (one horizontal row, wrapped if many)
+  # ---- Chart dimensions: responsive to wave count ----
+  if (n_waves <= 4) {
+    width <- 1100; base_h <- 420
+  } else if (n_waves <= 8) {
+    width <- 960; base_h <- 380
+  } else {
+    width <- 1200; base_h <- 340
+  }
   legend_row_h <- 30
-  height <- 380 + legend_row_h
+  height <- base_h + legend_row_h
   margin <- list(top = 30, right = 20, bottom = 80, left = 60)
-  plot_w <- width - margin$left - margin$right  # 880px
-  plot_h <- height - margin$top - margin$bottom - legend_row_h  # 240px
+  plot_w <- width - margin$left - margin$right
+  plot_h <- height - margin$top - margin$bottom - legend_row_h
 
   # ---- Y-axis range: metric-appropriate fixed ranges ----
   y_min_data <- min(all_vals, na.rm = TRUE)
@@ -331,15 +380,15 @@ build_line_chart <- function(chart_data, config, active_segment = NULL,
 
   svg_parts <- c(svg_parts, '</g>')  # Close plot area group
 
-  # ---- Legend: horizontal row below chart ----
-  legend_y <- height - legend_row_h + 8
-  # Calculate legend item widths: swatch(16) + gap(6) + text + spacing(24)
-  # Estimate text width: ~7px per character at font-size 12
+  # ---- Legend: interactive pill-style chips below chart ----
+  legend_y <- height - legend_row_h + 4
+  # Calculate legend item widths: pill padding + dot(8) + gap(6) + text + padding
+  # Estimate text width: ~6.5px per character at font-size 11
   legend_items <- list()
   total_legend_w <- 0
   for (s_idx in seq_along(chart_data$series)) {
     seg_label <- chart_data$series[[s_idx]]$name
-    item_w <- 16 + 6 + nchar(seg_label) * 7 + 24
+    item_w <- 12 + 8 + 6 + nchar(seg_label) * 6.5 + 12 + 8  # pill padding + dot + text + gap
     legend_items[[s_idx]] <- list(
       name = seg_label,
       colour = segment_colours[s_idx],
@@ -353,17 +402,27 @@ build_line_chart <- function(chart_data, config, active_segment = NULL,
   lx <- legend_start_x
 
   for (item in legend_items) {
+    pill_w <- item$w - 8  # minus gap
+    pill_h <- 22
     svg_parts <- c(svg_parts, sprintf(
-      '<g class="tk-chart-legend-item" data-segment="%s">',
-      htmltools::htmlEscape(item$name)
+      '<g class="tk-chart-legend-item" data-segment="%s" style="cursor:pointer" onclick="toggleChartSeries(\'%s\',this)">',
+      htmltools::htmlEscape(item$name),
+      gsub("'", "\\\\'", htmltools::htmlEscape(item$name))
     ))
+    # Pill background
     svg_parts <- c(svg_parts, sprintf(
-      '<rect x="%.1f" y="%.1f" width="16" height="4" rx="2" fill="%s"/>',
-      lx, legend_y + 4, item$colour
+      '<rect x="%.1f" y="%.1f" width="%.1f" height="%d" rx="11" fill="#f0fafa" stroke="#e2e8f0" stroke-width="1"/>',
+      lx, legend_y, pill_w, pill_h
     ))
+    # Colour dot
     svg_parts <- c(svg_parts, sprintf(
-      '<text x="%.1f" y="%.1f" fill="#555" font-size="12" font-weight="600" dy="0.35em">%s</text>',
-      lx + 22, legend_y + 5, htmltools::htmlEscape(item$name)
+      '<circle cx="%.1f" cy="%.1f" r="4" fill="%s"/>',
+      lx + 12, legend_y + pill_h / 2, item$colour
+    ))
+    # Label text
+    svg_parts <- c(svg_parts, sprintf(
+      '<text x="%.1f" y="%.1f" fill="#1e293b" font-size="11" font-weight="600" dy="0.35em">%s</text>',
+      lx + 22, legend_y + pill_h / 2, htmltools::htmlEscape(item$name)
     ))
     svg_parts <- c(svg_parts, '</g>')
     lx <- lx + item$w
@@ -497,23 +556,25 @@ build_sparkline_svg <- function(values, width = 60, height = 16, colour = "#3233
 #' First segment uses brand colour, others use a distinct palette.
 #'
 #' @keywords internal
-get_segment_colours <- function(segment_names, brand_colour) {
-  palette <- c(
-    brand_colour,
-    "#CC9900",  # Gold
-    "#2E8B57",  # Sea green
-    "#CD5C5C",  # Indian red
-    "#4682B4",  # Steel blue
-    "#9370DB",  # Medium purple
-    "#D2691E",  # Chocolate
-    "#20B2AA"   # Light sea green
-  )
-
-  n <- length(segment_names)
-  if (n <= length(palette)) {
-    return(palette[seq_len(n)])
+get_segment_colours <- function(segment_names, brand_colour, config = NULL) {
+  # Use shared palette system if available, with configurable preset
+  preset <- "default"
+  if (!is.null(config)) {
+    preset <- get_setting(config, "segment_palette_preset", default = "default") %||% "default"
   }
 
-  # Extend palette by cycling
+  n <- length(segment_names)
+
+  if (exists("get_segment_palette", mode = "function")) {
+    return(get_segment_palette(preset = preset, brand_colour = brand_colour, n = n))
+  }
+
+  # Fallback: hardcoded palette (if shared module not sourced)
+  palette <- c(
+    brand_colour,
+    "#CC9900", "#2E8B57", "#CD5C5C", "#4682B4",
+    "#9370DB", "#D2691E", "#20B2AA", "#8B6914", "#708090"
+  )
+  if (n <= length(palette)) return(palette[seq_len(n)])
   rep_len(palette, n)
 }

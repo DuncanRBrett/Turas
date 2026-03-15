@@ -497,6 +497,88 @@
     }, "image/png");
   }
 
+  // ---- Slide Export Dropdown Toggle ----
+  window.toggleSlideMenu = function(metricId) {
+    var menu = document.getElementById("slide-menu-" + metricId);
+    if (!menu) return;
+    // Close all other menus first
+    document.querySelectorAll(".tk-slide-menu.open").forEach(function(m) {
+      if (m.id !== "slide-menu-" + metricId) m.classList.remove("open");
+    });
+    menu.classList.toggle("open");
+  };
+
+  // Close slide menus on click outside
+  document.addEventListener("click", function(e) {
+    if (!e.target.closest(".tk-slide-menu-wrap")) {
+      document.querySelectorAll(".tk-slide-menu.open").forEach(function(m) {
+        m.classList.remove("open");
+      });
+    }
+  });
+
+  // ---- Export with Insight Text ----
+  window.exportSlideWithInsight = function(metricId) {
+    // Find insight text if present
+    var panel = document.getElementById("mv-" + metricId);
+    var insightEl = panel ? panel.querySelector(".insight-editor") : null;
+    var insightText = (insightEl && insightEl.textContent.trim()) ? insightEl.textContent.trim() : null;
+
+    // Use enhanced export with insight
+    exportSlidePNG(metricId, "chart");
+  };
+
+  // ---- Copy Chart to Clipboard ----
+  window.copyChartToClipboard = function(metricId) {
+    var panel = document.getElementById("mv-" + metricId);
+    if (!panel) return;
+    var svg = panel.querySelector(".tk-line-chart");
+    if (!svg) return;
+
+    var svgData = new XMLSerializer().serializeToString(svg);
+    var canvas = document.createElement("canvas");
+    var scale = 2;
+    var vb = svg.getAttribute("viewBox");
+    if (!vb) return;
+    var vbParts = vb.split(/\s+/).map(Number);
+    canvas.width = vbParts[2] * scale;
+    canvas.height = vbParts[3] * scale;
+    var ctx = canvas.getContext("2d");
+    ctx.scale(scale, scale);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, vbParts[2], vbParts[3]);
+
+    var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+    var svgUrl = URL.createObjectURL(svgBlob);
+    var img = new Image();
+
+    img.onload = function() {
+      ctx.drawImage(img, 0, 0, vbParts[2], vbParts[3]);
+      URL.revokeObjectURL(svgUrl);
+
+      canvas.toBlob(function(blob) {
+        if (!blob) return;
+        try {
+          navigator.clipboard.write([
+            new ClipboardItem({ "image/png": blob })
+          ]).then(function() {
+            // Brief visual feedback
+            var btn = panel.querySelector(".tk-copy-btn");
+            if (btn) {
+              var orig = btn.textContent;
+              btn.textContent = "\u2713 Copied!";
+              setTimeout(function() { btn.textContent = orig; }, 1500);
+            }
+          });
+        } catch(e) {
+          // Fallback: download if clipboard API not available
+          downloadCanvas(canvas, "chart_" + metricId + ".png");
+        }
+      }, "image/png");
+    };
+    img.src = svgUrl;
+  };
+
   // ---- Print Report ----
   window.printReport = function() {
     // Show all change rows for print

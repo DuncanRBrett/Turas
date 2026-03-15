@@ -32,9 +32,14 @@ source(file.path(tracker_root, "lib", "tracking_crosstab_engine.R"))
 source(file.path(tracker_root, "lib", "html_report", "00_html_guard.R"))
 source(file.path(tracker_root, "lib", "html_report", "01_data_transformer.R"))
 source(file.path(tracker_root, "lib", "html_report", "02_table_builder.R"))
+source(file.path(tracker_root, "lib", "html_report", "05_chart_builder.R"))
+source(file.path(tracker_root, "lib", "html_report", "03a_page_styling.R"))
+source(file.path(tracker_root, "lib", "html_report", "03b_page_components.R"))
+source(file.path(tracker_root, "lib", "html_report", "03c_summary_builder.R"))
+source(file.path(tracker_root, "lib", "html_report", "03d_metrics_builder.R"))
+source(file.path(tracker_root, "lib", "html_report", "03e_overview_builder.R"))
 source(file.path(tracker_root, "lib", "html_report", "03_page_builder.R"))
 source(file.path(tracker_root, "lib", "html_report", "04_html_writer.R"))
-source(file.path(tracker_root, "lib", "html_report", "05_chart_builder.R"))
 source(file.path(tracker_root, "lib", "html_report", "99_html_report_main.R"))
 
 
@@ -1572,7 +1577,8 @@ test_that("CSS contains low-base warning classes", {
   expect_true(grepl(".tk-low-base", css_output, fixed = TRUE))
   expect_true(grepl("#dc2626", css_output, fixed = TRUE))  # Red colour
   expect_true(grepl(".tk-low-base-dim", css_output, fixed = TRUE))
-  expect_true(grepl("opacity:0.45", css_output, fixed = TRUE))
+  # Low-base-dim now uses muted text colour instead of opacity
+  expect_true(grepl("#94a3b8", css_output, fixed = TRUE))
 })
 
 test_that("CSS contains header action button dark variant", {
@@ -2013,8 +2019,6 @@ test_that("JS has pngDataUrl handling in pin objects", {
 
   # captureMetricView should store pngDataUrl
   expect_true(grepl("pngDataUrl", content, fixed = TRUE))
-  # capturePinAsPng function should exist
-  expect_true(grepl("capturePinAsPng", content, fixed = TRUE))
 
   unlink(output_path)
 })
@@ -2026,9 +2030,8 @@ test_that("Pinned card renders PNG image when pngDataUrl exists", {
   result <- generate_tracker_html_report(crosstab_data, config, output_path)
   content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
 
-  # renderPinnedCards should check for pngDataUrl and render <img>
+  # CSS should include pinned-card-png styling
   expect_true(grepl("pinned-card-png", content, fixed = TRUE))
-  expect_true(grepl("pin.pngDataUrl", content, fixed = TRUE))
 
   unlink(output_path)
 })

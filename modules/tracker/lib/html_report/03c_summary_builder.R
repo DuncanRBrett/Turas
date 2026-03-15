@@ -1,0 +1,736 @@
+# ==============================================================================
+# TurasTracker HTML Report - Summary Tab Builder
+# ==============================================================================
+# Builds the Summary/Dashboard tab: KPI hero cards, wave pulse bar,
+# significance heatmap, metrics overview table, and sig changes cards.
+# Extracted from 03_page_builder.R for maintainability.
+# VERSION: 3.0.0
+# ==============================================================================
+
+
+#' Build Summary Tab Content
+#'
+#' Assembles the full Summary tab with metadata strip, KPI hero cards,
+#' wave pulse bar, significant changes, and metrics overview table.
+#'
+#' @param html_data List. Output from transform_tracker_for_html()
+#' @param config List. Tracker configuration
+#' @return htmltools tag
+#' @keywords internal
+build_summary_tab <- function(html_data, config) {
+
+  project_name <- html_data$metadata$project_name %||% "Tracking Report"
+  n_metrics <- html_data$n_metrics
+  n_waves <- length(html_data$waves)
+  n_segments <- length(html_data$segments)
+  baseline_label <- html_data$wave_lookup[html_data$baseline_wave]
+  latest_wave_id <- html_data$waves[n_waves]
+  latest_wave_label <- html_data$wave_lookup[latest_wave_id]
+
+  # Get latest wave sample size from first metric Total segment
+  latest_n <- NA
+  if (length(html_data$metric_rows) > 0) {
+    total_seg <- html_data$segments[1]
+    for (mr in html_data$metric_rows) {
+      cell <- mr$segment_cells[[total_seg]][[latest_wave_id]]
+      if (!is.null(cell) && !is.na(cell$n)) {
+        latest_n <- cell$n
+        break
+      }
+    }
+  }
+
+  # Fieldwork period (from config)
+  fieldwork_start <- get_setting(config, "fieldwork_start", default = NULL)
+  fieldwork_end <- get_setting(config, "fieldwork_end", default = NULL)
+  fieldwork_text <- ""
+  if (!is.null(fieldwork_start) && !is.null(fieldwork_end)) {
+    fieldwork_text <- sprintf("%s \u2013 %s", fieldwork_start, fieldwork_end)
+  }
+
+  htmltools::tags$div(class = "summary-tab-content",
+
+    # ---- Metadata Strip (4 cards matching tabs dash-meta-strip) ----
+    build_metadata_strip(n_metrics, n_waves, latest_n, fieldwork_text,
+                          baseline_label, latest_wave_label),
+
+    # ---- KPI Hero Cards ----
+    build_kpi_hero_cards(html_data, config),
+
+    # ---- Wave-over-Wave Pulse Bar ----
+    build_wave_pulse_bar(html_data),
+
+    # Background & Method insight box
+    htmltools::tags$div(class = "summary-insight-box", id = "summary-section-background",
+      htmltools::tags$div(class = "summary-section-controls",
+        htmltools::tags$button(class = "turas-action-btn",
+          onclick = "pinSummarySection('background')",
+          htmltools::HTML("&#x1F4CC; Pin to Views")),
+        htmltools::tags$button(class = "turas-action-btn",
+          onclick = "exportSummarySlide('background')",
+          htmltools::HTML("&#x1F4F7; Export Slide"))
+      ),
+      htmltools::tags$h3(class = "summary-insight-title", "Background & Method"),
+      htmltools::tags$div(
+        class = "insight-editor summary-editor",
+        contenteditable = "true",
+        `data-placeholder` = "Add background and methodology notes here...",
+        id = "summary-background-editor"
+      )
+    ),
+
+    # Summary insight box
+    htmltools::tags$div(class = "summary-insight-box", id = "summary-section-findings",
+      htmltools::tags$div(class = "summary-section-controls",
+        htmltools::tags$button(class = "turas-action-btn",
+          onclick = "pinSummarySection('findings')",
+          htmltools::HTML("&#x1F4CC; Pin to Views")),
+        htmltools::tags$button(class = "turas-action-btn",
+          onclick = "exportSummarySlide('findings')",
+          htmltools::HTML("&#x1F4F7; Export Slide"))
+      ),
+      htmltools::tags$h3(class = "summary-insight-title", "Summary"),
+      htmltools::tags$div(
+        class = "insight-editor summary-editor",
+        contenteditable = "true",
+        `data-placeholder` = "Add key findings and summary here...",
+        id = "summary-findings-editor"
+      )
+    ),
+
+    # ---- Significant Changes Section ----
+    build_sig_changes_section(html_data),
+
+    # ---- Significance Heatmap Matrix ----
+    build_sig_heatmap(html_data, config),
+
+    # Metric type filter chips (only if more than one type present)
+    htmltools::HTML(build_summary_type_filter(html_data)),
+
+    # Action buttons bar
+    htmltools::tags$div(class = "summary-actions",
+      htmltools::tags$button(class = "turas-action-btn",
+        onclick = "exportSummaryExcel()",
+        htmltools::HTML("&#x2B73; Export Excel")),
+      htmltools::tags$button(class = "turas-action-btn",
+        onclick = "pinSummaryTable()",
+        htmltools::HTML("&#x1F4CC; Pin to Views")),
+      htmltools::tags$button(class = "turas-action-btn",
+        onclick = "exportSummaryTableSlide()",
+        htmltools::HTML("&#x1F4F7; Export Slide"))
+    ),
+
+    # Metrics Overview table (Total segment by wave) — at bottom
+    build_summary_metrics_table(html_data)
+  )
+}
+
+
+# ==============================================================================
+# METADATA STRIP
+# ==============================================================================
+
+#' Build Metadata Strip
+#'
+#' Four-card metadata strip matching the tabs dash-meta-strip pattern.
+#' Cards have brand-coloured left borders, large values, and uppercase labels.
+#'
+#' @param n_metrics Integer. Number of tracked metrics
+#' @param n_waves Integer. Number of waves
+#' @param latest_n Integer or NA. Sample size for latest wave
+#' @param fieldwork_text Character. Fieldwork period text
+#' @param baseline_label Character. Baseline wave label
+#' @param latest_label Character. Latest wave label
+#' @return htmltools tag
+#' @keywords internal
+build_metadata_strip <- function(n_metrics, n_waves, latest_n, fieldwork_text,
+                                  baseline_label, latest_label) {
+
+  n_display <- if (!is.na(latest_n)) formatC(latest_n, format = "d", big.mark = ",") else "\u2014"
+
+  htmltools::tags$div(class = "tk-meta-strip",
+    htmltools::tags$div(class = "tk-meta-card",
+      htmltools::tags$div(class = "tk-meta-value", n_metrics),
+      htmltools::tags$div(class = "tk-meta-label", "Metrics Tracked")
+    ),
+    htmltools::tags$div(class = "tk-meta-card",
+      htmltools::tags$div(class = "tk-meta-value", n_waves),
+      htmltools::tags$div(class = "tk-meta-label", "Waves")
+    ),
+    htmltools::tags$div(class = "tk-meta-card",
+      htmltools::tags$div(class = "tk-meta-value", htmltools::HTML(sprintf("n=%s", n_display))),
+      htmltools::tags$div(class = "tk-meta-label", sprintf("Latest (%s)", latest_label))
+    ),
+    htmltools::tags$div(class = "tk-meta-card",
+      htmltools::tags$div(class = "tk-meta-value",
+        if (nzchar(fieldwork_text)) fieldwork_text else sprintf("%s \u2192 %s", baseline_label, latest_label)),
+      htmltools::tags$div(class = "tk-meta-label",
+        if (nzchar(fieldwork_text)) "Fieldwork" else "Baseline \u2192 Latest")
+    )
+  )
+}
+
+
+# ==============================================================================
+# KPI HERO CARDS
+# ==============================================================================
+
+#' Build KPI Hero Cards
+#'
+#' Large, prominent KPI summary cards showing latest value, trend direction,
+#' change from previous wave, and mini sparkline for each tracked metric.
+#' Provides the "5-second rule" executive overview.
+#'
+#' @param html_data List. Output from transform_tracker_for_html()
+#' @param config List. Tracker configuration
+#' @return htmltools tag
+#' @keywords internal
+build_kpi_hero_cards <- function(html_data, config) {
+
+  if (length(html_data$metric_rows) == 0) return(htmltools::tags$div())
+
+  total_seg <- html_data$segments[1]
+  waves <- html_data$waves
+  n_waves <- length(waves)
+  latest_wave <- waves[n_waves]
+  prev_wave <- if (n_waves >= 2) waves[n_waves - 1] else NULL
+  brand_colour <- get_setting(config, "brand_colour", default = "#323367") %||% "#323367"
+
+  # Configurable thresholds for traffic light borders
+  green_threshold <- as.numeric(get_setting(config, "dashboard_green_threshold", default = "70")) %||% 70
+  amber_threshold <- as.numeric(get_setting(config, "dashboard_amber_threshold", default = "50")) %||% 50
+
+  # Filter to hero metrics if configured
+  hero_filter <- get_setting(config, "dashboard_hero_metrics", default = NULL)
+  hero_metric_ids <- NULL
+  if (!is.null(hero_filter) && nzchar(hero_filter)) {
+    hero_metric_ids <- trimws(strsplit(hero_filter, ",")[[1]])
+  }
+
+  cards <- list()
+  for (mr in html_data$metric_rows) {
+    # Skip if hero filter is set and this metric is not included
+    if (!is.null(hero_metric_ids) && !(mr$metric_id %in% hero_metric_ids)) next
+
+    cells <- mr$segment_cells[[total_seg]]
+    if (is.null(cells)) next
+    latest_cell <- cells[[latest_wave]]
+    if (is.null(latest_cell)) next
+
+    # Current value
+    current_val <- latest_cell$display_value
+    raw_val <- latest_cell$value
+
+    # Change from previous wave
+    change_html <- ""
+    trend_class <- "tk-hero-trend-stable"
+    if (!is.null(prev_wave)) {
+      prev_cell <- cells[[prev_wave]]
+      if (!is.null(prev_cell) && !is.na(latest_cell$change_vs_prev)) {
+        change_num <- latest_cell$change_vs_prev
+        is_sig <- isTRUE(latest_cell$sig_vs_prev)
+        is_pct <- grepl("(pct|box|range|proportion|category|any)", mr$metric_name)
+
+        if (change_num > 0) {
+          trend_class <- "tk-hero-trend-up"
+          arrow <- "\u25B2"
+          change_text <- if (is_pct) sprintf("+%.1f pp", change_num) else sprintf("+%.2f", change_num)
+        } else if (change_num < 0) {
+          trend_class <- "tk-hero-trend-down"
+          arrow <- "\u25BC"
+          change_text <- if (is_pct) sprintf("%.1f pp", change_num) else sprintf("%.2f", change_num)
+        } else {
+          arrow <- "\u2192"
+          change_text <- "No change"
+        }
+
+        sig_badge <- if (is_sig) '<span class="tk-hero-sig">*</span>' else ""
+        change_html <- sprintf(
+          '<div class="%s"><span class="tk-hero-arrow">%s</span> %s%s</div>',
+          trend_class, arrow, htmltools::htmlEscape(change_text), sig_badge
+        )
+      }
+    }
+
+    # Mini sparkline
+    sparkline_svg <- ""
+    sparkline_vals <- vapply(waves, function(wid) {
+      cell <- cells[[wid]]
+      if (!is.null(cell) && !is.na(cell$value)) cell$value else NA_real_
+    }, numeric(1))
+    if (sum(!is.na(sparkline_vals)) >= 2) {
+      sparkline_svg <- build_sparkline_svg(sparkline_vals, width = 80, height = 24, colour = brand_colour)
+    }
+
+    # Traffic light border colour
+    border_colour <- "#e2e8f0"  # default: neutral grey
+    if (!is.na(raw_val)) {
+      if (raw_val >= green_threshold) {
+        border_colour <- "#4a7c6f"  # sage green
+      } else if (raw_val >= amber_threshold) {
+        border_colour <- "#c9a96e"  # muted gold
+      } else {
+        border_colour <- "#b85450"  # dusty rose
+      }
+    }
+
+    cards <- c(cards, list(
+      htmltools::tags$div(class = "tk-hero-card",
+        style = sprintf("border-left-color: %s", border_colour),
+        htmltools::tags$div(class = "tk-hero-label", mr$metric_label),
+        htmltools::tags$div(class = "tk-hero-body",
+          htmltools::tags$div(class = "tk-hero-value", htmltools::HTML(current_val)),
+          htmltools::HTML(change_html)
+        ),
+        htmltools::tags$div(class = "tk-hero-sparkline", htmltools::HTML(sparkline_svg))
+      )
+    ))
+  }
+
+  if (length(cards) == 0) return(htmltools::tags$div())
+
+  htmltools::tags$div(class = "tk-hero-strip", cards)
+}
+
+
+# ==============================================================================
+# WAVE-OVER-WAVE PULSE BAR
+# ==============================================================================
+
+#' Build Wave-over-Wave Pulse Bar
+#'
+#' A compact horizontal strip summarising the latest wave transition.
+#' Shows counts of significant increases, decreases, and stable metrics
+#' for instant executive "pulse check".
+#'
+#' @param html_data List. Output from transform_tracker_for_html()
+#' @return htmltools tag
+#' @keywords internal
+build_wave_pulse_bar <- function(html_data) {
+
+  waves <- html_data$waves
+  n_waves <- length(waves)
+  if (n_waves < 2) return(htmltools::tags$div())
+
+  latest_wave <- waves[n_waves]
+  prev_wave <- waves[n_waves - 1]
+  latest_label <- html_data$wave_lookup[latest_wave]
+  prev_label <- html_data$wave_lookup[prev_wave]
+
+  # Count significant changes across Total segment (or all segments)
+  sig_up <- 0L
+  sig_down <- 0L
+  stable <- 0L
+  total_metrics <- 0L
+
+  total_seg <- html_data$segments[1]
+  for (mr in html_data$metric_rows) {
+    cells <- mr$segment_cells[[total_seg]]
+    if (is.null(cells)) next
+    cell <- cells[[latest_wave]]
+    if (is.null(cell)) next
+    total_metrics <- total_metrics + 1L
+
+    if (isTRUE(cell$sig_vs_prev) && !is.na(cell$change_vs_prev)) {
+      if (cell$change_vs_prev > 0) sig_up <- sig_up + 1L
+      else sig_down <- sig_down + 1L
+    } else {
+      stable <- stable + 1L
+    }
+  }
+
+  htmltools::tags$div(class = "tk-pulse-bar",
+    htmltools::tags$div(class = "tk-pulse-label",
+      htmltools::HTML(sprintf("%s &rarr; %s",
+        htmltools::htmlEscape(prev_label),
+        htmltools::htmlEscape(latest_label)
+      ))
+    ),
+    if (sig_up > 0) {
+      htmltools::tags$span(class = "tk-pulse-badge tk-pulse-up",
+        sprintf("\u25B2 %d significant increase%s", sig_up, if (sig_up > 1) "s" else ""))
+    },
+    if (sig_down > 0) {
+      htmltools::tags$span(class = "tk-pulse-badge tk-pulse-down",
+        sprintf("\u25BC %d significant decrease%s", sig_down, if (sig_down > 1) "s" else ""))
+    },
+    htmltools::tags$span(class = "tk-pulse-badge tk-pulse-stable",
+      sprintf("%d stable", stable))
+  )
+}
+
+
+# ==============================================================================
+# SIGNIFICANCE HEATMAP MATRIX
+# ==============================================================================
+
+#' Build Significance Heatmap Matrix
+#'
+#' A compact grid showing metrics (rows) x segments (columns), with cells
+#' colour-coded by the direction and significance of the latest wave change.
+#' Provides "at a glance" pattern spotting for executives.
+#'
+#' @param html_data List. Output from transform_tracker_for_html()
+#' @param config List. Tracker configuration
+#' @return htmltools tag or empty div if single wave
+#' @keywords internal
+build_sig_heatmap <- function(html_data, config) {
+
+  waves <- html_data$waves
+  n_waves <- length(waves)
+  if (n_waves < 2) return(htmltools::tags$div())
+
+  latest_wave <- waves[n_waves]
+  segments <- html_data$segments
+
+  # Build matrix: rows = metrics, cols = segments
+  parts <- c()
+  parts <- c(parts, '<div class="tk-heatmap-section">')
+  parts <- c(parts, '<h3 class="summary-insight-title">Significance Matrix</h3>')
+  parts <- c(parts, '<p class="dash-section-sub">Latest wave change direction by metric and segment. Green = significant increase, Red = significant decrease, Grey = no significant change.</p>')
+  parts <- c(parts, '<div class="tk-heatmap-wrap">')
+  parts <- c(parts, '<table class="tk-table tk-heatmap-table">')
+
+  # Header
+  parts <- c(parts, '<thead><tr>')
+  parts <- c(parts, '<th class="tk-th tk-label-col tk-sticky-col">Metric</th>')
+  for (seg in segments) {
+    # Truncate long segment names for header
+    display <- if (nchar(seg) > 20) paste0(substr(seg, 1, 18), "\u2026") else seg
+    parts <- c(parts, sprintf('<th class="tk-th" title="%s">%s</th>',
+      htmltools::htmlEscape(seg), htmltools::htmlEscape(display)))
+  }
+  parts <- c(parts, '</tr></thead>')
+
+  # Body
+  parts <- c(parts, '<tbody>')
+  for (mr in html_data$metric_rows) {
+    parts <- c(parts, '<tr class="tk-heatmap-row">')
+    parts <- c(parts, sprintf(
+      '<td class="tk-td tk-label-col tk-sticky-col">%s</td>',
+      htmltools::htmlEscape(mr$metric_label)
+    ))
+
+    for (seg in segments) {
+      cells <- mr$segment_cells[[seg]]
+      cell <- if (!is.null(cells)) cells[[latest_wave]] else NULL
+
+      if (is.null(cell) || is.na(cell$change_vs_prev)) {
+        # No data
+        parts <- c(parts, '<td class="tk-td tk-heatmap-cell tk-heatmap-na">&mdash;</td>')
+      } else if (isTRUE(cell$sig_vs_prev)) {
+        if (cell$change_vs_prev > 0) {
+          # Significant increase
+          parts <- c(parts, sprintf(
+            '<td class="tk-td tk-heatmap-cell tk-heatmap-up" title="Significant increase">%s</td>',
+            htmltools::htmlEscape(cell$display_value)
+          ))
+        } else {
+          # Significant decrease
+          parts <- c(parts, sprintf(
+            '<td class="tk-td tk-heatmap-cell tk-heatmap-down" title="Significant decrease">%s</td>',
+            htmltools::htmlEscape(cell$display_value)
+          ))
+        }
+      } else {
+        # No significant change
+        parts <- c(parts, sprintf(
+          '<td class="tk-td tk-heatmap-cell tk-heatmap-stable" title="No significant change">%s</td>',
+          htmltools::htmlEscape(cell$display_value)
+        ))
+      }
+    }
+    parts <- c(parts, '</tr>')
+  }
+
+  parts <- c(parts, '</tbody></table></div></div>')
+  htmltools::HTML(paste(parts, collapse = "\n"))
+}
+
+
+# ==============================================================================
+# SIGNIFICANT CHANGES SECTION
+# ==============================================================================
+
+#' Build Significant Changes Section
+#'
+#' Scans all metrics x segments for the latest wave and shows cards
+#' for any statistically significant wave-on-wave changes.
+#' Matches crosstabs "Significant Findings" pattern.
+#'
+#' @param html_data List. Output from transform_tracker_for_html()
+#' @return htmltools tag or NULL if no significant changes
+#' @keywords internal
+build_sig_changes_section <- function(html_data) {
+
+  latest_wave <- html_data$waves[length(html_data$waves)]
+  prev_wave <- if (length(html_data$waves) >= 2) html_data$waves[length(html_data$waves) - 1] else NULL
+  latest_label <- html_data$wave_lookup[latest_wave]
+  prev_label <- if (!is.null(prev_wave)) html_data$wave_lookup[prev_wave] else ""
+
+  findings <- list()
+
+  for (mr in html_data$metric_rows) {
+    for (seg_name in names(mr$segment_cells)) {
+      cells <- mr$segment_cells[[seg_name]]
+      cell <- cells[[latest_wave]]
+      if (is.null(cell)) next
+      if (is.null(cell$sig_vs_prev) || is.na(cell$sig_vs_prev) || !isTRUE(cell$sig_vs_prev)) next
+      if (is.null(cell$change_vs_prev) || is.na(cell$change_vs_prev)) next
+
+      direction <- if (cell$change_vs_prev > 0) "up" else "down"
+      direction_label <- if (direction == "up") "increase" else "decrease"
+      direction_symbol <- if (direction == "up") "\u25B2" else "\u25BC"
+
+      # Get previous wave value for context
+      prev_cell <- cells[[prev_wave]]
+      prev_display <- if (!is.null(prev_cell)) prev_cell$display_value else ""
+
+      # Format the raw numeric change as plain text (not HTML)
+      change_num <- cell$change_vs_prev
+      is_pct <- grepl("(pct|box|range|proportion|category|any)", mr$metric_name)
+      change_text <- if (is_pct) {
+        sprintf("%+.1f pp", change_num)
+      } else {
+        sprintf("%+.2f", change_num)
+      }
+
+      findings[[length(findings) + 1]] <- list(
+        metric_label = mr$metric_label,
+        section = if (!is.na(mr$section) && nzchar(mr$section)) mr$section else "",
+        segment = seg_name,
+        direction = direction,
+        direction_label = direction_label,
+        direction_symbol = direction_symbol,
+        current_value = cell$display_value,
+        prev_value = prev_display,
+        change = change_text
+      )
+    }
+  }
+
+  # Empty state: show message instead of hiding section entirely
+  if (length(findings) == 0) {
+    return(htmltools::tags$div(class = "dash-section", id = "summary-section-sig-changes",
+      htmltools::tags$div(class = "dash-section-title", "Significant Changes"),
+      htmltools::tags$div(class = "dash-section-sub",
+        "Wave-on-wave changes that are statistically significant"
+      ),
+      htmltools::tags$div(class = "dash-sig-empty",
+        "There are no significant findings"
+      )
+    ))
+  }
+
+  # Sort: increases first, then decreases
+  findings <- findings[order(
+    sapply(findings, function(f) if (f$direction == "up") 0 else 1),
+    sapply(findings, function(f) f$metric_label)
+  )]
+
+  cards <- lapply(seq_along(findings), function(i) {
+    f <- findings[[i]]
+    border_colour <- if (f$direction == "up") "#059669" else "#c0392b"
+    sig_class <- paste0("tk-sig tk-sig-", f$direction)
+
+    sig_id <- sprintf("sig-%s-%s-%d",
+      gsub("[^a-zA-Z0-9]", "", f$metric_label %||% ""),
+      gsub("[^a-zA-Z0-9]", "", f$segment %||% ""), i)
+
+    htmltools::tags$div(
+      class = "dash-sig-card",
+      `data-sig-id` = sig_id,
+      style = sprintf("border-left-color: %s", border_colour),
+      # Action bar: toggle + pin
+      htmltools::tags$div(
+        class = "sig-card-actions",
+        htmltools::tags$button(
+          class = "sig-card-toggle-btn",
+          title = "Toggle visibility",
+          onclick = sprintf("toggleSigCard('%s')", sig_id),
+          htmltools::HTML("&#x1F441;")
+        ),
+        htmltools::tags$button(
+          class = "sig-card-pin-btn",
+          title = "Pin this finding",
+          onclick = sprintf("pinSigCard('%s')", sig_id),
+          htmltools::HTML("&#x1F4CC;")
+        )
+      ),
+      htmltools::tags$div(
+        class = "sig-card-content",
+        htmltools::tags$div(
+          class = "dash-sig-badges",
+          htmltools::tags$span(class = "dash-sig-metric-badge", f$metric_label),
+          if (nzchar(f$section)) htmltools::tags$span(class = "dash-sig-group-badge", f$section),
+          htmltools::tags$span(class = "dash-sig-segment-badge", f$segment)
+        ),
+        htmltools::tags$div(class = "dash-sig-text",
+          htmltools::tags$span(class = sig_class, f$direction_symbol),
+          sprintf(" Significant %s: %s \u2192 %s (%s)",
+            f$direction_label, f$prev_value, f$current_value, f$change
+          )
+        )
+      )
+    )
+  })
+
+  htmltools::tags$div(class = "dash-section", id = "summary-section-sig-changes",
+    htmltools::tags$div(class = "summary-section-controls",
+      htmltools::tags$button(
+        class = "turas-action-btn",
+        onclick = "pinVisibleSigFindings()",
+        htmltools::HTML("&#x1F4CC; Pin All Visible")
+      ),
+      htmltools::tags$button(
+        class = "turas-action-btn",
+        onclick = "exportSummarySlide('sig-changes')",
+        htmltools::HTML("&#x1F4F7; Export Slide")
+      )
+    ),
+    htmltools::tags$div(class = "dash-section-title", "Significant Changes"),
+    htmltools::tags$div(class = "dash-section-sub",
+      sprintf("Wave-on-wave changes that are statistically significant (%s vs %s). Click the eye to hide, pin to save individual findings.",
+        latest_label, prev_label)
+    ),
+    htmltools::tags$div(class = "dash-sig-grid", cards),
+    htmltools::tags$script(type = "application/json", id = "sig-card-states", "{}")
+  )
+}
+
+
+# ==============================================================================
+# SUMMARY METRICS TABLE
+# ==============================================================================
+
+#' Build Summary Tab Type Filter Chips
+#' @keywords internal
+build_summary_type_filter <- function(html_data) {
+  metric_types_present <- unique(vapply(html_data$metric_rows, function(mr) {
+    classify_metric_type(mr$metric_name)
+  }, character(1)))
+
+  if (length(metric_types_present) <= 1) return("")
+
+  type_label_map <- list(mean = "Mean / Rating", pct = "% / Top Box", nps = "NPS", other = "Other")
+  chips <- c('<div class="summary-type-filter">')
+  chips <- c(chips,
+    '<button class="summary-type-chip active" data-type-filter="all" onclick="filterSummaryByType(\'all\')">All</button>'
+  )
+  for (mt in c("mean", "pct", "nps", "other")) {
+    if (mt %in% metric_types_present) {
+      chips <- c(chips, sprintf(
+        '<button class="summary-type-chip" data-type-filter="%s" onclick="filterSummaryByType(\'%s\')">%s</button>',
+        mt, mt, type_label_map[[mt]]
+      ))
+    }
+  }
+  chips <- c(chips, '</div>')
+  paste(chips, collapse = "\n")
+}
+
+
+#' Build Summary Metrics Table
+#'
+#' Compact read-only table showing Total segment values by wave.
+#' Displayed on the Summary tab for a quick overview of all metrics.
+#'
+#' @param html_data List. Output from transform_tracker_for_html()
+#' @param min_base Integer. Minimum base for low-base warnings
+#' @return htmltools::HTML object
+#' @keywords internal
+build_summary_metrics_table <- function(html_data, min_base = 30L) {
+
+  seg_name <- html_data$segments[1]  # Total (or first segment)
+  waves <- html_data$waves
+  wave_labels <- html_data$wave_labels
+
+  parts <- c()
+  parts <- c(parts, '<div class="summary-metrics-table-wrap">')
+  parts <- c(parts, '<h3 class="summary-insight-title">Metrics Overview</h3>')
+  parts <- c(parts, '<table class="tk-table summary-metrics-table" id="summary-metrics-table">')
+
+  # Header
+  parts <- c(parts, '<thead><tr>')
+  parts <- c(parts, '<th class="tk-th tk-label-col">Metric</th>')
+  for (wl in wave_labels) {
+    parts <- c(parts, sprintf('<th class="tk-th">%s</th>', htmltools::htmlEscape(wl)))
+  }
+  parts <- c(parts, '</tr></thead>')
+
+  # Body
+  parts <- c(parts, '<tbody>')
+  total_cols <- 1 + length(waves)
+
+  # Base (n=) row at TOP — use max n across ALL metrics per wave
+  if (length(html_data$metric_rows) > 0) {
+    parts <- c(parts, '<tr class="tk-base-row">')
+    parts <- c(parts, '<td class="tk-td tk-label-col tk-base-label">Base (n=)</td>')
+    for (wid in waves) {
+      max_n <- NA_integer_
+      for (mr in html_data$metric_rows) {
+        cell <- mr$segment_cells[[seg_name]][[wid]]
+        if (!is.null(cell) && !is.na(cell$n)) {
+          if (is.na(max_n) || cell$n > max_n) max_n <- cell$n
+        }
+      }
+      if (!is.na(max_n) && max_n < min_base) {
+        n_display <- sprintf('<span class="tk-low-base">%s &#x26A0;</span>', max_n)
+      } else {
+        n_display <- if (!is.na(max_n)) as.character(max_n) else ""
+      }
+      parts <- c(parts, sprintf('<td class="tk-td tk-base-cell">%s</td>', n_display))
+    }
+    parts <- c(parts, '</tr>')
+  }
+
+  # Reorder metrics: grouped sections first, "(Ungrouped)" at bottom
+  grouped_metrics <- list()
+  ungrouped_metrics <- list()
+  for (mr in html_data$metric_rows) {
+    section <- if (is.na(mr$section) || mr$section == "") "(Ungrouped)" else mr$section
+    if (section == "(Ungrouped)") {
+      ungrouped_metrics <- c(ungrouped_metrics, list(mr))
+    } else {
+      grouped_metrics <- c(grouped_metrics, list(mr))
+    }
+  }
+  ordered_metrics <- c(grouped_metrics, ungrouped_metrics)
+
+  current_section <- ""
+  for (mr in ordered_metrics) {
+    section <- if (is.na(mr$section) || mr$section == "") "(Ungrouped)" else mr$section
+    if (section != current_section) {
+      current_section <- section
+      parts <- c(parts, sprintf(
+        '<tr class="tk-section-row"><td colspan="%d" class="tk-section-cell">%s</td></tr>',
+        total_cols, htmltools::htmlEscape(section)
+      ))
+    }
+
+    m_type <- classify_metric_type(mr$metric_name)
+    cells <- mr$segment_cells[[seg_name]]
+    parts <- c(parts, sprintf(
+      '<tr class="tk-metric-row" data-metric-type="%s">', m_type
+    ))
+    parts <- c(parts, sprintf(
+      '<td class="tk-td tk-label-col"><span class="tk-metric-label">%s</span></td>',
+      htmltools::htmlEscape(mr$metric_label)
+    ))
+
+    for (wid in waves) {
+      cell <- cells[[wid]]
+      val_display <- if (!is.null(cell)) cell$display_value else "&mdash;"
+      # Dim cells with low base
+      low_base_class <- ""
+      if (!is.null(cell) && !is.na(cell$n) && cell$n < min_base) {
+        low_base_class <- " tk-low-base-dim"
+      }
+      parts <- c(parts, sprintf('<td class="tk-td tk-value-cell%s">%s</td>', low_base_class, val_display))
+    }
+    parts <- c(parts, '</tr>')
+  }
+
+  parts <- c(parts, '</tbody></table></div>')
+  htmltools::HTML(paste(parts, collapse = "\n"))
+}
