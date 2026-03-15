@@ -526,6 +526,7 @@ test_that("calculates rating mean", {
     DisplayText = c("Very Dissatisfied", "Dissatisfied", "Neutral", "Satisfied", "Very Satisfied"),
     ShowInOutput = c("Y", "Y", "Y", "Y", "Y"),
     DisplayOrder = c(1, 2, 3, 4, 5),
+    ExcludeFromIndex = c("N", "N", "N", "N", "N"),
     stringsAsFactors = FALSE
   )
 
@@ -541,15 +542,14 @@ test_that("calculates rating mean", {
     selection_row, config
   )
 
-  if (!is.null(result)) {
-    expect_true(is.data.frame(result))
-    # Should contain Average row type
-    expect_true("Average" %in% result$RowType)
-    # Mean should be reasonable (between 1 and 5)
-    mean_row <- result[result$RowType == "Average", ]
-    total_mean <- as.numeric(mean_row[["TOTAL::Total"]])
-    expect_true(total_mean >= 1 && total_mean <= 5)
-  }
+  expect_false(is.null(result), info = "add_summary_statistic should not return NULL for Rating with CreateIndex=Y")
+  expect_true(is.data.frame(result))
+  # Should contain Average row type
+  expect_true("Average" %in% result$RowType)
+  # Mean should be reasonable (between 1 and 5)
+  mean_row <- result[result$RowType == "Average", ]
+  total_mean <- as.numeric(mean_row[["TOTAL::Total"]])
+  expect_true(total_mean >= 1 && total_mean <= 5)
 })
 
 test_that("rating mean matches base R calculation", {
@@ -569,6 +569,7 @@ test_that("rating mean matches base R calculation", {
     DisplayText = c("Very Dissatisfied", "Dissatisfied", "Neutral", "Satisfied", "Very Satisfied"),
     ShowInOutput = c("Y", "Y", "Y", "Y", "Y"),
     DisplayOrder = c(1, 2, 3, 4, 5),
+    ExcludeFromIndex = c("N", "N", "N", "N", "N"),
     stringsAsFactors = FALSE
   )
 
@@ -584,12 +585,11 @@ test_that("rating mean matches base R calculation", {
     selection_row, config
   )
 
-  if (!is.null(result)) {
-    mean_row <- result[result$RowType == "Average", ]
-    total_mean <- as.numeric(mean_row[["TOTAL::Total"]])
-    expected_mean <- mean(data$Q_Rating, na.rm = TRUE)
-    expect_equal(total_mean, expected_mean, tolerance = 0.1)
-  }
+  expect_false(is.null(result), info = "add_summary_statistic should not return NULL for Rating with CreateIndex=Y")
+  mean_row <- result[result$RowType == "Average", ]
+  total_mean <- as.numeric(mean_row[["TOTAL::Total"]])
+  expected_mean <- mean(data$Q_Rating, na.rm = TRUE)
+  expect_equal(total_mean, expected_mean, tolerance = 0.1)
 })
 
 test_that("includes StdDev when enabled", {
@@ -610,6 +610,7 @@ test_that("includes StdDev when enabled", {
     DisplayText = c("Very Dissatisfied", "Dissatisfied", "Neutral", "Satisfied", "Very Satisfied"),
     ShowInOutput = c("Y", "Y", "Y", "Y", "Y"),
     DisplayOrder = c(1, 2, 3, 4, 5),
+    ExcludeFromIndex = c("N", "N", "N", "N", "N"),
     stringsAsFactors = FALSE
   )
 
@@ -625,9 +626,8 @@ test_that("includes StdDev when enabled", {
     selection_row, config
   )
 
-  if (!is.null(result)) {
-    expect_true("StdDev" %in% result$RowType)
-  }
+  expect_false(is.null(result), info = "add_summary_statistic should not return NULL for Rating with CreateIndex=Y and show_standard_deviation=TRUE")
+  expect_true("StdDev" %in% result$RowType)
 })
 
 
@@ -984,4 +984,194 @@ test_that("weighted frequencies differ from unweighted", {
   has_diff <- !all(as.numeric(freq_uw) == as.numeric(freq_w)) ||
               !all(as.numeric(pct_uw) == as.numeric(pct_w))
   expect_true(has_diff || length(freq_uw) > 0)  # At minimum, processing succeeded
+})
+
+
+# ==============================================================================
+# 9. calculate_likert_index — direct unit tests
+# ==============================================================================
+
+context("calculate_likert_index — direct")
+
+test_that("likert index returns value between 1 and 5 for standard scale", {
+  set.seed(42)
+  n <- 100
+  data <- data.frame(
+    Q_Likert = sample(
+      c("Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"),
+      n, replace = TRUE, prob = c(0.05, 0.10, 0.20, 0.35, 0.30)
+    ),
+    stringsAsFactors = FALSE
+  )
+  options_info <- data.frame(
+    OptionText = c("Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"),
+    Index_Weight = c(1, 2, 3, 4, 5),
+    stringsAsFactors = FALSE
+  )
+  weights <- rep(1, n)
+
+  result <- calculate_likert_index(data, "Q_Likert", options_info, weights)
+
+  expect_false(is.null(result))
+  expect_equal(result$stat_name, "Index")
+  expect_true(result$value >= 1 && result$value <= 5)
+  expect_true(length(result$values) == n)
+  expect_true(length(result$weights) == n)
+})
+
+test_that("likert index matches manual weighted calculation", {
+  # Deterministic data for exact verification
+  data <- data.frame(
+    Q_Likert = c(rep("Strongly disagree", 10), rep("Agree", 20), rep("Strongly agree", 30)),
+    stringsAsFactors = FALSE
+  )
+  options_info <- data.frame(
+    OptionText = c("Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"),
+    Index_Weight = c(1, 2, 3, 4, 5),
+    stringsAsFactors = FALSE
+  )
+  weights <- rep(1, 60)
+
+  result <- calculate_likert_index(data, "Q_Likert", options_info, weights)
+
+  # Manual: (10*1 + 0*2 + 0*3 + 20*4 + 30*5) / 60 = (10 + 80 + 150) / 60 = 240/60 = 4.0
+  expect_equal(result$value, 4.0, tolerance = 1e-10)
+})
+
+test_that("likert index returns NULL when no Index_Weight defined", {
+  data <- data.frame(Q_Likert = c("A", "B", "C"), stringsAsFactors = FALSE)
+  options_info <- data.frame(
+    OptionText = c("A", "B", "C"),
+    Index_Weight = c(NA_real_, NA_real_, NA_real_),
+    stringsAsFactors = FALSE
+  )
+  weights <- rep(1, 3)
+
+  result <- calculate_likert_index(data, "Q_Likert", options_info, weights)
+  expect_null(result)
+})
+
+
+# ==============================================================================
+# 10. calculate_nps_score — direct unit tests
+# ==============================================================================
+
+context("calculate_nps_score — direct")
+
+test_that("NPS score returns value between -100 and 100", {
+  set.seed(42)
+  n <- 100
+  data <- data.frame(
+    Q_NPS = sample(0:10, n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+  weights <- rep(1, n)
+
+  result <- calculate_nps_score(data, "Q_NPS", weights)
+
+  expect_false(is.null(result))
+  expect_equal(result$stat_name, "NPS Score")
+  expect_true(result$value >= -100 && result$value <= 100)
+})
+
+test_that("NPS score matches manual calculation", {
+  # All promoters (9, 10) => NPS = +100
+  data_all_promoters <- data.frame(Q_NPS = c(9, 10, 9, 10, 10), stringsAsFactors = FALSE)
+  result_promo <- calculate_nps_score(data_all_promoters, "Q_NPS", rep(1, 5))
+  expect_equal(result_promo$value, 100)
+
+  # All detractors (0-6) => NPS = -100
+  data_all_detractors <- data.frame(Q_NPS = c(0, 1, 2, 3, 4), stringsAsFactors = FALSE)
+  result_detract <- calculate_nps_score(data_all_detractors, "Q_NPS", rep(1, 5))
+  expect_equal(result_detract$value, -100)
+
+  # Mixed: 3 promoters, 2 detractors, 1 passive => (3-2)/6*100 = 16.67
+  data_mixed <- data.frame(Q_NPS = c(9, 10, 10, 0, 3, 8), stringsAsFactors = FALSE)
+  result_mixed <- calculate_nps_score(data_mixed, "Q_NPS", rep(1, 6))
+  expected_nps <- ((3 - 2) / 6) * 100
+  expect_equal(result_mixed$value, expected_nps, tolerance = 0.01)
+})
+
+test_that("NPS score filters out DK and blank responses", {
+  data <- data.frame(
+    Q_NPS = c("9", "10", "DK", "Don't know", "", "0"),
+    stringsAsFactors = FALSE
+  )
+  weights <- rep(1, 6)
+
+  result <- calculate_nps_score(data, "Q_NPS", weights)
+
+  expect_false(is.null(result))
+  # Only 3 valid: 9 (promoter), 10 (promoter), 0 (detractor) => (2-1)/3*100
+  expected_nps <- ((2 - 1) / 3) * 100
+  expect_equal(result$value, expected_nps, tolerance = 0.01)
+})
+
+
+# ==============================================================================
+# 11. calculate_chi_square_row — direct unit tests
+# ==============================================================================
+
+context("calculate_chi_square_row — direct")
+
+test_that("chi-square returns row with RowType ChiSquare for valid data", {
+  # Simulate BoxCategory frequency results with strong association
+  boxcategory_results <- data.frame(
+    RowLabel = c("Top 2 Box", "Bottom 2 Box"),
+    RowType = c("Frequency", "Frequency"),
+    RowSource = c("boxcategory", "boxcategory"),
+    "TOTAL::Total" = c(100, 100),
+    "Gender::Male" = c(70, 30),
+    "Gender::Female" = c(30, 70),
+    check.names = FALSE, stringsAsFactors = FALSE
+  )
+
+  banner_info <- list(
+    internal_keys = c("TOTAL::Total", "Gender::Male", "Gender::Female")
+  )
+  config <- list(alpha = 0.05)
+
+  result <- calculate_chi_square_row(boxcategory_results, banner_info, config)
+
+  expect_false(is.null(result))
+  expect_true(is.data.frame(result))
+  expect_equal(result$RowType, "ChiSquare")
+  expect_equal(result$RowSource, "chi_square")
+  # RowLabel should contain chi-square statistic info
+  expect_true(grepl("Chi-square", result$RowLabel))
+})
+
+test_that("chi-square returns NULL for insufficient data", {
+  # Only one row — need at least 2 for chi-square
+  boxcategory_results <- data.frame(
+    RowLabel = "Top 2 Box",
+    RowType = "Frequency",
+    RowSource = "boxcategory",
+    "TOTAL::Total" = 50,
+    "Gender::Male" = 30,
+    "Gender::Female" = 20,
+    check.names = FALSE, stringsAsFactors = FALSE
+  )
+
+  banner_info <- list(
+    internal_keys = c("TOTAL::Total", "Gender::Male", "Gender::Female")
+  )
+  config <- list(alpha = 0.05)
+
+  result <- calculate_chi_square_row(boxcategory_results, banner_info, config)
+  expect_null(result)
+})
+
+test_that("chi-square returns NULL for NULL or empty inputs", {
+  banner_info <- list(internal_keys = c("TOTAL::Total", "Gender::Male"))
+  config <- list(alpha = 0.05)
+
+  expect_null(calculate_chi_square_row(NULL, banner_info, config))
+  expect_null(calculate_chi_square_row(
+    data.frame(), banner_info, config
+  ))
+  expect_null(calculate_chi_square_row(
+    data.frame(RowLabel = "x", RowType = "Frequency", stringsAsFactors = FALSE),
+    NULL, config
+  ))
 })

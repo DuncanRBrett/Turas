@@ -1,6 +1,6 @@
 # Turas Tabs Module - Code Inventory
 
-**Generated:** 15 March 2026 | **Version:** 10.8.2 | **R Files:** 52 lib + 9 tests + 2 entry = 63 | **JS Files:** 5 | **Total Lines:** 34,749 (lib R+JS) + 4,915 (tests) + 696 (entry) = 40,360
+**Generated:** 15 March 2026 | **Version:** 10.8.2 | **R Files:** 52 lib + 15 tests + 2 entry = 69 | **JS Files:** 5 | **Total Lines:** 34,749 (lib R+JS) + 9,072 (tests) + 696 (entry) = 44,517
 
 ------------------------------------------------------------------------
 
@@ -45,11 +45,11 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | HTML Report (JS) | 5 | 4,155 | 10.7% |
 | Utilities | 5 | 1,142 | 3.2% |
 | Config Templates | 1 | 1,373 | 3.9% |
-| Tests | 12 | 7,201 | 16.5% |
+| Tests | 15 | 9,072 | 19.5% |
 | Entry Points & GUI | 2 | 696 | 2.0% |
 
 **Note on test locations:**
-- `modules/tabs/tests/testthat/` — 12 files, 7,201 lines: tabs-specific business logic (core guard/config 243, calculations 56, utilities 96, V10.8 regressions 56, banner 46, data loading 35, numeric processor 32, Excel output 63, HTML report 45, standard processor 47, validation 46, composite processor 42 = 807 assertions total, 0 failures)
+- `modules/tabs/tests/testthat/` — 15 files, 9,072 lines: tabs-specific business logic (1,008 assertions total, 0 failures, 0 skips)
 - `tests/testthat/` (project root) — 10 files, ~2,389 lines: shared infrastructure (TRS compliance, shared utilities, code quality scans)
 - See `tests/testthat/README.md` and `modules/tabs/tests/README.md` for rationale.
 
@@ -202,21 +202,24 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 
 ### Tests
 
-| File | Lines | Assertions | Coverage |
-|---|---:|---:|---|
-| `tests/testthat/test_tabs_core.R` | 1,317 | 243 | Guard state, status, type conversion, config, validation gates |
-| `tests/testthat/test_calculations.R` | 508 | 56 | Rating mean, cell data, significance testing (weighted/unweighted) |
-| `tests/testthat/test_utilities.R` | 428 | 96 | safe_logical, safe_numeric, safe_equal, config, path, filter, format, excel_col, validate |
-| `tests/testthat/test_bugfixes_v10_8.R` | 575 | 56 | V10.8 regression tests: FP tolerance, Bessel SD, closure scoping, sig letters, tie-breaking, banner labels |
-| `tests/testthat/test_banner.R` | 464 | 46 | Banner structure, excel letters, banner labels, row indices, bases, Kish formula |
-| `tests/testthat/test_data_loading.R` | 301 | 35 | resolve_path (absolute/relative/whitespace), config header auto-detect, survey structure, table sheets |
-| `tests/testthat/test_numeric_processor.R` | 287 | 32 | IQR outliers, numeric bins, statistics (mean/SD/median/mode, weighted/unweighted) |
-| `tests/testthat/test_excel_output.R` | 581 | 63 | Excel styles, row style mapping, banner headers, base rows, question tables, summary/guide/error sheets, E2E file write |
-| `tests/testthat/test_html_report.R` | 454 | 45 | Guard validation, banner groups, data transformation, E2E HTML generation with content verification |
-| `tests/testthat/test_standard_processor.R` | 987 | 47 | Single/Multi response processing, freq/pct sums, ShowInOutput, BoxCategory, summary stats, dispatch routing, output structure, weighted |
-| `tests/testthat/test_validation.R` | 737 | 46 | Structure/config/weight/data/preflight validators, orchestrator, duplicate/orphan detection, colour/dashboard checks |
-| `tests/testthat/test_composite_processor.R` | 562 | 42 | Composite validation, Mean/Sum/WeightedMean calculation, NA handling, multi-composite processing, accuracy verification |
-| | **7,201** | **807** | |
+| File | Lines | Coverage |
+|---|---:|---|
+| `tests/testthat/test_tabs_core.R` | 1,317 | Guard state, status, type conversion, config, validation gates |
+| `tests/testthat/test_calculations.R` | 508 | Rating mean, cell data, significance testing (weighted/unweighted) |
+| `tests/testthat/test_utilities.R` | 428 | safe_logical, safe_numeric, safe_equal, config, path, filter, format, excel_col, validate |
+| `tests/testthat/test_bugfixes_v10_8.R` | 575 | V10.8 regression tests: FP tolerance, Bessel SD, closure scoping, sig letters, tie-breaking, banner labels |
+| `tests/testthat/test_banner.R` | 464 | Banner structure, excel letters, banner labels, row indices, bases, Kish formula |
+| `tests/testthat/test_data_loading.R` | 301 | resolve_path (absolute/relative/whitespace), config header auto-detect, survey structure, table sheets |
+| `tests/testthat/test_numeric_processor.R` | 287 | IQR outliers, numeric bins, statistics (mean/SD/median/mode, weighted/unweighted) |
+| `tests/testthat/test_excel_output.R` | 581 | Excel styles, row style mapping, banner headers, base rows, question tables, summary/guide/error sheets, E2E file write |
+| `tests/testthat/test_html_report.R` | 454 | Guard validation, banner groups, data transformation, E2E HTML generation with content verification |
+| `tests/testthat/test_standard_processor.R` | 1,177 | Single/Multi response, BoxCategory, rating mean, Likert index, NPS score, chi-square, dispatch routing, weighted processing |
+| `tests/testthat/test_validation.R` | 737 | Structure/config/weight/data/preflight validators, orchestrator, duplicate/orphan detection, colour/dashboard checks |
+| `tests/testthat/test_composite_processor.R` | 562 | Composite validation, Mean/Sum/WeightedMean calculation, NA handling, multi-composite processing, accuracy verification |
+| `tests/testthat/test_ranking_processor.R` | 683 | Ranking validation, percent_ranked_first, percent_top_n, mean_rank, normalize_rank_direction, rank_variance, edge cases |
+| `tests/testthat/test_workbook_builder.R` | 495 | Style config, project info, save_workbook_safe, create_crosstabs_workbook (Summary/Run_Status sheets, E2E file write) |
+| `tests/testthat/test_e2e_integration.R` | 503 | Full pipeline: config load → data load → analysis → Excel output → HTML output using demo survey data |
+| | **9,072** | **1,008 assertions, 0 failures, 0 skips** |
 
 ------------------------------------------------------------------------
 
@@ -270,11 +273,14 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | Numeric processor (outliers, bins, stats) | Yes (32 assertions) | |
 | Excel output (styles, headers, tables, E2E) | Yes (63 assertions) | |
 | HTML report generation (guard, transform, E2E) | Yes (45 assertions) | |
-| Standard processor (core analysis engine) | Yes (47 assertions) | Single/Multi response, BoxCategory, summary stats, dispatch routing |
+| Standard processor (core analysis engine) | Yes (59 assertions) | Single/Multi response, BoxCategory, rating mean, Likert index, NPS score, chi-square, dispatch routing, weighted processing |
 | Validation system (all 5 validator modules) | Yes (46 assertions) | Structure, config, weight, data, preflight validators + orchestrator |
 | Composite processor (virtual metrics) | Yes (42 assertions) | Mean/Sum/WeightedMean, NA handling, accuracy verification |
+| Ranking processor (V10.1) | Yes (90 assertions) | Ranking validation, percent_ranked_first, percent_top_n, mean_rank, normalize_rank_direction, rank_variance, edge cases |
+| Workbook builder | Yes (39 assertions) | Style config, project info, save_workbook_safe, create_crosstabs_workbook |
+| End-to-end integration | Yes (40 assertions) | Full pipeline: config → data → analysis → Excel → HTML using demo survey data |
 
-**Honest assessment:** 807 assertions across 12 test files cover core calculations, guard logic, utilities, validation, V10.8 bug fix regressions, banner creation, data loading, numeric processing, Excel output, HTML report generation, the core standard processor analysis engine, all 5 validation sub-modules, and composite metrics — all passing with 0 failures. All 7 bugs found during systematic code review have regression tests. The Excel output tests also uncovered and fixed a missing `config` argument bug in `write_question_table` → `write_base_rows`.
+**Honest assessment:** 1,008 assertions across 15 test files cover every major subsystem: core calculations, guard logic, utilities, validation (all 5 sub-modules), V10.8 regression bugs, banner creation, data loading, numeric processing, Excel output, HTML report generation, the standard processor analysis engine (including rating mean, Likert index, NPS score, chi-square), composite metrics, ranking processor, workbook builder, and full end-to-end integration — all passing with 0 failures and 0 skips. All 7 bugs found during systematic code review have regression tests.
 
 ### Key Strengths
 
