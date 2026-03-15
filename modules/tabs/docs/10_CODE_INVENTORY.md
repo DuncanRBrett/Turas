@@ -45,11 +45,11 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | HTML Report (JS) | 5 | 4,155 | 10.7% |
 | Utilities | 5 | 1,142 | 3.2% |
 | Config Templates | 1 | 1,373 | 3.9% |
-| Tests | 9 | 4,915 | 12.2% |
+| Tests | 12 | 7,201 | 16.5% |
 | Entry Points & GUI | 2 | 696 | 2.0% |
 
 **Note on test locations:**
-- `modules/tabs/tests/testthat/` — 9 files, 4,915 lines: tabs-specific business logic (core guard/config 243, calculations 56, utilities 96, V10.8 regressions 56, banner 46, data loading 35, numeric processor 32, Excel output 63, HTML report 45 = 560 assertions total)
+- `modules/tabs/tests/testthat/` — 12 files, 7,201 lines: tabs-specific business logic (core guard/config 243, calculations 56, utilities 96, V10.8 regressions 56, banner 46, data loading 35, numeric processor 32, Excel output 63, HTML report 45, standard processor 47, validation 46, composite processor 42 = 807 assertions total, 0 failures)
 - `tests/testthat/` (project root) — 10 files, ~2,389 lines: shared infrastructure (TRS compliance, shared utilities, code quality scans)
 - See `tests/testthat/README.md` and `modules/tabs/tests/README.md` for rationale.
 
@@ -213,7 +213,10 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | `tests/testthat/test_numeric_processor.R` | 287 | 32 | IQR outliers, numeric bins, statistics (mean/SD/median/mode, weighted/unweighted) |
 | `tests/testthat/test_excel_output.R` | 581 | 63 | Excel styles, row style mapping, banner headers, base rows, question tables, summary/guide/error sheets, E2E file write |
 | `tests/testthat/test_html_report.R` | 454 | 45 | Guard validation, banner groups, data transformation, E2E HTML generation with content verification |
-| | **4,915** | **560** | |
+| `tests/testthat/test_standard_processor.R` | 987 | 47 | Single/Multi response processing, freq/pct sums, ShowInOutput, BoxCategory, summary stats, dispatch routing, output structure, weighted |
+| `tests/testthat/test_validation.R` | 737 | 46 | Structure/config/weight/data/preflight validators, orchestrator, duplicate/orphan detection, colour/dashboard checks |
+| `tests/testthat/test_composite_processor.R` | 562 | 42 | Composite validation, Mean/Sum/WeightedMean calculation, NA handling, multi-composite processing, accuracy verification |
+| | **7,201** | **807** | |
 
 ------------------------------------------------------------------------
 
@@ -267,8 +270,11 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | Numeric processor (outliers, bins, stats) | Yes (32 assertions) | |
 | Excel output (styles, headers, tables, E2E) | Yes (63 assertions) | |
 | HTML report generation (guard, transform, E2E) | Yes (45 assertions) | |
+| Standard processor (core analysis engine) | Yes (47 assertions) | Single/Multi response, BoxCategory, summary stats, dispatch routing |
+| Validation system (all 5 validator modules) | Yes (46 assertions) | Structure, config, weight, data, preflight validators + orchestrator |
+| Composite processor (virtual metrics) | Yes (42 assertions) | Mean/Sum/WeightedMean, NA handling, accuracy verification |
 
-**Honest assessment:** 560 assertions across 9 test files cover core calculations, guard logic, utilities, validation, V10.8 bug fix regressions, banner creation, data loading, numeric processing, Excel output, and HTML report generation end-to-end. All 7 bugs found during systematic code review have regression tests. The Excel output tests also uncovered and fixed a missing `config` argument bug in `write_question_table` → `write_base_rows`.
+**Honest assessment:** 807 assertions across 12 test files cover core calculations, guard logic, utilities, validation, V10.8 bug fix regressions, banner creation, data loading, numeric processing, Excel output, HTML report generation, the core standard processor analysis engine, all 5 validation sub-modules, and composite metrics — all passing with 0 failures. All 7 bugs found during systematic code review have regression tests. The Excel output tests also uncovered and fixed a missing `config` argument bug in `write_question_table` → `write_base_rows`.
 
 ### Key Strengths
 

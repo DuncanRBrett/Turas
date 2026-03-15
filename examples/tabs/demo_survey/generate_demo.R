@@ -651,7 +651,7 @@ settings_df <- data.frame(
     # Index descriptor
     "index_descriptor",
     # Charts
-    "show_charts",
+    "show_charts", "chart_palette_preset",
     # Priority metric on charts
     "priority_metric"
   ),
@@ -684,7 +684,7 @@ settings_df <- data.frame(
     # Index descriptor
     "Strongly disagree(1) = 1 to Strongly agree(5) = 5",
     # Charts
-    "TRUE",
+    "TRUE", "warm",
     # Priority metric on charts
     "Mean, NPS Score"
   ),
