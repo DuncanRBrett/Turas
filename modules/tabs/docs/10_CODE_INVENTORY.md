@@ -1,6 +1,6 @@
 # Turas Tabs Module - Code Inventory
 
-**Generated:** 15 March 2026 | **Version:** 10.8 | **R Files:** 48 lib + 3 tests + 2 entry = 53 | **JS Files:** 5 | **Total Lines:** 31,039 R (lib) + 4,155 JS + 2,949 (tests/entry) = 38,143
+**Generated:** 15 March 2026 | **Version:** 10.8.1 | **R Files:** 52 lib + 4 tests + 2 entry = 58 | **JS Files:** 5 | **Total Lines:** 35,302 (lib R+JS) + 2,828 (tests) + 696 (entry) = 38,826
 
 ------------------------------------------------------------------------
 
@@ -41,15 +41,15 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | Banner & Cell Calculations | 3 | 1,895 | 5.4% |
 | Weighting & Statistics | 1 | 1,578 | 4.5% |
 | Excel Output | 3 | 2,577 | 7.3% |
-| HTML Report (R) | 9 | 7,217 | 20.5% |
-| HTML Report (JS) | 5 | 4,155 | 11.8% |
+| HTML Report (R) | 13 | 7,280 | 18.8% |
+| HTML Report (JS) | 5 | 4,155 | 10.7% |
 | Utilities | 5 | 1,142 | 3.2% |
 | Config Templates | 1 | 1,373 | 3.9% |
-| Tests | 3 | 2,253 | 6.4% |
+| Tests | 4 | 2,828 | 7.3% |
 | Entry Points & GUI | 2 | 696 | 2.0% |
 
 **Note on test locations:**
-- `modules/tabs/tests/testthat/` — 3 files, 2,253 lines: tabs-specific business logic (core guard/config 243 assertions, calculations 56 assertions, utilities 96 assertions)
+- `modules/tabs/tests/testthat/` — 4 files, 2,828 lines: tabs-specific business logic (core guard/config 243 assertions, calculations 56 assertions, utilities 96 assertions, V10.8 bug fix regressions 56 assertions)
 - `tests/testthat/` (project root) — 10 files, ~2,389 lines: shared infrastructure (TRS compliance, shared utilities, code quality scans)
 - See `tests/testthat/README.md` and `modules/tabs/tests/README.md` for rationale.
 
@@ -113,16 +113,16 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 |---|---:|---|
 | `lib/question_orchestrator.R` | 678 | Question data preparation and coordination |
 | `lib/question_dispatcher.R` | 423 | Route questions to processors by Variable_Type |
-| `lib/standard_processor.R` | 1,338 | Process Single/Multi/Likert/Rating questions |
-| `lib/numeric_processor.R` | 592 | Process Numeric questions with bins |
+| `lib/standard_processor.R` | 1,340 | Process Single/Multi/Likert/Rating questions |
+| `lib/numeric_processor.R` | 599 | Process Numeric questions with bins |
 | | **3,031** | |
 
 ### Composite Metrics
 
 | File | Lines | Purpose |
 |---|---:|---|
-| `lib/composite_processor.R` | 826 | Composite metrics combining multiple questions |
-| | **826** | |
+| `lib/composite_processor.R` | 830 | Composite metrics combining multiple questions |
+| | **830** | |
 
 ### Ranking System
 
@@ -131,7 +131,7 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | `lib/ranking.R` | 1,019 | Ranking question orchestration with 3 submodules |
 | `lib/ranking/ranking_validation.R` | 200 | Ranking format/position validation |
 | `lib/ranking/ranking_metrics.R` | 557 | Ranking metric calculations (mean_rank, %first, %top-n) |
-| `lib/ranking/ranking_crosstabs.R` | 312 | Ranking crosstab row creation per banner |
+| `lib/ranking/ranking_crosstabs.R` | 318 | Ranking crosstab row creation per banner |
 | | **2,088** | |
 
 ### Banner & Cell Calculations
@@ -147,8 +147,8 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 
 | File | Lines | Purpose |
 |---|---:|---|
-| `lib/weighting.R` | 1,578 | Weighted analysis, Kish effective-n, z-test, t-test, chi-square |
-| | **1,578** | |
+| `lib/weighting.R` | 1,587 | Weighted analysis, Kish effective-n, z-test, t-test, chi-square |
+| | **1,587** | |
 
 ### Excel Output
 
@@ -164,15 +164,19 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | File | Lines | Purpose |
 |---|---:|---|
 | `lib/html_report/00_html_guard.R` | 181 | Input validation; package checks (htmltools, jsonlite) |
-| `lib/html_report/01_data_transformer.R` | 535 | Transform results to HTML structures |
+| `lib/html_report/01_data_transformer.R` | 541 | Transform results to HTML structures |
 | `lib/html_report/02_table_builder.R` | 327 | Build HTML table elements with data attributes |
-| `lib/html_report/03_page_builder.R` | 2,336 | Assemble complete HTML page (CSS, JS, layout) |
+| `lib/html_report/03_page_builder.R` | 342 | Page assembler + JS module loader (V10.8 split) |
+| `lib/html_report/03a_page_styling.R` | 926 | CSS stylesheet + print CSS (extracted from 03) |
+| `lib/html_report/03b_page_components.R` | 1,105 | Layout components, question containers, qualitative (extracted from 03) |
 | `lib/html_report/04_html_writer.R` | 111 | Write self-contained HTML file |
 | `lib/html_report/05_dashboard_transformer.R` | 510 | Extract headline metrics for dashboard |
-| `lib/html_report/06_dashboard_builder.R` | 1,993 | Dashboard components (gauges, heatmap, findings) |
+| `lib/html_report/06_dashboard_builder.R` | 1,037 | Dashboard orchestrator + component builders (V10.8 split) |
+| `lib/html_report/06a_dashboard_js.R` | 492 | Dashboard JavaScript (heatmap export, gauge interactions, extracted from 06) |
+| `lib/html_report/06b_dashboard_styling.R` | 488 | Dashboard CSS + colour system (extracted from 06) |
 | `lib/html_report/07_chart_builder.R` | 767 | Inline SVG chart generation (semantic palettes) |
-| `lib/html_report/99_html_report_main.R` | 448 | HTML report entry point (guard, transform, build, write) |
-| | **7,208** | |
+| `lib/html_report/99_html_report_main.R` | 452 | HTML report entry point (guard, transform, build, write) |
+| | **7,279** | |
 
 ### HTML Report (JavaScript)
 
@@ -203,7 +207,8 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | `tests/testthat/test_tabs_core.R` | 1,317 | 243 | Guard state, status, type conversion, config, validation gates |
 | `tests/testthat/test_calculations.R` | 508 | 56 | Rating mean, cell data, significance testing (weighted/unweighted) |
 | `tests/testthat/test_utilities.R` | 428 | 96 | safe_logical, safe_numeric, safe_equal, config, path, filter, format, excel_col, validate |
-| | **2,253** | **395** | |
+| `tests/testthat/test_bugfixes_v10_8.R` | 575 | 56 | V10.8 regression tests: FP tolerance, Bessel SD, closure scoping, sig letters, tie-breaking, banner labels |
+| | **2,828** | **451** | |
 
 ------------------------------------------------------------------------
 
@@ -242,19 +247,23 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | Validation gates | Yes (42 assertions) | |
 | Cell calculations | Yes (24 assertions) | |
 | Rating mean (weighted/unweighted) | Yes (16 assertions) | |
-| Significance testing (z-test) | Yes (16 assertions) | |
+| Significance testing (z-test) | Yes (16 + 14 V10.8 assertions) | |
 | Path resolution | Yes (12 assertions) | |
 | Filter security | Yes (8 assertions) | |
 | Excel column letters | Yes (6 assertions) | |
+| Floating-point tolerance (weighted z-test) | Yes (6 V10.8 assertions) | |
+| Bessel-corrected weighted variance | Yes (4 V10.8 assertions) | |
+| Ranking metrics (tie-breaking) | Yes (4 V10.8 assertions) | |
+| Ranking crosstab row creation | Yes (8 V10.8 assertions) | |
+| Composite sig_letters lookup | Yes (3 V10.8 assertions) | |
+| Banner label priority (HTML report) | Yes (5 V10.8 assertions) | |
 | Banner creation | | Not tested |
 | Data loading | | Not tested |
 | Excel output | | Not tested |
-| HTML report generation | | Not tested |
-| Ranking calculations | | Not tested |
-| Numeric processor | | Not tested |
-| Composite processor | | Not tested |
+| HTML report generation (end-to-end) | | Not tested |
+| Numeric processor (end-to-end) | | Not tested |
 
-**Honest assessment:** 395 assertions cover core calculations, guard logic, utilities, and validation. High-risk statistical functions are tested. Integration-level tests (end-to-end report generation) are not automated. Priority expansion areas: weighting edge cases, ranking metrics, banner creation.
+**Honest assessment:** 451 assertions cover core calculations, guard logic, utilities, validation, and V10.8 bug fix regressions. All 7 bugs found during systematic code review now have regression tests. Integration-level tests (end-to-end report generation) are not automated. Priority expansion areas: banner creation, data loading, Excel output.
 
 ### Key Strengths
 
@@ -265,13 +274,15 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 5. **Memory-efficient** - Index-based banner subsetting; vectorised rating mean
 6. **Self-contained HTML** - Zero external dependencies; pure SVG charts
 7. **Config safety** - Unrecognised settings trigger console warning (typo detection)
+8. **Modular HTML report** - Largest files split into focused submodules (V10.8.1: no file > 1,105 lines)
+9. **Bessel-corrected statistics** - Weighted SD uses sample variance (V10.8)
+10. **Floating-point safe** - Weighted z-test tolerates FP noise in 100% cells (V10.8)
 
 ### Known Limitations
 
-1. `page_builder.R` (2,336 lines) and `dashboard_builder.R` (1,993 lines) are large single files
-2. `config_loader.R` retains legacy functions not called by pipeline (marked @keywords internal)
-3. Test coverage does not include banner, ranking, data loading, or output generation
-4. `run_crosstabs.R` uses `return()` at top-level scope (works in Shiny but not from bare R console)
+1. `config_loader.R` retains legacy functions not called by pipeline (marked @keywords internal)
+2. Test coverage does not include banner, data loading, or output generation (ranking now partially covered)
+3. `run_crosstabs.R` uses `return()` at top-level scope (works in Shiny but not from bare R console)
 
 ------------------------------------------------------------------------
 
@@ -300,8 +311,8 @@ crosstabs  data_setup   +----------+  +--------------+
 _config.R  .R            | Validate |  | Excel Writer |
                          | (5 mods) |  | + Guide      |
                          +----+-----+  +--------------+
-                              |        | HTML Report  |
-                              v        | (9 R + 5 JS) |
+                              |        | HTML Report   |
+                              v        | (13 R + 5 JS) |
                          +----------+  +--------------+
                          | Question |
                          | Dispatch |

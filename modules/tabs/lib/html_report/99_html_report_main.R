@@ -30,9 +30,13 @@
 
 # Source all submodules — fail loudly if any file is missing
 .hr_required_files <- c("00_html_guard.R", "01_data_transformer.R",
-                         "02_table_builder.R", "03_page_builder.R",
+                         "02_table_builder.R",
+                         "03a_page_styling.R", "03b_page_components.R",
+                         "03_page_builder.R",
                          "04_html_writer.R",
                          "05_dashboard_transformer.R",
+                         "06b_dashboard_styling.R",
+                         "06a_dashboard_js.R",
                          "06_dashboard_builder.R",
                          "07_chart_builder.R")
 
