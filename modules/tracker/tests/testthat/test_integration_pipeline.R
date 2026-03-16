@@ -42,6 +42,11 @@ if (file.exists(trs_run_state_path)) tryCatch(source(trs_run_state_path), error 
 trs_banner_path <- file.path(turas_root, "modules", "shared", "lib", "trs_banner.R")
 if (file.exists(trs_banner_path)) tryCatch(source(trs_banner_path), error = function(e) NULL)
 
+# Pre-source shared utilities (wave_loader.R needs these)
+shared_lib <- file.path(turas_root, "modules", "shared", "lib")
+weights_path <- file.path(shared_lib, "weights_utils.R")
+if (file.exists(weights_path)) source(weights_path)
+
 # Source tracker modules in dependency order
 source(file.path(tracker_root, "lib", "00_guard.R"))
 source(file.path(tracker_root, "lib", "constants.R"))

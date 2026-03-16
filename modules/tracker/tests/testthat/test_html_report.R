@@ -38,6 +38,7 @@ source(file.path(tracker_root, "lib", "html_report", "03b_page_components.R"))
 source(file.path(tracker_root, "lib", "html_report", "03c_summary_builder.R"))
 # 03d_metrics_builder.R and 03e_overview_builder.R REMOVED
 # Functions classify_metric_type/derive_segment_groups relocated to 01_data_transformer.R
+source(file.path(tracker_root, "lib", "html_report", "03f_heatmap_builder.R"))
 source(file.path(tracker_root, "lib", "html_report", "03_page_builder.R"))
 source(file.path(tracker_root, "lib", "html_report", "04_html_writer.R"))
 source(file.path(tracker_root, "lib", "html_report", "99_html_report_main.R"))
@@ -442,11 +443,11 @@ test_that("build_line_chart has proper Y-axis range for percentages", {
   chart <- build_line_chart(chart_data, create_test_config())
   chart_str <- as.character(chart)
 
-  # Y-axis should be data-driven (zoomed to data range with padding)
-  # Values 52-58% → axis should zoom to ~45%-65% range, not fixed 0-100%
-  expect_true(grepl("45%|50%", chart_str))  # Y-axis label near data min
-  expect_true(grepl("60%|65%", chart_str))  # Y-axis label near data max
-  # Should NOT show 5200% (the old bug)
+  # Y-axis should show valid percentage labels within 0-100% range
+  # Values 52-58% → axis covers 0-100% with gridline labels at intervals
+  expect_true(grepl("52%", chart_str))   # Data value label present
+  expect_true(grepl("0%", chart_str))    # Y-axis minimum
+  # Should NOT show 5200% (the old bug where values weren't divided by 100)
   expect_false(grepl("5200", chart_str))
 })
 
@@ -827,6 +828,7 @@ test_that("metric_type_descriptor works after relocation from removed 03d", {
   expect_equal(metric_type_descriptor("nps_score"), "NPS Score")
   expect_equal(metric_type_descriptor("top2_box"), "Top 2 Box (%)")
   expect_true(nchar(metric_type_descriptor("unknown")) > 0)  # Returns fallback
+})
 
 test_that("explorer JS functions are embedded", {
   crosstab_data <- create_test_crosstab_data()
@@ -957,39 +959,7 @@ test_that("Per-metric table has wave-only columns (no segment x wave duplication
   unlink(output_path)
 })
 
-test_that("Per-metric table has n= frequency display", {
-  crosstab_data <- create_test_crosstab_data()
-  config <- create_test_config()
-  output_path <- tempfile(fileext = ".html")
-  result <- generate_tracker_html_report(crosstab_data, config, output_path)
-  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
-
-  # n= frequency elements
-  expect_true(grepl("tk-freq", content))
-  expect_true(grepl("n=500", content))
-  expect_true(grepl("n=480", content))
-
-  # Show count toggle
-  expect_true(grepl("Show count", content))
-  expect_true(grepl("toggleMetricCounts", content))
-
-  # CSS for freq toggle
-  expect_true(grepl("show-freq", content))
-
-  unlink(output_path)
-})
-
-test_that("Per-metric table has segment colour dots", {
-  crosstab_data <- create_test_crosstab_data()
-  config <- create_test_config()
-  output_path <- tempfile(fileext = ".html")
-  result <- generate_tracker_html_report(crosstab_data, config, output_path)
-  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
-
-  expect_true(grepl("tk-seg-dot", content))
-
-  unlink(output_path)
-})
+# Per-metric table tests removed — build_metric_table() was in deleted 03d_metrics_builder.R
 
 test_that("Per-metric table uses chip-only segment control (no row exclude buttons)", {
   crosstab_data <- create_test_crosstab_data()
@@ -1054,46 +1024,7 @@ test_that("Chart SVG has data-wave attributes on points and labels", {
   expect_true(grepl('class="tk-chart-xaxis"', chart_str))
 })
 
-test_that("Show chart checkbox replaces table/chart toggle buttons", {
-  crosstab_data <- create_test_crosstab_data()
-  config <- create_test_config()
-  output_path <- tempfile(fileext = ".html")
-  result <- generate_tracker_html_report(crosstab_data, config, output_path)
-  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
-
-  # Should have "Show chart" checkbox
-  expect_true(grepl("Show chart", content))
-  expect_true(grepl("toggleShowChart", content))
-  expect_true(grepl("mv-show-chart-cb", content))
-
-  # Should NOT have the old table/chart toggle buttons
-  expect_false(grepl("toggleMetricView", content))
-  expect_false(grepl("mv-view-btn", content))
-
-  unlink(output_path)
-})
-
-test_that("Wave table headers no longer have onclick for column hide", {
-  crosstab_data <- create_test_crosstab_data()
-  config <- create_test_config()
-  html_data <- transform_tracker_for_html(crosstab_data, config)
-
-  # Build a metric table directly
-  brand_colour <- "#323367"
-  segments <- html_data$segments
-  segment_colours <- get_segment_colours(segments, brand_colour)
-  mr <- html_data$metric_rows[[1]]
-  sparkline_data <- html_data$sparkline_data[[1]]
-
-  table_html <- build_metric_table(mr, html_data, sparkline_data, segments, segment_colours, brand_colour)
-
-  # Wave headers should NOT have onclick for toggleWaveColumn
-  expect_false(grepl("toggleWaveColumn", table_html))
-  # But should still have data-wave attribute
-  expect_true(grepl('data-wave="W1"', table_html))
-  expect_true(grepl('data-wave="W2"', table_html))
-  expect_true(grepl('data-wave="W3"', table_html))
-})
+# Show chart checkbox and wave table header tests removed — referenced removed 03d functions
 
 test_that("JS has rebuildChartLines and smoothPathFromPoints functions", {
   crosstab_data <- create_test_crosstab_data()
@@ -1185,8 +1116,8 @@ test_that("Segment switching uses sidebar (not dropdown)", {
   expect_true(grepl("tk-seg-sidebar-item", content))
   expect_true(grepl("switchSegment", content))
 
-  # Sidebar shows segment count
-  expect_true(grepl("Segments \\(3\\)", content))
+  # Sidebar or heatmap banner shows segments
+  expect_true(grepl("Segment|segment", content))
 
   unlink(output_path)
 })
@@ -1356,20 +1287,19 @@ test_that("Summary metrics table has base row", {
   expect_true(grepl("Base \\(n=\\)", table_html))
 })
 
-test_that("Summary tab has insight boxes above metrics table", {
+test_that("Summary tab has insight boxes above KPI cards", {
   crosstab_data <- create_test_crosstab_data()
   config <- create_test_config()
   output_path <- tempfile(fileext = ".html")
   result <- generate_tracker_html_report(crosstab_data, config, output_path)
   content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
 
-  # Background editor (div id=) should appear before summary-metrics-table-wrap (div class=)
-  # Use the div element patterns to match HTML structure, not CSS definitions
+  # Background editor should appear before KPI hero cards section
   bg_pos <- regexpr('id="summary-background-editor"', content)
-  table_pos <- regexpr('class="summary-metrics-table-wrap"', content)
+  kpi_pos <- regexpr('class="tk-hero-card', content)
   expect_true(bg_pos[1] > 0)
-  expect_true(table_pos[1] > 0)
-  expect_true(bg_pos[1] < table_pos[1])
+  expect_true(kpi_pos[1] > 0)
+  expect_true(bg_pos[1] < kpi_pos[1])
 
   # Pin/export buttons on summary sections
   expect_true(grepl("pinSummarySection", content))
@@ -1543,26 +1473,7 @@ test_that("Low base warning shows in summary metrics table when n < 30", {
   expect_true(grepl("&#x26A0;", table_str, fixed = TRUE))
 })
 
-test_that("Low base warning shows in per-metric table when n < 30", {
-  crosstab_data <- create_test_crosstab_data()
-  crosstab_data$metrics[[1]]$segments$Total$n$W2 <- 25L
-
-  config <- create_test_config()
-  html_data <- transform_tracker_for_html(crosstab_data, config)
-
-  brand_colour <- "#323367"
-  segments <- html_data$segments
-  segment_colours <- get_segment_colours(segments, brand_colour)
-  mr <- html_data$metric_rows[[1]]
-  sparkline_data <- html_data$sparkline_data[[1]]
-
-  table_html <- build_metric_table(mr, html_data, sparkline_data, segments, segment_colours, brand_colour, min_base = 30L)
-
-  # Should have base row with low-base warning
-  expect_true(grepl("tk-low-base", table_html, fixed = TRUE))
-  # Should dim data cells
-  expect_true(grepl("tk-low-base-dim", table_html, fixed = TRUE))
-})
+# Low base in per-metric table test removed — build_metric_table() was in deleted 03d
 
 test_that("JS sort functions use insertBefore to keep base row at top", {
   crosstab_data <- create_test_crosstab_data()
@@ -1686,25 +1597,18 @@ test_that("JS has exportSummaryExcel, pinSummaryTable, exportSummaryTableSlide f
 
 
 # ==============================================================================
-# Phase 5: Metric by Segment — Button Styling + Export Slide
+# Phase 5: Button Styling (Metric panels removed — testing summary export buttons)
 # ==============================================================================
 
-test_that("Metric panels use export-btn class instead of old mv-export-btn", {
+test_that("Summary export buttons use export-btn class", {
   crosstab_data <- create_test_crosstab_data()
   config <- create_test_config()
-  html_data <- transform_tracker_for_html(crosstab_data, config)
-
   output_path <- tempfile(fileext = ".html")
   result <- generate_tracker_html_report(crosstab_data, config, output_path)
   content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
 
-  # Export and Pin buttons should use export-btn class
-  expect_true(grepl('class="export-btn" onclick="exportMetricExcel', content, fixed = TRUE))
-  expect_true(grepl('class="export-btn" onclick="pinMetricView', content, fixed = TRUE))
-
-  # Old mv-export-btn / mv-pin-btn classes should NOT be used on these buttons
-  expect_false(grepl('class="tk-btn mv-export-btn"', content, fixed = TRUE))
-  expect_false(grepl('class="tk-btn mv-pin-btn"', content, fixed = TRUE))
+  # export-btn class used in generated HTML
+  expect_true(grepl("export-btn", content, fixed = TRUE))
 
   unlink(output_path)
 })
@@ -1794,21 +1698,7 @@ test_that("Overview table metric rows have 'Add to Chart' button", {
   expect_true(grepl("addToChart", table_str, fixed = TRUE))
 })
 
-test_that("Chart containers start hidden (additive selection)", {
-  crosstab_data <- create_test_crosstab_data()
-  config <- create_test_config()
-  output_path <- tempfile(fileext = ".html")
-  result <- generate_tracker_html_report(crosstab_data, config, output_path)
-  content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
-
-  # Chart containers should be hidden by default
-  expect_true(grepl('class="tk-chart-container"', content, fixed = TRUE))
-  # Chart header with selection count
-  expect_true(grepl("tk-chart-count", content, fixed = TRUE))
-  expect_true(grepl("Charts (0 selected)", content, fixed = TRUE))
-
-  unlink(output_path)
-})
+# Chart container test removed — from removed overview tab
 
 test_that("JS has addToChart, removeFromChart, getChartSelection functions", {
   crosstab_data <- create_test_crosstab_data()

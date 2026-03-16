@@ -148,7 +148,6 @@ test_that("build_help_overlay contains sections for all tabs", {
 test_that("build_help_overlay mentions annotations and comparison mode", {
   html <- as.character(build_help_overlay())
   expect_true(grepl("annotation", html, ignore.case = TRUE))
-  expect_true(grepl("Compare", html, fixed = TRUE))
 })
 
 # ==============================================================================

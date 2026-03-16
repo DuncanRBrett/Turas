@@ -313,7 +313,7 @@ test_that("build_chart_axes_svg returns gridlines with dashed style", {
   combined <- paste(parts, collapse = "\n")
 
   # Gridlines should be dashed with the correct colour
-  expect_true(grepl('stroke="#edf2f7"', combined, fixed = TRUE))
+  expect_true(grepl('stroke="#e2e8f0"', combined, fixed = TRUE))
   expect_true(grepl('stroke-dasharray="6,4"', combined, fixed = TRUE))
 })
 
