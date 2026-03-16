@@ -227,20 +227,9 @@ function buildMultiStackedSVG(data, selectedKeys, qCode) {
   var colours = data.colours || [];
 
   // Pre-calculate legend layout
-  // Only include percentages in single-bar mode (multi-bar has labels on each bar)
-  var showLegendPct = singleBarMode;
-  var firstVals = data.columns[selectedKeys[0]] ? data.columns[selectedKeys[0]].values : [];
-  var firstTotal = 0;
-  firstVals.forEach(function(v) { firstTotal += v; });
   var legPositions = [], legX = labelMargin, legRow = 0;
   for (var li = 0; li < labels.length; li++) {
-    var legText;
-    if (showLegendPct) {
-      var legPct = firstTotal > 0 ? Math.round((firstVals[li] || 0) / firstTotal * 100) : 0;
-      legText = labels[li] + " (" + legPct + "%)";
-    } else {
-      legText = labels[li];
-    }
+    var legText = labels[li];
     var itemW = legText.length * 6 + 30;
     if (legX + itemW > barW - labelMargin && li > 0) { legRow++; legX = labelMargin; }
     legPositions.push({ x: legX, row: legRow, text: legText });
