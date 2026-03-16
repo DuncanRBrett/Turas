@@ -957,12 +957,27 @@ var _hubSrcLbl_%5$s = \'%4$s\';
   var rendered = card.querySelector(".qual-md-rendered");
   var editor = card.querySelector(".qual-md-editor");
   if (rendered && editor) rendered.innerHTML = %1$srenderMarkdown(editor.value);
+  var imgStore = card.querySelector(".qual-img-store");
+  var imageData = (imgStore && imgStore.value) ? imgStore.value : null;
+  var imageWidth = imgStore ? parseInt(imgStore.getAttribute("data-img-w")) || 0 : 0;
+  var imageHeight = imgStore ? parseInt(imgStore.getAttribute("data-img-h")) || 0 : 0;
+  if (!imageData) {
+    var thumb = card.querySelector(".qual-img-thumb");
+    if (thumb && thumb.src && thumb.src.indexOf("data:") === 0) {
+      imageData = thumb.src;
+      imageWidth = thumb.naturalWidth || 0;
+      imageHeight = thumb.naturalHeight || 0;
+    }
+  }
   var pinObj = {
     id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2,5),
     pinType: "text_box", qCode: null,
     title: titleEl ? titleEl.textContent.trim() : "Qualitative Slide",
     subtitle: "",
     insight: rendered ? rendered.innerHTML : "",
+    imageData: imageData,
+    imageWidth: imageWidth,
+    imageHeight: imageHeight,
     tableHtml: null, chartSvg: null,
     baseText: null, timestamp: Date.now()
   };

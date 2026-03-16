@@ -288,6 +288,13 @@
       '</textarea>' +
     '</div>';
 
+    // Image (custom slide image — always shown)
+    if (pin.imageData) {
+      html += '<div style="margin-bottom:12px;text-align:center;">' +
+        '<img src="' + pin.imageData + '" style="max-width:100%;max-height:500px;border-radius:6px;border:1px solid #e2e8f0;" />' +
+      '</div>';
+    }
+
     // Respect pinMode: "all" (default), "chart_insight", "table_insight"
     var mode = pin.pinMode || "all";
     var showChart = (mode === "all" || mode === "chart_insight");

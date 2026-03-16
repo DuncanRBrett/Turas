@@ -418,15 +418,12 @@ build_stacked_bar_svg <- function(items, bar_width = 680, chart_id = NULL) {
   usable_width <- bar_width - (label_margin * 2)
 
   # Pre-calculate legend layout to determine total height (may wrap to multiple rows)
-  # Legend includes percentage values for clarity
   legend_row_gap <- 18
   legend_positions <- list()
   leg_x <- label_margin
   leg_row <- 0
-  total_for_pct <- sum(items$value, na.rm = TRUE)
   for (i in seq_len(nrow(items))) {
-    pct_val <- if (total_for_pct > 0) round(items$value[i]) else 0
-    legend_text <- sprintf("%s (%g%%)", items$label[i], pct_val)
+    legend_text <- items$label[i]
     item_width <- nchar(legend_text) * 5.8 + 30  # ~5.8px per char at 10.5px font
     # Wrap to next row if this item would overflow
     if (leg_x + item_width > bar_width - label_margin && i > 1) {
