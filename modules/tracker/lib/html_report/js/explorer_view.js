@@ -1102,7 +1102,8 @@
       callout = document.createElement("div");
       callout.id = "vis-hover-callout";
       callout.className = "vis-hover-callout";
-      document.body.appendChild(callout);
+      var panel = (typeof _tkPanel === "function") ? _tkPanel() : document.body;
+      panel.appendChild(callout);
     }
 
     var points = container.querySelectorAll(".tk-chart-point");

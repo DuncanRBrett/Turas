@@ -579,7 +579,8 @@ function smoothPathFromPoints(points) {
  * Toggle significance indicators on/off
  */
 function toggleSignificance() {
-  document.body.classList.toggle("hide-significance");
+  var panel = (typeof _tkPanel === "function") ? _tkPanel() : document.body;
+  panel.classList.toggle("hide-significance");
 }
 
 /**

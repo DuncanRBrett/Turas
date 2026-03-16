@@ -57,7 +57,7 @@
     ctx.fillRect(0, 0, slideW, slideH);
 
     // Header bar
-    var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367";
+    var brandColour = (typeof _tkBrand === "function") ? _tkBrand() : (getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367");
     ctx.fillStyle = brandColour;
     ctx.fillRect(0, 0, slideW, 60);
 

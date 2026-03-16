@@ -644,7 +644,7 @@ function exportPinnedCardPNG(pinId) {
   var fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
   var pad = 20;
   var usableW = W - pad * 2;
-  var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367";
+  var brandColour = (typeof _tkBrand === "function") ? _tkBrand() : (getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367");
 
   // ---- 1. Title ----
   var titleText = pin.metricTitle || pin.qTitle || "Pinned View";
@@ -1020,14 +1020,15 @@ function printAllPins() {
   }
 
   // Add print class
-  document.body.classList.add("print-pinned-only");
+  var printPanel = (typeof _tkPanel === "function") ? _tkPanel() : document.body;
+  printPanel.classList.add("print-pinned-only");
 
   // Slight delay for repaint, then print
   setTimeout(function() {
     window.print();
     // Remove class after print dialog
     setTimeout(function() {
-      document.body.classList.remove("print-pinned-only");
+      printPanel.classList.remove("print-pinned-only");
     }, 500);
   }, 200);
 }
@@ -1497,7 +1498,7 @@ function exportSummaryTableSlide() {
   var table = document.getElementById("summary-metrics-table");
   if (!table) return;
 
-  var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367";
+  var brandColour = (typeof _tkBrand === "function") ? _tkBrand() : (getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367");
   var slideW = 1280, slideH = 720, scale = 3;
   var canvas = document.createElement("canvas");
   canvas.width = slideW * scale;

@@ -210,7 +210,8 @@
     popover.style.top = popoverTop + "px";
     popover.style.position = "fixed";
     popover.style.zIndex = "9999";
-    document.body.appendChild(popover);
+    var panel = (typeof _tkPanel === "function") ? _tkPanel() : document.body;
+    panel.appendChild(popover);
     activePopover = popover;
 
     // Focus input

@@ -10,6 +10,22 @@
 (function() {
   "use strict";
 
+  // ---- Hub-safe helpers ----
+  // When embedded in report hub, scope class toggles and CSS var reads
+  // to the tracker panel container instead of document.body/documentElement.
+  // Falls back to document.body/documentElement when running standalone.
+  function _tkPanel() {
+    return document.querySelector('[data-hub-panel="tracker"]') || document.body;
+  }
+  function _tkBrand() {
+    var panel = document.querySelector('[data-hub-panel="tracker"]');
+    var el = panel || document.documentElement;
+    return getComputedStyle(el).getPropertyValue("--brand").trim() || "#323367";
+  }
+  // Expose for other tracker JS modules
+  window._tkPanel = _tkPanel;
+  window._tkBrand = _tkBrand;
+
   // ---- State ----
   var currentSegment = SEGMENTS[0] || "Total";
   var changeRowState = { "vs-prev": false, "vs-base": false };
@@ -159,7 +175,7 @@
 
   // ---- Sparkline Toggle ----
   window.toggleSparklines = function() {
-    document.body.classList.toggle("hide-sparklines");
+    _tkPanel().classList.toggle("hide-sparklines");
   };
 
   // ---- View Switching (Table / Charts) ----
@@ -694,7 +710,7 @@
     var table = document.getElementById("tk-crosstab-table");
     if (!table) return;
 
-    var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367";
+    var brandColour = _tkBrand();
 
     // Extract visible data from the DOM table (same logic as exportOverviewSlide)
     var headers = [];
@@ -863,7 +879,7 @@
     var table = document.getElementById("tk-crosstab-table");
     if (!table) return;
 
-    var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367";
+    var brandColour = _tkBrand();
 
     // Extract visible data from the DOM table
     var headers = [];

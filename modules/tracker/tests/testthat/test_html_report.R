@@ -720,15 +720,17 @@ test_that("JS files pass syntax validation", {
   # slide_export, tab_navigation, metrics_view, pinned_views
   expect_true(length(js_files) >= 7)
 
-  # Skip if node is not installed (syntax validation is a bonus check)
-  node_available <- tryCatch({
-    system2("node", args = "--version", stdout = TRUE, stderr = TRUE)
-    TRUE
-  }, error = function(e) FALSE)
-  skip_if_not(node_available, "node is not installed — skipping JS syntax check")
+  # Find node binary — R may not inherit the full shell PATH (e.g. Homebrew)
+  node_bin <- Sys.which("node")
+  if (!nzchar(node_bin)) {
+    for (candidate in c("/opt/homebrew/bin/node", "/usr/local/bin/node")) {
+      if (file.exists(candidate)) { node_bin <- candidate; break }
+    }
+  }
+  skip_if(!nzchar(node_bin), "node is not installed — skipping JS syntax check")
 
   for (js_file in js_files) {
-    result <- system2("node", args = c("--check", js_file),
+    result <- system2(node_bin, args = c("--check", js_file),
                        stdout = TRUE, stderr = TRUE)
     status <- attr(result, "status")
     expect_true(is.null(status) || status == 0,

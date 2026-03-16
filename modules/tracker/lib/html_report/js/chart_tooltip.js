@@ -16,7 +16,8 @@
     tooltip = document.createElement("div");
     tooltip.className = "tk-chart-tooltip";
     tooltip.style.display = "none";
-    document.body.appendChild(tooltip);
+    var panel = (typeof _tkPanel === "function") ? _tkPanel() : document.body;
+    panel.appendChild(tooltip);
     return tooltip;
   }
 
