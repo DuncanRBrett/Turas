@@ -1,5 +1,5 @@
 // ==============================================================================
-// TurasTracker HTML Report - Metrics by Segment View
+// TurasTracker HTML Report - Explorer Metrics View
 // ==============================================================================
 // Controls the per-metric view: metric selection, segment chips, wave chips,
 // significance toggle, show-chart checkbox, n= count toggle,
@@ -8,6 +8,21 @@
 // Segment and wave chip selections PERSIST across metric switches —
 // stored in global activeSegments / activeWaves objects.
 // ==============================================================================
+
+// ---- Breadcrumb updater ----
+function updateBreadcrumbSegments() {
+  var breadcrumb = document.getElementById("mv-breadcrumb");
+  if (!breadcrumb) return;
+  var activePanel = document.querySelector(".tk-metric-panel.active");
+  if (!activePanel) return;
+  var chipBar = activePanel.querySelector(".mv-segment-chips");
+  if (!chipBar) return;
+  var activeChips = chipBar.querySelectorAll(".tk-segment-chip.active");
+  var segNames = [];
+  activeChips.forEach(function(chip) { segNames.push(chip.textContent.trim()); });
+  var el = document.getElementById("mv-breadcrumb-segments");
+  if (el) el.textContent = segNames.length > 0 ? "Segments: " + segNames.join(", ") : "";
+}
 
 // ---- Global chip state (persists across metric panels) ----
 var activeSegments = {};   // { segmentName: true/false }
@@ -149,6 +164,22 @@ function selectTrackerMetric(metricId) {
   document.querySelectorAll(".tk-metric-nav-item").forEach(function(item) {
     item.classList.toggle("active", item.getAttribute("data-metric-id") === metricId);
   });
+
+  // Update breadcrumb
+  var breadcrumb = document.getElementById("mv-breadcrumb");
+  if (breadcrumb && target) {
+    var titleEl = target.querySelector(".mv-metric-title");
+    var metricName = titleEl ? titleEl.childNodes[0].textContent.trim() : metricId;
+    document.getElementById("mv-breadcrumb-metric").textContent = metricName;
+    // Gather active segment names (only from table chips, not chart chips)
+    var chipBar = target.querySelector(".mv-segment-chips");
+    var activeChips = chipBar ? chipBar.querySelectorAll(".tk-segment-chip.active") : [];
+    var segNames = [];
+    activeChips.forEach(function(chip) { segNames.push(chip.textContent.trim()); });
+    document.getElementById("mv-breadcrumb-segments").textContent =
+      segNames.length > 0 ? "Segments: " + segNames.join(", ") : "";
+    breadcrumb.classList.add("visible");
+  }
 }
 
 /**
@@ -212,6 +243,7 @@ function toggleSegmentGroupExpand(metricId, groupName, headerBtn) {
 
   // Apply to all panels so state persists across metric switches
   applyChipStateAllPanels();
+  updateBreadcrumbSegments();
 }
 
 /**
@@ -283,6 +315,7 @@ function toggleSegmentChip(metricId, segmentName, chip) {
 
   // Apply state to ALL panels (so chip visual state persists across metric switches)
   applyChipStateAllPanels();
+  updateBreadcrumbSegments();
 }
 
 /**
@@ -546,7 +579,8 @@ function smoothPathFromPoints(points) {
  * Toggle significance indicators on/off
  */
 function toggleSignificance() {
-  document.body.classList.toggle("hide-significance");
+  var panel = (typeof _tkPanel === "function") ? _tkPanel() : document.body;
+  panel.classList.toggle("hide-significance");
 }
 
 /**
@@ -660,14 +694,39 @@ function dismissMetricInsight(metricId) {
 }
 
 /**
- * Pin current metric view to the Pinned Views tab
+ * Pin current metric view to the Pinned Views tab.
  * @param {string} metricId - The metric ID
+ * @param {string} [mode="all"] - Pin mode: "all" (insight+chart+table), "chart" (insight+chart), "table" (insight+table)
  */
-function pinMetricView(metricId) {
+function pinMetricView(metricId, mode) {
+  // Close pin menu if open
+  var menu = document.getElementById("pin-menu-" + metricId);
+  if (menu) menu.style.display = "none";
+
   if (typeof togglePin === "function") {
-    togglePin(metricId);
+    togglePin(metricId, mode || "all");
   }
 }
+
+/**
+ * Toggle the pin dropdown menu visibility
+ * @param {string} metricId - The metric ID
+ */
+function togglePinMenu(metricId) {
+  var menu = document.getElementById("pin-menu-" + metricId);
+  if (!menu) return;
+  var isVisible = menu.style.display !== "none";
+  // Close all other pin menus first
+  document.querySelectorAll(".tk-pin-menu").forEach(function(m) { m.style.display = "none"; });
+  menu.style.display = isVisible ? "none" : "block";
+}
+
+// Close pin menus on click outside
+document.addEventListener("click", function(e) {
+  if (!e.target.closest(".tk-pin-dropdown")) {
+    document.querySelectorAll(".tk-pin-menu").forEach(function(m) { m.style.display = "none"; });
+  }
+});
 
 
 // ==============================================================================
@@ -874,4 +933,191 @@ function exportMetricExcel(metricId) {
 
   var filename = "metric_" + metricId.replace(/[^a-zA-Z0-9_-]/g, "_") + ".xls";
   downloadBlob(xml, filename, "application/vnd.ms-excel");
+}
+
+
+// ==============================================================================
+// METRIC COMPARISON MODE
+// ==============================================================================
+// Allow selecting 2-3 metrics to overlay on a single chart for correlation
+// analysis. Toggle via "Compare" button in the metrics sidebar.
+
+var compareMode = false;
+var compareMetrics = [];  // Array of metric IDs selected for comparison
+var MAX_COMPARE = 3;
+
+/**
+ * Toggle comparison mode on/off.
+ */
+function toggleCompareMode() {
+  compareMode = !compareMode;
+  var btn = document.getElementById("mv-compare-toggle");
+  if (btn) {
+    btn.classList.toggle("active", compareMode);
+    btn.textContent = compareMode ? "Exit Compare" : "Compare";
+  }
+
+  if (!compareMode) {
+    compareMetrics = [];
+    // Remove comparison chart
+    var compChart = document.getElementById("mv-comparison-chart");
+    if (compChart) compChart.style.display = "none";
+    // Restore normal single-metric view
+    document.querySelectorAll(".tk-metric-nav-item").forEach(function(item) {
+      item.classList.remove("compare-selected");
+    });
+    // Show the currently active single metric panel
+    var activeNav = document.querySelector(".tk-metric-nav-item.active");
+    if (activeNav) selectMetric(activeNav.getAttribute("data-metric-id"));
+  } else {
+    // Start with currently selected metric
+    var activeNav = document.querySelector(".tk-metric-nav-item.active");
+    if (activeNav) {
+      var metricId = activeNav.getAttribute("data-metric-id");
+      compareMetrics = [metricId];
+      activeNav.classList.add("compare-selected");
+    }
+    showCompareBadge();
+  }
+}
+
+/**
+ * In compare mode, clicking a sidebar metric adds/removes it from comparison.
+ */
+function toggleCompareMetric(metricId) {
+  if (!compareMode) return false;  // Not in compare mode
+
+  var idx = compareMetrics.indexOf(metricId);
+  if (idx >= 0) {
+    // Remove from comparison
+    compareMetrics.splice(idx, 1);
+  } else if (compareMetrics.length < MAX_COMPARE) {
+    // Add to comparison
+    compareMetrics.push(metricId);
+  } else {
+    // Already at max — remove first, add new
+    compareMetrics.shift();
+    compareMetrics.push(metricId);
+  }
+
+  // Update nav item styles
+  document.querySelectorAll(".tk-metric-nav-item").forEach(function(item) {
+    var mid = item.getAttribute("data-metric-id");
+    item.classList.toggle("compare-selected", compareMetrics.indexOf(mid) >= 0);
+  });
+
+  showCompareBadge();
+  renderComparisonChart();
+  return true;  // Signal that compare mode handled the click
+}
+
+/** Update the compare badge count. */
+function showCompareBadge() {
+  var badge = document.getElementById("mv-compare-badge");
+  if (badge) {
+    badge.textContent = compareMetrics.length + "/" + MAX_COMPARE;
+    badge.style.display = compareMode ? "" : "none";
+  }
+}
+
+/**
+ * Render a comparison chart overlaying selected metrics.
+ * Uses different line styles (solid, dashed, dotted) for each metric.
+ */
+function renderComparisonChart() {
+  var container = document.getElementById("mv-comparison-chart");
+  if (!container) return;
+
+  if (compareMetrics.length === 0) {
+    container.style.display = "none";
+    return;
+  }
+
+  container.style.display = "block";
+
+  // Hide individual metric panels
+  document.querySelectorAll(".tk-metric-panel").forEach(function(p) {
+    p.classList.remove("active");
+  });
+
+  // Collect SVG charts from each selected metric and overlay them
+  var lineStyles = ["", "8,4", "3,3"];  // solid, dashed, dotted
+  var colours = [];
+  var labels = [];
+  var svgParts = [];
+
+  // Read the first metric's chart to get dimensions and axes
+  var firstPanel = document.getElementById("mv-" + compareMetrics[0]);
+  var firstSvg = firstPanel ? firstPanel.querySelector(".tk-line-chart") : null;
+  if (!firstSvg) {
+    container.innerHTML = '<p style="color:#888;text-align:center;padding:40px;">No chart data available for selected metrics.</p>';
+    return;
+  }
+
+  // Clone the first SVG as base (axes, gridlines)
+  var baseSvg = firstSvg.cloneNode(true);
+
+  // Remove all series-specific elements (lines, points, labels, legend, area fills)
+  baseSvg.querySelectorAll(".tk-chart-line, .tk-chart-point, .tk-chart-label, .tk-chart-legend-item, .tk-area-fill").forEach(function(el) {
+    el.remove();
+  });
+
+  // Clean up previous comparison elements
+  var existing = baseSvg.querySelectorAll(".comparison-overlay");
+  existing.forEach(function(el) { el.remove(); });
+
+  // Create a comparison overlay group for all appended elements
+  var ns = "http://www.w3.org/2000/svg";
+  var overlayGroup = document.createElementNS(ns, "g");
+  overlayGroup.setAttribute("class", "comparison-overlay");
+  var plotGroup = baseSvg.querySelector("g[transform]");
+
+  compareMetrics.forEach(function(metricId, idx) {
+    var panel = document.getElementById("mv-" + metricId);
+    if (!panel) return;
+    var svg = panel.querySelector(".tk-line-chart");
+    if (!svg) return;
+
+    var titleEl = panel.querySelector(".mv-metric-title");
+    labels.push(titleEl ? titleEl.textContent.trim() : metricId);
+
+    // Extract lines and restyle with dash patterns
+    svg.querySelectorAll(".tk-chart-line").forEach(function(line) {
+      var clone = line.cloneNode(true);
+      if (lineStyles[idx]) {
+        clone.setAttribute("stroke-dasharray", lineStyles[idx]);
+      }
+      clone.setAttribute("data-compare-metric", metricId);
+      overlayGroup.appendChild(clone);
+
+      // Capture colour for legend
+      if (colours.length <= idx) {
+        colours.push(clone.getAttribute("stroke") || "#323367");
+      }
+    });
+
+    // Extract points
+    svg.querySelectorAll(".tk-chart-point").forEach(function(pt) {
+      var clone = pt.cloneNode(true);
+      clone.setAttribute("data-compare-metric", metricId);
+      overlayGroup.appendChild(clone);
+    });
+  });
+
+  if (plotGroup) plotGroup.appendChild(overlayGroup);
+
+  // Build comparison legend
+  var legendHtml = '<div class="tk-comparison-legend">';
+  compareMetrics.forEach(function(metricId, idx) {
+    var dashStyle = idx === 0 ? "border-top:2px solid" : (idx === 1 ? "border-top:2px dashed" : "border-top:2px dotted");
+    legendHtml += '<div class="tk-comparison-legend-item">' +
+      '<span class="tk-comparison-legend-line" style="' + dashStyle + ' ' + (colours[idx] || '#323367') + '"></span>' +
+      '<span>' + (labels[idx] || metricId) + '</span></div>';
+  });
+  legendHtml += '</div>';
+
+  container.innerHTML = '<div class="tk-comparison-chart">' +
+    baseSvg.outerHTML +
+    legendHtml +
+    '</div>';
 }

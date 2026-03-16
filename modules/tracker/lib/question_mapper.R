@@ -138,7 +138,7 @@
 #' @export
 build_question_map_index <- function(question_mapping, config) {
 
-  message("Building question map index...")
+  cat("Building question map index...\n")
 
   # Get wave IDs from config (e.g., c("W1", "W2", "W3"))
   # These must match column names in question_mapping
@@ -234,7 +234,7 @@ build_question_map_index <- function(question_mapping, config) {
         src <- metadata$SourceQuestions[i]
         if (!is.na(src) && trimws(as.character(src)) != "") {
           metadata$QuestionType[i] <- "Composite"
-          message(paste0("  Auto-detected '", q_code, "' as Composite (has SourceQuestions)"))
+          cat(paste0("  Auto-detected '", q_code, "' as Composite (has SourceQuestions)\n"))
           next
         }
       }
@@ -249,7 +249,7 @@ build_question_map_index <- function(question_mapping, config) {
     }
   }
 
-  message(paste0("  Indexed ", nrow(question_mapping), " questions across ", length(wave_ids), " waves"))
+  cat(paste0("  Indexed ", nrow(question_mapping), " questions across ", length(wave_ids), " waves\n"))
 
   return(list(
     standard_to_wave = standard_to_wave,
@@ -451,7 +451,7 @@ extract_question_data <- function(wave_df, wave_id, standard_code, question_map)
 #' @export
 validate_question_mapping <- function(config, question_map, wave_data) {
 
-  message("Validating question mapping completeness...")
+  cat("Validating question mapping completeness...\n")
 
   tracked_questions <- config$tracked_questions$QuestionCode
   wave_ids <- config$waves$WaveID
@@ -486,10 +486,10 @@ validate_question_mapping <- function(config, question_map, wave_data) {
     n_missing <- sum(availability[[wave_id]] == "MISSING_DATA")
     n_not_mapped <- sum(availability[[wave_id]] == "NOT_MAPPED")
 
-    message(paste0("  ", wave_id, ": ",
-                   n_available, " available, ",
-                   n_missing, " missing from data, ",
-                   n_not_mapped, " not mapped"))
+    cat(paste0("  ", wave_id, ": ",
+               n_available, " available, ",
+               n_missing, " missing from data, ",
+               n_not_mapped, " not mapped\n"))
   }
 
   # Identify questions available across all waves
@@ -498,7 +498,7 @@ validate_question_mapping <- function(config, question_map, wave_data) {
   })
 
   n_trackable <- sum(all_available)
-  message(paste0("  ", n_trackable, " questions available across all ", length(wave_ids), " waves"))
+  cat(paste0("  ", n_trackable, " questions available across all ", length(wave_ids), " waves\n"))
 
   return(availability)
 }
@@ -579,8 +579,8 @@ get_tracking_specs <- function(question_map, question_code, config = NULL) {
     if (length(q_row_idx) > 0) {
       tracking_specs <- metadata_df$TrackingSpecs[q_row_idx[1]]
       if (!is.na(tracking_specs) && trimws(tracking_specs) != "") {
-        message(paste0("  [INFO] TrackingSpecs for '", question_code,
-                       "' read from question_mapping (consider moving to TrackedQuestions sheet)"))
+        cat(paste0("  [INFO] TrackingSpecs for '", question_code,
+                   "' read from question_mapping (consider moving to TrackedQuestions sheet)\n"))
         return(trimws(tracking_specs))
       }
     }

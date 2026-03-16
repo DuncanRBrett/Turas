@@ -96,7 +96,7 @@
 
       try {
         var chartData = JSON.parse(chartAttr);
-      } catch (e) { continue; }
+      } catch (e) { console.warn("[ChartControls] Parse error:", e.message); continue; }
 
       if (!chartData || !chartData.series) continue;
       if (!allWaveLabels && chartData.wave_labels) {
@@ -116,12 +116,16 @@
       if (chartData.is_percentage) isPct = true;
       if (chartData.is_nps) isNPS = true;
 
+      // Classify metric type for type guard
+      var metricType = chartData.is_nps ? "nps" : (chartData.is_percentage ? "pct" : "mean");
+
       seriesData.push({
         name: label,
         values: segSeries.values,
         metricId: metricId,
         isPct: chartData.is_percentage || false,
-        isNPS: chartData.is_nps || false
+        isNPS: chartData.is_nps || false,
+        metricType: metricType
       });
     }
 
@@ -129,6 +133,23 @@
       chartContainer.innerHTML = '<p style="color:#888;text-align:center;padding:40px;">No data available for segment: ' + segmentName + '</p>';
       return;
     }
+
+    // Type guard: prevent mixing different metric types on the same chart
+    var types = {};
+    seriesData.forEach(function(s) { types[s.metricType] = true; });
+    var typeKeys = Object.keys(types);
+    if (typeKeys.length > 1) {
+      var typeNames = { pct: "Percentages", mean: "Means/Ratings", nps: "NPS" };
+      var mixed = typeKeys.map(function(t) { return typeNames[t] || t; }).join(" and ");
+      chartContainer.innerHTML = '<div style="text-align:center;padding:40px 20px;color:#64748b;">' +
+        '<div style="font-size:14px;font-weight:600;margin-bottom:8px;">Cannot compare different metric types</div>' +
+        '<div style="font-size:12px;">Selected metrics include ' + mixed + '. ' +
+        'Deselect metrics so only one type remains, or use the type filter to view one type at a time.</div></div>';
+      return;
+    }
+    // Set flags consistently from the homogeneous type
+    isPct = typeKeys[0] === "pct";
+    isNPS = typeKeys[0] === "nps";
 
     // Build the SVG
     var svg = buildCombinedSVG(seriesData, allWaveLabels, allWaveIds, segmentName, isPct, isNPS);
@@ -156,21 +177,31 @@
     });
     if (allVals.length === 0) return "";
 
+    // Honest axis scaling: percentages start at 0, ratings use full scale
+    var dataMin = Math.min.apply(null, allVals);
+    var dataMax = Math.max.apply(null, allVals);
     var yMin, yMax;
     if (isPct) {
-      yMin = 0; yMax = 100;
+      // Percentage: always start at 0, smart ceiling
+      yMin = 0;
+      yMax = Math.min(100, Math.ceil((dataMax + 10) / 10) * 10);
+      if (yMax < 20) yMax = 20;
     } else if (isNPS) {
-      yMin = -100; yMax = 100;
-    } else {
-      var dataMin = Math.min.apply(null, allVals);
-      var dataMax = Math.max.apply(null, allVals);
-      if (dataMax <= 5.5) { yMin = 0; yMax = 5; }
-      else if (dataMax <= 10.5) { yMin = 0; yMax = 10; }
-      else {
-        var range = dataMax - dataMin || 1;
-        yMin = Math.max(0, dataMin - range * 0.15);
-        yMax = dataMax + range * 0.15;
+      // NPS: always include 0, extend to data rounded to nearest 10
+      yMin = Math.min(0, Math.floor((dataMin - 10) / 10) * 10);
+      yMax = Math.max(0, Math.ceil((dataMax + 10) / 10) * 10);
+      yMin = Math.max(-100, yMin);
+      yMax = Math.min(100, yMax);
+      if (yMax - yMin < 40) {
+        var mid = (dataMin + dataMax) / 2;
+        yMin = Math.max(-100, Math.floor((mid - 20) / 10) * 10);
+        yMax = Math.min(100, Math.ceil((mid + 20) / 10) * 10);
       }
+    } else {
+      // Rating scales: use full scale (1-5 or 1-10)
+      if (dataMax <= 5.5) { yMin = 1; yMax = 5; }
+      else if (dataMax <= 10.5) { yMin = 0; yMax = 10; }
+      else { yMin = 0; yMax = Math.ceil(dataMax); }
     }
     var yRange = yMax - yMin || 1;
 
@@ -193,14 +224,14 @@
     for (var gi = 0; gi <= 4; gi++) {
       var gv = yMin + (yMax - yMin) * gi / 4;
       var gy = plotH - scaleY(gv);
-      parts.push('<line x1="0" y1="' + gy.toFixed(1) + '" x2="' + plotW + '" y2="' + gy.toFixed(1) + '" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="4,4"/>');
-      parts.push('<text x="-10" y="' + gy.toFixed(1) + '" text-anchor="end" fill="#666" font-size="12" dy="0.35em">' + formatVal(gv) + '</text>');
+      parts.push('<line x1="0" y1="' + gy.toFixed(1) + '" x2="' + plotW + '" y2="' + gy.toFixed(1) + '" stroke="#e2e8f0" stroke-width="0.75" stroke-dasharray="6,4"/>');
+      parts.push('<text x="-10" y="' + gy.toFixed(1) + '" text-anchor="end" fill="#64748b" font-size="11" font-weight="500" dy="0.35em">' + formatVal(gv) + '</text>');
     }
 
     // X-axis labels
     for (var xi = 0; xi < nWaves; xi++) {
       var xPos = xi / (nWaves - 1) * plotW;
-      parts.push('<text x="' + xPos.toFixed(1) + '" y="' + (plotH + 24) + '" text-anchor="middle" fill="#666" font-size="13" font-weight="600">' + waveLabels[xi] + '</text>');
+      parts.push('<text x="' + xPos.toFixed(1) + '" y="' + (plotH + 24) + '" text-anchor="middle" fill="#64748b" font-size="12" font-weight="600">' + waveLabels[xi] + '</text>');
       parts.push('<line x1="' + xPos.toFixed(1) + '" y1="' + plotH + '" x2="' + xPos.toFixed(1) + '" y2="' + (plotH + 5) + '" stroke="#ccc" stroke-width="1"/>');
     }
 
@@ -228,7 +259,15 @@
 
       // Points and labels
       points.forEach(function(p) {
-        parts.push('<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="5" fill="' + colour + '" stroke="#fff" stroke-width="2.5"/>');
+        var waveId = waveIds ? waveIds[p.wi] : "";
+        var waveLabel = waveLabels[p.wi] || "";
+        parts.push('<circle class="tk-chart-point" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="6" fill="' + colour + '" stroke="#fff" stroke-width="2.5"' +
+          ' data-segment="' + series.name + '"' +
+          ' data-wave="' + waveId + '"' +
+          ' data-wave-label="' + waveLabel + '"' +
+          ' data-value="' + formatVal(p.val) + '"' +
+          (p.wi > 0 && points.length > 1 ? ' data-change="' + (p.val - (series.values[p.wi - 1] || p.val)).toFixed(2) + '"' : '') +
+          '/>');
         allLabelsByWave[p.wi].push({
           x: p.x, y: p.y - 14, text: formatVal(p.val), colour: colour
         });
@@ -254,25 +293,34 @@
         }
       }
       labels.forEach(function(lb) {
-        parts.push('<text x="' + lb.x.toFixed(1) + '" y="' + lb.y.toFixed(1) + '" text-anchor="middle" fill="' + lb.colour + '" font-size="11" font-weight="700">' + lb.text + '</text>');
+        // Background pill for readability
+        var textW = lb.text.length * 7.5 + 8;
+        parts.push('<rect x="' + (lb.x - textW / 2).toFixed(1) + '" y="' + (lb.y - 11).toFixed(1) + '" width="' + textW.toFixed(1) + '" height="16" rx="3" fill="#ffffff" opacity="0.85"/>');
+        parts.push('<text x="' + lb.x.toFixed(1) + '" y="' + lb.y.toFixed(1) + '" text-anchor="middle" fill="' + lb.colour + '" font-size="13" font-weight="700">' + lb.text + '</text>');
       });
     });
 
     parts.push('</g>');
 
     // Legend
+    // Legend: pill-style chips matching R-side charts
     var legendY = height - legendRowH + 8;
-    var lx = margin.left;
+    var totalLegendW = 0;
+    var legendItems = [];
     seriesData.forEach(function(series, sIdx) {
       var colour = CHART_COLOURS[sIdx % CHART_COLOURS.length];
-      var itemW = 16 + 6 + series.name.length * 6.5 + 24;
-      if (lx + itemW > width - 20) {
-        lx = margin.left;
-        legendY += 20;
-      }
-      parts.push('<rect x="' + lx + '" y="' + (legendY + 4) + '" width="16" height="4" rx="2" fill="' + colour + '"/>');
-      parts.push('<text x="' + (lx + 22) + '" y="' + (legendY + 5) + '" fill="#555" font-size="11" font-weight="600" dy="0.35em">' + series.name + '</text>');
-      lx += itemW;
+      var itemW = 12 + 8 + 6 + series.name.length * 6.5 + 12 + 8;
+      legendItems.push({ name: series.name, colour: colour, w: itemW });
+      totalLegendW += itemW;
+    });
+    var lx = Math.max(margin.left, (width - totalLegendW) / 2);
+    legendItems.forEach(function(item) {
+      var pillW = item.w - 8;
+      var pillH = 22;
+      parts.push('<rect x="' + lx.toFixed(1) + '" y="' + legendY.toFixed(1) + '" width="' + pillW.toFixed(1) + '" height="' + pillH + '" rx="11" fill="#f0fafa" stroke="#e2e8f0" stroke-width="1"/>');
+      parts.push('<circle cx="' + (lx + 12).toFixed(1) + '" cy="' + (legendY + pillH / 2).toFixed(1) + '" r="4" fill="' + item.colour + '"/>');
+      parts.push('<text x="' + (lx + 22).toFixed(1) + '" y="' + (legendY + pillH / 2).toFixed(1) + '" fill="#1e293b" font-size="11" font-weight="600" dy="0.35em">' + item.name + '</text>');
+      lx += item.w;
     });
 
     parts.push('</svg>');
@@ -328,6 +376,7 @@
       ctx.drawImage(img, 0, 0);
 
       canvas.toBlob(function(blob) {
+        if (!blob) { console.error("[Export] PNG blob creation failed"); return; }
         var url = URL.createObjectURL(blob);
         var a = document.createElement("a");
         a.href = url;
@@ -386,16 +435,6 @@
     rebuildCombinedChart();
   };
 
-  // ---- Tooltip ----
-  document.addEventListener("DOMContentLoaded", function() {
-    document.addEventListener("mouseover", function(e) {
-      if (e.target.classList && e.target.classList.contains("tk-chart-point")) {
-        var segment = e.target.getAttribute("data-segment");
-        var wave = e.target.getAttribute("data-wave");
-        var value = e.target.getAttribute("data-value");
-        e.target.setAttribute("title", segment + " | " + wave + ": " + value);
-      }
-    });
-  });
+  // Tooltip handled by chart_tooltip.js (global tk-chart-point hover)
 
 })();

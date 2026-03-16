@@ -38,10 +38,18 @@ generate_tracker_html_report <- function(crosstab_data, config, output_path) {
   html_data <- tryCatch(
     transform_tracker_for_html(crosstab_data, config),
     error = function(e) {
-      list(status = "REFUSED", code = "CALC_TRANSFORM_FAILED",
-           message = sprintf("Data transformation failed: %s", e$message),
-           how_to_fix = "Check crosstab_data structure is valid",
-           context = list(error = e$message))
+      cat("\n=== TURAS ERROR ===\n")
+      cat("Code: CALC_TRANSFORM_FAILED\n")
+      cat("Message:", e$message, "\n")
+      cat("How to fix: Check crosstab_data structure is valid\n")
+      cat("==================\n\n")
+      tracker_refuse(
+        code = "CALC_TRANSFORM_FAILED",
+        title = "Data Transformation Failed",
+        problem = sprintf("Data transformation failed: %s", e$message),
+        why_it_matters = "Cannot generate HTML report without transformed data.",
+        how_to_fix = "Check crosstab_data structure is valid"
+      )
     }
   )
   if (!is.null(html_data$status) && html_data$status == "REFUSED") {
@@ -79,14 +87,15 @@ generate_tracker_html_report <- function(crosstab_data, config, output_path) {
       cat("\n=== TURAS ERROR ===\n")
       cat("Code: CALC_PAGE_BUILD_FAILED\n")
       cat("Message:", e$message, "\n")
+      cat("How to fix: Check htmltools is installed and data structure is valid\n")
       cat("==================\n\n")
-      return(list(
-        status = "REFUSED",
+      tracker_refuse(
         code = "CALC_PAGE_BUILD_FAILED",
-        message = sprintf("Page assembly failed: %s", e$message),
-        how_to_fix = "Check htmltools is installed and data structure is valid",
-        context = list(error = e$message)
-      ))
+        title = "Page Assembly Failed",
+        problem = sprintf("Page assembly failed: %s", e$message),
+        why_it_matters = "Cannot produce the HTML report without successful page assembly.",
+        how_to_fix = "Check htmltools is installed and data structure is valid"
+      )
     }
   )
   if (is.list(page) && !is.null(page$status) && page$status == "REFUSED") {

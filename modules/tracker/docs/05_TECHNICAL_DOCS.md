@@ -692,15 +692,17 @@ source("tests/regression/test_regression_tracker_dashboard.R")
 
 ### Test Coverage
 
-**Current:** \~15% automated, 85% manual
+**Current:** 652 tests across 14 test files, covering statistical core,
+HTML report generation, guard validation, and chart rendering.
 
-**Recommended Unit Tests:**
+**Key Test Files:**
 
 ``` r
-test_that("TrackingSpecs validation catches invalid specs")
-test_that("Multi-mention column detection works correctly")
-test_that("Top box calculation correct for 1-5 scale")
-test_that("Z-test for proportions produces correct p-values")
+tests/testthat/test_html_report.R        # HTML report structure and content
+tests/testthat/test_guard.R              # TRS guard layer validation
+tests/testthat/test_qualitative_panel.R  # Qualitative panel rendering
+tests/testthat/test_line_charts.R        # Line chart SVG generation
+tests/testthat/test_summary_builder.R    # Summary tab components
 ```
 
 ### Manual Testing Checklist
@@ -826,7 +828,8 @@ Date Completed: 28 December 2025
 
 ### Known Limitations
 
-1.  **Test Coverage:** \~15% automated
+1.  **Test Coverage:** 652 tests across 14 files (strong coverage of
+    core and HTML report functionality)
 2.  **No Confidence Intervals in Wave History:** CIs calculated but not
     displayed
 3.  **No Automated Charts:** Users create charts manually
@@ -948,8 +951,11 @@ compatibility with existing projects and data structures.
 
 ### Planned Features
 
-**v3.0:** - Automated chart generation - HTML report format - PowerPoint
-export - 80% test coverage
+**v3.0 (delivered):** - Automated chart generation (line charts with
+SVG) - Interactive HTML report with 4-tab layout (Summary, Explorer,
+Added Slides, Pinned Views) - 652 tests across 14 test files
+
+**Next:** - PowerPoint export
 
 **v3.5:** - Seasonality adjustment - Trend forecasting - Statistical
 process control (SPC) charts

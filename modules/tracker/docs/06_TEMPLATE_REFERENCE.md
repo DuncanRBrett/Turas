@@ -184,9 +184,86 @@ Define which questions to include in trend analysis.
 
 ### Optional Columns
 
-| Column       | Type | Description               |
-|--------------|------|---------------------------|
-| QuestionText | Text | Display label for reports |
+| Column        | Type    | Description                                                | Example           |
+|---------------|---------|------------------------------------------------------------|--------------------|
+| QuestionText  | Text    | Display label for reports                                  | Brand awareness    |
+| MetricLabel   | Text    | Custom display label (defaults to QuestionCode if blank)   | Overall Satisfaction |
+| Section       | Text    | Sub-group heading within metric type (see below)           | Experience         |
+| SortOrder     | Numeric | Display order within section (defaults to row order)       | 1, 2, 3           |
+| TrackingSpecs | Text    | Custom metric specifications (see Chapter 2)               | mean,top2_box      |
+
+### Metric Type Groups & Section Hierarchy
+
+The HTML report heatmap organises metrics in a **two-level hierarchy**:
+
+**Level 1 — Metric Type Groups** (automatic, based on QuestionType and TrackingSpecs):
+
+| Type Group               | Included Metrics                                   | Colour Scale      |
+|--------------------------|----------------------------------------------------|--------------------|
+| **Means / Ratings**      | mean, composite, index                             | Green/amber/red    |
+| **Percentages / Box Scores** | top\_box, top2\_box, bottom\_box, pct\_agree, etc. | Green/amber/red    |
+| **% Response**           | pct\_response (behavioural / descriptive)          | Blue intensity     |
+| **NPS**                  | nps\_score, promoters\_pct, detractors\_pct        | Green/amber/red    |
+
+Metrics are automatically classified into these groups. The groups appear as bold uppercase
+section headers in the heatmap (e.g., **MEANS / RATINGS**).
+
+**Level 2 — Sections** (configured via the `Section` column in TrackedQuestions):
+
+Within each type group, metrics are further grouped by the `Section` value. This creates
+sub-headings like *Experience*, *Satisfaction*, *Sustainability* under the type group header.
+
+**Example config:**
+
+```
+QuestionCode    | QuestionType | Section          | SortOrder | TrackingSpecs
+Q_QUALITY       | Rating       | Experience       | 1         | mean,top2_box
+Q_VALUE         | Rating       | Experience       | 2         | mean,top2_box
+Q_ATMOSPHERE    | Rating       | Experience       | 3         | mean,top2_box
+Q_STAFF         | Rating       | Experience       | 4         | mean,top2_box
+Q_OVERALL_SAT   | Rating       | Satisfaction     | 5         | mean
+Q_SUSTAIN       | Rating       | Sustainability   | 6         | mean
+Q_DRINK_DAILY   | Multi_Mention| Behaviour        |           | pct_response
+Q_BUY_CHAIN     | Multi_Mention| Purchase Channel |           | pct_response
+Q_BUY_INDIE     | Multi_Mention| Purchase Channel |           | pct_response
+Q_NPS           | NPS          | Satisfaction     |           |
+```
+
+This produces a heatmap layout:
+
+```
+MEANS / RATINGS
+  Experience
+    Coffee quality is consistently good (Mean)         3.8  3.7  3.9  3.8
+    Prices represent good value for money (Mean)       3.1  3.0  3.2  3.1
+    ...
+  Satisfaction
+    Overall satisfaction (Mean)                        4.8  4.7  4.9  4.8
+  Sustainability
+    Sustainability importance (Mean)                   2.5  2.4  2.6  2.5
+
+PERCENTAGES / BOX SCORES
+  Experience
+    Coffee quality is consistently good (% Agree)      61   58   63   61
+    ...
+
+% RESPONSE
+  Behaviour
+    % Drink Coffee Daily                               55   53   57   55
+  Purchase Channel
+    % Buy from Chain                                   48   46   50   48
+    % Buy from Independent Cafe                        24   22   26   24
+
+NPS
+  Satisfaction
+    Likelihood to recommend                            -48  -50  -46  -48
+```
+
+**Tips:**
+- Leave `Section` blank if you don't need sub-grouping (metrics appear directly under the type header)
+- Use consistent Section names across QuestionTypes so related metrics group together
+- SortOrder controls order within a section; leave blank to use spreadsheet row order
+- The same question can generate metrics in multiple type groups (e.g., a Rating question with `TrackingSpecs: mean,top2_box` appears under both Means/Ratings and Percentages/Box Scores)
 
 ### Supported QuestionType Values
 
@@ -201,12 +278,12 @@ Define which questions to include in trend analysis.
 
 ### Example
 
-```         
-QuestionCode   | QuestionText                  | QuestionType
-Q01_Awareness  | Brand awareness (unaided)     | Single_Response
-Q02_Satisfaction | Overall satisfaction (1-10) | Rating
-Q03_NPS        | Likelihood to recommend       | NPS
-Q04_Features   | Features used (select all)    | Multi_Mention
+```
+QuestionCode     | QuestionText                  | QuestionType    | Section      | SortOrder | MetricLabel        | TrackingSpecs
+Q01_Awareness    | Brand awareness (unaided)     | Single_Response | Brand        | 1         | Brand Awareness    |
+Q02_Satisfaction | Overall satisfaction (1-10)   | Rating          | Satisfaction | 2         | Overall Satisfaction | mean,top2_box
+Q03_NPS          | Likelihood to recommend       | NPS             | Satisfaction | 3         |                    |
+Q04_Features     | Features used (select all)    | Multi_Mention   | Usage        | 4         |                    | pct_response
 ```
 
 ------------------------------------------------------------------------

@@ -63,7 +63,7 @@ source(file.path(script_dir, "lib", "00_guard.R"))
 tryCatch({
   .source_trs_infrastructure_tracker()
 }, error = function(e) {
-  message("[TRS INFO] TRS infrastructure not fully loaded: ", e$message)
+  cat("[TRS INFO] TRS infrastructure not fully loaded: ", e$message, "\n")
 })
 
 source(file.path(script_dir, "lib", "constants.R"))
@@ -87,12 +87,20 @@ source(file.path(script_dir, "lib", "tracker_dashboard_reports.R"))
 # Load tracking crosstab modules
 source(file.path(script_dir, "lib", "tracking_crosstab_engine.R"))
 source(file.path(script_dir, "lib", "tracking_crosstab_excel.R"))
+# Load shared colour palette system
+shared_palette_path <- file.path(script_dir, "..", "shared", "lib", "colour_palettes.R")
+if (file.exists(shared_palette_path)) source(shared_palette_path)
 # Load HTML report modules
 assign(".tracker_lib_dir", file.path(script_dir, "lib"), envir = globalenv())
 source(file.path(script_dir, "lib", "html_report", "00_html_guard.R"))
 source(file.path(script_dir, "lib", "html_report", "01_data_transformer.R"))
 source(file.path(script_dir, "lib", "html_report", "02_table_builder.R"))
 source(file.path(script_dir, "lib", "html_report", "05_chart_builder.R"))
+source(file.path(script_dir, "lib", "html_report", "03a_page_styling.R"))
+source(file.path(script_dir, "lib", "html_report", "03b_page_components.R"))
+source(file.path(script_dir, "lib", "html_report", "03c_summary_builder.R"))
+# 03d_metrics_builder.R and 03e_overview_builder.R REMOVED (replaced by Explorer + Visualise)
+source(file.path(script_dir, "lib", "html_report", "03f_heatmap_builder.R"))
 source(file.path(script_dir, "lib", "html_report", "03_page_builder.R"))
 source(file.path(script_dir, "lib", "html_report", "04_html_writer.R"))
 source(file.path(script_dir, "lib", "html_report", "99_html_report_main.R"))
@@ -236,9 +244,9 @@ run_tracker <- function(tracking_config_path,
     turas_banner_start("TRACKER", "2.2")
   } else {
     cat("================================================================================\n")
-    cat(paste0("TURASTACKER - MVT ", phase_label, "\n"))
+    cat(paste0("TURAS TRACKER - MVT ", phase_label, "\n"))
     cat("================================================================================\n")
-    cat(paste0("Version: 2.2 (2025-12-11) - Enhanced Reports: Dashboard & Significance Matrix\n"))
+    cat("Version: 2.2\n")
     cat(paste0("Started: ", format(start_time, "%Y-%m-%d %H:%M:%S"), "\n"))
     cat("\n")
   }
@@ -261,20 +269,16 @@ run_tracker <- function(tracking_config_path,
       cat(paste0("  Question mapping from config: ", basename(question_mapping_path), "\n"))
     } else {
       # No parameter and no config setting
-      cat("\n=== TURAS ERROR ===\n")
-      cat("Code: IO_MAPPING_PATH_MISSING\n")
-      cat("Message: No question mapping file path provided and no 'question_mapping_file' setting in config.\n")
-      cat("Fix: Add 'question_mapping_file' to Settings sheet, or pass question_mapping_path to run_tracker()\n")
-      cat("==================\n\n")
-      return(list(
-        status = "REFUSED",
+      tracker_refuse(
         code = "IO_MAPPING_PATH_MISSING",
-        message = "No question mapping file path provided and no 'question_mapping_file' setting found in config.",
+        title = "No Question Mapping File Specified",
+        problem = "No question mapping file path provided and no 'question_mapping_file' setting found in config.",
+        why_it_matters = "Question mapping is required to track questions across waves.",
         how_to_fix = c(
           "Add 'question_mapping_file' setting in the Settings sheet of your config file",
           "Or pass question_mapping_path to run_tracker()"
         )
-      ))
+      )
     }
   }
 

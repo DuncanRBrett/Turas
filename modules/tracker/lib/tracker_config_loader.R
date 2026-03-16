@@ -91,7 +91,7 @@ load_tracking_config <- function(config_path) {
     )
   }
 
-  message("Loading tracking configuration from: ", basename(config_path))
+  cat("Loading tracking configuration from: ", basename(config_path), "\n")
 
   # SHARED CODE NOTE: This sheet reading pattern is identical to TurasTabs
   # Future: Extract to shared/config_utils.R::read_config_sheet()
@@ -129,6 +129,18 @@ load_tracking_config <- function(config_path) {
           parsed[still_na] <- as.Date(vals[still_na], format = "%Y%m%d")
         }
         waves[[date_col]] <- parsed
+      }
+    }
+  }
+
+  # Validate date ranges
+  if ("FieldworkStart" %in% names(waves) && "FieldworkEnd" %in% names(waves)) {
+    for (i in seq_len(nrow(waves))) {
+      if (!is.na(waves$FieldworkStart[i]) && !is.na(waves$FieldworkEnd[i])) {
+        if (waves$FieldworkStart[i] > waves$FieldworkEnd[i]) {
+          cat(sprintf("\n[TURAS WARNING] Wave '%s': FieldworkStart (%s) is after FieldworkEnd (%s). Dates may be swapped.\n",
+              waves$WaveID[i], waves$FieldworkStart[i], waves$FieldworkEnd[i]))
+        }
       }
     }
   }
@@ -223,6 +235,15 @@ load_tracking_config <- function(config_path) {
     )
   }
 
+  # Check for duplicate Banner entries
+  if (!is.null(banner) && nrow(banner) > 0) {
+    banner_key <- paste(banner$BreakVariable, banner$BreakLabel, sep = "||")
+    dupe_banners <- banner_key[duplicated(banner_key)]
+    if (length(dupe_banners) > 0) {
+      cat("\n[TURAS WARNING] Duplicate Banner entries detected: ", paste(unique(dupe_banners), collapse = ", "), "\n")
+    }
+  }
+
   # Load TrackedQuestions sheet
   tracked_questions <- tryCatch({
     read_config_sheet(config_path, "TrackedQuestions", "QuestionCode")
@@ -254,6 +275,18 @@ load_tracking_config <- function(config_path) {
     )
   }
 
+  # Check for duplicate QuestionCodes
+  dupe_codes <- tracked_questions$QuestionCode[duplicated(tracked_questions$QuestionCode)]
+  if (length(dupe_codes) > 0) {
+    return(tracker_refuse(
+      code = "CFG_DUPLICATE_QUESTION_CODES",
+      title = "Duplicate Question Codes in TrackedQuestions",
+      problem = sprintf("The following QuestionCode values appear more than once: %s", paste(unique(dupe_codes), collapse = ", ")),
+      why_it_matters = "Each QuestionCode must be unique to avoid ambiguous metric mapping.",
+      how_to_fix = "Remove or rename duplicate QuestionCode entries in the TrackedQuestions sheet."
+    ))
+  }
+
   # Add defaults for optional TrackedQuestions columns
   # TrackingSpecs: analysis-level metric specification (moved from question_mapping)
   if (!"TrackingSpecs" %in% names(tracked_questions)) {
@@ -271,6 +304,13 @@ load_tracking_config <- function(config_path) {
   if (!"SortOrder" %in% names(tracked_questions)) {
     tracked_questions$SortOrder <- seq_len(nrow(tracked_questions))
   } else {
+    # Warn if non-numeric values found
+    if ("SortOrder" %in% names(tracked_questions)) {
+      non_numeric <- !grepl("^[0-9]+$", as.character(tracked_questions$SortOrder))
+      if (any(non_numeric, na.rm = TRUE)) {
+        cat("[TURAS WARNING] SortOrder contains non-numeric values; using row order for those entries.\n")
+      }
+    }
     # Convert to numeric, defaulting to row order for non-numeric values
     tracked_questions$SortOrder <- suppressWarnings(as.numeric(tracked_questions$SortOrder))
     na_rows <- is.na(tracked_questions$SortOrder)
@@ -279,9 +319,38 @@ load_tracking_config <- function(config_path) {
     }
   }
 
-  message(paste0("  Loaded ", nrow(waves), " waves"))
-  message(paste0("  Loaded ", nrow(tracked_questions), " tracked questions"))
-  message(paste0("  Loaded ", nrow(banner), " banner breakouts"))
+  # Validate TrackingSpecs values
+  if ("TrackingSpecs" %in% names(tracked_questions)) {
+    valid_spec_types <- c("mean", "nps", "top_box", "top2_box", "top3_box",
+                          "bottom_box", "bottom2_box", "bottom3_box",
+                          "pct_agree", "pct_disagree", "pct_response",
+                          "net_score", "proportion", "composite")
+    specs_to_check <- tracked_questions$TrackingSpecs[!is.na(tracked_questions$TrackingSpecs) &
+                                                       trimws(tracked_questions$TrackingSpecs) != ""]
+    if (length(specs_to_check) > 0) {
+      # Parse each spec: extract base type (before any parenthesized arguments)
+      spec_base_types <- gsub("\\(.*$", "", trimws(specs_to_check))
+      invalid_specs <- spec_base_types[!spec_base_types %in% valid_spec_types]
+      if (length(invalid_specs) > 0) {
+        cat(sprintf("[TURAS WARNING] Unrecognized TrackingSpecs values: %s. Valid types: %s\n",
+            paste(unique(invalid_specs), collapse = ", "),
+            paste(valid_spec_types, collapse = ", ")))
+      }
+    }
+  }
+
+  # Default blank MetricLabel to QuestionCode
+  if ("MetricLabel" %in% names(tracked_questions)) {
+    na_labels <- is.na(tracked_questions$MetricLabel) | tracked_questions$MetricLabel == ""
+    if (any(na_labels)) {
+      tracked_questions$MetricLabel[na_labels] <- tracked_questions$QuestionCode[na_labels]
+      cat(sprintf("[TURAS INFO] %d metrics with blank MetricLabel defaulted to QuestionCode.\n", sum(na_labels)))
+    }
+  }
+
+  cat(paste0("  Loaded ", nrow(waves), " waves\n"))
+  cat(paste0("  Loaded ", nrow(tracked_questions), " tracked questions\n"))
+  cat(paste0("  Loaded ", nrow(banner), " banner breakouts\n"))
 
   # Build configuration object
   config <- list(
@@ -327,7 +396,7 @@ load_question_mapping <- function(mapping_path) {
     )
   }
 
-  message("Loading question mapping from: ", basename(mapping_path))
+  cat("Loading question mapping from: ", basename(mapping_path), "\n")
 
   # Load QuestionMap sheet
   mapping <- tryCatch({
@@ -398,7 +467,7 @@ load_question_mapping <- function(mapping_path) {
     )
   }
 
-  message(paste0("  Loaded mapping for ", nrow(mapping), " questions across ", length(wave_cols), " waves"))
+  cat(paste0("  Loaded mapping for ", nrow(mapping), " questions across ", length(wave_cols), " waves\n"))
 
   return(mapping)
 }
@@ -486,7 +555,7 @@ parse_settings_to_list <- function(settings_df) {
 #' @export
 validate_tracking_config <- function(config, question_mapping) {
 
-  message("Validating tracking configuration...")
+  cat("Validating tracking configuration...\n")
 
   # Validate wave IDs are unique
   if (any(duplicated(config$waves$WaveID))) {
@@ -567,7 +636,7 @@ validate_tracking_config <- function(config, question_mapping) {
     cat("[WARNING] No 'Total' found in banner structure\n")
   }
 
-  message("  Configuration validation passed")
+  cat("  Configuration validation passed\n")
 
   invisible(TRUE)
 }
@@ -587,6 +656,7 @@ validate_tracking_config <- function(config, question_mapping) {
 #'
 #' @export
 get_setting <- function(config, setting_name, default = NULL) {
+  if (is.null(config) || is.null(config$settings)) return(default)
   if (setting_name %in% names(config$settings)) {
     val <- config$settings[[setting_name]]
     # Treat NA or empty string as "not set" — return default

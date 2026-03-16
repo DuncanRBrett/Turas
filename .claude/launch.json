@@ -18,6 +18,12 @@
       "runtimeExecutable": "/bin/bash",
       "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve examples/tabs/demo_survey/Output -l 8775 --no-clipboard"],
       "port": 8775
+    },
+    {
+      "name": "tracker-report",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve examples/tracker/full_test -l 8780 --no-clipboard"],
+      "port": 8780
     }
   ]
 }

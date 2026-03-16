@@ -10,6 +10,22 @@
 (function() {
   "use strict";
 
+  // ---- Hub-safe helpers ----
+  // When embedded in report hub, scope class toggles and CSS var reads
+  // to the tracker panel container instead of document.body/documentElement.
+  // Falls back to document.body/documentElement when running standalone.
+  function _tkPanel() {
+    return document.querySelector('[data-hub-panel="tracker"]') || document.body;
+  }
+  function _tkBrand() {
+    var panel = document.querySelector('[data-hub-panel="tracker"]');
+    var el = panel || document.documentElement;
+    return getComputedStyle(el).getPropertyValue("--brand").trim() || "#323367";
+  }
+  // Expose for other tracker JS modules
+  window._tkPanel = _tkPanel;
+  window._tkBrand = _tkBrand;
+
   // ---- State ----
   var currentSegment = SEGMENTS[0] || "Total";
   var changeRowState = { "vs-prev": false, "vs-base": false };
@@ -159,7 +175,7 @@
 
   // ---- Sparkline Toggle ----
   window.toggleSparklines = function() {
-    document.body.classList.toggle("hide-sparklines");
+    _tkPanel().classList.toggle("hide-sparklines");
   };
 
   // ---- View Switching (Table / Charts) ----
@@ -168,17 +184,18 @@
     var chartPanel = document.getElementById("tk-chart-panel");
     var btnTable = document.getElementById("btn-table-view");
     var btnChart = document.getElementById("btn-chart-view");
+    if (!tablePanel || !chartPanel) return;
 
     if (view === "table") {
       tablePanel.style.display = "";
       chartPanel.style.display = "none";
-      btnTable.classList.add("tk-btn-active");
-      btnChart.classList.remove("tk-btn-active");
+      if (btnTable) btnTable.classList.add("tk-btn-active");
+      if (btnChart) btnChart.classList.remove("tk-btn-active");
     } else {
       tablePanel.style.display = "none";
       chartPanel.style.display = "";
-      btnTable.classList.remove("tk-btn-active");
-      btnChart.classList.add("tk-btn-active");
+      if (btnTable) btnTable.classList.remove("tk-btn-active");
+      if (btnChart) btnChart.classList.add("tk-btn-active");
     }
   };
 
@@ -232,7 +249,7 @@
           try {
             var d = JSON.parse(chartData);
             return formatMetricType(d.metric_name);
-          } catch(e) { return "Other"; }
+          } catch(e) { console.warn("[Navigation] Parse error:", e.message); return "Other"; }
         }
         return "Other";
       });
@@ -693,7 +710,7 @@
     var table = document.getElementById("tk-crosstab-table");
     if (!table) return;
 
-    var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367";
+    var brandColour = _tkBrand();
 
     // Extract visible data from the DOM table (same logic as exportOverviewSlide)
     var headers = [];
@@ -851,6 +868,7 @@
       if (typeof renderPinnedCards === "function") renderPinnedCards();
       if (typeof savePinnedData === "function") savePinnedData();
     } catch (e) {
+      console.warn("[Navigation] Canvas export failed:", e.message);
       // Canvas tainted or too large — fallback to HTML rendering
     }
   }
@@ -861,7 +879,7 @@
     var table = document.getElementById("tk-crosstab-table");
     if (!table) return;
 
-    var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367";
+    var brandColour = _tkBrand();
 
     // Extract visible data from the DOM table
     var headers = [];
@@ -1093,3 +1111,32 @@
   });
 
 })();
+
+// ==============================================================================
+// SUMMARY TAB COLLAPSIBLE SECTIONS
+// ==============================================================================
+
+// Toggle sig cards show all / collapse to 6
+window.toggleSigCards = function() {
+  var grid = document.getElementById("sig-cards-grid");
+  var btn = document.getElementById("sig-show-more-btn");
+  if (!grid || !btn) return;
+  if (grid.classList.contains("sig-cards-collapsed")) {
+    grid.classList.remove("sig-cards-collapsed");
+    btn.textContent = "Show fewer";
+  } else {
+    grid.classList.add("sig-cards-collapsed");
+    var total = grid.querySelectorAll(".dash-sig-card").length;
+    btn.textContent = "Show all " + total + " findings";
+  }
+};
+
+// Toggle collapsible summary sections (heatmap, etc.)
+window.toggleSummarySection = function(sectionId) {
+  var body = document.getElementById("summary-section-" + sectionId);
+  if (!body) return;
+  var header = body.previousElementSibling;
+  if (!header) return;
+  body.classList.toggle("collapsed");
+  header.classList.toggle("collapsed");
+};

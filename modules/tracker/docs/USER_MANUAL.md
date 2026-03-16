@@ -240,6 +240,16 @@ Defines which questions to track and how to display them.
 | Q_INTENT | Purchase Intent | mean=Average,box:Agree=Positive,box:Disagree=Negative | Commercial | 5 |
 | Q_COMPOSITE | Customer Experience | mean | Summary | 6 |
 
+**How metrics are organised in the HTML report heatmap:**
+
+Metrics are displayed in a two-level hierarchy. At the top level, they are
+automatically grouped by **metric type** based on QuestionType and TrackingSpecs:
+Means/Ratings, Percentages/Box Scores, % Response, and NPS. Within each type
+group, metrics are further grouped by the `Section` value. A single question
+with multiple TrackingSpecs (e.g., `mean,top2_box`) will appear in multiple
+type groups. See the Template Reference (Chapter 1, TrackedQuestions) for a
+detailed visual example of this layout.
+
 ### 4.4 Banner Sheet
 
 Defines demographic breakout segments. The tracker always calculates a
@@ -641,13 +651,36 @@ generating a single report type) or the `output_path` parameter.
 
 ### 9.3 HTML Report Features
 
-The interactive HTML report includes: - Section grouping with
-collapsible sections - Banner segment tabs (Total, Region segments,
-etc.) - Data tables with wave-over-wave values and changes -
-Significance indicators (arrows and colour coding) - Trend line charts
-per metric - Export to CSV functionality - Responsive design for screen
-and print - Self-contained (no external dependencies, shareable as a
-single file)
+The interactive HTML report uses a 4-tab layout:
+
+-   **Summary** — KPI hero cards, wave pulse bar, significance
+    heatmap, and metrics overview table
+-   **Explorer** — Interactive exploration of metrics across segments
+    and waves with drill-down capabilities
+-   **Added Slides** — User-created slide exports collected in one
+    place for presentation building
+-   **Pinned Views** — Saved metric views that persist across sessions
+    via localStorage
+
+Additional features include:
+
+-   **Two-level metric organisation** — The heatmap automatically groups
+    metrics by type (Means/Ratings, Percentages/Box Scores, % Response,
+    NPS) with bold uppercase headers. Within each type group, metrics are
+    further grouped by the `Section` column from TrackedQuestions (e.g.,
+    Experience, Satisfaction, Sustainability). This creates a clear
+    visual hierarchy without any manual ordering.
+-   **Colour scales by metric type** — Means and percentages use
+    green/amber/red thresholds. % Response metrics (behavioural/
+    descriptive proportions like "% Drink Coffee Daily") use a blue
+    intensity scale to avoid false good/bad judgements on neutral data.
+-   Banner segment selection (Total, Region segments, etc.)
+-   Data tables with wave-over-wave values and changes
+-   Significance indicators (bold text with directional colour accent)
+-   Trend sparkline charts per metric
+-   Export to CSV and slide PNG functionality
+-   Responsive design for screen and print
+-   Self-contained (no external dependencies, shareable as a single file)
 
 HTML report appearance is controlled by the `brand_colour`,
 `accent_colour`, `company_name`, `researcher_logo_path`, and
