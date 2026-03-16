@@ -7,6 +7,23 @@
 # ==============================================================================
 
 
+#' Classify Metric Name into Data Type
+#'
+#' Maps metric_name to one of four data type categories for type separation
+#' and heatmap grouping. Shared classification used by data transformer,
+#' heatmap builder, and chart type guards.
+#'
+#' @param metric_name Character. The metric name (e.g., "mean", "top2_box", "nps_score")
+#' @return Character. Data type key: "mean", "pct", "nps", or "other"
+#' @keywords internal
+classify_data_type <- function(metric_name) {
+  if (metric_name == "mean" || grepl("(mean|index|composite)", metric_name)) return("mean")
+  if (metric_name %in% c("nps_score", "nps", "promoters_pct", "passives_pct", "detractors_pct")) return("nps")
+  if (grepl("(pct|box|range|proportion|category|any)", metric_name)) return("pct")
+  "other"
+}
+
+
 #' Transform Tracking Crosstab Data for HTML
 #'
 #' Converts the crosstab_data structure into flat, HTML-friendly structures
@@ -162,6 +179,15 @@ transform_metric_for_html <- function(metric, waves, wave_lookup, segments,
     segment_cells[[seg_name]] <- cells
   }
 
+  # Classify data type for type separation and heatmap grouping
+  data_type <- classify_data_type(metric$metric_name)
+
+  # Determine if this is the "headline" metric for its question
+  # Headline: mean for ratings, nps_score for NPS, first pct metric otherwise
+  is_headline <- (metric$metric_name == "mean" && data_type == "mean") ||
+                 (metric$metric_name == "nps_score" && data_type == "nps") ||
+                 (data_type == "pct" && grepl("^(top2_box|top_box|proportion)", metric$metric_name))
+
   list(
     metric_id = metric_id,
     question_code = metric$question_code,
@@ -171,6 +197,8 @@ transform_metric_for_html <- function(metric, waves, wave_lookup, segments,
     sort_order = metric$sort_order,
     question_type = metric$question_type,
     question_text = if (is.null(metric$question_text) || is.na(metric$question_text)) "" else metric$question_text,
+    data_type = data_type,
+    is_headline = is_headline,
     segment_cells = segment_cells
   )
 }
@@ -293,6 +321,20 @@ build_chart_data <- function(metric, waves, wave_labels, segments) {
     )
   }
 
+  # Determine scale_max for rating questions (used by chart axis scaling)
+  is_pct <- grepl("(pct|box|range|proportion|category|any)", metric$metric_name)
+  is_nps <- metric$metric_name %in% c("nps_score", "nps")
+  scale_max <- NULL
+  if (!is_pct && !is_nps) {
+    # Infer scale from data: collect all non-NA values
+    all_vals <- unlist(lapply(series, function(s) s$values), use.names = FALSE)
+    all_vals <- all_vals[!is.na(all_vals)]
+    if (length(all_vals) > 0) {
+      mx <- max(all_vals, na.rm = TRUE)
+      scale_max <- if (mx <= 5.5) 5L else if (mx <= 10.5) 10L else ceiling(mx)
+    }
+  }
+
   list(
     metric_id = paste0("metric_", which(sapply(segments, function(s) TRUE))[1]),
     metric_label = metric$metric_label,
@@ -301,8 +343,9 @@ build_chart_data <- function(metric, waves, wave_labels, segments) {
     wave_ids = unname(waves),
     wave_labels = unname(wave_labels),
     series = series,
-    is_percentage = grepl("(pct|box|range|proportion|category|any)", metric$metric_name),
-    is_nps = metric$metric_name %in% c("nps_score", "nps")
+    is_percentage = is_pct,
+    is_nps = is_nps,
+    scale_max = scale_max
   )
 }
 

@@ -47,7 +47,7 @@ build_chart_axes_svg <- function(n_waves, wave_labels, wave_ids,
   for (gv in grid_vals) {
     gy <- plot_h - scale_fn(gv)
     parts <- c(parts, sprintf(
-      '<line x1="0" y1="%.1f" x2="%d" y2="%.1f" stroke="#edf2f7" stroke-width="0.75" stroke-dasharray="6,4"/>',
+      '<line x1="0" y1="%.1f" x2="%d" y2="%.1f" stroke="#e2e8f0" stroke-width="0.75" stroke-dasharray="6,4"/>',
       gy, plot_w, gy
     ))
     parts <- c(parts, sprintf(
@@ -117,7 +117,7 @@ build_chart_series_svg <- function(chart_data, segment_colours, n_waves,
       prev_val <- if (i > 1 && !is.na(series$values[i - 1])) format_fn(series$values[i - 1]) else ""
       change_val <- if (i > 1 && !is.na(series$values[i - 1])) format_fn(val - series$values[i - 1]) else ""
       point_circles <- c(point_circles, sprintf(
-        '<circle cx="%.1f" cy="%.1f" r="7" fill="%s" stroke="#fff" stroke-width="2.5" class="tk-chart-point" data-segment="%s" data-wave="%s" data-value="%s" data-wave-label="%s" data-prev-value="%s" data-change="%s"/>',
+        '<circle cx="%.1f" cy="%.1f" r="6" fill="%s" stroke="#fff" stroke-width="2.5" class="tk-chart-point" data-segment="%s" data-wave="%s" data-value="%s" data-wave-label="%s" data-prev-value="%s" data-change="%s"/>',
         x_pos, y_pos, colour,
         htmltools::htmlEscape(seg_name),
         htmltools::htmlEscape(chart_data$wave_ids[i]),
@@ -181,7 +181,7 @@ build_chart_series_svg <- function(chart_data, segment_colours, n_waves,
       }
 
       svg_parts <- c(svg_parts, sprintf(
-        '<path d="%s" fill="none" stroke="%s" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round" opacity="%s" class="tk-chart-line" data-segment="%s"/>',
+        '<path d="%s" fill="none" stroke="%s" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" opacity="%s" class="tk-chart-line" data-segment="%s"/>',
         path_d, colour, line_opacity,
         htmltools::htmlEscape(seg_name)
       ))
@@ -326,9 +326,9 @@ build_line_chart <- function(chart_data, config, active_segment = NULL,
   plot_w <- width - margin$left - margin$right
   plot_h <- height - margin$top - margin$bottom - legend_row_h
 
-  # ---- Y-axis range: data-driven with smart padding ----
-  # Instead of fixed ranges (0-5, 0-100) which flatten small variations,
-  # use data-driven ranges that make the trend visible while keeping context.
+  # ---- Y-axis range: honest scaling with contextual ceiling ----
+  # Percentages always start at 0 (honest), with smart ceiling to avoid wasted space.
+  # Ratings use full scale (1-5 or 1-10). NPS always includes 0.
   y_min_data <- min(all_vals, na.rm = TRUE)
   y_max_data <- max(all_vals, na.rm = TRUE)
 
@@ -336,27 +336,22 @@ build_line_chart <- function(chart_data, config, active_segment = NULL,
   dp_ratings <- decimal_config$dp_ratings %||% 2
   dp_nps <- decimal_config$dp_nps %||% 2
 
+  # Use scale_max from chart_data if available (set by data transformer)
+  scale_max_hint <- chart_data$scale_max
+
   if (chart_data$is_percentage) {
-    # Percentage: zoom to data range with padding, anchored to nice round numbers
-    y_range_data <- y_max_data - y_min_data
-    if (y_range_data == 0) y_range_data <- 10
-    y_pad <- max(5, y_range_data * 0.25)  # at least 5pp padding
-    y_axis_min <- max(0, floor((y_min_data - y_pad) / 5) * 5)   # round down to nearest 5
-    y_axis_max <- min(100, ceiling((y_max_data + y_pad) / 5) * 5) # round up to nearest 5
-    # If data clustered near top or bottom, ensure minimum visible range
-    if (y_axis_max - y_axis_min < 20) {
-      mid <- (y_min_data + y_max_data) / 2
-      y_axis_min <- max(0, floor((mid - 10) / 5) * 5)
-      y_axis_max <- min(100, ceiling((mid + 10) / 5) * 5)
-    }
+    # Percentage: always start at 0, ceiling adapts to data
+    y_axis_min <- 0
+    y_axis_max <- min(100, ceiling((y_max_data + 10) / 10) * 10)
+    if (y_axis_max < 20) y_axis_max <- 20  # minimum ceiling
     format_fn <- function(v) paste0(format(round(v, dp_pct), nsmall = dp_pct), "%")
   } else if (chart_data$is_nps) {
-    # NPS: zoom to data range
-    y_range_data <- y_max_data - y_min_data
-    if (y_range_data == 0) y_range_data <- 20
-    y_pad <- max(10, y_range_data * 0.25)
-    y_axis_min <- max(-100, floor((y_min_data - y_pad) / 10) * 10)
-    y_axis_max <- min(100, ceiling((y_max_data + y_pad) / 10) * 10)
+    # NPS: always include 0, extend to data range rounded to nearest 10
+    y_axis_min <- min(0, floor((y_min_data - 10) / 10) * 10)
+    y_axis_max <- max(0, ceiling((y_max_data + 10) / 10) * 10)
+    y_axis_min <- max(-100, y_axis_min)
+    y_axis_max <- min(100, y_axis_max)
+    # Ensure at least 40-point visible range
     if (y_axis_max - y_axis_min < 40) {
       mid <- (y_min_data + y_max_data) / 2
       y_axis_min <- max(-100, floor((mid - 20) / 10) * 10)
@@ -364,26 +359,17 @@ build_line_chart <- function(chart_data, config, active_segment = NULL,
     }
     format_fn <- function(v) sprintf("%+.*f", dp_nps, v)
   } else {
-    # Rating scales: zoom to data range, not fixed 0-5 or 0-10
-    y_range_data <- y_max_data - y_min_data
-    if (y_range_data == 0) y_range_data <- 0.5
-    y_pad <- max(0.25, y_range_data * 0.3)
-    # Round to nice intervals
-    if (y_max_data <= 5.5) {
-      step <- 0.25
+    # Rating scales: use full scale range (1-5 or 1-10)
+    if (!is.null(scale_max_hint) && !is.na(scale_max_hint)) {
+      y_axis_max <- scale_max_hint
+    } else if (y_max_data <= 5.5) {
+      y_axis_max <- 5
     } else if (y_max_data <= 10.5) {
-      step <- 0.5
+      y_axis_max <- 10
     } else {
-      step <- max(1, round(y_range_data / 5))
+      y_axis_max <- ceiling(y_max_data)
     }
-    y_axis_min <- max(0, floor((y_min_data - y_pad) / step) * step)
-    y_axis_max <- ceiling((y_max_data + y_pad) / step) * step
-    # Ensure minimum visible range
-    if (y_axis_max - y_axis_min < step * 3) {
-      mid <- (y_min_data + y_max_data) / 2
-      y_axis_min <- max(0, floor((mid - step * 2) / step) * step)
-      y_axis_max <- ceiling((mid + step * 2) / step) * step
-    }
+    y_axis_min <- if (y_axis_max <= 5) 1 else if (y_axis_max <= 10) 0 else 0
     format_fn <- function(v) format(round(v, dp_ratings), nsmall = dp_ratings)
   }
 

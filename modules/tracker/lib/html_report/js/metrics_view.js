@@ -693,14 +693,39 @@ function dismissMetricInsight(metricId) {
 }
 
 /**
- * Pin current metric view to the Pinned Views tab
+ * Pin current metric view to the Pinned Views tab.
  * @param {string} metricId - The metric ID
+ * @param {string} [mode="all"] - Pin mode: "all" (insight+chart+table), "chart" (insight+chart), "table" (insight+table)
  */
-function pinMetricView(metricId) {
+function pinMetricView(metricId, mode) {
+  // Close pin menu if open
+  var menu = document.getElementById("pin-menu-" + metricId);
+  if (menu) menu.style.display = "none";
+
   if (typeof togglePin === "function") {
-    togglePin(metricId);
+    togglePin(metricId, mode || "all");
   }
 }
+
+/**
+ * Toggle the pin dropdown menu visibility
+ * @param {string} metricId - The metric ID
+ */
+function togglePinMenu(metricId) {
+  var menu = document.getElementById("pin-menu-" + metricId);
+  if (!menu) return;
+  var isVisible = menu.style.display !== "none";
+  // Close all other pin menus first
+  document.querySelectorAll(".tk-pin-menu").forEach(function(m) { m.style.display = "none"; });
+  menu.style.display = isVisible ? "none" : "block";
+}
+
+// Close pin menus on click outside
+document.addEventListener("click", function(e) {
+  if (!e.target.closest(".tk-pin-dropdown")) {
+    document.querySelectorAll(".tk-pin-menu").forEach(function(m) { m.style.display = "none"; });
+  }
+});
 
 
 // ==============================================================================

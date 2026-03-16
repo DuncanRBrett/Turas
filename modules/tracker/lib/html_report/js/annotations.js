@@ -152,9 +152,17 @@
     var waveId = pointEl.getAttribute("data-wave") || "";
     var waveLabel = pointEl.getAttribute("data-wave-label") || waveId;
 
-    // Find metric panel to get metricId
+    // Find metric panel to get metricId (Metrics tab or Overview tab)
     var panel = pointEl.closest(".tk-metric-panel");
     var metricId = panel ? panel.getAttribute("data-metric-id") : "";
+    if (!metricId) {
+      // Overview chart: try to find metricId from closest metric row via segment name
+      // In overview, the segment attribute is the metric name (series label)
+      var overviewContainer = pointEl.closest("#tk-combined-chart");
+      if (overviewContainer) {
+        metricId = "overview";
+      }
+    }
     if (!metricId) return;
 
     // Check for existing annotation
@@ -178,11 +186,18 @@
           'onclick="window._saveAnnotation(\'' + metricId + "','" + waveId + "','" + segment + "'" + ')">Save</button>' +
       '</div>';
 
-    // Position near the data point
+    // Position near the data point using fixed positioning for stability
     var rect = pointEl.getBoundingClientRect();
-    popover.style.left = (rect.left + rect.width / 2 - 100) + "px";
-    popover.style.top = (rect.bottom + 10 + window.scrollY) + "px";
-    popover.style.position = "absolute";
+    var popoverLeft = Math.max(8, Math.min(rect.left + rect.width / 2 - 120, window.innerWidth - 260));
+    var popoverTop = rect.bottom + 8;
+    // If near bottom of viewport, show above instead
+    if (popoverTop + 120 > window.innerHeight) {
+      popoverTop = rect.top - 120;
+    }
+    popover.style.left = popoverLeft + "px";
+    popover.style.top = popoverTop + "px";
+    popover.style.position = "fixed";
+    popover.style.zIndex = "9999";
     document.body.appendChild(popover);
     activePopover = popover;
 

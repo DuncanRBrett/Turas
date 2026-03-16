@@ -10,12 +10,13 @@ var pinnedViews = [];
 /**
  * Toggle pin on a metric (add or remove)
  * @param {string} metricId - The metric ID
+ * @param {string} [mode="all"] - Pin mode: "all", "chart", "table"
  */
-function togglePin(metricId) {
+function togglePin(metricId, mode) {
   // Always add a new pin (multi-pin support).
   // Each pin captures the current view state (visible segments, chart, table).
   // Unpinning is done via the ✕ button on each pinned card.
-  var pinObj = captureMetricView(metricId);
+  var pinObj = captureMetricView(metricId, mode || "all");
   if (pinObj) {
     pinnedViews.push(pinObj);
   }
@@ -31,9 +32,11 @@ function togglePin(metricId) {
  * Captures chart SVG only if chart is currently visible.
  * Records display state: show-freq (counts), vs-prev/vs-base row visibility.
  * @param {string} metricId - The metric ID
+ * @param {string} [mode="all"] - Pin mode: "all" (chart+table), "chart" (chart only), "table" (table only)
  * @returns {Object|null} Pin object
  */
-function captureMetricView(metricId) {
+function captureMetricView(metricId, mode) {
+  mode = mode || "all";
   var panel = document.getElementById("mv-" + metricId);
   if (!panel) return null;
 
@@ -49,8 +52,9 @@ function captureMetricView(metricId) {
   });
 
   // ---- Build clean table HTML (only visible segments) ----
+  // Skip table capture if mode is "chart" (insight+chart only)
   var cleanTableHtml = "";
-  if (tableArea) {
+  if (tableArea && mode !== "chart") {
     var tableClone = tableArea.cloneNode(true);
 
     // Remove hidden segment rows
@@ -109,9 +113,10 @@ function captureMetricView(metricId) {
   }
 
   // ---- Chart SVG: only capture if chart is currently displayed ----
+  // Skip chart capture if mode is "table" (insight+table only)
   var chartSvg = "";
   var chartVisible = false;
-  if (chartArea && chartArea.style.display !== "none") {
+  if (chartArea && chartArea.style.display !== "none" && mode !== "table") {
     chartVisible = true;
     // Clone chart and remove hidden elements
     var chartClone = chartArea.cloneNode(true);
@@ -136,6 +141,7 @@ function captureMetricView(metricId) {
     tableHtml: cleanTableHtml,
     chartSvg: chartSvg,
     chartVisible: chartVisible,
+    pinMode: mode,
     insightText: insightEditor ? insightEditor.innerHTML : "",
     timestamp: Date.now(),
     order: pinnedViews.length
@@ -1015,6 +1021,42 @@ function saveReportHTML() {
  * @param {string} sectionType - "background" or "findings"
  */
 function pinSummarySection(sectionType) {
+  // Handle KPI cards pinning
+  if (sectionType === "kpi-cards") {
+    var visibleCards = document.querySelectorAll('.kpi-card-item:not(.kpi-card-hidden)');
+    if (visibleCards.length === 0) {
+      alert("No visible KPI cards to pin. Show some cards first.");
+      return;
+    }
+    var container = document.createElement("div");
+    container.className = "tk-hero-strip";
+    container.style.cssText = "display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;";
+    for (var i = 0; i < visibleCards.length; i++) {
+      var clone = visibleCards[i].cloneNode(true);
+      // Remove hide button from cloned card
+      var hideBtn = clone.querySelector(".kpi-card-hide-btn");
+      if (hideBtn) hideBtn.remove();
+      container.appendChild(clone);
+    }
+    var pinObj = {
+      id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+      metricId: "summary-kpi-cards",
+      metricTitle: "Key Metrics at a Glance",
+      visibleSegments: [],
+      tableHtml: container.outerHTML,
+      chartSvg: "",
+      chartVisible: false,
+      insightText: "",
+      timestamp: Date.now(),
+      order: pinnedViews.length
+    };
+    pinnedViews.push(pinObj);
+    renderPinnedCards();
+    updatePinBadge();
+    savePinnedData();
+    return;
+  }
+
   var editorId = sectionType === "background"
     ? "summary-background-editor"
     : "summary-findings-editor";
@@ -1227,8 +1269,20 @@ function exportSummarySlide(sectionType) {
  * Export the summary metrics table as Excel XML.
  */
 function exportSummaryExcel() {
-  var table = document.getElementById("summary-metrics-table");
+  // Try heatmap table first, then fall back to legacy summary table
+  var table = document.getElementById("hm-overview-table") || document.getElementById("summary-metrics-table");
   if (!table) return;
+
+  var isHeatmap = table.id === "hm-overview-table";
+
+  // For heatmap, determine current segment and mode
+  var segLabel = "Total", modeLabel = "Absolute";
+  if (isHeatmap) {
+    var segSel = document.getElementById("hm-segment-select");
+    if (segSel) segLabel = segSel.options[segSel.selectedIndex].text;
+    var activeMode = document.querySelector(".hm-mode-btn.active");
+    if (activeMode) modeLabel = activeMode.textContent.trim();
+  }
 
   var xml = '<?xml version="1.0"?>\n';
   xml += '<?mso-application progid="Excel.Sheet"?>\n';
@@ -1239,12 +1293,21 @@ function exportSummaryExcel() {
   xml += '<Style ss:ID="Default"><Font ss:FontName="Calibri" ss:Size="11"/></Style>\n';
   xml += '<Style ss:ID="Title"><Font ss:FontName="Calibri" ss:Size="14" ss:Bold="1"/></Style>\n';
   xml += '<Style ss:ID="Header"><Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1"/><Interior ss:Color="#D9E2F3" ss:Pattern="Solid"/></Style>\n';
+  xml += '<Style ss:ID="Section"><Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#333333"/><Interior ss:Color="#F0F0F0" ss:Pattern="Solid"/></Style>\n';
+  xml += '<Style ss:ID="Green"><Font ss:FontName="Calibri" ss:Size="11"/><Interior ss:Color="#D4EDDA" ss:Pattern="Solid"/></Style>\n';
+  xml += '<Style ss:ID="Amber"><Font ss:FontName="Calibri" ss:Size="11"/><Interior ss:Color="#FFF3CD" ss:Pattern="Solid"/></Style>\n';
+  xml += '<Style ss:ID="Red"><Font ss:FontName="Calibri" ss:Size="11"/><Interior ss:Color="#F8D7DA" ss:Pattern="Solid"/></Style>\n';
   xml += '</Styles>\n';
 
-  xml += '<Worksheet ss:Name="Summary"><Table>\n';
+  var sheetTitle = isHeatmap ? "Overview Heatmap" : "Summary Metrics Overview";
+  var sheetName = xmlEscape((isHeatmap ? segLabel + " - " + modeLabel : "Summary").substring(0, 31));
+  xml += '<Worksheet ss:Name="' + sheetName + '">\n<Table>\n';
 
-  // Title row
-  xml += '<Row><Cell ss:StyleID="Title"><Data ss:Type="String">Summary Metrics Overview</Data></Cell></Row>\n';
+  // Title rows
+  xml += '<Row><Cell ss:StyleID="Title"><Data ss:Type="String">' + xmlEscape(sheetTitle) + '</Data></Cell></Row>\n';
+  if (isHeatmap) {
+    xml += '<Row><Cell><Data ss:Type="String">Segment: ' + xmlEscape(segLabel) + '  |  Mode: ' + xmlEscape(modeLabel) + '</Data></Cell></Row>\n';
+  }
   xml += '<Row></Row>\n';
 
   // Headers
@@ -1252,37 +1315,68 @@ function exportSummaryExcel() {
   if (headerRow) {
     xml += '<Row>\n';
     headerRow.querySelectorAll("th").forEach(function(th) {
+      if (th.classList.contains("hm-spark-col") || th.classList.contains("hm-delta-col")) return;
       xml += '<Cell ss:StyleID="Header"><Data ss:Type="String">' + xmlEscape(th.textContent.trim()) + '</Data></Cell>\n';
     });
+    if (isHeatmap) {
+      xml += '<Cell ss:StyleID="Header"><Data ss:Type="String">Change</Data></Cell>\n';
+    }
     xml += '</Row>\n';
   }
 
-  // Body rows (skip hidden)
+  // Body rows
   table.querySelectorAll("tbody tr").forEach(function(tr) {
     if (tr.style.display === "none") return;
-    if (tr.classList.contains("tk-base-row")) {
-      xml += '<Row>\n';
-      tr.querySelectorAll("td").forEach(function(td) {
-        xml += '<Cell><Data ss:Type="String">' + xmlEscape(td.textContent.trim()) + '</Data></Cell>\n';
-      });
-      xml += '</Row>\n';
+
+    // Type/section headers
+    if (tr.classList.contains("hm-type-header") || tr.classList.contains("hm-section-header") || tr.classList.contains("tk-section-row")) {
+      var label = tr.textContent.trim();
+      var nCols = headerRow ? headerRow.querySelectorAll("th").length : 5;
+      if (isHeatmap) nCols = nCols - 1; // minus spark/delta + change
+      xml += '<Row><Cell ss:StyleID="Section" ss:MergeAcross="' + (nCols - 1) + '"><Data ss:Type="String">' + xmlEscape(label) + '</Data></Cell></Row>\n';
       return;
     }
-    if (tr.classList.contains("tk-section-row")) {
-      xml += '<Row><Cell><Data ss:Type="String">' + xmlEscape(tr.textContent.trim()) + '</Data></Cell></Row>\n';
-      return;
-    }
+
+    if (isHeatmap && !tr.classList.contains("hm-metric-row")) return;
+
     xml += '<Row>\n';
     tr.querySelectorAll("td").forEach(function(td) {
-      var label = td.querySelector(".tk-metric-label");
-      var text = label ? label.textContent.trim() : td.textContent.trim();
-      xml += '<Cell><Data ss:Type="String">' + xmlEscape(text) + '</Data></Cell>\n';
+      if (td.classList.contains("hm-spark-cell") || td.classList.contains("hm-delta-cell")) return;
+
+      var text = "";
+      var dataType = "String";
+      var style = "Default";
+
+      var label = td.querySelector(".tk-metric-label") || td.querySelector(".hm-metric-label");
+      if (label) {
+        text = label.textContent.trim();
+      } else if (td.classList.contains("hm-value-cell")) {
+        var numVal = parseFloat(td.getAttribute("data-value"));
+        if (!isNaN(numVal)) { text = String(numVal); dataType = "Number"; }
+        else { text = td.textContent.trim(); }
+        var bg = td.style.backgroundColor || "";
+        if (bg.indexOf("39, 174, 96") >= 0 || bg.indexOf("46, 204, 113") >= 0) style = "Green";
+        else if (bg.indexOf("243, 156, 18") >= 0 || bg.indexOf("241, 196, 15") >= 0) style = "Amber";
+        else if (bg.indexOf("231, 76, 60") >= 0 || bg.indexOf("192, 57, 43") >= 0) style = "Red";
+      } else {
+        text = td.textContent.trim();
+      }
+
+      xml += '<Cell ss:StyleID="' + style + '"><Data ss:Type="' + dataType + '">' + xmlEscape(text) + '</Data></Cell>\n';
     });
+
+    if (isHeatmap) {
+      var deltaCell = tr.querySelector(".hm-delta-cell");
+      var deltaText = deltaCell ? deltaCell.textContent.trim() : "";
+      xml += '<Cell><Data ss:Type="String">' + xmlEscape(deltaText) + '</Data></Cell>\n';
+    }
+
     xml += '</Row>\n';
   });
 
   xml += '</Table>\n</Worksheet>\n</Workbook>';
-  downloadBlob(xml, "summary_metrics.xls", "application/vnd.ms-excel");
+  var filename = isHeatmap ? "heatmap_" + segLabel.replace(/[^a-zA-Z0-9_-]/g, "_") + ".xls" : "summary_metrics.xls";
+  downloadBlob(xml, filename, "application/vnd.ms-excel");
 }
 
 /**

@@ -66,7 +66,10 @@ build_tracker_page <- function(html_data, table_html, charts, config) {
         build_summary_tab(html_data, config)
       ),
 
-      # Tab 2: Metrics by Segment
+      # Tab 2: Heatmap Explorer
+      build_explorer_tab(html_data, config),
+
+      # Tab 3: Metrics by Segment
       htmltools::tags$div(id = "tab-metrics", class = "tab-panel",
         build_metrics_tab(html_data, charts, config)
       ),
@@ -113,7 +116,17 @@ build_tracker_page <- function(html_data, table_html, charts, config) {
         )
       ),
 
-      # Tab 4: Added Slides (qualitative panel)
+      # Tab 4: Visualise (populated dynamically from Explorer)
+      htmltools::tags$div(id = "tab-visualise", class = "tab-panel",
+        htmltools::tags$div(id = "visualise-placeholder", class = "visualise-empty",
+          htmltools::tags$h3("Select metrics or segments in the Explorer, then click Visualise."),
+          htmltools::tags$p(class = "dash-section-sub",
+            "Use the Explorer tab to select rows, then click the Visualise button to see detailed charts and comparisons here.")
+        ),
+        htmltools::tags$div(id = "visualise-content", style = "display:none")
+      ),
+
+      # Tab 5: Added Slides (qualitative panel)
       htmltools::tags$div(id = "tab-slides", class = "tab-panel",
         build_qualitative_panel()
       ),
@@ -142,7 +155,7 @@ build_tracker_page <- function(html_data, table_html, charts, config) {
     ),
 
     # JavaScript
-    htmltools::tags$script(htmltools::HTML(build_tracker_javascript(html_data)))
+    htmltools::tags$script(htmltools::HTML(build_tracker_javascript(html_data, config)))
   )
 
   htmltools::browsable(page)
@@ -235,6 +248,12 @@ build_report_tab_nav <- function(brand_colour, has_about = FALSE) {
     ),
     htmltools::tags$button(
       class = "report-tab",
+      onclick = "switchReportTab('explorer')",
+      `data-tab` = "explorer",
+      "Explorer"
+    ),
+    htmltools::tags$button(
+      class = "report-tab",
       onclick = "switchReportTab('metrics')",
       `data-tab` = "metrics",
       "Metrics by Segment"
@@ -244,6 +263,14 @@ build_report_tab_nav <- function(brand_colour, has_about = FALSE) {
       onclick = "switchReportTab('overview')",
       `data-tab` = "overview",
       "Segment Overview"
+    ),
+    htmltools::tags$button(
+      class = "report-tab",
+      onclick = "switchReportTab('visualise')",
+      `data-tab` = "visualise",
+      id = "tab-btn-visualise",
+      style = "display:none",
+      "Visualise"
     ),
     htmltools::tags$button(
       class = "report-tab",

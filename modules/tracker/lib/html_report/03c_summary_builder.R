@@ -100,6 +100,12 @@ build_summary_tab <- function(html_data, config) {
           "Latest wave values (%s) with change vs previous wave. Border colour: <span style='color:#4a7c6f;font-weight:600'>green</span> = significant increase, <span style='color:#c9a96e;font-weight:600'>amber</span> = stable, <span style='color:#b85450;font-weight:600'>red</span> = significant decrease.",
           htmltools::htmlEscape(latest_wave_label)
         ))
+      ),
+      htmltools::tags$div(class = "kpi-card-controls",
+        htmltools::tags$button(class = "turas-action-btn", onclick = "toggleAllKpiCards()",
+          htmltools::HTML("&#x1F441; Show/Hide All")),
+        htmltools::tags$button(class = "turas-action-btn", onclick = "pinVisibleKpiCards()",
+          htmltools::HTML("&#x1F4CC; Pin Visible Cards"))
       )
     ),
     build_kpi_hero_cards(html_data, config),
@@ -111,26 +117,7 @@ build_summary_tab <- function(html_data, config) {
     build_sig_changes_section(html_data),
 
     # ---- 7. Significance Heatmap Matrix (collapsed by default) ----
-    build_sig_heatmap(html_data, config),
-
-    # ---- 8. Metric type filter chips ----
-    htmltools::HTML(build_summary_type_filter(html_data)),
-
-    # Action buttons bar
-    htmltools::tags$div(class = "summary-actions",
-      htmltools::tags$button(class = "turas-action-btn",
-        onclick = "exportSummaryExcel()",
-        htmltools::HTML("&#x2B73; Export Excel")),
-      htmltools::tags$button(class = "turas-action-btn",
-        onclick = "pinSummaryTable()",
-        htmltools::HTML("&#x1F4CC; Pin to Views")),
-      htmltools::tags$button(class = "turas-action-btn",
-        onclick = "exportSummaryTableSlide()",
-        htmltools::HTML("&#x1F4F7; Export Slide"))
-    ),
-
-    # ---- 9. Metrics Overview table (Total segment by wave) ----
-    build_summary_metrics_table(html_data)
+    build_sig_heatmap(html_data, config)
   )
 }
 
@@ -205,10 +192,6 @@ build_kpi_hero_cards <- function(html_data, config) {
   prev_wave <- if (n_waves >= 2) waves[n_waves - 1] else NULL
   brand_colour <- get_setting(config, "brand_colour", default = "#323367") %||% "#323367"
 
-  # Traffic light borders use TREND direction (not absolute values)
-  # Green = significant increase, Amber = stable/no sig change, Red = significant decrease
-  # This works consistently across all metric types (%, means, NPS)
-
   # Filter to hero metrics if configured
   hero_filter <- get_setting(config, "dashboard_hero_metrics", default = NULL)
   hero_metric_ids <- NULL
@@ -216,9 +199,14 @@ build_kpi_hero_cards <- function(html_data, config) {
     hero_metric_ids <- trimws(strsplit(hero_filter, ",")[[1]])
   }
 
-  cards <- list()
+  # Classify metrics by type for grouping
+  type_labels <- list(mean = "Means / Ratings", pct = "Percentages / Box Scores",
+                       nps = "NPS", other = "Other")
+  type_order <- c("mean", "pct", "nps", "other")
+
+  # Build card data with type info
+  card_list <- list()
   for (mr in html_data$metric_rows) {
-    # Skip if hero filter is set and this metric is not included
     if (!is.null(hero_metric_ids) && !(mr$metric_id %in% hero_metric_ids)) next
 
     cells <- mr$segment_cells[[total_seg]]
@@ -226,26 +214,26 @@ build_kpi_hero_cards <- function(html_data, config) {
     latest_cell <- cells[[latest_wave]]
     if (is.null(latest_cell)) next
 
-    # Current value
+    m_type <- if (!is.null(mr$data_type)) mr$data_type else classify_data_type(mr$metric_name)
     current_val <- latest_cell$display_value
-    raw_val <- latest_cell$value
+    is_pct <- grepl("(pct|box|range|proportion|category|any)", mr$metric_name)
 
     # Change from previous wave
     change_html <- ""
-    trend_class <- "tk-hero-trend-stable"
+    change_num <- 0
+    is_positive <- FALSE
+    is_negative <- FALSE
     if (!is.null(prev_wave)) {
-      prev_cell <- cells[[prev_wave]]
-      if (!is.null(prev_cell) && !is.na(latest_cell$change_vs_prev)) {
+      if (!is.null(latest_cell$change_vs_prev) && !is.na(latest_cell$change_vs_prev)) {
         change_num <- latest_cell$change_vs_prev
         is_sig <- isTRUE(latest_cell$sig_vs_prev)
-        is_pct <- grepl("(pct|box|range|proportion|category|any)", mr$metric_name)
 
         if (change_num > 0) {
-          trend_class <- "tk-hero-trend-up"
+          is_positive <- TRUE
           arrow <- "\u25B2"
           change_text <- if (is_pct) sprintf("+%.1f pp", change_num) else sprintf("+%.2f", change_num)
         } else if (change_num < 0) {
-          trend_class <- "tk-hero-trend-down"
+          is_negative <- TRUE
           arrow <- "\u25BC"
           change_text <- if (is_pct) sprintf("%.1f pp", change_num) else sprintf("%.2f", change_num)
         } else {
@@ -253,6 +241,7 @@ build_kpi_hero_cards <- function(html_data, config) {
           change_text <- "No change"
         }
 
+        trend_class <- if (is_positive) "tk-hero-trend-up" else if (is_negative) "tk-hero-trend-down" else "tk-hero-trend-stable"
         sig_badge <- if (is_sig) '<span class="tk-hero-sig">*</span>' else ""
         change_html <- sprintf(
           '<div class="%s"><span class="tk-hero-arrow">%s</span> %s%s</div>',
@@ -272,37 +261,72 @@ build_kpi_hero_cards <- function(html_data, config) {
     }
 
     # Traffic light border colour — based on TREND direction
-    # Green = sig increase, Amber = stable, Red = sig decrease
     border_colour <- "#c9a96e"  # default: amber/stable
     if (!is.null(prev_wave)) {
-      prev_cell <- cells[[prev_wave]]
-      if (!is.null(prev_cell) && !is.na(latest_cell$change_vs_prev)) {
+      if (!is.null(latest_cell$change_vs_prev) && !is.na(latest_cell$change_vs_prev)) {
         is_sig <- isTRUE(latest_cell$sig_vs_prev)
         if (is_sig && latest_cell$change_vs_prev > 0) {
-          border_colour <- "#4a7c6f"  # sage green — significant improvement
+          border_colour <- "#4a7c6f"
         } else if (is_sig && latest_cell$change_vs_prev < 0) {
-          border_colour <- "#b85450"  # dusty rose — significant decline
+          border_colour <- "#b85450"
         }
-        # Non-significant changes stay amber
       }
     }
 
-    cards <- c(cards, list(
-      htmltools::tags$div(class = "tk-hero-card",
+    # Value colour: reflect direction (not always brand colour)
+    value_colour_class <- if (is_positive) "tk-hero-val-up" else if (is_negative) "tk-hero-val-down" else "tk-hero-val-neutral"
+
+    card_list <- c(card_list, list(list(
+      type = m_type,
+      metric_id = mr$metric_id,
+      card = htmltools::tags$div(class = paste("tk-hero-card", "kpi-card-item"),
+        `data-metric-type` = m_type,
+        `data-metric-id` = mr$metric_id,
         style = sprintf("border-left-color: %s", border_colour),
-        htmltools::tags$div(class = "tk-hero-label", mr$metric_label),
+        htmltools::tags$div(class = "kpi-card-header",
+          htmltools::tags$div(class = "tk-hero-label", mr$metric_label),
+          htmltools::tags$button(class = "kpi-card-hide-btn", title = "Hide card",
+            onclick = sprintf("hideKpiCard('%s')", mr$metric_id),
+            htmltools::HTML("&times;"))
+        ),
         htmltools::tags$div(class = "tk-hero-body",
-          htmltools::tags$div(class = "tk-hero-value", htmltools::HTML(current_val)),
+          htmltools::tags$div(class = paste("tk-hero-value", value_colour_class),
+            htmltools::HTML(current_val)),
           htmltools::HTML(change_html)
         ),
         htmltools::tags$div(class = "tk-hero-sparkline", htmltools::HTML(sparkline_svg))
       )
-    ))
+    )))
   }
 
-  if (length(cards) == 0) return(htmltools::tags$div())
+  if (length(card_list) == 0) return(htmltools::tags$div())
 
-  htmltools::tags$div(class = "tk-hero-strip", cards)
+  # Group by type
+  present_types <- unique(vapply(card_list, function(c) c$type, character(1)))
+  present_types <- type_order[type_order %in% present_types]
+  show_headers <- length(present_types) > 1
+
+  groups <- list()
+  for (type_key in present_types) {
+    type_cards <- Filter(function(c) c$type == type_key, card_list)
+    type_cards_tags <- lapply(type_cards, function(c) c$card)
+
+    if (show_headers) {
+      groups <- c(groups, list(
+        htmltools::tags$div(class = "kpi-type-group",
+          htmltools::tags$div(class = "kpi-type-header",
+            type_labels[[type_key]] %||% type_key),
+          htmltools::tags$div(class = "tk-hero-strip", type_cards_tags)
+        )
+      ))
+    } else {
+      groups <- c(groups, list(
+        htmltools::tags$div(class = "tk-hero-strip", type_cards_tags)
+      ))
+    }
+  }
+
+  htmltools::tags$div(class = "kpi-hero-section", id = "kpi-hero-section", groups)
 }
 
 
@@ -344,7 +368,7 @@ build_wave_pulse_bar <- function(html_data) {
     if (is.null(cell)) next
     total_metrics <- total_metrics + 1L
 
-    if (isTRUE(cell$sig_vs_prev) && !is.na(cell$change_vs_prev)) {
+    if (isTRUE(cell$sig_vs_prev) && !is.null(cell$change_vs_prev) && !is.na(cell$change_vs_prev)) {
       if (cell$change_vs_prev > 0) sig_up <- sig_up + 1L
       else sig_down <- sig_down + 1L
     } else {
@@ -419,9 +443,41 @@ build_sig_heatmap <- function(html_data, config) {
   }
   parts <- c(parts, '</tr></thead>')
 
-  # Body
+  # Body — group rows by data type for visual separation
+  # Classify each metric into type groups
+  type_labels <- list(mean = "Means / Ratings", pct = "Percentages / Box Scores",
+                       nps = "NPS", other = "Other")
+  classify_hm_type <- function(metric_name) {
+    if (metric_name %in% c("nps_score", "nps", "promoters_pct", "passives_pct", "detractors_pct")) return("nps")
+    if (grepl("(pct|box|range|proportion|category|any)", metric_name)) return("pct")
+    if (metric_name == "mean" || grepl("(mean|index|composite)", metric_name)) return("mean")
+    "other"
+  }
+
+  # Build ordered list of type groups present
+  type_order <- c("mean", "pct", "nps", "other")
+  metric_types <- vapply(html_data$metric_rows, function(mr) classify_hm_type(mr$metric_name), character(1))
+  present_types <- unique(metric_types)
+  present_types <- type_order[type_order %in% present_types]
+  show_type_headers <- length(present_types) > 1  # only show headers if multiple types
+
   parts <- c(parts, '<tbody>')
-  for (mr in html_data$metric_rows) {
+  for (type_key in present_types) {
+    type_indices <- which(metric_types == type_key)
+    if (length(type_indices) == 0) next
+
+    # Insert type group header row if multiple types present
+    if (show_type_headers) {
+      parts <- c(parts, sprintf(
+        '<tr class="tk-heatmap-type-header"><td class="tk-td" colspan="%d" style="background:#f8fafc;font-weight:600;font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:0.04em;padding:10px 12px 6px;">%s</td></tr>',
+        length(segments) + 1,
+        htmltools::htmlEscape(type_labels[[type_key]] %||% type_key)
+      ))
+    }
+
+    for (mi in type_indices) {
+      mr <- html_data$metric_rows[[mi]]
+
     parts <- c(parts, '<tr class="tk-heatmap-row">')
     parts <- c(parts, sprintf(
       '<td class="tk-td tk-label-col tk-sticky-col">%s</td>',
@@ -434,7 +490,7 @@ build_sig_heatmap <- function(html_data, config) {
       cells <- mr$segment_cells[[seg]]
       cell <- if (!is.null(cells)) cells[[latest_wave]] else NULL
 
-      if (is.null(cell) || is.na(cell$change_vs_prev)) {
+      if (is.null(cell) || is.null(cell$change_vs_prev) || is.na(cell$change_vs_prev)) {
         # No data
         parts <- c(parts, '<td class="tk-td tk-heatmap-cell tk-heatmap-na">&mdash;</td>')
       } else {
@@ -473,7 +529,8 @@ build_sig_heatmap <- function(html_data, config) {
       }
     }
     parts <- c(parts, '</tr>')
-  }
+    }  # end for mi in type_indices
+  }  # end for type_key in present_types
 
   parts <- c(parts, '</tbody></table></div>')
   parts <- c(parts, '</div>')  # close summary-collapse-body
@@ -531,7 +588,7 @@ build_sig_changes_section <- function(html_data) {
 
       findings[[length(findings) + 1]] <- list(
         metric_label = mr$metric_label,
-        section = if (!is.na(mr$section) && nzchar(mr$section)) mr$section else "",
+        section = if (!is.null(mr$section) && !is.na(mr$section) && nzchar(mr$section)) mr$section else "",
         segment = seg_name,
         direction = direction,
         direction_label = direction_label,
@@ -562,6 +619,9 @@ build_sig_changes_section <- function(html_data) {
     sapply(findings, function(f) f$metric_label)
   )]
 
+  # Collect unique segments for filter dropdown
+  sig_segments <- unique(sapply(findings, function(f) f$segment))
+
   cards <- lapply(seq_along(findings), function(i) {
     f <- findings[[i]]
     border_colour <- if (f$direction == "up") "#059669" else "#c0392b"
@@ -574,6 +634,7 @@ build_sig_changes_section <- function(html_data) {
     htmltools::tags$div(
       class = "dash-sig-card",
       `data-sig-id` = sig_id,
+      `data-segment` = f$segment,
       style = sprintf("border-left-color: %s", border_colour),
       # Action bar: toggle + pin
       htmltools::tags$div(
@@ -609,6 +670,17 @@ build_sig_changes_section <- function(html_data) {
     )
   })
 
+  # Build segment filter dropdown — include ALL segments (Total + banners), not just those with findings
+  all_segments <- names(html_data$metric_rows[[1]]$segment_cells)
+  seg_filter_options <- list(
+    htmltools::tags$option(value = "all", "All Segments")
+  )
+  for (seg in all_segments) {
+    seg_filter_options <- c(seg_filter_options, list(
+      htmltools::tags$option(value = seg, seg)
+    ))
+  }
+
   htmltools::tags$div(class = "dash-section", id = "summary-section-sig-changes",
     htmltools::tags$div(class = "summary-section-controls",
       htmltools::tags$button(
@@ -626,6 +698,19 @@ build_sig_changes_section <- function(html_data) {
     htmltools::tags$div(class = "dash-section-sub",
       sprintf("Wave-on-wave changes that are statistically significant (%s vs %s). Click the eye to hide, pin to save individual findings.",
         latest_label, prev_label)
+    ),
+    # Segment filter (always shown)
+    htmltools::tags$div(class = "sig-segment-filter",
+      htmltools::tags$label(class = "hm-control-label", "Filter by Segment:"),
+      htmltools::tags$select(class = "hm-select", id = "sig-segment-filter",
+        onchange = "filterSigBySegment(this.value)",
+        seg_filter_options
+      )
+    ),
+    # Empty state message (hidden by default, shown by JS when filter yields no results)
+    htmltools::tags$div(class = "dash-sig-empty sig-filter-empty", id = "sig-filter-empty",
+      style = "display:none",
+      "No significant changes for this segment"
     ),
     if (length(findings) > 6) {
       htmltools::tags$div(class = "dash-sig-grid sig-cards-collapsed", id = "sig-cards-grid", cards)

@@ -5,7 +5,11 @@
  * navigation sidebar.
  * =========================================================================== */
 
-var activeMetricTypeFilter = "all";
+// Default to first type — set from active chip on load
+var activeMetricTypeFilter = (function() {
+  var activeChip = document.querySelector(".mv-type-chip.active");
+  return activeChip ? (activeChip.getAttribute("data-type-filter") || "all") : "all";
+})();
 
 function filterMetricType(typeKey) {
   activeMetricTypeFilter = typeKey;
@@ -18,6 +22,15 @@ function filterMetricType(typeKey) {
 function filterMetricNav(query) {
   window._metricSearchQuery = (query || "").toLowerCase();
   applyMetricNavFilter();
+}
+
+// Apply filter on load if not "all"
+if (activeMetricTypeFilter !== "all") {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function() { applyMetricNavFilter(); });
+  } else {
+    setTimeout(function() { applyMetricNavFilter(); }, 0);
+  }
 }
 
 function applyMetricNavFilter() {

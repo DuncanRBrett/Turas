@@ -55,6 +55,36 @@ classify_metric_type <- function(metric_name) {
 }
 
 
+#' Get Human-Readable Metric Type Descriptor
+#'
+#' Returns a clean subtitle string describing the metric type,
+#' e.g. "Mean Score", "Top 2 Box (%)", "NPS Score".
+#'
+#' @param metric_name Character. Internal metric name (e.g., "mean", "top2_box")
+#' @return Character. Human-readable metric type descriptor
+#' @keywords internal
+metric_type_descriptor <- function(metric_name) {
+  if (metric_name == "mean") return("Mean Score")
+  if (metric_name == "nps_score" || metric_name == "nps") return("NPS Score")
+  if (metric_name == "promoters_pct") return("NPS \u2014 Promoters (%)")
+  if (metric_name == "passives_pct") return("NPS \u2014 Passives (%)")
+  if (metric_name == "detractors_pct") return("NPS \u2014 Detractors (%)")
+  if (grepl("^top[_]?2[_]?box", metric_name)) return("Top 2 Box (%)")
+  if (grepl("^top[_]?3[_]?box", metric_name)) return("Top 3 Box (%)")
+  if (grepl("^bottom[_]?2[_]?box", metric_name)) return("Bottom 2 Box (%)")
+  if (grepl("^bottom[_]?3[_]?box", metric_name)) return("Bottom 3 Box (%)")
+  if (grepl("^box_", metric_name)) return("Box Score (%)")
+  if (grepl("^category_", metric_name)) return("Category (%)")
+  if (grepl("^range_", metric_name)) return("Range (%)")
+  # Fallback using classify_metric_type for broader matching
+  m_type <- classify_metric_type(metric_name)
+  if (m_type == "mean") return("Mean Score")
+  if (m_type == "nps") return("NPS (%)")
+  if (m_type == "pct") return("Percentage (%)")
+  "Metric"
+}
+
+
 #' Build Metrics by Segment Tab
 #'
 #' Assembles the complete Metrics by Segment tab with sidebar navigation,
@@ -77,12 +107,58 @@ build_metrics_tab <- function(html_data, charts, config) {
   # Build per-metric panels
   metric_panels <- build_metric_panels(html_data, charts, config, segments, segment_colours)
 
-  # Global significance toggle
+  # Significance test info
+  alpha <- html_data$metadata$confidence_level
+  p_val <- if (!is.null(alpha)) sprintf("p<%.2f", 1 - alpha) else "p<0.05"
+  conf_pct <- if (!is.null(alpha)) paste0(round(alpha * 100), "%") else "95%"
+
+  # Global significance toggle + info button
   sig_toggle <- htmltools::tags$div(class = "mv-global-controls",
     htmltools::tags$label(class = "tk-toggle",
       htmltools::tags$input(type = "checkbox", id = "toggle-sig-global",
                              onchange = "toggleSignificance()"),
       htmltools::tags$span(class = "tk-toggle-label", "Hide Significance Indicators")
+    ),
+    htmltools::tags$button(
+      class = "tk-sig-info-btn",
+      onclick = "document.getElementById('sig-explainer').classList.toggle('visible')",
+      htmltools::HTML("&#x2139; How significance works")
+    )
+  )
+
+  # Significance explainer callout (hidden by default, toggled by button)
+  sig_explainer <- htmltools::tags$div(
+    class = "tk-sig-explainer", id = "sig-explainer",
+    htmltools::tags$div(class = "tk-sig-explainer-header",
+      htmltools::tags$strong("Significance Testing"),
+      htmltools::tags$button(
+        class = "tk-sig-explainer-close",
+        onclick = "document.getElementById('sig-explainer').classList.remove('visible')",
+        htmltools::HTML("&times;")
+      )
+    ),
+    htmltools::tags$div(class = "tk-sig-explainer-body",
+      htmltools::tags$p(sprintf(
+        "Each wave is compared against the baseline wave using a z-test (for proportions) or t-test (for means) at the %s confidence level (%s).",
+        conf_pct, p_val
+      )),
+      htmltools::tags$div(class = "tk-sig-explainer-legend",
+        htmltools::tags$div(class = "tk-sig-legend-item",
+          htmltools::tags$span(class = "sig-arrow", style = "color:#059669;background:rgba(5,150,105,0.08);", htmltools::HTML("&#x25B2;")),
+          htmltools::tags$span("Significantly higher than baseline")
+        ),
+        htmltools::tags$div(class = "tk-sig-legend-item",
+          htmltools::tags$span(class = "sig-arrow", style = "color:#c0392b;background:rgba(192,57,43,0.08);", htmltools::HTML("&#x25BC;")),
+          htmltools::tags$span("Significantly lower than baseline")
+        ),
+        htmltools::tags$div(class = "tk-sig-legend-item",
+          htmltools::tags$span(class = "sig-arrow", style = "color:#94a3b8;background:rgba(148,163,184,0.08);", htmltools::HTML("&#x2014;")),
+          htmltools::tags$span("No significant difference")
+        )
+      ),
+      htmltools::tags$p(class = "tk-sig-explainer-note",
+        "Minimum base size: n=30. Results with low base sizes are flagged."
+      )
     )
   )
 
@@ -94,15 +170,17 @@ build_metrics_tab <- function(html_data, charts, config) {
   type_filter_html <- ""
   if (length(metric_types_present) > 1) {
     type_label_map <- list(mean = "Mean / Rating", pct = "% / Top Box", nps = "NPS", other = "Other")
+    first_type <- metric_types_present[1]
     type_chips <- c('<div class="mv-type-filter">')
     type_chips <- c(type_chips,
-      '<button class="mv-type-chip active" data-type-filter="all" onclick="filterMetricType(\'all\')">All</button>'
+      '<button class="mv-type-chip" data-type-filter="all" onclick="filterMetricType(\'all\')">All</button>'
     )
     for (mt in c("mean", "pct", "nps", "other")) {
       if (mt %in% metric_types_present) {
+        is_first <- mt == first_type
         type_chips <- c(type_chips, sprintf(
-          '<button class="mv-type-chip" data-type-filter="%s" onclick="filterMetricType(\'%s\')">%s</button>',
-          mt, mt, type_label_map[[mt]]
+          '<button class="mv-type-chip%s" data-type-filter="%s" onclick="filterMetricType(\'%s\')">%s</button>',
+          if (is_first) " active" else "", mt, mt, type_label_map[[mt]]
         ))
       }
     }
@@ -125,6 +203,7 @@ build_metrics_tab <- function(html_data, charts, config) {
         ),
         htmltools::HTML(type_filter_html),
         sig_toggle,
+        sig_explainer,
         htmltools::tags$div(class = "mv-sidebar-nav-wrap",
           htmltools::tags$div(class = "mv-sidebar-nav-header",
             sprintf("Metrics (%d)", n_metrics)
@@ -259,28 +338,39 @@ build_metric_panels <- function(html_data, charts, config, segments, segment_col
       active_class, mr$metric_id, htmltools::htmlEscape(mr$metric_id)
     ))
 
-    # Title — question text as prominent heading, metric label as subtitle context
-    # Inspired by best-practice chart labelling: question as bold title, metric type below
+    # Title — question text as prominent heading, metric type as subtitle context
+    # Pattern: bold question as title, clean metric type descriptor below
     q_raw <- mr$question_text
     q_display <- ""
     if (!is.null(q_raw) && !is.na(q_raw) && nzchar(q_raw) && q_raw != "NA") {
       q_display <- q_raw
-    } else if (!is.null(mr$question_type) && tolower(mr$question_type) == "composite") {
-      q_display <- "Composite Metric"
     }
 
-    if (nzchar(q_display) && q_display != mr$metric_label) {
-      # Question text as bold title, metric_label as subtitle context
+    # Build a clean metric type subtitle (e.g., "Mean Score", "Top 2 Box (%)")
+    type_desc <- metric_type_descriptor(mr$metric_name)
+    is_composite <- !is.null(mr$question_type) && !is.na(mr$question_type) && tolower(mr$question_type) == "composite"
+
+    if (nzchar(q_display)) {
+      # Question text as bold title, metric type as lighter subtitle
+      subtitle <- if (is_composite) paste0(type_desc, " \u00B7 Composite") else type_desc
       panel_parts <- c(panel_parts, sprintf(
         '<h2 class="mv-metric-title">%s</h2><p class="mv-metric-subtitle">%s</p>',
         htmltools::htmlEscape(q_display),
-        htmltools::htmlEscape(mr$metric_label)
+        htmltools::htmlEscape(subtitle)
+      ))
+    } else if (is_composite) {
+      # Composite without question text — use metric_label as title
+      panel_parts <- c(panel_parts, sprintf(
+        '<h2 class="mv-metric-title">%s</h2><p class="mv-metric-subtitle">%s</p>',
+        htmltools::htmlEscape(mr$metric_label),
+        htmltools::htmlEscape(paste0(type_desc, " \u00B7 Composite"))
       ))
     } else {
-      # Just the metric label as title (no redundant subtitle)
+      # Fallback — metric_label as title, type descriptor as subtitle
       panel_parts <- c(panel_parts, sprintf(
-        '<h2 class="mv-metric-title">%s</h2>',
-        htmltools::htmlEscape(mr$metric_label)
+        '<h2 class="mv-metric-title">%s</h2><p class="mv-metric-subtitle">%s</p>',
+        htmltools::htmlEscape(mr$metric_label),
+        htmltools::htmlEscape(type_desc)
       ))
     }
 
@@ -404,7 +494,8 @@ build_metric_panels <- function(html_data, charts, config, segments, segment_col
     ))
     panel_parts <- c(panel_parts, '</div>')
 
-    # Export + Pin + Slide buttons
+    # Export + Pin + Slide buttons (wrapped in control group, pushed right)
+    panel_parts <- c(panel_parts, '<div class="mv-control-group mv-action-buttons" style="border-right:none;margin-left:auto;">')
     panel_parts <- c(panel_parts, sprintf(
       '<button class="export-btn" onclick="exportMetricExcel(\'%s\')" title="Export to Excel">&#x2B73; Export Excel</button>',
       mr$metric_id
@@ -413,14 +504,36 @@ build_metric_panels <- function(html_data, charts, config, segments, segment_col
       '<button class="export-btn" onclick="copyChartToClipboard(\'%s\')" title="Copy chart to clipboard">&#x1F4CB; Copy Chart</button>',
       mr$metric_id
     ))
+    panel_parts <- c(panel_parts,
+      '<div class="tk-pin-dropdown" style="display:inline-block;position:relative;">'
+    )
     panel_parts <- c(panel_parts, sprintf(
-      '<button class="export-btn" onclick="pinMetricView(\'%s\')" title="Pin this view">&#x1F4CC; Pin</button>',
+      '<button class="export-btn" onclick="togglePinMenu(\'%s\')" title="Pin this view">&#x1F4CC; Pin &#x25BE;</button>',
       mr$metric_id
     ))
+    panel_parts <- c(panel_parts, sprintf(
+      '<div class="tk-pin-menu" id="pin-menu-%s" style="display:none;">' ,
+      mr$metric_id
+    ))
+    panel_parts <- c(panel_parts, sprintf(
+      '<button class="tk-pin-option" onclick="pinMetricView(\'%s\',\'all\')">Insight + Chart + Table</button>',
+      mr$metric_id
+    ))
+    panel_parts <- c(panel_parts, sprintf(
+      '<button class="tk-pin-option" onclick="pinMetricView(\'%s\',\'chart\')">Insight + Chart</button>',
+      mr$metric_id
+    ))
+    panel_parts <- c(panel_parts, sprintf(
+      '<button class="tk-pin-option" onclick="pinMetricView(\'%s\',\'table\')">Insight + Table</button>',
+      mr$metric_id
+    ))
+    panel_parts <- c(panel_parts, '</div></div>')
     panel_parts <- c(panel_parts, sprintf(
       '<button class="export-btn" onclick="toggleSlideMenu(\'%s\')" title="Export as slide">&#x1F4F8; Export Slide &#x25BE;</button>',
       mr$metric_id
     ))
+
+    panel_parts <- c(panel_parts, '</div>')  # close mv-action-buttons
 
     # Slide export dropdown menu (hidden by default)
     panel_parts <- c(panel_parts, sprintf(
