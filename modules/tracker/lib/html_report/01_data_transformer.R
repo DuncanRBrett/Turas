@@ -9,17 +9,23 @@
 
 #' Classify Metric Name into Data Type
 #'
-#' Maps metric_name to one of four data type categories for type separation
+#' Maps metric_name to one of five data type categories for type separation
 #' and heatmap grouping. Shared classification used by data transformer,
 #' heatmap builder, and chart type guards.
 #'
 #' @param metric_name Character. The metric name (e.g., "mean", "top2_box", "nps_score")
-#' @return Character. Data type key: "mean", "pct", "nps", or "other"
+#' @return Character. Data type key: "mean", "pct", "pct_response", "nps", or "other"
 #' @keywords internal
 classify_data_type <- function(metric_name) {
   if (metric_name == "mean" || grepl("(mean|index|composite)", metric_name)) return("mean")
   if (metric_name %in% c("nps_score", "nps", "promoters_pct", "passives_pct", "detractors_pct")) return("nps")
-  if (grepl("(pct|box|range|proportion|category|any)", metric_name)) return("pct")
+  # Top-box / bottom-box / range — derived from a scale question
+
+  if (grepl("(box|range)", metric_name)) return("pct")
+  # Standalone proportions — brand awareness, category %, multi-mention %
+  if (grepl("(category|proportion|any)", metric_name)) return("pct_response")
+  # Other percentage specs (fallback)
+  if (grepl("pct", metric_name)) return("pct")
   "other"
 }
 

@@ -14,7 +14,7 @@
   var brandColour = (typeof BRAND_COLOUR_HEX !== "undefined") ? BRAND_COLOUR_HEX : "#323367";
 
   // ---- Read thresholds from data attribute ----
-  var hmThresholds = { pct: {green:70,amber:50}, mean5: {green:4,amber:3}, mean10: {green:7,amber:5}, nps: {green:30,amber:0} };
+  var hmThresholds = { pct: {green:70,amber:50}, pct_response: {green:50,amber:25}, mean5: {green:4,amber:3}, mean10: {green:7,amber:5}, nps: {green:30,amber:0} };
   (function loadThresholds() {
     var section = document.querySelector(".hm-overview-section[data-thresholds]");
     if (section) {
@@ -31,7 +31,17 @@
   }
 
   function absoluteCellStyle(val, metricType) {
-    // Green/amber/red threshold-based colouring
+    // pct_response uses a blue sequential scale — these are descriptive proportions,
+    // not evaluative metrics, so green/red "good/bad" coding is inappropriate
+    if (metricType === "pct_response") {
+      // Blue sequential: light (low %) → dark (high %)
+      // Scale: 0–100%, mapped to opacity 0.06–0.40
+      var frac = Math.min(1, Math.max(0, val / 100));
+      var opacity = (0.06 + frac * 0.34).toFixed(2);
+      return "background:rgba(37,99,171," + opacity + ")";  // #2563ab blue
+    }
+
+    // Green/amber/red threshold-based colouring for evaluative metrics
     var thr;
     if (metricType === "pct") {
       thr = hmThresholds.pct;
@@ -76,15 +86,20 @@
   function changeCellStyle(changeVal, isSig) {
     if (changeVal === null || isNaN(changeVal)) return "";
     var r, g, b;
-    if (changeVal > 0) { r = 5; g = 150; b = 105; }      // green
-    else if (changeVal < 0) { r = 192; g = 57; b = 43; }  // red
+    // Diverging blue (positive) / coral-red (negative) — distinct from absolute green/amber/red
+    if (changeVal > 0) { r = 37; g = 99; b = 171; }       // blue (#2563ab)
+    else if (changeVal < 0) { r = 200; g = 70; b = 55; }   // coral-red (#c84637)
     else return "";
     var magnitude = Math.abs(changeVal);
-    // Match R-side: more striking range
     var intensity = Math.min(1, magnitude / 10);
     var opacity = 0.10 + intensity * 0.30;
-    if (isSig) opacity += 0.10;
-    return "background:rgba(" + r + "," + g + "," + b + "," + opacity.toFixed(2) + ")";
+    if (isSig) opacity += 0.12;
+    var style = "background:rgba(" + r + "," + g + "," + b + "," + opacity.toFixed(2) + ")";
+    // Significant changes get bold text + left accent border
+    if (isSig) {
+      style += ";font-weight:700;border-left:3px solid rgba(" + r + "," + g + "," + b + ",0.7)";
+    }
+    return style;
   }
 
   function formatChange(val, metricName) {
@@ -134,6 +149,30 @@
       '<circle cx="' + lastX.toFixed(1) + '" cy="' + lastY.toFixed(1) + '" r="2" fill="' + colour + '"/></svg>';
   }
 
+  // ---- Scale legend update for change modes ----
+  var originalLegendHtml = null; // cached on first call
+
+  function updateScaleLegend(mode) {
+    var legend = document.getElementById("hm-scale-legend");
+    if (!legend) return;
+    // Cache original absolute-mode legend
+    if (originalLegendHtml === null) {
+      originalLegendHtml = legend.innerHTML;
+    }
+    if (mode === "absolute") {
+      legend.innerHTML = originalLegendHtml;
+    } else {
+      // Diverging blue/red scale for change modes
+      var label = mode === "vs-prev" ? "Change vs Previous" : "Change vs Baseline";
+      legend.innerHTML =
+        '<span class="hm-legend-title">Scale: ' + label + '</span>' +
+        '<span class="hm-legend-item"><span class="hm-legend-swatch" style="background:rgba(37,99,171,0.35)"></span> Positive change</span>' +
+        '<span class="hm-legend-item"><span class="hm-legend-swatch" style="background:rgba(200,70,55,0.35)"></span> Negative change</span>' +
+        '<span class="hm-legend-item"><span class="hm-legend-swatch" style="background:rgba(37,99,171,0.45);border-left:3px solid rgba(37,99,171,0.7);width:16px"></span> Statistically significant</span>' +
+        '<span class="hm-legend-item" style="margin-left:8px;font-style:italic">Darker = larger magnitude</span>';
+    }
+  }
+
   // ---- Banner switching ----
   window.hmSwitchBanner = function(segmentName) {
     currentBanner = segmentName;
@@ -158,6 +197,8 @@
     if (modeNote) {
       modeNote.style.display = (mode === "vs-prev" || mode === "vs-base") ? "" : "none";
     }
+    // Update scale legend to match mode
+    updateScaleLegend(mode);
     refreshHeatmap();
   };
 
@@ -355,13 +396,11 @@
 
   // ---- Drill-down navigation ----
   window.hmDrillDown = function(metricId) {
-    if (typeof switchReportTab === "function") {
-      switchReportTab("metrics");
-    }
-    if (typeof selectTrackerMetric === "function") {
-      setTimeout(function() {
-        selectTrackerMetric(metricId);
-      }, 100);
+    // Drill from heatmap row → Visualise tab with this metric
+    if (typeof explorerVisualiseMetrics === "function") {
+      explorerVisualiseMetrics([metricId]);
+    } else if (typeof switchReportTab === "function") {
+      switchReportTab("visualise");
     }
   };
 
@@ -397,7 +436,16 @@
   // ---- Significant changes segment filter ----
   window.filterSigBySegment = function(segment) {
     var cards = document.querySelectorAll(".dash-sig-card");
+    var grid = document.getElementById("sig-cards-grid");
     var visibleCount = 0;
+
+    // When filtering to a specific segment, remove the collapsed class
+    // so that nth-child CSS doesn't hide filtered results that happen
+    // to be at position 7+ in the DOM
+    if (segment !== "all" && grid) {
+      grid.classList.remove("sig-cards-collapsed");
+    }
+
     for (var i = 0; i < cards.length; i++) {
       var card = cards[i];
       var cardSeg = card.getAttribute("data-segment");
@@ -408,6 +456,12 @@
         card.style.display = "none";
       }
     }
+
+    // When switching back to "all", re-apply collapsed if > 6
+    if (segment === "all" && grid && visibleCount > 6) {
+      grid.classList.add("sig-cards-collapsed");
+    }
+
     // Show/hide empty message
     var emptyMsg = document.getElementById("sig-filter-empty");
     if (emptyMsg) {
@@ -416,7 +470,13 @@
     // Show/hide the "show more" button
     var showMoreBtn = document.getElementById("sig-show-more-btn");
     if (showMoreBtn) {
-      showMoreBtn.style.display = visibleCount > 6 ? "" : "none";
+      if (segment === "all") {
+        showMoreBtn.style.display = visibleCount > 6 ? "" : "none";
+        showMoreBtn.textContent = "Show all " + visibleCount + " findings";
+      } else {
+        // When filtered to a segment, no need for show more
+        showMoreBtn.style.display = "none";
+      }
     }
   };
 

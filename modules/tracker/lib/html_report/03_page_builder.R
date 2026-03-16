@@ -6,8 +6,8 @@
 #   03a_page_styling.R   - CSS/JS loading, minification, brand substitution
 #   03b_page_components.R - Header, footer, help overlay, about, pinned, qual
 #   03c_summary_builder.R - Summary/Dashboard tab (KPI heroes, pulse, heatmap)
-#   03d_metrics_builder.R - Metrics by Segment tab (nav, panels, tables)
-#   03e_overview_builder.R - Segment Overview tab (sidebar, controls, charts)
+#   03d_metrics_builder.R - (REMOVED: replaced by Explorer + Visualise)
+#   03e_overview_builder.R - (REMOVED: replaced by Explorer + Visualise)
 # VERSION: 3.0.0
 # ==============================================================================
 
@@ -69,52 +69,8 @@ build_tracker_page <- function(html_data, table_html, charts, config) {
       # Tab 2: Heatmap Explorer
       build_explorer_tab(html_data, config),
 
-      # Tab 3: Metrics by Segment
-      htmltools::tags$div(id = "tab-metrics", class = "tab-panel",
-        build_metrics_tab(html_data, charts, config)
-      ),
-
-      # Tab 3: Segment Overview
-      htmltools::tags$div(id = "tab-overview", class = "tab-panel",
-        htmltools::tags$div(class = "tk-layout",
-          build_overview_sidebar(html_data, config),
-          htmltools::tags$main(class = "tk-content",
-            build_controls(html_data, config),
-            # Overview actions: Pin + Export (above table)
-            htmltools::tags$div(class = "overview-actions-bar",
-              htmltools::tags$button(class = "tk-btn",
-                onclick = "pinOverviewView()",
-                htmltools::HTML("&#x1F4CC; Pin Current View")),
-              htmltools::tags$button(class = "tk-btn",
-                onclick = "exportOverviewSlide()",
-                htmltools::HTML("&#x1F4F8; Export Slide"))
-            ),
-            htmltools::tags$div(class = "tk-main-area",
-              htmltools::tags$div(class = "tk-table-panel", table_html),
-              htmltools::tags$div(class = "tk-chart-panel",
-                id = "tk-chart-panel",
-                style = "display:none",
-                build_chart_containers(html_data, charts, config)
-              )
-            ),
-            htmltools::tags$div(class = "insight-area",
-              htmltools::tags$button(class = "insight-toggle",
-                onclick = "toggleOverviewInsight()", "+ Add Insight"),
-              htmltools::tags$div(class = "insight-container", style = "display:none",
-                htmltools::tags$div(class = "insight-editor",
-                  contenteditable = "true",
-                  `data-placeholder` = "Type overview insight here...",
-                  id = "overview-insight-editor",
-                  oninput = ""),
-                htmltools::tags$button(class = "insight-dismiss",
-                  title = "Delete insight",
-                  onclick = "dismissOverviewInsight()",
-                  htmltools::HTML("&times;"))
-              )
-            )
-          )
-        )
-      ),
+      # Metrics by Segment and Segment Overview REMOVED
+      # Functionality fully replaced by Explorer + Visualise tabs
 
       # Tab 4: Visualise (populated dynamically from Explorer)
       htmltools::tags$div(id = "tab-visualise", class = "tab-panel",
@@ -252,18 +208,7 @@ build_report_tab_nav <- function(brand_colour, has_about = FALSE) {
       `data-tab` = "explorer",
       "Explorer"
     ),
-    htmltools::tags$button(
-      class = "report-tab",
-      onclick = "switchReportTab('metrics')",
-      `data-tab` = "metrics",
-      "Metrics by Segment"
-    ),
-    htmltools::tags$button(
-      class = "report-tab",
-      onclick = "switchReportTab('overview')",
-      `data-tab` = "overview",
-      "Segment Overview"
-    ),
+    # Metrics by Segment and Segment Overview REMOVED (replaced by Explorer + Visualise)
     htmltools::tags$button(
       class = "report-tab",
       onclick = "switchReportTab('visualise')",

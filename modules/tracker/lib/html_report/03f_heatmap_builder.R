@@ -40,7 +40,9 @@ build_overview_heatmap <- function(html_data, config) {
     mean10= list(green = as.numeric(get_setting(config, "heatmap_mean10_green",default = "7.0")),
                  amber = as.numeric(get_setting(config, "heatmap_mean10_amber",default = "5.0"))),
     nps   = list(green = as.numeric(get_setting(config, "heatmap_nps_green",   default = "30")),
-                 amber = as.numeric(get_setting(config, "heatmap_nps_amber",   default = "0")))
+                 amber = as.numeric(get_setting(config, "heatmap_nps_amber",   default = "0"))),
+    pct_response = list(green = as.numeric(get_setting(config, "heatmap_response_green", default = "50")),
+                        amber = as.numeric(get_setting(config, "heatmap_response_amber", default = "25")))
   )
 
   # Serialize thresholds as JSON for JS
@@ -48,7 +50,7 @@ build_overview_heatmap <- function(html_data, config) {
 
   # ---- Legend ----
   legend_html <- c(
-    '<div class="hm-legend">',
+    '<div class="hm-legend" id="hm-scale-legend">',
     '<span class="hm-legend-title">Scale:</span>',
     sprintf('<span class="hm-legend-item"><span class="hm-legend-swatch hm-swatch-green"></span> %s+%% / %s+ mean / %s+ NPS</span>',
       hm_thresholds$pct$green, hm_thresholds$mean5$green, hm_thresholds$nps$green),
@@ -58,6 +60,7 @@ build_overview_heatmap <- function(html_data, config) {
       hm_thresholds$nps$amber, hm_thresholds$nps$green),
     sprintf('<span class="hm-legend-item"><span class="hm-legend-swatch hm-swatch-red"></span> &lt;%s%% / &lt;%s mean / &lt;%s NPS</span>',
       hm_thresholds$pct$amber, hm_thresholds$mean5$amber, hm_thresholds$nps$amber),
+    '<span class="hm-legend-item"><span class="hm-legend-swatch" style="background:rgba(37,99,171,0.25)"></span> %% Response (blue = magnitude)</span>',
     '</div>'
   )
 
@@ -101,8 +104,8 @@ build_overview_heatmap <- function(html_data, config) {
   # ---- Build heatmap grid ----
   # Classify and order metrics by type group, then by section within type
   type_labels <- list(mean = "Means / Ratings", pct = "Percentages / Box Scores",
-                       nps = "NPS", other = "Other")
-  type_order <- c("mean", "pct", "nps", "other")
+                       pct_response = "% Response", nps = "NPS", other = "Other")
+  type_order <- c("mean", "pct", "pct_response", "nps", "other")
 
   metric_data_types <- vapply(html_data$metric_rows, function(mr) {
     if (!is.null(mr$data_type)) mr$data_type else classify_data_type(mr$metric_name)
@@ -323,7 +326,9 @@ build_explorer_data_json <- function(html_data, config) {
     mean10 = list(green = as.numeric(get_setting(config, "heatmap_mean10_green", default = "7.0")),
                   amber = as.numeric(get_setting(config, "heatmap_mean10_amber", default = "5.0"))),
     nps    = list(green = as.numeric(get_setting(config, "heatmap_nps_green", default = "30")),
-                  amber = as.numeric(get_setting(config, "heatmap_nps_amber", default = "0")))
+                  amber = as.numeric(get_setting(config, "heatmap_nps_amber", default = "0"))),
+    pct_response = list(green = as.numeric(get_setting(config, "heatmap_response_green", default = "50")),
+                        amber = as.numeric(get_setting(config, "heatmap_response_amber", default = "25")))
   )
 
   metrics_list <- lapply(seq_along(html_data$metric_rows), function(i) {
@@ -399,8 +404,8 @@ build_explorer_tab <- function(html_data, config) {
 
   # Type labels for metric dropdown grouping
   type_labels <- list(mean = "Means / Ratings", pct = "Percentages / Box Scores",
-                       nps = "NPS", other = "Other")
-  type_order <- c("mean", "pct", "nps", "other")
+                       pct_response = "% Response", nps = "NPS", other = "Other")
+  type_order <- c("mean", "pct", "pct_response", "nps", "other")
 
   # Build metric selector options grouped by type
   metric_options <- c()
@@ -542,7 +547,16 @@ heatmap_cell_style <- function(val, data_type, brand_colour, thresholds = NULL) 
     )
   }
 
-  # Determine which threshold set to use
+  # pct_response uses a blue sequential scale — descriptive proportions,
+
+  # not evaluative metrics, so green/red "good/bad" is inappropriate
+  if (data_type == "pct_response") {
+    frac <- min(1, max(0, val / 100))
+    opacity <- 0.06 + frac * 0.34
+    return(sprintf("background:rgba(37,99,171,%.2f)", opacity))  # blue sequential
+  }
+
+  # Determine which threshold set to use for evaluative metrics
   if (data_type == "pct") {
     thr <- thresholds$pct
   } else if (data_type == "nps") {
@@ -602,11 +616,11 @@ heatmap_cell_style <- function(val, data_type, brand_colour, thresholds = NULL) 
 heatmap_change_style <- function(change_val, is_sig) {
   if (is.na(change_val)) return("")
 
-  # Green/red diverging palette
+  # Blue/coral-red diverging palette (matches JS changeCellStyle)
   if (change_val > 0) {
-    r <- 5; g <- 150; b <- 105  # #059669
+    r <- 37; g <- 99; b <- 171  # #2563ab blue
   } else if (change_val < 0) {
-    r <- 192; g <- 57; b <- 43  # #c0392b
+    r <- 200; g <- 70; b <- 55  # #c84637 coral-red
   } else {
     return("")
   }
@@ -615,7 +629,12 @@ heatmap_change_style <- function(change_val, is_sig) {
   magnitude <- abs(change_val)
   intensity <- min(1, magnitude / 10)  # 10pp or 10 points = max intensity
   opacity <- 0.10 + intensity * 0.30
-  if (isTRUE(is_sig)) opacity <- opacity + 0.10  # significant boost
+  if (isTRUE(is_sig)) opacity <- opacity + 0.12  # significant boost
 
-  sprintf("background:rgba(%d,%d,%d,%.2f)", r, g, b, opacity)
+  style <- sprintf("background:rgba(%d,%d,%d,%.2f)", r, g, b, opacity)
+  # Significant changes get bold text + left accent border
+  if (isTRUE(is_sig)) {
+    style <- paste0(style, sprintf(";font-weight:700;border-left:3px solid rgba(%d,%d,%d,0.7)", r, g, b))
+  }
+  style
 }

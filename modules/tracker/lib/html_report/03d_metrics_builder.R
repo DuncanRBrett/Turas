@@ -50,7 +50,12 @@ derive_segment_groups <- function(segments) {
 classify_metric_type <- function(metric_name) {
   if (metric_name == "mean") return("mean")
   if (metric_name %in% c("nps_score", "nps", "promoters_pct", "passives_pct", "detractors_pct")) return("nps")
-  if (grepl("(pct|box|range|proportion|category|any)", metric_name)) return("pct")
+  # Top-box / bottom-box / range — derived from a scale question
+  if (grepl("(box|range)", metric_name)) return("pct")
+  # Standalone proportions — brand awareness, category %, multi-mention %
+  if (grepl("(category|proportion|any)", metric_name)) return("pct_response")
+  # Other percentage specs (fallback)
+  if (grepl("pct", metric_name)) return("pct")
   "other"
 }
 
@@ -74,12 +79,14 @@ metric_type_descriptor <- function(metric_name) {
   if (grepl("^bottom[_]?2[_]?box", metric_name)) return("Bottom 2 Box (%)")
   if (grepl("^bottom[_]?3[_]?box", metric_name)) return("Bottom 3 Box (%)")
   if (grepl("^box_", metric_name)) return("Box Score (%)")
-  if (grepl("^category_", metric_name)) return("Category (%)")
+  if (grepl("^category_", metric_name)) return("% Response")
   if (grepl("^range_", metric_name)) return("Range (%)")
+  if (grepl("(proportion|any)", metric_name)) return("% Response")
   # Fallback using classify_metric_type for broader matching
   m_type <- classify_metric_type(metric_name)
   if (m_type == "mean") return("Mean Score")
   if (m_type == "nps") return("NPS (%)")
+  if (m_type == "pct_response") return("% Response")
   if (m_type == "pct") return("Percentage (%)")
   "Metric"
 }
@@ -169,13 +176,13 @@ build_metrics_tab <- function(html_data, charts, config) {
 
   type_filter_html <- ""
   if (length(metric_types_present) > 1) {
-    type_label_map <- list(mean = "Mean / Rating", pct = "% / Top Box", nps = "NPS", other = "Other")
+    type_label_map <- list(mean = "Mean / Rating", pct = "% / Top Box", pct_response = "% Response", nps = "NPS", other = "Other")
     first_type <- metric_types_present[1]
     type_chips <- c('<div class="mv-type-filter">')
     type_chips <- c(type_chips,
       '<button class="mv-type-chip" data-type-filter="all" onclick="filterMetricType(\'all\')">All</button>'
     )
-    for (mt in c("mean", "pct", "nps", "other")) {
+    for (mt in c("mean", "pct", "pct_response", "nps", "other")) {
       if (mt %in% metric_types_present) {
         is_first <- mt == first_type
         type_chips <- c(type_chips, sprintf(

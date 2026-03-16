@@ -152,15 +152,24 @@
     var waveId = pointEl.getAttribute("data-wave") || "";
     var waveLabel = pointEl.getAttribute("data-wave-label") || waveId;
 
-    // Find metric panel to get metricId (Metrics tab or Overview tab)
-    var panel = pointEl.closest(".tk-metric-panel");
-    var metricId = panel ? panel.getAttribute("data-metric-id") : "";
+    // Find metric panel to get metricId (Metrics tab, Overview tab, or Visualise tab)
+    var metricId = pointEl.getAttribute("data-metric-id") || "";
+    if (!metricId) {
+      var panel = pointEl.closest(".tk-metric-panel");
+      metricId = panel ? panel.getAttribute("data-metric-id") : "";
+    }
     if (!metricId) {
       // Overview chart: try to find metricId from closest metric row via segment name
-      // In overview, the segment attribute is the metric name (series label)
       var overviewContainer = pointEl.closest("#tk-combined-chart");
       if (overviewContainer) {
         metricId = "overview";
+      }
+    }
+    if (!metricId) {
+      // Visualise chart: use the segment data attribute as fallback
+      var visChart = pointEl.closest(".vis-chart-area, .vis-line-chart");
+      if (visChart) {
+        metricId = "visualise";
       }
     }
     if (!metricId) return;
@@ -222,6 +231,12 @@
     }
   }
 
+  /** Notify Visualise chart to re-render after annotation change. */
+  function notifyAnnotationChange() {
+    // Dispatch custom event so the Visualise chart can re-render
+    document.dispatchEvent(new CustomEvent("tk-annotation-changed"));
+  }
+
   // Global handlers (called from inline onclick in popover)
   window._saveAnnotation = function(metricId, waveId, segment) {
     if (!activePopover) return;
@@ -229,11 +244,13 @@
     var text = input ? input.value : "";
     setAnnotation(metricId, waveId, segment, text);
     closeAnnotationPopover();
+    notifyAnnotationChange();
   };
 
   window._removeAnnotation = function(metricId, waveId, segment) {
     removeAnnotation(metricId, waveId, segment);
     closeAnnotationPopover();
+    notifyAnnotationChange();
   };
 
   window._cancelAnnotation = function() {

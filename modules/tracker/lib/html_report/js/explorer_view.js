@@ -288,7 +288,12 @@
     visible: {},           // sidebar item visibility {id: true}
     chartVisible: true,
     vprev: false,
-    vbase: false
+    vbase: false,
+    showCI: false,
+    showValues: "last",   // "all", "last2", "last", "none"
+    labelMode: "last",    // synced with showValues
+    yAxisMin: null,        // null = auto (0 for pct/mean, extends negative for NPS)
+    yAxisMax: null         // null = auto (above highest data point)
   };
 
   window.explorerVisualise = function() {
@@ -327,6 +332,40 @@
     visState.chartVisible = true;
     visState.vprev = false;
     visState.vbase = false;
+    visState.yAxisMin = null;
+    visState.yAxisMax = null;
+
+    // Annotations persist across navigation — they are keyed to metric+wave
+    // and will only render if the matching series is visible
+
+    renderVisualiseView(data);
+    if (typeof switchReportTab === "function") switchReportTab("visualise");
+  };
+
+  /**
+   * Programmatic entry point: visualise specific metric IDs from heatmap drill-down
+   * @param {string[]} metricIds - Array of metric IDs to visualise
+   */
+  window.explorerVisualiseMetrics = function(metricIds) {
+    if (!metricIds || metricIds.length === 0) return;
+    var data = loadExplorerData();
+    if (!data) return;
+
+    // Show Visualise tab button
+    var tabBtn = document.getElementById("tab-btn-visualise");
+    if (tabBtn) tabBtn.style.display = "";
+    var placeholder = document.getElementById("visualise-placeholder");
+    var content = document.getElementById("visualise-content");
+    if (placeholder) placeholder.style.display = "none";
+    if (content) content.style.display = "";
+
+    visState.mode = "metrics";
+    visState.metricIds = metricIds;
+    var segSel = document.getElementById("hm-banner-select");
+    visState.contextSegment = segSel ? segSel.value : data.segments[0];
+    visState.allSegments = data.segments;
+    visState.visible = {};
+    for (var i = 0; i < metricIds.length; i++) visState.visible[metricIds[i]] = true;
 
     renderVisualiseView(data);
     if (typeof switchReportTab === "function") switchReportTab("visualise");
@@ -385,6 +424,30 @@
       }
       h.push('</div>');
     }
+    // Significance legend
+    h.push('<div class="vis-sidebar-section">');
+    h.push('<div class="vis-sidebar-section-title">Significance</div>');
+    h.push('<div class="vis-sidebar-legend">');
+    h.push('<div class="vis-legend-row"><span class="tk-sig-badge tk-sig-badge-up">&#x25B2; sig</span> Significant increase</div>');
+    h.push('<div class="vis-legend-row"><span class="tk-sig-badge tk-sig-badge-down">&#x25BC; sig</span> Significant decrease</div>');
+    h.push('<div class="vis-legend-row"><span class="tk-low-base-icon">&#x26A0;</span> Low base (n &lt; 30)</div>');
+    h.push('</div></div>');
+
+    // CI bands explanation (shown when CI is toggled on)
+    h.push('<div class="vis-sidebar-section vis-ci-legend" id="vis-ci-sidebar" style="display:none">');
+    h.push('<div class="vis-sidebar-section-title">Confidence Bands</div>');
+    h.push('<div class="vis-sidebar-legend" style="font-size:11px;color:#64748b;line-height:1.5">');
+    h.push('Shaded bands show estimated 95% confidence intervals based on sample size (n).');
+    h.push(' Wider bands indicate less certainty.');
+    h.push(' Non-overlapping bands suggest a meaningful difference.');
+    h.push('</div></div>');
+
+    // Low base warnings placeholder (filled after table build)
+    h.push('<div class="vis-sidebar-section" id="vis-low-base-section" style="display:none">');
+    h.push('<div class="vis-sidebar-section-title vis-warning-title">&#x26A0; Low Base Warnings</div>');
+    h.push('<div class="vis-low-base-list" id="vis-low-base-list"></div>');
+    h.push('</div>');
+
     h.push('</div>'); // vis-sidebar
 
     // ---- Main content ----
@@ -418,6 +481,28 @@
     h.push('</div>');
     h.push('<div class="mv-control-group">');
     h.push('<label class="tk-toggle"><input type="checkbox" checked onchange="visToggleChart(this.checked)"><span class="tk-toggle-label">Show chart</span></label>');
+    h.push('<label class="tk-toggle"><input type="checkbox" onchange="visToggleCI(this.checked)"><span class="tk-toggle-label">Show CI bands</span></label>');
+    h.push('<label class="tk-toggle"><input type="checkbox" onchange="visToggleBase(this.checked)"><span class="tk-toggle-label">Show base (n)</span></label>');
+    h.push('</div>');
+    h.push('<div class="mv-control-group">');
+    h.push('<span class="tk-toggle-label" style="font-weight:600;margin-right:4px">Values:</span>');
+    h.push('<select class="hm-select" style="font-size:12px;padding:2px 6px" onchange="visSetLabelMode(this.value)">');
+    h.push('<option value="last"' + (visState.labelMode === "last" ? ' selected' : '') + '>Last only</option>');
+    h.push('<option value="last2"' + (visState.labelMode === "last2" ? ' selected' : '') + '>Last 2</option>');
+    h.push('<option value="all"' + (visState.labelMode === "all" ? ' selected' : '') + '>All points</option>');
+    h.push('<option value="none"' + (visState.labelMode === "none" ? ' selected' : '') + '>None</option>');
+    h.push('</select>');
+    h.push('</div>');
+    h.push('<div class="mv-control-group">');
+    h.push('<span class="tk-toggle-label" style="font-weight:600;margin-right:4px">Y-axis:</span>');
+    h.push('<input type="number" class="vis-axis-input" id="vis-ymin" placeholder="Min" step="any"' +
+      (visState.yAxisMin != null ? ' value="' + visState.yAxisMin + '"' : '') +
+      ' onchange="visSetYAxis()" title="Y-axis minimum (leave blank for auto: starts at 0)">');
+    h.push('<span style="color:#94a3b8;margin:0 2px">&ndash;</span>');
+    h.push('<input type="number" class="vis-axis-input" id="vis-ymax" placeholder="Max" step="any"' +
+      (visState.yAxisMax != null ? ' value="' + visState.yAxisMax + '"' : '') +
+      ' onchange="visSetYAxis()" title="Y-axis maximum (leave blank for auto)">');
+    h.push('<button class="vis-axis-reset" onclick="visResetYAxis()" title="Reset to auto">&#x21BA;</button>');
     h.push('</div>');
     h.push('<div class="mv-control-group mv-action-buttons" style="border-right:none;margin-left:auto">');
     h.push('<button class="export-btn" onclick="visExportExcel()">&#x2B73; Export Excel</button>');
@@ -439,12 +524,21 @@
     h.push(buildVisTable(data));
     h.push('</div>');
 
-    // Insight area
+    // Insight area with markdown editor
     h.push('<div class="insight-area">');
     h.push('<button class="insight-toggle" onclick="visToggleInsight()">+ Add Insight</button>');
     h.push('<div class="insight-container" id="vis-insight" style="display:none">');
-    h.push('<div class="insight-editor" contenteditable="true" data-placeholder="Type key insight here..." id="vis-insight-editor"></div>');
-    h.push('<button class="insight-dismiss" title="Delete insight" onclick="visDismissInsight()">×</button>');
+    h.push('<div class="insight-md-toolbar">');
+    h.push('<button class="insight-md-btn" title="Bold" onclick="visInsertMd(\'**\',\'**\')"><strong>B</strong></button>');
+    h.push('<button class="insight-md-btn" title="Italic" onclick="visInsertMd(\'*\',\'*\')"><em>I</em></button>');
+    h.push('<button class="insight-md-btn" title="Heading" onclick="visInsertMd(\'## \',\'\')">H2</button>');
+    h.push('<button class="insight-md-btn" title="Bullet" onclick="visInsertMd(\'- \',\'\')">&#x2022;</button>');
+    h.push('<button class="insight-md-btn" title="Quote" onclick="visInsertMd(\'> \',\'\')">"</button>');
+    h.push('<span class="insight-md-hint">Supports **bold**, *italic*, ## heading, - bullets, > quotes</span>');
+    h.push('</div>');
+    h.push('<textarea class="insight-md-editor" id="vis-insight-editor" rows="4" placeholder="Type key insight here... (**bold**, *italic*, ## heading, - bullet, > quote)" oninput="visRenderInsight()"></textarea>');
+    h.push('<div class="insight-md-rendered" id="vis-insight-rendered"></div>');
+    h.push('<button class="insight-dismiss" title="Delete insight" onclick="visDismissInsight()">&times;</button>');
     h.push('</div></div>');
 
     h.push('</div>'); // vis-main
@@ -454,12 +548,27 @@
 
     // Render chart after DOM insertion
     if (visState.chartVisible) renderVisCombinedChart(data);
+
+    // Populate low base warnings
+    if (visState.lowBaseWarnings && visState.lowBaseWarnings.length > 0) {
+      var lbSection = document.getElementById("vis-low-base-section");
+      var lbList = document.getElementById("vis-low-base-list");
+      if (lbSection && lbList) {
+        lbSection.style.display = "";
+        var lbHtml = "";
+        for (var lb = 0; lb < visState.lowBaseWarnings.length; lb++) {
+          lbHtml += '<div class="vis-low-base-item">&#x26A0; ' + escapeHtml(visState.lowBaseWarnings[lb]) + '</div>';
+        }
+        lbList.innerHTML = lbHtml;
+      }
+    }
   }
 
   // ---- Unified detail table ----
   function buildVisTable(data) {
     var waves = data.waves;
     var waveLabels = data.waveLabels;
+    var LOW_BASE_THRESHOLD = 30;
     var t = [];
 
     t.push('<table class="tk-table vis-detail-table" id="vis-tbl">');
@@ -470,8 +579,44 @@
     }
     t.push('</tr></thead><tbody>');
 
+    // Helper: build a change cell with significance badge
+    function changeCell(cellData, changeKey, sigKey, metricName, waveId) {
+      var cv = cellData ? cellData[changeKey] : null;
+      if (cv == null) return '<td class="tk-td tk-change-cell" data-wave="' + waveId + '">&mdash;</td>';
+      var formatted = HmUtils.formatChange(cv, metricName);
+      var isSig = cellData && cellData[sigKey] === true;
+      var sigHtml = "";
+      if (isSig) {
+        var cls = cv > 0 ? "tk-sig-badge tk-sig-badge-up" : "tk-sig-badge tk-sig-badge-down";
+        var arrow = cv > 0 ? "&#x25B2;" : "&#x25BC;";
+        sigHtml = ' <span class="' + cls + '">' + arrow + ' sig</span>';
+      }
+      var bgStyle = HmUtils.changeCellStyle(cv, isSig);
+      return '<td class="tk-td tk-change-cell" data-wave="' + waveId + '" style="' + bgStyle + '">' +
+        '<span class="tk-change-val">' + formatted + '</span>' + sigHtml + '</td>';
+    }
+
+    // Helper: build base (n) row
+    function baseRow(segData, visId, hidCls) {
+      var r = '<tr class="tk-base-row' + hidCls + '" data-vis-id="' + escapeHtml(visId) + '">';
+      r += '<td class="tk-td tk-label-col tk-base-label">Base (n)</td>';
+      var hasLowBase = false;
+      for (var bw = 0; bw < waves.length; bw++) {
+        var bc = segData[waves[bw]];
+        var n = bc ? bc.n : null;
+        var lowBase = (n != null && n < LOW_BASE_THRESHOLD);
+        if (lowBase) hasLowBase = true;
+        var cls = lowBase ? ' class="tk-td tk-base-cell tk-low-base"' : ' class="tk-td tk-base-cell"';
+        r += '<td' + cls + ' data-wave="' + waves[bw] + '">' + (n != null ? n : "&mdash;") +
+          (lowBase ? ' <span class="tk-low-base-icon" title="Low base: n=' + n + '">&#x26A0;</span>' : '') + '</td>';
+      }
+      r += '</tr>';
+      return { html: r, hasLowBase: hasLowBase };
+    }
+
+    var lowBaseWarnings = [];
+
     if (visState.mode === "metrics") {
-      // Rows = metrics, for the context segment
       var seg = visState.contextSegment;
       for (var mi = 0; mi < visState.metricIds.length; mi++) {
         var met = findMetric(data, visState.metricIds[mi]);
@@ -481,7 +626,7 @@
         var hidCls = vis ? "" : " vis-item-hidden";
         var col = VIS_COLOURS[mi % VIS_COLOURS.length];
 
-        // Value row
+        // Value row with sig indicators
         t.push('<tr class="tk-metric-row' + hidCls + '" data-vis-id="' + escapeHtml(met.id) + '">');
         t.push('<td class="tk-td tk-label-col"><span class="tk-seg-dot" style="background:' + col + '"></span><span class="tk-metric-label">' + escapeHtml(met.label) + '</span></td>');
         for (var vw = 0; vw < waves.length; vw++) {
@@ -493,14 +638,16 @@
         }
         t.push('</tr>');
 
-        // vs Previous
+        // Base (n) row
+        var br = baseRow(sd, met.id, hidCls);
+        t.push(br.html);
+        if (br.hasLowBase) lowBaseWarnings.push(met.label);
+
+        // vs Previous (with significance badges and background)
         t.push('<tr class="tk-change-row tk-vs-prev' + hidCls + '" data-vis-id="' + escapeHtml(met.id) + '">');
         t.push('<td class="tk-td tk-label-col tk-change-label">vs Prev</td>');
         for (var pw = 0; pw < waves.length; pw++) {
-          var pc = sd[waves[pw]];
-          var pv = (pc && pc.change_prev != null) ? HmUtils.formatChange(pc.change_prev, met.label) : "";
-          var ps = (pc && pc.sig_prev) ? " *" : "";
-          t.push('<td class="tk-td tk-change-cell" data-wave="' + waves[pw] + '">' + pv + ps + '</td>');
+          t.push(changeCell(sd[waves[pw]], "change_prev", "sig_prev", met.label, waves[pw]));
         }
         t.push('</tr>');
 
@@ -508,10 +655,7 @@
         t.push('<tr class="tk-change-row tk-vs-base' + hidCls + '" data-vis-id="' + escapeHtml(met.id) + '">');
         t.push('<td class="tk-td tk-label-col tk-change-label">vs Base</td>');
         for (var bw = 0; bw < waves.length; bw++) {
-          var bc = sd[waves[bw]];
-          var bv = (bc && bc.change_base != null) ? HmUtils.formatChange(bc.change_base, met.label) : "";
-          var bs = (bc && bc.sig_base) ? " *" : "";
-          t.push('<td class="tk-td tk-change-cell" data-wave="' + waves[bw] + '">' + bv + bs + '</td>');
+          t.push(changeCell(sd[waves[bw]], "change_base", "sig_base", met.label, waves[bw]));
         }
         t.push('</tr>');
       }
@@ -519,17 +663,6 @@
       // Rows = segments, for the context metric
       var metric = findMetric(data, visState.contextMetric);
       if (metric) {
-        // Base row
-        var totalData = metric.data[data.segments[0]];
-        if (totalData) {
-          t.push('<tr class="tk-base-row"><td class="tk-td tk-label-col tk-base-label">Base (n=)</td>');
-          for (var bwi = 0; bwi < waves.length; bwi++) {
-            var bci = totalData[waves[bwi]];
-            t.push('<td class="tk-td tk-base-cell" data-wave="' + waves[bwi] + '">' + (bci ? bci.n : "") + '</td>');
-          }
-          t.push('</tr>');
-        }
-
         for (var si2 = 0; si2 < visState.allSegments.length; si2++) {
           var seg2 = visState.allSegments[si2];
           var sd2 = metric.data[seg2];
@@ -539,6 +672,7 @@
           var hidCls2 = vis2 ? "" : " vis-item-hidden";
           var col2 = VIS_COLOURS[segIdx2 % VIS_COLOURS.length];
 
+          // Value row
           t.push('<tr class="tk-metric-row' + hidCls2 + '" data-vis-id="' + escapeHtml(seg2) + '">');
           t.push('<td class="tk-td tk-label-col"><span class="tk-seg-dot" style="background:' + col2 + '"></span><span class="tk-metric-label">' + escapeHtml(seg2) + '</span></td>');
           for (var vw2 = 0; vw2 < waves.length; vw2++) {
@@ -550,23 +684,24 @@
           }
           t.push('</tr>');
 
+          // Base (n) row
+          var br2 = baseRow(sd2, seg2, hidCls2);
+          t.push(br2.html);
+          if (br2.hasLowBase) lowBaseWarnings.push(seg2);
+
+          // vs Previous
           t.push('<tr class="tk-change-row tk-vs-prev' + hidCls2 + '" data-vis-id="' + escapeHtml(seg2) + '">');
           t.push('<td class="tk-td tk-label-col tk-change-label">vs Prev</td>');
           for (var pw2 = 0; pw2 < waves.length; pw2++) {
-            var pc2 = sd2[waves[pw2]];
-            var pv2 = (pc2 && pc2.change_prev != null) ? HmUtils.formatChange(pc2.change_prev, metric.label) : "";
-            var ps2 = (pc2 && pc2.sig_prev) ? " *" : "";
-            t.push('<td class="tk-td tk-change-cell" data-wave="' + waves[pw2] + '">' + pv2 + ps2 + '</td>');
+            t.push(changeCell(sd2[waves[pw2]], "change_prev", "sig_prev", metric.label, waves[pw2]));
           }
           t.push('</tr>');
 
+          // vs Baseline
           t.push('<tr class="tk-change-row tk-vs-base' + hidCls2 + '" data-vis-id="' + escapeHtml(seg2) + '">');
           t.push('<td class="tk-td tk-label-col tk-change-label">vs Base</td>');
           for (var bw2 = 0; bw2 < waves.length; bw2++) {
-            var bc2 = sd2[waves[bw2]];
-            var bv2 = (bc2 && bc2.change_base != null) ? HmUtils.formatChange(bc2.change_base, metric.label) : "";
-            var bs2 = (bc2 && bc2.sig_base) ? " *" : "";
-            t.push('<td class="tk-td tk-change-cell" data-wave="' + waves[bw2] + '">' + bv2 + bs2 + '</td>');
+            t.push(changeCell(sd2[waves[bw2]], "change_base", "sig_base", metric.label, waves[bw2]));
           }
           t.push('</tr>');
         }
@@ -574,7 +709,36 @@
     }
 
     t.push('</tbody></table>');
+
+    // Store low base warnings for sidebar
+    visState.lowBaseWarnings = lowBaseWarnings;
+
     return t.join("\n");
+  }
+
+  // ---- Catmull-Rom spline helper (cardinal spline, tension 0) ----
+  function catmullRomPath(points) {
+    if (points.length < 2) return "";
+    if (points.length === 2) return "M" + points[0].x + "," + points[0].y + "L" + points[1].x + "," + points[1].y;
+
+    var d = "M" + points[0].x + "," + points[0].y;
+    for (var i = 0; i < points.length - 1; i++) {
+      var p0 = points[Math.max(0, i - 1)];
+      var p1 = points[i];
+      var p2 = points[i + 1];
+      var p3 = points[Math.min(points.length - 1, i + 2)];
+
+      // Control points (tension = 0 for smooth Catmull-Rom)
+      var cp1x = p1.x + (p2.x - p0.x) / 6;
+      var cp1y = p1.y + (p2.y - p0.y) / 6;
+      var cp2x = p2.x - (p3.x - p1.x) / 6;
+      var cp2y = p2.y - (p3.y - p1.y) / 6;
+
+      d += "C" + cp1x.toFixed(1) + "," + cp1y.toFixed(1) + "," +
+           cp2x.toFixed(1) + "," + cp2y.toFixed(1) + "," +
+           p2.x.toFixed(1) + "," + p2.y.toFixed(1);
+    }
+    return d;
   }
 
   // ---- Combined SVG Line Chart with Annotations ----
@@ -597,6 +761,7 @@
           label: met.label,
           colour: VIS_COLOURS[mi % VIS_COLOURS.length],
           values: waves.map(function(w) { var c = met.data[seg][w]; return c ? c.value : null; }),
+          rawData: met.data[seg],
           type: met.type
         });
       }
@@ -612,6 +777,7 @@
             label: segName,
             colour: VIS_COLOURS[segIdx % VIS_COLOURS.length],
             values: waves.map(function(w) { var c = metric.data[segName][w]; return c ? c.value : null; }),
+            rawData: metric.data[segName],
             type: metric.type
           });
         }
@@ -624,11 +790,11 @@
     }
 
     // Determine chart type label
-    var typeLabel = series[0].type === "pct" ? "%" : series[0].type === "nps" ? "NPS" : "";
+    var typeLabel = (series[0].type === "pct" || series[0].type === "pct_response") ? "%" : series[0].type === "nps" ? "NPS" : "";
 
-    // Responsive: use wide viewBox, CSS will scale
-    var W = 960, H = 340;
-    var pad = { top: 30, right: 90, bottom: 50, left: 55 };
+    // Premium chart dimensions
+    var W = 960, H = 380;
+    var pad = { top: 40, right: 80, bottom: 55, left: 60 };
     var plotW = W - pad.left - pad.right;
     var plotH = H - pad.top - pad.bottom;
 
@@ -640,32 +806,219 @@
       }
     }
     if (allVals.length === 0) { container.innerHTML = ''; return; }
-    var yMin = Math.min.apply(null, allVals), yMax = Math.max.apply(null, allVals);
-    var yR = yMax - yMin || 1;
-    yMin -= yR * 0.12; yMax += yR * 0.12;
+    var dataMin = Math.min.apply(null, allVals), dataMax = Math.max.apply(null, allVals);
+
+    // Default: start from 0 (or below most negative), extend above max
+    // User can override with visState.yAxisMin / yAxisMax
+    var yMin, yMax;
+    if (typeLabel === "%") {
+      // Percentage: 0 to above max (capped at 100)
+      yMin = 0;
+      yMax = Math.min(100, dataMax + Math.max(5, (dataMax - dataMin) * 0.15));
+      if (dataMax > 95) yMax = 100;
+    } else if (series[0].type === "nps") {
+      // NPS can be negative (-100 to +100)
+      // Start below most negative, end above most positive
+      yMin = Math.min(0, dataMin);
+      yMax = Math.max(0, dataMax);
+      var npsRange = yMax - yMin || 20;
+      yMin = Math.floor((yMin - npsRange * 0.1) / 5) * 5;
+      yMax = Math.ceil((yMax + npsRange * 0.1) / 5) * 5;
+      yMin = Math.max(-100, yMin);
+      yMax = Math.min(100, yMax);
+    } else {
+      // Means: start from 0 (or below lowest if scale allows), extend above max
+      yMin = 0;
+      // If data starts well above 0 (e.g., 3.5 on 5-pt scale), still show from 0
+      yMax = dataMax + Math.max(0.2, (dataMax - dataMin) * 0.15);
+      // If values are negative, extend below
+      if (dataMin < 0) {
+        yMin = dataMin - Math.abs(dataMin) * 0.15;
+      }
+    }
+
+    // Apply user overrides if set
+    if (visState.yAxisMin != null) yMin = visState.yAxisMin;
+    if (visState.yAxisMax != null) yMax = visState.yAxisMax;
 
     function xP(i) { return pad.left + (i / Math.max(waves.length - 1, 1)) * plotW; }
     function yP(val) { return pad.top + plotH - ((val - yMin) / (yMax - yMin)) * plotH; }
 
     var svg = [];
-    svg.push('<svg class="vis-line-chart" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="font-family:Arial,sans-serif">');
+    svg.push('<svg class="vis-line-chart" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">');
 
-    // Horizontal grid lines
+    // Definitions
+    svg.push('<defs>');
+    svg.push('<filter id="callout-shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.12"/></filter>');
+    svg.push('</defs>');
+
+    // Horizontal grid lines (faint, decluttered)
     var nTicks = 5;
-    for (var t = 0; t <= nTicks; t++) {
-      var yv = yMin + (t / nTicks) * (yMax - yMin);
+    for (var gt = 0; gt <= nTicks; gt++) {
+      var yv = yMin + (gt / nTicks) * (yMax - yMin);
       var yy = yP(yv);
-      svg.push('<line x1="' + pad.left + '" y1="' + yy + '" x2="' + (W - pad.right) + '" y2="' + yy + '" stroke="#e2e8f0" stroke-width="1"/>');
+      svg.push('<line x1="' + pad.left + '" y1="' + yy + '" x2="' + (W - pad.right) + '" y2="' + yy + '" stroke="#e2e8f0" stroke-width="0.75"/>');
       var tl = typeLabel === "%" ? Math.round(yv) + "%" : yv.toFixed(1);
-      svg.push('<text x="' + (pad.left - 10) + '" y="' + (yy + 4) + '" text-anchor="end" fill="#94a3b8" font-size="11" font-weight="400">' + tl + '</text>');
+      svg.push('<text x="' + (pad.left - 12) + '" y="' + (yy + 4) + '" text-anchor="end" fill="#94a3b8" font-size="11" font-weight="400" font-family="-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">' + tl + '</text>');
     }
 
-    // X axis labels
+    // X axis labels (premium typography)
     for (var xi = 0; xi < waves.length; xi++) {
-      svg.push('<text x="' + xP(xi) + '" y="' + (H - pad.bottom + 20) + '" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="400">' + escapeHtml(waveLabels[xi]) + '</text>');
+      svg.push('<text x="' + xP(xi) + '" y="' + (H - pad.bottom + 22) + '" text-anchor="middle" fill="#64748b" font-size="11" font-weight="500" font-family="-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">' + escapeHtml(waveLabels[xi]) + '</text>');
+      // Subtle vertical gridline
+      svg.push('<line x1="' + xP(xi) + '" y1="' + pad.top + '" x2="' + xP(xi) + '" y2="' + (H - pad.bottom) + '" stroke="#f1f5f9" stroke-width="0.5"/>');
     }
 
-    // Load annotations
+    // Confidence bands (shaded area ± estimated CI based on n)
+    // Hidden by default; toggled with CI checkbox. Uses smooth Catmull-Rom edges.
+    var showCI = visState.showCI === true;
+    for (var sb = 0; sb < series.length; sb++) {
+      var serBand = series[sb];
+      var bandUpper = [], bandLower = [];
+      for (var bw = 0; bw < waves.length; bw++) {
+        if (serBand.values[bw] == null) continue;
+        var val = serBand.values[bw];
+        var ciWidth;
+        var nEst = 300; // default assumed n
+        // Try to get actual n from rawData
+        if (serBand.rawData) {
+          var bCell = serBand.rawData[waves[bw]];
+          if (bCell && bCell.n) nEst = bCell.n;
+        }
+        if (serBand.type === "pct" || serBand.type === "pct_response") {
+          var p = val / 100;
+          ciWidth = Math.max(0.5, 1.96 * Math.sqrt(Math.max(0, p * (1 - p)) / nEst) * 100);
+        } else if (serBand.type === "nps") {
+          ciWidth = Math.max(1, 1.96 * Math.sqrt(2500 / nEst)); // NPS has std~50
+        } else {
+          // Mean: assume std ~0.8 for 5-pt scale
+          ciWidth = Math.max(0.03, 1.96 * 0.8 / Math.sqrt(nEst));
+        }
+        bandUpper.push({ x: xP(bw), y: yP(val + ciWidth) });
+        bandLower.push({ x: xP(bw), y: yP(val - ciWidth) });
+      }
+      if (bandUpper.length >= 2) {
+        // Smooth upper and lower edges using Catmull-Rom
+        var upperPath = catmullRomPath(bandUpper);
+        var lowerRev = bandLower.slice().reverse();
+        var lowerPath = catmullRomPath(lowerRev);
+        // Combine: upper path forward, line to lower start, lower path, close
+        var bandD = upperPath + "L" + lowerRev[0].x.toFixed(1) + "," + lowerRev[0].y.toFixed(1) +
+          lowerPath.substring(lowerPath.indexOf("C")) + "Z";
+        svg.push('<path class="vis-ci-band" d="' + bandD + '" fill="' + serBand.colour + '" opacity="0.10"' +
+          (showCI ? '' : ' style="display:none"') + '/>');
+      }
+    }
+
+    // Build series-colour lookup for annotations
+    var seriesColourMap = {};
+    for (var scm = 0; scm < series.length; scm++) {
+      seriesColourMap[series[scm].id] = series[scm].colour;
+    }
+
+    // Lines + dots + data point labels
+    var labelMode = visState.labelMode || "last";
+    var allPointLabels = []; // collected for collision avoidance
+
+    for (var s2 = 0; s2 < series.length; s2++) {
+      var ser = series[s2];
+      var pts = [];
+      for (var w = 0; w < waves.length; w++) {
+        if (ser.values[w] != null) pts.push({ x: xP(w), y: yP(ser.values[w]), v: ser.values[w], wi: w });
+      }
+
+      // Draw smooth curve
+      if (pts.length > 1) {
+        var smoothPath = catmullRomPath(pts);
+        svg.push('<path d="' + smoothPath + '" fill="none" stroke="' + ser.colour + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>');
+      }
+
+      // Draw dots — each is a tk-chart-point for annotation support + hover callout
+      for (var pi = 0; pi < pts.length; pi++) {
+        var waveId = waves[pts[pi].wi];
+        var ptVal = pts[pi].v;
+        // Compute changes from previous and baseline
+        // Use series-specific type for formatting (not global typeLabel which is based on first series)
+        var serIsPct = (ser.type === "pct" || ser.type === "pct_response" || ser.type === "nps");
+        var changePrev = "", changeBase = "";
+        if (ser.rawData) {
+          // Previous wave change
+          if (pts[pi].wi > 0) {
+            for (var pw = pts[pi].wi - 1; pw >= 0; pw--) {
+              var prevCell = ser.rawData[waves[pw]];
+              if (prevCell && prevCell.value != null) {
+                var cp = ptVal - prevCell.value;
+                changePrev = (cp >= 0 ? "+" : "") + (serIsPct ? Math.round(cp) : cp.toFixed(2));
+                break;
+              }
+            }
+          }
+          // Baseline change (wave 0)
+          var baseCell = ser.rawData[waves[0]];
+          if (baseCell && baseCell.value != null && pts[pi].wi > 0) {
+            var cb = ptVal - baseCell.value;
+            changeBase = (cb >= 0 ? "+" : "") + (serIsPct ? Math.round(cb) : cb.toFixed(2));
+          }
+        }
+        var formattedVal = serIsPct ? Math.round(ptVal) + "%" : ptVal.toFixed(2);
+        svg.push('<circle class="tk-chart-point" cx="' + pts[pi].x + '" cy="' + pts[pi].y +
+          '" r="5" fill="#fff" stroke="' + ser.colour + '" stroke-width="2.5"' +
+          ' data-wave="' + waveId + '" data-segment="' + escapeHtml(ser.id) +
+          '" data-wave-label="' + escapeHtml(waveLabels[pts[pi].wi]) + '"' +
+          ' data-metric-id="' + escapeHtml(visState.mode === "metrics" ? ser.id : visState.contextMetric) + '"' +
+          ' data-label="' + escapeHtml(ser.label) + '"' +
+          ' data-value="' + escapeHtml(formattedVal) + '"' +
+          ' data-change-prev="' + escapeHtml(changePrev) + '"' +
+          ' data-change-base="' + escapeHtml(changeBase) + '"' +
+          ' data-colour="' + ser.colour + '"' +
+          ' style="cursor:pointer"/>');
+        svg.push('<circle cx="' + pts[pi].x + '" cy="' + pts[pi].y + '" r="2.5" fill="' + ser.colour + '" pointer-events="none"/>');
+      }
+
+      // Determine which points get value labels based on labelMode
+      if (labelMode !== "none" && pts.length > 0) {
+        var labelPts = [];
+        if (labelMode === "all") {
+          labelPts = pts;
+        } else if (labelMode === "last2") {
+          labelPts = pts.slice(-2);
+        } else { // "last"
+          labelPts = pts.slice(-1);
+        }
+        for (var lpi = 0; lpi < labelPts.length; lpi++) {
+          var lp = labelPts[lpi];
+          var lpText = serIsPct ? Math.round(lp.v) + "%" : lp.v.toFixed(1);
+          var isLast = (lp === pts[pts.length - 1]);
+          allPointLabels.push({
+            x: isLast ? lp.x + 14 : lp.x,
+            y: isLast ? lp.y : lp.y - 14,
+            rawY: lp.y,
+            text: lpText,
+            colour: ser.colour,
+            anchor: isLast ? "start" : "middle",
+            isEnd: isLast
+          });
+        }
+      }
+    }
+
+    // Point labels — collision avoidance
+    allPointLabels.sort(function(a, b) { return a.rawY - b.rawY; });
+    for (var ei = 1; ei < allPointLabels.length; ei++) {
+      if (Math.abs(allPointLabels[ei].x - allPointLabels[ei - 1].x) < 40 &&
+          Math.abs(allPointLabels[ei].y - allPointLabels[ei - 1].y) < 16) {
+        allPointLabels[ei].y = allPointLabels[ei - 1].y + 16;
+      }
+    }
+    for (var ej = 0; ej < allPointLabels.length; ej++) {
+      var el = allPointLabels[ej];
+      var fontSize = el.isEnd ? "12" : "10";
+      var fontWeight = el.isEnd ? "700" : "600";
+      svg.push('<text x="' + el.x + '" y="' + (el.y + 4) + '" text-anchor="' + el.anchor + '" fill="' + el.colour +
+        '" font-size="' + fontSize + '" font-weight="' + fontWeight + '" font-family="-apple-system,sans-serif">' + el.text + '</text>');
+    }
+
+    // Load and render annotations (prominent style with arrows)
     var annots = [];
     if (typeof tkAnnotations !== "undefined") {
       if (visState.mode === "metrics") {
@@ -674,89 +1027,133 @@
           for (var aj = 0; aj < mAnns.length; aj++) annots.push(mAnns[aj]);
         }
       } else {
-        annots = tkAnnotations.getForMetric(visState.contextMetric);
+        annots = tkAnnotations.getForMetric(visState.contextMetric) || [];
       }
     }
 
-    // Render annotation markers (vertical dashed lines + callout labels)
+    // Render annotation markers — prominent style: solid colour pill with arrow to data point
     for (var an = 0; an < annots.length; an++) {
       var ann = annots[an];
       var waveIdx = waves.indexOf(ann.waveId);
       if (waveIdx < 0) continue;
       var axPos = xP(waveIdx);
-      var annCol = ann.colour || "#94a3b8";
 
-      // Dashed vertical line
-      svg.push('<line x1="' + axPos + '" y1="' + pad.top + '" x2="' + axPos + '" y2="' + (H - pad.bottom) +
-        '" stroke="' + annCol + '" stroke-width="1" stroke-dasharray="4,3" opacity="0.6"/>');
-
-      // Callout: small circle + connecting line + text
-      var calloutY = pad.top + 14 + (an % 3) * 16; // stagger to avoid overlap
-      var textX = axPos + 8;
-      var annText = ann.text.length > 30 ? ann.text.substring(0, 30) + "\u2026" : ann.text;
-
-      // Small marker dot on the axis line
-      svg.push('<circle cx="' + axPos + '" cy="' + calloutY + '" r="3" fill="' + annCol + '" opacity="0.7"/>');
-
-      // Callout connector + text
-      svg.push('<line x1="' + axPos + '" y1="' + calloutY + '" x2="' + (textX + 2) + '" y2="' + calloutY + '" stroke="' + annCol + '" stroke-width="1" opacity="0.5"/>');
-      svg.push('<text x="' + (textX + 4) + '" y="' + (calloutY + 4) + '" fill="' + annCol + '" font-size="10" font-weight="500" font-style="italic">' + escapeHtml(annText) + '</text>');
-    }
-
-    // Lines + dots + end labels
-    // Collect end-label positions for collision avoidance
-    var endLabels = [];
-    for (var s2 = 0; s2 < series.length; s2++) {
-      var ser = series[s2];
-      var pts = [];
-      for (var w = 0; w < waves.length; w++) {
-        if (ser.values[w] != null) pts.push({ x: xP(w), y: yP(ser.values[w]), v: ser.values[w], wi: w });
+      // Find the data point Y for this annotation's metric/segment
+      var targetY = null;
+      var annSeriesCol = ann.colour || "#64748b";
+      // Match to a visible series to get colour and y position
+      for (var as2 = 0; as2 < series.length; as2++) {
+        var aSer = series[as2];
+        if (aSer.id === ann.metricId || aSer.id === ann.segment) {
+          annSeriesCol = aSer.colour;
+          if (aSer.values[waveIdx] != null) targetY = yP(aSer.values[waveIdx]);
+          break;
+        }
       }
+      // If no matching visible series found, skip this annotation entirely
+      // (the series is hidden — don't fall back to another series)
+      if (targetY === null) continue;
 
-      // Draw line
-      if (pts.length > 1) {
-        svg.push('<path d="M' + pts.map(function(p) { return p.x + ',' + p.y; }).join('L') +
-          '" fill="none" stroke="' + ser.colour + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>');
-      }
+      // Callout card position — above the data point
+      var calloutY = Math.max(pad.top + 8, targetY - 38 - (an % 2) * 26);
+      var annText = ann.text.length > 24 ? ann.text.substring(0, 24) + "\u2026" : ann.text;
+      var textW = annText.length * 6 + 16;
+      var cardX = axPos - textW / 2;
+      // Clamp to chart bounds
+      if (cardX < pad.left) cardX = pad.left;
+      if (cardX + textW > W - pad.right) cardX = W - pad.right - textW;
 
-      // Draw dots — each is a tk-chart-point for annotation support
-      for (var pi = 0; pi < pts.length; pi++) {
-        var waveId = waves[pts[pi].wi];
-        svg.push('<circle class="tk-chart-point" cx="' + pts[pi].x + '" cy="' + pts[pi].y + '" r="4.5" fill="' + ser.colour +
-          '" stroke="#fff" stroke-width="2" data-wave="' + waveId + '" data-segment="' + escapeHtml(ser.id) +
-          '" data-wave-label="' + escapeHtml(waveLabels[pts[pi].wi]) + '" style="cursor:pointer"/>');
-      }
+      // Arrow line from callout to data point
+      var arrowStartY = calloutY + 10;
+      svg.push('<line x1="' + axPos + '" y1="' + arrowStartY + '" x2="' + axPos + '" y2="' + (targetY - 7) +
+        '" stroke="' + annSeriesCol + '" stroke-width="1.5" stroke-dasharray="3,2" opacity="0.7"/>');
+      // Arrowhead
+      svg.push('<polygon points="' + (axPos - 3) + ',' + (targetY - 10) + ' ' + axPos + ',' + (targetY - 5) + ' ' + (axPos + 3) + ',' + (targetY - 10) +
+        '" fill="' + annSeriesCol + '" opacity="0.7"/>');
 
-      // End label (last data point)
-      if (pts.length > 0) {
-        var last = pts[pts.length - 1];
-        var lbl = typeLabel === "%" ? Math.round(last.v) + "%" : last.v.toFixed(2);
-        endLabels.push({ x: last.x + 10, y: last.y + 4, text: lbl, colour: ser.colour, rawY: last.y });
-      }
-    }
-
-    // Simple collision avoidance for end labels
-    endLabels.sort(function(a, b) { return a.rawY - b.rawY; });
-    for (var ei = 1; ei < endLabels.length; ei++) {
-      if (endLabels[ei].y - endLabels[ei - 1].y < 14) {
-        endLabels[ei].y = endLabels[ei - 1].y + 14;
-      }
-    }
-    for (var ej = 0; ej < endLabels.length; ej++) {
-      var el = endLabels[ej];
-      svg.push('<text x="' + el.x + '" y="' + el.y + '" fill="' + el.colour + '" font-size="12" font-weight="600">' + el.text + '</text>');
+      // Solid colour pill (prominent — series colour background, white text)
+      svg.push('<rect x="' + cardX + '" y="' + (calloutY - 10) + '" width="' + textW + '" height="20" rx="10" fill="' + annSeriesCol + '" opacity="0.9"/>');
+      svg.push('<text x="' + (cardX + textW / 2) + '" y="' + (calloutY + 4) + '" text-anchor="middle" fill="#fff" font-size="10" font-weight="700" font-family="-apple-system,sans-serif">' + escapeHtml(annText) + '</text>');
     }
 
     svg.push('</svg>');
 
-    // Legend below chart
-    svg.push('<div class="vis-legend">');
+    // Legend below chart (compact, premium)
+    var legendParts = [];
+    legendParts.push('<div class="vis-legend">');
     for (var li = 0; li < series.length; li++) {
-      svg.push('<span class="vis-legend-item"><span class="vis-legend-swatch" style="background:' + series[li].colour + '"></span>' + escapeHtml(series[li].label) + '</span>');
+      legendParts.push('<span class="vis-legend-item"><span class="vis-legend-swatch" style="background:' + series[li].colour + '"></span>' + escapeHtml(series[li].label) + '</span>');
     }
-    svg.push('</div>');
+    legendParts.push('</div>');
+
+    svg.push(legendParts.join(""));
 
     container.innerHTML = svg.join("\n");
+
+    // Bind hover callout on data points
+    bindHoverCallouts(container);
+  }
+
+  // ---- Hover callout for data points ----
+  function bindHoverCallouts(container) {
+    // Create or reuse callout element
+    var callout = document.getElementById("vis-hover-callout");
+    if (!callout) {
+      callout = document.createElement("div");
+      callout.id = "vis-hover-callout";
+      callout.className = "vis-hover-callout";
+      document.body.appendChild(callout);
+    }
+
+    var points = container.querySelectorAll(".tk-chart-point");
+    points.forEach(function(pt) {
+      pt.addEventListener("mouseenter", function(e) {
+        var label = pt.getAttribute("data-label") || "";
+        var waveLbl = pt.getAttribute("data-wave-label") || "";
+        var value = pt.getAttribute("data-value") || "";
+        var chgPrev = pt.getAttribute("data-change-prev") || "";
+        var chgBase = pt.getAttribute("data-change-base") || "";
+        var colour = pt.getAttribute("data-colour") || "#333";
+
+        var html = '<div class="vis-callout-header" style="border-left:4px solid ' + colour + '">';
+        html += '<span class="vis-callout-label">' + escapeHtml(label) + '</span>';
+        html += '<span class="vis-callout-wave">' + escapeHtml(waveLbl) + '</span>';
+        html += '</div>';
+        html += '<div class="vis-callout-value">' + escapeHtml(value) + '</div>';
+        if (chgPrev || chgBase) {
+          html += '<div class="vis-callout-changes">';
+          if (chgPrev) {
+            var prevCls = chgPrev.charAt(0) === "+" ? "pos" : (chgPrev.charAt(0) === "-" ? "neg" : "");
+            html += '<div class="vis-callout-change"><span class="vis-callout-change-label">vs Previous</span><span class="vis-callout-change-val ' + prevCls + '">' + escapeHtml(chgPrev) + '</span></div>';
+          }
+          if (chgBase) {
+            var baseCls = chgBase.charAt(0) === "+" ? "pos" : (chgBase.charAt(0) === "-" ? "neg" : "");
+            html += '<div class="vis-callout-change"><span class="vis-callout-change-label">vs Baseline</span><span class="vis-callout-change-val ' + baseCls + '">' + escapeHtml(chgBase) + '</span></div>';
+          }
+          html += '</div>';
+        }
+
+        callout.innerHTML = html;
+        callout.style.display = "block";
+
+        // Position near the point
+        var rect = pt.getBoundingClientRect();
+        var cw = callout.offsetWidth || 180;
+        var ch = callout.offsetHeight || 80;
+        var left = rect.left + window.scrollX + 16;
+        var top = rect.top + window.scrollY - ch - 8;
+        // If too high, show below
+        if (top < window.scrollY + 8) top = rect.bottom + window.scrollY + 8;
+        // If too far right, shift left
+        if (left + cw > window.innerWidth + window.scrollX - 16) left = rect.left + window.scrollX - cw - 8;
+        callout.style.left = left + "px";
+        callout.style.top = top + "px";
+      });
+
+      pt.addEventListener("mouseleave", function() {
+        callout.style.display = "none";
+      });
+    });
   }
 
   // ---- Sidebar toggle ----
@@ -776,6 +1173,7 @@
   // ---- Context change (Mode A segment selector) ----
   window.visChangeContext = function(value) {
     visState.contextSegment = value;
+    // Annotations persist — they are keyed to metric+wave, not segment
     var data = loadExplorerData();
     if (!data) return;
     // Rebuild table and chart
@@ -794,6 +1192,71 @@
     });
   };
 
+  // ---- Toggle base (n) rows ----
+  window.visToggleBase = function(show) {
+    document.querySelectorAll("#vis-tbl .tk-base-row").forEach(function(row) {
+      row.classList.toggle("visible", show);
+    });
+  };
+
+  // ---- Set label mode (all / last2 / last / none) ----
+  window.visSetLabelMode = function(mode) {
+    visState.labelMode = mode;
+    var data = loadExplorerData();
+    if (data && visState.chartVisible) renderVisCombinedChart(data);
+  };
+
+  // ---- Clear annotations when data context changes ----
+  function visClearAnnotations() {
+    if (typeof tkAnnotations === "undefined") return;
+    // Remove annotations for all currently visualised metrics/segments
+    if (visState.mode === "metrics") {
+      for (var i = 0; i < visState.metricIds.length; i++) {
+        var anns = tkAnnotations.getForMetric(visState.metricIds[i]);
+        for (var j = anns.length - 1; j >= 0; j--) {
+          tkAnnotations.remove(anns[j].metricId, anns[j].waveId, anns[j].segment);
+        }
+      }
+    } else if (visState.contextMetric) {
+      var anns2 = tkAnnotations.getForMetric(visState.contextMetric);
+      for (var k = anns2.length - 1; k >= 0; k--) {
+        tkAnnotations.remove(anns2[k].metricId, anns2[k].waveId, anns2[k].segment);
+      }
+    }
+  }
+
+  // ---- Y-axis controls ----
+  window.visSetYAxis = function() {
+    var minEl = document.getElementById("vis-ymin");
+    var maxEl = document.getElementById("vis-ymax");
+    visState.yAxisMin = (minEl && minEl.value !== "") ? parseFloat(minEl.value) : null;
+    visState.yAxisMax = (maxEl && maxEl.value !== "") ? parseFloat(maxEl.value) : null;
+    var data = loadExplorerData();
+    if (data && visState.chartVisible) renderVisCombinedChart(data);
+  };
+
+  window.visResetYAxis = function() {
+    visState.yAxisMin = null;
+    visState.yAxisMax = null;
+    var minEl = document.getElementById("vis-ymin");
+    var maxEl = document.getElementById("vis-ymax");
+    if (minEl) minEl.value = "";
+    if (maxEl) maxEl.value = "";
+    var data = loadExplorerData();
+    if (data && visState.chartVisible) renderVisCombinedChart(data);
+  };
+
+  // ---- Toggle CI bands ----
+  window.visToggleCI = function(show) {
+    visState.showCI = show;
+    document.querySelectorAll(".vis-ci-band").forEach(function(el) {
+      el.style.display = show ? "" : "none";
+    });
+    // Toggle CI sidebar legend
+    var ciSidebar = document.getElementById("vis-ci-sidebar");
+    if (ciSidebar) ciSidebar.style.display = show ? "" : "none";
+  };
+
   // ---- Toggle chart ----
   window.visToggleChart = function(show) {
     visState.chartVisible = show;
@@ -805,7 +1268,7 @@
     }
   };
 
-  // ---- Insight ----
+  // ---- Insight (markdown editor) ----
   window.visToggleInsight = function() {
     var c = document.getElementById("vis-insight");
     var btn = c ? c.previousElementSibling : null;
@@ -818,8 +1281,33 @@
     var c = document.getElementById("vis-insight");
     var btn = c ? c.previousElementSibling : null;
     var editor = document.getElementById("vis-insight-editor");
-    if (editor) editor.innerHTML = "";
+    var rendered = document.getElementById("vis-insight-rendered");
+    if (editor) editor.value = "";
+    if (rendered) rendered.innerHTML = "";
     if (c) { c.style.display = "none"; if (btn) btn.style.display = ""; }
+  };
+
+  window.visRenderInsight = function() {
+    var editor = document.getElementById("vis-insight-editor");
+    var rendered = document.getElementById("vis-insight-rendered");
+    if (editor && rendered && typeof renderMarkdown === "function") {
+      rendered.innerHTML = renderMarkdown(editor.value);
+    }
+  };
+
+  window.visInsertMd = function(before, after) {
+    var editor = document.getElementById("vis-insight-editor");
+    if (!editor) return;
+    var start = editor.selectionStart;
+    var end = editor.selectionEnd;
+    var text = editor.value;
+    var selected = text.substring(start, end);
+    var replacement = before + (selected || "text") + after;
+    editor.value = text.substring(0, start) + replacement + text.substring(end);
+    editor.focus();
+    var newPos = start + before.length + (selected || "text").length;
+    editor.setSelectionRange(newPos, newPos);
+    visRenderInsight();
   };
 
   // ---- Pin ----
@@ -835,25 +1323,55 @@
     var main = document.getElementById("vis-main-panel");
     if (!main) return;
 
+    // Determine title
     var titleEl = main.querySelector(".vis-context-title, .vis-context-select");
     var titleText = titleEl ? (titleEl.tagName === "SELECT" ? titleEl.options[titleEl.selectedIndex].text : titleEl.textContent) : "Visualise";
-    var insight = document.getElementById("vis-insight-editor");
-    var insightText = insight ? insight.innerHTML.trim() : "";
 
-    var pinHtml = '<div class="pinned-view-content">';
-    pinHtml += '<h3>' + escapeHtml(titleText) + '</h3>';
-    if (insightText) pinHtml += '<div class="pinned-insight">' + insightText + '</div>';
+    // Capture insight (rendered markdown HTML)
+    var insightEditor = document.getElementById("vis-insight-editor");
+    var insightRendered = document.getElementById("vis-insight-rendered");
+    var insightText = insightRendered ? insightRendered.innerHTML.trim() : (insightEditor ? insightEditor.value.trim() : "");
+
+    // Capture chart SVG
+    var chartSvg = "";
     if (mode === "all" || mode === "chart") {
       var chartEl = document.getElementById("vis-chart");
-      if (chartEl) pinHtml += '<div class="pinned-chart">' + chartEl.innerHTML + '</div>';
+      if (chartEl) chartSvg = chartEl.innerHTML;
     }
+
+    // Capture table HTML (clean: remove hidden rows)
+    var tableHtml = "";
     if (mode === "all" || mode === "table") {
       var tableEl = document.getElementById("vis-table");
-      if (tableEl) pinHtml += '<div class="pinned-table">' + tableEl.innerHTML + '</div>';
+      if (tableEl) {
+        var clone = tableEl.cloneNode(true);
+        clone.querySelectorAll(".vis-item-hidden").forEach(function(r) { r.remove(); });
+        clone.querySelectorAll(".tk-change-row:not(.visible)").forEach(function(r) { r.remove(); });
+        tableHtml = clone.innerHTML;
+      }
     }
-    pinHtml += '</div>';
 
-    if (typeof addPinnedView === "function") addPinnedView(pinHtml, titleText);
+    // Build pin object matching pinnedViews structure
+    if (typeof pinnedViews === "undefined") { console.warn("Pinned views not available"); return; }
+
+    var pinObj = {
+      id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+      metricId: "visualise-" + (visState.mode === "metrics" ? visState.contextSegment : visState.contextMetric),
+      metricTitle: titleText,
+      visibleSegments: [],
+      tableHtml: tableHtml,
+      chartSvg: chartSvg,
+      chartVisible: mode === "all" || mode === "chart",
+      pinMode: mode,
+      insightText: insightText,
+      timestamp: Date.now(),
+      order: pinnedViews.length
+    };
+
+    pinnedViews.push(pinObj);
+    if (typeof renderPinnedCards === "function") renderPinnedCards();
+    if (typeof updatePinBadge === "function") updatePinBadge();
+    if (typeof savePinnedData === "function") savePinnedData();
   };
 
   // ---- Export ----
@@ -1011,6 +1529,14 @@
     if (!text) return "";
     return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
+
+  // ---- Listen for annotation changes to refresh Visualise chart ----
+  document.addEventListener("tk-annotation-changed", function() {
+    var data = loadExplorerData();
+    if (data && visState.chartVisible && visState.mode) {
+      renderVisCombinedChart(data);
+    }
+  });
 
   // ---- Init ----
   function initExplorer() {

@@ -23,6 +23,8 @@
   function showTooltip(e) {
     var el = e.target;
     if (!el.classList.contains("tk-chart-point")) return;
+    // Skip points inside the Visualise chart — they have their own rich hover callout
+    if (el.closest("#vis-chart")) return;
 
     var tip = createTooltip();
     var segment = el.getAttribute("data-segment") || "";

@@ -211,9 +211,10 @@ function renderPinnedCards() {
     var pin = item;
     html += "<div class=\"pinned-card\" data-pin-id=\"" + pin.id + "\">";
 
-    // Header
+    // Header — use metricTitle for metric pins, qTitle for Added Slide pins
+    var titleText = pin.metricTitle || pin.qTitle || "Untitled";
     html += "<div class=\"pinned-card-header\">";
-    html += "<h3 class=\"pinned-card-title\">" + escapeHtml(pin.metricTitle) + "</h3>";
+    html += "<h3 class=\"pinned-card-title\">" + escapeHtml(titleText) + "</h3>";
     html += "<div class=\"pinned-card-actions\">";
     html += "<button class=\"tk-btn tk-btn-sm\" onclick=\"exportPinnedCardPNG('" + pin.id + "')\" title=\"Export as PNG\">&#x1F4F8;</button>";
     if (i > 0) {
@@ -234,6 +235,16 @@ function renderPinnedCards() {
       html += "<div class=\"pinned-card-insight-editor insight-editor\" contenteditable=\"true\" data-pin-id=\"" + pin.id + "\" oninput=\"syncPinnedInsight('" + pin.id + "',this)\" style=\"display:none\" data-placeholder=\"Type insight for this pin...\"></div>";
     }
     html += "</div>";
+
+    // Image (Added Slide pins with uploaded images)
+    if (pin.imageData) {
+      html += "<div class=\"pinned-card-image\">";
+      html += "<img src=\"" + pin.imageData + "\"";
+      if (pin.imageWidth) html += " width=\"" + pin.imageWidth + "\"";
+      if (pin.imageHeight) html += " height=\"" + pin.imageHeight + "\"";
+      html += " style=\"max-width:100%;height:auto;border-radius:6px;\" alt=\"Slide image\"/>";
+      html += "</div>";
+    }
 
     // Chart (if captured and was visible)
     if (pin.chartSvg && pin.chartVisible !== false) {
@@ -636,7 +647,7 @@ function exportPinnedCardPNG(pinId) {
   var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367";
 
   // ---- 1. Title ----
-  var titleText = pin.metricTitle || "Pinned View";
+  var titleText = pin.metricTitle || pin.qTitle || "Pinned View";
   var titleLines = pinWrapTextLines(titleText, usableW, 9.5);
   var titleLineH = 20;
   var titleStartY = pad + 12;
@@ -662,12 +673,35 @@ function exportPinnedCardPNG(pinId) {
   var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 24 : 0;
   var insightY = contentTop;
 
+  // ---- 3b. Image (Added Slide pins) ----
+  var imageTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 8 : 0);
+  var imageDisplayH = 0;
+  var imageDataUrl = null;
+  var imageRenderW = 0;
+  var imageRenderH = 0;
+
+  if (pin.imageData) {
+    imageDataUrl = pin.imageData;
+    var imgW = pin.imageWidth || 800;
+    var imgH = pin.imageHeight || 400;
+    // Scale image to fit within usable width, max height 500
+    var imgScale = Math.min(1, usableW / imgW);
+    imageRenderW = Math.round(imgW * imgScale);
+    imageRenderH = Math.round(imgH * imgScale);
+    if (imageRenderH > 500) {
+      imageRenderH = 500;
+      imageRenderW = Math.round(imgW * (500 / imgH));
+    }
+    imageDisplayH = imageRenderH + 8;
+  }
+
   // ---- 4. Chart dimensions ----
-  var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 8 : 0);
+  var chartTopY = imageTopY + imageDisplayH + (imageDisplayH > 0 ? 8 : 0);
   var chartDisplayH = 0;
   var chartClone = null;
   var chartScale = 1;
 
+  var legendItems = []; // {colour, label} for legend below chart
   if (pin.chartSvg && pin.chartVisible !== false) {
     var chartTempDiv = document.createElement("div");
     chartTempDiv.innerHTML = pin.chartSvg;
@@ -693,6 +727,16 @@ function exportPinnedCardPNG(pinId) {
         chartScale = usableW / chartOrigW;
         chartDisplayH = chartOrigH * chartScale;
       }
+    }
+    // Extract legend items from the .vis-legend div (sits outside the SVG)
+    var legendDiv = chartTempDiv.querySelector(".vis-legend");
+    if (legendDiv) {
+      legendDiv.querySelectorAll(".vis-legend-item").forEach(function(item) {
+        var swatch = item.querySelector(".vis-legend-swatch");
+        var colour = swatch ? swatch.style.background || swatch.style.backgroundColor || "#333" : "#333";
+        legendItems.push({ colour: colour, label: item.textContent.trim() });
+      });
+      chartDisplayH += 24; // Reserve space for legend row
     }
   }
 
@@ -762,12 +806,46 @@ function exportPinnedCardPNG(pinId) {
     svg.appendChild(insResult.element);
   }
 
+  // Image (Added Slide pins) — embed as SVG <image> element
+  if (imageDataUrl && imageDisplayH > 0) {
+    var imgEl = document.createElementNS(ns, "image");
+    imgEl.setAttribute("x", pad);
+    imgEl.setAttribute("y", imageTopY);
+    imgEl.setAttribute("width", imageRenderW);
+    imgEl.setAttribute("height", imageRenderH);
+    imgEl.setAttributeNS("http://www.w3.org/1999/xlink", "href", imageDataUrl);
+    imgEl.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    svg.appendChild(imgEl);
+  }
+
   // Chart — clone SVG content into <g> element (no foreignObject!)
   if (chartClone && chartDisplayH > 0) {
     var chartG = document.createElementNS(ns, "g");
     chartG.setAttribute("transform", "translate(" + pad + "," + chartTopY + ") scale(" + chartScale + ")");
     while (chartClone.firstChild) chartG.appendChild(chartClone.firstChild);
     svg.appendChild(chartG);
+
+    // Render legend items below the chart (extracted from the .vis-legend div)
+    if (legendItems.length > 0) {
+      var legendY = chartTopY + chartDisplayH - 8;
+      var legendX = pad;
+      var legendG = document.createElementNS(ns, "g");
+      for (var li = 0; li < legendItems.length; li++) {
+        var lRect = document.createElementNS(ns, "rect");
+        lRect.setAttribute("x", legendX); lRect.setAttribute("y", legendY - 8);
+        lRect.setAttribute("width", "10"); lRect.setAttribute("height", "10");
+        lRect.setAttribute("rx", "2"); lRect.setAttribute("fill", legendItems[li].colour);
+        legendG.appendChild(lRect);
+        var lText = document.createElementNS(ns, "text");
+        lText.setAttribute("x", legendX + 14); lText.setAttribute("y", legendY + 1);
+        lText.setAttribute("fill", "#334155"); lText.setAttribute("font-size", "11");
+        lText.setAttribute("font-weight", "500");
+        lText.textContent = legendItems[li].label;
+        legendG.appendChild(lText);
+        legendX += legendItems[li].label.length * 6.5 + 30;
+      }
+      svg.appendChild(legendG);
+    }
   }
 
   // Table — rendered as SVG rect+text elements
@@ -804,7 +882,8 @@ function exportPinnedCardPNG(pinId) {
     URL.revokeObjectURL(url);
     canvas.toBlob(function(blob) {
       if (!blob) return;
-      var filename = "pinned_" + pin.metricTitle.replace(/[^a-zA-Z0-9]/g, "_") + ".png";
+      var fnTitle = pin.metricTitle || pin.qTitle || "view";
+      var filename = "pinned_" + fnTitle.replace(/[^a-zA-Z0-9]/g, "_") + ".png";
       var a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = filename;
