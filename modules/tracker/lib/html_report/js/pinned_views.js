@@ -1276,7 +1276,7 @@ function hydrateSigCardStates() {
         if (card) card.classList.add("sig-hidden");
       }
     }
-  } catch(e) {}
+  } catch(e) { console.warn("[PinnedViews] Parse error:", e.message); }
 }
 
 /**

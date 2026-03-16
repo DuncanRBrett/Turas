@@ -6,8 +6,7 @@
 #   03a_page_styling.R   - CSS/JS loading, minification, brand substitution
 #   03b_page_components.R - Header, footer, help overlay, about, pinned, qual
 #   03c_summary_builder.R - Summary/Dashboard tab (KPI heroes, pulse, heatmap)
-#   03d_metrics_builder.R - (REMOVED: replaced by Explorer + Visualise)
-#   03e_overview_builder.R - (REMOVED: replaced by Explorer + Visualise)
+#   03f_heatmap_builder.R - Explorer tab (heatmap table with drill-down)
 # VERSION: 3.0.0
 # ==============================================================================
 
@@ -15,8 +14,7 @@
 #' Build Tracker HTML Page
 #'
 #' Assembles the complete HTML page from tables, charts, and controls.
-#' Uses a 6-tab layout: Summary, Metrics by Segment, Segment Overview,
-#' Added Slides, About, Pinned Views.
+#' Uses a 4-tab layout: Summary, Explorer, Added Slides, Pinned Views.
 #'
 #' @param html_data List. Output from transform_tracker_for_html()
 #' @param table_html htmltools::HTML. Table from build_tracking_table()
@@ -69,10 +67,7 @@ build_tracker_page <- function(html_data, table_html, charts, config) {
       # Tab 2: Heatmap Explorer
       build_explorer_tab(html_data, config),
 
-      # Metrics by Segment and Segment Overview REMOVED
-      # Functionality fully replaced by Explorer + Visualise tabs
-
-      # Tab 4: Visualise (populated dynamically from Explorer)
+      # Tab 3: Visualise (populated dynamically from Explorer)
       htmltools::tags$div(id = "tab-visualise", class = "tab-panel",
         htmltools::tags$div(id = "visualise-placeholder", class = "visualise-empty",
           htmltools::tags$h3("Select metrics or segments in the Explorer, then click Visualise."),
@@ -176,9 +171,8 @@ build_annotations_json <- function(config) {
 
 #' Build Report Tab Navigation
 #'
-#' Renders the tab bar with Summary, Metrics by Segment, Segment Overview,
-#' Added Slides, About (optional), and Pinned Views tabs. Includes Save/Print
-#' action buttons pushed to the right.
+#' Renders the tab bar with Summary, Explorer, Added Slides, About (optional),
+#' and Pinned Views tabs. Includes Save/Print action buttons pushed to the right.
 #'
 #' @param brand_colour Character. Brand colour hex code
 #' @param has_about Logical. Whether the About tab should be shown
@@ -208,7 +202,6 @@ build_report_tab_nav <- function(brand_colour, has_about = FALSE) {
       `data-tab` = "explorer",
       "Explorer"
     ),
-    # Metrics by Segment and Segment Overview REMOVED (replaced by Explorer + Visualise)
     htmltools::tags$button(
       class = "report-tab",
       onclick = "switchReportTab('visualise')",

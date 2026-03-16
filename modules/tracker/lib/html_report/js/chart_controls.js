@@ -96,7 +96,7 @@
 
       try {
         var chartData = JSON.parse(chartAttr);
-      } catch (e) { continue; }
+      } catch (e) { console.warn("[ChartControls] Parse error:", e.message); continue; }
 
       if (!chartData || !chartData.series) continue;
       if (!allWaveLabels && chartData.wave_labels) {
@@ -376,6 +376,7 @@
       ctx.drawImage(img, 0, 0);
 
       canvas.toBlob(function(blob) {
+        if (!blob) { console.error("[Export] PNG blob creation failed"); return; }
         var url = URL.createObjectURL(blob);
         var a = document.createElement("a");
         a.href = url;

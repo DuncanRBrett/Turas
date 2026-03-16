@@ -18,7 +18,7 @@
   (function loadThresholds() {
     var section = document.querySelector(".hm-overview-section[data-thresholds]");
     if (section) {
-      try { hmThresholds = JSON.parse(section.getAttribute("data-thresholds")); } catch(e) {}
+      try { hmThresholds = JSON.parse(section.getAttribute("data-thresholds")); } catch(e) { console.warn("[Heatmap] Threshold parse error:", e.message); }
     }
   })();
 

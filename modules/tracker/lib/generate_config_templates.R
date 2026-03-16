@@ -109,6 +109,13 @@ generate_tracking_config_template <- function(output_path) {
           description = "Generate interactive HTML report alongside Excel",
           valid_values_text = "Y or N",
           dropdown = c("Y", "N")
+        ),
+        list(
+          name = "dashboard_hero_metrics",
+          required = FALSE,
+          default = "",
+          description = "Comma-separated QuestionCodes to highlight as hero metrics on the HTML dashboard summary",
+          valid_values_text = "QuestionCodes from TrackedQuestions (e.g., Q01_NPS,Q02_CSAT)"
         )
       )
     ),
@@ -194,6 +201,14 @@ generate_tracking_config_template <- function(output_path) {
           default = "",
           description = "WaveID to use as baseline for significance testing (defaults to first wave)",
           valid_values_text = "A WaveID from the Waves sheet (e.g., W1)"
+        ),
+        list(
+          name = "show_sample_sizes",
+          required = FALSE,
+          default = "Y",
+          description = "Display sample sizes (n=) in report output",
+          valid_values_text = "Y or N",
+          dropdown = c("Y", "N")
         )
       )
     ),
@@ -275,6 +290,146 @@ generate_tracking_config_template <- function(output_path) {
       )
     ),
 
+    # --- DEFAULT TRACKING SPECS section ---
+    list(
+      section_name = "DEFAULT TRACKING SPECS",
+      fields = list(
+        list(
+          name = "default_rating_specs",
+          required = FALSE,
+          default = "",
+          description = "Default TrackingSpecs for Rating/Likert questions (used when TrackingSpecs is blank)",
+          valid_values_text = "Comma-separated: mean, top_box, top2_box, top3_box, bottom_box, bottom2_box, distribution, range:X-Y"
+        ),
+        list(
+          name = "default_nps_specs",
+          required = FALSE,
+          default = "",
+          description = "Default TrackingSpecs for NPS questions (used when TrackingSpecs is blank)",
+          valid_values_text = "Comma-separated: nps_score, promoters_pct, passives_pct, detractors_pct, full"
+        ),
+        list(
+          name = "default_single_response_specs",
+          required = FALSE,
+          default = "",
+          description = "Default TrackingSpecs for Single_Response questions (used when TrackingSpecs is blank)",
+          valid_values_text = "Comma-separated: all, top3, category:X"
+        ),
+        list(
+          name = "default_multi_mention_specs",
+          required = FALSE,
+          default = "",
+          description = "Default TrackingSpecs for Multi_Mention questions (used when TrackingSpecs is blank)",
+          valid_values_text = "Comma-separated: auto, any, count_mean, count_distribution, option:X, category:X"
+        ),
+        list(
+          name = "default_composite_specs",
+          required = FALSE,
+          default = "",
+          description = "Default TrackingSpecs for Composite/Index questions (used when TrackingSpecs is blank)",
+          valid_values_text = "Comma-separated: mean, top_box, top2_box, top3_box, distribution, range:X-Y"
+        )
+      )
+    ),
+
+    # --- HEATMAP THRESHOLDS section ---
+    list(
+      section_name = "HEATMAP THRESHOLDS",
+      fields = list(
+        list(
+          name = "heatmap_pct_green",
+          required = FALSE,
+          default = 70,
+          description = "Percentage threshold for green (good) heatmap colouring",
+          valid_values_text = "Numeric 0-100",
+          integer_range = c(0, 100)
+        ),
+        list(
+          name = "heatmap_pct_amber",
+          required = FALSE,
+          default = 50,
+          description = "Percentage threshold for amber (caution) heatmap colouring",
+          valid_values_text = "Numeric 0-100",
+          integer_range = c(0, 100)
+        ),
+        list(
+          name = "heatmap_mean5_green",
+          required = FALSE,
+          default = "4.0",
+          description = "Mean score (5-point scale) threshold for green heatmap colouring",
+          valid_values_text = "Numeric 1.0-5.0"
+        ),
+        list(
+          name = "heatmap_mean5_amber",
+          required = FALSE,
+          default = "3.0",
+          description = "Mean score (5-point scale) threshold for amber heatmap colouring",
+          valid_values_text = "Numeric 1.0-5.0"
+        ),
+        list(
+          name = "heatmap_mean10_green",
+          required = FALSE,
+          default = "7.0",
+          description = "Mean score (10-point scale) threshold for green heatmap colouring",
+          valid_values_text = "Numeric 1.0-10.0"
+        ),
+        list(
+          name = "heatmap_mean10_amber",
+          required = FALSE,
+          default = "5.0",
+          description = "Mean score (10-point scale) threshold for amber heatmap colouring",
+          valid_values_text = "Numeric 1.0-10.0"
+        ),
+        list(
+          name = "heatmap_nps_green",
+          required = FALSE,
+          default = 30,
+          description = "NPS threshold for green heatmap colouring",
+          valid_values_text = "Integer -100 to 100",
+          integer_range = c(-100, 100)
+        ),
+        list(
+          name = "heatmap_nps_amber",
+          required = FALSE,
+          default = 0,
+          description = "NPS threshold for amber heatmap colouring",
+          valid_values_text = "Integer -100 to 100",
+          integer_range = c(-100, 100)
+        ),
+        list(
+          name = "heatmap_response_green",
+          required = FALSE,
+          default = 50,
+          description = "Response percentage threshold for green heatmap colouring (pct_response metrics)",
+          valid_values_text = "Numeric 0-100",
+          integer_range = c(0, 100)
+        ),
+        list(
+          name = "heatmap_response_amber",
+          required = FALSE,
+          default = 25,
+          description = "Response percentage threshold for amber heatmap colouring (pct_response metrics)",
+          valid_values_text = "Numeric 0-100",
+          integer_range = c(0, 100)
+        )
+      )
+    ),
+
+    # --- CHARTS section ---
+    list(
+      section_name = "CHARTS",
+      fields = list(
+        list(
+          name = "segment_palette_preset",
+          required = FALSE,
+          default = "default",
+          description = "Colour palette preset for banner segment charts in HTML reports",
+          valid_values_text = "default, muted, vibrant, or monochrome",
+          dropdown = c("default", "muted", "vibrant", "monochrome")
+        )
+      )
+    ),
+
     # --- OTHER section ---
     list(
       section_name = "OTHER",
@@ -292,6 +447,13 @@ generate_tracking_config_template <- function(output_path) {
           default = "",
           description = "Notes to include in report appendix or footer",
           valid_values_text = "Free text"
+        ),
+        list(
+          name = "annotations",
+          required = FALSE,
+          default = "",
+          description = "Pre-configured chart annotations as JSON array (e.g., [{\"metricId\":\"Q01\",\"waveId\":\"W2\",\"text\":\"Campaign launched\"}])",
+          valid_values_text = "JSON array string or leave blank"
         )
       )
     )
@@ -404,7 +566,7 @@ generate_tracking_config_template <- function(output_path) {
     ),
     list(
       name = "TrackingSpecs", width = 40, required = FALSE,
-      description = "Comma-separated metrics to calculate: mean, top_box, top2_box, top3_box, bottom_box, bottom2_box, distribution, nps_score, promoters_pct, passives_pct, detractors_pct, full, all, auto, count_mean, range:X-Y, category:X, option:X"
+      description = "Comma-separated metrics to calculate: mean, top_box, top2_box, top3_box, bottom_box, bottom2_box, bottom3_box, distribution, nps_score, promoters_pct, passives_pct, detractors_pct, full, all, auto, count_mean, count_distribution, range:X-Y, box:CATEGORY, category:X, option:X. Append =Label for custom display names (e.g., range:4-5=Agree)"
     )
   )
 
@@ -434,6 +596,17 @@ generate_tracking_config_template <- function(output_path) {
       QuestionCode = "Q05_Features", QuestionText = "Features Used",
       QuestionType = "Multi_Mention", MetricLabel = "% Mentioning",
       Section = "Usage", SortOrder = 5, TrackingSpecs = "auto"
+    ),
+    list(
+      QuestionCode = "Q06_Agreement", QuestionText = "Service Agreement (1-5)",
+      QuestionType = "Rating", MetricLabel = "% Agree",
+      Section = "Satisfaction", SortOrder = 6,
+      TrackingSpecs = "mean,box:Agree=Top Box,bottom_box"
+    ),
+    list(
+      QuestionCode = "Q07_CX_Index", QuestionText = "Customer Experience Index",
+      QuestionType = "Composite", MetricLabel = "CX Score",
+      Section = "Summary Indices", SortOrder = 7, TrackingSpecs = "mean,top2_box"
     )
   )
 
@@ -452,7 +625,7 @@ generate_tracking_config_template <- function(output_path) {
   banner_columns <- list(
     list(
       name = "BreakVariable", width = 22, required = TRUE,
-      description = "Variable name used as the banner break (e.g., Total, Region)"
+      description = "Canonical variable name for this banner break (e.g., Total, Region)"
     ),
     list(
       name = "BreakLabel", width = 25, required = TRUE,
@@ -469,28 +642,36 @@ generate_tracking_config_template <- function(output_path) {
     list(
       name = "W3", width = 18, required = FALSE,
       description = "Column name in Wave 3 data for this break variable"
+    ),
+    list(
+      name = "W4", width = 18, required = FALSE,
+      description = "Column name in Wave 4 data for this break variable"
     )
   )
 
   banner_examples <- list(
     list(
       BreakVariable = "Total", BreakLabel = "All Respondents",
-      W1 = "Total", W2 = "Total", W3 = "Total"
+      W1 = "Total", W2 = "Total", W3 = "Total", W4 = "Total"
     ),
     list(
       BreakVariable = "Region", BreakLabel = "Region",
-      W1 = "Q_Region", W2 = "Q_Region", W3 = "DEM_Region"
+      W1 = "Q_Region", W2 = "Q_Region", W3 = "DEM_Region", W4 = "DEM_Region"
     ),
     list(
       BreakVariable = "AgeGroup", BreakLabel = "Age Group",
-      W1 = "Q_Age", W2 = "Q_Age", W3 = "DEM_Age"
+      W1 = "Q_Age", W2 = "Q_Age", W3 = "DEM_Age", W4 = "DEM_Age"
+    ),
+    list(
+      BreakVariable = "Gender", BreakLabel = "Gender",
+      W1 = "Q_Gender", W2 = "Q_Gender", W3 = "DEM_Gender", W4 = "DEM_Gender"
     )
   )
 
   write_table_sheet(
     wb, "Banner", banner_columns,
     title = "TURAS Tracker - Banner Definitions",
-    subtitle = "Define banner break variables for subgroup analysis. Column names can differ across waves.",
+    subtitle = "Define banner break variables for subgroup analysis. Column names can differ across waves. Add more wave columns (W5, W6, ...) as needed.",
     example_rows = banner_examples,
     num_blank_rows = 20
   )
@@ -531,11 +712,11 @@ generate_question_mapping_template <- function(output_path) {
   question_map_columns <- list(
     list(
       name = "QuestionCode", width = 22, required = TRUE,
-      description = "Canonical question code used across the tracking study"
+      description = "Canonical question code used across the tracking study (must match TrackedQuestions)"
     ),
     list(
       name = "QuestionText", width = 40, required = FALSE,
-      description = "Question text for documentation and report labels"
+      description = "Full question wording for documentation and report labels"
     ),
     list(
       name = "QuestionType", width = 20, required = FALSE,
@@ -555,12 +736,25 @@ generate_question_mapping_template <- function(output_path) {
       description = "Column name in Wave 3 data file for this question"
     ),
     list(
+      name = "W4", width = 18, required = FALSE,
+      description = "Column name in Wave 4 data file for this question"
+    ),
+    list(
+      name = "ResponseScale", width = 25, required = FALSE,
+      description = "Scale description for documentation (e.g., '1=Very Dissatisfied to 5=Very Satisfied')"
+    ),
+    list(
+      name = "ScalePoints", width = 14, required = FALSE,
+      description = "Number of scale points for rating questions (e.g., 5, 7, 10)",
+      integer_range = c(2, 100)
+    ),
+    list(
       name = "SourceQuestions", width = 30, required = FALSE,
-      description = "For Composite type: semicolon-separated list of source question columns"
+      description = "For Composite type: semicolon-separated list of source question codes that form the index"
     ),
     list(
       name = "TrackingSpecs", width = 40, required = FALSE,
-      description = "Comma-separated metrics to calculate: mean, top_box, top2_box, top3_box, bottom_box, bottom2_box, distribution, nps_score, promoters_pct, passives_pct, detractors_pct, full, all, auto, count_mean, range:X-Y, category:X, option:X"
+      description = "Comma-separated metrics (legacy location; prefer TrackedQuestions sheet). Specs: mean, top_box, top2_box, top3_box, bottom_box, bottom2_box, bottom3_box, distribution, nps_score, promoters_pct, passives_pct, detractors_pct, full, all, auto, count_mean, count_distribution, range:X-Y, box:CATEGORY, category:X, option:X"
     )
   )
 
@@ -568,39 +762,58 @@ generate_question_mapping_template <- function(output_path) {
     list(
       QuestionCode = "Q01_Awareness", QuestionText = "Brand Awareness",
       QuestionType = "Single_Response",
-      W1 = "Q10", W2 = "Q12", W3 = "Q15",
+      W1 = "Q10", W2 = "Q12", W3 = "Q15", W4 = "Q15",
+      ResponseScale = "Yes / No / Not sure", ScalePoints = "",
       SourceQuestions = "", TrackingSpecs = "all"
     ),
     list(
-      QuestionCode = "Q02_Satisfaction", QuestionText = "Overall Satisfaction",
+      QuestionCode = "Q02_Satisfaction", QuestionText = "Overall Satisfaction (1-10)",
       QuestionType = "Rating",
-      W1 = "Q20", W2 = "Q22", W3 = "Q25",
+      W1 = "Q20", W2 = "Q22", W3 = "Q25", W4 = "Q25",
+      ResponseScale = "1=Very Dissatisfied to 10=Very Satisfied", ScalePoints = 10,
       SourceQuestions = "", TrackingSpecs = "mean,top2_box"
     ),
     list(
-      QuestionCode = "Q03_NPS", QuestionText = "Net Promoter Score",
+      QuestionCode = "Q03_NPS", QuestionText = "How likely to recommend? (0-10)",
       QuestionType = "NPS",
-      W1 = "Q30", W2 = "Q32", W3 = "Q35",
-      SourceQuestions = "", TrackingSpecs = "nps_score"
+      W1 = "Q30", W2 = "Q32", W3 = "Q35", W4 = "Q35",
+      ResponseScale = "0=Not at all likely to 10=Extremely likely", ScalePoints = 11,
+      SourceQuestions = "", TrackingSpecs = "nps_score,promoters_pct,detractors_pct"
     ),
     list(
-      QuestionCode = "Q04_Purchase", QuestionText = "Purchase Intent",
+      QuestionCode = "Q04_Purchase", QuestionText = "How likely to purchase?",
       QuestionType = "Single_Response",
-      W1 = "Q40", W2 = "Q42", W3 = "Q45",
-      SourceQuestions = "", TrackingSpecs = "top_box"
+      W1 = "Q40", W2 = "Q42", W3 = "Q45", W4 = "Q45",
+      ResponseScale = "Definitely / Probably / Might / Probably Not / Definitely Not", ScalePoints = 5,
+      SourceQuestions = "", TrackingSpecs = "category:Definitely"
     ),
     list(
-      QuestionCode = "Q05_Features", QuestionText = "Features Used",
+      QuestionCode = "Q05_Features", QuestionText = "Which features have you used?",
       QuestionType = "Multi_Mention",
-      W1 = "Q50", W2 = "Q52", W3 = "Q55",
+      W1 = "Q50", W2 = "Q52", W3 = "Q55", W4 = "Q55",
+      ResponseScale = "Select all that apply", ScalePoints = "",
       SourceQuestions = "Q50_1;Q50_2;Q50_3", TrackingSpecs = "auto"
+    ),
+    list(
+      QuestionCode = "Q06_Agreement", QuestionText = "Service meets expectations (1-5)",
+      QuestionType = "Rating",
+      W1 = "Q60", W2 = "Q62", W3 = "Q65", W4 = "Q65",
+      ResponseScale = "1=Strongly Disagree to 5=Strongly Agree", ScalePoints = 5,
+      SourceQuestions = "", TrackingSpecs = "mean,box:Agree=Top Box"
+    ),
+    list(
+      QuestionCode = "Q07_CX_Index", QuestionText = "Customer Experience Index",
+      QuestionType = "Composite",
+      W1 = "", W2 = "", W3 = "", W4 = "",
+      ResponseScale = "Calculated index", ScalePoints = "",
+      SourceQuestions = "Q02_Satisfaction;Q06_Agreement", TrackingSpecs = "mean"
     )
   )
 
   write_table_sheet(
     wb, "QuestionMap", question_map_columns,
     title = "TURAS Tracker - Question Mapping",
-    subtitle = "Map canonical question codes to actual column names in each wave's data file. Add wave columns (W4, W5, ...) as needed.",
+    subtitle = "Map canonical question codes to actual column names in each wave's data file. Add more wave columns (W5, W6, ...) as needed.",
     example_rows = question_map_examples,
     num_blank_rows = 50
   )

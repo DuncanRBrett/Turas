@@ -153,8 +153,7 @@ build_help_overlay <- function() {
         htmltools::tags$h3("Report Tabs"),
         htmltools::tags$ul(
           htmltools::tags$li(htmltools::tags$strong("Summary"), " \u2014 Key findings and methodology notes"),
-          htmltools::tags$li(htmltools::tags$strong("Metrics by Segment"), " \u2014 Explore one metric at a time with segment chips and chart toggle"),
-          htmltools::tags$li(htmltools::tags$strong("Segment Overview"), " \u2014 Full crosstab table with all metrics"),
+          htmltools::tags$li(htmltools::tags$strong("Explorer"), " \u2014 Interactive heatmap table to explore metrics across waves and segments"),
           htmltools::tags$li(htmltools::tags$strong("Added Slides"), " \u2014 Insert custom slides with images and commentary"),
           htmltools::tags$li(htmltools::tags$strong("Pinned Views"), " \u2014 Save and compare specific metric views")
         ),
@@ -169,7 +168,7 @@ build_help_overlay <- function() {
         htmltools::tags$h3("Trend Annotations"),
         htmltools::tags$p("Click a data point on any chart to add a contextual annotation (e.g., 'Campaign launched'). Annotations appear as labelled markers on the chart."),
         htmltools::tags$h3("Metric Comparison"),
-        htmltools::tags$p("Enable 'Compare' mode on the Metrics by Segment tab to overlay up to 3 metrics on a single chart for correlation analysis."),
+        htmltools::tags$p("Select metrics in the Explorer tab and click Visualise to overlay up to 3 metrics on a single chart for correlation analysis."),
         htmltools::tags$h3("Export"),
         htmltools::tags$p("Export tables as CSV or Excel. Export charts and metrics as high-resolution PNG slides. Copy charts to clipboard for pasting into presentations.")
       )
@@ -296,7 +295,7 @@ build_pinned_tab <- function() {
     htmltools::tags$div(
       id = "pinned-empty-state",
       class = "pinned-empty-state",
-      htmltools::HTML("&#x1F4CC; No pinned views yet. Go to <strong>Metrics by Segment</strong> and click <strong>Pin</strong> to save a view here.")
+      htmltools::HTML("&#x1F4CC; No pinned views yet. Go to the <strong>Explorer</strong> tab and click <strong>Pin</strong> to save a view here.")
     )
   )
 }

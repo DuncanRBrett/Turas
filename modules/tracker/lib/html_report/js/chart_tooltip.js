@@ -70,15 +70,16 @@
   document.addEventListener("mouseover", function(e) {
     if (e.target.classList && e.target.classList.contains("tk-chart-point")) {
       showTooltip(e);
-      // Enlarge point on hover
-      e.target.setAttribute("r", "7");
+      // Store original radius and enlarge point on hover
+      e.target.dataset.origRadius = e.target.getAttribute("r");
+      e.target.setAttribute("r", "8");
     }
   });
 
   document.addEventListener("mouseout", function(e) {
     if (e.target.classList && e.target.classList.contains("tk-chart-point")) {
       hideTooltip();
-      e.target.setAttribute("r", "5");
+      e.target.setAttribute("r", e.target.dataset.origRadius || "6");
     }
   });
 

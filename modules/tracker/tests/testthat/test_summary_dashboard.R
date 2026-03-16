@@ -21,7 +21,7 @@ if (file.exists(palette_path)) source(palette_path)
 source(file.path(tracker_root, "lib", "constants.R"))
 source(file.path(tracker_root, "lib", "tracker_config_loader.R"))
 source(file.path(tracker_root, "lib", "html_report", "05_chart_builder.R"))
-source(file.path(tracker_root, "lib", "html_report", "03d_metrics_builder.R"))
+source(file.path(tracker_root, "lib", "html_report", "01_data_transformer.R"))
 source(file.path(tracker_root, "lib", "html_report", "03c_summary_builder.R"))
 
 # --- Helpers ------------------------------------------------------------------

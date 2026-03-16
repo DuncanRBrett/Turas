@@ -7,8 +7,8 @@
 #   - build_tracker_css()   from 03a_page_styling.R
 #   - read_tracker_js_file() from 03a_page_styling.R
 #   - build_tracker_javascript() from 03a_page_styling.R
-#   - classify_metric_type() from 03d_metrics_builder.R
-#   - derive_segment_groups() from 03d_metrics_builder.R
+#   - classify_metric_type() from 01_data_transformer.R (relocated from removed 03d)
+#   - derive_segment_groups() from 01_data_transformer.R (relocated from removed 03d)
 # ==============================================================================
 
 library(testthat)
@@ -26,7 +26,7 @@ if (file.exists(palette_path)) source(palette_path)
 source(file.path(tracker_root, "lib", "constants.R"))
 source(file.path(tracker_root, "lib", "tracker_config_loader.R"))
 source(file.path(tracker_root, "lib", "html_report", "05_chart_builder.R"))
-source(file.path(tracker_root, "lib", "html_report", "03d_metrics_builder.R"))
+source(file.path(tracker_root, "lib", "html_report", "01_data_transformer.R"))
 source(file.path(tracker_root, "lib", "html_report", "03a_page_styling.R"))
 
 

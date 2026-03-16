@@ -12,6 +12,9 @@
 (function() {
   "use strict";
 
+  /** Escape a string for safe use inside HTML attributes. */
+  function escapeAttr(s) { return String(s).replace(/&/g,"&amp;").replace(/'/g,"&#39;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
   // ---- Annotation Data Store ----
   // Structure: [{metricId, waveId, segment, text, colour}]
   var annotations = [];
@@ -23,7 +26,7 @@
     try {
       var data = JSON.parse(store.textContent);
       if (Array.isArray(data)) annotations = data;
-    } catch(e) {}
+    } catch(e) { console.warn("[Annotations] Parse error:", e.message); }
   }
 
   /** Save annotations to hidden JSON store. */
@@ -189,10 +192,10 @@
         (existing ? existing.text.replace(/"/g, '&quot;') : '') + '">' +
       '<div class="tk-annotation-actions">' +
         (existing ? '<button class="tk-btn tk-btn-sm" style="color:#c0392b;" onclick="window._removeAnnotation(\'' +
-          metricId + "','" + waveId + "','" + segment + "'" + ')">Remove</button>' : '') +
+          escapeAttr(metricId) + "','" + escapeAttr(waveId) + "','" + escapeAttr(segment) + "'" + ')">Remove</button>' : '') +
         '<button class="tk-btn tk-btn-sm" onclick="window._cancelAnnotation()">Cancel</button>' +
         '<button class="tk-btn tk-btn-sm" style="background:var(--brand);color:#fff;border-color:var(--brand);" ' +
-          'onclick="window._saveAnnotation(\'' + metricId + "','" + waveId + "','" + segment + "'" + ')">Save</button>' +
+          'onclick="window._saveAnnotation(\'' + escapeAttr(metricId) + "','" + escapeAttr(waveId) + "','" + escapeAttr(segment) + "'" + ')">Save</button>' +
       '</div>';
 
     // Position near the data point using fixed positioning for stability

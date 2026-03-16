@@ -12,7 +12,7 @@
     // mode: "chart", "table", or "chart_table"
     mode = mode || "chart";
 
-    // Find chart container: check Segment Overview first, then Metrics by Segment panel
+    // Find chart container: check Summary first, then Explorer panel
     var container = document.querySelector('.tk-chart-container[data-metric-id="' + metricId + '"]');
     if (!container) {
       var mvPanel = document.getElementById("mv-" + metricId);
@@ -27,7 +27,7 @@
     if (!metricRow) {
       metricRow = document.querySelector('.tk-metric-row[data-metric-id="' + metricId + '"]');
     }
-    // Extract title — try overview label first, then Metrics by Segment title
+    // Extract title — try overview label first, then Explorer panel title
     var title = "Metric";
     if (metricRow) {
       var labelEl = metricRow.querySelector(".tk-metric-label");
@@ -486,6 +486,7 @@
 
   function downloadCanvas(canvas, filename) {
     canvas.toBlob(function(blob) {
+      if (!blob) { console.error("[Export] PNG blob creation failed"); return; }
       var url = URL.createObjectURL(blob);
       var a = document.createElement("a");
       a.href = url;

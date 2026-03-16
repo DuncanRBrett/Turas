@@ -140,8 +140,7 @@ test_that("build_help_overlay is hidden by default", {
 test_that("build_help_overlay contains sections for all tabs", {
   html <- as.character(build_help_overlay())
   expect_true(grepl("Summary", html, fixed = TRUE))
-  expect_true(grepl("Metrics by Segment", html, fixed = TRUE))
-  expect_true(grepl("Segment Overview", html, fixed = TRUE))
+  expect_true(grepl("Explorer", html, fixed = TRUE))
   expect_true(grepl("Added Slides", html, fixed = TRUE))
   expect_true(grepl("Pinned Views", html, fixed = TRUE))
 })

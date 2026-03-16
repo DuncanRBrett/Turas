@@ -86,7 +86,12 @@ if (!exists("turas_refuse", mode = "function")) {
         "  How to fix: ", how_to_fix, "\n",
         strrep("=", 70), "\n"
       )
-      # Throw as a turas_refusal condition so handlers can catch it consistently
+      # Console output for Shiny visibility (errors must be visible in console)
+      cat(msg)
+      # Throw as a turas_refusal condition so handlers can catch it.
+      # NOTE: stop() is intentional here — this is the fallback when the shared
+      # TRS infrastructure is unavailable. The condition class allows callers
+      # using tryCatch/withCallingHandlers to intercept turas_refusal specifically.
       cond <- structure(
         class = c("turas_refusal", "error", "condition"),
         list(message = msg, code = code, title = title, problem = problem,
@@ -95,7 +100,18 @@ if (!exists("turas_refuse", mode = "function")) {
       stop(cond)
     }
     with_refusal_handler <- function(expr, module = "UNKNOWN") {
-      tryCatch(expr, error = function(e) stop(e))
+      tryCatch(expr,
+        turas_refusal = function(e) {
+          # Already printed to console by turas_refuse(); return structured result
+          list(status = "REFUSED", code = e$code, message = e$message,
+               how_to_fix = e$how_to_fix)
+        },
+        error = function(e) {
+          cat("\n[", module, " ERROR] ", conditionMessage(e), "\n", sep = "")
+          list(status = "REFUSED", code = "BUG_UNEXPECTED",
+               message = conditionMessage(e), how_to_fix = "Check console for details")
+        }
+      )
     }
     guard_init <- function(module = "UNKNOWN") {
       list(module = module, warnings = list(), stable = TRUE)

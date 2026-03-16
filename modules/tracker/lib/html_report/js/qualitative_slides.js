@@ -284,7 +284,7 @@ function restoreQualSlides() {
         if (imgArea) imgArea.style.display = "";
       }
     });
-  } catch(e) {}
+  } catch(e) { console.warn("[QualSlides] Parse error:", e.message); }
 }
 
 // Auto-restore on DOMContentLoaded

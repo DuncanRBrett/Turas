@@ -19,8 +19,8 @@ source(file.path(tracker_root, "lib", "tracker_config_loader.R"))
 source(file.path(tracker_root, "lib", "html_report", "05_chart_builder.R"))
 source(file.path(tracker_root, "lib", "html_report", "03b_page_components.R"))
 source(file.path(tracker_root, "lib", "html_report", "03c_summary_builder.R"))
-source(file.path(tracker_root, "lib", "html_report", "03d_metrics_builder.R"))
-source(file.path(tracker_root, "lib", "html_report", "03e_overview_builder.R"))
+# 03d_metrics_builder.R and 03e_overview_builder.R REMOVED
+# Functions classify_metric_type/derive_segment_groups relocated to 01_data_transformer.R
 source(file.path(tracker_root, "lib", "html_report", "03_page_builder.R"))
 
 

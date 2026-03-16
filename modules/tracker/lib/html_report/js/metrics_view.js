@@ -1,5 +1,5 @@
 // ==============================================================================
-// TurasTracker HTML Report - Metrics by Segment View
+// TurasTracker HTML Report - Explorer Metrics View
 // ==============================================================================
 // Controls the per-metric view: metric selection, segment chips, wave chips,
 // significance toggle, show-chart checkbox, n= count toggle,
@@ -1061,6 +1061,16 @@ function renderComparisonChart() {
     el.remove();
   });
 
+  // Clean up previous comparison elements
+  var existing = baseSvg.querySelectorAll(".comparison-overlay");
+  existing.forEach(function(el) { el.remove(); });
+
+  // Create a comparison overlay group for all appended elements
+  var ns = "http://www.w3.org/2000/svg";
+  var overlayGroup = document.createElementNS(ns, "g");
+  overlayGroup.setAttribute("class", "comparison-overlay");
+  var plotGroup = baseSvg.querySelector("g[transform]");
+
   compareMetrics.forEach(function(metricId, idx) {
     var panel = document.getElementById("mv-" + metricId);
     if (!panel) return;
@@ -1077,7 +1087,7 @@ function renderComparisonChart() {
         clone.setAttribute("stroke-dasharray", lineStyles[idx]);
       }
       clone.setAttribute("data-compare-metric", metricId);
-      baseSvg.querySelector("g[transform]").appendChild(clone);
+      overlayGroup.appendChild(clone);
 
       // Capture colour for legend
       if (colours.length <= idx) {
@@ -1089,9 +1099,11 @@ function renderComparisonChart() {
     svg.querySelectorAll(".tk-chart-point").forEach(function(pt) {
       var clone = pt.cloneNode(true);
       clone.setAttribute("data-compare-metric", metricId);
-      baseSvg.querySelector("g[transform]").appendChild(clone);
+      overlayGroup.appendChild(clone);
     });
   });
+
+  if (plotGroup) plotGroup.appendChild(overlayGroup);
 
   // Build comparison legend
   var legendHtml = '<div class="tk-comparison-legend">';

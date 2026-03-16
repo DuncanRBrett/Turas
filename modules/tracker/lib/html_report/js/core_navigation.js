@@ -168,17 +168,18 @@
     var chartPanel = document.getElementById("tk-chart-panel");
     var btnTable = document.getElementById("btn-table-view");
     var btnChart = document.getElementById("btn-chart-view");
+    if (!tablePanel || !chartPanel) return;
 
     if (view === "table") {
       tablePanel.style.display = "";
       chartPanel.style.display = "none";
-      btnTable.classList.add("tk-btn-active");
-      btnChart.classList.remove("tk-btn-active");
+      if (btnTable) btnTable.classList.add("tk-btn-active");
+      if (btnChart) btnChart.classList.remove("tk-btn-active");
     } else {
       tablePanel.style.display = "none";
       chartPanel.style.display = "";
-      btnTable.classList.remove("tk-btn-active");
-      btnChart.classList.add("tk-btn-active");
+      if (btnTable) btnTable.classList.remove("tk-btn-active");
+      if (btnChart) btnChart.classList.add("tk-btn-active");
     }
   };
 
@@ -232,7 +233,7 @@
           try {
             var d = JSON.parse(chartData);
             return formatMetricType(d.metric_name);
-          } catch(e) { return "Other"; }
+          } catch(e) { console.warn("[Navigation] Parse error:", e.message); return "Other"; }
         }
         return "Other";
       });
@@ -851,6 +852,7 @@
       if (typeof renderPinnedCards === "function") renderPinnedCards();
       if (typeof savePinnedData === "function") savePinnedData();
     } catch (e) {
+      console.warn("[Navigation] Canvas export failed:", e.message);
       // Canvas tainted or too large — fallback to HTML rendering
     }
   }

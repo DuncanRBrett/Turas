@@ -30,6 +30,89 @@ classify_data_type <- function(metric_name) {
 }
 
 
+#' Classify Metric Name into Display Type
+#'
+#' Maps internal metric_name values to human-readable filter categories.
+#' Similar to classify_data_type() but used for UI display grouping.
+#' Relocated from removed 03d_metrics_builder.R.
+#'
+#' @param metric_name Character. The metric name (e.g., "mean", "top2_box", "nps_score")
+#' @return Character. Display type key: "mean", "pct", "pct_response", "nps", or "other"
+#' @keywords internal
+classify_metric_type <- function(metric_name) {
+  if (metric_name == "mean") return("mean")
+  if (metric_name %in% c("nps_score", "nps", "promoters_pct", "passives_pct", "detractors_pct")) return("nps")
+  if (grepl("(box|range)", metric_name)) return("pct")
+  if (grepl("(category|proportion|any)", metric_name)) return("pct_response")
+  if (grepl("pct", metric_name)) return("pct")
+  "other"
+}
+
+
+#' Derive Segment Groups from Segment Names
+#'
+#' Splits segments into hierarchical groups based on the prefix before
+#' the first underscore. "Total" is placed in its own standalone group.
+#' Relocated from removed 03d_metrics_builder.R.
+#'
+#' @param segments Character vector of segment names
+#' @return List with: standalone (character vector), groups (named list of character vectors)
+#' @keywords internal
+derive_segment_groups <- function(segments) {
+  standalone <- character(0)
+  groups <- list()
+
+  for (seg in segments) {
+    if (seg == "Total") {
+      standalone <- c(standalone, seg)
+      next
+    }
+    underscore_pos <- regexpr("_", seg, fixed = TRUE)
+    if (underscore_pos > 0) {
+      group_name <- substr(seg, 1, underscore_pos - 1)
+    } else {
+      group_name <- seg
+    }
+    if (is.null(groups[[group_name]])) groups[[group_name]] <- character(0)
+    groups[[group_name]] <- c(groups[[group_name]], seg)
+  }
+
+  list(standalone = standalone, groups = groups)
+}
+
+
+#' Get Human-Readable Metric Type Descriptor
+#'
+#' Returns a clean subtitle string describing the metric type,
+#' e.g. "Mean Score", "Top 2 Box (%)", "NPS Score".
+#' Relocated from removed 03d_metrics_builder.R.
+#'
+#' @param metric_name Character. Internal metric name (e.g., "mean", "top2_box")
+#' @return Character. Human-readable metric type descriptor
+#' @keywords internal
+metric_type_descriptor <- function(metric_name) {
+  if (metric_name == "mean") return("Mean Score")
+  if (metric_name == "nps_score" || metric_name == "nps") return("NPS Score")
+  if (metric_name == "promoters_pct") return("NPS \u2014 Promoters (%)")
+  if (metric_name == "passives_pct") return("NPS \u2014 Passives (%)")
+  if (metric_name == "detractors_pct") return("NPS \u2014 Detractors (%)")
+  if (grepl("^top[_]?2[_]?box", metric_name)) return("Top 2 Box (%)")
+  if (grepl("^top[_]?3[_]?box", metric_name)) return("Top 3 Box (%)")
+  if (grepl("^bottom[_]?2[_]?box", metric_name)) return("Bottom 2 Box (%)")
+  if (grepl("^bottom[_]?3[_]?box", metric_name)) return("Bottom 3 Box (%)")
+  if (grepl("^box_", metric_name)) return("Box Score (%)")
+  if (grepl("^category_", metric_name)) return("% Response")
+  if (grepl("^range_", metric_name)) return("Range (%)")
+  if (grepl("(proportion|any)", metric_name)) return("% Response")
+  m_type <- classify_metric_type(metric_name)
+  if (m_type == "mean") return("Mean Score")
+  if (m_type == "nps") return("NPS (%)")
+  if (m_type == "pct_response") return("% Response")
+  if (m_type == "pct") return("Percentage (%)")
+  "Metric"
+}
+
+
 #' Transform Tracking Crosstab Data for HTML
 #'
 #' Converts the crosstab_data structure into flat, HTML-friendly structures

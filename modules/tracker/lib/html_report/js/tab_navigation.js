@@ -2,7 +2,7 @@
 // TurasTracker HTML Report - Tab Navigation
 // ==============================================================================
 // Handles switching between the 4 report tabs:
-//   Summary | Metrics by Segment | Segment Overview | Pinned Views
+//   Summary | Explorer | Added Slides | Pinned Views
 // ==============================================================================
 
 /**
