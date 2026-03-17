@@ -1379,17 +1379,10 @@
       svg.appendChild(insightRendered.element);
     }
 
-    // Slide image (config-driven or manually uploaded)
-    if (pin.imageData && imageDisplayW > 0 && imageDisplayH > 0) {
-      var svgImg = document.createElementNS(ns, "image");
-      svgImg.setAttribute("x", pad);
-      svgImg.setAttribute("y", imageTopY);
-      svgImg.setAttribute("width", imageDisplayW);
-      svgImg.setAttribute("height", imageDisplayH);
-      svgImg.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", pin.imageData);
-      svgImg.setAttribute("preserveAspectRatio", "xMidYMid meet");
-      svg.appendChild(svgImg);
-    }
+    // Slide image — stored for canvas compositing (not in SVG, which taints canvas)
+    var _pinImageData = (pin.imageData && imageDisplayW > 0 && imageDisplayH > 0) ? pin.imageData : null;
+    var _pinImageX = pad, _pinImageY = imageTopY;
+    var _pinImageW = imageDisplayW, _pinImageH = imageDisplayH;
 
     // Chart — clone SVG content into <g> element
     if (chartClone && chartDisplayH > 0) {
@@ -1431,18 +1424,38 @@
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
-      canvas.toBlob(function(blob) {
-        if (!blob) return;
-        var slug = titleText.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 40);
-        var filename = "pinned_" + slug + ".png";
-        var a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(a.href);
-      }, "image/png");
+
+      // Composite pin image directly on canvas (avoids SVG <image> taint)
+      var _finishExport = function() {
+        canvas.toBlob(function(blob) {
+          if (!blob) return;
+          var slug = titleText.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 40);
+          var filename = "pinned_" + slug + ".png";
+          var a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(a.href);
+        }, "image/png");
+      };
+
+      if (_pinImageData) {
+        var pinImg = new Image();
+        pinImg.onload = function() {
+          ctx.drawImage(pinImg,
+            _pinImageX * renderScale, _pinImageY * renderScale,
+            _pinImageW * renderScale, _pinImageH * renderScale);
+          _finishExport();
+        };
+        pinImg.onerror = function() {
+          _finishExport();
+        };
+        pinImg.src = _pinImageData;
+      } else {
+        _finishExport();
+      }
     };
     img.src = url;
   };
