@@ -1190,6 +1190,23 @@
     }
     if (!pin) return;
 
+    // If pin has an image, pre-load it to get natural dimensions before building SVG
+    if (pin.imageData) {
+      var preImg = new Image();
+      preImg.onload = function() {
+        ReportHub._buildPinExportSVG(pin, preImg.naturalWidth, preImg.naturalHeight);
+      };
+      preImg.onerror = function() {
+        // Image failed to load — export without it
+        ReportHub._buildPinExportSVG(pin, 0, 0);
+      };
+      preImg.src = pin.imageData;
+    } else {
+      ReportHub._buildPinExportSVG(pin, 0, 0);
+    }
+  };
+
+  ReportHub._buildPinExportSVG = function(pin, pinImageW, pinImageH) {
     var ns = "http://www.w3.org/2000/svg";
     var W = 1280;
     var fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
@@ -1252,13 +1269,24 @@
       insightBlockH = insightRendered.height + 24;
     }
 
+    // ---- 3b. Image dimensions (config-driven or manually uploaded slide image) ----
+    var imageTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 8 : 0);
+    var imageDisplayH = 0;
+    var imageDisplayW = 0;
+    if (pin.imageData && pinImageW > 0 && pinImageH > 0) {
+      // Scale image to fit within usable width, preserving aspect ratio
+      imageDisplayW = Math.min(usableW, pinImageW);
+      var imgScale = imageDisplayW / pinImageW;
+      imageDisplayH = Math.round(pinImageH * imgScale);
+    }
+
     // ---- 4. Chart dimensions ----
     // Respect pinMode: "all" (default), "chart_insight", "table_insight"
     var exportMode = pin.pinMode || "all";
     var exportShowChart = (exportMode === "all" || exportMode === "chart_insight");
     var exportShowTable = (exportMode === "all" || exportMode === "table_insight");
 
-    var chartTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 8 : 0);
+    var chartTopY = imageTopY + imageDisplayH + (imageDisplayH > 0 ? 8 : 0);
     var chartDisplayH = 0;
     var chartClone = null;
     var chartScale = 1;
@@ -1351,6 +1379,18 @@
       svg.appendChild(insightRendered.element);
     }
 
+    // Slide image (config-driven or manually uploaded)
+    if (pin.imageData && imageDisplayW > 0 && imageDisplayH > 0) {
+      var svgImg = document.createElementNS(ns, "image");
+      svgImg.setAttribute("x", pad);
+      svgImg.setAttribute("y", imageTopY);
+      svgImg.setAttribute("width", imageDisplayW);
+      svgImg.setAttribute("height", imageDisplayH);
+      svgImg.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", pin.imageData);
+      svgImg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+      svg.appendChild(svgImg);
+    }
+
     // Chart — clone SVG content into <g> element
     if (chartClone && chartDisplayH > 0) {
       var chartG = document.createElementNS(ns, "g");
@@ -1379,7 +1419,7 @@
     var img = new Image();
     img.onerror = function() {
       URL.revokeObjectURL(url);
-      console.error("[Hub Pin PNG] SVG render failed for pin: " + pinId);
+      console.error("[Hub Pin PNG] SVG render failed for pin: " + pin.id);
       alert("PNG export failed. Please try using Chrome or Edge browser.");
     };
     img.onload = function() {

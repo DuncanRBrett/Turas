@@ -67,6 +67,43 @@ The config file requires two sheets:
 | tracker | Brand Tracker | path/to/tracker.html | tracker |
 | tabs | Crosstabs | path/to/tabs.html | tabs |
 
+**Slides sheet** (optional — one row per qualitative slide):
+| slide_title | content | display_order | image_path |
+|-------------|---------|---------------|------------|
+| Intro | Title slide content | 1 | path/to/intro.jpg |
+| Methodology | Method description... | 2 | |
+| Grid | | 3 | path/to/grid.png |
+
+- `slide_title` (required): Displayed as the slide heading
+- `content` (optional if `image_path` provided): Markdown-formatted text rendered on the slide. If both content and image_path are empty, the slide is skipped.
+- `display_order` (required): Numeric sort order
+- `image_path` (optional): Path to an image file (PNG, JPG/JPEG, or SVG). Can be absolute or relative to the config file directory.
+
+### Slide Image Handling
+
+Images specified via `image_path` are automatically **compressed and base64-embedded** into the self-contained HTML — no external links or dependencies.
+
+**Compression pipeline:**
+1. Images wider than **800px** are downscaled (bilinear interpolation) to 800px width, preserving aspect ratio
+2. PNG and JPEG images are re-encoded as **JPEG at 0.85 quality**
+3. SVG images pass through as-is (already lightweight vector format)
+4. The compressed image is base64-encoded and embedded directly in the HTML
+
+**Rough compression guide:**
+
+| Original | Dimensions | After resize + JPEG 0.85 |
+|----------|-----------|--------------------------|
+| 5MB PNG, 3000x2000 | 800x533 | ~40-80KB |
+| 5MB PNG, 1200x800 | 800x533 | ~50-100KB |
+| 5MB JPEG, 4000x3000 | 800x600 | ~30-60KB |
+| 5MB JPEG, 800x600 (already <=800) | No resize | ~80-150KB |
+
+Base64 encoding adds ~33% to the byte size in the HTML file. A typical slide image adds **65-200KB** to the output file.
+
+**Manual image uploads** (via the image button in the report UI) are also compressed client-side: resized to max 800px wide, JPEG 0.7 quality, with a 5MB file size guard.
+
+**Requirements:** The `png`, `jpeg`, and `base64enc` R packages must be available for image compression. If unavailable, images are embedded at their original size as a fallback (larger file size but still functional).
+
 ## File Structure
 
 ```
@@ -117,4 +154,6 @@ testthat::test_dir("modules/report_hub/tests/testthat")
 - `openxlsx` — Excel config reading
 - `htmltools` — HTML escaping
 - `jsonlite` — JSON serialization for pinned data
-- `base64enc` — Logo image encoding
+- `base64enc` — Logo and slide image encoding
+- `png` — PNG image reading (for slide image compression)
+- `jpeg` — JPEG image reading/writing (for slide image compression)

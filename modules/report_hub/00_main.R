@@ -7,9 +7,21 @@
 # Test with jpeg/png since these are needed for image compression and less
 # likely to be pre-loaded by Shiny compared to base64enc
 renv_activate <- file.path("renv", "activate.R")
-if (file.exists(renv_activate) &&
-    (!requireNamespace("jpeg", quietly = TRUE) || !requireNamespace("png", quietly = TRUE))) {
+has_jpeg <- requireNamespace("jpeg", quietly = TRUE)
+has_png <- requireNamespace("png", quietly = TRUE)
+cat(sprintf("  [report_hub] Package check: jpeg=%s, png=%s, renv_exists=%s\n",
+            has_jpeg, has_png, file.exists(renv_activate)))
+if (file.exists(renv_activate) && (!has_jpeg || !has_png)) {
+  cat("  [report_hub] Activating renv for image packages...\n")
   source(renv_activate)
+  # Verify packages are now available
+  has_jpeg2 <- requireNamespace("jpeg", quietly = TRUE)
+  has_png2 <- requireNamespace("png", quietly = TRUE)
+  cat(sprintf("  [report_hub] After renv: jpeg=%s, png=%s\n", has_jpeg2, has_png2))
+  if (!has_jpeg2 || !has_png2) {
+    cat("  [report_hub] WARNING: jpeg/png still not available after renv activation.\n")
+    cat("  [report_hub] .libPaths():", paste(.libPaths(), collapse = ", "), "\n")
+  }
 }
 
 # Source module files

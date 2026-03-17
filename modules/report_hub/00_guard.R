@@ -599,9 +599,16 @@
     } else if (nrow(slides_df) > 0) {
       # Coerce display_order to numeric
       slides_df$display_order <- suppressWarnings(as.numeric(slides_df$display_order))
-      # Remove rows with missing title or content
-      valid_slides <- !is.na(slides_df$slide_title) & nzchar(trimws(slides_df$slide_title)) &
-                      !is.na(slides_df$content) & nzchar(trimws(slides_df$content))
+      # Remove rows with missing title; content OR image_path must be present
+      has_title <- !is.na(slides_df$slide_title) & nzchar(trimws(slides_df$slide_title))
+      has_content <- !is.na(slides_df$content) & nzchar(trimws(slides_df$content))
+      has_image <- if ("image_path" %in% names(slides_df)) {
+        !is.na(slides_df$image_path) & nzchar(trimws(slides_df$image_path)) &
+          trimws(slides_df$image_path) != "NA"
+      } else {
+        rep(FALSE, nrow(slides_df))
+      }
+      valid_slides <- has_title & (has_content | has_image)
       slides_df <- slides_df[valid_slides, , drop = FALSE]
       if (nrow(slides_df) > 0) {
         # Sort by display_order
@@ -610,10 +617,16 @@
         has_image_col <- "image_path" %in% names(slides_df)
         config_dir <- dirname(config_file)
         slides <- lapply(seq_len(nrow(slides_df)), function(i) {
+          raw_content <- slides_df$content[i]
+          content_val <- if (is.na(raw_content) || !nzchar(trimws(raw_content))) {
+            ""
+          } else {
+            trimws(.clean_openxml_escapes(raw_content))
+          }
           slide <- list(
             id = sprintf("hub-slide-%d", i),
             title = trimws(.clean_openxml_escapes(slides_df$slide_title[i])),
-            content = trimws(.clean_openxml_escapes(slides_df$content[i])),
+            content = content_val,
             order = slides_df$display_order[i]
           )
           # Resolve and encode image if image_path column exists and has a value
