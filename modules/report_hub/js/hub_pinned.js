@@ -650,17 +650,42 @@
   ReportHub.handleHubSlideImage = function(slideId, inputEl) {
     var file = inputEl.files && inputEl.files[0];
     if (!file) return;
+
+    // File size guard (5MB raw)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image too large (" + (file.size / 1024 / 1024).toFixed(1) + "MB). Maximum is 5MB.");
+      inputEl.value = "";
+      return;
+    }
+
     var reader = new FileReader();
     reader.onload = function(e) {
-      var dataUrl = e.target.result;
-      var card = document.querySelector('.hub-slide-card[data-slide-id="' + slideId + '"]');
-      if (!card) return;
-      var preview = card.querySelector(".hub-slide-img-preview");
-      var thumb = card.querySelector(".hub-slide-img-thumb");
-      var store = card.querySelector(".hub-slide-img-store");
-      if (thumb) thumb.src = dataUrl;
-      if (preview) preview.style.display = "";
-      if (store) store.value = dataUrl;
+      var img = new Image();
+      img.onerror = function() { /* invalid image data — silently skip */ };
+      img.onload = function() {
+        // Resize to max 800px on longest side + recompress as JPEG 0.7
+        var maxDim = 800;
+        var w = img.width, h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+          else { w = Math.round(w * maxDim / h); h = maxDim; }
+        }
+        var canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        var dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+
+        var card = document.querySelector('.hub-slide-card[data-slide-id="' + slideId + '"]');
+        if (!card) return;
+        var preview = card.querySelector(".hub-slide-img-preview");
+        var thumb = card.querySelector(".hub-slide-img-thumb");
+        var store = card.querySelector(".hub-slide-img-store");
+        if (thumb) thumb.src = dataUrl;
+        if (preview) preview.style.display = "";
+        if (store) store.value = dataUrl;
+      };
+      img.src = e.target.result;
     };
     reader.readAsDataURL(file);
     // Reset file input so the same file can be re-selected

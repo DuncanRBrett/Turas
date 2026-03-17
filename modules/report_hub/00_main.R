@@ -4,8 +4,11 @@
 #' Entry point: combine_reports()
 
 # Ensure renv library is available (Shiny subprocess may skip renv activation)
+# Test with jpeg/png since these are needed for image compression and less
+# likely to be pre-loaded by Shiny compared to base64enc
 renv_activate <- file.path("renv", "activate.R")
-if (file.exists(renv_activate) && !requireNamespace("base64enc", quietly = TRUE)) {
+if (file.exists(renv_activate) &&
+    (!requireNamespace("jpeg", quietly = TRUE) || !requireNamespace("png", quietly = TRUE))) {
   source(renv_activate)
 }
 
