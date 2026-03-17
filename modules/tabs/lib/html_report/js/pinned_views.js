@@ -1441,7 +1441,13 @@ function pinSigCard(sigId) {
 function pinVisibleSigFindings() {
   var section = document.getElementById("dash-sec-sig-findings");
   if (!section) return;
-  var visible = section.querySelectorAll(".dash-sig-card:not(.sig-hidden)");
+  var allVisible = section.querySelectorAll(".dash-sig-card:not(.sig-hidden)");
+  if (allVisible.length === 0) return;
+
+  // Respect segment filter: exclude cards hidden by display:none
+  var visible = Array.from(allVisible).filter(function(card) {
+    return card.style.display !== "none";
+  });
   if (visible.length === 0) return;
 
   var wrapper = document.createElement("div");
@@ -1505,13 +1511,43 @@ function hydrateSigCardStates() {
 }
 
 /**
+ * Filter significant finding cards by banner group (segment).
+ * Called from the segment filter dropdown onchange handler.
+ */
+function filterSigBySegment(segment) {
+  var cards = document.querySelectorAll(".dash-sig-card");
+  var visibleCount = 0;
+
+  for (var i = 0; i < cards.length; i++) {
+    var card = cards[i];
+    var cardSeg = card.getAttribute("data-segment");
+    if (segment === "all" || cardSeg === segment) {
+      card.style.display = "";
+      visibleCount++;
+    } else {
+      card.style.display = "none";
+    }
+  }
+
+  // Show/hide empty message
+  var emptyMsg = document.getElementById("sig-filter-empty");
+  if (emptyMsg) {
+    emptyMsg.style.display = visibleCount === 0 ? "" : "none";
+  }
+}
+
+/**
  * Export the Significant Findings section as a PNG slide.
  * Reuses the exportDashboardSlide infrastructure but adapted for sig cards.
  */
 function exportSigFindingsSlide() {
   var section = document.getElementById("dash-sec-sig-findings");
   if (!section) return;
-  var cards = section.querySelectorAll(".dash-sig-card");
+  // Respect segment filter: only export visible cards
+  var allCards = section.querySelectorAll(".dash-sig-card");
+  var cards = Array.from(allCards).filter(function(card) {
+    return card.style.display !== "none" && !card.classList.contains("sig-hidden");
+  });
   if (cards.length === 0) { alert("No significant findings to export."); return; }
 
   // Read metadata

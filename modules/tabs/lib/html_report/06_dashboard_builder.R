@@ -966,6 +966,7 @@ build_sig_findings_section <- function(sig_findings, brand_colour) {
     htmltools::tags$div(
       class = "dash-sig-card",
       `data-sig-id` = sig_id,
+      `data-segment` = f$banner_group %||% "",
       # Action bar: toggle visibility + pin individual finding
       htmltools::tags$div(
         class = "sig-card-actions",
@@ -1001,6 +1002,18 @@ build_sig_findings_section <- function(sig_findings, brand_colour) {
     )
   })
 
+  # Build segment filter dropdown from unique banner groups
+  all_segments <- unique(vapply(sig_findings, function(f) f$banner_group %||% "", character(1)))
+  all_segments <- all_segments[nzchar(all_segments)]
+  seg_filter_options <- list(
+    htmltools::tags$option(value = "all", "All Segments")
+  )
+  for (seg in all_segments) {
+    seg_filter_options <- c(seg_filter_options, list(
+      htmltools::tags$option(value = seg, seg)
+    ))
+  }
+
   htmltools::tags$div(
     class = "dash-section",
     id = "dash-sec-sig-findings",
@@ -1022,7 +1035,23 @@ build_sig_findings_section <- function(sig_findings, brand_colour) {
     htmltools::tags$div(class = "dash-section-sub",
       "Columns significantly higher than others on headline metrics. Click the eye to hide, pin to save individual findings."
     ),
-    htmltools::tags$div(class = "dash-sig-grid", cards),
+    # Segment filter dropdown
+    if (length(all_segments) > 1) {
+      htmltools::tags$div(class = "sig-segment-filter",
+        htmltools::tags$label(class = "sig-filter-label", "FILTER BY SEGMENT:"),
+        htmltools::tags$select(
+          class = "sig-filter-select",
+          id = "sig-segment-filter",
+          onchange = "filterSigBySegment(this.value)",
+          seg_filter_options
+        )
+      )
+    },
+    htmltools::tags$div(class = "dash-sig-grid", id = "sig-cards-grid", cards),
+    # Empty state message when segment filter yields no results
+    htmltools::tags$div(class = "sig-filter-empty", id = "sig-filter-empty",
+      "No significant findings for this segment."
+    ),
     # State store for toggle visibility persistence
     htmltools::tags$script(type = "application/json", id = "sig-card-states", "{}")
   )

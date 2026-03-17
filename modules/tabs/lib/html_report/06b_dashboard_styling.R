@@ -302,6 +302,28 @@ build_dashboard_css <- function(brand_colour) {
     }
     .dash-hm-na { color: #cbd5e1; }
 
+    /* === SEGMENT FILTER === */
+    .sig-segment-filter {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 12px;
+    }
+    .sig-filter-label {
+      font-size: 11px; font-weight: 700; color: #64748b;
+      letter-spacing: 0.5px; text-transform: uppercase;
+    }
+    .sig-filter-select {
+      font-size: 13px; padding: 6px 12px; border: 1px solid #e2e8f0;
+      border-radius: 6px; background: #fff; color: #1e293b;
+      cursor: pointer; outline: none; min-width: 160px;
+    }
+    .sig-filter-select:focus { border-color: #94a3b8; }
+    .sig-filter-empty {
+      padding: 16px 20px; font-size: 13px; color: #94a3b8;
+      font-style: italic; text-align: center;
+      background: #f8fafc; border-radius: 8px; border: 1px dashed #e2e8f0;
+      display: none;
+    }
+
     /* === SIGNIFICANT FINDINGS === */
     .dash-sig-grid {
       display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
