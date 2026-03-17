@@ -246,13 +246,18 @@ function renderPinnedCards() {
       html += "</div>";
     }
 
-    // Chart (if captured and was visible)
-    if (pin.chartSvg && pin.chartVisible !== false) {
+    // Respect pinMode: "all" (default), "chart_insight", "table_insight", "chart", "table"
+    var cardMode = pin.pinMode || "all";
+    var cardShowChart = (cardMode === "all" || cardMode === "chart_insight" || cardMode === "chart");
+    var cardShowTable = (cardMode === "all" || cardMode === "table_insight" || cardMode === "table");
+
+    // Chart (if captured and mode includes chart)
+    if (cardShowChart && pin.chartSvg && pin.chartVisible !== false) {
       html += "<div class=\"pinned-card-chart\">" + pin.chartSvg + "</div>";
     }
 
-    // Table
-    if (pin.tableHtml) {
+    // Table (if mode includes table)
+    if (cardShowTable && pin.tableHtml) {
       html += "<div class=\"pinned-card-body\">" + pin.tableHtml + "</div>";
     }
 
@@ -695,14 +700,19 @@ function exportPinnedCardPNG(pinId) {
     imageDisplayH = imageRenderH + 8;
   }
 
-  // ---- 4. Chart dimensions ----
+  // Respect pinMode: "all" (default), "chart_insight", "table_insight", "chart", "table"
+  var expMode = pin.pinMode || "all";
+  var expShowChart = (expMode === "all" || expMode === "chart_insight" || expMode === "chart");
+  var expShowTable = (expMode === "all" || expMode === "table_insight" || expMode === "table");
+
+  // ---- 4. Chart dimensions ---- (only if mode includes chart)
   var chartTopY = imageTopY + imageDisplayH + (imageDisplayH > 0 ? 8 : 0);
   var chartDisplayH = 0;
   var chartClone = null;
   var chartScale = 1;
 
   var legendItems = []; // {colour, label} for legend below chart
-  if (pin.chartSvg && pin.chartVisible !== false) {
+  if (expShowChart && pin.chartSvg && pin.chartVisible !== false) {
     var chartTempDiv = document.createElement("div");
     chartTempDiv.innerHTML = pin.chartSvg;
     var svgEl = chartTempDiv.querySelector("svg");
@@ -740,12 +750,12 @@ function exportPinnedCardPNG(pinId) {
     }
   }
 
-  // ---- 5. Table dimensions ----
+  // ---- 5. Table dimensions ---- (only if mode includes table)
   var tableTopY = chartTopY + chartDisplayH + (chartDisplayH > 0 ? 8 : 0);
   var tableData = null;
   var estimatedTableH = 0;
 
-  if (pin.tableHtml) {
+  if (expShowTable && pin.tableHtml) {
     tableData = extractPinTableData(pin.tableHtml);
     if (tableData && tableData.length > 0) {
       // Estimate: header 26px + data rows 22px each

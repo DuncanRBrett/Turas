@@ -492,11 +492,16 @@ function exportPinnedCardPNG(pinId) {
     imageH = Math.round(pin.imageHeight * imgScale);
   }
 
-  // 3. Chart dimensions (full width)
+  // Respect pinMode: "all" (default), "chart_insight", "table_insight"
+  var pngMode = pin.pinMode || "all";
+  var pngShowTable = (pngMode === "all" || pngMode === "table_insight");
+  var pngShowChart = (pngMode === "all" || pngMode === "chart_insight");
+
+  // 3. Chart dimensions (full width) — only if mode includes chart
   var chartTopY = imageTopY + imageH + (imageH > 0 ? 8 : 0);
   var chartH = 0, hasChart = false;
   var chartTemp = null;
-  if (pin.chartSvg) {
+  if (pngShowChart && pin.chartSvg) {
     var tempDiv = document.createElement("div");
     tempDiv.innerHTML = pin.chartSvg;
     chartTemp = tempDiv.querySelector("svg");
@@ -511,10 +516,10 @@ function exportPinnedCardPNG(pinId) {
     }
   }
 
-  // 4. Table dimensions (full width)
+  // 4. Table dimensions (full width) — only if mode includes table
   var tableTopY = chartTopY + chartH + (chartH > 0 ? 8 : 0);
   var tableH = 0;
-  if (pin.tableHtml) {
+  if (pngShowTable && pin.tableHtml) {
     var countRows = (pin.tableHtml.match(/<tr/g) || []).length;
     tableH = countRows * 18 + 4;
   }
@@ -590,8 +595,8 @@ function exportPinnedCardPNG(pinId) {
     svg.appendChild(svgImg);
   }
 
-  // 3. Chart
-  if (hasChart && chartTemp) {
+  // 3. Chart — respect pin mode
+  if (pngShowChart && hasChart && chartTemp) {
     var chartClone = chartTemp.cloneNode(true);
     var cvb = chartClone.getAttribute("viewBox").split(" ").map(Number);
     var cScale2 = usableW / cvb[2];
@@ -601,8 +606,8 @@ function exportPinnedCardPNG(pinId) {
     svg.appendChild(cG);
   }
 
-  // 4. Table
-  if (pin.tableHtml) {
+  // 4. Table — respect pin mode
+  if (pngShowTable && pin.tableHtml) {
     var tDiv = document.createElement("div");
     tDiv.innerHTML = pin.tableHtml;
     var tRows = extractSlideTableData({
@@ -686,10 +691,15 @@ function copyPinnedCardToClipboard(pinId) {
     imageH = Math.round(pin.imageHeight * imgScale);
   }
 
+  // Respect pinMode: "all" (default), "chart_insight", "table_insight"
+  var clipMode = pin.pinMode || "all";
+  var clipShowTable = (clipMode === "all" || clipMode === "table_insight");
+  var clipShowChart = (clipMode === "all" || clipMode === "chart_insight");
+
   var chartTopY = imageTopY + imageH + (imageH > 0 ? 8 : 0);
   var chartH = 0, hasChart = false;
   var chartTemp = null;
-  if (pin.chartSvg) {
+  if (clipShowChart && pin.chartSvg) {
     var tempDiv = document.createElement("div");
     tempDiv.innerHTML = pin.chartSvg;
     chartTemp = tempDiv.querySelector("svg");
@@ -706,7 +716,7 @@ function copyPinnedCardToClipboard(pinId) {
 
   var tableTopY = chartTopY + chartH + (chartH > 0 ? 8 : 0);
   var tableH = 0;
-  if (pin.tableHtml) {
+  if (clipShowTable && pin.tableHtml) {
     var countRows = (pin.tableHtml.match(/<tr/g) || []).length;
     tableH = countRows * 18 + 4;
   }
@@ -782,7 +792,8 @@ function copyPinnedCardToClipboard(pinId) {
     svg.appendChild(svgImg);
   }
 
-  if (hasChart && chartTemp) {
+  // Chart — respect pin mode
+  if (clipShowChart && hasChart && chartTemp) {
     var chartClone = chartTemp.cloneNode(true);
     var cvb = chartClone.getAttribute("viewBox").split(" ").map(Number);
     var cScale2 = usableW / cvb[2];
@@ -792,7 +803,8 @@ function copyPinnedCardToClipboard(pinId) {
     svg.appendChild(cG);
   }
 
-  if (pin.tableHtml) {
+  // Table — respect pin mode
+  if (clipShowTable && pin.tableHtml) {
     var tDiv = document.createElement("div");
     tDiv.innerHTML = pin.tableHtml;
     var tRows = extractSlideTableData({
@@ -900,11 +912,16 @@ function exportAllPinnedSlides() {
       imageH = Math.round(pin.imageHeight * imgScale);
     }
 
-    // 3. Chart dimensions (full width)
+    // Respect pinMode: "all" (default), "chart_insight", "table_insight"
+    var slideMode = pin.pinMode || "all";
+    var slideShowTable = (slideMode === "all" || slideMode === "table_insight");
+    var slideShowChart = (slideMode === "all" || slideMode === "chart_insight");
+
+    // 3. Chart dimensions (full width) — only if mode includes chart
     var chartTopY = imageTopY + imageH + (imageH > 0 ? 8 : 0);
     var chartH = 0, hasChart = false;
     var chartTemp = null;
-    if (pin.chartSvg) {
+    if (slideShowChart && pin.chartSvg) {
       var tempDiv = document.createElement("div");
       tempDiv.innerHTML = pin.chartSvg;
       chartTemp = tempDiv.querySelector("svg");
@@ -919,10 +936,10 @@ function exportAllPinnedSlides() {
       }
     }
 
-    // 4. Table dimensions (full width)
+    // 4. Table dimensions (full width) — only if mode includes table
     var tableTopY = chartTopY + chartH + (chartH > 0 ? 8 : 0);
     var tableH = 0;
-    if (pin.tableHtml) {
+    if (slideShowTable && pin.tableHtml) {
       var countRows = (pin.tableHtml.match(/<tr/g) || []).length;
       tableH = countRows * 18 + 4;
     }
@@ -1001,8 +1018,8 @@ function exportAllPinnedSlides() {
       svg.appendChild(svgImg);
     }
 
-    // 3. Chart (full width — visual pattern)
-    if (hasChart && chartTemp) {
+    // 3. Chart (full width — visual pattern) — respect pin mode
+    if (slideShowChart && hasChart && chartTemp) {
       var chartClone = chartTemp.cloneNode(true);
       var cvb = chartClone.getAttribute("viewBox").split(" ").map(Number);
       var cScale2 = usableW / cvb[2];
@@ -1012,8 +1029,8 @@ function exportAllPinnedSlides() {
       svg.appendChild(cG);
     }
 
-    // 4. Table (full width — detailed reference)
-    if (pin.tableHtml) {
+    // 4. Table (full width — detailed reference) — respect pin mode
+    if (slideShowTable && pin.tableHtml) {
       var tDiv = document.createElement("div");
       tDiv.innerHTML = pin.tableHtml;
       var tRows = extractSlideTableData({ querySelector: function(sel) { return tDiv.querySelector(sel); }, querySelectorAll: function(sel) { return tDiv.querySelectorAll(sel); } });
@@ -1196,6 +1213,11 @@ function printPinnedViews() {
     }
     page.appendChild(hdr);
 
+    // Respect pinMode: "all" (default), "chart_insight", "table_insight"
+    var printMode = pin.pinMode || "all";
+    var printShowTable = (printMode === "all" || printMode === "table_insight");
+    var printShowChart = (printMode === "all" || printMode === "chart_insight");
+
     // Content: stacked — insight, chart, table
     // Insight first (the "so what")
     if (pin.insightText) {
@@ -1223,16 +1245,16 @@ function printPinnedViews() {
       page.appendChild(imgDiv);
     }
 
-    // Chart (visual pattern)
-    if (pin.chartSvg) {
+    // Chart (visual pattern) — respect pin mode
+    if (printShowChart && pin.chartSvg) {
       var chartDiv = document.createElement("div");
       chartDiv.className = "pinned-print-chart";
       chartDiv.innerHTML = pin.chartSvg;
       page.appendChild(chartDiv);
     }
 
-    // Table (detailed reference)
-    if (pin.tableHtml) {
+    // Table (detailed reference) — respect pin mode
+    if (printShowTable && pin.tableHtml) {
       var tableDiv = document.createElement("div");
       tableDiv.className = "pinned-print-table";
       tableDiv.innerHTML = pin.tableHtml;
