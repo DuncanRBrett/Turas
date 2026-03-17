@@ -450,6 +450,7 @@ check_cell_combinations_vs_data <- function(cell_df, data, error_log) {
 #' @return Updated error_log
 #' @keywords internal
 check_trim_config_consistency <- function(specs_df, error_log) {
+  if (!"apply_trimming" %in% names(specs_df)) return(error_log)
   for (i in seq_len(nrow(specs_df))) {
     wname <- as.character(specs_df$weight_name[i])
     apply_trim <- toupper(trimws(as.character(specs_df$apply_trimming[i])))

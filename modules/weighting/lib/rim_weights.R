@@ -307,7 +307,11 @@ calculate_rim_weights <- function(data,
       } else if (col_name_syntactic %in% names(population)) {
         population[col_name_syntactic] <- target_props[level] * base_n
       }
-      # If neither found, it's likely the reference level (omitted from model matrix)
+      # If neither found, it's the reference level (omitted from model matrix).
+      # Its target is implicitly satisfied via the intercept constraint.
+      if (verbose) {
+        message(sprintf("  Note: '%s=%s' is the reference level — target implied by intercept.", var, level))
+      }
     }
   }
 

@@ -118,6 +118,9 @@ write_weighted_data <- function(data, output_file, verbose = TRUE) {
 
     return(invisible(output_file))
 
+  }, turas_refusal = function(e) {
+    # Re-signal TRS refusals with their original code (don't wrap in generic IO error)
+    stop(e)
   }, error = function(e) {
     weighting_refuse(
       code = "IO_WRITE_FAILED",
@@ -689,6 +692,9 @@ generate_weighting_report <- function(weighting_results, output_file,
 
     return(invisible(output_file))
 
+  }, turas_refusal = function(e) {
+    # Re-signal TRS refusals with their original code (don't wrap in generic IO error)
+    stop(e)
   }, error = function(e) {
     weighting_refuse(
       code = "IO_DIAGNOSTICS_WRITE_FAILED",

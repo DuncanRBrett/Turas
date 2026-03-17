@@ -62,9 +62,7 @@ test_that("check_weight_specs_methods passes with valid single-method config", {
   available_sheets <- c("General", "Weight_Specifications", "Rim_Targets")
   error_log <- NULL
   result <- check_weight_specs_methods(specs, available_sheets, error_log)
-  if (!is.null(result) && nrow(result) > 0) {
-    expect_equal(sum(result$Severity == "Error"), 0)
-  }
+  expect_true(is.null(result) || nrow(result) == 0 || sum(result$Severity == "Error") == 0)
 })
 
 # --- Check: Rim targets sum ---
@@ -99,9 +97,7 @@ test_that("check_rim_targets_sum passes with correct sum", {
   )
   error_log <- NULL
   result <- check_rim_targets_sum(rim_df, error_log)
-  if (!is.null(result) && nrow(result) > 0) {
-    expect_equal(sum(result$Severity == "Error"), 0)
-  }
+  expect_true(is.null(result) || nrow(result) == 0 || sum(result$Severity == "Error") == 0)
 })
 
 # --- Check: Cell combinations vs data (dynamic columns) ---
@@ -168,9 +164,7 @@ test_that("check_cell_combinations_vs_data passes with valid data", {
   )
   error_log <- NULL
   result <- check_cell_combinations_vs_data(cell_df, data, error_log)
-  if (!is.null(result) && nrow(result) > 0) {
-    expect_equal(sum(result$Severity == "Error"), 0)
-  }
+  expect_true(is.null(result) || nrow(result) == 0 || sum(result$Severity == "Error") == 0)
 })
 
 # --- Check: Cell targets sum ---
@@ -238,9 +232,7 @@ test_that("check_duplicate_weight_names passes with unique names", {
   )
   error_log <- NULL
   result <- check_duplicate_weight_names(specs, error_log)
-  if (!is.null(result)) {
-    expect_equal(nrow(result), 0)
-  }
+  expect_true(is.null(result) || nrow(result) == 0)
 })
 
 # --- Check: Colour codes ---
@@ -263,9 +255,7 @@ test_that("check_colour_codes passes with valid hex", {
   config <- list(brand_colour = "#1e3a5f", accent_colour = "#2aa198")
   error_log <- NULL
   result <- check_colour_codes(config, error_log)
-  if (!is.null(result)) {
-    expect_equal(nrow(result), 0)
-  }
+  expect_true(is.null(result) || nrow(result) == 0)
 })
 
 # --- Orchestrator ---
