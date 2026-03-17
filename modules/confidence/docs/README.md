@@ -79,10 +79,20 @@ run_confidence_analysis(
 -   R 4.0+ (R 4.2+ recommended)
 -   RStudio (optional but recommended)
 
-### R Packages
+### R Packages (with minimum tested versions)
+
+| Package      | Min Version | Purpose                              |
+|--------------|-------------|--------------------------------------|
+| readxl       | 1.4.3       | Read Excel config and data files     |
+| openxlsx     | 4.2.5       | Write formatted Excel output         |
+| data.table   | 1.14.8      | Fast CSV loading (optional)          |
+| testthat     | 3.1.0       | Unit testing framework (dev only)    |
+| future       | 1.33.0      | Parallel bootstrap (optional)        |
+| future.apply | 1.11.0      | Parallel bootstrap (optional)        |
 
 ``` r
 install.packages(c("readxl", "openxlsx", "data.table"))
+# Optional (for parallel bootstrap): install.packages(c("future", "future.apply"))
 ```
 
 ------------------------------------------------------------------------
@@ -126,6 +136,20 @@ your declared sampling method.
 
 ## Version History
 
+### v10.3 (March 2026)
+
+-   **Subset question support:** New `Filter_Variable` and
+    `Filter_Values` columns in Question_Analysis allow confidence
+    intervals on routed/filtered sub-samples with automatic
+    base-size callouts in HTML report
+-   **Bug fixes:** Fixed switch fallback in sampling_labels.R for
+    unrecognised methods; fixed type-safety in ci_dispatcher prior
+    extraction; fixed type alignment in proportion stats matching
+-   **Validation:** Relaxed confidence level validation to accept
+    any value in (0,1), not just 0.90/0.95/0.99
+-   **Documentation:** Package versions listed; subset filtering
+    guide added to USER_MANUAL
+
 ### v10.2 (March 2026)
 
 -   **HTML Report:** Self-contained interactive HTML report with
@@ -138,7 +162,7 @@ your declared sampling method.
 -   **Wilson Fix:** Fixed `Run_Wilson` column name mismatch that
     silently prevented Wilson score intervals from being calculated
 -   **Expanded Tests:** New test files for CI dispatcher, mean CI,
-    and study-level calculations; 596 tests passing
+    and study-level calculations
 
 ### v10.1 (December 2025)
 

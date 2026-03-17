@@ -313,14 +313,17 @@ apply.
 
 ### Optional Columns
 
-| Column          | Description                                  |
-|-----------------|----------------------------------------------|
-| Prior_Mean      | Bayesian prior mean                          |
-| Prior_SD        | Bayesian prior SD (for means only)           |
-| Prior_N         | Bayesian prior sample size                   |
-| Promoter_Codes  | NPS promoter codes (default: 9,10)           |
-| Detractor_Codes | NPS detractor codes (default: 0,1,2,3,4,5,6) |
-| Notes           | Documentation (not processed)                |
+| Column          | Description                                           |
+|-----------------|-------------------------------------------------------|
+| Question_Label  | Human-readable label shown in HTML report             |
+| Filter_Variable | Column name to filter on (for subset questions)       |
+| Filter_Values   | Comma-separated values to include (for subset filter) |
+| Prior_Mean      | Bayesian prior mean                                   |
+| Prior_SD        | Bayesian prior SD (for means only)                    |
+| Prior_N         | Bayesian prior sample size                            |
+| Promoter_Codes  | NPS promoter codes (default: 9,10)                    |
+| Detractor_Codes | NPS detractor codes (default: 0,1,2,3,4,5,6)         |
+| Notes           | Documentation (not processed)                         |
 
 ### Column Details
 
@@ -373,6 +376,38 @@ for means or NPS will cause an error.
 | Prior_Mean | 0 to 1 (e.g., 0.45 for 45%) | Any number on scale              |
 | Prior_SD   | Not used                    | Required if Prior_Mean specified |
 | Prior_N    | Effective prior sample size | Effective prior sample size      |
+
+#### Subset Filtering (Filter_Variable / Filter_Values)
+
+Use these columns when a question was only answered by a subset
+of respondents (e.g., due to survey routing or skip logic).
+
+| Parameter       | Description                                        |
+|-----------------|----------------------------------------------------|
+| Filter_Variable | Column name in the data to filter on               |
+| Filter_Values   | Comma-separated values to include in the filter     |
+
+**Example:** If Q15 was only asked to respondents who selected
+"Yes" on Q14:
+
+| Question_ID | Filter_Variable | Filter_Values | ...other columns... |
+|-------------|-----------------|---------------|---------------------|
+| Q15         | Q14             | Yes           | ...                 |
+
+**Example:** If Q20 was only shown to respondents aged 18-34
+(Age_Group codes 1 and 2):
+
+| Question_ID | Filter_Variable | Filter_Values | ...other columns... |
+|-------------|-----------------|---------------|---------------------|
+| Q20         | Age_Group       | 1,2           | ...                 |
+
+**Important notes:**
+- The filter reduces the effective sample size, producing wider
+  intervals. The HTML report flags subset questions with a
+  warning callout showing the filtered base size.
+- If the filter yields zero respondents, the question is skipped
+  with a warning.
+- Leave both columns blank for full-sample questions.
 
 ------------------------------------------------------------------------
 
@@ -984,6 +1019,109 @@ confident the result is robust. When they disagree substantially:
 
 ------------------------------------------------------------------------
 
+## Sample Design and What It Means for Your Results
+
+### The Core Question: Can I Trust These Numbers?
+
+The answer depends on two things: **precision** (how wide are
+the intervals?) and **accuracy** (is the sample representative?).
+Confidence intervals only measure precision. A well-designed
+sample addresses accuracy.
+
+### How Different Sample Designs Affect Risk
+
+| Design | Precision Risk | Accuracy Risk | Practical Guidance |
+|---|---|---|---|
+| Random | Low (formula is exact) | Low if response rate is high | Gold standard; results are directly generalisable |
+| Stratified | Low to Moderate | Low | Often more precise than simple random; CIs may be conservative |
+| Cluster | **Moderate to High** | Moderate | CIs do NOT adjust for clustering and may be too narrow |
+| Quota | Moderate | Moderate if quotas well-matched | Not random, but structured quotas can mitigate bias |
+| Online Panel | Moderate | Variable | Panel quality varies; self-selection and coverage gaps exist |
+| Self-Selected | High | **High** | CIs are meaningful only as internal consistency checks |
+| Census | Low | Depends on response rate | 80%+ response is excellent; below 50% is problematic |
+
+### Quota Samples: A Realistic View
+
+Most commercial market research uses quota samples. These are
+not technically random, but a well-designed quota sample with
+demographic targets closely matched to the population can
+produce reliable results for most business decisions. The key
+risks are:
+
+1.  **Within-cell bias** — Even if age/gender quotas match the
+    population, respondents within each cell are not randomly
+    selected and may differ from non-respondents
+2.  **Coverage gaps** — Hard-to-reach groups (e.g., rural,
+    elderly, low-income) are often under-represented
+3.  **Attitudinal differences** — People who agree to take surveys
+    may hold different views from those who refuse
+
+The Turas HTML report uses "Stability Interval" (not "Confidence
+Interval") for non-probability designs to honestly communicate
+this distinction.
+
+### When Small Sub-Samples Arise
+
+Some questions are only asked to a subset of respondents (e.g.,
+product users, people who answered "Yes" to a filter question).
+These sub-samples can be much smaller than the full sample,
+leading to:
+
+-   Wider confidence intervals
+-   Higher sensitivity to outliers
+-   Greater risk that a few respondents dominate the result
+
+Use the `Filter_Variable` and `Filter_Values` columns in the
+Question_Analysis sheet to flag these questions. The module will
+calculate CIs on the filtered sub-sample and prominently flag
+the reduced base size in the HTML report.
+
+**Rule of thumb:** Sub-samples below n=100 should be interpreted
+with caution. Below n=30, treat results as directional only.
+
+------------------------------------------------------------------------
+
+## Primer: Significant Differences in Tabs and Tracker
+
+While the Confidence module focuses on individual question
+precision, the **Tabs** and **Tracker** modules test whether
+differences between groups or time periods are statistically
+significant. Here is a brief guide to how these connect:
+
+### Tabs: Comparing Groups
+
+The Tabs module applies column-proportion z-tests (for
+percentages) and independent t-tests (for means) to compare
+banner groups. A result marked with a significance letter (e.g.,
+"A") means that group's value is significantly higher than the
+group indicated by the letter, at the configured confidence level.
+
+**Connection to confidence intervals:** If two groups' confidence
+intervals do not overlap, the difference is almost certainly
+significant. If they do overlap, the difference may or may not
+be significant (overlapping CIs is a conservative test).
+
+### Tracker: Comparing Time Periods
+
+The Tracker module tests whether a metric has changed
+significantly between waves. It uses z-tests for proportions and
+t-tests for means, with optional trend analysis.
+
+**Connection to confidence intervals:** A change is significant
+when the current wave's estimate falls outside the previous
+wave's confidence interval (approximately). The Tracker module
+handles this formally using hypothesis tests.
+
+### Multiple Comparisons
+
+When testing many questions or many groups simultaneously, some
+"significant" results will be false positives. At 95% confidence,
+roughly 1 in 20 tests will show significance by chance alone.
+The Confidence module supports Bonferroni, Holm, and FDR
+adjustments to control this.
+
+------------------------------------------------------------------------
+
 **End of User Manual**
 
-*Turas Confidence Module v2.1.0* *Last Updated: March 2026*
+*Turas Confidence Module v10.3* *Last Updated: March 2026*

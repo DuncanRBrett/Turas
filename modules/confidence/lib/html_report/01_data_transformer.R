@@ -171,7 +171,11 @@ transform_proportion_question <- function(q_id, result, conf_level, global_n_eff
                                           conf_level, is_weighted, quality,
                                           methods_used, sampling_method)
 
-  list(
+  # Prepend subset warning if this is a filtered sub-sample question
+  subset_html <- build_subset_callout(result)
+  if (nzchar(subset_html)) callout <- paste0(subset_html, "\n", callout)
+
+  q_out <- list(
     type = "proportion",
     question_id = q_id,
     estimate = p,
@@ -184,8 +188,13 @@ transform_proportion_question <- function(q_id, result, conf_level, global_n_eff
     results = result,
     quality = quality,
     callout = callout,
-    methods_used = methods_used
+    methods_used = methods_used,
+    is_subset = isTRUE(result$is_subset),
+    subset_n = result$subset_n,
+    filter_variable = result$filter_variable,
+    filter_values = result$filter_values
   )
+  q_out
 }
 
 #' @keywords internal
@@ -222,7 +231,10 @@ transform_mean_question <- function(q_id, result, conf_level, global_n_eff,
                                     conf_level, is_weighted, quality,
                                     methods_used, sampling_method)
 
-  list(
+  subset_html <- build_subset_callout(result)
+  if (nzchar(subset_html)) callout <- paste0(subset_html, "\n", callout)
+
+  q_out <- list(
     type = "mean",
     question_id = q_id,
     estimate = mean_val,
@@ -235,8 +247,13 @@ transform_mean_question <- function(q_id, result, conf_level, global_n_eff,
     results = result,
     quality = quality,
     callout = callout,
-    methods_used = methods_used
+    methods_used = methods_used,
+    is_subset = isTRUE(result$is_subset),
+    subset_n = result$subset_n,
+    filter_variable = result$filter_variable,
+    filter_values = result$filter_values
   )
+  q_out
 }
 
 #' @keywords internal
@@ -273,7 +290,10 @@ transform_nps_question <- function(q_id, result, conf_level, global_n_eff,
                                    result$pct_promoters, result$pct_detractors,
                                    methods_used, sampling_method)
 
-  list(
+  subset_html <- build_subset_callout(result)
+  if (nzchar(subset_html)) callout <- paste0(subset_html, "\n", callout)
+
+  q_out <- list(
     type = "nps",
     question_id = q_id,
     estimate = nps_score,
@@ -286,8 +306,13 @@ transform_nps_question <- function(q_id, result, conf_level, global_n_eff,
     results = result,
     quality = quality,
     callout = callout,
-    methods_used = methods_used
+    methods_used = methods_used,
+    is_subset = isTRUE(result$is_subset),
+    subset_n = result$subset_n,
+    filter_variable = result$filter_variable,
+    filter_values = result$filter_values
   )
+  q_out
 }
 
 
@@ -354,6 +379,29 @@ assess_quality_mean <- function(n_eff, ci_width, sd_val, mean_val, result, label
 # ==============================================================================
 # CALLOUT TEXT GENERATORS (Plain English with assumption warnings)
 # ==============================================================================
+
+#' Build subset warning callout HTML
+#' @keywords internal
+build_subset_callout <- function(result) {
+  if (!isTRUE(result$is_subset)) return("")
+
+  filter_var <- result$filter_variable %||% "unknown"
+  filter_vals <- result$filter_values %||% "unknown"
+  subset_n <- result$subset_n %||% result$n %||% "unknown"
+
+  sprintf(
+    paste0(
+      '<div class="ci-callout ci-callout-warning">',
+      '<strong>Subset question.</strong> ',
+      'This question was answered by a filtered sub-sample (%s = %s, n&nbsp;=&nbsp;%s). ',
+      'The smaller base size means wider intervals and lower precision than full-sample questions. ',
+      'Interpret with additional caution, particularly if the sub-sample is small (n&nbsp;&lt;&nbsp;100).',
+      '</div>'
+    ),
+    filter_var, filter_vals, format(as.integer(subset_n), big.mark = ",")
+  )
+}
+
 
 #' Generate structured proportion callout (3 visual sections)
 #' @keywords internal

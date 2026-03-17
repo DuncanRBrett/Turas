@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Confidence Module - Technical Documentation
 
-**Version:** 10.2 **Last Updated:** March 2026 **Audience:**
+**Version:** 10.3 **Last Updated:** March 2026 **Audience:**
 Developers, Technical Maintainers
 
 ------------------------------------------------------------------------
@@ -59,11 +59,12 @@ modules/confidence/
 │   ├── 05_means.R              # Mean CI methods
 │   ├── 07_output.R             # Excel output generation
 │   ├── utils.R                 # Utility functions
+│   ├── sampling_labels.R       # Sampling method terminology (v10.3)
 │   ├── question_processor.R    # Shared question processing logic
 │   ├── ci_dispatcher.R         # CI calculation dispatch
 │   └── output_helpers.R        # Output building helpers
 ├── lib/                        # Supporting libraries
-│   └── html_report/            # HTML report generation (v10.2)
+│   └── html_report/            # HTML report generation (v10.3)
 │       ├── 99_html_report_main.R   # Entry point & orchestrator
 │       ├── 00_html_guard.R         # Input validation
 │       ├── 01_data_transformer.R   # Data transformation & callouts
@@ -73,19 +74,41 @@ modules/confidence/
 │       ├── 05_chart_builder.R      # SVG chart generation
 │       └── js/
 │           └── confidence_navigation.js  # Tab/question navigation
-├── tests/                      # Test suite
+├── scripts/                    # Config generators
+│   ├── generate_config_template.R  # Master template generator
+│   └── generate_demo_config.R      # Demo project config generator
+├── tests/                      # Test suite (10 files, ~3,500 lines)
 │   └── testthat/               # Unit & integration tests
 │       ├── setup.R
-│       ├── test_proportion_ci.R
-│       ├── test_mean_ci.R
+│       ├── test_bugfixes_v10_3.R   # v10.3 regression tests
 │       ├── test_ci_dispatcher.R
-│       ├── test_study_level.R
+│       ├── test_guard.R
 │       ├── test_html_report.R
-│       └── ...
+│       ├── test_mean_ci.R
+│       ├── test_proportion_ci.R
+│       ├── test_question_processor.R
+│       ├── test_sampling_labels.R
+│       ├── test_study_level.R
+│       └── test_utils.R
 ├── docs/                       # Documentation
 ├── run_confidence_gui.R        # Shiny GUI launcher
 └── examples/                   # Example configs and data
 ```
+
+### v10.3 Additions
+
+The v10.3 release added:
+
+- **`sampling_labels.R`**: Maps 8 sampling methods to appropriate terminology
+  (CI vs SI, MOE vs PE) for probability vs non-probability designs
+- **Subset filtering**: `Filter_Variable` and `Filter_Values` config columns
+  allow sub-sample analysis with automatic callout warnings
+- **`Question_Label`**: Optional human-readable label column in Question_Analysis
+- **Config generators**: `scripts/generate_config_template.R` and
+  `scripts/generate_demo_config.R` produce polished Excel configs with the
+  standard Turas colour scheme (pale peach/green/yellow/blue), data validation
+  dropdowns, legend rows, and section dividers
+- **`test_bugfixes_v10_3.R`**: 48 regression tests for all v10.3 changes
 
 ### Refactored Architecture (v10.1)
 
@@ -341,7 +364,7 @@ process_nps_question(q_row, survey_data, weight_var, config)
 **Version Constant:**
 
 ``` r
-MAIN_VERSION <- "10.1"
+MAIN_VERSION <- "10.3"
 ```
 
 ------------------------------------------------------------------------
@@ -485,10 +508,21 @@ config <- list(
 
   questions = data.frame(
     Question_ID = c("Q1", "Q2", ...),
+    Question_Label = c("Satisfaction", "NPS", ...),  # v10.3
     Statistic_Type = c("proportion", "mean", ...),
-    Categories = c("1,2", NA, ...),
     Run_MOE = c("Y", "Y", ...),
-    ...
+    Run_Wilson = c("N", "Y", ...),
+    Run_Bootstrap = c("Y", "N", ...),
+    Run_Credible = c("N", "N", ...),
+    Categories = c("1,2", NA, ...),
+    Promoter_Codes = c(NA, "9,10", ...),
+    Detractor_Codes = c(NA, "0,1,2,3,4,5,6", ...),
+    Prior_Mean = c(NA, NA, ...),
+    Prior_SD = c(NA, NA, ...),
+    Prior_N = c(NA, NA, ...),
+    Filter_Variable = c(NA, NA, ...),  # v10.3
+    Filter_Values = c(NA, NA, ...),    # v10.3
+    Notes = c("...", "...", ...)
   ),
 
   population_margins = data.frame(...)  # Optional
@@ -503,7 +537,8 @@ config <- list(
 | Bootstrap_Iterations  | 1000-10000       | 5000    |
 | Decimal_Separator     | "." or ","       | "."     |
 | Calculate_Effective_N | "Y" or "N"       | "Y"     |
-| Generate_HTML_Report  | "Y" or "N"       | "N"     |
+| Generate_HTML_Report  | "Y" or "N"       | "Y"     |
+| Max_Questions         | 1-1000           | 200     |
 | Brand_Colour          | Hex colour code  | "#1e3a5f" |
 | Accent_Colour         | Hex colour code  | "#2aa198" |
 | Sampling_Method       | See below        | "Not_Specified" |
@@ -927,7 +962,6 @@ list(
 
 -   Banner column support
 -   Multiple comparison adjustments
--   Subgroup analysis
 -   Trend analysis
 -   Interactive dashboard
 -   API mode
@@ -944,6 +978,40 @@ list(
 ------------------------------------------------------------------------
 
 ## Version History
+
+### v10.3 (March 2026) - Subset Filtering, Sampling Labels & Config Polish
+
+**New Features:**
+-   **Subset Filtering:** `Filter_Variable` and `Filter_Values` columns
+    in Question_Analysis allow sub-sample analysis. HTML report generates
+    automatic callout warnings with base size and caution notes.
+-   **Sampling Labels Module:** `sampling_labels.R` maps 8 sampling
+    methods to appropriate terminology (CI/SI, MOE/PE) for probability
+    vs non-probability designs. Used across Excel output and HTML report.
+-   **Question_Label:** Optional human-readable label column shown
+    alongside Question_ID in reports.
+-   **Config Generators:** `scripts/generate_config_template.R` and
+    `scripts/generate_demo_config.R` produce polished Excel configs with
+    the standard Turas colour scheme (pale peach required rows, pale
+    green optional rows, pale yellow input cells, pale blue description
+    columns with blue italic text), data validation dropdowns on all
+    constrained fields, legend rows, and section dividers.
+
+**Bug Fixes:**
+-   **Type coercion in proportion stats:** `calculate_proportion_stats()`
+    now coerces numeric values to match character category codes
+-   **safe_extract_numeric:** Handles character "NA" and empty strings
+    without error
+-   **validate_conf_level:** Accepts numeric strings (e.g. "0.95")
+-   **output_helpers:** Preserves FALSE/0 values instead of treating
+    them as missing
+-   **NPS bootstrap:** Correctly handles weighted bootstrap resampling
+-   **Bayesian priors:** Handles numeric, character, and empty prior
+    values gracefully
+
+**Testing:**
+-   New test file: `test_bugfixes_v10_3.R` (48 tests)
+-   Expanded from 596 to 844 passing tests (10 test files)
 
 ### v10.2 (March 2026) - HTML Report & Sampling Method
 
@@ -971,7 +1039,7 @@ list(
 **Testing:**
 -   New test files: `test_ci_dispatcher.R`, `test_mean_ci.R`,
     `test_study_level.R`, `test_html_report.R`
--   Expanded from ~300 to 596 passing tests
+-   Expanded from ~300 to 596 passing tests (pre-v10.3)
 
 ### v10.1 (December 2025) - Refactoring Release
 
@@ -1007,4 +1075,4 @@ list(
 
 **End of Technical Documentation**
 
-*Turas Confidence Module v10.2* *Last Updated: March 2026*
+*Turas Confidence Module v10.3* *Last Updated: March 2026*
