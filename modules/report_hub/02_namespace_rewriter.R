@@ -315,7 +315,9 @@ rewrite_html_onclick_conflicts <- function(html, report_key) {
     "exportAllPinnedSlides",
     "printPinnedViews",
     "exportPinnedCardPNG",
-    "toggleSlideMenu"
+    "toggleSlideMenu",
+    # --- Segment filter (tabs summary page) ---
+    "filterSigBySegment"
   )
 
   for (fn in conflict_fns) {
@@ -484,7 +486,9 @@ remove_save_print_buttons <- function(html) {
     "printPinnedViews",
     "exportPinnedCardPNG",
     "toggleSlideMenu",
-    "exportInsightsHTML"
+    "exportInsightsHTML",
+    # --- Segment filter (tabs summary page) ---
+    "filterSigBySegment"
   )
 }
 

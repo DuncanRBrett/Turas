@@ -3,6 +3,12 @@
 #' Combines multiple Turas HTML reports into a single unified report.
 #' Entry point: combine_reports()
 
+# Ensure renv library is available (Shiny subprocess may skip renv activation)
+renv_activate <- file.path("renv", "activate.R")
+if (file.exists(renv_activate) && !requireNamespace("base64enc", quietly = TRUE)) {
+  source(renv_activate)
+}
+
 # Source module files
 hub_dir <- file.path("modules", "report_hub")
 source(file.path(hub_dir, "00_guard.R"))

@@ -510,12 +510,16 @@
     // Re-render before pinning
     if (rendered && editor) rendered.innerHTML = hubRenderMarkdown(editor.value);
     // Capture slide image if present
+    // .value captures manual uploads; .textContent captures config-embedded images
     var imgStore = card.querySelector(".hub-slide-img-store");
-    var imageData = (imgStore && imgStore.textContent && imgStore.textContent.length > 0)
-      ? imgStore.textContent : null;
+    var imageData = null;
+    if (imgStore) {
+      var val = imgStore.value || imgStore.textContent || "";
+      if (val.length > 0) imageData = val;
+    }
     var pinObj = {
       id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
-      title: titleEl ? titleEl.textContent.trim() : "Slide",
+      title: titleEl ? (titleEl.value || titleEl.textContent || "").trim() || "Slide" : "Slide",
       sourceLabel: "Overview",
       insight: rendered ? rendered.innerHTML : "",
       imageData: imageData,
