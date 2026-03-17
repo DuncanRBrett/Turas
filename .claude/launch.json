@@ -30,6 +30,12 @@
       "runtimeExecutable": "/bin/bash",
       "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve '/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Projects/demo/waves/CCS-W4/output' -l 8785 --no-clipboard"],
       "port": 8785
+    },
+    {
+      "name": "ccpb-report",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve '/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Projects/CCPB/CCPB_CSAT/03_Waves/CSAT2025/04_Analysis/Crosstabs' -l 8790 --no-clipboard"],
+      "port": 8790
     }
   ]
 }

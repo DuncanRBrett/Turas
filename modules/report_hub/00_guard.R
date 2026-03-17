@@ -443,6 +443,82 @@
 }
 
 
+#' Encode and Compress a Slide Image to a Base64 Data URI
+#'
+#' Reads an image file (PNG, JPG, or SVG), downscales if wider than 800px,
+#' re-encodes as JPEG at 0.85 quality, and returns a data URI string.
+#' SVG files are passed through without re-encoding.
+#'
+#' @param image_path Absolute path to the image file
+#' @return A \code{data:image/...;base64,...} string, or NULL on failure
+#' @keywords internal
+.encode_slide_image <- function(image_path) {
+  ext <- tolower(tools::file_ext(image_path))
+
+  # SVG: pass through as-is (already lightweight vector format)
+  if (ext == "svg") {
+    raw_bytes <- readBin(image_path, "raw", file.info(image_path)$size)
+    b64 <- base64enc::base64encode(raw_bytes)
+    return(sprintf("data:image/svg+xml;base64,%s", b64))
+  }
+
+  # Read raster image
+  img <- tryCatch({
+    if (ext == "png") {
+      png::readPNG(image_path)
+    } else if (ext %in% c("jpg", "jpeg")) {
+      jpeg::readJPEG(image_path)
+    } else {
+      return(NULL)
+    }
+  }, error = function(e) NULL)
+  if (is.null(img)) return(NULL)
+
+  # Downscale if wider than 800px (bilinear via approx on each channel)
+  max_w <- 800
+  orig_h <- nrow(img)
+  orig_w <- ncol(img)
+  if (orig_w > max_w) {
+    scale <- max_w / orig_w
+    new_w <- max_w
+    new_h <- max(1L, round(orig_h * scale))
+    n_channels <- if (length(dim(img)) == 3) dim(img)[3] else 1L
+    if (n_channels == 1) {
+      # Greyscale
+      resized <- matrix(0, nrow = new_h, ncol = new_w)
+      for (row in seq_len(new_h)) {
+        src_row <- min(orig_h, max(1, round(row / scale)))
+        row_data <- img[src_row, ]
+        resized[row, ] <- approx(seq_len(orig_w), row_data, xout = seq(1, orig_w, length.out = new_w))$y
+      }
+      img <- resized
+    } else {
+      resized <- array(0, dim = c(new_h, new_w, n_channels))
+      for (ch in seq_len(n_channels)) {
+        for (row in seq_len(new_h)) {
+          src_row <- min(orig_h, max(1, round(row / scale)))
+          row_data <- img[src_row, , ch]
+          resized[row, , ch] <- approx(seq_len(orig_w), row_data, xout = seq(1, orig_w, length.out = new_w))$y
+        }
+      }
+      img <- resized
+    }
+  }
+
+  # Clamp values to [0, 1] (approx can produce slight overshoot)
+  img <- pmin(pmax(img, 0), 1)
+
+  # Encode as JPEG at 0.85 quality to a raw vector
+  raw_con <- rawConnection(raw(0), open = "wb")
+  on.exit(close(raw_con), add = TRUE)
+  jpeg::writeJPEG(img, raw_con, quality = 0.85)
+  jpeg_bytes <- rawConnectionValue(raw_con)
+
+  b64 <- base64enc::base64encode(jpeg_bytes)
+  sprintf("data:image/jpeg;base64,%s", b64)
+}
+
+
 #' Parse Optional Config Sheets (CrossRef, Slides)
 #'
 #' Reads the optional CrossRef and Slides sheets from the config file.
@@ -495,13 +571,44 @@
       if (nrow(slides_df) > 0) {
         # Sort by display_order
         slides_df <- slides_df[order(slides_df$display_order), ]
+        # Check for optional image_path column
+        has_image_col <- "image_path" %in% names(slides_df)
+        config_dir <- dirname(config_file)
         slides <- lapply(seq_len(nrow(slides_df)), function(i) {
-          list(
+          slide <- list(
             id = sprintf("hub-slide-%d", i),
             title = trimws(.clean_openxml_escapes(slides_df$slide_title[i])),
             content = trimws(.clean_openxml_escapes(slides_df$content[i])),
             order = slides_df$display_order[i]
           )
+          # Resolve and encode image if image_path column exists and has a value
+          if (has_image_col) {
+            img_path <- trimws(slides_df$image_path[i] %||% "")
+            if (nzchar(img_path) && !is.na(img_path)) {
+              # Try as-is (absolute), then relative to config dir
+              resolved <- img_path
+              if (!file.exists(resolved)) {
+                resolved <- file.path(config_dir, img_path)
+              }
+              if (file.exists(resolved)) {
+                encoded <- .encode_slide_image(normalizePath(resolved))
+                if (!is.null(encoded)) {
+                  slide$image_data <- encoded
+                } else {
+                  warnings <<- c(warnings, sprintf(
+                    "Slide '%s': Could not encode image '%s'. Unsupported format or corrupt file.",
+                    slide$title, img_path
+                  ))
+                }
+              } else {
+                warnings <<- c(warnings, sprintf(
+                  "Slide '%s': Image file not found: %s. Slide will be created without an image.",
+                  slide$title, img_path
+                ))
+              }
+            }
+          }
+          slide
         })
       }
     }

@@ -287,6 +287,72 @@ generate_report_hub_config_template <- function(output_path) {
   cat("  CrossRef sheet created\n")
 
   # ============================================================================
+  # SHEET 4: Slides (table format, optional)
+  # ============================================================================
+
+  slides_columns <- list(
+    list(
+      name = "slide_title",
+      width = 30,
+      required = TRUE,
+      description = "Slide title/heading",
+      dropdown = NULL,
+      numeric_range = NULL,
+      integer_range = NULL
+    ),
+    list(
+      name = "content",
+      width = 60,
+      required = TRUE,
+      description = "Slide content (supports markdown: **bold**, *italic*, - bullets)",
+      dropdown = NULL,
+      numeric_range = NULL,
+      integer_range = NULL
+    ),
+    list(
+      name = "display_order",
+      width = 12,
+      required = TRUE,
+      description = "Display order (1, 2, 3...)",
+      dropdown = NULL,
+      numeric_range = NULL,
+      integer_range = c(1, 999)
+    ),
+    list(
+      name = "image_path",
+      width = 45,
+      required = FALSE,
+      description = "Path to slide image (PNG, JPG, SVG). Auto-compressed and embedded as Base64. Relative to config file or absolute.",
+      dropdown = NULL,
+      numeric_range = NULL,
+      integer_range = NULL
+    )
+  )
+
+  slides_examples <- list(
+    list(slide_title = "Key Findings",
+         content = "**Main insight:** Customer satisfaction increased significantly in Q1.",
+         display_order = 1,
+         image_path = ""),
+    list(slide_title = "Methodology",
+         content = "Online survey conducted Jan-Feb 2025. n=1,000 nationally representative.",
+         display_order = 2,
+         image_path = "images/methodology_chart.png")
+  )
+
+  write_table_sheet(
+    wb = wb,
+    sheet_name = "Slides",
+    columns_def = slides_columns,
+    title = "Insight Slides (Optional)",
+    subtitle = "Add insight cards with optional images to the Overview tab. Images are auto-compressed to keep file size small.",
+    example_rows = slides_examples,
+    num_blank_rows = 10
+  )
+
+  cat("  Slides sheet created\n")
+
+  # ============================================================================
   # Save workbook
   # ============================================================================
 

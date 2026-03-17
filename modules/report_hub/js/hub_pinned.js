@@ -509,11 +509,16 @@
     var rendered = card.querySelector(".hub-slide-rendered");
     // Re-render before pinning
     if (rendered && editor) rendered.innerHTML = hubRenderMarkdown(editor.value);
+    // Capture slide image if present
+    var imgStore = card.querySelector(".hub-slide-img-store");
+    var imageData = (imgStore && imgStore.textContent && imgStore.textContent.length > 0)
+      ? imgStore.textContent : null;
     var pinObj = {
       id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
       title: titleEl ? titleEl.textContent.trim() : "Slide",
       sourceLabel: "Overview",
       insight: rendered ? rendered.innerHTML : "",
+      imageData: imageData,
       tableHtml: null,
       chartSvg: null,
       timestamp: Date.now()
