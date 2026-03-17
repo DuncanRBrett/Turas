@@ -63,6 +63,10 @@ for (f in lib_files) {
 cell_path <- file.path(MODULE_DIR, "lib", "cell_weights.R")
 if (file.exists(cell_path)) source(cell_path, local = FALSE)
 
+# Source preflight validators if they exist
+preflight_path <- file.path(MODULE_DIR, "lib", "validation", "preflight_validators.R")
+if (file.exists(preflight_path)) source(preflight_path, local = FALSE)
+
 # Source HTML report submodules if they exist
 html_report_dir <- file.path(MODULE_DIR, "lib", "html_report")
 if (dir.exists(html_report_dir)) {

@@ -581,14 +581,79 @@ Re-run. DEFF drops to 1.6, Max Weight = 4.0, Efficiency = 63%. This is acceptabl
 
 ## Dependencies
 
-| Package | Purpose | Required |
-|---------|---------|----------|
-| `readxl` | Read Excel configs | Yes |
-| `survey` | Rim weight calibration | Yes |
-| `openxlsx` | Write Excel output | Yes |
-| `haven` | Read SPSS .sav files | Optional |
-| `htmltools` | HTML report | If html_report=Y |
-| `base64enc` | Logo embedding | If logo used |
+| Package | Version | Purpose | Required |
+|---------|---------|---------|----------|
+| `readxl` | 1.4.5 | Read Excel config files | Yes |
+| `survey` | 4.4.8 | Rim weight calibration via `calibrate()` | Yes |
+| `openxlsx` | 4.2.8 | Write Excel output (diagnostics, weighted data) | Yes |
+| `haven` | 2.5.5 | Read SPSS `.sav` data files | Optional |
+| `htmltools` | 0.5.8.1 | Assemble self-contained HTML reports | If html_report=Y |
+| `base64enc` | 0.1.3 | Embed logo images as base64 in HTML | If logo used |
+
+**R version:** 4.5.1 or later recommended. Tested on R 4.0+.
+
+---
+
+## Weighting Primer — Why, When, and Watchouts
+
+### Why Weight at All?
+
+In an ideal world, every survey would be a perfectly representative random sample of the target population. In practice, this almost never happens:
+
+- **Online panels** skew young, urban, and tech-savvy
+- **Telephone surveys** under-represent mobile-only households
+- **Stratified samples** deliberately over-sample small segments for analysis
+- **Non-response** is rarely random — certain demographic groups are harder to reach
+
+Weighting corrects these biases by assigning a multiplier to each respondent. A respondent from an under-represented group gets a weight > 1 (they "count more"), while an over-represented respondent gets a weight < 1.
+
+### The Core Trade-Off
+
+Weighting **reduces bias** (your estimates better represent the population) but **increases variance** (your estimates become less precise). This trade-off is captured by the design effect (DEFF):
+
+- **DEFF = 1.0** → No variance cost (all weights equal)
+- **DEFF = 1.5** → Moderate cost (effective sample = actual / 1.5)
+- **DEFF = 2.0** → High cost (effective sample halved)
+
+There is no universal "right" DEFF. The acceptable level depends on your sample size, the magnitude of the bias, and how the data will be used. As a rule of thumb: a DEFF under 2.0 is standard in market research; above 3.0 warrants serious review.
+
+### Sample Design Considerations
+
+Your weighting approach should follow from your sample design, not the other way around:
+
+| Sample Design | Typical Approach |
+|---|---|
+| **Simple random sample** | May not need weighting if response is balanced |
+| **Stratified random sample** | Design weights to correct for deliberate over/under-sampling |
+| **Quota sample** | Rim weights to adjust for quota shortfalls |
+| **Online panel** | Rim weights on demographics; watch for DEFF |
+| **Convenience / snowball** | Weighting can help but cannot fully fix selection bias |
+| **Multi-stage cluster** | Design weights + possible rim adjustment; consider complex survey design |
+
+**Key point:** Weighting cannot manufacture information that was never collected. If entire population segments are absent from your sample, no amount of weighting will fix that. Weighting adjusts proportions — it cannot create data for groups that are completely missing.
+
+### Practical Workarounds
+
+**Combining small categories:** If a category has very few respondents (< 20), consider merging it with a related category before weighting. For example:
+- Combine "18–24" and "25–34" into "18–34"
+- Combine "Eastern Cape" + "Northern Cape" + "Free State" into "Other provinces"
+- Combine "Retired" + "Unemployed" into "Not employed"
+
+Then adjust your target percentages to match the combined categories.
+
+**Handling missing data in weighting variables:** Respondents with NA in a weighting variable are excluded from that weight calculation. Options:
+1. **Impute** the missing values before weighting (e.g., assign the modal category)
+2. **Exclude** the records with NA from the weighted analysis
+3. **Create a separate "Missing" category** in your targets (only if you know the population proportion of non-responders, which you usually don't)
+
+**Dealing with non-convergence (rim weights):** If rim weighting doesn't converge:
+1. Reduce the number of rim variables (max 5)
+2. Collapse categories with few respondents
+3. Increase `max_iterations` to 200
+4. Relax `convergence_tolerance` to 0.05
+5. Check whether your sample is fundamentally too different from the targets
+
+**Weight stacking (combined methods):** You can run design weights first, then apply rim weighting using the design weights as base weights. This corrects for both stratification and demographic biases. Configure multiple weights in the Weight_Specifications sheet — they are calculated in order.
 
 ---
 

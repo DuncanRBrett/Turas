@@ -362,16 +362,8 @@ calculate_rim_weights <- function(data,
 
   # Calculate g-weights (calibration factors) if base weights were provided
   if (!is.null(base_weights)) {
-    # Protect against division by zero or near-zero base weights
-    if (any(starting_weights <= 0, na.rm = TRUE)) {
-      weighting_refuse(
-        code = "DATA_INVALID_WEIGHTS",
-        title = "Invalid base weights",
-        problem = "Base weights must be positive. Found zero or negative values.",
-        why_it_matters = "Division by zero or negative weights will produce invalid calibration factors.",
-        how_to_fix = "Ensure all base weights are positive values greater than 0."
-      )
-    }
+    # base_weights positivity already validated at input (line 138)
+    # starting_weights = base_weights[complete_idx], so safe to divide
     g_weights <- final_weights / starting_weights
   } else {
     g_weights <- final_weights  # If starting from 1, g = final

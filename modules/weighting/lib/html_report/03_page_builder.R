@@ -677,15 +677,25 @@ build_summary_panel <- function(html_data, summary_table) {
     paste(summary$weight_names, collapse = ", ")
   )
 
+  overview_callout <- '<div class="wt-callout" style="margin-bottom:12px;">
+    This table summarises all calculated weights. <strong>Eff. N</strong> (effective sample size) shows the
+    equivalent unweighted sample size after accounting for weight variability &mdash; this is the sample size you
+    should use when interpreting precision. <strong>DEFF</strong> (design effect due to weighting) quantifies the
+    variance inflation factor. <strong>Quality</strong> is assessed based on efficiency and the presence of
+    extreme weights. See the Weight Details tab for per-weight distributions and diagnostics.
+  </div>'
+
   sprintf(
     '<div id="tab-summary" class="tab-panel active">
       %s
       <div class="wt-card">
         <h3>All Weights Overview</h3>
         %s
+        %s
       </div>
     </div>',
     stats,
+    overview_callout,
     if (nzchar(summary_table %||% "")) summary_table else "<p>No summary data available.</p>"
   )
 }
@@ -736,10 +746,10 @@ build_details_panel <- function(html_data, tables, charts) {
     if (!is.null(charts[[chart_key]]) && nzchar(charts[[chart_key]])) {
       panel_content <- paste0(panel_content, sprintf(
         '<div class="wt-card"><h3>Distribution</h3>
-          <div class="wt-callout">This histogram shows how weights are distributed across respondents.
-          A tight cluster around 1.0 means the sample closely matches targets with minimal adjustment.
-          A wide spread or long tail indicates some respondents need large corrections, which reduces effective sample size.
-          Ideally, most weights should fall between 0.5 and 2.0.</div>
+          <div class="wt-callout">This histogram shows the distribution of weights across all respondents.
+          A narrow distribution centred near 1.0 indicates the sample already closely matched the population targets, requiring only minor adjustments.
+          A wide spread or heavy tail means some respondents are being up-weighted or down-weighted substantially, which inflates variance and reduces the effective sample size.
+          Weights outside the range 0.3&ndash;3.0 are often worth investigating, as extreme weights can allow a small number of respondents to dominate weighted estimates.</div>
           %s</div>',
         charts[[chart_key]]
       ))
@@ -885,15 +895,25 @@ build_method_documentation <- function(weight_details) {
         '<div class="wt-method-doc">
           <h4>%s (Design Weight)</h4>
           <p>Design weights correct for unequal selection probabilities in stratified sampling.
-          Each stratum receives a weight proportional to its share in the population relative to
-          its share in the sample: <em>w = (Population N / Total Pop) / (Sample N / Total Sample)</em>.</p>
+          For each stratum, the weight is calculated as:
+          <em>w<sub>h</sub> = N<sub>h</sub> / n<sub>h</sub></em>, where N<sub>h</sub> is the population
+          size and n<sub>h</sub> is the sample size in stratum h. This ensures each stratum contributes
+          to estimates in proportion to its population share, regardless of how many respondents
+          were sampled from it.</p>
+          <p>Design weights are appropriate when you have a stratified sample with known population
+          counts per stratum. They do not require iteration and produce exact corrections.</p>
         </div>', wn),
       "rim" = , "rake" = sprintf(
         '<div class="wt-method-doc">
           <h4>%s (Rim / Raking Weight)</h4>
-          <p>Rim weights (also known as raking or iterative proportional fitting) adjust the sample
-          to match known population margins on multiple variables simultaneously. The algorithm
-          iteratively adjusts weights until convergence, using <code>survey::calibrate()</code>.</p>
+          <p>Rim weights (also called raking or iterative proportional fitting) adjust the sample
+          to match known population marginal distributions on multiple variables simultaneously.
+          The algorithm iteratively adjusts weights across each variable in turn until the weighted
+          sample margins converge to the target margins within a specified tolerance.</p>
+          <p>This implementation uses <code>survey::calibrate()</code> with the raking method.
+          Rim weighting requires only marginal (univariate) population distributions &mdash; it does
+          not require knowledge of the full joint distribution. This makes it practical when only
+          census-level marginals are available.</p>
           %s
         </div>', wn,
         if (!is.null(detail$rim_variables)) {
@@ -904,9 +924,13 @@ build_method_documentation <- function(weight_details) {
       "cell" = sprintf(
         '<div class="wt-method-doc">
           <h4>%s (Cell / Interlocked Weight)</h4>
-          <p>Cell weights adjust the sample to match the joint (cross-tabulated) population
-          distribution across two or more variables. Each unique combination of variable levels
-          receives a weight: <em>w = (target%% &times; N) / cell count</em>.</p>
+          <p>Cell weights (interlocked weights) adjust the sample to match the known joint distribution
+          of two or more variables. Unlike rim weighting, which matches marginal distributions independently,
+          cell weighting matches the exact cross-tabulated proportions.</p>
+          <p>For each cell: <em>w = (target proportion &times; total N) / cell count</em>.
+          This requires knowing the population percentage for every combination of variable levels.
+          Cell weighting is more precise than rim weighting but requires more population data and
+          can produce extreme weights if any cells have very few respondents.</p>
           %s
         </div>', wn,
         if (!is.null(detail$cell_variables)) {
@@ -924,13 +948,14 @@ build_method_documentation <- function(weight_details) {
     # Add key diagnostics
     if (!is.null(diag)) {
       method_desc <- paste0(method_desc, sprintf(
-        '<ul>
-          <li>Total N: %d | Effective N: %d (Efficiency: %.1f%%)</li>
-          <li>Design Effect: %.2f | Weight range: %.4f to %.4f</li>
-          <li>Quality Assessment: <strong>%s</strong></li>
-        </ul>',
-        diag$sample_size$n_total,
-        diag$effective_sample$effective_n,
+        '<div class="wt-callout" style="margin-top:12px;">
+          <strong>Key metrics:</strong>
+          Total N: %s &middot; Effective N: %s (Efficiency: %.1f%%%%) &middot;
+          Design Effect: %.2f &middot; Weight range: [%.4f, %.4f] &middot;
+          Quality: <strong>%s</strong>
+        </div>',
+        format(diag$sample_size$n_total, big.mark = ","),
+        format(diag$effective_sample$effective_n, big.mark = ","),
         diag$effective_sample$efficiency,
         diag$effective_sample$design_effect,
         diag$distribution$min,

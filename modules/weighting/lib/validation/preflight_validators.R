@@ -381,46 +381,53 @@ check_cell_combinations_vs_data <- function(cell_df, data, error_log) {
 
   data_cols <- names(data)
 
+  # Cell target columns use dynamic variable names as column headers
+  # (e.g., Gender, AgeGroup) — not fixed Variable_1/Value_1 format
+  cell_vars <- setdiff(names(cell_df), c("weight_name", "target_percent"))
+
+  if (length(cell_vars) == 0) {
+    error_log <- log_preflight_issue(
+      error_log, "Cell Combinations vs Data", "No Cell Variables",
+      "Cell_Targets has no variable columns (only weight_name and target_percent found).",
+      "", "Error"
+    )
+    return(error_log)
+  }
+
+  # Check all cell variable columns exist in data
+  missing_vars <- setdiff(cell_vars, data_cols)
+  if (length(missing_vars) > 0) {
+    error_log <- log_preflight_issue(
+      error_log, "Cell Combinations vs Data", "Cell Variable Not Found",
+      sprintf("Cell variable column(s) not found in data: %s. Available columns: %s.",
+              paste(missing_vars, collapse = ", "),
+              paste(utils::head(data_cols, 15), collapse = ", ")),
+      paste(missing_vars, collapse = ", "), "Error"
+    )
+    return(error_log)
+  }
+
+  # Check each cell combination exists in data
   for (i in seq_len(nrow(cell_df))) {
     wname <- as.character(cell_df$weight_name[i])
-    var1 <- as.character(cell_df$Variable_1[i])
-    val1 <- as.character(cell_df$Value_1[i])
-    var2 <- as.character(cell_df$Variable_2[i])
-    val2 <- as.character(cell_df$Value_2[i])
 
-    # Check Variable_1 exists in data
-    if (!var1 %in% data_cols) {
-      error_log <- log_preflight_issue(
-        error_log, "Cell Combinations vs Data", "Cell Variable Not Found",
-        sprintf("Weight '%s': Variable_1='%s' does not exist as a column in the data.",
-                wname, var1),
-        paste(wname, var1, sep = " / "), "Error"
-      )
-      next
+    # Build match condition across all cell variables
+    match_mask <- rep(TRUE, nrow(data))
+    combo_parts <- character(0)
+    for (var in cell_vars) {
+      target_val <- as.character(cell_df[[var]][i])
+      data_val <- as.character(data[[var]])
+      match_mask <- match_mask & (data_val == target_val) & !is.na(data_val)
+      combo_parts <- c(combo_parts, sprintf("%s='%s'", var, target_val))
     }
+    combo_label <- paste(combo_parts, collapse = " + ")
 
-    # Check Variable_2 exists in data
-    if (!var2 %in% data_cols) {
-      error_log <- log_preflight_issue(
-        error_log, "Cell Combinations vs Data", "Cell Variable Not Found",
-        sprintf("Weight '%s': Variable_2='%s' does not exist as a column in the data.",
-                wname, var2),
-        paste(wname, var2, sep = " / "), "Error"
-      )
-      next
-    }
-
-    # Check combination exists in data
-    data_var1 <- as.character(data[[var1]])
-    data_var2 <- as.character(data[[var2]])
-    combo_exists <- any(data_var1 == val1 & data_var2 == val2, na.rm = TRUE)
-
-    if (!combo_exists) {
+    if (!any(match_mask)) {
       error_log <- log_preflight_issue(
         error_log, "Cell Combinations vs Data", "Cell Combination Not in Data",
-        sprintf("Weight '%s': combination %s='%s' + %s='%s' has zero respondents in data.",
-                wname, var1, val1, var2, val2),
-        paste(wname, var1, val1, var2, val2, sep = " / "), "Warning"
+        sprintf("Weight '%s': combination %s has zero respondents in data.",
+                wname, combo_label),
+        paste(wname, combo_label, sep = " / "), "Warning"
       )
     }
   }
@@ -547,11 +554,10 @@ check_data_file_columns <- function(config, data, error_log) {
                          unique(as.character(config$rim_targets$variable)))
   }
 
-  # Collect variables from cell targets
+  # Collect variables from cell targets (dynamic column names)
   if (!is.null(config$cell_targets) && nrow(config$cell_targets) > 0) {
-    referenced_vars <- c(referenced_vars,
-                         unique(as.character(config$cell_targets$Variable_1)),
-                         unique(as.character(config$cell_targets$Variable_2)))
+    cell_var_cols <- setdiff(names(config$cell_targets), c("weight_name", "target_percent"))
+    referenced_vars <- c(referenced_vars, cell_var_cols)
   }
 
   referenced_vars <- unique(referenced_vars)
@@ -917,9 +923,8 @@ validate_weighting_preflight <- function(config, data, error_log = NULL) {
     weight_vars <- c(weight_vars, unique(as.character(rim_df$variable)))
   }
   if (!is.null(cell_df) && nrow(cell_df) > 0) {
-    weight_vars <- c(weight_vars,
-                     unique(as.character(cell_df$Variable_1)),
-                     unique(as.character(cell_df$Variable_2)))
+    cell_var_cols <- setdiff(names(cell_df), c("weight_name", "target_percent"))
+    weight_vars <- c(weight_vars, cell_var_cols)
   }
   weight_vars <- unique(weight_vars)
   weight_vars <- weight_vars[!is.na(weight_vars) & weight_vars != ""]

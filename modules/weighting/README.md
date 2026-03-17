@@ -49,8 +49,8 @@ The config file is an Excel workbook (`Weight_Config.xlsx`) with required and op
 ### Generate a Template
 
 ```r
-source("modules/weighting/templates/create_template.R")
-create_weight_config_template("my_project/Weight_Config.xlsx")
+source("modules/weighting/lib/generate_config_templates.R")
+generate_weight_config_template("my_project/Weight_Config.xlsx")
 ```
 
 ### Required Sheets
@@ -296,7 +296,7 @@ modules/weighting/
       99_html_report_main.R
       js/weighting_navigation.js
   tests/
-    testthat/                  # 248 tests
+    testthat/                  # 158 tests
   examples/
     example1_design_weights/   # Design weight walkthrough
     example2_rim_weights/      # Rim weight walkthrough
@@ -315,8 +315,16 @@ modules/weighting/
 
 ## Dependencies
 
-**Required:** `readxl`, `survey`, `openxlsx`
-**Optional:** `haven` (for SPSS .sav files), `htmltools` (for HTML report), `base64enc` (for logo embedding in HTML)
+| Package | Version | Purpose | Required |
+|---------|---------|---------|----------|
+| `readxl` | 1.4.5 | Read Excel config files | Yes |
+| `survey` | 4.4.8 | Rim weight calibration | Yes |
+| `openxlsx` | 4.2.8 | Write Excel output | Yes |
+| `haven` | 2.5.5 | Read SPSS .sav files | Optional |
+| `htmltools` | 0.5.8.1 | HTML report generation | If html_report=Y |
+| `base64enc` | 0.1.3 | Logo embedding in HTML | If logo used |
+
+**R version:** 4.5.1 or later recommended (tested on R 4.0+).
 
 ---
 

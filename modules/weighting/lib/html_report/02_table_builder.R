@@ -121,13 +121,13 @@ build_diagnostics_table <- function(diagnostics) {
   )
 
   callout <- '<div class="wt-callout" style="margin-top:16px;">
-    <strong>Reading these metrics:</strong>
-    <strong>Min/Max</strong> show the weight range. Values far from 1.0 indicate large adjustments for some respondents.
-    <strong>Q1/Q3</strong> (quartiles) show where the middle 50%% of weights fall &mdash; a narrow range means most respondents have similar weights.
-    <strong>SD</strong> (standard deviation) measures spread; lower is better.
-    <strong>CV</strong> (coefficient of variation = SD/Mean) summarises variability as a ratio; values below 0.3 are typical.
-    <strong>Design Effect (DEFF)</strong> measures variance inflation from weighting. DEFF = 1.0 means no effect (equal weights); DEFF = 2.0 means the effective sample is halved.
-    <strong>Efficiency</strong> = 100%% / DEFF &mdash; the percentage of sample size retained after weighting. Higher is better; below 50%% suggests weights may be too variable.
+    <strong>Reading these metrics:</strong><br/>
+    <strong>Min/Max:</strong> The smallest and largest weights assigned to any respondent. Values far from 1.0 mean some respondents are being counted much more or less than others.<br/>
+    <strong>Q1/Q3:</strong> The 25th and 75th percentiles. The middle 50%% of weights fall between these values &mdash; a narrow Q1&ndash;Q3 range means most respondents carry similar weight.<br/>
+    <strong>SD:</strong> Standard deviation of the weights. Lower values indicate more uniform weighting.<br/>
+    <strong>CV:</strong> Coefficient of variation (SD &divide; Mean). Summarises weight variability as a ratio; values below 0.20 indicate good uniformity, above 0.50 may warrant review.<br/>
+    <strong>Design Effect (DEFF):</strong> Kish&rsquo;s design effect due to unequal weighting, calculated as n &times; &sum;w&sup2; / (&sum;w)&sup2;. DEFF = 1.0 means all weights are equal (no variance inflation). Higher values mean the effective sample size is reduced relative to the actual sample size.<br/>
+    <strong>Efficiency:</strong> 100%% &divide; DEFF &mdash; the proportion of the sample&rsquo;s statistical power retained after weighting. Above 70%% is generally good; below 50%% suggests the weights are highly variable and precision is substantially reduced.
   </div>'
 
   paste0(grid_html, callout)
@@ -155,12 +155,20 @@ build_margins_table <- function(margins) {
     ))
   }
 
+  callout <- '<div class="wt-callout" style="margin-bottom:12px;">
+    This table compares the target marginal percentages with the achieved (weighted) percentages for each variable and category.
+    Differences close to zero (green) confirm that the raking algorithm converged successfully.
+    Small residual differences (amber) are normal and typically arise from rounding or near-empty cells.
+    Large differences (red, &gt;2pp) may indicate convergence issues or structural problems in the data.
+  </div>'
+
   sprintf(
     '<h4>Rim Target Achievement</h4>
+    %s
     <table class="wt-table">
       <thead><tr><th>Variable</th><th>Category</th><th>Target</th><th>Achieved</th><th>Diff</th></tr></thead>
       <tbody>%s</tbody>
-    </table>', rows
+    </table>', callout, rows
   )
 }
 
@@ -182,12 +190,19 @@ build_stratum_table <- function(stratum_summary) {
     ))
   }
 
+  callout <- '<div class="wt-callout" style="margin-bottom:12px;">
+    Each stratum&rsquo;s weight equals its population size divided by the number of respondents sampled from it.
+    Strata that are under-represented in the sample relative to the population receive weights greater than 1.0;
+    over-represented strata receive weights less than 1.0.
+  </div>'
+
   sprintf(
     '<h4>Stratum Details</h4>
+    %s
     <table class="wt-table">
       <thead><tr><th>Stratum</th><th>Population</th><th>Sample</th><th>Weight</th></tr></thead>
       <tbody>%s</tbody>
-    </table>', rows
+    </table>', callout, rows
   )
 }
 
@@ -208,12 +223,20 @@ build_cell_table <- function(cell_summary) {
     ))
   }
 
+  callout <- '<div class="wt-callout" style="margin-bottom:12px;">
+    Each cell represents a unique combination of the interlocking variables.
+    The weight for each cell is: (target %% &times; total N) &divide; cell count.
+    Cells with very few respondents will receive large weights &mdash; consider combining sparse
+    categories if any single cell has fewer than ~10 respondents.
+  </div>'
+
   sprintf(
     '<h4>Cell Details</h4>
+    %s
     <table class="wt-table">
       <thead><tr><th>Cell</th><th>Target%%</th><th>Sample N</th><th>Sample%%</th><th>Weight</th></tr></thead>
       <tbody>%s</tbody>
-    </table>', rows
+    </table>', callout, rows
   )
 }
 

@@ -21,7 +21,10 @@
 #
 # ==============================================================================
 
-library(openxlsx)
+if (!requireNamespace("openxlsx", quietly = TRUE)) {
+  stop("Package 'openxlsx' is required for config template generation. Install with: install.packages('openxlsx')",
+       call. = FALSE)
+}
 
 # Source the shared template infrastructure
 # Provides: .TPL_* colour constants, make_*_style() factories,
@@ -209,7 +212,7 @@ generate_weight_config_template <- function(output_path) {
   )
 
   write_settings_sheet(
-    wb, "Settings", settings_def,
+    wb, "General", settings_def,
     title = "TURAS Weighting Module - Configuration",
     subtitle = "Configure file paths and branding options. Required fields are highlighted in orange."
   )
@@ -438,28 +441,16 @@ generate_weight_config_template <- function(output_path) {
       description = "Must match a weight_name from Weight_Specifications with method=cell."
     ),
     list(
-      name = "Variable_1",
+      name = "Gender",
       width = 20,
       required = TRUE,
-      description = "First interlocking variable column name in your data."
+      description = "EXAMPLE column — rename to your first interlocking variable. Values must match data exactly."
     ),
     list(
-      name = "Value_1",
+      name = "AgeGroup",
       width = 20,
       required = TRUE,
-      description = "Category value for the first variable (must match data values exactly)."
-    ),
-    list(
-      name = "Variable_2",
-      width = 20,
-      required = TRUE,
-      description = "Second interlocking variable column name in your data."
-    ),
-    list(
-      name = "Value_2",
-      width = 20,
-      required = TRUE,
-      description = "Category value for the second variable (must match data values exactly)."
+      description = "EXAMPLE column — rename to your second interlocking variable. Values must match data exactly."
     ),
     list(
       name = "target_percent",
@@ -473,26 +464,20 @@ generate_weight_config_template <- function(output_path) {
   cell_targets_examples <- list(
     list(
       weight_name = "wgt_cell",
-      Variable_1 = "Gender",
-      Value_1 = "Male",
-      Variable_2 = "AgeGroup",
-      Value_2 = "18-34",
+      Gender = "Male",
+      AgeGroup = "18-34",
       target_percent = 15
     ),
     list(
       weight_name = "wgt_cell",
-      Variable_1 = "Gender",
-      Value_1 = "Male",
-      Variable_2 = "AgeGroup",
-      Value_2 = "35-54",
+      Gender = "Male",
+      AgeGroup = "35-54",
       target_percent = 17
     ),
     list(
       weight_name = "wgt_cell",
-      Variable_1 = "Gender",
-      Value_1 = "Male",
-      Variable_2 = "AgeGroup",
-      Value_2 = "55+",
+      Gender = "Male",
+      AgeGroup = "55+",
       target_percent = 16
     )
   )

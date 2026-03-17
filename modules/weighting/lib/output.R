@@ -746,8 +746,8 @@ print_run_summary <- function(weighting_results) {
     cat(sprintf("%-25s %-10s %12s %12s %10s\n",
                 weight_name,
                 method,
-                format(eff_n, big.mark = ","),
-                sprintf("%.2f", deff),
+                if (is.na(eff_n)) "N/A" else format(eff_n, big.mark = ","),
+                if (is.na(deff)) "N/A" else sprintf("%.2f", deff),
                 status))
   }
 
