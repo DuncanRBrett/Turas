@@ -2,23 +2,24 @@
 # TESTS: Output Functions (output.R)
 # ==============================================================================
 
-test_that("write_weighted_data writes CSV correctly", {
+test_that("write_weighted_data writes CSV weight lookup correctly", {
   data <- create_simple_survey(n = 50)
   data$weight <- runif(50, 0.5, 2.0)
 
   output_file <- file.path(tempdir(), "test_weighted.csv")
   on.exit(unlink(output_file))
 
-  write_weighted_data(data, output_file, verbose = FALSE)
+  write_weighted_data(data, output_file, id_column = "id",
+                      weight_names = "weight", verbose = FALSE)
 
   expect_true(file.exists(output_file))
 
   reloaded <- read.csv(output_file)
   expect_equal(nrow(reloaded), 50)
-  expect_true("weight" %in% names(reloaded))
+  expect_equal(names(reloaded), c("id", "weight"))
 })
 
-test_that("write_weighted_data writes XLSX correctly", {
+test_that("write_weighted_data writes XLSX weight lookup correctly", {
   skip_if_not_installed("openxlsx")
 
   data <- create_simple_survey(n = 50)
@@ -27,9 +28,13 @@ test_that("write_weighted_data writes XLSX correctly", {
   output_file <- file.path(tempdir(), "test_weighted.xlsx")
   on.exit(unlink(output_file))
 
-  write_weighted_data(data, output_file, verbose = FALSE)
+  write_weighted_data(data, output_file, id_column = "id",
+                      weight_names = "weight", verbose = FALSE)
 
   expect_true(file.exists(output_file))
+
+  reloaded <- openxlsx::read.xlsx(output_file)
+  expect_equal(names(reloaded), c("id", "weight"))
 })
 
 test_that("write_weighted_data handles NULL path", {
@@ -40,8 +45,21 @@ test_that("write_weighted_data handles NULL path", {
 
 test_that("write_weighted_data rejects unsupported format", {
   data <- create_simple_survey(n = 10)
+  data$weight <- runif(10, 0.5, 2.0)
   expect_error(
-    write_weighted_data(data, "test.json", verbose = FALSE),
+    write_weighted_data(data, "test.json", id_column = "id",
+                        weight_names = "weight", verbose = FALSE),
+    class = "turas_refusal"
+  )
+})
+
+test_that("write_weighted_data refuses when id_column missing from data", {
+  data <- create_simple_survey(n = 10)
+  data$weight <- runif(10, 0.5, 2.0)
+  expect_error(
+    write_weighted_data(data, file.path(tempdir(), "test.csv"),
+                        id_column = "NonExistent",
+                        weight_names = "weight", verbose = FALSE),
     class = "turas_refusal"
   )
 })

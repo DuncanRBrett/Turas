@@ -39,7 +39,8 @@ Weight_Config.xlsx
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| output_file | Path | (none) | Path to save weighted data |
+| id_column | Text | ResponseID | Name of respondent ID column in data |
+| output_file | Path | (none) | Path for weight lookup file (ID + weight columns) |
 | save_diagnostics | Y/N | N | Save Excel diagnostic report to file |
 | diagnostics_file | Path | (none) | Path for diagnostic report (required if save_diagnostics=Y) |
 | html_report | Y/N | N | Generate self-contained HTML report |

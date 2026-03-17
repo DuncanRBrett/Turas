@@ -13,16 +13,21 @@ TURAS_WARN_AMBER <- "#f39c12"
 TURAS_POOR_RED <- "#e74c3c"
 TURAS_LIGHT_GREY <- "#f5f5f5"
 
-#' Write Weighted Data
+#' Write Weight Lookup File
 #'
-#' Writes the weighted data to a file (CSV or Excel).
+#' Writes a clean weight lookup file with respondent ID in column A and
+#' weight column(s) in subsequent columns. This is the primary output —
+#' a file you can merge back into your data.
 #'
 #' @param data Data frame with weight column(s) added
-#' @param output_file Character, path to output file
+#' @param output_file Character, path to output file (.csv or .xlsx)
+#' @param id_column Character, name of the respondent ID column (default: "ResponseID")
+#' @param weight_names Character vector, names of weight columns to include
 #' @param verbose Logical, print progress
 #' @return Invisible path to written file
 #' @export
-write_weighted_data <- function(data, output_file, verbose = TRUE) {
+write_weighted_data <- function(data, output_file, id_column = "ResponseID",
+                                weight_names = NULL, verbose = TRUE) {
 
   if (is.null(output_file) || is.na(output_file) || output_file == "") {
     if (verbose) {
@@ -30,6 +35,45 @@ write_weighted_data <- function(data, output_file, verbose = TRUE) {
     }
     return(invisible(NULL))
   }
+
+  # Validate ID column exists
+  if (!id_column %in% names(data)) {
+    weighting_refuse(
+      code = "CFG_INVALID_ID_COLUMN",
+      title = "ID Column Not Found",
+      problem = sprintf("id_column '%s' not found in data. Available columns: %s",
+                        id_column, paste(utils::head(names(data), 15), collapse = ", ")),
+      why_it_matters = "The ID column is needed to produce a weight lookup file you can merge back into your data.",
+      how_to_fix = "Set id_column in the General sheet of your config to match a column in your data file."
+    )
+  }
+
+  # Auto-detect weight columns if not specified
+  if (is.null(weight_names)) {
+    # Weight columns are any columns added by the weighting process
+    # They appear after the original data columns
+    weight_names <- setdiff(names(data), names(data)[!sapply(data, is.numeric)])
+    # Safer: look for columns that could be weights (contain "weight" or "wt" in name)
+    weight_candidates <- grep("^(weight|wt|w_)", names(data), ignore.case = TRUE, value = TRUE)
+    if (length(weight_candidates) > 0) {
+      weight_names <- weight_candidates
+    }
+  }
+
+  # Build the output data frame: ID + weight columns
+  output_cols <- c(id_column, weight_names)
+  missing_cols <- setdiff(output_cols, names(data))
+  if (length(missing_cols) > 0) {
+    weighting_refuse(
+      code = "DATA_MISSING_COLUMNS",
+      title = "Output Columns Not Found",
+      problem = sprintf("Columns not found in data: %s", paste(missing_cols, collapse = ", ")),
+      why_it_matters = "Cannot write the weight lookup file without these columns.",
+      how_to_fix = "Check weight_names and id_column settings match your data."
+    )
+  }
+
+  output_data <- data[, output_cols, drop = FALSE]
 
   # Ensure directory exists
   output_dir <- dirname(output_file)
@@ -41,23 +85,24 @@ write_weighted_data <- function(data, output_file, verbose = TRUE) {
   file_ext <- tolower(tools::file_ext(output_file))
 
   if (verbose) {
-    message("\nWriting weighted data...")
+    message("\nWriting weight lookup file...")
     message("  Output file: ", basename(output_file))
     message("  Format: ", toupper(file_ext))
-    message("  Rows: ", nrow(data))
-    message("  Columns: ", ncol(data))
+    message("  ID column: ", id_column)
+    message("  Weight columns: ", paste(weight_names, collapse = ", "))
+    message("  Rows: ", nrow(output_data))
   }
 
   tryCatch({
     if (file_ext == "csv") {
-      write.csv(data, output_file, row.names = FALSE)
+      write.csv(output_data, output_file, row.names = FALSE)
     } else if (file_ext %in% c("xlsx", "xls")) {
       if (!requireNamespace("openxlsx", quietly = TRUE)) {
         weighting_refuse(
           code = "PKG_OPENXLSX_MISSING",
           title = "Required Package Not Installed",
           problem = "The 'openxlsx' package is required for Excel output but is not installed.",
-          why_it_matters = "Cannot write weighted data to Excel format without this package.",
+          why_it_matters = "Cannot write weight lookup file to Excel format without this package.",
           how_to_fix = c(
             "Install the package: install.packages('openxlsx')",
             "Or use CSV format instead (change output_file extension to .csv)"
@@ -68,16 +113,41 @@ write_weighted_data <- function(data, output_file, verbose = TRUE) {
       # TRS v1.0: Use atomic save to prevent file corruption on network/OneDrive folders
       if (exists("turas_save_workbook_atomic", mode = "function")) {
         wb <- openxlsx::createWorkbook()
-        openxlsx::addWorksheet(wb, "Weighted_Data")
-        openxlsx::writeData(wb, "Weighted_Data", data, rowNames = FALSE)
+        openxlsx::addWorksheet(wb, "Weights")
+
+        # Write header and data
+        openxlsx::writeData(wb, "Weights", output_data, rowNames = FALSE)
+
+        # Style the header row
+        header_style <- openxlsx::createStyle(
+          fontSize = 11, textDecoration = "bold",
+          fgFill = TURAS_BRAND_BLUE, fontColour = "#FFFFFF",
+          halign = "center", border = "bottom",
+          borderColour = TURAS_ACCENT_TEAL
+        )
+        openxlsx::addStyle(wb, "Weights", header_style,
+                           rows = 1, cols = seq_along(output_cols), gridExpand = TRUE)
+
+        # Format weight columns to 6 decimal places
+        weight_style <- openxlsx::createStyle(numFmt = "0.000000")
+        for (wc in seq_along(weight_names)) {
+          openxlsx::addStyle(wb, "Weights", weight_style,
+                             rows = 2:(nrow(output_data) + 1),
+                             cols = wc + 1, gridExpand = TRUE)
+        }
+
+        # Auto-size columns
+        openxlsx::setColWidths(wb, "Weights", cols = 1, widths = 18)
+        openxlsx::setColWidths(wb, "Weights", cols = 2:(length(output_cols)),
+                               widths = 16)
 
         save_result <- turas_save_workbook_atomic(wb, output_file, module = "WEIGHTING")
         if (!save_result$success) {
           weighting_refuse(
             code = "IO_ATOMIC_SAVE_FAILED",
-            title = "Failed to Save Weighted Data File",
+            title = "Failed to Save Weight Lookup File",
             problem = sprintf("Atomic save failed for: %s", output_file),
-            why_it_matters = "Weighted data was calculated but could not be saved safely.",
+            why_it_matters = "Weights were calculated but could not be saved safely.",
             how_to_fix = c(
               "Check directory permissions",
               "Ensure file is not open in another program",
@@ -113,7 +183,7 @@ write_weighted_data <- function(data, output_file, verbose = TRUE) {
     }
 
     if (verbose) {
-      message("  Data written successfully")
+      message("  Weight lookup file written successfully")
     }
 
     return(invisible(output_file))
@@ -125,8 +195,8 @@ write_weighted_data <- function(data, output_file, verbose = TRUE) {
     weighting_refuse(
       code = "IO_WRITE_FAILED",
       title = "Failed to Write Output File",
-      problem = sprintf("Could not write weighted data to: %s", output_file),
-      why_it_matters = "Weighted data was calculated but could not be saved.",
+      problem = sprintf("Could not write weight lookup file to: %s", output_file),
+      why_it_matters = "Weights were calculated but could not be saved.",
       how_to_fix = c(
         "Check directory permissions",
         "Ensure file is not open in another program",

@@ -296,16 +296,14 @@ modules/weighting/
       99_html_report_main.R
       js/weighting_navigation.js
   tests/
-    testthat/                  # 158 tests
+    testthat/                  # ~298 tests
   examples/
     example1_design_weights/   # Design weight walkthrough
     example2_rim_weights/      # Rim weight walkthrough
     example3_combined_weights/ # Combined methods
-  templates/
-    Weight_Config_Template.xlsx
-    create_template.R
   docs/
-    USER_GUIDE.md
+    Weight_Config_Template.xlsx   # Pre-built template
+    USER_MANUAL.md
     TECHNICAL_DOCS.md
     TEMPLATE_REFERENCE.md
     CONFIG_EXAMPLE.md

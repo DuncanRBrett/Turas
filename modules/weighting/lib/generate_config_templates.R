@@ -129,10 +129,17 @@ generate_weight_config_template <- function(output_path) {
           valid_values_text = "Relative or absolute file path, e.g. 'data/survey.csv'"
         ),
         list(
+          name = "id_column",
+          required = FALSE,
+          default = "ResponseID",
+          description = "Name of the respondent ID column in the data file. Used to produce the weight lookup file (ID + Weight columns only)",
+          valid_values_text = "Column name from your data, e.g. 'ResponseID', 'resp_id', 'ID'"
+        ),
+        list(
           name = "output_file",
           required = FALSE,
           default = "",
-          description = "Path for the weighted output file (CSV or Excel). If blank, auto-generated from data_file",
+          description = "Path for the weight lookup file (ID + weight columns). If blank, auto-generated from data_file",
           valid_values_text = "File path with .csv or .xlsx extension"
         ),
         list(

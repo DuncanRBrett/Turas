@@ -313,6 +313,18 @@ run_weighting <- function(config_file,
 
   data <- as.data.frame(data)
 
+  # Resolve id_column: if not set in config, use first column of data
+  if (is.null(config$general$id_column)) {
+    config$general$id_column <- names(data)[1]
+    if (verbose) {
+      message("  ID column: ", config$general$id_column, " (auto-detected: first column)")
+    }
+  } else {
+    if (verbose) {
+      message("  ID column: ", config$general$id_column)
+    }
+  }
+
   if (verbose) {
     message("  Rows: ", nrow(data))
     message("  Columns: ", ncol(data))
@@ -484,10 +496,13 @@ run_weighting <- function(config_file,
   output_file <- NULL
   diagnostics_file <- NULL
 
-  # Write data if output file specified
+  # Write weight lookup file (ID + weight columns) if output file specified
   if (!is.null(config$general$output_file_resolved)) {
     output_file <- config$general$output_file_resolved
-    write_weighted_data(data, output_file, verbose = verbose)
+    write_weighted_data(data, output_file,
+                        id_column = config$general$id_column,
+                        weight_names = weight_names,
+                        verbose = verbose)
   }
 
   update_progress(0.90, "Generating diagnostics report...")

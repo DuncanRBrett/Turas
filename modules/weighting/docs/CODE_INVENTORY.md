@@ -4,7 +4,7 @@
 
 The Turas Weighting module provides production-ready sample weighting for survey data. It supports three weighting methods: **Design weights** (stratified sampling with population proportions), **Rim/raking weights** (iterative proportional fitting via `survey::calibrate`), and **Cell/interlocked weights** (joint distribution matching). The module features weight trimming and capping, comprehensive diagnostics (design effect, statistical efficiency), and multiple output formats including formatted Excel workbooks, CSV, and self-contained HTML reports. All parameters are driven by an Excel configuration file with structured sheets for targets, variable mappings, and advanced options.
 
-**Quality Score:** 85/100 (Production)
+**Quality Score:** 93/100 (Production)
 
 ------------------------------------------------------------------------
 
@@ -40,21 +40,21 @@ The Turas Weighting module provides production-ready sample weighting for survey
 | File | Lines | Purpose | Quality | Notes |
 |----|---:|----|---:|----|
 | `00_guard.R` | 261 | TRS guard layer; validates config and data file paths, checks required Excel sheet presence, enforces parameter constraints | 93/100 | First line of defence; returns structured TRS refusals with actionable fix instructions |
-| `config_loader.R` | 725 | Excel configuration parser; reads and validates General, Weights, Targets, and Advanced sheets from the config workbook | 88/100 | Comprehensive handling of multiple sheet types; translates Excel structure into internal config list |
+| `config_loader.R` | 740 | Excel configuration parser; reads and validates General, Weights, Targets, and Advanced sheets from the config workbook | 90/100 | Supports id_column setting for weight lookup output; comprehensive handling of multiple sheet types |
 | `validation.R` | 410 | Data validation layer; performs type checks, completeness verification, NA detection, and column existence checks against config | 90/100 | Runs after config loading but before calculation; catches data-config mismatches early |
 | `design_weights.R` | 362 | Design weight calculator; computes weights from stratified sampling with known population proportions | 90/100 | Well-tested statistical method; handles single and multi-variable stratification |
-| `rim_weights.R` | 655 | Rim/raking weight calculator using `survey::calibrate` for iterative proportional fitting (IPF) | 92/100 | Leverages the `survey` package for robust calibration; handles convergence monitoring and failure reporting |
+| `rim_weights.R` | 660 | Rim/raking weight calculator using `survey::calibrate` for iterative proportional fitting (IPF) | 93/100 | Leverages the `survey` package for robust calibration; reference-level logging; convergence monitoring and failure reporting |
 | `cell_weights.R` | 437 | Cell/interlocked weight calculator; matches joint distributions across multiple variables simultaneously | 88/100 | Handles cross-tabulated target distributions; validates cell counts before calculation |
 | `trimming.R` | 386 | Weight trimming and capping; supports cap method (hard limits), percentile method, and post-trim rescaling to preserve totals | 90/100 | Applies after weight calculation; ensures weights stay within acceptable bounds |
 | `diagnostics.R` | 498 | Quality diagnostics engine; computes design effect (DEFF), statistical efficiency, weight distribution statistics, and convergence metrics | 90/100 | Critical for assessing weighting quality; results feed into both Excel and HTML outputs |
-| `output.R` | 820 | Excel and CSV output generator; produces formatted workbooks with data sheets, weight columns, and diagnostics summary sheet | 85/100 | Largest core file; handles workbook styling, conditional formatting, and multi-sheet layout |
-| `generate_config_templates.R` | 662 | Professional Excel template generator; creates pre-formatted config workbooks using shared Turas template infrastructure | 90/100 | Uses shared infrastructure for consistent template style across modules |
+| `output.R` | 870 | Weight lookup and diagnostics output; produces clean ID+Weight files (.xlsx/.csv) and formatted diagnostics workbooks | 90/100 | Output file contains only respondent ID and weight columns (ready to merge); tryCatch handlers correctly pass through TRS refusals |
+| `generate_config_templates.R` | 680 | Professional Excel template generator; creates pre-formatted config workbooks using shared Turas template infrastructure | 91/100 | Includes id_column setting; cell targets use dynamic column format matching calculation code |
 
 ### Validation (`lib/validation/`)
 
 | File | Lines | Purpose | Quality | Notes |
 |----|---:|----|---:|----|
-| `preflight_validators.R` | 960 | Suite of 14 cross-referential pre-flight checks; validates target consistency, variable availability, population total alignment, and logical constraints before any calculation begins | 95/100 | Most thorough validation file in the module; catches subtle config errors that would cause misleading results |
+| `preflight_validators.R` | 968 | Suite of 14 cross-referential pre-flight checks; validates target consistency, variable availability, population total alignment, and logical constraints before any calculation begins | 95/100 | Dynamic cell variable column support; guards against missing apply_trimming column; 19 dedicated tests |
 
 ### HTML Report (`lib/html_report/`)
 
@@ -208,9 +208,9 @@ Quality scores are assigned on a 0--100 scale based on six dimensions. Each file
 
 ### Module-Level Observations
 
--   **Guard and validation files (90--95):** These are the strongest components. The preflight validator at 95/100 is the highest-scoring file, reflecting its thoroughness in catching subtle configuration errors before they propagate.
--   **Core calculation files (88--92):** The statistical engines are well-implemented and benefit from leveraging established R packages (`survey::calibrate` for rim weighting). `rim_weights.R` scores highest at 92/100 due to its robust convergence handling.
--   **Config loader (88):** Comprehensive parsing of four Excel sheet types. Complexity is inherent to the task but the file remains well-organised.
--   **Output (85):** The largest core file at 820 lines. Functional and reliable, but its size suggests it could benefit from decomposition into smaller, focused output helpers.
--   **HTML report (82--88):** Functional with clean output. The page builder at 82/100 is the lowest-scoring HTML file due to its size (1,044 lines) and the amount of embedded CSS. The orchestrator and writer score well.
--   **Template generator (90):** Clean integration with the shared Turas template infrastructure; generates professional, consistent configuration templates.
+-   **Guard and validation files (90--95):** The strongest components. The preflight validator at 95/100 is the highest-scoring file, reflecting its thoroughness in catching subtle configuration errors before they propagate.
+-   **Core calculation files (90--93):** The statistical engines are well-implemented and benefit from leveraging established R packages (`survey::calibrate` for rim weighting). `rim_weights.R` scores highest at 93/100 due to its robust convergence handling and reference-level logging.
+-   **Config loader (90):** Comprehensive parsing of four Excel sheet types including id_column support. Complexity is inherent to the task but the file remains well-organised.
+-   **Output (90):** Produces clean weight lookup files (ID + weight columns) for easy merge-back into data. tryCatch handlers correctly pass through TRS refusals using turas_refusal condition class.
+-   **HTML report (85--91):** All callouts rewritten with precise, defensible statistical language (Kish DEFF formula, proper efficiency definitions). Page builder at 85/100 is the lowest-scoring HTML file due to its size (1,069 lines).
+-   **Template generator (91):** Cell targets use dynamic column format matching calculation code. Clean integration with shared Turas template infrastructure.

@@ -180,7 +180,8 @@ Key-value format with `Setting` and `Value` columns:
 |---------|--------------|----------|-------------|
 | `project_name` | Brand Health 2026 | **Yes** | Project identifier |
 | `data_file` | data/survey.csv | **Yes** | Path to input data |
-| `output_file` | output/weighted.csv | No | Path for weighted data output |
+| `id_column` | ResponseID | No | Respondent ID column name (default: ResponseID) |
+| `output_file` | output/weights.xlsx | No | Path for weight lookup file (ID + weight columns) |
 | `save_diagnostics` | Y | No | Generate diagnostics workbook |
 | `diagnostics_file` | output/diagnostics.xlsx | If save_diagnostics=Y | Diagnostics path |
 | `html_report` | Y | No | Generate HTML report |
@@ -316,7 +317,7 @@ This creates a professional Excel template with dropdown validation, colour-code
 
 ### Weighted Data File
 
-Your original data with weight column(s) added. If you configured `output_file = "output/weighted.csv"`, the file is saved there. The `result$data` object also contains the weighted data in memory.
+A clean **weight lookup file** with respondent ID in column A and weight column(s) in subsequent columns. This file is ready to merge back into your data. If you configured `output_file = "output/weights.xlsx"`, the file is saved there. The `result$data` object contains the full data with weight columns appended in memory.
 
 ### Excel Diagnostics Workbook
 
@@ -538,7 +539,8 @@ Re-run. DEFF drops to 1.6, Max Weight = 4.0, Efficiency = 63%. This is acceptabl
 |-------|-------|----------|---------|-------------|
 | General | project_name | Yes | — | Project identifier |
 | General | data_file | Yes | — | Input data path |
-| General | output_file | No | — | Weighted data output path |
+| General | id_column | No | ResponseID | Respondent ID column name |
+| General | output_file | No | — | Weight lookup file path (ID + weights) |
 | General | save_diagnostics | No | N | Generate diagnostics workbook |
 | General | diagnostics_file | Conditional | — | Diagnostics output path |
 | General | html_report | No | N | Generate HTML report |
@@ -667,7 +669,7 @@ my_project/
   data/
     survey.csv            ← data_file = "data/survey.csv"
   output/
-    weighted.csv          ← output_file = "output/weighted.csv"
+    weights.xlsx          ← output_file = "output/weights.xlsx" (ID + weight columns only)
 ```
 
 You can move the entire project folder anywhere (OneDrive, Dropbox, another computer) and it works without changes. Absolute paths are also supported.

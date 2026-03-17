@@ -101,6 +101,13 @@ load_weighting_config <- function(config_file, verbose = TRUE) {
   # Resolve data file path relative to config location
   general$data_file_resolved <- resolve_config_path(general$data_file, project_root)
 
+  # ID column (defaults to first column of data if not specified)
+  if (!is.null(general$id_column) && !is.na(general$id_column) && nzchar(trimws(general$id_column))) {
+    general$id_column <- trimws(general$id_column)
+  } else {
+    general$id_column <- NULL  # Will be resolved to first column when data is loaded
+  }
+
   # Resolve output file path if specified
   if (!is.null(general$output_file) && !is.na(general$output_file) && general$output_file != "") {
     general$output_file_resolved <- resolve_config_path(general$output_file, project_root)

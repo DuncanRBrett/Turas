@@ -153,7 +153,8 @@ list(
     project_name = "...",
     data_file = "...",
     data_file_resolved = "...",       # Absolute path
-    output_file_resolved = "...",
+    id_column = "ResponseID",         # Respondent ID column name
+    output_file_resolved = "...",     # Weight lookup file path
     save_diagnostics = TRUE/FALSE,
     html_report = TRUE/FALSE,
     html_report_file_resolved = "...",

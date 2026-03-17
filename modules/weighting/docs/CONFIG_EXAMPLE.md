@@ -9,8 +9,8 @@ This guide shows you **exactly** what your Weight_Config.xlsx should look like. 
 Run this in R to generate a working template:
 
 ```r
-source("modules/weighting/templates/create_template.R")
-create_weight_config_template("my_project/Weight_Config.xlsx")
+source("modules/weighting/lib/generate_config_templates.R")
+generate_weight_config_template("my_project/Weight_Config.xlsx")
 ```
 
 This creates a pre-configured template with all sheets and v3.0 parameters.
@@ -37,7 +37,8 @@ If creating manually, your Excel file can have up to 7 sheets:
 |---------|-------|
 | project_name | My_Survey_Project |
 | data_file | data/survey_responses.csv |
-| output_file | data/survey_weighted.csv |
+| id_column | ResponseID |
+| output_file | output/survey_weights.xlsx |
 | save_diagnostics | Y |
 | diagnostics_file | output/weight_diagnostics.xlsx |
 | html_report | Y |
@@ -52,6 +53,8 @@ If creating manually, your Excel file can have up to 7 sheets:
 - `data_file` path is relative to the Weight_Config.xlsx location
 - All paths can be relative or absolute
 - Supported data formats: .csv, .xlsx, .xls, .sav
+- `id_column` defaults to "ResponseID" if not specified
+- `output_file` produces a **weight lookup file** (ID + weight columns only) — ready to merge back into your data
 - `html_report_file` is auto-generated if left blank
 - `brand_colour`/`accent_colour` are optional (defaults used if blank)
 - `researcher_name`/`client_name` appear in the HTML report header as "Prepared by X for Y"
@@ -154,23 +157,29 @@ Example with Gender x Age cross-tabulation:
 
 **Optional sheet - defaults work for most cases.**
 
-| weight_name | max_iterations | convergence_tolerance | force_convergence |
-|-------------|----------------|----------------------|-------------------|
-| pop_weight | 100 | 0.001 | N |
+| weight_name | max_iterations | convergence_tolerance | calibration_method | weight_bounds |
+|-------------|----------------|----------------------|--------------------|---------------|
+| pop_weight | 500 | 1e-6 | raking | 0.1,10 |
 
 **Parameter Guide:**
 
 **max_iterations** (default: 50)
 - How many iterations before stopping
-- Increase to 100 if convergence fails
+- Increase to 500 if convergence fails with many variables
 
-**convergence_tolerance** (default: 0.001)
+**convergence_tolerance** (default: 1e-7)
 - How precisely margins must match targets
-- Smaller values = tighter convergence
+- Smaller values = tighter convergence (1e-6 is fine for most cases)
 
-**force_convergence** (default: N)
-- Set to Y to accept non-converged weights (not recommended)
-- Always review diagnostics if using this
+**calibration_method** (default: raking)
+- `raking` — standard iterative proportional fitting (recommended)
+- `linear` — linear calibration (allows negative weights unless bounded)
+- `logit` — logit calibration (bounded by weight_bounds)
+
+**weight_bounds** (default: 0.3,3.0)
+- Format: `lower,upper` — minimum and maximum allowed weight values
+- Wider bounds allow convergence but increase variance
+- Narrower bounds preserve precision but may prevent convergence
 
 ---
 
@@ -262,8 +271,13 @@ source("modules/weighting/run_weighting.R")
 result <- run_weighting("Weight_Config.xlsx")
 
 # Check results
-head(result$data)                                  # Data with new weight column(s)
+head(result$data)                                  # Data with weight column(s) appended
 result$weight_results$pop_weight$diagnostics       # Quality metrics
+
+# Output files:
+# - output/survey_weights.xlsx    → Weight lookup (ID + weight columns only)
+# - output/weight_diagnostics.xlsx → Diagnostics report
+# - output/weighting_report.html   → Interactive HTML report
 ```
 
 Or from the Turas GUI: click **Weighting**, browse to your folder, select config, and click **Calculate Weights**.
