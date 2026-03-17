@@ -17,7 +17,18 @@
 # - utils.R (validation helpers)
 # ==============================================================================
 
-CI_DISPATCHER_VERSION <- "10.1"
+CI_DISPATCHER_VERSION <- "10.2"
+
+# Safe extraction of optional numeric config fields
+# Handles character, numeric, NA, NULL, and empty string inputs
+safe_extract_numeric <- function(value) {
+  if (is.null(value) || length(value) == 0) return(NULL)
+  if (is.numeric(value) && !is.na(value)) return(value)
+  if (is.na(value)) return(NULL)
+  val_str <- as.character(value)
+  if (!nzchar(trimws(val_str))) return(NULL)
+  suppressWarnings(as.numeric(val_str))
+}
 
 # ==============================================================================
 # PROPORTION CI DISPATCH
@@ -106,11 +117,11 @@ dispatch_proportion_ci <- function(p, n_eff, values, categories, weights,
   # -------------------------------------------------------------------------
   run_cred_flag <- q_row$Run_Credible
   if (!is.null(run_cred_flag) && !is.na(run_cred_flag) && toupper(run_cred_flag) == "Y") {
-    prior_mean <- if (!is.null(q_row$Prior_Mean) && !is.na(q_row$Prior_Mean) && nzchar(trimws(q_row$Prior_Mean))) suppressWarnings(as.numeric(q_row$Prior_Mean)) else NULL
-    prior_n    <- if (!is.null(q_row$Prior_N) && !is.na(q_row$Prior_N) && nzchar(trimws(q_row$Prior_N))) suppressWarnings(as.numeric(q_row$Prior_N)) else NULL
+    prior_mean <- safe_extract_numeric(q_row$Prior_Mean)
+    prior_n    <- safe_extract_numeric(q_row$Prior_N)
 
     # Validate prior_mean is in valid range for proportion (0-1)
-    if (!is.null(prior_mean) && (prior_mean < 0 || prior_mean > 1)) {
+    if (!is.null(prior_mean) && (is.na(prior_mean) || prior_mean < 0 || prior_mean > 1)) {
       warnings_list <- c(warnings_list,
         sprintf("Question %s: Prior_Mean=%.2f invalid for proportion (must be 0-1), Bayesian CI skipped", q_id, prior_mean))
     } else {
@@ -208,9 +219,9 @@ dispatch_mean_ci <- function(mean_val, sd_val, n_eff, values, weights,
   # -------------------------------------------------------------------------
   run_cred_flag <- q_row$Run_Credible
   if (!is.null(run_cred_flag) && !is.na(run_cred_flag) && toupper(run_cred_flag) == "Y") {
-    prior_mean <- if (!is.null(q_row$Prior_Mean) && !is.na(q_row$Prior_Mean) && nzchar(trimws(q_row$Prior_Mean))) suppressWarnings(as.numeric(q_row$Prior_Mean)) else NULL
-    prior_sd   <- if (!is.null(q_row$Prior_SD) && !is.na(q_row$Prior_SD) && nzchar(trimws(q_row$Prior_SD))) suppressWarnings(as.numeric(q_row$Prior_SD)) else NULL
-    prior_n    <- if (!is.null(q_row$Prior_N) && !is.na(q_row$Prior_N) && nzchar(trimws(q_row$Prior_N))) suppressWarnings(as.numeric(q_row$Prior_N)) else NULL
+    prior_mean <- safe_extract_numeric(q_row$Prior_Mean)
+    prior_sd   <- safe_extract_numeric(q_row$Prior_SD)
+    prior_n    <- safe_extract_numeric(q_row$Prior_N)
 
     tryCatch({
       result$bayesian <- credible_interval_mean(
@@ -360,8 +371,10 @@ dispatch_nps_ci <- function(nps_stats, values, promoter_codes, detractor_codes,
   # -------------------------------------------------------------------------
   run_cred_flag <- q_row$Run_Credible
   if (!is.null(run_cred_flag) && !is.na(run_cred_flag) && toupper(run_cred_flag) == "Y") {
-    prior_mean <- if (!is.null(q_row$Prior_Mean) && !is.na(q_row$Prior_Mean) && nzchar(trimws(q_row$Prior_Mean))) suppressWarnings(as.numeric(q_row$Prior_Mean)) else 0
-    prior_sd   <- if (!is.null(q_row$Prior_SD) && !is.na(q_row$Prior_SD) && nzchar(trimws(q_row$Prior_SD))) suppressWarnings(as.numeric(q_row$Prior_SD)) else 50  # Wide prior
+    prior_mean <- safe_extract_numeric(q_row$Prior_Mean)
+    if (is.null(prior_mean)) prior_mean <- 0
+    prior_sd   <- safe_extract_numeric(q_row$Prior_SD)
+    if (is.null(prior_sd)) prior_sd <- 50  # Wide prior
 
     # Calculate SE for NPS
     p_prom <- pct_promoters / 100

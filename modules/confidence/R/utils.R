@@ -267,7 +267,7 @@ validate_sample_size <- function(n, param_name = "n", min_n = 1) {
 #' @return Logical. TRUE if valid (invisible)
 #'
 #' @keywords internal
-validate_conf_level <- function(conf_level, allowed_values = c(0.90, 0.95, 0.99)) {
+validate_conf_level <- function(conf_level, allowed_values = NULL) {
   if (!is.numeric(conf_level)) {
     confidence_refuse(
       code = "CFG_INVALID_CONF_LEVEL_TYPE",

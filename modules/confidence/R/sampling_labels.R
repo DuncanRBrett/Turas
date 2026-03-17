@@ -84,8 +84,9 @@ get_sampling_labels <- function(sampling_method = "Not_Specified") {
     "Online_Panel"  = "panel",
     "Self_Selected" = "convenience",
     "Not_Specified" = "not_specified",
-    "not_specified"   # fallback for unrecognised values
+    "not_specified"  # fallback: unrecognised values default to cautious framing
   )
+  if (is.null(normalised)) normalised <- "not_specified"
 
   # Probability-based designs use standard CI/MOE language
   # Non-probability (including not_specified) uses softened SI/PE language

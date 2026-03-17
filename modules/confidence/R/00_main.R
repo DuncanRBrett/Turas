@@ -796,20 +796,90 @@ process_all_questions <- function(config, survey_data, weight_var, verbose) {
       next
     }
 
+    # Apply subset filter if Filter_Variable and Filter_Values are specified
+    q_data <- survey_data
+    is_subset <- FALSE
+    subset_n <- nrow(survey_data)
+
+    filter_var <- if ("Filter_Variable" %in% names(q_row)) q_row$Filter_Variable else NULL
+    filter_vals <- if ("Filter_Values" %in% names(q_row)) q_row$Filter_Values else NULL
+
+    if (!is.null(filter_var) && !is.na(filter_var) && nzchar(trimws(as.character(filter_var)))) {
+      filter_var <- trimws(as.character(filter_var))
+
+      if (!filter_var %in% names(survey_data)) {
+        warnings_list <- c(warnings_list,
+          sprintf("Question %s: Filter_Variable '%s' not found in data - using full sample", q_id, filter_var))
+      } else {
+        # Parse filter values (comma-separated)
+        filter_codes <- parse_codes(as.character(filter_vals))
+        if (length(filter_codes) > 0) {
+          # Align types for matching
+          col_values <- survey_data[[filter_var]]
+          if (is.numeric(col_values) && is.character(filter_codes)) {
+            filter_codes <- suppressWarnings(as.numeric(filter_codes))
+            filter_codes <- filter_codes[!is.na(filter_codes)]
+          } else if (is.character(col_values) && is.numeric(filter_codes)) {
+            filter_codes <- as.character(filter_codes)
+          }
+
+          mask <- col_values %in% filter_codes & !is.na(col_values)
+          q_data <- survey_data[mask, , drop = FALSE]
+          is_subset <- TRUE
+          subset_n <- nrow(q_data)
+
+          if (subset_n == 0) {
+            warnings_list <- c(warnings_list,
+              sprintf("Question %s: Filter '%s' in (%s) yielded 0 respondents - skipping",
+                      q_id, filter_var, paste(filter_codes, collapse = ",")))
+            next
+          }
+
+          if (verbose && subset_n < nrow(survey_data)) {
+            cat(sprintf("    %s: filtered to n=%d (subset: %s=%s)\n",
+                        q_id, subset_n, filter_var, paste(filter_codes, collapse = ",")))
+          }
+        }
+      }
+    }
+
     if (stat_type == "proportion") {
-      result <- process_proportion_question(q_row, survey_data, weight_var, config)
+      result <- process_proportion_question(q_row, q_data, weight_var, config)
+      if (!is.null(result$result)) {
+        result$result$is_subset <- is_subset
+        result$result$subset_n <- subset_n
+        if (is_subset) {
+          result$result$filter_variable <- filter_var
+          result$result$filter_values <- as.character(filter_vals)
+        }
+      }
       proportion_results[[q_id]] <- result$result
       warnings_list <- c(warnings_list, result$warnings)
     } else if (stat_type == "mean") {
-      result <- process_mean_question(q_row, survey_data, weight_var, config)
+      result <- process_mean_question(q_row, q_data, weight_var, config)
+      if (!is.null(result$result)) {
+        result$result$is_subset <- is_subset
+        result$result$subset_n <- subset_n
+        if (is_subset) {
+          result$result$filter_variable <- filter_var
+          result$result$filter_values <- as.character(filter_vals)
+        }
+      }
       mean_results[[q_id]] <- result$result
       warnings_list <- c(warnings_list, result$warnings)
     } else if (stat_type == "nps") {
-      result <- process_nps_question(q_row, survey_data, weight_var, config)
+      result <- process_nps_question(q_row, q_data, weight_var, config)
+      if (!is.null(result$result)) {
+        result$result$is_subset <- is_subset
+        result$result$subset_n <- subset_n
+        if (is_subset) {
+          result$result$filter_variable <- filter_var
+          result$result$filter_values <- as.character(filter_vals)
+        }
+      }
       nps_results[[q_id]] <- result$result
       warnings_list <- c(warnings_list, result$warnings)
     } else {
-      warning(sprintf("Unknown statistic type '%s' for question %s", stat_type, q_id))
       warnings_list <- c(warnings_list,
         sprintf("Question %s: Unknown statistic type '%s'", q_id, stat_type))
     }

@@ -221,6 +221,14 @@ prepare_question_data <- function(values, weights = NULL, require_numeric = FALS
 #'
 #' @keywords internal
 calculate_proportion_stats <- function(values, categories, weights = NULL) {
+  # Align types for %in% matching: if one is numeric and other character, coerce both
+  if (is.numeric(values) && is.character(categories)) {
+    categories <- suppressWarnings(as.numeric(categories))
+    categories <- categories[!is.na(categories)]
+  } else if (is.character(values) && is.numeric(categories)) {
+    categories <- as.character(categories)
+  }
+
   in_category <- values %in% categories
 
   if (!is.null(weights)) {

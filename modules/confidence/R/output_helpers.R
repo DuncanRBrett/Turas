@@ -42,7 +42,7 @@ build_base_result_row <- function(q_id, base_fields) {
 
   for (name in names(base_fields)) {
     value <- base_fields[[name]]
-    row[[name]] <- if (!is.null(value)) value else NA
+    row[[name]] <- if (is.null(value)) NA else value
   }
 
   return(row)
