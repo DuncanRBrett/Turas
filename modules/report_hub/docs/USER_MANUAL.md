@@ -135,6 +135,63 @@ Maps questions between tracker and crosstabs reports for cross-referencing.
 
 Rows with empty `tracker_code` or `tabs_code` are automatically skipped.
 
+### Slides Sheet (Optional)
+
+Adds qualitative insight slides to the Overview front page. Each row becomes an editable slide card.
+
+| Column | Required? | Description |
+|--------|-----------|-------------|
+| `slide_title` | **Yes** | Heading displayed on the slide card |
+| `content` | No* | Markdown-formatted text body. Supports headings, bold, italic, lists, etc. |
+| `display_order` | **Yes** | Numeric sort order (1, 2, 3...) |
+| `image_path` | No* | Path to an image file (PNG, JPG/JPEG, or SVG). Can be absolute or relative to the config file directory. |
+
+*\*At least one of `content` or `image_path` must be provided. Slides with neither are skipped. A slide with only an image (no text content) is valid — useful for chart screenshots, infographics, or visual summaries.*
+
+**Example:**
+
+| slide_title | content | display_order | image_path |
+|-------------|---------|---------------|------------|
+| Introduction | Project background and objectives... | 1 | |
+| Methodology | **Online survey** fielded Jan-Feb 2026... | 2 | |
+| Key Findings | | 3 | charts/key_findings.png |
+| Summary | Overall brand health remains strong. | 4 | charts/summary.png |
+
+- **Row 1 & 2:** Text-only slides (no image)
+- **Row 3:** Image-only slide (no text content — this is valid)
+- **Row 4:** Slide with both text and image
+
+#### Slide Image Handling
+
+Images specified via `image_path` are automatically **compressed and base64-embedded** into the self-contained HTML output. No external image files are referenced.
+
+**Compression pipeline:**
+1. Images wider than **800px** are downscaled to 800px width (bilinear interpolation), preserving aspect ratio
+2. PNG and JPEG images are re-encoded as **JPEG at 0.85 quality**
+3. SVG images pass through as-is (already lightweight vector format)
+4. The compressed image is base64-encoded and embedded directly in the HTML
+
+**Rough compression guide:**
+
+| Original | Dimensions | After compression |
+|----------|-----------|-------------------|
+| 5MB PNG, 3000x2000 | Resized to 800x533 | ~40-80KB |
+| 5MB PNG, 1200x800 | Resized to 800x533 | ~50-100KB |
+| 5MB JPEG, 4000x3000 | Resized to 800x600 | ~30-60KB |
+| 5MB JPEG, 800x600 (no resize needed) | 800x600 | ~80-150KB |
+
+Base64 encoding adds ~33% to the byte size in the HTML file. A typical slide image contributes **65-200KB** to the output file.
+
+**Manual image uploads** via the image button in the report UI are also compressed client-side: resized to max 800px wide, JPEG 0.7 quality, with a 5MB file size guard.
+
+**Requirements:** The `png`, `jpeg`, and `base64enc` R packages must be installed for image compression. If unavailable, images are embedded at their original size (larger file but still functional).
+
+**Tips for best results:**
+- Use PNG for charts and screenshots (crisp lines, text)
+- Use JPEG for photographs
+- Pre-size images to ~800-1200px wide for fastest processing
+- SVG is ideal for logos and simple graphics (no quality loss at any size)
+
 ---
 
 ## Function Reference

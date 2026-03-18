@@ -88,7 +88,7 @@ The output is a **single, self-contained HTML file** with all CSS, JS, images (B
 
 ## 2. Pipeline Steps
 
-### Step 1: Guard Validation (00_guard.R — 367 lines)
+### Step 1: Guard Validation (00_guard.R)
 
 Validates before any processing:
 - Config file exists and is readable `.xlsx`
@@ -98,6 +98,8 @@ Validates before any processing:
 - Report keys are valid format (starts with letter, only `a-z`, `A-Z`, `0-9`, `-`, `_`)
 - Report keys are unique
 - Colour values are valid hex codes (if provided)
+- **Slides sheet** (if present): validates required columns (`slide_title`, `content`, `display_order`), filters to slides with title + content or image, resolves `image_path` values, and compresses/encodes images
+- Logo path resolution and output directory validation
 
 Returns TRS refusal with actionable `how_to_fix` on any failure.
 
@@ -298,11 +300,29 @@ Replacement happens in `07_page_assembler.R` via simple string substitution.
 |-------|--------|----------|
 | Settings | Key-value (Field/Value columns) OR single-row (column names = fields) | Yes |
 | Reports | Table with one row per report | Yes |
+| Slides | Table with one row per qualitative slide (title, content, image, order) | No |
 | CrossRef | Table mapping tracker ↔ tabs question codes | No |
 
 ### Config Reading
 
 The guard layer (`00_guard.R`) reads the config. Settings sheet supports both formats — key-value is auto-detected by checking if the first column header is "Field" or similar.
+
+### Slides Sheet Processing
+
+The optional Slides sheet adds qualitative insight slides to the Overview front page. Processing in `00_guard.R`:
+
+1. **Validation:** Each slide requires `slide_title` + at least one of `content` or `image_path`. Slides missing both are silently skipped.
+2. **Content:** Markdown text stored as-is; rendered client-side. Empty content (`""`) is valid when an image is provided.
+3. **Image encoding:** Images go through `.encode_slide_image()` — a compression pipeline that:
+   - Reads PNG/JPEG files via the `png` and `jpeg` R packages
+   - Downscales images wider than 800px (bilinear interpolation, aspect ratio preserved)
+   - Re-encodes as JPEG at 0.85 quality
+   - Base64-encodes the result as a `data:image/jpeg;base64,...` URI
+   - SVG images are base64-encoded as-is (no rasterisation)
+   - Falls back to raw base64 embedding if `png`/`jpeg` packages are unavailable
+4. **Path resolution:** `image_path` values are tried as absolute paths first, then relative to the config file directory.
+
+The encoded image data is stored in `slide$image_data` and rendered by `03_front_page_builder.R` as an `<img>` thumbnail above the content area, with a hidden `<textarea>` holding the base64 data for client-side serialisation.
 
 ### Template Generation
 
