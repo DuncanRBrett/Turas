@@ -159,6 +159,7 @@ combine_reports <- function(config_file, output_file = NULL, auto_cross_ref = FA
 
   # --- Step 7: Assemble final HTML ---
   cat("Step 6: Assembling combined report...\n")
+  config$original_filename <- basename(output_file)
   final_html <- assemble_hub_html(config, parsed_reports, overview_html, navigation_html)
 
   # --- Step 8: Write output ---

@@ -384,7 +384,11 @@ build_help_overlay <- function() {
       htmltools::tags$h3("Exporting & Sharing"),
       htmltools::tags$ul(
         htmltools::tags$li(htmltools::tags$span(class = "help-key", "Save Report"),
-          "Downloads the HTML file with all your insights, pins, and edits preserved."),
+          htmltools::HTML(paste0(
+            "Saves the report with all your insights, pins, and edits preserved. ",
+            "In Chrome/Edge a <em>Save As</em> dialog lets you choose the location and overwrite the original file. ",
+            "In other browsers the file downloads as <strong>&lt;filename&gt;_updated.html</strong>."
+          ))),
         htmltools::tags$li(htmltools::tags$span(class = "help-key", "\U0001F4F7 Export PNG"),
           "Download any chart or pinned card as a high-resolution PNG image."),
         htmltools::tags$li(htmltools::tags$span(class = "help-key", "\U0001F4CB Copy"),
@@ -399,8 +403,9 @@ build_help_overlay <- function() {
       htmltools::tags$div(class = "help-tip",
         htmltools::HTML(paste0(
           "<strong>Tip:</strong> This report is a live working document. ",
-          "Add insights, pin key findings, create narrative slides, then <strong>Save</strong> ",
-          "to keep everything. Re-open the saved file any time to continue where you left off. ",
+          "Add insights, pin key findings, create narrative slides, then <strong>Save Report</strong> ",
+          "to keep everything. In Chrome or Edge you can save directly over the original file. ",
+          "Re-open the saved file any time to continue where you left off. ",
           "Press <strong>?</strong> to show this guide again."
         ))
       ),

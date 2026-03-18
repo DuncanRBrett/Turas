@@ -277,17 +277,49 @@ var ReportHub = ReportHub || {};
 
     // Serialize the full page
     var html = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
-
-    // Download as file
     var blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement("a");
-    a.href = url;
-    a.download = document.title.replace(/[^a-zA-Z0-9_\- ]/g, "") + "_saved.html";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+
+    // Determine suggested filename: derive from original name or page title, append _updated
+    var baseName = "";
+    var metaEl = document.querySelector('meta[name="turas-original-filename"]');
+    if (metaEl && metaEl.getAttribute("content")) {
+      baseName = metaEl.getAttribute("content").replace(/\.html$/i, "");
+    } else {
+      baseName = document.title.replace(/[^a-zA-Z0-9_\- ]/g, "");
+    }
+    var suggestedName = baseName + "_updated.html";
+
+    // Use File System Access API (Save As dialog) if available, otherwise fall back
+    if (window.showSaveFilePicker) {
+      window.showSaveFilePicker({
+        suggestedName: suggestedName,
+        types: [{
+          description: "HTML Document",
+          accept: { "text/html": [".html"] }
+        }]
+      }).then(function(handle) {
+        return handle.createWritable().then(function(writable) {
+          return writable.write(blob).then(function() {
+            return writable.close();
+          });
+        });
+      }).catch(function(err) {
+        // User cancelled the dialog — do nothing
+        if (err.name !== "AbortError") {
+          console.error("Save failed:", err);
+        }
+      });
+    } else {
+      // Fallback for browsers without File System Access API
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = suggestedName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
   };
 
   /**

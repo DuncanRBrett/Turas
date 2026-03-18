@@ -1090,15 +1090,31 @@ function saveReportHTML() {
 
   // Download
   var blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
-  var a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
   var projectTitle = document.querySelector(".tk-header-project");
   var filename = projectTitle ? projectTitle.textContent.trim().replace(/[^a-zA-Z0-9_-]/g, "_") : "tracking_report";
-  a.download = filename + "_updated.html";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(a.href);
+  var suggestedName = filename + "_updated.html";
+
+  // Use File System Access API (Save As dialog) if available, otherwise fall back
+  if (window.showSaveFilePicker) {
+    window.showSaveFilePicker({
+      suggestedName: suggestedName,
+      types: [{ description: "HTML Document", accept: { "text/html": [".html"] } }]
+    }).then(function(handle) {
+      return handle.createWritable().then(function(writable) {
+        return writable.write(blob).then(function() { return writable.close(); });
+      });
+    }).catch(function(err) {
+      if (err.name !== "AbortError") console.error("Save failed:", err);
+    });
+  } else {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = suggestedName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  }
 }
 
 

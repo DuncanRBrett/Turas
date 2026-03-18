@@ -22,6 +22,8 @@ assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_
   parts <- c(parts, '  <meta charset="UTF-8"/>')
   parts <- c(parts, '  <meta name="viewport" content="width=device-width, initial-scale=1"/>')
   parts <- c(parts, '  <meta name="turas-report-type" content="hub"/>')
+  parts <- c(parts, sprintf('  <meta name="turas-original-filename" content="%s"/>',
+                             htmltools::htmlEscape(config$original_filename %||% "")))
   parts <- c(parts, sprintf('  <title>%s</title>',
                              htmltools::htmlEscape(config$settings$project_title)))
 

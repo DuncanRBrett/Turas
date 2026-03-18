@@ -565,7 +565,7 @@ function saveReportHTML() {
   var html = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
   var blob = new Blob([html], { type: "text/html;charset=utf-8" });
 
-  // Derive filename: prefer original source filename + "_Updated", fall back to title
+  // Derive filename: prefer original source filename + "_updated", fall back to title
   var sourceMeta = document.querySelector('meta[name="turas-source-filename"]');
   var fname;
   if (sourceMeta && sourceMeta.content) {
@@ -574,7 +574,23 @@ function saveReportHTML() {
     var title = document.querySelector(".header-title");
     fname = title ? title.textContent.replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_") : "Report";
   }
-  downloadBlob(blob, fname + "_Updated.html");
+  var suggestedName = fname + "_updated.html";
+
+  // Use File System Access API (Save As dialog) if available, otherwise fall back
+  if (window.showSaveFilePicker) {
+    window.showSaveFilePicker({
+      suggestedName: suggestedName,
+      types: [{ description: "HTML Document", accept: { "text/html": [".html"] } }]
+    }).then(function(handle) {
+      return handle.createWritable().then(function(writable) {
+        return writable.write(blob).then(function() { return writable.close(); });
+      });
+    }).catch(function(err) {
+      if (err.name !== "AbortError") console.error("Save failed:", err);
+    });
+  } else {
+    downloadBlob(blob, suggestedName);
+  }
 
   // Restore DOM elements for continued use
   if (removedChipBar) {
