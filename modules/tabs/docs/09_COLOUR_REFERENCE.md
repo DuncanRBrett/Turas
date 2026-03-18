@@ -64,7 +64,47 @@ These control *when* the traffic light colours change, not the colours themselve
 |-------|---------|--------|
 | `chart_bar_colour` | Falls back to `brand_colour` | Hex 6-digit |
 
-**Used in:** Horizontal bar charts (nominal questions). Passed via `data.chart_bar_colour` in the chart JSON data, read by `chart_picker.js`.
+**Used in:** Horizontal bar charts (nominal questions). When only a single banner column is displayed, this colour is used directly. When multiple banner columns are selected and no custom series colours are defined, this colour is used as the seed for auto-generating a distinct palette via HSL rotation.
+
+### 1.5 Custom Series Colours (Banner Breaks)
+
+Optional per-series colour overrides for nominal bar charts with multiple banner columns (e.g., Total, Cape Town, Johannesburg). These allow clients to use their corporate colour scheme on bar charts.
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `chart_series_colour_1` | Optional | Colour for 1st banner series (e.g., Total) |
+| `chart_series_colour_2` | Optional | Colour for 2nd banner series |
+| `chart_series_colour_3` | Optional | Colour for 3rd banner series |
+| `chart_series_colour_4` | Optional | Colour for 4th banner series |
+| `chart_series_colour_5` | Optional | Colour for 5th banner series |
+| `chart_series_colour_6` | Optional | Colour for 6th banner series |
+| `chart_series_colour_7` | Optional | Colour for 7th banner series |
+| `chart_series_colour_8` | Optional | Colour for 8th banner series |
+
+**Behaviour:**
+- If **no series colours** are defined → `chart_bar_colour` is used with auto-generated HSL rotation (existing behaviour, unchanged).
+- If **any series colours** are defined → they are used sequentially for each banner column. Colours are assigned in the order columns appear in the chart toggle chips.
+- If there are **more series than colours defined** → colours cycle back to the start (with a console warning).
+- **Stacked bar charts are not affected** — they always use `chart_palette_preset` and the semantic colour mapping.
+
+**Interaction with other settings:**
+- `chart_palette_preset` controls stacked bars only — completely independent of series colours.
+- `chart_bar_colour` is still used as the single-column fallback and as the seed for auto-generation when no series colours are defined.
+
+**Example configuration (client corporate colours):**
+
+| Setting | Value |
+|---------|-------|
+| `chart_palette_preset` | `research` |
+| `chart_series_colour_1` | `#1B365D` |
+| `chart_series_colour_2` | `#3A6EA5` |
+| `chart_series_colour_3` | `#E87722` |
+| `chart_series_colour_4` | `#5B9A7D` |
+| `chart_series_colour_5` | `#8E4585` |
+
+In this example, stacked bars use the research preset (purple-green semantic palette) while nominal bar charts use the client's five corporate colours.
+
+**Report Hub:** Custom series colours carry through automatically. The colours are embedded in each tab report's HTML/JS data, and the report hub parses them as-is without modification.
 
 ---
 

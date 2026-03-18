@@ -842,6 +842,17 @@ build_question_chart <- function(question_data, options_df, config_obj) {
     })
   }
 
+  # Add custom series colours for nominal bar charts (if defined in config)
+  series_colours <- Filter(function(x) !is.null(x) && nzchar(x), list(
+    config_obj$chart_series_colour_1, config_obj$chart_series_colour_2,
+    config_obj$chart_series_colour_3, config_obj$chart_series_colour_4,
+    config_obj$chart_series_colour_5, config_obj$chart_series_colour_6,
+    config_obj$chart_series_colour_7, config_obj$chart_series_colour_8
+  ))
+  if (length(series_colours) > 0) {
+    chart_data$series_colours <- unlist(series_colours)
+  }
+
   # ------------------------------------------------------------------
   # STEP 4: Extract priority metric per column (if configured)
   # ------------------------------------------------------------------

@@ -463,9 +463,22 @@ function buildMultiHorizontalSVG(data, selectedKeys) {
   var bottomPad = lastWrap ? 16 : 8;
   var totalH = barsH + metricStripH + bottomPad;
 
-  // Distinct colour palette for columns — use chart_bar_colour for horizontal bars
+  // Distinct colour palette for columns — use custom series colours if provided,
+  // otherwise fall back to auto-generated palette from chart_bar_colour
   var bc = data.chart_bar_colour || data.brand_colour || BRAND_COLOUR;
-  var colColours = nCols > 1 ? getDistinctPalette(bc, nCols) : [bc];
+  var colColours;
+  if (data.series_colours && data.series_colours.length > 0) {
+    colColours = [];
+    for (var ci = 0; ci < nCols; ci++) {
+      colColours.push(data.series_colours[ci % data.series_colours.length]);
+    }
+    if (nCols > data.series_colours.length) {
+      console.warn("Chart has " + nCols + " series but only " +
+        data.series_colours.length + " custom colours defined. Colours will repeat.");
+    }
+  } else {
+    colColours = nCols > 1 ? getDistinctPalette(bc, nCols) : [bc];
+  }
 
   var p = [];
   p.push("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 " + chartW + " " + totalH + "\" role=\"img\" aria-label=\"Bar chart\" style=\"font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;\">");
