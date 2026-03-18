@@ -74,19 +74,19 @@ guard_check_collapsing <- function(guard, collapsed_levels) {
 #' @param outcome_type Outcome type
 #' @return Updated guard state
 #' @keywords internal
-guard_check_sample_size <- function(guard, n_obs, n_params, outcome_type) {
+guard_check_sample_size <- function(guard, n_obs, n_params, outcome_type, config = NULL) {
   # Events per parameter rule
-  epp <- n_obs / n_params
+  epp <- if (n_params > 0) n_obs / n_params else Inf
 
-  if (epp < 10) {
+  if (epp < CATDRIVER_DEFAULTS$min_epp) {
     guard <- guard_warn(guard,
-      sprintf("Low events-per-parameter ratio (%.1f). Recommend >= 10 for stable estimates.", epp),
+      sprintf("Low events-per-parameter ratio (%.1f). Recommend >= %g for stable estimates.", epp, CATDRIVER_DEFAULTS$min_epp),
       "sample_size"
     )
     guard <- guard_flag_stability(guard, "Low events-per-parameter ratio")
   }
 
-  if (n_obs < 100) {
+  if (n_obs < (config$min_sample_size %||% CATDRIVER_DEFAULTS$min_sample_size)) {
     guard <- guard_warn(guard,
       sprintf("Small sample size (N=%d). Results may have wide confidence intervals.", n_obs),
       "sample_size"
@@ -208,7 +208,7 @@ guard_direction_sanity <- function(guard, prep_data, model_result, config) {
           # If level has lower proportion, OR should be < 1
           prop_diff <- level_prop - ref_prop
 
-          if ((prop_diff > 0.05 && or_val < 0.8) || (prop_diff < -0.05 && or_val > 1.25)) {
+          if ((prop_diff > CATDRIVER_DEFAULTS$direction_prop_diff && or_val < CATDRIVER_DEFAULTS$direction_or_lower) || (prop_diff < -CATDRIVER_DEFAULTS$direction_prop_diff && or_val > CATDRIVER_DEFAULTS$direction_or_upper)) {
             mismatches <- mismatches + 1
           }
         }
@@ -216,21 +216,18 @@ guard_direction_sanity <- function(guard, prep_data, model_result, config) {
     }
   }
 
-  # If majority of checked comparisons mismatch, likely reversal
+  # If majority of checked comparisons mismatch, likely reversal — warn, don't hard refuse
+  # This is a soft guard: the model may still be valid (e.g. confounding effects)
   if (checked > 2 && mismatches / checked > 0.5) {
-    catdriver_refuse(
-      reason = "CFG_OUTCOME_ORDER_REVERSED",
-      title = "OUTCOME ORDER APPEARS REVERSED",
-      problem = "Odds ratio directions do not align with raw data patterns.",
-      why_it_matters = "This usually means the outcome ordering is backwards, producing inverted interpretations.",
-      fix = paste0(
-        "Check the 'Order' column for your outcome variable.\n",
-        "Ensure Low values are listed BEFORE High values.\n",
-        "For satisfaction: 'Dissatisfied;Neutral;Satisfied'\n",
-        "NOT: 'Satisfied;Neutral;Dissatisfied'"
-      ),
-      details = paste0("CURRENT ORDER: ", paste(outcome_levels, collapse = " < "))
-    )
+    guard_warn(guard, paste0(
+      "OUTCOME ORDER MAY BE REVERSED: Odds ratio directions do not align with raw data patterns ",
+      "for ", mismatches, "/", checked, " comparisons. ",
+      "Check the 'Order' column for your outcome variable. ",
+      "Ensure Low values are listed BEFORE High values (e.g. 'Dissatisfied;Neutral;Satisfied'). ",
+      "Current order: ", paste(outcome_levels, collapse = " < ")
+    ))
+    guard_flag_stability(guard, "direction_sanity",
+      paste0("OR direction mismatch in ", mismatches, "/", checked, " comparisons — possible outcome order reversal"))
   }
 
   guard
@@ -336,7 +333,7 @@ guard_post_model <- function(guard, prep_data, model_result, config) {
   # Sample size checks
   n_obs <- nrow(prep_data$data)
   n_params <- prep_data$n_terms
-  guard <- guard_check_sample_size(guard, n_obs, n_params, config$outcome_type)
+  guard <- guard_check_sample_size(guard, n_obs, n_params, config$outcome_type, config)
 
   # Proportional odds check (ordinal only)
   if (!is.null(model_result$proportional_odds)) {

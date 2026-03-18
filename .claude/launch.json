@@ -36,6 +36,12 @@
       "runtimeExecutable": "/bin/bash",
       "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve '/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Projects/CCPB/CCPB_CSAT/03_Waves/CSAT2025/04_Analysis/Crosstabs' -l 8790 --no-clipboard"],
       "port": 8790
+    },
+    {
+      "name": "catdriver-report",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve modules/catdriver/examples/demo -l 8795 --no-clipboard"],
+      "port": 8795
     }
   ]
 }

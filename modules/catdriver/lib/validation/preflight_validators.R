@@ -1172,10 +1172,42 @@ validate_catdriver_preflight <- function(config, data, variables_df,
     n_info <- sum(error_log$Component == "Preflight" & error_log$Severity == "Info")
 
     if (n_preflight == 0) {
-      cat("  All 15 pre-flight checks passed\n")
+      cat("  \u2714 All 15 pre-flight checks passed\n")
     } else {
       cat(sprintf("  Pre-flight found %d issue(s): %d error(s), %d warning(s), %d info\n",
                   n_preflight, n_errors, n_warnings, n_info))
+
+      # Print boxed summary for errors (visible in Shiny console)
+      if (n_errors > 0) {
+        preflight_errors <- error_log[error_log$Component == "Preflight" &
+                                       error_log$Severity == "Error", , drop = FALSE]
+
+        cat("\n\u250C\u2500\u2500\u2500 CATDRIVER PRE-FLIGHT CHECK FAILED \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n")
+        for (i in seq_len(nrow(preflight_errors))) {
+          cat(sprintf("\u2502 [%d] %s\n", i, preflight_errors$IssueType[i]))
+          # Wrap long descriptions
+          desc <- preflight_errors$Description[i]
+          desc_lines <- strwrap(desc, width = 52, prefix = "\u2502     ")
+          cat(paste(desc_lines, collapse = "\n"), "\n")
+        }
+        cat("\u2502\n")
+        cat(sprintf("\u2502 %d of 15 checks failed. Fix errors above before\n", n_errors))
+        cat("\u2502 running the analysis.\n")
+        cat("\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\n")
+      }
+
+      # Print warnings in a lighter format
+      if (n_warnings > 0) {
+        preflight_warnings <- error_log[error_log$Component == "Preflight" &
+                                         error_log$Severity == "Warning", , drop = FALSE]
+        cat("  Pre-flight warnings (analysis will proceed):\n")
+        for (i in seq_len(nrow(preflight_warnings))) {
+          var_str <- if (nzchar(preflight_warnings$QuestionCode[i]))
+            sprintf(" [%s]", preflight_warnings$QuestionCode[i]) else ""
+          cat(sprintf("    \u26A0 %s%s\n", preflight_warnings$IssueType[i], var_str))
+        }
+        cat("\n")
+      }
     }
   }
 

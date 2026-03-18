@@ -283,7 +283,7 @@ validate_catdriver_data <- function(data, config) {
     if (strategy == "drop_row") {
       # These rows will be dropped - but only if outcome is also valid
       # (outcome missing rows are already excluded)
-      driver_missing_in_valid <- is.na(data[[driver_var]]) & outcome_valid_mask
+      driver_missing_in_valid <- is_missing_value(data[[driver_var]]) & outcome_valid_mask
       effective_n <- effective_n - sum(driver_missing_in_valid)
       # Update mask for next driver (cumulative exclusion)
       outcome_valid_mask <- outcome_valid_mask & !is.na(data[[driver_var]])
@@ -328,10 +328,10 @@ validate_catdriver_data <- function(data, config) {
   }
 
   # Check for rare categories
-  rare_cats <- names(outcome_info$counts)[outcome_info$counts < 10]
+  rare_cats <- names(outcome_info$counts)[outcome_info$counts < CATDRIVER_DEFAULTS$rare_level_threshold]
   if (length(rare_cats) > 0) {
     diagnostics$warnings <- c(diagnostics$warnings,
-      paste0("Outcome has rare categories (<10 obs): ",
+      paste0("Outcome has rare categories (<", CATDRIVER_DEFAULTS$rare_level_threshold, " obs): ",
              paste(rare_cats, collapse = ", ")))
   }
 
@@ -371,10 +371,10 @@ validate_catdriver_data <- function(data, config) {
 
     # Check for rare categories in categorical drivers
     if (driver_info$is_categorical) {
-      rare_driver_cats <- names(driver_info$counts)[driver_info$counts < 10]
+      rare_driver_cats <- names(driver_info$counts)[driver_info$counts < CATDRIVER_DEFAULTS$rare_level_threshold]
       if (length(rare_driver_cats) > 0 && length(rare_driver_cats) < driver_info$n_categories) {
         diagnostics$warnings <- c(diagnostics$warnings,
-          paste0("Driver '", driver_var, "' has rare categories (<10 obs): ",
+          paste0("Driver '", driver_var, "' has rare categories (<", CATDRIVER_DEFAULTS$rare_level_threshold, " obs): ",
                  paste(head(rare_driver_cats, 3), collapse = ", "),
                  if (length(rare_driver_cats) > 3) paste0(" +", length(rare_driver_cats) - 3, " more") else ""))
       }
@@ -408,12 +408,13 @@ validate_catdriver_data <- function(data, config) {
   for (driver_var in config$driver_vars) {
     if (is_categorical(data_complete[[driver_var]])) {
       tab <- table(data_complete[[driver_var]], data_complete[[config$outcome_var]])
-      small_cell_check <- detect_small_cells(tab, threshold = 5)
+      cell_threshold <- config$rare_cell_threshold %||% CATDRIVER_DEFAULTS$rare_cell_threshold
+      small_cell_check <- detect_small_cells(tab, threshold = cell_threshold)
 
       if (small_cell_check$has_small_cells) {
         diagnostics$small_cells[[driver_var]] <- small_cell_check
         diagnostics$warnings <- c(diagnostics$warnings,
-          paste0("Small cells (<5) in ", driver_var, " x ", config$outcome_var,
+          paste0("Small cells (<", cell_threshold, ") in ", driver_var, " x ", config$outcome_var,
                  " cross-tabulation"))
       }
     }
@@ -438,10 +439,10 @@ validate_catdriver_data <- function(data, config) {
 
     events_per_predictor <- min_events / n_terms
 
-    if (events_per_predictor < 10) {
+    if (events_per_predictor < CATDRIVER_DEFAULTS$min_epp) {
       diagnostics$warnings <- c(diagnostics$warnings,
         paste0("Low events per predictor: ", round(events_per_predictor, 1),
-               " (recommend 10+). Consider reducing number of predictors."))
+               " (recommend ", CATDRIVER_DEFAULTS$min_epp, "+). Consider reducing number of predictors."))
     }
 
     diagnostics$events_per_predictor <- events_per_predictor

@@ -186,7 +186,8 @@ create_config <- function(filename, outcome_var, outcome_label, outcome_type,
                           multinomial_mode = NULL, target_outcome_level = NULL,
                           use_weights = TRUE,
                           subgroup_var = NULL,
-                          exclude_drivers = NULL) {
+                          exclude_drivers = NULL,
+                          slides = NULL) {
 
   wb <- createWorkbook()
 
@@ -228,7 +229,7 @@ create_config <- function(filename, outcome_var, outcome_label, outcome_type,
   add_setting("probability_lifts",  "TRUE")
   add_setting("brand_colour",       "#323367")
   add_setting("accent_colour",      "#CC9900")
-  add_setting("researcher_logo_path", file.path(demo_output_dir, "trlwhite.png"))
+  add_setting("researcher_logo_path", file.path(demo_dir, "trlwhite.png"))
   add_setting("report_title",       paste0("Customer ", outcome_label, " — Key Drivers"))
 
   # Subgroup settings (optional)
@@ -310,6 +311,15 @@ create_config <- function(filename, outcome_var, outcome_label, outcome_type,
   addWorksheet(wb, "Driver_Settings")
   writeData(wb, "Driver_Settings", driver_settings)
 
+  # --- Slides sheet (optional) ---
+  sheets_to_style <- c("Settings", "Variables", "Driver_Settings")
+
+  if (!is.null(slides) && is.data.frame(slides) && nrow(slides) > 0) {
+    addWorksheet(wb, "Slides")
+    writeData(wb, "Slides", slides)
+    sheets_to_style <- c(sheets_to_style, "Slides")
+  }
+
   # --- Style all sheets ---
   header_style <- createStyle(
     fontName = "Arial", fontSize = 11,
@@ -318,7 +328,7 @@ create_config <- function(filename, outcome_var, outcome_label, outcome_type,
     border = "Bottom", borderColour = "#000000"
   )
 
-  for (sheet in c("Settings", "Variables", "Driver_Settings")) {
+  for (sheet in sheets_to_style) {
     addStyle(wb, sheet, header_style, rows = 1,
              cols = 1:10, gridExpand = TRUE)
     setColWidths(wb, sheet, cols = 1:10, widths = "auto")
@@ -334,6 +344,18 @@ create_config <- function(filename, outcome_var, outcome_label, outcome_type,
 # 3. CREATE THREE CONFIG FILES
 # ==============================================================================
 
+# --- Demo slides for binary config ---
+demo_slides <- data.frame(
+  slide_order      = c(1, 2),
+  slide_title      = c("Executive Summary", "Methodology Note"),
+  slide_content    = c(
+    "## Key Findings\n\n**Service quality** is the strongest driver of customer churn.\n\n- Customers rating service as 'Poor' are 3x more likely to churn\n- Price perception has moderate influence\n- Contract length shows weak but significant effect\n\n> Focus retention efforts on service quality improvements",
+    "## Analysis Approach\n\nBinary logistic regression was used to identify drivers of churn.\n\n- **Outcome**: Customer churn (Yes/No)\n- **Drivers**: 6 categorical variables\n- **Sample**: 500 respondents\n- **Weighting**: Survey weights applied"
+  ),
+  slide_image_path = c("", ""),
+  stringsAsFactors = FALSE
+)
+
 # Binary: Churn (Retained vs Churned)
 create_config(
   filename           = "demo_config_binary.xlsx",
@@ -341,7 +363,8 @@ create_config(
   outcome_label      = "Customer Churn",
   outcome_type       = "binary",
   outcome_order      = "Retained;Churned",
-  reference_category = "Retained"
+  reference_category = "Retained",
+  slides             = demo_slides
 )
 
 # Ordinal: Satisfaction (Low / Medium / High)

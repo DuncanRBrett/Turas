@@ -12,12 +12,22 @@
 
 #' Detect Outcome Type
 #'
-#' Determines whether outcome should be treated as binary, ordinal, or nominal.
+#' Determines whether the outcome variable should be treated as binary,
+#' ordinal, or nominal (multinomial) based on data characteristics, user
+#' overrides, and ordering specifications. Refuses if fewer than 2 categories.
 #'
-#' @param outcome_var Outcome variable vector
-#' @param order_spec Optional order specification from config
-#' @param override_type Optional override ("binary", "ordinal", "nominal")
-#' @return List with type and method information
+#' @param outcome_var Vector (factor, character, or numeric) of outcome values.
+#' @param order_spec Character vector or NULL, optional explicit ordering of
+#'   outcome categories (triggers ordinal detection when provided).
+#' @param override_type Character, one of "auto" (default), "binary", "ordinal",
+#'   or "nominal". When not "auto", forces the specified type.
+#' @return List with fields:
+#'   \item{type}{Character: "binary", "ordinal", or "nominal"}
+#'   \item{method}{Character: "binomial_logistic", "proportional_odds", or
+#'     "multinomial_logistic"}
+#'   \item{n_categories}{Integer, number of unique outcome categories}
+#'   \item{categories}{Character vector of category names in order}
+#'   \item{is_ordered}{Logical, TRUE for ordinal outcomes}
 #' @export
 detect_outcome_type <- function(outcome_var, order_spec = NULL, override_type = "auto") {
 
@@ -43,8 +53,7 @@ detect_outcome_type <- function(outcome_var, order_spec = NULL, override_type = 
     type <- tolower(override_type)
 
     if (type == "binary" && n_unique != 2) {
-      warning("Binary type specified but outcome has ", n_unique, " categories. ",
-              "Using multinomial instead.")
+      cat(sprintf("   [WARNING] Binary type specified but outcome has %d categories. Using multinomial instead.\n", n_unique))
       type <- "nominal"
     }
 
@@ -129,11 +138,18 @@ detect_outcome_type <- function(outcome_var, order_spec = NULL, override_type = 
 
 #' Detect Predictor Type
 #'
-#' Determines how a predictor variable should be treated in the model.
+#' Determines how a predictor variable should be treated in the model based
+#' on its data type and number of unique values. Used as a fallback when
+#' no explicit Driver_Settings sheet is provided.
 #'
-#' @param predictor_var Predictor variable vector
-#' @param order_spec Optional order specification from config
-#' @return List with type and coding information
+#' @param predictor_var Vector of predictor values (any type).
+#' @param order_spec Character vector or NULL, optional explicit level ordering
+#'   (presence triggers ordinal classification).
+#' @return List with fields:
+#'   \item{type}{Character: "continuous", "binary_categorical", "nominal",
+#'     "ordinal", "high_cardinality", or "constant"}
+#'   \item{needs_dummy}{Logical, TRUE if dummy encoding is required}
+#'   \item{n_dummies}{Integer, number of dummy variables needed}
 #' @keywords internal
 detect_predictor_type <- function(predictor_var, order_spec = NULL) {
 
@@ -171,7 +187,7 @@ detect_predictor_type <- function(predictor_var, order_spec = NULL) {
 
   # High cardinality (> 20)
   if (n_unique > 20) {
-    warning("Predictor has ", n_unique, " categories. Consider grouping.")
+    cat(sprintf("   [WARNING] Predictor has %d categories. Consider grouping.\n", n_unique))
     return(list(
       type = "high_cardinality",
       needs_dummy = TRUE,
@@ -190,13 +206,17 @@ detect_predictor_type <- function(predictor_var, order_spec = NULL) {
 
 #' Prepare Outcome Variable
 #'
-#' Converts outcome variable to appropriate format for modeling.
-#' REFUSES with hard error if outcome type doesn't match data.
+#' Converts the outcome variable to the appropriate factor format for modeling:
+#' unordered factor for binary/nominal, ordered factor for ordinal. Validates
+#' that configured categories match the data and refuses with a hard error
+#' on mismatch. Sets the reference category when specified in config.
 #'
-#' @param data Data frame
-#' @param config Configuration list
-#' @param outcome_info Outcome type detection results
-#' @return Modified data frame with prepared outcome
+#' @param data Data frame containing the outcome variable.
+#' @param config Configuration list with outcome_var, reference_category,
+#'   outcome_order, and outcome_type.
+#' @param outcome_info List from detect_outcome_type() with type and categories.
+#' @return Modified data frame with the outcome column converted to a properly
+#'   levelled factor.
 #' @export
 prepare_outcome <- function(data, config, outcome_info) {
 
@@ -312,13 +332,20 @@ prepare_outcome <- function(data, config, outcome_info) {
 
 #' Prepare Predictor Variables
 #'
-#' Converts predictor variables to appropriate format for modeling.
-#' Uses DRIVER_SETTINGS from config for explicit type and reference level.
-#' Falls back to inference ONLY when no Driver_Settings sheet exists.
+#' Converts all predictor variables to the appropriate factor format for
+#' modeling, including setting reference levels and contrast matrices.
+#' Uses explicit settings from the Driver_Settings config sheet when
+#' available; falls back to automatic type inference only when no
+#' Driver_Settings sheet exists. Validates that configured levels match
+#' data and refuses on mismatch.
 #'
-#' @param data Data frame
-#' @param config Configuration list
-#' @return List with prepared data and predictor info
+#' @param data Data frame containing all predictor columns.
+#' @param config Configuration list with driver_vars, driver_settings,
+#'   driver_orders, and label accessors.
+#' @return List with:
+#'   \item{data}{Modified data frame with prepared factor columns}
+#'   \item{predictor_info}{Named list keyed by variable name, each containing
+#'     type, needs_dummy, n_dummies, reference_level, levels, and source}
 #' @export
 prepare_predictors <- function(data, config) {
 
@@ -602,10 +629,12 @@ prepare_predictors <- function(data, config) {
 
 #' Build Model Formula
 #'
-#' Constructs the formula for logistic regression.
+#' Constructs a simple additive formula for logistic regression from the
+#' configured outcome variable and driver variables.
 #'
-#' @param config Configuration list
-#' @return Formula object
+#' @param config Configuration list with outcome_var (character) and
+#'   driver_vars (character vector).
+#' @return A formula object of the form \code{outcome ~ var1 + var2 + ...}.
 #' @keywords internal
 build_model_formula <- function(config) {
   # Simple additive formula
@@ -617,11 +646,22 @@ build_model_formula <- function(config) {
 
 #' Preprocess Data for Analysis
 #'
-#' Main preprocessing function that prepares all variables.
+#' Main preprocessing entry point that detects the outcome type, prepares the
+#' outcome and predictor variables, builds the model formula, and computes
+#' outcome category counts. Orchestrates calls to detect_outcome_type(),
+#' prepare_outcome(), prepare_predictors(), and build_model_formula().
 #'
-#' @param data Raw data frame
-#' @param config Configuration list
-#' @return List with preprocessed data and metadata
+#' @param data Data frame of raw survey data with all required columns.
+#' @param config Configuration list with outcome_var, outcome_order,
+#'   outcome_type, driver_vars, driver_settings, and reference_category.
+#' @return List with:
+#'   \item{data}{Data frame with prepared outcome and predictor columns}
+#'   \item{outcome_info}{List from detect_outcome_type()}
+#'   \item{predictor_info}{Named list from prepare_predictors()}
+#'   \item{model_formula}{Formula object}
+#'   \item{outcome_counts}{Table of outcome category frequencies}
+#'   \item{n_predictors}{Integer, number of predictor variables}
+#'   \item{n_terms}{Integer, total number of model terms (sum of dummies)}
 #' @export
 preprocess_catdriver_data <- function(data, config) {
 
@@ -660,9 +700,13 @@ preprocess_catdriver_data <- function(data, config) {
 
 #' Get Reference Category for Variable
 #'
-#' @param data Preprocessed data
-#' @param var_name Variable name
-#' @return Reference category name
+#' Returns the reference (baseline) category for a given variable. For factors,
+#' this is the first level. For character variables, the first value
+#' alphabetically.
+#'
+#' @param data Data frame containing the variable.
+#' @param var_name Character, name of the variable to inspect.
+#' @return Character, the reference category name, or NA for numeric variables.
 #' @keywords internal
 get_reference_category <- function(data, var_name) {
   var_data <- data[[var_name]]
@@ -681,12 +725,16 @@ get_reference_category <- function(data, var_name) {
 
 #' Create Dummy Variable Mapping
 #'
-#' Creates a mapping from dummy variable names to original variable and category.
+#' Creates a mapping from expected dummy variable column names (as R would
+#' generate them via model.matrix) to the original variable name, category
+#' label, and reference level. Used for interpreting model coefficients.
 #'
-#' @param data Preprocessed data
-#' @param config Configuration list
-#' @param predictor_info Predictor information list
-#' @return Data frame mapping dummy names to original variables
+#' @param data Data frame with prepared factor columns.
+#' @param config Configuration list with driver_vars and label accessors.
+#' @param predictor_info Named list from prepare_predictors() with needs_dummy
+#'   and level information per variable.
+#' @return Data frame with columns: dummy_name, original_var, category,
+#'   reference, label.
 #' @keywords internal
 create_dummy_mapping <- function(data, config, predictor_info) {
 

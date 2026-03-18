@@ -36,7 +36,7 @@ run_ordinal_logistic_robust <- function(formula, data, weights = NULL, config, g
   if (requireNamespace("ordinal", quietly = TRUE)) {
     model <- tryCatch({
       if (!is.null(weights) && length(weights) == nrow(data)) {
-        if (!(length(unique(weights)) == 1 && unique(weights)[1] == 1)) {
+        if (!all(abs(weights - 1) < 1e-10)) {
           fit_data$.wt <- weights
           ordinal::clm(formula, data = fit_data, weights = .wt, link = "logit")
         } else {
@@ -87,7 +87,7 @@ run_ordinal_logistic_robust <- function(formula, data, weights = NULL, config, g
 
     model <- tryCatch({
       if (!is.null(weights) && length(weights) == nrow(data)) {
-        if (!(length(unique(weights)) == 1 && unique(weights)[1] == 1)) {
+        if (!all(abs(weights - 1) < 1e-10)) {
           fit_data$.wt <- weights
           MASS::polr(formula, data = fit_data, weights = .wt, Hess = TRUE, method = "logistic")
         } else {

@@ -50,6 +50,11 @@ build_cd_html_page <- function(html_data, tables, charts, config,
   } else NULL
 
   interpretation_section <- build_cd_interpretation_section(brand_colour)
+
+  # Qualitative slides section (from config or interactive)
+  slides_data <- config$slides %||% NULL
+  qualitative_section <- build_cd_qualitative_panel(slides_data, brand_colour)
+
   footer_section <- build_cd_footer(config)
 
   # Horizontal section nav bar
@@ -58,6 +63,73 @@ build_cd_html_page <- function(html_data, tables, charts, config,
 
   # Action bar (save button)
   action_bar <- build_cd_action_bar(report_title)
+
+  # Help modal overlay — single container for all section help
+  help_modal <- htmltools::tags$div(
+    id = "cd-help-modal",
+    class = "cd-help-modal",
+    onclick = "if(event.target===this)cdCloseHelp()",
+    htmltools::tags$div(
+      class = "cd-help-modal-content",
+      htmltools::tags$div(class = "cd-help-modal-header",
+        htmltools::tags$span(id = "cd-help-modal-title"),
+        htmltools::tags$button(class = "cd-help-modal-close",
+                               onclick = "cdCloseHelp()",
+                               htmltools::HTML("&times;"))
+      ),
+      htmltools::tags$div(id = "cd-help-modal-body",
+                           class = "cd-help-modal-body")
+    )
+  )
+
+  # Help content data — JSON keyed by section ID
+  help_data_json <- jsonlite::toJSON(list(
+    importance = list(
+      title = "Driver Importance",
+      body = "Driver Importance shows which factors have the strongest statistical relationship with your outcome. It uses Type II Wald chi-square tests to measure each factor's contribution. Higher percentage = stronger influence. This does not imply causation \u2014 it measures association strength in the model."
+    ),
+    `odds-ratios` = list(
+      title = "Odds Ratios",
+      body = "Odds Ratios show how each category compares to the reference category. An OR > 1 means higher odds of the outcome; OR < 1 means lower odds. The 95% confidence interval shows the range of plausible values. If the interval crosses 1.0, the difference is not statistically significant. The forest plot visualises these values \u2014 dots to the right of the centre line indicate higher odds."
+    ),
+    patterns = list(
+      title = "Factor Patterns",
+      body = "Factor Patterns show the distribution of your outcome across each driver's categories. This helps you see the raw data behind the model \u2014 which categories have the highest and lowest outcome rates. Look for clear gradients (outcome increasing/decreasing across ordered categories) as these indicate strong drivers."
+    ),
+    `probability-lifts` = list(
+      title = "Probability Lifts",
+      body = "Probability Lifts translate odds ratios into predicted percentage-point changes in outcome probability. This is more intuitive than odds ratios for non-technical audiences. A +5pp lift means the predicted probability increases by 5 percentage points compared to the reference category."
+    ),
+    diagnostics = list(
+      title = "Model Diagnostics",
+      body = "Diagnostics summarise model health: convergence (did the model solve?), sample size adequacy, multicollinearity (are drivers too correlated?), and small cell warnings (are any category combinations very rare?). Green = good, amber = acceptable, red = investigate."
+    )
+  ), auto_unbox = TRUE)
+
+  help_data_tag <- htmltools::tags$script(
+    id = "cd-help-data",
+    type = "application/json",
+    htmltools::HTML(help_data_json)
+  )
+
+  # Help modal JS
+  help_js <- htmltools::tags$script(htmltools::HTML('
+function cdShowHelp(sectionId) {
+  var modal = document.getElementById("cd-help-modal");
+  var dataEl = document.getElementById("cd-help-data");
+  if (!modal || !dataEl) return;
+  var data = JSON.parse(dataEl.textContent || "{}");
+  var info = data[sectionId];
+  if (!info) return;
+  document.getElementById("cd-help-modal-title").textContent = info.title;
+  document.getElementById("cd-help-modal-body").innerHTML = info.body;
+  modal.classList.add("active");
+}
+function cdCloseHelp() {
+  var modal = document.getElementById("cd-help-modal");
+  if (modal) modal.classList.remove("active");
+}
+'))
 
   # Hidden insight store (single report mode — no prefix)
   insight_store <- htmltools::tags$textarea(
@@ -77,7 +149,7 @@ build_cd_html_page <- function(html_data, tables, charts, config,
 
   # Read JS files
   js_files <- c("cd_utils.js", "cd_navigation.js", "cd_insights.js",
-                 "cd_pinned_views.js", "cd_slide_export.js")
+                 "cd_pinned_views.js", "cd_slide_export.js", "cd_qualitative.js")
   js_tags <- lapply(js_files, function(fname) {
     js_path <- file.path(.cd_html_report_dir, "js", fname)
     js_content <- if (file.exists(js_path)) {
@@ -170,12 +242,16 @@ build_cd_html_page <- function(html_data, tables, charts, config,
           diagnostics_section,
           subgroup_section,
           interpretation_section,
+          qualitative_section,
           pinned_section,
           footer_section,
+          help_modal,
+          help_data_tag,
           insight_store,
           pinned_store
         )
       ),
+      help_js,
       js_tags
     )
   )
@@ -1281,6 +1357,96 @@ build_cd_css <- function(brand_colour, accent_colour) {
   .cd-header-module-name { font-size: 20px; }
   .cd-header-title { font-size: 18px; }
 }
+
+/* ---- Qualitative Slides ---- */
+.cd-qual-slide-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+  margin-bottom: 12px; overflow: hidden; transition: box-shadow 200ms;
+}
+.cd-qual-slide-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.cd-qual-slide-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+}
+.cd-qual-slide-title {
+  font-size: 14px; font-weight: 600; color: #1e293b;
+  outline: none; min-width: 120px;
+}
+.cd-qual-slide-title:focus { border-bottom: 2px solid BRAND_COLOUR; }
+.cd-qual-slide-actions { display: flex; gap: 4px; }
+.cd-qual-slide-actions .export-btn {
+  background: none; border: 1px solid #e2e8f0; border-radius: 4px;
+  padding: 3px 7px; font-size: 13px; cursor: pointer; color: #475569;
+}
+.cd-qual-slide-actions .export-btn:hover { background: #f1f5f9; }
+.cd-qual-md-editor {
+  display: none; width: 100%; min-height: 120px; padding: 12px 16px;
+  border: none; outline: none; font-family: monospace; font-size: 13px;
+  line-height: 1.6; resize: vertical; box-sizing: border-box;
+}
+.cd-qual-slide-card.editing .cd-qual-md-editor { display: block; }
+.cd-qual-slide-card.editing .cd-qual-md-rendered { display: none; }
+.cd-qual-md-rendered {
+  padding: 12px 16px; font-size: 13px; line-height: 1.7; color: #334155;
+  min-height: 40px; cursor: text;
+}
+.cd-qual-md-rendered h2 { font-size: 15px; font-weight: 700; margin: 8px 0 4px; color: #1e293b; }
+.cd-qual-md-rendered ul { margin: 4px 0; padding-left: 20px; }
+.cd-qual-md-rendered blockquote {
+  border-left: 3px solid BRAND_COLOUR; margin: 8px 0; padding: 4px 12px;
+  color: #475569; font-style: italic;
+}
+.cd-qual-img-preview {
+  padding: 8px 16px; position: relative;
+}
+.cd-qual-img-thumb {
+  max-width: 100%; max-height: 300px; border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+.cd-qual-img-remove {
+  position: absolute; top: 12px; right: 20px; background: rgba(0,0,0,0.5);
+  color: #fff; border: none; border-radius: 50%; width: 24px; height: 24px;
+  font-size: 14px; cursor: pointer; line-height: 24px; text-align: center;
+}
+.cd-qual-img-remove:hover { background: rgba(220,38,38,0.8); }
+
+/* ================================================================ */
+/* HELP OVERLAY MODALS                                              */
+/* ================================================================ */
+
+.cd-help-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%; border: 1px solid #cbd5e1;
+  background: #f8fafc; color: #64748b; font-size: 12px; font-weight: 700;
+  cursor: pointer; margin-left: 8px; vertical-align: middle;
+  font-family: inherit; line-height: 1; padding: 0;
+}
+.cd-help-btn:hover { background: BRAND_COLOUR; color: #fff; border-color: BRAND_COLOUR; }
+.cd-help-modal {
+  display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.4); z-index: 10000; justify-content: center; align-items: center;
+}
+.cd-help-modal.active { display: flex; }
+.cd-help-modal-content {
+  background: #fff; border-radius: 10px; max-width: 520px; width: 90%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+}
+.cd-help-modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 20px; border-bottom: 1px solid #e2e8f0;
+}
+.cd-help-modal-header span { font-size: 16px; font-weight: 700; color: #1e293b; }
+.cd-help-modal-close {
+  background: none; border: none; font-size: 22px; cursor: pointer; color: #94a3b8;
+  padding: 0 4px; line-height: 1;
+}
+.cd-help-modal-close:hover { color: #64748b; }
+.cd-help-modal-body { padding: 20px; font-size: 14px; line-height: 1.7; color: #334155; }
+
+@media print {
+  .cd-help-btn { display: none !important; }
+  .cd-help-modal { display: none !important; }
+}
 '
   css <- gsub("BRAND_COLOUR", brand_colour, css, fixed = TRUE)
   css <- gsub("ACCENT_COLOUR", accent_colour, css, fixed = TRUE)
@@ -1317,6 +1483,7 @@ build_cd_section_nav <- function(brand_colour = "#323367", id_prefix = "",
 
   links <- c(links, list(
     htmltools::tags$a(href = paste0("#", id_prefix, "cd-interpretation"), "Guide"),
+    htmltools::tags$a(href = paste0("#", id_prefix, "cd-qualitative"), "Slides"),
     htmltools::tags$a(href = paste0("#", id_prefix, "cd-pinned-section"), "Pinned Views")
   ))
 
@@ -1671,7 +1838,8 @@ build_cd_exec_summary <- function(html_data, brand_colour, id_prefix = "") {
 build_cd_importance_section <- function(tables, charts, brand_colour,
                                         id_prefix = "", n_drivers = 0) {
   title_row <- build_cd_section_title_row("Driver Importance", "importance",
-                                           id_prefix = id_prefix)
+                                           id_prefix = id_prefix,
+                                           help_id = "importance")
   insight_area <- build_cd_insight_area("importance", id_prefix = id_prefix)
 
   # Importance filter bar — show threshold options if many drivers
@@ -1797,7 +1965,8 @@ build_cd_patterns_section <- function(html_data, tables, id_prefix = "") {
   })
 
   title_row <- build_cd_section_title_row("Factor Patterns", "patterns",
-                                           id_prefix = id_prefix)
+                                           id_prefix = id_prefix,
+                                           help_id = "patterns")
   insight_area <- build_cd_insight_area("patterns", id_prefix = id_prefix)
 
   htmltools::tags$div(
@@ -1871,7 +2040,8 @@ build_cd_probability_lifts_section <- function(html_data, tables, charts,
   })
 
   title_row <- build_cd_section_title_row("Probability Lifts", "probability-lifts",
-                                           id_prefix = id_prefix)
+                                           id_prefix = id_prefix,
+                                           help_id = "probability-lifts")
   insight_area <- build_cd_insight_area("probability-lifts", id_prefix = id_prefix)
 
   # Chip bar for driver show/hide on the combined chart
@@ -1929,7 +2099,8 @@ build_cd_or_section <- function(tables, charts, has_bootstrap,
   }
 
   title_row <- build_cd_section_title_row("Odds Ratios", "odds-ratios",
-                                           id_prefix = id_prefix)
+                                           id_prefix = id_prefix,
+                                           help_id = "odds-ratios")
   insight_area <- build_cd_insight_area("odds-ratios", id_prefix = id_prefix)
 
   # OR chip bar for factor filtering
@@ -2054,7 +2225,8 @@ build_cd_diagnostics_section <- function(tables, html_data, id_prefix = "") {
   }
 
   title_row <- build_cd_section_title_row("Model Diagnostics", "diagnostics",
-                                           id_prefix = id_prefix)
+                                           id_prefix = id_prefix,
+                                           help_id = "diagnostics")
   insight_area <- build_cd_insight_area("diagnostics", id_prefix = id_prefix)
 
   htmltools::tags$div(
@@ -2193,16 +2365,18 @@ build_cd_insight_area <- function(section_key, id_prefix = "") {
 
 #' Build Section Title Row
 #'
-#' Wraps a section title and pin button in a flex row.
+#' Wraps a section title, optional help button, and pin button in a flex row.
 #'
 #' @param title_text Title text
 #' @param section_key Section key for pinning
 #' @param id_prefix ID prefix for the panel
 #' @param show_pin Whether to show the pin button
+#' @param help_id Optional help section ID. When provided, a small (?) button
+#'   is rendered next to the title that opens the help modal for this section.
 #' @return htmltools tag
 #' @keywords internal
 build_cd_section_title_row <- function(title_text, section_key, id_prefix = "",
-                                        show_pin = TRUE) {
+                                        show_pin = TRUE, help_id = NULL) {
   pin_btn <- if (show_pin) {
     htmltools::tags$button(
       class = "cd-pin-btn",
@@ -2214,9 +2388,18 @@ build_cd_section_title_row <- function(title_text, section_key, id_prefix = "",
     )
   }
 
+  help_btn <- if (!is.null(help_id)) {
+    htmltools::tags$button(
+      class = "cd-help-btn",
+      onclick = sprintf("cdShowHelp('%s')", help_id),
+      title = "Learn more",
+      "?"
+    )
+  }
+
   htmltools::tags$div(
     class = "cd-section-title-row",
-    htmltools::tags$h2(class = "cd-section-title", title_text),
+    htmltools::tags$h2(class = "cd-section-title", title_text, help_btn),
     pin_btn
   )
 }
@@ -2341,5 +2524,155 @@ build_cd_action_bar <- function(report_title = "Catdriver Report") {
       onclick = "cdSaveReportHTML()",
       "\U0001F4BE Save Report"
     )
+  )
+}
+
+
+# ==============================================================================
+# QUALITATIVE SLIDES PANEL
+# ==============================================================================
+
+#' Build Qualitative Slides Panel
+#'
+#' Creates a section for narrative slides with markdown editing,
+#' image upload, and pin-to-pinned-views functionality. Slides can
+#' be pre-seeded from the config Excel (Slides sheet) and/or added
+#' interactively in the browser.
+#'
+#' @param slides List of slide objects (each with id, title, content, image_data), or NULL
+#' @param brand_colour Hex brand colour
+#' @return htmltools tag
+#' @keywords internal
+build_cd_qualitative_panel <- function(slides = NULL, brand_colour = "#323367") {
+
+  # Build initial slide cards from config (if any)
+  slide_cards <- if (!is.null(slides) && length(slides) > 0) {
+    lapply(slides, function(s) {
+      build_cd_qual_slide_card(
+        s$id %||% paste0("cd-qual-", sample.int(1e6, 1)),
+        s$title %||% "Untitled Slide",
+        s$content %||% "",
+        s$image_data
+      )
+    })
+  }
+
+  htmltools::tags$div(
+    class = "cd-section",
+    id = "cd-qualitative",
+    `data-cd-section` = "qualitative",
+    htmltools::tags$div(
+      class = "cd-qual-container",
+      style = "max-width:1400px;margin:0 auto;padding:20px 32px;",
+      htmltools::tags$div(
+        class = "cd-qual-header",
+        style = "display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;",
+        htmltools::tags$div(
+          htmltools::tags$h2(style = "font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;",
+                             "Added Slides"),
+          htmltools::tags$p(style = "font-size:12px;color:#64748b;",
+                            "Narrative findings, interpretations, and supporting images. Double-click to edit, use markdown for formatting.")
+        ),
+        htmltools::tags$div(
+          style = "display:flex;gap:8px;",
+          htmltools::tags$button(class = "export-btn", onclick = "cdAddQualSlide()",
+                                 "\u2795 Add Slide")
+        )
+      ),
+      htmltools::tags$div(
+        class = "cd-qual-md-help",
+        style = "background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px 16px;margin-bottom:16px;font-size:11px;color:#64748b;line-height:1.6;",
+        htmltools::tags$span(style = "font-weight:600;color:#475569;", "Formatting: "),
+        htmltools::HTML(paste0(
+          "<code>**bold**</code> &middot; ",
+          "<code>*italic*</code> &middot; ",
+          "<code>## Heading</code> &middot; ",
+          "<code>- bullet</code> &middot; ",
+          "<code>&gt; quote</code>"
+        ))
+      ),
+      htmltools::tags$div(id = "cd-qual-slides-container", slide_cards),
+      htmltools::tags$div(
+        id = "cd-qual-empty-state",
+        style = paste0(
+          if (!is.null(slides) && length(slides) > 0) "display:none;" else "",
+          "text-align:center;padding:60px 20px;color:#94a3b8;"
+        ),
+        htmltools::tags$div(style = "font-size:36px;margin-bottom:12px;", "\U0001F4DD"),
+        htmltools::tags$div(style = "font-size:14px;font-weight:600;", "No slides yet"),
+        htmltools::tags$div(style = "font-size:12px;margin-top:4px;",
+          "Click 'Add Slide' to create narrative content, or add a 'Slides' sheet to your config Excel.")
+      )
+    )
+  )
+}
+
+
+#' Build Single Qualitative Slide Card
+#'
+#' @param slide_id Character unique ID
+#' @param title Character slide title
+#' @param content_md Character markdown content
+#' @param image_data Character base64 data URL for embedded image, or NULL
+#' @return htmltools tag
+#' @keywords internal
+build_cd_qual_slide_card <- function(slide_id, title, content_md, image_data = NULL) {
+  htmltools::tags$div(
+    class = "cd-qual-slide-card",
+    `data-slide-id` = slide_id,
+    htmltools::tags$div(
+      class = "cd-qual-slide-header",
+      htmltools::tags$div(
+        class = "cd-qual-slide-title",
+        contenteditable = "true",
+        title
+      ),
+      htmltools::tags$div(
+        class = "cd-qual-slide-actions",
+        htmltools::tags$button(class = "export-btn", title = "Add image",
+                               onclick = sprintf("cdTriggerQualImage('%s')", slide_id),
+                               htmltools::HTML("&#x1F5BC;")),
+        htmltools::tags$button(class = "export-btn", title = "Pin this slide",
+                               onclick = sprintf("cdPinQualSlide('%s')", slide_id),
+                               htmltools::HTML("&#x1F4CC;")),
+        htmltools::tags$button(class = "export-btn", title = "Move up",
+                               onclick = sprintf("cdMoveQualSlide('%s','up')", slide_id),
+                               htmltools::HTML("&#x25B2;")),
+        htmltools::tags$button(class = "export-btn", title = "Move down",
+                               onclick = sprintf("cdMoveQualSlide('%s','down')", slide_id),
+                               htmltools::HTML("&#x25BC;")),
+        htmltools::tags$button(class = "export-btn", title = "Remove slide",
+                               style = "color:#e8614d;",
+                               onclick = sprintf("cdRemoveQualSlide('%s')", slide_id),
+                               htmltools::HTML("&#x2715;"))
+      )
+    ),
+    # Image preview
+    htmltools::tags$div(class = "cd-qual-img-preview",
+      style = if (is.null(image_data) || !nzchar(image_data %||% "")) "display:none;" else "",
+      htmltools::tags$img(class = "cd-qual-img-thumb",
+        src = if (!is.null(image_data) && nzchar(image_data %||% "")) image_data else ""),
+      htmltools::tags$button(class = "cd-qual-img-remove",
+                             onclick = sprintf("cdRemoveQualImage('%s')", slide_id),
+                             title = "Remove image",
+                             htmltools::HTML("&times;"))
+    ),
+    # Hidden file input for image upload
+    htmltools::tags$input(type = "file", class = "cd-qual-img-input",
+                          accept = "image/*", style = "display:none;",
+                          onchange = sprintf("cdHandleQualImage('%s', this)", slide_id)),
+    # Markdown editor (shown when editing)
+    htmltools::tags$textarea(
+      class = "cd-qual-md-editor",
+      rows = "6",
+      placeholder = "Enter markdown content... (**bold**, *italic*, > quote, - bullet, ## heading)",
+      content_md
+    ),
+    # Rendered output (shown when not editing)
+    htmltools::tags$div(class = "cd-qual-md-rendered"),
+    # Hidden stores for persistence
+    htmltools::tags$textarea(class = "cd-qual-md-store", style = "display:none;", content_md),
+    htmltools::tags$textarea(class = "cd-qual-img-store", style = "display:none;",
+      if (!is.null(image_data) && nzchar(image_data %||% "")) image_data else "")
   )
 }

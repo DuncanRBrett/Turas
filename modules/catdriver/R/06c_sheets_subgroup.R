@@ -16,13 +16,17 @@
 
 #' Add All Subgroup Comparison Sheets
 #'
-#' Master function that adds all three subgroup sheets to the workbook.
+#' Master function that adds all three subgroup comparison sheets (Summary,
+#' OR Compare, Model Fit) to the workbook. Each sheet is wrapped in tryCatch
+#' so that a failure in one does not prevent the others from being written.
 #'
-#' @param wb openxlsx workbook object
-#' @param comparison Subgroup comparison object from build_subgroup_comparison()
-#' @param results Full analysis results list
-#' @param config Configuration list
-#' @param styles List of openxlsx styles
+#' @param wb An openxlsx workbook object.
+#' @param comparison List returned by build_subgroup_comparison(), containing
+#'   importance_matrix, or_comparison, model_fit, insights, and group_names.
+#' @param results List of full analysis results (passed through for context).
+#' @param config Configuration list with subgroup_var and labels.
+#' @param styles List of openxlsx style objects from create_output_styles().
+#' @return NULL (called for side effects; sheets are added to \code{wb}).
 #' @keywords internal
 add_subgroup_sheets <- function(wb, comparison, results, config, styles) {
 
@@ -56,12 +60,17 @@ add_subgroup_sheets <- function(wb, comparison, results, config, styles) {
 
 #' Add Subgroup Summary Sheet
 #'
-#' Shows side-by-side importance rankings for each driver across subgroups.
+#' Writes the "Subgroup Summary" sheet showing side-by-side driver importance
+#' rankings and percentages across subgroups. Highlights universal drivers
+#' in green and segment-specific drivers in amber.
 #'
-#' @param wb openxlsx workbook object
-#' @param comparison Subgroup comparison object
-#' @param config Configuration list
-#' @param styles List of openxlsx styles
+#' @param wb An openxlsx workbook object.
+#' @param comparison List returned by build_subgroup_comparison(), containing
+#'   importance_matrix (with classification column), group_names, subgroup_var,
+#'   and insights.
+#' @param config Configuration list (reserved for future label customisation).
+#' @param styles List of openxlsx style objects from create_output_styles().
+#' @return NULL (called for side effects).
 #' @keywords internal
 add_subgroup_summary_sheet <- function(wb, comparison, config, styles) {
 
@@ -163,12 +172,16 @@ add_subgroup_summary_sheet <- function(wb, comparison, config, styles) {
 
 #' Add Subgroup OR Comparison Sheet
 #'
-#' Shows odds ratio values across subgroups for each driver level.
+#' Writes the "Subgroup OR Compare" sheet showing odds ratio values, confidence
+#' intervals, and p-values across subgroups for each driver level. Highlights
+#' notable rows where the OR ratio across groups exceeds 2.0.
 #'
-#' @param wb openxlsx workbook object
-#' @param comparison Subgroup comparison object
-#' @param config Configuration list
-#' @param styles List of openxlsx styles
+#' @param wb An openxlsx workbook object.
+#' @param comparison List returned by build_subgroup_comparison(), containing
+#'   or_comparison data frame and group_names.
+#' @param config Configuration list (reserved for future label customisation).
+#' @param styles List of openxlsx style objects from create_output_styles().
+#' @return NULL (called for side effects).
 #' @keywords internal
 add_subgroup_or_sheet <- function(wb, comparison, config, styles) {
 
@@ -236,12 +249,16 @@ add_subgroup_or_sheet <- function(wb, comparison, config, styles) {
 
 #' Add Subgroup Model Fit Sheet
 #'
-#' Shows model fit statistics for each subgroup.
+#' Writes the "Subgroup Model Fit" sheet with one row per subgroup showing
+#' sample size, McFadden R2, AIC, convergence status, run status, and
+#' the estimation engine used.
 #'
-#' @param wb openxlsx workbook object
-#' @param comparison Subgroup comparison object
-#' @param config Configuration list
-#' @param styles List of openxlsx styles
+#' @param wb An openxlsx workbook object.
+#' @param comparison List returned by build_subgroup_comparison(), containing
+#'   model_fit data frame and subgroup_var.
+#' @param config Configuration list (reserved for future label customisation).
+#' @param styles List of openxlsx style objects from create_output_styles().
+#' @return NULL (called for side effects).
 #' @keywords internal
 add_subgroup_model_fit_sheet <- function(wb, comparison, config, styles) {
 

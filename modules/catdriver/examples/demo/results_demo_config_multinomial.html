@@ -1094,6 +1094,96 @@
   .cd-header-module-name { font-size: 20px; }
   .cd-header-title { font-size: 18px; }
 }
+
+/* ---- Qualitative Slides ---- */
+.cd-qual-slide-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+  margin-bottom: 12px; overflow: hidden; transition: box-shadow 200ms;
+}
+.cd-qual-slide-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.cd-qual-slide-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+}
+.cd-qual-slide-title {
+  font-size: 14px; font-weight: 600; color: #1e293b;
+  outline: none; min-width: 120px;
+}
+.cd-qual-slide-title:focus { border-bottom: 2px solid #323367; }
+.cd-qual-slide-actions { display: flex; gap: 4px; }
+.cd-qual-slide-actions .export-btn {
+  background: none; border: 1px solid #e2e8f0; border-radius: 4px;
+  padding: 3px 7px; font-size: 13px; cursor: pointer; color: #475569;
+}
+.cd-qual-slide-actions .export-btn:hover { background: #f1f5f9; }
+.cd-qual-md-editor {
+  display: none; width: 100%; min-height: 120px; padding: 12px 16px;
+  border: none; outline: none; font-family: monospace; font-size: 13px;
+  line-height: 1.6; resize: vertical; box-sizing: border-box;
+}
+.cd-qual-slide-card.editing .cd-qual-md-editor { display: block; }
+.cd-qual-slide-card.editing .cd-qual-md-rendered { display: none; }
+.cd-qual-md-rendered {
+  padding: 12px 16px; font-size: 13px; line-height: 1.7; color: #334155;
+  min-height: 40px; cursor: text;
+}
+.cd-qual-md-rendered h2 { font-size: 15px; font-weight: 700; margin: 8px 0 4px; color: #1e293b; }
+.cd-qual-md-rendered ul { margin: 4px 0; padding-left: 20px; }
+.cd-qual-md-rendered blockquote {
+  border-left: 3px solid #323367; margin: 8px 0; padding: 4px 12px;
+  color: #475569; font-style: italic;
+}
+.cd-qual-img-preview {
+  padding: 8px 16px; position: relative;
+}
+.cd-qual-img-thumb {
+  max-width: 100%; max-height: 300px; border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+.cd-qual-img-remove {
+  position: absolute; top: 12px; right: 20px; background: rgba(0,0,0,0.5);
+  color: #fff; border: none; border-radius: 50%; width: 24px; height: 24px;
+  font-size: 14px; cursor: pointer; line-height: 24px; text-align: center;
+}
+.cd-qual-img-remove:hover { background: rgba(220,38,38,0.8); }
+
+/* ================================================================ */
+/* HELP OVERLAY MODALS                                              */
+/* ================================================================ */
+
+.cd-help-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%; border: 1px solid #cbd5e1;
+  background: #f8fafc; color: #64748b; font-size: 12px; font-weight: 700;
+  cursor: pointer; margin-left: 8px; vertical-align: middle;
+  font-family: inherit; line-height: 1; padding: 0;
+}
+.cd-help-btn:hover { background: #323367; color: #fff; border-color: #323367; }
+.cd-help-modal {
+  display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.4); z-index: 10000; justify-content: center; align-items: center;
+}
+.cd-help-modal.active { display: flex; }
+.cd-help-modal-content {
+  background: #fff; border-radius: 10px; max-width: 520px; width: 90%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+}
+.cd-help-modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 20px; border-bottom: 1px solid #e2e8f0;
+}
+.cd-help-modal-header span { font-size: 16px; font-weight: 700; color: #1e293b; }
+.cd-help-modal-close {
+  background: none; border: none; font-size: 22px; cursor: pointer; color: #94a3b8;
+  padding: 0 4px; line-height: 1;
+}
+.cd-help-modal-close:hover { color: #64748b; }
+.cd-help-modal-body { padding: 20px; font-size: 14px; line-height: 1.7; color: #334155; }
+
+@media print {
+  .cd-help-btn { display: none !important; }
+  .cd-help-modal { display: none !important; }
+}
 </style>
 </head>
 <body class="cd-body">
@@ -1138,6 +1228,7 @@
     <a href="#cd-odds-ratios">Odds Ratios</a>
     <a href="#cd-diagnostics">Diagnostics</a>
     <a href="#cd-interpretation">Guide</a>
+    <a href="#cd-qualitative">Slides</a>
     <a href="#cd-pinned-section">Pinned Views</a>
   </nav>
   <main class="cd-main">
@@ -1192,7 +1283,10 @@
       </div>
       <div class="cd-section" id="cd-importance" data-cd-section="importance">
         <div class="cd-section-title-row">
-          <h2 class="cd-section-title">Driver Importance</h2>
+          <h2 class="cd-section-title">
+            Driver Importance
+            <button class="cd-help-btn" onclick="cdShowHelp(&#39;importance&#39;)" title="Learn more">?</button>
+          </h2>
           <button class="cd-pin-btn" data-cd-pin-section="importance" data-cd-pin-prefix="" onclick="cdPinSection(&#39;importance&#39;,&#39;&#39;)" title="Pin this section">📌</button>
         </div>
         <div class="cd-insight-area" data-cd-insight-section="importance" data-cd-insight-prefix="">
@@ -1333,7 +1427,10 @@
       </div>
       <div class="cd-section" id="cd-patterns" data-cd-section="patterns">
         <div class="cd-section-title-row">
-          <h2 class="cd-section-title">Factor Patterns</h2>
+          <h2 class="cd-section-title">
+            Factor Patterns
+            <button class="cd-help-btn" onclick="cdShowHelp(&#39;patterns&#39;)" title="Learn more">?</button>
+          </h2>
           <button class="cd-pin-btn" data-cd-pin-section="patterns" data-cd-pin-prefix="" onclick="cdPinSection(&#39;patterns&#39;,&#39;&#39;)" title="Pin this section">📌</button>
         </div>
         <div class="cd-insight-area" data-cd-insight-section="patterns" data-cd-insight-prefix="">
@@ -1663,7 +1760,10 @@
       </div>
       <div class="cd-section" id="cd-probability-lifts" data-cd-section="probability-lifts">
         <div class="cd-section-title-row">
-          <h2 class="cd-section-title">Probability Lifts</h2>
+          <h2 class="cd-section-title">
+            Probability Lifts
+            <button class="cd-help-btn" onclick="cdShowHelp(&#39;probability-lifts&#39;)" title="Learn more">?</button>
+          </h2>
           <button class="cd-pin-btn" data-cd-pin-section="probability-lifts" data-cd-pin-prefix="" onclick="cdPinSection(&#39;probability-lifts&#39;,&#39;&#39;)" title="Pin this section">📌</button>
         </div>
         <div class="cd-insight-area" data-cd-insight-section="probability-lifts" data-cd-insight-prefix="">
@@ -2054,7 +2154,10 @@
       </div>
       <div class="cd-section" id="cd-odds-ratios" data-cd-section="odds-ratios">
         <div class="cd-section-title-row">
-          <h2 class="cd-section-title">Odds Ratios</h2>
+          <h2 class="cd-section-title">
+            Odds Ratios
+            <button class="cd-help-btn" onclick="cdShowHelp(&#39;odds-ratios&#39;)" title="Learn more">?</button>
+          </h2>
           <button class="cd-pin-btn" data-cd-pin-section="odds-ratios" data-cd-pin-prefix="" onclick="cdPinSection(&#39;odds-ratios&#39;,&#39;&#39;)" title="Pin this section">📌</button>
         </div>
         <div class="cd-insight-area" data-cd-insight-section="odds-ratios" data-cd-insight-prefix="">
@@ -2586,7 +2689,10 @@
       </div>
       <div class="cd-section" id="cd-diagnostics" data-cd-section="diagnostics">
         <div class="cd-section-title-row">
-          <h2 class="cd-section-title">Model Diagnostics</h2>
+          <h2 class="cd-section-title">
+            Model Diagnostics
+            <button class="cd-help-btn" onclick="cdShowHelp(&#39;diagnostics&#39;)" title="Learn more">?</button>
+          </h2>
           <button class="cd-pin-btn" data-cd-pin-section="diagnostics" data-cd-pin-prefix="" onclick="cdPinSection(&#39;diagnostics&#39;,&#39;&#39;)" title="Pin this section">📌</button>
         </div>
         <div class="cd-insight-area" data-cd-insight-section="diagnostics" data-cd-insight-prefix="">
@@ -2688,6 +2794,29 @@
           Odds ratios show association, not causation. With non-probability samples, p-values and confidence intervals should be treated as approximate indicators rather than strict inferential bounds.
         </div>
       </div>
+      <div class="cd-section" id="cd-qualitative" data-cd-section="qualitative">
+        <div class="cd-qual-container" style="max-width:1400px;margin:0 auto;padding:20px 32px;">
+          <div class="cd-qual-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+            <div>
+              <h2 style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;">Added Slides</h2>
+              <p style="font-size:12px;color:#64748b;">Narrative findings, interpretations, and supporting images. Double-click to edit, use markdown for formatting.</p>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="export-btn" onclick="cdAddQualSlide()">➕ Add Slide</button>
+            </div>
+          </div>
+          <div class="cd-qual-md-help" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px 16px;margin-bottom:16px;font-size:11px;color:#64748b;line-height:1.6;">
+            <span style="font-weight:600;color:#475569;">Formatting: </span>
+            <code>**bold**</code> &middot; <code>*italic*</code> &middot; <code>## Heading</code> &middot; <code>- bullet</code> &middot; <code>&gt; quote</code>
+          </div>
+          <div id="cd-qual-slides-container"></div>
+          <div id="cd-qual-empty-state" style="text-align:center;padding:60px 20px;color:#94a3b8;">
+            <div style="font-size:36px;margin-bottom:12px;">📝</div>
+            <div style="font-size:14px;font-weight:600;">No slides yet</div>
+            <div style="font-size:12px;margin-top:4px;">Click 'Add Slide' to create narrative content, or add a 'Slides' sheet to your config Excel.</div>
+          </div>
+        </div>
+      </div>
       <div class="cd-section" id="cd-pinned-section" data-cd-section="pinned-views">
         <div class="cd-pinned-panel-header">
           <div class="cd-pinned-panel-title">📌 Pinned Views</div>
@@ -2706,14 +2835,41 @@
         <div id="cd-pinned-cards-container"></div>
       </div>
       <div class="cd-footer">
-        Generated by TURAS Categorical Key Driver Module v1.1 | 04 March 2026 00:04
+        Generated by TURAS Categorical Key Driver Module v1.1 | 18 March 2026 09:17
         <br/>
         The Research LampPost (Pty) Ltd
       </div>
+      <div id="cd-help-modal" class="cd-help-modal" onclick="if(event.target===this)cdCloseHelp()">
+        <div class="cd-help-modal-content">
+          <div class="cd-help-modal-header">
+            <span id="cd-help-modal-title"></span>
+            <button class="cd-help-modal-close" onclick="cdCloseHelp()">&times;</button>
+          </div>
+          <div id="cd-help-modal-body" class="cd-help-modal-body"></div>
+        </div>
+      </div>
+      <script id="cd-help-data" type="application/json">{"importance":{"title":"Driver Importance","body":"Driver Importance shows which factors have the strongest statistical relationship with your outcome. It uses Type II Wald chi-square tests to measure each factor's contribution. Higher percentage = stronger influence. This does not imply causation — it measures association strength in the model."},"odds-ratios":{"title":"Odds Ratios","body":"Odds Ratios show how each category compares to the reference category. An OR > 1 means higher odds of the outcome; OR < 1 means lower odds. The 95% confidence interval shows the range of plausible values. If the interval crosses 1.0, the difference is not statistically significant. The forest plot visualises these values — dots to the right of the centre line indicate higher odds."},"patterns":{"title":"Factor Patterns","body":"Factor Patterns show the distribution of your outcome across each driver's categories. This helps you see the raw data behind the model — which categories have the highest and lowest outcome rates. Look for clear gradients (outcome increasing/decreasing across ordered categories) as these indicate strong drivers."},"probability-lifts":{"title":"Probability Lifts","body":"Probability Lifts translate odds ratios into predicted percentage-point changes in outcome probability. This is more intuitive than odds ratios for non-technical audiences. A +5pp lift means the predicted probability increases by 5 percentage points compared to the reference category."},"diagnostics":{"title":"Model Diagnostics","body":"Diagnostics summarise model health: convergence (did the model solve?), sample size adequacy, multicollinearity (are drivers too correlated?), and small cell warnings (are any category combinations very rare?). Green = good, amber = acceptable, red = investigate."}}</script>
       <textarea class="cd-insight-store" id="cd-insight-store" data-cd-prefix="" style="display:none;">{}</textarea>
       <script id="cd-pinned-views-data" type="application/json">[]</script>
     </div>
   </main>
+  <script>
+function cdShowHelp(sectionId) {
+  var modal = document.getElementById("cd-help-modal");
+  var dataEl = document.getElementById("cd-help-data");
+  if (!modal || !dataEl) return;
+  var data = JSON.parse(dataEl.textContent || "{}");
+  var info = data[sectionId];
+  if (!info) return;
+  document.getElementById("cd-help-modal-title").textContent = info.title;
+  document.getElementById("cd-help-modal-body").innerHTML = info.body;
+  modal.classList.add("active");
+}
+function cdCloseHelp() {
+  var modal = document.getElementById("cd-help-modal");
+  if (modal) modal.classList.remove("active");
+}
+</script>
   <script>/* ==============================================================================
  * CATDRIVER HTML REPORT - UTILITY FUNCTIONS
  * ==============================================================================
@@ -4758,6 +4914,526 @@
     if (text.length <= maxChars) return text;
     return text.substring(0, maxChars - 1) + '\u2026';
   }
+
+})();</script>
+  <script>/* ==============================================================================
+ * CATDRIVER HTML REPORT - QUALITATIVE SLIDES
+ * ==============================================================================
+ * Add free-form qualitative slides (text + optional image) to the report.
+ * Slides support markdown editing, image upload (base64), reordering, and
+ * pinning to the Pinned Views panel via cdPinnedViews.
+ * All functions prefixed cd to avoid global namespace conflicts.
+ * ============================================================================== */
+
+(function() {
+  'use strict';
+
+  // ---------------------------------------------------------------------------
+  // Markdown helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Render a subset of markdown to HTML.
+   * Supports: ## heading, **bold**, *italic*, - bullets, > blockquote,
+   * blank-line paragraph breaks.
+   * @param {string} md - Raw markdown text
+   * @returns {string} HTML string
+   */
+  window.cdRenderMarkdown = function(md) {
+    if (!md) return '';
+
+    var lines = md.split('\n');
+    var html = [];
+    var inList = false;
+    var inQuote = false;
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+
+      // Headings (## only <e2><80><94> keep it simple)
+      if (/^##\s+/.test(line)) {
+        if (inList) { html.push('</ul>'); inList = false; }
+        if (inQuote) { html.push('</blockquote>'); inQuote = false; }
+        html.push('<h3>' + inlineFormat(line.replace(/^##\s+/, '')) + '</h3>');
+        continue;
+      }
+
+      // Bullet list items
+      if (/^\s*[-*]\s+/.test(line)) {
+        if (inQuote) { html.push('</blockquote>'); inQuote = false; }
+        if (!inList) { html.push('<ul>'); inList = true; }
+        html.push('<li>' + inlineFormat(line.replace(/^\s*[-*]\s+/, '')) + '</li>');
+        continue;
+      } else if (inList) {
+        html.push('</ul>');
+        inList = false;
+      }
+
+      // Blockquote
+      if (/^>\s?/.test(line)) {
+        if (inList) { html.push('</ul>'); inList = false; }
+        if (!inQuote) { html.push('<blockquote>'); inQuote = true; }
+        html.push(inlineFormat(line.replace(/^>\s?/, '')) + '<br>');
+        continue;
+      } else if (inQuote) {
+        html.push('</blockquote>');
+        inQuote = false;
+      }
+
+      // Blank line <e2><80><94> paragraph break
+      if (line.trim() === '') {
+        html.push('<br>');
+        continue;
+      }
+
+      // Regular text
+      html.push('<p>' + inlineFormat(line) + '</p>');
+    }
+
+    if (inList) html.push('</ul>');
+    if (inQuote) html.push('</blockquote>');
+
+    return html.join('\n');
+  };
+
+  /**
+   * Apply inline formatting: **bold** and *italic*.
+   * @param {string} text
+   * @returns {string}
+   */
+  function inlineFormat(text) {
+    // Bold first (greedy inner match)
+    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // Italic
+    text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    return text;
+  }
+
+  /**
+   * Strip markdown formatting for plain-text contexts.
+   * @param {string} md - Raw markdown
+   * @returns {string} Plain text
+   */
+  window.cdStripMarkdown = function(md) {
+    if (!md) return '';
+    return md
+      .replace(/^##\s+/gm, '')
+      .replace(/\*\*(.+?)\*\*/g, '$1')
+      .replace(/\*(.+?)\*/g, '$1')
+      .replace(/^>\s?/gm, '')
+      .replace(/^\s*[-*]\s+/gm, '')
+      .trim();
+  };
+
+  // ---------------------------------------------------------------------------
+  // Slide management
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Generate a unique slide ID.
+   * @returns {string}
+   */
+  function generateSlideId() {
+    return 'qual-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+  }
+
+  /**
+   * Get the slides container element.
+   * @returns {HTMLElement|null}
+   */
+  function getContainer() {
+    return document.getElementById('cd-qual-slides-container');
+  }
+
+  /**
+   * Render all existing qualitative slide cards on page load.
+   * Hydrates markdown previews and images from hidden store textareas.
+   */
+  window.cdRenderAllQualSlides = function() {
+    var container = getContainer();
+    if (!container) return;
+
+    var cards = container.querySelectorAll('.cd-qual-slide-card');
+    for (var i = 0; i < cards.length; i++) {
+      var card = cards[i];
+      hydrateCard(card);
+    }
+    cdUpdateQualEmptyState();
+  };
+
+  /**
+   * Hydrate a single card: render markdown preview and restore image.
+   * @param {HTMLElement} card
+   */
+  function hydrateCard(card) {
+    var mdStore = card.querySelector('.cd-qual-md-store');
+    var rendered = card.querySelector('.cd-qual-md-rendered');
+    var imgStore = card.querySelector('.cd-qual-img-store');
+    var imgPreview = card.querySelector('.cd-qual-img-preview');
+
+    // Render markdown
+    if (mdStore && rendered) {
+      rendered.innerHTML = cdRenderMarkdown(mdStore.value || '');
+    }
+
+    // Restore image
+    if (imgStore && imgStore.value && imgPreview) {
+      var dataUrl = imgStore.value;
+      imgPreview.innerHTML = '<img src="' + dataUrl + '" alt="Slide image" ' +
+        'style="max-width:100%; max-height:300px; border-radius:4px;" ' +
+        'data-img-width="' + (card.getAttribute('data-img-width') || '') + '" ' +
+        'data-img-height="' + (card.getAttribute('data-img-height') || '') + '">';
+    }
+  }
+
+  /**
+   * Toggle edit/view mode on a qualitative slide card.
+   * @param {HTMLElement} card - The .cd-qual-slide-card element
+   */
+  window.cdToggleQualEdit = function(card) {
+    if (!card) return;
+
+    var editor = card.querySelector('.cd-qual-md-editor');
+    var rendered = card.querySelector('.cd-qual-md-rendered');
+    var mdStore = card.querySelector('.cd-qual-md-store');
+
+    if (!editor || !rendered || !mdStore) return;
+
+    var isEditing = editor.style.display !== 'none';
+
+    if (isEditing) {
+      // Save and switch to view mode
+      mdStore.value = editor.value;
+      rendered.innerHTML = cdRenderMarkdown(editor.value);
+      editor.style.display = 'none';
+      rendered.style.display = 'block';
+    } else {
+      // Switch to edit mode
+      editor.value = mdStore.value || '';
+      editor.style.display = 'block';
+      rendered.style.display = 'none';
+      editor.focus();
+    }
+  };
+
+  /**
+   * Add a new empty qualitative slide with editing mode active.
+   */
+  window.cdAddQualSlide = function() {
+    var container = getContainer();
+    if (!container) return;
+
+    var slideId = generateSlideId();
+
+    var cardHtml =
+      '<div class="cd-qual-slide-card" data-slide-id="' + slideId + '">' +
+        '<div class="cd-qual-slide-header">' +
+          '<h4 class="cd-qual-slide-title" contenteditable="true" ' +
+            'placeholder="Slide title...">Untitled Slide</h4>' +
+          '<div class="cd-qual-slide-actions">' +
+            '<button class="cd-qual-btn cd-qual-btn-move-up" title="Move up" ' +
+              'onclick="cdMoveQualSlide(\'' + slideId + '\', \'up\')">' +
+              '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2">' +
+                '<path d="M7 11V3M3 7l4-4 4 4"/>' +
+              '</svg>' +
+            '</button>' +
+            '<button class="cd-qual-btn cd-qual-btn-move-down" title="Move down" ' +
+              'onclick="cdMoveQualSlide(\'' + slideId + '\', \'down\')">' +
+              '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2">' +
+                '<path d="M7 3v8M3 7l4 4 4-4"/>' +
+              '</svg>' +
+            '</button>' +
+            '<button class="cd-qual-btn cd-qual-btn-pin" title="Pin to Pinned Views" ' +
+              'onclick="cdPinQualSlide(\'' + slideId + '\')">' +
+              '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">' +
+                '<path d="M7 1v8M4 4l3-3 3 3M2 13h10"/>' +
+              '</svg>' +
+            '</button>' +
+            '<button class="cd-qual-btn cd-qual-btn-remove" title="Remove slide" ' +
+              'onclick="cdRemoveQualSlide(\'' + slideId + '\')">' +
+              '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2">' +
+                '<path d="M3 3l8 8M11 3l-8 8"/>' +
+              '</svg>' +
+            '</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="cd-qual-slide-body">' +
+          '<textarea class="cd-qual-md-editor" ' +
+            'placeholder="Write your content here... (supports **bold**, *italic*, ## headings, - bullets, > quotes)" ' +
+            'rows="6" style="display:block;"></textarea>' +
+          '<div class="cd-qual-md-rendered" style="display:none;"></div>' +
+          '<textarea class="cd-qual-md-store" style="display:none;"></textarea>' +
+        '</div>' +
+        '<div class="cd-qual-slide-image">' +
+          '<div class="cd-qual-img-preview"></div>' +
+          '<input type="file" class="cd-qual-img-input" accept="image/*" ' +
+            'style="display:none;" ' +
+            'onchange="cdHandleQualImage(\'' + slideId + '\', this)">' +
+          '<textarea class="cd-qual-img-store" style="display:none;"></textarea>' +
+          '<div class="cd-qual-img-actions">' +
+            '<button class="cd-qual-btn cd-qual-btn-add-img" title="Add image" ' +
+              'onclick="cdTriggerQualImage(\'' + slideId + '\')">' +
+              '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">' +
+                '<rect x="1" y="2" width="12" height="10" rx="2"/>' +
+                '<circle cx="4.5" cy="5.5" r="1.5"/>' +
+                '<path d="M1 10l3-3 2 2 3-3 4 4"/>' +
+              '</svg>' +
+              ' Image' +
+            '</button>' +
+            '<button class="cd-qual-btn cd-qual-btn-remove-img" title="Remove image" ' +
+              'onclick="cdRemoveQualImage(\'' + slideId + '\')" style="display:none;">' +
+              '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2">' +
+                '<path d="M3 3l8 8M11 3l-8 8"/>' +
+              '</svg>' +
+              ' Remove image' +
+            '</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    container.insertAdjacentHTML('beforeend', cardHtml);
+    cdUpdateQualEmptyState();
+
+    // Focus the editor on the new card
+    var newCard = container.querySelector('[data-slide-id="' + slideId + '"]');
+    if (newCard) {
+      var editor = newCard.querySelector('.cd-qual-md-editor');
+      if (editor) editor.focus();
+    }
+  };
+
+  /**
+   * Handle image file input <e2><80><94> read as base64 data URL, store dimensions.
+   * @param {string} slideId - Slide ID
+   * @param {HTMLInputElement} input - The file input element
+   */
+  window.cdHandleQualImage = function(slideId, input) {
+    if (!input.files || !input.files[0]) return;
+
+    var file = input.files[0];
+    var card = getCardById(slideId);
+    if (!card) return;
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var dataUrl = e.target.result;
+
+      // Get image dimensions
+      var img = new Image();
+      img.onload = function() {
+        card.setAttribute('data-img-width', img.naturalWidth);
+        card.setAttribute('data-img-height', img.naturalHeight);
+
+        // Store base64 data
+        var imgStore = card.querySelector('.cd-qual-img-store');
+        if (imgStore) imgStore.value = dataUrl;
+
+        // Show preview
+        var preview = card.querySelector('.cd-qual-img-preview');
+        if (preview) {
+          preview.innerHTML = '<img src="' + dataUrl + '" alt="Slide image" ' +
+            'style="max-width:100%; max-height:300px; border-radius:4px;" ' +
+            'data-img-width="' + img.naturalWidth + '" ' +
+            'data-img-height="' + img.naturalHeight + '">';
+        }
+
+        // Toggle button visibility
+        var addBtn = card.querySelector('.cd-qual-btn-add-img');
+        var removeBtn = card.querySelector('.cd-qual-btn-remove-img');
+        if (addBtn) addBtn.style.display = 'none';
+        if (removeBtn) removeBtn.style.display = 'inline-flex';
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  /**
+   * Trigger the hidden file input for image upload.
+   * @param {string} slideId - Slide ID
+   */
+  window.cdTriggerQualImage = function(slideId) {
+    var card = getCardById(slideId);
+    if (!card) return;
+
+    var input = card.querySelector('.cd-qual-img-input');
+    if (input) input.click();
+  };
+
+  /**
+   * Remove an image from a slide.
+   * @param {string} slideId - Slide ID
+   */
+  window.cdRemoveQualImage = function(slideId) {
+    var card = getCardById(slideId);
+    if (!card) return;
+
+    // Clear stores and preview
+    var imgStore = card.querySelector('.cd-qual-img-store');
+    var preview = card.querySelector('.cd-qual-img-preview');
+    var input = card.querySelector('.cd-qual-img-input');
+
+    if (imgStore) imgStore.value = '';
+    if (preview) preview.innerHTML = '';
+    if (input) input.value = '';
+
+    card.removeAttribute('data-img-width');
+    card.removeAttribute('data-img-height');
+
+    // Toggle button visibility
+    var addBtn = card.querySelector('.cd-qual-btn-add-img');
+    var removeBtn = card.querySelector('.cd-qual-btn-remove-img');
+    if (addBtn) addBtn.style.display = 'inline-flex';
+    if (removeBtn) removeBtn.style.display = 'none';
+  };
+
+  /**
+   * Remove a qualitative slide card (with confirmation).
+   * @param {string} slideId - Slide ID
+   */
+  window.cdRemoveQualSlide = function(slideId) {
+    if (!confirm('Remove this slide? This cannot be undone.')) return;
+
+    var card = getCardById(slideId);
+    if (card) card.remove();
+
+    cdUpdateQualEmptyState();
+  };
+
+  /**
+   * Move a slide up or down in the container.
+   * @param {string} slideId - Slide ID
+   * @param {string} direction - 'up' or 'down'
+   */
+  window.cdMoveQualSlide = function(slideId, direction) {
+    var card = getCardById(slideId);
+    if (!card) return;
+
+    var container = getContainer();
+    if (!container) return;
+
+    if (direction === 'up') {
+      var prev = card.previousElementSibling;
+      if (prev && prev.classList.contains('cd-qual-slide-card')) {
+        container.insertBefore(card, prev);
+      }
+    } else if (direction === 'down') {
+      var next = card.nextElementSibling;
+      if (next && next.classList.contains('cd-qual-slide-card')) {
+        container.insertBefore(next, card);
+      }
+    }
+  };
+
+  /**
+   * Pin a qualitative slide to Pinned Views.
+   * Creates a pin object with pinType "qualitative" and pushes it to
+   * the cdPinnedViews array via window.cdGetPinnedViews().
+   * @param {string} slideId - Slide ID
+   */
+  window.cdPinQualSlide = function(slideId) {
+    var card = getCardById(slideId);
+    if (!card) return;
+
+    // Gather slide content
+    var titleEl = card.querySelector('.cd-qual-slide-title');
+    var mdStore = card.querySelector('.cd-qual-md-store');
+    var editor = card.querySelector('.cd-qual-md-editor');
+    var imgStore = card.querySelector('.cd-qual-img-store');
+
+    // Sync editor to store if still in edit mode
+    if (editor && editor.style.display !== 'none') {
+      if (mdStore) mdStore.value = editor.value;
+    }
+
+    var title = titleEl ? titleEl.textContent.trim() : 'Untitled Slide';
+    var mdText = mdStore ? mdStore.value : '';
+    var imgData = imgStore ? imgStore.value : '';
+
+    // Build the pin object
+    var pin = {
+      type: 'pin',
+      pinType: 'qualitative',
+      id: 'pin-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6),
+      sectionKey: 'qualitative-' + slideId,
+      sectionTitle: title,
+      panelLabel: 'Qualitative',
+      insightText: cdStripMarkdown(mdText),
+      markdownText: mdText,
+      chartSvg: '',
+      tableHtml: imgData
+        ? '<div class="cd-qual-pinned-image"><img src="' + imgData + '" ' +
+          'style="max-width:100%; border-radius:4px;" alt="' + title + '"></div>'
+        : '',
+      timestamp: new Date().toISOString(),
+      imgWidth: card.getAttribute('data-img-width') || '',
+      imgHeight: card.getAttribute('data-img-height') || ''
+    };
+
+    // Push to the shared pinned views array
+    var pins = window.cdGetPinnedViews();
+    pins.push(pin);
+
+    // Persist and re-render
+    if (typeof window.cdSavePinnedData === 'function') {
+      window.cdSavePinnedData();
+    }
+    if (typeof window.cdRenderPinnedCards === 'function') {
+      window.cdRenderPinnedCards();
+    }
+    if (typeof window.cdUpdatePinBadge === 'function') {
+      window.cdUpdatePinBadge();
+    }
+  };
+
+  /**
+   * Show or hide the empty-state placeholder based on slide count.
+   */
+  window.cdUpdateQualEmptyState = function() {
+    var container = getContainer();
+    var emptyState = document.getElementById('cd-qual-empty-state');
+    if (!container || !emptyState) return;
+
+    var cards = container.querySelectorAll('.cd-qual-slide-card');
+    emptyState.style.display = cards.length === 0 ? 'block' : 'none';
+  };
+
+  // ---------------------------------------------------------------------------
+  // Internal helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Find a slide card by its data-slide-id.
+   * @param {string} slideId
+   * @returns {HTMLElement|null}
+   */
+  function getCardById(slideId) {
+    var container = getContainer();
+    if (!container) return null;
+    return container.querySelector('.cd-qual-slide-card[data-slide-id="' + slideId + '"]');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Initialisation
+  // ---------------------------------------------------------------------------
+
+  document.addEventListener('DOMContentLoaded', function() {
+    cdRenderAllQualSlides();
+
+    // Double-click on rendered markdown area toggles to edit mode
+    var container = getContainer();
+    if (container) {
+      container.addEventListener('dblclick', function(e) {
+        var rendered = e.target.closest('.cd-qual-md-rendered');
+        if (!rendered) return;
+
+        var card = rendered.closest('.cd-qual-slide-card');
+        if (card) {
+          cdToggleQualEdit(card);
+        }
+      });
+    }
+  });
 
 })();</script>
 </body>

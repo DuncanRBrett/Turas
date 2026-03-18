@@ -1,7 +1,7 @@
 # Turas Categorical Key Driver Module
 
-**Version:** 13.0
-**Last Updated:** 4 March 2026
+**Version:** 14.0
+**Last Updated:** March 2026
 
 Key driver analysis for categorical outcomes using logistic regression methods.
 
@@ -21,6 +21,11 @@ The Categorical Key Driver module identifies which factors most strongly influen
 - Bootstrap confidence intervals (optional)
 - Plain-English executive summaries
 - Interactive HTML reports with SVG charts
+- **Qualitative slides** — add narrative slides with markdown formatting
+  and images directly within the HTML report; pin slides to Pinned Views
+  for export
+- **Help overlays** — contextual (?) help icons on every major report
+  section explaining what each panel shows and how to interpret it
 - **Subgroup comparison** — split analysis by a grouping variable
   (e.g., age, region) and compare driver importance across groups
 - **Multi-config GUI** — run multiple outcome analyses and generate a
@@ -50,6 +55,10 @@ source("launch_turas.R")
 # Click "Launch Categorical Key Driver"
 ```
 
+The HTML report includes an **Add Slide** button for adding qualitative
+commentary with markdown formatting and images. Pre-seed slides from
+the config Excel by adding a **Slides** sheet (see User Manual Section 15).
+
 ### Using Command Line
 
 ```r
@@ -64,7 +73,7 @@ results <- run_categorical_keydriver("path/to/config.xlsx")
 
 ## Configuration
 
-Create an Excel file with three sheets (Settings, Variables, Driver_Settings):
+Create an Excel file with three required sheets (Settings, Variables, Driver_Settings) and one optional sheet (Slides):
 
 ### Settings Sheet
 
@@ -154,6 +163,22 @@ modules/catdriver/
 ---
 
 ## Dependencies
+
+### Package Versions (from renv.lock)
+
+| Package | Version | Role |
+|---------|---------|------|
+| MASS | 7.3-65 | Ordinal fallback (polr) |
+| nnet | (bundled with R) | Multinomial logistic regression |
+| car | (bundled with R) | Type II Wald chi-square tests |
+| openxlsx | 4.2.8 | Excel I/O |
+| ordinal | (install separately) | Primary ordinal engine (clm) |
+| brglm2 | (install separately) | Firth bias-reduced estimation |
+| haven | 2.5.5 | SPSS/Stata import |
+| data.table | 1.17.8 | Fast data manipulation |
+| htmltools | 0.5.8.1 | HTML report generation |
+| jsonlite | 2.0.0 | JSON serialisation |
+| base64enc | 0.1-3 | Image embedding in HTML reports |
 
 **Required:**
 ```r

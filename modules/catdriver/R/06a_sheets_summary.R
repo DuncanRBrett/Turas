@@ -10,10 +10,13 @@
 
 #' Add Executive Summary Sheet
 #'
-#' @param wb Workbook
-#' @param results Analysis results
-#' @param config Configuration
-#' @param styles Style list
+#' Writes a plain-language executive summary sheet to the workbook, including
+#' model confidence, top drivers with insights, key findings, and cautions.
+#'
+#' @param wb An openxlsx workbook object.
+#' @param results List of full analysis results from run_categorical_keydriver().
+#' @param config Configuration list with analysis_name, outcome_label, and labels.
+#' @param styles List of openxlsx style objects from create_output_styles().
 #' @keywords internal
 add_executive_summary_sheet <- function(wb, results, config, styles) {
 
@@ -45,9 +48,15 @@ add_executive_summary_sheet <- function(wb, results, config, styles) {
 
 #' Generate Executive Summary Text
 #'
-#' @param results Analysis results
-#' @param config Configuration
-#' @return Character vector of summary lines
+#' Produces a character vector of plain-text lines forming the executive
+#' summary narrative, including sample information, model confidence rating,
+#' top drivers with directional insights, key findings, and model fit details.
+#'
+#' @param results List of full analysis results containing importance,
+#'   model_result, diagnostics, factor_patterns, and weight_diagnostics.
+#' @param config Configuration list with analysis_name, outcome_label,
+#'   driver_vars, and weight_var.
+#' @return Character vector where each element is one line of the summary.
 #' @keywords internal
 generate_executive_summary <- function(results, config) {
 
@@ -190,10 +199,16 @@ generate_executive_summary <- function(results, config) {
 
 #' Generate Driver Insight
 #'
-#' @param driver_row Row from importance data frame
-#' @param results Analysis results
-#' @param config Configuration
-#' @return Character insight or NULL
+#' Creates a single plain-language sentence describing the strongest effect
+#' for a given driver variable by examining its factor patterns and selecting
+#' the category with the highest odds ratio above 1.
+#'
+#' @param driver_row Single-row data frame from the importance data frame,
+#'   must contain \code{variable} column.
+#' @param results List of full analysis results containing \code{factor_patterns}.
+#' @param config Configuration list with \code{outcome_label}.
+#' @return Character string with the insight, or NULL if no meaningful
+#'   effect is found.
 #' @keywords internal
 generate_driver_insight <- function(driver_row, results, config) {
 
@@ -229,9 +244,15 @@ generate_driver_insight <- function(driver_row, results, config) {
 
 #' Generate Key Insights
 #'
-#' @param results Analysis results
-#' @param config Configuration
-#' @return Character vector of insights
+#' Produces a set of automatic plain-language insights based on the analysis
+#' results, covering dominant drivers, model explanatory power, and data
+#' quality concerns.
+#'
+#' @param results List of full analysis results containing importance,
+#'   model_result (with fit_statistics), and diagnostics.
+#' @param config Configuration list (currently unused but reserved for future
+#'   insight customisation).
+#' @return Character vector of insight bullet-point strings.
 #' @keywords internal
 generate_key_insights <- function(results, config) {
 
@@ -271,10 +292,15 @@ generate_key_insights <- function(results, config) {
 
 #' Add Importance Sheet
 #'
-#' @param wb Workbook
-#' @param results Analysis results
-#' @param config Configuration
-#' @param styles Style list
+#' Writes the "Importance Summary" sheet showing ranked driver importance
+#' with chi-square statistics, p-values, significance colour coding, and
+#' an interpretation guide.
+#'
+#' @param wb An openxlsx workbook object.
+#' @param results List of full analysis results containing \code{importance}
+#'   data frame.
+#' @param config Configuration list (used for label lookups).
+#' @param styles List of openxlsx style objects from create_output_styles().
 #' @keywords internal
 add_importance_sheet <- function(wb, results, config, styles) {
 
@@ -341,10 +367,14 @@ add_importance_sheet <- function(wb, results, config, styles) {
 
 #' Add Factor Patterns Sheet
 #'
-#' @param wb Workbook
-#' @param results Analysis results
-#' @param config Configuration
-#' @param styles Style list
+#' Writes the "Factor Patterns" sheet with cross-tabulation tables for each
+#' driver variable, showing category counts, outcome proportions, odds ratios
+#' versus reference, confidence intervals, and effect size labels.
+#'
+#' @param wb An openxlsx workbook object.
+#' @param results List of full analysis results containing \code{factor_patterns}.
+#' @param config Configuration list with \code{driver_vars} for iteration order.
+#' @param styles List of openxlsx style objects from create_output_styles().
 #' @keywords internal
 add_patterns_sheet <- function(wb, results, config, styles) {
 

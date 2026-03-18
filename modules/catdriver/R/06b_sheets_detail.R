@@ -10,10 +10,15 @@
 
 #' Add Model Summary Sheet
 #'
-#' @param wb Workbook
-#' @param results Analysis results
-#' @param config Configuration
-#' @param styles Style list
+#' Writes the "Model Summary" sheet containing model type, outcome variable,
+#' sample sizes, number of predictors, McFadden pseudo-R2, AIC, likelihood
+#' ratio test, convergence status, and a pseudo-R2 interpretation guide.
+#'
+#' @param wb An openxlsx workbook object.
+#' @param results List of full analysis results containing \code{model_result}
+#'   (with fit_statistics and convergence), \code{diagnostics}, and \code{prep_data}.
+#' @param config Configuration list with outcome_label, outcome_var, driver_vars.
+#' @param styles List of openxlsx style objects from create_output_styles().
 #' @keywords internal
 add_model_summary_sheet <- function(wb, results, config, styles) {
 
@@ -69,7 +74,7 @@ add_model_summary_sheet <- function(wb, results, config, styles) {
 
   summary_data <- rbind(summary_data, data.frame(
     Metric = "Number of Predictors",
-    Value = sprintf("%d factors (%d terms)", length(config$driver_vars), results$prep_data$n_terms),
+    Value = sprintf("%d factors (%d terms)", length(config$driver_vars), results$prep_data$n_terms %||% length(config$driver_vars)),
     Interpretation = ""
   ))
 
@@ -132,10 +137,17 @@ add_model_summary_sheet <- function(wb, results, config, styles) {
 
 #' Add Odds Ratios Sheet
 #'
-#' @param wb Workbook
-#' @param results Analysis results
-#' @param config Configuration
-#' @param styles Style list
+#' Writes the "Odds Ratios" sheet with factor comparisons, model-based and
+#' bootstrap confidence intervals (when available), significance, effect size
+#' colour coding, plain-English interpretation, and an OR interpretation guide.
+#'
+#' @param wb An openxlsx workbook object.
+#' @param results List of full analysis results containing \code{odds_ratios}
+#'   data frame with columns such as factor_label, comparison, reference,
+#'   or_formatted, ci_formatted, p_formatted, significance, effect, and
+#'   optionally boot_median_or, boot_ci_lower, boot_ci_upper, sign_stability.
+#' @param config Configuration list with \code{detailed_output} flag.
+#' @param styles List of openxlsx style objects from create_output_styles().
 #' @keywords internal
 add_odds_ratios_sheet <- function(wb, results, config, styles) {
 
@@ -182,9 +194,9 @@ add_odds_ratios_sheet <- function(wb, results, config, styles) {
   names(out_df) <- col_names
 
   # Add plain-English interpretation column
-  or_numeric <- or_df$or_formatted
-  # Parse OR values for interpretation
-  or_vals <- suppressWarnings(as.numeric(gsub("[^0-9.]", "", or_df$or_formatted)))
+  # Parse OR values for interpretation — extract value BEFORE any CI parenthetical
+  # e.g. "2.50 (1.20, 4.10)" → "2.50" → 2.50
+  or_vals <- suppressWarnings(as.numeric(gsub("\\s*\\(.*", "", or_df$or_formatted)))
   interpretations <- vapply(or_vals, function(or_val) {
     if (is.na(or_val)) return("")
     if (or_val > 3.0) "Much more likely"
@@ -257,10 +269,16 @@ add_odds_ratios_sheet <- function(wb, results, config, styles) {
 
 #' Add Diagnostics Sheet
 #'
-#' @param wb Workbook
-#' @param results Analysis results
-#' @param config Configuration
-#' @param styles Style list
+#' Writes the "Diagnostics" sheet with data quality checks (sample size,
+#' complete cases, convergence, small cells), missing data summary, and
+#' warning messages. Applies colour coding to check statuses.
+#'
+#' @param wb An openxlsx workbook object.
+#' @param results List of full analysis results containing \code{diagnostics}
+#'   (with complete_n, original_n, pct_complete, small_cells, missing_summary,
+#'   warnings) and \code{model_result} (with convergence).
+#' @param config Configuration list with \code{min_sample_size}.
+#' @param styles List of openxlsx style objects from create_output_styles().
 #' @keywords internal
 add_diagnostics_sheet <- function(wb, results, config, styles) {
 

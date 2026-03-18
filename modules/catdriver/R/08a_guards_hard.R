@@ -431,7 +431,7 @@ guard_reference_not_missing <- function(config, prep_data) {
                                        "refused", "decline", "prefer not", "no response")
 
       is_missing_ref <- any(sapply(missing_patterns_bounded, function(p) {
-        grepl(p, ref_lower)
+        grepl(p, ref_lower, perl = TRUE)
       })) || any(sapply(missing_patterns_substring, function(p) {
         grepl(p, ref_lower, fixed = TRUE)
       }))

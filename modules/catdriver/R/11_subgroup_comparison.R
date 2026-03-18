@@ -89,12 +89,17 @@ build_subgroup_comparison <- function(subgroup_results, config = NULL) {
 
 #' Build Importance Comparison Matrix
 #'
-#' Creates a data frame with one row per driver and columns for each group's
-#' rank and importance percentage.
+#' Creates a data frame with one row per driver variable and columns for each
+#' subgroup's importance rank and percentage. Collects all drivers across all
+#' groups (handles cases where a driver appears in some groups but not others),
+#' and adds summary columns for average rank and maximum rank difference.
 #'
-#' @param successful Named list of successful subgroup results
-#' @return Data frame with columns: variable, label, {group}_rank, {group}_pct, ...
-#'   avg_rank, max_rank_diff
+#' @param successful Named list of successful subgroup result objects, each
+#'   containing an \code{importance} data frame with variable, label, and
+#'   importance_pct columns.
+#' @return Data frame with columns: variable, label, {group}_rank (integer),
+#'   {group}_pct (numeric), avg_rank, max_rank_diff, n_groups_present.
+#'   Sorted by avg_rank ascending.
 #' @keywords internal
 build_importance_matrix <- function(successful) {
 
@@ -182,14 +187,19 @@ build_importance_matrix <- function(successful) {
 
 #' Classify Drivers as Universal, Segment-Specific, or Mixed
 #'
-#' Adds a `classification` column to the importance matrix:
-#' - Universal: rank <= 3 in ALL groups AND max_rank_diff <= 2
-#' - Segment-Specific: rank <= 3 in exactly 1 group AND rank > 5 in all others
-#' - Mixed: everything else
+#' Adds a \code{classification} column to the importance matrix based on
+#' how consistently a driver ranks across subgroups. Classification rules:
+#' Universal = rank <= 3 in ALL groups AND max_rank_diff <= 2;
+#' Segment-Specific = rank <= 3 in exactly 1 group AND rank > 5 in all
+#' others; Mixed = everything else; Insufficient Data = fewer than 2 groups.
 #'
-#' @param importance_matrix Data frame from build_importance_matrix()
-#' @param group_names Character vector of group names
-#' @return Updated data frame with `classification` column
+#' @param importance_matrix Data frame from build_importance_matrix() with
+#'   columns {group}_rank for each subgroup.
+#' @param group_names Character vector of subgroup names matching the column
+#'   name prefixes.
+#' @return The input data frame with an added \code{classification} column
+#'   (character: "Universal", "Segment-Specific", "Mixed", or
+#'   "Insufficient Data").
 #' @keywords internal
 classify_drivers <- function(importance_matrix, group_names) {
 
@@ -229,12 +239,18 @@ classify_drivers <- function(importance_matrix, group_names) {
 
 #' Build Odds Ratio Comparison Across Subgroups
 #'
-#' For each driver's most important level (highest absolute log-OR),
-#' compares OR values across subgroups.
+#' For each driver-level combination present in any subgroup, collects the
+#' odds ratio, confidence interval, and p-value from each group. Computes
+#' the OR ratio (max/min across groups) to identify notable differences.
+#' Results are sorted by OR ratio descending to surface the most different
+#' effects first.
 #'
-#' @param successful Named list of successful subgroup results
+#' @param successful Named list of successful subgroup result objects, each
+#'   containing an \code{odds_ratios} data frame with driver, label, level,
+#'   or, or_ci_lower, or_ci_upper, and p_value columns.
 #' @return Data frame with columns: driver, label, level,
-#'   {group}_or, {group}_ci, {group}_p, ..., or_ratio, notable
+#'   {group}_or (numeric), {group}_ci (character), {group}_p (numeric),
+#'   or_ratio (numeric, max/min OR), notable (character, "Yes"/"No"/"-").
 #' @keywords internal
 build_or_comparison <- function(successful) {
 
@@ -332,11 +348,16 @@ build_or_comparison <- function(successful) {
 
 #' Build Model Fit Summary Across Subgroups
 #'
-#' One row per subgroup with key model statistics.
+#' Creates a summary data frame with one row per subgroup containing key
+#' model statistics for comparison. Useful for identifying subgroups where
+#' the model performs notably better or worse.
 #'
-#' @param successful Named list of successful subgroup results
-#' @return Data frame with columns: subgroup, n, mcfadden_r2, aic,
-#'   convergence, status, engine_used
+#' @param successful Named list of successful subgroup result objects, each
+#'   containing \code{model_result} (with fit_statistics, convergence,
+#'   engine_used) and \code{group_n}.
+#' @return Data frame with columns: subgroup (character), n (integer),
+#'   mcfadden_r2 (numeric), aic (numeric), convergence (character "Yes"/"No"),
+#'   status (character), engine_used (character).
 #' @keywords internal
 build_model_fit_summary <- function(successful) {
 
@@ -370,13 +391,17 @@ build_model_fit_summary <- function(successful) {
 
 #' Generate Subgroup Comparison Insights
 #'
-#' Produces plain-language bullet points summarising key differences
-#' and similarities across subgroups, suitable for management reporting.
+#' Produces plain-language bullet points summarising key differences and
+#' similarities across subgroups, suitable for management reporting. Covers
+#' universal drivers, segment-specific drivers, biggest rank movers, and
+#' model fit variation.
 #'
-#' @param importance_matrix Data frame from build_importance_matrix() with classification
-#' @param model_fit Data frame from build_model_fit_summary()
-#' @param group_names Character vector of group names
-#' @return Character vector of insight strings
+#' @param importance_matrix Data frame from build_importance_matrix() with
+#'   classification column and per-group rank columns.
+#' @param model_fit Data frame from build_model_fit_summary() with subgroup
+#'   and mcfadden_r2 columns.
+#' @param group_names Character vector of subgroup names.
+#' @return Character vector of insight strings (one per insight bullet point).
 #' @keywords internal
 generate_subgroup_insights <- function(importance_matrix, model_fit, group_names) {
 

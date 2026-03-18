@@ -1,10 +1,28 @@
 # Turas Categorical Key Driver Module - Reference Guide
 
-**Version:** 12.0
-**Last Updated:** 3 March 2026
+**Version:** 13.0
+**Last Updated:** March 2026
 **Target Audience:** Statisticians, Senior Analysts, Methodologists
 
+**R Compatibility:** R >= 4.0
+
 This document provides comprehensive technical reference for the statistical methods used in the Categorical Key Driver module.
+
+### Package Versions (from renv.lock)
+
+| Package | Version | Role |
+|---------|---------|------|
+| MASS | 7.3-65 | Ordinal fallback engine (polr) |
+| nnet | (bundled with R) | Multinomial logistic regression (multinom) |
+| car | (bundled with R) | Type II Wald chi-square tests (Anova) |
+| openxlsx | 4.2.8 | Excel workbook generation |
+| ordinal | (install separately) | Primary ordinal engine (clm) |
+| brglm2 | (install separately) | Firth bias-reduced estimation |
+| haven | 2.5.5 | SPSS/Stata data import |
+| data.table | 1.17.8 | Fast data manipulation |
+| htmltools | 0.5.8.1 | HTML report assembly |
+| jsonlite | 2.0.0 | JSON serialisation for report data |
+| base64enc | 0.1-3 | Image embedding in HTML reports |
 
 ---
 

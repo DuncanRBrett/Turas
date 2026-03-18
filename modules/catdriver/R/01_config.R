@@ -87,6 +87,14 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
     )
   }
 
+  # Deduplicate settings (last value wins if duplicated)
+  if (any(duplicated(settings_df$Setting))) {
+    dup_names <- unique(settings_df$Setting[duplicated(settings_df$Setting)])
+    cat(sprintf("   [WARNING] Duplicate settings found: %s. Using last value.\n",
+                paste(dup_names, collapse = ", ")))
+    settings_df <- settings_df[!duplicated(settings_df$Setting, fromLast = TRUE), ]
+  }
+
   # Convert to named list
   settings <- setNames(as.list(settings_df$Value), settings_df$Setting)
 
@@ -418,8 +426,23 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
       get_setting(settings, "subgroup_include_total", TRUE), TRUE
     ),
 
+    # Slide and footer settings (optional)
+    slide_image_dir = get_setting(settings, "slide_image_dir", NULL),
+    custom_disclaimer = get_setting(settings, "custom_disclaimer", NULL),
+    custom_footer = get_setting(settings, "custom_footer", NULL),
+
     # Raw settings for reference
     settings = settings
+  )
+
+  # ===========================================================================
+  # LOAD SLIDES SHEET (OPTIONAL)
+  # ===========================================================================
+
+  config$slides <- load_slides_from_config(
+    config_file = config_file,
+    project_root = project_root,
+    slide_image_dir = config$slide_image_dir
   )
 
   # Validate settings ranges
@@ -466,6 +489,122 @@ load_catdriver_config <- function(config_file, project_root = NULL) {
   }
 
   config
+}
+
+
+#' Load Slides from Config File
+#'
+#' Checks if a "Slides" sheet exists in the config Excel file and, if so,
+#' reads it and returns a list of slide objects. Each slide includes an id,
+#' title, optional markdown content, and optional base64-encoded image data.
+#'
+#' @param config_file Path to configuration Excel file
+#' @param project_root Project root directory for resolving relative paths
+#' @param slide_image_dir Optional directory for resolving relative image paths
+#' @return List of slide objects, or NULL if no Slides sheet exists
+#' @keywords internal
+load_slides_from_config <- function(config_file, project_root = NULL, slide_image_dir = NULL) {
+
+  # Check if Slides sheet exists
+  available_sheets <- tryCatch(
+    openxlsx::getSheetNames(config_file),
+    error = function(e) character(0)
+  )
+
+  if (!"Slides" %in% available_sheets) {
+    return(NULL)
+  }
+
+  # Read the sheet
+  slides_df <- tryCatch(
+    openxlsx::read.xlsx(config_file, sheet = "Slides"),
+    error = function(e) {
+      cat("   [WARNING] Could not read Slides sheet:", e$message, "\n")
+      return(NULL)
+    }
+  )
+
+  if (is.null(slides_df) || nrow(slides_df) == 0) {
+    return(NULL)
+  }
+
+  # Handle missing columns gracefully - add defaults
+  if (!"slide_order" %in% names(slides_df)) {
+    slides_df$slide_order <- seq_len(nrow(slides_df))
+  }
+  if (!"slide_title" %in% names(slides_df)) {
+    slides_df$slide_title <- paste("Slide", seq_len(nrow(slides_df)))
+  }
+  if (!"slide_content" %in% names(slides_df)) {
+    slides_df$slide_content <- NA
+  }
+  if (!"slide_image_path" %in% names(slides_df)) {
+    slides_df$slide_image_path <- NA
+  }
+
+  # Clean up and sort
+  slides_df$slide_order <- suppressWarnings(as.numeric(slides_df$slide_order))
+  slides_df <- slides_df[!is.na(slides_df$slide_order), , drop = FALSE]
+
+  if (nrow(slides_df) == 0) {
+    return(NULL)
+  }
+
+  slides_df <- slides_df[order(slides_df$slide_order), , drop = FALSE]
+
+  # Resolve base directory for images
+  if (is.null(project_root)) {
+    project_root <- dirname(config_file)
+  }
+  image_base_dir <- if (!is.null(slide_image_dir) && nzchar(slide_image_dir)) {
+    resolve_path(project_root, slide_image_dir)
+  } else {
+    project_root
+  }
+
+  # Build slide objects
+  slides <- lapply(seq_len(nrow(slides_df)), function(i) {
+    row <- slides_df[i, ]
+
+    # Base64 encode image if path is provided and file exists
+    image_data <- NULL
+    img_path_raw <- row$slide_image_path
+
+    if (!is.null(img_path_raw) && !is.na(img_path_raw) && nzchar(trimws(img_path_raw))) {
+      img_path <- resolve_path(image_base_dir, trimws(img_path_raw))
+
+      if (file.exists(img_path)) {
+        tryCatch({
+          raw_bytes <- readBin(img_path, "raw", file.info(img_path)$size)
+          b64 <- base64enc::base64encode(raw_bytes)
+          ext <- tolower(tools::file_ext(img_path))
+          mime_type <- switch(ext,
+            "png"  = "image/png",
+            "jpg"  = "image/jpeg",
+            "jpeg" = "image/jpeg",
+            "gif"  = "image/gif",
+            "svg"  = "image/svg+xml",
+            "image/png"
+          )
+          image_data <- paste0("data:", mime_type, ";base64,", b64)
+        }, error = function(e) {
+          message(sprintf("[Catdriver] Warning: Could not encode image '%s': %s", img_path, e$message))
+        })
+      } else {
+        message(sprintf("[Catdriver] Warning: Slide image not found: %s", img_path))
+      }
+    }
+
+    list(
+      id = paste0("slide_", i),
+      order = as.integer(row$slide_order),
+      title = if (!is.na(row$slide_title)) trimws(row$slide_title) else paste("Slide", i),
+      content = if (!is.na(row$slide_content)) row$slide_content else NULL,
+      image_data = image_data
+    )
+  })
+
+  slides
 }
 
 
@@ -609,8 +748,7 @@ validate_config_against_data <- function(config, data) {
 
   # Check weight variable
   if (!is.null(config$weight_var) && !config$weight_var %in% data_cols) {
-    warning("Weight variable '", config$weight_var, "' not found in data. ",
-            "Proceeding without weights.")
+    cat(sprintf("   [WARNING] Weight variable '%s' not found in data. Proceeding without weighting.\n", config$weight_var))
   }
 
   invisible(TRUE)
@@ -639,46 +777,8 @@ get_setting <- function(settings, name, default = NULL) {
 }
 
 
-#' Convert Setting to Numeric
-#'
-#' @param value Value to convert
-#' @param default Default if conversion fails
-#' @return Numeric value
-#' @keywords internal
-as_numeric_setting <- function(value, default) {
-  if (is.null(value) || is.na(value)) {
-    return(default)
-  }
-  result <- suppressWarnings(as.numeric(value))
-  if (is.na(result)) {
-    return(default)
-  }
-  result
-}
-
-
-#' Convert Setting to Logical
-#'
-#' @param value Value to convert
-#' @param default Default if conversion fails
-#' @return Logical value
-#' @keywords internal
-as_logical_setting <- function(value, default) {
-  if (is.null(value) || is.na(value)) {
-    return(default)
-  }
-  if (is.logical(value)) {
-    return(value)
-  }
-  value_str <- tolower(as.character(value))
-  if (value_str %in% c("true", "yes", "1", "t", "y")) {
-    return(TRUE)
-  }
-  if (value_str %in% c("false", "no", "0", "f", "n")) {
-    return(FALSE)
-  }
-  default
-}
+# NOTE: as_numeric_setting() and as_logical_setting() are defined in
+# R/07_utilities.R (single source of truth). Do not duplicate here.
 
 
 #' Resolve File Path

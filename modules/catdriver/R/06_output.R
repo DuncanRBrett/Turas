@@ -16,13 +16,17 @@
 
 #' Generate Excel Output
 #'
-#' Creates a formatted Excel workbook with all analysis results.
-#' TRS v1.0: Includes Run_Status sheet with status, degraded flag, and reasons.
+#' Creates a formatted Excel workbook containing all catdriver analysis results.
+#' Includes Run_Status (TRS v1.0), executive summary, importance, factor
+#' patterns, model summary, odds ratios, diagnostics, interpretation, and
+#' optional subgroup comparison sheets. Validates the output path before writing.
 #'
-#' @param results Full analysis results list
-#' @param config Configuration list
-#' @param output_file Path to output Excel file
-#' @return Path to created file (invisibly)
+#' @param results List of full analysis results from run_categorical_keydriver(),
+#'   including importance, odds_ratios, factor_patterns, model_result, and diagnostics.
+#' @param config Configuration list with output settings, driver_vars, labels,
+#'   and detailed_output flag.
+#' @param output_file Character, absolute or relative path to the output .xlsx file.
+#' @return Character path to the created file (returned invisibly).
 #' @export
 write_catdriver_output <- function(results, config, output_file) {
 
@@ -71,60 +75,62 @@ write_catdriver_output <- function(results, config, output_file) {
   # TRS v1.0: Sheet 1 - Run_Status (required per spec)
   add_run_status_sheet(wb, results, styles)
 
+  # Track sheet generation failures for PARTIAL status
+  sheet_errors <- character(0)
+
+  # Helper: try adding a sheet, track failures
+  try_sheet <- function(sheet_name, expr) {
+    tryCatch(expr, error = function(e) {
+      cat(sprintf("   [ERROR] %s sheet failed: %s\n", sheet_name, conditionMessage(e)))
+      sheet_errors <<- c(sheet_errors, sprintf("%s: %s", sheet_name, conditionMessage(e)))
+    })
+  }
+
   # Sheet 2: Executive Summary
-  tryCatch(
-    add_executive_summary_sheet(wb, results, config, styles),
-    error = function(e) cat("   [ERROR] Executive Summary sheet failed:", conditionMessage(e), "\n")
-  )
+  try_sheet("Executive Summary",
+    add_executive_summary_sheet(wb, results, config, styles))
 
   # Sheet 3: Importance Summary
-  tryCatch(
-    add_importance_sheet(wb, results, config, styles),
-    error = function(e) cat("   [ERROR] Importance sheet failed:", conditionMessage(e), "\n")
-  )
+  try_sheet("Importance",
+    add_importance_sheet(wb, results, config, styles))
 
   # Sheet 4: Factor Patterns
-  tryCatch(
-    add_patterns_sheet(wb, results, config, styles),
-    error = function(e) cat("   [ERROR] Patterns sheet failed:", conditionMessage(e), "\n")
-  )
+  try_sheet("Patterns",
+    add_patterns_sheet(wb, results, config, styles))
 
   # Sheet 5: Model Summary
-  tryCatch(
-    add_model_summary_sheet(wb, results, config, styles),
-    error = function(e) cat("   [ERROR] Model Summary sheet failed:", conditionMessage(e), "\n")
-  )
+  try_sheet("Model Summary",
+    add_model_summary_sheet(wb, results, config, styles))
 
   # Sheet 6: Odds Ratios (if detailed output)
   if (config$detailed_output) {
-    tryCatch(
-      add_odds_ratios_sheet(wb, results, config, styles),
-      error = function(e) cat("   [ERROR] Odds Ratios sheet failed:", conditionMessage(e), "\n")
-    )
+    try_sheet("Odds Ratios",
+      add_odds_ratios_sheet(wb, results, config, styles))
   }
 
   # Sheet 7: Diagnostics (if detailed output)
   if (config$detailed_output) {
-    tryCatch(
-      add_diagnostics_sheet(wb, results, config, styles),
-      error = function(e) cat("   [ERROR] Diagnostics sheet failed:", conditionMessage(e), "\n")
-    )
+    try_sheet("Diagnostics",
+      add_diagnostics_sheet(wb, results, config, styles))
   }
 
   # Sheet 8: Interpretation & Limits (always included for transparency)
-  tryCatch(
-    add_interpretation_sheet(wb, results, config, styles),
-    error = function(e) cat("   [ERROR] Interpretation sheet failed:", conditionMessage(e), "\n")
-  )
+  try_sheet("Interpretation",
+    add_interpretation_sheet(wb, results, config, styles))
 
   # Sheets 9-11: Subgroup Comparison (only when subgroup analysis is active)
   if (isTRUE(results$subgroup_active) && !is.null(results$subgroup_comparison)) {
     if (exists("add_subgroup_sheets", mode = "function")) {
-      tryCatch(
-        add_subgroup_sheets(wb, results$subgroup_comparison, results, config, styles),
-        error = function(e) cat("   [ERROR] Subgroup sheets failed:", conditionMessage(e), "\n")
-      )
+      try_sheet("Subgroup Comparison",
+        add_subgroup_sheets(wb, results$subgroup_comparison, results, config, styles))
     }
+  }
+
+  # Track sheet failures as PARTIAL in run status
+  if (length(sheet_errors) > 0) {
+    results$run_status <- "PARTIAL"
+    results$degraded_reasons <- c(results$degraded_reasons %||% character(0),
+      paste0("Excel sheet generation error: ", sheet_errors))
   }
 
   # Save workbook (TRS v1.0: Use atomic save if available)
@@ -150,11 +156,14 @@ write_catdriver_output <- function(results, config, output_file) {
 
 #' Add Run_Status Sheet (TRS v1.0)
 #'
-#' Creates the required Run_Status sheet per TRS v1.0 spec.
+#' Creates the mandatory Run_Status sheet per TRS v1.0 spec, reporting
+#' the overall run status (PASS/PARTIAL), degraded flag, timestamp,
+#' module version, and any degraded reasons or affected outputs.
 #'
-#' @param wb Workbook
-#' @param results Analysis results
-#' @param styles Style list
+#' @param wb An openxlsx workbook object to add the sheet to.
+#' @param results List of analysis results containing run_status, degraded,
+#'   degraded_reasons, and affected_outputs fields.
+#' @param styles List of openxlsx style objects from create_output_styles().
 #' @keywords internal
 add_run_status_sheet <- function(wb, results, styles) {
 
@@ -230,8 +239,12 @@ add_run_status_sheet <- function(wb, results, styles) {
 
 #' Create Output Styles
 #'
-#' @param wb Workbook object
-#' @return List of style objects
+#' Builds a named list of openxlsx style objects used consistently across
+#' all catdriver Excel output sheets (header, subheader, title, section,
+#' normal, number, pct, integer, reference, warning, success, error).
+#'
+#' @param wb An openxlsx workbook object (styles are bound to the workbook).
+#' @return Named list of openxlsx Style objects.
 #' @keywords internal
 create_output_styles <- function(wb) {
 
@@ -324,12 +337,15 @@ create_output_styles <- function(wb) {
 
 #' Print Console Summary
 #'
-#' Prints a structured summary of results to console.
-#' Uses boxed format for visibility in Shiny console output.
+#' Prints a structured, boxed summary of catdriver analysis results to the
+#' R console. Designed for high visibility in Shiny console output. Shows
+#' outcome, sample size, weights, model fit, top 3 drivers with direction,
+#' and any warnings.
 #'
-#' @param results Analysis results
-#' @param config Configuration
-#' @param output_file Path to generated output file (optional)
+#' @param results List of full analysis results from run_categorical_keydriver().
+#' @param config Configuration list with outcome_label, weight_var, and driver_vars.
+#' @param output_file Character, optional path to the generated output file
+#'   (displayed at the bottom of the summary box).
 #' @export
 print_console_summary <- function(results, config, output_file = NULL) {
 

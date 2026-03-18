@@ -91,13 +91,14 @@ run_multinomial_logistic_robust <- function(formula, data, weights = NULL, confi
   # FIT MODEL
   # ===========================================================================
 
-  fit_data <- data  # Local copy to avoid polluting caller's data with .wt column
+  fit_data <- data  # Local copy to avoid polluting caller's data with weight column
   # Hess = TRUE stores the Hessian so vcov()/confint() work outside fit scope
+  # Use unique column name to avoid collision with user data columns
   model <- tryCatch({
     if (!is.null(weights) && length(weights) == nrow(data)) {
-      if (!(length(unique(weights)) == 1 && unique(weights)[1] == 1)) {
-        fit_data$.wt <- weights
-        nnet::multinom(formula, data = fit_data, weights = .wt,
+      if (!all(abs(weights - 1) < 1e-10)) {
+        fit_data$..catdriver_wt.. <- weights
+        nnet::multinom(formula, data = fit_data, weights = ..catdriver_wt..,
                        trace = FALSE, maxit = 500, Hess = TRUE)
       } else {
         nnet::multinom(formula, data = fit_data,
@@ -202,6 +203,7 @@ run_multinomial_logistic_robust <- function(formula, data, weights = NULL, confi
     lr_df <- attr(ll_full, "df") - attr(ll_null, "df")
     lr_pvalue <- pchisq(lr_stat, abs(lr_df), lower.tail = FALSE)
   } else {
+    cat("   [WARNING] Null model failed to fit - R\u00B2 and LR test unavailable\n")
     mcfadden_r2 <- NA
     lr_stat <- NA
     lr_df <- NA

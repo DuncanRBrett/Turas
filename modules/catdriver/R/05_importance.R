@@ -41,7 +41,7 @@ calculate_importance <- function(model_result, config) {
       car::Anova(model, type = "II")
     }
   }, error = function(e) {
-    warning("car::Anova failed: ", e$message, ". Using fallback method.")
+    cat(sprintf("   [WARNING] car::Anova failed: %s. Using fallback method.\n", e$message))
     calculate_fallback_importance(model_result, config)
   })
 
@@ -59,9 +59,14 @@ calculate_importance <- function(model_result, config) {
 
 #' Process ANOVA Results into Importance Data Frame
 #'
-#' @param anova_result Result from car::Anova
-#' @param config Configuration list
-#' @return Data frame with processed importance
+#' Transforms raw car::Anova output into a ranked importance data frame with
+#' relative percentages, significance stars, and effect size classifications.
+#'
+#' @param anova_result Object returned by car::Anova (class "anova"), containing
+#'   chi-square statistics and p-values for each predictor.
+#' @param config Configuration list with driver variable names and labels.
+#' @return Data frame with columns: variable, chi_square, df, p_value,
+#'   importance_pct, label, significance, effect_size, rank.
 #' @keywords internal
 process_anova_results <- function(anova_result, config) {
 
@@ -128,13 +133,8 @@ process_anova_results <- function(anova_result, config) {
   # Calculate effect size category based on chi-square
   # Use Cohen's w approximation: w = sqrt(chi2/n)
   # But we'll use a simpler heuristic based on importance %
-  importance_df$effect_size <- sapply(importance_df$importance_pct, function(pct) {
-    if (is.na(pct)) return("Unknown")
-    if (pct > 30) return("Very Large")
-    if (pct > 15) return("Large")
-    if (pct > 5) return("Medium")
-    return("Small")
-  })
+  importance_df$effect_size <- vapply(importance_df$importance_pct,
+    classify_importance_effect, character(1))
 
   # Sort by importance
   importance_df <- importance_df[order(-importance_df$importance_pct), ]
@@ -150,11 +150,15 @@ process_anova_results <- function(anova_result, config) {
 
 #' Calculate Importance for Multinomial Models
 #'
-#' Uses likelihood ratio tests comparing full model to reduced models.
+#' Uses likelihood ratio tests comparing the full multinomial model to reduced
+#' models (each with one predictor removed) to compute per-variable importance.
+#' Falls back to equal importance if model data cannot be extracted.
 #'
-#' @param model_result Model results
-#' @param config Configuration list
-#' @return Data frame with importance metrics
+#' @param model_result List returned by run_catdriver_model(), must contain
+#'   \code{model} (fitted multinom object) and optionally \code{analysis_data}.
+#' @param config Configuration list with \code{driver_vars} and \code{outcome_var}.
+#' @return Data frame with columns: variable, chi_square, df, p_value,
+#'   importance_pct, label, significance, effect_size, rank.
 #' @keywords internal
 calculate_multinomial_importance <- function(model_result, config) {
 
@@ -254,13 +258,8 @@ calculate_multinomial_importance <- function(model_result, config) {
 
   importance_df$significance <- sapply(importance_df$p_value, get_sig_stars)
 
-  importance_df$effect_size <- sapply(importance_df$importance_pct, function(pct) {
-    if (is.na(pct)) return("Unknown")
-    if (pct > 30) return("Very Large")
-    if (pct > 15) return("Large")
-    if (pct > 5) return("Medium")
-    return("Small")
-  })
+  importance_df$effect_size <- vapply(importance_df$importance_pct,
+    classify_importance_effect, character(1))
 
   # Sort and rank
   importance_df <- importance_df[order(-importance_df$importance_pct), ]
@@ -273,11 +272,16 @@ calculate_multinomial_importance <- function(model_result, config) {
 
 #' Fallback Importance Calculation
 #'
-#' Uses coefficient z-values when car::Anova fails.
+#' Uses squared z-values from individual coefficients as a proxy for chi-square
+#' statistics when car::Anova fails. Aggregates dummy variable importance back
+#' to the original factor level using aggregate_dummy_importance().
 #'
-#' @param model_result Model results
-#' @param config Configuration list
-#' @return Data frame with importance metrics
+#' @param model_result List returned by run_catdriver_model(), must contain
+#'   \code{coefficients} data frame with \code{term}, \code{z_value}, and
+#'   \code{p_value} columns.
+#' @param config Configuration list with \code{driver_vars} and label accessors.
+#' @return Data frame with columns: variable, chi_square, p_value,
+#'   importance_pct, label, df, significance, effect_size, rank.
 #' @keywords internal
 calculate_fallback_importance <- function(model_result, config) {
 
@@ -334,13 +338,8 @@ calculate_fallback_importance <- function(model_result, config) {
 
   importance_df$df <- NA
   importance_df$significance <- sapply(importance_df$p_value, get_sig_stars)
-  importance_df$effect_size <- sapply(importance_df$importance_pct, function(pct) {
-    if (is.na(pct)) return("Unknown")
-    if (pct > 30) return("Very Large")
-    if (pct > 15) return("Large")
-    if (pct > 5) return("Medium")
-    return("Small")
-  })
+  importance_df$effect_size <- vapply(importance_df$importance_pct,
+    classify_importance_effect, character(1))
 
   # Sort and rank
   importance_df <- importance_df[order(-importance_df$importance_pct), ]
@@ -360,9 +359,10 @@ calculate_fallback_importance <- function(model_result, config) {
 #' @param importance_df Data frame with term-level importance
 #' @param config Configuration list
 #' @param mapping Optional pre-computed mapping from map_terms_to_levels()
+#' @param prep_data Optional preprocessing results with predictor_info for fallback mapping
 #' @return Data frame with factor-level importance
 #' @keywords internal
-aggregate_dummy_importance <- function(importance_df, config, mapping = NULL) {
+aggregate_dummy_importance <- function(importance_df, config, mapping = NULL, prep_data = NULL) {
 
   # Match terms to original variables using proper introspection
   term_to_var <- character(nrow(importance_df))
@@ -385,13 +385,13 @@ aggregate_dummy_importance <- function(importance_df, config, mapping = NULL) {
       next
     }
 
-    # Third try: check contrasts/xlevels from model for reliable mapping
+    # Third try: check contrasts/xlevels from prep_data for reliable mapping
     # This uses model matrix infrastructure instead of substring parsing
     matched <- FALSE
     for (driver_var in config$driver_vars) {
       # Get expected column names from model.matrix for this variable
       # by checking if term matches the pattern R would generate
-      if (exists("prep_data") && !is.null(prep_data$predictor_info[[driver_var]])) {
+      if (!is.null(prep_data) && !is.null(prep_data$predictor_info[[driver_var]])) {
         levels_vec <- prep_data$predictor_info[[driver_var]]$levels
         if (!is.null(levels_vec)) {
           for (lvl in levels_vec[-1]) {  # Skip reference
@@ -460,12 +460,7 @@ extract_odds_ratios <- function(model_result, config, prep_data, mapping = NULL)
 
   # Deprecation warning
 
-  warning(
-    "extract_odds_ratios() is DEPRECATED as of v2.0.\n",
-    "Use extract_odds_ratios_mapped() with canonical term mapping instead.\n",
-    "This function will be removed in a future version.",
-    call. = FALSE
-  )
+  cat("   [WARNING] extract_odds_ratios() is DEPRECATED as of v2.0. Use extract_odds_ratios_mapped() with canonical term mapping instead. This function will be removed in a future version.\n")
 
   coef_df <- model_result$coefficients
 
@@ -597,12 +592,22 @@ extract_odds_ratios <- function(model_result, config, prep_data, mapping = NULL)
 
 #' Calculate Factor Patterns
 #'
-#' Creates cross-tabulation with outcome proportions for each factor.
+#' Creates cross-tabulation tables showing outcome proportions for each level
+#' of each categorical driver variable, along with matched odds ratios.
+#' Produces the data underlying the "Factor Patterns" Excel sheet.
 #'
-#' @param prep_data Preprocessed data
-#' @param config Configuration list
-#' @param or_df Odds ratios data frame
-#' @return List of factor pattern data frames
+#' @param prep_data List returned by preprocess_catdriver_data(), containing
+#'   \code{data} (data frame with prepared factors) and \code{outcome_info}.
+#' @param config Configuration list with \code{outcome_var}, \code{driver_vars},
+#'   and label accessors.
+#' @param or_df Data frame of odds ratios (from extract_odds_ratios_mapped()),
+#'   with columns: factor, comparison, odds_ratio, or_lower, or_upper, effect.
+#' @return Named list keyed by driver variable name, each element containing:
+#'   \item{variable}{Character, variable name}
+#'   \item{label}{Character, display label}
+#'   \item{reference}{Character, reference level name}
+#'   \item{patterns}{Data frame with category, n, pct_of_total, outcome
+#'     proportions, odds_ratio, or_lower, or_upper, effect, is_reference}
 #' @export
 calculate_factor_patterns <- function(prep_data, config, or_df) {
 

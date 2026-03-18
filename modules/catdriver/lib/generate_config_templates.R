@@ -366,6 +366,36 @@ build_catdriver_settings_def <- function() {
           dropdown = NULL,
           numeric_range = NULL,
           integer_range = NULL
+        ),
+        list(
+          name = "slide_image_dir",
+          required = FALSE,
+          default = "",
+          description = "Directory containing slide images. Helps resolve relative image paths in the Slides sheet.",
+          valid_values_text = "Directory path (absolute or relative to config file)",
+          dropdown = NULL,
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "custom_disclaimer",
+          required = FALSE,
+          default = "",
+          description = "Custom text for the report footer disclaimer. Replaces the default disclaimer if provided.",
+          valid_values_text = "Free text",
+          dropdown = NULL,
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "custom_footer",
+          required = FALSE,
+          default = "",
+          description = "Custom footer text displayed at the bottom of the HTML report.",
+          valid_values_text = "Free text",
+          dropdown = NULL,
+          numeric_range = NULL,
+          integer_range = NULL
         )
       )
     ),
@@ -616,6 +646,85 @@ build_catdriver_driver_settings_examples <- function() {
 
 
 # ==============================================================================
+# SLIDES SHEET DEFINITION
+# ==============================================================================
+
+#' Build Slides table columns definition
+#'
+#' Returns a list of column definitions for the Slides table sheet,
+#' which allows users to define custom presentation slides for the
+#' HTML report output.
+#'
+#' @return List of column definitions
+#' @keywords internal
+build_catdriver_slides_columns <- function() {
+  list(
+    list(
+      name = "slide_order",
+      width = 14,
+      required = TRUE,
+      description = "Order of the slide in the presentation (1, 2, 3...). Must be a whole number >= 1.",
+      dropdown = NULL,
+      integer_range = c(1, 999),
+      numeric_range = NULL
+    ),
+    list(
+      name = "slide_title",
+      width = 30,
+      required = TRUE,
+      description = "Title displayed on the slide card. Keep concise for best appearance.",
+      dropdown = NULL,
+      integer_range = NULL,
+      numeric_range = NULL
+    ),
+    list(
+      name = "slide_content",
+      width = 60,
+      required = FALSE,
+      description = "Markdown content for the slide body. Supports **bold**, *italic*, ## heading, - bullet, > quote.",
+      dropdown = NULL,
+      integer_range = NULL,
+      numeric_range = NULL
+    ),
+    list(
+      name = "slide_image_path",
+      width = 40,
+      required = FALSE,
+      description = "Path to an image file (PNG, JPG) to embed in the slide. Will be base64 encoded. Relative paths resolved against slide_image_dir.",
+      dropdown = NULL,
+      integer_range = NULL,
+      numeric_range = NULL
+    )
+  )
+}
+
+
+#' Build Slides example rows
+#'
+#' Returns example rows for the Slides table sheet demonstrating
+#' title-only slides, content slides with markdown, and image slides.
+#'
+#' @return List of named lists
+#' @keywords internal
+build_catdriver_slides_examples <- function() {
+  list(
+    list(
+      slide_order = 1,
+      slide_title = "Executive Summary",
+      slide_content = "## Key Findings\n\n- **Service quality** is the strongest driver of satisfaction\n- Price perception has a *moderate* positive effect\n\n> Overall model explains 72% of variance",
+      slide_image_path = ""
+    ),
+    list(
+      slide_order = 2,
+      slide_title = "Methodology",
+      slide_content = "The analysis uses categorical key driver modelling with:\n\n- Ordinal logistic regression\n- SHAP-based importance decomposition\n- Bootstrap confidence intervals (n=500)",
+      slide_image_path = "images/methodology_diagram.png"
+    )
+  )
+}
+
+
+# ==============================================================================
 # MAIN TEMPLATE GENERATION FUNCTION
 # ==============================================================================
 
@@ -630,6 +739,7 @@ build_catdriver_driver_settings_examples <- function() {
 #'   \item{Settings}{Analysis parameters, file paths, quality controls, output options}
 #'   \item{Variables}{Outcome, driver, and weight variable definitions}
 #'   \item{Driver_Settings}{Per-driver type, ordering, reference levels, and policies}
+#'   \item{Slides}{Custom presentation slides for the HTML report}
 #' }
 #'
 #' @param output_path Character. Full path for the output .xlsx file.
@@ -697,12 +807,25 @@ generate_catdriver_config_template <- function(output_path) {
   )
 
   # ============================================================
+  # SHEET 4: Slides
+  # ============================================================
+  write_table_sheet(
+    wb = wb,
+    sheet_name = "Slides",
+    columns_def = build_catdriver_slides_columns(),
+    title = "TURAS Catdriver Module - Slides",
+    subtitle = "Define custom presentation slides for the HTML report. Supports markdown content and embedded images.",
+    example_rows = build_catdriver_slides_examples(),
+    num_blank_rows = 20
+  )
+
+  # ============================================================
   # SAVE
   # ============================================================
   saveWorkbook(wb, output_path, overwrite = TRUE)
 
   cat(sprintf("[Catdriver] Config template saved to: %s\n", output_path))
-  cat(sprintf("  Sheets: Settings, Variables, Driver_Settings\n"))
+  cat(sprintf("  Sheets: Settings, Variables, Driver_Settings, Slides\n"))
 
   invisible(output_path)
 }

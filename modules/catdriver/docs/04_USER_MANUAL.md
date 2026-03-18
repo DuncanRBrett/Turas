@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Categorical Key Driver Module — User Manual
 
-**Version:** 12.0 **Last Updated:** 3 March 2026 **Target Audience:**
+**Version:** 13.0 **Last Updated:** March 2026 **Target Audience:**
 Market Researchers, Data Analysts, Survey Managers
 
 ------------------------------------------------------------------------
@@ -33,6 +33,26 @@ Market Researchers, Data Analysts, Survey Managers
 12. [Decision Flowcharts](#12-decision-flowcharts)
 13. [Complete Worked Example](#13-complete-worked-example)
 14. [Quick Reference Tables](#14-quick-reference-tables)
+15. [Working with Slides and Images](#15-working-with-slides-and-images)
+16. [Understanding Help Overlays](#16-understanding-help-overlays)
+
+------------------------------------------------------------------------
+
+### Package Versions (from renv.lock)
+
+| Package | Version | Role |
+|---------|---------|------|
+| MASS | 7.3-65 | Ordinal fallback (polr) |
+| nnet | (bundled with R) | Multinomial logistic regression |
+| car | (bundled with R) | Type II Wald chi-square tests |
+| openxlsx | 4.2.8 | Excel I/O |
+| ordinal | (install separately) | Primary ordinal engine (clm) |
+| brglm2 | (install separately) | Firth bias-reduced estimation |
+| haven | 2.5.5 | SPSS/Stata import |
+| data.table | 1.17.8 | Fast data manipulation |
+| htmltools | 0.5.8.1 | HTML report generation |
+| jsonlite | 2.0.0 | JSON serialisation |
+| base64enc | 0.1-3 | Image embedding in HTML reports |
 
 ------------------------------------------------------------------------
 
@@ -402,8 +422,8 @@ report comparing the ordinal and binary models.
 
 ## 5. Setting Up Your Configuration File
 
-The configuration file is an Excel workbook (.xlsx) with 3 sheets. You
-can copy the template from
+The configuration file is an Excel workbook (.xlsx) with 3 required
+sheets and 1 optional sheet (Slides). You can copy the template from
 `modules/catdriver/docs/templates/CatDriver_Config_Template.xlsx`.
 
 ### Sheet 1: Settings
@@ -450,6 +470,9 @@ the correct model type. See Section 2 for guidance.
 | `rare_level_policy` | "warn_only" | Global policy for rare categories |
 | `reference_category` | (first alphabetically) | Outcome reference level |
 | `researcher_logo_path` | (none) | Path to logo image for HTML report header |
+| `slide_image_dir` | (none) | Directory containing images referenced in the Slides sheet |
+| `custom_disclaimer` | (none) | Custom disclaimer text for HTML report footer |
+| `custom_footer` | (none) | Custom footer text for HTML report |
 
 #### Multinomial-Only Settings
 
@@ -529,6 +552,29 @@ controls.
 | campus | categorical |  |  | missing_as_level | warn_only |
 | course_type | categorical |  |  | missing_as_level | collapse_to_other |
 | employment_field | categorical |  |  | missing_as_level | warn_only |
+
+### Sheet 4: Slides (Optional)
+
+This sheet lets you pre-seed qualitative slides into the HTML report.
+Each row becomes a slide in the Qualitative Slides panel.
+
+| Column | Required | Description |
+|----|----|-----|
+| `slide_order` | Yes | Integer controlling display order (1 = first) |
+| `slide_title` | Yes | Slide heading |
+| `slide_content` | Yes | Slide body text (supports markdown formatting) |
+| `slide_image_path` | No | Filename of an image to embed (relative to `slide_image_dir`) |
+
+**Example:**
+
+| slide_order | slide_title | slide_content | slide_image_path |
+|----|----|----|----|
+| 1 | Key Finding | **Grade** is the dominant driver of satisfaction. | grade_chart.png |
+| 2 | Regional Note | Campus differences are *negligible* after controlling for grade. | |
+
+Set `slide_image_dir` in the Settings sheet to point to the folder
+containing your slide images. Image paths in this sheet are relative
+to that directory.
 
 ### Choosing the Reference Level
 
@@ -1371,6 +1417,9 @@ fit, sample information, warnings
 | accent_colour | No | #CC9900 | Hex colour |
 | multinomial_mode | If multinomial | — | baseline_category, per_outcome, all_pairwise, one_vs_all |
 | target_outcome_level | If one_vs_all | — | Category value |
+| slide_image_dir | No | (none) | Directory path |
+| custom_disclaimer | No | (none) | Any text |
+| custom_footer | No | (none) | Any text |
 
 ### Driver Types Quick Reference
 
@@ -1433,6 +1482,94 @@ fit, sample information, warnings
 | 0.2-0.4 | Good        | Strong model              |
 | 0.1-0.2 | Moderate    | Useful but incomplete     |
 | \< 0.1  | Limited     | Important drivers missing |
+
+------------------------------------------------------------------------
+
+## 15. Working with Slides and Images
+
+The Qualitative Slides panel lets you add narrative commentary,
+annotations, and images directly within the HTML report. Slides
+appear as a dedicated panel alongside the analytical sections.
+
+### Adding Slides from Within the HTML Report
+
+1.  Click the **Add Slide** button in the Qualitative Slides panel
+2.  Enter a **title** for the slide
+3.  Write your content in the **markdown editor**
+4.  Optionally upload an image (PNG or JPG recommended; keep file
+    sizes reasonable for report performance)
+5.  Click **Save** to add the slide to the report
+
+Slides can be reordered, edited, or deleted after creation.
+
+### Pre-Seeding Slides from the Config Excel
+
+Add a **Slides** sheet to your config workbook with these columns:
+
+| Column | Required | Description |
+|----|----|-----|
+| `slide_order` | Yes | Integer controlling display order |
+| `slide_title` | Yes | Slide heading text |
+| `slide_content` | Yes | Body text with markdown formatting |
+| `slide_image_path` | No | Image filename (relative to `slide_image_dir`) |
+
+Set `slide_image_dir` in the Settings sheet to point to the folder
+containing your images.
+
+### Pinning Slides to Pinned Views
+
+Any slide can be pinned to Pinned Views for export:
+
+1.  Click the **pin icon** on the slide card
+2.  The slide appears in the Pinned Views section alongside any
+    pinned analytical sections
+3.  Use the export function to generate a combined output of all
+    pinned items
+
+### Markdown Formatting Reference
+
+Slides support standard markdown formatting:
+
+| Syntax | Result |
+|--------|--------|
+| `**bold text**` | **bold text** |
+| `*italic text*` | *italic text* |
+| `## Heading` | Section heading |
+| `- item` | Bullet list item |
+| `> quote` | Block quote |
+
+### Image Recommendations
+
+-   **Formats**: PNG or JPG
+-   **File size**: Keep images under 2 MB for fast report loading
+-   **Resolution**: 72-150 DPI is sufficient for screen display
+-   Images are embedded directly in the HTML report and do not
+    require external hosting
+
+------------------------------------------------------------------------
+
+## 16. Understanding Help Overlays
+
+Every major section of the HTML report includes a **(?)** help icon
+in its header. Clicking the icon opens a contextual overlay
+explaining what the section shows and how to interpret its contents.
+
+### Available Help Overlays
+
+| Section | What the Help Overlay Explains |
+|---------|-------------------------------|
+| Executive Summary | How findings are generated and what the plain-English narrative covers |
+| Importance Ranking | How driver importance percentages are calculated (chi-square method) |
+| Factor Patterns | How to read the category breakdown tables and what the percentages mean |
+| Probability Lifts | What percentage-point lifts represent and how to compare them |
+| Odds Ratios | How to interpret odds ratio forest plots and confidence intervals |
+| Diagnostics | What model fit statistics mean and when to be concerned |
+| Subgroup Comparison | How to read cross-group driver rankings and what classifications mean |
+| Qualitative Slides | How to add, edit, and export slides |
+
+Help overlays are self-contained and do not require external
+documentation. They are designed to make each section
+interpretable by non-statisticians without leaving the report.
 
 ------------------------------------------------------------------------
 

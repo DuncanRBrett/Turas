@@ -25,7 +25,7 @@ handle_missing_data <- function(data, config) {
 
   original_n <- nrow(data)
   rows_to_drop <- integer(0)
-  missing_report <- list()
+  missing_report <- list(drivers = list())
 
   # ==========================================================================
   # OUTCOME VARIABLE - ALWAYS DROP MISSING
@@ -291,9 +291,8 @@ apply_rare_level_policy <- function(data, config) {
     if (length(rare_levels) > 0) {
       if (policy == "warn_only") {
         var_report$action <- "warned"
-        warning("Rare levels in '", var_name, "': ",
-                paste(rare_levels, collapse = ", "),
-                " (N < ", global_threshold, ")")
+        cat(sprintf("   [WARNING] Rare levels in '%s': %s (N < %d)\n",
+                    var_name, paste(rare_levels, collapse = ", "), global_threshold))
 
       } else if (policy == "collapse_to_other") {
         # Collapse rare levels to "Other"

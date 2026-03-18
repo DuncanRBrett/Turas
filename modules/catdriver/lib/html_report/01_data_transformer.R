@@ -84,7 +84,7 @@ transform_catdriver_for_html <- function(results, config) {
       factor_label = r$factor_label,
       comparison = r$comparison,
       reference = r$reference,
-      or_value = suppressWarnings(as.numeric(gsub("[^0-9.]", "", r$or_formatted))),
+      or_value = suppressWarnings(as.numeric(gsub("\\s*\\(.*", "", r$or_formatted))),
       or_formatted = r$or_formatted,
       ci_formatted = r$ci_formatted,
       p_formatted = r$p_formatted,

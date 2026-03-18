@@ -270,13 +270,18 @@ map_terms_to_levels <- function(model, data, formula = NULL) {
 
 #' Map Multinomial Model Terms
 #'
-#' Extends basic mapping to include outcome levels for multinomial models.
+#' Extends the basic term-to-level mapping to include outcome levels for
+#' multinomial logistic regression. Creates one copy of the base mapping
+#' per non-reference outcome level, each annotated with outcome_level and
+#' reference_outcome.
 #'
-#' @param model Fitted multinom model
-#' @param data Data frame
-#' @param formula Model formula
-#' @param outcome_var Outcome variable name
-#' @return Data frame with mapping including outcome_level
+#' @param model Fitted nnet::multinom model object.
+#' @param data Data frame used for fitting.
+#' @param formula Model formula object.
+#' @param outcome_var Character, name of the outcome variable (used to
+#'   identify reference outcome category).
+#' @return Data frame extending the base mapping with additional columns:
+#'   outcome_level (character) and reference_outcome (character).
 #' @export
 map_multinomial_terms <- function(model, data, formula, outcome_var) {
 
@@ -432,11 +437,17 @@ extract_odds_ratios_mapped <- function(model_result, mapping, config, conf_level
 
 #' Aggregate Term Importance to Variable Level
 #'
-#' Uses mapping to correctly aggregate dummy variable importance to factor level.
+#' Uses the canonical term-level mapping to correctly aggregate dummy variable
+#' chi-square statistics back to the original factor level. Sums chi-squares
+#' and takes the minimum p-value across all dummy terms belonging to each
+#' driver variable.
 #'
-#' @param term_importance Data frame with term-level chi-squares
-#' @param mapping Term-level mapping
-#' @return Data frame with variable-level importance
+#' @param term_importance Data frame with columns: term (character, coefficient
+#'   name), chi_square (numeric), p_value (numeric).
+#' @param mapping Data frame from map_terms_to_levels() with columns: driver,
+#'   coef_name, design_col, is_reference.
+#' @return Data frame with columns: variable (original driver name),
+#'   chi_square (summed), p_value (minimum across terms).
 #' @keywords internal
 aggregate_importance_mapped <- function(term_importance, mapping) {
 
@@ -480,12 +491,18 @@ aggregate_importance_mapped <- function(term_importance, mapping) {
 
 #' Validate Mapping Completeness
 #'
-#' Checks that all model terms can be mapped. This is a HARD GATE -
-#' if any coefficients are unmapped, the analysis refuses to proceed.
+#' Checks that every model coefficient can be mapped back to an original
+#' predictor variable. This is a HARD GATE -- if any non-intercept,
+#' non-threshold coefficients are unmapped, the analysis refuses to proceed
+#' via catdriver_refuse() to prevent silently incorrect results.
 #'
-#' @param mapping Term-level mapping from map_terms_to_levels() or map_multinomial_terms()
-#' @param model_coefs Model coefficient names (from names(coef(model)) or similar)
-#' @return TRUE if valid, refuses with catdriver_refuse() otherwise
+#' @param mapping Data frame from map_terms_to_levels() or
+#'   map_multinomial_terms(), with columns: coef_name, is_reference.
+#' @param model_coefs Character vector of model coefficient names (from
+#'   names(coef(model)) or similar). Intercept and ordinal threshold terms
+#'   (containing "|") are automatically filtered out before checking.
+#' @return Invisible TRUE if all coefficients are mapped. Otherwise, calls
+#'   catdriver_refuse() and does not return.
 #'
 #' @note Threshold parameters are identified by the "|" separator (e.g. "Low|Medium").
 #'   This is standard in ordinal::clm and MASS::polr. If adding support for new ordinal

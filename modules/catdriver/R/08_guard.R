@@ -95,14 +95,19 @@ catdriver_refuse <- function(reason = NULL, message = NULL,
 
 #' Run Analysis with Top-Level Refusal Handler
 #'
-#' Wraps the main analysis function to catch refusal conditions
-#' and display them cleanly without a stack trace.
+#' Wraps the main analysis function to catch turas_refusal conditions
+#' and display them cleanly without a stack trace. Also catches unexpected
+#' errors and formats them as bug reports. This is the CatDriver override
+#' that ensures backwards compatibility with code expecting
+#' catdriver_refusal_result class.
 #'
-#' This is the CatDriver override that ensures backwards compatibility
-#' with code expecting catdriver_refusal_result class.
-#'
-#' @param expr Expression to evaluate (typically run_categorical_keydriver call)
-#' @return Result of expression, or refusal result if refused
+#' @param expr Unevaluated R expression to evaluate (typically a
+#'   run_categorical_keydriver() call).
+#' @return If the expression succeeds, its return value. If a TRS refusal
+#'   is raised, an invisible list of class c("catdriver_refusal_result",
+#'   "turas_refusal_result") with \code{refused = TRUE}. If an unexpected
+#'   error occurs, an invisible list of class c("catdriver_error_result",
+#'   "turas_error_result") with \code{error = TRUE}.
 #' @export
 with_refusal_handler <- function(expr) {
   # Use the shared TRS handler
@@ -170,8 +175,14 @@ with_refusal_handler <- function(expr) {
 
 #' Check if Result was a Refusal
 #'
-#' @param result Result from with_refusal_handler()
-#' @return TRUE if analysis was refused
+#' Tests whether a result object from with_refusal_handler() represents
+#' a TRS refusal. Supports both new TRS and legacy CatDriver result classes.
+#'
+#' @param result Any R object, typically the return value from
+#'   with_refusal_handler().
+#' @return Logical, TRUE if the result is a refusal (either
+#'   turas_refusal_result or catdriver_refusal_result class with
+#'   \code{refused = TRUE}).
 #' @export
 is_refusal <- function(result) {
   # Check for both new TRS and legacy CatDriver result classes
@@ -189,10 +200,13 @@ is_refusal <- function(result) {
 
 #' Initialize Guard State
 #'
-#' Creates a new guard state object to track warnings and issues.
-#' Includes CatDriver-specific fields for collapsed levels and dropped predictors.
+#' Creates a new guard state object to track warnings, stability flags, and
+#' data modifications throughout the analysis pipeline. Includes CatDriver-specific
+#' fields for collapsed levels, dropped predictors, and separation detection.
 #'
-#' @return Guard state list
+#' @return List with fields: module, warnings, soft_failures, fallback_used,
+#'   fallback_reason, stability_flags, collapsed_levels, dropped_predictors,
+#'   missing_handled, separation_detected, data_modifications, timestamp.
 #' @export
 guard_init <- function() {
   # Start with base structure matching TRS shared implementation
@@ -216,10 +230,14 @@ guard_init <- function() {
 
 #' Add Warning to Guard State
 #'
-#' @param guard Guard state object
-#' @param message Warning message
-#' @param category Warning category
-#' @return Updated guard state
+#' Appends a warning message to both the flat warnings vector and the
+#' categorised soft_failures list within the guard state.
+#'
+#' @param guard List, guard state object from guard_init().
+#' @param message Character, warning message text.
+#' @param category Character, warning category key (e.g., "general", "dropped",
+#'   "separation"). Defaults to "general".
+#' @return Updated guard state list (modified copy).
 #' @keywords internal
 guard_warn <- function(guard, message, category = "general") {
   guard$warnings <- c(guard$warnings, message)
@@ -230,9 +248,12 @@ guard_warn <- function(guard, message, category = "general") {
 
 #' Add Stability Flag
 #'
-#' @param guard Guard state object
-#' @param flag Stability flag text
-#' @return Updated guard state
+#' Records a stability concern that may affect result reliability.
+#' Duplicate flags are automatically de-duplicated.
+#'
+#' @param guard List, guard state object from guard_init().
+#' @param flag Character, stability flag text describing the concern.
+#' @return Updated guard state list (modified copy).
 #' @keywords internal
 guard_flag_stability <- function(guard, flag) {
   guard$stability_flags <- unique(c(guard$stability_flags, flag))
@@ -242,10 +263,15 @@ guard_flag_stability <- function(guard, flag) {
 
 #' Get Guard Summary for Output
 #'
-#' Creates summary of all warnings and flags for output.
+#' Creates a summary of all warnings, stability flags, and data modifications
+#' accumulated during the analysis. Used for the Run_Status sheet and
+#' console summary output.
 #'
-#' @param guard Guard state object
-#' @return List with summary info
+#' @param guard List, guard state object from guard_init().
+#' @return List with fields: module, has_issues, n_warnings, warnings,
+#'   stability_flags, fallback_used, fallback_reason, use_with_caution,
+#'   collapsed_levels, dropped_predictors, separation_detected,
+#'   data_modifications.
 #' @export
 guard_summary <- function(guard) {
   has_issues <- length(guard$warnings) > 0 ||
@@ -279,13 +305,14 @@ guard_summary <- function(guard) {
 
 #' Record Collapsed Levels
 #'
-#' Records when rare levels have been collapsed.
+#' Records when rare factor levels have been collapsed into a combined
+#' category. Also adds a stability flag for the affected variable.
 #'
-#' @param guard Guard state object
-#' @param variable Variable name
-#' @param original_levels Original level names
-#' @param collapsed_to Name of level they were collapsed to
-#' @return Updated guard state
+#' @param guard List, guard state object from guard_init().
+#' @param variable Character, name of the variable whose levels were collapsed.
+#' @param original_levels Character vector, names of the original rare levels.
+#' @param collapsed_to Character, name of the level they were collapsed into.
+#' @return Updated guard state list (modified copy).
 #' @keywords internal
 guard_record_collapse <- function(guard, variable, original_levels, collapsed_to) {
   guard$collapsed_levels[[variable]] <- list(
@@ -299,12 +326,13 @@ guard_record_collapse <- function(guard, variable, original_levels, collapsed_to
 
 #' Record Dropped Predictor
 #'
-#' Records when a predictor has been dropped from analysis.
+#' Records when a predictor variable has been excluded from the analysis
+#' and logs a warning with the reason.
 #'
-#' @param guard Guard state object
-#' @param variable Variable name
-#' @param reason Reason for dropping
-#' @return Updated guard state
+#' @param guard List, guard state object from guard_init().
+#' @param variable Character, name of the dropped predictor variable.
+#' @param reason Character, explanation of why the predictor was dropped.
+#' @return Updated guard state list (modified copy).
 #' @keywords internal
 guard_record_dropped <- function(guard, variable, reason) {
   guard$dropped_predictors <- c(guard$dropped_predictors, variable)
@@ -315,11 +343,14 @@ guard_record_dropped <- function(guard, variable, reason) {
 
 #' Record Separation Detection
 #'
-#' Records when perfect/quasi separation was detected.
+#' Records when perfect or quasi-complete separation has been detected in
+#' the model. Sets the separation_detected flag, adds a stability flag,
+#' and optionally logs a detailed warning.
 #'
-#' @param guard Guard state object
-#' @param details Details about the separation
-#' @return Updated guard state
+#' @param guard List, guard state object from guard_init().
+#' @param details Character or NULL, optional description of which variables
+#'   or levels exhibit separation.
+#' @return Updated guard state list (modified copy).
 #' @keywords internal
 guard_record_separation <- function(guard, details = NULL) {
   guard$separation_detected <- TRUE
@@ -333,13 +364,17 @@ guard_record_separation <- function(guard, details = NULL) {
 
 #' Record Fallback Estimator Usage
 #'
-#' Records when fallback estimator was used due to primary engine failure.
+#' Records when the primary estimation engine failed and a fallback engine
+#' was used instead. Sets the fallback_used flag, stores the reason, adds
+#' a stability flag, and logs a warning.
 #'
-#' @param guard Guard state object
-#' @param primary_engine Name of primary engine that failed
-#' @param fallback_engine Name of fallback engine used
-#' @param reason Reason for fallback
-#' @return Updated guard state
+#' @param guard List, guard state object from guard_init().
+#' @param primary_engine Character, name of the primary engine that failed
+#'   (e.g., "ordinal::clm").
+#' @param fallback_engine Character, name of the fallback engine used
+#'   (e.g., "MASS::polr").
+#' @param reason Character, explanation of why the primary engine failed.
+#' @return Updated guard state list (modified copy).
 #' @keywords internal
 guard_record_fallback <- function(guard, primary_engine, fallback_engine, reason) {
   guard$fallback_used <- TRUE
@@ -355,12 +390,15 @@ guard_record_fallback <- function(guard, primary_engine, fallback_engine, reason
 
 #' Record Data Modification
 #'
-#' Records any modifications made to input data (for transparency).
+#' Records any modifications made to input data for full transparency
+#' in the output. Modifications are stored in a list keyed by type.
 #'
-#' @param guard Guard state object
-#' @param type Type of modification (e.g., "level_collapse", "missing_impute")
-#' @param details Details of the modification
-#' @return Updated guard state
+#' @param guard List, guard state object from guard_init().
+#' @param type Character, category of modification (e.g., "level_collapse",
+#'   "missing_impute", "type_coercion").
+#' @param details Character or list, description of the specific modification
+#'   performed.
+#' @return Updated guard state list (modified copy).
 #' @keywords internal
 guard_record_modification <- function(guard, type, details) {
   guard$data_modifications[[type]] <- c(guard$data_modifications[[type]], list(details))

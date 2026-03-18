@@ -88,7 +88,7 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
   fit_data <- data  # Local copy to avoid polluting caller's data with .wt column
   model <- tryCatch({
     if (!is.null(weights) && length(weights) == nrow(data)) {
-      if (length(unique(weights)) == 1 && unique(weights)[1] == 1) {
+      if (all(abs(weights - 1) < 1e-10)) {
         glm(formula, data = fit_data, family = binomial(link = "logit"))
       } else {
         fit_data$.wt <- weights
@@ -134,7 +134,7 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
         fallback_used <- TRUE
 
         if (!is.null(weights) && length(weights) == nrow(data) &&
-            !(length(unique(weights)) == 1 && unique(weights)[1] == 1)) {
+            !all(abs(weights - 1) < 1e-10)) {
           fit_data$.wt <- weights
           glm(formula, data = fit_data, family = binomial(link = "logit"),
               weights = .wt, method = brglm2::brglm_fit)
@@ -341,8 +341,7 @@ check_multicollinearity <- function(model) {
   }, error = function(e) {
     # VIF calculation failed - log explicitly (no silent fails per TRS)
     msg <- sprintf("VIF diagnostics failed and were skipped: %s", conditionMessage(e))
-    cat(sprintf("   [WARN] %s\n", msg))
-    warning(msg, call. = FALSE)
+    cat(sprintf("   [WARNING] %s\n", msg))
     NULL
   })
 

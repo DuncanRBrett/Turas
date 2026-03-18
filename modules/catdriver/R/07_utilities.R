@@ -5,10 +5,63 @@
 # Helper functions for the categorical key driver module.
 # These utilities support configuration, data handling, and output formatting.
 #
-# Version: 1.0
-# Date: December 2024
+# Version: 1.1
+# Date: March 2026
 #
 # ==============================================================================
+
+# ==============================================================================
+# NULL COALESCING OPERATOR
+# ==============================================================================
+
+# Define %||% if not already available (sourced via TRS infrastructure in production,
+# but needed as safety net for standalone sourcing and tests)
+if (!exists("%||%", mode = "function")) {
+  `%||%` <- function(x, y) if (is.null(x) || length(x) == 0) y else x
+}
+
+# ==============================================================================
+# MODULE DEFAULTS (centralised thresholds & constants)
+# ==============================================================================
+# All hard-coded thresholds live here. Config values override these defaults.
+# Reference: CLAUDE.md requires "Configuration over hardcoding".
+
+#' CatDriver Module Default Parameters
+#'
+#' Centralised list of default thresholds and constants used throughout
+#' the catdriver module. Config settings override these values.
+#'
+#' @keywords internal
+CATDRIVER_DEFAULTS <- list(
+  # Sample adequacy
+  min_sample_size      = 30L,     # Minimum N for any analysis
+  min_epp              = 10,      # Events per predictor (soft warning)
+  min_subgroup_n       = 30L,     # Minimum per-subgroup N
+
+  # Rare levels & sparse cells
+  rare_level_threshold = 10L,     # Minimum N to keep a level
+  rare_cell_threshold  = 5L,      # Cross-tab cell warning threshold
+
+  # Missing data
+  missing_threshold    = 50,      # Max % missing before refusal
+
+  # Model diagnostics
+  confidence_level     = 0.95,    # CI confidence level
+  vif_threshold        = 5.0,     # GVIF threshold for multicollinearity
+
+  # Effect size classification (importance %)
+  effect_very_large    = 30,      # >30% = Very Large
+  effect_large         = 15,      # >15% = Large
+  effect_medium        = 5,       # >5%  = Medium
+
+  # OR direction sanity
+  direction_prop_diff  = 0.05,    # Proportion diff threshold for mismatch check
+  direction_or_upper   = 1.25,    # OR above this with negative prop = mismatch
+  direction_or_lower   = 0.80,    # OR below this with positive prop = mismatch
+
+  # Bootstrap
+  bootstrap_reps       = 500L     # Default bootstrap resamples
+)
 
 # ==============================================================================
 # SETTING CONVERSION HELPERS
@@ -218,6 +271,23 @@ interpret_or_effect <- function(or) {
   } else {
     return("Very Large")
   }
+}
+
+
+#' Classify Importance Effect Size
+#'
+#' Maps relative importance percentage to a human-readable effect size label.
+#' Thresholds: >30% = Very Large, >15% = Large, >5% = Medium, otherwise Small.
+#'
+#' @param pct Numeric, importance percentage (0-100)
+#' @return Character, one of "Very Large", "Large", "Medium", "Small"
+#' @keywords internal
+classify_importance_effect <- function(pct) {
+  if (is.na(pct) || !is.numeric(pct)) return("Unknown")
+  if (pct > CATDRIVER_DEFAULTS$effect_very_large) return("Very Large")
+  if (pct > CATDRIVER_DEFAULTS$effect_large) return("Large")
+  if (pct > CATDRIVER_DEFAULTS$effect_medium) return("Medium")
+  "Small"
 }
 
 
@@ -570,7 +640,7 @@ calc_mcfadden_r2 <- function(model, null_model = NULL) {
       ll_null <- model$null.deviance / -2
     } else {
       # Approximate from model
-      warning("Null model not provided, R-squared may be approximate")
+      cat("   [WARNING] Null model not provided, R-squared may be approximate\n")
       ll_null <- ll_full * 0.5  # Placeholder
     }
   }
@@ -755,7 +825,7 @@ run_bootstrap_or <- function(data, formula, outcome_type, weights = NULL,
   # Get term names from initial fit
   initial_model <- fit_model_for_bootstrap(data, formula, outcome_type, weights)
   if (is.null(initial_model)) {
-    warning("Initial model fit failed - cannot run bootstrap")
+    cat("   [WARNING] Initial model fit failed - cannot run bootstrap\n")
     return(NULL)
   }
 
@@ -852,8 +922,8 @@ fit_model_for_bootstrap <- function(data, formula, outcome_type, weights = NULL)
     } else if (outcome_type == "ordinal") {
       if (requireNamespace("ordinal", quietly = TRUE)) {
         if (!is.null(weights)) {
-          data$.wt <- weights
-          ordinal::clm(formula, data = data, weights = .wt, link = "logit")
+          data$..catdriver_wt.. <- weights
+          ordinal::clm(formula, data = data, weights = ..catdriver_wt.., link = "logit")
         } else {
           ordinal::clm(formula, data = data, link = "logit")
         }

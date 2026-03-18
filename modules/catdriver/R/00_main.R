@@ -947,6 +947,32 @@ run_categorical_keydriver_impl <- function(config_file,
     trs_banner_end("CATEGORICAL KEY DRIVER ANALYSIS", status, elapsed)
   }
 
+  # Print structured completion summary for Shiny console visibility
+  cat("\n\u250C\u2500\u2500\u2500 CATDRIVER COMPLETE \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n")
+  cat(sprintf("\u2502 Status: %s\n", run_status))
+  cat(sprintf("\u2502 Outcome: %s (%s)\n",
+              config$outcome_label %||% config$outcome_var,
+              config$outcome_type %||% "unknown"))
+  cat(sprintf("\u2502 Drivers: %d analysed\n", length(config$driver_vars)))
+  if (!is.null(model_result$fit_statistics$mcfadden_r2)) {
+    cat(sprintf("\u2502 Model fit: McFadden R\u00B2 = %.3f\n",
+                model_result$fit_statistics$mcfadden_r2))
+  }
+  if (!is.null(diagnostics$analysis_n)) {
+    cat(sprintf("\u2502 Sample: %d respondents (of %d original)\n",
+                diagnostics$analysis_n %||% nrow(data),
+                diagnostics$original_n %||% nrow(data)))
+  }
+  cat(sprintf("\u2502 Output: %s\n", basename(config$output_file)))
+  if (isTRUE(config$html_report)) {
+    cat(sprintf("\u2502 HTML: %s\n", basename(sub("\\.xlsx$", ".html", config$output_file))))
+  }
+  if (length(degraded_reasons) > 0) {
+    cat(sprintf("\u2502 Warnings: %d (see Run_Status sheet)\n", length(degraded_reasons)))
+  }
+  cat(sprintf("\u2502 Time: %.1f seconds\n", elapsed))
+  cat("\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\n")
+
   # Print console summary (includes output file path)
   print_console_summary(results, config, output_file = config$output_file)
 

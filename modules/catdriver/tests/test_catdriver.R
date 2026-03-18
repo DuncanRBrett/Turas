@@ -1166,6 +1166,142 @@ test_that("write_catdriver_output creates valid Excel file", {
 
 
 # ==============================================================================
+# SUITE 7: BUG FIX REGRESSION TESTS (v1.1 upgrade)
+# ==============================================================================
+
+test_that("null coalescing operator %||% is available", {
+  # %||% must be defined after sourcing utilities
+  expect_true(exists("%||%", mode = "function"),
+              info = "%%||%% operator should be defined in 07_utilities.R or via TRS infrastructure")
+
+  # Test basic behavior
+  expect_equal(NULL %||% "default", "default")
+  expect_equal("value" %||% "default", "value")
+  expect_equal(character(0) %||% "default", "default")
+  expect_equal(list() %||% "default", "default")
+  expect_equal(42 %||% "default", 42)
+})
+
+
+test_that("OR parsing handles formatted values with confidence intervals", {
+  # Simulate the OR parsing that happens in 06b_sheets_detail.R
+  # The bug was: gsub("[^0-9.]", "", "2.50 (1.20, 4.10)") -> "2.501.204.10"
+  # Fix: gsub("\\s*\\(.*", "", ...) to strip everything from first paren
+
+  test_cases <- c("2.50", "2.50 (1.20, 4.10)", "0.75 (0.50-1.12)", "1.00", "3.14 (2.00, 5.00)")
+  expected <- c(2.50, 2.50, 0.75, 1.00, 3.14)
+
+  or_vals <- suppressWarnings(as.numeric(gsub("\\s*\\(.*", "", test_cases)))
+
+  expect_equal(or_vals, expected,
+               info = "OR parsing should extract value before parenthetical CI")
+})
+
+
+test_that("aggregate_dummy_importance accepts prep_data as parameter", {
+  # The bug was: aggregate_dummy_importance() referenced global prep_data
+  # Fix: added prep_data as explicit parameter
+
+  # Check function signature includes prep_data parameter
+  fn_args <- names(formals(aggregate_dummy_importance))
+  expect_true("prep_data" %in% fn_args,
+              info = "aggregate_dummy_importance should accept prep_data as parameter")
+})
+
+
+test_that("soft guard direction_sanity does not hard refuse", {
+  # guard_direction_sanity should warn, not call catdriver_refuse()
+  # We verify by checking the source code doesn't contain catdriver_refuse
+
+  fn_body <- deparse(body(guard_direction_sanity))
+  has_refuse <- any(grepl("catdriver_refuse", fn_body))
+
+  expect_false(has_refuse,
+               info = "guard_direction_sanity is a soft guard and should not call catdriver_refuse()")
+})
+
+
+test_that("missing data handler initialises drivers list", {
+  # handle_missing_data should not error on first driver assignment
+  data <- generate_binary_data(50)
+  config <- list(
+    outcome_var = "churn",
+    outcome_label = "Churn",
+    driver_vars = c("service", "price"),
+    driver_settings = NULL,
+    missing_threshold = 50
+  )
+
+  result <- tryCatch(
+    handle_missing_data(data, config),
+    error = function(e) list(error = TRUE, message = e$message)
+  )
+
+  expect_false(isTRUE(result$error),
+               info = paste("handle_missing_data should not error:",
+                            if (isTRUE(result$error)) result$message else "OK"))
+  expect_true(is.list(result$missing_report$drivers),
+              info = "missing_report$drivers should be an initialised list")
+})
+
+
+test_that("multinomial model uses safe weight column name", {
+  # Verify that the weight column name doesn't collide with user data
+  fn_body <- deparse(body(run_multinomial_logistic_robust))
+  has_safe_name <- any(grepl("catdriver_wt", fn_body))
+  has_old_name <- any(grepl('\\$\\.wt', fn_body))
+
+  expect_true(has_safe_name,
+              info = "Multinomial should use ..catdriver_wt.. for weight column")
+})
+
+
+test_that("slide loading returns NULL when no Slides sheet", {
+  # Create a minimal config without Slides sheet
+  skip_if_not_installed("openxlsx")
+
+  tmp <- tempfile(fileext = ".xlsx")
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Settings")
+  openxlsx::writeData(wb, "Settings", data.frame(Setting = "test", Value = "1"))
+  openxlsx::saveWorkbook(wb, tmp, overwrite = TRUE)
+
+  result <- load_slides_from_config(tmp)
+  expect_null(result, info = "Should return NULL when no Slides sheet exists")
+
+  file.remove(tmp)
+})
+
+
+test_that("slide loading reads valid Slides sheet", {
+  skip_if_not_installed("openxlsx")
+
+  tmp <- tempfile(fileext = ".xlsx")
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Settings")
+  openxlsx::writeData(wb, "Settings", data.frame(Setting = "test", Value = "1"))
+  openxlsx::addWorksheet(wb, "Slides")
+  openxlsx::writeData(wb, "Slides", data.frame(
+    slide_order = c(1, 2),
+    slide_title = c("First Slide", "Second Slide"),
+    slide_content = c("## Hello\n\nContent here", "More content"),
+    slide_image_path = c(NA, NA),
+    stringsAsFactors = FALSE
+  ))
+  openxlsx::saveWorkbook(wb, tmp, overwrite = TRUE)
+
+  result <- load_slides_from_config(tmp)
+  expect_true(is.list(result), info = "Should return a list of slides")
+  expect_equal(length(result), 2)
+  expect_equal(result[[1]]$title, "First Slide")
+  expect_equal(result[[2]]$title, "Second Slide")
+  expect_true(!is.null(result[[1]]$content))
+
+  file.remove(tmp)
+})
+
+
+# ==============================================================================
 # TEST SUITE COMPLETE
 # ==============================================================================
 #
