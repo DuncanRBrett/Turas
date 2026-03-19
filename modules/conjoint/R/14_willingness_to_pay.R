@@ -80,12 +80,16 @@ calculate_wtp <- function(utilities, config, model_result = NULL, verbose = TRUE
     )
   }
 
+  # Estimate price coefficient SE for full delta method
+  price_coef_se <- estimate_price_coefficient_se(utilities, price_attr)
+
   # Calculate aggregate WTP
-  wtp_table <- calculate_aggregate_wtp(utilities, price_attr, price_coef, config, verbose)
+  wtp_table <- calculate_aggregate_wtp(utilities, price_attr, price_coef, price_coef_se, config, verbose)
 
   result <- list(
     wtp_table = wtp_table,
     price_coefficient = price_coef,
+    price_coefficient_se = price_coef_se,
     price_attribute = price_attr,
     method = wtp_method
   )
@@ -164,22 +168,80 @@ estimate_price_coefficient <- function(utilities, price_attr, verbose = TRUE) {
 }
 
 
+#' Estimate Standard Error of Price Coefficient
+#'
+#' Uses the regression SE from the price-utility linear fit.
+#'
+#' @param utilities Utilities data frame
+#' @param price_attr Price attribute name
+#' @return Numeric SE of price coefficient, or NA if unavailable
+#' @keywords internal
+estimate_price_coefficient_se <- function(utilities, price_attr) {
+
+  price_utils <- utilities[utilities$Attribute == price_attr, ]
+  if (nrow(price_utils) < 2) return(NA_real_)
+
+  price_values <- extract_numeric_prices(price_utils$Level)
+  valid <- !is.na(price_values)
+  if (sum(valid) < 2) return(NA_real_)
+
+  fit <- lm(price_utils$Utility[valid] ~ price_values[valid])
+  summary_fit <- summary(fit)
+
+  # SE of slope coefficient
+  if (nrow(summary_fit$coefficients) >= 2) {
+    return(summary_fit$coefficients[2, 2])
+  }
+
+  NA_real_
+}
+
+
 #' Extract Numeric Price Values from Level Labels
 #'
-#' Handles common price formats: "$9.99", "R150", "150", "EUR 50.00"
+#' Handles common price formats: "$9.99", "R150", "150", "EUR 50.00",
+#' "1,500.00" (English), "1.500,00" (European)
 #'
 #' @param levels Character vector of price level labels
 #' @return Numeric vector of price values
 #' @keywords internal
 extract_numeric_prices <- function(levels) {
 
-  # Strip currency symbols, spaces, commas
-  cleaned <- gsub("[^0-9.]", "", levels)
+  cleaned <- vapply(levels, function(lvl) {
+    # Remove currency symbols and whitespace
+    s <- gsub("[^0-9.,]", "", lvl)
+    if (nchar(s) == 0) return(NA_real_)
 
-  # Handle cases where stripping leaves empty string
-  cleaned[cleaned == ""] <- NA
+    # Detect European format: "1.500,00" (dot as thousands, comma as decimal)
+    # Heuristic: if comma appears after dots, it is likely the decimal separator
+    if (grepl("\\.", s) && grepl(",", s)) {
+      dot_pos <- regexpr("\\.", s)
+      comma_pos <- regexpr(",", s)
+      if (comma_pos > dot_pos) {
+        # European: dots are thousands separators, comma is decimal
+        s <- gsub("\\.", "", s)  # remove thousands dots
+        s <- gsub(",", ".", s)   # comma -> decimal point
+      } else {
+        # English: commas are thousands separators, dot is decimal
+        s <- gsub(",", "", s)
+      }
+    } else if (grepl(",", s) && !grepl("\\.", s)) {
+      # Comma only: could be thousands (1,500) or decimal (1,50)
+      # If exactly 3 digits after comma, treat as thousands separator
+      if (grepl(",\\d{3}$", s)) {
+        s <- gsub(",", "", s)
+      } else {
+        s <- gsub(",", ".", s)  # Treat as decimal
+      }
+    } else {
+      # English format or plain number: remove commas
+      s <- gsub(",", "", s)
+    }
 
-  as.numeric(cleaned)
+    suppressWarnings(as.numeric(s))
+  }, numeric(1), USE.NAMES = FALSE)
+
+  cleaned
 }
 
 
@@ -189,14 +251,18 @@ extract_numeric_prices <- function(levels) {
 
 #' Calculate Aggregate WTP Table
 #'
+#' Uses the full delta method for WTP confidence intervals:
+#' Var(WTP) = Var(-beta/price_coef) ≈ (SE_beta/price_coef)^2 + (beta*SE_price/price_coef^2)^2
+#'
 #' @param utilities Utilities data frame
 #' @param price_attr Price attribute name
 #' @param price_coef Price coefficient
+#' @param price_coef_se SE of price coefficient (for full delta method)
 #' @param config Configuration
 #' @param verbose Logical
 #' @return Data frame with WTP per attribute level
 #' @keywords internal
-calculate_aggregate_wtp <- function(utilities, price_attr, price_coef, config, verbose) {
+calculate_aggregate_wtp <- function(utilities, price_attr, price_coef, price_coef_se, config, verbose) {
 
   # WTP for each non-price attribute level relative to baseline
   non_price <- utilities[utilities$Attribute != price_attr, ]
@@ -204,13 +270,22 @@ calculate_aggregate_wtp <- function(utilities, price_attr, price_coef, config, v
   wtp_rows <- list()
   for (i in seq_len(nrow(non_price))) {
     row <- non_price[i, ]
-    wtp_value <- -(row$Utility / price_coef)
+    beta <- row$Utility
+    wtp_value <- -(beta / price_coef)
 
-    # CI propagation (delta method approximation)
-    se_wtp <- if (!is.null(row$SE) && row$SE > 0) {
-      abs(row$SE / price_coef)
-    } else {
-      NA_real_
+    # Full delta method for WTP SE:
+    # WTP = -beta / price_coef
+    # Var(WTP) ≈ (SE_beta / price_coef)^2 + (beta * SE_price / price_coef^2)^2
+    # This accounts for uncertainty in both the attribute coefficient AND the price coefficient
+    se_wtp <- NA_real_
+    if (!is.null(row$SE) && row$SE > 0 && !is.na(price_coef_se)) {
+      # Full delta method with both sources of variance
+      var_from_beta <- (row$SE / price_coef)^2
+      var_from_price <- (beta * price_coef_se / price_coef^2)^2
+      se_wtp <- sqrt(var_from_beta + var_from_price)
+    } else if (!is.null(row$SE) && row$SE > 0) {
+      # Partial delta method (price coefficient SE unknown — fallback)
+      se_wtp <- abs(row$SE / price_coef)
     }
 
     z <- qnorm(1 - (1 - (config$confidence_level %||% 0.95)) / 2)

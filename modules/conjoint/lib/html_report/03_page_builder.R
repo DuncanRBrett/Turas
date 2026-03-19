@@ -120,20 +120,17 @@ build_conjoint_meta <- function(summary, config = list()) {
 
 #' @keywords internal
 build_conjoint_css <- function(brand, accent) {
-  css <- '
-:root {
-  --cj-brand: BRAND;
-  --cj-accent: ACCENT;
-}
+  css_root <- sprintf(':root { --cj-brand: %s; --cj-accent: %s; }', brand, accent)
+  css <- paste0(css_root, '
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8fafc; color:#334155; line-height:1.6; }
+body { font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; background:#f8f7f5; color:#1e293b; line-height:1.6; }
 
 /* === HEADER === */
 .cj-header {
   background: linear-gradient(135deg, #1a2744, #2a3f5f);
   color: white;
   padding: 24px 40px 20px;
-  border-bottom: 3px solid BRAND;
+  border-bottom: 3px solid var(--cj-brand);
 }
 .cj-header-inner { display:flex; flex-direction:column; max-width:1400px; margin:0 auto; }
 .cj-header-top { display:flex; align-items:center; justify-content:space-between; }
@@ -160,6 +157,7 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
   width:28px; height:28px; border-radius:50%; border:1.5px solid rgba(255,255,255,0.5);
   background:transparent; color:rgba(255,255,255,0.8); font-size:14px; font-weight:700;
   cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition:all 0.15s ease;
 }
 .cj-help-btn:hover { background:rgba(255,255,255,0.1); }
 
@@ -171,10 +169,10 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 .cj-report-tab {
   padding:12px 20px; font-size:13px; font-weight:500; color:#64748b;
   cursor:pointer; border:none; border-bottom:3px solid transparent;
-  background:none; transition:all 200ms;
+  background:none; transition:all 0.15s ease;
 }
-.cj-report-tab:hover { color:BRAND; }
-.cj-report-tab.active { color:BRAND; border-bottom-color:BRAND; }
+.cj-report-tab:hover { color:var(--cj-brand); }
+.cj-report-tab.active { color:var(--cj-brand); border-bottom-color:var(--cj-brand); }
 
 /* === MAIN CONTENT === */
 .cj-panels-wrap { max-width:1400px; margin:0 auto; padding:24px 40px 60px; }
@@ -183,19 +181,21 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 
 /* === CARDS === */
 .cj-card {
-  background:white; border-radius:8px; padding:24px; margin-bottom:20px;
-  box-shadow:0 1px 3px rgba(0,0,0,0.06);
+  background:white; border:1px solid #e2e8f0; border-radius:8px; padding:24px; margin-bottom:20px;
+  box-shadow:0 1px 3px rgba(0,0,0,0.06); transition:all 0.15s ease;
 }
+.cj-card:hover { box-shadow:0 2px 8px rgba(0,0,0,0.08); }
 .cj-card h2 { font-size:16px; font-weight:600; color:#1e293b; margin-bottom:16px; }
-.cj-card h3 { font-size:14px; font-weight:600; color:#334155; margin-bottom:12px; }
+.cj-card h3 { font-size:14px; font-weight:600; color:#1e293b; margin-bottom:12px; }
 
 /* === KPI ROW === */
 .cj-kpi-row { display:flex; gap:16px; margin-bottom:20px; flex-wrap:wrap; }
 .cj-kpi {
-  background:white; border-radius:8px; padding:16px 20px; min-width:140px;
-  box-shadow:0 1px 3px rgba(0,0,0,0.06); text-align:center; flex:1;
+  background:white; border:1px solid #e2e8f0; border-radius:8px; padding:16px 20px; min-width:140px;
+  box-shadow:0 1px 3px rgba(0,0,0,0.06); text-align:center; flex:1; transition:all 0.15s ease;
 }
-.cj-kpi-value { font-size:24px; font-weight:700; color:BRAND; }
+.cj-kpi:hover { box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+.cj-kpi-value { font-size:24px; font-weight:700; color:var(--cj-brand); }
 .cj-kpi-label { font-size:11px; color:#64748b; margin-top:4px; }
 
 /* === UTILITIES SIDEBAR LAYOUT === */
@@ -203,21 +203,21 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 .cj-util-sidebar {
   width:260px; flex-shrink:0; position:sticky; top:60px; align-self:flex-start;
   max-height:calc(100vh - 80px); overflow-y:auto;
-  background:white; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:16px;
+  background:white; border:1px solid #e2e8f0; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:16px;
 }
 .cj-util-sidebar-header { font-size:12px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:12px; }
 .cj-util-search {
   width:100%; padding:8px 12px; border:1px solid #e2e8f0; border-radius:6px;
-  font-size:12px; margin-bottom:12px; outline:none;
+  font-size:12px; margin-bottom:12px; outline:none; transition:all 0.15s ease;
 }
-.cj-util-search:focus { border-color:BRAND; }
+.cj-util-search:focus { border-color:var(--cj-brand); }
 .cj-util-item {
   padding:8px 12px; border-radius:6px; cursor:pointer; font-size:13px;
-  color:#334155; transition:all 150ms; margin-bottom:2px;
+  color:#1e293b; transition:all 0.15s ease; margin-bottom:2px;
 }
 .cj-util-item:hover { background:#f1f5f9; }
-.cj-util-item.active { background:BRAND; color:white; font-weight:500; }
-.cj-util-item-count { font-size:11px; color:#94a3b8; float:right; }
+.cj-util-item.active { background:var(--cj-brand); color:white; font-weight:500; }
+.cj-util-item-count { font-size:11px; color:#64748b; float:right; }
 .cj-util-item.active .cj-util-item-count { color:rgba(255,255,255,0.7); }
 .cj-util-content { flex:1; min-width:0; }
 .cj-attr-detail { display:none; }
@@ -231,10 +231,10 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 .cj-num { font-variant-numeric:tabular-nums; text-align:right; }
 .cj-positive { color:#16a34a; font-weight:500; }
 .cj-negative { color:#dc2626; font-weight:500; }
-.cj-baseline { color:#94a3b8; font-size:11px; font-weight:400; }
+.cj-baseline { color:#64748b; font-size:11px; font-weight:400; }
 .cj-highlight-row { background:#f0fdf4; }
 .cj-bar-cell { width:200px; }
-.cj-bar { height:18px; background:BRAND; border-radius:4px; opacity:0.75; transition:width 200ms; }
+.cj-bar { height:18px; background:var(--cj-brand); border-radius:4px; opacity:0.75; transition:width 200ms; }
 
 /* === CHART CONTAINERS === */
 .cj-chart-container { margin:16px 0; }
@@ -246,36 +246,36 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 .cj-export-btn {
   display:inline-flex; align-items:center; gap:4px; padding:6px 12px;
   font-size:11px; font-weight:500; border:1px solid #e2e8f0; border-radius:6px;
-  background:white; color:#64748b; cursor:pointer; transition:all 200ms;
+  background:white; color:#64748b; cursor:pointer; transition:all 0.15s ease;
 }
-.cj-export-btn:hover { border-color:BRAND; color:BRAND; }
+.cj-export-btn:hover { border-color:var(--cj-brand); color:var(--cj-brand); }
 
 /* === INSIGHT AREAS === */
 .cj-insight-area { margin-top:16px; border-top:1px solid #f1f5f9; padding-top:12px; }
 .cj-insight-toggle {
-  font-size:12px; color:BRAND; cursor:pointer; font-weight:500;
-  background:none; border:none; padding:4px 0;
+  font-size:12px; color:var(--cj-brand); cursor:pointer; font-weight:500;
+  background:none; border:none; padding:4px 0; transition:all 0.15s ease;
 }
 .cj-insight-toggle:hover { text-decoration:underline; }
 .cj-insight-body { display:none; margin-top:8px; }
 .cj-insight-body.open { display:block; }
 .cj-insight-editor {
   min-height:60px; padding:12px; border:1px solid #e2e8f0; border-radius:6px;
-  font-size:13px; line-height:1.5; color:#334155; outline:none;
+  font-size:13px; line-height:1.5; color:#1e293b; outline:none; transition:all 0.15s ease;
 }
-.cj-insight-editor:focus { border-color:BRAND; box-shadow:0 0 0 2px rgba(50,51,103,0.1); }
+.cj-insight-editor:focus { border-color:var(--cj-brand); box-shadow:0 0 0 2px rgba(50,51,103,0.1); }
 .cj-insight-editor:empty::before {
-  content:attr(data-placeholder); color:#94a3b8; font-style:italic;
+  content:attr(data-placeholder); color:#64748b; font-style:italic;
 }
 
 /* === PIN BUTTON (emoji style, matches tabs) === */
 .cj-pin-btn {
   background:none; border:1px solid #e2e8f0; border-radius:4px;
   cursor:pointer; font-size:14px; padding:3px 8px;
-  color:#94a3b8; transition:all 0.15s;
+  color:#64748b; transition:all 0.15s ease;
 }
-.cj-pin-btn:hover { border-color:BRAND; color:BRAND; }
-.cj-pin-btn.pinned { color:BRAND; border-color:BRAND; }
+.cj-pin-btn:hover { border-color:var(--cj-brand); color:var(--cj-brand); }
+.cj-pin-btn.pinned { color:var(--cj-brand); border-color:var(--cj-brand); }
 
 /* === PIN BOUNCE ANIMATION === */
 @keyframes cj-pin-bounce {
@@ -302,13 +302,14 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 .cj-tab-badge {
   display:inline-flex; align-items:center; justify-content:center;
   min-width:18px; height:18px; padding:0 5px; border-radius:9px;
-  background:BRAND; color:#fff; font-size:10px; font-weight:700;
+  background:var(--cj-brand); color:#fff; font-size:10px; font-weight:700;
   margin-left:6px; vertical-align:middle;
 }
 
 /* === CALLOUT BOXES === */
 .cj-callout {
-  background:#f8fafc; border-left:3px solid BRAND; border-radius:0 6px 6px 0;
+  background:linear-gradient(135deg, color-mix(in srgb, var(--cj-brand) 6%, white), white);
+  border-left:4px solid var(--cj-brand); border-radius:0 6px 6px 0;
   padding:14px 18px; margin-bottom:16px; font-size:12px; line-height:1.65; color:#475569;
 }
 .cj-callout-title {
@@ -334,12 +335,12 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
   background:none; white-space:nowrap; transition:all 200ms;
   margin-bottom:-2px;
 }
-.cj-slide-tab:hover { color:BRAND; }
-.cj-slide-tab.active { color:BRAND; border-bottom-color:BRAND; font-weight:600; }
+.cj-slide-tab:hover { color:var(--cj-brand); }
+.cj-slide-tab.active { color:var(--cj-brand); border-bottom-color:var(--cj-brand); font-weight:600; }
 .cj-slide-card {
   background:white; border-radius:8px; padding:20px; margin-bottom:16px;
   box-shadow:0 1px 3px rgba(0,0,0,0.06); position:relative;
-  border-left:3px solid BRAND; display:none;
+  border-left:3px solid var(--cj-brand); display:none;
 }
 .cj-slide-card.active { display:block; }
 .cj-slide-header {
@@ -351,15 +352,15 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
   background:transparent; outline:none; padding:2px 0; flex:1; margin-right:12px;
   transition:border-color 200ms;
 }
-.cj-slide-title-input:focus { border-bottom-color:BRAND; }
-.cj-slide-title-input::placeholder { color:#94a3b8; font-style:italic; }
+.cj-slide-title-input:focus { border-bottom-color:var(--cj-brand); }
+.cj-slide-title-input::placeholder { color:#64748b; font-style:italic; }
 .cj-slide-editor-layout { display:flex; gap:16px; }
 .cj-slide-editor-layout textarea {
   flex:1; min-height:200px; padding:12px; border:1px solid #e2e8f0; border-radius:6px;
   font-size:13px; line-height:1.6; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
   color:#334155; outline:none; resize:vertical;
 }
-.cj-slide-editor-layout textarea:focus { border-color:BRAND; box-shadow:0 0 0 2px rgba(50,51,103,0.1); }
+.cj-slide-editor-layout textarea:focus { border-color:var(--cj-brand); box-shadow:0 0 0 2px rgba(50,51,103,0.1); }
 .cj-slide-preview {
   flex:1; min-height:200px; padding:12px 16px; border:1px solid #e2e8f0;
   border-radius:6px; background:#fafbfc; font-size:13px; line-height:1.6;
@@ -375,13 +376,13 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 .cj-slide-preview code { background:#f1f5f9; padding:1px 4px; border-radius:3px; font-size:12px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
 .cj-slide-preview hr { border:none; border-top:1px solid #e2e8f0; margin:12px 0; }
 .cj-slide-actions { display:flex; gap:6px; flex-shrink:0; }
-.cj-slide-empty { text-align:center; padding:60px 20px; color:#94a3b8; }
+.cj-slide-empty { text-align:center; padding:60px 20px; color:#64748b; }
 
 /* === PINNED VIEWS === */
 .cj-pinned-container { min-height:200px; }
 .cj-pinned-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
 .cj-pinned-empty {
-  text-align:center; padding:60px 20px; color:#94a3b8;
+  text-align:center; padding:60px 20px; color:#64748b;
 }
 .cj-pinned-empty-icon { font-size:36px; margin-bottom:12px; }
 .cj-pinned-card {
@@ -403,7 +404,7 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
   font-size:14px; font-weight:600; color:#334155;
   padding:4px 12px; outline:none;
 }
-.cj-section-title:empty::before { content:"Section title..."; color:#94a3b8; font-style:italic; }
+.cj-section-title:empty::before { content:"Section title..."; color:#64748b; font-style:italic; }
 
 /* === SIMULATOR === */
 .cj-sim-layout { display:flex; gap:24px; flex-wrap:wrap; }
@@ -411,51 +412,51 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 .cj-sim-results { flex:1; min-width:300px; }
 .cj-sim-product {
   background:white; border-radius:8px; padding:16px; margin-bottom:12px;
-  box-shadow:0 1px 3px rgba(0,0,0,0.06); border-left:3px solid BRAND;
+  box-shadow:0 1px 3px rgba(0,0,0,0.06); border-left:3px solid var(--cj-brand);
 }
 .cj-sim-product-name {
   font-size:13px; font-weight:600; color:#1e293b; border:none; border-bottom:1.5px solid transparent;
-  background:transparent; outline:none; padding:2px 0; width:160px; transition:border-color 200ms;
+  background:transparent; outline:none; padding:2px 0; width:160px; transition:border-color 0.15s ease;
 }
-.cj-sim-product-name:focus { border-bottom-color:BRAND; }
+.cj-sim-product-name:focus { border-bottom-color:var(--cj-brand); }
 .cj-sim-select {
   width:100%; padding:6px 10px; border:1px solid #e2e8f0; border-radius:4px;
-  font-size:12px; margin-bottom:6px; outline:none;
+  font-size:12px; margin-bottom:6px; outline:none; transition:all 0.15s ease;
 }
-.cj-sim-select:focus { border-color:BRAND; }
+.cj-sim-select:focus { border-color:var(--cj-brand); }
 .cj-sim-add-btn {
   display:inline-flex; align-items:center; gap:4px; padding:8px 16px;
   font-size:12px; font-weight:500; border:1px solid #e2e8f0; border-radius:6px;
-  background:white; color:BRAND; cursor:pointer;
+  background:white; color:var(--cj-brand); cursor:pointer; transition:all 0.15s ease;
 }
-.cj-sim-add-btn:hover { background:BRAND; color:white; }
+.cj-sim-add-btn:hover { background:var(--cj-brand); color:white; }
 .cj-sim-share-bar { margin:8px 0; }
 .cj-sim-bar-bg { height:28px; background:#f1f5f9; border-radius:4px; overflow:hidden; position:relative; }
 .cj-sim-bar-fill { height:100%; border-radius:4px; transition:width 300ms; display:flex; align-items:center; justify-content:flex-end; padding-right:8px; color:white; font-size:11px; font-weight:600; }
 .cj-sim-mode-btns { display:flex; gap:8px; margin-bottom:16px; }
 .cj-sim-mode-btn {
   padding:6px 14px; font-size:12px; font-weight:500; border:1px solid #e2e8f0;
-  border-radius:6px; background:white; color:#64748b; cursor:pointer;
+  border-radius:6px; background:white; color:#64748b; cursor:pointer; transition:all 0.15s ease;
 }
-.cj-sim-mode-btn.active { background:BRAND; color:white; border-color:BRAND; }
+.cj-sim-mode-btn.active { background:var(--cj-brand); color:white; border-color:var(--cj-brand); }
 
 /* === ABOUT PAGE === */
 .cj-about-section { max-width:700px; }
 .cj-about-grid { display:grid; grid-template-columns:120px 1fr; gap:8px 16px; margin-bottom:16px; }
 .cj-about-label { font-size:12px; font-weight:500; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; }
 .cj-about-value { font-size:13px; color:#334155; }
-.cj-about-value a { color:BRAND; text-decoration:none; }
+.cj-about-value a { color:var(--cj-brand); text-decoration:none; }
 .cj-about-value a:hover { text-decoration:underline; }
 .cj-about-notes {
   min-height:80px; padding:12px; border:1px solid #e2e8f0; border-radius:6px;
   font-size:13px; line-height:1.5; outline:none; margin-top:8px;
 }
-.cj-about-notes:focus { border-color:BRAND; }
-.cj-about-notes:empty::before { content:attr(data-placeholder); color:#94a3b8; font-style:italic; }
+.cj-about-notes:focus { border-color:var(--cj-brand); }
+.cj-about-notes:empty::before { content:attr(data-placeholder); color:#64748b; font-style:italic; }
 
 /* === HELP OVERLAY === */
 .cj-help-overlay {
-  display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5);
+  display:none; position:fixed; top:0; right:0; bottom:0; left:0; background:rgba(0,0,0,0.5);
   z-index:1000; align-items:center; justify-content:center;
 }
 .cj-help-overlay.open { display:flex; }
@@ -466,15 +467,15 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 .cj-help-card h2 { font-size:18px; font-weight:700; color:#1e293b; margin-bottom:16px; }
 .cj-help-card ul { list-style:none; padding:0; }
 .cj-help-card li { padding:6px 0; font-size:13px; color:#334155; display:flex; gap:8px; }
-.cj-help-key { font-weight:600; color:BRAND; min-width:120px; flex-shrink:0; }
-.cj-help-dismiss { text-align:center; margin-top:20px; font-size:12px; color:#94a3b8; }
+.cj-help-key { font-weight:600; color:var(--cj-brand); min-width:120px; flex-shrink:0; }
+.cj-help-dismiss { text-align:center; margin-top:20px; font-size:12px; color:#64748b; }
 
 /* === STATUS INDICATORS === */
 .cj-status-pass { color:#16a34a; font-weight:600; }
 .cj-status-fail { color:#dc2626; font-weight:600; }
 
 /* === FOOTER === */
-.cj-footer { text-align:center; padding:20px 40px; color:#94a3b8; font-size:11px; border-top:1px solid #e2e8f0; }
+.cj-footer { text-align:center; padding:20px 40px; color:#64748b; font-size:11px; border-top:1px solid #e2e8f0; }
 
 /* === RESPONSIVE === */
 @media (max-width:768px) {
@@ -484,9 +485,7 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
   .cj-util-sidebar { width:100%; position:static; max-height:none; }
   .cj-sim-layout { flex-direction:column; }
 }
-'
-  css <- gsub("BRAND", brand, css, fixed = TRUE)
-  css <- gsub("ACCENT", accent, css, fixed = TRUE)
+')
   css
 }
 
@@ -634,13 +633,14 @@ build_report_tab_nav <- function(html_data, config = list()) {
 
   buttons <- vapply(tabs, function(t) {
     active <- if (t$id == "overview") " active" else ""
+    aria_sel <- if (t$id == "overview") "true" else "false"
     sprintf(
-      '<button class="cj-report-tab%s" onclick="switchReportTab(\'%s\')" data-tab="%s">%s</button>',
-      active, t$id, t$id, t$label
+      '<button class="cj-report-tab%s" role="tab" aria-selected="%s" onclick="switchReportTab(\'%s\')" data-tab="%s">%s</button>',
+      active, aria_sel, t$id, t$id, t$label
     )
   }, character(1))
 
-  sprintf('<nav class="cj-report-tabs">%s</nav>', paste(buttons, collapse = "\n"))
+  sprintf('<nav class="cj-report-tabs" role="tablist">%s</nav>', paste(buttons, collapse = "\n"))
 }
 
 
@@ -677,7 +677,7 @@ build_overview_panel <- function(html_data, tables, charts, config = list()) {
   insight <- build_insight_area("overview", html_data$insights)
 
   sprintf(
-    '<div class="cj-panel active" id="panel-overview">
+    '<div class="cj-panel active" role="tabpanel" id="panel-overview">
 %s
 %s
 <div class="cj-card">
@@ -707,7 +707,7 @@ build_utilities_panel <- function(html_data, tables, charts, brand, config = lis
 
   attrs <- names(html_data$utilities_by_attr)
   if (length(attrs) == 0) {
-    return('<div class="cj-panel" id="panel-utilities"><div class="cj-card"><p>No utilities data available.</p></div></div>')
+    return('<div class="cj-panel" role="tabpanel" id="panel-utilities"><div class="cj-card"><p>No utilities data available.</p></div></div>')
   }
 
   # Sidebar items
@@ -765,7 +765,7 @@ build_utilities_panel <- function(html_data, tables, charts, brand, config = lis
   insight <- build_insight_area("utilities", html_data$insights)
 
   sprintf(
-    '<div class="cj-panel" id="panel-utilities">
+    '<div class="cj-panel" role="tabpanel" id="panel-utilities">
 <div class="cj-util-layout">
 %s
 <div class="cj-util-content">
@@ -852,7 +852,7 @@ build_diagnostics_panel <- function(html_data, tables, charts, brand) {
   insight <- build_insight_area("diagnostics", html_data$insights)
 
   sprintf(
-    '<div class="cj-panel" id="panel-diagnostics">%s%s</div>',
+    '<div class="cj-panel" role="tabpanel" id="panel-diagnostics">%s%s</div>',
     paste(sections, collapse = "\n"), insight
   )
 }
@@ -865,7 +865,7 @@ build_diagnostics_panel <- function(html_data, tables, charts, brand) {
 #' @keywords internal
 build_lc_panel <- function(html_data, tables, charts, brand) {
 
-  if (is.null(html_data$lc_data)) return('<div class="cj-panel" id="panel-latentclass"></div>')
+  if (is.null(html_data$lc_data)) return('<div class="cj-panel" role="tabpanel" id="panel-latentclass"></div>')
 
   lc <- html_data$lc_data
   sections <- character()
@@ -927,7 +927,7 @@ build_lc_panel <- function(html_data, tables, charts, brand) {
     ))
   }
 
-  sprintf('<div class="cj-panel" id="panel-latentclass">%s</div>', paste(sections, collapse = "\n"))
+  sprintf('<div class="cj-panel" role="tabpanel" id="panel-latentclass">%s</div>', paste(sections, collapse = "\n"))
 }
 
 
@@ -938,7 +938,7 @@ build_lc_panel <- function(html_data, tables, charts, brand) {
 #' @keywords internal
 build_wtp_panel <- function(html_data, tables, charts, brand) {
 
-  if (is.null(html_data$wtp_data)) return('<div class="cj-panel" id="panel-wtp"></div>')
+  if (is.null(html_data$wtp_data)) return('<div class="cj-panel" role="tabpanel" id="panel-wtp"></div>')
 
   sections <- character()
 
@@ -995,7 +995,7 @@ build_wtp_panel <- function(html_data, tables, charts, brand) {
 
   insight <- build_insight_area("wtp", html_data$insights)
 
-  sprintf('<div class="cj-panel" id="panel-wtp">%s%s</div>',
+  sprintf('<div class="cj-panel" role="tabpanel" id="panel-wtp">%s%s</div>',
           paste(sections, collapse = "\n"), insight)
 }
 
@@ -1008,7 +1008,7 @@ build_wtp_panel <- function(html_data, tables, charts, brand) {
 build_simulator_panel <- function(html_data, brand) {
 
   if (is.null(html_data$simulator_data)) {
-    return('<div class="cj-panel" id="panel-simulator"><div class="cj-card"><p>No simulator data available.</p></div></div>')
+    return('<div class="cj-panel" role="tabpanel" id="panel-simulator"><div class="cj-card"><p>No simulator data available.</p></div></div>')
   }
 
   # Mode-switched callouts
@@ -1039,7 +1039,7 @@ build_simulator_panel <- function(html_data, brand) {
   pin_sim <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-simulator\')" title="Pin this view">\U0001F4CC</button>'
 
   sprintf(
-    '<div class="cj-panel" id="panel-simulator">
+    '<div class="cj-panel" role="tabpanel" id="panel-simulator">
 <div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
 <h2 style="margin-bottom:0;">Market Simulator</h2>
@@ -1078,7 +1078,7 @@ build_simulator_panel <- function(html_data, brand) {
 build_about_panel <- function(about, config = list()) {
 
   if (is.null(about) || !isTRUE(about$has_content)) {
-    return('<div class="cj-panel" id="panel-about"></div>')
+    return('<div class="cj-panel" role="tabpanel" id="panel-about"></div>')
   }
 
   # Contact grid
@@ -1116,7 +1116,7 @@ build_about_panel <- function(about, config = list()) {
   )
 
   sprintf(
-    '<div class="cj-panel" id="panel-about">
+    '<div class="cj-panel" role="tabpanel" id="panel-about">
 <div class="cj-card">
 <h2>About This Report</h2>
 <div class="cj-about-section">
@@ -1137,7 +1137,7 @@ build_about_panel <- function(about, config = list()) {
 #' @keywords internal
 build_pinned_panel <- function() {
   '
-<div class="cj-panel" id="panel-pinned">
+<div class="cj-panel" role="tabpanel" id="panel-pinned">
 <div class="cj-pinned-container">
 <div class="cj-pinned-header">
 <div>
@@ -1169,7 +1169,7 @@ build_pinned_panel <- function() {
 #' @keywords internal
 build_slides_panel <- function() {
   '
-<div class="cj-panel" id="panel-slides">
+<div class="cj-panel" role="tabpanel" id="panel-slides">
 <div class="cj-slides-container">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
 <div>
@@ -1273,8 +1273,8 @@ build_insight_area <- function(tab_id, insights = list()) {
 
   # --- Model Fit Quality callout ---
   fit_body <- "<p>Model fit measures how well the estimated utilities explain the observed choices in the data.</p>"
-  if (!is.null(diag$mcfadden_r2) && !is.na(diag$mcfadden_r2)) {
-    r2 <- diag$mcfadden_r2
+  if (!is.null(diag$fit_statistics$mcfadden_r2) && !is.na(diag$fit_statistics$mcfadden_r2)) {
+    r2 <- diag$fit_statistics$mcfadden_r2
     quality <- if (r2 >= 0.4) "excellent"
                else if (r2 >= 0.3) "very good"
                else if (r2 >= 0.2) "good"
@@ -1285,15 +1285,15 @@ build_insight_area <- function(tab_id, insights = list()) {
       r2, quality
     )
   }
-  if (!is.null(diag$ll_ratio_p) && !is.na(diag$ll_ratio_p)) {
-    sig_text <- if (diag$ll_ratio_p < 0.001) "highly significant (p < 0.001)"
-                else if (diag$ll_ratio_p < 0.01) sprintf("significant (p = %.3f)", diag$ll_ratio_p)
-                else if (diag$ll_ratio_p < 0.05) sprintf("marginally significant (p = %.3f)", diag$ll_ratio_p)
-                else sprintf("not significant (p = %.3f)", diag$ll_ratio_p)
+  if (!is.null(diag$fit_statistics$ll_ratio_p) && !is.na(diag$fit_statistics$ll_ratio_p)) {
+    sig_text <- if (diag$fit_statistics$ll_ratio_p < 0.001) "highly significant (p < 0.001)"
+                else if (diag$fit_statistics$ll_ratio_p < 0.01) sprintf("significant (p = %.3f)", diag$fit_statistics$ll_ratio_p)
+                else if (diag$fit_statistics$ll_ratio_p < 0.05) sprintf("marginally significant (p = %.3f)", diag$fit_statistics$ll_ratio_p)
+                else sprintf("not significant (p = %.3f)", diag$fit_statistics$ll_ratio_p)
     fit_body <- paste0(fit_body, sprintf(
       "<p>The log-likelihood ratio test is %s, indicating the model %s than a null model with no attribute effects.</p>",
       sig_text,
-      if (diag$ll_ratio_p < 0.05) "performs significantly better" else "may not perform significantly better"
+      if (diag$fit_statistics$ll_ratio_p < 0.05) "performs significantly better" else "may not perform significantly better"
     ))
   }
   callouts <- c(callouts, .build_callout("Model Fit Quality", fit_body))

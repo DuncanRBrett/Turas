@@ -209,38 +209,107 @@ extract_lc_solution <- function(hb_output, bayesm_data, k, R, thin, config) {
   col_names <- bayesm_data$col_names
   respondent_ids <- bayesm_data$respondent_ids
 
-  betadraw <- hb_output$betadraw
+  betadraw_raw <- hb_output$betadraw
+  n_draws_total <- dim(betadraw_raw)[3]
+
+  # Remove burn-in draws
+  burnin <- as.integer(config$hb_burnin %||% 5000)
+  n_burnin_draws <- min(floor(burnin / max(thin, 1)), n_draws_total - 1)
+  if (n_burnin_draws > 0) {
+    betadraw <- betadraw_raw[, , (n_burnin_draws + 1):n_draws_total, drop = FALSE]
+  } else {
+    betadraw <- betadraw_raw
+  }
   n_draws <- dim(betadraw)[3]
 
-  # Individual-level posterior means
+  # Individual-level posterior means (post burn-in)
   individual_betas <- matrix(NA, nrow = n_respondents, ncol = n_parameters)
   for (i in seq_len(n_respondents)) {
-    individual_betas[i, ] <- colMeans(betadraw[i, , , drop = FALSE])
+    draws_i <- betadraw[i, , , drop = TRUE]
+    if (is.matrix(draws_i)) {
+      individual_betas[i, ] <- rowMeans(draws_i)
+    } else {
+      individual_betas[i, ] <- draws_i
+    }
   }
   colnames(individual_betas) <- col_names
   rownames(individual_betas) <- respondent_ids
 
-  # Assign respondents to classes using k-means on individual betas
-  # This is the standard approach when using bayesm for LC
+  # Assign respondents to classes using bayesm's mixture component draws
+  # bayesm's nmix output contains the actual posterior mixture assignments:
+  #   - compdraw: list of draws of component parameters (mu, rooti)
+  #   - probdraw: matrix [n_draws x k] of mixture component probabilities
+  # hb_output$nmix$zdraw is not directly available, but we can derive
+  # class membership from the posterior component probabilities and individual betas
   if (k == 1) {
     class_assignment <- rep(1L, n_respondents)
     class_probs <- matrix(1, nrow = n_respondents, ncol = 1)
   } else {
-    km <- tryCatch({
-      kmeans(individual_betas, centers = k, nstart = 25, iter.max = 100)
+    class_probs <- tryCatch({
+      # Use bayesm's mixture component probabilities and parameters to compute
+      # posterior class membership for each respondent
+      # Get posterior mean component probabilities
+      prob_draws <- hb_output$nmix$probdraw  # [n_draws x k]
+      comp_draws <- hb_output$nmix$compdraw  # list of n_draws, each list of k components
+
+      if (!is.null(prob_draws) && !is.null(comp_draws)) {
+        # Average component probabilities across posterior draws
+        avg_probs <- colMeans(prob_draws)
+
+        # Get posterior mean component parameters (mu and Sigma)
+        n_post_draws <- length(comp_draws)
+        # Use last half of draws (post-convergence)
+        start_draw <- max(1, floor(n_post_draws / 2))
+        comp_means <- matrix(0, nrow = k, ncol = n_parameters)
+        for (kk in seq_len(k)) {
+          mu_draws <- matrix(0, nrow = n_post_draws - start_draw + 1, ncol = n_parameters)
+          for (d in start_draw:n_post_draws) {
+            mu_draws[d - start_draw + 1, ] <- comp_draws[[d]][[kk]]$mu
+          }
+          comp_means[kk, ] <- colMeans(mu_draws)
+        }
+
+        # Compute respondent-level posterior class probabilities
+        # P(class c | beta_i) ∝ π_c × N(beta_i | mu_c, Sigma_c)
+        resp_probs <- matrix(NA, nrow = n_respondents, ncol = k)
+        for (i in seq_len(n_respondents)) {
+          log_probs <- numeric(k)
+          for (kk in seq_len(k)) {
+            # Simplified: use Euclidean distance as proxy for multivariate normal
+            diff <- individual_betas[i, ] - comp_means[kk, ]
+            log_probs[kk] <- log(max(avg_probs[kk], 1e-300)) - 0.5 * sum(diff^2)
+          }
+          # Softmax for numerical stability
+          log_probs <- log_probs - max(log_probs)
+          exp_probs <- exp(log_probs)
+          resp_probs[i, ] <- exp_probs / sum(exp_probs)
+        }
+        resp_probs
+      } else {
+        # Fallback if bayesm output structure is unexpected
+        NULL
+      }
     }, error = function(e) {
-      # Fallback: simple assignment based on first principal component
+      message(sprintf("[TRS INFO] CONJ_LC_BAYESM_PROBS_FAILED: %s — falling back to distance-based assignment", conditionMessage(e)))
       NULL
     })
 
-    if (!is.null(km)) {
-      class_assignment <- km$cluster
-      # Compute soft probabilities based on distance to centers
-      class_probs <- compute_class_probabilities(individual_betas, km$centers)
+    if (is.null(class_probs)) {
+      # Fallback: use k-means on individual betas (less statistically principled)
+      km <- tryCatch({
+        kmeans(individual_betas, centers = k, nstart = 25, iter.max = 100)
+      }, error = function(e) NULL)
+
+      if (!is.null(km)) {
+        class_assignment <- km$cluster
+        class_probs <- compute_class_probabilities(individual_betas, km$centers)
+      } else {
+        class_assignment <- rep(seq_len(k), length.out = n_respondents)
+        class_probs <- matrix(1 / k, nrow = n_respondents, ncol = k)
+      }
     } else {
-      # Fallback: equal assignment
-      class_assignment <- rep(seq_len(k), length.out = n_respondents)
-      class_probs <- matrix(1 / k, nrow = n_respondents, ncol = k)
+      # Modal assignment from posterior probabilities
+      class_assignment <- apply(class_probs, 1, which.max)
     }
   }
 
@@ -369,12 +438,15 @@ assign_respondents_to_classes <- function(class_probs, respondent_ids) {
 
 #' Calculate Log-Likelihood for LC Model
 #'
-#' Computes the total log-likelihood based on individual-level betas
-#' and the observed choices.
+#' Computes the total log-likelihood using individual-level posterior mean betas.
+#' Note: This is a point-estimate approximation. The true marginal log-likelihood
+#' would require integration over the posterior, but this approximation is standard
+#' practice for BIC/AIC comparison across LC solutions and provides consistent
+#' relative rankings.
 #'
 #' @param individual_betas Matrix of individual betas
 #' @param bayesm_data Prepared bayesm data
-#' @return Total log-likelihood
+#' @return Total log-likelihood (point-estimate approximation)
 #' @keywords internal
 calculate_lc_log_likelihood <- function(individual_betas, bayesm_data) {
 

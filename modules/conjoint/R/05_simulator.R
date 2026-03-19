@@ -81,6 +81,10 @@ predict_market_shares <- function(products,
     logit = predict_shares_logit(product_utilities, availability),
     first_choice = predict_shares_first_choice(product_utilities, availability),
     randomized_first_choice = predict_shares_randomized_first_choice(product_utilities, availability),
+    # NOTE: conjoint_refuse halts execution via stop(), so this never returns a value
+
+    # to `shares`. Kept as defense-in-depth — if conjoint_refuse were ever changed to
+    # return instead of halt, this would assign the refusal list to `shares`.
     conjoint_refuse(
       code = "CFG_SIMULATOR_UNKNOWN_METHOD",
       title = "Unknown Simulation Method",

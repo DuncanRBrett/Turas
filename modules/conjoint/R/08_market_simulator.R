@@ -240,12 +240,13 @@ write_market_share_section <- function(wb, sheet_name, config, n_products,
     col_letter <- int2col(col)
 
     # Total Utility Formula: VLOOKUP each attribute's utility from Simulator Data
-    # Sum all VLOOKUP results
+    # Uses compound key (Attribute|Level) to avoid ambiguous Level-only matches
     utility_formula_parts <- vapply(seq_along(attributes), function(i) {
       config_row <- config_start_row + 1 + i  # +1 for header
-      cell_ref <- paste0(col_letter, config_row)
-      sprintf('IFERROR(VLOOKUP(%s,\'Simulator Data\'!$A:$C,3,FALSE),0)',
-              cell_ref)
+      level_ref <- paste0(col_letter, config_row)
+      attr_ref <- paste0("$A", config_row)
+      sprintf('IFERROR(VLOOKUP(%s&"|"&%s,\'Simulator Data\'!$A:$D,4,FALSE),0)',
+              attr_ref, level_ref)
     }, character(1))
 
     utility_formula <- paste0("=", paste(utility_formula_parts, collapse = "+"))
@@ -356,9 +357,10 @@ write_utilities_breakdown <- function(wb, sheet_name, config, n_products,
       config_row <- config_start_row + 1 + i  # +1 for header row
       level_cell <- paste0(col_letter, config_row)
 
-      # VLOOKUP formula
-      formula <- sprintf("=IFERROR(VLOOKUP(%s,\'Simulator Data\'!$A:$C,3,FALSE),0)",
-                         level_cell)
+      # VLOOKUP formula using compound key (Attribute|Level) for unambiguous matching
+      attr_cell <- paste0("$A", config_row)
+      formula <- sprintf("=IFERROR(VLOOKUP(%s&\"|\"&%s,\'Simulator Data\'!$A:$D,4,FALSE),0)",
+                         attr_cell, level_cell)
       writeFormula(wb, sheet_name, x = formula, startCol = col, startRow = current_row)
     }
 
@@ -501,9 +503,12 @@ create_simulator_data_sheet <- function(wb, utilities, importance, header_style)
   # Add worksheet
   addWorksheet(wb, sheet_name, gridLines = FALSE, tabColour = "#767676")
 
-  # Table 1: Utility Lookup (cols A-C)
-  lookup_data <- utilities[, c("Level", "Attribute", "Utility")]
+  # Table 1: Utility Lookup (cols A-D)
+  # Column A is a compound key (Attribute|Level) to avoid ambiguous Level-only lookups
+  lookup_data <- utilities[, c("Attribute", "Level", "Utility")]
   lookup_data <- lookup_data[order(lookup_data$Attribute, lookup_data$Level), ]
+  lookup_data$Key <- paste0(lookup_data$Attribute, "|", lookup_data$Level)
+  lookup_data <- lookup_data[, c("Key", "Attribute", "Level", "Utility")]
 
   # Write as formatted table
   writeDataTable(wb, sheet_name,
@@ -515,16 +520,16 @@ create_simulator_data_sheet <- function(wb, utilities, importance, header_style)
                  withFilter = FALSE,
                  headerStyle = header_style)
 
-  # Table 2: Attribute Importance (cols E-F)
+  # Table 2: Attribute Importance (cols F-G)
   importance_data <- importance[, c("Attribute", "Importance")]
   importance_data <- importance_data[order(-importance_data$Importance), ]
 
-  writeData(wb, sheet_name, importance_data, startRow = 1, startCol = 5,
+  writeData(wb, sheet_name, importance_data, startRow = 1, startCol = 6,
             colNames = TRUE, headerStyle = header_style)
 
   # Format columns
-  setColWidths(wb, sheet_name, cols = 1:3, widths = c(20, 20, 15))
-  setColWidths(wb, sheet_name, cols = 5:6, widths = c(20, 15))
+  setColWidths(wb, sheet_name, cols = 1:4, widths = c(30, 20, 20, 15))
+  setColWidths(wb, sheet_name, cols = 6:7, widths = c(20, 15))
 
   # Hide this sheet - get sheet index and set visibility
   sheet_idx <- which(names(wb) == sheet_name)

@@ -103,7 +103,7 @@ import_alchemer_conjoint <- function(file_path,
   log_verbose(sprintf("  Raw data: %d rows, %d columns", nrow(df), ncol(df)), verbose)
 
   # Validate required Alchemer columns
-  validate_alchemer_columns(df)
+  df <- validate_alchemer_columns(df)
 
   # Create unique choice_set_id (ResponseID + SetNumber combination)
   df$choice_set_id <- paste(df$ResponseID, df$SetNumber, sep = "_")
@@ -280,7 +280,7 @@ validate_alchemer_columns <- function(df) {
     }
   }
 
-  invisible(TRUE)
+  df
 }
 
 

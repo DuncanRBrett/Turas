@@ -203,8 +203,8 @@ if (exists("generate_conjoint_html_report", mode = "function") && !is.null(resul
 
   report_config <- list(
     project_name   = "Smartphone Conjoint v3.1 Demo",
-    brand_colour   = "#1e40af",
-    accent_colour  = "#f59e0b",
+    brand_colour   = "#323367",
+    accent_colour  = "#CC9900",
     analyst_name   = "Demo Analyst",
     analyst_email  = "demo@turas.io",
     company_name   = "The Research LampPost",

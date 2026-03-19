@@ -23,51 +23,7 @@
 # ==============================================================================
 
 # ==============================================================================
-# LOAD REQUIRED PACKAGES
-# ==============================================================================
-
-# Suppress package startup messages for cleaner output
-suppressPackageStartupMessages({
-  # Data manipulation
-  if (!require(dplyr, quietly = TRUE)) {
-    conjoint_refuse(
-      code = "PKG_DPLYR_MISSING",
-      title = "Required Package Not Installed",
-      problem = "Package 'dplyr' is required but not installed.",
-      why_it_matters = "The Conjoint module relies on dplyr for data manipulation operations. Without it, analysis cannot proceed.",
-      how_to_fix = "Install the package with: install.packages('dplyr')"
-    )
-  }
-
-  # Excel I/O
-  if (!require(openxlsx, quietly = TRUE)) {
-    conjoint_refuse(
-      code = "PKG_OPENXLSX_MISSING",
-      title = "Required Package Not Installed",
-      problem = "Package 'openxlsx' is required but not installed.",
-      why_it_matters = "The Conjoint module requires openxlsx to read configuration files and write output workbooks.",
-      how_to_fix = "Install the package with: install.packages('openxlsx')"
-    )
-  }
-
-  # Choice modeling
-  if (!require(mlogit, quietly = TRUE)) {
-    message("[TRS INFO] CONJ_PKG_MLOGIT_MISSING: Package 'mlogit' not found - install with: install.packages('mlogit')")
-  }
-
-  # Data indexing for mlogit (required for mlogit >= 1.1-0)
-  if (!require(dfidx, quietly = TRUE)) {
-    message("[TRS INFO] CONJ_PKG_DFIDX_MISSING: Package 'dfidx' not found - install with: install.packages('dfidx')")
-  }
-
-  # Fallback estimation
-  if (!require(survival, quietly = TRUE)) {
-    message("[TRS INFO] CONJ_PKG_SURVIVAL_MISSING: Package 'survival' not found - install with: install.packages('survival')")
-  }
-})
-
-# ==============================================================================
-# TRS GUARD LAYER
+# TRS GUARD LAYER (must be sourced FIRST — before package checks that use conjoint_refuse)
 # ==============================================================================
 
 # Source TRS guard layer for refusal handling
@@ -122,6 +78,57 @@ tryCatch({
   .source_trs_infrastructure()
 }, error = function(e) {
   message(sprintf("[TRS INFO] CONJ_TRS_LOAD: Could not load TRS infrastructure: %s", e$message))
+})
+
+# ==============================================================================
+# LOAD REQUIRED PACKAGES (after guard is available for conjoint_refuse)
+# ==============================================================================
+
+suppressPackageStartupMessages({
+  # Data manipulation
+  if (!require(dplyr, quietly = TRUE)) {
+    if (exists("conjoint_refuse", mode = "function")) {
+      conjoint_refuse(
+        code = "PKG_DPLYR_MISSING",
+        title = "Required Package Not Installed",
+        problem = "Package 'dplyr' is required but not installed.",
+        why_it_matters = "The Conjoint module relies on dplyr for data manipulation operations.",
+        how_to_fix = "Install the package with: install.packages('dplyr')"
+      )
+    } else {
+      stop("Required package 'dplyr' is not installed. Install with: install.packages('dplyr')")
+    }
+  }
+
+  # Excel I/O
+  if (!require(openxlsx, quietly = TRUE)) {
+    if (exists("conjoint_refuse", mode = "function")) {
+      conjoint_refuse(
+        code = "PKG_OPENXLSX_MISSING",
+        title = "Required Package Not Installed",
+        problem = "Package 'openxlsx' is required but not installed.",
+        why_it_matters = "The Conjoint module requires openxlsx to read configuration files and write output workbooks.",
+        how_to_fix = "Install the package with: install.packages('openxlsx')"
+      )
+    } else {
+      stop("Required package 'openxlsx' is not installed. Install with: install.packages('openxlsx')")
+    }
+  }
+
+  # Choice modeling (optional — checked at estimation time)
+  if (!require(mlogit, quietly = TRUE)) {
+    message("[TRS INFO] CONJ_PKG_MLOGIT_MISSING: Package 'mlogit' not found - install with: install.packages('mlogit')")
+  }
+
+  # Data indexing for mlogit (required for mlogit >= 1.1-0)
+  if (!require(dfidx, quietly = TRUE)) {
+    message("[TRS INFO] CONJ_PKG_DFIDX_MISSING: Package 'dfidx' not found - install with: install.packages('dfidx')")
+  }
+
+  # Fallback estimation
+  if (!require(survival, quietly = TRUE)) {
+    message("[TRS INFO] CONJ_PKG_SURVIVAL_MISSING: Package 'survival' not found - install with: install.packages('survival')")
+  }
 })
 
 # ==============================================================================
@@ -431,7 +438,7 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
 
     if (verbose) {
       cat("   ✓ Importance scores calculated:\n")
-      for (i in 1:min(3, nrow(importance))) {
+      for (i in seq_len(min(3, nrow(importance)))) {
         cat(sprintf("      %d. %s: %.1f%%\n",
                     i,
                     importance$Attribute[i],
@@ -607,8 +614,18 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
       cat("\n")
     }
 
-    # Re-throw error for caller to handle (already a conjoint_refuse or other structured error)
-    stop(e)
+    # Return TRS refusal for caller to handle
+    return(list(
+      status = "REFUSED",
+      code = "CONJ_ANALYSIS_FAILED",
+      message = conditionMessage(e),
+      how_to_fix = c(
+        "Check your configuration file is valid",
+        "Verify your data file exists and has correct format",
+        "Ensure required packages are installed (mlogit, survival, openxlsx)",
+        "Review validation warnings above"
+      )
+    ))
   })
 
   invisible(result)

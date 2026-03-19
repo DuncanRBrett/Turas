@@ -34,6 +34,7 @@ var SimEngine = (function() {
 
   // MNL logit share prediction
   function predictSharesLogit(products) {
+    if (!products || products.length === 0) return [];
     var utilities = products.map(productUtility);
     var maxU = Math.max.apply(null, utilities);
     var expU = utilities.map(function(u) { return Math.exp(u - maxU); });
@@ -43,6 +44,7 @@ var SimEngine = (function() {
 
   // First choice prediction
   function predictSharesFirstChoice(products) {
+    if (!products || products.length === 0) return [];
     var utilities = products.map(productUtility);
     var maxU = Math.max.apply(null, utilities);
     var count = utilities.filter(function(u) { return u === maxU; }).length;
@@ -102,6 +104,85 @@ var SimEngine = (function() {
     return sensitivitySweep(baseProduct, priceAttribute, otherProducts, method);
   }
 
+  // Predict shares including a None/no-purchase alternative
+  function predictSharesWithNone(products, noneUtility, method) {
+    if (!products || products.length === 0) return [];
+    var noneU = (noneUtility !== undefined && noneUtility !== null) ? noneUtility : 0;
+    if (method === "first_choice") {
+      var utilities = products.map(productUtility);
+      utilities.push(noneU);
+      var maxU = Math.max.apply(null, utilities);
+      var count = utilities.filter(function(u) { return u === maxU; }).length;
+      return utilities.map(function(u) { return u === maxU ? 100 / count : 0; });
+    }
+    // Logit (MNL) with none
+    var utilities = products.map(productUtility);
+    utilities.push(noneU);
+    var maxU = Math.max.apply(null, utilities);
+    var expU = utilities.map(function(u) { return Math.exp(u - maxU); });
+    var sumExp = expU.reduce(function(a, b) { return a + b; }, 0);
+    return expU.map(function(e) { return (e / sumExp) * 100; });
+  }
+
+  // Get the none utility from the simulator data JSON
+  function getNoneUtility() {
+    return (data && data.noneUtility !== undefined) ? data.noneUtility : 0;
+  }
+
+  // Calculate point price elasticity from demand curve data
+  // Uses finite differences: elasticity_i = (dQ/dP) * (P_i / Q_i)
+  function calculatePriceElasticity(demandData) {
+    if (!demandData || demandData.length < 2) return [];
+    var results = [];
+    for (var i = 0; i < demandData.length; i++) {
+      var price = parseFloat(demandData[i].level);
+      var share = demandData[i].share;
+      var dQ, dP;
+      if (i === 0) {
+        // Forward difference
+        dQ = demandData[i + 1].share - share;
+        dP = parseFloat(demandData[i + 1].level) - price;
+      } else if (i === demandData.length - 1) {
+        // Backward difference
+        dQ = share - demandData[i - 1].share;
+        dP = price - parseFloat(demandData[i - 1].level);
+      } else {
+        // Central difference
+        dQ = demandData[i + 1].share - demandData[i - 1].share;
+        dP = parseFloat(demandData[i + 1].level) - parseFloat(demandData[i - 1].level);
+      }
+      var elasticity = (dP !== 0 && share !== 0) ? (dQ / dP) * (price / share) : 0;
+      results.push({
+        level: demandData[i].level,
+        price: price,
+        share: share,
+        elasticity: elasticity
+      });
+    }
+    return results;
+  }
+
+  // Find the price level that maximizes revenue (share * price)
+  function findOptimalPrice(demandData, priceValues) {
+    if (!demandData || demandData.length === 0) return null;
+    var bestRevenue = -Infinity;
+    var bestIdx = 0;
+    for (var i = 0; i < demandData.length; i++) {
+      var price = priceValues ? priceValues[i] : parseFloat(demandData[i].level);
+      var revenue = (demandData[i].share / 100) * price;
+      if (revenue > bestRevenue) {
+        bestRevenue = revenue;
+        bestIdx = i;
+      }
+    }
+    return {
+      level: demandData[bestIdx].level,
+      price: priceValues ? priceValues[bestIdx] : parseFloat(demandData[bestIdx].level),
+      share: demandData[bestIdx].share,
+      revenue: bestRevenue
+    };
+  }
+
   return {
     init: init,
     getData: getData,
@@ -109,6 +190,10 @@ var SimEngine = (function() {
     predictShares: predictShares,
     predictSharesLogit: predictSharesLogit,
     predictSharesFirstChoice: predictSharesFirstChoice,
+    predictSharesWithNone: predictSharesWithNone,
+    getNoneUtility: getNoneUtility,
+    calculatePriceElasticity: calculatePriceElasticity,
+    findOptimalPrice: findOptimalPrice,
     sensitivitySweep: sensitivitySweep,
     sourceOfVolume: sourceOfVolume,
     demandCurve: demandCurve

@@ -241,8 +241,9 @@ simulator_data_to_json <- function(sim_data) {
       about[[f]] <- trimws(val)
     }
   }
-  # Check if any content exists
-  about$has_content <- length(about) > 0
+  # Check if any content exists (compute before adding to list)
+  has_content <- length(about) > 0
+  about$has_content <- has_content
   about
 }
 

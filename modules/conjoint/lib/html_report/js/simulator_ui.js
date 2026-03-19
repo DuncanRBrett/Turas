@@ -11,6 +11,8 @@ var SimUI = (function() {
   var productCounter = 0;
   var method = "logit";
   var currentMode = "shares";
+  var includeNone = false;
+  var _renameTimer = null;
 
   var _initialized = false;
 
@@ -30,8 +32,8 @@ var SimUI = (function() {
   function addProduct() {
     var data = SimEngine.getData();
     if (!data) return;
-    if (products.length >= 8) {
-      showSimToast("Maximum of 8 products reached");
+    if (products.length >= 12) {
+      showSimToast("Maximum of 12 products reached");
       return;
     }
 
@@ -52,6 +54,35 @@ var SimUI = (function() {
     updateResults();
   }
 
+  function copyProduct(idx) {
+    if (products.length >= 12) {
+      showSimToast("Maximum of 12 products reached");
+      return;
+    }
+    var source = products[idx];
+    if (!source) return;
+    productCounter++;
+    var configCopy = {};
+    for (var k in source.config) configCopy[k] = source.config[k];
+    products.splice(idx + 1, 0, { name: source.name + " (copy)", config: configCopy });
+    renderProductPanels();
+    updateResults();
+  }
+
+  function resetAll() {
+    var data = SimEngine.getData();
+    if (!data) return;
+    products = [];
+    productCounter = 0;
+    addProduct();
+    addProduct();
+  }
+
+  function toggleNone(checked) {
+    includeNone = checked;
+    updateResults();
+  }
+
   function renderProductPanels() {
     var container = document.getElementById("cj-sim-products");
     if (!container) return;
@@ -62,10 +93,13 @@ var SimUI = (function() {
     products.forEach(function(prod, idx) {
       html += '<div class="cj-sim-product">';
       html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
-      html += '<input type="text" class="cj-sim-product-name" value="' + escAttr(prod.name) + '" oninput="SimUI.renameProduct(' + idx + ',this.value)" />';
+      html += '<input type="text" class="cj-sim-product-name" value="' + escAttr(prod.name) + '" oninput="SimUI._debouncedRename(' + idx + ',this.value)" />';
+      html += '<div style="display:flex;gap:4px;">';
+      html += '<button style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:12px;" onclick="SimUI.copyProduct(' + idx + ')" title="Copy product">&#x2398;</button>';
       if (products.length > 1) {
         html += '<button style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;" onclick="SimUI.removeProduct(' + idx + ')">\u00d7</button>';
       }
+      html += '</div>';
       html += '</div>';
 
       data.attributes.forEach(function(attr) {
@@ -82,11 +116,14 @@ var SimUI = (function() {
       html += '</div>';
     });
 
-    if (products.length >= 8) {
-      html += '<button class="cj-sim-add-btn" style="opacity:0.4;pointer-events:none;">+ Add Product (Max 8)</button>';
+    html += '<div style="display:flex;gap:8px;align-items:center;">';
+    if (products.length >= 12) {
+      html += '<button class="cj-sim-add-btn" style="opacity:0.4;pointer-events:none;flex:1;">+ Add Product (Max 12)</button>';
     } else {
-      html += '<button class="cj-sim-add-btn" onclick="SimUI.addProduct()">+ Add Product</button>';
+      html += '<button class="cj-sim-add-btn" onclick="SimUI.addProduct()" style="flex:1;">+ Add Product</button>';
     }
+    html += '<button class="cj-sim-add-btn" style="background:#f1f5f9;color:#64748b;flex:0 0 auto;" onclick="SimUI.resetAll()">Reset All</button>';
+    html += '</div>';
     container.innerHTML = html;
   }
 
@@ -96,6 +133,17 @@ var SimUI = (function() {
       // Update results without re-rendering panels (avoids losing input focus)
       updateResults();
     }
+  }
+
+  // Debounced rename: waits 300ms after last keystroke before updating results
+  function _debouncedRename(idx, name) {
+    if (products[idx]) {
+      products[idx].name = name;
+    }
+    if (_renameTimer) clearTimeout(_renameTimer);
+    _renameTimer = setTimeout(function() {
+      updateResults();
+    }, 300);
   }
 
   function setLevel(productIdx, attrName, levelName) {
@@ -126,24 +174,55 @@ var SimUI = (function() {
 
   function renderShares(container) {
     var configs = products.map(function(p) { return p.config; });
-    var shares = SimEngine.predictShares(configs, method);
+    var displayProducts = products.slice();
+    var shares;
+
+    if (includeNone) {
+      var noneU = SimEngine.getNoneUtility();
+      shares = SimEngine.predictSharesWithNone(configs, noneU, method);
+      // Add a "None" entry for display
+      displayProducts = displayProducts.concat([{ name: "None (No Purchase)", config: {} }]);
+    } else {
+      shares = SimEngine.predictShares(configs, method);
+    }
 
     var html = '<h3 style="font-size:14px;font-weight:600;color:#1e293b;margin-bottom:12px;">Predicted Market Shares</h3>';
 
-    // Method selector
-    html += '<div style="margin-bottom:12px;">';
+    // None option toggle
+    html += '<div style="margin-bottom:10px;">';
+    html += '<label style="font-size:12px;color:#64748b;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">';
+    html += '<input type="checkbox" ' + (includeNone ? 'checked' : '') + ' onchange="SimUI.toggleNone(this.checked)" style="accent-color:#323367;" />';
+    html += 'Include No-Purchase Option</label></div>';
+
+    // Method selector with info tooltip
+    html += '<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">';
     html += '<select class="cj-sim-select" style="width:auto;" onchange="SimUI.setMethod(this.value)">';
     html += '<option value="logit"' + (method === "logit" ? " selected" : "") + '>Logit (MNL)</option>';
     html += '<option value="first_choice"' + (method === "first_choice" ? " selected" : "") + '>First Choice</option>';
-    html += '</select></div>';
+    html += '</select>';
+    html += '<span class="cj-sim-tooltip-wrap" style="position:relative;display:inline-block;">';
+    html += '<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:11px;font-weight:600;cursor:help;">?</span>';
+    html += '<span class="cj-sim-tooltip" style="display:none;position:absolute;left:24px;top:-8px;z-index:10;background:#1e293b;color:#f8fafc;font-size:11px;padding:10px 12px;border-radius:6px;width:260px;line-height:1.5;pointer-events:none;">';
+    html += '<strong>Logit (MNL):</strong> Distributes shares proportionally based on utility differences. Reflects realistic substitution patterns.<br><br>';
+    html += '<strong>First Choice:</strong> Awards 100% share to the highest-utility product. Best for winner-takes-all scenarios.';
+    html += '</span></span>';
+    html += '</div>';
 
     // Share bars
     html += '<div id="cj-sim-share-chart"></div>';
 
     container.innerHTML = html;
 
+    // Activate tooltip hover
+    var wrap = container.querySelector(".cj-sim-tooltip-wrap");
+    if (wrap) {
+      var tip = wrap.querySelector(".cj-sim-tooltip");
+      wrap.addEventListener("mouseenter", function() { tip.style.display = "block"; });
+      wrap.addEventListener("mouseleave", function() { tip.style.display = "none"; });
+    }
+
     // Render SVG bars
-    SimCharts.renderShareBars("cj-sim-share-chart", products, shares);
+    SimCharts.renderShareBars("cj-sim-share-chart", displayProducts, shares);
   }
 
   function renderSensitivityMode(container) {
@@ -242,7 +321,11 @@ var SimUI = (function() {
     init: init,
     addProduct: addProduct,
     removeProduct: removeProduct,
+    copyProduct: copyProduct,
+    resetAll: resetAll,
+    toggleNone: toggleNone,
     renameProduct: renameProduct,
+    _debouncedRename: _debouncedRename,
     setLevel: setLevel,
     setMethod: setMethod,
     switchMode: switchMode,

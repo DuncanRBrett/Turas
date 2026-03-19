@@ -17,9 +17,20 @@ var SimCharts = (function() {
 
   // === MARKET SHARE BARS ===
 
+  // Inject CSS for animated bar transitions (once)
+  var _barStyleInjected = false;
+  function _injectBarAnimStyle() {
+    if (_barStyleInjected) return;
+    _barStyleInjected = true;
+    var style = document.createElement("style");
+    style.textContent = ".cj-bar-anim { transition: width 300ms ease-in-out; }";
+    document.head.appendChild(style);
+  }
+
   function renderShareBars(containerId, products, shares) {
     var container = document.getElementById(containerId);
     if (!container) return;
+    _injectBarAnimStyle();
 
     var n = shares.length;
     var w = 540, barH = 38, gap = 14, ml = 180, mr = 70;
@@ -28,6 +39,13 @@ var SimCharts = (function() {
     var maxShare = Math.max.apply(null, shares.concat([50]));
 
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w + ' ' + h + '" width="100%" style="max-width:' + w + 'px;font-family:system-ui,sans-serif;">';
+
+    // Vertical gridlines every 10%
+    for (var g = 10; g <= maxShare; g += 10) {
+      var gx = ml + (g / maxShare) * pw;
+      svg += '<line x1="' + gx.toFixed(1) + '" y1="0" x2="' + gx.toFixed(1) + '" y2="' + h + '" stroke="#e2e8f0" stroke-width="0.5"/>';
+      svg += '<text x="' + gx.toFixed(1) + '" y="' + (h - 2) + '" text-anchor="middle" fill="#cbd5e1" font-size="9">' + g + '%</text>';
+    }
 
     for (var i = 0; i < n; i++) {
       var y = i * (barH + gap) + 10;
@@ -44,8 +62,15 @@ var SimCharts = (function() {
         svg += '<text x="' + (ml - 8) + '" y="' + (y + barH / 2 + 8) + '" text-anchor="end" fill="#94a3b8" font-size="9" dominant-baseline="central">' + escSvg(desc) + '</text>';
       }
 
-      svg += '<rect x="' + ml + '" y="' + y + '" width="' + bw.toFixed(1) + '" height="' + barH + '" rx="4" fill="' + getColour(i) + '" opacity="0.8"/>';
-      svg += '<text x="' + (ml + bw + 6).toFixed(1) + '" y="' + (y + barH / 2) + '" fill="#334155" font-size="12" font-weight="600" dominant-baseline="central">' + shares[i].toFixed(1) + '%</text>';
+      svg += '<rect class="cj-bar-anim" x="' + ml + '" y="' + y + '" width="' + bw.toFixed(1) + '" height="' + barH + '" rx="4" fill="' + getColour(i) + '" opacity="0.8"/>';
+
+      // Share percentage label: white on bar if wide enough, else to the right
+      var shareLabel = shares[i].toFixed(1) + '%';
+      if (bw > 50) {
+        svg += '<text x="' + (ml + bw - 8).toFixed(1) + '" y="' + (y + barH / 2) + '" text-anchor="end" fill="#ffffff" font-size="12" font-weight="600" dominant-baseline="central">' + shareLabel + '</text>';
+      } else {
+        svg += '<text x="' + (ml + bw + 6).toFixed(1) + '" y="' + (y + barH / 2) + '" fill="#334155" font-size="12" font-weight="600" dominant-baseline="central">' + shareLabel + '</text>';
+      }
     }
 
     svg += '</svg>';
@@ -211,36 +236,131 @@ var SimCharts = (function() {
 
   // === DEMAND CURVE ===
 
-  function renderDemandCurve(containerId, curveData) {
+  function renderDemandCurve(containerId, curveData, options) {
     var container = document.getElementById(containerId);
     if (!container || !curveData || curveData.length === 0) return;
 
+    options = options || {};
+    var title = options.title || "Demand Curve";
+    var xLabel = options.xLabel || "Price Level";
+    var yLabel = options.yLabel || "Predicted Share (%)";
+    var optimalPrice = options.optimalPrice || null;
+
     var n = curveData.length;
-    var w = 400, h = 250, ml = 60, mr = 20, mt = 30, mb = 50;
+    var w = 500, h = 300, ml = 65, mr = 30, mt = 36, mb = 60;
     var pw = w - ml - mr, ph = h - mt - mb;
-    var maxS = Math.max.apply(null, curveData.map(function(d) { return d.share; })) * 1.1;
+    var maxS = Math.max.apply(null, curveData.map(function(d) { return d.share; })) * 1.15;
+    var minS = 0;
     if (maxS < 10) maxS = 10;
 
-    var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w + ' ' + h + '" width="100%" style="max-width:' + w + 'px;font-family:system-ui,sans-serif;">';
-    svg += '<text x="' + (w / 2) + '" y="16" text-anchor="middle" fill="#334155" font-size="12" font-weight="500">Demand Curve</text>';
+    var uid = "dc-" + Math.random().toString(36).substring(2, 8);
 
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w + ' ' + h + '" width="100%" style="max-width:' + w + 'px;font-family:system-ui,sans-serif;">';
+
+    // Title
+    svg += '<text x="' + (w / 2) + '" y="18" text-anchor="middle" fill="#334155" font-size="13" font-weight="500">' + escSvg(title) + '</text>';
+
+    // Y-axis label
+    svg += '<text x="14" y="' + (mt + ph / 2) + '" text-anchor="middle" fill="#64748b" font-size="10" font-weight="400" transform="rotate(-90,14,' + (mt + ph / 2) + ')">' + escSvg(yLabel) + '</text>';
+
+    // X-axis label
+    svg += '<text x="' + (ml + pw / 2) + '" y="' + (h - 6) + '" text-anchor="middle" fill="#64748b" font-size="10" font-weight="400">' + escSvg(xLabel) + '</text>';
+
+    // Horizontal gridlines
+    var yStep = niceStep(maxS - minS, 5);
+    for (var gy = yStep; gy <= maxS; gy += yStep) {
+      var yy = mt + (1 - (gy - minS) / (maxS - minS)) * ph;
+      svg += '<line x1="' + ml + '" y1="' + yy.toFixed(1) + '" x2="' + (w - mr) + '" y2="' + yy.toFixed(1) + '" stroke="#e2e8f0" stroke-width="0.5"/>';
+      svg += '<text x="' + (ml - 6) + '" y="' + yy.toFixed(1) + '" text-anchor="end" fill="#64748b" font-size="9" dominant-baseline="central">' + gy.toFixed(0) + '%</text>';
+    }
+
+    // Area fill under the curve
     var points = [];
+    var areaPoints = [];
     for (var i = 0; i < n; i++) {
       var x = ml + (i / Math.max(n - 1, 1)) * pw;
       var y = mt + (1 - curveData[i].share / maxS) * ph;
-      points.push(x.toFixed(1) + "," + y.toFixed(1));
-
-      svg += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="4" fill="' + brandColour + '"/>';
-      svg += '<text x="' + x.toFixed(1) + '" y="' + (y - 8).toFixed(1) + '" text-anchor="middle" fill="#334155" font-size="9" font-weight="500">' + curveData[i].share.toFixed(1) + '%</text>';
-      svg += '<text x="' + x.toFixed(1) + '" y="' + (h - mb + 16) + '" text-anchor="middle" fill="#64748b" font-size="10">' + curveData[i].level + '</text>';
+      points.push({ x: x, y: y });
+      areaPoints.push(x.toFixed(1) + "," + y.toFixed(1));
     }
 
-    if (points.length > 1) {
-      svg += '<polyline points="' + points.join(" ") + '" fill="none" stroke="' + brandColour + '" stroke-width="2.5"/>';
+    // Area fill polygon
+    if (areaPoints.length > 1) {
+      var areaPath = areaPoints.join(" ") + " " + points[n - 1].x.toFixed(1) + "," + (mt + ph) + " " + points[0].x.toFixed(1) + "," + (mt + ph);
+      svg += '<polygon points="' + areaPath + '" fill="' + brandColour + '" opacity="0.07"/>';
     }
+
+    // Line
+    if (areaPoints.length > 1) {
+      svg += '<polyline points="' + areaPoints.join(" ") + '" fill="none" stroke="' + brandColour + '" stroke-width="2.5" stroke-linejoin="round"/>';
+    }
+
+    // Optimal price marker
+    if (optimalPrice) {
+      for (var oi = 0; oi < n; oi++) {
+        if (curveData[oi].level === optimalPrice.level) {
+          var ox = points[oi].x;
+          var oy = points[oi].y;
+          svg += '<line x1="' + ox.toFixed(1) + '" y1="' + oy.toFixed(1) + '" x2="' + ox.toFixed(1) + '" y2="' + (mt + ph) + '" stroke="#16a34a" stroke-width="1" stroke-dasharray="4,3"/>';
+          svg += '<text x="' + ox.toFixed(1) + '" y="' + (mt + ph + 12) + '" text-anchor="middle" fill="#16a34a" font-size="9" font-weight="500">Optimal</text>';
+          break;
+        }
+      }
+    }
+
+    // Data points with hover targets
+    for (var i = 0; i < n; i++) {
+      var px = points[i].x;
+      var py = points[i].y;
+
+      // Invisible larger hit area for hover
+      svg += '<circle cx="' + px.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="14" fill="transparent" class="' + uid + '-hover-target" data-idx="' + i + '" style="cursor:pointer;"/>';
+
+      // Visible dot
+      svg += '<circle cx="' + px.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="5" fill="' + brandColour + '" stroke="#fff" stroke-width="1.5" style="pointer-events:none;"/>';
+
+      // Data label
+      svg += '<text x="' + px.toFixed(1) + '" y="' + (py - 10).toFixed(1) + '" text-anchor="middle" fill="#334155" font-size="9" font-weight="500" style="pointer-events:none;">' + curveData[i].share.toFixed(1) + '%</text>';
+
+      // X-axis tick label
+      var tickLabel = curveData[i].level;
+      if (String(tickLabel).length > 10) tickLabel = String(tickLabel).substring(0, 9) + "\u2026";
+      if (n <= 8) {
+        svg += '<text x="' + px.toFixed(1) + '" y="' + (mt + ph + 16) + '" text-anchor="middle" fill="#64748b" font-size="10">' + escSvg(tickLabel) + '</text>';
+      } else {
+        svg += '<text x="' + px.toFixed(1) + '" y="' + (mt + ph + 16) + '" text-anchor="end" fill="#64748b" font-size="9" transform="rotate(-35,' + px.toFixed(1) + ',' + (mt + ph + 16) + ')">' + escSvg(tickLabel) + '</text>';
+      }
+    }
+
+    // Tooltip container (rendered as foreignObject for HTML tooltip)
+    svg += '<foreignObject x="0" y="0" width="' + w + '" height="' + h + '" style="pointer-events:none;">';
+    svg += '<div xmlns="http://www.w3.org/1999/xhtml" id="' + uid + '-tip" style="display:none;position:absolute;background:#1e293b;color:#f8fafc;padding:6px 10px;border-radius:4px;font-size:11px;line-height:1.5;pointer-events:none;white-space:nowrap;"></div>';
+    svg += '</foreignObject>';
 
     svg += '</svg>';
     container.innerHTML = svg;
+
+    // Attach hover listeners for tooltips
+    var tipEl = document.getElementById(uid + "-tip");
+    var targets = container.querySelectorAll("." + uid + "-hover-target");
+    targets.forEach(function(el) {
+      el.addEventListener("mouseenter", function(e) {
+        var idx = parseInt(el.getAttribute("data-idx"), 10);
+        if (isNaN(idx) || !curveData[idx]) return;
+        var d = curveData[idx];
+        var tipText = d.level + ": " + d.share.toFixed(1) + "%";
+        if (d.elasticity !== undefined) tipText += " | Elasticity: " + d.elasticity.toFixed(2);
+        if (tipEl) {
+          tipEl.textContent = tipText;
+          tipEl.style.display = "block";
+          tipEl.style.left = (points[idx].x - 40) + "px";
+          tipEl.style.top = (points[idx].y - 34) + "px";
+        }
+      });
+      el.addEventListener("mouseleave", function() {
+        if (tipEl) tipEl.style.display = "none";
+      });
+    });
   }
 
 

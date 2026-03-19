@@ -112,7 +112,7 @@ estimate_auto_method <- function(data, config, verbose = TRUE) {
     list(success = FALSE, error = conditionMessage(e))
   })
 
-  if (!inherits(mlogit_result, "list") || mlogit_result$success != FALSE) {
+  if (!inherits(mlogit_result, "list") || !identical(mlogit_result$success, FALSE)) {
     log_verbose("  ✓ mlogit estimation successful", verbose)
     return(mlogit_result)
   }
@@ -128,7 +128,7 @@ estimate_auto_method <- function(data, config, verbose = TRUE) {
     list(success = FALSE, error = conditionMessage(e))
   })
 
-  if (!inherits(clogit_result, "list") || clogit_result$success != FALSE) {
+  if (!inherits(clogit_result, "list") || !identical(clogit_result$success, FALSE)) {
     # TRS PARTIAL: Fallback estimator used
     message(sprintf("[TRS PARTIAL] CONJ_MLOGIT_FALLBACK: mlogit failed, using clogit fallback (original error: %s)",
                     mlogit_result$error))
@@ -439,11 +439,15 @@ extract_mlogit_results <- function(model, data, config) {
     ll_null <- tryCatch({
       summary(model)$logLik["null"]
     }, error = function(e) {
-      # Last resort: estimate null model
-      message("[TRS INFO] CONJ_NULL_LL_ESTIMATED: Could not extract null log-likelihood - estimating from null model")
-      null_formula <- as.formula(paste(config$chosen_column, "~ 1"))
-      null_model <- mlogit::mlogit(null_formula, data = data)
-      as.numeric(logLik(null_model))
+      # Last resort: calculate analytically
+      # For a null model with J alternatives, LL_null = n * log(1/J)
+      message("[TRS INFO] CONJ_NULL_LL_ESTIMATED: Could not extract null log-likelihood - calculating analytically")
+      n_chosen <- sum(data[[config$chosen_column]] == 1)
+      # Count alternatives per choice set from the data
+      n_alts_per_set <- table(paste(data[[config$respondent_id_column]],
+                                     data[[config$choice_set_column]], sep = "_"))
+      avg_alts <- mean(n_alts_per_set)
+      n_chosen * log(1 / avg_alts)
     })
   }
 
@@ -511,10 +515,20 @@ estimate_with_clogit <- function(data, config, verbose = TRUE) {
   })
 
   attr_terms <- paste(escaped_attrs, collapse = " + ")
+
+  # Create unique strata combining respondent_id and choice_set_id
+
+  # This prevents pooling choice sets across respondents when choice_set IDs repeat per respondent
+  data$.clogit_strata <- interaction(
+    data[[config$respondent_id_column]],
+    data[[config$choice_set_column]],
+    drop = TRUE
+  )
+
   formula_str <- paste(
     config$chosen_column, "~",
     attr_terms,
-    "+ strata(", config$choice_set_column, ")"
+    "+ strata(.clogit_strata)"
   )
   formula_obj <- as.formula(formula_str)
 
@@ -567,7 +581,9 @@ extract_clogit_results <- function(model, data, config) {
   # Sample info
   n_obs <- nrow(data)
   n_respondents <- length(unique(data[[config$respondent_id_column]]))
-  n_choice_sets <- length(unique(data[[config$choice_set_column]]))
+  # Count total unique choice situations (respondent x choice_set combinations)
+  n_choice_sets <- length(unique(paste(data[[config$respondent_id_column]],
+                                        data[[config$choice_set_column]], sep = "_")))
 
   # Create standardized result
   structure(list(
@@ -626,8 +642,11 @@ estimate_rating_based_conjoint <- function(data_list, config, verbose = TRUE) {
     data[[attr]] <- factor(data[[attr]], levels = levels_vec)
   }
 
-  # Build formula
-  attr_terms <- paste(config$attributes$AttributeName, collapse = " + ")
+  # Build formula with escaped attribute names for special characters
+  escaped_attrs <- sapply(config$attributes$AttributeName, function(a) {
+    if (grepl("[^a-zA-Z0-9_.]", a)) paste0("`", a, "`") else a
+  })
+  attr_terms <- paste(escaped_attrs, collapse = " + ")
   formula_str <- paste(rating_var, "~", attr_terms)
   formula_obj <- as.formula(formula_str)
 

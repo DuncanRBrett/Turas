@@ -124,8 +124,8 @@ prepare_bayesm_data <- function(data_list, config, verbose = TRUE) {
   attr_names <- config$attributes$AttributeName
 
   # Create dummy variables for all attributes
-  # Effect coding: each attribute with K levels gets K-1 dummies
-  # The first level is the reference (coded as -1 for effect coding, 0 for dummy)
+  # Dummy coding: each attribute with K levels gets K-1 columns
+  # The first level is the reference (coded as 0; other levels coded as 1 when present)
   design_cols <- list()
   col_names <- character()
   attribute_map <- list()  # maps column indices to attribute/level
@@ -313,8 +313,21 @@ extract_hb_results <- function(hb_output, bayesm_data, config, burnin, thin, ver
   respondent_ids <- bayesm_data$respondent_ids
 
   # hb_output$betadraw is an array: [respondents x parameters x draws]
-  # After burn-in removal (bayesm handles this internally based on R and keep)
-  betadraw <- hb_output$betadraw
+  # bayesm does NOT discard burn-in automatically — we must remove burn-in draws
+  betadraw_raw <- hb_output$betadraw
+  n_draws_total <- dim(betadraw_raw)[3]
+
+  # Remove burn-in draws: bayesm keeps every 'thin'-th draw, so the number
+
+  # of burn-in draws to discard = floor(burnin / thin)
+  n_burnin_draws <- min(floor(burnin / max(thin, 1)), n_draws_total - 1)
+  if (n_burnin_draws > 0) {
+    betadraw <- betadraw_raw[, , (n_burnin_draws + 1):n_draws_total, drop = FALSE]
+    log_verbose(sprintf("  → Discarded %d burn-in draws, retaining %d posterior draws",
+                         n_burnin_draws, dim(betadraw)[3]), verbose)
+  } else {
+    betadraw <- betadraw_raw
+  }
   n_draws <- dim(betadraw)[3]
 
   # Calculate individual-level posterior means
@@ -322,8 +335,16 @@ extract_hb_results <- function(hb_output, bayesm_data, config, burnin, thin, ver
   individual_sds <- matrix(NA, nrow = n_respondents, ncol = n_parameters)
 
   for (i in seq_len(n_respondents)) {
-    individual_betas[i, ] <- colMeans(betadraw[i, , , drop = FALSE])
-    individual_sds[i, ] <- apply(betadraw[i, , , drop = FALSE], 2, sd)
+    # Drop to 2D matrix [parameters x draws] before computing means
+    draws_i <- betadraw[i, , , drop = TRUE]
+    if (is.matrix(draws_i)) {
+      individual_betas[i, ] <- rowMeans(draws_i)
+      individual_sds[i, ] <- apply(draws_i, 1, sd)
+    } else {
+      # Single draw remaining — no SD
+      individual_betas[i, ] <- draws_i
+      individual_sds[i, ] <- 0
+    }
   }
 
   colnames(individual_betas) <- col_names
@@ -402,12 +423,12 @@ run_hb_convergence_diagnostics <- function(hb_output, bayesm_data, verbose = TRU
   .load_hb_diagnostics()
 
   # Calculate basic diagnostics from the population-level draws
-  # hb_output$nmix contains the mixture parameters over iterations
-  # For basic diagnostics, use the mean of individual betas across iterations
+  # Use ALL draws (including burn-in) for convergence assessment — burn-in
+  # non-stationarity is exactly what we want to detect
 
   n_respondents <- bayesm_data$n_respondents
   n_params <- bayesm_data$n_parameters
-  betadraw <- hb_output$betadraw
+  betadraw <- hb_output$betadraw  # Full draws including burn-in
   n_draws <- dim(betadraw)[3]
 
   # Calculate effective sample size and simple convergence metrics
