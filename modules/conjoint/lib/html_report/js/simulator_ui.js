@@ -183,6 +183,7 @@ var SimUI = (function() {
 
   function switchMode(mode) {
     currentMode = mode;
+    _sharesControlsRendered = false;  // Force controls rebuild when switching modes
     updateResults();
   }
 
@@ -202,31 +203,23 @@ var SimUI = (function() {
     }
   }
 
-  function renderShares(container) {
-    var configs = products.map(function(p) { return p.config; });
-    var displayProducts = products.slice();
-    var shares;
+  var _sharesControlsRendered = false;
 
-    if (includeNone) {
-      var noneU = SimEngine.getNoneUtility();
-      shares = SimEngine.predictSharesWithNone(configs, noneU, method);
-      // Add a "None" entry for display
-      displayProducts = displayProducts.concat([{ name: "None (No Purchase)", config: {} }]);
-    } else {
-      shares = SimEngine.predictShares(configs, method);
-    }
+  function renderSharesControls(container) {
+    // Only render controls once — they persist across updates
+    if (_sharesControlsRendered && document.getElementById("cj-sim-share-chart")) return;
 
     var html = '<h3 style="font-size:14px;font-weight:600;color:#1e293b;margin-bottom:12px;">Predicted Market Shares</h3>';
 
     // None option toggle
     html += '<div style="margin-bottom:10px;">';
     html += '<label style="font-size:12px;color:#64748b;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">';
-    html += '<input type="checkbox" ' + (includeNone ? 'checked' : '') + ' onchange="SimUI.toggleNone(this.checked)" style="accent-color:#323367;" />';
+    html += '<input type="checkbox" id="cj-sim-none-cb" ' + (includeNone ? 'checked' : '') + ' onchange="SimUI.toggleNone(this.checked)" style="accent-color:#323367;" />';
     html += 'Include No-Purchase Option</label></div>';
 
     // Method selector with info tooltip
     html += '<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">';
-    html += '<select class="cj-sim-select" style="width:auto;" onchange="SimUI.setMethod(this.value)">';
+    html += '<select id="cj-sim-method-sel" class="cj-sim-select" style="width:auto;" onchange="SimUI.setMethod(this.value)">';
     html += '<option value="logit"' + (method === "logit" ? " selected" : "") + '>Logit (MNL)</option>';
     html += '<option value="rfc"' + (method === "rfc" ? " selected" : "") + '>RFC (Approximate)</option>';
     html += '<option value="purchase_likelihood"' + (method === "purchase_likelihood" ? " selected" : "") + '>Purchase Likelihood</option>';
@@ -235,10 +228,10 @@ var SimUI = (function() {
     html += '<span class="cj-sim-tooltip-wrap" style="position:relative;display:inline-block;">';
     html += '<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:11px;font-weight:600;cursor:help;">?</span>';
     html += '<span class="cj-sim-tooltip" style="display:none;position:absolute;left:24px;top:-8px;z-index:10;background:#1e293b;color:#f8fafc;font-size:11px;padding:10px 12px;border-radius:6px;width:280px;line-height:1.5;pointer-events:none;">';
-    html += '<strong>Logit (MNL):</strong> Distributes shares proportionally based on utility differences. Reflects realistic substitution patterns. Best general-purpose method.<br><br>';
-    html += '<strong>RFC (Approximate):</strong> Adds Gumbel random error to aggregate utilities across many draws, then counts first-choices. Produces similar results to Logit but with natural stochastic variation. Note: this uses aggregate-level utilities; true individual-level RFC requires the R-side simulator.<br><br>';
-    html += '<strong>Purchase Likelihood:</strong> Converts each product\'s utility to an independent purchase probability. Values do NOT sum to 100% — useful when products are not direct substitutes.<br><br>';
-    html += '<strong>First Choice:</strong> Awards 100% share to the highest-utility product. Winner-takes-all — useful for niche or monopoly scenarios.';
+    html += '<strong>Logit (MNL):</strong> Distributes shares proportionally based on utility differences.<br><br>';
+    html += '<strong>RFC (Approximate):</strong> Adds Gumbel noise to aggregate utilities, counts first-choices across draws.<br><br>';
+    html += '<strong>Purchase Likelihood:</strong> Independent purchase probability per product (values don\'t sum to 100%).<br><br>';
+    html += '<strong>First Choice:</strong> 100% share to highest-utility product.';
     html += '</span></span>';
     html += '</div>';
 
@@ -246,37 +239,53 @@ var SimUI = (function() {
     var sf = SimEngine.getScaleFactor();
     html += '<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">';
     html += '<label style="font-size:11px;color:#64748b;white-space:nowrap;">Scale factor:</label>';
-    html += '<input type="range" min="0.1" max="3.0" step="0.1" value="' + sf.toFixed(1) + '" ';
+    html += '<input type="range" id="cj-sim-scale-slider" min="0.1" max="3.0" step="0.1" value="' + sf.toFixed(1) + '" ';
     html += 'style="width:120px;accent-color:#323367;" ';
-    html += 'oninput="SimUI.setScaleFactor(parseFloat(this.value));this.nextElementSibling.textContent=parseFloat(this.value).toFixed(1)" />';
-    html += '<span style="font-size:12px;font-weight:600;color:#1e293b;min-width:24px;">' + sf.toFixed(1) + '</span>';
+    html += 'oninput="SimUI.setScaleFactor(parseFloat(this.value));document.getElementById(\'cj-sim-scale-val\').textContent=parseFloat(this.value).toFixed(1)" />';
+    html += '<span id="cj-sim-scale-val" style="font-size:12px;font-weight:600;color:#1e293b;min-width:24px;">' + sf.toFixed(1) + '</span>';
     html += '<span class="cj-sim-tooltip-wrap" style="position:relative;display:inline-block;">';
     html += '<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:11px;font-weight:600;cursor:help;">?</span>';
     html += '<span class="cj-sim-tooltip" style="display:none;position:absolute;left:24px;top:-8px;z-index:10;background:#1e293b;color:#f8fafc;font-size:11px;padding:10px 12px;border-radius:6px;width:240px;line-height:1.5;pointer-events:none;">';
-    html += 'Multiplies utilities before share computation. <strong>1.0</strong> = no adjustment. <strong>&gt;1</strong> = more differentiated shares (larger gaps). <strong>&lt;1</strong> = more equal shares. Use for calibration against known market data.';
+    html += 'Multiplies utilities before share computation. <strong>1.0</strong> = no adjustment. <strong>&gt;1</strong> = more differentiated shares. <strong>&lt;1</strong> = more equal shares.';
     html += '</span></span>';
     html += '</div>';
 
-    // Share bars
+    // Chart + revenue containers (updated separately)
     html += '<div id="cj-sim-share-chart"></div>';
-
-    // Revenue/profit summary (auto-detected when a price attribute exists)
     html += '<div id="cj-sim-revenue"></div>';
 
     container.innerHTML = html;
 
-    // Activate tooltip hover
-    var wrap = container.querySelector(".cj-sim-tooltip-wrap");
-    if (wrap) {
+    // Activate all tooltip hovers
+    container.querySelectorAll(".cj-sim-tooltip-wrap").forEach(function(wrap) {
       var tip = wrap.querySelector(".cj-sim-tooltip");
-      wrap.addEventListener("mouseenter", function() { tip.style.display = "block"; });
-      wrap.addEventListener("mouseleave", function() { tip.style.display = "none"; });
+      if (tip) {
+        wrap.addEventListener("mouseenter", function() { tip.style.display = "block"; });
+        wrap.addEventListener("mouseleave", function() { tip.style.display = "none"; });
+      }
+    });
+
+    _sharesControlsRendered = true;
+  }
+
+  function renderShares(container) {
+    // Render controls once, then only update chart area
+    renderSharesControls(container);
+
+    var configs = products.map(function(p) { return p.config; });
+    var displayProducts = products.slice();
+    var shares;
+
+    if (includeNone) {
+      var noneU = SimEngine.getNoneUtility();
+      shares = SimEngine.predictSharesWithNone(configs, noneU, method);
+      displayProducts = displayProducts.concat([{ name: "None (No Purchase)", config: {} }]);
+    } else {
+      shares = SimEngine.predictShares(configs, method);
     }
 
-    // Render SVG bars
+    // Only update the chart and revenue — controls stay intact
     SimCharts.renderShareBars("cj-sim-share-chart", displayProducts, shares);
-
-    // Render revenue summary (if price attribute detected)
     renderRevenueSummary(displayProducts, shares);
   }
 

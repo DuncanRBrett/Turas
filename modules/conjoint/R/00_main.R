@@ -505,9 +505,12 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
       if (!is.null(price_attr)) {
         wtp_result <- tryCatch({
           if (verbose) cat(sprintf("\n6b. Calculating willingness to pay (price attribute: %s)...\n", price_attr))
-          result <- calculate_wtp(utilities, price_attr, config,
-                                  individual_betas = model_result$individual_betas,
-                                  verbose = verbose)
+          # Set wtp_price_attribute in config if not already set
+          if (is.null(config$wtp_price_attribute) || is.na(config$wtp_price_attribute) ||
+              nchar(config$wtp_price_attribute) == 0) {
+            config$wtp_price_attribute <- price_attr
+          }
+          result <- calculate_wtp(utilities, config, model_result, verbose = verbose)
           if (verbose) cat("   \u2713 WTP calculated\n")
           result
         }, error = function(e) {

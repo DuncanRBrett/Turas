@@ -315,6 +315,12 @@ body { font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helve
   content:attr(data-placeholder); color:#a3a3a3; font-style:italic;
 }
 
+/* === SIMULATOR ANNOTATION EDITOR === */
+.cj-sim-annotation-editor:focus { border-color:#d4a843; box-shadow:0 0 0 3px rgba(212,168,67,0.15); }
+.cj-sim-annotation-editor:empty::before {
+  content:attr(data-placeholder); color:#b8860b; font-style:italic; opacity:0.6;
+}
+
 /* === PIN BUTTON (emoji style, matches tabs) === */
 .cj-pin-btn {
   background:none; border:1px solid #e2e8f0; border-radius:4px;
@@ -728,7 +734,7 @@ build_overview_panel <- function(html_data, tables, charts, config = list()) {
   )
 
   export_bar <- .build_export_bar("overview")
-  pin_btn <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-overview\')" title="Pin this view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 17v5"/><path d="M5 17h14"/><path d="M6 3v7l-1 3h14l-1-3V3z"/></svg></button>'
+  pin_btn <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-overview\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
   insight <- build_insight_area("overview", html_data$insights)
 
   sprintf(
@@ -796,7 +802,7 @@ build_utilities_panel <- function(html_data, tables, charts, brand, config = lis
     attr_id <- gsub("[^a-zA-Z0-9]", "-", attr_name)
     export_bar <- .build_export_bar(paste0("util-", attr_id))
     pin_btn <- sprintf(
-      '<button class="cj-pin-btn" onclick="togglePin(\'util-%s\')" title="Pin this view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 17v5"/><path d="M5 17h14"/><path d="M6 3v7l-1 3h14l-1-3V3z"/></svg></button>',
+      '<button class="cj-pin-btn" onclick="togglePin(\'util-%s\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>',
       .html_esc(attr_name)
     )
 
@@ -882,7 +888,7 @@ build_diagnostics_panel <- function(html_data, tables, charts, brand) {
   sections <- c(sections, diag_callouts)
 
   export_bar <- .build_export_bar("diagnostics")
-  pin_fit <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-fit\')" title="Pin this view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 17v5"/><path d="M5 17h14"/><path d="M6 3v7l-1 3h14l-1-3V3z"/></svg></button>'
+  pin_fit <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-fit\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
 
   # Model Fit
   sections <- c(sections, sprintf(
@@ -902,7 +908,7 @@ build_diagnostics_panel <- function(html_data, tables, charts, brand) {
     converged <- isTRUE(hb$convergence$converged)
     status_class <- if (converged) "cj-status-pass" else "cj-status-fail"
     status_text <- if (converged) "CONVERGED" else "NOT CONVERGED"
-    pin_conv <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-convergence\')" title="Pin this view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 17v5"/><path d="M5 17h14"/><path d="M6 3v7l-1 3h14l-1-3V3z"/></svg></button>'
+    pin_conv <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-convergence\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
 
     # Plain-language convergence explanation
     if (converged) {
@@ -949,7 +955,7 @@ build_diagnostics_panel <- function(html_data, tables, charts, brand) {
 
     # Respondent quality
     if (!is.null(hb$quality)) {
-      pin_quality <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-quality\')" title="Pin this view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 17v5"/><path d="M5 17h14"/><path d="M6 3v7l-1 3h14l-1-3V3z"/></svg></button>'
+      pin_quality <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-quality\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
 
       # Plain-language RLH explanation
       rlh_val <- hb$quality$mean_rlh %||% 0
@@ -1121,7 +1127,7 @@ build_lc_panel <- function(html_data, tables, charts, brand) {
   ))
 
   # BIC chart + comparison table
-  pin_bic <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-bic\')" title="Pin this view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 17v5"/><path d="M5 17h14"/><path d="M6 3v7l-1 3h14l-1-3V3z"/></svg></button>'
+  pin_bic <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-bic\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
   sections <- c(sections, sprintf(
     '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -1137,7 +1143,7 @@ build_lc_panel <- function(html_data, tables, charts, brand) {
 
   # Class sizes
   if (!is.null(charts$class_sizes)) {
-    pin_sizes <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-sizes\')" title="Pin this view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 17v5"/><path d="M5 17h14"/><path d="M6 3v7l-1 3h14l-1-3V3z"/></svg></button>'
+    pin_sizes <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-sizes\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
     sections <- c(sections, sprintf(
       '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -1151,7 +1157,7 @@ build_lc_panel <- function(html_data, tables, charts, brand) {
 
   # Class importance comparison
   if (!is.null(charts$class_importance)) {
-    pin_imp <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-importance\')" title="Pin this view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 17v5"/><path d="M5 17h14"/><path d="M6 3v7l-1 3h14l-1-3V3z"/></svg></button>'
+    pin_imp <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-importance\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
     sections <- c(sections, sprintf(
       '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -1200,7 +1206,7 @@ build_wtp_panel <- function(html_data, tables, charts, brand) {
   } else ""
 
   # WTP chart + table
-  pin_wtp <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-wtp-main\')" title="Pin this view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 17v5"/><path d="M5 17h14"/><path d="M6 3v7l-1 3h14l-1-3V3z"/></svg></button>'
+  pin_wtp <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-wtp-main\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
   sections <- c(sections, sprintf(
     '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -1218,7 +1224,7 @@ build_wtp_panel <- function(html_data, tables, charts, brand) {
 
   # Demand curve
   if (!is.null(charts$demand_curve) || !is.null(tables$demand_curve)) {
-    pin_demand <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-wtp-demand\')" title="Pin this view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 17v5"/><path d="M5 17h14"/><path d="M6 3v7l-1 3h14l-1-3V3z"/></svg></button>'
+    pin_demand <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-wtp-demand\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
     sections <- c(sections, sprintf(
       '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -1308,7 +1314,7 @@ build_simulator_panel <- function(html_data, brand) {
 
   insight <- build_insight_area("simulator", html_data$insights)
 
-  pin_sim <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-simulator\')" title="Pin this view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 17v5"/><path d="M5 17h14"/><path d="M6 3v7l-1 3h14l-1-3V3z"/></svg></button>'
+  pin_sim <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-simulator\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
 
   sprintf(
     '<div class="cj-panel" role="tabpanel" id="panel-simulator">
@@ -1334,13 +1340,13 @@ build_simulator_panel <- function(html_data, brand) {
 <div style="font-size:24px;">Add products to see predicted shares</div>
 </div>
 </div>
-<div class="cj-sim-annotation" id="cj-sim-annotation">
-<div class="cj-sim-annotation-toggle" onclick="toggleSimAnnotation()" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#64748b;font-weight:500;padding:4px 8px;border-radius:4px;transition:all 0.15s;">
-<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+<div class="cj-sim-annotation" id="cj-sim-annotation" style="margin-top:12px;border-left:3px solid #d4a843;padding-left:12px;">
+<div class="cj-sim-annotation-toggle" onclick="toggleSimAnnotation()" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#92700c;font-weight:600;padding:4px 0;transition:all 0.15s;">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#92700c" stroke-width="2.2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
 <span id="cj-sim-annotation-label">Add note</span>
 </div>
 <div id="cj-sim-annotation-body" style="display:none;margin-top:6px;">
-<div contenteditable="true" class="cj-sim-annotation-editor" id="cj-sim-annotation-editor" data-placeholder="Add your analysis note for this simulation scenario..." style="min-height:40px;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:12px;line-height:1.6;color:#1e293b;background:#fefce8;outline:none;transition:all 0.2s ease;" oninput="saveSimAnnotation()"></div>
+<div contenteditable="true" class="cj-sim-annotation-editor" id="cj-sim-annotation-editor" data-placeholder="Add your analysis note for this scenario..." style="min-height:48px;padding:12px 14px;border:2px solid #fbbf24;border-radius:8px;font-size:13px;line-height:1.6;color:#1e293b;background:#fffbeb;outline:none;transition:all 0.2s ease;box-shadow:0 1px 3px rgba(251,191,36,0.15);" oninput="saveSimAnnotation()"></div>
 </div>
 </div>
 </div>

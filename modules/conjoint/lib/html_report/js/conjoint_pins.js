@@ -12,14 +12,32 @@
   // === TOGGLE PIN ===
 
   window.togglePin = function(viewId) {
+    // Simulator pins are snapshots — always add, never toggle off
+    // This allows multiple market share / revenue / sensitivity snapshots
+    var isSimulator = (viewId === "pin-simulator");
+
+    if (isSimulator) {
+      var captured = captureView(viewId);
+      if (captured) {
+        // Give each simulator snapshot a unique ID
+        captured.id = "pin-sim-" + Date.now();
+        pinnedViews.push(captured);
+      }
+      renderPinnedCards();
+      savePinnedData();
+      updatePinnedBadge();
+      showPinToast("Snapshot pinned to collection");
+      bounceButton(viewId);
+      return;
+    }
+
+    // Non-simulator pins: standard toggle behavior
     var idx = pinnedViews.findIndex(function(v) { return v.id === viewId; });
     var wasPinned = idx >= 0;
 
     if (wasPinned) {
-      // Unpin
       pinnedViews.splice(idx, 1);
     } else {
-      // Pin: capture current view
       var captured = captureView(viewId);
       if (captured) {
         pinnedViews.push(captured);
@@ -31,7 +49,6 @@
     savePinnedData();
     updatePinnedBadge();
 
-    // Visual feedback: toast + bounce
     showPinToast(wasPinned ? "Removed from collection" : "Pinned to collection");
     bounceButton(viewId);
   };
@@ -87,9 +104,14 @@
       else if (panelPart === "overview") {
         source = document.querySelector("#panel-overview .cj-card");
       }
-      // Simulator: pin-simulator -> capture the results div
+      // Simulator: pin-simulator -> capture the results div with mode label
       else if (panelPart === "simulator") {
         source = document.getElementById("cj-sim-results");
+        // Tag with current mode for descriptive snapshot title
+        if (source) {
+          var modeBtn = document.querySelector(".cj-sim-mode-btn.active");
+          source._simMode = modeBtn ? modeBtn.textContent : "Simulator";
+        }
       }
     }
 
@@ -101,9 +123,15 @@
 
     if (!source) return null;
 
-    // Get title
-    var titleEl = source.querySelector("h2");
+    // Get title (simulator snapshots use mode label + timestamp)
+    var titleEl = source.querySelector("h2") || source.querySelector("h3");
     var title = titleEl ? titleEl.textContent : viewId;
+    if (source._simMode) {
+      var now = new Date();
+      var timeStr = now.getHours().toString().padStart(2, "0") + ":" + now.getMinutes().toString().padStart(2, "0");
+      title = source._simMode + " — " + timeStr;
+      delete source._simMode;
+    }
 
     // Get chart SVG
     var chartSvg = "";
