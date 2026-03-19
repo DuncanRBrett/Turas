@@ -40,6 +40,11 @@ transform_conjoint_for_html <- function(conjoint_results, config = list()) {
 
   # --- WTP data ---
   wtp_data <- .extract_wtp_data(conjoint_results$wtp)
+  # Thread currency symbol from config into WTP data
+  if (!is.null(wtp_data)) {
+    wtp_data$currency_symbol <- config$currency_symbol %||%
+      module_config$currency_symbol %||% "$"
+  }
 
   # --- Simulator data (JSON-ready) ---
   simulator_data <- .build_simulator_data(utilities, importance, model_result, module_config, config)
@@ -137,7 +142,8 @@ transform_conjoint_for_html <- function(conjoint_results, config = list()) {
   result <- list(
     wtp_table         = wtp$wtp_table,
     price_coefficient = wtp$price_coefficient %||% NA,
-    price_attribute   = wtp$price_attribute %||% "Price"
+    price_attribute   = wtp$price_attribute %||% "Price",
+    currency_symbol   = wtp$currency_symbol %||% NULL
   )
 
   # Demand curve data if available

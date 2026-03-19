@@ -337,13 +337,15 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
 
   if (is.null(wtp_data) || is.null(wtp_data$wtp_table)) return("")
 
+  cs <- wtp_data$currency_symbol %||% "$"
   wtp <- wtp_data$wtp_table
   # Filter out baselines
   if ("is_baseline" %in% names(wtp)) wtp <- wtp[!wtp$is_baseline, , drop = FALSE]
   if (nrow(wtp) == 0) return("")
 
   n <- nrow(wtp)
-  has_ci <- all(c("WTP_Lower", "WTP_Upper") %in% names(wtp))
+  has_ci <- all(c("WTP_Lower", "WTP_Upper") %in% names(wtp)) &&
+    any(!is.na(wtp$WTP_Lower) & !is.na(wtp$WTP_Upper))
   chart_width <- 800
   bar_height <- 30
   bar_gap <- 6
@@ -380,10 +382,10 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
     tx <- scale_x(tick)
     if (tx >= margin_left && tx <= chart_width - margin_right) {
       elements <- c(elements, .svg_gridline(tx, margin_top, tx, chart_height - margin_bottom))
-      elements <- c(elements, .svg_axis_label(tx, chart_height - margin_bottom + 16, sprintf("$%.0f", tick)))
+      elements <- c(elements, .svg_axis_label(tx, chart_height - margin_bottom + 16, sprintf("%s%.0f", cs, tick)))
     }
   }
-  elements <- c(elements, .svg_axis_label(zero_x, chart_height - margin_bottom + 16, "$0"))
+  elements <- c(elements, .svg_axis_label(zero_x, chart_height - margin_bottom + 16, paste0(cs, "0")))
 
   # Bars grouped by attribute
   y_pos <- margin_top
@@ -451,7 +453,7 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
     vanch <- if (val >= 0) "start" else "end"
     elements <- c(elements, sprintf(
       '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#334155" font-size="12" font-weight="600" dominant-baseline="central">%s</text>',
-      vx, y_pos + bar_height / 2, vanch, sprintf("$%.2f", val)
+      vx, y_pos + bar_height / 2, vanch, sprintf("%s%.2f", cs, val)
     ))
 
     y_pos <- y_pos + bar_height + bar_gap
@@ -482,8 +484,9 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
 #' @param brand_colour Hex colour
 #' @return HTML string with SVG wrapped in data-chart-id div
 #' @keywords internal
-build_demand_curve_chart <- function(demand_curve, brand_colour = "#323367") {
+build_demand_curve_chart <- function(demand_curve, brand_colour = "#323367", currency_symbol = "$") {
 
+  cs <- currency_symbol %||% "$"
   if (is.null(demand_curve) || nrow(demand_curve) < 2) return("")
 
   share_col <- if ("Share" %in% names(demand_curve)) "Share" else if ("Demand" %in% names(demand_curve)) "Demand" else NULL
@@ -528,7 +531,7 @@ build_demand_curve_chart <- function(demand_curve, brand_colour = "#323367") {
   x_ticks <- seq(ceiling(x_min / x_step) * x_step, floor(x_max / x_step) * x_step, by = x_step)
   for (xt in x_ticks) {
     xx <- scale_x(xt)
-    elements <- c(elements, .svg_axis_label(xx, chart_height - margin_bottom + 16, sprintf("$%.0f", xt), size = 11))
+    elements <- c(elements, .svg_axis_label(xx, chart_height - margin_bottom + 16, sprintf("%s%.0f", cs, xt), size = 11))
   }
 
   # Line (rounded joins/caps)

@@ -278,14 +278,18 @@ calculate_aggregate_wtp <- function(utilities, price_attr, price_coef, price_coe
     # Var(WTP) ≈ (SE_beta / price_coef)^2 + (beta * SE_price / price_coef^2)^2
     # This accounts for uncertainty in both the attribute coefficient AND the price coefficient
     se_wtp <- NA_real_
-    if (!is.null(row$SE) && row$SE > 0 && !is.na(price_coef_se)) {
+    # Support both "SE" and "Std_Error" column names (MNL uses Std_Error)
+    row_se <- if (!is.null(row$SE) && !is.na(row$SE)) row$SE
+              else if (!is.null(row$Std_Error) && !is.na(row$Std_Error)) row$Std_Error
+              else NA_real_
+    if (!is.na(row_se) && row_se > 0 && !is.na(price_coef_se)) {
       # Full delta method with both sources of variance
-      var_from_beta <- (row$SE / price_coef)^2
+      var_from_beta <- (row_se / price_coef)^2
       var_from_price <- (beta * price_coef_se / price_coef^2)^2
       se_wtp <- sqrt(var_from_beta + var_from_price)
-    } else if (!is.null(row$SE) && row$SE > 0) {
+    } else if (!is.na(row_se) && row_se > 0) {
       # Partial delta method (price coefficient SE unknown — fallback)
-      se_wtp <- abs(row$SE / price_coef)
+      se_wtp <- abs(row_se / price_coef)
     }
 
     z <- qnorm(1 - (1 - (config$confidence_level %||% 0.95)) / 2)

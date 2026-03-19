@@ -464,6 +464,7 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
 
     wtp_price_attribute = settings_list$wtp_price_attribute %||% NA_character_,
     wtp_method = settings_list$wtp_method %||% "marginal",
+    currency_symbol = settings_list$currency_symbol %||% "$",
 
     # =========================================================================
     # HTML OUTPUT SETTINGS (Phase 3 Upgrade)

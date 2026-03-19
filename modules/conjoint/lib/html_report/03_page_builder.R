@@ -226,6 +226,7 @@ body { font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helve
 /* === TABLES === */
 .cj-table { width:100%; border-collapse:collapse; font-size:13px; }
 .cj-table th { text-align:left; padding:8px 12px; border-bottom:2px solid #e2e8f0; color:#64748b; font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; }
+.cj-table th.cj-num-header { text-align:right; }
 .cj-table td { padding:8px 12px; border-bottom:1px solid #f1f5f9; }
 .cj-label-col { font-weight:400; color:#334155; }
 .cj-num { font-variant-numeric:tabular-nums; text-align:right; }
@@ -957,9 +958,10 @@ build_wtp_panel <- function(html_data, tables, charts, brand) {
   # Price coefficient info
   price_coef <- html_data$wtp_data$price_coefficient
   price_attr <- html_data$wtp_data$price_attribute %||% "Price"
+  cs <- html_data$wtp_data$currency_symbol %||% "$"
   info_html <- if (!is.na(price_coef)) {
-    sprintf('<p style="font-size:12px;color:#64748b;margin-bottom:12px;">Price attribute: <strong>%s</strong> | Price coefficient: <strong>%.4f</strong></p>',
-            .html_esc(price_attr), price_coef)
+    sprintf('<p style="font-size:12px;color:#64748b;margin-bottom:12px;">Price attribute: <strong>%s</strong> | Price coefficient: <strong>%.4f</strong> | Currency: <strong>%s</strong></p>',
+            .html_esc(price_attr), price_coef, .html_esc(cs))
   } else ""
 
   # WTP chart + table

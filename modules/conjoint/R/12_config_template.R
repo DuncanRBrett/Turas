@@ -203,6 +203,7 @@
   # --- WILLINGNESS TO PAY ---
   add("WILLINGNESS TO PAY", "wtp_price_attribute", "", "Name of the price attribute (leave blank to skip WTP)", FALSE, "", "Attribute name from Attributes sheet")
   add("WILLINGNESS TO PAY", "wtp_method", "marginal", "WTP calculation method", FALSE, "marginal,simulation", "marginal or simulation")
+  add("WILLINGNESS TO PAY", "currency_symbol", "$", "Currency symbol for WTP display (e.g. $, R, EUR, GBP)", FALSE, "", "Any currency symbol or abbreviation")
 
   # --- MARKET SIMULATOR ---
   add("MARKET SIMULATOR", "generate_market_simulator", "TRUE", "Generate interactive Excel market simulator sheet", FALSE, "TRUE,FALSE", "TRUE or FALSE")

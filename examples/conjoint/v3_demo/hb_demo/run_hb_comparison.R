@@ -11,7 +11,7 @@
 #   - HB (individual): Unique utilities per respondent + convergence diagnostics
 #
 # USAGE:
-#   source("examples/conjoint/v3_demo/run_hb_comparison.R")
+#   source("examples/conjoint/v3_demo/hb_demo/run_hb_comparison.R")
 #   (from the Turas root directory)
 #
 # NOTE:
@@ -28,7 +28,8 @@ cat("================================================================\n\n")
 # --- Setup ---
 turas_root <- getwd()
 demo_dir <- file.path(turas_root, "examples", "conjoint", "v3_demo")
-output_dir <- file.path(demo_dir, "output")
+hb_demo_dir <- file.path(demo_dir, "hb_demo")
+output_dir <- file.path(hb_demo_dir, "output")
 if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
 if (!file.exists(file.path(turas_root, "launch_turas.R"))) {
@@ -100,11 +101,11 @@ hb_results <- tryCatch({
   # Calculate utilities and importance
   utilities <- calculate_utilities(model_result, config, verbose = TRUE)
   importance <- calculate_attribute_importance(utilities, config, verbose = TRUE)
-  diagnostics <- calculate_model_diagnostics(model_result, data_list$data, config)
+  diagnostics <- calculate_model_diagnostics(model_result, data_list, utilities, importance, config)
 
   # Write Excel output
   write_conjoint_output(
-    model_result, utilities, importance, diagnostics,
+    utilities, importance, diagnostics, model_result,
     config, data_list,
     file.path(output_dir, "demo_hb_results.xlsx")
   )

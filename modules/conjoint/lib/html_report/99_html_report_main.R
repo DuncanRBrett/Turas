@@ -200,7 +200,10 @@ generate_conjoint_html_report <- function(conjoint_results, output_path, config 
 
     # Demand curve table
     if (!is.null(html_data$wtp_data$demand_curve)) {
-      tables$demand_curve <- build_demand_table(html_data$wtp_data$demand_curve)
+      tables$demand_curve <- build_demand_table(
+        html_data$wtp_data$demand_curve,
+        html_data$wtp_data$currency_symbol %||% "$"
+      )
     }
   }
 
@@ -254,7 +257,10 @@ generate_conjoint_html_report <- function(conjoint_results, output_path, config 
 
     # Demand curve chart
     if (!is.null(html_data$wtp_data$demand_curve)) {
-      charts$demand_curve <- build_demand_curve_chart(html_data$wtp_data$demand_curve, brand)
+      charts$demand_curve <- build_demand_curve_chart(
+        html_data$wtp_data$demand_curve, brand,
+        html_data$wtp_data$currency_symbol %||% "$"
+      )
     }
   }
 
