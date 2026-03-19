@@ -1280,17 +1280,24 @@ build_insight_area <- function(tab_id, insights = list()) {
 
   if (has_r2) {
     r2 <- diag$fit_statistics$mcfadden_r2
-    quality <- if (r2 >= 0.4) "excellent"
-               else if (r2 >= 0.3) "very good"
-               else if (r2 >= 0.2) "good"
-               else if (r2 >= 0.1) "acceptable"
-               else "weak"
+    # Plain-language trust verdict based on R2
+    if (r2 >= 0.3) {
+      verdict <- "strong"
+      trust_msg <- "You can <strong>confidently rely</strong> on these results for strategic decisions. The model clearly captures how people make choices between these products."
+    } else if (r2 >= 0.2) {
+      verdict <- "solid"
+      trust_msg <- "These results are <strong>reliable for decision-making</strong>. The model captures the key drivers of choice well. Importance rankings and utility patterns can be trusted."
+    } else if (r2 >= 0.1) {
+      verdict <- "usable"
+      trust_msg <- "These results provide <strong>useful directional guidance</strong>. The overall importance rankings are reliable, though individual utility estimates should be interpreted as approximate. Consider the hit rate below for additional confidence."
+    } else {
+      verdict <- "limited"
+      trust_msg <- "These results should be <strong>treated with caution</strong>. The model explains only a small portion of choice behaviour, which may mean the tested attributes are not the main factors driving decisions, or the data contains significant noise. Consider reviewing data quality or study design."
+    }
+
     fit_body <- sprintf(
-      "<p>Model fit measures how well the estimated utilities explain the observed choices. The McFadden pseudo-R\u00b2 for this model is <strong>%.3f</strong>, which indicates %s fit. In discrete choice models, values between 0.2 and 0.4 are generally considered to represent good to excellent fit \u2014 these values are not directly comparable to R\u00b2 in linear regression.</p>",
-      r2, quality
-    )
-    fit_body <- paste0(fit_body,
-      "<p><strong>Can you trust these results?</strong> McFadden pseudo-R\u00b2 works differently from regular R\u00b2 \u2014 values between 0.2 and 0.4 represent good to excellent fit. Even values around 0.1 can produce useful, actionable insights, especially when combined with a good hit rate.</p>"
+      "<p><strong>Bottom line:</strong> %s</p><p>The model's predictive accuracy score is <strong>%.3f</strong> (on a scale where 0.2\u20130.4 represents good to excellent for this type of analysis). This is a specialised measure for choice models and is not comparable to the R\u00b2 you may have seen in other contexts.</p>",
+      trust_msg, r2
     )
   } else {
     fit_body <- "<p>Model fit measures how well the estimated utilities explain the observed choices in the data. A well-fitting model means the attribute preferences we\u2019ve estimated accurately reflect how people actually make decisions.</p><p><strong>Can you trust these results?</strong> Look at the hit rate below \u2014 it shows what percentage of actual choices the model correctly predicted. Compare it to chance level (e.g., 33% for 3-alternative choice sets). A hit rate well above chance indicates the model is capturing real preferences. A hit rate only slightly above chance suggests the data may be noisy or the attributes may not be the primary drivers of choice.</p>"

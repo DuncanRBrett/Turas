@@ -483,8 +483,22 @@
       badge.textContent = "Last saved " + now.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
     }
 
+    // Preserve select element states in the clone
+    var selects = document.querySelectorAll("select");
+    selects.forEach(function(sel) { sel.setAttribute("data-saved-value", sel.value); });
+
     // Serialize HTML
     var clone = document.documentElement.cloneNode(true);
+
+    // Restore select values in clone
+    var clonedSelects = clone.querySelectorAll("select");
+    clonedSelects.forEach(function(sel) {
+      var val = sel.getAttribute("data-saved-value");
+      if (val) {
+        var opts = sel.querySelectorAll("option");
+        opts.forEach(function(opt) { opt.selected = (opt.value === val); });
+      }
+    });
 
     // Remove help overlay open state
     var helpEl = clone.querySelector("#cj-help-overlay");
@@ -492,13 +506,38 @@
 
     var html = "<!DOCTYPE html>\n" + clone.outerHTML;
 
-    // Determine filename
+    // Determine default filename
     var meta = document.querySelector('meta[name="turas-source-filename"]');
     var baseName = meta ? meta.getAttribute("content") : "Conjoint_Report";
     baseName = baseName.replace(/\.[^/.]+$/, "");
     var filename = baseName + "_Updated.html";
 
-    downloadBlob(html, filename, "text/html");
+    // Use File System Access API "Save As" dialog if available (Chrome 86+)
+    if (window.showSaveFilePicker) {
+      window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{
+          description: "HTML Report",
+          accept: { "text/html": [".html"] }
+        }]
+      }).then(function(handle) {
+        return handle.createWritable().then(function(writable) {
+          return writable.write(html).then(function() {
+            return writable.close();
+          });
+        });
+      }).then(function() {
+        showToast("Report saved successfully");
+      }).catch(function(err) {
+        // User cancelled the dialog or API error — fall back to download
+        if (err.name !== "AbortError") {
+          downloadBlob(html, filename, "text/html");
+        }
+      });
+    } else {
+      // Fallback for browsers without File System Access API
+      downloadBlob(html, filename, "text/html");
+    }
   };
 
 

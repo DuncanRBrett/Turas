@@ -82,23 +82,8 @@ var SimCharts = (function() {
     // Add sticky annotations showing share percentage on each bar
     _injectAnnotationStyle();
     var svgEl = container.querySelector("svg");
-    if (svgEl) {
-      var svgRect = svgEl.getBoundingClientRect();
-      var containerRect = container.getBoundingClientRect();
-      var scaleX = svgEl.viewBox.baseVal.width / svgRect.width;
-      var scaleY = svgEl.viewBox.baseVal.height / svgRect.height;
-      var offsetLeft = svgRect.left - containerRect.left;
-      var offsetTop = svgRect.top - containerRect.top;
-
-      for (var ai = 0; ai < n; ai++) {
-        var ay = ai * (barH + gap) + 10;
-        var abw = Math.max((shares[ai] / maxShare) * pw, 2);
-        // Position annotation at end of bar
-        var annX = offsetLeft + (ml + abw) / scaleX;
-        var annY = offsetTop + (ay + barH / 2) / scaleY;
-        addAnnotation(container, annX, annY, shares[ai].toFixed(1) + "%");
-      }
-    }
+    // Enable click-to-annotate on bars (user can add custom notes)
+    _enableClickAnnotations(container);
   }
 
   function getProductDescriptor(config, maxAttrs) {
@@ -187,25 +172,8 @@ var SimCharts = (function() {
     svg += '</svg>';
     container.innerHTML = svg;
 
-    // Add sticky annotations at each data point
-    _injectAnnotationStyle();
-    var sensSvgEl = container.querySelector("svg");
-    if (sensSvgEl) {
-      var sensSvgRect = sensSvgEl.getBoundingClientRect();
-      var sensContRect = container.getBoundingClientRect();
-      var sensScaleX = sensSvgEl.viewBox.baseVal.width / sensSvgRect.width;
-      var sensScaleY = sensSvgEl.viewBox.baseVal.height / sensSvgRect.height;
-      var sensOffLeft = sensSvgRect.left - sensContRect.left;
-      var sensOffTop = sensSvgRect.top - sensContRect.top;
-
-      for (var si = 0; si < n; si++) {
-        var sx = ml + (si / Math.max(n - 1, 1)) * pw;
-        var sy = mt + (1 - (sweepResults[si].share - minS) / (maxS - minS)) * ph;
-        var sannX = sensOffLeft + sx / sensScaleX;
-        var sannY = sensOffTop + sy / sensScaleY;
-        addAnnotation(container, sannX, sannY, sweepResults[si].share.toFixed(1) + "%");
-      }
-    }
+    // Enable click-to-annotate on the sensitivity chart
+    _enableClickAnnotations(container);
   }
 
 
@@ -430,42 +398,96 @@ var SimCharts = (function() {
    * @param {string} text - Label text
    * @returns {HTMLElement} The annotation element
    */
-  function addAnnotation(chartContainer, x, y, text) {
-    // Ensure container has relative positioning for absolute children
-    var pos = window.getComputedStyle(chartContainer).position;
-    if (pos === "static" || pos === "") {
-      chartContainer.style.position = "relative";
-    }
+  // ========================================================
+  // CLICK-TO-ANNOTATE: User can click any chart area to add a custom note
+  // Annotations persist in the DOM and are included in Save Report
+  // ========================================================
 
-    var ann = document.createElement("div");
-    ann.className = "cj-sticky-annotation";
-    ann.textContent = text;
-    ann.style.cssText = "position:absolute;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:500;color:#1e293b;white-space:nowrap;pointer-events:none;transform:translate(-50%,-100%);margin-top:-8px;z-index:5;";
-    ann.style.left = x + "px";
-    ann.style.top = y + "px";
-
-    // Triangle pointer underneath
-    var tri = document.createElement("div");
-    tri.style.cssText = "position:absolute;left:50%;bottom:-5px;transform:translateX(-50%);width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid #e2e8f0;";
-    ann.appendChild(tri);
-
-    // Inner triangle (white fill) to cover the border
-    var triInner = document.createElement("div");
-    triInner.style.cssText = "position:absolute;left:50%;bottom:-4px;transform:translateX(-50%);width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:4px solid #fff;";
-    ann.appendChild(triInner);
-
-    chartContainer.appendChild(ann);
-    return ann;
-  }
-
-  // Inject annotation CSS (once)
   var _annStyleInjected = false;
   function _injectAnnotationStyle() {
     if (_annStyleInjected) return;
     _annStyleInjected = true;
     var style = document.createElement("style");
-    style.textContent = ".cj-sticky-annotation { box-shadow: 0 1px 3px rgba(0,0,0,0.08); }";
+    style.textContent = [
+      ".cj-chart-annotation { position:absolute; background:#fff; border:1px solid #e2e8f0; border-radius:6px; padding:6px 10px; font-size:11px; font-weight:500; color:#1e293b; white-space:nowrap; z-index:5; box-shadow:0 1px 4px rgba(0,0,0,0.10); cursor:move; transform:translate(-50%,-100%); margin-top:-10px; }",
+      ".cj-chart-annotation::after { content:''; position:absolute; left:50%; bottom:-5px; transform:translateX(-50%); width:0; height:0; border-left:5px solid transparent; border-right:5px solid transparent; border-top:5px solid #e2e8f0; }",
+      ".cj-chart-annotation .cj-ann-text { outline:none; min-width:30px; display:inline-block; }",
+      ".cj-chart-annotation .cj-ann-text:empty::before { content:'Type note...'; color:#94a3b8; font-style:italic; }",
+      ".cj-chart-annotation .cj-ann-remove { display:inline-block; margin-left:6px; color:#94a3b8; cursor:pointer; font-size:13px; font-weight:700; line-height:1; }",
+      ".cj-chart-annotation .cj-ann-remove:hover { color:#dc2626; }",
+      ".cj-chart-annotation-prompt { position:absolute; background:rgba(30,41,59,0.8); color:#fff; padding:4px 10px; border-radius:4px; font-size:10px; pointer-events:none; transform:translate(-50%,-100%); margin-top:-4px; z-index:4; white-space:nowrap; }"
+    ].join("\n");
     document.head.appendChild(style);
+  }
+
+  function _enableClickAnnotations(chartContainer) {
+    if (!chartContainer || chartContainer._annEnabled) return;
+    chartContainer._annEnabled = true;
+    _injectAnnotationStyle();
+
+    var pos = window.getComputedStyle(chartContainer).position;
+    if (pos === "static" || pos === "") {
+      chartContainer.style.position = "relative";
+    }
+
+    chartContainer.addEventListener("dblclick", function(e) {
+      // Don't add annotation if clicking on an existing annotation
+      if (e.target.closest && e.target.closest(".cj-chart-annotation")) return;
+
+      var rect = chartContainer.getBoundingClientRect();
+      var x = e.clientX - rect.left;
+      var y = e.clientY - rect.top;
+
+      _createAnnotation(chartContainer, x, y, "");
+    });
+
+    // Show hint on first hover
+    var _hintShown = false;
+    chartContainer.addEventListener("mouseenter", function() {
+      if (_hintShown) return;
+      _hintShown = true;
+      var hint = document.createElement("div");
+      hint.className = "cj-chart-annotation-prompt";
+      hint.textContent = "Double-click to add a note";
+      hint.style.left = "50%";
+      hint.style.top = "8px";
+      hint.style.transform = "translateX(-50%)";
+      hint.style.marginTop = "0";
+      chartContainer.appendChild(hint);
+      setTimeout(function() { if (hint.parentNode) hint.parentNode.removeChild(hint); }, 3000);
+    });
+  }
+
+  function _createAnnotation(container, x, y, text) {
+    var ann = document.createElement("div");
+    ann.className = "cj-chart-annotation";
+    ann.style.left = x + "px";
+    ann.style.top = y + "px";
+
+    var textEl = document.createElement("span");
+    textEl.className = "cj-ann-text";
+    textEl.contentEditable = "true";
+    textEl.textContent = text;
+    ann.appendChild(textEl);
+
+    var removeBtn = document.createElement("span");
+    removeBtn.className = "cj-ann-remove";
+    removeBtn.innerHTML = "&times;";
+    removeBtn.title = "Remove annotation";
+    removeBtn.onclick = function(e) {
+      e.stopPropagation();
+      ann.parentNode.removeChild(ann);
+    };
+    ann.appendChild(removeBtn);
+
+    // Focus the text field immediately
+    container.appendChild(ann);
+    textEl.focus();
+
+    // Prevent double-click on annotation from creating another
+    ann.addEventListener("dblclick", function(e) { e.stopPropagation(); });
+
+    return ann;
   }
 
 
@@ -479,6 +501,6 @@ var SimCharts = (function() {
     renderSensitivity: renderSensitivity,
     renderSourceOfVolume: renderSourceOfVolume,
     renderDemandCurve: renderDemandCurve,
-    addAnnotation: addAnnotation
+    enableClickAnnotations: _enableClickAnnotations
   };
 })();

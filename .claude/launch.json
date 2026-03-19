@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "conjoint-report",
-      "runtimeExecutable": "/usr/local/bin/npx",
-      "runtimeArgs": ["serve", "examples/conjoint/v3_demo/output", "-l", "8765", "--no-clipboard"],
+      "runtimeExecutable": "/usr/local/bin/Rscript",
+      "runtimeArgs": ["--vanilla", ".claude/serve.R"],
       "port": 8765
     }
   ]

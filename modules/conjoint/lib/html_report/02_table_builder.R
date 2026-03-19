@@ -23,11 +23,16 @@ build_importance_table <- function(importance) {
 
   rows <- vapply(seq_len(nrow(importance)), function(i) {
     imp <- importance$Importance[i]
-    bar_width <- min(imp, 100)
+    # Interpretation for each attribute
+    interp <- if (imp > 30) "Primary driver"
+              else if (imp > 20) "Major influence"
+              else if (imp > 10) "Moderate influence"
+              else if (imp > 5) "Minor influence"
+              else "Minimal impact"
     sprintf(
-      '<tr><td class="cj-label-col" data-col-key="attribute" data-export-value="%s">%s</td><td class="cj-num" data-col-key="importance" data-export-value="%.1f">%.1f%%</td><td><div class="cj-bar-cell"><div class="cj-bar" style="width:%.1f%%"></div></div></td></tr>',
+      '<tr><td class="cj-label-col" data-col-key="attribute" data-export-value="%s">%s</td><td class="cj-num" data-col-key="importance" data-export-value="%.1f">%.1f%%</td><td data-col-key="interpretation" style="color:#64748b;font-size:12px;">%s</td></tr>',
       .html_escape(importance$Attribute[i]),
-      .html_escape(importance$Attribute[i]), imp, imp, bar_width
+      .html_escape(importance$Attribute[i]), imp, imp, interp
     )
   }, character(1))
 
@@ -35,7 +40,7 @@ build_importance_table <- function(importance) {
     '<table class="cj-table" data-table-id="importance"><thead><tr>',
     '<th data-col-key="attribute">Attribute</th>',
     '<th data-col-key="importance">Importance</th>',
-    '<th></th></tr></thead><tbody>',
+    '<th data-col-key="interpretation">Interpretation</th></tr></thead><tbody>',
     paste(rows, collapse = "\n"),
     '</tbody></table>'
   )
