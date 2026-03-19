@@ -58,13 +58,13 @@ build_importance_chart <- function(importance, brand_colour = "#323367") {
   n <- nrow(imp_sorted)
 
   chart_width <- 800
-  chart_height <- max(200, n * 40 + 60)
+  chart_height <- max(200, n * 48 + 60)
   margin_left <- 180
   margin_right <- 80
   margin_top <- 30
   margin_bottom <- 30
   plot_w <- chart_width - margin_left - margin_right
-  bar_height <- 24
+  bar_height <- 32
   bar_gap <- 16
 
   elements <- character()
@@ -79,11 +79,24 @@ build_importance_chart <- function(importance, brand_colour = "#323367") {
     elements <- c(elements, .svg_axis_label(x, chart_height - margin_bottom + 16, sprintf("%d%%", tick)))
   }
 
-  # Bars with opacity gradient: least important (0.72) → most important (0.92)
+  # Mean importance reference line
+
+  mean_imp <- mean(imp_sorted$Importance)
+  mean_x <- margin_left + (mean_imp / max_imp) * plot_w
+  elements <- c(elements, sprintf(
+    '<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,4"/>',
+    mean_x, margin_top, mean_x, chart_height - margin_bottom
+  ))
+  elements <- c(elements, sprintf(
+    '<text x="%.1f" y="%d" text-anchor="middle" fill="#94a3b8" font-size="10" font-weight="400">mean</text>',
+    mean_x, margin_top - 4
+  ))
+
+  # Bars with opacity gradient: least important (0.70) → most important (0.95)
   for (i in seq_len(n)) {
     y <- margin_top + (i - 1) * (bar_height + bar_gap)
     w <- (imp_sorted$Importance[i] / max_imp) * plot_w
-    bar_opacity <- 0.72 + (i - 1) / max(n - 1, 1) * 0.20
+    bar_opacity <- 0.70 + (i - 1) / max(n - 1, 1) * 0.25
 
     # Label
     elements <- c(elements, sprintf(
@@ -93,14 +106,14 @@ build_importance_chart <- function(importance, brand_colour = "#323367") {
 
     # Bar with rounded corners
     elements <- c(elements, sprintf(
-      '<rect x="%d" y="%.1f" width="%.1f" height="%d" rx="4" fill="%s" opacity="%.2f"/>',
+      '<rect x="%d" y="%.1f" width="%.1f" height="%d" rx="4" ry="4" fill="%s" opacity="%.2f"/>',
       margin_left, y, max(w, 2), bar_height, brand_colour, bar_opacity
     ))
 
-    # Value label
-    elements <- c(elements, .svg_value_label(
-      margin_left + w + 6, y + bar_height / 2,
-      sprintf("%.1f%%", imp_sorted$Importance[i]), "start"
+    # Value label (font-weight 500)
+    elements <- c(elements, sprintf(
+      '<text x="%.1f" y="%.1f" text-anchor="start" fill="#334155" font-size="12" font-weight="500">%s</text>',
+      margin_left + w + 6, y + bar_height / 2, sprintf("%.1f%%", imp_sorted$Importance[i])
     ))
   }
 
@@ -132,7 +145,7 @@ build_utility_chart <- function(attr_utilities, attr_name, brand_colour = "#3233
   margin_bottom <- 50
   plot_w <- chart_width - margin_left - margin_right
   plot_h <- chart_height - margin_top - margin_bottom
-  bar_width <- min(50, (plot_w / n) * 0.6)
+  bar_width <- min(55, (plot_w / n) * 0.6)
 
   u_values <- attr_utilities$Utility
   u_max <- max(abs(u_values), 0.5) * 1.2
@@ -184,13 +197,16 @@ build_utility_chart <- function(attr_utilities, attr_name, brand_colour = "#3233
     }
 
     elements <- c(elements, sprintf(
-      '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="4" fill="%s" opacity="0.8"/>',
+      '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="4" ry="4" fill="%s" opacity="0.85"/>',
       x, bar_y, bar_width, max(bar_h, 1), bar_colour
     ))
 
-    # Value label
+    # Value label (font-weight 500)
     label_y <- if (u >= 0) bar_y - 6 else bar_y + bar_h + 14
-    elements <- c(elements, .svg_value_label(x_center, label_y, sprintf("%.3f", u), size = 12))
+    elements <- c(elements, sprintf(
+      '<text x="%.1f" y="%.1f" text-anchor="middle" fill="#334155" font-size="12" font-weight="500">%s</text>',
+      x_center, label_y, sprintf("%.3f", u)
+    ))
 
     # Level label (horizontal, no rotation)
     label <- attr_utilities$Level[i]
@@ -301,8 +317,9 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
   if (nrow(wtp) == 0) return("")
 
   n <- nrow(wtp)
+  has_ci <- all(c("WTP_Lower", "WTP_Upper") %in% names(wtp))
   chart_width <- 800
-  bar_height <- 24
+  bar_height <- 30
   bar_gap <- 6
   group_gap <- 14
   margin_left <- 220
@@ -373,15 +390,43 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
       bw <- zero_x - scale_x(val)
     }
     elements <- c(elements, sprintf(
-      '<rect x="%.1f" y="%.1f" width="%.1f" height="%d" rx="4" fill="%s" opacity="0.8"/>',
+      '<rect x="%.1f" y="%.1f" width="%.1f" height="%d" rx="4" ry="4" fill="%s" opacity="0.85"/>',
       bx, y_pos, max(bw, 2), bar_height, bar_colour
     ))
 
-    # Value label
+    # CI whiskers (if available)
+    if (has_ci) {
+      ci_lo <- wtp$WTP_Lower[i]
+      ci_hi <- wtp$WTP_Upper[i]
+      if (!is.na(ci_lo) && !is.na(ci_hi)) {
+        ci_lo_x <- scale_x(ci_lo)
+        ci_hi_x <- scale_x(ci_hi)
+        ci_y <- y_pos + bar_height / 2
+        whisker_h <- 8
+        # Horizontal line
+        elements <- c(elements, sprintf(
+          '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#475569" stroke-width="1.5"/>',
+          ci_lo_x, ci_y, ci_hi_x, ci_y
+        ))
+        # Left whisker cap
+        elements <- c(elements, sprintf(
+          '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#475569" stroke-width="1.5"/>',
+          ci_lo_x, ci_y - whisker_h / 2, ci_lo_x, ci_y + whisker_h / 2
+        ))
+        # Right whisker cap
+        elements <- c(elements, sprintf(
+          '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#475569" stroke-width="1.5"/>',
+          ci_hi_x, ci_y - whisker_h / 2, ci_hi_x, ci_y + whisker_h / 2
+        ))
+      }
+    }
+
+    # Value label (font-weight 500)
     vx <- if (val >= 0) scale_x(val) + 4 else scale_x(val) - 4
     vanch <- if (val >= 0) "start" else "end"
-    elements <- c(elements, .svg_value_label(
-      vx, y_pos + bar_height / 2, sprintf("$%.2f", val), anchor = vanch, size = 12
+    elements <- c(elements, sprintf(
+      '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#334155" font-size="12" font-weight="500">%s</text>',
+      vx, y_pos + bar_height / 2, vanch, sprintf("$%.2f", val)
     ))
 
     y_pos <- y_pos + bar_height + bar_gap

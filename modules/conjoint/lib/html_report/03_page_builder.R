@@ -548,8 +548,11 @@ build_conjoint_header <- function(summary, brand, config = list()) {
     )
   }
 
-  # Help button
-  help_btn <- '<button class="cj-help-btn" onclick="toggleHelpOverlay()" title="Show help guide">?</button>'
+  # Help button + Save Report button
+  help_btn <- '<div style="display:flex;align-items:center;gap:8px;">
+<button class="cj-export-btn" onclick="saveReportHTML()" title="Save Report" style="font-size:12px;padding:4px 10px;border:1px solid rgba(255,255,255,0.3);background:transparent;color:#fff;border-radius:4px;cursor:pointer;">Save Report</button>
+<button class="cj-help-btn" onclick="toggleHelpOverlay()" title="Show help guide">?</button>
+</div>'
 
   # Prepared by line
   prepared_parts <- character()
@@ -629,7 +632,7 @@ build_report_tab_nav <- function(html_data, config = list()) {
   }
 
   tabs <- c(tabs, list(list(id = "pinned", label = "Pinned <span class=\"cj-tab-badge\" id=\"cj-pinned-count\" style=\"display:none;\">0</span>")))
-  tabs <- c(tabs, list(list(id = "slides", label = "Slides")))
+  tabs <- c(tabs, list(list(id = "slides", label = "Added Slides")))
 
   buttons <- vapply(tabs, function(t) {
     active <- if (t$id == "overview") " active" else ""
@@ -668,8 +671,8 @@ build_overview_panel <- function(html_data, tables, charts, config = list()) {
   )
 
   overview_callout <- .build_callout(
-    "Understanding This Overview",
-    "<p>Attribute importance shows which product features most influence customer choices. Higher percentages indicate attributes where level changes have the greatest impact on preferences. The importance values are derived from the range of utility values within each attribute.</p>"
+    "What Is Attribute Importance?",
+    "<p>Attribute importance tells you <strong>what matters most</strong> when people choose between products. Think of it as a percentage score showing how much each feature influences the final decision.</p><p>For example, if Price has an importance of 35%, it means that roughly a third of a customer\u2019s decision comes down to price alone. If Brand is 20%, it means brand matters but less than price.</p><p>These scores are calculated from the <strong>range of preference scores</strong> (utilities) within each attribute. An attribute where people strongly prefer one level over another will have high importance. An attribute where all levels are viewed similarly will have low importance.</p><p><strong>Key insight:</strong> Importance scores always sum to 100% across all attributes, making them easy to compare.</p>"
   )
 
   export_bar <- .build_export_bar("overview")
@@ -759,7 +762,7 @@ build_utilities_panel <- function(html_data, tables, charts, brand, config = lis
 
   util_callout <- .build_callout(
     "Reading Utility Values",
-    "<p>Part-worth utilities represent how much each attribute level contributes to overall product attractiveness. Higher values indicate greater preference. One level per attribute serves as the baseline (utility = 0), and other levels are measured relative to it. Positive values are preferred over the baseline; negative values are less preferred.</p>"
+    "<p>Utilities (also called part-worth utilities) measure <strong>how much people like or dislike</strong> each level of an attribute, relative to a baseline level.</p><p>Think of utilities as preference points. A positive value means people prefer that level over the baseline; a negative value means they prefer it less. The larger the number, the stronger the preference.</p><p>For example, if Brand A has a utility of +0.8 and Brand B has -0.3, people clearly prefer Brand A. The baseline brand (utility = 0) sits in between.</p><p>One level per attribute serves as the baseline (utility = 0), and all other levels are measured relative to it. Positive values are preferred over the baseline; negative values are less preferred.</p><p><strong>Statistical significance:</strong> Levels marked with stars (*, **, ***) are statistically significant, meaning we are confident the preference is real and not just random noise in the data.</p>"
   )
 
   insight <- build_insight_area("utilities", html_data$insights)
@@ -945,7 +948,7 @@ build_wtp_panel <- function(html_data, tables, charts, brand) {
   # WTP callout
   wtp_callout <- .build_callout(
     "Willingness to Pay",
-    "<p>WTP converts utility values into monetary equivalents by dividing each level\u2019s utility by the price coefficient. This tells you how much extra a customer would pay for one level versus the baseline. Positive WTP means customers are willing to pay a premium; negative WTP means they require a discount.</p>"
+    "<p>Willingness to Pay (WTP) converts preference scores into <strong>monetary values</strong>. It answers the question: <em>How much extra would a customer pay for one feature level over another?</em></p><p>WTP is calculated by dividing each level\u2019s utility by the price coefficient (which measures how much utility changes per unit of price). A positive WTP means customers would pay a premium for that feature; a negative WTP means they would need a discount.</p><p>For example, if upgrading from 64GB to 256GB storage has a WTP of $45, it means the average customer values that upgrade at $45 &mdash; they would be willing to pay up to $45 more for 256GB compared to 64GB.</p><p><strong>Confidence intervals</strong> show the range of plausible WTP values. Narrower intervals indicate more precise estimates.</p><p><strong>Caveat:</strong> WTP assumes a linear relationship between price and preference. Real-world pricing decisions should consider competitive context and market conditions.</p>"
   )
   sections <- c(sections, wtp_callout)
 
@@ -1015,7 +1018,7 @@ build_simulator_panel <- function(html_data, brand) {
   sim_callout_shares <- .build_callout("Market Shares",
     "<p>Market share simulation predicts each product\u2019s share of preference using the configured attribute levels (up to 8 products). The Logit model distributes share proportionally to each product\u2019s total utility; First Choice assigns all share to whichever product each respondent would most likely pick. Configure products on the left and see predicted shares update on the right. Click on a product name to rename it.</p>")
   sim_callout_sensitivity <- .build_callout("Sensitivity Analysis",
-    "<p>Sensitivity analysis sweeps through each level of a selected attribute for a chosen product while holding all other attributes constant. This reveals how much market share changes as you move between levels \u2014 helping identify which attribute level changes have the greatest competitive impact.</p>")
+    "<p>Sensitivity analysis reveals <strong>how much market share changes</strong> when you switch between levels of a single attribute, while keeping everything else constant.</p><p>Select a product and an attribute to sweep. The chart shows the predicted market share at each level of that attribute. Steep curves indicate high sensitivity &mdash; small changes in that attribute cause large share shifts. Flat curves indicate the market is relatively insensitive to changes in that attribute.</p><p>This is invaluable for decisions like: <em>If we upgrade our battery from 3000mAh to 5000mAh, how much market share would we gain?</em> Or: <em>How much share would we lose if we raised the price by $100?</em></p><p><strong>Tip:</strong> Compare sensitivity across attributes to find the most impactful levers for your product strategy.</p>")
   sim_callout_sov <- .build_callout("Source of Volume",
     "<p>Source of Volume shows where a new product (the last one in the list) draws its market share from. By comparing shares before and after the new product enters, you can see which existing competitors lose the most \u2014 helping you understand the competitive dynamics of a potential new entry.</p>")
 
@@ -1173,7 +1176,7 @@ build_slides_panel <- function() {
 <div class="cj-slides-container">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
 <div>
-<h2 style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;">Slides</h2>
+<h2 style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;">Added Slides</h2>
 <p style="font-size:12px;color:#64748b;">Build narrative slides with Markdown. Use **bold**, *italic*, # headings, - bullets, > quotes, and --- rules.</p>
 </div>
 <div style="display:flex;gap:8px;">

@@ -107,6 +107,7 @@
       id: "slide-" + Date.now(),
       title: "",
       body: "",
+      images: [],
       timestamp: new Date().toISOString()
     });
     activeSlideIdx = slides.length - 1;
@@ -154,9 +155,62 @@
       saveSlides();
       // Live preview
       var preview = document.getElementById("cj-slide-preview-" + idx);
-      if (preview) preview.innerHTML = renderMarkdown(md);
+      if (preview) preview.innerHTML = renderMarkdown(md) + renderSlideImages(idx);
     }
   };
+
+  // Insert image into a slide via file picker
+  window.insertSlideImage = function(idx) {
+    var input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.style.display = "none";
+    input.addEventListener("change", function() {
+      var file = input.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        if (!slides[idx]) return;
+        if (!slides[idx].images) slides[idx].images = [];
+        slides[idx].images.push({
+          id: "img-" + Date.now(),
+          name: file.name,
+          data: e.target.result
+        });
+        saveSlides();
+        // Re-render preview to show image
+        var preview = document.getElementById("cj-slide-preview-" + idx);
+        if (preview) preview.innerHTML = renderMarkdown(slides[idx].body || "") + renderSlideImages(idx);
+      };
+      reader.readAsDataURL(file);
+      input.remove();
+    });
+    document.body.appendChild(input);
+    input.click();
+  };
+
+  window.removeSlideImage = function(slideIdx, imgIdx) {
+    if (slides[slideIdx] && slides[slideIdx].images) {
+      slides[slideIdx].images.splice(imgIdx, 1);
+      saveSlides();
+      var preview = document.getElementById("cj-slide-preview-" + slideIdx);
+      if (preview) preview.innerHTML = renderMarkdown(slides[slideIdx].body || "") + renderSlideImages(slideIdx);
+    }
+  };
+
+  function renderSlideImages(idx) {
+    var slide = slides[idx];
+    if (!slide || !slide.images || slide.images.length === 0) return "";
+    var html = '<div style="margin-top:12px;border-top:1px solid #e2e8f0;padding-top:12px;">';
+    slide.images.forEach(function(img, imgIdx) {
+      html += '<div style="position:relative;display:inline-block;margin:4px;">';
+      html += '<img src="' + img.data + '" alt="' + escAttrNav(img.name) + '" style="max-width:100%;max-height:300px;border-radius:4px;border:1px solid #e2e8f0;" />';
+      html += '<button style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.5);color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:20px;text-align:center;" onclick="removeSlideImage(' + idx + ',' + imgIdx + ')">&times;</button>';
+      html += '</div>';
+    });
+    html += '</div>';
+    return html;
+  }
 
   function renderSlides() {
     var tabStrip = document.getElementById("cj-slide-tabs");
@@ -193,6 +247,7 @@
       html += '<div class="cj-slide-header">';
       html += '<input type="text" class="cj-slide-title-input" placeholder="Slide title..." value="' + escAttrNav(slide.title || "") + '" oninput="updateSlideTitle(' + idx + ',this.value)" />';
       html += '<div class="cj-slide-actions">';
+      html += '<button class="cj-export-btn" onclick="insertSlideImage(' + idx + ')" title="Insert Image">&#128247; Image</button>';
       if (idx > 0) html += '<button class="cj-export-btn" onclick="moveSlide(' + idx + ',-1)" title="Move up">&uarr;</button>';
       if (idx < slides.length - 1) html += '<button class="cj-export-btn" onclick="moveSlide(' + idx + ',1)" title="Move down">&darr;</button>';
       html += '<button class="cj-export-btn" onclick="pinSlide(' + idx + ')" title="Pin">\ud83d\udccc</button>';
@@ -202,7 +257,7 @@
       // Editor + Preview
       html += '<div class="cj-slide-editor-layout">';
       html += '<textarea placeholder="Write in Markdown..." oninput="updateSlideBody(' + idx + ',this.value)">' + escHtmlNav(slide.body || "") + '</textarea>';
-      html += '<div class="cj-slide-preview" id="cj-slide-preview-' + idx + '">' + renderMarkdown(slide.body || "") + '</div>';
+      html += '<div class="cj-slide-preview" id="cj-slide-preview-' + idx + '">' + renderMarkdown(slide.body || "") + renderSlideImages(idx) + '</div>';
       html += '</div>';
 
       html += '</div>';
@@ -329,7 +384,7 @@
     var slide = slides[idx];
     if (!slide) return;
     if (typeof window._addPinnedEntry === "function") {
-      var renderedBody = renderMarkdown(slide.body || "");
+      var renderedBody = renderMarkdown(slide.body || "") + renderSlideImages(idx);
       window._addPinnedEntry({
         id: slide.id,
         title: slide.title || "Slide " + (idx + 1),

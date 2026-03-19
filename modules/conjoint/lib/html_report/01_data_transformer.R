@@ -42,7 +42,7 @@ transform_conjoint_for_html <- function(conjoint_results, config = list()) {
   wtp_data <- .extract_wtp_data(conjoint_results$wtp)
 
   # --- Simulator data (JSON-ready) ---
-  simulator_data <- .build_simulator_data(utilities, importance, model_result, module_config)
+  simulator_data <- .build_simulator_data(utilities, importance, model_result, module_config, config)
 
   # --- Insight seeds ---
   insights <- .extract_insights(config)
@@ -150,7 +150,7 @@ transform_conjoint_for_html <- function(conjoint_results, config = list()) {
 
 #' Build simulator JSON-ready data from utilities and config
 #' @keywords internal
-.build_simulator_data <- function(utilities, importance, model_result, config) {
+.build_simulator_data <- function(utilities, importance, model_result, config, report_config = list()) {
   if (is.null(utilities)) return(NULL)
 
   # Build attribute list with levels and utilities
@@ -182,6 +182,16 @@ transform_conjoint_for_html <- function(conjoint_results, config = list()) {
     individual = list(),
     classes    = list()
   )
+
+  # Default products from config (pre-defined simulator products)
+  sim_products <- report_config$simulator_products %||% config$simulator_products %||% NULL
+  if (!is.null(sim_products) && is.list(sim_products) && length(sim_products) > 0) {
+    default_products <- lapply(sim_products, function(prod) {
+      levels <- as.list(prod[setdiff(names(prod), "name")])
+      list(name = prod$name %||% "Product", levels = levels)
+    })
+    sim_data$defaultProducts <- default_products
+  }
 
   # Individual betas for RFC (if HB)
   if (!is.null(model_result$individual_betas)) {

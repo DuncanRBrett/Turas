@@ -23,10 +23,33 @@ var SimUI = (function() {
 
     _initialized = true;
 
-    // Start with 2 default products
-    addProduct();
-    addProduct();
-    updateResults();
+    // Check for pre-defined products from config
+    if (data.defaultProducts && Array.isArray(data.defaultProducts) && data.defaultProducts.length > 0) {
+      data.defaultProducts.forEach(function(defProd) {
+        productCounter++;
+        var config = {};
+        // Start with first level of each attribute as default
+        data.attributes.forEach(function(attr) {
+          config[attr.name] = attr.levels[0].name;
+        });
+        // Override with levels from the config product
+        if (defProd.levels) {
+          for (var attrName in defProd.levels) {
+            if (defProd.levels.hasOwnProperty(attrName)) {
+              config[attrName] = defProd.levels[attrName];
+            }
+          }
+        }
+        products.push({ name: defProd.name || ("Product " + productCounter), config: config });
+      });
+      renderProductPanels();
+      updateResults();
+    } else {
+      // Start with 2 default products
+      addProduct();
+      addProduct();
+      updateResults();
+    }
   }
 
   function addProduct() {
