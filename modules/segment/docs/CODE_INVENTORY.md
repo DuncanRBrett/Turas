@@ -1,179 +1,143 @@
 # Segment Module - Code Inventory
 
-**Module:** Segmentation (Turas Platform)
-**Version:** 12.0
-**Last Updated:** 2026-03-08
-**Quality Score:** 92/100
+**Version:** 11.1
+**Total R source code:** ~15,000 lines (core) + ~9,800 lines (HTML report) = ~24,800 lines
+**Last updated:** 2026-03-19
 
 ---
 
-## Summary Statistics
+## Core Pipeline (`R/` directory)
 
-| Category | Files | Lines of Code |
-|----------|-------|---------------|
-| Core Analysis (`R/`) | 23 | 14,916 |
-| HTML Report Pipeline (`lib/html_report/`) | 9 | 8,094 |
-| Preflight Validators (`lib/validation/`) | 1 | 798 |
-| **Total Source** | **33** | **23,808** |
-| Tests (`tests/testthat/`) | 14 | 3,967 |
-| Documentation (`docs/`) | 9 | ~220 KB |
+All files sourced by `R/00_main.R` in sequence. This is the active code path.
 
----
+| File | Lines | Responsibility |
+|------|-------|---------------|
+| `00_main.R` | 1,018 | Main orchestrator: 7-step pipeline, exploration/final/multi-method modes |
+| `00_guard.R` | 385 | TRS guard framework: segment_refuse(), guard state, status determination |
+| `00a_guards_hard.R` | 360 | Hard guards (REFUSE): data file, clustering vars, ID, sample size, method, k range |
+| `00b_guards_soft.R` | 234 | Soft guards (PARTIAL): low variance, small clusters, silhouette, outliers, missing data, correlations |
+| `01_config.R` | 453 | Configuration loading and validation from Excel (Settings/Value format) |
+| `02_data_prep.R` | 605 | Data loading, variable selection, missing data, outliers, standardization |
+| `02a_variable_selection.R` | 521 | Variable selection: variance, correlation, factor analysis methods |
+| `02b_outliers.R` | 764 | Outlier detection: Z-score and Mahalanobis methods with flag/remove handling |
+| `03_clustering.R` | 254 | Method dispatcher: routes to kmeans/hclust/gmm, validates result structure |
+| `03a_kmeans.R` | 529 | K-means engine: standard + mini-batch for large datasets, k-means++ init |
+| `03b_hclust.R` | 177 | Hierarchical clustering: hclust/fastcluster, dendrogram extraction, cophenetic |
+| `03c_gmm.R` | 265 | GMM clustering via mclust: BIC model selection, probabilities, uncertainty |
+| `04_validation.R` | 743 | Validation metrics: silhouette, elbow, stability (bootstrap + simple), discriminant analysis |
+| `05_profiling.R` | 733 | Segment profiling: means, ANOVA, auto-naming, demographics, chi-square tests |
+| `05a_profiling_stats.R` | 534 | Enhanced profiling: significance tests, index scores, Cohen's d, variable importance |
+| `06_rules.R` | 777 | Classification rules (rpart), golden questions (Random Forest), rule formatting |
+| `07_cards.R` | 489 | Segment action cards: headlines, defining traits, strengths, pain points, actions |
+| `08_scoring.R` | 830 | Score new respondents using saved models (with imputation parameter consistency) |
+| `09_output.R` | 823 | Excel export: assignments, exploration reports, final reports (openxlsx formatted) |
+| `09a_excel_styles.R` | 313 | Shared Excel style definitions: branded headers, conditional formatting, helpers |
+| `10_utilities.R` | 1,827 | Utilities: config templates, package management, seed handling, quick-run helpers |
+| `11_lca.R` | 801 | Latent Class Analysis via poLCA: categorical data clustering |
+| `12_executive_summary.R` | 878 | Executive summary generator: headline, findings, quality, descriptions, recommendations |
+| `13_vulnerability.R` | 650 | Vulnerability/switching analysis: confidence scores, switching matrix |
 
-## Core Analysis Files (R/)
-
-| File | Lines | Purpose | Quality |
-|------|-------|---------|---------|
-| `00_main.R` | 1,017 | Main orchestrator: exploration/final/multi-method pipelines | 90 |
-| `00_guard.R` | 381 | TRS v1.1 guard framework, refusal wrapper, state management | 93 |
-| `00a_guards_hard.R` | 360 | Hard guards that REFUSE: data, config, method validation | 93 |
-| `00b_guards_soft.R` | 327 | Soft guards + pre/post orchestrators (PARTIAL status) | 92 |
-| `01_config.R` | 498 | Config loading, validation, 40+ parameters with defaults | 90 |
-| `02_data_prep.R` | 605 | Data loading, missing data handling, standardization | 88 |
-| `02a_variable_selection.R` | 521 | Multi-method variable selection (variance, correlation, FA) | 88 |
-| `02b_outliers.R` | 764 | Outlier detection (Z-score, Mahalanobis) and handling | 88 |
-| `03_clustering.R` | 254 | Method dispatcher to kmeans/hclust/gmm | 90 |
-| `03a_kmeans.R` | 529 | K-means with mini-batch for large datasets (>10k rows) | 90 |
-| `03b_hclust.R` | 177 | Hierarchical clustering with linkage options | 90 |
-| `03c_gmm.R` | 265 | Gaussian Mixture Models via mclust | 90 |
-| `04_validation.R` | 743 | Silhouette, elbow, gap statistic, bootstrap stability | 90 |
-| `05_profiling.R` | 733 | Segment profiling, means, demographics | 88 |
-| `05a_profiling_stats.R` | 720 | ANOVA, effect sizes, significance testing | 88 |
-| `06_rules.R` | 777 | Classification rules via decision trees (rpart) | 87 |
-| `07_cards.R` | 489 | Segment action cards and narratives | 87 |
-| `08_scoring.R` | 830 | Score new data against saved models | 88 |
-| `09_output.R` | 1,002 | Excel export with openxlsx, TRS Run_Status sheet | 90 |
-| `10_utilities.R` | 1,586 | Utilities, quick-run functions, variable importance | 85 |
-| `11_lca.R` | 801 | Latent Class Analysis (mclust-based) | 87 |
-| `12_executive_summary.R` | 878 | Auto-generated narrative insights | 88 |
-| `13_vulnerability.R` | 659 | Segment switching/vulnerability analysis | 88 |
-
-## HTML Report Pipeline (lib/html_report/)
-
-| File | Lines | Purpose | Quality |
-|------|-------|---------|---------|
-| `00_html_guard.R` | 132 | Input validation for HTML reports | 88 |
-| `01_data_transformer.R` | 224 | Results to HTML-ready data structures | 87 |
-| `02_table_builder.R` | 655 | Styled HTML table generation | 86 |
-| `03_page_builder.R` | 2,982 | Page layout, inline SVG, section assembly | 82 |
-| `04_html_writer.R` | 98 | Write assembled HTML to file | 88 |
-| `05_chart_builder.R` | 1,112 | SVG chart generation (bars, radar, heatmaps) | 86 |
-| `06_exploration_report.R` | 686 | K-selection exploration HTML layout | 85 |
-| `07_combined_report.R` | 1,898 | Multi-method tabbed comparison report | 85 |
-| `99_html_report_main.R` | 307 | Entry point for HTML report pipeline | 88 |
-
-## Preflight Validators (lib/validation/)
-
-| File | Lines | Purpose | Quality |
-|------|-------|---------|---------|
-| `preflight_validators.R` | 798 | 15 cross-referential checks, orchestrator | 92 |
-
-## Test Suite (tests/testthat/)
-
-| File | Lines | Purpose |
-|------|-------|---------|
-| `helper-setup.R` | 59 | Shared test utilities, synthetic data generator |
-| `test_guard.R` | 331 | Guard initialization, recording, summary tests |
-| `test_guards_hard.R` | 256 | Hard guard validation (refusals) |
-| `test_guards_soft.R` | 297 | Soft guard warnings |
-| `test_clustering.R` | 279 | K-means functionality |
-| `test_hclust.R` | 224 | Hierarchical clustering |
-| `test_gmm.R` | 260 | Gaussian Mixture Models |
-| `test_validation.R` | 291 | Metrics (silhouette, elbow) |
-| `test_output.R` | 252 | Excel export functions |
-| `test_html_report.R` | 389 | HTML report generation |
-| `test_integration.R` | 394 | End-to-end pipeline tests |
-| `test_executive_summary.R` | 406 | Narrative generation |
-| `test_edge_cases.R` | 151 | Empty data, single var, edge cases |
-| `test_vulnerability.R` | 378 | Switching analysis |
+**Total core R:** 14,963 lines across 24 files
 
 ---
 
-## Architecture Diagram
+## HTML Report Pipeline (`lib/html_report/`)
 
-```
-Config (Excel)
-    |
-    v
-[01_config.R] Load & Validate (40+ parameters)
-    |
-    v
-[preflight_validators.R] 15 Cross-Referential Checks
-    |
-    v
-[02_data_prep.R] Load Data, Handle Missing Values
-    |
-    +---> [02a_variable_selection.R] Reduce Variable Set (optional)
-    +---> [02b_outliers.R] Detect & Handle Outliers (optional)
-    |
-    v
-[00b_guards_soft.R] segment_guard_pre_analysis() -- Hard + Soft Guards
-    |
-    v
-[03_clustering.R] Method Dispatcher
-    |
-    +---> [03a_kmeans.R] K-Means (mini-batch for n > 10k)
-    +---> [03b_hclust.R] Hierarchical (ward.D2, complete, etc.)
-    +---> [03c_gmm.R] Gaussian Mixture Models (mclust)
-    |
-    v
-[04_validation.R] Silhouette, Elbow, Gap, Bootstrap Stability
-    |
-    v
-[00b_guards_soft.R] segment_guard_post_clustering() -- Quality Checks
-    |
-    v
-[05_profiling.R] + [05a_profiling_stats.R] Segment Profiles & Statistics
-    |
-    +---> [06_rules.R] Classification Rules (rpart)
-    +---> [07_cards.R] Segment Action Cards
-    +---> [08_scoring.R] Score New Data
-    +---> [11_lca.R] Latent Class Analysis (optional)
-    +---> [12_executive_summary.R] Auto-Generated Narrative
-    +---> [13_vulnerability.R] Switching Analysis
-    |
-    v
-[09_output.R] Excel Export (openxlsx, Run_Status FIRST)
-    |
-    v
-[lib/html_report/] Interactive HTML Report Pipeline (9 files)
-```
+Self-contained report generation system producing interactive, branded HTML with SVG charts.
+
+| File | Lines | Responsibility |
+|------|-------|---------------|
+| `99_html_report_main.R` | ~200 | Main entry point: routes to final/exploration/combined builders |
+| `00_html_guard.R` | ~150 | Input validation for HTML report generation |
+| `01_data_transformer.R` | ~400 | Flattens segmentation results into HTML-ready data structures |
+| `02_table_builder.R` | ~500 | Builds 6+ htmltools table objects (profiles, validation, rules, etc.) |
+| `03_page_builder.R` | ~2,843 | Complete page assembly: CSS (2,800+ lines), section layout, navigation |
+| `04_html_writer.R` | ~200 | Atomic file writer (write → rename pattern for safety) |
+| `05_chart_builder.R` | ~1,111 | SVG chart generation: silhouette, sizes, importance, heatmap |
+| `06_exploration_report.R` | ~400 | K-selection variant of HTML report |
+| `07_combined_report.R` | ~1,949 | Multi-method comparison report builder |
+
+### JavaScript Modules (`lib/html_report/js/`)
+
+| File | Lines | Responsibility |
+|------|-------|---------------|
+| `seg_navigation.js` | ~300 | Section navigation, tab switching, report state management |
+| `seg_pinned_views.js` | ~600 | Pin management: add/remove/reorder pins, section dividers, serialization |
+| `seg_slide_export.js` | ~500 | PNG export at 3840x2160 (3x): layout, rendering, download |
+| `seg_utils.js` | ~200 | Shared helpers: HTML escape, text wrap, blob download, insight editors |
+
+**Total HTML report:** ~9,770 lines across 13 files
 
 ---
 
-## Quality Scoring Criteria
+## Library Files (`lib/` — non-HTML)
 
-Each file is scored on 5 dimensions (20 points each, 100 max):
+Legacy/support library files. Most functionality has been consolidated into R/ files.
 
-| Dimension | Description |
-|-----------|-------------|
-| **Correctness** | Logic correct, edge cases handled, no bugs |
-| **Robustness** | TRS compliance, error handling, graceful degradation |
-| **Documentation** | Roxygen2 docs, inline comments, clear variable names |
-| **Test Coverage** | Corresponding tests exist, edge cases tested |
-| **Code Style** | Consistent formatting, functions < 100 lines, no hardcoded paths |
+| File | Status | Notes |
+|------|--------|-------|
+| `segment_cards.R` | Legacy | Superseded by `R/07_cards.R` |
+| `segment_config.R` | Legacy | Superseded by `R/01_config.R` |
+| `segment_data_prep.R` | Legacy | Superseded by `R/02_data_prep.R` |
+| `segment_export.R` | Legacy | Superseded by `R/09_output.R` |
+| `segment_kmeans.R` | Legacy | Superseded by `R/03a_kmeans.R` |
+| `segment_lca.R` | Legacy | Superseded by `R/11_lca.R` |
+| `segment_outliers.R` | Legacy | Superseded by `R/02b_outliers.R` |
+| `segment_profile.R` | Legacy | Superseded by `R/05_profiling.R` |
+| `segment_profiling_enhanced.R` | Legacy | Superseded by `R/05a_profiling_stats.R` |
+| `segment_rules.R` | Legacy | Superseded by `R/06_rules.R` |
+| `segment_scoring.R` | Legacy | Superseded by `R/08_scoring.R` |
+| `segment_utils.R` | Legacy | Superseded by `R/10_utilities.R` |
+| `segment_validation.R` | Legacy | Superseded by `R/04_validation.R` |
+| `segment_variable_selection.R` | Legacy | Superseded by `R/02a_variable_selection.R` |
+| `segment_visualization.R` | Legacy | Chart generation (partially superseded by HTML chart_builder) |
 
 ---
 
-## Execution Modes
+## Tests (`tests/`)
 
-| Mode | Triggered By | Output |
-|------|-------------|--------|
-| **Exploration** | `k_fixed` not set | K-selection report with metrics comparison |
-| **Final** | `k_fixed` set, single method | Full segmentation report with profiles |
-| **Multi-Method** | `method = "kmeans,hclust,gmm"` or `"all"` | Combined comparison report |
+| File | Coverage |
+|------|----------|
+| `run_tests.R` | Test runner script |
+| `run_preflight.R` | Pre-flight regression test system |
+| `testthat/helper-setup.R` | Test setup and fixtures |
+| `testthat/test_clustering.R` | K-means, hclust, gmm clustering |
+| `testthat/test_edge_cases.R` | Boundary conditions and edge cases |
+| `testthat/test_executive_summary.R` | Summary generation |
+| `testthat/test_gmm.R` | GMM-specific tests |
+| `testthat/test_guard.R` | Guard framework |
+| `testthat/test_guards_hard.R` | Hard guard validation |
+| `testthat/test_guards_soft.R` | Soft guard warnings |
+| `testthat/test_hclust.R` | Hierarchical clustering |
+| `testthat/test_integration.R` | End-to-end integration tests |
+| `testthat/test_output.R` | Excel output validation |
+| `testthat/test_validation.R` | Validation metrics |
+| `fixtures/generate_test_data.R` | Synthetic test data generator |
 
 ---
 
-## Key Dependencies
+## R Package Dependencies
 
-| Package | Purpose | Required? |
-|---------|---------|-----------|
-| `openxlsx` | Excel output with formatting | Yes |
-| `readxl` | Read Excel config/data | Yes |
-| `writexl` | Simple Excel output (legacy) | Yes |
-| `mclust` | GMM clustering | For GMM only |
-| `fastcluster` | Fast hierarchical clustering | Optional |
-| `rpart` | Classification rules | For rules only |
-| `psych` | Factor analysis variable selection | For FA only |
-| `randomForest` | Golden questions | Optional |
+### Required (core functionality)
+| Package | Min Version | Purpose |
+|---------|-------------|---------|
+| `stats` | (built-in) | K-means clustering, ANOVA |
+| `cluster` | 2.1.0 | Silhouette analysis |
+| `readxl` | 1.4.0 | Read Excel config/data files |
+| `openxlsx` | 4.2.5 | Write formatted Excel output |
+| `htmltools` | 0.5.0 | HTML report assembly |
+
+### Optional (enhanced features)
+| Package | Feature | Purpose |
+|---------|---------|---------|
+| `mclust` | GMM clustering | Gaussian Mixture Models via EM |
+| `poLCA` | LCA | Latent Class Analysis |
+| `rpart` | Classification rules | Decision tree segment rules |
+| `randomForest` | Golden questions | Variable importance for prediction |
+| `fastcluster` | Large hclust | Faster hierarchical clustering |
+| `MASS` | Mahalanobis outliers | Multivariate outlier detection |
+| `psych` | Factor analysis | Variable selection via factor loading |
+| `haven` | SPSS data | Read .sav files |
+
+### Minimum R Version
+R 4.0.0 or higher

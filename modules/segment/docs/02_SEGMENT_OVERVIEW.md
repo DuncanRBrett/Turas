@@ -1,7 +1,7 @@
 # Turas Segmentation Module - Overview
 
-**Version:** 11.0
-**Last Updated:** 5 March 2026
+**Version:** 11.1
+**Last Updated:** 19 March 2026
 
 Transform your survey data into actionable customer segments with multiple clustering algorithms, interactive HTML reports, and executive-ready deliverables.
 
@@ -93,20 +93,21 @@ Customer segmentation divides your respondents into distinct groups (segments) b
 | **Segment Drift Monitoring** | Track distribution changes over time |
 | **Respondent Typing** | Single or batch classification |
 
-### Interactive HTML Reports (v11.0)
+### Interactive HTML Reports (v11.1)
 
 | Feature | Description |
 |---------|-------------|
 | **Self-Contained HTML** | Single-file report with no external dependencies |
 | **SVG Charts** | Scalable vector charts for sizes, silhouette, heatmap, importance |
 | **Sticky Navigation** | Section-aware nav bar for quick access |
-| **Pinned Views** | Collect charts and tables into a curated workspace |
-| **Slide Export** | Export individual sections as PNG for presentations |
+| **Pinned Views** | Collect charts and tables into a curated workspace, with image upload support |
+| **Image Upload in Pins** | Attach PNG/JPEG/GIF/WebP images (max 2 MB) to pin cards via image icon |
+| **Slide Export** | Export individual sections as PNG with "Turas Segment" watermark |
 | **Brand Customisation** | Configure colours and titles from the config Excel file |
 | **Section Visibility** | Toggle report sections on/off via config flags |
 | **Exploration Report** | K-selection variant with elbow plot and solution previews |
 
-### Enhanced Features (v11.0)
+### Enhanced Features (v11.1)
 
 | Feature | Description |
 |---------|-------------|
@@ -119,6 +120,7 @@ Customer segmentation divides your respondents into distinct groups (segments) b
 | **Demographic Profiling** | Chi-square analysis of segment composition |
 | **Stability Check** | Fast multi-run consistency verification |
 | **Segment Assignments** | Excel output with ID, segment_id, segment_name (+ GMM probabilities) |
+| **Branded Excel Output** | Formatted Excel reports via openxlsx with consistent Turas styling |
 | **Latent Class Analysis** | Alternative method for categorical data |
 
 ---
@@ -291,7 +293,7 @@ Phase 1: EXPLORATION                 Phase 2: FINAL
 ### Required Packages
 
 ```r
-install.packages(c("readxl", "writexl", "cluster", "openxlsx", "htmltools"))
+install.packages(c("readxl", "cluster", "openxlsx", "htmltools"))
 ```
 
 ### Optional Packages

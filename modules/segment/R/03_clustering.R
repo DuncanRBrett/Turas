@@ -20,7 +20,7 @@
 #   )
 # ==============================================================================
 
-SEGMENT_VERSION <- "12.0"
+SEGMENT_VERSION <- "11.1"
 
 #' Run Clustering Analysis
 #'
@@ -51,16 +51,15 @@ run_clustering <- function(data_list, config, guard) {
 
   # Dispatch to method
   result <- switch(method,
-    kmeans   = run_kmeans_dispatch(data_list, config, guard),
-    hclust   = run_hclust_dispatch(data_list, config, guard),
-    gmm      = run_gmm_dispatch(data_list, config, guard),
-    ensemble = run_ensemble_clustering(data_list, config, guard),
+    kmeans = run_kmeans_dispatch(data_list, config, guard),
+    hclust = run_hclust_dispatch(data_list, config, guard),
+    gmm    = run_gmm_dispatch(data_list, config, guard),
     segment_refuse(
       code = "CFG_INVALID_METHOD",
       title = "Unsupported Clustering Method",
       problem = sprintf("Method '%s' is not implemented.", method),
       why_it_matters = "Only supported methods can produce valid results.",
-      how_to_fix = "Use one of: kmeans, hclust, gmm, ensemble"
+      how_to_fix = "Use one of: kmeans, hclust, gmm"
     )
   )
 
@@ -239,15 +238,13 @@ validate_clustering_result <- function(result, method) {
 #' @return Matrix of cluster centers (k x p)
 #' @keywords internal
 calculate_cluster_centers <- function(data, clusters) {
-  unique_labels <- sort(unique(clusters))
-  k <- length(unique_labels)
+  k <- length(unique(clusters))
   centers <- matrix(NA, nrow = k, ncol = ncol(data))
   colnames(centers) <- colnames(data)
-  rownames(centers) <- unique_labels
+  rownames(centers) <- seq_len(k)
 
-  for (i in seq_along(unique_labels)) {
-    label <- unique_labels[i]
-    mask <- clusters == label
+  for (i in seq_len(k)) {
+    mask <- clusters == i
     if (sum(mask) > 0) {
       centers[i, ] <- colMeans(data[mask, , drop = FALSE], na.rm = TRUE)
     }

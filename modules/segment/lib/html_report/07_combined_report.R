@@ -206,10 +206,13 @@ generate_segment_combined_html_report <- function(results, config, output_path) 
       warnings <<- c(warnings, sprintf("Method '%s' validation table: %s", m, e$message))
       NULL
     })
-    # Per-method tabs only show overview and validation (not full profiles)
+    tbls$profiles <- tryCatch(build_seg_profile_table(hd), error = function(e) {
+      warnings <<- c(warnings, sprintf("Method '%s' profile table: %s", m, e$message))
+      NULL
+    })
     method_tables[[m]] <- tbls
 
-    # Charts (only sizes and silhouette for per-method tabs)
+    # Charts
     chts <- list()
     chts$sizes <- tryCatch(
       build_seg_sizes_chart(hd, brand_colour),
@@ -222,6 +225,20 @@ generate_segment_combined_html_report <- function(results, config, output_path) 
       build_seg_silhouette_chart(hd, brand_colour),
       error = function(e) {
         warnings <<- c(warnings, sprintf("Method '%s' silhouette chart: %s", m, e$message))
+        NULL
+      }
+    )
+    chts$heatmap <- tryCatch(
+      build_seg_heatmap_chart(hd, brand_colour, accent_colour),
+      error = function(e) {
+        warnings <<- c(warnings, sprintf("Method '%s' heatmap chart: %s", m, e$message))
+        NULL
+      }
+    )
+    chts$importance <- tryCatch(
+      build_seg_importance_chart(hd, brand_colour),
+      error = function(e) {
+        warnings <<- c(warnings, sprintf("Method '%s' importance chart: %s", m, e$message))
         NULL
       }
     )
@@ -429,11 +446,14 @@ build_seg_combined_page <- function(method_html_data,
                                config$report_title %||% "Segment_Combined_Report")
   hub_meta <- htmltools::tagList(
     htmltools::tags$meta(name = "turas-report-type", content = "segment-combined"),
-    htmltools::tags$meta(name = "turas-module-version", content = "11.0"),
+    htmltools::tags$meta(name = "turas-module-version", content = "11.1"),
     htmltools::tags$meta(name = "turas-source-filename", content = source_filename)
   )
 
-  # --- Report-level tab bar (Analysis | Pinned Views) ---
+  # --- Action bar with help ---
+  action_bar <- build_seg_action_bar(report_title)
+
+  # --- Report-level tab bar (Analysis | Pinned Views | About) ---
   report_tab_bar <- htmltools::tags$div(
     class = "seg-report-tabs",
     htmltools::tags$button(
@@ -445,6 +465,11 @@ build_seg_combined_page <- function(method_html_data,
       class = "seg-report-tab-btn",
       `data-tab` = "pinned",
       "Pinned Views"
+    ),
+    htmltools::tags$button(
+      class = "seg-report-tab-btn",
+      `data-tab` = "about",
+      "About"
     )
   )
 
@@ -456,36 +481,35 @@ build_seg_combined_page <- function(method_html_data,
     htmltools::tags$div(
       class = "seg-pinned-panel-header",
       htmltools::tags$div(class = "seg-pinned-panel-title",
-                          "Pinned Views"),
+                          "\U0001F4CC Pinned Views"),
       htmltools::tags$div(
         class = "seg-pinned-panel-actions",
         htmltools::tags$button(
           class = "seg-pinned-panel-btn",
           onclick = "segAddSection()",
-          "+ Add Section"
+          "\u2795 Add Section"
         ),
         htmltools::tags$button(
           class = "seg-pinned-panel-btn",
           onclick = "segExportAllPinnedPNG()",
-          "Export All as PNG"
+          "\U0001F4E5 Export All as PNG"
         ),
         htmltools::tags$button(
           class = "seg-pinned-panel-btn",
           onclick = "segPrintPinnedViews()",
-          "Print / PDF"
+          "\U0001F5B6 Print / PDF"
         ),
         htmltools::tags$button(
           class = "seg-pinned-panel-btn",
           onclick = "segClearAllPinned()",
-          "Clear All"
+          "\U0001F5D1 Clear All"
         )
       )
     ),
     htmltools::tags$div(
       id = "seg-pinned-empty",
       class = "seg-pinned-empty",
-      htmltools::tags$div(class = "seg-pinned-empty-icon", style = "font-size:32px; color:#94a3b8;",
-                          "\U0001F4CC"),
+      htmltools::tags$div(class = "seg-pinned-empty-icon", "\U0001F4CC"),
       htmltools::tags$div("No pinned views yet."),
       htmltools::tags$div(
         style = "font-size:12px;margin-top:4px;",
@@ -524,19 +548,15 @@ build_seg_combined_page <- function(method_html_data,
     htmltools::tags$body(
       class = "seg-body",
       header,
+      action_bar,
       report_tab_bar,
       htmltools::tags$main(
         class = "seg-main",
-        # Analysis tab content
+        # Analysis tab content — comparison only (individual method reports are separate)
         htmltools::tags$div(
           id = "seg-analysis-tab",
           class = "seg-content",
-          tab_bar,
-          htmltools::tags$div(
-            class = "seg-method-panels-container",
-            method_panels,
-            comparison_panel
-          ),
+          comparison_panel,
           footer
         ),
         # Pinned Views tab content (hidden by default)
@@ -545,6 +565,14 @@ build_seg_combined_page <- function(method_html_data,
           class = "seg-content",
           style = "display:none;",
           pinned_section,
+          footer
+        ),
+        # About tab content (hidden by default)
+        htmltools::tags$div(
+          id = "seg-about-tab",
+          class = "seg-content",
+          style = "display:none;",
+          build_seg_about_section(config, method_html_data[[1]]),
           footer
         ),
         insight_store,
@@ -1046,7 +1074,7 @@ build_seg_combined_page <- function(method_html_data,
         class = "seg-combined-exec-stat",
         htmltools::tags$div(class = "seg-combined-exec-stat-label", "BSS/TSS"),
         htmltools::tags$div(class = "seg-combined-exec-stat-value",
-                            sprintf("%.1f%%", diag$betweenss_totss * 100))
+                            sprintf("%.0f%%", diag$betweenss_totss * 100))
       )
     ))
   }
@@ -1089,10 +1117,19 @@ build_seg_combined_page <- function(method_html_data,
     overview_els <- c(overview_els, list(tables$overview))
   }
 
+  # Pin prefix for combined report (method-specific to avoid collisions)
+  pin_prefix <- paste0(tolower(method), "-")
+
   if (length(overview_els) > 0) {
     sections$overview <- htmltools::tags$div(
       class = "seg-combined-section",
-      htmltools::tags$h4(class = "seg-combined-section-title", "Segment Overview"),
+      `data-seg-section` = paste0(pin_prefix, "overview"),
+      htmltools::tags$div(
+        class = "seg-combined-section-header",
+        style = "display:flex;justify-content:space-between;align-items:center;",
+        htmltools::tags$h4(class = "seg-combined-section-title", "Segment Overview"),
+        build_seg_component_pin_btn(paste0(pin_prefix, "overview"), "chart", pin_prefix)
+      ),
       htmltools::tags$p(
         class = "seg-combined-section-desc",
         sprintf("Segment sizes for the %s solution with k = %d.",
@@ -1116,7 +1153,13 @@ build_seg_combined_page <- function(method_html_data,
   if (length(validation_els) > 0) {
     sections$validation <- htmltools::tags$div(
       class = "seg-combined-section",
-      htmltools::tags$h4(class = "seg-combined-section-title", "Validation Metrics"),
+      `data-seg-section` = paste0(pin_prefix, "validation"),
+      htmltools::tags$div(
+        class = "seg-combined-section-header",
+        style = "display:flex;justify-content:space-between;align-items:center;",
+        htmltools::tags$h4(class = "seg-combined-section-title", "Validation Metrics"),
+        build_seg_component_pin_btn(paste0(pin_prefix, "validation"), "chart", pin_prefix)
+      ),
       htmltools::tags$p(
         class = "seg-combined-section-desc",
         "Silhouette scores and cluster validation statistics for this method."
@@ -1125,10 +1168,59 @@ build_seg_combined_page <- function(method_html_data,
     )
   }
 
-  # NOTE: Per-method tabs in the comparison report are kept lean.
-  # Full profiles, variable importance, and segment cards are only shown
-  # in the single-method report for the chosen best-fit method.
-  # This avoids confusion from showing duplicate detail across methods.
+  # --- Profiles (heatmap) ---
+  profiles_els <- list()
+  if (!is.null(charts$heatmap)) {
+    profiles_els <- c(profiles_els, list(charts$heatmap))
+  }
+  if (!is.null(tables$profiles)) {
+    profiles_els <- c(profiles_els, list(
+      htmltools::tags$div(style = "margin-top:16px;", tables$profiles)
+    ))
+  }
+
+  if (length(profiles_els) > 0) {
+    sections$profiles <- htmltools::tags$div(
+      class = "seg-combined-section",
+      `data-seg-section` = paste0(pin_prefix, "profiles"),
+      htmltools::tags$div(
+        class = "seg-combined-section-header",
+        style = "display:flex;justify-content:space-between;align-items:center;",
+        htmltools::tags$h4(class = "seg-combined-section-title", "Segment Profiles"),
+        build_seg_component_pin_btn(paste0(pin_prefix, "profiles"), "chart", pin_prefix)
+      ),
+      htmltools::tags$p(
+        class = "seg-combined-section-desc",
+        "Heatmap showing variable means per segment. Darker cells indicate higher values relative to the overall mean."
+      ),
+      profiles_els
+    )
+  }
+
+  # --- Variable Importance ---
+  if (!is.null(charts$importance)) {
+    sections$importance <- htmltools::tags$div(
+      class = "seg-combined-section",
+      htmltools::tags$h4(class = "seg-combined-section-title", "Variable Importance"),
+      htmltools::tags$p(
+        class = "seg-combined-section-desc",
+        "Variables ranked by their discriminating power across segments (eta-squared from ANOVA)."
+      ),
+      charts$importance
+    )
+  }
+
+  # --- Segment Cards (if available) ---
+  if (!is.null(html_data$enhanced$segment_cards)) {
+    cards_content <- .build_seg_combined_cards(html_data)
+    if (!is.null(cards_content)) {
+      sections$cards <- htmltools::tags$div(
+        class = "seg-combined-section",
+        htmltools::tags$h4(class = "seg-combined-section-title", "Segment Cards"),
+        cards_content
+      )
+    }
+  }
 
   # --- Wrap in panel div ---
   panel_class <- if (is_first) {
@@ -1245,19 +1337,11 @@ build_seg_combined_page <- function(method_html_data,
     )
   }, character(1))
 
-  sections$intro <- htmltools::tags$div(
-    htmltools::tags$p(
-      class = "seg-combined-section-desc",
-      sprintf("Side-by-side comparison of %s across %d clustering methods.",
-              paste(method_labels, collapse = ", "),
-              length(active_methods))
-    ),
-    htmltools::tags$div(
-      style = "background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:13px; color:#1e40af;",
-      htmltools::tags$strong("Purpose: "),
-      "This report compares methods to help select the best segmentation approach. ",
-      "Use the single-method report for the chosen method as your client deliverable."
-    )
+  sections$intro <- htmltools::tags$p(
+    class = "seg-combined-section-desc",
+    sprintf("Side-by-side comparison of %s across %d clustering methods.",
+            paste(method_labels, collapse = ", "),
+            length(active_methods))
   )
 
   # --- Metrics comparison table ---
@@ -1299,8 +1383,38 @@ build_seg_combined_page <- function(method_html_data,
     )
   }
 
+  # --- Method overview cards with pros/cons ---
+  method_cards <- lapply(active_methods, function(m) {
+    callout <- .build_method_callout(m, method_html_data[[m]]$k %||% 0)
+    if (!is.null(callout)) callout
+  })
+  method_cards <- Filter(Negate(is.null), method_cards)
+
+  if (length(method_cards) > 0) {
+    sections$method_overviews <- htmltools::tags$div(
+      class = "seg-combined-section",
+      htmltools::tags$h4(class = "seg-combined-section-title", "Method Overviews"),
+      htmltools::tags$p(
+        class = "seg-combined-section-desc",
+        "Each method takes a different approach to grouping respondents. Understanding these differences helps inform which solution to adopt."
+      ),
+      method_cards
+    )
+  }
+
+  # --- Analyst insight area for method choice rationale ---
+  sections$analyst_insight <- htmltools::tags$div(
+    class = "seg-combined-section",
+    htmltools::tags$h4(class = "seg-combined-section-title", "Analyst Commentary"),
+    htmltools::tags$p(
+      class = "seg-combined-section-desc",
+      "Use this space to document why a particular method was chosen and any considerations for the final solution."
+    ),
+    build_seg_insight_area("comparison-method-choice")
+  )
+
   htmltools::tags$div(
-    class = "seg-method-panel",
+    class = "seg-method-panel seg-method-panel-visible",
     `data-method` = "comparison",
     htmltools::tags$h3(
       style = "font-size:18px; font-weight:600; color:#1e293b; margin:0 0 16px 0;",
@@ -1548,7 +1662,7 @@ build_seg_method_comparison_table <- function(method_html_data) {
       htmltools::tags$td(
         class = bss_class,
         style = "font-family:monospace;",
-        if (!is.na(met$betweenss_totss)) sprintf("%.1f%%", met$betweenss_totss * 100) else "-"
+        if (!is.na(met$betweenss_totss)) sprintf("%.0f%%", met$betweenss_totss * 100) else "-"
       ),
       htmltools::tags$td(
         class = ch_class,
@@ -1562,7 +1676,7 @@ build_seg_method_comparison_table <- function(method_html_data) {
       ),
       htmltools::tags$td(
         style = "font-family:monospace;",
-        if (!is.na(met$min_segment_pct)) sprintf("%.1f%%", met$min_segment_pct) else "-"
+        if (!is.na(met$min_segment_pct)) sprintf("%.0f%%", met$min_segment_pct) else "-"
       )
     )
   })

@@ -256,6 +256,11 @@ generate_segment_html_report <- function(results, config, output_path) {
     }
   )
 
+  # Map sizes chart to overview (page builder expects charts$overview)
+  if (!is.null(charts$sizes)) {
+    charts$overview <- charts$sizes
+  }
+
   cat(sprintf("    Built %d charts\n", sum(!sapply(charts, is.null))))
 
   # ==========================================================================
@@ -267,6 +272,13 @@ generate_segment_html_report <- function(results, config, output_path) {
     build_seg_html_page(html_data, tables, charts, config),
     error = function(e) {
       cat(sprintf("    ERROR: Page assembly failed: %s\n", e$message))
+      # Get call stack for debugging
+      calls <- sys.calls()
+      for (ci in max(1, length(calls) - 8):length(calls)) {
+        ct <- tryCatch(deparse(calls[[ci]], width.cutoff = 100)[1], error = function(x) "???")
+        if (nchar(ct) > 150) ct <- paste0(substr(ct, 1, 147), "...")
+        cat(sprintf("    [%d] %s\n", ci, ct))
+      }
       NULL
     }
   )

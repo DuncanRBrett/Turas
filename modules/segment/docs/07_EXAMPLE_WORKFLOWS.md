@@ -1,7 +1,7 @@
 # Turas Segmentation Module - Example Workflows
 
-**Version:** 11.0
-**Last Updated:** 5 March 2026
+**Version:** 11.1
+**Last Updated:** 19 March 2026
 
 This document provides practical step-by-step workflows for common segmentation scenarios.
 

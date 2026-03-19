@@ -261,7 +261,7 @@ build_seg_exploration_metrics_table <- function(html_data) {
       val <- metrics_df[[bss_col]][i]
       cells <- c(cells, list(htmltools::tags$td(
         class = "seg-td seg-mono",
-        if (!is.na(val)) sprintf("%.1f%%", val * 100) else "-"
+        if (!is.na(val)) sprintf("%.0f%%", val * 100) else "-"
       )))
     }
 
@@ -325,7 +325,7 @@ build_seg_k_comparison_table <- function(html_data) {
         ),
         htmltools::tags$span(
           style = "width:80px; font-size:11px; color:#94a3b8; font-family:monospace;",
-          sprintf("%d (%.1f%%)", cnt, pct)
+          sprintf("%d (%.0f%%)", cnt, pct)
         )
       )
     })
@@ -677,7 +677,7 @@ build_seg_recommendation_section <- function(html_data, accent_colour) {
       if (!is.null(score)) {
         htmltools::tags$p(
           class = "seg-recommendation-reason",
-          sprintf("Confidence score: %.1f%%", score * 100)
+          sprintf("Confidence score: %.0f%%", score * 100)
         )
       },
       reason_items

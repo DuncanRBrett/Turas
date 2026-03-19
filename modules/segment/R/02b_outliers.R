@@ -147,8 +147,10 @@ detect_outliers_mahalanobis <- function(data, clustering_vars, alpha = 0.001) {
   # Remove any rows with missing values for Mahalanobis calculation
   complete_cases <- complete.cases(cluster_data)
   if (sum(complete_cases) < nrow(cluster_data)) {
-    cat(sprintf("  [SEGMENT] Removed %d rows with missing values for Mahalanobis calculation\n",
-                nrow(cluster_data) - sum(complete_cases)))
+    warning(sprintf(
+      "Removed %d rows with missing values for Mahalanobis calculation",
+      nrow(cluster_data) - sum(complete_cases)
+    ))
   }
 
   cluster_data_complete <- cluster_data[complete_cases, , drop = FALSE]
@@ -174,8 +176,10 @@ detect_outliers_mahalanobis <- function(data, clustering_vars, alpha = 0.001) {
   }
 
   if (n < 5 * p) {
-    cat(sprintf("  [SEGMENT WARNING] Mahalanobis distance may be unstable with n=%d and p=%d. Recommended: n >= %d (5 * p). Consider using 'z_score' method or reducing variables.\n",
-                n, p, 5 * p))
+    warning(sprintf(
+      "Mahalanobis distance may be unstable with n=%d and p=%d.\n  Recommended: n >= %d (5 * p)\n  Consider using 'z_score' method or reducing variables.",
+      n, p, 5 * p
+    ), call. = FALSE)
   }
 
   # Calculate center and covariance
@@ -280,9 +284,12 @@ handle_outliers <- function(data, outlier_flags, handling = "flag") {
     # Remove outliers from data
     if (n_outliers > 0) {
       # DEFENSIVE: Handle NA values in outlier_flags
-      # Keep rows where outlier_flags is explicitly FALSE (exclude TRUE and NA)
+      # Keep rows where outlier_flags is FALSE (not TRUE and not NA)
+      keep_rows <- !isTRUE(outlier_flags)
+      # Alternative: keep_rows <- isFALSE(outlier_flags) - only keeps explicit FALSE
+      # We use !isTRUE() to keep both FALSE and NA rows, then remove NAs explicitly
       keep_rows <- outlier_flags == FALSE
-      keep_rows[is.na(keep_rows)] <- FALSE
+      keep_rows[is.na(keep_rows)] <- FALSE  # Treat NA as "don't keep"
 
       result$data <- data[keep_rows, , drop = FALSE]
       result$removed <- TRUE
@@ -293,8 +300,10 @@ handle_outliers <- function(data, outlier_flags, handling = "flag") {
 
       # Warn if removing too many records
       if (pct_outliers > 10) {
-        cat(sprintf("  [SEGMENT WARNING] Removing %.1f%% of records as outliers. Consider reviewing threshold settings.\n",
-                    pct_outliers))
+        warning(sprintf(
+          "Removing %.1f%% of records as outliers. Consider reviewing threshold settings.",
+          pct_outliers
+        ))
       }
     } else {
       result$message <- "No outliers detected."
@@ -538,17 +547,11 @@ review_outliers <- function(data, outlier_result, clustering_vars, id_var,
       row_data$Segment_Name <- if (!is.null(segment_names)) segment_names[seg] else paste0("Segment ", seg)
     }
 
-    # Add outlier severity info (z-score method provides details; Mahalanobis does not)
-    has_zscore_details <- !is.null(outlier_result$details) &&
-                          !is.null(outlier_result$details$extreme_vars)
-    if (has_zscore_details) {
+    # Add outlier severity info
+    if (!is.null(outlier_result$details)) {
       row_data$Extreme_Vars <- outlier_result$details$extreme_vars[idx]
       row_data$Max_Z_Score <- round(outlier_result$details$max_abs_z[idx], 2)
       row_data$Problem_Vars <- outlier_result$details$extreme_var_names[idx]
-    } else if (!is.null(outlier_result$distances)) {
-      # Mahalanobis method: use distance as severity measure
-      row_data$Mahalanobis_Distance <- round(outlier_result$distances[idx], 2)
-      row_data$Threshold <- round(outlier_result$threshold, 2)
     }
 
     # Add responses for each clustering variable
@@ -568,24 +571,10 @@ review_outliers <- function(data, outlier_result, clustering_vars, id_var,
     row_data$Avg_Deviation <- round(mean(abs(var_values - overall_means)), 2)
 
     # Add action column
-    if (has_zscore_details) {
-      row_data$Recommended_Action <- classify_outlier_action(
-        extreme_vars = outlier_result$details$extreme_vars[idx],
-        max_z = outlier_result$details$max_abs_z[idx]
-      )
-    } else if (!is.null(outlier_result$distances)) {
-      # Mahalanobis-based action classification
-      dist_ratio <- outlier_result$distances[idx] / outlier_result$threshold
-      row_data$Recommended_Action <- if (dist_ratio > 2) {
-        "REMOVE - Extreme multivariate outlier"
-      } else if (dist_ratio > 1.5) {
-        "REVIEW - Strong multivariate outlier"
-      } else {
-        "FLAG - Moderate multivariate outlier"
-      }
-    } else {
-      row_data$Recommended_Action <- "REVIEW - Method details unavailable"
-    }
+    row_data$Recommended_Action <- classify_outlier_action(
+      extreme_vars = outlier_result$details$extreme_vars[idx],
+      max_z = outlier_result$details$max_abs_z[idx]
+    )
 
     review_list[[i]] <- row_data
   }
@@ -634,31 +623,30 @@ review_outliers <- function(data, outlier_result, clustering_vars, id_var,
   # ===========================================================================
 
   if (!is.null(output_path)) {
-    {
-      # Create sheets
-      sheets <- list(
-        "Summary" = summary_df,
-        "Outlier_Review" = review_df
-      )
+    # Create sheets
+    sheets <- list(
+      "Summary" = summary_df,
+      "Outlier_Review" = review_df
+    )
 
-      # Add reference sheet with variable means
-      means_df <- data.frame(
-        Variable = clustering_vars,
-        Overall_Mean = round(overall_means, 2),
-        stringsAsFactors = FALSE
-      )
+    # Add reference sheet with variable means
+    means_df <- data.frame(
+      Variable = clustering_vars,
+      Overall_Mean = round(overall_means, 2),
+      stringsAsFactors = FALSE
+    )
 
-      if (!is.null(question_labels)) {
-        means_df$Label <- sapply(clustering_vars, function(v) {
-          if (v %in% names(question_labels)) question_labels[v] else ""
-        })
-      }
-
-      sheets[["Variable_Reference"]] <- means_df
-
-      segment_write_xlsx(sheets, output_path, "outlier review")
-      cat(sprintf("\n✓ Outlier review exported to: %s\n", basename(output_path)))
+    if (!is.null(question_labels)) {
+      means_df$Label <- sapply(clustering_vars, function(v) {
+        if (v %in% names(question_labels)) question_labels[v] else ""
+      })
     }
+
+    sheets[["Variable_Reference"]] <- means_df
+
+    # Write to Excel with branded formatting
+    seg_write_xlsx(sheets, output_path)
+    cat(sprintf("\n✓ Outlier review exported to: %s\n", basename(output_path)))
   }
 
   cat("\n")

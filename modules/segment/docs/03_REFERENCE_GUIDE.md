@@ -1,7 +1,7 @@
 # Turas Segmentation Module - Reference Guide
 
-**Version:** 11.0
-**Last Updated:** 5 March 2026
+**Version:** 11.1
+**Last Updated:** 19 March 2026
 **Target Audience:** Statisticians, Senior Analysts, Methodologists
 
 This document provides comprehensive technical reference for the statistical methods used in the Turas Segmentation Module.

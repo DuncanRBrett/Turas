@@ -434,16 +434,6 @@ export_cards_text <- function(cards_result, output_path) {
 #' @export
 export_cards_excel <- function(cards_result, output_path) {
 
-  if (!requireNamespace("writexl", quietly = TRUE)) {
-    segment_refuse(
-      code = "PKG_WRITEXL_MISSING",
-      title = "Package writexl Required",
-      problem = "Package 'writexl' is not installed.",
-      why_it_matters = "Excel export requires the writexl package.",
-      how_to_fix = "Install the package with: install.packages('writexl')"
-    )
-  }
-
   # Create multiple sheets
   sheets <- list(
     "Summary" = cards_result$cards_df
@@ -472,6 +462,7 @@ export_cards_excel <- function(cards_result, output_path) {
     sheets[[sheet_name]] <- card_df
   }
 
-  segment_write_xlsx(sheets, output_path, "segment cards")
+  # Write to Excel with branded formatting
+  seg_write_xlsx(sheets, output_path)
   cat(sprintf("✓ Segment cards exported to: %s\n", output_path))
 }

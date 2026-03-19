@@ -70,17 +70,18 @@ build_seg_sizes_chart <- function(html_data, brand_colour = "#323367") {
       label_width - 10, y + bar_height / 2, seg_label
     ))
 
-    # Bar rect
+    # Bar rect (with toggle group for show/hide)
+    group_id <- sprintf("seg-bar-%d", i)
     bars <- paste0(bars, sprintf(
-      '<rect x="%.0f" y="%.1f" width="%.1f" height="%d" rx="4" fill="%s" opacity="%.2f"/>\n',
-      label_width, y, bar_w, bar_height, brand_colour, opacity
+      '<rect x="%.0f" y="%.1f" width="%.1f" height="%d" rx="4" fill="%s" opacity="%.2f" data-seg-bar-group="%s"/>\n',
+      label_width, y, bar_w, bar_height, brand_colour, opacity, group_id
     ))
 
     # Value label: n count and percentage
-    value_text <- sprintf("n=%d (%.1f%%)", row$n, row$pct)
+    value_text <- sprintf("n=%d (%.0f%%)", row$n, row$pct)
     bars <- paste0(bars, sprintf(
-      '<text x="%.1f" y="%.1f" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="500" dominant-baseline="central">%s</text>\n',
-      label_width + bar_w + 8, y + bar_height / 2, value_text
+      '<text x="%.1f" y="%.1f" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="500" dominant-baseline="central" data-seg-label-group="%s">%s</text>\n',
+      label_width + bar_w + 8, y + bar_height / 2, group_id, value_text
     ))
   }
 
@@ -246,7 +247,7 @@ build_seg_importance_chart <- function(html_data, brand_colour = "#323367") {
   if (has_pct) {
     metric_vals <- vi$importance_pct
     metric_label <- "Importance (%)"
-    fmt <- function(v) sprintf("%.1f%%", v)
+    fmt <- function(v) sprintf("%.0f%%", v)
   } else if (has_eta) {
     metric_vals <- vi$eta_squared
     metric_label <- "Eta-squared"
@@ -314,8 +315,9 @@ build_seg_importance_chart <- function(html_data, brand_colour = "#323367") {
     ))
   }
 
-  # Bars
+  # Bars with inline X close button
   bars <- ""
+  x_btn_size <- 18  # clickable area for X button
   for (i in seq_len(n)) {
     val <- metric_vals[i]
     if (is.na(val)) val <- 0
@@ -327,20 +329,37 @@ build_seg_importance_chart <- function(html_data, brand_colour = "#323367") {
     lbl <- labels[i]
     if (nchar(lbl) > 35) lbl <- paste0(substr(lbl, 1, 33), "\u2026")
 
+    group_id <- sprintf("imp-bar-%d", i)
+
+    # Label text
     bars <- paste0(bars, sprintf(
-      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="400" dominant-baseline="central">%s</text>\n',
-      label_width - 8, y + bar_height / 2, htmltools::htmlEscape(lbl)
+      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="400" dominant-baseline="central" data-seg-label-group="%s">%s</text>\n',
+      label_width - 8, y + bar_height / 2, group_id, htmltools::htmlEscape(lbl)
     ))
 
+    # Bar rect
     bars <- paste0(bars, sprintf(
-      '<rect x="%.0f" y="%.1f" width="%.1f" height="%d" rx="4" fill="%s" opacity="%.2f"/>\n',
-      label_width, y, bar_w, bar_height, brand_colour, opacity
+      '<rect x="%.0f" y="%.1f" width="%.1f" height="%d" rx="4" fill="%s" opacity="%.2f" data-seg-bar-group="%s"/>\n',
+      label_width, y, bar_w, bar_height, brand_colour, opacity, group_id
     ))
 
+    # Value text
+    val_x <- label_width + bar_w + 6
     bars <- paste0(bars, sprintf(
-      '<text x="%.1f" y="%.1f" font-size="10" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="500" dominant-baseline="central">%s</text>\n',
-      label_width + bar_w + 6, y + bar_height / 2, fmt(val)
+      '<text x="%.1f" y="%.1f" font-size="10" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="500" dominant-baseline="central" data-seg-label-group="%s">%s</text>\n',
+      val_x, y + bar_height / 2, group_id, fmt(val)
     ))
+
+    # X close button (circle + x) at far right of bar
+    x_centre <- chart_width - 20
+    y_centre <- y + bar_height / 2
+    bars <- paste0(bars, sprintf(paste0(
+      '<g class="seg-bar-x-btn" data-seg-target-group="%s" style="cursor:pointer;" onclick="segToggleBarByX(this,\'%s\')">\n',
+      '  <circle cx="%.0f" cy="%.1f" r="9" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>\n',
+      '  <text x="%.0f" y="%.1f" text-anchor="middle" dominant-baseline="central" font-size="11" ',
+      'font-family="\'Segoe UI\', Arial, sans-serif" fill="#94a3b8" font-weight="600">\u00D7</text>\n',
+      '</g>\n'
+    ), group_id, group_id, x_centre, y_centre, x_centre, y_centre))
   }
 
   svg <- sprintf(
@@ -412,21 +431,21 @@ build_seg_heatmap_chart <- function(html_data, brand_colour = "#323367",
     }
   }
 
-  # Colour interpolation: red (-) -> white (0) -> green (+)
+  # Colour interpolation: blue (-) -> white (0) -> red (+)
   z_to_colour <- function(z) {
     z <- max(-3, min(3, z))  # clamp
     if (z >= 0) {
-      # White to green (above average)
+      # White to red
       intensity <- min(1, z / 2.5)
-      r <- round(255 * (1 - intensity * 0.65))
-      g <- round(255 * (1 - intensity * 0.05))
-      b <- round(255 * (1 - intensity * 0.60))
-    } else {
-      # White to red (below average)
-      intensity <- min(1, abs(z) / 2.5)
       r <- 255
       g <- round(255 * (1 - intensity * 0.7))
-      b <- round(255 * (1 - intensity * 0.7))
+      b <- round(255 * (1 - intensity * 0.8))
+    } else {
+      # White to blue
+      intensity <- min(1, abs(z) / 2.5)
+      r <- round(255 * (1 - intensity * 0.8))
+      g <- round(255 * (1 - intensity * 0.6))
+      b <- 255
     }
     sprintf("#%02x%02x%02x", r, g, b)
   }
@@ -480,15 +499,13 @@ build_seg_heatmap_chart <- function(html_data, brand_colour = "#323367",
         x, y, cell_width, cell_height, bg_colour
       ))
 
-      # Mean value text
+      # Mean value text — consistent 1dp for alignment
       mean_text <- if (is.na(mean_val)) {
         "NA"
       } else if (abs(mean_val) >= 100) {
         sprintf("%.0f", mean_val)
-      } else if (abs(mean_val) >= 10) {
-        sprintf("%.1f", mean_val)
       } else {
-        sprintf("%.2f", mean_val)
+        sprintf("%.1f", mean_val)
       }
 
       cells <- paste0(cells, sprintf(
@@ -878,13 +895,13 @@ build_seg_overlap_heatmap <- function(html_data, brand_colour = "#323367") {
   if (max_dist == 0) max_dist <- 1
   norm_matrix <- dist_matrix / max_dist
 
-  cell_size <- 85
-  label_width <- 180
-  header_height <- 120
+  cell_size <- 70
+  label_width <- 120
+  header_height <- 60
   chart_width <- label_width + k * cell_size + 10
   total_height <- header_height + k * cell_size + 10
 
-  # Colour interpolation: red (similar/overlapping) -> yellow -> green (distinct)
+  # Colour interpolation: red (overlap/close) -> yellow -> green (distinct/far)
   overlap_colour <- function(norm_val) {
     if (is.na(norm_val)) return("#f1f5f9")
     v <- max(0, min(1, norm_val))
@@ -906,25 +923,24 @@ build_seg_overlap_heatmap <- function(html_data, brand_colour = "#323367") {
   header <- ""
   for (j in seq_len(k)) {
     x <- label_width + (j - 1) * cell_size + cell_size / 2
-    y_anchor <- header_height - 6
     seg_label <- htmltools::htmlEscape(seg_names[j])
-    if (nchar(seg_label) > 20) seg_label <- paste0(substr(seg_label, 1, 19), "\u2026")
+    if (nchar(seg_label) > 15) seg_label <- paste0(substr(seg_label, 1, 14), "\u2026")
     header <- paste0(header, sprintf(
-      '<text x="%.1f" y="%.0f" text-anchor="start" font-size="12" font-family="Arial, sans-serif" fill="%s" font-weight="500" transform="rotate(-45, %.1f, %.0f)">%s</text>\n',
-      x, y_anchor, brand_colour, x, y_anchor, seg_label
+      '<text x="%.1f" y="%.0f" text-anchor="end" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="%s" font-weight="500" transform="rotate(-30, %.1f, %.0f)">%s</text>\n',
+      x, header_height - 8, brand_colour, x, header_height - 8, seg_label
     ))
   }
 
-  # Data cells — display similarity percentage (100% = identical, 0% = most distinct)
+  # Data cells
   cells <- ""
   for (i in seq_len(k)) {
     y <- header_height + (i - 1) * cell_size
 
     # Row label
     row_label <- htmltools::htmlEscape(seg_names[i])
-    if (nchar(row_label) > 22) row_label <- paste0(substr(row_label, 1, 21), "\u2026")
+    if (nchar(row_label) > 14) row_label <- paste0(substr(row_label, 1, 13), "\u2026")
     cells <- paste0(cells, sprintf(
-      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="12" font-family="Arial, sans-serif" fill="#334155" font-weight="500" dominant-baseline="central">%s</text>\n',
+      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="400" dominant-baseline="central">%s</text>\n',
       label_width - 8, y + cell_size / 2, row_label
     ))
 
@@ -936,10 +952,10 @@ build_seg_overlap_heatmap <- function(html_data, brand_colour = "#323367") {
         value_text <- "\u2014"
         txt_colour <- "#94a3b8"
       } else {
+        raw_dist <- dist_matrix[i, j]
         norm_val <- norm_matrix[i, j]
-        similarity <- round((1 - norm_val) * 100)
         bg_colour <- overlap_colour(norm_val)
-        value_text <- sprintf("%d%%", similarity)
+        value_text <- sprintf("%.2f", raw_dist)
         txt_colour <- if (norm_val < 0.3) "#ffffff" else "#1e293b"
       }
 
@@ -949,14 +965,14 @@ build_seg_overlap_heatmap <- function(html_data, brand_colour = "#323367") {
       ))
 
       cells <- paste0(cells, sprintf(
-        '<text x="%.1f" y="%.1f" text-anchor="middle" font-size="14" font-family="Arial, sans-serif" fill="%s" font-weight="600" dominant-baseline="central">%s</text>\n',
+        '<text x="%.1f" y="%.1f" text-anchor="middle" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="%s" font-weight="500" dominant-baseline="central">%s</text>\n',
         x + cell_size / 2, y + cell_size / 2, txt_colour, value_text
       ))
     }
   }
 
   # Legend
-  legend_y <- header_height + k * cell_size + 4
+  legend_y <- header_height + k * cell_size + 2
   legend_width <- k * cell_size
   legend_x <- label_width
   n_steps <- 20
@@ -972,18 +988,18 @@ build_seg_overlap_heatmap <- function(html_data, brand_colour = "#323367") {
     ))
   }
   legend <- paste0(legend, sprintf(
-    '<text x="%.0f" y="%.0f" font-size="10" font-family="\'Segoe UI\', Arial, sans-serif" fill="#64748b">Similar (high overlap)</text>\n',
-    legend_x, legend_y + 22
+    '<text x="%.0f" y="%.0f" font-size="9" font-family="\'Segoe UI\', Arial, sans-serif" fill="#94a3b8">Overlapping</text>\n',
+    legend_x, legend_y + 20
   ))
   legend <- paste0(legend, sprintf(
-    '<text x="%.0f" y="%.0f" text-anchor="end" font-size="10" font-family="\'Segoe UI\', Arial, sans-serif" fill="#64748b">Distinct (well separated)</text>\n',
-    legend_x + legend_width, legend_y + 22
+    '<text x="%.0f" y="%.0f" text-anchor="end" font-size="9" font-family="\'Segoe UI\', Arial, sans-serif" fill="#94a3b8">Distinct</text>\n',
+    legend_x + legend_width, legend_y + 20
   ))
 
-  total_height <- total_height + 30
+  total_height <- total_height + 25
 
   svg <- sprintf(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %.0f %.0f" class="seg-chart seg-overlap-heatmap" role="img" aria-label="Segment similarity matrix showing pairwise overlap between %d segments. 100%% = identical, 0%% = maximally distinct.">\n%s\n%s\n%s\n</svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %.0f %.0f" class="seg-chart seg-overlap-heatmap" role="img" aria-label="Segment overlap heatmap showing pairwise distances between %d segments">\n%s\n%s\n%s\n</svg>',
     chart_width, total_height, k, header, cells, legend
   )
 
@@ -1023,7 +1039,7 @@ build_seg_golden_questions_chart <- function(html_data, brand_colour = "#323367"
   # Use importance_pct if available, else raw importance
   if ("importance_pct" %in% names(tq)) {
     vals <- tq$importance_pct
-    fmt <- function(v) sprintf("%.1f%%", v)
+    fmt <- function(v) sprintf("%.0f%%", v)
   } else if ("importance" %in% names(tq)) {
     vals <- tq$importance
     fmt <- function(v) sprintf("%.2f", v)
@@ -1045,7 +1061,7 @@ build_seg_golden_questions_chart <- function(html_data, brand_colour = "#323367"
   }
 
   # Header: accuracy badge
-  acc_text <- if (!is.na(accuracy)) sprintf("OOB Accuracy: %.1f%%", accuracy * 100) else ""
+  acc_text <- if (!is.na(accuracy)) sprintf("OOB Accuracy: %.0f%%", accuracy * 100) else ""
   header <- sprintf(
     '<text x="%.0f" y="18" font-size="12" font-family="\'Segoe UI\', Arial, sans-serif" fill="%s" font-weight="600">%s</text>\n',
     label_width, brand_colour, acc_text

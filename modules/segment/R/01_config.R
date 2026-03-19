@@ -116,6 +116,55 @@ read_segment_config <- function(config_file) {
   }
 
   cat(sprintf("  Loaded %d configuration parameters\n", length(config)))
+
+  # Load optional Insights sheet (section_key -> insight_text)
+  config$.insights <- tryCatch({
+    ins <- openxlsx::read.xlsx(config_file, sheet = "Insights")
+    if (!is.null(ins) && nrow(ins) > 0 && all(c("Section", "Insight") %in% names(ins))) {
+      ins_list <- setNames(as.character(ins$Insight), tolower(trimws(ins$Section)))
+      ins_list <- ins_list[nzchar(ins_list)]
+      if (length(ins_list) > 0) {
+        cat(sprintf("  Loaded %d pre-configured insights\n", length(ins_list)))
+      }
+      ins_list
+    } else {
+      NULL
+    }
+  }, error = function(e) NULL)
+
+  # Load optional About sheet (analyst details)
+  config$.about <- tryCatch({
+    abt <- openxlsx::read.xlsx(config_file, sheet = "About")
+    if (!is.null(abt) && nrow(abt) > 0 && all(c("Setting", "Value") %in% names(abt))) {
+      about_list <- setNames(as.character(abt$Value), tolower(trimws(abt$Setting)))
+      about_list <- about_list[nzchar(about_list)]
+      if (length(about_list) > 0) {
+        cat(sprintf("  Loaded %d about/analyst details\n", length(about_list)))
+      }
+      about_list
+    } else {
+      NULL
+    }
+  }, error = function(e) NULL)
+
+  # Load optional Slides sheet (title, content, image_path)
+  config$.slides <- tryCatch({
+    sl <- openxlsx::read.xlsx(config_file, sheet = "Slides")
+    if (!is.null(sl) && nrow(sl) > 0 && "Title" %in% names(sl)) {
+      slides <- lapply(seq_len(nrow(sl)), function(i) {
+        list(
+          title = as.character(sl$Title[i] %||% ""),
+          content = as.character(sl$Content[i] %||% ""),
+          image_path = as.character(sl$Image[i] %||% "")
+        )
+      })
+      cat(sprintf("  Loaded %d pre-configured slides\n", length(slides)))
+      slides
+    } else {
+      NULL
+    }
+  }, error = function(e) NULL)
+
   config
 }
 
@@ -167,7 +216,7 @@ validate_segment_config <- function(config) {
   }
 
   # Validate each method
-  valid_methods <- c("kmeans", "hclust", "gmm", "ensemble")
+  valid_methods <- c("kmeans", "hclust", "gmm")
   invalid <- setdiff(methods, valid_methods)
   if (length(invalid) > 0) {
     segment_refuse(
@@ -187,15 +236,6 @@ validate_segment_config <- function(config) {
   # Method-specific parameters
   linkage_method <- get_char_config(config, "linkage_method", default_value = "ward.D2")
   gmm_model_type <- get_config_value(config, "gmm_model_type", default_value = NULL)
-
-  # Ensemble-specific parameters
-  ensemble_methods_str <- get_config_value(config, "ensemble_methods", default_value = NULL)
-  ensemble_methods <- if (!is.null(ensemble_methods_str) && nzchar(trimws(as.character(ensemble_methods_str)))) {
-    trimws(unlist(strsplit(as.character(ensemble_methods_str), "[,;]")))
-  } else {
-    c("kmeans", "hclust")
-  }
-  ensemble_n_runs <- as.integer(get_config_value(config, "ensemble_n_runs", default_value = 50))
 
   # ===========================================================================
   # OPTIONAL PARAMETERS WITH DEFAULTS
@@ -226,8 +266,8 @@ validate_segment_config <- function(config) {
   nstart <- get_numeric_config(config, "nstart", default_value = 50, min = 1, max = 200)
   seed <- get_numeric_config(config, "seed", default_value = 123, min = 1)
 
-  # Validate k range (only relevant for exploration mode, not final mode)
-  if (is.null(k_fixed) && k_min >= k_max) {
+  # Validate k
+  if (k_min >= k_max) {
     segment_refuse(
       code = "CFG_INVALID_K_RANGE",
       title = "Invalid K Range",
@@ -343,7 +383,11 @@ validate_segment_config <- function(config) {
   # ENHANCED FEATURES
   # ===========================================================================
 
-  golden_questions_n <- get_numeric_config(config, "golden_questions_n", default_value = 3, min = 1, max = 10)
+  # Default to all clustering variables; analyst can filter in the HTML report
+  n_clustering_vars <- length(clustering_vars)
+  golden_questions_n <- get_numeric_config(config, "golden_questions_n",
+                                            default_value = max(n_clustering_vars, 5),
+                                            min = 1, max = 100)
   auto_name_style <- get_char_config(config, "auto_name_style", default_value = "descriptive",
     allowed_values = c("descriptive", "persona", "simple"))
 
@@ -369,7 +413,7 @@ validate_segment_config <- function(config) {
   # Metadata
   project_name <- get_char_config(config, "project_name", default_value = "Segmentation Analysis")
   analyst_name <- get_char_config(config, "analyst_name", default_value = "Analyst")
-  description <- as.character(get_config_value(config, "description", default_value = ""))
+  description <- as.character(get_config_value(config, "description", default_value = "") %||% "")
 
   # Question labels
   question_labels_file <- get_config_value(config, "question_labels_file", default_value = NULL)
@@ -393,7 +437,6 @@ validate_segment_config <- function(config) {
     # Method
     method = method, methods = methods, is_multi_method = is_multi_method,
     linkage_method = linkage_method, gmm_model_type = gmm_model_type,
-    ensemble_methods = ensemble_methods, ensemble_n_runs = ensemble_n_runs,
     # K parameters
     k_fixed = k_fixed, k_min = k_min, k_max = k_max, nstart = nstart, seed = seed,
     # Data handling
@@ -432,54 +475,11 @@ validate_segment_config <- function(config) {
     project_name = project_name, analyst_name = analyst_name, description = description,
     question_labels_file = question_labels_file, question_labels = question_labels,
     segment_names_file = segment_names_file,
+    # Pre-configured content from Excel
+    insights = config$.insights, about = config$.about, slides = config$.slides,
     # Mode detection
     mode = if (is.null(k_fixed)) "exploration" else "final"
   )
-
-  # ===========================================================================
-  # PARAMETER INTERACTION VALIDATION
-  # ===========================================================================
-
-  # Variable selection requires at least 3 clustering vars to be meaningful
-  if (variable_selection && length(clustering_vars) < 3) {
-    segment_refuse(
-      code = "CFG_VARSEL_TOO_FEW_VARS",
-      title = "Variable Selection Requires More Variables",
-      problem = sprintf("variable_selection=TRUE but only %d clustering variables specified.", length(clustering_vars)),
-      why_it_matters = "Variable selection reduces the variable set — you need at least 3 to select from.",
-      how_to_fix = "Either add more variables to clustering_vars or set variable_selection=FALSE."
-    )
-  }
-
-  # max_clustering_vars must be less than total variables for selection to make sense
-  if (variable_selection && max_clustering_vars >= length(clustering_vars)) {
-    cat(sprintf("  [INFO] max_clustering_vars (%d) >= total clustering_vars (%d). Variable selection will have no effect.\n",
-                max_clustering_vars, length(clustering_vars)))
-  }
-
-  # Factor analysis variable selection requires psych package
-  if (variable_selection && variable_selection_method %in% c("factor_analysis", "both")) {
-    if (!requireNamespace("psych", quietly = TRUE)) {
-      segment_refuse(
-        code = "PKG_PSYCH_MISSING",
-        title = "Package 'psych' Required for Factor Analysis",
-        problem = "Variable selection method 'factor_analysis' requires the 'psych' package.",
-        why_it_matters = "Cannot perform factor analysis without the psych package.",
-        how_to_fix = "Install psych: install.packages('psych') or set variable_selection_method='variance_correlation'."
-      )
-    }
-  }
-
-  # Stability check with small stability_n_runs is unreliable
-  if (run_stability_check && stability_n_runs < 5) {
-    cat(sprintf("  [INFO] stability_n_runs=%d is low. Consider 10+ for reliable stability assessment.\n",
-                stability_n_runs))
-  }
-
-  # Hclust with large k is unusual
-  if (method == "hclust" && !is.null(k_fixed) && k_fixed > 10) {
-    cat(sprintf("  [INFO] k_fixed=%d with hclust is unusual. Ward's method works best with k <= 8.\n", k_fixed))
-  }
 
   # ===========================================================================
   # SUMMARY OUTPUT

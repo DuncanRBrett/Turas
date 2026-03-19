@@ -144,6 +144,28 @@
   };
 
   /**
+   * Pin arbitrary custom content (used by slides, custom sections).
+   * @param {string} title - Display title for the pinned card
+   * @param {string} htmlContent - HTML string to display in the card
+   */
+  window.segPinCustomContent = function(title, htmlContent) {
+    segPinnedViews.push({
+      type: 'pin',
+      id: 'custom-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6),
+      sectionKey: 'custom',
+      prefix: '',
+      panelLabel: '',
+      sectionTitle: title,
+      insightText: '',
+      chartSvg: '',
+      tableHtml: htmlContent,
+      timestamp: new Date().toISOString()
+    });
+    segRenderPinnedCards();
+    segUpdatePinBadge();
+  };
+
+  /**
    * Update a section header title.
    * @param {number} idx - Index in segPinnedViews
    * @param {string} newTitle
@@ -208,10 +230,10 @@
       tableHtml = tableClone.outerHTML;
     }
 
-    // For exec-summary, capture key content blocks
+    // For exec-summary, capture key content blocks INCLUDING segment callouts
     if (sectionKey === 'exec-summary' && !tableHtml && !chartSvg) {
       var execContent = '';
-      var summaryBlocks = section.querySelectorAll('.seg-exec-block, .seg-finding-box, .seg-key-insights-heading');
+      var summaryBlocks = section.querySelectorAll('.seg-quality-banner, .seg-exec-block, .seg-finding-box, .seg-key-insights-heading, .seg-callout');
       summaryBlocks.forEach(function(el) {
         execContent += el.outerHTML;
       });
@@ -333,6 +355,11 @@
         ? '<div class="seg-pinned-card-table">' + pin.tableHtml + '</div>'
         : '';
 
+      var imageBlock = pin.imageData
+        ? '<div class="seg-pinned-card-image"><img src="' + pin.imageData + '" alt="User image" style="max-width:100%;max-height:300px;border-radius:4px;margin:8px 0;">'
+        + '<button class="seg-pinned-action-btn seg-pinned-remove-btn" onclick="segRemoveImage(\'' + pin.id + '\')" title="Remove image" style="margin-left:8px;font-size:11px;">\u2715 Remove</button></div>'
+        : '';
+
       var actionsHtml = '';
       if (idx > 0) {
         actionsHtml += '<button class="seg-pinned-action-btn" onclick="segMovePinned(\'' + pin.id + '\', -1)" title="Move up">\u25B2</button>';
@@ -340,6 +367,7 @@
       if (idx < total - 1) {
         actionsHtml += '<button class="seg-pinned-action-btn" onclick="segMovePinned(\'' + pin.id + '\', 1)" title="Move down">\u25BC</button>';
       }
+      actionsHtml += '<button class="seg-pinned-action-btn" onclick="segTriggerImageUpload(\'' + pin.id + '\')" title="Add image">\uD83D\uDDBC</button>';
       actionsHtml += '<button class="seg-pinned-action-btn seg-pinned-export-btn" onclick="segExportPinnedCardPNG(\'' + pin.id + '\')" title="Export as PNG">\uD83D\uDCE5</button>';
       actionsHtml += '<button class="seg-pinned-action-btn seg-pinned-remove-btn" onclick="segRemovePinned(\'' + pin.id + '\')" title="Remove pin">\u2715</button>';
 
@@ -351,6 +379,7 @@
         + '<div class="seg-pinned-card-actions">' + actionsHtml + '</div>'
         + '</div>'
         + insightBlock
+        + imageBlock
         + chartBlock
         + tableBlock;
 
@@ -642,6 +671,77 @@
     } catch (e) {
       // Ignore parse errors
     }
+  };
+
+
+  // ==========================================================================
+  // IMAGE UPLOAD FOR PINNED VIEWS
+  // ==========================================================================
+
+  /**
+   * Trigger a file input to upload an image for a pinned card.
+   * Accepts PNG/JPG, converts to base64, stores in pin object.
+   * Max size: 2MB.
+   * @param {string} pinId - ID of the pin to attach the image to
+   */
+  window.segTriggerImageUpload = function(pinId) {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+    input.style.display = 'none';
+
+    input.onchange = function(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+
+      // Check size (2MB limit)
+      if (file.size > 2 * 1024 * 1024) {
+        alert('Image must be under 2MB. Please choose a smaller file.');
+        return;
+      }
+
+      // Check type
+      if (!file.type.match(/^image\/(png|jpeg|gif|webp)$/)) {
+        alert('Please select a PNG, JPEG, GIF, or WebP image.');
+        return;
+      }
+
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        var dataUrl = ev.target.result;
+
+        // Find pin and attach image
+        for (var i = 0; i < segPinnedViews.length; i++) {
+          if (segPinnedViews[i].id === pinId) {
+            segPinnedViews[i].imageData = dataUrl;
+            break;
+          }
+        }
+
+        segRenderPinnedCards();
+        segSavePinnedData();
+      };
+      reader.readAsDataURL(file);
+    };
+
+    document.body.appendChild(input);
+    input.click();
+    document.body.removeChild(input);
+  };
+
+  /**
+   * Remove an uploaded image from a pinned card.
+   * @param {string} pinId - ID of the pin
+   */
+  window.segRemoveImage = function(pinId) {
+    for (var i = 0; i < segPinnedViews.length; i++) {
+      if (segPinnedViews[i].id === pinId) {
+        delete segPinnedViews[i].imageData;
+        break;
+      }
+    }
+    segRenderPinnedCards();
+    segSavePinnedData();
   };
 
 })();

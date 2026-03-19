@@ -57,10 +57,10 @@ test_segment_differences <- function(data, clusters, variables, alpha = 0.05) {
       }, error = function(e) NULL)
       
       if (!is.null(test_result)) {
-        # Calculate epsilon-squared as effect size (standard for Kruskal-Wallis)
-        # epsilon^2 = H / (n - 1), where H is the Kruskal-Wallis statistic
+        # Calculate eta-squared as effect size
         n <- length(var_complete)
-        eta_sq <- test_result$statistic / (n - 1)
+        k <- length(unique(clusters_complete))
+        eta_sq <- (test_result$statistic - k + 1) / (n - k)
         
         results <- rbind(results, data.frame(
           Variable = var,
@@ -213,9 +213,8 @@ calculate_cohens_d <- function(data, clusters, variables) {
           n_j <- length(data_j)
           
           pooled_sd <- sqrt(((n_i - 1) * sd_i^2 + (n_j - 1) * sd_j^2) / (n_i + n_j - 2))
-
-          # Guard against division by zero (constant values in both groups)
-          cohens_d <- if (pooled_sd == 0) 0 else (mean_i - mean_j) / pooled_sd
+          
+          cohens_d <- (mean_i - mean_j) / pooled_sd
           
           d_matrix[i, j] <- round(cohens_d, 2)
           d_matrix[j, i] <- round(-cohens_d, 2)
@@ -319,8 +318,9 @@ create_enhanced_profile_report <- function(data, clusters, clustering_vars,
   
   sheets[["Effect_Sizes"]] <- effect_summary
 
+  # Write to Excel with branded formatting
   cat("Exporting enhanced profile report...\n")
-  segment_write_xlsx(sheets, output_path, "enhanced profile report")
+  seg_write_xlsx(sheets, output_path)
 
   cat(sprintf("✓ Enhanced profile report saved to: %s\n", basename(output_path)))
   cat(sprintf("  Sheets: %d\n\n", length(sheets)))
@@ -333,8 +333,21 @@ create_enhanced_profile_report <- function(data, clusters, clustering_vars,
 }
 
 
-# NOTE: identify_golden_questions() is defined in 06_rules.R (the authoritative version
-# used by 00_main.R). A duplicate was removed from here to avoid conflicting signatures.
+# ==============================================================================
+# GOLDEN QUESTIONS - MOVED TO R/06_rules.R
+# ==============================================================================
+# The identify_golden_questions() function is now defined in R/06_rules.R
+# (the canonical version with full TRS refusals and Random Forest support).
+# Removed from this file to eliminate duplicate definition.
+# ==============================================================================
+
+
+# ==============================================================================
+# PLACEHOLDER - identify_golden_questions moved to R/06_rules.R
+# ==============================================================================
+# See R/06_rules.R for the complete implementation.
+#' @keywords internal
+.golden_questions_moved_notice <- "identify_golden_questions() is in R/06_rules.R"
 
 
 # ==============================================================================
@@ -370,7 +383,7 @@ rank_variable_importance <- function(data, clusters, clustering_vars,
   for (var in clustering_vars) {
     var_data <- data[[var]]
 
-    eta_squared_values[var] <- tryCatch({
+    tryCatch({
       complete_idx <- !is.na(var_data) & !is.na(clusters)
       var_complete <- var_data[complete_idx]
       clusters_complete <- clusters[complete_idx]
@@ -380,9 +393,10 @@ rank_variable_importance <- function(data, clusters, clustering_vars,
 
       ss_between <- anova_summary[[1]]$"Sum Sq"[1]
       ss_total <- sum(anova_summary[[1]]$"Sum Sq")
-      if (ss_total > 0) ss_between / ss_total else 0
+      eta_squared_values[var] <- ss_between / ss_total
+
     }, error = function(e) {
-      0
+      eta_squared_values[var] <- 0
     })
   }
 

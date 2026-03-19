@@ -44,7 +44,7 @@ transform_final_for_html <- function(results, config) {
     segment_id = as.integer(names(seg_table)),
     segment_name = sn[as.integer(names(seg_table))],
     n = as.integer(seg_table),
-    pct = round(as.numeric(seg_table) / n_obs * 100, 1),
+    pct = round(as.numeric(seg_table) / n_obs * 100, 0),
     stringsAsFactors = FALSE
   )
 
@@ -91,8 +91,14 @@ transform_final_for_html <- function(results, config) {
   # Vulnerability analysis
   vulnerability <- results$vulnerability %||% NULL
 
-  # Golden questions
+  # Golden questions — ensure importance_pct column exists for chart builder
   golden_questions <- results$golden_questions %||% NULL
+  if (!is.null(golden_questions) && !is.null(golden_questions$top_questions)) {
+    tq <- golden_questions$top_questions
+    if ("pct_of_total" %in% names(tq) && !"importance_pct" %in% names(tq)) {
+      golden_questions$top_questions$importance_pct <- tq$pct_of_total
+    }
+  }
 
   # Question labels
   question_labels <- config$question_labels %||% NULL
@@ -206,18 +212,17 @@ transform_exploration_for_html <- function(results, config) {
   # Add rank
   result$rank <- seq_len(nrow(result))
 
-  # Calculate importance percentage and cumulative
-  # Prefer eta-squared; fall back to F-statistic for proportional importance
-  if (!is.null(eta_col) && sum(result$eta_squared, na.rm = TRUE) > 0) {
-    total_eta <- sum(result$eta_squared, na.rm = TRUE)
-    result$importance_pct <- round(result$eta_squared / total_eta * 100, 1)
-    result$cumulative_pct <- round(cumsum(result$importance_pct), 1)
-    result$importance_metric <- "eta_squared"
-  } else if (!is.null(f_col) && sum(result$f_statistic, na.rm = TRUE) > 0) {
-    total_f <- sum(result$f_statistic, na.rm = TRUE)
-    result$importance_pct <- round(result$f_statistic / total_f * 100, 1)
-    result$cumulative_pct <- round(cumsum(result$importance_pct), 1)
-    result$importance_metric <- "f_statistic"
+  # Calculate importance percentage (normalized to 100%)
+  if (!is.null(eta_col)) {
+    total <- sum(result$eta_squared, na.rm = TRUE)
+    if (total > 0) {
+      result$importance_pct <- round(result$eta_squared / total * 100, 1)
+    }
+  } else if (!is.null(f_col)) {
+    total <- sum(result$f_statistic, na.rm = TRUE)
+    if (total > 0) {
+      result$importance_pct <- round(result$f_statistic / total * 100, 1)
+    }
   }
 
   result

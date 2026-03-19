@@ -1,32 +1,71 @@
 # Turas Segmentation Module -- User Manual
 
-**Version:** 11.0 **Last Updated:** 6 March 2026 **Audience:** Market Researchers, Data Analysts, Survey Managers
+**Version:** 11.1
+**Last Updated:** 19 March 2026
+**Audience:** Market Researchers, Data Analysts, Survey Managers
+**Module:** `modules/segment/`
 
 ------------------------------------------------------------------------
 
 ## Table of Contents
 
-1.  [Quick Start](#1-quick-start)
-2.  [Choosing Variables](#2-choosing-variables)
-3.  [Choosing the Number of Segments (k)](#3-choosing-the-number-of-segments-k)
-4.  [Choosing a Segmentation Model](#4-choosing-a-segmentation-model)
-5.  [Running a Segmentation: Start to Finish](#5-running-a-segmentation-start-to-finish)
-6.  [Using Segments in Other Modules](#6-using-segments-in-other-modules)
-7.  [Interpreting Results](#7-interpreting-results)
-8.  [Pitfalls and Common Mistakes](#8-pitfalls-and-common-mistakes)
-9.  [Config Reference](#9-config-reference)
+1.  [Introduction](#1-introduction)
+2.  [Quick Start](#2-quick-start)
+3.  [The Segmentation Workflow](#3-the-segmentation-workflow)
+4.  [Choosing the Optimal Number of Segments](#4-choosing-the-optimal-number-of-segments)
+5.  [Dealing with Partial Answers (Missing Data)](#5-dealing-with-partial-answers-missing-data)
+6.  [Choosing the Right Model](#6-choosing-the-right-model)
+7.  [Configuration Reference](#7-configuration-reference)
+8.  [Interpreting Results](#8-interpreting-results)
+9.  [Common Pitfalls](#9-common-pitfalls)
+10. [R Package Dependencies](#10-r-package-dependencies)
+11. [Troubleshooting](#11-troubleshooting)
 
 ------------------------------------------------------------------------
 
-## 1. Quick Start
+## 1. Introduction
 
-This section gets you from zero to a working segmentation as fast as possible. You need two things: a data file and a config file.
+### What Is Segmentation?
+
+Market segmentation is the process of dividing a population of respondents into groups (segments) that are internally similar and externally different. Respondents within a segment share attitudes, needs, or behaviours that distinguish them from respondents in other segments.
+
+In a survey context, segmentation takes a set of numeric variables -- satisfaction ratings, agreement scales, importance scores, brand perceptions -- and finds natural groupings among respondents based on how they answered those questions. The result is a set of segments, each with a distinct profile that can be named, described, and acted upon.
+
+### Why Segmentation Matters for Market Research
+
+**Segmentation turns data into strategy.** Without segmentation, a survey produces averages that describe nobody in particular. With segmentation, the same data reveals distinct groups of customers, each with their own needs, pain points, and behaviours. This enables:
+
+- **Targeted messaging** -- Speak to each segment in language that resonates with their specific concerns.
+- **Product prioritisation** -- Focus development on features that matter most to your most valuable segments.
+- **Resource allocation** -- Direct marketing spend toward segments with the highest potential return.
+- **Tracking over time** -- Monitor whether segments are growing, shrinking, or changing in composition.
+- **Customer understanding** -- Move beyond demographics to understand why people behave the way they do.
+
+### How Turas Handles Segmentation
+
+The Turas segment module is a configuration-driven pipeline. You provide a data file and an Excel config file; the module handles data preparation, clustering, validation, profiling, and reporting. The workflow is designed around two modes:
+
+- **Exploration mode** -- Tests multiple numbers of segments (k values) and recommends the best one. Use this first.
+- **Final mode** -- Runs the analysis with your chosen k and produces full results including segment assignments, profiles, action cards, and an HTML report.
+
+All output is generated as Excel files (for your workbench) and optionally as a self-contained HTML report (for stakeholder delivery).
+
+------------------------------------------------------------------------
+
+## 2. Quick Start
+
+This section gets you from zero to a working segmentation in the shortest path possible.
+
+### What You Need
+
+1. **A data file** -- CSV, Excel (.xlsx), or SPSS (.sav) format. One row per respondent, one column per variable. Must include a unique respondent ID column and numeric columns for clustering.
+2. **A config file** -- An Excel file with a sheet named "Config" containing two columns: `Setting` and `Value`.
 
 ### Minimal Config
 
-Create an Excel file (e.g., `my_config.xlsx`) with a sheet named **Config**. The sheet has two columns: `Setting` and `Value`. Only three settings are required:
+Create an Excel file (e.g., `my_config.xlsx`) with a sheet named **Config**. Only three settings are required:
 
-```         
+```
 Setting          | Value
 -----------------|----------------------------
 data_file        | data/survey_data.csv
@@ -34,13 +73,13 @@ id_variable      | respondent_id
 clustering_vars  | Q01,Q02,Q03,Q04,Q05
 ```
 
-That is it. Everything else has sensible defaults.
+Everything else has sensible defaults.
 
 ### Run It
 
 **Option A: Through the Turas GUI**
 
-``` r
+```r
 source("launch_turas.R")
 launch_turas()
 ```
@@ -49,26 +88,32 @@ Select the Segment module, browse to your config file, validate, and run.
 
 **Option B: From the R console**
 
-``` r
+```r
 source("modules/segment/run_segment.R")
 result <- turas_segment_from_config("my_config.xlsx")
+```
+
+**Option C: Command line**
+
+```bash
+Rscript modules/segment/run_segment.R my_config.xlsx
 ```
 
 ### What Happens
 
 Because `k_fixed` was left blank, the module runs in **exploration mode**. It tests k = 3 through k = 6 (the defaults) and produces:
 
--   An Excel report with metrics for each k value
--   An HTML report with elbow plots and silhouette charts
--   A recommendation for the best k
+- An Excel report with metrics for each k value
+- An HTML report (if `html_report = TRUE`) with elbow plots and silhouette charts
+- A recommendation for the best k
 
-You then review the output, choose your k, add `k_fixed = 4` (or whatever you chose) to the config, and re-run. The second run produces the final segmentation with full profiling, action cards, and segment assignments.
+You then review the output, choose your k, add `k_fixed = 4` (or whatever you chose) to the config, and re-run. The second run produces the final segmentation.
 
 ### Quick Run (No Config File)
 
 For rapid prototyping without creating a config file:
 
-``` r
+```r
 source("modules/segment/R/10_utilities.R")
 
 result <- run_segment_quick(
@@ -82,278 +127,85 @@ result <- run_segment_quick(
 
 ------------------------------------------------------------------------
 
-## 2. Choosing Variables
+## 3. The Segmentation Workflow
 
-Variable selection is the single most important decision in segmentation. The variables you cluster on determine what your segments represent.
-
-### What to Include
-
-**Attitudinal variables** -- Satisfaction ratings, brand perceptions, agreement scales, importance ratings. These capture how people think and feel, which is the foundation of most market segmentation.
-
-**Behavioural variables** -- Purchase frequency, usage occasions, channel preference scores. These capture what people do. Best when expressed as numeric scales.
-
-**Needs-based variables** -- Statements about what respondents want or need from a category. These produce actionable segments because needs can be addressed with product and service changes.
-
-### What NOT to Include
-
-**Demographics** (age, gender, income, region) -- These should be used to *profile* your segments after they are created, not to define them. If you cluster on age, you will get age-based segments, which you could have created with a simple cross-tab.
-
-**ID columns** -- Respondent IDs, timestamps, record numbers. These are unique per row and will destroy the clustering.
-
-**Open-ended responses** -- Free text cannot be clustered directly. If you need to include open-end themes, code them as numeric variables first.
-
-**Constants** -- Any variable where every respondent gave the same answer provides zero discrimination. The module will flag these automatically.
-
-**Highly skewed variables** -- If 95% of respondents chose the same answer, that variable adds noise rather than signal.
-
-### How Many Variables?
-
-| Count | Guidance                                                 |
-|-------|----------------------------------------------------------|
-| 2-4   | Too few -- solution will be over-simplified              |
-| 5-12  | Ideal range for most surveys                             |
-| 13-15 | Acceptable with variable selection enabled               |
-| 16+   | Too many -- enable variable selection or reduce manually |
-
-### Variable Selection Features
-
-When you have more variables than you should cluster on, the module can automatically reduce them. All variable selection is controlled from the main Config sheet -- there is no separate VarSel_Config sheet.
-
-**Variance filtering** removes variables where nearly everyone answered the same way. If a 10-point scale has a variance below 0.1 (on standardised data), it is not differentiating respondents and should be dropped.
-
-**Correlation analysis** finds pairs of variables that are highly correlated (e.g., r \> 0.80). When two variables measure essentially the same thing, one is removed (the one with lower overall variance).
-
-**Factor analysis** identifies the underlying dimensions in your data and selects representative variables from each factor. This is the most sophisticated method and produces the most balanced variable set.
-
-### Config Parameters for Variable Selection
-
-| Parameter | Default | What It Does |
-|----|----|----|
-| `variable_selection` | `FALSE` | Set to `TRUE` to enable automatic variable selection |
-| `variable_selection_method` | `variance_correlation` | Algorithm: `variance_correlation`, `factor_analysis`, or `both` |
-| `max_clustering_vars` | `10` | Target number of variables to keep (2-20) |
-| `varsel_min_variance` | `0.1` | Minimum variance threshold (0.01-1.0) |
-| `varsel_max_correlation` | `0.8` | Maximum allowed correlation before one variable is removed (0.5-0.95) |
-
-**Example config for variable selection:**
-
-```         
-Setting                    | Value
----------------------------|----------------------------
-data_file                  | data/large_survey.csv
-id_variable                | ResponseID
-clustering_vars            | Q01,Q02,Q03,Q04,...,Q25
-variable_selection         | TRUE
-variable_selection_method  | variance_correlation
-max_clustering_vars        | 10
-varsel_min_variance        | 0.1
-varsel_max_correlation     | 0.8
-```
-
-The module will reduce your 25 variables to approximately 10, removing those with low variance and those that duplicate information already captured by other variables. The variable selection report is included in the output so you can see exactly which variables were kept and why.
-
-------------------------------------------------------------------------
-
-## 3. Choosing the Number of Segments (k)
-
-How many segments should you have? This is part science, part art. The module gives you the science; you supply the art.
-
-### Step 1: Run Exploration Mode
-
-Leave `k_fixed` blank in your config and set the range you want to test:
-
-```         
-Setting    | Value
------------|-------
-k_fixed    |
-k_min      | 2
-k_max      | 8
-```
-
-The module will run the clustering algorithm for every k from 2 to 8 and produce comparison metrics.
-
-### Step 2: Read the Exploration Report
-
-The exploration report (Excel and HTML) gives you several metrics for each k value:
-
-**Silhouette score** (most important) -- Measures how well each respondent fits their assigned segment compared to the next-closest segment. Ranges from -1 to 1.
-
-| Score       | Interpretation                          |
-|-------------|-----------------------------------------|
-| 0.71 - 1.00 | Excellent separation                    |
-| 0.51 - 0.70 | Good separation                         |
-| 0.26 - 0.50 | Moderate -- structure present but fuzzy |
-| \< 0.25     | Weak -- may not have real segments      |
-
-**Elbow plot (WCSS)** -- Shows the within-cluster sum of squares for each k. Look for the "elbow" where the curve bends -- adding more segments beyond that point gives diminishing returns.
-
-**Calinski-Harabasz index** -- Higher is better. Measures the ratio of between-cluster variance to within-cluster variance.
-
-**Davies-Bouldin index** -- Lower is better. Measures average similarity between each cluster and its most similar neighbour.
-
-### Step 3: Apply Practical Judgement
-
-Statistics alone do not choose k. Ask yourself:
-
--   **Can you describe each segment?** If you cannot give a meaningful name to every segment, you may have too many.
--   **Can you action each segment differently?** If two segments would receive the same marketing treatment, they should probably be merged.
--   **Will stakeholders remember them?** Four segments named "Advocates, Engaged, Passive, Detractors" is manageable. Eight is not.
--   **Are all segments large enough?** A segment with 3% of respondents is too small to act on in most contexts.
-
-### Rules of Thumb
-
-| Situation                            | Recommended k |
-|--------------------------------------|---------------|
-| Most consumer surveys (n = 200-1000) | 3-5           |
-| Large-scale tracking studies         | 4-6           |
-| B2B with small sample                | 2-4           |
-| Complex needs-based segmentation     | 4-6           |
-| Maximum practical limit              | 8             |
-
-**Never go above 8 segments** unless you have a very specific reason and a very large sample. More than 8 segments is almost always overfitting -- you are finding structure in the noise rather than in the signal.
-
-### Pitfalls
-
--   **Overfitting**: More segments always improves the statistical metrics, but the extra segments may not be real. If silhouette barely improves from k=5 to k=6, stick with 5.
--   **Tiny clusters**: If any segment has fewer than 30 respondents, the profiles will be unreliable. Set `min_segment_size_pct` to at least 10%.
--   **Metrics disagree**: When silhouette says k=4 and the elbow says k=5, run both as final solutions and compare the profiles. Choose the one that tells a more coherent story.
-
-------------------------------------------------------------------------
-
-## 4. Choosing a Segmentation Model
-
-The module supports four clustering algorithms. In most cases, K-means is the right choice. Use the decision matrix below when you are unsure.
-
-### Decision Matrix
-
-| Factor | K-means | Hierarchical | GMM | LCA |
-|----|----|----|----|----|
-| **Best for** | Most surveys | Exploring structure | Overlapping segments | Categorical data |
-| **Data type** | Continuous (scales, ratings) | Continuous | Continuous | Categorical / ordinal |
-| **Speed** | Fast | Moderate | Slower | Moderate |
-| **Sample size limit** | 50,000+ | \~15,000 | 10,000 | 5,000 |
-| **Cluster shape** | Spherical | Varies by linkage | Elliptical | N/A (model-based) |
-| **Assignment type** | Hard | Hard | Soft (probabilities) | Soft (probabilities) |
-| **Model selection** | Silhouette, elbow | Dendrogram | BIC/AIC | BIC/AIC |
-| **Reproducibility** | Depends on nstart | Deterministic | Depends on init | Depends on init |
-
-### K-means (Default)
-
-Use K-means when: - Your data is numeric ratings or scales (1-5, 1-7, 1-10) - You want the fastest run time - You expect roughly equal-sized, compact segments
-
-Config:
-
-```         
-method  | kmeans
-nstart  | 50
-```
-
-The `nstart` parameter controls how many random starting positions the algorithm tries. Higher values (25-50) produce more stable results. The default is 50. For very large datasets (n \> 10,000), the module automatically switches to mini-batch K-means for speed.
-
-### Hierarchical Clustering
-
-Use hierarchical clustering when: - You want to explore the nested structure of your data before choosing k - A dendrogram visualisation is important for your stakeholders - You want a deterministic result (same data always gives same answer) - Your sample is under 15,000 respondents (memory constraint for the distance matrix)
-
-Config:
-
-```         
-method          | hclust
-linkage_method  | ward.D2
-```
-
-**Linkage methods:** - `ward.D2` (recommended) -- Produces compact, balanced clusters. Best default for survey data. - `complete` -- Creates well-separated clusters, but can produce unequal sizes. - `average` -- A middle ground, useful when cluster sizes vary substantially.
-
-### Gaussian Mixture Models (GMM)
-
-Use GMM when: - You believe segments genuinely overlap (respondents sit between groups) - You need probability-based membership (e.g., "this respondent is 70% Segment A, 30% Segment B") - You want BIC-based model selection rather than heuristic metrics - Your clusters may be elliptical rather than spherical
-
-Config:
-
-```         
-method          | gmm
-gmm_model_type  |
-```
-
-Leave `gmm_model_type` blank to let the algorithm automatically select the best covariance structure via BIC. If you know what you want, valid values include `VVV` (most flexible), `EEE` (all clusters same shape), and others.
-
-Requires the `mclust` package: `install.packages("mclust")`
-
-GMM produces additional output columns in the assignments file: - `prob_segment_1`, `prob_segment_2`, etc. -- probability of belonging to each segment - `max_probability` -- the highest probability - `uncertainty` -- 1 minus the highest probability (higher = more ambiguous)
-
-### Latent Class Analysis (LCA)
-
-Use LCA when: - Your clustering variables are purely categorical (yes/no, multi-choice) - Standard K-means on categorical data produces poor results - You want formal model fit statistics (AIC, BIC)
-
-Config:
-
-```         
-use_lca  | TRUE
-```
-
-Requires the `poLCA` package: `install.packages("poLCA")`
-
-LCA is best for categorical variables that cannot be meaningfully treated as continuous. For Likert scales (e.g., 1-5 agreement), K-means or GMM are usually preferable.
-
-### Multi-Method Comparison
-
-Not sure which method is best? Run them all side-by-side:
-
-```         
-method  | kmeans,hclust,gmm
-```
-
-Or use:
-
-```         
-method  | all
-```
-
-This runs each algorithm independently on the same prepared data and produces: - Per-method assignment files (`seg_kmeans_assignments.xlsx`, `seg_hclust_assignments.xlsx`, `seg_gmm_assignments.xlsx`) - Per-method model files - A combined HTML report with tabs for each method plus a **Comparison** tab showing: - Side-by-side metrics (silhouette, BSS/TSS) - Agreement matrix (Adjusted Rand Index) showing how much the methods agree - A method recommendation based on overall quality
-
-------------------------------------------------------------------------
-
-## 5. Running a Segmentation: Start to Finish
-
-Segmentation is a three-step process. You use **Excel as your workbench** (reviewing metrics, refining variables, editing segment names) and the **HTML report as the deliverable** (the polished output for stakeholders). All three steps run from the Shiny app or R console -- the Excel files are what you review between runs.
+Segmentation is a multi-step process. You use **Excel as your workbench** (reviewing metrics, refining variables, editing segment names) and the **HTML report as the deliverable** (the polished output for stakeholders).
 
 ```
-STEP 1: EXPLORE        →  Excel workbench  →  Pick k, remove weak variables
-STEP 2: FINALIZE       →  Excel workbench  →  Review & edit segment names
-STEP 3: DELIVER (opt.) →  HTML report      →  Send to stakeholders
+STEP 1: PREPARE DATA      -->  Clean data, choose variables
+STEP 2: CREATE CONFIG      -->  Excel config file, exploration mode first
+STEP 3: RUN EXPLORATION    -->  Test multiple k values
+STEP 4: REVIEW RESULTS     -->  Pick k, remove weak variables
+STEP 5: RUN FINAL          -->  Lock in k, generate full output
+STEP 6: NAME SEGMENTS      -->  Review and edit auto-generated names
+STEP 7: SCORE NEW DATA     -->  Apply model to new respondents (optional)
 ```
 
-### Before You Start: Prepare Your Data
+### Step 1: Prepare Your Data
 
-Your data file should be:
-- **Format:** CSV, Excel (.xlsx), or SPSS (.sav)
-- **Structure:** One row per respondent, one column per variable
-- **ID column:** A unique identifier (e.g., `respondent_id`)
-- **Clustering variables:** Numeric columns with the attitudes/behaviours to segment on
+Your data file should be structured as one row per respondent with one column per variable.
 
 **Data quality checklist:**
 
--   [ ] No duplicate respondent IDs
--   [ ] All clustering variables are numeric
--   [ ] Missing data under 15% per variable
--   [ ] Variables use consistent scales (all 1--10, or all 1--5, etc.)
--   [ ] No constant variables (everyone gave the same answer)
--   [ ] At least 100 complete cases after removing missing data
+- [ ] Unique respondent ID column (no duplicates)
+- [ ] All clustering variables are numeric
+- [ ] Missing data under 15% per variable (configurable)
+- [ ] Variables use consistent measurement scales where possible
+- [ ] No constant variables (where every respondent gave the same answer)
+- [ ] At least 100 complete cases after removing missing data
+- [ ] No demographic variables in the clustering set (use them for profiling instead)
 
-### Before You Start: Create the Config File
+**Supported file formats:**
 
-Copy the template from `modules/segment/docs/templates/Segment_Config_Template.xlsx` and fill in the Settings tab. At minimum, set:
+| Format | Extension | Notes |
+|--------|-----------|-------|
+| CSV | `.csv` | Most portable, recommended |
+| Excel | `.xlsx` | Specify sheet name with `data_sheet` if not "Data" |
+| SPSS | `.sav` | Requires the `haven` package |
+
+**Choosing clustering variables:**
+
+| Include | Exclude |
+|---------|---------|
+| Satisfaction ratings | Respondent IDs |
+| Agreement scales | Timestamps |
+| Brand perceptions | Open-ended text |
+| Importance ratings | Demographics (use for profiling) |
+| Behavioural frequency | Constants (zero variance) |
+| Needs-based statements | Highly skewed variables (95%+ same answer) |
+
+**How many variables?**
+
+| Count | Guidance |
+|-------|----------|
+| 2-4 | Too few -- solution will be over-simplified |
+| 5-12 | Ideal range for most surveys |
+| 13-15 | Acceptable if variable selection is enabled |
+| 16+ | Too many -- enable variable selection or reduce manually |
+
+### Step 2: Create Your Config File (Exploration Mode First)
+
+Copy the template from `modules/segment/docs/templates/Segment_Config_Template.xlsx` or create a new Excel file with a "Config" sheet.
+
+For your first run, leave `k_fixed` blank to trigger exploration mode. Set the range of k values you want to test:
 
 ```
 Setting          | Value
 -----------------|--------------------------------
-data_file        | path/to/your/data.csv
+data_file        | data/survey_data.csv
 id_variable      | respondent_id
 clustering_vars  | Q01,Q02,Q03,Q04,Q05,Q06,Q07
+k_fixed          |
+k_min            | 3
+k_max            | 6
+method           | kmeans
+html_report      | TRUE
+output_folder    | output/
 ```
 
 You can also generate a config template programmatically:
 
-``` r
+```r
 source("modules/segment/R/10_utilities.R")
 generate_config_template(
   data_file = "data/survey.csv",
@@ -362,553 +214,644 @@ generate_config_template(
 )
 ```
 
----
+### Step 3: Run Exploration to Find Optimal k
 
-### STEP 1: Exploration Run
+Run the analysis:
 
-**Goal:** Find the right number of segments and confirm your variables are contributing.
-
-**Config settings for this step:**
-
-```
-Setting          | Value                | Notes
------------------|----------------------|------------------------------
-k_fixed          | (leave blank)        | Triggers exploration mode
-k_min            | 3                    | Smallest k to test
-k_max            | 6                    | Largest k to test
-method           | kmeans               | Or hclust, gmm, lca, or comma-separated for multi-method
-```
-
-**Run it** from the Shiny app (browse to config, validate, run) or from R:
-
-``` r
+```r
 source("modules/segment/run_segment.R")
 result <- turas_segment_from_config("config/my_segmentation.xlsx")
 ```
 
-**Output:** `seg_k_selection_report.xlsx` with these sheets:
+The module will:
 
-| Sheet                    | What It Contains                                                       |
-|--------------------------|------------------------------------------------------------------------|
-| **Metrics_Comparison**   | All fit metrics (silhouette, BSS/TSS, etc.) across k values            |
-| **Profile_K3**           | Segment means for k=3 (one sheet per k tested)                        |
-| **Profile_K4**           | Segment means for k=4                                                  |
-| **Variable_Contribution**| Eta-squared per variable with ESSENTIAL / USEFUL / MINIMAL IMPACT flags|
-| **Run_Status**           | Execution summary                                                      |
+1. Load and validate your data
+2. Handle missing values according to your config
+3. Standardise variables (z-scores)
+4. Run clustering for every k from `k_min` to `k_max`
+5. Calculate validation metrics for each k
+6. Generate a recommendation
 
-**What to do with the output:**
+**Output files:**
 
-1. **Open `seg_k_selection_report.xlsx`** in Excel.
+| File | Content |
+|------|---------|
+| `seg_k_selection_report.xlsx` | Metrics comparison, profiles per k, variable contribution |
+| `seg_k_selection_report.html` | Interactive charts (elbow, silhouette) |
 
-2. **Check the Metrics_Comparison sheet.** Compare silhouette scores and BSS/TSS across k values. Higher silhouette = better-separated segments. The module highlights its recommended k, but use your judgement -- does the recommended k produce segments that make business sense?
+### Step 4: Review Exploration Results and Choose k
 
-3. **Check the Variable_Contribution sheet.** This is new and important. For the recommended k, each clustering variable is rated:
+Open `seg_k_selection_report.xlsx` in Excel.
 
-   | Category            | Eta-Squared | What It Means                            |
-   |---------------------|-------------|------------------------------------------|
-   | **ESSENTIAL**       | > 0.30      | This variable strongly separates segments |
-   | **USEFUL**          | 0.10 -- 0.30| Contributes meaningfully                  |
-   | **MINIMAL IMPACT**  | < 0.10      | Not helping -- consider removing           |
+1. **Metrics_Comparison sheet** -- Compare silhouette scores and BSS/TSS across k values. The module highlights its recommended k, but use your judgement.
 
-   Variables marked "Consider removing" in the Annotation column are candidates for removal. Removing weak variables often improves the solution.
+2. **Variable_Contribution sheet** -- Each clustering variable is rated by eta-squared:
 
-4. **Check the Profile sheets.** Do the segments at your chosen k tell a coherent story? Can you see distinct groups that a stakeholder would recognise?
+   | Category | Eta-Squared | Meaning |
+   |----------|-------------|---------|
+   | ESSENTIAL | > 0.30 | Strongly separates segments |
+   | USEFUL | 0.10 - 0.30 | Contributes meaningfully |
+   | MINIMAL IMPACT | < 0.10 | Not helping -- consider removing |
 
-5. **If you need to refine:** Update your config -- remove weak variables from `clustering_vars`, adjust `k_min`/`k_max`, try a different method -- and re-run Step 1. Repeat until you are satisfied.
+3. **Profile sheets** -- Review segment means at each k. Do the segments tell a coherent story?
 
-> **Tip:** Exploration mode works with all methods (K-Means, Hierarchical, GMM, LCA). You can also test multiple methods at once by setting `method = kmeans,hclust,gmm`. Note that LCA is not a `method` value -- to include LCA, set `use_lca = TRUE` separately.
+4. **Refine if needed** -- Remove weak variables, adjust k range, try a different method, then re-run exploration.
 
----
+See Section 4 for a detailed guide to choosing k.
 
-### STEP 2: Final Run
+### Step 5: Run Final Segmentation with Chosen k
 
-**Goal:** Lock in your chosen k, generate descriptive segment names, and produce assignments.
-
-**Config settings for this step:**
-
-```
-Setting          | Value                | Notes
------------------|----------------------|------------------------------
-k_fixed          | 4                    | Your chosen number of segments
-auto_name_style  | descriptive          | Auto-generate meaningful names (or "persona", "simple")
-html_report      | TRUE                 | Generate HTML report (optional -- see shortcut below)
-```
-
-Enable any additional features you want:
+Update your config to set `k_fixed` and enable the features you want:
 
 ```
-generate_action_cards   | TRUE
-generate_rules          | TRUE
-run_stability_check     | TRUE
+Setting                | Value
+-----------------------|------------------------------------------
+k_fixed                | 4
+auto_name_style        | descriptive
+generate_action_cards  | TRUE
+generate_rules         | TRUE
+run_stability_check    | TRUE
+golden_questions_n     | 5
+demographic_vars       | age_group,gender,region
+html_report            | TRUE
+save_model             | TRUE
 ```
 
-**Run it** the same way as Step 1.
+Run it the same way as the exploration.
 
-**Output:** `seg_segment_assignments.xlsx` with these sheets:
+**Output files:**
 
-| Sheet                    | What It Contains                                           |
-|--------------------------|------------------------------------------------------------|
-| **Segment_Assignments**  | One row per respondent: ID, segment_id, segment_name       |
-| **Segment_Names**        | Editable name table (see below)                            |
+| File | Content |
+|------|---------|
+| `seg_segment_assignments.xlsx` | ID + segment_id + segment_name per respondent |
+| `seg_segmentation_report.xlsx` | Profiles, validation, statistics |
+| `seg_segmentation_report.html` | Complete HTML report for stakeholders |
+| `seg_model.rds` | Saved model for scoring new data |
 
-The **Segment_Names** sheet has three columns:
+### Step 6: Review and Name Your Segments
 
-```
-Segment_ID | Suggested_Name              | Custom_Name
------------|-----------------------------|-----------------
-1          | Health-Focused Traditionalists|
-2          | Price-Sensitive Pragmatists  |
-3          | Brand-Loyal Enthusiasts      |
-4          | Disengaged Minimalists       |
-```
-
-**What to do with the output:**
-
-1. **Open `seg_segment_assignments.xlsx`** in Excel.
-2. **Go to the Segment_Names sheet.** The `Suggested_Name` column contains auto-generated names based on what makes each segment distinctive.
-3. **Edit the `Custom_Name` column.** Type your preferred name for each segment. If you leave `Custom_Name` blank, the suggested name is used. Examples:
-
-   ```
-   Segment_ID | Suggested_Name              | Custom_Name
-   -----------|-----------------------------|-----------------
-   1          | Health-Focused Traditionalists| Wellness Warriors
-   2          | Price-Sensitive Pragmatists  | Budget Hunters
-   3          | Brand-Loyal Enthusiasts      | True Believers
-   4          | Disengaged Minimalists       | The Indifferent
-   ```
-
-4. **Save the Excel file.** Do not rename it or move it.
-
-> **Shortcut:** If you are happy with the auto-generated names and set `html_report = TRUE` in this step, the HTML report is produced immediately using the suggested names. You can skip Step 3 entirely and go straight to delivering the report.
-
----
-
-### STEP 3: Finalize HTML Report (Optional)
-
-**Goal:** Produce the final stakeholder-ready HTML report using your edited segment names.
-
-**When to use this step:** Only if you edited segment names in Step 2 and did not set `html_report = TRUE` there, or if you want to regenerate the report with different names.
-
-**Config settings for this step:**
+The segment assignments file includes a **Segment_Names** sheet:
 
 ```
-Setting              | Value                                    | Notes
----------------------|------------------------------------------|---------
-k_fixed              | 4                                        | Same k as Step 2
-segment_names_file   | output/seg_segment_assignments.xlsx      | Path to the Excel you edited in Step 2
-html_report          | TRUE                                     | Generate the HTML report
+Segment_ID | Suggested_Name                | Custom_Name
+-----------|-------------------------------|-----------------
+1          | Health-Focused Traditionalists |
+2          | Price-Sensitive Pragmatists    |
+3          | Brand-Loyal Enthusiasts        |
+4          | Disengaged Minimalists         |
 ```
 
-**Run it** the same way as Steps 1 and 2.
+**To use your own names:**
 
-**What happens:** The module reads your edited names from the `Segment_Names` sheet. For each segment, it uses `Custom_Name` if you filled it in, otherwise falls back to `Suggested_Name`. These names appear throughout the HTML report -- in the executive summary, profiles, charts, action cards, and everywhere else.
+1. Fill in the `Custom_Name` column with your preferred names.
+2. Save the Excel file (do not rename or move it).
+3. Add `segment_names_file = output/seg_segment_assignments.xlsx` to your config.
+4. Set `html_report = TRUE` and re-run.
 
-**Output:** `seg_segmentation_report.html` -- a self-contained HTML file you can email, share, or present. It contains (depending on your settings):
+The module reads your edited names and uses them throughout the HTML report.
 
--   Executive summary with quality assessment and pen-sketch descriptions
--   Segment sizes and composition
--   Validation metrics (silhouette, BSS/TSS)
--   Variable importance (eta-squared)
--   Segment profile heatmap and table
--   Overlap heatmap (centroid distances)
--   Golden questions (best discriminating variables)
--   Classification rules (if enabled)
--   Segment action cards (if enabled)
--   Vulnerability analysis
--   Interpretation guide
+**Auto-naming styles:**
 
-See Section 7 for how to read each part.
+| Style | Example | When to use |
+|-------|---------|-------------|
+| `descriptive` | "Health-Focused Traditionalists" | Default; describes what makes the segment distinctive |
+| `persona` | "The Wellness Warrior" | More evocative; good for stakeholder presentations |
+| `simple` | "Segment A" | Neutral labels; use when you will rename manually |
 
-> **What if the file is missing?** If `segment_names_file` points to a file that does not exist, the module prints a warning to the console and falls back to auto-generated names. It does not fail.
+### Step 7: Score New Respondents (Optional)
 
----
+After building a segmentation, you can assign new respondents to the existing segments without re-running the full analysis.
 
-### Multi-Method Comparison (Optional)
+**Requirements:**
 
-At any point, you can compare how different algorithms segment your data by setting:
+- The original model was saved (`save_model = TRUE`)
+- The new data contains the same clustering variables as the original
+
+**Batch scoring:**
+
+```r
+source("modules/segment/R/08_scoring.R")
+
+scores <- score_new_data(
+  model_file  = "output/seg_model.rds",
+  new_data    = new_survey_data,
+  id_variable = "respondent_id",
+  output_file = "output/new_respondent_scores.xlsx"
+)
+```
+
+Each respondent receives:
+- `segment` -- Assigned segment number
+- `segment_name` -- Segment label
+- `distance_to_center` -- Distance from cluster centroid
+- `assignment_confidence` -- Confidence score (0-1)
+
+**Single respondent typing:**
+
+```r
+result <- type_respondent(
+  answers = c(Q01 = 8, Q02 = 7, Q03 = 9, Q04 = 8, Q05 = 9),
+  model_file = "output/seg_model.rds"
+)
+cat("Assigned to:", result$segment_name, "\n")
+cat("Confidence:", scales::percent(result$confidence), "\n")
+```
+
+**Monitoring segment drift:**
+
+Over time, the distribution of new respondents across segments may shift. Compare distributions to detect drift:
+
+```r
+drift <- compare_segment_distributions(
+  model_file     = "output/seg_model.rds",
+  scoring_result = scores
+)
+```
+
+If any segment changes by more than 10 percentage points, consider re-running the full segmentation on the combined data.
+
+------------------------------------------------------------------------
+
+## 4. Choosing the Optimal Number of Segments
+
+Choosing the number of segments (k) is the most consequential decision in any segmentation study. It is part science and part art. The module provides the statistical evidence; you supply the business judgement.
+
+### The Exploration Report
+
+Run exploration mode (leave `k_fixed` blank) to test a range of k values. The output includes several complementary metrics, each measuring a different aspect of cluster quality.
+
+### Metric 1: The Elbow Method (Within-Cluster Sum of Squares)
+
+**What it measures:** The total within-cluster sum of squares (WCSS) quantifies how tightly respondents cluster around their assigned segment centres. Lower WCSS means tighter, more homogeneous segments.
+
+**How to read the chart:** The elbow plot shows WCSS on the y-axis and k on the x-axis. As k increases, WCSS always decreases (more segments always produce tighter clusters). Look for the point where the curve bends -- the "elbow" -- where adding more segments yields diminishing improvement.
+
+**Interpretation:**
+
+- WCSS drops sharply from k=2 to k=4, then flattens from k=4 onwards: the elbow is at k=4.
+- If the curve decreases smoothly without a clear bend, the data may not have well-defined clusters. Consider the other metrics.
+
+**Limitations:** The elbow is often ambiguous. It is best used as a starting point, not as a definitive answer.
+
+### Metric 2: Silhouette Analysis
+
+**What it measures:** The silhouette score for each respondent quantifies how similar that respondent is to others in their own segment compared to the nearest neighbouring segment. It ranges from -1 to +1. The average silhouette width across all respondents is the single best summary measure of cluster quality.
+
+**Thresholds** (Kaufman & Rousseeuw, 1990):
+
+| Average Silhouette | Interpretation |
+|--------------------|----------------|
+| 0.71 - 1.00 | Strong structure found |
+| 0.51 - 0.70 | Reasonable structure found |
+| 0.26 - 0.50 | Structure is weak and could be artificial |
+| < 0.26 | No substantial structure found |
+
+**How to use it:** Choose the k with the highest average silhouette width. If multiple k values produce similar silhouettes, prefer the smaller k (simpler model).
+
+**Per-segment silhouettes:** The HTML report shows silhouette values broken down by segment. If one segment has many respondents with negative silhouette values, those respondents may be better assigned to a neighbouring segment. This often indicates that two segments should be merged.
+
+### Metric 3: Gap Statistic
+
+**What it measures:** The gap statistic (Tibshirani, Walther, & Hastie, 2001) compares the observed WCSS to the expected WCSS under a reference distribution with no cluster structure. The optimal k is the smallest value where the gap statistic reaches its maximum, meaning the clustering explains substantially more variance than random data would.
+
+**Interpretation:** Choose the smallest k where the gap statistic is within one standard error of its maximum value. This is a formally principled approach but can be computationally expensive for large datasets.
+
+### Metric 4: Calinski-Harabasz Index
+
+**What it measures:** The ratio of between-cluster variance to within-cluster variance, adjusted for the number of clusters and sample size. Higher values indicate better-defined clusters.
+
+**How to use it:** Choose the k with the highest Calinski-Harabasz index. There is no absolute threshold -- the index is most useful for comparing different k values on the same data.
+
+**Typical range:** 10 to 1000+. The absolute value depends on the data, but higher is always better.
+
+### Metric 5: Davies-Bouldin Index
+
+**What it measures:** The average "similarity" between each cluster and its most similar neighbour, where similarity is defined as the ratio of within-cluster spread to between-cluster separation. Lower values indicate better-separated clusters.
+
+**Threshold:** Below 1.0 is generally considered good.
+
+### Practical Considerations
+
+Statistics alone do not choose k. After reviewing the metrics, apply these practical tests:
+
+1. **Can you describe each segment?** If you cannot give a meaningful, distinct name to every segment, you may have too many.
+
+2. **Can you act on each segment differently?** If two segments would receive the same marketing treatment, they should be merged.
+
+3. **Will stakeholders remember them?** Four segments named "Advocates, Engaged, Passive, Detractors" is manageable. Eight is not.
+
+4. **Are all segments large enough?** A segment with fewer than 30 respondents (or less than 5% of the sample) is too small to produce reliable profiles. Set `min_segment_size_pct` to at least 10%.
+
+5. **Is the solution stable?** Enable `run_stability_check = TRUE` and look for scores above 80%. Unstable solutions change with different random seeds, which means the segments are not robust.
+
+### Decision Framework
+
+Use this flowchart when the metrics do not clearly point to a single k:
+
+```
+1. What does silhouette recommend?           --> k_sil
+2. What does the elbow suggest?              --> k_elbow
+3. Are all segments above minimum size?       --> Filter out k values with tiny segments
+
+IF k_sil == k_elbow:
+   Use that k.
+
+IF k_sil != k_elbow AND they differ by 1:
+   Run both as final solutions.
+   Compare the profiles.
+   Choose the one that tells a more coherent story.
+
+IF metrics disagree by more than 1:
+   Run both extremes as final solutions.
+   If the larger k splits a segment from the smaller k into two
+   clearly distinct groups, the larger k is justified.
+   If the split produces two similar segments, use the smaller k.
+
+IN ALL CASES:
+   Verify stability (>80%).
+   Verify minimum segment size (>10%).
+   Verify business interpretability.
+```
+
+### Rules of Thumb
+
+| Situation | Recommended k |
+|-----------|---------------|
+| Most consumer surveys (n = 200-1000) | 3-5 |
+| Large-scale tracking studies | 4-6 |
+| B2B with small sample (n < 200) | 2-4 |
+| Complex needs-based segmentation | 4-6 |
+| Maximum practical limit | 8 |
+
+Never go above 8 segments unless you have a very specific reason and a very large sample. Beyond 8, you are almost certainly overfitting.
+
+------------------------------------------------------------------------
+
+## 5. Dealing with Partial Answers (Missing Data)
+
+Missing data is common in surveys. How you handle it affects both the sample you analyse and the quality of your segments.
+
+### Understanding Why Data Is Missing
+
+The appropriate strategy depends on why respondents left questions blank. Statisticians distinguish three mechanisms:
+
+**MCAR -- Missing Completely At Random**
+
+The probability of a value being missing is unrelated to both the missing value itself and all other observed values. Example: a respondent's browser crashed mid-survey. The missingness is pure chance.
+
+**Test:** If respondents with missing data look the same as those without (similar demographics, similar response patterns on completed questions), the data is likely MCAR.
+
+**MAR -- Missing At Random**
+
+The probability of a value being missing depends on other observed variables but not on the missing value itself. Example: younger respondents are more likely to skip a question about retirement planning, but among younger respondents, the skipping is unrelated to their actual retirement plans.
+
+**Test:** If you can predict which respondents have missing data from their other answers, the data is MAR.
+
+**MNAR -- Missing Not At Random**
+
+The probability of a value being missing depends on the value itself. Example: dissatisfied customers are more likely to skip a satisfaction question. The missing values are systematically different from the observed values.
+
+**Test:** This is the hardest to detect because the evidence is in the unobserved data. Domain knowledge is your best guide. If a question about a sensitive topic has unusually high non-response, suspect MNAR.
+
+### Available Strategies
+
+The module supports four missing data strategies, configured via the `missing_data` parameter:
+
+| Strategy | Config Value | When to Use |
+|----------|-------------|-------------|
+| Listwise deletion | `listwise_deletion` | Data is MCAR; missing rate is low (<10%) |
+| Mean imputation | `mean_imputation` | Data is MAR; moderate missing rate (5-15%) |
+| Median imputation | `median_imputation` | Data is MAR; variables are skewed |
+| Refuse | `refuse` | Missing rate exceeds threshold; forces you to clean data first |
+
+### Decision Flowchart
+
+```
+START: How much data is missing?
+
+IF missing rate < 5%:
+   --> Listwise deletion is safe regardless of mechanism.
+       You lose few cases and the impact is minimal.
+
+IF missing rate 5-15%:
+   --> Is the data MCAR?
+       YES --> Listwise deletion is unbiased but reduces sample size.
+              Imputation preserves sample size.
+              Either is acceptable; try both and compare.
+       NO  --> Is the data MAR?
+              YES --> Use mean or median imputation.
+                     Mean for symmetric distributions.
+                     Median for skewed distributions.
+              NO  --> Data may be MNAR.
+                     Imputation may introduce bias.
+                     Consider removing the variable.
+                     Consult a statistician if possible.
+
+IF missing rate > 15%:
+   --> Consider removing the variable from clustering_vars.
+       A variable with 30%+ missing is unreliable for clustering.
+       If you must keep it, use imputation and document the decision.
+```
+
+### Impact on Results
+
+| Strategy | Effect on Sample Size | Effect on Segment Structure |
+|----------|----------------------|----------------------------|
+| Listwise deletion | Reduces sample (potentially substantially) | Unbiased if MCAR; may bias if MAR/MNAR |
+| Mean imputation | Preserves full sample | Shrinks variable variance; may pull segments toward centre |
+| Median imputation | Preserves full sample | More robust to skew than mean; same variance concern |
+| Refuse | Analysis stops | Forces you to address the root cause |
+
+### Recommendation
+
+**Try both deletion and imputation, then compare.** If the segment structure is similar under both approaches, the missing data is not materially affecting your results. If the segments change substantially, investigate which variables have the most missing data and consider removing them.
+
+### Configuring the Threshold
+
+The `missing_threshold` parameter (default: 15) sets the maximum percentage of missing data allowed per variable before the module raises a warning or refuses to proceed:
+
+```
+missing_data       | mean_imputation
+missing_threshold  | 15
+```
+
+If any variable exceeds this threshold and `missing_data = refuse`, the analysis will stop with a clear error message explaining which variables are problematic and how to fix the issue.
+
+------------------------------------------------------------------------
+
+## 6. Choosing the Right Model
+
+The module supports four clustering algorithms. In most cases, K-means is the right choice. Use this section when you are unsure.
+
+### Comparison Table
+
+| Factor | K-means | Hierarchical | GMM | LCA |
+|--------|---------|-------------|-----|-----|
+| **Best for** | Most surveys | Exploring nested structure | Overlapping segments | Categorical data |
+| **Data type** | Continuous (scales, ratings) | Continuous | Continuous | Categorical / ordinal |
+| **Speed** | Fast | Moderate | Slower | Moderate |
+| **Sample size** | Up to 50,000+ (mini-batch) | Up to ~15,000 | Up to ~10,000 | Up to ~5,000 |
+| **Cluster shape** | Spherical (equal-sized) | Varies by linkage | Elliptical (flexible) | N/A (model-based) |
+| **Assignment** | Hard (each respondent in exactly one segment) | Hard | Soft (probability per segment) | Soft (probability per class) |
+| **Model selection** | Silhouette, elbow | Dendrogram | BIC/AIC | BIC/AIC |
+| **Reproducibility** | Depends on nstart/seed | Deterministic | Depends on initialisation | Depends on initialisation |
+| **Key advantage** | Simple, fast, widely understood | Reveals hierarchical structure | Captures overlapping groups | Handles non-numeric data |
+| **Key limitation** | Assumes spherical clusters | Memory-intensive distance matrix | Slower; can overfit with many parameters | Requires categorical inputs |
+
+### K-means (Default)
+
+**When to use:** Your data consists of numeric ratings or scales (1-5, 1-7, 1-10). You want the fastest run time. You expect roughly compact, well-separated segments. This covers the vast majority of market research segmentation projects.
+
+**How it works:** K-means randomly initialises k cluster centres, assigns each respondent to the nearest centre, then iteratively adjusts the centres to minimise within-cluster variance. The `nstart` parameter controls how many random initialisations are tried; higher values (25-50) produce more stable results.
+
+**Large datasets:** For datasets with more than 10,000 respondents, the module automatically switches to mini-batch K-means, which processes random subsamples at each iteration for dramatically improved performance with minimal quality loss.
+
+**Config example:**
+
+```
+method  | kmeans
+nstart  | 50
+```
+
+### Hierarchical Clustering
+
+**When to use:** You want to explore the nested structure of your data before choosing k. A dendrogram visualisation is important for your audience. You want a deterministic result (same data always gives the same answer). Your sample is under 15,000 respondents.
+
+**How it works:** Hierarchical clustering builds a tree (dendrogram) by iteratively merging the most similar pairs of clusters, starting from individual respondents. You then "cut" the tree at the desired height to produce k segments.
+
+**Linkage methods:**
+
+| Method | Behaviour | Recommendation |
+|--------|-----------|----------------|
+| `ward.D2` | Produces compact, balanced clusters | Best default for survey data |
+| `complete` | Creates well-separated clusters | Can produce unequal sizes |
+| `average` | Middle ground | Useful when cluster sizes vary substantially |
+
+**Config example:**
+
+```
+method          | hclust
+linkage_method  | ward.D2
+```
+
+### Gaussian Mixture Models (GMM)
+
+**When to use:** You believe segments genuinely overlap (respondents sit between groups). You need probability-based membership (e.g., "this respondent is 70% Segment A, 30% Segment B"). Your clusters may be elliptical rather than spherical.
+
+**How it works:** GMM assumes the data is generated by a mixture of Gaussian distributions, each representing a segment. It estimates the parameters (mean, covariance) of each distribution and assigns each respondent a probability of belonging to each segment.
+
+**Additional outputs:** GMM produces probability columns in the assignments file: `prob_segment_1`, `prob_segment_2`, etc., plus a `max_probability` and `uncertainty` column.
+
+**Requires:** The `mclust` R package.
+
+**Config example:**
+
+```
+method          | gmm
+gmm_model_type  |
+```
+
+Leave `gmm_model_type` blank to let the algorithm automatically select the best covariance structure via BIC. If you know what you want, valid values include `VVV` (most flexible), `EEE` (all clusters same shape), and others from the mclust documentation.
+
+### Latent Class Analysis (LCA)
+
+**When to use:** Your clustering variables are purely categorical (yes/no, multiple choice, coded open-ends). Standard K-means on categorical data produces poor results because Euclidean distance is not meaningful for category labels.
+
+**How it works:** LCA assumes respondents belong to one of k unobserved ("latent") classes, each characterised by a distinct pattern of response probabilities. It estimates these probabilities using maximum likelihood and assigns each respondent to their most probable class.
+
+**Requires:** The `poLCA` R package.
+
+**Config example:**
+
+```
+use_lca  | TRUE
+```
+
+**Note:** LCA is not set via the `method` parameter. It is enabled separately because it requires a fundamentally different data format (categorical rather than continuous).
+
+### Multi-Method Comparison
+
+Not sure which method is best? Run them all side-by-side:
 
 ```
 method  | kmeans,hclust,gmm
 ```
 
-This produces a combined HTML report with a "Best Fit" recommendation and side-by-side comparison of each algorithm's segments.
+Or use:
 
-### Summary: What You Set in Each Step
-
-| Setting              | Step 1 (Explore) | Step 2 (Finalize) | Step 3 (HTML) |
-|----------------------|------------------|-------------------|---------------|
-| `k_fixed`            | *(blank)*        | 4                 | 4             |
-| `k_min` / `k_max`   | 3 / 6            | --                | --            |
-| `auto_name_style`    | --               | descriptive       | --            |
-| `segment_names_file` | --               | --                | path/to/xlsx  |
-| `html_report`        | --               | TRUE *(optional)* | TRUE          |
-
-------------------------------------------------------------------------
-
-## 6. Using Segments in Other Modules
-
-Once you have a segmentation, you will want to use those segments as banners in cross-tabs, as subgroups in key driver analysis, or in other downstream work. Here is how.
-
-### How the Assignment File Works
-
-The segmentation module produces a file called `seg_segment_assignments.xlsx` (or with your configured prefix). This file has three columns:
-
-```         
-respondent_id | segment_id | segment_name
-1001          | 1          | Advocates
-1002          | 3          | Passive
-1003          | 2          | Engaged
-1004          | 1          | Advocates
+```
+method  | all
 ```
 
-This is the bridge between your segmentation and everything else. You merge it onto your original data using the ID column.
+This runs each algorithm independently on the same prepared data and produces:
+- Per-method assignment files
+- Per-method model files
+- A combined HTML report with tabs for each method plus a comparison tab showing side-by-side metrics and a recommendation
 
-### Merging Segments onto Your Data
+### When to Use Each -- Quick Decision Guide
 
-The module provides a utility function for this:
+```
+Q: Is your data numeric (ratings, scales)?
+   YES --> Q: Is your sample under 15,000?
+            YES --> K-means (default) or Hierarchical
+            NO  --> K-means (auto mini-batch)
+   NO  --> Q: Is your data categorical?
+            YES --> LCA
+            NO  --> Convert to numeric or categorical first
 
-``` r
-source("modules/segment/R/10_utilities.R")
+Q: Do you need soft (probabilistic) assignments?
+   YES --> GMM or LCA
+   NO  --> K-means or Hierarchical
 
-merge_result <- merge_segment_to_data(
-  data_path       = "data/survey_data.csv",
-  assignment_path = "output/seg_segment_assignments.xlsx",
-  id_column       = "respondent_id",
-  output_path     = "data/survey_data_with_segments.csv"
-)
-
-# Check the result
-cat("Matched:", merge_result$n_matched, "respondents\n")
-cat("Unmatched:", merge_result$n_unmatched, "respondents\n")
+Q: Do you need a deterministic result (no randomness)?
+   YES --> Hierarchical
+   NO  --> Any method (use seed for reproducibility)
 ```
 
-This creates a new data file with the `segment_id` and `segment_name` columns appended. If you omit `output_path`, the function returns the merged data frame in memory without writing a file.
-
-### Using Segments as a Banner in the Tabs Module
-
-The Tabs module lets you cross-tabulate survey results by segment. To do this:
-
-1.  Merge your segment onto the data (see above).
-2.  In the Tabs config, add `segment_name` as a banner variable:
-
-```         
-Setting         | Value
-----------------|------------------------------------
-data_file       | data/survey_data_with_segments.csv
-banner_vars     | segment_name
-```
-
-Each tab table will now show results broken out by segment, with significance tests comparing the segments.
-
-### Using Segments as Subgroups in Key Driver Analysis
-
-The Key Driver module can run separate driver analyses for each segment. To do this:
-
-1.  Merge your segment onto the data.
-2.  In the Key Driver config file, add a **Segments** sheet with these columns:
-
-| segment_name | segment_variable | segment_values |
-|--------------|------------------|----------------|
-| Advocates    | segment_name     | Advocates      |
-| Engaged      | segment_name     | Engaged        |
-| Passive      | segment_name     | Passive        |
-| Detractors   | segment_name     | Detractors     |
-
-The key driver module will run its full analysis separately for each segment, producing per-segment driver rankings, quadrant charts, and importance maps.
-
-### Using Segments in Categorical Driver Analysis (catdriver)
-
-The same approach works for catdriver. Merge the segment column onto your data and define the segments in the Segments sheet of the catdriver config.
-
-### Step-by-Step Summary
-
-1.  Run segmentation to get assignment file
-2.  Call `merge_segment_to_data()` to add segments to original data
-3.  Use the merged data file in downstream modules
-4.  Configure segment as a banner (tabs) or subgroup (keydriver/catdriver)
-
 ------------------------------------------------------------------------
 
-## 7. Interpreting Results
-
-### Reading the HTML Report Section by Section
-
-**Executive Summary** -- A plain-English overview generated automatically. It tells you how many segments were found, the overall quality of the solution, which segment is largest, which variables differentiate best, and any warnings. Read this first to get the big picture.
-
-The quality assessment uses these thresholds:
-
-| Rating    | Silhouette Score | Meaning                                       |
-|-----------|------------------|-----------------------------------------------|
-| Excellent | \> 0.50          | Strong, well-separated segments               |
-| Good      | 0.35 - 0.50      | Meaningful segments with some overlap         |
-| Moderate  | 0.25 - 0.35      | Segments exist but boundaries are fuzzy       |
-| Limited   | \< 0.25          | Weak structure -- consider different approach |
-
-**Segment Overview** -- A bar chart and table showing how many respondents are in each segment and their percentage of the total. Look for reasonably balanced sizes. If one segment has 60% and another has 5%, the solution may be picking up on a dominant pattern rather than useful sub-groups.
-
-**Validation Metrics** -- A silhouette chart showing how well each respondent fits their segment. The chart plots individual silhouette values grouped by segment. Respondents with negative silhouette values are "misclassified" -- they are closer to a neighbouring segment than to their own. A few of these are normal; many indicate a problem.
-
-Additional metrics displayed: - **BSS/TSS (Between-SS / Total-SS):** Proportion of variance explained by the segments. Higher is better. Above 0.40 is typical for survey data. - **Calinski-Harabasz index:** Higher is better. No absolute threshold, but useful for comparing solutions. - **Davies-Bouldin index:** Lower is better. Below 1.0 is generally good.
-
-### Segment Profiles
-
-The profile heatmap and table show the mean score for each variable in each segment, alongside the overall mean. This is how you understand *what makes each segment different*.
-
-**Reading the heatmap:** Darker cells indicate higher scores. Look for the pattern -- which segments score high on which variables? The variables are sorted by importance (eta-squared), so the most differentiating variables appear at the top.
-
-**Index scores:** Some outputs show index scores (segment mean / overall mean \* 100). An index of 120 means that segment scores 20% above average on that variable. An index of 80 means 20% below average. Indices above 110 and below 90 are generally noteworthy.
-
-### Variable Importance (Eta-Squared)
-
-The variable importance chart shows how much each variable contributes to distinguishing the segments, measured by eta-squared.
-
-| Eta-squared | Interpretation                                 |
-|-------------|------------------------------------------------|
-| \> 0.14     | Large effect -- strong differentiator          |
-| 0.06 - 0.14 | Medium effect -- meaningful differentiator     |
-| 0.01 - 0.06 | Small effect -- weak differentiator            |
-| \< 0.01     | Negligible -- not useful for this segmentation |
-
-Variables with low eta-squared could potentially be removed from the clustering variables without changing the solution much.
-
-**Important note:** Because segments are *defined* by these variables, p-values in the statistical tests are descriptive, not inferential. Focus on effect sizes (eta-squared), not p-values.
-
-### Vulnerability Analysis
-
-Every final run includes a vulnerability (switching) analysis that identifies respondents whose segment assignment is borderline -- they sit near the boundary between two segments.
-
-**What it measures:** - **Assignment confidence** (0 to 1): How firmly each respondent belongs to their segment. For K-means/hierarchical, this is based on distance ratios. For GMM, it uses probability margins. - **Vulnerable flag:** Respondents with confidence below 0.3 (configurable). - **Would switch to:** The segment each borderline respondent would join if reassigned. - **Switching matrix:** Counts of potential switches between segment pairs, showing which segments have the most overlap.
-
-**Interpreting the vulnerability rate:**
-
-| \% Vulnerable | Interpretation |
-|----|----|
-| \< 15% | Strong segmentation with clear boundaries |
-| 15-30% | Moderate overlap between some segments |
-| \> 30% | Significant overlap -- consider fewer segments or different variables |
-
-**Note on GMM:** GMM naturally produces lower vulnerability rates because its probability-based assignments provide sharper confidence scores. Do not compare vulnerability rates across methods.
-
-### Golden Questions
-
-Golden questions are the 3-5 variables (configurable via `golden_questions_n`) that best discriminate between segments. They are identified using Random Forest variable importance -- a machine learning approach that captures non-linear relationships the eta-squared may miss.
-
-These are your "typing" questions: if you could only ask a few questions to assign a new respondent to a segment, these would be the ones. They are useful for: - Shortening a screening questionnaire - Building a typing tool for ongoing classification - Understanding which variables really drive the segmentation
-
-### Segment Action Cards
-
-Action cards provide executive-ready summaries for each segment: - **Segment name and size** - **Defining characteristics** (what makes this segment unique) - **Strengths** (highest-scoring variables) - **Pain points** (lowest-scoring variables) - **Recommended actions** (auto-generated suggestions based on the profile)
-
-These are designed to be shared directly with stakeholders who need to act on the segments without reading the full technical report.
-
-### Classification Rules
-
-When enabled (`generate_rules = TRUE`), the module uses a decision tree to produce plain-English IF-THEN rules for segment membership. For example:
-
-> IF Product Quality \>= 7.5 AND Service Rating \>= 6.0 THEN Segment = Advocates (accuracy: 82%)
-
-These rules simplify the complex multivariate clustering into a few decision points. They are approximate (the decision tree will not perfectly replicate the clustering) but give stakeholders an intuitive understanding of what defines each segment. The overall classification accuracy is reported alongside the rules.
-
-------------------------------------------------------------------------
-
-## 8. Pitfalls and Common Mistakes
-
-### Too Many Variables
-
-**Symptom:** Segments are hard to interpret, silhouette score is low, solution is unstable across runs.
-
-**Fix:** Enable variable selection (`variable_selection = TRUE`) to automatically reduce your variable set. Alternatively, manually select 5-12 variables based on theory: which attitudes or behaviours do you *expect* to differentiate your market?
-
-### Too Many Segments
-
-**Symptom:** Small segments with fewer than 30 respondents. Segments that are hard to name. Stakeholders cannot remember them all.
-
-**Fix:** Start with fewer segments. In most surveys, 3-5 segments capture the key market structure. You can always test more later.
-
-### Too Few Segments
-
-**Symptom:** Segments are very broad and each contains diverse respondents. Profiles look similar to the overall average. Silhouette score is very high but segments are not actionable.
-
-**Fix:** Try k+1. A two-segment solution often just splits "happy" from "unhappy" without capturing the nuance.
-
-### Ignoring Validation Metrics
-
-**Symptom:** Stakeholders choose k based on "we want 5 segments" without looking at the data.
-
-**Fix:** Always run exploration mode first. If the data does not support 5 segments, forcing 5 will produce a poor solution. Let the data guide the number, then adjust based on practical needs.
-
-### Not Checking Segment Stability
-
-**Symptom:** Re-running the analysis with a different seed produces different segments.
-
-**Fix:** Enable stability checking (`run_stability_check = TRUE`). If stability is below 80%, the solution is fragile. Try: - Reducing the number of variables - Reducing k - Increasing `nstart` for K-means (try 50 or 100) - Switching to hierarchical clustering (deterministic)
-
-### Including Demographics as Clustering Variables
-
-**Symptom:** Segments defined primarily by age, gender, or region rather than attitudes. The segmentation tells you things you already knew.
-
-**Fix:** Remove all demographic variables from `clustering_vars`. Use them as `profile_vars` or `demographic_vars` instead. Demographics should describe your segments, not define them.
-
-### Missing Data Problems
-
-**Symptom:** Too many respondents dropped due to listwise deletion. Sample size falls below minimum.
-
-**Fix:** First, check which variables have the most missing data and consider removing them from the clustering set. If the issue is moderate (5-15% missing), switch to `missing_data = mean_imputation` or `missing_data = median_imputation`. If a variable has more than 30% missing, do not include it.
-
-### Scale Inconsistency
-
-**Symptom:** Variables measured on different scales (some 1-5, some 1-10, some 0-100) dominate or are drowned out in the clustering.
-
-**Fix:** Keep `standardize = TRUE` (the default). The module standardises all variables to mean 0 and standard deviation 1 before clustering, which puts them on equal footing regardless of original scale.
-
-### Interpreting Too Much into Small Segments
-
-**Symptom:** A segment with 15 respondents is described in great detail and treated as a strategic target.
-
-**Fix:** Small segments have unreliable profiles. A mean based on 15 respondents has wide confidence intervals. Set `min_segment_size_pct` to at least 10% to flag segments that are too small to act on.
-
-------------------------------------------------------------------------
-
-## 9. Config Reference
+## 7. Configuration Reference
 
 All parameters available in the Config sheet, organised by category. Parameters are listed with their default values -- only set the ones you want to change.
 
 ### Core Settings (Required)
 
-| Parameter | Default | Description |
-|----|----|----|
-| `data_file` | (none) | Path to survey data file (.csv, .xlsx, .xls, .sav) |
-| `id_variable` | (none) | Column name for respondent ID |
-| `clustering_vars` | (none) | Comma-separated list of variables to cluster on |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `data_file` | text | *(none)* | Path to survey data file (.csv, .xlsx, .xls, .sav) |
+| `id_variable` | text | *(none)* | Column name for respondent ID (must be unique) |
+| `clustering_vars` | text | *(none)* | Comma-separated list of variables to cluster on |
 
 ### Core Settings (Optional)
 
-| Parameter | Default | Description |
-|----|----|----|
-| `data_sheet` | `Data` | Sheet name for Excel data files |
-| `profile_vars` | (all) | Comma-separated list of profiling variables (not clustering) |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `data_sheet` | text | `Data` | Sheet name when reading Excel data files |
+| `profile_vars` | text | *(all numeric)* | Comma-separated profiling variables (not used for clustering). If blank, all numeric non-clustering variables are used |
 
 ### Mode and K Settings
 
-| Parameter | Default | Description                                          |
-|-----------|---------|------------------------------------------------------|
-| `k_fixed` | (blank) | Fixed k for final mode. Leave blank for exploration. |
-| `k_min`   | `3`     | Minimum k to test in exploration mode (2-10)         |
-| `k_max`   | `6`     | Maximum k to test in exploration mode (2-15)         |
-| `seed`    | `123`   | Random seed for reproducibility                      |
+| Parameter | Type | Default | Allowed | Description |
+|-----------|------|---------|---------|-------------|
+| `k_fixed` | integer | *(blank)* | 2+ | Fixed k for final mode. Leave blank for exploration |
+| `k_min` | integer | `3` | 2-10 | Minimum k to test in exploration mode |
+| `k_max` | integer | `6` | 2-15 | Maximum k to test in exploration mode |
+| `seed` | integer | `123` | 1+ | Random seed for reproducibility |
 
-**Mode detection:** If `k_fixed` is blank, the module runs in exploration mode. If `k_fixed` is set, it runs in final mode.
+**Mode detection:** If `k_fixed` is blank or absent, the module runs in exploration mode. If `k_fixed` is set, it runs in final mode.
 
 ### Clustering Algorithm
 
-| Parameter | Default | Description |
-|----|----|----|
-| `method` | `kmeans` | Algorithm: `kmeans`, `hclust`, `gmm`, comma-separated list, or `all` |
-| `nstart` | `50` | Random starts for K-means (1-200). Higher = more stable. |
-| `linkage_method` | `ward.D2` | Linkage for hierarchical clustering: `ward.D`, `ward.D2`, `single`, `complete`, `average`, `mcquitty`, `median`, `centroid` |
-| `gmm_model_type` | (auto) | GMM covariance structure. Blank = auto-select by BIC. |
-| `use_lca` | `FALSE` | Enable Latent Class Analysis (requires `poLCA`) |
+| Parameter | Type | Default | Allowed | Description |
+|-----------|------|---------|---------|-------------|
+| `method` | text | `kmeans` | `kmeans`, `hclust`, `gmm`, comma-separated list, or `all` | Clustering algorithm(s) |
+| `nstart` | integer | `50` | 1-200 | Random starts for K-means. Higher = more stable |
+| `linkage_method` | text | `ward.D2` | `ward.D`, `ward.D2`, `single`, `complete`, `average`, `mcquitty`, `median`, `centroid` | Linkage for hierarchical clustering |
+| `gmm_model_type` | text | *(auto)* | mclust model names (e.g., `VVV`, `EEE`) | GMM covariance structure. Blank = auto-select by BIC |
+| `use_lca` | logical | `FALSE` | `TRUE`, `FALSE` | Enable Latent Class Analysis (requires `poLCA`) |
 
 ### Data Handling
 
-| Parameter | Default | Description |
-|----|----|----|
-| `missing_data` | `listwise_deletion` | Strategy: `listwise_deletion`, `mean_imputation`, `median_imputation`, `refuse` |
-| `missing_threshold` | `15` | Maximum % missing allowed per variable (0-100) |
-| `standardize` | `TRUE` | Standardise variables before clustering |
-| `min_segment_size_pct` | `10` | Minimum % of sample per segment (0-50). Warns if below. |
-| `scale_max` | (auto) | Maximum value on your rating scale (e.g., 10 for 1-10). Used by auto-naming and action cards. |
+| Parameter | Type | Default | Allowed | Description |
+|-----------|------|---------|---------|-------------|
+| `missing_data` | text | `listwise_deletion` | `listwise_deletion`, `mean_imputation`, `median_imputation`, `refuse` | How to handle missing values in clustering variables |
+| `missing_threshold` | numeric | `15` | 0-100 | Maximum % missing allowed per variable |
+| `standardize` | logical | `TRUE` | `TRUE`, `FALSE` | Standardise variables to z-scores before clustering |
+| `min_segment_size_pct` | numeric | `10` | 0-50 | Minimum % of sample per segment. Warns if any segment is below this |
+| `scale_max` | numeric | `10` | 1-100 | Maximum value on rating scale. Used by auto-naming and action cards |
 
 ### Outlier Detection
 
-| Parameter | Default | Description |
-|----|----|----|
-| `outlier_detection` | `FALSE` | Enable outlier detection |
-| `outlier_method` | `zscore` | Detection algorithm: `zscore` or `mahalanobis` |
-| `outlier_threshold` | `3.0` | Z-score threshold for flagging (1.0-5.0) |
-| `outlier_min_vars` | `1` | Minimum variables a respondent must be outlier on |
-| `outlier_handling` | `flag` | Action: `none`, `flag`, or `remove` |
-| `outlier_alpha` | `0.001` | Significance level for Mahalanobis method (0.0001-0.1) |
+| Parameter | Type | Default | Allowed | Description |
+|-----------|------|---------|---------|-------------|
+| `outlier_detection` | logical | `FALSE` | `TRUE`, `FALSE` | Enable outlier detection |
+| `outlier_method` | text | `zscore` | `zscore`, `mahalanobis` | Detection algorithm |
+| `outlier_threshold` | numeric | `3.0` | 1.0-5.0 | Z-score threshold for flagging outliers |
+| `outlier_min_vars` | integer | `1` | 1+ | Minimum variables a respondent must be outlier on to be flagged |
+| `outlier_handling` | text | `flag` | `none`, `flag`, `remove` | What to do with detected outliers |
+| `outlier_alpha` | numeric | `0.001` | 0.0001-0.1 | Significance level for Mahalanobis method |
 
 ### Variable Selection
 
-| Parameter | Default | Description |
-|----|----|----|
-| `variable_selection` | `FALSE` | Enable automatic variable reduction |
-| `variable_selection_method` | `variance_correlation` | Algorithm: `variance_correlation`, `factor_analysis`, or `both` |
-| `max_clustering_vars` | `10` | Target number of variables to keep (2-20) |
-| `varsel_min_variance` | `0.1` | Minimum variance threshold (0.01-1.0) |
-| `varsel_max_correlation` | `0.8` | Maximum allowed correlation (0.5-0.95) |
+| Parameter | Type | Default | Allowed | Description |
+|-----------|------|---------|---------|-------------|
+| `variable_selection` | logical | `FALSE` | `TRUE`, `FALSE` | Enable automatic variable reduction |
+| `variable_selection_method` | text | `variance_correlation` | `variance_correlation`, `factor_analysis`, `both` | Selection algorithm |
+| `max_clustering_vars` | integer | `10` | 2-20 | Target number of variables to keep |
+| `varsel_min_variance` | numeric | `0.1` | 0.01-1.0 | Minimum variance threshold |
+| `varsel_max_correlation` | numeric | `0.8` | 0.5-0.95 | Maximum allowed pairwise correlation |
 
 ### K Selection Metrics
 
-| Parameter | Default | Description |
-|----|----|----|
-| `k_selection_metrics` | `silhouette,elbow` | Comma-separated: `silhouette`, `elbow`, `gap` |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `k_selection_metrics` | text | `silhouette,elbow` | Comma-separated list of metrics to calculate |
 
 ### Output Settings
 
-| Parameter | Default | Description |
-|----|----|----|
-| `output_folder` | `output/` | Where to save results |
-| `output_prefix` | `seg_` | Filename prefix for all output files |
-| `create_dated_folder` | `TRUE` | Create timestamped subfolder for each run |
-| `save_model` | `TRUE` | Save model object (.rds) for scoring new data |
-| `segment_names` | `auto` | Custom names (comma-separated) or `auto` |
-| `auto_name_style` | `descriptive` | Auto-naming style: `descriptive`, `persona`, `simple` |
-| `question_labels_file` | (blank) | Path to Excel file with variable labels (optional) |
-| `segment_names_file` | (blank) | Path to Excel with edited segment names (Step 3 workflow) |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `output_folder` | text | `output/` | Directory for output files |
+| `output_prefix` | text | `seg_` | Filename prefix for all output files |
+| `create_dated_folder` | logical | `TRUE` | Create timestamped subfolder for each run |
+| `save_model` | logical | `TRUE` | Save model object (.rds) for scoring new data |
+| `segment_names` | text | `auto` | Custom names (comma-separated) or `auto` for auto-generation |
+| `auto_name_style` | text | `descriptive` | Auto-naming style: `descriptive`, `persona`, `simple` |
+| `question_labels_file` | text | *(blank)* | Path to Excel file with variable labels (two columns: variable, label) |
+| `segment_names_file` | text | *(blank)* | Path to Excel with edited segment names (Step 3 workflow) |
 
 ### Enhanced Features
 
-| Parameter | Default | Description |
-|----|----|----|
-| `generate_rules` | `FALSE` | Generate IF-THEN classification rules (requires `rpart`) |
-| `rules_max_depth` | `3` | Decision tree depth for rules (1-5) |
-| `generate_action_cards` | `FALSE` | Generate executive-ready segment action cards |
-| `run_stability_check` | `FALSE` | Run stability assessment across multiple seeds |
-| `stability_n_runs` | `5` | Number of runs for stability check (3-20) |
-| `golden_questions_n` | `3` | Number of top discriminating variables to identify (1-10) |
-| `demographic_vars` | (blank) | Comma-separated demographic variables for profiling |
+| Parameter | Type | Default | Allowed | Description |
+|-----------|------|---------|---------|-------------|
+| `generate_rules` | logical | `FALSE` | `TRUE`, `FALSE` | Generate IF-THEN classification rules (requires `rpart`) |
+| `rules_max_depth` | integer | `3` | 1-5 | Decision tree depth for rules |
+| `generate_action_cards` | logical | `FALSE` | `TRUE`, `FALSE` | Generate executive-ready segment action cards |
+| `run_stability_check` | logical | `FALSE` | `TRUE`, `FALSE` | Run stability assessment across multiple seeds |
+| `stability_n_runs` | integer | `5` | 3-20 | Number of runs for stability check |
+| `golden_questions_n` | integer | `3` | 1-10 | Number of top discriminating variables to identify |
+| `demographic_vars` | text | *(blank)* | | Comma-separated demographic variables for profiling |
 
 ### HTML Report
 
-| Parameter       | Default   | Description                                    |
-|-----------------|-----------|------------------------------------------------|
-| `html_report`   | `FALSE`   | Generate interactive HTML report               |
-| `brand_colour`  | `#323367` | Primary colour for headers, nav, charts (hex)  |
-| `accent_colour` | `#CC9900` | Accent colour for highlights and markers (hex) |
-| `report_title`  | (auto)    | Title displayed in report header               |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `html_report` | logical | `FALSE` | Generate interactive HTML report |
+| `brand_colour` | text | `#323367` | Primary colour for headers, nav, charts (hex) |
+| `accent_colour` | text | `#CC9900` | Accent colour for highlights and markers (hex) |
+| `report_title` | text | *(auto)* | Title displayed in report header |
 
 ### HTML Report Section Visibility
 
 Each section of the HTML report can be shown or hidden independently:
 
-| Parameter                | Default | Section                                 |
-|--------------------------|---------|-----------------------------------------|
-| `html_show_exec_summary` | `TRUE`  | Executive summary narrative             |
-| `html_show_overview`     | `TRUE`  | Segment sizes chart and table           |
-| `html_show_validation`   | `TRUE`  | Silhouette chart and validation metrics |
-| `html_show_importance`   | `TRUE`  | Variable importance (eta-squared) chart |
-| `html_show_profiles`     | `TRUE`  | Profile heatmap and table               |
-| `html_show_demographics` | `TRUE`  | Demographic breakdown by segment        |
-| `html_show_rules`        | `TRUE`  | Classification rules table              |
-| `html_show_cards`        | `TRUE`  | Segment action cards                    |
-| `html_show_stability`    | `TRUE`  | Stability assessment                    |
-| `html_show_membership`   | `TRUE`  | GMM membership probabilities            |
-| `html_show_guide`        | `TRUE`  | Interpretation guide                    |
+| Parameter | Default | Section |
+|-----------|---------|---------|
+| `html_show_exec_summary` | `TRUE` | Executive summary narrative |
+| `html_show_overview` | `TRUE` | Segment sizes chart and table |
+| `html_show_validation` | `TRUE` | Silhouette chart and validation metrics |
+| `html_show_importance` | `TRUE` | Variable importance (eta-squared) chart |
+| `html_show_profiles` | `TRUE` | Profile heatmap and table |
+| `html_show_demographics` | `TRUE` | Demographic breakdown by segment |
+| `html_show_rules` | `TRUE` | Classification rules table |
+| `html_show_cards` | `TRUE` | Segment action cards |
+| `html_show_stability` | `TRUE` | Stability assessment |
+| `html_show_membership` | `TRUE` | GMM membership probabilities |
+| `html_show_guide` | `TRUE` | Interpretation guide |
 
 ### Metadata
 
-| Parameter      | Default                 | Description                    |
-|----------------|-------------------------|--------------------------------|
-| `project_name` | `Segmentation Analysis` | Project name for reports       |
-| `analyst_name` | `Analyst`               | Analyst name for reports       |
-| `description`  | (blank)                 | Free-text analysis description |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `project_name` | text | `Segmentation Analysis` | Project name for reports |
+| `analyst_name` | text | `Analyst` | Analyst name for reports |
+| `description` | text | *(blank)* | Free-text analysis description |
 
-### Complete Example: Exploration Config
+### Complete Config Examples
 
-```         
+**Exploration config:**
+
+```
 Setting                | Value
 -----------------------|------------------------------------------
 data_file              | data/customer_survey_2026.csv
@@ -934,9 +877,9 @@ report_title           | Customer Segmentation Exploration
 project_name           | Q1 2026 Customer Segmentation
 ```
 
-### Complete Example: Final Config
+**Final config:**
 
-```         
+```
 Setting                  | Value
 -------------------------|------------------------------------------
 data_file                | data/customer_survey_2026.csv
@@ -977,9 +920,9 @@ project_name             | Q1 2026 Customer Segmentation
 analyst_name             | Research Team
 ```
 
-### Complete Example: Multi-Method Comparison Config
+**Multi-method comparison config:**
 
-```         
+```
 Setting                  | Value
 -------------------------|------------------------------------------
 data_file                | data/customer_survey_2026.csv
@@ -1000,29 +943,419 @@ project_name             | Multi-Method Comparison
 
 ------------------------------------------------------------------------
 
+## 8. Interpreting Results
+
+### Reading the HTML Report
+
+The HTML report is a self-contained file you can email, share, or present. Each section provides a different lens on the segmentation.
+
+**Executive Summary** -- A plain-English overview generated automatically. It tells you how many segments were found, the overall quality of the solution, which segment is largest, which variables differentiate best, and any warnings. Read this first to get the big picture.
+
+Quality assessment thresholds:
+
+| Rating | Silhouette Score | Meaning |
+|--------|------------------|---------|
+| Excellent | > 0.50 | Strong, well-separated segments |
+| Good | 0.35 - 0.50 | Meaningful segments with some overlap |
+| Moderate | 0.25 - 0.35 | Segments exist but boundaries are fuzzy |
+| Limited | < 0.25 | Weak structure -- consider a different approach |
+
+**Segment Overview** -- A bar chart and table showing how many respondents are in each segment and their percentage of the total. Look for reasonably balanced sizes. If one segment has 60% and another has 5%, the solution may be picking up on a dominant pattern rather than useful sub-groups.
+
+**Validation Metrics** -- A silhouette chart showing how well each respondent fits their assigned segment. Respondents with negative silhouette values are closer to a neighbouring segment than to their own. A few are normal; many indicate a problem.
+
+Additional metrics:
+- **BSS/TSS:** Proportion of variance explained by the segments. Higher is better. Above 0.40 is typical for survey data.
+- **Calinski-Harabasz index:** Higher is better. No absolute threshold; useful for comparing solutions.
+- **Davies-Bouldin index:** Lower is better. Below 1.0 is generally good.
+
+### Understanding Segment Profiles
+
+The profile heatmap and table show the mean score for each variable in each segment, alongside the overall mean.
+
+**Reading the heatmap:** Darker cells indicate higher scores. Look for the pattern -- which segments score high on which variables? Variables are sorted by importance (eta-squared), so the most differentiating variables appear at the top.
+
+**Index scores:** Some outputs show index scores (segment mean / overall mean * 100). An index of 120 means that segment scores 20% above average. An index of 80 means 20% below average. Indices above 110 and below 90 are generally noteworthy.
+
+### Variable Importance (Eta-Squared)
+
+The variable importance chart shows how much each variable contributes to distinguishing the segments.
+
+| Eta-squared | Interpretation |
+|-------------|----------------|
+| > 0.14 | Large effect -- strong differentiator |
+| 0.06 - 0.14 | Medium effect -- meaningful differentiator |
+| 0.01 - 0.06 | Small effect -- weak differentiator |
+| < 0.01 | Negligible -- not useful for this segmentation |
+
+**Important note:** Because segments are *defined* by these variables, p-values in the statistical tests are descriptive, not inferential. Focus on effect sizes (eta-squared), not p-values.
+
+### Using Golden Questions for Prediction
+
+Golden questions are the 3-5 variables (configurable via `golden_questions_n`) that best discriminate between segments. They are identified using Random Forest variable importance, which captures non-linear relationships that eta-squared may miss.
+
+These are your "typing" questions. If you could only ask a few questions to assign a new respondent to a segment, these would be the ones. They are useful for:
+- Shortening a screening questionnaire
+- Building a typing tool for ongoing classification
+- Understanding which variables really drive the segmentation
+
+### Interpreting Vulnerability / Switching Analysis
+
+Every final run includes a vulnerability analysis that identifies respondents whose segment assignment is borderline.
+
+**What it measures:**
+- **Assignment confidence** (0 to 1): How firmly each respondent belongs to their segment. For K-means and hierarchical, this is based on distance ratios. For GMM, it uses probability margins.
+- **Vulnerable flag:** Respondents with confidence below 0.3 (the default threshold).
+- **Would switch to:** The segment each borderline respondent would join if reassigned.
+- **Switching matrix:** Counts of potential switches between segment pairs, showing which segments have the most overlap.
+
+**Interpreting the vulnerability rate:**
+
+| % Vulnerable | Interpretation |
+|--------------|----------------|
+| < 15% | Strong segmentation with clear boundaries |
+| 15-30% | Moderate overlap between some segments |
+| > 30% | Significant overlap -- consider fewer segments or different variables |
+
+**Note on GMM:** GMM naturally produces lower vulnerability rates because its probability-based assignments provide sharper confidence scores. Do not compare vulnerability rates across methods.
+
+### Using Action Cards
+
+Action cards provide executive-ready summaries for each segment:
+- **Segment name and size**
+- **Defining characteristics** -- what makes this segment unique
+- **Strengths** -- highest-scoring variables relative to the overall mean
+- **Pain points** -- lowest-scoring variables relative to the overall mean
+- **Recommended actions** -- auto-generated suggestions based on the profile
+
+These are designed to be shared directly with stakeholders who need to act on the segments without reading the full technical report.
+
+### Classification Rules
+
+When enabled (`generate_rules = TRUE`), the module uses a decision tree to produce plain-English IF-THEN rules for segment membership. For example:
+
+> IF Product Quality >= 7.5 AND Service Rating >= 6.0 THEN Segment = Advocates (accuracy: 82%)
+
+These rules simplify the complex multivariate clustering into a few decision points. They are approximate (the decision tree will not perfectly replicate the clustering) but give stakeholders an intuitive understanding of what defines each segment.
+
+------------------------------------------------------------------------
+
+## 9. Common Pitfalls
+
+### Too Many Clustering Variables
+
+**Symptom:** Segments are hard to interpret. Silhouette score is low. Solution is unstable across runs.
+
+**Why it happens:** With too many variables, the high-dimensional space becomes sparse (the "curse of dimensionality"). Distances between respondents become less meaningful, and noise variables dilute the signal.
+
+**Fix:** Aim for 5-12 clustering variables. Enable `variable_selection = TRUE` to automatically reduce your variable set, or manually select variables based on theory. Check the Variable_Contribution sheet to identify variables with minimal impact.
+
+**Recommendation:** Start with variables you expect to differentiate your market based on prior knowledge or business hypotheses. Add more only if the initial set does not produce interpretable segments.
+
+### Highly Correlated Inputs
+
+**Symptom:** Two or more variables that measure essentially the same thing dominate the clustering. Segments are defined by this one dimension rather than a balanced set of attributes.
+
+**Why it happens:** K-means treats each variable equally. If you have three satisfaction measures that are all correlated at r=0.9, they act as a triple-weighted single variable, pulling the segmentation toward satisfaction as the primary axis.
+
+**Fix:** Check the correlation matrix in the pre-clustering checks output. Remove one variable from each highly correlated pair, or enable variable selection with `varsel_max_correlation = 0.8`.
+
+### Unstandardised Data
+
+**Symptom:** Variables measured on different scales (1-5, 1-10, 0-100) produce segments dominated by the high-range variable.
+
+**Why it happens:** K-means uses Euclidean distance. A variable on a 0-100 scale will have 10-20 times the range of a 1-5 scale, making it dominate the distance calculation.
+
+**Fix:** Keep `standardize = TRUE` (the default). This converts all variables to z-scores (mean=0, SD=1) before clustering. Only set it to `FALSE` if all your variables are already on the same scale and you have a specific reason not to standardise.
+
+### Small Segments (< 5% of Sample)
+
+**Symptom:** A segment with 15 respondents is described in great detail and treated as a strategic target.
+
+**Why it happens:** The clustering algorithm optimises statistical fit, not business utility. A tiny cluster may be statistically valid but practically useless -- its profiles have wide confidence intervals and it is too small to target.
+
+**Fix:** Set `min_segment_size_pct` to at least 10%. If small segments persist, try fewer clusters. A two-respondent segment is a pair of outliers, not a market segment.
+
+### Overfitting with Too Many Segments
+
+**Symptom:** Every k you test improves the silhouette score slightly. You end up with 7 or 8 segments, but some pairs are nearly indistinguishable in their profiles.
+
+**Why it happens:** More clusters always produce a tighter fit to the data. With enough clusters, each respondent becomes their own segment -- perfect statistical fit, zero business value.
+
+**Fix:** Apply the practical tests from Section 4. Can you name each segment distinctively? Can you act on each one differently? Would a stakeholder remember them? If any answer is "no," you have too many.
+
+### Including Demographics as Clustering Variables
+
+**Symptom:** Segments are defined primarily by age, gender, or region. The segmentation tells you things you already knew.
+
+**Why it happens:** Demographics are strongly discriminating variables. If you include age in the clustering, you will get age-based segments, which you could have created with a simple cross-tab.
+
+**Fix:** Remove all demographic variables from `clustering_vars`. Use them as `profile_vars` or `demographic_vars` instead. Demographics should describe your segments, not define them.
+
+### Not Checking Stability
+
+**Symptom:** Re-running the analysis with a different seed produces different segments.
+
+**Fix:** Enable stability checking (`run_stability_check = TRUE`). Interpretation:
+
+| Stability Score | Interpretation |
+|----------------|----------------|
+| >= 90% | Excellent -- very stable |
+| 80-89% | Good -- reasonably stable |
+| 70-79% | Acceptable -- some instability |
+| 60-69% | Marginal -- review variables and k |
+| < 60% | Poor -- solution is unreliable |
+
+If stability is below 80%, try: reducing the number of variables, reducing k, increasing `nstart` (try 100), or switching to hierarchical clustering (which is deterministic).
+
+### Scale Inconsistency
+
+**Symptom:** Variables measured on different scales produce distorted clusters.
+
+**Fix:** Keep `standardize = TRUE`. If you have a specific reason to use raw values, ensure all variables are on the same scale.
+
+------------------------------------------------------------------------
+
+## 10. R Package Dependencies
+
+### Required Packages
+
+These packages must be installed for the core module to function:
+
+| Package | Minimum Version | Purpose |
+|---------|----------------|---------|
+| `stats` | *(base R)* | K-means clustering (`kmeans()`), scaling, basic statistics |
+| `cluster` | 2.1.0+ | Silhouette analysis (`silhouette()`), cluster validation metrics |
+| `readxl` | 1.4.0+ | Reading Excel config and data files |
+| `openxlsx` | 4.2.0+ | Writing Excel output files with formatting |
+| `htmltools` | 0.5.0+ | HTML report generation |
+
+### Optional Packages
+
+These packages enable additional features and are loaded on demand:
+
+| Package | Purpose | Required When |
+|---------|---------|---------------|
+| `mclust` | Gaussian Mixture Models (GMM) | `method = gmm` |
+| `poLCA` | Latent Class Analysis (LCA) | `use_lca = TRUE` |
+| `rpart` | Decision tree classification rules | `generate_rules = TRUE` |
+| `randomForest` | Golden questions (variable importance via Random Forest) | Golden questions feature (always attempted in final mode) |
+| `fastcluster` | Faster hierarchical clustering for large datasets | `method = hclust` with large n (auto-detected) |
+| `MASS` | Mahalanobis distance for outlier detection; discriminant analysis | `outlier_method = mahalanobis` |
+| `psych` | Factor analysis for variable selection | `variable_selection_method = factor_analysis` |
+| `haven` | Reading SPSS (.sav) data files | When data file is .sav format |
+| `writexl` | Alternative Excel writer (used in some scoring exports) | Scoring functions |
+| `jsonlite` | JSON output for programmatic access | JSON export features |
+
+### Minimum R Version
+
+**R 4.0 or later** is required. The module uses features introduced in R 4.0 including the pipe-friendly error handling and updated default random number generation.
+
+### Installing Dependencies
+
+Install all required and commonly used optional packages at once:
+
+```r
+install.packages(c(
+  "cluster", "readxl", "openxlsx", "htmltools",
+  "mclust", "rpart", "randomForest", "MASS", "psych", "haven"
+))
+```
+
+If you are using `renv` for package management:
+
+```r
+renv::install(c(
+  "cluster", "readxl", "openxlsx", "htmltools",
+  "mclust", "rpart", "randomForest", "MASS", "psych", "haven"
+))
+renv::snapshot()
+```
+
+### Checking Dependencies
+
+The module checks for required packages at startup and for optional packages when the relevant feature is invoked. If a package is missing, you will receive a TRS refusal with a clear error message including the install command:
+
+```
+[SEGMENT REFUSED] PKG_CLUSTER_MISSING
+  Package 'cluster' is not installed.
+  Install the package with: install.packages('cluster')
+```
+
+------------------------------------------------------------------------
+
+## 11. Troubleshooting
+
+### "Config file not found"
+
+**Error code:** `IO_*`
+
+**Cause:** The `data_file` or config file path is incorrect, or the file has been moved.
+
+**Fix:**
+- Check that the file path is correct. Use `file.exists("path/to/file.csv")` in R to verify.
+- Paths are relative to the working directory. Use `getwd()` to check where R is looking.
+- Ensure the file extension matches the actual format (.csv, .xlsx, .sav).
+
+### "Clustering variable not found in data"
+
+**Error code:** `DATA_*`
+
+**Cause:** A variable name in `clustering_vars` does not match any column in the data file.
+
+**Fix:**
+- Variable names are case-sensitive. `Q01` is not the same as `q01`.
+- Open your data file and check the exact column headers.
+- Watch for trailing spaces in variable names (common when copying from Excel).
+
+### "Non-numeric clustering variables"
+
+**Error code:** `DATA_NON_NUMERIC_VARS`
+
+**Cause:** One or more clustering variables contain text or mixed data types.
+
+**Fix:**
+- Check the identified variables in your data file.
+- Common causes: a "Don't know" response coded as text instead of NA, or a column that should be numeric but has been read as character due to a formatting issue.
+- Clean the data and ensure all clustering columns are numeric.
+
+### "Duplicate ID values"
+
+**Error code:** `DATA_DUPLICATE_IDS`
+
+**Cause:** The ID column contains duplicate values.
+
+**Fix:**
+- Check for and remove duplicate rows in your data.
+- If duplicates are intentional (e.g., multiple responses per respondent), you need to restructure the data to one row per respondent before segmenting.
+
+### "Insufficient sample size"
+
+**Error code:** `DATA_INSUFFICIENT_SAMPLE`
+
+**Cause:** The sample is too small for the requested number of segments. The module requires at least 50 respondents per segment.
+
+**Fix:**
+- Reduce `k_max` or `k_fixed` to a value your sample can support.
+- Check if too many respondents are being removed by missing data handling. Try `missing_data = mean_imputation` instead of `listwise_deletion`.
+- Check if outlier removal is reducing the sample excessively.
+
+### "Zero variance variables"
+
+**Error code:** `DATA_ZERO_VARIANCE`
+
+**Cause:** One or more clustering variables have the same value for every respondent. These cannot be standardised (division by zero) and contribute nothing to clustering.
+
+**Fix:**
+- Remove the identified variable(s) from `clustering_vars`.
+- This often happens with filter questions where a screened sample all gave the same qualifying answer.
+
+### "Low silhouette score"
+
+**Not an error, but a quality warning.**
+
+**Cause:** The segments are not well-separated. Respondents do not cluster neatly into distinct groups on the chosen variables.
+
+**Fix:**
+- Try fewer segments (lower k).
+- Review your clustering variables. Remove variables with low eta-squared (marked "MINIMAL IMPACT" in the exploration report).
+- Try a different clustering method (e.g., GMM if you suspect overlapping clusters).
+- Consider whether the data genuinely contains distinct segments. Not all markets segment cleanly.
+
+### "K-means did not converge"
+
+**Cause:** The K-means algorithm reached its maximum iterations without finding stable cluster centres.
+
+**Fix:**
+- Increase `nstart` to 100 or higher. More random starts increases the chance of finding a good solution.
+- Check for extreme outliers that may be pulling centres around. Enable `outlier_detection = TRUE`.
+- Try `method = hclust` as an alternative (deterministic, always converges).
+
+### "Package X is not installed"
+
+**Error code:** `PKG_*`
+
+**Cause:** A required or optional package is missing.
+
+**Fix:**
+- The error message includes the exact install command. Run it in R.
+- If you are using `renv`, use `renv::install("package_name")` followed by `renv::snapshot()`.
+
+### "Excessive missing data"
+
+**Error code:** `DATA_EXCESSIVE_MISSING`
+
+**Cause:** The percentage of missing data exceeds the `missing_threshold`.
+
+**Fix:**
+- Identify which variables have the most missing data and consider removing them from `clustering_vars`.
+- Increase `missing_threshold` if you are comfortable with more missing data.
+- Switch from `refuse` to `mean_imputation` or `median_imputation`.
+- If a variable has more than 30% missing, strongly consider dropping it.
+
+### "Error occurred but I cannot see details in Shiny"
+
+**Cause:** Turas runs through a Shiny application, which can suppress error output in the browser.
+
+**Fix:**
+- Check the R console where you launched the Shiny app. All errors are written to the console with boxed formatting.
+- Look for `=== TURAS ERROR ===` or `[SEGMENT REFUSED]` in the console output.
+- The error message includes a code, description, and a "how to fix" instruction.
+
+### "Model file not found" (when scoring)
+
+**Error code:** `IO_MODEL_FILE_MISSING`
+
+**Cause:** The `.rds` model file is missing when attempting to score new data.
+
+**Fix:**
+- Ensure the original segmentation was run with `save_model = TRUE`.
+- Check the file path. Model files are saved in the output folder with the configured prefix (e.g., `seg_model.rds`).
+- If using dated folders (`create_dated_folder = TRUE`), check inside the timestamped subfolder.
+
+### "Missing variables in new data" (when scoring)
+
+**Error code:** `DATA_MISSING_VARIABLES`
+
+**Cause:** The new data for scoring does not contain all the clustering variables from the original model.
+
+**Fix:**
+- Ensure the new data file contains exactly the same clustering variable columns as the original.
+- Column names must match exactly (case-sensitive).
+- If your survey changed between waves, you may need to rebuild the segmentation model.
+
+### Console Output Is Missing or Truncated
+
+**Cause:** R console buffer may be too small, or the Shiny app is capturing output.
+
+**Fix:**
+- Increase console buffer size in RStudio: Tools > Global Options > Console > Limit visible console output.
+- When running from the command line, redirect output to a file: `Rscript run_segment.R config.xlsx > output.log 2>&1`
+
+------------------------------------------------------------------------
+
 ## Output File Reference
 
 ### Exploration Mode
 
 | File | Content |
-|----|----|
-| `seg_k_selection_report.xlsx` | Metrics comparison, recommendation, profiles per k |
+|------|---------|
+| `seg_k_selection_report.xlsx` | Metrics comparison, recommendation, profiles per k, variable contribution |
 | `seg_k_selection_report.html` | Interactive HTML with elbow and silhouette charts |
-| `seg_model.rds` | Saved model object |
 
 ### Final Mode
 
 | File | Content |
-|----|----|
+|------|---------|
 | `seg_segmentation_report.xlsx` | Summary, profiles, statistics, validation |
 | `seg_segmentation_report.html` | Interactive HTML report with all enabled sections |
-| `seg_segment_assignments.xlsx` | ID + segment_id + segment_name (+ GMM probs) |
+| `seg_segment_assignments.xlsx` | ID + segment_id + segment_name (+ GMM probabilities if applicable) |
 | `seg_model.rds` | Saved model for scoring new data |
 
 ### Multi-Method Mode
 
 | File | Content |
-|----|----|
+|------|---------|
 | `seg_kmeans_assignments.xlsx` | K-means segment assignments |
 | `seg_hclust_assignments.xlsx` | Hierarchical segment assignments |
 | `seg_gmm_assignments.xlsx` | GMM segment assignments (with probabilities) |
@@ -1033,52 +1366,44 @@ project_name             | Multi-Method Comparison
 
 ------------------------------------------------------------------------
 
-## Scoring New Data
+## Using Segments in Other Turas Modules
 
-After building a segmentation, you can assign new respondents to the existing segments without re-running the full analysis.
+Once you have a segmentation, you can use those segments as banners in cross-tabs, as subgroups in key driver analysis, or in other downstream work.
 
-### Requirements
+### Merging Segments onto Your Data
 
--   The original model was saved (`save_model = TRUE` in the config)
--   The new data contains the same clustering variables as the original
+The module provides a utility function:
 
-### How to Score
+```r
+source("modules/segment/R/10_utilities.R")
 
-``` r
-source("modules/segment/R/08_scoring.R")
-
-scores <- score_new_data(
-  model_file  = "output/seg_model.rds",
-  new_data    = new_survey_data,
-  id_variable = "respondent_id",
-  output_file = "output/new_respondent_scores.xlsx"
+merge_result <- merge_segment_to_data(
+  data_path       = "data/survey_data.csv",
+  assignment_path = "output/seg_segment_assignments.xlsx",
+  id_column       = "respondent_id",
+  output_path     = "data/survey_data_with_segments.csv"
 )
 ```
 
-Each respondent receives: - `segment` -- Assigned segment number - `segment_name` -- Segment label - `distance_to_center` -- Distance from cluster centroid - `assignment_confidence` -- Confidence score (0-1)
+### Using Segments as a Banner in the Tabs Module
 
-### Monitoring Segment Drift
+1. Merge your segment onto the data.
+2. In the Tabs config, add `segment_name` as a banner variable.
 
-Over time, the distribution of new respondents across segments may shift. Use:
+### Using Segments in Key Driver or Categorical Driver Analysis
 
-``` r
-drift <- compare_segment_distributions(
-  model_file     = "output/seg_model.rds",
-  scoring_result = scores
-)
-```
-
-If any segment changes by more than 10 percentage points, consider re-running the full segmentation on the combined data.
+1. Merge your segment onto the data.
+2. In the Key Driver or catdriver config file, add a Segments sheet defining each segment by its `segment_name` column value.
 
 ------------------------------------------------------------------------
 
 ## Additional Resources
 
--   [03_REFERENCE_GUIDE.md](03_REFERENCE_GUIDE.md) -- Statistical methods reference
--   [05_TECHNICAL_DOCS.md](05_TECHNICAL_DOCS.md) -- Developer documentation
--   [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) -- Complete field-by-field template reference
--   [07_EXAMPLE_WORKFLOWS.md](07_EXAMPLE_WORKFLOWS.md) -- Practical example workflows
--   [08_HTML_REPORT_GUIDE.md](08_HTML_REPORT_GUIDE.md) -- HTML report features and usage
+- [03_REFERENCE_GUIDE.md](03_REFERENCE_GUIDE.md) -- Statistical methods reference
+- [05_TECHNICAL_DOCS.md](05_TECHNICAL_DOCS.md) -- Developer documentation
+- [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) -- Complete field-by-field template reference
+- [07_EXAMPLE_WORKFLOWS.md](07_EXAMPLE_WORKFLOWS.md) -- Practical example workflows
+- [08_HTML_REPORT_GUIDE.md](08_HTML_REPORT_GUIDE.md) -- HTML report features and usage
 
 ------------------------------------------------------------------------
 

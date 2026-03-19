@@ -108,39 +108,67 @@ write_config_workbook <- function(config_df, output_path) {
   wb <- createWorkbook()
   addWorksheet(wb, "Config")
 
-  # Header style
+  # Branded header style (Turas navy with gold accent border)
   header_style <- createStyle(
-    fontName = "Arial",
+    fontName = "Aptos",
     fontSize = 11,
     textDecoration = "bold",
     fgFill = "#323367",
     fontColour = "#FFFFFF",
     halign = "left",
+    valign = "center",
     border = "Bottom",
     borderColour = "#CC9900",
-    borderStyle = "medium"
+    borderStyle = "medium",
+    wrapText = TRUE
   )
 
-  # Data style
-  data_style <- createStyle(
-    fontName = "Arial",
-    fontSize = 10,
+  # Setting name style (left-aligned, medium weight)
+  setting_style <- createStyle(
+    fontName = "Aptos",
+    fontSize = 11,
     halign = "left",
-    wrapText = FALSE
+    valign = "center",
+    textDecoration = "bold"
+  )
+
+  # Value style (left-aligned)
+  value_style <- createStyle(
+    fontName = "Aptos",
+    fontSize = 11,
+    halign = "left",
+    valign = "center"
+  )
+
+  # Alternating row style
+  alt_row_style <- createStyle(
+    fontName = "Aptos",
+    fontSize = 11,
+    fgFill = "#F5F7FA",
+    halign = "left",
+    valign = "center"
   )
 
   # Write data
   writeData(wb, "Config", config_df, headerStyle = header_style)
 
-  # Apply data style
-  addStyle(wb, "Config", data_style,
-           rows = 2:(nrow(config_df) + 1),
-           cols = 1:2,
-           gridExpand = TRUE)
+  # Apply styles row by row
+  for (i in seq_len(nrow(config_df))) {
+    row <- i + 1  # +1 for header
+    addStyle(wb, "Config", setting_style, rows = row, cols = 1)
+    if (i %% 2 == 0) {
+      addStyle(wb, "Config", alt_row_style, rows = row, cols = 1:2, gridExpand = TRUE, stack = TRUE)
+    } else {
+      addStyle(wb, "Config", value_style, rows = row, cols = 2)
+    }
+  }
 
   # Set column widths
   setColWidths(wb, "Config", cols = 1, widths = 30)
   setColWidths(wb, "Config", cols = 2, widths = 80)
+
+  # Freeze header
+  freezePane(wb, "Config", firstRow = TRUE)
 
   # Save
   saveWorkbook(wb, output_path, overwrite = TRUE)
@@ -271,13 +299,35 @@ write_config_workbook(config4_df,
 
 
 # ==========================================================================
+# CONFIG 5: Combined Multi-Method Comparison
+# ==========================================================================
+# Runs K-means, Hierarchical, and GMM simultaneously and produces
+# a side-by-side comparison report. Useful for method validation.
+
+config5 <- common_settings()
+config5$method         <- "kmeans,hclust,gmm"
+config5$k_fixed        <- "4"
+config5$nstart         <- "50"
+config5$linkage_method <- "ward.D2"
+config5$gmm_model_type <- "VVV"
+config5$seed           <- "123"
+config5$output_prefix  <- "demo_combined_"
+config5$report_title   <- "Customer Segmentation - Multi-Method Comparison"
+
+config5_df <- build_config_df(config5)
+write_config_workbook(config5_df,
+  file.path(script_dir, "demo_combined_config.xlsx"))
+
+
+# ==========================================================================
 # Summary
 # ==========================================================================
 
 cat("\n==============================================================\n")
-cat("  Config generation complete. 4 files created:\n")
-cat("  1. demo_kmeans_explore.xlsx  (exploration, k=3-6)\n")
-cat("  2. demo_kmeans_final.xlsx    (k-means, k=4)\n")
-cat("  3. demo_hclust_final.xlsx    (hierarchical, k=4)\n")
-cat("  4. demo_gmm_final.xlsx       (GMM, k=4)\n")
+cat("  Config generation complete. 5 files created:\n")
+cat("  1. demo_kmeans_explore.xlsx   (exploration, k=3-6)\n")
+cat("  2. demo_kmeans_final.xlsx     (k-means, k=4)\n")
+cat("  3. demo_hclust_final.xlsx     (hierarchical, k=4)\n")
+cat("  4. demo_gmm_final.xlsx        (GMM, k=4)\n")
+cat("  5. demo_combined_config.xlsx  (multi-method comparison, k=4)\n")
 cat("==============================================================\n")
