@@ -78,6 +78,27 @@ var SimCharts = (function() {
     // Product configuration grid below the chart
     var gridHtml = buildProductGrid(products, shares);
     container.innerHTML = svg + gridHtml;
+
+    // Add sticky annotations showing share percentage on each bar
+    _injectAnnotationStyle();
+    var svgEl = container.querySelector("svg");
+    if (svgEl) {
+      var svgRect = svgEl.getBoundingClientRect();
+      var containerRect = container.getBoundingClientRect();
+      var scaleX = svgEl.viewBox.baseVal.width / svgRect.width;
+      var scaleY = svgEl.viewBox.baseVal.height / svgRect.height;
+      var offsetLeft = svgRect.left - containerRect.left;
+      var offsetTop = svgRect.top - containerRect.top;
+
+      for (var ai = 0; ai < n; ai++) {
+        var ay = ai * (barH + gap) + 10;
+        var abw = Math.max((shares[ai] / maxShare) * pw, 2);
+        // Position annotation at end of bar
+        var annX = offsetLeft + (ml + abw) / scaleX;
+        var annY = offsetTop + (ay + barH / 2) / scaleY;
+        addAnnotation(container, annX, annY, shares[ai].toFixed(1) + "%");
+      }
+    }
   }
 
   function getProductDescriptor(config, maxAttrs) {
@@ -165,6 +186,26 @@ var SimCharts = (function() {
 
     svg += '</svg>';
     container.innerHTML = svg;
+
+    // Add sticky annotations at each data point
+    _injectAnnotationStyle();
+    var sensSvgEl = container.querySelector("svg");
+    if (sensSvgEl) {
+      var sensSvgRect = sensSvgEl.getBoundingClientRect();
+      var sensContRect = container.getBoundingClientRect();
+      var sensScaleX = sensSvgEl.viewBox.baseVal.width / sensSvgRect.width;
+      var sensScaleY = sensSvgEl.viewBox.baseVal.height / sensSvgRect.height;
+      var sensOffLeft = sensSvgRect.left - sensContRect.left;
+      var sensOffTop = sensSvgRect.top - sensContRect.top;
+
+      for (var si = 0; si < n; si++) {
+        var sx = ml + (si / Math.max(n - 1, 1)) * pw;
+        var sy = mt + (1 - (sweepResults[si].share - minS) / (maxS - minS)) * ph;
+        var sannX = sensOffLeft + sx / sensScaleX;
+        var sannY = sensOffTop + sy / sensScaleY;
+        addAnnotation(container, sannX, sannY, sweepResults[si].share.toFixed(1) + "%");
+      }
+    }
   }
 
 
@@ -378,6 +419,56 @@ var SimCharts = (function() {
   }
 
 
+  // === STICKY ANNOTATIONS ===
+
+  /**
+   * Create a sticky annotation label at a given position within a chart container.
+   * The annotation is a small tooltip-like div with a triangle pointer underneath.
+   * @param {HTMLElement} chartContainer - The container element (must have position:relative)
+   * @param {number} x - Left position in pixels
+   * @param {number} y - Top position in pixels (annotation appears above this point)
+   * @param {string} text - Label text
+   * @returns {HTMLElement} The annotation element
+   */
+  function addAnnotation(chartContainer, x, y, text) {
+    // Ensure container has relative positioning for absolute children
+    var pos = window.getComputedStyle(chartContainer).position;
+    if (pos === "static" || pos === "") {
+      chartContainer.style.position = "relative";
+    }
+
+    var ann = document.createElement("div");
+    ann.className = "cj-sticky-annotation";
+    ann.textContent = text;
+    ann.style.cssText = "position:absolute;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:500;color:#1e293b;white-space:nowrap;pointer-events:none;transform:translate(-50%,-100%);margin-top:-8px;z-index:5;";
+    ann.style.left = x + "px";
+    ann.style.top = y + "px";
+
+    // Triangle pointer underneath
+    var tri = document.createElement("div");
+    tri.style.cssText = "position:absolute;left:50%;bottom:-5px;transform:translateX(-50%);width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid #e2e8f0;";
+    ann.appendChild(tri);
+
+    // Inner triangle (white fill) to cover the border
+    var triInner = document.createElement("div");
+    triInner.style.cssText = "position:absolute;left:50%;bottom:-4px;transform:translateX(-50%);width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:4px solid #fff;";
+    ann.appendChild(triInner);
+
+    chartContainer.appendChild(ann);
+    return ann;
+  }
+
+  // Inject annotation CSS (once)
+  var _annStyleInjected = false;
+  function _injectAnnotationStyle() {
+    if (_annStyleInjected) return;
+    _annStyleInjected = true;
+    var style = document.createElement("style");
+    style.textContent = ".cj-sticky-annotation { box-shadow: 0 1px 3px rgba(0,0,0,0.08); }";
+    document.head.appendChild(style);
+  }
+
+
   function escSvg(s) {
     return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
@@ -387,6 +478,7 @@ var SimCharts = (function() {
     renderShareBars: renderShareBars,
     renderSensitivity: renderSensitivity,
     renderSourceOfVolume: renderSourceOfVolume,
-    renderDemandCurve: renderDemandCurve
+    renderDemandCurve: renderDemandCurve,
+    addAnnotation: addAnnotation
   };
 })();

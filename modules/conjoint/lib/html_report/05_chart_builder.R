@@ -18,14 +18,14 @@
   )
 }
 
-.svg_gridline <- function(x1, y1, x2, y2) {
+.svg_gridline <- function(x1, y1, x2, y2, colour = "#f1f5f9") {
   sprintf(
-    '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#e2e8f0" stroke-width="1"/>',
-    x1, y1, x2, y2
+    '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="1"/>',
+    x1, y1, x2, y2, colour
   )
 }
 
-.svg_axis_label <- function(x, y, label, anchor = "middle", size = 11, weight = 500) {
+.svg_axis_label <- function(x, y, label, anchor = "middle", size = 11, weight = 400) {
   sprintf(
     '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#64748b" font-size="%d" font-weight="%d">%s</text>',
     x, y, anchor, size, weight, label
@@ -69,7 +69,7 @@ build_importance_chart <- function(importance, brand_colour = "#323367") {
 
   elements <- character()
 
-  # Gridlines (skip tick=0 to remove left-edge clutter)
+  # Horizontal gridlines at each tick mark
   max_imp <- max(imp_sorted$Importance, 50)
   grid_ticks <- seq(0, ceiling(max_imp / 10) * 10, by = 10)
   for (tick in grid_ticks) {
@@ -79,8 +79,17 @@ build_importance_chart <- function(importance, brand_colour = "#323367") {
     elements <- c(elements, .svg_axis_label(x, chart_height - margin_bottom + 16, sprintf("%d%%", tick)))
   }
 
-  # Mean importance reference line
+  # Bottom axis line and left axis line only (no outer box)
+  elements <- c(elements, sprintf(
+    '<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#cbd5e1" stroke-width="1"/>',
+    margin_left, chart_height - margin_bottom, chart_width - margin_right, chart_height - margin_bottom
+  ))
+  elements <- c(elements, sprintf(
+    '<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#cbd5e1" stroke-width="1"/>',
+    margin_left, margin_top, margin_left, chart_height - margin_bottom
+  ))
 
+  # Mean importance reference line
   mean_imp <- mean(imp_sorted$Importance)
   mean_x <- margin_left + (mean_imp / max_imp) * plot_w
   elements <- c(elements, sprintf(
@@ -92,29 +101,37 @@ build_importance_chart <- function(importance, brand_colour = "#323367") {
     mean_x, margin_top - 4
   ))
 
-  # Bars with opacity gradient: least important (0.70) → most important (0.95)
+  # Bars with opacity gradient: least important (0.70) -> most important (0.95)
   for (i in seq_len(n)) {
     y <- margin_top + (i - 1) * (bar_height + bar_gap)
     w <- (imp_sorted$Importance[i] / max_imp) * plot_w
     bar_opacity <- 0.70 + (i - 1) / max(n - 1, 1) * 0.25
+    val_label <- sprintf("%.1f%%", imp_sorted$Importance[i])
 
-    # Label
+    # Attribute label (font-weight 400 for softer axis labels)
     elements <- c(elements, sprintf(
-      '<text x="%d" y="%.1f" text-anchor="end" fill="#334155" font-size="13" font-weight="500" dominant-baseline="central">%s</text>',
+      '<text x="%d" y="%.1f" text-anchor="end" fill="#334155" font-size="13" font-weight="400" dominant-baseline="central">%s</text>',
       margin_left - 8, y + bar_height / 2, imp_sorted$Attribute[i]
     ))
 
-    # Bar with rounded corners
+    # Bar with rounded corners and white stroke for separation
     elements <- c(elements, sprintf(
-      '<rect x="%d" y="%.1f" width="%.1f" height="%d" rx="4" ry="4" fill="%s" opacity="%.2f"/>',
+      '<rect x="%d" y="%.1f" width="%.1f" height="%d" rx="4" ry="4" fill="%s" opacity="%.2f" stroke="#fff" stroke-width="1"/>',
       margin_left, y, max(w, 2), bar_height, brand_colour, bar_opacity
     ))
 
-    # Value label (font-weight 500)
-    elements <- c(elements, sprintf(
-      '<text x="%.1f" y="%.1f" text-anchor="start" fill="#334155" font-size="12" font-weight="500">%s</text>',
-      margin_left + w + 6, y + bar_height / 2, sprintf("%.1f%%", imp_sorted$Importance[i])
-    ))
+    # Value label: inside bar (white, right-aligned) if wide enough, else outside
+    if (w > 80) {
+      elements <- c(elements, sprintf(
+        '<text x="%.1f" y="%.1f" text-anchor="end" fill="#ffffff" font-size="12" font-weight="600" dominant-baseline="central">%s</text>',
+        margin_left + w - 8, y + bar_height / 2, val_label
+      ))
+    } else {
+      elements <- c(elements, sprintf(
+        '<text x="%.1f" y="%.1f" text-anchor="start" fill="#334155" font-size="12" font-weight="600" dominant-baseline="central">%s</text>',
+        margin_left + w + 6, y + bar_height / 2, val_label
+      ))
+    }
   }
 
   .svg_wrap("importance", elements, chart_width, chart_height)
@@ -158,13 +175,13 @@ build_utility_chart <- function(attr_utilities, attr_name, brand_colour = "#3233
 
   # No SVG title — card h2 already shows attribute name
 
-  # Zero line (softer)
+  # Zero line (solid thin line, not dashed)
   elements <- c(elements, sprintf(
-    '<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="6,3"/>',
+    '<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" stroke="#94a3b8" stroke-width="1"/>',
     margin_left, zero_y, chart_width - margin_right, zero_y
   ))
 
-  # Gridlines using nice tick step
+  # Horizontal gridlines using nice tick step
   grid_step <- .nice_tick_step(u_max)
   if (grid_step > 0) {
     grid_vals <- seq(-floor(u_max / grid_step) * grid_step,
@@ -197,22 +214,22 @@ build_utility_chart <- function(attr_utilities, attr_name, brand_colour = "#3233
     }
 
     elements <- c(elements, sprintf(
-      '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="4" ry="4" fill="%s" opacity="0.85"/>',
+      '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="4" ry="4" fill="%s" opacity="0.85" stroke="#fff" stroke-width="1"/>',
       x, bar_y, bar_width, max(bar_h, 1), bar_colour
     ))
 
-    # Value label (font-weight 500)
+    # Value label (font-weight 600 for bolder contrast)
     label_y <- if (u >= 0) bar_y - 6 else bar_y + bar_h + 14
     elements <- c(elements, sprintf(
-      '<text x="%.1f" y="%.1f" text-anchor="middle" fill="#334155" font-size="12" font-weight="500">%s</text>',
+      '<text x="%.1f" y="%.1f" text-anchor="middle" fill="#334155" font-size="12" font-weight="600">%s</text>',
       x_center, label_y, sprintf("%.3f", u)
     ))
 
-    # Level label (horizontal, no rotation)
+    # Level label (font-weight 400, colour #475569)
     label <- attr_utilities$Level[i]
     if (nchar(label) > 20) label <- paste0(substr(label, 1, 19), "\u2026")
     elements <- c(elements, sprintf(
-      '<text x="%.1f" y="%.1f" text-anchor="middle" fill="#64748b" font-size="11">%s</text>',
+      '<text x="%.1f" y="%.1f" text-anchor="middle" fill="#475569" font-size="11" font-weight="400">%s</text>',
       x_center, chart_height - margin_bottom + 16, label
     ))
   }
@@ -276,19 +293,28 @@ build_bic_chart <- function(comparison, optimal_k, brand_colour = "#323367") {
     paste(points, collapse = " "), brand_colour
   ))
 
-  # Data points (white stroke border for premium look)
+  # Data points (white fill, brand stroke for connected-dot look)
   for (i in seq_along(ks)) {
     cx <- x_scale(ks[i])
     cy <- y_scale(bics[i])
-    fill <- if (ks[i] == optimal_k) "#c0695c" else brand_colour
-    r <- if (ks[i] == optimal_k) 6 else 5
+    is_optimal <- (ks[i] == optimal_k)
+    fill <- if (is_optimal) "#fff" else "#fff"
+    stroke_col <- if (is_optimal) "#c0695c" else brand_colour
+    r <- if (is_optimal) 7 else 5
+    sw <- if (is_optimal) 3 else 2.5
     elements <- c(elements, sprintf(
-      '<circle cx="%.1f" cy="%.1f" r="%d" fill="%s" stroke="#fff" stroke-width="2.5"/>', cx, cy, r, fill
+      '<circle cx="%.1f" cy="%.1f" r="%d" fill="%s" stroke="%s" stroke-width="%.1f"/>', cx, cy, r, fill, stroke_col, sw
     ))
     elements <- c(elements, .svg_axis_label(cx, chart_height - margin_bottom + 20, sprintf("K=%d", ks[i]), size = 11))
-  }
 
-  # No SVG title — card h2 already shows "Model Comparison"
+    # Label the optimal (minimum BIC) point
+    if (is_optimal) {
+      elements <- c(elements, sprintf(
+        '<text x="%.1f" y="%.1f" text-anchor="middle" fill="#c0695c" font-size="10" font-weight="600">Optimal</text>',
+        cx, cy - 14
+      ))
+    }
+  }
 
   .svg_wrap("bic-comparison", elements, chart_width, chart_height)
 }
@@ -339,13 +365,13 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
 
   elements <- character()
 
-  # Zero line (softer)
+  # Zero line (solid thin line, not dashed)
   elements <- c(elements, sprintf(
-    '<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="6,3"/>',
+    '<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="#94a3b8" stroke-width="1"/>',
     zero_x, margin_top, zero_x, chart_height - margin_bottom
   ))
 
-  # Gridlines
+  # Horizontal gridlines
   tick_step <- .nice_tick_step(wtp_abs_max)
   ticks <- seq(-floor(wtp_abs_max / tick_step) * tick_step,
                ceiling(wtp_abs_max / tick_step) * tick_step, by = tick_step)
@@ -366,7 +392,6 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
     curr_attr <- wtp$Attribute[i]
     if (curr_attr != prev_attr && prev_attr != "") {
       y_pos <- y_pos + group_gap
-      # No empty separator text element
     }
     prev_attr <- curr_attr
 
@@ -375,13 +400,13 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
     label <- sprintf("%s: %s", curr_attr, wtp$Level[i])
     if (nchar(label) > 34) label <- paste0(substr(label, 1, 33), "\u2026")
 
-    # Label
+    # Label (font-weight 400, colour #475569)
     elements <- c(elements, sprintf(
-      '<text x="%d" y="%.1f" text-anchor="end" fill="#334155" font-size="11" dominant-baseline="central">%s</text>',
+      '<text x="%d" y="%.1f" text-anchor="end" fill="#475569" font-size="11" font-weight="400" dominant-baseline="central">%s</text>',
       margin_left - 8, y_pos + bar_height / 2, label
     ))
 
-    # Bar
+    # Bar with white stroke for separation
     if (val >= 0) {
       bx <- zero_x
       bw <- scale_x(val) - zero_x
@@ -390,7 +415,7 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
       bw <- zero_x - scale_x(val)
     }
     elements <- c(elements, sprintf(
-      '<rect x="%.1f" y="%.1f" width="%.1f" height="%d" rx="4" ry="4" fill="%s" opacity="0.85"/>',
+      '<rect x="%.1f" y="%.1f" width="%.1f" height="%d" rx="4" ry="4" fill="%s" opacity="0.85" stroke="#fff" stroke-width="1"/>',
       bx, y_pos, max(bw, 2), bar_height, bar_colour
     ))
 
@@ -408,12 +433,12 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
           '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#475569" stroke-width="1.5"/>',
           ci_lo_x, ci_y, ci_hi_x, ci_y
         ))
-        # Left whisker cap
+        # Left whisker T-cap
         elements <- c(elements, sprintf(
           '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#475569" stroke-width="1.5"/>',
           ci_lo_x, ci_y - whisker_h / 2, ci_lo_x, ci_y + whisker_h / 2
         ))
-        # Right whisker cap
+        # Right whisker T-cap
         elements <- c(elements, sprintf(
           '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#475569" stroke-width="1.5"/>',
           ci_hi_x, ci_y - whisker_h / 2, ci_hi_x, ci_y + whisker_h / 2
@@ -421,11 +446,11 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
       }
     }
 
-    # Value label (font-weight 500)
+    # Value label (font-weight 600 for bolder contrast)
     vx <- if (val >= 0) scale_x(val) + 4 else scale_x(val) - 4
     vanch <- if (val >= 0) "start" else "end"
     elements <- c(elements, sprintf(
-      '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#334155" font-size="12" font-weight="500">%s</text>',
+      '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#334155" font-size="12" font-weight="600" dominant-baseline="central">%s</text>',
       vx, y_pos + bar_height / 2, vanch, sprintf("$%.2f", val)
     ))
 
@@ -515,20 +540,23 @@ build_demand_curve_chart <- function(demand_curve, brand_colour = "#323367") {
     paste(line_points, collapse = " "), brand_colour
   ))
 
-  # Data points (white stroke border)
+  # Data points (white fill, brand stroke for filled-circle look)
   for (i in seq_len(nrow(demand_curve))) {
     cx <- scale_x(prices[i])
     cy <- scale_y(shares[i])
     elements <- c(elements, sprintf(
-      '<circle cx="%.1f" cy="%.1f" r="5" fill="%s" stroke="#fff" stroke-width="2.5"/>', cx, cy, brand_colour
+      '<circle cx="%.1f" cy="%.1f" r="5" fill="#fff" stroke="%s" stroke-width="2.5"/>', cx, cy, brand_colour
     ))
     elements <- c(elements, .svg_value_label(cx, cy - 12, sprintf("%.1f%%", shares[i]), size = 11))
   }
 
   # Axis title labels
-  elements <- c(elements, .svg_value_label(chart_width / 2, chart_height - 5, "Price", size = 12))
   elements <- c(elements, sprintf(
-    '<text x="15" y="%.1f" text-anchor="middle" fill="#334155" font-size="12" font-weight="600" transform="rotate(-90,15,%.1f)">Market Share</text>',
+    '<text x="%.1f" y="%d" text-anchor="middle" fill="#475569" font-size="12" font-weight="400">Price</text>',
+    chart_width / 2, chart_height - 5
+  ))
+  elements <- c(elements, sprintf(
+    '<text x="15" y="%.1f" text-anchor="middle" fill="#475569" font-size="12" font-weight="400" transform="rotate(-90,15,%.1f)">Market Share</text>',
     margin_top + plot_h / 2, margin_top + plot_h / 2
   ))
 

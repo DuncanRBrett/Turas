@@ -1016,7 +1016,7 @@ build_simulator_panel <- function(html_data, brand) {
 
   # Mode-switched callouts
   sim_callout_shares <- .build_callout("Market Shares",
-    "<p>Market share simulation predicts each product\u2019s share of preference using the configured attribute levels (up to 8 products). The Logit model distributes share proportionally to each product\u2019s total utility; First Choice assigns all share to whichever product each respondent would most likely pick. Configure products on the left and see predicted shares update on the right. Click on a product name to rename it.</p>")
+    "<p>Market share simulation predicts each product\u2019s share of preference using the configured attribute levels (up to 8 products). The Logit model distributes share proportionally to each product\u2019s total utility; First Choice assigns all share to whichever product each respondent would most likely pick. Configure products on the left and see predicted shares update on the right. Click on a product name to rename it.</p><p><strong>No-Purchase Option:</strong> The \u2018Include No-Purchase Option\u2019 checkbox adds a \u2018do nothing\u2019 alternative to the simulation. If your survey included a \u2018None of these\u2019 option, the model has estimated its utility and the simulator uses this directly. If your survey did not include a none option, the simulator uses a neutral utility (zero), which provides a rough approximation \u2014 but for the most accurate no-purchase estimates, this option should be part of your questionnaire design.</p>")
   sim_callout_sensitivity <- .build_callout("Sensitivity Analysis",
     "<p>Sensitivity analysis reveals <strong>how much market share changes</strong> when you switch between levels of a single attribute, while keeping everything else constant.</p><p>Select a product and an attribute to sweep. The chart shows the predicted market share at each level of that attribute. Steep curves indicate high sensitivity &mdash; small changes in that attribute cause large share shifts. Flat curves indicate the market is relatively insensitive to changes in that attribute.</p><p>This is invaluable for decisions like: <em>If we upgrade our battery from 3000mAh to 5000mAh, how much market share would we gain?</em> Or: <em>How much share would we lose if we raised the price by $100?</em></p><p><strong>Tip:</strong> Compare sensitivity across attributes to find the most impactful levers for your product strategy.</p>")
   sim_callout_sov <- .build_callout("Source of Volume",
@@ -1275,8 +1275,10 @@ build_insight_area <- function(tab_id, insights = list()) {
   diag <- html_data$diagnostics
 
   # --- Model Fit Quality callout ---
-  fit_body <- "<p>Model fit measures how well the estimated utilities explain the observed choices in the data.</p>"
-  if (!is.null(diag$fit_statistics$mcfadden_r2) && !is.na(diag$fit_statistics$mcfadden_r2)) {
+  has_r2 <- !is.null(diag$fit_statistics$mcfadden_r2) && !is.na(diag$fit_statistics$mcfadden_r2)
+  has_ll <- !is.null(diag$fit_statistics$ll_ratio_p) && !is.na(diag$fit_statistics$ll_ratio_p)
+
+  if (has_r2) {
     r2 <- diag$fit_statistics$mcfadden_r2
     quality <- if (r2 >= 0.4) "excellent"
                else if (r2 >= 0.3) "very good"
@@ -1287,8 +1289,14 @@ build_insight_area <- function(tab_id, insights = list()) {
       "<p>Model fit measures how well the estimated utilities explain the observed choices. The McFadden pseudo-R\u00b2 for this model is <strong>%.3f</strong>, which indicates %s fit. In discrete choice models, values between 0.2 and 0.4 are generally considered to represent good to excellent fit \u2014 these values are not directly comparable to R\u00b2 in linear regression.</p>",
       r2, quality
     )
+    fit_body <- paste0(fit_body,
+      "<p><strong>Can you trust these results?</strong> McFadden pseudo-R\u00b2 works differently from regular R\u00b2 \u2014 values between 0.2 and 0.4 represent good to excellent fit. Even values around 0.1 can produce useful, actionable insights, especially when combined with a good hit rate.</p>"
+    )
+  } else {
+    fit_body <- "<p>Model fit measures how well the estimated utilities explain the observed choices in the data. A well-fitting model means the attribute preferences we\u2019ve estimated accurately reflect how people actually make decisions.</p><p><strong>Can you trust these results?</strong> Look at the hit rate below \u2014 it shows what percentage of actual choices the model correctly predicted. Compare it to chance level (e.g., 33% for 3-alternative choice sets). A hit rate well above chance indicates the model is capturing real preferences. A hit rate only slightly above chance suggests the data may be noisy or the attributes may not be the primary drivers of choice.</p>"
   }
-  if (!is.null(diag$fit_statistics$ll_ratio_p) && !is.na(diag$fit_statistics$ll_ratio_p)) {
+
+  if (has_ll) {
     sig_text <- if (diag$fit_statistics$ll_ratio_p < 0.001) "highly significant (p < 0.001)"
                 else if (diag$fit_statistics$ll_ratio_p < 0.01) sprintf("significant (p = %.3f)", diag$fit_statistics$ll_ratio_p)
                 else if (diag$fit_statistics$ll_ratio_p < 0.05) sprintf("marginally significant (p = %.3f)", diag$fit_statistics$ll_ratio_p)
@@ -1298,15 +1306,18 @@ build_insight_area <- function(tab_id, insights = list()) {
       sig_text,
       if (diag$fit_statistics$ll_ratio_p < 0.05) "performs significantly better" else "may not perform significantly better"
     ))
+    fit_body <- paste0(fit_body,
+      "<p>The likelihood ratio test checks whether the model as a whole is statistically significant \u2014 meaning the attributes genuinely influence choices rather than people choosing randomly.</p>"
+    )
   }
   callouts <- c(callouts, .build_callout("Model Fit Quality", fit_body))
 
   # --- Estimation Method callout ---
   method_body <- switch(
     method,
-    "mlogit" =, "mnl" = "<p>Multinomial Logit (MNL) is the foundational model for choice-based conjoint analysis. It assumes each respondent evaluates alternatives by summing up the utility (attractiveness) of each attribute level, then selects the option with the highest total utility \u2014 with some randomness reflecting the unpredictable aspects of human decision-making.</p><p>MNL produces a single set of aggregate utilities representing the average preferences across all respondents. It works well when preferences are relatively homogeneous, and provides reliable, interpretable results with modest sample sizes.</p>",
-    "hb" = "<p>Hierarchical Bayes (HB) estimation produces individual-level utilities for each respondent. It combines information from all respondents (the \u2018population\u2019) with each individual\u2019s choices to produce stable estimates \u2014 even when a single respondent provides limited data.</p><p>The algorithm iterates thousands of times, gradually converging on preference estimates. This means we can see not just what matters on average, but how different people value different things. HB is the gold standard for modern conjoint analysis.</p>",
-    "latent_class" =, "lc" = "<p>Latent Class analysis identifies distinct groups (segments) of respondents who share similar preference patterns. Rather than assuming everyone has the same preferences (aggregate) or estimating individual preferences (HB), it finds the best number of naturally-occurring segments and estimates a separate set of utilities for each segment.</p><p>This approach is useful when you suspect the market contains fundamentally different types of buyers \u2014 for example, price-sensitive versus brand-loyal customers.</p>",
+    "mlogit" =, "mnl" = "<p><strong>Why this method?</strong> Multinomial Logit (MNL) was selected for this analysis. MNL is the standard approach for choice-based conjoint \u2014 it\u2019s robust, well-understood, and produces reliable aggregate-level preference estimates. It works well when you need a clear picture of overall market preferences without individual-level detail.</p><p>Multinomial Logit (MNL) is the foundational model for choice-based conjoint analysis. It assumes each respondent evaluates alternatives by summing up the utility (attractiveness) of each attribute level, then selects the option with the highest total utility \u2014 with some randomness reflecting the unpredictable aspects of human decision-making.</p><p>MNL produces a single set of aggregate utilities representing the average preferences across all respondents. It works well when preferences are relatively homogeneous, and provides reliable, interpretable results with modest sample sizes.</p>",
+    "hb" = "<p><strong>Why this method?</strong> Hierarchical Bayes (HB) was selected for this analysis. HB is the gold standard for modern conjoint because it estimates preferences at the individual respondent level, not just the aggregate. This means we can see how different people value different features, identify preference segments, and run more accurate market simulations.</p><p>Hierarchical Bayes (HB) estimation produces individual-level utilities for each respondent. It combines information from all respondents (the \u2018population\u2019) with each individual\u2019s choices to produce stable estimates \u2014 even when a single respondent provides limited data.</p><p>The algorithm iterates thousands of times, gradually converging on preference estimates. This means we can see not just what matters on average, but how different people value different things. HB is the gold standard for modern conjoint analysis.</p>",
+    "latent_class" =, "lc" = "<p><strong>Why this method?</strong> Latent Class analysis was selected to discover distinct preference-based segments in the data. Rather than assuming everyone has similar preferences, this approach identifies naturally-occurring groups of respondents who share similar preference patterns.</p><p>Latent Class analysis identifies distinct groups (segments) of respondents who share similar preference patterns. Rather than assuming everyone has the same preferences (aggregate) or estimating individual preferences (HB), it finds the best number of naturally-occurring segments and estimates a separate set of utilities for each segment.</p><p>This approach is useful when you suspect the market contains fundamentally different types of buyers \u2014 for example, price-sensitive versus brand-loyal customers.</p>",
     "best_worst" =, "bws" = "<p>Best-Worst Scaling asks respondents to identify both the most and least preferred options in each choice set. This extracts more information per task than standard choice-based conjoint, producing more discriminating utility estimates.</p><p>By capturing both the best and worst choices, we can better distinguish between levels that respondents are neutral about versus those they actively avoid.</p>",
     "<p>The conjoint analysis estimates part-worth utilities for each attribute level, representing how much each level contributes to overall product preference. These utilities can be used to predict market shares, calculate willingness to pay, and understand competitive dynamics.</p>"
   )
