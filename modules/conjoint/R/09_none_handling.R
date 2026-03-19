@@ -27,8 +27,8 @@ detect_none_option <- function(data, config) {
 
   # None detection patterns
   none_patterns <- c(
-    "none", "no choice", "neither", "none of these", "none of the above",
-    "no option", "opt out", "skip", "no selection"
+    "\\bnone\\b", "\\bno choice\\b", "\\bneither\\b", "\\bnone of these\\b", "\\bnone of the above\\b",
+    "\\bno option\\b", "\\bopt out\\b", "\\bskip\\b", "\\bno selection\\b"
   )
 
   # METHOD 1: Check for none in attribute values

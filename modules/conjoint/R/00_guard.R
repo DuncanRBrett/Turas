@@ -46,15 +46,31 @@ if (!exists("turas_refuse", mode = "function")) {
   if (!trs_loaded) {
     warning("TRS infrastructure not found. Using fallback.")
     turas_refuse <- function(code, title, problem, why_it_matters, how_to_fix, ...) {
-      stop(paste0("[", code, "] ", title, ": ", problem))
+      # TRS-compliant: output to console then stop with structured message
+      # The stop() here is intentional — turas_refuse is expected to halt execution
+      # throughout the codebase. The structured message is printed for Shiny console visibility.
+      msg <- paste0("[", code, "] ", title, ": ", problem)
+      cat("\n=== TURAS REFUSAL ===\n")
+      cat("Code:", code, "\n")
+      cat("Title:", title, "\n")
+      cat("Problem:", problem, "\n")
+      cat("How to fix:", paste(how_to_fix, collapse = "; "), "\n")
+      cat("====================\n\n")
+      stop(msg, call. = FALSE)
     }
-    with_refusal_handler <- function(expr, module = "UNKNOWN") tryCatch(expr, error = function(e) stop(e))
+    with_refusal_handler <- function(expr, module = "UNKNOWN") {
+      tryCatch(expr, error = function(e) {
+        list(status = "REFUSED", code = "UNHANDLED_ERROR", message = conditionMessage(e),
+             module = module, how_to_fix = "Check the console output for details")
+      })
+    }
     guard_init <- function(module = "UNKNOWN") list(module = module, warnings = list(), stable = TRUE)
     guard_warn <- function(guard, msg, category = "general") { guard$warnings <- c(guard$warnings, list(list(msg = msg, category = category))); guard }
     guard_flag_stability <- function(guard, reason) { guard$stable <- FALSE; guard }
-    guard_summary <- function(guard) list(module = guard$module, warning_count = length(guard$warnings), is_stable = guard$stable, has_issues = length(guard$warnings) > 0)
+    guard_summary <- function(guard) list(module = guard$module, warning_count = length(guard$warnings), is_stable = guard$stable, has_issues = length(guard$warnings) > 0, stability_flags = character(0))
     trs_status_pass <- function(module) list(status = "PASS", module = module)
     trs_status_partial <- function(module, degraded_reasons, affected_outputs) list(status = "PARTIAL", module = module, degraded_reasons = degraded_reasons)
+    trs_status_refuse <- function(module, code, message, how_to_fix) list(status = "REFUSED", module = module, code = code, message = message, how_to_fix = how_to_fix)
   }
 }
 
@@ -270,7 +286,7 @@ validate_conjoint_attributes <- function(attributes) {
   }
 
   # Check minimum structure
-  unique_attrs <- unique(attributes$attribute)
+  unique_attrs <- unique(attributes$AttributeName)
   if (length(unique_attrs) < 2) {
     conjoint_refuse(
       code = "CFG_INSUFFICIENT_ATTRIBUTES",
@@ -283,7 +299,7 @@ validate_conjoint_attributes <- function(attributes) {
 
   # Check each attribute has at least 2 levels
   for (attr in unique_attrs) {
-    levels <- attributes$level[attributes$attribute == attr]
+    levels <- attributes$LevelNames[attributes$AttributeName == attr]
     if (length(unique(levels)) < 2) {
       conjoint_refuse(
         code = "CFG_INSUFFICIENT_LEVELS",
@@ -353,8 +369,9 @@ validate_conjoint_convergence <- function(model_result) {
     )
   }
 
-  # Check convergence if available
-  if (!is.null(model_result$converged) && !model_result$converged) {
+  # Check convergence if available (supports both flat and nested structure)
+  converged_val <- model_result$convergence$converged %||% model_result$converged
+  if (!is.null(converged_val) && !converged_val) {
     conjoint_refuse(
       code = "MODEL_DID_NOT_CONVERGE",
       title = "Model Did Not Converge",
@@ -372,12 +389,16 @@ validate_conjoint_convergence <- function(model_result) {
 }
 
 
-#' Validate Data Has Sufficient Choices
+#' Guard: Check Data Exists and Is Non-Empty
+#'
+#' Quick pre-check before detailed validation in 02_data.R.
+#' Do not confuse with validate_conjoint_data() in 02_data.R which
+#' performs comprehensive column/type validation.
 #'
 #' @param data Choice data
-#' @param min_choices Minimum choices per respondent
+#' @param min_choices Minimum choices per respondent (unused, kept for compat)
 #' @keywords internal
-validate_conjoint_data <- function(data, min_choices = 5) {
+guard_check_data_exists <- function(data, min_choices = 5) {
 
   if (is.null(data) || nrow(data) == 0) {
     conjoint_refuse(
@@ -653,7 +674,8 @@ conjoint_status_refuse <- function(code = NULL, reason = NULL) {
   trs_status_refuse(
     module = "CONJOINT",
     code = code,
-    reason = reason
+    message = reason %||% "Conjoint analysis refused",
+    how_to_fix = "Check the error code and console output for details"
   )
 }
 

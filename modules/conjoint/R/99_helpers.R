@@ -483,7 +483,19 @@ require_package <- function(package, install_msg = NULL) {
         package, package
       )
     }
-    stop(install_msg, call. = FALSE)
+    if (exists("conjoint_refuse", mode = "function")) {
+      conjoint_refuse(
+        code = sprintf("PKG_%s_MISSING", toupper(package)),
+        title = "Required Package Not Installed",
+        problem = sprintf("Package '%s' is required but not installed.", package),
+        why_it_matters = install_msg,
+        how_to_fix = sprintf("Install with: install.packages('%s')", package)
+      )
+    } else {
+      cat(sprintf("\n=== TURAS ERROR ===\n%s\nFix: install.packages('%s')\n==================\n",
+                  install_msg, package))
+      return(invisible(FALSE))
+    }
   }
   TRUE
 }
@@ -573,5 +585,5 @@ escape_attr_for_regex <- function(attr) {
 #' Get module version
 #' @keywords internal
 get_conjoint_version <- function() {
-  "2.1.0"
+  "3.1.0"
 }

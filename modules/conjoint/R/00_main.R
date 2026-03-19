@@ -23,51 +23,7 @@
 # ==============================================================================
 
 # ==============================================================================
-# LOAD REQUIRED PACKAGES
-# ==============================================================================
-
-# Suppress package startup messages for cleaner output
-suppressPackageStartupMessages({
-  # Data manipulation
-  if (!require(dplyr, quietly = TRUE)) {
-    conjoint_refuse(
-      code = "PKG_DPLYR_MISSING",
-      title = "Required Package Not Installed",
-      problem = "Package 'dplyr' is required but not installed.",
-      why_it_matters = "The Conjoint module relies on dplyr for data manipulation operations. Without it, analysis cannot proceed.",
-      how_to_fix = "Install the package with: install.packages('dplyr')"
-    )
-  }
-
-  # Excel I/O
-  if (!require(openxlsx, quietly = TRUE)) {
-    conjoint_refuse(
-      code = "PKG_OPENXLSX_MISSING",
-      title = "Required Package Not Installed",
-      problem = "Package 'openxlsx' is required but not installed.",
-      why_it_matters = "The Conjoint module requires openxlsx to read configuration files and write output workbooks.",
-      how_to_fix = "Install the package with: install.packages('openxlsx')"
-    )
-  }
-
-  # Choice modeling
-  if (!require(mlogit, quietly = TRUE)) {
-    message("[TRS INFO] CONJ_PKG_MLOGIT_MISSING: Package 'mlogit' not found - install with: install.packages('mlogit')")
-  }
-
-  # Data indexing for mlogit (required for mlogit >= 1.1-0)
-  if (!require(dfidx, quietly = TRUE)) {
-    message("[TRS INFO] CONJ_PKG_DFIDX_MISSING: Package 'dfidx' not found - install with: install.packages('dfidx')")
-  }
-
-  # Fallback estimation
-  if (!require(survival, quietly = TRUE)) {
-    message("[TRS INFO] CONJ_PKG_SURVIVAL_MISSING: Package 'survival' not found - install with: install.packages('survival')")
-  }
-})
-
-# ==============================================================================
-# TRS GUARD LAYER
+# TRS GUARD LAYER (must be sourced FIRST — before package checks that use conjoint_refuse)
 # ==============================================================================
 
 # Source TRS guard layer for refusal handling
@@ -122,6 +78,63 @@ tryCatch({
   .source_trs_infrastructure()
 }, error = function(e) {
   message(sprintf("[TRS INFO] CONJ_TRS_LOAD: Could not load TRS infrastructure: %s", e$message))
+})
+
+# ==============================================================================
+# LOAD REQUIRED PACKAGES (after guard is available for conjoint_refuse)
+# ==============================================================================
+
+suppressPackageStartupMessages({
+  # Data manipulation
+  if (!require(dplyr, quietly = TRUE)) {
+    if (exists("conjoint_refuse", mode = "function")) {
+      conjoint_refuse(
+        code = "PKG_DPLYR_MISSING",
+        title = "Required Package Not Installed",
+        problem = "Package 'dplyr' is required but not installed.",
+        why_it_matters = "The Conjoint module relies on dplyr for data manipulation operations.",
+        how_to_fix = "Install the package with: install.packages('dplyr')"
+      )
+    } else {
+      cat("\n=== TURAS ERROR ===\nPackage 'dplyr' is required but not installed.\nFix: install.packages('dplyr')\n==================\n")
+      return(list(status = "REFUSED", code = "PKG_DPLYR_MISSING",
+                  message = "Required package 'dplyr' is not installed.",
+                  how_to_fix = "Install with: install.packages('dplyr')"))
+    }
+  }
+
+  # Excel I/O
+  if (!require(openxlsx, quietly = TRUE)) {
+    if (exists("conjoint_refuse", mode = "function")) {
+      conjoint_refuse(
+        code = "PKG_OPENXLSX_MISSING",
+        title = "Required Package Not Installed",
+        problem = "Package 'openxlsx' is required but not installed.",
+        why_it_matters = "The Conjoint module requires openxlsx to read configuration files and write output workbooks.",
+        how_to_fix = "Install the package with: install.packages('openxlsx')"
+      )
+    } else {
+      cat("\n=== TURAS ERROR ===\nPackage 'openxlsx' is required but not installed.\nFix: install.packages('openxlsx')\n==================\n")
+      return(list(status = "REFUSED", code = "PKG_OPENXLSX_MISSING",
+                  message = "Required package 'openxlsx' is not installed.",
+                  how_to_fix = "Install with: install.packages('openxlsx')"))
+    }
+  }
+
+  # Choice modeling (optional — checked at estimation time)
+  if (!require(mlogit, quietly = TRUE)) {
+    message("[TRS INFO] CONJ_PKG_MLOGIT_MISSING: Package 'mlogit' not found - install with: install.packages('mlogit')")
+  }
+
+  # Data indexing for mlogit (required for mlogit >= 1.1-0)
+  if (!require(dfidx, quietly = TRUE)) {
+    message("[TRS INFO] CONJ_PKG_DFIDX_MISSING: Package 'dfidx' not found - install with: install.packages('dfidx')")
+  }
+
+  # Fallback estimation
+  if (!require(survival, quietly = TRUE)) {
+    message("[TRS INFO] CONJ_PKG_SURVIVAL_MISSING: Package 'survival' not found - install with: install.packages('survival')")
+  }
 })
 
 # ==============================================================================
@@ -186,6 +199,7 @@ if (!dir.exists(.conjoint_module_dir)) {
 
 # Source all component files in order
 source(file.path(.conjoint_module_dir, "99_helpers.R"))      # Helper functions (must be first)
+source(file.path(.conjoint_module_dir, "00_preflight.R"))    # Pre-flight checks
 source(file.path(.conjoint_module_dir, "01_config.R"))       # Configuration loading
 source(file.path(.conjoint_module_dir, "05_alchemer_import.R"))  # Alchemer data import (NEW)
 source(file.path(.conjoint_module_dir, "02_data.R"))         # Data loading and validation
@@ -262,6 +276,9 @@ rm(.conjoint_module_dir)
 #' @param output_file Path for results Excel file.
 #'   If NULL, reads from config Settings sheet.
 #' @param verbose Logical, print detailed progress (default TRUE)
+#' @param run_preflight Logical. If TRUE, runs a pre-flight check to validate
+#'   that all module files, packages, and infrastructure are in place before
+#'   starting analysis. Default FALSE to avoid overhead on normal runs.
 #'
 #' @return List containing:
 #'   - utilities: Data frame of part-worth utilities by attribute level
@@ -297,7 +314,22 @@ rm(.conjoint_module_dir)
 #'
 #' @export
 run_conjoint_analysis <- function(config_file, data_file = NULL, output_file = NULL,
-                                  verbose = TRUE) {
+                                  verbose = TRUE, run_preflight = FALSE) {
+
+  # ==========================================================================
+  # OPTIONAL PRE-FLIGHT CHECK
+  # ==========================================================================
+
+  if (isTRUE(run_preflight)) {
+    pf <- conjoint_preflight(verbose = verbose)
+    if (pf$status == "REFUSED") {
+      cat("\n=== TURAS ERROR ===\n")
+      cat("Pre-flight check failed. Cannot proceed with analysis.\n")
+      cat("Issues:", paste(pf$failures, collapse = "; "), "\n")
+      cat("==================\n\n")
+      return(pf)
+    }
+  }
 
   # ==========================================================================
   # TRS REFUSAL HANDLER WRAPPER (TRS v1.0)
@@ -332,11 +364,11 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
 
   # Print TRS start banner
   if (exists("turas_print_start_banner", mode = "function")) {
-    turas_print_start_banner("CONJOINT", "3.0.0")
+    turas_print_start_banner("CONJOINT", get_conjoint_version())
   } else if (verbose) {
     cat("\n")
     cat(rep("=", 80), "\n", sep = "")
-    cat("TURAS CONJOINT ANALYSIS - Version 3.0.0\n")
+    cat(sprintf("TURAS CONJOINT ANALYSIS - Version %s\n", get_conjoint_version()))
     cat(rep("=", 80), "\n", sep = "")
     cat("\n")
   }
@@ -431,7 +463,7 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
 
     if (verbose) {
       cat("   ✓ Importance scores calculated:\n")
-      for (i in 1:min(3, nrow(importance))) {
+      for (i in seq_len(min(3, nrow(importance)))) {
         cat(sprintf("      %d. %s: %.1f%%\n",
                     i,
                     importance$Attribute[i],
@@ -455,6 +487,36 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
         cat(sprintf("   ✓ Hit rate = %.1f%% (chance = %.1f%%)\n",
                     diagnostics$fit_statistics$hit_rate * 100,
                     diagnostics$fit_statistics$chance_rate * 100))
+      }
+    }
+
+    # STEP 6b: Calculate WTP (if price attribute exists)
+    wtp_result <- NULL
+    if (exists("calculate_wtp", mode = "function")) {
+      # Auto-detect price attribute from config
+      price_attr <- config$price_attribute %||% NULL
+      if (is.null(price_attr)) {
+        # Try to detect a price-like attribute name
+        attr_names <- if (!is.null(utilities)) unique(utilities$Attribute) else character(0)
+        price_candidates <- grep("price|cost|fee", attr_names, ignore.case = TRUE, value = TRUE)
+        if (length(price_candidates) > 0) price_attr <- price_candidates[1]
+      }
+
+      if (!is.null(price_attr)) {
+        wtp_result <- tryCatch({
+          if (verbose) cat(sprintf("\n6b. Calculating willingness to pay (price attribute: %s)...\n", price_attr))
+          # Set wtp_price_attribute in config if not already set
+          if (is.null(config$wtp_price_attribute) || is.na(config$wtp_price_attribute) ||
+              nchar(config$wtp_price_attribute) == 0) {
+            config$wtp_price_attribute <- price_attr
+          }
+          result <- calculate_wtp(utilities, config, model_result, verbose = verbose)
+          if (verbose) cat("   \u2713 WTP calculated\n")
+          result
+        }, error = function(e) {
+          if (verbose) cat(sprintf("   WTP calculation skipped: %s\n", conditionMessage(e)))
+          NULL
+        })
       }
     }
 
@@ -535,7 +597,9 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
           insight_utilities = config$insight_utilities %||% "",
           insight_diagnostics = config$insight_diagnostics %||% "",
           insight_simulator = config$insight_simulator %||% "",
-          insight_wtp = config$insight_wtp %||% ""
+          insight_wtp = config$insight_wtp %||% "",
+          custom_slides = config$custom_slides %||% NULL,
+          currency_symbol = config$currency_symbol %||% "$"
         )
 
         tryCatch({
@@ -573,8 +637,12 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
       cat("\n")
     }
 
-    # Return comprehensive results
+    # Return comprehensive results with top-level TRS status
+    # Status is PASS when no warnings, PARTIAL when warnings exist
+    top_status <- if (length(all_warnings) == 0) "PASS" else "PARTIAL"
+
     list(
+      status = top_status,
       utilities = utilities,
       importance = importance,
       diagnostics = diagnostics,
@@ -582,8 +650,9 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
       config = config,
       data_info = data_list,
       elapsed_time = as.numeric(elapsed),
-      version = "3.0.0",
-      run_result = run_result
+      version = get_conjoint_version(),
+      run_result = run_result,
+      warnings = if (length(all_warnings) > 0) all_warnings else NULL
     )
 
   }, error = function(e) {
@@ -607,8 +676,18 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
       cat("\n")
     }
 
-    # Re-throw error for caller to handle (already a conjoint_refuse or other structured error)
-    stop(e)
+    # Return TRS refusal for caller to handle
+    return(list(
+      status = "REFUSED",
+      code = "CONJ_ANALYSIS_FAILED",
+      message = conditionMessage(e),
+      how_to_fix = c(
+        "Check your configuration file is valid",
+        "Verify your data file exists and has correct format",
+        "Ensure required packages are installed (mlogit, survival, openxlsx)",
+        "Review validation warnings above"
+      )
+    ))
   })
 
   invisible(result)

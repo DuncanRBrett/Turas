@@ -209,38 +209,107 @@ extract_lc_solution <- function(hb_output, bayesm_data, k, R, thin, config) {
   col_names <- bayesm_data$col_names
   respondent_ids <- bayesm_data$respondent_ids
 
-  betadraw <- hb_output$betadraw
+  betadraw_raw <- hb_output$betadraw
+  n_draws_total <- dim(betadraw_raw)[3]
+
+  # Remove burn-in draws
+  burnin <- as.integer(config$hb_burnin %||% 5000)
+  n_burnin_draws <- min(floor(burnin / max(thin, 1)), n_draws_total - 1)
+  if (n_burnin_draws > 0) {
+    betadraw <- betadraw_raw[, , (n_burnin_draws + 1):n_draws_total, drop = FALSE]
+  } else {
+    betadraw <- betadraw_raw
+  }
   n_draws <- dim(betadraw)[3]
 
-  # Individual-level posterior means
+  # Individual-level posterior means (post burn-in)
   individual_betas <- matrix(NA, nrow = n_respondents, ncol = n_parameters)
   for (i in seq_len(n_respondents)) {
-    individual_betas[i, ] <- colMeans(betadraw[i, , , drop = FALSE])
+    draws_i <- betadraw[i, , , drop = TRUE]
+    if (is.matrix(draws_i)) {
+      individual_betas[i, ] <- rowMeans(draws_i)
+    } else {
+      individual_betas[i, ] <- draws_i
+    }
   }
   colnames(individual_betas) <- col_names
   rownames(individual_betas) <- respondent_ids
 
-  # Assign respondents to classes using k-means on individual betas
-  # This is the standard approach when using bayesm for LC
+  # Assign respondents to classes using bayesm's mixture component draws
+  # bayesm's nmix output contains the actual posterior mixture assignments:
+  #   - compdraw: list of draws of component parameters (mu, rooti)
+  #   - probdraw: matrix [n_draws x k] of mixture component probabilities
+  # hb_output$nmix$zdraw is not directly available, but we can derive
+  # class membership from the posterior component probabilities and individual betas
   if (k == 1) {
     class_assignment <- rep(1L, n_respondents)
     class_probs <- matrix(1, nrow = n_respondents, ncol = 1)
   } else {
-    km <- tryCatch({
-      kmeans(individual_betas, centers = k, nstart = 25, iter.max = 100)
+    class_probs <- tryCatch({
+      # Use bayesm's mixture component probabilities and parameters to compute
+      # posterior class membership for each respondent
+      # Get posterior mean component probabilities
+      prob_draws <- hb_output$nmix$probdraw  # [n_draws x k]
+      comp_draws <- hb_output$nmix$compdraw  # list of n_draws, each list of k components
+
+      if (!is.null(prob_draws) && !is.null(comp_draws)) {
+        # Average component probabilities across posterior draws
+        avg_probs <- colMeans(prob_draws)
+
+        # Get posterior mean component parameters (mu and Sigma)
+        n_post_draws <- length(comp_draws)
+        # Use last half of draws (post-convergence)
+        start_draw <- max(1, floor(n_post_draws / 2))
+        comp_means <- matrix(0, nrow = k, ncol = n_parameters)
+        for (kk in seq_len(k)) {
+          mu_draws <- matrix(0, nrow = n_post_draws - start_draw + 1, ncol = n_parameters)
+          for (d in start_draw:n_post_draws) {
+            mu_draws[d - start_draw + 1, ] <- comp_draws[[d]][[kk]]$mu
+          }
+          comp_means[kk, ] <- colMeans(mu_draws)
+        }
+
+        # Compute respondent-level posterior class probabilities
+        # P(class c | beta_i) ∝ π_c × N(beta_i | mu_c, Sigma_c)
+        resp_probs <- matrix(NA, nrow = n_respondents, ncol = k)
+        for (i in seq_len(n_respondents)) {
+          log_probs <- numeric(k)
+          for (kk in seq_len(k)) {
+            # Simplified: use Euclidean distance as proxy for multivariate normal
+            diff <- individual_betas[i, ] - comp_means[kk, ]
+            log_probs[kk] <- log(max(avg_probs[kk], 1e-300)) - 0.5 * sum(diff^2)
+          }
+          # Softmax for numerical stability
+          log_probs <- log_probs - max(log_probs)
+          exp_probs <- exp(log_probs)
+          resp_probs[i, ] <- exp_probs / sum(exp_probs)
+        }
+        resp_probs
+      } else {
+        # Fallback if bayesm output structure is unexpected
+        NULL
+      }
     }, error = function(e) {
-      # Fallback: simple assignment based on first principal component
+      message(sprintf("[TRS INFO] CONJ_LC_BAYESM_PROBS_FAILED: %s — falling back to distance-based assignment", conditionMessage(e)))
       NULL
     })
 
-    if (!is.null(km)) {
-      class_assignment <- km$cluster
-      # Compute soft probabilities based on distance to centers
-      class_probs <- compute_class_probabilities(individual_betas, km$centers)
+    if (is.null(class_probs)) {
+      # Fallback: use k-means on individual betas (less statistically principled)
+      km <- tryCatch({
+        kmeans(individual_betas, centers = k, nstart = 25, iter.max = 100)
+      }, error = function(e) NULL)
+
+      if (!is.null(km)) {
+        class_assignment <- km$cluster
+        class_probs <- compute_class_probabilities(individual_betas, km$centers)
+      } else {
+        class_assignment <- rep(seq_len(k), length.out = n_respondents)
+        class_probs <- matrix(1 / k, nrow = n_respondents, ncol = k)
+      }
     } else {
-      # Fallback: equal assignment
-      class_assignment <- rep(seq_len(k), length.out = n_respondents)
-      class_probs <- matrix(1 / k, nrow = n_respondents, ncol = k)
+      # Modal assignment from posterior probabilities
+      class_assignment <- apply(class_probs, 1, which.max)
     }
   }
 
@@ -257,8 +326,11 @@ extract_lc_solution <- function(hb_output, bayesm_data, k, R, thin, config) {
   colnames(class_betas) <- col_names
   rownames(class_betas) <- paste0("Class_", seq_len(k))
 
-  # Calculate log-likelihood for information criteria
-  ll <- calculate_lc_log_likelihood(individual_betas, bayesm_data)
+  # Calculate mixture log-likelihood for information criteria
+  # Uses class-level betas and class proportions (not individual betas)
+  # so that LL varies with K and BIC/AIC comparison is meaningful
+  class_proportions <- class_sizes / sum(class_sizes)
+  ll <- calculate_lc_log_likelihood(class_betas, class_proportions, bayesm_data)
 
   # Number of parameters: k classes * n_parameters + (k-1) class membership
   n_params <- k * n_parameters + (k - 1)
@@ -369,39 +441,65 @@ assign_respondents_to_classes <- function(class_probs, respondent_ids) {
 
 #' Calculate Log-Likelihood for LC Model
 #'
-#' Computes the total log-likelihood based on individual-level betas
-#' and the observed choices.
+#' Compute Mixture Log-Likelihood for Latent Class Model Selection
 #'
-#' @param individual_betas Matrix of individual betas
+#' Computes the mixture log-likelihood:
+#'   LL = sum_i log( sum_k pi_k * prod_t P(y_it | X_it, mu_k) )
+#'
+#' where mu_k are class-level mean betas and pi_k are class proportions.
+#' This gives DIFFERENT LL values for different K, enabling proper BIC/AIC
+#' model comparison. Using individual posterior means would give the same LL
+#' regardless of K (since individual betas are the same across K solutions).
+#'
+#' @param class_betas Matrix (K x n_params) of class-level mean betas
+#' @param class_proportions Numeric vector of length K, class mixing proportions (sum to 1)
 #' @param bayesm_data Prepared bayesm data
-#' @return Total log-likelihood
+#' @return Total mixture log-likelihood
 #' @keywords internal
-calculate_lc_log_likelihood <- function(individual_betas, bayesm_data) {
+calculate_lc_log_likelihood <- function(class_betas, class_proportions, bayesm_data) {
 
   n_respondents <- bayesm_data$n_respondents
   lgtdata <- bayesm_data$lgtdata
+  k <- nrow(class_betas)
   total_ll <- 0
 
   for (i in seq_len(n_respondents)) {
     resp <- lgtdata[[i]]
-    betas <- individual_betas[i, ]
     X <- resp$X
     y <- resp$y
     n_tasks <- length(y)
     rows_per_task <- nrow(X) / n_tasks
 
-    for (t in seq_len(n_tasks)) {
-      row_start <- (t - 1) * rows_per_task + 1
-      row_end <- t * rows_per_task
-      X_task <- X[row_start:row_end, , drop = FALSE]
+    # For each class, compute P(all choices | class_betas_k)
+    class_ll <- numeric(k)
+    for (kk in seq_len(k)) {
+      betas_k <- class_betas[kk, ]
+      task_ll <- 0
 
-      V <- as.numeric(X_task %*% betas)
-      exp_V <- exp(V - max(V))
-      prob <- exp_V / sum(exp_V)
-      chosen_prob <- prob[y[t]]
+      for (t in seq_len(n_tasks)) {
+        row_start <- (t - 1) * rows_per_task + 1
+        row_end <- t * rows_per_task
+        X_task <- X[row_start:row_end, , drop = FALSE]
 
-      total_ll <- total_ll + log(max(chosen_prob, 1e-300))
+        V <- as.numeric(X_task %*% betas_k)
+        exp_V <- exp(V - max(V))
+        prob <- exp_V / sum(exp_V)
+        chosen_prob <- max(prob[y[t]], 1e-300)
+
+        task_ll <- task_ll + log(chosen_prob)
+      }
+
+      class_ll[kk] <- task_ll
     }
+
+    # Mixture log-likelihood: log( sum_k pi_k * exp(class_ll_k) )
+    # Use log-sum-exp for numerical stability
+    log_pi <- log(pmax(class_proportions, 1e-300))
+    log_terms <- log_pi + class_ll
+    max_log <- max(log_terms)
+    resp_ll <- max_log + log(sum(exp(log_terms - max_log)))
+
+    total_ll <- total_ll + resp_ll
   }
 
   total_ll

@@ -40,9 +40,14 @@ transform_conjoint_for_html <- function(conjoint_results, config = list()) {
 
   # --- WTP data ---
   wtp_data <- .extract_wtp_data(conjoint_results$wtp)
+  # Thread currency symbol from config into WTP data
+  if (!is.null(wtp_data)) {
+    wtp_data$currency_symbol <- config$currency_symbol %||%
+      module_config$currency_symbol %||% "$"
+  }
 
   # --- Simulator data (JSON-ready) ---
-  simulator_data <- .build_simulator_data(utilities, importance, model_result, module_config)
+  simulator_data <- .build_simulator_data(utilities, importance, model_result, module_config, config)
 
   # --- Insight seeds ---
   insights <- .extract_insights(config)
@@ -94,7 +99,7 @@ transform_conjoint_for_html <- function(conjoint_results, config = list()) {
 #' @keywords internal
 .extract_hb_data <- function(model_result) {
   if (is.null(model_result)) return(NULL)
-  method <- model_result$method %||% ""
+  method <- tolower(model_result$method %||% "")
   if (!method %in% c("hierarchical_bayes", "hb")) return(NULL)
 
   hb <- list(
@@ -137,7 +142,8 @@ transform_conjoint_for_html <- function(conjoint_results, config = list()) {
   result <- list(
     wtp_table         = wtp$wtp_table,
     price_coefficient = wtp$price_coefficient %||% NA,
-    price_attribute   = wtp$price_attribute %||% "Price"
+    price_attribute   = wtp$price_attribute %||% "Price",
+    currency_symbol   = wtp$currency_symbol %||% NULL
   )
 
   # Demand curve data if available
@@ -150,7 +156,7 @@ transform_conjoint_for_html <- function(conjoint_results, config = list()) {
 
 #' Build simulator JSON-ready data from utilities and config
 #' @keywords internal
-.build_simulator_data <- function(utilities, importance, model_result, config) {
+.build_simulator_data <- function(utilities, importance, model_result, config, report_config = list()) {
   if (is.null(utilities)) return(NULL)
 
   # Build attribute list with levels and utilities
@@ -176,12 +182,24 @@ transform_conjoint_for_html <- function(conjoint_results, config = list()) {
       project_name      = config$project_name %||% "Conjoint Simulator",
       estimation_method = model_result$method %||% "mlogit",
       n_respondents     = model_result$n_respondents %||% NA,
+      default_customers = as.numeric(config$default_customers %||%
+                                     report_config$default_customers %||% 1000),
       generated         = format(Sys.time(), "%Y-%m-%d %H:%M:%S")
     ),
     attributes = attributes,
     individual = list(),
     classes    = list()
   )
+
+  # Default products from config (pre-defined simulator products)
+  sim_products <- report_config$simulator_products %||% config$simulator_products %||% NULL
+  if (!is.null(sim_products) && is.list(sim_products) && length(sim_products) > 0) {
+    default_products <- lapply(sim_products, function(prod) {
+      levels <- as.list(prod[setdiff(names(prod), "name")])
+      list(name = prod$name %||% "Product", levels = levels)
+    })
+    sim_data$defaultProducts <- default_products
+  }
 
   # Individual betas for RFC (if HB)
   if (!is.null(model_result$individual_betas)) {
@@ -241,8 +259,9 @@ simulator_data_to_json <- function(sim_data) {
       about[[f]] <- trimws(val)
     }
   }
-  # Check if any content exists
-  about$has_content <- length(about) > 0
+  # Check if any content exists (compute before adding to list)
+  has_content <- length(about) > 0
+  about$has_content <- has_content
   about
 }
 

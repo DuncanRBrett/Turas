@@ -364,7 +364,8 @@ calculate_hit_rate <- function(model_result, data, config) {
 
       # Sanity check: verify it's a matrix and row sums are ~1.0
       if (!is.matrix(fitted_mat)) {
-        stop("fitted() did not return a matrix as expected")
+        message("[TRS INFO] CONJ_HITRATE: fitted() did not return a matrix — hit rate unavailable")
+        return(NA)
       }
 
       # Get actual choices from long-format data
@@ -417,16 +418,14 @@ calculate_hit_rate <- function(model_result, data, config) {
 
       # Sanity checks: verify dimensions match before computing hit rate
       if (length(actual_vec) != nrow(fitted_mat)) {
-        stop(sprintf(
-          "Alignment error: %d actual choices != %d rows in fitted matrix",
-          length(actual_vec), nrow(fitted_mat)
-        ))
+        message(sprintf("[TRS INFO] CONJ_HITRATE: Alignment error: %d actual choices != %d rows in fitted matrix",
+                        length(actual_vec), nrow(fitted_mat)))
+        return(NA)
       }
       if (length(pred_vec) != length(actual_vec)) {
-        stop(sprintf(
-          "Alignment error: %d predictions != %d actual choices",
-          length(pred_vec), length(actual_vec)
-        ))
+        message(sprintf("[TRS INFO] CONJ_HITRATE: Alignment error: %d predictions != %d actual choices",
+                        length(pred_vec), length(actual_vec)))
+        return(NA)
       }
 
       # Calculate hit rate
@@ -436,7 +435,7 @@ calculate_hit_rate <- function(model_result, data, config) {
 
       # Optional: Print diagnostic info (controlled by option)
       # Set with: options(conjoint.verbose_diagnostics = TRUE)
-      if (getOption("conjoint.verbose_diagnostics", default = TRUE)) {
+      if (getOption("conjoint.verbose_diagnostics", default = FALSE)) {
         cat("\n[HIT RATE CALCULATION]\n")
         cat("======================\n")
         cat(sprintf("Fitted matrix dimensions: %d choice sets × %d alternatives\n",

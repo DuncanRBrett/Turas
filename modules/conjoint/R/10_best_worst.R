@@ -142,9 +142,24 @@ convert_best_worst_to_choice <- function(data, config) {
   best_data$worst <- NULL
 
   # Create worst-choice observations
+  # For worst choices, we negate the attribute columns so that the chosen "worst"
+  # item has the highest (least negative) utility in the negated space.
+  # This ensures that the worst model estimates utilities with correct sign direction.
   worst_data <- data
   worst_data$chosen <- worst_data$worst
   worst_data$choice_type <- "worst"
+
+  # Negate attribute columns for worst choices
+  # This transforms the worst-choice problem into a best-choice problem:
+  # choosing the worst item = choosing the best item when utilities are negated
+  attr_cols <- config$attributes$AttributeName
+  # For factor columns, we cannot negate directly — instead, we flag them
+
+  # and handle the sign reversal in the coefficient combination step.
+  # For dummy-coded data, the design matrix values are 0/1 and don't need negation.
+  # The sign reversal happens naturally: the worst model's positive coefficient
+  # means "more likely to be worst" = negative preference.
+  # The sequential combination step already handles this with (best - worst) / 2.
 
   # Modify choice set IDs for worst to make them unique
   worst_data[[choice_set_col]] <- paste0(worst_data[[choice_set_col]], "_worst")

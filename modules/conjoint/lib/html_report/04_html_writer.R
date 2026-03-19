@@ -19,7 +19,10 @@ write_conjoint_html_report <- function(page, output_path) {
   }
 
   tryCatch({
-    writeLines(page, output_path, useBytes = TRUE)
+    # Write as UTF-8 (not useBytes which can corrupt multibyte characters)
+    con <- file(output_path, open = "wt", encoding = "UTF-8")
+    on.exit(close(con), add = TRUE)
+    writeLines(enc2utf8(page), con, useBytes = FALSE)
 
     file_size <- file.size(output_path)
     file_size_mb <- round(file_size / (1024 * 1024), 2)

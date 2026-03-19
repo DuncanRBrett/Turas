@@ -23,19 +23,24 @@ build_importance_table <- function(importance) {
 
   rows <- vapply(seq_len(nrow(importance)), function(i) {
     imp <- importance$Importance[i]
-    bar_width <- min(imp, 100)
+    # Interpretation for each attribute
+    interp <- if (imp > 30) "Primary driver"
+              else if (imp > 20) "Major influence"
+              else if (imp > 10) "Moderate influence"
+              else if (imp > 5) "Minor influence"
+              else "Minimal impact"
     sprintf(
-      '<tr><td class="cj-label-col" data-col-key="attribute" data-export-value="%s">%s</td><td class="cj-num" data-col-key="importance" data-export-value="%.1f">%.1f%%</td><td><div class="cj-bar-cell"><div class="cj-bar" style="width:%.1f%%"></div></div></td></tr>',
+      '<tr><td class="cj-label-col" data-col-key="attribute" data-export-value="%s">%s</td><td class="cj-num" data-col-key="importance" data-export-value="%.1f">%.1f%%</td><td data-col-key="interpretation" style="color:#64748b;font-size:12px;">%s</td></tr>',
       .html_escape(importance$Attribute[i]),
-      .html_escape(importance$Attribute[i]), imp, imp, bar_width
+      .html_escape(importance$Attribute[i]), imp, imp, interp
     )
   }, character(1))
 
   paste0(
     '<table class="cj-table" data-table-id="importance"><thead><tr>',
     '<th data-col-key="attribute">Attribute</th>',
-    '<th data-col-key="importance">Importance</th>',
-    '<th></th></tr></thead><tbody>',
+    '<th class="cj-num-header" data-col-key="importance">Importance</th>',
+    '<th data-col-key="interpretation">Interpretation</th></tr></thead><tbody>',
     paste(rows, collapse = "\n"),
     '</tbody></table>'
   )
@@ -73,12 +78,12 @@ build_utilities_table <- function(utilities) {
     )
   }, character(1))
 
-  se_header <- if (has_se) '<th data-col-key="se">Std. Error</th>' else ""
+  se_header <- if (has_se) '<th class="cj-num-header" data-col-key="se">Std. Error</th>' else ""
 
   paste0(
     '<table class="cj-table" data-table-id="utilities"><thead><tr>',
     '<th data-col-key="level">Level</th>',
-    '<th data-col-key="utility">Utility</th>',
+    '<th class="cj-num-header" data-col-key="utility">Utility</th>',
     se_header,
     '</tr></thead><tbody>',
     paste(rows, collapse = "\n"),
@@ -122,7 +127,7 @@ build_model_fit_table <- function(diagnostics, model_result) {
   paste0(
     '<table class="cj-table" data-table-id="model-fit"><thead><tr>',
     '<th data-col-key="metric">Metric</th>',
-    '<th data-col-key="value">Value</th>',
+    '<th class="cj-num-header" data-col-key="value">Value</th>',
     '</tr></thead><tbody>',
     paste(rows, collapse = "\n"),
     '</tbody></table>'
@@ -154,8 +159,8 @@ build_convergence_table <- function(convergence) {
   paste0(
     '<table class="cj-table" data-table-id="convergence"><thead><tr>',
     '<th data-col-key="parameter">Parameter</th>',
-    '<th data-col-key="geweke_z">Geweke z</th>',
-    '<th data-col-key="ess">ESS</th>',
+    '<th class="cj-num-header" data-col-key="geweke_z">Geweke z</th>',
+    '<th class="cj-num-header" data-col-key="ess">ESS</th>',
     '</tr></thead><tbody>',
     paste(rows, collapse = "\n"),
     '</tbody></table>'
@@ -185,10 +190,10 @@ build_lc_comparison_table <- function(comparison, optimal_k) {
 
   paste0(
     '<table class="cj-table" data-table-id="lc-comparison"><thead><tr>',
-    '<th data-col-key="k">K</th>',
-    '<th data-col-key="aic">AIC</th>',
-    '<th data-col-key="bic">BIC</th>',
-    '<th data-col-key="entropy_r2">Entropy R\u00b2</th>',
+    '<th class="cj-num-header" data-col-key="k">K</th>',
+    '<th class="cj-num-header" data-col-key="aic">AIC</th>',
+    '<th class="cj-num-header" data-col-key="bic">BIC</th>',
+    '<th class="cj-num-header" data-col-key="entropy_r2">Entropy R\u00b2</th>',
     '</tr></thead><tbody>',
     paste(rows, collapse = "\n"),
     '</tbody></table>'
@@ -197,7 +202,7 @@ build_lc_comparison_table <- function(comparison, optimal_k) {
 
 
 #' Build WTP Table
-#' @param wtp_data WTP data list with wtp_table, price_attribute
+#' @param wtp_data WTP data list with wtp_table, price_attribute, currency_symbol
 #' @return HTML string
 #' @keywords internal
 build_wtp_table <- function(wtp_data) {
@@ -205,21 +210,25 @@ build_wtp_table <- function(wtp_data) {
   if (is.null(wtp_data) || is.null(wtp_data$wtp_table)) return("")
 
   wtp <- wtp_data$wtp_table
-  has_ci <- all(c("WTP_Lower", "WTP_Upper") %in% names(wtp))
+  cs <- wtp_data$currency_symbol %||% "$"
+  has_ci <- all(c("WTP_Lower", "WTP_Upper") %in% names(wtp)) &&
+    any(!is.na(wtp$WTP_Lower) & !is.na(wtp$WTP_Upper))
 
   rows <- vapply(seq_len(nrow(wtp)), function(i) {
     is_bl <- if ("is_baseline" %in% names(wtp)) wtp$is_baseline[i] else FALSE
     wtp_val <- wtp$WTP[i]
     wtp_class <- if (is_bl) "" else if (wtp_val > 0) "cj-positive" else if (wtp_val < 0) "cj-negative" else ""
-    wtp_display <- if (is_bl) "\u2014" else sprintf("$%.2f", wtp_val)
+    wtp_display <- if (is_bl) "\u2014" else sprintf("%s%.2f", cs, wtp_val)
 
     ci_cell <- if (has_ci) {
       if (is_bl) {
         '<td class="cj-num" data-col-key="ci">\u2014</td>'
+      } else if (is.na(wtp$WTP_Lower[i]) || is.na(wtp$WTP_Upper[i])) {
+        '<td class="cj-num" data-col-key="ci" style="color:#94a3b8;">\u2014</td>'
       } else {
         sprintf(
-          '<td class="cj-num" data-col-key="ci" data-export-value="[%.2f, %.2f]">[$%.2f, $%.2f]</td>',
-          wtp$WTP_Lower[i], wtp$WTP_Upper[i], wtp$WTP_Lower[i], wtp$WTP_Upper[i]
+          '<td class="cj-num" data-col-key="ci" data-export-value="[%.2f, %.2f]">[%s%.2f, %s%.2f]</td>',
+          wtp$WTP_Lower[i], wtp$WTP_Upper[i], cs, wtp$WTP_Lower[i], cs, wtp$WTP_Upper[i]
         )
       }
     } else ""
@@ -236,13 +245,13 @@ build_wtp_table <- function(wtp_data) {
     )
   }, character(1))
 
-  ci_header <- if (has_ci) '<th data-col-key="ci">95% CI</th>' else ""
+  ci_header <- if (has_ci) '<th class="cj-num-header" data-col-key="ci">95% CI</th>' else ""
 
   paste0(
     '<table class="cj-table" data-table-id="wtp"><thead><tr>',
     '<th data-col-key="attribute">Attribute</th>',
     '<th data-col-key="level">Level</th>',
-    '<th data-col-key="wtp">WTP</th>',
+    '<th class="cj-num-header" data-col-key="wtp">WTP</th>',
     ci_header,
     '</tr></thead><tbody>',
     paste(rows, collapse = "\n"),
@@ -253,12 +262,14 @@ build_wtp_table <- function(wtp_data) {
 
 #' Build Demand Curve Table
 #' @param demand_curve Data frame with Price, Demand (or Share)
+#' @param currency_symbol Currency symbol for display
 #' @return HTML string
 #' @keywords internal
-build_demand_table <- function(demand_curve) {
+build_demand_table <- function(demand_curve, currency_symbol = "$") {
 
   if (is.null(demand_curve) || nrow(demand_curve) == 0) return("")
 
+  cs <- currency_symbol %||% "$"
   share_col <- if ("Share" %in% names(demand_curve)) "Share" else if ("Demand" %in% names(demand_curve)) "Demand" else NULL
   if (is.null(share_col)) return("")
 
@@ -266,15 +277,15 @@ build_demand_table <- function(demand_curve) {
     price <- demand_curve$Price[i]
     share <- demand_curve[[share_col]][i]
     sprintf(
-      '<tr><td class="cj-num" data-col-key="price" data-export-value="%.2f">$%.2f</td><td class="cj-num" data-col-key="share" data-export-value="%.1f">%.1f%%</td></tr>',
-      price, price, share, share
+      '<tr><td class="cj-num" data-col-key="price" data-export-value="%.2f">%s%.2f</td><td class="cj-num" data-col-key="share" data-export-value="%.1f">%.1f%%</td></tr>',
+      price, cs, price, share, share
     )
   }, character(1))
 
   paste0(
     '<table class="cj-table" data-table-id="demand-curve"><thead><tr>',
-    '<th data-col-key="price">Price</th>',
-    '<th data-col-key="share">Market Share</th>',
+    '<th class="cj-num-header" data-col-key="price">Price</th>',
+    '<th class="cj-num-header" data-col-key="share">Market Share</th>',
     '</tr></thead><tbody>',
     paste(rows, collapse = "\n"),
     '</tbody></table>'
@@ -382,7 +393,7 @@ build_respondent_quality_table <- function(quality, n_respondents = NA) {
   paste0(
     '<table class="cj-table" data-table-id="respondent-quality"><thead><tr>',
     '<th data-col-key="metric">Metric</th>',
-    '<th data-col-key="value">Value</th>',
+    '<th class="cj-num-header" data-col-key="value">Value</th>',
     '</tr></thead><tbody>',
     paste(rows, collapse = "\n"),
     '</tbody></table>'

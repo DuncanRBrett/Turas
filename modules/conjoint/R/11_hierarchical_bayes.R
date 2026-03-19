@@ -124,8 +124,8 @@ prepare_bayesm_data <- function(data_list, config, verbose = TRUE) {
   attr_names <- config$attributes$AttributeName
 
   # Create dummy variables for all attributes
-  # Effect coding: each attribute with K levels gets K-1 dummies
-  # The first level is the reference (coded as -1 for effect coding, 0 for dummy)
+  # Dummy coding: each attribute with K levels gets K-1 columns
+  # The first level is the reference (coded as 0; other levels coded as 1 when present)
   design_cols <- list()
   col_names <- character()
   attribute_map <- list()  # maps column indices to attribute/level
@@ -161,6 +161,38 @@ prepare_bayesm_data <- function(data_list, config, verbose = TRUE) {
 
   log_verbose(sprintf("  → %d alternatives per choice set", p), verbose)
 
+  # Validate that ALL choice sets have exactly p alternatives
+
+  # bayesm requires constant p — mismatches cause silent wrong results
+  bad_cs <- character(0)
+  for (rid in respondent_ids) {
+    resp_mask <- data[[resp_col]] == rid
+    resp_cs_ids <- unique(data[[cs_col]][resp_mask])
+    for (csid in resp_cs_ids) {
+      cs_size <- sum(data[[resp_col]] == rid & data[[cs_col]] == csid)
+      if (cs_size != p) {
+        bad_cs <- c(bad_cs, sprintf("resp=%s cs=%s (got %d)", rid, csid, cs_size))
+        if (length(bad_cs) >= 5) break  # limit diagnostic output
+      }
+    }
+    if (length(bad_cs) >= 5) break
+  }
+
+  if (length(bad_cs) > 0) {
+    return(conjoint_refuse(
+      code = "DATA_INCONSISTENT_ALTERNATIVES",
+      message = sprintf(
+        "Not all choice sets have %d alternatives. bayesm requires a constant number of alternatives per choice set.",
+        p
+      ),
+      how_to_fix = c(
+        "Ensure every choice set has exactly the same number of alternatives",
+        "Check for missing rows or inconsistent none-option inclusion",
+        sprintf("Mismatched examples: %s", paste(bad_cs, collapse = "; "))
+      )
+    ))
+  }
+
   # Build lgtdata: one element per respondent
   lgtdata <- vector("list", n_respondents)
 
@@ -180,7 +212,24 @@ prepare_bayesm_data <- function(data_list, config, verbose = TRUE) {
       cs_id <- choice_sets[t]
       cs_mask <- resp_data[[cs_col]] == cs_id
       chosen <- resp_data[[chosen_col]][cs_mask]
-      y_vec[t] <- which(chosen == 1)[1]
+      y_val <- which(chosen == 1)[1]
+
+      # Guard: ensure exactly one chosen alternative per choice set
+      if (is.na(y_val)) {
+        return(conjoint_refuse(
+          code = "DATA_NO_CHOICE",
+          message = sprintf(
+            "No chosen alternative found for respondent '%s' in choice set '%s'.",
+            resp_id, cs_id
+          ),
+          how_to_fix = c(
+            "Ensure every choice set has exactly one row with chosen=1",
+            "Check for missing or zero values in the chosen column"
+          )
+        ))
+      }
+
+      y_vec[t] <- y_val
     }
 
     lgtdata[[i]] <- list(
@@ -313,8 +362,21 @@ extract_hb_results <- function(hb_output, bayesm_data, config, burnin, thin, ver
   respondent_ids <- bayesm_data$respondent_ids
 
   # hb_output$betadraw is an array: [respondents x parameters x draws]
-  # After burn-in removal (bayesm handles this internally based on R and keep)
-  betadraw <- hb_output$betadraw
+  # bayesm does NOT discard burn-in automatically — we must remove burn-in draws
+  betadraw_raw <- hb_output$betadraw
+  n_draws_total <- dim(betadraw_raw)[3]
+
+  # Remove burn-in draws: bayesm keeps every 'thin'-th draw, so the number
+
+  # of burn-in draws to discard = floor(burnin / thin)
+  n_burnin_draws <- min(floor(burnin / max(thin, 1)), n_draws_total - 1)
+  if (n_burnin_draws > 0) {
+    betadraw <- betadraw_raw[, , (n_burnin_draws + 1):n_draws_total, drop = FALSE]
+    log_verbose(sprintf("  → Discarded %d burn-in draws, retaining %d posterior draws",
+                         n_burnin_draws, dim(betadraw)[3]), verbose)
+  } else {
+    betadraw <- betadraw_raw
+  }
   n_draws <- dim(betadraw)[3]
 
   # Calculate individual-level posterior means
@@ -322,8 +384,16 @@ extract_hb_results <- function(hb_output, bayesm_data, config, burnin, thin, ver
   individual_sds <- matrix(NA, nrow = n_respondents, ncol = n_parameters)
 
   for (i in seq_len(n_respondents)) {
-    individual_betas[i, ] <- colMeans(betadraw[i, , , drop = FALSE])
-    individual_sds[i, ] <- apply(betadraw[i, , , drop = FALSE], 2, sd)
+    # Drop to 2D matrix [parameters x draws] before computing means
+    draws_i <- betadraw[i, , , drop = TRUE]
+    if (is.matrix(draws_i)) {
+      individual_betas[i, ] <- rowMeans(draws_i)
+      individual_sds[i, ] <- apply(draws_i, 1, sd)
+    } else {
+      # Single draw remaining — no SD
+      individual_betas[i, ] <- draws_i
+      individual_sds[i, ] <- 0
+    }
   }
 
   colnames(individual_betas) <- col_names
@@ -402,12 +472,12 @@ run_hb_convergence_diagnostics <- function(hb_output, bayesm_data, verbose = TRU
   .load_hb_diagnostics()
 
   # Calculate basic diagnostics from the population-level draws
-  # hb_output$nmix contains the mixture parameters over iterations
-  # For basic diagnostics, use the mean of individual betas across iterations
+  # Use ALL draws (including burn-in) for convergence assessment — burn-in
+  # non-stationarity is exactly what we want to detect
 
   n_respondents <- bayesm_data$n_respondents
   n_params <- bayesm_data$n_parameters
-  betadraw <- hb_output$betadraw
+  betadraw <- hb_output$betadraw  # Full draws including burn-in
   n_draws <- dim(betadraw)[3]
 
   # Calculate effective sample size and simple convergence metrics

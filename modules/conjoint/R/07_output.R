@@ -456,7 +456,7 @@ create_utilities_sheet <- function(wb, utilities, header_style,
   utility_col <- which(names(utilities) == "Utility")
   if (length(utility_col) > 0) {
     # Positive utilities
-    for (i in 2:nrow(utilities)+1) {
+    for (i in 2:(nrow(utilities)+1)) {
       if (utilities$Utility[i-1] > 0) {
         openxlsx::addStyle(wb, "Part-Worth Utilities", positive_style,
                           rows = i, cols = utility_col)

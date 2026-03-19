@@ -282,7 +282,7 @@ build_interaction_formula <- function(config) {
   all_terms <- c(main_effects, int_effects)
 
   # Build formula
-  formula_str <- sprintf("choice ~ %s | 0", paste(all_terms, collapse = " + "))
+  formula_str <- sprintf("%s ~ %s | 0", config$chosen_column, paste(all_terms, collapse = " + "))
 
   as.formula(formula_str)
 }

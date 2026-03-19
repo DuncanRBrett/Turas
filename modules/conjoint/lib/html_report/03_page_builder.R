@@ -47,6 +47,27 @@ build_conjoint_page <- function(html_data, tables, charts, config) {
     simulator_data_to_json(html_data$simulator_data)
   } else "{}"
 
+  # Custom slides JSON from config (pre-populate slides panel)
+  slides_json <- "[]"
+  custom_slides <- config$custom_slides %||% NULL
+  if (!is.null(custom_slides) && length(custom_slides) > 0) {
+    slides_list <- lapply(seq_along(custom_slides), function(i) {
+      s <- custom_slides[[i]]
+      slide <- list(
+        id = paste0("slide-config-", i),
+        title = s$title %||% paste("Slide", i),
+        body = s$content %||% "",
+        images = s$images %||% list(),
+        timestamp = format(Sys.time(), "%Y-%m-%dT%H:%M:%S")
+      )
+      slide
+    })
+    slides_json <- tryCatch(
+      jsonlite::toJSON(slides_list, auto_unbox = TRUE),
+      error = function(e) "[]"
+    )
+  }
+
   sprintf(
     '<!DOCTYPE html>
 <html lang="en">
@@ -78,7 +99,7 @@ build_conjoint_page <- function(html_data, tables, charts, config) {
 </footer>
 <script type="application/json" id="cj-simulator-data">%s</script>
 <script type="application/json" id="pinned-views-data">[]</script>
-<script type="application/json" id="slides-data">[]</script>
+<script type="application/json" id="slides-data">%s</script>
 <script>%s</script>
 </body>
 </html>',
@@ -86,7 +107,7 @@ build_conjoint_page <- function(html_data, tables, charts, config) {
     header, nav,
     overview, utilities, diagnostics, lc_panel, wtp_panel, simulator, about, pinned, slides,
     help_overlay,
-    summary$generated, sim_json, js
+    summary$generated, sim_json, slides_json, js
   )
 }
 
@@ -120,20 +141,17 @@ build_conjoint_meta <- function(summary, config = list()) {
 
 #' @keywords internal
 build_conjoint_css <- function(brand, accent) {
-  css <- '
-:root {
-  --cj-brand: BRAND;
-  --cj-accent: ACCENT;
-}
+  css_root <- sprintf(':root { --cj-brand: %s; --cj-accent: %s; }', brand, accent)
+  css <- paste0(css_root, '
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8fafc; color:#334155; line-height:1.6; }
+body { font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; background:#f8f7f5; color:#1e293b; line-height:1.6; }
 
 /* === HEADER === */
 .cj-header {
   background: linear-gradient(135deg, #1a2744, #2a3f5f);
   color: white;
   padding: 24px 40px 20px;
-  border-bottom: 3px solid BRAND;
+  border-bottom: 3px solid var(--cj-brand);
 }
 .cj-header-inner { display:flex; flex-direction:column; max-width:1400px; margin:0 auto; }
 .cj-header-top { display:flex; align-items:center; justify-content:space-between; }
@@ -160,6 +178,7 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
   width:28px; height:28px; border-radius:50%; border:1.5px solid rgba(255,255,255,0.5);
   background:transparent; color:rgba(255,255,255,0.8); font-size:14px; font-weight:700;
   cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition:all 0.15s ease;
 }
 .cj-help-btn:hover { background:rgba(255,255,255,0.1); }
 
@@ -171,10 +190,10 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 .cj-report-tab {
   padding:12px 20px; font-size:13px; font-weight:500; color:#64748b;
   cursor:pointer; border:none; border-bottom:3px solid transparent;
-  background:none; transition:all 200ms;
+  background:none; transition:all 0.15s ease;
 }
-.cj-report-tab:hover { color:BRAND; }
-.cj-report-tab.active { color:BRAND; border-bottom-color:BRAND; }
+.cj-report-tab:hover { color:var(--cj-brand); }
+.cj-report-tab.active { color:var(--cj-brand); border-bottom-color:var(--cj-brand); }
 
 /* === MAIN CONTENT === */
 .cj-panels-wrap { max-width:1400px; margin:0 auto; padding:24px 40px 60px; }
@@ -183,19 +202,21 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 
 /* === CARDS === */
 .cj-card {
-  background:white; border-radius:8px; padding:24px; margin-bottom:20px;
-  box-shadow:0 1px 3px rgba(0,0,0,0.06);
+  background:white; border:1px solid #e2e8f0; border-radius:8px; padding:24px; margin-bottom:20px;
+  box-shadow:0 1px 3px rgba(0,0,0,0.06); transition:all 0.15s ease;
 }
+.cj-card:hover { box-shadow:0 2px 8px rgba(0,0,0,0.08); }
 .cj-card h2 { font-size:16px; font-weight:600; color:#1e293b; margin-bottom:16px; }
-.cj-card h3 { font-size:14px; font-weight:600; color:#334155; margin-bottom:12px; }
+.cj-card h3 { font-size:14px; font-weight:600; color:#1e293b; margin-bottom:12px; }
 
 /* === KPI ROW === */
 .cj-kpi-row { display:flex; gap:16px; margin-bottom:20px; flex-wrap:wrap; }
 .cj-kpi {
-  background:white; border-radius:8px; padding:16px 20px; min-width:140px;
-  box-shadow:0 1px 3px rgba(0,0,0,0.06); text-align:center; flex:1;
+  background:white; border:1px solid #e2e8f0; border-radius:8px; padding:16px 20px; min-width:140px;
+  box-shadow:0 1px 3px rgba(0,0,0,0.06); text-align:center; flex:1; transition:all 0.15s ease;
 }
-.cj-kpi-value { font-size:24px; font-weight:700; color:BRAND; }
+.cj-kpi:hover { box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+.cj-kpi-value { font-size:24px; font-weight:700; color:var(--cj-brand); }
 .cj-kpi-label { font-size:11px; color:#64748b; margin-top:4px; }
 
 /* === UTILITIES SIDEBAR LAYOUT === */
@@ -203,21 +224,21 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 .cj-util-sidebar {
   width:260px; flex-shrink:0; position:sticky; top:60px; align-self:flex-start;
   max-height:calc(100vh - 80px); overflow-y:auto;
-  background:white; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:16px;
+  background:white; border:1px solid #e2e8f0; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:16px;
 }
 .cj-util-sidebar-header { font-size:12px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:12px; }
 .cj-util-search {
   width:100%; padding:8px 12px; border:1px solid #e2e8f0; border-radius:6px;
-  font-size:12px; margin-bottom:12px; outline:none;
+  font-size:12px; margin-bottom:12px; outline:none; transition:all 0.15s ease;
 }
-.cj-util-search:focus { border-color:BRAND; }
+.cj-util-search:focus { border-color:var(--cj-brand); }
 .cj-util-item {
   padding:8px 12px; border-radius:6px; cursor:pointer; font-size:13px;
-  color:#334155; transition:all 150ms; margin-bottom:2px;
+  color:#1e293b; transition:all 0.15s ease; margin-bottom:2px;
 }
 .cj-util-item:hover { background:#f1f5f9; }
-.cj-util-item.active { background:BRAND; color:white; font-weight:500; }
-.cj-util-item-count { font-size:11px; color:#94a3b8; float:right; }
+.cj-util-item.active { background:var(--cj-brand); color:white; font-weight:500; }
+.cj-util-item-count { font-size:11px; color:#64748b; float:right; }
 .cj-util-item.active .cj-util-item-count { color:rgba(255,255,255,0.7); }
 .cj-util-content { flex:1; min-width:0; }
 .cj-attr-detail { display:none; }
@@ -226,15 +247,16 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 /* === TABLES === */
 .cj-table { width:100%; border-collapse:collapse; font-size:13px; }
 .cj-table th { text-align:left; padding:8px 12px; border-bottom:2px solid #e2e8f0; color:#64748b; font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; }
+.cj-table th.cj-num-header { text-align:right; }
 .cj-table td { padding:8px 12px; border-bottom:1px solid #f1f5f9; }
 .cj-label-col { font-weight:400; color:#334155; }
 .cj-num { font-variant-numeric:tabular-nums; text-align:right; }
 .cj-positive { color:#16a34a; font-weight:500; }
 .cj-negative { color:#dc2626; font-weight:500; }
-.cj-baseline { color:#94a3b8; font-size:11px; font-weight:400; }
+.cj-baseline { color:#64748b; font-size:11px; font-weight:400; }
 .cj-highlight-row { background:#f0fdf4; }
 .cj-bar-cell { width:200px; }
-.cj-bar { height:18px; background:BRAND; border-radius:4px; opacity:0.75; transition:width 200ms; }
+.cj-bar { height:18px; background:var(--cj-brand); border-radius:4px; opacity:0.75; transition:width 200ms; }
 
 /* === CHART CONTAINERS === */
 .cj-chart-container { margin:16px 0; }
@@ -246,36 +268,67 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 .cj-export-btn {
   display:inline-flex; align-items:center; gap:4px; padding:6px 12px;
   font-size:11px; font-weight:500; border:1px solid #e2e8f0; border-radius:6px;
-  background:white; color:#64748b; cursor:pointer; transition:all 200ms;
+  background:white; color:#64748b; cursor:pointer; transition:all 0.15s ease;
 }
-.cj-export-btn:hover { border-color:BRAND; color:BRAND; }
+.cj-export-btn:hover { border-color:var(--cj-brand); color:var(--cj-brand); }
 
 /* === INSIGHT AREAS === */
 .cj-insight-area { margin-top:16px; border-top:1px solid #f1f5f9; padding-top:12px; }
 .cj-insight-toggle {
-  font-size:12px; color:BRAND; cursor:pointer; font-weight:500;
-  background:none; border:none; padding:4px 0;
+  font-size:12px; color:var(--cj-brand); cursor:pointer; font-weight:500;
+  background:none; border:none; padding:4px 0; transition:all 0.15s ease;
 }
 .cj-insight-toggle:hover { text-decoration:underline; }
 .cj-insight-body { display:none; margin-top:8px; }
 .cj-insight-body.open { display:block; }
 .cj-insight-editor {
   min-height:60px; padding:12px; border:1px solid #e2e8f0; border-radius:6px;
-  font-size:13px; line-height:1.5; color:#334155; outline:none;
+  font-size:13px; line-height:1.5; color:#1e293b; outline:none; transition:all 0.15s ease;
 }
-.cj-insight-editor:focus { border-color:BRAND; box-shadow:0 0 0 2px rgba(50,51,103,0.1); }
+.cj-insight-editor:focus { border-color:var(--cj-brand); box-shadow:0 0 0 2px rgba(50,51,103,0.1); }
 .cj-insight-editor:empty::before {
-  content:attr(data-placeholder); color:#94a3b8; font-style:italic;
+  content:attr(data-placeholder); color:#64748b; font-style:italic;
+}
+
+/* === ATTRIBUTE-LEVEL STICKY NOTES === */
+.cj-attr-note { margin-top:14px; border-top:1px solid #f1f5f9; padding-top:10px; }
+.cj-attr-note-toggle {
+  display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+  font-size:12px; color:#64748b; font-weight:500; padding:4px 8px;
+  border-radius:4px; transition:all 0.2s ease; background:none; border:none;
+}
+.cj-attr-note-toggle:hover { background:#f1f5f9; color:var(--cj-brand); }
+.cj-attr-note-toggle.has-note { color:var(--cj-brand); }
+.cj-attr-note-toggle.has-note .cj-attr-note-label { font-weight:600; }
+.cj-attr-note-icon { font-size:14px; }
+.cj-attr-note-body {
+  margin-top:8px; animation:cj-note-fadein 0.2s ease;
+}
+@keyframes cj-note-fadein { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+.cj-attr-note-editor {
+  min-height:48px; padding:10px 12px; border:1.5px solid #e2e8f0; border-radius:6px;
+  font-size:12px; line-height:1.6; color:#1e293b; outline:none;
+  background:#fefce8; transition:all 0.2s ease;
+}
+.cj-attr-note-editor:focus { border-color:var(--cj-brand); box-shadow:0 0 0 2px rgba(50,51,103,0.08); background:#fffef5; }
+.cj-attr-note-editor:empty::before {
+  content:attr(data-placeholder); color:#a3a3a3; font-style:italic;
+}
+
+/* === SIMULATOR ANNOTATION EDITOR === */
+.cj-sim-annotation-editor:focus { border-color:#d4a843; box-shadow:0 0 0 3px rgba(212,168,67,0.15); }
+.cj-sim-annotation-editor:empty::before {
+  content:attr(data-placeholder); color:#b8860b; font-style:italic; opacity:0.6;
 }
 
 /* === PIN BUTTON (emoji style, matches tabs) === */
 .cj-pin-btn {
   background:none; border:1px solid #e2e8f0; border-radius:4px;
   cursor:pointer; font-size:14px; padding:3px 8px;
-  color:#94a3b8; transition:all 0.15s;
+  color:#64748b; transition:all 0.15s ease;
 }
-.cj-pin-btn:hover { border-color:BRAND; color:BRAND; }
-.cj-pin-btn.pinned { color:BRAND; border-color:BRAND; }
+.cj-pin-btn:hover { border-color:var(--cj-brand); color:var(--cj-brand); }
+.cj-pin-btn.pinned { color:var(--cj-brand); border-color:var(--cj-brand); }
 
 /* === PIN BOUNCE ANIMATION === */
 @keyframes cj-pin-bounce {
@@ -302,13 +355,14 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 .cj-tab-badge {
   display:inline-flex; align-items:center; justify-content:center;
   min-width:18px; height:18px; padding:0 5px; border-radius:9px;
-  background:BRAND; color:#fff; font-size:10px; font-weight:700;
+  background:var(--cj-brand); color:#fff; font-size:10px; font-weight:700;
   margin-left:6px; vertical-align:middle;
 }
 
 /* === CALLOUT BOXES === */
 .cj-callout {
-  background:#f8fafc; border-left:3px solid BRAND; border-radius:0 6px 6px 0;
+  background:linear-gradient(135deg, color-mix(in srgb, var(--cj-brand) 6%, white), white);
+  border-left:4px solid var(--cj-brand); border-radius:0 6px 6px 0;
   padding:14px 18px; margin-bottom:16px; font-size:12px; line-height:1.65; color:#475569;
 }
 .cj-callout-title {
@@ -334,12 +388,12 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
   background:none; white-space:nowrap; transition:all 200ms;
   margin-bottom:-2px;
 }
-.cj-slide-tab:hover { color:BRAND; }
-.cj-slide-tab.active { color:BRAND; border-bottom-color:BRAND; font-weight:600; }
+.cj-slide-tab:hover { color:var(--cj-brand); }
+.cj-slide-tab.active { color:var(--cj-brand); border-bottom-color:var(--cj-brand); font-weight:600; }
 .cj-slide-card {
   background:white; border-radius:8px; padding:20px; margin-bottom:16px;
   box-shadow:0 1px 3px rgba(0,0,0,0.06); position:relative;
-  border-left:3px solid BRAND; display:none;
+  border-left:3px solid var(--cj-brand); display:none;
 }
 .cj-slide-card.active { display:block; }
 .cj-slide-header {
@@ -351,15 +405,15 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
   background:transparent; outline:none; padding:2px 0; flex:1; margin-right:12px;
   transition:border-color 200ms;
 }
-.cj-slide-title-input:focus { border-bottom-color:BRAND; }
-.cj-slide-title-input::placeholder { color:#94a3b8; font-style:italic; }
+.cj-slide-title-input:focus { border-bottom-color:var(--cj-brand); }
+.cj-slide-title-input::placeholder { color:#64748b; font-style:italic; }
 .cj-slide-editor-layout { display:flex; gap:16px; }
 .cj-slide-editor-layout textarea {
   flex:1; min-height:200px; padding:12px; border:1px solid #e2e8f0; border-radius:6px;
   font-size:13px; line-height:1.6; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
   color:#334155; outline:none; resize:vertical;
 }
-.cj-slide-editor-layout textarea:focus { border-color:BRAND; box-shadow:0 0 0 2px rgba(50,51,103,0.1); }
+.cj-slide-editor-layout textarea:focus { border-color:var(--cj-brand); box-shadow:0 0 0 2px rgba(50,51,103,0.1); }
 .cj-slide-preview {
   flex:1; min-height:200px; padding:12px 16px; border:1px solid #e2e8f0;
   border-radius:6px; background:#fafbfc; font-size:13px; line-height:1.6;
@@ -375,13 +429,13 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 .cj-slide-preview code { background:#f1f5f9; padding:1px 4px; border-radius:3px; font-size:12px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
 .cj-slide-preview hr { border:none; border-top:1px solid #e2e8f0; margin:12px 0; }
 .cj-slide-actions { display:flex; gap:6px; flex-shrink:0; }
-.cj-slide-empty { text-align:center; padding:60px 20px; color:#94a3b8; }
+.cj-slide-empty { text-align:center; padding:60px 20px; color:#64748b; }
 
 /* === PINNED VIEWS === */
 .cj-pinned-container { min-height:200px; }
 .cj-pinned-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
 .cj-pinned-empty {
-  text-align:center; padding:60px 20px; color:#94a3b8;
+  text-align:center; padding:60px 20px; color:#64748b;
 }
 .cj-pinned-empty-icon { font-size:36px; margin-bottom:12px; }
 .cj-pinned-card {
@@ -403,7 +457,7 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
   font-size:14px; font-weight:600; color:#334155;
   padding:4px 12px; outline:none;
 }
-.cj-section-title:empty::before { content:"Section title..."; color:#94a3b8; font-style:italic; }
+.cj-section-title:empty::before { content:"Section title..."; color:#64748b; font-style:italic; }
 
 /* === SIMULATOR === */
 .cj-sim-layout { display:flex; gap:24px; flex-wrap:wrap; }
@@ -411,51 +465,51 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 .cj-sim-results { flex:1; min-width:300px; }
 .cj-sim-product {
   background:white; border-radius:8px; padding:16px; margin-bottom:12px;
-  box-shadow:0 1px 3px rgba(0,0,0,0.06); border-left:3px solid BRAND;
+  box-shadow:0 1px 3px rgba(0,0,0,0.06); border-left:3px solid var(--cj-brand);
 }
 .cj-sim-product-name {
   font-size:13px; font-weight:600; color:#1e293b; border:none; border-bottom:1.5px solid transparent;
-  background:transparent; outline:none; padding:2px 0; width:160px; transition:border-color 200ms;
+  background:transparent; outline:none; padding:2px 0; width:160px; transition:border-color 0.15s ease;
 }
-.cj-sim-product-name:focus { border-bottom-color:BRAND; }
+.cj-sim-product-name:focus { border-bottom-color:var(--cj-brand); }
 .cj-sim-select {
   width:100%; padding:6px 10px; border:1px solid #e2e8f0; border-radius:4px;
-  font-size:12px; margin-bottom:6px; outline:none;
+  font-size:12px; margin-bottom:6px; outline:none; transition:all 0.15s ease;
 }
-.cj-sim-select:focus { border-color:BRAND; }
+.cj-sim-select:focus { border-color:var(--cj-brand); }
 .cj-sim-add-btn {
   display:inline-flex; align-items:center; gap:4px; padding:8px 16px;
   font-size:12px; font-weight:500; border:1px solid #e2e8f0; border-radius:6px;
-  background:white; color:BRAND; cursor:pointer;
+  background:white; color:var(--cj-brand); cursor:pointer; transition:all 0.15s ease;
 }
-.cj-sim-add-btn:hover { background:BRAND; color:white; }
+.cj-sim-add-btn:hover { background:var(--cj-brand); color:white; }
 .cj-sim-share-bar { margin:8px 0; }
 .cj-sim-bar-bg { height:28px; background:#f1f5f9; border-radius:4px; overflow:hidden; position:relative; }
 .cj-sim-bar-fill { height:100%; border-radius:4px; transition:width 300ms; display:flex; align-items:center; justify-content:flex-end; padding-right:8px; color:white; font-size:11px; font-weight:600; }
 .cj-sim-mode-btns { display:flex; gap:8px; margin-bottom:16px; }
 .cj-sim-mode-btn {
   padding:6px 14px; font-size:12px; font-weight:500; border:1px solid #e2e8f0;
-  border-radius:6px; background:white; color:#64748b; cursor:pointer;
+  border-radius:6px; background:white; color:#64748b; cursor:pointer; transition:all 0.15s ease;
 }
-.cj-sim-mode-btn.active { background:BRAND; color:white; border-color:BRAND; }
+.cj-sim-mode-btn.active { background:var(--cj-brand); color:white; border-color:var(--cj-brand); }
 
 /* === ABOUT PAGE === */
 .cj-about-section { max-width:700px; }
 .cj-about-grid { display:grid; grid-template-columns:120px 1fr; gap:8px 16px; margin-bottom:16px; }
 .cj-about-label { font-size:12px; font-weight:500; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; }
 .cj-about-value { font-size:13px; color:#334155; }
-.cj-about-value a { color:BRAND; text-decoration:none; }
+.cj-about-value a { color:var(--cj-brand); text-decoration:none; }
 .cj-about-value a:hover { text-decoration:underline; }
 .cj-about-notes {
   min-height:80px; padding:12px; border:1px solid #e2e8f0; border-radius:6px;
   font-size:13px; line-height:1.5; outline:none; margin-top:8px;
 }
-.cj-about-notes:focus { border-color:BRAND; }
-.cj-about-notes:empty::before { content:attr(data-placeholder); color:#94a3b8; font-style:italic; }
+.cj-about-notes:focus { border-color:var(--cj-brand); }
+.cj-about-notes:empty::before { content:attr(data-placeholder); color:#64748b; font-style:italic; }
 
 /* === HELP OVERLAY === */
 .cj-help-overlay {
-  display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5);
+  display:none; position:fixed; top:0; right:0; bottom:0; left:0; background:rgba(0,0,0,0.5);
   z-index:1000; align-items:center; justify-content:center;
 }
 .cj-help-overlay.open { display:flex; }
@@ -466,15 +520,15 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
 .cj-help-card h2 { font-size:18px; font-weight:700; color:#1e293b; margin-bottom:16px; }
 .cj-help-card ul { list-style:none; padding:0; }
 .cj-help-card li { padding:6px 0; font-size:13px; color:#334155; display:flex; gap:8px; }
-.cj-help-key { font-weight:600; color:BRAND; min-width:120px; flex-shrink:0; }
-.cj-help-dismiss { text-align:center; margin-top:20px; font-size:12px; color:#94a3b8; }
+.cj-help-key { font-weight:600; color:var(--cj-brand); min-width:120px; flex-shrink:0; }
+.cj-help-dismiss { text-align:center; margin-top:20px; font-size:12px; color:#64748b; }
 
 /* === STATUS INDICATORS === */
 .cj-status-pass { color:#16a34a; font-weight:600; }
 .cj-status-fail { color:#dc2626; font-weight:600; }
 
 /* === FOOTER === */
-.cj-footer { text-align:center; padding:20px 40px; color:#94a3b8; font-size:11px; border-top:1px solid #e2e8f0; }
+.cj-footer { text-align:center; padding:20px 40px; color:#64748b; font-size:11px; border-top:1px solid #e2e8f0; }
 
 /* === RESPONSIVE === */
 @media (max-width:768px) {
@@ -484,9 +538,7 @@ body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8
   .cj-util-sidebar { width:100%; position:static; max-height:none; }
   .cj-sim-layout { flex-direction:column; }
 }
-'
-  css <- gsub("BRAND", brand, css, fixed = TRUE)
-  css <- gsub("ACCENT", accent, css, fixed = TRUE)
+')
   css
 }
 
@@ -503,8 +555,13 @@ build_conjoint_print_css <- function() {
   .cj-report-tabs, .cj-export-bar, .cj-export-btn, .cj-pin-btn,
   .cj-insight-toggle, .cj-help-overlay, .cj-help-btn,
   .cj-util-search, .cj-sim-add-btn, .cj-sim-mode-btns,
-  .cj-pinned-card-actions, .cj-slide-actions,
+  .cj-pinned-card-actions, .cj-slide-actions { display:none !important; }
+  /* Hide pinned & simulator by default, but allow override for targeted prints */
   #panel-pinned, #panel-simulator { display:none !important; }
+  body.cj-printing-pinned #panel-pinned { display:block !important; }
+  body.cj-printing-pinned .cj-panel:not(#panel-pinned) { display:none !important; }
+  body.cj-printing-slides #panel-slides { display:block !important; }
+  body.cj-printing-slides .cj-panel:not(#panel-slides) { display:none !important; }
 
   body { background:white !important; font-size:14px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   .cj-panels-wrap { padding:0 !important; max-width:none !important; }
@@ -549,8 +606,11 @@ build_conjoint_header <- function(summary, brand, config = list()) {
     )
   }
 
-  # Help button
-  help_btn <- '<button class="cj-help-btn" onclick="toggleHelpOverlay()" title="Show help guide">?</button>'
+  # Help button + Save Report button
+  help_btn <- '<div style="display:flex;align-items:center;gap:8px;">
+<button class="cj-export-btn" onclick="saveReportHTML()" title="Save Report" style="font-size:12px;padding:4px 10px;border:1px solid rgba(255,255,255,0.3);background:transparent;color:#fff;border-radius:4px;cursor:pointer;">Save Report</button>
+<button class="cj-help-btn" onclick="toggleHelpOverlay()" title="Show help guide">?</button>
+</div>'
 
   # Prepared by line
   prepared_parts <- character()
@@ -630,17 +690,18 @@ build_report_tab_nav <- function(html_data, config = list()) {
   }
 
   tabs <- c(tabs, list(list(id = "pinned", label = "Pinned <span class=\"cj-tab-badge\" id=\"cj-pinned-count\" style=\"display:none;\">0</span>")))
-  tabs <- c(tabs, list(list(id = "slides", label = "Slides")))
+  tabs <- c(tabs, list(list(id = "slides", label = "Added Slides")))
 
   buttons <- vapply(tabs, function(t) {
     active <- if (t$id == "overview") " active" else ""
+    aria_sel <- if (t$id == "overview") "true" else "false"
     sprintf(
-      '<button class="cj-report-tab%s" onclick="switchReportTab(\'%s\')" data-tab="%s">%s</button>',
-      active, t$id, t$id, t$label
+      '<button class="cj-report-tab%s" role="tab" aria-selected="%s" onclick="switchReportTab(\'%s\')" data-tab="%s">%s</button>',
+      active, aria_sel, t$id, t$id, t$label
     )
   }, character(1))
 
-  sprintf('<nav class="cj-report-tabs">%s</nav>', paste(buttons, collapse = "\n"))
+  sprintf('<nav class="cj-report-tabs" role="tablist">%s</nav>', paste(buttons, collapse = "\n"))
 }
 
 
@@ -668,16 +729,16 @@ build_overview_panel <- function(html_data, tables, charts, config = list()) {
   )
 
   overview_callout <- .build_callout(
-    "Understanding This Overview",
-    "<p>Attribute importance shows which product features most influence customer choices. Higher percentages indicate attributes where level changes have the greatest impact on preferences. The importance values are derived from the range of utility values within each attribute.</p>"
+    "What Is Attribute Importance?",
+    "<p>Attribute importance tells you <strong>what matters most</strong> when people choose between products. Think of it as a percentage score showing how much each feature influences the final decision.</p><p>For example, if Price has an importance of 35%, it means that roughly a third of a customer\u2019s decision comes down to price alone. If Brand is 20%, it means brand matters but less than price.</p><p>These scores are calculated from the <strong>range of preference scores</strong> (utilities) within each attribute. An attribute where people strongly prefer one level over another will have high importance. An attribute where all levels are viewed similarly will have low importance.</p><p><strong>Key insight:</strong> Importance scores always sum to 100% across all attributes, making them easy to compare.</p>"
   )
 
   export_bar <- .build_export_bar("overview")
-  pin_btn <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-overview\')" title="Pin this view">\U0001F4CC</button>'
+  pin_btn <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-overview\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
   insight <- build_insight_area("overview", html_data$insights)
 
   sprintf(
-    '<div class="cj-panel active" id="panel-overview">
+    '<div class="cj-panel active" role="tabpanel" id="panel-overview">
 %s
 %s
 <div class="cj-card">
@@ -707,16 +768,18 @@ build_utilities_panel <- function(html_data, tables, charts, brand, config = lis
 
   attrs <- names(html_data$utilities_by_attr)
   if (length(attrs) == 0) {
-    return('<div class="cj-panel" id="panel-utilities"><div class="cj-card"><p>No utilities data available.</p></div></div>')
+    return('<div class="cj-panel" role="tabpanel" id="panel-utilities"><div class="cj-card"><p>No utilities data available.</p></div></div>')
   }
 
   # Sidebar items
   sidebar_items <- vapply(seq_along(attrs), function(i) {
     active <- if (i == 1) " active" else ""
     n_levels <- nrow(html_data$utilities_by_attr[[attrs[i]]])
+    attr_id <- gsub("[^a-zA-Z0-9]", "-", attrs[i])
     sprintf(
-      '<div class="cj-util-item%s" data-attr="%s" onclick="selectAttribute(\'%s\')">%s<span class="cj-util-item-count">%d levels</span></div>',
-      active, .html_esc(attrs[i]), .html_esc(attrs[i]), .html_esc(attrs[i]), n_levels
+      '<div class="cj-util-item%s" data-attr="%s" onclick="selectAttribute(\'%s\')">%s<span style="display:flex;align-items:center;gap:4px;"><span class="cj-attr-note-badge" id="attr-badge-%s" style="display:none;width:8px;height:8px;border-radius:50%%;background:#323367;flex-shrink:0;" title="Has note"></span><span class="cj-util-item-count">%d levels</span></span></div>',
+      active, .html_esc(attrs[i]), .html_esc(attrs[i]), .html_esc(attrs[i]),
+      attr_id, n_levels
     )
   }, character(1))
 
@@ -733,12 +796,38 @@ build_utilities_panel <- function(html_data, tables, charts, brand, config = lis
   details <- vapply(seq_along(attrs), function(i) {
     active <- if (i == 1) " active" else ""
     attr_name <- attrs[i]
-    chart_html <- charts$utility_charts[[attr_name]] %||% ""
+    bar_chart_html <- charts$utility_charts[[attr_name]] %||% ""
+    dot_chart_html <- charts$utility_dot_charts[[attr_name]] %||% ""
     table_html <- tables$utility_tables[[attr_name]] %||% ""
-    export_bar <- .build_export_bar(paste0("util-", gsub("[^a-zA-Z0-9]", "-", attr_name)))
+    attr_id <- gsub("[^a-zA-Z0-9]", "-", attr_name)
+    export_bar <- .build_export_bar(paste0("util-", attr_id))
     pin_btn <- sprintf(
-      '<button class="cj-pin-btn" onclick="togglePin(\'util-%s\')" title="Pin this view">\U0001F4CC</button>',
+      '<button class="cj-pin-btn" onclick="togglePin(\'util-%s\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>',
       .html_esc(attr_name)
+    )
+
+    # Chart type toggle (bar vs dot)
+    chart_toggle <- sprintf(
+      '<div class="cj-chart-type-toggle" style="display:flex;gap:2px;background:#f1f5f9;border-radius:6px;padding:2px;">
+<button class="cj-chart-type-btn active" data-type="bar" onclick="switchChartType(\'%s\',\'bar\',this)" title="Bar chart" style="padding:4px 10px;border:none;border-radius:4px;font-size:11px;cursor:pointer;background:#fff;color:#1e293b;font-weight:500;transition:all 0.15s;">Bar</button>
+<button class="cj-chart-type-btn" data-type="dot" onclick="switchChartType(\'%s\',\'dot\',this)" title="Dot plot" style="padding:4px 10px;border:none;border-radius:4px;font-size:11px;cursor:pointer;background:transparent;color:#64748b;font-weight:500;transition:all 0.15s;">Dot</button>
+</div>',
+      attr_id, attr_id
+    )
+
+    # Per-attribute sticky note
+    note_html <- sprintf(
+      '<div class="cj-attr-note" id="attr-note-%s">
+<div class="cj-attr-note-toggle" onclick="toggleAttrNote(\'%s\')">
+<span class="cj-attr-note-icon" id="attr-note-icon-%s"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span>
+<span class="cj-attr-note-label" id="attr-note-label-%s">Add note</span>
+</div>
+<div class="cj-attr-note-body" id="attr-note-body-%s" style="display:none;">
+<div class="cj-attr-note-editor" contenteditable="true" data-placeholder="Add your analysis note for %s..." id="attr-note-editor-%s" oninput="saveAttrNote(\'%s\')"></div>
+</div>
+</div>',
+      attr_id, attr_id, attr_id, attr_id, attr_id,
+      .html_esc(attr_name), attr_id, attr_id
     )
 
     sprintf(
@@ -746,26 +835,31 @@ build_utilities_panel <- function(html_data, tables, charts, brand, config = lis
 <div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
 <h2 style="margin-bottom:0;">%s</h2>
-<div style="display:flex;gap:8px;">%s %s</div>
+<div style="display:flex;gap:8px;align-items:center;">%s %s %s</div>
 </div>
-<div class="cj-chart-container">%s</div>
+<div class="cj-chart-container" id="chart-bar-%s">%s</div>
+<div class="cj-chart-container" id="chart-dot-%s" style="display:none;">%s</div>
+%s
 %s
 </div>
 </div>',
       active, .html_esc(attr_name), .html_esc(attr_name),
-      pin_btn, export_bar, chart_html, table_html
+      chart_toggle, pin_btn, export_bar,
+      attr_id, bar_chart_html,
+      attr_id, dot_chart_html,
+      table_html, note_html
     )
   }, character(1))
 
   util_callout <- .build_callout(
     "Reading Utility Values",
-    "<p>Part-worth utilities represent how much each attribute level contributes to overall product attractiveness. Higher values indicate greater preference. One level per attribute serves as the baseline (utility = 0), and other levels are measured relative to it. Positive values are preferred over the baseline; negative values are less preferred.</p>"
+    "<p>Utilities (also called part-worth utilities) measure <strong>how much people like or dislike</strong> each level of an attribute, relative to a baseline level.</p><p>Think of utilities as preference points. A positive value means people prefer that level over the baseline; a negative value means they prefer it less. The larger the number, the stronger the preference.</p><p>For example, if Brand A has a utility of +0.8 and Brand B has -0.3, people clearly prefer Brand A. The baseline brand (utility = 0) sits in between.</p><p>One level per attribute serves as the baseline (utility = 0), and all other levels are measured relative to it. Positive values are preferred over the baseline; negative values are less preferred.</p><p><strong>Statistical significance:</strong> Levels marked with stars (*, **, ***) are statistically significant, meaning we are confident the preference is real and not just random noise in the data.</p>"
   )
 
   insight <- build_insight_area("utilities", html_data$insights)
 
   sprintf(
-    '<div class="cj-panel" id="panel-utilities">
+    '<div class="cj-panel" role="tabpanel" id="panel-utilities">
 <div class="cj-util-layout">
 %s
 <div class="cj-util-content">
@@ -794,7 +888,7 @@ build_diagnostics_panel <- function(html_data, tables, charts, brand) {
   sections <- c(sections, diag_callouts)
 
   export_bar <- .build_export_bar("diagnostics")
-  pin_fit <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-fit\')" title="Pin this view">\U0001F4CC</button>'
+  pin_fit <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-fit\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
 
   # Model Fit
   sections <- c(sections, sprintf(
@@ -811,48 +905,199 @@ build_diagnostics_panel <- function(html_data, tables, charts, brand) {
   # HB Convergence
   if (!is.null(html_data$hb_data)) {
     hb <- html_data$hb_data
-    status_class <- if (isTRUE(hb$convergence$converged)) "cj-status-pass" else "cj-status-fail"
-    status_text <- if (isTRUE(hb$convergence$converged)) "CONVERGED" else "NOT CONVERGED"
-    pin_conv <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-convergence\')" title="Pin this view">\U0001F4CC</button>'
+    converged <- isTRUE(hb$convergence$converged)
+    status_class <- if (converged) "cj-status-pass" else "cj-status-fail"
+    status_text <- if (converged) "CONVERGED" else "NOT CONVERGED"
+    pin_conv <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-convergence\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+
+    # Plain-language convergence explanation
+    if (converged) {
+      conv_explain <- '<div class="cj-callout" style="margin-top:12px;"><p><strong>What this means:</strong> The MCMC algorithm has stabilised. The utility estimates are no longer drifting and can be trusted. The chain explored enough of the parameter space that further iterations would not materially change the results.</p></div>'
+    } else {
+      conv_explain <- '<div class="cj-callout" style="margin-top:12px;border-left-color:#e74c3c;">
+<p><strong>What does \u201cnot converged\u201d mean?</strong> Hierarchical Bayes estimation works by running a long chain of random samples (MCMC). The chain needs to \u201csettle down\u201d \u2014 early samples are unreliable and are discarded (burn-in). Convergence means the remaining samples have stabilised around the true values.</p>
+<p style="margin-top:8px;"><strong>Why it matters:</strong> If the chain hasn\u2019t converged, the utility estimates may still be drifting, meaning the results could change if you ran more iterations. The utilities are approximate rather than definitive.</p>
+<p style="margin-top:8px;"><strong>What to do about it:</strong></p>
+<ul style="margin:6px 0 0 16px;line-height:1.7;">
+<li><strong>Increase iterations</strong> \u2014 try 20,000\u201350,000 (current: %s) with burn-in set to half</li>
+<li><strong>Check the Geweke diagnostic</strong> \u2014 it compares the start and end of the chain. A failure means the chain was still drifting. More burn-in can help.</li>
+<li><strong>Check Effective Sample Size (ESS)</strong> \u2014 ESS below 100 means high autocorrelation between draws. Increase thinning (e.g., thin=5 keeps every 5th draw) or run more iterations.</li>
+<li><strong>Simplify the model</strong> \u2014 too many attribute levels relative to sample size can slow convergence. Consider whether all attributes are needed.</li>
+</ul>
+<p style="margin-top:8px;"><strong>Can you still use these results?</strong> Often, yes \u2014 directional findings (which attributes matter most, which levels are preferred) are usually stable well before formal convergence. But treat precise share predictions and small utility differences with caution.</p>
+</div>'
+      conv_explain <- sprintf(conv_explain,
+        format(hb$iterations %||% 0, big.mark = ",")
+      )
+    }
 
     sections <- c(sections, sprintf(
       '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
 <h2 style="margin-bottom:0;">HB Convergence</h2>%s
 </div>
-<p>Status: <span class="%s">%s</span></p>
-<p>Iterations: %s | Burn-in: %s | Draws retained: %s</p>
+<p>Status: <span class="%s" style="font-weight:600;font-size:13px;">%s</span></p>
+<div style="display:flex;gap:24px;flex-wrap:wrap;margin:8px 0;">
+<div><span style="color:#64748b;font-size:12px;">Iterations</span><br><strong>%s</strong></div>
+<div><span style="color:#64748b;font-size:12px;">Burn-in</span><br><strong>%s</strong></div>
+<div><span style="color:#64748b;font-size:12px;">Draws retained</span><br><strong>%s</strong></div>
+</div>
+%s
 %s
 </div>',
       pin_conv, status_class, status_text,
       format(hb$iterations %||% 0, big.mark = ","),
       format(hb$burnin %||% 0, big.mark = ","),
       format(hb$n_draws %||% 0, big.mark = ","),
-      tables$convergence %||% ""
+      tables$convergence %||% "",
+      conv_explain
     ))
 
     # Respondent quality
     if (!is.null(hb$quality)) {
-      pin_quality <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-quality\')" title="Pin this view">\U0001F4CC</button>'
+      pin_quality <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-quality\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+
+      # Plain-language RLH explanation
+      rlh_val <- hb$quality$mean_rlh %||% 0
+      chance_val <- hb$quality$chance_rlh %||% 0.333
+      n_flagged <- hb$quality$n_flagged %||% 0
+
+      if (rlh_val > 0.6) {
+        rlh_verdict <- "Excellent \u2014 respondents understood the task and made consistent, meaningful choices."
+      } else if (rlh_val > 0.5) {
+        rlh_verdict <- "Good \u2014 most respondents engaged thoughtfully with the choice tasks."
+      } else if (rlh_val > 0.4) {
+        rlh_verdict <- "Acceptable \u2014 preferences are being captured, but some respondents may have been inattentive."
+      } else {
+        rlh_verdict <- "Low \u2014 many respondents may have been choosing randomly or the attributes tested are not strongly driving choices."
+      }
+
+      rlh_explain <- sprintf(
+        '<div class="cj-callout" style="margin-top:12px;">
+<p><strong>What is RLH?</strong> Root Likelihood (RLH) measures how well the model predicts each respondent\u2019s actual choices. A value of %.3f means random guessing; higher is better. Mean RLH of <strong>%.3f</strong> is %s above chance.</p>
+<p style="margin-top:6px;"><strong>Verdict:</strong> %s</p>
+%s</div>',
+        chance_val, rlh_val,
+        sprintf("%.0f%%", ((rlh_val / chance_val) - 1) * 100),
+        rlh_verdict,
+        if (n_flagged > 0) sprintf('<p style="margin-top:6px;"><strong>Flagged respondents (%d):</strong> These respondents have RLH close to chance level, suggesting random or inattentive responses. Consider excluding them for a sensitivity check \u2014 if results change substantially, these respondents may be introducing noise.</p>', n_flagged) else ""
+      )
+
       sections <- c(sections, sprintf(
         '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
 <h2 style="margin-bottom:0;">Respondent Quality</h2>%s
 </div>
+%s
 %s</div>',
         pin_quality,
         tables$respondent_quality %||% sprintf(
-          '<p>Mean RLH: <strong>%.3f</strong> | Chance: %.3f | Flagged: %d</p>',
-          hb$quality$mean_rlh, hb$quality$chance_rlh, hb$quality$n_flagged
-        )
+          '<div style="display:flex;gap:24px;flex-wrap:wrap;margin:8px 0;">
+<div><span style="color:#64748b;font-size:12px;">Mean RLH</span><br><strong>%.3f</strong></div>
+<div><span style="color:#64748b;font-size:12px;">Chance Level</span><br><strong>%.3f</strong></div>
+<div><span style="color:#64748b;font-size:12px;">Flagged Respondents</span><br><strong>%d</strong></div>
+</div>',
+          rlh_val, chance_val, n_flagged
+        ),
+        rlh_explain
       ))
     }
   }
 
+  # Method primer (expandable reference)
+  method_primer <- '
+<div class="cj-card">
+<details>
+<summary style="cursor:pointer;font-weight:600;font-size:14px;color:#1e293b;padding:4px 0;">
+<span style="margin-left:4px;">Method Reference Guide</span>
+</summary>
+<div style="margin-top:12px;">
+
+<h3 style="font-size:13px;font-weight:600;color:#323367;margin:16px 0 8px;">Estimation Methods \u2014 Which Should I Use?</h3>
+<table class="cj-table" style="font-size:12px;">
+<thead><tr>
+<th style="width:18%;">Method</th>
+<th style="width:30%;">Best For</th>
+<th style="width:26%;">Strengths</th>
+<th style="width:26%;">Limitations</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><strong>MNL (Logit)</strong></td>
+<td>Standard conjoint with moderate sample sizes (n \u2265 200). Good all-purpose default.</td>
+<td>Fast, robust, well-understood. Works well when preferences are fairly homogeneous.</td>
+<td>Produces only aggregate utilities \u2014 cannot detect individual differences. Assumes IIA (proportional substitution).</td>
+</tr>
+<tr>
+<td><strong>Hierarchical Bayes (HB)</strong></td>
+<td>Individual-level analysis, heterogeneous markets, segmentation, realistic simulations.</td>
+<td>Gold standard. Individual utilities enable better simulations and segment discovery. Borrows strength across respondents.</td>
+<td>Slower (MCMC). Requires convergence checks. May need n \u2265 300 for stable estimates with many parameters.</td>
+</tr>
+<tr>
+<td><strong>Latent Class</strong></td>
+<td>Discovering distinct preference segments. When HB individual estimates aren\u2019t needed but heterogeneity matters.</td>
+<td>Produces interpretable segments with distinct preference profiles. Good for strategy workshops.</td>
+<td>Must choose number of classes. Segments are probabilistic, not definitive. Can be sensitive to starting values.</td>
+</tr>
+<tr>
+<td><strong>Conditional Logit</strong></td>
+<td>Fallback when MNL fails. Complex designs with alternative-specific attributes.</td>
+<td>Handles some designs MNL cannot. Uses Cox regression formulation.</td>
+<td>Generally prefer MNL or HB. Limited diagnostics compared to mlogit.</td>
+</tr>
+</tbody>
+</table>
+
+<h3 style="font-size:13px;font-weight:600;color:#323367;margin:20px 0 8px;">Simulation Methods \u2014 Which Should I Use?</h3>
+<table class="cj-table" style="font-size:12px;">
+<thead><tr>
+<th style="width:18%;">Method</th>
+<th style="width:30%;">How It Works</th>
+<th style="width:26%;">Best For</th>
+<th style="width:26%;">Considerations</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><strong>Logit (MNL)</strong></td>
+<td>Distributes shares proportionally to exp(utility). Higher-utility products get more share, but even weak products get some.</td>
+<td>General-purpose. Good default for most analyses. Smooth, deterministic results.</td>
+<td>Can overstate shares for weak products. Shares are always non-zero. Subject to IIA assumption.</td>
+</tr>
+<tr>
+<td><strong>RFC</strong></td>
+<td>Adds random error (Gumbel noise) to utilities across many draws, then counts first-choices. With individual-level HB betas this is the gold standard; with aggregate utilities the results approximate logit.</td>
+<td>Gold standard when used with HB individual betas (R-side simulator). The interactive HTML simulator uses aggregate utilities, so RFC here is an approximation.</td>
+<td>Results vary slightly between runs (stochastic). For true individual-level RFC, use the R-side simulator with HB estimation. Use 2,000+ draws for stability.</td>
+</tr>
+<tr>
+<td><strong>Purchase Likelihood</strong></td>
+<td>Converts each product\u2019s utility to an independent purchase probability via the logistic function. Values do NOT sum to 100%.</td>
+<td>When products are not direct substitutes (e.g., separate categories). When you need absolute purchase intent rather than relative shares.</td>
+<td>Cannot be directly compared to market shares. Not appropriate when products compete head-to-head in the same choice context.</td>
+</tr>
+<tr>
+<td><strong>First Choice</strong></td>
+<td>Each respondent (or the aggregate) picks the highest-utility product. Winner takes all.</td>
+<td>Monopolistic markets. When one product truly dominates. Simple \u201cwho wins?\u201d questions.</td>
+<td>Unrealistic for competitive markets \u2014 a tiny utility advantage gives 100% share. No substitution effects.</td>
+</tr>
+</tbody>
+</table>
+
+<div class="cj-callout" style="margin-top:14px;">
+<p><strong>Rule of thumb:</strong> For the most accurate market simulations, use <strong>HB estimation</strong> with the <strong>R-side RFC simulator</strong> (which uses individual-level betas). In the interactive HTML report, <strong>Logit (MNL)</strong> is the recommended default. Use <strong>Latent Class</strong> when your primary goal is segment discovery rather than market simulation.</p>
+</div>
+
+</div>
+</details>
+</div>'
+  sections <- c(sections, method_primer)
+
   insight <- build_insight_area("diagnostics", html_data$insights)
 
   sprintf(
-    '<div class="cj-panel" id="panel-diagnostics">%s%s</div>',
+    '<div class="cj-panel" role="tabpanel" id="panel-diagnostics">%s%s</div>',
     paste(sections, collapse = "\n"), insight
   )
 }
@@ -865,7 +1110,7 @@ build_diagnostics_panel <- function(html_data, tables, charts, brand) {
 #' @keywords internal
 build_lc_panel <- function(html_data, tables, charts, brand) {
 
-  if (is.null(html_data$lc_data)) return('<div class="cj-panel" id="panel-latentclass"></div>')
+  if (is.null(html_data$lc_data)) return('<div class="cj-panel" role="tabpanel" id="panel-latentclass"></div>')
 
   lc <- html_data$lc_data
   sections <- character()
@@ -882,7 +1127,7 @@ build_lc_panel <- function(html_data, tables, charts, brand) {
   ))
 
   # BIC chart + comparison table
-  pin_bic <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-bic\')" title="Pin this view">\U0001F4CC</button>'
+  pin_bic <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-bic\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
   sections <- c(sections, sprintf(
     '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -898,7 +1143,7 @@ build_lc_panel <- function(html_data, tables, charts, brand) {
 
   # Class sizes
   if (!is.null(charts$class_sizes)) {
-    pin_sizes <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-sizes\')" title="Pin this view">\U0001F4CC</button>'
+    pin_sizes <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-sizes\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
     sections <- c(sections, sprintf(
       '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -912,7 +1157,7 @@ build_lc_panel <- function(html_data, tables, charts, brand) {
 
   # Class importance comparison
   if (!is.null(charts$class_importance)) {
-    pin_imp <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-importance\')" title="Pin this view">\U0001F4CC</button>'
+    pin_imp <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-importance\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
     sections <- c(sections, sprintf(
       '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -927,7 +1172,7 @@ build_lc_panel <- function(html_data, tables, charts, brand) {
     ))
   }
 
-  sprintf('<div class="cj-panel" id="panel-latentclass">%s</div>', paste(sections, collapse = "\n"))
+  sprintf('<div class="cj-panel" role="tabpanel" id="panel-latentclass">%s</div>', paste(sections, collapse = "\n"))
 }
 
 
@@ -938,14 +1183,14 @@ build_lc_panel <- function(html_data, tables, charts, brand) {
 #' @keywords internal
 build_wtp_panel <- function(html_data, tables, charts, brand) {
 
-  if (is.null(html_data$wtp_data)) return('<div class="cj-panel" id="panel-wtp"></div>')
+  if (is.null(html_data$wtp_data)) return('<div class="cj-panel" role="tabpanel" id="panel-wtp"></div>')
 
   sections <- character()
 
   # WTP callout
   wtp_callout <- .build_callout(
     "Willingness to Pay",
-    "<p>WTP converts utility values into monetary equivalents by dividing each level\u2019s utility by the price coefficient. This tells you how much extra a customer would pay for one level versus the baseline. Positive WTP means customers are willing to pay a premium; negative WTP means they require a discount.</p>"
+    "<p>Willingness to Pay (WTP) converts preference scores into <strong>monetary values</strong>. It answers the question: <em>How much extra would a customer pay for one feature level over another?</em></p><p>WTP is calculated by dividing each level\u2019s utility by the price coefficient (which measures how much utility changes per unit of price). A positive WTP means customers would pay a premium for that feature; a negative WTP means they would need a discount.</p><p>For example, if upgrading from 64GB to 256GB storage has a WTP of $45, it means the average customer values that upgrade at $45 &mdash; they would be willing to pay up to $45 more for 256GB compared to 64GB.</p><p><strong>Confidence intervals</strong> show the range of plausible WTP values. Narrower intervals indicate more precise estimates.</p><p><strong>Caveat:</strong> WTP assumes a linear relationship between price and preference. Real-world pricing decisions should consider competitive context and market conditions.</p>"
   )
   sections <- c(sections, wtp_callout)
 
@@ -954,13 +1199,14 @@ build_wtp_panel <- function(html_data, tables, charts, brand) {
   # Price coefficient info
   price_coef <- html_data$wtp_data$price_coefficient
   price_attr <- html_data$wtp_data$price_attribute %||% "Price"
+  cs <- html_data$wtp_data$currency_symbol %||% "$"
   info_html <- if (!is.na(price_coef)) {
-    sprintf('<p style="font-size:12px;color:#64748b;margin-bottom:12px;">Price attribute: <strong>%s</strong> | Price coefficient: <strong>%.4f</strong></p>',
-            .html_esc(price_attr), price_coef)
+    sprintf('<p style="font-size:12px;color:#64748b;margin-bottom:12px;">Price attribute: <strong>%s</strong> | Price coefficient: <strong>%.4f</strong> | Currency: <strong>%s</strong></p>',
+            .html_esc(price_attr), price_coef, .html_esc(cs))
   } else ""
 
   # WTP chart + table
-  pin_wtp <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-wtp-main\')" title="Pin this view">\U0001F4CC</button>'
+  pin_wtp <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-wtp-main\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
   sections <- c(sections, sprintf(
     '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -978,7 +1224,7 @@ build_wtp_panel <- function(html_data, tables, charts, brand) {
 
   # Demand curve
   if (!is.null(charts$demand_curve) || !is.null(tables$demand_curve)) {
-    pin_demand <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-wtp-demand\')" title="Pin this view">\U0001F4CC</button>'
+    pin_demand <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-wtp-demand\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
     sections <- c(sections, sprintf(
       '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -995,7 +1241,7 @@ build_wtp_panel <- function(html_data, tables, charts, brand) {
 
   insight <- build_insight_area("wtp", html_data$insights)
 
-  sprintf('<div class="cj-panel" id="panel-wtp">%s%s</div>',
+  sprintf('<div class="cj-panel" role="tabpanel" id="panel-wtp">%s%s</div>',
           paste(sections, collapse = "\n"), insight)
 }
 
@@ -1008,22 +1254,54 @@ build_wtp_panel <- function(html_data, tables, charts, brand) {
 build_simulator_panel <- function(html_data, brand) {
 
   if (is.null(html_data$simulator_data)) {
-    return('<div class="cj-panel" id="panel-simulator"><div class="cj-card"><p>No simulator data available.</p></div></div>')
+    return('<div class="cj-panel" role="tabpanel" id="panel-simulator"><div class="cj-card"><p>No simulator data available.</p></div></div>')
   }
 
   # Mode-switched callouts
   sim_callout_shares <- .build_callout("Market Shares",
-    "<p>Market share simulation predicts each product\u2019s share of preference using the configured attribute levels (up to 8 products). The Logit model distributes share proportionally to each product\u2019s total utility; First Choice assigns all share to whichever product each respondent would most likely pick. Configure products on the left and see predicted shares update on the right. Click on a product name to rename it.</p>")
+    "<p>Market share simulation predicts each product\u2019s share of preference using the configured attribute levels. Configure products on the left and see predicted shares update on the right.</p><p><strong>No-Purchase Option:</strong> The \u2018Include No-Purchase\u2019 checkbox adds a \u2018do nothing\u2019 alternative.</p>
+<details style=\"margin-top:10px;\"><summary style=\"cursor:pointer;font-weight:600;font-size:12px;color:#323367;\">How does share calculation work?</summary>
+<div style=\"margin-top:8px;font-size:12px;line-height:1.7;\">
+<p>Each product\u2019s <strong>total utility</strong> is the sum of its part-worth utilities across all attributes. For example, if Brand=PremiumX has utility +0.30 and Price=$199 has utility +0.50, the product\u2019s total utility is 0.80.</p>
+<p><strong>Logit (MNL):</strong> Shares are computed as: Share(i) = exp(U<sub>i</sub>) / \u03a3 exp(U<sub>j</sub>). This distributes preference proportionally \u2014 a product with twice the exponentiated utility gets roughly twice the share. The exponential function means utility differences are amplified non-linearly: a 0.5 utility advantage translates to a larger share advantage than a linear model would predict.</p>
+<p><strong>RFC:</strong> Adds random noise (Gumbel-distributed) to each utility, then counts which product \u201cwins\u201d across thousands of draws. With aggregate utilities this approximates Logit; with individual betas it captures preference heterogeneity.</p>
+<p><strong>Scale Factor:</strong> Multiplies all utilities before computing shares. A factor &gt;1 amplifies differences (dominant products get even more share); &lt;1 compresses them (shares become more equal). Use to calibrate against known market data.</p>
+</div></details>")
   sim_callout_sensitivity <- .build_callout("Sensitivity Analysis",
-    "<p>Sensitivity analysis sweeps through each level of a selected attribute for a chosen product while holding all other attributes constant. This reveals how much market share changes as you move between levels \u2014 helping identify which attribute level changes have the greatest competitive impact.</p>")
+    "<p>Sensitivity analysis reveals <strong>how much market share changes</strong> when you switch between levels of a single attribute, while keeping everything else constant.</p><p><strong>Tip:</strong> Compare sensitivity across attributes to find the most impactful levers for your product strategy.</p>
+<details style=\"margin-top:10px;\"><summary style=\"cursor:pointer;font-weight:600;font-size:12px;color:#323367;\">How does sensitivity work?</summary>
+<div style=\"margin-top:8px;font-size:12px;line-height:1.7;\">
+<p>For the selected product and attribute, the simulator cycles through every level of that attribute while holding all other attributes constant. At each level, it recalculates the full market share for all products.</p>
+<p>The result is a curve showing: <em>if we change just this one attribute, how does our share move?</em> Steep slopes indicate high sensitivity \u2014 that attribute is a powerful lever. Flat curves mean changes to that attribute have little competitive impact.</p>
+<p><strong>Price sensitivity</strong> is particularly useful: the resulting curve is a demand curve, showing how market share declines as price increases. The slope of this curve at any point approximates the price elasticity of demand.</p>
+<p><strong>Interpreting the chart:</strong> The x-axis shows attribute levels; the y-axis shows the focal product\u2019s predicted market share. Competitors\u2019 configurations remain fixed.</p>
+</div></details>")
   sim_callout_sov <- .build_callout("Source of Volume",
-    "<p>Source of Volume shows where a new product (the last one in the list) draws its market share from. By comparing shares before and after the new product enters, you can see which existing competitors lose the most \u2014 helping you understand the competitive dynamics of a potential new entry.</p>")
+    "<p>Source of Volume shows where a new product draws its market share from \u2014 which competitors lose the most when a new entrant appears.</p>
+<details style=\"margin-top:10px;\"><summary style=\"cursor:pointer;font-weight:600;font-size:12px;color:#323367;\">How does source of volume work?</summary>
+<div style=\"margin-top:8px;font-size:12px;line-height:1.7;\">
+<p>The analysis runs in two steps:</p>
+<ol style=\"margin:4px 0 4px 16px;\">
+<li><strong>Baseline:</strong> Calculate market shares for existing products only (without the new product)</li>
+<li><strong>Test:</strong> Add the new product and recalculate shares for all products (including the new one)</li>
+</ol>
+<p>The difference between baseline and test shares for each existing product shows how much share it lost to the new entrant. Products that are most similar to the new product (in terms of attribute levels) lose the most share \u2014 this is the IIA (Independence of Irrelevant Alternatives) property of the logit model.</p>
+<p><strong>Reading the chart:</strong> Negative bars show share lost by existing products; the positive bar shows the new product\u2019s gained share. The total volume is conserved \u2014 what the new product gains exactly equals what competitors collectively lose.</p>
+</div></details>")
+
+  sim_callout_revenue <- .build_callout("Revenue Simulator",
+    "<p>Revenue simulation shows how much revenue each product configuration would generate, by combining market share, price, and a hypothetical customer base.</p><p><strong>Revenue = Price \u00d7 Share% \u00d7 Customers</strong></p><p>Adjust the customer count to match your market size. A product with lower market share but higher price can generate more revenue than a cheaper product with higher share \u2014 this is the key insight.</p>
+<details style=\"margin-top:10px;\"><summary style=\"cursor:pointer;font-weight:600;font-size:12px;color:#323367;\">Why revenue matters more than share</summary>
+<div style=\"margin-top:8px;font-size:12px;line-height:1.7;\">
+<p>Market share tells you which product people prefer. Revenue tells you which product makes money. A product at $10 with 59% share generates $5,900 in revenue per 1000 customers. A product at $6 with 41% share generates only $2,460. Leadership cares about revenue, not preference.</p>
+</div></details>")
 
   sim_callouts <- sprintf(
     '<div id="cj-sim-callout-shares" class="cj-sim-callout active">%s</div>
+<div id="cj-sim-callout-revenue" class="cj-sim-callout">%s</div>
 <div id="cj-sim-callout-sensitivity" class="cj-sim-callout">%s</div>
 <div id="cj-sim-callout-sov" class="cj-sim-callout">%s</div>',
-    sim_callout_shares, sim_callout_sensitivity, sim_callout_sov
+    sim_callout_shares, sim_callout_revenue, sim_callout_sensitivity, sim_callout_sov
   )
 
   # Simulator export bar
@@ -1036,10 +1314,10 @@ build_simulator_panel <- function(html_data, brand) {
 
   insight <- build_insight_area("simulator", html_data$insights)
 
-  pin_sim <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-simulator\')" title="Pin this view">\U0001F4CC</button>'
+  pin_sim <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-simulator\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
 
   sprintf(
-    '<div class="cj-panel" id="panel-simulator">
+    '<div class="cj-panel" role="tabpanel" id="panel-simulator">
 <div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
 <h2 style="margin-bottom:0;">Market Simulator</h2>
@@ -1049,6 +1327,7 @@ build_simulator_panel <- function(html_data, brand) {
 <p style="font-size:12px;color:#64748b;margin-bottom:16px;">Configure product profiles and compare predicted market shares.</p>
 <div class="cj-sim-mode-btns">
 <button class="cj-sim-mode-btn active" onclick="switchSimMode(\'shares\')">Market Shares</button>
+<button class="cj-sim-mode-btn" onclick="switchSimMode(\'revenue\')">Revenue</button>
 <button class="cj-sim-mode-btn" onclick="switchSimMode(\'sensitivity\')">Sensitivity</button>
 <button class="cj-sim-mode-btn" onclick="switchSimMode(\'sov\')">Source of Volume</button>
 </div>
@@ -1059,6 +1338,16 @@ build_simulator_panel <- function(html_data, brand) {
 <div class="cj-sim-results" id="cj-sim-results">
 <div style="text-align:center;padding:40px;color:#94a3b8;">
 <div style="font-size:24px;">Add products to see predicted shares</div>
+</div>
+</div>
+<div class="cj-sim-annotation" id="cj-sim-annotation" style="margin-top:12px;border-left:3px solid #d4a843;padding-left:12px;">
+<div class="cj-sim-annotation-toggle" onclick="toggleSimAnnotation()" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#92700c;font-weight:600;padding:4px 0;transition:all 0.15s;">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#92700c" stroke-width="2.2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+<span id="cj-sim-annotation-label">Add note</span>
+</div>
+<div id="cj-sim-annotation-body" style="display:none;margin-top:6px;">
+<div contenteditable="true" class="cj-sim-annotation-editor" id="cj-sim-annotation-editor" data-placeholder="Add your analysis note for this scenario..." style="min-height:48px;padding:12px 14px;border:2px solid #fbbf24;border-radius:8px;font-size:13px;line-height:1.6;color:#1e293b;background:#fffbeb;outline:none;transition:all 0.2s ease;box-shadow:0 1px 3px rgba(251,191,36,0.15);" oninput="saveSimAnnotation()"></div>
+</div>
 </div>
 </div>
 </div>
@@ -1078,7 +1367,7 @@ build_simulator_panel <- function(html_data, brand) {
 build_about_panel <- function(about, config = list()) {
 
   if (is.null(about) || !isTRUE(about$has_content)) {
-    return('<div class="cj-panel" id="panel-about"></div>')
+    return('<div class="cj-panel" role="tabpanel" id="panel-about"></div>')
   }
 
   # Contact grid
@@ -1116,7 +1405,7 @@ build_about_panel <- function(about, config = list()) {
   )
 
   sprintf(
-    '<div class="cj-panel" id="panel-about">
+    '<div class="cj-panel" role="tabpanel" id="panel-about">
 <div class="cj-card">
 <h2>About This Report</h2>
 <div class="cj-about-section">
@@ -1137,7 +1426,7 @@ build_about_panel <- function(about, config = list()) {
 #' @keywords internal
 build_pinned_panel <- function() {
   '
-<div class="cj-panel" id="panel-pinned">
+<div class="cj-panel" role="tabpanel" id="panel-pinned">
 <div class="cj-pinned-container">
 <div class="cj-pinned-header">
 <div>
@@ -1169,11 +1458,11 @@ build_pinned_panel <- function() {
 #' @keywords internal
 build_slides_panel <- function() {
   '
-<div class="cj-panel" id="panel-slides">
+<div class="cj-panel" role="tabpanel" id="panel-slides">
 <div class="cj-slides-container">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
 <div>
-<h2 style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;">Slides</h2>
+<h2 style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;">Added Slides</h2>
 <p style="font-size:12px;color:#64748b;">Build narrative slides with Markdown. Use **bold**, *italic*, # headings, - bullets, > quotes, and --- rules.</p>
 </div>
 <div style="display:flex;gap:8px;">
@@ -1272,38 +1561,56 @@ build_insight_area <- function(tab_id, insights = list()) {
   diag <- html_data$diagnostics
 
   # --- Model Fit Quality callout ---
-  fit_body <- "<p>Model fit measures how well the estimated utilities explain the observed choices in the data.</p>"
-  if (!is.null(diag$mcfadden_r2) && !is.na(diag$mcfadden_r2)) {
-    r2 <- diag$mcfadden_r2
-    quality <- if (r2 >= 0.4) "excellent"
-               else if (r2 >= 0.3) "very good"
-               else if (r2 >= 0.2) "good"
-               else if (r2 >= 0.1) "acceptable"
-               else "weak"
+  has_r2 <- !is.null(diag$fit_statistics$mcfadden_r2) && !is.na(diag$fit_statistics$mcfadden_r2)
+  has_ll <- !is.null(diag$fit_statistics$ll_ratio_p) && !is.na(diag$fit_statistics$ll_ratio_p)
+
+  if (has_r2) {
+    r2 <- diag$fit_statistics$mcfadden_r2
+    # Plain-language trust verdict based on R2
+    if (r2 >= 0.3) {
+      verdict <- "strong"
+      trust_msg <- "You can <strong>confidently rely</strong> on these results for strategic decisions. The model clearly captures how people make choices between these products."
+    } else if (r2 >= 0.2) {
+      verdict <- "solid"
+      trust_msg <- "These results are <strong>reliable for decision-making</strong>. The model captures the key drivers of choice well. Importance rankings and utility patterns can be trusted."
+    } else if (r2 >= 0.1) {
+      verdict <- "usable"
+      trust_msg <- "These results provide <strong>useful directional guidance</strong>. The overall importance rankings are reliable, though individual utility estimates should be interpreted as approximate. Consider the hit rate below for additional confidence."
+    } else {
+      verdict <- "limited"
+      trust_msg <- "These results should be <strong>treated with caution</strong>. The model explains only a small portion of choice behaviour, which may mean the tested attributes are not the main factors driving decisions, or the data contains significant noise. Consider reviewing data quality or study design."
+    }
+
     fit_body <- sprintf(
-      "<p>Model fit measures how well the estimated utilities explain the observed choices. The McFadden pseudo-R\u00b2 for this model is <strong>%.3f</strong>, which indicates %s fit. In discrete choice models, values between 0.2 and 0.4 are generally considered to represent good to excellent fit \u2014 these values are not directly comparable to R\u00b2 in linear regression.</p>",
-      r2, quality
+      "<p><strong>Bottom line:</strong> %s</p><p>The model's predictive accuracy score is <strong>%.3f</strong> (on a scale where 0.2\u20130.4 represents good to excellent for this type of analysis). This is a specialised measure for choice models and is not comparable to the R\u00b2 you may have seen in other contexts.</p>",
+      trust_msg, r2
     )
+  } else {
+    fit_body <- "<p>Model fit measures how well the estimated utilities explain the observed choices in the data. A well-fitting model means the attribute preferences we\u2019ve estimated accurately reflect how people actually make decisions.</p><p><strong>Can you trust these results?</strong> Look at the hit rate below \u2014 it shows what percentage of actual choices the model correctly predicted. Compare it to chance level (e.g., 33% for 3-alternative choice sets). A hit rate well above chance indicates the model is capturing real preferences. A hit rate only slightly above chance suggests the data may be noisy or the attributes may not be the primary drivers of choice.</p>"
   }
-  if (!is.null(diag$ll_ratio_p) && !is.na(diag$ll_ratio_p)) {
-    sig_text <- if (diag$ll_ratio_p < 0.001) "highly significant (p < 0.001)"
-                else if (diag$ll_ratio_p < 0.01) sprintf("significant (p = %.3f)", diag$ll_ratio_p)
-                else if (diag$ll_ratio_p < 0.05) sprintf("marginally significant (p = %.3f)", diag$ll_ratio_p)
-                else sprintf("not significant (p = %.3f)", diag$ll_ratio_p)
+
+  if (has_ll) {
+    sig_text <- if (diag$fit_statistics$ll_ratio_p < 0.001) "highly significant (p < 0.001)"
+                else if (diag$fit_statistics$ll_ratio_p < 0.01) sprintf("significant (p = %.3f)", diag$fit_statistics$ll_ratio_p)
+                else if (diag$fit_statistics$ll_ratio_p < 0.05) sprintf("marginally significant (p = %.3f)", diag$fit_statistics$ll_ratio_p)
+                else sprintf("not significant (p = %.3f)", diag$fit_statistics$ll_ratio_p)
     fit_body <- paste0(fit_body, sprintf(
       "<p>The log-likelihood ratio test is %s, indicating the model %s than a null model with no attribute effects.</p>",
       sig_text,
-      if (diag$ll_ratio_p < 0.05) "performs significantly better" else "may not perform significantly better"
+      if (diag$fit_statistics$ll_ratio_p < 0.05) "performs significantly better" else "may not perform significantly better"
     ))
+    fit_body <- paste0(fit_body,
+      "<p>The likelihood ratio test checks whether the model as a whole is statistically significant \u2014 meaning the attributes genuinely influence choices rather than people choosing randomly.</p>"
+    )
   }
   callouts <- c(callouts, .build_callout("Model Fit Quality", fit_body))
 
   # --- Estimation Method callout ---
   method_body <- switch(
     method,
-    "mlogit" =, "mnl" = "<p>Multinomial Logit (MNL) is the foundational model for choice-based conjoint analysis. It assumes each respondent evaluates alternatives by summing up the utility (attractiveness) of each attribute level, then selects the option with the highest total utility \u2014 with some randomness reflecting the unpredictable aspects of human decision-making.</p><p>MNL produces a single set of aggregate utilities representing the average preferences across all respondents. It works well when preferences are relatively homogeneous, and provides reliable, interpretable results with modest sample sizes.</p>",
-    "hb" = "<p>Hierarchical Bayes (HB) estimation produces individual-level utilities for each respondent. It combines information from all respondents (the \u2018population\u2019) with each individual\u2019s choices to produce stable estimates \u2014 even when a single respondent provides limited data.</p><p>The algorithm iterates thousands of times, gradually converging on preference estimates. This means we can see not just what matters on average, but how different people value different things. HB is the gold standard for modern conjoint analysis.</p>",
-    "latent_class" =, "lc" = "<p>Latent Class analysis identifies distinct groups (segments) of respondents who share similar preference patterns. Rather than assuming everyone has the same preferences (aggregate) or estimating individual preferences (HB), it finds the best number of naturally-occurring segments and estimates a separate set of utilities for each segment.</p><p>This approach is useful when you suspect the market contains fundamentally different types of buyers \u2014 for example, price-sensitive versus brand-loyal customers.</p>",
+    "mlogit" =, "mnl" = "<p><strong>Why this method?</strong> Multinomial Logit (MNL) was selected for this analysis. MNL is the standard approach for choice-based conjoint \u2014 it\u2019s robust, well-understood, and produces reliable aggregate-level preference estimates. It works well when you need a clear picture of overall market preferences without individual-level detail.</p><p>Multinomial Logit (MNL) is the foundational model for choice-based conjoint analysis. It assumes each respondent evaluates alternatives by summing up the utility (attractiveness) of each attribute level, then selects the option with the highest total utility \u2014 with some randomness reflecting the unpredictable aspects of human decision-making.</p><p>MNL produces a single set of aggregate utilities representing the average preferences across all respondents. It works well when preferences are relatively homogeneous, and provides reliable, interpretable results with modest sample sizes.</p>",
+    "hb" = "<p><strong>Why this method?</strong> Hierarchical Bayes (HB) was selected for this analysis. HB is the gold standard for modern conjoint because it estimates preferences at the individual respondent level, not just the aggregate. This means we can see how different people value different features, identify preference segments, and run more accurate market simulations.</p><p>Hierarchical Bayes (HB) estimation produces individual-level utilities for each respondent. It combines information from all respondents (the \u2018population\u2019) with each individual\u2019s choices to produce stable estimates \u2014 even when a single respondent provides limited data.</p><p>The algorithm iterates thousands of times, gradually converging on preference estimates. This means we can see not just what matters on average, but how different people value different things. HB is the gold standard for modern conjoint analysis.</p>",
+    "latent_class" =, "lc" = "<p><strong>Why this method?</strong> Latent Class analysis was selected to discover distinct preference-based segments in the data. Rather than assuming everyone has similar preferences, this approach identifies naturally-occurring groups of respondents who share similar preference patterns.</p><p>Latent Class analysis identifies distinct groups (segments) of respondents who share similar preference patterns. Rather than assuming everyone has the same preferences (aggregate) or estimating individual preferences (HB), it finds the best number of naturally-occurring segments and estimates a separate set of utilities for each segment.</p><p>This approach is useful when you suspect the market contains fundamentally different types of buyers \u2014 for example, price-sensitive versus brand-loyal customers.</p>",
     "best_worst" =, "bws" = "<p>Best-Worst Scaling asks respondents to identify both the most and least preferred options in each choice set. This extracts more information per task than standard choice-based conjoint, producing more discriminating utility estimates.</p><p>By capturing both the best and worst choices, we can better distinguish between levels that respondents are neutral about versus those they actively avoid.</p>",
     "<p>The conjoint analysis estimates part-worth utilities for each attribute level, representing how much each level contributes to overall product preference. These utilities can be used to predict market shares, calculate willingness to pay, and understand competitive dynamics.</p>"
   )
@@ -1390,9 +1697,20 @@ build_conjoint_js <- function() {
 .html_esc <- function(x) {
   if (is.null(x) || length(x) == 0) return("")
   x <- as.character(x)
+  # Step 1: Standard HTML escaping of ALL ampersands, angle brackets, quotes
   x <- gsub("&", "&amp;", x, fixed = TRUE)
   x <- gsub("<", "&lt;", x, fixed = TRUE)
   x <- gsub(">", "&gt;", x, fixed = TRUE)
   x <- gsub("\"", "&quot;", x, fixed = TRUE)
+  # Step 2: Replace UTF-8 multibyte sequences with HTML entities (raw bytes)
+  # After step 1, any & in the original text is now &amp;, so new entities
+  # introduced here are safe and won't be double-escaped
+  x <- gsub("\xe2\x80\x94", "&mdash;", x, useBytes = TRUE)   # em-dash
+  x <- gsub("\xe2\x80\x93", "&ndash;", x, useBytes = TRUE)   # en-dash
+  x <- gsub("\xe2\x80\x98", "&lsquo;", x, useBytes = TRUE)   # left single quote
+  x <- gsub("\xe2\x80\x99", "&rsquo;", x, useBytes = TRUE)   # right single quote
+  x <- gsub("\xe2\x80\x9c", "&ldquo;", x, useBytes = TRUE)   # left double quote
+  x <- gsub("\xe2\x80\x9d", "&rdquo;", x, useBytes = TRUE)   # right double quote
+  x <- gsub("\xe2\x80\xa6", "&hellip;", x, useBytes = TRUE)   # ellipsis
   x
 }

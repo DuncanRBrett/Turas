@@ -81,6 +81,10 @@ predict_market_shares <- function(products,
     logit = predict_shares_logit(product_utilities, availability),
     first_choice = predict_shares_first_choice(product_utilities, availability),
     randomized_first_choice = predict_shares_randomized_first_choice(product_utilities, availability),
+    # NOTE: conjoint_refuse halts execution via stop(), so this never returns a value
+
+    # to `shares`. Kept as defense-in-depth — if conjoint_refuse were ever changed to
+    # return instead of halt, this would assign the refusal list to `shares`.
     conjoint_refuse(
       code = "CFG_SIMULATOR_UNKNOWN_METHOD",
       title = "Unknown Simulation Method",
@@ -789,4 +793,128 @@ generate_demand_curve <- function(base_product,
   })
 
   do.call(rbind, results)
+}
+
+
+# ==============================================================================
+# CONFIDENCE INTERVALS ON SIMULATED SHARES
+# ==============================================================================
+
+#' Predict Market Shares with Confidence Intervals
+#'
+#' Computes share predictions with bootstrap CIs by resampling individual-level
+#' utilities (from HB estimation). Each bootstrap draw samples respondents with
+#' replacement, computes individual-level shares, and aggregates.
+#'
+#' For HB models, this uses true individual-level RFC (each respondent has their
+#' own beta vector). For aggregate models, CIs cannot be computed and NA is returned.
+#'
+#' @param products List of product configurations
+#' @param utilities Data frame with Attribute, Level, Utility columns (aggregate)
+#' @param individual_betas Matrix (n_respondents x n_params) of individual betas
+#' @param attribute_map List mapping column names to attribute/level pairs
+#' @param method Character: "logit" or "rfc" (default "rfc")
+#' @param n_boot Integer: number of bootstrap draws (default 1000)
+#' @param conf_level Numeric: confidence level (default 0.95)
+#' @param verbose Logical
+#'
+#' @return Data frame with: Product, Share_Percent, Lower, Upper, SE
+#'
+#' @export
+predict_shares_with_ci <- function(products,
+                                   utilities,
+                                   individual_betas = NULL,
+                                   attribute_map = NULL,
+                                   method = "rfc",
+                                   n_boot = 1000,
+                                   conf_level = 0.95,
+                                   verbose = FALSE) {
+
+  n_products <- length(products)
+
+  # If no individual betas, fall back to aggregate (no CIs possible)
+  if (is.null(individual_betas) || is.null(attribute_map)) {
+    base_shares <- predict_market_shares(products, utilities, method = method)
+    base_shares$Lower <- NA_real_
+    base_shares$Upper <- NA_real_
+    base_shares$SE <- NA_real_
+    if (verbose) message("[TRS INFO] No individual betas available - CIs not computed")
+    return(base_shares)
+  }
+
+  n_respondents <- nrow(individual_betas)
+  param_names <- colnames(individual_betas)
+
+  # Build design vectors for each product
+  # Each product config maps to a utility = sum of relevant betas
+  product_design <- matrix(0, nrow = n_products, ncol = ncol(individual_betas))
+  colnames(product_design) <- param_names
+
+  for (p_idx in seq_len(n_products)) {
+    prod <- products[[p_idx]]
+    for (attr_name in names(prod)) {
+      level_val <- prod[[attr_name]]
+      # Find which column corresponds to this attribute-level
+      for (col_idx in seq_along(attribute_map)) {
+        am <- attribute_map[[col_idx]]
+        if (am$attribute == attr_name && am$level == level_val) {
+          product_design[p_idx, col_idx] <- 1
+          break
+        }
+      }
+    }
+  }
+
+  # Compute individual-level shares for a given set of betas
+  compute_individual_shares <- function(betas_matrix) {
+    n <- nrow(betas_matrix)
+    # Compute utility for each product for each respondent
+    U <- betas_matrix %*% t(product_design)  # n_resp x n_products
+
+    if (method == "rfc") {
+      # RFC: add Gumbel noise per respondent, count first choices
+      wins <- rep(0, n_products)
+      for (i in seq_len(n)) {
+        gumbel <- -log(-log(runif(n_products)))
+        noisy_u <- U[i, ] + gumbel
+        wins[which.max(noisy_u)] <- wins[which.max(noisy_u)] + 1
+      }
+      wins / n * 100
+    } else {
+      # Logit: average of individual-level logit shares
+      share_mat <- matrix(0, nrow = n, ncol = n_products)
+      for (i in seq_len(n)) {
+        u <- U[i, ]
+        eu <- exp(u - max(u))
+        share_mat[i, ] <- eu / sum(eu) * 100
+      }
+      colMeans(share_mat)
+    }
+  }
+
+  # Point estimate
+  point_shares <- compute_individual_shares(individual_betas)
+
+  # Bootstrap
+  if (verbose) cat(sprintf("  Computing %d bootstrap CIs...\n", n_boot))
+  boot_shares <- matrix(0, nrow = n_boot, ncol = n_products)
+  for (b in seq_len(n_boot)) {
+    boot_idx <- sample.int(n_respondents, replace = TRUE)
+    boot_shares[b, ] <- compute_individual_shares(individual_betas[boot_idx, , drop = FALSE])
+  }
+
+  # CI bounds (percentile method)
+  alpha <- (1 - conf_level) / 2
+  lower <- apply(boot_shares, 2, quantile, probs = alpha)
+  upper <- apply(boot_shares, 2, quantile, probs = 1 - alpha)
+  se <- apply(boot_shares, 2, sd)
+
+  data.frame(
+    Product = paste0("Product_", seq_len(n_products)),
+    Share_Percent = point_shares,
+    Lower = lower,
+    Upper = upper,
+    SE = se,
+    stringsAsFactors = FALSE
+  )
 }
