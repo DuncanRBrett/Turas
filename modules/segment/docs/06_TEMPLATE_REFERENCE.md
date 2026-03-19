@@ -1,7 +1,7 @@
 # Turas Segmentation Module - Template Reference
 
-**Version:** 11.0
-**Last Updated:** 5 March 2026
+**Version:** 11.1
+**Last Updated:** 19 March 2026
 **Target Audience:** Analysts, Project Managers, Template Configurers
 
 This document provides complete field-by-field reference for the Segmentation configuration templates.
@@ -11,19 +11,24 @@ This document provides complete field-by-field reference for the Segmentation co
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Core Settings](#core-settings)
-3. [Clustering Algorithm Settings](#clustering-algorithm-settings)
-4. [Data Handling Settings](#data-handling-settings)
-5. [Outlier Detection Settings](#outlier-detection-settings)
-6. [Variable Selection Settings](#variable-selection-settings)
-7. [K Selection Settings](#k-selection-settings)
-8. [Output Settings](#output-settings)
-9. [HTML Report Settings](#html-report-settings)
-10. [Enhanced Features Settings](#enhanced-features-settings)
-11. [Metadata Settings](#metadata-settings)
-12. [Output Structure](#output-structure)
-13. [Complete Examples](#complete-examples)
-14. [Validation Rules](#validation-rules)
+2. [Optional Config Sheets](#optional-config-sheets)
+   - [Labels Sheet](#labels-sheet)
+   - [Insights Sheet](#insights-sheet)
+   - [About Sheet](#about-sheet)
+   - [Slides Sheet](#slides-sheet)
+3. [Core Settings](#core-settings)
+4. [Clustering Algorithm Settings](#clustering-algorithm-settings)
+5. [Data Handling Settings](#data-handling-settings)
+6. [Outlier Detection Settings](#outlier-detection-settings)
+7. [Variable Selection Settings](#variable-selection-settings)
+8. [K Selection Settings](#k-selection-settings)
+9. [Output Settings](#output-settings)
+10. [HTML Report Settings](#html-report-settings)
+11. [Enhanced Features Settings](#enhanced-features-settings)
+12. [Metadata Settings](#metadata-settings)
+13. [Output Structure](#output-structure)
+14. [Complete Examples](#complete-examples)
+15. [Validation Rules](#validation-rules)
 
 ---
 
@@ -46,6 +51,187 @@ Both templates use a consistent structure:
 |-------|---------|----------|
 | Instructions | Usage documentation | No |
 | Config | All analysis settings | Yes |
+| Labels | Human-readable variable labels for charts and tables | No |
+| Insights | Pre-populated analyst insights for HTML report sections | No |
+| About | Project metadata for the HTML report About tab | No |
+| Slides | Custom presentation slides for the HTML report Slides tab | No |
+
+The Config sheet is the only required sheet. The four optional sheets (Labels, Insights, About, Slides) enrich the HTML report with additional context and are ignored when `html_report = FALSE`.
+
+---
+
+## Optional Config Sheets
+
+The following sections describe the optional sheets that can be included in the Segment_Config_Template.xlsx file. These sheets provide additional metadata and content for the HTML report.
+
+### Labels Sheet
+
+The Labels sheet maps raw variable names (as they appear in the data file) to human-readable labels. These labels are used throughout the HTML report in chart axis labels, table headers, profile heatmaps, and variable importance displays. When a Labels sheet is not provided, raw variable names are displayed as-is.
+
+**Columns:**
+
+| Column | Required | Description |
+|--------|----------|-------------|
+| variable | Yes | The exact variable name as it appears in the data file (case-sensitive) |
+| label | Yes | The human-readable label to display in reports |
+
+**Example:**
+
+```
+variable | label
+---------|----------------------------------
+Q02      | Overall satisfaction
+Q03      | Product quality
+Q04      | Value for money
+Q05      | Customer service
+Q06      | Likelihood to recommend
+Q07      | Brand trust
+Q08      | Purchase intent
+age      | Age group
+gender   | Gender
+tenure   | Years as customer
+```
+
+**Notes:**
+- Labels apply to both clustering variables and profiling variables.
+- Variables not listed in the Labels sheet retain their original column names.
+- This sheet provides the same functionality as the `question_labels_file` setting in the Config sheet. If both are provided, the Labels sheet takes precedence.
+
+---
+
+### Insights Sheet
+
+The Insights sheet allows the analyst to pre-populate the insight editor panels in the HTML report. Each row maps an insight to a specific report section. When the report is opened, these insights appear pre-filled in the corresponding section's insight editor, where they can be further edited by the report viewer before exporting slides.
+
+**Columns:**
+
+| Column | Required | Description |
+|--------|----------|-------------|
+| Section | Yes | The section key identifying which report section the insight belongs to |
+| Insight | Yes | The insight text to pre-populate in that section's editor |
+
+**Valid Section Keys:**
+
+| Section Key | Report Section |
+|-------------|----------------|
+| `exec-summary` | Executive Summary |
+| `overview` | Segment Overview (sizes and composition) |
+| `validation` | Cluster Validation (silhouette and fit metrics) |
+| `overlap` | Segment Overlap (if overlap analysis is enabled) |
+| `importance` | Variable Importance (eta-squared analysis) |
+| `golden-questions` | Golden Questions (key discriminating variables) |
+| `profiles` | Segment Profiles (heatmap and profile table) |
+| `vulnerability` | Vulnerability Analysis (if vulnerability analysis is enabled) |
+| `comparison-method-choice` | Method Comparison and Choice (multi-method runs only) |
+
+**Example:**
+
+```
+Section              | Insight
+---------------------|-------------------------------------------------------
+exec-summary         | Four distinct customer segments were identified, with
+                     | the Premium Advocates segment showing the highest
+                     | lifetime value potential.
+overview             | The largest segment (Mainstream, 35%) represents the
+                     | core customer base with moderate satisfaction scores.
+validation           | Silhouette scores indicate well-separated clusters
+                     | with minimal overlap between segments.
+importance           | Brand trust and product quality are the two strongest
+                     | differentiators across segments.
+profiles             | The At-Risk segment scores significantly below average
+                     | on customer service and value for money.
+```
+
+**Notes:**
+- Multiple rows can use the same Section key to provide multiple insights for a single section.
+- Section keys that do not match any visible report section are silently ignored.
+- Insights are editable in the HTML report's built-in insight editor and are included when exporting slides.
+
+---
+
+### About Sheet
+
+The About sheet provides project metadata that populates the About tab in the HTML report. This tab displays analyst details, project information, and any confidentiality notices or methodology notes.
+
+**Columns:**
+
+| Column | Required | Description |
+|--------|----------|-------------|
+| Setting | Yes | The setting key (case-insensitive) |
+| Value | Yes | The value for that setting |
+
+**Valid Settings:**
+
+| Setting | Description | Example |
+|---------|-------------|---------|
+| `analyst` | Name of the analyst who ran the segmentation | `Jane Smith` |
+| `company` | Company or organisation name | `The Research LampPost` |
+| `email` | Contact email for queries about the analysis | `jane@example.com` |
+| `project` | Project name or identifier | `Brand Health Tracker Q1 2026` |
+| `client` | Client name (the party the analysis was prepared for) | `Acme Corporation` |
+| `date` | Date of the analysis or report | `March 2026` |
+| `confidentiality` | Confidentiality notice or classification | `Confidential - Internal Use Only` |
+| `notes` | Methodology notes or additional context | `K-means with ward.D2 validation` |
+| `methodology` | Alias for `notes`; either key is accepted | `Hierarchical clustering on 8 attitudinal variables` |
+
+**Example:**
+
+```
+Setting          | Value
+-----------------|----------------------------------------------
+analyst          | Jane Smith
+company          | The Research LampPost
+email            | jane@lamppost.co.za
+project          | Customer Segmentation Study
+client           | Acme Corporation
+date             | March 2026
+confidentiality  | Confidential - Client Use Only
+methodology      | K-means clustering on 8 attitudinal variables,
+                 | Ward's method validation, n=1,200
+```
+
+**Notes:**
+- Settings not listed in the About sheet are omitted from the About tab (no defaults are substituted).
+- The `notes` and `methodology` settings are interchangeable; if both are provided, `methodology` takes precedence.
+- The About tab is always available in the HTML report when at least one setting is provided.
+
+---
+
+### Slides Sheet
+
+The Slides sheet defines custom presentation slides that appear in the Slides tab of the HTML report. This is useful for adding title slides, methodology descriptions, context slides, or any supplementary content that should accompany the analysis.
+
+**Columns:**
+
+| Column | Required | Description |
+|--------|----------|-------------|
+| Title | Yes | The slide title displayed as a heading |
+| Content | Yes | The slide body text (supports plain text; line breaks are preserved) |
+| Image | No | File path to an image to embed in the slide (PNG, JPG, or SVG) |
+
+**Example:**
+
+```
+Title                  | Content                                    | Image
+-----------------------|--------------------------------------------|---------------------------
+Project Background     | This segmentation was commissioned to       |
+                       | understand distinct customer groups within  |
+                       | the South African retail market.            |
+Methodology            | Eight attitudinal variables were selected   | methodology_diagram.png
+                       | based on factor analysis. K-means clustering|
+                       | was applied with k=4.                       |
+Key Recommendations    | Focus acquisition spend on the Growth       |
+                       | segment, which shows highest intent but     |
+                       | lowest current penetration.                 |
+```
+
+**Notes:**
+- The Image column accepts relative file paths (resolved relative to the config file location) or absolute file paths.
+- Images are base64-encoded and embedded directly into the HTML report, so the report remains a self-contained single file.
+- Supported image formats are PNG, JPG/JPEG, and SVG.
+- If the Image column is left blank for a row, the slide contains only the title and text content.
+- If a referenced image file cannot be found, the slide is still created but without the image, and a warning is logged to the console.
+- Slides appear in the Slides tab in the same order as the rows in the sheet.
 
 ---
 

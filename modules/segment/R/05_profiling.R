@@ -689,16 +689,6 @@ profile_demographics <- function(data, clusters, demo_vars,
 #' @export
 export_demographic_profiles <- function(demo_result, output_path) {
 
-  if (!requireNamespace("writexl", quietly = TRUE)) {
-    segment_refuse(
-      code = "PKG_WRITEXL_MISSING",
-      title = "Package writexl Required",
-      problem = "Package 'writexl' is not installed.",
-      why_it_matters = "Excel export requires the writexl package.",
-      how_to_fix = "Install the package with: install.packages('writexl')"
-    )
-  }
-
   sheets <- list()
 
   # Summary sheet with chi-squared tests
@@ -716,18 +706,7 @@ export_demographic_profiles <- function(demo_result, output_path) {
     sheets[[sheet_name]] <- demo_result$numeric_profiles[[var]]
   }
 
-  # TRS v1.0: Use atomic save if available
-  if (exists("turas_save_writexl_atomic", mode = "function")) {
-    save_result <- turas_save_writexl_atomic(
-      sheets = sheets,
-      file_path = output_path,
-      module = "SEGMENT"
-    )
-    if (!save_result$success) {
-      warning(sprintf("[SEGMENT] Failed to save demographic profiles: %s", save_result$error))
-    }
-  } else {
-    writexl::write_xlsx(sheets, output_path)
-  }
+  # Write to Excel with branded formatting
+  seg_write_xlsx(sheets, output_path)
   cat(sprintf("✓ Demographic profiles exported to: %s\n", basename(output_path)))
 }

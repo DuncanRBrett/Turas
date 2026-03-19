@@ -109,6 +109,8 @@
   function switchReportTab(tabName, tabBtns) {
     var analysisTab = document.getElementById('seg-analysis-tab');
     var pinnedTab   = document.getElementById('seg-pinned-tab');
+    var slidesTab   = document.getElementById('seg-slides-tab');
+    var aboutTab    = document.getElementById('seg-about-tab');
     var sectionNav  = document.getElementById('seg-section-nav');
 
     // Toggle active class on tab buttons
@@ -119,15 +121,20 @@
       );
     }
 
-    if (tabName === 'pinned') {
-      if (analysisTab) analysisTab.style.display = 'none';
-      if (pinnedTab)   pinnedTab.style.display   = 'block';
-      if (sectionNav)  sectionNav.style.display   = 'none';
-    } else {
-      if (analysisTab) analysisTab.style.display = 'block';
-      if (pinnedTab)   pinnedTab.style.display   = 'none';
-      if (sectionNav)  sectionNav.style.display   = '';
-    }
+    // Hide all tabs
+    if (analysisTab) analysisTab.style.display = 'none';
+    if (pinnedTab)   pinnedTab.style.display   = 'none';
+    if (slidesTab)   slidesTab.style.display   = 'none';
+    if (aboutTab)    aboutTab.style.display     = 'none';
+
+    // Show section nav only on analysis tab
+    if (sectionNav) sectionNav.style.display = (tabName === 'analysis') ? '' : 'none';
+
+    // Show the active tab
+    if (tabName === 'analysis' && analysisTab)  analysisTab.style.display = 'block';
+    else if (tabName === 'pinned' && pinnedTab) pinnedTab.style.display   = 'block';
+    else if (tabName === 'slides' && slidesTab) slidesTab.style.display   = 'block';
+    else if (tabName === 'about' && aboutTab)   aboutTab.style.display    = 'block';
   }
 
   /**
@@ -181,11 +188,47 @@
 
     var html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
     var blob = new Blob([html], { type: 'text/html' });
-    window.segDownloadBlob(blob, filename);
 
+    // Use File System Access API (Chrome/Edge) for Save As dialog,
+    // fall back to anchor download (Safari/Firefox)
+    if (typeof window.showSaveFilePicker === 'function') {
+      window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{
+          description: 'HTML Report',
+          accept: { 'text/html': ['.html'] }
+        }]
+      }).then(function(handle) {
+        return handle.createWritable().then(function(writable) {
+          return writable.write(blob).then(function() {
+            return writable.close();
+          });
+        });
+      }).then(function() {
+        segShowSaveBadge('Saved!');
+      }).catch(function(err) {
+        // User cancelled the dialog — not an error
+        if (err.name !== 'AbortError') {
+          console.warn('Save failed, falling back to download:', err);
+          window.segDownloadBlob(blob, filename);
+          segShowSaveBadge('Downloaded');
+        }
+      });
+    } else {
+      // Safari / Firefox fallback — direct download
+      window.segDownloadBlob(blob, filename);
+      segShowSaveBadge('Downloaded');
+    }
+  };
+
+  /**
+   * Show a brief save confirmation badge.
+   * @param {string} text - Badge text (e.g., "Saved!" or "Downloaded")
+   */
+  function segShowSaveBadge(text) {
     var badge = document.getElementById('seg-saved-badge');
     if (badge) {
-      badge.textContent = 'Saved!';
+      badge.textContent = text;
       badge.style.display = 'inline';
       badge.style.opacity = '1';
       setTimeout(function() {
@@ -193,7 +236,7 @@
         setTimeout(function() { badge.style.display = 'none'; }, 300);
       }, 2000);
     }
-  };
+  }
 
   /**
    * Trigger browser print dialog for the report.

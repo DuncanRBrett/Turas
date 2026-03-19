@@ -269,6 +269,21 @@
       }
 
     } else {
+      // User-uploaded image (if present, render above chart)
+      if (pin.imageData) {
+        var imgMaxH = 200;
+        var imgMaxW = SLIDE_W - 96;
+        var imgEl = document.createElementNS(NS, 'image');
+        imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'href', pin.imageData);
+        imgEl.setAttribute('x', 48);
+        imgEl.setAttribute('y', yPos);
+        imgEl.setAttribute('width', imgMaxW);
+        imgEl.setAttribute('height', imgMaxH);
+        imgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+        svgEl.appendChild(imgEl);
+        yPos += imgMaxH + 12;
+      }
+
       // Standard stacked layout: chart above table
       var chartArea = SLIDE_H - yPos - 60; // Reserve 60px for footer
       if (pin.chartSvg && chartArea > 80) {
@@ -334,6 +349,19 @@
       }
     }
 
+    // Watermark — bottom-right, subtle brand text
+    var watermark = document.createElementNS(NS, 'text');
+    watermark.setAttribute('x', SLIDE_W - 52);
+    watermark.setAttribute('y', SLIDE_H - 44);
+    watermark.setAttribute('text-anchor', 'end');
+    watermark.setAttribute('fill', brandColour);
+    watermark.setAttribute('fill-opacity', '0.3');
+    watermark.setAttribute('font-size', '10');
+    watermark.setAttribute('font-weight', '400');
+    watermark.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
+    watermark.textContent = 'Turas Segment';
+    svgEl.appendChild(watermark);
+
     // Footer strip
     var footerY = SLIDE_H - 36;
     var footerBg = document.createElementNS(NS, 'rect');
@@ -379,6 +407,18 @@
    * @param {Object} pin - Pin data (for filename)
    */
   function renderSVGtoPNG(svgString, pin) {
+    // Show progress overlay
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;' +
+      'background:rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;z-index:99999;';
+    var msg = document.createElement('div');
+    msg.style.cssText = 'background:#fff;color:#323367;padding:16px 28px;border-radius:8px;' +
+      'font-size:14px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;' +
+      'box-shadow:0 4px 16px rgba(0,0,0,0.15);';
+    msg.textContent = 'Rendering slide\u2026';
+    overlay.appendChild(msg);
+    document.body.appendChild(overlay);
+
     var blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
     var url = URL.createObjectURL(blob);
     var img = new Image();
@@ -405,11 +445,14 @@
             (pin.sectionTitle || 'slide').replace(/\s+/g, '_') + '.png';
           segDownloadBlob(pngBlob, filename);
         }
+        // Dismiss progress overlay
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       }, 'image/png');
     };
 
     img.onerror = function() {
       URL.revokeObjectURL(url);
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       console.error('Failed to render slide SVG to image');
     };
 

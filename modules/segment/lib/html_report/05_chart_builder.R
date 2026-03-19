@@ -70,17 +70,18 @@ build_seg_sizes_chart <- function(html_data, brand_colour = "#323367") {
       label_width - 10, y + bar_height / 2, seg_label
     ))
 
-    # Bar rect
+    # Bar rect (with toggle group for show/hide)
+    group_id <- sprintf("seg-bar-%d", i)
     bars <- paste0(bars, sprintf(
-      '<rect x="%.0f" y="%.1f" width="%.1f" height="%d" rx="4" fill="%s" opacity="%.2f"/>\n',
-      label_width, y, bar_w, bar_height, brand_colour, opacity
+      '<rect x="%.0f" y="%.1f" width="%.1f" height="%d" rx="4" fill="%s" opacity="%.2f" data-seg-bar-group="%s"/>\n',
+      label_width, y, bar_w, bar_height, brand_colour, opacity, group_id
     ))
 
     # Value label: n count and percentage
-    value_text <- sprintf("n=%d (%.1f%%)", row$n, row$pct)
+    value_text <- sprintf("n=%d (%.0f%%)", row$n, row$pct)
     bars <- paste0(bars, sprintf(
-      '<text x="%.1f" y="%.1f" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="500" dominant-baseline="central">%s</text>\n',
-      label_width + bar_w + 8, y + bar_height / 2, value_text
+      '<text x="%.1f" y="%.1f" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="500" dominant-baseline="central" data-seg-label-group="%s">%s</text>\n',
+      label_width + bar_w + 8, y + bar_height / 2, group_id, value_text
     ))
   }
 
@@ -246,7 +247,7 @@ build_seg_importance_chart <- function(html_data, brand_colour = "#323367") {
   if (has_pct) {
     metric_vals <- vi$importance_pct
     metric_label <- "Importance (%)"
-    fmt <- function(v) sprintf("%.1f%%", v)
+    fmt <- function(v) sprintf("%.0f%%", v)
   } else if (has_eta) {
     metric_vals <- vi$eta_squared
     metric_label <- "Eta-squared"
@@ -314,8 +315,9 @@ build_seg_importance_chart <- function(html_data, brand_colour = "#323367") {
     ))
   }
 
-  # Bars
+  # Bars with inline X close button
   bars <- ""
+  x_btn_size <- 18  # clickable area for X button
   for (i in seq_len(n)) {
     val <- metric_vals[i]
     if (is.na(val)) val <- 0
@@ -327,20 +329,37 @@ build_seg_importance_chart <- function(html_data, brand_colour = "#323367") {
     lbl <- labels[i]
     if (nchar(lbl) > 35) lbl <- paste0(substr(lbl, 1, 33), "\u2026")
 
+    group_id <- sprintf("imp-bar-%d", i)
+
+    # Label text
     bars <- paste0(bars, sprintf(
-      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="400" dominant-baseline="central">%s</text>\n',
-      label_width - 8, y + bar_height / 2, htmltools::htmlEscape(lbl)
+      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="400" dominant-baseline="central" data-seg-label-group="%s">%s</text>\n',
+      label_width - 8, y + bar_height / 2, group_id, htmltools::htmlEscape(lbl)
     ))
 
+    # Bar rect
     bars <- paste0(bars, sprintf(
-      '<rect x="%.0f" y="%.1f" width="%.1f" height="%d" rx="4" fill="%s" opacity="%.2f"/>\n',
-      label_width, y, bar_w, bar_height, brand_colour, opacity
+      '<rect x="%.0f" y="%.1f" width="%.1f" height="%d" rx="4" fill="%s" opacity="%.2f" data-seg-bar-group="%s"/>\n',
+      label_width, y, bar_w, bar_height, brand_colour, opacity, group_id
     ))
 
+    # Value text
+    val_x <- label_width + bar_w + 6
     bars <- paste0(bars, sprintf(
-      '<text x="%.1f" y="%.1f" font-size="10" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="500" dominant-baseline="central">%s</text>\n',
-      label_width + bar_w + 6, y + bar_height / 2, fmt(val)
+      '<text x="%.1f" y="%.1f" font-size="10" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="500" dominant-baseline="central" data-seg-label-group="%s">%s</text>\n',
+      val_x, y + bar_height / 2, group_id, fmt(val)
     ))
+
+    # X close button (circle + x) at far right of bar
+    x_centre <- chart_width - 20
+    y_centre <- y + bar_height / 2
+    bars <- paste0(bars, sprintf(paste0(
+      '<g class="seg-bar-x-btn" data-seg-target-group="%s" style="cursor:pointer;" onclick="segToggleBarByX(this,\'%s\')">\n',
+      '  <circle cx="%.0f" cy="%.1f" r="9" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>\n',
+      '  <text x="%.0f" y="%.1f" text-anchor="middle" dominant-baseline="central" font-size="11" ',
+      'font-family="\'Segoe UI\', Arial, sans-serif" fill="#94a3b8" font-weight="600">\u00D7</text>\n',
+      '</g>\n'
+    ), group_id, group_id, x_centre, y_centre, x_centre, y_centre))
   }
 
   svg <- sprintf(
@@ -480,15 +499,13 @@ build_seg_heatmap_chart <- function(html_data, brand_colour = "#323367",
         x, y, cell_width, cell_height, bg_colour
       ))
 
-      # Mean value text
+      # Mean value text — consistent 1dp for alignment
       mean_text <- if (is.na(mean_val)) {
         "NA"
       } else if (abs(mean_val) >= 100) {
         sprintf("%.0f", mean_val)
-      } else if (abs(mean_val) >= 10) {
-        sprintf("%.1f", mean_val)
       } else {
-        sprintf("%.2f", mean_val)
+        sprintf("%.1f", mean_val)
       }
 
       cells <- paste0(cells, sprintf(
@@ -907,9 +924,9 @@ build_seg_overlap_heatmap <- function(html_data, brand_colour = "#323367") {
   for (j in seq_len(k)) {
     x <- label_width + (j - 1) * cell_size + cell_size / 2
     seg_label <- htmltools::htmlEscape(seg_names[j])
-    if (nchar(seg_label) > 10) seg_label <- paste0(substr(seg_label, 1, 9), "\u2026")
+    if (nchar(seg_label) > 15) seg_label <- paste0(substr(seg_label, 1, 14), "\u2026")
     header <- paste0(header, sprintf(
-      '<text x="%.1f" y="%.0f" text-anchor="end" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="%s" font-weight="500" transform="rotate(-45, %.1f, %.0f)">%s</text>\n',
+      '<text x="%.1f" y="%.0f" text-anchor="end" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="%s" font-weight="500" transform="rotate(-30, %.1f, %.0f)">%s</text>\n',
       x, header_height - 8, brand_colour, x, header_height - 8, seg_label
     ))
   }
@@ -1022,7 +1039,7 @@ build_seg_golden_questions_chart <- function(html_data, brand_colour = "#323367"
   # Use importance_pct if available, else raw importance
   if ("importance_pct" %in% names(tq)) {
     vals <- tq$importance_pct
-    fmt <- function(v) sprintf("%.1f%%", v)
+    fmt <- function(v) sprintf("%.0f%%", v)
   } else if ("importance" %in% names(tq)) {
     vals <- tq$importance
     fmt <- function(v) sprintf("%.2f", v)
@@ -1044,7 +1061,7 @@ build_seg_golden_questions_chart <- function(html_data, brand_colour = "#323367"
   }
 
   # Header: accuracy badge
-  acc_text <- if (!is.na(accuracy)) sprintf("OOB Accuracy: %.1f%%", accuracy * 100) else ""
+  acc_text <- if (!is.na(accuracy)) sprintf("OOB Accuracy: %.0f%%", accuracy * 100) else ""
   header <- sprintf(
     '<text x="%.0f" y="18" font-size="12" font-family="\'Segoe UI\', Arial, sans-serif" fill="%s" font-weight="600">%s</text>\n',
     label_width, brand_colour, acc_text

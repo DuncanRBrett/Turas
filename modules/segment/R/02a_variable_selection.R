@@ -501,19 +501,8 @@ export_variable_selection_report <- function(selection_result, output_path) {
     sheets[["Factor_Assignments"]] <- factor_assign
   }
 
-  # Write to Excel (TRS v1.0: Use atomic save if available)
-  if (exists("turas_save_writexl_atomic", mode = "function")) {
-    save_result <- turas_save_writexl_atomic(
-      sheets = sheets,
-      file_path = output_path,
-      module = "SEGMENT"
-    )
-    if (!save_result$success) {
-      warning(sprintf("[SEGMENT] Failed to save variable selection report: %s", save_result$error))
-    }
-  } else {
-    writexl::write_xlsx(sheets, output_path)
-  }
+  # Write to Excel with branded formatting
+  seg_write_xlsx(sheets, output_path)
 
   cat(sprintf("✓ Exported variable selection report with %d sheets\n", length(sheets)))
 

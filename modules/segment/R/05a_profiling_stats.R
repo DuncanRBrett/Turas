@@ -318,20 +318,9 @@ create_enhanced_profile_report <- function(data, clusters, clustering_vars,
   
   sheets[["Effect_Sizes"]] <- effect_summary
 
-  # Write to Excel (TRS v1.0: Use atomic save if available)
+  # Write to Excel with branded formatting
   cat("Exporting enhanced profile report...\n")
-  if (exists("turas_save_writexl_atomic", mode = "function")) {
-    save_result <- turas_save_writexl_atomic(
-      sheets = sheets,
-      file_path = output_path,
-      module = "SEGMENT"
-    )
-    if (!save_result$success) {
-      warning(sprintf("[SEGMENT] Failed to save enhanced profile report: %s", save_result$error))
-    }
-  } else {
-    writexl::write_xlsx(sheets, output_path)
-  }
+  seg_write_xlsx(sheets, output_path)
 
   cat(sprintf("✓ Enhanced profile report saved to: %s\n", basename(output_path)))
   cat(sprintf("  Sheets: %d\n\n", length(sheets)))
@@ -345,206 +334,20 @@ create_enhanced_profile_report <- function(data, clusters, clustering_vars,
 
 
 # ==============================================================================
-# FEATURE 3: GOLDEN QUESTIONS IDENTIFIER
+# GOLDEN QUESTIONS - MOVED TO R/06_rules.R
+# ==============================================================================
+# The identify_golden_questions() function is now defined in R/06_rules.R
+# (the canonical version with full TRS refusals and Random Forest support).
+# Removed from this file to eliminate duplicate definition.
 # ==============================================================================
 
-#' Identify Golden Questions (Key Discriminating Variables)
-#'
-#' Finds the minimum set of variables needed to predict segment membership.
-#' Uses Random Forest variable importance if available, falls back to eta-squared
-#' from ANOVA.
-#'
-#' @param data Data frame with all variables
-#' @param clusters Integer vector of segment assignments
-#' @param clustering_vars Character vector of clustering variable names
-#' @param n_questions Integer, number of golden questions to identify (default: 3)
-#' @param question_labels Named vector of question labels (optional)
-#'
-#' @return List with golden_questions, importance_scores, importance_df
-#' @export
-#' @examples
-#' golden <- identify_golden_questions(
-#'   data = survey_data,
-#'   clusters = result$clusters,
-#'   clustering_vars = config$clustering_vars,
-#'   n_questions = 3
-#' )
-identify_golden_questions <- function(data, clusters, clustering_vars,
-                                       n_questions = 3, question_labels = NULL) {
 
-  cat("\n")
-  cat(rep("=", 80), "\n", sep = "")
-  cat("IDENTIFYING GOLDEN QUESTIONS\n")
-  cat(rep("=", 80), "\n", sep = "")
-  cat("\n")
-
-  # Prepare data
-  analysis_data <- data[, clustering_vars, drop = FALSE]
-  analysis_data$segment <- as.factor(clusters)
-
-  # Remove rows with missing values
-  complete_rows <- complete.cases(analysis_data)
-  analysis_data <- analysis_data[complete_rows, ]
-
-  cat(sprintf("Analyzing %d variables across %d segments...\n",
-              length(clustering_vars), length(unique(clusters))))
-
-  # ===========================================================================
-  # TRY RANDOM FOREST METHOD
-  # ===========================================================================
-
-  importance_scores <- NULL
-  method_used <- NULL
-  classification_accuracy <- NULL
-
-  if (requireNamespace("randomForest", quietly = TRUE)) {
-    cat("Using Random Forest for variable importance...\n")
-    method_used <- "Random Forest"
-
-    tryCatch({
-      # Fit random forest
-      rf_formula <- as.formula(paste("segment ~", paste(clustering_vars, collapse = " + ")))
-
-      rf_model <- randomForest::randomForest(
-        rf_formula,
-        data = analysis_data,
-        importance = TRUE,
-        ntree = 500
-      )
-
-      # Get importance (MeanDecreaseGini or MeanDecreaseAccuracy)
-      importance_matrix <- randomForest::importance(rf_model)
-
-      # Use MeanDecreaseAccuracy if available, otherwise MeanDecreaseGini
-      if ("MeanDecreaseAccuracy" %in% colnames(importance_matrix)) {
-        importance_scores <- importance_matrix[, "MeanDecreaseAccuracy"]
-      } else {
-        importance_scores <- importance_matrix[, "MeanDecreaseGini"]
-      }
-
-      # Calculate classification accuracy
-      predictions <- predict(rf_model, analysis_data)
-      classification_accuracy <- mean(predictions == analysis_data$segment)
-
-      cat(sprintf("✓ Random Forest fitted successfully\n"))
-      cat(sprintf("  Classification accuracy: %.1f%%\n", classification_accuracy * 100))
-
-    }, error = function(e) {
-      cat(sprintf("⚠ Random Forest failed: %s\n", e$message))
-      cat("  Falling back to eta-squared method...\n")
-      message(sprintf("[TRS PARTIAL] SEG_RF_FAILED: Random Forest failed (%s) - using eta-squared method", e$message))
-      importance_scores <<- NULL
-    })
-  } else {
-    cat("randomForest not installed. Using eta-squared method...\n")
-    cat("  Install with: install.packages('randomForest')\n")
-    message("[TRS PARTIAL] SEG_RF_MISSING: randomForest package not available - using eta-squared method")
-  }
-
-  # ===========================================================================
-  # FALLBACK: ETA-SQUARED FROM ANOVA
-  # ===========================================================================
-
-  if (is.null(importance_scores)) {
-    method_used <- "ANOVA (eta-squared)"
-
-    importance_scores <- numeric(length(clustering_vars))
-    names(importance_scores) <- clustering_vars
-
-    for (var in clustering_vars) {
-      var_data <- analysis_data[[var]]
-
-      tryCatch({
-        anova_result <- aov(var_data ~ analysis_data$segment)
-        anova_summary <- summary(anova_result)
-
-        # Calculate eta-squared
-        ss_between <- anova_summary[[1]]$"Sum Sq"[1]
-        ss_total <- sum(anova_summary[[1]]$"Sum Sq")
-        eta_squared <- ss_between / ss_total
-
-        importance_scores[var] <- eta_squared
-
-      }, error = function(e) {
-        importance_scores[var] <- 0
-      })
-    }
-
-    cat(sprintf("✓ Eta-squared calculated for %d variables\n", length(clustering_vars)))
-  }
-
-  # ===========================================================================
-  # RANK AND SELECT TOP N
-  # ===========================================================================
-
-  # Sort by importance (descending)
-  sorted_idx <- order(importance_scores, decreasing = TRUE)
-  ranked_vars <- names(importance_scores)[sorted_idx]
-  ranked_scores <- importance_scores[sorted_idx]
-
-  # Select top n
-  n_questions <- min(n_questions, length(clustering_vars))
-  golden_questions <- ranked_vars[1:n_questions]
-  golden_scores <- ranked_scores[1:n_questions]
-
-  # ===========================================================================
-  # CREATE IMPORTANCE DATA FRAME
-  # ===========================================================================
-
-  importance_df <- data.frame(
-    Variable = ranked_vars,
-    Importance = round(ranked_scores, 4),
-    Rank = 1:length(ranked_vars),
-    Golden_Question = ranked_vars %in% golden_questions,
-    stringsAsFactors = FALSE
-  )
-
-  # Add labels if available
-  if (!is.null(question_labels)) {
-    importance_df$Label <- sapply(importance_df$Variable, function(v) {
-      if (v %in% names(question_labels)) question_labels[v] else v
-    }, USE.NAMES = FALSE)
-    # Reorder columns
-    importance_df <- importance_df[, c("Rank", "Variable", "Label", "Importance", "Golden_Question")]
-  }
-
-  # ===========================================================================
-  # CONSOLE OUTPUT
-  # ===========================================================================
-
-  cat("\n")
-  cat(sprintf("Top %d discriminating variables:\n", n_questions))
-  for (i in 1:n_questions) {
-    var_name <- golden_questions[i]
-    score <- golden_scores[i]
-
-    # Get label if available
-    display_name <- if (!is.null(question_labels) && var_name %in% names(question_labels)) {
-      paste0(var_name, ": ", question_labels[var_name])
-    } else {
-      var_name
-    }
-
-    cat(sprintf("  %d. %s (importance: %.2f)\n", i, display_name, score))
-  }
-
-  if (!is.null(classification_accuracy)) {
-    cat(sprintf("\nThese %d questions predict segment membership with %.0f%% accuracy.\n",
-                n_questions, classification_accuracy * 100))
-  }
-
-  cat(sprintf("\nMethod used: %s\n", method_used))
-  cat("\n")
-
-  return(list(
-    golden_questions = golden_questions,
-    importance_scores = importance_scores,
-    importance_df = importance_df,
-    n_questions = n_questions,
-    method = method_used,
-    classification_accuracy = classification_accuracy
-  ))
-}
+# ==============================================================================
+# PLACEHOLDER - identify_golden_questions moved to R/06_rules.R
+# ==============================================================================
+# See R/06_rules.R for the complete implementation.
+#' @keywords internal
+.golden_questions_moved_notice <- "identify_golden_questions() is in R/06_rules.R"
 
 
 # ==============================================================================

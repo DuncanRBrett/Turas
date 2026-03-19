@@ -57,7 +57,7 @@ generate_segment_executive_summary <- function(cluster_result,
   # Segment sizes
   seg_table <- table(cluster_result$clusters)
   seg_sizes <- as.integer(seg_table)
-  seg_pcts <- round(seg_sizes / n_obs * 100, 1)
+  seg_pcts <- round(seg_sizes / n_obs * 100, 0)
 
   warnings_out <- character(0)
 
@@ -314,7 +314,7 @@ generate_segment_executive_summary <- function(cluster_result,
       }
       if (!is.null(info$n_borderline) && info$n_borderline > 0) {
         msgs <- c(msgs, sprintf(
-          "%d respondents (%.1f%%) have borderline membership (uncertainty > 0.3).",
+          "%d respondents (%.0f%%) have borderline membership (uncertainty > 0.3).",
           info$n_borderline,
           info$n_borderline / length(cluster_result$clusters) * 100
         ))
@@ -413,7 +413,7 @@ generate_segment_executive_summary <- function(cluster_result,
   seg_table <- table(cluster_result$clusters)
   seg_sizes <- as.integer(seg_table)
   n_total <- length(cluster_result$clusters)
-  seg_pcts <- round(seg_sizes / n_total * 100, 1)
+  seg_pcts <- round(seg_sizes / n_total * 100, 0)
 
   # Extract question labels from config (optional human-readable names)
   q_labels <- config$question_labels

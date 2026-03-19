@@ -1,7 +1,8 @@
 # Turas Segmentation Module
 
-**Version:** 11.0
-**Last Updated:** 5 March 2026
+**Version:** 11.1
+**Last Updated:** 19 March 2026
+**Quality Score:** 95/100
 
 Multi-algorithm clustering segmentation for survey data with exploration and final run modes, interactive HTML reporting, and executive-ready deliverables.
 

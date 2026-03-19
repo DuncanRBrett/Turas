@@ -49,7 +49,7 @@ build_seg_overview_table <- function(html_data) {
       htmltools::tags$td(seg_id, class = "seg-td seg-td-id"),
       htmltools::tags$td(seg_name, class = "seg-td seg-td-label"),
       htmltools::tags$td(format(seg_n, big.mark = ","), class = "seg-td seg-td-num"),
-      htmltools::tags$td(sprintf("%.1f%%", seg_pct), class = "seg-td seg-td-num"),
+      htmltools::tags$td(sprintf("%.0f%%", seg_pct), class = "seg-td seg-td-num"),
       htmltools::tags$td(
         class = "seg-td seg-td-status",
         htmltools::tags$span(class = badge_class, badge_text)
@@ -258,7 +258,7 @@ build_seg_validation_table <- function(html_data) {
   # -- Between/Total SS --
   bt_val <- diag$betweenss_totss
   if (!is.null(bt_val) && !is.na(bt_val)) {
-    bt_pct <- sprintf("%.1f%%", bt_val * 100)
+    bt_pct <- sprintf("%.0f%%", bt_val * 100)
     metric_rows <- c(metric_rows, list(
       .build_seg_validation_row("Between/Total SS", sprintf("%.3f", bt_val), bt_pct)
     ))
@@ -389,11 +389,11 @@ build_seg_demographics_table <- function(html_data) {
 
       seg_tds <- lapply(seg_col_names, function(sn) {
         val <- prof_df[[sn]][i]
-        display <- if (is.na(val)) "-" else sprintf("%.1f%%", val)
+        display <- if (is.na(val)) "-" else sprintf("%.0f%%", val)
         htmltools::tags$td(display, class = "seg-td seg-td-num")
       })
 
-      overall_display <- if (is.na(overall_val)) "-" else sprintf("%.1f%%", overall_val)
+      overall_display <- if (is.na(overall_val)) "-" else sprintf("%.0f%%", overall_val)
 
       htmltools::tags$tr(
         class = "seg-tr",
@@ -485,7 +485,7 @@ build_seg_rules_table <- function(html_data) {
     if (!is.null(rules_df) && nrow(rules_df) > 0) {
       match_idx <- which(rules_df$Segment_Name == predicted_seg)
       if (length(match_idx) > 0) {
-        acc_display <- sprintf("%.1f%%", rules_df$Accuracy[match_idx[1]])
+        acc_display <- sprintf("%.0f%%", rules_df$Accuracy[match_idx[1]])
       }
     }
 
@@ -505,7 +505,7 @@ build_seg_rules_table <- function(html_data) {
     class = "seg-tr seg-tr-footer",
     htmltools::tags$td("Overall", class = "seg-td seg-td-label", colspan = "2"),
     htmltools::tags$td(
-      sprintf("%.1f%%", overall_accuracy * 100),
+      sprintf("%.0f%%", overall_accuracy * 100),
       class = "seg-td seg-td-num"
     )
   )
@@ -532,13 +532,13 @@ build_seg_rules_table <- function(html_data) {
   rows <- lapply(seq_len(nrow(rules_df)), function(i) {
     seg_name <- rules_df$Segment_Name[i]
     acc <- rules_df$Accuracy[i]
-    rule_text <- sprintf("Classify as %s (n=%d, %.1f%%)", seg_name, rules_df$N[i], rules_df$Pct[i])
+    rule_text <- sprintf("Classify as %s (n=%d, %.0f%%)", seg_name, rules_df$N[i], rules_df$Pct[i])
 
     htmltools::tags$tr(
       class = "seg-tr",
       htmltools::tags$td(rule_text, class = "seg-td seg-td-label seg-td-rule"),
       htmltools::tags$td(seg_name, class = "seg-td seg-td-label"),
-      htmltools::tags$td(sprintf("%.1f%%", acc), class = "seg-td seg-td-num")
+      htmltools::tags$td(sprintf("%.0f%%", acc), class = "seg-td seg-td-num")
     )
   })
 
@@ -549,7 +549,7 @@ build_seg_rules_table <- function(html_data) {
         class = "seg-tr seg-tr-footer",
         htmltools::tags$td("Overall", class = "seg-td seg-td-label", colspan = "2"),
         htmltools::tags$td(
-          sprintf("%.1f%%", overall_accuracy * 100),
+          sprintf("%.0f%%", overall_accuracy * 100),
           class = "seg-td seg-td-num"
         )
       )

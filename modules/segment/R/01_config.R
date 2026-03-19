@@ -116,6 +116,55 @@ read_segment_config <- function(config_file) {
   }
 
   cat(sprintf("  Loaded %d configuration parameters\n", length(config)))
+
+  # Load optional Insights sheet (section_key -> insight_text)
+  config$.insights <- tryCatch({
+    ins <- openxlsx::read.xlsx(config_file, sheet = "Insights")
+    if (!is.null(ins) && nrow(ins) > 0 && all(c("Section", "Insight") %in% names(ins))) {
+      ins_list <- setNames(as.character(ins$Insight), tolower(trimws(ins$Section)))
+      ins_list <- ins_list[nzchar(ins_list)]
+      if (length(ins_list) > 0) {
+        cat(sprintf("  Loaded %d pre-configured insights\n", length(ins_list)))
+      }
+      ins_list
+    } else {
+      NULL
+    }
+  }, error = function(e) NULL)
+
+  # Load optional About sheet (analyst details)
+  config$.about <- tryCatch({
+    abt <- openxlsx::read.xlsx(config_file, sheet = "About")
+    if (!is.null(abt) && nrow(abt) > 0 && all(c("Setting", "Value") %in% names(abt))) {
+      about_list <- setNames(as.character(abt$Value), tolower(trimws(abt$Setting)))
+      about_list <- about_list[nzchar(about_list)]
+      if (length(about_list) > 0) {
+        cat(sprintf("  Loaded %d about/analyst details\n", length(about_list)))
+      }
+      about_list
+    } else {
+      NULL
+    }
+  }, error = function(e) NULL)
+
+  # Load optional Slides sheet (title, content, image_path)
+  config$.slides <- tryCatch({
+    sl <- openxlsx::read.xlsx(config_file, sheet = "Slides")
+    if (!is.null(sl) && nrow(sl) > 0 && "Title" %in% names(sl)) {
+      slides <- lapply(seq_len(nrow(sl)), function(i) {
+        list(
+          title = as.character(sl$Title[i] %||% ""),
+          content = as.character(sl$Content[i] %||% ""),
+          image_path = as.character(sl$Image[i] %||% "")
+        )
+      })
+      cat(sprintf("  Loaded %d pre-configured slides\n", length(slides)))
+      slides
+    } else {
+      NULL
+    }
+  }, error = function(e) NULL)
+
   config
 }
 
@@ -334,7 +383,11 @@ validate_segment_config <- function(config) {
   # ENHANCED FEATURES
   # ===========================================================================
 
-  golden_questions_n <- get_numeric_config(config, "golden_questions_n", default_value = 3, min = 1, max = 10)
+  # Default to all clustering variables; analyst can filter in the HTML report
+  n_clustering_vars <- length(clustering_vars)
+  golden_questions_n <- get_numeric_config(config, "golden_questions_n",
+                                            default_value = max(n_clustering_vars, 5),
+                                            min = 1, max = 100)
   auto_name_style <- get_char_config(config, "auto_name_style", default_value = "descriptive",
     allowed_values = c("descriptive", "persona", "simple"))
 
@@ -360,7 +413,7 @@ validate_segment_config <- function(config) {
   # Metadata
   project_name <- get_char_config(config, "project_name", default_value = "Segmentation Analysis")
   analyst_name <- get_char_config(config, "analyst_name", default_value = "Analyst")
-  description <- get_char_config(config, "description", default_value = "")
+  description <- as.character(get_config_value(config, "description", default_value = "") %||% "")
 
   # Question labels
   question_labels_file <- get_config_value(config, "question_labels_file", default_value = NULL)
@@ -422,6 +475,8 @@ validate_segment_config <- function(config) {
     project_name = project_name, analyst_name = analyst_name, description = description,
     question_labels_file = question_labels_file, question_labels = question_labels,
     segment_names_file = segment_names_file,
+    # Pre-configured content from Excel
+    insights = config$.insights, about = config$.about, slides = config$.slides,
     # Mode detection
     mode = if (is.null(k_fixed)) "exploration" else "final"
   )

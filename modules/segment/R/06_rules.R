@@ -651,6 +651,37 @@ identify_golden_questions <- function(data,
     }
 
     # =========================================================================
+    # INCREMENTAL ACCURACY — run RF with top-1, top-2, ..., top-n variables
+    # Shows how accuracy changes as questions are added or removed
+    # =========================================================================
+
+    sorted_vars <- names(mean_decrease_accuracy)[sorted_idx[seq_len(n_top)]]
+    incremental_accuracy <- numeric(n_top)
+
+    cat("  Computing incremental accuracy...\n")
+    for (q in seq_len(n_top)) {
+      sub_vars <- sorted_vars[seq_len(q)]
+      sub_data <- clean_data[, sub_vars, drop = FALSE]
+      sub_model <- tryCatch({
+        randomForest::randomForest(
+          x = sub_data, y = clean_clusters,
+          ntree = max(200, n_trees %/% 2), importance = FALSE
+        )
+      }, error = function(e) NULL)
+      if (!is.null(sub_model)) {
+        sub_conf <- sub_model$confusion[, -ncol(sub_model$confusion), drop = FALSE]
+        incremental_accuracy[q] <- round(sum(diag(sub_conf)) / sum(sub_conf), 4)
+      } else {
+        incremental_accuracy[q] <- NA_real_
+      }
+    }
+
+    top_questions$cumulative_accuracy <- incremental_accuracy
+    cat(sprintf("  Accuracy curve: %s\n\n",
+                paste(sprintf("top-%d=%.1f%%", seq_len(n_top),
+                              incremental_accuracy * 100), collapse = ", ")))
+
+    # =========================================================================
     # BUILD RESULT
     # =========================================================================
 
@@ -658,6 +689,7 @@ identify_golden_questions <- function(data,
       status = "PASS",
       top_questions = top_questions,
       accuracy = round(oob_accuracy, 4),
+      incremental_accuracy = incremental_accuracy,
       confusion_matrix = confusion_counts,
       per_segment_accuracy = round(per_segment_accuracy, 4),
       n_trees = n_trees,

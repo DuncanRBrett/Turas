@@ -105,23 +105,27 @@ export_segment_assignments <- function(data, clusters, segment_names, id_var, ou
     stringsAsFactors = FALSE
   )
 
-  sheets <- list(
-    Segment_Assignments = assignments,
-    Segment_Names = names_df
-  )
+  # Write to Excel with professional formatting
+  wb <- openxlsx::createWorkbook()
 
-  # Write to Excel (TRS v1.0: Use atomic save if available)
-  if (exists("turas_save_writexl_atomic", mode = "function")) {
-    save_result <- turas_save_writexl_atomic(
-      sheets = sheets,
-      file_path = output_path,
-      module = "SEGMENT"
-    )
+  # Sheet 1: Segment Assignments
+  openxlsx::addWorksheet(wb, "Segment_Assignments")
+  seg_write_branded_sheet(wb, "Segment_Assignments", assignments)
+
+  # Sheet 2: Segment Names (for user editing)
+  openxlsx::addWorksheet(wb, "Segment_Names")
+  seg_write_branded_sheet(wb, "Segment_Names", names_df)
+  # Make Custom_Name column wider for editing
+  openxlsx::setColWidths(wb, "Segment_Names", cols = 3, widths = 30)
+
+  # Save with atomic write
+  if (exists("turas_save_workbook_atomic", mode = "function")) {
+    save_result <- turas_save_workbook_atomic(wb, output_path, module = "SEGMENT")
     if (!save_result$success) {
       warning(sprintf("[SEGMENT] Failed to save assignments: %s", save_result$error))
     }
   } else {
-    writexl::write_xlsx(sheets, output_path)
+    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
   }
 
   cat(sprintf("  Exported %d segment assignments (with Segment_Names sheet)\n", nrow(assignments)))
@@ -418,18 +422,25 @@ export_exploration_report <- function(exploration_result, metrics_result,
     }
   }
 
-  # Write all sheets to Excel (TRS v1.0: Use atomic save if available)
-  if (exists("turas_save_writexl_atomic", mode = "function")) {
-    save_result <- turas_save_writexl_atomic(
-      sheets = profile_sheets,
-      file_path = output_path,
-      module = "SEGMENT"
-    )
+  # Write all sheets to Excel with professional formatting
+  wb <- openxlsx::createWorkbook()
+
+  for (sheet_name in names(profile_sheets)) {
+    openxlsx::addWorksheet(wb, sheet_name)
+    sheet_data <- profile_sheets[[sheet_name]]
+    if (!is.null(sheet_data) && is.data.frame(sheet_data) && nrow(sheet_data) > 0) {
+      seg_write_branded_sheet(wb, sheet_name, sheet_data)
+    }
+  }
+
+  # Save with atomic write
+  if (exists("turas_save_workbook_atomic", mode = "function")) {
+    save_result <- turas_save_workbook_atomic(wb, output_path, module = "SEGMENT")
     if (!save_result$success) {
       warning(sprintf("[SEGMENT] Failed to save exploration report: %s", save_result$error))
     }
   } else {
-    writexl::write_xlsx(profile_sheets, output_path)
+    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
   }
 
   cat(sprintf("✓ Exported exploration report with %d sheets\n", length(profile_sheets)))
@@ -760,18 +771,25 @@ export_final_report <- function(final_result, profile_result, validation_metrics
     }
   }
 
-  # Write to Excel (TRS v1.0: Use atomic save if available)
-  if (exists("turas_save_writexl_atomic", mode = "function")) {
-    save_result <- turas_save_writexl_atomic(
-      sheets = sheets,
-      file_path = output_path,
-      module = "SEGMENT"
-    )
+  # Write to Excel with professional formatting
+  wb <- openxlsx::createWorkbook()
+
+  for (sheet_name in names(sheets)) {
+    openxlsx::addWorksheet(wb, sheet_name)
+    sheet_data <- sheets[[sheet_name]]
+    if (!is.null(sheet_data) && is.data.frame(sheet_data) && nrow(sheet_data) > 0) {
+      seg_write_branded_sheet(wb, sheet_name, sheet_data)
+    }
+  }
+
+  # Save with atomic write
+  if (exists("turas_save_workbook_atomic", mode = "function")) {
+    save_result <- turas_save_workbook_atomic(wb, output_path, module = "SEGMENT")
     if (!save_result$success) {
       warning(sprintf("[SEGMENT] Failed to save final report: %s", save_result$error))
     }
   } else {
-    writexl::write_xlsx(sheets, output_path)
+    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
   }
 
   cat(sprintf("  Exported report with %d sheets\n", length(sheets)))

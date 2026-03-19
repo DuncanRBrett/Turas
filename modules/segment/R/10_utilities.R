@@ -57,8 +57,17 @@
     validate_data_frame <- function(data, ...) invisible(TRUE)
   }
   if (!exists("validate_column_exists", mode = "function")) {
-    validate_column_exists <- function(data, col, ...) {
-      if (!col %in% names(data)) stop(sprintf("Column '%s' not found", col))
+    validate_column_exists <- function(data, col, label = NULL) {
+      if (!col %in% names(data)) {
+        segment_refuse(
+          code = "DATA_COLUMN_NOT_FOUND",
+          title = "Column Not Found",
+          problem = sprintf("Column '%s' not found in data.", col),
+          why_it_matters = sprintf("%s is required for processing.", label %||% col),
+          how_to_fix = sprintf("Check that '%s' exists in your data. Available: %s",
+                              col, paste(head(names(data), 10), collapse = ", "))
+        )
+      }
     }
   }
   invisible(FALSE)
@@ -112,7 +121,7 @@ check_segment_dependencies <- function(verbose = TRUE, install_missing = FALSE) 
   required_packages <- list(
     cluster = "Silhouette analysis and cluster validation",
     readxl  = "Read Excel configuration files",
-    writexl = "Write Excel output files"
+    openxlsx = "Write formatted Excel output files"
   )
 
   optional_packages <- list(
@@ -240,7 +249,7 @@ check_segment_dependencies <- function(verbose = TRUE, install_missing = FALSE) 
 #' @return Character string with install.packages() command
 #' @export
 get_minimum_install_cmd <- function() {
-  cmd <- 'install.packages(c("cluster", "readxl", "writexl"))'
+  cmd <- 'install.packages(c("cluster", "readxl", "openxlsx"))'
   cat("Minimum install (k-means only):\n")
   cat(paste0("  ", cmd, "\n"))
   invisible(cmd)
@@ -255,7 +264,7 @@ get_minimum_install_cmd <- function() {
 #' @return Character string with install.packages() command
 #' @export
 get_full_install_cmd <- function() {
-  cmd <- 'install.packages(c("cluster", "readxl", "writexl", "poLCA", "psych", "fmsb", "ggplot2", "randomForest", "haven"))'
+  cmd <- 'install.packages(c("cluster", "readxl", "openxlsx", "poLCA", "psych", "fmsb", "ggplot2", "randomForest", "haven"))'
   cat("Full install (all features):\n")
   cat(paste0("  ", cmd, "\n"))
   invisible(cmd)
@@ -416,19 +425,8 @@ generate_config_template <- function(data_file, output_file, mode = "exploration
     stringsAsFactors = FALSE
   )
 
-  # Write to Excel (TRS v1.0: Use atomic save if available)
-  if (exists("turas_save_writexl_atomic", mode = "function")) {
-    save_result <- turas_save_writexl_atomic(
-      sheets = list(Config = config_df),
-      file_path = output_file,
-      module = "SEGMENT"
-    )
-    if (!save_result$success) {
-      warning(sprintf("[SEGMENT] Failed to save config template: %s", save_result$error))
-    }
-  } else {
-    writexl::write_xlsx(list(Config = config_df), output_file)
-  }
+  # Write to Excel with branded formatting
+  seg_write_xlsx(list(Config = config_df), output_file)
 
   cat(sprintf("✓ Config template saved to: %s\n", output_file))
   cat("\nIMPORTANT: Edit the following required fields:\n")
@@ -1583,4 +1581,361 @@ merge_segment_to_data <- function(data_path,
     output_path = output_path,
     warnings = if (length(warnings) > 0) warnings else NULL
   )
+}
+
+
+# ==============================================================================
+# CONFIG TEMPLATE GENERATOR
+# ==============================================================================
+
+#' Generate Professional Segmentation Config Template
+#'
+#' Creates a branded Excel config template with all parameters,
+#' descriptions, default values, and data validation dropdowns.
+#'
+#' @param output_path Character, path for the output Excel file
+#' @param include_sample_values Logical, include example values (default TRUE)
+#' @return Invisible output path
+#' @export
+generate_segment_config_template <- function(output_path = "Segment_Config_Template.xlsx",
+                                              include_sample_values = TRUE) {
+  cat("Generating segmentation config template...\n")
+
+  if (!requireNamespace("openxlsx", quietly = TRUE)) {
+    segment_refuse(
+      code = "PKG_OPENXLSX_MISSING",
+      title = "Package openxlsx Required",
+      problem = "openxlsx is required to generate config templates.",
+      why_it_matters = "Professional formatting requires openxlsx.",
+      how_to_fix = "Install with: install.packages('openxlsx')"
+    )
+  }
+
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Config")
+
+  # Build config parameter table
+  params <- data.frame(
+    Setting = c(
+      # --- DATA SOURCE ---
+      "data_file", "data_sheet", "id_variable", "clustering_vars",
+      "profile_vars", "demographic_vars",
+      # --- CLUSTERING METHOD ---
+      "method", "linkage_method", "gmm_model_type",
+      # --- K PARAMETERS ---
+      "k_fixed", "k_min", "k_max", "nstart", "seed",
+      # --- DATA HANDLING ---
+      "missing_data", "missing_threshold", "standardize",
+      "min_segment_size_pct",
+      # --- OUTLIER DETECTION ---
+      "outlier_detection", "outlier_method", "outlier_threshold",
+      "outlier_handling", "outlier_min_vars",
+      # --- VARIABLE SELECTION ---
+      "variable_selection", "variable_selection_method",
+      "max_clustering_vars",
+      # --- OUTPUT ---
+      "output_folder", "output_prefix", "create_dated_folder",
+      "save_model", "segment_names", "auto_name_style", "scale_max",
+      # --- HTML REPORT ---
+      "html_report", "brand_colour", "accent_colour", "report_title",
+      # --- ENHANCED FEATURES ---
+      "generate_rules", "rules_max_depth",
+      "generate_action_cards",
+      "run_stability_check", "stability_n_runs",
+      "golden_questions_n",
+      # --- METADATA ---
+      "project_name", "analyst_name", "description",
+      "question_labels_file", "segment_names_file"
+    ),
+    Value = c(
+      # DATA SOURCE
+      if (include_sample_values) "data/survey_data.xlsx" else "",
+      "Data",
+      if (include_sample_values) "respondent_id" else "",
+      if (include_sample_values) "q1,q2,q3,q4,q5" else "",
+      "", "",
+      # METHOD
+      "kmeans", "ward.D2", "",
+      # K
+      "", "3", "6", "50", "123",
+      # DATA HANDLING
+      "listwise_deletion", "15", "TRUE", "10",
+      # OUTLIERS
+      "FALSE", "zscore", "3.0", "flag", "1",
+      # VARIABLE SELECTION
+      "FALSE", "variance_correlation", "10",
+      # OUTPUT
+      "output/", "seg_", "TRUE", "TRUE",
+      "auto", "descriptive", "10",
+      # HTML
+      "TRUE", "#323367", "#CC9900", "Segmentation Report",
+      # ENHANCED
+      "TRUE", "3", "TRUE", "FALSE", "5", "3",
+      # METADATA
+      if (include_sample_values) "My Segmentation Project" else "",
+      if (include_sample_values) "Analyst Name" else "",
+      "", "", ""
+    ),
+    Description = c(
+      # DATA SOURCE
+      "Path to survey data file (.xlsx, .csv, or .sav)",
+      "Sheet name in Excel file (default: Data)",
+      "Column name for respondent unique identifier",
+      "Comma-separated list of numeric variables for clustering",
+      "Comma-separated profile variables (optional, auto-detected if blank)",
+      "Comma-separated demographic variables for profiling (optional)",
+      # METHOD
+      "Clustering method: kmeans, hclust, gmm, or comma-separated for multi-method",
+      "Linkage method for hclust: ward.D2, complete, average, single",
+      "GMM covariance model type (blank = auto-select best BIC)",
+      # K
+      "Fixed number of segments (leave blank for exploration mode)",
+      "Minimum k to test in exploration mode",
+      "Maximum k to test in exploration mode",
+      "Number of random starts for k-means (higher = more stable, slower)",
+      "Random seed for reproducibility",
+      # DATA HANDLING
+      "How to handle missing data: listwise_deletion, mean_imputation, median_imputation, refuse",
+      "Maximum % missing data before warning (0-100)",
+      "Standardize variables before clustering? TRUE/FALSE",
+      "Minimum segment size as % of total (warns if below)",
+      # OUTLIERS
+      "Enable outlier detection? TRUE/FALSE",
+      "Outlier detection method: zscore or mahalanobis",
+      "Z-score threshold for outlier detection (typically 2.5-3.5)",
+      "How to handle outliers: none, flag, or remove",
+      "Minimum variables exceeding threshold to flag as outlier",
+      # VARIABLE SELECTION
+      "Enable automatic variable selection? TRUE/FALSE",
+      "Selection method: variance_correlation, factor_analysis, or both",
+      "Maximum number of clustering variables after selection",
+      # OUTPUT
+      "Output folder path (relative to config file)",
+      "Prefix for output file names",
+      "Create date-stamped subfolder? TRUE/FALSE",
+      "Save model object (.rds) for scoring? TRUE/FALSE",
+      "Segment names: 'auto' or comma-separated custom names",
+      "Auto-naming style: descriptive, persona, or simple",
+      "Maximum value on rating scale (for interpreting high/low scores)",
+      # HTML
+      "Generate interactive HTML report? TRUE/FALSE",
+      "Brand colour for report header (hex code)",
+      "Accent colour for highlights (hex code)",
+      "Report title displayed in header",
+      # ENHANCED
+      "Generate classification rules (decision tree)? TRUE/FALSE",
+      "Maximum depth for classification tree (1-5)",
+      "Generate executive action cards? TRUE/FALSE",
+      "Run stability bootstrap check? TRUE/FALSE",
+      "Number of bootstrap runs for stability (3-20)",
+      "Number of golden questions to identify (1-10)",
+      # METADATA
+      "Project name for report headers",
+      "Analyst name for report attribution",
+      "Project description (optional)",
+      "Path to Excel file with question labels (optional)",
+      "Path to Excel file with edited segment names (optional, Step 3 workflow)"
+    ),
+    stringsAsFactors = FALSE
+  )
+
+  # Write data with branded formatting
+  seg_write_branded_sheet(wb, "Config", params)
+
+  # Widen columns for readability
+  openxlsx::setColWidths(wb, "Config", cols = 1, widths = 28)
+  openxlsx::setColWidths(wb, "Config", cols = 2, widths = 35)
+  openxlsx::setColWidths(wb, "Config", cols = 3, widths = 65)
+
+  # Add data validation dropdowns
+  method_vals <- "kmeans,hclust,gmm,all"
+  missing_vals <- "listwise_deletion,mean_imputation,median_imputation,refuse"
+  outlier_method_vals <- "zscore,mahalanobis"
+  outlier_handling_vals <- "none,flag,remove"
+  bool_vals <- "TRUE,FALSE"
+  name_style_vals <- "descriptive,persona,simple"
+  linkage_vals <- "ward.D2,complete,average,single,mcquitty,median,centroid"
+  varsel_vals <- "variance_correlation,factor_analysis,both"
+
+  # Find row indices for each parameter that needs validation
+  method_row <- which(params$Setting == "method") + 1
+  missing_row <- which(params$Setting == "missing_data") + 1
+  outlier_m_row <- which(params$Setting == "outlier_method") + 1
+  outlier_h_row <- which(params$Setting == "outlier_handling") + 1
+  linkage_row <- which(params$Setting == "linkage_method") + 1
+  varsel_row <- which(params$Setting == "variable_selection_method") + 1
+  name_row <- which(params$Setting == "auto_name_style") + 1
+
+  # Apply data validation
+  tryCatch({
+    openxlsx::dataValidation(wb, "Config", col = 2, rows = method_row,
+      type = "list", value = paste0('"', method_vals, '"'))
+    openxlsx::dataValidation(wb, "Config", col = 2, rows = missing_row,
+      type = "list", value = paste0('"', missing_vals, '"'))
+    openxlsx::dataValidation(wb, "Config", col = 2, rows = outlier_m_row,
+      type = "list", value = paste0('"', outlier_method_vals, '"'))
+    openxlsx::dataValidation(wb, "Config", col = 2, rows = outlier_h_row,
+      type = "list", value = paste0('"', outlier_handling_vals, '"'))
+    openxlsx::dataValidation(wb, "Config", col = 2, rows = linkage_row,
+      type = "list", value = paste0('"', linkage_vals, '"'))
+    openxlsx::dataValidation(wb, "Config", col = 2, rows = varsel_row,
+      type = "list", value = paste0('"', varsel_vals, '"'))
+    openxlsx::dataValidation(wb, "Config", col = 2, rows = name_row,
+      type = "list", value = paste0('"', name_style_vals, '"'))
+
+    # Boolean validations
+    bool_settings <- c("standardize", "outlier_detection", "variable_selection",
+                       "create_dated_folder", "save_model", "html_report",
+                       "generate_rules", "generate_action_cards", "run_stability_check")
+    for (setting in bool_settings) {
+      row <- which(params$Setting == setting) + 1
+      if (length(row) == 1) {
+        openxlsx::dataValidation(wb, "Config", col = 2, rows = row,
+          type = "list", value = paste0('"', bool_vals, '"'))
+      }
+    }
+  }, error = function(e) {
+    cat(sprintf("  Note: Data validation could not be applied: %s\n", e$message))
+  })
+
+  # ---------------------------------------------------------------------------
+  # Labels sheet — variable / label pairs for question labels
+  # ---------------------------------------------------------------------------
+  openxlsx::addWorksheet(wb, "Labels")
+
+  labels_data <- data.frame(
+    variable = if (include_sample_values) c("q1", "q2", "q3", "q4", "q5") else character(0),
+    label = if (include_sample_values) c(
+      "Overall satisfaction with service",
+      "Likelihood to recommend",
+      "Value for money perception",
+      "Quality of customer support",
+      "Ease of use rating"
+    ) else character(0),
+    stringsAsFactors = FALSE
+  )
+
+  if (nrow(labels_data) > 0) {
+    seg_write_branded_sheet(wb, "Labels", labels_data)
+  } else {
+    openxlsx::writeData(wb, "Labels", data.frame(variable = character(0), label = character(0)),
+                         headerStyle = seg_style_header())
+    openxlsx::freezePane(wb, "Labels", firstRow = TRUE)
+  }
+  openxlsx::setColWidths(wb, "Labels", cols = 1, widths = 22)
+  openxlsx::setColWidths(wb, "Labels", cols = 2, widths = 50)
+
+  # ---------------------------------------------------------------------------
+  # Insights sheet — analyst-authored insights keyed to report sections
+  # ---------------------------------------------------------------------------
+  openxlsx::addWorksheet(wb, "Insights")
+
+  insights_data <- data.frame(
+    Section = c(
+      "exec-summary", "overview", "validation", "overlap",
+      "importance", "golden-questions", "profiles", "vulnerability"
+    ),
+    Insight = c(
+      "Key findings and strategic recommendations go here.",
+      "High-level overview of the segmentation solution.",
+      "Commentary on segment stability and validity metrics.",
+      "Notes on segment overlap and distinctiveness.",
+      "Which variables drive segment separation most.",
+      "The best survey questions for classifying new respondents.",
+      "Narrative descriptions of each segment profile.",
+      "Observations on vulnerable or at-risk segments."
+    ),
+    stringsAsFactors = FALSE
+  )
+
+  seg_write_branded_sheet(wb, "Insights", insights_data)
+  openxlsx::setColWidths(wb, "Insights", cols = 1, widths = 24)
+  openxlsx::setColWidths(wb, "Insights", cols = 2, widths = 65)
+
+  # Add comment explaining valid section keys
+  tryCatch({
+    openxlsx::writeComment(wb, "Insights", col = 1, row = 1,
+      comment = openxlsx::createComment(
+        comment = paste(
+          "Valid Section keys:",
+          "exec-summary, overview, validation, overlap,",
+          "importance, golden-questions, profiles, vulnerability.",
+          "Each key maps to a section in the HTML report.",
+          "You may add multiple rows per section."
+        ),
+        author = "Turas"
+      ))
+  }, error = function(e) {
+    cat(sprintf("  Note: Could not add Insights comment: %s\n", e$message))
+  })
+
+  # ---------------------------------------------------------------------------
+  # About sheet — project metadata for report attribution
+  # ---------------------------------------------------------------------------
+  openxlsx::addWorksheet(wb, "About")
+
+  about_data <- data.frame(
+    Setting = c(
+      "analyst", "company", "email", "project",
+      "client", "date", "confidentiality", "notes"
+    ),
+    Value = if (include_sample_values) c(
+      "Analyst Name",
+      "The Research LampPost",
+      "analyst@example.com",
+      "Customer Segmentation 2026",
+      "Client Organisation",
+      format(Sys.Date(), "%Y-%m-%d"),
+      "Confidential — internal use only",
+      ""
+    ) else rep("", 8),
+    stringsAsFactors = FALSE
+  )
+
+  seg_write_branded_sheet(wb, "About", about_data)
+  openxlsx::setColWidths(wb, "About", cols = 1, widths = 22)
+  openxlsx::setColWidths(wb, "About", cols = 2, widths = 50)
+
+  # ---------------------------------------------------------------------------
+  # Slides sheet — custom slide content for export
+  # ---------------------------------------------------------------------------
+  openxlsx::addWorksheet(wb, "Slides")
+
+  slides_data <- data.frame(
+    Title = c(
+      "Segmentation Overview",
+      "Strategic Recommendations"
+    ),
+    Content = c(
+      "This study identified N distinct customer segments based on attitudinal and behavioural variables.",
+      "Prioritise Segment A for retention campaigns; Segment B shows strongest growth potential."
+    ),
+    Image = c(
+      "overview_chart.png",
+      ""
+    ),
+    stringsAsFactors = FALSE
+  )
+
+  seg_write_branded_sheet(wb, "Slides", slides_data)
+  openxlsx::setColWidths(wb, "Slides", cols = 1, widths = 30)
+  openxlsx::setColWidths(wb, "Slides", cols = 2, widths = 65)
+  openxlsx::setColWidths(wb, "Slides", cols = 3, widths = 25)
+
+  # Save
+  if (exists("turas_save_workbook_atomic", mode = "function")) {
+    save_result <- turas_save_workbook_atomic(wb, output_path, module = "SEGMENT")
+    if (!save_result$success) {
+      warning(sprintf("Failed to save config template: %s", save_result$error))
+    }
+  } else {
+    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+  }
+
+  cat(sprintf("Config template saved: %s\n", output_path))
+  cat(sprintf("  Parameters: %d\n", nrow(params)))
+  cat("  Sheets: Config, Labels, Insights, About, Slides\n")
+  cat("  Includes: descriptions, default values, data validation dropdowns\n")
+
+  invisible(output_path)
 }

@@ -125,7 +125,8 @@ config_files <- c(
   "demo_kmeans_explore.xlsx",
   "demo_kmeans_final.xlsx",
   "demo_hclust_final.xlsx",
-  "demo_gmm_final.xlsx"
+  "demo_gmm_final.xlsx",
+  "demo_combined_config.xlsx"
 )
 
 all_configs_exist <- all(file.exists(file.path(demo_dir, config_files)))
@@ -252,6 +253,28 @@ run_times$gmm_final <- as.numeric(difftime(Sys.time(), t4, units = "secs"))
 cat("\n\n")
 
 
+# --------------------------------------------------------------------------
+# RUN 5: Combined Multi-Method Comparison
+# --------------------------------------------------------------------------
+# Runs K-means, Hierarchical, and GMM simultaneously on the same data
+# and produces a side-by-side comparison report with all methods.
+
+cat("##############################################################\n")
+cat("#  RUN 5: Multi-Method Comparison (kmeans + hclust + gmm)    #\n")
+cat("##############################################################\n\n")
+
+t5 <- Sys.time()
+run_results$combined <- tryCatch({
+  turas_segment_from_config(file.path(demo_dir, "demo_combined_config.xlsx"))
+}, error = function(e) {
+  cat(sprintf("\n[ERROR] Combined analysis failed: %s\n\n", e$message))
+  list(status = "FAILED", error = e$message)
+})
+run_times$combined <- as.numeric(difftime(Sys.time(), t5, units = "secs"))
+
+cat("\n\n")
+
+
 # ==========================================================================
 # SUMMARY
 # ==========================================================================
@@ -290,6 +313,10 @@ cat(sprintf("  %-35s  Status: %-10s  Time: %.1fs\n",
             "4. GMM (k=4)",
             extract_status(run_results$gmm_final),
             run_times$gmm_final))
+cat(sprintf("  %-35s  Status: %-10s  Time: %.1fs\n",
+            "5. Multi-Method Comparison",
+            extract_status(run_results$combined),
+            run_times$combined))
 
 total_time <- sum(unlist(run_times))
 cat(sprintf("\nTotal demo time: %.1f seconds\n", total_time))

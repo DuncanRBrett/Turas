@@ -623,45 +623,30 @@ review_outliers <- function(data, outlier_result, clustering_vars, id_var,
   # ===========================================================================
 
   if (!is.null(output_path)) {
-    if (!requireNamespace("writexl", quietly = TRUE)) {
-      warning("Package 'writexl' not available. Cannot export to Excel.")
-    } else {
-      # Create sheets
-      sheets <- list(
-        "Summary" = summary_df,
-        "Outlier_Review" = review_df
-      )
+    # Create sheets
+    sheets <- list(
+      "Summary" = summary_df,
+      "Outlier_Review" = review_df
+    )
 
-      # Add reference sheet with variable means
-      means_df <- data.frame(
-        Variable = clustering_vars,
-        Overall_Mean = round(overall_means, 2),
-        stringsAsFactors = FALSE
-      )
+    # Add reference sheet with variable means
+    means_df <- data.frame(
+      Variable = clustering_vars,
+      Overall_Mean = round(overall_means, 2),
+      stringsAsFactors = FALSE
+    )
 
-      if (!is.null(question_labels)) {
-        means_df$Label <- sapply(clustering_vars, function(v) {
-          if (v %in% names(question_labels)) question_labels[v] else ""
-        })
-      }
-
-      sheets[["Variable_Reference"]] <- means_df
-
-      # TRS v1.0: Use atomic save if available
-      if (exists("turas_save_writexl_atomic", mode = "function")) {
-        save_result <- turas_save_writexl_atomic(
-          sheets = sheets,
-          file_path = output_path,
-          module = "SEGMENT"
-        )
-        if (!save_result$success) {
-          warning(sprintf("[SEGMENT] Failed to save outlier review: %s", save_result$error))
-        }
-      } else {
-        writexl::write_xlsx(sheets, output_path)
-      }
-      cat(sprintf("\n✓ Outlier review exported to: %s\n", basename(output_path)))
+    if (!is.null(question_labels)) {
+      means_df$Label <- sapply(clustering_vars, function(v) {
+        if (v %in% names(question_labels)) question_labels[v] else ""
+      })
     }
+
+    sheets[["Variable_Reference"]] <- means_df
+
+    # Write to Excel with branded formatting
+    seg_write_xlsx(sheets, output_path)
+    cat(sprintf("\n✓ Outlier review exported to: %s\n", basename(output_path)))
   }
 
   cat("\n")

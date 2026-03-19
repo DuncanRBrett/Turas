@@ -434,16 +434,6 @@ export_cards_text <- function(cards_result, output_path) {
 #' @export
 export_cards_excel <- function(cards_result, output_path) {
 
-  if (!requireNamespace("writexl", quietly = TRUE)) {
-    segment_refuse(
-      code = "PKG_WRITEXL_MISSING",
-      title = "Package writexl Required",
-      problem = "Package 'writexl' is not installed.",
-      why_it_matters = "Excel export requires the writexl package.",
-      how_to_fix = "Install the package with: install.packages('writexl')"
-    )
-  }
-
   # Create multiple sheets
   sheets <- list(
     "Summary" = cards_result$cards_df
@@ -472,18 +462,7 @@ export_cards_excel <- function(cards_result, output_path) {
     sheets[[sheet_name]] <- card_df
   }
 
-  # TRS v1.0: Use atomic save if available
-  if (exists("turas_save_writexl_atomic", mode = "function")) {
-    save_result <- turas_save_writexl_atomic(
-      sheets = sheets,
-      file_path = output_path,
-      module = "SEGMENT"
-    )
-    if (!save_result$success) {
-      warning(sprintf("[SEGMENT] Failed to save segment cards: %s", save_result$error))
-    }
-  } else {
-    writexl::write_xlsx(sheets, output_path)
-  }
+  # Write to Excel with branded formatting
+  seg_write_xlsx(sheets, output_path)
   cat(sprintf("✓ Segment cards exported to: %s\n", output_path))
 }

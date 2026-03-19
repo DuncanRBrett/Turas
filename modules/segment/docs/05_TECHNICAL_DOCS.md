@@ -1,7 +1,7 @@
 # Turas Segmentation Module - Technical Documentation
 
-**Version:** 11.0
-**Last Updated:** 5 March 2026
+**Version:** 11.1
+**Last Updated:** 19 March 2026
 **Target Audience:** Developers, Technical Maintainers, Data Scientists
 
 ---
@@ -113,7 +113,7 @@ Guard Init -> Config -> Data Prep -> Hard Guards -> Clustering -> Validation -> 
 
 ```
 +---------------------------------------------------------------+
-|                   SEGMENT MODULE v11.0                          |
+|                   SEGMENT MODULE v11.1                          |
 +---------------------------------------------------------------+
 |                                                                 |
 |  +----------------------------------------------------------+  |
@@ -187,7 +187,6 @@ library(htmltools)      # HTML report generation
 
 # Data I/O
 library(readxl)         # Excel reading
-library(writexl)        # Excel writing
 library(haven)          # SPSS support (optional)
 
 # Clustering methods (optional)
@@ -210,7 +209,7 @@ library(ggplot2)        # Charts
 
 ```
 modules/segment/
-├── R/                                  # Core analysis code (v11.0)
+├── R/                                  # Core analysis code (v11.1)
 │   ├── 00_main.R                      # Main orchestrator
 │   ├── 00_guard.R                     # TRS guard framework
 │   ├── 00a_guards_hard.R             # Hard guards (REFUSE)
@@ -230,6 +229,7 @@ modules/segment/
 │   ├── 07_cards.R                    # Segment action cards
 │   ├── 08_scoring.R                  # New data scoring
 │   ├── 09_output.R                   # Excel export
+│   ├── 09a_excel_styles.R            # Excel formatting styles (openxlsx)
 │   ├── 10_utilities.R                # Utilities & quick run
 │   ├── 11_lca.R                      # Latent Class Analysis
 │   └── 12_executive_summary.R        # Executive summary generator
@@ -252,6 +252,10 @@ modules/segment/
 ├── run_segment.R                      # Entry point (sources R/00_main.R)
 ├── run_segment_gui.R                  # Shiny GUI
 ├── tests/                             # Module tests
+│   ├── run_preflight.R               # Pre-flight validation checks
+│   └── fixtures/
+│       ├── generate_golden_files.R   # Golden file generator
+│       └── golden/                   # Golden reference outputs
 ├── test_data/                         # Test datasets
 └── docs/                              # Documentation
 ```
@@ -279,6 +283,7 @@ modules/segment/
 | 07_cards.R | Action cards | `generate_segment_cards()` |
 | 08_scoring.R | Score new data | `score_new_data()`, `type_respondent()` |
 | 09_output.R | Excel output | `write_segment_results()` |
+| 09a_excel_styles.R | Excel formatting styles | `seg_write_xlsx()`, branded style definitions |
 | 10_utilities.R | Utilities & Quick Run | `run_segment_quick()`, `generate_config_template()` |
 | 11_lca.R | Latent Class Analysis | `run_lca_analysis()` |
 | 12_executive_summary.R | Narrative insights | `generate_segment_executive_summary()` |
@@ -797,6 +802,23 @@ This generates synthetic data and runs all three clustering methods with HTML re
 - Hierarchical clustering: distance matrix is O(n^2) memory
 
 ### Version History
+
+**v11.1 (March 2026) - Excel Styling, Pinned View Images, Slide Watermark**
+
+Incremental release adding branded Excel output, image upload in pinned views, and slide export improvements:
+
+*New Capabilities:*
+- Branded Excel output via openxlsx with `seg_write_xlsx()` convenience function (09a_excel_styles.R)
+- Image upload in pinned views (PNG/JPEG/GIF/WebP, max 2 MB)
+- Slide export watermark ("Turas Segment" in bottom-right at 30% opacity)
+- Rendering progress indicator during slide export
+- Insight editor improvements (visible dashed border, pencil icon toggle, hint text)
+- Silhouette threshold citation (Kaufman & Rousseeuw 1990)
+- Pre-flight test runner (tests/run_preflight.R)
+- Golden file test fixtures (tests/fixtures/generate_golden_files.R, tests/fixtures/golden/)
+
+*Dependency Changes:*
+- Removed writexl dependency; all Excel output now uses openxlsx exclusively
 
 **v11.0 (March 2026) - Multi-Algorithm + HTML Reports**
 

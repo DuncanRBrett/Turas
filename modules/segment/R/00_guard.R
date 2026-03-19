@@ -28,7 +28,11 @@ if (!exists("turas_refuse", mode = "function")) {
   if (file.exists(trs_path)) {
     source(trs_path)
   } else {
-    stop("[SEGMENT] Cannot find TRS infrastructure at: ", trs_path)
+    cat("\n=== TURAS SEGMENT ERROR ===\n")
+    cat("Cannot find TRS infrastructure at:", trs_path, "\n")
+    cat("Ensure TURAS_ROOT is set correctly.\n")
+    cat("===========================\n\n")
+    stop("[SEGMENT] Cannot find TRS infrastructure at: ", trs_path, call. = FALSE)
   }
 }
 
