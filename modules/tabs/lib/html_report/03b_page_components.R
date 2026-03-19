@@ -584,6 +584,10 @@ build_controls <- function(has_any_freq, has_any_pct, has_any_sig,
       htmltools::tags$label(class = "toggle-label",
         htmltools::tags$input(type = "checkbox", checked = NA, onchange = "toggleHeatmap(this.checked)"),
         "Heatmap"
+      ),
+      htmltools::tags$label(class = "toggle-label",
+        htmltools::tags$input(type = "checkbox", onchange = "toggleAllRows(this.checked)"),
+        "Hide rows"
       )
     ))
   }

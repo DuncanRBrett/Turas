@@ -293,6 +293,38 @@ function getLabelText(cell) {
   return clone.textContent.trim();
 }
 
+// ---- Toggle All Rows (Show/Hide All) ----
+function toggleAllRows(hideAll) {
+  var container = document.querySelector(".question-container:not([style*='display: none']):not([style*='display:none'])");
+  if (!container) return;
+  var table = container.querySelector("table.ct-table");
+  if (!table) return;
+  var rows = table.querySelectorAll("tr.ct-row-category, tr.ct-row-net");
+  var tableId = table.id;
+  if (!excludedRows[tableId]) excludedRows[tableId] = {};
+  rows.forEach(function(row) {
+    var labelCell = row.querySelector("td.ct-label-col");
+    if (!labelCell) return;
+    var label = getLabelText(labelCell);
+    var btn = row.querySelector(".row-exclude-btn");
+    if (hideAll) {
+      row.classList.add("ct-row-excluded");
+      excludedRows[tableId][label] = true;
+      if (btn) btn.textContent = "\u25CB";
+    } else {
+      row.classList.remove("ct-row-excluded");
+      delete excludedRows[tableId][label];
+      if (btn) btn.textContent = "\u2715";
+    }
+  });
+  // Rebuild chart
+  var wrapper = container.querySelector(".chart-wrapper[data-q-code]");
+  if (wrapper) {
+    var qCode = wrapper.getAttribute("data-q-code");
+    rebuildChartWithExclusions(qCode, excludedRows[tableId]);
+  }
+}
+
 // ---- Row Exclusion from Chart ----
 var excludedRows = {};  // keyed by tableId -> Set of labels
 

@@ -158,8 +158,8 @@ function captureCurrentView(qCode) {
     tableClone.querySelectorAll("[style*=\"display: none\"], [style*=\"display:none\"]").forEach(function(el) { el.remove(); });
     // Remove excluded rows
     tableClone.querySelectorAll(".ct-row-excluded").forEach(function(el) { el.remove(); });
-    // Remove sort indicators, exclude buttons, and frequency/significance annotations
-    tableClone.querySelectorAll(".ct-sort-indicator, .row-exclude-btn, .ct-freq, .ct-sig").forEach(function(el) { el.remove(); });
+    // Remove sort indicators, exclude buttons, and frequency annotations (keep significance markers)
+    tableClone.querySelectorAll(".ct-sort-indicator, .row-exclude-btn, .ct-freq").forEach(function(el) { el.remove(); });
   }
 
   // Capture chart SVG
