@@ -492,7 +492,9 @@ require_package <- function(package, install_msg = NULL) {
         how_to_fix = sprintf("Install with: install.packages('%s')", package)
       )
     } else {
-      stop(install_msg, call. = FALSE)
+      cat(sprintf("\n=== TURAS ERROR ===\n%s\nFix: install.packages('%s')\n==================\n",
+                  install_msg, package))
+      return(invisible(FALSE))
     }
   }
   TRUE

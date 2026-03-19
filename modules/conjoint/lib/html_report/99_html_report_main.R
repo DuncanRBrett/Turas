@@ -225,11 +225,16 @@ generate_conjoint_html_report <- function(conjoint_results, output_path, config 
     charts$importance <- build_importance_chart(html_data$importance, brand)
   }
 
-  # Utility charts per attribute
+  # Utility charts per attribute (bar + dot plot)
   charts$utility_charts <- lapply(names(html_data$utilities_by_attr), function(attr_name) {
     build_utility_chart(html_data$utilities_by_attr[[attr_name]], attr_name, brand)
   })
   names(charts$utility_charts) <- names(html_data$utilities_by_attr)
+
+  charts$utility_dot_charts <- lapply(names(html_data$utilities_by_attr), function(attr_name) {
+    build_utility_dot_plot(html_data$utilities_by_attr[[attr_name]], attr_name, brand)
+  })
+  names(charts$utility_dot_charts) <- names(html_data$utilities_by_attr)
 
   # BIC chart for LC
   if (!is.null(html_data$lc_data) && !is.null(html_data$lc_data$comparison)) {

@@ -232,7 +232,7 @@ if (!is.null(hb_results) && exists("generate_conjoint_html_report", mode = "func
   conjoint_results$wtp <- wtp_result
 
   report_config <- list(
-    project_name = "Smartphone Conjoint — HB Analysis",
+    project_name = "Smartphone Conjoint \u2014 HB Analysis",
     brand_colour = "#323367",
     accent_colour = "#CC9900",
     analyst_name = "Demo Analyst",

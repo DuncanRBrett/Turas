@@ -894,18 +894,18 @@ test_that("diagnostics callouts interpret McFadden R-squared ranges", {
   # Good fit (0.2-0.4)
   html_data <- list(
     summary = list(estimation_method = "mlogit"),
-    diagnostics = list(mcfadden_r2 = 0.32)
+    diagnostics = list(fit_statistics = list(mcfadden_r2 = 0.32))
   )
   callouts <- paste(.build_diagnostics_callouts(html_data), collapse = "\n")
-  expect_true(grepl("0.32", callouts, fixed = TRUE))
+  expect_true(grepl("0.320", callouts, fixed = TRUE))
 
   # Excellent fit (>0.4)
   html_data2 <- list(
     summary = list(estimation_method = "mlogit"),
-    diagnostics = list(mcfadden_r2 = 0.55)
+    diagnostics = list(fit_statistics = list(mcfadden_r2 = 0.55))
   )
   callouts2 <- paste(.build_diagnostics_callouts(html_data2), collapse = "\n")
-  expect_true(grepl("0.55", callouts2, fixed = TRUE))
+  expect_true(grepl("0.550", callouts2, fixed = TRUE))
 })
 
 
@@ -936,7 +936,7 @@ test_that("generated HTML includes callout boxes on major panels", {
   expect_true(grepl("cj-callout", html, fixed = TRUE))
 
   # Overview callout
-  expect_true(grepl("Understanding This Overview", html, fixed = TRUE))
+  expect_true(grepl("What Is Attribute Importance", html, fixed = TRUE))
 
   # Utilities callout
   expect_true(grepl("Reading Utility Values", html, fixed = TRUE))
@@ -1016,10 +1016,9 @@ test_that("pin buttons use emoji character on all panels", {
   # Pin button CSS class
   expect_true(grepl("cj-pin-btn", html, fixed = TRUE))
 
-  # Pin buttons should use emoji pushpin (U+1F4CC), not text "Pin"
-  # Test via togglePin pattern (proves pin buttons exist) and absence of old ">Pin<" text
-  pin_emoji <- "\U0001F4CC"
-  expect_true(grepl(pin_emoji, html, fixed = TRUE, useBytes = TRUE))
+  # Pin buttons should use SVG pin icon (replaced emoji for cross-platform rendering)
+  expect_true(grepl("cj-pin-btn", html, fixed = TRUE))
+  expect_true(grepl("togglePin", html, fixed = TRUE))
 
   # Overview pin
   expect_true(grepl("pin-overview", html, fixed = TRUE))

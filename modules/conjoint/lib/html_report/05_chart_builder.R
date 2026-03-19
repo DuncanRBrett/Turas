@@ -11,6 +11,17 @@
 
 # --- Shared SVG helpers ---
 
+# Escape text for safe inclusion in SVG <text> elements
+.svg_esc <- function(x) {
+  x <- as.character(x)
+  x <- gsub("&", "&amp;", x, fixed = TRUE)
+  x <- gsub("<", "&lt;", x, fixed = TRUE)
+  x <- gsub(">", "&gt;", x, fixed = TRUE)
+  x <- gsub("\"", "&quot;", x, fixed = TRUE)
+  x <- gsub("'", "&#39;", x, fixed = TRUE)
+  x
+}
+
 .svg_wrap <- function(chart_id, svg_content, chart_width, chart_height) {
   sprintf(
     '<div class="cj-chart-wrap" data-chart-id="%s"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" width="100%%" style="max-width:%dpx;font-family:system-ui,-apple-system,sans-serif;">%s</svg></div>',
@@ -28,14 +39,14 @@
 .svg_axis_label <- function(x, y, label, anchor = "middle", size = 11, weight = 400) {
   sprintf(
     '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#64748b" font-size="%d" font-weight="%d">%s</text>',
-    x, y, anchor, size, weight, label
+    x, y, anchor, size, weight, .svg_esc(label)
   )
 }
 
 .svg_value_label <- function(x, y, label, anchor = "middle", size = 12) {
   sprintf(
     '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#334155" font-size="%d" font-weight="600">%s</text>',
-    x, y, anchor, size, label
+    x, y, anchor, size, .svg_esc(label)
   )
 }
 
@@ -111,7 +122,7 @@ build_importance_chart <- function(importance, brand_colour = "#323367") {
     # Attribute label (font-weight 400 for softer axis labels)
     elements <- c(elements, sprintf(
       '<text x="%d" y="%.1f" text-anchor="end" fill="#334155" font-size="13" font-weight="400" dominant-baseline="central">%s</text>',
-      margin_left - 8, y + bar_height / 2, imp_sorted$Attribute[i]
+      margin_left - 8, y + bar_height / 2, .svg_esc(imp_sorted$Attribute[i])
     ))
 
     # Bar with rounded corners and white stroke for separation
@@ -230,11 +241,110 @@ build_utility_chart <- function(attr_utilities, attr_name, brand_colour = "#3233
     if (nchar(label) > 20) label <- paste0(substr(label, 1, 19), "\u2026")
     elements <- c(elements, sprintf(
       '<text x="%.1f" y="%.1f" text-anchor="middle" fill="#475569" font-size="11" font-weight="400">%s</text>',
-      x_center, chart_height - margin_bottom + 16, label
+      x_center, chart_height - margin_bottom + 16, .svg_esc(label)
     ))
   }
 
   chart_id <- paste0("utility-", gsub("[^a-zA-Z0-9]", "-", tolower(attr_name)))
+  .svg_wrap(chart_id, elements, chart_width, chart_height)
+}
+
+
+# ==============================================================================
+# UTILITY DOT PLOT (LOLLIPOP CHART)
+# ==============================================================================
+
+#' Build Utility Dot Plot (SVG)
+#'
+#' Horizontal lollipop chart — dots on a zero-line with connecting stems.
+#' Cleaner alternative to bars, especially good for showing positive/negative
+#' spread. Hidden by default; toggled via a chart-type switch in the UI.
+#'
+#' @param attr_utilities Data frame with Level and Utility columns
+#' @param attr_name Character string, attribute name
+#' @param brand_colour Hex colour for positive values
+#' @return HTML string with SVG
+#' @keywords internal
+build_utility_dot_plot <- function(attr_utilities, attr_name, brand_colour = "#323367") {
+
+  n <- nrow(attr_utilities)
+  row_height <- 36
+  chart_width <- 500
+  chart_height <- max(180, n * row_height + 60)
+  margin_left <- 120
+  margin_right <- 60
+  margin_top <- 20
+  margin_bottom <- 20
+  plot_w <- chart_width - margin_left - margin_right
+  plot_h <- chart_height - margin_top - margin_bottom
+
+  u_values <- attr_utilities$Utility
+  u_max <- max(abs(u_values), 0.3) * 1.25
+  u_min <- -u_max
+
+  scale_x <- function(v) margin_left + (v - u_min) / (u_max - u_min) * plot_w
+  zero_x <- scale_x(0)
+
+  elements <- character()
+
+  # Zero line (vertical)
+  elements <- c(elements, sprintf(
+    '<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,3"/>',
+    zero_x, margin_top, zero_x, chart_height - margin_bottom
+  ))
+
+  # Gridlines
+  grid_step <- .nice_tick_step(u_max)
+  if (grid_step > 0) {
+    grid_vals <- seq(-floor(u_max / grid_step) * grid_step,
+                     ceiling(u_max / grid_step) * grid_step, by = grid_step)
+    for (gv in grid_vals) {
+      if (abs(gv) < 1e-10) next
+      gx <- scale_x(gv)
+      if (gx >= margin_left && gx <= chart_width - margin_right) {
+        elements <- c(elements, .svg_gridline(gx, margin_top, gx, chart_height - margin_bottom, "#f1f5f9"))
+        elements <- c(elements, .svg_axis_label(gx, chart_height - 4, sprintf("%.2f", gv), anchor = "middle", size = 10))
+      }
+    }
+  }
+
+  # Dot rows
+  for (i in seq_len(n)) {
+    y_center <- margin_top + (i - 0.5) * (plot_h / n)
+    u <- u_values[i]
+    dot_x <- scale_x(u)
+    dot_colour <- if (u >= 0) brand_colour else "#c0695c"
+
+    # Stem line from zero to dot
+    elements <- c(elements, sprintf(
+      '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="2" opacity="0.5"/>',
+      zero_x, y_center, dot_x, y_center, dot_colour
+    ))
+
+    # Dot
+    elements <- c(elements, sprintf(
+      '<circle cx="%.1f" cy="%.1f" r="6" fill="%s" stroke="#fff" stroke-width="1.5"/>',
+      dot_x, y_center, dot_colour
+    ))
+
+    # Value label (to the right of dot)
+    label_x <- dot_x + if (u >= 0) 12 else -12
+    label_anchor <- if (u >= 0) "start" else "end"
+    elements <- c(elements, sprintf(
+      '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#334155" font-size="11" font-weight="600">%s</text>',
+      label_x, y_center + 4, label_anchor, sprintf("%.3f", u)
+    ))
+
+    # Level name on left
+    label <- attr_utilities$Level[i]
+    if (nchar(label) > 16) label <- paste0(substr(label, 1, 15), "\u2026")
+    elements <- c(elements, sprintf(
+      '<text x="%d" y="%.1f" text-anchor="end" fill="#475569" font-size="11" font-weight="400">%s</text>',
+      margin_left - 8, y_center + 4, .svg_esc(label)
+    ))
+  }
+
+  chart_id <- paste0("utility-dot-", gsub("[^a-zA-Z0-9]", "-", tolower(attr_name)))
   .svg_wrap(chart_id, elements, chart_width, chart_height)
 }
 
@@ -405,7 +515,7 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
     # Label (font-weight 400, colour #475569)
     elements <- c(elements, sprintf(
       '<text x="%d" y="%.1f" text-anchor="end" fill="#475569" font-size="11" font-weight="400" dominant-baseline="central">%s</text>',
-      margin_left - 8, y_pos + bar_height / 2, label
+      margin_left - 8, y_pos + bar_height / 2, .svg_esc(label)
     ))
 
     # Bar with white stroke for separation
@@ -467,6 +577,7 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
 #' Compute a "nice" tick step for axis labels
 #' @keywords internal
 .nice_tick_step <- function(range_val) {
+  if (is.null(range_val) || is.na(range_val) || range_val <= 0) return(1)
   rough <- range_val / 4
   mag <- 10^floor(log10(rough))
   candidates <- c(1, 2, 5, 10) * mag

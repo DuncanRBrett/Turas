@@ -161,6 +161,38 @@ prepare_bayesm_data <- function(data_list, config, verbose = TRUE) {
 
   log_verbose(sprintf("  → %d alternatives per choice set", p), verbose)
 
+  # Validate that ALL choice sets have exactly p alternatives
+
+  # bayesm requires constant p — mismatches cause silent wrong results
+  bad_cs <- character(0)
+  for (rid in respondent_ids) {
+    resp_mask <- data[[resp_col]] == rid
+    resp_cs_ids <- unique(data[[cs_col]][resp_mask])
+    for (csid in resp_cs_ids) {
+      cs_size <- sum(data[[resp_col]] == rid & data[[cs_col]] == csid)
+      if (cs_size != p) {
+        bad_cs <- c(bad_cs, sprintf("resp=%s cs=%s (got %d)", rid, csid, cs_size))
+        if (length(bad_cs) >= 5) break  # limit diagnostic output
+      }
+    }
+    if (length(bad_cs) >= 5) break
+  }
+
+  if (length(bad_cs) > 0) {
+    return(conjoint_refuse(
+      code = "DATA_INCONSISTENT_ALTERNATIVES",
+      message = sprintf(
+        "Not all choice sets have %d alternatives. bayesm requires a constant number of alternatives per choice set.",
+        p
+      ),
+      how_to_fix = c(
+        "Ensure every choice set has exactly the same number of alternatives",
+        "Check for missing rows or inconsistent none-option inclusion",
+        sprintf("Mismatched examples: %s", paste(bad_cs, collapse = "; "))
+      )
+    ))
+  }
+
   # Build lgtdata: one element per respondent
   lgtdata <- vector("list", n_respondents)
 
@@ -180,7 +212,24 @@ prepare_bayesm_data <- function(data_list, config, verbose = TRUE) {
       cs_id <- choice_sets[t]
       cs_mask <- resp_data[[cs_col]] == cs_id
       chosen <- resp_data[[chosen_col]][cs_mask]
-      y_vec[t] <- which(chosen == 1)[1]
+      y_val <- which(chosen == 1)[1]
+
+      # Guard: ensure exactly one chosen alternative per choice set
+      if (is.na(y_val)) {
+        return(conjoint_refuse(
+          code = "DATA_NO_CHOICE",
+          message = sprintf(
+            "No chosen alternative found for respondent '%s' in choice set '%s'.",
+            resp_id, cs_id
+          ),
+          how_to_fix = c(
+            "Ensure every choice set has exactly one row with chosen=1",
+            "Check for missing or zero values in the chosen column"
+          )
+        ))
+      }
+
+      y_vec[t] <- y_val
     }
 
     lgtdata[[i]] <- list(

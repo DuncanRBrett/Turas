@@ -344,6 +344,65 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
     log_verbose("  ✓ Loaded experimental design matrix", verbose)
   }
 
+  # Load custom slides (if exists and enabled)
+  custom_slides <- NULL
+  if ("Custom_Slides" %in% sheet_names) {
+    tryCatch({
+      slides_df <- openxlsx::read.xlsx(config_file, sheet = "Custom_Slides",
+                                        startRow = 4)
+      if (!is.null(slides_df) && nrow(slides_df) > 0) {
+        # Column names: "Slide.Title", "Content.(Markdown)", "Image.Path.(Optional)", "Position"
+        title_col <- grep("^Slide", names(slides_df), value = TRUE)[1]
+        content_col <- grep("^Content", names(slides_df), value = TRUE)[1]
+        image_col <- grep("^Image", names(slides_df), value = TRUE)[1]
+
+        custom_slides <- lapply(seq_len(nrow(slides_df)), function(r) {
+          title_val <- if (!is.na(title_col)) as.character(slides_df[[title_col]][r] %||% "") else ""
+          content_val <- if (!is.na(content_col)) as.character(slides_df[[content_col]][r] %||% "") else ""
+          image_val <- if (!is.null(image_col) && !is.na(image_col)) as.character(slides_df[[image_col]][r] %||% "") else ""
+
+          # Base64-encode image if path is provided and file exists
+          image_data <- NULL
+          if (nzchar(image_val)) {
+            img_path <- image_val
+            if (!file.exists(img_path)) {
+              img_path <- file.path(dirname(config_file), image_val)
+            }
+            if (file.exists(img_path)) {
+              tryCatch({
+                img_raw <- readBin(img_path, "raw", file.info(img_path)$size)
+                img_ext <- tolower(tools::file_ext(img_path))
+                img_mime <- switch(img_ext,
+                                   png = "image/png",
+                                   jpg = , jpeg = "image/jpeg",
+                                   gif = "image/gif",
+                                   webp = "image/webp",
+                                   "image/png")
+                image_data <- list(
+                  id = paste0("img-config-", r),
+                  name = basename(img_path),
+                  data = paste0("data:", img_mime, ";base64,", base64enc::base64encode(img_raw))
+                )
+              }, error = function(e) {
+                message(sprintf("[TRS INFO] Could not read slide image: %s", conditionMessage(e)))
+              })
+            }
+          }
+
+          result <- list(
+            title = title_val,
+            content = content_val
+          )
+          if (!is.null(image_data)) result$images <- list(image_data)
+          result
+        })
+        log_verbose(sprintf("  \u2713 Loaded %d custom slides", length(custom_slides)), verbose)
+      }
+    }, error = function(e) {
+      message(sprintf("[TRS INFO] Could not read Custom_Slides sheet: %s", conditionMessage(e)))
+    })
+  }
+
   # Build final config object
   config <- list(
     # Settings
@@ -354,6 +413,9 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
 
     # Design (optional)
     design = design,
+
+    # Custom slides (optional)
+    custom_slides = custom_slides,
 
     # Paths
     data_file = data_file,
@@ -497,6 +559,9 @@ load_conjoint_config <- function(config_file, project_root = NULL, verbose = TRU
     company_name = settings_list$company_name %||% "",
     closing_notes = settings_list$closing_notes %||% "",
     researcher_logo_base64 = settings_list$researcher_logo_base64 %||% "",
+
+    # Custom slides for HTML report
+    include_custom_slides = as.logical(settings_list$include_custom_slides %||% FALSE),
 
     # =========================================================================
     # PRODUCT OPTIMIZER SETTINGS (Phase 3 Upgrade)

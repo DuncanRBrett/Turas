@@ -369,8 +369,9 @@ validate_conjoint_convergence <- function(model_result) {
     )
   }
 
-  # Check convergence if available
-  if (!is.null(model_result$converged) && !model_result$converged) {
+  # Check convergence if available (supports both flat and nested structure)
+  converged_val <- model_result$convergence$converged %||% model_result$converged
+  if (!is.null(converged_val) && !converged_val) {
     conjoint_refuse(
       code = "MODEL_DID_NOT_CONVERGE",
       title = "Model Did Not Converge",
@@ -388,12 +389,16 @@ validate_conjoint_convergence <- function(model_result) {
 }
 
 
-#' Validate Data Has Sufficient Choices
+#' Guard: Check Data Exists and Is Non-Empty
+#'
+#' Quick pre-check before detailed validation in 02_data.R.
+#' Do not confuse with validate_conjoint_data() in 02_data.R which
+#' performs comprehensive column/type validation.
 #'
 #' @param data Choice data
-#' @param min_choices Minimum choices per respondent
+#' @param min_choices Minimum choices per respondent (unused, kept for compat)
 #' @keywords internal
-validate_conjoint_data <- function(data, min_choices = 5) {
+guard_check_data_exists <- function(data, min_choices = 5) {
 
   if (is.null(data) || nrow(data) == 0) {
     conjoint_refuse(
@@ -669,7 +674,8 @@ conjoint_status_refuse <- function(code = NULL, reason = NULL) {
   trs_status_refuse(
     module = "CONJOINT",
     code = code,
-    reason = reason
+    message = reason %||% "Conjoint analysis refused",
+    how_to_fix = "Check the error code and console output for details"
   )
 }
 

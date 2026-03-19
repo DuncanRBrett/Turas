@@ -226,6 +226,9 @@
   add("HTML REPORT INSIGHTS", "insight_simulator", "", "Pre-populated insight text for Simulator tab", FALSE, "", "Free text or markdown")
   add("HTML REPORT INSIGHTS", "insight_wtp", "", "Pre-populated insight text for WTP tab", FALSE, "", "Free text or markdown")
 
+  # --- REVENUE SIMULATOR ---
+  add("REVENUE SIMULATOR", "default_customers", "1000", "Default hypothetical customer count for revenue simulation", FALSE, "", "Positive integer (e.g. 1000, 5000, 10000)")
+
   # --- CUSTOM CONTENT ---
   add("CUSTOM CONTENT", "include_custom_slides", "FALSE", "Include custom slides in HTML report (see Custom_Slides sheet)", FALSE, "TRUE,FALSE", "TRUE or FALSE")
   add("CUSTOM CONTENT", "include_custom_images", "FALSE", "Include custom images in HTML report (see Custom_Images sheet)", FALSE, "TRUE,FALSE", "TRUE or FALSE")

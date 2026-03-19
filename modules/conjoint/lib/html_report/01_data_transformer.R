@@ -99,7 +99,7 @@ transform_conjoint_for_html <- function(conjoint_results, config = list()) {
 #' @keywords internal
 .extract_hb_data <- function(model_result) {
   if (is.null(model_result)) return(NULL)
-  method <- model_result$method %||% ""
+  method <- tolower(model_result$method %||% "")
   if (!method %in% c("hierarchical_bayes", "hb")) return(NULL)
 
   hb <- list(
@@ -182,6 +182,8 @@ transform_conjoint_for_html <- function(conjoint_results, config = list()) {
       project_name      = config$project_name %||% "Conjoint Simulator",
       estimation_method = model_result$method %||% "mlogit",
       n_respondents     = model_result$n_respondents %||% NA,
+      default_customers = as.numeric(config$default_customers %||%
+                                     report_config$default_customers %||% 1000),
       generated         = format(Sys.time(), "%Y-%m-%d %H:%M:%S")
     ),
     attributes = attributes,

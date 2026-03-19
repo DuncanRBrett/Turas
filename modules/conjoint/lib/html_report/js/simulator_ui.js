@@ -176,6 +176,11 @@ var SimUI = (function() {
     }
   }
 
+  function setScaleFactor(val) {
+    SimEngine.setScaleFactor(val);
+    updateResults();
+  }
+
   function switchMode(mode) {
     currentMode = mode;
     updateResults();
@@ -188,6 +193,8 @@ var SimUI = (function() {
 
     if (currentMode === "shares") {
       renderShares(resultsEl);
+    } else if (currentMode === "revenue") {
+      renderRevenueMode(resultsEl);
     } else if (currentMode === "sensitivity") {
       renderSensitivityMode(resultsEl);
     } else if (currentMode === "sov") {
@@ -221,18 +228,40 @@ var SimUI = (function() {
     html += '<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">';
     html += '<select class="cj-sim-select" style="width:auto;" onchange="SimUI.setMethod(this.value)">';
     html += '<option value="logit"' + (method === "logit" ? " selected" : "") + '>Logit (MNL)</option>';
+    html += '<option value="rfc"' + (method === "rfc" ? " selected" : "") + '>RFC (Approximate)</option>';
+    html += '<option value="purchase_likelihood"' + (method === "purchase_likelihood" ? " selected" : "") + '>Purchase Likelihood</option>';
     html += '<option value="first_choice"' + (method === "first_choice" ? " selected" : "") + '>First Choice</option>';
     html += '</select>';
     html += '<span class="cj-sim-tooltip-wrap" style="position:relative;display:inline-block;">';
     html += '<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:11px;font-weight:600;cursor:help;">?</span>';
-    html += '<span class="cj-sim-tooltip" style="display:none;position:absolute;left:24px;top:-8px;z-index:10;background:#1e293b;color:#f8fafc;font-size:11px;padding:10px 12px;border-radius:6px;width:260px;line-height:1.5;pointer-events:none;">';
-    html += '<strong>Logit (MNL):</strong> Distributes shares proportionally based on utility differences. Reflects realistic substitution patterns.<br><br>';
-    html += '<strong>First Choice:</strong> Awards 100% share to the highest-utility product. Best for winner-takes-all scenarios.';
+    html += '<span class="cj-sim-tooltip" style="display:none;position:absolute;left:24px;top:-8px;z-index:10;background:#1e293b;color:#f8fafc;font-size:11px;padding:10px 12px;border-radius:6px;width:280px;line-height:1.5;pointer-events:none;">';
+    html += '<strong>Logit (MNL):</strong> Distributes shares proportionally based on utility differences. Reflects realistic substitution patterns. Best general-purpose method.<br><br>';
+    html += '<strong>RFC (Approximate):</strong> Adds Gumbel random error to aggregate utilities across many draws, then counts first-choices. Produces similar results to Logit but with natural stochastic variation. Note: this uses aggregate-level utilities; true individual-level RFC requires the R-side simulator.<br><br>';
+    html += '<strong>Purchase Likelihood:</strong> Converts each product\'s utility to an independent purchase probability. Values do NOT sum to 100% — useful when products are not direct substitutes.<br><br>';
+    html += '<strong>First Choice:</strong> Awards 100% share to the highest-utility product. Winner-takes-all — useful for niche or monopoly scenarios.';
+    html += '</span></span>';
+    html += '</div>';
+
+    // Scale factor (exponent) control
+    var sf = SimEngine.getScaleFactor();
+    html += '<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">';
+    html += '<label style="font-size:11px;color:#64748b;white-space:nowrap;">Scale factor:</label>';
+    html += '<input type="range" min="0.1" max="3.0" step="0.1" value="' + sf.toFixed(1) + '" ';
+    html += 'style="width:120px;accent-color:#323367;" ';
+    html += 'oninput="SimUI.setScaleFactor(parseFloat(this.value));this.nextElementSibling.textContent=parseFloat(this.value).toFixed(1)" />';
+    html += '<span style="font-size:12px;font-weight:600;color:#1e293b;min-width:24px;">' + sf.toFixed(1) + '</span>';
+    html += '<span class="cj-sim-tooltip-wrap" style="position:relative;display:inline-block;">';
+    html += '<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:11px;font-weight:600;cursor:help;">?</span>';
+    html += '<span class="cj-sim-tooltip" style="display:none;position:absolute;left:24px;top:-8px;z-index:10;background:#1e293b;color:#f8fafc;font-size:11px;padding:10px 12px;border-radius:6px;width:240px;line-height:1.5;pointer-events:none;">';
+    html += 'Multiplies utilities before share computation. <strong>1.0</strong> = no adjustment. <strong>&gt;1</strong> = more differentiated shares (larger gaps). <strong>&lt;1</strong> = more equal shares. Use for calibration against known market data.';
     html += '</span></span>';
     html += '</div>';
 
     // Share bars
     html += '<div id="cj-sim-share-chart"></div>';
+
+    // Revenue/profit summary (auto-detected when a price attribute exists)
+    html += '<div id="cj-sim-revenue"></div>';
 
     container.innerHTML = html;
 
@@ -246,6 +275,187 @@ var SimUI = (function() {
 
     // Render SVG bars
     SimCharts.renderShareBars("cj-sim-share-chart", displayProducts, shares);
+
+    // Render revenue summary (if price attribute detected)
+    renderRevenueSummary(displayProducts, shares);
+  }
+
+  function detectPriceAttribute() {
+    var data = SimEngine.getData();
+    if (!data || !data.attributes) return null;
+    for (var i = 0; i < data.attributes.length; i++) {
+      var name = data.attributes[i].name.toLowerCase();
+      if (name.indexOf("price") >= 0 || name.indexOf("cost") >= 0 || name.indexOf("fee") >= 0) {
+        return data.attributes[i].name;
+      }
+    }
+    return null;
+  }
+
+  function extractPrice(product, priceAttr) {
+    var val = product.config ? product.config[priceAttr] : product[priceAttr];
+    if (!val) return 0;
+    // Strip currency symbols and parse
+    var num = parseFloat(String(val).replace(/[^0-9.\-]/g, ""));
+    return isNaN(num) ? 0 : num;
+  }
+
+  function renderRevenueSummary(displayProducts, shares) {
+    var revEl = document.getElementById("cj-sim-revenue");
+    if (!revEl) return;
+    var priceAttr = detectPriceAttribute();
+    if (!priceAttr) { revEl.innerHTML = ""; return; }
+
+    // Only show for actual products (not "None")
+    var realProducts = products.length;
+    var rows = "";
+    var bestRevIdx = 0, bestRev = -Infinity;
+
+    for (var i = 0; i < realProducts && i < shares.length; i++) {
+      var price = extractPrice(products[i], priceAttr);
+      var share = shares[i];
+      var revenue = (share / 100) * price;
+      if (revenue > bestRev) { bestRev = revenue; bestRevIdx = i; }
+      rows += '<tr>';
+      rows += '<td style="padding:4px 8px;font-size:12px;color:#334155;">' + escHtml(displayProducts[i].name) + '</td>';
+      rows += '<td style="padding:4px 8px;font-size:12px;text-align:right;">' + share.toFixed(1) + '%</td>';
+      rows += '<td style="padding:4px 8px;font-size:12px;text-align:right;">' + price.toFixed(0) + '</td>';
+      rows += '<td style="padding:4px 8px;font-size:12px;text-align:right;font-weight:600;">' + revenue.toFixed(2) + '</td>';
+      rows += '</tr>';
+    }
+
+    revEl.innerHTML =
+      '<div style="margin-top:12px;border-top:1px solid #f1f5f9;padding-top:10px;">' +
+      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">' +
+      '<span style="font-size:12px;font-weight:600;color:#1e293b;">Revenue Index</span>' +
+      '<span style="font-size:11px;color:#64748b;">(share \u00d7 price)</span></div>' +
+      '<table style="width:100%;border-collapse:collapse;">' +
+      '<thead><tr style="border-bottom:1px solid #e2e8f0;">' +
+      '<th style="padding:4px 8px;font-size:11px;color:#64748b;text-align:left;font-weight:500;">Product</th>' +
+      '<th style="padding:4px 8px;font-size:11px;color:#64748b;text-align:right;font-weight:500;">Share</th>' +
+      '<th style="padding:4px 8px;font-size:11px;color:#64748b;text-align:right;font-weight:500;">Price</th>' +
+      '<th style="padding:4px 8px;font-size:11px;color:#64748b;text-align:right;font-weight:500;">Revenue</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  // === REVENUE SIMULATOR MODE ===
+  var revenueCustomers = 1000;
+
+  function setRevenueCustomers(val) {
+    var n = parseInt(val, 10);
+    if (!isNaN(n) && n > 0) {
+      revenueCustomers = n;
+      updateResults();
+    }
+  }
+
+  function renderRevenueMode(container) {
+    var priceAttr = detectPriceAttribute();
+    if (!priceAttr) {
+      container.innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8;">' +
+        '<div style="font-size:18px;margin-bottom:8px;">Revenue Simulator Not Available</div>' +
+        '<p style="font-size:13px;">No price attribute detected in the conjoint design. Revenue simulation requires a price attribute.</p></div>';
+      return;
+    }
+
+    var configs = products.map(function(p) { return p.config; });
+    var shares = SimEngine.predictShares(configs, method);
+    var n_products = products.length;
+
+    // Compute revenue per product
+    var revenueData = [];
+    var maxRevenue = 0;
+    for (var i = 0; i < n_products; i++) {
+      var price = extractPrice(products[i], priceAttr);
+      var share = shares[i];
+      var revenue = price * (share / 100) * revenueCustomers;
+      revenueData.push({ name: products[i].name, share: share, price: price, revenue: revenue });
+      if (revenue > maxRevenue) maxRevenue = revenue;
+    }
+    var totalRevenue = revenueData.reduce(function(s, d) { return s + d.revenue; }, 0);
+
+    var html = '<h3 style="font-size:14px;font-weight:600;color:#1e293b;margin-bottom:4px;">Revenue Simulator</h3>';
+
+    // Customer count input
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">';
+    html += '<label style="font-size:12px;color:#64748b;">Hypothetical customers:</label>';
+    html += '<input type="number" value="' + revenueCustomers + '" min="1" step="100" ';
+    html += 'style="width:100px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:right;" ';
+    html += 'onchange="SimUI.setRevenueCustomers(this.value)" />';
+    html += '<span style="font-size:11px;color:#94a3b8;">(Revenue = Price \u00d7 Share% \u00d7 Customers)</span>';
+    html += '</div>';
+
+    // Stacked horizontal bars — Market Share row + Revenue row (OpinionX style)
+    var barHeight = 36;
+    var barGap = 8;
+    var chartW = 600;
+    var rowHeight = barHeight * 2 + barGap + 24;
+
+    html += '<div style="overflow-x:auto;">';
+
+    for (var p = 0; p < n_products; p++) {
+      var d = revenueData[p];
+      var shareW = Math.max(d.share, 2);
+      var revW = maxRevenue > 0 ? (d.revenue / totalRevenue) * 100 : 0;
+      var colours = ["#323367", "#c0695c", "#5b8c5a", "#d4a843", "#7c6fb0", "#4a90a4"];
+      var colour = colours[p % colours.length];
+      var lightColour = colour + "22";
+
+      html += '<div style="margin-bottom:16px;">';
+      html += '<div style="font-size:12px;font-weight:600;color:#1e293b;margin-bottom:4px;">' + escHtml(d.name) + '</div>';
+
+      // Market Share bar
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">';
+      html += '<span style="font-size:11px;color:#64748b;min-width:80px;text-align:right;">Market Share</span>';
+      html += '<div style="flex:1;background:#f1f5f9;border-radius:4px;height:' + barHeight + 'px;position:relative;overflow:hidden;">';
+      html += '<div style="width:' + shareW + '%;height:100%;background:' + colour + ';border-radius:4px;display:flex;align-items:center;justify-content:center;min-width:40px;transition:width 0.3s ease;">';
+      html += '<span style="font-size:12px;font-weight:600;color:#fff;">' + d.share.toFixed(1) + '%</span>';
+      html += '</div></div></div>';
+
+      // Revenue bar
+      html += '<div style="display:flex;align-items:center;gap:8px;">';
+      html += '<span style="font-size:11px;color:#64748b;min-width:80px;text-align:right;">Revenue</span>';
+      html += '<div style="flex:1;background:#fef3c7;border-radius:4px;height:' + barHeight + 'px;position:relative;overflow:hidden;">';
+      html += '<div style="width:' + Math.max(revW, 2) + '%;height:100%;background:#d4a843;border-radius:4px;display:flex;align-items:center;padding:0 10px;min-width:60px;transition:width 0.3s ease;">';
+      html += '<span style="font-size:12px;font-weight:600;color:#fff;">$' + d.revenue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0}) + '</span>';
+      html += '</div></div></div>';
+
+      html += '</div>';
+    }
+
+    html += '</div>';
+
+    // Summary table
+    html += '<div style="margin-top:12px;border-top:1px solid #f1f5f9;padding-top:10px;">';
+    html += '<table style="width:100%;border-collapse:collapse;">';
+    html += '<thead><tr style="border-bottom:1px solid #e2e8f0;">';
+    html += '<th style="padding:6px 8px;font-size:11px;color:#64748b;text-align:left;font-weight:500;">Product</th>';
+    html += '<th style="padding:6px 8px;font-size:11px;color:#64748b;text-align:right;font-weight:500;">Price</th>';
+    html += '<th style="padding:6px 8px;font-size:11px;color:#64748b;text-align:right;font-weight:500;">Share</th>';
+    html += '<th style="padding:6px 8px;font-size:11px;color:#64748b;text-align:right;font-weight:500;">Customers</th>';
+    html += '<th style="padding:6px 8px;font-size:11px;color:#64748b;text-align:right;font-weight:600;">Revenue</th>';
+    html += '</tr></thead><tbody>';
+    for (var t = 0; t < revenueData.length; t++) {
+      var rd = revenueData[t];
+      var custCount = Math.round(revenueCustomers * rd.share / 100);
+      html += '<tr' + (t === revenueData.length - 1 ? ' style="border-top:1px solid #e2e8f0;font-weight:600;"' : '') + '>';
+      html += '<td style="padding:6px 8px;font-size:12px;">' + escHtml(rd.name) + '</td>';
+      html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">$' + rd.price.toFixed(0) + '</td>';
+      html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">' + rd.share.toFixed(1) + '%</td>';
+      html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">' + custCount.toLocaleString() + '</td>';
+      html += '<td style="padding:6px 8px;font-size:12px;text-align:right;font-weight:600;">$' + rd.revenue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0}) + '</td>';
+      html += '</tr>';
+    }
+    // Total row
+    html += '<tr style="border-top:2px solid #1e293b;font-weight:600;">';
+    html += '<td style="padding:6px 8px;font-size:12px;">Total</td>';
+    html += '<td style="padding:6px 8px;"></td>';
+    html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">100%</td>';
+    html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">' + revenueCustomers.toLocaleString() + '</td>';
+    html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">$' + totalRevenue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0}) + '</td>';
+    html += '</tr></tbody></table></div>';
+
+    container.innerHTML = html;
   }
 
   function renderSensitivityMode(container) {
@@ -340,8 +550,9 @@ var SimUI = (function() {
   }
 
   return {
-    _initialized: _initialized,
     init: init,
+    setScaleFactor: setScaleFactor,
+    setRevenueCustomers: setRevenueCustomers,
     addProduct: addProduct,
     removeProduct: removeProduct,
     copyProduct: copyProduct,

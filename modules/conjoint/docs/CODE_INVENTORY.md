@@ -1,15 +1,13 @@
 # Conjoint Module - Code Inventory
 
-**Version:** 3.1.0
-**Generated:** 2026-03-19
-**Module:** `modules/conjoint/`
+**Version:** 3.1.0 **Generated:** 2026-03-19 **Module:** `modules/conjoint/`
 
----
+------------------------------------------------------------------------
 
 ## 1. Module Overview
 
 | Metric | Value |
-|--------|-------|
+|----|----|
 | Core R files (`R/`) | 19 |
 | HTML Report R files (`lib/html_report/`) | 7 |
 | HTML Simulator R files (`lib/html_simulator/`) | 4 |
@@ -24,12 +22,12 @@
 | **Grand total LOC** | **18,776** (across R + JS + HTML/R) |
 | Test files | 14 |
 
----
+------------------------------------------------------------------------
 
 ## 2. Core R Files
 
 | File | Purpose | Functions | Lines | Key Dependencies |
-|------|---------|-----------|-------|------------------|
+|----|----|----|----|----|
 | `00_main.R` | Entry point, module loader, orchestration | 4 | 636 | dplyr, openxlsx, mlogit, dfidx, survival |
 | `00_guard.R` | TRS guard layer, validation gates, status helpers | 20 | 768 | shared/lib/trs_refusal.R |
 | `01_config.R` | Config loading, autodetect heading, validation | 5 | 814 | openxlsx |
@@ -49,14 +47,14 @@
 | `14_willingness_to_pay.R` | WTP with delta-method CIs | 8 | 444 | (none beyond base R) |
 | `15_product_optimizer.R` | Exhaustive/greedy product optimization | 5 | 343 | (none beyond base R) |
 | `99_helpers.R` | Shared utilities, stats, formatting, logging | 29 | 587 | openxlsx |
-| **Totals** | | **206** | **12,702** | |
+| **Totals** |  | **206** | **12,702** |  |
 
----
+------------------------------------------------------------------------
 
 ## 3. HTML Report Files (`lib/html_report/`)
 
 | File | Purpose | Functions | Lines | Key Dependencies |
-|------|---------|-----------|-------|------------------|
+|----|----|----|----|----|
 | `00_html_guard.R` | Input validation for HTML generation | 7 | 145 | (none) |
 | `01_data_transformer.R` | Transform conjoint results to HTML data model | 10 | 264 | jsonlite |
 | `02_table_builder.R` | Build HTML tables for each panel | 11 | 390 | (none) |
@@ -64,28 +62,28 @@
 | `04_html_writer.R` | Write final HTML file to disk | 1 | 49 | (none) |
 | `05_chart_builder.R` | Inline SVG chart generation | 14 | 665 | (none) |
 | `99_html_report_main.R` | Top-level orchestrator for HTML report | 4 | 269 | jsonlite |
-| **Totals** | | **65** | **3,183** | |
+| **Totals** |  | **65** | **3,183** |  |
 
----
+------------------------------------------------------------------------
 
 ## 4. HTML Simulator Files (`lib/html_simulator/`)
 
 | File | Purpose | Functions | Lines |
-|------|---------|-----------|-------|
+|----|----|----|----|
 | `00_simulator_guard.R` | Validate simulator inputs | 1 | 29 |
 | `01_simulator_data_transformer.R` | Build simulator JSON data | 2 | 101 |
 | `02_simulator_page_builder.R` | Assemble standalone simulator HTML | 3 | 141 |
 | `99_simulator_main.R` | Top-level orchestrator | 1 | 74 |
-| **Totals** | | **7** | **345** |
+| **Totals** |  | **7** | **345** |
 
----
+------------------------------------------------------------------------
 
 ## 5. JavaScript Modules
 
 ### HTML Report JS (`lib/html_report/js/`)
 
 | File | Purpose | Lines |
-|------|---------|-------|
+|----|----|----|
 | `conjoint_charts.js` | Chart rendering (SVG toggle visibility) | 145 |
 | `conjoint_export.js` | PNG/CSV export from report panels | 342 |
 | `conjoint_navigation.js` | Tab switching, sidebar scroll, keyboard nav | 561 |
@@ -93,25 +91,25 @@
 | `simulator_charts.js` | Simulator bar chart rendering | 272 |
 | `simulator_engine.js` | MNL share calculation in browser | 201 |
 | `simulator_ui.js` | Simulator dropdowns, product config UI | 288 |
-| **Total** | | **2,179** |
+| **Total** |  | **2,179** |
 
 ### Standalone Simulator JS (`lib/html_simulator/js/`)
 
-| File | Purpose | Lines |
-|------|---------|-------|
-| `simulator_charts.js` | Bar chart for standalone simulator | 86 |
-| `simulator_engine.js` | MNL engine for standalone simulator | 104 |
-| `simulator_ui.js` | UI controls for standalone simulator | 177 |
-| **Total** | | **367** |
+| File                  | Purpose                              | Lines   |
+|-----------------------|--------------------------------------|---------|
+| `simulator_charts.js` | Bar chart for standalone simulator   | 86      |
+| `simulator_engine.js` | MNL engine for standalone simulator  | 104     |
+| `simulator_ui.js`     | UI controls for standalone simulator | 177     |
+| **Total**             |                                      | **367** |
 
----
+------------------------------------------------------------------------
 
 ## 6. Complete Function Index
 
 Alphabetical listing of all 232 R functions across the module.
 
 | Function | File | Line | Description |
-|----------|------|------|-------------|
+|----|----|----|----|
 | `.build_all_charts` | `lib/html_report/99_html_report_main.R` | 216 | Generate all SVG charts for HTML report |
 | `.build_all_tables` | `lib/html_report/99_html_report_main.R` | 152 | Generate all HTML tables for report |
 | `.build_callout` | `lib/html_report/03_page_builder.R` | 1260 | Build a styled callout box |
@@ -396,52 +394,52 @@ Alphabetical listing of all 232 R functions across the module.
 | `write_utilities_breakdown` | `R/08_market_simulator.R` | 315 | Excel simulator: utility decomposition |
 | `zero_center_utilities` | `R/99_helpers.R` | 540 | Zero-center a utility vector |
 
----
+------------------------------------------------------------------------
 
 ## 7. Package Dependency Matrix
 
 | Package | 00_main | 01_config | 02_data | 03_estimation | 04_utilities | 05_alchemer | 05_simulator | 07_output | 08_market_sim | 11_hb | 12_template | 13_lc | 14_wtp | 99_helpers |
-|---------|---------|-----------|---------|---------------|--------------|-------------|--------------|-----------|---------------|-------|-------------|-------|--------|------------|
-| **dplyr** | load | - | use | - | use | - | - | - | - | - | - | - | - | - |
-| **openxlsx** | load | use | - | - | - | use | - | use | use | - | use | - | - | use |
-| **mlogit** | load | - | - | use | - | - | - | - | - | - | - | - | - | - |
-| **dfidx** | load | - | - | use | - | - | - | - | - | - | - | - | - | - |
-| **survival** | load | - | - | use | - | - | - | - | - | - | - | - | - | - |
-| **bayesm** | - | - | - | - | - | - | - | - | - | use | - | use | - | - |
-| **coda** | - | - | - | - | - | - | - | - | - | optional | - | - | - | - |
-| **haven** | - | - | optional | - | - | - | - | - | - | - | - | - | - | - |
-| **jsonlite** | - | - | - | - | - | - | - | - | - | - | - | - | - | - |
+|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
+| **dplyr** | load | \- | use | \- | use | \- | \- | \- | \- | \- | \- | \- | \- | \- |
+| **openxlsx** | load | use | \- | \- | \- | use | \- | use | use | \- | use | \- | \- | use |
+| **mlogit** | load | \- | \- | use | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- |
+| **dfidx** | load | \- | \- | use | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- |
+| **survival** | load | \- | \- | use | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- |
+| **bayesm** | \- | \- | \- | \- | \- | \- | \- | \- | \- | use | \- | use | \- | \- |
+| **coda** | \- | \- | \- | \- | \- | \- | \- | \- | \- | optional | \- | \- | \- | \- |
+| **haven** | \- | \- | optional | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- |
+| **jsonlite** | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- |
 
 **jsonlite** is used by `lib/html_report/01_data_transformer.R` and `lib/html_simulator/01_simulator_data_transformer.R` for JSON serialization.
 
----
+------------------------------------------------------------------------
 
 ## 8. Test Coverage Map
 
 | Test File | Lines | Covers |
-|-----------|-------|--------|
-| `tests/testthat/test_config.R` | - | `01_config.R`: config loading, validation, autodetect |
-| `tests/testthat/test_estimation.R` | - | `03_estimation.R`: mlogit, clogit, auto, rating-based |
-| `tests/testthat/test_utilities.R` | - | `04_utilities.R`: utilities, importance, diagnostics |
-| `tests/testthat/test_simulation.R` | - | `05_simulator.R`: market shares, logit, first-choice, RFC |
-| `tests/testthat/test_interactions.R` | - | `06_interactions.R`: specify, estimate, analyze interactions |
-| `tests/testthat/test_edge_cases.R` | - | Cross-cutting: NA handling, empty data, single-level attrs |
-| `tests/testthat/test_bws.R` | - | `10_best_worst.R`: BWS validation, conversion, estimation |
-| `tests/testthat/test_wtp.R` | - | `14_willingness_to_pay.R`: price parsing, WTP, delta method |
-| `tests/testthat/test_optimizer.R` | - | `15_product_optimizer.R`: exhaustive, greedy, evaluation |
-| `tests/testthat/test_html_report.R` | - | `lib/html_report/`: HTML generation pipeline |
-| `tests/testthat/test_html_simulator.R` | - | `lib/html_simulator/`: standalone simulator |
-| `tests/test_unit_tests.R` | - | Standalone unit test runner (no testthat dependency) |
-| `tests/test_integration.R` | - | End-to-end: config -> data -> estimation -> output |
-| `tests/fixtures/synthetic_data/generate_conjoint_test_data.R` | - | Synthetic data generators for all test scenarios |
+|----|----|----|
+| `tests/testthat/test_config.R` | \- | `01_config.R`: config loading, validation, autodetect |
+| `tests/testthat/test_estimation.R` | \- | `03_estimation.R`: mlogit, clogit, auto, rating-based |
+| `tests/testthat/test_utilities.R` | \- | `04_utilities.R`: utilities, importance, diagnostics |
+| `tests/testthat/test_simulation.R` | \- | `05_simulator.R`: market shares, logit, first-choice, RFC |
+| `tests/testthat/test_interactions.R` | \- | `06_interactions.R`: specify, estimate, analyze interactions |
+| `tests/testthat/test_edge_cases.R` | \- | Cross-cutting: NA handling, empty data, single-level attrs |
+| `tests/testthat/test_bws.R` | \- | `10_best_worst.R`: BWS validation, conversion, estimation |
+| `tests/testthat/test_wtp.R` | \- | `14_willingness_to_pay.R`: price parsing, WTP, delta method |
+| `tests/testthat/test_optimizer.R` | \- | `15_product_optimizer.R`: exhaustive, greedy, evaluation |
+| `tests/testthat/test_html_report.R` | \- | `lib/html_report/`: HTML generation pipeline |
+| `tests/testthat/test_html_simulator.R` | \- | `lib/html_simulator/`: standalone simulator |
+| `tests/test_unit_tests.R` | \- | Standalone unit test runner (no testthat dependency) |
+| `tests/test_integration.R` | \- | End-to-end: config -\> data -\> estimation -\> output |
+| `tests/fixtures/synthetic_data/generate_conjoint_test_data.R` | \- | Synthetic data generators for all test scenarios |
 
 **Notable gaps:** No dedicated test files for `05_alchemer_import.R`, `09_none_handling.R`, `11_hierarchical_bayes.R`, `12_config_template.R`, or `13_latent_class.R` (some are tested indirectly via integration tests).
 
----
+------------------------------------------------------------------------
 
 ## 9. Architecture Flow
 
-```
+```         
 Config Excel (.xlsx)
     |
     v

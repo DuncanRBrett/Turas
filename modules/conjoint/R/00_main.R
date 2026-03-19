@@ -96,7 +96,10 @@ suppressPackageStartupMessages({
         how_to_fix = "Install the package with: install.packages('dplyr')"
       )
     } else {
-      stop("Required package 'dplyr' is not installed. Install with: install.packages('dplyr')")
+      cat("\n=== TURAS ERROR ===\nPackage 'dplyr' is required but not installed.\nFix: install.packages('dplyr')\n==================\n")
+      return(list(status = "REFUSED", code = "PKG_DPLYR_MISSING",
+                  message = "Required package 'dplyr' is not installed.",
+                  how_to_fix = "Install with: install.packages('dplyr')"))
     }
   }
 
@@ -111,7 +114,10 @@ suppressPackageStartupMessages({
         how_to_fix = "Install the package with: install.packages('openxlsx')"
       )
     } else {
-      stop("Required package 'openxlsx' is not installed. Install with: install.packages('openxlsx')")
+      cat("\n=== TURAS ERROR ===\nPackage 'openxlsx' is required but not installed.\nFix: install.packages('openxlsx')\n==================\n")
+      return(list(status = "REFUSED", code = "PKG_OPENXLSX_MISSING",
+                  message = "Required package 'openxlsx' is not installed.",
+                  how_to_fix = "Install with: install.packages('openxlsx')"))
     }
   }
 
@@ -193,6 +199,7 @@ if (!dir.exists(.conjoint_module_dir)) {
 
 # Source all component files in order
 source(file.path(.conjoint_module_dir, "99_helpers.R"))      # Helper functions (must be first)
+source(file.path(.conjoint_module_dir, "00_preflight.R"))    # Pre-flight checks
 source(file.path(.conjoint_module_dir, "01_config.R"))       # Configuration loading
 source(file.path(.conjoint_module_dir, "05_alchemer_import.R"))  # Alchemer data import (NEW)
 source(file.path(.conjoint_module_dir, "02_data.R"))         # Data loading and validation
@@ -269,6 +276,9 @@ rm(.conjoint_module_dir)
 #' @param output_file Path for results Excel file.
 #'   If NULL, reads from config Settings sheet.
 #' @param verbose Logical, print detailed progress (default TRUE)
+#' @param run_preflight Logical. If TRUE, runs a pre-flight check to validate
+#'   that all module files, packages, and infrastructure are in place before
+#'   starting analysis. Default FALSE to avoid overhead on normal runs.
 #'
 #' @return List containing:
 #'   - utilities: Data frame of part-worth utilities by attribute level
@@ -304,7 +314,22 @@ rm(.conjoint_module_dir)
 #'
 #' @export
 run_conjoint_analysis <- function(config_file, data_file = NULL, output_file = NULL,
-                                  verbose = TRUE) {
+                                  verbose = TRUE, run_preflight = FALSE) {
+
+  # ==========================================================================
+  # OPTIONAL PRE-FLIGHT CHECK
+  # ==========================================================================
+
+  if (isTRUE(run_preflight)) {
+    pf <- conjoint_preflight(verbose = verbose)
+    if (pf$status == "REFUSED") {
+      cat("\n=== TURAS ERROR ===\n")
+      cat("Pre-flight check failed. Cannot proceed with analysis.\n")
+      cat("Issues:", paste(pf$failures, collapse = "; "), "\n")
+      cat("==================\n\n")
+      return(pf)
+    }
+  }
 
   # ==========================================================================
   # TRS REFUSAL HANDLER WRAPPER (TRS v1.0)
@@ -339,11 +364,11 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
 
   # Print TRS start banner
   if (exists("turas_print_start_banner", mode = "function")) {
-    turas_print_start_banner("CONJOINT", "3.0.0")
+    turas_print_start_banner("CONJOINT", get_conjoint_version())
   } else if (verbose) {
     cat("\n")
     cat(rep("=", 80), "\n", sep = "")
-    cat("TURAS CONJOINT ANALYSIS - Version 3.0.0\n")
+    cat(sprintf("TURAS CONJOINT ANALYSIS - Version %s\n", get_conjoint_version()))
     cat(rep("=", 80), "\n", sep = "")
     cat("\n")
   }
@@ -465,6 +490,33 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
       }
     }
 
+    # STEP 6b: Calculate WTP (if price attribute exists)
+    wtp_result <- NULL
+    if (exists("calculate_wtp", mode = "function")) {
+      # Auto-detect price attribute from config
+      price_attr <- config$price_attribute %||% NULL
+      if (is.null(price_attr)) {
+        # Try to detect a price-like attribute name
+        attr_names <- if (!is.null(utilities)) unique(utilities$Attribute) else character(0)
+        price_candidates <- grep("price|cost|fee", attr_names, ignore.case = TRUE, value = TRUE)
+        if (length(price_candidates) > 0) price_attr <- price_candidates[1]
+      }
+
+      if (!is.null(price_attr)) {
+        wtp_result <- tryCatch({
+          if (verbose) cat(sprintf("\n6b. Calculating willingness to pay (price attribute: %s)...\n", price_attr))
+          result <- calculate_wtp(utilities, price_attr, config,
+                                  individual_betas = model_result$individual_betas,
+                                  verbose = verbose)
+          if (verbose) cat("   \u2713 WTP calculated\n")
+          result
+        }, error = function(e) {
+          if (verbose) cat(sprintf("   WTP calculation skipped: %s\n", conditionMessage(e)))
+          NULL
+        })
+      }
+    }
+
     # STEP 7: Generate Output
     if (verbose) cat("\n7. Generating Excel output...\n")
 
@@ -542,7 +594,9 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
           insight_utilities = config$insight_utilities %||% "",
           insight_diagnostics = config$insight_diagnostics %||% "",
           insight_simulator = config$insight_simulator %||% "",
-          insight_wtp = config$insight_wtp %||% ""
+          insight_wtp = config$insight_wtp %||% "",
+          custom_slides = config$custom_slides %||% NULL,
+          currency_symbol = config$currency_symbol %||% "$"
         )
 
         tryCatch({
@@ -580,8 +634,12 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
       cat("\n")
     }
 
-    # Return comprehensive results
+    # Return comprehensive results with top-level TRS status
+    # Status is PASS when no warnings, PARTIAL when warnings exist
+    top_status <- if (length(all_warnings) == 0) "PASS" else "PARTIAL"
+
     list(
+      status = top_status,
       utilities = utilities,
       importance = importance,
       diagnostics = diagnostics,
@@ -589,8 +647,9 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
       config = config,
       data_info = data_list,
       elapsed_time = as.numeric(elapsed),
-      version = "3.0.0",
-      run_result = run_result
+      version = get_conjoint_version(),
+      run_result = run_result,
+      warnings = if (length(all_warnings) > 0) all_warnings else NULL
     )
 
   }, error = function(e) {
