@@ -345,11 +345,11 @@ function wrapLabel(label, maxChars) {
   return [label.substring(0, bestSplit), label.substring(bestSplit + 1)];
 }
 
-// Distinct colour palette from brand colour using HSL rotation
-function getDistinctPalette(brandHex, count) {
-  var r = parseInt(brandHex.substr(1, 2), 16) / 255;
-  var g = parseInt(brandHex.substr(3, 2), 16) / 255;
-  var b = parseInt(brandHex.substr(5, 2), 16) / 255;
+// Convert hex colour to HSL {h: 0-1, s: 0-1, l: 0-1}
+function hexToHsl(hex) {
+  var r = parseInt(hex.substr(1, 2), 16) / 255;
+  var g = parseInt(hex.substr(3, 2), 16) / 255;
+  var b = parseInt(hex.substr(5, 2), 16) / 255;
   var mx = Math.max(r, g, b), mn = Math.min(r, g, b);
   var h = 0, s = 0, l = (mx + mn) / 2;
   if (mx !== mn) {
@@ -359,15 +359,43 @@ function getDistinctPalette(brandHex, count) {
     else if (mx === g) h = ((b - r) / d + 2) / 6;
     else h = ((r - g) / d + 4) / 6;
   }
+  return { h: h, s: s, l: l };
+}
+
+// Circular hue distance in degrees (0-180)
+function hueDist(a, b) {
+  var d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
+// Generate N distinct colours via dynamic HSL rotation from a brand colour.
+// avoidHues: optional array of hue degrees (0-360) to steer away from.
+function getDistinctPalette(brandHex, count, avoidHues) {
+  if (count <= 0) return [];
+  if (count === 1) return [brandHex];
+
+  var brand = hexToHsl(brandHex);
+  var brandDeg = brand.h * 360;
+  var step = 360 / count;
+  var minGap = step * 0.3;
+  var avoid = avoidHues || [];
+
   var palette = [];
-  // Wide hue offsets for maximum visual distinction between series
-  var offsets = [0, 145, 50, 210, 100, 280, 170, 320];
-  // Alternate lightness to add contrast even when hues are closer
-  var lightLevels = [0, 0.45, 0.40, 0.48, 0.42, 0.46, 0.44, 0.50];
   for (var i = 0; i < count; i++) {
-    var oh = ((h * 360 + (offsets[i] || i * 51)) % 360) / 360;
-    var os = i === 0 ? s : Math.max(0.50, s + 0.15);
-    var ol = i === 0 ? l : lightLevels[i] || 0.45;
+    var candidateDeg = (brandDeg + i * step) % 360;
+
+    // Shift away from avoided hues if too close
+    for (var a = 0; a < avoid.length; a++) {
+      if (hueDist(candidateDeg, avoid[a]) < minGap) {
+        candidateDeg = (candidateDeg + minGap) % 360;
+      }
+    }
+
+    var oh = candidateDeg / 360;
+    // First colour keeps brand saturation/lightness; rest get clamped values
+    var os = i === 0 ? brand.s : Math.min(0.65, Math.max(0.45, brand.s + 0.15));
+    // Alternate lightness for adjacent differentiation
+    var ol = i === 0 ? brand.l : (i % 2 === 1 ? 0.42 : 0.48);
     palette.push(hslToHex(oh, os, ol));
   }
   return palette;
@@ -463,18 +491,51 @@ function buildMultiHorizontalSVG(data, selectedKeys) {
   var bottomPad = lastWrap ? 16 : 8;
   var totalH = barsH + metricStripH + bottomPad;
 
-  // Distinct colour palette for columns — use custom series colours if provided,
-  // otherwise fall back to auto-generated palette from chart_bar_colour
+  // Distinct colour palette for columns — three modes:
+  // 1. No series_colours: auto-generate all from chart_bar_colour
+  // 2. Sparse (has null entries): custom at defined positions, auto-fill gaps
+  // 3. Dense (all non-null): use custom colours, cycling if needed
   var bc = data.chart_bar_colour || data.brand_colour || BRAND_COLOUR;
   var colColours;
   if (data.series_colours && data.series_colours.length > 0) {
-    colColours = [];
-    for (var ci = 0; ci < nCols; ci++) {
-      colColours.push(data.series_colours[ci % data.series_colours.length]);
+    // Check if sparse (has null/undefined entries)
+    var hasGaps = false;
+    var customHues = [];
+    for (var si = 0; si < data.series_colours.length; si++) {
+      if (data.series_colours[si] == null) {
+        hasGaps = true;
+      } else {
+        customHues.push(hexToHsl(data.series_colours[si]).h * 360);
+      }
     }
-    if (nCols > data.series_colours.length) {
-      console.warn("Chart has " + nCols + " series but only " +
-        data.series_colours.length + " custom colours defined. Colours will repeat.");
+
+    if (hasGaps) {
+      // Hybrid mode: fill null positions with auto-generated colours
+      var nullCount = 0;
+      for (var ni = 0; ni < nCols; ni++) {
+        if (ni >= data.series_colours.length || data.series_colours[ni] == null) nullCount++;
+      }
+      var fillers = nullCount > 0 ? getDistinctPalette(bc, nullCount, customHues) : [];
+      var fi = 0;
+      colColours = [];
+      for (var ci = 0; ci < nCols; ci++) {
+        if (ci < data.series_colours.length && data.series_colours[ci] != null) {
+          colColours.push(data.series_colours[ci]);
+        } else {
+          colColours.push(fillers[fi % fillers.length]);
+          fi++;
+        }
+      }
+    } else {
+      // Dense mode: all custom colours defined, cycle if needed
+      colColours = [];
+      for (var ci = 0; ci < nCols; ci++) {
+        colColours.push(data.series_colours[ci % data.series_colours.length]);
+      }
+      if (nCols > data.series_colours.length) {
+        console.warn("Chart has " + nCols + " series but only " +
+          data.series_colours.length + " custom colours defined. Colours will repeat.");
+      }
     }
   } else {
     colColours = nCols > 1 ? getDistinctPalette(bc, nCols) : [bc];

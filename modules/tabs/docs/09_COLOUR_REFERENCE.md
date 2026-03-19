@@ -81,30 +81,45 @@ Optional per-series colour overrides for nominal bar charts with multiple banner
 | `chart_series_colour_7` | Optional | Colour for 7th banner series |
 | `chart_series_colour_8` | Optional | Colour for 8th banner series |
 
-**Behaviour:**
-- If **no series colours** are defined → `chart_bar_colour` is used with auto-generated HSL rotation (existing behaviour, unchanged).
-- If **any series colours** are defined → they are used sequentially for each banner column. Colours are assigned in the order columns appear in the chart toggle chips.
-- If there are **more series than colours defined** → colours cycle back to the start (with a console warning).
-- **Stacked bar charts are not affected** — they always use `chart_palette_preset` and the semantic colour mapping.
+**Three modes of operation:**
+
+1. **No series colours defined** → auto-generates a distinct palette from `chart_bar_colour` using dynamic HSL rotation. Supports any number of series (1 to 20+) with evenly-spaced hues (`360/N` degrees apart) and alternating lightness for adjacent differentiation.
+
+2. **All series colours defined (dense)** → uses custom colours directly. If there are more series than defined colours, colours cycle back to the start (with a console warning).
+
+3. **Some series colours defined, others blank (hybrid)** → custom colours are used at their defined positions. Blank positions are auto-filled with generated colours that **avoid hues similar to your custom colours**, ensuring visual distinction across all series.
+
+**Stacked bar charts are never affected** — they always use `chart_palette_preset` and the semantic colour mapping, regardless of series colour settings.
 
 **Interaction with other settings:**
 - `chart_palette_preset` controls stacked bars only — completely independent of series colours.
 - `chart_bar_colour` is still used as the single-column fallback and as the seed for auto-generation when no series colours are defined.
 
-**Example configuration (client corporate colours):**
+**Example 1 — Full corporate palette:**
 
-| Setting | Value |
-|---------|-------|
-| `chart_palette_preset` | `research` |
-| `chart_series_colour_1` | `#1B365D` |
-| `chart_series_colour_2` | `#3A6EA5` |
-| `chart_series_colour_3` | `#E87722` |
-| `chart_series_colour_4` | `#5B9A7D` |
-| `chart_series_colour_5` | `#8E4585` |
+| Setting | Value | Effect |
+|---------|-------|--------|
+| `chart_palette_preset` | `research` | Stacked bars: purple-green semantic |
+| `chart_series_colour_1` | `#1B365D` | Total: navy |
+| `chart_series_colour_2` | `#3A6EA5` | 2nd break: blue |
+| `chart_series_colour_3` | `#E87722` | 3rd break: orange |
+| `chart_series_colour_4` | `#5B9A7D` | 4th break: sage |
+| `chart_series_colour_5` | `#8E4585` | 5th break: purple |
 
-In this example, stacked bars use the research preset (purple-green semantic palette) while nominal bar charts use the client's five corporate colours.
+**Example 2 — Hybrid (custom Total, rest auto-generated):**
 
-**Report Hub:** Custom series colours carry through automatically. The colours are embedded in each tab report's HTML/JS data, and the report hub parses them as-is without modification.
+| Setting | Value | Effect |
+|---------|-------|--------|
+| `chart_palette_preset` | `warm` | Stacked bars: earth tones |
+| `chart_series_colour_1` | `#DC2626` | Total: red (custom) |
+| `chart_series_colour_2` | *(blank)* | Auto-generated, avoids red hues |
+| `chart_series_colour_3` | *(blank)* | Auto-generated, distinct from above |
+
+**Example 3 — No custom colours (auto-generation only):**
+
+Leave all `chart_series_colour_*` fields blank. The system generates a visually distinct palette from `chart_bar_colour` for any number of banner series.
+
+**Report Hub:** Custom series colours carry through automatically. The colours are embedded in each tab report's HTML/JS data, and the report hub passes them through without modification.
 
 ---
 

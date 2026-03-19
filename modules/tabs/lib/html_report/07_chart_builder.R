@@ -842,15 +842,20 @@ build_question_chart <- function(question_data, options_df, config_obj) {
     })
   }
 
-  # Add custom series colours for nominal bar charts (if defined in config)
-  series_colours <- Filter(function(x) !is.null(x) && nzchar(x), list(
-    config_obj$chart_series_colour_1, config_obj$chart_series_colour_2,
-    config_obj$chart_series_colour_3, config_obj$chart_series_colour_4,
-    config_obj$chart_series_colour_5, config_obj$chart_series_colour_6,
-    config_obj$chart_series_colour_7, config_obj$chart_series_colour_8
-  ))
-  if (length(series_colours) > 0) {
-    chart_data$series_colours <- unlist(series_colours)
+  # Add custom series colours for nominal bar charts (sparse array with NA gaps).
+  # Defined positions get hex strings; undefined positions get NA (→ JSON null).
+  # JS fills null positions with auto-generated colours that avoid custom hues.
+  series_colour_fields <- paste0("chart_series_colour_", 1:8)
+  series_colours_raw <- lapply(series_colour_fields, function(f) {
+    val <- config_obj[[f]]
+    if (!is.null(val) && nzchar(val)) val else NA_character_
+  })
+
+  has_any_custom <- any(!is.na(series_colours_raw))
+  if (has_any_custom) {
+    # Trim trailing NAs (no need to send 8 elements if only 3 defined)
+    last_defined <- max(which(!is.na(series_colours_raw)))
+    chart_data$series_colours <- series_colours_raw[1:last_defined]
   }
 
   # ------------------------------------------------------------------
