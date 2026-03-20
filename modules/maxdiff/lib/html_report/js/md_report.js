@@ -533,7 +533,7 @@
 
     if (!val || val === "all") {
       // Show main (overall) table, hide all segment variants
-      if (mainDiv) mainDiv.style.display = "";
+      if (mainDiv) mainDiv.style.display = "block";
       divs.forEach(function(d) { if (d.getAttribute("data-segment") !== "all") d.style.display = "none"; });
     } else {
       // Hide main, show matching segment variant
@@ -541,7 +541,7 @@
       divs.forEach(function(d) {
         var seg = d.getAttribute("data-segment");
         if (seg === "all") { d.style.display = "none"; return; }
-        d.style.display = (seg === val) ? "" : "none";
+        d.style.display = (seg === val) ? "block" : "none";
       });
     }
   }

@@ -178,11 +178,29 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config,
   seg_scores <- if (!is.null(html_data$segment_filter)) html_data$segment_filter$segment_scores else NULL
   seg_config <- config$segment_settings
 
+  # Enrich segment scores with preference shares & rescaled scores (from HB individual utilities)
+  enriched_seg_scores <- seg_scores
+  if (!is.null(seg_scores) && !is.null(maxdiff_results$hb_results$individual_utilities)) {
+    enriched_seg_scores <- tryCatch(
+      enrich_segment_scores(
+        seg_scores,
+        maxdiff_results$hb_results$individual_utilities,
+        maxdiff_results$raw_data,
+        seg_config,
+        config$items
+      ),
+      error = function(e) {
+        message(sprintf("  Segment enrichment warning: %s (falling back to basic tables)", e$message))
+        seg_scores
+      }
+    )
+  }
+
   tables$preference_scores <- tryCatch(
     build_preference_scores_table(
       html_data$preferences$scores,
       html_data$preferences$anchor_data,
-      segment_data = seg_scores,
+      segment_data = enriched_seg_scores,
       segment_config = seg_config
     ),
     error = function(e) { message(sprintf("  Table error (preferences): %s", e$message)); "" }
@@ -192,7 +210,7 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config,
     build_count_scores_table(
       html_data$items$count_data,
       html_data$items$discrimination,
-      segment_data = seg_scores,
+      segment_data = enriched_seg_scores,
       segment_config = seg_config
     ),
     error = function(e) { message(sprintf("  Table error (counts): %s", e$message)); "" }
@@ -212,14 +230,37 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config,
     )
   }
 
-  # Head-to-head table
+  # Head-to-head table (with per-segment variants if HB utilities available)
   if (!is.null(html_data$head_to_head)) {
-    tables$head_to_head <- tryCatch(
+    main_h2h <- tryCatch(
       build_h2h_table(
         html_data$head_to_head$h2h_data,
         html_data$head_to_head$label_map
       ),
       error = function(e) { message(sprintf("  Table error (h2h): %s", e$message)); "" }
+    )
+
+    # Compute per-segment H2H matrices
+    segment_h2h <- NULL
+    if (!is.null(seg_config) && !is.null(maxdiff_results$hb_results$individual_utilities)) {
+      segment_h2h <- tryCatch(
+        compute_segment_h2h(
+          maxdiff_results$hb_results$individual_utilities,
+          maxdiff_results$raw_data,
+          seg_config,
+          config$items,
+          html_data$head_to_head$label_map
+        ),
+        error = function(e) {
+          message(sprintf("  Segment H2H warning: %s", e$message))
+          NULL
+        }
+      )
+    }
+
+    # Wrap in segment-filterable container if segment H2H data available
+    tables$head_to_head <- build_h2h_with_segments(
+      main_h2h, segment_h2h, html_data$head_to_head$label_map
     )
   }
 

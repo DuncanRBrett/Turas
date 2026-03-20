@@ -877,3 +877,258 @@ transform_utility_distributions <- function(results) {
     densities = densities[dist_df$Item_ID]
   )
 }
+
+
+# ==============================================================================
+# SEGMENT ENRICHMENT (preference shares + H2H per segment)
+# ==============================================================================
+
+#' Enrich segment scores with preference shares and rescaled scores
+#'
+#' Takes the basic segment_scores (which only contain BW_Score) and enriches
+#' each segment with preference shares and 0-100 rescaled scores computed
+#' from individual-level HB utilities filtered to segment respondents.
+#'
+#' @param segment_scores Data frame. Output from compute_segment_scores()
+#' @param individual_utils Data frame/matrix. Respondent x item utilities (with resp_id col)
+#' @param raw_data Data frame. Original survey data with segment variables
+#' @param segment_settings Data frame. Config segment definitions
+#' @param items Data frame. Config items (Item_ID, Item_Label, Include)
+#'
+#' @return Enriched segment_scores data frame with Pref_Share, Rescaled, Rank columns
+#' @keywords internal
+enrich_segment_scores <- function(segment_scores, individual_utils, raw_data,
+                                   segment_settings, items) {
+
+  if (is.null(segment_scores) || is.null(individual_utils) ||
+      is.null(raw_data) || is.null(segment_settings)) {
+    return(segment_scores)
+  }
+
+  # Get numeric item columns from individual utilities
+  if (is.data.frame(individual_utils)) {
+    numeric_cols <- vapply(individual_utils, is.numeric, logical(1))
+    resp_ids <- if ("resp_id" %in% names(individual_utils)) {
+      individual_utils$resp_id
+    } else {
+      seq_len(nrow(individual_utils))
+    }
+    utils_mat <- as.matrix(individual_utils[, numeric_cols, drop = FALSE])
+  } else {
+    utils_mat <- as.matrix(individual_utils)
+    resp_ids <- seq_len(nrow(utils_mat))
+  }
+
+  item_ids <- colnames(utils_mat)
+  if (is.null(item_ids) || length(item_ids) < 2) return(segment_scores)
+
+  # Build respondent-to-raw-data mapping
+  resp_id_var <- names(raw_data)[1]
+  resp_map <- data.frame(
+    resp_id = resp_ids,
+    stringsAsFactors = FALSE
+  )
+  resp_map <- merge(resp_map, raw_data, by.x = "resp_id", by.y = resp_id_var, all.x = TRUE)
+
+  # Get item labels
+  label_map <- if (!is.null(items) && "Item_Label" %in% names(items)) {
+    setNames(items$Item_Label, items$Item_ID)
+  } else {
+    setNames(item_ids, item_ids)
+  }
+
+  # Process each segment
+  enriched_rows <- list()
+
+  for (i in seq_len(nrow(segment_settings))) {
+    seg_id <- segment_settings$Segment_ID[i]
+    seg_label <- segment_settings$Segment_Label[i]
+    seg_var <- segment_settings$Variable_Name[i]
+    seg_def <- segment_settings$Segment_Def[i]
+    include <- segment_settings$Include_in_Output[i]
+
+    if (include != 1) next
+    if (!seg_var %in% names(resp_map)) next
+
+    # Determine segment membership
+    if (!is.null(seg_def) && !is.na(seg_def) && nzchar(trimws(seg_def))) {
+      seg_membership <- tryCatch({
+        if (exists("safe_eval_expression", mode = "function")) {
+          safe_eval_expression(seg_def, resp_map, context = sprintf("enrich segment '%s'", seg_id))
+        } else {
+          eval(parse(text = seg_def), envir = resp_map)
+        }
+      }, error = function(e) NULL)
+    } else {
+      seg_membership <- resp_map[[seg_var]]
+    }
+
+    if (is.null(seg_membership)) next
+
+    # Get respondent indices in this segment
+    seg_indices <- which(seg_membership == TRUE)
+    if (length(seg_indices) < 2) next
+
+    # Filter utilities to segment respondents
+    seg_utils <- utils_mat[seg_indices, , drop = FALSE]
+
+    # Compute preference shares for this segment (softmax per respondent, then average)
+    n_resp <- nrow(seg_utils)
+    shares_mat <- matrix(0, nrow = n_resp, ncol = ncol(seg_utils))
+    for (r in seq_len(n_resp)) {
+      row_utils <- seg_utils[r, ]
+      exp_u <- exp(row_utils - max(row_utils, na.rm = TRUE))
+      shares_mat[r, ] <- exp_u / sum(exp_u, na.rm = TRUE)
+    }
+    avg_shares <- colMeans(shares_mat, na.rm = TRUE) * 100
+    names(avg_shares) <- item_ids
+
+    # Compute rescaled 0-100 scores from mean segment utilities
+    mean_utils <- colMeans(seg_utils, na.rm = TRUE)
+    min_u <- min(mean_utils, na.rm = TRUE)
+    max_u <- max(mean_utils, na.rm = TRUE)
+    range_u <- max_u - min_u
+    rescaled <- if (range_u > 0) (mean_utils - min_u) / range_u * 100 else rep(50, length(mean_utils))
+    names(rescaled) <- item_ids
+
+    # Build enriched rows for this segment
+    included_items <- if (!is.null(items) && "Include" %in% names(items)) {
+      items$Item_ID[items$Include == 1]
+    } else {
+      item_ids
+    }
+    included_items <- intersect(included_items, item_ids)
+
+    seg_df <- data.frame(
+      Item_ID = included_items,
+      Item_Label = vapply(included_items, function(id) label_map[[id]] %||% id, character(1)),
+      Pref_Share = avg_shares[included_items],
+      Rescaled = rescaled[included_items],
+      stringsAsFactors = FALSE
+    )
+    seg_df <- seg_df[order(-seg_df$Rescaled), ]
+    seg_df$Rank <- seq_len(nrow(seg_df))
+
+    # Merge with existing BW_Score from segment_scores
+    existing <- segment_scores[segment_scores$Segment_ID == seg_id, , drop = FALSE]
+    if ("Segment_Value" %in% names(existing)) {
+      existing <- existing[existing$Segment_Value == TRUE, , drop = FALSE]
+    }
+
+    if (nrow(existing) > 0 && "BW_Score" %in% names(existing)) {
+      bw_map <- setNames(existing$BW_Score, existing$Item_ID %||% existing$Item_Label)
+      seg_df$BW_Score <- vapply(seg_df$Item_ID, function(id) {
+        bw_map[[id]] %||% NA_real_
+      }, numeric(1))
+    } else {
+      seg_df$BW_Score <- NA_real_
+    }
+
+    seg_df$Segment_ID <- seg_id
+    seg_df$Segment_Label <- seg_label
+    seg_df$Segment_Value <- TRUE
+    seg_df$Variable_Name <- seg_var
+    seg_df$Segment_N <- length(seg_indices)
+
+    enriched_rows[[seg_id]] <- seg_df
+  }
+
+  if (length(enriched_rows) == 0) return(segment_scores)
+
+  do.call(rbind, enriched_rows)
+}
+
+
+#' Compute per-segment head-to-head matrices
+#'
+#' For each segment, filters individual utilities to segment respondents
+#' and computes a full H2H comparison matrix.
+#'
+#' @param individual_utils Data frame/matrix. Respondent x item utilities (with resp_id col)
+#' @param raw_data Data frame. Original survey data with segment variables
+#' @param segment_settings Data frame. Config segment definitions
+#' @param items Data frame. Config items
+#' @param label_map Named character vector. Item_ID -> Item_Label
+#'
+#' @return Named list of H2H data frames (one per segment key like "Variable:Segment_ID")
+#' @keywords internal
+compute_segment_h2h <- function(individual_utils, raw_data, segment_settings,
+                                 items, label_map = NULL) {
+
+  if (is.null(individual_utils) || is.null(raw_data) || is.null(segment_settings)) {
+    return(NULL)
+  }
+
+  # Get numeric item columns
+  if (is.data.frame(individual_utils)) {
+    numeric_cols <- vapply(individual_utils, is.numeric, logical(1))
+    resp_ids <- if ("resp_id" %in% names(individual_utils)) {
+      individual_utils$resp_id
+    } else {
+      seq_len(nrow(individual_utils))
+    }
+    utils_mat <- as.matrix(individual_utils[, numeric_cols, drop = FALSE])
+  } else {
+    utils_mat <- as.matrix(individual_utils)
+    resp_ids <- seq_len(nrow(utils_mat))
+  }
+
+  item_ids <- colnames(utils_mat)
+  if (is.null(item_ids) || length(item_ids) < 2) return(NULL)
+
+  # Build respondent mapping
+  resp_id_var <- names(raw_data)[1]
+  resp_map <- data.frame(resp_id = resp_ids, stringsAsFactors = FALSE)
+  resp_map <- merge(resp_map, raw_data, by.x = "resp_id", by.y = resp_id_var, all.x = TRUE)
+
+  h2h_list <- list()
+
+  for (i in seq_len(nrow(segment_settings))) {
+    seg_id <- segment_settings$Segment_ID[i]
+    seg_var <- segment_settings$Variable_Name[i]
+    seg_def <- segment_settings$Segment_Def[i]
+    include <- segment_settings$Include_in_Output[i]
+
+    if (include != 1) next
+    if (!seg_var %in% names(resp_map)) next
+
+    # Determine membership
+    if (!is.null(seg_def) && !is.na(seg_def) && nzchar(trimws(seg_def))) {
+      seg_membership <- tryCatch({
+        if (exists("safe_eval_expression", mode = "function")) {
+          safe_eval_expression(seg_def, resp_map, context = sprintf("h2h segment '%s'", seg_id))
+        } else {
+          eval(parse(text = seg_def), envir = resp_map)
+        }
+      }, error = function(e) NULL)
+    } else {
+      seg_membership <- resp_map[[seg_var]]
+    }
+
+    if (is.null(seg_membership)) next
+
+    seg_indices <- which(seg_membership == TRUE)
+    if (length(seg_indices) < 2) next
+
+    seg_utils <- utils_mat[seg_indices, , drop = FALSE]
+
+    # Compute H2H matrix for this segment
+    n <- length(item_ids)
+    mat <- matrix(NA_real_, nrow = n, ncol = n, dimnames = list(item_ids, item_ids))
+    for (a in seq_len(n)) {
+      for (b in seq_len(n)) {
+        if (a != b) {
+          diff <- seg_utils[, a] - seg_utils[, b]
+          prob_a <- mean(1 / (1 + exp(-diff)), na.rm = TRUE)
+          mat[a, b] <- round(prob_a * 100, 1)
+        }
+      }
+    }
+
+    seg_key <- paste0(seg_var, ":", seg_id)
+    h2h_list[[seg_key]] <- as.data.frame(mat)
+  }
+
+  if (length(h2h_list) == 0) return(NULL)
+  h2h_list
+}
