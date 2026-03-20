@@ -383,6 +383,133 @@ build_segment_chart <- function(segment_data, brand_colour = "#1e3a5f") {
 
 
 # ==============================================================================
+# ITEM STRATEGY QUADRANT (Scatter: Mean Utility vs SD)
+# ==============================================================================
+
+#' Build Item Strategy Quadrant scatter chart
+#'
+#' Plots mean utility (x) vs standard deviation (y) for each item,
+#' creating four strategic quadrants:
+#' - High Mean, Low SD = Universal Favourites (top-left when rotated, or bottom-right standard)
+#' - High Mean, High SD = Polarising Leaders
+#' - Low Mean, Low SD = Low Priority
+#' - Low Mean, High SD = Divisive Rejects
+#'
+#' @param hb_pop Data frame with Item_Label, HB_Utility_Mean, HB_Utility_SD
+#' @param brand_colour Hex colour
+#'
+#' @return SVG string
+#' @keywords internal
+build_strategy_quadrant <- function(hb_pop, brand_colour = "#1e3a5f") {
+
+  if (is.null(hb_pop) || nrow(hb_pop) < 3) return("")
+  if (!all(c("HB_Utility_Mean", "HB_Utility_SD") %in% names(hb_pop))) return("")
+
+  n <- nrow(hb_pop)
+  means <- hb_pop$HB_Utility_Mean
+  sds <- hb_pop$HB_Utility_SD
+  labels <- hb_pop$Item_Label %||% hb_pop$Item_ID
+
+  chart_width <- 720
+  chart_height <- 520
+  ml <- 70    # left margin
+  mr <- 30
+  mt <- 40
+  mb <- 60
+  cw <- chart_width - ml - mr
+  ch <- chart_height - mt - mb
+
+  # Scales
+  x_min <- min(means) - diff(range(means)) * 0.1
+  x_max <- max(means) + diff(range(means)) * 0.1
+  y_min <- 0
+  y_max <- max(sds) * 1.2
+
+  if (x_max - x_min < 0.01) { x_min <- x_min - 1; x_max <- x_max + 1 }
+  if (y_max < 0.01) y_max <- 1
+
+  scale_x <- function(v) ml + (v - x_min) / (x_max - x_min) * cw
+  scale_y <- function(v) mt + (1 - (v - y_min) / (y_max - y_min)) * ch
+
+  # Quadrant dividers at median
+  med_x <- median(means)
+  med_y <- median(sds)
+  qx <- scale_x(med_x)
+  qy <- scale_y(med_y)
+
+  # Quadrant background fills (very subtle)
+  quadrants <- paste0(
+    sprintf('<rect x="%g" y="%g" width="%g" height="%g" fill="#dcfce7" opacity="0.25"/>', ml, qy, qx - ml, mt + ch - qy),       # Bottom-left: Low priority (green-ish)
+    sprintf('<rect x="%g" y="%g" width="%g" height="%g" fill="#dbeafe" opacity="0.25"/>', qx, qy, ml + cw - qx, mt + ch - qy),   # Bottom-right: Universal Favourite
+    sprintf('<rect x="%g" y="%g" width="%g" height="%g" fill="#fef3c7" opacity="0.25"/>', ml, mt, qx - ml, qy - mt),              # Top-left: Divisive
+    sprintf('<rect x="%g" y="%g" width="%g" height="%g" fill="#fce7f3" opacity="0.25"/>', qx, mt, ml + cw - qx, qy - mt)          # Top-right: Polarising Leaders
+  )
+
+  # Quadrant labels (corners)
+  q_labels <- paste0(
+    sprintf('<text x="%d" y="%d" fill="#94a3b8" font-size="10" font-weight="500" font-style="italic">Low Priority</text>', ml + 8, mt + ch - 8),
+    sprintf('<text x="%d" y="%d" fill="#94a3b8" font-size="10" font-weight="500" font-style="italic" text-anchor="end">Universal Favourites</text>', ml + cw - 8, mt + ch - 8),
+    sprintf('<text x="%d" y="%d" fill="#94a3b8" font-size="10" font-weight="500" font-style="italic">Divisive</text>', ml + 8, mt + 16),
+    sprintf('<text x="%d" y="%d" fill="#94a3b8" font-size="10" font-weight="500" font-style="italic" text-anchor="end">Polarising Leaders</text>', ml + cw - 8, mt + 16)
+  )
+
+  # Median lines (dashed)
+  med_lines <- paste0(
+    sprintf('<line x1="%g" y1="%d" x2="%g" y2="%d" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4,3"/>', qx, mt, qx, mt + ch),
+    sprintf('<line x1="%d" y1="%g" x2="%d" y2="%g" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4,3"/>', ml, qy, ml + cw, qy)
+  )
+
+  # Axis grid
+  x_ticks <- pretty(c(x_min, x_max), 5)
+  x_ticks <- x_ticks[x_ticks >= x_min & x_ticks <= x_max]
+  y_ticks <- pretty(c(y_min, y_max), 5)
+  y_ticks <- y_ticks[y_ticks >= y_min & y_ticks <= y_max]
+
+  grid_svg <- paste(c(
+    vapply(x_ticks, function(xt) {
+      x <- scale_x(xt)
+      paste0(
+        sprintf('<line x1="%g" y1="%d" x2="%g" y2="%d" stroke="#f1f5f9" stroke-width="1"/>', x, mt, x, mt + ch),
+        sprintf('<text x="%g" y="%d" text-anchor="middle" fill="#94a3b8" font-size="10">%.2f</text>', x, mt + ch + 16, xt)
+      )
+    }, character(1)),
+    vapply(y_ticks, function(yt) {
+      y <- scale_y(yt)
+      paste0(
+        sprintf('<line x1="%d" y1="%g" x2="%d" y2="%g" stroke="#f1f5f9" stroke-width="1"/>', ml, y, ml + cw, y),
+        sprintf('<text x="%d" y="%g" text-anchor="end" fill="#94a3b8" font-size="10">%.2f</text>', ml - 8, y + 4, yt)
+      )
+    }, character(1))
+  ), collapse = "\n")
+
+  # Axis labels
+  axis_labels <- paste0(
+    sprintf('<text x="%g" y="%d" text-anchor="middle" fill="#64748b" font-size="12" font-weight="500">Mean Utility</text>', ml + cw / 2, mt + ch + 40),
+    sprintf('<text x="%d" y="%g" text-anchor="middle" fill="#64748b" font-size="12" font-weight="500" transform="rotate(-90, %d, %g)">Standard Deviation</text>', ml - 50, mt + ch / 2, ml - 50, mt + ch / 2)
+  )
+
+  # Dots + labels
+  dots <- paste(vapply(seq_len(n), function(i) {
+    x <- scale_x(means[i])
+    y <- scale_y(sds[i])
+    label <- labels[i]
+    if (nchar(label) > 18) label <- paste0(substr(label, 1, 15), "...")
+    paste0(
+      sprintf('<circle cx="%g" cy="%g" r="6" fill="%s" opacity="0.7" stroke="white" stroke-width="1.5"/>', x, y, brand_colour),
+      sprintf('<text x="%g" y="%g" fill="#1e293b" font-size="10" font-weight="400">%s</text>', x + 10, y + 4, label)
+    )
+  }, character(1)), collapse = "\n")
+
+  # Border
+  border <- sprintf('<rect x="%d" y="%d" width="%d" height="%d" fill="none" stroke="#e2e8f0" stroke-width="1"/>',
+                    ml, mt, cw, ch)
+
+  svg_wrap(paste(quadrants, grid_svg, med_lines, q_labels, border, axis_labels, dots, sep = "\n"),
+           chart_width, chart_height, "Item Strategy Quadrant: Mean Utility vs Standard Deviation")
+}
+
+
+# ==============================================================================
 # COLOUR PALETTE
 # ==============================================================================
 

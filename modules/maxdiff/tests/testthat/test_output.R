@@ -59,7 +59,7 @@ test_that("output path uses Output_Folder from config", {
   output_path <- file.path(output_folder, output_filename)
 
   expect_true(grepl("MyProject_MaxDiff_Results.xlsx", output_path))
-  expect_true(grepl(normalizePath(tempdir(), mustWork = FALSE), normalizePath(output_path, mustWork = FALSE), fixed = TRUE))
+  expect_equal(dirname(output_path), output_folder)
 })
 
 # ==============================================================================

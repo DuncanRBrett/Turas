@@ -1224,21 +1224,21 @@ Always archive:
 
 ## Appendix B: Example Configuration
 
-A complete example configuration is available in:
+A complete working example with all features enabled is available in:
 ```
-modules/maxdiff/examples/basic/
+examples/maxdiff/demo_showcase/
 ```
 
-Generate example files:
+Run the full demo:
 ```r
-source("modules/maxdiff/examples/basic/create_example_files.R")
-create_example_files("path/to/output/folder")
+source("examples/maxdiff/demo_showcase/run_demo.R")
 ```
 
-This creates:
-- `example_maxdiff_config.xlsx` -- complete configuration workbook
-- `example_design.xlsx` -- design file for a 12-item study
-- `example_survey_data.xlsx` -- simulated survey responses (n = 300)
+This generates:
+- `Demo_MaxDiff_Config.xlsx` -- complete configuration with all features enabled
+- `demo_design.xlsx` -- balanced 3-version design for 12 items
+- `demo_data.csv` -- simulated survey responses (n = 200, with weights and anchor column)
+- `output/` -- HTML report (with embedded simulator) and Excel workbook
 
 ---
 

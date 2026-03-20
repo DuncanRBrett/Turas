@@ -55,8 +55,12 @@ fit_aggregate_logit <- function(long_data, items, weighted = TRUE,
     )
   }
 
-  # Make strata() available for formula construction without library() polluting global namespace
+  # Make survival functions available in the local environment.
+  # clogit() internally calls coxph() and Surv() without namespace qualification,
+  # so they must be findable in the calling frame.
   strata <- survival::strata
+  coxph <- survival::coxph
+  Surv <- survival::Surv
 
   # Get included items
   included_items <- items$Item_ID[items$Include == 1]

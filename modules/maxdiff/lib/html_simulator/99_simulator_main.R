@@ -140,3 +140,63 @@ generate_maxdiff_html_simulator <- function(maxdiff_results, config, output_path
     file_size_bytes = file_size
   )
 }
+
+
+#' Build Simulator HTML String (for embedding in report)
+#'
+#' Same as generate_maxdiff_html_simulator but returns the HTML string
+#' instead of writing to a file.
+#'
+#' @param maxdiff_results Full results from run_maxdiff()
+#' @param config Module config
+#'
+#' @return Character string of complete simulator HTML, or NULL on failure
+#' @keywords internal
+build_simulator_html_string <- function(maxdiff_results, config) {
+
+  .md_load_simulator_submodules()
+
+  hb_results <- maxdiff_results$hb_results
+  logit_results <- maxdiff_results$logit_results
+
+  if (is.null(hb_results) && is.null(logit_results)) {
+    message("[TRS INFO] MAXD_SIM_NO_UTILS: Need HB or logit results for simulator")
+    return(NULL)
+  }
+
+  guard <- validate_simulator_inputs(
+    utilities = if (!is.null(hb_results)) hb_results else logit_results,
+    config = config
+  )
+
+  if (!guard$valid) {
+    message(sprintf("[TRS PARTIAL] MAXD_SIM_GUARD: %s", paste(guard$issues, collapse = "; ")))
+    return(NULL)
+  }
+
+  sim_data <- build_simulator_data(
+    hb_results = hb_results,
+    logit_results = logit_results,
+    config = config,
+    segment_results = maxdiff_results$segment_results,
+    raw_data = maxdiff_results$raw_data
+  )
+
+  sim_dir <- get(".md_sim_dir", envir = globalenv())
+  js_dir <- file.path(sim_dir, "js")
+
+  read_js <- function(filename) {
+    fpath <- file.path(js_dir, filename)
+    if (file.exists(fpath)) paste(readLines(fpath, warn = FALSE), collapse = "\n") else ""
+  }
+
+  js_files <- list(
+    engine = read_js("simulator_engine.js"),
+    charts = read_js("simulator_charts.js"),
+    pins   = read_js("simulator_pins.js"),
+    export = read_js("simulator_export.js"),
+    ui     = read_js("simulator_ui.js")
+  )
+
+  build_simulator_page(sim_data, js_files)
+}

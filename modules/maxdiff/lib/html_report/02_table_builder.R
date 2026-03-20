@@ -1,5 +1,5 @@
 # ==============================================================================
-# MAXDIFF HTML REPORT - TABLE BUILDER - TURAS V11.0
+# MAXDIFF HTML REPORT - TABLE BUILDER - TURAS V11.2
 # ==============================================================================
 # Builds HTML tables for the MaxDiff report
 # Layer 2 of the 4-layer HTML report pipeline
@@ -314,4 +314,91 @@ build_segment_table <- function(segment_data) {
   }
 
   paste(tables_html, collapse = "\n")
+}
+
+
+# ==============================================================================
+# HEAD-TO-HEAD HEATMAP TABLE
+# ==============================================================================
+
+#' Build head-to-head comparison heatmap table
+#'
+#' @param h2h_data H2H data from compute_head_to_head (matrix or data.frame)
+#' @param label_map Named character vector mapping Item_ID to Item_Label
+#'
+#' @return HTML string
+#' @keywords internal
+build_h2h_table <- function(h2h_data, label_map = NULL) {
+
+  if (is.null(h2h_data)) {
+    return('<p class="md-empty">No head-to-head data available.</p>')
+  }
+
+  # h2h_data can be a named matrix or a data frame
+  # Expected: square matrix where [i,j] = P(item_i preferred over item_j)
+  if (is.data.frame(h2h_data)) {
+    # Check for Win_Rate column (long format from compute_head_to_head)
+    if ("Win_Rate" %in% names(h2h_data) && "Item_A" %in% names(h2h_data)) {
+      # Convert long format to matrix
+      items <- unique(c(h2h_data$Item_A, h2h_data$Item_B))
+      n <- length(items)
+      mat <- matrix(50, nrow = n, ncol = n, dimnames = list(items, items))
+      for (i in seq_len(nrow(h2h_data))) {
+        a <- h2h_data$Item_A[i]
+        b <- h2h_data$Item_B[i]
+        wr <- h2h_data$Win_Rate[i]
+        if (a %in% items && b %in% items) {
+          mat[a, b] <- round(wr * 100, 1)
+          mat[b, a] <- round((1 - wr) * 100, 1)
+        }
+      }
+      diag(mat) <- NA
+      h2h_data <- mat
+    } else {
+      h2h_data <- as.matrix(h2h_data)
+    }
+  }
+
+  if (!is.matrix(h2h_data) || nrow(h2h_data) < 2) {
+    return('<p class="md-empty">Insufficient data for head-to-head comparison.</p>')
+  }
+
+  items <- rownames(h2h_data)
+  if (is.null(items)) items <- paste0("Item_", seq_len(nrow(h2h_data)))
+  n <- length(items)
+
+  # Map to labels
+  get_label <- function(id) {
+    lbl <- if (!is.null(label_map) && id %in% names(label_map)) label_map[[id]] else id
+    if (nchar(lbl) > 20) lbl <- paste0(substr(lbl, 1, 17), "...")
+    htmlEscape(lbl)
+  }
+
+  # Header row
+  header_cells <- '<th class="md-th md-label-col" style="min-width:120px;">vs</th>'
+  for (j in seq_len(n)) {
+    header_cells <- paste0(header_cells, sprintf(
+      '<th class="md-th md-h2h-cell" style="writing-mode:vertical-lr;transform:rotate(180deg);max-width:40px;font-size:10px;">%s</th>',
+      get_label(items[j])))
+  }
+
+  # Data rows
+  rows <- vapply(seq_len(n), function(i) {
+    cells <- sprintf('<td class="md-td md-label-col" style="font-weight:500;font-size:12px;">%s</td>', get_label(items[i]))
+    for (j in seq_len(n)) {
+      val <- h2h_data[i, j]
+      if (i == j || is.na(val)) {
+        cells <- paste0(cells, '<td class="md-td md-h2h-cell md-h2h-self">&mdash;</td>')
+      } else {
+        css_class <- if (val > 55) "md-h2h-win" else if (val < 45) "md-h2h-lose" else "md-h2h-neutral"
+        cells <- paste0(cells, sprintf(
+          '<td class="md-td md-h2h-cell %s">%.0f%%</td>', css_class, val))
+      }
+    }
+    sprintf('<tr>%s</tr>', cells)
+  }, character(1))
+
+  sprintf(
+    '<div style="overflow-x:auto;"><table class="md-table md-table-compact" style="table-layout:fixed;"><thead><tr>%s</tr></thead><tbody>%s</tbody></table></div>',
+    header_cells, paste(rows, collapse = "\n"))
 }

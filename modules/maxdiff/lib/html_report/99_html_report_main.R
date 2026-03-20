@@ -1,12 +1,12 @@
 # ==============================================================================
-# MAXDIFF HTML REPORT - MAIN ORCHESTRATOR - TURAS V11.0
+# MAXDIFF HTML REPORT - MAIN ORCHESTRATOR - TURAS V11.2
 # ==============================================================================
 # Entry point for MaxDiff HTML report generation
 # Sources the 4-layer pipeline and pipes data through to produce a
 # self-contained HTML report file.
 # ==============================================================================
 
-MAXDIFF_HTML_REPORT_VERSION <- "11.1"
+MAXDIFF_HTML_REPORT_VERSION <- "11.2"
 
 # Flag to prevent re-sourcing
 .md_html_loaded <- FALSE
@@ -82,6 +82,38 @@ MAXDIFF_HTML_REPORT_VERSION <- "11.1"
 }
 
 
+#' Load JS module for report interactivity
+#'
+#' @return Character string of JS code, or empty string
+#' @keywords internal
+.md_load_js_module <- function() {
+  # Find JS file relative to this script
+  js_paths <- c(
+    file.path(getwd(), "modules", "maxdiff", "lib", "html_report", "js", "md_report.js"),
+    file.path(getwd(), "lib", "html_report", "js", "md_report.js")
+  )
+
+  if (exists("script_dir_override", envir = globalenv())) {
+    sd <- get("script_dir_override", envir = globalenv())
+    js_paths <- c(
+      file.path(sd, "..", "lib", "html_report", "js", "md_report.js"),
+      file.path(dirname(sd), "lib", "html_report", "js", "md_report.js"),
+      js_paths
+    )
+  }
+
+  for (jp in js_paths) {
+    jp <- normalizePath(jp, mustWork = FALSE)
+    if (file.exists(jp)) {
+      return(paste(readLines(jp, warn = FALSE), collapse = "\n"))
+    }
+  }
+
+  message("[TRS INFO] MAXD_HTML_JS_NOT_FOUND: md_report.js not found, report will have limited interactivity")
+  ""
+}
+
+
 # ==============================================================================
 # MAIN ENTRY POINT
 # ==============================================================================
@@ -94,11 +126,13 @@ MAXDIFF_HTML_REPORT_VERSION <- "11.1"
 #'   Must contain count_scores, logit_results, and/or hb_results.
 #' @param output_path Character. Path for the output HTML file.
 #' @param config List. Module configuration (from load_maxdiff_config).
+#' @param simulator_html Optional. Pre-built simulator HTML string for embedding.
 #'
 #' @return List with status, output_file, file_size_bytes
 #'
 #' @export
-generate_maxdiff_html_report <- function(maxdiff_results, output_path, config) {
+generate_maxdiff_html_report <- function(maxdiff_results, output_path, config,
+                                         simulator_html = NULL) {
 
   # Source sub-modules
   .md_load_report_submodules()
@@ -119,6 +153,9 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config) {
   if (!dir.exists(output_dir)) {
     dir.create(output_dir, recursive = TRUE)
   }
+
+  # Load JS module
+  js_code <- .md_load_js_module()
 
   # --- Layer 1: Transform ---
   html_data <- tryCatch({
@@ -167,6 +204,17 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config) {
     )
   }
 
+  # Head-to-head table
+  if (!is.null(html_data$head_to_head)) {
+    tables$head_to_head <- tryCatch(
+      build_h2h_table(
+        html_data$head_to_head$h2h_data,
+        html_data$head_to_head$label_map
+      ),
+      error = function(e) { message(sprintf("  Table error (h2h): %s", e$message)); "" }
+    )
+  }
+
   tables$diagnostics <- tryCatch(
     build_diagnostics_table(html_data$diagnostics),
     error = function(e) { message(sprintf("  Table error (diagnostics): %s", e$message)); "" }
@@ -207,9 +255,19 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config) {
     )
   }
 
+  # Item Strategy Quadrant (requires HB population utilities)
+  if (!is.null(maxdiff_results$hb_results$population_utilities)) {
+    charts$strategy_quadrant <- tryCatch(
+      build_strategy_quadrant(maxdiff_results$hb_results$population_utilities, brand),
+      error = function(e) { message(sprintf("  Chart error (strategy quadrant): %s", e$message)); "" }
+    )
+  }
+
   # --- Layer 4: Page assembly ---
   page <- tryCatch({
-    build_maxdiff_page(html_data, tables, charts, config)
+    build_maxdiff_page(html_data, tables, charts, config,
+                       simulator_html = simulator_html,
+                       js_code = js_code)
   }, error = function(e) {
     message(sprintf("[TRS PARTIAL] MAXD_HTML_PAGE_FAILED: %s", e$message))
     return(NULL)

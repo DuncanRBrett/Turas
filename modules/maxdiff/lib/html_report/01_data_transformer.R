@@ -1,5 +1,5 @@
 # ==============================================================================
-# MAXDIFF HTML REPORT - DATA TRANSFORMER - TURAS V11.0
+# MAXDIFF HTML REPORT - DATA TRANSFORMER - TURAS V11.2
 # ==============================================================================
 # Transforms MaxDiff analysis results into HTML-ready data structures
 # Layer 1 of the 4-layer HTML report pipeline
@@ -82,21 +82,29 @@ transform_maxdiff_for_html <- function(maxdiff_results, config) {
   # --- Build TURF ---
   turf <- transform_turf_section(maxdiff_results, config)
 
+  # --- Build head-to-head ---
+  head_to_head <- transform_h2h_section(maxdiff_results, config)
+
   # --- Build diagnostics ---
   diagnostics <- transform_diagnostics_section(maxdiff_results, config)
 
   # --- Build methodology ---
   methodology <- transform_methodology_section(maxdiff_results, config)
 
+  # --- Insights from config ---
+  insights <- config$insights %||% NULL
+
   list(
     meta = meta,
     summary = summary_data,
     preferences = preferences,
     items = items_analysis,
+    head_to_head = head_to_head,
     segments = segments,
     turf = turf,
     diagnostics = diagnostics,
-    methodology = methodology
+    methodology = methodology,
+    insights = insights
   )
 }
 
@@ -164,13 +172,14 @@ transform_summary_section <- function(results, config, meta) {
 
   callout <- sprintf(
     '<div class="md-callout md-callout-result">
-      <strong>Key Finding:</strong> Among %d items evaluated by %d respondents,
-      <strong>%s</strong> emerged as the most preferred item.%s
+      <strong>What you&#39;re looking at:</strong> A MaxDiff study where %d respondents evaluated %d items by repeatedly choosing their most and least preferred options from subsets.<br/>
+      <strong>What it means:</strong> <strong>%s</strong> emerged as the most preferred item.%s<br/>
+      <strong>What to do:</strong> Use the tabs below to explore preference scores, item-level analysis, and portfolio recommendations.
     </div>
     <div class="md-callout md-callout-method">
-      <strong>Estimation Method:</strong> %s %s
+      <strong>Estimation Method:</strong> %s &mdash; %s
     </div>',
-    meta$n_items, meta$n_total, htmlEscape(top_item), top_lead_text,
+    meta$n_total, meta$n_items, htmlEscape(top_item), top_lead_text,
     meta$method, method_note
   )
 
@@ -261,18 +270,11 @@ transform_preferences_section <- function(results, config) {
   anchor_data <- results$anchor_data
 
   callout <- paste0(
-    '<div class="md-callout md-callout-method">',
-    '<strong>Rescaled Scores (0&ndash;100):</strong> ',
-    'Utility estimates have been rescaled to a 0&ndash;100 range for ease of interpretation, ',
-    'where 0 represents the least preferred item and 100 represents the most preferred item among those tested. ',
-    'These scores reflect relative preference strength &mdash; items are only comparable to each other within this study, ',
-    'not to an external or absolute standard.',
-    '</div>',
-    '<div class="md-callout md-callout-method">',
-    '<strong>Preference Shares:</strong> ',
-    'Preference shares represent each item&#39;s estimated probability of being chosen from the full set, ',
-    'derived from the multinomial logit model. They sum to 100% and are the most intuitive metric for comparing items. ',
-    'An item with a 20% preference share is twice as likely to be chosen as one with a 10% share.',
+    '<div class="md-callout md-callout-result">',
+    '<strong>What you&#39;re looking at:</strong> Each item&#39;s preference share (probability of being chosen from the full set, summing to 100%) and rescaled utility score (0&ndash;100 scale).<br/>',
+    '<strong>What it means:</strong> Higher preference shares mean an item is more likely to be selected. An item with 20% share is twice as likely to be chosen as one with 10%. ',
+    'The 0&ndash;100 scores show relative preference strength &mdash; items are comparable within this study only, not to an external standard.<br/>',
+    '<strong>What to do:</strong> Use the toggle to switch between preference shares and raw utility scores. Click column headers to re-sort the table.',
     '</div>'
   )
 
@@ -315,18 +317,12 @@ transform_items_section <- function(results, config) {
   }
 
   callout <- paste0(
-    '<div class="md-callout md-callout-method">',
-    '<strong>Item Analysis &mdash; Best/Worst Counts:</strong> ',
-    '<strong>Best%</strong> is the percentage of times an item was selected as best (most preferred) when it appeared in a task. ',
-    '<strong>Worst%</strong> is the percentage of times it was selected as worst (least preferred) when shown. ',
-    '<strong>BW Score</strong> = (Best% &minus; Worst%) &divide; 100, ranging from &minus;1 (universally disliked &mdash; always chosen as worst) ',
-    'to +1 (universally preferred &mdash; always chosen as best). ',
-    'A score near zero indicates the item generates neither strong positive nor strong negative sentiment.',
-    '</div>',
     '<div class="md-callout md-callout-result">',
-    '<strong>Reading the Chart:</strong> ',
-    'The diverging bar chart makes it easy to spot items with strong positive or negative sentiment. ',
-    'Items extending far to the right are clear favourites; items extending to the left are consistently rejected.',
+    '<strong>What you&#39;re looking at:</strong> How often each item was picked as &ldquo;best&rdquo; vs &ldquo;worst&rdquo; across all choice tasks, plus the BW Score (Best% minus Worst%, divided by 100).<br/>',
+    '<strong>What it means:</strong> Items extending far right in the chart are clear favourites; items extending left are consistently rejected. ',
+    'A BW Score near +1 means universally preferred; near &minus;1 means universally disliked; near 0 means polarising or unremarkable.<br/>',
+    '<strong>What to do:</strong> Look for items that are strongly positive (prioritise) or strongly negative (consider dropping). ',
+    'The Item Strategy Quadrant (if available) shows which items are universally liked vs polarising.',
     '</div>'
   )
 
@@ -346,16 +342,10 @@ transform_segments_section <- function(results, config) {
 
   callout <- paste0(
     '<div class="md-callout md-callout-result">',
-    '<strong>Segment Analysis:</strong> ',
-    'This section shows how preferences vary across different respondent segments. ',
-    'Items where segments diverge represent potential targeting opportunities &mdash; ',
-    'features or messages that resonate strongly with one group but not others.',
-    '</div>',
-    '<div class="md-callout md-callout-method">',
-    '<strong>Interpretation Note:</strong> ',
-    'Differences shown are descriptive only &mdash; no formal statistical significance test has been applied. ',
-    'Apparent differences between small segments may reflect sampling variability rather than true preference differences. ',
-    'Consider segment sample sizes when drawing conclusions.',
+    '<strong>What you&#39;re looking at:</strong> Preference scores broken down by respondent segment (e.g. age, gender, region).<br/>',
+    '<strong>What it means:</strong> Items where segments diverge represent targeting opportunities &mdash; features that resonate strongly with one group but not others. ',
+    'Differences shown are descriptive only; no formal significance test has been applied. Small segments may show apparent differences due to sampling variability.<br/>',
+    '<strong>What to do:</strong> Look for items where segment bars are clearly different. Consider segment sample sizes before acting on apparent differences.',
     '</div>'
   )
 
@@ -378,23 +368,18 @@ transform_turf_section <- function(results, config) {
     ""
   }
 
-  callout <- sprintf(
-    '%s%s',
-    sprintf(
-      '<div class="md-callout md-callout-result"><strong>Portfolio Optimization (TURF):</strong> Portfolio optimization identifies the combination of items that appeals to the widest audience. A portfolio of %d items reaches <strong>%.1f%%</strong> of respondents.%s</div>',
-      nrow(turf$incremental_table),
-      max(turf$incremental_table$Reach_Pct, 0),
-      threshold_text
-    ),
-    paste0(
-      '<div class="md-callout md-callout-method">',
-      '<strong>How It Works:</strong> ',
-      '<strong>Reach</strong> is the percentage of respondents for whom at least one item in the portfolio is appealing. ',
-      'Items are added one at a time using a greedy algorithm: at each step, the item that brings the most new people into the portfolio&#39;s audience is selected. ',
-      'This is a greedy approximation that is optimal for practical purposes but is not guaranteed to find the globally optimal combination for every possible portfolio size.',
-      '</div>'
-    )
+  what_looking <- sprintf(
+    '<strong>What you&#39;re looking at:</strong> The optimal combination of items that appeals to the widest possible audience. A portfolio of %d items reaches <strong>%.1f%%</strong> of respondents.%s<br/>',
+    nrow(turf$incremental_table),
+    max(turf$incremental_table$Reach_Pct, 0),
+    threshold_text
   )
+  what_means <- paste0(
+    '<strong>What it means:</strong> &ldquo;Reach&rdquo; is the percentage of respondents for whom at least one item in the set is appealing. ',
+    'Items are added one at a time, each step selecting the item that brings the most new people into the audience. The chart shows diminishing returns as more items are added.<br/>'
+  )
+  what_to_do <- '<strong>What to do:</strong> Find the &ldquo;elbow&rdquo; in the reach curve &mdash; the point where adding more items yields little additional audience. That is your optimal portfolio size.'
+  callout <- paste0('<div class="md-callout md-callout-result">', what_looking, what_means, what_to_do, '</div>')
 
   list(
     incremental_table = turf$incremental_table,
@@ -433,29 +418,33 @@ transform_diagnostics_section <- function(results, config) {
   has_hb_diag <- !is.null(hb_diagnostics)
   has_logit_diag <- !is.null(logit_fit)
 
-  diag_parts <- '<div class="md-callout md-callout-method"><strong>Diagnostics:</strong> '
+  diag_parts <- '<div class="md-callout md-callout-result"><strong>What you&#39;re looking at:</strong> Technical measures that confirm whether the statistical model ran correctly and produced reliable estimates.<br/>'
+  diag_parts <- paste0(diag_parts, '<strong>What it means:</strong> ')
   if (has_hb_diag) {
     diag_parts <- paste0(diag_parts,
-      '<strong>Convergence (HB):</strong> ',
-      'R-hat values below 1.05 indicate the MCMC chains have converged to the target distribution. ',
-      'Effective Sample Size (ESS) above 400 suggests sufficient independent draws for reliable posterior summaries. ',
-      'Divergent transitions above 0 may indicate model misspecification or overly complex likelihood surfaces &mdash; ',
-      'results should be interpreted with caution if divergences are present.'
+      'R-hat below 1.05 = the model converged (green badge = good). ',
+      'ESS above 400 = enough independent samples for reliable estimates. ',
+      'Zero divergent transitions = the model explored the parameter space cleanly.'
     )
   }
   if (has_logit_diag) {
-    if (has_hb_diag) diag_parts <- paste0(diag_parts, '<br/><br/>')
+    if (has_hb_diag) diag_parts <- paste0(diag_parts, ' ')
     diag_parts <- paste0(diag_parts,
-      '<strong>Model Fit (Logit):</strong> ',
-      'McFadden&#39;s pseudo R&sup2; above 0.2 is generally considered good fit for discrete choice models. ',
-      'AIC and BIC provide relative measures for comparing alternative model specifications &mdash; lower values indicate better fit.'
+      'McFadden pseudo R&sup2; above 0.2 = good model fit for discrete choice. ',
+      'Lower AIC/BIC = better fit.'
     )
   }
   if (!has_hb_diag && !has_logit_diag) {
     diag_parts <- paste0(diag_parts,
       'Count-based analysis does not produce model fit statistics. ',
-      'Consider using Hierarchical Bayes or Aggregate Logit estimation for formal diagnostic measures.'
+      'Consider HB or Logit estimation for formal diagnostics.'
     )
+  }
+  diag_parts <- paste0(diag_parts, '<br/><strong>What to do:</strong> ')
+  if (has_hb_diag || has_logit_diag) {
+    diag_parts <- paste0(diag_parts, 'If all badges are green, results are reliable. If any show warnings, consult the methodology section below for guidance.')
+  } else {
+    diag_parts <- paste0(diag_parts, 'Review study design metrics to ensure adequate sample size and task coverage.')
   }
   callout <- paste0(diag_parts, '</div>')
 
@@ -578,6 +567,110 @@ transform_methodology_section <- function(results, config) {
     method_detail = method_detail,
     design_detail = design_detail,
     assumptions = assumptions,
+    callout = callout
+  )
+}
+
+
+# ==============================================================================
+# HEAD-TO-HEAD SECTION
+# ==============================================================================
+
+#' Transform head-to-head comparison data
+#'
+#' Computes pairwise win rates between items using preference shares or
+#' utility scores. Returns a matrix of win percentages.
+#'
+#' @param results List. Full results from run_maxdiff()
+#' @param config List. Module configuration
+#'
+#' @return List with $h2h_matrix (data.frame), $items, $callout, or NULL
+#' @keywords internal
+transform_h2h_section <- function(results, config) {
+
+  # Build full H2H matrix from pairwise compute_head_to_head() calls
+  # or directly from aggregate utilities when individual data unavailable
+  h2h_data <- NULL
+
+  # Prefer HB individual utilities for more accurate H2H
+  indiv_utils <- results$hb_results$individual_utilities
+
+  if (!is.null(indiv_utils) && exists("compute_head_to_head", mode = "function")) {
+    # Get item column names (exclude non-numeric like resp_id)
+    if (is.data.frame(indiv_utils)) {
+      numeric_cols <- vapply(indiv_utils, is.numeric, logical(1))
+      item_ids <- names(indiv_utils)[numeric_cols]
+    } else {
+      item_ids <- colnames(indiv_utils)
+    }
+
+    if (length(item_ids) >= 2) {
+      n <- length(item_ids)
+      mat <- matrix(NA_real_, nrow = n, ncol = n, dimnames = list(item_ids, item_ids))
+      for (i in seq_len(n)) {
+        mat[i, i] <- NA  # self vs self
+        for (j in seq_len(n)) {
+          if (i != j) {
+            res <- tryCatch(
+              compute_head_to_head(indiv_utils, item_ids[i], item_ids[j]),
+              error = function(e) NULL
+            )
+            if (!is.null(res)) mat[i, j] <- res$prob_a
+          }
+        }
+      }
+      h2h_data <- as.data.frame(mat)
+    }
+  }
+
+  # Fallback: compute from aggregate utilities using logistic formula
+  if (is.null(h2h_data)) {
+    agg <- NULL
+    if (!is.null(results$hb_results$population_utilities)) {
+      pop <- results$hb_results$population_utilities
+      agg <- setNames(pop$HB_Utility_Mean, pop$Item_ID)
+    } else if (!is.null(results$logit_results$utilities)) {
+      lu <- results$logit_results$utilities
+      agg <- setNames(lu$Logit_Utility, lu$Item_ID)
+    }
+
+    if (!is.null(agg) && length(agg) >= 2) {
+      item_ids <- names(agg)
+      n <- length(item_ids)
+      mat <- matrix(NA_real_, nrow = n, ncol = n, dimnames = list(item_ids, item_ids))
+      for (i in seq_len(n)) {
+        for (j in seq_len(n)) {
+          if (i != j) {
+            diff <- agg[i] - agg[j]
+            mat[i, j] <- round(1 / (1 + exp(-diff)) * 100, 1)
+          }
+        }
+      }
+      h2h_data <- as.data.frame(mat)
+    }
+  }
+
+  if (is.null(h2h_data)) return(NULL)
+
+  # Get item labels
+  items_df <- config$items
+  if (!is.null(items_df) && "Item_Label" %in% names(items_df)) {
+    label_map <- setNames(items_df$Item_Label, items_df$Item_ID)
+  } else {
+    label_map <- NULL
+  }
+
+  callout <- paste0(
+    '<div class="md-callout md-callout-result">',
+    '<strong>What you&#39;re looking at:</strong> Pairwise win rates &mdash; each cell shows the probability that the row item would be preferred over the column item in a direct comparison.<br/>',
+    '<strong>What it means:</strong> Values above 50% (green) mean the row item wins more often than not. This helps identify competitive matchups and clearly dominant items.<br/>',
+    '<strong>What to do:</strong> Look for items that consistently win (all-green rows) or consistently lose (all-red rows). Identify close matchups (values near 50%) where positioning could shift outcomes.',
+    '</div>'
+  )
+
+  list(
+    h2h_data = h2h_data,
+    label_map = label_map,
     callout = callout
   )
 }

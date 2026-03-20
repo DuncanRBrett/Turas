@@ -221,6 +221,32 @@ load_maxdiff_config <- function(config_path, project_root = NULL) {
   }
 
   # ============================================================================
+  # LOAD INSIGHTS (optional — for HTML report)
+  # ============================================================================
+
+  insights <- NULL
+  if ("INSIGHTS" %in% available_sheets) {
+    insights <- load_insights_sheet(config_path)
+  }
+
+  # ============================================================================
+  # LOAD SLIDES (optional — custom report pages)
+  # ============================================================================
+
+  slides <- NULL
+  if ("SLIDES" %in% available_sheets) {
+    slides <- tryCatch({
+      raw <- load_config_sheet(config_path, "SLIDES")
+      if (!is.null(raw) && nrow(raw) > 0 && "Title" %in% names(raw)) {
+        raw[!is.na(raw$Title) & nzchar(trimws(raw$Title)), , drop = FALSE]
+      } else NULL
+    }, error = function(e) {
+      message(sprintf("  [INFO] SLIDES sheet found but could not be read: %s", e$message))
+      NULL
+    })
+  }
+
+  # ============================================================================
   # VALIDATE CROSS-REFERENCES
   # ============================================================================
 
@@ -244,6 +270,8 @@ load_maxdiff_config <- function(config_path, project_root = NULL) {
     survey_mapping = survey_mapping,
     segment_settings = segment_settings,
     output_settings = output_settings,
+    insights = insights,
+    slides = slides,
     mode = mode,
     project_root = project_root,
     config_path = config_path
@@ -252,6 +280,70 @@ load_maxdiff_config <- function(config_path, project_root = NULL) {
   class(config) <- c("maxdiff_config", "list")
 
   return(config)
+}
+
+
+# ==============================================================================
+# INSIGHTS SHEET LOADER
+# ==============================================================================
+
+#' Load Optional INSIGHTS Sheet from Config Excel
+#'
+#' Reads an "INSIGHTS" sheet from the config workbook if it exists.
+#' Expected columns: Panel, Text (and optional Banner).
+#' Panel values map to report tabs: overview, preferences, items, h2h,
+#' turf, segments, diagnostics.
+#'
+#' @param config_path Character, path to config Excel file
+#' @return Named list of insights keyed by panel_id, or NULL
+#' @keywords internal
+load_insights_sheet <- function(config_path) {
+  tryCatch({
+    sheets <- openxlsx::getSheetNames(config_path)
+    if (!"INSIGHTS" %in% sheets) return(NULL)
+
+    df <- openxlsx::read.xlsx(config_path, sheet = "INSIGHTS",
+                              colNames = TRUE, detectDates = FALSE)
+    if (is.null(df) || nrow(df) == 0) return(NULL)
+
+    # Require Panel and Text columns
+    if (!all(c("Panel", "Text") %in% names(df))) {
+      message("  [INFO] INSIGHTS sheet found but missing Panel/Text columns - skipped")
+      return(NULL)
+    }
+
+    # Filter valid rows
+    df <- df[!is.na(df$Panel) & nzchar(trimws(df$Panel)) &
+             !is.na(df$Text) & nzchar(trimws(df$Text)), , drop = FALSE]
+    if (nrow(df) == 0) return(NULL)
+
+    has_banner <- "Banner" %in% names(df)
+
+    # Build structure: insights[[panel_id]] = list of list(banner, text)
+    insights <- list()
+    for (i in seq_len(nrow(df))) {
+      panel_id <- tolower(trimws(df$Panel[i]))
+      banner <- if (has_banner && !is.na(df$Banner[i]) && nzchar(trimws(df$Banner[i]))) {
+        trimws(df$Banner[i])
+      } else {
+        NA_character_
+      }
+      entry <- list(banner = banner, text = trimws(df$Text[i]))
+      if (is.null(insights[[panel_id]])) {
+        insights[[panel_id]] <- list(entry)
+      } else {
+        insights[[panel_id]] <- c(insights[[panel_id]], list(entry))
+      }
+    }
+
+    n_total <- sum(vapply(insights, length, integer(1)))
+    message(sprintf("  [INFO] Loaded %d insights for %d panels from INSIGHTS sheet",
+                    n_total, length(insights)))
+    insights
+  }, error = function(e) {
+    message(sprintf("  [WARNING] Could not read INSIGHTS sheet: %s", e$message))
+    NULL
+  })
 }
 
 

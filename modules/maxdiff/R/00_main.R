@@ -946,13 +946,48 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
   results$output_path <- output_path
 
   # ==========================================================================
-  # STEP 12: GENERATE HTML REPORT
+  # STEP 12: GENERATE SIMULATOR HTML STRING (for embedding in report)
   # ==========================================================================
 
+  generate_sim <- parse_yes_no(config$output_settings$Generate_Simulator %||% FALSE)
   generate_html <- parse_yes_no(config$output_settings$Generate_HTML_Report %||% FALSE)
+  simulator_html <- NULL
+
+  if (generate_sim && !is.null(output_path)) {
+    if (verbose) cat("\nSTEP 12: Generating interactive simulator...\n")
+
+    tryCatch({
+      base_dir <- get_script_dir()
+      sim_main <- file.path(base_dir, "..", "lib", "html_simulator", "99_simulator_main.R")
+      if (!file.exists(sim_main)) {
+        sim_main <- file.path(getwd(), "modules", "maxdiff", "lib", "html_simulator", "99_simulator_main.R")
+      }
+      if (file.exists(sim_main)) {
+        source(sim_main, local = FALSE)
+        if (generate_html) {
+          # Build simulator HTML string for embedding in report (don't write separate file)
+          simulator_html <- build_simulator_html_string(results, config)
+        } else {
+          # No report — write standalone simulator file
+          sim_path <- sub("\\.xlsx$", "_simulator.html", output_path)
+          sim_result <- generate_maxdiff_html_simulator(results, config, sim_path)
+          results$simulator_path <- sim_result$output_file
+        }
+      } else {
+        message("[TRS PARTIAL] MAXD_SIM_NOT_FOUND: Simulator module not found")
+      }
+    }, error = function(e) {
+      message(sprintf("[TRS PARTIAL] MAXD_SIM_FAILED: Simulator failed: %s", conditionMessage(e)))
+      add_warning(sprintf("Simulator: %s", conditionMessage(e)))
+    })
+  }
+
+  # ==========================================================================
+  # STEP 13: GENERATE HTML REPORT (with embedded simulator)
+  # ==========================================================================
 
   if (generate_html && !is.null(output_path)) {
-    if (verbose) cat("\nSTEP 12: Generating HTML report...\n")
+    if (verbose) cat("\nSTEP 13: Generating HTML report...\n")
 
     html_report_path <- sub("\\.xlsx$", ".html", output_path)
 
@@ -965,44 +1000,17 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
       }
       if (file.exists(html_main)) {
         source(html_main, local = FALSE)
-        html_result <- generate_maxdiff_html_report(results, html_report_path, config)
+        html_result <- generate_maxdiff_html_report(
+          results, html_report_path, config,
+          simulator_html = simulator_html
+        )
         results$html_report_path <- html_result$output_file
       } else {
         message("[TRS PARTIAL] MAXD_HTML_NOT_FOUND: HTML report module not found")
       }
     }, error = function(e) {
       message(sprintf("[TRS PARTIAL] MAXD_HTML_FAILED: HTML report failed: %s", conditionMessage(e)))
-      add_warning( sprintf("HTML report: %s", conditionMessage(e)))
-    })
-  }
-
-  # ==========================================================================
-  # STEP 13: GENERATE HTML SIMULATOR
-  # ==========================================================================
-
-  generate_sim <- parse_yes_no(config$output_settings$Generate_Simulator %||% FALSE)
-
-  if (generate_sim && !is.null(output_path)) {
-    if (verbose) cat("\nSTEP 13: Generating interactive simulator...\n")
-
-    sim_path <- sub("\\.xlsx$", "_simulator.html", output_path)
-
-    tryCatch({
-      base_dir <- get_script_dir()
-      sim_main <- file.path(base_dir, "..", "lib", "html_simulator", "99_simulator_main.R")
-      if (!file.exists(sim_main)) {
-        sim_main <- file.path(getwd(), "modules", "maxdiff", "lib", "html_simulator", "99_simulator_main.R")
-      }
-      if (file.exists(sim_main)) {
-        source(sim_main, local = FALSE)
-        sim_result <- generate_maxdiff_html_simulator(results, config, sim_path)
-        results$simulator_path <- sim_result$output_file
-      } else {
-        message("[TRS PARTIAL] MAXD_SIM_NOT_FOUND: Simulator module not found")
-      }
-    }, error = function(e) {
-      message(sprintf("[TRS PARTIAL] MAXD_SIM_FAILED: Simulator failed: %s", conditionMessage(e)))
-      add_warning( sprintf("Simulator: %s", conditionMessage(e)))
+      add_warning(sprintf("HTML report: %s", conditionMessage(e)))
     })
   }
 
