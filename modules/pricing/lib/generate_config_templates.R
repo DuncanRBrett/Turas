@@ -959,6 +959,23 @@ generate_pricing_config_template <- function(output_path,
   addStyle(wb, "Insights", make_help_style(), rows = 2:8, cols = 1:2, gridExpand = TRUE)
 
   # --------------------------------------------------------------------------
+  # AddedSlides Sheet (optional narrative slides for HTML report)
+  # --------------------------------------------------------------------------
+  addWorksheet(wb, "AddedSlides", gridLines = FALSE)
+
+  slides_data <- data.frame(
+    slide_title = c("Example Slide", ""),
+    content = c("Replace with your narrative content. Supports **bold**, *italic*, ## headings, - bullets, > quotes.", ""),
+    image_path = c("", ""),
+    display_order = c(1, 2),
+    stringsAsFactors = FALSE
+  )
+
+  writeData(wb, "AddedSlides", slides_data, startRow = 1, headerStyle = make_header_style())
+  addStyle(wb, "AddedSlides", make_help_style(), rows = 2:3, cols = 1:4, gridExpand = TRUE)
+  setColWidths(wb, "AddedSlides", cols = 1:4, widths = c(25, 60, 30, 15))
+
+  # --------------------------------------------------------------------------
   # Save
   # --------------------------------------------------------------------------
   saveWorkbook(wb, output_path, overwrite = overwrite)

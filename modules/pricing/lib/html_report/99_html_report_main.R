@@ -275,7 +275,8 @@ generate_pricing_html_report <- function(pricing_results, output_path,
   # --------------------------------------------------------------------------
   cat("   HTML Report: Assembling page...\n")
   page <- build_pricing_page(html_data, tables, charts, config,
-                              js_dir = js_dir, simulator_data = simulator_data)
+                              js_dir = js_dir, simulator_data = simulator_data,
+                              added_slides = config$added_slides)
 
   # --------------------------------------------------------------------------
   # Step 6: Write to disk

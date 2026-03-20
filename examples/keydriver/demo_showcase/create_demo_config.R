@@ -270,6 +270,25 @@ create_demo_config <- function(output_path = NULL) {
                      cols = 1:ncol(custom_slides), gridExpand = TRUE)
   openxlsx::setColWidths(wb, "CustomSlides", cols = 1:ncol(custom_slides), widths = c(20, 50, 20, 12))
 
+  # Sheet 6: Insights (v10.4)
+  # Pre-populated analyst insights that appear in the HTML report
+  openxlsx::addWorksheet(wb, "Insights")
+  insights_df <- data.frame(
+    section = c("exec-summary", "importance", "quadrant"),
+    insight_text = c(
+      "Customer service and product quality are the two strongest drivers of overall satisfaction, together explaining over 40% of the variance. These should be the primary focus of improvement efforts.",
+      "The derived importance ranking from Shapley decomposition shows a clear tier structure: the top 3 drivers account for the majority of explained variance, while the bottom 3 contribute marginally.",
+      "Three drivers fall in the 'Invest' quadrant (high importance, low performance): Customer Service, Digital Experience, and Communication Quality. These represent the highest-ROI improvement opportunities."
+    ),
+    image_path = c(NA_character_, NA_character_, NA_character_),
+    stringsAsFactors = FALSE
+  )
+
+  openxlsx::writeData(wb, "Insights", insights_df, startRow = 1)
+  openxlsx::addStyle(wb, "Insights", header_style, rows = 1,
+                     cols = 1:ncol(insights_df), gridExpand = TRUE)
+  openxlsx::setColWidths(wb, "Insights", cols = 1:ncol(insights_df), widths = c(20, 60, 20))
+
   # ------------------------------------------------------------------
   # Save
   # ------------------------------------------------------------------

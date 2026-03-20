@@ -4,7 +4,7 @@
 #
 # Purpose: Automatically generate Good/Better/Best tier structure from
 #          pricing analysis results
-# Version: 1.0.0
+# Version: 12.0
 # Date: 2025-12-11
 #
 # ==============================================================================

@@ -4,7 +4,7 @@
 #
 # Purpose: Load and validate Excel configuration for pricing analysis
 #          Supports autodetect heading row (header not always in row 1)
-# Version: 2.0.0
+# Version: 12.0
 # Date: 2026-03-09
 #
 # ==============================================================================
@@ -284,6 +284,11 @@ load_pricing_config <- function(config_file) {
   settings$insights <- tryCatch({
     load_insights_config(config_file)
   }, error = function(e) list())
+
+  # Load added slides (optional AddedSlides sheet)
+  settings$added_slides <- tryCatch({
+    load_added_slides(config_file)
+  }, error = function(e) NULL)
 
   return(settings)
 }
@@ -901,6 +906,120 @@ load_insights_config <- function(config_file) {
     }
   }
   result
+}
+
+
+#' Load Optional AddedSlides Sheet from Config Excel
+#'
+#' Reads an "AddedSlides" sheet from the pricing config workbook if it exists.
+#' Expected columns: slide_title, content (markdown), image_path (optional),
+#' display_order (optional, auto-sequenced if missing).
+#' Images are embedded as base64 data URIs for self-contained HTML reports.
+#'
+#' @param config_file Character, path to config Excel file
+#' @return List of slide objects, or NULL if sheet is absent
+#' @keywords internal
+load_added_slides <- function(config_file) {
+  sheets <- readxl::excel_sheets(config_file)
+
+  sheet_name <- if ("AddedSlides" %in% sheets) "AddedSlides"
+                else if ("Added_Slides" %in% sheets) "Added_Slides"
+                else return(NULL)
+
+  df <- tryCatch(
+    readxl::read_excel(config_file, sheet = sheet_name),
+    error = function(e) NULL
+  )
+
+  # Auto-detect header row if not in row 1
+
+  if (!is.null(df) && !all(c("slide_title", "content") %in% tolower(names(df)))) {
+    raw <- suppressMessages(
+      readxl::read_excel(config_file, sheet = sheet_name,
+                         col_names = FALSE, n_max = 10)
+    )
+    header_row <- NULL
+    for (r in seq_len(nrow(raw))) {
+      row_vals <- tolower(trimws(as.character(unlist(raw[r, ]))))
+      if ("slide_title" %in% row_vals && "content" %in% row_vals) {
+        header_row <- r
+        break
+      }
+    }
+    if (!is.null(header_row)) {
+      df <- readxl::read_excel(config_file, sheet = sheet_name,
+                               skip = header_row - 1)
+    }
+  }
+
+  if (is.null(df) || nrow(df) == 0) return(NULL)
+
+  # Normalize column names
+  names(df) <- tolower(trimws(names(df)))
+
+  if (!"slide_title" %in% names(df) || !"content" %in% names(df)) {
+    cat("  [INFO] AddedSlides sheet found but missing slide_title/content columns - skipped\n")
+    return(NULL)
+  }
+
+  # Filter valid rows
+  df <- df[!is.na(df$slide_title) & nzchar(trimws(as.character(df$slide_title))), , drop = FALSE]
+  if (nrow(df) == 0) return(NULL)
+
+  # Add display_order if not present
+  if (!"display_order" %in% names(df)) {
+    df$display_order <- seq_len(nrow(df))
+  }
+  df <- df[order(df$display_order), , drop = FALSE]
+
+  # Resolve image_path relative to config file directory
+
+  config_dir <- dirname(normalizePath(config_file, mustWork = FALSE))
+  has_image_col <- "image_path" %in% names(df)
+
+  slides <- lapply(seq_len(nrow(df)), function(i) {
+    slide <- list(
+      id = sprintf("added-slide-%d", i),
+      title = trimws(as.character(df$slide_title[i])),
+      content = trimws(as.character(df$content[i] %||% "")),
+      order = i,
+      image_data = NULL
+    )
+
+    # Embed image as base64 if image_path is provided
+    if (has_image_col && !is.na(df$image_path[i]) && nzchar(trimws(as.character(df$image_path[i])))) {
+      img_path <- trimws(as.character(df$image_path[i]))
+      # Resolve relative paths against config directory
+      if (!file.exists(img_path)) {
+        img_path <- file.path(config_dir, img_path)
+      }
+      if (file.exists(img_path) && requireNamespace("base64enc", quietly = TRUE)) {
+        tryCatch({
+          raw_bytes <- readBin(img_path, "raw", file.info(img_path)$size)
+          ext <- tolower(tools::file_ext(img_path))
+          mime <- switch(ext,
+            png = "image/png", jpg = "image/jpeg", jpeg = "image/jpeg",
+            gif = "image/gif", webp = "image/webp", svg = "image/svg+xml",
+            "image/png"
+          )
+          slide$image_data <- sprintf("data:%s;base64,%s",
+            mime, base64enc::base64encode(raw_bytes))
+          cat(sprintf("  [INFO] Embedded image for slide '%s' (%s, %dKB)\n",
+            slide$title, basename(img_path), round(length(raw_bytes) / 1024)))
+        }, error = function(e) {
+          cat(sprintf("  [WARNING] Could not embed image '%s': %s\n", img_path, e$message))
+        })
+      } else if (!file.exists(img_path)) {
+        cat(sprintf("  [WARNING] Image file not found for slide '%s': %s\n",
+          slide$title, img_path))
+      }
+    }
+
+    slide
+  })
+
+  cat(sprintf("  [INFO] Loaded %d added slides from %s sheet\n", length(slides), sheet_name))
+  slides
 }
 
 

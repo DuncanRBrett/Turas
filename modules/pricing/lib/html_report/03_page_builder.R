@@ -23,7 +23,8 @@
 #' @return Complete HTML document as character string
 #' @keywords internal
 build_pricing_page <- function(html_data, tables, charts, config,
-                                js_dir = NULL, simulator_data = NULL) {
+                                js_dir = NULL, simulator_data = NULL,
+                                added_slides = NULL) {
 
   brand <- config$brand_colour %||% "#1e3a5f"
   if (is.na(brand) || !nzchar(trimws(brand))) brand <- "#1e3a5f"
@@ -46,6 +47,8 @@ build_pricing_page <- function(html_data, tables, charts, config,
   if (!is.null(html_data$segments)) tabs[["segments"]] <- "Segments"
   if (!is.null(html_data$recommendation)) tabs[["recommendation"]] <- "Recommendation"
   if (has_simulator) tabs[["simulator"]] <- "Simulator"
+  has_slides <- !is.null(added_slides) && length(added_slides) > 0
+  tabs[["slides"]] <- "Added Slides"
   tabs[["pinned"]] <- "Pinned"
   tabs[["about"]] <- "About"
 
@@ -81,6 +84,7 @@ build_pricing_page <- function(html_data, tables, charts, config,
   if (has_simulator) {
     panels <- c(panels, build_simulator_panel(unit_cost, simulator_data))
   }
+  panels <- c(panels, build_added_slides_panel(added_slides))
   panels <- c(panels, build_pinned_views_panel())
   panels <- c(panels, build_about_panel(html_data, config))
 
@@ -524,6 +528,140 @@ body {
 }
 .pr-tooltip.visible { opacity: 1; }
 
+/* ── Added Slides ── */
+.pr-slides-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.pr-slides-hint {
+  font-size: 12px;
+  color: var(--pr-text-secondary);
+  margin-top: 2px;
+}
+.pr-slides-actions { display: flex; gap: 8px; }
+.pr-slides-md-help {
+  background: var(--pr-bg-muted);
+  border: 1px solid var(--pr-border);
+  border-radius: 6px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  font-size: 11px;
+  color: var(--pr-text-secondary);
+  line-height: 1.6;
+}
+.pr-slides-md-help code {
+  background: #e2e8f0;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+.pr-slide-card {
+  background: #fff;
+  border: 1px solid var(--pr-border);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.pr-slide-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.pr-slide-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--pr-text-primary);
+  outline: none;
+  min-width: 200px;
+  border-bottom: 1px dashed transparent;
+}
+.pr-slide-title:focus {
+  border-bottom-color: var(--pr-border);
+}
+.pr-slide-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.pr-slide-img-preview {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 12px;
+  border: 1px solid var(--pr-border);
+  border-radius: 6px;
+  overflow: hidden;
+  max-width: 100%;
+}
+.pr-slide-img-thumb {
+  display: block;
+  max-width: 100%;
+  max-height: 300px;
+  object-fit: contain;
+}
+.pr-slide-img-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.5);
+  color: #fff;
+  font-size: 16px;
+  line-height: 22px;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.pr-slide-img-preview:hover .pr-slide-img-remove { opacity: 1; }
+.pr-slide-md-editor {
+  width: 100%;
+  min-height: 100px;
+  padding: 12px;
+  font-size: 13px;
+  border: 1px solid var(--pr-border);
+  border-radius: 6px;
+  font-family: monospace;
+  resize: vertical;
+  display: none;
+  box-sizing: border-box;
+}
+.pr-slide-card.editing .pr-slide-md-editor { display: block; }
+.pr-slide-card.editing .pr-slide-md-rendered { display: none; }
+.pr-slide-card:not(.editing) .pr-slide-md-editor { display: none; }
+.pr-slide-md-rendered {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--pr-text-primary);
+  padding: 4px 0;
+  min-height: 24px;
+  cursor: pointer;
+}
+.pr-slide-md-rendered:empty::after {
+  content: "Double-click to add content...";
+  color: #94a3b8;
+  font-style: italic;
+}
+.pr-slide-md-rendered h2 { font-size: 16px; font-weight: 600; margin: 12px 0 6px; color: var(--pr-text-primary); }
+.pr-slide-md-rendered p { margin: 6px 0; }
+.pr-slide-md-rendered blockquote {
+  border-left: 3px solid var(--pr-brand);
+  padding: 8px 16px;
+  margin: 8px 0;
+  background: var(--pr-bg-muted);
+  font-style: italic;
+  color: #475569;
+}
+.pr-slide-md-rendered ul { padding-left: 20px; margin: 6px 0; }
+.pr-slide-md-rendered li { margin-bottom: 4px; }
+.pr-slide-md-rendered strong { font-weight: 700; }
+.pr-slide-md-rendered em { font-style: italic; }
+
 /* ── Print CSS (comprehensive, matching tabs module) ── */
 @page { size: A4 landscape; margin: 10mm 12mm; }
 
@@ -552,7 +690,7 @@ body {
 
   .pr-tab-nav { display: none !important; }
   .pr-panel { display: block !important; page-break-inside: avoid; margin-bottom: 16px; }
-  #panel-pinned, #panel-simulator .sim-battle { display: none !important; }
+  #panel-pinned, #panel-slides, #panel-simulator .sim-battle { display: none !important; }
 
   .pr-dashboard { page-break-after: avoid; }
   .pr-gauge-card { border-left-color: #1a2744 !important; box-shadow: none !important; }
@@ -1283,6 +1421,120 @@ build_recommendation_panel <- function(rec_data, tables, insights = list()) {
 # PINNED VIEWS PANEL
 # ==============================================================================
 
+# ==============================================================================
+# ADDED SLIDES PANEL (config-driven + interactive slide creation)
+# ==============================================================================
+
+#' Build the Added Slides panel
+#'
+#' Renders initial slides from config (if any) and provides interactive
+#' slide creation with markdown editing, image upload, reordering, and pinning.
+#'
+#' @param slides List of slide objects from load_added_slides(), or NULL
+#' @return HTML string for the slides panel
+#' @keywords internal
+build_added_slides_panel <- function(slides = NULL) {
+
+  # Build initial slide cards from config data
+  slide_cards_html <- ""
+  if (!is.null(slides) && length(slides) > 0) {
+    cards <- vapply(slides, function(s) {
+      build_slide_card(s$id, s$title, s$content, s$image_data)
+    }, character(1))
+    slide_cards_html <- paste(cards, collapse = "\n")
+  }
+
+  has_slides <- !is.null(slides) && length(slides) > 0
+  empty_display <- if (has_slides) "display:none;" else ""
+
+  sprintf(
+    '<div class="pr-panel" id="panel-slides">
+       <div class="pr-section">
+         <div class="pr-slides-header">
+           <div>
+             <h2 style="border:none;padding:0;margin:0 0 4px;">Added Slides</h2>
+             <p class="pr-slides-hint">Open-ended findings, quotes, and narrative content. Double-click to edit, use markdown for formatting.</p>
+           </div>
+           <div class="pr-slides-actions">
+             <button class="pr-btn-secondary" onclick="addPrSlide()">+ Add Slide</button>
+           </div>
+         </div>
+         <div class="pr-slides-md-help">
+           <span style="font-weight:600;color:#475569;">Formatting: </span>
+           <code>**bold**</code> &middot;
+           <code>*italic*</code> &middot;
+           <code>## Heading</code> &middot;
+           <code>- bullet</code> &middot;
+           <code>&gt; quote</code>
+         </div>
+         <div id="pr-slides-container">%s</div>
+         <div id="pr-slides-empty" style="%stext-align:center;padding:60px 20px;color:#94a3b8;">
+           <div style="font-size:36px;margin-bottom:12px;">&#128221;</div>
+           <div style="font-size:14px;font-weight:600;">No slides yet</div>
+           <div style="font-size:12px;margin-top:4px;">Click &ldquo;Add Slide&rdquo; to create narrative content, or add an &ldquo;AddedSlides&rdquo; sheet to your config Excel.</div>
+         </div>
+       </div>
+     </div>',
+    slide_cards_html,
+    empty_display
+  )
+}
+
+
+#' Build a single slide card
+#'
+#' @param slide_id Unique ID for the slide
+#' @param title Slide title text
+#' @param content_md Markdown content
+#' @param image_data Base64 data URI for embedded image, or NULL
+#' @return HTML string for one slide card
+#' @keywords internal
+build_slide_card <- function(slide_id, title, content_md, image_data = NULL) {
+
+  has_img <- !is.null(image_data) && nzchar(image_data %||% "")
+  img_display <- if (has_img) "" else "display:none;"
+  img_src <- if (has_img) image_data else ""
+
+  # Escape content for safe embedding in HTML textarea
+  safe_title <- htmlEscape(title)
+  safe_content <- htmlEscape(content_md)
+
+  sprintf(
+    '<div class="pr-slide-card" data-slide-id="%s">
+       <div class="pr-slide-header">
+         <div class="pr-slide-title" contenteditable="true">%s</div>
+         <div class="pr-slide-actions">
+           <button class="pr-export-btn" title="Add image" onclick="triggerPrSlideImage(\'%s\')">&#x1F5BC;</button>
+           <button class="pr-export-btn" title="Pin this slide" onclick="pinPrSlide(\'%s\')">&#x1F4CC;</button>
+           <button class="pr-export-btn" title="Move up" onclick="movePrSlide(\'%s\',\'up\')">&#x25B2;</button>
+           <button class="pr-export-btn" title="Move down" onclick="movePrSlide(\'%s\',\'down\')">&#x25BC;</button>
+           <button class="pr-export-btn" title="Remove slide" style="color:#e8614d;" onclick="removePrSlide(\'%s\')">&#x2715;</button>
+         </div>
+       </div>
+       <div class="pr-slide-img-preview" style="%s">
+         <img class="pr-slide-img-thumb" src="%s"/>
+         <button class="pr-slide-img-remove" onclick="removePrSlideImage(\'%s\')" title="Remove image">&times;</button>
+       </div>
+       <input type="file" class="pr-slide-img-input" accept="image/*" style="display:none;" onchange="handlePrSlideImage(\'%s\', this)">
+       <textarea class="pr-slide-md-editor" rows="6" placeholder="Enter markdown content... (**bold**, *italic*, &gt; quote, - bullet, ## heading)">%s</textarea>
+       <div class="pr-slide-md-rendered"></div>
+       <textarea class="pr-slide-md-store" style="display:none;">%s</textarea>
+       <textarea class="pr-slide-img-store" style="display:none;">%s</textarea>
+     </div>',
+    slide_id,
+    safe_title,
+    slide_id, slide_id, slide_id, slide_id, slide_id,
+    img_display,
+    img_src,
+    slide_id,
+    slide_id,
+    safe_content,
+    safe_content,
+    if (has_img) img_src else ""
+  )
+}
+
+
 build_pinned_views_panel <- function() {
   '<div class="pr-panel" id="panel-pinned">
      <div class="pr-section">
@@ -1610,7 +1862,7 @@ build_pricing_js <- function(js_dir = NULL) {
   js_parts <- character(0)
 
   if (!is.null(js_dir) && dir.exists(js_dir)) {
-    js_files <- c("pricing_simulator.js", "pricing_insights.js", "pricing_pins.js", "pricing_exports.js", "pricing_navigation.js")
+    js_files <- c("pricing_simulator.js", "pricing_insights.js", "pricing_pins.js", "pricing_slides.js", "pricing_exports.js", "pricing_navigation.js")
     for (jf in js_files) {
       jpath <- file.path(js_dir, jf)
       if (file.exists(jpath)) {

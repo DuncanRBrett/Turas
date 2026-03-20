@@ -252,19 +252,34 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
   if ("CustomSlides" %in% available_sheets) {
     cs_df <- tryCatch(
       openxlsx::read.xlsx(config_file, sheet = "CustomSlides"),
-      error = function(e) {
-        cat(sprintf("    [WARN] CustomSlides sheet exists but could not be read: %s\n",
-                    e$message))
-        NULL
-      }
+      error = function(e) NULL  # CustomSlides is optional — skip silently on read error
     )
     if (!is.null(cs_df) && nrow(cs_df) > 0) {
-      # Validate minimum columns
       if ("slide_title" %in% names(cs_df) && "slide_content" %in% names(cs_df)) {
         custom_slides <- cs_df
-        cat(sprintf("    [INFO] Loaded %d custom slide(s) from config\n", nrow(cs_df)))
+        cat(sprintf("   Loaded %d custom slide(s) from config\n", nrow(cs_df)))
       } else {
-        cat("    [WARN] CustomSlides sheet missing required columns: slide_title, slide_content\n")
+        cat("   [WARN] CustomSlides sheet missing required columns (slide_title, slide_content) — skipped\n")
+      }
+    }
+  }
+
+  # -----------------------------------------------------------------
+  # NEW v10.4: Load optional Insights sheet
+  # Columns: section (required), insight_text (required), image_path (optional)
+  # -----------------------------------------------------------------
+  insights <- NULL
+  if ("Insights" %in% available_sheets) {
+    ins_df <- tryCatch(
+      openxlsx::read.xlsx(config_file, sheet = "Insights"),
+      error = function(e) NULL  # Insights is optional — skip silently on read error
+    )
+    if (!is.null(ins_df) && nrow(ins_df) > 0) {
+      if ("section" %in% names(ins_df) && "insight_text" %in% names(ins_df)) {
+        insights <- ins_df
+        cat(sprintf("   Loaded %d pre-populated insight(s) from config\n", nrow(ins_df)))
+      } else {
+        cat("   [WARN] Insights sheet missing required columns (section, insight_text) — skipped\n")
       }
     }
   }
@@ -290,7 +305,9 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
     # NEW v10.3: Feature policies (on_fail behavior)
     feature_policies = feature_policies,
     # NEW v10.4: Config-driven presentation slides
-    custom_slides = custom_slides
+    custom_slides = custom_slides,
+    # NEW v10.4: Config-driven pre-populated insights
+    insights = insights
   )
 }
 
@@ -366,7 +383,7 @@ validate_stated_importance_sheet <- function(si_df) {
   }
 
   # Return the (possibly renamed) data frame so the caller gets the changes
-  invisible(si_df)
+  si_df
 }
 
 

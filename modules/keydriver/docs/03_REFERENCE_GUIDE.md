@@ -1,7 +1,7 @@
 # Turas Key Driver Analysis - Reference Guide
 
-**Version:** 10.0
-**Last Updated:** 22 December 2025
+**Version:** 10.4
+**Last Updated:** 20 March 2026
 **Target Audience:** Analysts, Statisticians, Data Scientists
 
 This document provides comprehensive reference for Key Driver Analysis methodology, statistical methods, and interpretation guidelines.
@@ -16,12 +16,16 @@ This document provides comprehensive reference for Key Driver Analysis methodolo
 4. [Method 3: Standardized Coefficients](#method-3-standardized-coefficients)
 5. [Method 4: Zero-Order Correlations](#method-4-zero-order-correlations)
 6. [Method 5: SHAP Analysis](#method-5-shap-analysis)
-7. [Multicollinearity Diagnostics (VIF)](#multicollinearity-diagnostics-vif)
-8. [Quadrant Analysis (IPA)](#quadrant-analysis-ipa)
-9. [Weighted Analysis](#weighted-analysis)
-10. [Interpretation Guidelines](#interpretation-guidelines)
-11. [Method Comparison](#method-comparison)
-12. [Assumptions and Limitations](#assumptions-and-limitations)
+7. [Method 6: Elastic Net](#method-6-elastic-net)
+8. [Method 7: Necessary Condition Analysis (NCA)](#method-7-necessary-condition-analysis-nca)
+9. [Method 8: Dominance Analysis](#method-8-dominance-analysis)
+10. [Method 9: GAM Nonlinear Effects](#method-9-gam-nonlinear-effects)
+11. [Multicollinearity Diagnostics (VIF)](#multicollinearity-diagnostics-vif)
+12. [Quadrant Analysis (IPA)](#quadrant-analysis-ipa)
+13. [Weighted Analysis](#weighted-analysis)
+14. [Interpretation Guidelines](#interpretation-guidelines)
+15. [Method Comparison](#method-comparison)
+16. [Assumptions and Limitations](#assumptions-and-limitations)
 
 ---
 
@@ -359,6 +363,224 @@ For tree-based models, SHAP values can be computed efficiently in O(TLD²) where
 
 ---
 
+## Method 6: Elastic Net
+
+### Concept
+
+Elastic Net (Tibshirani, 1996; Zou & Hastie, 2005) is a penalized regression method that combines L1 (lasso) and L2 (ridge) penalties. It performs automatic variable selection by shrinking unimportant driver coefficients to exactly zero, while retaining the regularization benefits of ridge regression for correlated predictors.
+
+### Mathematical Formulation
+
+```
+β̂_enet = argmin { Σ(Yᵢ - Xᵢβ)² + λ[α||β||₁ + (1-α)||β||₂²] }
+
+Where:
+  α ∈ [0, 1] = mixing parameter (α=1 is lasso, α=0 is ridge)
+  λ ≥ 0      = regularization strength
+  ||β||₁     = Σ|βⱼ| (L1 norm, encourages sparsity)
+  ||β||₂²    = Σβⱼ² (L2 norm, encourages shrinkage)
+```
+
+### Algorithm
+
+```
+1. Standardize all predictors to mean 0, SD 1
+2. Select alpha (default 0.5 for balanced elastic net)
+3. Use k-fold cross-validation (default k=10) to select optimal lambda
+4. Fit model at lambda.min (minimum CV error) and lambda.1se (most regularized within 1 SE)
+5. Drivers with coefficients shrunk to zero are excluded from the importance ranking
+6. Non-zero coefficients are converted to importance percentages
+```
+
+### Key Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| alpha | 0.5 | Mixing parameter: 0 = pure ridge, 1 = pure lasso |
+| nfolds | 10 | Number of cross-validation folds |
+| lambda | CV-selected | Regularization strength (lambda.min or lambda.1se) |
+
+### Strengths and Limitations
+
+| Strengths | Limitations |
+|-----------|-------------|
+| Automatic variable selection (zero coefficients) | Requires glmnet package |
+| Handles multicollinearity via L2 penalty | Choice of alpha affects results |
+| Works well with many drivers (k > 15) | Assumes linear relationships |
+| Cross-validation prevents overfitting | Penalization biases coefficient magnitudes |
+
+---
+
+## Method 7: Necessary Condition Analysis (NCA)
+
+### Concept
+
+Necessary Condition Analysis (Dul, 2016) identifies drivers that are *necessary* for achieving desired outcome levels, as opposed to merely *sufficient*. A necessary condition means that without a minimum level of the driver, high outcome levels are impossible regardless of other drivers. This is fundamentally different from correlational or regression-based importance.
+
+### Ceiling Effect Method
+
+NCA uses the CE-FDH (Ceiling Envelopment - Free Disposal Hull) method:
+
+```
+1. Plot each driver (X) against the outcome (Y)
+2. Identify the ceiling line: the upper boundary of the X-Y scatterplot
+3. Calculate the ceiling zone (empty space above the ceiling line)
+4. Necessity effect size d = ceiling zone / total scope
+
+Where:
+  d ≥ 0.1 and p < 0.05 → driver is a necessary condition
+  d < 0.1              → insufficient necessity effect
+```
+
+### Bottleneck Table
+
+The bottleneck table shows the minimum required level of each necessary driver for a given outcome target:
+
+```
+Outcome Target | Driver A (min) | Driver B (min) | Driver C (min)
+──────────────────────────────────────────────────────────────────
+50%            | 30%            | 20%            | NN
+70%            | 50%            | 40%            | 25%
+90%            | 75%            | 65%            | 50%
+
+NN = Not Necessary at this outcome level
+```
+
+### Interpretation Thresholds
+
+| Effect Size (d) | Interpretation |
+|------------------|----------------|
+| < 0.1 | Not a necessary condition |
+| 0.1 - 0.3 | Small necessity effect |
+| 0.3 - 0.5 | Medium necessity effect |
+| > 0.5 | Large necessity effect |
+
+Statistical significance is assessed via permutation test (p < 0.05 required).
+
+### Strengths and Limitations
+
+| Strengths | Limitations |
+|-----------|-------------|
+| Identifies bottleneck drivers others miss | Requires NCA package |
+| Complements regression-based methods | Less power with small samples |
+| Actionable bottleneck tables | Assumes monotonic ceiling |
+| No linearity assumption | Does not quantify sufficiency |
+
+---
+
+## Method 8: Dominance Analysis
+
+### Concept
+
+Dominance analysis (Budescu, 1993; Azen & Budescu, 2003) determines the relative importance of predictors through systematic pairwise comparisons across all possible subset regression models. It is closely related to Shapley value decomposition and provides three levels of dominance: complete, conditional, and general.
+
+### Three Levels of Dominance
+
+```
+Complete Dominance:
+  Driver A completely dominates B if A's additional R² contribution
+  exceeds B's in ALL possible subset models.
+  (Strongest claim — rarely achieved with correlated drivers)
+
+Conditional Dominance:
+  Driver A conditionally dominates B if A's average additional R²
+  exceeds B's at EVERY model size (0, 1, 2, ..., k-1 other predictors).
+  (Moderate claim — considers model complexity)
+
+General Dominance:
+  Driver A generally dominates B if A's overall average additional R²
+  exceeds B's across all subsets.
+  (Weakest claim — equivalent to Shapley value ranking)
+```
+
+### Relationship to Shapley Values
+
+General dominance values are mathematically identical to Shapley values for R² decomposition. Dominance analysis adds value by providing the complete and conditional dominance designations, which offer stronger statements about relative importance when they hold.
+
+### Output Structure
+
+```
+Driver          | General Dom. | Rank | Complete Dom. | Conditional Dom.
+────────────────────────────────────────────────────────────────────────
+Product Quality | 0.142        | 1    | Dominates B,C | Dominates B,C,D
+Service Quality | 0.098        | 2    | Dominates C   | Dominates C,D
+Value for Money | 0.065        | 3    | —             | Dominates D
+Delivery Speed  | 0.031        | 4    | —             | —
+```
+
+### Strengths and Limitations
+
+| Strengths | Limitations |
+|-----------|-------------|
+| Rigorous pairwise comparisons | Requires domir package |
+| Three levels of evidence | Computationally expensive: O(2^k) |
+| General dominance = Shapley values | Same k ≤ 15 practical limit |
+| Intuitive dominance designations | Assumes linear additive model |
+
+---
+
+## Method 9: GAM Nonlinear Effects
+
+### Concept
+
+Generalized Additive Models (Wood, 2017) extend linear regression by replacing linear terms with smooth nonlinear functions, allowing each driver to have a flexible curved relationship with the outcome. This reveals threshold effects, diminishing returns, and other nonlinear patterns that linear methods cannot detect.
+
+### Mathematical Formulation
+
+```
+Y = β₀ + f₁(X₁) + f₂(X₂) + ... + fₖ(Xₖ) + ε
+
+Where:
+  fⱼ(Xⱼ) = smooth function estimated via penalized regression splines
+  Each fⱼ is subject to a smoothing penalty to prevent overfitting
+```
+
+### Effective Degrees of Freedom (EDF)
+
+The EDF for each smooth term indicates the degree of nonlinearity:
+
+```
+EDF Interpretation:
+  EDF ≈ 1.0  → Essentially linear (straight line)
+  EDF 1.0-1.5 → Mild nonlinearity
+  EDF > 1.5   → Meaningful nonlinearity (curved relationship)
+  EDF > 3.0   → Highly nonlinear (multiple inflection points)
+```
+
+### Model Comparison
+
+GAM provides deviance explained, which is compared against the linear model R²:
+
+```
+If GAM deviance explained >> Linear R²:
+  → Nonlinear effects are important
+  → Consider reporting GAM results alongside linear methods
+
+If GAM deviance explained ≈ Linear R²:
+  → Relationships are approximately linear
+  → Linear methods are sufficient
+```
+
+### Output
+
+| Driver | EDF | p-value | Linear Beta | Nonlinear? |
+|--------|-----|---------|-------------|------------|
+| Product Quality | 1.2 | < 0.001 | 0.35 | No |
+| Service Quality | 2.8 | < 0.001 | 0.28 | Yes (diminishing returns) |
+| Value for Money | 1.1 | < 0.01 | 0.22 | No |
+| Delivery Speed | 3.5 | < 0.001 | 0.15 | Yes (threshold effect) |
+
+### Strengths and Limitations
+
+| Strengths | Limitations |
+|-----------|-------------|
+| Detects nonlinear relationships | Requires mgcv package |
+| EDF quantifies nonlinearity | Additive (no interactions by default) |
+| Penalized splines prevent overfitting | Harder to interpret than linear coefficients |
+| Deviance explained vs R² comparison | Needs larger sample for stable smooths |
+
+---
+
 ## Multicollinearity Diagnostics (VIF)
 
 ### Variance Inflation Factor
@@ -573,23 +795,28 @@ When using weights, prioritize:
 | General prioritization | Shapley |
 | High multicollinearity (VIF > 5) | Shapley or Relative Weights |
 | Need direction information | Beta coefficients |
-| Suspect non-linear effects | SHAP |
+| Suspect non-linear effects | SHAP or GAM |
 | Small sample (n < 100) | Relative Weights |
 | Large sample (n > 500) + ML | SHAP |
 | Simple baseline | Correlations |
+| Many drivers, need variable selection | Elastic Net |
+| Identify bottleneck/necessary drivers | NCA |
+| Rigorous pairwise driver comparisons | Dominance Analysis |
+| Quantify nonlinearity per driver | GAM |
 
 ### Method Properties Summary
 
-| Property | Shapley | RelWeights | Beta | Correlation | SHAP |
-|----------|---------|------------|------|-------------|------|
-| Always positive | Yes | Yes | No* | No | Yes |
-| Sums to 100% | Yes | Yes | No | No | Yes |
-| Handles collinearity | Yes | Yes | No | N/A | Yes |
-| Shows direction | No | No | Yes | Yes | Yes |
-| Non-linear | No | No | No | No | Yes |
-| Fast (k > 15) | No | Yes | Yes | Yes | Yes |
+| Property | Shapley | RelWeights | Beta | Correlation | SHAP | Elastic Net | NCA | Dominance | GAM |
+|----------|---------|------------|------|-------------|------|-------------|-----|-----------|-----|
+| Always positive | Yes | Yes | No* | No | Yes | No* | Yes | Yes | N/A |
+| Sums to 100% | Yes | Yes | No | No | Yes | No | No | Yes | No |
+| Handles collinearity | Yes | Yes | No | N/A | Yes | Yes | N/A | Yes | Partial |
+| Shows direction | No | No | Yes | Yes | Yes | Yes | No | No | Yes |
+| Non-linear | No | No | No | No | Yes | No | Yes | No | Yes |
+| Fast (k > 15) | No | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes |
+| Variable selection | No | No | No | No | No | Yes | No | No | No |
 
-*Beta weights use absolute values for ranking; signed values reported separately.
+*Beta weights and Elastic Net use absolute values for ranking; signed values reported separately.
 
 ---
 
@@ -644,6 +871,16 @@ When using weights, prioritize:
 - **Lundberg, S. M., & Lee, S. I.** (2017). A unified approach to interpreting model predictions. *Advances in Neural Information Processing Systems*, 30.
 
 - **Martilla, J. A., & James, J. C.** (1977). Importance-performance analysis. *Journal of Marketing*, 41(1), 77-79.
+
+- **Tibshirani, R.** (1996). Regression shrinkage and selection via the lasso. *Journal of the Royal Statistical Society: Series B*, 58(1), 267-288.
+
+- **Zou, H., & Hastie, T.** (2005). Regularization and variable selection via the elastic net. *Journal of the Royal Statistical Society: Series B*, 67(2), 301-320.
+
+- **Dul, J.** (2016). Necessary Condition Analysis (NCA): Logic and methodology of "necessary but not sufficient" causality. *Organizational Research Methods*, 19(1), 10-52.
+
+- **Azen, R., & Budescu, D. V.** (2003). The dominance analysis approach for comparing predictors in multiple regression. *Psychological Methods*, 8(2), 129-148.
+
+- **Wood, S. N.** (2017). *Generalized Additive Models: An Introduction with R* (2nd ed.). Chapman & Hall/CRC.
 
 ### Additional Reading
 

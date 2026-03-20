@@ -142,13 +142,21 @@ run_nca_analysis <- function(data, config) {
       nca_out <- NCA::nca_analysis(d[[drv]], d[[outcome_var]], ceilings = "ce_fdh")
       bn <- NCA::nca_output(nca_out, bottleneck.y = bottleneck_levels,
                             plots = FALSE, summaries = FALSE)
-      bn_vals <- if (!is.null(bn$bottleneck)) {
-        as.numeric(bn$bottleneck$ce_fdh)
-      } else {
+      # Validate bottleneck structure before extracting
+      bn_vals <- tryCatch({
+        if (!is.null(bn$bottleneck) && "ce_fdh" %in% names(bn$bottleneck)) {
+          vals <- as.numeric(bn$bottleneck$ce_fdh)
+          if (length(vals) == length(bottleneck_levels)) vals
+          else rep(NA_real_, length(bottleneck_levels))
+        } else {
+          rep(NA_real_, length(bottleneck_levels))
+        }
+      }, error = function(e2) {
         rep(NA_real_, length(bottleneck_levels))
-      }
+      })
       c(Driver = drv, setNames(bn_vals, paste0("Y_", bottleneck_levels, "pct")))
     }, error = function(e) {
+      cat(sprintf("   [WARN] Bottleneck for '%s' failed: %s\n", drv, e$message))
       c(Driver = drv, setNames(rep(NA, length(bottleneck_levels)),
                                paste0("Y_", bottleneck_levels, "pct")))
     })

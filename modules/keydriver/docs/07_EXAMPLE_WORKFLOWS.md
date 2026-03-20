@@ -1,7 +1,7 @@
 # Turas Key Driver Analysis - Example Workflows
 
-**Version:** 10.0
-**Last Updated:** 22 December 2025
+**Version:** 10.4
+**Last Updated:** 20 March 2026
 
 This document provides practical examples and step-by-step workflows for common Key Driver Analysis scenarios.
 
@@ -16,7 +16,13 @@ This document provides practical examples and step-by-step workflows for common 
 5. [Segment Comparison](#workflow-5-segment-comparison)
 6. [Handling Multicollinearity](#workflow-6-handling-multicollinearity)
 7. [Dual-Importance Analysis](#workflow-7-dual-importance-analysis)
-8. [Troubleshooting Guide](#troubleshooting-guide)
+8. [Elastic Net Variable Selection](#workflow-8-elastic-net-variable-selection)
+9. [Necessary Condition Analysis](#workflow-9-necessary-condition-analysis)
+10. [Dominance Analysis](#workflow-10-dominance-analysis)
+11. [GAM Nonlinear Effects](#workflow-11-gam-nonlinear-effects)
+12. [Custom Slides in HTML Report](#workflow-12-custom-slides-in-html-report)
+13. [Configurable Thresholds](#workflow-13-configurable-thresholds)
+14. [Troubleshooting Guide](#troubleshooting-guide)
 
 ---
 
@@ -400,6 +406,371 @@ Website          | 6.7%     | 45     | -38.3 | HIDDEN GEM
 **Interpretation:**
 - **Price Value (False Priority):** Customers SAY it matters a lot (92), but it doesn't actually drive satisfaction (21%). May need to adjust messaging.
 - **Website (Hidden Gem):** Low stated importance (45) but actually drives satisfaction. Customers undervalue this.
+
+---
+
+## Workflow 8: Elastic Net Variable Selection
+
+**Scenario:** You have many candidate drivers (15+) and want to automatically identify which ones truly matter, removing noise variables before interpreting importance.
+
+### Step 1: Enable Elastic Net in Settings
+
+**Settings sheet:**
+```
+Setting              | Value
+analysis_name        | Satisfaction Drivers - Elastic Net Selection
+data_file            | survey_data.csv
+output_file          | elastic_net_results.xlsx
+enable_elastic_net   | TRUE
+elastic_net_alpha    | 0.5
+elastic_net_nfolds   | 10
+```
+
+**Key parameters:**
+- `enable_elastic_net` - Activates elastic net regularization
+- `elastic_net_alpha` - Mixing parameter (0 = ridge, 1 = lasso, 0.5 = balanced elastic net)
+- `elastic_net_nfolds` - Number of cross-validation folds for lambda selection
+
+### Step 2: Run Analysis
+
+```r
+results <- run_keydriver_analysis(config_file = "elastic_net_config.xlsx")
+
+# Access elastic net results
+print(results$elastic_net$retained_drivers)
+print(results$elastic_net$coefficients)
+```
+
+### Step 3: Interpret Results
+
+**ElasticNet_Summary sheet:**
+```
+Driver           | Coefficient | Status
+Product Quality  | 0.312       | Retained
+Customer Service | 0.245       | Retained
+Value for Money  | 0.189       | Retained
+Delivery Speed   | 0.074       | Retained
+Website          | 0.000       | Zeroed Out
+Brand Awareness  | 0.000       | Zeroed Out
+Social Media     | 0.000       | Zeroed Out
+```
+
+**Lambda selection:**
+```
+Lambda Method | Lambda Value | Drivers Retained | CV Error
+lambda.min    | 0.0032       | 6                | 0.421
+lambda.1se    | 0.0187       | 4                | 0.438
+```
+
+### Step 4: Interpretation Tips
+
+- **Retained drivers** (non-zero coefficients) are the ones elastic net identifies as genuinely contributing to the outcome
+- **Zeroed out drivers** have been shrunk to exactly zero - they add noise, not signal
+- **lambda.1se** (default) gives a more parsimonious model - fewer drivers, slightly higher error but more robust
+- **lambda.min** retains more drivers but risks overfitting
+- **Coefficient magnitudes** indicate relative strength among retained drivers
+- **Alpha = 0.5** balances between grouping correlated drivers (ridge) and selecting among them (lasso)
+- After elastic net selection, the remaining analysis methods (Shapley, Relative Weights) run only on retained drivers
+
+---
+
+## Workflow 9: Necessary Condition Analysis
+
+**Scenario:** Identify which drivers are necessary conditions for achieving high satisfaction - drivers where a minimum level is required before high outcomes are even possible.
+
+### Step 1: Enable NCA in Settings
+
+**Settings sheet:**
+```
+Setting        | Value
+analysis_name  | Satisfaction Drivers - NCA
+data_file      | survey_data.csv
+output_file    | nca_results.xlsx
+enable_nca     | TRUE
+```
+
+### Step 2: Run Analysis
+
+```r
+results <- run_keydriver_analysis(config_file = "nca_config.xlsx")
+
+# Access NCA results
+print(results$nca$effect_sizes)
+print(results$nca$bottleneck)
+```
+
+### Step 3: Interpret Effect Sizes
+
+**NCA_Effects sheet:**
+```
+Driver           | Effect Size | Is Necessary
+Product Quality  | 0.42        | YES
+Customer Service | 0.31        | YES
+Value for Money  | 0.18        | YES
+Delivery Speed   | 0.08        | No
+Website          | 0.05        | No
+```
+
+**Effect size interpretation:**
+- **> 0.3** - Large necessary condition (driver is a strong gatekeeper)
+- **0.1 - 0.3** - Medium necessary condition
+- **< 0.1** - Not a meaningful necessary condition
+
+### Step 4: Read the Bottleneck Table
+
+**NCA_Bottleneck sheet (minimum driver levels needed for target outcome levels):**
+```
+Target Outcome | Product Quality | Customer Service | Value for Money
+50%            | 30%             | 20%              | 10%
+60%            | 45%             | 35%              | 25%
+70%            | 55%             | 50%              | 40%
+80%            | 70%             | 60%              | 55%
+90%            | 85%             | 75%              | 70%
+```
+
+### Step 5: Interpretation Tips
+
+- **Necessary ≠ Sufficient.** A necessary driver must be at a minimum level for high outcomes, but improving it alone may not increase outcomes
+- **Bottleneck table is actionable:** To achieve 80% satisfaction, Product Quality must be at least 70% - this is a floor, not a target
+- **Drivers that are necessary but not sufficient** should be treated as hygiene factors - maintain them above the threshold
+- **NCA complements standard importance:** A driver may have low derived importance but be a strict necessary condition
+- Use NCA alongside Shapley/Relative Weights for a complete picture of which drivers are gatekeepers vs. differentiators
+
+---
+
+## Workflow 10: Dominance Analysis
+
+**Scenario:** Determine which drivers dominate others across all possible sub-model comparisons, providing the most robust importance ranking available.
+
+### Step 1: Enable Dominance in Settings
+
+**Settings sheet:**
+```
+Setting            | Value
+analysis_name      | Satisfaction Drivers - Dominance
+data_file          | survey_data.csv
+output_file        | dominance_results.xlsx
+enable_dominance   | TRUE
+```
+
+**Note:** Dominance analysis is limited to 15 drivers maximum (it evaluates all possible sub-models). Weights are supported.
+
+### Step 2: Run Analysis
+
+```r
+results <- run_keydriver_analysis(config_file = "dominance_config.xlsx")
+
+# Access dominance results
+print(results$dominance$general)
+print(results$dominance$conditional)
+print(results$dominance$complete)
+```
+
+### Step 3: Interpret Results
+
+**Dominance_General sheet (average additional R² across all sub-models):**
+```
+Driver           | General Dominance | Rank
+Product Quality  | 0.182             | 1
+Customer Service | 0.156             | 2
+Value for Money  | 0.114             | 3
+Delivery Speed   | 0.068             | 4
+Website          | 0.034             | 5
+```
+
+**Dominance_Conditional sheet (dominance within model sizes):**
+```
+Driver           | 1-driver | 2-driver | 3-driver | 4-driver
+Product Quality  | 0.210    | 0.185    | 0.170    | 0.162
+Customer Service | 0.178    | 0.160    | 0.148    | 0.138
+Value for Money  | 0.125    | 0.118    | 0.110    | 0.103
+```
+
+**Dominance_Complete sheet (pairwise dominance matrix):**
+```
+                 | Product Quality | Customer Service | Value for Money
+Product Quality  | -               | Dominates        | Dominates
+Customer Service | Dominated       | -                | Dominates
+Value for Money  | Dominated       | Dominated        | -
+```
+
+### Step 4: Interpretation Tips
+
+- **General dominance** is the average incremental R² a driver contributes across all possible sub-models - the most stable importance metric
+- **Conditional dominance** shows importance at each model size (1-driver, 2-driver, etc.) - if a driver's conditional dominance is always higher than another's, it completely dominates
+- **Complete dominance** is the strictest test: Driver A completely dominates Driver B only if A's incremental contribution exceeds B's in every single sub-model
+- General dominance values sum to the total model R² - they partition explained variance exactly
+- When Shapley and dominance agree, you can be highly confident in the ranking
+- Dominance analysis handles multicollinearity naturally, similar to Shapley values
+
+---
+
+## Workflow 11: GAM Nonlinear Effects
+
+**Scenario:** Detect whether driver-outcome relationships are truly linear, or whether some drivers have diminishing returns, thresholds, or U-shaped effects.
+
+### Step 1: Enable GAM in Settings
+
+**Settings sheet:**
+```
+Setting        | Value
+analysis_name  | Satisfaction Drivers - GAM Nonlinearity
+data_file      | survey_data.csv
+output_file    | gam_results.xlsx
+enable_gam     | TRUE
+gam_k          | 5
+```
+
+**Key parameters:**
+- `enable_gam` - Activates Generalized Additive Model analysis
+- `gam_k` - Maximum basis dimension for smoothing splines (default 5; higher values allow more complex curves)
+
+### Step 2: Run Analysis
+
+```r
+results <- run_keydriver_analysis(config_file = "gam_config.xlsx")
+
+# Access GAM results
+print(results$gam$edf_summary)
+print(results$gam$shape_classifications)
+print(results$gam$model_comparison)
+```
+
+### Step 3: Interpret EDF Values
+
+**GAM_Effects sheet:**
+```
+Driver           | EDF   | Shape          | Nonlinear?
+Product Quality  | 1.02  | Linear         | No
+Customer Service | 2.84  | Diminishing    | YES
+Value for Money  | 1.15  | Linear         | No
+Delivery Speed   | 3.21  | Threshold      | YES
+Website          | 1.88  | Slight Curve   | Borderline
+```
+
+**EDF (Effective Degrees of Freedom) interpretation:**
+- **EDF ≈ 1.0** - Relationship is linear (straight line)
+- **EDF 1.0 - 1.5** - Essentially linear, minor curvature
+- **EDF > 1.5** - Meaningfully nonlinear, investigate the shape
+- **EDF approaching k** - May need higher `gam_k` to capture full complexity
+
+### Step 4: Review Shape Classifications
+
+- **Linear** - Straight-line relationship; standard regression is appropriate
+- **Diminishing** - Returns flatten at higher driver levels (most common nonlinear shape in satisfaction research)
+- **Threshold** - Little effect until a critical level, then strong effect
+- **U-shaped** - High satisfaction at both extremes, low in middle (rare but important)
+- **Inverted-U** - Optimal midpoint, declining at extremes
+
+### Step 5: Compare Linear vs GAM Fit
+
+**GAM_ModelComparison sheet:**
+```
+Metric              | Linear Model | GAM Model
+R²                  | 0.78         | -
+Deviance Explained  | -            | 83.2%
+AIC                 | 1245         | 1198
+```
+
+### Step 6: Interpretation Tips
+
+- If linear R² and GAM deviance explained are close (within 2-3 percentage points), nonlinearity is negligible - stick with linear interpretation
+- Large gaps suggest important nonlinear effects that standard importance methods may miss
+- For drivers with diminishing returns, the practical implication is that further improvement yields less benefit - focus investment elsewhere
+- For threshold effects, the action is clear: ensure the driver is above the threshold level
+- GAM results complement NCA - a threshold effect in GAM often aligns with a necessary condition in NCA
+- Use `gam_k = 5` for most surveys; increase to 8-10 only with large samples (n > 500) and many scale points
+
+---
+
+## Workflow 12: Custom Slides in HTML Report
+
+**Scenario:** Add bespoke narrative slides to the HTML report for executive commentary, methodology notes, or custom visualizations.
+
+### Step 1: Add CustomSlides Sheet to Config
+
+Add a new sheet called **CustomSlides** to your configuration Excel file:
+
+```
+slide_title          | slide_content                                              | slide_image           | slide_order
+Executive Summary    | ## Key Findings\n\nProduct quality is the dominant driver. | summary_chart.png     | 1
+Methodology Note     | Analysis uses Shapley values with 10 drivers.\n\n...       |                       | 2
+Regional Comparison  | ## Regional View\n\nSee attached chart for breakdown.      | regional_chart.png    | 3
+```
+
+**Column definitions:**
+- `slide_title` - Title displayed at the top of the slide
+- `slide_content` - Markdown-formatted text content (supports headers, bullets, bold, italics)
+- `slide_image` - Optional file path to an image (PNG/JPG) to include on the slide; leave blank for text-only slides
+- `slide_order` - Numeric order for slide positioning within the Pinned Views panel
+
+### Step 2: Run Analysis
+
+```r
+results <- run_keydriver_analysis(config_file = "custom_slides_config.xlsx")
+```
+
+### Step 3: View in HTML Report
+
+Custom slides appear in the **Pinned Views** panel of the HTML report, ordered by `slide_order`. They sit alongside any auto-generated pinned views.
+
+### Step 4: Tips
+
+- **Markdown support:** Use `##` for sub-headers, `**bold**` for emphasis, `-` for bullet lists
+- **Newlines:** Use `\n` in the Excel cell to create line breaks in the rendered markdown
+- **Images:** Provide paths relative to the config file location, or use absolute paths; supported formats are PNG and JPG
+- **Slide order:** Custom slides are interleaved with auto-generated content based on `slide_order` values; use decimals (e.g., 1.5) to position between existing slides
+- **No limit:** Add as many custom slides as needed, but keep content concise for readability
+
+---
+
+## Workflow 13: Configurable Thresholds
+
+**Scenario:** Override default VIF thresholds, effect size benchmarks, and other diagnostic cut-offs to match your organization's standards or research context.
+
+### Step 1: Add Threshold Overrides to Settings
+
+**Settings sheet:**
+```
+Setting                | Value
+analysis_name          | Satisfaction Drivers - Custom Thresholds
+data_file              | survey_data.csv
+output_file            | custom_threshold_results.xlsx
+vif_moderate_threshold | 3
+vif_high_threshold     | 7
+```
+
+**Available threshold settings:**
+- `vif_moderate_threshold` - VIF level triggering "Monitor" status (default: 5)
+- `vif_high_threshold` - VIF level triggering "High/Remove" status (default: 10)
+
+### Step 2: Run Analysis
+
+```r
+results <- run_keydriver_analysis(config_file = "custom_thresholds_config.xlsx")
+```
+
+### Step 3: Review Adjusted Diagnostics
+
+**With custom thresholds (vif_moderate = 3, vif_high = 7):**
+```
+Driver           | VIF  | Status (Custom) | Status (Default)
+Product Quality  | 2.3  | OK              | OK
+Brand Reputation | 4.8  | MODERATE        | OK
+Customer Service | 3.1  | MODERATE        | OK
+Brand Trust      | 8.2  | HIGH            | MODERATE
+```
+
+Notice how the stricter thresholds flag Brand Reputation and Customer Service as moderate concerns, while Brand Trust escalates from moderate to high.
+
+### Step 4: Interpretation Tips
+
+- **Stricter VIF thresholds** (lower values) are appropriate when you need highly stable beta weights or when presenting regression coefficients directly
+- **Relaxed VIF thresholds** (higher values) may be acceptable when relying primarily on Shapley values or Relative Weights, which handle collinearity better
+- **Academic standard** is typically VIF > 10 for concern; **applied research** often uses VIF > 5
+- **Effect size benchmarks** follow Cohen's conventions by default (small = 0.1, medium = 0.3, large = 0.5) but can be adjusted for domain-specific norms
+- Document any threshold changes in your report methodology section so readers understand the diagnostic criteria applied
+- Custom thresholds affect diagnostic flags and recommendations but do not change the underlying statistical computations
 
 ---
 

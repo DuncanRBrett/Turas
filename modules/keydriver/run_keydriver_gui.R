@@ -357,50 +357,61 @@ run_keydriver_gui <- function() {
 
       output_text <- ""
 
-      tryCatch({
-        # Get Turas root
-        turas_root <- getwd()
-        if (basename(turas_root) != "Turas") {
-          turas_root <- dirname(turas_root)
-        }
+      withProgress(message = "Running Key Driver Analysis...", value = 0, {
 
-        # Source module files with error handling
-        output_text <- paste0(output_text, "Loading Key Driver module...\n\n")
-        console_text(output_text)
+        tryCatch({
+          # Get Turas root
+          turas_root <- getwd()
+          if (basename(turas_root) != "Turas") {
+            turas_root <- dirname(turas_root)
+          }
 
-        for (src_file in kd_source_files) {
-          src_path <- file.path(turas_root, src_file)
-          tryCatch({
-            source(src_path)
-          }, error = function(e) {
-            cat(sprintf("   [WARN] Failed to source %s: %s\n", basename(src_path), e$message))
+          # Source module files with error handling
+          incProgress(0.05, detail = "Loading module files...")
+          output_text <- paste0(output_text, "Loading Key Driver module...\n\n")
+          console_text(output_text)
+
+          for (src_file in kd_source_files) {
+            src_path <- file.path(turas_root, src_file)
+            tryCatch({
+              source(src_path)
+            }, error = function(e) {
+              cat(sprintf("   [WARN] Failed to source %s: %s\n", basename(src_path), e$message))
+            })
+          }
+
+          # Build HTML report flag
+          html_report <- isTRUE(input$enable_html_report)
+
+          incProgress(0.10, detail = "Starting analysis...")
+
+          # Capture ALL analysis output (stdout, warnings, messages) - TRS v1.0 compliance
+          captured <- capture_console_all({
+            results <- run_keydriver_analysis(
+              config_file = files$config_file,
+              html_report = html_report
+            )
           })
-        }
 
-        # Build HTML report flag
-        html_report <- isTRUE(input$enable_html_report)
+          incProgress(0.80, detail = "Finalising results...")
 
-        # Capture ALL analysis output (stdout, warnings, messages) - TRS v1.0 compliance
-        captured <- capture_console_all({
-          results <- run_keydriver_analysis(
-            config_file = files$config_file,
-            html_report = html_report
-          )
+          output_text <- paste0(output_text, paste(captured$combined_output, collapse = "\n"))
+
+          if (captured$has_error) {
+            output_text <- paste0(output_text, "\n\nAnalysis failed - see error above")
+          } else if (captured$has_warnings) {
+            output_text <- paste0(output_text, "\n\nAnalysis complete with warnings - review above")
+          } else {
+            output_text <- paste0(output_text, "\n\nAnalysis complete!")
+          }
+
+          incProgress(0.05, detail = "Done!")
+
+        }, error = function(e) {
+          output_text <<- paste0(output_text, "\n\nError: ", e$message)
         })
 
-        output_text <- paste0(output_text, paste(captured$combined_output, collapse = "\n"))
-
-        if (captured$has_error) {
-          output_text <- paste0(output_text, "\n\nAnalysis failed - see error above")
-        } else if (captured$has_warnings) {
-          output_text <- paste0(output_text, "\n\nAnalysis complete with warnings - review above")
-        } else {
-          output_text <- paste0(output_text, "\n\nAnalysis complete!")
-        }
-
-      }, error = function(e) {
-        output_text <<- paste0(output_text, "\n\nError: ", e$message)
-      })
+      })  # End withProgress
 
       console_text(output_text)
       is_running(FALSE)

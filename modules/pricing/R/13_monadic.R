@@ -20,12 +20,12 @@
 #   - Lipovetsky (2006) — logistic regression for WTP estimation
 #   - Standard econometric demand estimation via GLM
 #
-# Version: 1.0.0
-# Date: 2026-03-09
+# Version: 12.0
+# Date: 2026-03-20
 #
 # ==============================================================================
 
-`%||%` <- function(x, y) if (is.null(x) || length(x) == 0 || (length(x) == 1 && is.na(x))) y else x
+# %||% operator is defined in 00_main.R — do not redefine here
 
 
 # ==============================================================================
@@ -77,10 +77,19 @@ run_monadic_analysis <- function(data, config) {
     intents <- as.numeric(as.numeric(intents_raw) > 0)
   }
 
+  # Extract weights if available
+  weight_var <- config$weight_var
+  if (!is.null(weight_var) && !is.na(weight_var) && weight_var %in% names(data)) {
+    case_weights <- as.numeric(data[[weight_var]])
+  } else {
+    case_weights <- rep(1, nrow(data))
+  }
+
   # Remove NAs
-  valid <- !is.na(prices) & !is.na(intents) & prices > 0
+  valid <- !is.na(prices) & !is.na(intents) & prices > 0 & !is.na(case_weights) & case_weights > 0
   prices <- prices[valid]
   intents <- intents[valid]
+  case_weights <- case_weights[valid]
 
   n_total <- nrow(data)
   n_valid <- length(prices)
@@ -113,9 +122,9 @@ run_monadic_analysis <- function(data, config) {
   model_type <- mon$model_type %||% "logistic"
 
   if (model_type == "log_logistic") {
-    model <- glm(intents ~ log(prices), family = binomial(link = "logit"))
+    model <- glm(intents ~ log(prices), family = binomial(link = "logit"), weights = case_weights)
   } else {
-    model <- glm(intents ~ prices, family = binomial(link = "logit"))
+    model <- glm(intents ~ prices, family = binomial(link = "logit"), weights = case_weights)
   }
 
   # Model diagnostics
@@ -210,6 +219,7 @@ run_monadic_analysis <- function(data, config) {
     confidence_intervals <- monadic_bootstrap_ci(
       prices = prices,
       intents = intents,
+      weights = case_weights,
       model_type = model_type,
       price_range = price_range,
       n_boot = n_boot,
@@ -325,6 +335,7 @@ compute_monadic_elasticity <- function(demand_curve) {
 #'
 #' @param prices Numeric vector of prices
 #' @param intents Numeric vector of binary intents (0/1)
+#' @param weights Numeric vector of case weights (NULL for equal weights)
 #' @param model_type "logistic" or "log_logistic"
 #' @param price_range Numeric vector of prices for demand curve prediction
 #' @param n_boot Number of bootstrap iterations
@@ -333,12 +344,19 @@ compute_monadic_elasticity <- function(demand_curve) {
 #'
 #' @return List with optimal_price_ci, optimal_profit_price_ci, demand_curve_ci
 #' @keywords internal
-monadic_bootstrap_ci <- function(prices, intents, model_type, price_range,
+monadic_bootstrap_ci <- function(prices, intents, weights = NULL, model_type, price_range,
                                   n_boot = 1000, conf_level = 0.95,
                                   unit_cost = NA) {
 
   n <- length(prices)
   alpha <- 1 - conf_level
+
+  # Weighted resampling probability
+  resample_prob <- if (!is.null(weights) && !all(weights == 1)) {
+    weights / sum(weights)
+  } else {
+    NULL
+  }
 
   boot_optimal_rev <- numeric(n_boot)
   boot_optimal_profit <- numeric(n_boot)
@@ -346,18 +364,19 @@ monadic_bootstrap_ci <- function(prices, intents, model_type, price_range,
 
   successful <- 0
   for (b in seq_len(n_boot)) {
-    idx <- sample(n, n, replace = TRUE)
+    idx <- sample(n, n, replace = TRUE, prob = resample_prob)
     b_prices <- prices[idx]
     b_intents <- intents[idx]
+    b_weights <- if (!is.null(weights)) weights[idx] else rep(1, n)
 
     # Skip degenerate samples (all same intent)
     if (length(unique(b_intents)) < 2) next
 
     tryCatch({
       if (model_type == "log_logistic") {
-        b_model <- glm(b_intents ~ log(b_prices), family = binomial(link = "logit"))
+        b_model <- glm(b_intents ~ log(b_prices), family = binomial(link = "logit"), weights = b_weights)
       } else {
-        b_model <- glm(b_intents ~ b_prices, family = binomial(link = "logit"))
+        b_model <- glm(b_intents ~ b_prices, family = binomial(link = "logit"), weights = b_weights)
       }
 
       b_pred <- predict(b_model, newdata = data.frame(b_prices = price_range), type = "response")

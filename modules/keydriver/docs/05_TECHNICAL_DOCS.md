@@ -1,7 +1,7 @@
 # Turas Key Driver Analysis Module -- Technical Documentation
 
-**Version:** 10.3
-**Last Updated:** 4 March 2026
+**Version:** 10.4
+**Last Updated:** 20 March 2026
 **Target Audience:** Developers, Technical Maintainers, Data Scientists
 
 ------------------------------------------------------------------------
@@ -12,7 +12,7 @@
 2.  [File Structure](#file-structure)
 3.  [Data Flow Pipeline](#data-flow-pipeline)
 4.  [Core Components](#core-components)
-5.  [Step Functions (v10.3)](#step-functions)
+5.  [Step Functions (v10.3+)](#step-functions)
 6.  [Analytical Features](#analytical-features)
 7.  [SHAP Submodule](#shap-submodule)
 8.  [Quadrant / IPA Submodule](#quadrant-submodule)
@@ -97,6 +97,18 @@ logic has no external Turas dependencies.
   |07_segmnt|      |08_exec   |
   |compare  |      |summary   |
   +---------+      +----------+
+       |                |
+       v                v
+  +---------+      +----------+
+  |09_elasti|      |10_nca    |
+  |c_net    |      |NCA       |
+  +---------+      +----------+
+       |                |
+       v                v
+  +---------+      +----------+
+  |11_domin |      |12_gam    |
+  |ance     |      |nonlinear |
+  +---------+      +----------+
                         |
                         v
                +------------------+
@@ -125,6 +137,10 @@ modules/keydriver/
 │   ├── 06_effect_size.R           # Effect size classification / interpretation
 │   ├── 07_segment_comparison.R    # Cross-segment driver comparison
 │   ├── 08_executive_summary.R     # Plain-English summary generator
+│   ├── 09_elastic_net.R           # Elastic Net variable selection via glmnet
+│   ├── 10_nca.R                   # Necessary Condition Analysis via NCA package
+│   ├── 11_dominance.R             # Dominance Analysis via domir package
+│   ├── 12_gam.R                   # GAM nonlinear effects via mgcv
 │   ├── kda_methods/
 │   │   └── method_shap.R          # SHAP orchestrator (entry point for SHAP pipeline)
 │   ├── kda_shap/
@@ -200,6 +216,10 @@ modules/keydriver/
 | `06_effect_size.R` | ~150 | Effect size classification (Cohen's f2, beta, r) | `get_effect_size_benchmarks()`, `classify_effect_size()`, `interpret_effect_sizes()` |
 | `07_segment_comparison.R` | ~300 | Cross-segment importance comparison | `build_importance_comparison_matrix()`, `classify_drivers()`, `generate_segment_insights()`, `run_segment_importance_comparison()` |
 | `08_executive_summary.R` | ~250 | Plain-English summary generation | `generate_executive_summary()` |
+| `09_elastic_net.R` | ~200 | Elastic Net variable selection via glmnet | `run_elastic_net()`, `extract_elastic_net_coefs()` |
+| `10_nca.R` | ~180 | Necessary Condition Analysis via NCA package | `run_nca_analysis()`, `format_nca_results()` |
+| `11_dominance.R` | ~200 | Dominance Analysis via domir package | `run_dominance_analysis()`, `format_dominance_results()` |
+| `12_gam.R` | ~220 | GAM nonlinear effects via mgcv | `run_gam_analysis()`, `extract_gam_smooth_terms()` |
 | `kda_methods/method_shap.R` | ~150 | SHAP pipeline orchestrator | `run_shap_analysis()` |
 | `kda_shap/shap_model.R` | ~120 | XGBoost model fitting with CV | `fit_shap_model()` |
 | `kda_shap/shap_calculate.R` | ~100 | TreeSHAP calculation, data prep | `prepare_shap_data()`, `encode_features()`, `create_feature_map()` |
@@ -231,6 +251,11 @@ modules/keydriver/
 | htmltools | HTML report | HTML tag generation |
 | parallel | SHAP only | Multi-core model training |
 | shiny | GUI only | Web application framework |
+| glmnet | >= 4.1.0, Elastic Net | Elastic Net / Lasso / Ridge variable selection |
+| NCA | >= 3.2.0, NCA only | Necessary Condition Analysis |
+| domir | >= 1.0.0, Dominance | Dominance Analysis decomposition |
+| mgcv | Recommended, GAM | Generalized Additive Models for nonlinear effects |
+| base64enc | >= 0.1, HTML report | Base64 encoding for embedded images |
 
 ------------------------------------------------------------------------
 
@@ -332,6 +357,38 @@ the config Settings sheet:
 The `handle_optional_feature()` function enforces this policy
 uniformly for both SHAP and Quadrant.
 
+### Advanced Analysis Extensions (v10.4)
+
+Version 10.4 adds four optional advanced analysis steps. Each is
+gated by an `enable_*` config flag and runs **after** the core
+analysis pipeline (step 5 -- importance). Results are stored in
+the main results list under their respective keys.
+
+```
+         step_calculate_importance()
+                    |
+         +----------+----------+----------+
+         |          |          |          |
+         v          v          v          v
+    [Elastic    [NCA]     [Dominance] [GAM]
+     Net]       (10_nca)  (11_domin)  (12_gam)
+    (09_elast)
+         |          |          |          |
+         v          v          v          v
+  results$     results$   results$   results$
+  elastic_net  nca        dominance  gam
+```
+
+| Feature | Config Flag | File | Results Key |
+|---------|------------|------|-------------|
+| Elastic Net | `enable_elastic_net` | `09_elastic_net.R` | `results$elastic_net` |
+| NCA | `enable_nca` | `10_nca.R` | `results$nca` |
+| Dominance Analysis | `enable_dominance` | `11_dominance.R` | `results$dominance` |
+| GAM Nonlinear | `enable_gam` | `12_gam.R` | `results$gam` |
+
+All four features use the same `handle_optional_feature()` mechanism
+as SHAP and Quadrant, respecting their respective `on_fail` policies.
+
 ------------------------------------------------------------------------
 
 ## Core Components {#core-components}
@@ -416,6 +473,8 @@ validated config list.
   stated_importance)
 - `SHAPParameters` -- SHAP-specific settings
 - `QuadrantParameters` -- Quadrant-specific settings
+- `CustomSlides` -- User-defined qualitative slides for HTML
+  report Pinned Views panel (v10.4)
 
 **Returns:**
 
@@ -1215,8 +1274,12 @@ without data are silently omitted. The page includes:
 - Diagnostics section (model summary + VIF)
 - Bootstrap CI section (if available)
 - Segment comparison section (if available)
+- Elastic Net section (if `enable_elastic_net = TRUE`, v10.4)
+- NCA section (if `enable_nca = TRUE`, v10.4)
+- Dominance Analysis section (if `enable_dominance = TRUE`, v10.4)
+- GAM nonlinear effects section (if `enable_gam = TRUE`, v10.4)
 - Interpretation guide
-- Pinned views panel
+- Pinned views panel (includes CustomSlides if defined, v10.4)
 - Footer
 
 **CSS:** Built inline via `build_kd_css()`. Uses the configurable
@@ -1287,7 +1350,7 @@ list(
 | `MODEL_` | Model fitting | `MODEL_ALIASED_COEFFICIENTS`, `MODEL_SINGULAR_MATRIX` |
 | `MAPPER_` | Term mapping | `MAPPER_COEFFICIENT_MISMATCH`, `MAPPER_TERM_MISMATCH` |
 | `PKG_` | Package dependencies | `PKG_HAVEN_REQUIRED` |
-| `FEATURE_` | Optional features | `FEATURE_SHAP_FAILED`, `FEATURE_QUADRANT_FAILED`, `FEATURE_SHAP_XGBOOST_MISSING`, `FEATURE_SHAPLEY_TOO_MANY_DRIVERS` |
+| `FEATURE_` | Optional features | `FEATURE_SHAP_FAILED`, `FEATURE_QUADRANT_FAILED`, `FEATURE_SHAP_XGBOOST_MISSING`, `FEATURE_SHAPLEY_TOO_MANY_DRIVERS`, `FEATURE_ELASTIC_NET_FAILED`, `FEATURE_NCA_FAILED`, `FEATURE_DOMINANCE_FAILED`, `FEATURE_GAM_FAILED` |
 
 ### Guard State Tracking
 
@@ -1347,6 +1410,15 @@ in the R console:
 | `threshold_method` | string | "mean" | Quadrant threshold method |
 | `brand_colour` | hex | "#323367" | HTML report brand colour |
 | `accent_colour` | hex | "#CC9900" | HTML report accent colour |
+| `enable_elastic_net` | boolean | FALSE | Enable Elastic Net variable selection (v10.4) |
+| `elastic_net_alpha` | numeric | 0.5 | Elastic Net mixing: 0=ridge, 0.5=elastic net, 1=lasso |
+| `elastic_net_nfolds` | integer | 10 | Cross-validation folds for Elastic Net |
+| `enable_nca` | boolean | FALSE | Enable Necessary Condition Analysis (v10.4) |
+| `enable_dominance` | boolean | FALSE | Enable Dominance Analysis (v10.4) |
+| `enable_gam` | boolean | FALSE | Enable GAM nonlinear effects (v10.4) |
+| `gam_k` | integer | 5 | Basis dimension for GAM smooth terms |
+| `vif_moderate_threshold` | numeric | 5 | VIF threshold for moderate multicollinearity warning |
+| `vif_high_threshold` | numeric | 10 | VIF threshold for high multicollinearity warning |
 
 ### Variables Sheet
 
@@ -1373,6 +1445,20 @@ in the R console:
 |--------|----------|-------------|
 | `driver` | Yes | Driver variable name |
 | `stated_importance` | Yes (or any numeric) | Stated importance rating |
+
+### CustomSlides Sheet (Optional, v10.4)
+
+| Column | Required | Description |
+|--------|----------|-------------|
+| `slide_title` | Yes | Title displayed on the slide |
+| `slide_content` | Yes | Slide body text (supports markdown) |
+| `slide_image` | No | File path to an image to embed in the slide |
+| `slide_order` | No | Integer controlling display order |
+
+Custom slides appear in the HTML report's Pinned Views panel,
+allowing analysts to add qualitative commentary, methodology
+notes, or contextual slides alongside the auto-generated
+analytical sections.
 
 ------------------------------------------------------------------------
 
@@ -1650,6 +1736,12 @@ source(file.path(base_dir, "06_effect_size.R"))
 source(file.path(base_dir, "07_segment_comparison.R"))
 source(file.path(base_dir, "08_executive_summary.R"))
 
+# 6b. v10.4 advanced features (uses guard, analysis)
+source(file.path(base_dir, "09_elastic_net.R"))
+source(file.path(base_dir, "10_nca.R"))
+source(file.path(base_dir, "11_dominance.R"))
+source(file.path(base_dir, "12_gam.R"))
+
 # 7. Main orchestrator (uses all above)
 source(file.path(base_dir, "00_main.R"))
 
@@ -1718,6 +1810,7 @@ source(file.path(base_dir, "00_main.R"))
 | 10.1 | Dec 2025 | SHAP integration, Quadrant/IPA, Segment comparison, Bootstrap CIs, Effect sizes, Executive summary, HTML report pipeline |
 | 10.2 | Dec 2025 | TRS v1.0 integration: refusal framework, guard state, explicit status. No silent failures. |
 | 10.3 | Dec 2025 | Explicit driver_type declarations, partial R-squared as primary method, feature on_fail policies, step function refactoring, enhanced output contract |
+| 10.4 | Mar 2026 | Elastic Net variable selection (glmnet), Necessary Condition Analysis (NCA), Dominance Analysis (domir), GAM nonlinear effects (mgcv), CustomSlides config sheet, configurable VIF thresholds |
 
 ------------------------------------------------------------------------
 

@@ -96,11 +96,12 @@ run_dominance_analysis <- function(data, config) {
   # --- Run domir ---
   dom_result <- tryCatch({
     if (!is.null(weight_var) && weight_var %in% names(d)) {
-      # Weighted: pass weights through lm wrapper
+      # Weighted: capture weight_var in local scope for closure safety
+      local_weight_var <- weight_var
       domir::domin(
         as.formula(formula_str),
         function(formula, data, ...) {
-          m <- stats::lm(formula, data = data, weights = data[[weight_var]])
+          m <- stats::lm(formula, data = data, weights = data[[local_weight_var]])
           summary(m)$r.squared
         },
         data = d
@@ -141,7 +142,12 @@ run_dominance_analysis <- function(data, config) {
   if (is.null(complete_dom)) complete_dom <- matrix(nrow = 0, ncol = 0)
 
   # --- Build summary data frame ---
-  gen_pct <- (general_dom / sum(general_dom)) * 100
+  total_dom <- sum(general_dom)
+  gen_pct <- if (total_dom > 1e-10) {
+    (general_dom / total_dom) * 100
+  } else {
+    rep(0, length(general_dom))
+  }
   results_df <- data.frame(
     Driver = names(general_dom),
     General_Dominance = round(general_dom, 4),

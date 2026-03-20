@@ -8,7 +8,7 @@
 ## Table of Contents
 
 1. [Quick Start](#1-quick-start)
-2. [Installation](#2-installation)
+2. [Installation & Dependencies](#2-installation--dependencies)
 3. [Van Westendorp Analysis](#3-van-westendorp-analysis)
 4. [Gabor-Granger Analysis](#4-gabor-granger-analysis)
 5. [Monadic Price Testing](#5-monadic-price-testing)
@@ -16,9 +16,13 @@
 7. [Understanding Output](#7-understanding-output)
 8. [HTML Report](#8-html-report)
 9. [Interactive Simulator](#9-interactive-simulator)
-10. [Advanced Features](#10-advanced-features)
-11. [Troubleshooting](#11-troubleshooting)
-12. [Best Practices](#12-best-practices)
+10. [Added Slides & Images](#10-added-slides--images)
+11. [Advanced Features](#11-advanced-features)
+12. [Troubleshooting](#12-troubleshooting)
+13. [Best Practices](#13-best-practices)
+14. [End-to-End Walkthrough](#14-end-to-end-walkthrough)
+15. [Known Limitations](#15-known-limitations)
+16. [Appendix: Package Versions](#16-appendix-package-versions)
 
 ---
 
@@ -65,28 +69,44 @@ run_pricing_gui()
 
 ---
 
-## 2. Installation
+## 2. Installation & Dependencies
 
 ### 2.1 System Requirements
 
 - R version 4.0 or higher
 - Excel for editing configuration files
 - Minimum 4GB RAM recommended
+- Modern browser for HTML reports (Chrome, Firefox, Safari, Edge)
 
 ### 2.2 Package Dependencies
 
-**Required:**
-- `readxl` - Excel file reading
-- `openxlsx` - Excel file writing
-- `ggplot2` - Visualizations
+**Required (core functionality):**
 
-**Optional:**
-- `pricesensitivitymeter` - For NMS extension
-- `haven` - SPSS/Stata file support
+| Package | Purpose | Minimum Version |
+|---------|---------|-----------------|
+| `readxl` | Excel config file reading | 1.4.0 |
+| `openxlsx` | Excel results output with formatting | 4.2.5 |
+| `stats` | GLM for monadic, statistical functions | (base R) |
+
+**Required (HTML report):**
+
+| Package | Purpose | Minimum Version |
+|---------|---------|-----------------|
+| `base64enc` | Image embedding in HTML reports | 0.1-3 |
+| `jsonlite` | JSON data for simulator | 1.8.0 |
+
+**Optional (enhanced features):**
+
+| Package | Purpose | When Needed |
+|---------|---------|-------------|
+| `pricesensitivitymeter` | NMS extension for Van Westendorp | When using NMS calibration |
+| `haven` | SPSS (.sav) / Stata (.dta) file support | When data is in SPSS/Stata format |
+| `survey` | Design-aware weighted analysis | For complex survey designs |
 
 Install all at once:
 ```r
-install.packages(c("readxl", "openxlsx", "ggplot2", "pricesensitivitymeter", "haven"))
+install.packages(c("readxl", "openxlsx", "base64enc", "jsonlite",
+                    "pricesensitivitymeter", "haven"))
 ```
 
 ---
@@ -419,7 +439,7 @@ When `generate_html_report = TRUE` in the Settings sheet, the module generates a
 ### 8.1 Report Features
 
 - **Self-contained**: Single HTML file with embedded CSS, SVG charts, and JavaScript
-- **Tabbed navigation**: Summary | Van Westendorp | Gabor-Granger | Monadic | Segments | Recommendation
+- **Tabbed navigation**: Summary | Van Westendorp | Gabor-Granger | Monadic | Segments | Recommendation | Simulator | Added Slides | Pinned | About
 - **Brand theming**: Set `brand_colour` in config to customise the colour scheme
 - **SVG charts**: Vector-based charts that scale to any resolution
 - **Report hub integration**: Meta tags enable automatic discovery by the Turas Report Hub
@@ -471,9 +491,63 @@ The simulator is a single HTML file. Clients can:
 
 ---
 
-## 10. Advanced Features
+## 10. Added Slides & Images
 
-### 10.1 NMS Extension (Newton-Miller-Smith)
+The pricing HTML report includes an "Added Slides" tab for embedding narrative content, quotes, findings, and images directly into the report.
+
+### 10.1 Config-Driven Slides
+
+Add an **AddedSlides** sheet to your config Excel with these columns:
+
+| Column | Required | Description |
+|--------|----------|-------------|
+| `slide_title` | YES | Title displayed at the top of the slide card |
+| `content` | YES | Markdown-formatted text content |
+| `image_path` | NO | Path to an image file (relative to config file or absolute) |
+| `display_order` | NO | Numeric sort order (auto-sequenced if omitted) |
+
+**Example AddedSlides Sheet:**
+
+| slide_title | content | image_path | display_order |
+|-------------|---------|------------|---------------|
+| Key Finding | Our target segment shows **high price sensitivity** below $30 | chart_export.png | 1 |
+| Customer Quote | > "I would pay up to $45 for this quality level" - Focus Group Participant | | 2 |
+| Market Context | ## Competitive Landscape\n- Competitor A: $35\n- Competitor B: $42 | | 3 |
+
+### 10.2 Markdown Formatting
+
+Slide content supports lightweight markdown:
+
+| Syntax | Renders As |
+|--------|------------|
+| `**bold text**` | **bold text** |
+| `*italic text*` | *italic text* |
+| `## Heading` | Large heading |
+| `- bullet point` | Bulleted list item |
+| `> quoted text` | Blockquote (indented, styled) |
+
+### 10.3 Interactive Slides in HTML Report
+
+The "Added Slides" tab in the HTML report supports interactive editing:
+
+- **Add Slide**: Click the "+ Add Slide" button to create new slides at runtime
+- **Edit Content**: Double-click any slide's rendered content to switch to the markdown editor
+- **Upload Images**: Click the image icon on any slide to upload a photo or chart (max 5MB, auto-resized to 800px)
+- **Reorder**: Use the up/down arrows to rearrange slides
+- **Pin to Curated**: Click the pin icon to add a slide to the Pinned Views tab for export
+- **Remove**: Click the X to delete a slide (with confirmation)
+
+### 10.4 Image Handling
+
+- **Config images**: Paths in the `image_path` column are resolved relative to the config file directory. Images are embedded as base64 data URIs, making the HTML report fully self-contained.
+- **Interactive uploads**: Images uploaded in the HTML report are client-side only (resized to max 800px, compressed to JPEG 70% quality). They are preserved when using the Save button.
+- **Supported formats**: PNG, JPEG, GIF, WebP, SVG
+
+---
+
+## 11. Advanced Features
+
+### 11.1 NMS Extension (Newton-Miller-Smith)
 
 Enhances Van Westendorp with behavioral calibration.
 
@@ -489,7 +563,7 @@ col_pi_expensive = "pi_expensive"
 
 **Output**: Revenue-optimal price based on actual purchase likelihood.
 
-### 10.2 Segment Analysis
+### 11.2 Segment Analysis
 
 Run pricing analysis across customer segments.
 
@@ -504,7 +578,7 @@ min_segment_n = 50
 - Segment-specific offers
 - Price sensitivity comparison
 
-### 10.3 Price Ladder Builder
+### 11.3 Price Ladder Builder
 
 Automatically generates Good/Better/Best pricing tiers.
 
@@ -524,7 +598,7 @@ anchor = "Standard"
 - Purchase intent estimates
 - Revenue projections
 
-### 10.4 Recommendation Synthesis
+### 11.4 Recommendation Synthesis
 
 Combines all analyses into executive summary.
 
@@ -543,9 +617,9 @@ Combines all analyses into executive summary.
 
 ---
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
-### 11.1 Common Errors
+### 12.1 Common Errors
 
 | Error | Cause | Solution |
 |-------|-------|----------|
@@ -555,7 +629,7 @@ Combines all analyses into executive summary.
 | "Package 'pricesensitivitymeter' required" | NMS not installed | `install.packages("pricesensitivitymeter")` |
 | "All 100% or 0%" | Price range too narrow | Expand tested price range |
 
-### 11.2 Data Quality Issues
+### 12.2 Data Quality Issues
 
 | Warning | Meaning | Action |
 |---------|---------|--------|
@@ -564,7 +638,7 @@ Combines all analyses into executive summary.
 | "Segment n < 50" | Small segment | Combine segments or lower threshold |
 | "High exclusion rate" | Many incomplete responses | Review data collection |
 
-### 11.3 Interpretation Issues
+### 12.3 Interpretation Issues
 
 **Issue**: Van Westendorp curves don't intersect clearly
 **Solution**: May indicate poorly defined market; consider price bundling or segmentation
@@ -577,9 +651,9 @@ Combines all analyses into executive summary.
 
 ---
 
-## 12. Best Practices
+## 13. Best Practices
 
-### 12.1 Study Design
+### 13.1 Study Design
 
 **Sample Size:**
 - Minimum 100 respondents for basic analysis
@@ -596,7 +670,7 @@ Combines all analyses into executive summary.
 - Gabor-Granger: Clear "Would you buy at $X?" questions
 - Both: Randomize order to reduce bias
 
-### 12.2 Data Collection
+### 13.2 Data Collection
 
 **Survey Flow:**
 1. Van Westendorp questions first (open-ended)
@@ -608,7 +682,7 @@ Combines all analyses into executive summary.
 - Monitor completion time (< 1 min suggests speeding)
 - Soft launch to test (n=50)
 
-### 12.3 Configuration
+### 13.3 Configuration
 
 **General:**
 - Always set `validate_monotonicity = TRUE`
@@ -620,7 +694,7 @@ Combines all analyses into executive summary.
 - Set `unit_cost` if known (enables profit analysis)
 - Test price sequence: lowest to highest
 
-### 12.4 Analysis
+### 13.4 Analysis
 
 **Validation:**
 - Review data quality metrics in Validation sheet
@@ -640,48 +714,118 @@ Combines all analyses into executive summary.
 
 ---
 
-## 10. Example Data Files
+## 14. End-to-End Walkthrough
 
-### Van Westendorp Example
+This section walks through a complete pricing study from survey design to final deliverable.
 
-**File**: `examples/pricing/van_westendorp_sample.csv`
+### 14.1 Survey Design
 
+**Step 1: Choose Your Method(s)**
+
+| If You Need... | Use |
+|----------------|-----|
+| Acceptable price range for a new product | Van Westendorp |
+| Revenue/profit-maximizing price with demand curve | Gabor-Granger |
+| Unbiased price point without anchoring effects | Monadic |
+| Both range and specific price | Van Westendorp + Gabor-Granger (`both`) |
+
+**Step 2: Design Survey Questions**
+
+For Van Westendorp, include these four open-ended price questions (exact wording matters):
+1. "At what price would you consider this product to be so cheap that you would question its quality?"
+2. "At what price would you consider this product a bargain — a great buy for the money?"
+3. "At what price would you consider this product getting expensive — you might still consider it, but would need to think about it?"
+4. "At what price would you consider this product too expensive to consider buying?"
+
+For Gabor-Granger, ask purchase intent at 5-7 specific price points:
+- "Would you purchase this product at $25?" (Yes/No)
+- "Would you purchase this product at $30?" (Yes/No)
+- ... and so on through your price range
+
+For Monadic, randomly assign ONE price per respondent and ask:
+- "Given this product at $XX, how likely are you to purchase?" (binary or scale)
+
+**Step 3: Determine Sample Size**
+
+- Van Westendorp: 200+ respondents minimum
+- Gabor-Granger: 200+ respondents minimum
+- Monadic: 50+ respondents per price cell (e.g., 5 cells = 250+ total)
+- Segment analysis: 100+ per segment
+
+### 14.2 Data Preparation
+
+**Step 1: Export survey data** to CSV or Excel format
+
+**Step 2: Verify data structure:**
+```r
+data <- read.csv("my_survey_data.csv")
+str(data)
+summary(data)
 ```
-ResponseID,too_cheap,bargain,expensive,too_expensive,age_group,weight
-1001,80,120,180,250,18-34,1.0
-1002,90,140,200,300,35-54,1.2
-1003,70,110,170,240,55+,0.9
+
+**Step 3: Check for common issues:**
+- Missing values in price columns
+- Non-numeric entries (e.g., "$25" instead of 25)
+- Illogical responses (too_cheap > too_expensive)
+
+### 14.3 Configuration
+
+**Step 1: Generate a config template:**
+```r
+source("modules/pricing/R/00_main.R")
+create_pricing_config("my_config.xlsx", method = "both")
 ```
 
-### Gabor-Granger Example
+**Step 2: Fill in the Settings sheet:**
+- `Project_Name`: Your project identifier
+- `Analysis_Method`: `van_westendorp`, `gabor_granger`, `monadic`, or `both`
+- `Data_File`: Path to your survey data
+- `Output_File`: Where to save results
+- `Currency_Symbol`: `$`, `€`, `£`, `R`, etc.
+- `Weight_Variable`: Column name if using survey weights
 
-**File**: `examples/pricing/gabor_granger_sample.csv`
+**Step 3: Fill in method-specific sheets** (VanWestendorp, GaborGranger, Monadic)
 
+**Step 4: (Optional) Add narrative slides** in the AddedSlides sheet
+
+### 14.4 Running the Analysis
+
+**Via Shiny GUI:**
+1. Launch Turas: `source("launch_turas.R"); launch_turas()`
+2. Navigate to Pricing module
+3. Load your config file
+4. Click "Run Analysis"
+5. Monitor progress in the R console
+
+**Via R script:**
+```r
+source("modules/pricing/R/00_main.R")
+result <- run_pricing_analysis("my_config.xlsx")
+
+# Check status
+cat("Status:", result$status, "\n")
+if (result$status == "PASS") {
+  cat("Results saved to:", result$output_file, "\n")
+  cat("HTML report:", result$html_report_file, "\n")
+}
 ```
-ResponseID,gg_25,gg_30,gg_35,gg_40,gg_45,gg_50,weight
-1001,1,1,1,0,0,0,1.0
-1002,1,1,0,0,0,0,1.2
-1003,1,1,1,1,0,0,0.9
-```
 
----
+### 14.5 Reviewing Results
 
-## 11. Template Reference
+1. **Excel workbook**: Open the output Excel file for detailed data tables
+2. **HTML report**: Open the HTML file in a browser for interactive exploration
+3. **Key things to check:**
+   - Recommendation tab: What price does the module recommend?
+   - Confidence level: HIGH/MEDIUM/LOW — how much agreement between methods?
+   - Data quality: Check Validation sheet for exclusion rates and warnings
+   - Segment differences: Do price sensitivities vary significantly across segments?
 
-The configuration template (`Pricing_Config_Template.xlsx`) includes:
+### 14.6 Delivering to Stakeholders
 
-1. **Instructions** sheet - Methodology overview
-2. **Settings** sheet - Global configuration
-3. **VanWestendorp** sheet - Van Westendorp settings
-4. **GaborGranger** sheet - Gabor-Granger settings
-5. **Validation** sheet - Data quality rules
-
-**Color Coding:**
-- **Yellow** = Required setting
-- **Green** = Optional (has default)
-- **Blue** = Example value
-
-For complete template documentation, see the template file itself.
+1. **Share the HTML report** — it's a single self-contained file, no installation needed
+2. **Add narrative slides** with key findings and recommendations before sharing
+3. **Include the simulator** (if enabled) for interactive scenario exploration
+4. **Pin key views** to the Pinned tab for a curated story
 
 ---
 
@@ -715,6 +859,72 @@ For complete template documentation, see the template file itself.
 4. Use Van Westendorp for acceptable range
 5. Use Gabor-Granger for specific price within that range
 ```
+
+---
+
+## 15. Known Limitations
+
+### 15.1 Statistical Limitations
+
+| Limitation | Impact | Workaround |
+|------------|--------|------------|
+| Van Westendorp assumes curves intersect cleanly | Poorly defined markets may produce no clear intersection | Use segmentation to identify more homogeneous groups |
+| Gabor-Granger assumes rational monotone demand | Some respondents may show non-monotonic responses | Use `smooth` monotonicity setting (isotonic regression) |
+| Monadic logistic regression assumes linear log-odds | Non-linear price effects may be missed | Use `log_logistic` model type, or increase price cells |
+| Bootstrap CIs require sufficient sample size | Small samples (< 100) produce wide, unstable intervals | Ensure 200+ respondents; 50+ per price cell for monadic |
+| Weighted analysis assumes proper survey weights | Incorrect weights bias all estimates | Validate weights sum to expected population totals |
+
+### 15.2 Data Limitations
+
+- **CSV/Excel only**: Does not natively read SPSS (.sav) or Stata (.dta) without the `haven` package
+- **Wide format preferred**: Gabor-Granger long format support is functional but less tested
+- **No panel/longitudinal support**: Each run is cross-sectional; tracking price sensitivity over time requires separate runs
+- **Maximum file size**: Performance may degrade with datasets exceeding 100,000 rows (rare in pricing research)
+
+### 15.3 Output Limitations
+
+- **HTML report is client-rendered**: Added slides and pinned views are stored in the browser — clearing browser data loses interactive changes (use Save button to persist)
+- **Simulator is approximation**: The simulator interpolates from the fitted model; extrapolation beyond tested price range is unreliable
+- **No direct PowerPoint export**: Use the PNG/slide export buttons to capture individual views, then assemble in your presentation tool
+
+### 15.4 Methodology Scope
+
+- **No conjoint integration**: Pricing module operates independently from the conjoint module; cross-method integration is planned but not yet implemented
+- **No cross-price elasticity**: Only own-price elasticity is calculated; competitive dynamics require separate analysis
+- **No Bayesian methods**: All estimation is frequentist (MLE via GLM); Bayesian priors are not supported
+
+---
+
+## 16. Appendix: Package Versions
+
+The pricing module has been tested with the following R package versions. Earlier versions may work but are not guaranteed.
+
+### Core Dependencies
+
+| Package | Tested Version | CRAN | Purpose |
+|---------|---------------|------|---------|
+| R | 4.3.x / 4.4.x | — | Base R runtime |
+| `stats` | (base) | — | `glm()`, `predict()`, `quantile()` |
+| `readxl` | 1.4.3 | Yes | Excel config file reading |
+| `openxlsx` | 4.2.7 | Yes | Excel output with styled formatting |
+| `base64enc` | 0.1-3 | Yes | Image embedding for HTML reports |
+| `jsonlite` | 1.8.9 | Yes | JSON serialization for simulator |
+| `tools` | (base) | — | `file_ext()` for MIME type detection |
+
+### Optional Dependencies
+
+| Package | Tested Version | CRAN | Purpose |
+|---------|---------------|------|---------|
+| `pricesensitivitymeter` | 1.2.1 | Yes | Newton-Miller-Smith (NMS) extension |
+| `haven` | 2.5.4 | Yes | SPSS/Stata data import |
+| `survey` | 4.4-2 | Yes | Complex survey weighting |
+
+### Development/Testing Dependencies
+
+| Package | Tested Version | Purpose |
+|---------|---------------|---------|
+| `testthat` | 3.2.1 | Unit testing framework |
+| `shiny` | 1.9.1 | GUI launcher |
 
 ---
 

@@ -65,45 +65,45 @@ build_kd_html_page <- function(html_data, tables, charts, config) {
     build_kd_exec_summary_section(html_data, config)
   }
   importance_section <- if (show_imp) {
-    build_kd_importance_section(charts, tables, html_data)
+    build_kd_importance_section(charts, tables, html_data, config)
   }
   method_section <- if (show_methods) {
-    build_kd_method_section(charts, tables, html_data)
+    build_kd_method_section(charts, tables, html_data, config)
   }
   effect_size_section <- if (show_effect) {
-    build_kd_effect_size_section(charts, tables, html_data)
+    build_kd_effect_size_section(charts, tables, html_data, config)
   }
   correlation_section <- if (show_corr) {
-    build_kd_correlation_section(charts, tables, corr_display)
+    build_kd_correlation_section(charts, tables, corr_display, config)
   }
   quadrant_section <- if (show_quad) {
-    build_kd_quadrant_section(charts, tables, html_data)
+    build_kd_quadrant_section(charts, tables, html_data, config)
   }
   shap_section <- if (show_shap) {
-    build_kd_shap_section(html_data, charts)
+    build_kd_shap_section(html_data, charts, config)
   }
   diagnostics_section <- if (show_diag) {
-    build_kd_diagnostics_section(tables, html_data)
+    build_kd_diagnostics_section(tables, html_data, config)
   }
   bootstrap_section <- if (show_boot) {
-    build_kd_bootstrap_section(charts, tables, html_data, boot_display)
+    build_kd_bootstrap_section(charts, tables, html_data, boot_display, config)
   }
   segment_section <- if (show_seg) {
-    build_kd_segment_section(charts, tables, html_data)
+    build_kd_segment_section(charts, tables, html_data, config)
   }
 
   # v10.4 advanced feature sections (shown only when data is present)
   elastic_net_section <- if (isTRUE(html_data$has_elastic_net)) {
-    build_kd_elastic_net_section(html_data)
+    build_kd_elastic_net_section(html_data, config)
   }
   nca_section <- if (isTRUE(html_data$has_nca)) {
-    build_kd_nca_section(html_data)
+    build_kd_nca_section(html_data, config)
   }
   dominance_section <- if (isTRUE(html_data$has_dominance)) {
-    build_kd_dominance_section(html_data)
+    build_kd_dominance_section(html_data, config)
   }
   gam_section <- if (isTRUE(html_data$has_gam)) {
-    build_kd_gam_section(html_data)
+    build_kd_gam_section(html_data, config)
   }
 
   interpretation_section <- if (show_guide) {
@@ -1983,7 +1983,7 @@ build_kd_exec_summary_section <- function(html_data, config = list()) {
 
   # --- Assemble section ---
   title_row    <- build_kd_section_title_row("Executive Summary", "exec-summary")
-  insight_area <- build_kd_insight_area("exec-summary")
+  insight_area <- build_kd_insight_area("exec-summary", config = config)
 
   htmltools::tags$div(
     class = "kd-section", id = "kd-exec-summary",
@@ -2007,12 +2007,12 @@ build_kd_exec_summary_section <- function(html_data, config = list()) {
 #' @param html_data Transformed HTML data (for n_drivers)
 #' @return htmltools tag
 #' @keywords internal
-build_kd_importance_section <- function(charts, tables, html_data) {
+build_kd_importance_section <- function(charts, tables, html_data, config = NULL) {
 
   n_drivers <- html_data$n_drivers %||% 0
 
   title_row    <- build_kd_section_title_row("Driver Importance", "importance")
-  insight_area <- build_kd_insight_area("importance")
+  insight_area <- build_kd_insight_area("importance", config = config)
 
   # Filter bar for many drivers
   filter_bar <- NULL
@@ -2122,11 +2122,11 @@ build_kd_importance_filter_bar <- function(n_drivers = 0) {
 #' @param tables Table list
 #' @return htmltools tag
 #' @keywords internal
-build_kd_method_section <- function(charts, tables, html_data = NULL) {
+build_kd_method_section <- function(charts, tables, html_data = NULL, config = NULL) {
 
   title_row    <- build_kd_section_title_row("Method Comparison",
                                               "method-comparison")
-  insight_area <- build_kd_insight_area("method-comparison")
+  insight_area <- build_kd_insight_area("method-comparison", config = config)
 
   # Method explanation callout
   method_items <- list(
@@ -2203,12 +2203,12 @@ build_kd_method_section <- function(charts, tables, html_data = NULL) {
 #' @param html_data Transformed HTML data
 #' @return htmltools tag or NULL
 #' @keywords internal
-build_kd_effect_size_section <- function(charts, tables, html_data) {
+build_kd_effect_size_section <- function(charts, tables, html_data, config = NULL) {
 
   if (is.null(html_data$effect_sizes)) return(NULL)
 
   title_row    <- build_kd_section_title_row("Effect Sizes", "effect-sizes")
-  insight_area <- build_kd_insight_area("effect-sizes")
+  insight_area <- build_kd_insight_area("effect-sizes", config = config)
 
   chart_wrapper <- if (!is.null(charts$effect_sizes)) {
     htmltools::tags$div(
@@ -2291,10 +2291,10 @@ build_kd_effect_size_section <- function(charts, tables, html_data) {
 #' @return htmltools tag
 #' @keywords internal
 build_kd_correlation_section <- function(charts, tables,
-                                          display_mode = "heatmap") {
+                                          display_mode = "heatmap", config = NULL) {
 
   title_row    <- build_kd_section_title_row("Correlation Matrix", "correlations")
-  insight_area <- build_kd_insight_area("correlations")
+  insight_area <- build_kd_insight_area("correlations", config = config)
 
   chart_wrapper <- if (!is.null(charts$correlation_heatmap) &&
                        display_mode %in% c("heatmap", "both")) {
@@ -2361,13 +2361,13 @@ build_kd_correlation_section <- function(charts, tables,
 #' @param html_data Transformed HTML data
 #' @return htmltools tag or NULL
 #' @keywords internal
-build_kd_quadrant_section <- function(charts, tables, html_data) {
+build_kd_quadrant_section <- function(charts, tables, html_data, config = NULL) {
 
   if (!isTRUE(html_data$has_quadrant)) return(NULL)
 
   title_row    <- build_kd_section_title_row("Importance-Performance Quadrant",
                                               "quadrant")
-  insight_area <- build_kd_insight_area("quadrant")
+  insight_area <- build_kd_insight_area("quadrant", config = config)
 
   chart_wrapper <- if (!is.null(charts$quadrant)) {
     htmltools::tags$div(
@@ -2469,12 +2469,12 @@ build_kd_quadrant_section <- function(charts, tables, html_data) {
 #' @param html_data Transformed HTML data
 #' @return htmltools tag or NULL
 #' @keywords internal
-build_kd_shap_section <- function(html_data, charts = list()) {
+build_kd_shap_section <- function(html_data, charts = list(), config = NULL) {
 
   if (!isTRUE(html_data$has_shap)) return(NULL)
 
   title_row    <- build_kd_section_title_row("SHAP Importance", "shap-summary")
-  insight_area <- build_kd_insight_area("shap-summary")
+  insight_area <- build_kd_insight_area("shap-summary", config = config)
 
   # SHAP chart (from charts list, built in orchestrator)
   chart_wrapper <- if (!is.null(charts$shap_importance)) {
@@ -2558,7 +2558,7 @@ build_kd_shap_section <- function(html_data, charts = list()) {
 #' @param html_data Transformed HTML data
 #' @return htmltools tag
 #' @keywords internal
-build_kd_diagnostics_section <- function(tables, html_data) {
+build_kd_diagnostics_section <- function(tables, html_data, config = NULL) {
 
   model_info <- html_data$model_info
 
@@ -2650,7 +2650,7 @@ build_kd_diagnostics_section <- function(tables, html_data) {
   }
 
   title_row    <- build_kd_section_title_row("Model Diagnostics", "diagnostics")
-  insight_area <- build_kd_insight_area("diagnostics")
+  insight_area <- build_kd_insight_area("diagnostics", config = config)
 
   # Model summary table
   model_summary_el <- if (!is.null(tables$model_summary)) {
@@ -2773,13 +2773,13 @@ build_kd_diagnostics_section <- function(tables, html_data) {
 #' @return htmltools tag or NULL
 #' @keywords internal
 build_kd_bootstrap_section <- function(charts, tables, html_data,
-                                        display_mode = "summary") {
+                                        display_mode = "summary", config = NULL) {
 
   if (!isTRUE(html_data$has_bootstrap)) return(NULL)
 
   title_row    <- build_kd_section_title_row("Bootstrap Confidence Intervals",
                                               "bootstrap-ci")
-  insight_area <- build_kd_insight_area("bootstrap-ci")
+  insight_area <- build_kd_insight_area("bootstrap-ci", config = config)
 
   chart_wrapper <- if (!is.null(charts$bootstrap_ci) &&
                        display_mode %in% c("summary", "full")) {
@@ -2828,13 +2828,13 @@ build_kd_bootstrap_section <- function(charts, tables, html_data,
 #' @param html_data Transformed HTML data
 #' @return htmltools tag or NULL
 #' @keywords internal
-build_kd_segment_section <- function(charts, tables, html_data) {
+build_kd_segment_section <- function(charts, tables, html_data, config = NULL) {
 
   if (is.null(html_data$segment_comparison)) return(NULL)
 
   title_row    <- build_kd_section_title_row("Segment Comparison",
                                               "segment-comparison")
-  insight_area <- build_kd_insight_area("segment-comparison")
+  insight_area <- build_kd_insight_area("segment-comparison", config = config)
 
   # Extract segment names for chip bar
   seg_data <- html_data$segment_comparison
@@ -3193,12 +3193,15 @@ build_kd_pinned_panel <- function(config = list()) {
 #' @param html_data Transformed data with $elastic_net
 #' @return htmltools tag or NULL
 #' @keywords internal
-build_kd_elastic_net_section <- function(html_data) {
+build_kd_elastic_net_section <- function(html_data, config = NULL) {
   enet <- html_data$elastic_net
   if (is.null(enet)) return(NULL)
 
   coefs <- enet$coefficients
-  if (is.null(coefs) || !is.data.frame(coefs) || nrow(coefs) == 0) return(NULL)
+  if (is.null(coefs) || !is.data.frame(coefs) || nrow(coefs) == 0) {
+    cat("    [WARN] Elastic net data present but coefficients table is empty — section skipped\n")
+    return(NULL)
+  }
 
   # Build table rows
   header <- htmltools::tags$tr(
@@ -3240,7 +3243,7 @@ build_kd_elastic_net_section <- function(html_data) {
               nrow(coefs))
     ),
     htmltools::tags$div(class = "kd-table-wrapper", table),
-    build_kd_insight_area("elastic-net")
+    build_kd_insight_area("elastic-net", config = config)
   )
 }
 
@@ -3254,12 +3257,15 @@ build_kd_elastic_net_section <- function(html_data) {
 #' @param html_data Transformed data with $nca
 #' @return htmltools tag or NULL
 #' @keywords internal
-build_kd_nca_section <- function(html_data) {
+build_kd_nca_section <- function(html_data, config = NULL) {
   nca <- html_data$nca
   if (is.null(nca)) return(NULL)
 
   summary_df <- nca$nca_summary
-  if (is.null(summary_df) || !is.data.frame(summary_df) || nrow(summary_df) == 0) return(NULL)
+  if (is.null(summary_df) || !is.data.frame(summary_df) || nrow(summary_df) == 0) {
+    cat("    [WARN] NCA data present but summary table is empty — section skipped\n")
+    return(NULL)
+  }
 
   header <- htmltools::tags$tr(
     htmltools::tags$th("Driver",        class = "kd-th kd-th-label"),
@@ -3302,7 +3308,7 @@ build_kd_nca_section <- function(html_data) {
         nca$n_necessary %||% 0, nca$n_analysed %||% 0)
     ),
     htmltools::tags$div(class = "kd-table-wrapper", table),
-    build_kd_insight_area("nca")
+    build_kd_insight_area("nca", config = config)
   )
 }
 
@@ -3316,12 +3322,15 @@ build_kd_nca_section <- function(html_data) {
 #' @param html_data Transformed data with $dominance
 #' @return htmltools tag or NULL
 #' @keywords internal
-build_kd_dominance_section <- function(html_data) {
+build_kd_dominance_section <- function(html_data, config = NULL) {
   dom <- html_data$dominance
   if (is.null(dom)) return(NULL)
 
   summary_df <- dom$summary
-  if (is.null(summary_df) || !is.data.frame(summary_df) || nrow(summary_df) == 0) return(NULL)
+  if (is.null(summary_df) || !is.data.frame(summary_df) || nrow(summary_df) == 0) {
+    cat("    [WARN] Dominance data present but summary table is empty — section skipped\n")
+    return(NULL)
+  }
 
   header <- htmltools::tags$tr(
     htmltools::tags$th("Rank",            class = "kd-th kd-th-rank"),
@@ -3358,7 +3367,7 @@ build_kd_dominance_section <- function(html_data) {
         dom$total_r_squared %||% 0, dom$n_drivers %||% 0, 2^(dom$n_drivers %||% 0))
     ),
     htmltools::tags$div(class = "kd-table-wrapper", table),
-    build_kd_insight_area("dominance")
+    build_kd_insight_area("dominance", config = config)
   )
 }
 
@@ -3372,12 +3381,15 @@ build_kd_dominance_section <- function(html_data) {
 #' @param html_data Transformed data with $gam
 #' @return htmltools tag or NULL
 #' @keywords internal
-build_kd_gam_section <- function(html_data) {
+build_kd_gam_section <- function(html_data, config = NULL) {
   gam_data <- html_data$gam
   if (is.null(gam_data)) return(NULL)
 
   summary_df <- gam_data$nonlinearity_summary
-  if (is.null(summary_df) || !is.data.frame(summary_df) || nrow(summary_df) == 0) return(NULL)
+  if (is.null(summary_df) || !is.data.frame(summary_df) || nrow(summary_df) == 0) {
+    cat("    [WARN] GAM data present but nonlinearity summary is empty — section skipped\n")
+    return(NULL)
+  }
 
   header <- htmltools::tags$tr(
     htmltools::tags$th("Driver",    class = "kd-th kd-th-label"),
@@ -3430,7 +3442,7 @@ build_kd_gam_section <- function(html_data) {
         gam_data$n_nonlinear %||% 0, gam_data$n_analysed %||% 0, improvement_text)
     ),
     htmltools::tags$div(class = "kd-table-wrapper", table),
-    build_kd_insight_area("gam")
+    build_kd_insight_area("gam", config = config)
   )
 }
 
@@ -3590,7 +3602,54 @@ build_kd_component_pin_btn <- function(section_key, component, prefix = "") {
 #' @param prefix ID prefix (default empty string)
 #' @return htmltools tagList
 #' @keywords internal
-build_kd_insight_area <- function(section_key, prefix = "") {
+build_kd_insight_area <- function(section_key, prefix = "", config = NULL) {
+  # Check for pre-populated insight from config$insights
+  pre_text <- NULL
+  pre_image_tag <- NULL
+  if (!is.null(config) && !is.null(config$insights)) {
+    ins <- config$insights
+    match_row <- ins[tolower(ins$section) == tolower(section_key), , drop = FALSE]
+    if (nrow(match_row) > 0) {
+      pre_text <- match_row$insight_text[1]
+      # Handle optional image (file path → base64 inline)
+      img_path <- match_row$image_path[1]
+      if (!is.null(img_path) && !is.na(img_path) && nchar(trimws(img_path)) > 0) {
+        img_path <- trimws(img_path)
+        if (file.exists(img_path)) {
+          ext <- tolower(tools::file_ext(img_path))
+          mime <- switch(ext, png = "image/png", jpg = , jpeg = "image/jpeg",
+                         gif = "image/gif", svg = "image/svg+xml", "image/png")
+          b64 <- tryCatch({
+            raw_bytes <- readBin(img_path, "raw", file.info(img_path)$size)
+            if (requireNamespace("base64enc", quietly = TRUE)) {
+              base64enc::base64encode(raw_bytes)
+            } else {
+              # Fallback: use base R base64 encoding (R >= 4.0)
+              jsonlite::base64_enc(raw_bytes)
+            }
+          }, error = function(e) NULL)
+          if (!is.null(b64)) {
+            pre_image_tag <- htmltools::tags$img(
+              src = paste0("data:", mime, ";base64,", b64),
+              alt = paste("Insight image for", section_key),
+              style = "max-width:100%; border-radius:6px; margin-top:8px;"
+            )
+          }
+        }
+      }
+    }
+  }
+
+  # Build the editor content
+  editor_children <- list()
+  if (!is.null(pre_text) && !is.na(pre_text) && nchar(pre_text) > 0) {
+    editor_children <- list(htmltools::HTML(htmltools::htmlEscape(pre_text)))
+  }
+
+  # Build the container — auto-show if pre-populated
+  has_content <- !is.null(pre_text) && !is.na(pre_text) && nchar(pre_text) > 0
+  container_style <- if (has_content) "display:block;" else ""
+
   htmltools::tags$div(
     class = "kd-insight-area",
     `data-kd-insight-section` = section_key,
@@ -3599,19 +3658,22 @@ build_kd_insight_area <- function(section_key, prefix = "") {
       class = "kd-insight-toggle",
       id = paste0(prefix, "kd-insight-toggle-", section_key),
       onclick = sprintf("kdToggleInsight('%s','%s')", section_key, prefix),
-      "+ Add Insight"
+      if (has_content) "Edit Insight" else "+ Add Insight"
     ),
     htmltools::tags$div(
       class = "kd-insight-container",
       id = paste0(prefix, "kd-insight-container-", section_key),
+      style = container_style,
       htmltools::tags$div(
         class = "kd-insight-editor",
         contenteditable = "true",
         role = "textbox",
         `aria-label` = paste("Analyst insight for", section_key, "section"),
         `data-placeholder` = "Type your insight or comment here...",
-        oninput = sprintf("kdSyncInsight('%s','%s')", section_key, prefix)
+        oninput = sprintf("kdSyncInsight('%s','%s')", section_key, prefix),
+        editor_children
       ),
+      pre_image_tag,
       htmltools::tags$button(
         class = "kd-insight-dismiss",
         onclick = sprintf("kdDismissInsight('%s','%s')", section_key, prefix),

@@ -4,8 +4,8 @@
 #
 # Purpose: Implement Van Westendorp PSM analysis using pricesensitivitymeter package
 #          Includes Newton-Miller-Smith (NMS) extension support
-# Version: 2.0.0
-# Date: 2025-12-11
+# Version: 12.0
+# Date: 2026-03-20
 #
 # References:
 # - Van Westendorp, P. (1976). NSS Price Sensitivity Meter (PSM)
@@ -403,23 +403,18 @@ validate_vw_with_refusal <- function(data, config, verbose = TRUE) {
       reason <- "Data quality too low for reliable analysis"
     }
 
-    # Source guard if available
-    if (exists("pricing_refuse", mode = "function")) {
-      pricing_refuse(
-        code = code,
-        title = "Van Westendorp Validation Failed",
-        problem = reason,
-        why_it_matters = "Van Westendorp PSM requires all 4 price perception questions with valid, logically consistent responses to produce reliable price points.",
-        how_to_fix = validation$recommendations,
-        details = list(
-          quality_score = validation$quality_score,
-          n_valid = validation$n_valid,
-          issues = validation$issues
-        )
+    pricing_refuse(
+      code = code,
+      title = "Van Westendorp Validation Failed",
+      problem = reason,
+      why_it_matters = "Van Westendorp PSM requires all 4 price perception questions with valid, logically consistent responses to produce reliable price points.",
+      how_to_fix = validation$recommendations,
+      details = list(
+        quality_score = validation$quality_score,
+        n_valid = validation$n_valid,
+        issues = validation$issues
       )
-    } else {
-      stop(sprintf("[%s] %s", code, reason), call. = FALSE)
-    }
+    )
   }
 
   return(validation)
@@ -656,9 +651,16 @@ run_van_westendorp <- function(data, config, validate = TRUE) {
 
   confidence_intervals <- NULL
   if (isTRUE(vw$calculate_confidence)) {
+    # Extract weights if available in config
+    vw_weights <- NULL
+    weight_var <- config$weight_var
+    if (!is.null(weight_var) && !is.na(weight_var) && weight_var %in% names(data)) {
+      vw_weights <- as.numeric(data[[weight_var]])
+    }
+
     confidence_intervals <- bootstrap_vw_confidence(
       too_cheap, cheap, expensive, too_expensive,
-      weights = NULL,
+      weights = vw_weights,
       iterations = vw$bootstrap_iterations %||% 1000,
       level = vw$confidence_level %||% 0.95
     )
@@ -714,11 +716,22 @@ bootstrap_vw_confidence <- function(too_cheap, cheap, expensive, too_expensive,
   expensive_c <- expensive[complete_idx]
   too_expensive_c <- too_expensive[complete_idx]
 
+  # Align weights with complete cases
+  weights_c <- if (!is.null(weights)) {
+    w <- weights[complete_idx]
+    # Normalise to sum to n for proper resampling probability
+    w / sum(w, na.rm = TRUE) * length(w)
+  } else {
+    NULL
+  }
+
   n_c <- length(too_cheap_c)
 
   if (n_c < 30) {
-    warning("Sample size too small for reliable bootstrap confidence intervals",
-            call. = FALSE)
+    pricing_console_warning(
+      sprintf("Sample size (n=%d) may be too small for reliable bootstrap confidence intervals", n_c),
+      context = "VW Bootstrap CI"
+    )
   }
 
   # Storage for bootstrap results
@@ -726,9 +739,12 @@ bootstrap_vw_confidence <- function(too_cheap, cheap, expensive, too_expensive,
   colnames(boot_results) <- c("PMC", "OPP", "IDP", "PME")
 
   # Run bootstrap using pricesensitivitymeter
+  # Use weighted resampling when weights are provided
+  resample_prob <- if (!is.null(weights_c)) weights_c / sum(weights_c) else NULL
+
   for (i in seq_len(iterations)) {
-    # Resample respondents with replacement
-    idx <- sample(n_c, n_c, replace = TRUE)
+    # Resample respondents with replacement (weighted if applicable)
+    idx <- sample(n_c, n_c, replace = TRUE, prob = resample_prob)
 
     boot_too_cheap <- too_cheap_c[idx]
     boot_cheap <- cheap_c[idx]

@@ -80,6 +80,16 @@ run_elastic_net_analysis <- function(data, config) {
   # Replace NaN from zero-variance columns with 0
   X_scaled[is.nan(X_scaled)] <- 0
 
+  # Check if any columns have meaningful variance after scaling
+  col_vars <- apply(X_scaled, 2, var, na.rm = TRUE)
+  if (all(col_vars < 1e-10)) {
+    return(list(
+      status = "PARTIAL",
+      message = "All drivers have zero or near-zero variance after scaling. Elastic net cannot produce meaningful results.",
+      result = NULL
+    ))
+  }
+
   # Weights
   w <- if (!is.null(weight_var) && weight_var %in% names(d)) {
     d[[weight_var]]

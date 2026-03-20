@@ -1,7 +1,7 @@
 # Turas Key Driver Analysis - Module Overview
 
-**Version:** 10.0
-**Last Updated:** 22 December 2025
+**Version:** 10.4
+**Last Updated:** 20 March 2026
 
 ---
 
@@ -20,7 +20,7 @@ Given an outcome metric (e.g., overall satisfaction) and multiple potential driv
 
 ## Key Capabilities
 
-### Five Statistical Methods
+### Nine Statistical Methods
 
 Turas KeyDriver uses multiple complementary methods because no single approach is perfect:
 
@@ -31,8 +31,24 @@ Turas KeyDriver uses multiple complementary methods because no single approach i
 | **Beta Weights** | Standardized regression coefficients | Traditional, widely understood |
 | **Correlations** | Bivariate relationships | Simple baseline |
 | **SHAP** | XGBoost + TreeSHAP | Non-linear relationships, interactions |
+| **Elastic Net** | Penalized regression (glmnet) | Variable selection, high-dimensional driver sets |
+| **NCA** | Necessary Condition Analysis (NCA package) | Identifying necessary (not just sufficient) drivers |
+| **Dominance Analysis** | General/conditional/complete dominance (domir) | Pairwise driver comparisons, Shapley-adjacent |
+| **GAM** | Generalized Additive Models (mgcv) | Detecting and quantifying nonlinear effects |
 
-By comparing all five, you get **robust consensus** on driver importance.
+By comparing all nine, you get **robust consensus** on driver importance.
+
+### Config-Driven Custom Slides (v10.4)
+
+The HTML report now supports config-driven custom slides, allowing analysts to inject additional commentary, methodology notes, or client-specific content into the report output via the configuration file.
+
+### Per-Table CSV/Excel Export (v10.4)
+
+Every data table in the HTML report now includes individual export buttons for CSV and Excel download, enabling stakeholders to extract specific results without opening the full workbook.
+
+### Configurable Analysis Thresholds (v10.4)
+
+Effect size benchmarks, VIF thresholds, and R² quality tiers can now be customised in the configuration file rather than relying on hardcoded defaults. This allows analysts to apply domain-specific standards.
 
 ### Survey Weights Support
 
@@ -57,6 +73,22 @@ When enabled, fits XGBoost model and calculates SHAP values:
 - Detects driver interactions
 - Provides individual-level explanations
 - Generates beeswarm, waterfall, and dependence plots
+
+### Elastic Net Variable Selection (v10.4)
+
+Penalized regression via glmnet that automatically selects the most relevant drivers by shrinking less important coefficients to zero. Combines L1 (lasso) and L2 (ridge) penalties, controlled by the alpha parameter. Useful when the driver set is large or when you want a parsimonious model that highlights only the drivers that genuinely contribute.
+
+### Necessary Condition Analysis (v10.4)
+
+NCA identifies drivers that are *necessary* (not just correlated) for high outcome levels. Using the CE-FDH ceiling technique, it detects bottleneck relationships where a minimum level of a driver is required before high performance is achievable. Results include necessity effect sizes and a bottleneck table showing the minimum driver level needed for each outcome target.
+
+### Dominance Analysis (v10.4)
+
+Dominance analysis (via the domir package) provides a rigorous pairwise comparison of drivers through general, conditional, and complete dominance rankings. Closely related to Shapley value decomposition, it offers an alternative lens on relative importance by examining whether one driver consistently outperforms another across all possible subset models.
+
+### GAM Nonlinear Effects (v10.4)
+
+Generalized Additive Models (via mgcv) fit smooth nonlinear terms for each driver, revealing curved and threshold relationships that linear methods miss. The effective degrees of freedom (EDF) for each smooth term indicate the degree of nonlinearity (EDF > 1.5 suggests meaningful curvature). Deviance explained is reported alongside linear R² for direct comparison.
 
 ### Quadrant Analysis (IPA)
 
@@ -158,7 +190,7 @@ Delivery Speed        9.4%     8.9%       9.4%   9.4%  0.44
 
 ## Strengths
 
-1. **Multiple Methods**: Cross-validation of importance rankings
+1. **Multiple Methods**: Nine complementary approaches for cross-validation of importance rankings
 2. **Robust to Multicollinearity**: Shapley and Relative Weights handle correlated drivers
 3. **Survey Weights**: Full support throughout analysis
 4. **Machine Learning Option**: SHAP captures non-linear effects
@@ -184,7 +216,7 @@ Delivery Speed        9.4%     8.9%       9.4%   9.4%  0.44
 
 | Aspect | Simple Regression | Turas KeyDriver |
 |--------|-------------------|-----------------|
-| Methods | 1 (beta weights) | 5 complementary |
+| Methods | 1 (beta weights) | 9 complementary |
 | Multicollinearity | Problematic | Handled (Shapley, RelWeights) |
 | Diagnostics | Manual | Automated (VIF, R²) |
 | Output | Coefficients only | Full Excel workbook |
@@ -194,7 +226,7 @@ Delivery Speed        9.4%     8.9%       9.4%   9.4%  0.44
 
 | Aspect | relaimpo | Turas KeyDriver |
 |--------|----------|-----------------|
-| Methods | 6+ | 5 (most useful) |
+| Methods | 6+ | 9 (most useful) |
 | Survey Weights | Limited | Full support |
 | SHAP/ML | No | Yes |
 | Output | R objects | Excel workbook |
@@ -206,7 +238,7 @@ Delivery Speed        9.4%     8.9%       9.4%   9.4%  0.44
 | Aspect | SPSS | Turas KeyDriver |
 |--------|------|-----------------|
 | Cost | Licensed | Open source |
-| Methods | Varies | 5 standardized |
+| Methods | Varies | 9 standardized |
 | SHAP | No | Yes |
 | Automation | Limited | Full scripting |
 | Output | Various | Standardized Excel |
@@ -220,6 +252,7 @@ Delivery Speed        9.4%     8.9%       9.4%   9.4%  0.44
 | 1.0 | Nov 2025 | Initial release |
 | 2.0 | Dec 2025 | Fixed Relative Weights, added survey weights, VIF, charts |
 | 10.0 | Dec 2025 | SHAP analysis, Quadrant charts, segment comparison, documentation consolidation |
+| 10.4 | Mar 2026 | Elastic Net variable selection, NCA, Dominance Analysis, GAM nonlinear effects, config-driven custom slides, per-table CSV/Excel export, configurable analysis thresholds |
 
 ---
 

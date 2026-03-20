@@ -68,9 +68,17 @@ run_gam_analysis <- function(data, config) {
   }
 
   # Only numeric drivers with enough unique values (need ≥ k for smooth)
+  # Also require sufficient sample size relative to basis dimension
+  min_n_per_smooth <- 3 * k_basis
   numeric_drivers <- driver_vars[vapply(driver_vars, function(v) {
     is.numeric(d[[v]]) && length(unique(d[[v]])) >= k_basis
   }, logical(1))]
+
+  if (nrow(d) < min_n_per_smooth) {
+    cat(sprintf("   [WARN] Sample size (%d) is small relative to k=%d. Reducing k to %d.\n",
+                nrow(d), k_basis, max(3, nrow(d) %/% 5)))
+    k_basis <- max(3L, as.integer(nrow(d) %/% 5))
+  }
 
   if (length(numeric_drivers) < 1) {
     return(list(

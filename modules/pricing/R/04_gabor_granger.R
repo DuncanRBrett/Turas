@@ -3,8 +3,8 @@
 # ==============================================================================
 #
 # Purpose: Implement Gabor-Granger pricing methodology
-# Version: 1.0.0
-# Date: 2025-11-18
+# Version: 12.0
+# Date: 2026-03-20
 #
 # References:
 # - Gabor, A., & Granger, C. W. J. (1966). Price as an indicator of quality
@@ -37,8 +37,10 @@ run_gabor_granger <- function(data, config) {
   n_prices <- length(unique(gg_data$price))
 
   if (n_respondents < 30) {
-    warning(sprintf("Low sample size for Gabor-Granger analysis: n=%d (recommended minimum: 30)",
-                    n_respondents), call. = FALSE)
+    pricing_console_warning(
+      sprintf("Low sample size: n=%d (recommended minimum: 30)", n_respondents),
+      context = "Gabor-Granger Analysis"
+    )
   }
 
   # Check monotonicity if requested
@@ -46,10 +48,12 @@ run_gabor_granger <- function(data, config) {
   if (isTRUE(gg$check_monotonicity)) {
     monotonicity_check <- check_gg_monotonicity(gg_data)
     if (monotonicity_check$violations > 0) {
-      warning(sprintf("%d respondents (%.1f%%) showed non-monotonic purchase intent",
-                      monotonicity_check$violations,
-                      monotonicity_check$violation_rate * 100),
-              call. = FALSE)
+      pricing_console_warning(
+        sprintf("%d respondents (%.1f%%) showed non-monotonic purchase intent",
+                monotonicity_check$violations,
+                monotonicity_check$violation_rate * 100),
+        context = "Gabor-Granger Monotonicity"
+      )
     }
   }
 
@@ -416,7 +420,7 @@ smooth_demand_curve <- function(demand_curve,
   # Remove NA values for smoothing
   valid_idx <- !is.na(demand_curve$purchase_intent)
   if (sum(valid_idx) < 3) {
-    warning("Insufficient valid data points for smoothing", call. = FALSE)
+    pricing_console_warning("Insufficient valid data points for smoothing", context = "Demand Curve Smoothing")
     return(demand_curve)
   }
 
@@ -584,8 +588,10 @@ smooth_loess_monotone <- function(prices, intent, span = 0.75, verbose = FALSE) 
     return(smoothed)
 
   }, error = function(e) {
-    warning("LOESS smoothing failed, falling back to isotonic: ", e$message,
-            call. = FALSE)
+    pricing_console_warning(
+      sprintf("LOESS smoothing failed, falling back to isotonic: %s", e$message),
+      context = "Demand Curve Smoothing"
+    )
     return(smooth_isotonic(prices, intent, verbose))
   })
 }

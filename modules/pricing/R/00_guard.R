@@ -14,7 +14,7 @@
 # Related:
 #   - modules/shared/lib/trs_refusal.R - shared TRS infrastructure
 #
-# Version: 1.0 (TRS Integration)
+# Version: 12.0 (TRS Integration)
 # Date: December 2024
 #
 # ==============================================================================
