@@ -2,13 +2,17 @@
 # KEY DRIVER OUTPUT WRITER
 # ==============================================================================
 #
-# Version: Turas v10.3 (Continuous Key Driver Upgrade)
-# Date: 2025-12
+# Version: Turas v10.4 (Continuous Key Driver Upgrade)
+# Date: 2026-03
 #
 # NEW IN v10.3:
 #   - Status table with run_status per spec
 #   - Method notes per driver
 #   - Enhanced output contract compliance
+#
+# NEW IN v10.4:
+#   - Elastic Net, NCA, Dominance, GAM Excel output sheets
+#   - v10.4 method status in Run_Status sheet
 #
 # ==============================================================================
 
@@ -413,11 +417,21 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
     "6. Run_Status - TRS run status and method notes (v10.3)",
     "7. README - This documentation",
     "",
+    "v10.4 Optional Sheets (when enabled):",
+    "8.  Elastic_Net - Regularized coefficients and driver selection",
+    "9.  NCA - Necessary Condition Analysis results",
+    "10. Dominance - General dominance decomposition of R²",
+    "11. GAM - Nonlinear effects (EDF, significance, shape)",
+    "",
     "=== REFERENCES ===",
     "",
     "Shapley, L. S. (1953). A value for n-person games.",
     "Johnson, J. W. (2000). A heuristic method for estimating relative weights.",
     "Tonidandel, S., & LeBreton, J. M. (2011). Relative importance analysis.",
+    "Zou, H. & Hastie, T. (2005). The Elastic Net. JRSS-B.",
+    "Dul, J. (2016). Necessary Condition Analysis (NCA).",
+    "Budescu, D. V. (1993). Dominance analysis. Psych. Bulletin.",
+    "Wood, S. N. (2017). Generalized Additive Models. 2nd Ed.",
     "",
     "For questions or support, contact the Turas development team."
   )

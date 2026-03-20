@@ -67,18 +67,26 @@ parse_data_export_map <- function(file_path, verbose = FALSE) {
 
   # Parse each column
   parsed_columns <- list()
+  skipped_columns <- integer(0)
 
   for (i in seq_len(n_cols)) {
     q_num_header <- as.character(q_num_row[[i]])
     q_id_header <- as.character(q_id_row[[i]])
 
-    # Skip if both are NA
+    # Skip if both are NA (track for reporting)
     if (is.na(q_num_header) && is.na(q_id_header)) {
+      skipped_columns <- c(skipped_columns, i)
       next
     }
 
     parsed_col <- parse_column_header(q_num_header, q_id_header, i)
     parsed_columns[[length(parsed_columns) + 1]] <- parsed_col
+  }
+
+  if (length(skipped_columns) > 0 && verbose) {
+    cat(sprintf("  NOTE: Skipped %d columns with empty headers (columns: %s)\n",
+                length(skipped_columns),
+                paste(skipped_columns, collapse = ", ")))
   }
 
   # Group columns by question number
@@ -91,6 +99,7 @@ parse_data_export_map <- function(file_path, verbose = FALSE) {
   return(list(
     questions = questions,
     n_columns = length(parsed_columns),
+    skipped_columns = skipped_columns,
     raw_data = data_map[1:2, ]
   ))
 }
@@ -177,9 +186,12 @@ parse_column_header <- function(q_num_header, q_id_header, col_index) {
     ))
 
   } else {
-    # Unexpected format - treat as simple
-    warning(sprintf("Unexpected header format (col %d): %s",
-                   col_index, q_num_header))
+    # Unexpected format - treat as simple but flag for review
+    # Using message() instead of warning() to ensure console visibility in Shiny
+    message(sprintf(
+      "AlchemerParser NOTE: Unexpected header format (col %d, %d parts): '%s' — treating as simple question. Review output to verify correctness.",
+      col_index, n_parts, q_num_header
+    ))
     return(list(
       col_index = col_index,
       q_num = q_num,
@@ -187,7 +199,8 @@ parse_column_header <- function(q_num_header, q_id_header, col_index) {
       structure = "simple",
       question_text = paste(parts[-1], collapse = ":"),
       row_label = NA_character_,
-      col_label = NA_character_
+      col_label = NA_character_,
+      format_flag = sprintf("Unexpected %d-part header format", n_parts)
     ))
   }
 }
@@ -234,12 +247,13 @@ extract_leading_number <- function(text) {
 group_columns_by_question <- function(parsed_columns) {
 
   questions <- list()
+  skipped_indices <- integer(0)
 
   for (col in parsed_columns) {
     q_num <- col$q_num
 
     if (is.na(q_num)) {
-      warning(sprintf("Skipping column %d with missing Q number", col$col_index))
+      skipped_indices <- c(skipped_indices, col$col_index)
       next
     }
 
@@ -256,6 +270,10 @@ group_columns_by_question <- function(parsed_columns) {
 
     # Add column to question group
     questions[[q_num]]$columns[[length(questions[[q_num]]$columns) + 1]] <- col
+  }
+
+  if (length(skipped_indices) > 0) {
+    attr(questions, "skipped_columns") <- skipped_indices
   }
 
   return(questions)
@@ -382,7 +400,8 @@ detect_grid_type_with_hints <- function(question_group, hints = list()) {
 
     # Check row label characteristics
     avg_label_length <- mean(nchar(unique_rows))
-    if (avg_label_length > 8) {
+    min_label_len <- if (exists("MIN_RADIO_GRID_LABEL_LENGTH")) MIN_RADIO_GRID_LABEL_LENGTH else 8L
+    if (avg_label_length > min_label_len) {
       # Likely a radio grid (descriptive labels)
       return("radio_grid")
     }

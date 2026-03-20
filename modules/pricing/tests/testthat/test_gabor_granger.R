@@ -183,3 +183,116 @@ test_that("check_gg_monotonicity detects violations", {
   expect_true(is.list(result))
   expect_true(!is.null(result$violations) || !is.null(result$violation_rate))
 })
+
+
+# ------------------------------------------------------------------------------
+# Edge cases
+# ------------------------------------------------------------------------------
+
+test_that("run_gabor_granger handles small sample (n=30)", {
+  skip_if(!exists("run_gabor_granger", mode = "function"),
+          "run_gabor_granger not available")
+
+  data <- generate_gg_data_wide(n = 30)
+  config <- make_gg_config()
+  config$gabor_granger$calculate_elasticity <- FALSE
+
+  result <- run_gabor_granger(data, config)
+  expect_true(!is.null(result$demand_curve))
+  expect_true(!is.null(result$optimal_price))
+})
+
+test_that("run_gabor_granger handles 100% purchase intent at all prices", {
+  skip_if(!exists("run_gabor_granger", mode = "function"),
+          "run_gabor_granger not available")
+
+  # Everyone says yes at every price
+  prices <- c(20, 30, 40, 50, 60)
+  data <- data.frame(
+    price_20 = rep(1, 50),
+    price_30 = rep(1, 50),
+    price_40 = rep(1, 50),
+    price_50 = rep(1, 50),
+    price_60 = rep(1, 50)
+  )
+  config <- make_gg_config(prices)
+  config$gabor_granger$calculate_elasticity <- FALSE
+
+  result <- run_gabor_granger(data, config)
+
+  # All intent should be 1.0
+  expect_true(all(result$demand_curve$purchase_intent >= 0.99))
+  # Optimal price should be highest (since all have 100% intent)
+  expect_equal(result$optimal_price$price, max(prices))
+})
+
+test_that("run_gabor_granger handles 0% purchase intent at all prices", {
+  skip_if(!exists("run_gabor_granger", mode = "function"),
+          "run_gabor_granger not available")
+
+  prices <- c(20, 30, 40, 50, 60)
+  data <- data.frame(
+    price_20 = rep(0, 50),
+    price_30 = rep(0, 50),
+    price_40 = rep(0, 50),
+    price_50 = rep(0, 50),
+    price_60 = rep(0, 50)
+  )
+  config <- make_gg_config(prices)
+  config$gabor_granger$calculate_elasticity <- FALSE
+
+  result <- run_gabor_granger(data, config)
+
+  # All intent should be 0
+  expect_true(all(result$demand_curve$purchase_intent <= 0.01))
+})
+
+test_that("run_gabor_granger smooth monotonicity enforces decreasing demand", {
+  skip_if(!exists("run_gabor_granger", mode = "function"),
+          "run_gabor_granger not available")
+
+  prices <- c(20, 30, 40, 50, 60)
+  set.seed(42)
+  # Create data where price_40 has HIGHER intent than price_30 (violation)
+  data <- data.frame(
+    price_20 = rbinom(100, 1, 0.8),
+    price_30 = rbinom(100, 1, 0.3),  # lower than expected
+    price_40 = rbinom(100, 1, 0.6),  # higher than price_30 (violation)
+    price_50 = rbinom(100, 1, 0.2),
+    price_60 = rbinom(100, 1, 0.1)
+  )
+  config <- make_gg_config(prices)
+  config$gg_monotonicity_behavior <- "smooth"
+  config$gabor_granger$calculate_elasticity <- FALSE
+
+  result <- run_gabor_granger(data, config)
+  dc <- result$demand_curve
+
+  # After smoothing, demand should be non-increasing
+  diffs <- diff(dc$purchase_intent)
+  expect_true(all(diffs <= 0.001))  # Small tolerance for floating point
+})
+
+test_that("calculate_price_elasticity returns NULL for single price point", {
+  skip_if(!exists("calculate_price_elasticity", mode = "function"),
+          "calculate_price_elasticity not available")
+
+  dc <- data.frame(price = 40, purchase_intent = 0.5)
+  result <- calculate_price_elasticity(dc)
+  expect_null(result)
+})
+
+test_that("run_gabor_granger with many price points", {
+  skip_if(!exists("run_gabor_granger", mode = "function"),
+          "run_gabor_granger not available")
+
+  prices <- seq(10, 100, by = 5)
+  data <- generate_gg_data_wide(n = 100, prices = prices)
+  config <- make_gg_config(prices)
+  config$gabor_granger$calculate_elasticity <- TRUE
+
+  result <- run_gabor_granger(data, config)
+
+  expect_equal(nrow(result$demand_curve), length(prices))
+  expect_true(!is.null(result$elasticity))
+})

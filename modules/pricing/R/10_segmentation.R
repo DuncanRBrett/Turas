@@ -421,6 +421,250 @@ generate_segment_insights <- function(comparison_table, method) {
 }
 
 
+#' Statistical Tests for Segment Price Differences
+#'
+#' Tests whether pricing metrics differ significantly between segments
+#' using permutation tests (non-parametric, no distributional assumptions).
+#'
+#' @param data Data frame with respondent-level data
+#' @param config Configuration list (must include segmentation settings)
+#' @param metric Column name to test (e.g., "cheap", "expensive", "wtp")
+#' @param method Test method: "permutation" (default) or "bootstrap_ci"
+#' @param n_perm Number of permutations for permutation test (default 1000)
+#' @param conf_level Confidence level for bootstrap CIs (default 0.95)
+#'
+#' @return List with:
+#'   \item{pairwise}{Data frame of pairwise comparisons with p-values}
+#'   \item{overall}{Overall test result (Kruskal-Wallis p-value)}
+#'   \item{summary}{Summary with segment means and CIs}
+#'   \item{significant_pairs}{Character vector of significantly different pairs}
+#'
+#' @details
+#' For each pair of segments, a two-sided permutation test compares the
+#' difference in weighted means against the null distribution obtained by
+#' randomly reassigning segment labels. This avoids parametric assumptions
+#' that are often violated in pricing data (skewed WTP distributions, etc.).
+#'
+#' An overall Kruskal-Wallis test is also reported as a global significance
+#' check. P-values are adjusted for multiple comparisons using the
+#' Holm-Bonferroni method.
+#'
+#' @export
+test_segment_differences <- function(data,
+                                     config,
+                                     metric,
+                                     method = c("permutation", "bootstrap_ci"),
+                                     n_perm = 1000,
+                                     conf_level = 0.95) {
+
+  method <- match.arg(method)
+
+  # --- Validate inputs ---
+  seg_col <- config$segmentation$segment_column
+  if (is.null(seg_col) || is.na(seg_col)) {
+    pricing_refuse(
+      code = "CFG_MISSING_SEGMENT_COLUMN",
+      title = "Segment Column Not Specified",
+      problem = "No segment_column specified in segmentation configuration",
+      why_it_matters = "Cannot test segment differences without segment definitions",
+      how_to_fix = "Add 'segment_column' to the Segmentation sheet in your configuration",
+      expected = "segment_column setting"
+    )
+  }
+
+  if (!seg_col %in% names(data)) {
+    pricing_refuse(
+      code = "DATA_SEGMENT_COLUMN_MISSING",
+      title = "Segment Column Not Found",
+      problem = sprintf("Segment column '%s' not found in data", seg_col),
+      why_it_matters = "Cannot segment data without the specified segment variable",
+      how_to_fix = "Verify segment_column name matches data exactly (case-sensitive)",
+      observed = names(data),
+      expected = seg_col
+    )
+  }
+
+  if (!metric %in% names(data)) {
+    pricing_refuse(
+      code = "DATA_METRIC_COLUMN_MISSING",
+      title = "Metric Column Not Found",
+      problem = sprintf("Metric column '%s' not found in data", metric),
+      why_it_matters = "Cannot test differences on a variable that doesn't exist",
+      how_to_fix = sprintf("Ensure '%s' exists in the data", metric),
+      observed = names(data),
+      expected = metric
+    )
+  }
+
+  # --- Prepare data ---
+  weight_col <- config$weight_var %||% config$segmentation$weight_var
+  has_weights <- !is.null(weight_col) && !is.na(weight_col) && weight_col %in% names(data)
+
+  # Subset to non-NA metric values
+  df <- data[!is.na(data[[metric]]) & !is.na(data[[seg_col]]), , drop = FALSE]
+  df$.metric <- as.numeric(df[[metric]])
+  df$.segment <- as.character(df[[seg_col]])
+  df$.weight <- if (has_weights) df[[weight_col]] else rep(1, nrow(df))
+
+  segments <- sort(unique(df$.segment))
+  if (length(segments) < 2) {
+    pricing_refuse(
+      code = "DATA_INSUFFICIENT_SEGMENTS",
+      title = "Not Enough Segments",
+      problem = sprintf("Need at least 2 segments, found %d", length(segments)),
+      why_it_matters = "Cannot compare segments without at least two groups",
+      how_to_fix = "Ensure data contains at least 2 distinct segment values",
+      expected = "2+ segments"
+    )
+  }
+
+  # --- Weighted mean helper ---
+  wmean <- function(x, w) {
+    valid <- !is.na(x) & !is.na(w)
+    sum(x[valid] * w[valid]) / sum(w[valid])
+  }
+
+  # --- Overall test: Kruskal-Wallis ---
+  kw_result <- tryCatch({
+    kruskal.test(df$.metric, factor(df$.segment))
+  }, error = function(e) NULL)
+
+  overall_p <- if (!is.null(kw_result)) kw_result$p.value else NA_real_
+
+  # --- Pairwise permutation tests ---
+  pairs <- combn(segments, 2, simplify = FALSE)
+  pairwise_results <- vector("list", length(pairs))
+
+  set.seed(42)  # Reproducibility
+
+  for (k in seq_along(pairs)) {
+    seg_a <- pairs[[k]][1]
+    seg_b <- pairs[[k]][2]
+
+    da <- df[df$.segment == seg_a, ]
+    db <- df[df$.segment == seg_b, ]
+
+    mean_a <- wmean(da$.metric, da$.weight)
+    mean_b <- wmean(db$.metric, db$.weight)
+    observed_diff <- mean_a - mean_b
+
+    if (method == "permutation") {
+      # Pool the two segments and permute labels
+      pooled <- rbind(da, db)
+      n_a <- nrow(da)
+      n_total <- nrow(pooled)
+
+      perm_diffs <- numeric(n_perm)
+      for (p in seq_len(n_perm)) {
+        perm_idx <- sample.int(n_total, n_a)
+        perm_a <- pooled[perm_idx, ]
+        perm_b <- pooled[-perm_idx, ]
+        perm_diffs[p] <- wmean(perm_a$.metric, perm_a$.weight) -
+          wmean(perm_b$.metric, perm_b$.weight)
+      }
+
+      # Two-sided p-value
+      p_value <- mean(abs(perm_diffs) >= abs(observed_diff))
+
+      pairwise_results[[k]] <- data.frame(
+        segment_a = seg_a,
+        segment_b = seg_b,
+        mean_a = round(mean_a, 2),
+        mean_b = round(mean_b, 2),
+        diff = round(observed_diff, 2),
+        p_value = round(p_value, 4),
+        stringsAsFactors = FALSE
+      )
+
+    } else {
+      # Bootstrap CI for difference in means
+      boot_diffs <- numeric(n_perm)
+      for (b in seq_len(n_perm)) {
+        idx_a <- sample.int(nrow(da), replace = TRUE)
+        idx_b <- sample.int(nrow(db), replace = TRUE)
+        boot_diffs[b] <- wmean(da$.metric[idx_a], da$.weight[idx_a]) -
+          wmean(db$.metric[idx_b], db$.weight[idx_b])
+      }
+
+      alpha <- 1 - conf_level
+      ci_lo <- quantile(boot_diffs, alpha / 2)
+      ci_hi <- quantile(boot_diffs, 1 - alpha / 2)
+      # Significant if CI excludes zero
+      significant <- !(ci_lo <= 0 && ci_hi >= 0)
+
+      pairwise_results[[k]] <- data.frame(
+        segment_a = seg_a,
+        segment_b = seg_b,
+        mean_a = round(mean_a, 2),
+        mean_b = round(mean_b, 2),
+        diff = round(observed_diff, 2),
+        ci_lower = round(ci_lo, 2),
+        ci_upper = round(ci_hi, 2),
+        significant = significant,
+        stringsAsFactors = FALSE
+      )
+    }
+  }
+
+  pairwise <- do.call(rbind, pairwise_results)
+
+  # Adjust p-values for multiple comparisons (Holm-Bonferroni)
+  if ("p_value" %in% names(pairwise)) {
+    pairwise$p_adjusted <- round(p.adjust(pairwise$p_value, method = "holm"), 4)
+    pairwise$significant <- pairwise$p_adjusted < (1 - conf_level)
+  }
+
+  # --- Segment summary with bootstrap CIs ---
+  summary_rows <- lapply(segments, function(seg) {
+    d <- df[df$.segment == seg, ]
+    seg_mean <- wmean(d$.metric, d$.weight)
+
+    # Bootstrap CI for segment mean
+    boot_means <- numeric(n_perm)
+    for (b in seq_len(n_perm)) {
+      idx <- sample.int(nrow(d), replace = TRUE)
+      boot_means[b] <- wmean(d$.metric[idx], d$.weight[idx])
+    }
+
+    alpha <- 1 - conf_level
+    data.frame(
+      segment = seg,
+      n = nrow(d),
+      mean = round(seg_mean, 2),
+      ci_lower = round(quantile(boot_means, alpha / 2), 2),
+      ci_upper = round(quantile(boot_means, 1 - alpha / 2), 2),
+      sd = round(sqrt(sum(d$.weight * (d$.metric - seg_mean)^2) / sum(d$.weight)), 2),
+      stringsAsFactors = FALSE
+    )
+  })
+  summary_df <- do.call(rbind, summary_rows)
+
+  # --- Significant pairs ---
+  sig_pairs <- character(0)
+  if ("significant" %in% names(pairwise)) {
+    sig_rows <- pairwise[pairwise$significant, ]
+    if (nrow(sig_rows) > 0) {
+      sig_pairs <- sprintf("%s vs %s", sig_rows$segment_a, sig_rows$segment_b)
+    }
+  }
+
+  list(
+    pairwise = pairwise,
+    overall = list(
+      test = "Kruskal-Wallis",
+      p_value = round(overall_p, 4),
+      significant = !is.na(overall_p) && overall_p < (1 - conf_level)
+    ),
+    summary = summary_df,
+    significant_pairs = sig_pairs,
+    metric = metric,
+    method = method,
+    n_permutations = n_perm,
+    conf_level = conf_level
+  )
+}
+
+
 # Helper operator for default values (if not already defined)
 if (!exists("%||%")) {
   `%||%` <- function(x, y) {

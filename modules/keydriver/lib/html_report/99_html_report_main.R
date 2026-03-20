@@ -29,7 +29,7 @@ if (!exists("%||%", mode = "function")) {
 .kd_required_files <- c("00_html_guard.R", "01_data_transformer.R",
                          "02_table_builder.R", "03_page_builder.R",
                          "04_html_writer.R", "05_chart_builder.R",
-                         "06_quadrant_section.R")
+                         "06_quadrant_section.R", "07_v104_sections.R")
 
 .kd_missing <- character(0)
 for (.kd_file in .kd_required_files) {

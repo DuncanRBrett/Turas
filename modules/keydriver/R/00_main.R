@@ -389,7 +389,7 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   if (exists("turas_print_start_banner", mode = "function")) {
     turas_print_start_banner("KEYDRIVER", KEYDRIVER_VERSION)
   } else {
-    trs_banner_start("KEY DRIVER ANALYSIS", "10.3")
+    trs_banner_start("KEY DRIVER ANALYSIS", KEYDRIVER_VERSION)
   }
 
   guard <- keydriver_guard_init()
@@ -1035,8 +1035,19 @@ write_keydriver_output_enhanced <- function(results, output_file,
     output_file = output_file, run_status = run_status,
     status_details = status_details)
 
-  if (!is.null(results$shap) || !is.null(results$quadrant)) {
+  # Re-open workbook to add optional sheets
+  has_extras <- !is.null(results$shap) || !is.null(results$quadrant) ||
+    !is.null(results$elastic_net) || !is.null(results$nca) ||
+    !is.null(results$dominance) || !is.null(results$gam)
+
+  if (has_extras) {
     wb <- openxlsx::loadWorkbook(output_file)
+
+    header_style <- openxlsx::createStyle(
+      fontSize = 11, fontColour = "#FFFFFF", fgFill = "#4472C4",
+      halign = "left", valign = "center", textDecoration = "bold",
+      border = "TopBottomLeftRight"
+    )
 
     if (!is.null(results$shap)) {
       turas_root <- find_turas_root()
@@ -1054,6 +1065,140 @@ write_keydriver_output_enhanced <- function(results, output_file,
       if (!is.null(results$quadrant$plots)) {
         wb <- insert_quadrant_charts_to_excel(wb, results$quadrant$plots)
       }
+    }
+
+    # --- v10.4 Elastic Net sheet ---
+    if (!is.null(results$elastic_net)) {
+      tryCatch({
+        openxlsx::addWorksheet(wb, "Elastic_Net")
+        enet <- results$elastic_net
+        if (!is.null(enet$coefficients) && is.data.frame(enet$coefficients)) {
+          openxlsx::writeData(wb, "Elastic_Net", enet$coefficients, startRow = 1)
+          openxlsx::addStyle(wb, "Elastic_Net", header_style, rows = 1,
+                            cols = 1:ncol(enet$coefficients), gridExpand = TRUE)
+          openxlsx::setColWidths(wb, "Elastic_Net", cols = 1:ncol(enet$coefficients), widths = "auto")
+          # Add summary below
+          summary_row <- nrow(enet$coefficients) + 3
+          summary_df <- data.frame(
+            Metric = c("Alpha", "Lambda (1se)", "Lambda (min)", "CV MSE (1se)",
+                       "CV MSE (min)", "Selected drivers (1se)", "N observations"),
+            Value = c(
+              round(enet$alpha %||% 0.5, 3),
+              round(enet$lambda_1se %||% 0, 6),
+              round(enet$lambda_min %||% 0, 6),
+              round(enet$cv_mse_1se %||% 0, 4),
+              round(enet$cv_mse_min %||% 0, 4),
+              length(enet$selected_drivers %||% character(0)),
+              enet$n_obs %||% 0
+            ),
+            stringsAsFactors = FALSE
+          )
+          openxlsx::writeData(wb, "Elastic_Net", summary_df, startRow = summary_row)
+          openxlsx::addStyle(wb, "Elastic_Net", header_style, rows = summary_row,
+                            cols = 1:2, gridExpand = TRUE)
+        }
+      }, error = function(e) {
+        cat(sprintf("   [WARN] Failed to write Elastic Net sheet: %s\n", e$message))
+      })
+    }
+
+    # --- v10.4 NCA sheet ---
+    if (!is.null(results$nca)) {
+      tryCatch({
+        openxlsx::addWorksheet(wb, "NCA")
+        nca <- results$nca
+        if (!is.null(nca$nca_summary) && is.data.frame(nca$nca_summary)) {
+          openxlsx::writeData(wb, "NCA", nca$nca_summary, startRow = 1)
+          openxlsx::addStyle(wb, "NCA", header_style, rows = 1,
+                            cols = 1:ncol(nca$nca_summary), gridExpand = TRUE)
+          openxlsx::setColWidths(wb, "NCA", cols = 1:ncol(nca$nca_summary), widths = "auto")
+          # Summary
+          summary_row <- nrow(nca$nca_summary) + 3
+          summary_df <- data.frame(
+            Metric = c("Necessary drivers", "Analysed drivers", "N observations"),
+            Value = c(nca$n_necessary %||% 0, nca$n_analysed %||% 0, nca$n_obs %||% 0),
+            stringsAsFactors = FALSE
+          )
+          openxlsx::writeData(wb, "NCA", summary_df, startRow = summary_row)
+          openxlsx::addStyle(wb, "NCA", header_style, rows = summary_row,
+                            cols = 1:2, gridExpand = TRUE)
+        }
+        # Bottleneck table
+        if (!is.null(nca$bottleneck_table) && is.data.frame(nca$bottleneck_table)) {
+          bt_row <- (nrow(nca$nca_summary) %||% 0) + 8
+          openxlsx::writeData(wb, "NCA", "Bottleneck Table:", startRow = bt_row - 1, startCol = 1)
+          openxlsx::writeData(wb, "NCA", nca$bottleneck_table, startRow = bt_row)
+          openxlsx::addStyle(wb, "NCA", header_style, rows = bt_row,
+                            cols = 1:ncol(nca$bottleneck_table), gridExpand = TRUE)
+        }
+      }, error = function(e) {
+        cat(sprintf("   [WARN] Failed to write NCA sheet: %s\n", e$message))
+      })
+    }
+
+    # --- v10.4 Dominance sheet ---
+    if (!is.null(results$dominance)) {
+      tryCatch({
+        openxlsx::addWorksheet(wb, "Dominance")
+        dom <- results$dominance
+        if (!is.null(dom$summary) && is.data.frame(dom$summary)) {
+          openxlsx::writeData(wb, "Dominance", dom$summary, startRow = 1)
+          openxlsx::addStyle(wb, "Dominance", header_style, rows = 1,
+                            cols = 1:ncol(dom$summary), gridExpand = TRUE)
+          openxlsx::setColWidths(wb, "Dominance", cols = 1:ncol(dom$summary), widths = "auto")
+          summary_row <- nrow(dom$summary) + 3
+          summary_df <- data.frame(
+            Metric = c("Total R-squared", "N drivers", "N sub-models", "N observations"),
+            Value = c(
+              round(dom$total_r_squared %||% 0, 4),
+              dom$n_drivers %||% 0,
+              2^(dom$n_drivers %||% 0),
+              dom$n_obs %||% 0
+            ),
+            stringsAsFactors = FALSE
+          )
+          openxlsx::writeData(wb, "Dominance", summary_df, startRow = summary_row)
+          openxlsx::addStyle(wb, "Dominance", header_style, rows = summary_row,
+                            cols = 1:2, gridExpand = TRUE)
+        }
+      }, error = function(e) {
+        cat(sprintf("   [WARN] Failed to write Dominance sheet: %s\n", e$message))
+      })
+    }
+
+    # --- v10.4 GAM sheet ---
+    if (!is.null(results$gam)) {
+      tryCatch({
+        openxlsx::addWorksheet(wb, "GAM")
+        gam_data <- results$gam
+        if (!is.null(gam_data$nonlinearity_summary) && is.data.frame(gam_data$nonlinearity_summary)) {
+          openxlsx::writeData(wb, "GAM", gam_data$nonlinearity_summary, startRow = 1)
+          openxlsx::addStyle(wb, "GAM", header_style, rows = 1,
+                            cols = 1:ncol(gam_data$nonlinearity_summary), gridExpand = TRUE)
+          openxlsx::setColWidths(wb, "GAM", cols = 1:ncol(gam_data$nonlinearity_summary), widths = "auto")
+          summary_row <- nrow(gam_data$nonlinearity_summary) + 3
+          summary_df <- data.frame(
+            Metric = c("Deviance explained (GAM)", "Linear R-squared", "Improvement",
+                       "Nonlinear drivers", "Analysed drivers", "Basis dimension (k)",
+                       "N observations"),
+            Value = c(
+              round(gam_data$deviance_explained %||% 0, 4),
+              round(gam_data$linear_r_squared %||% 0, 4),
+              round(gam_data$improvement %||% 0, 4),
+              gam_data$n_nonlinear %||% 0,
+              gam_data$n_analysed %||% 0,
+              gam_data$k_basis %||% 5,
+              gam_data$n_obs %||% 0
+            ),
+            stringsAsFactors = FALSE
+          )
+          openxlsx::writeData(wb, "GAM", summary_df, startRow = summary_row)
+          openxlsx::addStyle(wb, "GAM", header_style, rows = summary_row,
+                            cols = 1:2, gridExpand = TRUE)
+        }
+      }, error = function(e) {
+        cat(sprintf("   [WARN] Failed to write GAM sheet: %s\n", e$message))
+      })
     }
 
     openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)

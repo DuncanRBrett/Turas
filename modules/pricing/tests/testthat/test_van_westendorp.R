@@ -178,3 +178,92 @@ test_that("bootstrap_vw_confidence returns CIs", {
 
   expect_true(is.data.frame(result) || is.list(result))
 })
+
+
+# ------------------------------------------------------------------------------
+# Edge cases
+# ------------------------------------------------------------------------------
+
+test_that("run_van_westendorp handles small sample (n=30)", {
+  skip_if(!exists("run_van_westendorp", mode = "function"),
+          "run_van_westendorp not available")
+  skip_if(!requireNamespace("pricesensitivitymeter", quietly = TRUE),
+          "pricesensitivitymeter package not available")
+
+  data <- generate_vw_data(n = 30)
+  config <- make_vw_config()
+
+  result <- run_van_westendorp(data, config)
+  expect_true(!is.null(result$price_points))
+})
+
+test_that("run_van_westendorp handles data with many NAs", {
+  skip_if(!exists("run_van_westendorp", mode = "function"),
+          "run_van_westendorp not available")
+  skip_if(!requireNamespace("pricesensitivitymeter", quietly = TRUE),
+          "pricesensitivitymeter package not available")
+
+  data <- generate_vw_data(n = 200)
+  # Set 30% of cheap values to NA
+  data$cheap[sample(200, 60)] <- NA
+
+  config <- make_vw_config()
+
+  result <- run_van_westendorp(data, config)
+  expect_true(result$diagnostics$n_valid < 200)
+  expect_true(!is.null(result$price_points))
+})
+
+test_that("run_van_westendorp price points are ordered correctly", {
+  skip_if(!exists("run_van_westendorp", mode = "function"),
+          "run_van_westendorp not available")
+  skip_if(!requireNamespace("pricesensitivitymeter", quietly = TRUE),
+          "pricesensitivitymeter package not available")
+
+  data <- generate_vw_data(n = 300)
+  config <- make_vw_config()
+
+  result <- run_van_westendorp(data, config)
+  pp <- result$price_points
+
+  # Expected ordering: PMC <= OPP <= IDP <= PME
+  expect_true(pp$PMC <= pp$OPP + 0.01)
+  expect_true(pp$OPP <= pp$IDP + 0.01)
+  expect_true(pp$IDP <= pp$PME + 0.01)
+})
+
+test_that("validate_vw_data handles all-identical price responses", {
+  skip_if(!exists("validate_vw_data", mode = "function"),
+          "validate_vw_data not available")
+
+  data <- data.frame(
+    too_cheap = rep(50, 50),
+    cheap = rep(50, 50),
+    expensive = rep(50, 50),
+    too_expensive = rep(50, 50),
+    stringsAsFactors = FALSE
+  )
+  config <- make_vw_config()
+
+  result <- validate_vw_data(data, config, verbose = FALSE)
+  # Should detect the problem (zero variance)
+  expect_true(is.list(result))
+})
+
+test_that("validate_vw_data handles extreme price ranges", {
+  skip_if(!exists("validate_vw_data", mode = "function"),
+          "validate_vw_data not available")
+
+  set.seed(123)
+  data <- data.frame(
+    too_cheap = runif(50, 0.01, 0.10),
+    cheap = runif(50, 0.10, 1.00),
+    expensive = runif(50, 100, 1000),
+    too_expensive = runif(50, 1000, 10000),
+    stringsAsFactors = FALSE
+  )
+  config <- make_vw_config()
+
+  result <- validate_vw_data(data, config, verbose = FALSE)
+  expect_true(is.list(result))
+})

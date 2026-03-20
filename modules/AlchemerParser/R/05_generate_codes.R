@@ -347,7 +347,45 @@ validate_parsing <- function(questions, translation_data, word_hints,
       }
     }
 
-    # Check 4: Ambiguous multi-column questions
+    # Check 4: Grid options fallback or missing
+    if (q$is_grid && !is.null(q$grid_options_source)) {
+      if (q$grid_options_source == "generic_fallback") {
+        flags[[length(flags) + 1]] <- list(
+          q_num = q_num,
+          q_code = q$q_code %||% "unknown",
+          issue = "GRID_OPTIONS_GENERIC_FALLBACK",
+          severity = "WARNING",
+          details = sprintf("Grid Q%s (%s) used generic 0-10 rating scale — options may not match actual survey",
+                          q_num, q$grid_type)
+        )
+      } else if (q$grid_options_source == "none") {
+        flags[[length(flags) + 1]] <- list(
+          q_num = q_num,
+          q_code = q$q_code %||% "unknown",
+          issue = "GRID_OPTIONS_NOT_FOUND",
+          severity = "ERROR",
+          details = sprintf("Grid Q%s (%s) has no options — sub-questions will have empty option lists",
+                          q_num, q$grid_type)
+        )
+      }
+    }
+
+    # Check 5: Columns with unexpected header format
+    if (!q$is_grid && !is.null(q$columns)) {
+      for (col in q$columns) {
+        if (!is.null(col$format_flag)) {
+          flags[[length(flags) + 1]] <- list(
+            q_num = q_num,
+            q_code = q$q_code %||% "unknown",
+            issue = "UNEXPECTED_HEADER_FORMAT",
+            severity = "WARNING",
+            details = sprintf("Column %d: %s", col$col_index, col$format_flag)
+          )
+        }
+      }
+    }
+
+    # Check 5: Ambiguous multi-column questions
     if (!q$is_grid && q$n_columns > 1) {
       if (q$variable_type %in% c("Multi_Mention", "Ranking")) {
         # Check if we have Word doc confirmation

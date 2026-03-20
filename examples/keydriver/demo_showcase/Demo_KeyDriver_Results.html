@@ -1387,7 +1387,7 @@
         <span class="kd-header-badge-sep"></span>
         <span class="kd-header-badge"><span class="kd-header-badge-val">8</span>&nbsp;Drivers</span>
         <span class="kd-header-badge-sep"></span>
-        <span class="kd-header-badge"><span class="kd-header-badge-val">5</span>&nbsp;Methods</span>
+        <span class="kd-header-badge"><span class="kd-header-badge-val">6</span>&nbsp;Methods</span>
         <span class="kd-header-badge-sep"></span>
         <span class="kd-header-badge">Created Mar 2026</span>
       </div>
@@ -1413,6 +1413,7 @@
         <a href="#kd-effect-sizes">Effect Sizes</a>
         <a href="#kd-correlations">Correlations</a>
         <a href="#kd-quadrant">Quadrant</a>
+        <a href="#kd-shap-summary">SHAP</a>
         <a href="#kd-diagnostics">Diagnostics</a>
         <a href="#kd-bootstrap-ci">Bootstrap</a>
         <a href="#kd-segment-comparison">Segments</a>
@@ -1672,12 +1673,16 @@
                 <strong>Shapley Value: </strong>
                 Game-theoretic decomposition of model fit across all possible driver subsets.
               </li>
+              <li>
+                <strong>SHAP: </strong>
+                Machine-learning based importance using additive explanations from an XGBoost model.
+              </li>
             </ul>
             <p style="font-size:11px;color:var(--kd-text-muted);margin-top:6px;font-style:italic;">When drivers rank consistently across methods, confidence in their importance is high. Large rank discrepancies may indicate multicollinearity or non-linear effects.</p>
           </div>
           <div class="kd-chart-wrapper">
             <button class="kd-component-pin" data-kd-pin-section="method-comparison" data-kd-pin-prefix="" data-kd-pin-component="chart" onclick="kdPinComponent(&#39;method-comparison&#39;,&#39;chart&#39;,&#39;&#39;)" title="Pin chart only">📌 Chart</button>
-            <div class="kd-chart-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 310" class="kd-chart kd-method-agreement-chart" role="img" aria-label="Method agreement bump chart" style="font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;">
+            <div class="kd-chart-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 310" class="kd-chart kd-method-agreement-chart" role="img" aria-label="Method agreement bump chart" style="font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;">
 <text x="160.0" y="25.0" text-anchor="middle" font-size="11" fill="#334155" font-weight="500">Correlation</text>
 <line x1="160.0" y1="35.0" x2="160.0" y2="290.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
 <text x="300.0" y="25.0" text-anchor="middle" font-size="11" fill="#334155" font-weight="500">Beta</text>
@@ -1686,10 +1691,13 @@
 <line x1="440.0" y1="35.0" x2="440.0" y2="290.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
 <text x="580.0" y="25.0" text-anchor="middle" font-size="11" fill="#334155" font-weight="500">Shapley</text>
 <line x1="580.0" y1="35.0" x2="580.0" y2="290.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
+<text x="720.0" y="25.0" text-anchor="middle" font-size="11" fill="#334155" font-weight="500">SHAP</text>
+<line x1="720.0" y1="35.0" x2="720.0" y2="290.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
 <text x="148.0" y="65.0" text-anchor="end" font-size="11" fill="#334155" font-weight="500" dominant-baseline="central">network_reliability</text>
 <line x1="160.0" y1="65.0" x2="300.0" y2="65.0" stroke="#323367" stroke-width="2.5" opacity="0.90"/>
 <line x1="300.0" y1="65.0" x2="440.0" y2="65.0" stroke="#323367" stroke-width="2.5" opacity="0.90"/>
 <line x1="440.0" y1="65.0" x2="580.0" y2="65.0" stroke="#323367" stroke-width="2.5" opacity="0.90"/>
+<line x1="580.0" y1="65.0" x2="720.0" y2="65.0" stroke="#323367" stroke-width="2.5" opacity="0.90"/>
 <circle cx="160.0" cy="65.0" r="5" fill="#323367" opacity="1.00"/>
 <text x="160.0" y="65.0" text-anchor="middle" font-size="8" fill="white" font-weight="600" dominant-baseline="central">1</text>
 <circle cx="300.0" cy="65.0" r="5" fill="#323367" opacity="1.00"/>
@@ -1698,10 +1706,13 @@
 <text x="440.0" y="65.0" text-anchor="middle" font-size="8" fill="white" font-weight="600" dominant-baseline="central">1</text>
 <circle cx="580.0" cy="65.0" r="5" fill="#323367" opacity="1.00"/>
 <text x="580.0" y="65.0" text-anchor="middle" font-size="8" fill="white" font-weight="600" dominant-baseline="central">1</text>
+<circle cx="720.0" cy="65.0" r="5" fill="#323367" opacity="1.00"/>
+<text x="720.0" y="65.0" text-anchor="middle" font-size="8" fill="white" font-weight="600" dominant-baseline="central">1</text>
 <text x="148.0" y="125.0" text-anchor="end" font-size="11" fill="#334155" font-weight="500" dominant-baseline="central">customer_service</text>
 <line x1="160.0" y1="125.0" x2="300.0" y2="95.0" stroke="#323367" stroke-width="2.5" opacity="0.90"/>
 <line x1="300.0" y1="95.0" x2="440.0" y2="185.0" stroke="#323367" stroke-width="2.5" opacity="0.90"/>
 <line x1="440.0" y1="185.0" x2="580.0" y2="95.0" stroke="#323367" stroke-width="2.5" opacity="0.90"/>
+<line x1="580.0" y1="95.0" x2="720.0" y2="95.0" stroke="#323367" stroke-width="2.5" opacity="0.90"/>
 <circle cx="160.0" cy="125.0" r="5" fill="#323367" opacity="1.00"/>
 <text x="160.0" y="125.0" text-anchor="middle" font-size="8" fill="white" font-weight="600" dominant-baseline="central">3</text>
 <circle cx="300.0" cy="95.0" r="5" fill="#323367" opacity="1.00"/>
@@ -1710,10 +1721,13 @@
 <text x="440.0" y="185.0" text-anchor="middle" font-size="8" fill="white" font-weight="600" dominant-baseline="central">5</text>
 <circle cx="580.0" cy="95.0" r="5" fill="#323367" opacity="1.00"/>
 <text x="580.0" y="95.0" text-anchor="middle" font-size="8" fill="white" font-weight="600" dominant-baseline="central">2</text>
+<circle cx="720.0" cy="95.0" r="5" fill="#323367" opacity="1.00"/>
+<text x="720.0" y="95.0" text-anchor="middle" font-size="8" fill="white" font-weight="600" dominant-baseline="central">2</text>
 <text x="148.0" y="95.0" text-anchor="end" font-size="11" fill="#334155" font-weight="500" dominant-baseline="central">data_speed</text>
 <line x1="160.0" y1="95.0" x2="300.0" y2="155.0" stroke="#323367" stroke-width="2.5" opacity="0.90"/>
 <line x1="300.0" y1="155.0" x2="440.0" y2="95.0" stroke="#323367" stroke-width="2.5" opacity="0.90"/>
 <line x1="440.0" y1="95.0" x2="580.0" y2="125.0" stroke="#323367" stroke-width="2.5" opacity="0.90"/>
+<line x1="580.0" y1="125.0" x2="720.0" y2="155.0" stroke="#323367" stroke-width="2.5" opacity="0.90"/>
 <circle cx="160.0" cy="95.0" r="5" fill="#323367" opacity="1.00"/>
 <text x="160.0" y="95.0" text-anchor="middle" font-size="8" fill="white" font-weight="600" dominant-baseline="central">2</text>
 <circle cx="300.0" cy="155.0" r="5" fill="#323367" opacity="1.00"/>
@@ -1722,46 +1736,58 @@
 <text x="440.0" y="95.0" text-anchor="middle" font-size="8" fill="white" font-weight="600" dominant-baseline="central">2</text>
 <circle cx="580.0" cy="125.0" r="5" fill="#323367" opacity="1.00"/>
 <text x="580.0" y="125.0" text-anchor="middle" font-size="8" fill="white" font-weight="600" dominant-baseline="central">3</text>
+<circle cx="720.0" cy="155.0" r="5" fill="#323367" opacity="1.00"/>
+<text x="720.0" y="155.0" text-anchor="middle" font-size="8" fill="white" font-weight="600" dominant-baseline="central">4</text>
 <text x="148.0" y="185.0" text-anchor="end" font-size="11" fill="#94a3b8" font-weight="400" dominant-baseline="central">value_for_money</text>
 <line x1="160.0" y1="185.0" x2="300.0" y2="125.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <line x1="300.0" y1="125.0" x2="440.0" y2="215.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <line x1="440.0" y1="215.0" x2="580.0" y2="155.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
+<line x1="580.0" y1="155.0" x2="720.0" y2="125.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <circle cx="160.0" cy="185.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="300.0" cy="125.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="440.0" cy="215.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="580.0" cy="155.0" r="3" fill="#94a3b8" opacity="0.40"/>
+<circle cx="720.0" cy="125.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <text x="148.0" y="155.0" text-anchor="end" font-size="11" fill="#94a3b8" font-weight="400" dominant-baseline="central">coverage_area</text>
 <line x1="160.0" y1="155.0" x2="300.0" y2="185.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <line x1="300.0" y1="185.0" x2="440.0" y2="125.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <line x1="440.0" y1="125.0" x2="580.0" y2="185.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
+<line x1="580.0" y1="185.0" x2="720.0" y2="185.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <circle cx="160.0" cy="155.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="300.0" cy="185.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="440.0" cy="125.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="580.0" cy="185.0" r="3" fill="#94a3b8" opacity="0.40"/>
+<circle cx="720.0" cy="185.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <text x="148.0" y="215.0" text-anchor="end" font-size="11" fill="#94a3b8" font-weight="400" dominant-baseline="central">app_experience</text>
 <line x1="160.0" y1="215.0" x2="300.0" y2="245.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <line x1="300.0" y1="245.0" x2="440.0" y2="155.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <line x1="440.0" y1="155.0" x2="580.0" y2="215.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
+<line x1="580.0" y1="215.0" x2="720.0" y2="245.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <circle cx="160.0" cy="215.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="300.0" cy="245.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="440.0" cy="155.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="580.0" cy="215.0" r="3" fill="#94a3b8" opacity="0.40"/>
+<circle cx="720.0" cy="245.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <text x="148.0" y="245.0" text-anchor="end" font-size="11" fill="#94a3b8" font-weight="400" dominant-baseline="central">billing_clarity</text>
 <line x1="160.0" y1="245.0" x2="300.0" y2="215.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <line x1="300.0" y1="215.0" x2="440.0" y2="245.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <line x1="440.0" y1="245.0" x2="580.0" y2="245.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
+<line x1="580.0" y1="245.0" x2="720.0" y2="215.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <circle cx="160.0" cy="245.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="300.0" cy="215.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="440.0" cy="245.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="580.0" cy="245.0" r="3" fill="#94a3b8" opacity="0.40"/>
+<circle cx="720.0" cy="215.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <text x="148.0" y="275.0" text-anchor="end" font-size="11" fill="#94a3b8" font-weight="400" dominant-baseline="central">contract_flexibility</text>
 <line x1="160.0" y1="275.0" x2="300.0" y2="275.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <line x1="300.0" y1="275.0" x2="440.0" y2="275.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <line x1="440.0" y1="275.0" x2="580.0" y2="275.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
+<line x1="580.0" y1="275.0" x2="720.0" y2="275.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <circle cx="160.0" cy="275.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="300.0" cy="275.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="440.0" cy="275.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="580.0" cy="275.0" r="3" fill="#94a3b8" opacity="0.40"/>
+<circle cx="720.0" cy="275.0" r="3" fill="#94a3b8" opacity="0.40"/>
 </svg></div>
           </div>
           <div class="kd-table-wrapper">
@@ -1774,6 +1800,7 @@
                   <th class="kd-th kd-th-num">Rank_Beta</th>
                   <th class="kd-th kd-th-num">Rank_RelWeight</th>
                   <th class="kd-th kd-th-num">Rank_Shapley</th>
+                  <th class="kd-th kd-th-num">Rank_SHAP</th>
                   <th class="kd-th kd-th-num">Mean Rank</th>
                   <th class="kd-th kd-th-label">Agreement</th>
                 </tr>
@@ -1781,6 +1808,7 @@
               <tbody>
                 <tr class="kd-tr">
                   <td class="kd-td kd-td-label">network_reliability</td>
+                  <td class="kd-td kd-td-num">1</td>
                   <td class="kd-td kd-td-num">1</td>
                   <td class="kd-td kd-td-num">1</td>
                   <td class="kd-td kd-td-num">1</td>
@@ -1796,7 +1824,8 @@
                   <td class="kd-td kd-td-num">2</td>
                   <td class="kd-td kd-td-num">5</td>
                   <td class="kd-td kd-td-num">2</td>
-                  <td class="kd-td kd-td-num">3.0</td>
+                  <td class="kd-td kd-td-num">2</td>
+                  <td class="kd-td kd-td-num">2.8</td>
                   <td class="kd-td">
                     <span class="kd-badge kd-agree-medium">Medium</span>
                   </td>
@@ -1807,7 +1836,8 @@
                   <td class="kd-td kd-td-num">4</td>
                   <td class="kd-td kd-td-num">2</td>
                   <td class="kd-td kd-td-num">3</td>
-                  <td class="kd-td kd-td-num">2.8</td>
+                  <td class="kd-td kd-td-num">4</td>
+                  <td class="kd-td kd-td-num">3.0</td>
                   <td class="kd-td">
                     <span class="kd-badge kd-agree-high">High</span>
                   </td>
@@ -1818,7 +1848,8 @@
                   <td class="kd-td kd-td-num">3</td>
                   <td class="kd-td kd-td-num">6</td>
                   <td class="kd-td kd-td-num">4</td>
-                  <td class="kd-td kd-td-num">4.5</td>
+                  <td class="kd-td kd-td-num">3</td>
+                  <td class="kd-td kd-td-num">4.2</td>
                   <td class="kd-td">
                     <span class="kd-badge kd-agree-medium">Medium</span>
                   </td>
@@ -1829,7 +1860,8 @@
                   <td class="kd-td kd-td-num">5</td>
                   <td class="kd-td kd-td-num">3</td>
                   <td class="kd-td kd-td-num">5</td>
-                  <td class="kd-td kd-td-num">4.2</td>
+                  <td class="kd-td kd-td-num">5</td>
+                  <td class="kd-td kd-td-num">4.4</td>
                   <td class="kd-td">
                     <span class="kd-badge kd-agree-high">High</span>
                   </td>
@@ -1840,7 +1872,8 @@
                   <td class="kd-td kd-td-num">7</td>
                   <td class="kd-td kd-td-num">4</td>
                   <td class="kd-td kd-td-num">6</td>
-                  <td class="kd-td kd-td-num">5.8</td>
+                  <td class="kd-td kd-td-num">7</td>
+                  <td class="kd-td kd-td-num">6.0</td>
                   <td class="kd-td">
                     <span class="kd-badge kd-agree-medium">Medium</span>
                   </td>
@@ -1851,13 +1884,15 @@
                   <td class="kd-td kd-td-num">6</td>
                   <td class="kd-td kd-td-num">7</td>
                   <td class="kd-td kd-td-num">7</td>
-                  <td class="kd-td kd-td-num">6.8</td>
+                  <td class="kd-td kd-td-num">6</td>
+                  <td class="kd-td kd-td-num">6.6</td>
                   <td class="kd-td">
                     <span class="kd-badge kd-agree-high">High</span>
                   </td>
                 </tr>
                 <tr class="kd-tr">
                   <td class="kd-td kd-td-label">contract_flexibility</td>
+                  <td class="kd-td kd-td-num">8</td>
                   <td class="kd-td kd-td-num">8</td>
                   <td class="kd-td kd-td-num">8</td>
                   <td class="kd-td kd-td-num">8</td>
@@ -2347,6 +2382,59 @@
 <tr class="kd-quadrant-action-row"><td class="kd-quadrant-action-cell" style="font-weight:500;">contract_flexibility</td><td class="kd-quadrant-action-cell"><span class="kd-quadrant-badge" style="background-color:#94a3b8;color:#fff;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;">Low Priority</span></td><td class="kd-quadrant-action-cell" style="text-align:center;">8</td><td class="kd-quadrant-action-cell" style="text-align:center;"><span style="background:#f1f5f9;color:#64748b;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;">MONITOR</span></td></tr></tbody></table>
           </div>
         </div>
+        <div class="kd-section" id="kd-shap-summary" data-kd-section="shap-summary">
+          <div class="kd-section-title-row">
+            <h2 class="kd-section-title">SHAP Importance</h2>
+            <button class="kd-pin-btn" data-kd-pin-section="shap-summary" data-kd-pin-prefix="" onclick="kdPinSection(&#39;shap-summary&#39;,&#39;&#39;)" title="Pin this section">📌</button>
+          </div>
+          <div class="kd-insight-area" data-kd-insight-section="shap-summary" data-kd-insight-prefix="">
+            <button class="kd-insight-toggle" id="kd-insight-toggle-shap-summary" onclick="kdToggleInsight(&#39;shap-summary&#39;,&#39;&#39;)">+ Add Insight</button>
+            <div class="kd-insight-container" id="kd-insight-container-shap-summary" style="">
+              <div class="kd-insight-editor" contenteditable="true" role="textbox" aria-label="Analyst insight for shap-summary section" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;shap-summary&#39;,&#39;&#39;)"></div>
+              <button class="kd-insight-dismiss" onclick="kdDismissInsight(&#39;shap-summary&#39;,&#39;&#39;)">×</button>
+            </div>
+          </div>
+          <p class="kd-section-intro">SHAP-based feature importance shows each driver's contribution to the model's predictions, accounting for interactions between variables.</p>
+          <div class="kd-callout">
+            <div class="kd-callout-title">Why do SHAP values differ from driver importance?</div>
+            <div class="kd-callout-text">The driver importance section uses a linear regression model (Shapley value decomposition of R²), which assumes each driver has a constant, additive effect on the outcome. SHAP values are derived from an XGBoost model that captures non-linear relationships and interaction effects between drivers. Because of this, a driver may rank differently in SHAP analysis — for example, a driver with a modest linear correlation but strong non-linear or threshold effects will appear more important in SHAP. When both methods agree on a driver's importance, confidence is high. Discrepancies highlight drivers worth investigating for non-linear effects or interactions.</div>
+          </div>
+          <div class="kd-chart-wrapper">
+            <button class="kd-component-pin" data-kd-pin-section="shap-summary" data-kd-pin-prefix="" data-kd-pin-component="chart" onclick="kdPinComponent(&#39;shap-summary&#39;,&#39;chart&#39;,&#39;&#39;)" title="Pin chart only">📌 Chart</button>
+            <div class="kd-chart-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 302" width="100%" style="max-width:660px;display:block;" role="img" aria-label="SHAP importance bar chart">
+<text x="152.0" y="37.0" text-anchor="end" font-size="11" fill="#64748b" font-weight="500">network_reliability</text>
+<rect x="160.0" y="20.0" width="440.0" height="26.0" rx="4" fill="#323367" opacity="1.00"/>
+<text x="606.0" y="37.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">31%</text>
+<text x="152.0" y="71.0" text-anchor="end" font-size="11" fill="#64748b" font-weight="500">customer_service</text>
+<rect x="160.0" y="54.0" width="285.5" height="26.0" rx="4" fill="#323367" opacity="0.82"/>
+<text x="451.5" y="71.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">20%</text>
+<text x="152.0" y="105.0" text-anchor="end" font-size="11" fill="#64748b" font-weight="500">value_for_money</text>
+<rect x="160.0" y="88.0" width="171.2" height="26.0" rx="4" fill="#323367" opacity="0.69"/>
+<text x="337.2" y="105.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">12%</text>
+<text x="152.0" y="139.0" text-anchor="end" font-size="11" fill="#64748b" font-weight="500">data_speed</text>
+<rect x="160.0" y="122.0" width="143.6" height="26.0" rx="4" fill="#323367" opacity="0.66"/>
+<text x="309.6" y="139.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">10%</text>
+<text x="152.0" y="173.0" text-anchor="end" font-size="11" fill="#64748b" font-weight="500">coverage_area</text>
+<rect x="160.0" y="156.0" width="108.1" height="26.0" rx="4" fill="#323367" opacity="0.62"/>
+<text x="274.1" y="173.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">8%</text>
+<text x="152.0" y="207.0" text-anchor="end" font-size="11" fill="#64748b" font-weight="500">billing_clarity</text>
+<rect x="160.0" y="190.0" width="107.0" height="26.0" rx="4" fill="#323367" opacity="0.62"/>
+<text x="273.0" y="207.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">8%</text>
+<text x="152.0" y="241.0" text-anchor="end" font-size="11" fill="#64748b" font-weight="500">app_experience</text>
+<rect x="160.0" y="224.0" width="95.8" height="26.0" rx="4" fill="#323367" opacity="0.61"/>
+<text x="261.8" y="241.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">7%</text>
+<text x="152.0" y="275.0" text-anchor="end" font-size="11" fill="#64748b" font-weight="500">contract_flexibility</text>
+<rect x="160.0" y="258.0" width="70.4" height="26.0" rx="4" fill="#323367" opacity="0.58"/>
+<text x="236.4" y="275.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">5%</text>
+</svg></div>
+          </div>
+          <details style="margin-top:12px;">
+            <summary style="cursor:pointer;font-weight:600;font-size:12px;color:var(--kd-text-muted);">What is SHAP?</summary>
+            <div class="kd-callout" style="margin-top:8px;">
+              <div class="kd-callout-text">SHAP (SHapley Additive exPlanations) values provide a game-theoretic approach to feature importance. They decompose each prediction into additive contributions from each driver, accounting for interactions between variables. Values are computed using the shapr package and represent the mean absolute SHAP contribution across all observations.</div>
+            </div>
+          </details>
+        </div>
         <div class="kd-section" id="kd-diagnostics" data-kd-section="diagnostics">
           <div class="kd-section-title-row">
             <h2 class="kd-section-title">Model Diagnostics</h2>
@@ -2519,78 +2607,78 @@
           <div class="kd-chart-wrapper">
             <button class="kd-component-pin" data-kd-pin-section="bootstrap-ci" data-kd-pin-prefix="" data-kd-pin-component="chart" onclick="kdPinComponent(&#39;bootstrap-ci&#39;,&#39;chart&#39;,&#39;&#39;)" title="Pin chart only">📌 Chart</button>
             <div class="kd-chart-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 338" class="kd-chart kd-bootstrap-ci-chart" role="img" aria-label="Bootstrap confidence interval forest plot" style="font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;">
-<line x1="245.1" y1="25.0" x2="245.1" y2="328.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
-<text x="245.1" y="18.0" text-anchor="middle" font-size="9" fill="#94a3b8" font-weight="400">0.0</text>
-<line x1="356.7" y1="25.0" x2="356.7" y2="328.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
-<text x="356.7" y="18.0" text-anchor="middle" font-size="9" fill="#94a3b8" font-weight="400">0.2</text>
-<line x1="468.3" y1="25.0" x2="468.3" y2="328.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
-<text x="468.3" y="18.0" text-anchor="middle" font-size="9" fill="#94a3b8" font-weight="400">0.4</text>
-<line x1="579.9" y1="25.0" x2="579.9" y2="328.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
-<text x="579.9" y="18.0" text-anchor="middle" font-size="9" fill="#94a3b8" font-weight="400">0.6</text>
-<line x1="245.1" y1="25.0" x2="245.1" y2="328.0" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3" opacity="1.00"/>
+<line x1="247.8" y1="25.0" x2="247.8" y2="328.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
+<text x="247.8" y="18.0" text-anchor="middle" font-size="9" fill="#94a3b8" font-weight="400">0.0</text>
+<line x1="359.4" y1="25.0" x2="359.4" y2="328.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
+<text x="359.4" y="18.0" text-anchor="middle" font-size="9" fill="#94a3b8" font-weight="400">0.2</text>
+<line x1="471.1" y1="25.0" x2="471.1" y2="328.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
+<text x="471.1" y="18.0" text-anchor="middle" font-size="9" fill="#94a3b8" font-weight="400">0.4</text>
+<line x1="582.8" y1="25.0" x2="582.8" y2="328.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
+<text x="582.8" y="18.0" text-anchor="middle" font-size="9" fill="#94a3b8" font-weight="400">0.6</text>
+<line x1="247.8" y1="25.0" x2="247.8" y2="328.0" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3" opacity="1.00"/>
 <g class="kd-ci-row" data-kd-driver="network_reliability">
 <text x="192.0" y="44.0" text-anchor="end" font-size="11" fill="#334155" font-weight="400" dominant-baseline="central">network_reliability</text>
-<line x1="534.9" y1="44.0" x2="588.5" y2="44.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<line x1="534.9" y1="39.0" x2="534.9" y2="49.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<line x1="588.5" y1="39.0" x2="588.5" y2="49.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<circle cx="562.1" cy="44.0" r="4.0" fill="#323367" stroke="white" stroke-width="1.5"/>
-<text x="562.1" y="34.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.57</text>
+<line x1="537.0" y1="44.0" x2="588.8" y2="44.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<line x1="537.0" y1="39.0" x2="537.0" y2="49.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<line x1="588.8" y1="39.0" x2="588.8" y2="49.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<circle cx="563.4" cy="44.0" r="4.0" fill="#323367" stroke="white" stroke-width="1.5"/>
+<text x="563.4" y="34.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.57</text>
 </g>
 <g class="kd-ci-row" data-kd-driver="data_speed">
 <text x="192.0" y="80.0" text-anchor="end" font-size="11" fill="#334155" font-weight="400" dominant-baseline="central">data_speed</text>
-<line x1="428.4" y1="80.0" x2="494.4" y2="80.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<line x1="428.4" y1="75.0" x2="428.4" y2="85.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<line x1="494.4" y1="75.0" x2="494.4" y2="85.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<circle cx="460.3" cy="80.0" r="4.0" fill="#323367" stroke="white" stroke-width="1.5"/>
-<text x="460.3" y="70.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.39</text>
+<line x1="426.3" y1="80.0" x2="498.5" y2="80.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<line x1="426.3" y1="75.0" x2="426.3" y2="85.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<line x1="498.5" y1="75.0" x2="498.5" y2="85.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<circle cx="463.4" cy="80.0" r="4.0" fill="#323367" stroke="white" stroke-width="1.5"/>
+<text x="463.4" y="70.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.39</text>
 </g>
 <g class="kd-ci-row" data-kd-driver="customer_service">
 <text x="192.0" y="116.0" text-anchor="end" font-size="11" fill="#334155" font-weight="400" dominant-baseline="central">customer_service</text>
-<line x1="420.0" y1="116.0" x2="489.0" y2="116.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<line x1="420.0" y1="111.0" x2="420.0" y2="121.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<line x1="489.0" y1="111.0" x2="489.0" y2="121.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<circle cx="456.9" cy="116.0" r="4.0" fill="#323367" stroke="white" stroke-width="1.5"/>
-<text x="456.9" y="106.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.38</text>
+<line x1="430.0" y1="116.0" x2="492.3" y2="116.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<line x1="430.0" y1="111.0" x2="430.0" y2="121.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<line x1="492.3" y1="111.0" x2="492.3" y2="121.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<circle cx="459.9" cy="116.0" r="4.0" fill="#323367" stroke="white" stroke-width="1.5"/>
+<text x="459.9" y="106.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.38</text>
 </g>
 <g class="kd-ci-row" data-kd-driver="coverage_area">
 <text x="192.0" y="152.0" text-anchor="end" font-size="11" fill="#334155" font-weight="400" dominant-baseline="central">coverage_area</text>
-<line x1="386.7" y1="152.0" x2="444.4" y2="152.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<line x1="386.7" y1="147.0" x2="386.7" y2="157.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<line x1="444.4" y1="147.0" x2="444.4" y2="157.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<circle cx="416.3" cy="152.0" r="4.0" fill="#323367" stroke="white" stroke-width="1.5"/>
-<text x="416.3" y="142.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.31</text>
+<line x1="384.6" y1="152.0" x2="450.8" y2="152.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<line x1="384.6" y1="147.0" x2="384.6" y2="157.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<line x1="450.8" y1="147.0" x2="450.8" y2="157.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<circle cx="417.9" cy="152.0" r="4.0" fill="#323367" stroke="white" stroke-width="1.5"/>
+<text x="417.9" y="142.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.30</text>
 </g>
 <g class="kd-ci-row" data-kd-driver="value_for_money">
 <text x="192.0" y="188.0" text-anchor="end" font-size="11" fill="#334155" font-weight="400" dominant-baseline="central">value_for_money</text>
-<line x1="372.4" y1="188.0" x2="439.6" y2="188.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<line x1="372.4" y1="183.0" x2="372.4" y2="193.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<line x1="439.6" y1="183.0" x2="439.6" y2="193.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<circle cx="405.9" cy="188.0" r="4.0" fill="#323367" stroke="white" stroke-width="1.5"/>
-<text x="405.9" y="178.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.29</text>
+<line x1="371.6" y1="188.0" x2="444.1" y2="188.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<line x1="371.6" y1="183.0" x2="371.6" y2="193.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<line x1="444.1" y1="183.0" x2="444.1" y2="193.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<circle cx="407.5" cy="188.0" r="4.0" fill="#323367" stroke="white" stroke-width="1.5"/>
+<text x="407.5" y="178.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.29</text>
 </g>
 <g class="kd-ci-row" data-kd-driver="app_experience">
 <text x="192.0" y="224.0" text-anchor="end" font-size="11" fill="#334155" font-weight="400" dominant-baseline="central">app_experience</text>
-<line x1="343.4" y1="224.0" x2="415.0" y2="224.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<line x1="343.4" y1="219.0" x2="343.4" y2="229.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<line x1="415.0" y1="219.0" x2="415.0" y2="229.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<circle cx="381.2" cy="224.0" r="4.0" fill="#323367" stroke="white" stroke-width="1.5"/>
-<text x="381.2" y="214.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.24</text>
+<line x1="347.3" y1="224.0" x2="414.0" y2="224.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<line x1="347.3" y1="219.0" x2="347.3" y2="229.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<line x1="414.0" y1="219.0" x2="414.0" y2="229.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<circle cx="380.4" cy="224.0" r="4.0" fill="#323367" stroke="white" stroke-width="1.5"/>
+<text x="380.4" y="214.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.24</text>
 </g>
 <g class="kd-ci-row" data-kd-driver="billing_clarity">
 <text x="192.0" y="260.0" text-anchor="end" font-size="11" fill="#334155" font-weight="400" dominant-baseline="central">billing_clarity</text>
-<line x1="317.3" y1="260.0" x2="388.1" y2="260.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<line x1="317.3" y1="255.0" x2="317.3" y2="265.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<line x1="388.1" y1="255.0" x2="388.1" y2="265.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<circle cx="354.5" cy="260.0" r="4.0" fill="#323367" stroke="white" stroke-width="1.5"/>
-<text x="354.5" y="250.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.20</text>
+<line x1="321.0" y1="260.0" x2="394.1" y2="260.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<line x1="321.0" y1="255.0" x2="321.0" y2="265.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<line x1="394.1" y1="255.0" x2="394.1" y2="265.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<circle cx="357.6" cy="260.0" r="4.0" fill="#323367" stroke="white" stroke-width="1.5"/>
+<text x="357.6" y="250.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.20</text>
 </g>
 <g class="kd-ci-row" data-kd-driver="contract_flexibility">
 <text x="192.0" y="296.0" text-anchor="end" font-size="11" fill="#334155" font-weight="400" dominant-baseline="central">contract_flexibility</text>
-<line x1="204.1" y1="296.0" x2="273.1" y2="296.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<line x1="204.1" y1="291.0" x2="204.1" y2="301.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<line x1="273.1" y1="291.0" x2="273.1" y2="301.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
-<circle cx="237.7" cy="296.0" r="4.0" fill="#323367" stroke="white" stroke-width="1.5"/>
-<text x="237.7" y="286.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">-0.01</text>
+<line x1="204.3" y1="296.0" x2="277.6" y2="296.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<line x1="204.3" y1="291.0" x2="204.3" y2="301.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<line x1="277.6" y1="291.0" x2="277.6" y2="301.0" stroke="#323367" stroke-width="1.5" opacity="0.60"/>
+<circle cx="241.2" cy="296.0" r="4.0" fill="#323367" stroke="white" stroke-width="1.5"/>
+<text x="241.2" y="286.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">-0.01</text>
 </g>
 </svg></div>
           </div>
@@ -2919,31 +3007,31 @@
               <tbody>
                 <tr class="kd-tr">
                   <td class="kd-td kd-td-label">network_reliability</td>
-                  <td class="kd-td kd-td-num">0.468</td>
-                  <td class="kd-td kd-td-num">39.3%</td>
+                  <td class="kd-td kd-td-num">0.473</td>
+                  <td class="kd-td kd-td-num">38.6%</td>
                   <td class="kd-td">
                     <span class="kd-badge kd-agree-high">Retained</span>
                   </td>
                 </tr>
                 <tr class="kd-tr">
                   <td class="kd-td kd-td-label">customer_service</td>
-                  <td class="kd-td kd-td-num">0.303</td>
-                  <td class="kd-td kd-td-num">25.5%</td>
+                  <td class="kd-td kd-td-num">0.311</td>
+                  <td class="kd-td kd-td-num">25.3%</td>
                   <td class="kd-td">
                     <span class="kd-badge kd-agree-high">Retained</span>
                   </td>
                 </tr>
                 <tr class="kd-tr">
                   <td class="kd-td kd-td-label">value_for_money</td>
-                  <td class="kd-td kd-td-num">0.185</td>
-                  <td class="kd-td kd-td-num">15.5%</td>
+                  <td class="kd-td kd-td-num">0.191</td>
+                  <td class="kd-td kd-td-num">15.6%</td>
                   <td class="kd-td">
                     <span class="kd-badge kd-agree-high">Retained</span>
                   </td>
                 </tr>
                 <tr class="kd-tr">
                   <td class="kd-td kd-td-label">data_speed</td>
-                  <td class="kd-td kd-td-num">0.100</td>
+                  <td class="kd-td kd-td-num">0.103</td>
                   <td class="kd-td kd-td-num">8.4%</td>
                   <td class="kd-td">
                     <span class="kd-badge kd-agree-high">Retained</span>
@@ -2951,24 +3039,24 @@
                 </tr>
                 <tr class="kd-tr">
                   <td class="kd-td kd-td-label">coverage_area</td>
-                  <td class="kd-td kd-td-num">0.071</td>
-                  <td class="kd-td kd-td-num">6.0%</td>
+                  <td class="kd-td kd-td-num">0.075</td>
+                  <td class="kd-td kd-td-num">6.1%</td>
                   <td class="kd-td">
                     <span class="kd-badge kd-agree-high">Retained</span>
                   </td>
                 </tr>
                 <tr class="kd-tr">
                   <td class="kd-td kd-td-label">billing_clarity</td>
-                  <td class="kd-td kd-td-num">0.043</td>
-                  <td class="kd-td kd-td-num">3.6%</td>
+                  <td class="kd-td kd-td-num">0.049</td>
+                  <td class="kd-td kd-td-num">4.0%</td>
                   <td class="kd-td">
                     <span class="kd-badge kd-agree-high">Retained</span>
                   </td>
                 </tr>
                 <tr class="kd-tr">
                   <td class="kd-td kd-td-label">app_experience</td>
-                  <td class="kd-td kd-td-num">0.019</td>
-                  <td class="kd-td kd-td-num">1.6%</td>
+                  <td class="kd-td kd-td-num">0.023</td>
+                  <td class="kd-td kd-td-num">1.9%</td>
                   <td class="kd-td">
                     <span class="kd-badge kd-agree-high">Retained</span>
                   </td>
@@ -3125,7 +3213,7 @@
           </div>
         </div>
         <div class="kd-footer">
-          Generated by TURAS Key Driver Module v1.0 | 20 March 2026 17:25
+          Generated by TURAS Key Driver Module v1.0 | 20 March 2026 17:38
           <br/>
           The Research LampPost (Pty) Ltd
         </div>

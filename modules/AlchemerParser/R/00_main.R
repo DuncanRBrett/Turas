@@ -92,6 +92,25 @@ run_alchemerparser <- function(project_dir,
     cat(sprintf("  Found %d questions with %d total columns\n",
                 length(parsed_data$questions),
                 parsed_data$n_columns))
+    if (length(parsed_data$skipped_columns) > 0) {
+      cat(sprintf("  Skipped %d empty-header columns\n",
+                  length(parsed_data$skipped_columns)))
+    }
+  }
+
+  # Validate: data export map must yield at least one question
+  if (length(parsed_data$questions) == 0) {
+    alchemerparser_refuse(
+      code = "DATA_EMPTY_DATA_MAP",
+      title = "No Questions Found in Data Export Map",
+      problem = "Data export map was parsed but no questions were extracted.",
+      why_it_matters = "Cannot generate survey structure without at least one question in the data export map.",
+      how_to_fix = c(
+        "Verify the data export map file contains survey data",
+        "Check that row 1 contains question numbers (format: '1: Question text')",
+        "Re-export the data map from Alchemer"
+      )
+    )
   }
 
   # ==============================================================================
@@ -109,6 +128,21 @@ run_alchemerparser <- function(project_dir,
                 translation_data$n_options))
   }
 
+  # Validate: translation must contain at least some questions
+  if (translation_data$n_questions == 0) {
+    alchemerparser_refuse(
+      code = "DATA_EMPTY_TRANSLATION",
+      title = "No Questions Found in Translation Export",
+      problem = "Translation export was parsed but no question texts were extracted.",
+      why_it_matters = "Question texts from the translation export are needed to populate output files.",
+      how_to_fix = c(
+        "Verify the translation export contains question keys (format: 'q-{id}')",
+        "Check that the 'Key' and 'Default Text' columns are populated",
+        "Re-export the translation file from Alchemer"
+      )
+    )
+  }
+
   # ==============================================================================
   # STEP 4: Parse Word questionnaire
   # ==============================================================================
@@ -121,6 +155,13 @@ run_alchemerparser <- function(project_dir,
   if (verbose) {
     cat(sprintf("  Extracted hints for %d questions\n",
                 length(word_hints)))
+  }
+
+  # Validate: Word doc should provide some hints (non-fatal — warn only)
+  if (length(word_hints) == 0 && verbose) {
+    cat("  WARNING: No question hints extracted from Word questionnaire.\n")
+    cat("  Classification will rely on data export map and translation only.\n")
+    cat("  Grid type detection may be less accurate without bracket hints.\n")
   }
 
   # ==============================================================================
@@ -154,6 +195,20 @@ run_alchemerparser <- function(project_dir,
     for (type in names(type_summary)) {
       cat(sprintf("    %s: %d\n", type, type_summary[type]))
     }
+  }
+
+  # Validate: classification must produce at least one question
+  if (length(questions) == 0) {
+    alchemerparser_refuse(
+      code = "DATA_CLASSIFICATION_EMPTY",
+      title = "No Questions After Classification",
+      problem = "Question classification produced zero results.",
+      why_it_matters = "Cannot generate output files without classified questions.",
+      how_to_fix = c(
+        "Check that the data export map and translation export are from the same survey",
+        "Verify question numbers align between the three input files"
+      )
+    )
   }
 
   # ==============================================================================

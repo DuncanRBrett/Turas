@@ -615,6 +615,84 @@ Combines all analyses into executive summary.
 - Risk assessment
 - Executive narrative
 
+### 11.5 Point Price Elasticity
+
+Computes derivative-based point elasticity at any price on the demand curve, providing more precise elasticity estimates than the default arc elasticity between consecutive tested prices.
+
+**Function:** `compute_point_elasticity(demand_curve, prices_to_evaluate, delta)`
+
+**How It Works:**
+- Builds a monotone spline interpolator from the Gabor-Granger demand curve
+- Computes dQ/dP via central finite difference at each evaluation price
+- Returns point elasticity E(p) = (dQ/dP) × (P/Q)
+- Also computes marginal revenue MR(p) = Q(p) + p × dQ/dP
+
+**Output Columns:**
+| Column | Description |
+|--------|-------------|
+| `price` | Evaluation price |
+| `purchase_intent` | Interpolated demand at that price |
+| `elasticity` | Point elasticity (negative = normal demand) |
+| `elasticity_type` | "Elastic" (\|E\| > 1), "Inelastic" (\|E\| < 1), or "Unit Elastic" |
+| `revenue_index` | Price × demand |
+| `marginal_revenue` | Revenue change from a small price increase |
+
+**Key Insight:** Revenue is maximized where marginal revenue = 0 (i.e., elasticity = -1). The `revenue_maximizing_price` attribute on the result identifies this point.
+
+**Example:**
+```r
+dc <- run_gabor_granger(data, config)$demand_curve
+elast <- compute_point_elasticity(dc)
+cat("Revenue-maximizing price:", attr(elast, "revenue_maximizing_price"))
+```
+
+### 11.6 Segment Statistical Tests
+
+Tests whether pricing metrics differ significantly between customer segments using non-parametric methods that make no distributional assumptions.
+
+**Function:** `test_segment_differences(data, config, metric, method, n_perm)`
+
+**Methods Available:**
+- `"permutation"` (default) — Permutation test: shuffles segment labels to build a null distribution, then computes a two-sided p-value. P-values are Holm-Bonferroni adjusted for multiple comparisons.
+- `"bootstrap_ci"` — Bootstrap confidence intervals for the difference in means between each pair of segments. Significant if the CI excludes zero.
+
+**Configuration:**
+```
+segment_column = "customer_type"
+```
+
+**Output Structure:**
+```r
+result <- test_segment_differences(data, config, metric = "wtp")
+
+result$overall       # Kruskal-Wallis global test (p-value)
+result$pairwise      # Pairwise comparisons with p-values/CIs
+result$summary       # Segment means with bootstrap CIs
+result$significant_pairs  # Character vector: "Budget vs Premium"
+```
+
+**Interpreting Results:**
+- **Overall p < 0.05**: At least one segment differs significantly
+- **Pairwise p_adjusted < 0.05**: Specific pair differs (after multiple-comparison correction)
+- **Summary CIs**: Non-overlapping CIs strongly suggest different pricing is warranted
+
+**Example:**
+```r
+result <- test_segment_differences(
+  data, config,
+  metric = "wtp",
+  method = "permutation",
+  n_perm = 2000
+)
+
+if (length(result$significant_pairs) > 0) {
+  cat("Segments with statistically different WTP:\n")
+  cat(paste("-", result$significant_pairs, collapse = "\n"))
+}
+```
+
+**Note:** This replaces the heuristic-based segment insights (e.g., "20% price difference" thresholds) with formal statistical inference. The heuristic insights in `generate_segment_insights()` remain available for quick interpretation, while `test_segment_differences()` provides rigorous p-values for decision support.
+
 ---
 
 ## 12. Troubleshooting
@@ -890,8 +968,9 @@ if (result$status == "PASS") {
 ### 15.4 Methodology Scope
 
 - **No conjoint integration**: Pricing module operates independently from the conjoint module; cross-method integration is planned but not yet implemented
-- **No cross-price elasticity**: Only own-price elasticity is calculated; competitive dynamics require separate analysis
+- **No cross-price elasticity**: Only own-price elasticity is calculated; competitive dynamics require the competitive scenarios module (`08_competitive_scenarios.R`) for multi-brand simulation
 - **No Bayesian methods**: All estimation is frequentist (MLE via GLM); Bayesian priors are not supported
+- **Point elasticity requires 3+ price points**: The monotone spline interpolator needs at least 3 non-NA data points to compute derivatives
 
 ---
 

@@ -5,6 +5,34 @@
 # Implements detection hierarchy: NPS -> Likert -> Rating -> Ranking -> etc.
 # ==============================================================================
 
+# --- Classification Constants ------------------------------------------------
+
+# NPS questions always have exactly 11 options (0-10 scale)
+NPS_OPTION_COUNT <- 11L
+
+# Rating scale option counts considered valid for keyword-based detection
+# 5-point (e.g., Very Dissatisfied to Very Satisfied)
+# 7-point (e.g., Extremely Unlikely to Extremely Likely)
+# 10-point (numeric scale)
+# 11-point (0-10 inclusive)
+RATING_SCALE_COUNTS <- c(5L, 7L, 10L, 11L)
+
+# Rating scale with "Don't know" option (0-10 + Don't know)
+RATING_SCALE_WITH_DK_COUNT <- 12L
+
+# Minimum number of numeric options to classify as a rating scale
+MIN_NUMERIC_OPTIONS <- 3L
+
+# Minimum fraction of options that must be numeric to classify as rating
+MIN_NUMERIC_FRACTION <- 0.5
+
+# Grid option search: how far beyond expected ID to search
+GRID_OPTION_SEARCH_BEFORE <- 2L
+GRID_OPTION_SEARCH_AFTER <- 10L
+
+# Minimum average label length to consider radio grid (vs star rating)
+MIN_RADIO_GRID_LABEL_LENGTH <- 8L
+
 #' Classify Questions
 #'
 #' @description
@@ -102,10 +130,24 @@ classify_questions <- function(questions, translation_data, word_hints,
       # Search for options near the expected location
       # Alchemer is inconsistent - sometimes it's +num_rows, +num_rows+1, +num_rows+2, etc.
       options <- find_grid_options(as.integer(q$q_id), last_qid, translation_data)
+      grid_options_source <- "direct"
 
       # If still no options, try to find a shared rating scale (0-10 + Don't know)
       if (length(options) == 0) {
         options <- find_rating_scale_options(translation_data)
+        if (length(options) > 0) {
+          grid_options_source <- "generic_fallback"
+          if (verbose) {
+            cat(sprintf("  WARNING: Q%s (%s) — no grid options found at expected IDs (%d-%d). Using generic rating scale as fallback. Please review output.\n",
+                        q_num, grid_type, as.integer(q$q_id), last_qid))
+          }
+        } else {
+          grid_options_source <- "none"
+          if (verbose) {
+            cat(sprintf("  WARNING: Q%s (%s) — no options found at all. Grid sub-questions will have empty option lists.\n",
+                        q_num, grid_type))
+          }
+        }
       }
     } else {
       options <- get_options_for_question(q$q_id, translation_data)
@@ -120,7 +162,8 @@ classify_questions <- function(questions, translation_data, word_hints,
         q_id = q$q_id,
         grid_type = grid_type,
         sub_questions = sub_qs,
-        is_grid = TRUE
+        is_grid = TRUE,
+        grid_options_source = grid_options_source
       )
 
     } else if (grid_type == "radio_grid") {
@@ -131,7 +174,8 @@ classify_questions <- function(questions, translation_data, word_hints,
         q_id = q$q_id,
         grid_type = grid_type,
         sub_questions = sub_qs,
-        is_grid = TRUE
+        is_grid = TRUE,
+        grid_options_source = grid_options_source
       )
 
     } else if (grid_type == "star_rating_grid") {
@@ -142,7 +186,8 @@ classify_questions <- function(questions, translation_data, word_hints,
         q_id = q$q_id,
         grid_type = grid_type,
         sub_questions = sub_qs,
-        is_grid = TRUE
+        is_grid = TRUE,
+        grid_options_source = grid_options_source
       )
 
     } else {
@@ -189,125 +234,136 @@ classify_variable_type <- function(question, options, hints, verbose = FALSE) {
   n_cols <- length(question$columns)
   n_options <- length(options)
 
-  # 1. Check for NPS
-  if (n_options == 11) {
-    option_texts <- sapply(options, function(o) o$text)
-    option_values <- suppressWarnings(as.numeric(option_texts))
+  # Apply detection hierarchy: NPS -> Likert -> Rating -> Word hints ->
+  # Ranking -> Multi_Mention -> Numeric Rating -> Single_Response -> Open_End
+  detect_nps(options, n_options, q_text) %||%
+    detect_likert(options, n_options) %||%
+    detect_rating_by_keywords(options, n_options) %||%
+    detect_type_from_word_hints(hints) %||%
+    detect_ranking(hints, q_text, n_cols) %||%
+    detect_multi_mention(hints, question, n_cols) %||%
+    detect_numeric_rating(options, n_options) %||%
+    if (n_options > 0) "Single_Response" else "Open_End"
+}
 
-    if (all(!is.na(option_values)) && all(option_values == 0:10)) {
-      # Check for NPS keywords: recommend, likely to recommend
-      if (grepl("recommend|likely", q_text, ignore.case = TRUE)) {
-        return("NPS")
-      }
-      # If 11-point scale (0-10) but no clear keyword, still likely NPS
-      # Check if options match exactly 0:10
-      if (all(sort(option_values) == 0:10)) {
-        return("NPS")
-      }
-    }
+
+#' Detect NPS question type
+#' @keywords internal
+detect_nps <- function(options, n_options, q_text) {
+  if (n_options != NPS_OPTION_COUNT) return(NULL)
+
+  option_texts <- sapply(options, function(o) o$text)
+  option_values <- suppressWarnings(as.numeric(option_texts))
+
+  if (all(!is.na(option_values)) && all(sort(option_values) == 0:10)) {
+    return("NPS")
   }
+  NULL
+}
 
-  # 2. Check for Likert
-  if (n_options > 0) {
-    option_texts <- tolower(sapply(options, function(o) o$text))
-    likert_keywords <- c("disagree", "neutral", "agree", "strongly")
 
-    if (any(sapply(likert_keywords, function(kw) any(grepl(kw, option_texts))))) {
-      return("Likert")
-    }
+#' Detect Likert question type
+#' @keywords internal
+detect_likert <- function(options, n_options) {
+  if (n_options == 0) return(NULL)
+
+  option_texts <- tolower(sapply(options, function(o) o$text))
+  likert_keywords <- c("disagree", "neutral", "agree", "strongly")
+
+  if (any(sapply(likert_keywords, function(kw) any(grepl(kw, option_texts))))) {
+    return("Likert")
   }
+  NULL
+}
 
-  # 3. Check for Rating
-  if (n_options %in% c(5, 7, 10, 11)) {
-    option_texts <- tolower(sapply(options, function(o) o$text))
-    rating_keywords <- c("satisfied", "dissatisfied", "poor", "excellent",
+
+#' Detect Rating question type by keyword matching
+#' @keywords internal
+detect_rating_by_keywords <- function(options, n_options) {
+  if (!(n_options %in% RATING_SCALE_COUNTS)) return(NULL)
+
+  option_texts <- tolower(sapply(options, function(o) o$text))
+  rating_keywords <- c("satisfied", "dissatisfied", "poor", "excellent",
                         "quality", "likely", "unlikely")
 
-    if (any(sapply(rating_keywords, function(kw) any(grepl(kw, option_texts))))) {
-      return("Rating")
-    }
+  if (any(sapply(rating_keywords, function(kw) any(grepl(kw, option_texts))))) {
+    return("Rating")
   }
+  NULL
+}
 
-  # 4. Check for Slider/Numeric from Word doc
-  if (!is.na(hints$type)) {
-    if (hints$type == "slider") {
-      return("Numeric")
-    }
-    if (hints$type == "numeric") {
-      return("Numeric")
-    }
-    if (hints$type == "textbox") {
-      return("Open_End")
-    }
-  }
 
-  # 5. Check for Ranking
-  # Check Word doc hint first
+#' Detect variable type from Word document hints (slider, numeric, textbox)
+#' @keywords internal
+detect_type_from_word_hints <- function(hints) {
+  if (is.na(hints$type)) return(NULL)
+
+  switch(hints$type,
+    "slider"  = "Numeric",
+    "numeric" = "Numeric",
+    "textbox" = "Open_End",
+    NULL
+  )
+}
+
+
+#' Detect Ranking question type
+#' @keywords internal
+detect_ranking <- function(hints, q_text, n_cols) {
+  if (n_cols <= 1) return(NULL)
+
+  # Check Word doc hint
   if (!is.null(hints$has_rank_keyword) && !is.na(hints$has_rank_keyword) && hints$has_rank_keyword) {
-    if (n_cols > 1) {
+    return("Ranking")
+  }
+
+  # Check question text for ranking indicators
+  ranking_patterns <- c(
+    "ranking question",
+    "most to least|least to most",
+    "\\brank\\b|\\branking\\b|prioriti[sz]e"
+  )
+  for (pattern in ranking_patterns) {
+    if (grepl(pattern, q_text, ignore.case = TRUE)) {
       return("Ranking")
     }
   }
+  NULL
+}
 
-  # Check question text for explicit ranking indicators
-  # Very specific patterns to avoid false positives
-  if (grepl("ranking question", q_text, ignore.case = TRUE)) {
-    if (n_cols > 1) {
-      return("Ranking")
-    }
+
+#' Detect Multi_Mention from Word doc brackets or column structure
+#' @keywords internal
+detect_multi_mention <- function(hints, question, n_cols) {
+  # From Word doc brackets
+  if (!is.null(hints$brackets) && !is.na(hints$brackets) && hints$brackets == "[]") {
+    return("Multi_Mention")
   }
 
-  if (grepl("most to least|least to most", q_text, ignore.case = TRUE)) {
-    if (n_cols > 1) {
-      return("Ranking")
-    }
-  }
-
-  # Check for rank keyword (but be careful about "order" - too broad)
-  # Only check for "rank" specifically, not "order" (matches "place your order")
-  if (grepl("\\brank\\b|\\branking\\b|prioriti[sz]e", q_text, ignore.case = TRUE)) {
-    if (n_cols > 1) {
-      return("Ranking")
-    }
-  }
-
-  # 6. Check for Multi-Mention from Word doc brackets
-  if (!is.null(hints$brackets) && !is.na(hints$brackets)) {
-    if (hints$brackets == "[]") {
-      return("Multi_Mention")
-    }
-  }
-
-  # 7. Check for Multi-Mention from column structure
+  # From column structure
   if (n_cols > 1 && question$structure == "grid_or_multi") {
-    # Check if columns have different option labels
     option_labels <- sapply(question$columns, function(c) c$row_label)
     if (length(unique(option_labels)) == length(option_labels)) {
       return("Multi_Mention")
     }
   }
+  NULL
+}
 
-  # 8. Check for numeric rating scale (before Single_Response)
-  # If options are mostly numeric (e.g., 0-10, 1-5), classify as Rating
-  if (n_options > 0) {
-    option_texts <- sapply(options, function(o) o$text)
-    # Try to convert to numeric (ignore "Don't know", "None", etc.)
-    numeric_values <- suppressWarnings(as.numeric(option_texts))
-    n_numeric <- sum(!is.na(numeric_values))
 
-    # If most options are numeric (at least 50%), it's a rating scale
-    if (n_numeric >= max(3, n_options * 0.5)) {
-      return("Rating")
-    }
+#' Detect Rating from predominantly numeric options
+#' @keywords internal
+detect_numeric_rating <- function(options, n_options) {
+  if (n_options == 0) return(NULL)
+
+  option_texts <- sapply(options, function(o) o$text)
+  numeric_values <- suppressWarnings(as.numeric(option_texts))
+  n_numeric <- sum(!is.na(numeric_values))
+
+  if (n_numeric >= max(MIN_NUMERIC_OPTIONS, n_options * MIN_NUMERIC_FRACTION)) {
+    return("Rating")
   }
-
-  # 9. Check if Single-Response (has options)
-  if (n_options > 0) {
-    return("Single_Response")
-  }
-
-  # 10. Otherwise Open_End (no options, not classified above)
-  return("Open_End")
+  NULL
 }
 
 
@@ -391,8 +447,8 @@ create_radio_grid_questions <- function(question, options, hints) {
     numeric_values <- suppressWarnings(as.numeric(option_texts))
     n_numeric <- sum(!is.na(numeric_values))
 
-    # If most options are numeric (at least 50%), it's a rating scale
-    if (n_numeric >= max(3, length(options) * 0.5)) {
+    # If most options are numeric, it's a rating scale
+    if (n_numeric >= max(MIN_NUMERIC_OPTIONS, length(options) * MIN_NUMERIC_FRACTION)) {
       var_type <- "Rating"
     }
   }
@@ -531,9 +587,8 @@ find_grid_options <- function(base_id, expected_last_qid, translation_data) {
     }
   }
 
-  # Search nearby IDs (expected - 2 to expected + 10)
-  # This handles Alchemer's inconsistent storage patterns
-  search_range <- (expected_last_qid - 2):(expected_last_qid + 10)
+  # Search nearby IDs — Alchemer's inconsistent storage patterns
+  search_range <- (expected_last_qid - GRID_OPTION_SEARCH_BEFORE):(expected_last_qid + GRID_OPTION_SEARCH_AFTER)
   for (test_id in search_range) {
     qid <- as.character(test_id)
     if (qid %in% names(translation_data$options)) {
@@ -563,11 +618,11 @@ find_grid_options <- function(base_id, expected_last_qid, translation_data) {
 #' @keywords internal
 find_rating_scale_options <- function(translation_data) {
 
-  # First pass: Look for 12-option scale (0-10 + Don't know) - preferred
+  # First pass: Look for scale with Don't know (0-10 + Don't know) - preferred
   for (qid in names(translation_data$options)) {
     opts <- translation_data$options[[qid]]
 
-    if (length(opts) == 12) {
+    if (length(opts) == RATING_SCALE_WITH_DK_COUNT) {
       opt_texts <- sapply(opts, function(o) o$text)
 
       # Check if this is a 0-10 + Don't know scale
@@ -582,11 +637,11 @@ find_rating_scale_options <- function(translation_data) {
     }
   }
 
-  # Second pass: Fall back to 11-option scale (0-10 only) if 12-option not found
+  # Second pass: Fall back to 11-option scale (0-10 only) if no DK version found
   for (qid in names(translation_data$options)) {
     opts <- translation_data$options[[qid]]
 
-    if (length(opts) == 11) {
+    if (length(opts) == NPS_OPTION_COUNT) {
       opt_texts <- sapply(opts, function(o) o$text)
 
       has_zero <- any(grepl("^0$", opt_texts))
