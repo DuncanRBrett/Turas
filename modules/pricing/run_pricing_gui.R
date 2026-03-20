@@ -2,12 +2,15 @@
 # TURAS PRICING MODULE - SHINY GUI LAUNCHER
 # ==============================================================================
 #
-# Purpose: Minimal interface — select config file, run analysis, view console
-# Version: 12.0
+# Purpose: Select project directory, detect config files, run analysis
+# Version: 13.0
 # Date: 2026-03-20
 #
-# Everything is driven by the Excel configuration template.
-# This GUI provides: config file selection, run button, and console log.
+# Follows the standard Turas module GUI pattern:
+#   Step 1: Select project directory (browse or recent)
+#   Step 2: Select config file (auto-detected or browse)
+#   Step 3: Run analysis
+#   Step 4: View console output + summary
 #
 # ==============================================================================
 
@@ -19,117 +22,191 @@
 #' @export
 run_pricing_gui <- function() {
 
-  # Locate module directory
-  get_script_dir <- function() {
-    for (i in seq_len(sys.nframe())) {
-      file <- sys.frame(i)$ofile
-      if (!is.null(file) && grepl("run_pricing_gui", file)) {
-        return(dirname(normalizePath(file)))
-      }
+  # Early refuse function (TRS v1.0 — before full infra is loaded)
+  early_refuse <- function(code, title, problem, why_it_matters, how_to_fix) {
+    msg <- paste0(
+      "\n================================================================================\n",
+      sprintf("  [REFUSE] %s: %s\n", code, title),
+      "================================================================================\n\n",
+      "Problem:\n",
+      "  ", problem, "\n\n",
+      "Why it matters:\n",
+      "  ", why_it_matters, "\n\n",
+      "How to fix:\n"
+    )
+    for (step in how_to_fix) {
+      msg <- paste0(msg, "  ", step, "\n")
     }
-    args <- commandArgs(trailingOnly = FALSE)
-    file_arg <- grep("--file=", args, value = TRUE)
-    if (length(file_arg) > 0) {
-      file_path <- sub("--file=", "", file_arg)
-      if (grepl("run_pricing_gui", file_path)) {
-        return(dirname(normalizePath(file_path)))
-      }
-    }
-    return(file.path(getwd(), "modules", "pricing"))
+    msg <- paste0(msg, "\n================================================================================\n")
+    stop(msg, call. = FALSE)
   }
 
-  module_dir <- get_script_dir()
+  # Required packages
+  required_packages <- c("shiny", "shinyFiles")
+  missing_packages <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
+  if (length(missing_packages) > 0) {
+    early_refuse(
+      code = "PKG_MISSING_DEPENDENCY",
+      title = "Missing Required Packages",
+      problem = sprintf("The following required packages are not installed: %s",
+                        paste(missing_packages, collapse = ", ")),
+      why_it_matters = "The Pricing GUI cannot run without these packages.",
+      how_to_fix = c(
+        "Run the following command in R:",
+        sprintf("  install.packages(c(%s))",
+                paste(sprintf('"%s"', missing_packages), collapse = ", "))
+      )
+    )
+  }
+
+  suppressPackageStartupMessages({
+    library(shiny)
+    library(shinyFiles)
+  })
+
+  # Locate Turas root
+  turas_root <- getwd()
+  if (basename(turas_root) != "Turas") {
+    if (file.exists(file.path(dirname(turas_root), "launch_turas.R"))) {
+      turas_root <- dirname(turas_root)
+    }
+  }
+
+  # Locate module directory
+  module_dir <- file.path(turas_root, "modules", "pricing")
   r_dir <- file.path(module_dir, "R")
 
-  # Set script_dir_override so 00_main.R can find 00_guard.R and TRS infra
-  assign("script_dir_override", r_dir, envir = globalenv())
+  # Load shared GUI theme
+  source(file.path(turas_root, "modules", "shared", "lib", "gui_theme.R"))
+  theme <- turas_gui_theme("Pricing", "Price Sensitivity & Optimization")
+  hide_recents <- turas_hide_recents()
 
-  # Source ALL module files (guard must come before main)
-  source(file.path(r_dir, "00_guard.R"))
-  source(file.path(r_dir, "00_main.R"))
-  source(file.path(r_dir, "01_config.R"))
-  source(file.path(r_dir, "02_validation.R"))
-  source(file.path(r_dir, "03_van_westendorp.R"))
-  source(file.path(r_dir, "04_gabor_granger.R"))
-  source(file.path(r_dir, "05_visualization.R"))
-  source(file.path(r_dir, "06_output.R"))
-  source(file.path(r_dir, "07_wtp_distribution.R"))
-  source(file.path(r_dir, "08_competitive_scenarios.R"))
-  source(file.path(r_dir, "09_price_volume_optimisation.R"))
-  source(file.path(r_dir, "10_segmentation.R"))
-  source(file.path(r_dir, "11_price_ladder.R"))
-  source(file.path(r_dir, "12_recommendation_synthesis.R"))
-  source(file.path(r_dir, "13_monadic.R"))
+  # ============================================================================
+  # Recent Projects
+  # ============================================================================
+  RECENT_PROJECTS_FILE <- file.path(turas_root, ".recent_pricing_projects.rds")
 
-  # Check for required packages
-  required_packages <- c("shiny", "shinyFiles")
-  missing <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
-  if (length(missing) > 0) {
-    stop(sprintf("Missing required packages: %s\nInstall with: install.packages(c('%s'))",
-                 paste(missing, collapse = ", "),
-                 paste(missing, collapse = "', '")),
-         call. = FALSE)
+  load_recent_projects <- function() {
+    if (file.exists(RECENT_PROJECTS_FILE)) {
+      tryCatch(readRDS(RECENT_PROJECTS_FILE), error = function(e) list())
+    } else {
+      list()
+    }
   }
 
-  library(shiny)
-  library(shinyFiles)
+  save_recent_projects <- function(projects) {
+    tryCatch(saveRDS(projects, RECENT_PROJECTS_FILE), error = function(e) NULL)
+  }
 
-  # Load shared GUI theme
-  TURAS_HOME <- getwd()
-  source(file.path(TURAS_HOME, "modules", "shared", "lib", "gui_theme.R"))
-  theme <- turas_gui_theme("Pricing", "Price Sensitivity & Optimization")
+  add_recent_project <- function(project_info) {
+    recent <- load_recent_projects()
+    recent <- recent[!sapply(recent, function(x) x$project_dir == project_info$project_dir)]
+    recent <- c(list(project_info), recent)
+    recent <- recent[1:min(5, length(recent))]
+    save_recent_projects(recent)
+  }
+
+  # ============================================================================
+  # Config File Detection
+  # ============================================================================
+  detect_config_files <- function(dir) {
+    if (!dir.exists(dir)) return(character(0))
+    files <- list.files(dir, pattern = "\\.xlsx$", full.names = FALSE, ignore.case = TRUE)
+    config_patterns <- c("pricing.*config", "price.*config", "psm.*config",
+                         "van.*westendorp", "gabor.*granger", "config")
+    detected <- character(0)
+    for (pattern in config_patterns) {
+      matches <- grep(pattern, files, value = TRUE, ignore.case = TRUE)
+      if (length(matches) > 0) detected <- c(detected, matches)
+    }
+    unique(detected)
+  }
+
+  # ============================================================================
+  # Source module files (ordered by dependency)
+  # ============================================================================
+  pricing_source_files <- c(
+    "00_guard.R", "00_main.R", "01_config.R", "02_validation.R",
+    "03_van_westendorp.R", "04_gabor_granger.R", "05_visualization.R",
+    "06_output.R", "07_wtp_distribution.R", "08_competitive_scenarios.R",
+    "09_price_volume_optimisation.R", "10_segmentation.R",
+    "11_price_ladder.R", "12_recommendation_synthesis.R", "13_monadic.R"
+  )
 
   # ============================================================================
   # UI
   # ============================================================================
   ui <- fluidPage(
+
     theme$head,
     theme$header,
 
-    div(class = "turas-sidebar",
-      sidebarLayout(
-        sidebarPanel(
-          width = 4,
+    div(class = "turas-content",
 
-          h4("Configuration File"),
+      # Step 1: Project Directory
+      div(class = "turas-card",
+        h4(class = "turas-card-title", "Step 1: Select Project Directory"),
 
-          shinyFilesButton("config_file_button", "Browse",
-                          "Select configuration file (.xlsx)",
-                          multiple = FALSE,
-                          icon = icon("folder-open")),
-
-          verbatimTextOutput("config_path_display", placeholder = TRUE),
-
-          textInput("config_path_text", "Or paste full path",
-                    placeholder = "/path/to/pricing_config.xlsx"),
-
-          hr(),
-
-          actionButton("run_analysis", "Run Analysis",
-                       class = "turas-btn-run btn-block",
-                       icon = icon("play"))
+        fluidRow(
+          column(if (!hide_recents) 8 else 12,
+            shinyDirButton("project_dir_btn",
+                           "Browse for Project Folder",
+                           "Select project directory",
+                           class = "btn turas-btn-primary",
+                           icon = icon("folder-open"))
+          ),
+          if (!hide_recents) {
+            column(4,
+              uiOutput("recent_projects_ui")
+            )
+          }
         ),
 
-        mainPanel(
-          width = 8,
+        uiOutput("project_display")
+      ),
 
-          div(class = "turas-card",
-            h4("Console Output"),
-            div(class = "turas-console",
-                style = "max-height: 600px; overflow-y: auto;",
-                verbatimTextOutput("console_output")),
+      # Step 2: Config File
+      conditionalPanel(
+        condition = "output.project_selected",
+        div(class = "turas-card",
+          h4(class = "turas-card-title", "Step 2: Select Configuration File"),
+          uiOutput("config_selector"),
+          uiOutput("config_display"),
+          div(class = "turas-status-info",
+            tags$strong("Note: "), "The config file's Settings sheet should specify ",
+            tags$code("data_file"), " and ", tags$code("output_file"), " paths."
+          )
+        )
+      ),
 
-            conditionalPanel(
-              condition = "output.has_results",
-              hr(),
-              h4("Summary"),
-              tableOutput("results_table"),
-              hr(),
-              tags$p(
-                "Full results written to Excel and HTML report.",
-                "Open the HTML file for the interactive report with simulator.",
-                class = "turas-help-text"
-              )
+      # Step 3: Run Button
+      conditionalPanel(
+        condition = "output.ready_to_run",
+        div(class = "turas-card",
+          actionButton("run_analysis", "Run Pricing Analysis",
+                       class = "btn turas-btn-run",
+                       icon = icon("play"))
+        )
+      ),
+
+      # Step 4: Console Output
+      conditionalPanel(
+        condition = "output.show_console",
+        div(class = "turas-card",
+          h4(class = "turas-card-title", "Analysis Output"),
+          div(class = "turas-console",
+            verbatimTextOutput("console_output")
+          ),
+
+          conditionalPanel(
+            condition = "output.has_results",
+            hr(),
+            h4("Summary"),
+            tableOutput("results_table"),
+            hr(),
+            tags$p(
+              "Full results written to Excel. Open the HTML file for the interactive report.",
+              class = "turas-help-text"
             )
           )
         )
@@ -142,30 +219,128 @@ run_pricing_gui <- function() {
   # ============================================================================
   server <- function(input, output, session) {
 
-    rv <- reactiveValues(
-      results = NULL,
-      console = "",
-      config_path = NULL
+    # Reactive values
+    files <- reactiveValues(
+      project_dir = NULL,
+      config_file = NULL
     )
+
+    rv <- reactiveValues(
+      results = NULL
+    )
+
+    console_text <- reactiveVal("")
+    is_running <- reactiveVal(FALSE)
 
     # Auto-load config from launcher
     pre_config <- Sys.getenv("TURAS_MODULE_CONFIG", unset = "")
     if (nzchar(pre_config) && file.exists(pre_config)) {
       Sys.unsetenv("TURAS_MODULE_CONFIG")
-      rv$config_path <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
+      files$config_file <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
+      files$project_dir <- dirname(pre_config)
     }
 
-    # File chooser
-    volumes <- c(Home = path.expand("~"), Root = "/")
-    shinyFileChoose(input, "config_file_button", roots = volumes,
-                    filetypes = c("xlsx", "xls"))
+    # Set up directory browser
+    volumes <- c(Home = path.expand("~"),
+                 Documents = file.path(path.expand("~"), "Documents"),
+                 Desktop = file.path(path.expand("~"), "Desktop"))
 
-    # Handle file browser selection
-    observeEvent(input$config_file_button, {
-      if (!is.null(input$config_file_button) && !is.integer(input$config_file_button)) {
-        file_selected <- parseFilePaths(volumes, input$config_file_button)
+    shinyDirChoose(input, "project_dir_btn", roots = volumes, session = session)
+
+    # ------------------------------------------------------------------
+    # Handle project directory selection
+    # ------------------------------------------------------------------
+    observeEvent(input$project_dir_btn, {
+      if (!is.integer(input$project_dir_btn)) {
+        dir_path <- parseDirPath(volumes, input$project_dir_btn)
+        dir_path <- normalizePath(path.expand(dir_path), winslash = "/", mustWork = FALSE)
+        if (length(dir_path) > 0 && dir.exists(dir_path)) {
+          files$project_dir <- dir_path
+          files$config_file <- NULL
+        }
+      }
+    })
+
+    # ------------------------------------------------------------------
+    # Recent projects dropdown
+    # ------------------------------------------------------------------
+    output$recent_projects_ui <- renderUI({
+      recent <- load_recent_projects()
+      if (length(recent) > 0) {
+        choices <- setNames(
+          sapply(recent, function(x) x$project_dir),
+          sapply(recent, function(x) basename(x$project_dir))
+        )
+        selectInput("recent_project", "Recent:",
+                     choices = c("Select recent..." = "", choices),
+                     width = "100%")
+      }
+    })
+
+    # Handle recent project selection
+    observeEvent(input$recent_project, {
+      if (!is.null(input$recent_project) && input$recent_project != "") {
+        if (dir.exists(input$recent_project)) {
+          files$project_dir <- input$recent_project
+          files$config_file <- NULL
+        }
+      }
+    })
+
+    # ------------------------------------------------------------------
+    # Project display
+    # ------------------------------------------------------------------
+    output$project_display <- renderUI({
+      if (!is.null(files$project_dir)) {
+        div(class = "turas-file-display",
+          tags$strong(basename(files$project_dir)),
+          tags$br(),
+          tags$small(files$project_dir),
+          div(class = "status-success", "\u2713 Directory selected")
+        )
+      }
+    })
+
+    # ------------------------------------------------------------------
+    # Config file selector (auto-detect or browse)
+    # ------------------------------------------------------------------
+    output$config_selector <- renderUI({
+      req(files$project_dir)
+      configs <- detect_config_files(files$project_dir)
+
+      if (length(configs) > 0) {
+        radioButtons("config_select", "Detected config files:",
+                     choices = configs,
+                     selected = configs[1])
+      } else {
+        tagList(
+          div(class = "turas-status-warning",
+            "No pricing config files detected in this directory. ",
+            "Browse to select manually or check the directory."
+          ),
+          shinyFilesButton("config_btn", "Browse for Config File",
+                           "Select configuration file",
+                           class = "btn turas-btn-primary",
+                           multiple = FALSE)
+        )
+      }
+    })
+
+    # Handle config selection from radio buttons
+    observeEvent(input$config_select, {
+      if (!is.null(input$config_select) && !is.null(files$project_dir)) {
+        files$config_file <- file.path(files$project_dir, input$config_select)
+      }
+    })
+
+    # Handle config selection from file browser fallback
+    shinyFileChoose(input, "config_btn", roots = volumes,
+                    filetypes = c("xlsx", "xls"))
+    observeEvent(input$config_btn, {
+      if (!is.null(input$config_btn) && !is.integer(input$config_btn)) {
+        file_selected <- parseFilePaths(volumes, input$config_btn)
         if (nrow(file_selected) > 0) {
-          rv$config_path <- normalizePath(
+          files$config_file <- normalizePath(
             path.expand(as.character(file_selected$datapath)),
             winslash = "/", mustWork = FALSE
           )
@@ -173,19 +348,49 @@ run_pricing_gui <- function() {
       }
     })
 
-    # Display selected config path
-    output$config_path_display <- renderText({
-      if (!is.null(rv$config_path) && rv$config_path != "") {
-        paste("Selected:", rv$config_path)
-      } else {
-        "No file selected"
+    # Config display
+    output$config_display <- renderUI({
+      if (!is.null(files$config_file)) {
+        div(class = "turas-file-display",
+          tags$strong(basename(files$config_file)),
+          tags$br(),
+          tags$small(files$config_file),
+          if (file.exists(files$config_file)) {
+            div(class = "status-success", "\u2713 Config file found")
+          } else {
+            div(class = "status-error", "\u2717 File not found")
+          }
+        )
       }
     })
 
-    # Handle text path input
-    observeEvent(input$config_path_text, {
-      if (!is.null(input$config_path_text) && input$config_path_text != "") {
-        rv$config_path <- input$config_path_text
+    # ------------------------------------------------------------------
+    # Conditional panel outputs
+    # ------------------------------------------------------------------
+    output$project_selected <- reactive({ !is.null(files$project_dir) })
+    outputOptions(output, "project_selected", suspendWhenHidden = FALSE)
+
+    output$ready_to_run <- reactive({
+      !is.null(files$project_dir) &&
+      !is.null(files$config_file) &&
+      file.exists(files$config_file) &&
+      !is_running()
+    })
+    outputOptions(output, "ready_to_run", suspendWhenHidden = FALSE)
+
+    output$show_console <- reactive({ nchar(console_text()) > 0 })
+    outputOptions(output, "show_console", suspendWhenHidden = FALSE)
+
+    output$has_results <- reactive({ !is.null(rv$results) })
+    outputOptions(output, "has_results", suspendWhenHidden = FALSE)
+
+    # Console output
+    output$console_output <- renderText({
+      current_output <- console_text()
+      if (is.null(current_output) || length(current_output) == 0 || nchar(current_output[1]) == 0) {
+        "Console output will appear here when you run the analysis..."
+      } else {
+        paste(current_output, collapse = "\n")
       }
     })
 
@@ -194,50 +399,69 @@ run_pricing_gui <- function() {
     # ------------------------------------------------------------------
     observeEvent(input$run_analysis, {
 
-      config_path <- if (!is.null(input$config_path_text) && input$config_path_text != "") {
-        input$config_path_text
-      } else {
-        rv$config_path
-      }
+      req(files$project_dir, files$config_file)
 
-      if (is.null(config_path) || !nzchar(config_path)) {
-        showNotification("Please select a configuration file", type = "error")
-        return()
-      }
-
-      if (!file.exists(config_path)) {
-        showNotification(sprintf("Config file not found: %s", config_path), type = "error")
-        return()
-      }
-
-      rv$console <- ""
+      is_running(TRUE)
+      console_text("")
       rv$results <- NULL
 
-      tryCatch({
-        output_capture <- capture.output({
-          rv$results <- run_pricing_analysis(config_path)
+      # Save to recent projects
+      add_recent_project(list(project_dir = files$project_dir))
+
+      output_text <- ""
+
+      withProgress(message = "Running Pricing Analysis...", value = 0, {
+
+        tryCatch({
+
+          # Source module files
+          incProgress(0.05, detail = "Loading module files...")
+          output_text <- paste0(output_text, "Loading Pricing module...\n\n")
+          console_text(output_text)
+
+          # Set script_dir_override so 00_main.R can find 00_guard.R
+          assign("script_dir_override", r_dir, envir = globalenv())
+
+          for (src_file in pricing_source_files) {
+            src_path <- file.path(r_dir, src_file)
+            tryCatch({
+              source(src_path)
+            }, error = function(e) {
+              cat(sprintf("   [WARN] Failed to source %s: %s\n", src_file, e$message))
+            })
+          }
+
+          incProgress(0.10, detail = "Starting analysis...")
+
+          # Capture analysis output
+          captured <- capture.output({
+            rv$results <- run_pricing_analysis(files$config_file)
+          })
+
+          incProgress(0.80, detail = "Finalising results...")
+
+          output_text <- paste0(output_text, paste(captured, collapse = "\n"))
+          output_text <- paste0(output_text, "\n\nAnalysis complete!")
+
+          incProgress(0.05, detail = "Done!")
+
+        }, error = function(e) {
+          cat("\n=== ERROR IN PRICING ANALYSIS ===\n")
+          cat("Message:", e$message, "\n")
+          cat("=================================\n\n")
+          output_text <<- paste0(output_text, "\n\nError: ", e$message)
+          showNotification(paste("Error:", e$message), type = "error")
         })
-        rv$console <- paste(output_capture, collapse = "\n")
-        showNotification("Analysis complete", type = "message")
-      }, error = function(e) {
-        cat("\n=== ERROR IN PRICING ANALYSIS ===\n")
-        cat("Message:", e$message, "\n")
-        cat("=================================\n\n")
-        rv$console <- paste("ERROR:", e$message)
-        showNotification(paste("Error:", e$message), type = "error")
-      })
+
+      })  # End withProgress
+
+      console_text(output_text)
+      is_running(FALSE)
     })
 
-    # Console output
-    output$console_output <- renderPrint({
-      cat(rv$console)
-    })
-
-    # Has results flag
-    output$has_results <- reactive({ !is.null(rv$results) })
-    outputOptions(output, "has_results", suspendWhenHidden = FALSE)
-
+    # ------------------------------------------------------------------
     # Summary results table
+    # ------------------------------------------------------------------
     output$results_table <- renderTable({
       req(rv$results)
       method <- rv$results$method
@@ -246,13 +470,13 @@ run_pricing_gui <- function() {
         pp <- rv$results$results$price_points
         data.frame(
           `Price Point` = c("PMC", "OPP", "IDP", "PME"),
-          `Description` = c(
+          Description = c(
             "Point of Marginal Cheapness",
             "Optimal Price Point",
             "Indifference Price Point",
             "Point of Marginal Expensiveness"
           ),
-          `Price` = sprintf("$%.2f", c(pp$PMC, pp$OPP, pp$IDP, pp$PME)),
+          Price = sprintf("$%.2f", c(pp$PMC, pp$OPP, pp$IDP, pp$PME)),
           check.names = FALSE
         )
       } else if (method == "gabor_granger") {

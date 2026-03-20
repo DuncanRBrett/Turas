@@ -52,6 +52,10 @@ All sections can be independently shown or hidden via config settings. Add these
 | html_show_diagnostics | Model Diagnostics | TRUE |
 | html_show_bootstrap | Bootstrap CIs | TRUE |
 | html_show_segments | Segment Comparison | TRUE |
+| html_show_elastic_net | Elastic Net | TRUE |
+| html_show_nca | Necessary Condition Analysis | TRUE |
+| html_show_dominance | Dominance Analysis | TRUE |
+| html_show_gam | GAM Nonlinear Effects | TRUE |
 | html_show_guide | Interpretation Guide | TRUE |
 
 Additionally, two display mode settings control how certain sections render:
@@ -63,7 +67,7 @@ Additionally, two display mode settings control how certain sections render:
 
 ## Report Sections
 
-The report contains up to eleven sections. Sections with no data are automatically omitted, regardless of visibility settings.
+The report contains up to fifteen sections. Sections with no data are automatically omitted, regardless of visibility settings.
 
 ### Executive Summary
 
@@ -162,6 +166,34 @@ Side-by-side importance scores across defined customer segments, with:
 
 Appears when segments are defined in config.
 
+### Elastic Net Variable Selection (v10.4)
+
+Displays elastic net regularized regression results showing which drivers survive penalization. The table shows each driver's coefficient, importance percentage, and whether it was "Retained" or "Zeroed" at the parsimonious lambda.1se threshold. Drivers marked "Zeroed" can be safely deprioritised.
+
+Appears when `enable_elastic_net = TRUE` and the `glmnet` package is installed.
+
+### Necessary Condition Analysis (v10.4)
+
+Identifies "hygiene factors" -- drivers that are necessary conditions for high outcomes. A driver is necessary if high outcome values require at least moderate levels of that driver. The table shows NCA effect sizes, p-values, and whether each driver is classified as "Necessary" or "Not Necessary".
+
+Appears when `enable_nca = TRUE` and the `NCA` package is installed.
+
+### Dominance Analysis (v10.4)
+
+Decomposes the model's R-squared into per-driver contributions using all possible subset models. General dominance values are equivalent to Shapley values and provide a fair apportionment of explanatory power. The table shows rank, driver, general dominance R-squared contribution, and share percentage.
+
+Appears when `enable_dominance = TRUE` and the `domir` package is installed.
+
+### GAM Nonlinear Effects (v10.4)
+
+Tests whether driver-outcome relationships are nonlinear using Generalized Additive Models. The table shows effective degrees of freedom (EDF), F-statistics, p-values, and shape classification for each driver. EDF > 1.5 with p < 0.05 indicates meaningful curvature. Also reports whether the GAM explains meaningfully more variance than the linear model.
+
+Appears when `enable_gam = TRUE` and the `mgcv` package is installed.
+
+### Custom Slides
+
+Allows inclusion of qualitative commentary slides defined in the config file's **CustomSlides** sheet. Each slide has a title, body text, and optional position (before/after a named section).
+
 ### Interpretation Guide
 
 Built-in reference explaining the statistical methods, how to read charts and tables, and common caveats. Always present unless hidden via config.
@@ -200,6 +232,20 @@ Click "Add Section" in the Pinned Views toolbar to insert a divider between pins
 ### Analyst Insights
 
 Each section in the main report has an insight text area. Type your commentary there before pinning -- the insight text is captured along with the chart and table. Insights appear as styled callout blocks in pinned cards, print output, and PNG exports. Insights are preserved when you save the report.
+
+### Pre-Populated Insights (v10.4)
+
+Insights can be pre-populated from the config file's **Insights** sheet, allowing analysts to prepare commentary before generating the report. The sheet has these columns:
+
+| Column | Required | Description |
+|--------|----------|-------------|
+| section | Yes | Section key (e.g., `exec-summary`, `importance`, `quadrant`) |
+| insight_text | Yes | The insight text to pre-populate |
+| image_path | No | Path to an image file (PNG/JPG) to embed below the insight |
+
+Valid section keys: `exec-summary`, `importance`, `methods`, `effect-sizes`, `correlations`, `quadrant`, `shap`, `diagnostics`, `bootstrap`, `segments`, `elastic-net`, `nca`, `dominance`, `gam`.
+
+Images are base64-encoded and embedded directly in the HTML for a self-contained file. Insight text is sanitized against HTML injection using `htmltools::htmlEscape()`.
 
 ## Slide Export
 
@@ -297,6 +343,10 @@ Sections are conditionally included based on both data availability and visibili
 | Diagnostics | Model diagnostics in results + html_show_diagnostics = TRUE |
 | Bootstrap CIs | enable_bootstrap = TRUE + html_show_bootstrap = TRUE |
 | Segment Comparison | Segments defined in config + html_show_segments = TRUE |
+| Elastic Net | enable_elastic_net = TRUE + glmnet installed + html_show_elastic_net = TRUE |
+| NCA | enable_nca = TRUE + NCA installed + html_show_nca = TRUE |
+| Dominance Analysis | enable_dominance = TRUE + domir installed + html_show_dominance = TRUE |
+| GAM Nonlinear | enable_gam = TRUE + mgcv installed + html_show_gam = TRUE |
 | Interpretation Guide | Always present (unless html_show_guide = FALSE) |
 
 If an expected section is missing, verify the corresponding feature is enabled and check the console for TRS refusal messages.
