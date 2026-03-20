@@ -640,67 +640,48 @@ build_overview_panel <- function(html_data, tables, charts, insights = NULL) {
 
   s <- html_data$summary
 
-  # SVG icons for stat cards (matching simulator visual style)
-  icon_respondents <- '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>'
+  # SVG icons for stat cards
   icon_items <- '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>'
+  icon_respondents <- '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>'
   icon_top <- '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>'
   icon_range <- '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>'
-  icon_method <- '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>'
 
-  # Build stat cards with icons and sub-labels
-  top_share_val <- if (!is.null(s$top_share) && !is.na(s$top_share)) paste0(s$top_share, "%") else ""
-  share_range_val <- if (!is.null(s$share_range) && !is.na(s$share_range)) paste0(s$share_range, "pp") else ""
+  # Info callout at top
+  info_callout <- sprintf(
+    '<div class="md-callout md-callout-method" style="margin-bottom:16px;">
+<strong>MaxDiff Analysis</strong> &mdash; %s items evaluated by %s respondents using %s estimation.
+This report presents preference shares, item rankings, and comparative analysis.</div>',
+    s$n_items %||% "0",
+    format(as.integer(s$n_total %||% 0), big.mark = ","),
+    htmlEscape(s$method_label %||% ""))
+
+  # Build 4 stat cards: Items, Respondents, Top Share, Share Range
+  top_share_val <- if (!is.null(s$top_share) && !is.na(s$top_share)) paste0(s$top_share, "%") else "N/A"
+  share_range_val <- if (!is.null(s$share_range) && !is.na(s$share_range)) paste0(s$share_range, "pp") else "N/A"
 
   card1 <- sprintf(
-    '<div class="md-stat-card"><div class="md-stat-icon">%s</div><div class="md-stat-body"><div class="md-stat-value">%s</div><div class="md-stat-label">Respondents</div></div></div>',
-    icon_respondents, s$n_total %||% "0")
-
-  card2 <- sprintf(
     '<div class="md-stat-card"><div class="md-stat-icon">%s</div><div class="md-stat-body"><div class="md-stat-value">%s</div><div class="md-stat-label">Items Tested</div></div></div>',
     icon_items, s$n_items %||% "0")
 
-  card3 <- sprintf(
-    '<div class="md-stat-card"><div class="md-stat-icon">%s</div><div class="md-stat-body"><div class="md-stat-value" style="font-size:15px">%s</div><div class="md-stat-label">Top Item</div>%s</div></div>',
-    icon_top, htmlEscape(s$top_item %||% "N/A"),
-    if (nzchar(top_share_val)) sprintf('<div class="md-stat-sub">%s share</div>', top_share_val) else "")
+  card2 <- sprintf(
+    '<div class="md-stat-card"><div class="md-stat-icon">%s</div><div class="md-stat-body"><div class="md-stat-value">%s</div><div class="md-stat-label">Respondents</div></div></div>',
+    icon_respondents, format(as.integer(s$n_total %||% 0), big.mark = ","))
 
-  card4 <- if (nzchar(share_range_val)) {
-    sprintf(
-      '<div class="md-stat-card"><div class="md-stat-icon">%s</div><div class="md-stat-body"><div class="md-stat-value">%s</div><div class="md-stat-label">Share Range</div><div class="md-stat-sub">Top &ndash; Bottom</div></div></div>',
-      icon_range, share_range_val)
-  } else {
-    sprintf(
-      '<div class="md-stat-card"><div class="md-stat-icon">%s</div><div class="md-stat-body"><div class="md-stat-value">%s</div><div class="md-stat-label">Method</div></div></div>',
-      icon_method, htmlEscape(s$method_label %||% ""))
-  }
+  card3 <- sprintf(
+    '<div class="md-stat-card"><div class="md-stat-icon">%s</div><div class="md-stat-body"><div class="md-stat-value">%s</div><div class="md-stat-label">Top Share</div><div class="md-stat-sub">%s</div></div></div>',
+    icon_top, top_share_val, htmlEscape(s$top_item %||% ""))
+
+  card4 <- sprintf(
+    '<div class="md-stat-card"><div class="md-stat-icon">%s</div><div class="md-stat-body"><div class="md-stat-value">%s</div><div class="md-stat-label">Share Range</div><div class="md-stat-sub">Top &ndash; Bottom</div></div></div>',
+    icon_range, share_range_val)
 
   metrics <- sprintf('<div class="md-stat-grid">%s%s%s%s</div>', card1, card2, card3, card4)
 
-  # Key findings mini-section
-  findings <- '<div class="md-key-findings"><h3>Key Findings</h3><div class="md-findings-grid">'
-
-  findings <- paste0(findings, sprintf(
-    '<div class="md-finding-card md-finding-best"><div class="md-finding-icon">%s</div><div class="md-finding-body"><div class="md-finding-label">Most Preferred</div><div class="md-finding-value">%s</div></div></div>',
-    icon_top, htmlEscape(s$top_item %||% "N/A")))
-
-  if (!is.null(s$bottom_item) && s$bottom_item != "N/A") {
-    icon_bottom <- '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
-    findings <- paste0(findings, sprintf(
-      '<div class="md-finding-card md-finding-worst"><div class="md-finding-icon">%s</div><div class="md-finding-body"><div class="md-finding-label">Least Preferred</div><div class="md-finding-value">%s</div></div></div>',
-      icon_bottom, htmlEscape(s$bottom_item)))
-  }
-
-  findings <- paste0(findings, sprintf(
-    '<div class="md-finding-card"><div class="md-finding-icon">%s</div><div class="md-finding-body"><div class="md-finding-label">Estimation</div><div class="md-finding-value">%s</div></div></div>',
-    icon_method, htmlEscape(s$method_label %||% "")))
-
-  findings <- paste0(findings, '</div></div>')
-
-  # Preference shares chart in overview
+  # TOP ITEMS bar chart
   chart_html <- ""
   if (!is.null(charts$preference_chart)) {
     chart_html <- sprintf(
-      '<div class="md-chart-container"><div class="md-chart-title">Preference Shares</div>%s</div>',
+      '<div class="md-chart-container"><div class="md-chart-title">Top Items</div>%s</div>',
       charts$preference_chart)
   }
 
@@ -716,10 +697,9 @@ build_overview_panel <- function(html_data, tables, charts, insights = NULL) {
     %s
     %s
     %s
-    %s
   </div>
 </div>',
-    toolbar, metrics, findings, s$callout %||% "", chart_html, images_html)
+    toolbar, info_callout, metrics, chart_html, images_html)
 }
 
 
@@ -727,46 +707,195 @@ build_preferences_panel <- function(html_data, tables, charts, insights = NULL, 
 
   callout <- html_data$preferences$callout %||% ""
   pref_table <- tables$preference_scores %||% ""
+  seg_pref_container <- tables$seg_pref_container %||% ""
   toolbar <- build_panel_toolbar("preferences", insights)
   seg_dropdown <- build_segment_dropdown("preferences", segment_filter)
 
-  # Dual view: shares (primary) + utilities (toggle)
-  shares_chart <- ""
-  utils_chart <- ""
-  toggle_btn <- ""
-
   pin_icon <- "&#x1F4CC;"
-  if (!is.null(charts$preference_chart) || !is.null(charts$preference_detail_chart)) {
-    if (!is.null(charts$preference_chart)) {
-      shares_chart <- sprintf(
-        '<div id="md-pref-shares-view"><div class="md-chart-wrapper"><button class="md-chart-pin-btn" onclick="window._mdPinChart(this,\'Preference Shares\')" title="Pin chart">%s</button><div class="md-chart-container"><div class="md-chart-title">Preference Shares</div>%s</div></div></div>',
-        pin_icon, charts$preference_chart)
+
+  # Sub-tab 1: Preference Shares — chart wrapped in segment container
+  shares_chart_html <- ""
+  if (!is.null(charts$preference_chart)) {
+    main_chart_block <- sprintf(
+      '<div class="md-chart-wrapper"><button class="md-chart-pin-btn" onclick="window._mdPinChart(this,\'Preference Shares\')" title="Pin chart">%s</button><div class="md-chart-container"><div class="md-chart-title">Preference Shares</div>%s</div></div>',
+      pin_icon, charts$preference_chart)
+
+    # Build per-segment chart variants
+    seg_chart_divs <- ""
+    if (!is.null(charts$segment_preference_charts) && length(charts$segment_preference_charts) > 0) {
+      seg_parts <- character()
+      for (seg_key in names(charts$segment_preference_charts)) {
+        entry <- charts$segment_preference_charts[[seg_key]]
+        seg_svg <- entry$svg
+        seg_n <- entry$n
+        n_label <- if (!is.na(seg_n)) sprintf(
+          '<div class="md-segment-n-label" style="text-align:right;font-size:13px;color:#64748b;margin-bottom:4px;font-weight:500;">n = %s</div>',
+          format(as.integer(seg_n), big.mark = ",")) else ""
+        seg_chart_block <- sprintf(
+          '<div class="md-chart-wrapper"><div class="md-chart-container"><div class="md-chart-title">Preference Shares</div>%s</div></div>',
+          seg_svg)
+        seg_parts <- c(seg_parts, sprintf(
+          '<div data-segment="%s" style="display:none;">%s%s</div>',
+          htmlEscape(seg_key), n_label, seg_chart_block))
+      }
+      seg_chart_divs <- paste(seg_parts, collapse = "\n")
     }
-    if (!is.null(charts$preference_detail_chart)) {
-      utils_chart <- sprintf(
-        '<div id="md-pref-utils-view" style="display:none;"><div class="md-chart-wrapper"><button class="md-chart-pin-btn" onclick="window._mdPinChart(this,\'Utility Scores\')" title="Pin chart">%s</button><div class="md-chart-container"><div class="md-chart-title">Utility Scores (0&ndash;100 Scale)</div>%s</div></div></div>',
-        pin_icon, charts$preference_detail_chart)
+
+    # Wrap main + segment charts in a segment-filterable container
+    if (nzchar(seg_chart_divs)) {
+      shares_chart_html <- sprintf(
+        '<div class="md-segment-tables"><div data-segment="all" style="display:block;">%s</div>%s</div>',
+        main_chart_block, seg_chart_divs)
+    } else {
+      shares_chart_html <- main_chart_block
     }
-    toggle_btn <- '<button id="md-utility-toggle" class="md-btn-secondary" data-showing="shares" style="margin:8px 0;">Show Raw Utilities</button>'
   }
 
-  # Utility distribution raincloud chart
-  dist_chart <- ""
-  if (!is.null(charts$utility_distribution)) {
-    dist_chart <- sprintf(
-      '<div class="md-chart-wrapper"><button class="md-chart-pin-btn" onclick="window._mdPinChart(this,\'Utility Distributions\')" title="Pin chart">%s</button><div class="md-chart-container"><div class="md-chart-title">Individual Utility Distributions</div>%s</div></div>',
-      pin_icon, charts$utility_distribution)
+  # Sub-tab 2: Individual Utility — bar chart and distribution chart in separate segment containers
+  utils_chart_html <- ""
+  dist_chart_html <- ""
+  if (!is.null(charts$preference_detail_chart)) {
+    main_utils_block <- sprintf(
+      '<div class="md-chart-wrapper"><button class="md-chart-pin-btn" onclick="window._mdPinChart(this,\'Utility Scores\')" title="Pin chart">%s</button><div class="md-chart-container"><div class="md-chart-title">Utility Scores (0&ndash;100 Scale)</div>%s</div></div>',
+      pin_icon, charts$preference_detail_chart)
+
+    # Build per-segment utility bar chart variants
+    seg_util_divs <- ""
+    if (!is.null(charts$segment_utility_charts) && length(charts$segment_utility_charts) > 0) {
+      seg_parts <- character()
+      for (seg_key in names(charts$segment_utility_charts)) {
+        entry <- charts$segment_utility_charts[[seg_key]]
+        n_label <- if (!is.na(entry$n)) sprintf(
+          '<div class="md-segment-n-label" style="text-align:right;font-size:13px;color:#64748b;margin-bottom:4px;font-weight:500;">n = %s</div>',
+          format(as.integer(entry$n), big.mark = ",")) else ""
+        seg_chart_block <- sprintf(
+          '<div class="md-chart-wrapper"><div class="md-chart-container"><div class="md-chart-title">Utility Scores (0&ndash;100 Scale)</div>%s</div></div>',
+          entry$svg)
+        seg_parts <- c(seg_parts, sprintf(
+          '<div data-segment="%s" style="display:none;">%s%s</div>',
+          htmlEscape(seg_key), n_label, seg_chart_block))
+      }
+      seg_util_divs <- paste(seg_parts, collapse = "\n")
+    }
+
+    # Wrap utility bar chart in segment container
+    if (nzchar(seg_util_divs)) {
+      utils_chart_html <- sprintf(
+        '<div class="md-segment-tables"><div data-segment="all" style="display:block;">%s</div>%s</div>',
+        main_utils_block, seg_util_divs)
+    } else {
+      utils_chart_html <- main_utils_block
+    }
+
+    # Distribution chart — separate segment container
+    if (!is.null(charts$utility_distribution)) {
+      main_dist_block <- sprintf(
+        '<div class="md-chart-wrapper"><button class="md-chart-pin-btn" onclick="window._mdPinChart(this,\'Utility Distributions\')" title="Pin chart">%s</button><div class="md-chart-container"><div class="md-chart-title">Individual Utility Distributions</div>%s</div></div>',
+        pin_icon, charts$utility_distribution)
+
+      seg_dist_divs <- ""
+      if (!is.null(charts$segment_distribution_charts) && length(charts$segment_distribution_charts) > 0) {
+        seg_parts <- character()
+        for (seg_key in names(charts$segment_distribution_charts)) {
+          entry <- charts$segment_distribution_charts[[seg_key]]
+          n_label <- if (!is.na(entry$n)) sprintf(
+            '<div class="md-segment-n-label" style="text-align:right;font-size:13px;color:#64748b;margin-bottom:4px;font-weight:500;">n = %s</div>',
+            format(as.integer(entry$n), big.mark = ",")) else ""
+          seg_chart_block <- sprintf(
+            '<div class="md-chart-wrapper"><div class="md-chart-container"><div class="md-chart-title">Individual Utility Distributions</div>%s</div></div>',
+            entry$svg)
+          seg_parts <- c(seg_parts, sprintf(
+            '<div data-segment="%s" style="display:none;">%s%s</div>',
+            htmlEscape(seg_key), n_label, seg_chart_block))
+        }
+        seg_dist_divs <- paste(seg_parts, collapse = "\n")
+      }
+
+      if (nzchar(seg_dist_divs)) {
+        dist_chart_html <- sprintf(
+          '<div class="md-segment-tables"><div data-segment="all" style="display:block;">%s</div>%s</div>',
+          main_dist_block, seg_dist_divs)
+      } else {
+        dist_chart_html <- main_dist_block
+      }
+    }
   }
 
-  # Anchor threshold chart
-  anchor_chart <- ""
+  # Sub-tab 3: Anchored MaxDiff — chart wrapped in segment container with per-segment anchor charts
+  anchor_chart_html <- ""
   if (!is.null(charts$anchor_threshold) && nzchar(charts$anchor_threshold)) {
-    anchor_chart <- sprintf(
+    main_anchor_block <- sprintf(
       '<div class="md-chart-wrapper"><button class="md-chart-pin-btn" onclick="window._mdPinChart(this,\'Anchor Threshold\')" title="Pin chart">%s</button><div class="md-chart-container"><div class="md-chart-title">Anchored MaxDiff &mdash; Must-Have Threshold</div>%s</div></div>',
       pin_icon, charts$anchor_threshold)
+
+    # Build per-segment anchor threshold chart variants
+    seg_anchor_divs <- ""
+    if (!is.null(charts$segment_anchor_charts) && length(charts$segment_anchor_charts) > 0) {
+      seg_parts <- character()
+      for (seg_key in names(charts$segment_anchor_charts)) {
+        entry <- charts$segment_anchor_charts[[seg_key]]
+        n_label <- if (!is.na(entry$n)) sprintf(
+          '<div class="md-segment-n-label" style="text-align:right;font-size:13px;color:#64748b;margin-bottom:4px;font-weight:500;">n = %s</div>',
+          format(as.integer(entry$n), big.mark = ",")) else ""
+        seg_chart_block <- sprintf(
+          '<div class="md-chart-wrapper"><div class="md-chart-container"><div class="md-chart-title">Anchored MaxDiff &mdash; Must-Have Threshold</div>%s</div></div>',
+          entry$svg)
+        seg_parts <- c(seg_parts, sprintf(
+          '<div data-segment="%s" style="display:none;">%s%s</div>',
+          htmlEscape(seg_key), n_label, seg_chart_block))
+      }
+      seg_anchor_divs <- paste(seg_parts, collapse = "\n")
+    }
+
+    # Wrap in segment-filterable container
+    if (nzchar(seg_anchor_divs)) {
+      anchor_chart_html <- sprintf(
+        '<div class="md-segment-tables"><div data-segment="all" style="display:block;">%s</div>%s</div>',
+        main_anchor_block, seg_anchor_divs)
+    } else {
+      anchor_chart_html <- main_anchor_block
+    }
   }
 
   images_html <- build_panel_images(html_data$images, "preferences")
+
+  # Determine which sub-tabs to show
+  has_shares <- !is.null(charts$preference_chart) || nzchar(pref_table)
+  has_utility <- !is.null(charts$preference_detail_chart) || !is.null(charts$utility_distribution)
+  has_anchor <- !is.null(charts$anchor_threshold) && nzchar(charts$anchor_threshold)
+
+  # Build sub-tab nav
+  subtab_nav <- '<div class="md-subtab-nav">'
+  subtab_nav <- paste0(subtab_nav,
+    '<button class="md-subtab-btn active" data-group="pref" data-subtab="shares" onclick="window._mdSwitchSubtab(this)">Preference Shares</button>')
+  if (has_utility) {
+    subtab_nav <- paste0(subtab_nav,
+      '<button class="md-subtab-btn" data-group="pref" data-subtab="utility" onclick="window._mdSwitchSubtab(this)">Individual Utility</button>')
+  }
+  if (has_anchor) {
+    subtab_nav <- paste0(subtab_nav,
+      '<button class="md-subtab-btn" data-group="pref" data-subtab="anchor" onclick="window._mdSwitchSubtab(this)">Anchored MaxDiff</button>')
+  }
+  subtab_nav <- paste0(subtab_nav, '</div>')
+
+  # Build sub-panels — each includes segment table container for segment filtering
+  shares_panel <- sprintf(
+    '<div class="md-subpanel active" data-group="pref" data-subpanel="shares">%s%s</div>',
+    shares_chart_html, pref_table)
+
+  utility_panel <- ""
+  if (has_utility) {
+    utility_panel <- sprintf(
+      '<div class="md-subpanel" data-group="pref" data-subpanel="utility">%s%s%s</div>',
+      utils_chart_html, dist_chart_html, seg_pref_container)
+  }
+
+  anchor_panel <- ""
+  if (has_anchor) {
+    anchor_panel <- sprintf(
+      '<div class="md-subpanel" data-group="pref" data-subpanel="anchor">%s%s</div>',
+      anchor_chart_html, seg_pref_container)
+  }
 
   sprintf(
     '<div class="md-panel" id="panel-preferences">
@@ -780,11 +909,9 @@ build_preferences_panel <- function(html_data, tables, charts, insights = NULL, 
     %s
     %s
     %s
-    %s
-    %s
   </div>
 </div>',
-    toolbar, seg_dropdown, callout, toggle_btn, shares_chart, utils_chart, dist_chart, anchor_chart, pref_table, images_html)
+    toolbar, seg_dropdown, callout, subtab_nav, shares_panel, utility_panel, anchor_panel, images_html)
 }
 
 
@@ -792,23 +919,78 @@ build_items_panel <- function(html_data, tables, charts, insights = NULL, segmen
 
   callout <- html_data$items$callout %||% ""
   count_table <- tables$count_scores %||% ""
+  seg_counts_container <- tables$seg_counts_container %||% ""
   toolbar <- build_panel_toolbar("items", insights)
   seg_dropdown <- build_segment_dropdown("items", segment_filter)
 
   pin_icon <- "&#x1F4CC;"
-  diverging_chart <- ""
+
+  # Build diverging chart wrapped in segment container
+  diverging_chart_html <- ""
   if (!is.null(charts$diverging_chart)) {
-    diverging_chart <- sprintf(
+    main_div_block <- sprintf(
       '<div class="md-chart-wrapper"><button class="md-chart-pin-btn" onclick="window._mdPinChart(this,\'Best vs Worst\')" title="Pin chart">%s</button><div class="md-chart-container"><div class="md-chart-title">Best vs Worst Selection Frequency</div>%s</div></div>',
       pin_icon, charts$diverging_chart)
+
+    seg_div_parts <- ""
+    if (!is.null(charts$segment_diverging_charts) && length(charts$segment_diverging_charts) > 0) {
+      parts <- character()
+      for (sk in names(charts$segment_diverging_charts)) {
+        entry <- charts$segment_diverging_charts[[sk]]
+        n_label <- if (!is.na(entry$n)) sprintf(
+          '<div style="text-align:right;font-size:13px;color:#64748b;margin-bottom:4px;font-weight:500;">n = %s</div>',
+          format(as.integer(entry$n), big.mark = ",")) else ""
+        seg_block <- sprintf(
+          '<div class="md-chart-wrapper"><div class="md-chart-container"><div class="md-chart-title">Best vs Worst Selection Frequency</div>%s</div></div>',
+          entry$svg)
+        parts <- c(parts, sprintf(
+          '<div data-segment="%s" style="display:none;">%s%s</div>',
+          htmlEscape(sk), n_label, seg_block))
+      }
+      seg_div_parts <- paste(parts, collapse = "\n")
+    }
+
+    if (nzchar(seg_div_parts)) {
+      diverging_chart_html <- sprintf(
+        '<div class="md-segment-tables"><div data-segment="all" style="display:block;">%s</div>%s</div>',
+        main_div_block, seg_div_parts)
+    } else {
+      diverging_chart_html <- main_div_block
+    }
   }
 
-  # Item Strategy Quadrant
-  quadrant_chart <- ""
+  # Build strategy quadrant chart wrapped in segment container
+  quadrant_chart_html <- ""
   if (!is.null(charts$strategy_quadrant)) {
-    quadrant_chart <- sprintf(
+    main_quad_block <- sprintf(
       '<div class="md-chart-wrapper"><button class="md-chart-pin-btn" onclick="window._mdPinChart(this,\'Strategy Quadrant\')" title="Pin chart">%s</button><div class="md-chart-container"><div class="md-chart-title">Item Strategy Quadrant</div>%s</div></div>',
       pin_icon, charts$strategy_quadrant)
+
+    seg_quad_parts <- ""
+    if (!is.null(charts$segment_quadrant_charts) && length(charts$segment_quadrant_charts) > 0) {
+      parts <- character()
+      for (sk in names(charts$segment_quadrant_charts)) {
+        entry <- charts$segment_quadrant_charts[[sk]]
+        n_label <- if (!is.na(entry$n)) sprintf(
+          '<div style="text-align:right;font-size:13px;color:#64748b;margin-bottom:4px;font-weight:500;">n = %s</div>',
+          format(as.integer(entry$n), big.mark = ",")) else ""
+        seg_block <- sprintf(
+          '<div class="md-chart-wrapper"><div class="md-chart-container"><div class="md-chart-title">Item Strategy Quadrant</div>%s</div></div>',
+          entry$svg)
+        parts <- c(parts, sprintf(
+          '<div data-segment="%s" style="display:none;">%s%s</div>',
+          htmlEscape(sk), n_label, seg_block))
+      }
+      seg_quad_parts <- paste(parts, collapse = "\n")
+    }
+
+    if (nzchar(seg_quad_parts)) {
+      quadrant_chart_html <- sprintf(
+        '<div class="md-segment-tables"><div data-segment="all" style="display:block;">%s</div>%s</div>',
+        main_quad_block, seg_quad_parts)
+    } else {
+      quadrant_chart_html <- main_quad_block
+    }
   }
 
   images_html <- build_panel_images(html_data$images, "items")
@@ -820,6 +1002,37 @@ build_items_panel <- function(html_data, tables, charts, insights = NULL, segmen
 <strong>Best %</strong> = times chosen as best &divide; times shown. <strong>Worst %</strong> = times chosen as worst &divide; times shown.<br/>
 <strong>BW Score</strong> = Best% &minus; Worst%. Higher scores indicate stronger overall preference.</div>'
 
+  has_diverging <- nzchar(diverging_chart_html)
+  has_quadrant <- nzchar(quadrant_chart_html)
+
+  # Build sub-tab nav
+  subtab_nav <- '<div class="md-subtab-nav">'
+  subtab_nav <- paste0(subtab_nav,
+    '<button class="md-subtab-btn active" data-group="items" data-subtab="bw" onclick="window._mdSwitchSubtab(this)">Best vs Worst</button>')
+  if (has_quadrant) {
+    subtab_nav <- paste0(subtab_nav,
+      '<button class="md-subtab-btn" data-group="items" data-subtab="quadrant" onclick="window._mdSwitchSubtab(this)">Strategy Quadrant</button>')
+  }
+  subtab_nav <- paste0(subtab_nav,
+    '<button class="md-subtab-btn" data-group="items" data-subtab="detailed" onclick="window._mdSwitchSubtab(this)">Detailed Scores</button>')
+  subtab_nav <- paste0(subtab_nav, '</div>')
+
+  # Sub-panels — charts in segment containers, plus segment table fallback
+  bw_panel <- sprintf(
+    '<div class="md-subpanel active" data-group="items" data-subpanel="bw">%s%s</div>',
+    diverging_chart_html, seg_counts_container)
+
+  quadrant_panel <- ""
+  if (has_quadrant) {
+    quadrant_panel <- sprintf(
+      '<div class="md-subpanel" data-group="items" data-subpanel="quadrant">%s%s</div>',
+      quadrant_chart_html, seg_counts_container)
+  }
+
+  detailed_panel <- sprintf(
+    '<div class="md-subpanel" data-group="items" data-subpanel="detailed">%s%s</div>',
+    count_callout, count_table)
+
   sprintf(
     '<div class="md-panel" id="panel-items">
   <div class="md-section">
@@ -829,13 +1042,12 @@ build_items_panel <- function(html_data, tables, charts, insights = NULL, segmen
     %s
     %s
     %s
-    <h3>Detailed Count Scores</h3>
     %s
     %s
     %s
   </div>
 </div>',
-    toolbar, seg_dropdown, callout, diverging_chart, quadrant_chart, count_callout, count_table, images_html)
+    toolbar, seg_dropdown, callout, subtab_nav, bw_panel, quadrant_panel, detailed_panel, images_html)
 }
 
 
@@ -926,49 +1138,100 @@ build_segments_panel <- function(html_data, tables, charts, insights = NULL) {
 build_diagnostics_panel <- function(html_data, tables, charts, insights = NULL) {
 
   callout <- html_data$diagnostics$callout %||% ""
-  diag_table <- tables$diagnostics %||% ""
   toolbar <- build_panel_toolbar("diagnostics", insights)
 
-  # Diagnostics KPI summary cards (matching simulator style)
   d <- html_data$diagnostics
-  diag_cards <- ""
-  if (!is.null(d)) {
-    cards <- character()
-    # Model info
-    cards <- c(cards, sprintf(
-      '<div class="md-metric-card"><div class="md-metric-value">%s</div><div class="md-metric-label">Method</div></div>',
-      htmlEscape(html_data$meta$method %||% "N/A")))
-    cards <- c(cards, sprintf(
-      '<div class="md-metric-card"><div class="md-metric-value">%s</div><div class="md-metric-label">Respondents</div></div>',
-      format(d$n_total %||% 0, big.mark = ",")))
-    cards <- c(cards, sprintf(
-      '<div class="md-metric-card"><div class="md-metric-value">%s</div><div class="md-metric-label">Items</div></div>',
-      d$n_items %||% "0"))
-    # HB-specific cards
-    if (!is.null(d$hb_diagnostics)) {
-      hd <- d$hb_diagnostics
-      rhat_color <- if (!is.null(hd$max_rhat) && !is.na(hd$max_rhat) && hd$max_rhat <= 1.05) "color:#16a34a;" else "color:#dc2626;"
-      cards <- c(cards, sprintf(
-        '<div class="md-metric-card"><div class="md-metric-value" style="%s">%s</div><div class="md-metric-label">Max R-hat</div></div>',
-        rhat_color, if (!is.null(hd$max_rhat) && !is.na(hd$max_rhat)) sprintf("%.4f", hd$max_rhat) else "N/A"))
-      cards <- c(cards, sprintf(
-        '<div class="md-metric-card"><div class="md-metric-value">%s</div><div class="md-metric-label">Divergences</div></div>',
-        if (!is.null(hd$divergences) && !is.na(hd$divergences)) as.character(hd$divergences) else "N/A"))
-      cards <- c(cards, sprintf(
-        '<div class="md-metric-card"><div class="md-metric-value">%s</div><div class="md-metric-label">Quality Score</div></div>',
-        if (!is.null(hd$quality_score) && !is.na(hd$quality_score)) paste0(round(hd$quality_score), "/100") else "N/A"))
-    }
-    # Logit-specific cards
-    if (!is.null(d$logit_fit)) {
-      lf <- d$logit_fit
-      cards <- c(cards, sprintf(
-        '<div class="md-metric-card"><div class="md-metric-value">%s</div><div class="md-metric-label">Pseudo R&sup2;</div></div>',
-        if (!is.null(lf$pseudo_r2) && !is.na(lf$pseudo_r2)) sprintf("%.4f", lf$pseudo_r2) else "N/A"))
-    }
-    diag_cards <- sprintf('<div class="md-metrics" style="margin-bottom:16px;">%s</div>', paste(cards, collapse = "\n"))
+  meta <- html_data$meta
+
+  # Helper to build a stat card with icon
+  stat_card <- function(icon, value, label, sublabel = "") {
+    sub_html <- if (nzchar(sublabel)) sprintf('<div class="md-stat-sub">%s</div>', sublabel) else ""
+    sprintf(
+      '<div class="md-stat-card"><div class="md-stat-icon">%s</div><div class="md-stat-body"><div class="md-stat-value">%s</div><div class="md-stat-label">%s</div>%s</div></div>',
+      icon, value, label, sub_html)
   }
 
-  # Methodology folded in as collapsible section
+  # Icons
+  ic_grid <- '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>'
+  ic_users <- '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>'
+  ic_list <- '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>'
+  ic_trend <- '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>'
+
+  # --- Section 1: MODEL SUMMARY (4 stat cards) ---
+  method_label <- htmlEscape(meta$method %||% "N/A")
+  model_cards <- paste0(
+    stat_card(ic_grid, sprintf("<strong>Method</strong><br/>%s", method_label), "", ""),
+    stat_card(ic_users, format(as.integer(d$n_total %||% 0), big.mark = ","), "Respondents"),
+    stat_card(ic_grid, as.character(d$n_items %||% 0), "Items"),
+    stat_card(ic_list, as.character(d$n_segments %||% 0), "Segments"))
+
+  model_section <- sprintf(
+    '<h3 style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--md-text-secondary);margin:16px 0 10px;">Model Summary</h3><div class="md-stat-grid">%s</div>',
+    model_cards)
+
+  # --- Section 2: POPULATION UTILITY STATISTICS (4 stat cards) ---
+  pop_section <- ""
+  ps <- d$pop_stats
+  if (!is.null(ps)) {
+    pop_cards <- paste0(
+      stat_card(ic_list, as.character(ps$utility_range), "Utility Range", "Max &ndash; Min"),
+      stat_card(ic_grid, as.character(ps$mean_utility), "Mean Utility"),
+      stat_card(ic_list, as.character(ps$utility_sd), "Utility SD", "Population spread"),
+      stat_card(ic_trend, as.character(ps$discrimination), "Discrimination", "Range &divide; Items"))
+    pop_section <- sprintf(
+      '<h3 style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--md-text-secondary);margin:20px 0 10px;">Population Utility Statistics</h3><div class="md-stat-grid">%s</div>',
+      pop_cards)
+  }
+
+  # --- Section 3: MODEL QUALITY INDICATORS (4 stat cards) ---
+  quality_section <- ""
+  qi <- d$quality_indicators
+  if (!is.null(qi)) {
+    quality_cards <- paste0(
+      stat_card(ic_trend, paste0(qi$mean_max_share, "%"), "Mean Max Share", sprintf("Chance = %s%%", qi$chance_level)),
+      stat_card(ic_trend, paste0(qi$sharpness_ratio, "x"), "Sharpness Ratio", "vs chance level"),
+      stat_card(ic_list, as.character(qi$entropy_ratio), "Entropy Ratio", "Lower = sharper (0&ndash;1)"),
+      stat_card(ic_users, as.character(qi$heterogeneity), "Heterogeneity", "Avg SD from population"))
+    quality_section <- sprintf(
+      '<h3 style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--md-text-secondary);margin:20px 0 10px;">Model Quality Indicators</h3><div class="md-stat-grid">%s</div>',
+      quality_cards)
+  }
+
+  # --- Section 4: RESPONDENT UTILITY DISTRIBUTION (3 stat cards) ---
+  resp_section <- ""
+  rs <- d$respondent_stats
+  if (!is.null(rs)) {
+    resp_cards <- paste0(
+      stat_card(ic_list, as.character(rs$mean_range), "Mean Util Range", "Per respondent"),
+      stat_card(ic_list, as.character(rs$min_range), "Min Util Range", "Least discriminating"),
+      stat_card(ic_list, as.character(rs$max_range), "Max Util Range", "Most discriminating"))
+    resp_section <- sprintf(
+      '<h3 style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--md-text-secondary);margin:20px 0 10px;">Respondent Utility Distribution</h3><div class="md-stat-grid">%s</div>',
+      resp_cards)
+  }
+
+  # --- Section 5: ITEM-LEVEL DIAGNOSTICS TABLE ---
+  item_table_section <- ""
+  idt <- d$item_diag_table
+  if (!is.null(idt) && nrow(idt) > 0) {
+    # Build table HTML
+    rows <- vapply(seq_len(nrow(idt)), function(i) {
+      r <- idt[i, ]
+      # Highlight top pop utility in brand colour
+      pop_style <- if (i == 1) ' style="color:var(--md-brand);font-weight:600;"' else ""
+      sprintf('<tr><td class="md-td md-label-col">%s</td><td class="md-td md-num"%s>%s</td><td class="md-td md-num">%s</td><td class="md-td md-num">%s</td><td class="md-td md-num">%s</td><td class="md-td md-num">%s</td></tr>',
+        htmlEscape(r$Item_Label), pop_style, r$Pop_Utility, r$Indiv_Mean, r$Indiv_SD, r$Min, r$Max)
+    }, character(1))
+
+    item_table_section <- sprintf(
+      '<h3 style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--md-text-secondary);margin:20px 0 10px;">Item-Level Diagnostics</h3>
+<table class="md-table">
+<thead><tr><th class="md-th md-label-col">Item</th><th class="md-th md-num">Pop. Utility</th><th class="md-th md-num">Indiv. Mean</th><th class="md-th md-num">Indiv. SD</th><th class="md-th md-num">Min</th><th class="md-th md-num">Max</th></tr></thead>
+<tbody>%s</tbody>
+</table>', paste(rows, collapse = "\n"))
+  }
+
+  # Methodology as collapsible
   method_section <- ""
   if (!is.null(html_data$methodology)) {
     m <- html_data$methodology
@@ -1000,13 +1263,15 @@ build_diagnostics_panel <- function(html_data, tables, charts, insights = NULL) 
     %s
     %s
     %s
-    <h3>Detailed Metrics</h3>
+    %s
+    %s
+    %s
     %s
     %s
     %s
   </div>
 </div>',
-    toolbar, callout, diag_cards, diag_table, method_section, images_html)
+    toolbar, callout, model_section, pop_section, quality_section, resp_section, item_table_section, method_section, images_html)
 }
 
 
@@ -1443,6 +1708,40 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 /* === CUSTOM SLIDES === */
 .md-slide-content { font-size: 14px; line-height: 1.7; color: var(--md-text-primary); }
 
+/* === SUB-TAB NAVIGATION === */
+.md-subtab-nav {
+  display: flex; gap: 0; border-bottom: 2px solid var(--md-border);
+  margin-bottom: 16px; margin-top: 4px;
+}
+.md-subtab-btn {
+  background: transparent; border: none; padding: 8px 16px; font-size: 12px; font-weight: 500;
+  color: var(--md-text-secondary); cursor: pointer; border-bottom: 2px solid transparent;
+  margin-bottom: -2px; white-space: nowrap; transition: all 200ms;
+}
+.md-subtab-btn:hover { color: var(--md-brand); }
+.md-subtab-btn.active { color: var(--md-brand); border-bottom-color: var(--md-brand); font-weight: 600; }
+.md-subpanel { display: none; }
+.md-subpanel.active { display: block; }
+
+/* === DIAGNOSTICS RICH LAYOUT === */
+.md-diag-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.md-diag-card {
+  background: white; border-radius: 8px; padding: 18px 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid var(--md-border);
+}
+.md-diag-card h4 {
+  font-size: 12px; font-weight: 600; color: var(--md-text-secondary);
+  text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 12px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--md-border);
+}
+.md-diag-card.full-width { grid-column: 1 / -1; }
+.md-diag-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 0; font-size: 13px;
+}
+.md-diag-row-label { color: var(--md-text-secondary); }
+.md-diag-row-value { font-weight: 600; color: var(--md-text-primary); font-variant-numeric: tabular-nums; }
+
 /* === FOOTER === */
 .md-footer { text-align: center; padding: 20px 40px; color: #94a3b8; font-size: 11px; border-top: 1px solid var(--md-border); }
 
@@ -1452,7 +1751,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
   .md-metrics { flex-direction: column; }
   .md-stat-grid { flex-direction: column; }
   .md-findings-grid { flex-direction: column; }
+  .md-diag-grid { grid-template-columns: 1fr; }
   .md-tab-btn { padding: 8px 10px; font-size: 12px; }
+  .md-subtab-btn { padding: 6px 10px; font-size: 11px; }
 }'
 
   css <- gsub("BRAND_TOKEN", brand, css, fixed = TRUE)

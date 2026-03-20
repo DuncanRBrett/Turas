@@ -24,7 +24,7 @@
     // --- State ---
     var hiddenItems = {};
     var h2hSlots = [];
-    var MAX_H2H_SLOTS = 5;
+    var MAX_H2H_SLOTS = 10;
 
     // --- Tab switching with URL hash ---
     var tabs = document.querySelectorAll(".sim-tab-btn");

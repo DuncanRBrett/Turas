@@ -92,6 +92,26 @@
   }
 
   // --------------------------------------------------------------------------
+  // SUB-TAB NAVIGATION
+  // --------------------------------------------------------------------------
+  function switchSubtab(btn) {
+    var nav = btn.closest(".md-subtab-nav");
+    if (!nav) return;
+    var group = btn.getAttribute("data-group");
+    var target = btn.getAttribute("data-subtab");
+    var panel = nav.closest(".md-panel") || nav.parentElement;
+    // Deactivate all sub-tab buttons in this group
+    nav.querySelectorAll(".md-subtab-btn").forEach(function(b) {
+      b.classList.remove("active");
+    });
+    btn.classList.add("active");
+    // Show/hide sub-panels
+    panel.querySelectorAll('.md-subpanel[data-group="' + group + '"]').forEach(function(p) {
+      p.classList.toggle("active", p.getAttribute("data-subpanel") === target);
+    });
+  }
+
+  // --------------------------------------------------------------------------
   // TABLE SORTING
   // --------------------------------------------------------------------------
   function initTableSort() {
@@ -525,25 +545,29 @@
   function filterSegment(selectEl) {
     var panel = selectEl.closest(".md-panel");
     if (!panel) return;
-    var container = panel.querySelector(".md-segment-tables");
-    if (!container) return;
     var val = selectEl.value;  // e.g. "Age_Group:young" or "all"
-    var divs = container.querySelectorAll("div[data-segment]");
-    var mainDiv = container.querySelector('div[data-segment="all"]');
+    var isAll = !val || val === "all";
 
-    if (!val || val === "all") {
-      // Show main (overall) table, hide all segment variants
-      if (mainDiv) mainDiv.style.display = "block";
-      divs.forEach(function(d) { if (d.getAttribute("data-segment") !== "all") d.style.display = "none"; });
-    } else {
-      // Hide main, show matching segment variant
-      if (mainDiv) mainDiv.style.display = "none";
-      divs.forEach(function(d) {
-        var seg = d.getAttribute("data-segment");
-        if (seg === "all") { d.style.display = "none"; return; }
-        d.style.display = (seg === val) ? "block" : "none";
-      });
-    }
+    // Apply to ALL segment table containers in this panel (across sub-panels)
+    var containers = panel.querySelectorAll(".md-segment-tables");
+    containers.forEach(function(container) {
+      var divs = container.querySelectorAll("div[data-segment]");
+      var mainDiv = container.querySelector('div[data-segment="all"]');
+
+      if (isAll) {
+        if (mainDiv) mainDiv.style.display = "block";
+        divs.forEach(function(d) { if (d.getAttribute("data-segment") !== "all") d.style.display = "none"; });
+      } else {
+        if (mainDiv) mainDiv.style.display = "none";
+        divs.forEach(function(d) {
+          var seg = d.getAttribute("data-segment");
+          if (seg === "all") { d.style.display = "none"; return; }
+          d.style.display = (seg === val) ? "block" : "none";
+        });
+      }
+    });
+
+    // n= labels are inside segment divs and automatically show/hide with their parent
   }
 
   // --------------------------------------------------------------------------
@@ -835,6 +859,7 @@
   window._mdSaveReport = saveReportHTML;
   window._mdToggleHelp = toggleHelpOverlay;
   window._mdFilterSegment = filterSegment;
+  window._mdSwitchSubtab = switchSubtab;
   window._mdAddSlide = addSlide;
   window._mdTriggerSlideImage = triggerSlideImage;
   window._mdHandleSlideImage = handleSlideImage;

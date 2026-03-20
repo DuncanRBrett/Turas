@@ -139,12 +139,12 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config,
 
   # Validate inputs
   if (is.null(maxdiff_results)) {
-    message("[TRS INFO] MAXD_HTML_NO_RESULTS: No results provided for HTML report")
+    cat("[TRS INFO] MAXD_HTML_NO_RESULTS: No results provided for HTML report\n")
     return(list(status = "REFUSED", message = "No results provided"))
   }
 
   if (is.null(output_path) || !nzchar(output_path)) {
-    message("[TRS INFO] MAXD_HTML_NO_PATH: No output path specified")
+    cat("[TRS INFO] MAXD_HTML_NO_PATH: No output path specified\n")
     return(list(status = "REFUSED", message = "No output path"))
   }
 
@@ -158,14 +158,16 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config,
   js_code <- .md_load_js_module()
 
   # --- Layer 1: Transform ---
+  cat("  HTML Layer 1: Transforming data...\n")
   html_data <- tryCatch({
     transform_maxdiff_for_html(maxdiff_results, config)
   }, error = function(e) {
-    message(sprintf("[TRS PARTIAL] MAXD_HTML_TRANSFORM_FAILED: %s", e$message))
+    cat(sprintf("  [TRS PARTIAL] MAXD_HTML_TRANSFORM_FAILED: %s\n", e$message))
     return(NULL)
   })
 
   if (is.null(html_data)) {
+    cat("  HTML report REFUSED: Data transformation failed\n")
     return(list(status = "REFUSED", message = "Data transformation failed"))
   }
 
@@ -194,6 +196,75 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config,
         seg_scores
       }
     )
+  }
+
+  # Add per-segment anchor rates to enriched data (for Must-Have % column in segment tables)
+  # Uses Segment_Def expressions from seg_config to determine segment membership
+  if (!is.null(enriched_seg_scores) && is.data.frame(enriched_seg_scores) &&
+      !is.null(html_data$preferences$anchor_data) && !is.null(maxdiff_results$raw_data) &&
+      is.data.frame(seg_config) && nrow(seg_config) > 0) {
+    tryCatch({
+      anchor_var <- config$output_settings$Anchor_Variable %||% NULL
+      anchor_threshold_val <- as.numeric(config$output_settings$Anchor_Threshold %||% 0.50)
+      if (is.na(anchor_threshold_val)) anchor_threshold_val <- 0.50
+      anchor_format <- config$output_settings$Anchor_Format %||% "COMMA_SEPARATED"
+      raw_data_for_anchor <- maxdiff_results$raw_data
+
+      if (!is.null(anchor_var) && nzchar(anchor_var)) {
+        enriched_seg_scores$Anchor_Rate <- NA_real_
+        enriched_seg_scores$Is_Must_Have <- NA
+
+        for (cfg_i in seq_len(nrow(seg_config))) {
+          seg_id <- seg_config$Segment_ID[cfg_i]
+          seg_def_expr <- seg_config$Segment_Def[cfg_i]
+          seg_var <- seg_config$Variable_Name[cfg_i]
+
+          # Determine segment membership using Segment_Def expression
+          if (!is.null(seg_def_expr) && !is.na(seg_def_expr) && nzchar(trimws(seg_def_expr))) {
+            seg_membership <- tryCatch({
+              if (exists("safe_eval_expression", mode = "function")) {
+                safe_eval_expression(seg_def_expr, raw_data_for_anchor,
+                                     context = sprintf("anchor seg '%s'", seg_id))
+              } else {
+                eval(parse(text = seg_def_expr), envir = raw_data_for_anchor)
+              }
+            }, error = function(e) NULL)
+          } else if (seg_var %in% names(raw_data_for_anchor)) {
+            seg_membership <- raw_data_for_anchor[[seg_var]]
+          } else {
+            next
+          }
+          if (is.null(seg_membership)) next
+
+          seg_mask <- which(seg_membership == TRUE)
+          if (length(seg_mask) < 2) next
+
+          seg_raw <- raw_data_for_anchor[seg_mask, , drop = FALSE]
+          seg_anchor <- tryCatch(
+            process_anchor_data(seg_raw, anchor_var, config$items,
+                                anchor_format = anchor_format,
+                                anchor_threshold = anchor_threshold_val),
+            error = function(e) NULL
+          )
+          if (!is.null(seg_anchor) && "Anchor_Rate" %in% names(seg_anchor)) {
+            anchor_map <- setNames(seg_anchor$Anchor_Rate, seg_anchor$Item_ID)
+            musthave_map <- setNames(seg_anchor$Is_Must_Have, seg_anchor$Item_ID)
+
+            seg_rows_idx <- which(enriched_seg_scores$Segment_ID == seg_id &
+                                    (is.na(enriched_seg_scores$Segment_Value) | enriched_seg_scores$Segment_Value == TRUE))
+            for (idx in seg_rows_idx) {
+              item_id <- enriched_seg_scores$Item_ID[idx]
+              if (item_id %in% names(anchor_map)) {
+                enriched_seg_scores$Anchor_Rate[idx] <- anchor_map[[item_id]]
+                enriched_seg_scores$Is_Must_Have[idx] <- musthave_map[[item_id]]
+              }
+            }
+          }
+        }
+      }
+    }, error = function(e) {
+      message(sprintf("  Segment anchor enrichment warning: %s", e$message))
+    })
   }
 
   tables$preference_scores <- tryCatch(
@@ -258,9 +329,22 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config,
       )
     }
 
-    # Wrap in segment-filterable container if segment H2H data available
-    tables$head_to_head <- build_h2h_with_segments(
-      main_h2h, segment_h2h, html_data$head_to_head$label_map
+    # Compute segment n values from enriched segment data
+    segment_n <- NULL
+    if (!is.null(enriched_seg_scores) && is.data.frame(enriched_seg_scores) &&
+        "Segment_N" %in% names(enriched_seg_scores) &&
+        "Variable_Name" %in% names(enriched_seg_scores) &&
+        "Segment_ID" %in% names(enriched_seg_scores)) {
+      seg_unique <- unique(enriched_seg_scores[, c("Variable_Name", "Segment_ID", "Segment_N"), drop = FALSE])
+      segment_n <- setNames(
+        as.list(seg_unique$Segment_N),
+        paste0(seg_unique$Variable_Name, ":", seg_unique$Segment_ID)
+      )
+    }
+
+    # Wrap in segment-filterable container with n= labels
+    tables$head_to_head <- build_h2h_with_segments_and_n(
+      main_h2h, segment_h2h, html_data$head_to_head$label_map, segment_n
     )
   }
 
@@ -268,6 +352,21 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config,
     build_diagnostics_table(html_data$diagnostics),
     error = function(e) { message(sprintf("  Table error (diagnostics): %s", e$message)); "" }
   )
+
+  # --- Build segment-only containers for sub-panels ---
+  # These provide segment tables for sub-tabs that otherwise only have charts
+  tables$seg_pref_container <- ""
+  tables$seg_counts_container <- ""
+  if (!is.null(enriched_seg_scores) && is.data.frame(enriched_seg_scores) && nrow(enriched_seg_scores) > 0) {
+    tables$seg_pref_container <- tryCatch(
+      build_segment_only_container(enriched_seg_scores, "preference", seg_config),
+      error = function(e) { message(sprintf("  Segment container error (pref): %s", e$message)); "" }
+    )
+    tables$seg_counts_container <- tryCatch(
+      build_segment_only_container(enriched_seg_scores, "counts", seg_config),
+      error = function(e) { message(sprintf("  Segment container error (counts): %s", e$message)); "" }
+    )
+  }
 
   # --- Layer 3: Charts ---
   charts <- list()
@@ -281,6 +380,41 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config,
       build_preference_chart(html_data$preferences$scores, brand, use_shares = FALSE),
       error = function(e) { message(sprintf("  Chart error (pref detail): %s", e$message)); "" }
     )
+
+    # Generate per-segment preference share charts AND utility score charts
+    charts$segment_preference_charts <- list()
+    charts$segment_utility_charts <- list()
+    if (!is.null(enriched_seg_scores) && is.data.frame(enriched_seg_scores) && nrow(enriched_seg_scores) > 0) {
+      seg_ids <- unique(enriched_seg_scores$Segment_ID)
+      for (sid in seg_ids) {
+        seg_rows <- enriched_seg_scores[enriched_seg_scores$Segment_ID == sid, , drop = FALSE]
+        if ("Segment_Value" %in% names(seg_rows)) {
+          seg_rows <- seg_rows[seg_rows$Segment_Value == TRUE, , drop = FALSE]
+        }
+        if (nrow(seg_rows) < 2) next
+        var_name <- seg_rows$Variable_Name[1]
+        seg_key <- paste0(var_name, ":", sid)
+        seg_n <- if ("Segment_N" %in% names(seg_rows)) seg_rows$Segment_N[1] else NA
+
+        # Preference share chart (use_shares = TRUE)
+        seg_chart <- tryCatch(
+          build_preference_chart(seg_rows, brand, use_shares = TRUE),
+          error = function(e) NULL
+        )
+        if (!is.null(seg_chart) && nzchar(seg_chart)) {
+          charts$segment_preference_charts[[seg_key]] <- list(svg = seg_chart, n = seg_n)
+        }
+
+        # Utility score chart (use_shares = FALSE)
+        seg_util_chart <- tryCatch(
+          build_preference_chart(seg_rows, brand, use_shares = FALSE),
+          error = function(e) NULL
+        )
+        if (!is.null(seg_util_chart) && nzchar(seg_util_chart)) {
+          charts$segment_utility_charts[[seg_key]] <- list(svg = seg_util_chart, n = seg_n)
+        }
+      }
+    }
   }
 
   if (!is.null(html_data$items$count_data)) {
@@ -288,6 +422,51 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config,
       build_diverging_chart(html_data$items$count_data, brand),
       error = function(e) { message(sprintf("  Chart error (diverging): %s", e$message)); "" }
     )
+  }
+
+  # Generate per-segment diverging charts and strategy quadrant charts
+  charts$segment_diverging_charts <- list()
+  charts$segment_quadrant_charts <- list()
+  if (!is.null(enriched_seg_scores) && is.data.frame(enriched_seg_scores) && nrow(enriched_seg_scores) > 0 &&
+      "Best_Pct" %in% names(enriched_seg_scores) && "Worst_Pct" %in% names(enriched_seg_scores)) {
+    seg_ids <- unique(enriched_seg_scores$Segment_ID)
+    for (sid in seg_ids) {
+      seg_rows <- enriched_seg_scores[enriched_seg_scores$Segment_ID == sid, , drop = FALSE]
+      if ("Segment_Value" %in% names(seg_rows)) {
+        seg_rows <- seg_rows[seg_rows$Segment_Value == TRUE, , drop = FALSE]
+      }
+      if (nrow(seg_rows) < 2) next
+      var_name <- seg_rows$Variable_Name[1]
+      seg_key <- paste0(var_name, ":", sid)
+      seg_n <- if ("Segment_N" %in% names(seg_rows)) seg_rows$Segment_N[1] else NA
+
+      # Per-segment diverging chart (Best vs Worst)
+      div_data <- data.frame(
+        Item_Label = seg_rows$Item_Label,
+        Best_Pct = seg_rows$Best_Pct,
+        Worst_Pct = seg_rows$Worst_Pct,
+        stringsAsFactors = FALSE
+      )
+      div_data <- div_data[order(-div_data$Best_Pct), ]
+      seg_div <- tryCatch(build_diverging_chart(div_data, brand), error = function(e) NULL)
+      if (!is.null(seg_div) && nzchar(seg_div)) {
+        charts$segment_diverging_charts[[seg_key]] <- list(svg = seg_div, n = seg_n)
+      }
+
+      # Per-segment strategy quadrant (requires HB_Utility_Mean and HB_Utility_SD)
+      if ("HB_Utility_Mean" %in% names(seg_rows) && "HB_Utility_SD" %in% names(seg_rows)) {
+        quad_data <- data.frame(
+          Item_Label = seg_rows$Item_Label,
+          HB_Utility_Mean = seg_rows$HB_Utility_Mean,
+          HB_Utility_SD = seg_rows$HB_Utility_SD,
+          stringsAsFactors = FALSE
+        )
+        seg_quad <- tryCatch(build_strategy_quadrant(quad_data, brand), error = function(e) NULL)
+        if (!is.null(seg_quad) && nzchar(seg_quad)) {
+          charts$segment_quadrant_charts[[seg_key]] <- list(svg = seg_quad, n = seg_n)
+        }
+      }
+    }
   }
 
   if (!is.null(html_data$turf)) {
@@ -331,31 +510,165 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config,
     )
   }
 
+  # Per-segment utility distribution charts and anchor threshold charts
+  # Use seg_config (data frame) to iterate segments with Segment_Def for membership
+  charts$segment_distribution_charts <- list()
+  charts$segment_anchor_charts <- list()
+
+  if (!is.null(enriched_seg_scores) && is.data.frame(enriched_seg_scores) && nrow(enriched_seg_scores) > 0 &&
+      is.data.frame(seg_config) && nrow(seg_config) > 0) {
+    indiv_utils <- maxdiff_results$hb_results$individual_utilities
+    raw_data_local <- maxdiff_results$raw_data
+
+    for (cfg_i in seq_len(nrow(seg_config))) {
+      seg_id <- seg_config$Segment_ID[cfg_i]
+      seg_var <- seg_config$Variable_Name[cfg_i]
+      seg_def_expr <- seg_config$Segment_Def[cfg_i]
+      seg_key <- paste0(seg_var, ":", seg_id)
+
+      # Get segment N from enriched data
+      seg_enriched <- enriched_seg_scores[enriched_seg_scores$Segment_ID == seg_id, , drop = FALSE]
+      seg_n_val <- if (nrow(seg_enriched) > 0 && "Segment_N" %in% names(seg_enriched)) seg_enriched$Segment_N[1] else NA
+
+      # Determine segment membership using Segment_Def expression
+      if (!is.null(raw_data_local)) {
+        if (!is.null(seg_def_expr) && !is.na(seg_def_expr) && nzchar(trimws(seg_def_expr))) {
+          seg_membership <- tryCatch({
+            if (exists("safe_eval_expression", mode = "function")) {
+              safe_eval_expression(seg_def_expr, raw_data_local,
+                                   context = sprintf("chart seg '%s'", seg_id))
+            } else {
+              eval(parse(text = seg_def_expr), envir = raw_data_local)
+            }
+          }, error = function(e) NULL)
+        } else if (seg_var %in% names(raw_data_local)) {
+          seg_membership <- raw_data_local[[seg_var]]
+        } else {
+          next
+        }
+      } else {
+        next
+      }
+      if (is.null(seg_membership)) next
+      seg_mask <- which(seg_membership == TRUE)
+      if (length(seg_mask) < 5) next
+
+      # --- Per-segment distribution chart ---
+      if (!is.null(html_data$utility_distributions) && !is.null(indiv_utils)) {
+        seg_indiv <- tryCatch({
+          if (is.data.frame(indiv_utils)) {
+            indiv_utils[seg_mask, , drop = FALSE]
+          } else {
+            indiv_utils[seg_mask, , drop = FALSE]
+          }
+        }, error = function(e) NULL)
+
+        if (!is.null(seg_indiv) && nrow(seg_indiv) >= 5) {
+          seg_dist <- tryCatch({
+            numeric_cols <- if (is.data.frame(seg_indiv)) vapply(seg_indiv, is.numeric, logical(1)) else rep(TRUE, ncol(seg_indiv))
+            if (is.data.frame(seg_indiv)) {
+              item_ids <- names(seg_indiv)[numeric_cols]
+              mat <- as.matrix(seg_indiv[, numeric_cols, drop = FALSE])
+            } else {
+              mat <- as.matrix(seg_indiv)
+              item_ids <- colnames(mat)
+            }
+            if (length(item_ids) < 2) NULL
+            else {
+              dist_df <- data.frame(
+                Item_ID = item_ids,
+                Mean = vapply(item_ids, function(id) mean(mat[, id], na.rm = TRUE), numeric(1)),
+                Median = vapply(item_ids, function(id) median(mat[, id], na.rm = TRUE), numeric(1)),
+                SD = vapply(item_ids, function(id) sd(mat[, id], na.rm = TRUE), numeric(1)),
+                Q25 = vapply(item_ids, function(id) quantile(mat[, id], 0.25, na.rm = TRUE), numeric(1)),
+                Q75 = vapply(item_ids, function(id) quantile(mat[, id], 0.75, na.rm = TRUE), numeric(1)),
+                Min = vapply(item_ids, function(id) min(mat[, id], na.rm = TRUE), numeric(1)),
+                Max = vapply(item_ids, function(id) max(mat[, id], na.rm = TRUE), numeric(1)),
+                stringsAsFactors = FALSE
+              )
+              densities <- lapply(item_ids, function(id) {
+                vals <- mat[, id]; vals <- vals[!is.na(vals)]
+                if (length(vals) < 3) return(NULL)
+                d <- density(vals, n = 32); list(x = d$x, y = d$y)
+              })
+              names(densities) <- item_ids
+              pop <- maxdiff_results$hb_results$population_utilities
+              if (!is.null(pop) && "Item_Label" %in% names(pop)) {
+                dist_df$Item_Label <- setNames(pop$Item_Label, pop$Item_ID)[dist_df$Item_ID]
+              } else {
+                dist_df$Item_Label <- dist_df$Item_ID
+              }
+              dist_df <- dist_df[order(-dist_df$Mean), ]
+              list(summary = dist_df, densities = densities[dist_df$Item_ID])
+            }
+          }, error = function(e) NULL)
+
+          if (!is.null(seg_dist)) {
+            seg_dist_svg <- tryCatch(build_utility_distribution_chart(seg_dist, brand), error = function(e) NULL)
+            if (!is.null(seg_dist_svg) && nzchar(seg_dist_svg)) {
+              charts$segment_distribution_charts[[seg_key]] <- list(svg = seg_dist_svg, n = seg_n_val)
+            }
+          }
+        }
+      }
+
+      # --- Per-segment anchor threshold chart ---
+      if (!is.null(html_data$preferences$anchor_data)) {
+        anchor_var <- config$output_settings$Anchor_Variable %||% NULL
+        if (!is.null(anchor_var) && nzchar(anchor_var)) {
+          anchor_threshold_val <- as.numeric(config$output_settings$Anchor_Threshold %||% 0.50)
+          if (is.na(anchor_threshold_val)) anchor_threshold_val <- 0.50
+          anchor_format <- config$output_settings$Anchor_Format %||% "COMMA_SEPARATED"
+
+          seg_raw <- raw_data_local[seg_mask, , drop = FALSE]
+          seg_anchor <- tryCatch(
+            process_anchor_data(seg_raw, anchor_var, config$items,
+                                anchor_format = anchor_format,
+                                anchor_threshold = anchor_threshold_val),
+            error = function(e) NULL
+          )
+          if (!is.null(seg_anchor) && nrow(seg_anchor) > 0 && "Anchor_Rate" %in% names(seg_anchor)) {
+            seg_anchor_svg <- tryCatch(
+              build_anchor_threshold_chart(seg_anchor, brand, anchor_threshold_val),
+              error = function(e) NULL
+            )
+            if (!is.null(seg_anchor_svg) && nzchar(seg_anchor_svg)) {
+              charts$segment_anchor_charts[[seg_key]] <- list(svg = seg_anchor_svg, n = seg_n_val)
+            }
+          }
+        }
+      }
+    }
+  }
+
   # --- Layer 4: Page assembly ---
+  cat("  HTML Layer 4: Assembling page...\n")
   page <- tryCatch({
     build_maxdiff_page(html_data, tables, charts, config,
                        simulator_html = simulator_html,
                        js_code = js_code)
   }, error = function(e) {
-    message(sprintf("[TRS PARTIAL] MAXD_HTML_PAGE_FAILED: %s", e$message))
+    cat(sprintf("  [TRS PARTIAL] MAXD_HTML_PAGE_FAILED: %s\n", e$message))
     return(NULL)
   })
 
   if (is.null(page)) {
+    cat("  HTML report REFUSED: Page assembly failed\n")
     return(list(status = "REFUSED", message = "Page assembly failed"))
   }
 
   # --- Write ---
+  cat(sprintf("  HTML Writing to: %s\n", output_path))
   tryCatch({
     writeLines(page, output_path)
   }, error = function(e) {
-    message(sprintf("[TRS PARTIAL] MAXD_HTML_WRITE_FAILED: %s", e$message))
+    cat(sprintf("  [TRS PARTIAL] MAXD_HTML_WRITE_FAILED: %s\n", e$message))
     return(list(status = "REFUSED", message = sprintf("Write failed: %s", e$message)))
   })
 
   file_size <- file.info(output_path)$size
 
-  message(sprintf("  HTML report generated: %s (%.1f KB)", output_path, file_size / 1024))
+  cat(sprintf("  HTML report generated: %s (%.1f KB)\n", output_path, file_size / 1024))
 
   list(
     status = "PASS",

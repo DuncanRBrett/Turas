@@ -960,6 +960,11 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
       base_dir <- get_script_dir()
       sim_main <- file.path(base_dir, "..", "lib", "html_simulator", "99_simulator_main.R")
       if (!file.exists(sim_main)) {
+        # Try relative to cwd (when cwd is the module directory)
+        sim_main <- file.path(getwd(), "lib", "html_simulator", "99_simulator_main.R")
+      }
+      if (!file.exists(sim_main)) {
+        # Try from project root (when cwd is the project root)
         sim_main <- file.path(getwd(), "modules", "maxdiff", "lib", "html_simulator", "99_simulator_main.R")
       }
       if (file.exists(sim_main)) {
@@ -995,20 +1000,39 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
     tryCatch({
       base_dir <- get_script_dir()
       html_main <- file.path(base_dir, "..", "lib", "html_report", "99_html_report_main.R")
+      cat(sprintf("  HTML report module path (primary): %s [exists: %s]\n", html_main, file.exists(html_main)))
       if (!file.exists(html_main)) {
+        # Try relative to cwd (when cwd is the module directory)
+        html_main <- file.path(getwd(), "lib", "html_report", "99_html_report_main.R")
+        cat(sprintf("  HTML report module path (fallback 1): %s [exists: %s]\n", html_main, file.exists(html_main)))
+      }
+      if (!file.exists(html_main)) {
+        # Try from project root (when cwd is the project root)
         html_main <- file.path(getwd(), "modules", "maxdiff", "lib", "html_report", "99_html_report_main.R")
+        cat(sprintf("  HTML report module path (fallback 2): %s [exists: %s]\n", html_main, file.exists(html_main)))
       }
       if (file.exists(html_main)) {
+        cat("  Sourcing HTML report module...\n")
         source(html_main, local = FALSE)
+        cat(sprintf("  Generating HTML report to: %s\n", html_report_path))
         html_result <- generate_maxdiff_html_report(
           results, html_report_path, config,
           simulator_html = simulator_html
         )
-        results$html_report_path <- html_result$output_file
+        cat(sprintf("  HTML report result status: %s\n", html_result$status))
+        if (html_result$status == "PASS") {
+          results$html_report_path <- html_result$output_file
+          cat(sprintf("  HTML report saved: %s\n", html_result$output_file))
+        } else {
+          cat(sprintf("  HTML report failed: %s\n", html_result$message %||% "unknown"))
+        }
       } else {
+        cat("\n[TRS PARTIAL] MAXD_HTML_NOT_FOUND: HTML report module not found at any path\n")
         message("[TRS PARTIAL] MAXD_HTML_NOT_FOUND: HTML report module not found")
       }
     }, error = function(e) {
+      cat(sprintf("\n[TRS PARTIAL] MAXD_HTML_FAILED: HTML report failed: %s\n", conditionMessage(e)))
+      cat(sprintf("  Traceback: %s\n", paste(capture.output(traceback()), collapse = "\n  ")))
       message(sprintf("[TRS PARTIAL] MAXD_HTML_FAILED: HTML report failed: %s", conditionMessage(e)))
       add_warning(sprintf("HTML report: %s", conditionMessage(e)))
     })

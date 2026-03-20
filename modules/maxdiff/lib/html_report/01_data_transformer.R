@@ -329,7 +329,7 @@ transform_preferences_section <- function(results, config) {
     '<strong>What you&#39;re looking at:</strong> Each item&#39;s preference share (probability of being chosen from the full set, summing to 100%) and rescaled utility score (0&ndash;100 scale).<br/>',
     '<strong>What it means:</strong> Higher preference shares mean an item is more likely to be selected. An item with 20% share is twice as likely to be chosen as one with 10%. ',
     'The 0&ndash;100 scores show relative preference strength &mdash; items are comparable within this study only, not to an external standard.<br/>',
-    '<strong>What to do:</strong> Use the toggle to switch between preference shares and raw utility scores. Click column headers to re-sort the table.',
+    '<strong>What to do:</strong> Use the sub-tabs to switch between preference shares, individual utility, and anchored MaxDiff views. Use the segment dropdown to filter by group. Click column headers to re-sort the table.',
     '</div>'
   )
 
@@ -470,45 +470,126 @@ transform_diagnostics_section <- function(results, config) {
     )
   }
 
-  has_hb_diag <- !is.null(hb_diagnostics)
-  has_logit_diag <- !is.null(logit_fit)
+  n_items <- results$study_summary$n_items %||% 0
+  n_total <- results$study_summary$n_respondents %||% 0
 
-  diag_parts <- '<div class="md-callout md-callout-result"><strong>What you&#39;re looking at:</strong> Technical measures that confirm whether the statistical model ran correctly and produced reliable estimates.<br/>'
-  diag_parts <- paste0(diag_parts, '<strong>What it means:</strong> ')
-  if (has_hb_diag) {
-    diag_parts <- paste0(diag_parts,
-      'R-hat below 1.05 = the model converged (green badge = good). ',
-      'ESS above 400 = enough independent samples for reliable estimates. ',
-      'Zero divergent transitions = the model explored the parameter space cleanly.'
-    )
+  # Count segments
+  n_segments <- 0
+  if (!is.null(config$segment_settings) && is.data.frame(config$segment_settings)) {
+    n_segments <- nrow(config$segment_settings)
   }
-  if (has_logit_diag) {
-    if (has_hb_diag) diag_parts <- paste0(diag_parts, ' ')
-    diag_parts <- paste0(diag_parts,
-      'McFadden pseudo R&sup2; above 0.2 = good model fit for discrete choice. ',
-      'Lower AIC/BIC = better fit.'
-    )
+
+  # Compute population utility stats and per-respondent stats from individual utilities
+  pop_stats <- NULL
+  respondent_stats <- NULL
+  item_diag_table <- NULL
+
+  indiv <- results$hb_results$individual_utilities
+  pop <- results$hb_results$population_utilities
+
+  if (!is.null(indiv)) {
+    # Get numeric columns
+    if (is.data.frame(indiv)) {
+      numeric_cols <- vapply(indiv, is.numeric, logical(1))
+      item_ids <- names(indiv)[numeric_cols]
+      mat <- as.matrix(indiv[, numeric_cols, drop = FALSE])
+    } else {
+      mat <- as.matrix(indiv)
+      item_ids <- colnames(mat)
+    }
+
+    if (!is.null(item_ids) && length(item_ids) >= 2) {
+      # Population utility stats
+      item_means <- colMeans(mat, na.rm = TRUE)
+      item_sds <- apply(mat, 2, sd, na.rm = TRUE)
+      util_range <- max(item_means) - min(item_means)
+      mean_util <- mean(item_means)
+      util_sd <- mean(item_sds)
+      discrimination <- if (n_items > 0) util_range / n_items else NA
+
+      pop_stats <- list(
+        utility_range = round(util_range, 3),
+        mean_utility = round(mean_util, 3),
+        utility_sd = round(util_sd, 3),
+        discrimination = round(discrimination, 3)
+      )
+
+      # Model quality indicators
+      # Softmax preference shares per respondent
+      exp_mat <- exp(mat)
+      row_sums <- rowSums(exp_mat)
+      share_mat <- exp_mat / row_sums
+      max_shares <- apply(share_mat, 1, max)
+      mean_max_share <- mean(max_shares)
+      chance_level <- 1 / length(item_ids)
+      sharpness_ratio <- mean_max_share / chance_level
+
+      # Entropy ratio (0 = perfectly sharp, 1 = uniform)
+      log_share_mat <- log(share_mat + 1e-10)
+      row_entropy <- -rowSums(share_mat * log_share_mat)
+      max_entropy <- log(length(item_ids))
+      entropy_ratio <- mean(row_entropy) / max_entropy
+
+      # Heterogeneity: average within-item SD across population
+      heterogeneity <- mean(item_sds)
+
+      quality_indicators <- list(
+        mean_max_share = round(mean_max_share * 100, 1),
+        chance_level = round(chance_level * 100, 1),
+        sharpness_ratio = round(sharpness_ratio, 1),
+        entropy_ratio = round(entropy_ratio, 3),
+        heterogeneity = round(heterogeneity, 3)
+      )
+
+      # Respondent utility distribution
+      respondent_ranges <- apply(mat, 1, function(r) max(r, na.rm = TRUE) - min(r, na.rm = TRUE))
+      respondent_stats <- list(
+        mean_range = round(mean(respondent_ranges), 2),
+        min_range = round(min(respondent_ranges), 2),
+        max_range = round(max(respondent_ranges), 2)
+      )
+
+      # Item-level diagnostics table
+      # Get labels
+      labels <- item_ids
+      if (!is.null(pop) && "Item_Label" %in% names(pop)) {
+        label_map <- setNames(pop$Item_Label, pop$Item_ID)
+        labels <- ifelse(!is.na(label_map[item_ids]), label_map[item_ids], item_ids)
+      }
+      pop_utils <- if (!is.null(pop) && "Utility" %in% names(pop)) {
+        setNames(pop$Utility, pop$Item_ID)
+      } else {
+        item_means
+      }
+
+      item_diag_table <- data.frame(
+        Item_Label = labels,
+        Pop_Utility = round(as.numeric(pop_utils[item_ids]), 3),
+        Indiv_Mean = round(item_means, 3),
+        Indiv_SD = round(item_sds, 3),
+        Min = round(apply(mat, 2, min, na.rm = TRUE), 3),
+        Max = round(apply(mat, 2, max, na.rm = TRUE), 3),
+        stringsAsFactors = FALSE
+      )
+      item_diag_table <- item_diag_table[order(-item_diag_table$Pop_Utility), ]
+      rownames(item_diag_table) <- NULL
+    }
   }
-  if (!has_hb_diag && !has_logit_diag) {
-    diag_parts <- paste0(diag_parts,
-      'Count-based analysis does not produce model fit statistics. ',
-      'Consider HB or Logit estimation for formal diagnostics.'
-    )
-  }
-  diag_parts <- paste0(diag_parts, '<br/><strong>What to do:</strong> ')
-  if (has_hb_diag || has_logit_diag) {
-    diag_parts <- paste0(diag_parts, 'If all badges are green, results are reliable. If any show warnings, consult the methodology section below for guidance.')
-  } else {
-    diag_parts <- paste0(diag_parts, 'Review study design metrics to ensure adequate sample size and task coverage.')
-  }
-  callout <- paste0(diag_parts, '</div>')
+
+  # Callout text
+  callout <- '<div class="md-callout md-callout-method" style="margin-bottom:16px;"><span style="margin-right:6px;">&#9432;</span>Model diagnostics assess the reliability and validity of the MaxDiff analysis. Key indicators include <strong>preference sharpness</strong> (how decisive respondents are), <strong>heterogeneity</strong> (how much preferences vary), and <strong>item discrimination</strong> (how effectively the study differentiates between items).</div>'
 
   list(
     logit_fit = logit_fit,
     hb_diagnostics = hb_diagnostics,
-    n_total = results$study_summary$n_respondents %||% 0,
+    n_total = n_total,
     n_tasks = results$study_summary$n_tasks %||% 0,
-    n_items = results$study_summary$n_items %||% 0,
+    n_items = n_items,
+    n_segments = n_segments,
+    pop_stats = pop_stats,
+    quality_indicators = if (exists("quality_indicators")) quality_indicators else NULL,
+    respondent_stats = respondent_stats,
+    item_diag_table = item_diag_table,
     callout = callout
   )
 }
@@ -975,16 +1056,25 @@ enrich_segment_scores <- function(segment_scores, individual_utils, raw_data,
     # Compute preference shares for this segment (softmax per respondent, then average)
     n_resp <- nrow(seg_utils)
     shares_mat <- matrix(0, nrow = n_resp, ncol = ncol(seg_utils))
+    worst_mat <- matrix(0, nrow = n_resp, ncol = ncol(seg_utils))
     for (r in seq_len(n_resp)) {
       row_utils <- seg_utils[r, ]
+      # Best probability: softmax of utilities
       exp_u <- exp(row_utils - max(row_utils, na.rm = TRUE))
       shares_mat[r, ] <- exp_u / sum(exp_u, na.rm = TRUE)
+      # Worst probability: softmax of negative utilities
+      neg_utils <- -row_utils
+      exp_neg <- exp(neg_utils - max(neg_utils, na.rm = TRUE))
+      worst_mat[r, ] <- exp_neg / sum(exp_neg, na.rm = TRUE)
     }
     avg_shares <- colMeans(shares_mat, na.rm = TRUE) * 100
+    avg_worst <- colMeans(worst_mat, na.rm = TRUE) * 100
     names(avg_shares) <- item_ids
+    names(avg_worst) <- item_ids
 
     # Compute rescaled 0-100 scores from mean segment utilities
     mean_utils <- colMeans(seg_utils, na.rm = TRUE)
+    sd_utils <- apply(seg_utils, 2, sd, na.rm = TRUE)
     min_u <- min(mean_utils, na.rm = TRUE)
     max_u <- max(mean_utils, na.rm = TRUE)
     range_u <- max_u - min_u
@@ -1004,6 +1094,10 @@ enrich_segment_scores <- function(segment_scores, individual_utils, raw_data,
       Item_Label = vapply(included_items, function(id) label_map[[id]] %||% id, character(1)),
       Pref_Share = avg_shares[included_items],
       Rescaled = rescaled[included_items],
+      Best_Pct = round(avg_shares[included_items], 1),
+      Worst_Pct = round(avg_worst[included_items], 1),
+      HB_Utility_Mean = round(mean_utils[included_items], 4),
+      HB_Utility_SD = round(sd_utils[included_items], 4),
       stringsAsFactors = FALSE
     )
     seg_df <- seg_df[order(-seg_df$Rescaled), ]

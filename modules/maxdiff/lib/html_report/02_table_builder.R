@@ -479,16 +479,62 @@ build_segment_variant_tables <- function(segment_data, table_type = "preference"
     var_name <- var_lookup[[seg_id]] %||% seg_id
     seg_key <- paste0(var_name, ":", seg_id)
 
-    if (has_enriched) {
-      # Rich table matching "all" table structure
+    if (has_enriched && table_type == "counts") {
+      # Counts table: match "all" table headers exactly (Item | Best % | Worst % | BW Score)
+      seg_rows <- seg_rows[order(-seg_rows$BW_Score, na.last = TRUE), , drop = FALSE]
+
+      has_best <- "Best_Pct" %in% names(seg_rows) && any(!is.na(seg_rows$Best_Pct))
+      has_worst <- "Worst_Pct" %in% names(seg_rows) && any(!is.na(seg_rows$Worst_Pct))
+
+      cols <- c('<th class="md-th md-label-col">Item</th>',
+                '<th class="md-th md-num">Best %</th>',
+                '<th class="md-th md-num">Worst %</th>',
+                '<th class="md-th md-num">BW Score</th>')
+      header <- sprintf('<thead><tr>%s</tr></thead>', paste(cols, collapse = "\n"))
+
+      rows <- vapply(seq_len(nrow(seg_rows)), function(i) {
+        s <- seg_rows[i, ]
+        label <- htmlEscape(s$Item_Label)
+        cells <- sprintf('<td class="md-td md-label-col">%s</td>', label)
+
+        best_val <- if (has_best && !is.na(s$Best_Pct)) {
+          sprintf('<span class="md-positive">%s%%</span>', fmt_num(s$Best_Pct, 1))
+        } else "&mdash;"
+        cells <- paste0(cells, sprintf('<td class="md-td md-num">%s</td>', best_val))
+
+        worst_val <- if (has_worst && !is.na(s$Worst_Pct)) {
+          sprintf('<span class="md-negative">%s%%</span>', fmt_num(s$Worst_Pct, 1))
+        } else "&mdash;"
+        cells <- paste0(cells, sprintf('<td class="md-td md-num">%s</td>', worst_val))
+
+        bw <- if (!is.na(s$BW_Score)) {
+          bw_class <- if (s$BW_Score > 0) "md-positive" else if (s$BW_Score < 0) "md-negative" else ""
+          sprintf('<strong class="%s">%s</strong>', bw_class, fmt_num(s$BW_Score, 3))
+        } else {
+          "&mdash;"
+        }
+        cells <- paste0(cells, sprintf('<td class="md-td md-num">%s</td>', bw))
+        sprintf('<tr>%s</tr>', cells)
+      }, character(1))
+
+      table_html <- sprintf(
+        '<table class="md-table">%s<tbody>%s</tbody></table>',
+        header, paste(rows, collapse = "\n"))
+
+    } else if (has_enriched) {
+      # Preference table: rich format with Rank, Score, Pref Share, Must-Have
       seg_rows <- seg_rows[order(seg_rows$Rank), , drop = FALSE]
       max_score <- max(seg_rows$Rescaled, na.rm = TRUE)
+      has_seg_anchor <- "Anchor_Rate" %in% names(seg_rows) && any(!is.na(seg_rows$Anchor_Rate))
 
       # Header
       cols <- c('<th class="md-th md-label-col">Item</th>',
                 '<th class="md-th md-num">Rank</th>',
                 '<th class="md-th md-num">Score (0-100)</th>',
                 '<th class="md-th md-num">Pref Share</th>')
+      if (has_seg_anchor) {
+        cols <- c(cols, '<th class="md-th md-num">Must-Have %</th>')
+      }
       if ("BW_Score" %in% names(seg_rows) && any(!is.na(seg_rows$BW_Score))) {
         cols <- c(cols, '<th class="md-th md-num">BW Score</th>')
       }
@@ -505,6 +551,16 @@ build_segment_variant_tables <- function(segment_data, table_type = "preference"
         cells <- paste0(cells, sprintf('<td class="md-td md-num">%d</td>', s$Rank))
         cells <- paste0(cells, sprintf('<td class="md-td md-num"><strong>%s</strong></td>', fmt_num(s$Rescaled, 1)))
         cells <- paste0(cells, sprintf('<td class="md-td md-num">%s%%</td>', fmt_num(s$Pref_Share, 1)))
+        if (has_seg_anchor) {
+          anchor_rate <- if (!is.null(s$Anchor_Rate) && !is.na(s$Anchor_Rate)) s$Anchor_Rate else NA
+          if (!is.na(anchor_rate)) {
+            badge_class <- if (isTRUE(s$Is_Must_Have)) "md-badge-good" else ""
+            cells <- paste0(cells, sprintf('<td class="md-td md-num"><span class="%s">%s%%</span></td>',
+                                            badge_class, fmt_num(anchor_rate * 100, 0)))
+          } else {
+            cells <- paste0(cells, '<td class="md-td md-num">&mdash;</td>')
+          }
+        }
         if ("BW_Score" %in% names(seg_rows) && any(!is.na(seg_rows$BW_Score))) {
           bw <- if (!is.na(s$BW_Score)) {
             bw_class <- if (s$BW_Score > 0) "md-positive" else if (s$BW_Score < 0) "md-negative" else ""
@@ -579,6 +635,82 @@ build_h2h_with_segments <- function(main_h2h_html, segment_h2h_list, label_map =
     seg_divs <- c(seg_divs, sprintf(
       '<div data-segment="%s" style="display:none;">%s</div>',
       htmlEscape(seg_key), seg_table))
+  }
+
+  sprintf(
+    '<div class="md-segment-tables">
+      <div data-segment="all">%s</div>
+      %s
+    </div>',
+    main_h2h_html, paste(seg_divs, collapse = "\n"))
+}
+
+
+# ==============================================================================
+# SEGMENT-ONLY CONTAINER (for sub-panels that need segment data added)
+# ==============================================================================
+
+#' Build a segment-only container with empty "all" div
+#'
+#' Creates a .md-segment-tables container where the "all" div is empty
+#' (nothing shows by default) and per-segment divs appear when a segment
+#' is selected. Used to add segment tables to sub-panels that otherwise
+#' only have charts.
+#'
+#' @param segment_data Data frame. Enriched segment scores
+#' @param table_type Character. "preference" or "counts"
+#' @param segment_config Data frame. Config segment settings
+#'
+#' @return HTML string, or "" if no segment data
+#' @keywords internal
+build_segment_only_container <- function(segment_data, table_type = "preference", segment_config = NULL) {
+
+  seg_tables <- build_segment_variant_tables(segment_data, table_type, segment_config)
+  if (!nzchar(seg_tables)) return("")
+
+  sprintf(
+    '<div class="md-segment-tables"><div data-segment="all" style="display:block;"></div>%s</div>',
+    seg_tables)
+}
+
+
+# ==============================================================================
+# H2H SEGMENT TABLE WITH N= LABELS
+# ==============================================================================
+
+#' Build H2H table wrapped in segment container with n= labels
+#'
+#' @param main_h2h_html Character. The "all respondents" H2H table HTML
+#' @param segment_h2h_list Named list. Per-segment H2H data frames
+#' @param label_map Named character vector. Item_ID -> Item_Label
+#' @param segment_n Named list. seg_key -> n (sample size)
+#'
+#' @return HTML string
+#' @keywords internal
+build_h2h_with_segments_and_n <- function(main_h2h_html, segment_h2h_list, label_map = NULL, segment_n = NULL) {
+
+  if (is.null(segment_h2h_list) || length(segment_h2h_list) == 0) {
+    return(main_h2h_html)
+  }
+
+  seg_divs <- character()
+
+  for (seg_key in names(segment_h2h_list)) {
+    h2h_data <- segment_h2h_list[[seg_key]]
+    seg_table <- build_h2h_table(h2h_data, label_map)
+
+    # Add n= label if available
+    n_label <- ""
+    if (!is.null(segment_n) && seg_key %in% names(segment_n)) {
+      n_val <- segment_n[[seg_key]]
+      n_label <- sprintf(
+        '<div class="md-segment-n-label" style="text-align:right;font-size:13px;color:#64748b;margin-bottom:8px;font-weight:500;">n = %s</div>',
+        format(as.integer(n_val), big.mark = ","))
+    }
+
+    seg_divs <- c(seg_divs, sprintf(
+      '<div data-segment="%s" style="display:none;">%s%s</div>',
+      htmlEscape(seg_key), n_label, seg_table))
   }
 
   sprintf(
